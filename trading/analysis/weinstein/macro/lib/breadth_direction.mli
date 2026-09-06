@@ -1,12 +1,31 @@
 (** Refine the three-state macro trend with the DIRECTION of universe breadth.
 
-    Weinstein reads the advance/decline line and the new-highs-minus-new-lows
-    series as leading indicators of the tape (Ch. 8; see
-    [docs/design/weinstein-book-reference.md] §Macro Analysis). The existing
-    macro gate already weights both as {b level} signals inside its confidence
-    score. This module adds the reading he actually describes for those series —
-    whether participation is deteriorating or repairing — and exposes it as a
-    separate five-state label rather than folding it into the score.
+    {1 Book antecedent (Ch. 3), and how ours differs}
+
+    The antecedent for a participation percentage read by DIRECTION is Ch. 3,
+    not the Ch. 8 breadth instruments. Weinstein calculates weekly the
+    percentage of NYSE stocks "in Stages 1 and 2" (the Chart 3-11 footnote) and
+    charts it against the DJI, and he reads it directionally: through the first
+    half of 1982 the averages trended lower while that "percentage of bullish
+    charts" was "slowly but surely improving" — one of the gauges behind his
+    July 1982 bullish turn, a month before the bottom. That is affirmative book
+    support for the {b Recovering} rule below: improving participation off a
+    weak base, on a tape the averages still call soft.
+
+    {b Both inputs are ADAPTATIONS, not his statistics.} His gauge counts Stage
+    1 + Stage 2 membership; [pct_above] (from {!Breadth_bars}) counts names
+    above their 150-day (≈ 30-week) MA across a point-in-time top-3000 universe
+    — a cheaper proxy for the same "how much of the market is in an uptrend"
+    question, not the same statistic. His new-highs/new-lows gauge (Ch. 8) is a
+    NET — new 52-week highs minus new 52-week lows, weekly by preference;
+    [nl_pct] is the new-low SHARE of the universe, with no new-high term. See
+    [docs/design/weinstein-book-reference.md] §2.8 "Participation percentage
+    (Ch. 3)" for the resolved citation, and §2.4 for the net he specifies.
+
+    The existing macro gate already weights the Ch. 8 instruments as {b level}
+    signals inside its confidence score. This module adds the directional
+    reading and exposes it as a separate five-state label rather than folding it
+    into the score.
 
     It is a state {i label}, not a gate: {!classify} never blocks a side, and
     [Macro.result.trend] is untouched. Consumers that want the refinement read
@@ -82,7 +101,9 @@ val classify :
 
     + [trend = Bearish] → [Bearish_breadth]. An outright bearish tape is already
       the strongest statement the macro gate makes; refining it would only
-      weaken it.
+      weaken it. Because this rule is first and unconditional, [Recovering] and
+      [Deteriorating] are by construction never observed on a [Bearish] trend —
+      the two extra states can only refine a [Bullish] or [Neutral] tape.
     + [pct_above < weak_pct_above] and it fell by at least [falling_points] over
       the lookback → [Deteriorating].
     + [nl_pct > new_lows_pct] and [nl_pct > nl_pct_prior] → [Deteriorating].

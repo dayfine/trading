@@ -125,6 +125,28 @@ let test_sexp_round_trip _ =
   let parsed = MTW.t_of_sexp (MTW.sexp_of_t original) in
   assert_that parsed (elements_are (List.map original ~f:equal_to))
 
+(** [breadth_state]'s [[@sexp.default]] is reached only when the field is
+    ABSENT, which the round-trip above never exercises — it serializes the
+    three-field record and parses that back. Parse the LITERAL pre-feature
+    two-field shape instead: this is what every [macro_trend.sexp] written
+    before the field existed looks like on disk, and it is the compatibility
+    claim the [.mli] makes. *)
+let test_legacy_two_field_shape_defaults_breadth_state _ =
+  let parsed =
+    MTW.t_of_sexp (Sexp.of_string "(((date 2019-01-04) (trend Bearish)))")
+  in
+  assert_that parsed
+    (elements_are
+       [
+         equal_to
+           ({
+              date = _date "2019-01-04";
+              trend = Weinstein_types.Bearish;
+              breadth_state = Weinstein_types.Neutral_breadth;
+            }
+             : MTW.per_friday);
+       ])
+
 (* On-disk artefact -------------------------------------------------------- *)
 
 let test_write_creates_file_and_round_trips _ =
@@ -182,6 +204,8 @@ let suite =
          "unsorted_input_is_sorted_ascending_by_date"
          >:: test_unsorted_input_is_sorted_ascending_by_date;
          "sexp_round_trip" >:: test_sexp_round_trip;
+         "legacy two-field shape defaults breadth_state"
+         >:: test_legacy_two_field_shape_defaults_breadth_state;
          "write_creates_file_and_round_trips"
          >:: test_write_creates_file_and_round_trips;
          "write_empty_list_creates_file" >:: test_write_empty_list_creates_file;

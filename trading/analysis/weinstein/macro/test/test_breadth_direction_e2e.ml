@@ -12,8 +12,9 @@
     - {b The series reads Deteriorating down and Recovering up.} The COVID crash
       and rebound are the two cohorts whose realized P&L diverged most sharply,
       and both sit below the same participation threshold — a rule keyed on the
-      level alone could not tell them apart. Checked on the real cache at the
-      study's own Fridays.
+      level alone could not tell them apart. Checked on the real cache as the
+      study's own date -> state table, asserted date by date rather than as an
+      existence count over the two windows.
     - {b The read is live end to end.} Driving {!Macro.analyze_with_callbacks}
       Friday by Friday over 2017-2026 produces both extra states.
     - {b Disabled is the identity.} With the default config the projection
@@ -82,23 +83,35 @@ let _series_state series ~as_of =
     ~nl_pct:(new_lows ~week_offset:0)
     ~nl_pct_prior:(new_lows ~week_offset:back)
 
-let _count_series_state ~from_date ~to_date target =
+(** The study's date -> state table, asserted as the table it is rather than as
+    an existence count over a window: each listed date maps to the state the
+    27-year study reports for it, in order. An existence count would survive a
+    rule that labelled only one day of each window correctly. *)
+let test_study_date_to_state_table _ =
   let series = _skip_unless (_series ()) in
-  _fridays ~start:from_date ~end_:to_date
-  |> List.count ~f:(fun as_of ->
-      equal_breadth_state (_series_state series ~as_of) target)
-
-let test_covid_selloff_reads_deteriorating _ =
-  assert_that
-    (_count_series_state ~from_date:(_date "2020-02-21")
-       ~to_date:(_date "2020-03-13") Deteriorating)
-    (gt (module Int_ord) 0)
-
-let test_covid_rebound_reads_recovering _ =
-  assert_that
-    (_count_series_state ~from_date:(_date "2020-04-03")
-       ~to_date:(_date "2020-04-30") Recovering)
-    (gt (module Int_ord) 0)
+  let states =
+    List.map
+      [
+        "2020-02-28";
+        "2020-03-06";
+        "2020-03-13";
+        "2020-04-09";
+        "2020-04-17";
+        "2020-04-24";
+        "2020-04-30";
+      ] ~f:(fun d -> _series_state series ~as_of:(_date d))
+  in
+  assert_that states
+    (elements_are
+       [
+         equal_to Deteriorating;
+         equal_to Deteriorating;
+         equal_to Deteriorating;
+         equal_to Recovering;
+         equal_to Recovering;
+         equal_to Recovering;
+         equal_to Recovering;
+       ])
 
 (** The same level, opposite direction, opposite label — the property a
     level-only threshold cannot express. Participation is below the 45% weak
@@ -192,10 +205,8 @@ let test_disabled_projection_round_trips _ =
 let suite =
   "breadth_direction_e2e"
   >::: [
-         "the real series reads Deteriorating 2020-02-21..03-13"
-         >:: test_covid_selloff_reads_deteriorating;
-         "the real series reads Recovering 2020-04-03..04-30"
-         >:: test_covid_rebound_reads_recovering;
+         "the real series reproduces the study's date -> state table"
+         >:: test_study_date_to_state_table;
          "both windows sit below the same weak-participation threshold"
          >:: test_same_level_opposite_direction_opposite_state;
          "end to end: October 2018 reports Deteriorating"

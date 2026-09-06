@@ -3,10 +3,19 @@
 
     Complements {!Ad_bars} (advance/decline counts). Where A-D answers "how many
     issues rose today", this series answers "how much of the universe is in an
-    uptrend, and how many names are making fresh lows" — the participation
-    instruments of Weinstein Ch. 8 ("the forest"), see
-    [docs/design/weinstein-book-reference.md] §Macro Analysis. It backs
+    uptrend, and how many names are making fresh lows". It backs
     {!Breadth_direction}'s five-state read.
+
+    {b Both columns are adaptations, not Weinstein's own statistics.} The
+    antecedent for [n_above150] is the Ch. 3 participation gauge — the weekly
+    percentage of NYSE stocks "in Stages 1 and 2" of the Chart 3-11 footnote,
+    which he charts against the DJI and reads by direction — approximated here
+    by the share of a point-in-time top-3000 universe trading above its 150-day
+    (≈ 30-week) MA. [nl52] is the new-low half of the Ch. 8
+    new-highs-minus-new-lows gauge, carried as a count (and downstream as a
+    share of the universe) rather than as his NET of highs minus lows. See
+    [docs/design/weinstein-book-reference.md] §2.8 "Participation percentage
+    (Ch. 3)" and §2.4.
 
     {1 Format}
 

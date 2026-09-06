@@ -852,6 +852,27 @@ let test_cascade_summary_sexp_round_trip _ =
   let parsed = TA.cascade_summary_of_sexp (TA.sexp_of_cascade_summary s) in
   assert_that parsed (equal_to s)
 
+(** [breadth_state]'s [[@sexp.default]] is reached only when the field is
+    ABSENT, which the round-trip above never exercises. Reproduce the
+    pre-feature on-disk shape by dropping the field from a serialized summary —
+    this is the ~200 legacy [trade_audit.sexp] artefacts the [.mli] claims still
+    parse — and assert [Neutral_breadth] comes back. The builder's default is
+    [Bullish_breadth], so a no-op strip would fail this. *)
+let test_cascade_summary_without_breadth_state_defaults _ =
+  let s = make_cascade_summary ~macro_trend:Weinstein_types.Bullish () in
+  let legacy =
+    match TA.sexp_of_cascade_summary s with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom "breadth_state" :: _) -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (TA.cascade_summary_of_sexp legacy)
+    (equal_to { s with breadth_state = Weinstein_types.Neutral_breadth })
+
 let test_record_cascade_summary_appears_in_collector _ =
   let t = TA.create () in
   let s = make_cascade_summary () in
@@ -972,6 +993,8 @@ let suite =
          >:: test_collector_round_trips_through_sexp;
          "cascade_summary sexp round-trip"
          >:: test_cascade_summary_sexp_round_trip;
+         "cascade_summary without breadth_state defaults to Neutral_breadth"
+         >:: test_cascade_summary_without_breadth_state_defaults;
          "record_cascade_summary appears in collector"
          >:: test_record_cascade_summary_appears_in_collector;
          "get_cascade_summaries sorts by date"

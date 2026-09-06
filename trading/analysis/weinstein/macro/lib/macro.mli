@@ -130,9 +130,13 @@ type breadth_bar = Macro_types.breadth_bar = {
   new_highs : int;  (** Constituents making a fresh 52-week high. *)
   new_lows : int;  (** Constituents making a fresh 52-week low. *)
 }
-(** One day's universe-participation breadth — the Ch. 8 instruments, as raw
-    counts. Loaded by {!Breadth_bars}; indexed by {!Breadth_series_cache}, which
-    owns the count → percent conversion. *)
+(** One day's universe-participation breadth, as raw counts. [above_ma_count]
+    adapts the Ch. 3 participation gauge (his weekly percentage of NYSE stocks
+    in Stages 1 and 2) and [new_highs] / [new_lows] the two halves of the Ch. 8
+    net — see {!Breadth_bars} for what each substitutes, and
+    [docs/design/weinstein-book-reference.md] §2.8. Loaded by {!Breadth_bars};
+    indexed by {!Breadth_series_cache}, which owns the count → percent
+    conversion. *)
 
 val analyze :
   config:config ->

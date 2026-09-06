@@ -122,6 +122,16 @@ let test_weak_and_rising_is_recovering _ =
     (_classify ~pct_above:20.0 ~pct_above_prior:8.0 ())
     (equal_to Recovering)
 
+(** Rule 4 is gated on weakness on BOTH sides, mirroring
+    {!test_falling_from_a_strong_base_is_not_deteriorating}: an 8-point rise (>=
+    [rising_points]) from a base ABOVE [weak_pct_above] is a healthy tape
+    getting healthier, not a repair, and must project the trend. Without the
+    [weak_pct_above] guard in [_participation_rising] this reads Recovering. *)
+let test_rising_from_a_strong_base_is_not_recovering _ =
+  assert_that
+    (_classify ~trend:Bullish ~pct_above:68.0 ~pct_above_prior:60.0 ())
+    (equal_to Bullish_breadth)
+
 (* ------------------------------------------------------------------ *)
 (* Precedence                                                           *)
 (* ------------------------------------------------------------------ *)
@@ -233,6 +243,8 @@ let suite =
          "rising but below-threshold new lows project the trend"
          >:: test_rising_but_low_new_lows_projects;
          "weak and rising is Recovering" >:: test_weak_and_rising_is_recovering;
+         "rising from a strong base is not Recovering"
+         >:: test_rising_from_a_strong_base_is_not_recovering;
          "Deteriorating beats Recovering when both fire"
          >:: test_deteriorating_beats_recovering;
          "default config is off with the documented thresholds"

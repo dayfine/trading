@@ -99,6 +99,14 @@ Four-year cycle with remarkable historical regularity:
 
 **Use for fine-tuning entry/exit timing, not for primary signals.**
 
+### 2.8 Participation percentage (Ch. 3) — resolved 2026-09-06
+
+**Question:** what is the book antecedent for a "percent of the universe in an uptrend" breadth series, and does Weinstein read such a gauge *directionally* (improving vs deteriorating) rather than only by level?
+
+**Answer — yes, and the antecedent is Ch. 3, not the Ch. 8 breadth instruments.** The Chart 3-11 footnote describes calculating weekly the "percentage of stocks" on the NYSE "in Stages 1 and 2", charted against the DJI (with the S&P groups offered as a shortcut). Ch. 3 then reads it by direction: through the first half of 1982 the averages trended lower while that "percentage of bullish charts" was "slowly but surely improving" — one of the indicators behind his July 1982 bullish turn, a month before the Dow's low. His stated rationale is that the "subsurface condition of the market" often moves opposite to the averages.
+
+**Consequences for our code.** `Breadth_bars`' `n_above150` — the share of a point-in-time top-3000 universe above its 150-day (≈ 30-week) MA — is an **adaptation** of that gauge: his statistic counts Stage 1 + Stage 2 membership, ours substitutes a single MA test. `Breadth_direction`'s `Recovering` rule (weak participation, rising over the lookback) is the directional read he demonstrates; `Deteriorating` is its mirror. Separately, §2.4's new-highs/new-lows gauge is a **net** (new highs minus new lows); our `nl_pct` carries the new-low share only, which is likewise an adaptation.
+
 ## 3. Sector / Group Analysis — The "Trees" (Ch. 3)
 
 **Second filter. Two equally bullish individual charts will perform very differently depending on sector health. Favorable chart in bullish group → 50-75% advance. Same chart in bearish group → 5-10% gain.**

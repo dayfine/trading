@@ -97,10 +97,12 @@ type volume_confirmation =
 (** Overall market trend from macro analysis. *)
 type market_trend = Bullish | Bearish | Neutral [@@deriving show, eq, sexp]
 
-(** Macro trend refined by the DIRECTION of universe participation breadth — the
-    Ch. 8 "forest" instruments (percent above the long MA, new 52-week lows)
-    read as a rate of change rather than a level. See
-    [docs/design/weinstein-book-reference.md] §Macro Analysis.
+(** Macro trend refined by the DIRECTION of universe participation breadth
+    (percent above the long MA, new 52-week lows) read as a rate of change
+    rather than a level. Both inputs are adaptations — of the Ch. 3
+    participation gauge and of the Ch. 8 new-highs-minus-new-lows net
+    respectively; see [docs/design/weinstein-book-reference.md] §2.8 and §2.4,
+    and {!Breadth_direction} for what each substitutes.
 
     A strict refinement of {!market_trend}: {!market_trend_of_breadth_state}
     projects it back, and every existing consumer keeps matching on
