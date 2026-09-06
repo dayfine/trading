@@ -33,7 +33,7 @@ let _exit_trade ~date ~commission (c : Stale_hold.force_exit) :
         Time_ns_unix.Ofday.start_of_day;
   }
 
-let _exit_reason (c : Stale_hold.force_exit) : Position.exit_reason =
+let exit_reason (c : Stale_hold.force_exit) : Position.exit_reason =
   let detail =
     sprintf "last_bar_date=%s days_since_last_bar=%d"
       (Date.to_string c.last_bar_date)
@@ -100,7 +100,7 @@ let _apply_one ~date ~commission (portfolio, positions, trades)
   | Ok portfolio ->
       let positions =
         _close_strategy_position ~date ~exit_price:c.last_close
-          ~exit_reason:(_exit_reason c) ~positions c.symbol
+          ~exit_reason:(exit_reason c) ~positions c.symbol
       in
       (portfolio, positions, trade :: trades)
 

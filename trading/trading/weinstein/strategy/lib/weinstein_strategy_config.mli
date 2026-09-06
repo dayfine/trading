@@ -1675,10 +1675,22 @@ type config = {
 
           {b This is data hygiene with lookahead}, deliberately: whether a run
           of prints is terminal is only knowable from the whole series. It is
-          not a crash detector, carries no trading signal, and cannot leak an
-          edge — the only bars it removes are ones no counterparty could have
-          filled against. It is also {b not} a fix for the {e interleaved} bad-
-          bar class (CLE / ICT / ABK / MEL / MVL / AGR in the #2672 scan), which
+          not a crash detector — a mid-series collapse that later recovers is
+          untouched.
+
+          {b Known cost.} Keying on price shape alone, it {b cannot} distinguish
+          an administrative stub tail from a {b genuine terminal collapse}: a
+          symbol that really traded down through the ratio and was then delisted
+          has the same shape and is truncated too, deleting a real loss and
+          biasing returns {b upward}. Only the {e gradual} terminal decline
+          whose every step stays above the ratio survives
+          ([10.0 / 5.0 / 1.0 / 0.30 / 0.28] at [0.05] is untouched;
+          [10.0 / 9.0 / 0.20 / 0.15] is not). So the bars removed include, but
+          are not limited to, ones no counterparty could have filled against.
+          That bias is an accepted cost of a default-off axis and must be
+          reported in the paired re-run writeup — it is not a reason to flip the
+          default. It is also {b not} a fix for the {e interleaved} bad-bar
+          class (CLE / ICT / ABK / MEL / MVL / AGR in the #2672 scan), which
           needs a per-bar plausibility gate at fill time; that is tracked
           separately.
 

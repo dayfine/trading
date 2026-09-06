@@ -1016,6 +1016,191 @@ let test_stale_exit_frees_cash_with_realized_pnl _ =
       assert_that result.final_portfolio.current_cash
         (float_equal ~epsilon:1e-6 expected_cash))
 
+(* ===== #2672 guard 2 — force-exit when there is NO prior bar ============ *)
+
+(* [Snapshot_bar_source] resolves [get_previous_bar] over a bounded 60-day
+   lookback, so a symbol whose series stopped longer ago than that surfaces
+   [None] and the bar-dated force-exit above cannot see it at all. The adapter
+   below reproduces exactly that: exact-date [get_price], lookback-bounded
+   [get_previous_bar]. It is the DTV shape from #2672. *)
+let _no_prior_bar_lookback_days = 60
+
+let _bars_for table ~symbol =
+  List.Assoc.find table symbol ~equal:String.equal |> Option.value ~default:[]
+
+let _lookback_adapter table =
+  let get_price ~symbol ~date =
+    _bars_for table ~symbol
+    |> List.find ~f:(fun (b : Types.Daily_price.t) -> Date.equal b.date date)
+  in
+  let get_previous_bar ~symbol ~date =
+    let floor = Date.add_days date (-_no_prior_bar_lookback_days) in
+    _bars_for table ~symbol
+    |> List.filter ~f:(fun (b : Types.Daily_price.t) ->
+        Date.( < ) b.date date && Date.( >= ) b.date floor)
+    |> List.last
+  in
+  Trading_simulation_data.Market_data_adapter.create_with_callbacks ~get_price
+    ~get_previous_bar
+
+let _zombie_entry_open = 100.0
+let _zombie_last_close = 120.0
+let _zombie_start = date_of_string "2024-01-02"
+
+(* DTV prints two bars then stops for good; KEEP prints every calendar day so
+   the step loop always has a bar (the force-exit runner is a deliberate no-op
+   on a bar-less day). From 2024-03-04 on, DTV's last bar is outside the 60-day
+   lookback, so no prior bar exists and only the #2672 path can select it. *)
+let _zombie_table =
+  [
+    ( "DTV",
+      [
+        make_daily_price ~date:_zombie_start ~open_price:_zombie_entry_open
+          ~high:105.0 ~low:99.0 ~close:104.0 ~volume:800000;
+        make_daily_price
+          ~date:(Date.add_days _zombie_start 1)
+          ~open_price:104.0 ~high:122.0 ~low:103.0 ~close:_zombie_last_close
+          ~volume:900000;
+      ] );
+    ( "KEEP",
+      List.init 120 ~f:(fun i ->
+          make_daily_price
+            ~date:(Date.add_days _zombie_start i)
+            ~open_price:50.0 ~high:51.0 ~low:49.0 ~close:50.0 ~volume:500000) );
+  ]
+
+(* 90 days is deliberately longer than the 60-day lookback: while DTV still has
+   a visible prior bar its gap never reaches the threshold, so the bar-dated
+   path never fires and the arms differ ONLY on [exit_without_prior_bar]. *)
+let _zombie_exit_after_days = 90
+
+let _run_zombie_exit ~name ~exit_without_prior_bar ~f =
+  with_test_data
+    ("simulator_zombie_exit_" ^ name)
+    [ ("DTV", []); ("KEEP", []) ]
+    ~f:(fun data_dir ->
+      let deps =
+        create_deps ~symbols:[ "DTV"; "KEEP" ] ~data_dir
+          ~strategy:(module Noop_strategy)
+          ~commission:sample_config.commission
+          ~market_data_adapter:(_lookback_adapter _zombie_table)
+          ~stale_hold_policy:
+            {
+              Trading_simulation.Stale_hold.enabled = true;
+              stale_after_days = 5;
+              stale_exit_after_days = Some _zombie_exit_after_days;
+              exit_without_prior_bar;
+            }
+          ()
+      in
+      _submit_market_buy deps ~symbol:"DTV" ~quantity:10.0;
+      let config =
+        { sample_config with end_date = date_of_string "2024-04-30" }
+      in
+      let sim = Test_helpers.create_exn ~config ~deps in
+      match run sim with
+      | Error err -> failwith ("Run failed: " ^ Status.show err)
+      | Ok result -> f result)
+
+let _dtv_trades result =
+  List.concat_map result.steps ~f:(fun step -> step.trades)
+  |> List.filter ~f:(fun (t : Trading_base.Types.trade) ->
+      String.equal t.symbol "DTV")
+
+let _entry_buy =
+  all_of
+    [
+      field
+        (fun (t : Trading_base.Types.trade) -> t.side)
+        (equal_to (Trading_base.Types.Buy : Trading_base.Types.side));
+      field
+        (fun (t : Trading_base.Types.trade) -> t.quantity)
+        (float_equal 10.0);
+      field
+        (fun (t : Trading_base.Types.trade) -> t.price)
+        (float_equal _zombie_entry_open);
+    ]
+
+(** Armed, the zombie is realised: exactly one entry Buy plus one force-exit
+    Sell at DTV's last known close (the tier-3 [last_known_prices] answer, since
+    there is no prior bar to read one from), and the synthetic trade carries the
+    stale-exit runner's own order id — no engine order can produce it. *)
+let test_zombie_exit_armed_realizes_the_sell _ =
+  _run_zombie_exit ~name:"armed" ~exit_without_prior_bar:true ~f:(fun result ->
+      assert_that (_dtv_trades result)
+        (elements_are
+           [
+             _entry_buy;
+             all_of
+               [
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.side)
+                   (equal_to
+                      (Trading_base.Types.Sell : Trading_base.Types.side));
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.quantity)
+                   (float_equal 10.0);
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.price)
+                   (float_equal _zombie_last_close);
+                 field
+                   (fun (t : Trading_base.Types.trade) ->
+                     String.is_prefix t.order_id ~prefix:"DTV-stale-exit-order-")
+                   (equal_to true);
+               ];
+           ]))
+
+(** Armed, the position is gone from the portfolio afterwards — zero remaining
+    quantity, cash freed, nothing carried to the window end at a stale mark. *)
+let test_zombie_exit_armed_leaves_no_position _ =
+  _run_zombie_exit ~name:"flat" ~exit_without_prior_bar:true ~f:(fun result ->
+      assert_that
+        (List.find result.final_portfolio.positions ~f:(fun p ->
+             String.equal p.symbol "DTV"))
+        is_none)
+
+(** Default [false] is the R1 contract: the same run carries DTV open to the
+    window end with only its entry Buy, exactly as before #2672 — even though
+    [stale_exit_after_days] is armed. *)
+let test_zombie_exit_default_carries_the_position _ =
+  _run_zombie_exit ~name:"default" ~exit_without_prior_bar:false
+    ~f:(fun result ->
+      assert_that (_dtv_trades result) (elements_are [ _entry_buy ]);
+      assert_that
+        (Trading_portfolio.Calculations.position_quantity
+           (List.find_exn result.final_portfolio.positions ~f:(fun p ->
+                String.equal p.symbol "DTV")))
+        (float_equal 10.0))
+
+(** The exit tag (#2672 ask 2): a stale force-exit is a [StrategySignal]
+    labelled ["stale_force_exit"], detailed with the candidate's reference date
+    and gap. Pinned on {!Stale_exit_runner.exit_reason} directly because {!tick}
+    drops the Closed position from the map in the same fold that stamps the
+    reason, so the tag is unreadable from the run result. *)
+let test_stale_force_exit_carries_its_label _ =
+  assert_that
+    (Trading_simulation.Stale_exit_runner.exit_reason
+       ({
+          symbol = "DTV";
+          signed_quantity = 10.0;
+          last_close = _zombie_last_close;
+          last_bar_date = _zombie_start;
+          days_since_last_bar = _zombie_exit_after_days;
+        }
+         : Trading_simulation.Stale_hold.force_exit))
+    (matching ~msg:"Expected a stale_force_exit StrategySignal"
+       (function
+         | Trading_strategy.Position.StrategySignal { label; detail } ->
+             Some (label, detail)
+         | _ -> None)
+       (all_of
+          [
+            field fst (equal_to "stale_force_exit");
+            field snd
+              (is_some_and
+                 (equal_to "last_bar_date=2024-01-02 days_since_last_bar=90"));
+          ]))
+
 (* ==================== Win #4 — per-fold universe pruning =============== *)
 
 (** Pure-function pin for the simulator's Win #4 active-through filter.
@@ -1170,6 +1355,14 @@ let suite =
          >:: test_stale_exit_realizes_sell_at_last_close;
          "stale-exit (#1484): frees cash with realized PnL"
          >:: test_stale_exit_frees_cash_with_realized_pnl;
+         "stale-exit (#2672): no prior bar, armed, realizes the sell"
+         >:: test_zombie_exit_armed_realizes_the_sell;
+         "stale-exit (#2672): no prior bar, armed, leaves no position"
+         >:: test_zombie_exit_armed_leaves_no_position;
+         "stale-exit (#2672): no prior bar, default carries the position"
+         >:: test_zombie_exit_default_carries_the_position;
+         "stale-exit (#2672): the force-exit carries its stale_force_exit label"
+         >:: test_stale_force_exit_carries_its_label;
          "step executes market order" >:: test_step_executes_market_order;
          "limit order executes on later day"
          >:: test_limit_order_executes_on_later_day;

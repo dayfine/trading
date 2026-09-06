@@ -20,6 +20,19 @@
 
 open Core
 
+val exit_reason : Stale_hold.force_exit -> Trading_strategy.Position.exit_reason
+(** The [Position.exit_reason] stamped on the synthetic exit: a [StrategySignal]
+    tagged [label = "stale_force_exit"], with
+    [detail = Some "last_bar_date=<d> days_since_last_bar=<n>"] read off the
+    candidate. [Stop_log.exit_trigger_of_reason] maps it to the
+    [Strategy_signal] value that lands in the run's [exit_trigger] column, which
+    is how a delisting-driven exit is told apart from a stop or a strategy sell
+    (issue #2672 ask 2).
+
+    Exported for testing: {!tick} drives the position to [Closed] and drops it
+    from the positions map in the same fold that stamps the reason, so no caller
+    can read the tag back off the result. Pure. *)
+
 val tick :
   adapter:Trading_simulation_data.Market_data_adapter.t ->
   config:Stale_hold.config ->

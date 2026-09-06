@@ -37,11 +37,32 @@
 
     This is {b data hygiene with lookahead}, and deliberately so: whether a run
     of prints is terminal is only knowable from the whole series. It is {b not}
-    a crash detector and carries no trading signal — a mid-series collapse that
-    later recovers is left entirely alone, so the strategy still sees (and can
-    still lose money on) every genuine decline. The lookahead cannot leak an
-    edge because the only bars it removes are ones no counterparty could have
-    filled against.
+    a crash detector — a mid-series collapse that later recovers is left
+    entirely alone, so the strategy still sees (and can still lose money on)
+    every decline that keeps printing.
+
+    {2 The known cost: terminal collapses are indistinguishable from stubs}
+
+    The rule keys on price shape alone, so it {b cannot} tell an administrative
+    stub tail from a {b genuine terminal collapse}. A symbol that really traded
+    down through the ratio and was then delisted presents to {!cutoff_date} as
+    exactly the same shape and is truncated too — deleting a real loss and
+    biasing returns {b upward}. Only the {e gradual} terminal decline survives,
+    because each of its steps stays above the ratio:
+
+    - [10.0 / 5.0 / 1.0 / 0.30 / 0.28] at [ratio = 0.05] —
+      {b nothing truncated}. No suffix is below [0.05] of the close before it.
+    - [10.0 / 9.0 / 0.20 / 0.15] at [ratio = 0.05] —
+      {b truncated after the 9.0}, identically to the STMP stub tail, even
+      though a real bankruptcy of that shape is a −98% loss the run should have
+      taken.
+
+    So the narrower true claim is: the bars this rule removes {e include} ones
+    no counterparty could have filled against, but are not limited to them. That
+    upward bias is an accepted cost of a {b default-off} axis and must be
+    carried into the paired re-run writeup — it is not a property to rely on,
+    and not a reason to flip the default. Both shapes are pinned in
+    [test_stub_tail.ml].
 
     {2 Where it applies}
 

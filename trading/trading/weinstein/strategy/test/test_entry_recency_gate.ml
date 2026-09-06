@@ -107,6 +107,16 @@ let test_boundary_is_inclusive _ =
        [ _long "AT"; _long "OVER" ])
     (elements_are [ equal_to "AT" ])
 
+(** A bar dated {b after} the decision date yields a negative gap and is kept —
+    the gate is a staleness floor, not a two-sided window, so a warehouse row
+    that runs ahead of the simulated clock must never drop a candidate. *)
+let test_future_dated_bar_is_kept _ =
+  assert_that
+    (_survivors ~max_bar_age_days:10
+       ~table:[ ("AHEAD", _days_before (-5)) ]
+       [ _long "AHEAD" ])
+    (elements_are [ equal_to "AHEAD" ])
+
 (** No reading never drops a candidate (matches {!Short_borrow_gate.filter}). *)
 let test_missing_reading_is_retained _ =
   assert_that
@@ -181,6 +191,7 @@ let () =
            "stale candidate is dropped" >:: test_stale_candidate_is_dropped;
            "weekend-stale bar is kept" >:: test_weekend_stale_bar_is_kept;
            "boundary is inclusive" >:: test_boundary_is_inclusive;
+           "future-dated bar is kept" >:: test_future_dated_bar_is_kept;
            "missing reading is retained" >:: test_missing_reading_is_retained;
            "both sides are gated" >:: test_both_sides_are_gated;
            "apply: default keeps the stale symbol"

@@ -15,6 +15,12 @@
     - the strategy's [Bar_reader.daily_bars_for] ends on the same date the
       simulator's last visible bar does.
 
+    The last pair closes the loop end to end: a long's protective stop, resting
+    far above the penny prints, is walked through [Engine.update_market] over
+    the whole series. Unarmed it fills at $0.045 — the phantom [stop_loss]
+    itself, reproduced; armed it never fills, because no bar in the tail ever
+    reaches the engine.
+
     The unarmed arm of each test shows the defect side by side: with the guard
     off, [get_price] hands back the $0.03 bar the record's phantom stop_loss
     filled at. *)
@@ -23,6 +29,10 @@ open OUnit2
 open Core
 open Matchers
 module Bar_reader = Weinstein_strategy.Bar_reader
+module Create_order = Trading_orders.Create_order
+module Engine = Trading_engine.Engine
+module Order_manager = Trading_orders.Manager
+module Price_path = Trading_engine.Price_path
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Stub_tail = Snapshot_runtime.Stub_tail
@@ -183,6 +193,95 @@ let test_both_paths_end_on_the_same_date _ =
     (_strategy_last_bar_date ~ratio:_ratio)
     (is_some_and (equal_to _last_real_day))
 
+(* --- End to end through the engine ----------------------------------- *)
+
+(* A held long's protective stop, resting far above the penny prints. *)
+let _stop_price = 300.0
+let _held_quantity = 100.0
+
+(* [Price_path] draws from the bar unless a seed is fixed; pin one so the fill
+   price is a function of the bar alone, as [test_engine.ml] does. *)
+let _path_config = { Price_path.default_config with seed = Some 42 }
+
+let _resting_stop_order () =
+  match
+    Create_order.create_order
+      {
+        Create_order.symbol = _symbol;
+        side = Trading_base.Types.Sell;
+        order_type = Trading_base.Types.Stop _stop_price;
+        quantity = _held_quantity;
+        time_in_force = Trading_orders.Types.GTC;
+      }
+  with
+  | Ok order -> order
+  | Error err -> assert_failure ("create_order: " ^ Status.show err)
+
+(* Walk the whole series exactly as [Simulator._get_today_bars] does — one
+   [get_price] per (symbol, day), [None] filtered out — feeding each day's bars
+   to [Engine.update_market] and then processing the resting stop. Returns every
+   trade the engine produced, in order. *)
+let _stop_fills_over_series ~ratio =
+  let get_price, _, _ = _wire ~ratio in
+  let engine =
+    Engine.create
+      {
+        Trading_engine.Types.commission = { per_share = 0.0; minimum = 0.0 };
+        slippage_bps = 0;
+      }
+  in
+  let order_mgr = Order_manager.create () in
+  (match Order_manager.submit_orders order_mgr [ _resting_stop_order () ] with
+  | [ Ok () ] -> ()
+  | _ -> assert_failure "submit_orders rejected the resting stop");
+  List.concat_map
+    (List.range 0 (List.length _closes))
+    ~f:(fun i ->
+      let today_bars =
+        get_price ~symbol:_symbol ~date:(_day i)
+        |> Option.to_list
+        |> List.map ~f:(fun (b : Types.Daily_price.t) ->
+            {
+              Trading_engine.Types.symbol = _symbol;
+              open_price = b.open_price;
+              high_price = b.high_price;
+              low_price = b.low_price;
+              close_price = b.close_price;
+            })
+      in
+      Engine.update_market ~path_config:_path_config engine today_bars;
+      match Engine.process_orders engine order_mgr with
+      | Ok reports ->
+          List.concat_map reports ~f:(fun r -> r.Trading_engine.Types.trades)
+      | Error err -> assert_failure ("process_orders: " ^ Status.show err))
+
+(** Unarmed (the default), the $0.045 print reaches [Engine.update_market] and
+    the resting stop — 300.0, far above it — fills against it at that price.
+    This is the −$594k STMP phantom [stop_loss] the guard exists to prevent,
+    reproduced end to end. *)
+let test_unarmed_stop_fills_at_the_stub_print _ =
+  assert_that
+    (_stop_fills_over_series ~ratio:0.0)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (t : Trading_base.Types.trade) -> t.side)
+               (equal_to (Trading_base.Types.Sell : Trading_base.Types.side));
+             field
+               (fun (t : Trading_base.Types.trade) -> t.price)
+               (float_equal 0.045);
+           ];
+       ])
+
+(** Armed, no bar exists on any stub date, so [Engine.update_market] is handed
+    an empty bar list and the engine's last known bar for the symbol stays the
+    $329.61 real one — nothing ever crosses 300.0 and the stop produces no fill
+    at all. *)
+let test_armed_stop_never_fills _ =
+  assert_that (_stop_fills_over_series ~ratio:_ratio) (elements_are [])
+
 let () =
   run_test_tt_main
     ("stub_tail_bar_source"
@@ -199,4 +298,7 @@ let () =
            >:: test_armed_previous_bar_forward_fills_from_the_last_real_close;
            "armed: both paths end on the same date"
            >:: test_both_paths_end_on_the_same_date;
+           "unarmed: a resting stop fills at the stub print"
+           >:: test_unarmed_stop_fills_at_the_stub_print;
+           "armed: a resting stop never fills" >:: test_armed_stop_never_fills;
          ])
