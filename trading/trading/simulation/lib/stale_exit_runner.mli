@@ -24,10 +24,12 @@ val exit_reason : Stale_hold.force_exit -> Trading_strategy.Position.exit_reason
 (** The [Position.exit_reason] stamped on the synthetic exit: a [StrategySignal]
     tagged [label = "stale_force_exit"], with
     [detail = Some "last_bar_date=<d> days_since_last_bar=<n>"] read off the
-    candidate. [Stop_log.exit_trigger_of_reason] maps it to the
-    [Strategy_signal] value that lands in the run's [exit_trigger] column, which
-    is how a delisting-driven exit is told apart from a stop or a strategy sell
-    (issue #2672 ask 2).
+    candidate. The reason is stamped on the [Position] only: [tick] applies its
+    transitions internally, so [on_transitions] never observes them, and the
+    realised trade [tick] builds carries no [exit_trigger] — a stale force-exit
+    therefore renders as a BLANK [exit_trigger] column in [trades.csv] today
+    (issue #2687, pre-existing; 7 blank rows in the canonical 26y record). Until
+    that is threaded through, this label is the only place the tag exists.
 
     Exported for testing: {!tick} drives the position to [Closed] and drops it
     from the positions map in the same fold that stamps the reason, so no caller
