@@ -5,7 +5,8 @@
   test_snapshot_verifier
   test_resistance_sketch
   test_weekly_sidetable_builder
-  test_adjusted_basis)
+  test_adjusted_basis
+  test_series_tail)
  (libraries
   core
   core_unix
