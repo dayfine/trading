@@ -77,9 +77,6 @@ run_cell_salt() {
   log "RESULT $tag => ${m:-<no result - see $ART/$tag.log; OOM leaves empty log>} (wall $(( $(date +%s) - start ))s)"
 }
 
-SNAP2019=/tmp/snap_top3000_2019
-docker exec $C test -d $SNAP2019 || { log "ABORT: warehouse $SNAP2019 missing"; exit 1; }
-
 for salt in 1 2; do
   for arm in off on; do
     require_disk "pre-dg-26y-$arm-s$salt"; require_memory 4096 "pre-dg-26y-$arm-s$salt"

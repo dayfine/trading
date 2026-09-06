@@ -43,6 +43,8 @@ Results are copied per arm to `/tmp/sweeps/dg0906/` and committed under
 |---|---:|---:|---:|---:|---:|---:|
 | `dg-5y-2019-off` | 16.79 | 179 | 29.6 | 0.26 | 22.04 | 1992 s |
 | `dg-5y-2019-on` | 52.12 | 169 | 32.5 | 0.58 | 21.65 | 2020 s |
+| `dg-26y-off` | 302.65 | 723 | 34.3 | 0.40 | 36.26 | 9615 s |
+| `dg-26y-on` | 139.81 | 714 | 33.1 | 0.29 | 38.39 | 10206 s |
 
 **Tripwire passed:** the off arm reproduces the recorded 2019-vintage null
 (16.8% / 179 / maxDD 22.0, priorities doc 2026-09-06) digit-for-digit.
@@ -69,14 +71,9 @@ blank rows); filed as a separate issue.
 
 26y arms: the chain aborted on its memory guard (`2941MiB free < 4096`) while
 a rework agent was building; relaunch resumes at `dg-26y-off` (RESULT-skip).
-
-| `dg-26y-off` | 302.65 | 723 | 34.3 | 0.40 | 36.26 | 9615 s |
-
 **26y tripwire passed (06:23 PT):** `dg-26y-off` reproduces `rec26y-new-s0`
 (302.65% / 723 / Sharpe 0.40 / maxDD 36.26) digit-for-digit on the #2686 build —
 no build drift; the on arm's delta is attributable to the three guards alone.
-| `dg-26y-on` | 139.81 | 714 | 33.1 | 0.29 | 38.39 | 10206 s |
-
 ## 26y dissection (09:15 PT) — a path lottery, not a guard cost
 
 The on arm is **163pp below** the record it was meant to correct upward. Trade-level join
@@ -90,10 +87,11 @@ simply had less equity by then.
 Trade sets are identical up to that date (54 shared trades, delta exactly 0). The off arm
 enters BKNG (2003-06-12, a −$17.8k stop-out five days later); the on arm enters SEIC on
 06-17 instead. The per-screen `total_stocks` in the two arms' `trade_audit.sexp` (not
-committed — ~177k lines each; in the container at `/tmp/sweeps/dg0906/`) show why:
+committed — ~173k lines each; in the container at `/tmp/sweeps/dg0906/`) show why:
 **1,292 of 1,335 weekly screens differ**, from the second screen (2000-01-14: 2141 vs
-2140) onward, with the gap peaking at 22 symbols in 2016 (e.g. 2016-08-26: 1152 vs 1132)
-and 6 on the last screen. **The stub-tail guard trims the terminal stub run of every
+2140) onward, with the gap peaking at 22 symbols on 11 screens in 2017 (first 2017-02-10: 1071 vs
+1049; 2016's maximum is 20, e.g. 2016-08-26: 1152 vs 1132) and 6 on the last screen
+(2026-06-12: 613 vs 607); the on arm never exceeds the off arm. **The stub-tail guard trims the terminal stub run of every
 dying symbol in the warehouse**, so each such symbol leaves the on arm's universe a few
 bars earlier throughout the 26 years; the top-20 admission list (alphabetical tiebreak,
 `project_screener_alphabetical_tiebreak`) is therefore perturbed on almost every screen,

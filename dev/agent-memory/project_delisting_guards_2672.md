@@ -54,7 +54,7 @@ Related: [[project_saturday_stale_fill_defect]], [[project_record_rebase_2026_09
 reproduces the null; on 52.12% / 169 — the whole +35pp is STMP. 26y: off reproduces the
 record digit-for-digit (302.65 / 723 / 36.26); **on = 139.81% / 714 / Sharpe 0.29 / maxDD
 38.39 — 163pp BELOW**. Dissection: the stub-tail guard trims EVERY dying symbol's terminal run, so the
-universe differs on 1,292 of 1,335 screens from 2000-01-14 (gap up to 22 in 2016); the
+universe differs on 1,292 of 1,335 screens from 2000-01-14 (gap up to 22, on 11 screens in 2017; 2016 max 20); the
 first top-20 pick that flips is 2003-06-12 (BKNG→SEIC) and the paths never reconverge (457/720 shared; off-only +$1.25M vs on-only
 +$35k). **Path lottery, not a guard cost; do not re-base on it.** Lesson: ANY per-symbol
 data-hygiene change (twin dedup, splice drop, tail truncation) perturbs the 26y path the
