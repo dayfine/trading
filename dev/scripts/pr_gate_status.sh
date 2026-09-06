@@ -63,9 +63,30 @@
 #
 # OUTPUT: one row per PR --
 #   PR  CI  STRUCT  BEHAV  NEXT-ACTION
-# where STRUCT/BEHAV are ok | rework | unclear | stale(<sha>) | none.
+# where STRUCT/BEHAV are ok | rework | unclear | stale(<sha>) | unreadable(<sha>) | none.
 # "unclear" (#2432) means the gate's reviews disagree in a way this script
 # will not guess through -- NEXT-ACTION reads "ADJUDICATE", never "MERGE".
+# "unreadable(<sha>)" (H-QC-VERDICT-NEWLINE-COLLAPSE, PR #2663) means a review
+# AT THE CURRENT TIP exists but its markdown structure was destroyed (observed
+# live: the GitHub API returned a review body with every newline collapsed),
+# so no verdict can be read from it -- distinct from "stale", which means the
+# only reviews found are genuinely from an OLDER tip. See the `looks_corrupt`
+# doc comment in `_gate` below for the detection and why it cannot be confused
+# with "stale" or "unclear". NEXT-ACTION reads "RE-POST", never "MERGE".
+#
+# SCOPE OF THAT GUARANTEE (qc-behavioral rework iteration 1 of #2676): "never
+# MERGE" is true of the STATE-TO-ACTION mapping (a returned "unreadable(...)"
+# can only ever map to RE-POST) -- it is NOT a claim that a corrupted review
+# can never be masked into a different, readable-looking state. See the
+# comment directly above `$corrupt_sha`'s consumption inside `_gate` for the
+# one known masking gap (a corrupt review at the same tip as a readable,
+# heading-matched sibling for the SAME gate is silently dropped from
+# consideration, pre-existing aggregation behaviour unchanged by this fix)
+# and the `looks_corrupt` doc comment for a second, narrower known gap (an
+# ordinary, non-QC review whose body happens to mention an unfenced verdict
+# heading can flag a gate that was never actually dispatched as "unreadable"
+# rather than "none" -- misleading but still fail-closed, since neither
+# reads MERGE).
 #
 # "unclear"'S MEASURED BASE RATE (qc-behavioral review 4991549803, B3, rework
 # iteration 1 of PR #2432/#2456; CORRECTED in rework iteration 2, review
@@ -245,7 +266,15 @@ _gate() {
     # foreign verdict to this gate. The first version stripped fences for the
     # heading only, and case 10b in the test suite caught it immediately.
     # (No apostrophes in this jq program: it is single-quoted in sh.)
-    def review_result:
+    # Extracts the sha a review was written against: the body own "Reviewed
+    # SHA: ..." line if present, else (#2626) the review `commit_id` field.
+    # Factored out of `review_result` (H-QC-VERDICT-NEWLINE-COLLAPSE) so the
+    # corruption scan below (`looks_corrupt` plus its caller) can resolve a
+    # review sha WITHOUT needing its heading to have survived -- exactly the
+    # case where a newline-collapsed review heading match fails (every
+    # heading regex requires `^` at a REAL line start) but its "Reviewed SHA"
+    # substring, being unanchored, still parses fine.
+    def review_sha:
       (.body | strip_fences) as $clean
       | ($clean | capture("(?i)Reviewed SHA:?[ `*]*(?<s>[0-9a-f]{7,40})").s // "") as $body_sha
       #
@@ -268,7 +297,78 @@ _gate() {
       # (.commit_id // .commit.oid // "")), not a switch to the REST
       # endpoint. Only the curl/REST backend (`_pr_meta_curl`, which is what
       # the GHA orchestrator actually runs) is covered by this fallback today.
-      | (if ($body_sha != "") then $body_sha else (.commit_id // "") end) as $sha
+      | (if ($body_sha != "") then $body_sha else (.commit_id // "") end);
+
+    # (H-QC-VERDICT-NEWLINE-COLLAPSE, PR #2663) Detects a review body whose
+    # markdown structure was destroyed by newline loss -- observed live when
+    # the GitHub API returned a qc-structural review as ONE line, reading
+    # "...all passing).## VerdictAPPROVED", with essentially zero line breaks.
+    # The existing parser does not surface this as a parse failure on its own:
+    # every heading regex requires `^` at a REAL line start ((?m) has nothing
+    # to anchor to without newlines), so a collapsed review just fails every
+    # heading-attribution test and silently VANISHES from $results -- the gate
+    # then falls back to whatever OLDER, genuinely-parseable review happens to
+    # be in the array and reports a misleading `stale(<old-sha>)`, naming the
+    # wrong problem (PR #2663 reported `stale(25d1a938)` for a tip that
+    # actually HAD a review, at `a142243f`, just an unreadable one).
+    #
+    # A body "looks corrupt" when it contains the substring "## Verdict" (a
+    # loose, UNANCHORED match: `#+\s*verdict`, no `^` requirement) but EITHER:
+    #   - that substring is never matched by the real, anchored verdict regex
+    #     (i.e. it exists somewhere in the body, just not at a genuine line
+    #     start) -- the direct signature of newline collapse; OR
+    #   - the body is long (>200 chars) yet has almost no newlines (<3) --
+    #     catches a variant collapse that happens to still line up "## Verdict"
+    #     at true position 0 by coincidence.
+    # Both branches require the "## Verdict" substring to be present at all --
+    # a body that never mentions a verdict (case 11 in the test suite,
+    # "unclear": "Ran out of budget before reaching a verdict.") must NOT be
+    # flagged merely for being short or line-sparse. That review is genuinely
+    # unfinished, not corrupted, and must keep reading "unclear".
+    #
+    # (qc-behavioral rework iteration 1 of #2676) The gap class between
+    # "Verdict" and its token now includes `:` -- a compact, colon-style
+    # heading ("## Verdict: APPROVED") used to be treated as UNANCHORED (no
+    # character in the OLD class `[ *`\r\n]` matched the colon), which set
+    # `has_verdict_word` true and `has_anchored_verdict` false and flagged a
+    # perfectly well-formed review as corrupt. Two distinct symptoms, same
+    # root cause: a review with an earlier kind-matching heading read
+    # "unclear" instead of its real verdict (the colon broke the identical
+    # regex in review_result, below); a review with no heading naming the
+    # OTHER gate read a false "unreadable(<sha>)" for that unrelated,
+    # never-reviewed gate, since the corrupt-scan runs over the full review
+    # array independent of heading attribution. Cases 60-61 in the test suite
+    # pin both symptoms, fixed by the same one-class edit applied identically
+    # here and to the verdict regex in review_result (the two must stay in
+    # sync -- see that defs own comment; no apostrophes anywhere in this
+    # note, deliberately, since this whole program is single-quoted in sh).
+    #
+    # KNOWN, ACCEPTED GAP (not fixed here, decided deliberately): this
+    # predicate runs over EVERY review in the array, not just ones a QC agent
+    # actually posted. An ordinary, non-QC review that happens to mention an
+    # unfenced verdict-shaped heading -- without a genuine anchored verdict
+    # anywhere else in its body -- can flag `looks_corrupt` true for a gate
+    # that was never dispatched at all, reading "unreadable(<sha>)" instead of
+    # the correct "none". Still fails closed (RE-POST, never MERGE) and is
+    # narrow (requires a formal GitHub PR *review*, not a plain comment, whose
+    # body coincidentally resembles a QC verdict block) -- distinguishing a
+    # genuine QC review from an ordinary one would need author-based
+    # filtering, a materially larger change than "detect newline collapse",
+    # so this is left as a documented residual rather than folded into this
+    # fix. Not pinned by a test for the same reason case 26 in the test suite
+    # is not: a known, out-of-scope gap, recorded so it is not silently
+    # rediscovered.
+    def looks_corrupt:
+      (.body | strip_fences) as $clean
+      | ($clean | test("(?i)#+\\s*verdict")) as $has_verdict_word
+      | ($clean | test("(?ism)^#+ +Verdict[ :*`\\r\\n]+(APPROVED|NEEDS_REWORK)")) as $has_anchored_verdict
+      | ($clean | [scan("\n")] | length) as $newlines
+      | ($clean | length) as $len
+      | $has_verdict_word and (($has_anchored_verdict | not) or ($len > 200 and $newlines < 3));
+
+    def review_result:
+      (.body | strip_fences) as $clean
+      | review_sha as $sha
       #
       # DISAGREEING matches within ONE review body read "unclear", not
       # "whichever position wins" (#2425 rework of #2421). #2421 shipped "take
@@ -309,8 +409,16 @@ _gate() {
       # it is a one-character class addition with no interaction with the
       # fence stripper (which matches fence markers, not the gap between a
       # heading and its token).
+      #
+      # `:` in the same gap class (qc-behavioral rework iteration 1 of #2676):
+      # a compact "## Verdict: APPROVED" heading used to fail this regex
+      # entirely (no char in the OLD class matched the colon), reading
+      # "unclear" for a perfectly well-formed review. Must stay IDENTICAL to
+      # the looks_corrupt copy of this class above -- the two are deliberately
+      # kept in sync so a colon-style verdict is never simultaneously
+      # "readable here" and "corrupt there".
       | ( [ $clean
-            | match("(?ism)^#+ +Verdict[ *`\\r\\n]+(?<v>APPROVED|NEEDS_REWORK)"; "g")
+            | match("(?ism)^#+ +Verdict[ :*`\\r\\n]+(?<v>APPROVED|NEEDS_REWORK)"; "g")
             | .captures[] | select(.name == "v") | .string
           ] | unique
         ) as $verdicts
@@ -320,11 +428,53 @@ _gate() {
          else "unclear" end) as $verdict
       | { sha: $sha, verdict: $verdict };
 
-    [ .[] | select(
+    # H-QC-VERDICT-NEWLINE-COLLAPSE: scan the FULL, unfiltered review array
+    # (not the heading-attributed one below) for a review that is BOTH at the
+    # current tip and `looks_corrupt`. This has to run before -- and
+    # independently of -- the heading-based select just below, precisely
+    # because a corrupted review heading match FAILS, so it would otherwise
+    # never appear in $results at all for either gate. `review_sha` (not the
+    # body-only "Reviewed SHA" match) is used for the tip comparison because
+    # it already carries the `commit_id` fallback (#2626) and does not depend
+    # on the heading having survived.
+    ( [ .[] | select(review_sha as $s
+                      | $s == "" or ($tip | startswith($s)) or ($s | startswith($tip)))
+             | select(looks_corrupt) ]
+    ) as $corrupt_current
+    | ( if ($corrupt_current | length) > 0 then ($corrupt_current[0] | review_sha) else null end )
+      as $corrupt_sha
+    #
+    # SCOPE OF THE "unreadable never reaches MERGE" GUARANTEE (qc-behavioral
+    # rework iteration 1 of #2676, CP2-b): the guarantee is a property of the
+    # STATE-TO-ACTION mapping below -- whenever this function RETURNS
+    # "unreadable(<sha>)", the case statement in the caller can only ever map
+    # it to RE-POST, never MERGE, and that half is unconditionally true (it is a
+    # pure function of the returned string). It does NOT mean detection is
+    # complete: $corrupt_sha is computed here but ONLY consulted in the
+    # "none"/"stale" branches below (`length == 0`, or `$current | length ==
+    # 0`). If a SIBLING review at the same tip DOES carry a heading that
+    # matches this $kind (so `length != 0` and we take the aggregation branch
+    # instead), $corrupt_sha is silently discarded -- a collapsed
+    # NEEDS_REWORK sitting alongside a readable, heading-matched APPROVED at
+    # the same tip reads "ok", not "unreadable", exactly as it did before
+    # H-QC-VERDICT-NEWLINE-COLLAPSE (this is pre-existing aggregation
+    # behaviour, unchanged by that fix, not a regression it introduced).
+    # Accepted rather than fixed here: closing it would mean deciding whether
+    # a corrupt sibling should demote an otherwise-clean aggregation to
+    # "unclear" or "unreadable", which is a real design question (same
+    # category as the open "unclear" sha-less-aggregation question already
+    # deferred to a human, see dev/status/harness.md) and not a mechanical
+    # one-line fix like CP4/CP2 above.
+    | [ .[] | select(
         (.body | first_heading_text) as $h
         | ($h != null) and ($h | test("(?i)^(qc[- ])?" + $kind + "\\b"))
       ) ]
-    | if length == 0 then "none"
+    | if length == 0 then
+        # A corrupt review at the current tip never gets attributed to any
+        # gate by heading (its heading match failed too) -- so BOTH gate
+        # calls land here when one exists. Report it explicitly rather than
+        # the uninformative "none" (H-QC-VERDICT-NEWLINE-COLLAPSE).
+        if $corrupt_sha != null then "unreadable(" + ($corrupt_sha[0:8]) + ")" else "none" end
       else
         map(review_result) as $results
         #
@@ -377,9 +527,15 @@ _gate() {
                                   | $s == "" or ($tip | startswith($s)) or ($s | startswith($tip)))))
           as $current
         | if ($current | length) == 0 then
-            # every matching review is stale relative to the tip -- report
-            # using the LAST one, same as the pre-aggregation behaviour.
-            "stale(" + ($results[-1].sha[0:8]) + ")"
+            # Every HEADING-matched review for this gate is stale relative to
+            # the tip. But if a SEPARATE, corrupt review sits AT the current
+            # tip (never heading-matched, so it cannot be in $results at all),
+            # that corrupt review -- not the stale one -- is the real story:
+            # report "unreadable", not a misleading "re-run QC" pointing at an
+            # old review that was never the problem (H-QC-VERDICT-NEWLINE-COLLAPSE,
+            # PR #2663 live `stale(25d1a938)` misdiagnosis).
+            if $corrupt_sha != null then "unreadable(" + ($corrupt_sha[0:8]) + ")"
+            else "stale(" + ($results[-1].sha[0:8]) + ")" end
           else
             ($current | map(.verdict)) as $vs
             | ($vs | unique) as $distinct
@@ -614,6 +770,13 @@ for n in $PRS; do
     # is needed) and "dispatch" (nothing has run yet).
     *:unclear:*)     action="ADJUDICATE -- conflicting verdicts at $tip (structural)" ;;
     *:*:unclear)     action="ADJUDICATE -- conflicting verdicts at $tip (behavioral)" ;;
+    # "unreadable" (H-QC-VERDICT-NEWLINE-COLLAPSE) must never fall through to
+    # MERGE either, and must never be mistaken for "stale" (which implies
+    # "re-run QC" -- the wrong fix here, since a review WAS posted at this
+    # tip, it just can't be parsed). The actionable fix is a re-post with the
+    # markdown intact, not a fresh QC pass.
+    *:unreadable*:*) action="RE-POST -- qc-structural review body unreadable (newline-collapsed) at $tip" ;;
+    *:*:unreadable*) action="RE-POST -- qc-behavioral review body unreadable (newline-collapsed) at $tip" ;;
     *:none:*)        action="dispatch qc-structural" ;;
     *:stale*:*)      action="re-run qc-structural at $tip" ;;
     *:ok:none)       action="dispatch qc-behavioral" ;;
