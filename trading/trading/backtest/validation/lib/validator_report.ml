@@ -25,6 +25,11 @@ let _failing_invariants report =
   List.count report.checks ~f:(fun c ->
       (not c.passed) && equal_severity c.severity Invariant)
 
+let quality_flag_line report =
+  match Validator_fallback_check.fallback_exit_count report with
+  | 0 -> None
+  | n -> Some (sprintf "QUALITY-FLAG: %d fallback exits (V16)" n)
+
 let render_md report =
   let j = report.audit_join in
   let header =
@@ -35,8 +40,12 @@ let render_md report =
       (_failing_invariants report)
       j.matched j.total
   in
+  let flag =
+    Option.value_map (quality_flag_line report) ~default:""
+      ~f:(fun line -> line ^ "\n\n")
+  in
   let body = List.map report.checks ~f:_check_line |> String.concat ~sep:"\n" in
-  header ^ body ^ "\n"
+  header ^ flag ^ body ^ "\n"
 
 let _infer_run_end trades =
   List.map trades ~f:(fun (t : trade_row) -> t.exit_date)
@@ -63,4 +72,5 @@ let run ~run_dir ~data_dir ~config ~out =
   let report = Validator_checks.validate inputs in
   Sexp.save_hum (out ^ ".sexp") (sexp_of_report report);
   Out_channel.write_all (out ^ ".md") ~data:(render_md report);
+  Option.iter (quality_flag_line report) ~f:(eprintf "%s\n%!");
   report

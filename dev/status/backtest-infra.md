@@ -755,6 +755,33 @@ Merged in main:
   +35pp is STMP alone; 26y salt 0 done: on-arm 139.8% vs 302.7% is a path lottery — universe differs on 97% of screens — not a guard cost; salts 1–2 running). Blank `exit_trigger` on stale force-exits
   filed as #2687. Interleaved-series symbols (CLE/ICT/ABK/MEL/MVL/AGR) are a sibling
   defect, not fixed by the tail guard.
+  **2026-09-06 PR-C (`feat/fallback-exits-quality-flags`, closes #2687):** the
+  three-commit follow-up implementing
+  `dev/plans/delisting-data-fix-2026-09-06.md` §"Principle: fallbacks are quality
+  flags, not mechanisms".
+  1. `stale_force_exit` now reaches `trades.csv` — `Stale_exit_runner.tick`
+     returns the transitions it applied and the simulator announces them to
+     `on_transitions`, so `Stop_log` records the label instead of leaving the
+     column blank (the record's 7 blank rows).
+  2. New `Trading_simulation.Delisted_exit_runner` exits a held position at its
+     last real close with reason `delisted` once `active_through` has passed,
+     BEFORE the stale net runs — so a marked delisting is never counted as a
+     fallback. **Data-driven, no config flag**; `active_through` is populated on
+     no warehouse today, so it is a no-op and every golden is bit-identical.
+     Shared mechanics extracted to `Trading_simulation.Forced_exit`;
+     `Simulator.dependencies.prune_universe_by_active_through` splits the Win #4
+     prune away from the mere presence of the lookup.
+  3. Post-run validator **V16** (fallback exits: `stale_force_exit`,
+     `margin_call`, `maintenance_reduce`, `buyin_stress`, both
+     force-liquidation labels — `delisted` deliberately excluded) and **V17**
+     (entry filled against a bar more than `stale_entry_days` old — the CY
+     shape), both report-only, plus a `QUALITY-FLAG: <n> fallback exits (V16)`
+     line in the report header and the run log. Verify:
+     `dune exec trading/backtest/validation/test/test_validator_fallback_check.exe`,
+     `dune exec trading/simulation/test/test_delisted_exit_runner.exe`,
+     `dune exec trading/backtest/test/test_stale_exit_observability.exe`.
+  Still open from PR-A of the plan: nothing populates `active_through` yet, so
+  the delisted exit stays inert until the warehouses are rebuilt.
 
 - **Step 3 (tier-aware bar loader)** now unblocked; separately tracked at
   `dev/status/backtest-scale.md`. A/B the Legacy vs Tiered loader

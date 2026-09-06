@@ -10,7 +10,11 @@
     - the strategy screener (via {!Panel_strategy_builder.build}'s
       [?fold_start_date] → {!Weinstein_strategy.make}'s [?fold_start_date]), and
     - the simulator's per-step bar-fetch loop (via
-      {!Trading_simulation.Simulator.create_deps}'s [?active_through_for]).
+      {!Trading_simulation.Simulator.create_deps}'s
+      [?prune_universe_by_active_through]; before #2687 that half was gated on
+      [?active_through_for] being supplied at all, which is no longer a
+      sufficient signal — the lookup now has a second, unconditional consumer in
+      {!Trading_simulation.Delisted_exit_runner}).
 
     This file pins two contracts:
 
@@ -137,9 +141,11 @@ let test_opt_in_on_prunes_pre_fold_delisted_from_classification _ =
       ~active_through_for ~fold_start_date:fold_start
     |> List.sort ~compare:String.compare
   in
-  (* With the opt-in OFF the runner never builds [active_through_for] / a cutoff,
-     so the screener iterates the full loaded universe — every symbol reaches
-     classification. *)
+  (* With the opt-in OFF the runner resolves no cutoff, so the screener iterates
+     the full loaded universe — every symbol reaches classification. (Since
+     #2687 the runner does still build the [active_through_for] LOOKUP
+     unconditionally, for the simulator's delisted exit; what the opt-in gates
+     is the cutoff, on both the screener and the bar-fetch prune.) *)
   let reaching_off = List.sort universe ~compare:String.compare in
   (* Strictly fewer symbols reach classification with the opt-in ON (2 < 3). *)
   assert_that

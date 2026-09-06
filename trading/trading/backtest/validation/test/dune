@@ -1,5 +1,5 @@
-(test
- (name test_post_run_validator)
+(tests
+ (names test_post_run_validator test_validator_fallback_check)
  (libraries core ounit2 matchers post_run_validator types weinstein.types)
  (preprocess
   (pps ppx_jane)))

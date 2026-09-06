@@ -26,8 +26,9 @@ type request = {
   symbol : string;
   signed_quantity : float;
       (** Held quantity, signed: positive for a long (flattened with a Sell),
-          negative for a short (flattened with a Buy). A request with quantity
-          [0.0] produces no trade. *)
+          negative for a short (flattened with a Buy). Callers filter flat
+          positions out before building a request; this module does not
+          re-check. *)
   exit_price : float;
       (** The price to realise at. Callers supply the last {b real} close for
           the symbol — there is no bar today, so this is the only meaningful
