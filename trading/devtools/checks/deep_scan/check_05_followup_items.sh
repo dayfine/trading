@@ -40,24 +40,36 @@
 #
 # H-FOLLOWUP-COUNT's fix (above) made the count honest about WHAT it
 # measures ("every open checkbox, unscoped by heading") but that count
-# is crossed by construction: dev/status/harness.md's Tier 2-4 roadmap
-# (10 checkboxes as of the filing) is explicitly declared undispatchable
-# by lead-orchestrator Step 2c (milestone-gated / human-request-only),
-# and dev/status/cleanup.md's "How findings get here" section documents
-# the literal Backlog-entry template inside a fenced code block — that
-# placeholder text is not an open item at all. Neither shape is
-# "actionable open debt", which is what the threshold is trying to gate
-# on, so both are now EXCLUDED from the headline FOLLOWUP_COUNT metric
-# via a distinct, self-describing convention — not a denylist that can
-# silently drift from the file it describes:
+# is crossed by construction: dev/status/harness.md's Tier 2 and Tier 4
+# roadmap items are explicitly declared undispatchable by
+# lead-orchestrator Step 2c — Tier 2 is milestone-gated ("not
+# auto-dispatched"), Tier 4 is "the long-run end-state and dispatched
+# only on explicit human request" — and dev/status/cleanup.md's "How
+# findings get here" section documents the literal Backlog-entry
+# template inside a fenced code block — that placeholder text is not an
+# open item at all. Neither shape is "actionable open debt", which is
+# what the threshold is trying to gate on, so both are now EXCLUDED from
+# the headline FOLLOWUP_COUNT metric via a distinct, self-describing
+# convention — not a denylist that can silently drift from the file it
+# describes:
 #
-#   1. Tier/roadmap items — any `- [ ]` line whose nearest preceding H2
-#      heading (`## ...`) matches `## Tier <digit>` (e.g.
-#      "## Tier 2 — Milestone-gated"). This is an EXISTING convention
-#      already used in dev/status/harness.md for exactly this category
-#      of long-horizon, not-currently-dispatchable roadmap; a reader can
-#      see the exclusion by reading the file's own heading, with no
-#      separate list to keep in sync as tiers gain or lose items.
+#   1. Tier 2 / Tier 4 roadmap items — any `- [ ]` line whose nearest
+#      preceding H2 heading (`## ...`) matches `## Tier 2` or
+#      `## Tier 4` (e.g. "## Tier 2 — Milestone-gated"). The match is
+#      DELIBERATELY narrower than "any Tier heading": Step 2c dispatches
+#      **Tier 1 first, then Tier 3** — those two tiers are actionable
+#      open debt like any other, and must NOT be excluded just because
+#      they sit in the same tiered roadmap. Only Tier 2 (milestone-gated)
+#      and Tier 4 (human-request-only) are genuinely undispatchable. This
+#      is an EXISTING heading convention already used in
+#      dev/status/harness.md; a reader can see the exclusion by reading
+#      the file's own heading, with no separate list to keep in sync as
+#      tiers gain or lose items. See H-FOLLOWUP-THRESHOLD-RETUNE's
+#      rework note (Tier 1/Tier 3 fixture rows in
+#      deep_scan_followup_count_check.sh) for the incident this narrowed
+#      match fixes — the original version matched `## Tier <digit>`
+#      unconditionally and silently subtracted dispatchable Tier-1/
+#      Tier-3 work from the actionable count.
 #   2. Template / example text inside a fenced code block (```` ``` ````
 #      ... ```` ``` ````). This is the standard Markdown convention for
 #      "this is example text, not prose" — a `- [ ]` line inside a fence
@@ -129,14 +141,18 @@ for status_file in "${STATUS_DIR}"/*.md; do
         continue
         ;;
     esac
-    # Track whether we are under a "## Tier <digit>" H2 heading. Any OTHER
-    # H2 heading resets the flag; H3+ headings (e.g. "### T1-A: ...") and
+    # Track whether we are under a "## Tier 2" or "## Tier 4" H2 heading —
+    # the two tiers Step 2c declares undispatchable (milestone-gated /
+    # human-request-only). Tier 1 and Tier 3 are deliberately NOT matched
+    # here: Step 2c dispatches Tier 1 first, then Tier 3, so items under
+    # those headings are actionable open debt, not roadmap. Any OTHER H2
+    # heading resets the flag; H3+ headings (e.g. "### T1-A: ...") and
     # non-heading lines leave it unchanged, since Tier sections in practice
     # contain only direct bullet items before the next H2.
     case "$line" in
       "## "*)
         case "$line" in
-          "## Tier "[0-9]*) in_tier_heading=1 ;;
+          "## Tier 2"* | "## Tier 4"*) in_tier_heading=1 ;;
           *) in_tier_heading=0 ;;
         esac
         ;;

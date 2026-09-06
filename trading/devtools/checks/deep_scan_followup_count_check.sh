@@ -19,11 +19,18 @@
 #      per-file counts Check 5 computed, not "No open followup items in
 #      either scan" (the exact self-contradiction the bug produced: see
 #      dev/health/2026-07-27-deep.md lines 10 vs 303).
-#   4. (H-FOLLOWUP-THRESHOLD-RETUNE) Tier/roadmap items (a "- [ ]" line
-#      under a "## Tier <digit>" H2 heading) and template text inside a
-#      fenced code block are EXCLUDED from the actionable FOLLOWUP_COUNT
-#      metric, but still counted and surfaced via FOLLOWUP_EXCLUDED /
-#      FOLLOWUP_TOTAL and the Warnings/Info line — never silently dropped.
+#   4. (H-FOLLOWUP-THRESHOLD-RETUNE) Tier 2 / Tier 4 roadmap items (a
+#      "- [ ]" line under a "## Tier 2" or "## Tier 4" H2 heading) and
+#      template text inside a fenced code block are EXCLUDED from the
+#      actionable FOLLOWUP_COUNT metric, but still counted and surfaced
+#      via FOLLOWUP_EXCLUDED / FOLLOWUP_TOTAL and the Warnings/Info line
+#      — never silently dropped. Tier 1 and Tier 3 are deliberately NOT
+#      excluded — lead-orchestrator Step 2c dispatches Tier 1 first, then
+#      Tier 3, so items under those headings are actionable open debt
+#      like any other heading, not roadmap. (Rework of
+#      H-FOLLOWUP-THRESHOLD-RETUNE: the original version matched any
+#      "## Tier <digit>" heading and silently subtracted dispatchable
+#      Tier-1/Tier-3 work from the actionable count.)
 #   5. (H-FOLLOWUP-THRESHOLD-RETUNE) The check FAILS LOUDLY (non-zero
 #      exit, "FAIL:" to stderr) when it reads zero dev/status/*.md files,
 #      rather than silently reporting FOLLOWUP_COUNT=0 (which would read
@@ -37,16 +44,21 @@
 #     Expected: 2 actionable, 0 excluded, 2 total open.
 #   track-b.md — one open + one closed item under "### Follow-up" (H3).
 #     Expected: 1 actionable, 0 excluded, 1 total open.
-#   track-c.md — one open item under "## Tier 2 — Milestone-gated" (a
-#                closed item under the same heading, should not count
-#                either way), one open item under an ordinary heading,
-#                one open item inside a fenced code block, one open item
-#                after the fence closes.
-#     Expected: 2 actionable (the ordinary-heading item + the
-#     after-the-fence item), 2 excluded (the Tier-2 item + the
-#     inside-the-fence item), 4 total open.
+#   track-c.md — one open item under "## Tier 1 — Immediate" (actionable
+#                — Step 2c dispatches Tier 1 first), one open item under
+#                "## Tier 2 — Milestone-gated" (a closed item under the
+#                same heading, should not count either way), one open
+#                item under "## Tier 3 — After M5 stable" (actionable —
+#                Step 2c auto-dispatches Tier 3), one open item under
+#                "## Tier 4 — Long-run end state" (excluded —
+#                human-request-only), one open item under an ordinary
+#                heading, one open item inside a fenced code block, one
+#                open item after the fence closes.
+#     Expected: 4 actionable (Tier-1 + Tier-3 + the ordinary-heading item
+#     + the after-the-fence item), 3 excluded (the Tier-2 item, the
+#     Tier-4 item, and the inside-the-fence item), 7 total open.
 #
-#   Combined fixture totals: 5 actionable, 2 excluded, 7 total open.
+#   Combined fixture totals: 7 actionable, 3 excluded, 10 total open.
 #
 # How to re-verify by hand:
 #   sh trading/devtools/checks/deep_scan_followup_count_check.sh
@@ -112,10 +124,22 @@ cat > "${FAKE_ROOT}/dev/status/track-b.md" <<'EOF'
 EOF
 
 cat > "${FAKE_ROOT}/dev/status/track-c.md" <<'EOF'
+## Tier 1 — Immediate
+
+- [ ] JJJ: an open item under a Tier-1 heading, should be actionable (Step 2c dispatches Tier 1 first)
+
 ## Tier 2 — Milestone-gated
 
 - [ ] TIER-ITEM: an open item under a Tier-2 heading, should be EXCLUDED
 - [x] TIER-ITEM-CLOSED: a closed item under Tier-2, should not count either way
+
+## Tier 3 — After M5 stable
+
+- [ ] KKK: an open item under a Tier-3 heading, should be actionable (Step 2c auto-dispatches Tier 3)
+
+## Tier 4 — Long-run end state
+
+- [ ] LLL: an open item under a Tier-4 heading, should be EXCLUDED (human-request-only)
 
 ## Not a tier heading
 
@@ -139,18 +163,18 @@ FINDINGS_05="${FINDINGS_DIR}/05.findings"
 REPO_ROOT="$FAKE_ROOT" sh "$CHECK_05" "$DETAIL_FILE" "$FINDINGS_05"
 
 METRIC_LINE="$(grep '^M: FOLLOWUP_COUNT=' "$FINDINGS_05" || true)"
-if [ "$METRIC_LINE" != "M: FOLLOWUP_COUNT=5" ]; then
-  fail "expected 'M: FOLLOWUP_COUNT=5' in Check 5 findings, got: '${METRIC_LINE:-<missing>}'"
+if [ "$METRIC_LINE" != "M: FOLLOWUP_COUNT=7" ]; then
+  fail "expected 'M: FOLLOWUP_COUNT=7' in Check 5 findings, got: '${METRIC_LINE:-<missing>}'"
 fi
 
 EXCLUDED_LINE="$(grep '^M: FOLLOWUP_EXCLUDED=' "$FINDINGS_05" || true)"
-if [ "$EXCLUDED_LINE" != "M: FOLLOWUP_EXCLUDED=2" ]; then
-  fail "expected 'M: FOLLOWUP_EXCLUDED=2' in Check 5 findings, got: '${EXCLUDED_LINE:-<missing>}'"
+if [ "$EXCLUDED_LINE" != "M: FOLLOWUP_EXCLUDED=3" ]; then
+  fail "expected 'M: FOLLOWUP_EXCLUDED=3' in Check 5 findings, got: '${EXCLUDED_LINE:-<missing>}'"
 fi
 
 TOTAL_LINE="$(grep '^M: FOLLOWUP_TOTAL=' "$FINDINGS_05" || true)"
-if [ "$TOTAL_LINE" != "M: FOLLOWUP_TOTAL=7" ]; then
-  fail "expected 'M: FOLLOWUP_TOTAL=7' in Check 5 findings, got: '${TOTAL_LINE:-<missing>}'"
+if [ "$TOTAL_LINE" != "M: FOLLOWUP_TOTAL=10" ]; then
+  fail "expected 'M: FOLLOWUP_TOTAL=10' in Check 5 findings, got: '${TOTAL_LINE:-<missing>}'"
 fi
 
 SIDECAR="${FINDINGS_DIR}/followup_per_file.sidecar"
@@ -163,8 +187,8 @@ else
   if ! grep -qF 'track-b.md:1' "$SIDECAR"; then
     fail "sidecar missing 'track-b.md:1' (got: $(cat "$SIDECAR" | tr '\n' ';'))"
   fi
-  if ! grep -qF 'track-c.md:2' "$SIDECAR"; then
-    fail "sidecar missing 'track-c.md:2' (got: $(cat "$SIDECAR" | tr '\n' ';'))"
+  if ! grep -qF 'track-c.md:4' "$SIDECAR"; then
+    fail "sidecar missing 'track-c.md:4' (got: $(cat "$SIDECAR" | tr '\n' ';'))"
   fi
 fi
 
@@ -174,8 +198,8 @@ fi
 if grep -q '^W: ' "$FINDINGS_05"; then
   fail "5 actionable open items should not cross the threshold=10 warning; found a W: line"
 fi
-if ! grep -q '^I: Open items: 5 actionable total' "$FINDINGS_05"; then
-  fail "expected an info line reporting 5 actionable total open items, got: $(grep '^I: ' "$FINDINGS_05" || echo '<none>')"
+if ! grep -q '^I: Open items: 7 actionable total' "$FINDINGS_05"; then
+  fail "expected an info line reporting 7 actionable total open items, got: $(grep '^I: ' "$FINDINGS_05" || echo '<none>')"
 fi
 
 # ── Step 2: run Check 8 against the same fixture + findings dir ──
@@ -204,8 +228,8 @@ fi
 if ! grep -E '\| `track-b\.md` \| 1 \|' "$DETAIL_FILE" > /dev/null; then
   fail "Check 8 Trends detail does not show track-b.md with count 1"
 fi
-if ! grep -E '\| `track-c\.md` \| 2 \|' "$DETAIL_FILE" > /dev/null; then
-  fail "Check 8 Trends detail does not show track-c.md with count 2 (post-exclusion actionable count)"
+if ! grep -E '\| `track-c\.md` \| 4 \|' "$DETAIL_FILE" > /dev/null; then
+  fail "Check 8 Trends detail does not show track-c.md with count 4 (post-exclusion actionable count)"
 fi
 
 # ── Step 3: threshold-crossing fixture — pins the W: warning branch ──
