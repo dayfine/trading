@@ -19,9 +19,17 @@
     one {!Backtest.Panel_runner} wires in production:
     [Simulator.create_deps ~on_transitions:(Stop_log.record_transitions
      stop_log)] plus the {!Backtest.Strategy_wrapper} interception. The final
-    assertion goes one layer further than the margin file and renders the actual
+    assertions go one layer further than the margin file and render the actual
     CSV via {!Backtest.Trades_stream.write_all}, because the blank cell — not
-    the collector state — is what a reader of the record saw. *)
+    the collector state — is what a reader of the record saw.
+
+    The last two tests pin {!Trading_simulation.Delisted_exit_runner}'s
+    PRECEDENCE over the stale safety net through the same production wiring:
+    with a delisting marker present the run renders ["delisted"], and with the
+    marker absent (every warehouse built to date) it renders
+    ["stale_force_exit"] — the stale exit stays armed in both arms, so what is
+    pinned is the ordering, not merely the label. That precedence is what makes
+    a ["stale_force_exit"] row mean "unexplained", and therefore actionable. *)
 
 open OUnit2
 open Core
@@ -147,7 +155,7 @@ let _stale_policy ~stale_exit_after_days =
 (* Run the simulator with the production wiring and return the populated
    [stop_log] alongside the run result. [stale_exit_after_days = None] is the
    pre-#1484 default arm: the detector still records but nothing force-exits. *)
-let _run ~test_name ~stale_exit_after_days =
+let _run ?active_through_for ~test_name ~stale_exit_after_days () =
   let stop_log = Stop_log.create () in
   let strategy =
     Backtest.Strategy_wrapper.wrap ~stop_log (_one_shot_strategy ())
@@ -162,6 +170,7 @@ let _run ~test_name ~stale_exit_after_days =
           ~data_dir ~strategy ~commission:_commission
           ~market_data_adapter:(_adapter ())
           ~stale_hold_policy:(_stale_policy ~stale_exit_after_days)
+          ?active_through_for
           ~on_transitions:(Stop_log.record_transitions stop_log)
           ()
       in
@@ -194,7 +203,7 @@ let _dead_stop_info stop_log =
 let test_stop_log_records_stale_force_exit_label _ =
   let stop_log, _ =
     _run ~test_name:"stale_exit_label"
-      ~stale_exit_after_days:(Some _exit_after_days)
+      ~stale_exit_after_days:(Some _exit_after_days) ()
   in
   assert_that
     (Option.bind (_dead_stop_info stop_log) ~f:(fun i -> i.exit_trigger))
@@ -223,7 +232,7 @@ let test_stop_log_records_stale_force_exit_label _ =
     labels every position. *)
 let test_unarmed_run_records_no_exit_trigger _ =
   let stop_log, _ =
-    _run ~test_name:"stale_exit_unarmed" ~stale_exit_after_days:None
+    _run ~test_name:"stale_exit_unarmed" ~stale_exit_after_days:None ()
   in
   assert_that
     (Option.bind (_dead_stop_info stop_log) ~f:(fun i -> i.exit_trigger))
@@ -253,22 +262,16 @@ let _exit_trigger_cell ~output_dir =
       | Some (i, _) -> List.nth (split row) i)
   | _ -> assert_failure "trades.csv has no data row"
 
-(** The rendering half, and the actual #2687 symptom: the round trip the stale
-    force-exit closed renders ["stale_force_exit"] in [trades.csv], not the
-    blank cell the record carried. Joins the collector's [stop_info] to the
-    extracted round-trip exactly as {!Backtest.Result_writer} does, through
-    {!Backtest.Trades_stream.write_all}. *)
-let test_trades_csv_renders_the_stale_force_exit_label _ =
-  let stop_log, result =
-    _run ~test_name:"stale_exit_csv"
-      ~stale_exit_after_days:(Some _exit_after_days)
-  in
+(* Render the run's [_dead_symbol] round trip through the production writer —
+   joining the collector's [stop_info] to the extracted round-trip exactly as
+   {!Backtest.Result_writer} does — and return the [exit_trigger] cell. *)
+let _rendered_exit_trigger ~prefix (stop_log, (result : run_result)) =
   let round_trips =
     Trading_simulation.Metrics.extract_round_trips result.steps
     |> List.filter ~f:(fun (t : Trading_simulation.Metrics.trade_metrics) ->
         String.equal t.symbol _dead_symbol)
   in
-  let output_dir = Filename_unix.temp_dir "stale_exit_csv" "" in
+  let output_dir = Filename_unix.temp_dir prefix "" in
   Exn.protect
     ~f:(fun () ->
       Trades_stream.write_all ~output_dir
@@ -278,10 +281,49 @@ let test_trades_csv_renders_the_stale_force_exit_label _ =
           audit = [];
           force_liquidations = [];
         };
-      assert_that
-        (_exit_trigger_cell ~output_dir)
-        (is_some_and (equal_to "stale_force_exit")))
+      _exit_trigger_cell ~output_dir)
     ~finally:(fun () -> _rm_rf output_dir)
+
+(** The rendering half, and the actual #2687 symptom: the round trip the stale
+    force-exit closed renders ["stale_force_exit"] in [trades.csv], not the
+    blank cell the record carried. *)
+let test_trades_csv_renders_the_stale_force_exit_label _ =
+  assert_that
+    (_rendered_exit_trigger ~prefix:"stale_exit_csv"
+       (_run ~test_name:"stale_exit_csv"
+          ~stale_exit_after_days:(Some _exit_after_days) ()))
+    (is_some_and (equal_to "stale_force_exit"))
+
+(* The delisting marker: [_dead_symbol]'s last real bar. The delisted exit fires
+   on the first bar-bearing day strictly after it — long before the 10-day stale
+   gap the same run has armed. *)
+let _marker = Date.add_days _start 1
+
+(** The ordering claim that makes ["stale_force_exit"] mean something: with a
+    delisting marker present, the {b same} run that would otherwise report a
+    ["stale_force_exit"] reports ["delisted"] instead. A MARKED delisting is an
+    expected event and must never be counted as a data-quality flag; only an
+    UNMARKED one reaches the safety net. The stale force-exit is armed in both
+    arms, so this pins the precedence, not merely the label. *)
+let test_marked_delisting_renders_delisted_not_stale _ =
+  assert_that
+    (_rendered_exit_trigger ~prefix:"delisted_csv"
+       (_run ~test_name:"delisted_csv"
+          ~active_through_for:(fun _ -> Some _marker)
+          ~stale_exit_after_days:(Some _exit_after_days) ()))
+    (is_some_and (equal_to "delisted"))
+
+(** The R1 no-op the goldens rest on: an [active_through_for] that returns
+    [None] for every symbol — which is EVERY warehouse built to date — leaves
+    the run identical to one with no lookup supplied at all, right down to the
+    rendered cell. *)
+let test_absent_marker_leaves_the_stale_label _ =
+  assert_that
+    (_rendered_exit_trigger ~prefix:"no_marker_csv"
+       (_run ~test_name:"no_marker_csv"
+          ~active_through_for:(fun _ -> None)
+          ~stale_exit_after_days:(Some _exit_after_days) ()))
+    (is_some_and (equal_to "stale_force_exit"))
 
 let suite =
   "stale_exit_observability"
@@ -292,6 +334,10 @@ let suite =
          >:: test_unarmed_run_records_no_exit_trigger;
          "trades.csv renders the stale_force_exit label"
          >:: test_trades_csv_renders_the_stale_force_exit_label;
+         "marked delisting renders delisted, not stale"
+         >:: test_marked_delisting_renders_delisted_not_stale;
+         "absent marker leaves the stale label"
+         >:: test_absent_marker_leaves_the_stale_label;
        ]
 
 let () = run_test_tt_main suite

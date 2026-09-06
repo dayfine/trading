@@ -200,7 +200,16 @@ val run :
       Phase-1 stage classification (via {!Weinstein_strategy.make}'s
       [?fold_start_date], threaded through {!Panel_strategy_builder.build}); and
     - the simulator's per-step bar-fetch loop drops the same symbols (via
-      {!Trading_simulation.Simulator.create_deps}'s [?active_through_for]).
+      {!Trading_simulation.Simulator.create_deps}'s
+      [?prune_universe_by_active_through]).
+
+    Note the [active_through] {b lookup} itself is handed to the simulator
+    {b unconditionally}, independently of this flag: since #2687 it also drives
+    {!Trading_simulation.Delisted_exit_runner}, which exits a held position at
+    its last real close once the symbol's marker has passed. That is a
+    data-driven exit, not a tuning choice, so it needs no opt-in — and it is a
+    no-op on every warehouse built to date, none of which populates
+    [active_through]. This flag gates only the {e prune}.
 
     Both drop only symbols whose last active day is strictly before [start_date]
     — symbols genuinely uninvestable AT THE FOLD START. This is NOT survivor

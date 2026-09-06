@@ -90,7 +90,8 @@ let _on_transitions ~stop_log ~trade_audit ts =
 
 let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
     ~start_date ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
-    ?on_trade_fill ?active_through_for ~strategy ~market_data_adapter () =
+    ?on_trade_fill ~active_through_for ~prune_universe_by_active_through
+    ~strategy ~market_data_adapter () =
   (* Default-off [Warmup_trade_gate] (#1549 A2); identity unless the flag is on. *)
   let strategy =
     Strategy_wrapper.wrap ~stop_log strategy
@@ -109,7 +110,7 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
       ~maintenance_long_pct:input.config.maintenance_long_pct
       ~exempt_closing_trades_from_cash_floor:
         input.config.portfolio_config.exempt_closing_trades_from_cash_floor
-      ?on_trade_fill ?active_through_for
+      ?on_trade_fill ~active_through_for ~prune_universe_by_active_through
       ~on_transitions:(_on_transitions ~stop_log ~trade_audit)
       ?entry_extension_max_pct:(_entry_cap_for_sim input.config)
       ~sim_entry_fill_next_open:input.config.sim_entry_fill_next_open
@@ -268,13 +269,14 @@ let _resolve_panels ~shared_panels ~snapshot_dir ~manifest =
    symbols whose last active day is strictly before the fold start — point-in-
    time correct (not survivor bias). See [run]'s [?prune_universe_by_active_through]
    and [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
-(* Win #4: [Some _] → simulator-side [active_through_for] read off the panels;
-   [None] → no prune (bit-equal baseline). See [run]. *)
-let _active_through_for_of_panels ~daily_panels ~fold_start_date =
-  match fold_start_date with
-  | None -> None
-  | Some _ ->
-      Some (fun symbol -> Daily_panels.active_through_for daily_panels ~symbol)
+(* The run's per-symbol delisting-marker lookup, read straight off the panels.
+   Supplied UNCONDITIONALLY since #2687: [Simulator]'s delisted exit is driven
+   by the data, not by the Win #4 prune opt-in, which now has its own switch
+   ([Simulator.dependencies.prune_universe_by_active_through]). Bit-equal on
+   every warehouse built to date — none populates [active_through], so this
+   returns [None] for every symbol. See [run]. *)
+let _active_through_for_of_panels ~daily_panels symbol =
+  Daily_panels.active_through_for daily_panels ~symbol
 
 (* Win #4: [false] (default) → [None] (no prune anywhere → bit-equal baselines);
    [true] → [Some start_date] (the fold's first day as cutoff). Exposed for
@@ -321,9 +323,7 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
   let final_close_prices () =
     _final_close_prices ~daily_panels ~symbols:input.all_symbols ~end_date
   in
-  let active_through_for =
-    _active_through_for_of_panels ~daily_panels ~fold_start_date
-  in
+  let active_through_for = _active_through_for_of_panels ~daily_panels in
   (strategy, adapter, final_close_prices, daily_panels, active_through_for)
 
 (* Bundle of recorder collectors threaded through one backtest. Extracted
@@ -396,11 +396,12 @@ let _finish_panels ~daily_panels ~n_all_symbols ~shared_panels =
   if Option.is_none shared_panels then Daily_panels.close daily_panels
 
 (* Resolve the cost overlay and build the simulator. Extracted from [run] so it
-   stays within the function-length limit; [active_through_for] is the Win #4
-   simulator-side prune callback ([None] → no prune). *)
+   stays within the function-length limit. [active_through_for] is the run's
+   delisting-marker lookup (always supplied);
+   [prune_universe_by_active_through] is the separate Win #4 prune opt-in. *)
 let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
-    ~commission ?slippage_bps ?cost_model ?active_through_for ~strategy
-    ~market_data_adapter () =
+    ~commission ?slippage_bps ?cost_model ~active_through_for
+    ~prune_universe_by_active_through ~strategy ~market_data_adapter () =
   let on_trade_fill = _on_trade_fill_of_cost_model cost_model in
   let effective_commission, effective_slippage_bps =
     engine_costs_with_overlay ~default_commission:commission
@@ -409,8 +410,8 @@ let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
   _make_simulator input ~stop_log:r.stop_log ~trade_audit:r.trade_audit
     ~stale_hold_log:r.stale_hold_log ~start_date ~warmup_start ~end_date
     ~initial_cash ~commission:effective_commission
-    ?slippage_bps:effective_slippage_bps ?on_trade_fill ?active_through_for
-    ~strategy ~market_data_adapter ()
+    ?slippage_bps:effective_slippage_bps ?on_trade_fill ~active_through_for
+    ~prune_universe_by_active_through ~strategy ~market_data_adapter ()
 
 (* The Fill-phase step loop inside its trace span, with the caller's step hook
    bound to this run's recorders. Extracted so [run] stays under the
@@ -452,8 +453,8 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   let sim =
     _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
-      ~commission ?slippage_bps ?cost_model ?active_through_for ~strategy
-      ~market_data_adapter ()
+      ~commission ?slippage_bps ?cost_model ~active_through_for
+      ~prune_universe_by_active_through ~strategy ~market_data_adapter ()
   in
   let progress_acc =
     Panel_step_loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date

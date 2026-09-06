@@ -42,6 +42,8 @@
   portfolio_valuation
   stale_hold
   stale_exit_runner
+  forced_exit
+  delisted_exit_runner
   margin_runner
   long_maintenance
   short_buyin)

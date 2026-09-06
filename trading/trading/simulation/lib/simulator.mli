@@ -78,13 +78,35 @@ type dependencies = {
           in the backtest layer construct the hook from
           [Cost_model.apply_per_trade_commission] and thread it through. *)
   active_through_for : (string -> Core.Date.t option) option;
-      (** Optional per-symbol [active_through] lookup. When [Some f], the
-          simulator prunes [symbols] once at {!create} time: any symbol [s] with
-          [f s = Some d] and [Core.Date.(d < config.start_date)] is dropped from
-          the per-step bar-fetch loop ({!_get_today_bars}). [config.start_date]
-          is the simulator's first day (== fold start date including warmup); a
-          symbol whose last active day is strictly before this start cannot
-          contribute any usable bar to the run.
+      (** Optional per-symbol [active_through] lookup — the manifest's
+          last-active day for a symbol whose series ENDS because the security
+          stopped existing (cash merger, acquisition, bankruptcy delisting).
+          [None] for a symbol still trading, or one with no marker recorded.
+
+          Two independent consumers read it:
+
+          - {!Delisted_exit_runner} (since #2687): a held position whose marker
+            has PASSED ([config's step date > d]) is exited at the symbol's last
+            real close with reason ["delisted"], before the {!Stale_exit_runner}
+            safety net can report it as a ["stale_force_exit"] data-quality
+            flag. This consumer is {b unconditional} — it needs no opt-in,
+            because it is driven by the data, not by a tuning choice. It is a
+            no-op on every warehouse built to date (none populates
+            [active_through], so every lookup is [None]), which is what keeps
+            goldens bit-identical.
+          - The Win #4 universe prune, gated on
+            {!dependencies.prune_universe_by_active_through} — see that field.
+
+          Default [None] preserves bit-equal baselines for both. *)
+  prune_universe_by_active_through : bool;
+      (** Win #4 opt-in for the {b universe prune} half of
+          {!dependencies.active_through_for}. When [true] {b and} that lookup is
+          [Some f], the simulator prunes [symbols] once at {!create} time: any
+          symbol [s] with [f s = Some d] and [Core.Date.(d < config.start_date)]
+          is dropped from the per-step bar-fetch loop ({!_get_today_bars}).
+          [config.start_date] is the simulator's first day (== fold start date
+          including warmup); a symbol whose last active day is strictly before
+          this start cannot contribute any usable bar to the run.
 
           Domain framing: this is NOT survivor bias. Filtering on
           [active_through < fold_start_date] removes symbols that were genuinely
@@ -92,15 +114,25 @@ type dependencies = {
           the simulator began). Filtering on the present ("active_today") WOULD
           be survivor bias — that cut is wrong and is not performed here.
 
-          Default [None] preserves bit-equal baselines: no pruning, every symbol
-          participates in every step's bar-fetch loop. Authority:
-          [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
+          Default [false] preserves bit-equal baselines: no pruning, every
+          symbol participates in every step's bar-fetch loop. It is a separate
+          switch from the lookup itself precisely so a caller can arm the
+          data-driven delisted exit without also arming this performance
+          optimisation. Authority: [dev/plans/v7-sweep-speedup-2026-05-26.md]
+          §Win #4. *)
   on_transitions : (Trading_strategy.Position.transition list -> unit) option;
       (** Optional per-step observer of [Position.transition] batches. Fires
-          {b twice per step, not once}: there are exactly two call sites, both
-          reached from [_process_step_day], in this order.
+          {b two or three times per step, not once}: there are exactly three
+          call sites, in this order.
 
-          - [simulator.ml:406], inside [_process_fills_and_cancels] — the
+          - In [_prepare_market_state], the {!Delisted_exit_runner} +
+            {!Stale_exit_runner} forced exits (#2687). These are applied before
+            any order is executed, so they must be announced first. Unlike the
+            other two, this call is made {b only when that batch is non-empty} —
+            forced exits are rare, and skipping the empty call keeps the
+            observer's call count identical to what it was before #2687 on every
+            other step.
+          - [_process_fills_and_cancels], inside {!Cancel_handler} — the
             [CancelEntry] transitions for entry fills the portfolio refused to
             fund. Announced {e before} the strategy is called, because that is
             where the rejection is applied; folding them into the later batch
@@ -108,20 +140,21 @@ type dependencies = {
             {!Cancel_handler.transitions_for_rejected_trades}, builds no
             transition kind but [CancelEntry], so this batch is
             [CancelEntry]-only.
-          - [simulator.ml:452], after {!Margin_runner.tick} — the strategy's own
-            transitions plus any margin-driven transitions appended by
+          - [_process_step_day], after {!Margin_runner.tick} — the strategy's
+            own transitions plus any margin-driven transitions appended by
             {!Margin_runner.tick} (after same-tick collision dedup): the final
             list that step will apply.
 
-          Both fire unconditionally on every step, including steps where
-          [_should_call_strategy] is false but the margin runner still fires
-          (margin checks are not gated by the strategy cadence), and including
-          steps whose batch is empty — the observer is called with [[]] rather
-          than skipped. (An [Error] anywhere in a step aborts the whole run
-          rather than skipping a batch.) An observer must therefore treat each
-          call as {e one batch of} the step, never as "the step's transitions".
-          [None] (the default) is a no-op — purely observational, never
-          influences [portfolio], [positions], fills, or any simulated number.
+          The latter two fire unconditionally on every step, including steps
+          where [_should_call_strategy] is false but the margin runner still
+          fires (margin checks are not gated by the strategy cadence), and
+          including steps whose batch is empty — the observer is called with
+          [[]] rather than skipped. (An [Error] anywhere in a step aborts the
+          run rather than skipping a batch.) An observer must therefore treat
+          each call as {e one batch of} the step, never as "the step's
+          transitions". [None] (the default) is a no-op — purely observational,
+          never influences [portfolio], [positions], fills, or any simulated
+          number.
 
           Strategy-agnostic hook (mirrors [on_trade_fill]) so the simulator does
           not depend on the higher-layer [Backtest.Stop_log] / [Trade_audit]
@@ -229,6 +262,7 @@ val create_deps :
   ?exempt_closing_trades_from_cash_floor:bool ->
   ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
   ?active_through_for:(string -> Core.Date.t option) ->
+  ?prune_universe_by_active_through:bool ->
   ?on_transitions:(Trading_strategy.Position.transition list -> unit) ->
   ?entry_extension_max_pct:float ->
   ?sim_entry_fill_next_open:bool ->
@@ -294,9 +328,15 @@ val create_deps :
       simulator without giving [trading.simulation] a layering dependency on the
       higher-layer cost-model module.
     @param active_through_for
-      Optional per-symbol [active_through] lookup driving universe pruning at
-      {!create} time. Default [None] preserves baselines — no pruning. See the
-      field doc on {!dependencies.active_through_for} for the domain rationale
+      Optional per-symbol delisting-marker lookup, read by
+      {!Delisted_exit_runner} (unconditionally) and by the Win #4 universe prune
+      (only when [prune_universe_by_active_through] is [true]). Default [None]
+      preserves baselines. See the field doc on
+      {!dependencies.active_through_for}.
+    @param prune_universe_by_active_through
+      Win #4 opt-in for the universe prune at {!create} time. Default [false]
+      preserves baselines — no pruning. See the field doc on
+      {!dependencies.prune_universe_by_active_through} for the domain rationale
       (point-in-time pruning, NOT survivor bias).
     @param on_transitions
       Optional per-step transition observer. Default [None] — no observer, zero
@@ -315,6 +355,7 @@ val prune_symbols_by_active_through :
     relative to the present), so symbols delisted later during the fold are
     KEPT. This is NOT survivor bias — filtering on the current date would be,
     but that cut is not performed here. Invoked from {!create} when
+    [dependencies.prune_universe_by_active_through] is [true] {b and}
     [dependencies.active_through_for] is [Some _]; tests pin the predicate
     directly. Authority: [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
 
