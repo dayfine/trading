@@ -177,7 +177,8 @@ let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
     ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
     ~sketch_deep_days ~incremental ~progress_every ~tail_config
-    ~tail_exceptions_path ()
+    ~tail_exceptions:(Build_runner.tail_exceptions_or_exit tail_exceptions_path)
+    ()
 
 let command =
   Command.basic

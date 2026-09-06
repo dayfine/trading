@@ -771,6 +771,14 @@ Merged in main:
   beside `splices.csv`; veto list `trading/test_data/warehouse_exceptions.sexp`.
   No committed warehouse artifact moves (the repo carries none). Verify:
   `dune runtest analysis/weinstein/snapshot_pipeline analysis/scripts/build_snapshots`.
+  **Blast radius of the rebuild:** `active_through` is `None` on every warehouse
+  today, so two consumers are currently dead code and WAKE the moment a rebuilt
+  warehouse carries the marker (~1,964 of 2,908 symbols on the 2000 vintage) —
+  `Weinstein_strategy_screening.prune_universe_by_active_through` (drops a
+  delisted name from the candidate universe) and the macro classifier's
+  `active_through < d` drop in `weinstein_strategy_macro.ml`. Neither changes
+  behaviour on any warehouse built before this PR; both do on the next rebuild,
+  which is why the rebuild and the record re-base are one step, not two.
   Next: review the 2000-vintage report, rebuild the three vintage warehouses in
   Pinned shape (never `-incremental`, #2669), then PR-B (splice class) and the
   record re-base; runtime guard 3 retires under

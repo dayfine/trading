@@ -35,12 +35,15 @@
     - {b long low tail} (23 symbols) — hundreds to thousands of penny bars
       (ticker reuse, or a genuine multi-month collapse). Recognised by
       [n_stub > max_bars] (default 60).
-    - {b high-priced tail} — a terminal run below [ratio] whose own prints are
-      still real money (MEL: [$8,900] then 21 bars at [$11.72]). Recognised by
-      [first_stub_close >= max_price] (default [$1.00]). On the measured 2000
-      vintage this class is empty {e as a distinct class} — every member is
-      already caught by the mis-scale rule — but it is the gate that keeps a
-      [$100 -> $2] terminal collapse out of the stub class.
+    - {b high-priced tail} (1 symbol: ANCR) — a terminal run below [ratio] whose
+      own prints are still real money. ANCR is real to [$66.68] and then prints
+      a single bar at [$2.07]: that run is {e kept} here, and the stray pass
+      drops the bar separately (see {b Ordering and composition}). Recognised by
+      [first_stub_close >= max_price] (default [$1.00]). MEL ([$8,900] then 21
+      bars at [$11.72]) clears this gate too, but the mis-scale rule outranks it
+      and claims MEL first — so MEL illustrates the {e ordering}, not this
+      class. The gate is what keeps a [$100 -> $2] terminal collapse out of the
+      stub class.
 
     Raising the ratio does not help: at [0.20] the terminal-run count is 116 and
     at [0.50] it is 109. The ratio is not the lever —
@@ -69,7 +72,12 @@
 
     Classification reads {b raw} [close_price], matching the runtime guard's
     basis and the scan that produced the class lists above. A NaN close is
-    treated as non-stub, so a run never spans one.
+    treated as non-stub in {b both} positions a close can occupy: a run never
+    {e spans} one (the suffix maximum is unbounded, so the run test fails), and
+    a run never {e starts after} one (a non-finite reference disqualifies the
+    candidate). The second half matters because the reference close is what a
+    finding reports as [last_real_close] — without it, a NaN followed by a
+    handful of sub-$1 bars would truncate and write [nan] into the report.
 
     Pure: no I/O, no clock, no global state. Same bars + config always give the
     same bars + findings. *)

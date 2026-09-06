@@ -407,24 +407,37 @@ let _write_tail_report ~output_dir builts =
      Printf.eprintf "%s write failed: %s\n%!" tail_report_name msg);
   Printf.printf "%s\n%!" (Series_tail.summary findings)
 
+(* Pure loader: the failure is a value, so both halves are testable. The CLI
+   shells turn the [Error] into an exit via [tail_exceptions_or_exit]. *)
+let _read_exceptions_file p =
+  match
+    Or_error.try_with (fun () ->
+        Series_tail.Exceptions.of_file
+          (Series_tail.Exceptions.file_of_sexp (Sexp.load_sexp p)))
+  with
+  | Ok t -> Ok t
+  | Error e ->
+      Status.error_invalid_argument
+        (Printf.sprintf "tail exceptions load failed (%s): %s" p
+           (Error.to_string_hum e))
+
+let load_tail_exceptions path =
+  match path with
+  | None -> Ok Series_tail.Exceptions.empty
+  | Some p -> _read_exceptions_file p
+
 (* A malformed or missing exceptions file is FATAL: silently falling back to "no
    exceptions" would truncate exactly the symbols a reviewer vetoed. *)
-let _read_exceptions_file p =
-  try
-    Series_tail.Exceptions.of_file
-      (Series_tail.Exceptions.file_of_sexp (Sexp.load_sexp p))
-  with e ->
-    Printf.eprintf "tail exceptions load failed (%s): %s\n%!" p
-      (Exn.to_string e);
-    exit 1
-
-let _load_tail_exceptions path =
-  Option.value_map path ~default:Series_tail.Exceptions.empty
-    ~f:_read_exceptions_file
+let tail_exceptions_or_exit path =
+  match load_tail_exceptions path with
+  | Ok t -> t
+  | Error err ->
+      Printf.eprintf "%s\n%!" (Status.show err);
+      exit 1
 
 let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
     ~end_date ~sketch_deep_days ~incremental ~progress_every ~tail_config
-    ~tail_exceptions_path () =
+    ~tail_exceptions () =
   _ensure_dir output_dir;
   let schema = Snapshot_schema.default in
   let symbols_total = List.length symbols in
@@ -434,12 +447,7 @@ let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
   in
   let existing = if incremental then _existing_manifest ~output_dir else None in
   let manifest_path = Filename.concat output_dir "manifest.sexp" in
-  let tail =
-    {
-      config = tail_config;
-      exceptions = _load_tail_exceptions tail_exceptions_path;
-    }
-  in
+  let tail = { config = tail_config; exceptions = tail_exceptions } in
   let started_at = Core_unix.time () in
   let t0 = Time_ns.now () in
   let builts =

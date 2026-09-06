@@ -56,9 +56,12 @@ let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
     ~end_date ~sketch_deep_days ~incremental ~progress_every ~tail_config
     ~tail_exceptions_path () =
   let symbols = _load_universe ~universe_path in
+  let tail_exceptions =
+    Build_runner.tail_exceptions_or_exit tail_exceptions_path
+  in
   Build_runner.build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol
     ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every
-    ~tail_config ~tail_exceptions_path ()
+    ~tail_config ~tail_exceptions ()
 
 (* Flag [~doc] strings are hoisted to top-level bindings so the [Command.basic]
    flag block below stays flat (one line per flag) — the multi-line doc text is

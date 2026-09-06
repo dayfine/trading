@@ -78,7 +78,9 @@ type finding = {
 [@@deriving sexp_of, compare, equal]
 
 (* A NaN close is treated as unboundedly high so a stub run never spans one:
-   the run test asks whether every close from [k] on is BELOW the reference. *)
+   the run test asks whether every close from [k] on is BELOW the reference.
+   The same mapping makes a NaN REFERENCE non-finite, which [_valid_reference]
+   below rejects — see [_stub_run_start]. *)
 let _close (b : Types.Daily_price.t) =
   if Float.is_nan b.close_price then Float.infinity else b.close_price
 
@@ -93,6 +95,13 @@ let _suffix_maxima (closes : float array) : float array =
   done;
   maxima
 
+(* The reference close a run is measured against must be a real, positive
+   price. [_close] maps a NaN to [infinity], and [ratio *. infinity] is
+   [infinity], which every finite bar is below — so without the finiteness test
+   a NaN close followed by a few sub-$1 bars would read as a stub run and be
+   truncated, with [nan] written into the report as [last_real_close]. *)
+let _valid_reference r = Float.is_finite r && Float.( > ) r 0.0
+
 (* Smallest [k >= 1] such that every close in [k .. n-1] is below [ratio] of
    [closes.(k-1)]. Smallest = longest run; the test itself rules out any run
    whose interior recovers, so a mid-series collapse that recovers never
@@ -104,7 +113,7 @@ let _stub_run_start ~ratio (closes : float array) : int option =
   let rec scan k =
     if k >= n then None
     else if
-      Float.( > ) closes.(k - 1) 0.0
+      _valid_reference closes.(k - 1)
       && Float.( < ) maxima.(k) (ratio *. closes.(k - 1))
     then Some k
     else scan (k + 1)

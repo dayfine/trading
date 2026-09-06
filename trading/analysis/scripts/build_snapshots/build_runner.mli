@@ -34,13 +34,30 @@ val tail_params :
   (Snapshot_pipeline.Series_tail.Config.t * string option) Core.Command.Param.t
 (** Shared CLI flags for the series-tail pass, so both builders expose the same
     surface: [-stub-ratio], [-stub-max-bars], [-stub-max-price],
-    [-no-stub-truncation], [-no-stray-drop], [-tail-exceptions PATH]. Yields the
-    [~tail_config] and [~tail_exceptions_path] arguments {!build} takes.
+    [-no-stub-truncation], [-no-stray-drop], [-tail-exceptions PATH]. Yields
+    {!build}'s [~tail_config] plus the raw [-tail-exceptions] path, which the
+    CLI shell resolves through {!tail_exceptions_or_exit}.
 
     Only the three gate knobs are flags. The mis-scale threshold
     ([misscale_close]) and the stray-gap parameters are measured constants of
     the defect classes rather than per-build choices — see
     {!Snapshot_pipeline.Series_tail} for the measurement they come from. *)
+
+val load_tail_exceptions :
+  string option -> Snapshot_pipeline.Series_tail.Exceptions.t Status.status_or
+(** [load_tail_exceptions path] reads the series-tail veto list. [None] is
+    [Ok Exceptions.empty] (no exceptions). [Some p] parses [p] as
+    {!Snapshot_pipeline.Series_tail.Exceptions.file}; a missing or malformed
+    file is an [Error], never a silent fallback to "no exceptions" — that
+    fallback would truncate exactly the symbols a reviewer vetoed. Returning the
+    failure as a value (rather than exiting here) is what makes both halves
+    testable; the exit lives in {!tail_exceptions_or_exit}. *)
+
+val tail_exceptions_or_exit :
+  string option -> Snapshot_pipeline.Series_tail.Exceptions.t
+(** CLI shell around {!load_tail_exceptions}: prints the error to stderr and
+    exits 1. An unreadable exceptions file is fatal for a build, so both
+    builders call this before {!build} rather than passing a path in. *)
 
 val build :
   symbols:string list ->
@@ -53,7 +70,7 @@ val build :
   incremental:bool ->
   progress_every:int ->
   tail_config:Snapshot_pipeline.Series_tail.Config.t ->
-  tail_exceptions_path:string option ->
+  tail_exceptions:Snapshot_pipeline.Series_tail.Exceptions.t ->
   unit ->
   unit
 (** [build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
@@ -88,15 +105,17 @@ val build :
       Note: incremental-skipped symbols do not (re)write their side-table; a
       full (non-incremental) build emits one per symbol.
     - [progress_every] — emit [progress.sexp] every N symbols processed.
-    - [tail_config] / [tail_exceptions_path] — series-tail hygiene (#2672),
-      applied to each symbol's windowed bars {e before} the pipeline sees them
-      (see {!Snapshot_pipeline.Series_tail}). Terminal administrative stub runs
-      and stray late bars are dropped, so no [.snap] carries a phantom print;
-      every terminal run below the ratio is reported in
+    - [tail_config] / [tail_exceptions] — series-tail hygiene (#2672), applied
+      to each symbol's windowed bars {e before} the pipeline sees them (see
+      {!Snapshot_pipeline.Series_tail}). Terminal administrative stub runs and
+      stray late bars are dropped, so no [.snap] carries a phantom print; every
+      terminal run below the ratio is reported in
       [<output_dir>/terminal_runs.csv] whatever the gates decided, and a summary
-      line is logged. [tail_exceptions_path] is a sexp of symbols never edited;
-      [None] means no exceptions, and an unreadable file is fatal (falling back
-      to "no exceptions" would truncate exactly the symbols a reviewer vetoed).
+      line is logged. [tail_exceptions] names symbols never edited — their
+      findings come back [Kept_by_exception] and their series (and therefore
+      their [active_through] marker) are left whole. Build it with
+      {!tail_exceptions_or_exit}, which makes an unreadable file fatal;
+      {!Snapshot_pipeline.Series_tail.Exceptions.empty} means no exceptions.
       [deep_bars] are strictly before the window and feed only the side-table's
       depth, so they are not edited.
 

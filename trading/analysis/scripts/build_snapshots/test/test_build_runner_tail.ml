@@ -10,6 +10,7 @@ module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 
 let _end_date = Date.of_string "2021-12-31"
 let _stub_last_real = Date.of_string "2021-10-04"
+let _stub_untruncated_end = Date.of_string "2021-10-07"
 let _early_last = Date.of_string "2021-01-08"
 
 let _with_temp_dir f =
@@ -52,14 +53,15 @@ let _write_fixtures ~data_dir =
        ~start:(Date.of_string "2021-12-27")
        [ 10.0; 11.0; 12.0; 13.0; 14.0 ])
 
-let _build ~data_dir ~output_dir =
+let _build ?(tail_exceptions = Series_tail.Exceptions.empty) ~data_dir
+    ~output_dir () =
   Build_runner.build
     ~symbols:[ "STUB"; "EARLY"; "ALIVE" ]
     ~csv_data_dir:data_dir ~output_dir ~benchmark_symbol:None ~start_date:None
     ~end_date:(Some _end_date)
     ~sketch_deep_days:Build_runner.default_sketch_deep_days ~incremental:false
     ~progress_every:Build_runner.default_progress_every
-    ~tail_config:Series_tail.Config.default ~tail_exceptions_path:None ()
+    ~tail_config:Series_tail.Config.default ~tail_exceptions ()
 
 let _manifest_of ~output_dir =
   match
@@ -76,13 +78,15 @@ let _panels ~output_dir manifest =
   | Error e -> assert_failure ("panels create: " ^ Status.show e)
   | Ok p -> p
 
-let _run_build f =
+(* [f] receives the temp dir's [output_dir]; [tail_exceptions] lets a case build
+   the same fixtures with a reviewer's veto in force. *)
+let _run_build ?tail_exceptions f =
   _with_temp_dir (fun dir ->
       let data_dir = Filename.concat dir "csv" in
       let output_dir = Filename.concat dir "snap" in
       Core_unix.mkdir_p data_dir;
       _write_fixtures ~data_dir;
-      _build ~data_dir ~output_dir;
+      _build ?tail_exceptions ~data_dir ~output_dir ();
       f ~output_dir)
 
 let _active_through ~output_dir ~symbol =
@@ -134,15 +138,80 @@ let _check_early_history ~output_dir =
     (_history ~output_dir ~symbol:"EARLY")
     (is_ok_and_holds (size_is 5))
 
+let _report ~output_dir =
+  In_channel.read_all (Filename.concat output_dir Build_runner.tail_report_name)
+
 let _check_report ~output_dir =
-  let path = Filename.concat output_dir Build_runner.tail_report_name in
-  assert_that (In_channel.read_all path)
+  assert_that (_report ~output_dir)
     (all_of
        [
          contains_substring Series_tail.csv_header;
          contains_substring "STUB,stub_tail,2021-10-04,329.6100,3,";
          contains_substring ",truncated\n";
        ])
+
+(* Load the veto list through the real loader, from a real file. [contents] is
+   [None] for "point the loader at a path that does not exist". The file only
+   has to outlive the parse, so the scratch dir goes away with it. *)
+let _load_exceptions ?contents () =
+  _with_temp_dir (fun dir ->
+      let path = Filename.concat dir "warehouse_exceptions.sexp" in
+      Option.iter contents ~f:(fun data -> Out_channel.write_all path ~data);
+      Build_runner.load_tail_exceptions (Some path))
+
+let _exceptions_of ~contents =
+  match _load_exceptions ~contents () with
+  | Ok t -> t
+  | Error e -> assert_failure ("load_tail_exceptions: " ^ Status.show e)
+
+(* A symbol on the committed veto list keeps its stub tail, so both its stored
+   series and the [active_through] marker derived from that series' end stay at
+   the untruncated last bar — the point of the file being a reviewer's veto. *)
+let _stub_rows_untruncated =
+  is_ok_and_holds
+    (elements_are
+       [
+         _row_date_is (Date.of_string "2021-10-03");
+         _row_date_is _stub_last_real;
+         _row_date_is (Date.of_string "2021-10-05");
+         _row_date_is (Date.of_string "2021-10-06");
+         _row_date_is _stub_untruncated_end;
+       ])
+
+let _report_vetoes_stub =
+  all_of
+    [
+      contains_substring "STUB,stub_tail,2021-10-04,329.6100,3,";
+      contains_substring ",kept_by_exception\n";
+    ]
+
+let _check_exception_keeps_stub ~output_dir =
+  assert_that (_history ~output_dir ~symbol:"STUB") _stub_rows_untruncated;
+  assert_that
+    (_active_through ~output_dir ~symbol:"STUB")
+    (_is_date _stub_untruncated_end);
+  assert_that (_report ~output_dir) _report_vetoes_stub
+
+let test_exceptions_file_keeps_stub_series _ =
+  _run_build
+    ~tail_exceptions:(_exceptions_of ~contents:"((keep_tail (STUB)))")
+    _check_exception_keeps_stub
+
+(* The fatal path, made testable: [load_tail_exceptions] returns the failure as
+   a value and the [exit 1] lives in [Build_runner.tail_exceptions_or_exit],
+   which the two CLI shells call. Degrading to "no exceptions" would truncate
+   exactly the symbols a reviewer vetoed, so neither shape may be an [Ok]. *)
+let test_missing_exceptions_file_is_error _ =
+  assert_that (_load_exceptions ()) is_error
+
+let test_malformed_exceptions_file_is_error _ =
+  assert_that (_load_exceptions ~contents:"((keep_tail" ()) is_error
+
+let test_no_exceptions_path_is_empty _ =
+  assert_that
+    (Result.map (Build_runner.load_tail_exceptions None) ~f:(fun t ->
+         Series_tail.Exceptions.mem t ~symbol:"STUB"))
+    (is_ok_and_holds (equal_to false))
 
 let test_active_through_from_series_end _ = _run_build _check_markers
 let test_snap_ends_at_last_real_bar _ = _run_build _check_stub_history
@@ -157,6 +226,13 @@ let suite =
          "snap_ends_at_last_real_bar" >:: test_snap_ends_at_last_real_bar;
          "early_series_kept_whole" >:: test_early_series_kept_whole;
          "terminal_runs_report_written" >:: test_terminal_runs_report_written;
+         "exceptions_file_keeps_stub_series"
+         >:: test_exceptions_file_keeps_stub_series;
+         "missing_exceptions_file_is_error"
+         >:: test_missing_exceptions_file_is_error;
+         "malformed_exceptions_file_is_error"
+         >:: test_malformed_exceptions_file_is_error;
+         "no_exceptions_path_is_empty" >:: test_no_exceptions_path_is_empty;
        ]
 
 let () = run_test_tt_main suite

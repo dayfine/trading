@@ -27,6 +27,15 @@ let _apply ?(config = Config.default)
 let _date_is d =
   field (fun (b : Types.Daily_price.t) -> b.date) (equal_to ~cmp:Date.equal d)
 
+let _dates_are (bars : Types.Daily_price.t list) =
+  elements_are (List.map bars ~f:(fun b -> _date_is b.date))
+
+(* "Unchanged" means element-for-element identity, not merely the same length:
+   [size_is] witnesses identity only while the module's sole edit is a suffix
+   drop, and PR-B routes rescaling onto this same path. Same idiom as
+   [test_adjusted_basis.ml: test_equal_closes_is_bitwise_identity]. *)
+let _unchanged bars = equal_to ~cmp:(List.equal Types.Daily_price.equal) bars
+
 let _finding_is ~klass ~action ~n_stub ~cut_after =
   all_of
     [
@@ -60,7 +69,8 @@ let test_stmp_stub_tail_truncated _ =
 let test_wdr_stub_tail_truncated _ =
   assert_that
     (_apply ~symbol:"WDR" (_series (24.98 :: _repeat 29 0.27)))
-    (pair (size_is 1)
+    (pair
+       (elements_are [ _date_is _start ])
        (elements_are
           [
             _finding_is ~klass:Class.Stub_tail ~action:Action.Truncated
@@ -75,7 +85,7 @@ let test_agr_prefix_misscale_kept _ =
   let bars = _series (73_566.0 :: _repeat 200 33.94) in
   assert_that
     (_apply ~symbol:"AGR" bars)
-    (pair (size_is 201)
+    (pair (_unchanged bars)
        (elements_are
           [
             _finding_is ~klass:Class.Prefix_misscale ~action:Action.Kept
@@ -85,9 +95,10 @@ let test_agr_prefix_misscale_kept _ =
 (* MEL: $8,900 then 21 bars at $11.72 — a mis-scaled prefix whose run is also
    priced well above the $1 stub floor. *)
 let test_mel_prefix_misscale_kept _ =
+  let bars = _series (8_900.0 :: _repeat 21 11.72) in
   assert_that
-    (_apply ~symbol:"MEL" (_series (8_900.0 :: _repeat 21 11.72)))
-    (pair (size_is 22)
+    (_apply ~symbol:"MEL" bars)
+    (pair (_unchanged bars)
        (elements_are
           [
             _finding_is ~klass:Class.Prefix_misscale ~action:Action.Kept
@@ -98,9 +109,10 @@ let test_mel_prefix_misscale_kept _ =
    and low enough on ratio, but the run's own prints are real money, so the
    absolute-price floor keeps it. *)
 let test_high_priced_tail_kept _ =
+  let bars = _series [ 100.0; 2.0; 2.1; 1.9 ] in
   assert_that
-    (_apply ~symbol:"HIGH" (_series [ 100.0; 2.0; 2.1; 1.9 ]))
-    (pair (size_is 4)
+    (_apply ~symbol:"HIGH" bars)
+    (pair (_unchanged bars)
        (elements_are
           [
             _finding_is ~klass:Class.High_price_tail ~action:Action.Kept
@@ -110,9 +122,10 @@ let test_high_priced_tail_kept _ =
 (* 100 penny bars after $50: past the 60-bar cap, so ticker reuse or a genuine
    multi-month collapse — reported, never truncated. *)
 let test_long_low_tail_kept _ =
+  let bars = _series (50.0 :: _repeat 100 0.10) in
   assert_that
-    (_apply ~symbol:"LONG" (_series (50.0 :: _repeat 100 0.10)))
-    (pair (size_is 101)
+    (_apply ~symbol:"LONG" bars)
+    (pair (_unchanged bars)
        (elements_are
           [
             _finding_is ~klass:Class.Long_low_tail ~action:Action.Kept
@@ -122,9 +135,23 @@ let test_long_low_tail_kept _ =
 (* A genuine -60% crash whose series keeps printing near the new level: no
    suffix is below 5% of the close before it, so nothing is flagged at all. *)
 let test_genuine_crash_untouched _ =
-  assert_that
-    (_apply ~symbol:"CRASH" (_series [ 100.0; 40.0; 41.0; 39.0; 42.0 ]))
-    (pair (size_is 5) is_empty)
+  let bars = _series [ 100.0; 40.0; 41.0; 39.0; 42.0 ] in
+  assert_that (_apply ~symbol:"CRASH" bars) (pair (_unchanged bars) is_empty)
+
+(* A NaN close inside the terminal run makes the run's suffix maximum unbounded,
+   so nothing below the reference is ever found: no finding, no truncation.
+   ([_dates_are] rather than [_unchanged] because NaN <> NaN under [equal].) *)
+let test_nan_inside_run_kept _ =
+  let bars = _series [ 329.61; 0.045; 0.04; Float.nan ] in
+  assert_that (_apply ~symbol:"NANRUN" bars) (pair (_dates_are bars) is_empty)
+
+(* The other position a NaN can occupy: the close a candidate run is measured
+   AGAINST. [Float.nan] maps to [infinity] and [ratio *. infinity = infinity],
+   so without the finiteness guard every finite bar after it would read as a
+   stub and the report would carry [nan] as [last_real_close]. *)
+let test_nan_reference_starts_no_run _ =
+  let bars = _series [ 329.61; 0.045; Float.nan; 0.03 ] in
+  assert_that (_apply ~symbol:"NANREF" bars) (pair (_dates_are bars) is_empty)
 
 (* ANCR: 2000-08-01 at $66.68, then a single bar 2016-01-27 at $2.07. The bar
    is BOTH a (high-priced, hence kept) terminal run and a stray print; the
@@ -137,7 +164,8 @@ let test_ancr_stray_bar_dropped _ =
   in
   assert_that
     (_apply ~symbol:"ANCR" bars)
-    (pair (size_is 2)
+    (pair
+       (_unchanged (List.take bars 2))
        (elements_are
           [
             _finding_is ~klass:Class.High_price_tail ~action:Action.Kept
@@ -156,7 +184,8 @@ let test_stray_bar_alone _ =
   in
   assert_that
     (_apply ~symbol:"LATE" bars)
-    (pair (size_is 2)
+    (pair
+       (_unchanged (List.take bars 2))
        (elements_are
           [
             _finding_is ~klass:Class.Stray_bar ~action:Action.Stray_dropped
@@ -165,12 +194,12 @@ let test_stray_bar_alone _ =
 
 (* A symbol in the committed exceptions file is reported but never edited. *)
 let test_exception_keeps_stub_tail _ =
+  let bars = _series [ 329.61; 0.045; 0.04; 0.03 ] in
   assert_that
     (_apply
        ~exceptions:(Series_tail.Exceptions.of_symbols [ "STMP" ])
-       ~symbol:"STMP"
-       (_series [ 329.61; 0.045; 0.04; 0.03 ]))
-    (pair (size_is 4)
+       ~symbol:"STMP" bars)
+    (pair (_unchanged bars)
        (elements_are
           [
             _finding_is ~klass:Class.Stub_tail ~action:Action.Kept_by_exception
@@ -192,7 +221,7 @@ let test_edits_off_is_identity _ =
   in
   assert_that
     (_apply ~config:_edits_off ~symbol:"STMP" bars)
-    (pair (size_is 5)
+    (pair (_unchanged bars)
        (elements_are
           [
             _finding_is ~klass:Class.Stub_tail ~action:Action.Kept ~n_stub:4
@@ -202,9 +231,8 @@ let test_edits_off_is_identity _ =
           ]))
 
 let test_short_series_unchanged _ =
-  assert_that
-    (_apply ~symbol:"ONE" (_series [ 12.5 ]))
-    (pair (size_is 1) is_empty)
+  let bars = _series [ 12.5 ] in
+  assert_that (_apply ~symbol:"ONE" bars) (pair (_unchanged bars) is_empty)
 
 let test_classify_is_report_only _ =
   assert_that
@@ -229,6 +257,11 @@ let test_csv_and_summary _ =
          contains_substring "STMP,stub_tail,2021-10-04,329.6100,3,";
          contains_substring ",truncated\n";
        ])
+
+(* [terminal_runs.csv] is written even when the build finds nothing: a
+   header-only file is the positive evidence that the scan ran. *)
+let test_empty_csv_is_header_only _ =
+  assert_that (Series_tail.to_csv []) (equal_to (Series_tail.csv_header ^ "\n"))
 
 (* The on-disk shape of trading/test_data/warehouse_exceptions.sexp: a reviewer
    edits that file by hand, so the parse is part of the contract. *)
@@ -266,6 +299,8 @@ let suite =
          "high_priced_tail_kept" >:: test_high_priced_tail_kept;
          "long_low_tail_kept" >:: test_long_low_tail_kept;
          "genuine_crash_untouched" >:: test_genuine_crash_untouched;
+         "nan_inside_run_kept" >:: test_nan_inside_run_kept;
+         "nan_reference_starts_no_run" >:: test_nan_reference_starts_no_run;
          "ancr_stray_bar_dropped" >:: test_ancr_stray_bar_dropped;
          "stray_bar_alone" >:: test_stray_bar_alone;
          "exception_keeps_stub_tail" >:: test_exception_keeps_stub_tail;
@@ -273,6 +308,7 @@ let suite =
          "short_series_unchanged" >:: test_short_series_unchanged;
          "classify_is_report_only" >:: test_classify_is_report_only;
          "csv_and_summary" >:: test_csv_and_summary;
+         "empty_csv_is_header_only" >:: test_empty_csv_is_header_only;
          "summary_counts" >:: test_summary_counts;
          "exceptions_file_shape" >:: test_exceptions_file_shape;
          "empty_exceptions_file_parses" >:: test_empty_exceptions_file_parses;
