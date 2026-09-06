@@ -886,6 +886,7 @@ let stale_exit_deps data_dir ~stale_exit_after_days =
         Trading_simulation.Stale_hold.enabled = true;
         stale_after_days = 5;
         stale_exit_after_days;
+        exit_without_prior_bar = false;
       }
     ()
 

@@ -9,10 +9,10 @@ type t =
       manifest : Snapshot_pipeline.Snapshot_manifest.t;
     }
 
-let build_adapter_from_panels panels =
+let build_adapter_from_panels ?stub_tail panels =
   let callbacks = Snapshot_callbacks.of_daily_panels panels in
   let get_price, get_previous_bar =
-    Snapshot_bar_source.make_callbacks ~panels ~callbacks
+    Snapshot_bar_source.make_callbacks ?stub_tail ~panels ~callbacks ()
   in
   Trading_simulation_data.Market_data_adapter.create_with_callbacks ~get_price
     ~get_previous_bar

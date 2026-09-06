@@ -26,8 +26,10 @@ val tick :
   commission:Trading_engine.Types.commission_config ->
   date:Date.t ->
   today_bars:Trading_engine.Types.price_bar list ->
+  ?last_known_price:(symbol:string -> float option) ->
   portfolio:Trading_portfolio.Portfolio.t ->
   positions:Trading_strategy.Position.t String.Map.t ->
+  unit ->
   Trading_portfolio.Portfolio.t
   * Trading_strategy.Position.t String.Map.t
   * Trading_base.Types.trade list
@@ -42,6 +44,13 @@ val tick :
     - drives the matching Holding [Position.t] through Exiting to Closed and
       drops it from [positions] (no-op when no Holding position for the symbol
       exists — the portfolio is the source of truth).
+
+    [?last_known_price] is forwarded verbatim to
+    {!Stale_hold.force_exit_candidates}: it prices the #2672
+    [exit_without_prior_bar] candidates (those with no prior bar to read a close
+    from) off the caller's last-resolved-close cache, falling back to average
+    cost. Omitted, it is a lookup returning [None] for every symbol — inert
+    while that flag is off, which is the default.
 
     Returns the post-exit [(portfolio, positions, trades)] with [trades] in
     chronological (candidate) order, ready to merge into the step's trade list.

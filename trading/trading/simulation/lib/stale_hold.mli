@@ -13,8 +13,12 @@
     selects held positions whose bar gap has reached the configured threshold so
     the simulator can force-sell them at the last available close — closing the
     gap where a delisted/halted position is otherwise carried open indefinitely
-    and counted in terminal NAV (issue #1484). A future M&A track will add
-    explicit force-close on cash mergers and symbol-swap on stock mergers — see
+    and counted in terminal NAV (issue #1484). When
+    [config.exit_without_prior_bar] is additionally set, that selection extends
+    to held positions whose symbol has {b no} prior bar within the adapter's
+    lookback at all — the zombie the bar-dated path cannot see (issue #2672). A
+    future M&A track will add explicit force-close on cash mergers and
+    symbol-swap on stock mergers — see
     [dev/notes/next-session-priorities-2026-05-07.md] §"Long-term M&A track". *)
 
 open Core
@@ -40,12 +44,40 @@ type config = {
           still records events but the position is only forward-filled, which is
           the pre-#1484 behaviour. Default [None] keeps every existing run
           byte-identical. *)
+  exit_without_prior_bar : bool; [@sexp.default false]
+      (** {b #2672 guard 2 of 3.} Extends {!force_exit_candidates} to the
+          position whose symbol has {b no prior bar at all} within the adapter's
+          lookback — the case the [Some n] force-exit silently misses today,
+          because it selects only positions for which [get_previous_bar] returns
+          a bar to date the gap from.
+
+          Measured case (#2672): {b DTV} was entered 2020-03-28 off a bar dated
+          2019-09-30. The snapshot bar source looks back
+          [Snapshot_bar_source._previous_bar_lookback_days = 60] calendar days,
+          so that 180-day-old bar is invisible, [get_previous_bar] returns
+          [None], and the position is carried to the window end at a mark of
+          [0.00] — even on a run that had [stale_exit_after_days = Some 5]
+          armed.
+
+          When [true] {b and} [stale_exit_after_days = Some n], such a position
+          is force-exited once [n] calendar days have passed since the position
+          was {b opened} (its earliest lot's acquisition date — there is no last
+          bar to date the gap from), at its last known price per the caller's
+          [?last_known_price] lookup, else its average cost.
+
+          {b Default [false] = off}, bit-identical to every existing
+          baseline/golden — including the shipped
+          [stale_exit_after_days = Some 5], which this flag deliberately does
+          {b not} widen on its own (R1). Axis-expressible as
+          [((flag stale_exit_without_prior_bar) (values (true false)))]. See
+          [Weinstein_strategy_config.stale_exit_without_prior_bar]. *)
 }
 [@@deriving show, eq, sexp]
 
 val default_config : config
-(** [{ enabled = true; stale_after_days = 5; stale_exit_after_days = None }] —
-    detector on, force-exit off (pre-#1484 behaviour). *)
+(** [{ enabled = true; stale_after_days = 5; stale_exit_after_days = None;
+     exit_without_prior_bar = false }] — detector on, force-exit off (pre-#1484
+    behaviour), no-prior-bar extension off (pre-#2672 behaviour). *)
 
 (** {1 Event} *)
 
@@ -102,11 +134,18 @@ type force_exit = {
           for a short) at [last_close] to flatten the position. *)
   last_close : float;
       (** Close on the most recent bar — the price the synthetic exit fills at.
-      *)
-  last_bar_date : Date.t;  (** Date of [last_close]'s bar. *)
+          Under the [exit_without_prior_bar] extension there is no such bar, so
+          this is the caller-supplied last known price (else the position's
+          average cost). *)
+  last_bar_date : Date.t;
+      (** Date of [last_close]'s bar. Under the [exit_without_prior_bar]
+          extension there is no bar to date, so this is the date the position
+          was opened (its earliest lot's acquisition date). *)
   days_since_last_bar : int;
       (** Calendar gap [Date.diff date last_bar_date];
-          [>= stale_exit_after_days]. *)
+          [>= stale_exit_after_days]. Under the [exit_without_prior_bar]
+          extension this is days since the position was opened, per
+          [last_bar_date] above. *)
 }
 [@@deriving show, eq, sexp]
 (** One force-exit instruction per held position whose bar gap has reached
@@ -118,12 +157,25 @@ val force_exit_candidates :
   date:Date.t ->
   portfolio:Trading_portfolio.Portfolio.t ->
   today_bars:Trading_engine.Types.price_bar list ->
+  ?last_known_price:(symbol:string -> float option) ->
   config:config ->
+  unit ->
   force_exit list
 (** Select held positions to force-exit at [date]. For each held symbol with no
     bar in [today_bars], query [adapter.get_previous_bar]; emit a {!force_exit}
     when a prior bar exists and the gap [date - last_bar_date] is at least
     [config.stale_exit_after_days].
+
+    When [config.exit_without_prior_bar = true], a held symbol for which
+    [get_previous_bar] returns [None] {b also} emits a {!force_exit} once
+    [config.stale_exit_after_days] calendar days have passed since the position
+    was opened — the #2672 zombie the bar-dated path cannot see (see that
+    field's docstring for the DTV case). [?last_known_price] supplies the exit
+    price for that case: it is the caller's tier-3 last-resolved-close cache
+    (the simulator passes {!Portfolio_valuation}'s [last_known_prices]), and a
+    [None] answer falls through to the position's average cost — tier 4 of the
+    same chain. Defaults to a lookup returning [None] for every symbol, which is
+    inert while [exit_without_prior_bar = false].
 
     Returns [[]] when [config.stale_exit_after_days = None] (force-exit
     disabled), when [config.enabled = false], when no positions are held, or
