@@ -22,6 +22,7 @@ let _make_cascade ?(date = _date "2024-01-19")
     total_stocks = 20;
     candidates_after_held = 18;
     macro_trend;
+    breadth_state = Weinstein_types.breadth_state_of_market_trend macro_trend;
     long_macro_admitted = 18;
     long_breakout_admitted = 5;
     long_sector_admitted = 5;
@@ -109,8 +110,16 @@ let test_unsorted_input_is_sorted_ascending_by_date _ =
 let test_sexp_round_trip _ =
   let original : MTW.t =
     [
-      { date = _date "2024-01-19"; trend = Weinstein_types.Bullish };
-      { date = _date "2024-01-26"; trend = Weinstein_types.Bearish };
+      {
+        date = _date "2024-01-19";
+        trend = Weinstein_types.Bullish;
+        breadth_state = Weinstein_types.Bullish_breadth;
+      };
+      {
+        date = _date "2024-01-26";
+        trend = Weinstein_types.Bearish;
+        breadth_state = Weinstein_types.Deteriorating;
+      };
     ]
   in
   let parsed = MTW.t_of_sexp (MTW.sexp_of_t original) in

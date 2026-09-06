@@ -37,11 +37,11 @@ let _build_sector_rotation ~ticker_sectors ~bar_reader ~k ~ma_period_weeks
   in
   Sector_rotation.make ~config ~bar_reader ()
 
-let build ~ad_bars ~ticker_sectors ~config ~strategy_choice ~bar_reader
-    ~audit_recorder ?fold_start_date () =
+let build ~ad_bars ~breadth_bars ~ticker_sectors ~config ~strategy_choice
+    ~bar_reader ~audit_recorder ?fold_start_date () =
   match (strategy_choice : Strategy_choice.t) with
   | Weinstein ->
-      Weinstein_strategy.make ~ad_bars ~ticker_sectors ~bar_reader
+      Weinstein_strategy.make ~ad_bars ~breadth_bars ~ticker_sectors ~bar_reader
         ~audit_recorder ?fold_start_date config
   | Bah_benchmark { symbol } ->
       Trading_strategy.Bah_benchmark_strategy.make { symbol }

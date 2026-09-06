@@ -12,11 +12,21 @@
 
 open Core
 
-type per_friday = { date : Date.t; trend : Weinstein_types.market_trend }
+type per_friday = {
+  date : Date.t;
+  trend : Weinstein_types.market_trend;
+  breadth_state : Weinstein_types.breadth_state;
+      [@sexp.default Weinstein_types.Neutral_breadth]
+}
 [@@deriving sexp]
 (** One Friday's macro reading. [date] is the Friday on which [_run_screen]
     fired; [trend] is the [Macro.result.trend] returned by
-    [Macro.analyze_with_callbacks] that Friday. *)
+    [Macro.analyze_with_callbacks] that Friday, and [breadth_state] its
+    five-state breadth refinement.
+
+    [breadth_state] carries a [[@sexp.default]] so every [macro_trend.sexp]
+    written before the field existed — the two-field shape
+    [(((date 2019-01-04) (trend Bearish)))] — still parses. *)
 
 type t = per_friday list [@@deriving sexp]
 (** The per-Friday ledger written to disk. Sorted ascending by [date]; one entry

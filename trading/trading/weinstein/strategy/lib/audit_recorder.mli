@@ -243,6 +243,13 @@ type cascade_event = {
   diagnostics : Screener.cascade_diagnostics;
       (** Per-cascade-phase admission counts. Carried through unchanged from
           [Screener.result.cascade_diagnostics]. *)
+  breadth_state : Weinstein_types.breadth_state;
+      (** This Friday's [Macro.result.breadth_state] — the five-state read that
+          refines [diagnostics.macro_trend]. Recorded alongside the counts so a
+          run's artefacts can separate a Deteriorating tape from a Recovering
+          one after the fact; the gate itself still keys on [macro_trend]. With
+          the breadth-direction read disabled (the default) this is exactly the
+          projection of [macro_trend]. *)
   entered : int;
       (** How many of the {!Screener.scored_candidate}s the strategy actually
           entered this Friday — the count of {!Position.transition}s emitted by

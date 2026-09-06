@@ -6,6 +6,7 @@ open Core
     are not intended for external callers. *)
 
 val run_macro_only :
+  ?breadth_series:Breadth_series_cache.t ->
   config:Weinstein_strategy_config.config ->
   ad_series:Ad_series_cache.t ->
   prior_macro:Weinstein_types.market_trend ref ->
@@ -14,11 +15,17 @@ val run_macro_only :
   prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
   current_date:Date.t ->
   index_view:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
+  unit ->
   Macro.result
 (** Compute the macro result for [current_date] and update [prior_macro] /
     [prior_macro_result] refs in place. Runs unconditionally on every Friday so
     that halt-reset logic can consult the freshest macro trend even when the
-    universe screen is gated off. *)
+    universe screen is gated off.
+
+    [?breadth_series] is forwarded to
+    {!Panel_callbacks.macro_callbacks_of_weekly_views_cached} and read at
+    [current_date]. Omitted, the macro result's [breadth_state] is the
+    projection of its [trend] — the pre-breadth behaviour. *)
 
 val run_screen_after_macro :
   pending_entry_e:Entry_freeze.t ->

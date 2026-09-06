@@ -103,6 +103,7 @@ type _deps = {
           carried forward into [Runner.result.universe] / [universe.txt]. *)
   universe_size : int;
   ad_bars : Macro.ad_bar list;
+  breadth_bars : Macro.breadth_bar list;
   config : Weinstein_strategy.config;
   all_symbols : string list;
 }
@@ -151,6 +152,16 @@ let _load_ad_bars ?trace ~data_dir ~universe_size
     eprintf "Loading AD breadth bars...\n%!";
     Trace.record ?trace ~symbols_out:universe_size Trace.Phase.Macro (fun () ->
         Weinstein_strategy.Ad_bars.load ~data_dir))
+
+(** Load the daily universe-breadth series, honouring the same
+    [config.skip_ad_breadth] switch as {!_load_ad_bars}: the flag means "run
+    without exchange-breadth inputs", and participation breadth is the same
+    class of input. The skip path returns [[]], which is exactly what
+    {!Weinstein_strategy.Breadth_bars.load} returns for a missing CSV, so
+    downstream readers experience one degraded mode rather than two. *)
+let _load_breadth_bars ~data_dir ~(config : Weinstein_strategy.config) =
+  if config.skip_ad_breadth then []
+  else Weinstein_strategy.Breadth_bars.load ~data_dir
 
 (** Honor [config.skip_sector_etf_load] by clearing [config.sector_etfs] so no
     sector-ETF bars are loaded downstream. Hypothesis-testing flag — see
@@ -227,6 +238,7 @@ let _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () =
   eprintf "Universe: %d stocks\n%!" universe_size;
   let config = _maybe_clear_sector_etfs { config with universe } in
   let ad_bars = _load_ad_bars ?trace ~data_dir ~universe_size ~config () in
+  let breadth_bars = _load_breadth_bars ~data_dir ~config in
   Gc_trace.record ?trace:gc_trace ~phase:"macro_done" ();
   let all_symbols = _all_runner_symbols ~config ~universe in
   {
@@ -235,6 +247,7 @@ let _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () =
     universe;
     universe_size;
     ad_bars;
+    breadth_bars;
     config;
     all_symbols;
   }
@@ -248,6 +261,7 @@ let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
     data_dir_fpath = deps.data_dir_fpath;
     ticker_sectors = deps.ticker_sectors;
     ad_bars = deps.ad_bars;
+    breadth_bars = deps.breadth_bars;
     config = deps.config;
     all_symbols = deps.all_symbols;
   }

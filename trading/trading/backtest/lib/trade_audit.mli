@@ -392,6 +392,18 @@ type cascade_summary = {
   candidates_after_held : int;
       (** [total_stocks] minus already-held tickers. *)
   macro_trend : Weinstein_types.market_trend;
+  breadth_state : Weinstein_types.breadth_state;
+      [@sexp.default Weinstein_types.Neutral_breadth]
+      (** The Friday's five-state breadth reading
+          ([Macro.result.breadth_state]). Recorded for post-hoc segmentation —
+          no gate reads it.
+
+          The [[@sexp.default]] exists so the ~200 [trade_audit.sexp] /
+          [macro_trend.sexp] artefacts written before this field existed still
+          parse. [Neutral_breadth] is the right default for that: those files
+          predate any breadth series, so the runs that produced them could only
+          ever have been in the projected-from-trend mode, and a reader that
+          needs the trend has [macro_trend] right beside it. *)
   long_macro_admitted : int;
   long_breakout_admitted : int;
   long_sector_admitted : int;

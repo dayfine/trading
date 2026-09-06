@@ -832,6 +832,7 @@ let make_cascade_summary ?(date = _date "2024-01-19") ?(total_stocks = 20)
     total_stocks;
     candidates_after_held;
     macro_trend;
+    breadth_state = Weinstein_types.breadth_state_of_market_trend macro_trend;
     long_macro_admitted;
     long_breakout_admitted;
     long_sector_admitted;

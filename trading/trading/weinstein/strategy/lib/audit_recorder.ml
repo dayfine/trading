@@ -75,6 +75,7 @@ type cascade_drop = {
 type cascade_event = {
   date : Date.t;
   diagnostics : Screener.cascade_diagnostics;
+  breadth_state : Weinstein_types.breadth_state;
   entered : int;
   candidates : alternative_input list;
   drops : cascade_drop list;

@@ -212,6 +212,7 @@ let _cascade_summary_of_event (e : AR.cascade_event) :
     total_stocks = d.total_stocks;
     candidates_after_held = d.candidates_after_held;
     macro_trend = d.macro_trend;
+    breadth_state = e.breadth_state;
     long_macro_admitted = d.long_macro_admitted;
     long_breakout_admitted = d.long_breakout_admitted;
     long_sector_admitted = d.long_sector_admitted;

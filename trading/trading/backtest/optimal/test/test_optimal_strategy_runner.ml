@@ -200,7 +200,11 @@ let _write_macro_trend_sexp ~output_dir entries =
   let path = Filename.concat output_dir "macro_trend.sexp" in
   let payload : Backtest.Macro_trend_writer.t =
     List.map entries ~f:(fun (date, trend) ->
-        { Backtest.Macro_trend_writer.date; trend })
+        {
+          Backtest.Macro_trend_writer.date;
+          trend;
+          breadth_state = Weinstein_types.breadth_state_of_market_trend trend;
+        })
   in
   Sexp.save_hum path (Backtest.Macro_trend_writer.sexp_of_t payload)
 

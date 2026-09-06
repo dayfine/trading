@@ -110,6 +110,28 @@ let _diagnostics : Screener.cascade_diagnostics =
     short_top_n_admitted = 0;
   }
 
+(** The Friday's macro reading. Only [trend] (the drop trace's own gate) and
+    [breadth_state] (recorded verbatim on the event) are read by
+    {!Cascade_trace.record}; the rest is inert fixture. *)
+let _macro : Macro.result =
+  {
+    index_stage =
+      {
+        stage = Weinstein_types.Stage2 { weeks_advancing = 8; late = false };
+        ma_value = 100.0;
+        ma_direction = Weinstein_types.Rising;
+        ma_slope_pct = 0.01;
+        transition = None;
+        above_ma_count = 8;
+      };
+    indicators = [];
+    trend = Weinstein_types.Bullish;
+    breadth_state = Weinstein_types.Bullish_breadth;
+    confidence = 0.8;
+    regime_changed = false;
+    rationale = [];
+  }
+
 (** A recorder that captures the one [cascade_event] {!Cascade_trace.record}
     routes through it. [capture_candidates] is the only knob under test. *)
 let _capturing_recorder ~capture_candidates =
@@ -145,8 +167,8 @@ let _run_one_friday ~capture_candidates =
   let sink = Cascade_trace.on_walk_candidates t in
   Option.iter sink ~f:(fun f -> f _walk_contents);
   Cascade_trace.record t ~audit_recorder:recorder ~date:_current_date
-    ~config:Screener.default_config ~macro_trend:Weinstein_types.Bullish
-    ~result:_screen_result ~entered:0;
+    ~config:Screener.default_config ~macro:_macro ~result:_screen_result
+    ~entered:0;
   (sink, !captured)
 
 (* ------------------------------------------------------------------ *)
