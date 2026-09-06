@@ -156,21 +156,21 @@ type check_config = {
       (** V16: the [exit_trigger] values that mark a round trip as closed by a
           {b fallback safety net} rather than by a strategy rule. Default
           [["stale_force_exit"; "margin_call"; "maintenance_reduce";
-            "buyin_stress"; "force_liquidation_position";
-            "force_liquidation_portfolio"]].
+           "buyin_stress"; "force_liquidation_position";
+           "force_liquidation_portfolio"]].
 
           ["delisted"] is deliberately absent: a position exited on its
-          [active_through] marker is an EXPECTED corporate action, not a
-          defect. Configurable so a new safety net can be added to the list
-          the day it lands, without touching the check. *)
+          [active_through] marker is an EXPECTED corporate action, not a defect.
+          Configurable so a new safety net can be added to the list the day it
+          lands, without touching the check. *)
   stale_entry_days : int;
       (** V17: how many {b calendar} days may separate an entry fill from the
-          most recent daily bar at or before it before the fill counts as
-          priced against a dead series. Default [10] — comfortably clears a
-          long weekend plus an adjacent market holiday, so only a genuinely
-          ended series trips it. Calendar rather than bar count because the
-          question is "how long has this symbol been silent", which a bar count
-          cannot express for a symbol that stopped printing. *)
+          most recent daily bar at or before it before the fill counts as priced
+          against a dead series. Default [10] — comfortably clears a long
+          weekend plus an adjacent market holiday, so only a genuinely ended
+          series trips it. Calendar rather than bar count because the question
+          is "how long has this symbol been silent", which a bar count cannot
+          express for a symbol that stopped printing. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default

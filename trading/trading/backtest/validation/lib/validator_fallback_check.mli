@@ -5,8 +5,8 @@
     quality flags, not mechanisms"):
 
     {e "Stale exit is a fallback mechanism, like force_liquidation; they should
-    ideally never happen, and any instance we spot should lead to a data fix or
-    a quality flag that requires double-checking in analysis."}
+       ideally never happen, and any instance we spot should lead to a data fix
+       or a quality flag that requires double-checking in analysis."}
 
     So a non-zero count here is not a strategy result to interpret — it is a
     worklist. Zero is the target; each finding routes to a data fix or an
@@ -30,9 +30,9 @@ open Validator_types
 
 val check_v16 : inputs -> Validator_step.finding
 (** V16 (EXP): no round trip was closed by a fallback safety net — i.e. no row's
-    [exit_trigger] is in [config.fallback_exit_labels]
-    ([stale_force_exit], [margin_call], [maintenance_reduce], [buyin_stress],
-    and the two force-liquidation labels).
+    [exit_trigger] is in [config.fallback_exit_labels] ([stale_force_exit],
+    [margin_call], [maintenance_reduce], [buyin_stress], and the two
+    force-liquidation labels).
 
     ["delisted"] is deliberately {b not} in that list: since
     {!Trading_simulation.Delisted_exit_runner}, a held position whose

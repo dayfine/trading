@@ -292,44 +292,22 @@ let _build_run_result t =
 (* Notify the optional [on_transitions] observer with a batch of transitions
    (#2057).
 
-   The observer is called THREE times per step, deliberately and not once, in
-   the order the transitions were applied:
-
-   1. the delisted + stale force-exits, from [_prepare_market_state] — applied
-      before any order is even executed, so they must be announced first
-      (#2687);
-   2. the portfolio-rejection cancels, announced by
-      {!Cancel_handler.handle_rejected_trades} itself since #2524, which are
-      applied in [_process_fills_and_cancels] before the strategy is called;
-   3. the strategy + margin transitions, from [_process_step_day].
-
-   Folding any of them into a later notification would report them out of
-   order, which matters: {!Backtest.Stop_log} is last-writer-wins per
-   position. Call (1) is made only on steps that actually force-exited, so a
-   run with no stale exits notifies exactly as often as it did before #2687. *)
+   There are three call sites per step, not one, and their order is the order
+   the transitions were applied: the forced exits, announced by
+   {!Forced_exit_step.run} itself (they are applied before any order is even
+   executed, so they come first — #2687); then the portfolio-rejection cancels,
+   announced by {!Cancel_handler.handle_rejected_trades} itself since #2524;
+   then this one, the strategy + margin transitions. Folding any of them into a
+   later notification would report them out of order, which matters:
+   {!Backtest.Stop_log} is last-writer-wins per position. *)
 let _notify_transitions ~on_transitions transitions =
   Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
-(* Exit every held position whose delisting marker has passed, BEFORE the stale
-   safety net runs — a MARKED delisting must never be reported as a
-   [stale_force_exit] data-quality flag. Inert (returns its inputs) when no
-   [active_through_for] lookup is supplied, and a no-op on every warehouse built
-   to date, since none populates [active_through]. See
-   {!Delisted_exit_runner}. *)
-let _delisted_exits t ~portfolio ~positions ~today_bars =
-  match t.deps.active_through_for with
-  | None -> (portfolio, positions, [], [])
-  | Some active_through_for ->
-      Delisted_exit_runner.tick ~adapter:t.deps.market_data_adapter
-        ~active_through_for ~commission:t.config.commission ~date:t.current_date
-        ~today_bars ~portfolio ~positions ()
-
-(** Apply split detection, update market state, record stale-held positions,
-    exit delisted positions at their last real close, and (when configured,
-    default-off) force-exit stale positions at their last close. Returns the
-    post-split / post-force-exit portfolio, positions, today's bars, split
-    events, and the realised exit trades (merged into the step's [trades] by the
-    caller; see {!Delisted_exit_runner} and {!Stale_exit_runner}).
+(** Apply split detection, update market state, record stale-held positions, and
+    run the forced-exit phase ({!Forced_exit_step}: marked delistings first,
+    then the stale safety net). Returns the post-split / post-force-exit
+    portfolio, positions, today's bars, split events, and the realised exit
+    trades (merged into the step's [trades] by the caller).
 
     [last_known_prices] is handed to the force-exit selection as the tier-3
     price source for the #2672 [exit_without_prior_bar] candidates — positions
@@ -351,28 +329,16 @@ let _prepare_market_state t =
          ~date:t.current_date ~portfolio ~today_bars
          ~config:t.deps.stale_hold_policy)
       ~f:(Stale_hold.Log.record t.deps.stale_hold_log);
-  let portfolio, positions, delisted_trades, delisted_transitions =
-    _delisted_exits t ~portfolio ~positions ~today_bars
-  in
-  let portfolio, positions, stale_exit_trades, stale_exit_transitions =
-    Stale_exit_runner.tick ~adapter:t.deps.market_data_adapter
-      ~config:t.deps.stale_hold_policy ~commission:t.config.commission
+  let portfolio, positions, forced_exit_trades =
+    Forced_exit_step.run ~adapter:t.deps.market_data_adapter
+      ~active_through_for:t.deps.active_through_for
+      ~stale_config:t.deps.stale_hold_policy ~commission:t.config.commission
       ~date:t.current_date ~today_bars
       ~last_known_price:(fun ~symbol -> Hashtbl.find t.last_known_prices symbol)
-      ~portfolio ~positions ()
+      ~on_transitions:t.deps.on_transitions ~portfolio ~positions ()
   in
-  (* #2687: announce the forced exits so [Stop_log] can put their labels in
-     [trades.csv]. Skipped entirely on the (overwhelmingly common) step that
-     exited nothing, so the observer call count is unchanged there. *)
-  let forced_transitions = delisted_transitions @ stale_exit_transitions in
-  if not (List.is_empty forced_transitions) then
-    _notify_transitions ~on_transitions:t.deps.on_transitions forced_transitions;
   Trading_engine.Engine.update_market t.deps.engine today_bars;
-  ( portfolio,
-    positions,
-    today_bars,
-    split_events,
-    delisted_trades @ stale_exit_trades )
+  (portfolio, positions, today_bars, split_events, forced_exit_trades)
 
 (** Build the per-step [step_result]. Projection to the skinny
     [Portfolio_summary] mirrors Fix B from
@@ -458,13 +424,13 @@ let _retire_cancelled_entry_orders t ~positions ~transitions =
     and assemble the [step_result]. Returns the next simulator state paired with
     this day's [step_result]. *)
 let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
-    ~stale_exit_trades =
+    ~forced_exit_trades =
   let open Result.Let_syntax in
   let%bind portfolio, positions, fill_trades =
     _process_fills_and_cancels t ~portfolio ~positions ~today_bars
   in
-  (* Surface the already-realised stale force-exits in this step's trades. *)
-  let trades = stale_exit_trades @ fill_trades in
+  (* Surface the already-realised delisted / stale force-exits in this step. *)
+  let trades = forced_exit_trades @ fill_trades in
   let%bind strategy_transitions =
     _call_strategy { t with portfolio; positions }
   in
@@ -510,11 +476,11 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
 let step t =
   if _is_complete t then Ok (Completed (_build_run_result t))
   else
-    let portfolio, positions, today_bars, split_events, stale_exit_trades =
+    let portfolio, positions, today_bars, split_events, forced_exit_trades =
       _prepare_market_state t
     in
     _process_step_day t ~portfolio ~positions ~today_bars ~split_events
-      ~stale_exit_trades
+      ~forced_exit_trades
 
 let get_config t = t.config
 

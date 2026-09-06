@@ -23,8 +23,7 @@ let _v16_step (c : check_config) (row : trade_row) =
 let check_v16 inputs = fold_steps inputs.trades ~f:(_v16_step inputs.config)
 
 let fallback_exit_count report =
-  List.find report.checks ~f:(fun (r : check_result) ->
-      String.equal r.id "V16")
+  List.find report.checks ~f:(fun (r : check_result) -> String.equal r.id "V16")
   |> Option.value_map ~default:0 ~f:(fun (r : check_result) -> r.n_violations)
 
 (* ---- V17: an entry filled against a bar that had gone stale ------------ *)
@@ -46,8 +45,7 @@ let _v17_verdict (c : check_config) (b : bars) (row : trade_row) =
   | Some bar_date ->
       let gap = Date.diff row.entry_date bar_date in
       if gap > c.stale_entry_days then
-        Fail
-          (spec row (_v17_detail ~fill_date:row.entry_date ~bar_date ~gap))
+        Fail (spec row (_v17_detail ~fill_date:row.entry_date ~bar_date ~gap))
       else Pass
 
 let _v17_step inputs (row : trade_row) =

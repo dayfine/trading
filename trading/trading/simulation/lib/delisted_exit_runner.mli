@@ -8,13 +8,13 @@
     will ever arrive.
 
     This is a {b first-class, EXPECTED exit}, not a fallback. It runs BEFORE
-    {!Stale_exit_runner} in the simulator step precisely so that a {e marked}
-    delisting never reaches the stale safety net and never counts as a
-    data-quality flag. After this runs, a ["stale_force_exit"] row can only mean
-    "a symbol stopped printing bars and nothing in the warehouse explains why" —
-    which is a defect by definition. See
-    [dev/plans/delisting-data-fix-2026-09-06.md] §"Principle: fallbacks are
-    quality flags, not mechanisms".
+    {!Stale_exit_runner} — see {!Forced_exit_step}, which owns that ordering —
+    in the simulator step precisely so that a {e marked} delisting never reaches
+    the stale safety net and never counts as a data-quality flag. After this
+    runs, a ["stale_force_exit"] row can only mean "a symbol stopped printing
+    bars and nothing in the warehouse explains why" — which is a defect by
+    definition. See [dev/plans/delisting-data-fix-2026-09-06.md] §"Principle:
+    fallbacks are quality flags, not mechanisms".
 
     {2 Data-driven, not a strategy mechanism — no config flag}
 

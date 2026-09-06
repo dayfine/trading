@@ -43,6 +43,7 @@
   stale_hold
   stale_exit_runner
   forced_exit
+  forced_exit_step
   delisted_exit_runner
   margin_runner
   long_maintenance

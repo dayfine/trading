@@ -41,8 +41,8 @@ let render_md report =
       j.matched j.total
   in
   let flag =
-    Option.value_map (quality_flag_line report) ~default:""
-      ~f:(fun line -> line ^ "\n\n")
+    Option.value_map (quality_flag_line report) ~default:"" ~f:(fun line ->
+        line ^ "\n\n")
   in
   let body = List.map report.checks ~f:_check_line |> String.concat ~sep:"\n" in
   header ^ flag ^ body ^ "\n"

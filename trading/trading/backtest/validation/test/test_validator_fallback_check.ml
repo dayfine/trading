@@ -1,13 +1,12 @@
 (** Unit tests for V16 (fallback exits) + V17 (stale entry bars) — the
     quality-flag half of the post-run validator.
 
-    Both encode one principle
-    ([dev/plans/delisting-data-fix-2026-09-06.md] §"Principle: fallbacks are
-    quality flags, not mechanisms"): a safety-net exit should never happen, and
-    every instance is a worklist item, not a strategy result. So what these
-    tests pin is mostly what does {b not} count — a check that flagged ordinary
-    trades, or routine delistings, would bury the real defects it exists to
-    surface. *)
+    Both encode one principle ([dev/plans/delisting-data-fix-2026-09-06.md]
+    §"Principle: fallbacks are quality flags, not mechanisms"): a safety-net
+    exit should never happen, and every instance is a worklist item, not a
+    strategy result. So what these tests pin is mostly what does {b not} count —
+    a check that flagged ordinary trades, or routine delistings, would bury the
+    real defects it exists to surface. *)
 
 open Core
 open OUnit2
@@ -111,9 +110,9 @@ let test_v16_does_not_count_a_delisted_exit _ =
   in
   assert_that (_result ~id:"V16" inputs) (_violations_and_pass 0 true)
 
-(** Every fallback label in the default list is recognised. Written as one
-    trade per label so a label silently dropped from the default shows up as a
-    count, not as a pass. *)
+(** Every fallback label in the default list is recognised. Written as one trade
+    per label so a label silently dropped from the default shows up as a count,
+    not as a pass. *)
 let test_v16_recognises_every_default_fallback_label _ =
   let labels = (Vt.default_config : Vt.check_config).fallback_exit_labels in
   let inputs =
@@ -124,12 +123,11 @@ let test_v16_recognises_every_default_fallback_label _ =
             _trade ~symbol:(sprintf "S%d" i) ~exit_trigger:label ());
     }
   in
-  assert_that
-    (_result ~id:"V16" inputs)
+  assert_that (_result ~id:"V16" inputs)
     (_violations_and_pass (List.length labels) false)
 
-(** The specimen names the trigger and both dates, so a reader can chase the
-    row in the warehouse without re-running the backtest. *)
+(** The specimen names the trigger and both dates, so a reader can chase the row
+    in the warehouse without re-running the backtest. *)
 let test_v16_specimen_names_the_trigger_and_dates _ =
   let inputs =
     {
@@ -141,8 +139,7 @@ let test_v16_specimen_names_the_trigger_and_dates _ =
         ];
     }
   in
-  assert_that
-    (_result ~id:"V16" inputs)
+  assert_that (_result ~id:"V16" inputs)
     (field
        (fun (r : Vt.check_result) -> r.specimens)
        (elements_are
@@ -204,8 +201,8 @@ let test_fallback_exit_count_is_zero_when_v16_disabled _ =
 (** The CY shape: entered 2020-04-18 against a series whose last bar is
     2020-04-15 — three days, inside the default 10-day tolerance — versus a
     second entry a week later, by which point the series is 13 days dead. Only
-    the second flags, which is the point: the threshold has to clear an
-    ordinary long weekend. *)
+    the second flags, which is the point: the threshold has to clear an ordinary
+    long weekend. *)
 let test_v17_flags_only_the_genuinely_dead_series _ =
   let inputs =
     {
@@ -217,7 +214,8 @@ let test_v17_flags_only_the_genuinely_dead_series _ =
         ];
       bars =
         _bars_of
-          [ ("CY", _with_daily [ ("2020-04-14", 23.8); ("2020-04-15", 23.82) ])
+          [
+            ("CY", _with_daily [ ("2020-04-14", 23.8); ("2020-04-15", 23.82) ]);
           ];
     }
   in
@@ -262,8 +260,7 @@ let test_v17_skips_a_symbol_with_no_bars _ =
       trades = [ _trade ~symbol:"GHOST" ~entry_date:"2020-01-03" () ];
     }
   in
-  assert_that
-    (_result ~id:"V17" inputs)
+  assert_that (_result ~id:"V17" inputs)
     (all_of
        [
          field (fun (r : Vt.check_result) -> r.n_skipped) (equal_to 1);
@@ -280,8 +277,7 @@ let test_v17_skips_when_every_bar_postdates_the_entry _ =
       bars = _bars_of [ ("LATE", _with_daily [ ("2020-02-03", 50.0) ]) ];
     }
   in
-  assert_that
-    (_result ~id:"V17" inputs)
+  assert_that (_result ~id:"V17" inputs)
     (field (fun (r : Vt.check_result) -> r.n_skipped) (equal_to 1))
 
 let suite =
