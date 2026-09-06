@@ -196,7 +196,7 @@ fi
 # should be an "I:" info line, not a "W:" warning — sanity-check the
 # threshold branch didn't get inverted).
 if grep -q '^W: ' "$FINDINGS_05"; then
-  fail "5 actionable open items should not cross the threshold=10 warning; found a W: line"
+  fail "7 actionable open items should not cross the threshold=10 warning; found a W: line"
 fi
 if ! grep -q '^I: Open items: 7 actionable total' "$FINDINGS_05"; then
   fail "expected an info line reporting 7 actionable total open items, got: $(grep '^I: ' "$FINDINGS_05" || echo '<none>')"
