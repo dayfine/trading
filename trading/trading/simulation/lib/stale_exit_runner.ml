@@ -33,7 +33,7 @@ let _exit_trade ~date ~commission (c : Stale_hold.force_exit) :
         Time_ns_unix.Ofday.start_of_day;
   }
 
-let _exit_reason (c : Stale_hold.force_exit) : Position.exit_reason =
+let exit_reason (c : Stale_hold.force_exit) : Position.exit_reason =
   let detail =
     sprintf "last_bar_date=%s days_since_last_bar=%d"
       (Date.to_string c.last_bar_date)
@@ -100,18 +100,19 @@ let _apply_one ~date ~commission (portfolio, positions, trades)
   | Ok portfolio ->
       let positions =
         _close_strategy_position ~date ~exit_price:c.last_close
-          ~exit_reason:(_exit_reason c) ~positions c.symbol
+          ~exit_reason:(exit_reason c) ~positions c.symbol
       in
       (portfolio, positions, trade :: trades)
 
-let tick ~adapter ~config ~commission ~date ~today_bars ~portfolio ~positions =
+let tick ~adapter ~config ~commission ~date ~today_bars ?last_known_price
+    ~portfolio ~positions () =
   (* Only act on bar-bearing days, matching the detector's false-positive guard:
      a weekend / holiday with no bars at all should not trip a force-exit. *)
   if List.is_empty today_bars then (portfolio, positions, [])
   else
     let candidates =
       Stale_hold.force_exit_candidates ~adapter ~date ~portfolio ~today_bars
-        ~config
+        ?last_known_price ~config ()
     in
     let portfolio, positions, trades_rev =
       List.fold candidates ~init:(portfolio, positions, [])

@@ -203,6 +203,7 @@ let test_detect_disabled_returns_no_events _ =
       Stale_hold.enabled = false;
       stale_after_days = 5;
       stale_exit_after_days = None;
+      exit_without_prior_bar = false;
     }
   in
   let events =
@@ -227,7 +228,7 @@ let test_force_exit_disabled_by_default _ =
   in
   let candidates =
     Stale_hold.force_exit_candidates ~adapter ~date:(_date "2018-10-05")
-      ~portfolio ~today_bars:[] ~config:Stale_hold.default_config
+      ~portfolio ~today_bars:[] ~config:Stale_hold.default_config ()
   in
   assert_that candidates (size_is 0)
 
@@ -246,7 +247,7 @@ let test_force_exit_emits_long_candidate_at_last_close _ =
   in
   let candidates =
     Stale_hold.force_exit_candidates ~adapter ~date:(_date "2018-10-05")
-      ~portfolio ~today_bars:[] ~config
+      ~portfolio ~today_bars:[] ~config ()
   in
   assert_that candidates
     (elements_are
@@ -285,9 +286,135 @@ let test_force_exit_skips_recent_gap _ =
   in
   let candidates =
     Stale_hold.force_exit_candidates ~adapter ~date:(_date "2024-01-15")
-      ~portfolio ~today_bars:[] ~config
+      ~portfolio ~today_bars:[] ~config ()
   in
   assert_that candidates (size_is 0)
+
+(* -------------------------------------------------------------------- *)
+(* #2672 guard 2 — force-exit with no prior bar at all                   *)
+(* -------------------------------------------------------------------- *)
+
+(* The DTV shape from issue #2672: the position is opened 2020-03-28 off a bar
+   the adapter can no longer see (DTV's real series ends 2019-09-30, well
+   outside [Snapshot_bar_source]'s 60-day [get_previous_bar] lookback), and the
+   symbol never prints again. The adapter therefore has NO bar for it, ever. *)
+let _dtv_portfolio () =
+  _portfolio_with_position ~symbol:"DTV" ~quantity:1_000.0 ~entry_price:58.09
+    ~entry_date:(_date "2020-03-28")
+
+let _dtv_candidates ~exit_without_prior_bar ?last_known_price ~date () =
+  let config =
+    {
+      Stale_hold.default_config with
+      stale_exit_after_days = Some 5;
+      exit_without_prior_bar;
+    }
+  in
+  Stale_hold.force_exit_candidates
+    ~adapter:(_adapter_of_table ~table:[])
+    ~date ~portfolio:(_dtv_portfolio ())
+    ~today_bars:[ _today_bar ~symbol:"OTHER" ~price:10.0 ]
+    ?last_known_price ~config ()
+
+(** The zombie #2672 documents: with the shipped [Some 5] force-exit armed but
+    the extension off, a position whose symbol has no prior bar at all is
+    selected by nothing and rides to the window end. Pins the R1 default. *)
+let test_no_prior_bar_is_not_exited_by_default _ =
+  assert_that
+    (_dtv_candidates ~exit_without_prior_bar:false ~date:(_date "2020-06-30") ())
+    (size_is 0)
+
+(** Armed, the same position is force-exited once [n = 5] calendar days have
+    passed since it was OPENED — there is no last bar to date the gap from, so
+    the earliest lot's acquisition date is the reference. With no last-known
+    price supplied, the exit price falls through to average cost (tier 4 of
+    {!Portfolio_valuation}'s chain), which here is the entry price. *)
+let test_no_prior_bar_exits_at_avg_cost_when_armed _ =
+  assert_that
+    (_dtv_candidates ~exit_without_prior_bar:true ~date:(_date "2020-04-02") ())
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (c : Stale_hold.force_exit) -> c.symbol)
+               (equal_to "DTV");
+             field
+               (fun (c : Stale_hold.force_exit) -> c.signed_quantity)
+               (float_equal 1_000.0);
+             field
+               (fun (c : Stale_hold.force_exit) -> c.last_close)
+               (float_equal 58.09);
+             field
+               (fun (c : Stale_hold.force_exit) -> c.last_bar_date)
+               (equal_to (_date "2020-03-28"));
+             field
+               (fun (c : Stale_hold.force_exit) -> c.days_since_last_bar)
+               (equal_to 5);
+           ];
+       ])
+
+(** A supplied last-known price (tier 3) wins over average cost (tier 4) — the
+    simulator hands in {!Portfolio_valuation}'s cache, so the force-exit and the
+    NAV mark agree on what the position is worth. *)
+let test_no_prior_bar_prefers_last_known_price _ =
+  assert_that
+    (_dtv_candidates ~exit_without_prior_bar:true
+       ~last_known_price:(fun ~symbol ->
+         if String.equal symbol "DTV" then Some 41.25 else None)
+       ~date:(_date "2020-04-02") ())
+    (elements_are
+       [
+         field
+           (fun (c : Stale_hold.force_exit) -> c.last_close)
+           (float_equal 41.25);
+       ])
+
+(** Armed, the threshold is still honoured: 4 days after the position opened is
+    below [n = 5], so nothing is selected yet. *)
+let test_no_prior_bar_respects_threshold _ =
+  assert_that
+    (_dtv_candidates ~exit_without_prior_bar:true ~date:(_date "2020-04-01") ())
+    (size_is 0)
+
+(** The extension is inert while the force-exit itself is off — [None] remains
+    the byte-identical detector-only path even with the new flag set. *)
+let test_no_prior_bar_inert_when_force_exit_disabled _ =
+  let config =
+    {
+      Stale_hold.default_config with
+      stale_exit_after_days = None;
+      exit_without_prior_bar = true;
+    }
+  in
+  assert_that
+    (Stale_hold.force_exit_candidates
+       ~adapter:(_adapter_of_table ~table:[])
+       ~date:(_date "2020-06-30") ~portfolio:(_dtv_portfolio ())
+       ~today_bars:[ _today_bar ~symbol:"OTHER" ~price:10.0 ]
+       ~config ())
+    (size_is 0)
+
+(** Arming the extension does not disturb the bar-dated path: a position whose
+    prior bar IS visible and recent is still not selected. *)
+let test_armed_extension_leaves_recent_gap_alone _ =
+  let config =
+    {
+      Stale_hold.default_config with
+      stale_exit_after_days = Some 5;
+      exit_without_prior_bar = true;
+    }
+  in
+  assert_that
+    (Stale_hold.force_exit_candidates
+       ~adapter:
+         (_adapter_of_table ~table:[ ("AAPL", _date "2024-01-13", 105.0) ])
+       ~date:(_date "2024-01-15")
+       ~portfolio:
+         (_portfolio_with_position ~symbol:"AAPL" ~quantity:10.0
+            ~entry_price:100.0 ~entry_date:(_date "2024-01-02"))
+       ~today_bars:[] ~config ())
+    (size_is 0)
 
 (* -------------------------------------------------------------------- *)
 (* Log + persistence                                                     *)
@@ -379,6 +506,18 @@ let suite =
          >:: test_force_exit_emits_long_candidate_at_last_close;
          "force_exit: skips position with recent gap"
          >:: test_force_exit_skips_recent_gap;
+         "#2672: no prior bar is not exited by default"
+         >:: test_no_prior_bar_is_not_exited_by_default;
+         "#2672: no prior bar exits at avg cost when armed"
+         >:: test_no_prior_bar_exits_at_avg_cost_when_armed;
+         "#2672: no prior bar prefers the last known price"
+         >:: test_no_prior_bar_prefers_last_known_price;
+         "#2672: no prior bar respects the day threshold"
+         >:: test_no_prior_bar_respects_threshold;
+         "#2672: extension inert while force-exit is disabled"
+         >:: test_no_prior_bar_inert_when_force_exit_disabled;
+         "#2672: armed extension leaves a recent gap alone"
+         >:: test_armed_extension_leaves_recent_gap_alone;
          "log: events returned in chronological order"
          >:: test_log_records_events_in_chronological_order;
          "log: distinct_symbols dedupes" >:: test_log_distinct_symbols_dedupes;

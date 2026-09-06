@@ -16,5 +16,10 @@ let assemble ~config ~bar_reader ~current_date (screen_result : Screener.result)
     Entry_liquidity_gate.apply ~config:config.liquidity_config ~bar_reader
       ~current_date combined
   in
-  Short_borrow_gate.apply ~min_dollar_adv:config.short_borrow_min_dollar_adv
-    ~liquidity_config:config.liquidity_config ~bar_reader ~current_date combined
+  let combined =
+    Short_borrow_gate.apply ~min_dollar_adv:config.short_borrow_min_dollar_adv
+      ~liquidity_config:config.liquidity_config ~bar_reader ~current_date
+      combined
+  in
+  Entry_recency_gate.apply ~max_bar_age_days:config.entry_max_bar_age_days
+    ~bar_reader ~current_date combined

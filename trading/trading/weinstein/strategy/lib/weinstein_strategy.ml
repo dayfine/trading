@@ -20,6 +20,7 @@ module Special_exits = Special_exits
 module Liquidity_config = Liquidity_config
 module Liquidity_metric = Liquidity_metric
 module Entry_liquidity_gate = Entry_liquidity_gate
+module Entry_recency_gate = Entry_recency_gate
 module Liquidity_exit_runner = Liquidity_exit_runner
 module Extension_stop_runner = Extension_stop_runner
 module Volume_eject_runner = Volume_eject_runner

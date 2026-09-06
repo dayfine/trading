@@ -143,6 +143,13 @@ module Entry_liquidity_gate = Entry_liquidity_gate
     tests can pin the adapter's measurement basis end-to-end. See
     {!Entry_liquidity_gate}. *)
 
+module Entry_recency_gate = Entry_recency_gate
+(** The [entry_max_bar_age_days] entry-recency gate (issue #2672, guard 1 of 3):
+    drops entry candidates whose most recent daily bar is older than the
+    configured allowance, so the strategy never opens a position on a stale
+    ghost price. Default-off. Exposed so tests can pin both the pure filter and
+    the {!Bar_reader}-backed adapter. See {!Entry_recency_gate}. *)
+
 module Liquidity_exit_runner = Liquidity_exit_runner
 (** Held-position liquidity-degradation exit runner. Invoked among the special
     exits (alongside {!Stage3_force_exit_runner} / {!Laggard_rotation_runner})
@@ -1020,6 +1027,31 @@ type config = {
           [test_rs_trend_live.positive_declining_needs_the_flag], which sets
           {i this} field rather than [Rs.config]'s. See
           [Weinstein_strategy_config.enable_rs_positive_declining]. *)
+  entry_max_bar_age_days : int; [@sexp.default 0]
+      (** #2672 guard 1 of 3: when [> 0], drops an entry candidate whose most
+          recent daily bar is more than this many calendar days before the
+          decision date, so the strategy never opens a position on a stale ghost
+          price (measured case: DTV entered 2020-03-28 off its 2019-09-30 bar).
+          Default [0] = off, bit-identical (R1). See
+          [Weinstein_strategy_config.entry_max_bar_age_days]. *)
+  stale_exit_without_prior_bar : bool; [@sexp.default false]
+      (** #2672 guard 2 of 3: with [stale_exit_after_days = Some n], also
+          force-exits a held position whose symbol has NO prior bar within the
+          adapter's 60-day lookback — [n] days after the position opened, at its
+          last known price. Closes the zombie the bar-dated path cannot see (DTV
+          carried to the window end at a 0.00 mark despite the 5-day force-exit
+          being armed). Default [false] = off, bit-identical (R1). Threaded into
+          [Trading_simulation.Stale_hold.config.exit_without_prior_bar]. See
+          [Weinstein_strategy_config.stale_exit_without_prior_bar]. *)
+  stub_print_max_ratio : float; [@sexp.default 0.0]
+      (** #2672 guard 3 of 3: when [> 0.0], drops a symbol's TERMINAL run of
+          penny prints (each below this fraction of the last real close) from
+          the series both the simulator and the strategy read, so a stop cannot
+          fill at a $0.03 print after the symbol stopped trading (STMP: real
+          bars to $329.61, then $0.045 / $0.04 / $0.03 — a −$594k phantom loss
+          in the 26y record). Default [0.0] = off, bit-identical (R1).
+          Implemented by [Snapshot_runtime.Stub_tail]. See
+          [Weinstein_strategy_config.stub_print_max_ratio]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

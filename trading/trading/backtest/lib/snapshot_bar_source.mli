@@ -22,14 +22,26 @@
     path's behaviour for delisted / suspended symbols. *)
 
 val make_callbacks :
+  ?stub_tail:Snapshot_runtime.Stub_tail.t ->
   panels:Snapshot_runtime.Daily_panels.t ->
   callbacks:Snapshot_runtime.Snapshot_callbacks.t ->
+  unit ->
   (symbol:string -> date:Core.Date.t -> Types.Daily_price.t option)
   * (symbol:string -> date:Core.Date.t -> Types.Daily_price.t option)
-(** [make_callbacks ~panels ~callbacks] returns [(get_price, get_previous_bar)]
-    — the closure pair the
+(** [make_callbacks ?stub_tail ~panels ~callbacks] returns
+    [(get_price, get_previous_bar)] — the closure pair the
     {!Trading_simulation_data.Market_data_adapter.create_with_callbacks}
     constructor accepts.
+
+    [stub_tail] is the #2672 guard-3 resolver ({!Snapshot_runtime.Stub_tail.t}):
+    when supplied and armed, a date inside a symbol's truncated stub tail yields
+    no bar from [get_price], and [get_previous_bar]'s window is clamped to the
+    last real bar — so the simulator can neither fill a stop at a $0.03 penny
+    print (the STMP case) nor forward-fill a mark from one. The {b same}
+    resolver must be handed to {!Snapshot_runtime.Stub_tail.wrap_callbacks} for
+    the strategy's bar reader, or the two would disagree about which bars exist.
+    Omitted (the default) or unarmed, every read takes the prior path,
+    bit-identical.
 
     [panels] is the snapshot cache providing [read_today] / [read_history];
     [callbacks] is the field-accessor shim built via

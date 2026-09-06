@@ -23,6 +23,7 @@
   test_runner_hypothesis_overrides
   test_panel_loader_parity
   test_snapshot_mode_parity
+  test_stub_tail_bar_source
   test_backtest_runner_args
   test_config_override
   test_comparison
@@ -69,6 +70,7 @@
   trading.data_panel
   trading.data_panel.snapshot
   trading.engine
+  trading.orders
   trading.portfolio
   backtest_cost_model
   trading.simulation

@@ -1587,6 +1587,128 @@ type config = {
           [((flag enable_rs_positive_declining) (values (true false)))]. R3: no
           default flip without a ledger ACCEPT plus a confirmation grid — this
           PR claims no performance result whatsoever. *)
+  entry_max_bar_age_days : int; [@sexp.default 0]
+      (** {b #2672 guard 1 of 3 — entry recency.} When [> 0], an entry candidate
+          whose most recent {b daily} bar is dated more than this many calendar
+          days before the decision date is dropped in {!Entry_assembly} (via
+          {!Entry_recency_gate}) and never entered.
+
+          {b Why.} The entry path resolves a candidate's effective price from
+          the last bar [Bar_reader.daily_bars_for] returns, with no recency
+          check ({!Entry_audit_helpers.latest_close}). Measured case (#2672):
+          {b DTV}'s series ends 2019-09-30, yet the strategy entered it on
+          2020-03-28 at $58.09 — the close of a bar 180 days stale — and then
+          carried the position to the window end. The delisting marker that
+          should have caught this ([Types.Daily_price.active_through]) is
+          plumbed end-to-end but populated on {b no} warehouse (the EODHD parser
+          leaves it [None]), so the gate keys on the series' own last bar date
+          instead.
+
+          Units are {b calendar} days, so the value must clear a long weekend
+          plus a holiday: [10] is the suggested paired-run value; [5] would drop
+          candidates over a Christmas/New Year cluster.
+
+          {b Default [0] = off}, bit-identical to every existing
+          baseline/golden, and the same short-circuit keeps the extra bar read
+          off the default path (R1). R2: axis-expressible as
+          [((flag entry_max_bar_age_days) (values (0 5 10 20)))]. R3: no default
+          flip without a ledger ACCEPT plus a confirmation grid — this PR claims
+          no performance result whatsoever.
+
+          {b The three #2672 guards} are independent and compose:
+          {!config.entry_max_bar_age_days} (this one — never open a position on
+          a stale price), {!config.stale_exit_without_prior_bar} (realise the
+          zombie if one is opened anyway), {!config.stub_print_max_ratio} (drop
+          the penny-print tail that makes a dead series look tradeable). *)
+  stale_exit_without_prior_bar : bool; [@sexp.default false]
+      (** {b #2672 guard 2 of 3 — realise the zombie.} When [true] {b and}
+          [stale_exit_after_days = Some n], a held position whose symbol has
+          {b no} prior bar within the adapter's lookback is force-exited [n]
+          calendar days after the position was opened, at its last known price
+          (else its average cost). Threaded into
+          [Trading_simulation.Stale_hold.config.exit_without_prior_bar].
+
+          {b Why the shipped [stale_exit_after_days = Some 5] does not already
+             cover this.} That path selects a position by the gap between today
+          and the {e last bar the adapter returns}; when the adapter returns no
+          bar at all it selects nothing. The snapshot source looks back
+          [Snapshot_bar_source._previous_bar_lookback_days = 60] calendar days,
+          so a symbol whose series ended earlier than that is invisible to it.
+          Measured case (#2672): {b DTV}, entered 2020-03-28 off a 2019-09-30
+          bar, was carried to the window end at a mark of [0.00] — $65.8k of
+          phantom unrealised loss — on a run that had the 5-day force-exit
+          armed. Wide-stop arms hold delisted names longer, so any stop-width
+          surface read before this is fixed understates them.
+
+          {b Default [false] = off}, bit-identical to every existing
+          baseline/golden. It is a separate flag rather than a widening of
+          [stale_exit_after_days] precisely because that knob ships {e armed}
+          ([Some 5]) — folding the new selection into it would move goldens on
+          merge, which R1 forbids. R2: axis-expressible as
+          [((flag stale_exit_without_prior_bar) (values (true false)))]. R3: no
+          default flip without a ledger ACCEPT plus a confirmation grid.
+
+          Siblings: {!config.entry_max_bar_age_days} (prevent the entry in the
+          first place), {!config.stub_print_max_ratio} (truncate the stub tail
+          so a real last close exists to exit at). *)
+  stub_print_max_ratio : float; [@sexp.default 0.0]
+      (** {b #2672 guard 3 of 3 — stub-print tail.} When [> 0.0], a symbol's
+          {b terminal} run of implausible penny prints is dropped from the
+          series both the simulator and the strategy read: walking back from the
+          last bar, every bar whose close is below
+          [stub_print_max_ratio *. (close of the last bar before the run)] is a
+          stub, and the series is truncated at the last real bar. Only a run
+          that extends to the {e end} of the series is removed.
+
+          Measured case (#2672): {b STMP} has real bars through 2021-10-04 at
+          $329.61, then $0.045 / $0.04 / $0.03 to the end. A held long's stop
+          sits far above $0.045, so [Weinstein_stops.check_stop_hit] fires on
+          the first stub bar and the Market sell fills at its open — a −$594k
+          phantom loss in the canonical 26-year record, present in 56 of 92
+          committed trade sets. Nothing catches it today:
+          [Market_data_adapter._is_valid_bar] rejects only [close <= 0].
+
+          Suggested paired-run value [0.05]. At that ratio the {b CLE} shape
+          (months of interleaved ~$0.70 / ~$0.03 prints, final bar [0.025] after
+          [0.68]) loses only its final bar, and a real −60% one-day crash
+          followed by more bars is untouched.
+
+          {b This is data hygiene with lookahead}, deliberately: whether a run
+          of prints is terminal is only knowable from the whole series. It is
+          not a crash detector — a mid-series collapse that later recovers is
+          untouched.
+
+          {b Known cost.} Keying on price shape alone, it {b cannot} distinguish
+          an administrative stub tail from a {b genuine terminal collapse}: a
+          symbol that really traded down through the ratio and was then delisted
+          has the same shape and is truncated too, deleting a real loss and
+          biasing returns {b upward}. Only the {e gradual} terminal decline
+          whose every step stays above the ratio survives
+          ([10.0 / 5.0 / 1.0 / 0.30 / 0.28] at [0.05] is untouched;
+          [10.0 / 9.0 / 0.20 / 0.15] is not). So the bars removed include, but
+          are not limited to, ones no counterparty could have filled against.
+          That bias is an accepted cost of a default-off axis and must be
+          reported in the paired re-run writeup — it is not a reason to flip the
+          default. It is also {b not} a fix for the {e interleaved} bad-bar
+          class (CLE / ICT / ABK / MEL / MVL / AGR in the #2672 scan), which
+          needs a per-bar plausibility gate at fill time; that is tracked
+          separately.
+
+          Implemented by [Snapshot_runtime.Stub_tail], applied once per run and
+          shared between [Snapshot_bar_source] (simulator price reads) and
+          [Snapshot_callbacks] (every strategy bar / view read) so the two
+          cannot disagree about which bars exist. Truncating the series also
+          gives {!config.stale_exit_without_prior_bar} a real last close to
+          realise the position at.
+
+          {b Default [0.0] = off}, bit-identical to every existing
+          baseline/golden, and the short-circuit keeps the per-symbol close scan
+          off the default path (R1). R2: axis-expressible as
+          [((flag stub_print_max_ratio) (values (0.0 0.02 0.05 0.1)))]. R3: no
+          default flip without a ledger ACCEPT plus a confirmation grid.
+
+          Siblings: {!config.entry_max_bar_age_days},
+          {!config.stale_exit_without_prior_bar}. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

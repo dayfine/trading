@@ -12,6 +12,7 @@ open Core
 open Trading_simulation
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
+module Stub_tail = Snapshot_runtime.Stub_tail
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Cost_model = Backtest_cost_model.Cost_model
 
@@ -29,19 +30,22 @@ type input = {
    through [Bar_data_source.build_adapter (Snapshot {...})] would instead call
    [Daily_panels.create] again and produce a parallel ~330 MB LRU at the 15y
    SP500 window — see [dev/notes/15y-memory-cliff-2026-05-08.md] §"Cliff #2". *)
-let _build_market_data_adapter ~daily_panels =
-  Bar_data_source.build_adapter_from_panels daily_panels
+let _build_market_data_adapter ~daily_panels ~stub_tail =
+  Bar_data_source.build_adapter_from_panels ?stub_tail daily_panels
 
 (* Stale-hold policy for the simulator, derived from the resolved strategy
    config. The detector defaults ([enabled]/[stale_after_days]) are carried over
-   from [Stale_hold.default_config]; only [stale_exit_after_days] is threaded
-   from the strategy config. [None] (the default) keeps every existing backtest
-   byte-identical — the detector still records, but no force-exit fires. *)
+   from [Stale_hold.default_config]; [stale_exit_after_days] and the #2672
+   [exit_without_prior_bar] extension are threaded from the strategy config.
+   [None] keeps every existing backtest byte-identical — the detector still
+   records, but no force-exit fires; [exit_without_prior_bar = false] (the
+   default) keeps the armed [Some 5] path selecting exactly what it did. *)
 let _stale_hold_policy (config : Weinstein_strategy.config) : Stale_hold.config
     =
   {
     Stale_hold.default_config with
     stale_exit_after_days = config.stale_exit_after_days;
+    exit_without_prior_bar = config.stale_exit_without_prior_bar;
   }
 
 (* Simulator entry-fill cap (#2158 Phase 2): armed only when the flag is on
@@ -208,8 +212,7 @@ let _build_calendar ~start ~end_ : Date.t array =
    Refs: closes the regression on Bar_reader.of_snapshot_views (the
    [~calendar] plumbing on the snapshot views that this constructor now
    consumes was introduced in a separate prior PR). *)
-let _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest =
-  let callbacks = Snapshot_callbacks.of_daily_panels daily_panels in
+let _build_snapshot_bar_reader ~callbacks ~calendar ~snapshot_dir ~manifest =
   eprintf
     "Panel_runner: snapshot bar reader wired (calendar %d days) for strategy\n\
      %!"
@@ -288,8 +291,23 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
     ~shared_panels ~warmup_start ~end_date ~audit_recorder ?fold_start_date () =
   let daily_panels = _resolve_panels ~shared_panels ~snapshot_dir ~manifest in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
+  let base_callbacks = Snapshot_callbacks.of_daily_panels daily_panels in
+  (* #2672 guard 3: ONE stub-tail resolver, shared by the strategy's bar reader
+     and the simulator's price reads, so the two can never disagree about which
+     bars exist. Unarmed at the default ratio 0.0 — [wrap_callbacks] then
+     returns [base_callbacks] itself and [_build_market_data_adapter] takes the
+     unfiltered path, bit-identical. *)
+  let stub_tail =
+    Stub_tail.of_callbacks ~ratio:input.config.stub_print_max_ratio
+      base_callbacks
+  in
+  let stub_tail_opt =
+    if Stub_tail.is_armed stub_tail then Some stub_tail else None
+  in
   let bar_reader =
-    _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest
+    _build_snapshot_bar_reader
+      ~callbacks:(Stub_tail.wrap_callbacks stub_tail base_callbacks)
+      ~calendar ~snapshot_dir ~manifest
   in
   let strategy =
     Panel_strategy_builder.build ~ad_bars:input.ad_bars
@@ -297,7 +315,9 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
       ~config:input.config ~strategy_choice ~bar_reader ~audit_recorder
       ?fold_start_date ()
   in
-  let adapter = _build_market_data_adapter ~daily_panels in
+  let adapter =
+    _build_market_data_adapter ~daily_panels ~stub_tail:stub_tail_opt
+  in
   let final_close_prices () =
     _final_close_prices ~daily_panels ~symbols:input.all_symbols ~end_date
   in

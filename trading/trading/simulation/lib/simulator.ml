@@ -287,7 +287,14 @@ let _build_run_result t =
     (when configured, default-off) force-exit stale/delisted positions at their
     last close. Returns the post-split / post-force-exit portfolio, positions,
     today's bars, split events, and the realised force-exit trades (merged into
-    the step's [trades] by the caller; see {!Stale_exit_runner}). *)
+    the step's [trades] by the caller; see {!Stale_exit_runner}).
+
+    [last_known_prices] is handed to the force-exit selection as the tier-3
+    price source for the #2672 [exit_without_prior_bar] candidates — positions
+    whose symbol has no prior bar at all, so there is no close to read. It
+    carries this run's last-resolved closes (written by {!Portfolio_valuation}
+    at the end of each step, including its own tier-4 avg-cost entries), which
+    is why the two agree on what a held position is worth. *)
 let _prepare_market_state t =
   let split_events =
     Split_handler.detect_for_held_positions ~adapter:t.deps.market_data_adapter
@@ -305,7 +312,9 @@ let _prepare_market_state t =
   let portfolio, positions, stale_exit_trades =
     Stale_exit_runner.tick ~adapter:t.deps.market_data_adapter
       ~config:t.deps.stale_hold_policy ~commission:t.config.commission
-      ~date:t.current_date ~today_bars ~portfolio ~positions
+      ~date:t.current_date ~today_bars
+      ~last_known_price:(fun ~symbol -> Hashtbl.find t.last_known_prices symbol)
+      ~portfolio ~positions ()
   in
   Trading_engine.Engine.update_market t.deps.engine today_bars;
   (portfolio, positions, today_bars, split_events, stale_exit_trades)

@@ -20,14 +20,31 @@
 
 open Core
 
+val exit_reason : Stale_hold.force_exit -> Trading_strategy.Position.exit_reason
+(** The [Position.exit_reason] stamped on the synthetic exit: a [StrategySignal]
+    tagged [label = "stale_force_exit"], with
+    [detail = Some "last_bar_date=<d> days_since_last_bar=<n>"] read off the
+    candidate. The reason is stamped on the [Position] only: [tick] applies its
+    transitions internally, so [on_transitions] never observes them, and the
+    realised trade [tick] builds carries no [exit_trigger] — a stale force-exit
+    therefore renders as a BLANK [exit_trigger] column in [trades.csv] today
+    (issue #2687, pre-existing; 7 blank rows in the canonical 26y record). Until
+    that is threaded through, this label is the only place the tag exists.
+
+    Exported for testing: {!tick} drives the position to [Closed] and drops it
+    from the positions map in the same fold that stamps the reason, so no caller
+    can read the tag back off the result. Pure. *)
+
 val tick :
   adapter:Trading_simulation_data.Market_data_adapter.t ->
   config:Stale_hold.config ->
   commission:Trading_engine.Types.commission_config ->
   date:Date.t ->
   today_bars:Trading_engine.Types.price_bar list ->
+  ?last_known_price:(symbol:string -> float option) ->
   portfolio:Trading_portfolio.Portfolio.t ->
   positions:Trading_strategy.Position.t String.Map.t ->
+  unit ->
   Trading_portfolio.Portfolio.t
   * Trading_strategy.Position.t String.Map.t
   * Trading_base.Types.trade list
@@ -42,6 +59,13 @@ val tick :
     - drives the matching Holding [Position.t] through Exiting to Closed and
       drops it from [positions] (no-op when no Holding position for the symbol
       exists — the portfolio is the source of truth).
+
+    [?last_known_price] is forwarded verbatim to
+    {!Stale_hold.force_exit_candidates}: it prices the #2672
+    [exit_without_prior_bar] candidates (those with no prior bar to read a close
+    from) off the caller's last-resolved-close cache, falling back to average
+    cost. Omitted, it is a lookup returning [None] for every symbol — inert
+    while that flag is off, which is the default.
 
     Returns the post-exit [(portfolio, positions, trades)] with [trades] in
     chronological (candidate) order, ready to merge into the step's trade list.
