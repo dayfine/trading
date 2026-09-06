@@ -230,6 +230,25 @@ let test_csv_and_summary _ =
          contains_substring ",truncated\n";
        ])
 
+(* The on-disk shape of trading/test_data/warehouse_exceptions.sexp: a reviewer
+   edits that file by hand, so the parse is part of the contract. *)
+let test_exceptions_file_shape _ =
+  assert_that
+    ( Series_tail.Exceptions.file_of_sexp
+        (Sexp.of_string "((keep_tail (STMP WDR)))")
+    |> Series_tail.Exceptions.of_file
+    |> fun t ->
+      List.map [ "STMP"; "WDR"; "HIBB" ] ~f:(fun symbol ->
+          Series_tail.Exceptions.mem t ~symbol) )
+    (elements_are [ equal_to true; equal_to true; equal_to false ])
+
+let test_empty_exceptions_file_parses _ =
+  assert_that
+    (Series_tail.Exceptions.file_of_sexp (Sexp.of_string "((keep_tail ()))")
+    |> Series_tail.Exceptions.of_file
+    |> Series_tail.Exceptions.mem ~symbol:"STMP")
+    (equal_to false)
+
 let test_summary_counts _ =
   assert_that
     (Series_tail.summary
@@ -255,6 +274,8 @@ let suite =
          "classify_is_report_only" >:: test_classify_is_report_only;
          "csv_and_summary" >:: test_csv_and_summary;
          "summary_counts" >:: test_summary_counts;
+         "exceptions_file_shape" >:: test_exceptions_file_shape;
+         "empty_exceptions_file_parses" >:: test_empty_exceptions_file_parses;
        ]
 
 let () = run_test_tt_main suite

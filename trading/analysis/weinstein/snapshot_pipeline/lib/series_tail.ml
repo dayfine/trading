@@ -145,6 +145,23 @@ let _finding ~symbol ~klass ~action (bars : Types.Daily_price.t array) ~start =
 let _keep_prefix (bars : Types.Daily_price.t array) ~start =
   Array.sub bars ~pos:0 ~len:start |> Array.to_list
 
+(* Only the two editing actions drop the run; every [Kept*] action returns the
+   input list unchanged. *)
+let _edited_bars ~action arr ~start bars =
+  match action with
+  | Action.Truncated | Action.Stray_dropped -> _keep_prefix arr ~start
+  | Action.Kept | Action.Kept_by_exception -> bars
+
+let _classify_at (cfg : Config.stub) (arr : Types.Daily_price.t array) ~start =
+  _classify_run cfg ~last_real_close:arr.(start - 1).close_price
+    ~n_stub:(Array.length arr - start)
+    ~first_stub_close:arr.(start).close_price
+
+let _stub_action (cfg : Config.stub) ~excepted ~klass =
+  _action
+    ~eligible:(Class.equal klass Class.Stub_tail)
+    ~enabled:cfg.truncate ~excepted ~edited:Action.Truncated
+
 (* Terminal run of closes below [ratio] of the close preceding it. Detected
    whatever the gates say (the report lists every one); truncated only when the
    class is [Stub_tail], the edit is enabled, and the symbol is not excepted. *)
@@ -154,22 +171,10 @@ let _apply_stub (cfg : Config.stub) ~excepted ~symbol
   match _stub_run_start ~ratio:cfg.ratio (Array.map arr ~f:_close) with
   | None -> (bars, None)
   | Some start ->
-      let klass =
-        _classify_run cfg ~last_real_close:arr.(start - 1).close_price
-          ~n_stub:(Array.length arr - start)
-          ~first_stub_close:arr.(start).close_price
-      in
-      let action =
-        _action
-          ~eligible:(Class.equal klass Stub_tail)
-          ~enabled:cfg.truncate ~excepted ~edited:Action.Truncated
-      in
-      let kept =
-        match action with
-        | Action.Truncated -> _keep_prefix arr ~start
-        | _ -> bars
-      in
-      (kept, Some (_finding ~symbol ~klass ~action arr ~start))
+      let klass = _classify_at cfg arr ~start in
+      let action = _stub_action cfg ~excepted ~klass in
+      ( _edited_bars ~action arr ~start bars,
+        Some (_finding ~symbol ~klass ~action arr ~start) )
 
 (* First index of a droppable stray suffix: the earliest bar within the last
    [max_bars] whose gap to its predecessor is at least [gap_days]. Earliest =
@@ -194,12 +199,8 @@ let _apply_stray (cfg : Config.stray) ~excepted ~symbol
         _action ~eligible:true ~enabled:cfg.drop ~excepted
           ~edited:Action.Stray_dropped
       in
-      let kept =
-        match action with
-        | Action.Stray_dropped -> _keep_prefix arr ~start
-        | _ -> bars
-      in
-      (kept, Some (_finding ~symbol ~klass:Class.Stray_bar ~action arr ~start))
+      ( _edited_bars ~action arr ~start bars,
+        Some (_finding ~symbol ~klass:Class.Stray_bar ~action arr ~start) )
 
 let apply (config : Config.t) ~exceptions ~symbol bars =
   let excepted = Exceptions.mem exceptions ~symbol in

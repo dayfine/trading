@@ -29,7 +29,15 @@
     when armed it {e drops} the losing leg) and {!Splice_detector}
     (within-symbol ticker-reuse splices; report-only — it writes [splices.csv]
     and never changes the symbol set). With both unarmed the tool is
-    bit-identical to its pre-#2646 behaviour. *)
+    bit-identical to its pre-#2646 behaviour.
+
+    A third pass, {!Snapshot_pipeline.Series_tail}, runs inside
+    {!Build_runner.build} itself and is {b on by default} (#2672): it ends a
+    delisted symbol's series at its last real print — dropping the terminal
+    administrative stub run and any stray bar dated years later — and stamps the
+    manifest's [active_through] from the series end. It writes
+    [terminal_runs.csv] beside [splices.csv]. [-no-stub-truncation] /
+    [-no-stray-drop] reduce it to report-only. *)
 
 open Core
 module Scenario = Scenario_lib.Scenario
@@ -150,7 +158,7 @@ let _scan_splices ~config ~data_dir ~warmup_start ~end_date ~output_dir
 
 let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
     ~sketch_deep_days ~incremental ~progress_every ~twin_config ~splice_config
-    () =
+    ~tail_config ~tail_exceptions_path () =
   let scenario = Scenario.load scenario_path in
   let universe =
     _resolve_universe ~fixtures_root ~universe_path:scenario.universe_path
@@ -168,7 +176,8 @@ let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
   Build_runner.build ~symbols ~csv_data_dir ~output_dir
     ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
-    ~sketch_deep_days ~incremental ~progress_every ()
+    ~sketch_deep_days ~incremental ~progress_every ~tail_config
+    ~tail_exceptions_path ()
 
 let command =
   Command.basic
@@ -269,7 +278,7 @@ let command =
          ~doc:
            "Report out-of-band days even when a split is recoverable from the \
             raw-vs-adjusted divergence (default: suppress those)"
-     in
+     and tail_config, tail_exceptions_path = Build_runner.tail_params in
      fun () ->
        let basis =
          match String.lowercase twin_basis with
@@ -300,6 +309,6 @@ let command =
        in
        main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
          ~sketch_deep_days ~incremental ~progress_every ~twin_config
-         ~splice_config ())
+         ~splice_config ~tail_config ~tail_exceptions_path ())
 
 let () = Command_unix.run command

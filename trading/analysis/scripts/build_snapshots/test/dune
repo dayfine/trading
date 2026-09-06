@@ -1,5 +1,6 @@
 (tests
  (names test_universe_loader test_bar_window)
+ (modules test_universe_loader test_bar_window)
  (libraries
   core
   ounit2
@@ -9,5 +10,25 @@
   universe
   universe_loader
   bar_window)
+ (preprocess
+  (pps ppx_jane)))
+
+(test
+ (name test_build_runner_tail)
+ (modules test_build_runner_tail)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  ounit2
+  matchers
+  status
+  types
+  fpath
+  csv
+  trading.data_panel.snapshot
+  weinstein.snapshot_pipeline
+  weinstein.snapshot_runtime
+  build_runner)
  (preprocess
   (pps ppx_jane)))
