@@ -1,0 +1,8 @@
+[09-06 17:16:23] run tree HEAD=cccd06813 (expect cccd06813 for the rebuild; the acceptance run re-pins after #2692)
+[09-06 17:16:24] BUILD 2000 -> /tmp/snap_top3000_2000_v6tail
+[09-06 18:02:43] RESULT 2000 snaps=2999 manifest=2999 active_through=2999 exit=0
+[09-06 18:02:44] BUILD 2009 -> /tmp/snap_top3000_2009_v6tail
+[09-06 18:30:17] RESULT 2009 snaps=2033 manifest=2033 active_through=2033 exit=0
+[09-06 18:30:18] BUILD 2019 -> /tmp/snap_top3000_2019_v6tail
+[09-06 18:44:33] RESULT 2019 snaps=2209 manifest=2209 active_through=2209 exit=0
+[09-06 18:44:33] REBUILD DONE

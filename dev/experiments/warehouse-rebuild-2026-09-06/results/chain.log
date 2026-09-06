@@ -1,0 +1,4 @@
+[09-06 18:18:44] RUN rec26y-new-s0 on /tmp/snap_top3000_2000_v6tail
+[09-06 22:02:45] RESULT rec26y-new-s0 => total_return_pct 165.15792063971219 total_trades 715 sharpe_ratio 0.30898764455377753 max_drawdown_pct 42.371840829902126  V16/V17: none (wall 13441s)
+[09-06 22:02:45] RUN rec26y-new-s1 on /tmp/snap_top3000_2000_v6tail
+[09-06 22:04:34 dispatcher] STOPPED after rec26y-new-s0: V17 = 5 stale entries → entry-gate fix (PR-D) first; salts re-run after

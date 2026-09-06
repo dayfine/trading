@@ -1,0 +1,6 @@
+[09-06 09:32:00] run tree HEAD=3113f751e (expect 3113f751e)
+[09-06 09:32:05] RUN dg-26y-off-s1
+[09-06 12:14:30] RESULT dg-26y-off-s1 => total_return_pct 180.23295623669208 total_trades 726 win_rate 32.782369146005507 sharpe_ratio 0.32940413499096272 max_drawdown_pct 38.5554791058891  (wall 9745s)
+[09-06 12:14:31] RUN dg-26y-on-s1
+[09-06 12:37:28 dispatcher] PAUSED after dg-26y-off-s1 to free the container for the delisting-data-fix build; dg-26y-on-s1 will re-run on relaunch
+[09-06 16:40:44 dispatcher] CANCELLED: superseded by the warehouse rebuild (dev/experiments/warehouse-rebuild-2026-09-06/); dg-26y-off-s1 result retained

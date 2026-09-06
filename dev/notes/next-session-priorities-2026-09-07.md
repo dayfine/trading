@@ -47,7 +47,19 @@ MERGED; item 3 (per-state stop width) is the next build; item 4 (combined surfac
   rows in the record). Breadth scripts/series committed under
   `dev/experiments/yearly-trade-review-2026-09-04/breadth/`.
 
-## The sequence (unchanged from 09-06, items 1–2 done)
+## The sequence — REVISED 2026-09-06 evening: the data-layer fix comes first
+
+User direction (16:40 PT): fix the data, then re-run. The executable queue (10 steps:
+merge #2692 → pin+build → superset universes → rebuild 2000/2009/2019 warehouses with
+#2691 → review `terminal_runs.csv` → **V16/V17 acceptance run (0 fallbacks, 7 `delisted`
+rows, ONE CY entry, STMP `delisted` at ~$329.61)** → salted record re-base as a 3-salt
+band → golden check → docs re-base → retire guard 3 → PR-B splice class) is
+`dev/experiments/warehouse-rebuild-2026-09-06/README.md`, with scripts. Merged today on
+this track: #2691 (build-time `Series_tail`, `active_through` from series end); #2692 is
+the `delisted` exit + V16/V17 + #2687 label fix. Items 2–3 below (per-state stop width,
+combined surface) move AFTER the re-base — their comparators are being re-based.
+
+## The earlier sequence (09-06 items 1–2 done; items 3–4 now follow the re-base)
 
 ### 1. Close out #2672: record re-base + interleaved-series sibling
 
@@ -110,3 +122,13 @@ a ledger entry, paired goldens for every knob that moves.
 - Do not flip `initial_stop_buffer`, `stop_update_cadence`, any macro threshold, or the
   three #2672 guards' defaults on the evidence so far.
 - Do not describe the Weekly cadence as weekly-close evaluation.
+
+## Overnight 09-06 → 07: rebuild done, acceptance = V16 PASS / V17 FAIL(3), PR-D next
+
+Three `_v6tail` warehouses built (2000: 2,999 snaps; 2009: 2,033; 2019: 2,209 — the 2009/2019
+counts equal the old ones because ~970 / ~790 composition names have NO CSV in the store:
+the survivor tilt lives in the store, so the vintage gap fetch is a real P1). Acceptance
+cell on the rebuilt 2000 warehouse: V16 0 fallback exits, 10 `delisted` rows (STMP at
+$329.61), but **V17 = 3 stale entries (FII ×2, CY)** → PR-D (unconditional admission
+exclusion at `active_through`, + the #2693 survivor-marker fix) before the salted re-base.
+Full record: `dev/experiments/warehouse-rebuild-2026-09-06/README.md`.

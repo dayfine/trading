@@ -1,0 +1,104 @@
+# Warehouse rebuild on the data-layer fix, V16/V17 acceptance, salted record re-base (queued 2026-09-06)
+
+**Status: QUEUED** — runs in this order once PR #2692 merges (it carries the `delisted`
+exit and the V16/V17 validator the acceptance step reads). Each step is
+container-exclusive: no agents alongside a rebuild or a 26y cell
+(`container-capacity-scheduling.md`).
+
+## Queue
+
+| # | task | script / PR | done when |
+|---|---|---|---|
+| 0 | Merge #2692 (PR-C) after its gates | — | main green |
+| 1 | Pin a worktree at merged main; build `build_snapshots.exe`, `scenario_runner.exe`, `post_run_validator_cli.exe` | `git worktree add --detach .claude/worktrees/sweep-wh0906 <sha>` + docker `dune build` of the three targets | exes present |
+| 2 | Superset universes for 2000 / 2009 / 2019 = **composition ∪ the old warehouse's manifest symbols** ∪ GSPC.INDX (measured 16:50 PT: the old 2000 warehouse holds 2,908 names = 2,834 of the composition's 3,000 + 74 extras, so its union adds only 15 names; the old 2009 and 2019 warehouses hold 2,033 and 2,209 names — 996 and 798 composition names were absent, the survivor tilt of `project_warehouse_vintage_coverage` — so those rebuilds widen the universe materially, which is the point; the union keeps every name the old warehouses had) | `make_superset.sh` output unioned with `grep "(symbol " <old-wh>/manifest.sexp`; staged in `/tmp/wh-rebuild/specs/` (done 2026-09-06 16:50 PT) | 3 files: 2000 = 3,015, 2009 = 3,001, 2019 = 3,001 symbols incl. GSPC.INDX |
+| 3 | Rebuild the three vintage warehouses with #2691's build (`_v6tail` suffix; the old dirs stay for comparison) | `rebuild.sh` (~12 / ~22 / ~12 min) | manifest count = snap count; `active_through` count ≈ 1,964 on 2000; `terminal_runs.csv` per vintage copied to `results/` |
+| 4 | Review `terminal_runs_2000.csv`: 13 `stub_tail` truncated, 10 `prefix_misscale` kept, 23 `long_low_tail` kept, 1 `high_price_tail` kept, 14 stray bars dropped; whitelist any genuine collapse in `trading/test_data/warehouse_exceptions.sexp` and rebuild that vintage if the list changes | by hand | list matches `delisting-guards-rerun-2026-09-06/scan/` |
+| 4b | **PR-D** (`feat/no-entry-past-active-through`, dispatched 22:20 PT): unconditional admission exclusion at `active_through` + #2693 survivor-marker fix + the stale `panel_runner` comment | feat PR, full gates | merged; then rebuild the three warehouses again (#2693) |
+| 5 | **V16/V17 acceptance run**: record spec at salt 0 on the rebuilt 2000 warehouse + post-run validator | `acceptance-and-rebase.sh` (first cell) | **0 V16 fallback exits, 0 V17 stale entries**; the 7 former `stale_force_exit` rows render `delisted` (WLL1, RBAK, PCYC, CY, CHS, AZPN); CY has ONE entry; STMP exits `delisted` at ≈ $329.61, not `stop_loss` at $0.04 |
+| 6 | Salted record re-base: rec26y salts 1–2 on 2000; rec5y-2000 (2000) and rec5y-2019 (2019) at salt 0 | `acceptance-and-rebase.sh` (remaining cells; ~2.7 h per 26y cell) | per-arm artifacts in `results/`; the new record is a **3-salt band**, never one number; dissect vs the old record by `position_id` |
+| 7 | Golden check: the committed goldens read CSV fixtures (no warehouse built in CI), so #2691's truncation cannot move them by construction — confirm on the postsubmit golden workflows of the #2692 merge and state it | — | golden workflows green |
+| 8 | Docs: record re-base entry, `project_record_rebase_*` memory, standing results restated as bands, this README's results table | docs PR (mixed → full gates) | merged |
+| 9 | Retire runtime guard 3 (`stub_print_max_ratio`) under `experiment-flag-discipline.md` Rule 4 once every live warehouse is a `_v6tail` build; guards 1+2 stay | removal PR | merged, goldens bit-identical |
+| 10 | PR-B: splice / ticker-reuse class at build (10 mis-scaled prefixes, 23 long low tails; the `splices.csv` findings) | feat PR | rebuild again → re-base again (salted) |
+
+## Not re-run
+
+The stop-width and breadth-direction surfaces (within-cell A/B on the same defective
+data; relative reads stand; levels restated on the next touch). The old-warehouse salts
+run of the runtime guards (`delisting-guards-rerun-2026-09-06/chain-salts.sh`) is
+CANCELLED — superseded: guard 3 retires, and the rebuild answers the same question with
+the true universe. Its one completed cell (`dg-26y-off-s1` = 180.23% / 726 / maxDD 38.56,
+vs 302.65% at salt 0) is kept as the salt-spread datum for the record's own level.
+
+## Reads to pre-register
+
+- The 26y level on the rebuilt warehouse is expected to differ from 302.65% by the same
+  path-lottery mechanism as the guards-on run (the universe changes on most screens);
+  the acceptance criterion is the V16/V17 zero count and the named exits, NOT the level.
+- STMP: −$594k phantom becomes a small `delisted` exit; CLE stays wrong (class ii, PR-B).
+- The 5y-2019 cell on the rebuilt 2019 warehouse now runs on ~2,200 names, not the ~980
+  survivors of the 2000-vintage warehouse (`project_warehouse_vintage_coverage`).
+
+## Run log
+
+- **2000 rebuild (17:16–18:02 PT, 46 min, union superset 3,015 names):** 2,999 snaps =
+  2,999 manifest entries. `terminal_runs_2000.csv`: **17 `stub_tail` truncated** = the
+  scan's 13 + 4 the fresher CSV store exposes (APPB 2023 collapse to $0.0002, ESINQ
+  2026, GES — Guess's 2026 cash deal at $16.81 → $0.011, MYL — Mylan→Viatris 2020-11-16,
+  a new union name); 13 `prefix_misscale` kept, 28 `long_low_tail` kept, 1
+  `high_price_tail` kept, 13 stray bars dropped. Every scan truncation recurs. **Step 4
+  passes; no exceptions needed.**
+- **Defect found (#2693):** `active_through` is stamped on **2,999 / 2,999** symbols —
+  `_derive_active_through` compares the last bar to the CLI `-end-date` (2026-09-06),
+  which is after the store's last bar (2026-08-17), so 778 survivors carry
+  `active_through 2026-08-17` (plus clusters at 06-26 and 07-01). Harmless inside the
+  record window (every survivor marker is after 2026-06-26, so neither the `delisted`
+  exit nor the prune can act on it), wrong for any window reaching the store's end.
+  Fix = derive against the universe's max last-bar with a tolerance; rebuild after.
+  The acceptance run proceeds on this warehouse with that caveat pre-registered.
+- **2009 rebuild (18:02–18:30 PT, 28 min, union superset 3,001):** 2,033 snaps = 2,033
+  manifest entries = **exactly the old warehouse's count**; the builder logged the missing
+  composition names as `skip <SYM>: no CSV`. So the survivor tilt of the 2009/2019
+  vintages is in the **CSV store**, not in the old builds — the union superset cannot
+  widen them until the missing delisted names are fetched (the P1 "vintage warehouse gap
+  fetch" item, ~700–1,000 names per vintage via EODHD, then a Pinned rebuild). Same
+  `active_through` defect as 2000 (#2693: 2,033/2,033 marked).
+- **2019 rebuild (18:30–18:44 PT, 14 min):** 2,209 snaps = the old count (792 composition
+  names `no CSV`); `active_through` 2,209/2,209 (#2693). **REBUILD DONE 18:44 PT.** Per-vintage
+  `terminal_runs_{2000,2009,2019}.csv` in `results/`.
+- **Step 7 (golden check) passes early:** main is fully green on the #2692 merge
+  (552439c91) — `CI`, `perf-tier1`, `golden-runs-sp500-5y`, `golden-runs-custom-universe`
+  all success; the goldens read CSV fixtures, so the build-time truncation cannot move them.
+- **Acceptance cell `rec26y-new-s0`** started 18:18 PT on `snap_top3000_2000_v6tail`
+  (worktree `sweep-wh0906b` @ 552439c91); result ~21:00 PT.
+
+## Acceptance cell result (22:02 PT) — V16 PASS, V17 FAIL (3), chain stopped for PR-D
+
+`rec26y-new-s0` on `snap_top3000_2000_v6tail` (worktree @ 552439c91, 13,441 s wall —
+40% slower than the old warehouse's 9,615 s): **165.16% / 715 / Sharpe 0.31 / maxDD 42.37**
+— a level, and per the pre-registration NOT the criterion (path lottery: the universe
+differs from the old warehouse on most screens). The criteria:
+
+| criterion | result |
+|---|---|
+| 0 V16 fallback exits | **PASS** — `exit_trigger` counts: `delisted 10, laggard_rotation 234, stop_loss 464, extension_stop 3, stage3_force_exit 2, liquidity_exit 2`; zero `stale_force_exit`, zero blank |
+| the former `stale_force_exit` rows render `delisted` | **PASS** — WLL1, RBAK, CY, CHS, AZPN on this path (PCYC is not held on this path), plus STMP, ISSX, FII ×2, ANDV |
+| STMP exits `delisted` near $329.61 | **PASS** — 2021-10-05 at 329.61, +$4,189 (was `stop_loss` at $0.04, −$593,988) |
+| CY entered once | PASS on the count — but that one entry (2020-04-25) is itself stale |
+| 0 V17 stale entries | **FAIL — 3**: FII 2020-03-28 and 2020-04-04 (last bar 2020-01-31; 57 / 64 days), CY 2020-04-25 (last bar 2020-04-15; 10 days). All three are entries on a symbol whose `active_through` had passed; the run's own `delisted` exit then closed each within two days (−$845, −$844, −$122) |
+
+Note on the first validator pass: my chain pointed `post_run_validator_cli` at the
+worktree's fixture CSVs (`test_data`, 655 symbols ending 2025-05-16), which skipped 506
+entries and flagged five survivors (LLY, INFY, CP, COST, BP) against the fixture's end date.
+Re-run with `-data-dir /workspaces/trading-1/data` (the real store) → the 3 rows above;
+`acceptance-and-rebase.sh` fixed. Both validator outputs are in `results/`.
+
+**Consequence.** Admission still lets a symbol in after its marker has passed: the record
+convention has guard 1 (`entry_max_bar_age_days`) at its default 0 and the screener's PI
+filter behind `enable_pi_filter` (default false). Per the principle, the marker is data,
+not a mechanism: **PR-D** makes exclusion at admission unconditional when
+`active_through < as_of` (same shape as the `delisted` exit), and carries the #2693 fix
+(survivor markers). Then: rebuild the three warehouses (#2693), re-run this cell (expect
+V17 = 0 and 712 trades), then the salts. The chain was stopped at 22:03 PT after this
+cell; `rec26y-new-s1` had just started and is discarded.
