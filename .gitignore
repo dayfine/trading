@@ -147,3 +147,6 @@ trading/dev/experiments/weekly-cf/
 # accidentally committed at least 3 times (#1299, #2085, #2129) because
 # every build dirties it. See dev/status/cleanup.md tracked_build_artifact.
 trading/compile_commands.json
+
+# Claude Code harness scratch (session-local cron lock)
+.claude/scheduled_tasks.lock

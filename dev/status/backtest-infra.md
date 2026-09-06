@@ -746,6 +746,15 @@ Merged in main:
   re-run) are multi-hour backtests, which
   `.claude/rules/container-capacity-scheduling.md` forbids running alongside
   agents. **Recommend a LOCAL maintainer session**, not a GHA dispatch.
+  **2026-09-06 (local session):** fix landed as PR #2686 (`feat/delisting-guards-2672`) — three
+  default-off guards (`entry_max_bar_age_days`, `stale_exit_without_prior_bar`,
+  `stub_print_max_ratio`); root causes in `memory/project_delisting_guards_2672`
+  (the `active_through` marker is populated on NO warehouse; `get_previous_bar`'s
+  60-day cap makes stale entries zombies). Paired re-run in
+  `dev/experiments/delisting-guards-rerun-2026-09-06/` (5y-2019 pair done: the
+  +35pp is STMP alone; 26y salt 0 done: on-arm 139.8% vs 302.7% is a path lottery — universe differs on 97% of screens — not a guard cost; salts 1–2 running). Blank `exit_trigger` on stale force-exits
+  filed as #2687. Interleaved-series symbols (CLE/ICT/ABK/MEL/MVL/AGR) are a sibling
+  defect, not fixed by the tail guard.
 
 - **Step 3 (tier-aware bar loader)** now unblocked; separately tracked at
   `dev/status/backtest-scale.md`. A/B the Legacy vs Tiered loader

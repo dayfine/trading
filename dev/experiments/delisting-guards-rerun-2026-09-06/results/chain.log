@@ -1,0 +1,16 @@
+[09-06 01:52:22] run tree HEAD=3113f751e (expect 3113f751e)
+[09-06 01:52:26] RUN dg-5y-2019-off-s0
+[09-06 01:52:26] RUN dg-5y-2019-on-s0
+[09-06 02:25:38] RESULT dg-5y-2019-off-s0 => total_return_pct 16.792748043895 total_trades 179 win_rate 29.608938547486037 sharpe_ratio 0.2613116138679743 max_drawdown_pct 22.0449294765248  (wall 1992s)
+[09-06 02:26:06] RESULT dg-5y-2019-on-s0 => total_return_pct 52.1195639968294 total_trades 169 win_rate 32.544378698224854 sharpe_ratio 0.57757675250637353 max_drawdown_pct 21.653219461013787  (wall 2020s)
+[09-06 02:26:06] PAIR dg-5y-2019 COMPLETE
+[09-06 02:26:07] ABORT (pre-dg-26y-off): 2941MiB free < 4096
+[09-06 03:42:40] run tree HEAD=3113f751e (expect 3113f751e)
+[09-06 03:42:44] SKIP dg-5y-2019-on-s0
+[09-06 03:42:44] SKIP dg-5y-2019-off-s0
+[09-06 03:42:44] PAIR dg-5y-2019 COMPLETE
+[09-06 03:42:46] RUN dg-26y-off-s0
+[09-06 06:23:01] RESULT dg-26y-off-s0 => total_return_pct 302.6531612992386 total_trades 723 win_rate 34.3015214384509 sharpe_ratio 0.3969625221631925 max_drawdown_pct 36.257307926529784  (wall 9615s)
+[09-06 06:23:02] RUN dg-26y-on-s0
+[09-06 09:13:08] RESULT dg-26y-on-s0 => total_return_pct 139.81311535519362 total_trades 714 win_rate 33.0532212885154 sharpe_ratio 0.29192543437674812 max_drawdown_pct 38.38594178698682  (wall 10206s)
+[09-06 09:13:08] DG0906 CHAIN DONE
