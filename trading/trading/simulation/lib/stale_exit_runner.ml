@@ -56,66 +56,76 @@ let _find_holding positions symbol =
 let _set_or_drop_if_closed acc ~key ~data =
   if Position.is_closed data then Map.remove acc key else Map.set acc ~key ~data
 
-(* Drive the strategy [Position.t] for [symbol] from Holding through Exiting to
-   Closed at [exit_price], then drop it from [positions]. Returns [positions]
-   unchanged when no Holding position for [symbol] exists (the portfolio is the
-   source of truth for the realised trade; the strategy map is best-effort kept
-   in sync). *)
-(* Drive a Holding [pos] (id [id]) through Exiting to Closed at [exit_price],
-   returning the closed position, or [None] if any transition is rejected. *)
-let _drive_holding_to_closed ~id ~date ~exit_price ~exit_reason pos =
+(* The TriggerExit / ExitFill / ExitComplete triple that closes Holding [pos]
+   (id [id]) at [exit_price]. Built as data rather than applied inline so the
+   same list can be both folded onto the position AND reported to the caller's
+   transition observer — the [Stop_log] path that puts [exit_reason]'s label in
+   [trades.csv] (#2687). *)
+let _close_transitions ~id ~date ~exit_price ~exit_reason pos =
   let open Position in
   let qty = match get_state pos with Holding h -> h.quantity | _ -> 0.0 in
-  let steps =
-    [
-      { position_id = id; date; kind = TriggerExit { exit_reason; exit_price } };
-      {
-        position_id = id;
-        date;
-        kind = ExitFill { filled_quantity = qty; fill_price = exit_price };
-      };
-      { position_id = id; date; kind = ExitComplete };
-    ]
-  in
+  [
+    { position_id = id; date; kind = TriggerExit { exit_reason; exit_price } };
+    {
+      position_id = id;
+      date;
+      kind = ExitFill { filled_quantity = qty; fill_price = exit_price };
+    };
+    { position_id = id; date; kind = ExitComplete };
+  ]
+
+(* Apply [steps] to [pos], returning the closed position, or [None] if any
+   transition is rejected. *)
+let _drive_holding_to_closed ~steps pos =
   List.fold_result steps ~init:pos ~f:(fun acc trans ->
-      apply_transition acc trans)
+      Position.apply_transition acc trans)
   |> Result.ok
 
+(* Returns the post-close [positions] paired with the transitions that were
+   actually applied — an empty list when there was no Holding position to close
+   or the state machine rejected the sequence, so an observer is only ever told
+   about exits that really happened. *)
 let _close_strategy_position ~date ~exit_price ~exit_reason ~positions symbol =
   match _find_holding positions symbol with
-  | None -> positions
+  | None -> (positions, [])
   | Some (id, pos) -> (
-      match _drive_holding_to_closed ~id ~date ~exit_price ~exit_reason pos with
-      | Some closed -> _set_or_drop_if_closed positions ~key:id ~data:closed
-      | None -> positions)
+      let steps = _close_transitions ~id ~date ~exit_price ~exit_reason pos in
+      match _drive_holding_to_closed ~steps pos with
+      | Some closed ->
+          (_set_or_drop_if_closed positions ~key:id ~data:closed, steps)
+      | None -> (positions, []))
 
 (* Apply one stale force-exit: realise the synthetic trade against the portfolio
    and close the matching strategy position. A trade the portfolio rejects (e.g.
    the position was already flattened) is skipped and not reported. *)
-let _apply_one ~date ~commission (portfolio, positions, trades)
+let _apply_one ~date ~commission (portfolio, positions, trades, transitions)
     (c : Stale_hold.force_exit) =
   let trade = _exit_trade ~date ~commission c in
   match Trading_portfolio.Portfolio.apply_single_trade portfolio trade with
-  | Error _ -> (portfolio, positions, trades)
+  | Error _ -> (portfolio, positions, trades, transitions)
   | Ok portfolio ->
-      let positions =
+      let positions, applied =
         _close_strategy_position ~date ~exit_price:c.last_close
           ~exit_reason:(exit_reason c) ~positions c.symbol
       in
-      (portfolio, positions, trade :: trades)
+      ( portfolio,
+        positions,
+        trade :: trades,
+        List.rev_append applied transitions )
 
 let tick ~adapter ~config ~commission ~date ~today_bars ?last_known_price
     ~portfolio ~positions () =
   (* Only act on bar-bearing days, matching the detector's false-positive guard:
      a weekend / holiday with no bars at all should not trip a force-exit. *)
-  if List.is_empty today_bars then (portfolio, positions, [])
+  if List.is_empty today_bars then (portfolio, positions, [], [])
   else
     let candidates =
       Stale_hold.force_exit_candidates ~adapter ~date ~portfolio ~today_bars
         ?last_known_price ~config ()
     in
-    let portfolio, positions, trades_rev =
-      List.fold candidates ~init:(portfolio, positions, [])
+    let portfolio, positions, trades_rev, transitions_rev =
+      List.fold candidates
+        ~init:(portfolio, positions, [], [])
         ~f:(_apply_one ~date ~commission)
     in
-    (portfolio, positions, List.rev trades_rev)
+    (portfolio, positions, List.rev trades_rev, List.rev transitions_rev)

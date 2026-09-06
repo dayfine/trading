@@ -45,7 +45,8 @@
   test_margin_exit_observability
   test_trade_audit_external_exits
   test_ticket_cancel_observability
-  test_cancel_reason_closed_list)
+  test_cancel_reason_closed_list
+  test_stale_exit_observability)
  (libraries
   ounit2
   core

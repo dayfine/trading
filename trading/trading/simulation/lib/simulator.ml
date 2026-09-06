@@ -283,6 +283,26 @@ let _build_run_result t =
     metrics;
   }
 
+(* Notify the optional [on_transitions] observer with a batch of transitions
+   (#2057).
+
+   The observer is called THREE times per step, deliberately and not once, in
+   the order the transitions were applied:
+
+   1. the stale force-exits, from [_prepare_market_state] — applied before any
+      order is even executed, so they must be announced first (#2687);
+   2. the portfolio-rejection cancels, announced by
+      {!Cancel_handler.handle_rejected_trades} itself since #2524, which are
+      applied in [_process_fills_and_cancels] before the strategy is called;
+   3. the strategy + margin transitions, from [_process_step_day].
+
+   Folding any of them into a later notification would report them out of
+   order, which matters: {!Backtest.Stop_log} is last-writer-wins per
+   position. Call (1) is made only on steps that actually force-exited, so a
+   run with no stale exits notifies exactly as often as it did before #2687. *)
+let _notify_transitions ~on_transitions transitions =
+  Option.iter on_transitions ~f:(fun observe -> observe transitions)
+
 (** Apply split detection, update market state, record stale-held positions, and
     (when configured, default-off) force-exit stale/delisted positions at their
     last close. Returns the post-split / post-force-exit portfolio, positions,
@@ -309,13 +329,19 @@ let _prepare_market_state t =
          ~date:t.current_date ~portfolio ~today_bars
          ~config:t.deps.stale_hold_policy)
       ~f:(Stale_hold.Log.record t.deps.stale_hold_log);
-  let portfolio, positions, stale_exit_trades =
+  let portfolio, positions, stale_exit_trades, stale_exit_transitions =
     Stale_exit_runner.tick ~adapter:t.deps.market_data_adapter
       ~config:t.deps.stale_hold_policy ~commission:t.config.commission
       ~date:t.current_date ~today_bars
       ~last_known_price:(fun ~symbol -> Hashtbl.find t.last_known_prices symbol)
       ~portfolio ~positions ()
   in
+  (* #2687: announce the force-exits so [Stop_log] can put their label in
+     [trades.csv]. Skipped entirely on the (overwhelmingly common) step that
+     force-exited nothing, so the observer call count is unchanged there. *)
+  if not (List.is_empty stale_exit_transitions) then
+    _notify_transitions ~on_transitions:t.deps.on_transitions
+      stale_exit_transitions;
   Trading_engine.Engine.update_market t.deps.engine today_bars;
   (portfolio, positions, today_bars, split_events, stale_exit_trades)
 
@@ -342,19 +368,6 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
         ~benchmark_symbol:t.deps.benchmark_symbol ~date:t.current_date;
     had_market_bars = not (List.is_empty today_bars);
   }
-
-(* Notify the optional [on_transitions] observer with the strategy + margin
-   transitions (#2057).
-
-   The observer is still called TWICE per step, deliberately and not once — but
-   only one of those calls is here. Since #2524 the other lives inside
-   {!Cancel_handler.handle_rejected_trades}, which announces the
-   portfolio-rejection cancels itself. That call must stay separate and must
-   stay first: those cancels are applied in [_process_fills_and_cancels],
-   before the strategy is even called, so folding them into this later
-   notification would report them out of order. *)
-let _notify_transitions ~on_transitions transitions =
-  Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
 (* Execute pending orders, apply fills, and route rejected fills through
    {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). The

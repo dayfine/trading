@@ -24,16 +24,26 @@ val exit_reason : Stale_hold.force_exit -> Trading_strategy.Position.exit_reason
 (** The [Position.exit_reason] stamped on the synthetic exit: a [StrategySignal]
     tagged [label = "stale_force_exit"], with
     [detail = Some "last_bar_date=<d> days_since_last_bar=<n>"] read off the
-    candidate. The reason is stamped on the [Position] only: [tick] applies its
-    transitions internally, so [on_transitions] never observes them, and the
-    realised trade [tick] builds carries no [exit_trigger] — a stale force-exit
-    therefore renders as a BLANK [exit_trigger] column in [trades.csv] today
-    (issue #2687, pre-existing; 7 blank rows in the canonical 26y record). Until
-    that is threaded through, this label is the only place the tag exists.
+    candidate.
+
+    Since #2687 the reason also reaches [trades.csv]: {!tick} returns the
+    [TriggerExit; ExitFill; ExitComplete] transitions it applied, the simulator
+    hands them to [dependencies.on_transitions], and the backtest layer's
+    [Stop_log.record_transitions] turns the [TriggerExit] into a
+    [Stop_log.Strategy_signal] whose [label] is the [exit_trigger] column value.
+    Before that the column was BLANK for every stale force-exit (7 blank rows in
+    the canonical 26y record).
+
+    {b A non-zero count of these rows is a data-quality flag, not a feature.} A
+    stale force-exit is a safety net for a symbol that stopped producing bars
+    with no delisting marker to explain it; the marked case is
+    {!Delisted_exit_runner}'s ["delisted"] exit. See
+    [dev/plans/delisting-data-fix-2026-09-06.md] §"Principle: fallbacks are
+    quality flags, not mechanisms" and the validator's V16 report.
 
     Exported for testing: {!tick} drives the position to [Closed] and drops it
     from the positions map in the same fold that stamps the reason, so no caller
-    can read the tag back off the result. Pure. *)
+    can read the tag back off the returned [positions]. Pure. *)
 
 val tick :
   adapter:Trading_simulation_data.Market_data_adapter.t ->
@@ -48,6 +58,7 @@ val tick :
   Trading_portfolio.Portfolio.t
   * Trading_strategy.Position.t String.Map.t
   * Trading_base.Types.trade list
+  * Trading_strategy.Position.transition list
 (** Force-exit every stale held position selected by
     {!Stale_hold.force_exit_candidates}. For each candidate:
 
@@ -67,11 +78,15 @@ val tick :
     cost. Omitted, it is a lookup returning [None] for every symbol — inert
     while that flag is off, which is the default.
 
-    Returns the post-exit [(portfolio, positions, trades)] with [trades] in
-    chronological (candidate) order, ready to merge into the step's trade list.
-    A trade the portfolio rejects is skipped and not reported. Returns the
-    inputs unchanged (empty trade list) when [today_bars] is empty (no
-    force-exit on a weekend / holiday — matches the detector's false-positive
-    guard), when [config.stale_exit_after_days = None] /
-    [config.enabled = false], or when no candidate has reached the threshold —
+    Returns the post-exit [(portfolio, positions, trades, transitions)] with
+    both lists in chronological (candidate) order, ready to merge into the
+    step's trade list and to hand to [Simulator.dependencies.on_transitions]
+    respectively. [transitions] holds the [TriggerExit; ExitFill; ExitComplete]
+    triple per {b applied} exit — a candidate whose trade the portfolio
+    rejected, or that had no matching Holding position, contributes neither a
+    trade nor a transition, so an observer is never told about an exit that did
+    not happen (#2687). Returns the inputs unchanged (both lists empty) when
+    [today_bars] is empty (no force-exit on a weekend / holiday — matches the
+    detector's false-positive guard), when [config.stale_exit_after_days = None]
+    / [config.enabled = false], or when no candidate has reached the threshold —
     the default-off, byte-identical path. *)
