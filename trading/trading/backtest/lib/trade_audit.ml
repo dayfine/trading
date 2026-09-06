@@ -131,6 +131,8 @@ type cascade_summary = {
   total_stocks : int;
   candidates_after_held : int;
   macro_trend : Weinstein_types.market_trend;
+  breadth_state : Weinstein_types.breadth_state;
+      [@sexp.default Weinstein_types.Neutral_breadth]
   long_macro_admitted : int;
   long_breakout_admitted : int;
   long_sector_admitted : int;
@@ -292,8 +294,5 @@ let sexp_of_audit_records (records : audit_record list) : Sexp.t =
 let audit_records_of_sexp (sexp : Sexp.t) : audit_record list =
   [%of_sexp: audit_record list] sexp
 
-let sexp_of_audit_blob (blob : audit_blob) : Sexp.t =
-  [%sexp_of: audit_blob] blob
-
-let audit_blob_of_sexp (sexp : Sexp.t) : audit_blob =
-  [%of_sexp: audit_blob] sexp
+let sexp_of_audit_blob : audit_blob -> Sexp.t = [%sexp_of: audit_blob]
+let audit_blob_of_sexp : Sexp.t -> audit_blob = [%of_sexp: audit_blob]

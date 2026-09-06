@@ -40,6 +40,14 @@ module Ad_series_cache = Ad_series_cache
 (** Precomputed cumulative-A-D + momentum series for the per-tick macro path.
     See {!Ad_series_cache}. *)
 
+module Breadth_bars = Breadth_bars
+(** Daily universe-breadth loader (percent-above-MA, new 52-week highs/lows).
+    See {!Breadth_bars}. *)
+
+module Breadth_series_cache = Breadth_series_cache
+(** Point-in-time index over the daily breadth series, read by the per-tick
+    macro path. See {!Breadth_series_cache}. *)
+
 module Bar_reader = Bar_reader
 (** Panel-backed bar source. See {!Bar_reader}. *)
 
@@ -1198,6 +1206,7 @@ val entries_from_candidates :
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
   ?ad_bars:Macro.ad_bar list ->
+  ?breadth_bars:Macro.breadth_bar list ->
   ?ticker_sectors:(string, string) Hashtbl.t ->
   ?bar_reader:Bar_reader.t ->
   ?audit_recorder:Audit_recorder.t ->
@@ -1218,6 +1227,12 @@ val make :
       every screening day. Load once via {!Ad_bars.load} before calling [make] —
       the list lives in the closure for the lifetime of the strategy instance.
       Default: empty list (macro breadth indicators degrade to zero weight).
+    @param breadth_bars
+      Daily universe-participation breadth rows, loaded once via
+      {!Breadth_bars.load}. Indexed into a {!Breadth_series_cache.t} here and
+      read point-in-time on every screening day. Default: empty list — the
+      breadth callbacks answer [None] and {!Breadth_direction} falls back to
+      projecting the three-state macro trend, i.e. the pre-breadth behaviour.
     @param ticker_sectors
       Stock ticker → GICS sector name hashtable, typically loaded via
       {!Sector_map.load}. Used to expand the ETF-level sector analysis to

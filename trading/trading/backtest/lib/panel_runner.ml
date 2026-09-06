@@ -19,6 +19,7 @@ type input = {
   data_dir_fpath : Fpath.t;
   ticker_sectors : (string, string) Hashtbl.t;
   ad_bars : Macro.ad_bar list;
+  breadth_bars : Macro.breadth_bar list;
   config : Weinstein_strategy.config;
   all_symbols : string list;
 }
@@ -292,8 +293,9 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
   in
   let strategy =
     Panel_strategy_builder.build ~ad_bars:input.ad_bars
-      ~ticker_sectors:input.ticker_sectors ~config:input.config ~strategy_choice
-      ~bar_reader ~audit_recorder ?fold_start_date ()
+      ~breadth_bars:input.breadth_bars ~ticker_sectors:input.ticker_sectors
+      ~config:input.config ~strategy_choice ~bar_reader ~audit_recorder
+      ?fold_start_date ()
   in
   let adapter = _build_market_data_adapter ~daily_panels in
   let final_close_prices () =

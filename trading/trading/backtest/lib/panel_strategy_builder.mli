@@ -9,6 +9,7 @@ open Core
 
 val build :
   ad_bars:Macro.ad_bar list ->
+  breadth_bars:Macro.breadth_bar list ->
   ticker_sectors:(string, string) Hashtbl.t ->
   config:Weinstein_strategy.config ->
   strategy_choice:Strategy_choice.t ->
@@ -22,12 +23,12 @@ val build :
     simulator will run.
 
     The [Weinstein] branch threads the runner's deps-loaded inputs (AD bars,
-    sector map, config) through {!Weinstein_strategy.make}. The [Bah_benchmark]
-    branch ignores all of that machinery — BAH is a single-symbol passive
-    strategy that needs only its own [config.symbol]. The [bar_reader] /
-    [audit_recorder] are dropped on the BAH branch: BAH reads prices via
-    [get_price] (the snapshot-backed [Market_data_adapter]) and emits no audit
-    events.
+    daily universe breadth, sector map, config) through
+    {!Weinstein_strategy.make}. The [Bah_benchmark] branch ignores all of that
+    machinery — BAH is a single-symbol passive strategy that needs only its own
+    [config.symbol]. The [bar_reader] / [audit_recorder] are dropped on the BAH
+    branch: BAH reads prices via [get_price] (the snapshot-backed
+    [Market_data_adapter]) and emits no audit events.
 
     @param fold_start_date
       Win #4 opt-in (production wiring; see

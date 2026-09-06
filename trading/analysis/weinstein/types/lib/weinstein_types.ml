@@ -32,6 +32,24 @@ type volume_confirmation = Strong of float | Adequate of float | Weak of float
 
 type market_trend = Bullish | Bearish | Neutral [@@deriving show, eq, sexp]
 
+type breadth_state =
+  | Bullish_breadth
+  | Neutral_breadth
+  | Deteriorating
+  | Recovering
+  | Bearish_breadth
+[@@deriving show, eq, sexp]
+
+let market_trend_of_breadth_state = function
+  | Bullish_breadth -> Bullish
+  | Bearish_breadth -> Bearish
+  | Neutral_breadth | Deteriorating | Recovering -> Neutral
+
+let breadth_state_of_market_trend = function
+  | Bullish -> Bullish_breadth
+  | Bearish -> Bearish_breadth
+  | Neutral -> Neutral_breadth
+
 (** The 11 GICS sectors used by S&P/MSCI classification. *)
 type gics_sector =
   | Information_technology

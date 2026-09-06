@@ -31,6 +31,7 @@ type input = {
   data_dir_fpath : Fpath.t;
   ticker_sectors : (string, string) Hashtbl.t;
   ad_bars : Macro.ad_bar list;
+  breadth_bars : Macro.breadth_bar list;
   config : Weinstein_strategy.config;
   all_symbols : string list;
 }

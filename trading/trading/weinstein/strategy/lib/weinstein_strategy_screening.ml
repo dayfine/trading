@@ -484,8 +484,8 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
      actual transitions emitted, not the screener's top-N. Inert when the
      recorder did not opt in — live mode and every test. *)
   Cascade_trace.record trace ~audit_recorder ~date:current_date
-    ~config:config.screening_config ~macro_trend:macro_result.Macro.trend
-    ~result:screen_result ~entered:(List.length entries);
+    ~config:config.screening_config ~macro:macro_result ~result:screen_result
+    ~entered:(List.length entries);
   ticket_cancellations @ entries
 
 (** Stops are adjusted daily; screening runs only on Fridays (weekly review).

@@ -254,6 +254,7 @@ let test_zero_funded_week_still_carries_its_candidates _ =
     {
       date = _date "2024-06-14";
       diagnostics = _diagnostics ~long_top_n:1;
+      breadth_state = Weinstein_types.Bullish_breadth;
       entered = 0;
       candidates =
         [ { AR.candidate = _scored_candidate; reason = AR.Insufficient_cash } ];
@@ -307,6 +308,7 @@ let _week_with ~drops ~candidates =
     {
       date = _date "2024-06-14";
       diagnostics = _diagnostics ~long_top_n:1;
+      breadth_state = Weinstein_types.Bullish_breadth;
       entered = 0;
       candidates;
       drops;

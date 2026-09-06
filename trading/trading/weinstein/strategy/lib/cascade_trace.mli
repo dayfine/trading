@@ -77,14 +77,20 @@ val record :
   audit_recorder:Audit_recorder.t ->
   date:Core.Date.t ->
   config:Screener.config ->
-  macro_trend:Weinstein_types.market_trend ->
+  macro:Macro.result ->
   result:Screener.result ->
   entered:int ->
   unit
 (** Build this Friday's {!Audit_recorder.cascade_event} — [result]'s
-    [cascade_diagnostics], [entered], whatever {!on_walk_candidates} captured,
-    and {!of_screen} over whatever {!on_candidates} captured — and route it
-    through [audit_recorder.record_cascade_summary].
+    [cascade_diagnostics], the macro reading, [entered], whatever
+    {!on_walk_candidates} captured, and {!of_screen} over whatever
+    {!on_candidates} captured — and route it through
+    [audit_recorder.record_cascade_summary].
+
+    [~macro] supplies two independent things and only two: its [breadth_state]
+    is recorded verbatim on the event, and its [trend] drives the drop trace's
+    own macro gate exactly as before. The trace never consults [breadth_state],
+    so a five-state reading cannot silently move which candidates it reports.
 
     Call once per screened Friday, {b after} the entry walk — [entered] must
     count the transitions actually emitted, not the screener's top-N. *)

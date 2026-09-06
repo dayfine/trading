@@ -63,6 +63,18 @@ type config = {
   bearish_threshold : float;  (** confidence < this → Bearish. Default: 0.35. *)
   indicator_weights : indicator_weights;
   indicator_thresholds : indicator_thresholds;
+  breadth_direction : Breadth_direction.config;
+      [@sexp.default Breadth_direction.default_config]
+      (** Breadth-direction refinement of {!result.trend}, surfaced as
+          {!result.breadth_state}. Default [enabled = false] = the current
+          three-state read projected 1:1, bit-identical to every existing
+          baseline and golden.
+
+          Carries a [[@sexp.default]] so every scenario sexp written before this
+          field existed still parses; it is a real config field, so it is
+          axis-expressible as
+          [((macro_config ((breadth_direction ((enabled true))))))] through
+          [Backtest.Overlay_validator.apply_overrides]. *)
 }
 [@@deriving sexp]
 (** Configuration for macro analysis. *)
@@ -96,12 +108,35 @@ type result = {
   indicators : indicator_reading list;
       (** All indicator readings with individual signals. *)
   trend : Weinstein_types.market_trend;  (** Composite market trend. *)
+  breadth_state : Weinstein_types.breadth_state;
+      (** {!trend} refined by the direction of universe breadth. Always
+          populated: with [config.breadth_direction.enabled = false] (the
+          default) or no breadth series wired, it is exactly
+          [Weinstein_types.breadth_state_of_market_trend trend], so
+          [market_trend_of_breadth_state breadth_state = trend] holds
+          unconditionally in that mode. See {!Breadth_direction}. *)
   confidence : float;  (** 0.0–1.0. Weighted fraction of bullish indicators. *)
   regime_changed : bool;  (** True if [trend] differs from [prior]'s trend. *)
   rationale : string list;
       (** Human-readable explanation of the composite signal. *)
 }
 (** Result of macro analysis. *)
+
+type breadth_bar = Macro_types.breadth_bar = {
+  date : Core.Date.t;
+  universe_count : int;  (** Constituents with usable data that day. *)
+  above_ma_count : int;
+      (** Of those, how many closed above their 150-day MA. *)
+  new_highs : int;  (** Constituents making a fresh 52-week high. *)
+  new_lows : int;  (** Constituents making a fresh 52-week low. *)
+}
+(** One day's universe-participation breadth, as raw counts. [above_ma_count]
+    adapts the Ch. 3 participation gauge (his weekly percentage of NYSE stocks
+    in Stages 1 and 2) and [new_highs] / [new_lows] the two halves of the Ch. 8
+    net — see {!Breadth_bars} for what each substitutes, and
+    [docs/design/weinstein-book-reference.md] §2.8. Loaded by {!Breadth_bars};
+    indexed by {!Breadth_series_cache}, which owns the count → percent
+    conversion. *)
 
 val analyze :
   config:config ->
@@ -124,6 +159,11 @@ val analyze :
       must aggregate first via {!Ad_bars_aggregation.daily_to_weekly}.
     @param global_index_bars
       Weekly bars for each global index, as [(name, bars)] pairs. May be empty.
+      The bar-list path carries no breadth series, so [get_pct_above_ma] /
+      [get_new_lows_pct] answer [None] and {!Breadth_direction} falls back to
+      projecting [trend]. Callers that have a series compose {!with_breadth}
+      onto {!callbacks_from_bars} and use {!analyze_with_callbacks}.
+
     @param prior_stage Prior week's index stage (for transition detection).
     @param prior
       Prior week's macro result (for regime_changed detection). [None] on first
@@ -158,6 +198,13 @@ type callbacks = {
           declining) ending at [week_offset]. Only [week_offset:0] is consumed
           by {!analyze_with_callbacks}; higher offsets are permitted to return
           [None]. *)
+  get_pct_above_ma : week_offset:int -> float option;
+      (** Percent of the universe above its 150-day MA at [week_offset] weeks
+          back, in [0, 100]. Read only by {!Breadth_direction}; [None] means no
+          breadth series is wired (the default) or the offset predates it. *)
+  get_new_lows_pct : week_offset:int -> float option;
+      (** New 52-week lows as a percent of the universe at [week_offset] weeks
+          back, in [0, 100]. Same [None] contract as {!get_pct_above_ma}. *)
   global_index_stages : (string * Stage.callbacks) list;
       (** Per-global-index Stage callbacks, as [(name, callbacks)] pairs. The
           list shape mirrors [global_index_bars] in the bar-list API:
@@ -186,6 +233,10 @@ val callbacks_from_bars :
 (** [callbacks_from_bars ~config ~index_bars ~ad_bars ~global_index_bars] builds
     a {!callbacks} record:
 
+    - {!get_pct_above_ma} / {!get_new_lows_pct} answer [None] for every offset —
+      the bar-list path carries no breadth series and no [as_of] to slice one
+      at. Compose {!with_breadth} to supply them.
+
     - {!index_stage} delegates to {!Stage.callbacks_from_bars} over
       [index_bars].
     - {!get_index_close} reads [index_bars] adjusted_close at the matching
@@ -199,6 +250,22 @@ val callbacks_from_bars :
 
     Used internally by {!analyze}; exposed so that callers (e.g. tests or future
     panel-backed paths) can build the bundle the same way the wrapper does. *)
+
+val with_breadth :
+  callbacks -> Breadth_series_cache.t -> as_of:Core.Date.t -> callbacks
+(** [with_breadth cbs series ~as_of] returns [cbs] with its {!get_pct_above_ma}
+    and {!get_new_lows_pct} replaced by
+    {!Breadth_series_cache.callbacks_at}[ series ~as_of]. Every other closure is
+    shared unchanged, so the macro reading is identical apart from what
+    {!Breadth_direction} can now see.
+
+    This is a separate combinator rather than an optional argument on
+    {!callbacks_from_bars} because breadth needs an [as_of] the bar-list API
+    does not carry: the point-in-time cutoff is the whole contract
+    ({!Breadth_series_cache} §"Point-in-time contract"), and an argument that
+    silently defaults to "no cutoff" would be the wrong default to make easy.
+    The strategy's hot path does not use this — it builds the closures directly
+    in [Panel_callbacks.macro_callbacks_of_weekly_views_cached]. *)
 
 val analyze_with_callbacks :
   config:config ->

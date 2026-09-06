@@ -27,6 +27,8 @@ module Stage3_force_exit = Stage3_force_exit
 module Laggard_rotation = Laggard_rotation
 module Ad_bars = Ad_bars
 module Ad_series_cache = Ad_series_cache
+module Breadth_bars = Breadth_bars
+module Breadth_series_cache = Breadth_series_cache
 module Macro_inputs = Macro_inputs
 module Panel_callbacks = Panel_callbacks
 module Resistance_sketch_reader = Resistance_sketch_reader
@@ -174,14 +176,16 @@ let _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
     {!_run_macro_and_entries} so the macro trend is available to the
     macro-bearish trim pass (which runs before the entry walk) without computing
     the macro result twice. *)
-let _run_macro ~config ~ad_series ~prior_macro ~prior_macro_result ~peak_tracker
-    ~bar_reader ~prior_stages ~current_date ~index_view ~is_screening_day =
+let _run_macro ~config ~ad_series ~breadth_series ~prior_macro
+    ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages ~current_date
+    ~index_view ~is_screening_day =
   if not is_screening_day then None
   else
     let prev = !prior_macro in
     let r =
-      Weinstein_strategy_macro.run_macro_only ~config ~ad_series ~prior_macro
-        ~prior_macro_result ~bar_reader ~prior_stages ~current_date ~index_view
+      Weinstein_strategy_macro.run_macro_only ?breadth_series ~config ~ad_series
+        ~prior_macro ~prior_macro_result ~bar_reader ~prior_stages ~current_date
+        ~index_view ()
     in
     _maybe_reset_halt ~peak_tracker ~prior_macro:prev ~current_macro:r.trend;
     Some r
@@ -208,14 +212,15 @@ let _run_entries ~pending_entry_e ~fold_start_date ~config ~stop_states
     {!_process_market_day} so that function stays within the length / nesting
     limits; the skip-id union (stop / Stage-3 / laggard / force-liq exits) is
     assembled here. *)
-let _run_macro_and_trim ~config ~ad_series ~positions ~portfolio ~prior_macro
-    ~prior_macro_result ~prior_decline_character ~peak_tracker ~bar_reader
-    ~prior_stages ~get_price ~current_date ~index_view ~is_screening_day
-    ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
+let _run_macro_and_trim ~config ~ad_series ~breadth_series ~positions ~portfolio
+    ~prior_macro ~prior_macro_result ~prior_decline_character ~peak_tracker
+    ~bar_reader ~prior_stages ~get_price ~current_date ~index_view
+    ~is_screening_day ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
     ~force_exit_transitions =
   let macro_result_opt =
-    _run_macro ~config ~ad_series ~prior_macro ~prior_macro_result ~peak_tracker
-      ~bar_reader ~prior_stages ~current_date ~index_view ~is_screening_day
+    _run_macro ~config ~ad_series ~breadth_series ~prior_macro
+      ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages ~current_date
+      ~index_view ~is_screening_day
   in
   (* Re-classify the index's decline character (strictly-past read by the next
      tick's stops pass to arm the fast-crash absolute stop — Build 2). *)
@@ -260,11 +265,11 @@ let _run_dials_and_entries ~pending_entry_e ~fold_start_date ~config
   (late_tighten_transitions, entry_transitions)
 
 let _process_market_day ~pending_entry_e ~fold_start_date ~config ~ad_series
-    ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
-    ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
-    ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors ~stage3_streaks
-    ~laggard_streaks ~audit_recorder ~get_price ~(portfolio : Portfolio_view.t)
-    ~current_date =
+    ~breadth_series ~stop_states ~last_stop_out_dates ~prior_macro
+    ~prior_macro_result ~prior_decline_character ~peak_tracker ~bar_reader
+    ~prior_stages ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
+    ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
+    ~(portfolio : Portfolio_view.t) ~current_date =
   let positions = portfolio.positions in
   let exit_transitions, adjust_transitions =
     _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
@@ -290,10 +295,10 @@ let _process_market_day ~pending_entry_e ~fold_start_date ~config ~ad_series
     Weinstein_strategy_screening.is_screening_day_view index_view
   in
   let macro_result_opt, macro_trim_transitions =
-    _run_macro_and_trim ~config ~ad_series ~positions ~portfolio ~prior_macro
-      ~prior_macro_result ~prior_decline_character ~peak_tracker ~bar_reader
-      ~prior_stages ~get_price ~current_date ~index_view ~is_screening_day
-      ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
+    _run_macro_and_trim ~config ~ad_series ~breadth_series ~positions ~portfolio
+      ~prior_macro ~prior_macro_result ~prior_decline_character ~peak_tracker
+      ~bar_reader ~prior_stages ~get_price ~current_date ~index_view
+      ~is_screening_day ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
       ~force_exit_transitions
   in
   let late_tighten_transitions, entry_transitions =
@@ -309,21 +314,21 @@ let _process_market_day ~pending_entry_e ~fold_start_date ~config ~ad_series
     ~entry_transitions ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
 
 let _on_market_close ~pending_entry_e ~fold_start_date ~config ~ad_series
-    ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
-    ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
-    ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors ~stage3_streaks
-    ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
+    ~breadth_series ~stop_states ~last_stop_out_dates ~prior_macro
+    ~prior_macro_result ~prior_decline_character ~peak_tracker ~bar_reader
+    ~prior_stages ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
+    ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
     ~(portfolio : Portfolio_view.t) =
   match get_price config.indices.primary with
   | None -> Ok { Strategy_interface.transitions = [] }
   | Some primary_bar ->
       let current_date = primary_bar.Types.Daily_price.date in
       _process_market_day ~pending_entry_e ~fold_start_date ~config ~ad_series
-        ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
-        ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
-        ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
-        ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~portfolio
-        ~current_date
+        ~breadth_series ~stop_states ~last_stop_out_dates ~prior_macro
+        ~prior_macro_result ~prior_decline_character ~peak_tracker ~bar_reader
+        ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
+        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
+        ~get_price ~portfolio ~current_date
 
 (** Per-run closure bookkeeping table threaded through [on_market_close]:
     [pending_entry_e] (the Fix #2 no-chase pin table, consulted only when
@@ -332,9 +337,18 @@ let _on_market_close ~pending_entry_e ~fold_start_date ~config ~ad_series
     one-shot). *)
 let _make_closure_tables () : Entry_freeze.t = Entry_freeze.create ()
 
+(** Precompute the per-run breadth index, or [None] when no daily breadth rows
+    were loaded (missing CSV, or [config.skip_ad_breadth]). [None] is the
+    breadth-inert mode: every breadth callback answers [None] and the macro
+    result's [breadth_state] is the projection of its [trend]. *)
+let _breadth_series_of_bars = function
+  | [] -> None
+  | bars -> Some (Breadth_series_cache.of_daily_bars bars)
+
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
-    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
-    ?(audit_recorder = Audit_recorder.noop) ?fold_start_date config =
+    ?(breadth_bars = []) ?(ticker_sectors = Hashtbl.create (module String))
+    ?bar_reader ?(audit_recorder = Audit_recorder.noop) ?fold_start_date config
+    =
   (* Fail loudly on an inconsistent dawn-leverage config (margin must be armed;
      the dawn requirement must be a fractional (0,1] requirement). No-op when
      [dawn_leverage_enabled = false]. *)
@@ -364,16 +378,17 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
       ~momentum_period:config.macro_config.indicator_thresholds.momentum_period
       weekly_ad_bars
   in
+  let breadth_series = _breadth_series_of_bars breadth_bars in
   let pending_entry_e = _make_closure_tables () in
   let module M = struct
     let name = name
 
     let on_market_close =
       _on_market_close ~pending_entry_e ~fold_start_date ~config ~ad_series
-        ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
-        ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
-        ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
-        ~stage3_streaks ~laggard_streaks ~audit_recorder
+        ~breadth_series ~stop_states ~last_stop_out_dates ~prior_macro
+        ~prior_macro_result ~prior_decline_character ~peak_tracker ~bar_reader
+        ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
+        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 
@@ -381,6 +396,11 @@ module Internal_for_test = struct
   (* Tests pass the weekly A-D bar list directly; build the per-run cache from
      it here so the test seam keeps its [~ad_bars] signature while the strategy
      hot path consumes the precomputed [Ad_series_cache.t]. *)
+  (* The test seam is breadth-inert ([breadth_series = None]): the two breadth
+     callbacks answer [None] and the macro result's [breadth_state] is the
+     projection of its [trend]. Breadth-direction behaviour is pinned directly
+     on {!Breadth_direction.classify} and on the macro e2e test, neither of
+     which needs to drive a whole market day. *)
   let on_market_close ~fold_start_date ~config ~ad_bars =
     let ad_series =
       Ad_series_cache.of_weekly_ad_bars
@@ -389,6 +409,7 @@ module Internal_for_test = struct
     in
     let pending_entry_e = _make_closure_tables () in
     _on_market_close ~pending_entry_e ~fold_start_date ~config ~ad_series
+      ~breadth_series:None
 
   let maybe_reset_halt = _maybe_reset_halt
   let positions_minus_exited = _positions_minus_exited

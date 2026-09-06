@@ -36,8 +36,8 @@ let _sum_counts (bars : Macro.ad_bar list) =
 let _is_strictly_ascending (bars : Macro.ad_bar list) =
   let rec check = function
     | [] | [ _ ] -> true
-    | a :: (b :: _ as rest) ->
-        Date.compare a.Macro.date b.Macro.date < 0 && check rest
+    | (a : Macro.ad_bar) :: ((b : Macro.ad_bar) :: _ as rest) ->
+        Date.compare a.date b.date < 0 && check rest
   in
   check bars
 

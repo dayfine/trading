@@ -74,13 +74,14 @@ let _drops t ~config ~macro_trend ~result =
   if not t.enabled then []
   else of_screen ~config ~macro_trend ~candidates:!(t.cascade) ~result
 
-let record t ~(audit_recorder : Audit_recorder.t) ~date ~config ~macro_trend
-    ~(result : Screener.result) ~entered =
+let record t ~(audit_recorder : Audit_recorder.t) ~date ~config
+    ~(macro : Macro.result) ~(result : Screener.result) ~entered =
   audit_recorder.record_cascade_summary
     {
       date;
       diagnostics = result.cascade_diagnostics;
+      breadth_state = macro.breadth_state;
       entered;
       candidates = !(t.walk);
-      drops = _drops t ~config ~macro_trend ~result;
+      drops = _drops t ~config ~macro_trend:macro.trend ~result;
     }

@@ -97,6 +97,50 @@ type volume_confirmation =
 (** Overall market trend from macro analysis. *)
 type market_trend = Bullish | Bearish | Neutral [@@deriving show, eq, sexp]
 
+(** Macro trend refined by the DIRECTION of universe participation breadth
+    (percent above the long MA, new 52-week lows) read as a rate of change
+    rather than a level. Both inputs are adaptations — of the Ch. 3
+    participation gauge and of the Ch. 8 new-highs-minus-new-lows net
+    respectively; see [docs/design/weinstein-book-reference.md] §2.8 and §2.4,
+    and {!Breadth_direction} for what each substitutes.
+
+    A strict refinement of {!market_trend}: {!market_trend_of_breadth_state}
+    projects it back, and every existing consumer keeps matching on
+    [Macro.result.trend], which is unchanged. The two extra cases split what the
+    three-state read calls Neutral — a tape that is Bullish-or-Neutral on the
+    weighted indicators while breadth is collapsing is not the same regime as
+    one where breadth is repairing, and the 27-year study measured the
+    difference in realized P&L on entries made in each. *)
+type breadth_state =
+  | Bullish_breadth  (** Projects to [Bullish]. *)
+  | Neutral_breadth
+      (** Projects to [Neutral]; breadth is not moving decisively. *)
+  | Deteriorating
+      (** Participation is weak AND falling, or new lows are elevated AND
+          rising. Projects to [Neutral] — it never blocks a side on its own. *)
+  | Recovering
+      (** Participation is still weak but rising off the low. Projects to
+          [Neutral]. *)
+  | Bearish_breadth  (** Projects to [Bearish]. *)
+[@@deriving show, eq, sexp]
+
+val market_trend_of_breadth_state : breadth_state -> market_trend
+(** Project a [breadth_state] back onto the three-state read: [Bullish_breadth]
+    and [Bearish_breadth] map 1:1; [Neutral_breadth], [Deteriorating] and
+    [Recovering] all map to [Neutral].
+
+    This is the compatibility contract for the whole feature — with the
+    breadth-direction read disabled (the default), a macro result's
+    [breadth_state] is exactly [breadth_state_of_market_trend result.trend], so
+    the projection round-trips and no consumer of [trend] can observe a change.
+*)
+
+val breadth_state_of_market_trend : market_trend -> breadth_state
+(** The right inverse of {!market_trend_of_breadth_state}: the state a
+    three-state trend denotes when no breadth refinement is available.
+    [market_trend_of_breadth_state (breadth_state_of_market_trend t) = t] for
+    every [t]. *)
+
 (** Quality grade for candidates. Higher is better.
 
     [compare] gives [A_plus > A > B > C > D > F] ordering. *)

@@ -637,6 +637,7 @@ let _cascade_summary ~date : Backtest.Trade_audit.cascade_summary =
     total_stocks = 100;
     candidates_after_held = 100;
     macro_trend = Bullish;
+    breadth_state = Bullish_breadth;
     long_macro_admitted = 0;
     long_breakout_admitted = 0;
     long_sector_admitted = 0;

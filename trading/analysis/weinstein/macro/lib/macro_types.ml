@@ -36,15 +36,26 @@ type config = {
   bearish_threshold : float;
   indicator_weights : indicator_weights;
   indicator_thresholds : indicator_thresholds;
+  breadth_direction : Breadth_direction.config;
+      [@sexp.default Breadth_direction.default_config]
 }
 [@@deriving sexp]
 
 type ad_bar = { date : Date.t; advancing : int; declining : int }
 
+type breadth_bar = {
+  date : Date.t;
+  universe_count : int;
+  above_ma_count : int;
+  new_highs : int;
+  new_lows : int;
+}
+
 type result = {
   index_stage : Stage.result;
   indicators : indicator_reading list;
   trend : market_trend;
+  breadth_state : breadth_state;
   confidence : float;
   regime_changed : bool;
   rationale : string list;
@@ -55,6 +66,8 @@ type callbacks = {
   get_index_close : week_offset:int -> float option;
   get_cumulative_ad : week_offset:int -> float option;
   get_ad_momentum_ma : week_offset:int -> float option;
+  get_pct_above_ma : week_offset:int -> float option;
+  get_new_lows_pct : week_offset:int -> float option;
   global_index_stages : (string * Stage.callbacks) list;
 }
 
@@ -86,4 +99,5 @@ let default_config =
     bearish_threshold = 0.35;
     indicator_weights = default_indicator_weights;
     indicator_thresholds = default_indicator_thresholds;
+    breadth_direction = Breadth_direction.default_config;
   }

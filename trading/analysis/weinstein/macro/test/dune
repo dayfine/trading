@@ -3,22 +3,28 @@
   test_macro
   test_ad_bars_aggregation
   test_decline_character
-  test_index_circuit_breaker)
+  test_index_circuit_breaker
+  test_breadth_direction
+  test_breadth_series_cache)
  (modules
   test_macro
   test_ad_bars_aggregation
   test_decline_character
-  test_index_circuit_breaker)
- (libraries macro weinstein_types stage types core ounit2 matchers))
+  test_index_circuit_breaker
+  test_breadth_direction
+  test_breadth_series_cache)
+ (libraries macro weinstein_types stage types core core_unix ounit2 matchers))
 
-(test
- (name test_macro_e2e)
- (modules test_macro_e2e)
+(tests
+ (names test_macro_e2e test_breadth_direction_e2e)
+ (modules test_macro_e2e test_breadth_direction_e2e)
  (libraries
   macro
   weinstein_types
+  weinstein.data_source
   weinstein.data_source.testing
   types
   core
+  fpath
   ounit2
   matchers))

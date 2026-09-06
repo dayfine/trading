@@ -7,8 +7,8 @@ open Weinstein_strategy_config
     Friday (including when the halt is active) so [_maybe_reset_halt] can
     consult the freshest macro trend even when the universe screen is gated off.
 *)
-let run_macro_only ~config ~ad_series ~prior_macro ~prior_macro_result
-    ~bar_reader ~prior_stages ~current_date ~index_view =
+let run_macro_only ?breadth_series ~config ~ad_series ~prior_macro
+    ~prior_macro_result ~bar_reader ~prior_stages ~current_date ~index_view () =
   let index_prior_stage = Hashtbl.find prior_stages config.indices.primary in
   (* Phase F.3.d-2 caller migration: the global-index view assembly reads
      through {!Snapshot_runtime.Snapshot_callbacks} directly via the
@@ -30,9 +30,9 @@ let run_macro_only ~config ~ad_series ~prior_macro ~prior_macro_result
      Output is bit-identical (parity test: [Test_ad_series_cache]). *)
   let macro_callbacks =
     Panel_callbacks.macro_callbacks_of_weekly_views_cached ?ma_cache
-      ~index_symbol:config.indices.primary ~config:config.macro_config
-      ~index:index_view ~globals:global_index_views ~ad_series
-      ~as_of:current_date ()
+      ?breadth_series ~index_symbol:config.indices.primary
+      ~config:config.macro_config ~index:index_view ~globals:global_index_views
+      ~ad_series ~as_of:current_date ()
   in
   let macro_result =
     Macro.analyze_with_callbacks ~config:config.macro_config

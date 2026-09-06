@@ -1,6 +1,6 @@
 # Status: screener
 
-## Last updated: 2026-08-26
+## Last updated: 2026-09-05
 
 ## Status
 IN_PROGRESS
@@ -26,6 +26,12 @@ grep -n 'PR OPEN' dev/status/screener.md   # then check each #N is actually open
 ```
 
 If you write `PR OPEN`, you owe this file an edit when the PR merges.
+
+**2026-09-05**: `feat(macro): breadth-direction five-state read behind macro_config.breadth_direction (default-off)` (branch `feat/macro-breadth-direction`, **PR OPEN #2685**) — the macro gate gains a **direction** read of universe participation alongside its existing level-based trend. The gate's `market_trend` read Bullish into 2020-03-06 and Neutral through May 2020, so the COVID collapse and rebound carried one label while their entries diverged as sharply as anything in the run: below-45%-and-**falling** breadth lost in both books (−$604k / −$668k), below-45%-and-**rising** was the best cohort (+$627k / +$1.81M). Same level, opposite direction, opposite outcome — a level threshold cannot express it. Evidence: `dev/experiments/stop-width-cadence-surface-2026-09-05/README.md` §"Breadth state across 27 years".
+
+New `Weinstein_types.breadth_state` (five states) with `market_trend_of_breadth_state`; `market_trend` itself is **untouched**, so its ~12 exhaustive matches and every consumer of `Macro.result.trend` are unaffected. New `Breadth_bars` loader + `Breadth_series_cache` (point-in-time, O(log n), 5-rows-per-week offsets) over a committed 6,876-row daily series (`trading/test_data/breadth/synthetic_breadth_daily.csv`, per-year PIT top-3000, 2000-2026). Rule lives in `Breadth_direction.classify`; **Deteriorating is checked before Recovering** and wins the tie at a turn. R1: `breadth_direction.enabled` defaults `false`, in which mode `breadth_state` is exactly the projection of `trend` — bit-identical to every baseline; R2: axis-expressible as `((macro_config ((breadth_direction ((enabled true))))))`, verified through `Overlay_validator`'s deep merge. `cascade_summary` / `per_friday` gain the field with `[@sexp.default]` so the ~200 historical artefacts still parse. **No gate consumes it yet** — that is the per-state stop-width item (priorities 2026-09-06 item 3), which reads `Macro.result.breadth_state`.
+
+**Acceptance, and one honest deviation.** Defaults reproduce the study's reads with no retuning: Deteriorating on 2020-02-28 / 03-06 / 03-13, Recovering on 2020-04-09 / 04-17 / 04-24 / 04-30. The two 2020 assertions drive the cache + `classify` at those Fridays with `~trend:Neutral` rather than the full `Macro.analyze_with_callbacks` path, because rule 1 short-circuits a Bearish tape and the e2e test's reduced macro (GSPC alone, no A-D bars, no global indices) turns Bearish on 2020-02-28 — whereas the production run the study measured, with the full indicator set, read Bullish/Neutral there. Separate end-to-end cases cover the wiring that short-circuit hides (Oct 2018 → Deteriorating, Jun 2020 → Recovering). The brief's "every Friday of 2008" regression became 2018-2020: `GSPC.INDX` coverage in `trading/test_data` begins 2009-01-02.
 
 **2026-08-26**: `feat(rs): Positive_declining state behind default-off flag (#2556)` (branch `feat/rs-positive-declining`, **PR OPEN #2563**) — the follow-on the entry below deferred. That entry's book write-back established that the book gives positive-territory-but-**declining** RS a distinct meaning (Ch. 4, "when you see inferior action in the RS line compared to the price performance, don't ever buy that stock"; Chart 4-16) and deliberately left it undone because adding the state "changes admission + scoring for a real cohort". This lands it **behind a default-off flag**, which is how that class of change is supposed to land (`experiment-flag-discipline.md` R1-R3).
 

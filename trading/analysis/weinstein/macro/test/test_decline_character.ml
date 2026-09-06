@@ -48,6 +48,7 @@ let macro_result ~ma_value ~ma_direction ~ad_signal : Macro.result =
     index_stage = stage_result ~ma_value ~ma_direction;
     indicators = [ ad_line ad_signal ];
     trend = Weinstein_types.Bearish;
+    breadth_state = Weinstein_types.Bearish_breadth;
     confidence = 0.2;
     regime_changed = false;
     rationale = [];

@@ -43,6 +43,7 @@ let macro_result ~ma_value ~ma_direction ~ad_signal : Macro.result =
     indicators =
       [ { name = "A-D Line"; signal = ad_signal; weight = 2.0; detail = "t" } ];
     trend = Weinstein_types.Bearish;
+    breadth_state = Weinstein_types.Bearish_breadth;
     confidence = 0.2;
     regime_changed = false;
     rationale = [];

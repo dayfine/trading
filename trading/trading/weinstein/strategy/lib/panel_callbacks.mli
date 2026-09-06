@@ -167,11 +167,16 @@ val macro_callbacks_of_weekly_views :
       bit-for-bit per the PR-F invariant).
     - [get_ad_momentum_ma] returns the precomputed momentum-MA scalar at offset
       0 only.
+    - [get_pct_above_ma] / [get_new_lows_pct] answer [None] for every offset —
+      this constructor carries no [as_of], so it cannot apply the breadth
+      series' point-in-time cutoff. Callers that need breadth use the cached
+      twin below.
     - [global_index_stages] = each (name, view) -> Stage.callbacks. *)
 
 val macro_callbacks_of_weekly_views_cached :
   ?ma_cache:Weekly_ma_cache.t ->
   ?index_symbol:string ->
+  ?breadth_series:Breadth_series_cache.t ->
   config:Macro.config ->
   index:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   globals:(string * Snapshot_runtime.Snapshot_bar_views.weekly_view) list ->
@@ -186,7 +191,13 @@ val macro_callbacks_of_weekly_views_cached :
     [as_of], avoiding the per-tick rebuild of the cumulative-A-D array and
     momentum-MA scalar (the O(n²) A-D-live macro cost). The [index_stage],
     [get_index_close] and [global_index_stages] are constructed identically to
-    {!macro_callbacks_of_weekly_views}. *)
+    {!macro_callbacks_of_weekly_views}.
+
+    [?breadth_series] backs [get_pct_above_ma] / [get_new_lows_pct] via
+    {!Breadth_series_cache.callbacks_at} at the same [as_of]. Omitted (the
+    default), both answer [None] for every offset, which is what
+    {!Breadth_direction} treats as "no breadth wired" — so the bundle is
+    bit-identical to the pre-breadth one. *)
 
 val support_floor_callbacks_of_daily_view :
   Snapshot_runtime.Snapshot_bar_views.daily_view -> Weinstein_stops.callbacks
