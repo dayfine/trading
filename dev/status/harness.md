@@ -2215,7 +2215,7 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   is the mechanical alternative. `harness_gap: ONGOING_REVIEW`.
   (source: 2026-09-04 run 33894722318; second instance 2026-09-05 run 33962894987)
 
-- [ ] **H-QC-VERDICT-NEWLINE-COLLAPSE**: a QC review can post with every newline
+- [x] **H-QC-VERDICT-NEWLINE-COLLAPSE**: a QC review can post with every newline
   stripped — the whole body one line, reading `...all passing).## VerdictAPPROVED`.
   It renders acceptably for a human but is **invisible to `pr_gate_status.sh`**,
   which anchors on `^## Verdict`, so a current APPROVED reads as `stale(<sha>)`.
