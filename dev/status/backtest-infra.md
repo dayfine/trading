@@ -755,6 +755,34 @@ Merged in main:
   +35pp is STMP alone; 26y salt 0 done: on-arm 139.8% vs 302.7% is a path lottery — universe differs on 97% of screens — not a guard cost; salts 1–2 running). Blank `exit_trigger` on stale force-exits
   filed as #2687. Interleaved-series symbols (CLE/ICT/ABK/MEL/MVL/AGR) are a sibling
   defect, not fixed by the tail guard.
+  **2026-09-06 (PR-A of the data-layer fix, `feat/delisting-data-fix-a`):** per
+  `dev/plans/delisting-data-fix-2026-09-06.md`, the fix moves from the runtime
+  guard to WAREHOUSE BUILD time. New pure `Snapshot_pipeline.Series_tail`
+  (`trading/analysis/weinstein/snapshot_pipeline/lib/series_tail.mli`) classifies
+  a symbol's terminal run and truncates only the stub class
+  (`ratio 0.05 AND n <= 60 AND first stub close < $1` — 13 of 2,908 symbols on
+  the 2000 vintage), leaving prefix mis-scales (AGR: 4,653 real bars), long low
+  tails, and high-priced tails untouched; a bare ratio walk-back (what runtime
+  guard 3 does) would delete AGR's real series. It also drops stray late bars
+  (ANCR) and derives `Snapshot_manifest.active_through` from the series end —
+  the field was documented but populated on NO warehouse. Wired into the shared
+  `Build_runner.build` write path, so both `build_snapshots.exe` and
+  `build_scenario_snapshots.exe` get it; review sidecar `terminal_runs.csv`
+  beside `splices.csv`; veto list `trading/test_data/warehouse_exceptions.sexp`.
+  No committed warehouse artifact moves (the repo carries none). Verify:
+  `dune runtest analysis/weinstein/snapshot_pipeline analysis/scripts/build_snapshots`.
+  **Blast radius of the rebuild:** `active_through` is `None` on every warehouse
+  today, so two consumers are currently dead code and WAKE the moment a rebuilt
+  warehouse carries the marker (~1,964 of 2,908 symbols on the 2000 vintage) —
+  `Weinstein_strategy_screening.prune_universe_by_active_through` (drops a
+  delisted name from the candidate universe) and the macro classifier's
+  `active_through < d` drop in `weinstein_strategy_macro.ml`. Neither changes
+  behaviour on any warehouse built before this PR; both do on the next rebuild,
+  which is why the rebuild and the record re-base are one step, not two.
+  Next: review the 2000-vintage report, rebuild the three vintage warehouses in
+  Pinned shape (never `-incremental`, #2669), then PR-B (splice class) and the
+  record re-base; runtime guard 3 retires under
+  `experiment-flag-discipline.md` Rule 4 once every live warehouse is rebuilt.
   **2026-09-06 PR-C (`feat/fallback-exits-quality-flags`, closes #2687):** the
   three-commit follow-up implementing
   `dev/plans/delisting-data-fix-2026-09-06.md` §"Principle: fallbacks are quality
@@ -780,8 +808,8 @@ Merged in main:
      `dune exec trading/backtest/validation/test/test_validator_fallback_check.exe`,
      `dune exec trading/simulation/test/test_delisted_exit_runner.exe`,
      `dune exec trading/backtest/test/test_stale_exit_observability.exe`.
-  Still open from PR-A of the plan: nothing populates `active_through` yet, so
-  the delisted exit stays inert until the warehouses are rebuilt.
+  PR-A (#2691, merged) now populates `active_through` at build time, so the
+  delisted exit wakes on the next warehouse rebuild — until then it is inert.
 
 - **Step 3 (tier-aware bar loader)** now unblocked; separately tracked at
   `dev/status/backtest-scale.md`. A/B the Legacy vs Tiered loader

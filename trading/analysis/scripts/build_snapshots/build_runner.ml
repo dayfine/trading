@@ -2,6 +2,7 @@ open Core
 module Pipeline = Snapshot_pipeline.Pipeline
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_verifier = Snapshot_pipeline.Snapshot_verifier
+module Series_tail = Snapshot_pipeline.Series_tail
 module Weekly_sidetable_builder = Snapshot_pipeline.Weekly_sidetable_builder
 module Snapshot_columnar = Data_panel_snapshot.Snapshot_columnar
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
@@ -15,6 +16,27 @@ let default_progress_every = 50
    cap), so a symbol that traded through the whole span is never a false virgin
    at the scenario start. CLIs surface this as [--sketch-deep-days]. *)
 let default_sketch_deep_days = 3650
+
+(* Committed veto list for {!Series_tail}. Documented, not defaulted: the flag
+   stays optional so a build's behaviour never depends on the caller's cwd. *)
+let default_exceptions_path = "trading/test_data/warehouse_exceptions.sexp"
+let tail_report_name = "terminal_runs.csv"
+
+(* One built symbol: its manifest entry, the date of its last stored bar (None
+   when the entry was reused from a previous incremental run, so no bars were
+   read), and the tail findings to report. *)
+type built = {
+  entry : Snapshot_manifest.file_metadata;
+  last_bar : Core.Date.t option;
+  findings : Series_tail.finding list;
+}
+
+(* Series-tail hygiene knobs, bundled so the per-symbol call chain threads one
+   parameter rather than two. *)
+type tail_opts = {
+  config : Series_tail.Config.t;
+  exceptions : Series_tail.Exceptions.t;
+}
 
 type progress = {
   symbols_total : int;
@@ -111,12 +133,29 @@ let _file_metadata ~symbol ~path ~csv_mtime ~active_through =
     active_through;
   }
 
-(* Last-bar [active_through] is the symbol's delisting marker. The CSV loader
-   sets the same value on every row of a symbol's history, so reading the tail
-   is equivalent to reading any row. *)
+(* Last-bar [active_through] is the symbol's delisting marker when the source
+   carries one. The CSV loader sets the same value on every row of a symbol's
+   history, so reading the tail is equivalent to reading any row. In practice no
+   vendor path populates it (the EODHD parser leaves it [None]) — see
+   {!_derive_active_through} for the series-end derivation that does. *)
 let _active_through_of_bars (bars : Types.Daily_price.t list) : Date.t option =
   List.last bars
   |> Option.bind ~f:(fun (b : Types.Daily_price.t) -> b.active_through)
+
+let _last_bar_date (bars : Types.Daily_price.t list) : Date.t option =
+  List.last bars |> Option.map ~f:(fun (b : Types.Daily_price.t) -> b.date)
+
+(* Series end IS the delisting evidence (#2672): a symbol whose last stored bar
+   predates the build's end date stopped trading, so stamp that date. A symbol
+   still printing at the end of the window keeps [None] ("still trading /
+   unknown"). An explicit marker on the bars always wins. *)
+let _derive_active_through ~build_end ~bar_marker ~last_bar =
+  match bar_marker with
+  | Some _ as explicit -> explicit
+  | None -> (
+      match (build_end, last_bar) with
+      | Some end_, Some last when Date.( < ) last end_ -> Some last
+      | _ -> None)
 
 let _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows =
   (* Emit the v2 columnar mmap format ({!Snapshot_columnar}); it validates
@@ -143,10 +182,23 @@ let _write_weekly ~output_dir ~symbol ~deep_bars ~bars =
       Printf.eprintf "weekly side-table write failed for %s: %s\n%!" symbol
         (Status.show err)
 
+(* Phantom-bar hygiene, applied to the windowed bars BEFORE the pipeline sees
+   them: the [.snap] (and its weekly side-table) then contain only real prints.
+   [deep_bars] are strictly before the window and feed only the side-table's
+   depth, so they are left alone. *)
+let _clean_tail ~(tail : tail_opts) ~symbol bars =
+  Series_tail.apply tail.config ~exceptions:tail.exceptions ~symbol bars
+
 let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-    ~output_dir ~csv_mtime =
+    ~output_dir ~csv_mtime ~end_date ~tail =
   let path = _file_path ~output_dir ~symbol in
-  let active_through = _active_through_of_bars bars in
+  let bars, findings = _clean_tail ~tail ~symbol bars in
+  let last_bar = _last_bar_date bars in
+  let active_through =
+    _derive_active_through ~build_end:end_date
+      ~bar_marker:(_active_through_of_bars bars)
+      ~last_bar
+  in
   match
     Pipeline.build_for_symbol ~symbol ~bars ~deep_bars ~schema ?benchmark_bars
       ()
@@ -154,12 +206,18 @@ let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
   | Error err -> Error err
   | Ok rows ->
       _write_weekly ~output_dir ~symbol ~deep_bars ~bars;
-      _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows
+      Result.map
+        (_write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows)
+        ~f:(fun entry -> { entry; last_bar; findings })
 
+(* An incremental-skipped symbol reuses its previous entry verbatim, including
+   the [active_through] that build derived. No bars were read, so [last_bar] is
+   [None] and the entry is passed through the final derivation untouched. *)
 let _maybe_reuse ~existing ~symbol =
-  match existing with
-  | None -> None
-  | Some m -> Snapshot_manifest.find m ~symbol
+  let open Option.Let_syntax in
+  let%bind m = existing in
+  let%map entry = Snapshot_manifest.find m ~symbol in
+  { entry; last_bar = None; findings = [] }
 
 let _checkpoint_manifest ~manifest_path ~schema entry =
   match
@@ -171,21 +229,21 @@ let _checkpoint_manifest ~manifest_path ~schema entry =
         entry.Snapshot_manifest.symbol (Status.show err)
 
 let _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-    ~csv_mtime ~manifest_path ~checkpoint =
+    ~csv_mtime ~manifest_path ~checkpoint ~end_date ~tail =
   match
     _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-      ~output_dir ~csv_mtime
+      ~output_dir ~csv_mtime ~end_date ~tail
   with
   | Error err ->
       Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
       None
-  | Ok entry ->
-      if checkpoint then _checkpoint_manifest ~manifest_path ~schema entry;
-      Some entry
+  | Ok built ->
+      if checkpoint then _checkpoint_manifest ~manifest_path ~schema built.entry;
+      Some built
 
 let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~sketch_deep_days
     ~schema ~benchmark_bars ~output_dir ~manifest_path ~checkpoint ~csv_mtime
-    symbol =
+    ~tail symbol =
   match
     _load_split_bars ~data_dir ~start_date ~end_date ~sketch_deep_days ~symbol
   with
@@ -194,10 +252,11 @@ let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~sketch_deep_days
       None
   | Ok (deep_bars, bars) ->
       _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-        ~csv_mtime ~manifest_path ~checkpoint
+        ~csv_mtime ~manifest_path ~checkpoint ~end_date ~tail
 
 let _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
-    ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint symbol =
+    ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint ~tail
+    symbol =
   match _csv_mtime ~data_dir ~symbol with
   | None ->
       Printf.eprintf "skip %s: no CSV\n%!" symbol;
@@ -208,7 +267,7 @@ let _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
       else
         _try_build_and_checkpoint ~data_dir ~start_date ~end_date
           ~sketch_deep_days ~schema ~benchmark_bars ~output_dir ~manifest_path
-          ~checkpoint ~csv_mtime symbol
+          ~checkpoint ~csv_mtime ~tail symbol
 
 let _load_benchmark_bars ~data_dir ~start_date ~end_date sym =
   match _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol:sym with
@@ -294,21 +353,91 @@ let _write_final_manifest ~manifest_path ~schema ~entries ~elapsed =
 
 let _fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
     ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
-    ~symbols_total ~started_at i acc symbol =
+    ~symbols_total ~started_at ~tail i acc symbol =
   match
     _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
       ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint:true
-      symbol
+      ~tail symbol
   with
   | None -> acc
-  | Some entry ->
+  | Some built ->
       let symbols_done = i + 1 in
       _maybe_emit_progress ~output_dir ~progress_every ~symbols_total
         ~symbols_done ~last_completed:symbol ~started_at;
-      acc @ [ entry ]
+      acc @ [ built ]
+
+(* The build's end date: the operator's [--end-date] when given, else the latest
+   bar any symbol in this universe printed — the only end-of-data the builder
+   can know without a second pass over every CSV. Symbols whose own series stops
+   before it are the delisted ones. *)
+let _build_end_date ~end_date builts =
+  match end_date with
+  | Some _ -> end_date
+  | None ->
+      List.filter_map builts ~f:(fun b -> b.last_bar)
+      |> List.max_elt ~compare:Date.compare
+
+(* Full-history builds ([--end-date] absent) can only resolve the universe's end
+   once every symbol is read, so their per-symbol [active_through] is filled in
+   here rather than at checkpoint time. Reused (incremental-skip) entries keep
+   the value their own build derived. *)
+let _entry_with_derived_marker ~build_end b =
+  match b.last_bar with
+  | None -> b.entry
+  | Some _ ->
+      let active_through =
+        _derive_active_through ~build_end ~bar_marker:b.entry.active_through
+          ~last_bar:b.last_bar
+      in
+      { b.entry with active_through }
+
+let _finalize_entries ~end_date builts =
+  let build_end = _build_end_date ~end_date builts in
+  List.map builts ~f:(_entry_with_derived_marker ~build_end)
+
+(* Review sidecar (#2672): every terminal run below the ratio, whatever the
+   gates decided, so a human reads the vintage's classes once. Written even when
+   empty — a header-only file is the positive evidence that the scan ran and
+   found nothing. *)
+let _write_tail_report ~output_dir builts =
+  let findings = List.concat_map builts ~f:(fun b -> b.findings) in
+  let path = Filename.concat output_dir tail_report_name in
+  (try Out_channel.write_all path ~data:(Series_tail.to_csv findings)
+   with Sys_error msg ->
+     Printf.eprintf "%s write failed: %s\n%!" tail_report_name msg);
+  Printf.printf "%s\n%!" (Series_tail.summary findings)
+
+(* Pure loader: the failure is a value, so both halves are testable. The CLI
+   shells turn the [Error] into an exit via [tail_exceptions_or_exit]. *)
+let _read_exceptions_file p =
+  match
+    Or_error.try_with (fun () ->
+        Series_tail.Exceptions.of_file
+          (Series_tail.Exceptions.file_of_sexp (Sexp.load_sexp p)))
+  with
+  | Ok t -> Ok t
+  | Error e ->
+      Status.error_invalid_argument
+        (Printf.sprintf "tail exceptions load failed (%s): %s" p
+           (Error.to_string_hum e))
+
+let load_tail_exceptions path =
+  match path with
+  | None -> Ok Series_tail.Exceptions.empty
+  | Some p -> _read_exceptions_file p
+
+(* A malformed or missing exceptions file is FATAL: silently falling back to "no
+   exceptions" would truncate exactly the symbols a reviewer vetoed. *)
+let tail_exceptions_or_exit path =
+  match load_tail_exceptions path with
+  | Ok t -> t
+  | Error err ->
+      Printf.eprintf "%s\n%!" (Status.show err);
+      exit 1
 
 let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
-    ~end_date ~sketch_deep_days ~incremental ~progress_every () =
+    ~end_date ~sketch_deep_days ~incremental ~progress_every ~tail_config
+    ~tail_exceptions () =
   _ensure_dir output_dir;
   let schema = Snapshot_schema.default in
   let symbols_total = List.length symbols in
@@ -318,16 +447,64 @@ let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
   in
   let existing = if incremental then _existing_manifest ~output_dir else None in
   let manifest_path = Filename.concat output_dir "manifest.sexp" in
+  let tail = { config = tail_config; exceptions = tail_exceptions } in
   let started_at = Core_unix.time () in
   let t0 = Time_ns.now () in
-  let entries =
+  let builts =
     List.foldi symbols ~init:[]
       ~f:
         (_fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
            ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
-           ~symbols_total ~started_at)
+           ~symbols_total ~started_at ~tail)
   in
+  let entries = _finalize_entries ~end_date builts in
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
   _write_final_manifest ~manifest_path ~schema ~entries ~elapsed;
+  _write_tail_report ~output_dir builts;
   _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at;
   _verify_or_warn ~manifest_path
+
+(* Shared CLI surface for the tail knobs, so both builders expose exactly the
+   same flags and defaults. Only the three gate knobs are flags: the mis-scale
+   threshold and the stray-gap parameters are measured constants of the defect
+   classes, not per-build choices ({!Series_tail}). *)
+let tail_params =
+  let d = Series_tail.Config.default in
+  let%map_open.Command ratio =
+    flag "stub-ratio"
+      (optional_with_default d.stub.ratio float)
+      ~doc:"R Terminal-run close ratio below which a bar is a stub candidate"
+  and max_bars =
+    flag "stub-max-bars"
+      (optional_with_default d.stub.max_bars int)
+      ~doc:"N Longest terminal run still truncatable (longer = long low tail)"
+  and max_price =
+    flag "stub-max-price"
+      (optional_with_default d.stub.max_price float)
+      ~doc:"P The run's first close must be below this to count as a stub"
+  and no_stub_truncation =
+    flag "no-stub-truncation" no_arg
+      ~doc:"Report terminal stub tails without truncating them"
+  and no_stray_drop =
+    flag "no-stray-drop" no_arg
+      ~doc:"Report stray late bars without dropping them"
+  and exceptions_path =
+    flag "tail-exceptions" (optional string)
+      ~doc:
+        (Printf.sprintf
+           "PATH Sexp listing symbols whose tail is never edited, shape \
+            ((keep_tail (SYM ...))). Committed list: %s"
+           default_exceptions_path)
+  in
+  ( {
+      Series_tail.Config.stub =
+        {
+          d.stub with
+          truncate = not no_stub_truncation;
+          ratio;
+          max_bars;
+          max_price;
+        };
+      stray = { d.stray with drop = not no_stray_drop };
+    },
+    exceptions_path )
