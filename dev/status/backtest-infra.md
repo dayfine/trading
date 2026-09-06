@@ -702,6 +702,51 @@ Merged in main:
 
 ## Next Steps
 
+- **[NEW 2026-09-05] #2669 — `build_snapshots.exe -incremental` clobbers
+  `manifest.sexp`.** Filed by the maintainer 2026-09-05T02:42Z. A top-up run
+  over a 1-symbol universe rewrote a 2,208-entry manifest down to 1 entry while
+  leaving all 2,208 `.snap` files on disk; `Bar_source_resolver` enumerates
+  symbols from the manifest, so **the warehouse reads as empty to every runner**.
+  The `-incremental` flag is at
+  `trading/trading/backtest/snapshot_warehouse/build_scenario_snapshots.ml:202-205`
+  and is documented as a *skip* optimisation ("Skip symbols whose CSV mtime <=
+  the existing manifest's csv_mtime") — the manifest is nonetheless written with
+  only the processed set. Expected per the issue: merge the run's entries into
+  the existing manifest, **or** refuse a universe that is not a superset. Also
+  affects `dev/scripts/build_broad_snapshot_incremental.sh`, which advertises
+  checkpoint-resume across cron windows — an interrupted or
+  differently-scoped resumed window applies the same clobber.
+  **Bounded, self-contained, not strategy-touching, and not data-gated — this is
+  the top dispatchable feature item for the next orchestrator run.**
+  (orchestrator run 33962894987 triage; not dispatched only because the 3-agent
+  container cap was already committed to harness work.)
+
+- **[NEW 2026-09-05] #2672 — delisting stub prints fill stops at ~$0.** Filed by
+  the maintainer 2026-09-05T05:47Z: STMP 2021 exits at **$0.04** (entry $327.75,
+  −$593,988) and CLE 2014 at **$0.71** (entry $37.65), −$741k of phantom loss in
+  the canonical 26y record, whose 302.65% is said to be understated by ~70pp. The
+  same STMP print manufactured a −11.7pp "maxDD win" in the merged
+  `clock-default-fixed-basis-2026-09-04` cell.
+  **Two triage findings from run 33962894987 that change how ask 2 should be
+  implemented — check these before writing code:**
+  1. Ask 2 offers two detection routes ("no bars after date D, **or**
+     `active_through` < D"). The `active_through` route resolves through
+     `bar_reader.ml:243 _active_through_of_bars`, which is
+     `List.last bars |> Option.bind ~f:(fun b -> b.active_through)` — i.e. it
+     reads the field **off the last bar of the series**. If the stub print *is*
+     the last bar, that route sees the stub's own metadata and **cannot
+     discriminate it**. The stub-price route (ignore a final bar whose close is a
+     small fraction of the prior close) is the one that can.
+  2. `data/delisted_symbols.sexp` carries **no date field whatsoever** — entries
+     are `((code X) (exchange Y) (asset_type Z))` only — so it cannot supply a
+     delisting date to either route.
+  **Data-gated from GHA**: neither STMP nor CLE is in the runner's 655-symbol
+  `trading/test_data`, so this cannot be reproduced or regression-tested from a
+  GHA orchestrator run. Asks 1 and 3 (the V15 splice sweep and the paired 26y
+  re-run) are multi-hour backtests, which
+  `.claude/rules/container-capacity-scheduling.md` forbids running alongside
+  agents. **Recommend a LOCAL maintainer session**, not a GHA dispatch.
+
 - **Step 3 (tier-aware bar loader)** now unblocked; separately tracked at
   `dev/status/backtest-scale.md`. A/B the Legacy vs Tiered loader
   against a traced Legacy baseline. Do not pick up Step 3 from this

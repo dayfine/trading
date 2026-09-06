@@ -4,66 +4,64 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-04 (orchestrator run 33894722318; main **`20ed1788`**.
+Last updated: 2026-09-05 (orchestrator run 33962894987; main **`41fd244b`**.
 Green at run start: `dune build @runtest --force` **0**, 0 `^FAIL:`,
 `status_file_integrity` **0**, `index_size_linter` **0** — every exit code
 read **unpiped**. Step 0.5 skipped: `QUEUE_NON_EMPTY=0`, and per the
 precondition an **empty** queue is the opposite of saturated — maximum
 dispatch capacity, not a reason to no-op.
 
-**The queue was empty and main was green — the first clean start in several
-runs.** Everything the last two runs left in flight has landed (#2654 merged
-02:41Z, plus four experiment PRs). All eight remote branches were checked
-**individually** against their PR state: every one merged, zero orphans.
-(`git merge-base --is-ancestor` reports every squash-merged branch as
-"not in main" and would have manufactured eight phantom orphans.)
+**Three harness PRs opened (#2675, #2676, #2677); two of them had to be
+recovered by hand.** Two of the three dispatched agents finished their work
+but stalled on a backgrounded `dune` call without ever committing
+(`feedback_agents_background_wait_stall`). Per `pr-gate-loop.md`
+§"Dispatcher-side recovery" the orchestrator verified each agent's work **in
+that agent's own worktree** (fmt/build/runtest all 0, suites 68 and 72 clean)
+and committed + pushed it, rather than re-dispatching — the work was complete,
+only uncommitted.
 
-**#2663 MERGED `2310b6b8`** — the scheduled-workflow health check as a
-committed script (script half of **#2634**), after a rework that took it from
-10 to **16** assertions. Behavioral had found the monitor could **report green
-when nothing was measurable**: the cannot-measure signal was pinned on the
-workflow-list call site but not the per-workflow one, so a one-line mutation
-silently reclassified both known-red workflows as NO-SCHEDULE and the suite
-still passed 10/10. Merged only once `pr_gate_status.sh` itself printed `MERGE`.
+**#2662 re-diagnosed: the 2026-09-04 prime suspect is not supported by its own
+evidence.** Two hypotheses eliminated with controls. (i) The
+`$0`/`modelUsage:{}`/sub-second signature is the *generic* pre-flight-failure
+shape — a local control arm with **no `--agent` and `--allowedTools Bash`**
+reproduces it identically, so it cannot implicate `--allowedTools`. (ii) The
+`configureGitAuth` → `fatal: not in a git directory` exit-128 failure in the
+failing log is **present in both successful siblings' logs**. Also corrected:
+the model IS initialized (`"model":"claude-opus-5"`), so "never invoked" was
+wrong. What remains: SDK options differ in exactly two fields (`maxTurns`,
+`allowedTools`) — a narrowed suspect, not a diagnosis. Blocked on the action
+suppressing its streaming JSONL. Detail in `orchestrator-automation.md`; it
+could **not** be posted to the issue (`POST /issues/<n>/comments` → **403**).
 
-**#2664 open, all-green, held for human adjudication** — mutation-coverage
-harness for `dev/scripts/pr_gate_status.sh`, the merge gate itself (16 pinned
-mutations, 11 killed / **4 live survivor / 1 verified equivalent mutant**, 6 not
-previously named; the split is now **derived by the harness at run time**, not
-restated in prose). CI + structural(5) + behavioral(5) all green at `8775df22`,
-but the gate reader says `ADJUDICATE`: two behavioral verdicts exist at that SHA
-after a body-only fix, and the orchestrator made that body edit — so it declined
-to break the tie in favour of its own work. Re-dispatch: the 2026-09-03 dispatch
-of this item produced no branch and no PR.
+**#2639's hold detector: broken confirmed, and the one-line fix verified by
+positive control.** Live timeline data shows `reviewed` events carry
+`submitted_at`, never `created_at` — so the spec's parser raises `KeyError`
+and its `|| echo false` returns "not held". Run against **#2384 itself** (the
+−40.91pp incident): spec parser → *not held*; corrected parser → **HELD**.
+Negative control #2664 → correctly *not held*. First demonstration in 8 runs
+that this control can fire at all.
 
-**Two new merge-gate defects, found by hand in the run that built the harness
-for finding them mechanically:** `H-QC-VERDICT-NEWLINE-COLLAPSE` (a QC verdict
-can post with all newlines stripped — unreadable to the gate parser, though it
-failed safe as *stale*) and `H-GATE-TWO-VERDICTS-ONE-SHA` (a body-only fix
-necessarily yields two verdicts at one SHA, which a SHA-keyed reader cannot rank).
+**Drift found and fixed:** the two merge-gate gaps the 2026-09-04 summary said
+it "filed" existed only in that summary and this header — never in
+`harness.md`, which is what Step 2c dispatches from. Now filed there, with a
+third (`H-SETTINGS-HOOKS-ABSOLUTE-LOCAL-PATH`: both `.claude/settings.json`
+hooks point at macOS-only paths and fail on every GHA run).
 
-**`workflow` scope is blocked on EVERY route — measured with a control, not
-inferred.** `PUT /contents/.github/workflows/.scope-probe.txt` → **403**;
-`PUT /contents/dev/notes/.scope-probe.txt` (control) → **201**, same token,
-same scratch branch, seconds apart. The control is what makes it a
-measurement: a bare 403 is equally consistent with "cannot write at all".
-This hard-blocks **#2653**, **#2662** and #2634's wiring half. Scratch ref
-deleted (`204`); `main` never targeted.
+**Two NEW maintainer issues arrived today** — #2669 (`-incremental` clobbers
+`manifest.sexp`, making a warehouse read as empty) and #2672 (delisting stub
+prints fill stops at ~$0; −$741k phantom loss in the canonical 26y record).
+Triaged into `backtest-infra.md` §Next Steps; #2669 is the top dispatchable
+item next run, #2672 is LOCAL/data-gated.
 
-**Filed #2662** — `track-pacer-weekly` red since 2026-08-30: the CLI fails
-pre-flight in **552 ms at $0 with `modelUsage: {}`**, so the model is never
-invoked. Prime suspect (stated as a suspect): `--allowedTools` is missing
-`Agent`, the one line differing from its two working siblings. Note the
-2026-09-03 orchestrator failure carries the **byte-identical**
-`subtype:"success"` + `is_error:true` shell after 80 min and $48.67 —
-one boolean, provably different failure modes.
 
-Capabilities: `.claude/agents/**` writes **refused** (8th run); `workflow`
-scope unavailable by push **and** contents API (above); `POST
-/actions/workflows/<f>/dispatches` **403**; `POST /issues` create-only
-(`PATCH` and issue comments 403); `PATCH /pulls/<n>`,
-`POST /pulls/<n>/reviews`, `PUT /pulls/<n>/merge`, `PUT .../update-branch`
-all work.
+Capabilities (carried; measured 2026-09-04 unless noted): `.claude/agents/**`
+writes **refused** (9th run); `workflow` scope unavailable by push **and**
+contents API (403 on a workflow path vs **201** on a `dev/notes/` control,
+same token, seconds apart — the control is what makes it a measurement);
+`POST /actions/workflows/<f>/dispatches` **403**; `POST /issues` create-only
+(issue comments **403**, re-tested 2026-09-05); `PATCH /pulls/<n>`,
+`POST /pulls/<n>/reviews`, `POST /pulls` (create), `PUT /pulls/<n>/merge`,
+`PUT .../update-branch` all work.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -87,7 +85,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2654 MERGED `bf552095` (fixes #2632 empty-window crash); weekly-start-sweep unverified until its next cron |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | NEW maintainer issues #2669 (manifest clobber — top dispatchable item) + #2672 (delisting stub fills, LOCAL/data-gated); see Next Steps for triage |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | v1 harness (#1937) + C6b audit-join-by-position_id (#1947) MERGED; next: golden-run integration test for V3/V4/V7 (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
@@ -112,7 +110,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2664 | #2663 MERGED `2310b6b8` (#2634 script half); #2664 gate-parser mutation harness all-green but `ADJUDICATE` — 2 behavioral verdicts at one SHA |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2675, #2676, #2677 | #2664 MERGED `0be43856` (maintainer adjudicated); 3 new PRs: followup-count exclusions, gate `unreadable(<sha>)` state, derived scenario counts |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2637 MERGED 09-03; backlog has no actionable item — top is the test-file-length policy decision, human-gated 20 runs |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |

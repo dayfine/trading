@@ -686,7 +686,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
 - [x] H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH: Filed by qc-behavioral on PR #2243 (residual R1, non-blocking, **pre-existing and shared by all three implementations**). When a caller exports `REPO_ROOT` to something that fails the `[ -d "$REPO_ROOT" ]` guard, the guard falls through to the walk-up, the record is written to the **walked-up** root with `rc=0` and no diagnostic, and that walked-up value is re-exported to the `write_audit.sh` child. Measured on a fixture repo: `REPO_ROOT='/definitely/not/a/dir'`, `REPO_ROOT=''`, and `REPO_ROOT=/etc/hostname` (a regular file) each produced `rc=0` with the record landing under `$WALKUP/dev/audit/`; an instrumented child printed `CHILD-SEES-REPO_ROOT=[$WALKUP]`. So the observable failure shape this whole H-* family exists to prevent — *an audit record landing in a root the caller did not choose* — remains reachable, just via **malformed** input rather than valid input. Not a regression and not introduced by #2243: `_check_lib.sh:repo_root()`, `write_audit.sh:_repo_root()` and `record_qc_audit.sh:_repo_root()` all share the `[ -n ] && [ -d ]`-then-walk-up shape, so #2243's stated consistency goal is met. Unpinned by any scenario. Fix shape: in all three, treat "`REPO_ROOT` set but not a directory" as a **hard error** (`FAIL: REPO_ROOT is set to '<v>' but is not a directory`) rather than a silent fallthrough — a set-but-invalid override is far more likely a typo than a request to fall back. Needs a scenario asserting non-zero exit and **zero** records written in either root. `harness_gap: LINTER_CANDIDATE` (same precedence-consistency check as the parent item). (source: 2026-08-08 qc-behavioral R1 on PR #2243) **Fixed:** all three `_repo_root()`/`repo_root()` implementations (`_check_lib.sh`, `write_audit.sh`, `record_qc_audit.sh`) now split the single `[ -n ] && [ -d ]` guard into two branches: `REPO_ROOT` **set and non-empty** but failing `[ -d ]` (nonexistent path, or a path that exists but is a regular file) is a hard error — `FAIL: REPO_ROOT is set to '<v>' but is not a directory`, `exit 1`, no walk-up attempted — while `REPO_ROOT` **unset or the empty string** still falls through to the walk-up exactly as before. **Empty-string decision (deliberate, documented in each function's own code comment):** `REPO_ROOT=''` is treated the SAME as unset, not as set-but-invalid. Rationale: `${REPO_ROOT:-}` is empty for both an unset and an empty-string `REPO_ROOT` (the `:-` operator triggers on null-or-unset), so the two cases already collapse into the walk-up branch by shell construction; an empty override is indistinguishable from "no override supplied," every existing caller relies on exactly that fallback (it's the only path production uses — `REPO_ROOT` is test-only plumbing), and a hard error on `''` would protect against nothing (an empty value can't carry a wrong path) while risking breaking a caller that clears the var to mean "no override." **Regression coverage** (`record_qc_audit_test.sh`, 40 → 49 scenarios/assertions, measured by running the suite, not quoted from memory): scenarios 29a-c pin `_check_lib.sh:repo_root()` in isolation via a new `_repo_root_probe.sh` fixture wrapper (nonexistent path / regular file / empty string); scenarios 30a-c pin `write_audit.sh:_repo_root()` end-to-end (rc + zero records under the walked-up root for the two hard-error shapes, one record for the empty-string walk-up); scenarios 31a-c pin `record_qc_audit.sh:_repo_root()` end-to-end through its `write_audit.sh` child process, with all three sub-scenarios' `dev/reviews/<feature>.md` fixtures created upfront so a guard regression is caught by an actual wrong-root *publish* (rc=0, record written) rather than an incidental later "review file not found" error. **Mutation-tested live, one implementation at a time (revert guard, run suite, restore, verify byte-identical):** (1) reverted `_check_lib.sh`'s guard only → 47 passed, 2 failed (exactly 29a, 29b — 29c and everything else green); (2) restored, reverted `write_audit.sh`'s guard only → 46 passed, 3 failed (exactly 30a, 30b, and 30c as collateral — 30c's "exactly 1 record" assertion fails because 30a/30b's silent writes polluted the walked-up root's count to 3, correctly showing the bug's blast radius); (3) restored, reverted `record_qc_audit.sh`'s guard only → 46 passed, 3 failed (31a/31b/31c, with 31a/31b showing `rc=0` + a real record published under the walked-up root — the full H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING shape, not just a secondary error). All three restores verified byte-identical to the shipped fix (diffed against saved copies). **"Before" measurement:** ran the pre-existing 40-scenario suite (no 29/30/31) against the pre-fix scripts — 40/40 passed, confirming the defect was invisible to the existing suite and that this fix changes no previously-tested behavior (the unset-`REPO_ROOT` path scenarios 27b/28b and every other pre-existing scenario are untouched). **Dune wiring:** `_check_lib.sh` added to the `record_qc_audit_test.sh` runtest rule's `(deps ...)` in `trading/devtools/checks/dune` — scenario 29's fixture copies `_check_lib.sh` into a temp dir and probes `repo_root()` directly, and without the dep dune's sandbox never copies the file in (`cp: cannot stat ... No such file or directory`) even though it's readable outside the sandbox; caught by running the dune-wired suite, not just the direct `bash` invocation. Verify: `bash trading/devtools/checks/record_qc_audit_test.sh` (49/49) and `dune runtest devtools/checks/ --force` (also exercises the dune dep-wiring fix).
 
-- [ ] H-AUDIT-TEST-SCENARIO-COUNT-UNRECONCILABLE: Filed by qc-behavioral on PR #2243 (residual R2, non-blocking, **cosmetic**). The "N scenarios" figure quoted in `record_qc_audit_test.sh`'s prose, in PR bodies, and in this file reconciles with **no** mechanical count of the file. Measured at `813a91e5`: distinct scenario labels appearing in pass/fail text = **34**; `# Scenario` comment headers = **29**; distinct numeric scenario numbers = **28**. The quoted figure is **30**. The assertion count (**34**) *is* accurate and is the half the suite actually prints and machine-checks. The pre-existing text already said "28 scenarios" (also unreconcilable) and #2243 incremented it consistently by +2, so this is carried-forward imprecision rather than a new error — but it means every "N/M" citation in this family is half-unverifiable. Fix shape: drop the scenario count from prose and cite only the assertion count the suite prints, **or** have the suite print both counts so the figure is derived rather than transcribed. `harness_gap: LINTER_CANDIDATE` (a count printed by the suite cannot drift from the suite). (source: 2026-08-08 qc-behavioral R2 on PR #2243)
+- [x] H-AUDIT-TEST-SCENARIO-COUNT-UNRECONCILABLE: Filed by qc-behavioral on PR #2243 (residual R2, non-blocking, **cosmetic**). The "N scenarios" figure quoted in `record_qc_audit_test.sh`'s prose, in PR bodies, and in this file reconciled with **no** mechanical count of the file — measured at `813a91e5`: distinct scenario labels = 34, `# Scenario` headers = 29, distinct numeric scenario numbers = 28, vs. a quoted figure of 30. Re-measured before this fix, on `main@41fd244b`: the drift had widened further — the same file (grown to 3606 lines / 52 named scenarios) had 70 distinct scenario labels, 60 `# Scenario` header lines, and 61 distinct header-declared scenario numbers, while no figure anywhere had been updated to track it. Fixed by taking the second fix shape the item offered (deriving > correcting, since a corrected number just decays again): added `_derived_scenario_report()` to `record_qc_audit_test.sh` itself, which greps the suite's **own source** for all four counts (assertions executed, distinct scenario labels, `# Scenario` header lines, distinct scenario numbers named in headers — each precisely defined in the function's own doc comment, including why they legitimately disagree, e.g. `7a`/`7b`/`53a`/`53b` are labelled sub-cases with no header of their own, and the `# Scenarios 25 & 26` header names two numbers in one line) and prints all four at the end of every run, instead of any hand-transcribed figure. A count of 0 on any of the four is treated as a broken measurement, not a legitimate empty result, and hard-fails the suite naming which count broke. **PR #2677's own qc-behavioral rework (2026-09-05) found that the first cut of this fix only pinned 2 of the 4 zero-guards**: 53a/53b's shared fixture zeroes labels, headers, AND header-numbers simultaneously, and 53a's assertion checks only the labels complaint — so deleting the `headers` or `header_nums` guard block left the suite fully green (72/0), the exact silent-measurement-failure this function exists to prevent. Fixed by adding **53c** (one label, no header line at all — isolates `headers`, since `header_nums` can't be non-zero without a header either) and **53d** (a header line with no number token, plus one label — isolates `header_nums` from `headers`), each asserting the guard-specific complaint text rather than just the return code, so deleting either remaining guard now goes red naming exactly the sub-case that stops passing. All four zero-guards were then reconfirmed independently by GREEN→RED proof (delete each guard block in turn, observe the suite go red naming exactly the sub-case pinning it, restore, confirm byte-identical + green again). On current main the suite now prints: `74 assertions executed / 74 distinct scenario labels / 61 '# Scenario' header lines / 62 distinct scenario numbers named in headers` (the +2 vs. the prior 72/72/61/62 are scenarios 53c/53d themselves — both new labelled sub-cases with no header of their own, so headers/header_nums are unchanged). The label/header_nums reconciliation identity is `labels = header_nums - 7 + 19` (7 parent headers with no label of their own: `7 25 26 29 30 31 53`; 19 labelled sub-cases with no header of their own, now including 53c/53d) — documented in `_derived_scenario_report`'s own doc comment, since the first cut only documented the `+N` half and a reader following it as written could not reconcile the two counts. Verify: `bash trading/devtools/checks/record_qc_audit_test.sh` — lives at `trading/devtools/checks/record_qc_audit_test.sh` (`_derived_scenario_report` function + scenarios 53a-d + the final self-report call). `harness_gap: LINTER_CANDIDATE` — narrowed claim: each of the four counts is now guarded against reading exactly ZERO and cannot silently regress to that state without the suite going red; a regex that narrows but still matches at least one line (e.g. `'^# Scenario'` → `'^# Scenarios'`) is NOT caught by this mechanism, only a total-breakage-to-zero is. (source: 2026-08-08 qc-behavioral R2 on PR #2243; closed 2026-09-05; R1/R2/R3 rework closed same day per PR #2677 qc-behavioral)
 
 - [x] H-UNIVERSE-DEPS-EXEMPTION-EVIDENCE-STALE: Filed by qc-behavioral on PR #2243 (residual R3, non-blocking, **docs-only**). `universe_deps_exceptions.conf:44-47` and `:50-53`, plus the dune comment at `trading/devtools/checks/dune:471-475`, justify the `record_qc_audit.sh` / `write_audit.sh` exemptions on the grounds that the governing test *"ALWAYS overrides REPO_ROOT to a freshly-created temp fixture repo before invoking this script — the real dev/reviews/ and dev/audit/ directories are never read."* That is now **literally false in two places**: `record_qc_audit_test.sh:1446` (scenario 27b, pre-existing from #2231) and `:1587` (scenario 28b, added by #2243) both invoke under `env -u REPO_ROOT` with no override. The exemption remains **substantively valid** — the walk-up terminates inside the fixture, which carries its own `.claude` sentinel, and `dev/audit/` measured **106 before and after every run** including a forced dune re-run — but the *recorded evidence* no longer matches the code. This is precisely the drift H-CHECK-EXEMPTION-DRIFT (above, ~line 442) already flags as mechanically uncatchable. Fix shape: reword both exemption comments and the dune comment to the accurate invariant — *"every invocation either overrides `REPO_ROOT` to a temp fixture, or runs `env -u REPO_ROOT` from a script located inside a temp fixture that carries its own `.claude` sentinel; the walk-up therefore terminates in the fixture, never the real repo."* Folds naturally into the H-CHECK-EXEMPTION-DRIFT re-audit. (source: 2026-08-08 qc-behavioral R3 on PR #2243) **Fixed:** re-enumerated every `record_qc_audit.sh`/`write_audit.sh` invocation in `record_qc_audit_test.sh` from source rather than trusting the filed line numbers (grepped all ~60 `REPO_ROOT` occurrences): every site either explicitly sets `REPO_ROOT` (including the deliberate `''`/malformed cases in scenarios 29-31, which still count as "override", just to an invalid/empty value) or runs via `env -u REPO_ROOT` — and the `env -u` shape occurs at **exactly two sites, scenarios 27b and 28b**, confirming the filed item's count. Confirmed mechanically that both `env -u` fixtures (`WALKUP_ROOT` for 27b, `WALKUP3_ROOT` for 28b) are `mktemp -d` trees carrying their own `.claude` sentinel, so the walk-up in the unset-REPO_ROOT case terminates inside the fixture, never the real repo. Reworded all three sites (`universe_deps_exceptions.conf`'s `record_qc_audit.sh` and `write_audit.sh` entries, and the dune file's "H-CHECK-CACHE-BLIND exemption" comment) to state the accurate two-branch invariant, citing scenario names (27b/28b) rather than line numbers per the drift lesson this item itself demonstrates. Ran the real safety check rather than reusing the prior filing's number: `dev/audit/` measured 128 and `dev/reviews/` measured 142 both before and after running `record_qc_audit_test.sh` (57/57 passed, `git status --porcelain dev/audit dev/reviews` clean) — no real-repo file was touched. Comment/config-prose-only change; verified `dune build devtools`, `dune runtest devtools`, and `dune build @fmt` all exit 0 with zero `FAIL:` lines and no unintended fmt diff. Verify: `bash trading/devtools/checks/record_qc_audit_test.sh` (57 scenarios) and `dev/lib/run-in-env.sh dune runtest devtools/checks`. (fixed 2026-08-17 harness-maintainer on harness/universe-deps-evidence) **Rework (iteration 1, PR #2363):** qc-behavioral found the shipped two-branch wording under-enumerated — the invocation set has **four** shapes, not two, and six sites of the two exempted scripts (30a/b/c, 31a/b/c, plus 29a/b/c for the dune comment's `_check_lib.sh` mention) satisfied neither branch. The malformed-`REPO_ROOT` cases (29a/b, 30a/b, 31a/b) hard-error at `_repo_root()`'s `[ -d ]` guard before any override takes effect — the opposite of "a freshly-created temp fixture repo" — and `REPO_ROOT=''` (29c, 30c, 31c) is **not an override in effect either**: both `_repo_root()`s guard on `[ -n "${REPO_ROOT:-}" ]`, so `''` falls straight through to the walk-up. This also corrects this note's own prior claim that the malformed/`''` cases "still count as \`override\`" — they do not; malformed hard-errors before any override takes effect, and `''` is unset-equivalent. Reworded all three sites (`.conf` × 2, `dune` × 1) to a three-shape invariant: (a) override to a freshly-created fixture, (b) override to a deliberately malformed value that hard-errors before any path is computed, (c) walk-up reached via `env -u REPO_ROOT` or `REPO_ROOT=''`, seeded from the script's own directory so it terminates inside the fixture regardless of caller CWD. Dropped the exhaustive "(scenarios 27b and 28b)" framing in favor of "e.g. scenarios 27b/28b/..." so the prose doesn't re-acquire a drift-prone exhaustive site list. `.conf` non-comment lines remain a zero diff vs `main` (nothing added/removed/widened); `dune build devtools`, `dune runtest devtools` (57/57), `dune build @fmt` all exit 0. (reworked 2026-08-17 harness-maintainer, rework iteration 1 on PR #2363)
 
@@ -2175,6 +2175,113 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   remains untouched too), and the "first→last match" structural mutation noted
   above. `pr_gate_status.sh`'s production logic was not modified by this PR.
 
+## Added 2026-09-05 (lead-orchestrator, GHA run 33962894987)
+
+Three items filed by the orchestrator itself. **The first two were described in
+the 2026-09-04 daily summary as "both filed", but a repo-wide grep this run found
+them in `dev/daily/2026-09-04.md` and the `_index.md` header only — never in this
+file.** Step 2c dispatches from *this* file, so as recorded they were
+undispatchable and would have been lost. Filing them here is the fix; the lesson
+is that "filed" must mean "written to the backlog the dispatcher reads", not
+"described in a run summary".
+
+- [ ] **H-GATE-TWO-VERDICTS-ONE-SHA**: a body-only fix is the correct, cheap
+  response to a PR-body finding — it changes no SHA and re-runs no CI — but it
+  necessarily produces **two behavioral verdicts at one SHA**, which the
+  SHA-keyed `pr_gate_status.sh` cannot rank. It printed
+  `ADJUDICATE -- conflicting verdicts at 8775df22 (behavioral)` on #2664 and
+  correctly refused to decide. Two legitimate mechanisms interacting badly, not
+  a bug in either. Options: (a) rank by `submitted_at` within a SHA — a two-line
+  change to the reader; (b) dismiss the superseded review via the API so only one
+  survives. **Both need a decision, not a patch**, and the decision is the
+  standing Question 1 to the maintainer ("is *latest verdict at the same SHA
+  wins* a rule the orchestrator may apply itself?"). **Status 2026-09-05: the
+  #2664 instance was resolved by the maintainer merging it (`0be43856`,
+  2026-09-04T20:26Z) — that settles the instance but NOT the durable rule, so
+  the next body-only fix reproduces it.**
+  **SECOND INSTANCE, same day (2026-09-05, run 33962894987): PR #2676.** Its
+  re-QC behavioral verdict was NEEDS_REWORK on a **body-only** finding — the PR
+  body still quoted "68 tests clean" against a shipped 73, and asserted a
+  categorical "unreadable never reaches MERGE" that the reviewer showed
+  over-reads what the code guarantees. The orchestrator corrected the body (no
+  commit, no SHA change, CI not re-run) and then **stopped**: asking for a
+  re-read at the same SHA would produce two behavioral verdicts at `cd7a3bc7`
+  and land back on `ADJUDICATE`, and the orchestrator had itself written both
+  the original body and the correction — merging would be automation breaking a
+  tie in favour of its own work, the #2384 shape. **Two instances in two days
+  means this is not an edge case; it is the normal cost of the (correct, cheap)
+  body-only fix.** The cheapest durable answer is a one-line rule from the
+  maintainer; the two-line reader change (rank by `submitted_at` within a SHA)
+  is the mechanical alternative. `harness_gap: ONGOING_REVIEW`.
+  (source: 2026-09-04 run 33894722318; second instance 2026-09-05 run 33962894987)
+
+- [ ] **H-QC-VERDICT-NEWLINE-COLLAPSE**: a QC review can post with every newline
+  stripped — the whole body one line, reading `...all passing).## VerdictAPPROVED`.
+  It renders acceptably for a human but is **invisible to `pr_gate_status.sh`**,
+  which anchors on `^## Verdict`, so a current APPROVED reads as `stale(<sha>)`.
+  Observed once (#2663's re-structural review, 2026-09-04); the reviewer's `POST`
+  returned success both times, so **nothing detects it**. It failed in the safe
+  direction (unreadable → *stale*, never *approved*) and that property must be
+  preserved by any fix. **A dispatch against this item is in flight this run**
+  (branch `harness/qc-verdict-newline-collapse`) scoped to a gate-side *detector*
+  — the posting side lives in `.claude/agents/**`, which this runtime cannot
+  write. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-04 orchestrator run 33894722318)
+
+- [ ] **H-SETTINGS-HOOKS-ABSOLUTE-LOCAL-PATH**: both hooks in
+  `.claude/settings.json` are hardcoded to **macOS-local absolute paths** that
+  cannot exist on a GHA runner:
+  `SessionStart -> bash /Users/difan/Projects/trading-1/dev/scripts/sweep_stale_worktrees.sh ...`
+  and `Stop -> bash /Users/difan/Projects/trading-1/dev/scripts/cleanup_merged_worktrees.sh`.
+  Every containerised workflow loads project settings (`settingSources:
+  ["user","project","local"]`, confirmed in the SDK-options block of all three
+  container workflows' logs), so **both hooks fail on every GHA run of every
+  workflow**, silently — no gate observes hook exit status. Consequence: the
+  worktree sweep and merged-worktree cleanup that `worktree-isolation.md`
+  §Cleanup documents as automatic have never once run in CI, so stale
+  `.claude/worktrees/` and orchestrator `wt-*` trees accumulate on runner disk
+  with no reclaim path but the per-run fresh checkout. Fix shape: use the
+  repo-relative form (`bash dev/scripts/sweep_stale_worktrees.sh ...`), which
+  works in both environments. Same defect class as the book path in
+  `.claude/rules/book-as-authority.md` — except that one *documents* its
+  local-only nature and supplies a detection snippet; these do not.
+  **Explicitly NOT the cause of #2662**: the two workflows that succeed load the
+  identical settings file and fail the identical hooks (verified against
+  successful runs 33408488106 and 33894722318). `harness_gap: LINTER_CANDIDATE`
+  (a settings-path linter asserting no absolute `/Users/` or `/home/<user>/`
+  prefix in `.claude/settings.json` is a few lines and closes the class).
+  (source: 2026-09-05 orchestrator run 33962894987, found while diagnosing #2662)
+
+- [ ] **H-AGENT-WORKTREE-DISK-16GB-EACH**: measured 2026-09-05 (run 33962894987)
+  — **a dispatched agent's worktree costs ~16 GB once it has run `dune build`**,
+  and the GHA runner has ~145 GB total with ~13 GB already taken by the main
+  checkout. Three concurrent QC worktrees measured **16 GB / 16 GB / 16 GB = 48
+  GB**; combined with image layers and `_build` growth this run reached **100%
+  disk** and the harness's own task-output filesystem returned **ENOSPC**
+  (`the temp filesystem ... is full (0MB free)`), killing a tool call
+  mid-orchestration. Reclaimed 46 GB by removing four finished agents'
+  worktrees. Two consequences worth separating:
+  (a) **`.claude/rules/container-capacity-scheduling.md`'s "cap 3 agents" is
+  stated in terms of memory and cores; it has an undocumented DISK dimension.**
+  3 agents is roughly the disk ceiling too, by coincidence rather than design —
+  and a 4th agent would ENOSPC rather than merely contend. The rule's table
+  should carry a `disk` column (~16 GB per agent worktree, measured) so the two
+  limits are visible together.
+  (b) **The orchestrator batched its worktree cleanup instead of removing each
+  worktree as its agent finished**, which is exactly what `sweep-hygiene.md`
+  §"After each dispatched agent" forbids ("**rm -rf immediately — DON'T
+  batch**"; it cites 5-8 GB each, an underestimate against today's 16 GB). The
+  batching is what turned a survivable 69% into 100%. Fix shape: make the
+  post-agent `git worktree remove --force` unconditional in the orchestrator's
+  Step 4 cleanup rather than deferred to end-of-run, and consider a pre-dispatch
+  `df` guard that refuses a new agent below a free-space floor — a dispatch that
+  ENOSPCs mid-flight destroys the agent's work, which is strictly worse than
+  not dispatching it.
+  Note this cost is **not** avoidable by sharing a `_build`: per issue #2470
+  each agent needs its own worktree precisely so their builds do not contend.
+  The disk cost is the price of that isolation, so the answer is prompt
+  reclamation, not fewer worktrees. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-05 orchestrator run 33962894987)
 - [x] **H-QC-VERDICT-NEWLINE-COLLAPSE** (found by hand 2026-09-04, PR #2663;
   landed here since it was never written into this file at the time): a
   qc-structural review of #2663 was posted **APPROVED at the correct tip**,
