@@ -40,15 +40,30 @@ type config = {
   bearish_threshold : float;
   indicator_weights : indicator_weights;
   indicator_thresholds : indicator_thresholds;
+  breadth_direction : Breadth_direction.config;
+      [@sexp.default Breadth_direction.default_config]
 }
 [@@deriving sexp]
 
 type ad_bar = { date : Core.Date.t; advancing : int; declining : int }
 
+type breadth_bar = {
+  date : Core.Date.t;
+  universe_count : int;
+  above_ma_count : int;
+  new_highs : int;
+  new_lows : int;
+}
+(** One day's universe-participation breadth. Counts, not percentages — the
+    percentages are derived in {!Breadth_series_cache} so the divisor is always
+    the same day's [universe_count]. Loaded by {!Breadth_bars}; see its [.mli]
+    for provenance and the holiday-row rule. *)
+
 type result = {
   index_stage : Stage.result;
   indicators : indicator_reading list;
   trend : market_trend;
+  breadth_state : breadth_state;
   confidence : float;
   regime_changed : bool;
   rationale : string list;
@@ -59,6 +74,8 @@ type callbacks = {
   get_index_close : week_offset:int -> float option;
   get_cumulative_ad : week_offset:int -> float option;
   get_ad_momentum_ma : week_offset:int -> float option;
+  get_pct_above_ma : week_offset:int -> float option;
+  get_new_lows_pct : week_offset:int -> float option;
   global_index_stages : (string * Stage.callbacks) list;
 }
 (** Bundle of indicator callbacks consumed by [Macro.analyze_with_callbacks].

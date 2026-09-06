@@ -15,5 +15,5 @@ let _aggregate_week (week_rev : Macro.ad_bar list) : Macro.ad_bar =
 
 let daily_to_weekly (bars : Macro.ad_bar list) : Macro.ad_bar list =
   Time_period.Week_bucketing.bucket_weekly
-    ~get_date:(fun b -> b.Macro.date)
+    ~get_date:(fun (b : Macro.ad_bar) -> b.date)
     ~aggregate:_aggregate_week bars

@@ -61,6 +61,18 @@ let _regime_changed_of ~trend ~prior =
 (* Main function — callback shape                                       *)
 (* ------------------------------------------------------------------ *)
 
+(** Sample the two breadth callbacks at offset 0 and at the config's lookback,
+    and hand them to {!Breadth_direction.classify}. When the callbacks are inert
+    (no breadth series wired) all four samples are [None] and [classify] returns
+    the projection of [trend] — the pre-breadth behaviour. *)
+let _breadth_state_of ~(config : config) ~(callbacks : callbacks) ~trend =
+  let back = config.breadth_direction.lookback_weeks in
+  Breadth_direction.classify ~config:config.breadth_direction ~trend
+    ~pct_above:(callbacks.get_pct_above_ma ~week_offset:0)
+    ~pct_above_prior:(callbacks.get_pct_above_ma ~week_offset:back)
+    ~nl_pct:(callbacks.get_new_lows_pct ~week_offset:0)
+    ~nl_pct_prior:(callbacks.get_new_lows_pct ~week_offset:back)
+
 let analyze_with_callbacks ~config ~(callbacks : callbacks) ~prior_stage ~prior
     : result =
   let { stage_config; bullish_threshold; bearish_threshold; _ } = config in
@@ -79,7 +91,16 @@ let analyze_with_callbacks ~config ~(callbacks : callbacks) ~prior_stage ~prior
   in
   let regime_changed = _regime_changed_of ~trend ~prior in
   let rationale = _build_rationale ~indicators ~regime_changed ~trend in
-  { index_stage; indicators; trend; confidence; regime_changed; rationale }
+  let breadth_state = _breadth_state_of ~config ~callbacks ~trend in
+  {
+    index_stage;
+    indicators;
+    trend;
+    breadth_state;
+    confidence;
+    regime_changed;
+    rationale;
+  }
 
 (* ------------------------------------------------------------------ *)
 (* Bar-list wrapper — preserves the existing API                        *)
@@ -176,8 +197,16 @@ let callbacks_from_bars ~(config : config) ~(index_bars : Daily_price.t list)
     get_index_close = _make_get_index_close_from_bars index_arr;
     get_cumulative_ad = _make_get_from_float_array cum_ad_arr;
     get_ad_momentum_ma = _make_get_ad_momentum_ma ma_scalar;
+    get_pct_above_ma = (fun ~week_offset:_ -> None);
+    get_new_lows_pct = (fun ~week_offset:_ -> None);
     global_index_stages;
   }
+
+let with_breadth (callbacks : callbacks) series ~as_of : callbacks =
+  let get_pct_above_ma, get_new_lows_pct =
+    Breadth_series_cache.callbacks_at series ~as_of
+  in
+  { callbacks with get_pct_above_ma; get_new_lows_pct }
 
 let analyze ~config ~index_bars ~ad_bars ~global_index_bars ~prior_stage ~prior
     : result =

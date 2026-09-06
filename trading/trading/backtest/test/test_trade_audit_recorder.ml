@@ -88,6 +88,7 @@ let _macro : Macro.result =
     index_stage = _stage_result;
     indicators = [];
     trend = Weinstein_types.Bullish;
+    breadth_state = Weinstein_types.Bullish_breadth;
     confidence = 0.8;
     regime_changed = false;
     rationale = [ "fixture" ];
