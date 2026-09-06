@@ -1,4 +1,4 @@
-# Next-session priorities — 2026-09-05 (post exit-lever surface, 09-04)
+# Next-session priorities — 2026-09-05 (post exit-lever surface, 09-04) — SUPERSEDED by next-session-priorities-2026-09-06.md
 
 Supersedes `next-session-priorities-2026-09-04.md`. Its P0 (re-measure the
 exit levers on the fixed basis) is DONE; its P1 (vintage warehouses) is
