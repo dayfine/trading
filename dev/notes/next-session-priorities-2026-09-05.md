@@ -147,3 +147,21 @@ with its effective name count (`universe.txt` in the cell output).
   one trade (NVDA / MSTR).
 - Do not compare 2019-window levels across the 2000-vintage and 2019-vintage
   warehouses; different name sets.
+
+## Evening 2026-09-05 — orchestrator harness queue cleared; two notes for the next run
+
+- #2675 (Tier-exclusion narrowed to Tier 2 / Tier 4, two rework iterations), #2676
+  (newline-collapsed verdict detector, merged from main to resolve `harness.md`), #2677
+  (derived scenario counts) all merged after the full gate loop. `harness.md`'s open backlog
+  line for H-QC-VERDICT-NEWLINE-COLLAPSE flipped to `[x]` here (its completion entry already
+  existed). Follow-up recorded on #2675 by qc-behavioral (F4): the `track-c.md` fixture needs
+  one extra Tier-1 open item so the Tier 2/4 rule is distinguishable from its inverse.
+- Two dispatcher lessons, both cheap to encode: (1) `pkill -f "dune build"` kills the shell
+  running it and nothing else — kill container orphans by PID (three `dune build @fmt` orphans
+  from 09-03/09-04 survived every sweep until 09-05 15:51); (2) `gh pr merge --admin
+  --delete-branch` on a jj-colocated checkout fails the local step *and* skips the remote
+  branch delete, so merged branches linger — delete explicitly after `MERGED`. The stop-width
+  rework also confirmed the feat-agent stall mode (backgrounded `dune build`, agent re-waking
+  forever): finish from the dispatcher side after a scoped verification, then TaskStop.
+- Merge-order slip to avoid repeating: #2677 was admin-merged while main's CI was still
+  in progress on a docs-only merge. Green either way, but the rule is main green first.
