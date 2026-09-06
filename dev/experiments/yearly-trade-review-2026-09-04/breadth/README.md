@@ -9,7 +9,7 @@ years" section of `../../stop-width-cadence-surface-2026-09-05/README.md`.
   `trading/test_data/goldens-custom-universe/composition/top-3000-<year>.sexp`):
   `date, n, n_above150, NH52, NL52, advances, declines`. Runs against the
   host CSV store `data/<A>/<Z>/<SYM>/data.csv`.
-- `breadth_all_daily.csv` — its output, 2000-01-03 .. 2026-08, 6,875 rows.
+- `breadth_all_daily.csv` — its output, 2000-01-03 .. 2026-08, 6,876 rows.
 - `breadth_score.sh` — joins `^GSPC` (20-day return, % vs 150d MA) to the
   aggregates → `state_daily.csv` (`date, pct_above, nl_pct, nh, ad_cum,
   idx_4wk, idx_vs_ma150`), filtered to days with n ≥ 500.

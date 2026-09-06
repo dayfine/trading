@@ -37,9 +37,9 @@ MERGED; item 3 (per-state stop width) is the next build; item 4 (combined surfac
   whole +35pp is STMP** (−$175.8k stop at $0.04 → +$1.5k series-end exit at $329.61);
   everything else is path divergence. 26y: `dg-26y-off` reproduced the record digit-for-digit (302.65% / 723 / Sharpe 0.40 /
   maxDD 36.26, 06:23 PT — no build drift); `dg-26y-on` = **139.81% / 714 / Sharpe 0.29 / maxDD 38.39** — 163pp BELOW the record.
-  Dissected: a one-symbol universe difference on 2003-06-13 (the stub-tail guard ends a
-  2003 delisting a few bars earlier) flips a marginal top-20 pick (BKNG→SEIC) and the paths
-  never reconverge (457/720 shared; off-only +$1.25M vs on-only +$35k). **Path lottery, not
+  Dissected: the stub-tail guard trims every dying symbol's terminal run, so the universe
+  differs on 1,292 of 1,335 screens from 2000-01-14 (gap up to 22 symbols); the first
+  top-20 pick that flips is 2003-06-12 (BKNG→SEIC) and the paths never reconverge (457/720 shared; off-only +$1.25M vs on-only +$35k). **Path lottery, not
   a guard cost** — the STMP correction is exact in the shared trade. **Do NOT re-base on
   this arm.** Options: salts 1–2 of both arms (4 × 2.8 h), or arm guards 1+2 only in the
   record convention and keep STMP as a known phantom until guard 3 has salts.

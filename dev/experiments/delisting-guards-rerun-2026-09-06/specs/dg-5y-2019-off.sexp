@@ -1,14 +1,7 @@
-;; THE CANONICAL RECORD BASELINE (2026-08-24) — 26y broad record-convention
-;; run at the book-faithful stops basis. Config is the record convention
-;; (same overrides as the funding-grid grid1-null lineage) with the two
-;; #2530 flips (initial_stop_buffer 1.0, reset_anchor_on_stalled_cycle true)
-;; inherited as build defaults — deliberately NOT pinned in config_overrides.
-;; Build: c7660cac3 (post-#2530). Results + params.sexp in ../results/.
-;; Every arm after 2026-08-24 diffs against this run (supersedes the
-;; unreproducible grid1-null 305% record, #2503).
-;; Run with the split-safe warehouse (/tmp/snap_top3000_dedup_v5thin_adj),
-;; SNAPSHOT_CACHE_MB=1024, --no-emit-all-eligible, --parallel 1.
-;; NOT a golden — staging scenario, sentinel bands.
+;; #2672 paired re-run, 2019 window (2019-01-02..2023-12-29) on the 2019-VINTAGE
+;; warehouse /tmp/snap_top3000_2019 (top-3000-2019 PIT composition; DTV/ABK present).
+;; Config = the record convention (rec26y-new lineage) with the period/universe swapped;
+;; arm off = the three #2672 guards at their defaults (off). Salt 0. NOT a golden — staging scenario.
 ((name "dg-5y-2019-off")
  (description "#2672 paired re-run: record convention on the delisting-guards build; arm = guards OFF (default) vs ON")
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))

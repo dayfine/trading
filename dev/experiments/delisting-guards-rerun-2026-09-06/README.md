@@ -1,6 +1,6 @@
 # #2672 delisting guards — paired record re-run (2026-09-06)
 
-**Status: RUNNING (2026-09-06).** Build pinned at 3113f751e = PR #2686's first commit; the two rework commits (cd6c8febc, 72670075a) and the squash 1b7295cae add only tests, docstrings and one exported helper, so the pinned build is behaviour-identical to merged main. Field names in
+**Status: salt 0 DONE (2026-09-06 09:13 PT); salts 1–2 of the 26y pair RUNNING (`chain-salts.sh`, ~11 h).** Build pinned at 3113f751e = PR #2686's first commit; the two rework commits (cd6c8febc, 72670075a) and the squash 1b7295cae add only tests, docstrings and one exported helper, so the pinned build is behaviour-identical to merged main. Field names in
 `specs/dg-*-on.sexp` / `chain.sh` are the merged ones.
 
 ## Question
@@ -48,9 +48,9 @@ Results are copied per arm to `/tmp/sweeps/dg0906/` and committed under
 (16.8% / 179 / maxDD 22.0, priorities doc 2026-09-06) digit-for-digit.
 
 **Dissection (join `symbol|entry_date`, `dissect` awk in this README's history):**
-162 shared trades, drift **+$170,777 — all of it STMP** (2021-07-30 entry:
-`stop_loss` at $0.04 on 2021-10-06, −$175,779 → series-end exit at $329.61 on
-2021-10-11, +$1,530). 17 off-only trades (−$119,785) vs 7 on-only (−$48,977) are
+162 shared trades, drift **+$170,777: STMP +$177,309** (2021-07-30 entry: `stop_loss`
+at $0.04 on 2021-10-06, −$175,779 → series-end exit at $329.61 on 2021-10-11, +$1,530)
+and the other 161 shared trades net −$6,531. 17 off-only trades (−$119,785) vs 7 on-only (−$48,977) are
 path divergence after that cash difference; the only other |Δ| > $50k is MGNI
 2023-07-11 (on-only, −$57,586, `stop_loss`). Read: **the +35pp is one phantom
 loss removed**, not a mechanism gain — quote the cell as "STMP-corrected", never
@@ -86,15 +86,19 @@ off-only trades netted +$1,246,524** versus **257 on-only trades at +$35,322**. 
 2020 winners (BBWI, LOGI, NVDA) fill at identical prices for ~40% less P&L — the on arm
 simply had less equity by then.
 
-**First divergence: 2003-06-12.** Trade sets are identical up to that date with no P&L
-difference. The off arm enters BKNG (2003-06-12, a −$17.8k stop-out four days later); the
-on arm enters SEIC on 06-17 instead. The cascade records explain it: on the 2003-06-13
-screen the off arm sees `total_stocks 2151`, the on arm `2150` (and 2183 vs 2182 a week
-later). **The stub-tail guard truncates one 2003 delisting's terminal stub run**, so that
-symbol leaves the universe a few bars earlier than in the off arm; the top-20 admission
-list (with its alphabetical tiebreak, `project_screener_alphabetical_tiebreak`) reorders by
-one slot, a marginal pick flips, and the paths never reconverge. (Symbol identity not
-established — the audit records counts, not names; it does not change the conclusion.)
+**First TRADE divergence: 2003-06-12** — but the UNIVERSE differs almost from the start.
+Trade sets are identical up to that date (54 shared trades, delta exactly 0). The off arm
+enters BKNG (2003-06-12, a −$17.8k stop-out five days later); the on arm enters SEIC on
+06-17 instead. The per-screen `total_stocks` in the two arms' `trade_audit.sexp` (not
+committed — ~177k lines each; in the container at `/tmp/sweeps/dg0906/`) show why:
+**1,292 of 1,335 weekly screens differ**, from the second screen (2000-01-14: 2141 vs
+2140) onward, with the gap peaking at 22 symbols in 2016 (e.g. 2016-08-26: 1152 vs 1132)
+and 6 on the last screen. **The stub-tail guard trims the terminal stub run of every
+dying symbol in the warehouse**, so each such symbol leaves the on arm's universe a few
+bars earlier throughout the 26 years; the top-20 admission list (alphabetical tiebreak,
+`project_screener_alphabetical_tiebreak`) is therefore perturbed on almost every screen,
+and 2003-06-12 is simply the first week the perturbation reached a top-20 pick. (Symbol
+identities not established — the audit records counts, not names.)
 
 **Read:** the 26y salt-0 pair cannot attribute a guard effect — it is the 26y path
 lottery (`project_clock52_promoted`: "26y = salt-LOTTERY"; `project_edge_is_the_fat_tail`).
@@ -110,6 +114,8 @@ universe — guard 2 realises DTV-type zombies, guard 1 refuses stale entries) a
 STMP stub as a known −$594k phantom inside the record until guard 3 is evaluated with
 salts. The 5y-2019 cell stays a clean STMP correction.
 
-Also note: guard 3's universe effect is *earlier removal* of a dying symbol — every
-per-symbol data-hygiene change (twin dedup, splice drops, this) perturbs the 26y path the
-same way; a re-base after any of them needs salts, never a single pair.
+Also note: guard 3's universe effect is *earlier removal* of every dying symbol, on ~97%
+of screens — every per-symbol data-hygiene change (twin dedup, splice drops, this)
+perturbs the 26y path the same way; a re-base after any of them needs salts, never a
+single pair. This is also why option (b) (guards 1+2 only) is the cleaner A/B: it leaves
+the universe untouched.
