@@ -262,13 +262,6 @@ let _resolve_panels ~shared_panels ~snapshot_dir ~manifest =
   | Some p -> p
   | None -> _create_panels ~snapshot_dir ~manifest
 
-(* Win #4 opt-in: build the simulator's per-symbol [active_through] lookup from
-   the run's [Daily_panels.t]. Returns [None] when [fold_start_date] is unset
-   ([prune_universe_by_active_through = false] at [run]), so the simulator stays
-   on its byte-equal no-prune default. When [Some _], the simulator drops
-   symbols whose last active day is strictly before the fold start — point-in-
-   time correct (not survivor bias). See [run]'s [?prune_universe_by_active_through]
-   and [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
 (* The run's per-symbol delisting-marker lookup, read straight off the panels.
    Supplied UNCONDITIONALLY since #2687: [Simulator]'s delisted exit is driven
    by the data, not by the Win #4 prune opt-in, which now has its own switch
