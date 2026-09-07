@@ -48,10 +48,10 @@ let _series ~last =
 
 let _write_csv ~data_dir ~symbol bars =
   match Csv.Csv_storage.create ~data_dir:(Fpath.v data_dir) symbol with
-  | Error e -> assert_failure ("csv create: " ^ Status.show e)
+  | Error e -> failwith ("csv create: " ^ Status.show e)
   | Ok storage -> (
       match Csv.Csv_storage.save storage ~override:true bars with
-      | Error e -> assert_failure ("csv save: " ^ Status.show e)
+      | Error e -> failwith ("csv save: " ^ Status.show e)
       | Ok () -> ())
 
 let _symbols = [ "LIVE_END"; "LIVE_LAG"; "DEAD" ]
@@ -74,7 +74,7 @@ let _manifest_of ~output_dir =
   match
     Snapshot_manifest.read ~path:(Filename.concat output_dir "manifest.sexp")
   with
-  | Error e -> assert_failure ("manifest read: " ^ Status.show e)
+  | Error e -> failwith ("manifest read: " ^ Status.show e)
   | Ok m -> m
 
 let _panels ~output_dir manifest =
@@ -82,7 +82,7 @@ let _panels ~output_dir manifest =
     Snapshot_runtime.Daily_panels.create ~snapshot_dir:output_dir ~manifest
       ~max_cache_mb:8
   with
-  | Error e -> assert_failure ("panels create: " ^ Status.show e)
+  | Error e -> failwith ("panels create: " ^ Status.show e)
   | Ok p -> p
 
 (* Markers for [LIVE_END; LIVE_LAG; DEAD], read back through the same runtime
