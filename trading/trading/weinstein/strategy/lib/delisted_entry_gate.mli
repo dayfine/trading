@@ -4,13 +4,14 @@
     day, surfaced by [Snapshot_runtime.Daily_panels.active_through_for] and read
     here through {!Bar_reader.snapshot_callbacks}) says the series ENDS on that
     date because the security stopped existing — a cash merger, an acquisition,
-    a bankruptcy delisting. Once [as_of > active_through] the symbol is no longer {b admitted} as an
-    entry candidate: there is no security left to trade, and the "current
-    price" the entry path would read is the last print of a dead series.
+    a bankruptcy delisting. Once [as_of > active_through] the symbol is no
+    longer {b admitted} as an entry candidate: there is no security left to
+    trade, and the "current price" the entry path would read is the last print
+    of a dead series.
 
     {b Scope: admission, not fill.} This gate runs where candidates are
-    assembled. A ticket admitted on the marker day itself (kept deliberately,
-    to mirror the exit's boundary) is a resting order that can still fill on a
+    assembled. A ticket admitted on the marker day itself (kept deliberately, to
+    mirror the exit's boundary) is a resting order that can still fill on a
     later step — [Market_state] keeps serving a dark symbol's final bar, resting
     orders are not re-screened (`enable_entry_ticket_rescreen` defaults false;
     `entry_order_max_rest_weeks` 52), and the delisted exit acts only on a

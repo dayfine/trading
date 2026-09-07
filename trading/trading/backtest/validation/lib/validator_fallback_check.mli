@@ -78,6 +78,6 @@ val check_v17 : inputs -> Validator_step.finding
     With a populated [active_through] the admission-time case is removed by
     [Delisted_entry_gate] (#2695); a ticket admitted on the marker day can still
     fill a few days later, under this check's threshold, so a zero count is
-    evidence by margin, not by construction
-    (the position is exited at the marker and the symbol leaves the tradeable
-    set), so a non-zero count on a rebuilt warehouse is a build defect. *)
+    evidence by margin, not by construction (the position is exited at the
+    marker and the symbol leaves the tradeable set), so a non-zero count on a
+    rebuilt warehouse is a build defect. *)
