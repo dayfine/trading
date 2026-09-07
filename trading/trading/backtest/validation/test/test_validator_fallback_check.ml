@@ -198,19 +198,20 @@ let test_fallback_exit_count_is_zero_when_v16_disabled _ =
 
 (* ---- V17 --------------------------------------------------------------- *)
 
-(** The CY shape: entered 2020-04-18 against a series whose last bar is
-    2020-04-15 — three days, inside the default 10-day tolerance — versus a
-    second entry a week later, by which point the series is 13 days dead. Only
-    the second flags, which is the point: the threshold has to clear an ordinary
-    long weekend. *)
-let test_v17_flags_only_the_genuinely_dead_series _ =
+(** The motivating specimen, on its {b real} dates: the canonical 26y record
+    entered CY on 2020-04-18 and again on 2020-04-25 against a series whose last
+    bar is 2020-04-15. At the default [stale_entry_days = 7] the two split — the
+    first is 3 days stale (an ordinary long weekend, so it passes), the second
+    is 10 days stale and is reported. Exactly one violation, and it is the
+    second entry. *)
+let test_v17_flags_the_second_cy_entry_at_the_default _ =
   let inputs =
     {
       (Vt.empty_inputs ()) with
       trades =
         [
           _trade ~symbol:"CY" ~entry_date:"2020-04-18" ();
-          _trade ~symbol:"CY" ~entry_date:"2020-04-28" ();
+          _trade ~symbol:"CY" ~entry_date:"2020-04-25" ();
         ];
       bars =
         _bars_of
@@ -219,7 +220,34 @@ let test_v17_flags_only_the_genuinely_dead_series _ =
           ];
     }
   in
-  assert_that (_result ~id:"V17" inputs) (_violations_and_pass 1 false)
+  assert_that (_result ~id:"V17" inputs)
+    (all_of
+       [
+         field (fun (r : Vt.check_result) -> r.n_violations) (equal_to 1);
+         field (fun (r : Vt.check_result) -> r.passed) (equal_to false);
+         field
+           (fun (r : Vt.check_result) -> r.specimens)
+           (elements_are
+              [
+                field
+                  (fun (s : Vt.specimen) -> s.entry_date)
+                  (equal_to "2020-04-25");
+              ]);
+       ])
+
+(** The comparison is strict, and deliberately so: a gap of exactly
+    [stale_entry_days] passes. 2020-04-22 against a last bar of 2020-04-15 is 7
+    days — the boundary — and must not be reported, or the default would sit
+    {e on} the specimen it was chosen to stay below rather than under it. *)
+let test_v17_passes_a_gap_exactly_at_the_threshold _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades = [ _trade ~symbol:"CY" ~entry_date:"2020-04-22" () ];
+      bars = _bars_of [ ("CY", _with_daily [ ("2020-04-15", 23.82) ]) ];
+    }
+  in
+  assert_that (_result ~id:"V17" inputs) (_violations_and_pass 0 true)
 
 (** An entry filled on a bar the symbol actually printed passes — the ordinary
     case, which must not flag or the check is noise. *)
@@ -298,8 +326,10 @@ let suite =
          >:: test_quality_flag_line_is_absent_when_clean;
          "fallback exit count is zero when v16 disabled"
          >:: test_fallback_exit_count_is_zero_when_v16_disabled;
-         "v17 flags only the genuinely dead series"
-         >:: test_v17_flags_only_the_genuinely_dead_series;
+         "v17 flags the second cy entry at the default"
+         >:: test_v17_flags_the_second_cy_entry_at_the_default;
+         "v17 passes a gap exactly at the threshold"
+         >:: test_v17_passes_a_gap_exactly_at_the_threshold;
          "v17 passes a fill on a live bar"
          >:: test_v17_passes_a_fill_on_a_live_bar;
          "v17 threshold comes from config"

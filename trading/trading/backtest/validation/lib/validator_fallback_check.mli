@@ -58,6 +58,13 @@ val check_v17 : inputs -> Validator_step.finding
     2020-04-18 and again on 2020-04-25 for a symbol whose series had ended on
     2020-04-15.
 
+    At the default [stale_entry_days = 7] those two entries split, which is the
+    intended reading rather than a miss: 2020-04-18 is 3 days stale — an
+    ordinary long weekend, so it passes — and 2020-04-25 is 10 days stale, so it
+    is reported. The comparison is strict ([gap > stale_entry_days]), so a gap
+    exactly equal to the threshold passes; the default was chosen to sit
+    strictly below the specimen's 10-day gap rather than on it.
+
     No artifact carries the decision date (the audit's [entry_context] does not
     record it), so the check asks the bars the equivalent question: how old was
     the most recent daily bar at or before the fill date? A gap larger than the

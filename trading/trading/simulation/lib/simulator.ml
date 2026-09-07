@@ -483,6 +483,7 @@ let step t =
       ~forced_exit_trades
 
 let get_config t = t.config
+let universe_symbols t = t.deps.symbols
 
 let run t =
   let rec loop t =

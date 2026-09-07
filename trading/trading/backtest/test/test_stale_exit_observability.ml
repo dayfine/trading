@@ -313,6 +313,21 @@ let test_marked_delisting_renders_delisted_not_stale _ =
           ~stale_exit_after_days:(Some _exit_after_days) ()))
     (is_some_and (equal_to "delisted"))
 
+(** The literal ORDERING, not merely the effective precedence: with
+    [stale_exit_after_days = 1] both runners become eligible on the {b same}
+    step — the dead symbol's last bar is [_marker], so the day after it the
+    delisting marker has passed AND the stale gap has reached 1. Only the order
+    of the two calls in {!Trading_simulation.Forced_exit_step.run} decides which
+    one closes the position, and it must be the delisted one. Swapping those two
+    [let]s would move this assertion; the 10-day arm above it would not. *)
+let test_same_step_contention_resolves_to_delisted _ =
+  assert_that
+    (_rendered_exit_trigger ~prefix:"same_step_csv"
+       (_run ~test_name:"same_step_csv"
+          ~active_through_for:(fun _ -> Some _marker)
+          ~stale_exit_after_days:(Some 1) ()))
+    (is_some_and (equal_to "delisted"))
+
 (** The R1 no-op the goldens rest on: an [active_through_for] that returns
     [None] for every symbol — which is EVERY warehouse built to date — leaves
     the run identical to one with no lookup supplied at all, right down to the
@@ -336,6 +351,8 @@ let suite =
          >:: test_trades_csv_renders_the_stale_force_exit_label;
          "marked delisting renders delisted, not stale"
          >:: test_marked_delisting_renders_delisted_not_stale;
+         "same-step contention resolves to delisted"
+         >:: test_same_step_contention_resolves_to_delisted;
          "absent marker leaves the stale label"
          >:: test_absent_marker_leaves_the_stale_label;
        ]

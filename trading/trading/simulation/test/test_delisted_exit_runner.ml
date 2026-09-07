@@ -14,7 +14,12 @@
     - no bars today → nothing happens (weekend / holiday, matching
       {!Stale_exit_runner});
     - marker passed but the symbol's bars are unreadable → nothing happens, so
-      the position falls through to the stale safety net that flags it.
+      the position falls through to the stale safety net that flags it;
+    - marker day's own bar missing but an earlier bar present → the fallback
+      branch realises at that earlier close;
+    - marker passed but no matching Holding [Position.t] → the trade lands and
+      no transition is reported (the {!Trading_simulation.Forced_exit} claim
+      that an observer never hears about an exit that did not happen).
 
     Ordering against the stale runner, and the ["delisted"] label reaching
     [trades.csv], are pinned one layer up in
@@ -141,12 +146,13 @@ let _positions () =
       portfolio_lot_ids = [];
     }
 
-let _run ?(table = _bar_table) ?(today_bars = _today_bars) ~active_through_for
-    () =
+let _run ?(table = _bar_table) ?(today_bars = _today_bars) ?positions
+    ~active_through_for () =
+  let positions = Option.value positions ~default:(_positions ()) in
   Delisted_exit_runner.tick ~adapter:(_adapter ~table ()) ~active_through_for
     ~commission:_commission ~date:_today ~today_bars
     ~portfolio:(_portfolio_with_position ())
-    ~positions:(_positions ()) ()
+    ~positions ()
 
 let _always marker _symbol = marker
 let _trades (_, _, trades, _) = trades
@@ -269,6 +275,40 @@ let test_unpriceable_symbol_is_left_for_the_stale_net _ =
           ~active_through_for:(_always (Some _marker)) ()))
     (size_is 0)
 
+(** The second price-resolution branch: the marker day's own bar is missing from
+    the store, so the runner falls back to [get_previous_bar] and realises at
+    the last bar it can actually see — here the 2024-01-02 close, not the marker
+    close and not an invented price. Branch 1 (marker bar present) and the
+    total-miss fall-through are pinned above and below; this is the middle. *)
+let test_missing_marker_bar_falls_back_to_the_previous_bar _ =
+  assert_that
+    (_trades
+       (_run
+          ~table:
+            [
+              (_symbol, [ _make_bar ~date:(_date "2024-01-02") ~close:95.0 ]);
+              (_live, [ _make_bar ~date:_today ~close:50.0 ]);
+            ]
+          ~active_through_for:(_always (Some _marker)) ()))
+    (elements_are
+       [
+         field
+           (fun (t : Trading_base.Types.trade) -> t.price)
+           (float_equal 95.0);
+       ])
+
+(** {!Trading_simulation.Forced_exit.apply_all}'s second rejection claim, seen
+    through this runner: with no matching Holding [Position.t], the synthetic
+    trade still lands — the portfolio, not the strategy map, is the source of
+    truth for realised P&L — but NO transition is reported, so an observer is
+    never told about an exit the strategy never had. *)
+let test_missing_strategy_position_trades_but_reports_no_transition _ =
+  let _, _, trades, transitions =
+    _run ~positions:String.Map.empty
+      ~active_through_for:(_always (Some _marker)) ()
+  in
+  assert_that (List.length trades, List.length transitions) (equal_to (1, 0))
+
 let suite =
   "delisted_exit_runner"
   >::: [
@@ -287,6 +327,10 @@ let suite =
          "no bars today is a no-op" >:: test_no_bars_today_is_a_no_op;
          "unpriceable symbol is left for the stale net"
          >:: test_unpriceable_symbol_is_left_for_the_stale_net;
+         "missing marker bar falls back to the previous bar"
+         >:: test_missing_marker_bar_falls_back_to_the_previous_bar;
+         "missing strategy position trades but reports no transition"
+         >:: test_missing_strategy_position_trades_but_reports_no_transition;
        ]
 
 let () = run_test_tt_main suite

@@ -34,7 +34,9 @@ let fallback_exit_count report =
    and the whole episode was invisible because the exit label never reached
    trades.csv (#2687). The decision date is not carried in any artifact, so the
    check asks the equivalent question of the bars instead: how old was the most
-   recent bar at or before the fill? *)
+   recent bar at or before the fill? At the default threshold the first entry
+   (gap 3, a long weekend) passes and the second (gap 10) is reported — the
+   comparison is strict, so a gap equal to the threshold passes too. *)
 let _v17_detail ~fill_date ~bar_date ~gap =
   sprintf "entry filled %s but last bar is %s (%d days stale)"
     (Date.to_string fill_date) (Date.to_string bar_date) gap

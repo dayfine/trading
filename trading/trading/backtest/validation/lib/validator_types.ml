@@ -28,7 +28,7 @@ let _default_fallback_exit_labels =
     "force_liquidation_portfolio";
   ]
 
-let _default_stale_entry_days = 10
+let _default_stale_entry_days = 7
 let far_future = Date.of_string "2100-01-01"
 
 type severity = Invariant | Expectation [@@deriving sexp, equal]

@@ -166,11 +166,15 @@ type check_config = {
   stale_entry_days : int;
       (** V17: how many {b calendar} days may separate an entry fill from the
           most recent daily bar at or before it before the fill counts as priced
-          against a dead series. Default [10] — comfortably clears a long
-          weekend plus an adjacent market holiday, so only a genuinely ended
-          series trips it. Calendar rather than bar count because the question
-          is "how long has this symbol been silent", which a bar count cannot
-          express for a symbol that stopped printing. *)
+          against a dead series. Default [7] — clears an ordinary long weekend
+          plus an adjacent market holiday, so only a genuinely ended series
+          trips it, while still sitting strictly below the 10-day gap of the
+          record's second CY entry (2020-04-25, against a series that ended
+          2020-04-15) — the specimen V17 was written for. The comparison is
+          strict, so a gap of exactly [stale_entry_days] passes. Calendar rather
+          than bar count because the question is "how long has this symbol been
+          silent", which a bar count cannot express for a symbol that stopped
+          printing. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default

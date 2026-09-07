@@ -373,3 +373,15 @@ val run : t -> run_result Status.status_or
 (** Run the full simulation from start to end date. *)
 
 val get_config : t -> config
+
+val universe_symbols : t -> string list
+(** The symbol list this simulator actually fetches bars for each step — i.e.
+    [deps.symbols] after {!create}'s Win #4 prune step has (or has not) run.
+
+    Equal to the caller's [deps.symbols] on every run except one:
+    {!dependencies.prune_universe_by_active_through} is [true] {b and}
+    {!dependencies.active_through_for} is [Some f], in which case symbols
+    already delisted before [config.start_date] have been dropped. Exposed so
+    that gating is observable on the created value rather than only re-derivable
+    through {!prune_symbols_by_active_through} — the default-[false] no-prune
+    contract is what keeps baselines bit-equal, so it needs to be assertable. *)
