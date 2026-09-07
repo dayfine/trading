@@ -1,0 +1,20 @@
+V1 INV PASS
+V2 INV PASS
+V3 INV PASS
+V4 INV PASS
+V5 INV PASS
+V6 INV PASS
+V7 INV 54 violations
+V8 EXP PASS
+V9 EXP 85 violations
+V10 EXP 9 violations
+V11 EXP PASS
+V12 INV 16 violations
+V13 INV 152 violations
+V14 EXP PASS
+V15 EXP PASS
+V16 EXP PASS
+V17 EXP PASS
+audit join: 707/707 rows matched
+wrote /tmp/sweeps/wh0906v7/rec26y-new-s0-validator.sexp.sexp + /tmp/sweeps/wh0906v7/rec26y-new-s0-validator.sexp.md
+exit=0

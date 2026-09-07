@@ -1,0 +1,8 @@
+[09-06 22:44:52] run tree HEAD=b48537469 (expect b48537469 = PR #2695 tip, the #2693 marker fix)
+[09-06 22:44:52] BUILD 2000 -> /tmp/snap_top3000_2000_v7mark
+[09-06 23:18:36] RESULT 2000 snaps=2999 manifest=2999 active_through=2217 exit=0
+[09-06 23:18:36] BUILD 2009 -> /tmp/snap_top3000_2009_v7mark
+[09-06 23:40:35] RESULT 2009 snaps=2033 manifest=2033 active_through=817 exit=0
+[09-06 23:40:36] BUILD 2019 -> /tmp/snap_top3000_2019_v7mark
+[09-06 23:52:16] RESULT 2019 snaps=2209 manifest=2209 active_through=543 exit=0
+[09-06 23:52:16] REBUILD DONE

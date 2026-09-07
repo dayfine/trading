@@ -89,3 +89,18 @@ record convention; PI filter behind `enable_pi_filter`). PR-D = make it uncondit
 not the worktree's `test_data` fixtures (655 symbols ending 2025-05-16 → 506 skipped, 5
 false V17 hits on survivors). Rebuilt-warehouse 26y cell = 13,441 s (40% slower than the
 "thin" old warehouse).
+**PR-D merged 2026-09-07 01:18 PT (#2695, squash b0b411df6; closes #2693):**
+`Delisted_entry_gate` at the `Entry_assembly` seam (unconditional, data-driven: no entry
+once `active_through` has passed; marker-day still admits, mirroring the exit), and
+`Build_runner` survivor markers derived against the universe's max last-bar with
+`-survivor-tolerance-days 7` (2000 vintage: 2,217 of 2,999 marked, was 2,999/2,999).
+Residual (#2696): a ticket admitted on the marker day can still fill a few days later
+(resting orders not re-screened; the delisted exit acts on positions only) — under V17's
+7-day threshold, so a clean V17 is evidence by margin, not by construction. Second
+acceptance run launched 01:19 PT on `snap_top3000_2000_v7mark` (expect V16 0 / V17 0).
+**ACCEPTANCE PASSED (2026-09-07 04:12 PT, `snap_top3000_2000_v7mark`, PR #2695 build):**
+V16 PASS, V17 PASS; 7 `delisted` rows incl. STMP at $329.61; CY/FII never entered; zero
+blank or `stale_force_exit` rows. Level 263.16% / 707 / maxDD 42.37 (one draw; the record
+becomes the 3-salt band from the cells running through ~13:30 PT). Data-layer program
+complete except: retire guard 3 (Rule 4), #2696 fill-time cancel, PR-B splice class,
+vintage gap fetch (2009/2019 stores lack ~970/~790 composition names).
