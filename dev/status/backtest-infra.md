@@ -810,6 +810,36 @@ Merged in main:
      `dune exec trading/backtest/test/test_stale_exit_observability.exe`.
   PR-A (#2691, merged) now populates `active_through` at build time, so the
   delisted exit wakes on the next warehouse rebuild — until then it is inert.
+  **2026-09-06 PR-D (`feat/no-entry-past-active-through`, closes #2693):** the
+  acceptance cell of the rebuilt 2000-vintage warehouse
+  (`dev/experiments/warehouse-rebuild-2026-09-06/` §"Acceptance cell result")
+  passed V16 (0 fallback exits; STMP exits `delisted` at $329.61 instead of
+  `stop_loss` at $0.04) but **failed V17 with 3 stale entries** — FII
+  2020-03-28 and 2020-04-04 (series ended 2020-01-31) and CY 2020-04-25 (series
+  ended 2020-04-15), each closed within two days by the run's own `delisted`
+  exit. Admission, not the exit, was the defect: `entry_max_bar_age_days` is 0
+  in the record convention and the screener's PI filter is behind
+  `enable_pi_filter` (default false). Three commits:
+  1. New `Weinstein_strategy.Delisted_entry_gate`, applied **unconditionally**
+     as the last stage of `Entry_assembly.assemble`: a candidate (long OR
+     short) whose `active_through_for ticker = Some d` with `Date.(d < as_of)`
+     never reaches the entry walk. Same predicate and boundary as
+     `Delisted_exit_runner` (`as_of <= active_through` is still tradeable). No
+     config flag — the marker is data, not a mechanism; R1 holds structurally
+     because a pre-#2691 warehouse answers `None` for every symbol.
+  2. **#2693 fix** — `Build_runner._derive_active_through` compared each
+     symbol's last bar to the operator's `--end-date`, so the rebuild's
+     `-end-date 2026-09-06` against a store ending 2026-08-17 marked
+     **2,999 / 2,999** symbols including all 778 survivors. The reference is
+     now the universe's own last bar (max over the build), with a new
+     `-survivor-tolerance-days` flag (default 7) for vendor lag; the derivation
+     moved to `_finalize_entries` (the universe end is only knowable after
+     every symbol is read) and the marker split is logged.
+  3. Comment-only: drops the stale `fold_start_date` comment above
+     `panel_runner.ml`'s `_active_through_for_of_panels` (#2692 review note).
+  Verify: `dune runtest trading/weinstein/strategy analysis/scripts/build_snapshots`.
+  Next: rebuild the three vintage warehouses on this build (#2693 changes every
+  manifest), re-run the acceptance cell (expect V17 = 0), then the salts.
 
 - **Step 3 (tier-aware bar loader)** now unblocked; separately tracked at
   `dev/status/backtest-scale.md`. A/B the Legacy vs Tiered loader
