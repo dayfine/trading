@@ -755,6 +755,12 @@ Merged in main:
   +35pp is STMP alone; 26y salt 0 done: on-arm 139.8% vs 302.7% is a path lottery — universe differs on 97% of screens — not a guard cost; salts 1–2 running). Blank `exit_trigger` on stale force-exits
   filed as #2687. Interleaved-series symbols (CLE/ICT/ABK/MEL/MVL/AGR) are a sibling
   defect, not fixed by the tail guard.
+  **2026-09-06 evening:** data-layer fix merged — #2691 (build-time `Series_tail`, `active_through`
+  from series end) + #2692 (`delisted` exit, V16/V17, #2687). Three `_v6tail` warehouses rebuilt;
+  acceptance run on the rebuilt 2000 warehouse: **V16 PASS** (0 fallback exits, STMP `delisted`
+  at $329.61) but **V17 FAIL (3 stale entries: FII ×2, CY)** → PR-D (`feat/no-entry-past-
+  active-through`: unconditional admission exclusion + #2693 survivor-marker fix). Queue and
+  results: `dev/experiments/warehouse-rebuild-2026-09-06/README.md`.
   **2026-09-06 (PR-A of the data-layer fix, `feat/delisting-data-fix-a`):** per
   `dev/plans/delisting-data-fix-2026-09-06.md`, the fix moves from the runtime
   guard to WAREHOUSE BUILD time. New pure `Snapshot_pipeline.Series_tail`

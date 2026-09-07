@@ -19,8 +19,9 @@ to ingestion / warehouse build, so the backtest never sees a post-delisting stub
   real (free) key — the demo key returns `{}`; coverage before ~2010 unverified.
 - Two defect classes in the warehouse: (i) **terminal stub run** (STMP: real to
   2021-10-04 at $329.61, then $0.045/$0.04/$0.03 to the end); (ii) **interleaved /
-  mis-scaled series** (CLE, ICT, ABK, MEL, MVL, AGR; 66 symbols with ≥20 flagged bars
-  in `arc-rerun-2026-09-01/results/splice-scan.csv`) — ticker reuse merged into one
+  mis-scaled series** (CLE, ICT, MEL, MVL from the splice scan — 66 symbols with ≥20
+  flagged bars in `arc-rerun-2026-09-01/results/splice-scan.csv`; ABK and AGR show the
+  same shape in the trade sets but sit outside that scan's ≥20 cut) — ticker reuse merged into one
   series; no terminal rule can repair these.
 - Runtime guard 3 fixes (i) but perturbs the universe on 97% of screens (it ends every
   dying symbol's series a few bars early) and cannot tell a stub tail from a genuine

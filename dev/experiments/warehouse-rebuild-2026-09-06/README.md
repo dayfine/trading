@@ -11,7 +11,7 @@ container-exclusive: no agents alongside a rebuild or a 26y cell
 |---|---|---|---|
 | 0 | Merge #2692 (PR-C) after its gates | — | main green |
 | 1 | Pin a worktree at merged main; build `build_snapshots.exe`, `scenario_runner.exe`, `post_run_validator_cli.exe` | `git worktree add --detach .claude/worktrees/sweep-wh0906 <sha>` + docker `dune build` of the three targets | exes present |
-| 2 | Superset universes for 2000 / 2009 / 2019 = **composition ∪ the old warehouse's manifest symbols** ∪ GSPC.INDX (measured 16:50 PT: the old 2000 warehouse holds 2,908 names = 2,834 of the composition's 3,000 + 74 extras, so its union adds only 15 names; the old 2009 and 2019 warehouses hold 2,033 and 2,209 names — 996 and 798 composition names were absent, the survivor tilt of `project_warehouse_vintage_coverage` — so those rebuilds widen the universe materially, which is the point; the union keeps every name the old warehouses had) | `make_superset.sh` output unioned with `grep "(symbol " <old-wh>/manifest.sexp`; staged in `/tmp/wh-rebuild/specs/` (done 2026-09-06 16:50 PT) | 3 files: 2000 = 3,015, 2009 = 3,001, 2019 = 3,001 symbols incl. GSPC.INDX |
+| 2 | Superset universes for 2000 / 2009 / 2019 = **composition ∪ the old warehouse's manifest symbols** ∪ GSPC.INDX (corrected after review: the old 2000 warehouse holds 2,908 names = 2,893 of the composition's 3,000 + 15 non-composition names (GSPC.INDX, the SPDR sector ETFs, GDAXI/N225/ISF.LSE), so its union adds those 15; the old 2009 and 2019 warehouses hold 2,033 and 2,209 names — 968 and 792 composition names were absent (the survivor tilt of `project_warehouse_vintage_coverage`), and the rebuild logs show the same names as `no CSV`: the tilt is in the CSV store, so the union cannot widen them until the gap fetch) | `make_superset.sh` output unioned with `grep "(symbol " <old-wh>/manifest.sexp`; staged in `/tmp/wh-rebuild/specs/` (done 2026-09-06 16:50 PT) | 3 files: 2000 = 3,015, 2009 = 3,001, 2019 = 3,001 symbols incl. GSPC.INDX |
 | 3 | Rebuild the three vintage warehouses with #2691's build (`_v6tail` suffix; the old dirs stay for comparison) | `rebuild.sh` (~12 / ~22 / ~12 min) | manifest count = snap count; `active_through` count ≈ 1,964 on 2000; `terminal_runs.csv` per vintage copied to `results/` |
 | 4 | Review `terminal_runs_2000.csv`: 13 `stub_tail` truncated, 10 `prefix_misscale` kept, 23 `long_low_tail` kept, 1 `high_price_tail` kept, 14 stray bars dropped; whitelist any genuine collapse in `trading/test_data/warehouse_exceptions.sexp` and rebuild that vintage if the list changes | by hand | list matches `delisting-guards-rerun-2026-09-06/scan/` |
 | 4b | **PR-D** (`feat/no-entry-past-active-through`, dispatched 22:20 PT): unconditional admission exclusion at `active_through` + #2693 survivor-marker fix + the stale `panel_runner` comment | feat PR, full gates | merged; then rebuild the three warehouses again (#2693) |
@@ -53,8 +53,9 @@ vs 302.65% at salt 0) is kept as the salt-spread datum for the record's own leve
   `_derive_active_through` compares the last bar to the CLI `-end-date` (2026-09-06),
   which is after the store's last bar (2026-08-17), so 778 survivors carry
   `active_through 2026-08-17` (plus clusters at 06-26 and 07-01). Harmless inside the
-  record window (every survivor marker is after 2026-06-26, so neither the `delisted`
-  exit nor the prune can act on it), wrong for any window reaching the store's end.
+  record window (every survivor marker is on or after 2026-06-26 — 90 sit exactly on it —
+  and the `delisted` exit fires only when `current_date > active_through`, so neither it
+  nor the prune can act inside the window), wrong for any window reaching the store's end.
   Fix = derive against the universe's max last-bar with a tolerance; rebuild after.
   The acceptance run proceeds on this warehouse with that caveat pre-registered.
 - **2009 rebuild (18:02–18:30 PT, 28 min, union superset 3,001):** 2,033 snaps = 2,033
@@ -75,8 +76,7 @@ vs 302.65% at salt 0) is kept as the salt-spread datum for the record's own leve
 
 ## Acceptance cell result (22:02 PT) — V16 PASS, V17 FAIL (3), chain stopped for PR-D
 
-`rec26y-new-s0` on `snap_top3000_2000_v6tail` (worktree @ 552439c91, 13,441 s wall —
-40% slower than the old warehouse's 9,615 s): **165.16% / 715 / Sharpe 0.31 / maxDD 42.37**
+`rec26y-new-s0` on `snap_top3000_2000_v6tail` (worktree @ 552439c91, 13,441 s wall — 40% slower than `dg-26y-off-s0`'s 9,615 s on the old warehouse (`../delisting-guards-rerun-2026-09-06/README.md`, same spec, same build lineage), with a confound: the 2019 rebuild overlapped this cell's first 26 minutes (18:18–18:44), against the queue's own container-exclusive rule, so part of the gap is contention): **165.16% / 715 / Sharpe 0.31 / maxDD 42.37**
 — a level, and per the pre-registration NOT the criterion (path lottery: the universe
 differs from the old warehouse on most screens). The criteria:
 
