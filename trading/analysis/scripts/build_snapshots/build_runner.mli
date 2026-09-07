@@ -23,9 +23,14 @@ val default_sketch_deep_days : int
 val default_survivor_tolerance_days : int
 (** Default slack, in calendar days, between the universe's last bar and a
     symbol's own last bar before that symbol is treated as delisted: 7. The
-    vendor lags a few names by a day or two, so a symbol whose series stops
+    vendor lags a few names by a day or two (measured 2026-09-06: 778 of 782
+    survivors sit exactly on the store's last bar), so a symbol whose series stops
     mid-way through the store's final week is still trading. CLIs surface this
-    as the [--survivor-tolerance-days] default. *)
+    as the [--survivor-tolerance-days] default. A series that stops further back
+    than the tolerance — the 2026-09-06 rebuild had clusters 47 and 52 days
+    behind the store end (90 and 61 names), i.e. store copies not refreshed —
+    is marked as ended, which is the correct read for admission and exits until
+    the store is refetched: an entry on a bar that old is exactly the V17 defect. *)
 
 val survivor_tolerance_param : int Core.Command.Param.t
 (** Shared CLI flag [-survivor-tolerance-days], so both builders expose the same

@@ -4,9 +4,24 @@
     day, surfaced by [Snapshot_runtime.Daily_panels.active_through_for] and read
     here through {!Bar_reader.snapshot_callbacks}) says the series ENDS on that
     date because the security stopped existing — a cash merger, an acquisition,
-    a bankruptcy delisting. Once [as_of > active_through] the symbol cannot be
-    bought or shorted: there is no security left to trade, and the "current
+    a bankruptcy delisting. Once [as_of > active_through] the symbol is no longer {b admitted} as an
+    entry candidate: there is no security left to trade, and the "current
     price" the entry path would read is the last print of a dead series.
+
+    {b Scope: admission, not fill.} This gate runs where candidates are
+    assembled. A ticket admitted on the marker day itself (kept deliberately,
+    to mirror the exit's boundary) is a resting order that can still fill on a
+    later step — [Market_state] keeps serving a dark symbol's final bar, resting
+    orders are not re-screened (`enable_entry_ticket_rescreen` defaults false;
+    `entry_order_max_rest_weeks` 52), and the delisted exit acts only on a
+    broker position, never on an unfilled ticket. That residual is one to a few
+    days (a fill before the next weekly screen) and sits under the post-run V17
+    threshold of 7 days, so a clean V17 after this gate is evidence by margin,
+    not by construction. Closing it needs a fill-time cancel of resting entry
+    tickets at the marker (the {!Cancel_handler.cancel_resting_entry_orders}
+    seam) — tracked as a follow-up issue, out of scope here. Every stale entry
+    measured on 2026-09-06 (FII ×2, CY) was an admission-time entry weeks after
+    the marker, which this gate removes.
 
     This is the entry-side mirror of the simulator's [Delisted_exit_runner]
     (#2692), and it uses the same predicate with the same boundary —
