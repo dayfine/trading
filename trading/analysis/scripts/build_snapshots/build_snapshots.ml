@@ -53,15 +53,15 @@ let _load_universe ~universe_path =
       exit 1
 
 let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
-    ~end_date ~sketch_deep_days ~incremental ~progress_every ~tail_config
-    ~tail_exceptions_path () =
+    ~end_date ~sketch_deep_days ~incremental ~progress_every
+    ~survivor_tolerance_days ~tail_config ~tail_exceptions_path () =
   let symbols = _load_universe ~universe_path in
   let tail_exceptions =
     Build_runner.tail_exceptions_or_exit tail_exceptions_path
   in
-  Build_runner.build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol
-    ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every
-    ~tail_config ~tail_exceptions ()
+  Build_runner.build ~survivor_tolerance_days ~symbols ~csv_data_dir ~output_dir
+    ~benchmark_symbol ~start_date ~end_date ~sketch_deep_days ~incremental
+    ~progress_every ~tail_config ~tail_exceptions ()
 
 (* Flag [~doc] strings are hoisted to top-level bindings so the [Command.basic]
    flag block below stays flat (one line per flag) — the multi-line doc text is
@@ -137,10 +137,11 @@ let command =
          ~doc:doc_progress_every
      and _emit_weekly_sidetable =
        flag "emit-weekly-sidetable" no_arg ~doc:doc_emit_weekly_sidetable
+     and survivor_tolerance_days = Build_runner.survivor_tolerance_param
      and tail_config, tail_exceptions_path = Build_runner.tail_params in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol
          ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every
-         ~tail_config ~tail_exceptions_path ())
+         ~survivor_tolerance_days ~tail_config ~tail_exceptions_path ())
 
 let () = Command_unix.run command
