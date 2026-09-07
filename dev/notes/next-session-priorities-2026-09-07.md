@@ -136,3 +136,13 @@ the data is clean under the criteria; the salted re-base cells run through ~13:3
 the new record is their 3-salt band. Next code: retire runtime guard 3 (Rule 4), #2696
 (fill-time cancel), PR-B (splice class), the vintage gap fetch.
 Full record: `dev/experiments/warehouse-rebuild-2026-09-06/README.md`.
+
+## Record re-based (2026-09-07 10:43 PT) — quote the band, not a number
+
+Clean 2000-vintage warehouse (`_v7mark`), record convention, guards at default: **263% median,
+181–562% across salts 0–2, 705–755 trades, maxDD 42–45%**, every cell V16/V17 clean. The
++300pp at salt 1 is two salt-1-only monsters (AEIS 2025 +$973k, MOS 2006 +$806k). 5y-2000 =
+76.69% / 98; 5y-2019 = 42.37% / 175 (2019 warehouse still survivor-tilted: gap fetch = P1).
+Full record `dev/experiments/warehouse-rebuild-2026-09-06/README.md` §Step 6. Next code:
+guard-3 retirement (in flight), #2696, PR-B, gap fetch; then items 3–4 of 09-06 (per-state
+stop width, combined surface) against the NEW band.

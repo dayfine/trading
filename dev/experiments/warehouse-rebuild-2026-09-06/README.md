@@ -109,7 +109,7 @@ cell; `rec26y-new-s1` had just started and is discarded.
   on 2,217** (was 2,999/2,999 on `_v6tail`): 782 survivors within the 7-day tolerance of the
   universe's last bar (778 sat exactly on 2026-08-17 before). The old scan counted 1,964
   series ended before 2026-06 on 2,908 names; 2,217 on 2,999 names with the cutoff at the
-  store's end (2026-08-10) is consistent. Reports in `results/terminal_runs_<v>_v7.csv`.
+  store's last bar (2026-08-17) minus the 7-day tolerance (i.e. 2026-08-10) is consistent. Reports in `results/terminal_runs_<v>_v7.csv`.
 - **2009 (23:18–23:40, 22 min):** 2,033 snaps = 2,033 manifest entries; **`active_through`
   on 817** (was 2,033/2,033) — 1,216 survivors within the tolerance.
 - **2019 (23:40–23:52, 12 min):** 2,209 snaps; **`active_through` on 543** (was
@@ -118,8 +118,9 @@ cell; `rec26y-new-s1` had just started and is discarded.
 
 ## Second acceptance cell (04:12 PT Sep 7) — **V16 PASS, V17 PASS**; chain continues into the salts
 
-`rec26y-new-s0` on `snap_top3000_2000_v7mark` (worktree `sweep-wh0906c` @ PR #2695 tip
-b48537469, code-identical to the squash b0b411df6; validator against the real CSV store;
+`rec26y-new-s0` on `snap_top3000_2000_v7mark` (worktree `sweep-wh0906c` @ b48537469 — PR #2695's tip at launch; the four commits that
+followed before the squash b0b411df6 are docstrings and one test-helper rename, so the
+build is code-identical to merged main; validator against the real CSV store;
 10,402 s wall): **263.16% / 707 / Sharpe 0.39 / maxDD 42.37** — a level, not the criterion.
 
 | criterion | result |
@@ -136,3 +137,55 @@ validator `.sexp` + `.md`), `rec26y-new-s0-v7.validator.log`, `chain2.log`, `reb
 follow, ETA ~13:30 PT. The new record is the 3-salt band from those cells (step 6); the
 level above is one draw of it. Caveat carried: the fill-time residual (#2696) is bounded
 under V17's threshold, so V17 = 0 is evidence by margin.
+
+## Step 6 — salted re-base cells (chain done 10:43 PT Sep 7). Every cell V16 PASS / V17 PASS.
+
+| cell | warehouse | return % | trades | Sharpe | maxDD % | wall | exit triggers (no blank, no `stale_force_exit`) |
+|---|---|---:|---:|---:|---:|---:|---|
+| `rec26y-new-s0` | 2000 `_v7mark` | 263.16 | 707 | 0.39 | 42.37 | 10,402 s | delisted 7 / rotation 242 / stop 450 / ext 3 / s3 3 / liq 2 |
+| `rec26y-new-s1` | 2000 `_v7mark` | **561.61** | 705 | 0.52 | 45.15 | 10,160 s | delisted 3 / rotation 239 / stop 455 / ext 2 / s3 5 / liq 1 |
+| `rec26y-new-s2` | 2000 `_v7mark` | 180.89 | 755 | 0.32 | 42.18 | 10,618 s | delisted 4 / rotation 251 / stop 489 / ext 3 / s3 6 / liq 2 |
+| `rec5y-2000-new-s0` | 2000 `_v7mark` | 76.69 | 98 | 0.66 | 28.35 | 1,389 s | delisted 1 / rotation 19 / stop 74 / ext 3 / s3 1 |
+| `rec5y-2019-new-s0` | 2019 `_v7mark` | 42.37 | 175 | 0.50 | 21.65 | 1,267 s | delisted 1 / rotation 39 / stop 135 |
+
+Artifacts: `results/<cell>-v7-{actual.sexp,trades.csv,params.sexp,summary.sexp,open_positions.csv,validator.sexp.sexp,validator.sexp.md}` + `<cell>-v7.log`, `chain2.log`.
+
+**Reconciliations owed from earlier sections.** (1) The first acceptance section pre-registered
+"expect V17 = 0 and 712 trades" for the re-run; V17 = 0 landed and the count is **707**: the
+first run's 715 minus the 3 stale entries = 712 was the naive expectation, but removing three
+entries also frees cash and slots on those weeks, so the path re-picks — 707 vs 712 is that
+divergence, not a defect (every row is V16/V17 clean). (2) `results/terminal_runs_*_v7.csv` are
+**byte-identical** to their `_v6tail` counterparts — the #2693 fix changed only the survivor-
+marker derivation, an invariance control on the truncation rule.
+
+### The 26y band, dissected (`symbol|entry_date` join across salts)
+
+369 trades are shared by all three salts. The **+300pp between salts 0 and 1 is two monsters
+present only in salt 1's path**: AEIS 2025-06-24 → 2026-05-20 (**+$972,866**, stop_loss) and
+MOS 2006-10-30 → 2008-01-23 (**+$806,294**, stop_loss); the shared 2020 winners (LOGI, BBWI,
+NVDA) then fill at identical prices for ~1.75× the P&L because the salt-1 path carries more
+equity into 2020. Realised P&L: s0 +$2.44M / s1 +$4.97M / s2 +$1.74M; open-position value at
+the end 1.67M / 3.70M / 1.61M. This is `project_edge_is_the_fat_tail` and
+`project_clock52_promoted`'s "26y = salt lottery" once more, now on clean data: the AEIS-2025
+monster the 09-03 rebase named as "the gap" is a salt-1-only event.
+
+### Record re-base (the deliverable of the queue)
+
+The canonical record is now **the band on the clean 2000-vintage warehouse**, not one number:
+
+| statistic | s0 | s1 | s2 | median |
+|---|---:|---:|---:|---:|
+| total return % | 263.16 | 561.61 | 180.89 | **263.16** |
+| trades | 707 | 705 | 755 | 707 |
+| Sharpe | 0.39 | 0.52 | 0.32 | 0.39 |
+| maxDD % | 42.37 | 45.15 | 42.18 | 42.37 |
+
+versus the old record on the defective warehouse: 302.65 (s0) / 180.23 (s1) — a comparable
+spread; the level shift is path lottery, the drawdown is ~6pp worse across all salts (worth
+its own dissection before any stop-width read is re-stated). **Quote the record as
+"263% median, 181–562% across salts 0–2, maxDD 42–45%"**, never as one draw. Every
+pre-09-07 "standing result" is superseded; the stop-width and breadth-direction surfaces
+keep their within-cell reads and get re-stated on their next touch.
+
+Universe note for the 5y cells: 2000 (98 trades) and 2019 (175 trades, on a 2,209-name
+warehouse that still lacks 792 composition names — the gap fetch is the remaining P1).
