@@ -60,3 +60,32 @@ first top-20 pick that flips is 2003-06-12 (BKNG→SEIC) and the paths never rec
 data-hygiene change (twin dedup, splice drop, tail truncation) perturbs the 26y path the
 same way — a re-base after one needs salts, never a single pair. Options: salts 1–2 of
 both arms, or arm guards 1+2 only (no universe effect) in the record convention.
+
+**Data-layer fix landed (2026-09-06 evening).** #2691 (build-time
+`Snapshot_pipeline.Series_tail`: `active_through` from series end, stub-tail truncation
+only when ratio ≤ 0.05 AND run ≤ 60 bars AND stub close < $1, stray-bar drop,
+`terminal_runs.csv` review report, `warehouse_exceptions.sexp`) and #2692 (first-class
+`delisted` exit at `active_through`, `stale_force_exit` label reaches trades.csv (#2687
+closed), validator V16 fallback-exit report + V17 stale-entry-bar check, default 7
+days, `Forced_exit_step` ordering) are MERGED. Runtime guard 3 (`stub_print_max_ratio`)
+retires under Rule 4 once every live warehouse is a `_v6tail` rebuild.
+**Queue** = `dev/experiments/warehouse-rebuild-2026-09-06/README.md` (10 steps): union
+superset universes (composition ∪ old warehouse) → rebuild 2000/2009/2019 (`_v6tail`) →
+review report (2000: 17 truncated = scan's 13 + APPB/ESINQ/GES/MYL from the fresher
+store) → V16/V17 acceptance run (0 fallbacks, 7 `delisted` rows, one CY entry, STMP
+`delisted` ≈ $329.61) → salted re-base as a 3-salt band → golden check → docs → retire
+guard 3 → PR-B splice class. **#2693:** the rebuild stamps `active_through` on EVERY
+symbol (2,999/2,999) because the derivation compares to the CLI `-end-date`, not the
+store's max last-bar; harmless inside the record window, must be fixed before any window
+reaching the store's end. Old-warehouse salts run cancelled (its one cell: record at salt
+1 = 180.23% vs 302.65% at salt 0 — the record's own level is a salt lottery).
+**Acceptance (2026-09-06 22:02 PT, rebuilt 2000 warehouse):** V16 PASS (0 fallback exits;
+10 `delisted` rows incl. STMP at $329.61 — the −$594k phantom is gone); **V17 FAIL: 3
+stale entries** (FII 2020-03-28/04-04 after its series ended 01-31; CY 04-25 after 04-15)
+because admission has no unconditional `active_through` exclusion (guard 1 off in the
+record convention; PI filter behind `enable_pi_filter`). PR-D = make it unconditional
+(data-driven) + fix #2693 (survivor markers; builds mark 2,999/2,999). Validator gotcha:
+`post_run_validator_cli -data-dir` must be the REAL CSV store (`/workspaces/trading-1/data`),
+not the worktree's `test_data` fixtures (655 symbols ending 2025-05-16 → 506 skipped, 5
+false V17 hits on survivors). Rebuilt-warehouse 26y cell = 13,441 s (40% slower than the
+"thin" old warehouse).
