@@ -129,6 +129,10 @@ Three `_v6tail` warehouses built (2000: 2,999 snaps; 2009: 2,033; 2019: 2,209 �
 counts equal the old ones because ~970 / ~790 composition names have NO CSV in the store:
 the survivor tilt lives in the store, so the vintage gap fetch is a real P1). Acceptance
 cell on the rebuilt 2000 warehouse: V16 0 fallback exits, 10 `delisted` rows (STMP at
-$329.61), but **V17 = 3 stale entries (FII ×2, CY)** → PR-D (unconditional admission
-exclusion at `active_through`, + the #2693 survivor-marker fix) before the salted re-base.
+$329.61), but **V17 = 3 stale entries (FII ×2, CY)** → PR-D (#2695, MERGED 01:18 PT Sep 7:
+unconditional admission exclusion at `active_through` + the #2693 survivor-marker fix).
+**Second acceptance on the `_v7mark` rebuild (04:12 PT Sep 7): V16 PASS, V17 PASS** —
+the data is clean under the criteria; the salted re-base cells run through ~13:30 PT;
+the new record is their 3-salt band. Next code: retire runtime guard 3 (Rule 4), #2696
+(fill-time cancel), PR-B (splice class), the vintage gap fetch.
 Full record: `dev/experiments/warehouse-rebuild-2026-09-06/README.md`.
