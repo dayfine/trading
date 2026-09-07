@@ -17,6 +17,13 @@ let default_progress_every = 50
    at the scenario start. CLIs surface this as [--sketch-deep-days]. *)
 let default_sketch_deep_days = 3650
 
+(* Slack, in calendar days, between the universe's last bar and a symbol's own
+   last bar before that symbol counts as delisted (#2693). The vendor lags a
+   few names by a day or two — a symbol whose series stops on the Wednesday of
+   the store's final week is still trading, not delisted. CLIs surface this as
+   [--survivor-tolerance-days]. *)
+let default_survivor_tolerance_days = 7
+
 (* Committed veto list for {!Series_tail}. Documented, not defaulted: the flag
    stays optional so a build's behaviour never depends on the caller's cwd. *)
 let default_exceptions_path = "trading/test_data/warehouse_exceptions.sexp"
@@ -146,15 +153,23 @@ let _last_bar_date (bars : Types.Daily_price.t list) : Date.t option =
   List.last bars |> Option.map ~f:(fun (b : Types.Daily_price.t) -> b.date)
 
 (* Series end IS the delisting evidence (#2672): a symbol whose last stored bar
-   predates the build's end date stopped trading, so stamp that date. A symbol
-   still printing at the end of the window keeps [None] ("still trading /
-   unknown"). An explicit marker on the bars always wins. *)
-let _derive_active_through ~build_end ~bar_marker ~last_bar =
+   falls more than [survivor_tolerance_days] behind the universe's own last bar
+   stopped trading, so stamp that date. One still printing at the end keeps
+   [None] ("still trading / unknown"). An explicit marker on the bars wins.
+
+   The reference is the DATA's end, never the operator's [--end-date] (#2693):
+   the 2026-09-06 rebuild passed [-end-date 2026-09-06] against a CSV store
+   whose last bar was 2026-08-17, and every one of the 2,999 symbols — all 778
+   survivors included — came back marked. *)
+let _derive_active_through ~universe_end ~survivor_tolerance_days ~bar_marker
+    ~last_bar =
   match bar_marker with
   | Some _ as explicit -> explicit
   | None -> (
-      match (build_end, last_bar) with
-      | Some end_, Some last when Date.( < ) last end_ -> Some last
+      match (universe_end, last_bar) with
+      | Some end_, Some last when Date.diff end_ last > survivor_tolerance_days
+        ->
+          Some last
       | _ -> None)
 
 let _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows =
@@ -189,16 +204,15 @@ let _write_weekly ~output_dir ~symbol ~deep_bars ~bars =
 let _clean_tail ~(tail : tail_opts) ~symbol bars =
   Series_tail.apply tail.config ~exceptions:tail.exceptions ~symbol bars
 
+(* The per-symbol checkpoint carries only the EXPLICIT marker: the universe's
+   end is not known until every symbol has been read, so the series-end
+   derivation happens once in {!_finalize_entries}. *)
 let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-    ~output_dir ~csv_mtime ~end_date ~tail =
+    ~output_dir ~csv_mtime ~tail =
   let path = _file_path ~output_dir ~symbol in
   let bars, findings = _clean_tail ~tail ~symbol bars in
   let last_bar = _last_bar_date bars in
-  let active_through =
-    _derive_active_through ~build_end:end_date
-      ~bar_marker:(_active_through_of_bars bars)
-      ~last_bar
-  in
+  let active_through = _active_through_of_bars bars in
   match
     Pipeline.build_for_symbol ~symbol ~bars ~deep_bars ~schema ?benchmark_bars
       ()
@@ -229,10 +243,10 @@ let _checkpoint_manifest ~manifest_path ~schema entry =
         entry.Snapshot_manifest.symbol (Status.show err)
 
 let _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-    ~csv_mtime ~manifest_path ~checkpoint ~end_date ~tail =
+    ~csv_mtime ~manifest_path ~checkpoint ~tail =
   match
     _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-      ~output_dir ~csv_mtime ~end_date ~tail
+      ~output_dir ~csv_mtime ~tail
   with
   | Error err ->
       Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
@@ -252,7 +266,7 @@ let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~sketch_deep_days
       None
   | Ok (deep_bars, bars) ->
       _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-        ~csv_mtime ~manifest_path ~checkpoint ~end_date ~tail
+        ~csv_mtime ~manifest_path ~checkpoint ~tail
 
 let _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
     ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint ~tail
@@ -366,34 +380,49 @@ let _fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
         ~symbols_done ~last_completed:symbol ~started_at;
       acc @ [ built ]
 
-(* The build's end date: the operator's [--end-date] when given, else the latest
-   bar any symbol in this universe printed — the only end-of-data the builder
-   can know without a second pass over every CSV. Symbols whose own series stops
-   before it are the delisted ones. *)
-let _build_end_date ~end_date builts =
-  match end_date with
-  | Some _ -> end_date
-  | None ->
-      List.filter_map builts ~f:(fun b -> b.last_bar)
-      |> List.max_elt ~compare:Date.compare
+(* The universe's end of data: the latest bar ANY symbol in this build printed.
+   Derived from the bars, never from [--end-date] (#2693) — an [--end-date]
+   past the store's own end silently marks every survivor delisted. Symbols
+   whose series stops more than the tolerance before it are the delisted ones. *)
+let _universe_end builts =
+  List.filter_map builts ~f:(fun b -> b.last_bar)
+  |> List.max_elt ~compare:Date.compare
 
-(* Full-history builds ([--end-date] absent) can only resolve the universe's end
-   once every symbol is read, so their per-symbol [active_through] is filled in
-   here rather than at checkpoint time. Reused (incremental-skip) entries keep
-   the value their own build derived. *)
-let _entry_with_derived_marker ~build_end b =
+(* The universe's end is only resolvable once every symbol is read, so the
+   per-symbol [active_through] is filled in here rather than at checkpoint
+   time. Reused (incremental-skip) entries read no bars, so they keep the value
+   their own build derived. *)
+let _entry_with_derived_marker ~universe_end ~survivor_tolerance_days b =
   match b.last_bar with
   | None -> b.entry
   | Some _ ->
       let active_through =
-        _derive_active_through ~build_end ~bar_marker:b.entry.active_through
-          ~last_bar:b.last_bar
+        _derive_active_through ~universe_end ~survivor_tolerance_days
+          ~bar_marker:b.entry.active_through ~last_bar:b.last_bar
       in
       { b.entry with active_through }
 
-let _finalize_entries ~end_date builts =
-  let build_end = _build_end_date ~end_date builts in
-  List.map builts ~f:(_entry_with_derived_marker ~build_end)
+(* Survivor count, logged so an operator can see at a glance whether the
+   vintage's marker split looks sane (#2693: the defect it catches showed up as
+   "2,999 of 2,999 marked" on a store with 778 live names). *)
+let _log_marker_split entries =
+  let marked =
+    List.count entries ~f:(fun (e : Snapshot_manifest.file_metadata) ->
+        Option.is_some e.active_through)
+  in
+  Printf.printf "active_through: %d marked, %d survivors (of %d symbols)\n%!"
+    marked
+    (List.length entries - marked)
+    (List.length entries)
+
+let _finalize_entries ~survivor_tolerance_days builts =
+  let universe_end = _universe_end builts in
+  let entries =
+    List.map builts
+      ~f:(_entry_with_derived_marker ~universe_end ~survivor_tolerance_days)
+  in
+  _log_marker_split entries;
+  entries
 
 (* Review sidecar (#2672): every terminal run below the ratio, whatever the
    gates decided, so a human reads the vintage's classes once. Written even when
@@ -435,9 +464,10 @@ let tail_exceptions_or_exit path =
       Printf.eprintf "%s\n%!" (Status.show err);
       exit 1
 
-let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
-    ~end_date ~sketch_deep_days ~incremental ~progress_every ~tail_config
-    ~tail_exceptions () =
+let build ?(survivor_tolerance_days = default_survivor_tolerance_days) ~symbols
+    ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date ~end_date
+    ~sketch_deep_days ~incremental ~progress_every ~tail_config ~tail_exceptions
+    () =
   _ensure_dir output_dir;
   let schema = Snapshot_schema.default in
   let symbols_total = List.length symbols in
@@ -457,12 +487,27 @@ let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
            ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
            ~symbols_total ~started_at ~tail)
   in
-  let entries = _finalize_entries ~end_date builts in
+  let entries = _finalize_entries ~survivor_tolerance_days builts in
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
   _write_final_manifest ~manifest_path ~schema ~entries ~elapsed;
   _write_tail_report ~output_dir builts;
   _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at;
   _verify_or_warn ~manifest_path
+
+(* Shared CLI surface for the survivor tolerance, so both builders expose the
+   same flag and default. *)
+let survivor_tolerance_param =
+  let%map_open.Command days =
+    flag "survivor-tolerance-days"
+      (optional_with_default default_survivor_tolerance_days int)
+      ~doc:
+        (Printf.sprintf
+           "N Calendar days a symbol's last bar may trail the universe's last \
+            bar and still count as still-trading (active_through stays unset). \
+            Default %d."
+           default_survivor_tolerance_days)
+  in
+  days
 
 (* Shared CLI surface for the tail knobs, so both builders expose exactly the
    same flags and defaults. Only the three gate knobs are flags: the mis-scale

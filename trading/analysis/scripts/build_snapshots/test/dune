@@ -13,9 +13,9 @@
  (preprocess
   (pps ppx_jane)))
 
-(test
- (name test_build_runner_tail)
- (modules test_build_runner_tail)
+(tests
+ (names test_build_runner_tail test_build_runner_survivors)
+ (modules test_build_runner_tail test_build_runner_survivors)
  (libraries
   core
   core_unix

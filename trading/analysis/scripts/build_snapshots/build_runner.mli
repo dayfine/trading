@@ -20,6 +20,17 @@ val default_sketch_deep_days : int
     resistance sketch (resistance-v2 §D4): 3650 (~520 trading weeks, the deepest
     sketch horizon). CLIs surface this as the [--sketch-deep-days] default. *)
 
+val default_survivor_tolerance_days : int
+(** Default slack, in calendar days, between the universe's last bar and a
+    symbol's own last bar before that symbol is treated as delisted: 7. The
+    vendor lags a few names by a day or two, so a symbol whose series stops
+    mid-way through the store's final week is still trading. CLIs surface this
+    as the [--survivor-tolerance-days] default. *)
+
+val survivor_tolerance_param : int Core.Command.Param.t
+(** Shared CLI flag [-survivor-tolerance-days], so both builders expose the same
+    surface and default. Yields {!build}'s [?survivor_tolerance_days]. *)
+
 val default_exceptions_path : string
 (** Repo path of the committed series-tail veto list,
     [trading/test_data/warehouse_exceptions.sexp]. Documentation only: the
@@ -60,6 +71,7 @@ val tail_exceptions_or_exit :
     builders call this before {!build} rather than passing a path in. *)
 
 val build :
+  ?survivor_tolerance_days:int ->
   symbols:string list ->
   csv_data_dir:string ->
   output_dir:string ->
@@ -121,19 +133,32 @@ val build :
 
     {2 [active_through] is derived from the series end}
 
-    Every symbol whose last stored bar predates the build's end date is marked
-    delisted in the manifest ([file_metadata.active_through = Some last_bar]);
-    one still printing at the end keeps [None] ("still trading / unknown"). An
-    [active_through] already carried on the input bars always wins — but no
-    vendor path populates it today, which is why this derivation exists.
+    A symbol whose last stored bar falls more than [survivor_tolerance_days]
+    behind the {e universe's} last bar is marked delisted in the manifest
+    ([file_metadata.active_through = Some last_bar]); one still printing at the
+    end keeps [None] ("still trading / unknown"). An [active_through] already
+    carried on the input bars always wins — but no vendor path populates it
+    today, which is why this derivation exists.
 
-    The build's end date is [end_date] when given, else the latest bar any
-    symbol in the universe printed. In the latter case the value can only be
-    resolved after every symbol is read, so it is stamped on the {e final}
-    manifest rather than on the per-symbol checkpoints; an interrupted
-    full-history build resumed with [incremental] therefore reuses entries whose
-    marker is not yet filled in. Pass [end_date] (as {!Build_scenario_snapshots}
-    does) to have every checkpoint carry the final value.
+    - [survivor_tolerance_days] — the slack that separates "still trading" from
+      "delisted". The vendor lags a few names by a day or two, so an exact match
+      against the universe's last bar would mark them all delisted. Defaults to
+      {!default_survivor_tolerance_days}.
+
+    {b The reference is the universe's own last bar — the latest bar ANY symbol
+       in this build printed — never [end_date]} (#2693). An [end_date] past the
+    CSV store's own end marks every survivor delisted: the 2026-09-06 rebuild
+    passed [-end-date 2026-09-06] against a store whose last bar was 2026-08-17
+    and stamped a marker on all 2,999 symbols, 778 of them still trading.
+
+    The universe's end can only be resolved after every symbol is read, so the
+    derivation is stamped on the {e final} manifest rather than on the
+    per-symbol checkpoints — those carry only an explicit bar-borne marker. An
+    interrupted build resumed with [incremental] therefore reuses entries whose
+    derived marker is not filled in; a full (non-incremental) rebuild is the
+    supported shape (#2669).
+
+    The final manifest's marker split ("N marked, M survivors") is logged.
 
     Sketch-v5 PR 4: the sparse [<symbol>.weekly] side-table
     ({!Data_panel_snapshot.Weekly_sidetable}) is {b always} written next to each

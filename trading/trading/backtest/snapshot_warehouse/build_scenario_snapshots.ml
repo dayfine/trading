@@ -157,8 +157,8 @@ let _scan_splices ~config ~data_dir ~warmup_start ~end_date ~output_dir
   end
 
 let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
-    ~sketch_deep_days ~incremental ~progress_every ~twin_config ~splice_config
-    ~tail_config ~tail_exceptions_path () =
+    ~sketch_deep_days ~incremental ~progress_every ~survivor_tolerance_days
+    ~twin_config ~splice_config ~tail_config ~tail_exceptions_path () =
   let scenario = Scenario.load scenario_path in
   let universe =
     _resolve_universe ~fixtures_root ~universe_path:scenario.universe_path
@@ -173,7 +173,7 @@ let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
   in
   _scan_splices ~config:splice_config ~data_dir ~warmup_start:plan.warmup_start
     ~end_date:plan.end_date ~output_dir symbols;
-  Build_runner.build ~symbols ~csv_data_dir ~output_dir
+  Build_runner.build ~survivor_tolerance_days ~symbols ~csv_data_dir ~output_dir
     ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
     ~sketch_deep_days ~incremental ~progress_every ~tail_config
@@ -279,6 +279,7 @@ let command =
          ~doc:
            "Report out-of-band days even when a split is recoverable from the \
             raw-vs-adjusted divergence (default: suppress those)"
+     and survivor_tolerance_days = Build_runner.survivor_tolerance_param
      and tail_config, tail_exceptions_path = Build_runner.tail_params in
      fun () ->
        let basis =
@@ -309,7 +310,7 @@ let command =
          }
        in
        main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
-         ~sketch_deep_days ~incremental ~progress_every ~twin_config
-         ~splice_config ~tail_config ~tail_exceptions_path ())
+         ~sketch_deep_days ~incremental ~progress_every ~survivor_tolerance_days
+         ~twin_config ~splice_config ~tail_config ~tail_exceptions_path ())
 
 let () = Command_unix.run command
