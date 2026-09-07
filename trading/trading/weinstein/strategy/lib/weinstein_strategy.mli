@@ -150,6 +150,20 @@ module Entry_recency_gate = Entry_recency_gate
     ghost price. Default-off. Exposed so tests can pin both the pure filter and
     the {!Bar_reader}-backed adapter. See {!Entry_recency_gate}. *)
 
+module Delisted_entry_gate = Delisted_entry_gate
+(** Unconditional post-[active_through] entry exclusion (issue #2693): drops
+    entry candidates whose warehouse delisting marker has already passed, so the
+    strategy never opens a position in a security that no longer exists.
+    Data-driven, so there is no config flag — a no-op on any warehouse that
+    carries no marker. Exposed so tests can pin both the pure filter and the
+    {!Bar_reader}-backed adapter. See {!Delisted_entry_gate}. *)
+
+module Entry_assembly = Entry_assembly
+(** The entry-candidate assembly seam: where the per-candidate entry gates
+    compose before the entry walk. Exposed so tests can pin the composed
+    pipeline end-to-end (which gate order actually ships), not just each gate in
+    isolation. See {!Entry_assembly}. *)
+
 module Liquidity_exit_runner = Liquidity_exit_runner
 (** Held-position liquidity-degradation exit runner. Invoked among the special
     exits (alongside {!Stage3_force_exit_runner} / {!Laggard_rotation_runner})

@@ -21,5 +21,11 @@ let assemble ~config ~bar_reader ~current_date (screen_result : Screener.result)
       ~liquidity_config:config.liquidity_config ~bar_reader ~current_date
       combined
   in
-  Entry_recency_gate.apply ~max_bar_age_days:config.entry_max_bar_age_days
-    ~bar_reader ~current_date combined
+  let combined =
+    Entry_recency_gate.apply ~max_bar_age_days:config.entry_max_bar_age_days
+      ~bar_reader ~current_date combined
+  in
+  (* Unconditional and last (#2693): the delisting marker is data, not a
+     mechanism, so no config field gates it. A no-op on any warehouse whose
+     manifest carries no [active_through]. *)
+  Delisted_entry_gate.apply ~bar_reader ~current_date combined
