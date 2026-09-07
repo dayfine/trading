@@ -39,7 +39,7 @@ core_kernel                 v0.17.0
 core_unix                   v0.17.1
 cppo                        1.8.0
 csexp                       1.5.2
-cstruct                     6.2.0
+cstruct                     6.3.0
 csv                         2.4
 ctypes                      0.24.0
 ctypes-foreign              0.24.0
@@ -85,7 +85,7 @@ ocamlbuild                  0.16.1
 ocamlfind                   1.9.8
 ocamlformat                 0.29.0
 ocamlformat-lib             0.29.0
-ocp-indent                  1.9.0
+ocp-indent                  1.10.0
 ounit2                      2.2.7
 owl                         1.2
 owl-base                    1.2
