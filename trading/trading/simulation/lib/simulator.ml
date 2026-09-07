@@ -25,6 +25,7 @@ type dependencies = {
   exempt_closing_trades_from_cash_floor : bool;  (** See .mli. *)
   on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
   active_through_for : (string -> Core.Date.t option) option;  (** See .mli. *)
+  prune_universe_by_active_through : bool;  (** See .mli. Win #4 opt-in. *)
   on_transitions : (Trading_strategy.Position.transition list -> unit) option;
       (** See .mli. *)
   entry_extension_max_pct : float option;
@@ -47,9 +48,9 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(initial_long_margin_req = 1.0) ?(long_margin_rate_annual_pct = 0.0)
     ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
-    ?active_through_for ?on_transitions ?entry_extension_max_pct
-    ?(sim_entry_fill_next_open = false) ?(sim_exit_fill_next_open = false)
-    ?(entry_fill_reject_retries = 0)
+    ?active_through_for ?(prune_universe_by_active_through = false)
+    ?on_transitions ?entry_extension_max_pct ?(sim_entry_fill_next_open = false)
+    ?(sim_exit_fill_next_open = false) ?(entry_fill_reject_retries = 0)
     ?(entry_fill_resize = Entry_fill_resize.disabled) () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
@@ -80,6 +81,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     exempt_closing_trades_from_cash_floor;
     on_trade_fill;
     active_through_for;
+    prune_universe_by_active_through;
     on_transitions;
     entry_extension_max_pct;
     sim_entry_fill_next_open;
@@ -124,10 +126,14 @@ and t = {
 
 (** {1 Creation} *)
 
-(* Win #4: prune the per-step bar-fetch universe once, up front. [None]
-   active_through_for preserves baselines. *)
+(* Win #4: prune the per-step bar-fetch universe once, up front. Gated on its
+   own opt-in, NOT merely on [active_through_for] being supplied: since #2687
+   the lookup is also read by {!Delisted_exit_runner}, which callers arm
+   unconditionally, so the two consumers need separate switches. A [false] flag
+   (the default) or a [None] lookup preserves baselines. *)
 let _maybe_prune_deps ~fold_start_date deps =
   match deps.active_through_for with
+  | _ when not deps.prune_universe_by_active_through -> deps
   | None -> deps
   | Some f ->
       let symbols =
@@ -283,11 +289,25 @@ let _build_run_result t =
     metrics;
   }
 
+(* Notify the optional [on_transitions] observer with a batch of transitions
+   (#2057).
+
+   There are three call sites per step, not one, and their order is the order
+   the transitions were applied: the forced exits, announced by
+   {!Forced_exit_step.run} itself (they are applied before any order is even
+   executed, so they come first — #2687); then the portfolio-rejection cancels,
+   announced by {!Cancel_handler.handle_rejected_trades} itself since #2524;
+   then this one, the strategy + margin transitions. Folding any of them into a
+   later notification would report them out of order, which matters:
+   {!Backtest.Stop_log} is last-writer-wins per position. *)
+let _notify_transitions ~on_transitions transitions =
+  Option.iter on_transitions ~f:(fun observe -> observe transitions)
+
 (** Apply split detection, update market state, record stale-held positions, and
-    (when configured, default-off) force-exit stale/delisted positions at their
-    last close. Returns the post-split / post-force-exit portfolio, positions,
-    today's bars, split events, and the realised force-exit trades (merged into
-    the step's [trades] by the caller; see {!Stale_exit_runner}).
+    run the forced-exit phase ({!Forced_exit_step}: marked delistings first,
+    then the stale safety net). Returns the post-split / post-force-exit
+    portfolio, positions, today's bars, split events, and the realised exit
+    trades (merged into the step's [trades] by the caller).
 
     [last_known_prices] is handed to the force-exit selection as the tier-3
     price source for the #2672 [exit_without_prior_bar] candidates — positions
@@ -309,15 +329,16 @@ let _prepare_market_state t =
          ~date:t.current_date ~portfolio ~today_bars
          ~config:t.deps.stale_hold_policy)
       ~f:(Stale_hold.Log.record t.deps.stale_hold_log);
-  let portfolio, positions, stale_exit_trades =
-    Stale_exit_runner.tick ~adapter:t.deps.market_data_adapter
-      ~config:t.deps.stale_hold_policy ~commission:t.config.commission
+  let portfolio, positions, forced_exit_trades =
+    Forced_exit_step.run ~adapter:t.deps.market_data_adapter
+      ~active_through_for:t.deps.active_through_for
+      ~stale_config:t.deps.stale_hold_policy ~commission:t.config.commission
       ~date:t.current_date ~today_bars
       ~last_known_price:(fun ~symbol -> Hashtbl.find t.last_known_prices symbol)
-      ~portfolio ~positions ()
+      ~on_transitions:t.deps.on_transitions ~portfolio ~positions ()
   in
   Trading_engine.Engine.update_market t.deps.engine today_bars;
-  (portfolio, positions, today_bars, split_events, stale_exit_trades)
+  (portfolio, positions, today_bars, split_events, forced_exit_trades)
 
 (** Build the per-step [step_result]. Projection to the skinny
     [Portfolio_summary] mirrors Fix B from
@@ -342,19 +363,6 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
         ~benchmark_symbol:t.deps.benchmark_symbol ~date:t.current_date;
     had_market_bars = not (List.is_empty today_bars);
   }
-
-(* Notify the optional [on_transitions] observer with the strategy + margin
-   transitions (#2057).
-
-   The observer is still called TWICE per step, deliberately and not once — but
-   only one of those calls is here. Since #2524 the other lives inside
-   {!Cancel_handler.handle_rejected_trades}, which announces the
-   portfolio-rejection cancels itself. That call must stay separate and must
-   stay first: those cancels are applied in [_process_fills_and_cancels],
-   before the strategy is even called, so folding them into this later
-   notification would report them out of order. *)
-let _notify_transitions ~on_transitions transitions =
-  Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
 (* Execute pending orders, apply fills, and route rejected fills through
    {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). The
@@ -416,13 +424,13 @@ let _retire_cancelled_entry_orders t ~positions ~transitions =
     and assemble the [step_result]. Returns the next simulator state paired with
     this day's [step_result]. *)
 let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
-    ~stale_exit_trades =
+    ~forced_exit_trades =
   let open Result.Let_syntax in
   let%bind portfolio, positions, fill_trades =
     _process_fills_and_cancels t ~portfolio ~positions ~today_bars
   in
-  (* Surface the already-realised stale force-exits in this step's trades. *)
-  let trades = stale_exit_trades @ fill_trades in
+  (* Surface the already-realised delisted / stale force-exits in this step. *)
+  let trades = forced_exit_trades @ fill_trades in
   let%bind strategy_transitions =
     _call_strategy { t with portfolio; positions }
   in
@@ -468,13 +476,14 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
 let step t =
   if _is_complete t then Ok (Completed (_build_run_result t))
   else
-    let portfolio, positions, today_bars, split_events, stale_exit_trades =
+    let portfolio, positions, today_bars, split_events, forced_exit_trades =
       _prepare_market_state t
     in
     _process_step_day t ~portfolio ~positions ~today_bars ~split_events
-      ~stale_exit_trades
+      ~forced_exit_trades
 
 let get_config t = t.config
+let universe_symbols t = t.deps.symbols
 
 let run t =
   let rec loop t =

@@ -15,6 +15,20 @@ let _default_splice_pnl_pct_threshold = 100.0
 let _default_splice_max_days_held = 5
 let _default_splice_adj_ratio_min = 0.4
 let _default_splice_adj_ratio_max = 2.5
+
+(* V16: every exit label produced by a safety net rather than a strategy rule.
+   ["delisted"] is deliberately absent — see [validator_fallback_check.mli]. *)
+let _default_fallback_exit_labels =
+  [
+    "stale_force_exit";
+    "margin_call";
+    "maintenance_reduce";
+    "buyin_stress";
+    "force_liquidation_position";
+    "force_liquidation_portfolio";
+  ]
+
+let _default_stale_entry_days = 7
 let far_future = Date.of_string "2100-01-01"
 
 type severity = Invariant | Expectation [@@deriving sexp, equal]
@@ -90,6 +104,9 @@ type check_config = {
   splice_max_days_held : int; [@sexp.default _default_splice_max_days_held]
   splice_adj_ratio_min : float; [@sexp.default _default_splice_adj_ratio_min]
   splice_adj_ratio_max : float; [@sexp.default _default_splice_adj_ratio_max]
+  fallback_exit_labels : string list;
+      [@sexp.default _default_fallback_exit_labels]
+  stale_entry_days : int; [@sexp.default _default_stale_entry_days]
   disabled_checks : string list; [@sexp.default []]
   severity_overrides : (string * string) list; [@sexp.default []]
 }
@@ -141,6 +158,8 @@ let default_config =
     splice_max_days_held = _default_splice_max_days_held;
     splice_adj_ratio_min = _default_splice_adj_ratio_min;
     splice_adj_ratio_max = _default_splice_adj_ratio_max;
+    fallback_exit_labels = _default_fallback_exit_labels;
+    stale_entry_days = _default_stale_entry_days;
     disabled_checks = [];
     severity_overrides = [];
   }

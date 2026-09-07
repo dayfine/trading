@@ -1233,9 +1233,10 @@ let test_prune_symbols_by_active_through_drops_pre_fold_delistings _ =
      all survive (active_through >= fold_start, or [None]). Order preserved. *)
   assert_that kept (equal_to [ "ALIVE_1999"; "ALIVE_2025"; "UNKNOWN" ])
 
-(** Default behaviour pin: when [active_through_for] is [None] on the deps
-    record, [create] does not prune — [t.deps.symbols] equals the input list.
-    Confirms the no-pruning baseline is bit-equal to pre-Win-#4. *)
+(** Default behaviour pin, observed on the created simulator: with no
+    [active_through_for] at all, {!create} does not prune —
+    {!Simulator.universe_symbols} equals the input list. The no-pruning baseline
+    is bit-equal to pre-Win-#4. *)
 let test_create_without_active_through_for_preserves_symbols _ =
   with_test_data "simulator_no_pruning_baseline"
     [ ("AAPL", []); ("MSFT", []) ]
@@ -1246,42 +1247,64 @@ let test_create_without_active_through_for_preserves_symbols _ =
           ~commission:{ Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
           ()
       in
-      assert_that deps.symbols (equal_to [ "AAPL"; "MSFT"; "GOOG" ]))
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
+      assert_that (universe_symbols sim) (equal_to [ "AAPL"; "MSFT"; "GOOG" ]))
 
-(** [create] applies the prune when [active_through_for] is [Some _]. Symbol
-    delisted before [config.start_date] is dropped from [t.deps.symbols];
-    survivors retain their original order. *)
-let test_create_with_active_through_for_prunes_pre_fold_delisted _ =
-  with_test_data "simulator_pruning_active"
+(* The Win #4 prune fixture, shared by the flag-on / flag-off pair below: DEAD
+   carries [active_through = 2023-06-30], strictly before the fold's first day
+   (2024-01-02); AAPL / MSFT carry no marker. Only the flag decides whether
+   DEAD survives [create]. *)
+let _pruning_active_through_for = function
+  | "DEAD" -> Some (date_of_string "2023-06-30")
+  | _ -> None
+
+let _pruning_config =
+  { sample_config with start_date = date_of_string "2024-01-02" }
+
+let _pruning_deps ~data_dir ?prune_universe_by_active_through () =
+  create_deps ~symbols:[ "AAPL"; "DEAD"; "MSFT" ] ~data_dir
+    ~strategy:(module Test_helpers.Noop_strategy)
+    ~commission:{ Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
+    ~active_through_for:_pruning_active_through_for
+    ?prune_universe_by_active_through ()
+
+(** Flag ON: with [prune_universe_by_active_through = true] {b and} the lookup
+    supplied, [create] drops the pre-fold delisting from the simulator's
+    bar-fetch universe; survivors retain their original order. *)
+let test_create_with_prune_flag_on_drops_pre_fold_delisted _ =
+  with_test_data "simulator_pruning_flag_on"
     [ ("AAPL", []); ("MSFT", []); ("DEAD", []) ]
     ~f:(fun data_dir ->
-      let active_through_for = function
-        | "DEAD" -> Some (date_of_string "2023-06-30")
-        | _ -> None
-      in
       let deps =
-        create_deps ~symbols:[ "AAPL"; "DEAD"; "MSFT" ] ~data_dir
-          ~strategy:(module Test_helpers.Noop_strategy)
-          ~commission:{ Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
-          ~active_through_for ()
+        _pruning_deps ~data_dir ~prune_universe_by_active_through:true ()
       in
-      let config =
-        { sample_config with start_date = date_of_string "2024-01-02" }
-      in
-      (* [create]'s pruning step keys off [config.start_date] (the fold's
-         first day). DEAD has [active_through = 2023-06-30 < 2024-01-02], so
-         it is dropped. AAPL / MSFT have [active_through = None] and pass. *)
-      let sim = Test_helpers.create_exn ~config ~deps in
-      let deps = (get_config sim, sim) |> snd in
-      ignore deps;
-      (* The pruned list lives on the simulator's [t.deps.symbols]; we can't
-         observe [t] internals directly, so re-derive via the pure helper
-         under the same fold_start_date. *)
-      let kept =
-        prune_symbols_by_active_through ~symbols:[ "AAPL"; "DEAD"; "MSFT" ]
-          ~active_through_for ~fold_start_date:config.start_date
-      in
-      assert_that kept (equal_to [ "AAPL"; "MSFT" ]))
+      let sim = Test_helpers.create_exn ~config:_pruning_config ~deps in
+      assert_that (universe_symbols sim) (equal_to [ "AAPL"; "MSFT" ]))
+
+(** Flag OFF (the default): the same deps, same lookup, no prune. This is the
+    contract standing between every production [Panel_runner] run and a silently
+    pruned universe, since #2687 supplies [active_through_for] unconditionally —
+    the lookup alone must no longer arm the prune. *)
+let test_create_with_prune_flag_off_keeps_pre_fold_delisted _ =
+  with_test_data "simulator_pruning_flag_off"
+    [ ("AAPL", []); ("MSFT", []); ("DEAD", []) ]
+    ~f:(fun data_dir ->
+      let deps = _pruning_deps ~data_dir () in
+      let sim = Test_helpers.create_exn ~config:_pruning_config ~deps in
+      assert_that (universe_symbols sim) (equal_to [ "AAPL"; "DEAD"; "MSFT" ]))
+
+(** ...and the lookup itself survives that no-prune path, so the data-driven
+    delisted exit still sees DEAD's marker. Without this, "arm the exit without
+    arming the prune" would be untestable in the direction that matters. *)
+let test_create_with_prune_flag_off_keeps_the_delisting_lookup _ =
+  with_test_data "simulator_pruning_lookup_kept"
+    [ ("AAPL", []); ("MSFT", []); ("DEAD", []) ]
+    ~f:(fun data_dir ->
+      let deps = _pruning_deps ~data_dir () in
+      assert_that
+        (Option.bind deps.active_through_for ~f:(fun f -> f "DEAD")
+        |> Option.map ~f:Date.to_string)
+        (is_some_and (equal_to "2023-06-30")))
 
 (* G1 (2026-06-12): a backtest fill must stamp the held lot's [acquisition_date]
    with the simulated fill date, NOT the wall-clock run date. The engine stamps
@@ -1344,8 +1367,12 @@ let suite =
          >:: test_prune_symbols_by_active_through_drops_pre_fold_delistings;
          "Win #4: create without active_through_for preserves symbols"
          >:: test_create_without_active_through_for_preserves_symbols;
-         "Win #4: create with active_through_for prunes pre-fold delisted"
-         >:: test_create_with_active_through_for_prunes_pre_fold_delisted;
+         "Win #4: create with prune flag on drops pre-fold delisted"
+         >:: test_create_with_prune_flag_on_drops_pre_fold_delisted;
+         "Win #4: create with prune flag off keeps pre-fold delisted"
+         >:: test_create_with_prune_flag_off_keeps_pre_fold_delisted;
+         "Win #4: create with prune flag off keeps the delisting lookup"
+         >:: test_create_with_prune_flag_off_keeps_the_delisting_lookup;
          "forward-fill: held symbol with no bar today values at last-known \
           close (PR #916 CP4)"
          >:: test_forward_fill_uses_last_known_close_when_held_symbol_has_no_bar;
