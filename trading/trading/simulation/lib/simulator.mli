@@ -83,7 +83,7 @@ type dependencies = {
           stopped existing (cash merger, acquisition, bankruptcy delisting).
           [None] for a symbol still trading, or one with no marker recorded.
 
-          Two independent consumers read it:
+          Three independent consumers read it:
 
           - {!Delisted_exit_runner} (since #2687): a held position whose marker
             has PASSED ([config's step date > d]) is exited at the symbol's last
@@ -94,6 +94,12 @@ type dependencies = {
             no-op on every warehouse built to date (none populates
             [active_through], so every lookup is [None]), which is what keeps
             goldens bit-identical.
+          - {!Trading_simulation.Delisted_ticket_cancel} (since #2696): the
+            entry-side mirror, run from the same phase. A wholly-unfilled
+            resting entry ticket whose marker has PASSED is cancelled and its
+            order retired, so it cannot fill against the symbol's retained last
+            bar on a later step. Also {b unconditional}, also a no-op wherever
+            every lookup is [None].
           - The Win #4 universe prune, gated on
             {!dependencies.prune_universe_by_active_through} — see that field.
 

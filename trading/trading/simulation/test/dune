@@ -581,3 +581,33 @@
   trading.portfolio
   trading.strategy
   matchers))
+
+(test
+ (name test_delisted_ticket_cancel)
+ (modules test_delisted_ticket_cancel)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  status
+  trading.simulation
+  trading.base
+  trading.orders
+  trading.strategy
+  matchers))
+
+(test
+ (name test_delisted_ticket_cancel_sim)
+ (modules test_delisted_ticket_cancel_sim)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.simulation.data
+  trading.base
+  trading.engine
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))

@@ -331,6 +331,7 @@ let _prepare_market_state t =
       ~f:(Stale_hold.Log.record t.deps.stale_hold_log);
   let portfolio, positions, forced_exit_trades =
     Forced_exit_step.run ~adapter:t.deps.market_data_adapter
+      ~order_manager:t.deps.order_manager
       ~active_through_for:t.deps.active_through_for
       ~stale_config:t.deps.stale_hold_policy ~commission:t.config.commission
       ~date:t.current_date ~today_bars
