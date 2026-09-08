@@ -104,24 +104,37 @@ let _with_captured_output f =
   Stdlib.Sys.remove path;
   log
 
-(* Build the two-symbol warehouse, run [between] against the output directory,
-   then re-run over [second_run]. Returns the symbols the final manifest
-   indexes (sorted) paired with everything that second run logged. *)
+(* Every symbol the top-up may touch needs a CSV before either build runs. *)
+let _write_all_csvs ~data_dir =
+  List.iter (_new_symbol :: _initial_symbols) ~f:(fun symbol ->
+      _write_csv ~data_dir ~symbol)
+
+(* The second build is the one under test, so its stdout / stderr is captured
+   and returned alongside nothing else. *)
+let _second_build_captured ~incremental ~data_dir ~output_dir second_run =
+  _with_captured_output (fun () ->
+      _build ~incremental ~data_dir ~output_dir second_run)
+
+(* One top-up, staged inside an already-created [dir]: populate the CSVs, build
+   the two-symbol warehouse, run [between] against the output directory, then
+   re-run over [second_run]. *)
+let _topup_in_dir ~between ~incremental second_run dir =
+  let data_dir = Filename.concat dir "csv" in
+  let output_dir = Filename.concat dir "snap" in
+  Core_unix.mkdir_p data_dir;
+  _write_all_csvs ~data_dir;
+  _build ~incremental:false ~data_dir ~output_dir _initial_symbols;
+  between ~output_dir;
+  let log =
+    _second_build_captured ~incremental ~data_dir ~output_dir second_run
+  in
+  (_manifest_symbols ~output_dir, log)
+
+(* Returns the symbols the final manifest indexes (sorted) paired with
+   everything the second run logged. *)
 let _topup ?(between = fun ~output_dir:(_ : string) -> ()) ~incremental
     second_run =
-  _with_temp_dir (fun dir ->
-      let data_dir = Filename.concat dir "csv" in
-      let output_dir = Filename.concat dir "snap" in
-      Core_unix.mkdir_p data_dir;
-      List.iter (_new_symbol :: _initial_symbols) ~f:(fun symbol ->
-          _write_csv ~data_dir ~symbol);
-      _build ~incremental:false ~data_dir ~output_dir _initial_symbols;
-      between ~output_dir;
-      let log =
-        _with_captured_output (fun () ->
-            _build ~incremental ~data_dir ~output_dir second_run)
-      in
-      (_manifest_symbols ~output_dir, log))
+  _with_temp_dir (_topup_in_dir ~between ~incremental second_run)
 
 let _symbols_after ~incremental second_run =
   fst (_topup ~incremental second_run)
