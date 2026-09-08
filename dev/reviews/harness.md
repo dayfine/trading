@@ -111,3 +111,66 @@ NEEDS_REWORK
 
 `overall_qc: NEEDS_REWORK (behavioral)` — structural APPROVED (5), behavioral NEEDS_REWORK (2) at the same SHA. Audit: `dev/audit/2026-09-08-harness-daily-summary-publisher-harness.json`.
 
+
+---
+
+# QC review — PR #2725 (`harness/prune-anchor-selfref`)
+
+Structural reviewed at SHA `c96e6c2b`. **Tip is now `4bd4c221`** after an
+orchestrator rebase onto `bd7ac580` (see "SHA caveat" below).
+
+## Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | `dune build @fmt` | PASS | exit 0 |
+| H2 | `dune build` | PASS | exit 0 |
+| H3 | `dune runtest` | PASS | exit 0; `prune_candidates_test: 36 passed, 0 failed` |
+| P1–P4, P6 | linter-covered rows | NA | POSIX shell + markdown; no OCaml |
+| P5 | Internal helpers prefixed | NA→PASS | shell `_function_name` convention followed throughout |
+| A1 | Core module modification | NA | harness script only |
+| A2 | Dependency boundary | NA | no `(libraries …)` change |
+| A3 | No unnecessary modifications | PASS | three files, all necessary: `prune_candidates.sh`, `prune_candidates_test.sh`, `dev/status/harness.md` |
+
+**No Python** verified. Both scripts pass `dash -n`.
+
+## The six scepticism items the dispatch asked for
+
+1. **`ROOT` swap leak** — PASS. `ROOT="$tmp"` at line 531; **all six** return paths (534, 541, 548, 555, 561) restore `ROOT="$orig_root"` unconditionally. No early exit escapes restoration.
+2. **Writes into the real repo** — PASS. Every write is confined to the `mktemp -d` dir; no redirect targets a path outside it; `rm -rf "$tmp"` is unconditional.
+3. **Two-sidedness real** — PASS, and independently reproduced. Mutation 1 (`_is_cited` → `return 0`) trips the false-CLEAN guard; mutation 2 (`return 1`) trips the false-ORPHAN guard. The two guards are independent — neither alone covers both directions.
+4. **Live script exits 0 on this tree** — PASS, run *after* the status-file edit. This is the trap the fix had to survive: the new `harness.md` entry necessarily names the old anchor, so a fix that still resolved against the live tree would have re-broken the probe while documenting the repair.
+5. **The declared tradeoff** (the probe no longer proves `find`'s enumeration of the real tree) — **argued, not merely asserted.** All three historical failures of this probe were citation/dating *primitive* bugs (`\s` vs `[[:space:]]`, git `safe.directory`, and this one); `find -mindepth 1 -maxdepth 1 -type d` has no regex or locale surface to break the same way. Reviewer judged the trade reasonable on that evidence.
+6. **The self-disclosed gap** (deleting the `_checker2_self_test || return 1` call site is caught by nothing) — legitimate and consistent: the pre-existing checker3 probe has the identical hole. Recorded rather than hidden, which is the point.
+
+## Mutations — independently re-run, matched the author exactly
+
+| # | mutation | author claimed | reviewer measured |
+|---|---|---|---|
+| 1 | `_is_cited` → `return 0` (match everything) | 4 passed / 32 failed | **4 / 32 — exact match** |
+| 2 | `_is_cited` → `return 1` (match nothing) | 5 passed / 31 failed | **5 / 31 — exact match** |
+
+## Fixture C — the regression test for this bug's shape
+
+Documents a synthetic old experiment dir from a synthetic `dev/status/harness.md`, mirroring exactly what `efc25d68` did to the real anchor, and asserts the probe still passes with the dir correctly excluded. Reviewer confirmed it reproduces the historical bug's shape rather than a weaker cousin.
+
+## Quality Score
+
+5 — Exemplary. Gates all green, mutations two-sided and non-vacuous with counts matching to the digit, regression fixture pins the exact issue, temp-resource cleanup unconditional on every path, and both the tradeoff and the residual gap disclosed rather than buried.
+
+## Verdict
+
+APPROVED
+
+## SHA caveat — read before merging
+
+The verdict above was taken at `c96e6c2b`. PR #2721 merged mid-run and took the same `dev/status/harness.md` section, leaving #2725 `mergeable_state: dirty` — and **a conflicted PR gets no CI at all**, because GitHub cannot build the merge ref that `pull_request` workflows run against. The orchestrator therefore rebased onto `bd7ac580` and force-pushed `4bd4c221`.
+
+**The only delta is the conflict resolution** — both backlog entries kept, `main`'s `H-DAILY-SUMMARY-PR-LOST` first, then `H-PRUNE-ANCHOR-SELFREF`. No script or test byte changed. After the resolution the orchestrator re-verified, because `harness.md` is itself one of the script's five citation sources and had just changed:
+
+```
+bash dev/scripts/prune_candidates.sh        exit 0
+bash dev/scripts/prune_candidates_test.sh   exit 0   (36 passed, 0 failed)
+```
+
+Strictly, the structural verdict is stale at the new tip and should be re-confirmed there. It is recorded as APPROVED-at-`c96e6c2b` rather than silently carried forward. **Behavioral QC has not run at all.**
