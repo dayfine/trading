@@ -27,9 +27,16 @@
     Two optional, {b default-off} data-integrity passes run over the same
     windowed bars before the build: {!Twin_detector} (cross-symbol rename twins;
     when armed it {e drops} the losing leg) and {!Splice_detector}
-    (within-symbol ticker-reuse splices; report-only — it writes [splices.csv]
-    and never changes the symbol set). With both unarmed the tool is
+    (within-symbol ticker-reuse splices). With both unarmed the tool is
     bit-identical to its pre-#2646 behaviour.
+
+    The splice pass writes [splices.csv] as before and, since #2672 class ii,
+    {b acts} on what it finds via {!Snapshot_pipeline.Series_splice}: an
+    interleaved series (20+ findings) is dropped from the symbol set, a single
+    ticker reuse is cut at its last splice, and the decisions land in
+    [splice_actions.csv]. [-no-splice-action] restores the report-only
+    behaviour. The detector's own switch still defaults off, so none of this
+    runs unless [-detect-splices] is passed.
 
     A third pass, {!Snapshot_pipeline.Series_tail}, runs inside
     {!Build_runner.build} itself and is {b on by default} (#2672): it ends a
@@ -43,6 +50,7 @@ open Core
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
 module Plan = Scenario_snapshot_plan
+module Series_splice = Snapshot_pipeline.Series_splice
 
 (* Resolve the scenario's [universe_path] against [fixtures_root] and project it
    to its trading symbols, exactly as [Scenario_runner] does:
@@ -139,13 +147,39 @@ let _dedupe_symbols ~config ~data_dir ~warmup_start ~end_date ~output_dir
     Twin_detector.survivors report ~all_symbols
   end
 
+(* Splice dates per symbol, keyed for the per-symbol decision below. *)
+let _splice_dates (report : Splice_detector.report) =
+  List.fold report.findings
+    ~init:(Map.empty (module String))
+    ~f:(fun acc (f : Splice_detector.finding) ->
+      Map.add_multi acc ~key:f.symbol ~data:f.date)
+
+(* One decision per scanned symbol. The BARS this returns are discarded: the
+   scan window is not the build window, so the cut is re-applied to the build's
+   own bars inside {!Build_runner.build} via the plan. Only the finding — the
+   report row, which carries the decision — is kept. *)
+let _splice_findings ~splice_config ~exceptions ~report series =
+  let dates = _splice_dates report in
+  List.filter_map series ~f:(fun (s : Splice_detector.series) ->
+      snd
+        (Series_splice.apply splice_config ~exceptions ~symbol:s.symbol
+           ~splices:(Map.find_multi dates s.symbol)
+           (Array.to_list s.bars)))
+
+let _report_splice_actions ~output_dir findings =
+  _write_sidecar ~output_dir ~name:"splice_actions.csv"
+    ~data:(Series_splice.to_csv findings);
+  Printf.eprintf "%s\n%!" (Series_splice.summary findings)
+
 (* When armed, scan every symbol's adjusted-close series for ticker-reuse
-   splices and write the [splices.csv] sidecar. REPORT-ONLY by construction:
-   the return type is [unit], so no symbol is dropped and no bar is truncated
-   whatever the scan finds. Default-off config → no scan, no file, no I/O. *)
-let _scan_splices ~config ~data_dir ~warmup_start ~end_date ~output_dir
-    all_symbols =
-  if config.Splice_detector.Config.enabled then begin
+   splices, write the [splices.csv] + [splice_actions.csv] sidecars, and return
+   the symbols that survive plus the cuts the builder must apply. Default-off
+   config → no scan, no file, no I/O, every symbol kept and no cuts. *)
+let _plan_splices ~config ~splice_config ~exceptions ~data_dir ~warmup_start
+    ~end_date ~output_dir all_symbols =
+  if not config.Splice_detector.Config.enabled then
+    (all_symbols, Map.empty (module String))
+  else begin
     let series =
       List.filter_map all_symbols
         ~f:(_load_splice_series ~data_dir ~warmup_start ~end_date)
@@ -153,12 +187,20 @@ let _scan_splices ~config ~data_dir ~warmup_start ~end_date ~output_dir
     let report = Splice_detector.detect config series in
     _write_sidecar ~output_dir ~name:"splices.csv"
       ~data:(Splice_detector.to_csv report);
-    Printf.eprintf "%s\n%!" (Splice_detector.summary report)
+    Printf.eprintf "%s\n%!" (Splice_detector.summary report);
+    let findings = _splice_findings ~splice_config ~exceptions ~report series in
+    _report_splice_actions ~output_dir findings;
+    let dropped =
+      Set.of_list (module String) (Series_splice.dropped_symbols findings)
+    in
+    ( List.filter all_symbols ~f:(fun s -> not (Set.mem dropped s)),
+      Series_splice.cut_plan findings )
   end
 
 let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
     ~sketch_deep_days ~incremental ~progress_every ~survivor_tolerance_days
-    ~twin_config ~splice_config ~tail_config ~tail_exceptions_path () =
+    ~twin_config ~splice_config ~splice_action_config ~tail_config
+    ~tail_exceptions_path () =
   let scenario = Scenario.load scenario_path in
   let universe =
     _resolve_universe ~fixtures_root ~universe_path:scenario.universe_path
@@ -171,10 +213,14 @@ let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
       ~warmup_start:plan.warmup_start ~end_date:plan.end_date ~output_dir
       plan.all_symbols
   in
-  _scan_splices ~config:splice_config ~data_dir ~warmup_start:plan.warmup_start
-    ~end_date:plan.end_date ~output_dir symbols;
-  Build_runner.build ~survivor_tolerance_days ~symbols ~csv_data_dir ~output_dir
-    ~benchmark_symbol:(Some plan.benchmark_symbol)
+  let symbols, splice_cuts =
+    _plan_splices ~config:splice_config ~splice_config:splice_action_config
+      ~exceptions:(Build_runner.splice_exceptions_or_exit tail_exceptions_path)
+      ~data_dir ~warmup_start:plan.warmup_start ~end_date:plan.end_date
+      ~output_dir symbols
+  in
+  Build_runner.build ~survivor_tolerance_days ~splice_cuts ~symbols
+    ~csv_data_dir ~output_dir ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
     ~sketch_deep_days ~incremental ~progress_every ~tail_config
     ~tail_exceptions:(Build_runner.tail_exceptions_or_exit tail_exceptions_path)
@@ -274,6 +320,12 @@ let command =
        flag "splice-max-ratio"
          (optional_with_default Splice_detector.Config.default.max_ratio float)
          ~doc:"R Upper bound of the accepted day-over-day adjusted-close ratio"
+     and no_splice_action =
+       flag "no-splice-action" no_arg
+         ~doc:
+           "Classify and report splice findings without acting on them \
+            (splice_actions.csv still written; no symbol dropped, no series \
+            cut). Only meaningful with -detect-splices."
      and splice_include_split_days =
        flag "splice-include-split-days" no_arg
          ~doc:
@@ -309,8 +361,12 @@ let command =
            skip_split_days = not splice_include_split_days;
          }
        in
+       let splice_action_config =
+         { Series_splice.Config.default with act = not no_splice_action }
+       in
        main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
          ~sketch_deep_days ~incremental ~progress_every ~survivor_tolerance_days
-         ~twin_config ~splice_config ~tail_config ~tail_exceptions_path ())
+         ~twin_config ~splice_config ~splice_action_config ~tail_config
+         ~tail_exceptions_path ())
 
 let () = Command_unix.run command

@@ -131,20 +131,20 @@ end
 
 module Exceptions : sig
   type t
-  (** Symbols whose tail is never edited, however it classifies. Read from a
-      committed sexp file (default
-      [trading/test_data/warehouse_exceptions.sexp], shape
-      [((keep_tail (SYM ...)))]) so a reviewer can veto a truncation without a
-      code change. *)
+  (** Symbols whose tail is never edited, however it classifies. Built from the
+      [keep_tail] section of the committed warehouse exceptions file
+      ([trading/test_data/warehouse_exceptions.sexp], shape
+      [((keep_tail (SYM ...)) (splice (...)))]) so a reviewer can veto a
+      truncation without a code change.
 
-  type file = { keep_tail : string list } [@@deriving sexp]
-  (** On-disk shape. The builder parses the file and calls {!of_file}. *)
+      This module does {e not} parse that file. {!Build_runner} reads it once,
+      into a single strict record whose two sections are both optional, and
+      hands each module its own section as a view — see
+      {!Build_runner.load_tail_exceptions}. Strict means a mistyped section name
+      is a parse error rather than a silently empty veto list. *)
 
   val empty : t
   (** No exceptions — every symbol is subject to the rule. *)
-
-  val of_file : file -> t
-  (** [of_file f] is [of_symbols f.keep_tail]. *)
 
   val of_symbols : string list -> t
   (** [of_symbols syms] never edits any of [syms]'s tails. *)

@@ -789,6 +789,36 @@ Merged in main:
   Pinned shape (never `-incremental`, #2669), then PR-B (splice class) and the
   record re-base; runtime guard 3 retires under
   `experiment-flag-discipline.md` Rule 4 once every live warehouse is rebuilt.
+  **2026-09-07 PR-B of the data-layer fix (`feat/data/splice-action`), plan
+  §Design item 4 "class ii":** the splice detector stops being report-only. New
+  pure `Snapshot_pipeline.Series_splice`
+  (`trading/analysis/weinstein/snapshot_pipeline/lib/series_splice.mli`), shaped
+  exactly like `Series_tail` (`Config` / `Exceptions` / `Class` / `Action` /
+  `apply` / CSV report), takes a symbol's bars plus the dates
+  `Splice_detector` flagged for it and decides. A series with **20 or more**
+  findings is `Interleaved` — two issuers shuffled together, with no date that
+  separates them (66 symbols on the 2000 vintage: SWD 1,215, AEZ 694, ICT 589,
+  CLE 412, MEL 98, MVL 80) — and the symbol is **dropped** from the build's
+  symbol set, so it is absent from the manifest rather than present with zero
+  bars. Below that cut the series is a single ticker `Reuse` (CHS: two findings,
+  cut at the later, 2004-12-20) and is **cut at the last splice, keeping the
+  later segment**; the same cut with a mis-scaled earlier segment
+  (`close >= 1000` on the bar before the cut — AGR's raw 73,566 -> 33.94) is
+  classed `Prefix_misscale` so the report names it. A cut never moves
+  `active_through` (the later segment ends on the same bar); a dropped symbol
+  has no entry and no marker. The committed veto list
+  `trading/test_data/warehouse_exceptions.sexp` gains an optional `splice`
+  section (`keep` / `drop` / `cut_at SYM DATE`) that both parsers now ignore
+  each other's half of, so one file and one `-tail-exceptions PATH` serve both
+  passes. Sidecar `splice_actions.csv`
+  (`symbol,class,n_findings,cut_after,n_dropped,action`) beside
+  `terminal_runs.csv`; `-no-splice-action` restores #2649's report-only
+  behaviour. `Splice_detector.Config.enabled` still defaults `false`, so no
+  unarmed build reaches any of this and every golden is bit-identical. Verify:
+  `dune runtest analysis/weinstein/snapshot_pipeline` (20 new cases in
+  `test_series_splice.ml`). No builder was run against a real warehouse in this
+  PR — that is the next queue step
+  (`dev/experiments/warehouse-rebuild-2026-09-06/README.md`).
   **2026-09-06 PR-C (`feat/fallback-exits-quality-flags`, closes #2687):** the
   three-commit follow-up implementing
   `dev/plans/delisting-data-fix-2026-09-06.md` §"Principle: fallbacks are quality

@@ -3,6 +3,7 @@ module Pipeline = Snapshot_pipeline.Pipeline
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_verifier = Snapshot_pipeline.Snapshot_verifier
 module Series_tail = Snapshot_pipeline.Series_tail
+module Series_splice = Snapshot_pipeline.Series_splice
 module Weekly_sidetable_builder = Snapshot_pipeline.Weekly_sidetable_builder
 module Snapshot_columnar = Data_panel_snapshot.Snapshot_columnar
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
@@ -38,11 +39,17 @@ type built = {
   findings : Series_tail.finding list;
 }
 
-(* Series-tail hygiene knobs, bundled so the per-symbol call chain threads one
-   parameter rather than two. *)
-type tail_opts = {
+(* Series-hygiene knobs, bundled so the per-symbol call chain threads one
+   parameter rather than three. *)
+type hygiene_opts = {
   config : Series_tail.Config.t;
   exceptions : Series_tail.Exceptions.t;
+  splice_cuts : Core.Date.t Map.M(String).t;
+      (* Symbols to cut at build time, and the date to keep bars from (#2672
+         class ii). Decided by the scanner that sees every symbol's full
+         history; applied here to the build-window bars AND to the deep-history
+         prefix that feeds the weekly side-table. Symbols the scanner DROPPED
+         never reach the runner — they are removed from [symbols]. *)
 }
 
 type progress = {
@@ -200,17 +207,40 @@ let _write_weekly ~output_dir ~symbol ~deep_bars ~bars =
 (* Phantom-bar hygiene, applied to the windowed bars BEFORE the pipeline sees
    them: the [.snap] (and its weekly side-table) then contain only real prints.
    [deep_bars] are strictly before the window and feed only the side-table's
-   depth, so they are left alone. *)
-let _clean_tail ~(tail : tail_opts) ~symbol bars =
-  Series_tail.apply tail.config ~exceptions:tail.exceptions ~symbol bars
+   depth, so THIS rule leaves them alone — it edits the series' end, and a bar
+   before the window cannot be part of it. (The splice cut below edits the
+   series' START, so it does reach them.) *)
+let _clean_tail ~(hygiene : hygiene_opts) ~symbol bars =
+  Series_tail.apply hygiene.config ~exceptions:hygiene.exceptions ~symbol bars
+
+(* Splice hygiene runs BEFORE the tail rule: cutting away the earlier issuer
+   first means the tail rule then reads one company's series, which is the
+   series whose terminal run it is meant to classify.
+
+   Applied to [deep_bars] as well as the window bars, and that is not a
+   symmetry for its own sake: the scan and build windows are the same, so a cut
+   date is always inside the window and the whole deep prefix — up to
+   [sketch_deep_days] of it — is by construction the EARLIER issuer's. Cutting
+   it yields [] for a cut symbol, which is the right depth for a series that
+   starts at the cut. Leaving it would put ten years of the previous company's
+   weekly bars into the side-table, which is the only overhead-supply
+   representation the reader has — precisely the two-issuers defect the cut
+   exists to close. *)
+let _cut_splice ~(hygiene : hygiene_opts) ~symbol bars =
+  match Map.find hygiene.splice_cuts symbol with
+  | None -> bars
+  | Some date -> Series_splice.keep_from date bars
 
 (* The per-symbol checkpoint carries only the EXPLICIT marker: the universe's
    end is not known until every symbol has been read, so the series-end
    derivation happens once in {!_finalize_entries}. *)
 let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-    ~output_dir ~csv_mtime ~tail =
+    ~output_dir ~csv_mtime ~hygiene =
   let path = _file_path ~output_dir ~symbol in
-  let bars, findings = _clean_tail ~tail ~symbol bars in
+  let deep_bars = _cut_splice ~hygiene ~symbol deep_bars in
+  let bars, findings =
+    _clean_tail ~hygiene ~symbol (_cut_splice ~hygiene ~symbol bars)
+  in
   let last_bar = _last_bar_date bars in
   let active_through = _active_through_of_bars bars in
   match
@@ -243,10 +273,10 @@ let _checkpoint_manifest ~manifest_path ~schema entry =
         entry.Snapshot_manifest.symbol (Status.show err)
 
 let _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-    ~csv_mtime ~manifest_path ~checkpoint ~tail =
+    ~csv_mtime ~manifest_path ~checkpoint ~hygiene =
   match
     _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-      ~output_dir ~csv_mtime ~tail
+      ~output_dir ~csv_mtime ~hygiene
   with
   | Error err ->
       Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
@@ -257,7 +287,7 @@ let _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
 
 let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~sketch_deep_days
     ~schema ~benchmark_bars ~output_dir ~manifest_path ~checkpoint ~csv_mtime
-    ~tail symbol =
+    ~hygiene symbol =
   match
     _load_split_bars ~data_dir ~start_date ~end_date ~sketch_deep_days ~symbol
   with
@@ -266,10 +296,10 @@ let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~sketch_deep_days
       None
   | Ok (deep_bars, bars) ->
       _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-        ~csv_mtime ~manifest_path ~checkpoint ~tail
+        ~csv_mtime ~manifest_path ~checkpoint ~hygiene
 
 let _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
-    ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint ~tail
+    ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint ~hygiene
     symbol =
   match _csv_mtime ~data_dir ~symbol with
   | None ->
@@ -281,7 +311,7 @@ let _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
       else
         _try_build_and_checkpoint ~data_dir ~start_date ~end_date
           ~sketch_deep_days ~schema ~benchmark_bars ~output_dir ~manifest_path
-          ~checkpoint ~csv_mtime ~tail symbol
+          ~checkpoint ~csv_mtime ~hygiene symbol
 
 let _load_benchmark_bars ~data_dir ~start_date ~end_date sym =
   match _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol:sym with
@@ -367,11 +397,11 @@ let _write_final_manifest ~manifest_path ~schema ~entries ~elapsed =
 
 let _fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
     ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
-    ~symbols_total ~started_at ~tail i acc symbol =
+    ~symbols_total ~started_at ~hygiene i acc symbol =
   match
     _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
       ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint:true
-      ~tail symbol
+      ~hygiene symbol
   with
   | None -> acc
   | Some built ->
@@ -436,38 +466,64 @@ let _write_tail_report ~output_dir builts =
      Printf.eprintf "%s write failed: %s\n%!" tail_report_name msg);
   Printf.printf "%s\n%!" (Series_tail.summary findings)
 
-(* Pure loader: the failure is a value, so both halves are testable. The CLI
-   shells turn the [Error] into an exit via [tail_exceptions_or_exit]. *)
-let _read_exceptions_file p =
+(* The ONE on-disk shape of the warehouse exceptions file. Both sections are
+   optional — a file may carry only [keep_tail], only [splice], or both — but
+   the record is STRICT: no [allow_extra_fields], so a mistyped section name
+   ([splcie]) is a parse error rather than a silently empty veto list. That
+   strictness is what makes the fatal load path below mean anything: degrading
+   to "no exceptions" would edit exactly the symbols a reviewer vetoed. *)
+type exceptions_file = {
+  keep_tail : string list; [@sexp.default []]
+  splice : Series_splice.Exceptions.rule list; [@sexp.default []]
+}
+[@@deriving of_sexp]
+
+let _empty_exceptions_file = { keep_tail = []; splice = [] }
+
+let _parse_exceptions_file p =
   match
-    Or_error.try_with (fun () ->
-        Series_tail.Exceptions.of_file
-          (Series_tail.Exceptions.file_of_sexp (Sexp.load_sexp p)))
+    Or_error.try_with (fun () -> exceptions_file_of_sexp (Sexp.load_sexp p))
   with
   | Ok t -> Ok t
   | Error e ->
       Status.error_invalid_argument
-        (Printf.sprintf "tail exceptions load failed (%s): %s" p
+        (Printf.sprintf "warehouse exceptions load failed (%s): %s" p
            (Error.to_string_hum e))
 
+(* Pure loader: the failure is a value, so both halves are testable. The CLI
+   shells turn the [Error] into an exit via [tail_exceptions_or_exit] /
+   [splice_exceptions_or_exit]. One file, ONE parse, two views — the section a
+   caller does not care about still has to be well-formed. *)
+let _load_exceptions_file = function
+  | None -> Ok _empty_exceptions_file
+  | Some p -> _parse_exceptions_file p
+
 let load_tail_exceptions path =
-  match path with
-  | None -> Ok Series_tail.Exceptions.empty
-  | Some p -> _read_exceptions_file p
+  Result.map (_load_exceptions_file path) ~f:(fun f ->
+      Series_tail.Exceptions.of_symbols f.keep_tail)
+
+let load_splice_exceptions path =
+  Result.map (_load_exceptions_file path) ~f:(fun f ->
+      Series_splice.Exceptions.of_rules f.splice)
 
 (* A malformed or missing exceptions file is FATAL: silently falling back to "no
-   exceptions" would truncate exactly the symbols a reviewer vetoed. *)
-let tail_exceptions_or_exit path =
-  match load_tail_exceptions path with
+   exceptions" would edit exactly the symbols a reviewer vetoed. *)
+let _exceptions_or_exit = function
   | Ok t -> t
   | Error err ->
       Printf.eprintf "%s\n%!" (Status.show err);
       exit 1
 
-let build ?(survivor_tolerance_days = default_survivor_tolerance_days) ~symbols
-    ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date ~end_date
-    ~sketch_deep_days ~incremental ~progress_every ~tail_config ~tail_exceptions
-    () =
+let tail_exceptions_or_exit path =
+  _exceptions_or_exit (load_tail_exceptions path)
+
+let splice_exceptions_or_exit path =
+  _exceptions_or_exit (load_splice_exceptions path)
+
+let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
+    ?(splice_cuts = Map.empty (module String)) ~symbols ~csv_data_dir
+    ~output_dir ~benchmark_symbol ~start_date ~end_date ~sketch_deep_days
+    ~incremental ~progress_every ~tail_config ~tail_exceptions () =
   _ensure_dir output_dir;
   let schema = Snapshot_schema.default in
   let symbols_total = List.length symbols in
@@ -477,7 +533,9 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days) ~symbols
   in
   let existing = if incremental then _existing_manifest ~output_dir else None in
   let manifest_path = Filename.concat output_dir "manifest.sexp" in
-  let tail = { config = tail_config; exceptions = tail_exceptions } in
+  let hygiene =
+    { config = tail_config; exceptions = tail_exceptions; splice_cuts }
+  in
   let started_at = Core_unix.time () in
   let t0 = Time_ns.now () in
   let builts =
@@ -485,7 +543,7 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days) ~symbols
       ~f:
         (_fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
            ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
-           ~symbols_total ~started_at ~tail)
+           ~symbols_total ~started_at ~hygiene)
   in
   let entries = _finalize_entries ~survivor_tolerance_days builts in
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
@@ -537,8 +595,9 @@ let tail_params =
     flag "tail-exceptions" (optional string)
       ~doc:
         (Printf.sprintf
-           "PATH Sexp listing symbols whose tail is never edited, shape \
-            ((keep_tail (SYM ...))). Committed list: %s"
+           "PATH Warehouse exceptions sexp, shape ((keep_tail (SYM ...)) \
+            (splice ((keep SYM) (drop SYM) (cut_at SYM DATE)))). Both sections \
+            optional. Committed list: %s"
            default_exceptions_path)
   in
   ( {

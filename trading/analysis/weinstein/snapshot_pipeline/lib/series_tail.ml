@@ -27,11 +27,9 @@ end
 
 module Exceptions = struct
   type t = Set.M(String).t
-  type file = { keep_tail : string list } [@@deriving sexp]
 
   let empty = Set.empty (module String)
   let of_symbols syms = Set.of_list (module String) syms
-  let of_file (f : file) = of_symbols f.keep_tail
   let mem t ~symbol = Set.mem t symbol
 end
 
