@@ -1,3 +1,11 @@
 [09-07 01:19:31] RUN rec26y-new-s0 on /tmp/snap_top3000_2000_v7mark
 [09-07 04:12:53] RESULT rec26y-new-s0 => total_return_pct 263.15542634794929 total_trades 707 sharpe_ratio 0.38537854586575881 max_drawdown_pct 42.371840829902126  V16/V17: none (wall 10402s)
 [09-07 04:12:54] RUN rec26y-new-s1 on /tmp/snap_top3000_2000_v7mark
+[09-07 07:02:14] RESULT rec26y-new-s1 => total_return_pct 561.61088835683449 total_trades 705 sharpe_ratio 0.52493788823999454 max_drawdown_pct 45.147631313120804  V16/V17: none (wall 10160s)
+[09-07 07:02:14] RUN rec26y-new-s2 on /tmp/snap_top3000_2000_v7mark
+[09-07 09:59:12] RESULT rec26y-new-s2 => total_return_pct 180.89214861308551 total_trades 755 sharpe_ratio 0.3208128970474205 max_drawdown_pct 42.1800956171453  V16/V17: none (wall 10618s)
+[09-07 09:59:12] RUN rec5y-2000-new-s0 on /tmp/snap_top3000_2000_v7mark
+[09-07 10:22:21] RESULT rec5y-2000-new-s0 => total_return_pct 76.68581516856537 total_trades 98 sharpe_ratio 0.65554604384039739 max_drawdown_pct 28.34577281935524  V16/V17: none (wall 1389s)
+[09-07 10:22:21] RUN rec5y-2019-new-s0 on /tmp/snap_top3000_2019_v7mark
+[09-07 10:43:28] RESULT rec5y-2019-new-s0 => total_return_pct 42.36986630476774 total_trades 175 sharpe_ratio 0.50061484613865581 max_drawdown_pct 21.653219461013787  V16/V17: none (wall 1267s)
+[09-07 10:43:28] WH0906 CHAIN DONE
