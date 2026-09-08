@@ -464,20 +464,22 @@ let _read_exceptions_file ~what ~parse p =
         (Printf.sprintf "%s exceptions load failed (%s): %s" what p
            (Error.to_string_hum e))
 
+let _parse_tail_exceptions s =
+  Series_tail.Exceptions.of_file (Series_tail.Exceptions.file_of_sexp s)
+
+let _parse_splice_exceptions s =
+  Series_splice.Exceptions.of_file (Series_splice.Exceptions.file_of_sexp s)
+
 let load_tail_exceptions path =
   match path with
   | None -> Ok Series_tail.Exceptions.empty
-  | Some p ->
-      _read_exceptions_file ~what:"tail" p ~parse:(fun s ->
-          Series_tail.Exceptions.of_file (Series_tail.Exceptions.file_of_sexp s))
+  | Some p -> _read_exceptions_file ~what:"tail" p ~parse:_parse_tail_exceptions
 
 let load_splice_exceptions path =
   match path with
   | None -> Ok Series_splice.Exceptions.empty
   | Some p ->
-      _read_exceptions_file ~what:"splice" p ~parse:(fun s ->
-          Series_splice.Exceptions.of_file
-            (Series_splice.Exceptions.file_of_sexp s))
+      _read_exceptions_file ~what:"splice" p ~parse:_parse_splice_exceptions
 
 (* A malformed or missing exceptions file is FATAL: silently falling back to "no
    exceptions" would edit exactly the symbols a reviewer vetoed. *)
