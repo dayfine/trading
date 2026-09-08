@@ -131,7 +131,10 @@ echo "See dev/notes/next-session-priorities-2026-01-02.md for backstory." >"$FIX
 _git_commit "2026-01-03" "priorities doc citing 01-02 (a dev/notes-only citation)" dev/notes/next-session-priorities-2026-01-03.md
 
 # --- Checker 2 fixture: dirs spanning quarantine + citation ------------------
-# fuzz-startdate-crash: production's mandatory pinned anchor -- old, uncited.
+# fuzz-startdate-crash: an ordinary old, uncited dir (issue #2722 removed the
+# script's dependence on this specific name as a hardcoded sanity-probe
+# anchor -- see _checker2_self_test in prune_candidates.sh -- so it is kept
+# here only as one more real-shaped candidate, not as a required fixture).
 mkdir -p "$FIXTURE/dev/experiments/fuzz-startdate-crash"
 echo "a" >"$FIXTURE/dev/experiments/fuzz-startdate-crash/a.txt"
 _git_commit "2026-01-01" "add fuzz-startdate-crash" dev/experiments/fuzz-startdate-crash/a.txt
@@ -377,20 +380,115 @@ check "checker1 sanity probe fires when nothing is cited and the anchor is absen
 rm -rf "$FIXTURE"
 
 # ==============================================================================
-# FIXTURE C: checker 2's sanity probe fires when its target surface (the
-# fuzz-startdate-crash anchor dir) is entirely absent.
+# FIXTURE C: regression pin for issue #2722. Documenting a real experiment
+# dir's name in dev/status/ (a checker2 citation source) must NOT make
+# checker2's sanity self-test fail. This is the exact shape of the historical
+# bug: PR #2651 (commit efc25d68) fixed a GHA git-ownership failure by
+# writing the (then-)hardcoded anchor's literal name, fuzz-startdate-crash,
+# into dev/status/harness.md to explain the fix -- which correctly made
+# checker2's real citation-matching machinery report the anchor as cited, so
+# the old hardcoded-real-anchor probe aborted with a false "sanity probe
+# failed" on every subsequent run. Renaming the anchor would only have
+# deferred the identical failure to the next time someone documented the new
+# name -- which is exactly what this PR's OWN dev/status/harness.md entry
+# does, for this very fix. checker2's self-test (_checker2_self_test in
+# prune_candidates.sh) is now fully synthetic and depends on no real
+# directory at all -- this fixture proves that: it needs no
+# fuzz-startdate-crash stand-in anchor whatsoever, only an arbitrary old dir
+# that a status file happens to document.
 # ==============================================================================
 _init_fixture_repo
 echo "newest doc" >"$FIXTURE/dev/notes/next-session-priorities-2026-08-19.md"
 _git_commit "2026-08-19" "newest doc" dev/notes/next-session-priorities-2026-08-19.md
 echo "See dev/notes/next-session-priorities-2026-05-15.md for context." >"$FIXTURE/dev/plans/sector-concentration-cap-2026-05-15.md"
 _git_commit "2026-05-15" "anchor file (satisfies checker1 only)" dev/plans/sector-concentration-cap-2026-05-15.md
-mkdir -p "$FIXTURE/dev/experiments/some-other-dir-2026-01-01"
-echo "a" >"$FIXTURE/dev/experiments/some-other-dir-2026-01-01/a.txt"
-_git_commit "2026-01-01" "an experiment dir that is NOT the checker2 anchor" dev/experiments/some-other-dir-2026-01-01/a.txt
 
-check "checker2 sanity probe fires when fuzz-startdate-crash is absent" 1 "FAIL(checker2): sanity probe failed" \
-  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="2026-08-20" sh "$SCRIPT"
+# An experiment dir that would otherwise be a legitimate checker2 candidate
+# (old, would-be-uncited) -- then a status doc documents it, mirroring
+# exactly what commit efc25d68 did to fuzz-startdate-crash.
+mkdir -p "$FIXTURE/dev/experiments/documented-old-dir-2026-01-01"
+echo "a" >"$FIXTURE/dev/experiments/documented-old-dir-2026-01-01/a.txt"
+_git_commit "2026-01-01" "add an old experiment dir" dev/experiments/documented-old-dir-2026-01-01/a.txt
+echo "**H-SOME-FIX** -- fixed by touching dev/experiments/documented-old-dir-2026-01-01, see that dir for the repro." >"$FIXTURE/dev/status/harness.md"
+_git_commit "2026-01-02" "document the dir from a status file, exactly like efc25d68 did" dev/status/harness.md
+
+cat >"$FIXTURE/trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli" <<'EOF'
+type config = {
+  stops_config : Stop_types_fixture.config;
+      (** Nested fast-crash stop, referenced below as
+          [stops_config.catastrophic_stop_pct]; satisfies checker3's own
+          live-flag sanity probe. *)
+}
+EOF
+_git_commit "2026-01-01" "fixture strategy config" trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli
+mkdir -p "$FIXTURE/trading/trading/weinstein/stops/lib"
+cat >"$FIXTURE/trading/trading/weinstein/stops/lib/stop_types_fixture.mli" <<'EOF'
+type config = {
+  catastrophic_stop_pct : float; [@sexp.default 0.0]
+}
+EOF
+_git_commit "2026-01-01" "fixture nested stop config" trading/trading/weinstein/stops/lib/stop_types_fixture.mli
+cat >"$FIXTURE/dev/experiments/_ledger/2026-01-03-catstop.sexp" <<'EOF'
+((date 2026-01-03) (slug catstop) (verdict Reject)
+ (notes "fixture entry for catastrophic_stop_pct."))
+EOF
+_git_commit "2026-01-03" "ledger reject" dev/experiments/_ledger/2026-01-03-catstop.sexp
+echo "((stops_config ((catastrophic_stop_pct 0.10))))" >"$FIXTURE/trading/test_data/live-scenario.sexp"
+_git_commit "2026-01-05" "live spec referencing catastrophic_stop_pct" trading/test_data/live-scenario.sexp
+
+check "regression #2722: exits 0 even though a real experiment dir is documented in dev/status/" 0 "" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+check_not "regression #2722: checker2 does NOT report a sanity self-test failure" 0 "FAIL(checker2)" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+check_not "regression #2722: the documented dir is excluded from candidates (still correctly cited)" 0 "documented-old-dir-2026-01-01 |" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+# Regression witness for PR #2725's own qc-behavioral review (CP4): the three
+# checks above only pin what the self-test's citation/dating primitives
+# conclude -- none of them can tell the difference between "the self-test ran
+# and passed" and "the self-test never ran at all" (e.g. `return 0` inserted
+# at the top of _checker2_self_test, or its call site in checker2 deleted).
+# Both mutations leave the three checks above, and the whole suite's
+# pass/fail counts, byte-identical to a healthy run. The success marker
+# _checker2_self_test prints to stderr right before it returns 0 is the one
+# piece of committed-test-visible evidence that the probe body actually
+# executed to completion; assert it is present on a healthy run.
+check "regression #2725 CP4: checker2 self-test success marker is present (probe actually ran)" 0 \
+  "PASS(checker2-self-test)" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+rm -rf "$FIXTURE"
+
+# ==============================================================================
+# FIXTURE C2: mutation-witness for the checker2 self-test's LOUD-FAILURE path
+# (closes the residual gap #2725's review flagged under criterion 4: no
+# committed test previously drove _checker2_self_test itself to fail and
+# asserted the abort is loud). PRUNE_CANDIDATES_TODAY is set to an
+# unparseable string, which trips _checker2_self_test's own first fallible
+# step -- `_to_epoch "$TODAY"`, building the synthetic fixture's commit date
+# -- before the self-test touches any citation-matching primitive at all.
+# This exercises the self-test's OWN abort path, distinct from Fixture C's
+# citation-primitive checks above. No git history is needed: checker2's two
+# guards before invoking the self-test (dev/experiments/ exists, and has a
+# non-_ledger subdirectory) are filesystem-only.
+# ==============================================================================
+FIXTURE=$(mktemp -d)
+mkdir -p "$FIXTURE/dev/experiments/some-dir"
+echo x >"$FIXTURE/dev/experiments/some-dir/a.txt"
+
+check "checker2 self-test aborts loudly when TODAY cannot be parsed" 1 \
+  "FAIL(checker2): could not parse TODAY" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="not-a-date" sh "$SCRIPT"
+
+check_not "checker2 self-test failure suppresses the Checker 2 report section" 1 \
+  "## Checker 2" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="not-a-date" sh "$SCRIPT"
+
+check_not "checker2 self-test failure means the success marker never prints" 1 \
+  "PASS(checker2-self-test)" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="not-a-date" sh "$SCRIPT"
 
 rm -rf "$FIXTURE"
 

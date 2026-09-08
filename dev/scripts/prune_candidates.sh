@@ -154,6 +154,17 @@ _age_days() {
   echo $(( (te - pe) / 86400 ))
 }
 
+# Inverse of _to_epoch: epoch seconds -> YYYY-MM-DD. Same BSD/GNU try-both
+# pattern, needed only by _checker2_self_test to build a fixture commit date
+# a fixed offset before TODAY (see that function for why).
+_epoch_to_ymd() {
+  local e
+  e="$1"
+  date -j -r "$e" "+%Y-%m-%d" 2>/dev/null && return 0
+  date -d "@$e" "+%Y-%m-%d" 2>/dev/null && return 0
+  return 1
+}
+
 _is_cited() {
   # $1 = literal substring (a basename) to search for.
   # $2 = space-separated list of citation-source dirs to check (caller
@@ -431,6 +442,147 @@ checker1() {
 }
 
 # ----------------------------------------------------------------------------
+# Checker 2's citation/dating self-test (issue #2722)
+# ----------------------------------------------------------------------------
+# WHY THIS EXISTS, AND WHY IT IS SYNTHETIC RATHER THAN A NAMED REAL DIRECTORY.
+#
+# checker2 used to sanity-probe itself by asserting a specific real directory
+# (dev/experiments/fuzz-startdate-crash) got flagged as an orphan by the live
+# scan below. PR #2651 (commit efc25d68) broke that: fixing an earlier GHA
+# failure required documenting the anchor's name in dev/status/harness.md --
+# and dev/status/ is one of checker2's own citation sources
+# (CITE_DIRS_CHECKER2) -- so from that commit on, `_is_cited` correctly
+# started reporting the anchor as cited, and the probe (correctly) refused to
+# trust the run. Renaming the anchor to something else only postpones the
+# identical failure to the next time anyone documents THAT name -- including
+# this very fix's own dev/status/harness.md entry, which necessarily names
+# the old anchor to explain the bug it fixes.
+#
+# A real, permanently-named anchor is structurally incompatible with a
+# citation-source list that includes dev/status/: there is no name that can
+# ever be written about in prose without becoming "cited". The fix is to stop
+# anchoring on anything real -- build a throwaway git repo with freshly
+# process-ID-suffixed directory names that cannot exist in any document
+# anywhere because they do not exist until this function creates them,
+# exercise the EXACT SAME primitives (_is_cited, _git_log_date, _age_days)
+# against them, and discard the repo. This is weaker than the old probe in
+# exactly one respect -- it no longer proves `find`'s enumeration of the real
+# dev/experiments/ tree works -- but every historical failure of this probe
+# (the \s-vs-[[:space:]] regression, the git safe.directory regression, and
+# this one) was a citation/dating PRIMITIVE bug, never an enumeration bug,
+# and the synthetic fixture exercises those primitives in the same shell,
+# same grep, same git binary as the live pass immediately below it.
+#
+# TWO-SIDED: also asserts the opposite failure mode -- a citation grep that
+# matches everything (e.g. a pattern typo'd broad enough to match any
+# string, or an accidentally-inverted exit code) -- by citing a second
+# synthetic name from a synthetic dev/status/ file and asserting THAT one
+# reports cited. A guard that only checks "the known orphan is uncited"
+# cannot distinguish a healthy checker from one where _is_cited always
+# returns "not cited" regardless of input.
+#
+# SUCCESS MARKER: on the way out, a healthy run prints
+# "PASS(checker2-self-test): ..." to stderr. This is not decorative --
+# without it, neutering this function to `return 0` on its first line, or
+# deleting its call site in checker2 below, is observationally identical to
+# a passing run on every check the committed test suite runs. The marker is
+# the one thing that distinguishes "the probe ran and passed" from "the
+# probe never ran"; see dev/scripts/prune_candidates_test.sh FIXTURE C for
+# the mutation-witness assertion on it.
+_checker2_self_test() {
+  local orig_root tmp synth_orphan synth_cited rc
+  local today_epoch synth_epoch synth_date cdate age
+  orig_root="$ROOT"
+  tmp=$(mktemp -d 2>/dev/null) || {
+    echo "FAIL(checker2): mktemp failed building the citation self-test fixture." >&2
+    return 1
+  }
+  synth_orphan="prune-self-test-orphan-$$"
+  synth_cited="prune-self-test-cited-$$"
+
+  today_epoch=$(_to_epoch "$TODAY") || {
+    rm -rf "$tmp"
+    echo "FAIL(checker2): could not parse TODAY ('$TODAY') to build the self-test fixture date." >&2
+    return 1
+  }
+  synth_epoch=$((today_epoch - 40 * 86400))
+  synth_date=$(_epoch_to_ymd "$synth_epoch") || {
+    rm -rf "$tmp"
+    echo "FAIL(checker2): could not format the self-test fixture date." >&2
+    return 1
+  }
+
+  mkdir -p "$tmp/dev/experiments/$synth_orphan" "$tmp/dev/experiments/$synth_cited" \
+    "$tmp/dev/experiments/_ledger" "$tmp/dev/status" "$tmp/dev/plans" \
+    "$tmp/dev/notes" "$tmp/.claude"
+  echo x >"$tmp/dev/experiments/$synth_orphan/a.txt"
+  echo x >"$tmp/dev/experiments/$synth_cited/a.txt"
+  echo "see dev/experiments/$synth_cited for context" >"$tmp/dev/status/self-test.md"
+  echo x >"$tmp/CLAUDE.md"
+
+  (
+    cd "$tmp" \
+      && git -c safe.directory="$tmp" init -q \
+      && git -c safe.directory="$tmp" config user.email t@t \
+      && git -c safe.directory="$tmp" config user.name t \
+      && git -c safe.directory="$tmp" config commit.gpgsign false \
+      && git -c safe.directory="$tmp" add -A \
+      && GIT_AUTHOR_DATE="${synth_date}T12:00:00" GIT_COMMITTER_DATE="${synth_date}T12:00:00" \
+         git -c safe.directory="$tmp" commit -q -m "synthetic checker2 self-test fixture"
+  ) >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    rm -rf "$tmp"
+    echo "FAIL(checker2): could not build the citation self-test fixture repo (git init/add/commit failed, exit $rc)." >&2
+    return 1
+  fi
+
+  ROOT="$tmp"
+
+  if ! cdate=$(_git_log_date "dev/experiments/$synth_orphan"); then
+    ROOT="$orig_root"
+    rm -rf "$tmp"
+    echo "FAIL(checker2): git log failed dating the synthetic self-test fixture; see the git error above." >&2
+    return 1
+  fi
+  age=$(_age_days "$cdate")
+  if [ -z "$cdate" ] || [ "$age" -lt 30 ]; then
+    ROOT="$orig_root"
+    rm -rf "$tmp"
+    echo "FAIL(checker2): self-test failed -- the synthetic fixture dated '$cdate' (age $age days, expected >= 30). The dating primitive (_git_log_date / _age_days) is broken; refusing to report." >&2
+    return 1
+  fi
+
+  if _is_cited "$synth_orphan" "$CITE_DIRS_CHECKER2"; then
+    ROOT="$orig_root"
+    rm -rf "$tmp"
+    echo "FAIL(checker2): self-test failed -- a freshly-random, guaranteed-uncited synthetic name ($synth_orphan) was reported as CITED. The citation-matching primitive is broken in the false-CLEAN direction (matches everything); refusing to report." >&2
+    return 1
+  fi
+
+  if ! _is_cited "$synth_cited" "$CITE_DIRS_CHECKER2"; then
+    ROOT="$orig_root"
+    rm -rf "$tmp"
+    echo "FAIL(checker2): self-test failed -- a synthetic name deliberately cited from a synthetic dev/status/ file ($synth_cited) was reported as NOT cited. The citation-matching primitive is broken in the false-ORPHAN direction (matches nothing); refusing to report." >&2
+    return 1
+  fi
+
+  # Success marker (stderr): the ONLY committed evidence that this self-test
+  # actually ran to completion rather than being neutered to `return 0` at
+  # the top of the function, or having its call site (checker2's
+  # `_checker2_self_test || return 1`) deleted entirely -- either of which
+  # would silently skip every check above and leave checker2 permanently
+  # unable to detect a broken citation/dating primitive. See PR #2725
+  # review, CP4: without this marker, both mutations are byte-identical to
+  # a healthy run on the committed test suite.
+  echo "PASS(checker2-self-test): synthetic citation self-test succeeded." >&2
+
+  ROOT="$orig_root"
+  rm -rf "$tmp"
+  return 0
+}
+
+# ----------------------------------------------------------------------------
 # Checker 2 -- orphaned experiment dirs
 # ----------------------------------------------------------------------------
 # Directories directly under dev/experiments/ (excluding _ledger), cited by
@@ -438,7 +590,7 @@ checker1() {
 # more than 30 days before TODAY.
 checker2() {
   local exp_dir all_dirs base d cdate age fcount
-  local candidates total_files probed_known_orphan dir_count
+  local candidates total_files dir_count
 
   exp_dir="$ROOT/dev/experiments"
   if [ ! -d "$exp_dir" ]; then
@@ -452,9 +604,10 @@ checker2() {
     return 1
   fi
 
+  _checker2_self_test || return 1
+
   candidates=""
   total_files=0
-  probed_known_orphan=0
   for base in $all_dirs; do
     d="dev/experiments/$base"
     if ! cdate=$(_git_log_date "$d"); then
@@ -474,26 +627,7 @@ checker2() {
     candidates="$candidates$d|$fcount|$age|$cdate
 "
     total_files=$((total_files + fcount))
-    [ "$base" = "fuzz-startdate-crash" ] && probed_known_orphan=1
   done
-
-  # SANITY PROBE: dev/experiments/fuzz-startdate-crash (last touched
-  # 2026-05-02, cited nowhere) is a known-orphaned dir as of this writing.
-  # Unlike checker 1's probe, this one is NOT gated on the anchor existing --
-  # if it's absent, that is itself a probe failure, not a reason to skip.
-  # A probe that silently no-ops when its anchor is missing provides no
-  # safety net (that was an earlier draft's bug: the fixture test below could
-  # never exercise the failure path, because a fixture without a literal
-  # `fuzz-startdate-crash` directory just skipped the check instead of
-  # catching that the check never ran). Either the git-log dating or the
-  # citation-exclusion grep is broken in the false-safe direction (silently
-  # treating real orphans as cited/recent/absent), or this repo's anchor dir
-  # has genuinely been removed -- in which case update the anchor name here;
-  # do not weaken the check to a conditional one.
-  if [ "$probed_known_orphan" -ne 1 ]; then
-    echo "FAIL(checker2): sanity probe failed -- dev/experiments/fuzz-startdate-crash was not flagged as an orphan candidate (either missing entirely, or excluded by dating/citation logic). Refusing to report; if the anchor dir has legitimately been removed from this repo, update the anchor name in this script." >&2
-    return 1
-  fi
 
   dir_count=$(printf '%s' "$candidates" | grep -c . || true)
   echo "## Checker 2 -- orphaned experiment dirs"
