@@ -5,10 +5,15 @@ open Core
 module Adapter = Trading_simulation_data.Market_data_adapter
 module Position = Trading_strategy.Position
 
+(* The single definition of the delisting token. {!Delisted_ticket_cancel}
+   reads it rather than repeating the literal, so the exit half and the cancel
+   half of a delisting cannot drift apart in [trade_audit.sexp]. *)
+let label = "delisted"
+
 let exit_reason (active_through : Date.t) : Position.exit_reason =
   Position.StrategySignal
     {
-      label = "delisted";
+      label;
       detail =
         Some (sprintf "active_through=%s" (Date.to_string active_through));
     }

@@ -16,13 +16,17 @@
     orders are not re-screened (`enable_entry_ticket_rescreen` defaults false;
     `entry_order_max_rest_weeks` 52), and the delisted exit acts only on a
     broker position, never on an unfilled ticket. That residual is one to a few
-    days (a fill before the next weekly screen) and sits under the post-run V17
-    threshold of 7 days, so a clean V17 after this gate is evidence by margin,
-    not by construction. Closing it needs a fill-time cancel of resting entry
-    tickets at the marker (the {!Cancel_handler.cancel_resting_entry_orders}
-    seam) — tracked as a follow-up issue, out of scope here. Every stale entry
-    measured on 2026-09-06 (FII ×2, CY) was an admission-time entry weeks after
-    the marker, which this gate removes.
+    days (a fill before the next weekly screen) and sat under the post-run V17
+    threshold of 7 days, so a clean V17 from this gate alone was evidence by
+    margin, not by construction. It is now {b closed} by
+    {!Trading_simulation.Delisted_ticket_cancel} (#2696), which cancels the
+    resting ticket and retires its order on the first step past the marker — the
+    same [Date.(d < date)] boundary, run from {!Forced_exit_step} before the
+    step's order processing. The three guards compose: this gate blocks new
+    tickets, that module retires the one admitted on the marker day, and
+    [Delisted_exit_runner] closes anything that filled before either. Every
+    stale entry measured on 2026-09-06 (FII ×2, CY) was an admission-time entry
+    weeks after the marker, which this gate removes.
 
     This is the entry-side mirror of the simulator's [Delisted_exit_runner]
     (#2692), and it uses the same predicate with the same boundary —

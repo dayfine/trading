@@ -45,6 +45,7 @@
   forced_exit
   forced_exit_step
   delisted_exit_runner
+  delisted_ticket_cancel
   margin_runner
   long_maintenance
   short_buyin)

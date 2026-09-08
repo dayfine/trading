@@ -152,18 +152,28 @@ type t = {
       (** The [CancelEntry] transition's own reason token, persisted verbatim.
           Always [Some] exactly when {!ticket_age_weeks_at_cancel} is, and read
           together with it: the age says {i how long} the ticket rested, this
-          says {i what killed it}. Three tokens exist —
+          says {i what killed it}. Four tokens exist —
           {!Trading_simulation.Cancel_handler.portfolio_rejection_reason}
-          ([entry_fill_rejected_by_portfolio]) and
+          ([entry_fill_rejected_by_portfolio]),
           {!Weinstein_strategy.Entry_ticket_ttl}'s [entry_ticket_ttl_expired] /
-          [entry_ticket_requalification_failed].
+          [entry_ticket_requalification_failed], and
+          {!Trading_simulation.Delisted_ticket_cancel.cancel_reason}
+          ([delisted], #2696).
 
-          The distinction is load-bearing, not cosmetic. The two TTL tokens are
-          {b decisions} the strategy took; the rejection token is an
+          The distinction is load-bearing, not cosmetic, and the four tokens
+          fall in {b three} categories. The two TTL tokens are {b decisions} the
+          strategy took. The rejection token is an
           {b accident of capital timing} — a ticket that triggered, filled at
           the engine, and was then refused because the book could not fund it
-          (dev/notes/ticket-death-on-cash-2026-08-16.md). Averaging a cancel-age
-          column across both populations mixes a policy with a failure. *)
+          (dev/notes/ticket-death-on-cash-2026-08-16.md). [delisted] is a
+          {b data-driven death} — the symbol's series ended, so no policy and no
+          amount of cash could have kept the ticket alive; it fires on every
+          marker-carrying warehouse (#2691 onward) and belongs in its own
+          bucket. Averaging a cancel-age column across these populations mixes a
+          policy with a failure with a fact about the data.
+
+          The closed list is pinned by
+          [trading/trading/backtest/test/test_cancel_reason_closed_list.ml]. *)
   ticket_age_weeks_at_fill : int option; [@sexp.option]
       (** Whole weeks the ticket rested before it {b filled} — set by
           {!Execution_faithfulness.enrich} from the matched round-trip's
