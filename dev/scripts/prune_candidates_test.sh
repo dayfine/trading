@@ -445,6 +445,51 @@ check_not "regression #2722: checker2 does NOT report a sanity self-test failure
 check_not "regression #2722: the documented dir is excluded from candidates (still correctly cited)" 0 "documented-old-dir-2026-01-01 |" \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
 
+# Regression witness for PR #2725's own qc-behavioral review (CP4): the three
+# checks above only pin what the self-test's citation/dating primitives
+# conclude -- none of them can tell the difference between "the self-test ran
+# and passed" and "the self-test never ran at all" (e.g. `return 0` inserted
+# at the top of _checker2_self_test, or its call site in checker2 deleted).
+# Both mutations leave the three checks above, and the whole suite's
+# pass/fail counts, byte-identical to a healthy run. The success marker
+# _checker2_self_test prints to stderr right before it returns 0 is the one
+# piece of committed-test-visible evidence that the probe body actually
+# executed to completion; assert it is present on a healthy run.
+check "regression #2725 CP4: checker2 self-test success marker is present (probe actually ran)" 0 \
+  "PASS(checker2-self-test)" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+rm -rf "$FIXTURE"
+
+# ==============================================================================
+# FIXTURE C2: mutation-witness for the checker2 self-test's LOUD-FAILURE path
+# (closes the residual gap #2725's review flagged under criterion 4: no
+# committed test previously drove _checker2_self_test itself to fail and
+# asserted the abort is loud). PRUNE_CANDIDATES_TODAY is set to an
+# unparseable string, which trips _checker2_self_test's own first fallible
+# step -- `_to_epoch "$TODAY"`, building the synthetic fixture's commit date
+# -- before the self-test touches any citation-matching primitive at all.
+# This exercises the self-test's OWN abort path, distinct from Fixture C's
+# citation-primitive checks above. No git history is needed: checker2's two
+# guards before invoking the self-test (dev/experiments/ exists, and has a
+# non-_ledger subdirectory) are filesystem-only.
+# ==============================================================================
+FIXTURE=$(mktemp -d)
+mkdir -p "$FIXTURE/dev/experiments/some-dir"
+echo x >"$FIXTURE/dev/experiments/some-dir/a.txt"
+
+check "checker2 self-test aborts loudly when TODAY cannot be parsed" 1 \
+  "FAIL(checker2): could not parse TODAY" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="not-a-date" sh "$SCRIPT"
+
+check_not "checker2 self-test failure suppresses the Checker 2 report section" 1 \
+  "## Checker 2" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="not-a-date" sh "$SCRIPT"
+
+check_not "checker2 self-test failure means the success marker never prints" 1 \
+  "PASS(checker2-self-test)" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="not-a-date" sh "$SCRIPT"
+
 rm -rf "$FIXTURE"
 
 # ==============================================================================

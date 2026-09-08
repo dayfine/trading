@@ -480,6 +480,15 @@ checker1() {
 # reports cited. A guard that only checks "the known orphan is uncited"
 # cannot distinguish a healthy checker from one where _is_cited always
 # returns "not cited" regardless of input.
+#
+# SUCCESS MARKER: on the way out, a healthy run prints
+# "PASS(checker2-self-test): ..." to stderr. This is not decorative --
+# without it, neutering this function to `return 0` on its first line, or
+# deleting its call site in checker2 below, is observationally identical to
+# a passing run on every check the committed test suite runs. The marker is
+# the one thing that distinguishes "the probe ran and passed" from "the
+# probe never ran"; see dev/scripts/prune_candidates_test.sh FIXTURE C for
+# the mutation-witness assertion on it.
 _checker2_self_test() {
   local orig_root tmp synth_orphan synth_cited rc
   local today_epoch synth_epoch synth_date cdate age
@@ -557,6 +566,16 @@ _checker2_self_test() {
     echo "FAIL(checker2): self-test failed -- a synthetic name deliberately cited from a synthetic dev/status/ file ($synth_cited) was reported as NOT cited. The citation-matching primitive is broken in the false-ORPHAN direction (matches nothing); refusing to report." >&2
     return 1
   fi
+
+  # Success marker (stderr): the ONLY committed evidence that this self-test
+  # actually ran to completion rather than being neutered to `return 0` at
+  # the top of the function, or having its call site (checker2's
+  # `_checker2_self_test || return 1`) deleted entirely -- either of which
+  # would silently skip every check above and leave checker2 permanently
+  # unable to detect a broken citation/dating primitive. See PR #2725
+  # review, CP4: without this marker, both mutations are byte-identical to
+  # a healthy run on the committed test suite.
+  echo "PASS(checker2-self-test): synthetic citation self-test succeeded." >&2
 
   ROOT="$orig_root"
   rm -rf "$tmp"
