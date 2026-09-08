@@ -1057,15 +1057,6 @@ type config = {
           being armed). Default [false] = off, bit-identical (R1). Threaded into
           [Trading_simulation.Stale_hold.config.exit_without_prior_bar]. See
           [Weinstein_strategy_config.stale_exit_without_prior_bar]. *)
-  stub_print_max_ratio : float; [@sexp.default 0.0]
-      (** #2672 guard 3 of 3: when [> 0.0], drops a symbol's TERMINAL run of
-          penny prints (each below this fraction of the last real close) from
-          the series both the simulator and the strategy read, so a stop cannot
-          fill at a $0.03 print after the symbol stopped trading (STMP: real
-          bars to $329.61, then $0.045 / $0.04 / $0.03 — a −$594k phantom loss
-          in the 26y record). Default [0.0] = off, bit-identical (R1).
-          Implemented by [Snapshot_runtime.Stub_tail]. See
-          [Weinstein_strategy_config.stub_print_max_ratio]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

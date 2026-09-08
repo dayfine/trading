@@ -47,40 +47,24 @@ let _snapshot_to_daily_price (s : Snapshot.t) : Types.Daily_price.t option =
       active_through = None;
     }
 
-(* #2672 guard 3: a date inside the truncated stub tail has no bar, so the
-   simulator can neither mark against it nor fill a stop at it. [None] resolver
-   (the default, and any unarmed one) keeps every read on the prior path. *)
-let _keeps_date stub_tail ~symbol ~date =
-  match stub_tail with
-  | None -> true
-  | Some t -> Snapshot_runtime.Stub_tail.keeps t ~symbol ~date
-
 (* Today's bar: a single read_today call, then OHLCV reconstruction. *)
-let _make_get_price ~panels ~stub_tail =
+let _make_get_price ~panels =
  fun ~symbol ~date ->
-  if not (_keeps_date stub_tail ~symbol ~date) then None
-  else
-    match Daily_panels.read_today panels ~symbol ~date with
-    | Error _ ->
-        (* Symbol not in manifest, schema-skew, or decode error — surface as
-           "no bar". The simulator handles None via the same path as a missing
-           CSV row. *)
-        None
-    | Ok snapshot -> _snapshot_to_daily_price snapshot
+  match Daily_panels.read_today panels ~symbol ~date with
+  | Error _ ->
+      (* Symbol not in manifest, schema-skew, or decode error — surface as
+         "no bar". The simulator handles None via the same path as a missing
+         CSV row. *)
+      None
+  | Ok snapshot -> _snapshot_to_daily_price snapshot
 
 (* Previous bar: read_history over a bounded lookback, take the last entry
    that converts cleanly. The list is chronological (oldest first), so the
    last entry is the most recent. *)
-let _make_get_previous_bar ~panels ~stub_tail =
+let _make_get_previous_bar ~panels =
  fun ~symbol ~date ->
   let from = Date.add_days date (-_previous_bar_lookback_days) in
   let until = Date.add_days date (-1) in
-  (* #2672 guard 3: never forward-fill off a stub print either. *)
-  let until =
-    match stub_tail with
-    | None -> until
-    | Some t -> Snapshot_runtime.Stub_tail.clamp_until t ~symbol ~until
-  in
   match Daily_panels.read_history panels ~symbol ~from ~until with
   | Error _ -> None
   | Ok rows ->
@@ -90,12 +74,12 @@ let _make_get_previous_bar ~panels ~stub_tail =
          most recent valid bar strictly before [date]. *)
       List.rev rows |> List.find_map ~f:_snapshot_to_daily_price
 
-let make_callbacks ?stub_tail ~panels ~callbacks:_ () =
+let make_callbacks ~panels ~callbacks:_ =
   (* [callbacks] is accepted in the API to keep the contract symmetric with
      the rest of the snapshot_runtime surface (callers may already hold one),
      but the OHLCV path goes through [Daily_panels] directly — there's no
      win in routing through the [read_field]-shaped shim for a 6-field
      reconstruction that's natural to express as one [read_today] call. *)
-  let get_price = _make_get_price ~panels ~stub_tail in
-  let get_previous_bar = _make_get_previous_bar ~panels ~stub_tail in
+  let get_price = _make_get_price ~panels in
+  let get_previous_bar = _make_get_previous_bar ~panels in
   (get_price, get_previous_bar)

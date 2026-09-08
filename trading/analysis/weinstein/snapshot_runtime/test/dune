@@ -1,9 +1,5 @@
 (tests
- (names
-  test_daily_panels
-  test_snapshot_bar_views
-  test_snapshot_callbacks
-  test_stub_tail)
+ (names test_daily_panels test_snapshot_bar_views test_snapshot_callbacks)
  (libraries
   core
   core_unix

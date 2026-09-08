@@ -846,6 +846,25 @@ Merged in main:
   Verify: `dune runtest trading/weinstein/strategy analysis/scripts/build_snapshots`.
   Next: rebuild the three vintage warehouses on this build (#2693 changes every
   manifest), re-run the acceptance cell (expect V17 = 0), then the salts.
+  **2026-09-07 — runtime guard 3 RETIRED (`refactor/retire-stub-print-guard`):**
+  the Rule-4 condition stated above ("retires once every live warehouse is
+  rebuilt") is discharged. `stub_print_max_ratio` and
+  `Snapshot_runtime.Stub_tail` are deleted — config field, resolver module, the
+  `?stub_tail` threading through `Panel_runner` → `Bar_data_source` →
+  `Snapshot_bar_source`, and both test files (`test_stub_tail.ml`,
+  `test_stub_tail_bar_source.ml`). Build-time
+  `Snapshot_pipeline.Series_tail` (#2691) supersedes it with the length and
+  price gates the read-time rule could not apply, and every live warehouse is a
+  `_v7mark` rebuild (#2695) whose second acceptance cell passed V16 **and** V17
+  with guard 3 at its default 0.0
+  (`dev/experiments/warehouse-rebuild-2026-09-06/README.md` §"Second acceptance
+  cell"). Pure deletion: the default was the no-op, so goldens are
+  bit-identical. **Guards 1 and 2 stay** (`entry_max_bar_age_days`,
+  `stale_exit_without_prior_bar`). The two `dg-*-on.sexp` specs under
+  `dev/experiments/delisting-guards-rerun-2026-09-06/specs/` still name the
+  retired field and no longer resolve; they are kept as a record, flagged in
+  that experiment's README. Verify:
+  `dune runtest analysis/weinstein/snapshot_runtime trading/backtest trading/weinstein/strategy`.
 
 - **Step 3 (tier-aware bar loader)** now unblocked; separately tracked at
   `dev/status/backtest-scale.md`. A/B the Legacy vs Tiered loader
