@@ -19,6 +19,49 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-09-08 — `-incremental` no longer clobbers the warehouse manifest (#2669)
+
+- [x] **`build_snapshots.exe -incremental` now MERGES its entries into the
+  existing `manifest.sexp` instead of replacing it.** The final manifest write
+  in `Build_runner.build` constructed the manifest from this run's entries
+  alone, so a run over a subset universe deleted every other symbol from the
+  index. Observed by the maintainer 2026-09-04: a one-symbol top-up
+  (`GSPC.INDX`) against a freshly built 2,208-symbol vintage warehouse reported
+  `wrote 1 entries`, leaving an index naming only `GSPC.INDX` while all 2,208
+  `.snap` files sat untouched on disk. `Bar_source_resolver` enumerates symbols
+  **from the manifest**, so the warehouse read as empty to every runner.
+  - **Resolution (a) — merge, not refuse.** `-incremental` is documented as a
+    *skip* optimisation, and the per-symbol checkpoint already upserted via
+    `Snapshot_manifest.update_for_symbol`; only the final write replaced. The
+    fix makes the final write agree with the checkpoint. Refusing a
+    non-superset universe (the issue's alternative) would break the top-up that
+    motivated the report, so a non-superset run **warns** instead.
+  - **Where:** `trading/analysis/scripts/build_snapshots/build_runner.{ml,mli}`
+    — `_carry_candidates` / `_carried_entries` / `_log_carry_forward`, applied
+    between `_finalize_entries` and `_write_final_manifest`. The run's entry
+    wins on a symbol collision (no duplicates, no stale rows); a carried entry
+    whose `.snap` is gone is dropped (a stale index row would fail the closing
+    verify); the pre-run manifest is dropped whole on a `schema_hash` mismatch
+    (its files carry another indicator set's columns). Both drops are logged.
+  - **Non-incremental path untouched.** `existing` is read only when
+    `incremental` is true, so a full rebuild reads no pre-run manifest, carries
+    nothing, and still *replaces* the index — which remains how an operator
+    prunes symbols the warehouse should no longer carry. Pinned by
+    `test_full_rebuild_still_replaces_the_index`.
+  - **`dev/scripts/build_broad_snapshot_incremental.sh` needs no change** — it
+    always passes the full universe and relies on `timeout` to end a cron
+    window, so its resumes were already superset runs; it simply benefits when
+    a window is pointed at a different universe file.
+  - **Tests:**
+    `trading/analysis/scripts/build_snapshots/test/test_build_runner_incremental.ml`
+    (3 end-to-end cases: a top-up keeps the existing symbols; a subset rebuild
+    neither drops siblings nor duplicates itself; a full rebuild still
+    replaces). Verify:
+    `dev/lib/run-in-env.sh dune runtest analysis/scripts/build_snapshots/test/`.
+    Non-vacuous: deleting the three-line merge in `build` turns the first two
+    RED (`List length (1) does not match matchers length (3)` / `(2)`) and
+    leaves the third GREEN.
+
 ## 2026-09-03 — empty measurement window no longer crashes the runner (#2632)
 
 - [x] **`Runner.run_backtest` on a window with no trading day now raises a
@@ -702,24 +745,11 @@ Merged in main:
 
 ## Next Steps
 
-- **[NEW 2026-09-05] #2669 — `build_snapshots.exe -incremental` clobbers
-  `manifest.sexp`.** Filed by the maintainer 2026-09-05T02:42Z. A top-up run
-  over a 1-symbol universe rewrote a 2,208-entry manifest down to 1 entry while
-  leaving all 2,208 `.snap` files on disk; `Bar_source_resolver` enumerates
-  symbols from the manifest, so **the warehouse reads as empty to every runner**.
-  The `-incremental` flag is at
-  `trading/trading/backtest/snapshot_warehouse/build_scenario_snapshots.ml:202-205`
-  and is documented as a *skip* optimisation ("Skip symbols whose CSV mtime <=
-  the existing manifest's csv_mtime") — the manifest is nonetheless written with
-  only the processed set. Expected per the issue: merge the run's entries into
-  the existing manifest, **or** refuse a universe that is not a superset. Also
-  affects `dev/scripts/build_broad_snapshot_incremental.sh`, which advertises
-  checkpoint-resume across cron windows — an interrupted or
-  differently-scoped resumed window applies the same clobber.
-  **Bounded, self-contained, not strategy-touching, and not data-gated — this is
-  the top dispatchable feature item for the next orchestrator run.**
-  (orchestrator run 33962894987 triage; not dispatched only because the 3-agent
-  container cap was already committed to harness work.)
+- ~~**[NEW 2026-09-05] #2669 — `build_snapshots.exe -incremental` clobbers
+  `manifest.sexp`.**~~ **DONE 2026-09-08** — fixed by the merge in
+  `Build_runner.build`; see §"2026-09-08 — `-incremental` no longer clobbers
+  the warehouse manifest (#2669)" above for the resolution, the rejected
+  refuse-a-non-superset alternative, and the verify command. Closes #2669.
 
 - **[NEW 2026-09-05] #2672 — delisting stub prints fill stops at ~$0.** Filed by
   the maintainer 2026-09-05T05:47Z: STMP 2021 exits at **$0.04** (entry $327.75,
