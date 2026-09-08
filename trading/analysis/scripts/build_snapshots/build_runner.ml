@@ -610,9 +610,13 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
   let entries = _finalize_entries ~survivor_tolerance_days builts in
   let carried = _carried_entries ~existing ~schema entries in
   _log_carry_forward carried;
-  let entries = carried @ entries in
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
-  _write_final_manifest ~manifest_path ~schema ~entries ~elapsed;
+  (* Only the MANIFEST gets the merged set. [progress.sexp] and the tail report
+     stay scoped to this run's own symbols — a carried entry did no work in this
+     run, so counting it would report [symbols_done > symbols_total] on a
+     top-up. *)
+  _write_final_manifest ~manifest_path ~schema ~entries:(carried @ entries)
+    ~elapsed;
   _write_tail_report ~output_dir builts;
   _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at;
   _verify_or_warn ~manifest_path
