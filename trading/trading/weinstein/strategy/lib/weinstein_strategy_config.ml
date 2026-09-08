@@ -159,7 +159,6 @@ type config = {
   enable_rs_positive_declining : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_max_bar_age_days : int; [@sexp.default 0]  (** See [.mli]. *)
   stale_exit_without_prior_bar : bool; [@sexp.default false]  (** See [.mli]. *)
-  stub_print_max_ratio : float; [@sexp.default 0.0]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -274,7 +273,6 @@ let default_config ~universe ~index_symbol =
     enable_rs_positive_declining = false;
     entry_max_bar_age_days = 0;
     stale_exit_without_prior_bar = false;
-    stub_print_max_ratio = 0.0;
   }
 
 (* F5 arming predicate — the single source of truth for both halves of the

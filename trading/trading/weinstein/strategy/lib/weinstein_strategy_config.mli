@@ -1615,11 +1615,15 @@ type config = {
           flip without a ledger ACCEPT plus a confirmation grid — this PR claims
           no performance result whatsoever.
 
-          {b The three #2672 guards} are independent and compose:
+          {b The two runtime #2672 guards} are independent and compose:
           {!config.entry_max_bar_age_days} (this one — never open a position on
-          a stale price), {!config.stale_exit_without_prior_bar} (realise the
-          zombie if one is opened anyway), {!config.stub_print_max_ratio} (drop
-          the penny-print tail that makes a dead series look tradeable). *)
+          a stale price) and {!config.stale_exit_without_prior_bar} (realise the
+          zombie if one is opened anyway). A third runtime guard — which dropped
+          a symbol's terminal penny-print run at read time — was retired: the
+          same truncation now happens once at warehouse-build time in
+          [Snapshot_pipeline.Series_tail] (#2691), with the length and price
+          gates the read-time rule could not apply, so no runtime knob is
+          needed. *)
   stale_exit_without_prior_bar : bool; [@sexp.default false]
       (** {b #2672 guard 2 of 3 — realise the zombie.} When [true] {b and}
           [stale_exit_after_days = Some n], a held position whose symbol has
@@ -1648,67 +1652,10 @@ type config = {
           [((flag stale_exit_without_prior_bar) (values (true false)))]. R3: no
           default flip without a ledger ACCEPT plus a confirmation grid.
 
-          Siblings: {!config.entry_max_bar_age_days} (prevent the entry in the
-          first place), {!config.stub_print_max_ratio} (truncate the stub tail
-          so a real last close exists to exit at). *)
-  stub_print_max_ratio : float; [@sexp.default 0.0]
-      (** {b #2672 guard 3 of 3 — stub-print tail.} When [> 0.0], a symbol's
-          {b terminal} run of implausible penny prints is dropped from the
-          series both the simulator and the strategy read: walking back from the
-          last bar, every bar whose close is below
-          [stub_print_max_ratio *. (close of the last bar before the run)] is a
-          stub, and the series is truncated at the last real bar. Only a run
-          that extends to the {e end} of the series is removed.
-
-          Measured case (#2672): {b STMP} has real bars through 2021-10-04 at
-          $329.61, then $0.045 / $0.04 / $0.03 to the end. A held long's stop
-          sits far above $0.045, so [Weinstein_stops.check_stop_hit] fires on
-          the first stub bar and the Market sell fills at its open — a −$594k
-          phantom loss in the canonical 26-year record, present in 56 of 92
-          committed trade sets. Nothing catches it today:
-          [Market_data_adapter._is_valid_bar] rejects only [close <= 0].
-
-          Suggested paired-run value [0.05]. At that ratio the {b CLE} shape
-          (months of interleaved ~$0.70 / ~$0.03 prints, final bar [0.025] after
-          [0.68]) loses only its final bar, and a real −60% one-day crash
-          followed by more bars is untouched.
-
-          {b This is data hygiene with lookahead}, deliberately: whether a run
-          of prints is terminal is only knowable from the whole series. It is
-          not a crash detector — a mid-series collapse that later recovers is
-          untouched.
-
-          {b Known cost.} Keying on price shape alone, it {b cannot} distinguish
-          an administrative stub tail from a {b genuine terminal collapse}: a
-          symbol that really traded down through the ratio and was then delisted
-          has the same shape and is truncated too, deleting a real loss and
-          biasing returns {b upward}. Only the {e gradual} terminal decline
-          whose every step stays above the ratio survives
-          ([10.0 / 5.0 / 1.0 / 0.30 / 0.28] at [0.05] is untouched;
-          [10.0 / 9.0 / 0.20 / 0.15] is not). So the bars removed include, but
-          are not limited to, ones no counterparty could have filled against.
-          That bias is an accepted cost of a default-off axis and must be
-          reported in the paired re-run writeup — it is not a reason to flip the
-          default. It is also {b not} a fix for the {e interleaved} bad-bar
-          class (CLE / ICT / ABK / MEL / MVL / AGR in the #2672 scan), which
-          needs a per-bar plausibility gate at fill time; that is tracked
-          separately.
-
-          Implemented by [Snapshot_runtime.Stub_tail], applied once per run and
-          shared between [Snapshot_bar_source] (simulator price reads) and
-          [Snapshot_callbacks] (every strategy bar / view read) so the two
-          cannot disagree about which bars exist. Truncating the series also
-          gives {!config.stale_exit_without_prior_bar} a real last close to
-          realise the position at.
-
-          {b Default [0.0] = off}, bit-identical to every existing
-          baseline/golden, and the short-circuit keeps the per-symbol close scan
-          off the default path (R1). R2: axis-expressible as
-          [((flag stub_print_max_ratio) (values (0.0 0.02 0.05 0.1)))]. R3: no
-          default flip without a ledger ACCEPT plus a confirmation grid.
-
-          Siblings: {!config.entry_max_bar_age_days},
-          {!config.stale_exit_without_prior_bar}. *)
+          Sibling: {!config.entry_max_bar_age_days} (prevent the entry in the
+          first place). The stub tail that used to leave a dying series with no
+          real last close to exit at is now truncated at warehouse-build time by
+          [Snapshot_pipeline.Series_tail] (#2691), not by a runtime knob. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

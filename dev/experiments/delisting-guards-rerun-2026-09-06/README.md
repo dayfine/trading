@@ -1,5 +1,13 @@
 # #2672 delisting guards — paired record re-run (2026-09-06)
 
+> **Retired knob (2026-09-07).** Guard 3, `stub_print_max_ratio`, was removed
+> from the strategy config — the build-time `Snapshot_pipeline.Series_tail`
+> (#2691) supersedes it, and every live warehouse is a `_v7mark` rebuild
+> (#2695). The two `specs/dg-*-on.sexp` files below still name that field and
+> therefore **no longer parse**; they are kept verbatim as the record of what
+> was run, not as runnable specs. Guards 1 and 2
+> (`entry_max_bar_age_days`, `stale_exit_without_prior_bar`) are unchanged.
+
 **Status: salt 0 DONE (2026-09-06 09:13 PT); salts 1–2 of the 26y pair RUNNING (`chain-salts.sh`, ~11 h).** Build pinned at 3113f751e = PR #2686's first commit; the two rework commits (cd6c8febc, 72670075a) and the squash 1b7295cae add only tests, docstrings and one exported helper, so the pinned build is behaviour-identical to merged main. Field names in
 `specs/dg-*-on.sexp` / `chain.sh` are the merged ones.
 

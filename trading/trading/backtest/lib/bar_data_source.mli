@@ -84,18 +84,10 @@ val close_shared_panels : Snapshot_runtime.Daily_panels.t -> unit
     after the last backtest that read through [p]. *)
 
 val build_adapter_from_panels :
-  ?stub_tail:Snapshot_runtime.Stub_tail.t ->
   Snapshot_runtime.Daily_panels.t ->
   Trading_simulation_data.Market_data_adapter.t
-(** [build_adapter_from_panels ?stub_tail panels] wraps an existing
-    [Daily_panels.t] in a callback-mode [Market_data_adapter.t] without
-    allocating a second cache.
-
-    [stub_tail] is forwarded to {!Snapshot_bar_source.make_callbacks} as the
-    #2672 guard-3 resolver; omitted (every caller but {!Backtest.Panel_runner},
-    which is the only one holding a strategy config to read the ratio from) the
-    adapter reads the untruncated series, which is also what an unarmed resolver
-    produces.
+(** [build_adapter_from_panels panels] wraps an existing [Daily_panels.t] in a
+    callback-mode [Market_data_adapter.t] without allocating a second cache.
 
     Used by {!Backtest.Panel_runner} so the simulator's per-tick price reads and
     the strategy's snapshot-backed bar reader share one resident

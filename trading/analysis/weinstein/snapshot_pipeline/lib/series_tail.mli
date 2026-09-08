@@ -16,11 +16,13 @@
 
     {2 Why not a bare ratio}
 
-    The obvious rule — "walk back while [close < ratio * previous close]" — is
-    the one the runtime guard [Snapshot_runtime.Stub_tail] implements, and it is
-    {b wrong at build time}. Measured over all 2,908 symbols of the 2000-vintage
-    warehouse [snap_top3000_dedup_v5thin_adj] at [ratio = 0.05], the terminal
-    run splits into four populations a single ratio cannot separate:
+    The obvious rule — "walk back while [close < ratio * previous close]" — keys
+    on price shape alone, and it is {b wrong at build time}. (It is the rule the
+    retired #2672 runtime guard applied at read time; this module supersedes it
+    precisely because a bare ratio is not enough.) Measured over all 2,908
+    symbols of the 2000-vintage warehouse [snap_top3000_dedup_v5thin_adj] at
+    [ratio = 0.05], the terminal run splits into four populations a single ratio
+    cannot separate:
 
     - {b stub tail} (13 symbols) — the defect. STMP: real to 2021-10-04 at
       [$329.61], then 18 bars of [$0.045 / $0.04 / $0.03]. WDR: 29 bars at

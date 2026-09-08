@@ -31,9 +31,10 @@
     {b Default [max_bar_age_days = 0] = off}, bit-identical to every existing
     baseline / golden. Axis-expressible as
     [((flag entry_max_bar_age_days) (values (0 5 10 20)))]. Sibling #2672
-    guards: [stale_exit_without_prior_bar] (realises the zombie this gate would
-    have prevented) and [stub_print_max_ratio] (drops the penny-print tail that
-    makes a delisted series look tradeable). See
+    runtime guard: [stale_exit_without_prior_bar] (realises the zombie this gate
+    would have prevented). The penny-print tail that made a delisted series look
+    tradeable is removed at warehouse-build time by
+    [Snapshot_pipeline.Series_tail] (#2691), so no runtime guard covers it. See
     [Weinstein_strategy_config.entry_max_bar_age_days]. Pure with respect to the
     supplied bar reader / lookup. *)
 
