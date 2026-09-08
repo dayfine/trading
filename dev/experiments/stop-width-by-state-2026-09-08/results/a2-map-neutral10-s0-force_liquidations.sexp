@@ -1,0 +1,13 @@
+((events
+  (((symbol SGP_old1) (position_id SGP_old1-wein-3946) (date 2010-09-20)
+    (side Long) (entry_price 10.35) (current_price 3.75) (quantity 14909)
+    (cost_basis 154308.15) (unrealized_pnl -98399.4)
+    (unrealized_pnl_pct -0.6376811594202898) (reason Per_position))
+   ((symbol AWRE) (position_id AWRE-wein-7210) (date 2014-07-25) (side Long)
+    (entry_price 6.73) (current_price 5) (quantity 46211)
+    (cost_basis 311000.03) (unrealized_pnl -79945.030000000013)
+    (unrealized_pnl_pct -0.2570579494799406) (reason Per_position))
+   ((symbol MEL) (position_id MEL-wein-8212) (date 2017-02-08) (side Long)
+    (entry_price 171666.06) (current_price 12.2) (quantity 1)
+    (cost_basis 171666.06) (unrealized_pnl -171653.86)
+    (unrealized_pnl_pct -0.99992893178768116) (reason Per_position)))))
