@@ -53,3 +53,5 @@ own build derived).
 side-tables are always written).
 
 Related: [[project_warehouse_vintage_coverage]], [[project_snapshot_format_v2]].
+
+**SUPERSEDED 2026-09-08 by PR #2724 (pending merge; closes #2669):** `-incremental` now MERGES this run's entries into the existing manifest (carried entries keep their `active_through`; cross-schema carry refused; carried entries with a missing `.snap` dropped; the universe-superset check is a warning). Once merged, topping up over a partial universe is safe again — the "never top up with -incremental" rule below no longer applies. Still check manifest count vs `.snap` count before any chain (cheap tripwire).
