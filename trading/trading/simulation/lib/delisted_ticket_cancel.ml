@@ -27,20 +27,19 @@ let _marker_has_passed ~active_through_for ~date symbol =
   | None -> false
   | Some d -> Date.( < ) d date
 
+(* A resting ticket on a symbol whose series has already ended. *)
+let _is_dead_ticket ~active_through_for ~date (pos : Position.t) =
+  _is_resting_ticket pos
+  && _marker_has_passed ~active_through_for ~date pos.symbol
+
+let _cancel_transition ~date position_id : Position.transition =
+  { position_id; date; kind = CancelEntry { reason = cancel_reason } }
+
 let _cancel_transitions ~active_through_for ~date ~positions =
   Map.to_alist positions
-  |> List.filter_map ~f:(fun (id, (pos : Position.t)) ->
-      if
-        _is_resting_ticket pos
-        && _marker_has_passed ~active_through_for ~date pos.symbol
-      then
-        Some
-          {
-            Position.position_id = id;
-            date;
-            kind = CancelEntry { reason = cancel_reason };
-          }
-      else None)
+  |> List.filter ~f:(fun (_, pos) ->
+      _is_dead_ticket ~active_through_for ~date pos)
+  |> List.map ~f:(fun (id, _) -> _cancel_transition ~date id)
 
 (* Apply one [CancelEntry], dropping the now-[Closed] position from the map.
    Every transition built above names a wholly-unfilled [Entering], which the
