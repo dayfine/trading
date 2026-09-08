@@ -3,7 +3,7 @@
 ;; the pinned worktree sweep-item3 on the CLEAN 2000 warehouse /tmp/snap_top3000_2000_v7mark (#2695 build),
 ;; SNAPSHOT_CACHE_MB=1024, --no-emit-all-eligible, --parallel 1. NOT a golden — staging scenario, sentinel bands.
 ((name "a0-breadth-on-null")
- (description "Item-3 surface control: record convention + breadth_direction read ON, per-state map EMPTY (null: must reproduce the record salt-0 cell 263.16% if the read is purely additive)")
+ (description "Item-3 surface control: record convention + breadth_direction read ON, per-state map EMPTY (null: must reproduce r0-record-asis — the record spec at the same build — digit-for-digit if the read is purely additive)")
  (period ((start_date 2000-01-01) (end_date 2026-06-26)))
  (universe_path "../goldens-custom-universe/composition/top-3000-2000.sexp")
  (universe_size 3000)

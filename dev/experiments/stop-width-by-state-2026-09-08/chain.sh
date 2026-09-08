@@ -1,8 +1,8 @@
 #!/bin/sh
 # Item-3 surface, salt 0, clean 2000 warehouse (_v7mark), build = main e7dde095a (#2718) in sweep-item3.
-# Usage: sh chain.sh <lane> <arm>...   (lanes run concurrently: separate WORK/lock; shared ART)
+# Usage: [SALT=<n>] sh chain.sh <lane> <arm>...   (lanes run concurrently: separate WORK/lock; shared ART; SALT default 0)
 set -u
-LANE=$1; shift
+LANE=$1; shift; SALT=${SALT:-0}   # SALT=<n> env selects the salt (default 0); the tag carries it
 C=trading-1-dev; WT=/workspaces/trading-1/.claude/worktrees/sweep-item3; ROOT=$WT/trading; FIX=$ROOT/test_data/backtest_scenarios
 SPECS_HOST=/tmp/item3-run/specs; WORK=/tmp/item3-run/$LANE; ART=/tmp/sweeps/item3
 LOG_HOST=/tmp/item3-run/chain-$LANE.log; LOCK=/tmp/item3-run/chain-$LANE.lock; W2000=/tmp/snap_top3000_2000_v7mark; CELL_TIMEOUT=28800
@@ -12,7 +12,7 @@ mkdir -p /tmp/item3-run; mkdir "$LOCK" 2>/dev/null || { echo "ABORT: lock $LANE"
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 docker exec $C mkdir -p $WORK $ART
 log "lane $LANE HEAD=$(git -C /Users/difan/Projects/trading-1/.claude/worktrees/sweep-item3 rev-parse --short HEAD) (expect e7dde095a)"
-for name in "$@"; do salt=0; tag="$name-s$salt"; d=$WORK/$tag
+for name in "$@"; do salt=$SALT; tag="$name-s$salt"; d=$WORK/$tag
   if grep -q "RESULT $tag " "$LOG_HOST" 2>/dev/null; then log "SKIP $tag"; continue; fi
   docker exec $C sh -c "mkdir -p $d && rm -rf $d/*"; docker cp "$SPECS_HOST/$name.sexp" "$C:$d/" || { log "RESULT $tag => <spec missing>"; continue; }
   log "RUN $tag on $W2000"; start=$(date +%s)
