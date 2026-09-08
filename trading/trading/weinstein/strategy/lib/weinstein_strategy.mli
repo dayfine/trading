@@ -355,6 +355,7 @@ type config = {
           level for a new entry. Default: 1.02 (2% buffer above the screener
           stop). *)
   initial_stop_buffer_by_macro_state : Stop_buffer_by_state.t;
+      [@sexp.default Stop_buffer_by_state.default]
       (** Per-macro-state override of {!config.initial_stop_buffer} for the
           {b entry} fallback stop. Default [Stop_buffer_by_state.default] —
           every slot unset, so the resolved buffer is [initial_stop_buffer] for

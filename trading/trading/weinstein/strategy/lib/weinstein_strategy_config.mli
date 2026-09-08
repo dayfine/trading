@@ -42,6 +42,7 @@ type config = {
           Structural (support-floor) stops are unaffected: this multiplier is
           read only on the fallback branch. *)
   initial_stop_buffer_by_macro_state : Stop_buffer_by_state.t;
+      [@sexp.default Stop_buffer_by_state.default]
       (** Per-macro-state override of {!config.initial_stop_buffer} for the
           {b entry} fallback stop, keyed on [Macro.result.breadth_state] (PR
           #2685).
