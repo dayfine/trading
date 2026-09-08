@@ -6,7 +6,8 @@
   test_resistance_sketch
   test_weekly_sidetable_builder
   test_adjusted_basis
-  test_series_tail)
+  test_series_tail
+  test_series_splice)
  (libraries
   core
   core_unix

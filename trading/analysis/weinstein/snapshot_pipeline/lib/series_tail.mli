@@ -138,7 +138,11 @@ module Exceptions : sig
       code change. *)
 
   type file = { keep_tail : string list } [@@deriving sexp]
-  (** On-disk shape. The builder parses the file and calls {!of_file}. *)
+  (** On-disk shape. The builder parses the file and calls {!of_file}.
+
+      Unknown sections are ignored, so the same file may also carry
+      {!Series_splice}'s [splice] section (issue #2672 class ii) and both
+      modules parse it independently. *)
 
   val empty : t
   (** No exceptions — every symbol is subject to the rule. *)

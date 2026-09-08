@@ -27,7 +27,12 @@ end
 
 module Exceptions = struct
   type t = Set.M(String).t
-  type file = { keep_tail : string list } [@@deriving sexp]
+
+  (* Unknown sections are ignored so the one committed exceptions file can
+     also carry [Series_splice]'s [splice] section without this parser
+     tripping over it. *)
+  type file = { keep_tail : string list }
+  [@@deriving sexp] [@@sexp.allow_extra_fields]
 
   let empty = Set.empty (module String)
   let of_symbols syms = Set.of_list (module String) syms

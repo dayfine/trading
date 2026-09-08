@@ -18,4 +18,23 @@
 ; sub-cent micro-cap stub tails, and the 33 other flagged symbols (prefix
 ; mis-scales, long low tails) are already kept by the rule's own gates.
 
-((keep_tail ()))
+; The splice section (issue #2672 class ii) vetoes or replaces
+; Snapshot_pipeline.Series_splice's build-time decision on a ticker-reuse
+; series. Rules, one per symbol (last wins):
+;
+;   (keep SYM)              store the series whole, however it classifies
+;   (drop SYM)              exclude the symbol from the warehouse entirely
+;   (cut_at SYM 2004-12-20) cut here instead of at the rule's last splice,
+;                           keeping bars on or after the date
+;
+; Read splice_actions.csv once per vintage and record the decisions you
+; disagree with here; the entry is a decision, so say why. Both sections are
+; optional and each module ignores the other's, so this one file (passed as
+; -tail-exceptions PATH) carries both.
+;
+; Empty for the 2000 vintage: the 66 interleaved symbols (SWD 1,215 findings,
+; AEZ 694, ICT 589, CLE 412, MEL 98, MVL 80) are genuinely two issuers apiece
+; and the 1-2-finding tail (CHS 2004-12-20, AGR 2006-07-05) cuts cleanly.
+
+((keep_tail ())
+ (splice ()))

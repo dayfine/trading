@@ -68,7 +68,15 @@ to ingestion / warehouse build, so the backtest never sees a post-delisting stub
   verify with the report.
 - Review the report for the 2000 vintage (the scan `tail_scan_2000.txt` sizes it).
 - Rebuild 2000 / 2009 / 2019 warehouses (hours each; container-exclusive).
-- PR-B: splice-class handling at build (class ii).
+- PR-B — **SHIPPED 2026-09-07** (`feat/data/splice-action`): splice-class handling at
+  build (class ii). `Snapshot_pipeline.Series_splice` drops interleaved series
+  (>= 20 findings; 66 symbols on the 2000 vintage), cuts ticker-reuse and
+  prefix-mis-scaled series at the LAST splice keeping the later segment,
+  honours a `splice` section in `trading/test_data/warehouse_exceptions.sexp`
+  (`keep` / `drop` / `cut_at SYM DATE`), writes `splice_actions.csv`, and takes
+  `-no-splice-action` for report-only. Detector default-off is unchanged, so no
+  golden moves. Not yet run against a real warehouse — that is the rebuild step
+  below.
 - Record re-base with salts on the rebuilt 2000 warehouse; retire guard 3.
 
 ## Not doing

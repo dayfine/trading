@@ -59,6 +59,20 @@ val tail_params :
     the defect classes rather than per-build choices — see
     {!Snapshot_pipeline.Series_tail} for the measurement they come from. *)
 
+val load_splice_exceptions :
+  string option -> Snapshot_pipeline.Series_splice.Exceptions.t Status.status_or
+(** [load_splice_exceptions path] reads the {b splice} section of the same
+    warehouse exceptions file (issue #2672 class ii). [None] is
+    [Ok Exceptions.empty]. Sections are independent: a file carrying only
+    [keep_tail] parses here as "no splice exceptions", and a file carrying only
+    [splice] parses in {!load_tail_exceptions} as "no tail exceptions". A
+    missing or malformed file is an [Error], never a silent fallback. *)
+
+val splice_exceptions_or_exit :
+  string option -> Snapshot_pipeline.Series_splice.Exceptions.t
+(** CLI shell around {!load_splice_exceptions}: prints the error to stderr and
+    exits 1, exactly as {!tail_exceptions_or_exit} does. *)
+
 val load_tail_exceptions :
   string option -> Snapshot_pipeline.Series_tail.Exceptions.t Status.status_or
 (** [load_tail_exceptions path] reads the series-tail veto list. [None] is
@@ -77,6 +91,7 @@ val tail_exceptions_or_exit :
 
 val build :
   ?survivor_tolerance_days:int ->
+  ?splice_cuts:Core.Date.t Core.Map.M(Core.String).t ->
   symbols:string list ->
   csv_data_dir:string ->
   output_dir:string ->
@@ -135,8 +150,19 @@ val build :
       {!Snapshot_pipeline.Series_tail.Exceptions.empty} means no exceptions.
       [deep_bars] are strictly before the window and feed only the side-table's
       depth, so they are not edited.
+    - [splice_cuts] — build-time splice hygiene (#2672 class ii,
+      {!Snapshot_pipeline.Series_splice}). Each named symbol's bars are cut to
+      those dated on or after its date, {e before} the tail rule runs, so the
+      stored series describes one issuer. Decided by the caller's splice scan
+      (which sees every symbol's full history) rather than here; symbols that
+      scan {e dropped} are simply absent from [symbols], so they get no [.snap]
+      and no manifest entry. Defaults to empty — a build that passes nothing
+      behaves exactly as before.
 
     {2 [active_through] is derived from the series end}
+
+    A splice cut keeps the {e later} segment, so it never moves this marker; a
+    dropped symbol has no entry and therefore no marker at all.
 
     A symbol whose last stored bar falls more than [survivor_tolerance_days]
     behind the {e universe's} last bar is marked delisted in the manifest

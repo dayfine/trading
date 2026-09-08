@@ -36,6 +36,7 @@
   backtest
   scenario_lib
   scripts.build_runner
+  weinstein.snapshot_pipeline
   scenario_snapshot_plan
   splice_detector
   twin_detector)
