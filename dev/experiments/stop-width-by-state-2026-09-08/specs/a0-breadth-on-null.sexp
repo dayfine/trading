@@ -1,14 +1,7 @@
-;; THE CANONICAL RECORD BASELINE (2026-08-24) — 26y broad record-convention
-;; run at the book-faithful stops basis. Config is the record convention
-;; (same overrides as the funding-grid grid1-null lineage) with the two
-;; #2530 flips (initial_stop_buffer 1.0, reset_anchor_on_stalled_cycle true)
-;; inherited as build defaults — deliberately NOT pinned in config_overrides.
-;; Build: c7660cac3 (post-#2530). Results + params.sexp in ../results/.
-;; Every arm after 2026-08-24 diffs against this run (supersedes the
-;; unreproducible grid1-null 305% record, #2503).
-;; Run with the split-safe warehouse (/tmp/snap_top3000_dedup_v5thin_adj),
-;; SNAPSHOT_CACHE_MB=1024, --no-emit-all-eligible, --parallel 1.
-;; NOT a golden — staging scenario, sentinel bands.
+;; Item-3 surface arm (dev/experiments/stop-width-by-state-2026-09-08/README.md): the rec26y-new record spec
+;; with name/description changed and the documented overrides appended. Run at main e7dde095a (#2718) in
+;; the pinned worktree sweep-item3 on the CLEAN 2000 warehouse /tmp/snap_top3000_2000_v7mark (#2695 build),
+;; SNAPSHOT_CACHE_MB=1024, --no-emit-all-eligible, --parallel 1. NOT a golden — staging scenario, sentinel bands.
 ((name "a0-breadth-on-null")
  (description "Item-3 surface control: record convention + breadth_direction read ON, per-state map EMPTY (null: must reproduce the record salt-0 cell 263.16% if the read is purely additive)")
  (period ((start_date 2000-01-01) (end_date 2026-06-26)))

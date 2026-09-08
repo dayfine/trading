@@ -8,7 +8,8 @@ All three = the record spec `rec26y-new` (clean `_v7mark` 2000 warehouse, record
 
 | arm | per-state map | why |
 |---|---|---|
-| `a0-breadth-on-null` | EMPTY (every slot unset → scalar 1.0 = 4%) | **null control**: the breadth read is documented as purely additive; this cell must reproduce the record salt-0 cell (263.16% / 723 / DD 42.37) digit-for-digit or the read is not inert |
+| `r0-record-asis` | the record spec UNCHANGED, breadth read OFF | **build-paired comparator** (QC #2720 D2): the record at the current build; also re-bases the record itself on the post-#2709 build (expected: 263.16% / 707 / 0.385 / 42.37 if #2705/#2709 are inert on this warehouse — they need not be) |
+| `a0-breadth-on-null` | EMPTY (every slot unset → scalar 1.0 = 4%) | **null control**: the breadth read is documented as purely additive; this cell must reproduce the build-paired comparator `r0-record-asis` digit-for-digit or the read is not inert (the 09-07 record cell, 263.16% / 707 / Sharpe 0.385 / DD 42.37, ran at b48537469 — BEFORE #2705 and #2709, both of which act on marker-carrying warehouses like `_v7mark` — so it is not a build-paired null) |
 | `a1-map-neutral8` | bullish/recovering 0.9167 (12%), neutral 0.96 (8%), deteriorating/bearish 1.0 (4%) | the plan's candidate map, Neutral at the low end |
 | `a2-map-neutral10` | same with neutral 0.94 (10%) | Neutral at the high end |
 
@@ -18,4 +19,5 @@ Universe discipline: top-3000-2000 (broad) — a measurement surface, not sp500.
 
 ## Run log
 
-- 08:12 PT: lanes launched (`chain.sh A a0 a2`, `chain.sh B a1`), logs `/tmp/item3-run/chain-{A,B}.log`, artifacts `/tmp/sweeps/item3/`.
+- 08:12 PT: lanes launched (`chain.sh A a0 a2`, `chain.sh B a1`), logs `/tmp/item3-run/chain-{A,B}.log`, artifacts `/tmp/sweeps/item3/`. Two concurrent 26y cells (~4.0 GB of 7.75) — above `container-capacity-scheduling.md`'s one-at-a-time guidance; no agents are dispatched while they run.
+- QC #2720 rework: `r0-record-asis` added as the build-paired comparator (queued in lane B after a1); the null's expected trade count corrected to 707 (723 was the superseded 09-03 record); per-state entry counts need a date join on `cascade_summary.breadth_state` (per-Friday), not a per-trade field; the map only ever WIDENS (Deteriorating/Bearish 1.0 = the record scalar).

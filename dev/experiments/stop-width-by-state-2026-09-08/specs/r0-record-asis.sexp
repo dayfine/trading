@@ -2,8 +2,8 @@
 ;; with name/description changed and the documented overrides appended. Run at main e7dde095a (#2718) in
 ;; the pinned worktree sweep-item3 on the CLEAN 2000 warehouse /tmp/snap_top3000_2000_v7mark (#2695 build),
 ;; SNAPSHOT_CACHE_MB=1024, --no-emit-all-eligible, --parallel 1. NOT a golden — staging scenario, sentinel bands.
-((name "a2-map-neutral10")
- (description "Item-3 surface: record + breadth read ON + per-state map bullish/recovering 0.9167 (12%), neutral 0.94 (10%), deteriorating/bearish 1.0 (4%)")
+((name "r0-record-asis")
+ (description "Item-3 surface comparator: the record spec UNCHANGED, run at the current build (main e7dde095a, after #2705/#2709) on the clean _v7mark 2000 warehouse — the build-paired null for a0/a1/a2 (the 09-07 record cell ran at b48537469).")
  (period ((start_date 2000-01-01) (end_date 2026-06-26)))
  (universe_path "../goldens-custom-universe/composition/top-3000-2000.sexp")
  (universe_size 3000)
@@ -28,8 +28,7 @@
    ((laggard_rotation_config ((hysteresis_weeks 2))))
    ((liquidity_config ((min_entry_dollar_adv 1000000.0))))
    ((liquidity_config ((min_hold_dollar_adv 500000.0))))
-   ((stale_exit_after_days (5)))
-   ((macro_config ((breadth_direction ((enabled true)))))) ((initial_stop_buffer_by_macro_state ((bullish 0.9167) (recovering 0.9167) (neutral 0.94) (deteriorating 1.0) (bearish 1.0))))))
+   ((stale_exit_after_days (5)))))
  (expected ((total_return_pct ((min -90.0) (max 90000.0))) (total_trades ((min 1) (max 90000)))
    (win_rate ((min 0.0) (max 100.0))) (sharpe_ratio ((min -3.0) (max 5.0)))
    (max_drawdown_pct ((min 0.0) (max 90.0))) (avg_holding_days ((min 0.0) (max 800.0)))
