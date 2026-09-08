@@ -896,6 +896,26 @@
  (action
   (run sh %{dep:prune_candidates_test_runner.sh})))
 
+; publish_daily_summary test (H-DAILY-SUMMARY-PR-LOST, dev/status/harness.md,
+; 2026-09-08): dev/scripts/publish_daily_summary.sh is the plain-git +
+; curl-REST replacement for the jj-based publish step in
+; `.claude/agents/lead-orchestrator.md` Step 8, which was silently dropping
+; the daily summary every run in the GHA orchestrator container (`jj` is
+; non-functional there -- H-JJ-JST-BROKEN-GHA). A guard against that class of
+; silent loss is only worth having if it cannot itself rot unnoticed, so its
+; test runs in CI. Same shim + (universe) pattern as
+; prior_cell_check_test_runner.sh / prune_candidates_test_runner.sh above:
+; the script lives outside the dune workspace root and is resolved via
+; repo_root() at run time, and the test builds throwaway git-repo fixtures
+; (including a local bare "origin" remote, so push scenarios need no
+; network) at runtime, so it needs (universe) to see script edits.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:publish_daily_summary_test_runner.sh})))
+
 ; goldens_affected_check test (issue #2393): pins the PR-time detector
 ; for a config-default change that only a postsubmit golden would notice
 ; (the #2384 clock26 -38.42pp episode). goldens_affected_check.sh itself
