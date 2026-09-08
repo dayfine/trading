@@ -1,4 +1,5 @@
 #!/bin/sh
+# PARKED (2026-09-08): targets /tmp/snap_top3000_2000_v8splice, which was killed and deleted after the control-arm read (README §"Paired armed-splice rebuild"); re-run only after #2711 lands and a new armed build exists. The "Step 2" salted re-base in the inherited header does not apply here.
 # Paired acceptance on the armed-splice 2000 warehouse (PR-B #2708): rec26y-new salt 0 on _v8splice vs _v8ctl
 #   default) on the rebuilt 2000 warehouse; then the post-run validator; PASS =
 #   zero V16 fallback exits, zero V17 stale entries, STMP exits `delisted` at ~329.61.

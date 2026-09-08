@@ -144,5 +144,5 @@ Clean 2000-vintage warehouse (`_v7mark`), record convention, guards at default: 
 +300pp at salt 1 is two salt-1-only monsters (AEIS 2025 +$973k, MOS 2006 +$806k). 5y-2000 =
 76.69% / 98; 5y-2019 = 42.37% / 175 (2019 warehouse still survivor-tilted: gap fetch = P1).
 Full record `dev/experiments/warehouse-rebuild-2026-09-06/README.md` §Step 6. Next code:
-guard-3 retirement (MERGED #2705, 5a6ff8137), #2696 (MERGED #2709, 077b48973), PR-B (MERGED #2708, da4391d6f — detector still default-off; arm it in the next rebuild), gap fetch; then items 3–4 of 09-06 (per-state
+guard-3 retirement (MERGED #2705, 5a6ff8137), #2696 (MERGED #2709, 077b48973), PR-B (MERGED #2708) + its correction #2713 (MERGED, closes #2711: reuse = report-only, cut by exception — the blanket cut would have gutted 247/518 series, see README §"Paired armed-splice rebuild"), gap fetch (DONE 09-08 02:40: 1,359 names fetched; `_v9gap` 2009/2019 rebuild launched 03:08); then items 3–4 of 09-06 (per-state
 stop width, combined surface) against the NEW band.

@@ -1,4 +1,4 @@
-;; THE CANONICAL RECORD BASELINE (2026-08-24) — 26y broad record-convention
+;; wh-2000-superset — BUILD SCENARIO for rebuild3.sh (derived from rec26y-new: same window, universe_path → the staged superset).
 ;; run at the book-faithful stops basis. Config is the record convention
 ;; (same overrides as the funding-grid grid1-null lineage) with the two
 ;; #2530 flips (initial_stop_buffer 1.0, reset_anchor_on_stalled_cycle true)
@@ -6,7 +6,7 @@
 ;; Build: c7660cac3 (post-#2530). Results + params.sexp in ../results/.
 ;; Every arm after 2026-08-24 diffs against this run (supersedes the
 ;; unreproducible grid1-null 305% record, #2503).
-;; Run with the split-safe warehouse (/tmp/snap_top3000_dedup_v5thin_adj),
+;; BUILD SCENARIO for the paired armed-splice rebuild (rebuild3.sh): NOT a run spec — the record window over the staged superset universe.
 ;; SNAPSHOT_CACHE_MB=1024, --no-emit-all-eligible, --parallel 1.
 ;; NOT a golden — staging scenario, sentinel bands.
 ((name "wh-2000-superset")

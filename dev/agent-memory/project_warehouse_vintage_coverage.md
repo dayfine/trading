@@ -53,3 +53,5 @@ First consumer: `dev/experiments/clock-default-fixed-basis-2026-09-04/`.
 Gotcha on the way: [[project_build_snapshots_incremental_clobbers_manifest]].
 Levels across the 2000-vintage and 2019-vintage warehouses are still
 different universes — never compare a 2019-window level across them.
+
+**2026-09-08 02:40 — gap FETCHED.** 1,519 composition names missing from the 2009/2019 stores → 1,359 fetched from EODHD (Phase 1 probe green; delistings at real death dates), 12 rejected (ticker reused by a new 2026 listing — few rows), 148 synthetic `_old` twins skipped. Late-start check clean (ADRs/preferreds within weeks of the vintage). Rebuild `_v9gap` 2009/2019 warehouses next; until then the 2009/2019 `_v7mark` warehouses remain survivor-tilted (2,033 / 2,209 names). `dev/experiments/warehouse-rebuild-2026-09-06/fetch_gap.sh`.
