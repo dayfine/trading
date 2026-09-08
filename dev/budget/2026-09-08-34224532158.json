@@ -1,0 +1,28 @@
+{
+  "run_id": "2026-09-08-34224532158",
+  "timestamp": "2026-09-08T12:33:03Z",
+  "commit_sha": "5724b69cd54fd516e751034df98512a8ff8ce711",
+  "measurement_source": "claude-code-action execution_file (total_cost_usd from SDKResultMessage)",
+  "fallback_branch": "1b",
+  "notes": "total_cost_usd covers entire orchestrator run including all internally-spawned subagents (Agent tool calls). Per-subagent breakdown not available from action output — see dev/status/cost-tracking.md for limitation details.",
+  "subagents": [
+    {
+      "name": "orchestrator-total",
+      "model": "sonnet",
+      "input_tokens": null,
+      "output_tokens": null,
+      "cache_read_input_tokens": null,
+      "cache_creation_input_tokens": null,
+      "estimated_cost_usd": null,
+      "note": "Per-subagent breakdown not available from claude-code-action. total_cost_usd in totals covers all spawned subagents."
+    }
+  ],
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "cache_read_input_tokens": null,
+    "cache_creation_input_tokens": null,
+    "total_cost_usd": 20.17803125,
+    "measurement": "measured from claude-code-action execution_file total_cost_usd"
+  }
+}
