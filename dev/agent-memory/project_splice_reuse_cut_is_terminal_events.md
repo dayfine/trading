@@ -1,0 +1,12 @@
+---
+name: splice-reuse-cut-is-terminal-events
+description: 2026-09-08 paired armed rebuild (2000 vintage, control arm): PR-B's blanket "reuse → cut at the last splice" would gut 247/518 series (≥90% of bars; p50 2,033 bars) — the flagged days are terminal takeovers/bankruptcies (GES, TUP, BIG, HIBB, RAD), not ticker reuse. Treatment warehouse killed; #2711 = default report-only, cut by exception + short-tail guard.
+metadata:
+  type: project
+---
+
+**What was measured (01:27 PT, `dev/experiments/warehouse-rebuild-2026-09-06/results/splice_actions_2000_v8ctl.csv` + `reuse_cut_depth_2000_v8ctl.csv`):** detector on the 2000-vintage superset (3,015 symbols, 1999-01-02..2026-06-26) → 591 symbols with findings: interleaved 67 (drop — matches the scan's known bad names CLE/ICT/KBL/SWD/TIN/UCM/SIB…), prefix_misscale 6, **reuse 518**. Bars before the would-be cut: p10 455 / p50 2,033 / p90 4,906 / max 6,805; **247 of 518 lose ≥90% of the series**. Deepest: GES 2026-01-22 (taken private), NKTR, TUP/TUPBQ (bankruptcy), BIG, HIBB (takeover), RAD, EMMS, BFX — a takeover premium or collapse trips the [0.4, 2.5] adjusted-ratio band on the LAST real day, so "keep the later segment" keeps the STUB and deletes the company. That is Series_tail's shape seen from the other side.
+
+**Why it matters:** a single out-of-band day is far more often a corporate event than a reuse; ticker reuse needs both segments long (CHS 2004: years on each side + a volume regime change) or external evidence. The plan (§Design item 4) always said "split or drop per a committed exceptions file" — my PR-B brief made the cut blanket; the reviewers pinned the mechanism, not the rule's domain validity. **Rule for the future:** any build-time action that discards bars must be dry-run on a real vintage and its depth distribution read (bars dropped per symbol, share of series) BEFORE the armed build is trusted — the report-only arm is the cheap control and it caught this in one read.
+
+**State:** `_v8splice` killed + deleted; `_v8ctl` (report-only, identical to an unarmed build of this builder/window) kept in the container. `_v7mark` warehouses and the 263% band record stand. #2711 = fix (reuse default Kept; cut only by `cut_at`/`drop` exception; refuse cuts leaving < 250 kept bars; `n_dropped`/`n_kept` populated in report-only). Ops: the splice flags exist only on `build_scenario_snapshots.exe` (scenario-driven; needs `-fixtures-root`), not on `build_snapshots.exe`; `rebuild3.sh` is the paired invocation. Related: [[delisting-guards-2672]], [[record-rebase-2026-09-07]].

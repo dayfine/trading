@@ -190,3 +190,11 @@ keep their within-cell reads and get re-stated on their next touch.
 
 Universe note for the 5y cells: 2000 (98 trades) and 2019 (175 trades, on a 2,209-name
 warehouse that still lacks 792 composition names — the gap fetch is the remaining P1).
+
+## Paired armed-splice rebuild (2026-09-08 00:51 → 01:28 PT) — control arm read, treatment KILLED, #2711 filed
+
+`rebuild3.sh`: `build_scenario_snapshots.exe` @ 077b48973 (pinned `sweep-wh0908`; the splice flags exist only on this scenario-driven builder, which needs `-fixtures-root`), spec `specs/wh-2000-superset.sexp` (the rec26y record window over the staged 2000 superset, 3,015 symbols, window 1999-01-02..2026-06-26), `-tail-exceptions` = the committed file. Control arm `-detect-splices -no-splice-action` built in 36 min: 2,999 snaps; detector = 11,171 findings across 591 symbols; `series_splice` classes **interleaved 67 / prefix_misscale 6 / reuse 518**, all `kept` (report-only). `results/splice_actions_2000_v8ctl.csv`.
+
+Cut depth derived from the bar store (`results/reuse_cut_depth_2000_v8ctl.csv`, the sidecar reports `n_dropped = 0` in report-only mode — #2711 item 3): for the 518 `reuse` symbols the armed rule would drop p10 455 / **p50 2,033** / p75 3,269 / p90 4,906 / max 6,805 bars; **≥90% of the series for 247 symbols**, 50–90% for 143. The deepest cuts are terminal corporate events — GES 2026-01-22 (taken private; 6,805 of 6,848 bars), NKTR, TUPBQ/TUP, BIG, HIBB, RAD, EMMS, BFX — so "keep the later segment" keeps the stub and deletes the company. The treatment arm was killed at 01:28 and `_v8splice` deleted; nothing was re-based on it. The `_v7mark` warehouses and the §Step 6 band stand. Fix = #2711 (reuse default `Kept`; cut only by exception; refuse cuts that leave < 250 kept bars; `n_dropped`/`n_kept` in report-only). The 67 interleaved drops (CLE 412, ICT 589, KBL 569, SWD 1215, TIN 422, UCM 373, SIB 638, …) and the 6 prefix cases (BANB, BKNG 1999-03-29, HPC, HSBA, SBER, SGY) look right and stay.
+
+Lesson: **dry-run any bar-discarding build rule on a real vintage and read its depth distribution before trusting the armed build** — the report-only arm is the cheap control, and one read caught this.
