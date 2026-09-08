@@ -1,9 +1,25 @@
 open Core
 
-module Config = struct
-  type t = { act : bool; max_findings_keep : int; misscale_close : float }
+(* One trading year: the shortest later segment a 30-week MA and a stage
+   classification survive, and the length below which "keep the later segment"
+   keeps a stub rather than a company (#2711). See [Config.min_kept_bars]. *)
+let _default_min_kept_bars = 250
 
-  let default = { act = true; max_findings_keep = 20; misscale_close = 1000.0 }
+module Config = struct
+  type t = {
+    act : bool;
+    max_findings_keep : int;
+    misscale_close : float;
+    min_kept_bars : int;
+  }
+
+  let default =
+    {
+      act = true;
+      max_findings_keep = 20;
+      misscale_close = 1000.0;
+      min_kept_bars = _default_min_kept_bars;
+    }
 end
 
 module Exceptions = struct
@@ -43,6 +59,7 @@ module Action = struct
     | Kept_by_exception
     | Dropped_by_exception
     | Cut_by_exception
+    | Cut_refused_short_tail
   [@@deriving sexp_of, compare, equal]
 
   let to_string = function
@@ -52,6 +69,7 @@ module Action = struct
     | Kept_by_exception -> "kept_by_exception"
     | Dropped_by_exception -> "dropped_by_exception"
     | Cut_by_exception -> "cut_by_exception"
+    | Cut_refused_short_tail -> "cut_refused_short_tail"
 end
 
 type finding = {
@@ -61,6 +79,7 @@ type finding = {
   cut_after : Date.t option;
   cut_from : Date.t option;
   n_dropped : int;
+  n_kept : int;
   action : Action.t;
 }
 [@@deriving sexp_of, compare, equal]
@@ -80,19 +99,17 @@ let _last_date_before ~date bars =
   |> Option.map ~f:(fun (b : Types.Daily_price.t) -> b.date)
 
 (* Reference close for the mis-scale gate: the close on the last bar strictly
-   BEFORE the cut — the direct analogue of [Series_tail]'s [last_real_close],
-   and read on the same RAW basis, so the two modules' 1,000 thresholds mean the
-   same thing. (The detector works on adjusted closes; the mis-scale it is
-   distinguishing is a raw-price artefact.) *)
+   BEFORE the cut — the analogue of [Series_tail]'s [last_real_close], read on
+   the same RAW basis so the two modules' 1,000 thresholds mean the same thing.
+   (The detector works on adjusted closes; the mis-scale is a raw artefact.) *)
 let _boundary_close ~cut_from bars =
   _bars_before ~date:cut_from bars
   |> List.last
   |> Option.map ~f:(fun (b : Types.Daily_price.t) -> b.close_price)
 
 (* Findings count first, because no series legitimately jumps out of band
-   [max_findings_keep] times: that shape is two issuers shuffled together and no
-   date separates them. Only below the cut is a boundary meaningful, and only
-   there does the mis-scale gate get to rename the class. *)
+   [max_findings_keep] times: that shape is two issuers shuffled together, with
+   no date between them. Only below the cut may the mis-scale gate rename. *)
 let _classify (cfg : Config.t) ~n_findings ~boundary_close =
   if n_findings = 0 then Class.Clean
   else if n_findings >= cfg.max_findings_keep then Class.Interleaved
@@ -101,11 +118,16 @@ let _classify (cfg : Config.t) ~n_findings ~boundary_close =
     | Some c when Float.( >= ) c cfg.misscale_close -> Class.Prefix_misscale
     | Some _ | None -> Class.Reuse
 
+(* [Reuse] keeps the whole series (#2711): the blanket cut read a terminal
+   corporate event as a ticker recycle and kept the stub instead of the company
+   (247 of 518 lost 90%+ of their bars), so a reuse cuts only where a reviewer
+   named one. [Prefix_misscale] still cuts by rule — there the earlier segment
+   is a known artefact, not a company. *)
 let _rule_decision ~klass ~cut_from =
   match klass with
-  | Class.Clean -> Keep_all
+  | Class.Clean | Class.Reuse -> Keep_all
   | Class.Interleaved -> Drop_all
-  | Class.Reuse | Class.Prefix_misscale -> (
+  | Class.Prefix_misscale -> (
       match cut_from with Some d -> Cut d | None -> Keep_all)
 
 let _exception_decision = function
@@ -128,26 +150,50 @@ let _decide (cfg : Config.t) ~exceptions ~symbol ~rule =
     | Some r -> _exception_decision r
     | None -> (rule, _rule_action rule)
 
-(* A cut that would leave nothing behind degenerates to a drop: an entry with
-   zero bars in the manifest is exactly the shape the drop rule exists to
-   avoid. *)
+(* The structural guard on every cut, rule- or reviewer-driven: a cut leaving
+   fewer than [min_kept_bars] bars keeps a stub, and a terminal jump with a
+   short tail is [Series_tail]'s domain. It is a SAFETY NET for an exceptions
+   entry a reviewer got wrong, not the protection #2711 turns on — that is
+   [Reuse] defaulting to [Kept]; see the .mli. A cut leaving NOTHING is refused
+   with the rest; it degenerates to a drop only with the guard off, where a
+   zero-bar manifest entry is what a drop exists to avoid. *)
+let _guard_short_tail (cfg : Config.t) ~decision ~action bars =
+  match decision with
+  | Keep_all | Drop_all -> (decision, action)
+  | Cut d ->
+      let n_kept = List.length (keep_from d bars) in
+      if n_kept < cfg.min_kept_bars then
+        (Keep_all, Action.Cut_refused_short_tail)
+      else if n_kept = 0 then (Drop_all, Action.Dropped)
+      else (decision, action)
+
 let _resolve decision bars =
   match decision with
-  | Keep_all -> (Some bars, 0)
-  | Drop_all -> (None, List.length bars)
-  | Cut d -> (
-      match keep_from d bars with
-      | [] -> (None, List.length bars)
-      | kept -> (Some kept, List.length bars - List.length kept))
+  | Drop_all -> None
+  | Keep_all -> Some bars
+  | Cut d -> Some (keep_from d bars)
 
-(* The date the report names, whether or not the build acted on it: the
-   effective cut when there is one, otherwise the cut the rule would have made.
-   This is what makes a [-no-splice-action] run reviewable. *)
-let _reported_cut ~rule ~effective =
-  match (effective, rule) with
-  | Cut d, _ -> Some d
-  | (Keep_all | Drop_all), Cut d -> Some d
-  | (Keep_all | Drop_all), (Keep_all | Drop_all) -> None
+(* The date the report names, acted on or not: the cut that happened or was
+   refused, else the splice the series turns on. Naming it even for a kept
+   [Reuse] is what makes report-only reviewable (#2711 item 3). *)
+let _reported_cut ~klass ~cut_from ~attempted =
+  match attempted with
+  | Some _ -> attempted
+  | None -> (
+      match klass with
+      | Class.Reuse | Class.Prefix_misscale -> cut_from
+      | Class.Clean | Class.Interleaved -> None)
+
+(* Depth read off the BARS, not off the action, so a report-only row says how
+   deep the cut would have been. A dropped symbol loses all of them. *)
+let _counts ~reported ~dropped bars =
+  let total = List.length bars in
+  match (dropped, reported) with
+  | true, _ -> (total, 0)
+  | false, None -> (0, total)
+  | false, Some d ->
+      let n_kept = List.length (keep_from d bars) in
+      (total - n_kept, n_kept)
 
 (* A [Clean] symbol nobody vetoed has nothing to say: the report lists real
    splices and real reviewer decisions, not every symbol in the warehouse. *)
@@ -155,7 +201,8 @@ let _reportable ~klass ~exceptions ~symbol =
   (not (Class.equal klass Class.Clean))
   || Option.is_some (Exceptions.find exceptions ~symbol)
 
-let _finding ~symbol ~klass ~n_findings ~reported ~n_dropped ~action bars =
+let _finding ~symbol ~klass ~n_findings ~reported ~dropped ~action bars =
+  let n_dropped, n_kept = _counts ~reported ~dropped bars in
   {
     symbol;
     klass;
@@ -164,8 +211,12 @@ let _finding ~symbol ~klass ~n_findings ~reported ~n_dropped ~action bars =
       Option.bind reported ~f:(fun d -> _last_date_before ~date:d bars);
     cut_from = reported;
     n_dropped;
+    n_kept;
     action;
   }
+
+let _attempted_cut = function Cut d -> Some d | Keep_all | Drop_all -> None
+let _is_drop = function Drop_all -> true | Keep_all | Cut _ -> false
 
 let apply (config : Config.t) ~exceptions ~symbol ~splices bars =
   let splices = List.dedup_and_sort splices ~compare:Date.compare in
@@ -176,15 +227,20 @@ let apply (config : Config.t) ~exceptions ~symbol ~splices bars =
   in
   let klass = _classify config ~n_findings ~boundary_close in
   let rule = _rule_decision ~klass ~cut_from in
-  let effective, action = _decide config ~exceptions ~symbol ~rule in
-  let out_bars, n_dropped = _resolve effective bars in
+  let decided, decided_action = _decide config ~exceptions ~symbol ~rule in
+  let effective, action =
+    _guard_short_tail config ~decision:decided ~action:decided_action bars
+  in
+  let reported =
+    _reported_cut ~klass ~cut_from ~attempted:(_attempted_cut decided)
+  in
+  let out_bars = _resolve effective bars in
   let finding =
     if not (_reportable ~klass ~exceptions ~symbol) then None
     else
       Some
-        (_finding ~symbol ~klass ~n_findings
-           ~reported:(_reported_cut ~rule ~effective)
-           ~n_dropped ~action bars)
+        (_finding ~symbol ~klass ~n_findings ~reported
+           ~dropped:(_is_drop effective) ~action bars)
   in
   (out_bars, finding)
 
@@ -203,7 +259,7 @@ let dropped_symbols findings =
       | Action.Dropped | Action.Dropped_by_exception -> Some f.symbol
       | _ -> None)
 
-let csv_header = "symbol,class,n_findings,cut_after,n_dropped,action"
+let csv_header = "symbol,class,n_findings,cut_after,n_dropped,n_kept,action"
 let _date_or_blank = function None -> "" | Some d -> Date.to_string d
 
 let _csv_row f =
@@ -214,6 +270,7 @@ let _csv_row f =
       Int.to_string f.n_findings;
       _date_or_blank f.cut_after;
       Int.to_string f.n_dropped;
+      Int.to_string f.n_kept;
       Action.to_string f.action;
     ]
 
@@ -226,14 +283,17 @@ let _is_by_exception = function
   | Action.Kept_by_exception | Action.Dropped_by_exception
   | Action.Cut_by_exception ->
       true
-  | Action.Dropped | Action.Cut_at | Action.Kept -> false
+  | Action.Dropped | Action.Cut_at | Action.Kept | Action.Cut_refused_short_tail
+    ->
+      false
 
 let summary findings =
   Printf.sprintf
-    "series_splice: %d findings (%d dropped, %d cut_at, %d kept, %d \
-     by_exception)"
+    "series_splice: %d findings (%d dropped, %d cut_at, %d kept, %d refused, \
+     %d by_exception)"
     (List.length findings)
     (_count findings ~f:(Action.equal Action.Dropped))
     (_count findings ~f:(Action.equal Action.Cut_at))
     (_count findings ~f:(Action.equal Action.Kept))
+    (_count findings ~f:(Action.equal Action.Cut_refused_short_tail))
     (_count findings ~f:_is_by_exception)

@@ -49,6 +49,33 @@ to ingestion / warehouse build, so the backtest never sees a post-delisting stub
 4. **Interleaved series (class ii)** are handled by the splice detector at build: a
    symbol with a splice finding is split at the splice or dropped per a committed
    exceptions file; this is a separate PR (`#2649` made the detector report-only).
+
+   **2026-09-08 (#2711), correcting PR-B (#2708):** PR-B shipped this as a blanket
+   rule — every `reuse`-classed symbol cut at its last splice, keeping the later
+   segment — rather than "per a committed exceptions file" as written above. The
+   first armed scan of the 2000 vintage measured the cost: 518 reuse symbols, p50
+   **2,033 bars dropped** each, and **247 of the 518 losing 90% or more** of their
+   series
+   (`dev/experiments/warehouse-rebuild-2026-09-06/results/splice_actions_2000_v8ctl.csv`).
+   The deepest cuts are terminal corporate events, not ticker reuse — the verified
+   cases keep a stub of a few dozen bars (GES 43, after dropping 6,805 of 6,848 —
+   taken private; RAD 43, TUPBQ 26, BIG 9, HIBB 7, TUP 1), and 16 of the 20 deepest
+   cuts leave ≤80 bars. A takeover premium or a bankruptcy collapse trips the ratio
+   band on the security's *last real day*, so "keep the later segment" keeps the
+   administrative stub and deletes the company.
+   The rule is now what this item always said: `reuse` is **report-only**
+   (`Kept`), and a cut happens only via a `cut_at` / `drop` entry in the committed
+   exceptions file. `interleaved → Dropped` and `prefix_misscale → Cut_at` stand.
+   Any cut, rule- or exception-driven, is refused (`cut_refused_short_tail`) when
+   the kept later segment is shorter than `Series_splice.Config.min_kept_bars`
+   (250) — a terminal jump with a short tail is `Series_tail`'s domain. That guard
+   is a **safety net for exception-driven cuts, not the fix**: it would have refused
+   only 259 of the 518 blanket cuts, and 18 symbols lose ≥90% of their series behind
+   a ≥250-bar tail (NKTR 289, EMMS 263 — live repricings, not terminal events). The
+   report-only default is what protects those. The
+   `_v8splice` treatment warehouse built under the blanket rule was killed and
+   deleted; nothing was re-based on it, and the detector was default-off
+   throughout, so no golden or committed run was affected.
 5. **Runtime.** Guards 1 and 2 stay (a stale price is still a stale price; a zombie is
    still a zombie). Guard 3 becomes redundant on rebuilt warehouses and retires under
    `experiment-flag-discipline.md` Rule 4 once every live warehouse is rebuilt.
