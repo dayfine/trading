@@ -32,9 +32,8 @@ run_cell() { # name snapdir salt
   q=$(docker exec $C sh -c "grep -oE 'QUALITY-FLAG[^\n]*' $WORK/$tag.validator.log $ART/${tag}-validator.sexp 2>/dev/null | head -2 | tr '\n' ' '")
   log "RESULT $tag => ${m:-<no result>} V16/V17: ${q:-none} (wall $(( $(date +%s) - start ))s)"
 }
-# Paired acceptance on the armed-splice 2000 warehouse vs its report-only control (same builder, same window)
 run_cell rec5y-2019-new $W2019 0
-# salts 1-2 on BOTH warehouses: the survivorship cost as a band, paired
+# salts 1-2 on BOTH warehouses from the SAME build (sweep-wh0908): the survivorship cost as a paired band; the s0 pair is NOT build-paired (its v7 cell ran at the #2695 branch tip)
 run_cell rec5y-2019-new $W2019 1
 run_cell rec5y-2019-new $W2019OLD 1
 run_cell rec5y-2019-new $W2019 2
