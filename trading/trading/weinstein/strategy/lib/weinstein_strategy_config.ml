@@ -51,6 +51,9 @@ type config = {
   portfolio_config : Portfolio_risk.config;
   stops_config : Weinstein_stops.config;
   initial_stop_buffer : float;
+  initial_stop_buffer_by_macro_state : Stop_buffer_by_state.t;
+      [@sexp.default Stop_buffer_by_state.default]
+      (** See [.mli]. *)
   lookback_bars : int;
   bar_history_max_lookback_days : int option;
   skip_ad_breadth : bool;
@@ -198,6 +201,7 @@ let default_config ~universe ~index_symbol =
     portfolio_config = Portfolio_risk.default_config;
     stops_config = Weinstein_stops.default_config;
     initial_stop_buffer = 1.0;
+    initial_stop_buffer_by_macro_state = Stop_buffer_by_state.default;
     (* 56 = Rs.rs_ma_period - 1 + Rs.trend_lookback + 1. See the [.mli]. *)
     lookback_bars = 56;
     bar_history_max_lookback_days = None;

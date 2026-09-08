@@ -38,14 +38,27 @@
     is bit-identical (R1). *)
 
 val prefer_narrow_stops :
+  ?initial_stop_buffer:float ->
   config:Weinstein_strategy_config.config ->
   bar_reader:Bar_reader.t ->
   current_date:Core.Date.t ->
   Screener.scored_candidate list ->
   Screener.scored_candidate list
-(** [prefer_narrow_stops ~config ~bar_reader ~current_date candidates] stably
-    partitions [candidates] into (stop within [max_stop_distance_pct]) followed
-    by (stop wider), when [config.stop_width_mode = Demote_over_max].
+(** [prefer_narrow_stops ?initial_stop_buffer ~config ~bar_reader ~current_date
+     candidates] stably partitions [candidates] into (stop within
+    [max_stop_distance_pct]) followed by (stop wider), when
+    [config.stop_width_mode = Demote_over_max].
+
+    [?initial_stop_buffer] is the fallback-stop multiplier to measure widths
+    with, defaulting to [config.initial_stop_buffer]. It exists because
+    {!Weinstein_strategy_config.config.initial_stop_buffer_by_macro_state} lets
+    that multiplier depend on the macro state at entry
+    ({!Stop_buffer_by_state}), and this pass has no macro result of its own:
+    {!Entry_walk.entries_from_candidates} resolves the buffer once and passes
+    the {i same} [float] here and to the ticket builder, so the two cannot
+    disagree — which is the contract stated below. The default expression is the
+    R1 no-op: a caller that knows nothing about macro state measures exactly
+    what it measured before this parameter existed.
 
     Returns [candidates] unchanged under {!Stop_width_mode.Drop_over_max} and
     {!Stop_width_mode.Size_down}.
