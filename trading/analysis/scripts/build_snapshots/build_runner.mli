@@ -146,6 +146,32 @@ val build :
       existing manifest's recorded [csv_mtime] are reused rather than rebuilt.
       Note: incremental-skipped symbols do not (re)write their side-table; a
       full (non-incremental) build emits one per symbol.
+
+    {b An incremental build never shrinks the warehouse's index} (#2669).
+    [symbols] may be a strict {e subset} of the warehouse — a top-up adding one
+    benchmark ticker, or a cron window resuming a partial rebuild — so the final
+    manifest {b merges} this run's entries into the pre-run manifest rather than
+    replacing it: an entry for a symbol this run did not produce is carried
+    forward, and this run's entry wins on a symbol collision. Without the merge
+    a one-symbol top-up rewrote a 2,208-symbol manifest down to a single entry
+    while every [.snap] file stayed on disk, and because {!Bar_source_resolver}
+    enumerates symbols {e from the manifest} the warehouse then read as empty to
+    every runner. The merge makes the final write agree with the per-symbol
+    checkpoint, which already upserts
+    ({!Snapshot_pipeline.Snapshot_manifest.update_for_symbol}).
+
+    A carried entry is dropped when its [.snap] file no longer exists (a stale
+    index row would fail the closing verify), and the pre-run manifest is
+    dropped whole when its [schema_hash] differs from this build's (its files
+    carry another indicator set's columns); both are logged. A non-empty carry
+    set is reported as a warning, not refused — a top-up is a legitimate
+    non-superset universe, and refusing one would break the very operation this
+    flag exists to serve.
+
+    Merging is confined to the incremental path: with [incremental = false] no
+    pre-run manifest is read at all, so a full rebuild still {e replaces} the
+    index and remains the way to prune symbols the warehouse should no longer
+    carry.
     - [progress_every] — emit [progress.sexp] every N symbols processed.
     - [tail_config] / [tail_exceptions] — series-tail hygiene (#2672), applied
       to each symbol's windowed bars {e before} the pipeline sees them (see
@@ -205,9 +231,17 @@ val build :
     per-symbol checkpoints — those carry only an explicit bar-borne marker. An
     interrupted build resumed with [incremental] therefore reuses entries whose
     derived marker is not filled in; a full (non-incremental) rebuild is the
-    supported shape (#2669).
+    supported shape for (re)deriving markers across the whole warehouse. That
+    caveat is about the {e marker}, not the index — a resumed or partial run's
+    manifest still lists every symbol (see [incremental] above, #2669).
 
-    The final manifest's marker split ("N marked, M survivors") is logged.
+    The final manifest's marker split ("N marked, M survivors") is logged, over
+    the set actually written — this run's entries {e plus} any carried forward
+    (#2669) — so on a top-up the counts describe the whole warehouse index the
+    operator is signing off, not just the handful of symbols this run touched.
+    ([progress.sexp] and [terminal_runs.csv] stay run-scoped, because they count
+    work this run did.) A carried entry keeps the marker its own build derived;
+    it is not re-derived here (see above).
 
     Sketch-v5 PR 4: the sparse [<symbol>.weekly] side-table
     ({!Data_panel_snapshot.Weekly_sidetable}) is {b always} written next to each
