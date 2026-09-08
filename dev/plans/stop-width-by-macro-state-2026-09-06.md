@@ -1,5 +1,16 @@
 # Per-macro-state `initial_stop_buffer` — implementation plan (2026-09-06)
 
+> **Implemented 2026-09-08 on branch `feat/weinstein/stop-buffer-by-macro-state`**
+> (PR opened from that branch; see `dev/status/portfolio-stops.md`
+> §"Per-macro-state `initial_stop_buffer`"). Shipped as written: shape (a),
+> flat five-float record with the `0.0` sentinel, one resolved buffer threaded
+> to both consumers, map default-empty. Two deviations worth naming, neither
+> changing the design: the new module lives in `strategy/lib` as planned but
+> is also re-exported from `Weinstein_strategy` (so specs and tests can build a
+> map without reaching into the private module), and `buffer_for` treats **any
+> non-positive** slot as unset rather than exactly `0.0`, so a negative typo in
+> a sweep spec falls back instead of inverting the stop.
+
 Item 3 of the decided sequence in `dev/notes/next-session-priorities-2026-09-06.md`.
 Builds on PR #2685's five-state breadth read (`Weinstein_types.breadth_state`,
 `Macro.result.breadth_state`, `Breadth_direction`), which is already merged and

@@ -224,6 +224,12 @@ module Stop_width_mode = Stop_width_mode
     (and tests pinning the config-gated behaviour) can build the policy. See
     {!Stop_width_mode} for the honest-citation framing. *)
 
+module Stop_buffer_by_state = Stop_buffer_by_state
+(** Per-macro-state fallback initial-stop width, the type behind
+    {!config.initial_stop_buffer_by_macro_state}. Re-exposed so specs, sweeps
+    and tests can build a map without reaching into the private module. See
+    {!Stop_buffer_by_state}. *)
+
 module Entry_audit_capture = Entry_audit_capture
 (** Per-candidate entry construction + audit emission. Factored out of the main
     strategy file to keep it under the file-length cap. See
@@ -348,6 +354,13 @@ type config = {
       (** Multiplier applied to [suggested_stop] when computing the initial stop
           level for a new entry. Default: 1.02 (2% buffer above the screener
           stop). *)
+  initial_stop_buffer_by_macro_state : Stop_buffer_by_state.t;
+      (** Per-macro-state override of {!config.initial_stop_buffer} for the
+          {b entry} fallback stop. Default [Stop_buffer_by_state.default] —
+          every slot unset, so the resolved buffer is [initial_stop_buffer] for
+          every state (R1). See {!Stop_buffer_by_state} and
+          {!Weinstein_strategy_config.config.initial_stop_buffer_by_macro_state}.
+      *)
   lookback_bars : int;
       (** Number of weekly bars to pass to stage / RS / volume / breakout
           analysers (default: [56] since issue #2380 — was [52], which left

@@ -1254,6 +1254,69 @@ let test_strategy_config_parses_without_rs_declining_field _ =
        (fun (c : Weinstein_strategy.config) -> c.enable_rs_positive_declining)
        (equal_to false))
 
+(* -------------------------------------------------------------------- *)
+(* initial_stop_buffer_by_macro_state — R1/R2 wiring for the per-macro-  *)
+(* state stop width (plan stop-width-by-macro-state-2026-09-06)          *)
+(* -------------------------------------------------------------------- *)
+
+(** The map ships with every slot at [Stop_buffer_by_state.unset], so the entry
+    walk resolves [config.initial_stop_buffer] for every macro state and every
+    existing golden/baseline replays unchanged
+    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+let test_default_initial_stop_buffer_by_macro_state_is_empty _ =
+  let cfg = _default_config () in
+  assert_that cfg.initial_stop_buffer_by_macro_state
+    (equal_to
+       (Weinstein_strategy.Stop_buffer_by_state.default
+         : Weinstein_strategy.Stop_buffer_by_state.t))
+
+(** Axis reachability (R2), in the {b dot-path} spelling a sweep spec actually
+    writes ([initial_stop_buffer_by_macro_state.deteriorating=1.0] expands to
+    this overlay): it resolves through the {b real}
+    [Overlay_validator.apply_overrides] with no unknown-key error, lands the
+    named slot, and — the part the flat-five-float record exists for — leaves
+    the other four at [unset] rather than raising or blanking them. *)
+let test_stop_buffer_by_macro_state_dot_path_resolves_via_overlay_validator _ =
+  let merged =
+    Backtest.Overlay_validator.apply_overrides (_default_config ())
+      [
+        Sexp.of_string
+          "((initial_stop_buffer_by_macro_state ((deteriorating 1.0))))";
+      ]
+  in
+  assert_that merged.initial_stop_buffer_by_macro_state
+    (equal_to
+       ({
+          Weinstein_strategy.Stop_buffer_by_state.default with
+          deteriorating = 1.0;
+        }
+         : Weinstein_strategy.Stop_buffer_by_state.t))
+
+(** A config sexp with the field entirely ABSENT parses and lands the empty map
+    — the [[@sexp.default]] backward-compat half of R1: every spec written
+    before this field existed keeps parsing, bit-identically. Same pattern as
+    {!test_strategy_config_parses_with_volume_confirm_at_fill_absent}. *)
+let test_strategy_config_parses_with_stop_buffer_by_macro_state_absent _ =
+  let base = Weinstein_strategy.sexp_of_config (_default_config ()) in
+  let stripped =
+    match base with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom "initial_stop_buffer_by_macro_state"; _ ] ->
+                false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field
+       (fun (c : Weinstein_strategy.config) ->
+         c.initial_stop_buffer_by_macro_state)
+       (equal_to
+          (Weinstein_strategy.Stop_buffer_by_state.default
+            : Weinstein_strategy.Stop_buffer_by_state.t)))
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -1388,6 +1451,13 @@ let suite =
          >:: test_volume_confirm_at_fill_axis_resolves_via_overlay_validator;
          "strategy config parses with volume_confirm_at_fill absent"
          >:: test_strategy_config_parses_with_volume_confirm_at_fill_absent;
+         "default initial_stop_buffer_by_macro_state is the empty map"
+         >:: test_default_initial_stop_buffer_by_macro_state_is_empty;
+         "initial_stop_buffer_by_macro_state dot-path axis resolves via \
+          Overlay_validator"
+         >:: test_stop_buffer_by_macro_state_dot_path_resolves_via_overlay_validator;
+         "strategy config parses with initial_stop_buffer_by_macro_state absent"
+         >:: test_strategy_config_parses_with_stop_buffer_by_macro_state_absent;
        ]
 
 let () = run_test_tt_main suite

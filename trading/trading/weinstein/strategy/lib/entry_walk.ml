@@ -89,8 +89,8 @@ let _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
     so the closure is bit-identical to the pre-flag path when the flags are off
     (R1). Factored out of {!entries_from_candidates} so that function stays
     under the function-length limit. *)
-let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
-    ~portfolio_value (cand : Screener.scored_candidate) =
+let _make_entry_fn ~config ~initial_stop_buffer ~bar_reader ~current_date
+    ~stop_states ~portfolio_value (cand : Screener.scored_candidate) =
   let trigger_at_suggested =
     config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit
   in
@@ -105,9 +105,8 @@ let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
       (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
          ~current_date cand)
     ~portfolio_risk_config:config.portfolio_config
-    ~stops_config:config.stops_config
-    ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
-    ~portfolio_value ~current_date cand
+    ~stops_config:config.stops_config ~initial_stop_buffer ~stop_states
+    ~bar_reader ~portfolio_value ~current_date cand
 
 (** The two pre-walk transforms of the candidate list, both default-off
     identities (R1):
@@ -123,12 +122,29 @@ let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
     Order matters: the freeze rewrites [suggested_entry], and the demotion's
     stop-width measurement keys off the entry, so the freeze must run first or
     the two would disagree about which entry a candidate is being judged at. *)
-let _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
-    ~current_date candidates =
+let _prepare_candidates ~config ~initial_stop_buffer ~pending_entry_e ~held_set
+    ~bar_reader ~current_date candidates =
   Entry_freeze.apply ~enabled:config.freeze_entry_at_first_breakout
     ~pending:pending_entry_e ~held_set ~candidates
-  |> Entry_stop_width_order.prefer_narrow_stops ~config ~bar_reader
-       ~current_date
+  |> Entry_stop_width_order.prefer_narrow_stops ~initial_stop_buffer ~config
+       ~bar_reader ~current_date
+
+(** The fallback initial-stop multiplier this tick's entries are built with:
+    [config.initial_stop_buffer] unless
+    [config.initial_stop_buffer_by_macro_state] sets a width for the macro state
+    at entry ({!Stop_buffer_by_state}). Empty map (the default) or an absent
+    [?macro] both resolve to the scalar, so the default path is bit-identical
+    (R1).
+
+    Resolved once and threaded to both consumers — the ticket builder and the
+    [Demote_over_max] ordering pass — because the two agreeing on the width is
+    [entry_stop_width_order.mli]'s stated contract. *)
+let _initial_stop_buffer ~config ~macro =
+  match macro with
+  | None -> config.initial_stop_buffer
+  | Some (m : Macro.result) ->
+      Stop_buffer_by_state.buffer_for config.initial_stop_buffer_by_macro_state
+        ~fallback:config.initial_stop_buffer ~state:m.breadth_state
 
 (* G3: what one position still owes on a resting entry ticket, 0 for anything
    that is not one.
@@ -192,14 +208,15 @@ let entries_from_candidates ?sector_lookup
     ?(audit_recorder = Audit_recorder.noop) ?macro ?on_candidates_considered ()
     =
   let held_set = String.Set.of_list (held_symbols portfolio) in
+  let initial_stop_buffer = _initial_stop_buffer ~config ~macro in
   let candidates =
-    _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
-      ~current_date candidates
+    _prepare_candidates ~config ~initial_stop_buffer ~pending_entry_e ~held_set
+      ~bar_reader ~current_date candidates
   in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let make_entry =
-    _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
-      ~portfolio_value
+    _make_entry_fn ~config ~initial_stop_buffer ~bar_reader ~current_date
+      ~stop_states ~portfolio_value
   in
   let spendable = _spendable_cash ~config portfolio in
   let state =

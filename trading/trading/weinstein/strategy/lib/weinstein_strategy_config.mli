@@ -41,6 +41,23 @@ type config = {
           [dev/experiments/_ledger/2026-08-24-stops-basis-book-faithful.sexp].
           Structural (support-floor) stops are unaffected: this multiplier is
           read only on the fallback branch. *)
+  initial_stop_buffer_by_macro_state : Stop_buffer_by_state.t;
+      (** Per-macro-state override of {!config.initial_stop_buffer} for the
+          {b entry} fallback stop, keyed on [Macro.result.breadth_state] (PR
+          #2685).
+
+          {b Default [Stop_buffer_by_state.default] — every slot unset, so the
+             resolved buffer is [initial_stop_buffer] for every state and the
+             default path is bit-identical} (R1). Setting a slot is an
+          [Overlay_validator] axis (R2):
+          [initial_stop_buffer_by_macro_state.deteriorating=1.0].
+
+          Full contract — the sentinel, the flat-record/overlay reason, the
+          candidate map and its provenance, the Weinstein-W2 dial argument, and
+          the fact that the [deteriorating] / [recovering] slots stay inert
+          until [macro_config.breadth_direction] is armed — is in
+          {!Stop_buffer_by_state}. Plan:
+          [dev/plans/stop-width-by-macro-state-2026-09-06.md]. *)
   lookback_bars : int;
       (** Depth, in weekly bars, of the standard per-symbol weekly view the
           screen reads ([Bar_reader.weekly_view_for ~n:lookback_bars]). Every

@@ -10,6 +10,8 @@
   test_entry_audit_capture
   test_entry_freeze
   test_entry_stop_width_order
+  test_stop_buffer_by_state
+  test_stop_width_by_macro_state
   test_entry_ticket_tags
   test_entry_ticket_ttl
   test_exit_audit_capture

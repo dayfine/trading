@@ -44,7 +44,14 @@ val entries_from_candidates :
       {!Weinstein_stops.compute_initial_stop_with_floor}, threading [cand.side]:
       longs get a stop below the prior correction low; shorts get a stop above
       the prior rally high. Falls back to [config.initial_stop_buffer] when no
-      qualifying counter-move is in the lookback window.
+      qualifying counter-move is in the lookback window — or, when
+      [config.initial_stop_buffer_by_macro_state] sets a width for the
+      [breadth_state] of the [?macro] result passed here, to {i that} width
+      instead ({!Stop_buffer_by_state}). The map ships empty and an absent
+      [?macro] resolves to the scalar, so the default path is unchanged. The one
+      resolved multiplier is also what
+      {!Entry_stop_width_order.prefer_narrow_stops} measures with, so the
+      ordering pass and the gate cannot disagree about a candidate's width.
     - Emits a [CreateEntering] with [side = cand.side].
 
     Side effect: seeds [stop_states] with the computed initial stop for each new
