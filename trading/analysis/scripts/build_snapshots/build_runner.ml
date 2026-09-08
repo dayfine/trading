@@ -377,27 +377,28 @@ let _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at =
     ~progress:
       (_make_progress ~symbols_total ~symbols_done ~last_completed ~started_at)
 
-(* Entries of the pre-run manifest that are still usable as carry-forward
-   candidates. A manifest written under a DIFFERENT schema is not: its files
-   carry another indicator set's column layout, so adopting its rows would
-   advertise columns this build's readers cannot decode. Refusing across
-   schemas mirrors {!Snapshot_manifest.update_for_symbol}, which rejects a
-   cross-schema checkpoint for the same reason. *)
+(* A manifest written under a DIFFERENT schema carries another indicator set's
+   column layout, so adopting its rows would advertise columns this build's
+   readers cannot decode. Refusing across schemas mirrors
+   {!Snapshot_manifest.update_for_symbol}, which rejects a cross-schema
+   checkpoint for the same reason. Says so and carries nothing. *)
+let _refuse_cross_schema_carry ~(m : Snapshot_manifest.t) ~schema =
+  Printf.eprintf
+    "incremental: existing manifest's schema_hash %s differs from this build's \
+     %s; its %d entries are NOT carried forward\n\
+     %!"
+    m.schema_hash schema.Snapshot_schema.schema_hash (List.length m.entries);
+  []
+
+(* Entries of the pre-run manifest that are usable as carry-forward candidates:
+   all of them when the schema matches, none when it does not. *)
 let _carry_candidates ~existing ~schema =
   match existing with
   | None -> []
   | Some (m : Snapshot_manifest.t) ->
       if String.equal m.schema_hash schema.Snapshot_schema.schema_hash then
         m.entries
-      else begin
-        Printf.eprintf
-          "incremental: existing manifest's schema_hash %s differs from this \
-           build's %s; its %d entries are NOT carried forward\n\
-           %!"
-          m.schema_hash schema.Snapshot_schema.schema_hash
-          (List.length m.entries);
-        []
-      end
+      else _refuse_cross_schema_carry ~m ~schema
 
 (* Pre-run manifest entries for symbols this run did not produce (#2669).
 
