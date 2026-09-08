@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-09-03
+## Last updated: 2026-09-08
 
 ## Status
 IN_PROGRESS
@@ -819,6 +819,33 @@ Merged in main:
   `test_series_splice.ml`). No builder was run against a real warehouse in this
   PR — that is the next queue step
   (`dev/experiments/warehouse-rebuild-2026-09-06/README.md`).
+  **2026-09-08 #2711 corrects PR-B's `reuse` rule (`feat/data/splice-reuse-report-only`):**
+  the first armed scan of the 2000 vintage (control arm, `splice_actions_2000_v8ctl.csv`)
+  found 591 symbols with findings — interleaved 67, prefix_misscale 6, **reuse 518** —
+  and the blanket "cut at the last splice" would have dropped p50 **2,033 bars** per
+  reuse symbol, **247 of 518 losing 90%+** of their series. The deepest cuts are
+  terminal corporate events, not ticker reuse — the verified cases keep a stub of a
+  few dozen bars (GES 43 after dropping 6,805 of 6,848 — taken private; RAD 43,
+  TUPBQ 26, BIG 9, HIBB 7, TUP 1), and 16 of the 20 deepest cuts leave ≤80 bars: a
+  takeover premium or a bankruptcy collapse trips the ratio band on the last real
+  day, so "keep the later segment" keeps the stub and
+  deletes the company. `Series_splice` now defaults `reuse` to **`Kept`
+  (report-only)** — a reuse is cut only via a `cut_at` / `drop` entry in the committed
+  exceptions file, which is what plan §Design item 4 asked for — while
+  `interleaved → Dropped` and `prefix_misscale → Cut_at` stand. A new
+  `Config.min_kept_bars` (250, one trading year) refuses ANY cut, rule- or
+  exception-driven, whose kept later segment is shorter, reporting
+  `cut_refused_short_tail` and storing the series whole; a short tail after a terminal
+  jump is `Series_tail`'s domain. **That guard is a safety net for exception-driven
+  cuts, not the fix** — it would have refused only 259 of the 518 blanket cuts, and 18
+  symbols lose ≥90% of their series behind a ≥250-bar tail (NKTR 289, EMMS 263 — live
+  repricings, not terminal events); the report-only default is what protects those.
+  `splice_actions.csv` gains an `n_kept` column and
+  populates `n_dropped` in report-only mode too (both measured off the bars), so a
+  reviewer reads the would-be cut depth from the sidecar. The `_v8splice` treatment
+  warehouse built under the blanket rule was killed and deleted; nothing was re-based
+  on it, and `Splice_detector.Config.enabled` is still `false`, so no golden moved.
+  Verify: `dune runtest analysis/weinstein/snapshot_pipeline`.
   **2026-09-06 PR-C (`feat/fallback-exits-quality-flags`, closes #2687):** the
   three-commit follow-up implementing
   `dev/plans/delisting-data-fix-2026-09-06.md` §"Principle: fallbacks are quality

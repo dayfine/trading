@@ -32,11 +32,16 @@
 
     The splice pass writes [splices.csv] as before and, since #2672 class ii,
     {b acts} on what it finds via {!Snapshot_pipeline.Series_splice}: an
-    interleaved series (20+ findings) is dropped from the symbol set, a single
-    ticker reuse is cut at its last splice, and the decisions land in
-    [splice_actions.csv]. [-no-splice-action] restores the report-only
-    behaviour. The detector's own switch still defaults off, so none of this
-    runs unless [-detect-splices] is passed.
+    interleaved series (20+ findings) is dropped from the symbol set, a
+    mis-scaled prefix is cut away, and every decision lands in
+    [splice_actions.csv] with the depth it had or would have had. A plain
+    {e reuse} is reported and left whole (#2711 — the blanket cut read
+    take-privates and bankruptcies as ticker recycles and kept the stub); it is
+    cut only where the committed exceptions file names a [cut_at] or a [drop],
+    and any cut leaving under a trading year of bars is refused.
+    [-no-splice-action] restores the report-only behaviour. The detector's own
+    switch still defaults off, so none of this runs unless [-detect-splices] is
+    passed.
 
     A third pass, {!Snapshot_pipeline.Series_tail}, runs inside
     {!Build_runner.build} itself and is {b on by default} (#2672): it ends a
@@ -155,9 +160,11 @@ let _splice_dates (report : Splice_detector.report) =
       Map.add_multi acc ~key:f.symbol ~data:f.date)
 
 (* One decision per scanned symbol. The BARS this returns are discarded: the
-   scan window is not the build window, so the cut is re-applied to the build's
-   own bars inside {!Build_runner.build} via the plan. Only the finding — the
-   report row, which carries the decision — is kept. *)
+   scan sees only the windowed series it loaded here, while the edit has to
+   reach both halves of the symbol's history (the windowed bars behind its
+   [.snap] and the deep prefix behind its [.weekly]), so the cut is re-applied
+   inside {!Build_runner.build} via the plan. Only the finding — the report row,
+   which carries the decision — is kept. *)
 let _splice_findings ~splice_config ~exceptions ~report series =
   let dates = _splice_dates report in
   List.filter_map series ~f:(fun (s : Splice_detector.series) ->
