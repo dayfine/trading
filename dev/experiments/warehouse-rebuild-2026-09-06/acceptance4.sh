@@ -1,9 +1,7 @@
 #!/bin/sh
 # Acceptance on the GAP-FILLED 2019 warehouse (_v9gap, rebuild4.sh): rec5y-2019-new salt 0 — V16/V17 + the level vs the survivor-tilted _v7mark cell (42.37% / 175)
-#   default) on the rebuilt 2000 warehouse; then the post-run validator; PASS =
-#   zero V16 fallback exits, zero V17 stale entries, STMP exits `delisted` at ~329.61.
-# Step 2: salted record re-base — salts 0-2 of rec26y on the rebuilt 2000 warehouse,
-#   rec5y-2000 (2000 wh) and rec5y-2019 (2019 wh) at salt 0. One arm each.
+#   Then the post-run validator: PASS = zero V16 fallback exits, zero V17 stale entries. Compare the level and
+#   trade count with results/rec5y-2019-new-s0-v7-actual.sexp (42.37% / 175 on the survivor-tilted warehouse).
 # Reuses the run_cell shape of delisting-guards-rerun-2026-09-06/chain-salts.sh.
 set -u
 C=trading-1-dev
@@ -36,5 +34,10 @@ run_cell() { # name snapdir salt
 }
 # Paired acceptance on the armed-splice 2000 warehouse vs its report-only control (same builder, same window)
 run_cell rec5y-2019-new $W2019 0
+# salts 1-2 on BOTH warehouses: the survivorship cost as a band, paired
+run_cell rec5y-2019-new $W2019 1
+run_cell rec5y-2019-new $W2019OLD 1
+run_cell rec5y-2019-new $W2019 2
+run_cell rec5y-2019-new $W2019OLD 2
 # (salts 1-2 + the 5y cells follow only if the paired read is clean)
 log "WH0908V9 CHAIN DONE"
