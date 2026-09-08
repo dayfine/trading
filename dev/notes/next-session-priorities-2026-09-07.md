@@ -144,5 +144,5 @@ Clean 2000-vintage warehouse (`_v7mark`), record convention, guards at default: 
 +300pp at salt 1 is two salt-1-only monsters (AEIS 2025 +$973k, MOS 2006 +$806k). 5y-2000 =
 76.69% / 98; 5y-2019 = 42.37% / 175 (2019 warehouse still survivor-tilted: gap fetch = P1).
 Full record `dev/experiments/warehouse-rebuild-2026-09-06/README.md` §Step 6. Next code:
-guard-3 retirement (in flight), #2696, PR-B, gap fetch; then items 3–4 of 09-06 (per-state
+guard-3 retirement (MERGED #2705, 5a6ff8137), #2696 (feat agent in flight, branch `feat/backtest/delisted-ticket-cancel`), PR-B, gap fetch; then items 3–4 of 09-06 (per-state
 stop width, combined surface) against the NEW band.

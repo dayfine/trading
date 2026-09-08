@@ -19,7 +19,7 @@ container-exclusive: no agents alongside a rebuild or a 26y cell
 | 6 | Salted record re-base: rec26y salts 1–2 on 2000; rec5y-2000 (2000) and rec5y-2019 (2019) at salt 0 | `acceptance-and-rebase.sh` (remaining cells; ~2.7 h per 26y cell) | per-arm artifacts in `results/`; the new record is a **3-salt band**, never one number; dissect vs the old record by `position_id` |
 | 7 | Golden check: the committed goldens read CSV fixtures (no warehouse built in CI), so #2691's truncation cannot move them by construction — confirm on the postsubmit golden workflows of the #2692 merge and state it | — | golden workflows green |
 | 8 | Docs: record re-base entry, `project_record_rebase_*` memory, standing results restated as bands, this README's results table | docs PR (mixed → full gates) | merged |
-| 9 | Retire runtime guard 3 (`stub_print_max_ratio`) under `experiment-flag-discipline.md` Rule 4 once every live warehouse is a `_v6tail` build; guards 1+2 stay | removal PR | merged, goldens bit-identical |
+| 9 | **MERGED as #2705** (squash 5a6ff8137, 19:17 PT Sep 7): runtime guard 3 (`stub_print_max_ratio`) retired — superseded by build-time `Series_tail`; four bar-source files byte-identical to pre-#2686; guards 1+2 stay | removal PR, full gates | merged, goldens bit-identical |
 | 10 | PR-B: splice / ticker-reuse class at build (10 mis-scaled prefixes, 23 long low tails; the `splices.csv` findings) | feat PR | rebuild again → re-base again (salted) |
 
 ## Not re-run
