@@ -497,7 +497,13 @@ let _entry_with_derived_marker ~universe_end ~survivor_tolerance_days b =
 
 (* Survivor count, logged so an operator can see at a glance whether the
    vintage's marker split looks sane (#2693: the defect it catches showed up as
-   "2,999 of 2,999 marked" on a store with 778 live names). *)
+   "2,999 of 2,999 marked" on a store with 778 live names).
+
+   Called on the FINAL written set — this run's entries plus any carried
+   forward (#2669) — not on the run's own symbols, so on a top-up the split
+   still describes the whole warehouse index the operator is signing off. That
+   is deliberately unlike [progress.sexp] and the tail report, which stay
+   run-scoped because they count work this run actually did. *)
 let _log_marker_split entries =
   let marked =
     List.count entries ~f:(fun (e : Snapshot_manifest.file_metadata) ->
@@ -514,7 +520,6 @@ let _finalize_entries ~survivor_tolerance_days builts =
     List.map builts
       ~f:(_entry_with_derived_marker ~universe_end ~survivor_tolerance_days)
   in
-  _log_marker_split entries;
   entries
 
 (* Review sidecar (#2672): every terminal run below the ratio, whatever the
@@ -611,13 +616,14 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
   let entries = _finalize_entries ~survivor_tolerance_days builts in
   let carried = _carried_entries ~existing ~schema entries in
   _log_carry_forward carried;
+  let final_entries = carried @ entries in
+  _log_marker_split final_entries;
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
-  (* Only the MANIFEST gets the merged set. [progress.sexp] and the tail report
-     stay scoped to this run's own symbols — a carried entry did no work in this
-     run, so counting it would report [symbols_done > symbols_total] on a
-     top-up. *)
-  _write_final_manifest ~manifest_path ~schema ~entries:(carried @ entries)
-    ~elapsed;
+  (* Only the MANIFEST and its marker-split log get the merged set.
+     [progress.sexp] and the tail report stay scoped to this run's own symbols —
+     a carried entry did no work in this run, so counting it would report
+     [symbols_done > symbols_total] on a top-up. *)
+  _write_final_manifest ~manifest_path ~schema ~entries:final_entries ~elapsed;
   _write_tail_report ~output_dir builts;
   _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at;
   _verify_or_warn ~manifest_path

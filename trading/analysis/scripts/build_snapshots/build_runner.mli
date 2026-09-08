@@ -235,7 +235,13 @@ val build :
     caveat is about the {e marker}, not the index — a resumed or partial run's
     manifest still lists every symbol (see [incremental] above, #2669).
 
-    The final manifest's marker split ("N marked, M survivors") is logged.
+    The final manifest's marker split ("N marked, M survivors") is logged, over
+    the set actually written — this run's entries {e plus} any carried forward
+    (#2669) — so on a top-up the counts describe the whole warehouse index the
+    operator is signing off, not just the handful of symbols this run touched.
+    ([progress.sexp] and [terminal_runs.csv] stay run-scoped, because they count
+    work this run did.) A carried entry keeps the marker its own build derived;
+    it is not re-derived here (see above).
 
     Sketch-v5 PR 4: the sparse [<symbol>.weekly] side-table
     ({!Data_panel_snapshot.Weekly_sidetable}) is {b always} written next to each

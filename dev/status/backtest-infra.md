@@ -52,15 +52,34 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
     always passes the full universe and relies on `timeout` to end a cron
     window, so its resumes were already superset runs; it simply benefits when
     a window is pointed at a different universe file.
+  - **Marker-split log follows the merge.** `_log_marker_split` moved out of
+    `_finalize_entries` and now runs on `carried @ entries`, so the
+    `"N marked, M survivors (of K symbols)"` line describes the manifest the
+    build actually wrote. Left where it was it reported `of 1 symbols` on a
+    top-up that wrote 3 — and that line is what an operator reads to sign off a
+    delisting rebuild. `progress.sexp` and `terminal_runs.csv` stay run-scoped
+    (a carried entry did no work this run); the `.mli` says which is which.
   - **Tests:**
     `trading/analysis/scripts/build_snapshots/test/test_build_runner_incremental.ml`
-    (3 end-to-end cases: a top-up keeps the existing symbols; a subset rebuild
-    neither drops siblings nor duplicates itself; a full rebuild still
-    replaces). Verify:
+    (5 end-to-end cases: a top-up keeps the existing symbols *and* logs the
+    merged marker split; a subset rebuild neither drops siblings nor duplicates
+    itself; a full rebuild still replaces; a carried entry whose `.snap` is gone
+    is dropped so the closing verify still passes; a cross-schema pre-run
+    manifest is refused whole). Verify:
     `dev/lib/run-in-env.sh dune runtest analysis/scripts/build_snapshots/test/`.
-    Non-vacuous: deleting the three-line merge in `build` turns the first two
-    RED (`List length (1) does not match matchers length (3)` / `(2)`) and
-    leaves the third GREEN.
+    Non-vacuous, each reverted individually: deleting the three-line merge in
+    `build` turns the first two RED (`List length (1) does not match matchers
+    length (3)` / `(2)`) and leaves the third GREEN; dropping the
+    `Sys.file_exists` filter makes the stale-`.snap` case exit 3 on the closing
+    verify; dropping the `schema_hash` comparison makes the cross-schema case
+    carry all 3 symbols; moving the marker split back inside `_finalize_entries`
+    makes the top-up case read `of 1 symbols` against a 3-entry manifest.
+  - **Durable record reconciled.**
+    `dev/agent-memory/project_build_snapshots_incremental_clobbers_manifest.md`
+    (and its line in `dev/agent-memory/README.md`) carried "never top up with
+    `-incremental`" as a live rule; both now mark it superseded by this PR while
+    keeping the manifest-vs-`.snap` count tripwire and the superset-rebuild
+    recipe, which are still correct.
 
 ## 2026-09-03 — empty measurement window no longer crashes the runner (#2632)
 
@@ -816,7 +835,8 @@ Merged in main:
   behaviour on any warehouse built before this PR; both do on the next rebuild,
   which is why the rebuild and the record re-base are one step, not two.
   Next: review the 2000-vintage report, rebuild the three vintage warehouses in
-  Pinned shape (never `-incremental`, #2669), then PR-B (splice class) and the
+  Pinned shape (never `-incremental`, #2669 — that caveat is superseded as of
+  2026-09-08; see the #2669 entry above), then PR-B (splice class) and the
   record re-base; runtime guard 3 retires under
   `experiment-flag-discipline.md` Rule 4 once every live warehouse is rebuilt.
   **2026-09-07 PR-B of the data-layer fix (`feat/data/splice-action`), plan

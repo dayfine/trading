@@ -11,11 +11,16 @@
     These tests build a small warehouse, then re-run the builder over a
     {e subset} universe and read the resulting index back. The shapes pinned:
 
-    - an incremental top-up over a new symbol keeps the existing ones;
+    - an incremental top-up over a new symbol keeps the existing ones, and the
+      marker split logged for the run counts the carried entries too;
     - an incremental rebuild of one existing symbol neither drops its siblings
       nor duplicates itself;
     - a {e non}-incremental run still replaces the index outright, which is how
-      an operator prunes symbols the warehouse should no longer carry. *)
+      an operator prunes symbols the warehouse should no longer carry;
+    - a carried entry whose [.snap] file is gone is dropped, so the closing
+      verify still passes (carry guard B);
+    - a pre-run manifest written under another schema is refused whole (carry
+      guard A). *)
 
 open Core
 open OUnit2
@@ -72,9 +77,38 @@ let _manifest_symbols ~output_dir =
           e.symbol)
       |> List.sort ~compare:String.compare
 
-(* Build the two-symbol warehouse, then re-run over [second_run] and return the
-   symbols the final manifest indexes, sorted. *)
-let _symbols_after ~incremental second_run =
+(* The marker split and both carry guards report through stdout / stderr, so
+   pinning what they log means reading the process's own output. Both
+   descriptors are redirected to one temp file for the duration of [f] and
+   restored afterwards, leaving OUnit's own reporting untouched. *)
+let _with_captured_output f =
+  let path = Filename_unix.temp_file "build_runner_incremental_log" ".txt" in
+  Out_channel.flush Out_channel.stdout;
+  Out_channel.flush Out_channel.stderr;
+  let saved_out = Core_unix.dup Core_unix.stdout in
+  let saved_err = Core_unix.dup Core_unix.stderr in
+  let sink = Core_unix.openfile path ~mode:[ O_WRONLY; O_TRUNC ] in
+  Core_unix.dup2 ~src:sink ~dst:Core_unix.stdout ();
+  Core_unix.dup2 ~src:sink ~dst:Core_unix.stderr ();
+  Fun.protect
+    ~finally:(fun () ->
+      Out_channel.flush Out_channel.stdout;
+      Out_channel.flush Out_channel.stderr;
+      Core_unix.dup2 ~src:saved_out ~dst:Core_unix.stdout ();
+      Core_unix.dup2 ~src:saved_err ~dst:Core_unix.stderr ();
+      Core_unix.close saved_out;
+      Core_unix.close saved_err;
+      Core_unix.close sink)
+    f;
+  let log = In_channel.read_all path in
+  Stdlib.Sys.remove path;
+  log
+
+(* Build the two-symbol warehouse, run [between] against the output directory,
+   then re-run over [second_run]. Returns the symbols the final manifest
+   indexes (sorted) paired with everything that second run logged. *)
+let _topup ?(between = fun ~output_dir:(_ : string) -> ()) ~incremental
+    second_run =
   _with_temp_dir (fun dir ->
       let data_dir = Filename.concat dir "csv" in
       let output_dir = Filename.concat dir "snap" in
@@ -82,16 +116,53 @@ let _symbols_after ~incremental second_run =
       List.iter (_new_symbol :: _initial_symbols) ~f:(fun symbol ->
           _write_csv ~data_dir ~symbol);
       _build ~incremental:false ~data_dir ~output_dir _initial_symbols;
-      _build ~incremental ~data_dir ~output_dir second_run;
-      _manifest_symbols ~output_dir)
+      between ~output_dir;
+      let log =
+        _with_captured_output (fun () ->
+            _build ~incremental ~data_dir ~output_dir second_run)
+      in
+      (_manifest_symbols ~output_dir, log))
+
+let _symbols_after ~incremental second_run =
+  fst (_topup ~incremental second_run)
+
+(* Between the builds: drop one symbol's snapshot file, leaving its manifest
+   row behind as the stale index entry guard B exists to catch. *)
+let _delete_snap_of symbol ~output_dir =
+  Stdlib.Sys.remove (Filename.concat output_dir (symbol ^ ".snap"))
+
+let _bogus_schema_hash = "not-this-builds-schema"
+
+(* Between the builds: restamp the manifest under a foreign schema hash. The
+   [.snap] files are left alone — the point is a manifest whose rows advertise
+   another indicator set's column layout. *)
+let _restamp_schema_hash ~output_dir =
+  let path = Filename.concat output_dir "manifest.sexp" in
+  match Snapshot_manifest.read ~path with
+  | Error e -> failwith ("manifest read: " ^ Status.show e)
+  | Ok (m : Snapshot_manifest.t) -> (
+      match
+        Snapshot_manifest.write ~path
+          { m with schema_hash = _bogus_schema_hash }
+      with
+      | Error e -> failwith ("manifest write: " ^ Status.show e)
+      | Ok () -> ())
 
 (** The #2669 repro: an incremental top-up over a one-symbol universe must merge
     into the existing index, not replace it. Pre-fix this returned [["NEW"]] —
-    the two [.snap] files still on disk but invisible to every runner. *)
+    the two [.snap] files still on disk but invisible to every runner.
+
+    The log assertion pins the second half of the contract: the marker split is
+    reported over the set actually written (3 symbols), not over this run's own
+    (1). It read ["of 1 symbols"] while the manifest held 3 until the split was
+    moved to after the merge. *)
 let test_incremental_topup_keeps_existing_symbols _ =
   assert_that
-    (_symbols_after ~incremental:true [ _new_symbol ])
-    (elements_are [ equal_to "AAA"; equal_to "BBB"; equal_to _new_symbol ])
+    (_topup ~incremental:true [ _new_symbol ])
+    (pair
+       (elements_are [ equal_to "AAA"; equal_to "BBB"; equal_to _new_symbol ])
+       (contains_substring
+          "active_through: 0 marked, 3 survivors (of 3 symbols)"))
 
 (** A subset re-run over a symbol the warehouse already has keeps its siblings
     and yields exactly one entry for itself: the run's entry replaces the
@@ -108,6 +179,31 @@ let test_full_rebuild_still_replaces_the_index _ =
     (_symbols_after ~incremental:false [ _new_symbol ])
     (elements_are [ equal_to _new_symbol ])
 
+(** Carry guard B: a candidate whose [.snap] file no longer exists is dropped
+    instead of re-indexed. [BBB.snap] is deleted between the builds, so the
+    top-up carries [AAA] forward and leaves [BBB] out. The verify line is
+    asserted because it is what the guard protects: without the drop the stale
+    row reaches {!Snapshot_verifier.verify_directory}, which fails the file and
+    exits the build non-zero on every subsequent top-up. *)
+let test_carried_entry_without_a_snap_file_is_dropped _ =
+  assert_that
+    (_topup ~incremental:true ~between:(_delete_snap_of "BBB") [ _new_symbol ])
+    (pair
+       (elements_are [ equal_to "AAA"; equal_to _new_symbol ])
+       (contains_substring "verify: 2/2 files OK (failed=0)"))
+
+(** Carry guard A: a pre-run manifest whose [schema_hash] differs from this
+    build's is refused {e whole} — its rows describe another indicator set's
+    column layout, so adopting any of them would advertise columns this build's
+    readers cannot decode. The top-up therefore indexes [NEW] alone, and the
+    refusal is logged rather than silent. *)
+let test_cross_schema_manifest_is_not_carried _ =
+  assert_that
+    (_topup ~incremental:true ~between:_restamp_schema_hash [ _new_symbol ])
+    (pair
+       (elements_are [ equal_to _new_symbol ])
+       (contains_substring "entries are NOT carried forward"))
+
 let () =
   run_test_tt_main
     ("build_runner_incremental"
@@ -118,4 +214,8 @@ let () =
            >:: test_incremental_subset_rebuild_does_not_duplicate;
            "a full rebuild still replaces the index"
            >:: test_full_rebuild_still_replaces_the_index;
+           "a carried entry whose snap file is gone is dropped"
+           >:: test_carried_entry_without_a_snap_file_is_dropped;
+           "a cross-schema manifest is not carried forward"
+           >:: test_cross_schema_manifest_is_not_carried;
          ])
