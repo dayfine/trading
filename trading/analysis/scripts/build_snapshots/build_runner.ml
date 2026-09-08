@@ -47,8 +47,9 @@ type hygiene_opts = {
   splice_cuts : Core.Date.t Map.M(String).t;
       (* Symbols to cut at build time, and the date to keep bars from (#2672
          class ii). Decided by the scanner that sees every symbol's full
-         history; applied here to the build-window bars. Symbols the scanner
-         DROPPED never reach the runner — they are removed from [symbols]. *)
+         history; applied here to the build-window bars AND to the deep-history
+         prefix that feeds the weekly side-table. Symbols the scanner DROPPED
+         never reach the runner — they are removed from [symbols]. *)
 }
 
 type progress = {
@@ -206,13 +207,25 @@ let _write_weekly ~output_dir ~symbol ~deep_bars ~bars =
 (* Phantom-bar hygiene, applied to the windowed bars BEFORE the pipeline sees
    them: the [.snap] (and its weekly side-table) then contain only real prints.
    [deep_bars] are strictly before the window and feed only the side-table's
-   depth, so they are left alone. *)
+   depth, so THIS rule leaves them alone — it edits the series' end, and a bar
+   before the window cannot be part of it. (The splice cut below edits the
+   series' START, so it does reach them.) *)
 let _clean_tail ~(hygiene : hygiene_opts) ~symbol bars =
   Series_tail.apply hygiene.config ~exceptions:hygiene.exceptions ~symbol bars
 
 (* Splice hygiene runs BEFORE the tail rule: cutting away the earlier issuer
    first means the tail rule then reads one company's series, which is the
-   series whose terminal run it is meant to classify. *)
+   series whose terminal run it is meant to classify.
+
+   Applied to [deep_bars] as well as the window bars, and that is not a
+   symmetry for its own sake: the scan and build windows are the same, so a cut
+   date is always inside the window and the whole deep prefix — up to
+   [sketch_deep_days] of it — is by construction the EARLIER issuer's. Cutting
+   it yields [] for a cut symbol, which is the right depth for a series that
+   starts at the cut. Leaving it would put ten years of the previous company's
+   weekly bars into the side-table, which is the only overhead-supply
+   representation the reader has — precisely the two-issuers defect the cut
+   exists to close. *)
 let _cut_splice ~(hygiene : hygiene_opts) ~symbol bars =
   match Map.find hygiene.splice_cuts symbol with
   | None -> bars
@@ -224,6 +237,7 @@ let _cut_splice ~(hygiene : hygiene_opts) ~symbol bars =
 let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
     ~output_dir ~csv_mtime ~hygiene =
   let path = _file_path ~output_dir ~symbol in
+  let deep_bars = _cut_splice ~hygiene ~symbol deep_bars in
   let bars, findings =
     _clean_tail ~hygiene ~symbol (_cut_splice ~hygiene ~symbol bars)
   in
@@ -452,34 +466,45 @@ let _write_tail_report ~output_dir builts =
      Printf.eprintf "%s write failed: %s\n%!" tail_report_name msg);
   Printf.printf "%s\n%!" (Series_tail.summary findings)
 
-(* Pure loader: the failure is a value, so both halves are testable. The CLI
-   shells turn the [Error] into an exit via [tail_exceptions_or_exit] /
-   [splice_exceptions_or_exit]. One file, two sections, two parsers — each
-   ignores the other's section. *)
-let _read_exceptions_file ~what ~parse p =
-  match Or_error.try_with (fun () -> parse (Sexp.load_sexp p)) with
+(* The ONE on-disk shape of the warehouse exceptions file. Both sections are
+   optional — a file may carry only [keep_tail], only [splice], or both — but
+   the record is STRICT: no [allow_extra_fields], so a mistyped section name
+   ([splcie]) is a parse error rather than a silently empty veto list. That
+   strictness is what makes the fatal load path below mean anything: degrading
+   to "no exceptions" would edit exactly the symbols a reviewer vetoed. *)
+type exceptions_file = {
+  keep_tail : string list; [@sexp.default []]
+  splice : Series_splice.Exceptions.rule list; [@sexp.default []]
+}
+[@@deriving of_sexp]
+
+let _empty_exceptions_file = { keep_tail = []; splice = [] }
+
+let _parse_exceptions_file p =
+  match
+    Or_error.try_with (fun () -> exceptions_file_of_sexp (Sexp.load_sexp p))
+  with
   | Ok t -> Ok t
   | Error e ->
       Status.error_invalid_argument
-        (Printf.sprintf "%s exceptions load failed (%s): %s" what p
+        (Printf.sprintf "warehouse exceptions load failed (%s): %s" p
            (Error.to_string_hum e))
 
-let _parse_tail_exceptions s =
-  Series_tail.Exceptions.of_file (Series_tail.Exceptions.file_of_sexp s)
-
-let _parse_splice_exceptions s =
-  Series_splice.Exceptions.of_file (Series_splice.Exceptions.file_of_sexp s)
+(* Pure loader: the failure is a value, so both halves are testable. The CLI
+   shells turn the [Error] into an exit via [tail_exceptions_or_exit] /
+   [splice_exceptions_or_exit]. One file, ONE parse, two views — the section a
+   caller does not care about still has to be well-formed. *)
+let _load_exceptions_file = function
+  | None -> Ok _empty_exceptions_file
+  | Some p -> _parse_exceptions_file p
 
 let load_tail_exceptions path =
-  match path with
-  | None -> Ok Series_tail.Exceptions.empty
-  | Some p -> _read_exceptions_file ~what:"tail" p ~parse:_parse_tail_exceptions
+  Result.map (_load_exceptions_file path) ~f:(fun f ->
+      Series_tail.Exceptions.of_symbols f.keep_tail)
 
 let load_splice_exceptions path =
-  match path with
-  | None -> Ok Series_splice.Exceptions.empty
-  | Some p ->
-      _read_exceptions_file ~what:"splice" p ~parse:_parse_splice_exceptions
+  Result.map (_load_exceptions_file path) ~f:(fun f ->
+      Series_splice.Exceptions.of_rules f.splice)
 
 (* A malformed or missing exceptions file is FATAL: silently falling back to "no
    exceptions" would edit exactly the symbols a reviewer vetoed. *)

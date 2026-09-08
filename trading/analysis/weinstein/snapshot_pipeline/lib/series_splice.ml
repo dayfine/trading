@@ -10,12 +10,6 @@ module Exceptions = struct
   type rule = Keep of string | Drop of string | Cut_at of string * Date.t
   [@@deriving sexp, equal]
 
-  (* The [splice] section is optional and unknown sections are ignored, so this
-     one file carries both this module's rules and [Series_tail]'s [keep_tail]
-     list without either parser tripping over the other's section. *)
-  type file = { splice : rule list [@sexp.default []] }
-  [@@deriving sexp] [@@sexp.allow_extra_fields]
-
   type t = rule Map.M(String).t
 
   let _symbol = function Keep s | Drop s | Cut_at (s, _) -> s
@@ -27,7 +21,6 @@ module Exceptions = struct
     List.fold rules ~init:empty ~f:(fun acc r ->
         Map.set acc ~key:(_symbol r) ~data:r)
 
-  let of_file (f : file) = of_rules f.splice
   let find t ~symbol = Map.find t symbol
 end
 

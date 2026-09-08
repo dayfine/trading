@@ -61,12 +61,21 @@ val tail_params :
 
 val load_splice_exceptions :
   string option -> Snapshot_pipeline.Series_splice.Exceptions.t Status.status_or
-(** [load_splice_exceptions path] reads the {b splice} section of the same
-    warehouse exceptions file (issue #2672 class ii). [None] is
-    [Ok Exceptions.empty]. Sections are independent: a file carrying only
-    [keep_tail] parses here as "no splice exceptions", and a file carrying only
-    [splice] parses in {!load_tail_exceptions} as "no tail exceptions". A
-    missing or malformed file is an [Error], never a silent fallback. *)
+(** [load_splice_exceptions path] reads the {b splice} section of the warehouse
+    exceptions file (issue #2672 class ii). [None] is [Ok Exceptions.empty].
+
+    The file is parsed {b once}, by this module, into one strict record
+    [{ keep_tail; splice }]; this loader and {!load_tail_exceptions} are two
+    views of it. Both sections are {b optional} and independent: a file carrying
+    only [keep_tail] loads here as "no splice exceptions", and a file carrying
+    only [splice] loads in {!load_tail_exceptions} as "no tail exceptions".
+
+    Optional is not lenient. The record admits {b no other field}, so a mistyped
+    section name ([splcie]) is a parse [Error] rather than a silently empty veto
+    list — a missing, malformed, or misspelt file is never a silent fallback,
+    because that fallback would edit exactly the symbols a reviewer vetoed.
+    Consequently a file whose {e other} section is malformed fails here too,
+    which is the intended behaviour: one file, one parse, one verdict. *)
 
 val splice_exceptions_or_exit :
   string option -> Snapshot_pipeline.Series_splice.Exceptions.t
@@ -75,13 +84,14 @@ val splice_exceptions_or_exit :
 
 val load_tail_exceptions :
   string option -> Snapshot_pipeline.Series_tail.Exceptions.t Status.status_or
-(** [load_tail_exceptions path] reads the series-tail veto list. [None] is
-    [Ok Exceptions.empty] (no exceptions). [Some p] parses [p] as
-    {!Snapshot_pipeline.Series_tail.Exceptions.file}; a missing or malformed
-    file is an [Error], never a silent fallback to "no exceptions" — that
-    fallback would truncate exactly the symbols a reviewer vetoed. Returning the
-    failure as a value (rather than exiting here) is what makes both halves
-    testable; the exit lives in {!tail_exceptions_or_exit}. *)
+(** [load_tail_exceptions path] reads the {b keep_tail} section of the same
+    warehouse exceptions file. [None] is [Ok Exceptions.empty] (no exceptions).
+    [Some p] parses [p] as the one strict record described under
+    {!load_splice_exceptions} and projects its [keep_tail] list; a missing,
+    malformed, or misspelt file is an [Error], never a silent fallback to "no
+    exceptions" — that fallback would truncate exactly the symbols a reviewer
+    vetoed. Returning the failure as a value (rather than exiting here) is what
+    makes both halves testable; the exit lives in {!tail_exceptions_or_exit}. *)
 
 val tail_exceptions_or_exit :
   string option -> Snapshot_pipeline.Series_tail.Exceptions.t
@@ -149,11 +159,19 @@ val build :
       {!tail_exceptions_or_exit}, which makes an unreadable file fatal;
       {!Snapshot_pipeline.Series_tail.Exceptions.empty} means no exceptions.
       [deep_bars] are strictly before the window and feed only the side-table's
-      depth, so they are not edited.
+      depth, so {e this} rule does not edit them — it trims the series' end, and
+      a bar before the window is not part of it. ([splice_cuts] below trims the
+      series' start, so it does reach them.)
     - [splice_cuts] — build-time splice hygiene (#2672 class ii,
       {!Snapshot_pipeline.Series_splice}). Each named symbol's bars are cut to
       those dated on or after its date, {e before} the tail rule runs, so the
-      stored series describes one issuer. Decided by the caller's splice scan
+      stored series describes one issuer. The cut reaches {b both} halves of the
+      symbol's history: the windowed bars behind its [.snap], and the
+      [deep_bars] prefix behind its [.weekly] side-table. A cut date is inside
+      the build window and the deep prefix is strictly before it, so for a cut
+      symbol the prefix is entirely the earlier issuer's and drops out whole —
+      without that, the side-table (the reader's only overhead-supply source)
+      would still describe two companies. Decided by the caller's splice scan
       (which sees every symbol's full history) rather than here; symbols that
       scan {e dropped} are simply absent from [symbols], so they get no [.snap]
       and no manifest entry. Defaults to empty — a build that passes nothing

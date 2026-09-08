@@ -263,24 +263,15 @@ let test_csv_and_summary _ =
 let test_empty_csv_is_header_only _ =
   assert_that (Series_tail.to_csv []) (equal_to (Series_tail.csv_header ^ "\n"))
 
-(* The on-disk shape of trading/test_data/warehouse_exceptions.sexp: a reviewer
-   edits that file by hand, so the parse is part of the contract. *)
-let test_exceptions_file_shape _ =
+(* The veto list itself: [of_symbols] is the view {!Build_runner} hands this
+   module after parsing the [keep_tail] section. The on-disk parse is pinned
+   next to that parser, in [test_build_runner_exceptions.ml]. *)
+let test_exceptions_membership _ =
+  let t = Series_tail.Exceptions.of_symbols [ "STMP"; "WDR" ] in
   assert_that
-    ( Series_tail.Exceptions.file_of_sexp
-        (Sexp.of_string "((keep_tail (STMP WDR)))")
-    |> Series_tail.Exceptions.of_file
-    |> fun t ->
-      List.map [ "STMP"; "WDR"; "HIBB" ] ~f:(fun symbol ->
-          Series_tail.Exceptions.mem t ~symbol) )
+    (List.map [ "STMP"; "WDR"; "HIBB" ] ~f:(fun symbol ->
+         Series_tail.Exceptions.mem t ~symbol))
     (elements_are [ equal_to true; equal_to true; equal_to false ])
-
-let test_empty_exceptions_file_parses _ =
-  assert_that
-    (Series_tail.Exceptions.file_of_sexp (Sexp.of_string "((keep_tail ()))")
-    |> Series_tail.Exceptions.of_file
-    |> Series_tail.Exceptions.mem ~symbol:"STMP")
-    (equal_to false)
 
 let test_summary_counts _ =
   assert_that
@@ -310,8 +301,7 @@ let suite =
          "csv_and_summary" >:: test_csv_and_summary;
          "empty_csv_is_header_only" >:: test_empty_csv_is_header_only;
          "summary_counts" >:: test_summary_counts;
-         "exceptions_file_shape" >:: test_exceptions_file_shape;
-         "empty_exceptions_file_parses" >:: test_empty_exceptions_file_parses;
+         "exceptions_membership" >:: test_exceptions_membership;
        ]
 
 let () = run_test_tt_main suite

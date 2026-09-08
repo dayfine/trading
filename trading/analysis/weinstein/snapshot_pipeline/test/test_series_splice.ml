@@ -222,47 +222,47 @@ let test_cut_plan_and_dropped_symbols_read_the_actions _ =
           [ pair (equal_to "CHS") (equal_to ~cmp:Date.equal (_day 3)) ])
        (elements_are [ equal_to "ICT" ]))
 
-let test_exceptions_file_parses_all_three_rules _ =
+(* [act = false] short-circuits AHEAD of the exceptions lookup. Without that
+   guard a [-no-splice-action] run would honour [Drop CHS] and delete the
+   symbol, breaking "not one bar changed" for the report-only mode. The report
+   still names the cut the rule would have made. *)
+let test_report_only_ignores_a_drop_exception _ =
   assert_that
-    ( Exceptions.file_of_sexp
-        (Sexp.of_string
-           "((splice ((keep AGR) (drop ICT) (cut_at CHS 2004-12-20))))")
-    |> Exceptions.of_file
-    |> fun t ->
-      List.map [ "AGR"; "ICT"; "CHS"; "SWD" ] ~f:(fun symbol ->
-          Exceptions.find t ~symbol) )
-    (elements_are
-       [
-         is_some_and
-           (equal_to ~cmp:Exceptions.equal_rule (Exceptions.Keep "AGR"));
-         is_some_and
-           (equal_to ~cmp:Exceptions.equal_rule (Exceptions.Drop "ICT"));
-         is_some_and
-           (equal_to ~cmp:Exceptions.equal_rule
-              (Exceptions.Cut_at ("CHS", _d "2004-12-20")));
-         is_none;
-       ])
+    (_apply
+       ~config:{ Config.default with act = false }
+       ~exceptions:(Exceptions.of_rules [ Exceptions.Drop "CHS" ])
+       ~splices:[ _day 3 ]
+       _five)
+    (pair
+       (is_some_and (_bars_dated [ 0; 1; 2; 3; 4 ]))
+       (is_some_and
+          (_finding_is ~klass:Class.Reuse ~action:Action.Kept ~n_findings:1
+             ~cut_after:(Some (_day 2))
+             ~n_dropped:0)))
 
-(* Backward compatibility: the committed file's pre-#2672-class-ii shape (only
-   [keep_tail]) must still parse here as "no splice exceptions". *)
-let test_keep_tail_only_file_parses_as_no_splice_exceptions _ =
+(* Same guard, the other overriding rule: a [Cut_at] a reviewer recorded must
+   not move a single bar while the pass is report-only. The symbol is [Clean],
+   so the row exists only because an exception names it. *)
+let test_report_only_ignores_a_cut_at_exception _ =
   assert_that
-    (Exceptions.file_of_sexp (Sexp.of_string "((keep_tail (STMP WDR)))")
-    |> Exceptions.of_file
-    |> Exceptions.find ~symbol:"STMP")
-    is_none
+    (_apply
+       ~config:{ Config.default with act = false }
+       ~exceptions:(Exceptions.of_rules [ Exceptions.Cut_at ("CHS", _day 1) ])
+       ~splices:[] _five)
+    (pair
+       (is_some_and (_bars_dated [ 0; 1; 2; 3; 4 ]))
+       (is_some_and
+          (_finding_is ~klass:Class.Clean ~action:Action.Kept ~n_findings:0
+             ~cut_after:None ~n_dropped:0)))
 
-(* The other direction: [Series_tail] must ignore the section this PR adds, so
-   one file serves both modules. *)
-let test_series_tail_ignores_the_splice_section _ =
+(* "A symbol named twice keeps the last rule" — an operator appends a
+   correction rather than deleting the line above it. *)
+let test_of_rules_keeps_the_last_rule_for_a_symbol _ =
   assert_that
-    ( Snapshot_pipeline.Series_tail.Exceptions.file_of_sexp
-        (Sexp.of_string "((keep_tail (STMP)) (splice ((drop ICT))))")
-    |> Snapshot_pipeline.Series_tail.Exceptions.of_file
-    |> fun t ->
-      List.map [ "STMP"; "ICT" ] ~f:(fun symbol ->
-          Snapshot_pipeline.Series_tail.Exceptions.mem t ~symbol) )
-    (elements_are [ equal_to true; equal_to false ])
+    (Exceptions.find
+       (Exceptions.of_rules [ Exceptions.Keep "CHS"; Exceptions.Drop "CHS" ])
+       ~symbol:"CHS")
+    (is_some_and (equal_to ~cmp:Exceptions.equal_rule (Exceptions.Drop "CHS")))
 
 let test_csv_renders_the_documented_columns _ =
   assert_that
@@ -319,12 +319,12 @@ let suite =
          >:: test_keep_from_is_inclusive_of_its_own_date;
          "cut_plan_and_dropped_symbols_read_the_actions"
          >:: test_cut_plan_and_dropped_symbols_read_the_actions;
-         "exceptions_file_parses_all_three_rules"
-         >:: test_exceptions_file_parses_all_three_rules;
-         "keep_tail_only_file_parses_as_no_splice_exceptions"
-         >:: test_keep_tail_only_file_parses_as_no_splice_exceptions;
-         "series_tail_ignores_the_splice_section"
-         >:: test_series_tail_ignores_the_splice_section;
+         "report_only_ignores_a_drop_exception"
+         >:: test_report_only_ignores_a_drop_exception;
+         "report_only_ignores_a_cut_at_exception"
+         >:: test_report_only_ignores_a_cut_at_exception;
+         "of_rules_keeps_the_last_rule_for_a_symbol"
+         >:: test_of_rules_keeps_the_last_rule_for_a_symbol;
          "csv_renders_the_documented_columns"
          >:: test_csv_renders_the_documented_columns;
          "empty_csv_is_the_header_alone" >:: test_empty_csv_is_the_header_alone;

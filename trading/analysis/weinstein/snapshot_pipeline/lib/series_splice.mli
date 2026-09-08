@@ -16,7 +16,7 @@
 
     The committed full scan
     ([dev/experiments/arc-rerun-2026-09-01/results/splice-scan.csv], 11,028
-    flagged bars across 602 symbols of the 2000-vintage warehouse
+    flagged bars across 603 symbols of the 2000-vintage warehouse
     [snap_top3000_dedup_v5thin_adj]) splits into two shapes a single rule cannot
     treat alike:
 
@@ -86,10 +86,10 @@ end
 
 module Exceptions : sig
   (** A reviewer's veto of, or substitute for, the rule's decision on one
-      symbol. Read from the committed
+      symbol. Recorded in the committed
       [trading/test_data/warehouse_exceptions.sexp] (the same file
-      {!Series_tail} reads, under a separate [splice] section) so a decision
-      lands without a code change. *)
+      {!Series_tail}'s vetoes live in, under a separate [splice] section) so a
+      decision lands without a code change. *)
   type rule =
     | Keep of string  (** Store the series whole, however it classifies. *)
     | Drop of string  (** Exclude the symbol, however it classifies. *)
@@ -99,19 +99,19 @@ module Exceptions : sig
   [@@deriving sexp, equal]
 
   type t
+  (** The [splice] section of the committed warehouse exceptions file, indexed
+      by symbol. On disk the file reads [((keep_tail (...)) (splice (...)))],
+      with each splice rule spelt [(keep SYM)] / [(drop SYM)] /
+      [(cut_at SYM 2004-12-20)].
 
-  type file = { splice : rule list } [@@deriving sexp]
-  (** On-disk shape of the file's [splice] section:
-      [((splice ((keep SYM) (drop SYM) (cut_at SYM 2004-12-20))))]. The section
-      is optional and unknown sections are ignored, so a file carrying only
-      {!Series_tail}'s [keep_tail] parses as "no splice exceptions" and a file
-      carrying both parses for both modules. *)
+      This module does {e not} parse that file. {!Build_runner} reads it once,
+      into a single strict record whose two sections are both optional, and
+      hands each module its own section as a view — see
+      {!Build_runner.load_splice_exceptions}. Strict means a mistyped section
+      name is a parse error rather than a silently empty veto list. *)
 
   val empty : t
   (** No exceptions — every symbol is subject to the rule. *)
-
-  val of_file : file -> t
-  (** [of_file f] is [of_rules f.splice]. *)
 
   val of_rules : rule list -> t
   (** [of_rules rules] indexes [rules] by symbol. A symbol named twice keeps the
