@@ -846,6 +846,38 @@ Merged in main:
   Verify: `dune runtest trading/weinstein/strategy analysis/scripts/build_snapshots`.
   Next: rebuild the three vintage warehouses on this build (#2693 changes every
   manifest), re-run the acceptance cell (expect V17 = 0), then the salts.
+  **2026-09-07 PR-E (`feat/backtest/delisted-ticket-cancel`, closes #2696):** the
+  fill-time residual PR-D's own behavioral review named. PR-D gates *admission*,
+  but a ticket admitted on the marker day itself (kept deliberately, to mirror
+  the exit's `as_of <= active_through` boundary) is a resting order that could
+  still fill days later: `Market_state.update` keeps serving a dark symbol's
+  retained last bar, `Engine.process_orders` iterates active orders rather than
+  today's bars, resting tickets are not re-screened at the default config, and
+  the StopLimit entry model is exempt from the next-open fill gate. That band —
+  1 to 6 days past the marker — sits *under* V17's `stale_entry_days = 7`, so a
+  clean V17 after PR-D was evidence by margin, not by construction.
+  New `Trading_simulation.Delisted_ticket_cancel`
+  (`trading/trading/simulation/lib/delisted_ticket_cancel.mli`) closes it: run
+  last in `Forced_exit_step.run` (before the step's order processing), it emits
+  a `CancelEntry` tagged `delisted` — the same token the exit side stamps, so
+  one audit group covers both halves — for every wholly-unfilled `Entering`
+  position whose `active_through_for symbol = Some d` with `Date.(d < date)`,
+  and retires the matching resting order through
+  `Cancel_handler.cancel_resting_entry_orders`. Selection excludes a partially
+  filled entry (its shares are booked; the core `CancelEntry` validator rejects
+  it anyway) and any `Holding` position (the exit runner's job). It is
+  deliberately **not** gated on `today_bars`, unlike both exit runners: a
+  resting order *can* fill on a bar-less calendar day against the retained bar,
+  which is exactly when the hole is reachable. **Data-driven, no config flag** —
+  a pre-#2691 warehouse answers `None` for every symbol, so it is a no-op and
+  every golden is bit-identical (R1 met structurally). The three guards now
+  compose: admission blocks new tickets, this retires the marker-day one, and
+  `Delisted_exit_runner` closes anything that filled before either.
+  Verify: `dune exec trading/simulation/test/test_delisted_ticket_cancel.exe`
+  (10 selection / order-retirement / boundary cases) and
+  `dune exec trading/simulation/test/test_delisted_ticket_cancel_sim.exe` (the
+  V17 boundary end-to-end: without the marker the identical bar series fills on
+  the cross day, 2 days past the marker date, and with it produces zero trades).
 
 - **Step 3 (tier-aware bar loader)** now unblocked; separately tracked at
   `dev/status/backtest-scale.md`. A/B the Legacy vs Tiered loader
