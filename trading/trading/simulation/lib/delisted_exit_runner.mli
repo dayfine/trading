@@ -40,6 +40,13 @@
 
 open Core
 
+val label : string
+(** The delisting token, ["delisted"]: the [label] carried by {!exit_reason}'s
+    [StrategySignal], and — read from here rather than repeated as a literal —
+    the value {!Trading_simulation.Delisted_ticket_cancel.cancel_reason} stamps
+    on the {b cancel} half of a delisting. One definition, so the two halves
+    cannot drift apart in [trade_audit.sexp] / [trades.csv]. *)
+
 val exit_reason : Date.t -> Trading_strategy.Position.exit_reason
 (** [exit_reason active_through] is the [Position.exit_reason] stamped on the
     exit: a [StrategySignal] tagged [label = "delisted"], with

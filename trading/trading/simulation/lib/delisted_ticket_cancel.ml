@@ -4,11 +4,12 @@
 open Core
 module Position = Trading_strategy.Position
 
-(* Equal to the label {!Delisted_exit_runner.exit_reason} stamps on the exit
-   side, so one token covers both halves of a delisting in [trade_audit.sexp].
-   A stable identifier rather than a sentence, matching the sibling tokens in
-   {!Cancel_handler} and {!Weinstein_strategy.Entry_ticket_ttl}. *)
-let cancel_reason = "delisted"
+(* Read from {!Delisted_exit_runner}, which owns the single definition of the
+   literal, so one token covers both halves of a delisting in
+   [trade_audit.sexp] and the two cannot drift apart. A stable identifier
+   rather than a sentence, matching the sibling tokens in {!Cancel_handler} and
+   {!Weinstein_strategy.Entry_ticket_ttl}. *)
+let cancel_reason = Delisted_exit_runner.label
 
 (* True when [pos] is a wholly-unfilled resting ticket. A partially-filled
    [Entering] is excluded here rather than left to fail downstream: the core

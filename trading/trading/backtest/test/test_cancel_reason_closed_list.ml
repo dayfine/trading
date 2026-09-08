@@ -1,35 +1,45 @@
 (** Exhaustiveness pin for the {b cancel-reason closed list} (R2 on the
     trade-audit track, filed by qc-behavioral on PR #2357).
 
-    {b The claim under test.} Three docstrings —
-    [Trade_audit.record_transitions], [Ticket_lifecycle.cancel_reason], and
-    [Cancel_handler.portfolio_rejection_reason] — each assert a {e closed} list:
-    exactly three reason tokens can ever land in
-    [Ticket_lifecycle.cancel_reason]. Two are strategy {e decisions} built by
-    [Weinstein_strategy.Entry_ticket_ttl]; the third is the simulator's
-    capital-timing {e accident}, [Cancel_handler.portfolio_rejection_reason].
-    The distinction is load-bearing: a cancel-age column averaged without
-    splitting on the token mixes a policy with a failure
-    ([dev/notes/ticket-death-on-cash-2026-08-16.md]).
+    {b The claim under test.} Four docstrings —
+    [Trade_audit.record_transitions], [Ticket_lifecycle.cancel_reason],
+    [Cancel_handler.portfolio_rejection_reason] and
+    [Delisted_ticket_cancel.cancel_reason] — each assert a {e closed} list:
+    exactly four reason tokens can ever land in
+    [Ticket_lifecycle.cancel_reason], in {b three} categories. Two are strategy
+    {e decisions} built by [Weinstein_strategy.Entry_ticket_ttl]; the third is
+    the simulator's capital-timing {e accident},
+    [Cancel_handler.portfolio_rejection_reason]; the fourth is a
+    {e data-driven death}, [Delisted_ticket_cancel.cancel_reason] ([delisted],
+    #2696), emitted when a resting ticket's symbol has stopped existing. The
+    distinction is load-bearing: a cancel-age column averaged without splitting
+    on the token mixes a policy with a failure with a fact about the data
+    ([dev/notes/ticket-death-on-cash-2026-08-16.md],
+    [dev/plans/delisting-data-fix-2026-09-06.md]).
 
-    {b Why a hand-written list of three literals would pin nothing.} Comparing
-    three string constants against three string constants passes forever. So the
+    {b Why a hand-written list of four literals would pin nothing.} Comparing
+    four string constants against four string constants passes forever. So the
     {e reachable} side of the equality below is never written down — it is
-    {b derived} by driving the two production producers over an input grid,
+    {b derived} by driving the three production producers over an input grid,
     pushing every [CancelEntry] they emit through
     [Trade_audit.record_transitions], and reading back what the audit persisted.
     Only the {e documented} side is written down. Rename a token, delete a
     producer arm, or stop the audit persisting one, and the two sets diverge.
 
-    {b What this does NOT catch — stated plainly.} The grid drives the two
-    producer modules that exist today. A {e fourth} producer added in some third
+    {b What this does NOT catch — stated plainly.} The grid drives the three
+    producer modules that exist today. A {e fifth} producer added in some fourth
     module would not be reached, and this test would stay green while the
-    docstrings went stale. Closing that requires a source-level census of
-    [CancelEntry] construction sites, which is a linter's job, not a unit test's
-    — filed as R5 on [dev/status/trade-audit.md]. Within the two modules driven
-    here the grid is genuinely a sweep (every armed/disarmed combination of both
-    [Entry_ticket_ttl] gates, across three position states and three ages), so a
-    new arm added to either producer is very likely to be reached. *)
+    docstrings went stale. That is not hypothetical: it is exactly what happened
+    to the previous revision of this test, which drove two producers and stayed
+    green while #2709 added [Delisted_ticket_cancel] as a third — the blind spot
+    this docstring predicted, realised. Closing it requires a source-level
+    census of [CancelEntry] construction sites, which is a linter's job, not a
+    unit test's — filed as R5 on [dev/status/trade-audit.md], and #2709 is the
+    evidence that follow-up is worth doing. Within the three modules driven here
+    the grid is genuinely a sweep (every armed/disarmed combination of both
+    [Entry_ticket_ttl] gates, and every marker position relative to the step
+    date, across three position states and three ages), so a new arm added to
+    any producer is very likely to be reached. *)
 
 open OUnit2
 open Core
@@ -38,19 +48,22 @@ module TA = Backtest.Trade_audit
 module TL = Backtest.Ticket_lifecycle
 module Position = Trading_strategy.Position
 module Cancel_handler = Trading_simulation.Cancel_handler
+module Delisted_ticket_cancel = Trading_simulation.Delisted_ticket_cancel
 module Entry_ticket_ttl = Weinstein_strategy.Entry_ticket_ttl
 
-(* The documented side of the equality: the closed list exactly as the three
-   docstrings name it. [Cancel_handler]'s token is referenced symbolically
-   because it is exported; the two [Entry_ticket_ttl] tokens are private to that
-   module, so they appear here as literals — which is the point, since the
-   reachable side derives them by running the producer. *)
+(* The documented side of the equality: the closed list exactly as the four
+   docstrings name it. [Cancel_handler]'s and [Delisted_ticket_cancel]'s tokens
+   are referenced symbolically because they are exported; the two
+   [Entry_ticket_ttl] tokens are private to that module, so they appear here as
+   literals — which is the point, since the reachable side derives them by
+   running the producer. *)
 let _documented_cancel_reasons =
   String.Set.of_list
     [
       "entry_ticket_ttl_expired";
       "entry_ticket_requalification_failed";
       Cancel_handler.portfolio_rejection_reason;
+      Delisted_ticket_cancel.cancel_reason;
     ]
 
 (* Fixtures ---------------------------------------------------------------- *)
@@ -275,6 +288,42 @@ let _rejection_transitions =
           Cancel_handler.transitions_for_rejected_trades
             ~date:(_date "2024-02-02") ~positions ~rejected_trades))
 
+(* Producer 3 — Trading_simulation.Delisted_ticket_cancel ------------------- *)
+
+(* The step date the delisting grid is evaluated on. [_marker_grid] straddles
+   it so both sides of the strict [marker < date] boundary are swept. *)
+let _delisting_date = _date "2024-02-02"
+
+let _marker_grid =
+  [
+    (fun _ -> None);
+    (fun _ -> Some (_date "2024-01-15"));
+    (fun _ -> Some _delisting_date);
+    (fun _ -> Some (_date "2024-03-01"));
+  ]
+
+(* An empty order manager: [tick] retires the resting orders belonging to the
+   cancels it builds, and with no orders submitted that step is a no-op. What
+   this producer contributes to the equality is the transitions, which are
+   built from [positions] alone. *)
+let _delisting_transitions =
+  let position_grid =
+    [
+      _positions_of [ _entering ~id:"A-1" ~symbol:"AAPL" ~filled_quantity:0.0 ];
+      _positions_of [ _entering ~id:"A-1" ~symbol:"AAPL" ~filled_quantity:40.0 ];
+      _positions_of [ _holding ~id:"A-1" ~symbol:"AAPL" ];
+      String.Map.empty;
+    ]
+  in
+  List.concat_map position_grid ~f:(fun positions ->
+      List.concat_map _marker_grid ~f:(fun active_through_for ->
+          let _, transitions =
+            Delisted_ticket_cancel.tick
+              ~order_manager:(Trading_orders.Manager.create ())
+              ~active_through_for ~date:_delisting_date ~positions ()
+          in
+          transitions))
+
 (* Tests ------------------------------------------------------------------- *)
 
 (** The pin. Every token any production producer can drive into
@@ -285,21 +334,25 @@ let _rejection_transitions =
     a fourth token appearing. *)
 let test_reachable_reasons_equal_the_documented_closed_list _ =
   assert_that
-    (Set.to_list (_reachable_from (_ttl_transitions @ _rejection_transitions)))
+    (Set.to_list
+       (_reachable_from
+          (_ttl_transitions @ _rejection_transitions @ _delisting_transitions)))
     (equal_to (Set.to_list _documented_cancel_reasons))
 
-(** The partition the docstrings assert, pinned separately: two of the three
-    tokens are strategy {e decisions} and the third is a simulator {e accident}.
-    Set equality alone would still pass if a token migrated between the two
-    modules, which would silently invalidate the decision-vs-accident split
-    every cancel-reason analysis groups on. *)
+(** The partition the docstrings assert, pinned separately: four tokens in three
+    categories — two strategy {e decisions}, one simulator {e accident} of
+    capital timing, one {e data-driven death}. Set equality alone would still
+    pass if a token migrated between the modules, which would silently
+    invalidate the split every cancel-reason analysis groups on. *)
 let test_each_producer_contributes_its_documented_tokens _ =
   assert_that
     ( Set.to_list (_reachable_from _ttl_transitions),
-      Set.to_list (_reachable_from _rejection_transitions) )
+      Set.to_list (_reachable_from _rejection_transitions),
+      Set.to_list (_reachable_from _delisting_transitions) )
     (equal_to
        ( [ "entry_ticket_requalification_failed"; "entry_ticket_ttl_expired" ],
-         [ Cancel_handler.portfolio_rejection_reason ] ))
+         [ Cancel_handler.portfolio_rejection_reason ],
+         [ Delisted_ticket_cancel.cancel_reason ] ))
 
 let suite =
   "cancel reason closed list"

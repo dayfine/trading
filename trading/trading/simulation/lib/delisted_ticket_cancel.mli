@@ -67,18 +67,24 @@ module Position = Trading_strategy.Position
 
 val cancel_reason : string
 (** The reason token stamped on every [CancelEntry] this module builds:
-    ["delisted"]. Exposed — like {!Cancel_handler.portfolio_rejection_reason} —
-    so a [trade_audit.sexp] reader can group ticket deaths by cause without
-    matching prose, and it deliberately equals the label
-    {!Delisted_exit_runner.exit_reason} stamps on the exit side, so one token
-    covers both halves of a delisting in the audit.
+    ["delisted"]. It is {!Delisted_exit_runner.label} — {b defined once there},
+    not repeated here — so one token covers both halves of a delisting in the
+    audit and the two halves cannot drift apart. Exposed, like
+    {!Cancel_handler.portfolio_rejection_reason}, so a [trade_audit.sexp] reader
+    can group ticket deaths by cause without matching prose.
 
-    It sits in the same namespace as
-    {!Cancel_handler.portfolio_rejection_reason}
-    ([entry_fill_rejected_by_portfolio]) and
-    {!Weinstein_strategy.Entry_ticket_ttl}'s [entry_ticket_ttl_expired] /
-    [entry_ticket_requalification_failed] — now the four ways a resting entry
-    ticket dies. *)
+    {b It is the fourth token in the cancel-reason closed list, and a third
+       category.} The other three are {!Weinstein_strategy.Entry_ticket_ttl}'s
+    [entry_ticket_ttl_expired] / [entry_ticket_requalification_failed] —
+    strategy {e decisions} — and {!Cancel_handler.portfolio_rejection_reason}
+    ([entry_fill_rejected_by_portfolio]) — an {e accident of capital timing}.
+    This one is neither: it is a {e data-driven death}, the symbol's series
+    having ended, which no policy choice and no cash collision could have
+    avoided. Any consumer that splits on [cancel_reason] — the split the
+    {!Backtest.Ticket_lifecycle.cancel_reason} docstring calls "load-bearing,
+    not cosmetic" — must give it its own bucket rather than folding it into
+    either of the other two. Pinned by
+    [trading/trading/backtest/test/test_cancel_reason_closed_list.ml]. *)
 
 val tick :
   order_manager:Trading_orders.Manager.order_manager ->

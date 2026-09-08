@@ -32,9 +32,15 @@ val portfolio_rejection_reason : string
 (** The reason token stamped on every [CancelEntry] this module builds:
     ["entry_fill_rejected_by_portfolio"]. Exposed so a reader (and the tests)
     can group ticket deaths by cause without matching prose. It sits in the same
-    namespace as {!Weinstein_strategy.Entry_ticket_ttl}'s
-    [entry_ticket_ttl_expired] / [entry_ticket_requalification_failed], which
-    are the only other ways a resting entry ticket dies. *)
+    namespace as the three other ways a resting entry ticket dies:
+    {!Weinstein_strategy.Entry_ticket_ttl}'s [entry_ticket_ttl_expired] /
+    [entry_ticket_requalification_failed] — strategy {e decisions}, where this
+    token is an {e accident of capital timing} — and
+    {!Delisted_ticket_cancel.cancel_reason} ([delisted], #2696), a
+    {e data-driven death} once the symbol's series has ended. Four tokens, three
+    categories; a consumer splitting on the token must bucket all three
+    separately. The closed list is pinned by
+    [trading/trading/backtest/test/test_cancel_reason_closed_list.ml]. *)
 
 val transitions_for_rejected_trades :
   date:Date.t ->

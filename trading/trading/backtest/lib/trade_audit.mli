@@ -510,17 +510,26 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     mutually exclusive. Dropped when no entry was recorded for the id, same as
     the exit path.
 
-    {b Three kinds of cancel arrive here, not one.} Two are strategy
-    {e decisions} — {!Weinstein_strategy.Entry_ticket_ttl}'s
+    {b Four kinds of cancel arrive here, not one, in three categories.} Two are
+    strategy {e decisions} — {!Weinstein_strategy.Entry_ticket_ttl}'s
     [entry_ticket_ttl_expired] and [entry_ticket_requalification_failed]. The
     third, {!Trading_simulation.Cancel_handler.portfolio_rejection_reason}, is
     an {e accident of capital timing}: a ticket that triggered, filled at the
-    engine, and was then refused because the book could not fund it. That third
-    population is not a corner case — it was ~26% of placements on the run that
-    motivated recording the reason
-    ([dev/notes/ticket-death-on-cash-2026-08-16.md]) — so a cancel-age column
-    averaged without splitting on [cancel_reason] mixes a policy with a failure.
-*)
+    engine, and was then refused because the book could not fund it. The fourth,
+    {!Trading_simulation.Delisted_ticket_cancel.cancel_reason} ([delisted],
+    #2696), is a {e data-driven death}: the symbol's series ended, so the ticket
+    could never have filled against a real bar — neither a policy nor a funding
+    failure, and it needs its own bucket.
+
+    Neither of the non-strategy populations is a corner case: the rejection
+    token was ~26% of placements on the run that motivated recording the reason
+    ([dev/notes/ticket-death-on-cash-2026-08-16.md]), and [delisted] fires on
+    every marker-carrying warehouse (#2691 onward). So a cancel-age column
+    averaged without splitting on [cancel_reason] mixes a policy with a failure
+    with a fact about the data.
+
+    The closed list is pinned by
+    [trading/trading/backtest/test/test_cancel_reason_closed_list.ml]. *)
 
 val record_fill_volume :
   t -> position_id:string -> Ticket_lifecycle.fill_volume_check -> unit
