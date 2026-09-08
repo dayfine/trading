@@ -4,62 +4,49 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-05 (orchestrator run 33962894987; main **`41fd244b`**.
-Green at run start: `dune build @runtest --force` **0**, 0 `^FAIL:`,
-`status_file_integrity` **0**, `index_size_linter` **0** — every exit code
-read **unpiped**. Step 0.5 skipped: `QUEUE_NON_EMPTY=0`, and per the
-precondition an **empty** queue is the opposite of saturated — maximum
-dispatch capacity, not a reason to no-op.
+Last updated: 2026-09-08 (orchestrator run 34252318116; main **`c0630137`**.
+Green at run start: `dune build` **0**, `dune runtest` **0**, 0 `^FAIL:`,
+`status_file_integrity` **0**, `index_size_linter` **0** — every exit code read
+**unpiped**. Step 0.5 skipped: `QUEUE_NON_EMPTY=0`, and per the precondition an
+**empty** queue is the opposite of saturated.
 
-**Three harness PRs opened (#2675, #2676, #2677); two of them had to be
-recovered by hand.** Two of the three dispatched agents finished their work
-but stalled on a backgrounded `dune` call without ever committing
-(`feedback_agents_background_wait_stall`). Per `pr-gate-loop.md`
-§"Dispatcher-side recovery" the orchestrator verified each agent's work **in
-that agent's own worktree** (fmt/build/runtest all 0, suites 68 and 72 clean)
-and committed + pushed it, rather than re-dispatching — the work was complete,
-only uncommitted.
+**You have not seen an orchestrator summary since 2026-09-05, and that is a
+defect.** Five consecutive runs (`34030886835`, `34042419476`, `34127853646`,
+`34148849699`, `34224532158`) completed `success`, spent real money (the 09-08
+run alone **$20.18**) and created **zero** `ops/daily-*` PRs. Run 34224532158's
+log shows the file was written (`Using daily summary: dev/daily/2026-09-08.md`)
+and then died with the container. Root cause: Step 8 publishes via `jj`, which
+`H-JJ-JST-BROKEN-GHA` records as non-functional in this image — while the same
+run's sibling `git push origin ops/budget-...` succeeded. **This summary was
+published with plain git + curl instead.** Fix: PR #2721 (mechanism); the call
+site is still `jj` and is write-gated.
 
-**#2662 re-diagnosed: the 2026-09-04 prime suspect is not supported by its own
-evidence.** Two hypotheses eliminated with controls. (i) The
-`$0`/`modelUsage:{}`/sub-second signature is the *generic* pre-flight-failure
-shape — a local control arm with **no `--agent` and `--allowedTools Bash`**
-reproduces it identically, so it cannot implicate `--allowedTools`. (ii) The
-`configureGitAuth` → `fatal: not in a git directory` exit-128 failure in the
-failing log is **present in both successful siblings' logs**. Also corrected:
-the model IS initialized (`"model":"claude-opus-5"`), so "never invoked" was
-wrong. What remains: SDK options differ in exactly two fields (`maxTurns`,
-`allowedTools`) — a narrowed suspect, not a diagnosis. Blocked on the action
-suppressing its streaming JSONL. Detail in `orchestrator-automation.md`; it
-could **not** be posted to the issue (`POST /issues/<n>/comments` → **403**).
+**All three red scheduled workflows had stale diagnoses; two are now
+corrected.** Every cron fired since 09-05, so this run got a real answer rather
+than a stale row. **#2723 (new)**: the track-pacer no longer fails pre-flight —
+it runs **28 turns / $3.08** and dies only on the `subtype:"success"` +
+`is_error:true` contradiction, so the `allowedTools` hypothesis is **dead** and
+the ask is now `show_full_output: true` **alone**. **#2722 (new)**: PR #2651's
+own status entry cited `prune_candidates.sh`'s sanity-probe anchor, and
+`dev/status` is a citation source — the fix broke the check by documenting it;
+PR #2725 makes the probe synthetic and two-sided. The third (#2702) was already
+re-diagnosed by the 09-07 run whose summary was lost — which is the argument for
+filing to a queue rather than a summary.
 
-**#2639's hold detector: broken confirmed, and the one-line fix verified by
-positive control.** Live timeline data shows `reviewed` events carry
-`submitted_at`, never `created_at` — so the spec's parser raises `KeyError`
-and its `|| echo false` returns "not held". Run against **#2384 itself** (the
-−40.91pp incident): spec parser → *not held*; corrected parser → **HELD**.
-Negative control #2664 → correctly *not held*. First demonstration in 8 runs
-that this control can fire at all.
-
-**Drift found and fixed:** the two merge-gate gaps the 2026-09-04 summary said
-it "filed" existed only in that summary and this header — never in
-`harness.md`, which is what Step 2c dispatches from. Now filed there, with a
-third (`H-SETTINGS-HOOKS-ABSOLUTE-LOCAL-PATH`: both `.claude/settings.json`
-hooks point at macOS-only paths and fail on every GHA run).
-
-**Two NEW maintainer issues arrived today** — #2669 (`-incremental` clobbers
-`manifest.sexp`, making a warehouse read as empty) and #2672 (delisting stub
-prints fill stops at ~$0; −$741k phantom loss in the canonical 26y record).
-Triaged into `backtest-infra.md` §Next Steps; #2669 is the top dispatchable
-item next run, #2672 is LOCAL/data-gated.
-
+**Three PRs opened, none merged, each withheld for a different reason.** #2724
+(#2669 manifest clobber, CI 3/3, struct APPROVED). #2721 — struct APPROVED (5)
+but **behav NEEDS_REWORK (2)**: 28 mutations, 12 survived, including a mutant
+that **pushes an empty branch, prints a PR number, exits 0, and passes 35/35** —
+the summary-loss defect reproduced inside its own fix. #2725 — opened late, no
+QC. A qc-structural verdict on #2724 came back APPROVED with all three hard
+gates **ENVFAIL**; not treated as authoritative (CI verified the code instead).
 
 Capabilities (carried; measured 2026-09-04 unless noted): `.claude/agents/**`
-writes **refused** (9th run); `workflow` scope unavailable by push **and**
+writes **refused** (10th run); `workflow` scope unavailable by push **and**
 contents API (403 on a workflow path vs **201** on a `dev/notes/` control,
 same token, seconds apart — the control is what makes it a measurement);
 `POST /actions/workflows/<f>/dispatches` **403**; `POST /issues` create-only
-(issue comments **403**, re-tested 2026-09-05); `PATCH /pulls/<n>`,
+(issue comments **403**, re-tested 2026-09-08); `PATCH /pulls/<n>`,
 `POST /pulls/<n>/reviews`, `POST /pulls` (create), `PUT /pulls/<n>/merge`,
 `PUT .../update-branch` all work.
 
@@ -85,7 +72,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | NEW maintainer issues #2669 (manifest clobber — top dispatchable item) + #2672 (delisting stub fills, LOCAL/data-gated); see Next Steps for triage |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | #2724 | #2669 FIXED — `-incremental` now merges the manifest (CI 3/3, struct APPROVED); #2672 still open, may be closed by local delisting work |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | v1 harness (#1937) + C6b audit-join-by-position_id (#1947) MERGED; next: golden-run integration test for V3/V4/V7 (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
@@ -110,9 +97,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2675, #2676, #2677 | #2664 MERGED `0be43856` (maintainer adjudicated); 3 new PRs: followup-count exclusions, gate `unreadable(<sha>)` state, derived scenario counts |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2721, #2725 | #2721 daily-summary publisher (behav NEEDS_REWORK — suite misses its own thesis); #2725 prune probe made self-reference-proof (#2722) |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2637 MERGED 09-03; backlog has no actionable item — top is the test-file-length policy decision, human-gated 20 runs |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | not dispatched 09-08 (disk ceiling); top actionable item is the `test_gap` single-conjunct pin in `test_entry_fill_retry_e2e.ml` |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
