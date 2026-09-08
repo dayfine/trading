@@ -1,6 +1,5 @@
 #!/bin/sh
-# PARKED (2026-09-08): targets /tmp/snap_top3000_2000_v8splice, which was killed and deleted after the control-arm read (README §"Paired armed-splice rebuild"); re-run only after #2711 lands and a new armed build exists. The "Step 2" salted re-base in the inherited header does not apply here.
-# Paired acceptance on the armed-splice 2000 warehouse (PR-B #2708): rec26y-new salt 0 on _v8splice vs _v8ctl
+# Acceptance on the GAP-FILLED 2019 warehouse (_v9gap, rebuild4.sh): rec5y-2019-new salt 0 — V16/V17 + the level vs the survivor-tilted _v7mark cell (42.37% / 175)
 #   default) on the rebuilt 2000 warehouse; then the post-run validator; PASS =
 #   zero V16 fallback exits, zero V17 stale entries, STMP exits `delisted` at ~329.61.
 # Step 2: salted record re-base — salts 0-2 of rec26y on the rebuilt 2000 warehouse,
@@ -12,9 +11,9 @@ WT=/workspaces/trading-1/.claude/worktrees/sweep-wh0908   # main 077b48973 (afte
 ROOT=$WT/trading
 FIX=$ROOT/test_data/backtest_scenarios
 SPECS_HOST=/tmp/wh-rebuild/specs
-WORK=/tmp/wh-run3; ART=/tmp/sweeps/wh0908v8
-LOG_HOST=/tmp/wh-rebuild/chain3.log; LOCK=/tmp/wh-rebuild/chain3.lock
-W2000=/tmp/snap_top3000_2000_v8splice; WCTL=/tmp/snap_top3000_2000_v8ctl
+WORK=/tmp/wh-run4; ART=/tmp/sweeps/wh0908v9
+LOG_HOST=/tmp/wh-rebuild/chain4.log; LOCK=/tmp/wh-rebuild/chain4.lock
+W2019=/tmp/snap_top3000_2019_v9gap; W2019OLD=/tmp/snap_top3000_2019_v7mark
 CELL_TIMEOUT=28800
 log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG_HOST"; }
 run() { docker exec $C bash -c "cd $ROOT && eval \$(opam env) && $1"; }
@@ -36,7 +35,6 @@ run_cell() { # name snapdir salt
   log "RESULT $tag => ${m:-<no result>} V16/V17: ${q:-none} (wall $(( $(date +%s) - start ))s)"
 }
 # Paired acceptance on the armed-splice 2000 warehouse vs its report-only control (same builder, same window)
-run_cell rec26y-new $W2000 0
-run_cell rec26y-new $WCTL 0
+run_cell rec5y-2019-new $W2019 0
 # (salts 1-2 + the 5y cells follow only if the paired read is clean)
-log "WH0908 CHAIN DONE"
+log "WH0908V9 CHAIN DONE"
