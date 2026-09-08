@@ -1,0 +1,5 @@
+[09-08 00:51:22] run tree HEAD=077b48973 (expect 077b48973)
+[09-08 00:51:22] BUILD ctl -> /tmp/snap_top3000_2000_v8ctl (-no-splice-action)
+[09-08 01:26:34] RESULT ctl snaps=2999 manifest=2999 active_through=2060 exit=0
+[09-08 01:26:34] BUILD splice -> /tmp/snap_top3000_2000_v8splice ()
+[09-08 01:28:58] KILLED treatment arm by dispatcher: control-arm splice_actions.csv shows the Reuse cut rule would drop p50=2033 bars / >=90% of the series for 247 of 518 symbols (terminal corporate events misread as reuse). REBUILD3 DONE
