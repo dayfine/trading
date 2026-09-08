@@ -1,0 +1,6 @@
+[09-08 03:08:26] run tree HEAD=077b48973 (expect 077b48973 = main after #2709)
+[09-08 03:08:26] BUILD 2009 -> /tmp/snap_top3000_2009_v9gap
+[09-08 03:35:50] RESULT 2009 snaps=2886 manifest=2886 active_through=2818 exit=0
+[09-08 03:35:50] BUILD 2019 -> /tmp/snap_top3000_2019_v9gap
+[09-08 03:49:57] RESULT 2019 snaps=2936 manifest=2936 active_through=2869 exit=0
+[09-08 03:49:57] REBUILD4 DONE
