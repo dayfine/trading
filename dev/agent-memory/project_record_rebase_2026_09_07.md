@@ -17,9 +17,11 @@ series-tail truncation; #2695 survivor markers, 2,217 marked), build b48537469 (
 | 2 | 180.89 | 755 | 0.32 | 42.18 | +$1.74M | |
 
 369 trades shared by all three salts. Old record (defective warehouse): 302.65 (s0) / 180.23 (s1).
-Drawdown is ~6pp worse on clean data across all salts — dissect before re-stating any
+Drawdown is ~6pp worse on clean data at BOTH salts that have an old-warehouse counterpart (s0 +6.11, s1 +6.59; the defective record never ran s2) — dissect before re-stating any
 stop-width read. 5y cells: 2000 = 76.69% / 98; 2019 = 42.37% / 175 (warehouse survivor-tilted).
 **Acceptance criteria that make this the record:** V16 = 0 fallback exits, V17 = 0 stale
 entries on every cell; the 7 former blank rows render `delisted`; STMP exits at $329.61.
 Related: [[project_delisting_guards_2672]], [[project_record_rebase_2026_09_03]],
 [[project_edge_is_the_fat_tail]], [[project_clock52_promoted]].
+
+Dissection datum (qc-behavioral #2704): the _v6tail acceptance cell and the clean _v7mark s0 cell share max_drawdown_pct to all 15 digits (42.371840829902126) despite different returns and trade counts — the drawdown-defining window is identical across warehouses, so the +6pp is data-level (which names/bars exist), not path-level.
