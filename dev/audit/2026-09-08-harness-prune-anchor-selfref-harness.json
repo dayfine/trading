@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-08",
+  "feature": "harness",
+  "branch": "harness/prune-anchor-selfref",
+  "sha": "4bd4c221f49dcdaeb90c78cc198bacca3bce18af",
+  "recorded_at_ns": 1788891192656396842,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "SKIPPED",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 2,
+  "notes": ""
+}
