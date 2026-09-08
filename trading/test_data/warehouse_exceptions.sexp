@@ -29,8 +29,13 @@
 ;
 ; Read splice_actions.csv once per vintage and record the decisions you
 ; disagree with here; the entry is a decision, so say why. Both sections are
-; optional and each module ignores the other's, so this one file (passed as
-; -tail-exceptions PATH) carries both.
+; optional, so this one file (passed as -tail-exceptions PATH) carries both
+; and either may be omitted.
+;
+; The file is read ONCE, by Build_runner, into one strict record. Strict means
+; NO other field is accepted: a section name one letter wrong (splcie) is a
+; hard load failure, not a silently empty veto list. That is deliberate —
+; degrading to "no exceptions" would edit exactly the symbols listed here.
 ;
 ; Empty for the 2000 vintage: the 66 interleaved symbols (SWD 1,215 findings,
 ; AEZ 694, ICT 589, CLE 412, MEL 98, MVL 80) are genuinely two issuers apiece
