@@ -18,12 +18,14 @@
   test_build_runner_tail
   test_build_runner_survivors
   test_build_runner_splice
-  test_build_runner_exceptions)
+  test_build_runner_exceptions
+  test_build_runner_incremental)
  (modules
   test_build_runner_tail
   test_build_runner_survivors
   test_build_runner_splice
-  test_build_runner_exceptions)
+  test_build_runner_exceptions
+  test_build_runner_incremental)
  (libraries
   core
   core_unix
