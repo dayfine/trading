@@ -102,6 +102,7 @@ val tail_exceptions_or_exit :
 val build :
   ?survivor_tolerance_days:int ->
   ?splice_cuts:Core.Date.t Core.Map.M(Core.String).t ->
+  ?twin_config:Twin_detector.Config.t ->
   symbols:string list ->
   csv_data_dir:string ->
   output_dir:string ->
@@ -202,6 +203,32 @@ val build :
       scan {e dropped} are simply absent from [symbols], so they get no [.snap]
       and no manifest entry. Defaults to empty — a build that passes nothing
       behaves exactly as before.
+    - [twin_config] — cross-symbol rename-twin hygiene (#2730,
+      {!Twin_pass}/{!Twin_detector}), run {e before} the per-symbol loop: each
+      symbol's windowed adjusted-close series is compared against every other's,
+      and the losing leg of each detected twin group is removed from [symbols]
+      so the warehouse indexes one series per instrument. The report lands in
+      [<output_dir>/rename_twin_report.txt]. Defaults to
+      {!Twin_detector.Config.default}, which is [enabled = false]: no bar is
+      read, no file written, and [symbols] passes through untouched, so an
+      un-armed build is byte-identical to its pre-#2730 behaviour. Both builders
+      surface the flags via {!Twin_pass.params}; the vintage rebuild path
+      ([build_snapshots.exe]) had no way to arm the pass at all before #2730,
+      which is why the [_v7mark] warehouses still carry NLS/BFX, BB/BBRY,
+      AABA/YHOO and friends.
+
+    {2 [twin_config] with [incremental]: a dropped leg leaves the index}
+
+    The two compose without a special case, and the rule is stated here because
+    the naive composition is silently wrong. A symbol the twin pass drops is
+    absent from this run's entries, so the incremental merge above would
+    {e carry its pre-run entry forward} and the warehouse would keep indexing
+    the duplicate the pass just removed. It does not: symbols dropped by the
+    twin pass are excluded from the carry set, so a deduping rebuild removes
+    them from the index whether or not [incremental] is set. Their [.snap] files
+    may remain on disk, but the manifest is the warehouse's only index
+    ({!Bar_source_resolver} enumerates symbols from it), so an unindexed file is
+    not served to any runner. Pinned by [test_build_runner_twins.ml].
 
     {2 [active_through] is derived from the series end}
 

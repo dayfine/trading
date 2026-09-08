@@ -25,10 +25,22 @@
     goldens locally in snapshot mode.
 
     Two optional, {b default-off} data-integrity passes run over the same
-    windowed bars before the build: {!Twin_detector} (cross-symbol rename twins;
-    when armed it {e drops} the losing leg) and {!Splice_detector}
-    (within-symbol ticker-reuse splices). With both unarmed the tool is
-    bit-identical to its pre-#2646 behaviour.
+    windowed bars before the build: {!Splice_detector} (within-symbol
+    ticker-reuse splices) here in this shell, and {!Twin_pass}/{!Twin_detector}
+    (cross-symbol rename twins; when armed it {e drops} the losing leg) inside
+    {!Build_runner.build}, which this tool arms by threading [~twin_config]
+    through. With both unarmed the tool is bit-identical to its pre-#2646
+    behaviour.
+
+    The twin pass moved into {!Build_runner} in #2730 so the {e other} builder
+    ([build_snapshots.exe], the vintage-rebuild path) gets the identical pass
+    rather than a second copy of it. One consequence when {b both} flags are
+    armed — a combination no committed script uses: the splice scan now runs
+    {e before} the twin comparison rather than after, so the twin detector sees
+    only splice survivors. Neither pass changes the other's per-symbol verdict;
+    the ordering only decides whether a symbol the splice scan drops can be
+    picked as a twin group's survivor, and preferring a splice survivor there is
+    the better read anyway.
 
     The splice pass writes [splices.csv] as before and, since #2672 class ii,
     {b acts} on what it finds via {!Snapshot_pipeline.Series_splice}: an
@@ -105,18 +117,6 @@ let _load_windowed_bars ~data_dir ~warmup_start ~end_date symbol =
       in
       Some sorted
 
-(* Project a symbol's windowed bars to the (date, adjusted_close) series the
-   cross-symbol twin pass compares. *)
-let _load_twin_series ~data_dir ~warmup_start ~end_date symbol =
-  let open Option.Let_syntax in
-  let%map bars = _load_windowed_bars ~data_dir ~warmup_start ~end_date symbol in
-  let closes =
-    Array.map bars ~f:(fun (b : Types.Daily_price.t) ->
-        (b.date, b.adjusted_close))
-  in
-  let last_date, _ = closes.(Array.length closes - 1) in
-  { Twin_detector.symbol; data_end = last_date; closes }
-
 (* The within-symbol continuity pass reads whole bars: the adjusted close for
    the ratio, the raw close for the split guard, the volume for the report. *)
 let _load_splice_series ~data_dir ~warmup_start ~end_date symbol =
@@ -130,27 +130,6 @@ let _write_sidecar ~output_dir ~name ~data =
   let path = Filename.concat output_dir name in
   try Out_channel.write_all path ~data
   with Sys_error msg -> Printf.eprintf "%s write failed: %s\n%!" name msg
-
-let _write_twin_report ~output_dir report =
-  let text = Twin_detector.render report in
-  _write_sidecar ~output_dir ~name:"rename_twin_report.txt" ~data:(text ^ "\n");
-  Printf.eprintf "%s\n%!" text
-
-(* When armed, detect rename-twins across [all_symbols] and drop the losing
-   legs; emit the sidecar report. Default-off config → [all_symbols] unchanged,
-   no report. *)
-let _dedupe_symbols ~config ~data_dir ~warmup_start ~end_date ~output_dir
-    all_symbols =
-  if not config.Twin_detector.Config.enabled then all_symbols
-  else begin
-    let series =
-      List.filter_map all_symbols
-        ~f:(_load_twin_series ~data_dir ~warmup_start ~end_date)
-    in
-    let report = Twin_detector.detect config series in
-    _write_twin_report ~output_dir report;
-    Twin_detector.survivors report ~all_symbols
-  end
 
 (* Splice dates per symbol, keyed for the per-symbol decision below. *)
 let _splice_dates (report : Splice_detector.report) =
@@ -215,18 +194,13 @@ let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
   let plan = Plan.derive ~scenario ~universe in
   _log_plan plan ~scenario_path;
   let data_dir = Fpath.v csv_data_dir in
-  let symbols =
-    _dedupe_symbols ~config:twin_config ~data_dir
-      ~warmup_start:plan.warmup_start ~end_date:plan.end_date ~output_dir
-      plan.all_symbols
-  in
   let symbols, splice_cuts =
     _plan_splices ~config:splice_config ~splice_config:splice_action_config
       ~exceptions:(Build_runner.splice_exceptions_or_exit tail_exceptions_path)
       ~data_dir ~warmup_start:plan.warmup_start ~end_date:plan.end_date
-      ~output_dir symbols
+      ~output_dir plan.all_symbols
   in
-  Build_runner.build ~survivor_tolerance_days ~splice_cuts ~symbols
+  Build_runner.build ~survivor_tolerance_days ~splice_cuts ~twin_config ~symbols
     ~csv_data_dir ~output_dir ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
     ~sketch_deep_days ~incremental ~progress_every ~tail_config
@@ -280,38 +254,7 @@ let command =
             now always emitted (it is the only overhead-supply \
             representation), so this flag has no effect; accepted for \
             invocation-script back-compat"
-     and dedupe_rename_twins =
-       flag "dedupe-rename-twins" no_arg
-         ~doc:
-           "Drop rename-twin duplicate legs (same series under old+new ticker) \
-            before building; writes rename_twin_report.txt. Default off — \
-            existing warehouses stay reproducible."
-     and twin_min_overlap_days =
-       flag "twin-min-overlap-days"
-         (optional_with_default Twin_detector.Config.default.min_overlap_days
-            int)
-         ~doc:"N Min shared trading days for a twin match"
-     and twin_match_fraction =
-       flag "twin-match-fraction"
-         (optional_with_default Twin_detector.Config.default.match_fraction
-            float)
-         ~doc:"F Min fraction of overlapping days with near-identical closes"
-     and twin_close_epsilon =
-       flag "twin-close-epsilon"
-         (optional_with_default Twin_detector.Config.default.close_epsilon float)
-         ~doc:"E Relative tolerance for a single-day close match (basis=levels)"
-     and twin_basis =
-       flag "twin-basis"
-         (optional_with_default "levels" string)
-         ~doc:
-           "B Comparison basis: levels (default, adjusted-close levels) or \
-            returns (consecutive daily returns — catches renames whose feeds \
-            carry different adjustment bases)"
-     and twin_ret_epsilon =
-       flag "twin-ret-epsilon"
-         (optional_with_default Twin_detector.Config.default.ret_epsilon float)
-         ~doc:
-           "E Absolute tolerance on the daily-return difference (basis=returns)"
+     and twin_config = Twin_pass.params
      and detect_splices =
        flag "detect-splices" no_arg
          ~doc:
@@ -341,25 +284,6 @@ let command =
      and survivor_tolerance_days = Build_runner.survivor_tolerance_param
      and tail_config, tail_exceptions_path = Build_runner.tail_params in
      fun () ->
-       let basis =
-         match String.lowercase twin_basis with
-         | "levels" -> Twin_detector.Config.Levels
-         | "returns" -> Twin_detector.Config.Returns
-         | other ->
-             failwithf "unknown -twin-basis %s (expected levels|returns)" other
-               ()
-       in
-       let twin_config =
-         {
-           Twin_detector.Config.enabled = dedupe_rename_twins;
-           min_overlap_days = twin_min_overlap_days;
-           match_fraction = twin_match_fraction;
-           close_epsilon = twin_close_epsilon;
-           basis;
-           ret_epsilon = twin_ret_epsilon;
-           prefilter_rel_tol = Twin_detector.Config.default.prefilter_rel_tol;
-         }
-       in
        let splice_config =
          {
            Splice_detector.Config.enabled = detect_splices;

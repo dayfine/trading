@@ -415,17 +415,23 @@ let _carry_candidates ~existing ~schema =
    per-symbol checkpoint, which already upserts rather than replaces
    ({!Snapshot_manifest.update_for_symbol}).
 
-   Two candidates are dropped: one whose symbol this run produced (the fresh
-   entry wins, so a rebuilt symbol is never duplicated or stale), and one whose
-   [.snap] file is gone (a stale index row would fail the closing verify). *)
-let _carried_entries ~existing ~schema entries =
+   Three candidates are dropped: one whose symbol this run produced (the fresh
+   entry wins, so a rebuilt symbol is never duplicated or stale), one whose
+   [.snap] file is gone (a stale index row would fail the closing verify), and
+   one this run deliberately EXCLUDED — a twin leg the rename-twin pass dropped
+   (#2730). Carrying an excluded symbol forward would silently reinstate the
+   duplicate the pass exists to remove, and on an incremental rebuild that is
+   exactly the shape that hides it: the pass reports the drop, the manifest
+   keeps indexing it, and the backtest still holds both legs. *)
+let _carried_entries ~existing ~schema ~excluded entries =
   let produced =
     List.map entries ~f:(fun (e : Snapshot_manifest.file_metadata) -> e.symbol)
     |> Set.of_list (module String)
   in
+  let skip symbol = Set.mem produced symbol || Set.mem excluded symbol in
   _carry_candidates ~existing ~schema
   |> List.filter ~f:(fun (e : Snapshot_manifest.file_metadata) ->
-      (not (Set.mem produced e.symbol)) && Stdlib.Sys.file_exists e.path)
+      (not (skip e.symbol)) && Stdlib.Sys.file_exists e.path)
 
 (* A non-empty carry set means this run's universe was not a superset of the
    warehouse. That is legitimate (a top-up is exactly that shape), so it is a
@@ -589,13 +595,19 @@ let splice_exceptions_or_exit path =
   _exceptions_or_exit (load_splice_exceptions path)
 
 let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
-    ?(splice_cuts = Map.empty (module String)) ~symbols ~csv_data_dir
+    ?(splice_cuts = Map.empty (module String))
+    ?(twin_config = Twin_detector.Config.default) ~symbols ~csv_data_dir
     ~output_dir ~benchmark_symbol ~start_date ~end_date ~sketch_deep_days
     ~incremental ~progress_every ~tail_config ~tail_exceptions () =
   _ensure_dir output_dir;
   let schema = Snapshot_schema.default in
-  let symbols_total = List.length symbols in
   let data_dir = Fpath.v csv_data_dir in
+  let symbols, twin_dropped =
+    Twin_pass.run twin_config ~data_dir ~start_date ~end_date ~output_dir
+      symbols
+  in
+  let excluded = Set.of_list (module String) twin_dropped in
+  let symbols_total = List.length symbols in
   let benchmark_bars =
     _benchmark_bars_opt ~data_dir ~start_date ~end_date ~benchmark_symbol
   in
@@ -614,7 +626,7 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
            ~symbols_total ~started_at ~hygiene)
   in
   let entries = _finalize_entries ~survivor_tolerance_days builts in
-  let carried = _carried_entries ~existing ~schema entries in
+  let carried = _carried_entries ~existing ~schema ~excluded entries in
   _log_carry_forward carried;
   let final_entries = carried @ entries in
   _log_marker_split final_entries;

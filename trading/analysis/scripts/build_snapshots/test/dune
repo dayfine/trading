@@ -19,13 +19,15 @@
   test_build_runner_survivors
   test_build_runner_splice
   test_build_runner_exceptions
-  test_build_runner_incremental)
+  test_build_runner_incremental
+  test_build_runner_twins)
  (modules
   test_build_runner_tail
   test_build_runner_survivors
   test_build_runner_splice
   test_build_runner_exceptions
-  test_build_runner_incremental)
+  test_build_runner_incremental
+  test_build_runner_twins)
  (libraries
   core
   core_unix
@@ -39,6 +41,7 @@
   trading.data_panel.snapshot
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime
-  build_runner)
+  build_runner
+  trading.backtest.twin_detector)
  (preprocess
   (pps ppx_jane)))
