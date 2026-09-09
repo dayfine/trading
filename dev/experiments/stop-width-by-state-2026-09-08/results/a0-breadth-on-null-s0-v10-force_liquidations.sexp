@@ -1,0 +1,13 @@
+((events
+  (((symbol GERN) (position_id GERN-wein-5649) (date 2012-09-10) (side Long)
+    (entry_price 2.71) (current_price 1.2796) (quantity 58277)
+    (cost_basis 157930.66999999998) (unrealized_pnl -83359.420799999993)
+    (unrealized_pnl_pct -0.52782287822878227) (reason Per_position))
+   ((symbol AWRE) (position_id AWRE-wein-7235) (date 2014-07-25) (side Long)
+    (entry_price 6.73) (current_price 5) (quantity 65407)
+    (cost_basis 440189.11000000004) (unrealized_pnl -113154.11000000003)
+    (unrealized_pnl_pct -0.2570579494799406) (reason Per_position))
+   ((symbol BCRX) (position_id BCRX-wein-7630) (date 2015-08-07) (side Long)
+    (entry_price 14.69) (current_price 10.9) (quantity 30844)
+    (cost_basis 453098.36) (unrealized_pnl -116898.75999999998)
+    (unrealized_pnl_pct -0.25799863852961197) (reason Per_position)))))
