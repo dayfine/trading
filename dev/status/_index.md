@@ -81,7 +81,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2724 MERGED (`-incremental` merges the manifest); next: V18 store-sanity check for mis-scaled series (#2732 ask 2, dispatched 09-09 run 2) |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
-| [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | v1 harness (#1937) + C6b audit-join-by-position_id (#1947) MERGED; next: golden-run integration test for V3/V4/V7 (data-gated) |
+| [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | **V18 store-sanity MERGED (#2750)**, `Expectation`; next: #2732 asks 1+3 (quarantine MEL, re-run item-3) + build-time sibling |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
@@ -104,7 +104,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2721/#2725/#2727 MERGED; publisher verified in production this run (PR #2746); next: #2729 mutant reconcile + #2643 goldens nested-field FP (both dispatched 09-09 run 2) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2749 | #2643 nested-field FP MERGED (#2748, suite 21→23); #2749 open at `6024976c` after 2 reworks — rework cap spent, next run re-QCs |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (09-09 run 2 audit): 1 policy decision + 2 explicit archive entries + 1 fenced template. Prior "disk decline" framing withdrawn |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
