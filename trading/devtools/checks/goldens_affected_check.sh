@@ -89,7 +89,17 @@
 #                   shape (armed-stoplimit armed `stops_config` while
 #                   `reset_anchor_on_stalled_cycle` flipped underneath).
 #                   The file→field map is maintained by hand in
-#                   `_embedding_field`.
+#                   `_embedding_field`. EXCEPTION (issue #2643): the outer
+#                   knob is only emitted when at least one of the file's
+#                   changed fields already existed at BASE_REF (a
+#                   whole-word presence check against the file's BASE_REF
+#                   content). A file whose ONLY changed fields are brand-
+#                   new additions (e.g. a fresh `[@sexp.default]` field
+#                   added to `Weinstein_stops.config`) has no old value
+#                   anything could have been inheriting, so nothing to
+#                   flag via the outer name — the same "nothing can
+#                   inherit FROM that" carve-out Step 4b already applies
+#                   to top-level knobs, extended to this nested case.
 #     live-config-overrides.sexp — a changed line shaped "((<knob> ...)"
 #                   carries the field name as the identifier immediately
 #                   after "((". Nested config records (e.g.
@@ -429,7 +439,42 @@ for f in $CHANGED_CONFIG_FILES; do
     cat "$FILE_KNOBS" >> "$DIRECT_KNOBS_FILE"
     outer="$(_embedding_field "$f")"
     if [ -n "$outer" ]; then
-      printf '%s\tembeds:%s\n' "$outer" "$(basename "$f")" >> "$RELATED_KNOBS_FILE"
+      # Only emit the OUTER embedding knob if at least one of this file's
+      # changed fields already existed at BASE_REF -- i.e. this file
+      # contains a real value/removal change a golden's config_overrides
+      # could be silently inheriting. Issue #2643: a brand-new field
+      # (e.g. `stop_skip_entry_bar : bool [@sexp.default false]` added
+      # fresh to Weinstein_stops.config) has no "old behaviour" at all --
+      # nothing armed via the outer name (`stops_config`) could have been
+      # inheriting a value that didn't exist -- so it must not trigger the
+      # embedding-field emission. This is the same "newly-added field:
+      # nothing can inherit FROM that" carve-out Step 4b already applies
+      # to top-level knobs (see _sexp_default_value_in_file), extended to
+      # the nested-embedding case.
+      #
+      # Classification is a conservative whole-word presence check, not a
+      # syntax parse: a field counts as "pre-existing" if its name appears
+      # ANYWHERE in the file's BASE_REF content (even in a comment). That
+      # bias is deliberate and matches Step 2.5's own bias (see its header
+      # comment): when a diff-parse can't cleanly separate "added" from
+      # "changed", prefer the direction that still emits the outer knob
+      # (over-inclusive, one extra manual paired run) over the direction
+      # that could silently suppress a real change (#2384's failure mode).
+      # A field that changed value keeps its name in the BASE_REF file
+      # (the old value line still contains it), so this never misses a
+      # real value-change or removal; it only skips files whose FILE_KNOBS
+      # are entirely fresh additions.
+      HAS_PREEXISTING_FIELD=0
+      while IFS= read -r knob_field; do
+        [ -n "$knob_field" ] || continue
+        if git show "${BASE_REF}:${f}" 2>/dev/null | grep -qw -- "$knob_field"; then
+          HAS_PREEXISTING_FIELD=1
+          break
+        fi
+      done < "$FILE_KNOBS"
+      if [ "$HAS_PREEXISTING_FIELD" -eq 1 ]; then
+        printf '%s\tembeds:%s\n' "$outer" "$(basename "$f")" >> "$RELATED_KNOBS_FILE"
+      fi
     fi
   fi
 done
