@@ -449,6 +449,16 @@ rc=0
 _out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
 check "a 201 response missing a PR number is treated as failure" 1 "$rc"
 check_contains "malformed-201 names the risk" "$_out" "no PR number in the response body"
+# _create_pr itself must report non-zero on this path (not just the outer
+# cmd_publish check on an empty _pr_out) -- cmd_publish's push-then-create
+# catch prints the "pushed but has NO PR" risk ONLY when _create_pr's own
+# return code says failure. A mutant that flips _create_pr's internal
+# `return 1` -> `return 0` for the empty-$_num case still leaves cmd_publish's
+# separate `[ -z "$_pr_num" ]` check to catch the empty output and fail the
+# scenario -- so rc alone does not distinguish it. This message does: it only
+# fires through the `_create_pr ... || { ... }` catch, which only runs when
+# _create_pr's own return code is non-zero.
+check_contains "malformed-201 also hits the push-then-create catch (proves _create_pr itself returned non-zero, not just an empty PR number downstream)" "$_out" "pushed but has NO PR"
 _reset_mock_env
 
 # The existing-PR lookup itself fails (network/auth) -- must refuse to
