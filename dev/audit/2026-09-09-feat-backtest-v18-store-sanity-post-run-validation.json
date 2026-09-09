@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-09",
+  "feature": "post-run-validation",
+  "branch": "feat/backtest/v18-store-sanity",
+  "sha": "59d9df84b8f3d8316218cfe268e120fdd5e1992f",
+  "recorded_at_ns": 1788977882439178450,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

@@ -1,176 +1,173 @@
-Reviewed SHA: 6a1dfdcc58092a6bec8360265d9772b23a110904
+Reviewed SHA: 5232a8cf3b7958f953dbbdbee8b6626368ff11b5
 
-# QC review — PR #2721 (`harness/daily-summary-publisher`)
+## Structural QC — harness/goldens-nested-new-field (PR #2748)
 
-Orchestrator run 34252318116, 2026-09-08.
+### Summary
+This PR fixes a false-positive in `goldens_affected_check.sh` Step 2c (nested-config embedding field emission). The script was emitting the outer strategy-config knob (e.g., `stops_config`) whenever ANY field in a nested config file changed, including brand-new fields with no prior default. This caused false FAIL verdicts on PR #2642 when `stop_skip_entry_bar` was added to `Weinstein_stops.config`, matching goldens that armed the outer knob for unrelated existing fields.
 
-## Structural Checklist
+The fix gates outer-knob emission on at least one changed field existing at BASE_REF (via conservative `grep -qw` presence check). New fields alone do not trigger emission. Assertions 22 (brand-new field → OK) and 23 (pre-existing field with changed default → still FAIL) verify the fix is load-bearing and does not over-suppress.
+
+### Structural Checklist
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
-| H1 | `dune build @fmt` | PASS | exit 0 |
-| H2 | `dune build` | PASS | exit 0 |
-| H3 | `dune runtest` | PASS | exit 0; 0 `^FAIL:` lines; `OK: publish_daily_summary_test_runner.sh` present in the full log, so the new rule genuinely runs |
-| P1 | Function length | NA | No OCaml; shell procedures exit early |
-| P2 | No magic numbers | NA | Exit codes (0/1/2) and HTTP codes (201/422) are named, not bare |
-| P3 | Configurable values in a config record | NA | No strategy knobs; repo/remote/base-branch/daily-dir come from a declared ENV section |
-| P4 | Public-symbol export hygiene | NA | Internal functions underscore-prefixed; a guard restricts the exported surface when sourced |
-| P5 | Internal helpers prefixed per convention | PASS | All internal functions `_`-prefixed; `cmd_publish` is the single public entry point |
-| P6 | Tests conform to `.claude/rules/test-patterns.md` | NA | Shell suite, not OUnit/Matchers. Explicit `check()` / `check_contains()` / `check_not_contains()` assertions, mock `curl`, real git fixtures |
-| A1 | Core module modification (Portfolio/Orders/Position/Strategy/Engine) | NA | Harness/infrastructure only |
-| A2 | `analysis/` → `trading/trading/` dependency boundary | NA | No `trading/trading` source touched; no `(libraries ...)` change |
-| A3 | No unnecessary modifications to existing modules | PASS | 5 files: 3 new, 2 additive edits (`dune` + `harness.md`). File list taken from `/pulls/2721/files`, not a git-log ancestry walk |
+| H1 | dune build @fmt (format check) | PASS | Script and test file are correctly formatted. |
+| H2 | dune build | PASS | Full build completes with no errors. |
+| H3 | dune runtest | PASS | 23 assertions pass (21 prior + 2 new); no ^FAIL: lines. |
+| P1 | Functions ≤ 50 lines (linter) | NA | Shell scripts; dune runtest passed (includes format/lint gates). |
+| P2 | No magic numbers (linter) | NA | Shell scripts; dune runtest passed. |
+| P3 | Config completeness | NA | No config fields in this PR. |
+| P4 | Public-symbol export hygiene (linter) | NA | Shell scripts; dune runtest passed. |
+| P5 | Internal helpers prefixed per convention | NA | Shell scripts use standard `_function_name` convention for private routines. |
+| P6 | Tests conform to `.claude/rules/test-patterns.md` | NA | Test file uses shell-script assertion patterns (pass/fail counters), not OCaml test matchers. Shell-test assertions are appropriate for this fixture-driven harness. |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | NA | No OCaml library modifications; devtools shell scripts only. |
+| A2 | Dependency-direction rules (Tier 1 & 2) | NA | No OCaml library dependencies added. |
+| A3 | No unnecessary modifications to existing modules | PASS | Three files changed: script (fix), test (2 new assertions), status (documentation). All related to this issue. |
 
-### Absolute rules
+### Critical Over-Suppression Verification
 
-- **No Python** (`.claude/rules/no-python.md`): `find . -name "*.py"` returns empty. PASS.
-- **POSIX sh**: all three scripts are `#!/bin/sh`; no bash-isms in the script itself. PASS.
-- **Dune wiring**: matches the `prior_cell_check_test_runner.sh` / `prune_candidates_test_runner.sh` shim pattern — `repo_root()` resolution, `(universe)` dep for cache invalidation, FAIL (not SKIP) when the test is absent. PASS.
+**Question:** Can the new predicate `git show "${BASE_REF}:${f}" | grep -qw -- "$knob_field"` over-suppress emission for genuinely CHANGED defaults or REMOVED fields?
 
-### Non-vacuity — measured twice, independently
+**Answer:** No. Verified via three scenarios:
 
-The orchestrator ran these before opening the PR; the reviewer re-derived them rather than inheriting them, and the two sets agree.
+1. **Changed default value** — Field name still appears in BASE_REF file (old value line contains it) → `grep -qw` finds it → HAS_PREEXISTING_FIELD=1 → outer knob IS emitted. ✓ (Verified by test assertion 23: pre-existing `stop_skip_entry_bar` with flipped default still FAILs as expected.)
 
-| mutation | suite |
-|---|---|
-| no-summary guard `return 1` → `return 0` (fail **open** — the exact shape being replaced) | **34/35**, exit 1 |
-| drop the `-plan.md` exclusion from summary resolution | **33/35**, exit 1 |
-| restored | **35/35**, exit 0 |
+2. **Removed field** — Field name appears in BASE_REF (the line being removed contains it) → `grep -qw` finds it → HAS_PREEXISTING_FIELD=1 → outer knob IS emitted. ✓
 
-### Adversarial checks performed
+3. **Word-boundary correctness** — `grep -qw` uses word boundaries; a field named `config` does not match inside `my_config`. ✓ (Independently verified.)
 
-- **Every exit path fails closed** — resolution, `GH_TOKEN` validation, file existence, git operations, PR-create. No silent-success path found. This is the load-bearing property: the defect being replaced failed *silently*.
-- **`--dry-run` fidelity** — network-touching steps (`curl`, `git push`, PR-create) are skipped under `--dry-run`; the suite pins this with a forbidden-`curl` mock, so a dry-run that secretly reached the network would go red.
-- **Idempotency** — the already-open-PR path (422 → look up by head) is wired, not merely described.
+The predicate's bias toward over-emission (emit unless proven "new") matches the direction `.claude/rules/config-default-blast-radius.md` exists to protect (PR #2384's under-emission cost −40.91pp).
 
-## Quality Score
+### Quality Score
 
-5 — Exemplary. POSIX shell throughout, fail-closed at every step, 35 fixture-driven scenarios including network failure, idempotency and dry-run isolation, mutation-verified guards, correct dune wiring. No code smell, no drift, no suppression markers.
+5 — Focused fix with load-bearing test fixtures (assertions 22 and 23 confirm both correctness and lack of regression); all gates pass; predicate is conservative and sound.
 
 ## Verdict
 
 APPROVED
 
-## Note for behavioral review
-
-Pure harness/infrastructure PR. Per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely", the S\*/L\*/C\*/T\* domain block is NA; review against the generic Contract Pinning Checklist CP1–CP4 only.
-
-## Declared scope limit (not a defect)
-
-This PR closes the **mechanism** and explicitly not the **call site**: `.claude/agents/lead-orchestrator.md` Step 8 still publishes via `jj` and has not been repointed at the new script, because `.claude/agents/**` is write-gated in this runtime. The PR body and the `dev/status/harness.md` entry both state this, and the backlog item is deliberately left `- [ ]`. Until Step 8 is repointed, summaries will keep being lost exactly as measured.
 
 ---
 
-# Behavioral review — same SHA `6a1dfdcc`
+## Behavioral QC — harness/goldens-nested-new-field (PR #2748)
 
-Gates re-derived independently in the reviewer's own worktree: `dune build @fmt` 0, `dune build` 0, `dune runtest` 0, `^FAIL:` 0; suite 35/35 under `bash`, under `dash`, via the shim, and inside `dune runtest`. **All matched the orchestrator's measurements**, including both cited mutations (34/35 and 33/35, exit 1 each).
+Reviewed SHA: 5232a8cf3b7958f953dbbdbee8b6626368ff11b5
 
-Then it went further: **28 mutations run, 16 killed, 12 survived.**
+### Scope
 
-## Contract Pinning Checklist
+Pure harness / devtools PR — no domain logic. Per
+`.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely",
+the entire Weinstein S*/L*/C*/T* block is **NA**; review is through the generic
+CP1–CP4 Contract Pinning Checklist alone.
 
-| # | Check | Status | Notes |
-|---|-------|--------|-------|
-| CP1 | Each non-trivial docstring claim has an identified test pinning it | **FAIL** | `_resolve_summary_path` claims "newest … (mtime order)". `ls -t` → `ls` survives **35/35** — including the check literally named "picks the newest `-runN` variant **by mtime**", because the fixture's files sort identically under both orders. Against the real naming on `main` today (`2026-07-28-run2/3/4.md`) the mutant resolves **run2** where the shipped script resolves **run4** — publishing the day's FIRST summary while reporting success. `--summary`, `--base` and the branch-**reuse** behaviour are documented in USAGE and likewise unpinned |
-| CP2 | Each PR-body test claim has a corresponding committed test | **PASS** | "35 fixture-driven checks" verified across four invocation paths; the non-vacuity table reproduces exactly. No advertised test is missing |
-| CP3 | Pass-through / invariant tests pin identity, not existence or count | **FAIL** | The three `"landed on the bare remote"` assertions run `git branch --list ops/daily-…`, which pins the branch **name** and never that the summary is **on** it. Inserting `git reset -q --hard` immediately before `git push` yields: prints `PR #123 <url>`, **exit 0**, branch present on the remote, `dev/daily/2026-09-08.md` **absent from it** — and the suite reports **35/35** |
-| CP4 | Each guard named in a docstring has a test exercising the guarded scenario | **FAIL** | (a) **The production code path is never executed** — every fixture `git add && git commit`s the summary *before* invoking publish, so only the "already committed, nothing to add" branch runs; replacing the script's own `git add`+`git commit` branch with `return 1` leaves **35/35 green**. In production the summary is a new, uncommitted file, so the untested branch *is* the production path. (b) The mock `curl` never inspects the POST payload, so `head`/`base`/`title`/`body` are unasserted — a wrong `head` would open a PR from the wrong branch, another silent-drop shape |
+The contract under review is not "the false positive is gone" but
+**"nothing that previously FAILed correctly now passes"** — `goldens_affected_check.sh`
+is the required PR gate behind `.claude/rules/config-default-blast-radius.md`,
+which exists because #2384 merged a config-default flip on green CI at a cost of
+−40.91pp. This PR makes that gate fire *less* often, so over-suppression is the
+only failure mode that matters.
 
-## Domain checklist
-
-| # | Check | Status | Notes |
-|---|-------|--------|-------|
-| A1, S1–S6, L1–L4, C1–C3, T1–T4 | — | **NA** | Pure harness/infrastructure PR — a shell publisher, its suite, a dune shim and a status entry. No stage classification, entry/exit, stop, screener, sizing or backtest logic. Per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely", CP1–CP4 constitute the full review. No `BOOK-CHECK-NEEDED` items — no faithfulness claim is made or implied |
-
-## Dry-run fidelity — hypothesis right in kind, wrong in location
-
-The dispatch asked the reviewer to hunt `--dry-run` fidelity adversarially. It cleared dry-run and found the real gap elsewhere: dry-run skips exactly three things (existing-PR pre-check, `git push`, PR-create POST) and **all three are genuinely exercised in non-dry-run mode** against a local bare `origin` plus a mocked `curl`; six mutations against them all go red.
-
-The divergence is **upstream, in the fixture**: it pre-commits the summary, so both modes exercise only the degenerate "already committed" shape. That is why neither dry-run inspection nor qc-structural's code read could see it.
-
-## Honesty of scope — PASS
-
-The declared limitation is stated correctly and is not a defect. Two accuracy notes worth fixing in the same pass, since this repo squash-merges the body into `main`'s commit message: the body says `--dry-run` skips "the push and the POST" (it also skips the existing-PR lookup — the script's own docstring is correct), and `harness.md` points at a mutation list "in the script's own header" that lives only in the PR body.
-
-## Quality Score
-
-2 — Below standard. The implementation and its guards are well built and 16 of 28 mutations are properly killed, but the suite does not pin the PR's own thesis (a mutant that publishes nothing still reports success at 35/35) and never executes the production commit path.
-
-## Verdict
-
-NEEDS_REWORK
-
-## Required fixes
-
-1. **CP3** — assert branch **content**, not branch existence: `git --git-dir="$BARE_DIR" show "ops/daily-<date>:dev/daily/<date>.md"` must contain a sentinel.
-2. **CP4/CP1** — add one scenario in the **production shape** (write the summary, do *not* pre-commit it), asserting exit 0 **and** the sentinel on the pushed branch. The reviewer verified empirically that this single scenario passes against the shipped script and **kills both** critical survivors.
-3. **CP1** — add a third `-runN` whose lexical and mtime order **disagree**, and assert the mtime winner.
-4. **CP4** — have the mock `curl` write its `-d` payload to a file and assert `head`/`base`/`title`; add `--summary`, `--base` and branch-reuse scenarios. In-repo precedent for pinning survivors explicitly rather than leaving them undiscovered: `trading/devtools/checks/pr_gate_status_mutation_*`.
-
-## Combined result
-
-`overall_qc: NEEDS_REWORK (behavioral)` — structural APPROVED (5), behavioral NEEDS_REWORK (2) at the same SHA. Audit: `dev/audit/2026-09-08-harness-daily-summary-publisher-harness.json`.
-
-
----
-
-# QC review — PR #2725 (`harness/prune-anchor-selfref`)
-
-Structural reviewed at SHA `c96e6c2b`. **Tip is now `4bd4c221`** after an
-orchestrator rebase onto `bd7ac580` (see "SHA caveat" below).
-
-## Structural Checklist
+### Contract Pinning Checklist
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
-| H1 | `dune build @fmt` | PASS | exit 0 |
-| H2 | `dune build` | PASS | exit 0 |
-| H3 | `dune runtest` | PASS | exit 0; `prune_candidates_test: 36 passed, 0 failed` |
-| P1–P4, P6 | linter-covered rows | NA | POSIX shell + markdown; no OCaml |
-| P5 | Internal helpers prefixed | NA→PASS | shell `_function_name` convention followed throughout |
-| A1 | Core module modification | NA | harness script only |
-| A2 | Dependency boundary | NA | no `(libraries …)` change |
-| A3 | No unnecessary modifications | PASS | three files, all necessary: `prune_candidates.sh`, `prune_candidates_test.sh`, `dev/status/harness.md` |
+| CP1 | Non-trivial docstring claims pinned by tests | PASS | No new `.mli` (shell PR); the `.sh` header block is the operative contract. Claim "outer knob emitted only when ≥1 changed field already existed at BASE_REF, whole-word presence check" → matches the code exactly (`git show "${BASE_REF}:${f}" \| grep -qw -- "$knob_field"`, gate `HAS_PREEXISTING_FIELD -eq 1`). Pinned by assertions 22 (additive → suppress) + 23/18 (pre-existing → emit). Header, in-line comment, and `dev/status/harness.md` entry all describe the predicate accurately — no drift. |
+| CP2 | PR-body "Tests" claims exist in the committed test file | PASS | Every claim independently re-verified, not taken on report. "21 → 23 assertions": `^echo "=== Assertion` count is 21 at `HEAD~1`, 23 at HEAD. "all passing": `sh goldens_affected_check_test.sh` → **exit 0, 23 passed 0 failed** (read unpiped). "Assertion 22 verified RED against the pre-fix script (22/23, assertion 22 failing)": **reproduced exactly** — ran the new suite against `git show HEAD~1:…check.sh` → exit 1, `22 passed, 1 failed`, sole failure `assertion 22`, failing with the reported false-positive FAIL. Test is wired into `dune runtest` (`trading/devtools/checks/dune` line 937, with `_check_lib.sh` + the script as explicit deps). |
+| CP3 | Invariant tests pin identity, not just a count | PASS | The load-bearing invariant is behavioural identity of the FAIL path, and it is asserted as identity: assertion 23 requires `rc=1` **and** `'stops_config'` **and** `embeds:stop_types.mli` **and** `fixture-golden.sexp` in the output — the specific knob, the specific provenance tag, and the specific spec, not merely "some FAIL". Assertions 14/18 retain the pre-existing nested FAIL shapes unmodified. |
+| CP4 | Docstring guards exercised by tests | PASS | Guard "a field that changed value keeps its name in the BASE_REF file … never misses a real value-change" → assertion 23. Guard "the same carve-out Step 4b applies to top-level knobs, extended to the nested case" → assertion 22 + unmodified 21. One half-claim is unpinned — the docstring says "value-change **or removal**" and no committed assertion covers removal — but I verified the removal shape is safe by direct probe (R1 below), so it is recorded as a residual per the unpinned-but-**safe** rule rather than a FAIL. |
+| A1 | Core module modification strategy-agnostic | NA | qc-structural did not flag A1; no core module touched. |
 
-**No Python** verified. Both scripts pass `dash -n`.
+### Weinstein Behavioral Checklist
 
-## The six scepticism items the dispatch asked for
+| # | Status |
+|---|--------|
+| S1–S6, L1–L4, C1–C3, T1–T4 | **NA** — pure harness / devtools PR; touches no stage classifier, stop, screener, or macro logic. Domain checklist not applicable. No `BOOK-CHECK-NEEDED` items arise. |
 
-1. **`ROOT` swap leak** — PASS. `ROOT="$tmp"` at line 531; **all six** return paths (534, 541, 548, 555, 561) restore `ROOT="$orig_root"` unconditionally. No early exit escapes restoration.
-2. **Writes into the real repo** — PASS. Every write is confined to the `mktemp -d` dir; no redirect targets a path outside it; `rm -rf "$tmp"` is unconditional.
-3. **Two-sidedness real** — PASS, and independently reproduced. Mutation 1 (`_is_cited` → `return 0`) trips the false-CLEAN guard; mutation 2 (`return 1`) trips the false-ORPHAN guard. The two guards are independent — neither alone covers both directions.
-4. **Live script exits 0 on this tree** — PASS, run *after* the status-file edit. This is the trap the fix had to survive: the new `harness.md` entry necessarily names the old anchor, so a fix that still resolved against the live tree would have re-broken the probe while documenting the repair.
-5. **The declared tradeoff** (the probe no longer proves `find`'s enumeration of the real tree) — **argued, not merely asserted.** All three historical failures of this probe were citation/dating *primitive* bugs (`\s` vs `[[:space:]]`, git `safe.directory`, and this one); `find -mindepth 1 -maxdepth 1 -type d` has no regex or locale surface to break the same way. Reviewer judged the trade reasonable on that evidence.
-6. **The self-disclosed gap** (deleting the `_checker2_self_test || return 1` call site is caught by nothing) — legitimate and consistent: the pre-existing checker3 probe has the identical hole. Recorded rather than hidden, which is the point.
+### Independent verification performed
 
-## Mutations — independently re-run, matched the author exactly
+All work done in `/tmp/mut` against copies; the worktree was never mutated
+(`git status --porcelain` shows only the pre-existing `dev/reviews/harness.md`
+edit; no `.orig`/`.bak` anywhere).
 
-| # | mutation | author claimed | reviewer measured |
+**1. Assertion 22 pins the bug, not the fix** — reproduced (above). A fixture
+green both before and after would pin nothing; this one is genuinely RED
+pre-fix, and it is the *only* assertion that flips, so the fix is both
+load-bearing and isolated.
+
+**2. Assertion 23 is a real over-suppression guard** — mutation-tested:
+
+| mutant | effect | suite result | 23 caught it? |
 |---|---|---|---|
-| 1 | `_is_cited` → `return 0` (match everything) | 4 passed / 32 failed | **4 / 32 — exact match** |
-| 2 | `_is_cited` → `return 1` (match nothing) | 5 passed / 31 failed | **5 / 31 — exact match** |
+| gate → never true (never emit outer knob) | max over-suppression | 21/23 | **yes** (with 18) |
+| gate inverted (`-eq 1` → `-eq 0`) | inverted classification | 20/23 | **yes** (with 18, 22) |
+| `grep -qw` → `grep -q` (drop word-boundary) | *widens* matching | 23/23 | no — see R4 |
 
-## Fixture C — the regression test for this bug's shape
+Assertion 23 dies under both narrowing mutants, so it is a genuine guard.
 
-Documents a synthetic old experiment dir from a synthetic `dev/status/harness.md`, mirroring exactly what `efc25d68` did to the real anchor, and asserts the probe still passes with the dir correctly excluded. Reviewer confirmed it reproduces the historical bug's shape rather than a weaker cousin.
+> **Polarity correction to the review brief.** The brief asked me to confirm 23
+> goes red "if the predicate were **widened** (e.g. drop the `-w`)". It does not,
+> and it should not: widening makes the check emit **more**, and 23 asserts a
+> FAIL, so it stays green by construction. Assertion 23 guards the **narrowing**
+> direction — which is the correct polarity for it to guard, since narrowing is
+> the #2384 failure mode. The guard is real; the brief's stated mutation was
+> simply the wrong direction to test it with.
+
+**3. Adversarial diff shapes (item 4).** Nine bespoke fixtures against the
+post-fix script. `EMIT` = outer knob emitted → gate FAILs (safe);
+`SUPPRESS` = gate passes.
+
+| # | shape | result | safe? | pinned? |
+|---|---|---|---|---|
+| S1 | field **renamed** in the same commit | EMIT | safe | no |
+| S2 | new field whose name is a **substring** of an existing identifier (`stop_pct` vs `catastrophic_stop_pct`) | SUPPRESS | safe — genuinely new, `-w` correctly refuses the substring match | no |
+| S3 | field **added *and*** another field's default **changed**, same record | EMIT | safe | no |
+| S4 | field **removed** | EMIT | safe | no |
+| S5 | entire nested config **file** is new at HEAD | SUPPRESS | safe — all fields new, nothing can inherit | no |
+| S6 | new field whose name appears only in a BASE_REF **comment** | EMIT | safe — the documented over-emit bias, working | no |
+| S7 | `.ml` record-literal, pre-existing value changed | EMIT | safe | no |
+| S8 | `.ml` record-literal, brand-new field | SUPPRESS | safe | no |
+| S9 | `.ml` record-literal, **mixed** add + value-change | EMIT | safe | no |
+
+**Zero unsafe suppressions across all nine.** This is structural, not luck:
+`_changed_body_lines` captures both `+` **and** `-` diff lines, so any
+pre-existing field that changed or was removed contributes *its own name* to
+`FILE_KNOBS`, and that field's declaration line is by construction present in
+the BASE_REF text with the name as a whole word (`foo : …` / `foo = …`). A
+pre-existing changed field therefore cannot fail the `grep -qw` presence test.
+The rename case (S1) is safe for the same reason — the `-` line carries the old
+name. Assertions 22/23 exercise only the `.mli` `[@sexp.default]` extractor;
+S7–S9 confirm the `.ml` record-literal extractor feeds the same predicate with
+identical, safe behaviour.
+
+### Residuals (unpinned but verified safe — not FAILs)
+
+- **R1** — the docstring claims the predicate "never misses a real value-change
+  **or removal**"; removal (S4) has no committed assertion. Verified safe by
+  probe. *harness_gap: LINTER_CANDIDATE* — a 24th assertion mirroring 23 with a
+  deleted field is a few lines.
+- **R2** — the **mixed** add + value-change shape (S3/S9) is the most realistic
+  real-world PR shape and the one where suppression would be most damaging; it
+  is unpinned. Verified safe. *harness_gap: LINTER_CANDIDATE.*
+- **R3** — the `.ml` record-literal path through the new predicate (S7–S9) is
+  unpinned; 22/23 are `.mli`-only. Verified safe. *harness_gap: LINTER_CANDIDATE.*
+- **R4** — dropping `-w` survives the whole suite (23/23). This is the
+  *over-emitting* direction (a substring collision would resurrect the #2643
+  false positive but can never suppress a real change), so it is a cosmetic
+  hole, not a safety hole. *harness_gap: ONGOING_REVIEW.*
+
+None of these blocks approval: each is unpinned-**and-safe**, verified by direct
+probe in this review. Together they would make a tidy single follow-up
+(assertions 24–26) if the harness track wants belt-and-braces on a gate this
+load-bearing.
 
 ## Quality Score
 
-5 — Exemplary. Gates all green, mutations two-sided and non-vacuous with counts matching to the digit, regression fixture pins the exact issue, temp-resource cleanup unconditional on every path, and both the tradeoff and the residual gap disclosed rather than buried.
+5 — Exemplary: a narrow, well-reasoned fix to a required merge gate whose
+central safety claim I could not break in nine adversarial probes and three
+mutants; the RED-pre-fix reproduction and the over-suppression guard are
+exactly the two fixtures that matter, and the header, in-line comment, and
+status entry all describe the predicate accurately.
 
 ## Verdict
 
 APPROVED
-
-## SHA caveat — read before merging
-
-The verdict above was taken at `c96e6c2b`. PR #2721 merged mid-run and took the same `dev/status/harness.md` section, leaving #2725 `mergeable_state: dirty` — and **a conflicted PR gets no CI at all**, because GitHub cannot build the merge ref that `pull_request` workflows run against. The orchestrator therefore rebased onto `bd7ac580` and force-pushed `4bd4c221`.
-
-**The only delta is the conflict resolution** — both backlog entries kept, `main`'s `H-DAILY-SUMMARY-PR-LOST` first, then `H-PRUNE-ANCHOR-SELFREF`. No script or test byte changed. After the resolution the orchestrator re-verified, because `harness.md` is itself one of the script's five citation sources and had just changed:
-
-```
-bash dev/scripts/prune_candidates.sh        exit 0
-bash dev/scripts/prune_candidates_test.sh   exit 0   (36 passed, 0 failed)
-```
-
-Strictly, the structural verdict is stale at the new tip and should be re-confirmed there. It is recorded as APPROVED-at-`c96e6c2b` rather than silently carried forward. **Behavioral QC has not run at all.**
