@@ -71,3 +71,62 @@ max 27 KB).
 - Tool-result size: small, see above.
 - Poll loops in the main session: ~9% of turns, each a cheap cache read at
   the current context; the fix for their cost is lever 1, not fewer polls.
+
+## Correction (21:55 PT, same day) — absolute figures above are ~2× too high
+
+The transcript writes one record per content block, and a message with a
+text block plus a tool_use block appears twice with the same `usage`. Deduped
+on `message.id`: 7-day cache reads **3.2B** (not 6.5B), cache writes **98M**
+(not 225M); this session **144 API calls / 35M cache reads** (not 373 / 91M).
+Every ratio, the per-day shape, and the lever ranking are unchanged (both
+halves scale together). Read the tables above as "÷2".
+
+Per-turn shape of this session, deduped: context grew 150k → 350k over 144
+calls; 53 of the calls were bounded 30-second poll loops, ≈16% of the reads.
+The expensive pattern is not the context size itself but **wait-turns issued
+at a large context** — a poll at 350k costs 2.3× a poll at 150k for the same
+information. That points at cadence rules rather than a context cap (see the
+handoff discussion of 2026-09-08 evening).
+
+## What actually fills a 995k context (measured on the 09-07/08 session, 1,171 API calls)
+
+Not the codebase. The transcript's message content is ≈ 2.1 MB: **Bash tool
+inputs 0.74 MB** (741 calls — long heredocs, chain launches, analysis
+one-liners), **Bash results 0.60 MB** (avg 0.8 KB; the largest single result
+27 KB), **Agent briefs 0.45 MB** (118 dispatches × 3.8 KB — the same
+NO-WAITING / checkout / docker-wrapper / review-format boilerplate re-typed
+each time), assistant text + thinking 0.17 MB. No `Read` calls at all; no
+file is loaded twice. The context is the operational log of a very long
+dispatcher session, so "progressive disclosure of the codebase" is not the
+lever here — the codebase is already loaded on demand and barely appears.
+
+Smarter rules than a context cap, in order of expected saving:
+
+1. **Wait by event, not by poll.** 53 of this session's 144 calls were
+   bounded 30-second poll loops; a poll at 350k costs 2.3× one at 150k for
+   the same bit of information. A waiting script run with the harness's
+   background mode returns ONE turn when the cell / CI / agent finishes.
+   Rule: any wait expected to exceed ~5 minutes runs as a background
+   command that exits on the condition — never as a foreground sleep loop —
+   and the longer the context, the stricter this gets.
+2. **Boilerplate lives in the agent definition, not the brief.** Move the
+   NO-WAITING rule, the plain-git checkout, the docker-wrapper fallback, the
+   review-format block, and the finish protocol into
+   `.claude/agents/qc-*.md` / `feat-*.md`; a brief then carries only the PR
+   number, tip SHA, scope, and the review file path (~0.5 KB, not 4 KB).
+   This is a harness-maintainer item (GHA-dispatchable).
+3. **Hand off at a queue boundary, not at a token count.** When the
+   remaining queue is waits (cells, CI, agents) rather than work that uses
+   what is in context, write the handoff and clear; when the context is
+   being used (a dissection referencing earlier numbers), keep it whatever
+   its size. The write-back to the record (README / handoff) is the moment
+   the context's value drops.
+4. **Dispatcher-side dedupe of QC** (unchanged from above; ≈10%).
+5. The earlier "cap at ~300k" line is withdrawn (user, 09-08: "that's
+   aggressive").
+
+Refinement to rule 1 (user, 09-08): an event can fail to fire back (two
+stall classes are already on record), so the background wait is paired with
+a long fallback heartbeat — a 20–30 minute scheduled re-check of the same
+condition plus the clock — never a bare event wait, never a 30-second
+foreground loop. Harness item: issue #2738.
