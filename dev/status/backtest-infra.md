@@ -32,23 +32,32 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
     (pure over `Validator_types.report` — selection, per-check counts, specimen
     deltas, table rendering) + `bin/validator_diff.ml` (the CLI, which turns
     `Validator_diff.agreed` into an exit code). Tests:
-    `test/test_validator_diff.ml` (10 cases).
+    `test/test_validator_diff.ml` (13 cases) +
+    `trading/devtools/checks/validator_diff_exit_codes_smoke.sh` (the CLI's
+    8-case exit-code matrix, wired into `dune runtest`).
   - **Incantation** (no sibling chain template exists under `dev/scripts/`, so
     this is the record; also in `validator_diff.mli`'s header):
     ```sh
     dune exec trading/backtest/validation/bin/validator_diff.exe -- \
+      -check V6 \
       -report null=<results>/a0-...-validator.sexp.sexp \
       -report map=<results>/a1-...-validator.sexp.sexp
     ```
     Exit 0 = every selected check agrees; exit 1 = they differ, and the tool
     prints the `check | label... | verdict` table plus the specimens present in
     one report and not another. Exit 2 = the reports could not be read or
-    compared (bad `-report LABEL=PATH`, fewer than two reports, or a selected
-    check id missing from one report — never a silent pass). `-check V6` gates
-    on one check; `-severity all` widens the default `Invariant`-only selection
-    to include `Expectation` checks (off by default: an Expectation count moves
-    legitimately with the lever under test, an Invariant count moving means the
-    arms disagree about the data).
+    compared (bad `-report LABEL=PATH`, a missing or malformed report file,
+    fewer than two reports, or a selected check id missing from one report —
+    never a silent pass).
+    `-check V6` **is the paired-read gate**, and the form to run: V6 (twin
+    positions) is the check that carries instrument-set identity. Dropping it
+    audits every Invariant, and the per-trade ones — V7 (virgin-territory bars),
+    V12 (installed-stop distance), V13 (bar/price bounds) — follow the trade
+    list, so they move benignly whenever a lever holds a different set of
+    trades. On the fixture pair below all three differ (V7 54/66, V12 16/21,
+    V13 152/147) alongside V6, so the bare form is the wider audit, not the
+    gate. `-severity all` widens further still, to `Expectation` checks (off by
+    default: an Expectation count moves legitimately with the lever).
   - **Verify:** `dune runtest trading/backtest/validation/test`, and against the
     committed fixtures —
     `dev/experiments/stop-width-by-state-2026-09-08/results/a0-breadth-on-null-s0-validator.sexp.sexp`
@@ -56,7 +65,19 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
     (AABA/YHOO, BFX/NLS, DOC/HCP_old, AORT/CRY_old, BB/BBRY, AZN/AZN_old); the
     a0 report against itself exits 0.
   - The rule is written up as check 8 in
-    `.claude/rules/mechanism-validation-rigor.md`.
+    `.claude/rules/mechanism-validation-rigor.md` and step-2 item 8 of
+    `.claude/skills/screen-rigor/SKILL.md`.
+  - `behavioral_qc: NEEDS_REWORK at a7c10fcc4 (CP4-a read-failure exit code,
+    CP1-a N-ary, CP1-b -check V6 in the docs, CP4-b empty-selection) →
+    addressed in rework 1`. CP4-a was a live defect: `Sexp.load_sexp` raised on
+    a missing or malformed report and the uncaught exception exited **1** (the
+    "arms differ" code) rather than the documented 2; it now flows through the
+    `Result` path, pinned by the exit-code smoke check above. CP1-a added two
+    three-arm tests (both go red under a `List.take reports 2` mutation of
+    `compute`). CP1-b put `-check V6` in every documented incantation. CP4-b
+    corrected `compute`'s empty-selection docstring example (an unknown `-check`
+    id reaches `NotFound`, not that branch) and pinned the reachable route
+    (reports carrying only `Expectation` checks under the default).
   - **Not in scope (still open on #2730):** ask 1's `_v10dedup` vintage rebuild
     and ask 3's re-run of the item-3 surface on the deduped warehouse.
 

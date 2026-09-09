@@ -1033,3 +1033,23 @@
  (deps scheduled_workflow_health.sh)
  (action
   (run sh %{dep:scheduled_workflow_health_test.sh})))
+
+; validator_diff.exe exit-code matrix: drives the real CLI against fixture
+; report sexps under mktemp and asserts the process exit code for each of
+; {agree, differ, bad -report form, missing file, malformed sexp, wrong-shape
+; sexp, fewer than two reports, unknown -check id}. A unit test cannot pin a
+; process exit code, and the 0/1/2 split is the CLI's whole contract -- an
+; unreadable report exiting 1 ("the arms differ") instead of 2 was a live
+; defect (PR #2735 qc-behavioral, item CP4-a). VALIDATOR_DIFF_EXE points the
+; script at the built executable; %{exe:...} is itself a dep, so the cache
+; invalidates when the CLI changes. No (universe): every fixture is written
+; under mktemp, so the script reads no real-repo file beyond itself.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (setenv
+   VALIDATOR_DIFF_EXE
+   %{exe:../../trading/backtest/validation/bin/validator_diff.exe}
+   (run sh %{dep:validator_diff_exit_codes_smoke.sh}))))

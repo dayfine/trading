@@ -58,9 +58,13 @@ Bound it: which direction does the proxy bias?
    distinguish the hypotheses? (A bootstrap or sign-test beats an eyeballed median.)
 8. **Paired cells agree on every validator Invariant count** — run
    `validator_diff.exe` over the arms' post-run validator reports before quoting
-   a delta (`-report <label>=<path>` per arm; exit 0 = agree, 1 = differ). A V6
-   mismatch means the arms hold different instrument sets and the delta is not a
-   mechanism read. See `.claude/rules/mechanism-validation-rigor.md` check 8.
+   a delta (`-check V6 -report <label>=<path>` per arm; exit 0 = agree, 1 =
+   differ, 2 = the reports could not be read). A V6 mismatch means the arms hold
+   different instrument sets and the delta is not a mechanism read. Gate on
+   `-check V6`: dropping it audits every Invariant, and the per-trade ones
+   (V7 virgin-territory bars, V12 stop distance, V13 bar/price bounds) move
+   benignly with the trade list any lever changes by design. See
+   `.claude/rules/mechanism-validation-rigor.md` check 8.
 
 ### Step 3 — Calibrate the verdict to what a proxy can claim
 

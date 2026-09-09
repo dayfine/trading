@@ -22,13 +22,19 @@
 
     {v
       dune exec trading/backtest/validation/bin/validator_diff.exe -- \
+        -check V6 \
         -report null=<dir>/a0-...-validator.sexp.sexp \
         -report map=<dir>/a1-...-validator.sexp.sexp
     v}
 
     Exit 0 = every selected check agrees; exit 1 = they differ (the arms are not
-    comparable). Add [-check V6] to gate on one check, or [-severity all] to
-    include {!Validator_types.Expectation} checks too. *)
+    comparable); exit 2 = the reports could not be read or compared.
+
+    [-check V6] is the paired-read gate: V6 (twin positions) is the check that
+    carries instrument-set identity. Drop it for the wider audit over every
+    Invariant, and expect the per-trade ones (V7/V12/V13) to move benignly with
+    the lever — see {!Invariant_only}. [-severity all] widens further, to
+    {!Validator_types.Expectation} checks as well. *)
 
 (** Which checks are compared when no explicit [-check] list is given. *)
 type severity_filter =
@@ -36,9 +42,15 @@ type severity_filter =
       (** Only checks some report marks {!Validator_types.Invariant} — the
           default, because an {!Validator_types.Expectation} count legitimately
           moves with the lever under test (a wider stop holds different trades,
-          so its V9 overhead count differs without anything being wrong). An
-          {!Validator_types.Invariant} count moving means the two runs disagree
-          about the data itself. *)
+          so its V9 overhead count differs without anything being wrong).
+
+          This is the {b wider audit}, not the paired-read gate: it also carries
+          the {i per-trade} Invariants (V7 virgin-territory bars, V12 installed-
+          stop distance, V13 bar/price bounds), whose counts follow the trade
+          list and so move benignly for the same reason an Expectation does —
+          measured on this module's own motivating pair, all three differ
+          alongside V6. The check that carries the instrument-set-identity
+          meaning is {b V6} (twin positions): pass [-check V6] for the gate. *)
   | All_checks  (** Every check id present in any report. *)
 
 type labeled_report = { label : string; report : Validator_types.report }
@@ -88,7 +100,11 @@ val compute :
     Errors — never a silent pass, since the whole point is to refuse to certify
     an unverifiable pairing:
     - fewer than two reports (nothing to compare);
-    - the selection is empty (e.g. [-check] named nothing that exists);
+    - the selection is empty — every check the severity filter would have taken
+      was filtered out, e.g. reports carrying only
+      {!Validator_types.Expectation} checks under the default {!Invariant_only}.
+      (An unknown [-check] id does {b not} land here: it is a non-empty
+      selection, and fails below as [Not_found].);
     - a selected check id is missing from any one report ([Not_found]) — two
       runs whose validators ran different check sets cannot be diffed. *)
 

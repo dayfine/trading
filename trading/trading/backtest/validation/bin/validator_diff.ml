@@ -17,11 +17,23 @@ let _exit_agree = 0
 let _exit_differ = 1
 let _exit_usage = 2
 
+(* [Sexp.load_sexp] raises on a missing file, and [report_of_sexp] raises on a
+   sexp of the wrong shape. An escaping exception exits 1 — the code that means
+   "the arms differ", a real finding — so both are funnelled onto the [Error]
+   path and out through [_exit_usage] like every other operator error. Pinned by
+   devtools/checks/validator_diff_exit_codes_smoke.sh. *)
+let _load_report ~label path =
+  Or_error.try_with (fun () ->
+      { Vd.label; report = Vt.report_of_sexp (Sexp.load_sexp path) })
+  |> Result.map_error ~f:(fun err ->
+      sprintf "could not read report %S from %S: %s" label path
+        (Error.to_string_hum err))
+
 let _parse_report_arg arg =
   match String.lsplit2 arg ~on:'=' with
   | Some (label, path)
     when (not (String.is_empty label)) && not (String.is_empty path) ->
-      Ok { Vd.label; report = Vt.report_of_sexp (Sexp.load_sexp path) }
+      _load_report ~label path
   | _ -> Error (sprintf "-report expects LABEL=PATH, got %S" arg)
 
 let _parse_severity = function
