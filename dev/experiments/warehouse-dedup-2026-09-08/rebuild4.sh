@@ -29,7 +29,7 @@ for v in 2000 2009 2019; do
   out=/tmp/snap_top3000_${v}_v10dedup
   src=/tmp/wh-rebuild/specs/superset-$v.sexp; spec_host=/tmp/wh-rebuild/specs/superset-$v-nomel.sexp
   grep -v '(symbol MEL)' "$src" > "$spec_host"; n_rm=$(( $(grep -c '(symbol ' "$src") - $(grep -c '(symbol ' "$spec_host") ))
-  [ "$n_rm" = "1" ] || { log "ABORT: expected to drop exactly 1 MEL line from $src, dropped $n_rm"; exit 1; }
+  case "$v:$n_rm" in 2000:1|2009:0|2019:0) log "MEL lines dropped from superset-$v: $n_rm";; *) log "ABORT: unexpected MEL count in $src: dropped $n_rm"; exit 1;; esac
   docker cp "$spec_host" $C:$spec_host
   if docker exec $C test -f $out/manifest.sexp; then log "SKIP $v (manifest exists)"; continue; fi
   log "BUILD $v -> $out (MEL quarantined, twin pass armed, basis=returns)"
