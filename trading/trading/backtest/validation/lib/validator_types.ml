@@ -29,6 +29,10 @@ let _default_fallback_exit_labels =
   ]
 
 let _default_stale_entry_days = 7
+let _default_store_median_close_max = 10_000.0
+let _default_store_zero_volume_move_pct = 90.0
+let _default_store_zero_volume_max = 0
+let _default_store_min_bars = 20
 let far_future = Date.of_string "2100-01-01"
 
 type severity = Invariant | Expectation [@@deriving sexp, equal]
@@ -107,6 +111,12 @@ type check_config = {
   fallback_exit_labels : string list;
       [@sexp.default _default_fallback_exit_labels]
   stale_entry_days : int; [@sexp.default _default_stale_entry_days]
+  store_median_close_max : float;
+      [@sexp.default _default_store_median_close_max]
+  store_zero_volume_move_pct : float;
+      [@sexp.default _default_store_zero_volume_move_pct]
+  store_zero_volume_max : int; [@sexp.default _default_store_zero_volume_max]
+  store_min_bars : int; [@sexp.default _default_store_min_bars]
   disabled_checks : string list; [@sexp.default []]
   severity_overrides : (string * string) list; [@sexp.default []]
 }
@@ -160,6 +170,10 @@ let default_config =
     splice_adj_ratio_max = _default_splice_adj_ratio_max;
     fallback_exit_labels = _default_fallback_exit_labels;
     stale_entry_days = _default_stale_entry_days;
+    store_median_close_max = _default_store_median_close_max;
+    store_zero_volume_move_pct = _default_store_zero_volume_move_pct;
+    store_zero_volume_max = _default_store_zero_volume_max;
+    store_min_bars = _default_store_min_bars;
     disabled_checks = [];
     severity_overrides = [];
   }

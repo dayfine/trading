@@ -2,9 +2,10 @@
     open position), V7 (virgin-territory vs history), V9 (overhead supply), V10
     (entry-week spike), V13 (fill causality), V14 (entry-bar stop-out).
 
-    V15 (data-store splices) is a different concern — the bar store's own
-    integrity rather than a strategy decision or fill — and lives in
-    {!Validator_splice_check}. *)
+    V15 (data-store splices) and V18 (implausible stored series) are a different
+    concern — the bar store's own integrity rather than a strategy decision or
+    fill — and live in {!Validator_splice_check} and {!Validator_store_check}
+    respectively. *)
 
 open Validator_types
 
