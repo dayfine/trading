@@ -13,7 +13,7 @@ Written 14:10 PT 2026-09-09 at session end. The 09-09 handoff's queue items 1–
 
 ## Live (check first)
 
-- **PR #2749 (harness/publisher-mutant-reconcile, cron-authored) — HUMAN MERGE DECISION.** CI pass; qc-structural APPROVED at the tip `6024976c9`; qc-behavioral at the tip = NEEDS_REWORK on the PR BODY ONLY (four stale numbers) — the in-tree content reproduces by replay. Rework cap 2 exhausted; the body was corrected dispatcher-side by REST PATCH (tip unchanged) and a comment explains. Merge or not is yours; the gate script will keep printing `rework`. Follow-up worth an issue: the 422-guard `return 0` flip is unpinned (53/53) — a 422-empty-lookup scenario closes it.
+- PR #2749 (harness/publisher-mutant-reconcile) MERGED 09-09 PM after the user asked for a clean green: qc-structural re-run at the tip (APPROVED), then three body-only behavioral reworks and a fourth pass APPROVED once the control paragraph quoted raw `grep '^FAIL'` output instead of prose. Lesson recorded in `memory/feedback_corrections_have_a_base_rate` (4th instance): paste measured output verbatim, never paraphrase a measurement. Follow-up filed: #2753 (the 422-guard `return 0` flip is unpinned, 53/53).
 
 - r0 tripwire DONE 14:03: byte-identical to a0-s0-v10 (`stop-width-by-state-2026-09-08/results/r0-record-asis-s0-v10-*`). Nothing is running; `sweep-item3v10` and `sweep-dedup` removed.
 
