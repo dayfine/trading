@@ -18,7 +18,7 @@ Any read-only analysis whose output is a **build / no-build** or **promote /
 reject** decision on a strategy mechanism — autopsies, opportunity-cost probes,
 forward-return studies, selection-edge checks, "is there alpha in X" screens.
 
-## The seven checks (every screen must answer all seven *in its writeup*)
+## The eight checks (every screen must answer all eight *in its writeup*)
 
 1. **Estimand — am I measuring the thing the mechanism actually does?**
    State the realized-P&L quantity the mechanism would change, then confirm the
@@ -58,6 +58,35 @@ forward-return studies, selection-edge checks, "is there alpha in X" screens.
 7. **Uncertainty + power.** Small n, wide dispersion → wide CI. Say whether the
    sample can even distinguish the hypotheses. "Coin-flip at n=373 with this
    spread" is a finding; "median +1.44%" alone hides it.
+
+8. **Paired cells must agree on every validator Invariant count.** Run
+   `validator_diff.exe` (`trading/trading/backtest/validation/bin/`) over the
+   arms' post-run validator reports before quoting any delta between them:
+   ```sh
+   dune exec trading/backtest/validation/bin/validator_diff.exe -- \
+     -check V6 \
+     -report null=<results>/<arm-a>-validator.sexp.sexp \
+     -report map=<results>/<arm-b>-validator.sexp.sexp
+   ```
+   Exit 0 = the arms agree; exit 1 = they do not, and the tool names the checks
+   and the specimens present in one arm and not the other; exit 2 = the reports
+   could not be read or compared (a bad `-report LABEL=PATH`, a missing or
+   malformed file, fewer than two reports, or a selected check id missing from
+   one report — never a silent pass). **A V6 mismatch means the arms hold
+   different instrument sets and the P&L delta is not a mechanism read** — it
+   measures the data defect as much as the lever, and the effect scales with the
+   lever. Observed 2026-09-08 (issue #2730, off PR #2728): a null arm at
+   `V6 = 0` vs a map arm at `V6 = 6` twin positions, ~$764k = 27% of that arm's
+   realised delta being one instrument counted twice under two tickers.
+
+   **`-check V6` is the gate; the bare form is the wider audit.** Dropping
+   `-check` compares every Invariant, and the *per-trade* ones — V7
+   (virgin-territory bars), V12 (installed-stop distance), V13 (bar/price
+   bounds) — follow the trade list, so they move benignly whenever a lever holds
+   a different set of trades, which is what a lever does by design. On the pair
+   above, all three differ (V7 54/66, V12 16/21, V13 152/147) alongside V6. Only
+   V6 carries instrument-set identity, so gate the paired read on it and read the
+   bare form as an audit, not a verdict.
 
 ## Verdict calibration — what a screen may and may not claim
 
