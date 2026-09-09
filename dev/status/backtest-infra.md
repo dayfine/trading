@@ -19,6 +19,74 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-09-08 — the rename-twin dedupe pass reaches the vintage-rebuild builder (#2730)
+
+- [x] **`build_snapshots.exe` now exposes `-dedupe-rename-twins` (+ the five
+  `-twin-*` tuning flags), so the builder the vintage warehouse rebuilds
+  actually use can drop rename-twin duplicate legs.** The flags existed only on
+  `build_scenario_snapshots.exe`; `dev/experiments/warehouse-rebuild-2026-09-06/rebuild2.sh`
+  runs `build_snapshots.exe`, so the clean `_v7mark` vintages still index
+  NLS/BFX, BB/BBRY, AABA/YHOO, DOC/HCP_old, AORT/CRY_old, AZN/AZN_old,
+  LANC/MZTI, HPT/SVC — one instrument under two tickers with bar-for-bar
+  identical OHLC. A backtest holding both legs double-counts the position
+  (~$764k of duplicated P&L on the `a1-map-neutral8-s0` arm, `V6 INVARIANT 6
+  violations`), and the effect scales with any stop-width lever that keeps the
+  second leg alive longer. Same builder-flag gap as the splice flags in #2711.
+  - **Where:** new shared library
+    `trading/trading/backtest/snapshot_warehouse/twin_pass.{ml,mli}`
+    (`trading.backtest.twin_pass`) holds the I/O shell around the pure
+    `Twin_detector` — bar loading + windowing, the `rename_twin_report.txt`
+    sidecar write, and the `Twin_pass.params` CLI flag block. Both builders now
+    call the same code: `Build_runner.build` gained `?twin_config` and runs the
+    pass before its per-symbol loop, `build_snapshots.ml` threads
+    `Twin_pass.params` into it, and `build_scenario_snapshots.ml` deleted its
+    private `_load_twin_series` / `_dedupe_symbols` / `_write_twin_report` copy
+    plus its 30-line duplicate flag block and threads `~twin_config` through.
+  - **Default-off, byte-identical.** `?twin_config` defaults to
+    `Twin_detector.Config.default`, whose `enabled = false`; `Twin_pass.run`
+    then reads no bar, writes no file, and returns its input symbol list
+    unchanged. Every existing caller, test and warehouse build is unaffected
+    until a build passes `-dedupe-rename-twins`
+    (`.claude/rules/experiment-flag-discipline.md` R1).
+  - **`-incremental` rule (the decision this PR had to make).** A twin-dropped
+    symbol is absent from the run's entries, so the #2669 merge would carry its
+    pre-run manifest entry forward and the warehouse would keep indexing the
+    duplicate the pass just removed. Chosen behaviour: **exclude twin-dropped
+    symbols from the carry set** rather than refuse the flag combination — a
+    deduping rebuild removes them from the index whether or not `-incremental`
+    is set. Their `.snap` files may remain on disk but the manifest is the only
+    index (`Bar_source_resolver` enumerates from it), so an unindexed file is
+    served to nobody. Documented in `build_runner.mli` §"`twin_config` with
+    `incremental`".
+  - **One ordering change, documented.** With `-detect-splices` *and*
+    `-dedupe-rename-twins` both armed on `build_scenario_snapshots.exe` — a
+    combination no committed script uses — the splice scan now runs before the
+    twin comparison rather than after, so the twin detector sees only splice
+    survivors. The dependency is one-directional: twin→splice is inert (the
+    splice scan is within-symbol, so a smaller input set cannot change any
+    surviving symbol's verdict), while splice→twin **can** change which legs
+    survive — dropping a symbol that bridged a twin component splits that
+    component, so a previously-dropped leg survives. Both flags default off and
+    no committed script arms the pair. Noted in that module's header docstring.
+  - **Tests:**
+    `trading/analysis/scripts/build_snapshots/test/test_build_runner_twins.ml`
+    (4 end-to-end cases through the real builder against real CSVs: the default
+    disabled config indexes every symbol and writes no sidecar; an armed config
+    drops the losing leg from the manifest; the sidecar names the survivor and
+    the dropped leg; an incremental rerun over a warehouse built without the
+    pass removes the dropped leg from the merged index), plus
+    `trading/trading/backtest/snapshot_warehouse/test/test_twin_pass.ml`
+    (2 direct `Twin_pass.run` cases pinning the survivor guard: a symbol with no
+    CSV, and a symbol whose bars all fall outside the window, both survive the
+    armed pass in input order without changing the twin verdict). Verify:
+    `dev/lib/run-in-env.sh dune runtest analysis/scripts/build_snapshots/test/ trading/backtest/snapshot_warehouse/test/`.
+  - `behavioral_qc: NEEDS_REWORK at 557fdaec2 (CP4: missing-CSV survivor guard
+    untested) → addressed in rework 1`
+  - **Not in scope here:** issue #2730 ask 2 (make V6 a *gate* for paired
+    comparisons) and ask 3 (rebuild the three vintages as `_v10dedup` and
+    re-base the item-3 surface). This PR only makes the rebuild path capable of
+    deduping.
+
 ## 2026-09-08 — `-incremental` no longer clobbers the warehouse manifest (#2669)
 
 - [x] **`build_snapshots.exe -incremental` now MERGES its entries into the

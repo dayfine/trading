@@ -33,6 +33,16 @@
     automatically from a scenario. The durable fix is a Phase-F windowed/mmap
     decode in {!Daily_panels}; this flag is the cheap interim mitigation.
 
+    Optional [--dedupe-rename-twins] (+ the [--twin-*] tuning flags,
+    {!Twin_pass.params}): drop rename-twin duplicate legs — the same instrument
+    listed under an old and a new ticker — before building, and write
+    [rename_twin_report.txt] beside the warehouse. {b Default off}, so an
+    un-armed build is byte-identical. This is the vintage-rebuild path (#2730):
+    the flags existed only on [build_scenario_snapshots.exe], so the warehouses
+    that path built still carry NLS/BFX, BB/BBRY, AABA/YHOO and friends, and a
+    backtest holding both legs double-counts one position. Same builder-flag gap
+    as the splice flags in #2711.
+
     Checkpointing: per-symbol atomic manifest update + periodic [progress.sexp]
     emission, both handled by {!Build_runner}. See
     [dev/plans/daily-snapshot-streaming-2026-04-27.md] §Phasing Phase B and
@@ -54,14 +64,16 @@ let _load_universe ~universe_path =
 
 let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
     ~end_date ~sketch_deep_days ~incremental ~progress_every
-    ~survivor_tolerance_days ~tail_config ~tail_exceptions_path () =
+    ~survivor_tolerance_days ~twin_config ~tail_config ~tail_exceptions_path ()
+    =
   let symbols = _load_universe ~universe_path in
   let tail_exceptions =
     Build_runner.tail_exceptions_or_exit tail_exceptions_path
   in
-  Build_runner.build ~survivor_tolerance_days ~symbols ~csv_data_dir ~output_dir
-    ~benchmark_symbol ~start_date ~end_date ~sketch_deep_days ~incremental
-    ~progress_every ~tail_config ~tail_exceptions ()
+  Build_runner.build ~survivor_tolerance_days ~twin_config ~symbols
+    ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date ~end_date
+    ~sketch_deep_days ~incremental ~progress_every ~tail_config ~tail_exceptions
+    ()
 
 (* Flag [~doc] strings are hoisted to top-level bindings so the [Command.basic]
    flag block below stays flat (one line per flag) — the multi-line doc text is
@@ -138,10 +150,12 @@ let command =
      and _emit_weekly_sidetable =
        flag "emit-weekly-sidetable" no_arg ~doc:doc_emit_weekly_sidetable
      and survivor_tolerance_days = Build_runner.survivor_tolerance_param
+     and twin_config = Twin_pass.params
      and tail_config, tail_exceptions_path = Build_runner.tail_params in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol
          ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every
-         ~survivor_tolerance_days ~tail_config ~tail_exceptions_path ())
+         ~survivor_tolerance_days ~twin_config ~tail_config
+         ~tail_exceptions_path ())
 
 let () = Command_unix.run command
