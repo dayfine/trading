@@ -2438,3 +2438,52 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   60-61). `sh trading/devtools/checks/pr_gate_status_mutation_test.sh` --
   unaffected, still 16/16 matching pin. `dune build @fmt && dune build &&
   dune runtest` all exit 0, 0 `^FAIL:` lines.
+
+## Added 2026-09-09 (harness-maintainer, harness/goldens-nested-new-field, issue #2643)
+
+- [x] **H-GOLDENS-NESTED-NEW-FIELD**: `goldens_affected_check.sh` Step 2c
+  (nested-config embedding) emitted the OUTER strategy-config knob
+  (`stops_config`, `portfolio_config`, ...) whenever a changed surface file
+  contributed ANY changed field -- including a field that was a brand-new
+  addition with no prior default anywhere. Observed on PR #2642: adding
+  `stop_skip_entry_bar : bool [@sexp.default false]` to
+  `Weinstein_stops.config` (`trading/trading/weinstein/stops/lib/
+  stop_types.{ml,mli}`) made Step 2c emit `stops_config`, which 5 postsubmit
+  goldens arm for the unrelated `catastrophic_stop_pct` -- the check FAILed
+  and demanded a paired run whose two arms would have been bit-identical
+  (no default value changed). Step 4b's existing "newly-added field: nothing
+  can inherit FROM that" carve-out covered this shape for TOP-LEVEL knobs but
+  did not reach the nested-embedding path.
+
+  **Fix** (`trading/devtools/checks/goldens_affected_check.sh`, per-file loop
+  around the `_embedding_field` call): the outer embedding knob is now only
+  emitted when at least one of the file's changed fields (from `FILE_KNOBS`)
+  already existed at `BASE_REF` -- checked via a conservative whole-word
+  `grep -qw` presence test against `git show "${BASE_REF}:${f}"`. A field
+  that changed value keeps its name in the BASE_REF file (the old value line
+  still contains it), so this never misses a real value-change or removal;
+  it only skips a file whose entire changed-field set is fresh additions.
+  The predicate deliberately biases toward still emitting the outer knob
+  (over-inclusive, costs one extra manual paired run) whenever it cannot
+  cleanly tell "added" from "changed" -- the same direction
+  `config-default-blast-radius.md` exists to protect, since under-emitting
+  is what let #2384's -40.91pp regression merge on green CI.
+
+  **Fixtures** (`goldens_affected_check_test.sh`, assertions 22-23): (22) a
+  brand-new field added to a nested config file, with a golden arming the
+  outer identifier only for an unrelated pre-existing field -> OK (the bug
+  being fixed; FAILs against the pre-fix script, confirmed by reproduction).
+  (23) the SAME field name, but pre-existing with a changed default value ->
+  still FAIL via `embeds:stop_types.mli` (regression guard proving the fix's
+  predicate does not over-suppress real nested value changes -- the exact
+  risk `config-default-blast-radius.md` calls out). Assertion 18 (pre-existing
+  nested default flip) also still passes unmodified, confirming no behaviour
+  change for the case the rule must keep catching.
+
+  **Verify:** `sh trading/devtools/checks/goldens_affected_check_test.sh` --
+  23/23 assertions pass (21 before this change, +2 new). Reproduction check:
+  running the same 23-assertion suite against the pre-fix script fails
+  assertion 22 only (22/23), confirming the fix is load-bearing and isolated.
+  `dune build @fmt && dune build && dune runtest` all exit 0, 0 `^FAIL:`
+  lines (includes `goldens_affected_check_test.sh` running under
+  `dune runtest trading/devtools/checks/`).

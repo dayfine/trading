@@ -82,6 +82,21 @@
 #       old-vs-new VALUE change) -- otherwise every
 #       experiment-flag-discipline default-off mechanism landing would
 #       trip an affects-all FAIL for no reason.
+#   22. (#2643) A brand-new field with [@sexp.default] added to a NESTED
+#       config file (stops/lib/stop_types.mli), where a golden arms the
+#       OUTER embedding field (stops_config) for a DIFFERENT, unrelated
+#       field -> OK, exit 0. Pins the false-positive fix: Step 2c must not
+#       emit the outer embedding knob when the only changed field in the
+#       nested file is a fresh addition -- nothing could have been
+#       inheriting a value that didn't previously exist.
+#   23. (#2643 regression guard) The SAME field name as assertion 22
+#       (stop_skip_entry_bar), but here it already exists at BASE_REF and
+#       only its default VALUE changes -> still FAIL via
+#       embeds:stop_types.mli, exactly like assertion 18/14. Proves the
+#       #2643 fix's "pre-existing at BASE_REF" predicate correctly
+#       distinguishes "added" from "changed" for the very field shape
+#       that caused the false positive -- the fix must not over-suppress
+#       real nested default changes.
 #
 # Run:
 #   sh trading/devtools/checks/goldens_affected_check_test.sh
@@ -841,6 +856,78 @@ else
   fail "assertion 21: expected OK/exit0 (new field, not a value change), got rc=$RC output=$OUT"
 fi
 rm -rf "$REPO21"
+
+echo "=== Assertion 22: brand-new field added to a NESTED config file, golden arms the outer field for an UNRELATED existing field -> OK (issue #2643 fix) ==="
+# The exact false-positive shape from PR #2642: stop_skip_entry_bar is
+# added FRESH to Weinstein_stops.config (stop_types.mli). The golden here
+# arms the OUTER embedding identifier (stops_config) but only ever for
+# catastrophic_stop_pct, a field entirely untouched by this diff -- there
+# is no old value the new field could have caused anything to silently
+# inherit. Before the #2643 fix, Step 2c emitted "stops_config" as a
+# related knob purely because the file changed at all, which matched this
+# golden and produced a FAIL demanding a paired run that could only ever
+# be a no-op (both arms bit-identical, since no default value changed).
+REPO22="$(_new_repo)"
+mkdir -p "$(dirname "$REPO22/$NESTED_MLI_REL")" "$REPO22/.github/workflows"
+mkdir -p "$REPO22/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "type config = {"
+  echo "  reset_anchor_on_stalled_cycle : bool; [@sexp.default false]"
+  echo "}"
+} > "$REPO22/$NESTED_MLI_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO22/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((stops_config ((catastrophic_stop_pct 0.10)))))))"
+} > "$REPO22/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA22A="$(_commit "$REPO22" "base")"
+{
+  echo "type config = {"
+  echo "  reset_anchor_on_stalled_cycle : bool; [@sexp.default false]"
+  echo "  stop_skip_entry_bar : bool; [@sexp.default false]"
+  echo "}"
+} > "$REPO22/$NESTED_MLI_REL"
+SHA22B="$(_commit "$REPO22" "head: add brand-new stop_skip_entry_bar field to nested stops config")"
+_run "$REPO22" "$SHA22A" "$SHA22B"
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "zero postsubmit golden specs"; then
+  pass "assertion 22: brand-new nested field does not trigger outer-embedding FAIL -> OK"
+else
+  fail "assertion 22: expected OK/exit0 (new nested field, no false embeds: FAIL), got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO22"
+
+echo "=== Assertion 23: SAME field name as assertion 22, but PRE-EXISTING with a changed default value -> still FAIL (regression guard) ==="
+REPO23="$(_new_repo)"
+mkdir -p "$(dirname "$REPO23/$NESTED_MLI_REL")" "$REPO23/.github/workflows"
+mkdir -p "$REPO23/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "type config = {"
+  echo "  stop_skip_entry_bar : bool; [@sexp.default false]"
+  echo "}"
+} > "$REPO23/$NESTED_MLI_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO23/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((stops_config ((catastrophic_stop_pct 0.10)))))))"
+} > "$REPO23/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA23A="$(_commit "$REPO23" "base")"
+sed -i.bak 's/\[@sexp.default false\]/[@sexp.default true]/' "$REPO23/$NESTED_MLI_REL"
+rm -f "$REPO23/$NESTED_MLI_REL.bak"
+SHA23B="$(_commit "$REPO23" "head: flip PRE-EXISTING nested field default (not an addition)")"
+_run "$REPO23" "$SHA23A" "$SHA23B"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "'stops_config'" \
+  && echo "$OUT" | grep -q "embeds:stop_types.mli" \
+  && echo "$OUT" | grep -q "fixture-golden.sexp"; then
+  pass "assertion 23: pre-existing nested field value change still triggers outer-embedding FAIL (regression guard for #2643 fix)"
+else
+  fail "assertion 23: expected FAIL/exit1 naming stops_config via embeds:stop_types.mli, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO23"
 
 echo ""
 echo "=== Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed ==="
