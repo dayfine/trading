@@ -19,6 +19,47 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-09-08 — `validator_diff.exe`: the validator's Invariant counts become a cross-arm gate (#2730 ask 2)
+
+- [x] **A cell whose validator Invariant counts differ from its comparator's is
+  now mechanically refusable.** `post_run_validator_cli.exe` is report-only and
+  every experiment chain writes one report per arm, but nothing compared those
+  reports to each other — so the item-3 stop-width surface ran a null arm at
+  `V6 = 0` against a map arm at `V6 = 6` twin-position violations, and ~$764k of
+  that arm's realised delta was one instrument held twice under two tickers.
+  Nobody saw it until QC read the two `.md` files side by side (PR #2728).
+  - **Where:** `trading/trading/backtest/validation/lib/validator_diff.{ml,mli}`
+    (pure over `Validator_types.report` — selection, per-check counts, specimen
+    deltas, table rendering) + `bin/validator_diff.ml` (the CLI, which turns
+    `Validator_diff.agreed` into an exit code). Tests:
+    `test/test_validator_diff.ml` (10 cases).
+  - **Incantation** (no sibling chain template exists under `dev/scripts/`, so
+    this is the record; also in `validator_diff.mli`'s header):
+    ```sh
+    dune exec trading/backtest/validation/bin/validator_diff.exe -- \
+      -report null=<results>/a0-...-validator.sexp.sexp \
+      -report map=<results>/a1-...-validator.sexp.sexp
+    ```
+    Exit 0 = every selected check agrees; exit 1 = they differ, and the tool
+    prints the `check | label... | verdict` table plus the specimens present in
+    one report and not another. Exit 2 = the reports could not be read or
+    compared (bad `-report LABEL=PATH`, fewer than two reports, or a selected
+    check id missing from one report — never a silent pass). `-check V6` gates
+    on one check; `-severity all` widens the default `Invariant`-only selection
+    to include `Expectation` checks (off by default: an Expectation count moves
+    legitimately with the lever under test, an Invariant count moving means the
+    arms disagree about the data).
+  - **Verify:** `dune runtest trading/backtest/validation/test`, and against the
+    committed fixtures —
+    `dev/experiments/stop-width-by-state-2026-09-08/results/a0-breadth-on-null-s0-validator.sexp.sexp`
+    vs `a1-map-neutral8-s0-...` exits 1 and names all six twin pairs
+    (AABA/YHOO, BFX/NLS, DOC/HCP_old, AORT/CRY_old, BB/BBRY, AZN/AZN_old); the
+    a0 report against itself exits 0.
+  - The rule is written up as check 8 in
+    `.claude/rules/mechanism-validation-rigor.md`.
+  - **Not in scope (still open on #2730):** ask 1's `_v10dedup` vintage rebuild
+    and ask 3's re-run of the item-3 surface on the deduped warehouse.
+
 ## 2026-09-08 — the rename-twin dedupe pass reaches the vintage-rebuild builder (#2730)
 
 - [x] **`build_snapshots.exe` now exposes `-dedupe-rename-twins` (+ the five

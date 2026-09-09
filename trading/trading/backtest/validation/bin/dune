@@ -4,3 +4,10 @@
  (libraries core core_unix.command_unix post_run_validator)
  (preprocess
   (pps ppx_jane)))
+
+(executable
+ (name validator_diff)
+ (modules validator_diff)
+ (libraries core core_unix.command_unix post_run_validator status)
+ (preprocess
+  (pps ppx_jane)))

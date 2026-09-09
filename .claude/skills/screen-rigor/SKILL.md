@@ -1,6 +1,6 @@
 ---
 name: screen-rigor
-description: Walk a read-only "validate-before-build" screen through the 7 rigor checks and calibrate its verdict, BEFORE concluding build/no-build or promote/reject on a strategy mechanism. Use when an autopsy / opportunity-cost probe / forward-return study / "is there alpha in X" screen is about to produce a decision, when you're tempted to write "REJECTED" or "the mechanism doesn't work" off a cheap analysis, or when the user asks to validate a mechanism, screen a hypothesis, or sanity-check a no-build call. Pairs with experiment-gap-closing (the real WF-CV test this screen decides whether to enter).
+description: Walk a read-only "validate-before-build" screen through the 8 rigor checks and calibrate its verdict, BEFORE concluding build/no-build or promote/reject on a strategy mechanism. Use when an autopsy / opportunity-cost probe / forward-return study / "is there alpha in X" screen is about to produce a decision, when you're tempted to write "REJECTED" or "the mechanism doesn't work" off a cheap analysis, or when the user asks to validate a mechanism, screen a hypothesis, or sanity-check a no-build call. Pairs with experiment-gap-closing (the real WF-CV test this screen decides whether to enter).
 ---
 
 # Screen rigor — make a cheap read-only screen honest before it decides anything
@@ -35,7 +35,7 @@ that trades with stops and a real-time information set, the gap is large — the
 proxy can fail to find an edge that the real rule would capture, or vice-versa.
 Bound it: which direction does the proxy bias?
 
-### Step 2 — Run the seven checks (all must be answered in the writeup)
+### Step 2 — Run the eight checks (all must be answered in the writeup)
 
 1. **Estimand fidelity** — does the statistic track the realized-P&L the mechanism
    moves? (Step 1.)
@@ -56,6 +56,11 @@ Bound it: which direction does the proxy bias?
    events end-to-end.
 7. **Uncertainty + power** — small n / wide spread → wide CI. Can the sample even
    distinguish the hypotheses? (A bootstrap or sign-test beats an eyeballed median.)
+8. **Paired cells agree on every validator Invariant count** — run
+   `validator_diff.exe` over the arms' post-run validator reports before quoting
+   a delta (`-report <label>=<path>` per arm; exit 0 = agree, 1 = differ). A V6
+   mismatch means the arms hold different instrument sets and the delta is not a
+   mechanism read. See `.claude/rules/mechanism-validation-rigor.md` check 8.
 
 ### Step 3 — Calibrate the verdict to what a proxy can claim
 
