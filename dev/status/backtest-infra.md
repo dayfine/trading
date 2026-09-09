@@ -62,17 +62,26 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
     `-dedupe-rename-twins` both armed on `build_scenario_snapshots.exe` — a
     combination no committed script uses — the splice scan now runs before the
     twin comparison rather than after, so the twin detector sees only splice
-    survivors. Neither pass changes the other's per-symbol verdict; the ordering
-    only decides whether a splice-dropped symbol can win a twin group's survivor
-    slot. Noted in that module's header docstring.
+    survivors. The dependency is one-directional: twin→splice is inert (the
+    splice scan is within-symbol, so a smaller input set cannot change any
+    surviving symbol's verdict), while splice→twin **can** change which legs
+    survive — dropping a symbol that bridged a twin component splits that
+    component, so a previously-dropped leg survives. Both flags default off and
+    no committed script arms the pair. Noted in that module's header docstring.
   - **Tests:**
     `trading/analysis/scripts/build_snapshots/test/test_build_runner_twins.ml`
     (4 end-to-end cases through the real builder against real CSVs: the default
     disabled config indexes every symbol and writes no sidecar; an armed config
     drops the losing leg from the manifest; the sidecar names the survivor and
     the dropped leg; an incremental rerun over a warehouse built without the
-    pass removes the dropped leg from the merged index). Verify:
-    `dev/lib/run-in-env.sh dune runtest analysis/scripts/build_snapshots/test/`.
+    pass removes the dropped leg from the merged index), plus
+    `trading/trading/backtest/snapshot_warehouse/test/test_twin_pass.ml`
+    (2 direct `Twin_pass.run` cases pinning the survivor guard: a symbol with no
+    CSV, and a symbol whose bars all fall outside the window, both survive the
+    armed pass in input order without changing the twin verdict). Verify:
+    `dev/lib/run-in-env.sh dune runtest analysis/scripts/build_snapshots/test/ trading/backtest/snapshot_warehouse/test/`.
+  - `behavioral_qc: NEEDS_REWORK at 557fdaec2 (CP4: missing-CSV survivor guard
+    untested) → addressed in rework 1`
   - **Not in scope here:** issue #2730 ask 2 (make V6 a *gate* for paired
     comparisons) and ask 3 (rebuild the three vintages as `_v10dedup` and
     re-base the item-3 surface). This PR only makes the rebuild path capable of

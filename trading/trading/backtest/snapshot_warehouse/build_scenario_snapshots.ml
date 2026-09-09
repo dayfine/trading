@@ -37,10 +37,15 @@
     rather than a second copy of it. One consequence when {b both} flags are
     armed — a combination no committed script uses: the splice scan now runs
     {e before} the twin comparison rather than after, so the twin detector sees
-    only splice survivors. Neither pass changes the other's per-symbol verdict;
-    the ordering only decides whether a symbol the splice scan drops can be
-    picked as a twin group's survivor, and preferring a splice survivor there is
-    the better read anyway.
+    only splice survivors. The dependency is one-directional: twin→splice is
+    inert, because the splice scan is {e within-symbol} and a smaller input set
+    cannot change any surviving symbol's splice verdict. splice→twin can change
+    which legs survive: {!Twin_detector.detect} unions verified twin edges into
+    connected components, so dropping a symbol that was {e bridging} a group
+    (A~B and B~C verified but A~C below threshold) splits that component and a
+    previously-dropped leg then survives. Both flags default off and no
+    committed script arms the pair, so the ordering is unobserved today;
+    preferring a splice survivor is the better read anyway.
 
     The splice pass writes [splices.csv] as before and, since #2672 class ii,
     {b acts} on what it finds via {!Snapshot_pipeline.Series_splice}: an

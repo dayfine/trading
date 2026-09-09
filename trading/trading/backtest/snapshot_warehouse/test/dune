@@ -13,6 +13,24 @@
   (pps ppx_jane)))
 
 (test
+ (name test_twin_pass)
+ (modules test_twin_pass)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  ounit2
+  matchers
+  status
+  types
+  fpath
+  csv
+  twin_detector
+  twin_pass)
+ (preprocess
+  (pps ppx_jane)))
+
+(test
  (name test_splice_detector)
  (modules test_splice_detector)
  (libraries core ounit2 matchers types splice_detector)
