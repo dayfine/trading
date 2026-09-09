@@ -175,6 +175,32 @@ type check_config = {
           than bar count because the question is "how long has this symbol been
           silent", which a bar count cannot express for a symbol that stopped
           printing. *)
+  store_median_close_max : float;
+      (** V18: a symbol whose {b median} stored close exceeds this many dollars
+          is flagged as mis-scaled. Default [10_000.0] — two orders of magnitude
+          above a normal US equity, and two below MEL's ~$170k, so the rule has
+          room on both sides. Median rather than mean so the handful of $8-12
+          prints mixed into MEL's series cannot drag the statistic back toward a
+          plausible level. A legitimately high-priced instrument (BRK.A) trips
+          this by design; see {!Validator_store_check.check_v18} for why that is
+          the right trade for an EXPECTATION check, and raise this ceiling to
+          silence it for a run that legitimately holds one. *)
+  store_zero_volume_move_pct : float;
+      (** V18: a one-bar close move of more than this many percent
+          {b on zero volume} is flagged as a phantom print. Default [90.0] —
+          MEL's 2017-02-08 bar moved -99.99% ($175,002 -> $12.20) on volume 0.
+          Strict, so a move of exactly this size passes. *)
+  store_zero_volume_max : int;
+      (** V18: the volume at or below which a bar counts as untraded for the
+          rule above. Default [0] — literally nobody traded it. Raise it to
+          catch the near-zero-volume prints that surround MEL's phantom bars, at
+          the cost of flagging genuinely thin real moves. *)
+  store_min_bars : int;
+      (** V18: fewest stored daily bars a symbol needs before its series is
+          judged at all. Default [20] — about a month of trading. A shorter
+          series is {!Validator_step.Skip}ped and counted, never passed: a
+          median over five bars is not evidence the series is sane. At least one
+          bar is always required regardless of this value. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default
