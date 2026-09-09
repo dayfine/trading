@@ -5,11 +5,11 @@
 # WHY THIS EXISTS
 #   `.claude/agents/lead-orchestrator.md` Step 8 publishes the daily summary
 #   via:
+#       git config user.email "noreply@github.com"
+#       git config user.name "claude-orchestrator"
 #       jj bookmark set "$BRANCH" -r @
 #       jj git push -b "$BRANCH" --allow-new
-#   `jj` is exactly the tool H-JJ-JST-BROKEN-GHA (dev/status/harness.md)
-#   records as non-functional in the GHA orchestrator container image. The
-#   result, measured over five consecutive orchestrator runs
+#   The result, measured over five consecutive orchestrator runs
 #   (2026-09-06..08, run ids 34030886835 / 34042419476 / 34127853646 /
 #   34148849699 / 34224532158, conclusion "success" on every one, real cost
 #   -- $20.18 on the 09-08 run alone): the orchestrator WROTE the summary
@@ -17,12 +17,36 @@
 #   never pushed it anywhere, and the workflow's own "No open
 #   ops/daily-<date> PR found" fallback path confirms no PR was ever
 #   opened. The file died with the ephemeral runner. Zero `ops/daily-*` PRs
-#   exist since 2026-09-05 (PR #2680). `.claude/agents/**` is write-gated in
-#   this runtime, so the Step 8 PROSE cannot be fixed from here -- but a
-#   SCRIPT it calls can be, and per `.claude/rules/pr-merge-gates.md` Rule
-#   0's lesson ("anything that must not happen while nobody is watching has
-#   to be expressed in the vocabulary automation reads"), a script that
-#   fails loudly on every dropped step is exactly that vocabulary.
+#   exist since 2026-09-05 (PR #2680).
+#
+#   CORRECTED ROOT CAUSE (issue #2741, measured 2026-09-09 in this same
+#   container image, run 34350513426): `jj git push` itself is NOT broken
+#   here -- a probe branch pushed successfully with it. What Step 8 actually
+#   hits is two independently-fatal bugs of its own, neither one a jj/git
+#   version incompatibility: (1) it configures GIT's identity via
+#   `git config user.email/user.name`, but jj does not read git's config --
+#   jj needs `jj config set --user user.name/user.email`, so jj sees an
+#   empty author and refuses to push; (2) it never runs `jj describe`, so
+#   `@` is descriptionless, which jj also refuses to push
+#   ("Won't push commit ... since it has no description and it has no
+#   author and/or committer set"). Setting identity alone, or a description
+#   alone, each still fails on the other half -- both must be fixed
+#   together (`jj config set --user ...` then `jj describe`). This is a
+#   DIFFERENT defect from H-JJ-JST-BROKEN-GHA's `jst submit` failure (that
+#   one IS a real version mismatch: image git 2.34.1 vs jj's
+#   `jj git fetch --porcelain` requiring git >= 2.41.0) -- the two should
+#   not be conflated or fixed with the same patch. See issue #2741 for the
+#   full measurement and `dev/status/harness.md`'s H-JJ-JST-BROKEN-GHA /
+#   H-DAILY-SUMMARY-PR-LOST entries for the corrected record.
+#
+#   `.claude/agents/**` is write-gated in this runtime, so the Step 8 PROSE
+#   cannot be fixed from here -- but a SCRIPT it calls can be, and per
+#   `.claude/rules/pr-merge-gates.md` Rule 0's lesson ("anything that must
+#   not happen while nobody is watching has to be expressed in the
+#   vocabulary automation reads"), a script that fails loudly on every
+#   dropped step is exactly that vocabulary. This script sidesteps the
+#   whole jj-identity/description class of bug by using plain `git` (no
+#   jj) end to end, so it needs no `jj config` / `jj describe` fix at all.
 #
 #   This script does the whole publish with plain `git` (no jj) + `curl`
 #   REST (no `gh` -- confirmed absent from the orchestrator container, see
