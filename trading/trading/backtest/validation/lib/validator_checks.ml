@@ -4,6 +4,7 @@ module R = Validator_row_checks
 module B = Validator_bar_checks
 module S = Validator_splice_check
 module F = Validator_fallback_check
+module St = Validator_store_check
 
 let _specimen_cap = 10
 
@@ -26,6 +27,7 @@ let _registry : (string * severity * (inputs -> Validator_step.finding)) list =
     ("V15", Expectation, S.check_v15);
     ("V16", Expectation, F.check_v16);
     ("V17", Expectation, F.check_v17);
+    ("V18", Expectation, St.check_v18);
   ]
 
 let all_check_ids = List.map _registry ~f:(fun (id, _, _) -> id)

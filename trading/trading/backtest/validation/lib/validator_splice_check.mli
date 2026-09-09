@@ -3,7 +3,11 @@
     Split out from {!Validator_bar_checks} because it asks a different question
     from every other check: V1-V14 ask whether the strategy's decision or the
     resulting fill was sound, V15 asks whether the BARS the strategy was handed
-    describe one security at all. *)
+    describe one security at all.
+
+    {!Validator_store_check} (V18) asks that same question of the whole stored
+    series rather than of the two bars around a fill; the two are complementary,
+    since V15 can only see a discontinuity a trade happened to land on. *)
 
 open Validator_types
 

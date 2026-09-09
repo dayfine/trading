@@ -2,6 +2,7 @@
  (names
   test_post_run_validator
   test_validator_fallback_check
+  test_validator_store_check
   test_validator_diff)
  (libraries
   core
