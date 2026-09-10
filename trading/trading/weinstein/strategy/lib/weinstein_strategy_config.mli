@@ -243,6 +243,41 @@ type config = {
           by threading into [screening_config.neutral_blocks_longs] at screen
           time, so it is a single-component [Variant_matrix] flag axis.
           Default-off until an experiment-ledger ACCEPT. *)
+  deteriorating_blocks_longs : bool; [@sexp.default false]
+      (** Entry-gate axis (default-off, issue #2755): when [true], a
+          [Weinstein_types.Deteriorating] breadth state blocks new long entries.
+          Default [false] preserves the macro gate bit-equally.
+
+          {b Why this and not {!neutral_blocks_longs}.} Entries made while
+          breadth is [Deteriorating] lose in both books measured over 2000-2026
+          (record bundle n = 80, 29% win rate, -$604k realised;
+          [dev/experiments/stop-width-cadence-surface-2026-09-05/README.md]
+          §"Breadth state across 27 years"). Nothing blocks them today:
+          [Deteriorating] projects to [Neutral], which the three-state macro
+          gate admits. {!neutral_blocks_longs} would block it — but also
+          [Recovering], the best cohort in the same study (+$627k). This flag is
+          the narrow instrument: [Deteriorating] only.
+
+          {b Faithfulness.} A {e tightening} of Weinstein's unconditional macro
+          gate, not a new mechanism: Ch. 3 reads participation directionally
+          (the 1982 "subsurface condition" tell — [weinstein-book-reference.md]
+          §2.8), and "don't buy in bad tape" is spine item 6 of
+          [.claude/rules/weinstein-faithful-core.md]. A faithful dial (W2), not
+          a spine change (W1). Shorts and [Bearish] handling are untouched.
+
+          {b Inert unless [macro_config.breadth_direction.enabled].} With the
+          breadth-direction read off (the default), [Macro.result.breadth_state]
+          is exactly [breadth_state_of_market_trend result.trend], which never
+          yields [Deteriorating] — so the flag cannot fire and arming it alone
+          is a no-op. Same interaction {!Stop_buffer_by_state} documents.
+
+          Wired by threading into [screening_config.deteriorating_blocks_longs]
+          at screen time (fresh candidates) and into
+          {!Screener.longs_admitted_by_breadth} at the F2 resting-ticket
+          re-screen, so a resting long ticket is cancelled under [Deteriorating]
+          exactly as a fresh candidate is rejected. A single-component
+          [Variant_matrix] flag axis (R2). Default-off until an
+          experiment-ledger ACCEPT (R1/R3). *)
   neutral_blocks_shorts : bool; [@sexp.default true]
       (** Short-side mirror of {!neutral_blocks_longs}. When [true] (the
           default), a macro-[Neutral] tape blocks new short entries exactly as a

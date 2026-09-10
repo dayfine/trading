@@ -281,8 +281,12 @@ let _macro_admits_side ~config ~(macro_result : Macro.result)
     ~(side : Trading_base.Types.position_side) =
   match side with
   | Trading_base.Types.Long ->
-      Screener.longs_admitted_by_macro
-        ~neutral_blocks_longs:config.neutral_blocks_longs macro_result.trend
+      (* Same gate the cascade applies to a fresh candidate, so an armed
+         [deteriorating_blocks_longs] cancels the resting ticket too. *)
+      Screener.longs_admitted_by_breadth
+        ~neutral_blocks_longs:config.neutral_blocks_longs
+        ~deteriorating_blocks_longs:config.deteriorating_blocks_longs
+        macro_result.breadth_state
   | Trading_base.Types.Short ->
       Screener.shorts_admitted_by_macro
         ~neutral_blocks_shorts:config.neutral_blocks_shorts macro_result.trend
@@ -349,38 +353,29 @@ let _sector_lookup_of ~sector_map symbol =
   Hashtbl.find sector_map symbol
   |> Option.map ~f:(fun (ctx : Screener.sector_context) -> ctx.sector_name)
 
-(** Whether the current primary-index decline is a slow grind, for the faithful
-    short's [enable_slow_grind_short_gate]. Classified from the {b current}
-    cycle's macro result + index bars via {!Decline_character_wiring} — this is
-    lookahead-free for an entry gate (entries already gate on the current
-    [macro_trend]; the prior-cycle decline-character ref is the stops seam, not
-    the entry seam). Only consulted when the gate is enabled; returns [true]
-    otherwise so short admission stays bit-identical to the pre-gate behaviour
-    (the screener ignores the value when the gate is off). The classification
-    lives here, in the strategy lib (which depends on [weinstein.macro]), so the
-    screener lib stays macro-agnostic — it receives a plain bool. *)
+(* Thin adapter: project the strategy config's three slow-grind-gate fields onto
+   {!Decline_character_wiring.slow_grind_admits}, which owns the semantics. *)
 let _decline_is_slow_grind ~config ~macro_result ~index_view =
-  if not config.enable_slow_grind_short_gate then true
-  else
-    let classifier_config =
-      Decline_character_wiring.classifier_config
-        ~fast_v_arm_on_rate_alone:config.fast_v_arm_on_rate_alone
-        ~fast_v_min_rate_pct:config.fast_v_min_rate_pct
-    in
-    match
-      Decline_character_wiring.classify ~config:classifier_config
-        ~macro:macro_result ~index_view
-    with
-    | Decline_character.Slow_grind -> true
-    | Decline_character.Fast_v | Decline_character.Not_declining -> false
+  Decline_character_wiring.slow_grind_admits
+    ~enabled:config.enable_slow_grind_short_gate
+    ~fast_v_arm_on_rate_alone:config.fast_v_arm_on_rate_alone
+    ~fast_v_min_rate_pct:config.fast_v_min_rate_pct ~macro:macro_result
+    ~index_view
 
 (** Run the cascade screener over the Phase-2 [stocks], threading the top-level
-    [neutral_blocks_longs] / [neutral_blocks_shorts] entry-gate flags and the
+    [neutral_blocks_longs] / [deteriorating_blocks_longs] /
+    [neutral_blocks_shorts] entry-gate flags and the
     [enable_slow_grind_short_gate] decline-character gate into the screener
     config so they are expressible as [Weinstein_strategy.config] flag axes.
-    Default [false] on all three leaves the screener config untouched
-    bit-equally. Factored out of {!screen_universe} to keep that function under
-    the 50-line linter cap. *)
+    Default [false] on all four leaves the screener config untouched
+    bit-equally.
+
+    [~breadth_state] hands the cascade the macro read at five-state resolution;
+    it is consulted only by [deteriorating_blocks_longs]. With the
+    breadth-direction read disabled (the default) it is exactly
+    [breadth_state_of_market_trend macro_result.trend], so passing it changes
+    nothing. Factored out of {!screen_universe} to keep that function under the
+    50-line linter cap. *)
 let _run_screener ?membership_at ?on_candidates ~config
     ~(macro_result : Macro.result) ~index_view ~sector_map ~stocks ~portfolio
     ~last_stop_out_dates ~current_date () =
@@ -388,6 +383,7 @@ let _run_screener ?membership_at ?on_candidates ~config
     {
       config.screening_config with
       Screener.neutral_blocks_longs = config.neutral_blocks_longs;
+      Screener.deteriorating_blocks_longs = config.deteriorating_blocks_longs;
       Screener.neutral_blocks_shorts = config.neutral_blocks_shorts;
       Screener.enable_slow_grind_short_gate =
         config.enable_slow_grind_short_gate;
@@ -398,7 +394,8 @@ let _run_screener ?membership_at ?on_candidates ~config
   in
   Screener.screen_with_cooldown ?membership_at ?on_candidates
     ~decline_is_slow_grind ~config:screening_config
-    ~macro_trend:macro_result.Macro.trend ~sector_map ~stocks
+    ~macro_trend:macro_result.Macro.trend
+    ~breadth_state:macro_result.Macro.breadth_state ~sector_map ~stocks
     ~held_tickers:(Entry_walk.held_symbols portfolio)
     ~as_of:current_date
     ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)

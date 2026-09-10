@@ -59,6 +59,19 @@ include module type of struct
   include Screener_ranking
 end
 
+(** The cascade's macro gate — {!Screener_macro_gate.longs_admitted_by_macro},
+    {!Screener_macro_gate.longs_admitted_by_breadth},
+    {!Screener_macro_gate.shorts_admitted_by_macro}, and
+    {!Screener_macro_gate.breadth_state_or_projection} — re-exported so callers
+    keep writing [Screener.longs_admitted_by_macro]. Exposed (rather than kept
+    private to [screen]) so consumers that must re-ask the same question outside
+    a full {!screen} call cannot drift from it: the first such consumer is the
+    F2 resting-ticket re-screen cancel ({!Weinstein_strategy.Entry_ticket_ttl}),
+    whose symbol is held and therefore absent from [screen]'s candidate list. *)
+include module type of struct
+  include Screener_macro_gate
+end
+
 type candidate_params = {
   entry_buffer_pct : float;
       (** Fraction above breakout price for the suggested entry. Default: 0.005.
@@ -224,6 +237,23 @@ type config = {
           diagnosis). Mirrored from the top-level
           [Weinstein_strategy.config.neutral_blocks_longs] field so the flag is
           a [Variant_matrix] axis. *)
+  deteriorating_blocks_longs : bool; [@sexp.default false]
+      (** When [true], a [Weinstein_types.Deteriorating] breadth state blocks
+          new long candidates. Default [false] preserves the historical gate
+          bit-equally.
+
+          [Deteriorating] projects to [Neutral], so the three-state gate above
+          admits it; this flag is the narrower instrument that rejects only that
+          one state, leaving [Recovering] — the other [Neutral]-projecting
+          refinement — admitted. [neutral_blocks_longs] would block both.
+
+          {b Inert unless the caller supplies a refined breadth state.} Both
+          {!screen} and {!screen_with_cooldown} default [breadth_state] to
+          [Weinstein_types.breadth_state_of_market_trend macro_trend], which
+          never yields [Deteriorating] — so with no breadth-direction read the
+          flag can never fire. Mirrored from the top-level
+          [Weinstein_strategy.config.deteriorating_blocks_longs] field so the
+          flag is a [Variant_matrix] axis. Issue #2755. *)
   neutral_blocks_shorts : bool; [@sexp.default false]
       (** Short-side mirror of [neutral_blocks_longs]. When [true], a
           macro-[Neutral] tape blocks new short candidates exactly as a
@@ -496,26 +526,6 @@ type result = {
 }
 (** Screener output. *)
 
-val longs_admitted_by_macro :
-  neutral_blocks_longs:bool -> Weinstein_types.market_trend -> bool
-(** Whether the macro tape admits new {b long} entries — the cascade's
-    unconditional macro gate, exposed so consumers that must re-ask the same
-    question outside a full [screen] call cannot drift from it. [Bearish] always
-    blocks; [Neutral] blocks only when [neutral_blocks_longs] is set; [Bullish]
-    always admits. Pure.
-
-    First out-of-cascade consumer: the F2 re-screen cancel
-    ({!Weinstein_strategy.Entry_ticket_ttl}), which must decide whether a
-    resting ticket's symbol would still be admitted this week. A resting
-    ticket's symbol is held, so it is excluded from [screen]'s candidate list
-    and its admissibility is not otherwise observable. *)
-
-val shorts_admitted_by_macro :
-  neutral_blocks_shorts:bool -> Weinstein_types.market_trend -> bool
-(** Short-side mirror of {!longs_admitted_by_macro}: [Bullish] always blocks;
-    [Neutral] blocks only when [neutral_blocks_shorts] is set; [Bearish] always
-    admits (the book's short-only-in-a-confirmed-bear rule). Pure. *)
-
 val compare_for_ranking :
   candidate_ranking -> scored_candidate -> scored_candidate -> int
 (** [compare_for_ranking ranking a b] is the total order the cascade uses to
@@ -551,6 +561,7 @@ val screen_with_cooldown :
   ?membership_at:(string -> Core.Date.t -> bool) ->
   ?decline_is_slow_grind:bool ->
   ?on_candidates:((Stock_analysis.t * sector_context) list -> unit) ->
+  ?breadth_state:Weinstein_types.breadth_state ->
   config:config ->
   macro_trend:Weinstein_types.market_trend ->
   sector_map:(string, sector_context) Core.Hashtbl.t ->
@@ -572,6 +583,17 @@ val screen_with_cooldown :
       pre-gate behaviour. The caller (the strategy lib) computes this via its
       decline-character classifier; passing a plain bool keeps this lib
       macro-agnostic.
+
+    @param breadth_state
+      The same tape [macro_trend] describes, at {!Weinstein_types.breadth_state}
+      resolution — the caller's [Macro.result.breadth_state]. Consulted only by
+      {!longs_admitted_by_breadth}, i.e. only when
+      [config.deteriorating_blocks_longs] is [true]. Defaults to
+      [Weinstein_types.breadth_state_of_market_trend macro_trend], which never
+      yields [Deteriorating] or [Recovering] — so an absent argument is
+      bit-identical to the three-state gate no matter how the flag is set.
+      Callers that supply it must supply a state that projects back to
+      [macro_trend].
 
     @param on_candidates
       Issue #2490 gap G2. Called once, before evaluation, with the candidate

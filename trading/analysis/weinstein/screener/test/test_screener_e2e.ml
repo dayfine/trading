@@ -437,6 +437,190 @@ let test_neutral_blocks_longs_short_side_unchanged _ =
   assert_that (shorts_with true) (equal_to (shorts_with false))
 
 (* ------------------------------------------------------------------ *)
+(* deteriorating_blocks_longs entry-gate axis (default-off, #2755)      *)
+(* ------------------------------------------------------------------ *)
+
+let _config_deteriorating_blocks_longs blocks =
+  { Screener.default_config with Screener.deteriorating_blocks_longs = blocks }
+
+let _all_breadth_states : breadth_state list =
+  [
+    Bullish_breadth; Neutral_breadth; Deteriorating; Recovering; Bearish_breadth;
+  ]
+
+(** The pure gate, over the whole (flag × state) surface. Asserted on all five
+    states in both flag positions rather than a sample: the flag's entire claim
+    is that it separates [Deteriorating] from the other two [Neutral]-projecting
+    states, and only an exhaustive read shows the separation rather than
+    assuming it. *)
+let test_gate_truth_table_over_every_breadth_state _ =
+  let admits ~flag =
+    List.map _all_breadth_states ~f:(fun state ->
+        Screener.longs_admitted_by_breadth ~neutral_blocks_longs:false
+          ~deteriorating_blocks_longs:flag state)
+  in
+  assert_that
+    [ admits ~flag:false; admits ~flag:true ]
+    (elements_are
+       [
+         (* off: only the Bearish projection blocks — today's gate. *)
+         elements_are
+           [
+             equal_to true;
+             equal_to true;
+             equal_to true;
+             equal_to true;
+             equal_to false;
+           ];
+         (* on: Deteriorating joins it; Recovering stays admitted. *)
+         elements_are
+           [
+             equal_to true;
+             equal_to true;
+             equal_to false;
+             equal_to true;
+             equal_to false;
+           ];
+       ])
+
+(** [neutral_blocks_longs] is the blunt instrument this flag exists to replace:
+    it blocks [Recovering] — the best-performing cohort in the 27-year study —
+    along with [Deteriorating]. Pinned as a contrast so a future "just use
+    neutral_blocks_longs" simplification has to delete an assertion that says
+    why it is wrong. *)
+let test_neutral_blocks_longs_also_blocks_recovering _ =
+  let admits ~neutral_blocks_longs state =
+    Screener.longs_admitted_by_breadth ~neutral_blocks_longs
+      ~deteriorating_blocks_longs:false state
+  in
+  assert_that
+    [
+      admits ~neutral_blocks_longs:true Recovering;
+      admits ~neutral_blocks_longs:true Deteriorating;
+    ]
+    (elements_are [ equal_to false; equal_to false ])
+
+let _screen_in ~config ~breadth_state stocks =
+  Screener.screen_with_cooldown ~breadth_state ~config
+    ~macro_trend:(market_trend_of_breadth_state breadth_state)
+    ~sector_map:(_empty_sector_map ()) ~stocks ~held_tickers:[]
+    ~as_of:(Date.of_string "2023-12-29")
+    ~last_stop_out_dates:[] ()
+
+let _stocks_2021_2023 () =
+  _analyze_universe
+    ~start_date:(Date.of_string "2021-01-01")
+    ~end_date:(Date.of_string "2023-12-29")
+
+(** R1 through the real cascade: with the flag off, a [Deteriorating] tape
+    produces the canonical four-name buy list — the same list the
+    [Neutral]-macro path produces, because [Deteriorating] projects to
+    [Neutral]. This is the "nothing blocks these entries today" fact the flag
+    exists to change. *)
+let test_deteriorating_blocks_longs_off_is_identity _ =
+  let result =
+    _screen_in
+      ~config:(_config_deteriorating_blocks_longs false)
+      ~breadth_state:Deteriorating (_stocks_2021_2023 ())
+  in
+  assert_that result.Screener.buy_candidates
+    (elements_are _expected_2021_2023_buy_matchers)
+
+(** Flag on: a [Deteriorating] tape admits {b zero} long candidates, on the very
+    window that yields four with the flag off. *)
+let test_deteriorating_blocks_longs_on_blocks_deteriorating_buys _ =
+  let result =
+    _screen_in
+      ~config:(_config_deteriorating_blocks_longs true)
+      ~breadth_state:Deteriorating (_stocks_2021_2023 ())
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun (r : Screener.result) -> r.macro_trend) (equal_to Neutral);
+         field (fun (r : Screener.result) -> r.buy_candidates) is_empty;
+       ])
+
+(** The narrowness claim, through the cascade: with the flag ON, the three
+    non-[Deteriorating] admitting states each still produce the full four-name
+    buy list. [Recovering] is the load-bearing one — [neutral_blocks_longs]
+    would have blocked it. *)
+let test_deteriorating_blocks_longs_on_leaves_other_states_admitted _ =
+  let stocks = _stocks_2021_2023 () in
+  let buys_in state =
+    (_screen_in
+       ~config:(_config_deteriorating_blocks_longs true)
+       ~breadth_state:state stocks)
+      .Screener.buy_candidates
+  in
+  assert_that
+    [ buys_in Recovering; buys_in Neutral_breadth; buys_in Bullish_breadth ]
+    (elements_are
+       [
+         elements_are _expected_2021_2023_buy_matchers;
+         elements_are _expected_2021_2023_buy_matchers;
+         elements_are _expected_2021_2023_buy_matchers;
+       ])
+
+(** [Bearish_breadth] was already blocked and stays blocked — the flag adds a
+    rejection, it does not re-open one. *)
+let test_deteriorating_blocks_longs_leaves_bearish_blocked _ =
+  let result =
+    _screen_in
+      ~config:(_config_deteriorating_blocks_longs true)
+      ~breadth_state:Bearish_breadth (_stocks_2021_2023 ())
+  in
+  assert_that result.Screener.buy_candidates is_empty
+
+(** The documented inert-without-the-breadth-read contract: when the caller
+    supplies no [breadth_state], the cascade uses
+    [breadth_state_of_market_trend], which never yields [Deteriorating] — so an
+    armed flag changes nothing on any of the three trends. Built through the
+    real projection function, so a change to what the three-state read projects
+    onto moves this test with it. *)
+let test_flag_is_inert_when_no_breadth_state_is_supplied _ =
+  let stocks = _stocks_2021_2023 () in
+  let buys_for trend =
+    (Screener.screen
+       ~config:(_config_deteriorating_blocks_longs true)
+       ~macro_trend:trend ~sector_map:(_empty_sector_map ()) ~stocks
+       ~held_tickers:[])
+      .Screener.buy_candidates
+    |> List.map ~f:(fun (c : Screener.scored_candidate) -> c.Screener.ticker)
+  in
+  let buys_for_projection trend =
+    (_screen_in
+       ~config:(_config_deteriorating_blocks_longs true)
+       ~breadth_state:(breadth_state_of_market_trend trend)
+       stocks)
+      .Screener.buy_candidates
+    |> List.map ~f:(fun (c : Screener.scored_candidate) -> c.Screener.ticker)
+  in
+  assert_that
+    (List.map [ Bullish; Neutral; Bearish ] ~f:buys_for)
+    (elements_are
+       (List.map [ Bullish; Neutral; Bearish ] ~f:(fun trend ->
+            equal_to (buys_for_projection trend))))
+
+(** Short side is unaffected: under a [Deteriorating] tape the short candidate
+    list is identical whether the flag is on or off. Uses the 2018-2020
+    COVID-crash window where Stage-4 names produce shorts. *)
+let test_deteriorating_blocks_longs_short_side_unchanged _ =
+  let stocks =
+    _analyze_universe
+      ~start_date:(Date.of_string "2018-01-01")
+      ~end_date:(Date.of_string "2020-03-20")
+  in
+  let shorts_with blocks =
+    (_screen_in
+       ~config:(_config_deteriorating_blocks_longs blocks)
+       ~breadth_state:Deteriorating stocks)
+      .Screener.short_candidates
+    |> List.map ~f:(fun c -> c.Screener.ticker)
+  in
+  assert_that (shorts_with true) (equal_to (shorts_with false))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -464,4 +648,20 @@ let () =
            >:: test_neutral_blocks_longs_on_bullish_unaffected;
            "neutral_blocks_longs leaves short side unchanged"
            >:: test_neutral_blocks_longs_short_side_unchanged;
+           "longs_admitted_by_breadth truth table over every state"
+           >:: test_gate_truth_table_over_every_breadth_state;
+           "neutral_blocks_longs also blocks Recovering (why #2755 is narrower)"
+           >:: test_neutral_blocks_longs_also_blocks_recovering;
+           "deteriorating_blocks_longs off = identity (deteriorating buys \
+            preserved)" >:: test_deteriorating_blocks_longs_off_is_identity;
+           "deteriorating_blocks_longs on blocks deteriorating buys"
+           >:: test_deteriorating_blocks_longs_on_blocks_deteriorating_buys;
+           "deteriorating_blocks_longs on leaves the other admitting states"
+           >:: test_deteriorating_blocks_longs_on_leaves_other_states_admitted;
+           "deteriorating_blocks_longs leaves bearish blocked"
+           >:: test_deteriorating_blocks_longs_leaves_bearish_blocked;
+           "deteriorating_blocks_longs is inert with no breadth state supplied"
+           >:: test_flag_is_inert_when_no_breadth_state_is_supplied;
+           "deteriorating_blocks_longs leaves short side unchanged"
+           >:: test_deteriorating_blocks_longs_short_side_unchanged;
          ])
