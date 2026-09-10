@@ -582,6 +582,19 @@ type config = {
           [screening_config.neutral_blocks_longs] at screen time so it is a
           [Variant_matrix] flag axis. See [Weinstein_strategy_config] for full
           semantics. *)
+  deteriorating_blocks_longs : bool; [@sexp.default false]
+      (** Entry-gate axis (default-off, issue #2755): when [true], a
+          [Weinstein_types.Deteriorating] breadth state blocks new long entries
+          — the narrow instrument {!neutral_blocks_longs} is not, since that one
+          also blocks [Recovering]. Default [false] preserves the macro gate
+          bit-equally. Inert unless [macro_config.breadth_direction.enabled],
+          because without the breadth-direction read the state is only ever the
+          three-state projection. Threaded into
+          [screening_config.deteriorating_blocks_longs] at screen time and into
+          the F2 resting-ticket re-screen, so it is a [Variant_matrix] flag
+          axis. Tightens the macro gate only; Stage-2 entry, stops, and the
+          short-side gate are unaffected. See [Weinstein_strategy_config] for
+          full semantics. *)
   neutral_blocks_shorts : bool; [@sexp.default true]
       (** Short-side mirror of {!neutral_blocks_longs}: when [true] (the
           default), a macro-[Neutral] tape blocks new short entries (only

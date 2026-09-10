@@ -5,6 +5,7 @@ include Screener_scoring
 include Screener_admission
 include Screener_candidate_trace
 include Screener_ranking
+include Screener_macro_gate
 
 type candidate_params = {
   entry_buffer_pct : float;
@@ -48,6 +49,7 @@ type config = {
   max_short_candidates : int;
   cascade_post_stop_cooldown_weeks : int; [@sexp.default 0]
   neutral_blocks_longs : bool; [@sexp.default false]
+  deteriorating_blocks_longs : bool; [@sexp.default false]
   neutral_blocks_shorts : bool; [@sexp.default false]
   enable_slow_grind_short_gate : bool; [@sexp.default false]
   min_price : float; [@sexp.default 0.0]
@@ -71,6 +73,7 @@ let default_config =
     max_short_candidates = 10;
     cascade_post_stop_cooldown_weeks = 0;
     neutral_blocks_longs = false;
+    deteriorating_blocks_longs = false;
     neutral_blocks_shorts = false;
     enable_slow_grind_short_gate = false;
     min_price = 0.0;
@@ -259,50 +262,17 @@ let _top_n ~ranking n lst =
 let _filter_and_cap ~ranking ~candidate_fn ~max_n candidates =
   List.filter_map candidates ~f:candidate_fn |> _top_n ~ranking max_n
 
-(** Whether the macro tape admits new long entries.
-
-    [neutral_blocks_longs] defaults to [false] = the historical gate (longs
-    admitted under both [Bullish] and [Neutral]; blocked only under [Bearish]).
-    When [true], [Neutral] also blocks longs — only [Bullish] admits. This
-    tightens Weinstein's unconditional macro gate so a non-confirmed ([Neutral])
-    tape no longer admits buys. The short-side gate is unaffected. *)
-let _longs_admitted_by_macro ~neutral_blocks_longs macro_trend =
-  match macro_trend with
-  | Bearish -> false
-  | Neutral -> not neutral_blocks_longs
-  | Bullish -> true
-
-(** Whether the macro tape admits new short entries.
-
-    Mirror of {!_longs_admitted_by_macro} for the short side.
-    [neutral_blocks_shorts] defaults to [false] = the historical gate (shorts
-    admitted under both [Bearish] and [Neutral]; blocked only under [Bullish]).
-    When [true], [Neutral] also blocks shorts — only [Bearish] admits. This
-    tightens the short side to Weinstein's confirmed-bear rule
-    (weinstein-book-reference.md §Short-Selling Rules: short only in a confirmed
-    bear market), so a non-confirmed ([Neutral]) chop tape — exactly where
-    shorts get squeezed — no longer admits shorts. The long-side gate is
-    unaffected. *)
-let _shorts_admitted_by_macro ~neutral_blocks_shorts macro_trend =
-  match macro_trend with
-  | Bullish -> false
-  | Neutral -> not neutral_blocks_shorts
-  | Bearish -> true
-
-(* Public aliases: the F2 re-screen cancel must ask the same macro question the
-   cascade asks, for a symbol the cascade never sees (a resting ticket's symbol
-   is held, hence excluded from the candidate list). Sharing the function is
-   what keeps re-screen and screen from drifting. *)
-let longs_admitted_by_macro = _longs_admitted_by_macro
-let shorts_admitted_by_macro = _shorts_admitted_by_macro
-
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
     ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
-    ~max_buy_candidates ~neutral_blocks_longs ~ranking ~candidates ~macro_trend
-    : scored_candidate list =
-  if not (_longs_admitted_by_macro ~neutral_blocks_longs macro_trend) then []
+    ~max_buy_candidates ~neutral_blocks_longs ~deteriorating_blocks_longs
+    ~ranking ~candidates ~breadth_state : scored_candidate list =
+  if
+    not
+      (longs_admitted_by_breadth ~neutral_blocks_longs
+         ~deteriorating_blocks_longs breadth_state)
+  then []
   else
     let candidate_fn =
       _long_candidate ~weights ~thresholds ~params ~min_grade
@@ -317,7 +287,7 @@ let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     Two default-off gates tighten short admission toward Weinstein's
     confirmed-bear short rule:
     - [neutral_blocks_shorts]: when [true], a [Neutral] tape no longer admits
-      shorts (see {!_shorts_admitted_by_macro}).
+      shorts (see {!shorts_admitted_by_macro}).
     - [enable_slow_grind_short_gate]: when [true], shorts are admitted only when
       the current index decline is a slow grind ([decline_is_slow_grind]).
       [decline_is_slow_grind] is computed by the caller (the strategy lib, which
@@ -330,7 +300,7 @@ let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~ranking ~decline_is_slow_grind ~candidates ~macro_trend :
     scored_candidate list =
   let macro_admits =
-    _shorts_admitted_by_macro ~neutral_blocks_shorts macro_trend
+    shorts_admitted_by_macro ~neutral_blocks_shorts macro_trend
   in
   let slow_grind_admits =
     (not enable_slow_grind_short_gate) || decline_is_slow_grind
@@ -388,7 +358,7 @@ let _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member =
     [(buy_candidates, short_candidates)]; decoupled from [_screen] so the latter
     stays within the 50-line linter cap. *)
 let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
-    =
+    ~breadth_state =
   let buy_candidates =
     _evaluate_longs ~weights:config.weights ~thresholds:config.grade_thresholds
       ~params:config.candidate_params ~min_grade:config.min_grade
@@ -401,7 +371,8 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
       ~min_rs_normalized:config.min_rs_normalized
       ~max_buy_candidates:config.max_buy_candidates
       ~neutral_blocks_longs:config.neutral_blocks_longs
-      ~ranking:config.candidate_ranking ~candidates ~macro_trend
+      ~deteriorating_blocks_longs:config.deteriorating_blocks_longs
+      ~ranking:config.candidate_ranking ~candidates ~breadth_state
   in
   let short_candidates =
     _evaluate_shorts ~weights:config.weights ~thresholds:config.grade_thresholds
@@ -419,11 +390,13 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
   (buy_candidates, short_candidates)
 
 let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
-    ~sector_map ~stocks ~held_tickers ~cooldown_set ~is_member : result =
+    ~breadth_state ~sector_map ~stocks ~held_tickers ~cooldown_set ~is_member :
+    result =
   let held_set = String.Set.of_list held_tickers in
   let buys_active =
-    _longs_admitted_by_macro ~neutral_blocks_longs:config.neutral_blocks_longs
-      macro_trend
+    longs_admitted_by_breadth ~neutral_blocks_longs:config.neutral_blocks_longs
+      ~deteriorating_blocks_longs:config.deteriorating_blocks_longs
+      breadth_state
   in
   let total_stocks = List.length stocks in
   let candidates =
@@ -436,6 +409,7 @@ let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
   let candidates_after_held = List.length candidates in
   let buy_candidates, short_candidates =
     _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
+      ~breadth_state
   in
   {
     buy_candidates;
@@ -466,12 +440,13 @@ let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
 
 let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   _screen ~on_candidates:None ~config ~decline_is_slow_grind:true ~macro_trend
+    ~breadth_state:(breadth_state_or_projection ~macro_trend None)
     ~sector_map ~stocks ~held_tickers ~cooldown_set:String.Set.empty
     ~is_member:(fun _ -> true)
 
 let screen_with_cooldown ?membership_at ?(decline_is_slow_grind = true)
-    ?on_candidates ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~as_of
-    ~last_stop_out_dates () : result =
+    ?on_candidates ?breadth_state ~config ~macro_trend ~sector_map ~stocks
+    ~held_tickers ~as_of ~last_stop_out_dates () : result =
   let cooldown_set =
     _cooldown_block_set ~cooldown_weeks:config.cascade_post_stop_cooldown_weeks
       ~as_of ~last_stop_out_dates
@@ -479,5 +454,6 @@ let screen_with_cooldown ?membership_at ?(decline_is_slow_grind = true)
   let is_member ticker =
     match membership_at with None -> true | Some m -> m ticker as_of
   in
-  _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend ~sector_map
-    ~stocks ~held_tickers ~cooldown_set ~is_member
+  _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
+    ~breadth_state:(breadth_state_or_projection ~macro_trend breadth_state)
+    ~sector_map ~stocks ~held_tickers ~cooldown_set ~is_member
