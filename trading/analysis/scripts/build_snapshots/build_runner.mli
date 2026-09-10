@@ -50,14 +50,22 @@ val tail_params :
   (Snapshot_pipeline.Series_tail.Config.t * string option) Core.Command.Param.t
 (** Shared CLI flags for the series-tail pass, so both builders expose the same
     surface: [-stub-ratio], [-stub-max-bars], [-stub-max-price],
-    [-no-stub-truncation], [-no-stray-drop], [-tail-exceptions PATH]. Yields
-    {!build}'s [~tail_config] plus the raw [-tail-exceptions] path, which the
-    CLI shell resolves through {!tail_exceptions_or_exit}.
+    [-no-stub-truncation], [-no-stray-drop], [-cut-prefix-misscale],
+    [-misscale-min-kept-bars N], [-tail-exceptions PATH]. Yields {!build}'s
+    [~tail_config] plus the raw [-tail-exceptions] path, which the CLI shell
+    resolves through {!tail_exceptions_or_exit}.
 
-    Only the three gate knobs are flags. The mis-scale threshold
-    ([misscale_close]) and the stray-gap parameters are measured constants of
-    the defect classes rather than per-build choices — see
-    {!Snapshot_pipeline.Series_tail} for the measurement they come from. *)
+    [-cut-prefix-misscale] is {b off by default} (#2732): without it the
+    [prefix_misscale] class is reported and stored whole exactly as before, so
+    an existing invocation script rebuilds a byte-identical warehouse. With it,
+    the mis-scaled prefix is dropped and the real later segment kept, subject to
+    [-misscale-min-kept-bars] (default 250).
+
+    The gate knobs, the two edit switches and the cut's short-tail guard are
+    flags. The mis-scale threshold ([misscale_close]) and the stray-gap
+    parameters are measured constants of the defect classes rather than
+    per-build choices — see {!Snapshot_pipeline.Series_tail} for the measurement
+    they come from. *)
 
 val load_splice_exceptions :
   string option -> Snapshot_pipeline.Series_splice.Exceptions.t Status.status_or
@@ -186,9 +194,14 @@ val build :
       {!tail_exceptions_or_exit}, which makes an unreadable file fatal;
       {!Snapshot_pipeline.Series_tail.Exceptions.empty} means no exceptions.
       [deep_bars] are strictly before the window and feed only the side-table's
-      depth, so {e this} rule does not edit them — it trims the series' end, and
-      a bar before the window is not part of it. ([splice_cuts] below trims the
-      series' start, so it does reach them.)
+      depth, so a {e truncation} does not edit them — it trims the series' end,
+      and a bar before the window is not part of it. ([splice_cuts] below trims
+      the series' start, so it does reach them.) The one tail edit that trims
+      the start is the #2732 prefix cut ([-cut-prefix-misscale], default off):
+      when it fires, [deep_bars] are cut to the same date via
+      {!Snapshot_pipeline.Series_splice.keep_from}, so the mis-scaled prefix
+      cannot survive in the [.weekly] side-table after being removed from the
+      [.snap].
     - [splice_cuts] — build-time splice hygiene (#2672 class ii,
       {!Snapshot_pipeline.Series_splice}). Each named symbol's bars are cut to
       those dated on or after its date, {e before} the tail rule runs, so the

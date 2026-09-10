@@ -79,8 +79,9 @@ let test_wdr_stub_tail_truncated _ =
 
 (* AGR: the last "real" close is $73,566 and the 4,653 bars below it are the
    genuine series. A bare ratio walk-back would delete every one of them. The
-   mis-scale gate outranks the length gate, which this 200-bar run also
-   trips. *)
+   mis-scale gate outranks the length gate, which this 200-bar run also trips.
+   At the DEFAULT config the class is reported and the series stored whole —
+   this is the bit-identical path every pre-#2732 warehouse was built on. *)
 let test_agr_prefix_misscale_kept _ =
   let bars = _series (73_566.0 :: _repeat 200 33.94) in
   assert_that
@@ -91,6 +92,131 @@ let test_agr_prefix_misscale_kept _ =
             _finding_is ~klass:Class.Prefix_misscale ~action:Action.Kept
               ~n_stub:200 ~cut_after:_start;
           ]))
+
+(* The #2732 prefix cut, armed. Everything else stays at its default, so a test
+   using this config exercises exactly the one flag. *)
+let _cut_on =
+  {
+    Config.default with
+    stub = { Config.default.stub with misscale_cut = true };
+  }
+
+let _first_bar_is ~date ~close =
+  field List.hd_exn
+    (all_of
+       [
+         _date_is date;
+         field
+           (fun (b : Types.Daily_price.t) -> b.close_price)
+           (float_equal close);
+       ])
+
+(* AGR with the flag armed: the 300 real bars are kept and the single $73,566
+   bar that precedes them is dropped. [n_stub] still reports the run's length,
+   so the depth of the cut is readable from the sidecar. *)
+let test_agr_prefix_misscale_cut _ =
+  let real = _series ~start:(Date.add_days _start 1) (_repeat 300 33.94) in
+  assert_that
+    (_apply ~config:_cut_on ~symbol:"AGR"
+       (_series (73_566.0 :: _repeat 300 33.94)))
+    (pair (_dates_are real)
+       (elements_are
+          [
+            _finding_is ~klass:Class.Prefix_misscale ~action:Action.Cut_prefix
+              ~n_stub:300 ~cut_after:_start;
+          ]))
+
+(* BKNG carries a [999999.9999] sentinel rather than a merely-large price. The
+   first bar the warehouse stores must be the first real one. *)
+let test_bkng_sentinel_prefix_cut _ =
+  assert_that
+    (_apply ~config:_cut_on ~symbol:"BKNG"
+       (_series (999_999.9999 :: _repeat 300 69.0)))
+    (pair
+       (all_of
+          [
+            size_is 300;
+            _first_bar_is ~date:(Date.add_days _start 1) ~close:69.0;
+          ])
+       (elements_are
+          [
+            _finding_is ~klass:Class.Prefix_misscale ~action:Action.Cut_prefix
+              ~n_stub:300 ~cut_after:_start;
+          ]))
+
+(* PEGX: 210 real bars behind a sentinel, below the 250-bar guard. The cut is
+   refused and the series is stored whole — the live case the guard exists
+   for. *)
+let test_pegx_short_tail_refuses_cut _ =
+  let bars = _series (999_999.9999 :: _repeat 210 29.0) in
+  assert_that
+    (_apply ~config:_cut_on ~symbol:"PEGX" bars)
+    (pair (_unchanged bars)
+       (elements_are
+          [
+            _finding_is ~klass:Class.Prefix_misscale
+              ~action:Action.Cut_refused_short_tail ~n_stub:210
+              ~cut_after:_start;
+          ]))
+
+(* Arming the prefix cut must not change what the OTHER classes do: STMP is a
+   terminal stub and is still truncated from the end. *)
+let test_stub_tail_unaffected_by_cut_flag _ =
+  assert_that
+    (_apply ~config:_cut_on ~symbol:"STMP" (_series [ 329.61; 0.045; 0.04 ]))
+    (pair
+       (elements_are [ _date_is _start ])
+       (elements_are
+          [
+            _finding_is ~klass:Class.Stub_tail ~action:Action.Truncated
+              ~n_stub:2 ~cut_after:_start;
+          ]))
+
+(* A veto in the committed exceptions file outranks the cut, exactly as it
+   outranks a truncation. *)
+let test_exception_keeps_misscale_prefix _ =
+  let bars = _series (73_566.0 :: _repeat 300 33.94) in
+  assert_that
+    (_apply ~config:_cut_on
+       ~exceptions:(Series_tail.Exceptions.of_symbols [ "AGR" ])
+       ~symbol:"AGR" bars)
+    (pair (_unchanged bars)
+       (elements_are
+          [
+            _finding_is ~klass:Class.Prefix_misscale
+              ~action:Action.Kept_by_exception ~n_stub:300 ~cut_after:_start;
+          ]))
+
+(* The cut date the build feeds to [Series_splice.keep_from] for the deep
+   prefix: present only when a cut actually happened. *)
+let test_prefix_cut_from _ =
+  let of_config config =
+    Series_tail.prefix_cut_from
+      (Series_tail.classify config ~symbol:"AGR"
+         (_series (73_566.0 :: _repeat 300 33.94)))
+  in
+  assert_that
+    [ of_config _cut_on; of_config Config.default ]
+    (elements_are
+       [
+         is_some_and (equal_to ~cmp:Date.equal (Date.add_days _start 1));
+         is_none;
+       ])
+
+let test_cut_prefix_csv_row _ =
+  assert_that
+    (Series_tail.to_csv
+       (Series_tail.classify _cut_on ~symbol:"AGR"
+          (_series (73_566.0 :: _repeat 300 33.94))))
+    (contains_substring
+       "AGR,prefix_misscale,2021-10-04,73566.0000,300,2021-10-05,33.9400,")
+
+let test_cut_summary_counts _ =
+  assert_that
+    (Series_tail.summary
+       (Series_tail.classify _cut_on ~symbol:"AGR"
+          (_series (73_566.0 :: _repeat 300 33.94))))
+    (contains_substring "1 cut_prefix, 0 cut_refused_short_tail)")
 
 (* MEL: $8,900 then 21 bars at $11.72 — a mis-scaled prefix whose run is also
    priced well above the $1 stub floor. *)
@@ -286,6 +412,16 @@ let suite =
          "stmp_stub_tail_truncated" >:: test_stmp_stub_tail_truncated;
          "wdr_stub_tail_truncated" >:: test_wdr_stub_tail_truncated;
          "agr_prefix_misscale_kept" >:: test_agr_prefix_misscale_kept;
+         "agr_prefix_misscale_cut" >:: test_agr_prefix_misscale_cut;
+         "bkng_sentinel_prefix_cut" >:: test_bkng_sentinel_prefix_cut;
+         "pegx_short_tail_refuses_cut" >:: test_pegx_short_tail_refuses_cut;
+         "stub_tail_unaffected_by_cut_flag"
+         >:: test_stub_tail_unaffected_by_cut_flag;
+         "exception_keeps_misscale_prefix"
+         >:: test_exception_keeps_misscale_prefix;
+         "prefix_cut_from" >:: test_prefix_cut_from;
+         "cut_prefix_csv_row" >:: test_cut_prefix_csv_row;
+         "cut_summary_counts" >:: test_cut_summary_counts;
          "mel_prefix_misscale_kept" >:: test_mel_prefix_misscale_kept;
          "high_priced_tail_kept" >:: test_high_priced_tail_kept;
          "long_low_tail_kept" >:: test_long_low_tail_kept;
