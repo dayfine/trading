@@ -673,20 +673,32 @@ Docker container: <container-name>
 When done:
 1. Update dev/notes/data-gaps.md to reflect what was resolved or what still blocks
 2. Run build_inventory.exe if any data was fetched
-3. Open the PR via `jst submit` for any branch you pushed
-4. If $GITHUB_RUN_ID is set, append the GHA footer to the PR body immediately
-   after `jst submit` succeeds:
-     if [ -n "${GITHUB_RUN_ID:-}" ]; then
-       PR_NUM=$(GH_TOKEN=$GH_TOKEN gh pr view <branch> --json number -q '.number' 2>/dev/null || true)
-       if [ -n "$PR_NUM" ]; then
-         FOOTER="🤖 Dispatched by GHA orchestrator run [${GITHUB_RUN_ID}](https://github.com/dayfine/trading/actions/runs/${GITHUB_RUN_ID})"
-         EXISTING_BODY=$(GH_TOKEN=$GH_TOKEN gh pr view "$PR_NUM" --json body -q '.body' 2>/dev/null || true)
-         GH_TOKEN=$GH_TOKEN gh pr edit "$PR_NUM" --body "${EXISTING_BODY}
-
-${FOOTER}" 2>/dev/null || true
-       fi
-     fi
-5. Return: what changed, what still blocks, any errors, and the PR URL
+3. Open the PR for any branch you pushed:
+   - LOCAL (`$TRADING_IN_CONTAINER` unset): `GH_TOKEN=$GH_TOKEN jst submit <branch>`
+   - GHA (`$TRADING_IN_CONTAINER=1`): `jst` and `gh` are both unusable here —
+     `gh` is absent from this image, and `jst`'s internal `jj git fetch`
+     fails against this image's git 2.34.1 (measured 2026-09-13, GHA run
+     34768165769; see `dev/status/harness.md` H-JJ-JST-BROKEN-GHA). Create
+     the PR directly via the REST API, folding the GHA footer into the body
+     on creation (no separate edit call needed — GitHub auto-updates the
+     PR's diff as you push further commits to the branch, so this POST is
+     the only PR-API call required):
+       REPO="${GITHUB_REPOSITORY:-dayfine/trading}"
+       FOOTER="🤖 Dispatched by GHA orchestrator run [${GITHUB_RUN_ID}](https://github.com/dayfine/trading/actions/runs/${GITHUB_RUN_ID})"
+       printf '%s\n\n%s\n' "<your PR body>" "$FOOTER" > /tmp/prbody.md
+       PR_NUM=$(PR_TITLE="<your PR title>" PR_HEAD="<branch>" PR_REPO="$REPO" \
+         PR_BODY_FILE=/tmp/prbody.md python3 -c '
+import json, os, urllib.request
+body = open(os.environ["PR_BODY_FILE"]).read()
+req = urllib.request.Request(
+    f"https://api.github.com/repos/{os.environ[\"PR_REPO\"]}/pulls",
+    data=json.dumps({"title": os.environ["PR_TITLE"], "head": os.environ["PR_HEAD"],
+                      "base": "main", "body": body}).encode(),
+    headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+             "Accept": "application/vnd.github+json"}, method="POST")
+print(json.loads(urllib.request.urlopen(req).read())["number"])
+')
+4. Return: what changed, what still blocks, any errors, and the PR URL
 ```
 
 ops-data runs **before** feature agents — resolved data gaps may unblock
@@ -1079,32 +1091,52 @@ COMMIT DISCIPLINE — this is critical for reviewability AND for surviving rate-
       jj git push --bookmark feat/<feature>
   - **Open a DRAFT PR as soon as the first real commit is pushed** — do
     not wait until session end. If the session is killed mid-flight
-    (rate-limit, timeout), at least the PR exists with whatever was
-    pushed. Use jst to open the PR (jst is on PATH in trading-devcontainer):
-      GH_TOKEN=$GH_TOKEN jst submit feat/<feature>
-    Subsequent pushes update the PR automatically (same branch).
-    If jst is not available, use the URL printed by `jj git push`:
-      remote: Create a pull request for '<branch>' on GitHub by visiting:
-      remote:      https://github.com/dayfine/trading/pull/new/<branch>
-    **GHA footer (when $GITHUB_RUN_ID is set):** after `jst submit` succeeds,
-    append the orchestrator-origin footer to the PR body so it is scannable
-    from the PR list:
-      if [ -n "${GITHUB_RUN_ID:-}" ]; then
-        PR_NUM=$(GH_TOKEN=$GH_TOKEN gh pr view feat/<feature> --json number -q '.number' 2>/dev/null || true)
-        if [ -n "$PR_NUM" ]; then
-          FOOTER="🤖 Dispatched by GHA orchestrator run [${GITHUB_RUN_ID}](https://github.com/dayfine/trading/actions/runs/${GITHUB_RUN_ID})"
-          EXISTING_BODY=$(GH_TOKEN=$GH_TOKEN gh pr view "$PR_NUM" --json body -q '.body' 2>/dev/null || true)
-          GH_TOKEN=$GH_TOKEN gh pr edit "$PR_NUM" --body "${EXISTING_BODY}
+    (rate-limit, timeout), at least the PR exists with whatever was pushed.
 
-${FOOTER}" 2>/dev/null || true
-        fi
-      fi
+    - LOCAL (`$TRADING_IN_CONTAINER` unset): use jst (on PATH in
+      trading-devcontainer):
+        GH_TOKEN=$GH_TOKEN jst submit feat/<feature>
+      Subsequent pushes update the PR automatically (same branch). If jst
+      is not available, use the URL printed by `jj git push`:
+        remote: Create a pull request for '<branch>' on GitHub by visiting:
+        remote:      https://github.com/dayfine/trading/pull/new/<branch>
+
+    - GHA (`$TRADING_IN_CONTAINER=1`): `jst` and `gh` are both unusable —
+      `gh` is absent from this image, and `jst`'s internal `jj git fetch`
+      fails against this image's git 2.34.1 (measured 2026-09-13, GHA run
+      34768165769; see `dev/status/harness.md` H-JJ-JST-BROKEN-GHA). Create
+      the PR directly via REST, folding the GHA footer into the body on
+      creation — no separate edit call needed, since GitHub auto-updates
+      the PR's diff as you push further commits to the branch:
+        REPO="${GITHUB_REPOSITORY:-dayfine/trading}"
+        FOOTER="🤖 Dispatched by GHA orchestrator run [${GITHUB_RUN_ID}](https://github.com/dayfine/trading/actions/runs/${GITHUB_RUN_ID})"
+        printf '%s\n\n%s\n' "<your PR body>" "$FOOTER" > /tmp/prbody.md
+        PR_NUM=$(PR_TITLE="<title>" PR_HEAD="feat/<feature>" PR_REPO="$REPO" \
+          PR_BODY_FILE=/tmp/prbody.md python3 -c '
+import json, os, urllib.request
+body = open(os.environ["PR_BODY_FILE"]).read()
+req = urllib.request.Request(
+    f"https://api.github.com/repos/{os.environ[\"PR_REPO\"]}/pulls",
+    data=json.dumps({"title": os.environ["PR_TITLE"], "head": os.environ["PR_HEAD"],
+                      "base": "main", "body": body, "draft": True}).encode(),
+    headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+             "Accept": "application/vnd.github+json"}, method="POST")
+print(json.loads(urllib.request.urlopen(req).read())["number"])
+')
+      If this POST fails (e.g. a PR already exists on this branch — expected
+      on later commits), it's a no-op: your `git push` already updated the
+      existing PR's diff, nothing further to do.
   - At session end, mark the PR ready for review:
-      GH_TOKEN=$GH_TOKEN jst submit feat/<feature>
-    jst is on PATH in the orchestrator runtime (trading-devcontainer image
-    + dev/run.sh). If GH_TOKEN isn't set, jst will fail with a clear error
-    and the branch is still pushed — the orchestrator's Step 4.5 will
-    retry PR creation via the curl fallback.
+    - LOCAL: `GH_TOKEN=$GH_TOKEN jst submit feat/<feature>`. jst is on PATH
+      in the orchestrator runtime (trading-devcontainer image + dev/run.sh).
+      If GH_TOKEN isn't set, jst will fail with a clear error and the branch
+      is still pushed — the orchestrator's Step 4.5 will retry PR creation
+      via the curl fallback.
+    - GHA: no separate action needed. The draft→ready flip is not a REST
+      field GitHub exposes (see Step 5 Stage 3's GraphQL
+      `markPullRequestReadyForReview` mutation) — the orchestrator flips it
+      centrally, after QC APPROVES. Just make sure your status file says
+      READY_FOR_REVIEW so Step 5 picks the track up.
 
 MAX ITERATIONS — build-fix cycles:
   - If you have attempted 3 consecutive build-fix cycles without passing
@@ -1118,10 +1150,10 @@ Stop at a natural boundary (a passing build, a completed module).
 CRITICAL — before returning, do all of these (in this order, so a kill during the last step still leaves the PR open):
   1. Ensure dune build && dune runtest passes **on a clean checkout** of your branch (your worktree is isolated, so this is the local state — but verify nothing relies on files from sibling subagents' workspaces; only content tracked in your commits should matter)
   2. All changes committed and pushed (nothing uncommitted)
-  3. Draft PR already open from first push (see commit discipline); if not, open it now via `GH_TOKEN=$GH_TOKEN jst submit feat/<feature>`
+  3. Draft PR already open from first push (see commit discipline); if not, open it now — `GH_TOKEN=$GH_TOKEN jst submit feat/<feature>` LOCAL, the REST POST recipe from commit discipline above in GHA
   4. Update dev/status/<feature>.md (status, interface-stable, completed, in-progress, next-steps, commits)
   5. Do NOT edit dev/status/_index.md — I (the orchestrator) reconcile it in Step 5.5. Editing it from a feature PR collides with every sibling PR touching the same row. Exception: if this PR introduces a brand-new tracked work item (new status file), add the corresponding row to _index.md in this PR — I can't invent one.
-  6. If all work is done and tests pass: mark the PR ready for review via `GH_TOKEN=$GH_TOKEN jst submit feat/<feature>`, and set status to READY_FOR_REVIEW in the status file
+  6. If all work is done and tests pass: mark the PR ready for review (LOCAL: `GH_TOKEN=$GH_TOKEN jst submit feat/<feature>`; GHA: no action needed, see commit discipline above), and set status to READY_FOR_REVIEW in the status file
 
 <FEATURE-SPECIFIC CONSTRAINT IF ANY>
 
@@ -1251,7 +1283,8 @@ Recovery flow:
 
 ```bash
 # For each branch the subagent reported pushing:
-# gh is not available in the devcontainer — use curl against the REST API.
+# gh is not available in this runtime (neither locally-run orchestrator
+# sessions nor GHA ship it here) — use curl against the REST API.
 REPO="${GITHUB_REPOSITORY:-dayfine/trading}"
 OWNER="${REPO%/*}"
 PR_COUNT=$(curl -sSL \
@@ -1260,22 +1293,31 @@ PR_COUNT=$(curl -sSL \
   "https://api.github.com/repos/${REPO}/pulls?head=${OWNER}:<branch>&state=open" \
   | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
 if [ "$PR_COUNT" -eq 0 ]; then
-  GH_TOKEN=$GH_TOKEN jst submit <branch>
-  # Append GHA footer to the newly-created PR body.
-  if [ -n "${GITHUB_RUN_ID:-}" ]; then
-    PR_NUM=$(GH_TOKEN=$GH_TOKEN gh pr view <branch> --json number -q '.number' 2>/dev/null || true)
-    if [ -n "$PR_NUM" ]; then
-      FOOTER="🤖 Dispatched by GHA orchestrator run [${GITHUB_RUN_ID}](https://github.com/dayfine/trading/actions/runs/${GITHUB_RUN_ID})"
-      EXISTING_BODY=$(GH_TOKEN=$GH_TOKEN gh pr view "$PR_NUM" --json body -q '.body' 2>/dev/null || true)
-      GH_TOKEN=$GH_TOKEN gh pr edit "$PR_NUM" --body "${EXISTING_BODY}
-
-${FOOTER}" 2>/dev/null || true
-    fi
+  # jst is unusable here too in GHA (its internal `jj git fetch` fails
+  # against this image's git 2.34.1 — measured 2026-09-13, GHA run
+  # 34768165769; see dev/status/harness.md H-JJ-JST-BROKEN-GHA). Create the
+  # PR directly via REST, folding the GHA footer into the body on creation.
+  FOOTER="🤖 Dispatched by GHA orchestrator run [${GITHUB_RUN_ID}](https://github.com/dayfine/trading/actions/runs/${GITHUB_RUN_ID})"
+  printf '%s\n\n%s\n' "<subagent's own PR-body summary, or a generic note if unknown>" "$FOOTER" > /tmp/prbody.md
+  PR_NUM=$(PR_TITLE="<branch>" PR_HEAD="<branch>" PR_REPO="$REPO" \
+    PR_BODY_FILE=/tmp/prbody.md python3 -c '
+import json, os, urllib.request
+body = open(os.environ["PR_BODY_FILE"]).read()
+req = urllib.request.Request(
+    f"https://api.github.com/repos/{os.environ[\"PR_REPO\"]}/pulls",
+    data=json.dumps({"title": os.environ["PR_TITLE"], "head": os.environ["PR_HEAD"],
+                      "base": "main", "body": body}).encode(),
+    headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+             "Accept": "application/vnd.github+json"}, method="POST")
+print(json.loads(urllib.request.urlopen(req).read())["number"])
+' 2>/dev/null || true)
+  if [ -z "$PR_NUM" ]; then
+    echo "PR-CREATE-FAILED for <branch>"
   fi
 fi
 ```
 
-If jst still fails, surface the branch + jst error in the daily summary
+If the POST still fails, surface the branch + error in the daily summary
 under §Escalations with the GitHub PR-creation URL:
   https://github.com/dayfine/trading/pull/new/<branch>
 so the human can open the PR manually with one click. Don't loop on it.
@@ -1438,7 +1480,12 @@ it falls back to reading `dev/reviews/<feature>.md`:
 DATE="$(date +%Y-%m-%d)"
 FEATURE="<feature>"
 BRANCH="feat/<feature>"   # or harness/<name> for harness work
-PR_NUMBER="<N>"           # from `gh pr view --head $BRANCH --json number` if not already in hand
+PR_NUMBER="<N>"           # gh is unusable here; look it up via
+                          #   curl -sSL -H "Authorization: Bearer ${GH_TOKEN}" \
+                          #     -H "Accept: application/vnd.github+json" \
+                          #     "https://api.github.com/repos/${GITHUB_REPOSITORY:-dayfine/trading}/pulls?head=<owner>:$BRANCH&state=open" \
+                          #   | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0]["number"] if d else "")'
+                          # if not already in hand
 
 # Preferred — reads verdicts from `gh pr view <N> --json reviews`:
 bash trading/devtools/checks/record_qc_audit.sh \
@@ -1905,7 +1952,12 @@ this doc was wrong). Trust only `BUILD_EXIT`.
 ### Step 6.2: Status file integrity check
 
 ```bash
-dev/lib/run-in-env.sh sh trading/devtools/checks/status_file_integrity.sh
+# Path is relative to trading/, NOT repo root: run-in-env.sh cd's into
+# trading/ before exec'ing (see dev/lib/run-in-env.sh's PROJECT_ROOT
+# resolution), so a repo-root-relative path here 404s with "No such file
+# or directory" -- measured 2026-09-13, GHA run 34768165769. Do not "fix"
+# this back to a trading/-prefixed path.
+dev/lib/run-in-env.sh sh devtools/checks/status_file_integrity.sh
 INTEGRITY_EXIT=$?
 echo "status-integrity exit=$INTEGRITY_EXIT"
 ```
