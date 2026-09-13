@@ -155,7 +155,7 @@
 #        exactly that page. If the page is exhausted (every fetched
 #        completed run was a failure, with no older non-failure run seen
 #        to close the streak) the streak is reported as a FLOOR, printed
-#        as `streak>=N` rather than `streak=N` -- the true streak could be
+#        as `streak=>=N` rather than `streak=N` -- the true streak could be
 #        longer than the page this script chose to fetch. This mirrors the
 #        LIST call's own floor discipline (report the real count you
 #        looked at, and say so explicitly when there's more you didn't
@@ -434,7 +434,7 @@ _recent_scheduled_runs() {
 #      incrementing at the first completed run whose conclusion is not a
 #      failure class (a closed streak); it also stops if the page runs out
 #      before a close is found, in which case STREAK is reported as a
-#      FLOOR, printed as streak>=N (see the floor check in the RED branch
+#      FLOOR, printed as streak=>=N (see the floor check in the RED branch
 #      below / PAGINATION-IS-A-FLOOR in the top header).
 #   3. If no completed run was found at all (every fetched run is still
 #      in_progress/queued) -> UNOBSERVABLE. This is the exact incident
@@ -646,7 +646,7 @@ main() {
   done
 
   _active_total=$((_ok_count + _red_count + _stale_count + _nosched_count + _unobs_count))
-  echo "SUMMARY: active=${_active_total} (${_total_pages} page(s) fetched, full pagination -- a real total, not a floor) ok=${_ok_count} red=${_red_count} stale=${_stale_count} no-schedule=${_nosched_count} unobservable=${_unobs_count} -- red/stale/ok/unobservable are each computed from up to ${RUNS_PER_WORKFLOW} most-recent scheduled runs per workflow (not just the newest); red includes a per-workflow failure-streak count (see each RED line's streak=N, or streak>=N when the fetched page was exhausted before the streak closed)"
+  echo "SUMMARY: active=${_active_total} (${_total_pages} page(s) fetched, full pagination -- a real total, not a floor) ok=${_ok_count} red=${_red_count} stale=${_stale_count} no-schedule=${_nosched_count} unobservable=${_unobs_count} -- red/stale/ok/unobservable are each computed from up to ${RUNS_PER_WORKFLOW} most-recent scheduled runs per workflow (not just the newest); red includes a per-workflow failure-streak count (see each RED line's streak=N, or streak=>=N when the fetched page was exhausted before the streak closed)"
   if [ "$_red_count" -gt 0 ]; then
     echo "SUMMARY: RED workflows: ${_red_names}"
   fi
