@@ -32,6 +32,17 @@ let classify ~config ~macro ~index_view =
   let index_bars = _index_bars_of_weekly_view index_view in
   Decline_character.classify ~config ~macro ~index_bars
 
+let slow_grind_admits ~enabled ~fast_v_arm_on_rate_alone ~fast_v_min_rate_pct
+    ~macro ~index_view =
+  if not enabled then true
+  else
+    let config =
+      classifier_config ~fast_v_arm_on_rate_alone ~fast_v_min_rate_pct
+    in
+    match classify ~config ~macro ~index_view with
+    | Decline_character.Slow_grind -> true
+    | Decline_character.Fast_v | Decline_character.Not_declining -> false
+
 let update_ref ~fast_v_arm_on_rate_alone ~fast_v_min_rate_pct
     ~prior_decline_character ~macro_result_opt ~index_view =
   match macro_result_opt with

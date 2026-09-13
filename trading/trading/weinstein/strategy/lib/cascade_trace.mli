@@ -37,7 +37,14 @@ val of_screen :
     member to repeat it would dominate the artefact. The macro gate applied here
     is the {b diagnostics'} gate ([macro_trend <> Bearish] for longs,
     [<> Bullish] for shorts), not the live evaluation's [neutral_blocks_longs]
-    variant, so the trace and the counts agree on a Neutral tape.
+    or [deteriorating_blocks_longs] variant, so the trace and the counts agree
+    on a Neutral tape. The divergence is deliberate and is shared with
+    {!Screener_candidate_trace}: the trace answers "which phase dropped this
+    name", and pinning it to the diagnostics' gate keeps it consistent with the
+    [cascade_summary] counts emitted for the same Friday. When either
+    long-tightening flag is armed the trace therefore still emits long rows for
+    a tape the live cascade blocked; read [cascade_summary.long_macro_admitted]
+    for the live answer.
 
     {b Cost.} One score per candidate per admitted side — paid only when the
     caller opts into capture. The artefact is O(universe x sides x Fridays), so

@@ -40,6 +40,29 @@ val classify :
     the already-computed macro result for the current week. Pure and
     lookahead-free: every input is at the current week or earlier. *)
 
+val slow_grind_admits :
+  enabled:bool ->
+  fast_v_arm_on_rate_alone:bool ->
+  fast_v_min_rate_pct:float ->
+  macro:Macro.result ->
+  index_view:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
+  bool
+(** The faithful short's [enable_slow_grind_short_gate] answer: is the primary
+    index's current decline a slow grind (rather than a fast-V crash or no
+    decline at all)?
+
+    [enabled = false] (the gate off, the default) short-circuits to [true]
+    without classifying, so short admission is bit-identical to the pre-gate
+    behaviour — the screener ignores the value when the gate is off. Classified
+    from the {b current} cycle's macro result + index bars, which is
+    lookahead-free for an entry gate: entries already gate on the current
+    [macro_trend], and the prior-cycle {!update_ref} ref is the stops seam, not
+    the entry seam.
+
+    Lives here so the screener lib stays macro-agnostic (A2) — it receives a
+    plain bool. Takes the two arming primitives rather than the strategy config
+    for the same reason, matching {!classifier_config}. *)
+
 val update_ref :
   fast_v_arm_on_rate_alone:bool ->
   fast_v_min_rate_pct:float ->

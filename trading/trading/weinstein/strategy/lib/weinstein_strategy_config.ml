@@ -87,6 +87,7 @@ type config = {
       [@sexp.default Trading_portfolio.Margin_config.default_config]
       (** See [.mli]. *)
   neutral_blocks_longs : bool; [@sexp.default false]  (** See [.mli]. *)
+  deteriorating_blocks_longs : bool; [@sexp.default false]  (** See [.mli]. *)
   neutral_blocks_shorts : bool; [@sexp.default true]  (** See [.mli]. *)
   enable_slow_grind_short_gate : bool; [@sexp.default false]  (** See [.mli]. *)
   fast_v_arm_on_rate_alone : bool; [@sexp.default false]  (** See [.mli]. *)
@@ -226,6 +227,7 @@ let default_config ~universe ~index_symbol =
     enable_pi_filter = false;
     margin_config = Trading_portfolio.Margin_config.default_config;
     neutral_blocks_longs = false;
+    deteriorating_blocks_longs = false;
     neutral_blocks_shorts = true;
     enable_slow_grind_short_gate = false;
     fast_v_arm_on_rate_alone = false;
