@@ -18,8 +18,9 @@
     never a primary test. {!Series_tail.Class.Prefix_misscale} in particular is
     reachable only {e through} the terminal-run test.
 
-    So the residual class is: {b an implausible level with no discontinuity the
-    shape rules can act on.} Three sub-classes, all evidenced:
+    So the residual class is:
+    {b an implausible level with no discontinuity the shape rules can act on.}
+    Three sub-classes, all evidenced:
 
     - {b No seam inside the build window.} [Build_runner._clean_tail] applies
       {!Series_tail} to the {e windowed} bars, and the splice scan uses the same
@@ -28,20 +29,22 @@
       and no jump: zero findings from both modules, stored whole. The committed
       seam dates make this concrete — AGR 2006-07-03, SGY 2003-09-09, DRL
       2003-09-30, TEK_old 2007-02-26, SBER 2007-07-17, LJPC 2008-12-17, BYDDY
-      2009-12-28 ([dev/experiments/warehouse-dedup-2026-09-08/results/terminal_runs_*_v10.csv])
+      2009-12-28
+      ([dev/experiments/warehouse-dedup-2026-09-08/results/terminal_runs_*_v10.csv])
       — each is a symbol a window ending before its seam stores as several
       thousand bars of one number.
     - {b The short-tail guard refuses the cut.}
       {!Series_tail.Config.stub.misscale_min_kept_bars} (250) refuses a prefix
       cut that would leave less than a trading year and stores the series
-      {e whole}, artefact included ({!Series_tail.Action.Cut_refused_short_tail}).
-      Four rows of the committed [_v10] scans sit below that floor: PEGX 210
-      bars behind a [999999.9999] sentinel, CGE 180 behind [$4,000], TNT 44
-      behind [$9,820], HTV {b 21} behind [$14,000]. The refusal is correct on
-      its own terms — 21 bars cannot carry a 30-week MA — but neither module has
-      a {e drop} action to express "mostly artefact, too little real data to
-      salvage": {!Series_tail.Action} has none at all, and
-      {!Series_splice.Action.Dropped} fires only on 20+ splice findings.
+      {e whole}, artefact included
+      ({!Series_tail.Action.Cut_refused_short_tail}). Four rows of the committed
+      [_v10] scans sit below that floor: PEGX 210 bars behind a [999999.9999]
+      sentinel, CGE 180 behind [$4,000], TNT 44 behind [$9,820], HTV {b 21}
+      behind [$14,000]. The refusal is correct on its own terms — 21 bars cannot
+      carry a 30-week MA — but neither module has a {e drop} action to express
+      "mostly artefact, too little real data to salvage": {!Series_tail.Action}
+      has none at all, and {!Series_splice.Action.Dropped} fires only on 20+
+      splice findings.
     - {b Scope.} V18 examines only the symbols a run {e traded or held}
       ([Validator_store_check._v18_subjects]). A mis-scaled series the strategy
       never bought is invisible to it forever. A build-time pass sees every
@@ -71,7 +74,7 @@
     can never disagree about the same series.
 
     {b The rule is deliberately bare, and a legitimately expensive instrument
-    flags.} BRK.A trades above $400k and no test on the price series alone
+       flags.} BRK.A trades above $400k and no test on the price series alone
     separates "expensive share class" from "mis-mapped listing" — V18 pinned
     that as an accepted false positive and this module inherits the decision
     unchanged. The obvious narrowing — require a large max/min ratio, so that
@@ -85,20 +88,21 @@
 
     {b Why 10,000 and not the siblings' 1,000.} [misscale_close = 1000.0] is a
     {e single-bar} test, and it already accepts real prices as false positives:
-    CMG's genuine pre-split [$3,283.04] close is a committed
-    [prefix_misscale] row. As a {e median over a whole series} that constant
-    would sweep in every high-priced real name — NVR, AZO, BKNG, pre-split AMZN
-    and CMG. The default here is V18's [store_median_close_max] (10,000.0),
-    which clears all of those and still catches every measured artefact except
-    BRK.A: AGR [$73.5k], BYDDY [$78k], SBER [$107k], SWD [$136k], MEL [$172k],
-    LJPC [$220k], HTV [$14k], and the [999999.9999] sentinels.
+    CMG's genuine pre-split [$3,283.04] close is a committed [prefix_misscale]
+    row. As a {e median over a whole series} that constant would sweep in every
+    high-priced real name — NVR, AZO, BKNG, pre-split AMZN and CMG. The default
+    here is V18's [store_median_close_max] (10,000.0), which clears all of those
+    and still catches every measured artefact except BRK.A: AGR [$73.5k], BYDDY
+    [$78k], SBER [$107k], SWD [$136k], MEL [$172k], LJPC [$220k], HTV [$14k],
+    and the [999999.9999] sentinels.
 
     {2 Report-only, and not yet wired}
 
-    This module {b classifies and reports; it never edits a series and has no
-    action type}, which is why it is safe for a rule that knowingly flags BRK.A:
-    at build time an automatic drop on that false positive would delete a real
-    company. {!Config.enabled} defaults to [false] on top of that, mirroring
+    This module
+    {b classifies and reports; it never edits a series and has no action type},
+    which is why it is safe for a rule that knowingly flags BRK.A: at build time
+    an automatic drop on that false positive would delete a real company.
+    {!Config.enabled} defaults to [false] on top of that, mirroring
     {!Splice_detector.Config.enabled}, so arming is always explicit.
 
     Nothing calls it yet. That is {!Splice_detector}'s own sequence — #2649
@@ -148,9 +152,9 @@ module Class : sig
             seam inside the stored window, so neither {!Series_tail} nor
             {!Splice_detector} has anything to key on and no cut can help: there
             is no real segment in this window to keep. A reviewer's only options
-            are to drop the symbol or to raise the ceiling. {b This is the
-            residual class} the module exists for, and the one a max/min-ratio
-            refinement would have hidden. *)
+            are to drop the symbol or to raise the ceiling.
+            {b This is the residual class} the module exists for, and the one a
+            max/min-ratio refinement would have hidden. *)
     | Mixed_scale
         (** The median is above the ceiling but at least one bar is at or below
             it: the series carries two scales and the seam is inside the window.
