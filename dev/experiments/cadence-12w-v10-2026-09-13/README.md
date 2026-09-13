@@ -16,3 +16,19 @@ must clear the re-based band before it is anything but an axis. Every pre-09-03 
 Read with `ARM=a4-cadence-12w sh dev/experiments/deteriorating-gate-2026-09-13/read.sh <salt> <artifact-dir>`.
 
 ## Log
+
+- 09:40 PT: **salt 0 = 751.67% / 851 trades / Sharpe 0.578 / maxDD 29.99** (wall 11,334 s; `results/a4-cadence-12w-s0-v10-*`)
+  vs the null's **382.74 / 710 / 0.445 / 37.60**. V16/V17 PASS, **V6 = 0 on both, `validator_diff -check V6` exit 0**.
+  **Clears both criteria at salt 0:** realised $3.24M → **$5.83M (+$2.59M)**, unrealised $0.78M → $1.84M (9 open names:
+  ADM ADTN EXTR GE KLAC LLY MSM NOK URI vs 4), maxDD **37.6 → 30.0**. Exit mix `stop_loss` 450 → 336, `laggard_rotation`
+  244 → 483, `stage3_force_exit` 5 → 13 — the same "wide stop hands the exit to rotation" mechanism the 09-05 surface
+  described, now on a twin-free warehouse. Width buckets: 12% × 716, 13% × 78, 14% × 25, 15% × 10, 11% × 9. Join
+  (`symbol|entry_date`): 353 shared +$1.10M → +$1.70M (**drift +$606k**: BFX 2020-04-22 +$826k — ONE instrument on
+  `_v10dedup`, NVDA 2020-03-25 +$348k, IDXX +$249k, BB 2006 +$223k, WFRD +$204k); null-only 357 trades +$2.14M (BBWI
+  2020-08-08 +$532k, NVDA 2020-04-06 +$450k, UPBD +$324k, CMA-WS +$281k, KR +$268k) vs **gate-only 498 trades +$4.12M**
+  (CLS 2023-06-20 +$1.20M, NOVT 2016-06-03 +$636k, KTOS 2025-05-03 +$569k, BPT 2022-01-22 +$512k, BBWI 2020-08-20 +$409k,
+  TTEC +$319k, KLIC +$278k; worst BBAR −$118k, FLEX −$104k). Concentration caveat: the top four arm-only names are
+  $2.92M of the +$2.59M realised delta — the same CLS/NOVT/KTOS/BPT set the 09-05 and item-3 map cells surfaced, so the
+  salt-1/2 cells decide whether this is a lever or a re-draw that happens to land the same monsters. Force liquidations
+  6 (ATLC, SGP_old1, AWRE, ARCB, CBKCQ, IMMR) vs 3 — wide arms hold delisted names longer (known, #2672 family).
+  Salt 1 started 09:40 (lane B2); salt 2 running since 09:16 (lane A2).
