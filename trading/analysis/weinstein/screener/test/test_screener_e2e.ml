@@ -448,57 +448,120 @@ let _all_breadth_states : breadth_state list =
     Bullish_breadth; Neutral_breadth; Deteriorating; Recovering; Bearish_breadth;
   ]
 
-(** The pure gate, over the whole (flag × state) surface. Asserted on all five
-    states in both flag positions rather than a sample: the flag's entire claim
-    is that it separates [Deteriorating] from the other two [Neutral]-projecting
-    states, and only an exhaustive read shows the separation rather than
-    assuming it. *)
-let test_gate_truth_table_over_every_breadth_state _ =
-  let admits ~flag =
-    List.map _all_breadth_states ~f:(fun state ->
-        Screener.longs_admitted_by_breadth ~neutral_blocks_longs:false
-          ~deteriorating_blocks_longs:flag state)
+let _all_market_trends : market_trend list = [ Bullish; Neutral; Bearish ]
+
+let _admits ?(neutral_blocks_longs = false) ~flag ~macro_trend state =
+  Screener.longs_admitted_by_breadth ~neutral_blocks_longs
+    ~deteriorating_blocks_longs:flag ~macro_trend state
+
+(** The pure gate over its {b whole} input surface: every (macro_trend ×
+    breadth_state × flag) triple, 30 booleans. Exhaustive rather than sampled
+    because the gate's entire claim is a separation — the flag removes
+    [Deteriorating] and nothing else, and it can only ever remove — and a sample
+    cannot distinguish that from a gate that also reads the state where it
+    should read the trend. Rows are trends; columns are {!_all_breadth_states}.
+*)
+let test_gate_truth_table_over_every_trend_and_breadth_state _ =
+  let row ~flag ~macro_trend =
+    List.map _all_breadth_states ~f:(_admits ~flag ~macro_trend)
+  in
+  let grid ~flag =
+    List.map _all_market_trends ~f:(fun t -> row ~flag ~macro_trend:t)
+  in
+  let all_of_5 b = elements_are (List.init 5 ~f:(fun _ -> equal_to b)) in
+  (* Only the Deteriorating column (index 2) ever differs, and only on a trend
+     the three-state gate already admits. *)
+  let deteriorating_blocked =
+    elements_are
+      [
+        equal_to true;
+        equal_to true;
+        equal_to false;
+        equal_to true;
+        equal_to true;
+      ]
   in
   assert_that
-    [ admits ~flag:false; admits ~flag:true ]
+    [ grid ~flag:false; grid ~flag:true ]
     (elements_are
        [
-         (* off: only the Bearish projection blocks — today's gate. *)
+         (* off: exactly the three-state gate — trend decides, state is inert. *)
+         elements_are [ all_of_5 true; all_of_5 true; all_of_5 false ];
+         (* on: Deteriorating additionally rejected wherever the trend admits;
+            Bearish stays wholly blocked, Recovering stays admitted. *)
          elements_are
-           [
-             equal_to true;
-             equal_to true;
-             equal_to true;
-             equal_to true;
-             equal_to false;
-           ];
-         (* on: Deteriorating joins it; Recovering stays admitted. *)
-         elements_are
-           [
-             equal_to true;
-             equal_to true;
-             equal_to false;
-             equal_to true;
-             equal_to false;
-           ];
+           [ deteriorating_blocked; deteriorating_blocked; all_of_5 false ];
        ])
 
-(** [neutral_blocks_longs] is the blunt instrument this flag exists to replace:
-    it blocks [Recovering] — the best-performing cohort in the 27-year study —
-    along with [Deteriorating]. Pinned as a contrast so a future "just use
-    neutral_blocks_longs" simplification has to delete an assertion that says
-    why it is wrong. *)
-let test_neutral_blocks_longs_also_blocks_recovering _ =
-  let admits ~neutral_blocks_longs state =
-    Screener.longs_admitted_by_breadth ~neutral_blocks_longs
-      ~deteriorating_blocks_longs:false state
+(** The bit-equality contract the default rests on, asserted rather than
+    asserted-of: with the flag {b off} the gate is [longs_admitted_by_macro] on
+    the caller's own [macro_trend], at every (trend × state) pair and for both
+    settings of [neutral_blocks_longs] — including the pairs no projection can
+    produce, which is exactly where an earlier revision that gated on
+    [market_trend_of_breadth_state breadth_state] diverged. *)
+let test_flag_off_is_the_three_state_gate_at_every_pair _ =
+  let pairs =
+    List.concat_map [ false; true ] ~f:(fun neutral_blocks_longs ->
+        List.concat_map _all_market_trends ~f:(fun macro_trend ->
+            List.map _all_breadth_states ~f:(fun state ->
+                ( _admits ~neutral_blocks_longs ~flag:false ~macro_trend state,
+                  Screener.longs_admitted_by_macro ~neutral_blocks_longs
+                    macro_trend ))))
+  in
+  assert_that (List.map pairs ~f:fst)
+    (elements_are (List.map pairs ~f:(fun (_, expected) -> equal_to expected)))
+
+(** A [Bullish] tape refined to [Deteriorating] / [Recovering] — the pair no
+    projection produces, and the one the flag exists for.
+
+    Flag off: admitted, {b whatever} [neutral_blocks_longs] says, because the
+    three-state half reads the [Bullish] trend and not the [Neutral] the state
+    would project onto. Flag on: [Deteriorating] blocked, [Recovering] still
+    admitted. Pins that arming this flag does not silently widen
+    [neutral_blocks_longs] onto a confirmed-bullish tape. *)
+let test_a_bullish_tape_refined_by_breadth _ =
+  let admits ~neutral_blocks_longs ~flag state =
+    _admits ~neutral_blocks_longs ~flag ~macro_trend:Bullish state
   in
   assert_that
     [
-      admits ~neutral_blocks_longs:true Recovering;
-      admits ~neutral_blocks_longs:true Deteriorating;
+      admits ~neutral_blocks_longs:false ~flag:false Deteriorating;
+      admits ~neutral_blocks_longs:true ~flag:false Deteriorating;
+      admits ~neutral_blocks_longs:true ~flag:false Recovering;
+      admits ~neutral_blocks_longs:false ~flag:true Deteriorating;
+      admits ~neutral_blocks_longs:false ~flag:true Recovering;
     ]
-    (elements_are [ equal_to false; equal_to false ])
+    (elements_are
+       [
+         equal_to true;
+         equal_to true;
+         equal_to true;
+         equal_to false;
+         equal_to true;
+       ])
+
+(** [neutral_blocks_longs] is the blunt instrument this flag exists to replace:
+    on a genuinely [Neutral] tape it blocks [Recovering] — the best-performing
+    cohort in the 27-year study — along with [Deteriorating], while
+    [deteriorating_blocks_longs] on the same tape blocks only [Deteriorating].
+    Pinned as a contrast so a future "just use neutral_blocks_longs"
+    simplification has to delete an assertion that says why it is wrong. *)
+let test_neutral_blocks_longs_also_blocks_recovering _ =
+  let blunt state =
+    _admits ~neutral_blocks_longs:true ~flag:false ~macro_trend:Neutral state
+  in
+  let narrow state =
+    _admits ~neutral_blocks_longs:false ~flag:true ~macro_trend:Neutral state
+  in
+  assert_that
+    [
+      blunt Recovering;
+      blunt Deteriorating;
+      narrow Recovering;
+      narrow Deteriorating;
+    ]
+    (elements_are
+       [ equal_to false; equal_to false; equal_to true; equal_to false ])
 
 let _screen_in ~config ~breadth_state stocks =
   Screener.screen_with_cooldown ~breadth_state ~config
@@ -648,8 +711,12 @@ let () =
            >:: test_neutral_blocks_longs_on_bullish_unaffected;
            "neutral_blocks_longs leaves short side unchanged"
            >:: test_neutral_blocks_longs_short_side_unchanged;
-           "longs_admitted_by_breadth truth table over every state"
-           >:: test_gate_truth_table_over_every_breadth_state;
+           "longs_admitted_by_breadth truth table over every trend x state"
+           >:: test_gate_truth_table_over_every_trend_and_breadth_state;
+           "deteriorating_blocks_longs off = the three-state gate at every pair"
+           >:: test_flag_off_is_the_three_state_gate_at_every_pair;
+           "a bullish tape refined to Deteriorating / Recovering"
+           >:: test_a_bullish_tape_refined_by_breadth;
            "neutral_blocks_longs also blocks Recovering (why #2755 is narrower)"
            >:: test_neutral_blocks_longs_also_blocks_recovering;
            "deteriorating_blocks_longs off = identity (deteriorating buys \

@@ -15,9 +15,8 @@ let shorts_admitted_by_macro ~neutral_blocks_shorts macro_trend =
   | Bearish -> true
 
 let longs_admitted_by_breadth ~neutral_blocks_longs ~deteriorating_blocks_longs
-    (breadth_state : breadth_state) =
-  longs_admitted_by_macro ~neutral_blocks_longs
-    (market_trend_of_breadth_state breadth_state)
+    ~macro_trend (breadth_state : breadth_state) =
+  longs_admitted_by_macro ~neutral_blocks_longs macro_trend
   &&
   match breadth_state with
   | Deteriorating -> not deteriorating_blocks_longs

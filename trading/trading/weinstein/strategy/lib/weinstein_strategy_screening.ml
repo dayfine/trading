@@ -286,7 +286,7 @@ let _macro_admits_side ~config ~(macro_result : Macro.result)
       Screener.longs_admitted_by_breadth
         ~neutral_blocks_longs:config.neutral_blocks_longs
         ~deteriorating_blocks_longs:config.deteriorating_blocks_longs
-        macro_result.breadth_state
+        ~macro_trend:macro_result.trend macro_result.breadth_state
   | Trading_base.Types.Short ->
       Screener.shorts_admitted_by_macro
         ~neutral_blocks_shorts:config.neutral_blocks_shorts macro_result.trend

@@ -267,11 +267,11 @@ let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
     ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
     ~max_buy_candidates ~neutral_blocks_longs ~deteriorating_blocks_longs
-    ~ranking ~candidates ~breadth_state : scored_candidate list =
+    ~ranking ~candidates ~macro_trend ~breadth_state : scored_candidate list =
   if
     not
       (longs_admitted_by_breadth ~neutral_blocks_longs
-         ~deteriorating_blocks_longs breadth_state)
+         ~deteriorating_blocks_longs ~macro_trend breadth_state)
   then []
   else
     let candidate_fn =
@@ -372,7 +372,7 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
       ~max_buy_candidates:config.max_buy_candidates
       ~neutral_blocks_longs:config.neutral_blocks_longs
       ~deteriorating_blocks_longs:config.deteriorating_blocks_longs
-      ~ranking:config.candidate_ranking ~candidates ~breadth_state
+      ~ranking:config.candidate_ranking ~candidates ~macro_trend ~breadth_state
   in
   let short_candidates =
     _evaluate_shorts ~weights:config.weights ~thresholds:config.grade_thresholds
@@ -395,7 +395,7 @@ let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
   let held_set = String.Set.of_list held_tickers in
   let buys_active =
     longs_admitted_by_breadth ~neutral_blocks_longs:config.neutral_blocks_longs
-      ~deteriorating_blocks_longs:config.deteriorating_blocks_longs
+      ~deteriorating_blocks_longs:config.deteriorating_blocks_longs ~macro_trend
       breadth_state
   in
   let total_stocks = List.length stocks in

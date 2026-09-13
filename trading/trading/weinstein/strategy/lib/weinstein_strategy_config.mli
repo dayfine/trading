@@ -246,7 +246,10 @@ type config = {
   deteriorating_blocks_longs : bool; [@sexp.default false]
       (** Entry-gate axis (default-off, issue #2755): when [true], a
           [Weinstein_types.Deteriorating] breadth state blocks new long entries.
-          Default [false] preserves the macro gate bit-equally.
+          A pure extra conjunct on the existing macro gate — it can only
+          {e remove} admissions, never add one — so the default [false] leaves
+          that gate bit-identical unconditionally, at every ([trend],
+          [breadth_state]) pair and whatever {!neutral_blocks_longs} is set to.
 
           {b Why this and not {!neutral_blocks_longs}.} Entries made while
           breadth is [Deteriorating] lose in both books measured over 2000-2026

@@ -25,21 +25,25 @@ val longs_admitted_by_macro :
 val longs_admitted_by_breadth :
   neutral_blocks_longs:bool ->
   deteriorating_blocks_longs:bool ->
+  macro_trend:Weinstein_types.market_trend ->
   Weinstein_types.breadth_state ->
   bool
-(** {!longs_admitted_by_macro} read at {!Weinstein_types.breadth_state}
-    resolution: the three-state gate is applied to the projected trend
-    ([Weinstein_types.market_trend_of_breadth_state]), and then
-    [deteriorating_blocks_longs] may additionally reject
-    [Weinstein_types.Deteriorating] — the one [Neutral]-projecting state the
+(** {!longs_admitted_by_macro} on [macro_trend], {b and} a pure extra conjunct:
+    when [deteriorating_blocks_longs] is set, [Weinstein_types.Deteriorating]
+    additionally rejects longs — the one [Neutral]-projecting breadth state the
     27-year study measured as loss-making for entries
     ([dev/experiments/stop-width-cadence-surface-2026-09-05/README.md] §"Breadth
     state across 27 years"). [Recovering], the best cohort in the same study,
     stays admitted; [neutral_blocks_longs] would have blocked both.
 
-    With [deteriorating_blocks_longs = false] this is exactly
-    {!longs_admitted_by_macro} on the projected trend, so it is a drop-in for
-    every three-state call site. Issue #2755. *)
+    Because the three-state half reads the caller's own [macro_trend] — never a
+    projection of [breadth_state] — [deteriorating_blocks_longs = false] is
+    {b unconditionally}
+    [longs_admitted_by_macro ~neutral_blocks_longs macro_trend], for every
+    ([macro_trend], [breadth_state]) pair and every setting of
+    [neutral_blocks_longs]. That is what makes it a drop-in at every three-state
+    call site, and it imposes no consistency precondition on the two arguments.
+    Issue #2755. *)
 
 val shorts_admitted_by_macro :
   neutral_blocks_shorts:bool -> Weinstein_types.market_trend -> bool

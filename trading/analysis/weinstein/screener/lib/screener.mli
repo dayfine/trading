@@ -239,13 +239,15 @@ type config = {
           a [Variant_matrix] axis. *)
   deteriorating_blocks_longs : bool; [@sexp.default false]
       (** When [true], a [Weinstein_types.Deteriorating] breadth state blocks
-          new long candidates. Default [false] preserves the historical gate
-          bit-equally.
+          new long candidates. It is a pure extra conjunct on the existing
+          three-state gate, so the default [false] is the historical gate
+          bit-equally — unconditionally, whatever [macro_trend] /
+          [breadth_state] / [neutral_blocks_longs] the caller supplies.
 
-          [Deteriorating] projects to [Neutral], so the three-state gate above
-          admits it; this flag is the narrower instrument that rejects only that
-          one state, leaving [Recovering] — the other [Neutral]-projecting
-          refinement — admitted. [neutral_blocks_longs] would block both.
+          [Deteriorating] projects to [Neutral], so nothing blocks it today;
+          this flag is the narrower instrument that rejects only that one state,
+          leaving [Recovering] — the other [Neutral]-projecting refinement —
+          admitted. [neutral_blocks_longs] would block both.
 
           {b Inert unless the caller supplies a refined breadth state.} Both
           {!screen} and {!screen_with_cooldown} default [breadth_state] to
@@ -586,14 +588,15 @@ val screen_with_cooldown :
 
     @param breadth_state
       The same tape [macro_trend] describes, at {!Weinstein_types.breadth_state}
-      resolution — the caller's [Macro.result.breadth_state]. Consulted only by
-      {!longs_admitted_by_breadth}, i.e. only when
-      [config.deteriorating_blocks_longs] is [true]. Defaults to
+      resolution — the caller's [Macro.result.breadth_state]. Read {b only} as
+      the extra [Deteriorating] conjunct of {!longs_admitted_by_breadth}, i.e.
+      only when [config.deteriorating_blocks_longs] is [true]; the three-state
+      gate always reads [macro_trend] itself, so the two arguments need not
+      agree and a refinement of a [Bullish] tape can never tighten the
+      three-state answer. Defaults to
       [Weinstein_types.breadth_state_of_market_trend macro_trend], which never
-      yields [Deteriorating] or [Recovering] — so an absent argument is
-      bit-identical to the three-state gate no matter how the flag is set.
-      Callers that supply it must supply a state that projects back to
-      [macro_trend].
+      yields [Deteriorating] — so an absent argument is bit-identical to the
+      three-state gate no matter how the flag is set.
 
     @param on_candidates
       Issue #2490 gap G2. Called once, before evaluation, with the candidate
