@@ -112,6 +112,43 @@ let test_short_series_is_not_classified _ =
     (_classify ~symbol:"MEL" (_series (_repeat 20 172_140.0)))
     (is_some_and (_counts_are ~n_bars:20 ~n_above:20))
 
+(** The ceiling is {e strictly} above, so a series sitting exactly on it is not
+    reported — the docstring says so twice and nothing pinned it. Built at even
+    length from two differing halves ($9k and $11k) so the median is the mean of
+    the two central closes, landing on 10,000.0 exactly: the case that pins the
+    comparison AND the even-length branch of the median at the same boundary. *)
+let test_a_median_exactly_at_the_ceiling_is_not_flagged _ =
+  assert_that
+    (_classify ~symbol:"EDGE"
+       (_series (_repeat 10 9_000.0 @ _repeat 10 11_000.0)))
+    is_none
+
+(** [Whole_window] means {e every} bar is above the ceiling, so a single bar at
+    or below it is [Mixed_scale] — and the distinction is not cosmetic: this
+    series {e does} have a cut available, and [Whole_window] is the drop-
+    candidate list ({!Series_level.whole_window_symbols}). Misclassifying it
+    would route a cuttable series into the drop pile undetected. The lone bar
+    sits exactly {e on} the ceiling, which also pins that [n_above] counts
+    strictly-above and not at-or-above. *)
+let test_one_bar_at_the_ceiling_makes_the_series_mixed_scale _ =
+  assert_that
+    (_classify ~symbol:"ONEBAR" (_series (_repeat 59 73_566.74 @ [ 10_000.0 ])))
+    (is_some_and
+       (all_of
+          [ _klass_is Class.Mixed_scale; _counts_are ~n_bars:60 ~n_above:59 ]))
+
+(** The [Int.max 1] floor on [min_bars] is a crash guard, not a policy: the
+    field is a plain [int] with no smart constructor, so a [0] or negative value
+    from a future CLI flag or sexp would otherwise reach the median of an empty
+    array and raise [Invalid_argument]. Pinned rather than left as a comment. *)
+let test_min_bars_below_one_cannot_ask_for_an_empty_median _ =
+  assert_that
+    (_classify ~config:{ _armed with Config.min_bars = 0 } ~symbol:"EMPTY" [])
+    is_none;
+  assert_that
+    (_classify ~config:{ _armed with Config.min_bars = -5 } ~symbol:"EMPTY" [])
+    is_none
+
 (** Median, not mean, and the difference is load-bearing: one $1M print drags
     the mean of an otherwise $50 series above the ceiling, and the rule is about
     whether the BULK of the series is mis-scaled. (A single bad print is
@@ -248,6 +285,12 @@ let suite =
          "default config is a no op" >:: test_default_config_is_a_no_op;
          "short series is not classified"
          >:: test_short_series_is_not_classified;
+         "a median exactly at the ceiling is not flagged"
+         >:: test_a_median_exactly_at_the_ceiling_is_not_flagged;
+         "one bar at the ceiling makes the series mixed scale"
+         >:: test_one_bar_at_the_ceiling_makes_the_series_mixed_scale;
+         "min bars below one cannot ask for an empty median"
+         >:: test_min_bars_below_one_cannot_ask_for_an_empty_median;
          "one outlier bar does not flag the series"
          >:: test_one_outlier_bar_does_not_flag_the_series;
          "zero volume collapse is not this modules business"

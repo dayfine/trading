@@ -42,6 +42,9 @@ expectations so we never make these kinds of trades again."
   the build-time sibling of V18's **level** rule: a pure per-symbol
   classification of a stored series' price level, beside `Series_tail` and
   `Series_splice`. Default-off, report-only, no action type, not yet wired.
+- `trading/trading/backtest/validation/test/test_series_level_v18_median_agreement.ml`
+  — cross-module drift detector for the one statistic V18 and `Series_level`
+  each compute their own copy of (3 tests).
 - `trading/trading/backtest/validation/bin/post_run_validator_cli.ml` — CLI
   (`-run-dir -data-dir [-config] -out`).
 - `trading/trading/backtest/validation/test/test_post_run_validator.ml` — unit
@@ -256,7 +259,14 @@ docker exec trading-1-dev bash -c \
     the splice scan uses the same window, so a window ending before a symbol's
     seam stores the mis-scaled prefix alone with nothing to key on — AGR
     2006-07-03, SGY 2003-09-09, DRL 2003-09-30, TEK_old 2007-02-26, SBER
-    2007-07-17, LJPC 2008-12-17, BYDDY 2009-12-28. (ii) **The short-tail guard
+    2007-07-17, LJPC 2008-12-17, BYDDY 2009-12-28. **The blindness here is
+    certain at the code level; a present-day instance is not** — all three
+    committed vintages run to 2026, so every seam listed is *in*-window for
+    them and none of those seven symbols would flag on today's warehouse.
+    Sub-class (ii) below is the instance-verified one. Consequence for the
+    first armed report: it may carry **no** `Whole_window` row at all, and an
+    empty one is the expected result rather than broken wiring.
+    (ii) **The short-tail guard
     refuses the cut**: `misscale_min_kept_bars` (250) stores the series *whole*
     when the real segment is shorter — PEGX 210, CGE 180, TNT 44, **HTV 21**
     bars in `dev/experiments/warehouse-dedup-2026-09-08/results/
@@ -280,11 +290,30 @@ docker exec trading-1-dev bash -c \
     siblings' `misscale_close` (1,000.0): as a *median over a whole series*
     the latter would sweep in NVR / AZO / BKNG / pre-split AMZN and CMG (CMG's
     genuine $3,283.04 close is already a committed `prefix_misscale` row). The
-    median is computed identically to `_v18_median_close` so the two halves
-    cannot disagree about one series. BRK.A still flags, inherited from V18.
-  - Verify: `dune runtest analysis/weinstein/snapshot_pipeline/test/` — 15
-    cases. Mutation-verified: replacing the `n_above = n_bars` predicate with
-    a constant turns the classification, summary and drop-candidate tests red.
+    median *function* is byte-identical to `_v18_median_close`, and their
+    agreement is now pinned by a cross-module test rather than asserted —
+    `trading/backtest/validation/test/test_series_level_v18_median_agreement.ml`
+    feeds one bar set to both halves and compares, including at even length
+    with differing central closes. **The agreement is about the function, not
+    the whole check**: the two halves feed it different inputs — `Series_level`
+    drops non-finite closes before any statistic and counts only the survivors
+    against `min_bars`, V18 sorts the stored array raw and counts all of it —
+    so on a NaN-carrying series the two medians differ by construction
+    (`Float.compare` orders `nan` below every real price). The claim holds for
+    finite series, which is every series the scans produced. BRK.A still
+    flags, inherited from V18.
+  - Verify: `dune runtest --force analysis/weinstein/snapshot_pipeline/test/`
+    — 18 cases; plus 3 in the cross-module drift suite under
+    `dune runtest --force trading/backtest/validation/test/`.
+    Mutation-verified, each measured red then green on revert: replacing the
+    `n_above = n_bars` predicate with a constant reddens the classification,
+    summary and drop-candidate tests; dropping the even-length mean from
+    `_median_close` reddens the ceiling-boundary case and the drift suite's
+    differing-central-closes case; loosening the ceiling test to `<` reddens
+    the ceiling-boundary case; counting `>=` the ceiling, or classifying on
+    `n_above >= n - 1`, reddens the one-bar-at-the-ceiling case; removing the
+    `Int.max 1` floor on `min_bars` raises `Invalid_argument` in the
+    empty-series case.
   - **Not wired to anything yet**, deliberately — see Follow-ups.
 
 ## Follow-ups
@@ -304,7 +333,13 @@ docker exec trading-1-dev bash -c \
   + a sidecar + a CLI flag off an already-729-line `build_runner.ml` out of the
   detector's PR.
 - Decide, off that first armed report, whether a `Whole_window` row warrants a
-  **drop** action. That is the gap no existing module can express — `Series_tail
+  **drop** action. **Expect the report to be able to come back empty of
+  `Whole_window` rows** — the seven seam dates evidencing sub-class (i) are all
+  *in*-window for the three committed 2026-ending vintages, so that sub-class is
+  code-level certain but has no present-day instance; an empty report is the
+  expected result, not broken wiring. The instance-verified rows are sub-class
+  (ii)'s, and those land in `Mixed_scale`. That is the gap no existing module
+  can express — `Series_tail
   .Action` has no drop at all, and `Series_splice.Action.Dropped` needs 20+
   splice findings — and it is what would finally cover PEGX / CGE / TNT / HTV,
   whose prefix cut the 250-bar short-tail guard correctly refuses but which are

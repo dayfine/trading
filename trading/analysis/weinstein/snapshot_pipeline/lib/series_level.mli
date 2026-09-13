@@ -33,6 +33,15 @@
       ([dev/experiments/warehouse-dedup-2026-09-08/results/terminal_runs_*_v10.csv])
       — each is a symbol a window ending before its seam stores as several
       thousand bars of one number.
+      {b The blindness is certain at the code level; a present-day instance is
+         not:} all three committed vintages run to 2026, so every seam listed is
+      {e in}-window for them and none of those seven symbols would flag on
+      today's warehouse. This sub-class is an argument about what the shape
+      rules structurally cannot see, evidenced by dated seams — not a prediction
+      that a given build produces rows, unlike the instance-verified
+      [action=kept] rows of the next sub-class. So the first armed report may
+      carry {b no} {!Class.Whole_window} row at all, and an empty one is the
+      expected result rather than broken wiring.
     - {b The short-tail guard refuses the cut.}
       {!Series_tail.Config.stub.misscale_min_kept_bars} (250) refuses a prefix
       cut that would leave less than a trading year and stores the series
@@ -68,10 +77,26 @@
     {2 The rule, and the false positive it accepts}
 
     A series is reported when its {b median} close is strictly above
-    {!Config.median_close_max}. Median rather than mean, and computed
-    identically to V18's ([Validator_store_check._v18_median_close]: the mean of
-    the two central closes at even length) so the build-time and post-run halves
-    can never disagree about the same series.
+    {!Config.median_close_max}. Median rather than mean, and the median
+    {e function} is byte-identical to V18's
+    ([Validator_store_check._v18_median_close]: the mean of the two central
+    closes at even length). Two independent copies of one statistic drift
+    silently, so their agreement is pinned by a cross-module test
+    ([test_series_level_v18_median_agreement] under
+    [trading/backtest/validation/test/]) that feeds one bar set to both and
+    compares the medians, including at even length with differing central
+    closes.
+
+    {b That agreement is about the function, not the whole check, and the two
+       halves can still diverge on one shape: a series carrying non-finite
+       closes.} They feed the identical function different inputs — this module
+    drops non-finite closes before any statistic is taken and counts only the
+    surviving bars against {!Config.min_bars}, while V18 sorts the stored array
+    raw and counts all of it. [Float.compare] orders [nan] below every real
+    price, so on a NaN-carrying series the two medians differ by construction
+    and V18 additionally clears a [min_bars] floor this module would not. The
+    agreement therefore holds for every finite series — which is every series
+    the scans above produced — and is not a claim about NaN-carrying ones.
 
     {b The rule is deliberately bare, and a legitimately expensive instrument
        flags.} BRK.A trades above $400k and no test on the price series alone
@@ -135,7 +160,14 @@ module Config : sig
     min_bars : int;
         (** Series with fewer finite closes than this are not classified at all:
             a median over a handful of bars is not evidence the series is sane.
-            Default [20], V18's [store_min_bars]. *)
+            Default [20], V18's [store_min_bars].
+
+            {b Clamped to a floor of 1}, as V18's own step guard is: this is a
+            plain [int] with no smart constructor, so a [0] or negative value
+            reaching it from a future CLI flag or sexp would otherwise let an
+            empty series through to the median of an empty array. The clamp is a
+            crash guard, not a policy — a floor of 1 is still far too short for
+            the median to mean anything. *)
   }
   [@@deriving sexp, equal]
 
