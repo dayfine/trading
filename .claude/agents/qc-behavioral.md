@@ -33,7 +33,27 @@ git worktree remove --force "${WT}"
 
 ## Allowed tools
 
-Read, Glob, Grep (no Write, no Edit, no Bash — review only).
+Read, Glob, Grep, and Bash for the following review operations only:
+
+- Plain-git checkout of the PR into the agent's own isolated worktree, inspection
+  of that checkout, and cleanup of that worktree.
+- `docker exec trading-1-dev` to run `dune build` or scoped `dune runtest <dir>`
+  against that checkout, following the repo-wide container scheduling rules.
+- Temporary mutation probes in that checkout: sever the mechanism, run the
+  scoped tests, and revert each probe before continuing. Write/Edit are permitted
+  only for these temporary probes, never for implementing fixes.
+- `gh` reads and the single `gh api` POST to `/repos/<owner>/<repo>/pulls/<N>/reviews`
+  that publishes this review.
+
+Persistent edits, `jj` (any subcommand), pushes, merges, and editing or building
+the parent checkout remain forbidden. Restore all probe changes and remove
+review-created untracked files; `git status --porcelain` must be empty in the
+review worktree at the end, before cleanup.
+
+See `.claude/rules/qc-behavioral-authority.md` §"Operational requirements for QC
+agents in this repo" for the Docker/worktree contract. Its repo-local,
+container-visible worktree requirement takes precedence over the generic
+`/tmp` example above.
 
 ## Prerequisite
 
