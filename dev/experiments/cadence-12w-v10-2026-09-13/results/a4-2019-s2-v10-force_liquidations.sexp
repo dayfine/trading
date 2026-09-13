@@ -1,0 +1,13 @@
+((events
+  (((symbol OSPN) (position_id OSPN-wein-367) (date 2020-08-12) (side Long)
+    (entry_price 25.58) (current_price 18.84) (quantity 3090)
+    (cost_basis 79042.2) (unrealized_pnl -20826.599999999995)
+    (unrealized_pnl_pct -0.26348709929632519) (reason Per_position))
+   ((symbol APLS) (position_id APLS-wein-2523) (date 2021-09-10) (side Long)
+    (entry_price 58.76) (current_price 34.93) (quantity 2466)
+    (cost_basis 144902.16) (unrealized_pnl -58764.78)
+    (unrealized_pnl_pct -0.40554799183117768) (reason Per_position))
+   ((symbol APLS) (position_id APLS-wein-3269) (date 2023-07-17) (side Long)
+    (entry_price 73.36) (current_price 52.46) (quantity 1674)
+    (cost_basis 122804.64) (unrealized_pnl -34986.6)
+    (unrealized_pnl_pct -0.28489640130861504) (reason Per_position)))))

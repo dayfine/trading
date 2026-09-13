@@ -124,3 +124,123 @@ the book's stated band and must be argued as a modern-regime adaptation of a dia
   is negative and larger, and maxDD is worse. Both 5y cells fail both criteria at salt 0; salts 1–2 running.
   Caveat that cuts both ways: each 5y cell holds 120–180 trades, under the 230-trade measurability floor, so a
   single-salt 5y read is itself noise-dominated — which is why the grid runs three salts per cell.
+- 16:45 PT: **2019 vintage, salt 1** — null `n5-2019` = 39.12% / 181 trades / Sharpe 0.442 / maxDD 22.50 (wall 1,467 s);
+  arm `a4-2019` = **32.44% / 178 / 0.388 / maxDD 31.06** (wall 1,747 s). V16/V17 PASS, V6 = 0 on both, `validator_diff -check V6`
+  exit 0. **Loses on both criteria again:** realised $258k → **$207k (−$50k)**, unrealised $154k → $130k, maxDD **22.5 → 31.1**.
+  Exit mix `stop_loss` 135 → 96, `laggard_rotation` 42 → 77. Join: 90 shared −$19k → +$231k (**drift +$250k**, the
+  shared-trades-run-wider term for the third time); null-only 91 trades +$277k (APPS 2020-06-13 +$142k, ZS 2020-05-29
+  +$127k, UTHR 2020-12-02 +$77k, FDX 2020-08-07 +$64k) vs arm-only 88 trades **−$23k** (AN 2020-08-04 +$116k, HVT +$87k;
+  APLS 2021-06-08 −$61k, MGNI −$32k). By entry year the arm again gives back 2021 (−$61k → −$261k) and gains 2019
+  (−$75k → +$73k); 2020 flat. **Two of three salts fail both pre-registered criteria, so the 2019 cell is settled: it
+  does not clear.** Salt 2 runs for the complete band.
+- 17:00 PT: **2009 vintage, salt 1** — null `n5-2009` = 45.74% / 112 trades / Sharpe 0.590 / maxDD 20.43 (wall 1,542 s);
+  arm `a4-2009` = **17.82% / 154 / 0.292 / maxDD 25.23** (wall 2,220 s). V16/V17 PASS; V6 = 1 on the arm (the same CMD/CMN
+  2009-10-10 → 2010-03-22 rename twin as salt 0, +$9.6k each — `validator_diff -check V6` exit 1 on this pair, read
+  ex-twin). **Loses on both criteria:** realised $277k → **$10k (−$268k; −$277k ex-twin)**, unrealised $194k → $179k,
+  maxDD **20.4 → 25.2**. Exit mix `stop_loss` 74 → 52, `laggard_rotation` 36 → 97. Join: 59 shared −$82k → +$23k
+  (**drift +$104k**); null-only 53 trades +$359k (NPSP 2013-04-08 +$164k, SKX 2009-10-16 +$80k, SLM +$44k) vs arm-only
+  95 trades **−$13k** (LEN 2012-01 +$58k; SGP_old1 2010-05-10 −$32k = the stub-print phantom below, FOSL −$32k).
+  By entry year the arm loses 2010 (+$133k → −$19k) and 2013 (+$291k → +$2k). **Two of three salts fail both criteria:
+  the 2009 cell does not clear either.** Salt 2 runs for the band.
+- 17:40 PT: **2019 vintage, salt 2** — null `n5-2019` = 37.78% / 181 / Sharpe 0.432 / maxDD 22.83 (wall 1,754 s); arm `a4-2019`
+  = **30.99% / 177 / 0.375 / maxDD 31.16** (wall 1,506 s). V16/V17 PASS, V6 = 0 on both, `validator_diff -check V6` exit 0.
+  **Loses on both criteria — 3 of 3 on this cell:** realised $245k → **$213k (−$32k)**, unrealised $153k → $110k, maxDD
+  **22.8 → 31.2**. Join: 90 shared -23321 -> 228248 (drift 251569); null-only 91 trades +$269k (ZS 2020-05-29 +$128k, UTHR 2020-12-02 +$77k, FDX +$64k) vs
+  arm-only 87 trades −$15k (AN +$117k, HVT +$87k). By entry year: 2021 −$65k → **−$265k**, 2019 −$76k → +$73k, 2020 flat.
+  Drawdown episodes (equity_curve.csv): the null's maxDD at this salt is the 2022-04-08 → 2023-10-30 leg (Covid at salts 0–1);
+  the arm's is 2021-05-07 → 2023-10-27 at every salt — the 2021 bleed sets the wide arm's drawdown regardless of path.
+- 17:55 PT: **2009 vintage, salt 2** — null `n5-2009` = 12.85% / 128 / Sharpe 0.247 / maxDD 17.09 (wall 1,653 s); arm `a4-2009`
+  = **24.62% / 149 / 0.367 / maxDD 25.36** (wall 1,656 s). V16/V17 PASS; V6 = 1 on the arm (CMD/CMN twin, +$9.6k, third time).
+  **Loses on both criteria — 3 of 3 on this cell too:** realised $77k → **−$12k (−$89k; −$99k ex-twin)**; the +12pp level
+  is unrealised $67k → $268k on 11 open names vs 7; maxDD **17.1 → 25.4** (episode 2011-02 → 2012-07 null vs 2010-04 →
+  2012-06 arm, the same arm episode at all three salts). Join: 62 shared -18342 -> 56274 (drift 74615); null-only 66 trades +$96k vs arm-only 87
+  trades −$68k (SGP_old1 phantom −$32k again, FOSL). By entry year: 2010 +$119k → −$28k. Both lanes DONE 17:55 PT.
+
+## Force-liquidation dissection on the wide cells (item 2, 2026-09-13)
+
+Every `force_liquidations.sexp` event on the a4 (12%-weekly) cells is `(reason Per_position)` — the 25% per-position
+breaker (`Force_liquidation.default_config.max_long_unrealized_loss_fraction = 0.25`), never `Portfolio_floor` (disabled)
+and never an end-of-window liquidation. In `trades.csv` each one is labelled `stop_loss` (zero `force_liquidation` rows —
+the carried "`stop_loss` label hides the `Per_position` breaker" item), so the count is only visible in the sexp.
+
+26y cells: 6 / 5 / 5 events (s0 / s1 / s2) vs 3 / 2 / 2 on the null. Seven distinct names; raw bars read from `data/`:
+
+| event | bars (prev close → gap-day open/close, volume) | class |
+|---|---|---|
+| ATLC 2000-10-25 | 51.06 → 38.52 / 29.00, 6.8M vs ~0.3M | real earnings gap |
+| AWRE 2014-07-25 | 6.63 → 4.93 / 5.00, 0.82M vs ~0.1M | real (also on every null cell) |
+| ARCB 2014-07-31 | 42.29 → 40.50 / 31.73, 2.0M vs 0.3M | real |
+| CBKCQ 2014-10-07 | 9.10 → 6.76 / 6.73, 2.9M vs 0.3M | real |
+| IMMR 2018-08-03 | 14.23 → 10.97 / 10.78 (low 9.32), 3.1M vs 0.4M | real |
+| OSPN 2020-08-12 | 31.20 → 22.01 / 18.84, 6.0M vs 0.5M | real |
+| SGP_old1 2010-09-20 | 14.90 → 3.75 stub (30k), 5.62 stub (2k), 8.43 stub (1k) between real ~15 bars | **phantom — interleaved stub prints** |
+
+Six of seven are one-day earnings/guidance gaps through the 12% stop: the cost is the gap itself, not a mechanism defect,
+and the null avoids most of them only because its 4% daily stop sold before the event (IMMR s1: null out 2018-07-30 at
+−4.05%, wide out 2018-08-06 at −27.6%). That is the same shared-trades-run-wider trade-off already in the verdict: the
+wide arm pays the occasional gap in exchange for holding through whipsaw, and the paired totals include it.
+
+One phantom, present at all three 26y salts and on the 2009-vintage 5y arm: `SGP_old1` — Schering-Plough ceased trading
+2009-11-03 (Merck merger; `SGP` is in `data/delisted_symbols.sexp`), yet the `_old1` series runs to 2011-11-15 at $7–16
+with tens of millions of daily volume (a reused-ticker splice), with stub prints interleaved on 2010-09-20/21/23. The
+breaker fired on the 3.75 stub and the exit filled at the 5.62 stub: **−$60.4k / −$63.1k / −$63.8k realised per 26y salt**
+(< 3% of the +$2.0–2.6M realised gain, sign unchanged) and the same −$60k on `a4-2009-s0`. The null never holds
+`SGP_old1`. `splice-scan.csv` already flags the 2010-09-20 bar (14.90 → 3.75, ratio 0.252) — it is the #2672 defect class 2
+(interleaved series), and the post-merger tail belongs to the #2782 spin-off/backfill family for the next warehouse rebuild.
+
+**Conclusion:** the 5–6 force liquidations per wide cell are not a hidden delisting exposure — one phantom worth ~$60k, the
+rest real gaps that any wider stop must pay. Not a blocker for the promotion decision; the read-side fix is the exit label
+(carried) and the data-side fix is truncating `SGP_old1` at the merger in the next rebuild.
+
+## Confirmation-grid verdict (2026-09-13; written 17:10 PT at two salts per cell, confirmed 17:55 PT at three)
+
+**The grid does not clear.** Under the pre-registered per-cell rule (realised AND maxDD better at ≥ 2 of 3 salts) both 5y
+cells fail at **three of three salts** — every 5y pair loses on **both** criteria — and
+`promotion-confirmation.md` requires the candidate to clear a strong majority of cells and never be badly dominated.
+The 26y single-surface ACCEPT stands as recorded; **12%-weekly is not promotable** and stays a default-off axis.
+
+| cell | realised null → arm | maxDD null → arm | maxDD episode null | maxDD episode arm |
+|---|---:|---|---|---|
+| 26y s0 / s1 / s2 | +$2.59M / +$1.97M / +$2.48M | 37.6→30.0 / 32.8→28.1 / 43.0→33.0 | — | — |
+| 2019 s0 | $469k → $166k | 22.6 → 30.9 | 2020-02-12 → 2020-03-23 (Covid crash) | 2021-05-07 → 2023-10-27 (grind) |
+| 2019 s1 | $258k → $207k | 22.5 → 31.1 | 2020-02-12 → 2020-03-23 | 2021-05-07 → 2023-10-27 |
+| 2019 s2 | $245k → $213k | 22.8 → 31.2 | 2022-04-08 → 2023-10-30 | 2021-05-07 → 2023-10-27 |
+| 2009 s0 | $106k → −$23k | 17.9 → 27.1 | 2011-04-20 → 2012-11-15 | 2010-04-23 → 2012-06-05 |
+| 2009 s1 | $277k → $10k | 20.4 → 25.2 | 2011-05-31 → 2012-08-10 | 2010-04-23 → 2012-06-04 |
+| 2009 s2 | $77k → −$12k | 17.1 → 25.4 | 2011-02-10 → 2012-07-24 | 2010-04-23 → 2012-06-05 |
+
+**Why it reverses (transferable).** The mechanism's one salt-robust term — *the shared trades run wider* — is positive in
+every cell (+$0.6–2.0M at 26y; +$271k / +$250k on 2019; +$84k / +$104k on 2009). What flips the sign on the 5y cells is the
+**path re-draw** (arm-only minus null-only: −$0.57M / −$0.30M on 2019, −$0.21M / −$0.37M on 2009, vs +$2.0M / ≈0 / +$0.8M at
+26y) and the **drawdown episode**. The null's maxDD on 2019 is the Covid crash, which a 4% daily stop also rides down; the
+wide arm's maxDD is the 2021-05 → 2023-10 grind, where a 12% stop re-evaluated weekly holds the 2021 losers longer and
+carries more open names through the 2022 bear (11 vs 7 at the end). On 2009 the arm's episode starts at the 2010 flash-crash
+and runs two years, while the null's is the shorter 2011–12 leg. **Wide-weekly is regime-dependent: it wins where the
+drawdown is a fast crash followed by a recovery (the 26y record's tape; `project_stop_width_regime_dependent` found the same
+for 5.9% on 2000–04) and loses where it is a slow grind.** The 26y ACCEPT is a composition in which the fast-recovery term
+dominates; the two 5y vintages isolate the grind regimes and the sign flips. Same lesson as the 2026-05-30 early-admission
+grid (`promotion-confirmation.md`): the long-window DSR winner did not generalise to an independent context.
+
+**Consequences for the queue.**
+- No promotion PR; the two-knob paired goldens and the §5.3 argument are not owed.
+- The 10%-weekly neighbour arm is not owed either — the width curve puts 10% on the same plateau as 12%, and the reversal is
+  in the mechanism's direction (wider + weekly), not in the value.
+- Item 3 (cancel resting longs on Bearish) loses its motivation: on the record convention the Bearish-week-fill cohort is
+  **positive** (+$0.12 / +$0.22 / +$0.19M per salt, screens README §3); it is only negative on the wide arm, which is not being
+  promoted. No build for now; the brief is kept (`cancel_resting_longs_on_bearish`, a Bearish-only sub-predicate of the
+  rejected `enable_entry_ticket_rescreen`) in case a wide preset is ever revisited.
+- The exit stack on the record convention stays SETTLED (`project_exit_stack_survives_fixed_basis`); the gap is entry-side.
+
+## Item-6 screen (entry side, from the `n5-2019-s0` trade audit; no cell run)
+
+Per-week `long_top_n_admitted` is **20 on every screening week** from 2020-02 through 2020-06 (Deteriorating 03-06 → 04-17,
+Recovering from 04-24), while the null fills **1–3 entries per week** (entries by week: 03-28 ×3, 04-03/04 ×3, then one a
+week through May). Admission is not what limits deployment in the recovery — sizing and exposure are: `max_position_pct_long 0.14` ×
+`max_long_exposure_pct 0.70` (five full-size slots; in practice positions are sized below the cap and the 26y book holds
+10–14 names through late 2020), and capacity turns over only as stops or rotations free it. A
+"Recovering-week deployment cap / exposure ramp" is therefore a regime-conditioned version of the concentration knob
+(`project_capacity_concentration_surface`: a real lever, regime-dependent, 0.30 in the deep goldens), not a new admission
+mechanism. If it is ever built it must be sized as a surface over `{max_position_pct_long, max_long_exposure_pct}` gated on
+the index Stage-1→2 flip, and read on the broad cells with the same three-salt pairing — but the state-conditioning law from
+item 3 (labels turn over inside the moves the edge comes from) applies to sizing as much as to admission; screen the
+Recovering-week cohort's paired P&L at wider caps before building.
