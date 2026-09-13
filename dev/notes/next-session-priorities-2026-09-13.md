@@ -8,7 +8,8 @@ The 09-10 handoff's queue items 1–3 are resolved; item 4 is running; item 5–
 - **#2767** `fix(devtools)`: per-pid fixture root for `test_walk_failure_reporting` — closes #2760 (the concurrent-runtest `/tmp` race that produced the spurious H3 on #2758). Both QC gates; the behavioral pass drove the race deterministically (pre-fix 6/6 failures, post-fix 0/6).
 - **#2758** `feat(snapshot_pipeline)`: `-cut-prefix-misscale` (default-off) — queue item 2 (#2732). Structural re-run cleared the stale H3; behavioral rework iteration 1 added the deep-prefix `.weekly` side-table pin (probe e now fails 2 arms, control passes).
 - **#2759** `feat(strategy)`: `deteriorating_blocks_longs` (default-off) — queue item 3 (#2755). Behavioral rework iteration 1 threaded `~macro_trend` into `Screener_macro_gate.longs_admitted_by_breadth` (flag-off bit-identical by construction; the first pass found a flag-off behaviour change when `neutral_blocks_longs` was also on) and added the strategy-level fresh-candidate pin (two severing mutations had been green).
-- **#2768** pre-registration, **#2776** the verdict (below) — docs, admin-merged on green.
+- **#2768** pre-registration, **#2776** item-3 verdict, **#2777** handoff, **#2783** item-4 verdict — docs, admin-merged on green.
+- **#2778** harness(publisher): publish the run's artifacts (orchestrator-authored; closes #2775) — behavioral rework iteration 1 pinned all four allowlist entries and fixed the C-quoted-filename abort; merged 13:19 PT.
 
 ## The result that changes what comes next
 
@@ -24,7 +25,7 @@ REJECT-do-not-revive today). Flag stays default-off; Rule-4 retirement candidate
 
 ## Live (check first)
 
-- **Item 4 — 12% initial stop × weekly trail cadence on `_v10dedup`** (`dev/experiments/cadence-12w-v10-2026-09-13/`,
+- **Item 4 DONE (single-surface ACCEPT; grid owed) — 12% initial stop × weekly trail cadence on `_v10dedup`** (`dev/experiments/cadence-12w-v10-2026-09-13/`,
   arm `a4-cadence-12w` = a0 + `initial_stop_buffer 0.9167` + `stop_update_cadence Weekly`; same build/worktree/warehouse as
   item 3; same pre-registered binary rule). Lanes: B2 = salts 0 then 1 (started 06:32 / ~09:30), A2 = salt 2 (started 09:16).
   **ALL THREE SALTS LANDED (09:40 / 12:29 / 12:56): realised +$2.59M / +$1.97M / +$2.48M, maxDD 37.6→30.0 / 32.8→28.1 / 43.0→33.0, Sharpe better at every salt — 3 of 3 on both pre-registered criteria = single-surface ACCEPT** (ledger `2026-09-13-stop-width-12pct-weekly-cadence-v10dedup`, `memory/project_cadence_12w_v10dedup_accept`). Mechanism = the shared trades run wider (salt 1: arm-only and null-only net to zero). V6 = 1 on arm s1/s2 = one −$2.8k IAC/MTCH spin-off twin (#2782 filed). NOT promoted — see queue item 1.
