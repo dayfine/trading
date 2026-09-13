@@ -1905,7 +1905,12 @@ this doc was wrong). Trust only `BUILD_EXIT`.
 ### Step 6.2: Status file integrity check
 
 ```bash
-dev/lib/run-in-env.sh sh trading/devtools/checks/status_file_integrity.sh
+# Path is relative to trading/, NOT repo root: run-in-env.sh cd's into
+# trading/ before exec'ing (see dev/lib/run-in-env.sh's PROJECT_ROOT
+# resolution), so a repo-root-relative path here 404s with "No such file
+# or directory" -- measured 2026-09-13, GHA run 34768165769. Do not "fix"
+# this back to a trading/-prefixed path.
+dev/lib/run-in-env.sh sh devtools/checks/status_file_integrity.sh
 INTEGRITY_EXIT=$?
 echo "status-integrity exit=$INTEGRITY_EXIT"
 ```
