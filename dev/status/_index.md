@@ -4,52 +4,59 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-09 run 2 (orchestrator run 34378061508; main **`df7922fb`**.
-Green at run start: `dune build` **0**, `dune runtest` **0**, 0 `^FAIL:`,
-`status_file_integrity` **0**, `index_size_linter` **0** — every exit code read
-**unpiped**. Step 0.5 skipped: `QUEUE_NON_EMPTY=0`, and per the precondition an
-**empty** queue is the opposite of saturated.
+Last updated: 2026-09-13 (orchestrator run 34757914354; main **`8c7d0ada`**).
+Green at run start: `dune build` **0**, `dune runtest` **0**, 0 `^FAIL:` across
+4,213 lines, `status_file_integrity` **0**, `index_size_linter` **0** — every exit
+code read **unpiped**. Step 0.5 did not fire: `QUEUE_NON_EMPTY=1` (PR #2769), and
+Condition 1 failed (unreviewed tip), so a full pass was required.
 
-**Summary publication is fixed in practice; the call site is still not.** Five
-consecutive runs (`34030886835`, `34042419476`, `34127853646`, `34148849699`,
-`34224532158`) completed `success`, spent real money (09-08 alone **$20.18**) and
-created **zero** `ops/daily-*` PRs. 09-08, 09-09 run 1 and 09-09 run 2 all landed
-by bypassing Step 8. **Root cause corrected 2026-09-09 (issue #2741): `jj` is NOT
-broken in this image** — `jj git push` succeeds once `jj config set --user
-user.name/user.email` and `jj describe` have run. Step 8 sets *git's* identity
-(jj does not read it) and never describes `@`; both are independently fatal.
-`dev/scripts/publish_daily_summary.sh` (PR #2721) is the tested replacement and
-**was exercised end-to-end in production on 09-09 run 2** (PR #2746). Step 8
-still calls `jj`; the repoint is write-gated.
+**The orchestrator was DEAD for three days and the cause was not in this repo.**
+Six consecutive scheduled runs failed 2026-09-10 -> 09-12 (`34475636575`,
+`34501930703`, `34597781805`, `34622262330`, `34691534671`, `34702540272`), each
+`$0.0000` with `num_turns: 1`, `duration_ms ~506` and `modelUsage: {}` — the SDK
+died **before issuing a single model request**. Zero summaries, zero health scans,
+zero audits. The 09-13 track-pacer report leads with PR #2757 as the suspect; that
+hypothesis is **false** — `git diff 68cd3b8c origin/main -- .claude/agents/
+.github/workflows/` is **empty**, i.e. the agent definition and every workflow are
+byte-identical between the first dead run's head and today's successful one. The
+same content failed six times and then succeeded. What varied in lockstep is the
+**unpinned Claude Code build**: 2.1.266 green -> 267/268/269 red -> 2.1.270 green.
+Filed as **#2770** (ask: pin the version; alert on orchestrator failure).
 
-**D3 (2026-09-09 run 2): the orchestrator can end its turn mid-dispatch and
-destroy every agent's work.** Run `34350513426`'s `Run lead-orchestrator` step
-lasted **20m 57s** while its summary listed three agents as "in flight"; a single
-`dune runtest` on this runner exceeds 25 min, so none could have returned. Zero
-branches reached origin. Distinct from the artifact-loss defect above and blocked
-on no access grant — see `dev/daily/2026-09-09-run2.md`.
+**D2 (#2741) is CLOSED.** PR #2757 repointed Step 8 at
+`dev/scripts/publish_daily_summary.sh` (plain git + curl REST), so the five-runs
+-lost-the-summary defect can no longer recur by that path. Note the irony worth
+keeping: #2757 was then wrongly blamed for the three-day outage above, purely
+because it merged inside the gap. **#2729 is answered and CLOSED** by #2749
+(`cce6d073`) — the two QC passes ran disjoint mutation sets, and #2727 had
+already killed the mutant. **D3 (#2747) remains open**: nothing yet *mechanically*
+stops the orchestrator ending its turn mid-dispatch; this run held the discipline
+by hand, which is not a control.
 
-**All three red scheduled workflows had stale diagnoses; two are now
-corrected.** Every cron fired since 09-05, so this run got a real answer rather
-than a stale row. **#2723 (new)**: the track-pacer no longer fails pre-flight —
-it runs **28 turns / $3.08** and dies only on the `subtype:"success"` +
-`is_error:true` contradiction, so the `allowedTools` hypothesis is **dead** and
-the ask is now `show_full_output: true` **alone**. **#2722 (new)**: PR #2651's
-own status entry cited `prune_candidates.sh`'s sanity-probe anchor, and
-`dev/status` is a citation source — the fix broke the check by documenting it;
-PR #2725 makes the probe synthetic and two-sided. The third (#2702) was already
-re-diagnosed by the 09-07 run whose summary was lost — which is the argument for
-filing to a queue rather than a summary.
+**The watchers were all down during the outage, and one is blind by
+construction.** The scheduled-workflow health detector (#2634/#2663) needs only
+API **read** access — the blocked `workflow` scope gates *wiring it as a cron*,
+not *calling it*, and nothing had ever called it. **The orchestrator now runs it
+directly.** But run on 09-13 it reported `Daily orchestrator` = **OK** mid-outage:
+it inspected only the newest scheduled run, which was the orchestrator's own
+`in_progress` execution, classified as OK — so the orchestrator masks its own
+health unconditionally. Fixed in **#2772** (streak-aware, in-progress-unmasked).
+Separately, the **weekly deep scan ran on 09-07, reported every step successful,
+and produced no file** — the agent returned `is_error: false` after 31 turns and
+$0.39 in 98s, and the publish step's honest `No changes in dev/health/` guard
+exited 0. Filed as **#2771**. Three defects this month share one shape: **a green
+run is indistinguishable from a productive one, because nothing checks the
+artifact against the exit code.**
 
-**Those three PRs (#2721/#2724/#2725, plus #2727) all merged overnight 09-08.**
-The open question they left is #2729: the orchestrator's behavioural pass on
-#2721 found a mutant that **pushes an empty branch, prints a PR number, exits 0,
-and passes 35/35**, while the interactive pass on the same file found no such
-silent path. Both cannot be right; reconciling them is dispatched 09-09 run 2.
+Two RED weekly workflows remain (`Prune candidates weekly`, `Weekly start sweep
+(BAH SPY)`), both last fired **2026-09-07** — before their fix (#2725) merged.
+They cannot produce a new datapoint before their next weekly cron; not re-derived
+this run.
 
 Capabilities (carried; measured 2026-09-04 unless noted): `.claude/agents/**`
-writes **refused** (12th run — re-probed 2026-09-09 run 2 on the concrete Step 8
-repoint edit); `workflow` scope unavailable by push **and**
+writes **refused** (13th run — re-probed 2026-09-13 with a one-line Edit, refused;
+note #2757 landed a change to that file via a *human-merged PR*, which is a
+different route); `workflow` scope unavailable by push **and**
 contents API (403 on a workflow path vs **201** on a `dev/notes/` control,
 same token, seconds apart — the control is what makes it a measurement);
 `POST /actions/workflows/<f>/dispatches` **403**; `POST /issues` create-only
@@ -79,9 +86,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2724 MERGED (`-incremental` merges the manifest); next: V18 store-sanity check for mis-scaled series (#2732 ask 2, dispatched 09-09 run 2) |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2758 MERGED (prefix_misscale cut at build, `-cut-prefix-misscale`); next: #2732 asks 1+3 (MEL quarantine, item-3 re-run) — LOCAL/data-gated |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
-| [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | **V18 store-sanity MERGED (#2750)**, `Expectation`; next: #2732 asks 1+3 (quarantine MEL, re-run item-3) + build-time sibling |
+| [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | V18 #2750 + `Series_level` build-time sibling #2773 MERGED `9b65f7cb` (report-only, default-off, unwired); next: wire to Build_runner; #2732 asks 1+3 LOCAL |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
@@ -104,14 +111,14 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2749 | #2643 nested-field FP MERGED (#2748, suite 21→23); #2749 open at `6024976c` after 2 reworks — rework cap spent, next run re-QCs |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2772 MERGED `ccf075be` — streak-aware scheduled-workflow health, unmasked from in-progress runs (#2770); next: Step 6.2 doubled-path fix via PR route |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (09-09 run 2 audit): 1 policy decision + 2 explicit archive entries + 1 fenced template. Prior "disk decline" framing withdrawn |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | RS trend live (`lookback_bars` 52->56) landed via **#2561** (#2555 closed unmerged, superseded); #2380 closed; next: none queued |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | Clock 0→52 MERGED #2587; D-null adverse at top-1000, USER kept 52 (ledger amended #2611); next: optional A-null (salts 1,2) |
+| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | `deteriorating_blocks_longs` default-off long gate MERGED #2759 + pre-registered 3-salt read #2768; next: run that pre-registered read |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | Clock 0→52 MERGED #2587; A-null LANDED #2631 (`deb45a7e`) — return effect sign-inconsistent, maxDD the robust property; next: none queued |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |
