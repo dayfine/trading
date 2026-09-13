@@ -7,6 +7,7 @@ open OUnit2
 open Matchers
 module Series_tail = Snapshot_pipeline.Series_tail
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
+module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
 
 let _end_date = Date.of_string "2021-12-31"
 let _stub_last_real = Date.of_string "2021-10-04"
@@ -218,6 +219,111 @@ let test_snap_ends_at_last_real_bar _ = _run_build _check_stub_history
 let test_early_series_kept_whole _ = _run_build _check_early_history
 let test_terminal_runs_report_written _ = _run_build _check_report
 
+(* --- #2732 prefix cut: the deep-history half ------------------------------
+
+   The [.snap] half of the cut is pinned by [test_series_tail.ml] on the pure
+   core. The half these three cases exist for is the [SYMBOL.weekly]
+   side-table, which [Weekly_sidetable_builder.of_bars] builds over
+   [deep_bars @ bars] — up to ten years of history loaded from BEFORE the build
+   window to widen the resistance prefix. A mis-scale cut date is inside the
+   window and the whole deep prefix is by construction older than it, so
+   leaving the prefix uncut would keep the side-table (the reader's only
+   overhead-supply source) serving AGR's $73,566 highs to [Resistance_sketch]
+   after the [.snap] had already dropped them. Modelled on
+   [test_build_runner_splice.ml], which pins the identical property for the
+   sibling splice cut. *)
+
+let _mis_symbol = "AGR"
+
+(* AGR's shape (#2732): a mis-scaled early segment, then the real company. The
+   window opens INSIDE the mis-scaled segment, so the terminal run the tail
+   rule finds is the real series and its reference close is the artefact. *)
+let _mis_prefix_close = 73_566.0
+let _mis_real_close = 40.0
+let _mis_series_start = Date.of_string "2001-01-01"
+let _mis_window_start = Date.of_string "2004-01-05"
+
+(* First bar of the run: the stored series' new start after the cut. *)
+let _mis_cut_date = Date.of_string "2004-02-02"
+
+(* Long enough that the run clears the default [misscale_min_kept_bars] (250)
+   at one bar a week — 309 kept bars — so the cut is applied rather than
+   refused as a short tail. *)
+let _mis_end_date = Date.of_string "2009-12-31"
+
+let _mis_series () =
+  let rec build date acc =
+    if Date.( > ) date _mis_end_date then List.rev acc
+    else
+      let close =
+        if Date.( < ) date _mis_cut_date then _mis_prefix_close
+        else _mis_real_close
+      in
+      build (Date.add_days date 7) (_bar date close :: acc)
+  in
+  build _mis_series_start []
+
+let _armed_tail_config =
+  let cfg = Series_tail.Config.default in
+  { cfg with stub = { cfg.stub with misscale_cut = true } }
+
+let _mis_build ~tail_config ~data_dir ~output_dir =
+  Build_runner.build ~symbols:[ _mis_symbol ] ~csv_data_dir:data_dir ~output_dir
+    ~benchmark_symbol:None ~start_date:(Some _mis_window_start)
+    ~end_date:(Some _mis_end_date)
+    ~sketch_deep_days:Build_runner.default_sketch_deep_days ~incremental:false
+    ~progress_every:Build_runner.default_progress_every ~tail_config
+    ~tail_exceptions:Series_tail.Exceptions.empty ()
+
+let _run_mis_build ~tail_config f =
+  _with_temp_dir (fun dir ->
+      let data_dir = Filename.concat dir "csv" in
+      let output_dir = Filename.concat dir "snap" in
+      Core_unix.mkdir_p data_dir;
+      _write_csv ~data_dir ~symbol:_mis_symbol (_mis_series ());
+      _mis_build ~tail_config ~data_dir ~output_dir;
+      f ~output_dir)
+
+let _mis_weekly_entries ~output_dir =
+  match
+    Weekly_sidetable.read_file
+      ~path:(Filename.concat output_dir (_mis_symbol ^ ".weekly"))
+  with
+  | Error e -> assert_failure ("weekly side-table read: " ^ Status.show e)
+  | Ok entries -> entries
+
+(* Weekly entries strictly before the cut — the mis-scaled prefix's own weeks. *)
+let _mis_pre_cut_entries ~output_dir =
+  List.filter (_mis_weekly_entries ~output_dir)
+    ~f:(fun (e : Weekly_sidetable.entry) ->
+      Date.( < ) e.week_end_date _mis_cut_date)
+
+let _mis_weekly_highs ~output_dir =
+  List.map (_mis_weekly_entries ~output_dir)
+    ~f:(fun (e : Weekly_sidetable.entry) -> e.high)
+
+(* The control: un-armed, the deep prefix IS in the side-table. Without this
+   arm the assertion below would also pass if [deep_bars] never reached the
+   side-table at all. *)
+let test_uncut_misscale_symbol_keeps_its_deep_prefix _ =
+  _run_mis_build ~tail_config:Series_tail.Config.default (fun ~output_dir ->
+      assert_that
+        (List.length (_mis_pre_cut_entries ~output_dir))
+        (gt (module Int_ord) 0))
+
+let test_cut_misscale_symbol_has_no_weekly_entry_before_the_cut _ =
+  _run_mis_build ~tail_config:_armed_tail_config (fun ~output_dir ->
+      assert_that (_mis_pre_cut_entries ~output_dir) is_empty)
+
+(* The side-table is not merely trimmed by date: every surviving entry carries
+   the real company's price level, so no $73,566 bar leaked in under a
+   post-cut week-end date either. *)
+let test_cut_misscale_weekly_highs_are_all_the_real_company _ =
+  _run_mis_build ~tail_config:_armed_tail_config (fun ~output_dir ->
+      assert_that
+        (_mis_weekly_highs ~output_dir)
+        (each (float_equal _mis_real_close)))
+
 let suite =
   "build_runner_tail"
   >::: [
@@ -233,6 +339,12 @@ let suite =
          "malformed_exceptions_file_is_error"
          >:: test_malformed_exceptions_file_is_error;
          "no_exceptions_path_is_empty" >:: test_no_exceptions_path_is_empty;
+         "uncut_misscale_symbol_keeps_its_deep_prefix"
+         >:: test_uncut_misscale_symbol_keeps_its_deep_prefix;
+         "cut_misscale_symbol_has_no_weekly_entry_before_the_cut"
+         >:: test_cut_misscale_symbol_has_no_weekly_entry_before_the_cut;
+         "cut_misscale_weekly_highs_are_all_the_real_company"
+         >:: test_cut_misscale_weekly_highs_are_all_the_real_company;
        ]
 
 let () = run_test_tt_main suite

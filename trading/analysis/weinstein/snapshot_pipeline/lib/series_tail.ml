@@ -7,6 +7,8 @@ module Config = struct
     max_bars : int;
     max_price : float;
     misscale_close : float;
+    misscale_cut : bool;
+    misscale_min_kept_bars : int;
   }
 
   type stray = { drop : bool; gap_days : int; max_bars : int }
@@ -19,6 +21,8 @@ module Config = struct
       max_bars = 60;
       max_price = 1.0;
       misscale_close = 1000.0;
+      misscale_cut = false;
+      misscale_min_kept_bars = 250;
     }
 
   let default_stray = { drop = true; gap_days = 365; max_bars = 5 }
@@ -51,12 +55,20 @@ module Class = struct
 end
 
 module Action = struct
-  type t = Truncated | Stray_dropped | Kept | Kept_by_exception
+  type t =
+    | Truncated
+    | Stray_dropped
+    | Cut_prefix
+    | Cut_refused_short_tail
+    | Kept
+    | Kept_by_exception
   [@@deriving sexp_of, compare, equal]
 
   let to_string = function
     | Truncated -> "truncated"
     | Stray_dropped -> "stray_dropped"
+    | Cut_prefix -> "cut_prefix"
+    | Cut_refused_short_tail -> "cut_refused_short_tail"
     | Kept -> "kept"
     | Kept_by_exception -> "kept_by_exception"
 end
@@ -125,10 +137,10 @@ let _classify_run (cfg : Config.stub) ~last_real_close ~n_stub ~first_stub_close
   else if Float.( >= ) first_stub_close cfg.max_price then Class.High_price_tail
   else Class.Stub_tail
 
-(* Reported action: an ineligible class or a disabled edit is [Kept]; an
-   eligible run on an excepted symbol is [Kept_by_exception]. *)
-let _action ~eligible ~enabled ~excepted ~edited =
-  if (not eligible) || not enabled then Action.Kept
+(* Reported action for a class that HAS an edit: a disabled edit is [Kept], an
+   excepted symbol is [Kept_by_exception]. Ineligible classes never call it. *)
+let _action ~enabled ~excepted ~edited =
+  if not enabled then Action.Kept
   else if excepted then Action.Kept_by_exception
   else edited
 
@@ -152,34 +164,54 @@ let _finding ~symbol ~klass ~action (bars : Types.Daily_price.t array) ~start =
 let _keep_prefix (bars : Types.Daily_price.t array) ~start =
   Array.sub bars ~pos:0 ~len:start |> Array.to_list
 
-(* Only the two editing actions drop the run; every [Kept*] action returns the
-   input list unchanged. *)
+(* Mirror of [_keep_prefix]: the run itself, which for a [Prefix_misscale] is
+   the real series. [start <= n - 1], so the kept segment is never empty. *)
+let _keep_suffix (bars : Types.Daily_price.t array) ~start =
+  Array.sub bars ~pos:start ~len:(Array.length bars - start) |> Array.to_list
+
+(* Only the three editing actions change the series; a [Kept*] action and a
+   refused cut return the input unchanged. *)
 let _edited_bars ~action arr ~start bars =
   match action with
   | Action.Truncated | Action.Stray_dropped -> _keep_prefix arr ~start
-  | Action.Kept | Action.Kept_by_exception -> bars
+  | Action.Cut_prefix -> _keep_suffix arr ~start
+  | Action.Cut_refused_short_tail | Action.Kept | Action.Kept_by_exception ->
+      bars
 
 let _classify_at (cfg : Config.stub) (arr : Types.Daily_price.t array) ~start =
   _classify_run cfg ~last_real_close:arr.(start - 1).close_price
     ~n_stub:(Array.length arr - start)
     ~first_stub_close:arr.(start).close_price
 
-let _stub_action (cfg : Config.stub) ~excepted ~klass =
-  _action
-    ~eligible:(Class.equal klass Class.Stub_tail)
-    ~enabled:cfg.truncate ~excepted ~edited:Action.Truncated
+(* Short-tail guard, the analogue of [Series_splice.Config.min_kept_bars]: a
+   cut leaving less than a trading year is refused, not applied. *)
+let _misscale_edit (cfg : Config.stub) ~n_kept =
+  if n_kept < cfg.misscale_min_kept_bars then Action.Cut_refused_short_tail
+  else Action.Cut_prefix
+
+(* One action per class: [Stub_tail] drops the run, [Prefix_misscale] drops
+   what precedes it, the rest are report-only. Each edit has its own flag. *)
+let _run_action (cfg : Config.stub) ~excepted ~klass ~n_kept =
+  match klass with
+  | Class.Stub_tail ->
+      _action ~enabled:cfg.truncate ~excepted ~edited:Action.Truncated
+  | Class.Prefix_misscale ->
+      _action ~enabled:cfg.misscale_cut ~excepted
+        ~edited:(_misscale_edit cfg ~n_kept)
+  | Class.Long_low_tail | Class.High_price_tail | Class.Stray_bar -> Action.Kept
 
 (* Terminal run of closes below [ratio] of the close preceding it. Detected
-   whatever the gates say (the report lists every one); truncated only when the
-   class is [Stub_tail], the edit is enabled, and the symbol is not excepted. *)
-let _apply_stub (cfg : Config.stub) ~excepted ~symbol
+   whatever the gates say (the report lists every one); edited only when the
+   class has an enabled action and the symbol is not excepted. *)
+let _apply_run (cfg : Config.stub) ~excepted ~symbol
     (bars : Types.Daily_price.t list) =
   let arr = Array.of_list bars in
   match _stub_run_start ~ratio:cfg.ratio (Array.map arr ~f:_close) with
   | None -> (bars, None)
   | Some start ->
       let klass = _classify_at cfg arr ~start in
-      let action = _stub_action cfg ~excepted ~klass in
+      let n_kept = Array.length arr - start in
+      let action = _run_action cfg ~excepted ~klass ~n_kept in
       ( _edited_bars ~action arr ~start bars,
         Some (_finding ~symbol ~klass ~action arr ~start) )
 
@@ -203,8 +235,7 @@ let _apply_stray (cfg : Config.stray) ~excepted ~symbol
   | None -> (bars, None)
   | Some start ->
       let action =
-        _action ~eligible:true ~enabled:cfg.drop ~excepted
-          ~edited:Action.Stray_dropped
+        _action ~enabled:cfg.drop ~excepted ~edited:Action.Stray_dropped
       in
       ( _edited_bars ~action arr ~start bars,
         Some (_finding ~symbol ~klass:Class.Stray_bar ~action arr ~start) )
@@ -212,7 +243,7 @@ let _apply_stray (cfg : Config.stray) ~excepted ~symbol
 let apply (config : Config.t) ~exceptions ~symbol bars =
   let excepted = Exceptions.mem exceptions ~symbol in
   let after_stub, stub_finding =
-    _apply_stub config.stub ~excepted ~symbol bars
+    _apply_run config.stub ~excepted ~symbol bars
   in
   let after_stray, stray_finding =
     _apply_stray config.stray ~excepted ~symbol after_stub
@@ -251,9 +282,16 @@ let _count findings ~action =
 let summary findings =
   Printf.sprintf
     "series_tail: %d findings (%d truncated, %d stray_dropped, %d kept, %d \
-     kept_by_exception)"
+     kept_by_exception, %d cut_prefix, %d cut_refused_short_tail)"
     (List.length findings)
     (_count findings ~action:Action.Truncated)
     (_count findings ~action:Action.Stray_dropped)
     (_count findings ~action:Action.Kept)
     (_count findings ~action:Action.Kept_by_exception)
+    (_count findings ~action:Action.Cut_prefix)
+    (_count findings ~action:Action.Cut_refused_short_tail)
+
+let prefix_cut_from findings =
+  List.find_map findings ~f:(fun f ->
+      if Action.equal f.action Action.Cut_prefix then Some f.first_stub_date
+      else None)

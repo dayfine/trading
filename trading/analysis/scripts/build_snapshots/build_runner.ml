@@ -207,11 +207,22 @@ let _write_weekly ~output_dir ~symbol ~deep_bars ~bars =
 (* Phantom-bar hygiene, applied to the windowed bars BEFORE the pipeline sees
    them: the [.snap] (and its weekly side-table) then contain only real prints.
    [deep_bars] are strictly before the window and feed only the side-table's
-   depth, so THIS rule leaves them alone — it edits the series' end, and a bar
-   before the window cannot be part of it. (The splice cut below edits the
+   depth, so a TRUNCATION leaves them alone — it edits the series' end, and a
+   bar before the window cannot be part of it. (The splice cut below edits the
    series' START, so it does reach them.) *)
 let _clean_tail ~(hygiene : hygiene_opts) ~symbol bars =
   Series_tail.apply hygiene.config ~exceptions:hygiene.exceptions ~symbol bars
+
+(* The #2732 prefix cut is the one tail edit that moves the series' START, so
+   unlike a truncation it DOES reach the deep prefix: the mis-scaled segment is
+   by construction older than the cut date, so every deep bar predates it and
+   leaving them would put AGR's $73,566 weekly bars into the side-table — the
+   only overhead-supply representation the reader has. Same [keep_from] the
+   splice cut uses, so the two cannot drift apart. *)
+let _cut_deep_prefix ~findings deep_bars =
+  match Series_tail.prefix_cut_from findings with
+  | None -> deep_bars
+  | Some date -> Series_splice.keep_from date deep_bars
 
 (* Splice hygiene runs BEFORE the tail rule: cutting away the earlier issuer
    first means the tail rule then reads one company's series, which is the
@@ -241,6 +252,7 @@ let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
   let bars, findings =
     _clean_tail ~hygiene ~symbol (_cut_splice ~hygiene ~symbol bars)
   in
+  let deep_bars = _cut_deep_prefix ~findings deep_bars in
   let last_bar = _last_bar_date bars in
   let active_through = _active_through_of_bars bars in
   match
@@ -656,9 +668,10 @@ let survivor_tolerance_param =
   days
 
 (* Shared CLI surface for the tail knobs, so both builders expose exactly the
-   same flags and defaults. Only the three gate knobs are flags: the mis-scale
-   threshold and the stray-gap parameters are measured constants of the defect
-   classes, not per-build choices ({!Series_tail}). *)
+   same flags and defaults. The three gate knobs, the two edit switches and the
+   prefix cut's short-tail guard are flags; the mis-scale THRESHOLD and the
+   stray-gap parameters are measured constants of the defect classes, not
+   per-build choices ({!Series_tail}). *)
 let tail_params =
   let d = Series_tail.Config.default in
   let%map_open.Command ratio =
@@ -679,6 +692,18 @@ let tail_params =
   and no_stray_drop =
     flag "no-stray-drop" no_arg
       ~doc:"Report stray late bars without dropping them"
+  and cut_prefix_misscale =
+    flag "cut-prefix-misscale" no_arg
+      ~doc:
+        "Drop the mis-scaled prefix of a prefix_misscale series, keeping the \
+         real later segment (#2732). Default off: the class is reported and \
+         stored whole."
+  and misscale_min_kept_bars =
+    flag "misscale-min-kept-bars"
+      (optional_with_default d.stub.misscale_min_kept_bars int)
+      ~doc:
+        "N Refuse a prefix cut leaving fewer than N bars, storing the series \
+         whole"
   and exceptions_path =
     flag "tail-exceptions" (optional string)
       ~doc:
@@ -696,6 +721,8 @@ let tail_params =
           ratio;
           max_bars;
           max_price;
+          misscale_cut = cut_prefix_misscale;
+          misscale_min_kept_bars;
         };
       stray = { d.stray with drop = not no_stray_drop };
     },
