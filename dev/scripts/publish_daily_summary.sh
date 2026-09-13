@@ -63,7 +63,7 @@
 #       went undetected for five runs, so it is pinned hardest in the test
 #       suite (see publish_daily_summary_test.sh).
 #
-#   dev/scripts/publish_daily_summary.sh publish [--dry-run] \
+#   dev/scripts/publish_daily_summary.sh publish [--dry-run] [--summary-only] \
 #       [--summary <path>] [--date YYYY-MM-DD] [--base <branch>]
 #       Resolves the summary (unless --summary is given), creates/reuses
 #       branch `ops/daily-<basename>`, commits the file, pushes it, and
@@ -72,17 +72,35 @@
 #       without creating a duplicate. Prints "PR #<n> <url>" on success so
 #       the caller's log carries proof of publication.
 #
-#       --dry-run performs summary resolution, branch creation, and the
-#       local commit, but skips the network-touching steps (the existing-PR
-#       lookup, `git push`, and the PR-create POST) entirely. This is what
-#       makes the test suite possible without network or credentials: the
-#       resolution/branch/commit logic is exercised via --dry-run against
-#       real throwaway git-repo fixtures, and the push/POST paths (success,
-#       already-exists, and failure) are exercised in non-dry-run mode
-#       against a LOCAL file:// git remote (so `git push` needs no network)
-#       with a mocked `curl` injected on PATH (same technique as
-#       orchestrator_fastexit_gate_test.sh's mock curl) for the GitHub API
-#       calls.
+#       BY DEFAULT, this also stages and folds into the same commit any
+#       dirty/untracked path under the fixed run-artifact allowlist (issue
+#       #2775 ask 1) -- see `_RUN_ARTIFACT_PATHS` below for the exact list.
+#       This exists because Step 8's call site
+#       (`.claude/agents/lead-orchestrator.md`, write-gated in this
+#       runtime) invokes this script UNCHANGED as
+#       `publish_daily_summary.sh publish --summary "$SUMMARY_FILE"`, and
+#       previously that staged only the one named file -- so
+#       `dev/status/_index.md` (Step 5.5 reconcile), `dev/reviews/*.md`
+#       (QC records), `dev/audit/*.json` (audit records), and
+#       `dev/health/*.md` (health reports) rode along in the working tree
+#       with no publisher, and were then destroyed by the orchestrator
+#       workflow's post-Step-8 `git reset --hard && git clean -fd`. Making
+#       this the DEFAULT means the existing call site starts publishing
+#       them with zero call-site change, since that call site cannot be
+#       edited from here. Pass --summary-only to opt back into the old
+#       single-file behavior.
+#
+#       --dry-run performs summary + artifact resolution, branch creation,
+#       and the local commit, but skips the network-touching steps (the
+#       existing-PR lookup, `git push`, and the PR-create POST) entirely.
+#       This is what makes the test suite possible without network or
+#       credentials: the resolution/branch/commit logic is exercised via
+#       --dry-run against real throwaway git-repo fixtures, and the
+#       push/POST paths (success, already-exists, and failure) are
+#       exercised in non-dry-run mode against a LOCAL file:// git remote
+#       (so `git push` needs no network) with a mocked `curl` injected on
+#       PATH (same technique as orchestrator_fastexit_gate_test.sh's mock
+#       curl) for the GitHub API calls.
 #
 # ENV
 #   GH_TOKEN                        Required for any non-dry-run publish.
@@ -137,6 +155,53 @@ _resolve_summary_path() {
 _branch_name_for() {
   _base=$(basename "$1" .md)
   printf 'ops/daily-%s\n' "$_base"
+}
+
+# --- run-artifact publishing (issue #2775 ask 1) ---------------------------
+#
+# FIXED allowlist -- not caller-configurable, not derived from a global
+# `git status` scan. This is deliberate: the whole point is that the
+# publisher sweeps in the run's own known durable artifacts and NOTHING
+# else, so a stray dirty file anywhere else in the tree (a half-finished
+# edit from a concurrent process, leftover scratch state, etc.) can never
+# be swept into the daily-summary commit by accident. Every entry lives
+# under dev/ and matches what the orchestrator's Step 5/5.5/6.3 actually
+# write:
+#   dev/status/_index.md  -- Step 5.5 track-status reconcile
+#   dev/reviews/          -- Step 5 QC review records (*.md)
+#   dev/audit/            -- Step 5 stage-4 audit records (*.json)
+#   dev/health/           -- Step 6.3 health-scanner fast-scan reports (*.md)
+_RUN_ARTIFACT_PATHS="dev/status/_index.md dev/reviews dev/audit dev/health"
+
+# _stage_run_artifacts
+# Stages (via `git add`) whichever of $_RUN_ARTIFACT_PATHS are actually
+# dirty or untracked in the current working tree, and prints the list of
+# staged paths, one per line (relative to the repo root). Prints NOTHING
+# and stages nothing if none of the allowlisted paths are dirty -- the
+# caller must not assume "ran" means "staged something".
+_stage_run_artifacts() {
+  # shellcheck disable=SC2086 -- word-splitting on the fixed allowlist above
+  # is intentional: each element is its own pathspec. `-uall` so a whole
+  # untracked directory (e.g. a first-ever dev/health/ report) is listed as
+  # individual file paths rather than collapsed into one directory entry --
+  # both for an accurate reported list, and so the per-path `git add` below
+  # only ever sees paths that actually exist.
+  _dirty=$(git status --porcelain -uall -- $_RUN_ARTIFACT_PATHS 2>/dev/null | cut -c4-)
+  if [ -z "$_dirty" ]; then
+    return 0
+  fi
+  # Stage each dirty path ONE AT A TIME rather than handing the whole fixed
+  # allowlist to a single `git add` call: `git add -- <a mix of existing
+  # and nonexistent pathspecs>` fails FATAL ("pathspec '...' did not match
+  # any files") as soon as ONE element matches nothing on disk -- even when
+  # other elements in the very same call did match -- and under this
+  # script's `set -eu` that would abort the whole publish. Most runs will
+  # not have all four allowlisted paths dirty at once, so only ever `git
+  # add` paths `git status` itself already confirmed are real.
+  printf '%s\n' "$_dirty" | while IFS= read -r _artifact_path; do
+    [ -n "$_artifact_path" ] && git add -- "$_artifact_path"
+  done
+  printf '%s\n' "$_dirty"
 }
 
 # --- GitHub REST (curl only -- `gh` is confirmed absent from the GHA
@@ -222,12 +287,17 @@ _create_pr() {
 
 cmd_publish() {
   _dry_run=0
+  _summary_only=0
   _summary=""
   _date=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --dry-run)
         _dry_run=1
+        shift
+        ;;
+      --summary-only)
+        _summary_only=1
         shift
         ;;
       --summary)
@@ -296,12 +366,27 @@ cmd_publish() {
     }
   fi
 
+  _staged_something=0
   if [ -n "$(git status --porcelain -- "$_summary")" ]; then
     git add "$_summary"
+    _staged_something=1
+  fi
+
+  _artifact_list=""
+  if [ "$_summary_only" -eq 0 ]; then
+    _artifact_list=$(_stage_run_artifacts)
+    [ -n "$_artifact_list" ] && _staged_something=1
+  fi
+
+  if [ "$_staged_something" -eq 1 ]; then
     git commit -q -m "$_title" || {
       echo "publish_daily_summary: commit failed on $_branch" >&2
       return 1
     }
+    if [ -n "$_artifact_list" ]; then
+      echo "publish_daily_summary: also staged run artifacts:"
+      printf '%s\n' "$_artifact_list" | sed 's/^/  /'
+    fi
   else
     echo "publish_daily_summary: $_summary already committed on $_branch, nothing to add"
   fi
@@ -367,7 +452,7 @@ case "${1:-}" in
     cmd_publish "$@"
     ;;
   *)
-    echo "usage: $0 {resolve [--date YYYY-MM-DD] | publish [--dry-run] [--summary <path>] [--date YYYY-MM-DD] [--base <branch>]}" >&2
+    echo "usage: $0 {resolve [--date YYYY-MM-DD] | publish [--dry-run] [--summary-only] [--summary <path>] [--date YYYY-MM-DD] [--base <branch>]}" >&2
     exit 2
     ;;
 esac

@@ -579,6 +579,119 @@ rc=0
 (cd "${REPO_DIR:-/tmp}" && "$SCRIPT" publish --summary 2>/dev/null) || rc=$?
 check "publish --summary missing its value exits 2" 2 "$rc"
 
+# =============================================================================
+# Scenario group 10: run-artifact publishing (issue #2775 ask 1) -- the
+# publisher's Step-8 call site (`.claude/agents/lead-orchestrator.md`) is
+# write-gated in this runtime and cannot be updated to pass a new flag, so
+# the fix is default-ON: an unmodified `publish --summary <path>` call must
+# start folding in the run's other durable artifacts, with `--summary-only`
+# as the escape hatch back to the old single-file behavior.
+#
+# Mutations run by hand against a scratch copy while developing this group,
+# each confirmed to turn the named check(s) red before being reverted:
+#   (a) drop the `_stage_run_artifacts` call entirely (comment it out) ->
+#       "an artifact present-and-dirty IS staged" and "...is committed on
+#       the SAME branch as the summary" go red (remote never gets the file).
+#   (b) widen `_RUN_ARTIFACT_PATHS` to include the whole repo root (e.g. add
+#       a bare `.`) -> "a file outside the allowlist is NOT staged" goes red
+#       (the unrelated dirty file leaks into the commit).
+#   (c) make `--summary-only` a no-op (never read `_summary_only` before
+#       calling `_stage_run_artifacts`) -> "--summary-only suppresses
+#       artifact staging" goes red (the artifact ships anyway).
+#   (d) hoist the "also staged run artifacts" echo out of the
+#       `[ -n "$_artifact_list" ]` guard so it prints whenever ANYTHING was
+#       committed (summary or artifacts) -> "no artifacts dirty: publish
+#       reports nothing extra was staged" goes red, because that scenario
+#       leaves the summary itself uncommitted (production shape) so the
+#       commit path runs even with zero artifacts.
+# =============================================================================
+
+# (a) An artifact present-and-dirty IS staged and lands on the remote
+# alongside the summary, in the SAME commit/branch.
+_init_fixture
+_write_summary 2026-09-08 "" 202609080900 >/dev/null
+(cd "$REPO_DIR" && git add dev/daily && git commit -q -m "add summary")
+mkdir -p "$REPO_DIR/dev/health"
+printf '# Fast scan - 2026-09-08\n\nno findings\n' >"$REPO_DIR/dev/health/2026-09-08-fast.md"
+_reset_mock_env
+MOCK_CREATE_PR_NUMBER=1001
+MOCK_CREATE_PR_URL=https://github.com/dayfine/trading/pull/1001
+export MOCK_CREATE_PR_NUMBER MOCK_CREATE_PR_URL
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "artifact-present: publish still succeeds" 0 "$rc"
+check_contains "artifact-present: publish reports it staged run artifacts" "$_out" "also staged run artifacts"
+check_contains "artifact-present: reported artifact list names the health report" "$_out" "dev/health/2026-09-08-fast.md"
+_pushed_health=$(_remote_file_content ops/daily-2026-09-08 dev/health/2026-09-08-fast.md)
+check_contains "an artifact present-and-dirty IS staged: health report reaches the remote, on the SAME branch as the summary" "$_pushed_health" "Fast scan - 2026-09-08"
+_pushed_summary=$(_remote_file_content ops/daily-2026-09-08 dev/daily/2026-09-08.md)
+check_contains "artifact-present: the summary itself is still there too" "$_pushed_summary" "Status - 2026-09-08"
+_reset_mock_env
+
+# (b) A dirty file OUTSIDE the allowlist (repo root, not under dev/status,
+# dev/reviews, dev/audit, or dev/health) must NOT be staged or published,
+# even though it is dirty at publish time.
+_init_fixture
+_write_summary 2026-09-08 "" 202609080900 >/dev/null
+(cd "$REPO_DIR" && git add dev/daily && git commit -q -m "add summary")
+printf 'unrelated scratch edit\n' >>"$REPO_DIR/README.md"
+_reset_mock_env
+MOCK_CREATE_PR_NUMBER=1002
+MOCK_CREATE_PR_URL=https://github.com/dayfine/trading/pull/1002
+export MOCK_CREATE_PR_NUMBER MOCK_CREATE_PR_URL
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "out-of-allowlist dirty file: publish still succeeds" 0 "$rc"
+check_not_contains "a file outside the allowlist is NOT staged: publish does not report README.md" "$_out" "README.md"
+_pushed_readme=$(_remote_file_content ops/daily-2026-09-08 README.md)
+check "a file outside the allowlist is NOT staged: remote README.md is the ORIGINAL seed content, not the scratch edit" "seed" "$_pushed_readme"
+_readme_still_dirty=$(cd "$REPO_DIR" && git status --porcelain -- README.md)
+check_contains "the out-of-allowlist edit is still dirty in the working tree (never staged/committed)" "$_readme_still_dirty" "README.md"
+_reset_mock_env
+
+# (c) --summary-only restores the old single-file behavior: a dirty
+# artifact exists but must NOT be staged or published.
+_init_fixture
+_write_summary 2026-09-08 "" 202609080900 >/dev/null
+(cd "$REPO_DIR" && git add dev/daily && git commit -q -m "add summary")
+mkdir -p "$REPO_DIR/dev/audit"
+printf '{"finding": "test"}\n' >"$REPO_DIR/dev/audit/2026-09-08-test.json"
+_reset_mock_env
+MOCK_CREATE_PR_NUMBER=1003
+MOCK_CREATE_PR_URL=https://github.com/dayfine/trading/pull/1003
+export MOCK_CREATE_PR_NUMBER MOCK_CREATE_PR_URL
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 --summary-only 2>&1) || rc=$?
+check "--summary-only: publish still succeeds" 0 "$rc"
+check_not_contains "--summary-only suppresses artifact staging: no 'also staged' report" "$_out" "also staged run artifacts"
+_pushed_audit=$(_remote_file_content ops/daily-2026-09-08 dev/audit/2026-09-08-test.json)
+check "--summary-only: the audit artifact never reaches the remote" "" "$_pushed_audit"
+_audit_still_dirty=$(cd "$REPO_DIR" && git status --porcelain -uall -- dev/audit)
+check_contains "--summary-only: the audit artifact is still untracked in the working tree" "$_audit_still_dirty" "2026-09-08-test.json"
+_reset_mock_env
+
+# (d) No artifacts dirty, but the summary itself IS (production shape,
+# uncommitted) -- so _staged_something is true from the summary alone and
+# the commit path actually runs. This is the case that matters for
+# mutation (d): a version of the code that unconditionally prints "also
+# staged run artifacts" whenever ANYTHING is committed (rather than only
+# when $_artifact_list is non-empty) would be invisible to a scenario that
+# pre-commits the summary (staged_something stays 0, the whole commit
+# block is skipped) -- it only shows up once the summary itself is what
+# triggers the commit.
+_init_fixture
+_write_summary 2026-09-08 "" 202609080900 >/dev/null
+# deliberately NOT pre-committed -- see comment above
+_reset_mock_env
+MOCK_CREATE_PR_NUMBER=1004
+MOCK_CREATE_PR_URL=https://github.com/dayfine/trading/pull/1004
+export MOCK_CREATE_PR_NUMBER MOCK_CREATE_PR_URL
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "no artifacts dirty: publish still succeeds" 0 "$rc"
+check_not_contains "no artifacts dirty: publish reports nothing extra was staged" "$_out" "also staged run artifacts"
+_reset_mock_env
+
 printf '\n%d/%d checks passed\n' "$PASS" "$((PASS + FAIL))"
 if [ "$FAIL" -gt 0 ]; then
   exit 1
