@@ -58,6 +58,27 @@ any are still listed in `/tasks`.
   per-state map 4/8/12 for Deteriorating (already answered by the cohort table + item 3) and 4/8 for Bearish (a no-op:
   the map sizes at placement, the gate never places Bearish tickets). Book Ch. 6/8 read and reconciled (see the screens README).
 
+## Codex integration (set up 14:30–15:30 PT, after the autonomous block)
+
+- **Rules for a second agent in this directory are on main:** `AGENTS.md` (#2789) — own detached worktree under
+  `.claude/worktrees/`, plain git and never `jj` (jj from any worktree mutates the primary workspace, which
+  snapshots continuously; a Codex file rode into #2785 this way), dune only in the container against that
+  worktree, one dune in flight repo-wide (the shared dune cache corrupted a build today), docs-only PRs skip the
+  build, no self-merge / approve. Plus the **issue assignment protocol**: owner labels `agent/codex` /
+  `agent/claude` on top of the triage roles (`ready-for-agent` etc. — those role labels were only created today);
+  Codex picks the highest-P `ready-for-agent` + `agent/codex` issue, claims by issue comment, works on
+  `codex/<issue>-<slug>`, PR body `Closes #N`, `BLOCKED:` convention, done = PR open + CI green; the dispatcher
+  runs the gate loop and merges.
+- **Codex queue (seven `agent/codex` issues):** P2 #2788 (qc-behavioral "no Bash" line), #2653 (safe.directory
+  step order), #2753 (publisher 422-guard pin); P3 #2539, #2742, #2639, #2394. First dry run should be #2788.
+- **Open Codex PRs:** #2785 (review howto, draft) — Codex's second review left one ordering item: land #2788 first,
+  then cite it and re-review. #2786 (`.codex/rules/trading.rules` command policy) — NEEDS_REWORK from both my
+  review and Codex's own: deny/drop `jj`, narrow `docker` and `gh` (no stop/rm, no merge/approve), and prove the
+  repo-local rules file is actually loaded (today's approvals went to `~/.codex/rules/default.rules`).
+- **#2780** (post-merge audit): the deteriorating-gate REJECT stands but the *do-not-revive* classification is
+  challenged. Decide (keep-as-axis vs do-not-revive) and amend the ledger entry either way — a docs PR; not a
+  Codex item.
+
 ## Queue (in order)
 
 1. **Finish the grid** (above) → three-cell verdict → ledger amendment; if it holds, **add the 10%-weekly neighbour arm**
@@ -72,7 +93,7 @@ any are still listed in `/tasks`.
 5. **Record the no-builds as a memory + retire the dead axes** (Rule 4 clock starts for `deteriorating_blocks_longs`).
 6. **Entry side (later):** Recovering-week deployment cap — 2020-04/05 admitted 18/11/20/20 vs 8/5/5/4 taken; a
    portfolio-risk dial (position count / exposure ramp on the index's Stage-1→2 flip), book-faithful; screen first.
-7. Carried: orchestrator D2 push (09-10 item 5); #2753; #2729 residuals; `stop_loss` label hiding the `Per_position`
+7. Carried: #2780 classification decision (above); orchestrator D2 push (09-10 item 5); #2729 residuals; `stop_loss` label hiding the `Per_position`
    breaker; #2782 spin-off backfill twins before the next warehouse rebuild; #2785 (Codex howto draft) needs the
    "docs-only PRs skip the build gate" line and Codex's second look.
 
