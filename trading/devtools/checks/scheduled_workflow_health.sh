@@ -10,34 +10,93 @@
 #   silently missed a day, and in every case the rot was found only when a
 #   human happened to look at the Actions tab. The check itself is cheap:
 #
-#     GET /repos/{owner}/{repo}/actions/workflows            (paginated)
-#     GET /repos/{owner}/{repo}/actions/workflows/{id}/runs?event=schedule&per_page=1
+#     GET /repos/{owner}/{repo}/actions/workflows                  (paginated)
+#     GET /repos/{owner}/{repo}/actions/workflows/{id}/runs?event=schedule&per_page=N
 #
-#   -- for each ACTIVE workflow, look at its single newest scheduled
-#   (event=schedule) run and classify it. This script makes that repeatable
-#   instead of re-typed from memory each session.
+#   -- for each ACTIVE workflow, look at its N most recent scheduled
+#   (event=schedule) runs (default N=10, see RUNS PER WORKFLOW below) and
+#   classify from that history, not from a single run. This script makes
+#   that repeatable instead of re-typed from memory each session.
+#
+# WHY A SINGLE NEWEST RUN WAS NOT ENOUGH (2026-09-10..12 incident)
+#
+#   An earlier version of this script inspected only the single newest
+#   scheduled run per workflow. That version reported the Daily
+#   orchestrator workflow OK while it was in the middle of a THREE-DAY,
+#   SIX-CONSECUTIVE-FAILURE outage (six scheduled runs, 2026-09-10 12:14Z
+#   through 2026-09-12 15:32Z, each $0.0000 / num_turns=1 / modelUsage={}),
+#   because:
+#     1. it never looked past the newest run, so a failure streak was
+#        invisible unless the very newest run happened to also be red, and
+#     2. the newest run, at the moment the health check itself ran, was
+#        the orchestrator's own CURRENTLY-EXECUTING run (status=in_progress,
+#        conclusion=null) -- and the old code classified in_progress as OK
+#        ("succeeded, or is still in progress"). The one workflow most in
+#        need of monitoring is the one workflow that runs this very check,
+#        so its own live run masking its own history was a structural
+#        blind spot, not a corner case.
+#   This version fetches a page of recent runs, skips leading in_progress /
+#   queued runs for classification purposes (they carry no verdict yet),
+#   and computes a real failure-STREAK from the newest COMPLETED run
+#   backwards. See CLASSIFICATION below.
 #
 # CLASSIFICATION (one of, per active workflow)
 #
-#   RED         -- newest scheduled run's conclusion is failure / cancelled
-#                  / timed_out / action_required.
-#   STALE       -- newest scheduled run's conclusion is not RED, but its
-#                  age exceeds the staleness window (default below).
-#   NO-SCHEDULE -- the workflow has zero observed scheduled runs (either it
-#                  declares no cron trigger, or a cron trigger exists but
-#                  has never fired yet). Informational only -- NEVER
-#                  contributes to a non-zero exit. Distinguishing "no cron
-#                  in the YAML" from "cron exists, never fired" would
-#                  require parsing workflow source, which is out of scope
-#                  for an API-only script; both read the same to an
-#                  operator ("this workflow's schedule health is currently
-#                  unobservable from run history").
-#   OK          -- newest scheduled run succeeded (or is still in
-#                  progress) and is within the staleness window.
+#   RED          -- there is a non-zero streak of CONSECUTIVE failure-class
+#                   completed runs (failure / cancelled / timed_out /
+#                   action_required) counting back from the newest
+#                   COMPLETED run -- so a lone newest-run failure (streak=1)
+#                   is RED exactly as before, and a longer streak is RED
+#                   regardless of what an even-newer in_progress run shows.
+#                   The streak count is reported (streak=N) on the
+#                   workflow's output line and folded into the SUMMARY.
+#   STALE        -- the newest completed run is not RED, but its age
+#                   exceeds the staleness window (default below).
+#   NO-SCHEDULE  -- the workflow has zero observed scheduled runs at all
+#                   (either it declares no cron trigger, or one exists but
+#                   has never fired). Informational only -- NEVER
+#                   contributes to a non-zero exit. Distinguishing "no cron
+#                   in the YAML" from "cron exists, never fired" would
+#                   require parsing workflow source, out of scope for an
+#                   API-only script.
+#   UNOBSERVABLE -- every one of the N most-recently-fetched scheduled runs
+#                   is in_progress / queued -- i.e. there is at least one
+#                   scheduled run, but NONE of the runs this script looked
+#                   at have completed yet, so there is no verdict to read.
+#                   This is deliberately NOT the same as OK: an
+#                   in-progress run must never manufacture a green result
+#                   on its own (see the incident above). Like NO-SCHEDULE,
+#                   it is informational and does not force a non-zero exit
+#                   -- there is no positive evidence of failure here, only
+#                   an absence of evidence either way.
+#   OK           -- the newest COMPLETED run's conclusion is not a failure
+#                   class and it is within the staleness window. An
+#                   in_progress/queued NEWEST run does not, by itself,
+#                   change this: classification always falls through to
+#                   the newest completed run in the fetched page. The
+#                   output line still reports in_progress=1 when the
+#                   newest run itself hasn't completed, so a reader can see
+#                   a check is currently running without that fact
+#                   overriding the real verdict.
 #
-#   NOTE: only the SINGLE most-recent scheduled run is inspected per
-#   workflow. This script never reports a failure-streak COUNT -- see
-#   "PAGINATION-IS-A-FLOOR" below for why that distinction matters here.
+#   NOTE: this script fetches and classifies from up to RUNS-PER-WORKFLOW
+#   most recent scheduled runs (see below), not a single run -- this is
+#   what makes the failure-streak count and the
+#   in-progress-cannot-mask-a-streak guarantee possible. (An earlier
+#   revision of this header said the opposite -- "this script never
+#   reports a failure-streak COUNT" -- that claim went stale the moment it
+#   caused the incident above and is corrected here.)
+#
+# RUNS PER WORKFLOW
+#
+#   Up to RUNS-PER-WORKFLOW (default 10) of the most recent scheduled runs
+#   are fetched per workflow, in ONE API call (`per_page=<N>`) -- there is
+#   no additional pagination loop here, unlike the workflow-LIST call. 10
+#   is deliberately small: enough to see a multi-day failure streak (a
+#   daily cron produces about one run/day; the 6-run incident above fits
+#   with room to spare) without materially increasing API cost -- still
+#   exactly one request per workflow. Override with --runs-per-workflow /
+#   SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW.
 #
 # STALENESS WINDOW
 #
@@ -47,12 +106,16 @@
 #   misreport STALE. Override with --stale-hours / SCHEDULED_WF_HEALTH_STALE_HOURS
 #   for a repo/run where that matters; per-workflow windows are not
 #   implemented (would need to parse each workflow's own `schedule:` cron
-#   expression, out of scope for this pass).
+#   expression, out of scope for this pass). Staleness is always measured
+#   from the newest COMPLETED run's created_at, never from an in_progress
+#   run's -- an in_progress run's age says nothing about the last real
+#   result.
 #
 # EXIT CODES (distinct per failure CLASS -- never collapse "couldn't
 # measure" into "measured green", see DEGRADE-HONESTLY below)
 #
-#   0   all measured workflows are OK or NO-SCHEDULE (no RED, no STALE).
+#   0   all measured workflows are OK, NO-SCHEDULE, or UNOBSERVABLE (no
+#       RED, no STALE).
 #   1   at least one workflow is RED or STALE -- the real, gate-worthy signal.
 #   2   cannot measure: no GH_TOKEN in the environment and no
 #       SCHEDULED_WF_HEALTH_FETCH hook set, so no API call could be made at
@@ -67,9 +130,14 @@
 #   print a distinct "FAIL: ..." message to stderr. A monitor that reports
 #   exit 0 / "all OK" when it could not actually reach the API is worse
 #   than no monitor -- it launders a blind spot into a green signal. The
-#   fixture test (scheduled_workflow_health_test.sh) pins this: a
-#   missing-token fixture and an API-error fixture must each produce their
-#   own distinct exit code and message, never 0.
+#   same discipline is why UNOBSERVABLE is its own class instead of being
+#   folded into OK (see the incident above): a monitor that reports green
+#   because the only run it looked at hadn't finished yet is the exact
+#   same failure mode as exit 0 on a failed API call, just one layer
+#   further from the metal. The fixture test
+#   (scheduled_workflow_health_test.sh) pins all of this: a missing-token
+#   fixture, an API-error fixture, and an all-in-progress fixture must
+#   each produce their own distinct, never-green result.
 #
 # PAGINATION-IS-A-FLOOR (the other trap this repo has been burned by)
 #
@@ -82,11 +150,16 @@
 #        total, not a first-page floor. The summary line states the page
 #        count fetched, so a reader isn't left guessing whether pagination
 #        happened.
-#     2. The per-workflow RUNS call intentionally asks for `per_page=1` --
-#        but that is NOT the same bug, because this script never claims a
-#        count or streak from that call. It reports exactly what it asks
-#        for: "the single newest scheduled run's conclusion", not "how
-#        many of the last N runs failed". There is no floor to mislabel.
+#     2. The per-workflow RUNS call fetches a single page of
+#        `per_page=<RUNS_PER_WORKFLOW>` runs and computes the streak from
+#        exactly that page. If the page is exhausted (every fetched
+#        completed run was a failure, with no older non-failure run seen
+#        to close the streak) the streak is reported as a FLOOR, printed
+#        as `streak=>=N` rather than `streak=N` -- the true streak could be
+#        longer than the page this script chose to fetch. This mirrors the
+#        LIST call's own floor discipline (report the real count you
+#        looked at, and say so explicitly when there's more you didn't
+#        see) applied to a single-page fetch instead of a multi-page one.
 #
 #   The LIST loop is also BOUNDED (SCHEDULED_WF_HEALTH_MAX_PAGES, default
 #   1000): if a propagation bug or a pathological API response ever let
@@ -111,35 +184,41 @@
 #   wall-clock time.
 #
 # USAGE
-#   sh scheduled_workflow_health.sh [--repo owner/name] [--stale-hours N]
+#   sh scheduled_workflow_health.sh [--repo owner/name] [--stale-hours N] [--runs-per-workflow N]
 #
 # ENV
-#   GH_TOKEN                          GitHub token (required unless
-#                                      SCHEDULED_WF_HEALTH_FETCH is set)
-#   SCHEDULED_WF_HEALTH_REPO          default repo (overridden by --repo)
-#   SCHEDULED_WF_HEALTH_STALE_HOURS   default staleness window in hours
-#   SCHEDULED_WF_HEALTH_FETCH         injectable fetch hook (see above)
-#   SCHEDULED_WF_HEALTH_NOW_EPOCH     injectable "now", unix seconds (test only)
-#   SCHEDULED_WF_HEALTH_MAX_PAGES     bound on the workflow-list pagination
-#                                     loop (default 1000; see
-#                                     PAGINATION-IS-A-FLOOR above)
+#   GH_TOKEN                              GitHub token (required unless
+#                                          SCHEDULED_WF_HEALTH_FETCH is set)
+#   SCHEDULED_WF_HEALTH_REPO              default repo (overridden by --repo)
+#   SCHEDULED_WF_HEALTH_STALE_HOURS       default staleness window in hours
+#   SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW default scheduled runs fetched per
+#                                          workflow (see RUNS PER WORKFLOW
+#                                          above; overridden by
+#                                          --runs-per-workflow)
+#   SCHEDULED_WF_HEALTH_FETCH             injectable fetch hook (see above)
+#   SCHEDULED_WF_HEALTH_NOW_EPOCH         injectable "now", unix seconds (test only)
+#   SCHEDULED_WF_HEALTH_MAX_PAGES         bound on the workflow-list pagination
+#                                         loop (default 1000; see
+#                                         PAGINATION-IS-A-FLOOR above)
 
 set -eu
 
 _usage() {
   cat <<'EOF'
-Usage: scheduled_workflow_health.sh [--repo owner/name] [--stale-hours N]
+Usage: scheduled_workflow_health.sh [--repo owner/name] [--stale-hours N] [--runs-per-workflow N]
 
-Reports the classification (RED / STALE / NO-SCHEDULE / OK) of every
-active workflow's newest scheduled (cron) run. Exit 0 if all clear,
-1 if any RED/STALE, 2/3 if the API could not be queried at all, 64 on
-a usage error. See the header of this script for the full contract.
+Reports the classification (RED / STALE / NO-SCHEDULE / UNOBSERVABLE / OK)
+of every active workflow, computed from its N most recent scheduled (cron)
+runs (default N=10). Exit 0 if all clear, 1 if any RED/STALE, 2/3 if the
+API could not be queried at all, 64 on a usage error. See the header of
+this script for the full contract.
 EOF
 }
 
 REPO="${SCHEDULED_WF_HEALTH_REPO:-dayfine/trading}"
 STALE_HOURS="${SCHEDULED_WF_HEALTH_STALE_HOURS:-216}"
 MAX_PAGES="${SCHEDULED_WF_HEALTH_MAX_PAGES:-1000}"
+RUNS_PER_WORKFLOW="${SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW:-10}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -167,6 +246,18 @@ while [ $# -gt 0 ]; do
       STALE_HOURS="${1#*=}"
       shift
       ;;
+    --runs-per-workflow)
+      if [ $# -lt 2 ]; then
+        echo "FAIL: --runs-per-workflow requires an argument" >&2
+        exit 64
+      fi
+      RUNS_PER_WORKFLOW="$2"
+      shift 2
+      ;;
+    --runs-per-workflow=*)
+      RUNS_PER_WORKFLOW="${1#*=}"
+      shift
+      ;;
     -h|--help)
       _usage
       exit 0
@@ -182,6 +273,13 @@ done
 case "$STALE_HOURS" in
   ''|*[!0-9]*)
     echo "FAIL: --stale-hours must be a positive integer, got '$STALE_HOURS'" >&2
+    exit 64
+    ;;
+esac
+
+case "$RUNS_PER_WORKFLOW" in
+  ''|*[!0-9]*|0)
+    echo "FAIL: --runs-per-workflow must be a positive integer, got '$RUNS_PER_WORKFLOW'" >&2
     exit 64
     ;;
 esac
@@ -294,46 +392,159 @@ _list_active_workflows() {
   return 0
 }
 
-# Prints the newest scheduled run as "conclusion<TAB>status<TAB>created_at<TAB>run_id"
-# or nothing if the workflow has no observed scheduled runs at all.
-_newest_scheduled_run() {
+# Prints up to RUNS_PER_WORKFLOW most recent scheduled runs, newest first
+# (the GitHub API's natural order), one per line as
+# "conclusion<TAB>status<TAB>created_at<TAB>run_id" -- or nothing at all if
+# the workflow has zero observed scheduled runs. A single API call
+# (`per_page=${RUNS_PER_WORKFLOW}`); see RUNS PER WORKFLOW in the header
+# for why one page is enough and how the floor case is reported.
+_recent_scheduled_runs() {
   _id="$1"
-  if ! _resp=$(_api_get_json "repos/${REPO}/actions/workflows/${_id}/runs?event=schedule&per_page=1"); then
+  if ! _resp=$(_api_get_json "repos/${REPO}/actions/workflows/${_id}/runs?event=schedule&per_page=${RUNS_PER_WORKFLOW}"); then
     return 3
   fi
   _count=$(printf '%s' "$_resp" | jq '.workflow_runs | length')
   if [ "$_count" -eq 0 ]; then
     return 0
   fi
-  printf '%s' "$_resp" | jq -r '.workflow_runs[0] | [(.conclusion // "null"), (.status // "null"), .created_at, (.id | tostring)] | join("\t")'
+  printf '%s' "$_resp" | jq -r '.workflow_runs[] | [(.conclusion // "null"), (.status // "null"), .created_at, (.id | tostring)] | join("\t")'
   return 0
 }
 
-# _classify <conclusion> <created_at-ISO8601> <now-epoch> <stale-hours>
-# Echoes one of RED / STALE / OK plus an age-in-hours figure (or "n/a" if
-# the timestamp couldn't be parsed), tab-separated.
-_classify() {
-  _conclusion="$1"
-  _created_at="$2"
-  _now="$3"
-  _stale_hours="$4"
+# _classify_recent_runs <runs-newest-first-multiline> <now-epoch> <stale-hours>
+#
+# Reads the run history (as produced by _recent_scheduled_runs, newest
+# first) and echoes ONE tab-separated line:
+#
+#   CLASS<TAB>STREAK<TAB>AGE_HOURS<TAB>NEWEST_INPROGRESS<TAB>NEWEST_CONCLUSION<TAB>NEWEST_STATUS<TAB>NEWEST_CREATED_AT<TAB>NEWEST_RUN_ID
+#
+# CLASS is one of RED / STALE / OK / UNOBSERVABLE (never NO-SCHEDULE --
+# that's decided by the caller before this function is even invoked, on
+# whether _recent_scheduled_runs returned anything at all).
+#
+# Algorithm (see the header's CLASSIFICATION + WHY A SINGLE NEWEST RUN WAS
+# NOT ENOUGH sections for the incident this exists to fix):
+#   1. Runs with status != "completed" (in_progress, queued, ...) carry no
+#      verdict yet and are skipped entirely for streak/staleness purposes
+#      -- but the very newest run's own status/conclusion/created_at/id
+#      are still captured and reported, so the output line can say
+#      "in_progress=1" without that fact overriding the real verdict.
+#   2. STREAK counts CONSECUTIVE failure-class completed runs starting
+#      from the newest completed run backwards. The count stops
+#      incrementing at the first completed run whose conclusion is not a
+#      failure class (a closed streak); it also stops if the page runs out
+#      before a close is found, in which case STREAK is reported as a
+#      FLOOR, printed as streak=>=N (see the floor check in the RED branch
+#      below / PAGINATION-IS-A-FLOOR in the top header).
+#   3. If no completed run was found at all (every fetched run is still
+#      in_progress/queued) -> UNOBSERVABLE. This is the exact incident
+#      shape: a live in_progress run must never manufacture OK.
+#   4. Else if STREAK >= 1 -> RED.
+#   5. Else -> classify OK/STALE from the newest completed run's age,
+#      exactly as the old single-run `_classify` did.
+_classify_recent_runs() {
+  _runs_text="$1"
+  _now="$2"
+  _stale_hours="$3"
 
-  case "$_conclusion" in
-    failure|cancelled|timed_out|action_required)
-      printf 'RED\tn/a\n'
-      return 0
-      ;;
-  esac
+  _old_ifs="$IFS"
+  IFS='
+'
+  set -- $_runs_text
+  IFS="$_old_ifs"
+
+  _newest_conclusion="null"
+  _newest_status="null"
+  _newest_created_at=""
+  _newest_run_id=""
+  _newest_inprogress=0
+  _found_completed=0
+  _completed_count=0
+  _first_completed_conclusion=""
+  _first_completed_created_at=""
+  _streak=0
+  _streak_open=1
+  _idx=0
+
+  for _rline in "$@"; do
+    _idx=$((_idx + 1))
+    _rc=$(printf '%s' "$_rline" | cut -f1)
+    _rs=$(printf '%s' "$_rline" | cut -f2)
+    _rcat=$(printf '%s' "$_rline" | cut -f3)
+    _rid=$(printf '%s' "$_rline" | cut -f4)
+
+    if [ "$_idx" -eq 1 ]; then
+      _newest_conclusion="$_rc"
+      _newest_status="$_rs"
+      _newest_created_at="$_rcat"
+      _newest_run_id="$_rid"
+      case "$_rs" in
+        completed) : ;;
+        *) _newest_inprogress=1 ;;
+      esac
+    fi
+
+    if [ "$_rs" != "completed" ]; then
+      # No verdict yet -- skip for streak/staleness, but keep scanning:
+      # an older run further back in the page may still be completed.
+      continue
+    fi
+
+    _completed_count=$((_completed_count + 1))
+    if [ "$_found_completed" -eq 0 ]; then
+      _found_completed=1
+      _first_completed_conclusion="$_rc"
+      _first_completed_created_at="$_rcat"
+    fi
+
+    if [ "$_streak_open" -eq 1 ]; then
+      case "$_rc" in
+        failure|cancelled|timed_out|action_required)
+          _streak=$((_streak + 1))
+          ;;
+        *)
+          _streak_open=0
+          ;;
+      esac
+    fi
+  done
+
+  if [ "$_found_completed" -eq 0 ]; then
+    printf 'UNOBSERVABLE\tn/a\tn/a\t%s\t%s\t%s\t%s\t%s\n' \
+      "$_newest_inprogress" "$_newest_conclusion" "$_newest_status" "$_newest_created_at" "$_newest_run_id"
+    return 0
+  fi
+
+  if [ "$_streak" -ge 1 ]; then
+    _streak_str="$_streak"
+    if [ "$_streak_open" -eq 1 ] \
+      && [ "$_streak" -eq "$_completed_count" ] \
+      && [ "$_idx" -eq "$RUNS_PER_WORKFLOW" ]; then
+      # Every completed run this page contained was a failure (the
+      # streak was never closed) AND the page was full (RUNS_PER_WORKFLOW
+      # runs fetched) -- there may be more history past this page that
+      # would have closed the streak sooner. Report it as a floor, not an
+      # exact count (PAGINATION-IS-A-FLOOR). If the page came back
+      # SHORTER than RUNS_PER_WORKFLOW, we've seen the workflow's entire
+      # observed run history and the count is exact even though the
+      # streak was never "closed" by a success.
+      _streak_str=">=${_streak}"
+    fi
+    printf 'RED\t%s\tn/a\t%s\t%s\t%s\t%s\t%s\n' \
+      "$_streak_str" "$_newest_inprogress" "$_newest_conclusion" "$_newest_status" "$_newest_created_at" "$_newest_run_id"
+    return 0
+  fi
 
   _created_epoch=""
-  if _created_epoch=$(date -u -d "$_created_at" +%s 2>/dev/null); then
+  if _created_epoch=$(date -u -d "$_first_completed_created_at" +%s 2>/dev/null); then
     :
   else
     _created_epoch=""
   fi
 
   if [ -z "$_created_epoch" ]; then
-    printf 'OK\tn/a\n'
+    printf 'OK\t0\tn/a\t%s\t%s\t%s\t%s\t%s\n' \
+      "$_newest_inprogress" "$_newest_conclusion" "$_newest_status" "$_newest_created_at" "$_newest_run_id"
     return 0
   fi
 
@@ -341,14 +552,16 @@ _classify() {
   _age_hours=$((_age_seconds / 3600))
   _stale_seconds=$((_stale_hours * 3600))
   if [ "$_age_seconds" -gt "$_stale_seconds" ]; then
-    printf 'STALE\t%s\n' "$_age_hours"
+    printf 'STALE\t0\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$_age_hours" "$_newest_inprogress" "$_newest_conclusion" "$_newest_status" "$_newest_created_at" "$_newest_run_id"
   else
-    printf 'OK\t%s\n' "$_age_hours"
+    printf 'OK\t0\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$_age_hours" "$_newest_inprogress" "$_newest_conclusion" "$_newest_status" "$_newest_created_at" "$_newest_run_id"
   fi
 }
 
 main() {
-  echo "scheduled_workflow_health: repo=${REPO} stale_hours=${STALE_HOURS}"
+  echo "scheduled_workflow_health: repo=${REPO} stale_hours=${STALE_HOURS} runs_per_workflow=${RUNS_PER_WORKFLOW}"
 
   if ! _raw=$(_list_active_workflows); then
     # _list_active_workflows already wrote the FAIL message to stderr
@@ -364,6 +577,7 @@ main() {
   _red_count=0
   _stale_count=0
   _nosched_count=0
+  _unobs_count=0
   _red_names=""
   _stale_names=""
 
@@ -391,7 +605,7 @@ main() {
     _id=$(printf '%s' "$_line" | cut -f1)
     _name=$(printf '%s' "$_line" | cut -f2)
 
-    if ! _run_line=$(_newest_scheduled_run "$_id"); then
+    if ! _run_line=$(_recent_scheduled_runs "$_id"); then
       exit 3
     fi
     if [ -z "$_run_line" ]; then
@@ -400,26 +614,30 @@ main() {
       continue
     fi
 
-    _conclusion=$(printf '%s' "$_run_line" | cut -f1)
-    _status=$(printf '%s' "$_run_line" | cut -f2)
-    _created_at=$(printf '%s' "$_run_line" | cut -f3)
-    _run_id=$(printf '%s' "$_run_line" | cut -f4)
-
-    _class_line=$(_classify "$_conclusion" "$_created_at" "$_now" "$STALE_HOURS")
+    _class_line=$(_classify_recent_runs "$_run_line" "$_now" "$STALE_HOURS")
     _class=$(printf '%s' "$_class_line" | cut -f1)
-    _age_hours=$(printf '%s' "$_class_line" | cut -f2)
+    _streak=$(printf '%s' "$_class_line" | cut -f2)
+    _age_hours=$(printf '%s' "$_class_line" | cut -f3)
+    _inprogress=$(printf '%s' "$_class_line" | cut -f4)
+    _conclusion=$(printf '%s' "$_class_line" | cut -f5)
+    _status=$(printf '%s' "$_class_line" | cut -f6)
+    _created_at=$(printf '%s' "$_class_line" | cut -f7)
+    _run_id=$(printf '%s' "$_class_line" | cut -f8)
 
-    printf '%s\t%s\trun_id=%s status=%s conclusion=%s created_at=%s age_hours=%s\n' \
-      "$_class" "$_name" "$_run_id" "$_status" "$_conclusion" "$_created_at" "$_age_hours"
+    printf '%s\t%s\trun_id=%s status=%s conclusion=%s created_at=%s age_hours=%s streak=%s in_progress=%s\n' \
+      "$_class" "$_name" "$_run_id" "$_status" "$_conclusion" "$_created_at" "$_age_hours" "$_streak" "$_inprogress"
 
     case "$_class" in
       RED)
         _red_count=$((_red_count + 1))
-        _red_names="${_red_names}${_red_names:+, }${_name}"
+        _red_names="${_red_names}${_red_names:+, }${_name}(streak=${_streak})"
         ;;
       STALE)
         _stale_count=$((_stale_count + 1))
         _stale_names="${_stale_names}${_stale_names:+, }${_name}"
+        ;;
+      UNOBSERVABLE)
+        _unobs_count=$((_unobs_count + 1))
         ;;
       *)
         _ok_count=$((_ok_count + 1))
@@ -427,8 +645,8 @@ main() {
     esac
   done
 
-  _active_total=$((_ok_count + _red_count + _stale_count + _nosched_count))
-  echo "SUMMARY: active=${_active_total} (${_total_pages} page(s) fetched, full pagination -- a real total, not a floor) ok=${_ok_count} red=${_red_count} stale=${_stale_count} no-schedule=${_nosched_count} -- each figure is a count of workflows, from ONE most-recent scheduled run per workflow, never a failure-streak count"
+  _active_total=$((_ok_count + _red_count + _stale_count + _nosched_count + _unobs_count))
+  echo "SUMMARY: active=${_active_total} (${_total_pages} page(s) fetched, full pagination -- a real total, not a floor) ok=${_ok_count} red=${_red_count} stale=${_stale_count} no-schedule=${_nosched_count} unobservable=${_unobs_count} -- red/stale/ok/unobservable are each computed from up to ${RUNS_PER_WORKFLOW} most-recent scheduled runs per workflow (not just the newest); red includes a per-workflow failure-streak count (see each RED line's streak=N, or streak=>=N when the fetched page was exhausted before the streak closed)"
   if [ "$_red_count" -gt 0 ]; then
     echo "SUMMARY: RED workflows: ${_red_names}"
   fi
