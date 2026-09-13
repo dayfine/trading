@@ -96,3 +96,31 @@ must be dissected (all pre-#2695 phantom classes, or real gaps?). This is a two-
 0.9167 AND `stop_update_cadence` Daily → Weekly): `config-default-blast-radius.md` paired goldens for both knobs, and
 the book's own framing (§5.3 4–6% band; weekly re-evaluation = L3) should be cited in the promotion PR — 12% is outside
 the book's stated band and must be argued as a modern-regime adaptation of a dial, not the spine.
+
+## Confirmation grid — 5y cells on the 2009 / 2019 `_v10dedup` vintages (launched 14:09 PT 09-13; `chain-grid.sh`, lanes G1/G2)
+
+- 15:52 PT: **2019 vintage, salt 0** — null `n5-2019` = 66.02% / 179 trades / Sharpe 0.605 / maxDD 22.55 (wall 3,359 s);
+  arm `a4-2019` = **30.52% / 178 / 0.372 / maxDD 30.87** (wall 2,779 s). V16/V17 PASS, V6 = 0 on both,
+  `validator_diff -check V6` exit 0. **The arm LOSES on both criteria in this cell:** realised $469k → **$166k
+  (−$303k)**, unrealised $211k → $152k, maxDD **22.6 → 30.9**. Exit mix `stop_loss` 127 → 94, `laggard_rotation`
+  46 → 79 (the same shift as at 26y). Join (`symbol|entry_date`): only **89 shared** of ~179 — a 5y window
+  re-draws half its trade list — and the shared term still favours wide (**−$76k → +$195k, drift +$271k**), but
+  **null-only 90 trades +$545k** (APPS 2020-06-13 +$143k, ZS 2020-05-29 +$127k, GME 2020-09-14 +$101k, AAOI
+  2023-06 +$78k, FCNCA 2020-11 +$75k) vs **arm-only 89 trades −$29k** (AN 2020-08 +$117k, HVT +$87k, KBL +$63k;
+  APLS 2021-06 −$61k). By entry year the arm gives back 2021 (null +$72k → arm −$280k) and trails 2020
+  (+$752k → +$636k). Read: the shared-trades-run-wider mechanism holds here too, but on a ~180-trade window the
+  path re-draw decides the level and this draw lost the 2020 recovery names to other slots; maxDD worse because
+  the wider 2021 losers ran longer. One salt; the cell's verdict waits for salts 1–2 (and per
+  `promotion-confirmation.md` the value must not be *badly dominated* in any cell).
+- 15:57 PT: **2009 vintage, salt 0** — null `n5-2009` = 20.35% / 124 trades / Sharpe 0.337 / maxDD 17.92 (wall 3,476 s);
+  arm `a4-2009` = **25.54% / 149 / 0.372 / maxDD 27.12** (wall 2,970 s). V16/V17 PASS; **V6 = 1 on the arm**
+  (CMD/CMN 2009-10-10 → 2010-03-22, both `laggard_rotation` +$9.6k — a rename twin surviving in the 2009 vintage,
+  same class as #2782; +$9.6k duplicated, read ex-twin). **Loses on both criteria:** realised $106k → **−$23k
+  (−$130k; −$139k ex-twin)**, unrealised $113k → $289k on 11 open names vs 7 (the level's +5pp is all MTM), maxDD
+  **17.9 → 27.1**. Exit mix `stop_loss` 82 → 53, `laggard_rotation` 40 → 93. Join: 63 shared −$20k → +$64k
+  (**drift +$84k**, wide helps the shared trades again); null-only 61 trades +$126k (SKX 2009-10-16 +$79k, TEL
+  +$51k, SLM +$44k) vs arm-only 86 trades **−$87k**. By entry year the arm loses 2010 (+$141k → −$26k) and 2011.
+  **Same anatomy as the 2019 cell:** shared-trades-run-wider is positive, the path re-draw on a ~150-trade window
+  is negative and larger, and maxDD is worse. Both 5y cells fail both criteria at salt 0; salts 1–2 running.
+  Caveat that cuts both ways: each 5y cell holds 120–180 trades, under the 230-trade measurability floor, so a
+  single-salt 5y read is itself noise-dominated — which is why the grid runs three salts per cell.

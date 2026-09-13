@@ -46,6 +46,18 @@ into `cadence-12w-v10-2026-09-13/results/`, log each pair in its README, then th
 After the grid: `git worktree remove --force .claude/worktrees/sweep-detgate` and delete the persistent monitors if
 any are still listed in `/tasks`.
 
+**Grid state at 16:30 PT 09-13 (session cleared here; chains keep running under nohup):**
+- done: n5-2019-s0 66.02/179/DD 22.55; a4-2019-s0 30.52/178/DD 30.87 (**arm loses both criteria**: realised $469k→$166k, maxDD 22.6→30.9);
+  n5-2009-s0 20.35/124/DD 17.92; a4-2009-s0 25.54/149/DD 27.12 (**arm loses both**: realised $106k→−$23k, maxDD 17.9→27.1; V6=1 CMD/CMN twin +$9.6k);
+  n5-2019-s1 39.12/181/DD 22.50; n5-2009-s1 45.74/112/DD 20.43.
+- running: a4-2019-s1 (lane G1, since 16:16), a4-2009-s1 (lane G2, since 16:23); then n5/a4 at salt 2 on each lane (~25–50 min per cell).
+- reads so far are logged in `cadence-12w-v10-2026-09-13/README.md` §"Confirmation grid"; per-arm artifacts in `results/` (this PR).
+  Same anatomy in both 5y cells: shared-trades-run-wider positive (+$271k / +$84k), path re-draw negative and larger, maxDD worse.
+  If salts 1–2 repeat it, the value is "badly dominated" in the 5y cells → **no promotion**; the 26y ACCEPT stays single-surface with the grid recorded against it.
+- read command for a grid pair: `NULL=.sweep-output/detgate-grid/n5-<v>-s<salt>-v10 ARM=a4-<v> sh dev/experiments/deteriorating-gate-2026-09-13/read.sh <salt> .sweep-output/detgate-grid`
+  plus `validator_diff -check V6` on the two `-validator.sexp.sexp` files (in the sweep-detgate worktree's `_build`).
+- the monitors/background waits of this session are gone; re-arm a tail on `/tmp/grid-run/chain-G{1,2}.log` for RESULT lines.
+
 ## Settled this afternoon (screens, no cells): `cadence-12w-v10-2026-09-13/screens/README.md`
 
 - **Width is NOT linear**: replaying narrower initial stops on the wide arm's own trades gives flat ≤ 6%, a knee 7→9%,

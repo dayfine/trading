@@ -5,7 +5,7 @@
 # (shared, null-only, arm-only) with top movers. Usage: sh read.sh <salt> [arm-artifact-dir]
 set -eu
 salt=$1; ARMDIR=${2:-dev/experiments/deteriorating-gate-2026-09-13/results}; ARM=${ARM:-a3-deteriorating-gate}
-N=dev/experiments/stop-width-by-state-2026-09-08/results/a0-breadth-on-null-s$salt-v10
+N=${NULL:-dev/experiments/stop-width-by-state-2026-09-08/results/a0-breadth-on-null-s$salt-v10}
 A=$ARMDIR/$ARM-s$salt-v10
 k() { grep -oE "\($2 [0-9.eE+-]+" "$1-actual.sexp" | awk '{print $2}'; }
 hdr() { printf '%-6s %10s %8s %12s %12s %8s\n' arm level trades realised unrealised maxDD; }
