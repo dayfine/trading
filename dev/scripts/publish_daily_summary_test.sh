@@ -604,6 +604,32 @@ check "publish --summary missing its value exits 2" 2 "$rc"
 #       reports nothing extra was staged" goes red, because that scenario
 #       leaves the summary itself uncommitted (production shape) so the
 #       commit path runs even with zero artifacts.
+#
+# A qc-behavioral rework pass on 2026-09-13 (PR #2778 review 5191977193)
+# found that the four mutations below ALL left this group at 68/68 green
+# -- i.e. three of the four allowlist entries were entirely unpinned, and
+# the ONE negative witness (README.md, outside dev/ altogether) could not
+# distinguish "the fixed allowlist" from "anything under dev/". Scenario
+# (a2) below (all four entries dirty at once, each independently asserted
+# onto the remote, plus two near-miss witnesses INSIDE dev/) closes all
+# four:
+#   (e) widen the `dev/status/_index.md` entry (a FILE) to `dev/status`
+#       (the whole DIRECTORY) -> "near-miss: dev/status/harness.md (not
+#       _index.md) is NOT on the remote" goes red (a routinely-dirty
+#       per-track status file gets swept into the daily-summary commit).
+#   (f) drop `dev/audit` from `_RUN_ARTIFACT_PATHS` -> "all-four:
+#       dev/audit/ entry reaches the remote" goes red.
+#   (g) reduce `_RUN_ARTIFACT_PATHS` to `dev/health` alone (dropping
+#       `dev/status/_index.md`, `dev/reviews`, AND `dev/audit`) -> all
+#       three of "all-four: dev/status/_index.md (FILE entry) reaches the
+#       remote", "all-four: dev/reviews/ entry reaches the remote", and
+#       "all-four: dev/audit/ entry reaches the remote" go red at once.
+# Scenario (h) pins a `_stage_run_artifacts` guard that has no dedicated
+# mutation of its own (it protects against a filename shape, not an
+# allowlist edit): a run artifact whose name contains a space must still
+# be staged and published, and per CP4-A a forced `git add` failure on one
+# allowlist entry must not prevent the summary itself from being
+# committed/pushed/PR'd.
 # =============================================================================
 
 # (a) An artifact present-and-dirty IS staged and lands on the remote
@@ -626,6 +652,58 @@ _pushed_health=$(_remote_file_content ops/daily-2026-09-08 dev/health/2026-09-08
 check_contains "an artifact present-and-dirty IS staged: health report reaches the remote, on the SAME branch as the summary" "$_pushed_health" "Fast scan - 2026-09-08"
 _pushed_summary=$(_remote_file_content ops/daily-2026-09-08 dev/daily/2026-09-08.md)
 check_contains "artifact-present: the summary itself is still there too" "$_pushed_summary" "Status - 2026-09-08"
+_reset_mock_env
+
+# (a2) All FOUR allowlist entries dirty at once, each independently
+# asserted onto the remote -- so dropping (or widening) any SINGLE entry
+# from `_RUN_ARTIFACT_PATHS` reddens a NAMED check here (see mutations (e),
+# (f), (g) above). Also includes two near-miss negative witnesses INSIDE
+# dev/ -- a per-track status file that is NOT _index.md, and a dev/notes/
+# file -- neither of which is allowlisted at all: unlike (b) below's
+# witness (README.md, outside dev/ entirely), these sit inside the
+# protected prefix, so they are NOT caught merely by widening the scan to
+# the whole of dev/, only by widening (or dropping) the SPECIFIC entry
+# that would sweep them in.
+_init_fixture
+_write_summary 2026-09-08 "" 202609080900 >/dev/null
+(cd "$REPO_DIR" && git add dev/daily && git commit -q -m "add summary")
+mkdir -p "$REPO_DIR/dev/status" "$REPO_DIR/dev/reviews" "$REPO_DIR/dev/audit" "$REPO_DIR/dev/health" "$REPO_DIR/dev/notes"
+printf '# index\n' >"$REPO_DIR/dev/status/_index.md"
+printf '# track status\n' >"$REPO_DIR/dev/status/harness.md"
+printf '# review\n' >"$REPO_DIR/dev/reviews/qc-2026-09-08.md"
+printf '{"finding": "audit-x"}\n' >"$REPO_DIR/dev/audit/2026-09-08-audit.json"
+printf '# fast scan\n' >"$REPO_DIR/dev/health/2026-09-08-fast.md"
+printf '# scratch note\n' >"$REPO_DIR/dev/notes/scratch.md"
+_reset_mock_env
+MOCK_CREATE_PR_NUMBER=1005
+MOCK_CREATE_PR_URL=https://github.com/dayfine/trading/pull/1005
+export MOCK_CREATE_PR_NUMBER MOCK_CREATE_PR_URL
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "all-four-artifacts: publish still succeeds" 0 "$rc"
+
+_pushed_index=$(_remote_file_content ops/daily-2026-09-08 dev/status/_index.md)
+check_contains "all-four: dev/status/_index.md (FILE entry) reaches the remote" "$_pushed_index" "index"
+_pushed_review=$(_remote_file_content ops/daily-2026-09-08 dev/reviews/qc-2026-09-08.md)
+check_contains "all-four: dev/reviews/ entry reaches the remote" "$_pushed_review" "review"
+_pushed_audit2=$(_remote_file_content ops/daily-2026-09-08 dev/audit/2026-09-08-audit.json)
+check_contains "all-four: dev/audit/ entry reaches the remote" "$_pushed_audit2" "audit-x"
+_pushed_health2=$(_remote_file_content ops/daily-2026-09-08 dev/health/2026-09-08-fast.md)
+check_contains "all-four: dev/health/ entry reaches the remote" "$_pushed_health2" "fast scan"
+
+# near-miss #1: a per-track status file (NOT _index.md) must NOT ride
+# along with the _index.md FILE entry -- catches widening it to the whole
+# dev/status/ DIRECTORY.
+_pushed_track_status=$(_remote_file_content ops/daily-2026-09-08 dev/status/harness.md)
+check "near-miss: dev/status/harness.md (not _index.md) is NOT on the remote" "" "$_pushed_track_status"
+_track_status_dirty=$(cd "$REPO_DIR" && git status --porcelain -uall -- dev/status/harness.md)
+check_contains "near-miss: dev/status/harness.md is still dirty in the working tree" "$_track_status_dirty" "harness.md"
+
+# near-miss #2: dev/notes/ is not an allowlisted class at all.
+_pushed_notes=$(_remote_file_content ops/daily-2026-09-08 dev/notes/scratch.md)
+check "near-miss: dev/notes/scratch.md is NOT on the remote" "" "$_pushed_notes"
+_notes_dirty=$(cd "$REPO_DIR" && git status --porcelain -uall -- dev/notes/scratch.md)
+check_contains "near-miss: dev/notes/scratch.md is still dirty in the working tree" "$_notes_dirty" "scratch.md"
 _reset_mock_env
 
 # (b) A dirty file OUTSIDE the allowlist (repo root, not under dev/status,
@@ -690,6 +768,68 @@ rc=0
 _out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
 check "no artifacts dirty: publish still succeeds" 0 "$rc"
 check_not_contains "no artifacts dirty: publish reports nothing extra was staged" "$_out" "also staged run artifacts"
+_reset_mock_env
+
+# (h) A run-artifact filename that git C-quotes (contains a space) must
+# still be staged and published -- CP4-A (review 5191977193). An earlier
+# version of `_stage_run_artifacts` read paths back out of `git status
+# --porcelain` (which C-quotes a path containing a space, e.g.
+# `"dev/health/2026-09-08 fast.md"`) and fed the quoted string straight
+# back to `git add` as a pathspec, which failed FATAL and, under this
+# script's `set -eu`, aborted `cmd_publish` BEFORE `git commit` ran: the
+# summary was staged but never committed, never pushed, no PR -- the exact
+# H-DAILY-SUMMARY-PR-LOST outcome this script exists to prevent. The
+# current version never round-trips a path through git's own quoting (it
+# only ever `git add`s the four FIXED allowlist entries themselves), so
+# this must pass.
+_init_fixture
+_write_summary 2026-09-08 "" 202609080900 >/dev/null
+(cd "$REPO_DIR" && git add dev/daily && git commit -q -m "add summary")
+mkdir -p "$REPO_DIR/dev/health"
+printf '# Fast scan with a space in the name\n' >"$REPO_DIR/dev/health/2026-09-08 fast.md"
+_reset_mock_env
+MOCK_CREATE_PR_NUMBER=1006
+MOCK_CREATE_PR_URL=https://github.com/dayfine/trading/pull/1006
+export MOCK_CREATE_PR_NUMBER MOCK_CREATE_PR_URL
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "space-in-filename: publish still succeeds" 0 "$rc"
+check_contains "space-in-filename: publish reports it staged run artifacts" "$_out" "also staged run artifacts"
+check_contains "space-in-filename: reported artifact list names the file" "$_out" "dev/health/2026-09-08 fast.md"
+_pushed_spacey=$(_remote_file_content ops/daily-2026-09-08 "dev/health/2026-09-08 fast.md")
+check_contains "space-in-filename: the artifact itself reaches the remote" "$_pushed_spacey" "space in the name"
+_pushed_summary_h=$(_remote_file_content ops/daily-2026-09-08 dev/daily/2026-09-08.md)
+check_contains "space-in-filename: the summary itself is still there too" "$_pushed_summary_h" "Status - 2026-09-08"
+_reset_mock_env
+
+# (i) A forced staging failure on ONE allowlist entry must not abort the
+# publish -- CP4-A's second half. `_stage_run_artifacts` warns by name and
+# the summary is still committed, pushed, and PR'd. Simulated the way a
+# real `git add` failure most commonly happens: `dev/reviews/` is
+# .gitignore'd (`git add -- dev/reviews` then fails with "The following
+# paths are ignored ... Use -f", rc=1) while `dev/health/` is not -- so
+# ONE allowlist entry fails to stage while the other three still work.
+_init_fixture
+_write_summary 2026-09-08 "" 202609080900 >/dev/null
+(cd "$REPO_DIR" && git add dev/daily && git commit -q -m "add summary")
+echo "dev/reviews/" >"$REPO_DIR/.gitignore"
+(cd "$REPO_DIR" && git add .gitignore && git commit -q -m "ignore dev/reviews for this scenario")
+mkdir -p "$REPO_DIR/dev/reviews" "$REPO_DIR/dev/health"
+printf '# review\n' >"$REPO_DIR/dev/reviews/qc-2026-09-08.md"
+printf '# fast scan\n' >"$REPO_DIR/dev/health/2026-09-08-fast.md"
+_reset_mock_env
+MOCK_CREATE_PR_NUMBER=1007
+MOCK_CREATE_PR_URL=https://github.com/dayfine/trading/pull/1007
+export MOCK_CREATE_PR_NUMBER MOCK_CREATE_PR_URL
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "forced-staging-failure: publish still succeeds despite the bad entry" 0 "$rc"
+check_contains "forced-staging-failure: names the failing entry in a WARNING" "$_out" "WARNING: failed to stage run artifact dev/reviews"
+check_contains "forced-staging-failure: the OTHER artifact still ships" "$_out" "dev/health/2026-09-08-fast.md"
+_pushed_summary_i=$(_remote_file_content ops/daily-2026-09-08 dev/daily/2026-09-08.md)
+check_contains "forced-staging-failure: the summary itself STILL reaches the remote" "$_pushed_summary_i" "Status - 2026-09-08"
+_pushed_health3=$(_remote_file_content ops/daily-2026-09-08 dev/health/2026-09-08-fast.md)
+check_contains "forced-staging-failure: the healthy artifact STILL reaches the remote" "$_pushed_health3" "fast scan"
 _reset_mock_env
 
 printf '\n%d/%d checks passed\n' "$PASS" "$((PASS + FAIL))"

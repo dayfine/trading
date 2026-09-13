@@ -174,34 +174,56 @@ _branch_name_for() {
 _RUN_ARTIFACT_PATHS="dev/status/_index.md dev/reviews dev/audit dev/health"
 
 # _stage_run_artifacts
-# Stages (via `git add`) whichever of $_RUN_ARTIFACT_PATHS are actually
-# dirty or untracked in the current working tree, and prints the list of
-# staged paths, one per line (relative to the repo root). Prints NOTHING
-# and stages nothing if none of the allowlisted paths are dirty -- the
-# caller must not assume "ran" means "staged something".
+# Stages (via `git add`) whichever of $_RUN_ARTIFACT_PATHS exist on disk,
+# and prints the list of paths that ended up newly staged as a result
+# (relative to the repo root, one per line) by diffing `git diff --cached
+# --name-only` before and after. Prints NOTHING if nothing new was staged
+# -- the caller must not assume "ran" means "staged something". A failure
+# to stage any ONE allowlist entry is logged as a named WARNING and does
+# NOT abort the publish -- the summary itself (already staged by the
+# caller before this runs) must still reach the remote even if a run
+# artifact could not be folded in.
+#
+# Deliberately does NOT read paths back out of `git status --porcelain`
+# (an earlier version did, via `cut -c4-`). Porcelain v1 C-quotes any path
+# containing a space, quote, backslash, or (with the default
+# core.quotepath=true) a non-ASCII byte -- e.g. `"dev/health/2026-09-08
+# fast.md"`, quotes included -- and feeding that quoted string back to
+# `git add` as a pathspec fails FATAL ("pathspec '\"dev/health/2026-09-08
+# fast.md\"' did not match any files"), which under this script's
+# `set -eu` used to abort `cmd_publish` before `git commit` ran: the
+# summary got staged but never committed, never pushed, no PR -- the exact
+# H-DAILY-SUMMARY-PR-LOST outcome this script exists to prevent. This
+# version instead only ever `git add`s the FOUR FIXED allowlist entries
+# themselves -- literal strings written into this script, never round-
+# tripped through git's own quoting -- so no filename shape staged
+# underneath them can ever produce a bad pathspec here. `git diff --cached
+# --name-only` output (used only for the human-readable report below,
+# never fed back to another git command as a pathspec) is unaffected
+# either way.
 _stage_run_artifacts() {
+  _raa_before=$(git diff --cached --name-only 2>/dev/null || true)
   # shellcheck disable=SC2086 -- word-splitting on the fixed allowlist above
-  # is intentional: each element is its own pathspec. `-uall` so a whole
-  # untracked directory (e.g. a first-ever dev/health/ report) is listed as
-  # individual file paths rather than collapsed into one directory entry --
-  # both for an accurate reported list, and so the per-path `git add` below
-  # only ever sees paths that actually exist.
-  _dirty=$(git status --porcelain -uall -- $_RUN_ARTIFACT_PATHS 2>/dev/null | cut -c4-)
-  if [ -z "$_dirty" ]; then
-    return 0
-  fi
-  # Stage each dirty path ONE AT A TIME rather than handing the whole fixed
-  # allowlist to a single `git add` call: `git add -- <a mix of existing
-  # and nonexistent pathspecs>` fails FATAL ("pathspec '...' did not match
-  # any files") as soon as ONE element matches nothing on disk -- even when
-  # other elements in the very same call did match -- and under this
-  # script's `set -eu` that would abort the whole publish. Most runs will
-  # not have all four allowlisted paths dirty at once, so only ever `git
-  # add` paths `git status` itself already confirmed are real.
-  printf '%s\n' "$_dirty" | while IFS= read -r _artifact_path; do
-    [ -n "$_artifact_path" ] && git add -- "$_artifact_path"
+  # is intentional: each element is its own pathspec, checked for existence
+  # individually (`[ -e ]`) so `git add` is never handed a mix of existing
+  # and nonexistent pathspecs -- `git add -- <a mix>` fails FATAL as soon as
+  # ONE element matches nothing on disk, even when other elements in the
+  # same call did match.
+  for _raa_entry in $_RUN_ARTIFACT_PATHS; do
+    [ -e "$_raa_entry" ] || continue
+    if ! git add -- "$_raa_entry" >/dev/null; then
+      echo "publish_daily_summary: WARNING: failed to stage run artifact $_raa_entry -- continuing without it; the summary itself will still be published" >&2
+    fi
   done
-  printf '%s\n' "$_dirty"
+  _raa_after=$(git diff --cached --name-only 2>/dev/null || true)
+  [ -z "$_raa_after" ] && return 0
+  printf '%s\n' "$_raa_after" | while IFS= read -r _raa_path; do
+    [ -n "$_raa_path" ] || continue
+    if [ -n "$_raa_before" ] && printf '%s\n' "$_raa_before" | grep -qxF "$_raa_path"; then
+      continue
+    fi
+    printf '%s\n' "$_raa_path"
+  done
 }
 
 # --- GitHub REST (curl only -- `gh` is confirmed absent from the GHA
