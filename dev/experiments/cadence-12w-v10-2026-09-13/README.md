@@ -32,3 +32,67 @@ Read with `ARM=a4-cadence-12w sh dev/experiments/deteriorating-gate-2026-09-13/r
   salt-1/2 cells decide whether this is a lever or a re-draw that happens to land the same monsters. Force liquidations
   6 (ATLC, SGP_old1, AWRE, ARCB, CBKCQ, IMMR) vs 3 — wide arms hold delisted names longer (known, #2672 family).
   Salt 1 started 09:40 (lane B2); salt 2 running since 09:16 (lane A2).
+
+- 12:29 PT: **salt 2 = 627.20% / 835 trades / Sharpe 0.552 / maxDD 33.03** (wall 11,586 s; `results/a4-cadence-12w-s2-v10-*`)
+  vs the null's **639.74 / 728 / 0.526 / 42.96**. V16/V17 PASS. **V6 = 1 on the arm vs 0 on the null — `validator_diff
+  -check V6` exit 1 (DIFFER)**: `IAC 2006-03-16 twin positions: IAC/MTCH`. Decomposed: MTCH and IAC both entered
+  2006-03-16 at 4,540 shares and both exited 2006-03-20 `stop_loss`, −$2,860 and −$2,767 — MTCH's pre-2015 series is
+  IAC's backfilled history (a spin-off twin, not a rename twin, so `-dedupe-rename-twins` did not catch it; the null
+  never entered either name). The duplicated leg is **−$2.9k on a +$2.48M realised delta and cannot touch maxDD**, so
+  the cell is read ex-twin with the mismatch on record rather than discarded (issue #2782: spin-off backfill twins survive the rename-twin dedupe). **Clears both
+  criteria at salt 2 too:** realised $2.70M → **$5.18M (+$2.48M; +$2.48M ex-twin)**, unrealised $3.84M → $1.25M (the
+  null's three open names vs seven: ADTN EXPD KLAC LLY MSM NOK QCOM), maxDD **43.0 → 33.0**. Exit mix `stop_loss`
+  481 → 322, `laggard_rotation` 233 → 481, `stage3_force_exit` 4 → 13. Join: 359 shared +$0.99M → +$2.64M (**drift
+  +$1.65M** — the wide stop widens the shared winners); null-only 369 trades +$1.71M (LOGI 2020-05-06 +$381k, NVDA
+  2020-04-06 +$308k, IPIXQ +$255k, CMA-WS +$228k) vs gate-only 476 trades +$2.54M (NOVT 2016-06-03 +$613k, KTOS
+  2025-05-03 +$497k, AMAT 2020-11-07 +$447k, BBWI 2020-08-20 +$428k, ROG +$201k; worst BBAR −$112k, CIG −$110k, LYTS
+  −$104k, MOD −$103k). NOVT / KTOS / BBWI-08-20 recur from salt 0 — the same arm-only monster set at two salts is
+  the salt-robust part; the shared-drift term ($0.6M at s0, $1.65M at s2) is the second, and it is spread across
+  many names. **Two of three salts clear both pre-registered criteria — the candidate passes the bar regardless of
+  salt 1** (running, lane B2, due ~12:50).
+
+- 12:56 PT: **salt 1 = 708.28% / 835 trades / Sharpe 0.575 / maxDD 28.10** (wall 11,742 s; `results/a4-cadence-12w-s1-v10-*`)
+  vs the null's **311.75 / 707 / 0.427 / 32.75**. V16/V17 PASS. **V6 = 1 on the arm vs 0 on the null** (`validator_diff
+  -check V6` DIFFER) — the same IAC/MTCH spin-off twin (#2782): MTCH −$2,652 / IAC −$2,861, both 2006-03-16 → 03-20
+  `stop_loss`; −$2.7k duplicated on a +$1.97M realised delta, read ex-twin with the mismatch on record. **Clears both
+  criteria at salt 1:** realised $2.94M → **$4.91M (+$1.97M)**, unrealised $0.31M → $2.30M (9 open names: ADTN AMAT EXPD
+  KLAC LLY NOK QCOM SXT URI vs 5), maxDD **32.8 → 28.1**. Exit mix `stop_loss` 458 → 313, `laggard_rotation` 236 → 493,
+  `stage3_force_exit` 2 → 11. Join: 359 shared +$1.47M → +$3.45M (**drift +$1.98M**); null-only 348 trades +$1.47M
+  (BBWI 2020-08-08 +$377k, NVDA 2020-04-06 +$316k, PCYC +$212k, CMA-WS +$205k) vs gate-only 476 trades +$1.46M (KTOS
+  2025-05-03 +$479k, BBWI 2020-08-20 +$395k, KLIC 2020-11-09 +$264k, CLFD +$213k, BB 2006 +$208k; worst TEX −$108k,
+  BBAR −$103k, CIG −$101k) — **at this salt the arm-only and null-only sets net to zero; the whole realised gain is the
+  shared trades running wider.** Force liquidations 5 vs 2.
+
+## Three-salt read (all on `_v10dedup`, build 31e4bb9c3 vs null build 969637974; V6 = 0 on the null cells, 1 on arm s1/s2 = the IAC/MTCH 2006 twin, −$2.7–2.9k each, #2782)
+
+| salt | null a0-v10 (level / trades / Sharpe / maxDD) | cadence a4 | realised Δ | shared drift | arm-only − null-only | unrealised Δ | maxDD |
+|---|---|---|---:|---:|---:|---:|---|
+| 0 | 382.74 / 710 / 0.445 / 37.60 | 751.67 / 851 / 0.578 / 29.99 | **+$2.59M** | +$0.61M | +$1.98M | +$1.06M | **37.6 → 30.0** |
+| 1 | 311.75 / 707 / 0.427 / 32.75 | 708.28 / 835 / 0.575 / 28.10 | **+$1.97M** | +$1.98M | −$0.01M | +$1.99M | **32.8 → 28.1** |
+| 2 | 639.74 / 728 / 0.526 / 42.96 | 627.20 / 835 / 0.552 / 33.03 | **+$2.48M** | +$1.65M | +$0.82M | −$2.59M (null's ADTN/MU/URI) | **43.0 → 33.0** |
+
+**Pre-registered rule: realised AND maxDD better at ≥ 2 of 3 salts. Result: 3 of 3 on both. The candidate clears the bar.**
+Sharpe better at every salt (0.445 → 0.578, 0.427 → 0.575, 0.526 → 0.552); level +369 / +397 / −13pp (salt 2's level
+is the null's open MTM, quote the band: **627–752% vs 312–640%**; maxDD **28.1–33.0 vs 32.8–43.0**).
+
+**Why it works (transferable).** Two terms, both salt-robust: (1) **the shared trades run wider** — a 12% initial stop
+with a weekly trail update keeps the record's own winners through the whipsaw that a 4% daily stop sells into, and
+the exit shifts to `laggard_rotation` (236–244 → 481–493 per cell, `stop_loss` 450–481 → 313–336; the 09-05 surface's
+"a wide enough stop hands the exit to the rotation" on a clean warehouse); this term is +$0.6M / +$2.0M / +$1.65M.
+(2) **the arm-only set** (+$2.0M / ≈0 / +$0.8M) recurs by name — NOVT 2016, KTOS 2025, BBWI 2020-08-20, KLIC 2020-11
+at two or three salts — but it is not needed for the verdict: salt 1 clears on the shared term alone. The maxDD win is
+the same shape at every salt (−4.7 to −9.9pp) and is *not* the twin-double-funding artifact of the item-3 map (V6 = 0
+on the null, the one arm violation is a −$2.8k pair). Cost side: +125–141 trades per cell, 5–6 force liquidations vs
+2–3 (wide arms hold delisted names longer — #2672 family, the delisted exit now fires: `delisted` 8–10 vs 5–7), and
+9 open names at the end vs 3–5 (more unrealised carried — the band's upper draws are MTM-heavier).
+
+**Verdict: ACCEPT at the single-surface level** (ledger `2026-09-13-stop-width-12pct-weekly-cadence-v10dedup`). Per
+`experiment-flag-discipline.md` R3 and `promotion-confirmation.md` this is **necessary, not sufficient, for a default
+flip**: the same arm must clear a confirmation grid of ≥ 3 independent broad cells — the 2009 and 2019 `_v10dedup`
+vintages exist (5y windows 2009–13 / 2019–23 at three salts, paired against their own record-convention nulls), and
+one cell must span a bear regime (the 26y cell above already does). Blocking item before any promotion PR: the wide
+arm's delisting exposure (#2672 family) is now handled by the `delisted` exit, but the 5–6 force liquidations per cell
+must be dissected (all pre-#2695 phantom classes, or real gaps?). This is a two-knob change (`initial_stop_buffer` 1.0 →
+0.9167 AND `stop_update_cadence` Daily → Weekly): `config-default-blast-radius.md` paired goldens for both knobs, and
+the book's own framing (§5.3 4–6% band; weekly re-evaluation = L3) should be cited in the promotion PR — 12% is outside
+the book's stated band and must be argued as a modern-regime adaptation of a dial, not the spine.

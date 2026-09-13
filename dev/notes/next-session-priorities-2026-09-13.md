@@ -27,18 +27,17 @@ REJECT-do-not-revive today). Flag stays default-off; Rule-4 retirement candidate
 - **Item 4 — 12% initial stop × weekly trail cadence on `_v10dedup`** (`dev/experiments/cadence-12w-v10-2026-09-13/`,
   arm `a4-cadence-12w` = a0 + `initial_stop_buffer 0.9167` + `stop_update_cadence Weekly`; same build/worktree/warehouse as
   item 3; same pre-registered binary rule). Lanes: B2 = salts 0 then 1 (started 06:32 / ~09:30), A2 = salt 2 (started 09:16).
-  **Salt 0 landed 09:40: 751.67% / 851 / Sharpe 0.578 / maxDD 29.99 vs the null 382.74 / 710 / 37.60 — realised +$2.59M, maxDD −7.6pp, V6 = 0: CLEARS both criteria at one salt** (CLS/NOVT/KTOS/BPT = $2.92M of the arm-only P&L — concentration caveat; see the README). Salt 2 (A2) due ~12:15 PT, salt 1 (B2) due ~12:45 PT. If ≥ 1 more salt clears both, the candidate passes the pre-registered bar and moves to the promotion-confirmation grid (`promotion-confirmation.md`: ≥ 3 cells incl. a broad-vs-broad second universe — the 2009 / 2019 `_v10dedup` vintages exist) before any default flip; #2672-family delisting exposure of wide arms must be re-checked first.
+  **ALL THREE SALTS LANDED (09:40 / 12:29 / 12:56): realised +$2.59M / +$1.97M / +$2.48M, maxDD 37.6→30.0 / 32.8→28.1 / 43.0→33.0, Sharpe better at every salt — 3 of 3 on both pre-registered criteria = single-surface ACCEPT** (ledger `2026-09-13-stop-width-12pct-weekly-cadence-v10dedup`, `memory/project_cadence_12w_v10dedup_accept`). Mechanism = the shared trades run wider (salt 1: arm-only and null-only net to zero). V6 = 1 on arm s1/s2 = one −$2.8k IAC/MTCH spin-off twin (#2782 filed). NOT promoted — see queue item 1.
   Read each cell with `ARM=a4-cadence-12w sh dev/experiments/deteriorating-gate-2026-09-13/read.sh <salt> .sweep-output/detgate`
   and gate with `validator_diff -check V6` against `stop-width-by-state-2026-09-08/results/a0-breadth-on-null-s<salt>-v10-validator.sexp.sexp`.
   Artifacts land in `.sweep-output/detgate/a4-cadence-12w-s<salt>-v10-*`; copy to `cadence-12w-v10-2026-09-13/results/`
   (exclude `trade_audit.sexp`, 9 MB) and write the ledger entry either way.
-- Pinned worktree `.claude/worktrees/sweep-detgate` (31e4bb9c3) stays until item 4's cells finish; then
-  `git worktree remove --force .claude/worktrees/sweep-detgate`.
+- Pinned worktree `sweep-detgate` removed 13:05 PT after the last cell; the container is idle.
+
 
 ## Queue (in order)
 
-1. **Finish item 4** (above): three-salt read, ledger entry, memory, this doc's amendment. If it does not clear
-   realised AND maxDD at ≥ 2 of 3, retire it as the 09-05 record already anticipated (width is regime-dependent).
+1. **Item 4 promotion path (ACCEPT → grid, no default flip yet):** (a) confirmation grid — 2009 and 2019 `_v10dedup` vintages, 5y record-convention windows at 3 salts each, paired against their own nulls (the 26y cell is the bear-regime cell; `promotion-confirmation.md` broad-vs-broad); (b) dissect the 5–6 force liquidations per arm cell (phantom pre-#2695 classes vs real gaps); (c) paired goldens for BOTH knobs (`config-default-blast-radius.md`) and the W2 book argument (12% is outside §5.3's 4–6% band; weekly re-evaluation is L3) in the promotion PR. Also #2782: spin-off backfill twins (MTCH ≡ IAC pre-2015) survive the rename-twin dedupe — extend the detector before the next rebuild.
 2. **Orchestrator summary push (D2)** — carried from 09-10 item 5: step 8 sets git identity but jj reads its own and `@` is
    never described. Harness PR on `.github/workflows/`, full gates, idle container.
 3. **Follow-ups carried:** #2753 (publisher 422-guard unpinned, 53/53); #2729 residuals; the `stop_loss` label hiding
