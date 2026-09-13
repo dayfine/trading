@@ -38,6 +38,13 @@ expectations so we never make these kinds of trades again."
 - `trading/trading/backtest/snapshot_warehouse/splice_detector.{ml,mli}` — the
   build-time sibling of V15: a pure within-symbol continuity scan, wired
   default-off + report-only into `build_scenario_snapshots`.
+- `trading/analysis/weinstein/snapshot_pipeline/lib/series_level.{ml,mli}` —
+  the build-time sibling of V18's **level** rule: a pure per-symbol
+  classification of a stored series' price level, beside `Series_tail` and
+  `Series_splice`. Default-off, report-only, no action type, not yet wired.
+- `trading/trading/backtest/validation/test/test_series_level_v18_median_agreement.ml`
+  — cross-module drift detector for the one statistic V18 and `Series_level`
+  each compute their own copy of (3 tests).
 - `trading/trading/backtest/validation/bin/post_run_validator_cli.ml` — CLI
   (`-run-dir -data-dir [-config] -out`).
 - `trading/trading/backtest/validation/test/test_post_run_validator.ml` — unit
@@ -232,6 +239,83 @@ docker exec trading-1-dev bash -c \
     The volume guard was mutation-verified: removing it turns exactly the three
     volume-dependent tests red.
 
+- [x] **Build-time sibling of V18: `Series_level`**
+  (feat/backtest/build-time-store-sanity, issue #2732 ask 2, second half).
+  `trading/analysis/weinstein/snapshot_pipeline/lib/series_level.{ml,mli}` —
+  a pure, report-only classification of a stored series' **price level**,
+  beside `Series_tail` and `Series_splice`. `Config.enabled` defaults to
+  `false`; the module has no action type and never edits a series.
+  - **The residual was established before anything was built, and it is
+    narrower than the follow-up assumed.** Both existing build-time modules
+    key on a *discontinuity* — `Series_splice` on an adjusted-close ratio
+    outside `[0.4, 2.5]`, `Series_tail` on a *terminal* run below
+    `ratio × reference` — and their shared `misscale_close` (1,000.0) is a
+    reclassifier applied to a series that already tripped a shape rule, never
+    a primary level test. `Series_tail.Class.Prefix_misscale` is reachable
+    only *through* the terminal-run test. So the residual is exactly: an
+    implausible level with no discontinuity the shape rules can act on.
+  - Three evidenced sub-classes. (i) **Seam outside the build window**:
+    `Build_runner._clean_tail` runs `Series_tail` on the *windowed* bars and
+    the splice scan uses the same window, so a window ending before a symbol's
+    seam stores the mis-scaled prefix alone with nothing to key on — AGR
+    2006-07-03, SGY 2003-09-09, DRL 2003-09-30, TEK_old 2007-02-26, SBER
+    2007-07-17, LJPC 2008-12-17, BYDDY 2009-12-28. **The blindness here is
+    certain at the code level; a present-day instance is not** — all three
+    committed vintages run to 2026, so every seam listed is *in*-window for
+    them and none of those seven symbols would flag on today's warehouse.
+    Sub-class (ii) below is the instance-verified one. Consequence for the
+    first armed report: it may carry **no** `Whole_window` row at all, and an
+    empty one is the expected result rather than broken wiring.
+    (ii) **The short-tail guard
+    refuses the cut**: `misscale_min_kept_bars` (250) stores the series *whole*
+    when the real segment is shorter — PEGX 210, CGE 180, TNT 44, **HTV 21**
+    bars in `dev/experiments/warehouse-dedup-2026-09-08/results/
+    terminal_runs_*_v10.csv`, all `action=kept`. (iii) **Scope**: V18 examines
+    only symbols a run traded or held; a build pass sees all 2,908.
+  - **Two halves of V18 deliberately not moved**, because they are already
+    covered: MEL itself (98 splice findings → `Interleaved` → dropped), and
+    the phantom-print rule (a >90% move is a ratio outside `[0.4, 2.5]`, so
+    `Splice_detector` already reports every such bar *with* its volume). Only
+    the **level** rule was ever the residual, and the non-coverage is pinned
+    by a test so it reads as a decision.
+  - Reported rows sub-classify into `Whole_window` (every bar above the
+    ceiling — no seam, so no cut can help and a reviewer's only options are
+    drop or raise the ceiling) and `Mixed_scale` (seam in-window — cross-read
+    `terminal_runs.csv` / `splice_actions.csv` first, since a cut that keeps
+    the real segment beats a drop). Sub-classifying rather than *narrowing*
+    is deliberate: V18's reviewer argued down a max/min-ratio refinement on
+    false-negative grounds, and `Whole_window` is the case that proves them
+    right — a uniformly mis-scaled series has a max/min ratio near 1.0.
+  - Ceiling defaults to V18's `store_median_close_max` (10,000.0), not the
+    siblings' `misscale_close` (1,000.0): as a *median over a whole series*
+    the latter would sweep in NVR / AZO / BKNG / pre-split AMZN and CMG (CMG's
+    genuine $3,283.04 close is already a committed `prefix_misscale` row). The
+    median *function* is byte-identical to `_v18_median_close`, and their
+    agreement is now pinned by a cross-module test rather than asserted —
+    `trading/backtest/validation/test/test_series_level_v18_median_agreement.ml`
+    feeds one bar set to both halves and compares, including at even length
+    with differing central closes. **The agreement is about the function, not
+    the whole check**: the two halves feed it different inputs — `Series_level`
+    drops non-finite closes before any statistic and counts only the survivors
+    against `min_bars`, V18 sorts the stored array raw and counts all of it —
+    so on a NaN-carrying series the two medians differ by construction
+    (`Float.compare` orders `nan` below every real price). The claim holds for
+    finite series, which is every series the scans produced. BRK.A still
+    flags, inherited from V18.
+  - Verify: `dune runtest --force analysis/weinstein/snapshot_pipeline/test/`
+    — 18 cases; plus 3 in the cross-module drift suite under
+    `dune runtest --force trading/backtest/validation/test/`.
+    Mutation-verified, each measured red then green on revert: replacing the
+    `n_above = n_bars` predicate with a constant reddens the classification,
+    summary and drop-candidate tests; dropping the even-length mean from
+    `_median_close` reddens the ceiling-boundary case and the drift suite's
+    differing-central-closes case; loosening the ceiling test to `<` reddens
+    the ceiling-boundary case; counting `>=` the ceiling, or classifying on
+    `n_above >= n - 1`, reddens the one-bar-at-the-ceiling case; removing the
+    `Int.max 1` floor on `min_bars` raises `Invalid_argument` in the
+    empty-series case.
+  - **Not wired to anything yet**, deliberately — see Follow-ups.
+
 ## Follow-ups
 
 - Quarantine MEL from the 2000 vintage, or re-fetch and validate the series
@@ -241,11 +325,26 @@ docker exec trading-1-dev bash -c \
 - Run V18 over the canonical 26y record as first acceptance: expect MEL to
   reproduce, and review whatever else the level rule surfaces to calibrate
   whether $10,000 is the right ceiling for a broad universe.
-- Build-time sibling for V18, as `Splice_detector` is for V15: the same two
-  rules run over the whole warehouse at build rather than over the symbols one
-  run happened to touch, which is the other half of issue #2732 ask 2 ("the
-  vintage build / post-run validator"). Deliberately out of the V18 PR to keep
-  it to one new module.
+- Wire `Series_level` into `Build_runner` — report-only, behind a
+  `-detect-series-level` flag writing a `series_level.csv` sidecar — then arm
+  it on the next warehouse rebuild and read the report. The module exists and
+  is tested; nothing calls it yet, deliberately, mirroring `Splice_detector`'s
+  own #2649 (detect) / #2708 (act) sequence and keeping a `hygiene_opts` field
+  + a sidecar + a CLI flag off an already-729-line `build_runner.ml` out of the
+  detector's PR.
+- Decide, off that first armed report, whether a `Whole_window` row warrants a
+  **drop** action. **Expect the report to be able to come back empty of
+  `Whole_window` rows** — the seven seam dates evidencing sub-class (i) are all
+  *in*-window for the three committed 2026-ending vintages, so that sub-class is
+  code-level certain but has no present-day instance; an empty report is the
+  expected result, not broken wiring. The instance-verified rows are sub-class
+  (ii)'s, and those land in `Mixed_scale`. That is the gap no existing module
+  can express — `Series_tail
+  .Action` has no drop at all, and `Series_splice.Action.Dropped` needs 20+
+  splice findings — and it is what would finally cover PEGX / CGE / TNT / HTV,
+  whose prefix cut the 250-bar short-tail guard correctly refuses but which are
+  then stored artefact and all. Any such action must stay opt-in: the rule
+  knowingly flags BRK.A, and an automatic drop there deletes a real company.
 - Run V15 over the arc run as first acceptance: expect the CHS specimen to
   reproduce, and cross-check the flagged set against the 184 tradeable rows in
   `dev/experiments/arc-rerun-2026-09-01/results/splice-scan-tradeable.csv`.
@@ -266,7 +365,7 @@ docker exec trading-1-dev bash -c \
   the bar-dependent V3/V4/V7 are covered structurally but want a golden-run
   integration test.
 
-## Last updated: 2026-09-03
+## Last updated: 2026-09-13
 
 ## Interface stable
 

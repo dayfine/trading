@@ -3,7 +3,8 @@
   test_post_run_validator
   test_validator_fallback_check
   test_validator_store_check
-  test_validator_diff)
+  test_validator_diff
+  test_series_level_v18_median_agreement)
  (libraries
   core
   ounit2
@@ -11,6 +12,7 @@
   post_run_validator
   status
   types
+  weinstein.snapshot_pipeline
   weinstein.types)
  (preprocess
   (pps ppx_jane)))
