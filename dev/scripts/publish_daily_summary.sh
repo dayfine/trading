@@ -63,7 +63,7 @@
 #       went undetected for five runs, so it is pinned hardest in the test
 #       suite (see publish_daily_summary_test.sh).
 #
-#   dev/scripts/publish_daily_summary.sh publish [--dry-run] \
+#   dev/scripts/publish_daily_summary.sh publish [--dry-run] [--summary-only] \
 #       [--summary <path>] [--date YYYY-MM-DD] [--base <branch>]
 #       Resolves the summary (unless --summary is given), creates/reuses
 #       branch `ops/daily-<basename>`, commits the file, pushes it, and
@@ -72,17 +72,35 @@
 #       without creating a duplicate. Prints "PR #<n> <url>" on success so
 #       the caller's log carries proof of publication.
 #
-#       --dry-run performs summary resolution, branch creation, and the
-#       local commit, but skips the network-touching steps (the existing-PR
-#       lookup, `git push`, and the PR-create POST) entirely. This is what
-#       makes the test suite possible without network or credentials: the
-#       resolution/branch/commit logic is exercised via --dry-run against
-#       real throwaway git-repo fixtures, and the push/POST paths (success,
-#       already-exists, and failure) are exercised in non-dry-run mode
-#       against a LOCAL file:// git remote (so `git push` needs no network)
-#       with a mocked `curl` injected on PATH (same technique as
-#       orchestrator_fastexit_gate_test.sh's mock curl) for the GitHub API
-#       calls.
+#       BY DEFAULT, this also stages and folds into the same commit any
+#       dirty/untracked path under the fixed run-artifact allowlist (issue
+#       #2775 ask 1) -- see `_RUN_ARTIFACT_PATHS` below for the exact list.
+#       This exists because Step 8's call site
+#       (`.claude/agents/lead-orchestrator.md`, write-gated in this
+#       runtime) invokes this script UNCHANGED as
+#       `publish_daily_summary.sh publish --summary "$SUMMARY_FILE"`, and
+#       previously that staged only the one named file -- so
+#       `dev/status/_index.md` (Step 5.5 reconcile), `dev/reviews/*.md`
+#       (QC records), `dev/audit/*.json` (audit records), and
+#       `dev/health/*.md` (health reports) rode along in the working tree
+#       with no publisher, and were then destroyed by the orchestrator
+#       workflow's post-Step-8 `git reset --hard && git clean -fd`. Making
+#       this the DEFAULT means the existing call site starts publishing
+#       them with zero call-site change, since that call site cannot be
+#       edited from here. Pass --summary-only to opt back into the old
+#       single-file behavior.
+#
+#       --dry-run performs summary + artifact resolution, branch creation,
+#       and the local commit, but skips the network-touching steps (the
+#       existing-PR lookup, `git push`, and the PR-create POST) entirely.
+#       This is what makes the test suite possible without network or
+#       credentials: the resolution/branch/commit logic is exercised via
+#       --dry-run against real throwaway git-repo fixtures, and the
+#       push/POST paths (success, already-exists, and failure) are
+#       exercised in non-dry-run mode against a LOCAL file:// git remote
+#       (so `git push` needs no network) with a mocked `curl` injected on
+#       PATH (same technique as orchestrator_fastexit_gate_test.sh's mock
+#       curl) for the GitHub API calls.
 #
 # ENV
 #   GH_TOKEN                        Required for any non-dry-run publish.
@@ -137,6 +155,75 @@ _resolve_summary_path() {
 _branch_name_for() {
   _base=$(basename "$1" .md)
   printf 'ops/daily-%s\n' "$_base"
+}
+
+# --- run-artifact publishing (issue #2775 ask 1) ---------------------------
+#
+# FIXED allowlist -- not caller-configurable, not derived from a global
+# `git status` scan. This is deliberate: the whole point is that the
+# publisher sweeps in the run's own known durable artifacts and NOTHING
+# else, so a stray dirty file anywhere else in the tree (a half-finished
+# edit from a concurrent process, leftover scratch state, etc.) can never
+# be swept into the daily-summary commit by accident. Every entry lives
+# under dev/ and matches what the orchestrator's Step 5/5.5/6.3 actually
+# write:
+#   dev/status/_index.md  -- Step 5.5 track-status reconcile
+#   dev/reviews/          -- Step 5 QC review records (*.md)
+#   dev/audit/            -- Step 5 stage-4 audit records (*.json)
+#   dev/health/           -- Step 6.3 health-scanner fast-scan reports (*.md)
+_RUN_ARTIFACT_PATHS="dev/status/_index.md dev/reviews dev/audit dev/health"
+
+# _stage_run_artifacts
+# Stages (via `git add`) whichever of $_RUN_ARTIFACT_PATHS exist on disk,
+# and prints the list of paths that ended up newly staged as a result
+# (relative to the repo root, one per line) by diffing `git diff --cached
+# --name-only` before and after. Prints NOTHING if nothing new was staged
+# -- the caller must not assume "ran" means "staged something". A failure
+# to stage any ONE allowlist entry is logged as a named WARNING and does
+# NOT abort the publish -- the summary itself (already staged by the
+# caller before this runs) must still reach the remote even if a run
+# artifact could not be folded in.
+#
+# Deliberately does NOT read paths back out of `git status --porcelain`
+# (an earlier version did, via `cut -c4-`). Porcelain v1 C-quotes any path
+# containing a space, quote, backslash, or (with the default
+# core.quotepath=true) a non-ASCII byte -- e.g. `"dev/health/2026-09-08
+# fast.md"`, quotes included -- and feeding that quoted string back to
+# `git add` as a pathspec fails FATAL ("pathspec '\"dev/health/2026-09-08
+# fast.md\"' did not match any files"), which under this script's
+# `set -eu` used to abort `cmd_publish` before `git commit` ran: the
+# summary got staged but never committed, never pushed, no PR -- the exact
+# H-DAILY-SUMMARY-PR-LOST outcome this script exists to prevent. This
+# version instead only ever `git add`s the FOUR FIXED allowlist entries
+# themselves -- literal strings written into this script, never round-
+# tripped through git's own quoting -- so no filename shape staged
+# underneath them can ever produce a bad pathspec here. `git diff --cached
+# --name-only` output (used only for the human-readable report below,
+# never fed back to another git command as a pathspec) is unaffected
+# either way.
+_stage_run_artifacts() {
+  _raa_before=$(git diff --cached --name-only 2>/dev/null || true)
+  # shellcheck disable=SC2086 -- word-splitting on the fixed allowlist above
+  # is intentional: each element is its own pathspec, checked for existence
+  # individually (`[ -e ]`) so `git add` is never handed a mix of existing
+  # and nonexistent pathspecs -- `git add -- <a mix>` fails FATAL as soon as
+  # ONE element matches nothing on disk, even when other elements in the
+  # same call did match.
+  for _raa_entry in $_RUN_ARTIFACT_PATHS; do
+    [ -e "$_raa_entry" ] || continue
+    if ! git add -- "$_raa_entry" >/dev/null; then
+      echo "publish_daily_summary: WARNING: failed to stage run artifact $_raa_entry -- continuing without it; the summary itself will still be published" >&2
+    fi
+  done
+  _raa_after=$(git diff --cached --name-only 2>/dev/null || true)
+  [ -z "$_raa_after" ] && return 0
+  printf '%s\n' "$_raa_after" | while IFS= read -r _raa_path; do
+    [ -n "$_raa_path" ] || continue
+    if [ -n "$_raa_before" ] && printf '%s\n' "$_raa_before" | grep -qxF "$_raa_path"; then
+      continue
+    fi
+    printf '%s\n' "$_raa_path"
+  done
 }
 
 # --- GitHub REST (curl only -- `gh` is confirmed absent from the GHA
@@ -222,12 +309,17 @@ _create_pr() {
 
 cmd_publish() {
   _dry_run=0
+  _summary_only=0
   _summary=""
   _date=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --dry-run)
         _dry_run=1
+        shift
+        ;;
+      --summary-only)
+        _summary_only=1
         shift
         ;;
       --summary)
@@ -296,12 +388,27 @@ cmd_publish() {
     }
   fi
 
+  _staged_something=0
   if [ -n "$(git status --porcelain -- "$_summary")" ]; then
     git add "$_summary"
+    _staged_something=1
+  fi
+
+  _artifact_list=""
+  if [ "$_summary_only" -eq 0 ]; then
+    _artifact_list=$(_stage_run_artifacts)
+    [ -n "$_artifact_list" ] && _staged_something=1
+  fi
+
+  if [ "$_staged_something" -eq 1 ]; then
     git commit -q -m "$_title" || {
       echo "publish_daily_summary: commit failed on $_branch" >&2
       return 1
     }
+    if [ -n "$_artifact_list" ]; then
+      echo "publish_daily_summary: also staged run artifacts:"
+      printf '%s\n' "$_artifact_list" | sed 's/^/  /'
+    fi
   else
     echo "publish_daily_summary: $_summary already committed on $_branch, nothing to add"
   fi
@@ -367,7 +474,7 @@ case "${1:-}" in
     cmd_publish "$@"
     ;;
   *)
-    echo "usage: $0 {resolve [--date YYYY-MM-DD] | publish [--dry-run] [--summary <path>] [--date YYYY-MM-DD] [--base <branch>]}" >&2
+    echo "usage: $0 {resolve [--date YYYY-MM-DD] | publish [--dry-run] [--summary-only] [--summary <path>] [--date YYYY-MM-DD] [--base <branch>]}" >&2
     exit 2
     ;;
 esac
