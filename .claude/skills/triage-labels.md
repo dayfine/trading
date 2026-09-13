@@ -24,6 +24,20 @@ gh label create --repo dayfine/trading wontfix           --color CCCCCC --descri
 
 (Idempotent — `gh label create` exits non-zero if the label already exists; suppress with `|| true` when scripting.)
 
+## Owner labels (added 2026-09-13)
+
+Orthogonal to both the roles and the grades. Optional; present when a specific agent owns the item.
+
+| Label | Meaning |
+|---|---|
+| `agent/codex` | Codex picks this up (with `ready-for-agent`). Protocol: `AGENTS.md` §"Issue assignment protocol". |
+| `agent/claude` | The local Claude Code session or a feat-agent it dispatches. Off-limits to Codex. |
+
+```bash
+gh label create --repo dayfine/trading agent/codex  --color 5319E7 --description "Owner: Codex picks this up (with ready-for-agent)"
+gh label create --repo dayfine/trading agent/claude --color 0052CC --description "Owner: the local Claude Code session / dispatched feat-agents"
+```
+
 ## Grading taxonomy (added 2026-08-22, user-requested)
 
 Orthogonal to the triage roles above. Every open issue carries **one label from

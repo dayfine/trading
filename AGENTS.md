@@ -53,6 +53,46 @@ this way, and a concurrent Codex `dune build` corrupted the shared dune cache.
 The per-project Codex command policy lives in `.codex/rules/trading.rules`
 (PR #2786); the sandbox is a separate control and should stay on.
 
+## Issue assignment protocol (how work is handed to an agent)
+
+GitHub assignees cannot distinguish agents here (every agent runs as the same
+account), so **ownership is a label**, and the workflow state is the existing
+triage role (`.claude/skills/triage-labels.md`).
+
+| label | meaning |
+|---|---|
+| `ready-for-agent` | fully specified; an agent may start without asking |
+| `agent/codex` | owner is Codex |
+| `agent/claude` | owner is the local Claude Code session or a feat-agent it dispatches |
+| (no owner label) | the GHA orchestrator or whoever triages next; Codex does not take it |
+
+**Codex's loop:**
+
+1. **Pick** the open issue with `ready-for-agent` + `agent/codex` and the highest
+   priority (`P0` > `P1` > `P2` > `P3`; lowest number breaks ties). Never take an
+   issue carrying `agent/claude`, `needs-info`, `ready-for-human` or `do-not-merge`.
+2. **Claim** before touching anything: comment on the issue
+   `claimed by codex <UTC timestamp> — worktree .claude/worktrees/codex-<issue>-<slug>`.
+   If the latest comment is already a claim younger than 24 h from any agent, skip it.
+3. **Work** in that worktree per the rules above. Branch `codex/<issue>-<slug>`;
+   commits follow `CLAUDE.md`; the PR body starts with `Closes #<issue>` and has a
+   Test plan written from the diff (`grep '>::'` for OCaml tests; the script's own
+   check count for shell). One issue per PR.
+4. **Report** on the PR, not the issue: rework commits are second commits
+   (`fix(review): address QC rework iteration N (#PR)`), never amends.
+5. **Blocked or out of scope?** Comment on the issue starting with `BLOCKED:` and
+   what is needed, swap `ready-for-agent` for `needs-info` (or `ready-for-human`),
+   and stop. Do not widen the task.
+6. **Done** = the PR is open with CI green. Merging is the dispatcher's or a
+   human's; the merge's `Closes #<issue>` closes the issue. Remove your worktree.
+
+**Dispatcher side (Claude Code / human):** triage new issues (`needs-triage` →
+role + `kind/`/`size/`/`impact/`/`P` grades), add `agent/codex` to bounded,
+verifiable items (docs, shell with a test harness, single-module OCaml with
+TDD; no multi-hour backtests, no domain judgment calls), run the gate loop on
+Codex's PRs (`.claude/rules/pr-gate-loop.md`), merge, and move the owner label
+if an item is taken over (`agent/codex` → `agent/claude`, with a comment).
+
 ## Cursor Cloud specific instructions
 
 ### Overview
