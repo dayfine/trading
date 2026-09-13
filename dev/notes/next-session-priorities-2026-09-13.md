@@ -1,6 +1,6 @@
 # Next-session priorities — 2026-09-13 (supersedes 2026-09-10)
 
-Written 09:41 PT 2026-09-13 by the autonomous session that ran 00:17 → 09:41 PT while the user was away.
+Written 14:54 PT 2026-09-13 (autonomous 00:17–13:20 PT, then interactive with the user; the grid keeps running past this doc).
 The 09-10 handoff's queue items 1–3 are resolved; item 4 is running; item 5–6 untouched.
 
 ## Merged this session
@@ -23,28 +23,58 @@ anti-predictive** — the label turns over inside the moves the edge comes from.
 from the 09-04 yearly review (item 3 stop-width-by-state = REJECT-as-default/keep-axis on 09-09; the admission gate =
 REJECT-do-not-revive today). Flag stays default-off; Rule-4 retirement candidate after three sessions.
 
-## Live (check first)
+## Live (check first) — the item-4 confirmation grid is RUNNING across the session boundary
 
-- **Item 4 DONE (single-surface ACCEPT; grid owed) — 12% initial stop × weekly trail cadence on `_v10dedup`** (`dev/experiments/cadence-12w-v10-2026-09-13/`,
-  arm `a4-cadence-12w` = a0 + `initial_stop_buffer 0.9167` + `stop_update_cadence Weekly`; same build/worktree/warehouse as
-  item 3; same pre-registered binary rule). Lanes: B2 = salts 0 then 1 (started 06:32 / ~09:30), A2 = salt 2 (started 09:16).
-  **ALL THREE SALTS LANDED (09:40 / 12:29 / 12:56): realised +$2.59M / +$1.97M / +$2.48M, maxDD 37.6→30.0 / 32.8→28.1 / 43.0→33.0, Sharpe better at every salt — 3 of 3 on both pre-registered criteria = single-surface ACCEPT** (ledger `2026-09-13-stop-width-12pct-weekly-cadence-v10dedup`, `memory/project_cadence_12w_v10dedup_accept`). Mechanism = the shared trades run wider (salt 1: arm-only and null-only net to zero). V6 = 1 on arm s1/s2 = one −$2.8k IAC/MTCH spin-off twin (#2782 filed). NOT promoted — see queue item 1.
-  Read each cell with `ARM=a4-cadence-12w sh dev/experiments/deteriorating-gate-2026-09-13/read.sh <salt> .sweep-output/detgate`
-  and gate with `validator_diff -check V6` against `stop-width-by-state-2026-09-08/results/a0-breadth-on-null-s<salt>-v10-validator.sexp.sexp`.
-  Artifacts land in `.sweep-output/detgate/a4-cadence-12w-s<salt>-v10-*`; copy to `cadence-12w-v10-2026-09-13/results/`
-  (exclude `trade_audit.sexp`, 9 MB) and write the ledger entry either way.
-- Pinned worktree `sweep-detgate` removed 13:05 PT after the last cell; the container is idle.
+Launched 14:09 PT 09-13, two host-side `nohup` lanes of `dev/experiments/cadence-12w-v10-2026-09-13/chain-grid.sh`
+(pinned worktree `.claude/worktrees/sweep-detgate` @ 31e4bb9c3, build cache-warm; warehouses
+`/tmp/snap_top3000_{2009,2019}_v10dedup`; specs staged at `/tmp/grid-run/specs/`; ~50–60 min per 5y cell):
 
+- lane **G1**: `n5-2019:0 a4-2019:0 n5-2019:1 a4-2019:1 n5-2019:2 a4-2019:2` → `/tmp/grid-run/chain-G1.log`
+- lane **G2**: `n5-2009:0 a4-2009:0 n5-2009:1 a4-2009:1 n5-2009:2 a4-2009:2` → `/tmp/grid-run/chain-G2.log`
+- artifacts: `.sweep-output/detgate-grid/<spec>-s<salt>-v10-*` (= container `/tmp/sweeps/detgate-grid`)
+
+**Pickup procedure:** `tail /tmp/grid-run/chain-G?.log` and `docker exec trading-1-dev sh -c 'ps -eo etime,args | grep "[s]cenario_runner"'`.
+If a lane died (no process, no `LANE .. DONE`), re-run the SAME command line — the chain skips every cell that already has
+a `RESULT` line in its lane log and restarts the interrupted cell from scratch. Each null/arm pair at a salt is read with
+`validator_diff -check V6` (null vs arm reports) and
+`ARM=a4-2019 sh dev/experiments/deteriorating-gate-2026-09-13/read.sh <salt> .sweep-output/detgate-grid` — NOTE that
+`read.sh` hardcodes the 26y a0 null; for the grid cells pass the null explicitly by editing `N=` to
+`.sweep-output/detgate-grid/n5-<vintage>-s<salt>-v10` (or copy the script). Decision rule per cell = the pre-registered
+one (realised AND maxDD better at ≥ 2 of 3 salts); the grid clears if the 26y cell + both 5y cells clear
+(`promotion-confirmation.md`: strong majority, never badly dominated). Copy per-arm artifacts (no `trade_audit.sexp`)
+into `cadence-12w-v10-2026-09-13/results/`, log each pair in its README, then the ledger amendment.
+After the grid: `git worktree remove --force .claude/worktrees/sweep-detgate` and delete the persistent monitors if
+any are still listed in `/tasks`.
+
+## Settled this afternoon (screens, no cells): `cadence-12w-v10-2026-09-13/screens/README.md`
+
+- **Width is NOT linear**: replaying narrower initial stops on the wide arm's own trades gives flat ≤ 6%, a knee 7→9%,
+  a plateau 9–12% (±$0.4M) at three salts. The promotable value is the plateau → a 10%-weekly neighbour arm is owed.
+- **Four of five breadth states gain from wide at 3/3 salts, Deteriorating included** (its record loss was whipsaw:
+  stop-out 81% → 59%). The only cohort wide hurts is Bearish-week FILLS of older resting tickets (3/3, $0.1–0.4M).
+- **No-builds, with tables:** exit/tighten resting stops on `Deteriorating` (−$0.1…−1.2M on the wide arm at 4% or 8%),
+  on a Bearish onset (−$0.7…−1.2M), on leaving Bullish (−$1.8…−2.9M), on an index-speed trigger (−$0.3…−0.45M, fires
+  after the stop has cut); selective poor-RS exit at Bearish onsets (poor subset 1–17 positions, no consistent sign);
+  per-state map 4/8/12 for Deteriorating (already answered by the cohort table + item 3) and 4/8 for Bearish (a no-op:
+  the map sizes at placement, the gate never places Bearish tickets). Book Ch. 6/8 read and reconciled (see the screens README).
 
 ## Queue (in order)
 
-1. **Item 4 promotion path (ACCEPT → grid, no default flip yet):** (a) confirmation grid — 2009 and 2019 `_v10dedup` vintages, 5y record-convention windows at 3 salts each, paired against their own nulls (the 26y cell is the bear-regime cell; `promotion-confirmation.md` broad-vs-broad); (b) dissect the 5–6 force liquidations per arm cell (phantom pre-#2695 classes vs real gaps); (c) paired goldens for BOTH knobs (`config-default-blast-radius.md`) and the W2 book argument (12% is outside §5.3's 4–6% band; weekly re-evaluation is L3) in the promotion PR. Also #2782: spin-off backfill twins (MTCH ≡ IAC pre-2015) survive the rename-twin dedupe — extend the detector before the next rebuild.
-2. **Orchestrator summary push (D2)** — carried from 09-10 item 5: step 8 sets git identity but jj reads its own and `@` is
-   never described. Harness PR on `.github/workflows/`, full gates, idle container.
-3. **Follow-ups carried:** #2753 (publisher 422-guard unpinned, 53/53); #2729 residuals; the `stop_loss` label hiding
-   the `Per_position` breaker; `_v9gap` 2009 has no 5y spec (write it against `_v10dedup` 2009).
-4. **Rule-4 retirement worklist:** `deteriorating_blocks_longs` becomes removable after three sessions (this is session 1);
-   `initial_stop_buffer_by_macro_state` stays (keep-as-axis).
+1. **Finish the grid** (above) → three-cell verdict → ledger amendment; if it holds, **add the 10%-weekly neighbour arm**
+   (26y + both 5y vintages, 3 salts) before any promotion PR.
+2. **Force-liquidation dissection** on the wide cells (5–6 per cell vs 2–3; `force_liquidations.sexp` committed):
+   phantom pre-#2695 classes or real gaps. Dispatcher-side.
+3. **Cancel-on-Bearish** (`cancel_resting_longs_on_bearish`, default-off; book: suspend buying in Stage 4): mechanism PR
+   (new `CancelEntry` reason + one read site where resting tickets are re-evaluated; #2709 added the `delisted` reason
+   the same way), full gates, then one 3-salt arm on top of wide-weekly. Expected $0.1–0.4M/salt on a ~100-trade cohort.
+4. **Promotion PR for wide-weekly** only after 1–3: two-knob paired goldens (`config-default-blast-radius.md`), the §5.3
+   argument (12% or 10% as a modern-regime dial; weekly re-evaluation = L3), `experiment-flag-discipline.md` R3.
+5. **Record the no-builds as a memory + retire the dead axes** (Rule 4 clock starts for `deteriorating_blocks_longs`).
+6. **Entry side (later):** Recovering-week deployment cap — 2020-04/05 admitted 18/11/20/20 vs 8/5/5/4 taken; a
+   portfolio-risk dial (position count / exposure ramp on the index's Stage-1→2 flip), book-faithful; screen first.
+7. Carried: orchestrator D2 push (09-10 item 5); #2753; #2729 residuals; `stop_loss` label hiding the `Per_position`
+   breaker; #2782 spin-off backfill twins before the next warehouse rebuild; #2785 (Codex howto draft) needs the
+   "docs-only PRs skip the build gate" line and Codex's second look.
 
 ## Ops notes
 
