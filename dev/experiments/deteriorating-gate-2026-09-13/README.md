@@ -116,8 +116,8 @@ maxDD 1 of 3. The gate does not clear — REJECT.**
 
 **Why (the transferable part).** `Deteriorating` is a *direction* label on breadth inside a Bullish/Neutral tape. Over
 2000–2026 it fires on 52 weeks — 6 in 2020, 20 in 2022–23 — i.e. during fast recoveries and chop, which is exactly
-where the record's late-cycle monsters are bought (NVDA 2020-04-06 and UTHR 2020-12-02 are null-only at all three
-salts; BBWI 2020-08-08 at two; KLIC 2020-11-09 at one). Blocking admission on that label removes the fat tail the
+where the record's late-cycle monsters are bought (NVDA 2020-04-06 is null-only at all three
+salts; UTHR 2020-12-02 at two — salts 1 and 2, absent from both arms at salt 0; BBWI 2020-08-08 at two; KLIC 2020-11-09 at one). Blocking admission on that label removes the fat tail the
 strategy's edge consists of (`project_edge_is_the_fat_tail`), and the freed slots buy ordinary names (AEIS, AN, CLS)
 that do not replace it. The 09-04 observation that Deteriorating-state *entries* lost −$604k on the record was a
 cohort read below the 230-trade floor (`feedback_perturb_before_believing_a_cohort_split`) — on a paired,
@@ -126,9 +126,38 @@ net entries disappear but 290–330 change). The exit mix shifts toward stops (s
 244 → 227 rotations) — the opposite of every lever that has ever helped.
 
 **Classification (experiment-flag-discipline Rule 4): REJECT-do-not-revive for admission gating on `Deteriorating`.**
+*(Superseded — see the amendment below; the paragraph is kept as the record of what was first written.)*
 Unlike the per-state stop width (kept as a regime axis), there is no untested neighbour here: the flag is binary,
 the state is the book's directional read, and the result is anti-predictive by mechanism, not by noise. The flag
 stays default-off (R1) and becomes a retirement candidate after three sessions per Rule 4. This closes the
 state-conditioning line opened by the 09-04 yearly review (item 3 stop-width-by-state: REJECT-as-default; item 3'
 admission gate: REJECT-do-not-revive). Forward guidance unchanged: the record's gap is entry-side but
 *tail-preserving* levers only — breadth of the funnel, not narrowing it by regime labels.
+
+## Amendment 2026-09-13 (#2780) — classification is REJECT-as-default-but-legitimate-axis, not do-not-revive
+
+A post-merge audit (#2780) found the REJECT correct and independently re-derived (V6 = 0 on all six cells; realised
+−$1,699,946 / −$815,935 / −$1,247,695; maxDD 1 of 3) but the **do-not-revive** classification not earned:
+
+- The pre-registered failure branch above reads *"REJECT-as-default; keep-as-axis only if …"*. Escalating the
+  consequence to do-not-revive after the numbers were seen is the defect class pre-registration exists to prevent.
+- Rule 4 defines do-not-revive as failure *across every tested context*; its exemplar (early-admission) earned it on a
+  27-year cross-regime reversal. This experiment is one period × one universe × one preset; salts perturb the fill
+  path and are not independent contexts (`promotion-confirmation.md`). The mechanism's own causal story is
+  regime-scoped (52 `Deteriorating` weeks, concentrated in 2020 and 2022–23), so a different composition vintage is
+  precisely the untested neighbour. The sibling instrument (per-state stop width, 09-09) received keep-as-axis on the
+  same evidential shape.
+
+**Amended classification: REJECT-as-default-but-legitimate-axis.** `deteriorating_blocks_longs` stays default-off and
+searchable; it is removed from the Rule-4 retirement worklist. It earns do-not-revive only if a second broad cell on a
+different vintage (2009 or 2019 `_v10dedup`, three salts, paired against that vintage's own null) also fails both
+pre-registered criteria. The forward guidance is unchanged and lives in `memory/project_deteriorating_gate_reject`:
+regime labels applied to admission are anti-predictive because the label turns over inside the moves the edge comes
+from; entry-side work must be tail-preserving.
+
+Two factual corrections to the durable records (ledger notes, this README, the #2776 body): **UTHR 2020-12-02 is
+null-only at two salts (1 and 2), not three — at salt 0 it appears in neither arm** (verified from the committed
+`trades.csv`: null UTHR entries 2002-11-21 / 2014-08-29 at salt 0). NVDA 2020-04-06 (all three), BBWI 2020-08-08 (two)
+and KLIC 2020-11-09 (one) stand. The ledger's `mean_calmar 0.0000` placeholders for the gate cells are filled from
+`actual.sexp` `calmar_ratio`: gate **0.1000 / 0.1327 / 0.1051** vs null 0.1629 / 0.1676 / 0.1827 — worse at every
+salt, which strengthens the REJECT.
