@@ -23,6 +23,37 @@ what to *run* when, so the session neither idles nor thrashes.
 The rule that follows from the table: **a long backtest and an agent wave are
 mutually exclusive; dispatcher-side work is free and should fill every gap.**
 
+## GHA runner — memory-bound, not the local Cap 3
+
+The table above is calibrated to `trading-1-dev`, the **local** devcontainer
+(7.75 GB / ~8 cores). The **GHA runner** is a different, tighter resource:
+**15 GB total** (`free -g`), and it is **memory-bound, not core-bound** — the
+"Cap 3" agent ceiling above does not transfer to it as-is.
+
+Measured 2026-09-13, GHA run 34757914354: two QC agents were dispatched
+concurrently, each running a full OCaml `dune build`/`dune runtest`, and one
+was **OOM-killed (exit 137)**. Its verdict came back `NEEDS_REWORK` — but the
+finding was entirely about scheduling, not the code: CI was green on the same
+SHA, and the reviewer's own writeup recommended "retry in a fresh environment
+with adequate memory." A resource-contention artifact was read as a code
+defect.
+
+| on the GHA runner | cap |
+|---|---|
+| concurrent agents (QC / feat / harness), dispatched | 3 |
+| concurrent `dune build` / `dune runtest` in flight, of any kind | **1** |
+
+The build cap is the binding one, and it is smaller than the agent cap: **an
+agent that is not currently running `dune` does not consume it**, so up to 3
+agents can be dispatched concurrently as long as no two of them are compiling
+OCaml at the same instant. Two simultaneous full links is enough to trip the
+OOM on this runner's 15 GB ceiling.
+
+An OOM here behaves exactly as documented in "Diagnosing an OOM kill" below:
+no exception, no stack, no `Killed` line — just a verdict or a result that
+reads like a real finding. Absence of an error message is evidence *for* OOM
+under memory pressure here too, not evidence the review or run was sound.
+
 ## QC outranks backtests (user directive, 2026-08-18)
 
 **An open PR waiting on QC is scheduled BEFORE any backtest.** When the two
