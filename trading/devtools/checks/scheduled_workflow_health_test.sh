@@ -59,7 +59,7 @@
 #      naming the runs path. This is the exact fixture shape a prior
 #      review built by hand and found missing: assertions 6/7 fail on
 #      *every* path, so the list call fails first and the runs-call
-#      failure path (main()'s `if ! _run_line=$(_newest_scheduled_run
+#      failure path (main()'s `if ! _run_line=$(_recent_scheduled_runs
 #      ...)` and that function's own `if ! _resp=$(_api_get_json ...)`)
 #      was never exercised, on the higher-frequency of the two call
 #      sites (once per workflow vs. once per list page).
@@ -80,6 +80,29 @@
 #      is hit, rather than hanging. A prior review found the unbounded
 #      loop hangs (not fails) under a propagation-severed mutation --
 #      this pins the defensive bound added in response.
+#  17. Six consecutive failures with no newer run on top -> RED with
+#      streak=6 (streak reported exactly, since the fetched page of 10
+#      came back shorter than 10 -- the workflow's entire observed
+#      history was seen, so there's no floor to hedge).
+#  18. THE INCIDENT SHAPE this whole rework exists to fix: the same six
+#      consecutive failures as #17, but with a SEVENTH, newest run on top
+#      that is still `in_progress` (conclusion null) -- the exact state
+#      of the 2026-09-10..12 outage, where the health check's own
+#      currently-executing run was the newest run at scan time. Must
+#      still be RED, streak=6, in_progress=1. This is the regression
+#      test for the bug: verified by hand to FAIL against the
+#      pre-rework script (which reported OK / exit 0, see the PR
+#      description for the measured before/after) and PASS against the
+#      reworked one.
+#  19. A single failure followed (older) by a success -> NOT RED. Streaks
+#      are consecutive-from-newest: the newest completed run is a
+#      success, so the streak is 0 regardless of older history. A
+#      recovered workflow reads as recovered, not as "has ever failed."
+#  20. Every one of the fetched runs is `in_progress` / `queued` (none
+#      completed) -> classified UNOBSERVABLE, not OK, and does not by
+#      itself force a non-zero exit -- there's no positive evidence of
+#      failure, only an absence of any completed run to read a verdict
+#      from.
 #
 # Run: sh trading/devtools/checks/scheduled_workflow_health_test.sh
 
@@ -137,10 +160,10 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Alpha Weekly","state":"active"},{"id":2,"name":"Beta Nightly","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=1")
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=1")
+  *"actions/workflows/2/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":222,"conclusion":"success","status":"completed","created_at":"2026-09-03T12:00:00Z"}]}'
     ;;
   *)
@@ -170,10 +193,10 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Prune candidates weekly","state":"active"},{"id":2,"name":"Build CI image","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=1")
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":111,"conclusion":"failure","status":"completed","created_at":"2026-08-31T16:26:33Z"}]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=1")
+  *"actions/workflows/2/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":222,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
@@ -203,7 +226,7 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Weekly track pacer","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=1")
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-08-01T00:00:00Z"}]}'
     ;;
   *)
@@ -232,10 +255,10 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Manual-only workflow","state":"active"},{"id":2,"name":"Healthy Weekly","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=1")
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=1")
+  *"actions/workflows/2/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":222,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
@@ -360,16 +383,16 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":4,"workflows":[{"id":1,"name":"Failure wf","state":"active"},{"id":2,"name":"Cancelled wf","state":"active"},{"id":3,"name":"Timed out wf","state":"active"},{"id":4,"name":"Action required wf","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=1")
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":111,"conclusion":"failure","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=1")
+  *"actions/workflows/2/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":222,"conclusion":"cancelled","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
-  *"actions/workflows/3/runs?event=schedule&per_page=1")
+  *"actions/workflows/3/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":333,"conclusion":"timed_out","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
-  *"actions/workflows/4/runs?event=schedule&per_page=1")
+  *"actions/workflows/4/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":444,"conclusion":"action_required","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
@@ -401,11 +424,11 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Prune candidates weekly","state":"active"},{"id":2,"name":"Weekly track pacer","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=1")
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
     echo "simulated network failure on runs call" >&2
     exit 22
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=1")
+  *"actions/workflows/2/runs?event=schedule&per_page=10")
     echo "simulated network failure on runs call" >&2
     exit 22
     ;;
@@ -435,7 +458,7 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Weekly start sweep (BAH SPY)","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=1")
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
     echo "<html>not json</html>"
     ;;
   *)
@@ -478,7 +501,7 @@ case "$path" in
   *"repos/some-org/some-other-repo/actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Override repo wf","state":"active"}]}'
     ;;
-  *"repos/some-org/some-other-repo/actions/workflows/1/runs?event=schedule&per_page=1")
+  *"repos/some-org/some-other-repo/actions/workflows/1/runs?event=schedule&per_page=10")
     echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
@@ -538,6 +561,156 @@ if [ "$RC16" -eq 3 ] && echo "$OUT16" | grep -q 'pagination exceeded 3 page(s)';
   pass "assertion 16: unbounded-looking pagination is bounded -- exits 3 instead of hanging"
 else
   fail "assertion 16: expected exit3 with the pagination-bound message, got rc=$RC16 output=$OUT16"
+fi
+
+echo "=== Assertion 17: six consecutive failures, no newer run -> RED streak=6 (exact) ==="
+SHIM17="${TMPDIR_ROOT}/fetch17.sh"
+cat > "$SHIM17" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Daily orchestrator","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
+    echo '{"workflow_runs":[
+      {"id":699,"conclusion":"failure","status":"completed","created_at":"2026-09-12T15:32:00Z"},
+      {"id":698,"conclusion":"failure","status":"completed","created_at":"2026-09-12T11:37:00Z"},
+      {"id":697,"conclusion":"failure","status":"completed","created_at":"2026-09-11T16:29:00Z"},
+      {"id":696,"conclusion":"failure","status":"completed","created_at":"2026-09-11T12:13:00Z"},
+      {"id":695,"conclusion":"failure","status":"completed","created_at":"2026-09-10T16:24:00Z"},
+      {"id":694,"conclusion":"failure","status":"completed","created_at":"2026-09-10T12:14:00Z"}
+    ]}'
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM17"
+NOW17="$(date -u -d "2026-09-12T16:00:00Z" +%s)"
+_run "$SHIM17" "$NOW17"
+if [ "$RC" -ne 0 ] \
+  && echo "$OUT" | grep -q '^RED	Daily orchestrator' \
+  && echo "$OUT" | grep -q 'streak=6 ' \
+  && ! echo "$OUT" | grep -q 'streak=6+' \
+  && ! echo "$OUT" | grep -q 'streak=>=6'; then
+  pass "assertion 17: six consecutive failures -> RED, streak=6 (exact, page came back short)"
+else
+  fail "assertion 17: expected RED with exact streak=6, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 18: THE INCIDENT SHAPE -- 6 failures + newest in_progress -> still RED streak=6 ==="
+# This is the exact regression this rework exists to fix: verified by hand
+# (see PR description) that this fixture produces OK/exit0 against the
+# pre-rework script (single newest-run inspection classified the
+# in_progress newest run as OK, silently masking the 6-failure streak
+# underneath it) and RED/streak=6/exit-non-zero against the reworked one.
+SHIM18="${TMPDIR_ROOT}/fetch18.sh"
+cat > "$SHIM18" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Daily orchestrator","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
+    echo '{"workflow_runs":[
+      {"id":700,"conclusion":null,"status":"in_progress","created_at":"2026-09-12T15:32:00Z"},
+      {"id":699,"conclusion":"failure","status":"completed","created_at":"2026-09-12T15:32:00Z"},
+      {"id":698,"conclusion":"failure","status":"completed","created_at":"2026-09-12T11:37:00Z"},
+      {"id":697,"conclusion":"failure","status":"completed","created_at":"2026-09-11T16:29:00Z"},
+      {"id":696,"conclusion":"failure","status":"completed","created_at":"2026-09-11T12:13:00Z"},
+      {"id":695,"conclusion":"failure","status":"completed","created_at":"2026-09-10T16:24:00Z"},
+      {"id":694,"conclusion":"failure","status":"completed","created_at":"2026-09-10T12:14:00Z"}
+    ]}'
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM18"
+NOW18="$(date -u -d "2026-09-12T15:40:00Z" +%s)"
+_run "$SHIM18" "$NOW18"
+if [ "$RC" -ne 0 ] \
+  && echo "$OUT" | grep -q '^RED	Daily orchestrator' \
+  && echo "$OUT" | grep -q 'streak=6 in_progress=1' \
+  && echo "$OUT" | grep -q 'status=in_progress'; then
+  pass "assertion 18: incident shape (6 failures + in_progress newest) -> RED streak=6 in_progress=1, not masked"
+else
+  fail "assertion 18: expected RED streak=6 in_progress=1 (the incident this rework fixes), got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 19: single failure, then (older) a success -> NOT RED, recovered ==="
+SHIM19="${TMPDIR_ROOT}/fetch19.sh"
+cat > "$SHIM19" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Recovered Weekly","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
+    echo '{"workflow_runs":[
+      {"id":902,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"},
+      {"id":901,"conclusion":"failure","status":"completed","created_at":"2026-08-28T00:00:00Z"}
+    ]}'
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM19"
+NOW19="$(date -u -d "2026-09-04T06:00:00Z" +%s)"
+_run "$SHIM19" "$NOW19"
+if [ "$RC" -eq 0 ] \
+  && echo "$OUT" | grep -q '^OK	Recovered Weekly' \
+  && echo "$OUT" | grep -q 'streak=0'; then
+  pass "assertion 19: newest run recovered (success) after an older failure -> not RED, streak=0"
+else
+  fail "assertion 19: expected OK/streak=0 for a recovered workflow, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 20: every fetched run is in_progress/queued -> UNOBSERVABLE, not OK ==="
+SHIM20="${TMPDIR_ROOT}/fetch20.sh"
+cat > "$SHIM20" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":2,"workflows":[{"id":1,"name":"Mid-flight sweep","state":"active"},{"id":2,"name":"Healthy Weekly","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?event=schedule&per_page=10")
+    echo '{"workflow_runs":[
+      {"id":800,"conclusion":null,"status":"in_progress","created_at":"2026-09-12T15:00:00Z"},
+      {"id":799,"conclusion":null,"status":"queued","created_at":"2026-09-12T14:55:00Z"}
+    ]}'
+    ;;
+  *"actions/workflows/2/runs?event=schedule&per_page=10")
+    echo '{"workflow_runs":[{"id":222,"conclusion":"success","status":"completed","created_at":"2026-09-12T00:00:00Z"}]}'
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM20"
+NOW20="$(date -u -d "2026-09-12T15:10:00Z" +%s)"
+_run "$SHIM20" "$NOW20"
+if [ "$RC" -eq 0 ] \
+  && echo "$OUT" | grep -q '^UNOBSERVABLE	Mid-flight sweep' \
+  && ! echo "$OUT" | grep -q '^OK	Mid-flight sweep' \
+  && echo "$OUT" | grep -q '^OK	Healthy Weekly' \
+  && echo "$OUT" | grep -q 'unobservable=1'; then
+  pass "assertion 20: all-in-progress workflow -> UNOBSERVABLE (never OK), does not force non-zero exit"
+else
+  fail "assertion 20: expected UNOBSERVABLE (not OK) and exit0, got rc=$RC output=$OUT"
 fi
 
 echo ""
