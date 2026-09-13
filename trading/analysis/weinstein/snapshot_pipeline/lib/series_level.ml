@@ -85,18 +85,24 @@ let _finding (c : Config.t) ~symbol ~closes ~dates ~median =
     n_above;
   }
 
+(* Split into one guard per function rather than a chain of nested [else]s: each
+   of the three reasons for [None] — disabled, too short, plausible — reads on
+   its own. [bars] here are already the finite-close ones. *)
+let _classify_long_enough (c : Config.t) ~symbol bars =
+  let closes = _sorted_closes bars in
+  let median = _median_close closes in
+  if Float.( <= ) median c.median_close_max then None
+  else Some (_finding c ~symbol ~closes ~dates:(_sorted_dates bars) ~median)
+
 (* [Int.max 1] so a zero or negative [min_bars] still cannot ask for the median
    of an empty series; V18's step guard reads the same way. *)
+let _classify_enabled (c : Config.t) ~symbol bars =
+  let finite = _finite_bars bars in
+  if List.length finite < Int.max 1 c.min_bars then None
+  else _classify_long_enough c ~symbol finite
+
 let classify (c : Config.t) ~symbol bars =
-  if not c.enabled then None
-  else
-    let bars = _finite_bars bars in
-    if List.length bars < Int.max 1 c.min_bars then None
-    else
-      let closes = _sorted_closes bars in
-      let median = _median_close closes in
-      if Float.( <= ) median c.median_close_max then None
-      else Some (_finding c ~symbol ~closes ~dates:(_sorted_dates bars) ~median)
+  if c.enabled then _classify_enabled c ~symbol bars else None
 
 let whole_window_symbols findings =
   List.filter_map findings ~f:(fun f ->
