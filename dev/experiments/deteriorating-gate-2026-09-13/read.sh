@@ -1,12 +1,12 @@
 #!/bin/sh
 # Per-salt paired read: null = committed a0-breadth-on-null-s<salt>-v10 (stop-width-by-state-2026-09-08/results),
-# arm = a3-deteriorating-gate-s<salt>-v10 (results/ here, or the artifact dir given as $2).
+# arm = $ARM-s<salt>-v10 (ARM defaults to a3-deteriorating-gate; results/ here, or the artifact dir given as $2).
 # Prints level / realised / unrealised / maxDD / trades / exit mix, then the symbol|entry_date join
 # (shared, null-only, arm-only) with top movers. Usage: sh read.sh <salt> [arm-artifact-dir]
 set -eu
-salt=$1; ARMDIR=${2:-dev/experiments/deteriorating-gate-2026-09-13/results}
+salt=$1; ARMDIR=${2:-dev/experiments/deteriorating-gate-2026-09-13/results}; ARM=${ARM:-a3-deteriorating-gate}
 N=dev/experiments/stop-width-by-state-2026-09-08/results/a0-breadth-on-null-s$salt-v10
-A=$ARMDIR/a3-deteriorating-gate-s$salt-v10
+A=$ARMDIR/$ARM-s$salt-v10
 k() { grep -oE "\($2 [0-9.eE+-]+" "$1-actual.sexp" | awk '{print $2}'; }
 hdr() { printf '%-6s %10s %8s %12s %12s %8s\n' arm level trades realised unrealised maxDD; }
 row() { printf '%-6s %10.2f %8d %12.0f %12.0f %8.2f\n' "$1" "$(k $2 total_return_pct)" "$(k $2 total_trades)" \

@@ -49,3 +49,86 @@ from the chain log, the second-finishing lane's summary line can carry both arms
   (flag-off identity pinned by `test_deteriorating_blocks_longs_off_is_identity` + the widened truth table),
   #2758 (build-time builder flag, default-off, warehouse already built), #2750 (V18 validator check — post-run
   report only), #2767 (devtools test), ops/docs/harness. No a0 tripwire cell re-run (3 h); accepted by inspection.
+
+- 06:31 PT: **salt 1 = 229.23% / 675 trades / Sharpe 0.370 / maxDD 34.68** (wall 9,544 s; `results/a3-deteriorating-gate-s1-v10-*`)
+  vs the null's **311.75 / 707 / 0.427 / 32.75**. V16/V17 PASS, **V6 = 0 on both, `validator_diff -check V6` exit 0**.
+  **The gate LOSES at salt 1 on both criteria:** realised $2.94M → $2.12M (**−$816k**), unrealised $0.31M → $0.28M,
+  maxDD **worse** (32.8 → 34.7). Exit mix `stop_loss` 458 → 436, `laggard_rotation` 236 → 223 (fewer trades, same shape).
+  Join (`symbol|entry_date`): 384 shared +$1.72M → +$1.81M (drift +$95k: LOGI +$42k, MKSI +$26k); **null-only 323
+  trades +$1.22M** (BBWI 2020-08-08 +$377k, NVDA 2020-04-06 +$316k, BPT 2022-01-22 +$298k, B 2025-08 +$203k, UTHR
+  2020-12 +$166k) vs **gate-only 291 trades +$0.31M** (AEIS 2025-06-24 +$483k, UPBD +$238k, AN +$224k; MTCH 2020-06
+  −$239k, CLE −$131k, CNMD −$122k). Only 32 net entries disappear (707 → 675) but ~320 re-draw: blocking a week's
+  candidates shifts every later fill, so most of the delta is path re-draw, not the removed cohort itself. The
+  removed 2020 names (NVDA 04-06, BBWI 08-08, UTHR 12-02) are COVID-recovery monsters — Deteriorating fired inside a
+  Bullish/Neutral tape during the recovery (the audit shows 52 Deteriorating weeks, 17 Recovering). The gate is live
+  in the sim: on every Deteriorating week `long_top_n_admitted` = 0 (see the effectiveness table below). Open names
+  ADTN EXTR PKE QCOM URI (null) vs AVT QCOM SNA SXT URI (gate).
+
+  Effectiveness table (salt-1 arm, from `trade_audit.sexp`'s weekly cascade rows — weeks / Σ`long_top_n_admitted` / Σ`entered`):
+
+  | breadth_state | weeks | long_top_n | entered |
+  |---|---:|---:|---:|
+  | Bullish_breadth | 720 | 14,400 | 818 |
+  | Neutral_breadth | 148 | 2,960 | 320 |
+  | Recovering | 17 | 329 | 64 |
+  | **Deteriorating** | **52** | **0** | **0** |
+  | Bearish_breadth | 398 | 0 | 0 |
+
+  Deteriorating weeks by year: 2000:3 2007:3 2014:2 2015:2 2018:4 2019:2 2020:6 2021:2 **2022:10 2023:10** 2025:5 2026:3 —
+  the state fires mostly in the 2022–23 chop and inside the 2020 recovery, i.e. exactly where the record's late-cycle
+  monsters (NVDA, BBWI, UTHR) were bought.
+
+- 06:36 PT: **salt 0 = 179.91% / 700 trades / Sharpe 0.325 / maxDD 39.62** (wall 9,859 s; `results/a3-deteriorating-gate-s0-v10-*`)
+  vs the null's **382.74 / 710 / 0.445 / 37.60**. V16/V17 PASS, **V6 = 0 on both, `validator_diff -check V6` exit 0**.
+  **The gate LOSES at salt 0 on both criteria, harder:** realised $3.24M → $1.54M (**−$1.70M**), unrealised $0.78M → $0.37M,
+  maxDD **worse** (37.6 → 39.6). Exit mix `stop_loss` 450 → 459, `laggard_rotation` 244 → 227 — the gate hands exits
+  BACK to stops (the opposite of the direction every winning lever has shown). Join: 389 shared +$1.08M → +$1.19M
+  (drift +$116k: CSL, AMKR, QGEN); **null-only 321 trades +$2.16M** (BBWI 2020-08-08 +$532k, NVDA 2020-04-06 +$450k,
+  UPBD 2020-12-21 +$324k, KR 2014 +$268k, B 2025 +$267k, IPIXQ 2004 +$256k) vs **gate-only 311 trades +$0.35M**
+  (AEIS 2025-06-24 +$382k, BBWI 2020-08-**05** +$280k — the same name bought three days earlier at a smaller size,
+  MKSI +$267k, CLB +$254k; MTCH 2020-06 −$193k, CLE −$142k). Open names ADTN ARW ONTO QCOM (null) vs AVT NOK QCOM SXT URI.
+  **Two of three salts have now failed both pre-registered criteria, so the decision rule is settled: the gate does
+  not clear.** Salt 2 runs to completion for the band. The same two names head the null-only list at both salts
+  (NVDA 2020-04-06, BBWI 2020-08-08) — `Deteriorating` fires INSIDE the 2020 recovery (6 of its 52 weeks are 2020),
+  which is where the record's monsters are bought; blocking admission there is anti-predictive by construction,
+  the same shape as `project_cascade_selection_inversion` and `project_edge_is_the_fat_tail`.
+
+- 09:16 PT: **salt 2 = 197.90% / 690 trades / Sharpe 0.336 / maxDD 40.04** (wall 9,575 s; `results/a3-deteriorating-gate-s2-v10-*`)
+  vs the null's **639.74 / 728 / 0.526 / 42.96**. V16/V17 PASS, **V6 = 0 on both, `validator_diff -check V6` exit 0**.
+  Realised $2.70M → $1.46M (**−$1.25M**); unrealised $3.84M → $0.63M (the null's level is its three open names ADTN/MU/URI —
+  the band caveat, not a gate effect); maxDD **better** here (43.0 → 40.0), the one criterion the gate wins at one salt.
+  Exit mix `stop_loss` 481 → 458, `laggard_rotation` 233 → 218. Join: 395 shared +$0.77M → +$0.84M (drift +$78k);
+  **null-only 333 trades +$1.94M** (NVDA 2020-04-06 +$308k for the third time, KLIC 2020-11-09 +$302k, BPT 2022-01-22
+  +$290k, IPIXQ 2004 +$255k, TK 2022-11 +$199k, AROC 2023-11 +$186k, UTHR 2020-12 +$163k) vs **gate-only 295 trades
+  +$0.61M** (CLS 2023-07-01 +$522k, AN 2020-08-04 +$181k; MTCH 2020-06-18 −$199k for the third time, BCRX −$86k).
+  Open names ADTN MU URI (null) vs ADTN ALKS ARW NOK URI.
+
+## Three-salt read (all on `_v10dedup`, build 31e4bb9c3 vs null build 969637974; V6 = 0 on all six cells)
+
+| salt | null a0-v10 (level / trades / Sharpe / maxDD) | gate a3 | Δ level | realised Δ | unrealised Δ | maxDD |
+|---|---|---|---:|---:|---:|---|
+| 0 | 382.74 / 710 / 0.445 / 37.60 | 179.91 / 700 / 0.325 / 39.62 | −203pp | **−$1.70M** | −$0.40M | **worse** (+2.0) |
+| 1 | 311.75 / 707 / 0.427 / 32.75 | 229.23 / 675 / 0.370 / 34.68 | −83pp | **−$0.82M** | −$0.03M | **worse** (+1.9) |
+| 2 | 639.74 / 728 / 0.526 / 42.96 | 197.90 / 690 / 0.336 / 40.04 | −442pp | **−$1.25M** | −$3.21M (null's open MTM) | better (−2.9) |
+
+**Pre-registered rule: clears only if realised P&L AND maxDD both improve at ≥ 2 of 3 salts. Result: realised 0 of 3,
+maxDD 1 of 3. The gate does not clear — REJECT.**
+
+**Why (the transferable part).** `Deteriorating` is a *direction* label on breadth inside a Bullish/Neutral tape. Over
+2000–2026 it fires on 52 weeks — 6 in 2020, 20 in 2022–23 — i.e. during fast recoveries and chop, which is exactly
+where the record's late-cycle monsters are bought (NVDA 2020-04-06 and UTHR 2020-12-02 are null-only at all three
+salts; BBWI 2020-08-08 at two; KLIC 2020-11-09 at one). Blocking admission on that label removes the fat tail the
+strategy's edge consists of (`project_edge_is_the_fat_tail`), and the freed slots buy ordinary names (AEIS, AN, CLS)
+that do not replace it. The 09-04 observation that Deteriorating-state *entries* lost −$604k on the record was a
+cohort read below the 230-trade floor (`feedback_perturb_before_believing_a_cohort_split`) — on a paired,
+salted run the cohort's removal costs $0.8–1.7M realised per salt, because ~320 later fills re-draw too (only 10–38
+net entries disappear but 290–330 change). The exit mix shifts toward stops (salt 0: 450 → 459 `stop_loss`,
+244 → 227 rotations) — the opposite of every lever that has ever helped.
+
+**Classification (experiment-flag-discipline Rule 4): REJECT-do-not-revive for admission gating on `Deteriorating`.**
+Unlike the per-state stop width (kept as a regime axis), there is no untested neighbour here: the flag is binary,
+the state is the book's directional read, and the result is anti-predictive by mechanism, not by noise. The flag
+stays default-off (R1) and becomes a retirement candidate after three sessions per Rule 4. This closes the
+state-conditioning line opened by the 09-04 yearly review (item 3 stop-width-by-state: REJECT-as-default; item 3'
+admission gate: REJECT-do-not-revive). Forward guidance unchanged: the record's gap is entry-side but
+*tail-preserving* levers only — breadth of the funnel, not narrowing it by regime labels.
