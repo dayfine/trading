@@ -2120,7 +2120,7 @@ Count existing `dev/daily/${DATE}*.md` to pick the per-day session number N. Fir
 
 ## Step 8: Push the daily summary branch, open its PR, and auto-merge
 
-**GHA-only** (`$TRADING_IN_CONTAINER` set). In local runs, skip this step — the human reviews the file on disk and commits on their own cadence. In GHA the container dies at step exit, so an unpushed summary is lost. The workflow runtime no longer does this push for you (see PR #387); the orchestrator owns it.
+**GHA-only** (`$TRADING_IN_CONTAINER` set). In local runs, skip this step — the human reviews the file on disk and commits on their own cadence. In GHA the container dies at step exit, so an unpushed summary is lost. The workflow runtime no longer does this push for you (see PR #387); the orchestrator owns it — **through `dev/scripts/publish_daily_summary.sh`, never through `jj` or hand-rolled `git`/`curl`** (issue #2741: five consecutive runs lost their summary because the old inline block set git's identity while jj reads its own, and never described `@`; the script is plain git + curl REST, so that defect class cannot recur, and it fails loudly on every dropped step).
 
 ```bash
 # N = per-day session number from Step 7's filename.
@@ -2128,44 +2128,26 @@ Count existing `dev/daily/${DATE}*.md` to pick the per-day session number N. Fir
 #   dev/daily/${DATE}.md            → ops/daily-${DATE}
 #   dev/daily/${DATE}-runN.md       → ops/daily-${DATE}-runN
 DATE=$(date +%F)
-SUMMARY_FILE="$(ls -t dev/daily/${DATE}*.md | grep -v '\-plan\.md' | head -n 1)"
+SUMMARY_FILE="$(ls -t dev/daily/${DATE}*.md | grep -v -e '\-plan\.md' -e '\-summary\.md' | head -n 1)"   # never the consolidated file (workflow post-mortem, run-4)
 BASENAME="$(basename "$SUMMARY_FILE" .md)"       # e.g. 2026-04-16 or 2026-04-16-run2
 BRANCH="ops/${BASENAME/#/daily-}"                # → ops/daily-2026-04-16[-runN]
 
-git config user.email "noreply@github.com"
-git config user.name "claude-orchestrator"
-
-jj bookmark set "$BRANCH" -r @
-jj git push -b "$BRANCH" --allow-new
-```
-
-Then open the PR via curl (the devcontainer has no `gh`):
-
-```bash
-export PR_TITLE="ops: daily orchestrator summary ${BASENAME}"
-export PR_BODY="Automated daily orchestrator run. See \`$SUMMARY_FILE\` for the full summary."
-export PR_BRANCH="$BRANCH"
-payload="$(python3 -c 'import json,os;print(json.dumps({"title":os.environ["PR_TITLE"],"head":os.environ["PR_BRANCH"],"base":"main","body":os.environ["PR_BODY"]}))')"
-CREATE_RESPONSE="$(curl -sSL -X POST \
-  -H "Authorization: Bearer ${GH_TOKEN}" \
-  -H "Accept: application/vnd.github+json" \
-  -d "$payload" \
-  "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls")"
-PR_NUMBER="$(printf '%s' "$CREATE_RESPONSE" | python3 -c 'import json,sys;r=json.load(sys.stdin);print(r.get("number",""))' 2>/dev/null || true)"
-
-# If PR already existed (422 A pull request already exists — same-session re-run),
-# look it up by branch so we still have a PR number for the auto-merge step.
-if [ -z "$PR_NUMBER" ]; then
-  OWNER="${GITHUB_REPOSITORY%/*}"
-  PR_NUMBER="$(curl -sSL \
-    -H "Authorization: Bearer ${GH_TOKEN}" \
-    -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls?head=${OWNER}:${BRANCH}&state=open" \
-    | python3 -c 'import json,sys;xs=json.load(sys.stdin);print(xs[0]["number"] if xs else "")')"
+# Identity, branch, commit, push, and PR-create are ALL owned by the script
+# (plain git + curl REST; no jj, no gh). Do NOT add `git config`, `jj config`,
+# `jj describe`, `jj bookmark set` or `jj git push` here — that is the #2741
+# defect. Idempotent: an existing open PR for the head is reused. Prints
+# "PR #<n> <url>" on success; any dropped step exits non-zero with a named
+# message. Tested by dev/scripts/publish_daily_summary_test.sh (dune runtest).
+if PUBLISH_OUT="$(sh dev/scripts/publish_daily_summary.sh publish --summary "$SUMMARY_FILE")"; then
+  echo "$PUBLISH_OUT"
+  PR_NUMBER="$(printf '%s' "$PUBLISH_OUT" | sed -n 's/^PR #\([0-9][0-9]*\).*/\1/p')"
+else
+  echo "ESCALATE: publish_daily_summary.sh failed -- summary NOT published (see stderr above)"
+  PR_NUMBER=""
 fi
 ```
 
-Flag in §Escalations if either the push or the PR-create fails: a summary without a PR is invisible to the human.
+Flag in §Escalations if `PR_NUMBER` is empty: a summary without a PR is invisible to the human. The script's stderr names which step dropped (resolve / commit / push / PR-create).
 
 ### Step 8a: Note on auto-merge ownership
 
@@ -2190,7 +2172,7 @@ acceptable for one run but should be escalated if it persists.
 ### Step 8b: Consolidated summary (N >= 3)
 
 When this is the third or later run of the day (N >= 3), generate a same-day
-consolidated summary and include it in the summary PR before pushing.
+consolidated summary and push it onto the same `ops/daily-*` branch the script already published, so it lands in the same PR.
 
 **Why amend into the same PR rather than a separate branch:** the consolidated
 summary is a view over the same day's runs -- it belongs with the run-N summary
@@ -2216,6 +2198,9 @@ if [ "$_N" -ge 3 ]; then
     git add "dev/daily/${DATE}-summary.md" 2>/dev/null || true
     git commit --amend --no-edit 2>/dev/null \
       || git commit -m "ops: add consolidated summary ${DATE}"
+    # The script already pushed this branch once; the amend needs a re-push.
+    git push --force-with-lease "${PUBLISH_DAILY_SUMMARY_REMOTE:-origin}" "$BRANCH" \
+      || echo "ESCALATE: consolidated summary NOT pushed to $BRANCH"
   fi
 fi
 ```

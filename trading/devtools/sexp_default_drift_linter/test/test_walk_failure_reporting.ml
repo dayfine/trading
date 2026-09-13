@@ -60,11 +60,26 @@ let _mkdir_if_absent path =
    plus <root>/unreadable, chmod'd to 000 so any account other than root
    gets EACCES on [Sys.readdir root/unreadable]. [root] itself and [lib]
    stay 0755 so a non-root "nobody" invocation can still traverse down to
-   the point of failure. *)
+   the point of failure.
+
+   [root] is per-process (suffixed with the pid): the temp dir is shared by
+   every dune runtest in the container, and two concurrent runs sharing one
+   fixture path corrupt each other's mode flips (issue #2760). *)
+let _fixture_root_path () =
+  Filename.concat
+    (Filename.get_temp_dir_name ())
+    (Printf.sprintf "sexp_drift_walk_test_root.%d" (Unix.getpid ()))
+
+(* Restores the mode so [rm -rf] can descend, then removes the whole tree;
+   registered with [at_exit] so both the pass and the [exit 1] paths clean
+   up and pids that get recycled never inherit a stale fixture. *)
+let _remove_fixture_root root =
+  (try Unix.chmod (Filename.concat root "unreadable") 0o755
+   with Unix.Unix_error _ -> ());
+  ignore (Sys.command (Printf.sprintf "rm -rf %s" (Filename.quote root)))
+
 let _build_fixture_root () =
-  let root =
-    Filename.concat (Filename.get_temp_dir_name ()) "sexp_drift_walk_test_root"
-  in
+  let root = _fixture_root_path () in
   let lib_dir = Filename.concat root "lib" in
   let unreadable_dir = Filename.concat root "unreadable" in
   (* Reset the unreadable dir's mode first -- if a prior run left it 000
@@ -108,6 +123,7 @@ let _run_linter root =
 
 let () =
   let root = _build_fixture_root () in
+  at_exit (fun () -> _remove_fixture_root root);
   let exit_code, out = _run_linter root in
   if exit_code = 0 then (
     Printf.eprintf
