@@ -38,11 +38,11 @@ let _build_sector_rotation ~ticker_sectors ~bar_reader ~k ~ma_period_weeks
   Sector_rotation.make ~config ~bar_reader ()
 
 let build ~ad_bars ~breadth_bars ~ticker_sectors ~config ~strategy_choice
-    ~bar_reader ~audit_recorder ?fold_start_date () =
+    ~bar_reader ~audit_recorder ?fold_start_date ?universe_membership_at () =
   match (strategy_choice : Strategy_choice.t) with
   | Weinstein ->
       Weinstein_strategy.make ~ad_bars ~breadth_bars ~ticker_sectors ~bar_reader
-        ~audit_recorder ?fold_start_date config
+        ~audit_recorder ?fold_start_date ?universe_membership_at config
   | Bah_benchmark { symbol } ->
       Trading_strategy.Bah_benchmark_strategy.make { symbol }
   | Spy_only_weinstein { symbol; ma_period_weeks; enable_stage4_short } ->

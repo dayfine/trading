@@ -150,6 +150,7 @@ let _make_base_scenario () : Scenario.t =
     description = "stub base scenario for evaluator unit tests";
     period = { start_date = _date 2020 1 1; end_date = _date 2020 12 31 };
     universe_path = "ignored.sexp";
+    universe_schedule = [];
     config_overrides = [];
     strategy = Backtest.Strategy_choice.default;
     slippage_bps = None;

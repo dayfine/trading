@@ -225,6 +225,41 @@ let test_universe_path_roundtrip _ =
   let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
   assert_that roundtripped.universe_path (equal_to "universes/custom.sexp")
 
+(* Every pre-schedule scenario file omits [universe_schedule]; it must default
+   to the empty list, which is the "use [universe_path] for the whole window"
+   behaviour. *)
+let test_universe_schedule_absent_is_empty _ =
+  let s =
+    Scenario.t_of_sexp (Sexp.of_string (_make_sexp ~extra_expected_fields:""))
+  in
+  assert_that s.universe_schedule is_empty
+
+let _make_sexp_with_schedule =
+  sprintf
+    {|
+  ((name "test-scenario")
+   (description "Unit-test fixture")
+   (period ((start_date 2023-01-02) (end_date 2023-12-31)))
+   (universe_path "universes/small.sexp")
+   (universe_schedule
+    ((2019-01-01 "universes/top-3000-2019.sexp")
+     (2024-01-01 "universes/top-3000-2024.sexp")))
+   (config_overrides ())
+   (expected
+    (%s)))
+  |}
+    _base_expected_fields
+
+let test_universe_schedule_parses_and_roundtrips _ =
+  let original = Scenario.t_of_sexp (Sexp.of_string _make_sexp_with_schedule) in
+  let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
+  assert_that roundtripped.universe_schedule
+    (elements_are
+       [
+         equal_to (Date.of_string "2019-01-01", "universes/top-3000-2019.sexp");
+         equal_to (Date.of_string "2024-01-01", "universes/top-3000-2024.sexp");
+       ])
+
 (* Pre-3.4 scenario files set [(loader_strategy <variant>)]; after Stage 3
    PR 3.4 deleted the [Loader_strategy] enum + the field, those scenarios
    must continue to parse via [@sexp.allow_extra_fields]. The runner's
@@ -352,6 +387,10 @@ let suite =
          >:: test_universe_path_absent_uses_default;
          "universe_path present => round-trips" >:: test_universe_path_present;
          "universe_path sexp round-trips" >:: test_universe_path_roundtrip;
+         "universe_schedule absent => empty"
+         >:: test_universe_schedule_absent_is_empty;
+         "universe_schedule parses + round-trips"
+         >:: test_universe_schedule_parses_and_roundtrips;
          "extra loader_strategy field is tolerated (post-3.4 backward compat)"
          >:: test_loader_strategy_extra_field_tolerated;
          "cost_model absent => None" >:: test_cost_model_field_absent;

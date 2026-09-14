@@ -61,6 +61,7 @@
 open Core
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
+module Universe_schedule = Scenario_lib.Universe_schedule
 module Fixtures_root = Scenario_lib.Fixtures_root
 module Scenario_progress = Scenario_lib.Scenario_progress
 module Bar_source_resolver = Scenario_lib.Bar_source_resolver
@@ -74,6 +75,26 @@ let _sector_map_of_universe_file ~fixtures_root path =
      tier / pre-migration behaviour). *)
   let resolved = Filename.concat fixtures_root path in
   Universe_file.to_sector_map_override (Universe_file.load resolved)
+
+(* Resolve a scenario's universe into the pair [Backtest.Runner] needs:
+   the [sector_map_override] to stage and the optional dated membership
+   predicate to gate screening candidates with.
+
+   Empty [universe_schedule] (every pre-existing scenario) takes the
+   [universe_path] branch unchanged, with no membership predicate — bit-equal
+   to the pre-schedule behaviour. A non-empty schedule ignores [universe_path]
+   entirely: the sector map becomes the UNION of every scheduled list (so a
+   name that has dropped out of the current list still prices while held) and
+   the predicate is the schedule's step function. *)
+let _universe_of_scenario ~fixtures_root (s : Scenario.t) =
+  match s.universe_schedule with
+  | [] -> (_sector_map_of_universe_file ~fixtures_root s.universe_path, None)
+  | schedule -> (
+      match Universe_schedule.load ~fixtures_root schedule with
+      | Error err -> failwithf "scenario %s: %s" s.name (Status.show err) ()
+      | Ok sched ->
+          ( Some (Universe_schedule.union_sector_map sched),
+            Some (Universe_schedule.is_member sched) ))
 
 (* Actual metrics extracted from a run — serialized so the parent process
    can read back each child's result. *)
@@ -292,8 +313,8 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
     (Date.to_string s.period.end_date);
   let scenario_dir = _scenario_dir ~output_root s in
   Core_unix.mkdir_p scenario_dir;
-  let sector_map_override =
-    _sector_map_of_universe_file ~fixtures_root s.universe_path
+  let sector_map_override, universe_membership_at =
+    _universe_of_scenario ~fixtures_root s
   in
   let progress_emitter =
     Scenario_progress.make_emitter ~scenario_dir ~every_n_fridays:progress_every
@@ -313,7 +334,7 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
           ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter
           ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ?bar_data_source
           ?candidate_log:(Backtest.Candidate_log.create_if emit_candidates)
-          ~on_step_setup ())
+          ?universe_membership_at ~on_step_setup ())
   in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   (* Post-step: per-week candidate list (#2490). Runs after the canonical

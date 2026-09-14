@@ -71,6 +71,7 @@
 open Core
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
+module Universe_schedule = Scenario_lib.Universe_schedule
 module Plan = Scenario_snapshot_plan
 module Series_splice = Snapshot_pipeline.Series_splice
 
@@ -94,6 +95,29 @@ let _resolve_universe ~fixtures_root ~universe_path =
          %!"
         resolved;
       exit 1
+
+(* The trading symbols a scenario's warehouse must cover. An empty
+   [universe_schedule] (every pre-existing scenario) is the [universe_path]
+   branch above, unchanged. A non-empty schedule needs the UNION of every
+   scheduled list: a name that leaves the universe mid-run still has to price
+   while the position is held, so its bars must be staged for the whole
+   window. *)
+let _resolve_scenario_universe ~fixtures_root (scenario : Scenario.t) =
+  match scenario.universe_schedule with
+  | [] -> _resolve_universe ~fixtures_root ~universe_path:scenario.universe_path
+  | schedule -> (
+      match Universe_schedule.load ~fixtures_root schedule with
+      | Ok sched ->
+          Universe_schedule.union_sector_map sched
+          |> Hashtbl.keys
+          |> List.sort ~compare:String.compare
+      | Error err ->
+          Printf.eprintf
+            "build_scenario_snapshots: universe_schedule for scenario %s is \
+             unusable: %s\n\
+             %!"
+            scenario.name (Status.show err);
+          exit 1)
 
 let _log_plan (plan : Plan.t) ~scenario_path =
   Printf.eprintf
@@ -193,9 +217,7 @@ let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
     ~twin_config ~splice_config ~splice_action_config ~tail_config
     ~tail_exceptions_path () =
   let scenario = Scenario.load scenario_path in
-  let universe =
-    _resolve_universe ~fixtures_root ~universe_path:scenario.universe_path
-  in
+  let universe = _resolve_scenario_universe ~fixtures_root scenario in
   let plan = Plan.derive ~scenario ~universe in
   _log_plan plan ~scenario_path;
   let data_dir = Fpath.v csv_data_dir in

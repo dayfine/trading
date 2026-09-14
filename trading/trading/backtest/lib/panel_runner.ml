@@ -283,7 +283,8 @@ let fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date =
    (forwarded to {!Panel_strategy_builder.build}) and the simulator-side
    bar-fetch prune (the returned [active_through_for]); [None] is bit-equal. *)
 let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
-    ~shared_panels ~warmup_start ~end_date ~audit_recorder ?fold_start_date () =
+    ~shared_panels ~warmup_start ~end_date ~audit_recorder ?fold_start_date
+    ?universe_membership_at () =
   let daily_panels = _resolve_panels ~shared_panels ~snapshot_dir ~manifest in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let bar_reader =
@@ -293,7 +294,7 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
     Panel_strategy_builder.build ~ad_bars:input.ad_bars
       ~breadth_bars:input.breadth_bars ~ticker_sectors:input.ticker_sectors
       ~config:input.config ~strategy_choice ~bar_reader ~audit_recorder
-      ?fold_start_date ()
+      ?fold_start_date ?universe_membership_at ()
   in
   let adapter = _build_market_data_adapter ~daily_panels in
   let final_close_prices () =
@@ -402,8 +403,8 @@ let _run_steps ~r ~trace ~gc_trace ~progress_acc ~on_step_setup ~n_all_symbols
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
-    ?(prune_universe_by_active_through = false) ?candidate_log ?on_step_setup ()
-    =
+    ?(prune_universe_by_active_through = false) ?candidate_log ?on_step_setup
+    ?universe_membership_at () =
   let fold_start_date =
     fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date
   in
@@ -425,7 +426,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
         active_through_for ) =
     _setup_hybrid input ~strategy_choice ~snapshot_dir ~manifest ~shared_panels
       ~warmup_start ~end_date ~audit_recorder:r.audit_recorder ?fold_start_date
-      ()
+      ?universe_membership_at ()
   in
   let sim =
     _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash

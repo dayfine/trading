@@ -16,6 +16,7 @@ val build :
   bar_reader:Weinstein_strategy.Bar_reader.t ->
   audit_recorder:Weinstein_strategy.Audit_recorder.t ->
   ?fold_start_date:Date.t ->
+  ?universe_membership_at:(string -> Date.t -> bool) ->
   unit ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** [build ~ad_bars ~ticker_sectors ~config ~strategy_choice ~bar_reader
@@ -42,4 +43,12 @@ val build :
       no pre-pruning, every universe symbol is classified. Only the [Weinstein]
       branch consumes it; the other strategy constructors take no universe
       (Spy_only / BAH) or manage their own (Sector_rotation), so
-      [fold_start_date] is irrelevant there and ignored. *)
+      [fold_start_date] is irrelevant there and ignored.
+
+    @param universe_membership_at
+      Dated point-in-time universe membership, forwarded to
+      {!Weinstein_strategy.make}'s [?universe_membership_at] on the [Weinstein]
+      branch. [None] (the default) means every universe symbol is eligible on
+      every screening date — bit-equal to the pre-schedule baseline. Only the
+      [Weinstein] branch consumes it; the other constructors take no universe.
+      See {!Scenario_lib.Universe_schedule}. *)

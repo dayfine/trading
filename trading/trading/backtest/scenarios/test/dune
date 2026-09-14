@@ -2,6 +2,8 @@
  (names
   test_scenario
   test_universe_file
+  test_universe_schedule
+  test_universe_schedule_e2e
   test_universe_snapshot
   test_fixtures_root
   test_scenario_runner_isolation
@@ -13,6 +15,8 @@
  (modules
   test_scenario
   test_universe_file
+  test_universe_schedule
+  test_universe_schedule_e2e
   test_universe_snapshot
   test_fixtures_root
   test_scenario_runner_isolation

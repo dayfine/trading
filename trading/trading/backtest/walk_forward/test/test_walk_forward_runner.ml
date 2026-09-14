@@ -35,6 +35,7 @@ let _make_base ?(name = "base-test") ?(description = "base-desc")
     description;
     period = { start_date = _date 2020 1 1; end_date = _date 2020 1 31 };
     universe_path;
+    universe_schedule = [];
     config_overrides;
     strategy;
     slippage_bps;

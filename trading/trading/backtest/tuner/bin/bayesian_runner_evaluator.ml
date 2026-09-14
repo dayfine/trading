@@ -1,6 +1,7 @@
 open Core
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
+module Universe_schedule = Scenario_lib.Universe_schedule
 module GS = Tuner.Grid_search
 module Metric_types = Trading_simulation_types.Metric_types
 module Wf_types = Walk_forward.Walk_forward_types
@@ -17,8 +18,8 @@ type t =
 (* ------------------------------------------------------------------ *)
 
 let _sector_map_of_scenario ~fixtures_root (s : scenario) =
-  let resolved = Filename.concat fixtures_root s.universe_path in
-  Universe_file.to_sector_map_override (Universe_file.load resolved)
+  Universe_schedule.sector_map_of_unscheduled ~fixtures_root
+    ~runner_name:"Bayesian_runner_evaluator" s
 
 let _run_one ~fixtures_root ?(int_keys = []) (s : scenario) parameters =
   let cell_overrides = GS.cell_to_overrides ~int_keys parameters in

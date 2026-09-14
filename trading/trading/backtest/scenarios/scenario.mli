@@ -85,7 +85,31 @@ type t = {
 
           The runner loads the file, resolves it against the fixtures root, and
           filters the loaded sector-map accordingly. See
-          [dev/plans/backtest-scale-optimization-2026-04-17.md] §Step 1. *)
+          [dev/plans/backtest-scale-optimization-2026-04-17.md] §Step 1.
+
+          When [universe_schedule] below is non-empty this field is IGNORED for
+          membership — the schedule replaces it entirely. *)
+  universe_schedule : (Date.t * string) list; [@sexp.default []]
+      (** Dated point-in-time universe membership: a list of
+          [(date, universe_path)] pairs, each path relative to the same fixtures
+          root as [universe_path]. Empty (the default) means "use
+          [universe_path] for the whole window" — bit-identical to every
+          pre-existing scenario.
+
+          When non-empty, the entry dated [d_i] governs every screening date [d]
+          with [d_i <= d < d_(i+1)]; the first entry also governs every earlier
+          date and the last entry every later one. Entries may be given
+          unsorted; duplicate dates are a load error. The schedule gates the
+          screener's CANDIDATE set only — a position held in a symbol that drops
+          out of a later list is held to its normal exit, and the macro gate /
+          sector relative-strength inputs are untouched. The run stages the
+          UNION of every list so a dropped name keeps pricing while held.
+
+          Only {!Scenario_runner} implements this; every other scenario consumer
+          rejects a non-empty schedule via
+          {!Universe_schedule.reject_if_present} rather than silently ignoring
+          it. See {!Scenario_lib.Universe_schedule} and
+          [dev/plans/pit-universe-migration-2026-09-14.md] §Step 3a. *)
   config_overrides : Sexp.t list;
       (** Partial config sexps deep-merged into the default Weinstein config, in
           order. Empty list means the default config. *)

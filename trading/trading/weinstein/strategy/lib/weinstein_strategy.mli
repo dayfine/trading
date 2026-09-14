@@ -1277,6 +1277,7 @@ val make :
   ?bar_reader:Bar_reader.t ->
   ?audit_recorder:Audit_recorder.t ->
   ?fold_start_date:Date.t ->
+  ?universe_membership_at:(string -> Date.t -> bool) ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** Create a Weinstein strategy module with fresh internal state.
@@ -1328,7 +1329,19 @@ val make :
       whose last active day is strictly before [d]. Default [None] preserves
       baselines — no pre-pruning. Point-in-time, NOT survivor bias: see
       {!survivors_for_screening}'s [?active_through_for] / [?fold_start_date]
-      doc and the Win #4 spec in [dev/plans/v7-sweep-speedup-2026-05-26.md]. *)
+      doc and the Win #4 spec in [dev/plans/v7-sweep-speedup-2026-05-26.md].
+    @param universe_membership_at
+      Dated point-in-time universe membership: [f symbol as_of] answers whether
+      [symbol] is a member of the run's universe on the screening date [as_of].
+      When supplied, the screener cascade rejects non-members before stage
+      classification, AND-composed with the [config.enable_pi_filter] delisting
+      gate (see {!Screener.screen_with_cooldown}'s [?membership_at]). It gates
+      CANDIDATES only: a position already held in a symbol that later stops
+      being a member is held to its normal exit, because no exit or stop surface
+      consults this predicate. Default [None] preserves baselines — every
+      universe symbol is eligible on every date. Supplied by the scenario runner
+      from a spec's [universe_schedule] field; see
+      {!Scenario_lib.Universe_schedule}. *)
 
 (** {1 Internal — testing only}
 

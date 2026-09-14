@@ -1,6 +1,6 @@
 open Core
 module Scenario = Scenario_lib.Scenario
-module Universe_file = Scenario_lib.Universe_file
+module Universe_schedule = Scenario_lib.Universe_schedule
 module Metric_types = Trading_simulation_types.Metric_types
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot = Data_panel_snapshot.Snapshot
@@ -182,10 +182,10 @@ let _resolve_benchmark_series ~config ~earliest_start =
 
 (** Resolve the scenario's [universe_path] (relative to [fixtures_root]) into
     the optional sector-map override [Backtest.Runner] uses as its universe.
-    Mirrors [scenario_runner._sector_map_of_universe_file]. *)
-let _sector_map_override ~fixtures_root (scenario : Scenario.t) =
-  let resolved = Filename.concat fixtures_root scenario.universe_path in
-  Universe_file.to_sector_map_override (Universe_file.load resolved)
+    Rejects a [universe_schedule] — this runner has no dated-membership path. *)
+let _sector_map_override ~fixtures_root scenario =
+  Universe_schedule.sector_map_of_unscheduled ~fixtures_root
+    ~runner_name:"Rolling_start_runner" scenario
 
 (** Run one backtest from [start_date] to [config.end_date], threading the
     scenario's overrides / strategy / cost knobs and the shared sector-map

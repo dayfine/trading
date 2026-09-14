@@ -528,6 +528,7 @@ let _stub_base () : Scenario.t =
     description = "stub base for sensitivity-sweep regression test";
     period = { start_date = _date 2020 1 1; end_date = _date 2020 1 31 };
     universe_path = "universes/parity-7sym.sexp";
+    universe_schedule = [];
     config_overrides = [];
     strategy = Backtest.Strategy_choice.default;
     slippage_bps = None;
