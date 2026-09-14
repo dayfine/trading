@@ -91,6 +91,7 @@ cat > "$D/bin/gh" <<'GEOF'
 #!/bin/sh
 case "$GH_STUB_MODE" in
   fail) echo "gh: HTTP 422" >&2; exit 1 ;;
+  failbody) echo 4242; echo "gh: HTTP 500 after body" >&2; exit 1 ;;
   empty) exit 0 ;;
   *) echo 4242 ;;
 esac
@@ -100,6 +101,12 @@ rc=0; out=$(GH_STUB_MODE=ok PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md
 check "post_report: success returns 0 and prints the id" "0 codex_review: posted review id 4242" "$rc $out"
 rc=0; out=$(GH_STUB_MODE=fail PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md" 2>/dev/null) || rc=$?
 check "post_report: a failed gh api returns non-zero" 1 "$rc"
+# qc-behavioral rework iteration 1 (#2798, review 5194401789): the fail stub
+# above prints nothing, so the empty-id guard fires and the exit-status capture
+# was never the thing under test (a `gh api | sed` pipe survived). This arm
+# exits non-zero WHILE printing an id, so only the captured status can catch it.
+rc=0; out=$(GH_STUB_MODE=failbody PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md" 2>/dev/null) || rc=$?
+check "post_report: a failed gh api that still prints an id returns non-zero" 1 "$rc"
 rc=0; out=$(GH_STUB_MODE=empty PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md") || rc=$?
 check "post_report: an empty id returns non-zero" 1 "$rc"
 
