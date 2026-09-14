@@ -31,8 +31,16 @@ open Validator_types
 val check_v16 : inputs -> Validator_step.finding
 (** V16 (EXP): no round trip was closed by a fallback safety net — i.e. no row's
     [exit_trigger] is in [config.fallback_exit_labels] ([stale_force_exit],
-    [margin_call], [maintenance_reduce], [buyin_stress], and the two
-    force-liquidation labels).
+    [margin_call], [maintenance_reduce], [buyin_stress], [force_liquidation],
+    and the two legacy [force_liquidation_*] labels).
+
+    [force_liquidation] is what the drawdown breaker emits today
+    ({!Weinstein_strategy.Force_liquidation_runner.exit_label}); the [_position]
+    / [_portfolio] variants came from a [trades.csv] relabel removed on
+    2026-09-14 and are kept only so older artifacts still count. A breaker exit
+    is the archetype of what this check is for — it is the safety net the
+    principle above names by name — so the token it actually writes has to be in
+    the list, or the report reads zero on exactly the runs it was built to flag.
 
     ["delisted"] is deliberately {b not} in that list: since
     {!Trading_simulation.Delisted_exit_runner}, a held position whose

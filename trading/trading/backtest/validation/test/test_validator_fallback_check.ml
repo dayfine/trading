@@ -110,9 +110,48 @@ let test_v16_does_not_count_a_delisted_exit _ =
   in
   assert_that (_result ~id:"V16" inputs) (_violations_and_pass 0 true)
 
+(** {b The specimen this check was built for.} A drawdown-breaker exit carries
+    {!Weinstein_strategy.Force_liquidation_runner.exit_label}, and a force
+    liquidation must never pass silently. The token is spelled {b literally}
+    here rather than read off [default_config]: deriving the input from the
+    default list is exactly how this label stayed missing from it unnoticed —
+    such a test agrees with the default whatever the default happens to say. *)
+let test_v16_counts_the_breaker_exit_label _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          _trade ~symbol:"DDS" ~exit_trigger:"force_liquidation" ();
+          _trade ~symbol:"NORMAL" ~exit_trigger:"stop_loss" ();
+        ];
+    }
+  in
+  assert_that (_result ~id:"V16" inputs) (_violations_and_pass 1 false)
+
+(** The two [force_liquidation_*] tokens are {b legacy}: no live path emits them
+    since the [trades.csv] relabel that produced them was removed, but artifacts
+    written before that still carry them, so a validator run over an archived
+    [trades.csv] has to keep counting both. Spelled literally for the same
+    reason as the case above. *)
+let test_v16_still_counts_the_legacy_force_liquidation_labels _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          _trade ~symbol:"OLD1" ~exit_trigger:"force_liquidation_position" ();
+          _trade ~symbol:"OLD2" ~exit_trigger:"force_liquidation_portfolio" ();
+        ];
+    }
+  in
+  assert_that (_result ~id:"V16" inputs) (_violations_and_pass 2 false)
+
 (** Every fallback label in the default list is recognised. Written as one trade
     per label so a label silently dropped from the default shows up as a count,
-    not as a pass. *)
+    not as a pass. Note this case can only catch a {e removal} from the default,
+    never an {e omission} from it — that is what the two literal-token cases
+    above are for. *)
 let test_v16_recognises_every_default_fallback_label _ =
   let labels = (Vt.default_config : Vt.check_config).fallback_exit_labels in
   let inputs =
@@ -316,6 +355,10 @@ let suite =
          >:: test_v16_passes_a_run_with_no_fallbacks;
          "v16 does not count a delisted exit"
          >:: test_v16_does_not_count_a_delisted_exit;
+         "v16 counts the breaker exit label"
+         >:: test_v16_counts_the_breaker_exit_label;
+         "v16 still counts the legacy force liquidation labels"
+         >:: test_v16_still_counts_the_legacy_force_liquidation_labels;
          "v16 recognises every default fallback label"
          >:: test_v16_recognises_every_default_fallback_label;
          "v16 specimen names the trigger and dates"

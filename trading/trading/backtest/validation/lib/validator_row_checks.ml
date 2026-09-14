@@ -92,6 +92,13 @@ let check_v12 inputs =
 
 (* ---- V5: exit_trigger vs stop_trigger_kind consistency ----------------- *)
 
+(* Triggers whose row must carry a real stop kind ([gap_down] / [intraday]).
+   The two legacy [force_liquidation_*] labels belong here because the relabel
+   that produced them (removed 2026-09-14) overwrote rows whose underlying exit
+   really was a stop-out. The token the breaker emits today,
+   ["force_liquidation"], deliberately does NOT: it rides a [StrategySignal],
+   which {!Stop_log.classify_stop_trigger_kind} maps to [Non_stop_exit], and
+   that is what [_expected_kinds]'s else-branch already requires of it. *)
 let _stop_triggers =
   [ "stop_loss"; "force_liquidation_position"; "force_liquidation_portfolio" ]
 
