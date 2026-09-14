@@ -53,6 +53,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.BOT_GITHUB_TOKEN }}
 
+      # checkout configures safe.directory under a temporary HOME.
+      - name: Trust the checkout for subsequent steps
+        shell: bash
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
       - name: Compute today's date
         id: today
         run: echo "date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
@@ -60,6 +65,7 @@ jobs:
       - name: Run track-pacer
         uses: anthropics/claude-code-action@v1
         with:
+          show_full_output: true
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
           prompt: |
