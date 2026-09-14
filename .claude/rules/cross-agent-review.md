@@ -49,8 +49,11 @@ It checks the PR head out into a detached worktree under `.claude/worktrees/`,
 runs `codex exec -s read-only --ephemeral` with the review prompt (sandbox
 explicit, not inherited from user config; **no dune** — it consumes no container slot, so it may run beside a backtest),
 validates the report (`Reviewed SHA:` line 1, `## Codex review` first heading,
-`## Verdict` → `APPROVED|NEEDS_REWORK`, no gate headings), posts it with the
-full head SHA as `commit_id`, and removes the worktree. Docs-only PRs are
+`## Verdict` → `APPROVED|NEEDS_REWORK`, no gate headings) AND requires the real
+CODEX reader (`pr_gate_status.sh` `_gate`) to read the same verdict, posts it
+with the full head SHA as `commit_id`, and removes the worktree. The prompt
+pins the reviewer to the detached checkout (`git diff origin/main...HEAD`),
+never the live PR. Docs-only PRs are
 skipped (CI is their only gate).
 
 `docs/howtos/codex_pr_reviews.md` (#2785) describes the **promotion path** —

@@ -122,5 +122,21 @@ check "compat: a validated NEEDS_REWORK report reads rework in the CODEX reader"
 check "compat: the colon-style report reads rework in the CODEX reader" rework "$(_gate "$(_json "$D/verdictcolon.md")" codex "$SHA")"
 check "compat: a validated report never reads on the structural gate" none "$(_gate "$(_json "$D/good.md")" structural "$SHA")"
 
+# reader_agrees (advisory Codex review 5194134240 of #2798): the real CODEX
+# reader must read the validator's verdict before a post happens.
+check "reader_agrees: good report" 0 "$(if reader_agrees "$D/good.md" "$SHA"; then echo 0; else echo 1; fi)"
+check "reader_agrees: rework report" 0 "$(if reader_agrees "$D/rework.md" "$SHA"; then echo 0; else echo 1; fi)"
+printf 'Reviewed SHA: %s\n\n## Codex review — thing\n\n## Verdict\n\nAPPROVED\n\n## Verdict\n\nNEEDS_REWORK\n' "$SHA" > "$D/twoverdicts.md"
+check "conflicting verdicts: validator alone passes (first heading)" 0 "$(rc "$D/twoverdicts.md")"
+check "conflicting verdicts: reader_agrees refuses" 1 "$(if reader_agrees "$D/twoverdicts.md" "$SHA" 2>/dev/null; then echo 0; else echo 1; fi)"
+printf 'Reviewed SHA: %s\n\n## Codex review — thing\n\n```\n## Verdict\n\nAPPROVED\n```\n' "$SHA" > "$D/fenced.md"
+check "fenced verdict: reader_agrees refuses" 1 "$(if reader_agrees "$D/fenced.md" "$SHA" 2>/dev/null; then echo 0; else echo 1; fi)"
+# build_prompt: pinned to the checkout, never the live PR.
+p=$(build_prompt 42 "$SHA" "a title" dayfine/trading)
+check "prompt names the sha" 1 "$(printf '%s' "$p" | grep -c "Reviewed SHA: $SHA")"
+check "prompt pins the diff to the checkout" 1 "$(printf '%s' "$p" | grep -c "git diff origin/main...HEAD'")"
+check "prompt forbids the live PR diff" 1 "$(printf '%s' "$p" | grep -c "do not use 'gh pr diff'")"
+check "prompt carries no backticks" 0 "$(printf '%s' "$p" | grep -c '`')"
+
 if [ "$fails" -gt 0 ]; then printf 'FAIL: codex_review -- %d test(s) failed.\n' "$fails"; exit 1; fi
 printf 'OK: codex_review -- %d tests clean.\n' "$total"

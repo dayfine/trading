@@ -102,6 +102,52 @@ post_report() {
   echo "codex_review: posted review id $_id"
 }
 
+# reader_agrees FILE SHA -> 0 when the real CODEX reader (pr_gate_status.sh
+# _gate, sourced through its LIB seam) reads the same verdict validate_report
+# saw ("ok" for APPROVED, "rework" for NEEDS_REWORK). A report can pass the
+# line-oriented validator yet read "unclear" there -- two verdict headings
+# with different tokens, or the only verdict inside a fenced block (advisory
+# Codex review 5194134240 of #2798) -- so posting requires the reader's word.
+reader_agrees() {
+  _f=$1; _sha=$2
+  _want=$(awk 'f && NF {print; exit} /^#+ +Verdict[ :]*\r?$/ {f=1}' "$_f" | tr -d ' \r')
+  case "$_want" in APPROVED) _want=ok ;; NEEDS_REWORK) _want=rework ;; *) return 1 ;; esac
+  _got=$( PR_GATE_STATUS_LIB=1 . "$(dirname "$0")/pr_gate_status.sh"; _gate "$(jq -nc --arg b "$(cat "$_f")" '[{body: $b}]')" codex "$_sha" )
+  if [ "$_got" != "$_want" ]; then
+    echo "codex_review: the CODEX reader reads '$_got' where the validator saw '$_want'; refusing to post" >&2
+    return 1
+  fi
+}
+
+# build_prompt PR SHA TITLE REPO -> the review prompt on stdout. Everything the
+# reviewer is told to read is pinned to the detached checkout at SHA (an
+# immutable revision), never the live PR: a push during the review must not
+# change what the report's "Reviewed SHA" line vouches for (advisory Codex
+# review 5194134240 of #2798). No backticks: this text is emitted verbatim.
+build_prompt() {
+  _pr=$1; _sha=$2; _title=$3; _repo=$4
+  cat <<PEOF
+Review PR #$_pr (head $_sha, title: $_title) of $_repo as an independent ADVISORY reviewer.
+You are in a detached checkout of exactly $_sha. Read ONLY that checkout: the change is
+'git diff origin/main...HEAD' and the file list is 'git diff --name-only origin/main...HEAD'
+(do not use 'gh pr diff' or 'gh pr view' -- the live PR may have moved past this revision).
+Look for: correctness defects, missing or weak tests for claims the diff makes, contract drift
+between .mli docstrings / commit messages and the code, and violations of the repo rules under
+.claude/rules/ (test-patterns.md, experiment-flag-discipline.md, config-default-blast-radius.md,
+universe-discipline.md where relevant). Do NOT run dune, do not modify files, do not commit,
+push or post to GitHub.
+Report format (machine-parsed; follow exactly):
+  line 1: Reviewed SHA: $_sha
+  first heading: ## Codex review — $_title
+  then a findings table (| # | Check | Status | Notes |), a '## Quality Score' (1-5),
+  exactly ONE '## Verdict' heading whose next line is exactly APPROVED or NEEDS_REWORK
+  (never inside a code fence, never repeated), and '## NEEDS_REWORK Items'
+  (Finding / Location / Required fix) when applicable.
+Never use the headings 'Structural QC', 'Behavioral QC' or 'qc-...' anywhere: those name the
+Claude merge gates and your review is advisory, not a gate. Do not mention those gates.
+PEOF
+}
+
 # Sourcing with CODEX_REVIEW_LIB=1 stops here (offline tests).
 [ "${CODEX_REVIEW_LIB:-}" = 1 ] && return 0
 
@@ -136,27 +182,7 @@ fi
 
 REPORT="$REPORT_DIR/codex-review-pr-$PR-$SHA.md"
 PROMPT="$REPORT_DIR/codex-review-pr-$PR-prompt.txt"
-# Unquoted heredoc so $PR/$SHA/$TITLE expand; no backticks anywhere inside it
-# (they would execute -- the first dry run pasted `gh pr diff` output into the
-# prompt this way).
-cat > "$PROMPT" <<PEOF
-Review PR #$PR (head $SHA, title: $TITLE) of $REPO as an independent ADVISORY reviewer.
-Scope = the PR's own file list (gh pr view $PR --json files). You are in a detached checkout of the PR head;
-read the change with 'gh pr diff $PR' (or 'git diff origin/main...HEAD') and the files themselves.
-Look for: correctness defects, missing or weak tests for claims the diff makes, contract drift
-between .mli docstrings / PR body and the code, and violations of the repo rules under
-.claude/rules/ (test-patterns.md, experiment-flag-discipline.md, config-default-blast-radius.md,
-universe-discipline.md where relevant). Do NOT run dune, do not modify files, do not commit,
-push or post to GitHub.
-Report format (machine-parsed; follow exactly):
-  line 1: Reviewed SHA: $SHA
-  first heading: ## Codex review — $TITLE
-  then a findings table (| # | Check | Status | Notes |), a '## Quality Score' (1-5),
-  '## Verdict' whose next line is exactly APPROVED or NEEDS_REWORK, and
-  '## NEEDS_REWORK Items' (Finding / Location / Required fix) when applicable.
-Never use the headings 'Structural QC', 'Behavioral QC' or 'qc-...' anywhere: those name the
-Claude merge gates and your review is advisory, not a gate. Do not mention those gates.
-PEOF
+build_prompt "$PR" "$SHA" "$TITLE" "$REPO" > "$PROMPT"
 if [ "$DRY" = 1 ]; then
   echo "codex_review: dry run -- prompt for PR #$PR at $SHA:"; echo; cat "$PROMPT"; exit 0
 fi
@@ -174,7 +200,8 @@ if ! validate_report "$REPORT" "$SHA"; then
   echo "codex_review: report at $REPORT did not validate; NOT posted" >&2
   exit 1
 fi
-echo "codex_review: report validated: $REPORT"
+reader_agrees "$REPORT" "$SHA" || { echo "codex_review: report at $REPORT validated but the CODEX reader disagrees; NOT posted" >&2; exit 1; }
+echo "codex_review: report validated (validator + CODEX reader agree): $REPORT"
 if [ "$POST" = 1 ]; then
   post_report "$PR" "$SHA" "$REPORT" || { echo "codex_review: POST failed; the validated report is at $REPORT" >&2; exit 1; }
 else
