@@ -23,6 +23,20 @@
 #   sh dev/scripts/pr_gate_status.sh            # all open PRs
 #   sh dev/scripts/pr_gate_status.sh 2265 2280  # just these
 #
+# CODEX COLUMN (.claude/rules/cross-agent-review.md)
+#   A fourth, ADVISORY column reads reviews whose FIRST heading starts with
+#   "Codex" (e.g. "## Codex review -- <title>"), posted by dev/scripts/
+#   codex_review.sh. It is never a merge gate on its own: the three gates
+#   above decide. Two labels change how NEXT-ACTION reads it --
+#     review/codex-requested : a missing/stale Codex review is appended as a
+#                              hint, the action itself is unchanged;
+#     review/codex-required  : a would-be MERGE becomes a HOLD until a Codex
+#                              verdict is ok at the tip; the dispatcher swaps
+#                              the label to review/codex-timeout after 3h and
+#                              merges on the Claude gates (the fallback).
+#   A Codex review can never satisfy STRUCT or BEHAV (the kind test anchors
+#   on the first heading), and a Claude review can never satisfy CODEX.
+#
 # BACKEND SELECTION (#2432 defect 2)
 #   This script needs to read PR lists/metadata/check-runs from GitHub. Local
 #   interactive sessions have `gh` on PATH and a browser login; the GHA
@@ -719,8 +733,8 @@ else
   PRS=$(_list_open_prs)
 fi
 
-printf '%-6s %-8s %-14s %-14s %s\n' PR CI STRUCT BEHAV NEXT-ACTION
-printf '%s\n' "----------------------------------------------------------------------------"
+printf '%-6s %-8s %-14s %-14s %-14s %s\n' PR CI STRUCT BEHAV CODEX NEXT-ACTION
+printf '%s\n' "-------------------------------------------------------------------------------------------"
 
 for n in $PRS; do
   meta=$(_pr_meta "$n")
@@ -733,6 +747,9 @@ for n in $PRS; do
   # state, which is how #2384 merged 30 min after being drafted under an
   # explicit hold (#2396).
   held=$(printf '%s' "$meta" | jq -r '[.labels[].name] | index("do-not-merge") // empty')
+  # cross-agent-review.md: the two Codex labels (advisory hint / soft gate).
+  codex_requested=$(printf '%s' "$meta" | jq -r '[.labels[].name] | index("review/codex-requested") // empty')
+  codex_required=$(printf '%s' "$meta" | jq -r '[.labels[].name] | index("review/codex-required") // empty')
 
   # CI: pending anywhere beats fail beats pass -- never merge on non-pass.
   checks=$(_pr_checks_summary "$n" "$tip")
@@ -744,18 +761,19 @@ for n in $PRS; do
   esac
 
   if _is_docs_only "$files"; then
-    struct=skip; behav=skip
+    struct=skip; behav=skip; codex=skip
   else
     struct=$(_gate "$reviews" "structural" "$tip")
     behav=$(_gate "$reviews" "behavioral" "$tip")
+    codex=$(_gate "$reviews" "codex" "$tip")
   fi
 
   # One next action, in dependency order: CI first, then structural (behavioral
   # does not run until structural is APPROVED), then behavioral, then merge.
   case "$ci:$struct:$behav" in
     *)               if [ -n "$held" ]; then
-                       printf '%-6s %-8s %-14s %-14s %s\n' \
-                         "$n" "$ci" "$struct" "$behav" "HOLD -- do-not-merge label"
+                       printf '%-6s %-8s %-14s %-14s %-14s %s\n' \
+                         "$n" "$ci" "$struct" "$behav" "$codex" "HOLD -- do-not-merge label"
                        continue
                      fi ;;
   esac
@@ -786,5 +804,20 @@ for n in $PRS; do
     *)               action="inspect manually" ;;
   esac
 
-  printf '%-6s %-8s %-14s %-14s %s\n' "$n" "$ci" "$struct" "$behav" "$action"
+  # CODEX column (cross-agent-review.md). Advisory by default; a soft gate only
+  # under review/codex-required, and even then only where the three real gates
+  # would otherwise MERGE -- it never overrides a rework, a red CI or a hold.
+  if [ -n "$codex_required" ] && [ "$codex" != ok ] && [ "$codex" != skip ]; then
+    case "$action" in
+      MERGE*) action="HOLD -- review/codex-required (codex=$codex): dispatch codex review, or swap to review/codex-timeout after 3h" ;;
+    esac
+  elif [ -n "$codex_requested" ]; then
+    case "$codex" in
+      ok|skip) ;;
+      rework)  action="$action [codex: findings, advisory]" ;;
+      *)       action="$action [+ codex review (advisory) at $tip]" ;;
+    esac
+  fi
+
+  printf '%-6s %-8s %-14s %-14s %-14s %s\n' "$n" "$ci" "$struct" "$behav" "$codex" "$action"
 done

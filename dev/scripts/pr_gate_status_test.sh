@@ -1472,6 +1472,54 @@ check "colon-style verdict: the gate it actually names reads its real ok verdict
 check "colon-style verdict: an unrelated, never-reviewed gate reads none, not a false unreadable" \
   none "$(_gate "$(reviews "$COLON_STYLE_VERDICT")" structural "$TIP")"
 
+# Cross-agent review (.claude/rules/cross-agent-review.md): the advisory CODEX
+# column reads reviews whose first heading starts with "Codex". Pins the two
+# directions of isolation -- a Codex review never satisfies a Claude gate, and
+# a Claude gate review never satisfies the CODEX column -- plus the ok / rework
+# / stale readings on the codex kind itself.
+CODEX_ADVISORY_OK="Reviewed SHA: 7dc57cc06
+
+## Codex review — cross-agent review harness (PR #2797)
+
+| # | Check | Status |
+|---|-------|--------|
+| C1 | correctness | PASS |
+
+## Verdict
+
+APPROVED"
+
+CODEX_ADVISORY_REWORK="Reviewed SHA: 7dc57cc06
+
+## Codex review — cross-agent review harness (PR #2797)
+
+## Verdict
+
+NEEDS_REWORK"
+
+CODEX_ADVISORY_STALE="Reviewed SHA: deadbeef
+
+## Codex review — an earlier tip
+
+## Verdict
+
+APPROVED"
+
+check "codex review: reads ok on the codex kind at tip" \
+  ok "$(_gate "$(reviews "$CODEX_ADVISORY_OK")" codex "$TIP")"
+check "codex review: never satisfies the structural gate" \
+  none "$(_gate "$(reviews "$CODEX_ADVISORY_OK")" structural "$TIP")"
+check "codex review: never satisfies the behavioral gate" \
+  none "$(_gate "$(reviews "$CODEX_ADVISORY_OK")" behavioral "$TIP")"
+check "codex review: NEEDS_REWORK reads rework on the codex kind" \
+  rework "$(_gate "$(reviews "$CODEX_ADVISORY_REWORK")" codex "$TIP")"
+check "codex review: an old-sha review reads stale on the codex kind" \
+  "stale(deadbeef)" "$(_gate "$(reviews "$CODEX_ADVISORY_STALE")" codex "$TIP")"
+check "codex kind: a structural review never satisfies it" \
+  none "$(_gate "$(reviews "$STRUCT_WITH_BEHAV_SECTION")" codex "$TIP")"
+check "codex kind: a behavioral review never satisfies it" \
+  none "$(_gate "$(reviews "$REAL_BEHAVIORAL")" codex "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1

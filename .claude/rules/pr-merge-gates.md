@@ -46,6 +46,11 @@ A PR is mergeable only when **all three** are green:
    entirely" (pure infra / refactor / harness PRs that touch no domain
    logic — still requires the generic CP1–CP4 review).
 
+Both QC verdicts are **Claude Code** reviews. A Codex review (the advisory
+`CODEX` column, `.claude/rules/cross-agent-review.md`) never substitutes for
+either gate; `review/codex-required` can only turn a would-be MERGE into a
+timed HOLD, never bypass a gate.
+
 ## Docs-only PRs — both QC gates skipped
 
 A PR is **docs-only** if its diff touches **only** files in:
