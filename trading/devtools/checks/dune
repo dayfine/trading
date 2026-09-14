@@ -916,6 +916,13 @@
  (action
   (run sh %{dep:publish_daily_summary_test_runner.sh})))
 
+; Re-read the documented hold detector and its fixtures on each run (#2639).
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:draft_hold_test_runner.sh})))
+
 ; orchestrator_fastexit_gate test (issue #2579, extended by issue #2803):
 ; dev/scripts/orchestrator_fastexit_gate.sh is the mechanical backstop for
 ; the orchestrator workflow's daily-summary sanity checks (the NO-OP

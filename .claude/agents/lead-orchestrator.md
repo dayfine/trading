@@ -1755,29 +1755,44 @@ PR_NUMBER="<N>"   # from Step 5's Stage 1/2 output
 check_hold() {
   # Sets HELD=true/false and HOLD_REASON. Call before any merge or
   # draft->ready action; call again immediately before the merge PUT.
-  local pr_json
-  pr_json="$(curl -sSL \
+  # Default closed: callers surface HOLD_REASON as an escalation. A failed
+  # lookup or parse must never grant permission to merge (issue #2639).
+  HELD=true
+  HOLD_REASON="hold-check-error: PR lookup or parse failed"
+  local pr_json pr_flags has_label is_draft
+  pr_json="$(curl -fsSL \
     -H "Authorization: Bearer ${GH_TOKEN}" \
     -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}")"
-  local has_label is_draft
-  has_label="$(printf '%s' "$pr_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("true" if any(l.get("name")=="do-not-merge" for l in d.get("labels",[])) else "false")' 2>/dev/null || echo false)"
-  is_draft="$(printf '%s' "$pr_json" | python3 -c 'import json,sys; print("true" if json.load(sys.stdin).get("draft") else "false")' 2>/dev/null || echo false)"
+    "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}")" || return 0
+  pr_flags="$(printf '%s' "$pr_json" | jq -er '
+    if type != "object" or (.labels | type) != "array"
+       or (.draft | type) != "boolean" then error("invalid PR response")
+    else [any(.labels[]; .name == "do-not-merge"), .draft] | @tsv end
+  ')" || return 0
+  read -r has_label is_draft <<< "$pr_flags"
+  if [ "$has_label" = "true" ]; then
+    HOLD_REASON="do-not-merge-label=true"
+    return 0
+  fi
 
   local deliberate_draft_hold="false"
   if [ "$is_draft" = "true" ]; then
     local timeline
-    timeline="$(curl -sSL \
+    HOLD_REASON="hold-check-error: timeline lookup or parse failed"
+    timeline="$(curl -fsSL \
       -H "Authorization: Bearer ${GH_TOKEN}" \
       -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/timeline?per_page=100")"
-    deliberate_draft_hold="$(printf '%s' "$timeline" | python3 -c '
-import json,sys
-events = json.load(sys.stdin)
-first_review = next((e["created_at"] for e in events if e.get("event")=="reviewed"), None)
-converts = [e["created_at"] for e in events if e.get("event")=="convert_to_draft"]
-print("true" if first_review and any(c > first_review for c in converts) else "false")
-' 2>/dev/null || echo false)"
+      "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/timeline?per_page=100")" || return 0
+    deliberate_draft_hold="$(printf '%s' "$timeline" | jq -er '
+      def timestamp:
+        if type == "string" and length > 0 then . else error("missing event timestamp") end;
+      if type != "array" then error("invalid timeline response") else . end
+      | ([.[] | select(.event == "reviewed")
+          | (.submitted_at // .created_at) | timestamp] | sort | first) as $fr
+      | [.[] | select(.event == "convert_to_draft")
+          | (.created_at // .submitted_at) | timestamp] as $cd
+      | if $fr != null and any($cd[]; . > $fr) then "true" else "false" end
+    ')" || return 0
   fi
 
   if [ "$has_label" = "true" ] || [ "$deliberate_draft_hold" = "true" ]; then
