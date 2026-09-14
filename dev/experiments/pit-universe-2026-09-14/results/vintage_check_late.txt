@@ -1,0 +1,3 @@
+LATE APXT first=2025-11-17 vintage=2021-05-31 lag_d=1630 rows=205
+LATE EXCE first=2019-07-30 vintage=2013-05-31 lag_d=2251 rows=1170
+LATE TMS first=2025-04-21 vintage=2010-05-31 lag_d=5439 rows=351
