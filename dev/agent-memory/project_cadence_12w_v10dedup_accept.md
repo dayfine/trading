@@ -1,6 +1,6 @@
 ---
 name: project_cadence_12w_v10dedup_accept
-description: "12% initial stop (initial_stop_buffer 0.9167) × weekly trail cadence (stop_update_cadence Weekly) = single-surface ACCEPT on 09-13: 3 salts on _v10dedup vs the a0-v10 band — realised +$2.59M / +$1.97M / +$2.48M, maxDD 37.6→30.0 / 32.8→28.1 / 43.0→33.0, Sharpe better everywhere; band 627–752% vs 312–640%. Mechanism = the SHARED trades run wider (stop_loss ~460→~320, rotation ~240→~490 per cell); not a twin artifact (V6 = 0 on nulls; one −$2.8k IAC/MTCH spin-off twin on arm s1/s2, #2782). NOT promoted: grid (2009/2019 _v10dedup × 3 salts) + force-liquidation dissection + two-knob paired goldens + book §5.3 argument owed first."
+description: "12%×WEEKLY cadence: single-surface ACCEPT on 26y _v10dedup (3/3 salts, realised +$2.0–2.6M, maxDD −4.7 to −9.9pp) but the CONFIRMATION GRID FAILED 09-13: both 5y vintage cells (2009, 2019) lose realised AND maxDD at 2 of 3 salts. NOT promotable; default-off axis. Wide-weekly wins in fast-crash-then-recovery tapes, loses in slow grinds (2021–23, 2010–12)."
 metadata:
   type: project
   modified: 2026-09-13
@@ -24,3 +24,10 @@ this 26y cell is the bear-regime cell), dissect the force liquidations, paired g
 (`config-default-blast-radius.md`), and the W2 argument — 12% sits outside the book's §5.3 4–6% band and must be
 framed as a modern-regime adaptation of a dial; weekly re-evaluation is L3 (book-faithful).
 Related: [[project_stop_width_regime_dependent]] (5.9% vs 4% by window), [[project_edge_is_the_fat_tail]].
+
+**Grid verdict (09-13 evening, ledger `2026-09-13-stop-width-12pct-weekly-confirmation-grid`):** both 5y cells fail
+both criteria at every salt read (2019: $469k→$166k / 22.6→30.9 and $258k→$207k / 22.5→31.1; 2009: $106k→−$23k /
+17.9→27.1 and $277k→$10k / 20.4→25.2). Shared-trades-run-wider stays positive everywhere; the path re-draw and the
+drawdown EPISODE flip the sign — the null's 2019 maxDD is the Covid crash, the wide arm's is the 2021-05→2023-10 grind.
+Consequences: no promotion, no 10% neighbour arm, item-3 cancel-on-Bearish no-build (cohort is positive on the record).
+Same lesson as [[project_early_admission_mechanism]] and [[project_stop_width_regime_dependent]].
