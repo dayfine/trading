@@ -86,6 +86,22 @@ triage role (`.claude/skills/triage-labels.md`).
 6. **Done** = the PR is open with CI green. Merging is the dispatcher's or a
    human's; the merge's `Closes #<issue>` closes the issue. Remove your worktree.
 
+## Cross-agent review (`.claude/rules/cross-agent-review.md`)
+
+- Add the label `author/codex` to every PR you open. It goes through the same
+  gate loop as any PR: CI + qc-structural + qc-behavioral, both **Claude Code**
+  reviews, then the dispatcher merges. Your own review of your own PR is not a
+  gate.
+- When you are asked to review a PR (or `review/codex-requested` is on it), the
+  dispatcher runs `sh dev/scripts/codex_review.sh <PR>`, which invokes you
+  read-only and posts the result. Your report opens with `Reviewed SHA: <full
+  sha>`, its first heading is `## Codex review — <title>`, and it ends with
+  `## Verdict` → `APPROVED` or `NEEDS_REWORK`. **Never** use the headings
+  `## Structural QC`, `## Behavioral QC` or `## qc-…` — they name the Claude
+  merge gates and the poster refuses such a report.
+- Do not run dune during a review; the review is advisory and consumes no
+  container slot.
+
 **Dispatcher side (Claude Code / human):** triage new issues (`needs-triage` →
 role + `kind/`/`size/`/`impact/`/`P` grades), add `agent/codex` to bounded,
 verifiable items (docs, shell with a test harness, single-module OCaml with

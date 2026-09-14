@@ -1472,6 +1472,76 @@ check "colon-style verdict: the gate it actually names reads its real ok verdict
 check "colon-style verdict: an unrelated, never-reviewed gate reads none, not a false unreadable" \
   none "$(_gate "$(reviews "$COLON_STYLE_VERDICT")" structural "$TIP")"
 
+# Cross-agent review (.claude/rules/cross-agent-review.md): the advisory CODEX
+# column reads reviews whose first heading starts with "Codex". Pins the two
+# directions of isolation -- a Codex review never satisfies a Claude gate, and
+# a Claude gate review never satisfies the CODEX column -- plus the ok / rework
+# / stale readings on the codex kind itself.
+CODEX_ADVISORY_OK="Reviewed SHA: 7dc57cc06
+
+## Codex review — cross-agent review harness (PR #2797)
+
+| # | Check | Status |
+|---|-------|--------|
+| C1 | correctness | PASS |
+
+## Verdict
+
+APPROVED"
+
+CODEX_ADVISORY_REWORK="Reviewed SHA: 7dc57cc06
+
+## Codex review — cross-agent review harness (PR #2797)
+
+## Verdict
+
+NEEDS_REWORK"
+
+CODEX_ADVISORY_STALE="Reviewed SHA: deadbeef
+
+## Codex review — an earlier tip
+
+## Verdict
+
+APPROVED"
+
+check "codex review: reads ok on the codex kind at tip" \
+  ok "$(_gate "$(reviews "$CODEX_ADVISORY_OK")" codex "$TIP")"
+check "codex review: never satisfies the structural gate" \
+  none "$(_gate "$(reviews "$CODEX_ADVISORY_OK")" structural "$TIP")"
+check "codex review: never satisfies the behavioral gate" \
+  none "$(_gate "$(reviews "$CODEX_ADVISORY_OK")" behavioral "$TIP")"
+check "codex review: NEEDS_REWORK reads rework on the codex kind" \
+  rework "$(_gate "$(reviews "$CODEX_ADVISORY_REWORK")" codex "$TIP")"
+check "codex review: an old-sha review reads stale on the codex kind" \
+  "stale(deadbeef)" "$(_gate "$(reviews "$CODEX_ADVISORY_STALE")" codex "$TIP")"
+check "codex kind: a structural review never satisfies it" \
+  none "$(_gate "$(reviews "$STRUCT_WITH_BEHAV_SECTION")" codex "$TIP")"
+check "codex kind: a behavioral review never satisfies it" \
+  none "$(_gate "$(reviews "$REAL_BEHAVIORAL")" codex "$TIP")"
+
+# _codex_action (cross-agent-review.md): every branch of the label logic, plus
+# the CODEX_REVIEW=off fallback that must neutralise both labels.
+check "codex action: no label leaves MERGE alone" "MERGE" "$(_codex_action MERGE none "" "")"
+check "codex action: required + none turns MERGE into HOLD" \
+  "HOLD -- review/codex-required (codex=none): dispatch codex review, or swap to review/codex-timeout after 3h" \
+  "$(_codex_action MERGE none 0 "")"
+check "codex action: required + stale also holds" 1 "$(_codex_action MERGE "stale(deadbeef)" 0 "" | grep -c '^HOLD')"
+check "codex action: required + ok merges" "MERGE" "$(_codex_action MERGE ok 0 "")"
+check "codex action: required never overrides a rework" "rework (structural findings)" "$(_codex_action "rework (structural findings)" none 0 "")"
+check "codex action: required never overrides wait-for-CI" "wait for CI" "$(_codex_action "wait for CI" none 0 "")"
+check "codex action: requested + none appends the hint" "MERGE [+ codex review (advisory)]" "$(_codex_action MERGE none "" 0)"
+check "codex action: requested + rework appends findings note" "MERGE [codex: findings, advisory]" "$(_codex_action MERGE rework "" 0)"
+check "codex action: requested + ok is silent" "MERGE" "$(_codex_action MERGE ok "" 0)"
+check "codex action: docs-only skip is silent under requested" "MERGE (docs-only)" "$(_codex_action "MERGE (docs-only)" skip "" 0)"
+check "codex action: required + rework holds WITHOUT timeout advice" \
+  "HOLD -- review/codex-required (codex=rework): address the advisory findings, or a human removes the label" \
+  "$(_codex_action MERGE rework 0 "")"
+check "codex action: required + unclear holds with timeout advice (no verdict at tip)" 1 \
+  "$(_codex_action MERGE unclear 0 "" | grep -c 'swap to review/codex-timeout after 3h')"
+check "codex action: CODEX_REVIEW=off neutralises required" "MERGE" "$(CODEX_REVIEW=off _codex_action MERGE none 0 "")"
+check "codex action: CODEX_REVIEW=off neutralises requested" "MERGE" "$(CODEX_REVIEW=off _codex_action MERGE none "" 0)"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1

@@ -1053,3 +1053,15 @@
    VALIDATOR_DIFF_EXE
    %{exe:../../trading/backtest/validation/bin/validator_diff.exe}
    (run sh %{dep:validator_diff_exit_codes_smoke.sh}))))
+
+; codex_review test (2026-09-13, .claude/rules/cross-agent-review.md): pins the
+; report validator of dev/scripts/codex_review.sh -- the check that keeps an
+; advisory Codex review from ever being posted under a Claude gate heading --
+; and the CODEX_REVIEW=off fallback. Same shim + (universe) pattern as
+; prior_cell_check_test_runner.sh (dev/scripts/ is outside the workspace root).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:codex_review_test_runner.sh})))

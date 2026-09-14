@@ -23,6 +23,20 @@
 #   sh dev/scripts/pr_gate_status.sh            # all open PRs
 #   sh dev/scripts/pr_gate_status.sh 2265 2280  # just these
 #
+# CODEX COLUMN (.claude/rules/cross-agent-review.md)
+#   A fourth, ADVISORY column reads reviews whose FIRST heading starts with
+#   "Codex" (e.g. "## Codex review -- <title>"), posted by dev/scripts/
+#   codex_review.sh. It is never a merge gate on its own: the three gates
+#   above decide. Two labels change how NEXT-ACTION reads it --
+#     review/codex-requested : a missing/stale Codex review is appended as a
+#                              hint, the action itself is unchanged;
+#     review/codex-required  : a would-be MERGE becomes a HOLD until a Codex
+#                              verdict is ok at the tip; the dispatcher swaps
+#                              the label to review/codex-timeout after 3h and
+#                              merges on the Claude gates (the fallback).
+#   A Codex review can never satisfy STRUCT or BEHAV (the kind test anchors
+#   on the first heading), and a Claude review can never satisfy CODEX.
+#
 # BACKEND SELECTION (#2432 defect 2)
 #   This script needs to read PR lists/metadata/check-runs from GitHub. Local
 #   interactive sessions have `gh` on PATH and a browser login; the GHA
@@ -692,6 +706,39 @@ _pr_checks_summary() {
   esac
 }
 
+# _codex_action ACTION CODEX REQUIRED REQUESTED -> the NEXT-ACTION after the
+# advisory CODEX column is applied (cross-agent-review.md). REQUIRED /
+# REQUESTED are non-empty when the matching review/codex-* label is present.
+# CODEX_REVIEW=off (the documented fallback switch) disables BOTH label
+# effects, so switching the reviewer off can never leave a PR held on a review
+# that will not come (advisory Codex review 5194074884 of #2798). Lives above
+# the LIB seam so pr_gate_status_test.sh can pin every branch offline.
+_codex_action() {
+  _action=$1; _codex=$2; _required=$3; _requested=$4
+  if [ "${CODEX_REVIEW:-on}" = off ]; then
+    printf '%s' "$_action"; return 0
+  fi
+  if [ -n "$_required" ] && [ "$_codex" != ok ] && [ "$_codex" != skip ]; then
+    case "$_action" in
+      MERGE*)
+        # A RETURNED rework is findings, not a missing verdict: the 3h timeout
+        # applies only when Codex has not answered at this tip (advisory Codex
+        # review 5194186949 of #2798).
+        case "$_codex" in
+          rework) _action="HOLD -- review/codex-required (codex=rework): address the advisory findings, or a human removes the label" ;;
+          *)      _action="HOLD -- review/codex-required (codex=$_codex): dispatch codex review, or swap to review/codex-timeout after 3h" ;;
+        esac ;;
+    esac
+  elif [ -n "$_requested" ]; then
+    case "$_codex" in
+      ok|skip) ;;
+      rework)  _action="$_action [codex: findings, advisory]" ;;
+      *)       _action="$_action [+ codex review (advisory)]" ;;
+    esac
+  fi
+  printf '%s' "$_action"
+}
+
 # Sourcing with PR_GATE_STATUS_LIB=1 stops here, exposing every function above
 # for pr_gate_status_test.sh without hitting the network. EVERYTHING BELOW THIS
 # LINE IS A SIDE EFFECT and must stay below it.
@@ -719,8 +766,8 @@ else
   PRS=$(_list_open_prs)
 fi
 
-printf '%-6s %-8s %-14s %-14s %s\n' PR CI STRUCT BEHAV NEXT-ACTION
-printf '%s\n' "----------------------------------------------------------------------------"
+printf '%-6s %-8s %-14s %-14s %-14s %s\n' PR CI STRUCT BEHAV CODEX NEXT-ACTION
+printf '%s\n' "-------------------------------------------------------------------------------------------"
 
 for n in $PRS; do
   meta=$(_pr_meta "$n")
@@ -733,6 +780,9 @@ for n in $PRS; do
   # state, which is how #2384 merged 30 min after being drafted under an
   # explicit hold (#2396).
   held=$(printf '%s' "$meta" | jq -r '[.labels[].name] | index("do-not-merge") // empty')
+  # cross-agent-review.md: the two Codex labels (advisory hint / soft gate).
+  codex_requested=$(printf '%s' "$meta" | jq -r '[.labels[].name] | index("review/codex-requested") // empty')
+  codex_required=$(printf '%s' "$meta" | jq -r '[.labels[].name] | index("review/codex-required") // empty')
 
   # CI: pending anywhere beats fail beats pass -- never merge on non-pass.
   checks=$(_pr_checks_summary "$n" "$tip")
@@ -744,18 +794,19 @@ for n in $PRS; do
   esac
 
   if _is_docs_only "$files"; then
-    struct=skip; behav=skip
+    struct=skip; behav=skip; codex=skip
   else
     struct=$(_gate "$reviews" "structural" "$tip")
     behav=$(_gate "$reviews" "behavioral" "$tip")
+    codex=$(_gate "$reviews" "codex" "$tip")
   fi
 
   # One next action, in dependency order: CI first, then structural (behavioral
   # does not run until structural is APPROVED), then behavioral, then merge.
   case "$ci:$struct:$behav" in
     *)               if [ -n "$held" ]; then
-                       printf '%-6s %-8s %-14s %-14s %s\n' \
-                         "$n" "$ci" "$struct" "$behav" "HOLD -- do-not-merge label"
+                       printf '%-6s %-8s %-14s %-14s %-14s %s\n' \
+                         "$n" "$ci" "$struct" "$behav" "$codex" "HOLD -- do-not-merge label"
                        continue
                      fi ;;
   esac
@@ -786,5 +837,10 @@ for n in $PRS; do
     *)               action="inspect manually" ;;
   esac
 
-  printf '%-6s %-8s %-14s %-14s %s\n' "$n" "$ci" "$struct" "$behav" "$action"
+  # CODEX column (cross-agent-review.md): advisory by default; a soft gate only
+  # under review/codex-required, and only where the three real gates would
+  # otherwise MERGE. See _codex_action above the LIB seam (offline-tested).
+  action=$(_codex_action "$action" "$codex" "$codex_required" "$codex_requested")
+
+  printf '%-6s %-8s %-14s %-14s %-14s %s\n' "$n" "$ci" "$struct" "$behav" "$codex" "$action"
 done
