@@ -80,7 +80,14 @@ all twelve. Pinned worktree `sweep-detgate` removed; lane monitors stopped. Noth
    paired P&L of the Recovering-week cohort at `max_position_pct_long ∈ {0.14, 0.20, 0.25}` × `max_long_exposure_pct ∈ {0.70,
    0.85}` on the 26y record (3 salts, V6 gate) — a surface, not a flag; `experiment-gap-closing` skill.
 4. **`stop_loss` label hides the `Per_position` breaker** (carried; now measured: 5–6 mislabelled exits per wide cell, 2–3 per
-   null cell). Small harness PR: emit `force_liquidation` as the `exit_trigger` when the breaker fires. Feat-backtest.
+   null cell). Root cause read 09-13: `force_liquidation_runner.ml` `_transition_of_event` emits `Position.StopLoss` on purpose
+   and its comment says the distinction is "recorded separately"; `force_liquidation_log.mli` claims the events post-process
+   trades.csv's `exit_trigger`, but the only consumers (`result_writer.ml`, `runner.ml`) persist the events — no relabel exists.
+   Fix (weinstein tier, no core-module change): emit `Position.StrategySignal { label = "force_liquidation"; detail = Some
+   "per_position" / "portfolio_floor" }` so `Stop_log.exit_trigger_of_reason` surfaces it exactly like `stage3_force_exit`;
+   correct both docstrings; pin with a sim-level test (position down > 25% → `exit_trigger` = `force_liquidation`, and the
+   breaker's P&L unchanged). Check whether any golden compares the trades.csv trigger column (metrics are unaffected);
+   `read.sh`'s exit-mix table already lists the token. feat-backtest, small.
 5. **SGP_old1 truncation** + the #2782 spin-off twins before the next warehouse rebuild (ops-data).
 6. Carried: orchestrator D2 push (09-10 item 5); #2729 residuals; #2785.
 
