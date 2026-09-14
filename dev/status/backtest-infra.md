@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-09-08
+## Last updated: 2026-09-14
 
 ## Status
 IN_PROGRESS
@@ -893,6 +893,14 @@ Merged in main:
 - #419 Step 2 (per-phase tracing) — 2026-04-19.
 
 ## Next Steps
+
+- **[NEW 2026-09-14] PIT top-3000 universe migration — in flight locally (2026-09-14
+  session), do not dispatch.** Plan + decisions D1–D8, mechanism (`universe_schedule`
+  spec field → `membership_at` composition), sequencing 1–6:
+  `dev/plans/pit-universe-migration-2026-09-14.md`. Step 2 (fetch 2,483 union names)
+  and 3b/4 (warehouse `_v11pit`, new record band) are host/container-bound and
+  LOCAL; step 3a (the mechanism PR) is `feat-backtest` but dispatched from the local
+  session only — the orchestrator must not pick it up.
 
 - ~~**[NEW 2026-09-05] #2669 — `build_snapshots.exe -incremental` clobbers
   `manifest.sexp`.**~~ **DONE 2026-09-08** — fixed by the merge in
