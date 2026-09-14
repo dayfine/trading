@@ -151,6 +151,11 @@ jobs:
           # required" limbo instead of running CI.
           token: ${{ secrets.BOT_GITHUB_TOKEN }}
 
+      # checkout configures safe.directory under a temporary HOME.
+      - name: Trust the checkout for subsequent steps
+        shell: bash
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
       - name: Compute today's date
         id: today
         run: echo "date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
