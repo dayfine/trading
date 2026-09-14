@@ -87,6 +87,12 @@ check "codex_invoke: sandbox is explicitly read-only" "read-only" "$(awk 'p{prin
 
 # Posting (finding 2): a failed `gh api` must make post_report return non-zero;
 # the old pipe into sed masked it under POSIX sh.
+# The failure arms are called as AND-OR lists (`post_report … || rc=$?`), the
+# same shape as the real call site in codex_review.sh, NOT inside `$(…)`: in a
+# command substitution `set -e` stays live and aborts the function on the
+# failing assignment, which masked a dropped `|| return 1` (qc-behavioral
+# rework iteration 2 of #2798, review 5194837826). In an AND-OR list `set -e`
+# is suppressed inside the function, so only the explicit guard can fail it.
 cat > "$D/bin/gh" <<'GEOF'
 #!/bin/sh
 case "$GH_STUB_MODE" in
@@ -99,13 +105,13 @@ GEOF
 chmod +x "$D/bin/gh"
 rc=0; out=$(GH_STUB_MODE=ok PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md") || rc=$?
 check "post_report: success returns 0 and prints the id" "0 codex_review: posted review id 4242" "$rc $out"
-rc=0; out=$(GH_STUB_MODE=fail PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md" 2>/dev/null) || rc=$?
+rc=0; GH_STUB_MODE=fail PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md" >/dev/null 2>&1 || rc=$?
 check "post_report: a failed gh api returns non-zero" 1 "$rc"
 # qc-behavioral rework iteration 1 (#2798, review 5194401789): the fail stub
 # above prints nothing, so the empty-id guard fires and the exit-status capture
 # was never the thing under test (a `gh api | sed` pipe survived). This arm
 # exits non-zero WHILE printing an id, so only the captured status can catch it.
-rc=0; out=$(GH_STUB_MODE=failbody PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md" 2>/dev/null) || rc=$?
+rc=0; GH_STUB_MODE=failbody PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md" >/dev/null 2>&1 || rc=$?
 check "post_report: a failed gh api that still prints an id returns non-zero" 1 "$rc"
 rc=0; out=$(GH_STUB_MODE=empty PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md") || rc=$?
 check "post_report: an empty id returns non-zero" 1 "$rc"
