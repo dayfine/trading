@@ -65,5 +65,42 @@ check "CODEX_REVIEW=off says so" 1 "$(printf '%s' "$out" | grep -c 'disabled (CO
 rc=0; out=$(CODEX_REVIEW_LIB= sh "$HERE/codex_review.sh" 2>&1) || rc=$?
 check "no PR argument exits 2" "rc=2" "rc=$rc"
 
+# Invocation shape (advisory Codex review of #2798, finding 1): a stub codex on
+# PATH records its argv; the shape must be plain `exec` with --ephemeral, -o
+# REPORT, and the prompt as the LAST argument -- never the `review` subcommand,
+# which refuses a custom prompt alongside --base.
+mkdir -p "$D/bin"
+cat > "$D/bin/codex" <<'CEOF'
+#!/bin/sh
+printf '%s\n' "$@" > "$CODEX_STUB_ARGV"
+exit 0
+CEOF
+chmod +x "$D/bin/codex"
+printf 'the prompt\n' > "$D/prompt.txt"
+CODEX_STUB_ARGV="$D/argv" PATH="$D/bin:$PATH" codex_invoke "$D/wt" "$D/report.md" "$D/prompt.txt"
+check "codex_invoke: uses plain exec, not the review subcommand" 0 "$(grep -cx review "$D/argv")"
+check "codex_invoke: passes --ephemeral" 1 "$(grep -cx -- --ephemeral "$D/argv")"
+check "codex_invoke: passes -o REPORT" "$D/report.md" "$(awk 'p{print; exit} $0=="-o"{p=1}' "$D/argv")"
+check "codex_invoke: prompt is the last argument" "the prompt" "$(tail -1 "$D/argv")"
+check "codex_invoke: -C worktree first" "-C" "$(sed -n 1p "$D/argv")"
+
+# Posting (finding 2): a failed `gh api` must make post_report return non-zero;
+# the old pipe into sed masked it under POSIX sh.
+cat > "$D/bin/gh" <<'GEOF'
+#!/bin/sh
+case "$GH_STUB_MODE" in
+  fail) echo "gh: HTTP 422" >&2; exit 1 ;;
+  empty) exit 0 ;;
+  *) echo 4242 ;;
+esac
+GEOF
+chmod +x "$D/bin/gh"
+rc=0; out=$(GH_STUB_MODE=ok PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md") || rc=$?
+check "post_report: success returns 0 and prints the id" "0 codex_review: posted review id 4242" "$rc $out"
+rc=0; out=$(GH_STUB_MODE=fail PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md" 2>/dev/null) || rc=$?
+check "post_report: a failed gh api returns non-zero" 1 "$rc"
+rc=0; out=$(GH_STUB_MODE=empty PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md") || rc=$?
+check "post_report: an empty id returns non-zero" 1 "$rc"
+
 if [ "$fails" -gt 0 ]; then printf 'FAIL: codex_review -- %d test(s) failed.\n' "$fails"; exit 1; fi
 printf 'OK: codex_review -- %d tests clean.\n' "$total"

@@ -45,8 +45,8 @@ sh dev/scripts/codex_review.sh <PR> --dry-run  # print the prompt
 ```
 
 It checks the PR head out into a detached worktree under `.claude/worktrees/`,
-runs `codex exec review --base origin/main --ephemeral` (read-only sandbox,
-**no dune** — it consumes no container slot, so it may run beside a backtest),
+runs `codex exec --ephemeral` with the review prompt (read-only sandbox by
+default, **no dune** — it consumes no container slot, so it may run beside a backtest),
 validates the report (`Reviewed SHA:` line 1, `## Codex review` first heading,
 `## Verdict` → `APPROVED|NEEDS_REWORK`, no gate headings), posts it with the
 full head SHA as `commit_id`, and removes the worktree. Docs-only PRs are

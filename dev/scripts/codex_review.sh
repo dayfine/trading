@@ -68,6 +68,32 @@ is_docs_only() {
   return 0
 }
 
+# codex_invoke WT REPORT PROMPTFILE -> runs Codex read-only in WT and leaves the
+# report at REPORT. Plain `codex exec` (read-only sandbox is its default), NOT
+# `codex exec review`: that subcommand refuses a custom PROMPT alongside --base
+# (measured on 0.154.0: "the argument '--base <BRANCH>' cannot be used with
+# '[PROMPT]'"), and the prompt is what carries the machine-parsed format. The
+# invocation shape is pinned by codex_review_test.sh with a stub codex on PATH
+# -- the first live run (PR #2798) failed exactly here.
+codex_invoke() {
+  _wt=$1; _report=$2; _promptfile=$3
+  _model_args=""
+  [ -n "${CODEX_MODEL:-}" ] && _model_args="-m $CODEX_MODEL"
+  # shellcheck disable=SC2086
+  codex -C "$_wt" exec --ephemeral $_model_args -o "$_report" "$(cat "$_promptfile")"
+}
+
+# post_report PR SHA REPORT -> posts the report as a COMMENTED PR review pinned
+# to SHA; prints the review id; non-zero when the API call fails or returns no
+# id. Captured, not piped: under POSIX sh `gh api ... | sed` returns sed's
+# status, so a failed post exited 0 -- the advisory Codex review of #2798 found it.
+post_report() {
+  _pr=$1; _sha=$2; _report=$3
+  _id=$(gh api -X POST "repos/$REPO/pulls/$_pr/reviews" -f event=COMMENT -f commit_id="$_sha" -F body=@"$_report" --jq '.id') || return 1
+  [ -n "$_id" ] || return 1
+  echo "codex_review: posted review id $_id"
+}
+
 # Sourcing with CODEX_REVIEW_LIB=1 stops here (offline tests).
 [ "${CODEX_REVIEW_LIB:-}" = 1 ] && return 0
 
@@ -102,9 +128,13 @@ fi
 
 REPORT="$REPORT_DIR/codex-review-pr-$PR-$SHA.md"
 PROMPT="$REPORT_DIR/codex-review-pr-$PR-prompt.txt"
+# Unquoted heredoc so $PR/$SHA/$TITLE expand; no backticks anywhere inside it
+# (they would execute -- the first dry run pasted `gh pr diff` output into the
+# prompt this way).
 cat > "$PROMPT" <<PEOF
 Review PR #$PR (head $SHA, title: $TITLE) of $REPO as an independent ADVISORY reviewer.
-Scope = the PR's own file list (gh pr view $PR --json files); the --base diff is context only.
+Scope = the PR's own file list (gh pr view $PR --json files). You are in a detached checkout of the PR head;
+read the change with 'gh pr diff $PR' (or 'git diff origin/main...HEAD') and the files themselves.
 Look for: correctness defects, missing or weak tests for claims the diff makes, contract drift
 between .mli docstrings / PR body and the code, and violations of the repo rules under
 .claude/rules/ (test-patterns.md, experiment-flag-discipline.md, config-default-blast-radius.md,
@@ -129,12 +159,8 @@ trap cleanup EXIT INT TERM
 git -C "$ROOT" fetch -q origin "pull/$PR/head"
 git -C "$ROOT" worktree add --detach "$WT" "$SHA" >/dev/null
 
-MODEL_ARGS=""
-[ -n "${CODEX_MODEL:-}" ] && MODEL_ARGS="-m $CODEX_MODEL"
-# shellcheck disable=SC2086
-codex -C "$WT" exec review --base origin/main --ephemeral $MODEL_ARGS \
-  -o "$REPORT" "$(cat "$PROMPT")" >/dev/null 2>"$REPORT.stderr" || {
-  echo "codex_review: codex exec review failed (stderr in $REPORT.stderr)" >&2; exit 1; }
+codex_invoke "$WT" "$REPORT" "$PROMPT" >/dev/null 2>"$REPORT.stderr" || {
+  echo "codex_review: codex exec failed (stderr in $REPORT.stderr)" >&2; exit 1; }
 
 if ! validate_report "$REPORT" "$SHA"; then
   echo "codex_review: report at $REPORT did not validate; NOT posted" >&2
@@ -142,8 +168,7 @@ if ! validate_report "$REPORT" "$SHA"; then
 fi
 echo "codex_review: report validated: $REPORT"
 if [ "$POST" = 1 ]; then
-  gh api -X POST "repos/$REPO/pulls/$PR/reviews" -f event=COMMENT -f commit_id="$SHA" -F body=@"$REPORT" --jq '.id' \
-    | sed 's/^/codex_review: posted review id /'
+  post_report "$PR" "$SHA" "$REPORT" || { echo "codex_review: POST failed; the validated report is at $REPORT" >&2; exit 1; }
 else
   echo "codex_review: --no-post; not posted"
 fi
