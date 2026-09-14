@@ -4,11 +4,30 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-13 (orchestrator run 34757914354; main **`8c7d0ada`**).
-Green at run start: `dune build` **0**, `dune runtest` **0**, 0 `^FAIL:` across
-4,213 lines, `status_file_integrity` **0**, `index_size_linter` **0** — every exit
-code read **unpiped**. Step 0.5 did not fire: `QUEUE_NON_EMPTY=1` (PR #2769), and
-Condition 1 failed (unreviewed tip), so a full pass was required.
+Last updated: 2026-09-14 run 2 (orchestrator run 34878607445; main **`67485620`**
+at start, tip advanced to **`c5b11789`** mid-run). Green at run start from **CI on
+the same commit** — `build-and-test`, `perf-tier1-smoke`, `golden-sp500-5y`,
+`golden-custom-universe` all `success`; `status_file_integrity` **0**,
+`index_size_linter` **0**, `no_python_check` **0**, run standalone without dune,
+exit codes read **unpiped**. Step 0.5 did not fire: `QUEUE_NON_EMPTY=2` per the
+workflow (1 by the time I read it, #2809), and Condition 1 failed anyway.
+
+**Run 1 today proved the D3 hand-discipline note below is not a control.** Run
+`34853606164` dispatched three writing agents, recorded all three `_in flight_`,
+and produced **zero branches and zero PRs**; its `## Escalations`, `## Integration
+Queue` and dispatch-outcome column still hold the literal placeholder
+`_(Completed at the end of the run.)_`, and it never performed this reconcile —
+which is why this header sat two runs stale. Step 8 (the whole turn) ran **886 s**:
+a serial pre-dispatch baseline gate consumed it, agents were dispatched at the end,
+and the container was torn down mid-flight with nothing snapshotted to a branch.
+Filed as **#2810** with the reordering ask — dispatch *before* verifying, since
+nothing in the deterministic set gates dispatch and CI already publishes the build
+answer for the same commit. Run 2 dispatched ~9 min in and ran every check
+standalone (no dune, no mutex contention); all three lost tasks were re-dispatched.
+
+**Fifth instance of one class this month** (#2741, #2747, #2771, #2803, #2810):
+a green run is still indistinguishable from a productive one, because nothing
+checks a run's claimed dispatches against the branches that actually exist.
 
 **The orchestrator was DEAD for three days and the cause was not in this repo.**
 Six consecutive scheduled runs failed 2026-09-10 -> 09-12 (`34475636575`,
@@ -60,9 +79,11 @@ different route); `workflow` scope unavailable by push **and**
 contents API (403 on a workflow path vs **201** on a `dev/notes/` control,
 same token, seconds apart — the control is what makes it a measurement);
 `POST /actions/workflows/<f>/dispatches` **403**; `POST /issues` create-only
-(issue comments **403**, re-tested 2026-09-08); `PATCH /pulls/<n>`,
-`POST /pulls/<n>/reviews`, `POST /pulls` (create), `PUT /pulls/<n>/merge`,
-`PUT .../update-branch` all work.
+(issue comments **403**, re-tested 2026-09-08 and again 2026-09-14; **`PATCH
+/issues/<n>` is also 403** — new 2026-09-14, so a filed issue can be neither
+commented on nor edited, and a mistake in an issue body is uncorrectable from this
+runtime); `PATCH /pulls/<n>`, `POST /pulls/<n>/reviews`, `POST /pulls` (create),
+`PUT /pulls/<n>/merge`, `PUT .../update-branch` all work.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
