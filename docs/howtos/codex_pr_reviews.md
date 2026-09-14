@@ -1,5 +1,15 @@
 # Invoking Codex for PR reviews from another CLI
 
+> **Status (2026-09-13, `.claude/rules/cross-agent-review.md`, PR #2798):** the
+> default integration is **advisory**. `sh dev/scripts/codex_review.sh <PR>` runs
+> Codex read-only against the PR head, validates the report, and posts it under
+> `## Codex review — <title>`, which the `CODEX` column of
+> `pr_gate_status.sh` reads. The merge gates stay CI + Claude qc-structural +
+> Claude qc-behavioral for every PR. §§4–6 below describe the **promotion
+> path** — Codex playing the gate roles under the gate headings — which is NOT
+> enabled and would need its own rule change once the advisory column has
+> agreed with the Claude gates across enough PRs. §§0–3 apply to both.
+
 An orchestrator (Claude CLI, a GHA step, a shell controller) can run Codex as a
 subprocess to play the project's two review roles:
 
@@ -12,9 +22,13 @@ The controller — not Codex — owns authentication, the worktree, the
 structural→behavioral gate, verdict parsing, posting, and cleanup. Codex gets
 review authority only.
 
-Verified against `codex-cli 0.154.0`: `codex -C <dir> exec review --base
-<branch> --ephemeral --json --output-last-message <file> [PROMPT]` are all
-real flags.
+Measured against `codex-cli 0.154.0`: `codex exec review --base <branch>` **refuses a
+custom `[PROMPT]`** ("the argument '--base <BRANCH>' cannot be used with
+'[PROMPT]'" — the first live run of `codex_review.sh` on #2798 hit exactly this). The
+working shape is plain `codex -C <worktree> exec --ephemeral -o <file> "<prompt>"`, with
+the prompt naming the PR and telling Codex to read the change via `gh pr diff <N>` in
+the detached checkout; `--ephemeral`, `--json` and `-o/--output-last-message` are real
+`exec` flags.
 
 ## 0. Two rules that apply before anything else
 
@@ -139,7 +153,7 @@ sh dev/scripts/pr_gate_status.sh "$PR_NUMBER"                    # STRUCT/BEHAV 
 `-F body=@file` reads the file; `-f body=@file` sends the literal path.
 (`gh pr review --comment --body` also creates a review and is equivalent.)
 
-## 4. Structural review
+## 4. Structural review (promotion path — not enabled; see the status note at the top)
 
 Common prompt body (both variants):
 
@@ -180,14 +194,14 @@ Invocation (either variant):
 
 ```bash
 REPORT="/tmp/qc-structural-pr-${PR_NUMBER}.md"     # report files may live in /tmp; only the worktree may not
-codex -C "$WORKTREE" exec review --base origin/main --ephemeral --json \
-  --output-last-message "$REPORT" "$(cat prompt-structural.txt)"
+codex -C "$WORKTREE" exec --ephemeral --json \
+  --output-last-message "$REPORT" "$(cat prompt-structural.txt)"   # not `exec review --base`: it refuses a prompt
 ```
 
 The controller parses `$REPORT`, checks its first line names `$HEAD_SHA`,
 posts it (§3), and continues only on `APPROVED`.
 
-## 5. Behavioral review
+## 5. Behavioral review (promotion path — not enabled)
 
 Same worktree and PR input. The behavioral role's shell use is deliberately
 narrow, and this is the operating contract the repo's own behavioral reviews
@@ -198,7 +212,7 @@ end) — nothing that persists, no pushes, no parent tree.
 
 ```bash
 REPORT="/tmp/qc-behavioral-pr-${PR_NUMBER}.md"
-codex -C "$WORKTREE" exec review --base origin/main --ephemeral \
+codex -C "$WORKTREE" exec --ephemeral \
   --output-last-message "$REPORT" \
   "Review PR #${PR_NUMBER} (head ${HEAD_SHA}) as qc-behavioral. This head has
 already cleared the first gate; do NOT restate that fact or name that gate in
