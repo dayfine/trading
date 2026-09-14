@@ -1,113 +1,97 @@
 # Next-session priorities — 2026-09-14 (supersedes 2026-09-13)
 
-Written 18:05 PT 2026-09-13 (autonomous 16:31–18:10 PT). The 09-13 doc's queue items 1–3 and 5–6 are resolved below; the
-grid is complete.
+Written 02:40 PT 2026-09-14 (autonomous 16:31 PT 09-13 → 02:40 PT 09-14, user away from ~21:40 PT). Every queue item of
+the 09-13 doc is resolved; one code PR (#2800) is open and waiting on its gates.
 
-## Merged this session
+## Merged this session (all three gates or docs-only; every verdict at the current tip)
 
-- **#2791** docs: item-4 grid interim (salt-0 pairs, `read.sh` `NULL=` override, handoff note). Docs + artifacts; squash-merged on green.
-- **#2786** chore: `.codex/rules/trading.rules` project Codex command policy — rework iteration 1 by Codex addressed all four
-  first-round items (jj / merge forbidden, review + api prompt, docker narrowed to `exec trading-1-dev`/inspect/stats/ps with
-  stop/rm/kill/system forbidden, startup-loading smoke test in the howto). Verified every decision at the tip with
-  `codex execpolicy check --rules … -- <cmd>` (21 probes; note zsh needs `${=c}` to word-split), posted structural + behavioral
-  APPROVED, admin-merged (BEHIND, disjoint new files). Follow-up **#2793** (Codex queue, P3): bare `git push` allows `origin main`.
-- **#2792** docs: deteriorating-gate ledger amendment closing **#2780** — classification → **REJECT-as-default-but-legitimate-axis**
-  (the pre-registration's failure branch; Rule-4 do-not-revive needs every tested context, this was one period × one universe),
-  UTHR 2020-12-02 is null-only at two salts not three (absent both arms at salt 0), calmar placeholders filled (gate 0.100 /
-  0.133 / 0.105 vs null 0.163 / 0.168 / 0.183). `deteriorating_blocks_longs` is OFF the Rule-4 retirement worklist; do-not-revive
-  is earned only by a second vintage cell failing both criteria. `memory/project_deteriorating_gate_reject` updated.
+- **#2791** grid interim; **#2794** item-4 confirmation-grid verdict + force-liquidation dissection + item-6 screen;
+  **#2795** memory snapshot; **#2792** deteriorating-gate ledger amendment (closes #2780); **#2796** probe pre-registration;
+  **#2799** probe verdict + artifacts.
+- **#2786** Codex command policy (verified with `codex execpolicy check`); **#2785** Codex review howto (taken over,
+  re-framed as advisory-by-default); **#2797** Codex's `fix(ci)` trust step (#2653) — the first Codex-authored PR through
+  the loop; **#2798** cross-agent review harness (below).
 
-## The result that changes what comes next — the item-4 confirmation grid FAILS
+## Two results that change what comes next
 
-`dev/experiments/cadence-12w-v10-2026-09-13/README.md` §"Confirmation-grid verdict"; ledger
-`2026-09-13-stop-width-12pct-weekly-confirmation-grid` (verdict Reject); memory `project_cadence_12w_v10dedup_accept` (updated).
+1. **12%-weekly confirmation grid FAILS** (`cadence-12w-v10-2026-09-13/README.md` §verdict; ledger
+   `2026-09-13-stop-width-12pct-weekly-confirmation-grid`, twelve cells): both 5y vintage cells lose realised AND maxDD
+   at 3 of 3 salts (2019: $469k→$166k / 22.6→30.9, $258k→$207k / 22.5→31.1, $245k→$213k / 22.8→31.2; 2009: $106k→−$23k /
+   17.9→27.1, $277k→$10k / 20.4→25.2, $77k→−$12k / 17.1→25.4). Wide-weekly keeps its 26y single-surface ACCEPT and stays a
+   default-off axis; **not promotable**. Why: shared trades run wider everywhere, but chop-year entries (2021, 2010) bleed
+   12% instead of 4%, and the 26y's biggest 2019–23 winners (CLS, BFX, TTEC, CLFD, $2.6M) are absent from the 2019
+   composition (only 1,023 of ~2,980 names shared with the 2000 one). No promotion PR, no 10% neighbour arm, item-3
+   cancel-on-Bearish no-build (that cohort is positive on the record; brief parked below).
+2. **Concentration/deployment probe REJECT** (`concentration-deploy-2026-09-13/`, pre-registered #2796; ledger
+   `2026-09-14-concentration-deploy-probe`, seven cells; memory `project_concentration_deploy_probe_reject`):
+   c2 (exposure 0.85 + cash floor 0.15) is **bit-identical to the null** — neither knob binds at 0.14/position; c1
+   (per-position 0.25) fails realised AND Calmar at 3 of 3 salts (−$421k / −$892k / −$963k; maxDD 32.8→46.7 at s1). The
+   shared trades earn more, but a fuller-per-name book holds fewer names when the 2020 monsters screen in (NVDA/BBWI
+   null-only); the Recovering-week cohort (11–20 trades) flips sign with the salt; the one salt-robust cost is
+   Bearish-week resting fills at the bigger ticket (negative on the arm at all 3 salts, positive on the null at all 3).
+   **Item 6 (deployment ramp) = no-build. The entry gap is top-of-funnel (breakout gate, top-N), not funding or sizing.**
 
-| cell | realised null → arm | maxDD null → arm | maxDD episode null → arm |
-|---|---:|---|---|
-| 2019 s0 | $469k → $166k | 22.6 → 30.9 | Covid crash 2020-02/03 → 2021-05 … 2023-10 grind |
-| 2019 s1 | $258k → $207k | 22.5 → 31.1 | same |
-| 2009 s0 | $106k → −$23k | 17.9 → 27.1 | 2011-04 … 2012-11 → 2010-04 … 2012-06 |
-| 2009 s1 | $277k → $10k | 20.4 → 25.2 | 2011-05 … 2012-08 → 2010-04 … 2012-06 |
+Force liquidations on the wide cells (item 2): all `Per_position` breaker fires labelled `stop_loss`; 6/7 real earnings
+gaps, 1 phantom (SGP_old1 post-merger stub prints, −$60k/salt). Item-6 screen: `long_top_n_admitted` = 20 every week in
+spring 2020 while 1–3 fill — which is what the probe then tested.
 
-Both 5y cells fail both pre-registered criteria at two of three salts, so the grid cannot clear regardless of salt 2.
-**12%-weekly keeps its 26y single-surface ACCEPT and stays a default-off axis; it is not promotable.** Why: the
-shared-trades-run-wider term is positive in every cell; the path re-draw and the drawdown *episode* flip the sign — the wide
-arm's maxDD is a slow grind (2021–23, 2010–12), the null's is a fast crash. Wide-weekly wins fast-crash-then-recovery tapes
-(the 26y composition) and loses grinds. Same lesson as the 05-30 early-admission grid.
+## Cross-agent review is set up (#2798, `.claude/rules/cross-agent-review.md`)
 
-Consequences: no promotion PR, no two-knob goldens, **no 10%-weekly neighbour arm** (same plateau, directional reversal).
-**Item 3 cancel-on-Bearish = no build for now**: the mechanism already exists as the macro half of
-`enable_entry_ticket_rescreen` (rejected 08-18 for its stage-wobble half), a Bearish-only flag would be new — but the
-Bearish-week-fill cohort is *positive* on the record convention (+$0.12/+$0.22/+$0.19M per salt) and only negative on the
-wide arm. Brief kept at the bottom of this doc's §"Parked briefs" in case a wide preset returns.
+- Codex is an **advisory** reviewer; Claude qc-structural + qc-behavioral remain the gates for every PR. `pr_gate_status.sh`
+  has a fourth `CODEX` column; labels `author/codex`, `review/codex-requested` (hint), `review/codex-required` (timed HOLD
+  on a would-be MERGE, 3 h → `review/codex-timeout`), and `CODEX_REVIEW=off` neutralises everything.
+- `sh dev/scripts/codex_review.sh <PR>`: detached worktree at the head → `codex -C … exec -s read-only --ephemeral -o …`
+  → validator + the real `_gate` reader must agree → post under `## Codex review — …`. 40 offline tests; 94 gate-reader
+  tests; mutation pins 16/16.
+- **Evidence it earns its keep:** five advisory passes on #2798 itself found 9 items, 8 acted on (the `exec review --base`
+  incompatibility, a `gh api | sed` mask, sandbox not explicit, `CODEX_REVIEW=off` not honoured by the reader, a
+  validator/reader disagreement, shared report paths, timeout advice on a returned rework); the Claude behavioral gate
+  then found the test harness had masked a dropped `|| return 1` (command-substitution `set -e`) — two rework iterations,
+  APPROVED at 4f4ffa74. Next: use `review/codex-requested` on the next OCaml PR (#2800 is the candidate) and compare.
+- Codex queue: #2653 merged (#2797). Codex has `codex-2753-publisher-guard` and `codex-2788-behavioral-tools` worktrees
+  but no PRs yet; #2793 (git push tightening) is queued. `AGENTS.md` carries the cross-agent section.
 
-**Item 2 (force-liquidation dissection) settled** — README §"Force-liquidation dissection": every event is the 25%
-`Per_position` breaker labelled `stop_loss` (the carried label bug); six of seven are real one-day earnings gaps through the
-12% stop (ATLC 2000-10, AWRE 2014-07, ARCB 2014-07, CBKCQ 2014-10, IMMR 2018-08, OSPN 2020-08); one phantom, **SGP_old1**
-stub prints 2010-09-20/21/23 on a series that should end at the 2009-11 Merck merger (−$60k/salt, all salts + the 2009-s0 5y
-arm; already in `splice-scan.csv`). Data fix = truncate `SGP_old1` at the merger in the next warehouse rebuild (#2782 family).
+## Open PR — run the gate loop on it first
 
-**Item 6 screen** (README §"Item-6 screen"): `long_top_n_admitted` = 20 every week through spring 2020 while 1–3 entries fill
-per week — the sizing cap (0.14 × 0.70 = five slots) binds, not admission. A Recovering-week ramp is a regime-conditioned
-concentration knob (`project_capacity_concentration_surface`), not an admission mechanism; screen the cohort's paired P&L at
-wider caps before building anything.
-
-## Grid state — COMPLETE (both lanes DONE 17:55 PT)
-
-All twelve cells ran; salt-2 pairs confirm both 5y cells at three of three salts (2019 s2: $245k → $213k, 22.8 → 31.2; 2009 s2:
-$77k → −$12k, 17.1 → 25.4). Artifacts committed under `cadence-12w-v10-2026-09-13/results/`; README log + ledger `variants` hold
-all twelve. Pinned worktree `sweep-detgate` removed; lane monitors stopped. Nothing to pick up.
-
-## Codex integration state
-
-- `AGENTS.md` + `.codex/rules/trading.rules` on main. Codex claimed **#2788** at 15:43 PT and pushed
-  `codex/2788-behavioral-tools` (no PR yet at 17:30 PT) — do not duplicate; run the gate loop when the PR appears.
-- **#2785** (review howto, draft) still waits on #2788 landing, then the "docs-only PRs skip the build gate" line + Codex's
-  second look. Queue after #2788: #2653, #2753, #2793 (new), then P3 #2539 / #2742 / #2639 / #2394.
-- `pr_gate_status.sh` classifies experiment `.sexp`/`.csv` artifacts and ledger entries as full-three-gate (its comment says
-  so deliberately); the repo practice since #2776/#2783 is admin-merge on green for experiment-record PRs. #2792 got
-  dispatcher-side structural + behavioral reviews (fact-checked against the artifacts) to satisfy the script. **Decide and
-  write down one rule** — either widen the docs-only allowlist to `dev/experiments/**/results/*` + `dev/experiments/_ledger/*`
-  (with the ledger linter as the gate) or stop admin-merging records — and fix the script or the practice accordingly.
+- **#2800** `feat(backtest): label breaker exits force_liquidation in trades.csv` (feat-backtest agent, 12 files). CI at 27f3ef0aa failed on ONE finding — `FAIL: nesting linter` for `_transition_of_event` (max depth 7 > 5) — and a
+  rework agent was dispatched at 02:50 PT to extract helpers (second commit on the branch); re-check `gh pr checks 2800`. Beyond the label it (a) deleted the dead `Trades_stream` relabel (keyed on the breaker's fire date,
+  which never equals the D1 exit date), and (b) moved three diagnostic columns for breaker rows toward the
+  `stage3_force_exit` convention (`stop_trigger_kind` → `non_stop_exit`, `days_to_first_stop_trigger` → None, R7 → Fail).
+  (b) is scope beyond "only the label moves" — qc-behavioral should judge it; goldens' `actual.sexp` are untouched per the
+  agent. Dispatch qc-structural → qc-behavioral (rework cap 2) → merge; consider `review/codex-requested` on it as the
+  first OCaml advisory dry run.
 
 ## Queue (in order)
 
-1. **Finish the grid bands** (Live above) → salt-2 rows → PR the grid docs commit → merge.
-2. **Rule-4 / axis hygiene**: nothing retires (deteriorating gate is keep-axis; 12%-weekly is an ACCEPT-but-not-promoted
-   axis). Record in `dev/notes/mechanism-flag-inventory-*.md` if that file is refreshed.
-3. **Entry side is the gap** (`project_exit_stack_survives_fixed_basis`, `project_monster_funnel_top_of_funnel`): 87% of
-   monsters die at the breakout gate + top-N. The item-6 screen says deployment is slot-bound in recoveries. Next screen:
-   paired P&L of the Recovering-week cohort at `max_position_pct_long ∈ {0.14, 0.20, 0.25}` × `max_long_exposure_pct ∈ {0.70,
-   0.85}` on the 26y record (3 salts, V6 gate) — a surface, not a flag; `experiment-gap-closing` skill.
-4. **`stop_loss` label hides the `Per_position` breaker** (carried; now measured: 5–6 mislabelled exits per wide cell, 2–3 per
-   null cell). Root cause read 09-13: `force_liquidation_runner.ml` `_transition_of_event` emits `Position.StopLoss` on purpose
-   and its comment says the distinction is "recorded separately"; `force_liquidation_log.mli` claims the events post-process
-   trades.csv's `exit_trigger`, but the only consumers (`result_writer.ml`, `runner.ml`) persist the events — no relabel exists.
-   Fix (weinstein tier, no core-module change): emit `Position.StrategySignal { label = "force_liquidation"; detail = Some
-   "per_position" / "portfolio_floor" }` so `Stop_log.exit_trigger_of_reason` surfaces it exactly like `stage3_force_exit`;
-   correct both docstrings; pin with a sim-level test (position down > 25% → `exit_trigger` = `force_liquidation`, and the
-   breaker's P&L unchanged). Check whether any golden compares the trades.csv trigger column (metrics are unaffected);
-   `read.sh`'s exit-mix table already lists the token. feat-backtest, small.
-5. **SGP_old1 truncation** + the #2782 spin-off twins before the next warehouse rebuild (ops-data).
-6. Carried: orchestrator D2 push (09-10 item 5); #2729 residuals; #2785.
+1. Gate loop on #2800 (above).
+2. **Entry side, top of funnel**: the probe closed the funding/sizing branch. Next screen = breakout-gate width and top-N as
+   a surface on the 26y record (3 salts, V6 gate), reading the monster funnel (`project_monster_funnel_top_of_funnel`:
+   87% die at the breakout gate + top-N). `experiment-gap-closing` skill; pre-register before launching.
+3. **SGP_old1 truncation** at the 2009-11 merger + the #2782 spin-off twins before the next warehouse rebuild (ops-data).
+4. Rule-4 hygiene: nothing retires (deteriorating gate keep-as-axis; 12%-weekly ACCEPT-not-promoted; 0.25/position
+   REJECT-as-default). Note in the flag inventory if refreshed.
+5. Carried: orchestrator D2 push (09-10 item 5); #2729 residuals; #2793 (Codex).
 
 ## Ops notes
 
-- Two grid lane monitors may still be listed in `/tasks` (one from the previous session, one from this one); stop both after
-  `LANE .. DONE`.
-- `read.sh` lives on main with the `NULL=` override; a working copy branched before #2791 lacks it — use
-  `git show origin/main:dev/experiments/deteriorating-gate-2026-09-13/read.sh`.
-- Equity curves are not copied by `chain-grid.sh`; they sit in the container run dirs
-  (`sweep-detgate/trading/dev/backtest/scenarios-<ts>/<name>/equity_curve.csv`) — that is where the maxDD episode dates came
-  from. Worth adding `equity_curve.csv` to the chain's copy list.
-- `gh api …/reviews` needs the **full** 40-char `commit_id`; a short SHA returns 422 "Variable $commitOID … invalid value".
-- Memory index trimmed under its 24.4 KB limit (was cutting four lines).
+- **Host memory watchdog kills background shell loops** (twice tonight at ~45–49% free): prefer bounded `Monitor`s that emit
+  one event, not `run_in_background` polling loops, for waits > 10 min.
+- **A dune runtest wedged in a deleted agent worktree** (structural re-run agent, dead-pipe mode) ran 2h37m at 100% of a core
+  with 7 defunct children until killed; the feat agent's repo-wide `@fmt` wedged twice beside it. After every agent:
+  `docker exec trading-1-dev sh -c 'for p in $(pgrep -x dune); do readlink /proc/$p/cwd; done'` — kill any whose cwd is
+  `(deleted)`.
+- **jj snapshot target**: three times tonight files staged for the results commit landed in whatever commit was `@` (a
+  takeover / rework branch). `jj log -r @` before every `cp` into `results/`; `memory/feedback_write_then_jj_new_lands_in_previous_commit`.
+- perl `-pi` with shell `$vars` in the replacement interpolates them — three broken lines pushed tonight before caught.
+  For shell edits use awk/sed with literal quoting or a quoted heredoc + awk splice.
+- `chain-grid.sh`/`chain-conc.sh` now copy `equity_curve.csv`; the maxDD episode dates come from it.
+- Lane runtimes on the 26y record were ~2.3–2.9 h per cell, not the 1.6 h estimated; plan lanes accordingly.
+- Codex's interactive session (pid ~78304) and its worktrees were left untouched.
 
 ## Parked briefs
 
-- **`cancel_resting_longs_on_bearish`** (item 3, no-build): scratch brief content — new `Weinstein_strategy_config` bool
-  `[@sexp.default false]`; read site `weinstein_strategy_screening.ml` `_run_entry_ticket_ttl` → extend
-  `Entry_ticket_ttl.cancellations/run` with a macro-only predicate (reuse `_macro_admits_side`), longs only, unfilled
-  `Entering` only, precedence rescreen > macro > clock; new token `entry_ticket_macro_gate_closed` added to
-  `test_cancel_reason_closed_list.ml` and the `cancel_handler.mli` token list; flag-off bit-identical; unit + sim-level
-  tests modelled on `test_delisted_ticket_cancel_sim.ml`; W2 = book §Macro (suspend buying on a bearish tape).
+- **`cancel_resting_longs_on_bearish`** (item 3, no-build while wide-weekly is not promoted): new `Weinstein_strategy_config`
+  bool `[@sexp.default false]`; read site `weinstein_strategy_screening.ml` `_run_entry_ticket_ttl` → extend
+  `Entry_ticket_ttl` with a macro-only predicate (reuse `_macro_admits_side`), longs only, unfilled `Entering` only,
+  precedence rescreen > macro > clock; token `entry_ticket_macro_gate_closed` in `test_cancel_reason_closed_list.ml`;
+  flag-off bit-identical; W2 = book §Macro.
