@@ -1,7 +1,7 @@
 # Next-session priorities — 2026-09-14 (supersedes 2026-09-13)
 
-Written 02:40 PT 2026-09-14 (autonomous 16:31 PT 09-13 → 02:40 PT 09-14, user away from ~21:40 PT). Every queue item of
-the 09-13 doc is resolved; one code PR (#2800) is open and waiting on its gates.
+Written 04:05 PT 2026-09-14 (autonomous 16:31 PT 09-13 → 04:05 PT 09-14, user away from ~21:40 PT). Every queue item of
+the 09-13 doc is resolved and merged; no PR is open.
 
 ## Merged this session (all three gates or docs-only; every verdict at the current tip)
 
@@ -48,29 +48,36 @@ spring 2020 while 1–3 fill — which is what the probe then tested.
   validator/reader disagreement, shared report paths, timeout advice on a returned rework); the Claude behavioral gate
   then found the test harness had masked a dropped `|| return 1` (command-substitution `set -e`) — two rework iterations,
   APPROVED at 4f4ffa74. Next: use `review/codex-requested` on the next OCaml PR (#2800 is the candidate) and compare.
-- Codex queue: #2653 merged (#2797). Codex has `codex-2753-publisher-guard` and `codex-2788-behavioral-tools` worktrees
+- First OCaml advisory dry run done on #2800 with `review/codex-requested`: one finding, real (V16 gap), fixed before the
+  Claude gates ran. Codex queue: #2653 merged (#2797). Codex has `codex-2753-publisher-guard` and `codex-2788-behavioral-tools` worktrees
   but no PRs yet; #2793 (git push tightening) is queued. `AGENTS.md` carries the cross-agent section.
 
-## Open PR — run the gate loop on it first
+## #2800 MERGED 04:04 PT — breaker exits now labelled `force_liquidation` (queue item 4 done)
 
-- **#2800** `feat(backtest): label breaker exits force_liquidation in trades.csv` (feat-backtest agent, 12 files). CI at 27f3ef0aa failed on ONE finding — `FAIL: nesting linter` for `_transition_of_event` (max depth 7 > 5) — and a
-  rework agent was dispatched at 02:50 PT to extract helpers (second commit on the branch); re-check `gh pr checks 2800`. Beyond the label it (a) deleted the dead `Trades_stream` relabel (keyed on the breaker's fire date,
-  which never equals the D1 exit date), and (b) moved three diagnostic columns for breaker rows toward the
-  `stage3_force_exit` convention (`stop_trigger_kind` → `non_stop_exit`, `days_to_first_stop_trigger` → None, R7 → Fail).
-  (b) is scope beyond "only the label moves" — qc-behavioral should judge it; goldens' `actual.sexp` are untouched per the
-  agent. Dispatch qc-structural → qc-behavioral (rework cap 2) → merge; consider `review/codex-requested` on it as the
-  first OCaml advisory dry run.
+- `feat(backtest): label breaker exits force_liquidation in trades.csv` — three commits: the feature; a nesting-linter
+  refactor after CI's `FAIL: nesting linter` on `_transition_of_event`; V16 registration after the advisory Codex review
+  (5196263561) found the new token absent from `_default_fallback_exit_labels`. Gates: structural APPROVED (5196712236,
+  dune 0/0/0), behavioral APPROVED (5196864221, four probes RED). Also deleted the dead `Trades_stream` relabel (keyed on
+  the breaker's fire date, never the D1 exit date) and moved three breaker-row diagnostic columns to the non-stop-exit
+  convention — judged inseparable from the label change.
+- **Follow-up (small):** one `test_trade_audit_ratings.ml` case pinning R7 = `Fail` for a `force_liquidation`-labelled
+  `Strategy_signal` (the path is live; only unpinned).
+- Read-side effect: `read.sh`'s `force_liquidation` exit-mix row and V16's fallback count are non-zero on any run with
+  breaker exits from now on; pre-09-14 artifacts still carry them as `stop_loss` — use `force_liquidations.sexp` there.
+
+## Open PRs
+
+None at 04:05 PT.
 
 ## Queue (in order)
 
-1. Gate loop on #2800 (above).
-2. **Entry side, top of funnel**: the probe closed the funding/sizing branch. Next screen = breakout-gate width and top-N as
+1. **Entry side, top of funnel**: the probe closed the funding/sizing branch. Next screen = breakout-gate width and top-N as
    a surface on the 26y record (3 salts, V6 gate), reading the monster funnel (`project_monster_funnel_top_of_funnel`:
    87% die at the breakout gate + top-N). `experiment-gap-closing` skill; pre-register before launching.
-3. **SGP_old1 truncation** at the 2009-11 merger + the #2782 spin-off twins before the next warehouse rebuild (ops-data).
-4. Rule-4 hygiene: nothing retires (deteriorating gate keep-as-axis; 12%-weekly ACCEPT-not-promoted; 0.25/position
+2. **SGP_old1 truncation** at the 2009-11 merger + the #2782 spin-off twins before the next warehouse rebuild (ops-data).
+3. Rule-4 hygiene: nothing retires (deteriorating gate keep-as-axis; 12%-weekly ACCEPT-not-promoted; 0.25/position
    REJECT-as-default). Note in the flag inventory if refreshed.
-5. Carried: orchestrator D2 push (09-10 item 5); #2729 residuals; #2793 (Codex).
+4. Carried: orchestrator D2 push (09-10 item 5); #2729 residuals; #2793 (Codex).
 
 ## Ops notes
 
