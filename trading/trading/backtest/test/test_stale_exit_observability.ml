@@ -279,7 +279,6 @@ let _rendered_exit_trigger ~prefix (stop_log, (result : run_result)) =
           round_trips;
           stop_infos = Stop_log.get_stop_infos stop_log;
           audit = [];
-          force_liquidations = [];
         };
       _exit_trigger_cell ~output_dir)
     ~finally:(fun () -> _rm_rf output_dir)

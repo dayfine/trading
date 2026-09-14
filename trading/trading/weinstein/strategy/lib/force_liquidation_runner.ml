@@ -43,17 +43,39 @@ let _position_input_of_holding ~get_price (pos : Position.t) :
 let _portfolio_value ~cash ~positions ~get_price =
   Portfolio_view.portfolio_value { cash; positions } ~get_price
 
-(** Convert a force-liquidation event into a TriggerExit transition. The
-    exit_reason is [Position.StopLoss] — the existing variant the position state
-    machine + simulator already handle. The force-liquidation distinction is
-    recorded separately via the audit recorder. *)
+let exit_label = "force_liquidation"
+
+(** Token for the [reason] half of a breaker exit's [detail] payload. Kept
+    lowercase-snake so [detail] parses as a plain [key=value]-ish string like
+    every other special exit's. *)
+let _reason_token (reason : FL.reason) =
+  match reason with
+  | Per_position -> "per_position"
+  | Portfolio_floor -> "portfolio_floor"
+
+(** Convert a force-liquidation event into a TriggerExit transition.
+
+    The exit_reason is [Position.StrategySignal] with [label = exit_label] — the
+    same generic variant every other strategy-emitted exit uses
+    ([stage3_force_exit], [laggard_rotation], [liquidity_exit], ...). That is
+    what puts ["force_liquidation"] in the [exit_trigger] column of
+    [trades.csv], via {!Backtest.Stop_log.exit_trigger_of_reason}. [detail]
+    carries the breaker branch that fired plus the loss that fired it, so the
+    [Per_position] / [Portfolio_floor] distinction survives in the audit trail
+    (and in full in [force_liquidations.sexp], which is unchanged).
+
+    Before 2026-09-14 this emitted [Position.StopLoss], which made every breaker
+    exit indistinguishable from a stop-out in [trades.csv]. *)
 let _transition_of_event (e : FL.event) : Position.transition =
+  let loss_percent = -.e.unrealized_pnl_pct *. 100.0 in
   let exit_reason =
-    Position.StopLoss
+    Position.StrategySignal
       {
-        stop_price = e.entry_price;
-        actual_price = e.current_price;
-        loss_percent = -.e.unrealized_pnl_pct *. 100.0;
+        label = exit_label;
+        detail =
+          Some
+            (Printf.sprintf "%s loss_pct=%.2f" (_reason_token e.reason)
+               loss_percent);
       }
   in
   {

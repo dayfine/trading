@@ -7,7 +7,6 @@ type batch = {
   round_trips : Trading_simulation.Metrics.trade_metrics list;
   stop_infos : Stop_log.stop_info list;
   audit : Trade_audit.audit_record list;
-  force_liquidations : Portfolio_risk.Force_liquidation.event list;
 }
 
 let default_every_n_fridays = 4
@@ -26,26 +25,6 @@ let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
   | Portfolio_rebalancing -> "rebalancing"
   | Strategy_signal { label; _ } -> label
   | End_of_period -> "end_of_period"
-
-(** Build a (symbol, exit_date) -> reason map from force-liquidation events.
-    [trades.csv] rows are post-processed: when a row's (symbol, exit_date)
-    matches a recorded force-liquidation, the [exit_trigger] column is
-    overridden from the generic stop-loss label to the force-liquidation label.
-    The pair (symbol, exit_date) is unique enough in practice — a single
-    position cannot be force-closed twice and the same symbol can only re-enter
-    on a different date. *)
-let _build_force_liq_index
-    (events : Portfolio_risk.Force_liquidation.event list) =
-  List.fold events
-    ~init:(Map.empty (module String))
-    ~f:(fun acc (e : Portfolio_risk.Force_liquidation.event) ->
-      let key = e.symbol ^ "|" ^ Date.to_string e.date in
-      Map.set acc ~key ~data:e.reason)
-
-let _force_liq_label (reason : Portfolio_risk.Force_liquidation.reason) =
-  match reason with
-  | Per_position -> "force_liquidation_position"
-  | Portfolio_floor -> "force_liquidation_portfolio"
 
 let _fmt_float_opt = function Some s -> sprintf "%.2f" s | None -> ""
 
@@ -84,20 +63,14 @@ let header =
   in
   String.concat ~sep:"," (base @ Trade_context.csv_header_fields)
 
-let _write_trade_row oc force_liq_index ~ctx_pre
-    (t : Trading_simulation.Metrics.trade_metrics) =
+let _write_trade_row oc ~ctx_pre (t : Trading_simulation.Metrics.trade_metrics)
+    =
   (* Resolve the stop_info via the same position-keyed join {!Trade_context}
      uses for [stop_trigger_kind], so [entry_stop] / [exit_stop] / [exit_trigger]
      stay consistent with it. The prior symbol-keyed FIFO pop misaligned against
      that join on re-traded symbols (Nth position got the wrong trigger). *)
   let info = Trade_context.stop_info_for_trade ctx_pre ~trade:t in
-  let entry_stop, exit_stop, base_exit_trigger = _stop_fields info in
-  let force_liq_key = t.symbol ^ "|" ^ Date.to_string t.exit_date in
-  let exit_trigger =
-    match Map.find force_liq_index force_liq_key with
-    | Some reason -> _force_liq_label reason
-    | None -> base_exit_trigger
-  in
+  let entry_stop, exit_stop, exit_trigger = _stop_fields info in
   let ctx = Trade_context.of_precomputed ctx_pre ~trade:t in
   let base_cells =
     [
@@ -125,11 +98,10 @@ let _write_trade_row oc force_liq_index ~ctx_pre
     records). The same [ctx_pre] backs the per-row stop_info join, so
     [exit_trigger] and [stop_trigger_kind] resolve against one index. *)
 let _write_rows oc ~(batch : batch) ~round_trips =
-  let force_liq_index = _build_force_liq_index batch.force_liquidations in
   let ctx_pre =
     Trade_context.precompute ~audit:batch.audit ~stop_infos:batch.stop_infos
   in
-  List.iter round_trips ~f:(_write_trade_row oc force_liq_index ~ctx_pre)
+  List.iter round_trips ~f:(_write_trade_row oc ~ctx_pre)
 
 let _path ~output_dir = output_dir ^ "/trades.csv"
 

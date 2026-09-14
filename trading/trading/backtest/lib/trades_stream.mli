@@ -53,13 +53,21 @@ type batch = {
           {!Trade_context.stop_info_for_trade}. *)
   audit : Trade_audit.audit_record list;
       (** Per-trade decision trail backing the {!Trade_context} columns. *)
-  force_liquidations : Portfolio_risk.Force_liquidation.event list;
-      (** Force-liquidation events; a row whose [(symbol, exit_date)] matches
-          one has its [exit_trigger] overridden to the force-liquidation label.
-      *)
 }
-(** Everything a [trades.csv] row needs. Mirrors the four [Runner.result] fields
-    {!Result_writer} previously passed to its private trade writer. *)
+(** Everything a [trades.csv] row needs. Mirrors the [Runner.result] fields
+    {!Result_writer} previously passed to its private trade writer.
+
+    No force-liquidation field: the [exit_trigger] column has exactly one
+    source, the {!Stop_log.exit_trigger} joined per row from [stop_infos].
+    Before 2026-09-14 this record also carried
+    [Portfolio_risk.Force_liquidation.event]s and re-labelled any row whose
+    [(symbol, exit_date)] matched one. That join was keyed on the date the
+    breaker {e fired}, not the date the exit {e filled}, so it stopped hitting
+    entirely once exits began filling on the following bar — every breaker exit
+    read as ["stop_loss"]. Breaker exits now carry
+    {!Weinstein_strategy.Force_liquidation_runner.exit_label}
+    (["force_liquidation"]) in their [exit_reason] like every other
+    strategy-emitted exit, so no post-processing is needed. *)
 
 val header : string
 (** The [trades.csv] header line (without the trailing newline): 13 base columns

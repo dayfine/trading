@@ -81,7 +81,6 @@ let _snapshot ~steps_rev : Trades_stream.batch =
     round_trips = Metrics.extract_round_trips (List.rev steps_rev);
     stop_infos = [];
     audit = [];
-    force_liquidations = [];
   }
 
 let _rm_f path = try Core_unix.remove path with _ -> ()

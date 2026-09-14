@@ -121,6 +121,17 @@ let _capturing_recorder () =
   in
   (recorder, captured)
 
+(** Project a [TriggerExit] transition's [exit_reason] onto the
+    [(label, detail)] pair the [exit_trigger] column and the audit trail are
+    built from, so a [StopLoss] regression fails the match rather than silently
+    reading as "no label". *)
+let _strategy_signal_of (t : Position.transition) =
+  match t.kind with
+  | Position.TriggerExit
+      { exit_reason = Position.StrategySignal { label; detail }; _ } ->
+      Some (label, detail)
+  | _ -> None
+
 (* ------------------------------------------------------------------ *)
 (* Per-position trigger                                                 *)
 (* ------------------------------------------------------------------ *)
@@ -157,9 +168,40 @@ let test_per_position_trigger_emits_exit _ =
                     | Position.TriggerExit { exit_price; _ } -> Some exit_price
                     | _ -> None)
                   (float_equal 40.0));
+             (* The label is the [exit_trigger] cell of [trades.csv]; the
+                detail names the breaker branch and the loss that fired it. *)
+             matching ~msg:"Expected a StrategySignal exit_reason"
+               _strategy_signal_of
+               (equal_to
+                  ("force_liquidation", Some "per_position loss_pct=60.00"));
            ];
        ]);
   assert_that !captured (size_is 1)
+
+(** The exported token and the label actually stamped on a transition must be
+    the same string — the whole point of exporting it is that a downstream
+    reader can name the cell without re-spelling the literal. *)
+let test_exit_label_matches_emitted_label _ =
+  let pos =
+    _make_holding ~symbol:"AAPL" ~side:Trading_base.Types.Long
+      ~entry_date:(_date "2024-01-02") ~quantity:100.0 ~entry_price:100.0
+  in
+  let bar = _make_bar ~date:(_date "2024-04-29") ~close:40.0 in
+  let positions = String.Map.singleton "AAPL" pos in
+  let get_price s = if String.equal s "AAPL" then Some bar else None in
+  let peak_tracker = FL.Peak_tracker.create () in
+  let recorder, _ = _capturing_recorder () in
+  let transitions =
+    Force_liquidation_runner.update ~config:FL.default_config ~positions
+      ~get_price ~cash:1_000_000.0 ~current_date:(_date "2024-04-29")
+      ~peak_tracker ~audit_recorder:recorder
+  in
+  assert_that
+    (List.map transitions ~f:_strategy_signal_of)
+    (elements_are
+       [
+         is_some_and (field fst (equal_to Force_liquidation_runner.exit_label));
+       ])
 
 let test_per_position_trigger_no_fire_under_threshold _ =
   (* Long $100 → $80 = 20% loss; long threshold 25%; no fire. *)
@@ -231,8 +273,21 @@ let test_portfolio_floor_trigger_closes_all _ =
       ~get_price:get_price_crash ~cash:200_000.0
       ~current_date:(_date "2024-04-29") ~peak_tracker ~audit_recorder:recorder
   in
-  (* Both positions close under Portfolio_floor reason. *)
-  assert_that transitions (size_is 2);
+  (* Both positions close under Portfolio_floor reason. Both carry the SAME
+     ["force_liquidation"] label as a per-position breaker exit — the branch
+     that fired is in [detail], not in the [exit_trigger] cell. *)
+  assert_that
+    (List.map transitions ~f:_strategy_signal_of)
+    (elements_are
+       [
+         (* AAPL 100→20 and TSLA 200→40 are both −80%. *)
+         is_some_and
+           (equal_to
+              ("force_liquidation", Some "portfolio_floor loss_pct=80.00"));
+         is_some_and
+           (equal_to
+              ("force_liquidation", Some "portfolio_floor loss_pct=80.00"));
+       ]);
   assert_that !captured (size_is 2);
   (* Halt state must flip. *)
   assert_that (FL.Peak_tracker.halt_state peak_tracker) (equal_to FL.Halted)
@@ -597,6 +652,8 @@ let suite =
   >::: [
          "per_position_trigger_emits_exit"
          >:: test_per_position_trigger_emits_exit;
+         "exit_label matches the emitted StrategySignal label"
+         >:: test_exit_label_matches_emitted_label;
          "per_position_trigger_no_fire_under_threshold"
          >:: test_per_position_trigger_no_fire_under_threshold;
          "portfolio_floor_trigger_closes_all"
