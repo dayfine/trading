@@ -7,14 +7,19 @@
     portfolio's [Holding] positions + current bar prices. 2. Compute current
     [portfolio_value] and call {!Portfolio_risk.Force_liquidation.check} — which
     updates the peak-tracker and returns the events to fire. 3. For each event,
-    emit a [TriggerExit] transition (kind:
-    {!Trading_strategy.Position.StopLoss}) and a parallel
-    [record_force_liquidation] audit event.
+    emit a [TriggerExit] transition whose [exit_reason] is
+    {!Trading_strategy.Position.StrategySignal} with [label = ] {!exit_label},
+    and a parallel [record_force_liquidation] audit event.
 
-    The strategy state machine sees a regular [TriggerExit]; the audit channel
-    is what distinguishes a forced close from a regular stop-out. The [Halted]
-    state in the [peak_tracker] is consulted by the strategy to suppress new
-    entries until macro flips off Bearish.
+    The [StrategySignal] label is what distinguishes a forced close from a
+    regular stop-out downstream: {!Backtest.Stop_log.exit_trigger_of_reason}
+    turns it into a [Strategy_signal] trigger and the [trades.csv] writer
+    surfaces its [label] verbatim in the [exit_trigger] column — the same route
+    ["stage3_force_exit"] and ["laggard_rotation"] take. The audit channel
+    ([record_force_liquidation] → [force_liquidations.sexp]) carries the full
+    event with its [Per_position] / [Portfolio_floor] reason. The [Halted] state
+    in the [peak_tracker] is consulted by the strategy to suppress new entries
+    until macro flips off Bearish.
 
     Pure function over its inputs — no global state. Reads [peak_tracker]
     (mutates it via [Force_liquidation.check]) and [audit_recorder] (invokes the
@@ -22,6 +27,14 @@
 
 open Core
 open Trading_strategy
+
+val exit_label : string
+(** ["force_liquidation"] — the [label] carried by every breaker exit's
+    {!Trading_strategy.Position.StrategySignal} [exit_reason], and therefore the
+    exact token that appears in the [exit_trigger] column of [trades.csv]. Both
+    breaker branches share it; the branch that fired ([per_position] /
+    [portfolio_floor]) is the first word of the transition's [detail] and is
+    recorded in full in [force_liquidations.sexp]. *)
 
 val update :
   config:Portfolio_risk.Force_liquidation.config ->

@@ -132,6 +132,26 @@ let test_v5_retraded_symbol_consistent _ =
   in
   assert_that (result ~id:"V5" inputs) (violations_and_pass 0 true)
 
+(* A breaker exit rides a StrategySignal, which
+   Stop_log.classify_stop_trigger_kind maps to Non_stop_exit — so V5 must accept
+   force_liquidation paired with non_stop_exit. This is why the token is
+   deliberately NOT in Validator_row_checks._stop_triggers, unlike the two
+   legacy force_liquidation_* labels, which the (now removed) trades.csv relabel
+   stamped over rows whose underlying exit really was a stop-out. *)
+let test_v5_breaker_exit_is_a_non_stop_exit _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"DDS" ~entry_date:"2020-09-01" ~exit_date:"2020-10-05"
+            ~exit_trigger:"force_liquidation" ~stop_trigger_kind:"non_stop_exit"
+            ();
+        ];
+    }
+  in
+  assert_that (result ~id:"V5" inputs) (violations_and_pass 0 true)
+
 (* ---- V6: rename-twin duplicate positions ------------------------------- *)
 
 let test_v6 _ =
@@ -1168,6 +1188,8 @@ let suite =
          "v2_macro" >:: test_v2;
          "v5_trigger_consistency" >:: test_v5;
          "v5_retraded_symbol_consistent" >:: test_v5_retraded_symbol_consistent;
+         "v5_breaker_exit_is_a_non_stop_exit"
+         >:: test_v5_breaker_exit_is_a_non_stop_exit;
          "v6_twin" >:: test_v6;
          "v6_no_twin" >:: test_v6_no_twin;
          "v6_price_noise_twin" >:: test_v6_price_noise_twin;

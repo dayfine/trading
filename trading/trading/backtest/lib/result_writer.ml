@@ -47,10 +47,9 @@ let _write_params ~output_dir (result : Runner.result) =
    truncates whatever the stream left behind and rewrites the whole file. *)
 let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
     ~(stop_infos : Stop_log.stop_info list)
-    ~(audit : Trade_audit.audit_record list)
-    ~(force_liquidations : Portfolio_risk.Force_liquidation.event list) =
+    ~(audit : Trade_audit.audit_record list) =
   Trades_stream.write_all ~output_dir
-    { Trades_stream.round_trips; stop_infos; audit; force_liquidations }
+    { Trades_stream.round_trips; stop_infos; audit }
 
 let _write_equity_curve ~output_dir
     ~(steps : Trading_simulation_types.Simulator_types.step_result list) =
@@ -131,8 +130,7 @@ let write ~output_dir (result : Runner.result) =
     (output_dir ^ "/summary.sexp")
     (Summary.sexp_of_t result.summary);
   _write_trades ~output_dir ~round_trips:result.round_trips
-    ~stop_infos:result.stop_infos ~audit:result.audit
-    ~force_liquidations:result.force_liquidations;
+    ~stop_infos:result.stop_infos ~audit:result.audit;
   _write_equity_curve ~output_dir ~steps:result.steps;
   _write_trade_audit ~output_dir ~audit:result.audit
     ~cascade_summaries:result.cascade_summaries;
@@ -157,8 +155,8 @@ let write ~output_dir (result : Runner.result) =
     No [order_links] exist mid-run (the simulator publishes
     [run_result.order_position_links] only on its terminal result), hence no
     [position_id] on streamed rows. The end-of-run rewrite restores it. *)
-let _stream_batch ~stop_log ~trade_audit ~force_liquidation_log ~start_date
-    ~steps_rev : Trades_stream.batch =
+let _stream_batch ~stop_log ~trade_audit ~start_date ~steps_rev :
+    Trades_stream.batch =
   {
     round_trips = Runner.round_trips_in_window (List.rev steps_rev) ~start_date;
     stop_infos =
@@ -169,25 +167,25 @@ let _stream_batch ~stop_log ~trade_audit ~force_liquidation_log ~start_date
       Runner.filter_audit_records_in_window
         (Trade_audit.get_audit_records trade_audit)
         ~start_date;
-    force_liquidations =
-      Runner.filter_force_liquidations_in_window
-        (Force_liquidation_log.events force_liquidation_log)
-        ~start_date;
   }
 
 let _open_stream ~output_dir ~every_n_fridays ~start_date ~stop_log ~trade_audit
-    ~force_liquidation_log =
+    =
   Trades_stream.create ~output_dir ~every_n_fridays
-    ~snapshot:
-      (_stream_batch ~stop_log ~trade_audit ~force_liquidation_log ~start_date)
+    ~snapshot:(_stream_batch ~stop_log ~trade_audit ~start_date)
     ()
 
 let with_trades_stream ~output_dir ~every_n_fridays ~start_date ~f =
   let opened = ref None in
-  let on_step_setup ~stop_log ~trade_audit ~force_liquidation_log =
+  (* [force_liquidation_log] is part of the {!Panel_runner.step_hook_setup}
+     contract but no longer feeds [trades.csv]: a breaker exit now carries its
+     own ["force_liquidation"] label through [Stop_log] (see
+     {!Trades_stream.batch}). The log still backs [force_liquidations.sexp],
+     written at teardown. *)
+  let on_step_setup ~stop_log ~trade_audit ~force_liquidation_log:_ =
     let t =
       _open_stream ~output_dir ~every_n_fridays ~start_date ~stop_log
-        ~trade_audit ~force_liquidation_log
+        ~trade_audit
     in
     opened := Some t;
     fun ~date ~step -> Trades_stream.record_step t ~date ~step

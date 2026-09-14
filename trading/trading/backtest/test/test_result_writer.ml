@@ -1,15 +1,22 @@
 (** End-to-end pinning of {!Backtest.Result_writer.write}'s [trades.csv]
-    [exit_trigger] override (PR #695, qc-behavioral B2).
+    [exit_trigger] column (PR #695, qc-behavioral B2).
 
-    The backtest layer produces [trades.csv] rows whose [exit_trigger] column is
-    the standard {!Backtest.Stop_log.exit_trigger} label by default
-    (["stop_loss"], ["take_profit"], etc.) but overridden to
-    ["force_liquidation_position"] / ["force_liquidation_portfolio"] when the
-    same [(symbol, exit_date)] tuple appears in [result.force_liquidations]. The
-    literal label strings live only in [result_writer.ml] and were previously
-    not asserted by any test — these tests pin them end-to-end so a refactor
-    that drifts the strings or breaks the substitution rule fails
-    deterministically.
+    Every row's [exit_trigger] has exactly ONE source: the
+    {!Backtest.Stop_log.exit_trigger} joined to the row by position id. A
+    generic trigger renders its own token (["stop_loss"], ["take_profit"],
+    ["end_of_period"]); a [Strategy_signal] renders its [label] verbatim, which
+    is how ["force_liquidation"], ["stage3_force_exit"] and friends reach the
+    column.
+
+    Until 2026-09-14 there was a SECOND source: any row whose
+    [(symbol, exit_date)] matched an entry in [result.force_liquidations] was
+    re-labelled ["force_liquidation_position"] /
+    ["force_liquidation_portfolio"]. That join keyed on the date the breaker
+    {e fired}, not the date the exit {e filled}, so it stopped hitting entirely
+    once exits began filling on the following bar — every breaker exit read as
+    ["stop_loss"]. The override is gone; the tests below pin the single
+    remaining source, including the negative: a force-liquidation event on its
+    own relabels nothing.
 
     Also pins the reconciler-producer artefacts ([open_positions.csv],
     [splits.csv], [final_prices.csv]) — see
@@ -47,10 +54,10 @@ let _make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     position_id;
   }
 
-(** Build a force-liquidation event matching a trade by [(symbol, exit_date)].
-    The runner-side path always feeds [event.date = exit_date] for the close leg
-    of the round-trip, so the [(symbol, date)] join key in
-    [_build_force_liq_index] hits this row. *)
+(** Build a force-liquidation event whose [date] coincides with a trade's
+    [exit_date] — the most favourable case the removed [(symbol, exit_date)]
+    join could ever have seen. Used by the negative test below to show that even
+    an exact date coincidence no longer relabels anything. *)
 let _make_event ~symbol ~exit_date ~reason : FL.event =
   {
     symbol;
@@ -198,12 +205,92 @@ let _exit_trigger_idx header =
   | Some (i, _) -> i
   | None -> assert_failure "exit_trigger column not present in trades.csv"
 
+(** A [stop_info] whose [exit_trigger] is a breaker exit's [Strategy_signal],
+    i.e. exactly what {!Backtest.Stop_log} records after
+    {!Weinstein_strategy.Force_liquidation_runner} stamps the transition. *)
+let _force_liq_stop_info ~symbol ~detail : Backtest.Stop_log.stop_info =
+  {
+    position_id = symbol ^ "-1";
+    symbol;
+    entry_date = Some (_date "2024-01-02");
+    entry_stop = Some 95.0;
+    exit_stop = Some 95.0;
+    exit_trigger =
+      Some
+        (Backtest.Stop_log.Strategy_signal
+           {
+             label = Weinstein_strategy.Force_liquidation_runner.exit_label;
+             detail = Some detail;
+           });
+    max_stop = Some 95.0;
+    n_stop_raises = 0;
+  }
+
+(** Render one round-trip whose stop record carries [stop_info] and return its
+    [exit_trigger] cell. *)
+let _exit_trigger_cell_for ~prefix ~symbol ~stop_infos =
+  let dir = Core_unix.mkdtemp prefix in
+  Fun.protect
+    ~finally:(fun () ->
+      let _ = Core_unix.system (Printf.sprintf "rm -rf %s" dir) in
+      ())
+    (fun () ->
+      let trade =
+        _make_trade ~symbol ~exit_date:(_date "2024-04-29")
+          ~position_id:(symbol ^ "-1") ()
+      in
+      let result =
+        _make_result ~round_trips:[ trade ] ~force_liquidations:[] ~stop_infos
+          ()
+      in
+      Backtest.Result_writer.write ~output_dir:dir result;
+      let header, rows = _read_trades_csv ~output_dir:dir in
+      let idx = _exit_trigger_idx header in
+      List.map rows ~f:(fun cols -> List.nth_exn cols idx))
+
 (* ------------------------------------------------------------------ *)
-(* B2.1 — Per_position event labels exit_trigger                       *)
+(* B2.1 — Per_position breaker exit labels exit_trigger                *)
 (* ------------------------------------------------------------------ *)
 
-let test_per_position_force_liq_overrides_exit_trigger _ =
-  let dir = Core_unix.mkdtemp "/tmp/result_writer_per_pos_" in
+let test_per_position_force_liq_labels_exit_trigger _ =
+  assert_that
+    (_exit_trigger_cell_for ~prefix:"/tmp/result_writer_per_pos_" ~symbol:"AAPL"
+       ~stop_infos:
+         [
+           _force_liq_stop_info ~symbol:"AAPL"
+             ~detail:"per_position loss_pct=60.00";
+         ])
+    (elements_are [ equal_to "force_liquidation" ])
+
+(* ------------------------------------------------------------------ *)
+(* B2.2 — Portfolio_floor breaker exit labels exit_trigger             *)
+(* ------------------------------------------------------------------ *)
+
+(** Both breaker branches share ONE column token. The branch that fired lives in
+    the transition's [detail] and in [force_liquidations.sexp], so a reader
+    counting breaker exits greps one string and a reader attributing them reads
+    the sexp. *)
+let test_portfolio_floor_force_liq_labels_exit_trigger _ =
+  assert_that
+    (_exit_trigger_cell_for ~prefix:"/tmp/result_writer_floor_" ~symbol:"TSLA"
+       ~stop_infos:
+         [
+           _force_liq_stop_info ~symbol:"TSLA"
+             ~detail:"portfolio_floor loss_pct=80.00";
+         ])
+    (elements_are [ equal_to "force_liquidation" ])
+
+(* ------------------------------------------------------------------ *)
+(* B2.3 — A force-liquidation EVENT alone relabels nothing             *)
+(* ------------------------------------------------------------------ *)
+
+(** The regression guard for the removed [(symbol, exit_date)] override: a
+    [result.force_liquidations] entry that coincides exactly with the row's
+    symbol AND exit date — the best case the old join ever had — leaves the
+    column untouched. The label must come from the stop record or not at all, so
+    there is exactly one place a breaker exit can be mislabelled. *)
+let test_force_liq_event_alone_does_not_label _ =
+  let dir = Core_unix.mkdtemp "/tmp/result_writer_no_match_" in
   Fun.protect
     ~finally:(fun () ->
       let _ = Core_unix.system (Printf.sprintf "rm -rf %s" dir) in
@@ -220,84 +307,11 @@ let test_per_position_force_liq_overrides_exit_trigger _ =
       Backtest.Result_writer.write ~output_dir:dir result;
       let header, rows = _read_trades_csv ~output_dir:dir in
       let idx = _exit_trigger_idx header in
+      (* No stop_info joined → blank cell. The point is that the event did not
+         write anything into it. *)
       assert_that rows
         (elements_are
-           [
-             field
-               (fun cols -> List.nth_exn cols idx)
-               (equal_to "force_liquidation_position");
-           ]))
-
-(* ------------------------------------------------------------------ *)
-(* B2.2 — Portfolio_floor event labels exit_trigger                    *)
-(* ------------------------------------------------------------------ *)
-
-let test_portfolio_floor_force_liq_overrides_exit_trigger _ =
-  let dir = Core_unix.mkdtemp "/tmp/result_writer_floor_" in
-  Fun.protect
-    ~finally:(fun () ->
-      let _ = Core_unix.system (Printf.sprintf "rm -rf %s" dir) in
-      ())
-    (fun () ->
-      let exit_date = _date "2024-04-29" in
-      let trade = _make_trade ~symbol:"TSLA" ~exit_date () in
-      let event =
-        _make_event ~symbol:"TSLA" ~exit_date ~reason:FL.Portfolio_floor
-      in
-      let result =
-        _make_result ~round_trips:[ trade ] ~force_liquidations:[ event ] ()
-      in
-      Backtest.Result_writer.write ~output_dir:dir result;
-      let header, rows = _read_trades_csv ~output_dir:dir in
-      let idx = _exit_trigger_idx header in
-      assert_that rows
-        (elements_are
-           [
-             field
-               (fun cols -> List.nth_exn cols idx)
-               (equal_to "force_liquidation_portfolio");
-           ]))
-
-(* ------------------------------------------------------------------ *)
-(* B2.3 — Non-matching event does NOT override exit_trigger            *)
-(* ------------------------------------------------------------------ *)
-
-(** The override is keyed on [(symbol, exit_date)]. A force-liquidation event
-    with a non-matching symbol or date must NOT override the row — pin the join
-    precision so a refactor that broadens the key doesn't silently relabel
-    unrelated trades. *)
-let test_non_matching_event_does_not_override _ =
-  let dir = Core_unix.mkdtemp "/tmp/result_writer_no_match_" in
-  Fun.protect
-    ~finally:(fun () ->
-      let _ = Core_unix.system (Printf.sprintf "rm -rf %s" dir) in
-      ())
-    (fun () ->
-      let trade =
-        _make_trade ~symbol:"AAPL" ~exit_date:(_date "2024-04-29") ()
-      in
-      (* Same symbol, different exit_date — no join hit. *)
-      let event =
-        _make_event ~symbol:"AAPL" ~exit_date:(_date "2024-05-15")
-          ~reason:FL.Per_position
-      in
-      let result =
-        _make_result ~round_trips:[ trade ] ~force_liquidations:[ event ] ()
-      in
-      Backtest.Result_writer.write ~output_dir:dir result;
-      let header, rows = _read_trades_csv ~output_dir:dir in
-      let idx = _exit_trigger_idx header in
-      (* No matching event + no stop_info → blank exit_trigger. The point
-         is just that it is NOT one of the force-liquidation labels. *)
-      assert_that rows
-        (elements_are
-           [
-             field
-               (fun cols ->
-                 String.is_prefix (List.nth_exn cols idx)
-                   ~prefix:"force_liquidation")
-               (equal_to false);
-           ]))
+           [ field (fun cols -> List.nth_exn cols idx) (equal_to "") ]))
 
 (* ------------------------------------------------------------------ *)
 (* B2.4 — End_of_period stop_info renders "end_of_period" in trades.csv *)
@@ -907,12 +921,12 @@ let test_retraded_symbol_keys_triggers_by_position_id _ =
 let suite =
   "result_writer"
   >::: [
-         "per_position force-liq overrides exit_trigger"
-         >:: test_per_position_force_liq_overrides_exit_trigger;
-         "portfolio_floor force-liq overrides exit_trigger"
-         >:: test_portfolio_floor_force_liq_overrides_exit_trigger;
-         "non-matching event does not override exit_trigger"
-         >:: test_non_matching_event_does_not_override;
+         "per_position force-liq labels exit_trigger"
+         >:: test_per_position_force_liq_labels_exit_trigger;
+         "portfolio_floor force-liq labels exit_trigger"
+         >:: test_portfolio_floor_force_liq_labels_exit_trigger;
+         "force-liq event alone does not label exit_trigger"
+         >:: test_force_liq_event_alone_does_not_label;
          "end_of_period stop_info renders end_of_period label"
          >:: test_end_of_period_renders_label;
          "open_positions.csv header and rows"

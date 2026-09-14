@@ -3,8 +3,20 @@
     Mirrors the shape of {!Stop_log} / {!Trade_audit}: the strategy emits
     {!Weinstein_strategy.Audit_recorder.force_liquidation_event}s; the backtest
     runner threads them into a collector here, then drains the collector at
-    end-of-run for persistence as [force_liquidations.sexp] and post-processing
-    of [trades.csv]'s [exit_trigger] column.
+    end-of-run for persistence as [force_liquidations.sexp].
+
+    This collector does {b not} touch [trades.csv]. A breaker exit reaches the
+    [exit_trigger] column the same way every other strategy-emitted exit does:
+    {!Weinstein_strategy.Force_liquidation_runner} stamps the transition's
+    [exit_reason] with a [StrategySignal] labelled
+    {!Weinstein_strategy.Force_liquidation_runner.exit_label}
+    (["force_liquidation"]), {!Stop_log} records it, and {!Trades_stream}
+    renders the label. Until 2026-09-14 {!Trades_stream} instead re-labelled
+    rows by joining these events on [(symbol, exit_date)]; that join could not
+    hit once exits began filling on the bar {e after} the trigger, so every
+    breaker exit read as ["stop_loss"]. The events here remain the authority on
+    {e why} each breaker fired ([Per_position] vs [Portfolio_floor]) and on the
+    P&L at the moment it fired.
 
     Closes G4 from [dev/notes/short-side-gaps-2026-04-29.md]. Each event is
     evidence the strategy's primary stop machinery failed to protect the trade —

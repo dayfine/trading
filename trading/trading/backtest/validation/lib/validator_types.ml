@@ -17,13 +17,20 @@ let _default_splice_adj_ratio_min = 0.4
 let _default_splice_adj_ratio_max = 2.5
 
 (* V16: every exit label produced by a safety net rather than a strategy rule.
-   ["delisted"] is deliberately absent — see [validator_fallback_check.mli]. *)
+   ["delisted"] is deliberately absent — see [validator_fallback_check.mli].
+
+   ["force_liquidation"] is the token the breaker itself emits
+   ([Weinstein_strategy.Force_liquidation_runner.exit_label]). The two
+   [force_liquidation_*] tokens below are LEGACY: they were only ever produced
+   by a [trades.csv] post-processing relabel that was removed on 2026-09-14,
+   and are kept so artifacts written before then still count. *)
 let _default_fallback_exit_labels =
   [
     "stale_force_exit";
     "margin_call";
     "maintenance_reduce";
     "buyin_stress";
+    "force_liquidation";
     "force_liquidation_position";
     "force_liquidation_portfolio";
   ]

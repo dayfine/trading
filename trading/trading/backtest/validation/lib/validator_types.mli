@@ -156,8 +156,17 @@ type check_config = {
       (** V16: the [exit_trigger] values that mark a round trip as closed by a
           {b fallback safety net} rather than by a strategy rule. Default
           [["stale_force_exit"; "margin_call"; "maintenance_reduce";
-           "buyin_stress"; "force_liquidation_position";
+           "buyin_stress"; "force_liquidation"; "force_liquidation_position";
            "force_liquidation_portfolio"]].
+
+          ["force_liquidation"] is the token the drawdown breaker emits since
+          2026-09-14 — it is
+          {!Weinstein_strategy.Force_liquidation_runner.exit_label}, carried on
+          the exit's [StrategySignal] and surfaced verbatim in [trades.csv]. The
+          two [force_liquidation_*] tokens are {b legacy}: they were produced
+          only by a [trades.csv] post-processing relabel, removed in the same
+          change, and are retained so validator runs over artifacts written
+          before it still count those rows.
 
           ["delisted"] is deliberately absent: a position exited on its
           [active_through] marker is an EXPECTED corporate action, not a defect.
