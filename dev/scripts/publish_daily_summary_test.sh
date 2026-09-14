@@ -461,6 +461,23 @@ check_contains "malformed-201 names the risk" "$_out" "no PR number in the respo
 check_contains "malformed-201 also hits the push-then-create catch (proves _create_pr itself returned non-zero, not just an empty PR number downstream)" "$_out" "pushed but has NO PR"
 _reset_mock_env
 
+# PR-create returns 422, but both successful lookups find no open PR.
+# Mutation: change only the 422 empty-$_num guard's return 1 to return 0.
+# The caller still rejects the empty number, so exit status alone cannot
+# kill it; the push-then-create catch message pins _create_pr's failure.
+_init_fixture
+_write_summary 2026-09-08 "" 202609080900 >/dev/null
+(cd "$REPO_DIR" && git add dev/daily && git commit -q -m "add summary")
+_reset_mock_env
+MOCK_CREATE_HTTP_CODE=422
+export MOCK_CREATE_HTTP_CODE
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "422 with an empty fallback lookup is treated as failure" 1 "$rc"
+check_contains "422 empty lookup names the missing PR" "$_out" "lookup-by-head found no open PR"
+check_contains "422 empty lookup hits the push-then-create catch" "$_out" "pushed but has NO PR"
+_reset_mock_env
+
 # The existing-PR lookup itself fails (network/auth) -- must refuse to
 # proceed blind, not silently assume "no existing PR".
 _init_fixture
