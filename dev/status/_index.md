@@ -28,6 +28,20 @@ standalone (no dune, no mutex contention); all three lost tasks were re-dispatch
 **Fifth instance of one class this month** (#2741, #2747, #2771, #2803, #2810):
 a green run is still indistinguishable from a productive one, because nothing
 checks a run's claimed dispatches against the branches that actually exist.
+**#2812 (this run) closes the summary half of it** — `verify` no longer returns
+"nothing to verify" on a FULL-mode run.
+
+Run 2 shipped three mutation-verified PRs, all re-dispatches of run 1's lost work:
+**#2812** (`verify` asserts a FULL-mode summary was published, #2803), **#2813**
+(R7 + `force_liquidation`, #2800 follow-up), **#2814** (warn-level QC score
+digit/adjective lexicon, H-QC-SCORE-ADJECTIVE-LEXICON). All three await QC — not
+dispatched here because each QC agent needs its own cold **16 GB** `_build` and the
+one-dune mutex serializes them; disk peaked at **90%** during the feature dispatch
+and returned to **58%** once the finished worktrees were reclaimed. #2813's real
+result is a **corrected premise**: R7 already returned `Fail` for breaker exits as
+of #2800 (`stage_at_exit` was never the blocker for this exit kind), but the flip
+was unpinned and fired in only one shape — the plausible tidy-up that reverts it
+would have passed green.
 
 **The orchestrator was DEAD for three days and the cause was not in this repo.**
 Six consecutive scheduled runs failed 2026-09-10 -> 09-12 (`34475636575`,
