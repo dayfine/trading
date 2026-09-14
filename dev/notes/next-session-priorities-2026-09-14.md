@@ -19,8 +19,8 @@ the 09-13 doc is resolved and merged; no PR is open.
    at 3 of 3 salts (2019: $469k→$166k / 22.6→30.9, $258k→$207k / 22.5→31.1, $245k→$213k / 22.8→31.2; 2009: $106k→−$23k /
    17.9→27.1, $277k→$10k / 20.4→25.2, $77k→−$12k / 17.1→25.4). Wide-weekly keeps its 26y single-surface ACCEPT and stays a
    default-off axis; **not promotable**. Why: shared trades run wider everywhere, but chop-year entries (2021, 2010) bleed
-   12% instead of 4%, and the 26y's biggest 2019–23 winners (CLS, BFX, TTEC, CLFD, $2.6M) are absent from the 2019
-   composition (only 1,023 of ~2,980 names shared with the 2000 one). No promotion PR, no 10% neighbour arm, item-3
+   12% instead of 4%, and the 26y's biggest 2019–23 winners (CLS, BFX, TTEC, CLFD, $2.6M) are absent from the year-2019
+   vintage composition (only 1,023 of ~2,980 names shared with the year-2000 vintage list — 3,000 symbols as of 2000-05-31, held fixed). No promotion PR, no 10% neighbour arm, item-3
    cancel-on-Bearish no-build (that cohort is positive on the record; brief parked below).
 2. **Concentration/deployment probe REJECT** (`concentration-deploy-2026-09-13/`, pre-registered #2796; ledger
    `2026-09-14-concentration-deploy-probe`, seven cells; memory `project_concentration_deploy_probe_reject`):
@@ -69,12 +69,51 @@ spring 2020 while 1–3 fill — which is what the probe then tested.
 
 None at 04:05 PT.
 
+## P0 for the next session — migrate the record to a point-in-time top-3000 universe (user decision, 04:45 PT 09-14)
+
+**Terminology first, because it misled:** `top-3000-2000.sexp` is the **year-2000 vintage** list — the 3,000 highest
+dollar-volume names as of **2000-05-31** — held **fixed for all 26 years** of the record (`Composition_from_individuals`,
+3,000 entries; likewise `top-3000-2009` = 2009-05-31 and `top-3000-2019` = 2019-05-31). It is 3,000 symbols from the year
+2000, not 2,000 symbols. Say "year-2000 vintage" or "2000-05-31 list", never "the 2000 list".
+
+**Why migrate (found by the confirmation grid):** the two vintages share only 1,023 of ~2,980 names. Anything that listed
+or grew into the top 3,000 after 2000 is invisible to the 26y record (ZS, ETSY…), and every name still trading in 2023 is
+a survivor by construction — CLS, BFX, TTEC, CLFD alone are $2.6M of the 26y wide arm's 2019–23 gain and are not in the
+2019 list. Paired verdicts on one list stay valid (the tilt hits null and arm alike —
+`project_composition_golden_survivor_bias`), but (a) the headline levels carry a large survivorship inflation
+(`project_pit_survivorship_inflation`), (b) "vintage diversity" in a grid moves the universe more than the period, and
+(c) live trading screens the *current* top 3,000, so the backtest does not model membership drift — and the next
+queue item (top-of-funnel: breakout gate, top-N) is a membership question. Measure that on a survivor list and you
+measure the wrong estimand.
+
+**Plan (pre-register before building; one PR per step):**
+1. **Decisions to record first** (a docs PR): membership = top 3,000 by prior-year dollar volume, fixed at each year
+   start (no look-ahead), delisted names included; held positions in a name that drops out of the list are **held to
+   their normal exit** (no forced sell — a forced sell would invent a mechanism); one snapshot convention (the current
+   files use May-31; pick year-start or May-31 and keep it everywhere).
+2. **List builder:** extend the yearly top-1000 builder (`top-1000-1998.sexp` … exist) to top-3000 for 2000–2026 from
+   the delisted-inclusive EODHD coverage (`project_eodhd_delisted_unlock`); coverage check first
+   (`fetch-historical-data` skill). ops-data / feat-data.
+3. **Warehouse `_v11pit`:** union of the yearly lists (larger than 3,000 symbols → longer cells; budget ~3 h per 26y
+   cell). Fold in the **SGP_old1 truncation** at the 2009-11 merger and the **#2782 spin-off twins** — this is the
+   cheapest moment for both. Keep `_v10dedup` until the new band exists.
+4. **New record band:** the a0 null at 3 salts on `_v11pit` (~9 h container, two lanes) → new ledger baseline; re-pin the
+   goldens that move (one PR, `config-default-blast-radius.md` paired statement). Ledger note: every pre-migration 26y
+   verdict is a paired read on the year-2000 vintage list and stays valid as a relative read.
+5. **Grid rule update** (`promotion-confirmation.md`): with a PIT universe, "universe diversity" = breadth tier
+   (top-1000 vs top-3000), not vintage; period diversity = disjoint sub-windows of the same construction.
+6. Only then the top-of-funnel screen (breakout-gate width, top-N) on the new band.
+
+Cost: ~1 day of agent time for 1–2, hours of container for 3, ~9 h for 4, one goldens PR. Everything below in the
+queue rides in the same rebuild.
+
 ## Queue (in order)
 
-1. **Entry side, top of funnel**: the probe closed the funding/sizing branch. Next screen = breakout-gate width and top-N as
-   a surface on the 26y record (3 salts, V6 gate), reading the monster funnel (`project_monster_funnel_top_of_funnel`:
-   87% die at the breakout gate + top-N). `experiment-gap-closing` skill; pre-register before launching.
-2. **SGP_old1 truncation** at the 2009-11 merger + the #2782 spin-off twins before the next warehouse rebuild (ops-data).
+0. **The P0 above** — universe migration, steps 1–5, before any new measurement.
+1. **Entry side, top of funnel** (on the new band): breakout-gate width and top-N as a surface (3 salts, V6 gate), reading
+   the monster funnel (`project_monster_funnel_top_of_funnel`: 87% die at the breakout gate + top-N).
+   `experiment-gap-closing` skill; pre-register before launching.
+2. **SGP_old1 truncation** + the #2782 spin-off twins — folded into P0 step 3.
 3. Rule-4 hygiene: nothing retires (deteriorating gate keep-as-axis; 12%-weekly ACCEPT-not-promoted; 0.25/position
    REJECT-as-default). Note in the flag inventory if refreshed.
 4. Carried: orchestrator D2 push (09-10 item 5); #2729 residuals; #2793 (Codex).
