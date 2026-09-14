@@ -80,7 +80,10 @@ codex_invoke() {
   _model_args=""
   [ -n "${CODEX_MODEL:-}" ] && _model_args="-m $CODEX_MODEL"
   # shellcheck disable=SC2086
-  codex -C "$_wt" exec --ephemeral $_model_args -o "$_report" "$(cat "$_promptfile")"
+  # -s read-only is explicit: `codex exec` takes the sandbox mode from user/project
+  # config otherwise, so a dispatcher configured for workspace-write would
+  # launch a writable reviewer (advisory Codex review 5194019340 of #2798).
+  codex -C "$_wt" exec -s read-only --ephemeral $_model_args -o "$_report" "$(cat "$_promptfile")"
 }
 
 # post_report PR SHA REPORT -> posts the report as a COMMENTED PR review pinned

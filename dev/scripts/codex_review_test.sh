@@ -83,6 +83,7 @@ check "codex_invoke: passes --ephemeral" 1 "$(grep -cx -- --ephemeral "$D/argv")
 check "codex_invoke: passes -o REPORT" "$D/report.md" "$(awk 'p{print; exit} $0=="-o"{p=1}' "$D/argv")"
 check "codex_invoke: prompt is the last argument" "the prompt" "$(tail -1 "$D/argv")"
 check "codex_invoke: -C worktree first" "-C" "$(sed -n 1p "$D/argv")"
+check "codex_invoke: sandbox is explicitly read-only" "read-only" "$(awk 'p{print; exit} $0=="-s"{p=1}' "$D/argv")"
 
 # Posting (finding 2): a failed `gh api` must make post_report return non-zero;
 # the old pipe into sed masked it under POSIX sh.
