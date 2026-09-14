@@ -30,9 +30,10 @@ column) so the gate loop enforces it, not the chat.
    | `review/codex-required` | a would-be `MERGE` becomes `HOLD` until a Codex verdict is `ok` at the tip. **Soft gate with a timeout:** after 3 h without a verdict the dispatcher swaps the label to `review/codex-timeout`, comments why, and merges on the Claude gates. It never overrides a rework, a red CI or a `do-not-merge` hold. |
    | `review/codex-timeout` | record that the soft gate expired; informational. |
 
-   `CODEX_REVIEW=off` in the loop's environment makes `codex_review.sh` a
-   no-op (exit 0). Removing the label or setting that variable is the whole
-   fallback — nothing else changes.
+   `CODEX_REVIEW=off` in the environment makes `codex_review.sh` a no-op (exit 0)
+   AND makes `pr_gate_status.sh` ignore both labels (no HOLD, no hint), so a
+   switched-off reviewer can never hold a PR. Removing the label or setting
+   that variable is the whole fallback — nothing else changes.
 
 ## How a Codex review runs
 

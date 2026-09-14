@@ -706,6 +706,32 @@ _pr_checks_summary() {
   esac
 }
 
+# _codex_action ACTION CODEX REQUIRED REQUESTED -> the NEXT-ACTION after the
+# advisory CODEX column is applied (cross-agent-review.md). REQUIRED /
+# REQUESTED are non-empty when the matching review/codex-* label is present.
+# CODEX_REVIEW=off (the documented fallback switch) disables BOTH label
+# effects, so switching the reviewer off can never leave a PR held on a review
+# that will not come (advisory Codex review 5194074884 of #2798). Lives above
+# the LIB seam so pr_gate_status_test.sh can pin every branch offline.
+_codex_action() {
+  _action=$1; _codex=$2; _required=$3; _requested=$4
+  if [ "${CODEX_REVIEW:-on}" = off ]; then
+    printf '%s' "$_action"; return 0
+  fi
+  if [ -n "$_required" ] && [ "$_codex" != ok ] && [ "$_codex" != skip ]; then
+    case "$_action" in
+      MERGE*) _action="HOLD -- review/codex-required (codex=$_codex): dispatch codex review, or swap to review/codex-timeout after 3h" ;;
+    esac
+  elif [ -n "$_requested" ]; then
+    case "$_codex" in
+      ok|skip) ;;
+      rework)  _action="$_action [codex: findings, advisory]" ;;
+      *)       _action="$_action [+ codex review (advisory)]" ;;
+    esac
+  fi
+  printf '%s' "$_action"
+}
+
 # Sourcing with PR_GATE_STATUS_LIB=1 stops here, exposing every function above
 # for pr_gate_status_test.sh without hitting the network. EVERYTHING BELOW THIS
 # LINE IS A SIDE EFFECT and must stay below it.
@@ -804,20 +830,10 @@ for n in $PRS; do
     *)               action="inspect manually" ;;
   esac
 
-  # CODEX column (cross-agent-review.md). Advisory by default; a soft gate only
-  # under review/codex-required, and even then only where the three real gates
-  # would otherwise MERGE -- it never overrides a rework, a red CI or a hold.
-  if [ -n "$codex_required" ] && [ "$codex" != ok ] && [ "$codex" != skip ]; then
-    case "$action" in
-      MERGE*) action="HOLD -- review/codex-required (codex=$codex): dispatch codex review, or swap to review/codex-timeout after 3h" ;;
-    esac
-  elif [ -n "$codex_requested" ]; then
-    case "$codex" in
-      ok|skip) ;;
-      rework)  action="$action [codex: findings, advisory]" ;;
-      *)       action="$action [+ codex review (advisory) at $tip]" ;;
-    esac
-  fi
+  # CODEX column (cross-agent-review.md): advisory by default; a soft gate only
+  # under review/codex-required, and only where the three real gates would
+  # otherwise MERGE. See _codex_action above the LIB seam (offline-tested).
+  action=$(_codex_action "$action" "$codex" "$codex_required" "$codex_requested")
 
   printf '%-6s %-8s %-14s %-14s %-14s %s\n' "$n" "$ci" "$struct" "$behav" "$codex" "$action"
 done

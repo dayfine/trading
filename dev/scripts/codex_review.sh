@@ -47,7 +47,12 @@ validate_report() {
   if grep -qiE '^#{1,4} +(qc[- ])?(structural|behavioral)\b' "$_f"; then
     echo "codex_review: report carries a Claude gate heading (structural/behavioral); refusing to post" >&2; _bad=1
   fi
-  _verdict=$(awk 'f && NF {print; exit} /^#+ +Verdict/ {f=1}' "$_f" | tr -d ' \r')
+  # The heading must be exactly "Verdict" (optionally with a colon): the CODEX
+  # reader requires the token to follow "^#+ +Verdict" directly, so a heading
+  # like "## Verdict explanation" would validate here yet read as "unclear"
+  # there (advisory Codex review 5194074884 of #2798). The token is the next
+  # non-blank line, matching the reader's gap class.
+  _verdict=$(awk 'f && NF {print; exit} /^#+ +Verdict[ :]*\r?$/ {f=1}' "$_f" | tr -d ' \r')
   case "$_verdict" in
     APPROVED|NEEDS_REWORK) ;;
     *) echo "codex_review: '## Verdict' must be followed by APPROVED or NEEDS_REWORK (got: ${_verdict:-<none>})" >&2; _bad=1 ;;

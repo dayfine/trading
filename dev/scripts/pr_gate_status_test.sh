@@ -1520,6 +1520,23 @@ check "codex kind: a structural review never satisfies it" \
 check "codex kind: a behavioral review never satisfies it" \
   none "$(_gate "$(reviews "$REAL_BEHAVIORAL")" codex "$TIP")"
 
+# _codex_action (cross-agent-review.md): every branch of the label logic, plus
+# the CODEX_REVIEW=off fallback that must neutralise both labels.
+check "codex action: no label leaves MERGE alone" "MERGE" "$(_codex_action MERGE none "" "")"
+check "codex action: required + none turns MERGE into HOLD" \
+  "HOLD -- review/codex-required (codex=none): dispatch codex review, or swap to review/codex-timeout after 3h" \
+  "$(_codex_action MERGE none 0 "")"
+check "codex action: required + stale also holds" 1 "$(_codex_action MERGE "stale(deadbeef)" 0 "" | grep -c '^HOLD')"
+check "codex action: required + ok merges" "MERGE" "$(_codex_action MERGE ok 0 "")"
+check "codex action: required never overrides a rework" "rework (structural findings)" "$(_codex_action "rework (structural findings)" none 0 "")"
+check "codex action: required never overrides wait-for-CI" "wait for CI" "$(_codex_action "wait for CI" none 0 "")"
+check "codex action: requested + none appends the hint" "MERGE [+ codex review (advisory)]" "$(_codex_action MERGE none "" 0)"
+check "codex action: requested + rework appends findings note" "MERGE [codex: findings, advisory]" "$(_codex_action MERGE rework "" 0)"
+check "codex action: requested + ok is silent" "MERGE" "$(_codex_action MERGE ok "" 0)"
+check "codex action: docs-only skip is silent under requested" "MERGE (docs-only)" "$(_codex_action "MERGE (docs-only)" skip "" 0)"
+check "codex action: CODEX_REVIEW=off neutralises required" "MERGE" "$(CODEX_REVIEW=off _codex_action MERGE none 0 "")"
+check "codex action: CODEX_REVIEW=off neutralises requested" "MERGE" "$(CODEX_REVIEW=off _codex_action MERGE none "" 0)"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1

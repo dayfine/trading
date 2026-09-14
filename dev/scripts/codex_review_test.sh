@@ -103,5 +103,24 @@ check "post_report: a failed gh api returns non-zero" 1 "$rc"
 rc=0; out=$(GH_STUB_MODE=empty PATH="$D/bin:$PATH" post_report 1 "$SHA" "$D/good.md") || rc=$?
 check "post_report: an empty id returns non-zero" 1 "$rc"
 
+# Validator / reader agreement (advisory Codex review 5194074884 of #2798):
+# a heading like "## Verdict explanation" used to validate here while the
+# CODEX reader (pr_gate_status.sh _gate) reads "unclear" for it. The validator
+# now requires the heading to be exactly "Verdict"; and a report that validates
+# must read "ok" through the real reader, sourced via its own LIB seam.
+printf 'Reviewed SHA: %s\n\n## Codex review — thing\n\n## Verdict explanation\n\nAPPROVED\n' "$SHA" > "$D/verdictx.md"
+check "a 'Verdict explanation' heading does not validate" 1 "$(rc "$D/verdictx.md")"
+printf 'Reviewed SHA: %s\n\n## Codex review — thing\n\n## Verdict:\n\nNEEDS_REWORK\n' "$SHA" > "$D/verdictcolon.md"
+check "a colon-style 'Verdict:' heading validates (reader accepts it too)" 0 "$(rc "$D/verdictcolon.md")"
+PR_GATE_STATUS_LIB=1
+export PR_GATE_STATUS_LIB
+# shellcheck source=/dev/null
+. "$HERE/pr_gate_status.sh"
+_json() { jq -nc --arg b "$(cat "$1")" '[{body: $b}]'; }
+check "compat: a validated APPROVED report reads ok in the CODEX reader" ok "$(_gate "$(_json "$D/good.md")" codex "$SHA")"
+check "compat: a validated NEEDS_REWORK report reads rework in the CODEX reader" rework "$(_gate "$(_json "$D/rework.md")" codex "$SHA")"
+check "compat: the colon-style report reads rework in the CODEX reader" rework "$(_gate "$(_json "$D/verdictcolon.md")" codex "$SHA")"
+check "compat: a validated report never reads on the structural gate" none "$(_gate "$(_json "$D/good.md")" structural "$SHA")"
+
 if [ "$fails" -gt 0 ]; then printf 'FAIL: codex_review -- %d test(s) failed.\n' "$fails"; exit 1; fi
 printf 'OK: codex_review -- %d tests clean.\n' "$total"
