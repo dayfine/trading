@@ -28,16 +28,22 @@ standalone (no dune, no mutex contention); all three lost tasks were re-dispatch
 **Fifth instance of one class this month** (#2741, #2747, #2771, #2803, #2810):
 a green run is still indistinguishable from a productive one, because nothing
 checks a run's claimed dispatches against the branches that actually exist.
-**#2812 (this run) closes the summary half of it** — `verify` no longer returns
-"nothing to verify" on a FULL-mode run.
+**#2812 closes the summary half of it and is MERGED (`d04c75e2`)** — dispatched,
+double-QC'd (structural 5 / behavioral 5, 10/10 mutations killed, 0 survivors) and
+auto-merged inside this run. From the next run on, a FULL-mode run that loses its
+summary **fails the job** instead of going green. The **dispatch** half is still
+open — nothing checks claimed dispatches against branches that exist, which is
+exactly what run 1 needed (#2810).
 
 Run 2 shipped three mutation-verified PRs, all re-dispatches of run 1's lost work:
 **#2812** (`verify` asserts a FULL-mode summary was published, #2803), **#2813**
 (R7 + `force_liquidation`, #2800 follow-up), **#2814** (warn-level QC score
-digit/adjective lexicon, H-QC-SCORE-ADJECTIVE-LEXICON). All three await QC — not
-dispatched here because each QC agent needs its own cold **16 GB** `_build` and the
+digit/adjective lexicon, H-QC-SCORE-ADJECTIVE-LEXICON). **#2812 went the whole way —
+dispatched, both QC gates APPROVED at its tip, merged.** #2813 (CI green) and #2814
+await QC next run: each QC agent needs its own cold **16 GB** `_build` and the
 one-dune mutex serializes them; disk peaked at **90%** during the feature dispatch
-and returned to **58%** once the finished worktrees were reclaimed. #2813's real
+and returned to **58%** once the finished worktrees were reclaimed, which is what
+bought room for #2812's pass. #2813's real
 result is a **corrected premise**: R7 already returned `Fail` for breaker exits as
 of #2800 (`stage_at_exit` was never the blocker for this exit kind), but the flip
 was unpinned and fired in only one shape — the plausible tidy-up that reverts it
