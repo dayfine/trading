@@ -916,6 +916,24 @@
  (action
   (run sh %{dep:publish_daily_summary_test_runner.sh})))
 
+; orchestrator_fastexit_gate test (issue #2579, extended by issue #2803):
+; dev/scripts/orchestrator_fastexit_gate.sh is the mechanical backstop for
+; the orchestrator workflow's daily-summary sanity checks (the NO-OP
+; saturated-queue precondition, and -- since #2803 -- the FULL-mode
+; publication check that catches a green, costly run whose summary never
+; reached a PR or `main`). Same shim + (universe) pattern as
+; publish_daily_summary_test_runner.sh directly above: the script lives
+; outside the dune workspace root and is resolved via repo_root() at run
+; time, and the test builds throwaway git-repo fixtures (including
+; plumbing-level refs/remotes/origin/main snapshots) at runtime, so it
+; needs (universe) to see script edits.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:orchestrator_fastexit_gate_test_runner.sh})))
+
 ; goldens_affected_check test (issue #2393): pins the PR-time detector
 ; for a config-default change that only a postsubmit golden would notice
 ; (the #2384 clock26 -38.42pp episode). goldens_affected_check.sh itself

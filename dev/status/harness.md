@@ -2504,3 +2504,99 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   `dune build @fmt && dune build && dune runtest` all exit 0, 0 `^FAIL:`
   lines (includes `goldens_affected_check_test.sh` running under
   `dune runtest trading/devtools/checks/`).
+
+## Added 2026-09-14 (harness-maintainer, harness/fastexit-verify-full-mode, issue #2803)
+
+- [x] **H-FASTEXIT-VERIFY-FULL-MODE-BLIND** (issue #2803): `orchestrator_fastexit_gate.sh verify`
+  only ever checked the NO-OP branch of the daily summary -- on a FULL-mode
+  summary it printed `... is not a NO-OP-mode run; nothing to verify.` and
+  exited 0 unconditionally. That is how run 34768165769 (2026-09-13
+  evening) stayed fully green ($28.30, 50 minutes, 23/23 steps, two feature
+  PRs merged) while `dev/daily/2026-09-13-run2.md` never reached `main` and
+  no `ops/daily-2026-09-13-run2` PR was ever opened -- the fourth instance
+  this month of "a green run silently loses its only durable artifact"
+  (#2741, #2747, #2771, #2803 itself). Each prior fix closed one ROUTE to
+  loss (jj/git identity bugs, a plain-git+curl replacement publisher) and
+  left the CLASS open: nothing checked the artifact against the exit code.
+
+  **Fix** (`dev/scripts/orchestrator_fastexit_gate.sh`): `verify` now
+  dispatches on the summary's `**Mode:**` line three ways -- NO-OP
+  (unchanged), FULL (new), neither (unchanged trivial-pass fallback, message
+  text updated to say "NO-OP-mode or FULL-mode"). For FULL mode, a new
+  `_verify_full_mode_published` checks the predicate spelled out in the
+  script's new "FULL-MODE PUBLICATION CHECK" header section: published means
+  EITHER (a) the summary path already exists in the tree at `origin/main`
+  (cheap, no network, checked first), OR (b) an open-or-merged PR exists for
+  branch `ops/daily-<basename-without-.md>` (same gh/curl dual-backend
+  pattern as `open_pr_count`, new `daily_summary_pr_count` /
+  `_daily_summary_pr_count_{gh,curl}`, `state=all` + a `state=="open" or
+  merged_at != null` filter so a PR that was opened and later closed
+  WITHOUT merging does NOT count as published). Zero PRs and not on main
+  -> FAIL with an `::error::A-FASTEXIT-VACUOUS (issue #2803)` line naming
+  the branch. The ordering constraint (verify runs BEFORE the workflow's
+  own auto-merge step, so "merged" is not yet true on a healthy run) is
+  documented in the header and is why the predicate keys on the PR
+  *existing*, never on the merge having happened. A known, stated gap: the
+  check only fires for a Mode string starting with "full"
+  (case-insensitively); other "real work happened" mode strings in the
+  corpus (`NO-DISPATCH PASS`, `LIGHT COORDINATION`, etc.) still fall through
+  unchecked -- out of scope for this issue's dispatch.
+
+  **Tests** (`dev/scripts/orchestrator_fastexit_gate_test.sh`, scenarios
+  15-24, +13 checks): no PR + not on main -> FAIL citing `#2803`; open PR ->
+  PASS; merged PR (`state=closed`, `merged_at` set) -> PASS; a
+  closed-but-UNMERGED PR -> FAIL (the key mutation this suite exists to
+  kill -- "any PR found" is not "published"); already on `origin/main` ->
+  PASS via the fast path, proven to never call curl at all
+  (`MOCK_CURL_FAIL=1` set alongside it); curl failure / non-JSON response
+  while checking -> fails closed (rc=2), same discipline as the existing
+  NO-OP path; real-corpus casing variants ("Full pass", "FULL_PASS") still
+  recognised; and the `ops/daily-<basename>` branch name is pinned
+  end-to-end against a `-run2`-suffixed path (matching the actual incident
+  file), captured via a new `MOCK_DAILY_PR_URL_FILE` mock-curl hook and
+  asserted with a `&state=all`-anchored substring so a "forgot to strip
+  `.md`" branch-derivation bug can't hide behind a merely-prefix-matching
+  assertion. Scenario 1 (previously "any non-NO-OP mode short-circuits")
+  was renamed/repointed to a genuinely-neither mode string
+  (`LIGHT COORDINATION`, taken from the real corpus) since FULL is no
+  longer one of the trivial-pass cases.
+
+  **Mutation-verified by hand** (all RED before restore, GREEN after,
+  27/27 clean at rest): (1) drop the `open`/`merged_at` jq filter in
+  `_daily_summary_pr_count_curl` (accept any state) -> killed by the
+  closed-unmerged scenario. (2) remove the `_daily_summary_on_main` fast
+  path entirely -> killed by the already-on-main scenario (flips rc 0->2,
+  proving the short-circuit is real, not incidental). (3) drop the `-i`
+  flag from the FULL-mode `grep` (case-sensitive `full` no longer matches
+  literal `FULL`) -> killed 8 of the 10 new scenarios at once (confirms the
+  flag is load-bearing, not merely defensive). (4) forget to strip `.md` in
+  `_daily_summary_branch` -> killed by the branch-derivation pin (only
+  because that assertion was tightened mid-session to anchor on
+  `&state=all`; the original prefix-only assertion would NOT have caught
+  this, since `...-run2.md` still contains `...-run2` as a substring --
+  recorded here so a future reader doesn't re-introduce the weaker form).
+  (5) relax the `-eq 0` failure gate to `-ge 0` (always fail) -> killed by
+  the open-PR and merged-PR PASS scenarios. (6) make `_daily_summary_on_main`
+  always report true (`|| true`) -> killed 8 of the 10 new scenarios (same
+  breadth as mutation 3, different mechanism).
+
+  Also newly wired into `dune runtest`: `orchestrator_fastexit_gate_test.sh`
+  had never been wired at all (unlike its sibling
+  `publish_daily_summary_test.sh`) -- added
+  `trading/devtools/checks/orchestrator_fastexit_gate_test_runner.sh` (same
+  shim + `(universe)` pattern as the sibling runners) and the matching
+  `dune runtest` rule in `trading/devtools/checks/dune`.
+
+  **Left out of scope** (stated explicitly per the dispatch's "note the
+  ordering constraint" instruction, not silently dropped): (a) the KNOWN
+  GAP above (non-FULL/non-NO-OP "real work" mode strings); (b) no
+  `.github/workflows/` edit was made or needed -- the workflow's existing
+  call site already fails the job on `verify`'s non-zero exit, and
+  pushing a workflow-file edit is server-side rejected in this runtime
+  ("refusing to allow a Personal Access Token ... without workflow
+  scope").
+
+  **Verify:** `sh dev/scripts/orchestrator_fastexit_gate_test.sh` -- 27/27
+  checks pass (14 prior + 13 new). `dev/lib/run-in-env.sh dune build`,
+  `dune runtest`, and `dune build @fmt` all exit 0 (run under the
+  single-dune-in-flight mutex per this runner's memory constraints).

@@ -12,7 +12,7 @@
 #   - genuinely idle queue (PRs open, no drift) + NO-OP        => PASS (verify)
 #   - drift hidden only behind an exempted orchestrator-summary
 #     commit ("ops: daily orchestrator summary ...")           => PASS (verify)
-#   - non-NO-OP summary                                        => PASS trivially, no PR lookup
+#   - neither NO-OP nor FULL summary                           => PASS trivially, no PR lookup
 #
 # #2605 rework adds the production-failure shapes qc-behavioral found were
 # unfixtured:
@@ -26,6 +26,19 @@
 #   - a same-day consolidated rollup (-summary.md) sits alongside the
 #     per-run summary                                    => excluded from
 #     _prior_summary_path, same as the workflow's own locate step
+#
+# #2803 adds the FULL-mode publication check (Scenarios 15-24): a FULL-mode
+# summary with no open-or-merged PR for its branch, and not on origin/main,
+# is the shape that let a green, costly run silently lose its only durable
+# artifact. Covers: no PR + not on main => FAIL; open PR => PASS; merged PR
+# => PASS; a CLOSED-BUT-UNMERGED PR => FAIL (the key mutation this suite
+# exists to kill -- "any PR found" is not "published"); already on
+# origin/main => PASS via a fast path that never calls curl; curl failure /
+# non-JSON response while checking => fails closed (rc=2), same discipline
+# as the NO-OP path; real-corpus Mode-string casing variants ("Full pass",
+# "FULL_PASS") are still recognised; and the ops/daily-<basename> branch
+# name is pinned end-to-end against a "-run2"-suffixed path, matching the
+# real incident (dev/daily/2026-09-13-run2.md).
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -60,10 +73,11 @@ check_bool() {
   fi
 }
 
-# --- mock curl: returns a JSON array of $MOCK_PR_COUNT elements regardless
-# of the URL/headers it's called with -- open_pr_count only cares about
-# `jq 'length'` on the response. Two more failure-mode toggles simulate the
-# production curl-backend failure shapes (#2605 rework):
+# --- mock curl: dispatches on whether the URL (found among "$@") contains
+# a "head=" query param -- that shape is UNIQUE to daily_summary_pr_count's
+# request (open_pr_count never filters by head). Two more failure-mode
+# toggles simulate the production curl-backend failure shapes (#2605 rework),
+# applied identically regardless of which request shape is being answered:
 #   MOCK_CURL_FAIL=1     -- simulate `curl -f` on a 401/403/5xx: exit 22,
 #                            NO stdout (the exact shape that made the old
 #                            `curl -f ... | jq 'length'` pipeline silently
@@ -71,13 +85,28 @@ check_bool() {
 #                            which has no `pipefail`).
 #   MOCK_CURL_GARBAGE=1  -- simulate a curl "success" (exit 0) whose body
 #                            jq cannot parse into a count.
+#
+# open_pr_count requests (no "head=") answer with a JSON array of
+# $MOCK_PR_COUNT dummy elements, as before -- open_pr_count only cares about
+# `jq 'length'` on the response, so the element shape is irrelevant to it.
+#
+# daily_summary_pr_count requests ("head=" present) answer according to
+# $MOCK_DAILY_PR_STATE, with a real `state`/`merged_at` shape since
+# _daily_summary_pr_count_curl's jq filter inspects both fields:
+#   none              -- []  (no PR at all for this branch)
+#   open              -- one PR, state=open, merged_at=null
+#   merged            -- one PR, state=closed, merged_at=<non-null>
+#   closed-unmerged   -- one PR, state=closed, merged_at=null (opened, then
+#                        abandoned/closed WITHOUT merging -- must NOT count
+#                        as published)
 MOCK_BIN_DIR=$(mktemp -d -t orchestrator_fastexit_gate_mockbin.XXXXXX)
 trap 'rm -rf "$MOCK_BIN_DIR" "${TMP_REPO:-}"' EXIT
 
 cat > "$MOCK_BIN_DIR/curl" <<'EOF'
 #!/bin/sh
-# Mock curl -- ignores its real arguments; behavior controlled by env vars
-# set by the test before each scenario (see the comment above this heredoc).
+# Mock curl -- behavior controlled by env vars set by the test before each
+# scenario (see the comment above this heredoc), dispatched by inspecting
+# the URL among "$@" for a "head=" query param.
 if [ "${MOCK_CURL_FAIL:-0}" = 1 ]; then
   exit 22
 fi
@@ -85,6 +114,30 @@ if [ "${MOCK_CURL_GARBAGE:-0}" = 1 ]; then
   printf 'not-json-at-all'
   exit 0
 fi
+
+_url=""
+for _a in "$@"; do
+  case "$_a" in
+    https://*) _url="$_a" ;;
+  esac
+done
+
+case "$_url" in
+  *head=*)
+    if [ -n "${MOCK_DAILY_PR_URL_FILE:-}" ]; then
+      printf '%s' "$_url" >"$MOCK_DAILY_PR_URL_FILE"
+    fi
+    case "${MOCK_DAILY_PR_STATE:-none}" in
+      none) printf '[]' ;;
+      open) printf '[{"state":"open","merged_at":null}]' ;;
+      merged) printf '[{"state":"closed","merged_at":"2026-09-13T12:00:00Z"}]' ;;
+      closed-unmerged) printf '[{"state":"closed","merged_at":null}]' ;;
+      *) printf '[]' ;;
+    esac
+    exit 0
+    ;;
+esac
+
 n="${MOCK_PR_COUNT:-0}"
 printf '['
 i=0
@@ -107,6 +160,8 @@ MOCK_CURL_FAIL=0
 export MOCK_CURL_FAIL
 MOCK_CURL_GARBAGE=0
 export MOCK_CURL_GARBAGE
+MOCK_DAILY_PR_STATE=none
+export MOCK_DAILY_PR_STATE
 
 # --- fixture repo -------------------------------------------------------
 # dev/status/ commit before the prior summary (T0), the prior summary itself
@@ -161,9 +216,46 @@ _reset_repo_no_drift() {
   # see zero drift. Also clears any commit `_write_and_commit_prior_summary`
   # added in an earlier scenario, since `git reset --hard` to the root
   # commit removes files that only existed in later, now-discarded commits.
+  # Also drops any refs/remotes/origin/main left by `_set_origin_main` in a
+  # prior scenario -- `git reset --hard` on the CURRENT branch doesn't touch
+  # that ref itself, so without this it would silently leak into the next
+  # FULL-mode scenario and make `_daily_summary_on_main` answer true when
+  # the scenario means to test the "not on main yet" path.
   (
     cd "$TMP_REPO"
     git reset -q --hard "$(git rev-list --max-parents=0 HEAD)"
+    git update-ref -d refs/remotes/origin/main 2>/dev/null || true
+  )
+}
+
+# _set_origin_main <mode> [summary-relpath]
+# Points refs/remotes/origin/main at a fresh commit representing "what's on
+# origin/main right now", entirely via plumbing (read-tree/write-tree/
+# commit-tree/update-ref against a throwaway index) -- never touches the
+# fixture's real HEAD, branch, working tree, or index. Two shapes:
+#   with-summary    -- the tree contains ONLY <summary-relpath>, whose
+#                       content is read from its current on-disk copy in
+#                       $TMP_REPO (so it matches whatever the scenario
+#                       already wrote via _reset_summary). Models "the
+#                       summary already merged to main".
+#   without-summary -- an EMPTY tree. Models the common/healthy case: verify
+#                       runs BEFORE the workflow's own auto-merge step, so
+#                       origin/main normally does NOT have the summary yet
+#                       even on a run that will end up fine.
+_set_origin_main() {
+  _som_mode="$1"
+  _som_relpath="${2:-}"
+  (
+    cd "$TMP_REPO"
+    _som_index=$(mktemp -u -t fastexit_gate_scratch_index.XXXXXX)
+    GIT_INDEX_FILE="$_som_index" git read-tree --empty
+    if [ "$_som_mode" = "with-summary" ]; then
+      GIT_INDEX_FILE="$_som_index" GIT_WORK_TREE="$TMP_REPO" git add -- "$_som_relpath"
+    fi
+    _som_tree=$(GIT_INDEX_FILE="$_som_index" git write-tree)
+    _som_commit=$(git commit-tree "$_som_tree" -m "origin/main scratch snapshot")
+    git update-ref refs/remotes/origin/main "$_som_commit"
+    rm -f "$_som_index"
   )
 }
 
@@ -195,14 +287,18 @@ _run_verify() {
   ) >/tmp/orchestrator_fastexit_gate_test.out 2>&1
 }
 
-# --- Scenario 1: not a NO-OP summary -> PASS trivially, no PR lookup ----
+# --- Scenario 1: neither NO-OP nor FULL mode -> PASS trivially, no PR
+# lookup at all (uses a real corpus mode string, "LIGHT COORDINATION", per
+# dev/daily/2026-07-06.md -- distinct from the FULL-mode scenarios added
+# below, which exercise the #2803 publication check this mode deliberately
+# is NOT subject to; see the "KNOWN GAP" paragraph in the script header).
 MOCK_PR_COUNT=0
 export MOCK_PR_COUNT
 _reset_repo_no_drift
-_reset_summary FULL
+_reset_summary "LIGHT COORDINATION"
 rc=0
 _run_verify dev/daily/2026-08-27.md || rc=$?
-check "non-NO-OP summary short-circuits to PASS" 0 "$rc"
+check "neither-NO-OP-nor-FULL summary short-circuits to PASS" 0 "$rc"
 
 # --- Scenario 2: NO-OP + empty queue + no drift -> FAIL (the #2579 bug) --
 MOCK_PR_COUNT=0
@@ -364,6 +460,166 @@ MD
 rc=0
 _run_verify dev/daily/2026-08-27.md || rc=$?
 check "same-day consolidated rollup is excluded from _prior_summary_path" 1 "$rc"
+
+# =========================================================================
+# FULL-mode publication check (issue #2803): a FULL-mode summary with no
+# open-or-merged PR for its ops/daily-<basename> branch, and not yet on
+# origin/main, means the run's only durable artifact never got published --
+# the exact shape run 34768165769 (2026-09-13 evening) hit while staying
+# fully green. See the "FULL-MODE PUBLICATION CHECK" header comment in
+# orchestrator_fastexit_gate.sh for the full predicate and its ordering-
+# constraint rationale.
+# =========================================================================
+
+# --- Scenario 15: FULL mode, no PR for the branch, not on origin/main ->
+# FAIL, citing the failure class by issue number so a reader of the CI log
+# knows exactly what broke and why. -------------------------------------
+MOCK_DAILY_PR_STATE=none
+export MOCK_DAILY_PR_STATE
+_reset_repo_no_drift
+_set_origin_main without-summary
+_reset_summary FULL
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "FULL mode with no PR and not on main is rejected" 1 "$rc"
+if grep -q '#2803' /tmp/orchestrator_fastexit_gate_test.out; then _cite_ok=0; else _cite_ok=1; fi
+check_bool "rejection cites issue #2803" "$_cite_ok"
+
+# --- Scenario 16: FULL mode, an OPEN PR exists for the branch -> PASS ----
+MOCK_DAILY_PR_STATE=open
+_reset_repo_no_drift
+_set_origin_main without-summary
+_reset_summary FULL
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "FULL mode with an open PR for its branch is accepted" 0 "$rc"
+
+# --- Scenario 17: FULL mode, the PR for the branch already MERGED (state
+# closed, merged_at set) -> PASS. This is the ordinary post-merge shape;
+# `state=all` + the merged_at check is what makes this distinguishable from
+# scenario 18 below. -------------------------------------------------------
+MOCK_DAILY_PR_STATE=merged
+_reset_repo_no_drift
+_set_origin_main without-summary
+_reset_summary FULL
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "FULL mode with a merged PR for its branch is accepted" 0 "$rc"
+
+# --- Scenario 18: FULL mode, a PR for the branch was opened then CLOSED
+# WITHOUT merging -> FAIL. This is the mutation this suite exists to kill:
+# a naive "any PR found regardless of state" check would wrongly pass here
+# -- an abandoned, unmerged PR is exactly as much a loss as never opening
+# one at all. ---------------------------------------------------------------
+MOCK_DAILY_PR_STATE=closed-unmerged
+_reset_repo_no_drift
+_set_origin_main without-summary
+_reset_summary FULL
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "FULL mode with only a closed-unmerged PR is rejected" 1 "$rc"
+
+# --- Scenario 19: FULL mode, the summary is ALREADY on origin/main -> PASS
+# via the fast path, without ever calling curl. MOCK_CURL_FAIL=1 here is
+# deliberate: if the production code called daily_summary_pr_count despite
+# already finding the file on origin/main, this scenario would flip to
+# rc=2 and expose the bug -- proving the short-circuit actually short-
+# circuits, not just that it happens to return the right answer. ----------
+MOCK_DAILY_PR_STATE=none
+_reset_repo_no_drift
+_reset_summary FULL
+_set_origin_main with-summary dev/daily/2026-08-27.md
+MOCK_CURL_FAIL=1
+export MOCK_CURL_FAIL
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "FULL mode already on origin/main passes without calling curl" 0 "$rc"
+MOCK_CURL_FAIL=0
+export MOCK_CURL_FAIL
+
+# --- Scenario 20: FULL mode, curl itself fails while checking the PR
+# status -> fails closed (rc=2), never silently treated as "not published"
+# (rc=1) or "published" (rc=0) -- mirrors Scenario 11's NO-OP-path coverage
+# of the same production failure shape (an expired/rotated GH_TOKEN). ------
+MOCK_DAILY_PR_STATE=open
+_reset_repo_no_drift
+_set_origin_main without-summary
+_reset_summary FULL
+MOCK_CURL_FAIL=1
+export MOCK_CURL_FAIL
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "FULL mode fails closed when curl itself fails" 2 "$rc"
+MOCK_CURL_FAIL=0
+export MOCK_CURL_FAIL
+
+# --- Scenario 21: FULL mode, curl "succeeds" but returns a body jq cannot
+# parse into a count for the daily-summary-PR query -> fails closed. -------
+MOCK_DAILY_PR_STATE=open
+_reset_repo_no_drift
+_set_origin_main without-summary
+_reset_summary FULL
+MOCK_CURL_GARBAGE=1
+export MOCK_CURL_GARBAGE
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "FULL mode fails closed on a non-JSON curl response" 2 "$rc"
+MOCK_CURL_GARBAGE=0
+export MOCK_CURL_GARBAGE
+
+# --- Scenario 22: case-insensitive / real-corpus Mode string variants are
+# still recognised as FULL-mode -- "Full pass" (mixed case, matches
+# dev/daily/2026-05-01-run2.md's actual wording) with no PR -> FAIL. -------
+MOCK_DAILY_PR_STATE=none
+_reset_repo_no_drift
+_set_origin_main without-summary
+_reset_summary "Full pass -- Step 0.5 fast-exit declined"
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "mixed-case 'Full pass' Mode string is recognised as FULL and rejected without a PR" 1 "$rc"
+
+# --- Scenario 23: "FULL_PASS" (underscore variant, matches
+# dev/daily/2026-05-23.md's wording) with an open PR -> PASS. --------------
+MOCK_DAILY_PR_STATE=open
+_reset_repo_no_drift
+_set_origin_main without-summary
+_reset_summary "FULL_PASS"
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "'FULL_PASS' Mode string is recognised as FULL and accepted with an open PR" 0 "$rc"
+
+# --- Scenario 24: branch derivation matches the real incident shape -- a
+# "-run2" suffixed summary path derives branch ops/daily-2026-08-27-run2,
+# pinned by capturing the actual URL the mock curl received (not just the
+# pass/fail outcome, which a wrong branch name could still accidentally
+# produce if MOCK_DAILY_PR_STATE happens to match). ------------------------
+MOCK_DAILY_PR_STATE=none
+_reset_repo_no_drift
+_set_origin_main without-summary
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2026-08-27-run2.md <<'MD'
+# Status - 2026-08-27 [run 2]
+
+**Mode:** FULL
+MD
+)
+MOCK_DAILY_PR_URL_FILE=$(mktemp -t orchestrator_fastexit_gate_url.XXXXXX)
+export MOCK_DAILY_PR_URL_FILE
+rc=0
+_run_verify dev/daily/2026-08-27-run2.md || rc=$?
+check "a -run2 suffixed summary with no PR is rejected (matches the #2803 incident shape)" 1 "$rc"
+if grep -qF 'head=dayfine:ops/daily-2026-08-27-run2&state=all' "$MOCK_DAILY_PR_URL_FILE"; then
+  _branch_ok=0
+else
+  _branch_ok=1
+fi
+check_bool "branch derivation strips only .md and matches ops/daily-2026-08-27-run2" "$_branch_ok"
+rm -f "$MOCK_DAILY_PR_URL_FILE"
+unset MOCK_DAILY_PR_URL_FILE
+
+MOCK_DAILY_PR_STATE=none
+export MOCK_DAILY_PR_STATE
 
 printf '\n%d/%d checks passed\n' "$((total - fails))" "$total"
 if [ "$fails" -gt 0 ]; then
