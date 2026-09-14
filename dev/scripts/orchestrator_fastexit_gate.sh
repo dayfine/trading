@@ -47,13 +47,67 @@
 #       own documented exemption.
 #
 #   dev/scripts/orchestrator_fastexit_gate.sh verify <summary-path>
-#       Reads the daily summary at <summary-path>. If it is not a NO-OP-mode
-#       summary, prints a note and exits 0 (nothing to check). If it IS
-#       NO-OP-mode, independently recomputes the open-PR count and the
-#       dev/status/ drift since the prior summary and FAILS (exit 1, with an
-#       `::error::` line per violation) if either contradicts the no-op
-#       claim. Exits 0 only when both checks confirm the queue really was
-#       empty of work.
+#       Reads the daily summary at <summary-path>. If it is NO-OP-mode,
+#       independently recomputes the open-PR count and the dev/status/ drift
+#       since the prior summary and FAILS (exit 1, with an `::error::` line
+#       per violation) if either contradicts the no-op claim. If it is
+#       FULL-mode, checks that the summary was actually PUBLISHED (see
+#       "FULL-MODE PUBLICATION CHECK" below) and FAILS if not. Neither NO-OP
+#       nor FULL: prints a note and exits 0 (nothing this script knows how to
+#       check for that mode string). Exits 0 only when the applicable check
+#       (or lack of one) confirms nothing is wrong.
+#
+# FULL-MODE PUBLICATION CHECK (issue #2803)
+#   The NO-OP check above answers "was the no-op claim honest". It has no
+#   opinion on the other branch: a FULL-mode run that did real work but then
+#   never got its own summary published was INVISIBLE to it -- `verify`
+#   printed "is not a NO-OP-mode run; nothing to verify." and exited 0. Run
+#   34768165769 (2026-09-13 evening) is the measured instance: $28.30, 50
+#   minutes, 23/23 green steps, two feature PRs merged -- and
+#   dev/daily/2026-09-13-run2.md never reached `main`, no
+#   `ops/daily-2026-09-13-run2` PR ever opened, and the Step 5.5 index
+#   reconcile it should have carried was lost with it. Fourth instance of
+#   this class this month (#2741, #2747, #2771, #2803 itself); each prior fix
+#   closed one ROUTE to summary loss and left the CLASS open: a green run is
+#   indistinguishable from a productive one because nothing checks the
+#   artifact against the exit code.
+#
+#   "Published" (for a FULL-mode summary at path P, branch
+#   ops/daily-<basename-of-P-without-.md>, matching `publish_daily_summary.sh`'s
+#   own `_branch_name_for` convention) means EITHER:
+#     (a) P already exists in the tree at origin/main (checked first --
+#         free, no network, and correct even if some other route landed it
+#         without going through the ops/daily-* branch convention at all), OR
+#     (b) an open-or-merged PR exists for that branch (checked via the same
+#         gh/curl backend as open_pr_count).
+#   A PR that is closed WITHOUT having merged does NOT count -- that shape
+#   (open a PR, then abandon/close it) is exactly as much a loss as never
+#   opening one, and is deliberately distinguished from "merged" in the
+#   fixture suite.
+#
+#   ORDERING CONSTRAINT, worth stating because it makes the predicate
+#   non-obvious: this script's caller (.github/workflows/orchestrator.yml)
+#   runs `verify` BEFORE its own auto-merge step. So on a perfectly healthy
+#   run, (a) is normally false at call time -- the summary hasn't merged yet,
+#   only its PR exists. The predicate MUST key on the PR existing (open OR
+#   merged), never on the merge having already happened, or every healthy
+#   run would fail this check. (a) exists as a second, independent path for
+#   cases outside that ordering (e.g. a summary folded into some other
+#   commit that reached main by a different route, or a later re-check of
+#   `verify` after the merge completed) -- it is not the primary signal.
+#
+#   KNOWN GAP, stated rather than silently left implicit (the whole point of
+#   this file existing is to not let a check pass vacuously the way the old
+#   "nothing to verify" fallback did): this check only fires for a Mode
+#   string that starts with "full" (case-insensitively) right after
+#   "**Mode:**". The daily-summary corpus also contains many OTHER mode
+#   strings that are equally "real work happened" runs -- "NO-DISPATCH
+#   PASS", "LIGHT COORDINATION", "RECONCILE + HEALTH + PR-EVAL pass", etc. --
+#   and those still fall through to the untouched "nothing to verify" path.
+#   Extending coverage to all such strings was out of scope for this pass;
+#   the issue #2803 dispatch scoped the fix to "FULL-mode" specifically. A
+#   summary using one of those other mode strings and losing its PR would
+#   NOT be caught by this script today.
 #
 # BACKEND SELECTION (mirrors dev/scripts/pr_gate_status.sh)
 #   The GHA orchestrator container has `curl` + `$GH_TOKEN` but no `gh`
@@ -144,6 +198,125 @@ open_pr_count() {
   esac
 }
 
+# --- FULL-mode publication check (issue #2803) -------------------------
+
+# _daily_summary_branch <summary-path>
+# ops/daily-<basename-without-.md> -- MUST match publish_daily_summary.sh's
+# own `_branch_name_for` exactly, since that is the branch the publisher
+# actually creates. Deliberately re-derived here rather than sourced from
+# that script: this script has no dependency on publish_daily_summary.sh
+# today, and adding one just to share one line would trade a one-line
+# duplication for a cross-script coupling that isn't worth it. If the two
+# ever drift, the fixture suite's branch-name assertions will catch it.
+_daily_summary_branch() {
+  _base=$(basename "$1" .md)
+  printf 'ops/daily-%s' "$_base"
+}
+
+# _daily_summary_on_main <summary-path>
+# True (rc 0) iff <summary-path> already exists in the tree at origin/main.
+# Cheap, no network. See the "FULL-MODE PUBLICATION CHECK" header comment
+# for why this is a secondary path, not the primary signal: verify runs
+# BEFORE this workflow's own auto-merge step, so on a healthy run this is
+# normally false even when publishing worked correctly. If `origin/main`
+# doesn't resolve at all (no such ref locally), `git cat-file` fails and
+# this reports false -- the safe direction, since the caller then falls
+# back to the stronger PR-existence check rather than silently assuming
+# "published".
+_daily_summary_on_main() {
+  git cat-file -e "origin/main:$1" 2>/dev/null
+}
+
+_daily_summary_pr_count_gh() {
+  gh pr list --repo "$REPO" --head "$1" --state all --json state,mergedAt \
+    --jq '[.[] | select(.state == "OPEN" or .mergedAt != null)] | length'
+}
+
+_daily_summary_pr_count_curl() {
+  # Same split-the-pipe discipline as _open_pr_count_curl (capture body,
+  # check curl's own exit status, THEN pipe to jq) -- `sh` has no
+  # pipefail, so a bare `curl -f ... | jq ...` would let a failing curl
+  # through as jq's rc=0-on-empty-input, exactly the defect issue #2605
+  # fixed for open_pr_count. `state=all` is required to see merged PRs
+  # (which report as `state: closed`, distinguished from a genuinely
+  # abandoned closed PR only by `merged_at`).
+  _branch="$1"
+  _owner="${REPO%%/*}"
+  _body=$(
+    curl -sS -f \
+      -H "Authorization: Bearer ${GH_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${REPO}/pulls?head=${_owner}:${_branch}&state=all&per_page=100"
+  ) || return 2
+  _count=$(printf '%s' "$_body" | jq '[.[] | select(.state == "open" or .merged_at != null)] | length') || return 2
+  case "$_count" in
+    '' | *[!0-9]*) return 2 ;;
+  esac
+  printf '%s' "$_count"
+}
+
+# daily_summary_pr_count <branch>
+# Count of PRs for <branch> that are either currently open or have merged.
+# A count of 0 means neither -- either no PR was ever opened for this
+# branch, or one was opened and later closed without merging. Both are the
+# "not published" shape this check exists to catch.
+daily_summary_pr_count() {
+  _branch="$1"
+  _backend=$(_detect_backend) || {
+    echo "orchestrator_fastexit_gate: neither \`gh\` nor (\`curl\` + \$GH_TOKEN)" >&2
+    echo "is available -- refusing to report a daily-summary PR count (a silent 0" >&2
+    echo "here would be indistinguishable from a real missing/unmerged PR)." >&2
+    return 2
+  }
+  case "$_backend" in
+    gh) _daily_summary_pr_count_gh "$_branch" ;;
+    curl) _daily_summary_pr_count_curl "$_branch" ;;
+    *)
+      echo "orchestrator_fastexit_gate: unrecognised backend '$_backend'" \
+        "(from \$ORCHESTRATOR_FASTEXIT_GATE_BACKEND) -- refusing to report" \
+        "a daily-summary PR count rather than silently returning nothing." >&2
+      return 2
+      ;;
+  esac
+}
+
+# _verify_full_mode_published <summary-path>
+# The FULL-mode half of `verify` -- see the "FULL-MODE PUBLICATION CHECK"
+# header comment for the predicate and its rationale. Split out of
+# `verify` itself (rather than inlined) so the mode-dispatch in `verify`
+# reads as a flat if/elif/else over the three cases.
+_verify_full_mode_published() {
+  _summary="$1"
+
+  if _daily_summary_on_main "$_summary"; then
+    echo "orchestrator_fastexit_gate verify: $_summary is already present on origin/main; published."
+    return 0
+  fi
+
+  _branch=$(_daily_summary_branch "$_summary")
+  _pr_count=$(daily_summary_pr_count "$_branch") || {
+    echo "::error::orchestrator_fastexit_gate verify: $_summary declares FULL mode but the PR status for branch $_branch could not be determined -- refusing to validate a full-mode run blind." >&2
+    return 2
+  }
+  # Same belt-and-braces as the NO-OP path's numeric guard (see its comment
+  # for why this must be checked explicitly rather than trusted to `[ -eq
+  # 0 ]` alone under `set -e`).
+  case "$_pr_count" in
+    '' | *[!0-9]*)
+      echo "::error::orchestrator_fastexit_gate verify: $_summary declares FULL mode but daily_summary_pr_count returned a non-numeric value ('$_pr_count') for branch $_branch -- refusing to validate a full-mode run blind." >&2
+      return 2
+      ;;
+  esac
+
+  if [ "$_pr_count" -eq 0 ]; then
+    echo "::error::A-FASTEXIT-VACUOUS (issue #2803): $_summary declares FULL mode but no open-or-merged PR exists for branch $_branch, and the summary is not present on origin/main. The daily summary was NOT published -- see H-DAILY-SUMMARY-PR-LOST / issue #2803 for the failure class this catches (a green, costly run whose only durable artifact silently never left the runner)." >&2
+    return 1
+  fi
+
+  echo "orchestrator_fastexit_gate verify: FULL-mode run OK (branch $_branch has an open-or-merged PR; count: $_pr_count)."
+  return 0
+}
+
 # --- dev/status/ drift (Condition 2, mirrored from lead-orchestrator.md) ----
 
 # _prior_summary_path <current-summary-path>
@@ -231,8 +404,16 @@ verify() {
     return 2
   fi
 
+  # NO-OP and FULL are mutually exclusive prefixes of the same "**Mode:**"
+  # line, so these two checks can never both fire for one summary.
+  if grep -qiE '^\*\*Mode:\*\* *full' "$_summary"; then
+    _full_rc=0
+    _verify_full_mode_published "$_summary" || _full_rc=$?
+    return "$_full_rc"
+  fi
+
   if ! grep -qE '^\*\*Mode:\*\* NO-OP' "$_summary"; then
-    echo "orchestrator_fastexit_gate verify: $_summary is not a NO-OP-mode run; nothing to verify."
+    echo "orchestrator_fastexit_gate verify: $_summary is not a NO-OP-mode or FULL-mode run; nothing to verify."
     return 0
   fi
 
