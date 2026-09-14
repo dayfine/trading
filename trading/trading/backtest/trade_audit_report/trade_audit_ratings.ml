@@ -183,7 +183,8 @@ let rule_description = function
       "No entry within 5d of a 10% drop in last 30d (Ch.4 \xe2\x80\x94 \
        plunge-buy avoidance)"
   | R7_exit_on_stage_3_to_4 ->
-      "Exit on Stage3 \xe2\x86\x92 Stage4 transition (Ch.6)"
+      "Exit on Stage3 \xe2\x86\x92 Stage4 transition, and never reach \
+       force-liquidation (Ch.6)"
   | R8_macro_alignment ->
       "Macro alignment: Bullish for longs, Bearish for shorts (Ch.3, Ch.8)"
 
@@ -296,22 +297,58 @@ let _eval_r6 ~config ~closes (e : TA.entry_decision) =
   if not (_is_long e) then Not_applicable
   else _recent_plunge_verdict ~config ~entry_date:e.entry_date closes
 
-(** R7 requires comparing entry-stage to exit-stage. A trade entered in Stage 2
-    and exited in Stage 4 without an explicit exit_trigger of Stop_loss /
-    Signal_reversal indicates the strategy held through a Stage3 \xe2\x86\x92
-    Stage4 transition without exiting on signal. *)
-let _eval_r7 (e : TA.entry_decision) (x : TA.exit_decision option) =
+(* The [exit_trigger] label the drawdown breaker stamps on every
+   force-liquidation exit — [Weinstein_strategy.Force_liquidation_runner
+   .exit_label], carried on the transition's [StrategySignal] and mapped to
+   [Stop_log.Strategy_signal] by [exit_trigger_of_reason]. Spelled literally
+   rather than taken as a library dependency, for the same reason
+   [Validator_types._default_fallback_exit_labels] spells it: this analysis
+   layer sits below the strategy layer that owns the token. *)
+let _force_liquidation_exit_label = "force_liquidation"
+
+(* Whether an exit trigger is a drawdown-breaker (force-liquidation) exit. *)
+let _is_force_liquidation (trigger : Backtest.Stop_log.exit_trigger) =
+  match trigger with
+  | Strategy_signal { label; _ } ->
+      String.equal label _force_liquidation_exit_label
+  | _ -> false
+
+(* R7's verdict from an exit trigger plus the entry/exit stage shape. Two
+   distinct failure modes, checked in this order:
+
+   1. Force-liquidation — the drawdown breaker is the safety net, not a
+      strategy signal, so its firing is by construction evidence the
+      protective stop never removed the position. Unconditional [Fail]:
+      unlike the held-through shape below it needs no stage comparison, so it
+      also catches the breaker firing on a short, or while the classifier
+      still reads Stage 2/3 (the case where the stop most clearly failed).
+   2. Held through Stage3 -> Stage4 — a long entered in Stage 2/3 and exited
+      in Stage 4 on anything other than [Stop_loss] / [Signal_reversal] rode
+      the transition down instead of exiting on signal. *)
+let _r7_of_trigger ~entered_long ~entered_stage_2_or_3 ~exited_in_stage_4
+    (trigger : Backtest.Stop_log.exit_trigger) =
+  if _is_force_liquidation trigger then Fail
+  else if entered_long && entered_stage_2_or_3 && exited_in_stage_4 then
+    match trigger with Stop_loss _ | Signal_reversal _ -> Pass | _ -> Fail
+  else Pass
+
+(** R7 reads the enriched [exit_] when the record has one. When it does not, the
+    reason-only [external_exit] can still answer failure mode 1 — it carries an
+    [exit_trigger] but no [stage_at_exit], and mode 1 needs none. Every other
+    trigger on that path stays {!Not_applicable}, as does a still-open position.
+*)
+let _eval_r7 (e : TA.entry_decision) (x : TA.exit_decision option)
+    (ext : TA.external_exit_decision option) =
   match x with
-  | None -> Not_applicable
   | Some exit_d ->
-      let entered_long = _is_long e in
-      let exited_in_stage_4 = _is_stage4 exit_d.stage_at_exit in
-      let entered_stage_2_or_3 = _is_stage2 e.stage || _is_stage3 e.stage in
-      if entered_long && entered_stage_2_or_3 && exited_in_stage_4 then
-        match exit_d.exit_trigger with
-        | Stop_loss _ | Signal_reversal _ -> Pass
-        | _ -> Fail
-      else Pass
+      _r7_of_trigger ~entered_long:(_is_long e)
+        ~entered_stage_2_or_3:(_is_stage2 e.stage || _is_stage3 e.stage)
+        ~exited_in_stage_4:(_is_stage4 exit_d.stage_at_exit)
+        exit_d.exit_trigger
+  | None -> (
+      match ext with
+      | Some ext_d when _is_force_liquidation ext_d.exit_trigger -> Fail
+      | Some _ | None -> Not_applicable)
 
 let _eval_r8 (e : TA.entry_decision) =
   match (e.side, e.macro_trend) with
@@ -343,7 +380,10 @@ let evaluate_rules ?(pre_entry_closes = _no_closes) ~config
       rule = R6_no_recent_plunge;
       outcome = _eval_r6 ~config ~closes:pre_entry_closes e;
     };
-    { rule = R7_exit_on_stage_3_to_4; outcome = _eval_r7 e x };
+    {
+      rule = R7_exit_on_stage_3_to_4;
+      outcome = _eval_r7 e x record.external_exit;
+    };
     { rule = R8_macro_alignment; outcome = _eval_r8 e };
   ]
 

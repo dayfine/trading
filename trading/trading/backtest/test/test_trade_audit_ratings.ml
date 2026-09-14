@@ -93,8 +93,31 @@ let make_exit ?(symbol = "AAPL") ?(exit_date = _date "2024-04-20")
     weeks_stage_left_2;
   }
 
-let make_record ?(exit_ = Some (make_exit ())) entry : TA.audit_record =
-  { entry; exit_; external_exit = None; execution = None }
+let make_record ?(exit_ = Some (make_exit ())) ?(external_exit = None) entry :
+    TA.audit_record =
+  { entry; exit_; external_exit; execution = None }
+
+(* A reason-only exit record, the shape [Trade_audit.record_transitions] writes
+   when no enriched [exit_] was captured. Carries no [stage_at_exit]. *)
+let make_external_exit
+    ?(exit_trigger =
+      Backtest.Stop_log.Strategy_signal { label = "margin_call"; detail = None })
+    () : TA.external_exit_decision =
+  {
+    symbol = "AAPL";
+    exit_date = _date "2024-04-20";
+    position_id = "AAPL-1";
+    exit_trigger;
+  }
+
+(* The exact token [Weinstein_strategy.Force_liquidation_runner.exit_label]
+   stamps on a breaker exit, spelled literally here rather than read off the
+   production constant: a test that derives its input from the value under
+   test agrees with that value whatever it says (the omission mode #2800's
+   rework found in the V16 default-label test). *)
+let force_liquidation_trigger ?(detail = Some "per_position loss_pct=60.00") ()
+    =
+  Backtest.Stop_log.Strategy_signal { label = "force_liquidation"; detail }
 
 let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     ?(entry_date = _date "2024-01-15") ?(exit_date = _date "2024-04-20")
@@ -477,6 +500,120 @@ let test_r7_na_when_position_open _ =
   assert_that
     (outcome_of_rule_id evals TR.R7_exit_on_stage_3_to_4)
     (equal_to TR.Not_applicable)
+
+(* -- R7 force-liquidation (#2800 follow-up) ------------------------------ *)
+
+(* Evaluate R7 for a long entered in Stage 2 that exits on [trigger] in
+   [stage_at_exit]. *)
+let _r7_of_exit ?(side = Trading_base.Types.Long) ~stage_at_exit ~exit_trigger
+    () =
+  let evals =
+    TR.evaluate_rules ~config:cfg
+      (make_record
+         ~exit_:(Some (make_exit ~stage_at_exit ~exit_trigger ()))
+         (make_entry ~side ()))
+  in
+  outcome_of_rule_id evals TR.R7_exit_on_stage_3_to_4
+
+(* The shape #2800 changed: before it, a breaker exit was stamped
+   [Position.StopLoss] and R7 read it as a clean stop-out ([Pass]). *)
+let test_r7_fail_force_liquidation_in_stage_4 _ =
+  assert_that
+    (_r7_of_exit
+       ~stage_at_exit:(WT.Stage4 { weeks_declining = 6 })
+       ~exit_trigger:(force_liquidation_trigger ())
+       ())
+    (equal_to TR.Fail)
+
+(* The stage-independent half of the rule: the breaker firing while the
+   classifier still reads Stage 2 is the case where the protective stop most
+   clearly failed, and the pre-existing held-through-Stage-4 shape alone would
+   have rated it [Pass]. *)
+let test_r7_fail_force_liquidation_still_in_stage_2 _ =
+  assert_that
+    (_r7_of_exit
+       ~stage_at_exit:(WT.Stage2 { weeks_advancing = 12; late = false })
+       ~exit_trigger:(force_liquidation_trigger ())
+       ())
+    (equal_to TR.Fail)
+
+(* Side-independent too: the held-through shape is long-only, so a short's
+   breaker exit would otherwise rate [Pass]. *)
+let test_r7_fail_force_liquidation_on_short _ =
+  assert_that
+    (_r7_of_exit ~side:Trading_base.Types.Short
+       ~stage_at_exit:(WT.Stage1 { weeks_in_base = 3 })
+       ~exit_trigger:
+         (force_liquidation_trigger
+            ~detail:(Some "portfolio_floor loss_pct=80.00") ())
+       ())
+    (equal_to TR.Fail)
+
+(* Blast-radius guard: only the breaker's own label fails stage-independently.
+   Another [Strategy_signal] exit in a healthy stage keeps the prior verdict. *)
+let test_r7_pass_other_strategy_signal_outside_stage_4 _ =
+  assert_that
+    (_r7_of_exit
+       ~stage_at_exit:(WT.Stage2 { weeks_advancing = 12; late = false })
+       ~exit_trigger:
+         (Backtest.Stop_log.Strategy_signal
+            { label = "laggard_rotation"; detail = None })
+       ())
+    (equal_to TR.Pass)
+
+(* The reason-only channel: [external_exit] carries an [exit_trigger] but no
+   [stage_at_exit], which is why R7 was left [Not_applicable] there in #2196.
+   The force-liquidation shape needs no stage, so it is now answerable. *)
+let test_r7_fail_force_liquidation_via_external_exit _ =
+  let evals =
+    TR.evaluate_rules ~config:cfg
+      (make_record ~exit_:None
+         ~external_exit:
+           (Some
+              (make_external_exit
+                 ~exit_trigger:(force_liquidation_trigger ())
+                 ()))
+         (make_entry ()))
+  in
+  assert_that
+    (outcome_of_rule_id evals TR.R7_exit_on_stage_3_to_4)
+    (equal_to TR.Fail)
+
+(* ...and every other external label stays N/A, exactly as before — the
+   external-exit fallback is scoped to the breaker, not opened generally. *)
+let test_r7_na_for_other_external_exit_label _ =
+  let evals =
+    TR.evaluate_rules ~config:cfg
+      (make_record ~exit_:None
+         ~external_exit:(Some (make_external_exit ()))
+         (make_entry ()))
+  in
+  assert_that
+    (outcome_of_rule_id evals TR.R7_exit_on_stage_3_to_4)
+    (equal_to TR.Not_applicable)
+
+(* Enriched wins: a record carrying both channels is rated off [exit_], so the
+   external fallback cannot mask a real stop-out. *)
+let test_r7_enriched_exit_wins_over_external_force_liquidation _ =
+  let evals =
+    TR.evaluate_rules ~config:cfg
+      (make_record
+         ~exit_:
+           (Some
+              (make_exit
+                 ~stage_at_exit:
+                   (WT.Stage2 { weeks_advancing = 9; late = false })
+                 ()))
+         ~external_exit:
+           (Some
+              (make_external_exit
+                 ~exit_trigger:(force_liquidation_trigger ())
+                 ()))
+         (make_entry ()))
+  in
+  assert_that
+    (outcome_of_rule_id evals TR.R7_exit_on_stage_3_to_4)
+    (equal_to TR.Pass)
 
 (* -- R8 macro alignment -------------------------------------------------- *)
 
@@ -952,6 +1089,20 @@ let suite =
          "R7 fail held through stage 4 via time"
          >:: test_r7_fail_held_through_stage_4_via_time;
          "R7 NA when position open" >:: test_r7_na_when_position_open;
+         "R7 fail force liquidation in stage 4"
+         >:: test_r7_fail_force_liquidation_in_stage_4;
+         "R7 fail force liquidation still in stage 2"
+         >:: test_r7_fail_force_liquidation_still_in_stage_2;
+         "R7 fail force liquidation on short"
+         >:: test_r7_fail_force_liquidation_on_short;
+         "R7 pass other strategy signal outside stage 4"
+         >:: test_r7_pass_other_strategy_signal_outside_stage_4;
+         "R7 fail force liquidation via external exit"
+         >:: test_r7_fail_force_liquidation_via_external_exit;
+         "R7 NA for other external exit label"
+         >:: test_r7_na_for_other_external_exit_label;
+         "R7 enriched exit wins over external force liquidation"
+         >:: test_r7_enriched_exit_wins_over_external_force_liquidation;
          "R8 pass long macro bullish" >:: test_r8_pass_long_macro_bullish;
          "R8 fail long macro bearish" >:: test_r8_fail_long_macro_bearish;
          "R8 marginal long macro neutral"

@@ -1,6 +1,6 @@
 # Status: trade-audit
 
-## Last updated: 2026-08-17
+## Last updated: 2026-09-14
 
 ## Status
 READY_FOR_REVIEW
@@ -405,6 +405,61 @@ from `weinstein_strategy.ml`'s stops pass) only ever sees exits
       unchanged: R7 needs `stage_at_exit` (unavailable by design →
       `Not_applicable`), MFE/MAE cannot be fed by a reason-only
       record.
+
+      **Partly superseded 2026-09-14 (R7 force-liquidation pin, below):**
+      the "R7 needs `stage_at_exit`" claim holds for R7's
+      held-through-Stage3→Stage4 shape but not for its
+      force-liquidation shape, which needs no stage and is therefore
+      answerable from a reason-only `external_exit`. MFE/MAE remain
+      unreachable from that record.
+
+## R7 force-liquidation pin (2026-09-14, #2800 follow-up)
+
+- [x] **A force-liquidation exit rates `R7 = Fail`, stage- and
+      side-independently, on both audit channels.** Built in
+      `trading/trading/backtest/trade_audit_report/trade_audit_ratings.ml`
+      (`_is_force_liquidation` / `_r7_of_trigger` / `_eval_r7`), tests in
+      `trading/trading/backtest/test/test_trade_audit_ratings.ml` (+7).
+      Verify: `dune runtest trading/backtest/test`.
+
+      **Premise check (the item as dispatched assumed R7 was still
+      `Not_applicable` for breaker exits — it was not).** PR #2800
+      changed the breaker's `exit_reason` from `Position.StopLoss` to
+      `StrategySignal { label = "force_liquidation" }`. Breaker exits
+      route through `Exit_audit_capture` (`Special_exits.run` calls
+      `emit_audit force_exit_ts`), so they land on the *enriched*
+      `exit_` with a real `stage_at_exit` — never on `external_exit`.
+      `_eval_r7`'s `Stop_loss _ | Signal_reversal _ -> Pass | _ ->
+      Fail` therefore already flipped breaker exits from `Pass` to
+      `Fail` the moment #2800 merged. So the pin was *reachable*, and
+      two gaps remained:
+
+      1. **Unpinned.** The flip is claimed in #2800's own
+         "Downstream consumers of `StopLoss`" table but no test
+         exercised a `Strategy_signal` trigger against R7 — the three
+         existing R7 cases cover `Stop_loss`, `Time_expired` and
+         `exit_ = None`. A later "tidy-up" adding `Strategy_signal` to
+         the Pass arm would have silently reverted it. Same shape as
+         the findings in `dev/reviews/force-liquidation-pr695-behavioral.md`.
+      2. **Only failed in one shape.** The `Fail` was contingent on
+         `long ∧ entry-stage ∈ {2,3} ∧ exit-stage = Stage4`. A breaker
+         firing on a short, or while the classifier still read Stage
+         2/3, returned `Pass` — and a long that lost ≥25% of entry
+         value while still classified Stage 2 is the case where the
+         protective stop most clearly failed.
+
+      Fix: the force-liquidation shape is now checked first and
+      unconditionally, on the authority of `force_liquidation_log.mli`
+      ("each event is evidence the strategy's primary stop machinery
+      failed to protect the trade") — the breaker is the safety net,
+      not a strategy signal. Because it needs no `stage_at_exit`, R7
+      also answers it from a reason-only `external_exit`, so the
+      verdict no longer depends on which audit channel captured the
+      exit. Every other external label stays `Not_applicable`, and
+      every other trigger keeps its prior verdict.
+
+      No golden moved: ratings feed the `trade_audit_report` artefact
+      only, never `actual.sexp`.
 
 ## Report-side defect fixes (2026-07-13)
 
