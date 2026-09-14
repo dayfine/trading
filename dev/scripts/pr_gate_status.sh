@@ -720,7 +720,14 @@ _codex_action() {
   fi
   if [ -n "$_required" ] && [ "$_codex" != ok ] && [ "$_codex" != skip ]; then
     case "$_action" in
-      MERGE*) _action="HOLD -- review/codex-required (codex=$_codex): dispatch codex review, or swap to review/codex-timeout after 3h" ;;
+      MERGE*)
+        # A RETURNED rework is findings, not a missing verdict: the 3h timeout
+        # applies only when Codex has not answered at this tip (advisory Codex
+        # review 5194186949 of #2798).
+        case "$_codex" in
+          rework) _action="HOLD -- review/codex-required (codex=rework): address the advisory findings, or a human removes the label" ;;
+          *)      _action="HOLD -- review/codex-required (codex=$_codex): dispatch codex review, or swap to review/codex-timeout after 3h" ;;
+        esac ;;
     esac
   elif [ -n "$_requested" ]; then
     case "$_codex" in

@@ -1534,6 +1534,11 @@ check "codex action: requested + none appends the hint" "MERGE [+ codex review (
 check "codex action: requested + rework appends findings note" "MERGE [codex: findings, advisory]" "$(_codex_action MERGE rework "" 0)"
 check "codex action: requested + ok is silent" "MERGE" "$(_codex_action MERGE ok "" 0)"
 check "codex action: docs-only skip is silent under requested" "MERGE (docs-only)" "$(_codex_action "MERGE (docs-only)" skip "" 0)"
+check "codex action: required + rework holds WITHOUT timeout advice" \
+  "HOLD -- review/codex-required (codex=rework): address the advisory findings, or a human removes the label" \
+  "$(_codex_action MERGE rework 0 "")"
+check "codex action: required + unclear holds with timeout advice (no verdict at tip)" 1 \
+  "$(_codex_action MERGE unclear 0 "" | grep -c 'swap to review/codex-timeout after 3h')"
 check "codex action: CODEX_REVIEW=off neutralises required" "MERGE" "$(CODEX_REVIEW=off _codex_action MERGE none 0 "")"
 check "codex action: CODEX_REVIEW=off neutralises requested" "MERGE" "$(CODEX_REVIEW=off _codex_action MERGE none "" 0)"
 

@@ -180,8 +180,14 @@ if is_docs_only "$FILES"; then
   exit 0
 fi
 
-REPORT="$REPORT_DIR/codex-review-pr-$PR-$SHA.md"
-PROMPT="$REPORT_DIR/codex-review-pr-$PR-prompt.txt"
+# One directory per invocation (PID-suffixed): concurrent runs on the same PR
+# must not overwrite each other's prompt or validated report before it is
+# posted (advisory Codex review 5194186949 of #2798). The report path is
+# printed on success and failure so it can always be retrieved.
+RUN_DIR="$REPORT_DIR/codex-review-pr-$PR-$$"
+mkdir -p "$RUN_DIR"
+REPORT="$RUN_DIR/report-$SHA.md"
+PROMPT="$RUN_DIR/prompt.txt"
 build_prompt "$PR" "$SHA" "$TITLE" "$REPO" > "$PROMPT"
 if [ "$DRY" = 1 ]; then
   echo "codex_review: dry run -- prompt for PR #$PR at $SHA:"; echo; cat "$PROMPT"; exit 0
