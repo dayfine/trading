@@ -87,14 +87,24 @@ retires the value on this base; the knob stays an axis (it already is one).
   — the salt-0 Recovering gain (+$122k) does not survive a salt: it was one draw, not a property; Neutral +$757k → +$1.26M,
   Bullish +$1.78M → +$1.04M, Deteriorating −$272k → −$231k, Bearish-week fills +$222k → −$71k (negative at both salts).
 
-## Verdict (2026-09-14, 00:15 PT; c1 salt 2 still running for the band, c2 stopped after salt 0)
+- 02:29 PT 09-14: **c1-conc25, salt 2** (wall 8,227 s; `results/c1-conc25-s2-v10-*`; lane G1 DONE) vs `a0-breadth-on-null-s2-v10`.
+  V16/V17 PASS, V6 = 0, `validator_diff -check V6` exit 0. Level 639.74 → 184.29, trades 728 → 505, Sharpe 0.526 → 0.318,
+  **realised $2.70M → $1.74M (−$963k)**, **Calmar 0.183 → 0.094**, maxDD 43.0 → 42.7 (flat; the null's is its $3.84M
+  open-MTM cell — arm episode 2021-11-08 → 2025-12-18), unrealised $3.84M → $252k. **Fails both — 3 of 3 salts.** Join: 262
+  shared +$546k → +$1.04M (drift +$491k); null-only 466 +$2.16M (KLIC 2020-11-09 +$302k, WNC 2003, IPIXQ 2004, CMA-WS
+  2016, CHRW 2025) vs arm-only 243 +$704k. 2020 realised flat at this salt (+$926k → +$951k). Cohorts: Recovering n=19
+  +$508k → n=14 +$630k (+$122k / −$402k / +$122k across salts: a draw); **Bearish-week fills +$187k → −$223k — negative
+  on the arm at all three salts (−$381k / −$71k / −$223k) while positive on the null at all three: the one salt-robust cost
+  of concentration is a bigger resting ticket filling into a Bearish tape.**
+
+## Verdict (2026-09-14; written 00:15 PT at two salts, confirmed 02:29 PT at three; c2 stopped after salt 0)
 
 **Neither arm clears. The "deploy more in recoveries" hypothesis has no lever on this base.**
 
 | arm | salt 0 | salt 1 | status |
 |---|---|---|---|
 | c2-deploy85 (exposure 0.85, cash floor 0.15) | bit-identical to the null | not run | **INERT** — neither knob binds at 0.14 per position |
-| c1-conc25 (per-position 0.25) | realised −$421k, Calmar 0.163 → 0.159, maxDD 37.6 → 34.6 | realised −$892k, Calmar 0.168 → 0.092, maxDD 32.8 → 46.7 | **fails both criteria at 2 of 2 salts** |
+| c1-conc25 (per-position 0.25) | realised −$421k, Calmar 0.163 → 0.159, maxDD 37.6 → 34.6 | realised −$892k, Calmar 0.168 → 0.092, maxDD 32.8 → 46.7; **salt 2**: realised −$963k, Calmar 0.183 → 0.094, maxDD flat | **fails both criteria at 3 of 3 salts** |
 
 **Why (transferable).** The shared-trade term is positive at both salts (+$574k, +$311k: the same trades earn more at the
 wider cap), but concentration cuts the trade count by a third (710 → 474, 707 → 504) and the concurrent-name count (4–6
