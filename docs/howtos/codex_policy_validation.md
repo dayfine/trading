@@ -29,6 +29,62 @@ Argument tokens match exactly: `sh dev/scripts/` would not match a script
 within that directory. No directory-wide cleanup or temporary-script allows
 are installed.
 
+## Permission audit: September 15, 2026
+
+The scheduled issue cycle exposed both missing rules and command-shape mismatches.
+The audit evaluated command arguments with the project and user rule files;
+it did not execute the target commands or prove which rules an already-running
+session had loaded. The project was configured as trusted.
+
+| Operation | Finding | Disposition |
+| --- | --- | --- |
+| `gh issue edit` | Allowed only by a saved personal approval | Now included in the project rule, because AGENTS.md requires blocked-issue label transitions. This permits all issue edits, not only label changes. |
+| `git switch`, `gh run list`, `docker exec trading-1-dev` | Already allowed | No broader rules needed. Prefer direct commands with literal arguments. |
+| `git worktree remove` | Explicit `prompt` | Still requires target review. Repeating a saved allow cannot override this prompt rule. |
+| `git -C <repo> worktree remove ...` | Different argument prefix; generic removal rule does not match | Do not use argument reordering to evade policy. Normalize invocation when comparing decisions. |
+| `crontab -l` | Personal read approval | Does not authorize modification. |
+| `crontab -` | No matching allow | Approving the preceding `sed` filter in a pipeline does not authorize the crontab write. |
+| `gh pr review --comment` | Explicit `prompt` | Retain review controls; a broader review allow would also permit approval reviews. |
+| `git push origin main` | Matches broad push allow | Separate tightening tracked by issue #2793; this change does not claim to restrict push destinations. |
+
+The official rule semantics are `forbidden` > `prompt` > `allow`, not
+"most specific rule wins". Rules load at startup; restart after a policy update.
+An allow permits execution outside the sandbox without a prompt. A rule change
+does not alter the authorization scope of the task or other managed controls.
+
+Complex shell substitutions, redirections, and control flow can cause an entire
+shell invocation to be evaluated instead of its constituent command prefixes.
+Compute timestamps separately and pass PR/comment text through body files.
+Do not solve a wrapper mismatch by broadly allowing `sh`, `zsh`, or `python`.
+
+### Remaining cleanup and scheduler work
+
+These require reviewed implementations before adding command allows:
+
+- Owned-worktree cleanup: validate a registered worktree beneath the expected
+  repository, session ownership, clean status, and published commits; reject
+  the primary checkout, other agents' worktrees, and an active scheduler tree.
+  Test rejection cases as well as successful cleanup. Do not blanket-allow
+  worktree removal or treat a directory prefix as a glob.
+- Scheduler management: permit only the session's tagged entry, preserve other
+  jobs, handle failed reads without installing an empty crontab, and use finished
+  state to make leftover ticks harmless. Do not blanket-allow `crontab -`, which
+  can replace every job.
+
+An allow for a helper script grants execution of that script's current contents;
+its path is not a content-integrity guarantee. Helper code and its policy must be
+reviewed together. No cleanup helper, scheduler allow, user-wide settings change,
+or promise of zero prompts is included in this policy update.
+
+To reproduce the rule check without performing an issue edit:
+
+```bash
+codex execpolicy check --rules .codex/rules/trading.rules -- gh issue edit 2394 --repo dayfine/trading --remove-label ready-for-agent --add-label needs-info
+```
+
+Expected decision: `allow`. The inline negative examples ensure the issue-edit
+rule does not match `gh issue delete` or `gh issue transfer`.
+
 ## Startup enforcement smoke test
 
 Use an isolated, trusted checkout. Record the checksum of user rule files
