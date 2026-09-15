@@ -43,11 +43,21 @@ spanning two axes:
     isn't already present. A grid that never sees a bear-dominated regime can
     only certify a bull-regime artifact.
 - **Universe diversity — BROAD vs BROAD only.** The canonical universe **plus ≥1
-  different broad universe**: a different PIT composition vintage
-  (`top-3000-2019` vs `top-3000-2000`), or a different breadth tier (top-1000 vs
-  top-3000). A survivor-biased composition golden is fine here because the bias
-  hits baseline and candidate equally — the *relative* comparison still holds
-  (see `project_composition_golden_survivor_bias`).
+  different broad universe** of the **same construction**. Since the PIT
+  migration (`dev/plans/pit-universe-migration-2026-09-14.md`, #2816) the
+  canonical universe is a dated `universe_schedule` of yearly top-N lists, not
+  a single vintage, so the diversity axis is the **breadth tier**: a top-1000
+  schedule vs the top-3000 schedule, built from the same yearly lists with the
+  same D1/D2 dating. A *vintage* is no longer an axis — every schedule already
+  spans all vintages, and a single frozen vintage (`top-3000-2000.sexp`) is a
+  different, survivor-tilted construction whose levels are not comparable to a
+  scheduled cell (`project_warehouse_vintage_coverage`: −12 to −23pp
+  deterministic displacement between constructions). Period diversity is
+  likewise disjoint sub-windows **of the same schedule**, never a window on one
+  construction compared with a window on another. A survivor-biased
+  composition golden is still fine as a *tripwire* because the bias hits
+  baseline and candidate equally — the *relative* comparison holds
+  (see `project_composition_golden_survivor_bias`) — but it is not a grid cell.
 
   ⚠ **An earlier version of this clause offered "SP500-510 vs top-3000" as the
   example. That is superseded by `.claude/rules/universe-discipline.md`**
