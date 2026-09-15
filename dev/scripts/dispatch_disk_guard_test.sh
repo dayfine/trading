@@ -107,6 +107,22 @@ _assert_contains "default-closed" "malformed-df-reading"
 _run_guard 3 ""
 _assert_exit 1 "empty-df-reading"
 _assert_contains "REFUSE:" "empty-df-reading"
+_assert_contains "default-closed" "empty-df-reading"
+
+# ---- Scenario 5b: well-formed df line with a NON-NUMERIC Available field --
+# must REFUSE via the default-closed path, not crash ----
+# Distinct from scenario 4 (single-line garbage, no second line at all) and
+# scenario 5 (empty injection): this is a properly-shaped two-line df -Pk
+# fixture (header + one data line, five fields) where field 4 itself is not
+# a number. Without this scenario the `*[!0-9]*` arm of the case statement
+# guarding FREE_KB is never exercised -- both scenarios 4 and 5 reach the
+# empty-string `''` arm instead (awk prints nothing when there's no second
+# line to match NR==2), so deleting the `*[!0-9]*` arm survives undetected.
+
+_run_guard 3 "$(printf 'Filesystem     1024-blocks      Used Available Capacity Mounted on\noverlay          153617296  13000000 notanumber 50%% /\n')"
+_assert_exit 1 "non-numeric-available-field"
+_assert_contains "REFUSE:" "non-numeric-available-field"
+_assert_contains "default-closed" "non-numeric-available-field"
 
 # ---- Scenario 6: missing agent-count argument -- must REFUSE ----
 
@@ -136,4 +152,38 @@ ACTUAL_OUTPUT="$(DISPATCH_DISK_GUARD_FLOOR_GB=1 DISPATCH_DISK_GUARD_DF_TEXT="$(_
 _assert_exit 0 "floor-override-pass"
 _assert_contains "required-floor=1GB" "floor-override-pass"
 
-echo "OK: dispatch_disk_guard_test -- all 9 scenarios passed (pass/refuse/boundary x2/malformed/empty/missing-arg/bad-arg/zero-agent-floor/floor-override)."
+# ---- Scenario 10: the floor actually SCALES with <agent-count> -- same free
+# space (50GB), 1 agent PASSES and 3 agents REFUSES ----
+# Every other non-override scenario above fixes the agent count at 3, so none
+# of them can tell apart "the formula multiplies by agent-count" from "the
+# formula is a constant that happens to equal 68 when count=3" -- a rewrite
+# that hardcodes REQUIRED_GB=$((3 * PER_AGENT_WORKTREE_GB + SAFETY_MARGIN_GB))
+# (ignoring $1 entirely) stays green against every scenario above. This pair
+# pins agent-count as a real multiplicand: at 50GB free, 1 agent's floor (36)
+# passes and 3 agents' floor (68) refuses -- the same free-space reading,
+# different verdicts, only explained by AGENT_COUNT actually scaling the sum.
+
+_run_guard 1 "$(_df_text $((50 * KB_PER_GB)))"
+_assert_exit 0 "one-agent-50gb-passes"
+_assert_contains "OK:" "one-agent-50gb-passes"
+
+_run_guard 3 "$(_df_text $((50 * KB_PER_GB)))"
+_assert_exit 1 "three-agents-50gb-refuses"
+_assert_contains "REFUSE:" "three-agents-50gb-refuses"
+
+# ---- Scenario 11: an invalid DISPATCH_DISK_GUARD_FLOOR_GB override value --
+# must REFUSE rather than silently ignore the override and fall back to the
+# agent-count formula ----
+
+ACTUAL_OUTPUT="$(DISPATCH_DISK_GUARD_FLOOR_GB=abc DISPATCH_DISK_GUARD_DF_TEXT="$(_df_text $((100 * KB_PER_GB)))" sh "$GUARD" 3 . 2>&1)" && ACTUAL_EXIT=0 || ACTUAL_EXIT=$?
+_assert_exit 1 "invalid-floor-override"
+_assert_contains "REFUSE:" "invalid-floor-override"
+
+# ---- Scenario 12: the optional [target-path] argument is threaded through
+# into the printed decision line, not silently dropped ----
+
+ACTUAL_OUTPUT="$(DISPATCH_DISK_GUARD_DF_TEXT="$(_df_text $((100 * KB_PER_GB)))" sh "$GUARD" 3 /custom/target/path 2>&1)" && ACTUAL_EXIT=0 || ACTUAL_EXIT=$?
+_assert_exit 0 "custom-target-path"
+_assert_contains "target='/custom/target/path'" "custom-target-path"
+
+echo "OK: dispatch_disk_guard_test -- all 15 scenarios passed (pass/refuse/boundary x2/malformed/empty/non-numeric-field/missing-arg/bad-arg/zero-agent-floor/floor-override/agent-count-scaling x2/invalid-floor-override/target-path)."

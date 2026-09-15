@@ -2341,13 +2341,36 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   SAFETY_MARGIN_GB(20)`, both named constants citing this entry's
   measurement; exits 0 and prints the numbers either way. Fail-closed
   end to end: missing/non-numeric agent count, and a missing or malformed
-  `df` reading, all refuse rather than silently passing — verified with 7
-  mutations (comparison-operator flip, per-agent constant dropped, floor
-  constant changed by 20 and by 1, malformed-df-falls-through-to-pass,
-  exit-codes-inverted, per-agent constant loosened by 1 GB); every mutation
-  reddened in isolation via the fixture-driven `dev/scripts/
-  dispatch_disk_guard_test.sh` (9 scenarios, no live-disk dependency) and the
-  guard reverted byte-identical afterward. Wired into `dune runtest` via
+  `df` reading, all refuse rather than silently passing.
+  **2026-09-15 qc-behavioral rework (iteration 1):** the initial "7
+  mutations, 0 survivors" claim understated the surface — a behavioral
+  review found and verified **4 independent survivors** the original 9
+  scenarios missed: (1) the empty-`df`-reading scenario asserted only
+  `exit 1` + `REFUSE:`, so it passed via a live `df` call for the wrong
+  reason once the `${VAR+set}` seam fix was reverted, rather than pinning
+  the seam itself; (2) no scenario varied `<agent-count>` while holding
+  free space fixed, so mutants that hardcode the floor at 68 GB (ignoring
+  the argument), or that swap `PER_AGENT_WORKTREE_GB`/`SAFETY_MARGIN_GB`
+  in a way that preserves the count-3 sum (e.g. 8/44, 1/65, 0/68), all
+  survived; (3) no scenario fed a well-formed two-line `df` fixture with a
+  non-numeric `Available` field, so deleting the `*[!0-9]*` case arm
+  survived (that input then hit a raw shell arithmetic error, exit 2, no
+  `REFUSE:` line — breaching the fail-closed contract silently). A fourth
+  mutation (`REQUIRED_KB = R·2^20` vs `FREE_GB = ⌊FREE_KB/2^20⌋` reordering)
+  was checked and is a **true equivalent mutant** (mathematically
+  indistinguishable for integer R), not a coverage gap. All three real gaps
+  are now closed by new scenarios (agent-count-scaling pair, non-numeric-
+  Available-field, and the empty-reading assertion tightened to also check
+  `default-closed`), each independently verified to redden its named
+  mutation and confirmed green unmutated; the guard script itself needed
+  **no behavioral change** — every fail-closed path was already correct,
+  only the tests under-pinned it. Two more scenarios (target-path threaded
+  into the printed line; invalid `DISPATCH_DISK_GUARD_FLOOR_GB` override
+  value) were added as cheap, non-blocking coverage in the same pass.
+  Verified with the fixture-driven `dev/scripts/
+  dispatch_disk_guard_test.sh` (now 15 scenarios, no live-disk dependency);
+  every mutation above reddened in isolation and the guard reverted
+  byte-identical afterward. Wired into `dune runtest` via
   `trading/devtools/checks/dispatch_disk_guard_test_runner.sh` (the
   established dev/scripts/-is-outside-the-workspace shim pattern, same as
   `orchestrator_fastexit_gate_test_runner.sh` / `codex_review_test_runner.sh`).
