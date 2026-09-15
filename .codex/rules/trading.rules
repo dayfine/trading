@@ -7,7 +7,7 @@ prefix_rule(pattern=["gh", "pr", "merge"], decision="forbidden", justification="
 prefix_rule(pattern=["gh", "pr", "review"], decision="prompt", match=["gh pr review 2786 --approve", "gh pr review --comment 2786"])
 prefix_rule(pattern=["gh", "api"], decision="prompt", justification="Check the HTTP method and endpoint before granting access.")
 prefix_rule(pattern=["gh", "pr", ["view", "diff", "checks", "list", "create"]], decision="allow", match=["gh pr view 2786"], not_match=["gh pr merge 2786", "gh pr review 2786 --approve"])
-prefix_rule(pattern=["gh", "issue", ["view", "list", "create", "comment"]], decision="allow")
+prefix_rule(pattern=["gh", "issue", ["view", "list", "create", "comment", "edit"]], decision="allow", match=["gh issue edit 2394 --repo dayfine/trading --remove-label ready-for-agent --add-label needs-info"], not_match=["gh issue delete 2394", "gh issue transfer 2394 other/repo"])
 prefix_rule(pattern=["gh", "auth", "status"], decision="allow")
 prefix_rule(pattern=["gh", "run", ["view", "list"]], decision="allow")
 # Exec allows arbitrary code in this container: use only for authorized tasks
