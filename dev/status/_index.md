@@ -12,6 +12,17 @@ codes read **unpiped**). Step 0.5 did not fire: `QUEUE_NON_EMPTY=0`, and an empt
 queue is the *opposite* of saturated, so the #2579 precondition forbids evaluating
 the four conditions at all.
 
+**The artifact-loss class is CLOSED on both halves.** #2812 (09-14) closed the
+summary half; **#2831 `ac6aaeed` (today) closes the dispatch half** — a FULL-mode
+run that claims a dispatch and produces no artifact now **fails the job** instead
+of going green. Validated self-referentially: the merged check was run against
+*this* run's own summary and both halves reported OK, exit 0. Five recurrences
+this month (#2741, #2747, #2771, #2803, #2810); none can recur by these routes.
+Both PRs opened this run were written, CI-verified, double-reviewed and **merged
+inside the same run** — #2831 through **two rework iterations** (behavioral
+NEEDS_REWORK twice, each time with proof, each time correct). Integration queue
+ends the run **empty**.
+
 **The queue emptied legitimately, which is the first clean handoff this month.**
 #2814 (structural + behavioral APPROVED at `c61e91a3`) and #2813 (NEEDS_REWORK at
 `773f3542` → both APPROVED at `6f5b1cd1` after one rework) merged overnight via the
@@ -28,42 +39,15 @@ data-gated, or human-gated on an R3 flip. `support-floor-stops`' next-task cell 
 **stale by three weeks** and would have caused a wrong dispatch — caught by the
 CLAUDE.md pre-flight grep, corrected below.
 
-**Run 1 today proved the D3 hand-discipline note below is not a control.** Run
-`34853606164` dispatched three writing agents, recorded all three `_in flight_`,
-and produced **zero branches and zero PRs**; its `## Escalations`, `## Integration
-Queue` and dispatch-outcome column still hold the literal placeholder
-`_(Completed at the end of the run.)_`, and it never performed this reconcile —
-which is why this header sat two runs stale. Step 8 (the whole turn) ran **886 s**:
-a serial pre-dispatch baseline gate consumed it, agents were dispatched at the end,
-and the container was torn down mid-flight with nothing snapshotted to a branch.
-Filed as **#2810** with the reordering ask — dispatch *before* verifying, since
-nothing in the deterministic set gates dispatch and CI already publishes the build
-answer for the same commit. Run 2 dispatched ~9 min in and ran every check
-standalone (no dune, no mutex contention); all three lost tasks were re-dispatched.
-
-**Fifth instance of one class this month** (#2741, #2747, #2771, #2803, #2810):
-a green run is still indistinguishable from a productive one, because nothing
-checks a run's claimed dispatches against the branches that actually exist.
-**#2812 closes the summary half of it and is MERGED (`d04c75e2`)** — dispatched,
-double-QC'd (structural 5 / behavioral 5, 10/10 mutations killed, 0 survivors) and
-auto-merged inside this run. From the next run on, a FULL-mode run that loses its
-summary **fails the job** instead of going green. The **dispatch** half is still
-open — nothing checks claimed dispatches against branches that exist, which is
-exactly what run 1 needed (#2810).
-
-Run 2 shipped three mutation-verified PRs, all re-dispatches of run 1's lost work:
-**#2812** (`verify` asserts a FULL-mode summary was published, #2803), **#2813**
-(R7 + `force_liquidation`, #2800 follow-up), **#2814** (warn-level QC score
-digit/adjective lexicon, H-QC-SCORE-ADJECTIVE-LEXICON). **#2812 went the whole way —
-dispatched, both QC gates APPROVED at its tip, merged.** #2813 (CI green) and #2814
-await QC next run: each QC agent needs its own cold **16 GB** `_build` and the
-one-dune mutex serializes them; disk peaked at **90%** during the feature dispatch
-and returned to **58%** once the finished worktrees were reclaimed, which is what
-bought room for #2812's pass. #2813's real
-result is a **corrected premise**: R7 already returned `Fail` for breaker exits as
-of #2800 (`stage_at_exit` was never the blocker for this exit kind), but the flip
-was unpinned and fired in only one shape — the plausible tidy-up that reverts it
-would have passed green.
+**09-14 (both runs), compressed — full record in `dev/daily/2026-09-14*.md`.** Run 1
+dispatched three writing agents and produced zero branches (turn torn down
+mid-dispatch; filed **#2810**, the reordering ask now applied by default). Run 2
+re-dispatched all three and shipped **#2812** (summary-half gate, merged
+`d04c75e2`), **#2813** (R7 + `force_liquidation` — real result was a *corrected
+premise*: the flip already worked as of #2800 but was unpinned and fired in one
+shape only) and **#2814** (QC score lexicon). #2813/#2814 merged overnight with
+full double-QC. **D3/#2747 is now mechanically closed by #2831 — see the top of
+this header.**
 
 **The orchestrator was DEAD for three days and the cause was not in this repo.**
 Six consecutive scheduled runs failed 2026-09-10 -> 09-12 (`34475636575`,
@@ -84,9 +68,9 @@ Filed as **#2770** (ask: pin the version; alert on orchestrator failure).
 keeping: #2757 was then wrongly blamed for the three-day outage above, purely
 because it merged inside the gap. **#2729 is answered and CLOSED** by #2749
 (`cce6d073`) — the two QC passes ran disjoint mutation sets, and #2727 had
-already killed the mutant. **D3 (#2747) remains open**: nothing yet *mechanically*
-stops the orchestrator ending its turn mid-dispatch; this run held the discipline
-by hand, which is not a control.
+already killed the mutant. **D3 (#2747) is CLOSED as of 09-15** — #2831 (`ac6aaeed`)
+makes the check mechanical: a run claiming a dispatch with no artifact now fails
+the job. The hand-discipline note it replaces was never a control.
 
 **The watchers were all down during the outage, and one is blind by
 construction.** The scheduled-workflow health detector (#2634/#2663) needs only
@@ -168,7 +152,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2814 QC-score lexicon MERGED `e69137d2`; 09-15 dispatched: dispatch-half gate (#2810) + settings-path linter (H-SETTINGS-HOOKS-ABSOLUTE-LOCAL-PATH) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-15: #2831 dispatch-artifact gate MERGED `ac6aaeed` (artifact-loss class CLOSED both halves) + #2830 settings-path linter MERGED `e995ed22` |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (09-09 run 2 audit): 1 policy decision + 2 explicit archive entries + 1 fenced template. Prior "disk decline" framing withdrawn |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
