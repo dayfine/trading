@@ -1007,11 +1007,21 @@ check "H-GATEPARSER-CURL-PROJECTION-UNPINNED: sha-less REST review + stale commi
 #     commit_id is the CURRENT tip -- the fallback must also let a genuinely
 #     current sha-less review reach MERGE through this exact REST path. This
 #     is what distinguishes "the field is projected and read correctly" from
-#     "the field is projected but garbled" -- e.g. a projection that copies
-#     only a PREFIX of commit_id (a "loosened", not deleted, guard) still
-#     changes 36b not at all (the id there never matched the tip either way)
-#     but flips THIS case, because a truncated sha no longer string-equals
-#     the full 40-hex tip.
+#     "the field is projected but garbled". A projection that copies only a
+#     PREFIX of commit_id (e.g. `commit_id: (.commit_id[0:8])`) does NOT flip
+#     this case -- it reddens 36b alone (36b's stale commit_id shares $TIP's
+#     first 36 hex characters and differs only in the tail, so any
+#     truncation width that still reads as a prefix of $TIP is also a prefix
+#     of the stale sha; verified at widths 1/4/8/20/36) and 36c stays green,
+#     because `_gate`'s tip comparison is a bidirectional `startswith`
+#     (`($tip | startswith($s)) or ($s | startswith($tip))`, ~line 455/541),
+#     not string equality -- a short prefix of the CURRENT tip still matches
+#     here. What 36c catches ALONE, invisible to the pre-existing suite
+#     (cases 34-36/43-45, which stay clean under it), is a wrong-source
+#     mutation: `commit_id: .node_id` instead of `commit_id: .commit_id`
+#     (mutation N3; see H-GATEPARSER-CURL-PROJECTION-UNPINNED in
+#     dev/status/harness.md) -- the wrong REST field's value happens not to
+#     equal $TIP, so only this case fails to reach MERGE.
 NO_SHA_CURRENT_COMMIT_ID_REST_REVIEW=$(jq -nc --arg tip "$TIP" '
   [{
     id: 999111, node_id: "PRR_xyz",
