@@ -1140,3 +1140,19 @@
  (deps _check_lib.sh settings_path_check.sh)
  (action
   (run sh %{dep:settings_path_check_test.sh})))
+
+; dispatch_disk_guard test (H-AGENT-WORKTREE-DISK-16GB-EACH,
+; dev/status/harness.md, 2026-09-15): dev/scripts/dispatch_disk_guard.sh is
+; the mechanical pre-dispatch disk guard -- a dispatched agent worktree costs
+; ~16 GB once it has run `dune build` (measured 2026-09-05, run
+; 33962894987), and a hand-held "cap agents at 2 instead of 3" call is not a
+; control. Same shim + (universe) pattern as
+; orchestrator_fastexit_gate_test_runner.sh above: the guard and its test
+; both live in dev/scripts/, outside the dune workspace root, and are
+; resolved via repo_root() at run time.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:dispatch_disk_guard_test_runner.sh})))
