@@ -1,0 +1,9 @@
+[09-15 07:45:03] lane A HEAD=3a20f4987 (expect 3a20f4987)
+[09-15 07:45:03] D6 manifest check: union=9900 manifest=9364 absent=551 (_old=450 real=101; expect real <= ~120: the 109 MISS + 3 quarantined + twin-dedup drops)
+[09-15 07:45:03] RUN a0-pit-null-s0-v11 on /tmp/snap_top3000_pit_v11pit
+[09-15 13:43:17] RESULT a0-pit-null-s0-v11 => total_return_pct 457.00690715250335 total_trades 732 sharpe_ratio 0.48200421724797948 max_drawdown_pct 40.643121141626757  V6 INVARIANT PASS V16 EXPECTATION 2 violations V17 EXPECTATION PASS  (wall 21494s)
+[09-15 13:43:17] RUN a0-pit-null-s2-v11 on /tmp/snap_top3000_pit_v11pit
+[09-15 20:48:28] RESULT a0-pit-null-s2-v11 => total_return_pct 152.02543908257942 total_trades 762 sharpe_ratio 0.29699933223017327 max_drawdown_pct 51.323958472185936  V6 INVARIANT PASS V16 EXPECTATION 2 violations V17 EXPECTATION PASS  (wall 25511s)
+[09-15 20:48:28] RUN a0-pit-null-s1-v11 on /tmp/snap_top3000_pit_v11pit
+[09-16 03:18:58] RESULT a0-pit-null-s1-v11 => total_return_pct 188.0473708593918 total_trades 766 sharpe_ratio 0.32886052747690214 max_drawdown_pct 53.048137621013844  V6 INVARIANT PASS V16 EXPECTATION 1 violations V17 EXPECTATION PASS  (wall 23430s)
+[09-16 03:18:58] LANE A DONE

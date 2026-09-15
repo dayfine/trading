@@ -1,0 +1,466 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+180 group(s), 284 symbol(s) dropped
+  survivor CYRNQ <- [CYRN]
+    CYRN (overlap=5985, match=0.9686)
+  survivor CZR <- [ERI]
+    ERI (overlap=1600, match=0.9937)
+  survivor DD <- [DWDP]
+    DWDP (overlap=5390, match=0.9514)
+  survivor DELL <- [DVMT]
+    DVMT (overlap=595, match=0.9966)
+  survivor DHC <- [SNH]
+    SNH (overlap=4996, match=0.9964)
+  survivor DIDIY <- [DIDI]
+    DIDI (overlap=241, match=1.0000)
+  survivor DINO <- [HFC]
+    HFC (overlap=2693, match=0.9974)
+  survivor DJTWW <- [DWACW]
+    DWACW (overlap=628, match=0.9952)
+  survivor DMC <- [FDP]
+    FDP (overlap=7164, match=0.9983)
+  survivor DOC <- [HCP_old]
+    HCP_old (overlap=5500, match=0.9944)
+  survivor DOO <- [DOOO]
+    DOOO (overlap=3147, match=0.9819)
+  survivor DTCB <- [DTC]
+    DTC (overlap=874, match=1.0000)
+  survivor DVLT <- [TOM; WISA]
+    TOM (overlap=101, match=0.9700)
+    WISA (overlap=1691, match=0.7189)
+  survivor EA <- [ERTS]
+    ERTS (overlap=2086, match=0.9511)
+  survivor ECHO <- [SATS]
+    SATS (overlap=4655, match=0.9994)
+  survivor EHC <- [HLS]
+    HLS (overlap=2814, match=0.9972)
+  survivor ELME <- [WRE]
+    WRE (overlap=6241, match=0.9918)
+  survivor ELNK <- [ELNK1]
+    ELNK1 (overlap=528, match=1.0000)
+  survivor EMBJ <- [ERJ]
+    ERJ (overlap=6401, match=0.9941)
+  survivor EMBT <- [ZAZZT; ZBZZT]
+    ZAZZT (overlap=327, match=0.9693)
+    ZBZZT (overlap=245, match=0.9795)
+  survivor EMWP <- [EROS; ESGC]
+    EROS (overlap=1741, match=0.9983)
+    ESGC (overlap=2212, match=0.9959)
+  survivor EQNR <- [STO]
+    STO (overlap=597, match=0.9832)
+  survivor ERINQ <- [ERN]
+    ERN (overlap=2481, match=0.9976)
+  survivor ESINQ <- [ESI1]
+    ESI1 (overlap=4672, match=0.9923)
+  survivor ESMK <- [WPSC]
+    WPSC (overlap=1181, match=0.9949)
+  survivor ESND <- [USTR]
+    USTR (overlap=2950, match=0.9905)
+  survivor EVO <- [RNVS]
+    RNVS (overlap=1068, match=0.9531)
+  survivor EVRI <- [GCA]
+    GCA (overlap=2495, match=0.9976)
+  survivor F-P-C <- [F-PC]
+    F-PC (overlap=1686, match=0.9822)
+  survivor FBIN <- [FBHS]
+    FBHS (overlap=2885, match=0.9990)
+  survivor FCRD <- [TCRD]
+    TCRD (overlap=2712, match=0.9978)
+  survivor FHI <- [FII]
+    FII (overlap=5465, match=0.9918)
+  survivor FISV <- [FI; FISV_old]
+    FI (overlap=7008, match=0.9766)
+    FISV_old (overlap=6399, match=0.9975)
+  survivor FLG-P-A <- [FLG-PA]
+    FLG-PA (overlap=2381, match=0.9840)
+  survivor FMCC <- [FRE]
+    FRE (overlap=1718, match=0.9849)
+  survivor FNMA <- [FNM]
+    FNM (overlap=1718, match=0.9924)
+  survivor FRCB <- [FRC]
+    FRC (overlap=3109, match=0.9855)
+  survivor FTCHQ <- [FTCH; FTCHF]
+    FTCH (overlap=1360, match=0.9985)
+    FTCHF (overlap=1512, match=0.9382)
+  survivor FTI <- [FTI1]
+    FTI1 (overlap=3921, match=0.9997)
+  survivor GAMI <- [GBL]
+    GBL (overlap=5997, match=0.9937)
+  survivor GAP <- [GPS]
+    GPS (overlap=6740, match=0.9697)
+  survivor GB <- [FPAC; FPAC-U; FPAC-WS]
+    FPAC (overlap=1118, match=0.4512)
+    FPAC-U (overlap=710, match=0.6714)
+    FPAC-WS (overlap=476, match=0.9874)
+  survivor GEAR <- [VSTO]
+    VSTO (overlap=2469, match=1.0000)
+  survivor GEN <- [SYMC]
+    SYMC (overlap=4303, match=0.9919)
+  survivor GIG-U <- [GIG-WS]
+    GIG-WS (overlap=3090, match=1.0000)
+  survivor GIX-U <- [GIX-UN; GIX-WS]
+    GIX-UN (overlap=4211, match=0.9912)
+    GIX-WS (overlap=4463, match=0.9991)
+  survivor GL <- [TMK]
+    TMK (overlap=4006, match=0.9995)
+  survivor GLAE <- [GLA]
+    GLA (overlap=4927, match=0.9685)
+  survivor GNCAQ <- [GNCA]
+    GNCA (overlap=2277, match=0.9965)
+  survivor GOLLQ <- [GOL]
+    GOL (overlap=4937, match=0.9957)
+  survivor GPT2 <- [GKK]
+    GKK (overlap=2193, match=0.9936)
+  survivor GRP-U <- [GRP-UN]
+    GRP-UN (overlap=5599, match=0.9921)
+  survivor GRTSQ <- [GRTS]
+    GRTS (overlap=1549, match=0.9845)
+  survivor GS-P-A <- [GS-PA]
+    GS-PA (overlap=5364, match=0.9845)
+  survivor GSAH <- [GSAH-U; GSAH-WS]
+    GSAH-U (overlap=647, match=0.9969)
+    GSAH-WS (overlap=647, match=0.9969)
+  survivor GSM <- [GSM1]
+    GSM1 (overlap=1613, match=0.9895)
+  survivor GTM <- [ZI]
+    ZI (overlap=1283, match=1.0000)
+  survivor GYRE <- [TRGT]
+    TRGT (overlap=2356, match=0.9928)
+  survivor HCR <- [HCLP]
+    HCLP (overlap=1708, match=0.9982)
+  survivor HELP <- [VZA]
+    VZA (overlap=236, match=0.9660)
+  survivor HGTXU <- [HGT]
+    HGT (overlap=3767, match=0.9554)
+  survivor HHH <- [HHC]
+    HHC (overlap=3256, match=0.9985)
+  survivor HIMS <- [HIMS-WS]
+    HIMS-WS (overlap=247, match=1.0000)
+  survivor HLIO <- [SNHY]
+    SNHY (overlap=6146, match=0.9870)
+  survivor HOS <- [HLX]
+    HLX (overlap=7198, match=0.9997)
+  survivor HOUS <- [RLGY]
+    RLGY (overlap=2473, match=0.9992)
+  survivor HTGMQ <- [HTGM]
+    HTGM (overlap=2084, match=0.9918)
+  survivor HTO <- [SJW]
+    SJW (overlap=6886, match=0.9537)
+  survivor HWC <- [HBHC]
+    HBHC (overlap=5133, match=0.9891)
+  survivor HYLN <- [HYLN-WS]
+    HYLN-WS (overlap=562, match=1.0000)
+  survivor HYREQ <- [HYRE]
+    HYRE (overlap=1219, match=0.9885)
+  survivor HZAC <- [HZAC-U; HZAC-WS]
+    HZAC-U (overlap=257, match=1.0000)
+    HZAC-WS (overlap=257, match=1.0000)
+  survivor IBDRY <- [CYDS; DCIX; DESCQ; DLWI; DME; DPW; DRX; DRYS; DZA; EBAYL; EDO; EJH; ENCO; ESIMF; ETP_old2; ETRM; EUA; EURN; EVEQ; EXPI; FAL; FCGY; FLUT; FNCX; FPC; FTUSQ; GBSN; GPUS; GX; HIVE; HMBL; HOGS; HRVEQ; HSE; HTG; IBIS; IISX; IMPX_old; INPX; IOM; ISG; JMAR; JOS; RGSE; RICO; RML; ROSG; RX; SBFM; SBMC; SCOXQ; SDW; SFP; SGNT_old; SHU; SLNK; SMDK; SNCA; SOAP; SOBI; SRR; SUG; SUNE; SUS; SYTA; TIO; TKMR; TND; TNO; TNXP; TSTN; TXM; UDS; UPHN; UPR; VNTR; WCAP_old; WSPTQ; WTCT; WWY; XTIA; ZPLS]
+    CYDS (overlap=1175, match=0.0443)
+    DCIX (overlap=2333, match=0.0476)
+    DESCQ (overlap=1668, match=0.0324)
+    DLWI (overlap=23, match=1.0000)
+    DME (overlap=2093, match=0.0703)
+    DPW (overlap=3527, match=0.0939)
+    DRX (overlap=2411, match=0.0585)
+    DRYS (overlap=3142, match=0.0987)
+    DZA (overlap=1424, match=0.0513)
+    EBAYL (overlap=1562, match=0.0737)
+    EDO (overlap=1365, match=0.0946)
+    EJH (overlap=1286, match=0.0296)
+    ENCO (overlap=1460, match=0.0295)
+    ESIMF (overlap=1503, match=0.1411)
+    ETP_old2 (overlap=1826, match=0.1447)
+    ETRM (overlap=2500, match=0.0724)
+    EUA (overlap=226, match=0.0978)
+    EURN (overlap=3765, match=0.0454)
+    EVEQ (overlap=1577, match=0.0228)
+    EXPI (overlap=3295, match=0.0364)
+    FAL (overlap=368, match=0.0926)
+    FCGY (overlap=4824, match=0.0950)
+    FLUT (overlap=4856, match=0.0853)
+    FNCX (overlap=2556, match=0.1108)
+    FPC (overlap=1352, match=0.0718)
+    FTUSQ (overlap=2198, match=0.1188)
+    GBSN (overlap=288, match=0.0627)
+    GPUS (overlap=4821, match=0.0799)
+    GX (overlap=2709, match=0.0883)
+    HIVE (overlap=3872, match=0.0387)
+    HMBL (overlap=4791, match=0.0762)
+    HOGS (overlap=1553, match=0.0354)
+    HRVEQ (overlap=2098, match=0.0620)
+    HSE (overlap=171, match=0.1000)
+    HTG (overlap=147, match=0.0685)
+    IBIS (overlap=1265, match=0.0475)
+    IISX (overlap=2178, match=0.1344)
+    IMPX_old (overlap=440, match=0.4442)
+    INPX (overlap=2840, match=0.0493)
+    IOM (overlap=2431, match=0.0494)
+    ISG (overlap=3794, match=0.0664)
+    JMAR (overlap=823, match=0.1448)
+    JOS (overlap=1030, match=0.1769)
+    RGSE (overlap=2782, match=0.0360)
+    RICO (overlap=2672, match=0.0577)
+    RML (overlap=2401, match=0.0571)
+    ROSG (overlap=2786, match=0.0959)
+    RX (overlap=1301, match=0.1754)
+    SBFM (overlap=4188, match=0.0432)
+    SBMC (overlap=2828, match=0.0640)
+    SCOXQ (overlap=1522, match=0.0381)
+    SDW (overlap=2393, match=0.0627)
+    SFP (overlap=2544, match=0.0983)
+    SGNT_old (overlap=0, match=0.0000)
+    SHU (overlap=2697, match=0.0731)
+    SLNK (overlap=1645, match=0.0724)
+    SMDK (overlap=374, match=0.4558)
+    SNCA (overlap=3524, match=0.1039)
+    SOAP (overlap=1148, match=0.0610)
+    SOBI (overlap=2699, match=0.0782)
+    SRR (overlap=2198, match=0.0733)
+    SUG (overlap=2023, match=0.0554)
+    SUNE (overlap=4821, match=0.0886)
+    SUS (overlap=171, match=0.1000)
+    SYTA (overlap=2791, match=0.0530)
+    TIO (overlap=4601, match=0.0678)
+    TKMR (overlap=2725, match=0.0477)
+    TND (overlap=2268, match=0.0538)
+    TNO (overlap=421, match=0.0690)
+    TNXP (overlap=3598, match=0.0431)
+    TSTN (overlap=0, match=0.0000)
+    TXM (overlap=1668, match=0.1392)
+    UDS (overlap=2580, match=0.0900)
+    UPHN (overlap=578, match=0.2842)
+    UPR (overlap=2826, match=0.0917)
+    VNTR (overlap=1496, match=0.0314)
+    WCAP_old (overlap=165, match=0.9512)
+    WSPTQ (overlap=715, match=0.2073)
+    WTCT (overlap=1771, match=0.0644)
+    WWY (overlap=1797, match=0.0484)
+    XTIA (overlap=3493, match=0.0515)
+    ZPLS (overlap=2182, match=0.1320)
+  survivor ICDI <- [ICD]
+    ICD (overlap=2533, match=0.9988)
+  survivor ICPT <- [ICPT1]
+    ICPT1 (overlap=294, match=0.9932)
+  survivor IIJIY <- [IIJI]
+    IIJI (overlap=4846, match=0.9880)
+  survivor ILG <- [IILG]
+    IILG (overlap=2053, match=0.9981)
+  survivor IMBI <- [EVLV_old]
+    EVLV_old (overlap=5419, match=0.9983)
+  survivor IMOS <- [IMOS1]
+    IMOS1 (overlap=3357, match=0.9934)
+  survivor INFIQ <- [INFI]
+    INFI (overlap=5878, match=0.9763)
+  survivor INVX <- [DRQ]
+    DRQ (overlap=6714, match=0.9994)
+  survivor IONS <- [ISIS]
+    ISIS (overlap=4522, match=0.9883)
+  survivor IPOF <- [IPOF-U; IPOF-WS; IPOF-WT]
+    IPOF-U (overlap=268, match=0.9925)
+    IPOF-WS (overlap=268, match=0.9925)
+    IPOF-WT (overlap=441, match=0.5773)
+  survivor IR <- [GDI]
+    GDI (overlap=773, match=0.9832)
+  survivor IRBTQ <- [IRBT]
+    IRBT (overlap=5061, match=0.9949)
+  survivor ISHC <- [ISH]
+    ISH (overlap=3062, match=0.9909)
+  survivor ISLE <- [ISLE_old]
+    ISLE_old (overlap=334, match=1.0000)
+  survivor J <- [JEC]
+    JEC (overlap=4091, match=0.9995)
+  survivor JBTM <- [JBT]
+    JBT (overlap=4142, match=1.0000)
+  survivor JOBY <- [RTP]
+    RTP (overlap=207, match=1.0000)
+  survivor JOY <- [JOYG]
+    JOYG (overlap=2062, match=0.9743)
+  survivor JOYY <- [YY]
+    YY (overlap=3149, match=0.9984)
+  survivor JPM-P-C <- [JPM-PC]
+    JPM-PC (overlap=1721, match=0.9808)
+  survivor JPM-P-D <- [JPM-PD]
+    JPM-PD (overlap=1721, match=0.9808)
+  survivor JPM-P-J <- [JPM-PJ]
+    JPM-PJ (overlap=1721, match=0.9814)
+  survivor JPM-P-K <- [JPM-PK]
+    JPM-PK (overlap=1380, match=0.9840)
+  survivor JPM-P-L <- [JPM-PL]
+    JPM-PL (overlap=1335, match=0.9843)
+  survivor RELX <- [RUK]
+    RUK (overlap=2973, match=0.9916)
+  survivor RGP <- [RECN]
+    RECN (overlap=4862, match=0.9981)
+  survivor RST <- [RST1]
+    RST1 (overlap=317, match=1.0000)
+  survivor RT <- [RI]
+    RI (overlap=902, match=0.9956)
+  survivor RTX <- [UTX]
+    UTX (overlap=5613, match=0.9790)
+  survivor SAX1 <- [SAXN]
+    SAXN (overlap=555, match=0.9892)
+  survivor SBLK <- [SEA1]
+    SEA1 (overlap=384, match=0.9948)
+  survivor SCNB <- [SUBK]
+    SUBK (overlap=4268, match=0.9815)
+  survivor SCTL <- [REPH]
+    REPH (overlap=2068, match=0.9942)
+  survivor SEI <- [SOI]
+    SOI (overlap=1846, match=1.0000)
+  survivor SESN <- [EBIO]
+    EBIO (overlap=1077, match=0.9963)
+  survivor SFTW <- [SFTW-U; SFTW-WS]
+    SFTW-U (overlap=411, match=1.0000)
+    SFTW-WS (overlap=411, match=0.9854)
+  survivor SGHC <- [SEAH; SEAH-U; SEAH-WS]
+    SEAH (overlap=297, match=1.0000)
+    SEAH-U (overlap=270, match=1.0000)
+    SEAH-WS (overlap=275, match=0.9818)
+  survivor SGI <- [TPX]
+    TPX (overlap=5324, match=1.0000)
+  survivor SHEL <- [RDS-A]
+    RDS-A (overlap=4157, match=0.9976)
+  survivor SHYF <- [SPAR]
+    SPAR (overlap=5737, match=0.9979)
+  survivor SKLZ <- [SKLZ-WS]
+    SKLZ-WS (overlap=256, match=1.0000)
+  survivor SLAI <- [WBAI]
+    WBAI (overlap=1905, match=0.9932)
+  survivor SLS <- [GALE]
+    GALE (overlap=503, match=0.9900)
+  survivor SNBR <- [SCSS]
+    SCSS (overlap=4754, match=0.9895)
+  survivor SPB <- [HRG]
+    HRG (overlap=5166, match=0.9681)
+  survivor SPCE <- [IPOA]
+    IPOA (overlap=522, match=1.0000)
+  survivor SPNT <- [TPRE]
+    TPRE (overlap=1938, match=0.9990)
+  survivor SPXC <- [SPW]
+    SPW (overlap=4462, match=0.9895)
+  survivor SSEIQ <- [SSE]
+    SSE (overlap=473, match=0.9534)
+  survivor SSI <- [SSI1]
+    SSI1 (overlap=374, match=1.0000)
+  survivor SSSS <- [GSVC]
+    GSVC (overlap=2079, match=0.9933)
+  survivor STE <- [STE1]
+    STE1 (overlap=4488, match=0.9904)
+  survivor STLA <- [FCAU]
+    FCAU (overlap=2111, match=0.9919)
+  survivor STR <- [FLMN]
+    FLMN (overlap=1124, match=0.9920)
+  survivor STRR <- [HSON]
+    HSON (overlap=5636, match=0.9785)
+  survivor SVC <- [HPT]
+    HPT (overlap=5467, match=0.9974)
+  survivor SWBI <- [SWHC]
+    SWHC (overlap=2632, match=0.9913)
+  survivor SYNC <- [SYNC1]
+    SYNC1 (overlap=518, match=0.9594)
+  survivor TALO <- [SGY]
+    SGY (overlap=5121, match=0.9982)
+  survivor TBCH <- [HEAR]
+    HEAR (overlap=3548, match=0.9972)
+  survivor TCRT <- [ZIOP]
+    ZIOP (overlap=4026, match=0.9650)
+  survivor TDAY <- [GCI]
+    GCI (overlap=2965, match=0.9885)
+  survivor TE <- [FREY]
+    FREY (overlap=1335, match=1.0000)
+  survivor TECK <- [TCK]
+    TCK (overlap=233, match=0.9957)
+  survivor TEN <- [TNP]
+    TNP (overlap=5619, match=0.9996)
+  survivor TFCFA <- [FOXA1]
+    FOXA1 (overlap=1434, match=1.0000)
+  survivor TFIN <- [TBK]
+    TBK (overlap=2073, match=0.9986)
+  survivor TIMB <- [TIMB-W; TSU]
+    TIMB-W (overlap=5811, match=0.9924)
+    TSU (overlap=1203, match=0.9967)
+  survivor TKO <- [WWE]
+    WWE (overlap=6052, match=0.9980)
+  survivor TNL <- [WYN; WYND]
+    WYN (overlap=2979, match=0.9980)
+    WYND (overlap=682, match=0.9971)
+  survivor TOVX <- [SYN]
+    SYN (overlap=4298, match=0.9965)
+  survivor TPCO <- [TPUB; TRNC]
+    TPUB (overlap=472, match=0.9894)
+    TRNC (overlap=1062, match=0.9981)
+  survivor TPGY <- [TPGY-U; TPGY-WS; TPGY-WT]
+    TPGY-U (overlap=265, match=1.0000)
+    TPGY-WS (overlap=267, match=0.9925)
+    TPGY-WT (overlap=414, match=0.6731)
+  survivor TRLA <- [TRLA1]
+    TRLA1 (overlap=604, match=1.0000)
+  survivor TRTN <- [TAL1]
+    TAL1 (overlap=2662, match=0.9842)
+  survivor TTCF <- [FMCI]
+    FMCI (overlap=401, match=0.9900)
+  survivor TUPBQ <- [TUP]
+    TUP (overlap=6721, match=0.9912)
+  survivor TVTX <- [RTRX]
+    RTRX (overlap=2703, match=0.9941)
+  survivor UCB <- [UCBI]
+    UCBI (overlap=5636, match=0.9988)
+  survivor UTZ <- [UTZ-WS]
+    UTZ-WS (overlap=329, match=0.9817)
+  survivor VIAV <- [JDSU]
+    JDSU (overlap=2975, match=0.9956)
+  survivor VIV <- [VIV_old]
+    VIV_old (overlap=5219, match=0.9887)
+  survivor VLTA <- [SNPR; SNPR-U; SNPR-WS]
+    SNPR (overlap=212, match=1.0000)
+    SNPR-U (overlap=206, match=1.0000)
+    SNPR-WS (overlap=206, match=1.0000)
+  survivor VSTD <- [YOSH]
+    YOSH (overlap=792, match=0.9975)
+  survivor VTNRQ <- [VTNR]
+    VTNR (overlap=6187, match=0.9943)
+  survivor VTOL <- [ERA]
+    ERA (overlap=1861, match=0.9989)
+  survivor VVX <- [VEC]
+    VEC (overlap=2009, match=0.9980)
+  survivor WBA <- [WAG]
+    WAG (overlap=2847, match=0.9986)
+  survivor WBD <- [DISCA]
+    DISCA (overlap=4221, match=0.9998)
+  survivor WCRX <- [WCRX1]
+    WCRX1 (overlap=133, match=1.0000)
+  survivor WEB <- [WWWW]
+    WWWW (overlap=2521, match=0.9984)
+  survivor WGS <- [SMFR]
+    SMFR (overlap=590, match=0.9525)
+  survivor WKC <- [INT]
+    INT (overlap=6447, match=0.9988)
+  survivor WLB <- [WLBA]
+    WLBA (overlap=4786, match=0.9954)
+  survivor WMGI <- [TRNX1]
+    TRNX1 (overlap=1271, match=0.9984)
+  survivor WP <- [VNTV]
+    VNTV (overlap=1463, match=0.9986)
+  survivor WPF <- [WPF-U; WPF-WS]
+    WPF-U (overlap=243, match=1.0000)
+    WPF-WS (overlap=243, match=1.0000)
+  survivor WPM <- [SLW]
+    SLW (overlap=344, match=1.0000)
+  survivor WPP <- [WPPGY]
+    WPPGY (overlap=5009, match=0.9928)
+  survivor WT <- [WETF]
+    WETF (overlap=6016, match=0.9663)
+  survivor WTW <- [WLTW]
+    WLTW (overlap=5178, match=0.9905)
+  survivor XHG <- [FLJ]
+    FLJ (overlap=1192, match=0.9656)
+  survivor XL <- [XL_old]
+    XL_old (overlap=678, match=1.0000)
+  survivor XRN <- [GMRE]
+    GMRE (overlap=2469, match=0.9976)
+  survivor XYZ <- [SQ]
+    SQ (overlap=2305, match=1.0000)
+  survivor ZQKSQ <- [ZQK]
+    ZQK (overlap=3020, match=0.9964)
+  survivor ZWS <- [RXN]
+    RXN (overlap=2439, match=0.9984)
