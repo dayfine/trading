@@ -2001,7 +2001,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   entry. Mutations (k)/(f)/(g) from H-GATEPARSER-NO-MUTATION-COVERAGE below are
   deliberately out of scope here — left to that item's own PR.
 
-- [ ] **H-GATEPARSER-CURL-PROJECTION-UNPINNED** (from #2628's review): the
+- [x] **H-GATEPARSER-CURL-PROJECTION-UNPINNED** (from #2628's review): the
   `_pr_meta_curl` `commit_id` projection widening — the half of the #2626 fix
   that makes the fallback reachable — has no regression pin: reverting that
   one line alone leaves the suite exit 0 / 54 clean (measured during #2628's
@@ -2009,6 +2009,70 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   needs a fixture that drives the REST projection itself (mock `curl` JSON →
   assert the review objects reaching `_gate` carry `commit_id`), not just the
   `review_result` fallback the current cases 43-45 pin.
+
+  **DONE (2026-09-15).** What shipped: two new END-TO-END cases (36b, 36c) in
+  `dev/scripts/pr_gate_status_test.sh`, appended after the existing curl-backend
+  e2e block (cases 34-36). Unlike cases 43-45 (which call `_gate` directly on a
+  hand-built `[{body, commit_id}]` array and never touch `_pr_meta_curl`), these
+  two drive the REAL script end to end through a stub `curl` that returns
+  RAW GitHub REST review payloads (`id`/`node_id`/`user`/`state`/`submitted_at`/
+  `commit_id`, the actual `GET /pulls/:n/reviews` shape) — so the assertion can
+  only pass if `_pr_meta_curl`'s projection actually carries `commit_id` from
+  that raw payload through to the array `_gate` consumes. 36b: a sha-less
+  behavioral-review body + a stale `commit_id` must NOT reach MERGE (reads
+  "re-run qc-behavioral at `$tip`"). 36c: the happy-path companion — the same
+  shape with a CURRENT `commit_id` must reach MERGE — so a mutation that makes
+  every review look permanently stale doesn't pass 36b for the wrong reason.
+
+  Premise re-confirmed before writing the fix (as the dispatch brief required):
+  reverting `_pr_meta_curl`'s projection line alone
+  (`map({body: .body, commit_id: .commit_id})` → `map({body: .body})`), with
+  ONLY cases 43-45 present (pre-existing baseline, no 36b/36c yet), left the
+  suite exit 0 / 94 clean — same defect shape as the #2628 measurement,
+  reconfirmed at the current test count.
+
+  Mutation table (each row: apply mutation to a clean copy of
+  `pr_gate_status.sh`, run `sh dev/scripts/pr_gate_status_test.sh`, record
+  result, then restore the clean file):
+
+  | # | mutation | 36b (stale) | 36c (current) | caught? |
+  |---|---|---|---|---|
+  | M1 | full revert: drop `commit_id` from the projection | FAIL (want RERUN, got MERGE) | ok | **yes** |
+  | M2 | rename projected key `commit_id` → `commitId` (well-meaning-refactor shape) | FAIL (want RERUN, got MERGE) | ok | **yes** |
+  | M3 | hardcode `commit_id: ""` in the projection | FAIL (want RERUN, got MERGE) | ok | **yes** |
+  | M4 | swap `body`/`commit_id` in the projection (copy-paste bug) | FAIL (want RERUN, got other) | FAIL (want MERGE, got other) | **yes** |
+  | M5 | narrow the projected value: `commit_id: (.commit_id[0:8])` (truncate to 8 hex chars) | ok | ok | **NO — survivor, see below** |
+  | M6 | narrow the projection scope: only project `commit_id` when `.state == "APPROVED"` | FAIL (want RERUN, got MERGE) | ok | **yes** |
+  | M7 | loosen the projected value: `commit_id: (.commit_id \| ascii_upcase)` | ok | FAIL (want MERGE, got other) | **yes** |
+
+  **M5 survives, reported rather than hidden, per the dispatch brief's
+  honesty requirement.** Root cause: it is not a coverage gap in this fixture
+  — `_gate`'s own sha comparison (`pr_gate_status.sh` lines 454-455 and
+  540-541: `$tip | startswith($s)`) intentionally treats a short, valid PREFIX
+  of the tip sha as current, because a human-written "Reviewed SHA: <7-40 hex
+  chars>" line is legitimately allowed to be a short sha (the capture regex is
+  `{7,40}`). An 8-char truncation of the tip IS a valid prefix, so by that
+  same, pre-existing, deliberate design the truncated `commit_id` is correctly
+  read as current — this is not the commit_id-projection defect this item
+  targets, it is `_gate`'s documented short-sha tolerance, out of scope here.
+  M2/M6/M7 (three other, non-prefix-preserving loosenings/narrowings) confirm
+  the projection path itself is not under-tested — they all redden.
+
+  **Loosened-vs-deleted check (explicit, per the brief):** M1/M3 (deletion) and
+  M2/M6 (loosening the projection's scope/key) both redden identically via
+  36b; M5/M7 (loosening the projected value) show the two new cases are
+  actually doing separate work — 36b (stale) alone would have missed M7, and
+  36c (current) alone would have missed nothing here but is what proves the
+  fallback reads the value correctly, not just detects its absence. The one
+  survivor (M5) is explained above as a pre-existing design feature, not a
+  fixture weakness.
+
+  Full suite: 94 tests before this PR, 96 after (36b, 36c added). Verify:
+  `sh dev/scripts/pr_gate_status_test.sh` — expect `OK: pr_gate_status -- 96
+  tests clean.`, exit 0. Files touched: `dev/scripts/pr_gate_status_test.sh`,
+  this entry. `dev/scripts/pr_gate_status.sh` itself is unchanged — the
+  fallback logic (#2626) was already correct; only its REST-projection path
+  was unpinned.
 
 - [x] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
   reader, yet its suite is verified only by hand. A ~30-line mutation harness

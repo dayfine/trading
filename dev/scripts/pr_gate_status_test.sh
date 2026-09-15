@@ -895,6 +895,139 @@ export GATE_LABELS_JSON
 
 rm -rf "$CURL_E2E_STUB_DIR"
 
+# 36b-36c. H-GATEPARSER-CURL-PROJECTION-UNPINNED (dev/status/harness.md): cases
+# 43-45 below pin the `commit_id` FALLBACK inside `review_result` by
+# constructing the `_gate`-shaped `[{body, commit_id}]` array directly -- they
+# call `_gate` straight, so they never exercise `_pr_meta_curl`'s REST RESHAPE,
+# which is the ONLY code that puts `commit_id` on that array in the first
+# place when the orchestrator runs under the curl backend. Reverting
+# `_pr_meta_curl`'s projection line alone (`map({body: .body, commit_id:
+# .commit_id})` -> `map({body: .body})`) left the full suite green (measured
+# 2026-09-15 during this item's own fix: reverted, ran `sh
+# dev/scripts/pr_gate_status_test.sh`, 94/94 clean, exit 0) precisely because
+# nothing drove a RAW REST review payload -- carrying the extra fields
+# (`id`/`user`/`state`/`submitted_at`) GitHub's REST API actually returns --
+# through `_pr_meta_curl` end to end. These two cases do: the stub `curl`
+# returns that raw shape for the reviews endpoint, and the assertion reads the
+# SAME end-to-end script output cases 34-36 above read (the real
+# `pr_gate_status.sh`, not `_gate` in isolation).
+CURL_PROJECTION_STUB_DIR=$(mktemp -d)
+cat > "$CURL_PROJECTION_STUB_DIR/curl" <<'STUB'
+#!/bin/sh
+url=""
+for a in "$@"; do
+  case "$a" in
+    https://*) url=$a ;;
+  esac
+done
+case "$url" in
+  */pulls\?state=open*)
+    jq -n --arg n "$GATE_PR_NUMBER" '[{number: ($n | tonumber)}]'
+    ;;
+  */pulls/*/files*)
+    printf '%s\n' "$GATE_FILES" | jq -R -s 'split("\n") | map(select(length > 0) | {filename: .})'
+    ;;
+  */pulls/*/reviews*)
+    printf '%s\n' "$GATE_REVIEWS_JSON"
+    ;;
+  */commits/*/check-runs*)
+    printf '%s\n' "$GATE_CHECKS" | jq -R -s '
+      split("\n") | map(select(length > 0)) | map(
+        if . == "pending" then {status: "queued", conclusion: null}
+        elif . == "pass" then {status: "completed", conclusion: "success"}
+        else {status: "completed", conclusion: "failure"} end)
+      | {check_runs: .}'
+    ;;
+  */pulls/*)
+    jq -n --arg tip "$GATE_TIP" --argjson labels "${GATE_LABELS_JSON:-[]}" \
+      '{head: {sha: $tip}, labels: $labels}'
+    ;;
+esac
+STUB
+chmod +x "$CURL_PROJECTION_STUB_DIR/curl"
+
+GATE_TIP=$TIP
+GATE_CHECKS=pass
+export GATE_TIP GATE_CHECKS
+
+# Raw GitHub REST review payload: the behavioral review's body carries NO
+# "Reviewed SHA:" line, and its `commit_id` points at an OLD commit -- NOT the
+# PR's current tip ($TIP). The structural review IS current (body carries its
+# own "Reviewed SHA:" line at the tip), so structural alone would already read
+# "ok" -- only the projection reaching the behavioral review's `commit_id`
+# can tell this apart from a fully-reviewed, mergeable PR.
+NO_SHA_OLD_COMMIT_ID_REST_REVIEW=$(jq -nc --arg tip "$TIP" '
+  [{
+    id: 999111, node_id: "PRR_xyz",
+    user: {login: "qc-behavioral-bot"},
+    body: "## Behavioral QC — clean pass\n\n## Verdict\n\nAPPROVED",
+    state: "COMMENTED", submitted_at: "2026-08-01T00:00:00Z",
+    commit_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+    id: 999112, node_id: "PRR_abc",
+    user: {login: "qc-structural-bot"},
+    body: ("Reviewed SHA: " + $tip + "\n\n## Structural QC — clean pass\n\n## Verdict\n\nAPPROVED"),
+    state: "COMMENTED", submitted_at: "2026-08-01T00:00:01Z",
+    commit_id: $tip
+  }]')
+
+# 36b. RED/GREEN pin, END TO END through `_pr_meta_curl`'s REST reshape: with
+#     the behavioral review's commit_id stale, the PR must NOT read MERGE --
+#     it must ask for a behavioral re-run. Confirmed this is what the
+#     projection is responsible for: reverting `_pr_meta_curl`'s widened
+#     projection back to `map({body: .body})` turns this RED (reads MERGE
+#     instead), while cases 43-45 (which never call `_pr_meta_curl`) stay
+#     green under that exact revert.
+GATE_REVIEWS_JSON=$NO_SHA_OLD_COMMIT_ID_REST_REVIEW
+export GATE_REVIEWS_JSON
+row=$(_e2e_probe "$CURL_PROJECTION_STUB_DIR" "dummy-token" 501 | tail -1)
+case "$row" in
+  *"re-run qc-behavioral at $TIP"*) got=RERUN ;;
+  *MERGE*)                          got=MERGE ;;
+  *)                                got=other ;;
+esac
+check "H-GATEPARSER-CURL-PROJECTION-UNPINNED: sha-less REST review + stale commit_id, through _pr_meta_curl, blocks MERGE" \
+  RERUN "$got"
+
+# 36c. Happy-path companion, same end-to-end path: the behavioral review's
+#     commit_id is the CURRENT tip -- the fallback must also let a genuinely
+#     current sha-less review reach MERGE through this exact REST path. This
+#     is what distinguishes "the field is projected and read correctly" from
+#     "the field is projected but garbled" -- e.g. a projection that copies
+#     only a PREFIX of commit_id (a "loosened", not deleted, guard) still
+#     changes 36b not at all (the id there never matched the tip either way)
+#     but flips THIS case, because a truncated sha no longer string-equals
+#     the full 40-hex tip.
+NO_SHA_CURRENT_COMMIT_ID_REST_REVIEW=$(jq -nc --arg tip "$TIP" '
+  [{
+    id: 999111, node_id: "PRR_xyz",
+    user: {login: "qc-behavioral-bot"},
+    body: "## Behavioral QC — clean pass\n\n## Verdict\n\nAPPROVED",
+    state: "COMMENTED", submitted_at: "2026-08-01T00:00:00Z",
+    commit_id: $tip
+  },
+  {
+    id: 999112, node_id: "PRR_abc",
+    user: {login: "qc-structural-bot"},
+    body: ("Reviewed SHA: " + $tip + "\n\n## Structural QC — clean pass\n\n## Verdict\n\nAPPROVED"),
+    state: "COMMENTED", submitted_at: "2026-08-01T00:00:01Z",
+    commit_id: $tip
+  }]')
+GATE_REVIEWS_JSON=$NO_SHA_CURRENT_COMMIT_ID_REST_REVIEW
+export GATE_REVIEWS_JSON
+row=$(_e2e_probe "$CURL_PROJECTION_STUB_DIR" "dummy-token" 501 | tail -1)
+case "$row" in
+  *MERGE*) got=MERGE ;;
+  *)       got=other ;;
+esac
+check "H-GATEPARSER-CURL-PROJECTION-UNPINNED: sha-less REST review + CURRENT commit_id, through _pr_meta_curl, reaches MERGE" \
+  MERGE "$got"
+
+GATE_LABELS_JSON='[]'
+export GATE_LABELS_JSON
+rm -rf "$CURL_PROJECTION_STUB_DIR"
+
 # --- B2 (qc-behavioral rework iteration 1, review 4991549803): a review with no
 # parseable "Reviewed SHA" is not merely "harmless because a later review
 # supersedes it" (the docstring's claim, corrected above in _gate) -- it is
