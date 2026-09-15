@@ -39,6 +39,28 @@
 # "FULL_PASS") are still recognised; and the ops/daily-<basename> branch
 # name is pinned end-to-end against a "-run2"-suffixed path, matching the
 # real incident (dev/daily/2026-09-13-run2.md).
+#
+# #2810 adds the FULL-mode DISPATCH-artifact check (Scenarios 25-33): a
+# FULL-mode summary can be genuinely published (Scenarios 15-24 all pass)
+# while its OWN `## Dispatched this run` table still claims an unresolved
+# dispatch -- run 34853606164 (2026-09-14) recorded three writing-agent
+# rows as `_in flight_` and ended there, $18.30 for zero branches. Covers:
+# a writing-agent row still reading "in flight" => FAIL; the literal
+# "completed at the end of the run" placeholder anywhere in the section,
+# even with no in-flight row => FAIL; all writing-agent rows resolved
+# (PR # cited, or "**completed**" for a rework row whose PR is cited only
+# in Track) => PASS; a QC-agent row reading "in flight at run end" (a
+# review spanning a run boundary, nothing lost) => PASS -- the key
+# mutation this half of the suite exists to kill, since a naive "any row
+# still in flight" rule would wrongly reject the ordinary QC continuation
+# shape in dev/daily/2026-09-05.md; a skip/no-dispatch row (Agent "--")
+# => PASS regardless of its Outcome text; no `## Dispatched this run`
+# section at all, or a table in some other (non-4-column) shape => PASS,
+# silently -- nothing this check knows how to parse is not evidence of
+# anything; and two real-corpus excerpts, verbatim from
+# dev/daily/2026-09-14.md (the broken run) and
+# dev/daily/2026-09-14-run2.md (the healthy re-dispatch), pinned to FAIL
+# and PASS respectively.
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -617,6 +639,187 @@ fi
 check_bool "branch derivation strips only .md and matches ops/daily-2026-08-27-run2" "$_branch_ok"
 rm -f "$MOCK_DAILY_PR_URL_FILE"
 unset MOCK_DAILY_PR_URL_FILE
+
+MOCK_DAILY_PR_STATE=none
+export MOCK_DAILY_PR_STATE
+
+# =========================================================================
+# FULL-mode DISPATCH-artifact check (issue #2810): a FULL-mode summary can
+# be genuinely PUBLISHED (an open PR exists for its branch -- Scenarios
+# 15-24 all pass) while its own `## Dispatched this run` table still
+# claims a dispatch that never resolved. See the "FULL-MODE
+# DISPATCH-ARTIFACT CHECK" header comment in orchestrator_fastexit_gate.sh
+# for the full predicate. Every scenario below uses an OPEN PR for the
+# summary's own branch (MOCK_DAILY_PR_STATE=open) so the publication check
+# always passes -- any FAIL below is attributable to the dispatch-artifact
+# check alone, never a confound with the #2803 half.
+# =========================================================================
+
+# _write_dispatch_summary <dispatch-section-body>
+# Writes a FULL-mode dev/daily/2026-08-27.md whose `## Dispatched this run`
+# section is exactly <dispatch-section-body> (verbatim, already including
+# any table markup and/or trailing prose). Mirrors _reset_summary's
+# fixture shape but adds the section under test.
+_write_dispatch_summary() {
+  (
+    cd "$TMP_REPO"
+    {
+      printf '# Status - 2026-08-27 [run 1]\n\n'
+      printf '**Mode:** FULL\n\n'
+      printf '## Dispatched this run\n\n'
+      printf '%s\n' "$1"
+    } >dev/daily/2026-08-27.md
+    touch -t 202608270000 dev/daily/2026-08-27.md
+  )
+}
+
+MOCK_DAILY_PR_STATE=open
+export MOCK_DAILY_PR_STATE
+
+# --- Scenario 25: a writing-agent row still reads "in flight" (the run
+# 34853606164 shape, minus the placeholder -- isolates the row-level
+# signature from the section-level one tested in Scenario 27). ----------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| harness | harness-maintainer | _in flight_ | `verify` asserts a FULL-mode summary was published (#2803) |
+| cleanup | — | **skipped** | nothing to do |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "an unresolved writing-agent 'in flight' row is rejected" 1 "$rc"
+if grep -q '#2810' /tmp/orchestrator_fastexit_gate_test.out; then _cite_ok=0; else _cite_ok=1; fi
+check_bool "rejection cites issue #2810" "$_cite_ok"
+
+# --- Scenario 26: every writing-agent row resolved (a real PR cited) ->
+# PASS. ------------------------------------------------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| harness | harness-maintainer | **PR #2812** | completed cleanly |
+| ops-data | — | **skipped** | data-gaps.md unchanged |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "a fully-resolved dispatch table is accepted" 0 "$rc"
+
+# --- Scenario 27: the literal turn-ended-mid-dispatch placeholder, with
+# NO writing-agent row at all (isolates the section-level signature from
+# the row-level one tested in Scenario 25) -> FAIL. -----------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| cleanup | — | **skipped** | nothing to do |
+
+_(This section is completed at the end of the run.)_'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "the turn-ended-mid-dispatch placeholder alone is rejected" 1 "$rc"
+
+# --- Scenario 28: a QC re-review row reading "in flight at run end" (a
+# review spanning a run boundary, per .claude/rules/pr-gate-loop.md -- the
+# PR under review already exists, nothing was lost) -> PASS. This is the
+# key mutation this half of the suite exists to kill: a naive "any row
+# still in flight" rule would wrongly reject this, the ordinary shape
+# recorded verbatim in dev/daily/2026-09-05.md. ---------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| harness (#2676) | qc-structural (re) | in flight at run end | prior verdict stale by definition |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "a QC re-review 'in flight at run end' row is accepted (not a writing agent)" 0 "$rc"
+
+# --- Scenario 29: a skip/no-dispatch row (Agent "--") whose NOTES column
+# happens to mention "in flight" as context, not as this row's own claim
+# -> PASS. Lifted verbatim from dev/daily/2026-09-14-run2.md's real
+# "not dispatched" row. ---------------------------------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| backtest-infra / PIT universe | — | **not dispatched** | Fenced LOCAL: "PIT universe migration in flight LOCAL, do not dispatch" |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "a skip row is accepted even when its Notes column mentions 'in flight'" 0 "$rc"
+
+# --- Scenario 30: a table in a different (non-canonical) shape -> PASS,
+# silently -- nothing this check knows how to parse is not evidence of
+# anything. Also exercises that an "in flight"-looking Outcome inside a
+# non-canonical table is correctly never inspected. -----------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| PR | Branch | Author | Tip SHA | Status |
+|----|--------|--------|---------|--------|
+| #123 | feat/x | someone | abcdef0 | in flight |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "a non-canonical table shape is ignored (PASS, silent)" 0 "$rc"
+
+# --- Scenario 31: a rework-iteration row citing its PR only in the TRACK
+# column ("harness (#2749)"), Outcome = "**completed**" with no PR/branch
+# of its own -> PASS. Pins the design decision that an artifact need not
+# be re-cited in Outcome when it already exists (see the header comment's
+# "WHY SCOPED TO WRITING AGENTS" rationale) -- the row this check must NOT
+# treat as a violation. ---------------------------------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| harness (#2749) | harness-maintainer | **completed** | rework iteration 1 |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "a rework-iteration row citing its PR only in Track is accepted" 0 "$rc"
+
+# --- Scenario 32: real-corpus excerpt, VERBATIM from dev/daily/2026-09-14.md
+# (the actual broken run 34853606164) -> FAIL. -----------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| harness | harness-maintainer | _in flight_ | `verify` asserts a FULL-mode summary was actually published (#2803) |
+| trade-audit | feat-backtest | _in flight_ | pin R7 = `Fail` for a `force_liquidation` exit (#2800 follow-up) |
+| harness | harness-maintainer | _in flight_ | warn-level quality-score digit/adjective lexicon (H-QC-SCORE-ADJECTIVE-LEXICON) |
+| cleanup | — | **skipped** | Backlog holds no actionable work |
+| ops-data | — | **skipped** | data-gaps.md last touched 2026-05-03 (134 days); EODHD_API_KEY unset |
+
+_(This section is completed at the end of the run.)_'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "real-corpus excerpt from the broken 2026-09-14.md run is rejected" 1 "$rc"
+
+# --- Scenario 33: real-corpus excerpt, VERBATIM from
+# dev/daily/2026-09-14-run2.md (the actual healthy re-dispatch that
+# followed) -> PASS. -------------------------------------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| harness | harness-maintainer | **PR #2812** | verify asserts a FULL-mode summary was published (#2803) |
+| harness | harness-maintainer | **PR #2814** | Warn-level quality-score digit/adjective lexicon |
+| trade-audit | feat-backtest | **PR #2813** | R7 + force_liquidation |
+| backtest-infra / PIT universe | — | **not dispatched** | Fenced LOCAL: PIT universe migration in flight LOCAL, do not dispatch |
+| cleanup | — | **skipped** | Backlog audited 2026-09-09, no actionable work |
+| ops-data | — | **skipped** | gap file is 134 days stale |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "real-corpus excerpt from the healthy 2026-09-14-run2.md run is accepted" 0 "$rc"
+
+# --- Scenario 34: an Agent value that contains a writing-agent name as a
+# SUBSTRING but does not START with it -> PASS. Pins prefix (not
+# substring) matching: an Agent like a QC-style annotation referencing
+# "ops-data" mid-string must not be treated as the ops-data writing agent
+# itself. -------------------------------------------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| ops-data | reviewer-of-ops-data-output | in flight | not an ops-data dispatch, a review annotation |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "an Agent containing a writer name as a substring (not a prefix) is not treated as a writer" 0 "$rc"
 
 MOCK_DAILY_PR_STATE=none
 export MOCK_DAILY_PR_STATE

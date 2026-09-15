@@ -51,11 +51,14 @@
 #       independently recomputes the open-PR count and the dev/status/ drift
 #       since the prior summary and FAILS (exit 1, with an `::error::` line
 #       per violation) if either contradicts the no-op claim. If it is
-#       FULL-mode, checks that the summary was actually PUBLISHED (see
-#       "FULL-MODE PUBLICATION CHECK" below) and FAILS if not. Neither NO-OP
-#       nor FULL: prints a note and exits 0 (nothing this script knows how to
-#       check for that mode string). Exits 0 only when the applicable check
-#       (or lack of one) confirms nothing is wrong.
+#       FULL-mode, checks BOTH that the summary was actually PUBLISHED (see
+#       "FULL-MODE PUBLICATION CHECK" below) AND that its claimed dispatches
+#       produced artifacts (see "FULL-MODE DISPATCH-ARTIFACT CHECK" below),
+#       and FAILS if either check fails (exit 2 if either check could not be
+#       determined, i.e. failed closed). Neither NO-OP nor FULL: prints a
+#       note and exits 0 (nothing this script knows how to check for that
+#       mode string). Exits 0 only when every applicable check (or lack of
+#       one) confirms nothing is wrong.
 #
 # FULL-MODE PUBLICATION CHECK (issue #2803)
 #   The NO-OP check above answers "was the no-op claim honest". It has no
@@ -108,6 +111,72 @@
 #   the issue #2803 dispatch scoped the fix to "FULL-mode" specifically. A
 #   summary using one of those other mode strings and losing its PR would
 #   NOT be caught by this script today.
+#
+# FULL-MODE DISPATCH-ARTIFACT CHECK (issue #2810)
+#   The publication check above answers "did the summary FILE reach origin".
+#   It has no opinion on the summary's own CONTENT: a FULL-mode run can
+#   publish a perfectly real summary that itself admits three agents were
+#   dispatched and never finished. Run 34853606164 (2026-09-14, "run 1") is
+#   the measured instance: three `## Dispatched this run` rows read
+#   `_in flight_`, the run ended there (turn budget exhausted mid-dispatch),
+#   and the job still reported `conclusion: success` -- $18.30 for zero
+#   branches, zero PRs, zero status updates. Third instance of the general
+#   "green run, no artifact" class after #2741/#2747/#2771, and the second
+#   half of what #2803 opened (#2803's own fix, `_verify_full_mode_published`
+#   above, closed the SUMMARY half; this closes the DISPATCH half).
+#
+#   WHAT COUNTS AS A VIOLATION -- two independent signatures, checked
+#   against the `## Dispatched this run` section only (see
+#   `_verify_full_mode_dispatch_artifacts` for the exact parse):
+#     (a) the section contains the literal "turn ended mid-dispatch"
+#         placeholder text ("completed at the end of the run", matched as a
+#         case-insensitive substring so it catches every wording variant
+#         observed in the corpus), anywhere in the section -- this needs no
+#         table at all, since it is direct textual evidence on its own.
+#     (b) within the canonical `| Track | Agent | Outcome | Notes |` table
+#         (see `.claude/agents/lead-orchestrator.md` "## Dispatched this
+#         run" template), a row whose Agent names a WRITING agent
+#         (feat-backtest / feat-data / feat-weinstein / harness-maintainer /
+#         ops-data / code-health -- matched by case-insensitive prefix, so
+#         "feat-backtest (rework #1)" etc. still match) still reads
+#         "in flight" in its Outcome column.
+#
+#   WHY SCOPED TO WRITING AGENTS, AND WHY "in flight" RATHER THAN "cites no
+#   PR/branch" (issue #2810's own dispatch brief proposed the latter, and it
+#   does not survive contact with the real dev/daily/*.md corpus --
+#   surveyed 2026-09-15, see the mutation-test-file header for the specific
+#   counter-examples):
+#     - A rework-iteration row (e.g. "harness-maintainer | **completed** |
+#       rework iteration 1") legitimately cites its PR only in the TRACK
+#       column, not Outcome, because the PR already exists from an earlier
+#       row. Requiring an artifact reference IN Outcome false-positives on
+#       every rework row in the corpus.
+#     - A QC-verdict row ("qc-structural | **APPROVED (5)**") never cites a
+#       PR/branch in Outcome either -- the QC agent reviews an existing
+#       artifact, it doesn't create one. Requiring an artifact anywhere in
+#       the row (to dodge the above) creates the OPPOSITE hole: run 1's own
+#       broken rows cite unrelated issue numbers in Notes as context
+#       ("(#2803)", "(#2800 follow-up)") that are not this row's own
+#       produced artifact -- a bare `#\d+` search anywhere in the row would
+#       have missed the exact case this check exists to catch.
+#     - A QC re-review CAN legitimately read "in flight at run end"
+#       (dev/daily/2026-09-05.md) when a review spans a run boundary per
+#       `.claude/rules/pr-gate-loop.md` -- the PR under review already
+#       exists, nothing was lost. Scoping to writing agents excludes this
+#       correctly; scoping to "no artifact in Outcome" would not.
+#   The "in flight" marker itself is grounded in two independently confirmed
+#   real instances, not just #2810: dev/daily/2026-09-03.md's
+#   `harness-maintainer | *in flight at write time*` row, which
+#   dev/daily/2026-09-04.md's own next-day entry confirms "produced no
+#   branch and no PR" and had to be re-dispatched from scratch.
+#
+#   TABLE-SHAPE GATE: (b) only fires when the section's first `|`-prefixed
+#   line matches the canonical 4-column header (whitespace/case-insensitive).
+#   A summary with no `## Dispatched this run` section, or a table in some
+#   other shape, makes (b) a no-op -- SILENCE, not failure, per the
+#   fail-direction requirement (a table shape this script doesn't recognise
+#   is not evidence of anything). (a) still applies regardless of table
+#   shape or absence, since it needs no table to be meaningful.
 #
 # BACKEND SELECTION (mirrors dev/scripts/pr_gate_status.sh)
 #   The GHA orchestrator container has `curl` + `$GH_TOKEN` but no `gh`
@@ -317,6 +386,88 @@ _verify_full_mode_published() {
   return 0
 }
 
+# --- FULL-mode dispatch-artifact check (issue #2810) --------------------
+
+# _verify_full_mode_dispatch_artifacts <summary-path>
+# The dispatch half of the FULL-mode check -- see the "FULL-MODE
+# DISPATCH-ARTIFACT CHECK" header comment for the predicate, the two
+# violation signatures, and why the design is scoped to writing agents +
+# an "in flight" marker rather than a generic "cites no PR/branch" rule.
+#
+# Pure text parsing, no network -- unlike _verify_full_mode_published this
+# never fails closed with rc=2; there is nothing here that can be
+# undetermined the way a curl call can.
+_verify_full_mode_dispatch_artifacts() {
+  _summary="$1"
+  _awk_out=$(awk '
+    BEGIN { insec = 0; sawsection = 0; rowno = 0; placeholder = 0; nfail = 0; intable = 0 }
+    /^## Dispatched this run/ { insec = 1; sawsection = 1; next }
+    insec && /^## / { insec = 0 }
+    insec && /^---$/ { insec = 0 }
+    insec {
+      lower = tolower($0)
+      if (index(lower, "completed at the end of the run") > 0) placeholder = 1
+      if (substr($0, 1, 1) == "|") {
+        rowno++
+        if (rowno == 1) {
+          norm = lower
+          gsub(/[ \t]/, "", norm)
+          if (norm == "|track|agent|outcome|notes|") intable = 1
+          next
+        }
+        if (rowno == 2) next  # separator row (|---|---|---|---|), never data
+        if (!intable) next    # header did not match the canonical shape
+        n = split($0, cols, "|")
+        if (n < 4) next
+        track = cols[2]; agent = cols[3]; outcome = cols[4]
+        gsub(/^[ \t]+|[ \t]+$/, "", track)
+        gsub(/^[ \t]+|[ \t]+$/, "", agent)
+        gsub(/^[ \t]+|[ \t]+$/, "", outcome)
+        agentlow = tolower(agent)
+        iswriter = 0
+        np = split("feat-backtest feat-data feat-weinstein harness-maintainer ops-data code-health", pfx, " ")
+        for (i = 1; i <= np; i++) {
+          if (index(agentlow, pfx[i]) == 1) { iswriter = 1; break }
+        }
+        if (iswriter && index(tolower(outcome), "in flight") > 0) {
+          nfail++
+          print "ROW:" track "\t" agent "\t" outcome
+        }
+      } else {
+        rowno = 0
+        intable = 0
+      }
+    }
+    END {
+      print "PLACEHOLDER:" placeholder
+      print "SAWSECTION:" sawsection
+      print "NFAIL:" nfail
+    }
+  ' "$_summary")
+
+  _placeholder=$(printf '%s\n' "$_awk_out" | grep '^PLACEHOLDER:' | cut -d: -f2)
+  _sawsection=$(printf '%s\n' "$_awk_out" | grep '^SAWSECTION:' | cut -d: -f2)
+  _nfail=$(printf '%s\n' "$_awk_out" | grep '^NFAIL:' | cut -d: -f2)
+
+  if [ "${_placeholder:-0}" = "1" ] || [ "${_nfail:-0}" -gt 0 ]; then
+    echo "::error::A-FASTEXIT-VACUOUS (issue #2810): $_summary's ## Dispatched this run section claims a dispatch with no artifact to show for it. Per run 34853606164 (2026-09-14) -- three agents dispatched, zero branches, zero PRs, job still green -- a claimed dispatch that never resolved is exactly this failure class." >&2
+    printf '%s\n' "$_awk_out" | grep '^ROW:' | while IFS= read -r _r; do
+      echo "::error::  unresolved writing-agent row: ${_r#ROW:}" >&2
+    done
+    if [ "${_placeholder:-0}" = "1" ]; then
+      echo "::error::  the section still carries its 'completed at the end of the run' placeholder -- the turn ended mid-dispatch and the table was never finalized." >&2
+    fi
+    return 1
+  fi
+
+  if [ "${_sawsection:-0}" = "1" ]; then
+    echo "orchestrator_fastexit_gate verify: dispatch-artifact check OK ($_summary's ## Dispatched this run table has no unresolved writing-agent rows)."
+  else
+    echo "orchestrator_fastexit_gate verify: $_summary has no ## Dispatched this run section; dispatch-artifact check not applicable."
+  fi
+  return 0
+}
+
 # --- dev/status/ drift (Condition 2, mirrored from lead-orchestrator.md) ----
 
 # _prior_summary_path <current-summary-path>
@@ -409,7 +560,19 @@ verify() {
   if grep -qiE '^\*\*Mode:\*\* *full' "$_summary"; then
     _full_rc=0
     _verify_full_mode_published "$_summary" || _full_rc=$?
-    return "$_full_rc"
+    _dispatch_rc=0
+    _verify_full_mode_dispatch_artifacts "$_summary" || _dispatch_rc=$?
+    # Worst-of: rc=2 (couldn't determine, fail closed) outranks rc=1
+    # (determined it's bad), which outranks rc=0. Both checks always print
+    # their own ::error:: detail, so returning the worse code loses no
+    # information -- it only decides the exit status.
+    if [ "$_full_rc" -eq 2 ] || [ "$_dispatch_rc" -eq 2 ]; then
+      return 2
+    fi
+    if [ "$_full_rc" -ne 0 ] || [ "$_dispatch_rc" -ne 0 ]; then
+      return 1
+    fi
+    return 0
   fi
 
   if ! grep -qE '^\*\*Mode:\*\* NO-OP' "$_summary"; then

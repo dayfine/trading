@@ -155,7 +155,7 @@ Branch: harness/consolidate-day. SHA: 6f2255639cb326745aad06f755de1839a9fe3847. 
 
 Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
-- [ ] **H-DAILY-SUMMARY-PR-LOST** (branch `harness/daily-summary-publisher`, 2026-09-08): **five consecutive GHA orchestrator runs lost their daily summary entirely** — the last summary landed on `main` via PR #2680 (`dev/daily/2026-09-05.md`, merged 2026-09-05); runs `34030886835` / `34042419476` (09-06), `34127853646` / `34148849699` (09-07), and `34224532158` (09-08) all completed with conclusion `success` (not no-op fast-exits — the 09-08 run alone cost `total_cost_usd = 20.17803125`, `dev/budget/2026-09-08-34224532158.json`), and zero `ops/daily-*` PRs exist for any of them (newest `ops/daily-*` head remains `ops/daily-2026-09-05`). Run `34224532158`'s own log proves the file WAS written and the workflow DID look for its PR: `Using daily summary: dev/daily/2026-09-08.md` followed by `No open ops/daily-2026-09-08 PR found (no-op run or lead-orchestrator failure).` — the summary existed on the runner and died with the ephemeral container, never pushed. Root-cause hypothesis, **corrected 2026-09-09 (issue #2741, measured in this same container image, run 34350513426)**: `jj git push` is NOT broken in this image — a probe branch pushed successfully with it. Step 8 as written hits two bugs of its own instead, neither one a jj/git version issue: (1) it sets **git's** identity (`git config user.email/user.name`) but jj does not read git's config, so jj sees an empty author and refuses to push; (2) it never runs `jj describe`, so `@` is descriptionless, which jj also refuses to push. Both are independently fatal — fixing only one still fails on the other; `jj config set --user user.name/user.email` + `jj describe` fixes both together. This is a *different* defect from `jst submit`'s failure recorded in H-JJ-JST-BROKEN-GHA below (that one is a real git-version incompatibility: image git 2.34.1 vs jj's `jj git fetch --porcelain` needing git >= 2.41.0) — the two must not be fixed with the same patch. Original (superseded) hypothesis, kept for the record: `.claude/agents/lead-orchestrator.md` Step 8 publishes via `jj bookmark set ...` + `jj git push -b ... --allow-new`, and `jj` is exactly the tool H-JJ-JST-BROKEN-GHA (below) already records as non-functional in the GHA orchestrator container image — the workflow's own sibling `git push origin ops/budget-...` step in the SAME run succeeded, proving plain git works fine from that container; only the jj-based path fails. **Fix shipped (script half only):** `dev/scripts/publish_daily_summary.sh` + `dev/scripts/publish_daily_summary_test.sh` (53 fixture-driven checks after the F2 correction below) is a plain-`git` + `curl`-REST publisher: resolves the newest `dev/daily/<date>*.md` (excluding `*-plan.md`), creates/reuses branch `ops/daily-<name>`, commits, pushes, and opens a PR via `POST /repos/$REPO/pulls`, idempotent on an already-open PR (422 fallback → look up by head, same shape as `orchestrator_fastexit_gate.sh`'s own PR-fallback), and fails loudly (non-zero exit, named stderr message) on every step that can silently drop the summary — no summary found, push rejected, PR-create returning no usable number. Wired into `dune runtest` via `trading/devtools/checks/publish_daily_summary_test_runner.sh` (same shim pattern as `prior_cell_check_test_runner.sh` / `prune_candidates_test_runner.sh`). The original 35-check suite shipped in PR #2721 was mutation-verified by hand during development but the mutation *list* lived only in a session report never committed to the repo; a qc-behavioral rework pass (2026-09-08, follow-up to #2721) independently ran 28 mutations, found 12 survivors — two critical (a `git reset --hard` before push that let the script report success while publishing nothing, and the production `git add`+`git commit` path being untested because every fixture pre-committed the summary) — and added the killing scenarios directly in `publish_daily_summary_test.sh`, with the reasoning for each recorded inline in that scenario's own comment rather than in an external report. **REMAINS OPEN: the wiring half.** `.claude/agents/lead-orchestrator.md` Step 8 still calls `jj bookmark set` / `jj git push -b ... --allow-new` and has NOT been repointed at this script — `.claude/agents/**` is write-gated in the harness-maintainer runtime, so that edit needs a session with agent-definition write access (or a human). Until Step 8 is repointed, the orchestrator will keep losing summaries exactly as measured above; this script only closes the *mechanism*, not the *call site*. Verify: `dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest` exit 0; `sh dev/scripts/publish_daily_summary_test.sh` directly prints `53/53 checks passed` (grew from 52 via the F2 correction below — see the "equivalent mutant" correction paragraph).
+- [x] **H-DAILY-SUMMARY-PR-LOST** (branch `harness/daily-summary-publisher`, 2026-09-08): **five consecutive GHA orchestrator runs lost their daily summary entirely** — the last summary landed on `main` via PR #2680 (`dev/daily/2026-09-05.md`, merged 2026-09-05); runs `34030886835` / `34042419476` (09-06), `34127853646` / `34148849699` (09-07), and `34224532158` (09-08) all completed with conclusion `success` (not no-op fast-exits — the 09-08 run alone cost `total_cost_usd = 20.17803125`, `dev/budget/2026-09-08-34224532158.json`), and zero `ops/daily-*` PRs exist for any of them (newest `ops/daily-*` head remains `ops/daily-2026-09-05`). Run `34224532158`'s own log proves the file WAS written and the workflow DID look for its PR: `Using daily summary: dev/daily/2026-09-08.md` followed by `No open ops/daily-2026-09-08 PR found (no-op run or lead-orchestrator failure).` — the summary existed on the runner and died with the ephemeral container, never pushed. Root-cause hypothesis, **corrected 2026-09-09 (issue #2741, measured in this same container image, run 34350513426)**: `jj git push` is NOT broken in this image — a probe branch pushed successfully with it. Step 8 as written hits two bugs of its own instead, neither one a jj/git version issue: (1) it sets **git's** identity (`git config user.email/user.name`) but jj does not read git's config, so jj sees an empty author and refuses to push; (2) it never runs `jj describe`, so `@` is descriptionless, which jj also refuses to push. Both are independently fatal — fixing only one still fails on the other; `jj config set --user user.name/user.email` + `jj describe` fixes both together. This is a *different* defect from `jst submit`'s failure recorded in H-JJ-JST-BROKEN-GHA below (that one is a real git-version incompatibility: image git 2.34.1 vs jj's `jj git fetch --porcelain` needing git >= 2.41.0) — the two must not be fixed with the same patch. Original (superseded) hypothesis, kept for the record: `.claude/agents/lead-orchestrator.md` Step 8 publishes via `jj bookmark set ...` + `jj git push -b ... --allow-new`, and `jj` is exactly the tool H-JJ-JST-BROKEN-GHA (below) already records as non-functional in the GHA orchestrator container image — the workflow's own sibling `git push origin ops/budget-...` step in the SAME run succeeded, proving plain git works fine from that container; only the jj-based path fails. **Fix shipped (script half only):** `dev/scripts/publish_daily_summary.sh` + `dev/scripts/publish_daily_summary_test.sh` (53 fixture-driven checks after the F2 correction below) is a plain-`git` + `curl`-REST publisher: resolves the newest `dev/daily/<date>*.md` (excluding `*-plan.md`), creates/reuses branch `ops/daily-<name>`, commits, pushes, and opens a PR via `POST /repos/$REPO/pulls`, idempotent on an already-open PR (422 fallback → look up by head, same shape as `orchestrator_fastexit_gate.sh`'s own PR-fallback), and fails loudly (non-zero exit, named stderr message) on every step that can silently drop the summary — no summary found, push rejected, PR-create returning no usable number. Wired into `dune runtest` via `trading/devtools/checks/publish_daily_summary_test_runner.sh` (same shim pattern as `prior_cell_check_test_runner.sh` / `prune_candidates_test_runner.sh`). The original 35-check suite shipped in PR #2721 was mutation-verified by hand during development but the mutation *list* lived only in a session report never committed to the repo; a qc-behavioral rework pass (2026-09-08, follow-up to #2721) independently ran 28 mutations, found 12 survivors — two critical (a `git reset --hard` before push that let the script report success while publishing nothing, and the production `git add`+`git commit` path being untested because every fixture pre-committed the summary) — and added the killing scenarios directly in `publish_daily_summary_test.sh`, with the reasoning for each recorded inline in that scenario's own comment rather than in an external report. **Wiring half CLOSED (corrected 2026-09-15, was falsely marked open):** this entry previously stated the wiring half remained open because `.claude/agents/lead-orchestrator.md` Step 8 still called `jj bookmark set` / `jj git push`. That was stale by 2026-09-15 — **#2757** (commit `68cd3b8c`, "Step 8 publishes via publish_daily_summary.sh, not jj") repointed Step 8 at this script; `main` today calls `sh dev/scripts/publish_daily_summary.sh publish --summary "$SUMMARY_FILE"` and explicitly forbids jj. Verified on `main` 2026-09-15 rather than re-inherited: `grep -n 'publish_daily_summary\|jj bookmark set' .claude/agents/lead-orchestrator.md` shows the script call, not jj. The residual failure class is NOT this item — it is the broader "green run, no durable artifact" class now tracked as H-FASTEXIT-VERIFY-FULL-MODE-BLIND (#2803, closed) and H-FASTEXIT-VERIFY-DISPATCH-ARTIFACTS (#2810, closed, see "Added 2026-09-15" below) — both mechanical `verify`-time checks, not wiring. Original entry (`dev/daily/2026-09-14-run2.md` §Escalations) flagged this exact staleness and declined to self-correct because two dispatched agents were writing this file concurrently at the time; corrected now that the conflict has cleared. Verify: `dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest` exit 0; `sh dev/scripts/publish_daily_summary_test.sh` directly prints `53/53 checks passed` (grew from 52 via the F2 correction below — see the "equivalent mutant" correction paragraph).
 
   **Follow-up (issue #2729, 2026-09-09): the "two disagreeing qc-behavioral passes" reconciled — not a contradiction, disjoint mutation sets.** #2721 got TWO GitHub PR reviews at the same tip SHA `6a1dfdcc`, 17:39:54Z (qc-structural, APPROVED 5) and 17:46:15Z (qc-behavioral, APPROVED 4) — the latter is "the interactive-session pass" the issue refers to. It ran three mutations (A: no-summary guard fail-open, B: drop the `-plan.md` exclusion, C: both no-PR-number guards removed) and, on CP3, asserted the push/422 scenarios "assert the branch really landed on the bare remote ( `git branch --list` ), not just an exit code" — a claim it reached by **reading** the assertion, not by mutating the git-push mechanics themselves. It never tested a content-losing mutation. Separately, the orchestrator dispatched its OWN qc-behavioral pass on the SAME SHA (`dev/reviews/harness.md`, NEEDS_REWORK quality 2) that ran a much broader 28-mutation sweep and specifically tried `git reset --hard` (to `$REMOTE/$BASE_BRANCH`) immediately before `git push` — exactly the content-losing mutation the interactive pass's CP3 claim rested on but never tried — and found it survives: prints `PR #<n> <url>`, exits 0, and the original 35-check suite reports 35/35 green while the pushed branch carries no summary. **Both passes are correct about what they actually tested; the interactive pass's CP3 PASS rested on an unverified assumption that a later, more adversarial mutation falsified.** This is not "both cannot be right about the same mutant" — they tested different mutants entirely, and only one of the two tried the one that mattered.
 
@@ -2600,3 +2600,107 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   checks pass (14 prior + 13 new). `dev/lib/run-in-env.sh dune build`,
   `dune runtest`, and `dune build @fmt` all exit 0 (run under the
   single-dune-in-flight mutex per this runner's memory constraints).
+
+## Added 2026-09-15 (harness-maintainer, harness/dispatch-artifact-gate, issue #2810)
+
+- [x] **H-FASTEXIT-VERIFY-DISPATCH-ARTIFACTS** (issue #2810): closes the
+  *dispatch* half of the five-instance "green run, no artifact" class
+  (#2741, #2747, #2771, #2803, #2810) -- #2803/H-FASTEXIT-VERIFY-FULL-MODE-BLIND
+  above closed the *summary-publication* half only. Run 34853606164
+  (2026-09-14, "run 1") published a perfectly real, publishable summary
+  whose own `## Dispatched this run` table recorded three writing-agent
+  rows as `_in flight_` and ended there (turn budget exhausted
+  mid-dispatch): $18.30 for zero branches, zero PRs, zero status updates,
+  job still `conclusion: success`. `_verify_full_mode_published` had no
+  opinion on this -- it only checks that the summary FILE reached origin,
+  not that the summary's own CONTENT resolved.
+
+  **Fix** (`dev/scripts/orchestrator_fastexit_gate.sh`): new
+  `_verify_full_mode_dispatch_artifacts`, called from `verify`'s FULL-mode
+  branch alongside `_verify_full_mode_published` (worst-of the two return
+  codes: rc=2 outranks rc=1 outranks rc=0, both print their own `::error::`
+  detail so nothing is lost by combining). Two independent violation
+  signatures, both scoped to the `## Dispatched this run` section only:
+  (a) the literal "completed at the end of the run" placeholder text
+  (case-insensitive substring, catches every wording variant seen in the
+  corpus), anywhere in the section, regardless of table shape; (b) within
+  the canonical `| Track | Agent | Outcome | Notes |` table (matched
+  whitespace/case-insensitive), a row whose Agent names a WRITING agent
+  (`feat-backtest` / `feat-data` / `feat-weinstein` / `harness-maintainer`
+  / `ops-data` / `code-health`, matched by case-insensitive PREFIX so
+  "feat-backtest (rework #1)" etc. still match) still reads "in flight" in
+  Outcome. A missing section, or a table in a different shape, makes (b) a
+  no-op -- silence, not failure.
+
+  **Premise correction (per the dispatch brief's own instruction to follow
+  the data):** the original brief proposed "any dispatch-claiming row must
+  cite a PR (`#\d+`) or branch somewhere in the row." Surveyed against the
+  real `dev/daily/*.md` corpus (last ~10 non-plan files, 2026-09-15) that
+  rule does not survive contact with real data in either direction:
+  (i) too strict -- rework-iteration rows legitimately cite their PR only
+  in the TRACK column (e.g. `harness (#2749) | harness-maintainer |
+  **completed** | rework iteration 1`, `dev/daily/2026-09-09-run2.md`),
+  and QC-verdict rows (`qc-structural | **APPROVED (5)**`) never cite an
+  artifact in Outcome at all since they review an existing PR rather than
+  create one -- both would false-positive under the original rule;
+  (ii) too loose -- run 1's own broken rows cite UNRELATED issue numbers
+  in Notes as context (`_in flight_ | ...published (#2803)`), so a bare
+  `#\d+` search anywhere in the row would have MISSED the exact case
+  #2810 exists to catch. The shipped design instead keys on the "in
+  flight" marker, scoped to writing agents only (a QC re-review reading
+  "in flight at run end" is legitimate per `.claude/rules/pr-gate-loop.md`
+  -- a review spanning a run boundary, nothing lost -- confirmed by the
+  real `dev/daily/2026-09-05.md` row of exactly that shape). The marker
+  itself is grounded in two independently confirmed real instances, not
+  just #2810: `dev/daily/2026-09-03.md`'s `harness-maintainer | *in flight
+  at write time*` row, which `dev/daily/2026-09-04.md`'s own next-day entry
+  confirms "produced no branch and no PR" and had to be re-dispatched from
+  scratch.
+
+  **Tests** (`dev/scripts/orchestrator_fastexit_gate_test.sh`, scenarios
+  25-34, +11 checks): an unresolved writing-agent "in flight" row -> FAIL
+  citing `#2810`; the placeholder alone (no in-flight row) -> FAIL,
+  isolated from the row-level signature; all writing-agent rows resolved
+  -> PASS; a QC re-review "in flight at run end" row -> PASS (the key
+  mutation this half of the suite exists to kill -- a naive "any row still
+  in flight" rule would wrongly reject the ordinary QC-continuation
+  shape); a skip row (Agent `--`) whose Notes mentions "in flight" as
+  context -> PASS; a non-canonical (5-column) table shape -> PASS,
+  silently; a rework row citing its PR only in Track -> PASS; two
+  real-corpus excerpts VERBATIM from `dev/daily/2026-09-14.md` (broken,
+  FAIL) and `dev/daily/2026-09-14-run2.md` (healthy re-dispatch, PASS);
+  and an Agent containing a writer name as a substring but not a prefix
+  (e.g. `reviewer-of-ops-data-output`) -> PASS, not treated as a writer.
+
+  **Mutation-verified by hand** (all RED before restore, GREEN after,
+  38/38 clean at rest): (1) make the new function `return 0` immediately
+  -> killed 4 checks (both in-flight-row and placeholder-only scenarios,
+  plus the broken-corpus regression). (2) `iswriter && in-flight-substring`
+  -> `iswriter || ...` (drop the outcome condition) -> killed 4 checks
+  (false-positives every resolved/QC/rework scenario). (3) delete the
+  placeholder-detection line -> killed the placeholder-only scenario (and
+  only that one, correctly isolated from the in-flight-row signature).
+  (4) drop `harness-maintainer` from the writer-prefix list -> killed 2
+  checks. (5) change the search substring from `"in flight"` to
+  `"in-flight"` (hyphen) -> killed 2 checks. (6) comment out `nfail++` (the
+  count never increments) -> killed 2 checks. (7, found during the
+  session's own extra rigor pass beyond the required 6, then killed by
+  adding Scenario 34): loosen the prefix match `index(...) == 1` to
+  `index(...) > 0` (substring anywhere, not prefix) -> survived the
+  original 33 scenarios, so a 34th scenario (`reviewer-of-ops-data-output`,
+  containing `ops-data` as a substring but not a prefix) was added
+  specifically to close it; re-verified RED with the mutation, GREEN
+  restored. Zero surviving mutations at time of writing.
+
+  Backward compatibility: scenarios 1-24 (the #2579 NO-OP checks and the
+  #2803 publication checks) are unaffected -- `_reset_summary`'s fixture
+  never includes a `## Dispatched this run` section, so the new check
+  always no-ops (silence) for all of them; re-ran the full 27-scenario
+  suite before adding anything and confirmed 27/27 unchanged.
+
+  **Verify:** `sh dev/scripts/orchestrator_fastexit_gate_test.sh` --
+  38/38 checks pass (27 prior + 11 new). `dev/lib/run-in-env.sh dune build
+  @fmt`, `dune build`, and `dune runtest` (full suite, not just
+  `devtools/checks`) all exit 0 with zero `^FAIL:` lines across 4,480
+  output lines (run under the single-dune-in-flight mutex, foreground,
+  exit codes read unpiped).
