@@ -236,6 +236,20 @@ run_mutation x5 killed \
   's/\[0-9a-f\]{7,40}/[0-9a-f]{8,40}/' \
   'regress the sha-capture lower bound from {7,40} back to {8,40} -- the exact #2397 short-sha bug'
 
+# p1-p2: H-GATEPARSER-CURL-PROJECTION-UNPINNED (dev/status/harness.md).
+# `_pr_meta_curl`'s `commit_id` projection (line ~670) is pinned end to end by
+# cases 36b/36c in pr_gate_status_test.sh, not by any row above -- none of x1-x5
+# or d/j/k/f/g/m touch that line. These two rows make that PR's central claim
+# self-verifying on every `dune runtest` instead of living only in prose (the
+# PR body / status entry's own mutation table, run by hand).
+run_mutation p1 killed \
+  's/map({body: \.body, commit_id: \.commit_id})/map({body: .body})/' \
+  'H-GATEPARSER-CURL-PROJECTION-UNPINNED: drop commit_id from the _pr_meta_curl projection entirely'
+
+run_mutation p2 killed \
+  's/commit_id: \.commit_id})/commit_id: (.commit_id[0:8])})/' \
+  'H-GATEPARSER-CURL-PROJECTION-UNPINNED: truncate the projected commit_id to 8 hex chars -- killed because 36b'"'"'s stale commit_id shares $TIP'"'"'s prefix and differs only in the tail (see the fixture fix in pr_gate_status_test.sh case 36b)'
+
 run_mutation s5 survivor \
   's/(?<h>\.\*)\$")\]/(?<h>.*)")]/' \
   'UNPINNED: drop the trailing $ end-anchor from the heading regex -- a VERIFIED EQUIVALENT MUTANT, not a live defect. What bounds "." at end-of-line is the ABSENCE of dot-all ((?s)), not (?m): confirmed in this container jq-1.6/Oniguruma, `"a\nb" | test("(?m)a.b")` is false but `"a\nb" | test("(?ms)a.b")` is true, so with only (?m) set the capture is line-bounded with or without the trailing $, making it redundant here. (Also a jq-semantics tripwire: if a future jq made "." dot-all by default, s5 would stop being equivalent.) The suite pins neither reading, but no test can ever distinguish them -- this is not left-for-follow-up work.' \
