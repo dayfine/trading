@@ -32,6 +32,9 @@ let _write_fixtures () =
   Out_channel.write_all
     (Filename.concat root "broad.sexp")
     ~data:"Full_sector_map";
+  (* A vintage file that parses but names nobody — the truncated-file shape
+     [load] must reject rather than turn into a zero-candidate window. *)
+  Out_channel.write_all (Filename.concat root "empty.sexp") ~data:"(Pinned ())";
   root
 
 let _load_two_list_schedule () =
@@ -140,6 +143,28 @@ let test_full_sector_map_entry_rejected _ =
        [ (_ymd 2020 1 1, "broad.sexp") ])
     (is_error_with Status.Failed_precondition)
 
+(* An entry whose membership list is empty parses as [Pinned []]; [load] must
+   reject it (naming the path and the entry's date) rather than admit a
+   silently zero-candidate window into the step function. *)
+let test_empty_membership_list_rejected _ =
+  let root = _write_fixtures () in
+  assert_that
+    (Universe_schedule.load ~fixtures_root:root
+       [ (_ymd 2020 1 1, "early.sexp"); (_ymd 2021 1 1, "empty.sexp") ])
+    (all_of
+       [
+         is_error_with Status.Invalid_argument;
+         field
+           (fun r ->
+             Result.error r
+             |> Option.value_map ~default:"<no error>" ~f:(fun (e : Status.t) ->
+                 e.message))
+           (all_of
+              [
+                contains_substring "empty.sexp"; contains_substring "2021-01-01";
+              ]);
+       ])
+
 let test_reject_if_present_allows_empty _ =
   assert_that
     (Universe_schedule.reject_if_present ~runner_name:"Walk_forward_executor" [])
@@ -206,6 +231,8 @@ let suite =
          "empty schedule rejected" >:: test_empty_schedule_rejected;
          "Full_sector_map entry rejected"
          >:: test_full_sector_map_entry_rejected;
+         "entry with an empty membership list rejected"
+         >:: test_empty_membership_list_rejected;
          "reject_if_present allows empty"
          >:: test_reject_if_present_allows_empty;
          "reject_if_present names field and runner"

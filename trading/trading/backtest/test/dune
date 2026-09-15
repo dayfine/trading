@@ -46,7 +46,8 @@
   test_ticket_cancel_observability
   test_cancel_reason_closed_list
   test_stale_exit_observability
-  test_force_liquidation_observability)
+  test_force_liquidation_observability
+  test_panel_strategy_builder_schedule)
  (libraries
   ounit2
   core

@@ -4,6 +4,7 @@
   test_universe_file
   test_universe_schedule
   test_universe_schedule_e2e
+  test_universe_schedule_scenario_seam
   test_universe_snapshot
   test_fixtures_root
   test_scenario_runner_isolation
@@ -17,6 +18,7 @@
   test_universe_file
   test_universe_schedule
   test_universe_schedule_e2e
+  test_universe_schedule_scenario_seam
   test_universe_snapshot
   test_fixtures_root
   test_scenario_runner_isolation
@@ -47,9 +49,11 @@
  (preprocess
   (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show))
  (deps
-  ; test_scenario_runner_wall_span.ml runs the real scenario_runner.exe as a
-  ; subprocess (issue #2606 regression) and reads scenario_runner.ml's source
-  ; for its structural check. Without these deps dune is free to skip
+  ; test_scenario_runner_wall_span.ml and
+  ; test_universe_schedule_scenario_seam.ml run the real scenario_runner.exe as
+  ; a subprocess (issue #2606 regression; the scenario->runner universe seam),
+  ; and the former also reads scenario_runner.ml's source for its structural
+  ; check. Without these deps dune is free to skip
   ; building the exe / mirroring the source into this test's sandbox (same
   ; hazard as issue #2565's csv_snapshot_builder_cleanup_subject.exe).
   ../scenario_runner.exe

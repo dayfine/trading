@@ -2,10 +2,13 @@
     date to the set of symbols eligible for entry on that date.
 
     A schedule is a list of [(date, universe_path)] entries, each path resolved
-    against the fixtures root and loaded by {!Universe_file} (so every shape
-    that module accepts — [Pinned], [Full_sector_map], and a
-    [Composition_from_individuals] {!Universe.Snapshot.t} sexp — works here
-    unchanged).
+    against the fixtures root and loaded by {!Universe_file}. Every shape that
+    module accepts which carries an EXPLICIT membership list works here
+    unchanged — a [Pinned] list, and a [Composition_from_individuals]
+    {!Universe.Snapshot.t} sexp (which {!Universe_file.load} projects to
+    [Pinned]). The [Full_sector_map] sentinel is the one exception: it names no
+    symbols, so it cannot say who is a member on a given date and {!load}
+    rejects it. So does an entry whose membership list is empty.
 
     {b Window semantics.} Entries are sorted by date on load. The entry dated
     [d_i] governs every screening date [d] with [d_i <= d < d_(i+1)]; the FIRST
@@ -37,12 +40,14 @@ val load : fixtures_root:string -> (Date.t * string) list -> t Status.status_or
     [fixtures_root], loads it via {!Universe_file.load}, and builds the step
     function.
 
-    Returns [Error Invalid_argument] when [entries] is empty or when two entries
-    carry the same date, and [Error Failed_precondition] when a referenced
-    universe file resolves to [Full_sector_map] (the [data/sectors.csv] sentinel
-    carries no explicit membership list, so it cannot participate in a dated
-    schedule). Propagates [Failure] from {!Universe_file.load} for a missing or
-    malformed file. *)
+    Returns [Error Invalid_argument] when [entries] is empty, when two entries
+    carry the same date, or when a referenced universe file carries an EMPTY
+    membership list (naming the path and the entry's date — a truncated or empty
+    vintage file would otherwise load as a silently zero-candidate window).
+    Returns [Error Failed_precondition] when a referenced universe file resolves
+    to [Full_sector_map] (the [data/sectors.csv] sentinel carries no explicit
+    membership list, so it cannot participate in a dated schedule). Propagates
+    [Failure] from {!Universe_file.load} for a missing or malformed file. *)
 
 val members_at : t -> Date.t -> String.Set.t
 (** [members_at t d] is the member set governing screening date [d], per the
@@ -67,10 +72,10 @@ val reject_if_present :
     [universe_schedule] and [runner_name].
 
     Every scenario consumer that resolves [universe_path] itself — walk-forward,
-    rolling-start, barbell, the tuners, the all-eligible diagnostic — must call
-    this so a scheduled spec fails loudly on a runner that does not implement
-    dated membership, rather than silently running the whole window against the
-    single [universe_path]. *)
+    rolling-start, barbell, the tuners, the all-eligible diagnostic, the
+    leak-repro diagnostic — must call this so a scheduled spec fails loudly on a
+    runner that does not implement dated membership, rather than silently
+    running the whole window against the single [universe_path]. *)
 
 val sector_map_of_unscheduled :
   fixtures_root:string ->

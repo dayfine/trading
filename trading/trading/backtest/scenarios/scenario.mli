@@ -107,8 +107,9 @@ type t = {
 
           Only {!Scenario_runner} implements this; every other scenario consumer
           rejects a non-empty schedule via
-          {!Universe_schedule.reject_if_present} rather than silently ignoring
-          it. See {!Scenario_lib.Universe_schedule} and
+          {!Universe_schedule.reject_if_present} / {!raise_if_present} (usually
+          through {!Universe_schedule.sector_map_of_unscheduled}) rather than
+          silently ignoring it. See {!Scenario_lib.Universe_schedule} and
           [dev/plans/pit-universe-migration-2026-09-14.md] §Step 3a. *)
   config_overrides : Sexp.t list;
       (** Partial config sexps deep-merged into the default Weinstein config, in

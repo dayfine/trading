@@ -17,9 +17,14 @@ let _duplicate_dates (sorted : (Date.t * string) list) =
       Date.equal a b)
   |> Option.map ~f:(fun ((d, _), _) -> d)
 
-(* Load one [(date, path)] entry. [Full_sector_map] is rejected: the
-   [data/sectors.csv] sentinel carries no explicit membership list, so it cannot
-   express "these symbols are members on this date". *)
+(* Load one [(date, path)] entry. Two shapes are rejected, both for the same
+   reason — they name no members, so they cannot express "these symbols are
+   members on this date":
+
+   - [Full_sector_map], the [data/sectors.csv] sentinel; and
+   - an EMPTY [Pinned] list. A truncated or empty vintage file would otherwise
+     load fine and silently produce a zero-candidate window rather than a load
+     error, which is exactly the failure a 27-entry schedule must not hide. *)
 let _load_entry ~fixtures_root (date, path) =
   let resolved = Filename.concat fixtures_root path in
   match Universe_file.load resolved with
@@ -28,6 +33,12 @@ let _load_entry ~fixtures_root (date, path) =
         (sprintf
            "Universe_schedule: %s (entry dated %s) is the Full_sector_map \
             sentinel; a dated schedule needs an explicit membership list."
+           path (Date.to_string date))
+  | Universe_file.Pinned [] ->
+      _error Status.Invalid_argument
+        (sprintf
+           "Universe_schedule: %s (entry dated %s) lists no symbols; every \
+            schedule entry needs a non-empty membership list."
            path (Date.to_string date))
   | Universe_file.Pinned pinned ->
       let sectors =

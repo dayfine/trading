@@ -36,6 +36,14 @@ val build_fold_scenario :
     - [description] preserved from [base] but prefixed with the fold label.
     - [period = fold.test_period] — the OOS evaluation window.
     - [universe_path] preserved.
+    - [universe_schedule] preserved — a scheduled base carries its dated
+      point-in-time membership into every fold. (Walk-forward does not yet
+      IMPLEMENT dated membership: {!Walk_forward_executor} rejects a non-empty
+      schedule loudly via
+      {!Scenario_lib.Universe_schedule.sector_map_of_unscheduled}. Preserving
+      the field here keeps the fold scenario a faithful copy so that rejection
+      fires on the fold, rather than the schedule silently vanishing at the fold
+      boundary.)
     - [config_overrides = base.config_overrides @ variant.overrides] — variant
       overrides are APPENDED last so they win on conflicts (last-writer-wins per
       {!Tuner_bin.Bayesian_runner_evaluator.build} and

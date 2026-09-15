@@ -49,6 +49,19 @@ val build :
       Dated point-in-time universe membership, forwarded to
       {!Weinstein_strategy.make}'s [?universe_membership_at] on the [Weinstein]
       branch. [None] (the default) means every universe symbol is eligible on
-      every screening date — bit-equal to the pre-schedule baseline. Only the
-      [Weinstein] branch consumes it; the other constructors take no universe.
-      See {!Scenario_lib.Universe_schedule}. *)
+      every screening date — bit-equal to the pre-schedule baseline. See
+      {!Scenario_lib.Universe_schedule}.
+
+    Only the [Weinstein] branch can honour it, so [build] {b raises} [Failure]
+    (naming the strategy choice and [universe_schedule]) when [Some _] reaches a
+    branch that would silently ignore it while still trading the scenario's
+    universe — concretely [Sector_rotation_weinstein] with
+    [use_scenario_universe = true], whose tradable set is every staged symbol,
+    i.e. the UNION of every list in the schedule.
+
+    The remaining branches trade a symbol set the scenario universe does not
+    determine — [Bah_benchmark], [Spy_only_weinstein] and [Breaker_spy_sleeve]
+    are single-symbol, and [Sector_rotation_weinstein] with
+    [use_scenario_universe = false] trades its own SPDR sector-ETF default list
+    — so a schedule is inapplicable there (the same reason they already ignore
+    [universe_path]) and is ignored without raising. *)

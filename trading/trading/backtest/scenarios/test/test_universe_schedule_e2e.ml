@@ -137,6 +137,27 @@ let _baseline_trades () =
   let s = _scenario () in
   _run ~sector_map_override:(_baseline_sector_map s) s
 
+(** The baseline witness the dropout assertions rest on: with no schedule, this
+    scenario really does round-trip JPM and AAPL (both entered 2019-05-04,
+    BEFORE [_drop_date]) and JNJ (entered 2019-06-22, AFTER it). Pinned so
+    [test_dropped_symbol_entered_after_drop_is_gone]'s "JNJ count = 0" is
+    self-evidently non-vacuous rather than trivially true of a run that never
+    held JNJ at all. *)
+let test_baseline_holds_the_symbols_the_schedule_drops _ =
+  assert_that
+    (_baseline_trades ()
+    |> List.filter_map ~f:(fun t ->
+        if List.mem _dropped t.symbol ~equal:String.equal then
+          Some (t.symbol, t.entry_date)
+        else None)
+    |> List.sort ~compare:Poly.compare)
+    (elements_are
+       [
+         equal_to ("AAPL", _ymd 2019 5 4);
+         equal_to ("JNJ", _ymd 2019 6 22);
+         equal_to ("JPM", _ymd 2019 5 4);
+       ])
+
 (** A single-entry schedule over the scenario's own symbols reproduces the
     baseline round-trips exactly — the schedule seam is inert when it admits
     every symbol on every date. *)
@@ -194,6 +215,8 @@ let test_positions_held_through_dropout_exit_normally _ =
 let suite =
   "universe_schedule_e2e_tests"
   >::: [
+         "baseline holds JPM/AAPL (pre-drop) and JNJ (post-drop)"
+         >:: test_baseline_holds_the_symbols_the_schedule_drops;
          "single-entry schedule is bit-equal to universe_path"
          >:: test_single_entry_schedule_is_bit_equal;
          "union sector map spans every list"
