@@ -202,7 +202,11 @@ val evaluate_rules :
 
     R7 reads the record's enriched [exit_] when it has one, and otherwise falls
     back to its reason-only [external_exit] for the force-liquidation shape only
-    — so a breaker exit rates the same whichever audit channel captured it. *)
+    — so a breaker exit rates the same whichever audit channel captured it. That
+    fallback is defensive rather than load-bearing today: breaker exits route
+    through {!Weinstein_strategy.Exit_audit_capture} and so land on the enriched
+    [exit_], leaving the reason-only channel unexercised by the current breaker
+    path. *)
 
 val score_of_rules : rule_evaluation list -> float
 (** Roll up rule outcomes into a per-trade score in [[0, 1]]. [Pass] counts 1,

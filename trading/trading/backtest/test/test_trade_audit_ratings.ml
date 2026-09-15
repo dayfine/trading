@@ -561,6 +561,24 @@ let test_r7_pass_other_strategy_signal_outside_stage_4 _ =
        ())
     (equal_to TR.Pass)
 
+(* The complement of the guard above, and the case that keeps the
+   held-through-Stage-4 arm honest: the same non-breaker [Strategy_signal]
+   that passes in a healthy stage must still [Fail] when it closed a long that
+   rode Stage 3 into Stage 4. Without it, widening that arm's [Pass] match to
+   admit [Strategy_signal _] would silently flip every non-breaker signal exit
+   (laggard_rotation, stage3_force_exit, extension_stop, macro_bearish_trim,
+   liquidity_exit, volume_eject) in Stage 4 from [Fail] to [Pass] with a green
+   suite. *)
+let test_r7_fail_other_strategy_signal_held_through_stage_4 _ =
+  assert_that
+    (_r7_of_exit
+       ~stage_at_exit:(WT.Stage4 { weeks_declining = 5 })
+       ~exit_trigger:
+         (Backtest.Stop_log.Strategy_signal
+            { label = "laggard_rotation"; detail = None })
+       ())
+    (equal_to TR.Fail)
+
 (* The reason-only channel: [external_exit] carries an [exit_trigger] but no
    [stage_at_exit], which is why R7 was left [Not_applicable] there in #2196.
    The force-liquidation shape needs no stage, so it is now answerable. *)
@@ -1097,6 +1115,8 @@ let suite =
          >:: test_r7_fail_force_liquidation_on_short;
          "R7 pass other strategy signal outside stage 4"
          >:: test_r7_pass_other_strategy_signal_outside_stage_4;
+         "R7 fail other strategy signal held through stage 4"
+         >:: test_r7_fail_other_strategy_signal_held_through_stage_4;
          "R7 fail force liquidation via external exit"
          >:: test_r7_fail_force_liquidation_via_external_exit;
          "R7 NA for other external exit label"
