@@ -1109,3 +1109,34 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:codex_review_test_runner.sh})))
+
+; Settings hook path linter (H-SETTINGS-HOOKS-ABSOLUTE-LOCAL-PATH,
+; dev/status/harness.md, 2026-09-15): .claude/settings.json hooks must not
+; hardcode a user-specific absolute path (/Users/<user>/... or
+; /home/<user>/...) -- every containerised workflow loads project settings,
+; so a hook pinned to one developer's machine silently fails on every CI
+; run with no gate observing hook exit status. Both SessionStart and Stop
+; hooks were pinned this way and had therefore never once run in CI.
+; .claude/settings.json is outside the dune workspace root and is read via
+; repo_root() in _check_lib.sh at RUN TIME, so (universe) is required per
+; H-CHECK-CACHE-BLIND (same reasoning as index_size_linter.sh above).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:settings_path_check.sh})))
+
+; Fixture-driven self-test for settings_path_check.sh: drives the linter
+; over temp JSON fixtures via SETTINGS_PATH_CHECK_FILE (never over the live
+; .claude/settings.json alone, which would make the test pass vacuously
+; once the file itself is fixed) -- macOS /Users/ FAIL, Linux /home/<user>/
+; FAIL, clean repo-relative-only PASS, legitimate non-home absolute paths
+; (including the "/opt/homebrew/" near-miss) PASS, and a missing target
+; file FAIL rather than silently passing.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh settings_path_check.sh)
+ (action
+  (run sh %{dep:settings_path_check_test.sh})))
