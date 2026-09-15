@@ -40,7 +40,8 @@
 # name is pinned end-to-end against a "-run2"-suffixed path, matching the
 # real incident (dev/daily/2026-09-13-run2.md).
 #
-# #2810 adds the FULL-mode DISPATCH-artifact check (Scenarios 25-33): a
+# #2810 adds the FULL-mode DISPATCH-artifact check (Scenarios 25-34,
+# extended to 35-40 by the #2831 behavioral-QC rework -- see below): a
 # FULL-mode summary can be genuinely published (Scenarios 15-24 all pass)
 # while its OWN `## Dispatched this run` table still claims an unresolved
 # dispatch -- run 34853606164 (2026-09-14) recorded three writing-agent
@@ -61,6 +62,20 @@
 # dev/daily/2026-09-14.md (the broken run) and
 # dev/daily/2026-09-14-run2.md (the healthy re-dispatch), pinned to FAIL
 # and PASS respectively.
+#
+# #2831 behavioral-QC rework (CP4) adds Scenarios 35-40: the pfx[]
+# writer-agent whitelist in _verify_full_mode_dispatch_artifacts had only
+# harness-maintainer genuinely isolated-tested -- feat-backtest was pinned
+# only in combination with harness-maintainer, and feat-data /
+# feat-weinstein / ops-data / code-health had none, so dropping any of
+# those five from pfx[] left the suite green (CP4-a). Scenarios 35-39 test
+# each of those five standalone. Separately, the table-shape header gate
+# (the canonical `| Track | Agent | Outcome | Notes |` check) was itself
+# unpinned -- removing it entirely also passed all 38 scenarios, because
+# the one non-canonical-table fixture (old Scenario 30) happened to
+# column-misalign away from any writer name (CP4-b). Scenario 40 uses a
+# non-canonical header engineered so column 3 coincidentally holds a
+# writer name, so the shape gate's effect is actually exercised.
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -820,6 +835,89 @@ _write_dispatch_summary '| Track | Agent | Outcome | Notes |
 rc=0
 _run_verify dev/daily/2026-08-27.md || rc=$?
 check "an Agent containing a writer name as a substring (not a prefix) is not treated as a writer" 0 "$rc"
+
+# --- Scenarios 35-39: each writing agent named in the pfx[] whitelist,
+# tested ISOLATED (mirroring Scenario 25's single-row shape) -- rework
+# per QC finding CP4-a: the six-name list at
+# orchestrator_fastexit_gate.sh's `split("feat-backtest feat-data
+# feat-weinstein harness-maintainer ops-data code-health", pfx, " ")`
+# only had harness-maintainer genuinely isolated-tested; feat-backtest was
+# pinned only in COMBINATION with harness-maintainer (old Scenario 32), and
+# feat-data / feat-weinstein / ops-data / code-health had zero coverage at
+# all -- removing any of those five from pfx[] left the whole suite green.
+# Each of the five below fails standalone if its name is dropped from
+# pfx[]. -------------------------------------------------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| trade-audit | feat-backtest | _in flight_ | pin R7 = `Fail` for a `force_liquidation` exit |
+| cleanup | — | **skipped** | nothing to do |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "feat-backtest alone (no other writer row) with an unresolved 'in flight' row is rejected" 1 "$rc"
+
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| data-foundations | feat-data | _in flight_ | extend deep universe coverage |
+| cleanup | — | **skipped** | nothing to do |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "feat-data alone with an unresolved 'in flight' row is rejected" 1 "$rc"
+
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| weinstein-base | feat-weinstein | _in flight_ | short-side risk control |
+| cleanup | — | **skipped** | nothing to do |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "feat-weinstein alone with an unresolved 'in flight' row is rejected" 1 "$rc"
+
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| ops | ops-data | _in flight_ | rebuild universe inventory |
+| cleanup | — | **skipped** | nothing to do |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "ops-data alone with an unresolved 'in flight' row is rejected" 1 "$rc"
+
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| cleanup | code-health | _in flight_ | function-length finding |
+| ops-data | — | **skipped** | data-gaps.md unchanged |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "code-health alone with an unresolved 'in flight' row is rejected" 1 "$rc"
+
+# --- Scenario 40: a NON-canonical table header whose column layout would
+# coincidentally place a writer name in the "Agent" position (column 3) if
+# the table-shape gate were absent -> PASS. Rework per QC finding CP4-b:
+# the old Scenario 30 fixture (`| PR | Branch | Author | Tip SHA | Status |`)
+# happened to column-misalign so column 3 ("Author") held a non-writer
+# value ("someone"), so removing the shape gate entirely (treating any
+# first `|`-row as the header) ALSO passed all 38 scenarios -- Scenario 30
+# pinned only "this one fixture passes", not "the guard rejects a
+# wrong-shaped table that would otherwise false-positive". This fixture's
+# column 3 ("Assignee") holds "ops-data" with Outcome "in flight" in
+# column 4 -- exactly the shape that would wrongly fail under the gate-
+# removed mutation, and correctly stays silent (PASS) under the real
+# canonical-header check. --------------------------------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| PR | Assignee | Status | Comment |
+|----|----------|--------|---------|
+| #500 | ops-data | in flight | unrelated non-canonical table, must not be inspected |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "a non-canonical table whose column 3 coincidentally holds a writer name is ignored (PASS, silent)" 0 "$rc"
 
 MOCK_DAILY_PR_STATE=none
 export MOCK_DAILY_PR_STATE
