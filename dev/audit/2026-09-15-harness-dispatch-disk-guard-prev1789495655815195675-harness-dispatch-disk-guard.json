@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-15",
+  "feature": "harness-dispatch-disk-guard",
+  "branch": "harness/dispatch-disk-guard",
+  "sha": "e050c880aa6650d4789e532372e146108168d9a6",
+  "recorded_at_ns": 1789495655815195675,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
