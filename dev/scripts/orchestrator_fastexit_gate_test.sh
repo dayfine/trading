@@ -41,7 +41,7 @@
 # real incident (dev/daily/2026-09-13-run2.md).
 #
 # #2810 adds the FULL-mode DISPATCH-artifact check (Scenarios 25-34,
-# extended to 35-40 by the #2831 behavioral-QC rework -- see below): a
+# extended to 35-41 by the #2831 behavioral-QC rework -- see below): a
 # FULL-mode summary can be genuinely published (Scenarios 15-24 all pass)
 # while its OWN `## Dispatched this run` table still claims an unresolved
 # dispatch -- run 34853606164 (2026-09-14) recorded three writing-agent
@@ -63,7 +63,7 @@
 # dev/daily/2026-09-14-run2.md (the healthy re-dispatch), pinned to FAIL
 # and PASS respectively.
 #
-# #2831 behavioral-QC rework (CP4) adds Scenarios 35-40: the pfx[]
+# #2831 behavioral-QC rework (CP4) adds Scenarios 35-41: the pfx[]
 # writer-agent whitelist in _verify_full_mode_dispatch_artifacts had only
 # harness-maintainer genuinely isolated-tested -- feat-backtest was pinned
 # only in combination with harness-maintainer, and feat-data /
@@ -75,7 +75,16 @@
 # the one non-canonical-table fixture (old Scenario 30) happened to
 # column-misalign away from any writer name (CP4-b). Scenario 40 uses a
 # non-canonical header engineered so column 3 coincidentally holds a
-# writer name, so the shape gate's effect is actually exercised.
+# writer name, so the shape gate's effect is actually exercised -- but it
+# only proves a ZERO-shared-words header is ignored. A second rework pass
+# (CP4-c) found that Scenario 40 alone did not distinguish an EXACT
+# canonical-string match from a looser "all four keywords present, any
+# order" match -- a fuzzy-match mutant of the header check passed all 44
+# scenarios through Scenario 40. Scenario 41 uses a header containing all
+# four canonical words in the WRONG order, paired with a data row that
+# places a writer name and "_in flight_" in the literal columns 3/4 the
+# parser reads, so an exact-match check stays silent (PASS) while a fuzzy
+# all-words-present check would misfire (FAIL).
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -918,6 +927,31 @@ _write_dispatch_summary '| PR | Assignee | Status | Comment |
 rc=0
 _run_verify dev/daily/2026-08-27.md || rc=$?
 check "a non-canonical table whose column 3 coincidentally holds a writer name is ignored (PASS, silent)" 0 "$rc"
+
+# --- Scenario 41: a header containing all four canonical words, but NOT in
+# canonical column order, paired with a data row that places a writer name
+# and "_in flight_" in the fixed positional columns the parser reads
+# (literal column 3 / column 4) -> PASS, silent. Rework per QC finding
+# CP4-c: Scenario 40 proves a header sharing ZERO words with the canonical
+# form is ignored, but does not prove the check enforces exact canonical
+# equality (column order + exact wording) rather than a looser "all four
+# keywords present, any order" match -- a mutant that loosens
+# `norm == "|track|agent|outcome|notes|"` to an all-four-words-present test
+# passes every scenario through 40. This header ("| Agent | Outcome |
+# Track | Notes |") contains all four words yet in the wrong order, so
+# `norm` never equals the canonical string and `intable` must stay 0 under
+# the real (exact-match) check; the data row's literal column 3 holds
+# "feat-backtest" and column 4 holds "_in flight_" -- exactly the shape
+# that, if the gate were fuzzy, would misread this non-canonical table as
+# the real dispatch table and reject it. ------------------------------------
+_reset_repo_no_drift
+_set_origin_main without-summary
+_write_dispatch_summary '| Agent | Outcome | Track | Notes |
+|-------|--------|-------|-------|
+| trade-audit | feat-backtest | _in flight_ | pin R7 = `Fail` for a `force_liquidation` exit |'
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "a header with all four canonical words in the wrong order is ignored -- exact-match, not fuzzy all-words-present (PASS, silent)" 0 "$rc"
 
 MOCK_DAILY_PR_STATE=none
 export MOCK_DAILY_PR_STATE
