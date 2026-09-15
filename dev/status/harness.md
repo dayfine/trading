@@ -2010,19 +2010,22 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   assert the review objects reaching `_gate` carry `commit_id`), not just the
   `review_result` fallback the current cases 43-45 pin.
 
-  **DONE (2026-09-15).** What shipped: two new END-TO-END cases (36b, 36c) in
+  **DONE (2026-09-15), reworked (2026-09-15, QC behavioral iteration 1).** What
+  shipped: two new END-TO-END cases (36b, 36c) in
   `dev/scripts/pr_gate_status_test.sh`, appended after the existing curl-backend
   e2e block (cases 34-36). Unlike cases 43-45 (which call `_gate` directly on a
   hand-built `[{body, commit_id}]` array and never touch `_pr_meta_curl`), these
   two drive the REAL script end to end through a stub `curl` that returns
   RAW GitHub REST review payloads (`id`/`node_id`/`user`/`state`/`submitted_at`/
   `commit_id`, the actual `GET /pulls/:n/reviews` shape) — so the assertion can
-  only pass if `_pr_meta_curl`'s projection actually carries `commit_id` from
-  that raw payload through to the array `_gate` consumes. 36b: a sha-less
-  behavioral-review body + a stale `commit_id` must NOT reach MERGE (reads
-  "re-run qc-behavioral at `$tip`"). 36c: the happy-path companion — the same
-  shape with a CURRENT `commit_id` must reach MERGE — so a mutation that makes
-  every review look permanently stale doesn't pass 36b for the wrong reason.
+  only pass if `_pr_meta_curl`'s projection carries the GENUINE `commit_id`
+  value through, not merely a non-empty one (see the rework below — the first
+  version of this claim was true of deletion but false of truncation). 36b: a
+  sha-less behavioral-review body + a stale `commit_id` must NOT reach MERGE
+  (reads "re-run qc-behavioral at `$tip`"). 36c: the happy-path companion — the
+  same shape with a CURRENT `commit_id` must reach MERGE — so a mutation that
+  makes every review look permanently stale doesn't pass 36b for the wrong
+  reason.
 
   Premise re-confirmed before writing the fix (as the dispatch brief required):
   reverting `_pr_meta_curl`'s projection line alone
@@ -2031,41 +2034,68 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   suite exit 0 / 94 clean — same defect shape as the #2628 measurement,
   reconfirmed at the current test count.
 
+  **Rework (QC behavioral iteration 1, quality 2, two FAILs).** The first
+  version of 36b used a maximally dissimilar stale `commit_id` (`aaaa…a`, 40
+  a's). That fixture choice made the original M5 survivor
+  (`commit_id: (.commit_id[0:8])`, truncate to 8 hex chars) look like `_gate`'s
+  pre-existing short-sha tolerance rather than a real gap — but the same "it's
+  just a valid prefix" argument also excuses truncating to a SINGLE hex
+  character, which is not benign (roughly 1-in-16 arbitrary commits would
+  false-positive as current). Fix: 36b's stale `commit_id` is now
+  `7dc57cc06aa1b2c3d4e5f60718293a4b5c6ddead` — shares `$TIP`'s first 36 hex
+  characters, differs only in the last 4 (`dead` vs `7e8f`) — so any truncation
+  short enough to still read as a "valid prefix" of `$TIP` is ALSO a valid
+  prefix of the stale sha, and 36b reddens regardless of truncation width.
+  Verified directly (all three arms, in isolation, clean `pr_gate_status.sh`
+  restored between each):
+
+  | arm | result |
+  |---|---|
+  | clean code, new fixture | `sh dev/scripts/pr_gate_status_test.sh` → exit 0, `OK: pr_gate_status -- 96 tests clean.` |
+  | `commit_id: (.commit_id[0:8])` (M5, truncate 8) | exit 1, `FAIL H-GATEPARSER-CURL-PROJECTION-UNPINNED: ... blocks MERGE: want RERUN, got MERGE` — only 36b reddens |
+  | `commit_id: (.commit_id[0:4])` (truncate 4) | same single FAIL as above |
+  | `commit_id: (.commit_id[0:1])` (truncate 1) | same single FAIL as above |
+
+  M5 is now **killed**, not a survivor: the table below is updated accordingly.
+
   Mutation table (each row: apply mutation to a clean copy of
   `pr_gate_status.sh`, run `sh dev/scripts/pr_gate_status_test.sh`, record
-  result, then restore the clean file):
+  result, then restore the clean file). The **pre-existing suite** column is
+  new in this rework — it answers "does this mutation already redden a case
+  that existed before 36b/36c?", run against cases 34-36/43-45 with 36b/36c
+  removed entirely:
 
-  | # | mutation | 36b (stale) | 36c (current) | caught? |
-  |---|---|---|---|---|
-  | M1 | full revert: drop `commit_id` from the projection | FAIL (want RERUN, got MERGE) | ok | **yes** |
-  | M2 | rename projected key `commit_id` → `commitId` (well-meaning-refactor shape) | FAIL (want RERUN, got MERGE) | ok | **yes** |
-  | M3 | hardcode `commit_id: ""` in the projection | FAIL (want RERUN, got MERGE) | ok | **yes** |
-  | M4 | swap `body`/`commit_id` in the projection (copy-paste bug) | FAIL (want RERUN, got other) | FAIL (want MERGE, got other) | **yes** |
-  | M5 | narrow the projected value: `commit_id: (.commit_id[0:8])` (truncate to 8 hex chars) | ok | ok | **NO — survivor, see below** |
-  | M6 | narrow the projection scope: only project `commit_id` when `.state == "APPROVED"` | FAIL (want RERUN, got MERGE) | ok | **yes** |
-  | M7 | loosen the projected value: `commit_id: (.commit_id \| ascii_upcase)` | ok | FAIL (want MERGE, got other) | **yes** |
+  | # | mutation | 36b (stale) | 36c (current) | pre-existing suite | caught? |
+  |---|---|---|---|---|---|
+  | M1 | full revert: drop `commit_id` from the projection | FAIL (want RERUN, got MERGE) | ok | clean (94/94) | **yes, by 36b alone** |
+  | M2 | rename projected key `commit_id` → `commitId` (well-meaning-refactor shape) | FAIL (want RERUN, got MERGE) | ok | clean (94/94) | **yes, by 36b alone** |
+  | M3 | hardcode `commit_id: ""` in the projection | FAIL (want RERUN, got MERGE) | ok | clean (94/94) | **yes, by 36b alone** |
+  | M4 | swap `body`/`commit_id` in the projection (copy-paste bug) | FAIL (want RERUN, got other) | FAIL (want MERGE, got other) | **2 FAIL** (`defect 2 nice-to-have e2e (curl backend)`, `B1 e2e (curl backend)`) | yes, but already caught pre-existing — 36b/36c add nothing new here |
+  | M5 | narrow the projected value: `commit_id: (.commit_id[0:8])` (truncate to 8 hex chars) | FAIL (want RERUN, got MERGE) | ok | clean (94/94) | **yes, by 36b alone (was a survivor before the fixture fix above)** |
+  | M6 | narrow the projection scope: only project `commit_id` when `.state == "APPROVED"` | FAIL (want RERUN, got MERGE) | ok | clean (94/94) | **yes, by 36b alone** |
+  | M7 | loosen the projected value: `commit_id: (.commit_id \| ascii_upcase)` | ok | FAIL (want MERGE, got other) | **2 FAIL** (same two as M4) | yes, but already caught pre-existing — 36c adds nothing new here |
+  | N3 | wrong source field: `commit_id: .node_id` | ok | FAIL (want MERGE, got other) | clean (94/94) | **yes, by 36c ALONE — the pre-existing suite misses this entirely** |
 
-  **M5 survives, reported rather than hidden, per the dispatch brief's
-  honesty requirement.** Root cause: it is not a coverage gap in this fixture
-  — `_gate`'s own sha comparison (`pr_gate_status.sh` lines 454-455 and
-  540-541: `$tip | startswith($s)`) intentionally treats a short, valid PREFIX
-  of the tip sha as current, because a human-written "Reviewed SHA: <7-40 hex
-  chars>" line is legitimately allowed to be a short sha (the capture regex is
-  `{7,40}`). An 8-char truncation of the tip IS a valid prefix, so by that
-  same, pre-existing, deliberate design the truncated `commit_id` is correctly
-  read as current — this is not the commit_id-projection defect this item
-  targets, it is `_gate`'s documented short-sha tolerance, out of scope here.
-  M2/M6/M7 (three other, non-prefix-preserving loosenings/narrowings) confirm
-  the projection path itself is not under-tested — they all redden.
+  **Corrected loosened-vs-deleted claim (the second FAIL).** The PR's original
+  claim — "M5/M7 show the two new cases are doing separate work, 36b alone
+  would have missed M7" — does not hold: M7 (`ascii_upcase`) reddens two
+  pre-existing curl-e2e cases (`defect 2 nice-to-have e2e`, `B1 e2e`) even with
+  36b/36c removed entirely (verified above), so M7 demonstrates nothing about
+  the new cases' marginal value. M4 has the same property. The honest and
+  verified argument for why 36c is load-bearing is **N3**: sourcing the
+  projected `commit_id` from the wrong REST field (`.node_id` instead of
+  `.commit_id`) is a mutation the pre-existing suite (cases 34-36/43-45) does
+  not catch at all — it stays 94/94 clean — while 36c alone reddens it (the
+  wrong value happens not to equal `$TIP`, so the "current" case fails to reach
+  MERGE). That is the actual demonstration that 36c pins something cases 43-45
+  cannot: not merely "the field survives a value-preserving refactor" but "the
+  field is sourced from the correct REST attribute, not just A field."
 
-  **Loosened-vs-deleted check (explicit, per the brief):** M1/M3 (deletion) and
-  M2/M6 (loosening the projection's scope/key) both redden identically via
-  36b; M5/M7 (loosening the projected value) show the two new cases are
-  actually doing separate work — 36b (stale) alone would have missed M7, and
-  36c (current) alone would have missed nothing here but is what proves the
-  fallback reads the value correctly, not just detects its absence. The one
-  survivor (M5) is explained above as a pre-existing design feature, not a
-  fixture weakness.
+  With the fixture fix, M1/M2/M3/M5/M6 are each caught by 36b alone and are
+  each invisible to the pre-existing suite (all clean at 94/94) — so 36b's
+  marginal value is real and broad, not just against outright deletion. 36c's
+  marginal value is demonstrated by N3 specifically, not by M7 (which the
+  original writeup miscited).
 
   Full suite: 94 tests before this PR, 96 after (36b, 36c added). Verify:
   `sh dev/scripts/pr_gate_status_test.sh` — expect `OK: pr_gate_status -- 96
@@ -2073,6 +2103,18 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   this entry. `dev/scripts/pr_gate_status.sh` itself is unchanged — the
   fallback logic (#2626) was already correct; only its REST-projection path
   was unpinned.
+
+  **R1 (non-blocking recommendation, done in the rework).** Added two rows
+  (`p1`, `p2`) to `trading/devtools/checks/pr_gate_status_mutation_test.sh` —
+  the dune-wired mutation harness for H-GATEPARSER-NO-MUTATION-COVERAGE below
+  — so this item's central claim (the projection is pinned, not just argued in
+  prose) is re-verified on every `dune runtest` rather than only by hand: `p1`
+  drops `commit_id` from the projection entirely (killed), `p2` truncates it to
+  8 hex chars (killed, dependent on the 36b fixture fix above — verified: both
+  pass cleanly against the current tree). Verify:
+  `sh trading/devtools/checks/pr_gate_status_mutation_test.sh` — expect `OK: pr_gate_status
+  mutation harness -- 18 mutation(s) match pin (13 killed / 4 live survivor / 1
+  equivalent mutant).`, exit 0 (was 16/11/4/1 before this addition).
 
 - [x] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
   reader, yet its suite is verified only by hand. A ~30-line mutation harness

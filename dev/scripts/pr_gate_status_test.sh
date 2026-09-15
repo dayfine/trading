@@ -956,13 +956,26 @@ export GATE_TIP GATE_CHECKS
 # own "Reviewed SHA:" line at the tip), so structural alone would already read
 # "ok" -- only the projection reaching the behavioral review's `commit_id`
 # can tell this apart from a fully-reviewed, mergeable PR.
+#
+# The stale commit_id below shares $TIP's first 36 hex characters and differs
+# only in the last 4 (`dead` vs `7e8f`) -- DELIBERATELY, not a maximally
+# dissimilar sha (e.g. all-`a`'s). `_gate` treats any 7-40 char PREFIX of $TIP
+# as current (a human-written "Reviewed SHA: <short sha>" line is legitimate),
+# so a stale-vs-tip fixture that differs in its FIRST few characters would let
+# a mutation that truncates the projected commit_id to a short prefix survive
+# undetected -- the truncated stale value would happen to still be a prefix of
+# $TIP. Sharing the prefix and differing only in the tail closes that gap: no
+# truncation width can make the stale value look like a valid prefix of $TIP
+# without ALSO being a valid prefix of the (identical-prefix) stale value,
+# which does not help a mutant read "current". See H-GATEPARSER-CURL-
+# PROJECTION-UNPINNED in dev/status/harness.md for the rework that added this.
 NO_SHA_OLD_COMMIT_ID_REST_REVIEW=$(jq -nc --arg tip "$TIP" '
   [{
     id: 999111, node_id: "PRR_xyz",
     user: {login: "qc-behavioral-bot"},
     body: "## Behavioral QC — clean pass\n\n## Verdict\n\nAPPROVED",
     state: "COMMENTED", submitted_at: "2026-08-01T00:00:00Z",
-    commit_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    commit_id: "7dc57cc06aa1b2c3d4e5f60718293a4b5c6ddead"
   },
   {
     id: 999112, node_id: "PRR_abc",
