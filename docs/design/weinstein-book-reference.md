@@ -374,6 +374,26 @@ stopping it on the pre-fill low (`dev/experiments/arc-rerun-2026-09-01/README.md
 post-run guard V14 (PR #2641). Settled by qc-behavioral review 5096349477
 reading the source text (local session).
 
+**Resolved question (2026-09-15) — is a portfolio drawdown-breaker exit
+(`force_liquidation`) a stop-discipline failure in every stage, long or
+short?** Yes. Ch. 6 makes the protective stop non-optional: the sell-stop is
+entered GTC the moment a position is opened ("never be left unprotected"),
+the stop level is computed *before* the buy and used as a candidate filter,
+and purchases are limited to cases where the initial stop sits no more than
+~15 % below the purchase price. Ch. 6 closes with the pledge to never hold
+any stock, long or short, without a protective stop, so that "no single
+position will cripple your portfolio". A position that survives to be
+liquidated by a portfolio-level breaker therefore failed the per-position
+stop discipline regardless of its stage at exit — the book's rule is about
+protecting the position from the first bar, not about the stage it was in
+when the damage arrived. Implementation: trade-audit rating R7 = `Fail` for
+`force_liquidation` exits (PR #2813). Settled by qc-behavioral review of
+#2813 reading the source text (local session). Open design question (not a
+book question): whether the breaker shape should stay under R7 or get its
+own rating id — R7 now carries two meanings (stop never placed / breaker
+exit); nothing in `docs/design/` defines the R1–R8 taxonomy, so this is a
+`dev/status/trade-audit.md` decision, not a faithfulness one.
+
 ### 5.2 Trailing Stop — Investor Method
 
 State machine with explicit transitions:
