@@ -21,7 +21,7 @@
 
 open Core
 module Scenario = Scenario_lib.Scenario
-module Universe_file = Scenario_lib.Universe_file
+module Universe_schedule = Scenario_lib.Universe_schedule
 
 let _fold_start = Date.create_exn ~y:2011 ~m:Jul ~d:1
 let _fold_end = Date.create_exn ~y:2012 ~m:Jun ~d:29
@@ -167,11 +167,13 @@ let _print_top_survivors ~sampling_rate ~top =
 (** ----- Backtest runner ---------------------------------------------*)
 
 let[@inline never] _run_one_backtest ~fixtures_root ~scenario =
-  let resolved_universe =
-    Filename.concat fixtures_root scenario.Scenario.universe_path
-  in
+  (* Resolve through [Universe_schedule] rather than [Universe_file] directly,
+     so a scenario carrying a [universe_schedule] fails loudly here too instead
+     of being silently run against its [universe_path] for the whole window —
+     the same guard every other non-scenario_runner consumer applies. *)
   let sector_map_override =
-    Universe_file.to_sector_map_override (Universe_file.load resolved_universe)
+    Universe_schedule.sector_map_of_unscheduled ~fixtures_root
+      ~runner_name:"Leak_repro" scenario
   in
   let result =
     Backtest.Runner.run_backtest ~start_date:_fold_start ~end_date:_fold_end

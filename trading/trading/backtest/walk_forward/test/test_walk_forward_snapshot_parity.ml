@@ -298,6 +298,7 @@ let _make_base ~universe_path : Scenario.t =
     description = "synthetic dual-fixture base scenario";
     period = { start_date = _fixture_start; end_date = _ymd 2021 1 1 };
     universe_path;
+    universe_schedule = [];
     config_overrides = [];
     strategy = Backtest.Strategy_choice.default;
     slippage_bps = None;

@@ -17,6 +17,7 @@ let build_fold_scenario ~(base : Scenario.t) ~(fold : Window_spec.fold)
     description = _description ~base ~variant ~fold;
     period = fold.test_period;
     universe_path = base.universe_path;
+    universe_schedule = base.universe_schedule;
     config_overrides = base.config_overrides @ variant.overrides;
     strategy = base.strategy;
     slippage_bps = base.slippage_bps;

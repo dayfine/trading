@@ -44,7 +44,7 @@ let _parallel_modes_under_test = [ 1; 4 ]
 
 let _date y m d = Date.create_exn ~y ~m:(Month.of_int_exn m) ~d
 
-let _make_base () : Scenario.t =
+let _make_base ?(universe_schedule = []) () : Scenario.t =
   let expected : Scenario.expected =
     {
       total_return_pct = { min_f = -100.0; max_f = 500.0 };
@@ -66,6 +66,7 @@ let _make_base () : Scenario.t =
     description = "stub base scenario";
     period = { start_date = _date 2020 1 1; end_date = _date 2020 1 31 };
     universe_path = "universes/parity-7sym.sexp";
+    universe_schedule;
     config_overrides = [];
     strategy = Backtest.Strategy_choice.default;
     slippage_bps = None;
@@ -211,6 +212,41 @@ let test_failure_injection_parallel_one_surfaces_directly _ =
      parallel-mode niceness. *)
   assert_that raised (is_some_and (contains_substring _failure_message))
 
+(* ---- Call-site rejection: a scheduled spec must fail loudly -------- *)
+
+(** {!Scenario_lib.Universe_schedule.sector_map_of_unscheduled}'s loud failure,
+    exercised at a real CALL SITE rather than on the helper: walk-forward does
+    not implement dated point-in-time membership, so a base scenario carrying a
+    non-empty [universe_schedule] must raise — naming the field and the runner —
+    instead of silently running every fold against the single [universe_path].
+
+    Deliberately no [?run_one] stub: the production [_run_one] is what carries
+    the guard, and the guard is the first thing it does, so this raises before
+    any backtest work begins (the [fixtures_root] below is never read). *)
+let _run_scheduled_base () : string option =
+  let base =
+    _make_base
+      ~universe_schedule:[ (_date 2010 1 1, "universes/small.sexp") ]
+      ()
+  in
+  let spec = _make_spec () in
+  try
+    let _ : Executor.result =
+      Executor.execute_spec ~base ~spec
+        ~fixtures_root:"/tmp/unused-guard-raises-first" ~parallel:1 ()
+    in
+    None
+  with Failure msg -> Some msg
+
+let test_scheduled_spec_rejected_at_walk_forward_call_site _ =
+  assert_that (_run_scheduled_base ())
+    (is_some_and
+       (all_of
+          [
+            contains_substring "universe_schedule";
+            contains_substring "Walk_forward_executor";
+          ]))
+
 (* ---- §C Smoke: invalid_argument boundary -------------------------- *)
 
 let _run_with_parallel ~parallel : string option =
@@ -249,6 +285,8 @@ let suite =
          >:: test_parallel_zero_rejected;
          "parallel > max_parallel rejected with Invalid_argument"
          >:: test_parallel_above_cap_rejected;
+         "a non-empty universe_schedule is rejected at the walk-forward call \
+          site" >:: test_scheduled_spec_rejected_at_walk_forward_call_site;
        ]
 
 let () = run_test_tt_main suite

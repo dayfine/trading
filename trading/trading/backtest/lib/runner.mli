@@ -199,6 +199,7 @@ val run_backtest :
   ?cost_model:Backtest_cost_model.Cost_model.t ->
   ?candidate_log:Candidate_log.collector ->
   ?on_step_setup:Panel_runner.step_hook_setup ->
+  ?universe_membership_at:(string -> Date.t -> bool) ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -213,6 +214,16 @@ val run_backtest :
       {!Window_filter.Empty_measurement_window} for why the runner raises rather
       than returning a flat, zero-return [result]. Before issue #2632 this case
       escaped as a raw stdlib [Invalid_argument "List.last"].
+
+    [universe_membership_at] is the run's dated point-in-time universe schedule:
+    [f symbol as_of] answers whether [symbol] is a member of the universe on the
+    screening date [as_of]. The screener cascade rejects non-members before
+    stage classification; nothing else consults it, so a held position whose
+    symbol leaves the schedule is held to its normal exit. [None] (the default)
+    is bit-equal to the pre-schedule baseline. Callers that pass it must also
+    widen [sector_map_override] to the UNION of every scheduled list, so a name
+    that has dropped out still prices while held —
+    {!Scenario_lib.Universe_schedule.union_sector_map} builds that union.
 
     [candidate_log] opts into per-week candidate capture (issue #2490),
     populating [result.candidate_weeks] as well as the passed collector. Build

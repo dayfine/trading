@@ -142,7 +142,8 @@ let test_callback_default_is_none _ =
   let config = _default_config () in
   let bar_reader = Bar_reader.empty () in
   assert_that
-    (Macro.Internal_for_test.membership_at_callback_of ~config ~bar_reader)
+    (Macro.Internal_for_test.membership_at_callback_of ~config ~bar_reader
+       ~universe_membership_at:None)
     is_none
 
 (** [enable_pi_filter = true] with no bars: callback factory returns [Some _],
@@ -154,8 +155,58 @@ let test_callback_enabled_returns_some _ =
   let config = { (_default_config ()) with enable_pi_filter = true } in
   let bar_reader = Bar_reader.empty () in
   assert_that
-    (Macro.Internal_for_test.membership_at_callback_of ~config ~bar_reader)
+    (Macro.Internal_for_test.membership_at_callback_of ~config ~bar_reader
+       ~universe_membership_at:None)
     (is_some_and (field (fun c -> c "AAPL" (_ymd 2024 6 14)) (equal_to true)))
+
+(** Schedule only ([enable_pi_filter = false] + a [universe_membership_at]): the
+    factory must still return [Some], carrying the schedule predicate verbatim.
+    Without this the dated-universe gate would silently vanish on every run that
+    leaves the delisting filter off (its default). *)
+let test_callback_schedule_only_returns_schedule _ =
+  let config = _default_config () in
+  let bar_reader = Bar_reader.empty () in
+  assert_that
+    (Macro.Internal_for_test.membership_at_callback_of ~config ~bar_reader
+       ~universe_membership_at:
+         (Some (fun ticker _ -> String.equal ticker "AAPL")))
+    (is_some_and
+       (all_of
+          [
+            field (fun c -> c "AAPL" (_ymd 2024 6 14)) (equal_to true);
+            field (fun c -> c "MSFT" (_ymd 2024 6 14)) (equal_to false);
+          ]))
+
+(** Both sources on: the callback is their conjunction. With no bars the PI
+    predicate admits every symbol, so the schedule decides — but the AND is what
+    is pinned here: a symbol the schedule rejects stays rejected. *)
+let test_callback_both_sources_are_anded _ =
+  let config = { (_default_config ()) with enable_pi_filter = true } in
+  let bar_reader = Bar_reader.empty () in
+  assert_that
+    (Macro.Internal_for_test.membership_at_callback_of ~config ~bar_reader
+       ~universe_membership_at:(Some (fun _ _ -> false)))
+    (is_some_and (field (fun c -> c "AAPL" (_ymd 2024 6 14)) (equal_to false)))
+
+(** Both sources on, the OTHER half of the conjunction: the schedule admits the
+    symbol but the PI filter rejects it. Reuses
+    {!test_active_through_set_rejects_after_delisting}'s fixture — bars carrying
+    [active_through = Some 2024-03-31] read at [as_of = 2024-06-14]. Without
+    this case a schedule-only mutant (dropping the PI conjunct entirely) passes
+    the suite, because every other both-sources test runs on
+    [Bar_reader.empty ()] where the PI predicate admits everything. *)
+let test_callback_pi_false_schedule_true_rejects _ =
+  let config = { (_default_config ()) with enable_pi_filter = true } in
+  let bars =
+    _bars
+      ~active_through:(Some (_ymd 2024 3 31))
+      ~n:10 ~start_date:(_ymd 2024 1 2) ~start_price:100.0 ~step:0.5 ()
+  in
+  let bar_reader = Bar_reader.of_in_memory_bars [ ("AAPL", bars) ] in
+  assert_that
+    (Macro.Internal_for_test.membership_at_callback_of ~config ~bar_reader
+       ~universe_membership_at:(Some (fun _ _ -> true)))
+    (is_some_and (field (fun c -> c "AAPL" (_ymd 2024 6 14)) (equal_to false)))
 
 let suite =
   "pi_filter_wiring_tests"
@@ -170,6 +221,12 @@ let suite =
          "test_callback_default_is_none" >:: test_callback_default_is_none;
          "test_callback_enabled_returns_some"
          >:: test_callback_enabled_returns_some;
+         "test_callback_schedule_only_returns_schedule"
+         >:: test_callback_schedule_only_returns_schedule;
+         "test_callback_both_sources_are_anded"
+         >:: test_callback_both_sources_are_anded;
+         "test_callback_pi_false_schedule_true_rejects"
+         >:: test_callback_pi_false_schedule_true_rejects;
        ]
 
 let () = run_test_tt_main suite

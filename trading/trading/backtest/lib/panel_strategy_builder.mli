@@ -16,6 +16,7 @@ val build :
   bar_reader:Weinstein_strategy.Bar_reader.t ->
   audit_recorder:Weinstein_strategy.Audit_recorder.t ->
   ?fold_start_date:Date.t ->
+  ?universe_membership_at:(string -> Date.t -> bool) ->
   unit ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** [build ~ad_bars ~ticker_sectors ~config ~strategy_choice ~bar_reader
@@ -42,4 +43,25 @@ val build :
       no pre-pruning, every universe symbol is classified. Only the [Weinstein]
       branch consumes it; the other strategy constructors take no universe
       (Spy_only / BAH) or manage their own (Sector_rotation), so
-      [fold_start_date] is irrelevant there and ignored. *)
+      [fold_start_date] is irrelevant there and ignored.
+
+    @param universe_membership_at
+      Dated point-in-time universe membership, forwarded to
+      {!Weinstein_strategy.make}'s [?universe_membership_at] on the [Weinstein]
+      branch. [None] (the default) means every universe symbol is eligible on
+      every screening date — bit-equal to the pre-schedule baseline. See
+      {!Scenario_lib.Universe_schedule}.
+
+    Only the [Weinstein] branch can honour it, so [build] {b raises} [Failure]
+    (naming the strategy choice and [universe_schedule]) when [Some _] reaches a
+    branch that would silently ignore it while still trading the scenario's
+    universe — concretely [Sector_rotation_weinstein] with
+    [use_scenario_universe = true], whose tradable set is every staged symbol,
+    i.e. the UNION of every list in the schedule.
+
+    The remaining branches trade a symbol set the scenario universe does not
+    determine — [Bah_benchmark], [Spy_only_weinstein] and [Breaker_spy_sleeve]
+    are single-symbol, and [Sector_rotation_weinstein] with
+    [use_scenario_universe = false] trades its own SPDR sector-ETF default list
+    — so a schedule is inapplicable there (the same reason they already ignore
+    [universe_path]) and is ignored without raising. *)

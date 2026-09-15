@@ -1,6 +1,7 @@
 open Core
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
+module Universe_schedule = Scenario_lib.Universe_schedule
 module WS = Window_spec
 module WFR = Walk_forward_runner
 module Report = Walk_forward_report
@@ -57,9 +58,9 @@ let max_trade_pnl_dollars_of_metrics
     [dev/notes/bayesian-int-rounding-bug-2026-05-19.md]. *)
 let[@inline never] _extract_fold ~fixtures_root ~bar_data_source ~shared_panels
     (s : Scenario.t) : Report.fold_actual =
-  let resolved = Filename.concat fixtures_root s.universe_path in
   let sector_map_override =
-    Universe_file.to_sector_map_override (Universe_file.load resolved)
+    Universe_schedule.sector_map_of_unscheduled ~fixtures_root
+      ~runner_name:"Walk_forward_executor" s
   in
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date

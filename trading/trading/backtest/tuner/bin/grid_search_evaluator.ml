@@ -1,12 +1,13 @@
 open Core
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
+module Universe_schedule = Scenario_lib.Universe_schedule
 
 type scenario = Scenario.t
 
 let _sector_map_of_scenario ~fixtures_root (s : scenario) =
-  let resolved = Filename.concat fixtures_root s.universe_path in
-  Universe_file.to_sector_map_override (Universe_file.load resolved)
+  Universe_schedule.sector_map_of_unscheduled ~fixtures_root
+    ~runner_name:"Grid_search_evaluator" s
 
 let _run_one ~fixtures_root (s : scenario) cell =
   let cell_overrides = Tuner.Grid_search.cell_to_overrides cell in

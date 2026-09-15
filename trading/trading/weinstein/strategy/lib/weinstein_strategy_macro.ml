@@ -68,12 +68,28 @@ let _pi_membership_at ~bar_reader (symbol : string) (as_of : Core.Date.t) =
       | None -> true
       | Some d -> Core.Date.( <= ) as_of d)
 
-(** Build the optional [?membership_at] callback for {!screen_universe} based on
-    [config.enable_pi_filter]. When the flag is [false] (default), returns
-    [None] — the screener's PI gate is a no-op and baselines are preserved. When
-    [true], returns [Some] of {!_pi_membership_at} closed over [bar_reader]. *)
-let _membership_at_callback_of ~config ~bar_reader =
-  if config.enable_pi_filter then Some (_pi_membership_at ~bar_reader) else None
+(** Build the optional [?membership_at] callback for {!screen_universe} from the
+    two independent membership sources, AND-composed:
+
+    - the delisting-marker PI filter, armed by [config.enable_pi_filter]
+      ({!_pi_membership_at} closed over [bar_reader]); and
+    - [universe_membership_at], the run's dated point-in-time universe schedule
+      ({!Scenario_lib.Universe_schedule.is_member} partially applied), supplied
+      by the runner and [None] on every unscheduled run.
+
+    Both off (the default) returns [None] — the screener's membership gate is a
+    no-op and baselines are preserved bit-for-bit. Either one alone returns that
+    one predicate; both on returns their conjunction, so a symbol must be both
+    still-listed and a scheduled member to reach stage classification. *)
+let _membership_at_callback_of ~config ~bar_reader ~universe_membership_at =
+  let pi_ok =
+    if config.enable_pi_filter then Some (_pi_membership_at ~bar_reader)
+    else None
+  in
+  match (pi_ok, universe_membership_at) with
+  | None, other | other, None -> other
+  | Some pi, Some scheduled ->
+      Some (fun symbol as_of -> pi symbol as_of && scheduled symbol as_of)
 
 (** Build the [(?active_through_for, ?fold_start_date)] pair the screener pre-
     pruning uses. Returns [(None, None)] when [fold_start_date] is [None] —
@@ -99,10 +115,10 @@ let _prune_args_of ~bar_reader ~fold_start_date =
     screener is invoked; macro-specific gating — longs blocked under Bearish,
     shorts blocked under Bullish — happens inside the screener. Under Bearish
     this yields short-side entries (per the bear-market shorting chapter). *)
-let run_screen_after_macro ~pending_entry_e ~fold_start_date ~config
-    ~stop_states ~last_stop_out_dates ~bar_reader ~prior_stages
-    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
-    ~index_view ~audit_recorder ~macro_result =
+let run_screen_after_macro ~pending_entry_e ~fold_start_date
+    ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
+    ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
+    ~portfolio ~current_date ~index_view ~audit_recorder ~macro_result =
   let ma_cache = Bar_reader.ma_cache bar_reader in
   (* Phase F.3.d-2 caller migration: the sector ETF analysis reads through
      {!Snapshot_runtime.Snapshot_callbacks} directly via the
@@ -115,7 +131,9 @@ let run_screen_after_macro ~pending_entry_e ~fold_start_date ~config
       ~sector_etfs:config.sector_etfs ~cb ~as_of:current_date
       ~sector_prior_stages ~index_view ~ticker_sectors ()
   in
-  let membership_at = _membership_at_callback_of ~config ~bar_reader in
+  let membership_at =
+    _membership_at_callback_of ~config ~bar_reader ~universe_membership_at
+  in
   let active_through_for, fold_start_date =
     _prune_args_of ~bar_reader ~fold_start_date
   in
@@ -128,17 +146,18 @@ let run_screen_after_macro ~pending_entry_e ~fold_start_date ~config
     Friday, with a valid macro result). Returns the list of entry transitions,
     or [[]] when any guard is false. Extracted from [_on_market_close] to keep
     the entry-transition branch at a shallower nesting level. *)
-let entry_transitions_if_active ~pending_entry_e ~fold_start_date ~halted
-    ~is_screening_day ~macro_result_opt ~config ~stop_states
-    ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
-    ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
-    ~audit_recorder =
+let entry_transitions_if_active ~pending_entry_e ~fold_start_date
+    ~universe_membership_at ~halted ~is_screening_day ~macro_result_opt ~config
+    ~stop_states ~last_stop_out_dates ~bar_reader ~prior_stages
+    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+    ~index_view ~audit_recorder =
   match (halted, is_screening_day, macro_result_opt) with
   | false, true, Some macro_result ->
-      run_screen_after_macro ~pending_entry_e ~fold_start_date ~config
-        ~stop_states ~last_stop_out_dates ~bar_reader ~prior_stages
-        ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
-        ~index_view ~audit_recorder ~macro_result
+      run_screen_after_macro ~pending_entry_e ~fold_start_date
+        ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
+        ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+        ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
+        ~macro_result
   | _ -> []
 
 module Internal_for_test = struct

@@ -37,12 +37,38 @@ let _build_sector_rotation ~ticker_sectors ~bar_reader ~k ~ma_period_weeks
   in
   Sector_rotation.make ~config ~bar_reader ()
 
+(* A dated universe schedule is only honourable by a branch that screens the
+   SCENARIO's universe. [Sector_rotation_weinstein] with
+   [use_scenario_universe = true] trades every staged symbol — and on a
+   scheduled run the staged set is the UNION of every list in the schedule
+   ({!Scenario_lib.Universe_schedule.union_sector_map}) — so it would silently
+   trade names the schedule has already dropped. Fail loudly instead.
+
+   The remaining branches trade a symbol set the scenario's universe does not
+   determine at all ([Bah_benchmark] / [Spy_only_weinstein] /
+   [Breaker_spy_sleeve] are single-symbol; sector rotation with
+   [use_scenario_universe = false] trades the SPDR sector-ETF default list), so
+   for them a schedule is inapplicable rather than silently wrong — the same
+   reason they already ignore [universe_path]. *)
+let _reject_schedule_on_scenario_universe ~use_scenario_universe
+    ~universe_membership_at =
+  match (use_scenario_universe, universe_membership_at) with
+  | true, Some _ ->
+      failwith
+        "Panel_strategy_builder: strategy_choice Sector_rotation_weinstein \
+         with use_scenario_universe = true does not implement \
+         universe_schedule (dated point-in-time membership) — it trades the \
+         whole staged universe, which on a scheduled run is the UNION of every \
+         list. Drop universe_schedule from the spec, or run this scenario \
+         under the Weinstein strategy."
+  | true, None | false, _ -> ()
+
 let build ~ad_bars ~breadth_bars ~ticker_sectors ~config ~strategy_choice
-    ~bar_reader ~audit_recorder ?fold_start_date () =
+    ~bar_reader ~audit_recorder ?fold_start_date ?universe_membership_at () =
   match (strategy_choice : Strategy_choice.t) with
   | Weinstein ->
       Weinstein_strategy.make ~ad_bars ~breadth_bars ~ticker_sectors ~bar_reader
-        ~audit_recorder ?fold_start_date config
+        ~audit_recorder ?fold_start_date ?universe_membership_at config
   | Bah_benchmark { symbol } ->
       Trading_strategy.Bah_benchmark_strategy.make { symbol }
   | Spy_only_weinstein { symbol; ma_period_weeks; enable_stage4_short } ->
@@ -58,6 +84,8 @@ let build ~ad_bars ~breadth_bars ~ticker_sectors ~config ~strategy_choice
         use_scenario_universe;
         sector_cap;
       } ->
+      _reject_schedule_on_scenario_universe ~use_scenario_universe
+        ~universe_membership_at;
       _build_sector_rotation ~ticker_sectors ~bar_reader ~k ~ma_period_weeks
         ~enable_macro_gate ~use_scenario_universe ~sector_cap
   | Breaker_spy_sleeve { symbol } ->

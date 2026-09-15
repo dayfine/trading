@@ -298,17 +298,17 @@ let _score_all_candidates ~forward_table ~scorer_config
 (* Universe resolution                                                *)
 (* ---------------------------------------------------------------- *)
 
-(** Resolve [scenario.universe_path] against the fixtures root, load the
-    universe file, and return [(universe, sector_table)] where [sector_table] is
-    the symbol→sector hashtable that drives [_build_sector_context_map].
-
-    Pinned: use exactly the listed symbols + their sectors. Full_sector_map:
-    fall back to [Sector_map.load] over [data/sectors.csv]. *)
+(** Resolve [scenario.universe_path] into [(universe, sector_table)], the
+    symbol→sector hashtable driving [_build_sector_context_map]. Pinned: exactly
+    the listed symbols + sectors. Full_sector_map: fall back to
+    [Sector_map.load] over [data/sectors.csv]. A [universe_schedule] is rejected
+    — dated membership has no implementation here. *)
 let _resolve_universe ~fixtures_root (scenario : Scenario_lib.Scenario.t) :
     string list * (string, string) Hashtbl.t =
-  let path = Filename.concat fixtures_root scenario.universe_path in
-  let uf = Scenario_lib.Universe_file.load path in
-  match Scenario_lib.Universe_file.to_sector_map_override uf with
+  match
+    Scenario_lib.Universe_schedule.sector_map_of_unscheduled ~fixtures_root
+      ~runner_name:"All_eligible_runner" scenario
+  with
   | Some tbl ->
       let universe = Hashtbl.keys tbl |> List.sort ~compare:String.compare in
       (universe, tbl)

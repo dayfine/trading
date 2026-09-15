@@ -73,6 +73,7 @@ val run :
   ?prune_universe_by_active_through:bool ->
   ?candidate_log:Candidate_log.collector ->
   ?on_step_setup:step_hook_setup ->
+  ?universe_membership_at:(string -> Date.t -> bool) ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t
@@ -223,7 +224,16 @@ val run :
     bar-fetched, every golden / snapshot-parity test replays unchanged. Only the
     {!Strategy_choice.Weinstein} strategy consumes the screener-side cutoff; the
     simulator-side bar-fetch prune applies regardless of strategy choice (it
-    drops symbols no strategy could use). *)
+    drops symbols no strategy could use).
+
+    [universe_membership_at] is the run's dated point-in-time universe schedule,
+    forwarded verbatim to {!Panel_strategy_builder.build}. [None] (the default)
+    is bit-equal to the pre-schedule baseline. It is orthogonal to
+    [prune_universe_by_active_through]: that flag drops symbols delisted before
+    the fold start on BOTH the screener and the simulator bar-fetch loop,
+    whereas this predicate gates the screener's candidate set only and never
+    touches the simulator, so held positions keep pricing after their symbol
+    leaves the schedule. See {!Scenario_lib.Universe_schedule}. *)
 
 val fold_start_date_of_opt_in :
   prune_universe_by_active_through:bool -> start_date:Date.t -> Date.t option

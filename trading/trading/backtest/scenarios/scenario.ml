@@ -58,6 +58,7 @@ type t = {
   description : string;
   period : period;
   universe_path : string; [@sexp.default default_universe_path]
+  universe_schedule : (Date.t * string) list; [@sexp.default []]
   config_overrides : Sexp.t list;
   strategy : Backtest.Strategy_choice.t;
       [@sexp.default Backtest.Strategy_choice.default]

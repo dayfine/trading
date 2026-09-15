@@ -11,8 +11,8 @@ module Scenario = Scenario_lib.Scenario
 let _date y m d = Date.create_exn ~y ~m:(Month.of_int_exn m) ~d
 
 let _make_base ?(name = "base-test") ?(description = "base-desc")
-    ?(universe_path = "universes/parity-7sym.sexp") ?(config_overrides = [])
-    ?(slippage_bps = None) ?(cost_model = None)
+    ?(universe_path = "universes/parity-7sym.sexp") ?(universe_schedule = [])
+    ?(config_overrides = []) ?(slippage_bps = None) ?(cost_model = None)
     ?(strategy = Backtest.Strategy_choice.default) () : Scenario.t =
   let expected : Scenario.expected =
     {
@@ -35,6 +35,7 @@ let _make_base ?(name = "base-test") ?(description = "base-desc")
     description;
     period = { start_date = _date 2020 1 1; end_date = _date 2020 1 31 };
     universe_path;
+    universe_schedule;
     config_overrides;
     strategy;
     slippage_bps;
@@ -105,6 +106,23 @@ let test_universe_and_strategy_preserved _ =
            (fun (sc : Scenario.t) -> sc.strategy)
            (equal_to Backtest.Strategy_choice.default);
        ])
+
+(* The sibling of [test_universe_and_strategy_preserved] for the dated
+   point-in-time schedule: a scheduled base scenario must carry its schedule
+   into every fold, or a walk-forward spec would silently lose dated membership
+   the moment it was split into folds. *)
+let test_universe_schedule_preserved _ =
+  let schedule =
+    [
+      (_date 2000 1 1, "universes/top-3000-2000.sexp");
+      (_date 2010 1 1, "universes/top-3000-2010.sexp");
+    ]
+  in
+  let base = _make_base ~universe_schedule:schedule () in
+  let fold = _make_fold () in
+  let variant : WFR.variant = { label = "v"; overrides = [] } in
+  let s = WFR.build_fold_scenario ~base ~fold ~variant in
+  assert_that s.universe_schedule (elements_are (List.map schedule ~f:equal_to))
 
 let test_slippage_bps_preserved _ =
   let base = _make_base ~slippage_bps:(Some 5) () in
@@ -253,6 +271,7 @@ let suite =
          "overrides appended last" >:: test_overrides_appended_last;
          "universe + strategy preserved"
          >:: test_universe_and_strategy_preserved;
+         "universe_schedule preserved" >:: test_universe_schedule_preserved;
          "slippage_bps preserved" >:: test_slippage_bps_preserved;
          "cost_model preserved (Some)" >:: test_cost_model_preserved;
          "cost_model preserved (None)" >:: test_cost_model_none_preserved;

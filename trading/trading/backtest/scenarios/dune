@@ -3,6 +3,7 @@
  (modules
   scenario
   universe_file
+  universe_schedule
   universe_snapshot
   fixtures_root
   smoke_catalog
@@ -32,6 +33,7 @@
   trading.simulation.types
   backtest
   backtest_all_eligible
-  scenario_lib)
+  scenario_lib
+  status)
  (preprocess
   (pps ppx_sexp_conv)))

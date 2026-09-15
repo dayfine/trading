@@ -115,8 +115,12 @@ val execute_spec :
       schedule when [?parallel > 1], so the operator sees the schedule even when
       children finish out of order.
     + Resolve the scenario's universe via
-      {!Scenario_lib.Universe_file.to_sector_map_override} against
-      [fixtures_root].
+      {!Scenario_lib.Universe_schedule.sector_map_of_unscheduled} against
+      [fixtures_root] — which additionally RAISES [Failure] (naming
+      [universe_schedule] and ["Walk_forward_executor"]) when the scenario
+      carries a non-empty [universe_schedule], since walk-forward resolves one
+      universe for the whole fold rather than implementing dated point-in-time
+      membership.
     + Run {!Backtest.Runner.run_backtest} on that scenario and convert its
       summary metrics into a {!Walk_forward_report.fold_actual}.
     + Tag the result with the fold name and variant label.

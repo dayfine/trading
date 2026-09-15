@@ -30,6 +30,7 @@ val run_macro_only :
 val run_screen_after_macro :
   pending_entry_e:Entry_freeze.t ->
   fold_start_date:Date.t option ->
+  universe_membership_at:(string -> Date.t -> bool) option ->
   config:Weinstein_strategy_config.config ->
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
   last_stop_out_dates:Date.t Hashtbl.M(String).t ->
@@ -56,11 +57,19 @@ val run_screen_after_macro :
     [Some d], the screener pre-prunes [config.universe] before Phase 1 stage
     classification, dropping symbols whose [active_through < d] via the
     snapshot-backed [Bar_reader] callbacks. Point-in-time, NOT survivor bias.
-    See [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
+    See [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4.
+
+    [~universe_membership_at] is the run's dated point-in-time universe
+    schedule, [None] on every unscheduled run. When [Some f], the screener
+    cascade rejects any candidate for which [f symbol current_date] is [false],
+    AND-composed with the [config.enable_pi_filter] delisting gate. It gates
+    CANDIDATES only — held positions, stops, and the macro / sector inputs never
+    consult it. See {!Scenario_lib.Universe_schedule}. *)
 
 val entry_transitions_if_active :
   pending_entry_e:Entry_freeze.t ->
   fold_start_date:Date.t option ->
+  universe_membership_at:(string -> Date.t -> bool) option ->
   halted:bool ->
   is_screening_day:bool ->
   macro_result_opt:Macro.result option ->
@@ -82,8 +91,8 @@ val entry_transitions_if_active :
     when any guard is false. Keeps [_on_market_close] at a shallow nesting
     level.
 
-    [~fold_start_date] is forwarded to {!run_screen_after_macro}. See its doc.
-*)
+    [~fold_start_date] and [~universe_membership_at] are forwarded to
+    {!run_screen_after_macro}. See its doc. *)
 
 module Internal_for_test : sig
   val pi_membership_at : bar_reader:Bar_reader.t -> string -> Date.t -> bool
@@ -108,10 +117,18 @@ module Internal_for_test : sig
   val membership_at_callback_of :
     config:Weinstein_strategy_config.config ->
     bar_reader:Bar_reader.t ->
+    universe_membership_at:(string -> Date.t -> bool) option ->
     (string -> Date.t -> bool) option
-  (** [membership_at_callback_of ~config ~bar_reader] returns [None] when
-      [config.enable_pi_filter = false] (default), preserving existing
-      baselines, and [Some] of {!pi_membership_at} closed over [bar_reader] when
-      [config.enable_pi_filter = true]. Exposed for unit-testing the flag-driven
-      branch. *)
+  (** [membership_at_callback_of ~config ~bar_reader ~universe_membership_at]
+      AND-composes the two membership sources the screener gate can have:
+
+      - [None] when [config.enable_pi_filter = false] (default) AND
+        [universe_membership_at = None] — no gate, existing baselines preserved;
+      - [Some] of {!pi_membership_at} closed over [bar_reader] when only
+        [config.enable_pi_filter = true];
+      - [Some] of [universe_membership_at] when only that is supplied (the
+        dated-schedule-without-PI-filter case);
+      - [Some] of their conjunction when both are on.
+
+      Exposed for unit-testing the composition. *)
 end

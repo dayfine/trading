@@ -1,6 +1,7 @@
 open Core
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
+module Universe_schedule = Scenario_lib.Universe_schedule
 module Runner = Barbell.Barbell_runner
 
 type leg_spec = {
@@ -27,12 +28,11 @@ let engine_leg ?(strategy = Backtest.Strategy_choice.default) ?(overrides = [])
   { name = "engine"; strategy; overrides }
 
 (* Resolve the scenario's [universe_path] (relative to [fixtures_root]) into the
-   sector-map override both legs trade over. Mirrors
-   [scenario_runner._sector_map_of_universe_file] and
-   [rolling_start_runner._sector_map_override]. *)
-let _sector_map_override ~fixtures_root (scenario : Scenario.t) =
-  let resolved = Filename.concat fixtures_root scenario.universe_path in
-  Universe_file.to_sector_map_override (Universe_file.load resolved)
+   sector-map override both legs trade over, rejecting a [universe_schedule]
+   (no dated-membership path here). *)
+let _sector_map_override ~fixtures_root scenario =
+  Universe_schedule.sector_map_of_unscheduled ~fixtures_root
+    ~runner_name:"Barbell_scenario" scenario
 
 (* Build one leg's thunk: run [run_backtest] over the scenario's period with the
    leg's strategy + overrides (and the shared universe + bar source), then
