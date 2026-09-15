@@ -89,6 +89,9 @@ FIXME_COUNT=0
 HACK_COUNT=0
 SIZE_VIOLATION_COUNT=0
 FOLLOWUP_COUNT=0
+FOLLOWUP_MAX_PER_FILE=unavailable
+FOLLOWUP_OVER_THRESHOLD=unavailable
+FOLLOWUP_THRESHOLD_PER_FILE=unavailable
 QC_CAL_COUNT=0
 DUNE_AVAILABLE=false
 REWORK_STREAK_COUNT=0
@@ -130,6 +133,9 @@ for findings_file in "${FINDINGS_DIR}"/*.findings; do
           HACK_COUNT)               HACK_COUNT="$val" ;;
           SIZE_VIOLATION_COUNT)     SIZE_VIOLATION_COUNT="$val" ;;
           FOLLOWUP_COUNT)           FOLLOWUP_COUNT="$val" ;;
+          FOLLOWUP_MAX_PER_FILE)    FOLLOWUP_MAX_PER_FILE="$val" ;;
+          FOLLOWUP_OVER_THRESHOLD)  FOLLOWUP_OVER_THRESHOLD="$val" ;;
+          FOLLOWUP_THRESHOLD_PER_FILE) FOLLOWUP_THRESHOLD_PER_FILE="$val" ;;
           QC_CAL_COUNT)             QC_CAL_COUNT="$val" ;;
           DUNE_AVAILABLE)           DUNE_AVAILABLE="$val" ;;
           REWORK_STREAK_COUNT)      REWORK_STREAK_COUNT="$val" ;;
@@ -188,7 +194,7 @@ cat >> "$OUTPUT_FILE" <<METRICS_EOF
 - Design doc drift items: ${DRIFT_COUNT}
 - TODO/FIXME/HACK annotations: ${TOTAL_ANNOTATIONS} (TODO: ${TODO_COUNT}, FIXME: ${FIXME_COUNT}, HACK: ${HACK_COUNT})
 - Files >300 lines: ${SIZE_VIOLATION_COUNT}
-- Open items (\`- [ ]\` in dev/status/*.md, unscoped by heading): ${FOLLOWUP_COUNT} (maintenance threshold: 10)
+- Open items (\`- [ ]\` in dev/status/*.md, unscoped by heading): ${FOLLOWUP_COUNT} actionable repo-wide; maximum per file: ${FOLLOWUP_MAX_PER_FILE}; files over maintenance threshold (${FOLLOWUP_THRESHOLD_PER_FILE} per file): ${FOLLOWUP_OVER_THRESHOLD}
 - QC calibration findings: ${QC_CAL_COUNT} (dune available: ${DUNE_AVAILABLE})
 - Rework streak escalations (consecutive_rework_count >= 3, per write_audit.sh:37): ${REWORK_STREAK_COUNT}
 - Architecture graph violations (monitored): ${ARCH_GRAPH_VIOLATION_COUNT}

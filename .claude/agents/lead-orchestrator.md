@@ -577,15 +577,21 @@ consumed by blocking refactors, no feat-agents run today — this is correct.
 
 ### 2b: Non-blocking followup accumulation (scheduled)
 
-Count total open items across all `## Followup / Known Improvements` sections.
-Read threshold and cycle ratio from `dev/config/merge-policy.json` (defaults:
-threshold = 10 items, maintenance every 3rd run if threshold exceeded).
+Use deep-scan Check 5's actionable per-file counts: open `- [ ]` items
+anywhere in each `dev/status/*.md`, excluding Tier 2/Tier 4 roadmap headings
+and fenced templates. Read `followup_threshold_per_file` and
+`maintenance_cycle_ratio` from `dev/config/merge-policy.json` (defaults:
+4 items per file, maintenance every 3rd run).
 
-If the count exceeds the threshold AND this run falls on a maintenance cycle:
-replace one feature slot with a maintenance pass — dispatch the feat-agent owning
-the most followup items with a `## Refactor Mode` prompt listing the top items.
+If `FOLLOWUP_OVER_THRESHOLD` is greater than zero AND this run falls on a
+maintenance cycle: replace one feature slot with a maintenance pass — dispatch
+the feat-agent owning the most actionable items with a `## Refactor Mode`
+prompt listing the top items. Equality does not trigger maintenance. Four
+items per track is normal; a concentrated backlog should trigger this gate,
+while adding more lightly loaded tracks should not (#2742).
 
-Record the total followup count in today's daily summary regardless.
+Record the repo-wide `FOLLOWUP_COUNT`, maximum per-file count, and number of
+files over the threshold in today's daily summary regardless.
 
 ### 2c: Harness backlog (runs alongside or instead of feat-agents)
 

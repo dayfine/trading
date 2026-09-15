@@ -1,5 +1,5 @@
 {
-  "followup_threshold": 10,
+  "followup_threshold_per_file": 4,
   "maintenance_cycle_ratio": 3,
   "auto_merge_enabled": true,
   "_cost_note": "Auth is a Max-20x subscription (flat-rate, not per-token billing). The $ figures below are API-equivalent estimates only; they do not bill. max_daily_cost_usd is therefore a runaway-dispatch BACKSTOP, not a real budget — set high so it rarely gates, letting actual eligible-work availability + subscription rate-limits be the true constraint. Raised 50->200 on 2026-06-13 (weekly utilization was 13%).",

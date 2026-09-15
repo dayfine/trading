@@ -192,11 +192,9 @@ else
   fi
 fi
 
-# A warning must fire (5 actionable items is under the threshold=10, so this
-# should be an "I:" info line, not a "W:" warning — sanity-check the
-# threshold branch didn't get inverted).
+# All files are at or below the default per-file threshold of four.
 if grep -q '^W: ' "$FINDINGS_05"; then
-  fail "7 actionable open items should not cross the threshold=10 warning; found a W: line"
+  fail "files with at most 4 actionable items should not cross the per-file threshold; found a W: line"
 fi
 if ! grep -q '^I: Open items: 7 actionable total' "$FINDINGS_05"; then
   fail "expected an info line reporting 7 actionable total open items, got: $(grep '^I: ' "$FINDINGS_05" || echo '<none>')"
@@ -234,14 +232,8 @@ fi
 
 # ── Step 3: threshold-crossing fixture — pins the W: warning branch ──
 #
-# The 5-actionable-item fixture above only ever exercises the `elif` info
-# branch (check_05_followup_items.sh's threshold check); the
-# `[ "$FOLLOWUP_COUNT" -gt 10 ]` warning branch is the ACTUAL signal the
-# orchestrator's Step 2b maintenance-cycle decision reads, and it went
-# unpinned in the original version of this test — inverting `-gt` to `-lt`
-# would leave the suite green while flipping that signal backwards. Use a
-# separate fixture root so this doesn't disturb the sidecar Step 2 above
-# already validated.
+# A concentrated eleven-item backlog must still warn, while the distributed
+# fixture below distinguishes the per-file decision from the old total gate.
 
 mkdir -p "${FAKE_ROOT_WARN}/dev/status"
 
@@ -250,7 +242,7 @@ mkdir -p "${FAKE_ROOT_WARN}/dev/status"
   echo
   i=1
   while [ "$i" -le 11 ]; do
-    echo "- [ ] open item number ${i}, crosses the threshold=10 warning"
+    echo "- [ ] open item number ${i}, crosses the per-file threshold=4 warning"
     i=$((i + 1))
   done
 } > "${FAKE_ROOT_WARN}/dev/status/track-warn.md"
@@ -274,16 +266,61 @@ fi
 # exists somewhere."
 WARN_LINE="$(grep '^W: Open item accumulation:' "$FINDINGS_WARN" || true)"
 case "$WARN_LINE" in
-  "W: Open item accumulation: 11 actionable open"*"(threshold: 10"*"see 'Followup Count Detail' below"*)
+  "W: Open item accumulation: 1 status file(s) exceed 4 actionable items per file: track-warn.md:11"*"see 'Followup Count Detail' below"*)
     ;;
   *)
-    fail "expected a W: warning line for 11 actionable open items crossing threshold=10 with the 'Followup Count Detail' pointer, got: '${WARN_LINE:-<missing>}'"
+    fail "expected a W: warning line for 11 actionable open items crossing the per-file threshold=4 with the 'Followup Count Detail' pointer, got: '${WARN_LINE:-<missing>}'"
     ;;
 esac
 
 if grep -q '^I: Open items:' "$FINDINGS_WARN"; then
-  fail "11 actionable open items crosses the threshold=10; should emit W:, not also I:"
+  fail "11 actionable open items crosses the per-file threshold=4; should emit W:, not also I:"
 fi
+
+# Per-file boundary and configuration checks (#2742). Keep the total above
+# the old repo-wide threshold while every individual file stays at four.
+THRESHOLD_CHECKS=0
+threshold_check() {
+  THRESHOLD_CHECKS=$((THRESHOLD_CHECKS + 1))
+  if ! "$@"; then fail "per-file threshold check ${THRESHOLD_CHECKS}: $*"; fi
+}
+run_threshold_fixture() {
+  : > "$FINDINGS_WARN"
+  REPO_ROOT="$FAKE_ROOT_WARN" sh "$CHECK_05" "$DETAIL_FILE_WARN" "$FINDINGS_WARN"
+}
+for track in a b c; do
+  printf '%s\n' '- [ ] one' '- [ ] two' '- [ ] three' '- [ ] four' > "${FAKE_ROOT_WARN}/dev/status/track-${track}.md"
+done
+# Retain the file but empty its old eleven-item backlog.
+: > "${FAKE_ROOT_WARN}/dev/status/track-warn.md"
+run_threshold_fixture
+threshold_check grep -qx 'M: FOLLOWUP_COUNT=12' "$FINDINGS_WARN"
+threshold_check grep -qx 'M: FOLLOWUP_MAX_PER_FILE=4' "$FINDINGS_WARN"
+threshold_check grep -qx 'M: FOLLOWUP_OVER_THRESHOLD=0' "$FINDINGS_WARN"
+threshold_check test "$(grep -c '^W:' "$FINDINGS_WARN" || true)" -eq 0
+printf '%s\n' '- [ ] five' >> "${FAKE_ROOT_WARN}/dev/status/track-b.md"
+run_threshold_fixture
+threshold_check grep -qx 'M: FOLLOWUP_OVER_THRESHOLD=1' "$FINDINGS_WARN"
+threshold_check grep -q 'per file: track-b.md:5 ' "$FINDINGS_WARN"
+# Raising the configured threshold must change the decision at equality.
+mkdir -p "${FAKE_ROOT_WARN}/dev/config"
+printf '%s\n' '{"followup_threshold_per_file":5}' > "${FAKE_ROOT_WARN}/dev/config/merge-policy.json"
+run_threshold_fixture
+threshold_check grep -qx 'M: FOLLOWUP_THRESHOLD_PER_FILE=5' "$FINDINGS_WARN"
+threshold_check grep -qx 'M: FOLLOWUP_OVER_THRESHOLD=0' "$FINDINGS_WARN"
+threshold_check test "$(grep -c '^W:' "$FINDINGS_WARN" || true)" -eq 0
+# Zero is a valid explicit threshold; it must not be replaced by the default.
+printf '%s\n' '{"followup_threshold_per_file":0}' > "${FAKE_ROOT_WARN}/dev/config/merge-policy.json"
+run_threshold_fixture
+threshold_check grep -qx 'M: FOLLOWUP_OVER_THRESHOLD=3' "$FINDINGS_WARN"
+# Invalid configured thresholds fail visibly instead of silencing maintenance.
+for policy in '{"followup_threshold_per_file":-1}' '{"followup_threshold_per_file":1.5}' '{"followup_threshold_per_file":"five"}' '{broken'; do
+  printf '%s\n' "$policy" > "${FAKE_ROOT_WARN}/dev/config/merge-policy.json"
+  : > "$FINDINGS_WARN"
+  if run_threshold_fixture 2> "$STDERR_EMPTY"; then threshold_rc=0; else threshold_rc=$?; fi
+  threshold_check test "$threshold_rc" -ne 0
+  threshold_check test ! -s "$FINDINGS_WARN"
+done
 
 # ── Step 4: zero-files-found fixture — pins the fail-loud guard ──
 #
@@ -320,4 +357,5 @@ if [ "$FAIL_COUNT" -gt 0 ]; then
   exit 1
 fi
 
+echo "OK: ${THRESHOLD_CHECKS} per-file threshold checks passed."
 echo "OK: deep scan follow-up/open-item counter (H-FOLLOWUP-COUNT / H-FOLLOWUP-THRESHOLD-RETUNE) change-detector test passed."
