@@ -4,13 +4,29 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-14 run 2 (orchestrator run 34878607445; main **`67485620`**
-at start, tip advanced to **`c5b11789`** mid-run). Green at run start from **CI on
-the same commit** — `build-and-test`, `perf-tier1-smoke`, `golden-sp500-5y`,
-`golden-custom-universe` all `success`; `status_file_integrity` **0**,
-`index_size_linter` **0**, `no_python_check` **0**, run standalone without dune,
-exit codes read **unpiped**. Step 0.5 did not fire: `QUEUE_NON_EMPTY=2` per the
-workflow (1 by the time I read it, #2809), and Condition 1 failed anyway.
+Last updated: 2026-09-15 (orchestrator run 34970422269; main **`4eff1f97`**, green
+on **all five** CI checks — `build-and-test`, `perf-tier1-smoke`, `golden-sp500-5y`,
+`golden-custom-universe`, `perf-tier2-nightly`; `status_file_integrity` **0**,
+`index_size_linter` **0**, `no_python_check` **0**, standalone without dune, exit
+codes read **unpiped**). Step 0.5 did not fire: `QUEUE_NON_EMPTY=0`, and an empty
+queue is the *opposite* of saturated, so the #2579 precondition forbids evaluating
+the four conditions at all.
+
+**The queue emptied legitimately, which is the first clean handoff this month.**
+#2814 (structural + behavioral APPROVED at `c61e91a3`) and #2813 (NEEDS_REWORK at
+`773f3542` → both APPROVED at `6f5b1cd1` after one rework) merged overnight via the
+maintainer's local session. Verdicts pinned to final tips; nothing stranded.
+**Dispatched 2 agents ~13 min in, before any verification** — the #2810 reordering,
+applied by choice since Step 8's prose is write-gated — and **published the summary
+mid-run as #2829** while they built. Two, not three: the RAM cap (1 dune) and the
+**disk** cap (~16 GB/worktree, `H-AGENT-WORKTREE-DISK-16GB-EACH`) interact so a
+third agent buys *no* parallelism (the mutex serializes the build) for +16 GB, on a
+runner that hit 100% and ENOSPC the last time it ran three. Deep scan is **current**
+(09-14, 1 day old) — the prior run's 21-days-stale `[info]` is resolved, #2771 did
+not recur. No feature dispatch: every IN_PROGRESS feature track is LOCAL-fenced,
+data-gated, or human-gated on an R3 flip. `support-floor-stops`' next-task cell was
+**stale by three weeks** and would have caused a wrong dispatch — caught by the
+CLAUDE.md pre-flight grep, corrected below.
 
 **Run 1 today proved the D3 hand-discipline note below is not a control.** Run
 `34853606164` dispatched three writing agents, recorded all three `_in flight_`,
@@ -139,11 +155,11 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
-| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | #2371 `6c3485c4` + #2368 `a994b7bc` MERGED (cohort measured; mis-join claim withdrawn); next: retire `project_rest_time_pnl_is_cell_specific` (obligation now due) |
+| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | #2813 R7=Fail for `force_liquidation` MERGED `989eceb0` (double-QC, 1 rework); next: retire `project_rest_time_pnl_is_cell_specific` (obligation due) |
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
-| [support-floor-stops](support-floor-stops.md) | IN_PROGRESS | feat-weinstein | — | #2505 stops differential pin MERGED (A2 rule fix #2508 landed, unblocking it); next: `_ratchet_tightened` ratchet-freeze defect (#2486 H1) |
+| [support-floor-stops](support-floor-stops.md) | IN_PROGRESS | feat-weinstein | — | #2486 book-faithful stops basis SHIPPED 08-24 (buffer 1.02->1.0, anchor-reset on); next: UNSET — prior cell cited #2486 H1, already done (09-15) |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #2081 robust dollar-ADV (#2060) MERGED `9670e49a`; next: short-leg regime-P&L decomposition (LOCAL) |
 | [extension-stop](extension-stop.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | arming + insurance-ACCEPT MERGED (#1960, ext_stop 2.0/0.25, default-off); next: default-flip only on further insurance-ACCEPT (R3, human-gated) |
 | [decline-character](decline-character.md) | MERGED | — | — | WORKSTREAM EXHAUSTED (#1739); closed in #2493 after 8 pacer asks; one EODHD-gated item to re-home |
@@ -152,7 +168,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2772 MERGED `ccf075be` — streak-aware scheduled-workflow health, unmasked from in-progress runs (#2770); next: Step 6.2 doubled-path fix via PR route |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2814 QC-score lexicon MERGED `e69137d2`; 09-15 dispatched: dispatch-half gate (#2810) + settings-path linter (H-SETTINGS-HOOKS-ABSOLUTE-LOCAL-PATH) |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (09-09 run 2 audit): 1 policy decision + 2 explicit archive entries + 1 fenced template. Prior "disk decline" framing withdrawn |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
