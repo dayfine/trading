@@ -140,8 +140,24 @@ type rule_id =
           [config.recent_plunge_min_drop_pct] drop within
           [config.recent_plunge_lookback_days]. *)
   | R7_exit_on_stage_3_to_4
-      (** Stop discipline — must exit when stage transitions Stage3 \xe2\x86\x92
-          Stage4. Book §5.4. *)
+      (** Stop discipline. Book §5.4. Two failure shapes, either of which is a
+          [Fail]:
+
+          - {b Held through Stage3 \xe2\x86\x92 Stage4}: a long entered in Stage
+            2/3 and exited in Stage 4 on any trigger other than [Stop_loss] /
+            [Signal_reversal] rode the transition down instead of exiting on
+            signal.
+          - {b Force-liquidated}: the exit carries the drawdown breaker's
+            [Strategy_signal] label
+            ({!Weinstein_strategy.Force_liquidation_runner.exit_label} =
+            ["force_liquidation"], the token it has emitted since 2026-09-14 /
+            PR #2800 — before that a breaker exit was stamped [StopLoss] and
+            read here as a clean stop-out). The breaker is the safety net, not a
+            strategy signal: its firing means the protective stop never removed
+            the position, which is a stop-discipline failure regardless of side
+            or exit stage. Because this shape needs no [stage_at_exit], it is
+            the one R7 verdict the reason-only
+            {!Backtest.Trade_audit.external_exit_decision} can also answer. *)
   | R8_macro_alignment
       (** Bullish macro for longs, bearish macro for shorts. Book §2 / §6.1. *)
 [@@deriving sexp, eq]
@@ -182,7 +198,15 @@ val evaluate_rules :
 
     [pre_entry_closes] supplies the symbol's daily closes at/before the entry so
     R6 (recent-plunge avoidance) can evaluate; omit it (default [[]]) to keep R6
-    {!Not_applicable} as when no bar source is available. *)
+    {!Not_applicable} as when no bar source is available.
+
+    R7 reads the record's enriched [exit_] when it has one, and otherwise falls
+    back to its reason-only [external_exit] for the force-liquidation shape only
+    — so a breaker exit rates the same whichever audit channel captured it. That
+    fallback is defensive rather than load-bearing today: breaker exits route
+    through {!Weinstein_strategy.Exit_audit_capture} and so land on the enriched
+    [exit_], leaving the reason-only channel unexercised by the current breaker
+    path. *)
 
 val score_of_rules : rule_evaluation list -> float
 (** Roll up rule outcomes into a per-trade score in [[0, 1]]. [Pass] counts 1,
