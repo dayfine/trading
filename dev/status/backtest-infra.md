@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-09-14
+## Last updated: 2026-09-15
 
 ## Status
 IN_PROGRESS
@@ -894,13 +894,13 @@ Merged in main:
 
 ## Next Steps
 
-- **[NEW 2026-09-14] PIT top-3000 universe migration — in flight locally (2026-09-14
-  session), do not dispatch.** Plan + decisions D1–D8, mechanism (`universe_schedule`
-  spec field → `membership_at` composition), sequencing 1–6:
-  `dev/plans/pit-universe-migration-2026-09-14.md`. Step 2 (fetch 2,483 union names)
-  and 3b/4 (warehouse `_v11pit`, new record band) are host/container-bound and
-  LOCAL; step 3a (the mechanism PR) is `feat-backtest` but dispatched from the local
-  session only — the orchestrator must not pick it up.
+- **[2026-09-14] PIT top-3000 universe migration — in flight locally (2026-09-14/15
+  session), do not dispatch.** Plan `dev/plans/pit-universe-migration-2026-09-14.md` (#2808).
+  Step 1 docs MERGED #2808; step 2 fetch MERGED #2809 (2,798 names, 3 reuses quarantined,
+  every vintage 2000–2025 ≥ 95.7%); step 3a `universe_schedule` MERGED #2816 (one rework
+  iteration). Step 3b `_v11pit` warehouse: single-pass 10,504-name build OOM-killed (exit
+  137); four-chunk `-incremental` build running from 19:37 PT. Step 4 (a0-pit-null × 3 salts,
+  chain-pit.sh) follows; step 5 grid-rule update; then the top-of-funnel screen.
 
 - ~~**[NEW 2026-09-05] #2669 — `build_snapshots.exe -incremental` clobbers
   `manifest.sexp`.**~~ **DONE 2026-09-08** — fixed by the merge in

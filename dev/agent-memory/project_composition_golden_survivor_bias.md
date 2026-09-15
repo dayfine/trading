@@ -64,3 +64,8 @@ Coverage is clean *by construction*: names without bars couldn't be ranked into 
 - `dev/notes/random-universe-sweep-2026-05-18.md` — full random-sample writeup
 - `dev/reports/composition-golden-bar-coverage-2026-05-18.md` — coverage audit
 - `trading/test_data/backtest_scenarios/goldens-custom-universe-scenarios/weinstein-2019-top-500.sexp` — header carries the bridge-smoke-test warning
+
+**09-14 decision (user):** migrate the record to a yearly point-in-time top-3000 (`_v11pit`) before the next
+measurement; the grid showed the year-2000 vintage list (3,000 symbols as of 2000-05-31, fixed 26y) and the year-2019
+list share only 1,023 names and the 26y wide arm's biggest 2019–23 winners are 2000-vintage survivors. Plan = P0 in
+`dev/notes/next-session-priorities-2026-09-14.md`. Say "year-2000 vintage", never "the 2000 list" (reads as 2,000 symbols).
