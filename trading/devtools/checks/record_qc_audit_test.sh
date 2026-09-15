@@ -40,6 +40,12 @@ mkdir -p "${TMP_REPO}/dev/reviews" "${TMP_REPO}/dev/audit" \
 
 cp "${SCRIPT}" "${TMP_REPO}/trading/devtools/checks/"
 cp "${SCRIPT_DIR}/write_audit.sh" "${TMP_REPO}/trading/devtools/checks/"
+# qc_score_lexicon_check.sh (H-QC-SCORE-ADJECTIVE-LEXICON) is sourced by
+# record_qc_audit.sh via a REPO_ROOT-relative path; without this copy every
+# scenario below would silently exercise the "companion file missing, skip"
+# branch instead of the real lexicon check, and scenarios 54/55 (added for
+# this backstop) would pass vacuously.
+cp "${SCRIPT_DIR}/qc_score_lexicon_check.sh" "${TMP_REPO}/trading/devtools/checks/"
 chmod +x "${TMP_REPO}/trading/devtools/checks/"*.sh
 
 PASS_COUNT=0
@@ -3877,6 +3883,103 @@ else
     "no '# Scenario header lines' complaint (headers=1 was fine)" "${c53d_no_headers_complaint}" \
     "'distinct scenario numbers named in headers' complaint present" "${c53d_header_nums_complaint}"
   echo "${out53d}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 54 — H-QC-SCORE-ADJECTIVE-LEXICON end-to-end (file mode): a
+# review file reproducing the #2115 shape verbatim (score 1 captioned
+# "Excellent") fires the new lexicon WARN on stderr, while every EXISTING
+# behavior (rc=0, JSON verdicts + quality_score) stays exactly as scenario
+# 1 already pins it — the new check is additive-only, never a regression to
+# the mature extraction path.
+# ---------------------------------------------------------------------------
+FEATURE54="lexicon-mismatch-file-mode"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE54}.md" <<'EOF'
+Reviewed SHA: abc54321
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+1 — Excellent implementation, no changes needed.
+EOF
+
+out54=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+          "${FEATURE54}" "feat/dummy" "2026-05-25" 2>&1) && rc54=0 || rc54=$?
+JSON54="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE54}.json"
+c54_rc=1; (( rc54 == 0 )) || c54_rc=0
+c54_json=1; [[ -f "${JSON54}" ]] || c54_json=0
+c54_score=1; grep -q '"quality_score": *1' "${JSON54}" 2>/dev/null || c54_score=0
+c54_warn=1; grep -q "WARN:" <<<"${out54}" || c54_warn=0
+c54_word=1; grep -qi "excellent" <<<"${out54}" || c54_word=0
+
+if [[ "${c54_rc}${c54_json}${c54_score}${c54_warn}${c54_word}" == "11111" ]]; then
+  pass "scenario 54 — H-QC-SCORE-ADJECTIVE-LEXICON: score 1 + 'Excellent' fires WARN on stderr, rc=0, JSON quality_score=1 unchanged (additive-only, non-blocking)"
+else
+  fail "scenario 54 — expected rc=0, JSON present with quality_score 1, and a WARN mentioning 'excellent'; got rc=${rc54}, output:"
+  report_conjuncts \
+    "rc54==0 (actual=${rc54})" "${c54_rc}" \
+    "JSON file exists" "${c54_json}" \
+    "quality_score==1 in JSON" "${c54_score}" \
+    "WARN: present in output" "${c54_warn}" \
+    "'excellent' named in WARN" "${c54_word}"
+  echo "${out54}" | sed 's/^/      /'
+  [[ -f "${JSON54}" ]] && echo "      json: $(cat "${JSON54}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 55 — H-QC-SCORE-ADJECTIVE-LEXICON end-to-end (PR mode): a
+# correctly-paired score 5 + "Exemplary" rationale stays silent (no WARN),
+# proving the check does not fire on every high-scoring review — only on a
+# genuine digit/adjective mismatch. Also confirms existing PR-mode
+# extraction (verdicts + quality_score) is unaffected by this check's
+# presence.
+# ---------------------------------------------------------------------------
+FEATURE55="lexicon-matched-pr-mode"
+S55_DIR="${TMP_REPO}/s55"
+mkdir -p "${S55_DIR}"
+cat > "${S55_DIR}/reviews.jsonl" <<'EOF'
+STATE:APPROVED
+Reviewed SHA: def55555
+
+## Structural QC — lexicon-matched-pr-mode
+
+## Verdict
+APPROVED
+ENDBODY
+STATE:APPROVED
+Reviewed SHA: def55555
+
+## Behavioral QC — lexicon-matched-pr-mode
+
+## Quality Score
+5 — Exemplary implementation, could serve as reference.
+
+## Verdict
+APPROVED
+ENDBODY
+EOF
+make_gh_mock "${S55_DIR}" "${S55_DIR}/reviews.jsonl"
+
+out55=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S55_DIR}/gh" \
+          bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+          "${FEATURE55}" "feat/dummy" "2026-05-25" --pr-number 5555 2>&1) && rc55=0 || rc55=$?
+JSON55="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE55}.json"
+c55_rc=1; (( rc55 == 0 )) || c55_rc=0
+c55_score=1; grep -q '"quality_score": *5' "${JSON55}" 2>/dev/null || c55_score=0
+c55_no_warn=1; grep -q "WARN:" <<<"${out55}" && c55_no_warn=0
+
+if [[ "${c55_rc}${c55_score}${c55_no_warn}" == "111" ]]; then
+  pass "scenario 55 — H-QC-SCORE-ADJECTIVE-LEXICON: score 5 + 'Exemplary' (correct polarity) stays silent, rc=0, JSON quality_score=5 unchanged"
+else
+  fail "scenario 55 — expected rc=0, JSON quality_score=5, and NO 'WARN:' in output; got rc=${rc55}, output:"
+  report_conjuncts \
+    "rc55==0 (actual=${rc55})" "${c55_rc}" \
+    "quality_score==5 in JSON" "${c55_score}" \
+    "no WARN: in output" "${c55_no_warn}"
+  echo "${out55}" | sed 's/^/      /'
+  [[ -f "${JSON55}" ]] && echo "      json: $(cat "${JSON55}")"
 fi
 
 # ---------------------------------------------------------------------------

@@ -613,6 +613,33 @@ if [ -n "$QUALITY_SCORE" ] && ! echo "$QUALITY_SCORE" | grep -qE '^[1-5]$'; then
   exit 1
 fi
 
+# --- Digit/adjective lexicon warning (H-QC-SCORE-ADJECTIVE-LEXICON) ---
+#
+# Warn-level, non-blocking secondary backstop for the #2115 failure shape
+# (a quality score of 1 captioned "Excellent"). Sourced from a companion
+# script rather than inlined here to keep this already heavily-hardened
+# extraction file's diff small; see that file's header for the full design
+# rationale and the deliberately narrow lexicon.
+#
+# This block can NEVER affect this script's exit code or the record written
+# by write_audit.sh below: qc_score_lexicon_warn always returns 0 and its
+# return value is not even inspected here, and the source guard skips
+# silently (never a hard failure of THIS script) if the companion file is
+# somehow missing.
+if [ -n "$QUALITY_SCORE" ]; then
+  QC_LEXICON_LIB="$REPO_ROOT/trading/devtools/checks/qc_score_lexicon_check.sh"
+  if [ -f "$QC_LEXICON_LIB" ]; then
+    # shellcheck source=trading/devtools/checks/qc_score_lexicon_check.sh
+    . "$QC_LEXICON_LIB"
+    QC_LEXICON_SOURCE_TEXT="${BODIES:-}"
+    if [ "$FILE_MODE" -eq 1 ]; then
+      QC_LEXICON_SOURCE_TEXT="$(cat "$REVIEW_FILE" 2>/dev/null || true)"
+    fi
+    QC_LEXICON_RATIONALE="$(qc_score_lexicon_extract_rationale_line "$QC_LEXICON_SOURCE_TEXT")"
+    qc_score_lexicon_warn "$QUALITY_SCORE" "$QC_LEXICON_RATIONALE"
+  fi
+fi
+
 # --- Extract reviewed SHA (H-AUDIT-REWORK-COUNT-BLIND, dev/status/harness.md) ---
 #
 # Both QC agents' PR review comment bodies (qc-structural.md /

@@ -755,9 +755,27 @@
 
 (rule
  (alias runtest)
- (deps record_qc_audit.sh write_audit.sh _check_lib.sh (universe))
+ (deps
+  record_qc_audit.sh
+  write_audit.sh
+  _check_lib.sh
+  qc_score_lexicon_check.sh
+  (universe))
  (action
   (run bash %{dep:record_qc_audit_test.sh})))
+
+; qc_score_lexicon_check.sh (H-QC-SCORE-ADJECTIVE-LEXICON): warn-level,
+; non-blocking backstop for the #2115 digit/adjective mismatch shape (a
+; quality score of 1 captioned "Excellent"). Sourced by record_qc_audit.sh
+; (see that rule's deps above); this rule pins the library's own two
+; functions directly with private fixtures -- no repo-root walk-up, no
+; (universe) needed.
+
+(rule
+ (alias runtest)
+ (deps qc_score_lexicon_check.sh)
+ (action
+  (run bash %{dep:qc_score_lexicon_check_test.sh})))
 
 ; Active exceptions report: lists all linter_exceptions.conf entries and
 ; inline @large-module / @large-function markers with status (active /
