@@ -4,120 +4,65 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-15 (orchestrator run 34970422269; main **`4eff1f97`**, green
-on **all five** CI checks — `build-and-test`, `perf-tier1-smoke`, `golden-sp500-5y`,
-`golden-custom-universe`, `perf-tier2-nightly`; `status_file_integrity` **0**,
-`index_size_linter` **0**, `no_python_check` **0**, standalone without dune, exit
-codes read **unpiped**). Step 0.5 did not fire: `QUEUE_NON_EMPTY=0`, and an empty
-queue is the *opposite* of saturated, so the #2579 precondition forbids evaluating
-the four conditions at all.
+Last updated: 2026-09-15 (orchestrator run 2; main **`767ef9aa`**, green on all
+CI checks; `status_file_integrity` **0**, `index_size_linter` **0**,
+`no_python_check` **0** — run standalone without dune, exit codes read unpiped).
 
-**The artifact-loss class is CLOSED on both halves.** #2812 (09-14) closed the
-summary half; **#2831 `ac6aaeed` (today) closes the dispatch half** — a FULL-mode
-run that claims a dispatch and produces no artifact now **fails the job** instead
-of going green. Validated self-referentially: the merged check was run against
-*this* run's own summary and both halves reported OK, exit 0. Five recurrences
-this month (#2741, #2747, #2771, #2803, #2810); none can recur by these routes.
-Both PRs opened this run were written, CI-verified, double-reviewed and **merged
-inside the same run** — #2831 through **two rework iterations** (behavioral
-NEEDS_REWORK twice, each time with proof, each time correct). Integration queue
-ends the run **empty**.
+**This header was trimmed this run.** It had reached **18725/20480 bytes (91%)**
+of the linter cap by accreting run-by-run incident narrative, and would have
+failed CI mid-reconcile within a few runs. Every incident block removed below is
+fully recorded in its own `dev/daily/` summary, which is where run history
+belongs; this header now carries only **standing facts that change slowly**.
+Keep it that way — append to the daily summary, not here.
 
-**The queue emptied legitimately, which is the first clean handoff this month.**
-#2814 (structural + behavioral APPROVED at `c61e91a3`) and #2813 (NEEDS_REWORK at
-`773f3542` → both APPROVED at `6f5b1cd1` after one rework) merged overnight via the
-maintainer's local session. Verdicts pinned to final tips; nothing stranded.
-**Dispatched 2 agents ~13 min in, before any verification** — the #2810 reordering,
-applied by choice since Step 8's prose is write-gated — and **published the summary
-mid-run as #2829** while they built. Two, not three: the RAM cap (1 dune) and the
-**disk** cap (~16 GB/worktree, `H-AGENT-WORKTREE-DISK-16GB-EACH`) interact so a
-third agent buys *no* parallelism (the mutex serializes the build) for +16 GB, on a
-runner that hit 100% and ENOSPC the last time it ran three. Deep scan is **current**
-(09-14, 1 day old) — the prior run's 21-days-stale `[info]` is resolved, #2771 did
-not recur. No feature dispatch: every IN_PROGRESS feature track is LOCAL-fenced,
-data-gated, or human-gated on an R3 flip. `support-floor-stops`' next-task cell was
-**stale by three weeks** and would have caused a wrong dispatch — caught by the
-CLAUDE.md pre-flight grep, corrected below.
+## Standing constraints
 
-**09-14 (both runs), compressed — full record in `dev/daily/2026-09-14*.md`.** Run 1
-dispatched three writing agents and produced zero branches (turn torn down
-mid-dispatch; filed **#2810**, the reordering ask now applied by default). Run 2
-re-dispatched all three and shipped **#2812** (summary-half gate, merged
-`d04c75e2`), **#2813** (R7 + `force_liquidation` — real result was a *corrected
-premise*: the flip already worked as of #2800 but was unpinned and fired in one
-shape only) and **#2814** (QC score lexicon). #2813/#2814 merged overnight with
-full double-QC. **D3/#2747 is now mechanically closed by #2831 — see the top of
-this header.**
+**Capabilities** (re-measured 2026-09-15 run 2 unless noted):
+- `.claude/agents/**` direct writes **refused** (17th consecutive run).
+- `.claude/rules/**` writes **also refused** — measured 2026-09-15 run 2, when a
+  dispatched agent was blocked twice writing `container-capacity-scheduling.md`.
+  **This corrects an earlier assumption** that the gate covered only
+  `.claude/agents/**`; PR #2828 edited a rules file through a *human-merged PR*,
+  a different route.
+- `POST /issues` **works** (#2835, #2837 filed this run).
+  **`POST /issues/:n/comments` also works** — corrects the carried "403" claim,
+  disproved this run when a QC agent posted a verdict through it successfully.
+  `PATCH /issues/:n` remains **403**, so a filed issue cannot be corrected here.
+- `workflow` scope unavailable by push **and** contents API (403 on a workflow
+  path vs **201** on a `dev/notes/` control, same token, seconds apart — the
+  control is what makes it a measurement); `POST /actions/workflows/<f>/dispatches`
+  **403**. Blocks #2770, #1636, #2113, and makes the #2810 dispatch-before-verify
+  reordering a choice each run rather than a mechanism.
 
-**The orchestrator was DEAD for three days and the cause was not in this repo.**
-Six consecutive scheduled runs failed 2026-09-10 -> 09-12 (`34475636575`,
-`34501930703`, `34597781805`, `34622262330`, `34691534671`, `34702540272`), each
-`$0.0000` with `num_turns: 1`, `duration_ms ~506` and `modelUsage: {}` — the SDK
-died **before issuing a single model request**. Zero summaries, zero health scans,
-zero audits. The 09-13 track-pacer report leads with PR #2757 as the suspect; that
-hypothesis is **false** — `git diff 68cd3b8c origin/main -- .claude/agents/
-.github/workflows/` is **empty**, i.e. the agent definition and every workflow are
-byte-identical between the first dead run's head and today's successful one. The
-same content failed six times and then succeeded. What varied in lockstep is the
-**unpinned Claude Code build**: 2.1.266 green -> 267/268/269 red -> 2.1.270 green.
-Filed as **#2770** (ask: pin the version; alert on orchestrator failure).
+**Runner ceilings** (bind before cost does; cap is 2 agents, not 3):
+concurrent `dune` in flight **1** (15 GB, memory-bound; OOM measured run
+`34757914354`) · disk per agent worktree **~16 GB**
+(`H-AGENT-WORKTREE-DISK-16GB-EACH`) · reclaim each worktree **as its agent
+finishes**, never batched (batching took run `33962894987` from 69% to ENOSPC).
 
-**D2 (#2741) is CLOSED.** PR #2757 repointed Step 8 at
-`dev/scripts/publish_daily_summary.sh` (plain git + curl REST), so the five-runs
--lost-the-summary defect can no longer recur by that path. Note the irony worth
-keeping: #2757 was then wrongly blamed for the three-day outage above, purely
-because it merged inside the gap. **#2729 is answered and CLOSED** by #2749
-(`cce6d073`) — the two QC passes ran disjoint mutation sets, and #2727 had
-already killed the mutant. **D3 (#2747) is CLOSED as of 09-15** — #2831 (`ac6aaeed`)
-makes the check mechanical: a run claiming a dispatch with no artifact now fails
-the job. The hand-discipline note it replaces was never a control.
+**The open defect class** — *a green run is indistinguishable from a productive
+one, because nothing checks the artifact against the exit code.* Instances
+#2741, #2747, #2771, #2803, #2810; summary half closed by **#2812**, dispatch
+half by **#2831**. Still open one level up: **#2837** (a QC verdict posted to a
+surface the merge gate cannot read is invisible and undetected) and **#2835**
+(Step 0.5 Condition 2 derives `PREV_ISO` from mtime, which `actions/checkout`
+sets to run start, so the condition cannot fail on GHA — the script it delegates
+to already fixed this in #2605; the prose did not).
 
-**The watchers were all down during the outage, and one is blind by
-construction.** The scheduled-workflow health detector (#2634/#2663) needs only
-API **read** access — the blocked `workflow` scope gates *wiring it as a cron*,
-not *calling it*, and nothing had ever called it. **The orchestrator now runs it
-directly.** But run on 09-13 it reported `Daily orchestrator` = **OK** mid-outage:
-it inspected only the newest scheduled run, which was the orchestrator's own
-`in_progress` execution, classified as OK — so the orchestrator masks its own
-health unconditionally. Fixed in **#2772** (streak-aware, in-progress-unmasked).
-Separately, the **weekly deep scan ran on 09-07, reported every step successful,
-and produced no file** — the agent returned `is_error: false` after 31 turns and
-$0.39 in 98s, and the publish step's honest `No changes in dev/health/` guard
-exited 0. Filed as **#2771**. Three defects this month share one shape: **a green
-run is indistinguishable from a productive one, because nothing checks the
-artifact against the exit code.**
+**Feature tracks are fenced, by design.** Every IN_PROGRESS feature row below is
+LOCAL-fenced (maintainer-owned), data-gated, or human-gated on an R3 default-flip.
+The current milestone is the **PIT top-3000 universe migration**
+(`dev/plans/pit-universe-migration-2026-09-14.md`; steps 1-3a merged
+#2808/#2809/#2816, 3b + step-4 null band in flight locally, #2832) — maintainer-led
+and LOCAL. Orchestrator dispatch stays off it; harness is where the throughput is.
 
-Two RED weekly workflows remain (`Prune candidates weekly`, `Weekly start sweep
-(BAH SPY)`), both last fired **2026-09-07** — before their fix (#2725) merged.
-They cannot produce a new datapoint before their next weekly cron; not re-derived
-this run.
+**Two RED weekly workflows** remain (`Prune candidates weekly`, `Weekly start
+sweep (BAH SPY)`), both last fired 2026-09-07, before their fix (#2725) merged.
+Neither can produce a new datapoint before its next weekly cron.
 
-Capabilities (carried; measured 2026-09-04 unless noted): `.claude/agents/**`
-writes **refused** (13th run — re-probed 2026-09-13 with a one-line Edit, refused;
-note #2757 landed a change to that file via a *human-merged PR*, which is a
-different route); `workflow` scope unavailable by push **and**
-contents API (403 on a workflow path vs **201** on a `dev/notes/` control,
-same token, seconds apart — the control is what makes it a measurement);
-`POST /actions/workflows/<f>/dispatches` **403**; `POST /issues` create-only
-(issue comments **403**, re-tested 2026-09-08 and again 2026-09-14; **`PATCH
-/issues/<n>` is also 403** — new 2026-09-14, so a filed issue can be neither
-commented on nor edited, and a mistake in an issue body is uncorrectable from this
-runtime); `PATCH /pulls/<n>`, `POST /pulls/<n>/reviews`, `POST /pulls` (create),
-`PUT /pulls/<n>/merge`, `PUT .../update-branch` all work.
-
-Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
-orchestrator run — not here. This header carries the current run only.
-Ten prior run summaries were inlined above it until 2026-08-14, growing
-the file to 21,972 bytes against the linter's 20,480 cap and turning a
-lookup table into a changelog; each already ended with a pointer to its
-own daily file, so nothing was lost in moving them out. Recent runs:
-`2026-08-14.md`, `2026-08-13.md`, `2026-08-12.md`, `2026-08-09.md`,
-`2026-08-08.md`, `2026-08-07.md`, `2026-08-05.md`, `2026-08-04.md`.
-
-## Active + complete tracks
-
-Each row: one line; deeper task detail in the linked status file.
-"Next task" = top-of-queue concrete item from that file's Next Steps.
+**Note for Step 2c:** `git merge-base --is-ancestor` is **not** a merged-ness test
+in this repo — squash merges make every correctly-merged branch a non-ancestor of
+`main`, so it reports NOT-MERGED for all of them. Check PR state instead.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
@@ -152,7 +97,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-15: #2831 dispatch-artifact gate MERGED `ac6aaeed` (artifact-loss class CLOSED both halves) + #2830 settings-path linter MERGED `e995ed22` |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | run 2 MERGED both: #2834 gate curl-projection pin `767ef9aa` + #2836 pre-dispatch disk guard `2d023810`; next: N3 mutation row + count-split residual |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (09-09 run 2 audit): 1 policy decision + 2 explicit archive entries + 1 fenced template. Prior "disk decline" framing withdrawn |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
