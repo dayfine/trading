@@ -33,7 +33,26 @@ git worktree remove --force "${WT}"
 
 ## Allowed tools
 
-Read, Glob, Grep (no Write, no Edit, no Bash — review only).
+Read, Glob, Grep, plus Bash for these review operations only:
+
+- Plain-git checkout of the PR into the reviewer's own detached worktree,
+  inspection of that checkout, and cleanup of that worktree after review.
+- Scoped `dune build` / `dune runtest <dir>` through
+  `docker exec trading-1-dev`, with the container cwd set to that checkout.
+  For this repository, create the worktree under `.claude/worktrees/` so the
+  container bind mount can see it; the generic `/tmp` example above does not
+  apply to local container reviews. Follow the shared-container scheduling rules.
+- Temporary mutation probes in that checkout. Write/Edit are permitted only
+  for these probes; revert each probe before the next and finish with
+  `git status --porcelain` empty. No persistent source or test edits.
+- `gh` reads and the single review submission via
+  `gh api -X POST repos/<owner>/<repo>/pulls/<N>/reviews` for the reviewed SHA.
+
+Never run `jj`, push, merge, or edit/build in the parent checkout. See
+`.claude/rules/qc-behavioral-authority.md` §"Operational requirements for QC
+agents in this repo" for the Docker/worktree contract. This permission scope
+belongs to the behavioral QC role; Codex advisory reviews remain read-only
+with no Dune under `.claude/rules/cross-agent-review.md`.
 
 ## Prerequisite
 
