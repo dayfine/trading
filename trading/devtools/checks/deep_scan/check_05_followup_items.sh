@@ -1,7 +1,7 @@
 #!/bin/sh
 # Check 5: Open item count (from status files) — feeds the orchestrator's
 # Step 2b maintenance-cycle decision (dev/config/merge-policy.json
-# "followup_threshold").
+# "followup_threshold_per_file").
 #
 # Usage: sh check_05_followup_items.sh <report_file> [findings_file]
 #
@@ -80,12 +80,10 @@
 # Warnings/Info line and the metrics block, so the derived split is
 # always visible and never has to be reconciled against prose by hand.
 #
-# Retuning `dev/config/merge-policy.json`'s `followup_threshold` upward
-# instead was the other candidate resolution the filing left open; NOT
-# taken, because the non-actionable floor is not a constant (Tier items
-# open and close over time) and a raised threshold decays the moment the
-# roadmap's shape changes, whereas an exclusion keyed on the file's own
-# structure tracks that shape automatically.
+# Per-file threshold (#2742): four actionable items per track is normal;
+# warn above four, so adding more lightly loaded tracks cannot trip the gate.
+# This replaces the permanently exceeded repo-wide ten-item threshold.
+# Read the same policy as Step 2b; totals remain available for trend reporting.
 #
 # ────────────────────────────────────────────────────────────────
 # FAIL-LOUD ON ZERO FILES READ
@@ -115,6 +113,18 @@ FINDINGS_FILE="${2:-}"
 # ────────────────────────────────────────────────────────────────
 
 STATUS_DIR="${REPO_ROOT}/dev/status"
+
+FOLLOWUP_THRESHOLD_PER_FILE=4
+POLICY_FILE="${REPO_ROOT}/dev/config/merge-policy.json"
+if [ -f "$POLICY_FILE" ]; then
+  FOLLOWUP_THRESHOLD_PER_FILE=$(jq -er '
+    if has("followup_threshold_per_file") then .followup_threshold_per_file else 4 end
+    | select(type == "number") | select(. >= 0 and . == floor)
+  ' "$POLICY_FILE") || die "check_05_followup_items: followup_threshold_per_file must be a nonnegative integer in ${POLICY_FILE}"
+fi
+FOLLOWUP_MAX_PER_FILE=0
+FOLLOWUP_OVER_THRESHOLD=0
+OVERLOADED_FILES=""
 
 FILES_READ=0
 FOLLOWUP_COUNT=0
@@ -169,6 +179,13 @@ for status_file in "${STATUS_DIR}"/*.md; do
         ;;
     esac
   done < "$status_file"
+  if [ "$file_count" -gt "$FOLLOWUP_MAX_PER_FILE" ]; then
+    FOLLOWUP_MAX_PER_FILE=$file_count
+  fi
+  if [ "$file_count" -gt "$FOLLOWUP_THRESHOLD_PER_FILE" ]; then
+    FOLLOWUP_OVER_THRESHOLD=$((FOLLOWUP_OVER_THRESHOLD + 1))
+    OVERLOADED_FILES="${OVERLOADED_FILES}${OVERLOADED_FILES:+, }$(basename "$status_file"):${file_count}"
+  fi
   if [ "$file_count" -gt 0 ]; then
     fname="$(basename "$status_file")"
     FOLLOWUP_PER_FILE="${FOLLOWUP_PER_FILE}${fname}:${file_count}\n"
@@ -179,12 +196,15 @@ if [ "$FILES_READ" -eq 0 ]; then
   die "check_05_followup_items: found zero dev/status/*.md files under ${STATUS_DIR} -- cannot measure open-item debt. Reporting FOLLOWUP_COUNT=0 here would misread as 'no open debt' instead of 'the scan did not run'. Check REPO_ROOT resolution (repo_root() in _check_lib.sh) and that dev/status/ exists and is non-empty."
 fi
 
-if [ "$FOLLOWUP_COUNT" -gt 10 ]; then
-  add_warning "Open item accumulation: ${FOLLOWUP_COUNT} actionable open \`- [ ]\` items across dev/status/*.md, unscoped by heading (threshold: 10; ${FOLLOWUP_EXCLUDED} additional Tier-roadmap/template items excluded, ${FOLLOWUP_TOTAL} total open) — see 'Followup Count Detail' below for the per-file breakdown"
+if [ "$FOLLOWUP_OVER_THRESHOLD" -gt 0 ]; then
+  add_warning "Open item accumulation: ${FOLLOWUP_OVER_THRESHOLD} status file(s) exceed ${FOLLOWUP_THRESHOLD_PER_FILE} actionable items per file: ${OVERLOADED_FILES} (${FOLLOWUP_COUNT} actionable repo-wide; ${FOLLOWUP_EXCLUDED} additional Tier-roadmap/template items excluded, ${FOLLOWUP_TOTAL} total open) — see 'Followup Count Detail' below for the per-file breakdown"
 elif [ "$FOLLOWUP_COUNT" -gt 0 ]; then
   add_info "Open items: ${FOLLOWUP_COUNT} actionable total \`- [ ]\` items across dev/status/*.md, unscoped by heading (${FOLLOWUP_EXCLUDED} additional Tier-roadmap/template items excluded, ${FOLLOWUP_TOTAL} total open)"
 fi
 
+add_metric FOLLOWUP_MAX_PER_FILE "$FOLLOWUP_MAX_PER_FILE"
+add_metric FOLLOWUP_OVER_THRESHOLD "$FOLLOWUP_OVER_THRESHOLD"
+add_metric FOLLOWUP_THRESHOLD_PER_FILE "$FOLLOWUP_THRESHOLD_PER_FILE"
 add_metric FOLLOWUP_COUNT "$FOLLOWUP_COUNT"
 add_metric FOLLOWUP_EXCLUDED "$FOLLOWUP_EXCLUDED"
 add_metric FOLLOWUP_TOTAL "$FOLLOWUP_TOTAL"

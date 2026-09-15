@@ -112,7 +112,7 @@ Your only write target is `dev/health/<YYYY-MM-DD>-[fast|deep].md`.
 1. <what> -- <where>
 
 ## Metrics
-- Open follow-up items: N (maintenance threshold: 10)
+- Open follow-up items: N actionable repo-wide; maximum per file: N; files over maintenance threshold (from `followup_threshold_per_file`, default 4): N
 - Linter exceptions past review date: N
 - Dead code candidates: N (deep scan only)
 - Design doc drift items: N (deep scan only)
