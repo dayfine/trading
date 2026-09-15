@@ -2303,7 +2303,7 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   (source: 2026-09-05 orchestrator run 33962894987, found while diagnosing #2662;
   fixed 2026-09-15 orchestrator run, PR TBD)
 
-- [ ] **H-AGENT-WORKTREE-DISK-16GB-EACH**: measured 2026-09-05 (run 33962894987)
+- [~] **H-AGENT-WORKTREE-DISK-16GB-EACH**: measured 2026-09-05 (run 33962894987)
   — **a dispatched agent's worktree costs ~16 GB once it has run `dune build`**,
   and the GHA runner has ~145 GB total with ~13 GB already taken by the main
   checkout. Three concurrent QC worktrees measured **16 GB / 16 GB / 16 GB = 48
@@ -2333,6 +2333,47 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   The disk cost is the price of that isolation, so the answer is prompt
   reclamation, not fewer worktrees. `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-09-05 orchestrator run 33962894987)
+  **2026-09-15 partial fix (harness/dispatch-disk-guard, PR TBD):** shipped
+  the pre-dispatch `df` guard named in (b) above —
+  `dev/scripts/dispatch_disk_guard.sh` takes an agent count (and/or an
+  explicit `DISPATCH_DISK_GUARD_FLOOR_GB` override) and refuses (exit 1) when
+  free disk is below `agent_count * PER_AGENT_WORKTREE_GB(16) +
+  SAFETY_MARGIN_GB(20)`, both named constants citing this entry's
+  measurement; exits 0 and prints the numbers either way. Fail-closed
+  end to end: missing/non-numeric agent count, and a missing or malformed
+  `df` reading, all refuse rather than silently passing — verified with 7
+  mutations (comparison-operator flip, per-agent constant dropped, floor
+  constant changed by 20 and by 1, malformed-df-falls-through-to-pass,
+  exit-codes-inverted, per-agent constant loosened by 1 GB); every mutation
+  reddened in isolation via the fixture-driven `dev/scripts/
+  dispatch_disk_guard_test.sh` (9 scenarios, no live-disk dependency) and the
+  guard reverted byte-identical afterward. Wired into `dune runtest` via
+  `trading/devtools/checks/dispatch_disk_guard_test_runner.sh` (the
+  established dev/scripts/-is-outside-the-workspace shim pattern, same as
+  `orchestrator_fastexit_gate_test_runner.sh` / `codex_review_test_runner.sh`).
+  Verify: `dev/lib/run-in-env.sh dune runtest devtools/checks` (look for `OK:
+  dispatch_disk_guard_test`), or standalone `sh
+  dev/scripts/dispatch_disk_guard_test.sh`.
+  **Still open** (do not re-derive from scratch — pick up here):
+  - **(a) is only half-done.** The `.claude/rules/container-capacity-
+    scheduling.md` disk-column edit was attempted twice from this session's
+    runtime and was refused both times by the permission system as "a
+    sensitive file" — contradicting this item's own dispatch brief, which
+    stated `.claude/rules/**` was writable (citing PR #2828 four commits
+    prior). Whatever changed between #2828 and this run needs investigating
+    before the column can land; the intended diff (a 4th `disk` column,
+    `~16 GB` + this entry's citation) is fully specified above and in this
+    PR's body, ready to apply the moment a session can write that path.
+  - **(b) the orchestrator Step 4 unconditional-cleanup half is untouched.**
+    `.claude/agents/lead-orchestrator.md` writes are refused in this runtime
+    (16 consecutive runs per this item's dispatch brief); the guard script
+    above is dispatch-time only and does not by itself fix the batched-
+    cleanup root cause. A session that CAN write `.claude/agents/**` should
+    make `git worktree remove --force` unconditional per-agent in Step 4,
+    per (b)'s original fix shape above, and should also wire
+    `dispatch_disk_guard.sh` into the orchestrator's actual dispatch
+    decision (today it exists as a standalone script callable by hand, not
+    yet invoked automatically before dispatch).
 - [x] **H-QC-VERDICT-NEWLINE-COLLAPSE** (found by hand 2026-09-04, PR #2663;
   landed here since it was never written into this file at the time): a
   qc-structural review of #2663 was posted **APPROVED at the correct tip**,
