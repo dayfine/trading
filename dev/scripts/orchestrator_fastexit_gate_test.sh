@@ -231,6 +231,9 @@ TMP_REPO=$(mktemp -d -t orchestrator_fastexit_gate_repo.XXXXXX)
 # Status - 2026-08-26 [run 1]
 
 **Mode:** FULL
+
+## Scheduled workflows
+all OK (1 measured; exit 0)
 MD
   touch -t 202608260000 dev/daily/2026-08-26.md
 )
@@ -241,6 +244,9 @@ _reset_summary() {
 # Status - 2026-08-27 [run 1]
 
 **Mode:** $1
+
+## Scheduled workflows
+all OK (1 measured; exit 0)
 MD
   touch -t 202608270000 "$TMP_REPO/dev/daily/2026-08-27.md"
 }
@@ -317,6 +323,9 @@ _write_and_commit_prior_summary() {
 # Status - 2026-08-26 [run 1]
 
 **Mode:** FULL
+
+## Scheduled workflows
+all OK (1 measured; exit 0)
 MD
     touch -t 202608260000 dev/daily/2026-08-26.md
     git add dev/daily/2026-08-26.md
@@ -648,6 +657,9 @@ _set_origin_main without-summary
 # Status - 2026-08-27 [run 2]
 
 **Mode:** FULL
+
+## Scheduled workflows
+all OK (1 measured; exit 0)
 MD
 )
 MOCK_DAILY_PR_URL_FILE=$(mktemp -t orchestrator_fastexit_gate_url.XXXXXX)
@@ -689,7 +701,7 @@ _write_dispatch_summary() {
     cd "$TMP_REPO"
     {
       printf '# Status - 2026-08-27 [run 1]\n\n'
-      printf '**Mode:** FULL\n\n'
+      printf '**Mode:** FULL\n\n## Scheduled workflows\nall OK (1 measured; exit 0)\n\n'
       printf '## Dispatched this run\n\n'
       printf '%s\n' "$1"
     } >dev/daily/2026-08-27.md
@@ -955,6 +967,41 @@ check "a header with all four canonical words in the wrong order is ignored -- e
 
 MOCK_DAILY_PR_STATE=none
 export MOCK_DAILY_PR_STATE
+
+# #2634: published FULL summaries cannot silently omit scheduled health.
+MOCK_DAILY_PR_STATE=open
+_reset_summary FULL
+sed '/^## Scheduled workflows$/d' "$TMP_REPO/dev/daily/2026-08-27.md" > "$TMP_REPO/missing.md"
+rc=0
+_run_verify missing.md || rc=$?
+check "FULL missing scheduled-workflow section fails" 1 "$rc"
+_reset_summary FULL
+rc=0
+_run_verify dev/daily/2026-08-27.md || rc=$?
+check "FULL scheduled-workflow section passes" 0 "$rc"
+
+# Render all health exit classes from captured fixtures, without network access.
+health_fixture="$TMP_REPO/health.log"
+printf 'OK\tweekly\trun_id=12\nNO-SCHEDULE\tmanual\t(no runs)\nSUMMARY: ok=1\n' > "$health_fixture"
+rendered=$(sh "$HERE/scheduled_workflow_summary.sh" 0 "$health_fixture")
+check "renderer always emits fixed heading" 1 "$(printf '%s\n' "$rendered" | grep -c '^## Scheduled workflows$')"
+check "renderer counts measured OK only" 1 "$(printf '%s\n' "$rendered" | grep -c '^all OK (1 measured; exit 0)$')"
+printf 'RED\tweekly\tnewest_completed_run_id=11\nSTALE\tdaily\tnewest_completed_run_id=9\n' > "$health_fixture"
+rendered=$(sh "$HERE/scheduled_workflow_summary.sh" 1 "$health_fixture")
+check "renderer preserves RED completed id" 1 "$(printf '%s\n' "$rendered" | grep -c 'RED.*weekly.*newest_completed_run_id=11')"
+check "renderer preserves STALE completed id" 1 "$(printf '%s\n' "$rendered" | grep -c 'STALE.*daily.*newest_completed_run_id=9')"
+for health_rc in 2 3; do
+  printf 'FAIL: measurement unavailable\n' > "$health_fixture"
+  rendered=$(sh "$HERE/scheduled_workflow_summary.sh" "$health_rc" "$health_fixture")
+  check "renderer exit $health_rc is unmeasurable" 1 "$(printf '%s\n' "$rendered" | grep -c "^UNMEASURABLE (exit $health_rc:")"
+  check "renderer exit $health_rc retains reason" 1 "$(printf '%s\n' "$rendered" | grep -c 'FAIL: measurement unavailable')"
+done
+printf 'UNOBSERVABLE\tweekly\tno completed run\nSUMMARY: ok=0\n' > "$health_fixture"
+rendered=$(sh "$HERE/scheduled_workflow_summary.sh" 0 "$health_fixture")
+check "renderer cannot call unobservable all OK" 1 "$(printf '%s\n' "$rendered" | grep -c '^UNMEASURABLE')"
+: > "$health_fixture"
+rendered=$(sh "$HERE/scheduled_workflow_summary.sh" 0 "$health_fixture")
+check "renderer missing report is unmeasurable" 1 "$(printf '%s\n' "$rendered" | grep -c '^UNMEASURABLE')"
 
 printf '\n%d/%d checks passed\n' "$((total - fails))" "$total"
 if [ "$fails" -gt 0 ]; then
