@@ -236,12 +236,16 @@ run_mutation x5 killed \
   's/\[0-9a-f\]{7,40}/[0-9a-f]{8,40}/' \
   'regress the sha-capture lower bound from {7,40} back to {8,40} -- the exact #2397 short-sha bug'
 
-# p1-p2: H-GATEPARSER-CURL-PROJECTION-UNPINNED (dev/status/harness.md).
+# p1-p3: H-GATEPARSER-CURL-PROJECTION-UNPINNED (dev/status/harness.md).
 # `_pr_meta_curl`'s `commit_id` projection (line ~670) is pinned end to end by
 # cases 36b/36c in pr_gate_status_test.sh, not by any row above -- none of x1-x5
-# or d/j/k/f/g/m touch that line. These two rows make that PR's central claim
+# or d/j/k/f/g/m touch that line. These three rows make that PR's central claim
 # self-verifying on every `dune runtest` instead of living only in prose (the
-# PR body / status entry's own mutation table, run by hand).
+# PR body / status entry's own mutation table, run by hand). p1/p2 are caught
+# via 36b (a stale commit_id must not let the review read as current); p3
+# closes the residual named in dev/daily/2026-09-15-run2.md -- the one
+# mutation 36c catches ALONE, invisible to p1/p2 and to the pre-existing
+# suite (measured: 36b stays green under it; only 36c reddens).
 run_mutation p1 killed \
   's/map({body: \.body, commit_id: \.commit_id})/map({body: .body})/' \
   'H-GATEPARSER-CURL-PROJECTION-UNPINNED: drop commit_id from the _pr_meta_curl projection entirely'
@@ -249,6 +253,10 @@ run_mutation p1 killed \
 run_mutation p2 killed \
   's/commit_id: \.commit_id})/commit_id: (.commit_id[0:8])})/' \
   'H-GATEPARSER-CURL-PROJECTION-UNPINNED: truncate the projected commit_id to 8 hex chars -- killed because 36b'"'"'s stale commit_id shares $TIP'"'"'s prefix and differs only in the tail (see the fixture fix in pr_gate_status_test.sh case 36b)'
+
+run_mutation p3 killed \
+  's/commit_id: \.commit_id})/commit_id: .node_id})/' \
+  'H-GATEPARSER-CURL-PROJECTION-UNPINNED: wrong-source projection -- commit_id sourced from .node_id instead of .commit_id -- killed because 36c catches it ALONE (measured: 36b'"'"'s stale-vs-tip case stays green under this mutation since node_id never equals $TIP either way; only 36c'"'"'s CURRENT-commit_id case reddens, want MERGE got other)'
 
 run_mutation s5 survivor \
   's/(?<h>\.\*)\$")\]/(?<h>.*)")]/' \
