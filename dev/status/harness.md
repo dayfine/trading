@@ -2116,6 +2116,24 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   mutation harness -- 18 mutation(s) match pin (13 killed / 4 live survivor / 1
   equivalent mutant).`, exit 0 (was 16/11/4/1 before this addition).
 
+  **N3 residual closed (2026-09-16).** Added `p3` (`commit_id: .node_id`
+  instead of `.commit_id`, the wrong-source mutation the N3 row above says
+  36c catches ALONE), classified `killed`. Reproduced by hand first: applying
+  the mutation to a scratch copy and running `sh
+  dev/scripts/pr_gate_status_test.sh` (now 118 pre-existing cases, grown from
+  the 94 at the time N3 was recorded) left exactly one case red — the 36c
+  check ("...CURRENT commit_id...reaches MERGE": want MERGE, got other) — 117
+  of 118 stayed green, confirming 36c is the sole catcher and the older
+  "clean (94/94)" figure in the N3 row is a stale count, not a stale claim.
+  Non-vacuity checked directly: neutralising the `p3` sed to a no-op makes
+  `run_mutation`'s own guard fire (`MUTATION DID NOT APPLY`) and the harness
+  exit non-zero, so the row cannot pass vacuously.
+  `dev/scripts/pr_gate_status.sh` is unchanged (byte-diff confirmed) — this is
+  test-coverage only. Verify:
+  `sh trading/devtools/checks/pr_gate_status_mutation_test.sh` — expect `OK:
+  pr_gate_status mutation harness -- 19 mutation(s) match pin (14 killed / 4
+  live survivor / 1 equivalent mutant).`, exit 0.
+
 - [x] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
   reader, yet its suite is verified only by hand. A ~30-line mutation harness
   around the existing `PR_GATE_STATUS_LIB=1` seam, run in CI against a fixed
