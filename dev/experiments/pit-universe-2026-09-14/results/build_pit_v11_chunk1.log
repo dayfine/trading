@@ -1,0 +1,399 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+94 group(s), 113 symbol(s) dropped
+  survivor AAMI <- [BSIG]
+    BSIG (overlap=2574, match=0.9996)
+  survivor AAVVF <- [AAV]
+    AAV (overlap=3217, match=0.9981)
+  survivor ACTI <- [ACTI_old2]
+    ACTI_old2 (overlap=704, match=0.9900)
+  survivor AD <- [AD_old]
+    AD_old (overlap=6944, match=0.9976)
+  survivor AEVA <- [AEVA-WS]
+    AEVA-WS (overlap=410, match=0.9951)
+  survivor AFIIQ <- [AFI]
+    AFI (overlap=1546, match=1.0000)
+  survivor AHRT <- [AHH]
+    AHH (overlap=3266, match=0.9991)
+  survivor AIMC <- [AIMCV]
+    AIMCV (overlap=2965, match=0.9953)
+  survivor ALL-P-H <- [ALL-PH]
+    ALL-PH (overlap=1725, match=0.9814)
+  survivor ALNT <- [AMOT]
+    AMOT (overlap=6270, match=0.9888)
+  survivor AM <- [AMGP]
+    AMGP (overlap=468, match=0.9979)
+  survivor AMN <- [AHS]
+    AHS (overlap=207, match=1.0000)
+  survivor ANRZ <- [ANR]
+    ANR (overlap=2620, match=0.9966)
+  survivor AORT <- [CRY_old]
+    CRY_old (overlap=6097, match=0.9987)
+  survivor APO-P-A <- [APO-PA]
+    APO-PA (overlap=745, match=0.9825)
+  survivor ARCB <- [ABFS]
+    ABFS (overlap=4107, match=0.9832)
+  survivor ARQ <- [ADES]
+    ADES (overlap=5086, match=0.9864)
+  survivor ASAIY <- [ASAI]
+    ASAI (overlap=970, match=0.9969)
+  survivor ASB <- [ASBC]
+    ASBC (overlap=2842, match=0.9947)
+  survivor ASTH <- [AMEH]
+    AMEH (overlap=1605, match=0.9988)
+  survivor ATLC <- [CCRT]
+    CCRT (overlap=2311, match=0.9861)
+  survivor ATLX <- [ASGR; BWNG; CHRT]
+    ASGR (overlap=126, match=0.9920)
+    BWNG (overlap=126, match=0.9920)
+    CHRT (overlap=171, match=0.9941)
+  survivor AUOTY <- [AUO]
+    AUO (overlap=4365, match=0.9961)
+  survivor AUTO <- [ABTL]
+    ABTL (overlap=4662, match=0.9897)
+  survivor AVNT <- [AVNT_old]
+    AVNT_old (overlap=5464, match=0.9685)
+  survivor AVTA <- [BCOR_old]
+    BCOR_old (overlap=6110, match=0.9967)
+  survivor AX <- [BOFI]
+    BOFI (overlap=3377, match=0.9970)
+  survivor AZN <- [AZN_old]
+    AZN_old (overlap=7063, match=0.9984)
+  survivor AZREF <- [AZRE]
+    AZRE (overlap=1741, match=0.9966)
+  survivor AZTA <- [BRKS]
+    BRKS (overlap=6050, match=0.9980)
+  survivor BAC-P-E <- [BAC-PE]
+    BAC-PE (overlap=4949, match=0.9747)
+  survivor BAC-P-L <- [BAC-PL]
+    BAC-PL (overlap=3004, match=0.9897)
+  survivor BAC-P-M <- [BAC-PM]
+    BAC-PM (overlap=1725, match=0.9809)
+  survivor BAC-P-N <- [BAC-PN]
+    BAC-PN (overlap=1725, match=0.9838)
+  survivor BALL <- [BLL]
+    BLL (overlap=6129, match=0.9703)
+  survivor BB <- [BBRY]
+    BBRY (overlap=4771, match=0.9843)
+  survivor BBBY <- [BYON]
+    BYON (overlap=5851, match=0.9973)
+  survivor BBT <- [BHLB]
+    BHLB (overlap=6334, match=0.9918)
+  survivor BCAL <- [ABWG; ACME; AKER; ATHYQ; AYTU; BAS; BGEN; BIOC; CFRX; CNTV; CSKI]
+    ABWG (overlap=2376, match=0.7583)
+    ACME (overlap=2528, match=0.4998)
+    AKER (overlap=2635, match=0.3413)
+    ATHYQ (overlap=2314, match=0.9594)
+    AYTU (overlap=4466, match=0.4426)
+    BAS (overlap=3518, match=0.7017)
+    BGEN (overlap=378, match=0.9788)
+    BIOC (overlap=2490, match=0.2170)
+    CFRX (overlap=2394, match=0.1676)
+    CNTV (overlap=265, match=0.9053)
+    CSKI (overlap=2491, match=0.4450)
+  survivor BDST <- [BEBE]
+    BEBE (overlap=6666, match=0.9514)
+  survivor BEPC <- [BEPC-W]
+    BEPC-W (overlap=350, match=0.9799)
+  survivor BF-A <- [BFA]
+    BFA (overlap=6707, match=0.9993)
+  survivor BFH <- [ADS]
+    ADS (overlap=5238, match=0.9975)
+  survivor BFLY <- [BFLY-WS]
+    BFLY-WS (overlap=363, match=1.0000)
+  survivor BIGGQ <- [BIG]
+    BIG (overlap=6723, match=0.9911)
+  survivor BKI <- [BKFS]
+    BKFS (overlap=597, match=1.0000)
+  survivor BKR <- [BHGE; BHI]
+    BHGE (overlap=580, match=1.0000)
+    BHI (overlap=4907, match=0.9902)
+  survivor BN <- [BNN]
+    BNN (overlap=522, match=0.9750)
+  survivor BNK1 <- [BNK2]
+    BNK2 (overlap=1548, match=0.9800)
+  survivor BPYU <- [BPR]
+    BPR (overlap=411, match=0.9780)
+  survivor BPZRQ <- [BPZ]
+    BPZ (overlap=2869, match=0.9857)
+  survivor BRSP <- [CLNC]
+    CLNC (overlap=946, match=0.9958)
+  survivor BTX <- [BIGZ]
+    BIGZ (overlap=1218, match=0.9992)
+  survivor BWIN <- [BRP]
+    BRP (overlap=1151, match=0.9974)
+  survivor BWLP <- [ADPI; ANAC; CCX; CVT]
+    ADPI (overlap=293, match=0.9623)
+    ANAC (overlap=1799, match=0.7113)
+    CCX (overlap=1544, match=0.5943)
+    CVT (overlap=1877, match=0.6247)
+  survivor BWY <- [BWY1]
+    BWY1 (overlap=759, match=1.0000)
+  survivor C-P-N <- [C-PN]
+    C-PN (overlap=4001, match=0.9902)
+  survivor CADE <- [BXS]
+    BXS (overlap=6039, match=0.9965)
+  survivor CAJPY <- [CAJ]
+    CAJ (overlap=6357, match=0.9926)
+  survivor CANOQ <- [CANO]
+    CANO (overlap=946, match=0.9630)
+  survivor CBDBY <- [CBD]
+    CBD (overlap=6616, match=0.9537)
+  survivor CBRE <- [CBG]
+    CBG (overlap=3470, match=0.9948)
+  survivor CBRI <- [CBR]
+    CBR (overlap=4848, match=0.9934)
+  survivor CCC <- [CCCS]
+    CCCS (overlap=1317, match=1.0000)
+  survivor CCEP <- [CCE; CCE_old]
+    CCE (overlap=3853, match=0.9977)
+    CCE_old (overlap=4380, match=0.9799)
+  survivor CCIV <- [CCIV-U; CCIV-WS]
+    CCIV-U (overlap=213, match=0.9811)
+    CCIV-WS (overlap=213, match=0.9811)
+  survivor CECO <- [CECE]
+    CECE (overlap=6103, match=0.9936)
+  survivor CELJF <- [CEL]
+    CEL (overlap=3570, match=0.9821)
+  survivor CELL <- [BLI]
+    BLI (overlap=718, match=1.0000)
+  survivor CGIP <- [CGI]
+    CGI (overlap=5083, match=0.9667)
+  survivor CHFN <- [CHFN1]
+    CHFN1 (overlap=3364, match=0.9602)
+  survivor CHPT <- [CHPT-WS]
+    CHPT-WS (overlap=483, match=1.0000)
+  survivor CHX <- [APY]
+    APY (overlap=628, match=0.9968)
+  survivor CIM-P-B <- [CIM-PB]
+    CIM-PB (overlap=2394, match=0.9820)
+  survivor CIVI <- [BCEI]
+    BCEI (overlap=2500, match=0.9744)
+  survivor CLVT <- [CCC_old1]
+    CCC_old1 (overlap=567, match=1.0000)
+  survivor CMLT <- [CATP]
+    CATP (overlap=3544, match=0.9526)
+  survivor CMRC <- [BIGC]
+    BIGC (overlap=1254, match=1.0000)
+  survivor CNH <- [CNHI]
+    CNHI (overlap=6637, match=0.9965)
+  survivor CNR <- [CEIX]
+    CEIX (overlap=1796, match=0.9916)
+  survivor CNST <- [CNST1]
+    CNST1 (overlap=1500, match=0.9546)
+  survivor CNXM <- [CNNX]
+    CNNX (overlap=825, match=0.9976)
+  survivor COF-P-I <- [COF-PI]
+    COF-PI (overlap=1725, match=0.9826)
+  survivor COF-P-J <- [COF-PJ]
+    COF-PJ (overlap=1661, match=0.9825)
+  survivor CONNQ <- [CONN]
+    CONN (overlap=5213, match=0.9921)
+  survivor COR <- [ABC; COR_old]
+    ABC (overlap=6459, match=0.9930)
+    COR_old (overlap=6457, match=0.9960)
+  survivor CRR <- [CRRT]
+    CRRT (overlap=4184, match=0.9601)
+  survivor CRTX <- [CRTX1]
+    CRTX1 (overlap=2412, match=0.9598)
+  survivor CSW <- [CSWI]
+    CSWI (overlap=2436, match=1.0000)
+  survivor CTOS <- [CIC]
+    CIC (overlap=466, match=0.9806)
+  survivor CTRA <- [COG]
+    COG (overlap=6021, match=0.9990)
+  survivor CTX <- [CTX1]
+    CTX1 (overlap=2924, match=0.9969)
+  survivor CVLG <- [CVTI]
+    CVTI (overlap=5802, match=0.9959)
+  survivor CWEN-A <- [CWENA]
+    CWENA (overlap=3217, match=1.0000)
+skip AAC_old1: no CSV
+skip AAC_old2: no CSV
+skip AAM_old: no CSV
+skip AAN_old: no CSV
+skip ABCL_old: no CSV
+skip ABDR_old: no CSV
+skip ABHH: no CSV
+skip ABI_old2: no CSV
+skip ABOV: no CSV
+skip ABRX_old: no CSV
+skip ABS: no CSV
+skip ABTX_old: no CSV
+skip ACHN_old: no CSV
+skip ACH_old: no CSV
+skip ACIC_old: no CSV
+skip ACII_old: no CSV
+skip ACI_old: no CSV
+skip ACMR_old: no CSV
+skip ACOM: no CSV
+skip ACR_old: no CSV
+skip ACTC: no CSV
+skip ACTS_old: no CSV
+skip ACTV_old1: no CSV
+skip ADAM_old: no CSV
+skip ADCT_old: no CSV
+skip ADEX_old: no CSV
+skip ADT_old: no CSV
+skip AEC_old: no CSV
+skip AEGN_old: no CSV
+skip AFR_old: no CSV
+skip AGAM_old: no CSV
+skip AGD_old: no CSV
+skip AGII_old: no CSV
+skip AGL_old: no CSV
+skip AGR_old: no CSV
+skip AIC_old: no CSV
+skip AIP_old: no CSV
+skip AIT_old: no CSV
+skip AI_old1: no CSV
+skip ALAB_old: no CSV
+skip ALC_old: no CSV
+skip ALFA_old: no CSV
+skip ALLE_old: no CSV
+skip ALR_old: no CSV
+skip ALTI_old: no CSV
+skip AMBR_old: no CSV
+skip AMC_old: no CSV
+skip AMH_old: no CSV
+skip AMN_old: no CSV
+skip AMRK_old: no CSV
+skip AMRN_old: no CSV
+skip AMR_old: no CSV
+skip AMV_old: no CSV
+skip ANAC_old: no CSV
+skip ANCX_old: no CSV
+skip ANDN_old: no CSV
+skip ANFI_old: no CSV
+skip APM_old: no CSV
+skip APPX_old: no CSV
+skip APTI_old: no CSV
+skip APWR_old: no CSV
+skip ARCH_old: no CSV
+skip ARCP: no CSV
+skip ARCT_old: no CSV
+skip ARC_old: no CSV
+skip ARDT_old: no CSV
+skip ARD_old: no CSV
+skip ARIS_old1: no CSV
+skip ARMO: no CSV
+skip ARNC_old: no CSV
+skip ARPT: no CSV
+skip ARRY_old: no CSV
+skip ARX_old: no CSV
+skip AR_old: no CSV
+skip ASCA_old: no CSV
+skip ASC_old: no CSV
+skip ASND_old: no CSV
+skip ASPI_old: no CSV
+skip ASTN: no CSV
+skip AS_old: no CSV
+skip ATAC_old: no CSV
+skip ATAI_old: no CSV
+skip ATC_old: no CSV
+skip ATC_old1: no CSV
+skip ATEN_old: no CSV
+skip ATHR_old: no CSV
+skip ATI_old: no CSV
+skip ATLS_old: no CSV
+skip ATRS_old: no CSV
+skip ATRX_old: no CSV
+skip ATTO: no CSV
+skip AT_old1: no CSV
+skip AV: no CSV
+skip AVDL_old: no CSV
+skip AVGO_old: no CSV
+skip AVHI_old: no CSV
+skip AVIV_old: no CSV
+skip AVL_old: no CSV
+skip AVO_old: no CSV
+skip AV_old: no CSV
+skip AWGI_old: no CSV
+skip BAMM_old: no CSV
+skip BBBY_old: no CSV
+skip BBX_old: no CSV
+skip BCII_old: no CSV
+skip BCST_old: no CSV
+skip BDE_old: no CSV
+skip BDG_old: no CSV
+skip BDT_old: no CSV
+skip BEAM_old: no CSV
+skip BEAT_old: no CSV
+skip BEST_old: no CSV
+skip BETR_old: no CSV
+skip BEZ_old: no CSV
+skip BFI_old: no CSV
+skip BFLY_old: no CSV
+skip BGH_old: no CSV
+skip BHVN_old: no CSV
+skip BINT_old: no CSV
+skip BITA: no CSV
+skip BKC_old: no CSV
+skip BLOX_old: no CSV
+skip BLZE_old: no CSV
+skip BMED_old: no CSV
+skip BMM_old: no CSV
+skip BMR_old: no CSV
+skip BMY-R: no CSV
+skip BNT_old: no CSV
+skip BODY_old: no CSV
+skip BOLD_old: no CSV
+skip BOLT_old: no CSV
+skip BR1: no CSV
+skip BRKL: no CSV
+skip BRLI_old: no CSV
+skip BSY_old: no CSV
+skip BTC_old1: no CSV
+skip BTM_old: no CSV
+skip BTU_old: no CSV
+skip BVS_old: no CSV
+skip BV_old: no CSV
+skip BWS: no CSV
+skip BXG_old: no CSV
+skip BZ_old: no CSV
+skip B_old: no CSV
+skip CAI_old: no CSV
+skip CAP_old: no CSV
+skip CBC_old: no CSV
+skip CBIO_old: no CSV
+skip CCC_old: no CSV
+skip CCG_old: no CSV
+skip CCSI_old: no CSV
+skip CCXI_old: no CSV
+skip CD_old: no CSV
+skip CEP_old: no CSV
+skip CERE_old: no CSV
+skip CHA_old: no CSV
+skip CHK_old: no CSV
+skip CHR_old: no CSV
+skip CID_old: no CSV
+skip CIFC: no CSV
+skip CJES: no CSV
+skip CLAY_old: no CSV
+skip CLII: no CSV
+skip CLII-U: no CSV
+skip CLII-WS: no CSV
+skip CLUB: no CSV
+skip CMLF: no CSV
+skip CNG_old: no CSV
+skip CNH_old: no CSV
+skip COGT_old: no CSV
+skip COMP_old: no CSV
+skip CORZ_old: no CSV
+skip COUR_old: no CSV
+skip CPSL_old: no CSV
+skip CPWR_old: no CSV
+skip CRC_old: no CSV
+skip CROS_old2: no CSV
+skip CRU_old: no CSV
+skip CR_old: no CSV
+skip CSH_old: no CSV
+skip CSRA: no CSV
+skip CTW_old: no CSV
+skip CUB_old: no CSV
+skip CVT_old: no CSV
+skip CV_old: no CSV
+active_through: 2212 marked, 117 survivors (of 2329 symbols)
+wrote 2329 entries to /tmp/snap_top3000_pit_v11pit/manifest.sexp in 1204.60s
+series_tail: 77 findings (20 truncated, 11 stray_dropped, 46 kept, 0 kept_by_exception, 0 cut_prefix, 0 cut_refused_short_tail)
+verify: 2329/2329 files OK (failed=0)
+exit=0

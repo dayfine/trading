@@ -1,0 +1,18 @@
+((date 2026-09-15) (slug pit-universe-record-baseline)
+ (hypothesis
+  "Not a mechanism test: the record baseline re-measured on a point-in-time universe. dev/plans/pit-universe-migration-2026-09-14.md step 4: the a0 null (record spec, entry_order_max_rest_weeks 0) with a 27-entry yearly top-3000 universe_schedule 1999-2025 (D1 May-31 anchor, D2 dating, D4 dropped names held to normal exit, D6 union staged), three salts, on the _v11pit union warehouse. Expectation going in: a LOWER band than the frozen year-2000 vintage (312 / 383 / 640), because the frozen list is survivor-tilted (project_warehouse_vintage_coverage: -12 to -23pp on 5y) and the PIT schedule holds names that later delist.")
+ (base_scenario
+  "pit-universe-2026-09-14/step4: a0-pit-null salts 0/1/2, pinned worktree sweep-pit @ 3a20f4987 (#2816 universe_schedule), warehouse /tmp/snap_top3000_pit_v11pit at 9,364 entries after the 09-15 cross-chunk twin fix (233 legs unindexed, README §3b addendum), lists = the 27 as-run pit-v11 composition files (committed, md5-pinned). V6 = 0 on every salt; validator_diff -check V6 across the three reports exit 0. Cells 5h58m / 7h05m / 6h30m, single worker, CELL_TIMEOUT 36000.")
+ (window_id top3000-pit-1999-2025-record-26y-3salt) (baseline_label record-pit-null-v11pit)
+ (variants
+  (
+   ((label null-a0-v11pit-s0) (config_hash null-record-convention-pit)
+    (aggregate (((mean_sharpe 0.4820) (mean_calmar 0.1650) (mean_return_pct 457.01) (mean_max_drawdown_pct 40.64)))))
+   ((label null-a0-v11pit-s1) (config_hash null-record-convention-pit)
+    (aggregate (((mean_sharpe 0.3289) (mean_calmar 0.0760) (mean_return_pct 188.05) (mean_max_drawdown_pct 53.05)))))
+   ((label null-a0-v11pit-s2) (config_hash null-record-convention-pit)
+    (aggregate (((mean_sharpe 0.2970) (mean_calmar 0.0690) (mean_return_pct 152.03) (mean_max_drawdown_pct 51.32)))))
+  ))
+ (verdict Inconclusive)
+ (notes
+  "BASELINE ENTRY (verdict Inconclusive = no mechanism was tested; the band IS the result). New record band on the PIT universe: 152 / 188 / 457 % (salts 2 / 1 / 0), median 188, maxDD 40.6-53.0, 732-766 trades, realised $1.40M / $1.67M / $3.85M, unrealised $0.29M / $0.41M / $0.92M. Salt 0 is the salt-lottery top (same shape as the 2000-vintage salt-2 640); quote the band. Spread across salts 3.0x vs 2.1x on the old construction. Exit mix stable across salts (stop_loss 495-530, laggard_rotation 221-223); `delisted` exits (4-6) are new and expected under D4. V16: CLE 2014 force_liquidation on every salt, ASPS 2017 on s0/s2 - quality flags carried from the old band. NOT COMPARABLE to 312 / 383 / 640: different construction (dated membership, ~2,800 effective names/yr), different warehouse (9,364 vs 2,907 entries), new path draws. The migration also surfaced two data findings recorded separately: a chunked -incremental build misses every cross-chunk rename twin (project_pit_chunked_twin_miss; 233 legs; #2823 is the detector fix), and a PIT cell costs 6.3h because the union is stage-classified weekly (#2839; membership pruning rejected because it breaks prior-stage continuity). CONSEQUENCES: every arm from here pairs against a0-pit-null-s{0,1,2}-v11 at the same salt on _v11pit (validator_diff -check V6 gate); the promotion grid's universe axis is breadth tier of the same construction (promotion-confirmation.md, #2828); the 2000-vintage band and every verdict measured on it stay valid as RELATIVE reads on that construction but are not levels on this one. Next: one scheduled smoke golden in CI (step 6), then the top-of-funnel screen (breakout-gate width, top-N) pre-registered on this band."))

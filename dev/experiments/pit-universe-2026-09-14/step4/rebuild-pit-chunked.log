@@ -1,0 +1,12 @@
+[09-14 19:36:59] run tree HEAD=3a20f4987
+[09-14 19:36:59] CHUNK 1 BUILD (2627 symbols) -> /tmp/snap_top3000_pit_v11pit (snaps before=0)
+[09-14 20:05:18] CHUNK 1 RESULT snaps=2329 manifest=2329 exit=0
+[09-14 20:05:18] CHUNK 2 BUILD (2626 symbols) -> /tmp/snap_top3000_pit_v11pit (snaps before=2329)
+[09-14 20:34:36] CHUNK 2 RESULT snaps=4718 manifest=4718 exit=0
+[09-14 20:34:36] CHUNK 3 BUILD (2626 symbols) -> /tmp/snap_top3000_pit_v11pit (snaps before=4718)
+[09-14 21:05:24] CHUNK 3 RESULT snaps=7118 manifest=7118 exit=0
+[09-14 21:05:24] CHUNK 4 BUILD (2625 symbols) -> /tmp/snap_top3000_pit_v11pit (snaps before=7118)
+[09-14 21:46:15] CHUNK 4 RESULT snaps=9513 manifest=9513 exit=0
+[09-14 21:46:16] RESULT chunked snaps=9513 manifest=9513
+[09-14 21:46:16] no splice_actions.csv
+[09-14 21:46:16] REBUILD DONE

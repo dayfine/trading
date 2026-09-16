@@ -562,6 +562,11 @@ verify() {
     _verify_full_mode_published "$_summary" || _full_rc=$?
     _dispatch_rc=0
     _verify_full_mode_dispatch_artifacts "$_summary" || _dispatch_rc=$?
+    _scheduled_rc=0
+    if ! grep -qx '## Scheduled workflows' "$_summary"; then
+      echo "::error::FULL-mode summary missing ## Scheduled workflows (issue #2634): report health or UNMEASURABLE, never omit it." >&2
+      _scheduled_rc=1
+    fi
     # Worst-of: rc=2 (couldn't determine, fail closed) outranks rc=1
     # (determined it's bad), which outranks rc=0. Both checks always print
     # their own ::error:: detail, so returning the worse code loses no
@@ -569,7 +574,7 @@ verify() {
     if [ "$_full_rc" -eq 2 ] || [ "$_dispatch_rc" -eq 2 ]; then
       return 2
     fi
-    if [ "$_full_rc" -ne 0 ] || [ "$_dispatch_rc" -ne 0 ]; then
+    if [ "$_full_rc" -ne 0 ] || [ "$_dispatch_rc" -ne 0 ] || [ "$_scheduled_rc" -ne 0 ]; then
       return 1
     fi
     return 0

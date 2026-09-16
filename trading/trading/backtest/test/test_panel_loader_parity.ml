@@ -22,6 +22,16 @@
     via [equal_to] is bit-equality. Any drift (recompiled kernel, floating-point
     reorder, strategy logic change) fails the test.
 
+    {b Scheduled fixture.} [panel-golden-2019-schedule] is the one fixture
+    carrying a non-empty [universe_schedule]; its golden is produced through
+    [run_backtest]'s [?universe_membership_at] seam (see
+    {!_universe_of_scenario}). Two further tests below pin the relation between
+    its golden and the unscheduled [panel-golden-2019-full] one — that the
+    schedule removes exactly the post-drop entries of dropped symbols and leaves
+    every other round trip bit-equal. Those two compare committed files, so
+    unlike the per-scenario assertion they are not affected by the platform
+    drift below.
+
     {b Regenerating goldens.} Set [PANEL_GOLDEN_REGENERATE=1] in the environment
     and run the test once; missing or stale goldens are written to disk and the
     assertion is skipped. Diff the result, eyeball the trades for sanity (sym,
@@ -33,6 +43,7 @@ open Core
 open Matchers
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
+module Universe_schedule = Scenario_lib.Universe_schedule
 module Metrics = Trading_simulation.Metrics
 
 (* -------------------------------------------------------------------- *)
@@ -87,13 +98,40 @@ let _sector_map_override (s : Scenario.t) =
   let resolved = Filename.concat (_fixtures_root ()) s.universe_path in
   Universe_file.to_sector_map_override (Universe_file.load resolved)
 
+(** Resolve a scenario's universe into the pair [Backtest.Runner] needs, exactly
+    as [Scenario_runner._universe_of_scenario] does: an unscheduled scenario
+    (every fixture but [panel-golden-2019-schedule]) keeps its [universe_path]
+    and passes no membership predicate — bit-equal to the pre-schedule
+    behaviour; a scheduled one ignores [universe_path], stages the UNION of
+    every list so a dropped name still prices while held, and gates screening
+    candidates on the schedule's step function.
+
+    Mirroring the runner here is load-bearing, not incidental: without the
+    scheduled branch a regenerate would write the scheduled fixture a golden
+    identical to its unscheduled twin, and the seam would be silently untested.
+*)
+let _universe_of_scenario (s : Scenario.t) =
+  match s.universe_schedule with
+  | [] -> (_sector_map_override s, None)
+  | schedule -> (
+      match
+        Universe_schedule.load ~fixtures_root:(_fixtures_root ()) schedule
+      with
+      | Error err ->
+          OUnit2.assert_failure
+            (sprintf "scenario %s: Universe_schedule.load failed: %s" s.name
+               (Status.show err))
+      | Ok sched ->
+          ( Some (Universe_schedule.union_sector_map sched),
+            Some (Universe_schedule.is_member sched) ))
+
 let _run_panel (s : Scenario.t) : Metrics.trade_metrics list =
-  let sector_map_override = _sector_map_override s in
+  let sector_map_override, universe_membership_at = _universe_of_scenario s in
   let result =
     try
       Backtest.Runner.run_backtest ~start_date:s.period.start_date
         ~end_date:s.period.end_date ~overrides:s.config_overrides
-        ?sector_map_override ()
+        ?sector_map_override ?universe_membership_at ()
     with e ->
       OUnit2.assert_failure
         (sprintf "run_backtest raised: %s" (Exn.to_string e))
@@ -138,7 +176,39 @@ let _scenarios : (string * string) list =
   [
     ("tiered-loader-parity", "smoke/tiered-loader-parity.sexp");
     ("panel-golden-2019-full", "smoke/panel-golden-2019-full.sexp");
+    ("panel-golden-2019-schedule", "smoke/panel-golden-2019-schedule.sexp");
   ]
+
+(* -------------------------------------------------------------------- *)
+(* Scheduled-vs-unscheduled golden relation                              *)
+(* -------------------------------------------------------------------- *)
+
+let _baseline_name = "panel-golden-2019-full"
+let _scheduled_name = "panel-golden-2019-schedule"
+
+(** The date [universes/parity-4sym-2019-05-06.sexp] takes over in
+    [smoke/panel-golden-2019-schedule.sexp]'s schedule. *)
+let _drop_date = Date.create_exn ~y:2019 ~m:(Month.of_int_exn 5) ~d:6
+
+(** The symbols that second list removes. *)
+let _dropped = [ "AAPL"; "JPM"; "JNJ" ]
+
+let _entered_after_drop (t : golden_trade) =
+  List.mem _dropped t.symbol ~equal:String.equal
+  && Date.( >= ) t.entry_date _drop_date
+
+let _golden ~name = _load_golden ~path:(_golden_path ~name)
+
+(** The two relation tests below read the goldens off disk, so they are
+    meaningless while [PANEL_GOLDEN_REGENERATE=1] is rewriting those same files:
+    OUnit2 does not guarantee that the per-scenario capture tests run first, and
+    on a first-ever capture the scheduled golden does not exist yet. Skip during
+    a regenerate; the relation is checked on the next ordinary run, which is
+    what CI does. *)
+let _skip_during_regenerate () =
+  OUnit2.skip_if (_regenerate_requested ())
+    "PANEL_GOLDEN_REGENERATE=1 — goldens are being rewritten; the \
+     scheduled-vs-baseline relation is checked on the next ordinary run"
 
 (* -------------------------------------------------------------------- *)
 (* Test logic                                                            *)
@@ -205,5 +275,66 @@ let _make_test (name, scenario_rel) =
   "panel-mode round_trips match golden: " ^ name
   >:: _assert_round_trips_match_golden ~name ~scenario_rel
 
-let suite = "Panel_round_trips_golden" >::: List.map _scenarios ~f:_make_test
+(** Non-vacuity witness for the relation below: the UNSCHEDULED golden really
+    does round-trip a symbol that the schedule's second list drops, entered
+    after the drop date. Without this, "the scheduled golden is the baseline
+    minus the post-drop entries of dropped symbols" would be satisfiable by two
+    identical files — a schedule wired to nothing would pass.
+
+    JNJ is that symbol: entered 2019-06-22, 47 days after
+    [universes/parity-4sym-2019-05-06.sexp] takes over. *)
+let test_baseline_golden_round_trips_a_symbol_the_schedule_drops _ =
+  _skip_during_regenerate ();
+  assert_that
+    (_golden ~name:_baseline_name
+    |> List.filter ~f:_entered_after_drop
+    |> List.map ~f:(fun (t : golden_trade) -> (t.symbol, t.entry_date)))
+    (elements_are
+       [
+         equal_to ("JNJ", Date.create_exn ~y:2019 ~m:(Month.of_int_exn 6) ~d:22);
+       ])
+
+(** The committed scheduled golden is the committed unscheduled golden with
+    exactly the post-drop entries of dropped symbols removed — every surviving
+    round trip bit-equal, field for field.
+
+    Both halves are load-bearing, and they are the two decisions the scenario
+    exists to pin:
+
+    - {b removal} (the candidate gate bites): JNJ would have been entered
+      2019-06-22, after 2019-05-06 drops it, so its round trip is gone.
+    - {b D4} (held through dropout): AAPL and JPM were entered 2019-05-04,
+      BEFORE the drop, and exit 2019-05-08 / 2019-05-10, AFTER it. They are
+      dropped symbols too, yet their round trips survive unchanged — no exit,
+      stop, or liquidation surface consults the schedule. A mutant that gated
+      exits on membership would drop or move these and fail here.
+
+    This compares two committed files, so it is deterministic on every platform
+    — unlike the per-scenario golden assertion above, which stays skipped
+    pending the G15 cross-platform float drift. The LIVE counterpart — running
+    the schedule through [run_backtest] and asserting the same relation on fresh
+    round-trips — is [test_universe_schedule_e2e.ml]'s
+    [test_dropped_symbol_entered_after_drop_is_gone] together with
+    [test_positions_held_through_dropout_exit_normally]. What this test adds is
+    that the COMMITTED fixture pair still encodes that relation, which is what
+    the perf smoke and any future regenerate consume. *)
+let test_schedule_golden_differs_from_baseline_only_by_dropped_symbols _ =
+  _skip_during_regenerate ();
+  assert_that
+    (_golden ~name:_scheduled_name)
+    (elements_are
+       (_golden ~name:_baseline_name
+       |> List.filter ~f:(fun t -> not (_entered_after_drop t))
+       |> List.map ~f:_trade_matcher))
+
+let suite =
+  "Panel_round_trips_golden"
+  >::: List.map _scenarios ~f:_make_test
+       @ [
+           "baseline golden round-trips a symbol the schedule drops"
+           >:: test_baseline_golden_round_trips_a_symbol_the_schedule_drops;
+           "scheduled golden differs from baseline only by dropped symbols"
+           >:: test_schedule_golden_differs_from_baseline_only_by_dropped_symbols;
+         ]
+
 let () = run_test_tt_main suite

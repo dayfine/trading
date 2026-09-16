@@ -1,0 +1,312 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+78 group(s), 111 symbol(s) dropped
+  survivor JRJCY <- [JRJC]
+    JRJC (overlap=4389, match=0.9813)
+  survivor JW-A <- [JWA]
+    JWA (overlap=5875, match=0.9988)
+  survivor JWS <- [JWS-U; JWS-WS]
+    JWS-U (overlap=231, match=1.0000)
+    JWS-WS (overlap=231, match=1.0000)
+  survivor KBAL <- [KBALB]
+    KBALB (overlap=4236, match=0.9797)
+  survivor KEYW <- [KEYW1]
+    KEYW1 (overlap=710, match=1.0000)
+  survivor KHC <- [KRFT]
+    KRFT (overlap=702, match=0.9857)
+  survivor KNX <- [KNX1]
+    KNX1 (overlap=4954, match=0.9865)
+  survivor KODK <- [KODK-WS; KODK-WS-A]
+    KODK-WS (overlap=2075, match=0.9995)
+    KODK-WS-A (overlap=2075, match=0.9995)
+  survivor KW <- [K-W]
+    K-W (overlap=683, match=0.9824)
+  survivor LB1 <- [LB_old]
+    LB_old (overlap=1965, match=0.9980)
+  survivor LEAF <- [LFGR]
+    LFGR (overlap=1899, match=0.9921)
+  survivor LGF-A <- [LGFA]
+    LGFA (overlap=6492, match=0.9982)
+  survivor LGF-B <- [LGFB]
+    LGFB (overlap=1948, match=0.9995)
+  survivor LHC-UN <- [LHC-WS]
+    LHC-WS (overlap=2505, match=1.0000)
+  survivor LIN <- [PX_old]
+    PX_old (overlap=5242, match=0.9794)
+  survivor LKM <- [NQ]
+    NQ (overlap=1725, match=0.9988)
+  survivor LLFLQ <- [LL]
+    LL (overlap=4218, match=0.9969)
+  survivor LNSPF <- [JPR; KCS; KQIPQ; LCE; LJPC; LNR; LOCK1; LOTE; MADGQ; MAXW; MAYA; MILGF; MVL; NETE; OHGI; ORIG; PCO; PCZ; PGICQ; PIXY; POP; POS; PRSF; PTT]
+    JPR (overlap=764, match=0.8362)
+    KCS (overlap=395, match=0.9975)
+    KQIPQ (overlap=292, match=0.9622)
+    LCE (overlap=632, match=0.9731)
+    LJPC (overlap=2040, match=0.0378)
+    LNR (overlap=606, match=0.6463)
+    LOCK1 (overlap=0, match=0.0000)
+    LOTE (overlap=3058, match=0.4990)
+    MADGQ (overlap=294, match=0.9147)
+    MAXW (overlap=0, match=0.0000)
+    MAYA (overlap=1041, match=0.5679)
+    MILGF (overlap=3055, match=0.9158)
+    MVL (overlap=889, match=0.5664)
+    NETE (overlap=1892, match=0.1549)
+    OHGI (overlap=1300, match=0.1024)
+    ORIG (overlap=1108, match=0.3577)
+    PCO (overlap=864, match=0.4948)
+    PCZ (overlap=867, match=0.8961)
+    PGICQ (overlap=428, match=0.9508)
+    PIXY (overlap=1843, match=0.2812)
+    POP (overlap=415, match=0.9807)
+    POS (overlap=893, match=1.0000)
+    PRSF (overlap=0, match=0.0000)
+    PTT (overlap=1215, match=0.9975)
+  survivor LUMO <- [NLNK]
+    NLNK (overlap=2098, match=1.0000)
+  survivor LUXE <- [MYTE]
+    MYTE (overlap=1117, match=0.9973)
+  survivor MCOAQ <- [MNC]
+    MNC (overlap=1378, match=0.9869)
+  survivor MDLZ <- [KFT]
+    KFT (overlap=2283, match=0.9825)
+  survivor MGLN <- [MGL]
+    MGL (overlap=1198, match=1.0000)
+  survivor MGTI <- [MGT]
+    MGT (overlap=203, match=0.9950)
+  survivor MIL <- [MIL_old1]
+    MIL_old1 (overlap=1723, match=0.9965)
+  survivor MLKN <- [MLHR]
+    MLHR (overlap=6040, match=0.9987)
+  survivor MMATQ <- [MMAT]
+    MMAT (overlap=868, match=1.0000)
+  survivor MOSC-U <- [MOSC-WS]
+    MOSC-WS (overlap=2488, match=1.0000)
+  survivor MP <- [MP-WS]
+    MP-WS (overlap=278, match=1.0000)
+  survivor MPT <- [MPW]
+    MPW (overlap=5174, match=0.9985)
+  survivor MRSH <- [MMC]
+    MMC (overlap=7051, match=0.9999)
+  survivor MS-P-I <- [MS-PI]
+    MS-PI (overlap=3006, match=0.9877)
+  survivor MS-P-K <- [MS-PK]
+    MS-PK (overlap=2418, match=0.9843)
+  survivor MS-P-O <- [MS-PO]
+    MS-PO (overlap=1222, match=0.9844)
+  survivor MSCA <- [MSCA1]
+    MSCA1 (overlap=880, match=1.0000)
+  survivor MSGS <- [MSG; MSGS-W]
+    MSG (overlap=1285, match=0.9930)
+    MSGS-W (overlap=1573, match=0.9975)
+  survivor MUFG <- [MTU]
+    MTU (overlap=3144, match=0.9946)
+  survivor MZTI <- [LANC]
+    LANC (overlap=6915, match=0.9994)
+  survivor NEE-P-R <- [NEE-PR; NEEPRR]
+    NEE-PR (overlap=741, match=0.9797)
+    NEEPRR (overlap=741, match=0.9838)
+  survivor NEW <- [NEWCQ]
+    NEWCQ (overlap=614, match=0.9935)
+  survivor NLY-P-G <- [NLY-PG]
+    NLY-PG (overlap=2177, match=0.9830)
+  survivor NMRK <- [NMRKV]
+    NMRKV (overlap=256, match=0.9647)
+  survivor NOVN <- [NOVN1]
+    NOVN1 (overlap=1502, match=0.9807)
+  survivor NPKI <- [NR]
+    NR (overlap=6786, match=0.9938)
+  survivor NSR <- [MRH]
+    MRH (overlap=208, match=0.9614)
+  survivor NTPIF <- [NTP]
+    NTP (overlap=6182, match=0.9982)
+  survivor NTTYY <- [NTT]
+    NTT (overlap=314, match=0.9904)
+  survivor NVLS <- [NVLS1]
+    NVLS1 (overlap=2200, match=0.9973)
+  survivor NWG <- [RBS]
+    RBS (overlap=3348, match=0.9979)
+  survivor NXDR <- [KIND]
+    KIND (overlap=970, match=1.0000)
+  survivor OAK-P-A <- [OAK; OAK-P-B]
+    OAK (overlap=1714, match=0.9831)
+    OAK-P-B (overlap=3267, match=0.6776)
+  survivor OBDC <- [ORCC]
+    ORCC (overlap=998, match=0.9910)
+  survivor OCA <- [OCAI]
+    OCAI (overlap=1719, match=0.9953)
+  survivor ON <- [ONNN]
+    ONNN (overlap=3743, match=0.9856)
+  survivor ONE <- [ONE1; ONE2]
+    ONE1 (overlap=189, match=0.9894)
+    ONE2 (overlap=1545, match=0.9987)
+  survivor ONIT <- [OCN]
+    OCN (overlap=6651, match=0.9883)
+  survivor ONTO <- [NANO]
+    NANO (overlap=5489, match=0.9989)
+  survivor OPLN <- [KAR]
+    KAR (overlap=4076, match=1.0000)
+  survivor ORANY <- [ORAN]
+    ORAN (overlap=6786, match=0.9923)
+  survivor OUST <- [OUST-WS]
+    OUST-WS (overlap=204, match=0.9803)
+  survivor OZK <- [OZRK]
+    OZRK (overlap=5166, match=0.9930)
+  survivor PACK <- [OMAD]
+    OMAD (overlap=311, match=1.0000)
+  survivor PAMT <- [PTSI]
+    PTSI (overlap=6589, match=1.0000)
+  survivor PENG <- [PENG_old]
+    PENG_old (overlap=1861, match=0.9978)
+  survivor PETC <- [PETC1]
+    PETC1 (overlap=442, match=0.9955)
+  survivor PIPR <- [PJC]
+    PJC (overlap=4041, match=0.9983)
+  survivor PKY <- [PKY1]
+    PKY1 (overlap=192, match=1.0000)
+  survivor PPBT <- [KTOV]
+    KTOV (overlap=1321, match=0.9742)
+  survivor PPP <- [PPP3]
+    PPP3 (overlap=1048, match=0.9981)
+  survivor PRMB <- [PRMW]
+    PRMW (overlap=6758, match=0.9959)
+  survivor PSKY <- [PARA]
+    PARA (overlap=6941, match=0.9986)
+  survivor PSTH <- [PSTH-U; PSTH-WS]
+    PSTH-U (overlap=321, match=1.0000)
+    PSTH-WS (overlap=322, match=0.9969)
+  survivor PSUNQ <- [PSUN]
+    PSUN (overlap=3170, match=0.9700)
+  survivor QS <- [QS-WS; QS-WT]
+    QS-WS (overlap=270, match=1.0000)
+    QS-WT (overlap=339, match=1.0000)
+  survivor QUBT <- [PALI; POSO]
+    PALI (overlap=4881, match=0.3328)
+    POSO (overlap=145, match=0.9931)
+  survivor QVCGA <- [QRTEA; QVCA]
+    QRTEA (overlap=4711, match=0.9745)
+    QVCA (overlap=2977, match=0.9590)
+  survivor Q_old1 <- [Q_old]
+    Q_old (overlap=1904, match=0.9989)
+  survivor RCAPQ <- [RCAP]
+    RCAP (overlap=650, match=0.9630)
+skip JWS-WT: no CSV
+skip KBC: no CSV
+skip KTWO_old: no CSV
+skip LAB_old: no CSV
+skip LASE_old: no CSV
+skip LAW_old: no CSV
+skip LAZR: no CSV
+skip LDRH_old: no CSV
+skip LEAP_old: no CSV
+skip LEND_old: no CSV
+skip LFG_old: no CSV
+skip LFT_old: no CSV
+skip LGF_old2: no CSV
+skip LHC_old: no CSV
+skip LIFE_old: no CSV
+skip LINE_old: no CSV
+skip LIPO_old: no CSV
+skip LI_old: no CSV
+skip LQ: no CSV
+skip LRE_old: no CSV
+skip LSCP: no CSV
+skip LSE_old: no CSV
+skip LUCK_old: no CSV
+skip MAIR_old: no CSV
+skip MAKO_old: no CSV
+skip MAPS_old: no CSV
+skip MATV_old: no CSV
+skip MBLY_old: no CSV
+skip MBSC_old: no CSV
+skip MB_old: no CSV
+skip MCLD_old: no CSV
+skip MDA_old: no CSV
+skip MDLK_old: no CSV
+skip MEDE1: no CSV
+skip MENS_old: no CSV
+skip ME_old: no CSV
+skip MFLX_old: no CSV
+skip MGAM_old: no CSV
+skip MGRM_old: no CSV
+skip MIC: no CSV
+skip MIG_old: no CSV
+skip MIL_old: no CSV
+skip MIR_old: no CSV
+skip MMI_old: no CSV
+skip MMK_old: no CSV
+skip MNR_old: no CSV
+skip MOBI: no CSV
+skip MOB_old: no CSV
+skip MON_old: no CSV
+skip MORE_old: no CSV
+skip MR_old: no CSV
+skip MUSA_old: no CSV
+skip MWHS: no CSV
+skip NCT_old: no CSV
+skip NETG_old: no CSV
+skip NETL_old: no CSV
+skip NGA: no CSV
+skip NHP: no CSV
+skip NHWK_old: no CSV
+skip NINE_old: no CSV
+skip NITE_old: no CSV
+skip NLC_old: no CSV
+skip NMBL_old: no CSV
+skip NN_old: no CSV
+skip NOVS_old: no CSV
+skip NP_old: no CSV
+skip NRG_old: no CSV
+skip NSH_old: no CSV
+skip NSR_old: no CSV
+skip NSTC_old: no CSV
+skip NUTR_old: no CSV
+skip NYNY: no CSV
+skip NYX_old: no CSV
+skip OAS_old: no CSV
+skip OB_old: no CSV
+skip ONDS1: no CSV
+skip ONEI_old: no CSV
+skip ONTX: no CSV
+skip OPEN_old: no CSV
+skip OPI: no CSV
+skip OSG_old: no CSV
+skip OS_old: no CSV
+skip OTIS-W: no CSV
+skip OWN: no CSV
+skip PAR_old: no CSV
+skip PA_old1: no CSV
+skip PD1: no CSV
+skip PDX_old: no CSV
+skip PERI1: no CSV
+skip PFX_old2: no CSV
+skip PHH_old: no CSV
+skip PHOS: no CSV
+skip PIII_old: no CSV
+skip PINC: no CSV
+skip PLA: no CSV
+skip PLAY_old: no CSV
+skip PMI_old: no CSV
+skip PMTR_old: no CSV
+skip POWR_old: no CSV
+skip POW_old: no CSV
+skip PRCS_old1: no CSV
+skip PRH_old: no CSV
+skip PRM_old: no CSV
+skip PRM_old1: no CSV
+skip PRTO_old: no CSV
+skip PS_old: no CSV
+skip PYPL1: no CSV
+skip P_old: no CSV
+skip QCLS_old: no CSV
+skip QEDI: no CSV
+skip QLTY_old: no CSV
+skip RAIN_old1: no CSV
+skip RAM_old: no CSV
+skip RATE_old: no CSV
+skip RCI1: no CSV
+incremental: universe is not a superset of the existing manifest; carrying 4718 untouched symbol(s) forward (#2669)
+active_through: 6751 marked, 367 survivors (of 7118 symbols)
+wrote 7118 entries to /tmp/snap_top3000_pit_v11pit/manifest.sexp in 1367.63s
+series_tail: 82 findings (30 truncated, 9 stray_dropped, 43 kept, 0 kept_by_exception, 0 cut_prefix, 0 cut_refused_short_tail)
+verify: 7118/7118 files OK (failed=0)
+exit=0

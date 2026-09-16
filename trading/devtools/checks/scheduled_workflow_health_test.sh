@@ -676,7 +676,8 @@ _run "$SHIM18" "$NOW18"
 if [ "$RC" -ne 0 ] \
   && echo "$OUT" | grep -q '^RED	Daily orchestrator' \
   && echo "$OUT" | grep -q 'streak=6 in_progress=1' \
-  && echo "$OUT" | grep -q 'status=in_progress'; then
+  && echo "$OUT" | grep -q 'status=in_progress' \
+  && echo "$OUT" | grep -q 'newest_completed_run_id=699'; then
   pass "assertion 18: incident shape (6 failures + in_progress newest) -> RED streak=6 in_progress=1, not masked"
 else
   fail "assertion 18: expected RED streak=6 in_progress=1 (the incident this rework fixes), got rc=$RC output=$OUT"
