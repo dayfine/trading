@@ -1,0 +1,13 @@
+[09-15 04:05:54] SCAN pair-12 (5253 symbols)
+[09-15 04:38:27] RESULT pair-12 => 203 group(s), 289 symbol(s) dropped (wall 1951s, peak seen 152MiB / 7.75GiB)
+[09-15 04:38:28] SCAN pair-13 (5253 symbols)
+[09-15 05:16:07] RESULT pair-13 => 202 group(s), 299 symbol(s) dropped (wall 2257s, peak seen 167.6MiB / 7.75GiB)
+[09-15 05:16:07] SCAN pair-14 (5252 symbols)
+[09-15 05:52:25] RESULT pair-14 => 188 group(s), 278 symbol(s) dropped (wall 2177s, peak seen 182.1MiB / 7.75GiB)
+[09-15 05:52:25] SCAN pair-23 (5253 symbols)
+[09-15 06:29:44] RESULT pair-23 => 185 group(s), 301 symbol(s) dropped (wall 2238s, peak seen 184MiB / 7.75GiB)
+[09-15 06:29:44] SCAN pair-24 (5252 symbols)
+[09-15 07:06:23] RESULT pair-24 => 180 group(s), 284 symbol(s) dropped (wall 2198s, peak seen 186.1MiB / 7.75GiB)
+[09-15 07:06:24] SCAN pair-34 (5252 symbols)
+[09-15 07:42:01] RESULT pair-34 => 179 group(s), 289 symbol(s) dropped (wall 2136s, peak seen 188MiB / 7.75GiB)
+[09-15 07:42:01] PAIR SCAN DONE

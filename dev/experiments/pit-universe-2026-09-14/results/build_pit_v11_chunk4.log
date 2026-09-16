@@ -1,0 +1,305 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+67 group(s), 105 symbol(s) dropped
+  survivor RELX <- [RUK]
+    RUK (overlap=2973, match=0.9916)
+  survivor RGP <- [RECN]
+    RECN (overlap=4862, match=0.9981)
+  survivor RGSE <- [SMDK; UPHN]
+    SMDK (overlap=115, match=0.9649)
+    UPHN (overlap=319, match=0.9843)
+  survivor RST <- [RST1]
+    RST1 (overlap=317, match=1.0000)
+  survivor RT <- [RI]
+    RI (overlap=902, match=0.9956)
+  survivor RTX <- [UTX]
+    UTX (overlap=5613, match=0.9790)
+  survivor SAX1 <- [SAXN]
+    SAXN (overlap=555, match=0.9892)
+  survivor SBLK <- [SEA1]
+    SEA1 (overlap=384, match=0.9948)
+  survivor SCNB <- [SUBK]
+    SUBK (overlap=4268, match=0.9815)
+  survivor SCTL <- [REPH]
+    REPH (overlap=2068, match=0.9942)
+  survivor SEI <- [SOI]
+    SOI (overlap=1846, match=1.0000)
+  survivor SFTW <- [SFTW-U; SFTW-WS]
+    SFTW-U (overlap=411, match=1.0000)
+    SFTW-WS (overlap=411, match=0.9854)
+  survivor SGHC <- [SEAH; SEAH-U; SEAH-WS]
+    SEAH (overlap=297, match=1.0000)
+    SEAH-U (overlap=270, match=1.0000)
+    SEAH-WS (overlap=275, match=0.9818)
+  survivor SGI <- [TPX]
+    TPX (overlap=5324, match=1.0000)
+  survivor SHEL <- [RDS-A]
+    RDS-A (overlap=4157, match=0.9976)
+  survivor SHYF <- [SPAR]
+    SPAR (overlap=5737, match=0.9979)
+  survivor SKLZ <- [SKLZ-WS]
+    SKLZ-WS (overlap=256, match=1.0000)
+  survivor SLAI <- [WBAI]
+    WBAI (overlap=1905, match=0.9932)
+  survivor SNBR <- [SCSS]
+    SCSS (overlap=4754, match=0.9895)
+  survivor SPNT <- [TPRE]
+    TPRE (overlap=1938, match=0.9990)
+  survivor SPXC <- [SPW]
+    SPW (overlap=4462, match=0.9895)
+  survivor SSEIQ <- [SSE]
+    SSE (overlap=473, match=0.9534)
+  survivor SSI <- [SSI1]
+    SSI1 (overlap=374, match=1.0000)
+  survivor STE <- [STE1]
+    STE1 (overlap=4488, match=0.9904)
+  survivor SWBI <- [SWHC]
+    SWHC (overlap=2632, match=0.9913)
+  survivor SYNC <- [SYNC1]
+    SYNC1 (overlap=518, match=0.9594)
+  survivor TALO <- [SGY]
+    SGY (overlap=5121, match=0.9982)
+  survivor TCRT <- [ZIOP]
+    ZIOP (overlap=4026, match=0.9650)
+  survivor TECK <- [TCK]
+    TCK (overlap=233, match=0.9957)
+  survivor TEN <- [TNP]
+    TNP (overlap=5619, match=0.9996)
+  survivor TFIN <- [TBK]
+    TBK (overlap=2073, match=0.9986)
+  survivor TIMB <- [TIMB-W; TSU]
+    TIMB-W (overlap=5811, match=0.9924)
+    TSU (overlap=1203, match=0.9967)
+  survivor TIO <- [SGNT_old; TSTN]
+    SGNT_old (overlap=299, match=0.9631)
+    TSTN (overlap=614, match=0.9527)
+  survivor TKO <- [WWE]
+    WWE (overlap=6052, match=0.9980)
+  survivor TNL <- [WYN; WYND]
+    WYN (overlap=2979, match=0.9980)
+    WYND (overlap=682, match=0.9971)
+  survivor TNXP <- [RICO; ROSG; RX; SBFM; SBMC; SCOXQ; SFP; SHU; SLNK; SNCA; SOBI; SRR; SUG; SUS; SYTA; TKMR; TND; TNO; UDS; UPR; VNTR; WCAP_old; WTCT; WWY; XTIA; ZPLS]
+    RICO (overlap=1583, match=0.8837)
+    ROSG (overlap=1528, match=0.0694)
+    RX (overlap=511, match=0.9882)
+    SBFM (overlap=3563, match=0.5014)
+    SBMC (overlap=2469, match=0.7962)
+    SCOXQ (overlap=409, match=1.0000)
+    SFP (overlap=1286, match=0.7175)
+    SHU (overlap=1447, match=0.9025)
+    SLNK (overlap=1645, match=0.7032)
+    SNCA (overlap=2266, match=0.8071)
+    SOBI (overlap=1441, match=0.8451)
+    SRR (overlap=1279, match=0.7911)
+    SUG (overlap=790, match=0.3739)
+    SUS (overlap=171, match=0.9941)
+    SYTA (overlap=2791, match=0.5025)
+    TKMR (overlap=1529, match=0.1898)
+    TND (overlap=1163, match=0.9449)
+    TNO (overlap=421, match=0.8524)
+    UDS (overlap=1558, match=0.9955)
+    UPR (overlap=1596, match=0.8263)
+    VNTR (overlap=1496, match=0.2241)
+    WCAP_old (overlap=0, match=0.0000)
+    WTCT (overlap=513, match=0.9941)
+    WWY (overlap=1047, match=0.5870)
+    XTIA (overlap=3493, match=0.5515)
+    ZPLS (overlap=924, match=0.9978)
+  survivor TOVX <- [SYN]
+    SYN (overlap=4298, match=0.9965)
+  survivor TPCO <- [TPUB; TRNC]
+    TPUB (overlap=472, match=0.9894)
+    TRNC (overlap=1062, match=0.9981)
+  survivor TPGY <- [TPGY-U; TPGY-WS; TPGY-WT]
+    TPGY-U (overlap=265, match=1.0000)
+    TPGY-WS (overlap=267, match=0.9925)
+    TPGY-WT (overlap=414, match=0.6731)
+  survivor TRLA <- [TRLA1]
+    TRLA1 (overlap=604, match=1.0000)
+  survivor TRTN <- [TAL1]
+    TAL1 (overlap=2662, match=0.9842)
+  survivor TUPBQ <- [TUP]
+    TUP (overlap=6721, match=0.9912)
+  survivor TVTX <- [RTRX]
+    RTRX (overlap=2703, match=0.9941)
+  survivor UCB <- [UCBI]
+    UCBI (overlap=5636, match=0.9988)
+  survivor UTZ <- [UTZ-WS]
+    UTZ-WS (overlap=329, match=0.9817)
+  survivor VIV <- [VIV_old]
+    VIV_old (overlap=5219, match=0.9887)
+  survivor VLTA <- [SNPR; SNPR-U; SNPR-WS]
+    SNPR (overlap=212, match=1.0000)
+    SNPR-U (overlap=206, match=1.0000)
+    SNPR-WS (overlap=206, match=1.0000)
+  survivor VSTD <- [YOSH]
+    YOSH (overlap=792, match=0.9975)
+  survivor VTNRQ <- [VTNR]
+    VTNR (overlap=6187, match=0.9943)
+  survivor VVX <- [VEC]
+    VEC (overlap=2009, match=0.9980)
+  survivor WBA <- [WAG]
+    WAG (overlap=2847, match=0.9986)
+  survivor WCRX <- [WCRX1]
+    WCRX1 (overlap=133, match=1.0000)
+  survivor WEB <- [WWWW]
+    WWWW (overlap=2521, match=0.9984)
+  survivor WGS <- [SMFR]
+    SMFR (overlap=590, match=0.9525)
+  survivor WISA <- [TOM]
+    TOM (overlap=101, match=0.9700)
+  survivor WLB <- [WLBA]
+    WLBA (overlap=4786, match=0.9954)
+  survivor WMGI <- [TRNX1]
+    TRNX1 (overlap=1271, match=0.9984)
+  survivor WP <- [VNTV]
+    VNTV (overlap=1463, match=0.9986)
+  survivor WPF <- [WPF-U; WPF-WS]
+    WPF-U (overlap=243, match=1.0000)
+    WPF-WS (overlap=243, match=1.0000)
+  survivor WPM <- [SLW]
+    SLW (overlap=344, match=1.0000)
+  survivor WPP <- [WPPGY]
+    WPPGY (overlap=5009, match=0.9928)
+  survivor WT <- [WETF]
+    WETF (overlap=6016, match=0.9663)
+  survivor WTW <- [WLTW]
+    WLTW (overlap=5178, match=0.9905)
+  survivor XL <- [XL_old]
+    XL_old (overlap=678, match=1.0000)
+  survivor XYZ <- [SQ]
+    SQ (overlap=2305, match=1.0000)
+  survivor ZQKSQ <- [ZQK]
+    ZQK (overlap=3020, match=0.9964)
+  survivor ZWS <- [RXN]
+    RXN (overlap=2439, match=0.9984)
+skip RDUS_old: no CSV
+skip RENT_old: no CSV
+skip RENX_old: no CSV
+skip RESI_old: no CSV
+skip RGC_old: no CSV
+skip RICE-U: no CSV
+skip RICE-WS: no CSV
+skip RNA_old: no CSV
+skip ROC_old: no CSV
+skip RPC_old: no CSV
+skip RPRX_old: no CSV
+skip RRR_old: no CSV
+skip RTP-U: no CSV
+skip RTP-WS: no CSV
+skip RUBI_old: no CSV
+skip RVI_old: no CSV
+skip RXDX_old: no CSV
+skip RYAN_old: no CSV
+skip RYM_old: no CSV
+skip SAG: no CSV
+skip SAIL_old: no CSV
+skip SCIO_old: no CSV
+skip SCR_old: no CSV
+skip SDRL_old: no CSV
+skip SEDA_old: no CSV
+skip SEMG_old: no CSV
+skip SES_old: no CSV
+skip SEV_old1: no CSV
+skip SFR_old: no CSV
+skip SGI_old: no CSV
+skip SHLD_old: no CSV
+skip SIE: no CSV
+skip SII_old: no CSV
+skip SKIL_old: no CSV
+skip SKYT_old: no CSV
+skip SK_old: no CSV
+skip SLE_old: no CSV
+skip SMA_old: no CSV
+skip SNDA_old: no CSV
+skip SNOW_old: no CSV
+skip SOL_old1: no CSV
+skip SPCT_old: no CSV
+skip SPEC_old: no CSV
+skip SPFR: no CSV
+skip SPFR-U: no CSV
+skip SPFR-WS: no CSV
+skip SPWR_old: no CSV
+skip SRNGU: no CSV
+skip STCK_old: no CSV
+skip STEC_old: no CSV
+skip STHOV: no CSV
+skip STIC: no CSV
+skip STRC_old: no CSV
+skip STSA_old: no CSV
+skip SUNW_old: no CSV
+skip SUPR_old1: no CSV
+skip SUPR_old2: no CSV
+skip SWIM_old: no CSV
+skip SWLH: no CSV
+skip SWP_old: no CSV
+skip SYT_old: no CSV
+skip TACO_old1: no CSV
+skip TBA: no CSV
+skip TBIO_old: no CSV
+skip TBRG_old: no CSV
+skip TEN_old: no CSV
+skip TGE_old: no CSV
+skip TGN_old: no CSV
+skip THRX_old: no CSV
+skip TIC_old: no CSV
+skip TIER_old: no CSV
+skip TIME_old: no CSV
+skip TLN_old: no CSV
+skip TMC_old1: no CSV
+skip TMC_old2: no CSV
+skip TMH_old: no CSV
+skip TNP_old: no CSV
+skip TOPW_old: no CSV
+skip TRAD: no CSV
+skip TRAK_old: no CSV
+skip TRIL_old: no CSV
+skip TRI_old1: no CSV
+skip TRMR_old: no CSV
+skip TSIC_old: no CSV
+skip TSL_old: no CSV
+skip TYM1: no CSV
+skip UCI_old: no CSV
+skip UCL_old: no CSV
+skip ULTI_old: no CSV
+skip USM1: no CSV
+skip UST1: no CSV
+skip USTB1: no CSV
+skip VACQ: no CSV
+skip VEI: no CSV
+skip VGAC: no CSV
+skip VGAC-U: no CSV
+skip VGAC-WS: no CSV
+skip VG_old: no CSV
+skip VIA_old: no CSV
+skip VISN_old: no CSV
+skip VITL_old: no CSV
+skip VIVO_old: no CSV
+skip VR_old: no CSV
+skip VTIQ_old: no CSV
+skip WARR_old: no CSV
+skip WBDWV: no CSV
+skip WBD_old: no CSV
+skip WEBX: no CSV
+skip WEL_old: no CSV
+skip WEN_old: no CSV
+skip WEST_old: no CSV
+skip WE_old: no CSV
+skip WFRD_old: no CSV
+skip WFR_old: no CSV
+skip WOLF_old1: no CSV
+skip WOOF_old: no CSV
+skip WR: no CSV
+skip WRD_old: no CSV
+skip WX: no CSV
+skip XOG_old: no CSV
+skip XONE_old: no CSV
+skip YORK_old: no CSV
+skip ZD_old: no CSV
+skip ZGEN_old: no CSV
+skip ZIP_old: no CSV
+incremental: universe is not a superset of the existing manifest; carrying 7118 untouched symbol(s) forward (#2669)
+active_through: 9142 marked, 371 survivors (of 9513 symbols)
+wrote 9513 entries to /tmp/snap_top3000_pit_v11pit/manifest.sexp in 1908.87s
+series_tail: 61 findings (32 truncated, 8 stray_dropped, 21 kept, 0 kept_by_exception, 0 cut_prefix, 0 cut_refused_short_tail)
+verify: 9513/9513 files OK (failed=0)
+exit=0

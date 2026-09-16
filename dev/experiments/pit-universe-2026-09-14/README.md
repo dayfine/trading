@@ -102,3 +102,84 @@ and need no provenance note; nothing is rebuilt.
   `feat/pit-universe-schedule`.
 - Step 3b — `_v11pit` warehouse from the union superset (1999–2025 ∪ `GSPC.INDX` ∪ the
   `_v10dedup` manifest extras), after 3a merges; container-exclusive.
+
+## Step 3b addendum (2026-09-15) — the chunked build missed every cross-chunk rename twin
+
+The first step-4 cell (salt 0, launched 21:54 PT 09-14 on the 9,597-entry `_v11pit`) ended two ways at
+once: it hit the chain's 6 h `CELL_TIMEOUT` at ~96 % of the window (last trade 2025-05-15; a PIT cell on
+the 10k-name union runs ~6.3 h, 2.3× the 2.7 h `_v10dedup` cell, because `_classify_all` stage-classifies
+the whole union every Friday), and its partial validator report showed **V6 = 3 twin positions**
+(ALTM/LTHM, GTM/ZI, GEAR/VSTO) — all three pairs split across the four build chunks, exactly the caveat the
+chunked rebuild recorded. V6 sees only twins that were *held at the same time*; the real count was found by
+scanning:
+
+| scan | how | result |
+|---|---|---|
+| full union (10,504 names) | `build_snapshots -dedupe-rename-twins` on the superset | **OOM (exit 137, 5 min)** — the twin pass loads every symbol's bars before detecting |
+| six chunk-PAIR unions (5,253 names each) | same command; `rename_twin_report.txt` is written before the per-symbol loop, so the build is killed once it exists (`step4/twin-scan/pair-scan.sh`) | 179–203 groups per pair, ~35 min each, peak ~4.3 GB |
+
+Per pair (`step4/twin-scan/analyze-pair.sh`) a leg is a real cross-chunk twin only on a **direct** edge
+(overlap ≥ 200 bars, match ≥ 0.95), when its survivor is not a **hub** (> 4 legs: CISXF 65, BWLP, LNSPF,
+IBDRY, BCAL — the flat/zero-return series class behind the false transitive drops in #2823), when it is not
+one of the 84 legs deliberately restored in chunk 5, and when both legs are still indexed. That leaves
+**239 edges / 233 legs** (`all-drop-edges.txt`: ELV/ANTM, DXC/CSC, CPAY/FLT, EXE/CHK, AABA/YHOO,
+TFC/BBT_old, TPR/COH, AXON/TASR, KDP/DPS, LHX/HRS, JEF/LUK, GEN/NLOK, LUMN/CTL, BKNG/PCLN_old …).
+
+Fix, no code: chunk 6 = one `-incremental -dedupe-rename-twins` rebuild whose universe is the 460 legs of
+those pairs together, so the detector resolves each component and `Build_runner` drops the losers from the
+manifest (9,597 → 9,363, 40 s; `rename_twin_report_chunk6.txt`). One collateral: EMBT fell into the
+{CISXF, ZAZZT, ZBZZT} test-ticker component and was rebuilt alone without dedupe (chunk 7 → **9,364**).
+The 233 dropped legs were then aliased into the 27 yearly lists (`alias-lists.pl`, `alias3.txt`; per-list
+dedupe) — union 10,133 → 9,900, effective breadth per year 2,792–2,993 (`step4/specs/composition-counts.txt`,
+md5s in `composition-md5.txt`). D6 at relaunch: absent = 551 (450 `_old`, 101 real = 97 MISS + 3 quarantined +
+MEL), unchanged.
+
+Not reproducible from the repo alone: the as-run lists carry the 09-14 alias pass (`alias2.resolved`, 360
+legs) plus a handful of hand edits that the two alias maps do not regenerate byte-for-byte (1–5 symbol lines
+per list). Decision item: commit the 27 as-run lists (10 MB) under `pit-v11/composition/`, or keep them as
+a host archive and pin by md5.
+
+Lane A relaunched 07:45 PT 09-15 with `CELL_TIMEOUT=36000` (10 h), all three salts serial in one lane
+(two workers exceed the container).
+
+## Step 4 — record band on the PIT universe (2026-09-16, LANE A DONE 03:18 PT)
+
+Spec `step4/specs/a0-pit-null.sexp`: the a0 null (record spec, `entry_order_max_rest_weeks 0`) with a
+27-entry `universe_schedule` 1999–2025 (D1/D2 dating), run tree `sweep-pit @ 3a20f4987`, warehouse
+`_v11pit` at 9,364 entries. Artifacts `step4/results/`.
+
+| salt | return % | trades | Sharpe | maxDD % | realised P&L | unrealised | open | V6 | V16 | V17 | wall |
+|---|---:|---:|---:|---:|---:|---:|---|---|---|---|---|
+| 0 | 457.01 | 732 | 0.482 | 40.64 | $3.85M | $0.92M | 5 | PASS (0) | 2 (CLE 2014, ASPS 2017 — force_liquidation quality flags, same as the 2000-vintage band) | PASS | 5h58m |
+| 2 | 152.03 | 762 | 0.297 | 51.32 | $1.40M | $0.29M | 5 (CBL EQNR FROG GE QCOM) | PASS (0) | 2 (same CLE, ASPS) | PASS | 7h05m |
+| 1 | 188.05 | 766 | 0.329 | 53.05 | $1.67M | $0.41M | 7 (ETON EXEL FROG FTNT GE QCOM SXT) | PASS (0) | 1 (CLE) | PASS | 6h30m |
+
+Levels are **not comparable** to the year-2000 vintage band (312 / 383 / 640 %, `_v10dedup`): different
+construction (dated membership vs one survivor-tilted list), different warehouse. State the new band and
+stop; every later arm pairs against THIS band at the same salt on `_v11pit`, gated by `validator_diff -check V6`.
+
+**The band: 152 / 188 / 457 % (salts 2 / 1 / 0), median 188; maxDD 40.6–53.0; 732–766 trades; V6 = 0 on every
+salt** (`validator_diff -check V6` over the three reports: `0 | 0 | 0 | agree`, exit 0). Quote the band, never a
+salt. Salt 0's 457 is the salt-lottery top (final value $5.57M vs $2.52M / $2.88M) — the same shape as the
+2000-vintage band's salt-2 640, and the spread across salts is wider here (3.0× vs 2.1×).
+
+Exit mix per salt: stop_loss 495 / 530 / 530, laggard_rotation 221 / 221 / 223, delisted 4–6, extension_stop 2–4,
+liquidity_exit 2–3, force_liquidation 1–2 (CLE 2014 on every salt, ASPS 2017 on s0/s2 — the V16 quality flags),
+stage3_force_exit 1. The `delisted` exits are new relative to the 2000 vintage: a PIT schedule holds names that
+later leave the market, and D4 (dropped names held to normal exit) lets `active_through` end them.
+
+Comparison note — **do not read a level into the drop from 312 / 383 / 640.** The two bands differ in construction
+(dated membership with ~2,800 effective names per year vs one survivor-tilted 3,000-name list), in warehouse
+(`_v11pit` 9,364 vs `_v10dedup` 2,907 entries) and in path draw (every cell is a new draw at its salt). The
+`project_warehouse_vintage_coverage` measurement already put the survivorship cost of a frozen vintage at −12 to −23pp
+on a 5y window; a 26y window compounds it, so a lower PIT band is the expected direction, not a finding about the
+strategy. The record is now this band: every later arm pairs against `a0-pit-null-s{0,1,2}-v11` at the same salt
+on `_v11pit`, gated by `validator_diff -check V6`.
+
+Cell cost: 5h58m / 7h05m / 6h30m at ~5.5–6.5 GB (single worker). Issue #2839 tracks cutting that without changing
+stage continuity; membership pruning is explicitly out of scope (user decision 2026-09-15).
+
+Inputs committed with this record: the 27 as-run lists under `trading/test_data/backtest_scenarios/pit-v11/composition/`
+(md5s = `step4/specs/composition-md5.txt`), the spec, the chain + rebuild + twin-scan scripts, the alias maps, and
+the per-cell artifacts under `step4/results/` (the precedent set: actual / params / summary / trades / validator /
+open_positions / force_liquidations; trade_audit and equity_curve stay on the host under `/tmp/sweeps/pit-null/`).

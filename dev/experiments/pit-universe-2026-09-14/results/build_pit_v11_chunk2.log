@@ -1,0 +1,322 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+77 group(s), 117 symbol(s) dropped
+  survivor CYRNQ <- [CYRN]
+    CYRN (overlap=5985, match=0.9686)
+  survivor CZR <- [ERI]
+    ERI (overlap=1600, match=0.9937)
+  survivor DD <- [DWDP]
+    DWDP (overlap=5390, match=0.9514)
+  survivor DELL <- [DVMT]
+    DVMT (overlap=595, match=0.9966)
+  survivor DIDIY <- [DIDI]
+    DIDI (overlap=241, match=1.0000)
+  survivor DINO <- [HFC]
+    HFC (overlap=2693, match=0.9974)
+  survivor DJTWW <- [DWACW]
+    DWACW (overlap=628, match=0.9952)
+  survivor DMC <- [FDP]
+    FDP (overlap=7164, match=0.9983)
+  survivor DOC <- [HCP_old]
+    HCP_old (overlap=5500, match=0.9944)
+  survivor DOO <- [DOOO]
+    DOOO (overlap=3147, match=0.9819)
+  survivor DTCB <- [DTC]
+    DTC (overlap=874, match=1.0000)
+  survivor EA <- [ERTS]
+    ERTS (overlap=2086, match=0.9511)
+  survivor EHC <- [HLS]
+    HLS (overlap=2814, match=0.9972)
+  survivor ELNK <- [ELNK1]
+    ELNK1 (overlap=528, match=1.0000)
+  survivor EMBJ <- [ERJ]
+    ERJ (overlap=6401, match=0.9941)
+  survivor EMWP <- [EROS; ESGC]
+    EROS (overlap=1741, match=0.9983)
+    ESGC (overlap=2212, match=0.9959)
+  survivor ERINQ <- [ERN]
+    ERN (overlap=2481, match=0.9976)
+  survivor ESINQ <- [ESI1]
+    ESI1 (overlap=4672, match=0.9923)
+  survivor EVRI <- [GCA]
+    GCA (overlap=2495, match=0.9976)
+  survivor EXPI <- [DESCQ]
+    DESCQ (overlap=176, match=0.9943)
+  survivor F-P-C <- [F-PC]
+    F-PC (overlap=1686, match=0.9822)
+  survivor FBIN <- [FBHS]
+    FBHS (overlap=2885, match=0.9990)
+  survivor FHI <- [FII]
+    FII (overlap=5465, match=0.9918)
+  survivor FISV <- [FI; FISV_old]
+    FI (overlap=7008, match=0.9766)
+    FISV_old (overlap=6399, match=0.9975)
+  survivor FLG-P-A <- [FLG-PA]
+    FLG-PA (overlap=2381, match=0.9840)
+  survivor FLUT <- [CYDS; DCIX; DME; DPW; DRX; DRYS; EBAYL; EJH; ESIMF; ETP_old2; ETRM; EUA; EURN; FAL; FCGY; FNCX; FPC; GBSN; GPUS; HIVE; HMBL; HRVEQ; HSE; HTG; IBIS; IISX; IMPX_old; INPX; IOM; ISG; JOS]
+    CYDS (overlap=2323, match=0.5603)
+    DCIX (overlap=2333, match=0.6642)
+    DME (overlap=2093, match=0.8901)
+    DPW (overlap=4611, match=0.7996)
+    DRX (overlap=3559, match=0.2870)
+    DRYS (overlap=3703, match=0.7482)
+    EBAYL (overlap=1562, match=0.1416)
+    EJH (overlap=1286, match=0.0233)
+    ESIMF (overlap=2651, match=0.7460)
+    ETP_old2 (overlap=2974, match=0.9815)
+    ETRM (overlap=2501, match=0.9412)
+    EUA (overlap=226, match=0.9467)
+    EURN (overlap=3765, match=0.3789)
+    FAL (overlap=1396, match=0.2860)
+    FCGY (overlap=5972, match=0.6699)
+    FNCX (overlap=3704, match=0.7983)
+    FPC (overlap=1352, match=0.6514)
+    GBSN (overlap=288, match=0.6934)
+    GPUS (overlap=5969, match=0.6855)
+    HIVE (overlap=3872, match=0.4412)
+    HMBL (overlap=5632, match=0.5935)
+    HRVEQ (overlap=3246, match=0.6148)
+    HSE (overlap=171, match=0.9412)
+    HTG (overlap=1156, match=0.2009)
+    IBIS (overlap=2413, match=0.3740)
+    IISX (overlap=3326, match=0.8955)
+    IMPX_old (overlap=1588, match=0.8481)
+    INPX (overlap=3134, match=0.5515)
+    IOM (overlap=3579, match=0.5238)
+    ISG (overlap=4196, match=0.1814)
+    JOS (overlap=1939, match=0.7977)
+  survivor FMCC <- [FRE]
+    FRE (overlap=1718, match=0.9849)
+  survivor FNMA <- [FNM]
+    FNM (overlap=1718, match=0.9924)
+  survivor FRCB <- [FRC]
+    FRC (overlap=3109, match=0.9855)
+  survivor FTCHQ <- [FTCH; FTCHF]
+    FTCH (overlap=1360, match=0.9985)
+    FTCHF (overlap=1512, match=0.9382)
+  survivor FTI <- [FTI1]
+    FTI1 (overlap=3921, match=0.9997)
+  survivor GAMI <- [GBL]
+    GBL (overlap=5997, match=0.9937)
+  survivor GAP <- [GPS]
+    GPS (overlap=6740, match=0.9697)
+  survivor GB <- [FPAC; FPAC-U; FPAC-WS]
+    FPAC (overlap=1118, match=0.4512)
+    FPAC-U (overlap=710, match=0.6714)
+    FPAC-WS (overlap=476, match=0.9874)
+  survivor GIG-U <- [GIG-WS]
+    GIG-WS (overlap=3090, match=1.0000)
+  survivor GIX-U <- [GIX-UN; GIX-WS]
+    GIX-UN (overlap=4211, match=0.9912)
+    GIX-WS (overlap=4463, match=0.9991)
+  survivor GLAE <- [GLA]
+    GLA (overlap=4927, match=0.9685)
+  survivor GNCAQ <- [GNCA]
+    GNCA (overlap=2277, match=0.9965)
+  survivor GOLLQ <- [GOL]
+    GOL (overlap=4937, match=0.9957)
+  survivor GPT2 <- [GKK]
+    GKK (overlap=2193, match=0.9936)
+  survivor GRP-U <- [GRP-UN]
+    GRP-UN (overlap=5599, match=0.9921)
+  survivor GRTSQ <- [GRTS]
+    GRTS (overlap=1549, match=0.9845)
+  survivor GS-P-A <- [GS-PA]
+    GS-PA (overlap=5364, match=0.9845)
+  survivor GSAH <- [GSAH-U; GSAH-WS]
+    GSAH-U (overlap=647, match=0.9969)
+    GSAH-WS (overlap=647, match=0.9969)
+  survivor GSM <- [GSM1]
+    GSM1 (overlap=1613, match=0.9895)
+  survivor HCR <- [HCLP]
+    HCLP (overlap=1708, match=0.9982)
+  survivor HGTXU <- [HGT]
+    HGT (overlap=3767, match=0.9554)
+  survivor HHH <- [HHC]
+    HHC (overlap=3256, match=0.9985)
+  survivor HIMS <- [HIMS-WS]
+    HIMS-WS (overlap=247, match=1.0000)
+  survivor HOS <- [HLX]
+    HLX (overlap=7198, match=0.9997)
+  survivor HTGMQ <- [HTGM]
+    HTGM (overlap=2084, match=0.9918)
+  survivor HWC <- [HBHC]
+    HBHC (overlap=5133, match=0.9891)
+  survivor HYLN <- [HYLN-WS]
+    HYLN-WS (overlap=562, match=1.0000)
+  survivor HYREQ <- [HYRE]
+    HYRE (overlap=1219, match=0.9885)
+  survivor HZAC <- [HZAC-U; HZAC-WS]
+    HZAC-U (overlap=257, match=1.0000)
+    HZAC-WS (overlap=257, match=1.0000)
+  survivor ICDI <- [ICD]
+    ICD (overlap=2533, match=0.9988)
+  survivor ICPT <- [ICPT1]
+    ICPT1 (overlap=294, match=0.9932)
+  survivor IIJIY <- [IIJI]
+    IIJI (overlap=4846, match=0.9880)
+  survivor ILG <- [IILG]
+    IILG (overlap=2053, match=0.9981)
+  survivor IMBI <- [EVLV_old]
+    EVLV_old (overlap=5419, match=0.9983)
+  survivor IMOS <- [IMOS1]
+    IMOS1 (overlap=3357, match=0.9934)
+  survivor INFIQ <- [INFI]
+    INFI (overlap=5878, match=0.9763)
+  survivor INVX <- [DRQ]
+    DRQ (overlap=6714, match=0.9994)
+  survivor IONS <- [ISIS]
+    ISIS (overlap=4522, match=0.9883)
+  survivor IPOF <- [IPOF-U; IPOF-WS; IPOF-WT]
+    IPOF-U (overlap=268, match=0.9925)
+    IPOF-WS (overlap=268, match=0.9925)
+    IPOF-WT (overlap=441, match=0.5773)
+  survivor IR <- [GDI]
+    GDI (overlap=773, match=0.9832)
+  survivor IRBTQ <- [IRBT]
+    IRBT (overlap=5061, match=0.9949)
+  survivor ISHC <- [ISH]
+    ISH (overlap=3062, match=0.9909)
+  survivor ISLE <- [ISLE_old]
+    ISLE_old (overlap=334, match=1.0000)
+  survivor J <- [JEC]
+    JEC (overlap=4091, match=0.9995)
+  survivor JBTM <- [JBT]
+    JBT (overlap=4142, match=1.0000)
+  survivor JOY <- [JOYG]
+    JOYG (overlap=2062, match=0.9743)
+  survivor JPM-P-C <- [JPM-PC]
+    JPM-PC (overlap=1721, match=0.9808)
+  survivor JPM-P-D <- [JPM-PD]
+    JPM-PD (overlap=1721, match=0.9808)
+  survivor JPM-P-J <- [JPM-PJ]
+    JPM-PJ (overlap=1721, match=0.9814)
+  survivor JPM-P-K <- [JPM-PK]
+    JPM-PK (overlap=1380, match=0.9840)
+  survivor JPM-P-L <- [JPM-PL]
+    JPM-PL (overlap=1335, match=0.9843)
+skip CYN_old: no CSV
+skip DAN_old: no CSV
+skip DCP_old: no CSV
+skip DCT_old: no CSV
+skip DDC_old: no CSV
+skip DERM_old: no CSV
+skip DGN_old: no CSV
+skip DINE: no CSV
+skip DKNGW: no CSV
+skip DKNGZ: no CSV
+skip DM_old: no CSV
+skip DOCS_old: no CSV
+skip DOW_old: no CSV
+skip DRCT_old: no CSV
+skip DRS_old: no CSV
+skip DTC_old: no CSV
+skip DTK_old: no CSV
+skip DTV_old: no CSV
+skip DYNC_old: no CSV
+skip DYN_old: no CSV
+skip EC1: no CSV
+skip ECO_old: no CSV
+skip EDR_old: no CSV
+skip EE_old: no CSV
+skip EGLE_old: no CSV
+skip ELAB_old: no CSV
+skip ELOX: no CSV
+skip EMBX_old: no CSV
+skip EMC_old: no CSV
+skip EM_old: no CSV
+skip EROC: no CSV
+skip ESPR_old: no CSV
+skip ESR_old: no CSV
+skip ES_old: no CSV
+skip ET_old: no CSV
+skip EYES: no CSV
+skip EYE_old: no CSV
+skip FACT_old: no CSV
+skip FB_old: no CSV
+skip FB_old1: no CSV
+skip FEED_old: no CSV
+skip FGL_old: no CSV
+skip FHL: no CSV
+skip FLOW_old: no CSV
+skip FLXN_old: no CSV
+skip FLY_old: no CSV
+skip FMFC_old: no CSV
+skip FORE_old: no CSV
+skip FOXX_old: no CSV
+skip FPAC_old: no CSV
+skip FRSH_old: no CSV
+skip FRSH_oldoldold: no CSV
+skip FRX: no CSV
+skip FSL_old: no CSV
+skip FSTC1: no CSV
+skip FTOC: no CSV
+skip FTRE_old: no CSV
+skip FUSE_old2: no CSV
+skip FWAA: no CSV
+skip GAME_old: no CSV
+skip GCI_old: no CSV
+skip GCT_old: no CSV
+skip GEN_old: no CSV
+skip GFS_old: no CSV
+skip GHVI: no CSV
+skip GIC_old: no CSV
+skip GIG_old: no CSV
+skip GLBL_old: no CSV
+skip GLDB_old: no CSV
+skip GLG_old: no CSV
+skip GLIBA_old: no CSV
+skip GLK_old: no CSV
+skip GLS_old: no CSV
+skip GNSS_old: no CSV
+skip GNTA_old: no CSV
+skip GOGL: no CSV
+skip GPOR_old: no CSV
+skip GPT_old: no CSV
+skip GRIN_old: no CSV
+skip GRO_old: no CSV
+skip GRP1: no CSV
+skip GRUB_old: no CSV
+skip GSX_old: no CSV
+skip GTM_old: no CSV
+skip GV_old: no CSV
+skip HAWK_old: no CSV
+skip HCR_old: no CSV
+skip HK_old: no CSV
+skip HOL: no CSV
+skip HOMG: no CSV
+skip HPH_old: no CSV
+skip HQ_old: no CSV
+skip HTZ_old: no CSV
+skip IACO: no CSV
+skip IAC_old: no CSV
+skip IBCA_old: no CSV
+skip ICCM_old: no CSV
+skip ICON_old: no CSV
+skip IDEV_old: no CSV
+skip IDR_old: no CSV
+skip IFIN_old: no CSV
+skip IFLO_old: no CSV
+skip IHS_old: no CSV
+skip INBX_old: no CSV
+skip INCR_old: no CSV
+skip INMT_old: no CSV
+skip INOV_old1: no CSV
+skip INST_old: no CSV
+skip INVN_old1: no CSV
+skip INVN_old2: no CSV
+skip ION_old: no CSV
+skip IPOD_old: no CSV
+skip IPS1: no CSV
+skip IPX_old: no CSV
+skip IRE_old: no CSV
+skip JADE_old: no CSV
+skip JAN_old: no CSV
+skip JCAP_old: no CSV
+skip JILL_old: no CSV
+skip JONE: no CSV
+incremental: universe is not a superset of the existing manifest; carrying 2329 untouched symbol(s) forward (#2669)
+active_through: 4479 marked, 239 survivors (of 4718 symbols)
+wrote 4718 entries to /tmp/snap_top3000_pit_v11pit/manifest.sexp in 1271.48s
+series_tail: 72 findings (23 truncated, 5 stray_dropped, 44 kept, 0 kept_by_exception, 0 cut_prefix, 0 cut_refused_short_tail)
+verify: 4718/4718 files OK (failed=0)
+exit=0
