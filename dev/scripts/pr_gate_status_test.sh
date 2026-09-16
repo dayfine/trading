@@ -748,6 +748,9 @@ case "$1 $2" in
     printf '%s\n' "$GATE_PR_NUMBER"
     ;;
   "pr view")
+    case "$*" in
+      *"--json comments"*) printf '%s\n' "${GATE_COMMENTS_JSON:-[]}"; exit 0 ;;
+    esac
     jq -n --arg tip "$GATE_TIP" --argjson reviews "$GATE_REVIEWS_JSON" --arg files "$GATE_FILES" \
       --argjson labels "${GATE_LABELS_JSON:-[]}" \
       '{headRefOid: $tip,
@@ -827,6 +830,25 @@ check "B1 e2e (gh backend): do-not-merge label HOLDs a pass/ok/ok PR, never MERG
 GATE_LABELS_JSON='[]'
 export GATE_LABELS_JSON
 
+# #2837: exercise the real CLI row, not just the warning helper.
+GATE_COMMENTS_JSON=$(reviews "$STRUCT_WITH_BEHAV_SECTION")
+SAVED_GATE_REVIEWS=$GATE_REVIEWS_JSON
+GATE_REVIEWS_JSON='[]'
+export GATE_COMMENTS_JSON GATE_REVIEWS_JSON
+row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+check "GH e2e: issue comment keeps structural gate none" none "$(printf '%s' "$row" | awk '{print $3}')"
+check "GH e2e: missing-review row includes actionable diagnostic" yes "$(
+  case "$row" in *'dispatch qc-structural [WARNING: QC-looking ISSUE COMMENT (structural); not a review -- inspect and re-post]'*) echo yes ;; *) echo no ;; esac
+)"
+GATE_LABELS_JSON='[{"name":"do-not-merge"}]'
+row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+check "GH e2e: held row also shows misplaced comment" yes "$(
+  case "$row" in *'HOLD -- do-not-merge label [WARNING: QC-looking ISSUE COMMENT (structural); not a review -- inspect and re-post]'*) echo yes ;; *) echo no ;; esac
+)"
+GATE_LABELS_JSON='[]'
+GATE_REVIEWS_JSON=$SAVED_GATE_REVIEWS
+GATE_COMMENTS_JSON='[]'
+
 rm -rf "$GH_E2E_STUB_DIR"
 
 # 34. Defect 2's NICE-TO-HAVE, END TO END (curl backend): with `gh` absent
@@ -849,6 +871,9 @@ case "$url" in
     ;;
   */pulls/*/files*)
     printf '%s\n' "$GATE_FILES" | jq -R -s 'split("\n") | map(select(length > 0) | {filename: .})'
+    ;;
+  */issues/*/comments*)
+    printf '%s\n' "${GATE_COMMENTS_JSON:-[]}"
     ;;
   */pulls/*/reviews*)
     printf '%s\n' "$GATE_REVIEWS_JSON"
@@ -892,6 +917,25 @@ esac
 check "B1 e2e (curl backend): do-not-merge label HOLDs a pass/ok/ok PR, never MERGE" HOLD "$got"
 GATE_LABELS_JSON='[]'
 export GATE_LABELS_JSON
+
+# #2837: exercise the real CLI row, not just the warning helper.
+GATE_COMMENTS_JSON=$(reviews "$STRUCT_WITH_BEHAV_SECTION")
+SAVED_GATE_REVIEWS=$GATE_REVIEWS_JSON
+GATE_REVIEWS_JSON='[]'
+export GATE_COMMENTS_JSON GATE_REVIEWS_JSON
+row=$(_e2e_probe "$CURL_E2E_STUB_DIR" "dummy-token" 501 | tail -1)
+check "CURL e2e: issue comment keeps structural gate none" none "$(printf '%s' "$row" | awk '{print $3}')"
+check "CURL e2e: missing-review row includes actionable diagnostic" yes "$(
+  case "$row" in *'dispatch qc-structural [WARNING: QC-looking ISSUE COMMENT (structural); not a review -- inspect and re-post]'*) echo yes ;; *) echo no ;; esac
+)"
+GATE_LABELS_JSON='[{"name":"do-not-merge"}]'
+row=$(_e2e_probe "$CURL_E2E_STUB_DIR" "dummy-token" 501 | tail -1)
+check "CURL e2e: held row also shows misplaced comment" yes "$(
+  case "$row" in *'HOLD -- do-not-merge label [WARNING: QC-looking ISSUE COMMENT (structural); not a review -- inspect and re-post]'*) echo yes ;; *) echo no ;; esac
+)"
+GATE_LABELS_JSON='[]'
+GATE_REVIEWS_JSON=$SAVED_GATE_REVIEWS
+GATE_COMMENTS_JSON='[]'
 
 rm -rf "$CURL_E2E_STUB_DIR"
 
@@ -1697,6 +1741,57 @@ check "codex action: required + unclear holds with timeout advice (no verdict at
   "$(_codex_action MERGE unclear 0 "" | grep -c 'swap to review/codex-timeout after 3h')"
 check "codex action: CODEX_REVIEW=off neutralises required" "MERGE" "$(CODEX_REVIEW=off _codex_action MERGE none 0 "")"
 check "codex action: CODEX_REVIEW=off neutralises requested" "MERGE" "$(CODEX_REVIEW=off _codex_action MERGE none "" 0)"
+
+# #2837: comments are diagnostic only, never approval evidence.
+comment_warning() (
+  _pr_issue_comments() { printf '%s' "$1" > /dev/null; printf '%s' "$COMMENT_FIXTURE"; }
+  _qc_comment_warning 2837 "$1" "$2" "$TIP"
+)
+COMMENT_FIXTURE=$(reviews "$STRUCT_WITH_BEHAV_SECTION")
+check "misposted structural QC is visible" \
+  " [WARNING: QC-looking ISSUE COMMENT (structural); not a review -- inspect and re-post]" \
+  "$(comment_warning none none)"
+check "comment never becomes a gate review" none "$(_gate '[]' structural "$TIP")"
+COMMENT_FIXTURE=$(reviews "$REAL_BEHAVIORAL")
+check "misposted behavioral QC alongside structural review is visible" \
+  " [WARNING: QC-looking ISSUE COMMENT (behavioral); not a review -- inspect and re-post]" \
+  "$(comment_warning ok none)"
+COMMENT_FIXTURE=$(reviews "$CODEX_ADVISORY_OK")
+check "advisory comment is not Claude QC" "" "$(comment_warning none none)"
+COMMENT_FIXTURE=$(reviews 'Ordinary discussion mentioning APPROVED and Structural QC')
+check "ordinary comment is silent" "" "$(comment_warning none none)"
+COMMENT_FIXTURE='[]'
+check "no comments is silent" "" "$(comment_warning none none)"
+COMMENT_FIXTURE=$(reviews "$STRUCT_WITH_BEHAV_SECTION")
+check "already reviewed structural comment is ignored" "" "$(comment_warning ok none)"
+check "no missing gates skips comment request" "" "$(
+  _pr_issue_comments() { echo 'UNEXPECTED REQUEST'; return 1; }
+  _qc_comment_warning 2837 ok ok "$TIP"
+)"
+check "docs-only skips comment request" "" "$(
+  _pr_issue_comments() { echo 'UNEXPECTED REQUEST'; return 1; }
+  _qc_comment_warning 2837 skip skip "$TIP"
+)"
+check "failed comment request is visible but never approves" \
+  " [WARNING: issue-comment QC check unavailable]" "$(
+  _pr_issue_comments() { return 1; }
+  _qc_comment_warning 2837 none none "$TIP"
+)"
+check "malformed comment payload is visible" \
+  " [WARNING: issue-comment QC check unavailable]" "$(
+  _pr_issue_comments() { echo '{}'; }
+  _qc_comment_warning 2837 none none "$TIP"
+)"
+check "gh comment backend reads comments not reviews" \
+  'pr view 2837 --repo dayfine/trading --json comments --jq .comments' "$(
+  gh() { printf '%s' "$*"; }
+  _BACKEND=gh _pr_issue_comments 2837
+)"
+check "curl comment backend reads issue endpoint" \
+  'repos/dayfine/trading/issues/2837/comments?per_page=100' "$(
+  _curl_gh() { printf '%s' "$1"; }
+  _BACKEND=curl _pr_issue_comments 2837
+)"
 
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
