@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-15 (orchestrator run 2; main **`767ef9aa`**, green on all
+Last updated: 2026-09-16 (local session after the PIT band + Codex/QC wave; previously orchestrator run 2 09-15; main **`73487e7a7`**, green on all
 CI checks; `status_file_integrity` **0**, `index_size_linter` **0**,
 `no_python_check` **0** — run standalone without dune, exit codes read unpiped).
 
@@ -52,12 +52,15 @@ to already fixed this in #2605; the prose did not).
 **Feature tracks are fenced, by design.** Every IN_PROGRESS feature row below is
 LOCAL-fenced (maintainer-owned), data-gated, or human-gated on an R3 default-flip.
 The current milestone is the **PIT top-3000 universe migration**
-(`dev/plans/pit-universe-migration-2026-09-14.md`; steps 1-3a merged
-#2808/#2809/#2816, 3b + step-4 null band in flight locally, #2832) — maintainer-led
-and LOCAL. Orchestrator dispatch stays off it; harness is where the throughput is.
+(`dev/plans/pit-universe-migration-2026-09-14.md`; steps 1–6 MERGED —
+#2808/#2809/#2816, step-4 record band #2843 (152 / 188 / 457 %, V6 = 0), step-6 smoke golden #2846)
+— maintainer-led and LOCAL. Next on the track: #2823 (twin-detector direct-edge fix), #2839 (PIT cell
+cost, bit-identical), then the pre-registered top-of-funnel screen on the new band. Orchestrator dispatch stays off it; harness is where the throughput is.
 
-**Two RED weekly workflows** remain (`Prune candidates weekly`, `Weekly start
-sweep (BAH SPY)`), both last fired 2026-09-07, before their fix (#2725) merged.
+**Two RED weekly workflows** (`Prune candidates weekly`, `Weekly start sweep (BAH SPY)`)
+last fired 2026-09-07; the sweep's publish step now uses REST (#2842, closes #2702) and the
+orchestrator's daily summary carries a fixed `## Scheduled workflows` section (#2841, closes
+#2634) — the next weekly firing is the first evidence either way.
 Neither can produce a new datapoint before its next weekly cron.
 
 **Note for Step 2c:** `git merge-base --is-ancestor` is **not** a merged-ness test
@@ -72,7 +75,7 @@ in this repo — squash merges make every correctly-merged branch a non-ancestor
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | PIT universe migration LOCAL, do not dispatch: steps 1–3a MERGED (#2808/#2809/#2816); 3b `_v11pit` chunked build + step-4 null band in flight |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | PIT migration LOCAL, do not dispatch: steps 1–6 MERGED (#2843 band 152/188/457, #2846 golden); next #2823, #2839, top-of-funnel screen |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | V18 #2750 + `Series_level` build-time sibling #2773 MERGED `9b65f7cb` (report-only, default-off, unwired); next: wire to Build_runner; #2732 asks 1+3 LOCAL |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
