@@ -501,6 +501,17 @@ _reset_summary NO-OP
 rc=0
 _run_verify dev/daily/2026-08-27.md || rc=$?
 check "Condition 2 detects drift via commit date when mtimes are checkout-flattened" 1 "$rc"
+# #2835: the public command must delegate to the same timestamp recipe.
+expected_iso=$(cd "$TMP_REPO" && git log -1 --format='%cI' -- dev/daily/2026-08-26.md)
+actual_iso=$(cd "$TMP_REPO" && sh "$GATE" prior_summary_iso dev/daily/2026-08-27.md)
+check "prior_summary_iso CLI prefers commit time over checkout mtime" "$expected_iso" "$actual_iso"
+rc=0
+(cd "$TMP_REPO" && sh "$GATE" prior_summary_iso a b) >/dev/null 2>&1 || rc=$?
+check "prior_summary_iso CLI rejects extra arguments" 2 "$rc"
+mkdir -p "$TMP_REPO/no-summary"
+actual_iso=$(cd "$TMP_REPO/no-summary" && sh "$GATE" prior_summary_iso)
+check "prior_summary_iso CLI has empty output when no summary exists" "" "$actual_iso"
+
 
 # --- Scenario 14: _prior_summary_path excludes the same-day consolidated
 # rollup (dev/daily/<DATE>-summary.md), matching the workflow's own locate

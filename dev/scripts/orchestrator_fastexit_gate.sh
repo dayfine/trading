@@ -46,6 +46,9 @@
 #       grep-pipeline version this replaced did not actually implement its
 #       own documented exemption.
 #
+#   dev/scripts/orchestrator_fastexit_gate.sh prior_summary_iso [current-summary-path]
+#       Prints the selected prior summary's commit timestamp, falling back to
+#       mtime only for an uncommitted file; empty when no prior summary exists.
 #   dev/scripts/orchestrator_fastexit_gate.sh verify <summary-path> [expected-date]
 #       FIRST, regardless of mode: checks that <summary-path> is actually
 #       dated the run it is being verified for (see "STALE-SUMMARY CHECK"
@@ -578,6 +581,14 @@ _prior_summary_timestamp() {
   fi
 }
 
+# Shared CLI lookup for Step 0.5. Optional current summary is excluded, as
+# verify excludes its own output. Empty output means no prior summary exists.
+_prior_summary_iso() {
+  _prior_path=$(_prior_summary_path "${1:-}")
+  [ -n "$_prior_path" ] || return 0
+  _prior_summary_timestamp "$_prior_path"
+}
+
 # _status_changed_since <iso-timestamp>
 # Count of dev/status/ file touches by a commit since <iso-timestamp>,
 # excluding the orchestrator's own summary-landing commits ("ops: daily
@@ -778,6 +789,13 @@ case "${1:-}" in
   open_pr_count)
     open_pr_count
     ;;
+  prior_summary_iso)
+    if [ "$#" -gt 2 ]; then
+      echo "usage: $0 prior_summary_iso [current-summary-path]" >&2
+      exit 2
+    fi
+    _prior_summary_iso "${2:-}"
+    ;;
   status_changed_since)
     if [ $# -lt 2 ]; then
       echo "usage: $0 status_changed_since <iso-timestamp>" >&2
@@ -793,7 +811,7 @@ case "${1:-}" in
     verify "$2" "${3:-}"
     ;;
   *)
-    echo "usage: $0 {open_pr_count|status_changed_since <iso-ts>|verify <summary-path> [expected-date]}" >&2
+    echo "usage: $0 {open_pr_count|prior_summary_iso [current-summary-path]|status_changed_since <iso-ts>|verify <summary-path> [expected-date]}" >&2
     exit 2
     ;;
 esac
