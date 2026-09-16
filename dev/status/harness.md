@@ -2904,3 +2904,95 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   `devtools/checks`) all exit 0 with zero `^FAIL:` lines across 4,480
   output lines (run under the single-dune-in-flight mutex, foreground,
   exit codes read unpiped).
+
+## Added 2026-09-16 (harness-maintainer, harness/fastexit-verify-stale-date, issue #2850)
+
+- [x] **H-FASTEXIT-VERIFY-STALE-DATE** (issue #2850): `verify` previously had
+  no notion of which summary it was CALLED with -- it validated whatever
+  path the workflow handed it, regardless of date. Run 35096884441
+  (2026-09-16) hit this: `actions/checkout` flattens every tracked file's
+  mtime to checkout time, so `ls -t dev/daily/*.md` falls back to
+  name-ascending order and the workflow's locate-summary fallback picked
+  `dev/daily/2026-09-14.md` (2 days stale) when no summary existed for
+  today. `verify` validated it blind, reporting its 3 unresolved
+  `_in flight_` rows as if today's run had dispatched and lost 3 agents,
+  rather than reporting the true fault (today's run wrote no summary at
+  all). Reproduced by hand before fixing: sourced the unpatched script as a
+  lib and confirmed `verify dev/daily/2026-09-14.md` returned rc=0
+  ("NO-OP run OK") on 2026-09-16.
+
+  **Fix** (`dev/scripts/orchestrator_fastexit_gate.sh`): new
+  `_verify_summary_freshness`, called first in `verify`, before any
+  mode-specific check -- a stale summary makes the rest meaningless. Compares
+  the summary's own basename date against an expected date resolved, in
+  order: an optional 2nd positional arg to `verify` > `$ORCHESTRATOR_EXPECTED_DATE`
+  (set to `any` to disable entirely -- the fixture-suite/manual escape hatch)
+  > the real system UTC date. The system-date fallback is what makes the fix
+  self-activating on the workflow's existing ONE-ARGUMENT `verify "$SUMMARY"`
+  call (`.github/workflows/orchestrator.yml:421`) with zero YAML edit --
+  confirmed `ORCHESTRATOR_EXPECTED_DATE` is not set anywhere in that
+  workflow. Accepts the expected date OR the day before (UTC), so a run
+  straddling UTC midnight isn't falsely rejected; only fires at >=2 days
+  stale. Only returns 0/1, never 2 (rc=2 is reserved for "a real answer
+  exists but a network call failed to produce it"; a basename-vs-expected-date
+  comparison is fully determined locally, or not applicable). An unparsable
+  basename (no leading `YYYY-MM-DD`) is a silent pass-through, matching the
+  DISPATCH-ARTIFACT check's existing "an input shape this check doesn't
+  recognise is not evidence of anything" precedent -- kept the two existing
+  `missing.md`/`noop-missing.md` (#2634) fixtures green.
+
+  8 new scenarios in `orchestrator_fastexit_gate_test.sh` (Scenarios 42-49,
+  9 checks incl. one citation check): stale-by-2-days rejected (CLI
+  override) + cites #2850; exact-date accepted; day-before accepted
+  (midnight straddle); `ORCHESTRATOR_EXPECTED_DATE=any` bypasses on a
+  multi-year-stale fixture, contrasted with the SAME fixture rejected once
+  the hatch is off; unparsable basename passes through; and -- the
+  load-bearing proof for this issue -- the ONE-ARGUMENT `verify <path>` call
+  shape (no override arg, no env var) both rejects a dynamically-computed
+  2-days-ago fixture and accepts a dynamically-computed today fixture, via
+  the real system clock. Suite-wide, `ORCHESTRATOR_EXPECTED_DATE=any` is now
+  exported once near the top of the test file (all pre-existing fixtures use
+  synthetic dates unrelated to wall-clock "today" and would otherwise
+  spuriously fail).
+
+  **Mutation-verified by hand** (all RED in isolation, GREEN restored,
+  67/67 clean at rest): (1) `_verify_summary_freshness` unconditionally
+  `return 0` -> killed 4 checks (stale-reject, its citation, hatch-off
+  reject, one-arg stale-reject). (2) exact-date comparison replaced with
+  `if true` -> killed the same 4 (equivalent effect, confirms the
+  comparison itself is what those checks exercise). (3) delete the
+  yesterday-tolerance block -> killed exactly 1 (midnight-straddle),
+  cleanly isolated from the exact-date scenario. (4) delete the `any`
+  escape-hatch branch -> killed 24 checks (the hatch scenario itself, plus
+  every pre-existing scenario that relies on the suite-wide export --
+  confirms the hatch is load-bearing for backward compatibility, not just
+  for its own scenario). (5) unparsable-basename branch changed to
+  `return 1` -> killed exactly 1 (the pass-through scenario), with the
+  #2634 `missing.md`/`noop-missing.md` fixtures unaffected (they run under
+  the suite-wide hatch and never reach this branch). (6) system-UTC-date
+  fallback hardcoded to a fixed wrong date -> killed exactly 1 (the
+  one-arg-accepts-today scenario; the one-arg-rejects-stale scenario
+  survives this specific mutation since a wrong fixed date still doesn't
+  match a "2 days ago" fixture -- the pair together is what proves the
+  fallback is both live and correct). Zero surviving mutations at time of
+  writing.
+
+  Out of scope, recorded per the dispatch brief rather than built: (a)
+  replacing the `ls -t` idiom at its other call sites
+  (`.claude/agents/lead-orchestrator.md` Steps 1b/0.5/2e.1/8, and the
+  workflow's own fallback glob) -- all in write-gated paths this session
+  could not touch; (b) a `newest_summary` helper subcommand consolidating
+  the date-aware lookup logic -- a natural next step if (a) is ever picked
+  up, since every one of those call sites would want the same "prefer
+  commit date over mtime" logic this fix's sibling
+  (`_prior_summary_timestamp`) already has, rather than re-deriving it.
+
+  **Verify:** `sh dev/scripts/orchestrator_fastexit_gate_test.sh` --
+  67/67 checks pass (58 prior + 9 new). `sh -n
+  dev/scripts/orchestrator_fastexit_gate.sh` and `sh -n
+  dev/scripts/orchestrator_fastexit_gate_test.sh` both clean. This PR
+  touches only POSIX shell (no OCaml), so no `dune build`/`dune runtest`
+  was required or run for it -- see the PR body for the environment
+  constraints (GHA orchestrator runtime, no `jst`/`gh`, one-dune-in-flight
+  ceiling) that made this and the concurrent sibling harness PR shell-only
+  by design.

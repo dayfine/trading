@@ -46,19 +46,78 @@
 #       grep-pipeline version this replaced did not actually implement its
 #       own documented exemption.
 #
-#   dev/scripts/orchestrator_fastexit_gate.sh verify <summary-path>
-#       Reads the daily summary at <summary-path>. If it is NO-OP-mode,
-#       independently recomputes the open-PR count and the dev/status/ drift
-#       since the prior summary and FAILS (exit 1, with an `::error::` line
-#       per violation) if either contradicts the no-op claim. If it is
-#       FULL-mode, checks BOTH that the summary was actually PUBLISHED (see
-#       "FULL-MODE PUBLICATION CHECK" below) AND that its claimed dispatches
-#       produced artifacts (see "FULL-MODE DISPATCH-ARTIFACT CHECK" below),
-#       and FAILS if either check fails (exit 2 if either check could not be
-#       determined, i.e. failed closed). Neither NO-OP nor FULL: prints a
-#       note and exits 0 (nothing this script knows how to check for that
-#       mode string). Exits 0 only when every applicable check (or lack of
-#       one) confirms nothing is wrong.
+#   dev/scripts/orchestrator_fastexit_gate.sh verify <summary-path> [expected-date]
+#       FIRST, regardless of mode: checks that <summary-path> is actually
+#       dated the run it is being verified for (see "STALE-SUMMARY CHECK"
+#       below) and FAILS (exit 1) if it is not -- this runs before, and
+#       independently of, everything below, since a stale summary makes the
+#       mode-specific checks meaningless (they'd be validating the wrong
+#       file). <expected-date> is an optional override of the date verify
+#       compares against (see that section for the full resolution order);
+#       every existing one-argument call site is unaffected.
+#
+#       Then, if it is NO-OP-mode, independently recomputes the open-PR count
+#       and the dev/status/ drift since the prior summary and FAILS (exit 1,
+#       with an `::error::` line per violation) if either contradicts the
+#       no-op claim. If it is FULL-mode, checks BOTH that the summary was
+#       actually PUBLISHED (see "FULL-MODE PUBLICATION CHECK" below) AND that
+#       its claimed dispatches produced artifacts (see "FULL-MODE
+#       DISPATCH-ARTIFACT CHECK" below), and FAILS if either check fails
+#       (exit 2 if either check could not be determined, i.e. failed closed).
+#       Neither NO-OP nor FULL: prints a note and exits 0 (nothing this
+#       script knows how to check for that mode string). Exits 0 only when
+#       every applicable check (or lack of one) confirms nothing is wrong.
+#
+# STALE-SUMMARY CHECK (issue #2850)
+#   All the checks below this one assume `verify` was handed the CORRECT
+#   summary for the run being evaluated. That assumption broke on run
+#   35096884441 (2026-09-16): `actions/checkout` sets every tracked file's
+#   mtime to checkout time, so `ls -t dev/daily/*.md` has no real ordering
+#   information left and GNU `ls` falls back to name-ascending -- returning
+#   the OLDEST file, not the newest, everywhere this repo's tooling uses that
+#   idiom to mean "newest". The workflow's own locate-summary fallback hit
+#   this exact trap: no dev/daily/2026-09-16*.md existed (the orchestrator
+#   agent turn wrote no summary that run), the fallback glob picked
+#   dev/daily/2026-09-14.md -- two days stale -- and `verify` validated it
+#   as though it were today's run, reporting its three unresolved `_in
+#   flight_` rows as if today's run had dispatched three agents and lost
+#   them. The gate correctly failed the job (0 open PRs, per the NO-OP
+#   check), but for the wrong reason: it named a two-day-old file instead of
+#   the true fault (today's run produced no summary at all).
+#
+#   `_prior_summary_timestamp` (used by the drift check below) already
+#   solved the identical checkout-mtime trap for ITS OWN `ls -t` call by
+#   preferring the file's commit date; this check solves the same trap for
+#   `verify`'s OWN summary argument, which has no analogous "prefer git
+#   history" escape (the current run's summary is often not yet committed at
+#   all when `verify` runs against it).
+#
+#   The check compares the summary's OWN date -- parsed from its
+#   dev/daily/YYYY-MM-DD[-runN].md basename -- against an expected date. It
+#   accepts the expected date OR the day before it (UTC), so a run
+#   straddling UTC midnight is never falsely rejected; the guard only fires
+#   at >=2 days stale, unambiguously the defect class (today's incident was
+#   exactly 2 days stale). The expected date is resolved, in order: an
+#   explicit second positional argument to `verify` (for callers that want
+#   to pin a specific date), else $ORCHESTRATOR_EXPECTED_DATE (set to `any`
+#   to disable the check entirely -- the escape hatch the fixture suite uses,
+#   since its fixtures carry synthetic dates unrelated to wall-clock "today",
+#   and the one a human uses to manually verify an intentionally old
+#   summary), else the real system UTC date -- which is what the workflow's
+#   existing one-argument `verify "$SUMMARY"` call relies on implicitly, so
+#   the fix is live on that call site with NO workflow-YAML edit required.
+#
+#   A basename with no parsable leading date (e.g. a hand-named fixture path
+#   that isn't shaped like a daily summary at all) is NOT treated as a
+#   violation -- SILENCE, matching this script's existing convention that an
+#   input shape a check doesn't recognise is not evidence of anything (see
+#   the DISPATCH-ARTIFACT check's TABLE-SHAPE GATE below for the precedent).
+#   There is no rc=2 "couldn't determine" case here the way there is for the
+#   PR-count checks: unlike a failed network call standing between the
+#   script and a real answer, a stale/fresh verdict is either fully
+#   determined from local inputs (the basename plus the expected date, no
+#   network) or genuinely not applicable (unparsable basename, or the `any`
+#   escape hatch) -- so this check only ever returns 0 or 1.
 #
 # FULL-MODE PUBLICATION CHECK (issue #2803)
 #   The NO-OP check above answers "was the no-op claim honest". It has no
@@ -546,13 +605,94 @@ _status_changed_since() {
   echo "$_count"
 }
 
+# --- stale-summary check (issue #2850) ----------------------------------
+
+# _summary_date_from_basename <path>
+# Parses the leading YYYY-MM-DD out of a dev/daily/<date>[-suffix].md
+# basename. Prints the date and returns 0 on success; returns 1 (prints
+# nothing) if the basename doesn't start with a date shaped that way --
+# callers must treat that as "unknown", not as evidence of staleness.
+_summary_date_from_basename() {
+  _base=$(basename "$1" .md)
+  case "$_base" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*)
+      printf '%s' "$_base" | cut -c1-10
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# _prior_calendar_date <YYYY-MM-DD>
+# <date> minus one day, UTC. Portable: GNU date (Linux/CI) via `-d`, BSD date
+# (macOS) via `-j -v-1d -f`, same fallback shape as `_file_iso_mtime` above.
+_prior_calendar_date() {
+  date -u -d "$1 -1 day" '+%Y-%m-%d' 2>/dev/null \
+    || date -u -j -v-1d -f '%Y-%m-%d' "$1" '+%Y-%m-%d' 2>/dev/null
+}
+
+# _expected_summary_date <explicit-override>
+# Resolution order documented in the "STALE-SUMMARY CHECK" header comment:
+# explicit override (verify's optional second positional arg) > the
+# $ORCHESTRATOR_EXPECTED_DATE escape hatch > the real system UTC date. The
+# fallback to system date is what makes the fix live on the workflow's
+# existing one-argument `verify "$SUMMARY"` call with no YAML edit needed.
+_expected_summary_date() {
+  if [ -n "${1:-}" ]; then
+    printf '%s' "$1"
+    return 0
+  fi
+  if [ -n "${ORCHESTRATOR_EXPECTED_DATE:-}" ]; then
+    printf '%s' "$ORCHESTRATOR_EXPECTED_DATE"
+    return 0
+  fi
+  date -u '+%Y-%m-%d'
+}
+
+# _verify_summary_freshness <summary-path> [expected-date-override]
+# See the "STALE-SUMMARY CHECK" header comment for the full rationale. Only
+# ever returns 0 or 1 -- see that comment for why there is no rc=2 case here.
+_verify_summary_freshness() {
+  _summary="$1"
+  _override="${2:-}"
+
+  _expected=$(_expected_summary_date "$_override")
+  if [ "$_expected" = any ]; then
+    return 0
+  fi
+
+  _actual=$(_summary_date_from_basename "$_summary") || {
+    echo "orchestrator_fastexit_gate verify: $_summary's basename carries no parsable YYYY-MM-DD date; staleness check not applicable." >&2
+    return 0
+  }
+
+  if [ "$_actual" = "$_expected" ]; then
+    return 0
+  fi
+
+  _yesterday=$(_prior_calendar_date "$_expected")
+  if [ -n "$_yesterday" ] && [ "$_actual" = "$_yesterday" ]; then
+    return 0
+  fi
+
+  echo "::error::A-FASTEXIT-VACUOUS (issue #2850): $_summary is dated $_actual but the expected run date is $_expected -- no daily summary was written for $_expected, and this STALE summary is being verified instead of it. Per run 35096884441 (2026-09-16): checkout-flattened mtimes broke an \`ls -t\` fallback into picking a 2-day-old file, and verify validated it blind. See the STALE-SUMMARY CHECK header comment above for the full mechanism." >&2
+  return 1
+}
+
 # --- verify: the actual backstop ---------------------------------------
 
 verify() {
   _summary="$1"
+  _expected_date_override="${2:-}"
   if [ ! -f "$_summary" ]; then
     echo "orchestrator_fastexit_gate verify: summary file not found: $_summary" >&2
     return 2
+  fi
+
+  if ! _verify_summary_freshness "$_summary" "$_expected_date_override"; then
+    return 1
   fi
 
   # NO-OP and FULL are mutually exclusive prefixes of the same "**Mode:**"
@@ -647,13 +787,13 @@ case "${1:-}" in
     ;;
   verify)
     if [ $# -lt 2 ]; then
-      echo "usage: $0 verify <summary-path>" >&2
+      echo "usage: $0 verify <summary-path> [expected-date]" >&2
       exit 2
     fi
-    verify "$2"
+    verify "$2" "${3:-}"
     ;;
   *)
-    echo "usage: $0 {open_pr_count|status_changed_since <iso-ts>|verify <summary-path>}" >&2
+    echo "usage: $0 {open_pr_count|status_changed_since <iso-ts>|verify <summary-path> [expected-date]}" >&2
     exit 2
     ;;
 esac
