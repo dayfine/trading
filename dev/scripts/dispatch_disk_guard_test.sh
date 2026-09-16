@@ -186,4 +186,59 @@ ACTUAL_OUTPUT="$(DISPATCH_DISK_GUARD_DF_TEXT="$(_df_text $((100 * KB_PER_GB)))" 
 _assert_exit 0 "custom-target-path"
 _assert_contains "target='/custom/target/path'" "custom-target-path"
 
-echo "OK: dispatch_disk_guard_test -- all 15 scenarios passed (pass/refuse/boundary x2/malformed/empty/non-numeric-field/missing-arg/bad-arg/zero-agent-floor/floor-override/agent-count-scaling x2/invalid-floor-override/target-path)."
+# ---- Scenario 13: one agent at exactly (PER_AGENT_WORKTREE_GB+SAFETY_MARGIN_GB)
+# free -- must PASS
+# ---- Scenario 14: one agent one GB below that -- must REFUSE
+# Scenarios 13+14 pin PER_AGENT_WORKTREE_GB+SAFETY_MARGIN_GB to its exact sum
+# (36), not just a lower bound. Scenario 8 above (0 agents, 5GB free ->
+# REFUSE) only proves SAFETY_MARGIN_GB > 5; combined with the 3-agent
+# boundary pin (REQUIRED_GB_FOR_3_AGENTS=68 =>
+# 3*PER_AGENT_WORKTREE_GB+SAFETY_MARGIN_GB=68) that underdetermines the split
+# -- (P,S) in {(20,8),(16,20),(12,32),(10,38),(9,41)} and others all satisfy
+# "3P+S=68 and S>5" simultaneously, so every one of those pairs previously
+# survived this suite unmutated (verified by mutation testing in the PR that
+# added these scenarios). Exact-boundary probing at count=1 gives a second,
+# independent linear equation (P+S=36): free=36GB PASSES (pins P+S<=36) and
+# free=35GB REFUSES (pins P+S>=36), forcing P+S=36 exactly. Solved together
+# with 3P+S=68 (already pinned), that forces P=16 and S=20 uniquely --
+# closing the qc-behavioral non-blocking note on PR #2836 ("residual
+# degeneracy on the constants").
+#
+# Deliberately probed at count=1, NOT count=0 (the qc-behavioral review's
+# literal suggestion used a count=0 boundary instead): a mutant that computes
+# the floor as `max(1, count) * PER_AGENT_WORKTREE_GB + SAFETY_MARGIN_GB`
+# (i.e. clamps the effective agent count to at least 1) is strictly MORE
+# conservative than the real formula and only differs from it at count=0 --
+# verified by mutation testing to never produce a false PASS at any count.
+# Probing the P+S sum at count=0 (as the review literally proposed) would
+# incidentally distinguish -- and thus "kill" -- that benign, safe-direction
+# mutation too (measured: it does), which is not a defect worth pinning
+# against. Probing at count=1 instead avoids the count=0 case entirely, so
+# this suite pins the exact constant split without penalizing a strictly
+# safer shape than the one shipped.
+
+_run_guard 1 "$(_df_text $((36 * KB_PER_GB)))"
+_assert_exit 0 "one-agent-exactly-P-plus-S"
+_assert_contains "OK:" "one-agent-exactly-P-plus-S"
+
+_run_guard 1 "$(_df_text $((35 * KB_PER_GB)))"
+_assert_exit 1 "one-agent-one-gb-below-P-plus-S"
+_assert_contains "REFUSE:" "one-agent-one-gb-below-P-plus-S"
+
+# ---- Scenario 15: 5 agents at 90GB free -- must REFUSE ----
+# The real formula's floor at count=5 is 5*16+20=100GB, so 90GB free REFUSEs.
+# This also kills a step-function shape survivor noted in the same
+# qc-behavioral review: a guard rewritten as
+# `count <= 1 ? 36 : 68` (i.e. the count=1 and count=3 floors hardcoded, with
+# every count > 1 collapsed to the count=3 floor) passes every scenario above
+# -- none of them exercise a count other than 0, 1, or 3 -- but at count=5 it
+# would compute floor=68 where the real guard computes 100, a FALSE PASS at
+# 90GB free (68 <= 90 vs the real 100 > 90). A false PASS is the exact
+# expensive-direction error this guard's own header calls out as the one that
+# must never happen silently.
+
+_run_guard 5 "$(_df_text $((90 * KB_PER_GB)))"
+_assert_exit 1 "five-agents-90gb-refuses"
+_assert_contains "REFUSE:" "five-agents-90gb-refuses"
+
+echo "OK: dispatch_disk_guard_test -- all 18 scenarios passed (pass/refuse/boundary x2/malformed/empty/non-numeric-field/missing-arg/bad-arg/zero-agent-floor/floor-override/agent-count-scaling x2/invalid-floor-override/target-path/one-agent-P-plus-S-boundary x2/agent-count-beyond-three)."

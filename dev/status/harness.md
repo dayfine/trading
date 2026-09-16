@@ -2483,6 +2483,27 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   Verify: `dev/lib/run-in-env.sh dune runtest devtools/checks` (look for `OK:
   dispatch_disk_guard_test`), or standalone `sh
   dev/scripts/dispatch_disk_guard_test.sh`.
+  **2026-09-16 (harness/disk-guard-constant-split, PR TBD): closed the
+  residual constant-split degeneracy** qc-behavioral flagged as a
+  non-blocking note on the PR that landed the 15-scenario suite above
+  (count-dependence was pinned; the exact `PER_AGENT_WORKTREE_GB` /
+  `SAFETY_MARGIN_GB` split was not — `(20,8)`, `(12,32)`, `(10,38)`,
+  `(9,41)` and the shape `count <= 1 ? 36 : 68` all measured as surviving
+  mutants). Added 3 scenarios (suite now **18**): an exact free-space
+  boundary probed at **count=1** (36 GB pass / 35 GB refuse, pinning
+  `PER_AGENT_WORKTREE_GB+SAFETY_MARGIN_GB=36`) plus the existing count=3
+  boundary (68 GB, pinning `3P+S=68`) together force `P=16`, `S=20`
+  uniquely; and a count=5/90GB-refuse scenario that kills the step-function
+  shape. Measured deviation from the review's own literal suggestion (which
+  probed the boundary at **count=0** instead): count=0 probing pins the
+  same `P=16,S=20` split but also kills the `max(1, count)` mutation, which
+  is strictly more conservative than the shipped guard (never produces a
+  false PASS) and was explicitly named as a survivor that should stay
+  unpinned — probing at count=1 pins the same split without that side
+  effect, since `max(1, count)` is identical to the real formula everywhere
+  except count=0. `dispatch_disk_guard.sh` itself is byte-unchanged; only
+  the test file grew. Verify: `sh dev/scripts/dispatch_disk_guard_test.sh`
+  (expect `OK: ... all 18 scenarios passed`).
   **Still open** (do not re-derive from scratch — pick up here):
   - **(a) is only half-done.** The `.claude/rules/container-capacity-
     scheduling.md` disk-column edit was attempted twice from this session's
