@@ -1156,3 +1156,11 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:dispatch_disk_guard_test_runner.sh})))
+
+; Weekly sweep publication lives outside the Dune workspace, in workflow YAML.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:weekly_sweep_pr_test_runner.sh})))
