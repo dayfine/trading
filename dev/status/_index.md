@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-16 (local session after the PIT band + Codex/QC wave; previously orchestrator run 2 09-15; main **`73487e7a7`**, green on all
-CI checks; `status_file_integrity` **0**, `index_size_linter` **0**,
+Last updated: 2026-09-16 (orchestrator run 35125114953; previously a local session after the PIT band + Codex/QC wave; main **`3ce4381f`**, green on all four
+CI checks; `status_file_integrity` **0**, `index_size_linter` **0** (14002/20480 pre-reconcile; 15491 after),
 `no_python_check` **0** — run standalone without dune, exit codes read unpiped).
 
 **This header was trimmed this run.** It had reached **18725/20480 bytes (91%)**
@@ -18,16 +18,21 @@ Keep it that way — append to the daily summary, not here.
 ## Standing constraints
 
 **Capabilities** (re-measured 2026-09-15 run 2 unless noted):
-- `.claude/agents/**` direct writes **refused** (17th consecutive run).
+- `.claude/agents/**` direct writes **refused** (18th consecutive run; 09-16 probe
+  attempted the real fix — Step 1b's `ls -t` → `sort | tail -1` — not a throwaway edit).
 - `.claude/rules/**` writes **also refused** — measured 2026-09-15 run 2, when a
   dispatched agent was blocked twice writing `container-capacity-scheduling.md`.
   **This corrects an earlier assumption** that the gate covered only
   `.claude/agents/**`; PR #2828 edited a rules file through a *human-merged PR*,
   a different route.
-- `POST /issues` **works** (#2835, #2837 filed this run).
-  **`POST /issues/:n/comments` also works** — corrects the carried "403" claim,
-  disproved this run when a QC agent posted a verdict through it successfully.
-  `PATCH /issues/:n` remains **403**, so a filed issue cannot be corrected here.
+- `POST /issues` **works** (#2850 filed 09-16). **`POST /issues/:n/comments`
+  depends on WHICH agent calls it** — re-measured 09-16: **403 from the
+  orchestrator itself** (`"Resource not accessible by personal access token"`,
+  probed on both a new and an existing issue, with a same-session `POST /issues`
+  success as the control), but it **worked from a dispatched QC agent** on
+  09-15. Subagents and the orchestrator do not share a token. The 09-15 record
+  stated this unqualified; a capability note without the context it was measured
+  in is not reusable. `PATCH /issues/:n` remains **403**.
 - `workflow` scope unavailable by push **and** contents API (403 on a workflow
   path vs **201** on a `dev/notes/` control, same token, seconds apart — the
   control is what makes it a measurement); `POST /actions/workflows/<f>/dispatches`
@@ -43,11 +48,12 @@ finishes**, never batched (batching took run `33962894987` from 69% to ENOSPC).
 **The open defect class** — *a green run is indistinguishable from a productive
 one, because nothing checks the artifact against the exit code.* Instances
 #2741, #2747, #2771, #2803, #2810; summary half closed by **#2812**, dispatch
-half by **#2831**. Still open one level up: **#2837** (a QC verdict posted to a
-surface the merge gate cannot read is invisible and undetected) and **#2835**
-(Step 0.5 Condition 2 derives `PREV_ISO` from mtime, which `actions/checkout`
-sets to run start, so the condition cannot fail on GHA — the script it delegates
-to already fixed this in #2605; the prose did not).
+half by **#2831**; **#2837** (QC verdict posted where the merge gate cannot read
+it) closed by **#2840**. Still open one level up: **#2835** (Step 0.5 Condition 2
+derives `PREV_ISO` from mtime, so the condition cannot fail on GHA) and its wider
+form **#2850** (below) — in both cases the delegated script was fixed in #2605
+and the prose was not. Newest instance, 09-16: run `35096884441` exited
+`success` having written **no summary at all** ($12.68, 56 turns).
 
 **Feature tracks are fenced, by design.** Every IN_PROGRESS feature row below is
 LOCAL-fenced (maintainer-owned), data-gated, or human-gated on an R3 default-flip.
@@ -57,15 +63,31 @@ The current milestone is the **PIT top-3000 universe migration**
 — maintainer-led and LOCAL. Next on the track: #2823 (twin-detector direct-edge fix), #2839 (PIT cell
 cost, bit-identical), then the pre-registered top-of-funnel screen on the new band. Orchestrator dispatch stays off it; harness is where the throughput is.
 
-**Two RED weekly workflows** (`Prune candidates weekly`, `Weekly start sweep (BAH SPY)`)
-last fired 2026-09-07; the sweep's publish step now uses REST (#2842, closes #2702) and the
-orchestrator's daily summary carries a fixed `## Scheduled workflows` section (#2841, closes
-#2634) — the next weekly firing is the first evidence either way.
-Neither can produce a new datapoint before its next weekly cron.
+**Two RED weekly workflows.** Both last fired **2026-09-14** (not 09-07 as this
+header previously carried — re-measured 09-16) and both died at the same step
+with the same cause: `gh: command not found`, **exit 127**, at `gh pr create`
+(`gh` is absent from this image by design). #2842 applied the REST fix to
+`weekly-start-sweep.yml` only; **`prune-candidates-weekly.yml:131` is still
+`gh pr create`** and will fail identically on its next cron (#2847, streak 4;
+sweep streak >=10). The sweep's 09-14 failure predates #2842 (merged 09-16), so
+it is not a regression of that fix — the next weekly cron is the first real
+datapoint. The daily summary's fixed `## Scheduled workflows` section is #2841
+(closes #2634).
 
 **Note for Step 2c:** `git merge-base --is-ancestor` is **not** a merged-ness test
 in this repo — squash merges make every correctly-merged branch a non-ancestor of
 `main`, so it reports NOT-MERGED for all of them. Check PR state instead.
+
+**Note for every "newest file" lookup: `ls -t` is meaningless on GHA (#2850).**
+`actions/checkout` stamps every tracked file with one identical mtime, so `ls -t`
+falls back to name-**ascending** and `ls -t … | head -1` returns the **oldest**
+file. Measured 09-16: Step 1b's own recipe returned `dev/daily/2026-09-13.md`
+when the true newest was `2026-09-15-run2.md`. This already failed a job — run
+`35096884441`, whose gate validated a 2-day-old summary and reported its rows as
+if they were that run's. Use `ls <glob> | sort | tail -1` (ISO-dated names sort
+chronologically) or `git log -1 --format='%cI'`. Affects Steps 1b / 0.5 / 2e.1 / 8
+and the workflow's fallback glob; `orchestrator_fastexit_gate.sh` is already
+immune (#2605).
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
@@ -100,9 +122,9 @@ in this repo — squash merges make every correctly-merged branch a non-ancestor
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | run 2 MERGED both: #2834 gate curl-projection pin `767ef9aa` + #2836 pre-dispatch disk guard `2d023810`; next: N3 mutation row + count-split residual |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2851, #2852, #2853 | 09-16: both 09-15 residuals closed (#2852 N3 row, #2851 constant split) + #2853 stale-summary guard (#2850); next: workload-aware disk guard |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (09-09 run 2 audit): 1 policy decision + 2 explicit archive entries + 1 fenced template. Prior "disk decline" framing withdrawn |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (re-audited 09-16): 3 open items, all self-marked deliberate non-actions, + 1 fenced template. Prior itemization corrected |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
