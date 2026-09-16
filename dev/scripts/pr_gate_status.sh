@@ -706,6 +706,41 @@ _pr_checks_summary() {
   esac
 }
 
+# Issue comments are diagnostics only: never feed them into the review gates.
+# REST uses the same single-page limit as the other REST readers above.
+_pr_issue_comments() {
+  case "${_BACKEND:-}" in
+    gh) gh pr view "$1" --repo "$REPO" --json comments --jq '.comments' ;;
+    curl) _curl_gh "repos/$REPO/issues/$1/comments?per_page=100" ;;
+  esac
+}
+
+# Fetch once only when a Claude gate has no review. Reuse the gate parser's
+# heading/fence rules to avoid treating quoted QC or ordinary prose as a post.
+# A stale or incomplete QC-looking comment still merits inspection, not credit.
+_qc_comment_warning() {
+  _comment_pr=$1; _struct_state=$2; _behav_state=$3; _comment_tip=$4
+  case "$_struct_state:$_behav_state" in
+    none:*|*:none) ;;
+    *) return 0 ;;
+  esac
+  if ! _comments=$(_pr_issue_comments "$_comment_pr") ||
+     ! printf '%s' "$_comments" | jq -e 'type == "array" and all(.[]; (.body | type) == "string")' >/dev/null 2>&1; then
+    printf ' [WARNING: issue-comment QC check unavailable]'
+    return 0
+  fi
+  _misposted=""
+  if [ "$_struct_state" = none ] && [ "$(_gate "$_comments" structural "$_comment_tip")" != none ]; then
+    _misposted=structural
+  fi
+  if [ "$_behav_state" = none ] && [ "$(_gate "$_comments" behavioral "$_comment_tip")" != none ]; then
+    _misposted="${_misposted}${_misposted:+, }behavioral"
+  fi
+  if [ -n "$_misposted" ]; then
+    printf ' [WARNING: QC-looking ISSUE COMMENT (%s); not a review -- inspect and re-post]' "$_misposted"
+  fi
+}
+
 # _codex_action ACTION CODEX REQUIRED REQUESTED -> the NEXT-ACTION after the
 # advisory CODEX column is applied (cross-agent-review.md). REQUIRED /
 # REQUESTED are non-empty when the matching review/codex-* label is present.
@@ -801,12 +836,14 @@ for n in $PRS; do
     codex=$(_gate "$reviews" "codex" "$tip")
   fi
 
+  comment_warning=$(_qc_comment_warning "$n" "$struct" "$behav" "$tip")
+
   # One next action, in dependency order: CI first, then structural (behavioral
   # does not run until structural is APPROVED), then behavioral, then merge.
   case "$ci:$struct:$behav" in
     *)               if [ -n "$held" ]; then
                        printf '%-6s %-8s %-14s %-14s %-14s %s\n' \
-                         "$n" "$ci" "$struct" "$behav" "$codex" "HOLD -- do-not-merge label"
+                         "$n" "$ci" "$struct" "$behav" "$codex" "HOLD -- do-not-merge label${comment_warning}"
                        continue
                      fi ;;
   esac
@@ -842,5 +879,5 @@ for n in $PRS; do
   # otherwise MERGE. See _codex_action above the LIB seam (offline-tested).
   action=$(_codex_action "$action" "$codex" "$codex_required" "$codex_requested")
 
-  printf '%-6s %-8s %-14s %-14s %-14s %s\n' "$n" "$ci" "$struct" "$behav" "$codex" "$action"
+  printf '%-6s %-8s %-14s %-14s %-14s %s\n' "$n" "$ci" "$struct" "$behav" "$codex" "${action}${comment_warning}"
 done
