@@ -1164,3 +1164,11 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:weekly_sweep_pr_test_runner.sh})))
+
+; Codex push helper is outside Dune; resolve it through repo_root().
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:codex_push_test.sh})))

@@ -15,7 +15,7 @@ prefix_rule(pattern=["gh", "run", ["view", "list"]], decision="allow")
 prefix_rule(pattern=["docker", "exec", "trading-1-dev"], decision="allow", match=["docker exec trading-1-dev ps"], not_match=["docker exec other-container ps", "docker stop trading-1-dev"])
 prefix_rule(pattern=["docker", ["inspect", "stats", "ps"]], decision="allow")
 prefix_rule(pattern=["docker", ["stop", "restart", "rm", "kill", "system"]], decision="forbidden", justification="Do not interrupt or remove shared containers or data.")
-prefix_rule(pattern=["git", ["status", "diff", "log", "show", "rev-parse", "ls-files", "fetch", "switch", "add", "commit", "push"]], decision="allow")
+prefix_rule(pattern=["git", ["status", "diff", "log", "show", "rev-parse", "ls-files", "fetch", "switch", "add", "commit"]], decision="allow")
 prefix_rule(pattern=["git", "worktree", ["add", "list"]], decision="allow")
 # Cleanup requires checking the exact target; directory tokens are not globs.
 prefix_rule(pattern=["git", "worktree", "remove"], decision="prompt")
@@ -24,3 +24,9 @@ prefix_rule(pattern=["rm"], decision="prompt")
 prefix_rule(pattern=[["ls", "cat", "head", "tail", "wc", "rg", "grep", "diff", "file", "stat", "pwd", "date", "df", "du", "pgrep", "ps", "echo", "true"]], decision="allow")
 # Match a complete script path, not a directory prefix.
 prefix_rule(pattern=["sh", "dev/scripts/pr_gate_status.sh"], decision="allow", match=["sh dev/scripts/pr_gate_status.sh 2786"], not_match=["sh /tmp/anything.sh"])
+
+# Explicit prompt wins over any saved personal raw-push allow.
+prefix_rule(pattern=["git", "push"], decision="prompt", match=["git push origin main", "git push -u origin codex/x-y", "git push origin HEAD:main"], not_match=["sh dev/scripts/codex_push.sh"])
+# The helper validates its branch and rejects all arguments. Review its code
+# with this rule: a script-path allow does not pin the script contents.
+prefix_rule(pattern=["sh", "dev/scripts/codex_push.sh"], decision="allow", match=["sh dev/scripts/codex_push.sh"], not_match=["git push origin main", "sh /tmp/codex_push.sh"])
