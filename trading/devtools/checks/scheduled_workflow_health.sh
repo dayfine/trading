@@ -624,8 +624,11 @@ main() {
     _created_at=$(printf '%s' "$_class_line" | cut -f7)
     _run_id=$(printf '%s' "$_class_line" | cut -f8)
 
-    printf '%s\t%s\trun_id=%s status=%s conclusion=%s created_at=%s age_hours=%s streak=%s in_progress=%s\n' \
-      "$_class" "$_name" "$_run_id" "$_status" "$_conclusion" "$_created_at" "$_age_hours" "$_streak" "$_inprogress"
+    # The newest run may still be in progress; report the completed run that
+    # actually supplied the health verdict separately for summary consumers.
+    _completed_run_id=$(printf '%s\n' "$_run_line" | awk -F '\t' '$2 == "completed" {print $4; exit}')
+    printf '%s\t%s\trun_id=%s status=%s conclusion=%s created_at=%s age_hours=%s streak=%s in_progress=%s newest_completed_run_id=%s\n' \
+      "$_class" "$_name" "$_run_id" "$_status" "$_conclusion" "$_created_at" "$_age_hours" "$_streak" "$_inprogress" "${_completed_run_id:-none}"
 
     case "$_class" in
       RED)

@@ -2013,6 +2013,26 @@ in the daily summary's `## Health Scan` section and `## Escalations`.
 
 ---
 
+### Step 6.4: Scheduled workflow health (every FULL run)
+
+From the repository root, run with the existing `GH_TOKEN` environment (never
+print the token). Capture failures without aborting summary publication:
+
+```bash
+mkdir -p dev/_tmp
+scheduled_rc=0
+sh trading/devtools/checks/scheduled_workflow_health.sh > dev/_tmp/scheduled-health.log 2>&1 || scheduled_rc=$?
+sh dev/scripts/scheduled_workflow_summary.sh "$scheduled_rc" dev/_tmp/scheduled-health.log > dev/_tmp/scheduled-health.md
+```
+
+Exit 0 means the check completed; 1 means RED/STALE findings; 2 means no token;
+3 means API failure. Copy the rendered section verbatim into the daily summary,
+including each RED/STALE row and its `newest_completed_run_id`. Missing credentials
+or partial API failures are UNMEASURABLE, never a reason to omit the section.
+Escalate RED/STALE findings and measurement failures. NO-SCHEDULE and UNOBSERVABLE
+rows remain visible; they must not be counted as measured OK workflows.
+The FULL-mode verify gate requires the fixed section heading.
+
 ## Step 7: Write the daily summary
 
 Determine the per-day session number N by counting existing `dev/daily/${DATE}*.md`
@@ -2134,6 +2154,11 @@ in merge-policy.json with rough token estimates. Tag it "estimated" not "measure
 (From dev/health/<YYYY-MM-DD>-fast.md — omit if health scanner found nothing)
 - Result: CLEAN | FINDINGS
 - Critical items: <list or "none">
+
+## Scheduled workflows
+(Mandatory for FULL mode: replace this heading and placeholder with the exact
+section from dev/_tmp/scheduled-health.md, generated in Step 6.4. Report all OK
+with measured count, RED/STALE rows with completed run ids, or UNMEASURABLE.)
 
 ## Follow-up Queue
 (Read from ## Follow-up sections in each status file — omit this section if all are empty)
