@@ -55,7 +55,8 @@ universe diversity = breadth tier of the same construction), #2829 / #2833 / #28
    `(pi=true, sched=true)` truth-table row left open by #2816. `feat-backtest`, container-exclusive with #3.
 3. **#2823 detector fix** (`feat-backtest` or `feat-data`; default-off knob so existing reports stay bit-identical).
    Cap 3 agents, one dune at a time.
-4. **Top-of-funnel screen on the new band** — breakout-gate width and top-N (`project_monster_funnel_top_of_funnel`):
+4. **FIRST: the index-stage veto surface (added 09-16 after the drawdown dissection).** The band's NAV is one episode (2021-11 peak → −38..−53 % on every arm and universe); the largest universe-independent lever is that `Macro.analyze`'s composite outvotes a Stage-4 primary index (2022: SPX below a falling 30-wk MA all year, `trend` Bullish 25+ weeks → 126 entries, 82 % losers, −-e.8M/salt). Pre-register `macro_index_stage_veto : bool [.default false]` (Stage-3→4/4 index blocks long entries; composite keeps governing aggressiveness), 3 salts vs `a0-pit-null-s{0,1,2}-v11`, V6 gate, realised AND Calmar ≥ 2/3, paired 2022 cohort as the mechanism read. Tier-2 book check on "veto vs one vote" first (reference §2.1). Record: `dev/experiments/pit-universe-2026-09-14/README.md` §"Drawdown dissection"; memory `project_pit_drawdown_2021_25_macro_veto`. Then:
+5. **Top-of-funnel screen on the new band** — breakout-gate width and top-N (`project_monster_funnel_top_of_funnel`):
    `experiment-gap-closing`, **pre-register first** (arms, salts 0/1/2, criteria: realised AND Calmar vs the band at
    ≥ 2 of 3 salts; `validator_diff -check V6` on every pair). Budget ~6.3 h per cell, one lane: a 2-arm × 3-salt
    surface is ~38 h of container time — plan it as a chain with a file log and pinned worktree, and prefer
