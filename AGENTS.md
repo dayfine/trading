@@ -75,6 +75,7 @@ triage role (`.claude/skills/triage-labels.md`).
    `claimed by codex <UTC timestamp> — worktree .claude/worktrees/codex-<issue>-<slug>`.
    If the latest comment is already a claim younger than 24 h from any agent, skip it.
 3. **Work** in that worktree per the rules above. Branch `codex/<issue>-<slug>`;
+   push with `sh dev/scripts/codex_push.sh` (no arguments);
    commits follow `CLAUDE.md`; the PR body starts with `Closes #<issue>` and has a
    Test plan written from the diff (`grep '>::'` for OCaml tests; the script's own
    check count for shell). One issue per PR.

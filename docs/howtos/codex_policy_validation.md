@@ -45,7 +45,7 @@ session had loaded. The project was configured as trusted.
 | `crontab -l` | Personal read approval | Does not authorize modification. |
 | `crontab -` | No matching allow | Approving the preceding `sed` filter in a pipeline does not authorize the crontab write. |
 | `gh pr review --comment` | Explicit `prompt` | Retain review controls; a broader review allow would also permit approval reviews. |
-| `git push origin main` | Matches broad push allow | Separate tightening tracked by issue #2793; this change does not claim to restrict push destinations. |
+| `git push origin main` | Explicit `prompt` after #2793 | All raw pushes prompt, including feature pushes. Use the checked helper for unattended publication. |
 
 The official rule semantics are `forbidden` > `prompt` > `allow`, not
 "most specific rule wins". Rules load at startup; restart after a policy update.
@@ -115,3 +115,30 @@ Codex session saved its own launch approval during the test, so the whole
 user-rule file checksum changed. The before/after command behavior establishes
 project-rule loading; this run does not establish byte-for-byte invariance of
 the surrounding session's user policy.
+
+## Publishing Codex branches (#2793)
+
+Run `sh dev/scripts/codex_push.sh` with no arguments from your isolated worktree.
+It requires an attached `codex/*` branch and executes exactly
+`git push -u origin HEAD:refs/heads/<current-branch>`. It never selects a
+destination from upstream configuration. Other branches, detached HEAD, and
+arguments fail with a reason. `CODEX_PUSH_DRY_RUN=1` prints the command without
+pushing. The helper does not require a clean working tree; only committed HEAD
+is published. It uses the repository's existing origin configuration.
+
+Policy probes (do not execute the tested push):
+
+```bash
+codex execpolicy check --rules .codex/rules/trading.rules -- git push origin main
+codex execpolicy check --rules .codex/rules/trading.rules -- git push -u origin codex/x-y
+codex execpolicy check --rules .codex/rules/trading.rules -- sh dev/scripts/codex_push.sh
+```
+
+Expected: `prompt`, `prompt`, `allow`. The issue's original feature-push probe
+changes to `prompt` per the dispatcher clarification: the helper replaces that
+raw form. The explicit raw-push prompt also wins over a personal raw-push allow.
+Restart Codex to load the changed project policy. Shell prefixes cannot validate
+arbitrary Git options or destination refspecs; the helper enforces its contract
+in code. These rules are not a comprehensive Git security boundary: alternate
+executable paths, global Git options, aliases, hooks, origin configuration, and
+script content still require normal task authorization and review.
