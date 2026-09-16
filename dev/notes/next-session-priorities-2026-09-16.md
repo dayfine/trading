@@ -26,16 +26,31 @@ Two data findings on the way (both recorded, both open as issues):
 
 ## Merged this session
 
+**Added after the band landed (09-16, 04:00 → ~08:00 PT):** #2843 (step-4 record + the 27 as-run lists), #2845 (review-note
+wording), #2846 (step-6 scheduled smoke golden — CI now exercises the `universe_schedule` seam; also pins the #2816
+`(pi=true, sched=true)` row), and three Codex PRs gated locally: #2841 (scheduled-workflow health wiring, closes #2634),
+#2842 (weekly sweep publishes via REST, closes #2702), #2840 (gate-status warning for misposted QC verdicts, closes #2837;
+see its row in the Codex queue for state at write time). Each Codex PR took exactly one behavioral rework — every finding
+was a mutation-proven coverage gap, and the dispatcher applied the reviewer's own fixture as the second commit rather
+than waiting for Codex's hourly cycle (`fix(review): address QC rework iteration 1 (#N)`), then re-ran both gates at the
+new tip.
+
+**Process finding worth keeping:** one structural agent returned NEEDS_REWORK on #2840 claiming bash-only syntax in a
+`#!/bin/sh` test file; `sh -n` under dash/bash/macOS sh and the full suite under dash in the container (115/115) refuted
+it. `pr_gate_status.sh`'s only exit from a wrong same-tip verdict is a tip-moving commit, so a header-only second commit
+was pushed and structural re-run. Briefs now carry an interpreter-discipline paragraph (run suites exactly as dune does,
+inside the container; a syntax claim needs `sh -n` output pasted verbatim).
+
 #2826 (Codex policy, reviewed inline), #2827 (§5.1 tier-3 write-back + harness count), #2828 (step-5 grid rule:
 universe diversity = breadth tier of the same construction), #2829 / #2833 / #2838 (orchestrator daily records),
 #2832 (interim handoff). Orchestrator cron landed #2830 / #2831 / #2834 / #2836 on its own.
 
 ## P0 for the next session
 
-1. **Land #2843** — CI → qc-structural → qc-behavioral → merge (`sh dev/scripts/pr_gate_status.sh`). It is mixed
+1. ~~**Land #2843**~~ DONE 09-16 (3415a3396; both gates APPROVED 5). ~~Step 6 smoke golden~~ DONE (#2846, 7d392b432; 5/5). Remaining order below is unchanged: #2823 detector fix, then the top-of-funnel screen. Original text kept for the record: CI → qc-structural → qc-behavioral → merge (`sh dev/scripts/pr_gate_status.sh`). It is mixed
    (sexp fixtures + shell/perl scripts + docs), so both QC gates apply. If a QC agent objects to the 9.7 MB of
    lists: that was a user decision (09-15), cite it.
-2. **Step 6 — one scheduled smoke golden in CI** so the `universe_schedule` seam is exercised end to end: the
+2. ~~**Step 6 — one scheduled smoke golden in CI**~~ (DONE, #2846) so the `universe_schedule` seam is exercised end to end: the
    `panel-golden-2019-full` two-list arm in `test_universe_schedule_e2e.ml` is the fixture. Also pin the
    `(pi=true, sched=true)` truth-table row left open by #2816. `feat-backtest`, container-exclusive with #3.
 3. **#2823 detector fix** (`feat-backtest` or `feat-data`; default-off knob so existing reports stay bit-identical).
@@ -50,11 +65,11 @@ universe diversity = breadth tier of the same construction), #2829 / #2833 / #28
 
 | issue | P | what |
 |---|---|---|
-| #2837 | P2 | `pr_gate_status.sh`: make a QC verdict posted as an issue comment loud (`misposted`) instead of `none` |
+| #2837 | P2 | PR #2840 — structural APPROVED at 02100e9f1 after two reworks (one false-positive, one coverage gap); behavioral re-run in flight at write time; merge when `pr_gate_status.sh 2840` reads MERGE |
 | #2793 | P3 | unblocked — option 2 scoped small: `dev/scripts/codex_push.sh` (no args, pushes `HEAD:refs/heads/<codex/* branch>`), raw `git push` → prompt, rules probes, howto + AGENTS.md step 3 |
 | #2835 | P3 | orchestrator prose: derive the prior-summary timestamp from `git log`, not mtime |
-| #2702 | P3 | weekly-start-sweep step 7: curl REST instead of `gh` (may BLOCK on workflow scope) |
-| #2634 | P3 | narrowed to the wiring half: run `scheduled_workflow_health.sh` in Step 6, fixed daily-summary section, verify gate |
+| #2702 | P3 | DONE — PR #2842 merged 73487e7a7 (one rework: two discriminator fixtures) |
+| #2634 | P3 | DONE — PR #2841 merged 47d61658c (one rework: the FULL-only scope negative-boundary check) |
 
 #2394 stays `needs-info` (no config arms `min_rs_normalized`).
 
