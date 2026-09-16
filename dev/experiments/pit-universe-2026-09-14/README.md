@@ -183,3 +183,60 @@ Inputs committed with this record: the 27 as-run lists under `trading/test_data/
 (md5s = `step4/specs/composition-md5.txt`), the spec, the chain + rebuild + twin-scan scripts, the alias maps, and
 the per-cell artifacts under `step4/results/` (the precedent set: actual / params / summary / trades / validator /
 open_positions / force_liquidations; trade_audit and equity_curve stay on the host under `/tmp/sweeps/pit-null/`).
+
+## Drawdown dissection — 2021-11 → 2025-04 on the PIT band (2026-09-16, read-only)
+
+Asked because the band's NAV, not its realised P&L, is what matters. Like-for-like at salt 0 the PIT NAV path ends
+above the 2000-vintage path (5.57 vs 4.83 $M) and leads it for most of 2004–2021; the "much worse" band is entirely
+the last five years on salts 1/2. Every arm on every universe peaks in late 2021 ($4.7–6.1M) and gives back 38–53 %
+by 2024–25; PIT s0 recovers on one 2025 trade (ECHO +$647k), s1/s2 never do (2.88 / 2.52 $M; CAGR 4.1 / 3.6 %).
+
+| salt | peak | trough | depth | exits in window: n / realised | marks on open positions |
+|---|---|---|---:|---|---:|
+| 0 | 2021-11-29 $5.94M | 2024-08-05 $3.53M | −40.6 % | 119 / −$1.37M (28 wins +$1.55M, 91 losses −$2.92M) | −$1.04M |
+| 1 | 2021-02-11 $5.52M | 2025-04-07 $2.59M | −53.0 % | 190 / −$1.00M (55 / +$2.77M, 135 / −$3.77M) | −$1.93M |
+| 2 | 2021-11-09 $4.66M | 2025-04-07 $2.27M | −51.3 % | 155 / −$1.46M (39 / +$1.18M, 116 / −$2.64M) | −$0.94M |
+
+Entries dated 2021-11-01..2025-04-30, three salts pooled (453 trades, −$5.18M; the same window on the 2000-vintage
+band: 402 trades, −$2.29M — same direction, 2.3× deeper here):
+
+| entry year | n | P&L | losers | avg win | avg loss | exits |
+|---|---:|---:|---:|---:|---:|---|
+| 2022 | 126 | −$2.43M | 82 % | $24k | −$28k | 115 stop_loss / 11 laggard |
+| 2023 | 144 | −$0.68M | 72 % | $52k | −$25k | 105 / 37 / 2 delisted |
+| 2024 | 137 | −$1.39M | 69 % | $25k | −$25k | 96 / 41 |
+| 2025 (to Apr) | 38 | −$0.45M | 76 % | $17k | −$21k | 36 / 2 |
+| baseline 2010–2019 | 856 | +$4.29M | 65 % | $51k | −$19k | — |
+
+Four mechanisms, in order of size:
+
+1. **The macro composite outvotes a Stage-4 index (2022: −$0.8M per salt here, −$0.34M per salt on the old
+   universe).** SPX closed below its 30-week MA from 2022-01-21 through November with the MA falling from April —
+   Stage 4 by the book's own primary read ("most important single indicator", reference §2.1). `Macro.analyze`
+   weights the index stage 3.0 against A-D line 2.0 + momentum 2.0 + NH-NL 1.5 + global 1.5 = 7.0, with
+   `confidence = bullish / active > 0.65 → Bullish`: when the four breadth-type indicators flip bullish on a bear
+   rally the index's Bearish 3.0 is outvoted (7 / 10 = 0.70). The weekly `trend` read **Bullish** for Jan–Feb,
+   Jun–Jul and Oct–Dec 2022 and Neutral for most of the rest; it was Bearish for only a handful of weeks. Result:
+   126 entries in 2022 (103–117 per salt under a Bullish label), 82 % losers, median hold 15 days vs 37 in the
+   baseline, 55 % stopped out within 20 days. The macro gate never fired because the composite never said Bearish.
+   Whether an index-in-Stage-4 veto (index stage as a hard gate, composite for aggressiveness only) is the faithful
+   reading is a tier-1/tier-2 question — `weinstein-book-reference.md` §2.1 supports the index as primary; the book
+   also uses the other gauges. Not settled here.
+2. **Winner quality collapsed.** Entries reaching ≥ +20 %: 2.0 % of window entries (9 of 453, one ≥ +50 %) vs
+   10.0 % in the baseline (86 of 856, 24 ≥ +50 %). Same avg-loss magnitude, half the avg win: the fat tail that pays
+   for the stops (`project_edge_is_the_fat_tail`) was absent for three years, on both universes.
+3. **Recent-vintage cohort (universe-specific).** Names absent from every list ≤ 2018 (the 2020–21 IPO/SPAC
+   cohort: AXSM, BEAM, GETY, BLNK …) are 18–22 % of window entries but 40–50 % of the window loss (−$0.73 / −$0.87 /
+   −$0.54M; 90 % losers). The frozen 2000 list could never hold them — this is the honest universe's cost, not a
+   mechanism.
+4. **Marks on positions open at the peak** (−$0.9 to −1.9M): the 2021 peak embedded unrealised gains on names
+   like AMD / ON / CYTK / MPWR (s0) or ZS / WSC / FND (s1) that exited later with smaller gains.
+
+**Consequence for the queue.** The largest single, universe-independent lever identified on the honest band is
+mechanism 1. Proposed first experiment (pre-register before running): `macro_index_stage_veto : bool
+[@sexp.default false]` — a Stage-3→4 / Stage-4 primary index blocks long entries regardless of composite confidence
+(composite still governs aggressiveness) — as a 3-salt surface against `a0-pit-null-s{0,1,2}-v11` with
+`validator_diff -check V6`, criteria realised AND Calmar at ≥ 2 of 3 salts, plus the paired 2022 entry cohort as
+the mechanism read. Book check (tier 2, local) on the index-veto question comes first. Top-of-funnel work moves
+behind it. Artifacts: `step4/results/*-trades.csv`, host `/tmp/sweeps/pit-null/*-equity_curve.csv`,
+`*-macro_trend.sexp` (copies under `/tmp/twin-scan/`, not committed: 150 KB each × 3).
