@@ -55,7 +55,9 @@ for CURL_RC in 22 6; do
   check test "$rc" -ne 0
 done
 CURL_RC=0
-for REPLY in '{}' 'not-json' '{"number":42}' '{"number":0,"html_url":"https://github.com/x"}'; do
+for REPLY in '{}' 'not-json' '{"number":42}' '{"number":0,"html_url":"https://github.com/x"}' \
+  '{"number":"42","html_url":"https://github.com/dayfine/trading/pull/42"}' \
+  '{"number":42,"html_url":"https://evil.example.com/pull/42"}'; do
   run
   check test "$rc" -ne 0
 done
