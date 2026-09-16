@@ -2425,7 +2425,7 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   Verify: `dev/lib/run-in-env.sh dune runtest devtools/checks` (look for
   `OK: settings_path_check` and `OK: settings_path_check_test`).
   (source: 2026-09-05 orchestrator run 33962894987, found while diagnosing #2662;
-  fixed 2026-09-15 orchestrator run, PR TBD)
+  fixed 2026-09-15 orchestrator run, #2830 merged)
 
 - [~] **H-AGENT-WORKTREE-DISK-16GB-EACH**: measured 2026-09-05 (run 33962894987)
   — **a dispatched agent's worktree costs ~16 GB once it has run `dune build`**,
@@ -2457,7 +2457,7 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   The disk cost is the price of that isolation, so the answer is prompt
   reclamation, not fewer worktrees. `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-09-05 orchestrator run 33962894987)
-  **2026-09-15 partial fix (harness/dispatch-disk-guard, PR TBD):** shipped
+  **2026-09-15 partial fix (harness/dispatch-disk-guard, #2836 merged):** shipped
   the pre-dispatch `df` guard named in (b) above —
   `dev/scripts/dispatch_disk_guard.sh` takes an agent count (and/or an
   explicit `DISPATCH_DISK_GUARD_FLOOR_GB` override) and refuses (exit 1) when
@@ -2501,7 +2501,7 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   Verify: `dev/lib/run-in-env.sh dune runtest devtools/checks` (look for `OK:
   dispatch_disk_guard_test`), or standalone `sh
   dev/scripts/dispatch_disk_guard_test.sh`.
-  **2026-09-16 (harness/disk-guard-constant-split, PR TBD): closed the
+  **2026-09-16 (harness/disk-guard-constant-split, #2851 merged 48c53953d): closed the
   residual constant-split degeneracy** qc-behavioral flagged as a
   non-blocking note on the PR that landed the 15-scenario suite above
   (count-dependence was pinned; the exact `PER_AGENT_WORKTREE_GB` /
