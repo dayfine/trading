@@ -505,6 +505,12 @@ check "Condition 2 detects drift via commit date when mtimes are checkout-flatte
 expected_iso=$(cd "$TMP_REPO" && git log -1 --format='%cI' -- dev/daily/2026-08-26.md)
 actual_iso=$(cd "$TMP_REPO" && sh "$GATE" prior_summary_iso dev/daily/2026-08-27.md)
 check "prior_summary_iso CLI prefers commit time over checkout mtime" "$expected_iso" "$actual_iso"
+# Rework iteration 1 (behavioral review 5229033230): the current-summary exclusion must be load-bearing.
+# With every mtime flattened, `ls -t` tie-breaks to the prior anyway; make the current file strictly the
+# newest so only the exclusion can select the prior. Fails under `_prior_summary_path ""`.
+(cd "$TMP_REPO" && touch -t 202612310000 dev/daily/2026-08-27.md)
+actual_iso=$(cd "$TMP_REPO" && sh "$GATE" prior_summary_iso dev/daily/2026-08-27.md)
+check "prior_summary_iso CLI excludes the current summary from selection" "$expected_iso" "$actual_iso"
 rc=0
 (cd "$TMP_REPO" && sh "$GATE" prior_summary_iso a b) >/dev/null 2>&1 || rc=$?
 check "prior_summary_iso CLI rejects extra arguments" 2 "$rc"
