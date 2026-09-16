@@ -92,3 +92,15 @@ names fit, ~10,500 do not on 7.75 GB. Plan B launched 19:37: `rebuild-pit-chunke
 sequentially with `-incremental` into one dir. Caveat: the rename-twin pass sees one chunk at a time, so a renamed
 pair split across chunks is not deduped — V6 on the step-4 null is the check; report cross-chunk twin groups from the
 four `rename_twin_report_pit_v11_chunk*.txt`.
+**21:46–21:55 PT — 3b DONE, step 4 RUNNING.** Chunked build: 4 chunks exit 0, 9,513 snaps (28–41 min each). D6 check
+then ABORTED lane A: 523 real union names absent — the rename-twin pass dropped 446 legs (316 groups) because the
+union carries both tickers of every rename (the vintage lists ALREADY list both legs, e.g. 2005 has ABFS and ARCB: the
+store backfills the new ticker's history), and 86 of those legs are FALSE transitive drops (match < 0.95, some with
+overlap 0 — issue filed). Fix without code: (1) alias map from the 360 legit legs (match ≥ 0.95), applied to the 27
+lists with per-list dedupe → aliased series staged UNTRACKED in the pinned worktree at
+`trading/test_data/backtest_scenarios/pit-v11/composition/` (entries 81,000 → 78,613; effective PIT breadth ≈ 2,900
+unique instruments per year, not 3,000); (2) chunk 5 = the 84 false legs rebuilt as their own series, no dedupe,
+`-incremental` → manifest 9,597. D6 clean: absent real = 101 = 97 MISS + 3 quarantined + MEL. Spec
+`/tmp/pit-fetch/specs/a0-pit-null.sexp` now points at `pit-v11/composition/…`. Lane A (s0 then s2) launched 21:54 PT;
+lane B (s1) STOPPED at 21:56 — two workers hit 6.5 GB on the 9.6k-name warehouse; run s1 after lane A. Single worker
+sits at ~5.5 GB (the union-wide `_classify_all` screen — the plan's optional pre-prune is now worth doing).
