@@ -444,18 +444,18 @@ FOR each track with N > 0 open PRs:
 **Condition 2 — No dev/status/*.md file modified since the prior summary's timestamp (excluding orchestrator summary commits).**
 
 ```bash
-# Get the timestamp of the most recent prior summary (today or most recent)
-PREV_SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | grep -v '\-plan\.md' | head -1)"
-PREV_TS="$(date -r "$PREV_SUMMARY" +%s 2>/dev/null || stat -f %m "$PREV_SUMMARY")"
-PREV_ISO="$(date -r "$PREV_SUMMARY" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -d "@$PREV_TS" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null)"
+# Use the same commit-date-first lookup as the mechanical verify gate.
+PREV_ISO="$(dev/scripts/orchestrator_fastexit_gate.sh prior_summary_iso)"
 
 # Single source of truth for this check — see the exemption note below for
 # why a bare grep pipeline over `git log --name-only` does NOT correctly
 # implement the exemption (the file-path lines still contain a literal '.'
 # even after the subject line is filtered out).
-STATUS_CHANGED="$(dev/scripts/orchestrator_fastexit_gate.sh status_changed_since "$PREV_ISO")"
-if [ "${STATUS_CHANGED:-0}" -gt 0 ]; then
-  CONDITION_2=FAIL
+if [ -z "$PREV_ISO" ]; then
+  CONDITION_2=FAIL # No prior summary: full pass, never an empty drift window.
+else
+  STATUS_CHANGED="$(dev/scripts/orchestrator_fastexit_gate.sh status_changed_since "$PREV_ISO")"
+  if [ "${STATUS_CHANGED:-0}" -gt 0 ]; then CONDITION_2=FAIL; fi
 fi
 ```
 
@@ -470,10 +470,14 @@ You computed this in Step 1b. If any `[drift]` warning was emitted, Condition 3 
 **Condition 4 — Harness and cleanup backlogs unchanged since prior summary.**
 
 ```bash
-# Check for harness.md or cleanup.md changes since prior summary
-BACKLOG_CHANGED="$(git log --since="$PREV_ISO" --name-only --pretty="" -- dev/status/harness.md dev/status/cleanup.md | grep -c '.' || true)"
-if [ "${BACKLOG_CHANGED:-0}" -gt 0 ]; then
+# Reuse PREV_ISO from Condition 2, obtained via prior_summary_iso (not mtime).
+if [ -z "$PREV_ISO" ]; then
   CONDITION_4=FAIL
+else
+  BACKLOG_CHANGED="$(git log --since="$PREV_ISO" --name-only --pretty="" -- dev/status/harness.md dev/status/cleanup.md | grep -c '.' || true)"
+  if [ "${BACKLOG_CHANGED:-0}" -gt 0 ]; then
+    CONDITION_4=FAIL
+  fi
 fi
 ```
 
