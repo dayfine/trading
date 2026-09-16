@@ -1,4 +1,7 @@
 #!/bin/sh
+# POSIX-sh verified 2026-09-16: `sh dev/scripts/pr_gate_status_test.sh` under dash (the container's /bin/sh) exits 0,
+# 115/115 clean; `sh -n` parses under dash, bash and macOS sh. Recorded after a structural review at 89881f2a
+# reported bash-only syntax in the `$( case ... esac )` blocks (lines ~841-936) -- not reproducible; see PR #2840.
 # Unit tests for pr_gate_status.sh's _gate verdict reader. Offline: the fixtures
 # are review bodies, so no `gh` call is made.
 #
