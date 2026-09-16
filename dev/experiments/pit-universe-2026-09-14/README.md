@@ -116,7 +116,7 @@ scanning:
 | scan | how | result |
 |---|---|---|
 | full union (10,504 names) | `build_snapshots -dedupe-rename-twins` on the superset | **OOM (exit 137, 5 min)** — the twin pass loads every symbol's bars before detecting |
-| six chunk-PAIR unions (5,253 names each) | same command; `rename_twin_report.txt` is written before the per-symbol loop, so the build is killed once it exists (`step4/twin-scan/pair-scan.sh`) | 179–203 groups per pair, ~35 min each, peak ~4.3 GB |
+| six chunk-PAIR unions (5,253 names each) | same command; `rename_twin_report.txt` is written before the per-symbol loop, so the build is killed once it exists (`step4/twin-scan/pair-scan.sh`) | 179–203 groups per pair, ~35 min each; a single pair scan was observed at ~4.3 GB by `docker stats` mid-run (the `peak seen` value in `pair-scan.log` is sampled after `pkill` and is a post-kill residual, not a peak) |
 
 Per pair (`step4/twin-scan/analyze-pair.sh`) a leg is a real cross-chunk twin only on a **direct** edge
 (overlap ≥ 200 bars, match ≥ 0.95), when its survivor is not a **hub** (> 4 legs: CISXF 65, BWLP, LNSPF,
@@ -127,7 +127,7 @@ TFC/BBT_old, TPR/COH, AXON/TASR, KDP/DPS, LHX/HRS, JEF/LUK, GEN/NLOK, LUMN/CTL, 
 
 Fix, no code: chunk 6 = one `-incremental -dedupe-rename-twins` rebuild whose universe is the 460 legs of
 those pairs together, so the detector resolves each component and `Build_runner` drops the losers from the
-manifest (9,597 → 9,363, 40 s; `rename_twin_report_chunk6.txt`). One collateral: EMBT fell into the
+manifest (9,597 → 9,363 in 40 s; `rename_twin_report_chunk6.txt`). One collateral: EMBT fell into the
 {CISXF, ZAZZT, ZBZZT} test-ticker component and was rebuilt alone without dedupe (chunk 7 → **9,364**).
 The 233 dropped legs were then aliased into the 27 yearly lists (`alias-lists.pl`, `alias3.txt`; per-list
 dedupe) — union 10,133 → 9,900, effective breadth per year 2,792–2,993 (`step4/specs/composition-counts.txt`,
