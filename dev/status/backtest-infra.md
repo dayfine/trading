@@ -901,6 +901,17 @@ Merged in main:
   iteration). Step 3b `_v11pit` warehouse: single-pass 10,504-name build OOM-killed (exit
   137); four-chunk `-incremental` build running from 19:37 PT. Step 4 (a0-pit-null × 3 salts,
   chain-pit.sh) follows; step 5 grid-rule update; then the top-of-funnel screen.
+  Step 6 (scheduled smoke golden) READY_FOR_REVIEW on `feat/pit-smoke-golden`:
+  `smoke/panel-golden-2019-schedule.sexp` is the first committed spec carrying a
+  non-empty `universe_schedule`, so the `?universe_membership_at` seam is now
+  exercised by CI (tier-1 perf smoke, 2s/cell) and by the panel-golden gate
+  rather than only by a temp-dir unit test; its golden differs from
+  `panel-golden-2019-full` by exactly the JNJ round trip (D2 dating + D4
+  held-through-dropout, pinned in `test_panel_loader_parity.ml`). Also closes the
+  #2816 residual — the `(pi=true, sched=true)` conjunction row is pinned in
+  `test_pi_filter_wiring.ml`. Verify:
+  `dune exec trading/backtest/test/test_panel_loader_parity.exe` and
+  `TRADING_IN_CONTAINER=1 sh dev/scripts/perf_tier1_smoke.sh`.
 
 - ~~**[NEW 2026-09-05] #2669 — `build_snapshots.exe -incremental` clobbers
   `manifest.sexp`.**~~ **DONE 2026-09-08** — fixed by the merge in

@@ -1,0 +1,6 @@
+(((symbol JPM) (entry_date 2019-05-04) (exit_date 2019-05-10) (days_held 6)
+  (entry_price 116.16119659142959) (exit_price 111.75) (quantity 2152)
+  (pnl_dollars -9492.89506475647) (pnl_percent -3.7974786080630354))
+ ((symbol AAPL) (entry_date 2019-05-04) (exit_date 2019-05-08) (days_held 4)
+  (entry_price 211.77537962192471) (exit_price 201.9) (quantity 1180)
+  (pnl_dollars -11652.947953871155) (pnl_percent -4.6631386705833711)))

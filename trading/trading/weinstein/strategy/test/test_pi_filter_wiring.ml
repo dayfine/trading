@@ -208,6 +208,51 @@ let test_callback_pi_false_schedule_true_rejects _ =
        ~universe_membership_at:(Some (fun _ _ -> true)))
     (is_some_and (field (fun c -> c "AAPL" (_ymd 2024 6 14)) (equal_to false)))
 
+(** Both sources on, the full truth table on ONE callback — in particular the
+    (PI admits, schedule admits) row, which no other test pins: every existing
+    both-sources case asserts a rejection, so a mutant returning the constant
+    [false] predicate whenever both sources are armed would pass the suite.
+
+    Three symbols exercise the three reachable rows against a single
+    [bar_reader] + schedule pair:
+
+    - [AAPL] — still listed ([active_through = None]) and scheduled: ADMITTED.
+      This is the row that was missing.
+    - [DELI] — scheduled, but its bars carry [active_through = 2024-03-31] and
+      we read at [as_of = 2024-06-14]: rejected by the PI conjunct.
+    - [UNSCHED] — no bars at all, so the PI conjunct admits it, but the schedule
+      does not list it: rejected by the schedule conjunct.
+
+    Asserting all three on the same callback is what makes it a truth table
+    rather than three unrelated points: one conjunction, three inputs. *)
+let test_callback_both_sources_truth_table _ =
+  let config = { (_default_config ()) with enable_pi_filter = true } in
+  let as_of = _ymd 2024 6 14 in
+  let listed =
+    _bars ~n:10 ~start_date:(_ymd 2024 1 2) ~start_price:100.0 ~step:0.5 ()
+  in
+  let delisted =
+    _bars
+      ~active_through:(Some (_ymd 2024 3 31))
+      ~n:10 ~start_date:(_ymd 2024 1 2) ~start_price:100.0 ~step:0.5 ()
+  in
+  let bar_reader =
+    Bar_reader.of_in_memory_bars [ ("AAPL", listed); ("DELI", delisted) ]
+  in
+  let scheduled ticker _ =
+    List.mem [ "AAPL"; "DELI" ] ticker ~equal:String.equal
+  in
+  assert_that
+    (Macro.Internal_for_test.membership_at_callback_of ~config ~bar_reader
+       ~universe_membership_at:(Some scheduled))
+    (is_some_and
+       (all_of
+          [
+            field (fun c -> c "AAPL" as_of) (equal_to true);
+            field (fun c -> c "DELI" as_of) (equal_to false);
+            field (fun c -> c "UNSCHED" as_of) (equal_to false);
+          ]))
+
 let suite =
   "pi_filter_wiring_tests"
   >::: [
@@ -227,6 +272,8 @@ let suite =
          >:: test_callback_both_sources_are_anded;
          "test_callback_pi_false_schedule_true_rejects"
          >:: test_callback_pi_false_schedule_true_rejects;
+         "test_callback_both_sources_truth_table"
+         >:: test_callback_both_sources_truth_table;
        ]
 
 let () = run_test_tt_main suite
