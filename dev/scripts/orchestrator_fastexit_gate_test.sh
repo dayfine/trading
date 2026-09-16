@@ -209,6 +209,16 @@ export MOCK_CURL_GARBAGE
 MOCK_DAILY_PR_STATE=none
 export MOCK_DAILY_PR_STATE
 
+# #2850's stale-summary check compares a summary's own date against the real
+# system UTC date by default -- but every fixture in this suite uses
+# synthetic dates (2026-08-26, 2026-08-27, ...) unrelated to wall-clock
+# "today", so the check would reject nearly every scenario below with an
+# unrelated rc=1 if left at its default. Disable it suite-wide via its own
+# documented escape hatch; the "Scenario 42+" block below re-enables it
+# per-scenario (by unsetting or overriding) to test the guard itself.
+ORCHESTRATOR_EXPECTED_DATE=any
+export ORCHESTRATOR_EXPECTED_DATE
+
 # --- fixture repo -------------------------------------------------------
 # dev/status/ commit before the prior summary (T0), the prior summary itself
 # (T1, mtime), an optional dev/status/ commit AFTER the prior summary (T2,
@@ -992,6 +1002,124 @@ rc=0
 _run_verify noop-missing.md || rc=$?
 check "non-FULL summary is exempt from the scheduled-workflow section" 0 "$rc"
 MOCK_DAILY_PR_STATE=open
+
+# =========================================================================
+# STALE-SUMMARY CHECK (issue #2850): `verify` must refuse to validate a
+# summary whose own basename date doesn't match the expected run date. Run
+# 35096884441 (2026-09-16) hit this for real: no dev/daily/2026-09-16*.md
+# existed (checkout-flattened mtimes broke the workflow's `ls -t` fallback
+# into picking the OLDEST file instead of the newest -- see the
+# STALE-SUMMARY CHECK header comment in orchestrator_fastexit_gate.sh), and
+# `verify` validated a 2-day-old dev/daily/2026-09-14.md as if it were
+# today's run. Scenarios 42-49 cover: stale-by-2-days rejected (via the CLI
+# override, deterministic); exactly-today accepted; the day before accepted
+# (midnight-straddle tolerance); the ORCHESTRATOR_EXPECTED_DATE=any escape
+# hatch bypassing the check on a badly-stale (multi-year) date, contrasted
+# with the SAME fixture failing once the hatch is off (proves the pass
+# above is the hatch's doing, not an unrelated bug); an unparsable basename
+# treated as a silent pass-through, not a violation; and -- the load-bearing
+# proof for this issue -- the check firing via the EXISTING ONE-ARGUMENT
+# `verify <path>` call shape the workflow actually uses, with no override
+# argument and no env var, falling back to the real system UTC date.
+# =========================================================================
+
+MOCK_PR_COUNT=3
+_reset_repo_no_drift
+
+_write_daily_fixture() {
+  # $1 = relative path under $TMP_REPO, $2 = mode string
+  (
+    cd "$TMP_REPO"
+    cat > "$1" <<MD
+# Status - $1 [run 1]
+
+**Mode:** $2
+
+## Scheduled workflows
+all OK (1 measured; exit 0)
+MD
+  )
+}
+
+# --- Scenario 42: stale by 2 days (CLI override, deterministic) -> FAIL --
+_write_daily_fixture dev/daily/2026-09-14.md NO-OP
+rc=0
+( cd "$TMP_REPO" && "$GATE" verify dev/daily/2026-09-14.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "a summary dated 2 days before the expected date is rejected" 1 "$rc"
+if grep -q '#2850' /tmp/orchestrator_fastexit_gate_test.out; then _cite_ok=0; else _cite_ok=1; fi
+check_bool "staleness rejection cites issue #2850" "$_cite_ok"
+
+# --- Scenario 43: dated exactly the expected date -> PASS ----------------
+_write_daily_fixture dev/daily/2026-09-16.md NO-OP
+rc=0
+( cd "$TMP_REPO" && "$GATE" verify dev/daily/2026-09-16.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "a summary dated exactly the expected date is accepted" 0 "$rc"
+
+# --- Scenario 44: dated the day before the expected date (UTC-midnight
+# straddle) -> PASS --------------------------------------------------------
+_write_daily_fixture dev/daily/2026-09-15.md NO-OP
+rc=0
+( cd "$TMP_REPO" && "$GATE" verify dev/daily/2026-09-15.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "a summary dated the day before the expected date is accepted (midnight straddle)" 0 "$rc"
+
+# --- Scenario 45: ORCHESTRATOR_EXPECTED_DATE=any bypasses the check even on
+# a badly (multi-year) stale summary -> PASS ------------------------------
+_write_daily_fixture dev/daily/2020-01-01.md NO-OP
+rc=0
+( cd "$TMP_REPO"
+  ORCHESTRATOR_EXPECTED_DATE=any
+  export ORCHESTRATOR_EXPECTED_DATE
+  "$GATE" verify dev/daily/2020-01-01.md
+) >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "ORCHESTRATOR_EXPECTED_DATE=any bypasses the staleness check" 0 "$rc"
+
+# --- Scenario 46: the SAME badly-stale fixture, hatch off (explicit
+# override instead) -> FAIL. Contrasts directly with Scenario 45: proves
+# that scenario's PASS is the escape hatch's doing, not some unrelated gap
+# that would have passed this fixture regardless. --------------------------
+rc=0
+( cd "$TMP_REPO" && "$GATE" verify dev/daily/2020-01-01.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "the same badly-stale summary without the escape hatch is rejected" 1 "$rc"
+
+# --- Scenario 47: unparsable basename -> silent pass-through, not a
+# violation (matches the DISPATCH-ARTIFACT check's table-shape-gate
+# precedent: an input shape this check doesn't recognise is not evidence of
+# anything). -----------------------------------------------------------
+_write_daily_fixture not-a-daily-summary.md NO-OP
+rc=0
+( cd "$TMP_REPO" && "$GATE" verify not-a-daily-summary.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "an unparsable basename is a silent pass-through, not a violation" 0 "$rc"
+
+# --- Scenario 48/49: the EXISTING ONE-ARGUMENT `verify <path>` call shape
+# (no override argument, no ORCHESTRATOR_EXPECTED_DATE) -- the exact call
+# .github/workflows/orchestrator.yml makes and cannot be edited to add a
+# second argument to. Falls back to the real system UTC date, so these two
+# scenarios are dynamic (computed from the real clock) rather than pinned
+# to a fixed calendar date. -------------------------------------------------
+_today=$(date -u '+%Y-%m-%d')
+_two_days_ago=$(date -u -d "$_today - 2 day" '+%Y-%m-%d' 2>/dev/null \
+  || date -u -j -v-2d -f '%Y-%m-%d' "$_today" '+%Y-%m-%d')
+
+_write_daily_fixture "dev/daily/${_two_days_ago}.md" NO-OP
+rc=0
+( cd "$TMP_REPO"
+  unset ORCHESTRATOR_EXPECTED_DATE
+  "$GATE" verify "dev/daily/${_two_days_ago}.md"
+) >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "one-argument verify call (no override, real system date) rejects a 2-day-stale summary" 1 "$rc"
+
+_write_daily_fixture "dev/daily/${_today}.md" NO-OP
+rc=0
+( cd "$TMP_REPO"
+  unset ORCHESTRATOR_EXPECTED_DATE
+  "$GATE" verify "dev/daily/${_today}.md"
+) >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "one-argument verify call (no override, real system date) accepts a summary dated today" 0 "$rc"
 
 # Render all health exit classes from captured fixtures, without network access.
 health_fixture="$TMP_REPO/health.log"
