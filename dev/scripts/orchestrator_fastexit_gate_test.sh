@@ -979,6 +979,19 @@ _reset_summary FULL
 rc=0
 _run_verify dev/daily/2026-08-27.md || rc=$?
 check "FULL scheduled-workflow section passes" 0 "$rc"
+# Negative boundary (qc-behavioral, rework iteration 1): the requirement is FULL-scoped. A legitimate
+# NO-OP run never executes Step 6.4 and renders no section, so a NO-OP summary in the Scenario-3
+# configuration (open PRs, no drift) with the heading stripped must still verify rc 0. Goes red if the
+# guard is hoisted above the **Mode:** FULL branch.
+MOCK_DAILY_PR_STATE=none
+MOCK_PR_COUNT=3
+_reset_repo_no_drift
+_reset_summary NO-OP
+sed '/^## Scheduled workflows$/d' "$TMP_REPO/dev/daily/2026-08-27.md" > "$TMP_REPO/noop-missing.md"
+rc=0
+_run_verify noop-missing.md || rc=$?
+check "non-FULL summary is exempt from the scheduled-workflow section" 0 "$rc"
+MOCK_DAILY_PR_STATE=open
 
 # Render all health exit classes from captured fixtures, without network access.
 health_fixture="$TMP_REPO/health.log"
