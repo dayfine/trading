@@ -1767,6 +1767,35 @@ COMMENT_FIXTURE='[]'
 check "no comments is silent" "" "$(comment_warning none none)"
 COMMENT_FIXTURE=$(reviews "$STRUCT_WITH_BEHAV_SECTION")
 check "already reviewed structural comment is ignored" "" "$(comment_warning ok none)"
+# Rework iteration 1 (behavioral review 5223516596): pin the header's two explicit guarantees.
+# A stale (older-sha) or incomplete (no ## Verdict) QC-looking comment still prompts inspection --
+# the `!= none` tests must not narrow to `= ok`; and the comment fetch happens ONCE per PR.
+COMMENT_FIXTURE=$(reviews "Reviewed SHA: deadbeef1
+
+## Structural QC -- stale
+
+## Verdict
+
+APPROVED")
+check "stale QC-looking comment still prompts inspection" \
+  " [WARNING: QC-looking ISSUE COMMENT (structural); not a review -- inspect and re-post]" \
+  "$(comment_warning none none)"
+COMMENT_FIXTURE=$(reviews "Reviewed SHA: 7dc57cc06
+
+## Structural QC -- no verdict section
+
+Checklist prose only; the verdict section never landed.")
+check "incomplete QC-looking comment still prompts inspection" \
+  " [WARNING: QC-looking ISSUE COMMENT (structural); not a review -- inspect and re-post]" \
+  "$(comment_warning none none)"
+COMMENT_FIXTURE=$(reviews "$STRUCT_WITH_BEHAV_SECTION")
+CALL_LOG=$(mktemp)
+check "issue comments fetched once per PR" 1 "$(
+  _pr_issue_comments() { echo x >> "$CALL_LOG"; printf '%s' "$COMMENT_FIXTURE"; }
+  _qc_comment_warning 2837 none none "$TIP" > /dev/null
+  wc -l < "$CALL_LOG" | tr -d ' '
+)"
+rm -f "$CALL_LOG"
 check "no missing gates skips comment request" "" "$(
   _pr_issue_comments() { echo 'UNEXPECTED REQUEST'; return 1; }
   _qc_comment_warning 2837 ok ok "$TIP"
