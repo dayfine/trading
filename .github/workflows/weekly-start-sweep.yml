@@ -128,8 +128,17 @@ jobs:
           Workflow ran but \`${MD}\` was not produced. Check the workflow log."
           fi
 
-          gh pr create \
-            --title "ops(sweep): weekly-start BAH SPY ${DATE}" \
-            --body "${BODY}" \
-            --base main \
-            --head "${BRANCH}"
+          # REST publication: gh is absent from the CI image (#2702).
+          PAYLOAD=$(jq -n \
+            --arg title "ops(sweep): weekly-start BAH SPY ${DATE}" \
+            --arg body "${BODY}" --arg head "${BRANCH}" \
+            '{title: $title, body: $body, base: "main", head: $head}')
+          RESPONSE=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            --data "${PAYLOAD}" \
+            "https://api.github.com/repos/${REPO}/pulls")
+          # A successful transport alone does not prove that a PR was created.
+          printf '%s' "${RESPONSE}" | jq -er \
+            'select((.number | type) == "number" and .number > 0) | .html_url | select(type == "string" and startswith("https://github.com/"))'
