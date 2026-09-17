@@ -281,6 +281,51 @@ type config = {
           exactly as a fresh candidate is rejected. A single-component
           [Variant_matrix] flag axis (R2). Default-off until an
           experiment-ledger ACCEPT (R1/R3). *)
+  index_stage_veto_blocks_longs : bool; [@sexp.default false]
+      (** Entry-gate axis (default-off): when [true], a primary index classified
+          [Weinstein_types.Stage4 _] blocks new long entries outright, whatever
+          the macro composite's [trend] says. A pure extra conjunct on the
+          existing macro gate — it can only {e remove} admissions, never add one
+          — so the default [false] leaves that gate bit-identical
+          unconditionally, at every ([trend], [index_stage]) pair and whatever
+          {!neutral_blocks_longs} / {!deteriorating_blocks_longs} are set to.
+
+          {b Why.} {!Macro.analyze}'s composite weighs the index stage at 3.0 of
+          10.0 and calls anything over [confidence > 0.65] [Bullish], so it can
+          read [Bullish] with the index itself in Stage 4. It did, for most of
+          2022: the S&P sat below a falling 30-week MA from January to November
+          while [trend] stayed [Bullish] for 25+ weeks, and the strategy opened
+          126 entries in that stretch, 82% of them losers
+          ([dev/experiments/pit-universe-2026-09-14/README.md] §"Drawdown
+          dissection"). Nothing blocks those entries today.
+
+          {b Faithfulness.} A {e tightening} of Weinstein's unconditional macro
+          gate (spine item 6 of [.claude/rules/weinstein-faithful-core.md]), not
+          a new mechanism — a dial under W2. Ch. 8 "Stage Analysis for the
+          Market Averages" makes the index's Stage-4 breakdown an explicit,
+          unconditional suspension of new buying — "Suspend buying even if you
+          see a few stocks breaking out on their charts" — rather than one
+          weighted vote in the Weight-of-the-Evidence composite. Resolved
+          against the book on 2026-09-16; see
+          [docs/design/weinstein-book-reference.md] §2.1, block "Resolved
+          2026-09-16 — veto or vote?". A Stage-3 index top is caution only
+          ("proceed with caution"), so [Stage3] is deliberately {e not} vetoed.
+
+          {b Scope.} Long admission only. It does {e not} alter
+          [Macro.result.trend], the halt / breaker logic, the macro-bearish
+          exposure trim, [breadth_state], or the short side — the composite
+          keeps governing all of those, and Weinstein's Stage-4 index
+          instruction on the short side is the opposite one ("begin looking for
+          shorts").
+
+          Wired by threading into
+          [screening_config.index_stage_veto_blocks_longs] plus [?index_stage]
+          at screen time (fresh candidates) and into
+          {!Screener.longs_admitted_by_index_stage} at the F2 resting-ticket
+          re-screen, so a resting long ticket is cancelled under a Stage-4 index
+          exactly as a fresh candidate is rejected. A single-component
+          [Variant_matrix] flag axis routed through [Backtest.Overlay_validator]
+          (R2). Default-off until an experiment-ledger ACCEPT (R1/R3). *)
   neutral_blocks_shorts : bool; [@sexp.default true]
       (** Short-side mirror of {!neutral_blocks_longs}. When [true] (the
           default), a macro-[Neutral] tape blocks new short entries exactly as a

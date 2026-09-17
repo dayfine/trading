@@ -31,6 +31,18 @@
   matchers))
 
 (test
+ (name test_index_stage_veto_gate)
+ (modules test_index_stage_veto_gate)
+ (libraries
+  screener
+  stock_analysis
+  weinstein_types
+  types
+  core
+  ounit2
+  matchers))
+
+(test
  (name test_screener_e2e)
  (modules test_screener_e2e)
  (libraries
