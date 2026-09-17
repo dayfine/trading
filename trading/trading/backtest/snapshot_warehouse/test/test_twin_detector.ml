@@ -468,6 +468,19 @@ let test_hub_guard_rejects_oversized_group _ =
                 field rejection_survivor (equal_to "HUB0");
               ])))
 
+(* [max_group_size = Some 6] on a 6-member component: the guard fires on MORE
+   than the cap, so a component of exactly the cap is under it and still drops
+   its legs. Pins the boundary the [> cap] comparison sits on. *)
+let test_hub_guard_allows_group_at_exactly_the_cap _ =
+  let report =
+    Twin_detector.detect
+      { test_config with max_group_size = Some 6 }
+      (hub_series ())
+  in
+  assert_that report.dropped_symbols
+    (equal_to [ "HUB1"; "HUB2"; "HUB3"; "HUB4"; "HUB5" ]);
+  assert_that report.rejected is_empty
+
 (* The alias map lists exactly the dropped -> survivor pairs of a plain twin
    pair, with the overlap and match fraction measured against the survivor. *)
 let test_alias_map_lists_dropped_pairs _ =
@@ -489,6 +502,25 @@ let test_alias_map_lists_dropped_pairs _ =
              : Twin_detector.Alias_map.entry);
        ]);
   assert_that alias.rejected is_empty
+
+(* The artifact carries the report's rejections verbatim, so a consumer can tell
+   "not a twin" from "twin we declined to drop". *)
+let test_alias_map_carries_rejections _ =
+  let report =
+    Twin_detector.detect
+      { test_config with require_direct_match = true }
+      (chain_series ())
+  in
+  assert_that (Twin_detector.Alias_map.of_report report).rejected
+    (elements_are
+       [
+         all_of
+           [
+             field rejection_kept (equal_to "ALPHA");
+             field rejection_reason (equal_to Twin_detector.Transitive);
+             field rejection_survivor (equal_to "OMEGA");
+           ];
+       ])
 
 (* The artifact round-trips through sexp, so a universe schedule can consume it
    instead of hand-parsing the text report. *)
@@ -577,7 +609,10 @@ let suite =
          "hub_guard_off_drops_all_legs" >:: test_hub_guard_off_drops_all_legs;
          "hub_guard_rejects_oversized_group"
          >:: test_hub_guard_rejects_oversized_group;
+         "hub_guard_allows_group_at_exactly_the_cap"
+         >:: test_hub_guard_allows_group_at_exactly_the_cap;
          "alias_map_lists_dropped_pairs" >:: test_alias_map_lists_dropped_pairs;
+         "alias_map_carries_rejections" >:: test_alias_map_carries_rejections;
          "alias_map_sexp_round_trip" >:: test_alias_map_sexp_round_trip;
          "render_header_unchanged_with_defaults"
          >:: test_render_header_unchanged_with_defaults;

@@ -36,8 +36,9 @@ val alias_name : string
     {!Twin_detector.Alias_map.sexp_of_t} of the same report — the dropped →
     survivor map plus the guard rejections, so a universe schedule can consume
     the pass's verdict without parsing {!Twin_detector.render}'s text. Written
-    whenever the report is, in both modes: it is additive, never
-    behaviour-changing. *)
+    whenever {!report_name} is — i.e. by the armed pass, under either twin basis
+    and with or without the guards; a disabled pass writes neither file. It is
+    additive, never behaviour-changing. *)
 
 val params : Twin_detector.Config.t Command.Param.t
 (** Shared CLI flag block, so both builders expose one surface and one set of

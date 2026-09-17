@@ -302,9 +302,13 @@ let _over_cap (config : Config.t) members =
   | None -> false
   | Some cap -> List.length members > cap
 
-(* Split a component into the group it yields (if any leg is still dropped)
-   and the legs a guard spared. Without either guard every non-survivor leg is
-   dropped, which is the pre-#2823 behaviour. *)
+(* Split a component into the group it yields (if any) and the legs a guard
+   spared. Without either guard every non-survivor leg is dropped, which is the
+   pre-#2823 behaviour. Only the hub guard suppresses a component's group
+   entirely: [require_direct_match] can never empty [direct], because a
+   component of >= 2 members is connected by verified [_twin_stats] edges and
+   [_twin_stats] is symmetric, so the survivor's own verified partner always
+   passes the direct re-check. *)
 let _classify_component (config : Config.t) members =
   let survivor = _pick_survivor members in
   let legs =
@@ -325,8 +329,7 @@ let _classify_component (config : Config.t) members =
     let rejected =
       List.map indirect ~f:(_make_rejection config Transitive survivor)
     in
-    if List.is_empty direct then (None, rejected)
-    else (Some (_group_of config survivor direct), rejected)
+    (Some (_group_of config survivor direct), rejected)
 
 let _empty_report config =
   { config; groups = []; dropped_symbols = []; rejected = [] }

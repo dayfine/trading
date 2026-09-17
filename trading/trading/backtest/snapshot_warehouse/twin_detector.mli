@@ -168,8 +168,8 @@ module Alias_map : sig
   (** The machine-readable companion to {!render}: the dropped → survivor
       aliasing a downstream consumer (e.g. a universe schedule that must map a
       retired ticker onto the leg the warehouse actually holds) needs, without
-      hand-parsing the text report. Written for both modes — it is additive,
-      never behaviour-changing. *)
+      hand-parsing the text report. A pure projection of {!report}, written
+      alongside it — additive, never behaviour-changing. *)
 
   type entry = {
     dropped : string;
@@ -204,9 +204,12 @@ val detect : Config.t -> series list -> report
     [max_group_size] is rejected wholesale ({!Hub}) and contributes no group.
     Otherwise, with [require_direct_match], each non-survivor leg is re-checked
     against the survivor itself; legs that fail are reported {!Transitive} and
-    keep their series, and a component whose every leg fails contributes no
-    group at all. Both guards only ever {e reduce} [dropped_symbols], never grow
-    it, and with their defaults [rejected] is empty and the result is
+    keep their series. The hub guard is the only one that can suppress a
+    component's group entirely: a component of [>= 2] members is connected by
+    verified twin edges and the criterion is symmetric, so the survivor's own
+    verified partner always clears the direct re-check and at least one leg is
+    always dropped. Both guards only ever {e reduce} [dropped_symbols], never
+    grow it, and with their defaults [rejected] is empty and the result is
     bit-identical to the pre-guard detector.
 
     {b Prefilter completeness.} Anchors are every [min_overlap_days/2]-th
