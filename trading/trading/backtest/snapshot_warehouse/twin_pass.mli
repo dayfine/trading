@@ -30,11 +30,23 @@ val report_name : string
     [rename_twin_report.txt]. It holds {!Twin_detector.render}'s rendering of
     the config plus every detected group, and is also echoed to stderr. *)
 
+val alias_name : string
+(** Filename of the machine-readable companion written beside {!report_name}:
+    [rename_twin_report.alias.sexp], holding
+    {!Twin_detector.Alias_map.sexp_of_t} of the same report — the dropped →
+    survivor map plus the guard rejections, so a universe schedule can consume
+    the pass's verdict without parsing {!Twin_detector.render}'s text. Written
+    whenever {!report_name} is — i.e. by the armed pass, under either twin basis
+    and with or without the guards; a disabled pass writes neither file. It is
+    additive, never behaviour-changing. *)
+
 val params : Twin_detector.Config.t Command.Param.t
 (** Shared CLI flag block, so both builders expose one surface and one set of
     defaults: [-dedupe-rename-twins] (the master switch, default off),
     [-twin-basis levels|returns], [-twin-min-overlap-days],
-    [-twin-match-fraction], [-twin-close-epsilon], [-twin-ret-epsilon].
+    [-twin-match-fraction], [-twin-close-epsilon], [-twin-ret-epsilon], and the
+    two #2823 guards [-twin-require-direct-match] (default off) and
+    [-twin-max-group-size N] (default unlimited).
 
     Every numeric default comes from {!Twin_detector.Config.default}. An
     unrecognised [-twin-basis] value fails the command with the accepted
@@ -60,7 +72,8 @@ val run :
       [None] means unbounded on that side — the same contract as
       {!Bar_window.filter}), projected to its [(date, adjusted_close)] series,
       and handed to {!Twin_detector.detect}. The report is written to
-      [output_dir/]{!report_name} and echoed to stderr.
+      [output_dir/]{!report_name} (echoed to stderr) and its machine-readable
+      projection to [output_dir/]{!alias_name}.
 
     A symbol whose CSV is missing, unreadable, or empty in-window contributes no
     series and therefore can never be matched or dropped — it simply survives.

@@ -71,15 +71,37 @@ let _write_csv ~data_dir ~symbol bars =
 
 (* Runs the armed pass over [symbols] in a fresh temp dir, after writing a CSV
    for each [(symbol, bars)] in [fixtures]. Any symbol in [symbols] absent from
-   [fixtures] therefore has no file on disk. *)
-let _run_armed ~fixtures ~symbols ~start_date dir =
+   [fixtures] therefore has no file on disk. Returns the pass's
+   [(survivors, dropped)] together with the directory it wrote its sidecars
+   into, so a caller can assert on either. *)
+let _run_armed_in ~fixtures ~symbols ~start_date dir =
   let data_dir = Filename.concat dir "csv" in
   let output_dir = Filename.concat dir "snap" in
   Core_unix.mkdir_p data_dir;
   List.iter fixtures ~f:(fun (symbol, bars) ->
       _write_csv ~data_dir ~symbol bars);
-  Twin_pass.run _armed_config ~data_dir:(Fpath.v data_dir) ~start_date
-    ~end_date:None ~output_dir symbols
+  let result =
+    Twin_pass.run _armed_config ~data_dir:(Fpath.v data_dir) ~start_date
+      ~end_date:None ~output_dir symbols
+  in
+  (result, output_dir)
+
+let _run_armed ~fixtures ~symbols ~start_date dir =
+  fst (_run_armed_in ~fixtures ~symbols ~start_date dir)
+
+(* The armed pass's machine-readable sidecar, parsed back from
+   [output_dir]/[Twin_pass.alias_name]. [None] when it was not written. *)
+let _read_alias ~output_dir =
+  let path = Filename.concat output_dir Twin_pass.alias_name in
+  if Stdlib.Sys.file_exists path then
+    Some
+      (Twin_detector.Alias_map.t_of_sexp
+         (Sexp.of_string (In_channel.read_all path)))
+  else None
+
+let _run_armed_reading_alias ~fixtures ~symbols ~start_date dir =
+  let _, output_dir = _run_armed_in ~fixtures ~symbols ~start_date dir in
+  _read_alias ~output_dir
 
 (** A symbol with no CSV at all survives the armed pass in input order, and its
     presence changes neither the detected twin group nor the dropped set. *)
@@ -121,6 +143,37 @@ let test_symbol_empty_in_window_survives_the_armed_pass _ =
           [ equal_to _survivor; equal_to _control; equal_to _out_of_window ])
        (elements_are [ equal_to _dropped ]))
 
+(** The armed pass writes {!Twin_pass.alias_name} beside the text report, and it
+    parses back as the dropped -> survivor map the build actually applied — so a
+    universe schedule can consume the verdict without parsing the text. *)
+let test_armed_pass_writes_the_alias_sidecar _ =
+  assert_that
+    (_with_temp_dir
+       (_run_armed_reading_alias
+          ~fixtures:
+            [
+              (_dropped, _series ~last:_early_end ~close:50.0);
+              (_survivor, _series ~last:_late_end ~close:50.0);
+              (_control, _series ~last:_late_end ~close:20.0);
+            ]
+          ~symbols:[ _dropped; _survivor; _control ]
+          ~start_date:None))
+    (is_some_and
+       (field
+          (fun (a : Twin_detector.Alias_map.t) -> a.aliases)
+          (elements_are
+             [
+               all_of
+                 [
+                   field
+                     (fun (e : Twin_detector.Alias_map.entry) -> e.dropped)
+                     (equal_to _dropped);
+                   field
+                     (fun (e : Twin_detector.Alias_map.entry) -> e.survivor)
+                     (equal_to _survivor);
+                 ];
+             ])))
+
 let () =
   run_test_tt_main
     ("twin_pass"
@@ -129,4 +182,6 @@ let () =
            >:: test_symbol_without_a_csv_survives_the_armed_pass;
            "a symbol empty in-window survives the armed pass"
            >:: test_symbol_empty_in_window_survives_the_armed_pass;
+           "the armed pass writes the alias sidecar"
+           >:: test_armed_pass_writes_the_alias_sidecar;
          ])

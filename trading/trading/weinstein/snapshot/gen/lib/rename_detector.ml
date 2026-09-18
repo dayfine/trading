@@ -121,6 +121,10 @@ let _returns_score (config : Config.t) old_leg new_leg =
       basis = Twin_detector.Config.Returns;
       ret_epsilon = config.ret_epsilon;
       prefilter_rel_tol = Float.infinity;
+      (* Both #2823 guards are group-level; this scores one explicit pair, so
+         they are held at their no-op defaults. *)
+      require_direct_match = false;
+      max_group_size = None;
     }
   in
   let twin_series l =
