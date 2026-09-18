@@ -22,6 +22,10 @@ let longs_admitted_by_breadth ~neutral_blocks_longs ~deteriorating_blocks_longs
   | Deteriorating -> not deteriorating_blocks_longs
   | Bullish_breadth | Neutral_breadth | Recovering | Bearish_breadth -> true
 
+let longs_admitted_by_index_stage ~index_stage_veto_blocks_longs = function
+  | Some (Stage4 _) -> not index_stage_veto_blocks_longs
+  | Some (Stage1 _ | Stage2 _ | Stage3 _) | None -> true
+
 let breadth_state_or_projection ~macro_trend = function
   | Some state -> state
   | None -> breadth_state_of_market_trend macro_trend

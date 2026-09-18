@@ -597,6 +597,20 @@ type config = {
           axis. Tightens the macro gate only; Stage-2 entry, stops, and the
           short-side gate are unaffected. See [Weinstein_strategy_config] for
           full semantics. *)
+  index_stage_veto_blocks_longs : bool; [@sexp.default false]
+      (** Entry-gate axis (default-off): when [true], a primary index classified
+          [Weinstein_types.Stage4 _] blocks new long entries outright, whatever
+          the macro composite's [trend] says. A pure extra conjunct on the
+          existing macro gate, so the default [false] leaves that gate
+          bit-identical unconditionally. Faithful to Ch. 8's unconditional
+          "suspend buying" on the index's Stage-4 breakdown
+          ([docs/design/weinstein-book-reference.md] §2.1, "Resolved
+          2026-09-16"); a Stage-3 index top is caution only and is not vetoed.
+          Threaded into [screening_config.index_stage_veto_blocks_longs] plus
+          [?index_stage] at screen time and into the F2 resting-ticket
+          re-screen, so it is a [Variant_matrix] flag axis. Long admission only:
+          [trend], the halts, [breadth_state], and the short side are
+          unaffected. See [Weinstein_strategy_config] for full semantics. *)
   neutral_blocks_shorts : bool; [@sexp.default true]
       (** Short-side mirror of {!neutral_blocks_longs}: when [true] (the
           default), a macro-[Neutral] tape blocks new short entries (only

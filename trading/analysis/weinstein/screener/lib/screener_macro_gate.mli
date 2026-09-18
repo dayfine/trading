@@ -45,6 +45,35 @@ val longs_admitted_by_breadth :
     call site, and it imposes no consistency precondition on the two arguments.
     Issue #2755. *)
 
+val longs_admitted_by_index_stage :
+  index_stage_veto_blocks_longs:bool -> Weinstein_types.stage option -> bool
+(** Whether the {b primary index}'s own stage admits new long entries.
+
+    [false] on exactly one (flag, stage) pair — [index_stage_veto_blocks_longs]
+    set {b and} the index classified [Weinstein_types.Stage4 _]. Every other
+    pair is [true], including [None] (a caller with no index read wired). With
+    the flag off the function is therefore {b unconditionally} [true], so
+    [&&]-ing it into any long gate leaves that gate bit-identical — which is
+    what makes it a drop-in at both the cascade
+    ({!Screener.screen_with_cooldown} [?index_stage]) and the F2 resting-ticket
+    re-screen.
+
+    {b Authority.} weinstein-book-reference.md §2.1, block "Resolved 2026-09-16
+    — veto or vote?". Ch. 8 ("Stage Analysis for the Market Averages") makes the
+    index's Stage-4 breakdown below the 30-week MA an explicit, unconditional
+    suspension of new buying — "Suspend buying even if you see a few stocks
+    breaking out on their charts" — rather than one weighted vote inside the
+    Weight-of-the-Evidence composite. A Stage-3 index top is caution only
+    ("proceed with caution"), so [Stage3] is deliberately {e not} vetoed.
+
+    Matching [Stage4 _] alone covers the book's "3→4 or 4" case: the transition
+    week itself already classifies as [Stage4] in [Stage.result.stage] (the
+    [Stage3 -> Stage4] marker rides alongside in [Stage.result.transition]).
+
+    The short side is untouched — this is a long-admission conjunct only.
+    Weinstein's Stage-4 index instruction on the short side is the opposite one
+    ("begin looking for shorts"). *)
+
 val shorts_admitted_by_macro :
   neutral_blocks_shorts:bool -> Weinstein_types.market_trend -> bool
 (** Short-side mirror of {!longs_admitted_by_macro}: [Bullish] always blocks;
