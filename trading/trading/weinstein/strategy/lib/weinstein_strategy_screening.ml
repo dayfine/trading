@@ -280,13 +280,11 @@ let _stage_admits_side ~(side : Trading_base.Types.position_side)
 let _macro_admits_side ~config ~(macro_result : Macro.result)
     ~(side : Trading_base.Types.position_side) =
   match side with
+  (* {!Long_entry_macro_gate} is the same gate the cascade applies to a fresh
+     candidate, so an armed [deteriorating_blocks_longs] or
+     [index_stage_veto_blocks_longs] cancels the resting ticket too. *)
   | Trading_base.Types.Long ->
-      (* Same gate the cascade applies to a fresh candidate, so an armed
-         [deteriorating_blocks_longs] cancels the resting ticket too. *)
-      Screener.longs_admitted_by_breadth
-        ~neutral_blocks_longs:config.neutral_blocks_longs
-        ~deteriorating_blocks_longs:config.deteriorating_blocks_longs
-        ~macro_trend:macro_result.trend macro_result.breadth_state
+      Long_entry_macro_gate.admits ~config ~macro_result
   | Trading_base.Types.Short ->
       Screener.shorts_admitted_by_macro
         ~neutral_blocks_shorts:config.neutral_blocks_shorts macro_result.trend
@@ -364,18 +362,19 @@ let _decline_is_slow_grind ~config ~macro_result ~index_view =
 
 (** Run the cascade screener over the Phase-2 [stocks], threading the top-level
     [neutral_blocks_longs] / [deteriorating_blocks_longs] /
-    [neutral_blocks_shorts] entry-gate flags and the
-    [enable_slow_grind_short_gate] decline-character gate into the screener
-    config so they are expressible as [Weinstein_strategy.config] flag axes.
-    Default [false] on all four leaves the screener config untouched
+    [index_stage_veto_blocks_longs] / [neutral_blocks_shorts] entry-gate flags
+    and the [enable_slow_grind_short_gate] decline-character gate into the
+    screener config so they are expressible as [Weinstein_strategy.config] flag
+    axes. Default [false] on all five leaves the screener config untouched
     bit-equally.
 
     [~breadth_state] hands the cascade the macro read at five-state resolution;
     it is consulted only by [deteriorating_blocks_longs]. With the
     breadth-direction read disabled (the default) it is exactly
     [breadth_state_of_market_trend macro_result.trend], so passing it changes
-    nothing. Factored out of {!screen_universe} to keep that function under the
-    50-line linter cap. *)
+    nothing. [~index_stage] likewise hands over the primary index's own stage,
+    read only by [index_stage_veto_blocks_longs]. Factored out of
+    {!screen_universe} to keep that function under the 50-line linter cap. *)
 let _run_screener ?membership_at ?on_candidates ~config
     ~(macro_result : Macro.result) ~index_view ~sector_map ~stocks ~portfolio
     ~last_stop_out_dates ~current_date () =
@@ -384,6 +383,8 @@ let _run_screener ?membership_at ?on_candidates ~config
       config.screening_config with
       Screener.neutral_blocks_longs = config.neutral_blocks_longs;
       Screener.deteriorating_blocks_longs = config.deteriorating_blocks_longs;
+      Screener.index_stage_veto_blocks_longs =
+        config.index_stage_veto_blocks_longs;
       Screener.neutral_blocks_shorts = config.neutral_blocks_shorts;
       Screener.enable_slow_grind_short_gate =
         config.enable_slow_grind_short_gate;
@@ -395,7 +396,8 @@ let _run_screener ?membership_at ?on_candidates ~config
   Screener.screen_with_cooldown ?membership_at ?on_candidates
     ~decline_is_slow_grind ~config:screening_config
     ~macro_trend:macro_result.Macro.trend
-    ~breadth_state:macro_result.Macro.breadth_state ~sector_map ~stocks
+    ~breadth_state:macro_result.Macro.breadth_state
+    ~index_stage:macro_result.Macro.index_stage.Stage.stage ~sector_map ~stocks
     ~held_tickers:(Entry_walk.held_symbols portfolio)
     ~as_of:current_date
     ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
