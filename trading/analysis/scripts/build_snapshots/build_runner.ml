@@ -4,6 +4,7 @@ module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_verifier = Snapshot_pipeline.Snapshot_verifier
 module Series_tail = Snapshot_pipeline.Series_tail
 module Series_splice = Snapshot_pipeline.Series_splice
+module Series_level = Snapshot_pipeline.Series_level
 module Weekly_sidetable_builder = Snapshot_pipeline.Weekly_sidetable_builder
 module Snapshot_columnar = Data_panel_snapshot.Snapshot_columnar
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
@@ -32,11 +33,13 @@ let tail_report_name = "terminal_runs.csv"
 
 (* One built symbol: its manifest entry, the date of its last stored bar (None
    when the entry was reused from a previous incremental run, so no bars were
-   read), and the tail findings to report. *)
+   read), the tail findings to report, and the store-level review row when the
+   level pass is armed and this symbol's stored series failed its rule. *)
 type built = {
   entry : Snapshot_manifest.file_metadata;
   last_bar : Core.Date.t option;
   findings : Series_tail.finding list;
+  level : Series_level.finding option;
 }
 
 (* Series-hygiene knobs, bundled so the per-symbol call chain threads one
@@ -44,6 +47,11 @@ type built = {
 type hygiene_opts = {
   config : Series_tail.Config.t;
   exceptions : Series_tail.Exceptions.t;
+  level_config : Series_level.Config.t;
+      (* Store-level sanity ({!Series_level}), REPORT-ONLY: it classifies the
+         series this builder already decided to store and has no action type, so
+         an armed pass changes no [.snap] and no manifest entry. Defaults to
+         [enabled = false], under which [classify] reads no bar. *)
   splice_cuts : Core.Date.t Map.M(String).t;
       (* Symbols to cut at build time, and the date to keep bars from (#2672
          class ii). Decided by the scanner that sees every symbol's full
@@ -213,6 +221,18 @@ let _write_weekly ~output_dir ~symbol ~deep_bars ~bars =
 let _clean_tail ~(hygiene : hygiene_opts) ~symbol bars =
   Series_tail.apply hygiene.config ~exceptions:hygiene.exceptions ~symbol bars
 
+(* Store-level sanity reads the series the builder is ABOUT TO STORE — after the
+   splice cut and after the tail rule — because the question it asks is whether
+   what lands in the [.snap] is a plausible price series at all. Its residual
+   class is defined against exactly those bars: a mis-scale seam falling OUTSIDE
+   the build window presents, inside the window, as a uniformly mis-scaled
+   stored series with no discontinuity for either shape rule to key on. Running
+   it on the raw pre-cut bars would instead re-find defects those rules already
+   removed. Report-only: the row is carried out to the sidecar, never acted
+   on. *)
+let _classify_level ~(hygiene : hygiene_opts) ~symbol bars =
+  Series_level.classify hygiene.level_config ~symbol bars
+
 (* The #2732 prefix cut is the one tail edit that moves the series' START, so
    unlike a truncation it DOES reach the deep prefix: the mis-scaled segment is
    by construction older than the cut date, so every deep bar predates it and
@@ -253,6 +273,7 @@ let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
     _clean_tail ~hygiene ~symbol (_cut_splice ~hygiene ~symbol bars)
   in
   let deep_bars = _cut_deep_prefix ~findings deep_bars in
+  let level = _classify_level ~hygiene ~symbol bars in
   let last_bar = _last_bar_date bars in
   let active_through = _active_through_of_bars bars in
   match
@@ -264,16 +285,18 @@ let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
       _write_weekly ~output_dir ~symbol ~deep_bars ~bars;
       Result.map
         (_write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows)
-        ~f:(fun entry -> { entry; last_bar; findings })
+        ~f:(fun entry -> { entry; last_bar; findings; level })
 
 (* An incremental-skipped symbol reuses its previous entry verbatim, including
    the [active_through] that build derived. No bars were read, so [last_bar] is
-   [None] and the entry is passed through the final derivation untouched. *)
+   [None] and the entry is passed through the final derivation untouched — and
+   for the same reason it contributes no tail findings and no level row, which
+   keeps both sidecars scoped to the work this run actually did. *)
 let _maybe_reuse ~existing ~symbol =
   let open Option.Let_syntax in
   let%bind m = existing in
   let%map entry = Snapshot_manifest.find m ~symbol in
-  { entry; last_bar = None; findings = [] }
+  { entry; last_bar = None; findings = []; level = None }
 
 let _checkpoint_manifest ~manifest_path ~schema entry =
   match
@@ -552,6 +575,13 @@ let _write_tail_report ~output_dir builts =
      Printf.eprintf "%s write failed: %s\n%!" tail_report_name msg);
   Printf.printf "%s\n%!" (Series_tail.summary findings)
 
+(* Sibling review sidecar, written by {!Level_pass} only when the pass is armed
+   (#2732 follow-up): the tail report is unconditional because its pass always
+   runs, while this one is default-off, so an un-armed build leaves no file. *)
+let _write_level_report ~level_config ~output_dir builts =
+  Level_pass.write_report level_config ~output_dir
+    (List.filter_map builts ~f:(fun b -> b.level))
+
 (* The ONE on-disk shape of the warehouse exceptions file. Both sections are
    optional — a file may carry only [keep_tail], only [splice], or both — but
    the record is STRICT: no [allow_extra_fields], so a mistyped section name
@@ -608,7 +638,8 @@ let splice_exceptions_or_exit path =
 
 let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
     ?(splice_cuts = Map.empty (module String))
-    ?(twin_config = Twin_detector.Config.default) ~symbols ~csv_data_dir
+    ?(twin_config = Twin_detector.Config.default)
+    ?(level_config = Series_level.Config.default) ~symbols ~csv_data_dir
     ~output_dir ~benchmark_symbol ~start_date ~end_date ~sketch_deep_days
     ~incremental ~progress_every ~tail_config ~tail_exceptions () =
   _ensure_dir output_dir;
@@ -626,7 +657,12 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
   let existing = if incremental then _existing_manifest ~output_dir else None in
   let manifest_path = Filename.concat output_dir "manifest.sexp" in
   let hygiene =
-    { config = tail_config; exceptions = tail_exceptions; splice_cuts }
+    {
+      config = tail_config;
+      exceptions = tail_exceptions;
+      level_config;
+      splice_cuts;
+    }
   in
   let started_at = Core_unix.time () in
   let t0 = Time_ns.now () in
@@ -649,6 +685,7 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
      [symbols_done > symbols_total] on a top-up. *)
   _write_final_manifest ~manifest_path ~schema ~entries:final_entries ~elapsed;
   _write_tail_report ~output_dir builts;
+  _write_level_report ~level_config ~output_dir builts;
   _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at;
   _verify_or_warn ~manifest_path
 

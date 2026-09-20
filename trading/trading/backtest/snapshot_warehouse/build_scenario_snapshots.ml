@@ -66,7 +66,15 @@
     administrative stub run and any stray bar dated years later — and stamps the
     manifest's [active_through] from the series end. It writes
     [terminal_runs.csv] beside [splices.csv]. [-no-stub-truncation] /
-    [-no-stray-drop] reduce it to report-only. *)
+    [-no-stray-drop] reduce it to report-only.
+
+    A fourth pass, {!Snapshot_pipeline.Series_level} (wired via {!Level_pass}),
+    also runs inside {!Build_runner.build} and is {b off by default}: armed with
+    [-detect-series-level] it classifies each stored series' price {e level} and
+    writes [series_level.csv] beside the other sidecars. It has no action type
+    at all, so even armed it never drops, cuts or truncates a symbol — the rule
+    knowingly flags a legitimately expensive share class, and at build time an
+    automatic drop there would delete a real company. *)
 
 open Core
 module Scenario = Scenario_lib.Scenario
@@ -214,7 +222,7 @@ let _plan_splices ~config ~splice_config ~exceptions ~data_dir ~warmup_start
 
 let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
     ~sketch_deep_days ~incremental ~progress_every ~survivor_tolerance_days
-    ~twin_config ~splice_config ~splice_action_config ~tail_config
+    ~twin_config ~level_config ~splice_config ~splice_action_config ~tail_config
     ~tail_exceptions_path () =
   let scenario = Scenario.load scenario_path in
   let universe = _resolve_scenario_universe ~fixtures_root scenario in
@@ -227,8 +235,9 @@ let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
       ~data_dir ~warmup_start:plan.warmup_start ~end_date:plan.end_date
       ~output_dir plan.all_symbols
   in
-  Build_runner.build ~survivor_tolerance_days ~splice_cuts ~twin_config ~symbols
-    ~csv_data_dir ~output_dir ~benchmark_symbol:(Some plan.benchmark_symbol)
+  Build_runner.build ~survivor_tolerance_days ~splice_cuts ~twin_config
+    ~level_config ~symbols ~csv_data_dir ~output_dir
+    ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
     ~sketch_deep_days ~incremental ~progress_every ~tail_config
     ~tail_exceptions:(Build_runner.tail_exceptions_or_exit tail_exceptions_path)
@@ -282,6 +291,7 @@ let command =
             representation), so this flag has no effect; accepted for \
             invocation-script back-compat"
      and twin_config = Twin_pass.params
+     and level_config = Level_pass.params
      and detect_splices =
        flag "detect-splices" no_arg
          ~doc:
@@ -324,7 +334,7 @@ let command =
        in
        main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
          ~sketch_deep_days ~incremental ~progress_every ~survivor_tolerance_days
-         ~twin_config ~splice_config ~splice_action_config ~tail_config
-         ~tail_exceptions_path ())
+         ~twin_config ~level_config ~splice_config ~splice_action_config
+         ~tail_config ~tail_exceptions_path ())
 
 let () = Command_unix.run command
