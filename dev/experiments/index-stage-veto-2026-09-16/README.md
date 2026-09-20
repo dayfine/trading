@@ -154,3 +154,15 @@ dispatches while a cell runs (`container-capacity-scheduling.md` rule 1). Specs 
   lane: the 4-month smoke spec at 1024 vs 3072 vs 4096, compare wall + the cache line; if misses collapse, make it the
   chain default and record it on #2839. Not changed mid-chain (the running script must not be edited; wall time is
   not a criterion).
+
+**Correction (13:05 PT) — the MB cap is the wrong lever on a v2 warehouse.** `_v11pit` is columnar (`SNAPCOL1`, 19,198
+files, 3.5 GB). For a v2 entry `Daily_panels` counts only the int32 date array plus a constant against the byte budget,
+so the 1 GB `SNAPSHOT_CACHE_MB` never binds; what binds is the hard-coded `_max_open_mmap_handles = 256` in
+`daily_panels.ml` (doc: "well under a typical 1024 fd ulimit"). Each weekly pass over 9,915 symbols cycles a 256-entry
+LRU, so nearly every read is a miss = `openfile` + `fstat` + whole-file `map_file` + header parse, and every eviction
+is `close` + munmap — 118M of each per cell. Neither cap is dynamic; the only statistics are the cumulative
+hits/misses/evictions line at the end (no occupancy max/avg, no peak RSS in the chain scripts). Budget for lifting the
+cap to ≥ n_symbols: the worker holds 269 fds against a 1,048,576 limit and 54,667 mappings against
+`vm.max_map_count` 262,144 (one mapping per reader); heap per reader is the date array (~27 KB) plus a constant, so
+~10k readers ≈ 0.3 GB — affordable, bit-identical by construction. Proposed on #2839: make the handle cap an env knob
+(`SNAPSHOT_MAX_MMAP_HANDLES`, default 256 = unchanged), set it to 12,000 in the chain scripts, measure on the smoke.
