@@ -1,6 +1,8 @@
 # Next-session priorities — 2026-09-20 (supersedes 2026-09-17)
 
 Written 02:45 PT 2026-09-20 mid-session (the 09-16 → 09-20 session: rate-limit gap 09-16 19:35 → 09-20 00:00).
+
+**Read the 15:00 PT addendum at the bottom FIRST** — it supersedes the timing line in Step 0 (salt 0 landed 11:08, 8h33m), carries the salt-0 read and the resume protocol, and inserts #2878 → #2839 (snapshot-cache tracking, then the handle-cap knob) ahead of the P1 list.
 Main `b6696f84b`, green. **A backtest chain is LIVE in the container** — read §Ops before dispatching anything.
 
 ## State in one paragraph
