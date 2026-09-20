@@ -1,4 +1,4 @@
-Reviewed SHA: 0687955b9f3f0940a473aba73aa7430677441802
+Reviewed SHA: e5db698856325d05741df90456df209d0207981f
 
 # QC review — post-run-validation / PR #2773 (`feat/backtest/build-time-store-sanity`)
 
@@ -152,3 +152,86 @@ count), since a squash-merge makes the body the permanent commit message.
   for. Expect a possibly-**empty** `Whole_window` list and read it as the
   expected result, not broken wiring — R1's blindness is code-level certain but
   has no verified present-day instance.
+
+---
+
+# Structural re-review — PR #2875 (`feat/series-level-build-runner`) rework iteration 1
+
+Orchestrator run 35521718664, 2026-09-20. **Re-review at `e5db6988` after qc-behavioral NEEDS_REWORK on iteration 0.**
+
+`structural_qc: APPROVED` (re-review)
+
+## Rework scope
+
+Commit `e5db6988` addresses two QC findings (CP1 + CP3):
+
+| # | Finding | Pre-rework fix | Post-rework fixture |
+|---|---------|---|---|
+| CP1 | Whole-manifest identity for no-op check | Projected entries to `(symbol, payload_md5)` pairs; omitted `active_through` delisting marker | New `GONE` fixture with 21 bars (past 20-bar min) stopping 9 days before universe end (past 7-day tolerance) → derives non-`None` marker; new `_manifest_entries` helper compares WHOLE records including `active_through` |
+| CP3 | Ordering: classification happens post-edit | Fixtures didn't exercise pre/post differences | Added `SPLICED` (25 mis-scaled + 25 ordinary; cut keeps latter; uncut has mixed-scale row) + `STRAY` (21 mis-scaled + 1 stray bar 730 days later; tail drops it) with control arm + exact row assertions |
+
+**Test count:** 9 → 12 (added 3 ordering fixtures + control arm)
+
+**Equivalent mutant note:** Author correctly identified that the original finding (mutation at `_build_one_symbol:288`) was an equivalent mutant — `_active_through_of_bars` reads bar-level `active_through` (always `None` on CSV), while the real derivation is in `_derive_active_through` (called post-read from `_entry_with_derived_marker`). The reworked suite now reddens at the correct site. Pre-rework suite was green on both because `_payload_md5s` projection omitted `active_through` and no fixture carried a non-`None` marker.
+
+## Re-review verdict
+
+**All three gates pass; no regressions on pre-existing cases.**
+
+| Gate | Exit Code | Status |
+|------|-----------|--------|
+| H1: `dune build @fmt` | 0 | PASS |
+| H2: `dune build` | 0 | PASS |
+| H3: `dune runtest` (12 tests) | 0 | PASS |
+
+**Key verification points:**
+- P6 (test patterns): All 12 cases use one `assert_that` per value with composed matchers; no violations
+- Whole-record comparison with `~cmp:List.equal Snapshot_manifest.equal_file_metadata` ensures `active_through` is pinned
+- Control arm `test_uncut_splice_fixture_is_reported` is real (positive proof detector runs; "no row" under cut is real, not vacuous)
+- Exact row assertion on STRAY pins both class and bar count: `"STRAY,whole_window,21,..."`
+- A1/A2/A3: All pass; no core-module changes, no new dependencies, no cross-feature drift
+
+**Quality: 5** — Thorough rework with excellent fixture design, correct equivalent-mutant analysis, and comprehensive mutation coverage.
+
+No NEEDS_REWORK items.
+
+---
+
+# Behavioral re-review — PR #2875 (`feat/series-level-build-runner`) rework iteration 1
+
+Orchestrator run 35521718664, 2026-09-20. **Re-review at `e5db6988`** after qc-behavioral NEEDS_REWORK (quality 2) at `1b6d9031`. Posted as review `5261344674` (COMMENTED, pinned to `e5db6988`).
+
+`behavioral_qc: APPROVED` (re-review) — **Quality 4**
+
+## Both findings closed, re-derived independently
+
+Every mutation below was applied to this worktree, run in the foreground via `flock /tmp/dune.lock dev/lib/run-in-env.sh dune runtest --force analysis/scripts/build_snapshots/test`, and reverted. Final tree clean; suite green at `Ran: 12 / OK`.
+
+| # | probe | observed |
+|---|-------|----------|
+| base | none | `Ran: 12`, **exit 0** |
+| 1 | clear derived `active_through` for flagged symbols in `_entry_with_derived_marker` | `arming the level pass changed a manifest entry`, `Failures: 1`, **exit 1** |
+| 1b | probe 1 applied **and `GONE` removed from `_all_symbols`** | **exit 0** — the real harm goes undetected |
+| 2 | hoist `_classify_level` above both `_cut_splice` and `_clean_tail` | both ordering cases fail, `Failures: 2`, **exit 1** |
+| 2a | hoist above `_clean_tail` only | only the post-tail-rule case fails, `Failures: 1`, **exit 1** |
+| 3 | dead emission path (`_classify_level` always `None`) | `Failures: 5` incl. `uncut_splice_fixture_is_reported`; `level_classifies_the_post_splice_cut_series` **not** among them |
+| A | `Option.map (_active_through_of_bars bars) ~f:(fun _ -> assert false)` | **exit 0** — the assert never fires |
+
+**CP1 closed.** `_manifest_entries` compares whole `file_metadata` records via the derived `equal_file_metadata`, `path` normalised to basename. Probe 1 is the exact manifest-only harm and it reddens.
+
+**CP3 closed, and more tightly than reported.** Probe 2a shows each half of "after the splice cut **and** after the tail rule" is pinned *independently*, not merely the combined hoist.
+
+## The judgement calls
+
+- **Equivalent-mutant claim: confirmed, and stronger than stated.** `analysis/data/storage/csv/` contains zero occurrences of `active_through` — the CSV format neither writes nor reads the column — and EODHD sets it `None` (`http_client.ml:171`). Probe A proves the bar-level field is never `Some` anywhere in this suite, so the predecessor's site was undetectable regardless of what the test compared. The first-pass CP1 finding was **right in conclusion, inert in demonstration**.
+- **Deeper blindness: real, and `GONE` closes it.** Probe 1b is decisive — with the genuine harm applied and `GONE` removed, the whole-value comparison runs green. Fixing only the projection would have yielded a test that looks whole-value and still cannot see the harm. Restoring `GONE` is the sole difference that reddens probe 1, proving by elimination that `GONE` is both flagged and carries a non-`None` derived marker.
+- **`SPLICED` negative assertion: non-vacuous, because of the control.** Probe 3 kills the emission path: the control reddens while the "no row" assertion passes vacuously. The control is doing exactly the work it claims.
+- **No weakening.** All nine pre-existing cases keep their assertions; the only edit to an old case strengthens it. Widened `_all_symbols` introduces no literal collisions.
+
+## Non-blocking residuals
+
+- **R1** — PR body Test-plan table still lists 9 rows and describes the no-op case as comparing `payload_md5` lists; understates the committed test and omits the three ordering cases. Under-advertising, so no CP2 gate trips. *harness_gap: LINTER_CANDIDATE* (suite `>:::` names vs PR-body table names is mechanical).
+- **R2** — `_entries_of_build` builds only `HIGH`/`MIXED`/`REAL`/`GONE`, so the byte-identical claim is unpinned over the splice-cut and stray-drop paths this rework added. *harness_gap: LINTER_CANDIDATE*.
+- **R3** — `_uncut_splice_row` is a prefix, not a full row; the one row assertion in the file that does not pin its statistics. Defensible for a control arm. *harness_gap: ONGOING_REVIEW*.
+
+No NEEDS_REWORK items.

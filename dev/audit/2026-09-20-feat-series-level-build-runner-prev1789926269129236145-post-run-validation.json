@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-20",
+  "feature": "post-run-validation",
+  "branch": "feat/series-level-build-runner",
+  "sha": "1b6d90316d739300ca20a1b6442b38b80524bd83",
+  "recorded_at_ns": 1789926269129236145,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "Nine .ml files outside */lib/* exceed the 500-line hard limit unobserved because linter_file_length.sh scopes to */lib/*.ml (LINTER_CANDIDATE); CP1/CP3 both ONGOING_REVIEW (whole-value identity assertion; unpinned ordering claim)",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
