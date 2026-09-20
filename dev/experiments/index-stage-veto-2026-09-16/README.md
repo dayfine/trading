@@ -86,3 +86,35 @@ dispatches while a cell runs (`container-capacity-scheduling.md` rule 1). Specs 
   symbols, which is where the 6.3 h/cell goes. Ops note: a `dune build` started through a harness-backgrounded
   `docker exec` hung in `futex_wait` at 0 % CPU for 34 min; killed and relaunched detached (`docker exec -d … nohup`)
   — build long things detached from the start.
+
+- 2026-09-20 11:08 PT — **v1-index-veto, salt 0** (wall 30,789 s = 8h33m vs the null's 5h58m; `results/v1-index-veto-s0-v11-*`)
+  vs the committed `a0-pit-null-s0-v11`. `params.sexp` reads `index_stage_veto_blocks_longs true`; V6 = 0 on both,
+  `validator_diff -check V6` exit 0; V16 2 fallback exits (same CLE/ASPS quality flags as the null); `macro_trend.sexp`
+  byte-identical to the null's (398 Bearish / 748 Bullish / 189 Neutral weeks — the composite is untouched, as designed).
+  Level **457.0 → 344.7**, trades 732 → 703, Sharpe 0.482 → 0.443, **maxDD 40.6 → 33.5** (episode 2021-11-29 → 2024-08-05
+  on the null becomes 2022-01-03 → 2023-10-27 on the arm), **Calmar 0.165 → 0.173**, **realised $3.85M → $2.77M
+  (−$1.08M)**, end NAV $5.57M → $4.45M, open 5 → 6 names. **Fails the realised criterion, clears Calmar** at this salt.
+  Exit mix stop_loss 495 → 483, laggard 221 → 206.
+  Join (`symbol|entry_date`): **602 shared** (+$2.557M → +$2.553M, no drift), null-only 130 (+$1.29M), arm-only 101
+  (+$0.22M). **Trade-for-trade identical 2000-01 → 2018-11**; first divergence MLNX 2018-11-17 (Q4-2018 correction),
+  then CCOI 2020-03-21. Per entry-year: 2018 −$260k → −$245k; **2020 +$1.84M → +$1.32M**; 2021 −$212k → −$236k;
+  **2022 −$818k → −$282k**; 2023 −$134k → −$252k; 2024 −$278k → −$155k; **2025 +$1.17M → +$27k**; 2026 −$330k → −$275k.
+  - **2022 cohort (the mechanism read):** 19 null-only entries removed, net −$524k on the null (GETY −$118k, RGEN −$77k,
+    ALTM −$61k, ADTN −$54k …; only BBSI +$92k and two small winners removed); 2022 goes −$818k → −$282k, the 2022-23
+    window −$953k → −$534k. The veto did exactly what the dissection predicted, at this salt.
+  - **2020 re-entry episode:** the veto removed 10 entries dated 03-21 → 04-29 (CCOI −$41k, CTXS +$30k, KR +$30k, GC +$22k,
+    GIS +$24k, EGOV −$39k, GEAR −$29k, CPB −$17k, MRNA +$9k, MOH +$7k) — **net ≈ −$3k: the COVID re-entry cohort the veto
+    blocks was flat**, not the monster cohort. The 2020 gap (−$516k) is path divergence after that: the null funded ZS
+    05-29 (+$492k), BBBY 07-01 (+$518k), GME 09-14 (+$326k); the arm funded APPS 06-13 (+$498k), TTEC 08-04 (+$463k),
+    FCNCA 11-16 (+$188k). Monster lottery, not mechanism (`project_funding_grid_monster_lottery`).
+  - **2025 (−$1.15M) is ONE trade and not the veto:** ECHO 2025-08-26 (+$647k on the null) was screened by the arm at
+    score 110 and skipped `Insufficient_cash` — the arm's book was fuller that week. 2003 / 2009 episodes: identical
+    (the composite was already Bearish in every deep-bear Stage-4 week — see the proxy below), so no re-entry cost there.
+  - **Where the veto can bite (proxy, not the classifier):** weekly SPX close below a falling 30-week SMA crossed with the
+    run's composite trend. Deep bears: 2001 25 proxy-Stage-4 weeks / **0** not-Bearish, 2002 27 / 1, 2008 35 / 2 — the
+    composite already blocked buys, the veto is redundant. Modern regime: 2018 17 / **12**, 2020 9 / 9, 2022 26 / **10**,
+    2023 14 / **14**, 2025 9 / 8, 2026 7 / 7 — the disagreement weeks are all post-2017, which is why the two runs are
+    identical for 18 years. The audit records no gate-rejection marker for the veto (0 hits) — a diagnostic gap.
+  - **Read at one salt:** ex-ECHO the realised gap is ≈ −$430k, made of 2020 path divergence (−$516k) and 2023
+    (−$118k) against the 2022 save (+$536k). The drawdown improvement is real (33.5 vs 40.6, shorter episode); the level
+    loss is a funding lottery. Salts 1–2 decide whether the 2022 save is a property and the 2020/2025 losses are draws.
