@@ -127,3 +127,30 @@ dispatches while a cell runs (`container-capacity-scheduling.md` rule 1). Specs 
     YE-2022 the arm gave back $0.97M vs $1.57M. So at this salt: 2022–24 capital protection is real (≈ +$0.5–0.6M at the
     trough), the level and peak are draws. Judge Calmar on the trough-to-peak decomposition at salts 1–2, not on the
     ratio alone.
+
+## Runtime read (2026-09-20 12:40 PT) — where the 6–8.5 h/cell goes
+
+`Panel_runner`'s end-of-run cache line, same `SNAPSHOT_CACHE_MB=1024` everywhere:
+
+| cell | n_symbols | hits | misses | evictions | misses/symbol | misses/symbol/sim-year |
+|---|---:|---:|---:|---:|---:|---:|
+| dg-5y-2019 (2000-vintage wh, 6 sim-years) | 3,015 | 4.40M | 8.08M | 6.07M | 2,678 | 446 |
+| dg-26y / arc26y (2000-vintage, 27 sim-years) | 3,015 | 18.4M / 17.1M | 36.8M / 36.6M | 35.6M / 35.4M | 12,205 / 12,132 | 452 / 449 |
+| a0-pit-null s0 (_v11pit, 27) | 9,915 | 41.5M | 118.5M | 112.2M | 11,951 | 443 |
+| v1-index-veto s0 (_v11pit, 27) | 9,915 | 41.4M | 118.5M | 112.2M | 11,951 | 443 |
+
+- **The 1 GB decoded-panel LRU thrashes at every scale: 65–74 % miss rate, ~450 re-decodes per symbol per simulated
+  year, evictions ≈ misses.** The streaming design does its job for the heap (anon stays 2.2–3.5 GB; nothing holds 27
+  years) — but the cap is far below the weekly working set (n_symbols × the 130/520-week lookbacks), so nearly every
+  weekly read is a re-decode from the mmap. Misses are **linear in years and linear in symbols** (3.3× symbols → 3.2×
+  misses): this is the #2839 cost, and it is a cache-size problem, not an algorithmic one.
+- **Null and arm are identical to four digits** (118.5M misses both). The arm's 43 % extra wall at salt 0 is therefore
+  per-miss cost, not more work: whether a re-decode hits the VM page cache or the disk. Same mechanism explains the
+  same-list 5y-vs-26y superlinearity (446 vs 452 misses/symbol/year — identical — yet 3.6 vs 5.6 min/year): a 6-year
+  footprint stays page-cached, a 27-year footprint scrolls out of it. The 09-06 26y cells ran sequentially (no lane
+  overlap), so contention is ruled out for that pair.
+- **Lever (bit-identical by construction — a cache is a cache):** raise `SNAPSHOT_CACHE_MB` for PIT cells. The worker's
+  anon heap is 2.2–3.5 GB on a 7.75 GB container, so 3–4 GB of cache is available with one worker. To test after this
+  lane: the 4-month smoke spec at 1024 vs 3072 vs 4096, compare wall + the cache line; if misses collapse, make it the
+  chain default and record it on #2839. Not changed mid-chain (the running script must not be edited; wall time is
+  not a criterion).
