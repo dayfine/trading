@@ -344,9 +344,13 @@ docker exec trading-1-dev bash -c \
     block in `build_scenario_snapshots.ml`, because unlike the splice scan (a
     pre-pass in that one CLI shell) this pass runs *inside* `Build_runner.build`
     beside `Series_tail`, so both builders must surface one shared `params`
-    instead of two drifting copies. That also held `build_runner.ml`'s growth to
-    ~20 lines instead of ~45 — no limit bumped and no `@large-module` marker
-    added (`code-health-discipline.md`).
+    instead of two drifting copies. It also keeps 56 lines out of
+    `build_runner.ml`, which grows 729 → 771 all the same (+42, ~25 of them the
+    comments explaining the classification basis and the no-op contract). That
+    path is not covered by `linter_file_length.sh` (`*/lib/*.ml` only), so
+    nothing was gated on the number; `build` did trip the **fn-length** linter at
+    52 lines and was fixed by extracting a `_hygiene_opts` constructor, not by
+    bumping a limit or adding a marker (`code-health-discipline.md`).
   - `Build_runner.build` gains `?level_config`; `hygiene_opts` gains
     `level_config`; `built` gains `level : Series_level.finding option`. Each
     symbol's **stored** series — after the splice cut and after the tail rule —
