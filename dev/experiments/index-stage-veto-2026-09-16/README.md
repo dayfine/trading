@@ -118,3 +118,12 @@ dispatches while a cell runs (`container-capacity-scheduling.md` rule 1). Specs 
   - **Read at one salt:** ex-ECHO the realised gap is ≈ −$430k, made of 2020 path divergence (−$516k) and 2023
     (−$118k) against the 2022 save (+$536k). The drawdown improvement is real (33.5 vs 40.6, shorter episode); the level
     loss is a funding lottery. Salts 1–2 decide whether the 2022 save is a property and the 2020/2025 losses are draws.
+  - **MTM (added 11:30 PT):** end NAV $5.57M → $4.45M (−$1.12M) is realised, not marks — unrealised on the open book is
+    $0.92M (5 names, $4.12M market value) vs $0.86M (6 names, $4.26M). Year-end NAV diff: 2019 +$0.02M, **2020 −$1.02M**
+    (the monster funding lottery), 2021 −$0.53M, **2022 +$0.07M**, 2023 −$0.17M, 2024 −$0.01M, **2025 −$0.92M** (ECHO),
+    2026 −$1.12M. **The maxDD improvement is half a lower-peak artifact:** both curves bottom at the same $3.54M on
+    2023-10-27; the arm's % is smaller because its peak was $5.32M vs $5.94M (no ZS/BBBY/GME). The real protection is the
+    2024 leg — 2024-08-05 the arm sits at $4.01M vs the null's $3.53M trough (+$0.48M), and from the 2022-01 peak to
+    YE-2022 the arm gave back $0.97M vs $1.57M. So at this salt: 2022–24 capital protection is real (≈ +$0.5–0.6M at the
+    trough), the level and peak are draws. Judge Calmar on the trough-to-peak decomposition at salts 1–2, not on the
+    ratio alone.
