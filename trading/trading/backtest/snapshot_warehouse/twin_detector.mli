@@ -71,6 +71,26 @@ module Config : sig
             under [Returns]. Must be looser than the matching tolerance so
             genuine twins are never filtered out before the full compare; kept
             small so near-equal runs stay short. *)
+    require_direct_match : bool; [@sexp.default false]
+        (** When [true], every dropped leg must additionally match the group's
+            {e survivor} directly (the same overlap + match-fraction criterion)
+            rather than merely some other member of the group. A leg that fails
+            the direct check keeps its own series and is reported as
+            {!Transitive}.
+
+            Grouping is transitive (A~B and B~C merge A, B and C even when A~C
+            is 0), which on a wide multi-vintage universe chains unrelated
+            illiquid names into mega-groups — on the 10,504-name PIT union, 316
+            groups dropped 446 legs, 67 of them below a 0.80 match against their
+            own survivor (#2823). Defaults to [false] so every existing report
+            and warehouse is bit-identical. *)
+    max_group_size : int option; [@sexp.option]
+        (** Hub guard. When [Some cap], a component with more than [cap] members
+            is rejected wholesale: {b no} leg in it is dropped and each would-be
+            drop is reported as {!Hub}. Large components are empirically a false
+            class — they are chains through a shared near-constant series, not
+            one company under many tickers. [None] (the default) leaves
+            component size unlimited, which is the pre-#2823 behaviour. *)
   }
   [@@deriving sexp, equal]
 
@@ -78,7 +98,8 @@ module Config : sig
   (** Default config: disabled; [min_overlap_days = 100],
       [match_fraction = 0.95], [close_epsilon = 1e-4], [basis = Levels],
       [ret_epsilon = 1e-3], [prefilter_rel_tol = 2e-2] — the criterion the
-      visual audit used. *)
+      visual audit used — plus both #2823 guards off
+      ([require_direct_match = false], [max_group_size = None]). *)
 end
 
 type series = {
@@ -111,14 +132,65 @@ type group = {
 }
 [@@deriving sexp_of, equal]
 
+type rejection_reason =
+  | Transitive
+      (** The leg reached its group only through another member: it failed the
+          direct overlap/match-fraction check against the group's survivor while
+          [require_direct_match] was armed. *)
+  | Hub
+      (** The leg's component exceeded [max_group_size], so the whole component
+          was left intact. *)
+[@@deriving sexp, equal]
+
+type rejection = {
+  reason : rejection_reason;
+  survivor : string;  (** The would-be survivor of the component. *)
+  kept : string;
+      (** The leg that keeps its own series instead of being dropped. *)
+  overlap_days : int;  (** [kept] vs [survivor] — [0] when they never met. *)
+  match_fraction : float;  (** [kept] vs [survivor], on the configured basis. *)
+}
+[@@deriving sexp, equal]
+
 type report = {
   config : Config.t;
   groups : group list;  (** Detected twin groups, sorted by [survivor]. *)
   dropped_symbols : string list;
       (** Flattened, sorted union of every group's dropped legs — the set
           {!survivors} removes from a symbol list. *)
+  rejected : rejection list;
+      (** Legs a guard spared, sorted by [kept]. Report-only: every symbol here
+          keeps its own series. Always empty under the default config. *)
 }
 [@@deriving sexp_of]
+
+module Alias_map : sig
+  (** The machine-readable companion to {!render}: the dropped → survivor
+      aliasing a downstream consumer (e.g. a universe schedule that must map a
+      retired ticker onto the leg the warehouse actually holds) needs, without
+      hand-parsing the text report. A pure projection of {!report}, written
+      alongside it — additive, never behaviour-changing. *)
+
+  type entry = {
+    dropped : string;
+    survivor : string;
+    match_fraction : float;
+    overlap_days : int;
+  }
+  [@@deriving sexp, equal]
+
+  type t = {
+    aliases : entry list;
+        (** One entry per dropped leg, sorted by [dropped]. *)
+    rejected : rejection list;
+        (** The report's {!rejection}s verbatim — legs a guard spared, so a
+            consumer can tell "not a twin" from "twin we declined to drop". *)
+  }
+  [@@deriving sexp, equal]
+
+  val of_report : report -> t
+  (** [of_report report] projects [report] onto the alias artifact. *)
+end
 
 val detect : Config.t -> series list -> report
 (** [detect config series] finds rename-twin groups. When [config.enabled] is
@@ -127,6 +199,18 @@ val detect : Config.t -> series list -> report
     with the full overlap/match-fraction criterion, unions verified twin edges
     into connected components (so triples are one group), and picks the
     latest-[data_end] leg of each component as the survivor.
+
+    {b Guards (#2823, both off by default).} A component larger than
+    [max_group_size] is rejected wholesale ({!Hub}) and contributes no group.
+    Otherwise, with [require_direct_match], each non-survivor leg is re-checked
+    against the survivor itself; legs that fail are reported {!Transitive} and
+    keep their series. The hub guard is the only one that can suppress a
+    component's group entirely: a component of [>= 2] members is connected by
+    verified twin edges and the criterion is symmetric, so the survivor's own
+    verified partner always clears the direct re-check and at least one leg is
+    always dropped. Both guards only ever {e reduce} [dropped_symbols], never
+    grow it, and with their defaults [rejected] is empty and the result is
+    bit-identical to the pre-guard detector.
 
     {b Prefilter completeness.} Anchors are every [min_overlap_days/2]-th
     distinct date, so any pair whose dense overlap spans at least
@@ -152,4 +236,8 @@ val survivors : report -> all_symbols:string list -> string list
 val render : report -> string
 (** [render report] formats the config and each detected group (survivor,
     dropped legs with their overlap days + match fraction) as human-readable
-    multi-line text for the sidecar report file + stderr summary. *)
+    multi-line text for the sidecar report file + stderr summary.
+
+    Each {!rejection} adds one [rejected_transitive] / [rejected_hub] line, and
+    an armed guard names itself in the header. Under the default config neither
+    appears, so the rendering is byte-identical to the pre-#2823 one. *)

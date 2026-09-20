@@ -13,6 +13,8 @@ let test_config =
     basis = Twin_detector.Config.Levels;
     ret_epsilon = 1e-3;
     prefilter_rel_tol = 2e-2;
+    require_direct_match = false;
+    max_group_size = None;
   }
 
 (* Same thresholds under the returns basis. *)
@@ -355,6 +357,227 @@ let test_offset_window_detected_returns _ =
            ];
        ])
 
+(* ---------------------------------------------------------------------- *)
+(* #2823 — transitive mega-groups: direct-match requirement + hub guard.    *)
+(* ---------------------------------------------------------------------- *)
+
+(* A transitive chain. [ALPHA] (days 0..19) and [BRIDGE] (days 0..39) share
+   days 0..19 identically; [BRIDGE] and [OMEGA] (days 20..44) share days
+   20..39 identically; [ALPHA] and [OMEGA] share NO date at all. Union-find
+   merges all three even though the chain's endpoints never match — the #2823
+   shape (survivor BCAL <- [ABWG; ACME; AKER; …] at per-leg match 0.34).
+   [OMEGA] ends last, so it is the survivor and [ALPHA] is the leg that was
+   never compared against it. *)
+let chain_ramp = ramp ~n:45 ~base:100.0
+
+let chain_series () =
+  let alpha = series_of ~symbol:"ALPHA" (List.take chain_ramp 20) in
+  let bridge = series_of ~symbol:"BRIDGE" (List.take chain_ramp 40) in
+  let omega =
+    series_from ~symbol:"OMEGA" ~offset:20 (List.drop chain_ramp 20)
+  in
+  [ alpha; bridge; omega ]
+
+let rejection_kept (r : Twin_detector.rejection) = r.kept
+let rejection_reason (r : Twin_detector.rejection) = r.reason
+let rejection_survivor (r : Twin_detector.rejection) = r.survivor
+let rejection_overlap (r : Twin_detector.rejection) = r.overlap_days
+
+(* Defaults stay bit-identical to the pre-#2823 detector: the chain still
+   collapses into ONE group of three and records no rejection. Pinning this is
+   the acceptance bar — arming a knob must be the only way to move a report. *)
+let test_transitive_chain_default_is_one_group _ =
+  let report = Twin_detector.detect test_config (chain_series ()) in
+  assert_that report.groups
+    (elements_are
+       [
+         all_of
+           [
+             field group_survivor (equal_to "OMEGA");
+             field group_dropped (equal_to [ "ALPHA"; "BRIDGE" ]);
+           ];
+       ]);
+  assert_that report.rejected is_empty;
+  assert_that report.dropped_symbols (equal_to [ "ALPHA"; "BRIDGE" ])
+
+(* With [require_direct_match] the leg that never matched the survivor keeps
+   its own series and is reported [Transitive]; the leg that DOES match the
+   survivor directly is still dropped. *)
+let test_transitive_chain_direct_match_rejects_leg _ =
+  let report =
+    Twin_detector.detect
+      { test_config with require_direct_match = true }
+      (chain_series ())
+  in
+  assert_that report.groups
+    (elements_are
+       [
+         all_of
+           [
+             field group_survivor (equal_to "OMEGA");
+             field group_dropped (equal_to [ "BRIDGE" ]);
+           ];
+       ]);
+  assert_that report.dropped_symbols (equal_to [ "BRIDGE" ]);
+  assert_that report.rejected
+    (elements_are
+       [
+         all_of
+           [
+             field rejection_kept (equal_to "ALPHA");
+             field rejection_reason (equal_to Twin_detector.Transitive);
+             field rejection_survivor (equal_to "OMEGA");
+             field rejection_overlap (equal_to 0);
+           ];
+       ]);
+  assert_that
+    (Twin_detector.survivors report ~all_symbols:[ "ALPHA"; "BRIDGE"; "OMEGA" ])
+    (equal_to [ "ALPHA"; "OMEGA" ])
+
+(* Six mutually-identical legs — the "hub" shape memory
+   [project_pit_chunked_twin_miss] records as a false class. *)
+let hub_series () =
+  let closes = ramp ~n:20 ~base:70.0 in
+  List.init 6 ~f:(fun i -> series_of ~symbol:(Printf.sprintf "HUB%d" i) closes)
+
+(* [max_group_size = None] (the default): every non-survivor leg is dropped,
+   which is the pre-#2823 behaviour. *)
+let test_hub_guard_off_drops_all_legs _ =
+  let report = Twin_detector.detect test_config (hub_series ()) in
+  assert_that report.dropped_symbols
+    (equal_to [ "HUB1"; "HUB2"; "HUB3"; "HUB4"; "HUB5" ]);
+  assert_that report.rejected is_empty
+
+(* [max_group_size = Some 4]: the 6-member group exceeds the cap, so NO leg is
+   dropped and every would-be drop is reported [Hub]. *)
+let test_hub_guard_rejects_oversized_group _ =
+  let report =
+    Twin_detector.detect
+      { test_config with max_group_size = Some 4 }
+      (hub_series ())
+  in
+  assert_that report.groups is_empty;
+  assert_that report.dropped_symbols is_empty;
+  assert_that report.rejected
+    (elements_are
+       (List.init 5 ~f:(fun i ->
+            all_of
+              [
+                field rejection_kept (equal_to (Printf.sprintf "HUB%d" (i + 1)));
+                field rejection_reason (equal_to Twin_detector.Hub);
+                field rejection_survivor (equal_to "HUB0");
+              ])))
+
+(* [max_group_size = Some 6] on a 6-member component: the guard fires on MORE
+   than the cap, so a component of exactly the cap is under it and still drops
+   its legs. Pins the boundary the [> cap] comparison sits on. *)
+let test_hub_guard_allows_group_at_exactly_the_cap _ =
+  let report =
+    Twin_detector.detect
+      { test_config with max_group_size = Some 6 }
+      (hub_series ())
+  in
+  assert_that report.dropped_symbols
+    (equal_to [ "HUB1"; "HUB2"; "HUB3"; "HUB4"; "HUB5" ]);
+  assert_that report.rejected is_empty
+
+(* The alias map lists exactly the dropped -> survivor pairs of a plain twin
+   pair, with the overlap and match fraction measured against the survivor. *)
+let test_alias_map_lists_dropped_pairs _ =
+  let closes = ramp ~n:20 ~base:100.0 in
+  let ions = series_of ~symbol:"IONS" closes in
+  let isis = truncate_series ~symbol:"ISIS" ~n:15 closes in
+  let report = Twin_detector.detect test_config [ isis; ions ] in
+  let alias = Twin_detector.Alias_map.of_report report in
+  assert_that alias.aliases
+    (elements_are
+       [
+         equal_to
+           ({
+              dropped = "ISIS";
+              survivor = "IONS";
+              match_fraction = 1.0;
+              overlap_days = 15;
+            }
+             : Twin_detector.Alias_map.entry);
+       ]);
+  assert_that alias.rejected is_empty
+
+(* The artifact carries the report's rejections verbatim, so a consumer can tell
+   "not a twin" from "twin we declined to drop". *)
+let test_alias_map_carries_rejections _ =
+  let report =
+    Twin_detector.detect
+      { test_config with require_direct_match = true }
+      (chain_series ())
+  in
+  assert_that (Twin_detector.Alias_map.of_report report).rejected
+    (elements_are
+       [
+         all_of
+           [
+             field rejection_kept (equal_to "ALPHA");
+             field rejection_reason (equal_to Twin_detector.Transitive);
+             field rejection_survivor (equal_to "OMEGA");
+           ];
+       ])
+
+(* The artifact round-trips through sexp, so a universe schedule can consume it
+   instead of hand-parsing the text report. *)
+let test_alias_map_sexp_round_trip _ =
+  let report =
+    Twin_detector.detect
+      { test_config with require_direct_match = true }
+      (chain_series ())
+  in
+  let alias = Twin_detector.Alias_map.of_report report in
+  assert_that
+    (Twin_detector.Alias_map.t_of_sexp
+       (Twin_detector.Alias_map.sexp_of_t alias))
+    (equal_to (alias : Twin_detector.Alias_map.t))
+
+(* Defaults render the pre-#2823 header verbatim: neither knob appears in it
+   and no rejection line is emitted. *)
+let test_render_header_unchanged_with_defaults _ =
+  let lines =
+    Twin_detector.detect test_config (chain_series ())
+    |> Twin_detector.render |> String.split_lines
+  in
+  assert_that (List.hd_exn lines)
+    (equal_to
+       "rename-twin report: basis=levels enabled=true min_overlap_days=5 \
+        match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001");
+  assert_that
+    (List.count lines ~f:(fun l -> String.is_substring l ~substring:"rejected"))
+    (equal_to 0)
+
+(* An armed report names both knobs in the header and renders one labelled
+   line per rejected leg. *)
+let test_render_reports_rejected_legs _ =
+  let lines =
+    Twin_detector.detect
+      { test_config with require_direct_match = true }
+      (chain_series ())
+    |> Twin_detector.render |> String.split_lines
+  in
+  assert_that (List.hd_exn lines)
+    (contains_substring "require_direct_match=true");
+  assert_that
+    (List.count lines ~f:(fun l ->
+         String.is_substring l ~substring:"rejected_transitive ALPHA"))
+    (equal_to 1)
+
+(* Both knobs default to the v2 no-op. *)
+let test_config_defaults_are_off _ =
+  assert_that Twin_detector.Config.default
+    (all_of
+       [
+         field
+           (fun (c : Twin_detector.Config.t) -> c.require_direct_match)
+           (equal_to false);
+         field (fun (c : Twin_detector.Config.t) -> c.max_group_size) is_none;
+       ])
+
 let suite =
   "twin_detector"
   >::: [
@@ -379,6 +602,22 @@ let suite =
          >:: test_identical_data_end_tiebreak_returns;
          "offset_window_detected_returns"
          >:: test_offset_window_detected_returns;
+         "transitive_chain_default_is_one_group"
+         >:: test_transitive_chain_default_is_one_group;
+         "transitive_chain_direct_match_rejects_leg"
+         >:: test_transitive_chain_direct_match_rejects_leg;
+         "hub_guard_off_drops_all_legs" >:: test_hub_guard_off_drops_all_legs;
+         "hub_guard_rejects_oversized_group"
+         >:: test_hub_guard_rejects_oversized_group;
+         "hub_guard_allows_group_at_exactly_the_cap"
+         >:: test_hub_guard_allows_group_at_exactly_the_cap;
+         "alias_map_lists_dropped_pairs" >:: test_alias_map_lists_dropped_pairs;
+         "alias_map_carries_rejections" >:: test_alias_map_carries_rejections;
+         "alias_map_sexp_round_trip" >:: test_alias_map_sexp_round_trip;
+         "render_header_unchanged_with_defaults"
+         >:: test_render_header_unchanged_with_defaults;
+         "render_reports_rejected_legs" >:: test_render_reports_rejected_legs;
+         "config_defaults_are_off" >:: test_config_defaults_are_off;
        ]
 
 let () = run_test_tt_main suite
