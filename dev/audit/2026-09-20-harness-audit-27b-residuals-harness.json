@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-20",
+  "feature": "harness",
+  "branch": "harness/audit-27b-residuals",
+  "sha": "11f79ab6a548cf6333bb11007048cf644c540409",
+  "recorded_at_ns": 1789926269097271631,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "R2874-A: the $PWD-leak class remains open for scenarios 28b and 30c (LINTER_CANDIDATE); R2874-B: 27b's two guard claims are pinned by PR-body prose, not a committed mutation test (LINTER_CANDIDATE)",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

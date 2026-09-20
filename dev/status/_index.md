@@ -4,8 +4,10 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-16 (orchestrator run 35125114953; previously a local session after the PIT band + Codex/QC wave; main **`3ce4381f`**, green on all four
-CI checks; `status_file_integrity` **0**, `index_size_linter` **0** (14002/20480 pre-reconcile; 15491 after),
+Last updated: 2026-09-20 (orchestrator run 35521718664; run start `883ef4b9`, main after this run's
+two auto-merges **`f1549820`** (#2874, #2875); `status_file_integrity` **0**, `index_size_linter` **0**
+(15657/20480 after reconcile — note the linter *caught* this run's own oversized `screener` row at
+281 chars, pre-PR, and it was shortened),
 `no_python_check` **0** — run standalone without dune, exit codes read unpiped).
 
 **This header was trimmed this run.** It had reached **18725/20480 bytes (91%)**
@@ -97,9 +99,9 @@ immune (#2605).
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | PIT migration LOCAL, do not dispatch: steps 1–6 MERGED (#2843 band 152/188/457, #2846 golden); next #2823, #2839, top-of-funnel screen |
-| [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
-| [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | V18 #2750 + `Series_level` build-time sibling #2773 MERGED `9b65f7cb` (report-only, default-off, unwired); next: wire to Build_runner; #2732 asks 1+3 LOCAL |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | PIT migration LOCAL, do not dispatch: steps 1–6 MERGED (#2843 band 152/188/457, #2846 golden); #2823 shipped as #2862; next #2839, top-of-funnel screen |
+| [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1/v2 MERGED; twin-detector direct-match + hub guard MERGED #2862 (default-off); alias sidecar is armed-pass only (#2870); next: arm the guards on a PIT rebuild |
+| [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | `Series_level` WIRED to `Build_runner` behind `-detect-series-level`, report-only default-off, MERGED #2875 (1 rework); next: arm on next rebuild + read sidecar |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
@@ -122,13 +124,13 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2851, #2852, #2853 | 09-16: both 09-15 residuals closed (#2852 N3 row, #2851 constant split) + #2853 stale-summary guard (#2850); next: workload-aware disk guard |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-20: scenario-27b cumulative-count + dev/audit-leak residuals MERGED #2874 (mutation-verified); next: 28b/30c leak residuals (R2874-A), workload-aware disk guard |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (re-audited 09-16): 3 open items, all self-marked deliberate non-actions, + 1 fenced template. Prior itemization corrected |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | `deteriorating_blocks_longs` default-off long gate MERGED #2759 + pre-registered 3-salt read #2768; next: run that pre-registered read |
+| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | `deteriorating_blocks_longs` read RAN — REJECT-do-not-revive (#2776/#2792); `index_stage_veto_blocks_longs` MERGED default-off #2863; next: the veto arm (LOCAL) |
 | [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | Clock 0→52 MERGED #2587; A-null LANDED #2631 (`deb45a7e`) — return effect sign-inconsistent, maxDD the robust property; next: none queued |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
