@@ -59,3 +59,25 @@ mode of `build_snapshots` (`memory/project_pit_chunked_twin_miss`).
   `.claude/worktrees/agent-*` — the #2863 rework was recovered from disk, verified and pushed dispatcher-side.
 - Codex worktrees under `.claude/worktrees/codex-*` are Codex's to remove; leave them. `sweep-pit` (null build)
   can go once the veto arm has paired cleanly against the committed null artifacts.
+
+## Addendum 15:00 PT 2026-09-20 (session wrapped here; chain keeps running)
+
+- **Salt 0 landed 11:08 PT** (wall 8h33m): level 457.0 → 344.7, realised $3.85M → $2.77M (**fails**), maxDD 40.6 → 33.5,
+  Calmar 0.165 → 0.173 (**clears**). Join: trade-identical 2000 → 2018-11; 2022 cohort 19 entries removed, −$818k →
+  −$282k (the predicted save); 2020 re-entry cost ≈ nil (10 blocked entries net −$3k) but the 2020 monster funding
+  diverged (−$516k, lottery); 2025 −$1.15M is ECHO skipped `Insufficient_cash` (not the veto). MTM: the maxDD gain is
+  half a lower peak ($5.32M vs $5.94M; same $3.54M trough on 2023-10-27), half real 2022–24 protection (+$0.48M at the
+  null's 2024-08 trough). Full read: `dev/experiments/index-stage-veto-2026-09-16/README.md` §Log (branch
+  `exp/index-stage-veto`, pushed; `results/v1-index-veto-s0-v11-*` committed; `paired.sh` recovered and committed).
+- **Salt 1 started 11:07 PT**, salt 2 follows (~6–8.5 h each). Artifacts land in `.sweep-output/index-veto/` (host)
+  regardless of the session; the Monitor dies with the session, so on resume: `tail /tmp/veto-run/launch-A.log`, then
+  per cell copy the eight artifacts into `results/`, check `v6diff:exit=0`, run `paired.sh` vs
+  `pit-universe-2026-09-14/step4/results/a0-pit-null-s<salt>-v11-trades.csv`, append the read. Verdict after salt 2 by
+  the pre-registered rule; judge Calmar on the peak/trough decomposition, not the ratio.
+- **Runtime finding (README §"Runtime read", #2839 comments, memory `project_snapshot_cache_handle_cap_thrash`):**
+  every 26y cell re-decodes each symbol ~450×/sim-year because the v2 warehouse binds on the hard-coded 256 mmap-handle
+  cap in `daily_panels.ml`, not on `SNAPSHOT_CACHE_MB`. Misses identical on null and arm; wall variance is per-miss cost.
+  **Order after the lane: #2878 (occupancy/heap tracking, `ready-for-agent`) → #2839 knob `SNAPSHOT_MAX_MMAP_HANDLES`
+  ≥ n_symbols → smoke at 256 vs 12,000 → chain default.** Both bit-identical; both need the container, so after salt 2.
+- Keep `.claude/worktrees/sweep-veto` until the lane is done and the results PR is open; `sweep-pit` can go now that the
+  arm pairs cleanly against the committed null artifacts (V6 diff exit 0 at salt 0).
