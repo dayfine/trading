@@ -55,7 +55,7 @@ expectations so we never make these kinds of trades again."
   `Build_runner.build`. Default-off, report-only; `Twin_pass`' module shape,
   `-detect-splices`' contract.
 - `trading/analysis/scripts/build_snapshots/test/test_build_runner_level.ml` —
-  end-to-end wiring pin for that flag (9 tests).
+  end-to-end wiring pin for that flag (12 tests).
 - `trading/trading/backtest/validation/test/test_series_level_v18_median_agreement.ml`
   — cross-module drift detector for the one statistic V18 and `Series_level`
   each compute their own copy of (3 tests).
@@ -369,17 +369,27 @@ docker exec trading-1-dev bash -c \
     so nothing is dropped, cut or truncated whatever it finds. No config default
     changed, so no paired golden run was required
     (`config-default-blast-radius.md` B1).
-  - Verify: `dune runtest analysis/scripts/build_snapshots/` — 9 cases in
+  - Verify: `dune runtest analysis/scripts/build_snapshots/` — 12 cases in
     `test/test_build_runner_level.ml`: flag OFF ⇒ no sidecar; armed-vs-unarmed
-    `.snap` `payload_md5` lists equal (report-only, pinned in both directions);
-    flag ON ⇒ a file with the exact `csv_header`; the `whole_window` and
-    `mixed_scale` rows as literal CSV lines; an ordinary series yielding no row;
-    an armed pass with nothing to report writing the **header alone**; and both
-    tuning knobs shown live. Mutation-verified: `classify` handed
-    `enabled = false` reddens the three detector-reached cases (and dropping the
-    `level_config` read outright fails to compile on warning 69, which is its
-    own proof the field is live), and removing `write_report`'s config gate
-    reddens the flag-OFF case.
+    manifest entries equal **as whole records** (report-only, pinned in both
+    directions); flag ON ⇒ a file with the exact `csv_header`; the
+    `whole_window` and `mixed_scale` rows as literal CSV lines; an ordinary
+    series yielding no row; an armed pass with nothing to report writing the
+    **header alone**; both tuning knobs shown live; and the classification
+    basis pinned on both edits — a splice-cut symbol yields no row while the
+    same uncut fixture does, and a stray-dropped symbol's row carries the
+    stored 21 bars rather than the 22 that were read.
+  - Mutation-verified: `classify` handed `enabled = false` reddens the three
+    detector-reached cases (and dropping the `level_config` read outright fails
+    to compile on warning 69, which is its own proof the field is live);
+    removing `write_report`'s config gate reddens the flag-OFF case; clearing
+    `active_through` for flagged symbols in `_entry_with_derived_marker`
+    reddens the no-op case; and hoisting `_classify_level` above `_cut_splice` /
+    `_clean_tail` reddens the two ordering cases. The last two were **green**
+    against the pre-rework suite — the identity check projected entries to
+    `(symbol, payload_md5)` and no fixture carried a delisting marker or was
+    touched by either edit, so neither claim was pinned (QC rework iteration 1,
+    CP1/CP3).
 
 ## Follow-ups
 
