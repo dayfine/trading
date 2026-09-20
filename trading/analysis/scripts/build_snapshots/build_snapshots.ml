@@ -43,6 +43,13 @@
     backtest holding both legs double-counts one position. Same builder-flag gap
     as the splice flags in #2711.
 
+    Optional [--detect-series-level] (+ the [--series-level-*] tuning flags,
+    {!Level_pass.params}): classify each stored series' price {e level} and
+    write [series_level.csv] beside the warehouse.
+    {b Default off, and report-only even when armed} — it never drops, cuts or
+    truncates a symbol, so an armed build's warehouse is byte-identical to an
+    un-armed one.
+
     Checkpointing: per-symbol atomic manifest update + periodic [progress.sexp]
     emission, both handled by {!Build_runner}. See
     [dev/plans/daily-snapshot-streaming-2026-04-27.md] §Phasing Phase B and
@@ -64,14 +71,14 @@ let _load_universe ~universe_path =
 
 let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
     ~end_date ~sketch_deep_days ~incremental ~progress_every
-    ~survivor_tolerance_days ~twin_config ~tail_config ~tail_exceptions_path ()
-    =
+    ~survivor_tolerance_days ~twin_config ~level_config ~tail_config
+    ~tail_exceptions_path () =
   let symbols = _load_universe ~universe_path in
   let tail_exceptions =
     Build_runner.tail_exceptions_or_exit tail_exceptions_path
   in
-  Build_runner.build ~survivor_tolerance_days ~twin_config ~symbols
-    ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date ~end_date
+  Build_runner.build ~survivor_tolerance_days ~twin_config ~level_config
+    ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date ~end_date
     ~sketch_deep_days ~incremental ~progress_every ~tail_config ~tail_exceptions
     ()
 
@@ -151,11 +158,12 @@ let command =
        flag "emit-weekly-sidetable" no_arg ~doc:doc_emit_weekly_sidetable
      and survivor_tolerance_days = Build_runner.survivor_tolerance_param
      and twin_config = Twin_pass.params
+     and level_config = Level_pass.params
      and tail_config, tail_exceptions_path = Build_runner.tail_params in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol
          ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every
-         ~survivor_tolerance_days ~twin_config ~tail_config
+         ~survivor_tolerance_days ~twin_config ~level_config ~tail_config
          ~tail_exceptions_path ())
 
 let () = Command_unix.run command
