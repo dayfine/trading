@@ -73,3 +73,16 @@ dispatches while a cell runs (`container-capacity-scheduling.md` rule 1). Specs 
 ## Log
 
 (cells append here as they finish)
+
+- 2026-09-20 02:34 PT — **launched** (lane A, salts 0 → 1 → 2, one worker). Mechanism merged as #2863 (`5577d418a`,
+  two commits: the flag + a rework pinning the fresh-candidate wiring after qc-behavioral proved M2/M3 mutations
+  survived the suite); #2823 twin-detector guards merged alongside as #2862 (default-off, warehouse untouched). Pinned
+  worktree `sweep-veto` @ `5577d418a`; build drift vs the null's `3a20f4987` is the list in §Arm plus #2862/#2863,
+  both default-off. **Smoke** (same build, spec with `end_date 2000-04-28`, salt 0): exit 0, `params.sexp` reads
+  `index_stage_veto_blocks_longs true`, 10 trades, +3.17 % — the flag resolves through `Overlay_validator` and the
+  PIT schedule + `_v11pit` warehouse path works on this build. Chain script staged at `/tmp/veto-run/chain-veto.sh`
+  (copy of the committed one), specs at `/tmp/veto-run/specs`, artifacts `/tmp/sweeps/index-veto/`, launch log
+  `/tmp/veto-run/launch-A.log`. The warmup year (1999) alone costs ~18 min of weekly classification over 9,915
+  symbols, which is where the 6.3 h/cell goes. Ops note: a `dune build` started through a harness-backgrounded
+  `docker exec` hung in `futex_wait` at 0 % CPU for 34 min; killed and relaunched detached (`docker exec -d … nohup`)
+  — build long things detached from the start.
