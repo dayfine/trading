@@ -2,7 +2,14 @@
 
 ## Status
 
-IN_PROGRESS
+READY_FOR_REVIEW
+
+<!-- 2026-09-20: PR #2875 (wire Series_level into Build_runner behind
+     -detect-series-level, report-only + default-off) is open and green, so the
+     track carries an open PR awaiting QC. The 2026-07-13 reconcile note below
+     still applies to the OTHER follow-ups — they are data-gated / LOCAL /
+     operational, not dispatchable — so once #2875 merges with no successor PR
+     this reverts to IN_PROGRESS. -->
 
 <!-- 2026-07-13 orchestrator reconcile: heading was READY_FOR_REVIEW but v1
      harness (#1937) + C6b audit-join-by-position_id (#1947) are both MERGED
@@ -41,7 +48,14 @@ expectations so we never make these kinds of trades again."
 - `trading/analysis/weinstein/snapshot_pipeline/lib/series_level.{ml,mli}` —
   the build-time sibling of V18's **level** rule: a pure per-symbol
   classification of a stored series' price level, beside `Series_tail` and
-  `Series_splice`. Default-off, report-only, no action type, not yet wired.
+  `Series_splice`. Default-off, report-only, no action type; armed inside
+  `Build_runner.build` via `Level_pass` below (PR #2875).
+- `trading/analysis/scripts/build_snapshots/level_pass.{ml,mli}` — the CLI flag
+  block + `series_level.csv` sidecar writer that arms `Series_level` inside
+  `Build_runner.build`. Default-off, report-only; `Twin_pass`' module shape,
+  `-detect-splices`' contract.
+- `trading/analysis/scripts/build_snapshots/test/test_build_runner_level.ml` —
+  end-to-end wiring pin for that flag (12 tests).
 - `trading/trading/backtest/validation/test/test_series_level_v18_median_agreement.ml`
   — cross-module drift detector for the one statistic V18 and `Series_level`
   each compute their own copy of (3 tests).
@@ -314,7 +328,68 @@ docker exec trading-1-dev bash -c \
     `n_above >= n - 1`, reddens the one-bar-at-the-ceiling case; removing the
     `Int.max 1` floor on `min_bars` raises `Invalid_argument` in the
     empty-series case.
-  - **Not wired to anything yet**, deliberately — see Follow-ups.
+  - **Not wired to anything yet** at the time it shipped, deliberately; wired by
+    the entry below, which touched no line of `series_level.{ml,mli}`.
+
+- [x] **`Series_level` wired into `Build_runner`, report-only and default-off**
+  (feat/series-level-build-runner, PR #2875). The detector had shipped tested
+  and called by nothing; this is the wiring half only — no change to
+  `series_level.{ml,mli}`, no detection logic, no threshold.
+  - **`Level_pass`**
+    (`trading/analysis/scripts/build_snapshots/level_pass.{ml,mli}`, ~55 lines)
+    owns the two *impure* halves of arming a pure module: the `Core.Command`
+    flag block and the sidecar write. The **contract** is `-detect-splices`'
+    (#2649) — default-off master switch, a CSV named after the pass,
+    report-only. The **module boundary** is `Twin_pass`' rather than an inline
+    block in `build_scenario_snapshots.ml`, because unlike the splice scan (a
+    pre-pass in that one CLI shell) this pass runs *inside* `Build_runner.build`
+    beside `Series_tail`, so both builders must surface one shared `params`
+    instead of two drifting copies. It also keeps 56 lines out of
+    `build_runner.ml`, which grows 729 → 771 all the same (+42, ~25 of them the
+    comments explaining the classification basis and the no-op contract). That
+    path is not covered by `linter_file_length.sh` (`*/lib/*.ml` only), so
+    nothing was gated on the number; `build` did trip the **fn-length** linter at
+    52 lines and was fixed by extracting a `_hygiene_opts` constructor, not by
+    bumping a limit or adding a marker (`code-health-discipline.md`).
+  - `Build_runner.build` gains `?level_config`; `hygiene_opts` gains
+    `level_config`; `built` gains `level : Series_level.finding option`. Each
+    symbol's **stored** series — after the splice cut and after the tail rule —
+    is classified, and the rows land in `<output_dir>/series_level.csv`. The
+    basis is deliberate: the residual class is defined against what actually
+    lands in the `.snap` (a seam outside the window presents, inside it, as a
+    uniformly mis-scaled stored series), so classifying the raw pre-cut bars
+    would instead re-find defects the shape rules already removed.
+  - CLI on **both** builders: `-detect-series-level`,
+    `-series-level-median-max R`, `-series-level-min-bars N`. Every
+    `Series_level.Config` field is reachable from the command line, so
+    recalibrating the ceiling against a real warehouse needs no rebuild.
+  - **Unarmed is bit-identical**: `classify` reads no bar and `write_report`
+    writes no file, so an un-armed build leaves no trace in its output
+    directory. **Armed is still bit-identical** — the pass has no action type,
+    so nothing is dropped, cut or truncated whatever it finds. No config default
+    changed, so no paired golden run was required
+    (`config-default-blast-radius.md` B1).
+  - Verify: `dune runtest analysis/scripts/build_snapshots/` — 12 cases in
+    `test/test_build_runner_level.ml`: flag OFF ⇒ no sidecar; armed-vs-unarmed
+    manifest entries equal **as whole records** (report-only, pinned in both
+    directions); flag ON ⇒ a file with the exact `csv_header`; the
+    `whole_window` and `mixed_scale` rows as literal CSV lines; an ordinary
+    series yielding no row; an armed pass with nothing to report writing the
+    **header alone**; both tuning knobs shown live; and the classification
+    basis pinned on both edits — a splice-cut symbol yields no row while the
+    same uncut fixture does, and a stray-dropped symbol's row carries the
+    stored 21 bars rather than the 22 that were read.
+  - Mutation-verified: `classify` handed `enabled = false` reddens the three
+    detector-reached cases (and dropping the `level_config` read outright fails
+    to compile on warning 69, which is its own proof the field is live);
+    removing `write_report`'s config gate reddens the flag-OFF case; clearing
+    `active_through` for flagged symbols in `_entry_with_derived_marker`
+    reddens the no-op case; and hoisting `_classify_level` above `_cut_splice` /
+    `_clean_tail` reddens the two ordering cases. The last two were **green**
+    against the pre-rework suite — the identity check projected entries to
+    `(symbol, payload_md5)` and no fixture carried a delisting marker or was
+    touched by either edit, so neither claim was pinned (QC rework iteration 1,
+    CP1/CP3).
 
 ## Follow-ups
 
@@ -325,13 +400,14 @@ docker exec trading-1-dev bash -c \
 - Run V18 over the canonical 26y record as first acceptance: expect MEL to
   reproduce, and review whatever else the level rule surfaces to calibrate
   whether $10,000 is the right ceiling for a broad universe.
-- Wire `Series_level` into `Build_runner` — report-only, behind a
-  `-detect-series-level` flag writing a `series_level.csv` sidecar — then arm
-  it on the next warehouse rebuild and read the report. The module exists and
-  is tested; nothing calls it yet, deliberately, mirroring `Splice_detector`'s
-  own #2649 (detect) / #2708 (act) sequence and keeping a `hygiene_opts` field
-  + a sidecar + a CLI flag off an already-729-line `build_runner.ml` out of the
-  detector's PR.
+- **Arm `-detect-series-level` on the next warehouse rebuild and read
+  `series_level.csv`.** The wiring landed in PR #2875 (see Fixes above), so this
+  follow-up is now purely operational: pass the flag to `build_snapshots.exe` /
+  `build_scenario_snapshots.exe` on the next vintage build, and review the
+  sidecar. Nothing in the repo arms it, by design. Expect `Mixed_scale` rows
+  (sub-class (ii): PEGX / CGE / TNT / HTV, whose prefix cut the 250-bar
+  short-tail guard correctly refuses) and possibly **zero** `Whole_window` rows
+  — see the next item for why that is the expected result rather than a defect.
 - Decide, off that first armed report, whether a `Whole_window` row warrants a
   **drop** action. **Expect the report to be able to come back empty of
   `Whole_window` rows** — the seven seam dates evidencing sub-class (i) are all
@@ -365,7 +441,7 @@ docker exec trading-1-dev bash -c \
   the bar-dependent V3/V4/V7 are covered structurally but want a golden-run
   integration test.
 
-## Last updated: 2026-09-13
+## Last updated: 2026-09-20
 
 ## Interface stable
 

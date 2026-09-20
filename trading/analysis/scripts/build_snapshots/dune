@@ -14,6 +14,14 @@
   (pps ppx_jane)))
 
 (library
+ (name level_pass)
+ (public_name scripts.level_pass)
+ (modules level_pass)
+ (libraries core weinstein.snapshot_pipeline)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
  (name build_runner)
  (public_name scripts.build_runner)
  (modules build_runner)
@@ -25,6 +33,7 @@
   fpath
   trading.data_panel.snapshot
   bar_window
+  level_pass
   weinstein.snapshot_pipeline
   csv
   trading.backtest.twin_detector
@@ -42,6 +51,7 @@
   status
   universe_loader
   build_runner
+  level_pass
   trading.backtest.twin_pass)
  (preprocess
   (pps ppx_jane)))

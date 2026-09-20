@@ -111,6 +111,7 @@ val build :
   ?survivor_tolerance_days:int ->
   ?splice_cuts:Core.Date.t Core.Map.M(Core.String).t ->
   ?twin_config:Twin_detector.Config.t ->
+  ?level_config:Snapshot_pipeline.Series_level.Config.t ->
   symbols:string list ->
   csv_data_dir:string ->
   output_dir:string ->
@@ -229,6 +230,23 @@ val build :
       ([build_snapshots.exe]) had no way to arm the pass at all before #2730,
       which is why the [_v7mark] warehouses still carry NLS/BFX, BB/BBRY,
       AABA/YHOO and friends.
+
+    - [level_config] — build-time store-level sanity
+      ({!Snapshot_pipeline.Series_level}, wired via {!Level_pass}), run per
+      symbol on the series this build is {e about to store} — after the splice
+      cut and after the tail rule, so it asks about what actually lands in the
+      [.snap] rather than re-finding defects those rules already removed.
+      {b It is report-only and has no action type}: whatever it classifies, no
+      symbol is dropped, no series cut and no manifest entry changed, so an
+      {e armed} build produces a byte-identical warehouse to an un-armed one.
+      The findings land in [<output_dir>/]{!Level_pass.report_name} and a
+      summary line is logged. Defaults to
+      {!Snapshot_pipeline.Series_level.Config.default}, which is
+      [enabled = false]: no bar is examined and {b no file is written at all},
+      unlike the unconditional tail report above. Both builders surface the
+      flags via {!Level_pass.params}. Like the tail report, the sidecar is
+      run-scoped — an incremental-skipped or carried-forward symbol read no
+      bars, so it contributes no row.
 
     {2 [twin_config] with [incremental]: a dropped leg leaves the index}
 
