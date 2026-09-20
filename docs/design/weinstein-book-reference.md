@@ -35,7 +35,7 @@ Weinstein uses multiple long-term indicators, weighted by agreement ("Weight of 
 
 Apply the same stage analysis to the market index itself:
 - Plot DJI (or S&P 500) with its 30-week MA
-- Stage 3 potential top on DJI → become cautious, suspend new buying
+- Stage 3 potential top on DJI → become cautious ("proceed with caution"); the suspension of new buying is the Stage-4 breakdown, not the Stage-3 top — see "Resolved 2026-09-16" below
 - DJI breaks below 30-week MA into Stage 4 → very defensive: sell poor RS stocks, tighten stops, begin looking for shorts
 - Stage 1 base forming on DJI → prepare for next bull signal
 - DJI breaks above flattening/rising 30-week MA → start aggressive buying

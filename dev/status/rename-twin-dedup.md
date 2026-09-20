@@ -150,7 +150,7 @@ MaxDD 40.9%. Full writeup + why the haircut exceeds the 12% estimate:
 `dev/notes/dedup-record-rerun-2026-07-13.md`. Validator over the run:
 audit join 1171/1171, V5 PASS, V6 down to its 2 known false positives.
 
-## Transitive mega-groups guarded (2026-09-16, #2823, PR TBD)
+## Transitive mega-groups guarded (2026-09-16, #2823, #2862)
 
 Grouping is transitive, so on the 10,504-name PIT union (#2823) 316 groups
 dropped 446 legs — 67 below a 0.80 match against their own survivor, including
@@ -160,7 +160,7 @@ each leg against the group's survivor (failures reported `rejected_transitive`,
 series kept) and `max_group_size` leaves an oversized component intact
 (`rejected_hub`). CLI: `-twin-require-direct-match`, `-twin-max-group-size N`.
 `Twin_detector.Alias_map` is also written beside the text report as
-`rename_twin_report.alias.sexp` (both modes). With the defaults every existing
+`rename_twin_report.alias.sexp` (armed pass only). With the defaults every existing
 report, warehouse and test is bit-identical. **The PIT warehouse rebuild with
 the flag on is a separate operational step**, not done here.
 Verify: `dune runtest trading/backtest/snapshot_warehouse`.
