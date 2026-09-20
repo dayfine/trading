@@ -60,6 +60,16 @@ type hygiene_opts = {
          never reach the runner — they are removed from [symbols]. *)
 }
 
+(* Constructor rather than an inline record literal at the call site, so [build]
+   stays a readable sequence of stages as the bundle grows a field. *)
+let _hygiene_opts ~tail_config ~tail_exceptions ~level_config ~splice_cuts =
+  {
+    config = tail_config;
+    exceptions = tail_exceptions;
+    level_config;
+    splice_cuts;
+  }
+
 type progress = {
   symbols_total : int;
   symbols_done : int;
@@ -657,12 +667,7 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
   let existing = if incremental then _existing_manifest ~output_dir else None in
   let manifest_path = Filename.concat output_dir "manifest.sexp" in
   let hygiene =
-    {
-      config = tail_config;
-      exceptions = tail_exceptions;
-      level_config;
-      splice_cuts;
-    }
+    _hygiene_opts ~tail_config ~tail_exceptions ~level_config ~splice_cuts
   in
   let started_at = Core_unix.time () in
   let t0 = Time_ns.now () in

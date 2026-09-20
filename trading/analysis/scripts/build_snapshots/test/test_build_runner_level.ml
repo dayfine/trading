@@ -110,11 +110,12 @@ let _first_line s = List.hd_exn (String.split_lines s)
    the config rather than on "no findings" is what makes this observable: a
    header-only file would be indistinguishable from an armed pass that found
    nothing. *)
-let test_unarmed_build_writes_no_sidecar _ =
-  _run_build (fun ~output_dir ->
-      assert_that
-        (Stdlib.Sys.file_exists (_report_path ~output_dir))
-        (equal_to false))
+let _check_no_sidecar ~output_dir =
+  assert_that
+    (Stdlib.Sys.file_exists (_report_path ~output_dir))
+    (equal_to ~msg:"an un-armed build must not write the sidecar" false)
+
+let test_unarmed_build_writes_no_sidecar _ = _run_build _check_no_sidecar
 
 let _payload_md5s ~output_dir =
   match
@@ -126,58 +127,70 @@ let _payload_md5s ~output_dir =
           (e.symbol, e.payload_md5))
       |> List.sort ~compare:Poly.compare
 
+let _md5s_of_build ~dir ~name ~data_dir ~level_config =
+  let output_dir = Filename.concat dir name in
+  _build ~level_config ~symbols:_all_symbols ~data_dir ~output_dir ();
+  _payload_md5s ~output_dir
+
 (* The report-only claim, pinned in both directions: arming the pass over
    fixtures it DOES flag still writes byte-identical [.snap] files. The md5s come
    from the manifest, which checksums the payloads, so a single changed bar in
    any of the three symbols reddens this. *)
+let _check_arming_is_a_no_op dir =
+  let data_dir = Filename.concat dir "csv" in
+  Core_unix.mkdir_p data_dir;
+  _write_fixtures ~data_dir;
+  let unarmed =
+    _md5s_of_build ~dir ~name:"off" ~data_dir
+      ~level_config:Series_level.Config.default
+  in
+  let armed =
+    _md5s_of_build ~dir ~name:"on" ~data_dir ~level_config:(_armed ())
+  in
+  assert_that armed
+    (equal_to ~msg:"arming the level pass changed a .snap payload" unarmed)
+
 let test_arming_does_not_change_the_warehouse _ =
-  _with_temp_dir (fun dir ->
-      let data_dir = Filename.concat dir "csv" in
-      Core_unix.mkdir_p data_dir;
-      _write_fixtures ~data_dir;
-      let build_into name level_config =
-        let output_dir = Filename.concat dir name in
-        _build ~level_config ~symbols:_all_symbols ~data_dir ~output_dir ();
-        _payload_md5s ~output_dir
-      in
-      let unarmed = build_into "off" Series_level.Config.default in
-      let armed = build_into "on" (_armed ()) in
-      assert_that armed
-        (equal_to ~msg:"arming the level pass changed a .snap payload" unarmed))
+  _with_temp_dir _check_arming_is_a_no_op
 
 (* --- flag ON: the detector runs and the sidecar carries its rows ---------- *)
 
+let _check_report matcher ~output_dir =
+  assert_that (_report ~output_dir) matcher
+
+let _check_header_line ~output_dir =
+  assert_that
+    (_first_line (_report ~output_dir))
+    (equal_to Series_level.csv_header)
+
 let test_armed_build_writes_the_sidecar_header _ =
-  _run_build ~level_config:(_armed ()) (fun ~output_dir ->
-      assert_that
-        (_first_line (_report ~output_dir))
-        (equal_to Series_level.csv_header))
+  _run_build ~level_config:(_armed ()) _check_header_line
 
-(* The row is asserted as a literal rather than re-rendered through
-   [Series_level]'s own formatter, so it pins the class, the counts and the
-   statistics the detector computed instead of restating its code. *)
+(* Rows are asserted as literals rather than re-rendered through
+   [Series_level]'s own formatter, so they pin the class, the counts and the
+   statistics the detector computed instead of restating its code.
+   [100010.0000] is the mean of the two central closes at even length — half the
+   bars at 20 and half at 200,000 — above the 10,000 ceiling while 15 of the 30
+   closes sit below it, which is exactly [mixed_scale]. *)
+let _high_row =
+  "HIGH,whole_window,30,2021-01-04,2021-02-02,73566.0000,73566.0000,73566.0000,30"
+
+let _mixed_row =
+  "MIXED,mixed_scale,30,2021-01-04,2021-02-02,100010.0000,20.0000,200000.0000,15"
+
 let test_armed_build_reports_the_whole_window_symbol _ =
-  _run_build ~level_config:(_armed ()) (fun ~output_dir ->
-      assert_that (_report ~output_dir)
-        (contains_substring
-           "HIGH,whole_window,30,2021-01-04,2021-02-02,73566.0000,73566.0000,73566.0000,30"))
+  _run_build ~level_config:(_armed ())
+    (_check_report (contains_substring _high_row))
 
-(* [100010.0000] is the mean of the two central closes at even length — half the
-   bars at 20 and half at 200,000 — which is above the 10,000 ceiling while 15 of
-   the 30 closes sit below it: median-above plus [n_above < n_bars] is exactly
-   [mixed_scale]. *)
 let test_armed_build_sub_classifies_a_mixed_scale_series _ =
-  _run_build ~level_config:(_armed ()) (fun ~output_dir ->
-      assert_that (_report ~output_dir)
-        (contains_substring
-           "MIXED,mixed_scale,30,2021-01-04,2021-02-02,100010.0000,20.0000,200000.0000,15"))
+  _run_build ~level_config:(_armed ())
+    (_check_report (contains_substring _mixed_row))
 
 let test_plausible_symbol_is_not_reported _ =
-  _run_build ~level_config:(_armed ()) (fun ~output_dir ->
-      assert_that (_report ~output_dir)
-        (not_
-           ~msg:"an ordinary 50.00 series should not be a store-level finding"
-           (contains_substring "REAL,")))
+  _run_build ~level_config:(_armed ())
+    (_check_report
+       (not_ ~msg:"an ordinary 50.00 series is not a store-level finding"
+          (contains_substring "REAL,")))
 
 (* An EMPTY report is an expected outcome, not broken wiring: the [whole_window]
    sub-class is code-level certain but has no instance in any committed
@@ -185,8 +198,8 @@ let test_plausible_symbol_is_not_reported _ =
    all. What must still hold is that the file exists and carries the header —
    positive evidence the scan ran. *)
 let test_empty_report_is_header_only _ =
-  _run_build ~level_config:(_armed ()) ~symbols:[ "REAL" ] (fun ~output_dir ->
-      assert_that (_report ~output_dir) (equal_to _header_only))
+  _run_build ~level_config:(_armed ()) ~symbols:[ "REAL" ]
+    (_check_report (equal_to _header_only))
 
 (* --- the tuning knobs reach the detector too ------------------------------ *)
 
@@ -198,18 +211,18 @@ let _ceiling_below_real_close = 30.0
 let test_median_max_flag_is_routed_to_the_detector _ =
   _run_build
     ~level_config:(_armed ~median_close_max:_ceiling_below_real_close ())
-    ~symbols:[ "REAL" ] (fun ~output_dir ->
-      assert_that (_report ~output_dir)
-        (contains_substring "REAL,whole_window,30,"))
+    ~symbols:[ "REAL" ]
+    (_check_report (contains_substring "REAL,whole_window,30,"))
 
 (* One more bar than the fixture has, so the series is too short to classify and
    the symbol that otherwise flags drops out of the report. *)
 let _min_bars_above_fixture = _n_bars + 1
 
 let test_min_bars_flag_is_routed_to_the_detector _ =
-  _run_build ~level_config:(_armed ~min_bars:_min_bars_above_fixture ())
-    ~symbols:[ "HIGH" ] (fun ~output_dir ->
-      assert_that (_report ~output_dir) (equal_to _header_only))
+  _run_build
+    ~level_config:(_armed ~min_bars:_min_bars_above_fixture ())
+    ~symbols:[ "HIGH" ]
+    (_check_report (equal_to _header_only))
 
 let suite =
   "build_runner_level"
