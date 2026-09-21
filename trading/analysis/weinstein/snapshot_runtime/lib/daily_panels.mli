@@ -190,20 +190,111 @@ val cache_bytes : t -> int
 (** [cache_bytes t] returns the current sum of estimated bytes resident in the
     cache. Useful for tests that assert eviction kicked in. *)
 
-type stats = { hits : int; misses : int; evictions : int }
+val max_cache_bytes : t -> int
+(** [max_cache_bytes t] is the effective byte budget [t] was created under
+    ([max_cache_mb * 1_048_576]). Exposed so a runner can log the cap that was
+    actually in force next to the occupancy the run reached, rather than
+    re-deriving it from the environment — which would be wrong for a cache built
+    via {!create_with_handle_cap} by a caller that never read the env. *)
+
+val max_mmap_handles : t -> int
+(** [max_mmap_handles t] is the effective resident-[Mmap] reader cap [t] was
+    created under. Same rationale as {!max_cache_bytes}. *)
+
+type resident = { entries : int; bytes : int; mmap_open : int }
+[@@deriving sexp, equal]
+(** Instantaneous residency of the cache — what it holds {i right now}.
+
+    - [entries] — resident symbol entries (both backings).
+    - [bytes] — the same figure {!cache_bytes} returns.
+    - [mmap_open] — resident [Mmap] backings, i.e. open fds.
+
+    Distinct from {!occupancy}, which is the peak/mean history of these same
+    three quantities. Sampled by periodic tracers (the backtest runner's
+    [--gc-trace] CSV) to plot occupancy across a run. *)
+
+val resident : t -> resident
+(** [resident t] returns the cache's current {!resident} residency. O(1); takes
+    no sample and mutates nothing. *)
+
+type occupancy = {
+  max_entries : int;
+  max_bytes : int;
+  max_mmap_open : int;
+  avg_entries : float;
+  avg_bytes : float;
+}
+[@@deriving sexp, equal]
+(** Peak and mean resident occupancy observed since {!create}. Answers "how big
+    did the cache actually get, and did the caps bind?" from a run log rather
+    than from [/proc/<pid>] on a live worker (#2839).
+
+    {b Sampling point: once per insert, after limit enforcement.} Inserts — and
+    the evictions they trigger — are the only events that change residency, so
+    one sample per insert is a complete record of the distinct resident states
+    the cache passed through. No sample is taken per {!read_today} /
+    {!read_history}: a hit changes nothing but LRU order, and sampling per read
+    would weight the means by read frequency rather than by residency (a hot
+    resident symbol read 10k times would drown out the signal). Because the
+    sample is taken {i after} both caps are re-enforced, the maxima describe
+    peak {b resident} occupancy and never a transient over-limit spike.
+
+    - [max_entries] / [max_bytes] / [max_mmap_open] — high-water marks. Under a
+      binding handle cap [max_mmap_open] equals that cap (and [max_entries]
+      equals it too when every entry is an [Mmap] backing); a value below the
+      cap proves the cap never bound. [max_bytes] can exceed the byte budget by
+      design — the budget is best-effort and a single oversized entry stays
+      resident (see {!create}), so this reports what was really held.
+    - [avg_entries] / [avg_bytes] — means over those samples; [0.0] when nothing
+      was ever inserted. A mean well below the peak says the peak was a brief
+      excursion, not the steady state.
+
+    {!close} does not reset these — they are lifetime figures. It does drop
+    residency to zero, so inserts after a {!close} sample from an empty cache.
+*)
+
+type stats = {
+  hits : int;
+  misses : int;
+  miss_absent : int;
+  evictions : int;
+  n_symbols_touched : int;
+  n_symbols_absent : int;
+  occupancy : occupancy;
+}
 [@@deriving sexp, equal]
 (** Cumulative cache-access counters observed since {!create}.
 
     - [hits] — reads served from a resident (already-decoded) symbol entry.
-    - [misses] — reads that had to load + decode a symbol file from disk. Each
-      miss is one full sexp decode, the dominant per-read cost.
+    - [misses] — reads no resident entry could serve, so the manifest was
+      consulted. {b Meaning unchanged} since the counter was introduced: it
+      still counts every non-hit read, including reads of symbols that are not
+      in the manifest at all.
+    - [miss_absent] — the subset of [misses] whose symbol is
+      {b absent from the manifest}. Such a read can never be served from cache,
+      so it is charged on every read of that symbol for the whole run, inflating
+      [misses] without any file ever being decoded. On a 26y PIT cell the ~551
+      universe names missing from the warehouse manifest accounted for millions
+      of such "misses" — a permanent negative lookup, not thrash.
+      [misses - miss_absent] is the number of reads that actually loaded +
+      decoded a file.
     - [evictions] — LRU evictions that actually dropped a resident entry to
-      restore the byte budget.
+      restore the byte budget or the handle cap.
+    - [n_symbols_touched] — distinct symbols ever inserted into the cache. The
+      denominator of the honest thrash ratio
+      [(misses - miss_absent) / n_symbols_touched]: ≈1 means each symbol was
+      decoded roughly once (the cache held the working set), whereas a value
+      approaching the number of strategy cycles means the cache is thrashing —
+      every cycle re-decoding a symbol it just evicted. Using the {i universe}
+      size as the denominator understates thrash whenever the universe is larger
+      than the set actually touched.
+    - [n_symbols_absent] — distinct symbols looked up and found absent from the
+      manifest. The warehouse-coverage hole, counted in names.
+    - [occupancy] — see {!occupancy}.
 
-    The decisive thrash metric is [misses / n_symbols]: ≈1 means each symbol was
-    decoded roughly once (the cache held the working set), whereas a value
-    approaching the number of strategy cycles means the cache is thrashing —
-    every cycle re-decoding a symbol it just evicted. *)
+    Every field here is observation only: none is read by the load/evict path,
+    so a run's cached data, eviction decisions and results are identical whether
+    or not the counters are consulted. *)
 
 val cache_stats : t -> stats
 (** [cache_stats t] returns the cumulative {!stats} since {!create}. {!close}
