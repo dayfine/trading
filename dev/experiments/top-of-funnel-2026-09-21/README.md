@@ -91,3 +91,10 @@ the chain log; the summary line is scoped to `${out}/<name>/actual.sexp`). Each 
 
 - 2026-09-21 14:05 PT — pre-registered. Worktree `sweep-funnel` pinned at `ad5a9e04e` (= main); build + launch wait
   for the open QC wave (#2889 behavioral, #2894 structural/behavioral) to clear the container.
+- 2026-09-21 13:25 PT — **lane A launched** (`EXPECT_HEAD=ad5a9e04e sh chain-funnel.sh A d0-funnel-diag:0:emit t1-topn-40:0
+  t1-topn-40:1 t1-topn-40:2`, script + specs staged under `/tmp/funnel-run/`, artifacts `/tmp/sweeps/top-of-funnel/`,
+  chain log `/tmp/funnel-run/chain-A.log`). Pre-registration merged as #2897 (CI + both QC gates, quality 5/5) before
+  the first cell started; the perf-tier fix #2894 and the deps bump #2889 merged the same hour, so the container was
+  idle at launch (326 MB). Reviewer advisory adopted: `candidates.sexp` is ~500 MB per cell and is NOT committed —
+  `results/` gets the derived funnel decomposition (per-year counts by phase and sub-reason) plus the usual per-cell
+  raw artifacts. `paired.sh` (this commit) is the per-salt read; columns pinned to the 09-21 `trades.csv` header.
