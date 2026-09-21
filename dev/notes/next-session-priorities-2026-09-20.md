@@ -83,3 +83,32 @@ mode of `build_snapshots` (`memory/project_pit_chunked_twin_miss`).
   ≥ n_symbols → smoke at 256 vs 12,000 → chain default.** Both bit-identical; both need the container, so after salt 2.
 - Keep `.claude/worktrees/sweep-veto` until the lane is done and the results PR is open; `sweep-pit` can go now that the
   arm pairs cleanly against the committed null artifacts (V6 diff exit 0 at salt 0).
+
+## Addendum 2 — 23:00 PT 2026-09-20 (evening session; lane B is LIVE — read §Ops before touching the container)
+
+- **Salt 1 of lane A was LOST** to the chain's own `timeout 36000` guard (`exit=124`, 10h00m wall, 92.5 % done, last
+  date 2024-05-31, ~45–60 min short). Cause: the guard was sized off the null (6–7 h) and the arm runs ~43 % slower
+  (per-miss cache cost; s0 8h33m vs null 5h58m). Salt 2 auto-started on the same guard and was killed at 88 s.
+  README §Log 21:08 PT on `exp/index-stage-veto`.
+- **User decision (21:15 PT): build the cache knob first.** Shipped as **#2882** (merged `477522b7c`, both QC gates at
+  the tip, one behavioral rework): `Daily_panels.create_with_handle_cap` + env `SNAPSHOT_MAX_MMAP_HANDLES` (default
+  256, unchanged), logged on the panel-runner cache line. **Smoke** (4-month PIT spec, 9,915 symbols, salt 0): cap 256
+  27m23s / 5.34M evictions vs cap 12,000 **6m15s / 0 evictions**, `actual.sexp` + `trades.csv` md5 identical.
+  Memory `project_snapshot_cache_handle_cap_thrash` updated; #2839 stays open until the 26y cell number is in.
+- **Lane B launched 22:53 PT**: salts 1 → 2 on pinned worktree `sweep-veto2` @ `477522b7c`, `SNAPSHOT_MAX_MMAP_HANDLES=12000`,
+  `CELL_TIMEOUT` 60,000 s (now `${CELL_TIMEOUT:-60000}`; `WTREL` overridable), launch log `/tmp/veto-run/launch-B.log`,
+  artifacts `/tmp/sweeps/index-veto/` = host `.sweep-output/index-veto/`. Salt 0 stays on `5577d418a`; the build
+  drift (#2881 docs, #2882 knob) is recorded in README §Log with the md5 proof. **Per cell:** the same close-out as
+  the 15:00 addendum (copy the eight artifacts to `results/`, `v6diff:exit=0`, `paired.sh` vs the committed null, append
+  the read) — plus record wall + the `snapshot cache hits=…` line as the #2839 26y measurement. Verdict after salt 2 by
+  the pre-registered rule.
+- **Weekly perf review is now a rule** (`.claude/rules/perf-review-weekly.md`, #2881; user: "dedicate ~2h every week"):
+  read the tier-2/3 tables weekly, one cell per real workload shape (broad 5y + a PIT smoke are missing), FAIL rows →
+  tickets. First entry in `dev/status/backtest-perf.md`. Open follow-ups from that entry: tier-3 `sp500-2010-2026*`
+  FAIL root cause (masked by `continue-on-error`); add a broad-5y + PIT-smoke tier cell; #2878 occupancy/heap on the
+  cache line (`ready-for-agent`, needs the container → after lane B).
+- **Ops:** the container is exclusive to lane B (~2 cells; if the smoke ratio holds, 2–3 h each instead of 8–10).
+  A `docker exec` that a tool interrupt cancels may still have run — verify with `ps` before assuming a launch was
+  aborted (tonight's rejected lane-B launch was in fact running and had to be killed). Two hung `dune build`s from the
+  previous session were `kill -9`'d. Five phantom locked `agent-*` worktrees (dirs gone) were unlocked + pruned; 58
+  stale `worktree-agent-*` local branches remain (left alone). `sweep-veto` (lane A build) removed; host free ~60 GB.
