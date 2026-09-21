@@ -6,6 +6,9 @@
 # Artifacts: /tmp/sweeps/index-veto/ (container, bind-mounted). Specs are staged OUTSIDE any VCS tree at /tmp/veto-run/specs.
 # Lane A (salt 0) ran at CELL_TIMEOUT 36000 / cap 256 on 5577d418a; salt 1 died on that guard at 92.5 % (README §Log 21:08 PT),
 # so lanes B+ run on the #2839 knob build with SNAPSHOT_MAX_MMAP_HANDLES >= n_symbols and a 60,000 s guard.
+# The committed DEFAULTS therefore reproduce lanes B+ only. To reproduce a lane exactly, set all four per-lane vars:
+#   lane A  (salt 0):   WTREL=.claude/worktrees/sweep-veto  EXPECT_HEAD=5577d418a CELL_TIMEOUT=36000 SNAPSHOT_MAX_MMAP_HANDLES=256
+#   lanes B+ (salts 1-2, = the defaults below): WTREL=.claude/worktrees/sweep-veto2 EXPECT_HEAD=477522b7c CELL_TIMEOUT=60000 SNAPSHOT_MAX_MMAP_HANDLES=12000
 set -u
 LANE=$1; shift
 C=trading-1-dev; REPO=/Users/difan/Projects/trading-1; WTREL=${WTREL:-.claude/worktrees/sweep-veto}   # lane A: sweep-veto @5577d418a; lanes B+: sweep-veto2 @ the #2882 merge

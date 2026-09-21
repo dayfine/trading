@@ -99,14 +99,21 @@ dispatches while a cell runs (`container-capacity-scheduling.md` rule 1). Specs 
   (+$0.22M). **Trade-for-trade identical 2000-01 → 2018-11**; first divergence MLNX 2018-11-17 (Q4-2018 correction),
   then CCOI 2020-03-21. Per entry-year: 2018 −$260k → −$245k; **2020 +$1.84M → +$1.32M**; 2021 −$212k → −$236k;
   **2022 −$818k → −$282k**; 2023 −$134k → −$252k; 2024 −$278k → −$155k; **2025 +$1.17M → +$27k**; 2026 −$330k → −$275k.
-  - **2022 cohort (the mechanism read):** 19 null-only entries removed, net −$524k on the null (GETY −$118k, RGEN −$77k,
+  - **2022 cohort (the mechanism read):** 19 null-only entries removed, net **−$485k** on the null (GETY −$118k, RGEN −$77k,
     ALTM −$61k, ADTN −$54k …; only BBSI +$92k and two small winners removed); 2022 goes −$818k → −$282k, the 2022-23
     window −$953k → −$534k. The veto did exactly what the dissection predicted, at this salt.
-  - **2020 re-entry episode:** the veto removed 10 entries dated 03-21 → 04-29 (CCOI −$41k, CTXS +$30k, KR +$30k, GC +$22k,
-    GIS +$24k, EGOV −$39k, GEAR −$29k, CPB −$17k, MRNA +$9k, MOH +$7k) — **net ≈ −$3k: the COVID re-entry cohort the veto
-    blocks was flat**, not the monster cohort. The 2020 gap (−$516k) is path divergence after that: the null funded ZS
-    05-29 (+$492k), BBBY 07-01 (+$518k), GME 09-14 (+$326k); the arm funded APPS 06-13 (+$498k), TTEC 08-04 (+$463k),
-    FCNCA 11-16 (+$188k). Monster lottery, not mechanism (`project_funding_grid_monster_lottery`).
+    *(Net restated 2026-09-21 under the uniform `symbol|entry_date` key — see §Correction note; the entry count is
+    unchanged at 19, the net was first logged as −$524k.)*
+  - **2020 re-entry episode** *(window corrected 2026-09-21; see §Correction note)*: on the fixed
+    **2020-03-15 → 05-31** window — the same one used at salts 1–2 — the blocked re-entry cohort here is **12 null-only
+    entries, +$563k**, the *largest* of the three salts. It is dominated by **ZS 05-29 (+$492k)** and LACO 05-27 (+$74k);
+    the 03-21 → 04-29 sub-window alone (CCOI −$41k, CTXS +$30k, KR +$30k, GC +$22k, GIS +$24k, EGOV −$39k, GEAR −$29k,
+    CPB −$17k, MRNA +$9k, MOH +$7k) nets ≈ −$3k. **The 2020 re-entry block costs real money at this salt too** — the
+    earlier "the cohort was flat / monster lottery, not mechanism" read came from measuring salt 0 on the narrow
+    sub-window. What remains after the cohort is genuine path divergence, and at this salt it runs the arm's way:
+    Jun–Dec 2020 null-only is 10 entries +$869k (BBBY 07-01 +$518k, GME 09-14 +$326k) against arm-only 13 entries
+    +$1.01M (APPS 06-13 +$498k, TTEC 08-04 +$463k, FCNCA 11-16 +$188k). So the 2020 entry-year gap (−$516k) is the
+    re-entry tax, not the funding lottery (`project_funding_grid_monster_lottery`) it was first read as.
   - **2025 (−$1.15M) is ONE trade and not the veto:** ECHO 2025-08-26 (+$647k on the null) was screened by the arm at
     score 110 and skipped `Insufficient_cash` — the arm's book was fuller that week. 2003 / 2009 episodes: identical
     (the composite was already Bearish in every deep-bear Stage-4 week — see the proxy below), so no re-entry cost there.
@@ -115,12 +122,13 @@ dispatches while a cell runs (`container-capacity-scheduling.md` rule 1). Specs 
     composite already blocked buys, the veto is redundant. Modern regime: 2018 17 / **12**, 2020 9 / 9, 2022 26 / **10**,
     2023 14 / **14**, 2025 9 / 8, 2026 7 / 7 — the disagreement weeks are all post-2017, which is why the two runs are
     identical for 18 years. The audit records no gate-rejection marker for the veto (0 hits) — a diagnostic gap.
-  - **Read at one salt:** ex-ECHO the realised gap is ≈ −$430k, made of 2020 path divergence (−$516k) and 2023
-    (−$118k) against the 2022 save (+$536k). The drawdown improvement is real (33.5 vs 40.6, shorter episode); the level
-    loss is a funding lottery. Salts 1–2 decide whether the 2022 save is a property and the 2020/2025 losses are draws.
+  - **Read at one salt:** ex-ECHO the realised gap is ≈ −$430k, made of the 2020 entry-year gap (−$516k — mostly the
+    blocked re-entry cohort, see above) and 2023 (−$118k) against the 2022 save (+$536k). The drawdown improvement is
+    real (33.5 vs 40.6, shorter episode). Salts 1–2 decide whether the 2022 save is a property and whether the 2020
+    re-entry tax reproduces.
   - **MTM (added 11:30 PT):** end NAV $5.57M → $4.45M (−$1.12M) is realised, not marks — unrealised on the open book is
     $0.92M (5 names, $4.12M market value) vs $0.86M (6 names, $4.26M). Year-end NAV diff: 2019 +$0.02M, **2020 −$1.02M**
-    (the monster funding lottery), 2021 −$0.53M, **2022 +$0.07M**, 2023 −$0.17M, 2024 −$0.01M, **2025 −$0.92M** (ECHO),
+    (the blocked re-entry cohort, then path divergence), 2021 −$0.53M, **2022 +$0.07M**, 2023 −$0.17M, 2024 −$0.01M, **2025 −$0.92M** (ECHO),
     2026 −$1.12M. **The maxDD improvement is half a lower-peak artifact:** both curves bottom at the same $3.54M on
     2023-10-27; the arm's % is smaller because its peak was $5.32M vs $5.94M (no ZS/BBBY/GME). The real protection is the
     2024 leg — 2024-08-05 the arm sits at $4.01M vs the null's $3.53M trough (+$0.48M), and from the 2022-01 peak to
@@ -203,13 +211,16 @@ cap to ≥ n_symbols: the worker holds 269 fds against a 1,048,576 limit and 54,
   **Trade-identical 2000 → 2018** again; first divergence 2019 (28 → 27 entries). Per entry-year: **2020 +$1.46M →
   +$0.71M (−$0.76M)**; 2021 −$172k → −$308k; **2022 −$828k → −$525k (+$303k)**; 2023 −$222k → −$48k (+$174k);
   **2024 −$795k → −$303k (+$492k)**; **2025 +$55k → +$612k (+$557k)**; 2026 −$405k → −$94k (+$311k).
-  - **2022 cohort (the mechanism read, 2nd salt):** 13 null-only 2022 entries removed, losers GETY −$109k, ALTM −$55k,
+  - **2022 cohort (the mechanism read, 2nd salt):** **17** null-only 2022 entries removed, net **−$357k** (count and net
+    restated 2026-09-21 under the uniform `symbol|entry_date` key; first logged as 13), losers GETY −$109k, ALTM −$55k,
     ADTN −$50k, ESTA −$38k, NXE −$36k …, winners removed STLD +$46k, ISEE +$16k; the 2022–23 window −$1.05M → −$574k
     (+$477k). Same direction and similar size as salt 0 (+$419k on the window) — **the 2022 save is a property, not a draw.**
   - **2020 (the cost, 2nd salt):** null-only 2020 = 31 entries, **+$1.64M** — BBBY +$503k, ZS +$475k, GME +$304k, WSC +$271k,
     COHR +$154k; the arm's replacements TTEC +$454k, SNBR +$370k, AVGO +$181k. The blocked Mar-15 → May-31 re-entry
-    cohort is 12 entries **+$466k** at this salt (ZS 05-29 inside it) vs ≈ −$3k at salt 0 — so at salt 1 the veto's
-    2020 re-entry block did cost real money, not just path divergence. 2003 / 2009: identical both salts.
+    cohort is 12 entries **+$466k** at this salt (ZS 05-29 inside it) vs **+$563k** at salt 0 on the same window
+    (12 entries; the "≈ −$3k" first logged at salt 0 was the narrower 03-21 → 04-29 sub-window — corrected 2026-09-21,
+    see §Correction note) — so the veto's 2020 re-entry block costs real money at both salts, not just
+    path divergence. 2003 / 2009: identical both salts.
   - **2025 (+$557k) is ONE trade again, on the other side this time:** ECHO 2025-08-26 is **arm-only +$652k** here (at salt 0 it
     was null-only +$647k, skipped by the arm on `Insufficient_cash`). A lottery ticket that switches arms across salts;
     **ex-ECHO the realised gap is +$334k**, made of 2022–24 protection (+$0.97M) against the 2020 monsters (−$0.76M).
@@ -219,8 +230,8 @@ cap to ≥ n_symbols: the worker holds 269 fds against a 1,048,576 limit and 54,
     and the 2022-01 → YE-2022 give-back is $1.06M vs $1.49M. YE NAV diff: 2019 +$0.04M, **2020 −$1.23M**, 2021 −$0.94M,
     2022 −$0.54M, 2023 −$0.27M, 2024 +$0.09M, 2025 +$0.77M (ECHO), 2026 +$1.21M.
   - **Two-salt read:** 2022–24 capital protection reproduces (+$0.4–0.6M realised on the 2022–23 window, smaller give-back,
-    higher NAV at the null's trough, both salts); the 2020 cost reproduces (−$0.5M path at s0, −$0.76M including a
-    +$0.47M blocked re-entry cohort at s1); the level/realised verdict is decided by monster tickets (ZS/BBBY/GME vs
+    higher NAV at the null's trough, both salts); the 2020 cost reproduces (−$0.52M entry-year at s0 around a +$0.56M
+    blocked re-entry cohort, −$0.76M around a +$0.47M cohort at s1); the level/realised verdict is decided by monster tickets (ZS/BBBY/GME vs
     TTEC/SNBR, ECHO's side). Pre-registered rule needs realised AND Calmar at ≥ 2/3 salts: s0 = Calmar only, s1 = both.
     **Salt 2 decides** (running since 03:12 PT, ETA ~07:30). Whatever it says, the mechanism read is already: a 2022-style
     grind is where the veto earns, a 2020-style V-recovery is where it pays, and the fat-tail tax on the recovery is
@@ -234,8 +245,10 @@ cap to ≥ n_symbols: the worker holds 269 fds against a 1,048,576 limit and 54,
   Join: 632 shared (+$0.64M → +$0.93M), null-only 130 (**+$0.76M**), arm-only 84 (+$0.04M). Trade-identical 2000 → 2019
   (first divergence 2020). Per entry-year: **2020 +$1.58M → +$0.22M (−$1.35M)**; 2021 −$241k → −$129k; **2022 −$785k →
   −$300k (+$485k)**; 2023 −$319k → −$248k; 2024 −$319k → −$268k; 2025 +$27k → +$134k; 2026 −$230k → −$131k.
-  - **2022 cohort (3rd salt):** 11 null-only 2022 entries removed (GETY −$89k, ALTM −$50k, ADTN −$41k, ESTA −$41k, BHRB −$40k,
-    CCJ −$39k, FNB −$37k, AMBA −$31k; no real winners removed); 2022–23 window −$1.10M → −$0.55M (**+$556k**). Three for three.
+  - **2022 cohort (3rd salt):** **15** null-only 2022 entries removed, net **−$444k** (count and net restated 2026-09-21
+    under the uniform `symbol|entry_date` key; first logged as 11, which was the stricter "symbol absent from the arm
+    entirely" definition) — GETY −$89k, ALTM −$50k, ADTN −$41k, ESTA −$41k, BHRB −$40k, CCJ −$39k, FNB −$37k, AMBA −$31k;
+    no real winners removed (QDEL +$5k only); 2022–23 window −$1.10M → −$0.55M (**+$556k**). Three for three.
   - **2020 (3rd salt):** null-only 2020 = 28 entries **+$1.66M** (BBWI +$460k, BBBY +$379k, ZS +$359k, SNBR +$325k, WIT +$191k);
     the arm's replacements TTEC +$332k, AVGO +$131k. Blocked Mar-15 → May-31 re-entry cohort: 13 entries **+$329k**
     (ZS inside it again). ECHO 2025 is in neither arm at this salt.
@@ -243,6 +256,35 @@ cap to ≥ n_symbols: the worker holds 269 fds against a 1,048,576 limit and 54,
     2025-04-07 **$1.73M** (46.2 %). The arm's dollar trough is $0.54M *below* the null's on the same day; the Calmar / maxDD
     "win" here is entirely the lower peak. YE NAV diff negative every year from 2020 (−$1.02M) to 2026 (−$0.10M).
     2022 give-back $0.69M vs $1.51M — the grind protection is real, it just protects a smaller book.
+
+## Correction note (2026-09-21, from the qc-behavioral review of #2884 — `dev/reviews/index-stage-veto.md`)
+
+Three bookkeeping corrections to the log above. **No cell was re-run**; every corrected figure is re-derived from the
+per-salt `results/*-trades.csv` committed in this PR joined against the committed null
+(`pit-universe-2026-09-14/step4/results/a0-pit-null-s{0,1,2}-v11-trades.csv`) on `symbol|entry_date` — zero duplicate
+keys in any of the six files, so the join is exact. The verdict and its Rule-4 classification are unchanged; both
+corrections **strengthen** the read.
+
+1. **The 2020 blocked re-entry cohort is now measured on one window at all three salts.** Salt 0 was first logged on a
+   narrower **2020-03-21 → 04-29** window (10 entries, ≈ −$3k) while salts 1–2 used **2020-03-15 → 05-31** (12 and 13
+   entries), and the three were then quoted as a comparable triple. They were not comparable. The narrow window cannot
+   be defended on mechanism grounds: `macro_trend.sexp` is md5-identical across all three salts, so the veto's firing
+   weeks are salt-independent — 2020-05-29 is a veto week at every salt or at none, and ZS enters null-only at exactly
+   that date at all three. On the common window salt 0 is **12 entries / +$563,394**, the *largest* of the three; the
+   two entries the narrow window dropped are LACO 05-27 (+$74,122) and ZS 05-29 (+$492,371). Corrected triple:
+   **+$0.56M / +$0.47M / +$0.33M**. Consequence for the read: the 2020 re-entry tax is a property at **3/3 salts**,
+   symmetric with the 2022 grind save at 3/3 — not a salt-0 draw.
+2. **2022 removed-entry counts restated under the uniform key.** 19 / 13 / 11 as first logged mixed two definitions;
+   under `symbol|entry_date` throughout it is **19 / 17 / 15**, nets **−$484,629 / −$357,130 / −$444,311** (salt 0's
+   net was first logged as −$524k). Salt 2's "11" was the stricter "symbol absent from the arm entirely" count; salt 1's
+   "13" matched neither definition. Every *named* trade in all three lists, and the load-bearing 2022–23 window deltas
+   (+$418k / +$477k / +$556k), reproduce exactly — this is a counting-key artifact, not a data error.
+3. **The NAV peak / trough / give-back figures are not re-derivable from this PR.** They come from the chain's
+   `equity_curve.csv`, which `chain-veto.sh` copies to the artifact dir but which was not committed into `results/` and
+   is not recoverable without re-running a cell (the run machine is not this one). Treat every peak/trough/give-back
+   number in the log as **asserted, not artifact-backed**, including the lower-peak argument that discounts the Calmar
+   3/3 clear. The verdict does not rest on it: realised fails the conjunctive rule at 2/3 salts however Calmar is read.
+   Future chains in this family should commit `*-equity_curve.csv` alongside `*-trades.csv`.
 
 ## Verdict (2026-09-21, pre-registered rule: realised AND Calmar better than the null at ≥ 2 of 3 salts)
 
@@ -259,23 +301,32 @@ index suspends buying (§2.1, #2861), and the mechanism does exactly what it say
 
 **Why (the transferable read, 3/3 salts each):**
 - **Where it earns — the 2022 grind.** The composite stayed Bullish for 25+ weeks of 2022 while SPX sat below a falling
-  30-week MA; the veto removes 11–19 entries a year that lose −$0.5M net, and the 2022–23 window improves +$0.42M /
+  30-week MA; the veto removes 15–19 entries a year that lose −$0.36M to −$0.48M net, and the 2022–23 window improves +$0.42M /
   +$0.48M / +$0.56M. The 2022 give-back halves. This is the property, and it is exactly the PIT-drawdown episode that
   motivated the arm (`project_pit_drawdown_2021_25_macro_veto`).
 - **Where it pays — the 2020 V-recovery.** The index is still Stage 4 for 9–12 weeks after the March-2020 low while the
-  composite has already turned; the blocked Mar–May re-entry cohort is worth ≈ 0 / +$0.47M / +$0.33M, and the path
-  divergence that follows costs the arm the 2020 monsters (ZS, BBBY, GME, BBWI, SNBR: −$0.5M / −$0.76M / −$1.35M by
-  entry-year). The 2020 payoff is the fat tail the whole edge lives on (`project_edge_is_the_fat_tail`); a gate that
-  is late by a quarter at the bottom taxes it every time.
+  composite has already turned; on the fixed **2020-03-15 → 05-31** window the blocked re-entry cohort is worth
+  **+$0.56M / +$0.47M / +$0.33M** (12 / 12 / 13 null-only entries; net of the arm-only substitutes bought in the same
+  window, +$0.61M / +$0.49M / +$0.36M), and the path divergence that follows costs the arm the 2020 monsters
+  (ZS, BBBY, GME, BBWI, SNBR: −$0.5M / −$0.76M / −$1.35M by entry-year). The 2020 payoff is the fat tail the whole edge
+  lives on (`project_edge_is_the_fat_tail`); a gate that is late by a quarter at the bottom taxes it every time.
+  **The two legs are symmetric at 3/3 salts** — the 2022 grind save reproduces at every salt and so does the 2020
+  re-entry tax. The veto is not a mechanism that sometimes earns for free: it both earns and pays, every salt, which is
+  what makes this a clean REJECT-as-default rather than a salt-dependent draw.
 - **2001–02 and 2008 are inert** — the composite was already Bearish in every deep-bear Stage-4 week, so the veto never
   fires there (trade-identical 2000 → 2018/2019 at every salt). The disagreement weeks are all post-2017.
 - **The level is a monster lottery on top of that** (ECHO 2025 on the null's side at s0, the arm's at s1, absent at s2).
   Never quote the salt-1 +121pp or the salt-0 −112pp as the mechanism.
 
 **Forward guidance.** The veto is a *regime dial*, not a default: it trades 2020-style recovery upside for 2022-style
-grind protection, one-for-one in dollars at these salts. It belongs in a drawdown-averse (investor) preset, or
-combined with a faster re-admission (e.g. veto lifts when the index closes above the MA rather than waiting for the
-MA slope — a book question: Stage 4 → Stage 1 transition, §2.1). Not another single-lever screen on this base.
+grind protection, one-for-one in dollars at these salts. It belongs in a drawdown-averse (investor) preset. A faster
+re-admission is the obvious pairing, but **the cheap version of it is not book-faithful**: lifting the veto when the
+index merely *closes above* a still-falling MA is settled against by tier 1 — `weinstein-book-reference.md` §2.1
+("Resolved 2026-09-16"), the same entry this arm cites for its own faithfulness, says it is "not enough for the
+industrials to temporarily pop above the MA … if the average continues pointing lower", and that one buys
+aggressively only once "the levelled MA is penetrated on the upside". This is **not** an open book question. A faithful
+faster-re-admission dial would therefore key off the MA *levelling* (slope crossing up through flat), not a price
+cross, and would need a different formulation from the one sketched here. Not another single-lever screen on this base.
 
 **Runtime (#2839):** the cap-256 arm cell was 8h33m (s0) and >10h (s1, killed); at cap 12,000 the same cells are 4h19m
 and 3h37m — misses 118.5M → 6.3M, evictions 112M → 0. Chain default is now 12,000.
