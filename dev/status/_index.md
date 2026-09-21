@@ -4,11 +4,11 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-20 (orchestrator run 35521718664; run start `883ef4b9`, main after this run's
-two auto-merges **`f1549820`** (#2874, #2875); `status_file_integrity` **0**, `index_size_linter` **0**
-(15657/20480 after reconcile — note the linter *caught* this run's own oversized `screener` row at
-281 chars, pre-PR, and it was shortened),
-`no_python_check` **0** — run standalone without dune, exit codes read unpiped).
+Last updated: 2026-09-21 (orchestrator run 35610789642; run start `f99a1c18`, main after this run's
+auto-merge **`9b9751f5`** (#2884); `dune build` **0** and `dune runtest` **0** on `f99a1c18` with zero
+`^FAIL:` lines; `status_file_integrity` **0**, `index_size_linter` **0**, `no_python_check` **0** —
+run standalone without dune, exit codes read **unpiped** (a pipeline reports the last command's
+status, which is how a broken check reads as green).
 
 **This header was trimmed this run.** It had reached **18725/20480 bytes (91%)**
 of the linter cap by accreting run-by-run incident narrative, and would have
@@ -68,12 +68,15 @@ cost, bit-identical), then the pre-registered top-of-funnel screen on the new ba
 **Two RED weekly workflows.** Both last fired **2026-09-14** (not 09-07 as this
 header previously carried — re-measured 09-16) and both died at the same step
 with the same cause: `gh: command not found`, **exit 127**, at `gh pr create`
-(`gh` is absent from this image by design). #2842 applied the REST fix to
-`weekly-start-sweep.yml` only; **`prune-candidates-weekly.yml:131` is still
-`gh pr create`** and will fail identically on its next cron (#2847, streak 4;
-sweep streak >=10). The sweep's 09-14 failure predates #2842 (merged 09-16), so
-it is not a regression of that fix — the next weekly cron is the first real
-datapoint. The daily summary's fixed `## Scheduled workflows` section is #2841
+(`gh` is absent from this image by design). Re-verified **at source** 2026-09-21:
+`weekly-start-sweep.yml:141` now posts to the REST `pulls` endpoint (#2842's fix
+is in place), while **`prune-candidates-weekly.yml:131` is still `gh pr create`**
+and will fail identically on its next cron (#2847, streak 4; sweep streak >=10).
+Every datapoint in the sweep's streak predates #2842 (merged 09-16; newest
+failure 09-14), so it is a **stale streak, not a live regression**. Its Monday
+14:00 UTC cron had not yet fired at the 09-21 run (historical start delay ranges
+5 min to 5 h), so the first post-fix datapoint is still pending — check the
+mechanism at source, not the streak. The daily summary's fixed `## Scheduled workflows` section is #2841
 (closes #2634).
 
 **Note for Step 2c:** `git merge-base --is-ancestor` is **not** a merged-ness test
@@ -104,7 +107,7 @@ immune (#2605).
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | `Series_level` WIRED to `Build_runner` behind `-detect-series-level`, report-only default-off, MERGED #2875 (1 rework); next: arm on next rebuild + read sidecar |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
-| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
+| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | #2888 | cache occupancy + heap high-water telemetry OPEN #2888 (#2878, bit-identical); weekly perf review live (#2881); next: broad-5y + PIT-smoke tier cells |
 | [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | t3k factor-lens matrix SHIPPED LOCAL (#1639 2000-26 H1 r=-0.744; #1642 2011-26 confirm); next: regime-gated deploy proxy validation (LOCAL/data-gated) |
 | [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay (#1683) + scenario wiring (#1689) + floor_weight searchable axis (#1697, R2 complete) all MERGED default-off; no remaining follow-ups |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
@@ -130,7 +133,7 @@ immune (#2605).
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | `deteriorating_blocks_longs` read RAN — REJECT-do-not-revive (#2776/#2792); `index_stage_veto_blocks_longs` MERGED default-off #2863; next: the veto arm (LOCAL) |
+| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | veto arm DONE — REJECT-as-default/keep-as-axis (#2884); next: top-of-funnel screen (LOCAL) |
 | [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | Clock 0→52 MERGED #2587; A-null LANDED #2631 (`deb45a7e`) — return effect sign-inconsistent, maxDD the robust property; next: none queued |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |

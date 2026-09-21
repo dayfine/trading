@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-21",
+  "feature": "index-stage-veto",
+  "branch": "exp/index-stage-veto",
+  "sha": "45ea37ba9c36479e016c8c9cd4ba67b0f8140e60",
+  "recorded_at_ns": 1790002903017335323,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

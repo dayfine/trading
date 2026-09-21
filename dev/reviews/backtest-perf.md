@@ -231,3 +231,254 @@ Chain (timestamp prefix → Hashtbl bucket order → list_orders fold order → 
 ## Verdict
 
 APPROVED
+
+
+---
+
+# Behavioral QC — backtest snapshot-cache occupancy telemetry (PR #2888)
+
+## Behavioral QC — backtest snapshot-cache occupancy telemetry (#2878)
+
+Reviewed SHA: 6e56853b3647b3b0d94c13ff54bd2d4a9c7fc88a
+CI re-checked at this tip by me: `build-and-test` success, `perf-tier1-smoke` success, `goldens-affected` success.
+
+**Scope.** Pure infrastructure telemetry. No Weinstein domain logic, no strategy
+config field, no `[@sexp.default]` in the diff. Per
+`.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely",
+the entire S\*/L\*/C\*/T\* domain block is **NA** and CP1–CP4 is the full review.
+Authorities used: the new/changed `.mli` docstrings, the PR body's claims, and
+issue #2878's ask. The book is not implicated and was not consulted.
+
+**Method: mutation testing, not a read-through.** 21 mutations applied
+individually to the PR's own source, each built and run, each reverted before
+the next. Reruns were scoped to the three affected test executables
+(`test_daily_panels.exe`, `test_snapshot_cache_config.exe`, `test_gc_trace.exe`,
+`test_panel_runner_gc_trace.exe`) rather than the full suite — structural
+already ran `dune runtest` green at this tip, so a clean-build pass was not
+repeated. Working tree verified clean (`git status --porcelain` empty) after the
+last revert.
+
+### Mutation results — 19 RED, 2 GREEN
+
+Hunting the two shapes the author was warned about: the **projection blind spot**
+(#2875) and the **vacuous fixture** (#2875, deeper half).
+
+| # | mutation | result |
+|---|---|---|
+| M1 | `occupancy.max_entries` + 1 | RED (8 failures) |
+| M2 | `occupancy.max_bytes` + 1 | RED (8) |
+| M3 | `occupancy.max_mmap_open` + 1 | RED (7) |
+| M4 | `occupancy.avg_entries` + 1.0 | RED (7) |
+| M5 | `occupancy.avg_bytes` + 1.0 | RED (6) |
+| M6 | `miss_absent` never incremented | RED (1) |
+| M7 | `n_symbols_touched` + 1 | RED (7) |
+| M8 | `n_symbols_absent` + 1 | RED (6) |
+| M9 | sample **before** `_enforce_limits` (docstring says after) | RED |
+| M10 | **bit-identical probe:** `_over_limits` consults `Occupancy.summary` | RED |
+| M11 | drop `cap_mb=%d` from the format string | **COMPILE_ERROR** |
+| M12 | move `miss_absent` to after `evictions` in the line | RED |
+| M13 | `loads_per_touched` forgets to subtract `miss_absent` | RED |
+| M14 | `maxrss` scaled by word size instead of kB | **GREEN — unpinned** |
+| M15 | `top_heap` scaled by kB instead of word size | **GREEN — unpinned** |
+| M16 | `avg_bytes` rounds instead of truncates | RED |
+| M17 | **zero-overhead probe:** force the sampler before `record`'s `None` check | RED |
+| M18 | unsampled cache columns render `0,0,0` instead of `,,` | RED |
+| M19 | drop `mmap_open` from the CSV header | RED |
+| M20 | `Panel_runner` stops passing `~cache_sampler` (the wiring) | RED |
+| M21 | **anti-vacuity probe:** flatten `_sized_six` to uniform row counts | RED |
+
+**M1–M8 close the projection blind spot.** Every occupancy field and every new
+counter reddens *individually*. The mechanism is `_expect_stats`, which builds a
+whole expected `stats` record and compares with `equal_to`, so no field is
+dropped from the comparison. Where a float tolerance forced a leaf-by-leaf form
+(`test_v2_handle_cap_at_symbol_count_never_evicts`,
+`test_occupancy_peaks_at_binding_handle_cap`) all 11 leaves are asserted rather
+than a partial projection. #2875 does not recur.
+
+**M21 closes the vacuous fixture — and the guard defends itself.** `_sized_six`
+carries strictly increasing row counts, and
+`test_occupancy_bytes_track_entry_sizes_not_counts` asserts that precondition
+(`sizes = List.dedup_and_sort sizes`) *before* using it. Flattening the fixture
+to uniform sizes reddens immediately, so the fixture cannot silently decay into
+the vacuous state. This is the strongest form of the fix I have seen on this
+codebase and is worth citing to other PRs.
+
+**The armed/control pair is real.** `test_occupancy_peaks_at_binding_handle_cap`
+runs 6 symbols under a handle cap of 3 (cap binds: `evictions = 3`,
+`max_entries = 3`, `max_mmap_open = 3`, `avg_entries = 2.5` from the 1,2,3,3,3,3
+ramp); `test_occupancy_control_unbinding_cap_reports_true_peak` runs the same
+fixture at cap 6 (`evictions = 0`, peaks report true residency 6,
+`avg_entries = 3.5`). Without the control, `max_entries = cap` could pass on an
+implementation that merely echoed the cap. The dispatch brief's worry that the
+eviction path might be unpinned because the author's reported run shows
+`max_mmap_open=0 evictions=0` does **not** hold: that is the *integration*
+fixture (a v1 in-process snapshot); the *unit* tests do exercise a binding cap
+and a non-zero eviction count, and M3/M9/M10 all redden through that path.
+
+**M11 is the strongest pinning in the PR.** Dropping a field from the format
+string is a *compile* error (sprintf arity), not a test failure — structural's
+#2875 observation that compile-time pinning beats any test, realised here for
+free. M12 confirms the render test pins the **whole line** character-for-character
+rather than a substring: reordering two adjacent fields reddens.
+
+**`max_entries = j`, not `j+1`, and the docstring says so.** Because the sample
+is taken *after* `_enforce_limits`, the armed arm correctly asserts
+`max_entries = 3` under a cap of 3 with 6 symbols. `daily_panels.mli` states
+"Under a binding handle cap `max_mmap_open` equals that cap (and `max_entries`
+equals it too when every entry is an `Mmap` backing)" — the test matches the
+docstring; neither assumes the other. The separately-documented oversized-entry
+carve-out (`_enforce_limits` leaves ≥ 1 entry resident) is an independent claim
+about the *byte* budget and is stated as such (`max_bytes` "can exceed the byte
+budget by design").
+
+**The `misses_per_symbol` compatibility claim is accurate.** I read the format
+string, not the prose. Old: `hits misses evictions n_symbols misses_per_symbol`.
+New: `hits misses miss_absent evictions n_symbols misses_per_symbol`. So
+`miss_absent` is inserted *before* `evictions`; `misses_per_symbol` keeps its key,
+its value and its position immediately after `n_symbols` (a `misses_per_symbol=`
+grep still matches); and every field from `evictions` rightward shifts one place
+for a positional `awk` reader. That is exactly what the `.mli` and the PR body
+say. The final commit's self-correction landed correctly.
+
+### Bit-identical claim — verified, not taken on trust
+
+The load-bearing claim. Verified three ways:
+
+1. **Structural separation is enforced by definition order.** `_over_limits`,
+   `_enforce_limits` and `_evict_one` are all defined *above* `_sample_occupancy`
+   in `daily_panels.ml`, so the eviction path cannot reference the accumulator
+   without a deliberate code move. The `occ` field is written only by
+   `Occupancy.sample` / `touch` / `mark_absent` and read only by `cache_stats`.
+2. **M10 proves a future violation would be caught.** I made `_over_limits`
+   consult `(Daily_panels_occupancy.summary t.occ).max_entries` so that eviction
+   stops once the peak exceeds 2 — a genuine telemetry-influences-behaviour
+   change of exactly the shape this PR promises never to make. Two eviction tests
+   went red.
+3. **M17 pins the `--gc-trace`-off overhead claim.** `test_cache_sampler_not_forced_without_trace`
+   is a call-counter, not a comment; forcing the thunk before `record`'s `None`
+   check reddens it. `Panel_runner` builds the sampler closure unconditionally
+   (one partial application per run) but it is only ever *forced* inside
+   `Gc_trace.record`'s `Some trace` branch. The claim is "zero overhead", and one
+   closure allocation per run is a fair reading of that.
+
+I found **no** behaviour change and **no** golden movement. `goldens-affected` is
+green at this tip and the PR correctly states that
+`.claude/rules/config-default-blast-radius.md` does not fire (zero
+`[@sexp.default …]` and zero `let default*` records in the diff — I confirmed
+this against the diff).
+
+I also independently reproduced the author's reported after-line by running
+`test_panel_runner_gc_trace.exe` in my own worktree:
+
+```
+Panel_runner: snapshot cache hits=25793 misses=22 miss_absent=0 evictions=0 n_symbols=22 misses_per_symbol=1.00 n_symbols_touched=22 n_symbols_absent=0 loads_per_touched=1.00 max_entries=22 max_bytes=1278608 max_mmap_open=0 avg_entries=11.5 avg_bytes=697518 cap_mb=4096 cap_mmap_handles=256 top_heap_bytes=18265984 maxrss_bytes=31952896
+```
+
+Byte-identical to the PR body except `top_heap_bytes` / `maxrss_bytes`, which are
+environment-dependent by construction. The PR body's "Before" line is explicitly
+labelled *reconstructed, not re-run*, and its five values do appear byte-for-byte
+in the after line — an honest disclosure of a reconstruction rather than a
+silent one.
+
+### The `misses` / `miss_absent` design decision
+
+I judge the author's reasoning sound, and the `.mli` honest about it.
+
+- **`misses` semantics genuinely unchanged.** `t.misses <- t.misses + 1` still
+  fires *before* the manifest lookup (unchanged context line in the diff), so an
+  absent symbol still counts as a miss exactly as on `main`. The `.mli` says
+  "**Meaning unchanged** since the counter was introduced: it still counts every
+  non-hit read, including reads of symbols that are not in the manifest at all."
+  That is true of the code. Redefining it would have silently moved a number
+  present in every historical chain log — the conservative choice is right.
+- **Declining to add a negative-lookup cache is correct for this PR.** It would
+  alter the load path, which is precisely the constraint a telemetry PR is under,
+  and the avoided cost is an O(1) hashtable miss. `n_symbols_absent` exposes the
+  actionable quantity (the warehouse-coverage hole, counted in names) without
+  touching behaviour. M6 and `test_absent_symbol_misses_are_split_out` pin that an
+  absent read increments *both* `misses` and `miss_absent`, counts distinct absent
+  names, and leaves occupancy untouched (`n_symbols_touched` stays at the one real
+  symbol) — the full contract, not just the counter.
+- **`loads_per_touched` is the honest ratio and M13 pins the subtraction.**
+
+### Sampling point
+
+Issue #2878 required "pick one and document it". Both halves check out:
+
+- **Documented** in `daily_panels.mli`'s `occupancy` docstring, with the rejected
+  alternative (per-`read_today`) and *why* it was rejected (means would be
+  weighted by read frequency, not residency), plus the consequence of sampling
+  after enforcement (marks are peak **resident**, never a transient over-limit
+  spike). The PR body repeats it and `daily_panels_occupancy.mli` cross-refers
+  rather than duplicating — the contract has one owner.
+- **Implemented where the docstring says.** `_sample_occupancy` is called from
+  `_insert_into_cache`, after `_enforce_limits`, once per insert. M9 (moving the
+  sample before enforcement) reddens two tests, so the documented ordering is
+  pinned by the suite and not merely asserted in prose.
+
+## Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new `.mli` docstrings has an identified test that pins it | PASS | `occupancy` high-water/mean semantics → M1–M5 all red via `_expect_stats` whole-record equality + the sized/armed/control trio. "Sampling point: once per insert, after limit enforcement" → M9 red. "Every field here is observation only … results are identical whether or not the counters are consulted" → M10 red (bit-identical probe). `miss_absent` / `n_symbols_touched` / `n_symbols_absent` → M6/M7/M8 red + `test_absent_symbol_misses_are_split_out`. `resident` + `max_cache_bytes` / `max_mmap_handles` → `test_resident_and_caps_report_live_state`. `render_cache_stats_line` format contract → M11 (compile error) / M12 / M13 / M16 red. `Gc_trace.record` "called **only** on the `Some trace` path, so a run without `--gc-trace` pays nothing" → M17 red. "`None` renders as three blank CSV fields — blank rather than a sentinel" → M18 red. CSV header → M19 red. Residual R1 below is the one `.mli` claim a mutation did not redden. |
+| CP2 | Each claim in the PR body's "Test design" / "Bit-identical" sections has a corresponding test in the committed test files | PASS | "Whole-record assertions … a regression in any field reddens" → verified by M1–M8, not assumed. "Distinct per-symbol sizes … the strict-increase precondition is *itself* asserted" → verified by M21. "Armed / control pair" → both tests present and asserting different peaks (3 vs 6) and eviction counts (3 vs 0). "Wiring pinned end-to-end" → M20 red. "Line format pinned character-for-character, with all-distinct field values so no two columns can be transposed" → M12 red. "`--gc-trace` off … pinned by a call-counter test, not by a comment" → M17 red, and it is literally a call counter. Every advertised test exists in the committed files; no claim is unbacked. |
+| CP3 | Pass-through / identity / invariant contracts pin identity, not just size/shape | PASS | The identity contract here is *bit-identical behaviour*, and M10 is the direct probe: making the eviction path read telemetry reddens. The record-level analogue also holds — `_expect_stats` compares the entire `stats` value with `equal_to`, and `test_cache_sampler_forced_once_per_record` compares the whole `(calls, cache list)` tuple with `equal_to (2, [Some _sample; Some _sample])` rather than counting elements. `test_cache_columns_render_sampled_and_blank` uses `elements_are [equal_to "12,3456,7"; equal_to ",,"]`, not `size_is 2`. |
+| CP4 | Each guard called out explicitly in code docstrings has a test exercising the guarded-against scenario | PASS | "blank rather than a sentinel so a consumer cannot mistake 'not sampled' for a measured zero" → `test_cache_columns_render_sampled_and_blank`, M18 red. "the thunk is never forced and no cache is touched" without `--gc-trace` → `test_cache_sampler_not_forced_without_trace`, M17 red. "means are `0.0` when no sample was ever taken" / zero-denominator ratios → `test_zero_denominators_render_zero` pins `0.00`, not nan/inf. "the marks describe peak **resident** occupancy, never a transient over-limit spike" → M9 red. "`n_symbols_touched` … Using the *universe* size as the denominator understates thrash" → `test_absent_misses_move_only_the_loads_ratio` pins that removing absent misses moves `loads_per_touched` (2.70) and leaves `misses_per_symbol` (1.35) alone. `_release_entry`/fd-leak guard is pre-existing and untouched. |
+
+## Behavioral Checklist (domain)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1, S1–S6, L1–L4, C1–C3, T1–T4 | — | NA | Pure infrastructure / telemetry PR; touches no Weinstein domain logic, no stage classifier, no stop, no screener, no strategy config. Per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely", the domain checklist does not apply and CP1–CP4 above is the full review. qc-structural did not flag A1. No `BOOK-CHECK-NEEDED` items arise. |
+
+## Residuals (non-blocking — do not hold this PR)
+
+**R1 — `read_process_high_water`'s unit-conversion scalars are unpinned.**
+The two GREEN mutations. M14 (`maxrss` scaled by `_bytes_per_word` = 8 instead of
+`_bytes_per_kb` = 1024, a 128× understatement) and M15 (`top_heap` scaled by 1024
+instead of the word size, a 128× overstatement) both leave the suite green,
+because `test_process_high_water_is_positive` asserts only `> 0`. The `.mli`
+states both scalings precisely ("`top_heap_words` scaled by the word size",
+"`ru_maxrss` (kB on Linux) scaled to bytes") and neither claim is pinned.
+Cheap fix: replace `gt 0` with a plausible-range assertion — any OCaml test
+binary has `maxrss_bytes` ≥ 1 MiB and `top_heap_bytes` ≥ 64 KiB, and both
+mis-scalings fall outside those bounds. Non-blocking: these are diagnostic-only
+fields read by no decision path, and a 128× error would be obvious in a log.
+
+**R2 — the `close` lifetime claim is unpinned.** `daily_panels.mli` states
+"`close` does not reset these — they are lifetime figures. It does drop residency
+to zero, so inserts after a `close` sample from an empty cache." I confirmed by
+reading `close` that it clears `t.bytes` / `t.mmap_open` and leaves `t.occ`
+alone, so the claim is *true* — but no test covers it, and a future `close` that
+also reset `occ` would pass. A three-line test (read, close, read, assert
+`max_entries` unchanged) would close it.
+
+**R3 — the end-to-end line is only ever rendered in the v1 regime.** The
+integration fixture is an in-process CSV snapshot, so the printed line always
+carries `max_mmap_open=0 evictions=0`; no test renders the line from a run where
+the handle cap actually bound. The *accounting* for that regime is pinned at the
+unit level (armed arm, M3/M9/M10), so this is a gap in end-to-end render coverage
+only, not in correctness. Worth a v2-backed integration case whenever one is
+cheap.
+
+**R4 — process note, not a code finding.** The dispatch brief said structural's
+#2888 checklist was on disk at `dev/reviews/backtest-perf.md` with
+`Reviewed SHA: 6e56853b…` as line 1. It is not: that file's line 1 is
+`Reviewed SHA: 6f689d62…` and its contents are two older reviews (a prior
+backtest-perf tiering PR and #703). `dev/reviews/` is untouched by this PR's
+diff. I preserved the existing line 1 and appended my section under its own
+explicit SHA heading. Structural's #2888 verdict is on the PR itself, so nothing
+is lost — flagging so the gate record is not misread later.
+
+## Quality Score
+
+5 — Reference-grade. The two most recent QC catches on this codebase (#2875's
+projection blind spot and vacuous fixture) were both anticipated and both closed,
+verified by 21 mutations of which 19 reddened; the anti-vacuity precondition is
+*itself* asserted so the fixture cannot silently decay, and the log-line format is
+pinned at compile time rather than by a test. The bit-identical constraint holds
+under direct probing. The one real gap (R1) is two diagnostic-only unit scalars.
+
+## Verdict
+
+APPROVED
