@@ -204,3 +204,210 @@ text-only and no re-run is needed.
 ## Verdict
 
 NEEDS_REWORK
+
+---
+
+## Structural QC (re-review at 45ea37ba — rework iteration 1) 
+
+**Scope:** Text-only rework addressing qc-behavioral NEEDS_REWORK. Delta: 4 files, +286/−26 lines, **zero `.ml`/`.mli`/`dune` changes**. No executable logic touched; no build impact.
+
+**Gates run:** POSIX shell linter (`posix_sh_check.sh`) on `chain-veto.sh` — PASS. No `dune` gates run (build is contended and the delta guarantees no code impact). CI status: `perf-tier1-smoke` and `goldens-affected` both passed; `build-and-test` in_progress.
+
+**Files changed in rework 36a4f9bc → 45ea37ba:**
+1. `dev/experiments/_ledger/2026-09-21-index-stage-veto.sexp` — ledger notes updated to correct the cohort windows (−1/+2 lines) and added CAVEAT on uncommitted equity_curve.csv
+2. `dev/experiments/index-stage-veto-2026-09-16/README.md` — Verdict and Forward guidance sections rewritten to correct the 2020 blocked re-entry figures and clarify the book-settled faithfulness question
+3. `dev/experiments/index-stage-veto-2026-09-16/chain-veto.sh` — **comment-only**: +3 lines documenting per-lane parameter variants (lane A vs lanes B+)
+4. `dev/reviews/index-stage-veto.md` — new file with full behavioral review (206 lines; first line `Reviewed SHA: 36a4f9bc…`)
+
+**Verification:**
+- results/ artifacts: **zero changes** (unchanged between tips)
+- paired.sh and other scripts: **unchanged** 
+- POSIX portability: **pass** (114 scripts clean)
+- Ledger sexp: **parses** (valid s-expression with balanced parens)
+- dev/reviews first line: **correct** (pinned SHA is 36a4f9bc, the prior tip under behavioral review)
+
+### Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | NA | Zero `.ml`/`.mli`/`dune` in diff; format pass is guaranteed. POSIX linter pass on shell scripts. |
+| H2 | dune build | NA | Same; no code path touched. CI perf-tier1-smoke and goldens-affected already passed. |
+| H3 | dune runtest | NA | Same; no test infrastructure touched. The mechanism under test (`index_stage_veto_blocks_longs`) is tested in #2863. |
+| P1 | Functions ≤ 50 lines | NA | No functions in diff. |
+| P2 | No magic numbers | NA | No code in diff. |
+| P3 | Config completeness | NA | No config changes in diff. |
+| P4 | Public-symbol export hygiene | NA | No `.mli` in diff. |
+| P5 | Internal helpers prefixed per convention | NA | No helper functions in diff. |
+| P6 | Tests conform to test-patterns.md | NA | No test files in diff. Mechanism tests live in #2863. |
+| A1 | Core module modifications | NA | No modifications to Portfolio/Orders/Position/Strategy/Engine — diff is experiment record only. |
+| A2 | Dependency-direction rules respected | NA | No dune files touched. |
+| A3 | No unnecessary modifications | PASS | Diff contains only corrections to the rework's own narrative (README/ledger) and the QC review record. All 4 files in the rework delta are present in the GitHub API file list (confirmed via REST API); no stray files introduced. Behavioral review corrections (B1/R2/R3 findings) are exactly what the rework addresses. |
+
+### Quality Score
+
+5 — The rework precisely targets every structural issue the behavioral review surfaced (B1 cohort-window correction, R3 reworded faithfulness guidance, CAVEAT added), with no scope creep. Comment-only shell change passes POSIX linter. Ledger sexp is well-formed. The behavioral review's prior APPROVED checklist (CP1/CP3/CP4/rule conformance) stands unchanged; only the factual corrections to narrative landed. Clean iteration.
+
+### Verdict
+
+APPROVED
+
+---
+
+**Re-review complete at SHA 45ea37ba9c36479e016c8c9cd4ba67b0f8140e60.** Prior APPROVED at 36a4f9bc is superseded by this rework-iteration review. No blockers for merge once build-and-test completes (expected ~minutes).
+
+---
+
+## Behavioral QC (re-review at 45ea37ba — rework iteration 1)
+
+Reviewed SHA: 45ea37ba9c36479e016c8c9cd4ba67b0f8140e60 (rework iteration 1)
+
+Re-review of the text-only rework addressing my NEEDS_REWORK at `36a4f9bc`. Scope: 4 files, no
+`.ml`/`.mli`/`dune`. **No `dune` run** — the delta cannot affect a build, structural already ran the
+POSIX gate, and my work here is arithmetic over the committed CSVs. `git diff 36a4f9bc 45ea37ba --
+'*/results/*'` is **empty**: the artifacts I verified last round are byte-identical, so nothing I
+previously confirmed (V6=0 on all six reports, single-knob `params.sexp` isolation, salt-1 lane-B
+provenance, pre-registration ordering, U1–U4 broad PIT, the metric-glob tripwire) is in the delta.
+
+### What I re-derived — independently, not from the author's report
+
+Own `csv`+dict join on `symbol|entry_date` over all six `trades.csv`, written fresh for this pass.
+
+| quantity | author reports | I get | ✓ |
+|---|---|---|---|
+| duplicate join keys, all six files | 0 | 0 (703/705/716 arm, 732/766/762 null) | ✓ |
+| salt 0 cohort, fixed 2020-03-15→05-31 | 12 / +$563,394 | 12 / **+$563,394** | ✓ |
+| salt 1, same window | 12 / +$466,057 | 12 / +$466,057 | ✓ |
+| salt 2, same window | 13 / +$329,357 | 13 / +$329,357 | ✓ |
+| salt 0, narrow 03-21→04-29 | 10 / −$3,099 | 10 / −$3,099 | ✓ |
+| the two dropped entries | LACO 05-27 +$74,122; ZS 05-29 +$492,371 | exact | ✓ |
+| 2022 removed, uniform key | 19/17/15; −$484,629 / −$357,130 / −$444,311 | exact | ✓ |
+| *new* claim added in §Why: cohort net of arm-only substitutes | +$0.61M / +$0.49M / +$0.36M | +$608,765 / +$485,269 / +$356,214 | ✓ |
+| 2020 entry-year deltas | −$0.5M / −$0.76M / −$1.35M | −$516,211 / −$754,893 / −$1,353,531 | ✓ |
+
+**Every figure matches, including a claim the author added that I had not asked for and that is also
+correct.** The corrected salt-0 triple leg (+$563,394 on 12 entries) is the number the artifacts
+support; the README now carries it.
+
+### B1 — closed
+
+Corrected in every load-bearing place: README §Verdict §Why, the salt-0 log bullet (the "was flat /
+monster lottery, not mechanism" reading is gone and replaced with the corrected one), the salt-1
+cross-salt comparison, the new §Correction note item 1, and the ledger `notes` (now "blocked
+re-entry cohort on the FIXED 2020-03-15..05-31 window +$0.56M/+$0.47M/+$0.33M = 12/12/13"). §Why
+states the symmetry explicitly and accurately.
+
+**The author's claim to have found two spots beyond my line list is true and verified** — L115–116
+(the salt-0 "2020 entry-year gap (−$516k) is the re-entry tax, not the funding lottery it was first
+read as") and L130 (YE NAV "2020 −$1.02M (the blocked re-entry cohort, then path divergence)"). Both
+were stale under the old reading and both are now correct.
+
+**I found one more they missed — R5 below.** It is a single sentence in a log bullet that the same
+rework corrected two lines above it, so it is self-contradicting rather than load-bearing. Residual,
+not a block.
+
+### Did the correction overshoot? No.
+
+Verdict is unchanged: `(verdict Reject)`, "REJECT-as-default, keep as an axis", and the Rule-4
+classification "not do-not-revive: book-faithful, does what it says" survives verbatim in the
+ledger. §Why's new claim is "the two legs are symmetric at 3/3 salts — the 2022 grind save
+reproduces at every salt and so does the 2020 re-entry tax", which is exactly what the artifacts
+show and is the correct strengthening: it converts a salt-dependent-looking draw into a clean
+both-earns-and-pays REJECT. It does not claim the veto is *worse* than before, and it does not touch
+the pre-registered rule or its arithmetic (realised 1/3). No overclaim in the other direction.
+
+### R2 — disclosure judged on its merits: the right call, and the caveat is honest
+
+I confirmed no `equity_curve.csv` exists for this slug anywhere in the tree, so the fix genuinely
+required a re-run that was out of scope. Judging the disclosure rather than checking a box:
+
+- **The dependency is genuinely absent.** The pre-registered rule is conjunctive (realised **AND**
+  Calmar at ≥2/3). Realised clears 1/3 — s0 $3.85M→$2.77M fail, s1 clear, s2 $1.40M→$0.97M fail — all
+  three from `actual.sexp`, which *is* committed. The conjunction therefore fails at 2/3 salts
+  however Calmar is read. The un-backed NAV figures support only the *commentary* that the Calmar 3/3
+  clear is a lower-peak artifact; that commentary sits on top of an already-decided verdict. So "the
+  verdict does not rest on it" is **true**, not a hedge.
+- **The caveat is prominent, not buried.** §Correction note item 3 is a top-level section placed
+  immediately before §Verdict — a reader reaches it before the conclusion — and the ledger `notes`
+  carries it as a trailing `CAVEAT:`. It names the load-bearing use explicitly ("including the
+  lower-peak argument that discounts the Calmar 3/3 clear") rather than hiding behind a generic
+  disclaimer, and it records the forward fix. That is the correct shape for a disclosure.
+
+Accepted as closed by disclosure.
+
+### R3 — reframed correctly, and the author's correction to my citation is right
+
+Verified directly: `grep -c "Resolved 2026-09-16" docs/design/weinstein-book-reference.md` in this
+branch returns **0** — the entry is absent from the branch checkout — while `git show
+origin/main:docs/design/weinstein-book-reference.md` carries it at §2.1 with both quotes verbatim
+("not enough for the industrials to temporarily pop above the MA … if the average continues pointing
+lower"; "the levelled MA is penetrated on the upside"). **The branch simply predates the entry, so
+the citation is accurate at merge time** and a reviewer re-checking inside the worktree would be
+misled. Noting it here so a future reader is not confused. The reframing itself is sound: README
+§Forward guidance and the ledger now both state the price-cross version is settled *against* by
+tier 1 and that a faithful dial must key off MA levelling — not an open book question. Tier 2 not
+attempted (unreachable from this runner, per `book-as-authority.md` §Environment-aware protocol);
+tier 1 on `origin/main` settles it. No `BOOK-CHECK-NEEDED`.
+
+### R1, R4 — closed / partially closed
+
+R1 fixed: 19/17/15 with nets appears in all three log bullets, in §Why ("removes 15–19 entries a year
+that lose −$0.36M to −$0.48M net"), in §Correction note item 2, and in the ledger. R4 addressed by
+comment; see R6 for a small inaccuracy the new comment introduces.
+
+## Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Claims in new `.mli` docstrings pinned by tests | NA | No `.ml`/`.mli` in the diff. Mechanism shipped in #2863 with `test_index_stage_veto_gate.ml` incl. a default-`false` assertion. |
+| CP2 | Each claim in the record has corresponding evidence in the committed artifacts | **PASS** (was FAIL) | The 2020 cohort triple is now computed on one fixed window at all three salts and re-derives exactly (+$563,394 / +$466,057 / +$329,357). The 2022 counts re-derive under a uniform key (19/17/15). A newly-added §Why claim (cohort net of arm-only substitutes) also re-derives exactly. The one remaining figure class that is not artifact-backed (NAV peak/trough/give-back) is now explicitly disclosed as asserted, with the dependency correctly characterised — see R2 above. Residual R5: one un-updated log sentence. |
+| CP3 | Identity / pass-through claims pinned by identity | PASS | Unchanged from `36a4f9bc`; artifacts byte-identical. Single-knob isolation still pinned by a one-line `params.sexp` override diff; trade-identity by exact first-divergence key; 2003/2009 inertness by symmetric-difference = 0. |
+| CP4 | Each guard called out has evidence it was exercised | PASS | Unchanged. V6 `(passed true) (n_violations 0) (specimens ())` on all six reports → `validator_diff -check V6` exit 0 by construction (`mechanism-validation-rigor.md` check 8). `chain-veto.sh` aborts unchanged (HEAD pin, dirty check, warehouse assertion, disk guard, lane lock); the rework is comment-only. |
+
+## Behavioral Checklist (Weinstein domain rows)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1, S1–S6, L1–L4, C1–C3, T1–T4 | — | **NA** | Experiment-record PR; implements no domain logic. Mechanism faithfulness settled by tier 1 (`weinstein-book-reference.md` §2.1 on `origin/main`): the Stage-4 index breakdown is an unconditional suspension of new buying, so the veto tightens spine item 6 rather than inventing a mechanism (`weinstein-faithful-core.md` W2). |
+
+## Residuals (non-blocking — file, do not hold)
+
+**R5 — one stale sentence the rework missed, self-contradicting its own corrected paragraph.**
+README L238, closing the salt-1 "Two-salt read" bullet: *"the fat-tail tax on the recovery is real at
+one salt of two."* That is the pre-correction framing (true only when salt 0's cohort was read as
+flat). Two lines above, in the same bullet, the rework correctly writes *"the 2020 cost reproduces
+(−$0.52M entry-year at s0 around a +$0.56M blocked re-entry cohort, −$0.76M around a +$0.47M cohort
+at s1)"* — i.e. both salts. §Verdict §Why (L313) and §Correction note (L275–276) both say 3/3.
+Non-blocking because the durable, load-bearing statements are all correct and a reader hits the
+contradiction inside a paragraph that flags itself as corrected; but it is a one-word fix ("at both
+salts") if this is touched again. Grepped the full README for every other instance of the old
+framing (`≈ 0`, "flat", "lottery", "−$516k", "−$1.02M", "19 / 13 / 11", "11–19", "a draw",
+"salt-dependent") — L238 is the only survivor.
+
+**R6 — the new `chain-veto.sh` comment misstates one of the four defaults it documents.** The added
+line says *"lanes B+ (salts 1-2, = the defaults below): WTREL=.claude/worktrees/sweep-veto2 …"*, but
+the actual default on the next line is `WTREL=${WTREL:-.claude/worktrees/sweep-veto}` — **lane A's**
+worktree. `CELL_TIMEOUT` (60000) and `SNAPSHOT_MAX_MMAP_HANDLES` (12000) do default to lane B;
+`WTREL` does not. So the committed defaults reproduce neither lane cleanly, which is exactly the R4
+hazard, now with a comment asserting otherwise. The per-lane quadruple itself is correct and useful —
+only the "= the defaults below" parenthetical is wrong. Either change the default to `sweep-veto2` or
+drop the parenthetical.
+
+**R7 — the R2 caveat's enumeration is one category short.** It disclaims "every peak/trough/give-back
+number", but the year-end NAV-diff series (L130, L228, L257) comes from the same uncommitted
+`equity_curve.csv` and is not named. Widening the phrase to "every NAV-derived figure" would close it.
+
+## Quality Score
+
+4 — The rework is precise and complete on the blocking finding: the corrected triple re-derives
+exactly, it landed in all five places I cited plus two I did not, the §Correction note is an
+unusually good artifact (states the window, names the two dropped entries with dollar figures, gives
+the mechanism argument for why the narrow window was indefensible, and states the consequence for the
+read), and the author added a further correct claim rather than doing the minimum. R2 is closed by a
+disclosure that is honest, well-placed, and correctly reasoned about its own load-bearingness. Short
+of 5 only for R5 — a prose correction that left one contradicting sentence inside a paragraph it
+otherwise fixed, which is the known residual failure mode of this kind of edit — plus the small
+comment inaccuracy in R6.
+
+## Verdict
+
+APPROVED
