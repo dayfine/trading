@@ -151,8 +151,8 @@ typerep                     v0.17.1
 uopt                        v0.17.0
 uri                         4.4.0
 uri-sexp                    4.4.0
-uucp                        17.0.0
-uuseg                       17.0.0
+uucp                        18.0.0
+uuseg                       18.0.0
 uutf                        1.0.4
 variantslib                 v0.17.0
 yojson                      3.0.0
