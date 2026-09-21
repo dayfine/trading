@@ -16,20 +16,22 @@ let step_failed e =
 
 (** One step iteration: snapshot [_before], call [Simulator.step], snapshot
     [_after], return either the final result or the next simulator state. *)
-let step_with_gc_trace ?gc_trace ~date sim =
-  Gc_trace.record ?trace:gc_trace
+let step_with_gc_trace ?gc_trace ?cache_sampler ~date sim =
+  Gc_trace.record ?trace:gc_trace ?cache_sampler
     ~phase:(step_phase ~date ~boundary:"before")
     ();
   let outcome = Simulator.step sim in
-  Gc_trace.record ?trace:gc_trace ~phase:(step_phase ~date ~boundary:"after") ();
+  Gc_trace.record ?trace:gc_trace ?cache_sampler
+    ~phase:(step_phase ~date ~boundary:"after")
+    ();
   outcome
 
 (** One iteration of the step loop: snapshot before/after, dispatch on the
     outcome. Returns [`Done r] when the simulator completes, or
     [`Continue (sim', step_result)] with the next simulator state plus the
     per-step result (used to advance progress counters). *)
-let step_loop_iter ?gc_trace ~date sim =
-  match step_with_gc_trace ?gc_trace ~date sim with
+let step_loop_iter ?gc_trace ?cache_sampler ~date sim =
+  match step_with_gc_trace ?gc_trace ?cache_sampler ~date sim with
   | Error e -> step_failed e
   | Ok (Simulator.Completed result) -> `Done result
   | Ok (Simulator.Stepped (sim', step_result)) -> `Continue (sim', step_result)
@@ -66,11 +68,12 @@ let record_step_into_progress ~progress_acc ~date
     {!Backtest_progress.emit_final} call after the loop returns. [on_step], when
     passed, is invoked with the same completed step — the artefact-streaming
     hook (#2502). *)
-let run_simulator_with_gc_trace ?gc_trace ?progress_acc ?on_step ~stop_log sim =
+let run_simulator_with_gc_trace ?gc_trace ?cache_sampler ?progress_acc ?on_step
+    ~stop_log sim =
   let start_date = (Simulator.get_config sim).start_date in
   let rec loop sim ~pending_date =
     Stop_log.set_current_date stop_log pending_date;
-    match step_loop_iter ?gc_trace ~date:pending_date sim with
+    match step_loop_iter ?gc_trace ?cache_sampler ~date:pending_date sim with
     | `Done result -> result
     | `Continue (sim', step_result) ->
         record_step_into_progress ~progress_acc ~date:pending_date ~step_result;

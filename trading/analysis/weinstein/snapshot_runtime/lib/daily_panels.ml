@@ -3,6 +3,7 @@ module Snapshot = Data_panel_snapshot.Snapshot
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Backing = Daily_panels_backing
+module Occupancy = Daily_panels_occupancy
 
 (* 1 MiB. Used to convert [max_cache_mb] to a byte budget. *)
 let _bytes_per_mb = 1_048_576
@@ -30,7 +31,27 @@ let default_max_mmap_handles () =
    contribution recomputed at insert time and never revised. *)
 type cache_entry = { symbol : string; backing : Backing.t; bytes : int }
 
-type stats = { hits : int; misses : int; evictions : int }
+type occupancy = Occupancy.summary = {
+  max_entries : int;
+  max_bytes : int;
+  max_mmap_open : int;
+  avg_entries : float;
+  avg_bytes : float;
+}
+[@@deriving sexp, equal]
+
+type stats = {
+  hits : int;
+  misses : int;
+  miss_absent : int;
+  evictions : int;
+  n_symbols_touched : int;
+  n_symbols_absent : int;
+  occupancy : occupancy;
+}
+[@@deriving sexp, equal]
+
+type resident = { entries : int; bytes : int; mmap_open : int }
 [@@deriving sexp, equal]
 
 type t = {
@@ -52,7 +73,15 @@ type t = {
      for thrash diagnosis; never reset, not even by [close]. *)
   mutable hits : int;
   mutable misses : int;
+  (* Subset of [misses] whose symbol is absent from the manifest. Such a read
+     can never be served from cache, so it is charged on EVERY read of that
+     symbol — a permanent negative lookup, not thrash. Split out so the
+     thrash ratio can exclude it; [misses] keeps its original meaning. *)
+  mutable miss_absent : int;
   mutable evictions : int;
+  (* Occupancy telemetry. Observed only — never consulted by the eviction
+     path, so residency decisions are bit-identical with or without it. *)
+  occ : Occupancy.t;
 }
 
 (* --- Path resolution -------------------------------------------------- *)
@@ -107,6 +136,18 @@ let _enforce_limits t =
   in
   loop ()
 
+(* --- Occupancy telemetry ---------------------------------------------- *)
+
+(* Feed the current residency to the occupancy accumulator. Called once per
+   insert, AFTER [_enforce_limits] has restored both caps: inserts (and the
+   evictions they trigger) are the only events that change residency, so one
+   post-enforce sample per insert is a complete record of the distinct resident
+   states the cache passed through — and the marks describe peak RESIDENT
+   occupancy, never a transient over-limit spike. *)
+let _sample_occupancy t =
+  Occupancy.sample t.occ ~entries:(Hashtbl.length t.cache) ~bytes:t.bytes
+    ~mmap_open:t.mmap_open
+
 (* --- File loading ----------------------------------------------------- *)
 
 let _insert_into_cache t ~symbol ~backing =
@@ -117,6 +158,8 @@ let _insert_into_cache t ~symbol ~backing =
   Hashtbl.set t.cache ~key:symbol ~data:elt;
   t.bytes <- t.bytes + bytes;
   _enforce_limits t;
+  Occupancy.touch t.occ symbol;
+  _sample_occupancy t;
   entry
 
 let _load_symbol_file t (entry : Snapshot_manifest.file_metadata) =
@@ -127,6 +170,8 @@ let _load_and_insert t ~symbol =
   t.misses <- t.misses + 1;
   match Snapshot_manifest.find t.manifest ~symbol with
   | None ->
+      t.miss_absent <- t.miss_absent + 1;
+      Occupancy.mark_absent t.occ symbol;
       Status.error_not_found
         (Printf.sprintf "Daily_panels: symbol %s not in manifest" symbol)
   | Some metadata ->
@@ -160,7 +205,9 @@ let _empty_cache ~snapshot_dir ~manifest ~max_cache_bytes ~max_mmap_handles =
     mmap_open = 0;
     hits = 0;
     misses = 0;
+    miss_absent = 0;
     evictions = 0;
+    occ = Occupancy.create ();
   }
 
 let create_with_handle_cap ~max_mmap_handles ~snapshot_dir ~manifest
@@ -203,9 +250,27 @@ let active_through_for t ~symbol =
     ~f:(fun (e : Snapshot_manifest.file_metadata) -> e.active_through)
 
 let cache_bytes t = t.bytes
+let max_cache_bytes t = t.max_cache_bytes
+let max_mmap_handles t = t.max_mmap_handles
+
+let resident t =
+  ({
+     entries = Hashtbl.length t.cache;
+     bytes = t.bytes;
+     mmap_open = t.mmap_open;
+   }
+    : resident)
 
 let cache_stats t =
-  { hits = t.hits; misses = t.misses; evictions = t.evictions }
+  {
+    hits = t.hits;
+    misses = t.misses;
+    miss_absent = t.miss_absent;
+    evictions = t.evictions;
+    n_symbols_touched = Occupancy.n_touched t.occ;
+    n_symbols_absent = Occupancy.n_absent t.occ;
+    occupancy = Occupancy.summary t.occ;
+  }
 
 let close t =
   (* Release every resident entry first (closes [Mmap] fds), then clear the

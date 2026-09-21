@@ -131,6 +131,61 @@ let test_step_rows_interleave_with_phase_rows _ =
            (equal_to true);
        ])
 
+(* --- snapshot-cache occupancy columns (#2878) ------------------------- *)
+
+(* The per-step rows must carry a snapshot-cache sample, and it must be a real
+   read of the live cache rather than a placeholder: by the time the simulator
+   is stepping, symbols are resident, so entries and bytes are positive and the
+   mmap-handle count never exceeds the entry count (one fd per mmap entry, and
+   v1 entries hold none).
+
+   This pins the WIRING, which is the part that rots silently: [Gc_trace] can
+   render the columns perfectly while [Panel_runner] forgets to pass a sampler,
+   and every other test in this file would still pass.
+
+   The coarse phase rows ([macro_done], [fill_done]) are recorded outside the
+   step loop and legitimately carry no sample, so only the step rows are
+   asserted. *)
+let test_step_rows_carry_cache_occupancy _ =
+  let trace = Backtest.Gc_trace.create () in
+  _run_with_gc_trace ~gc_trace:(Some trace);
+  let step_samples =
+    Backtest.Gc_trace.snapshot_list trace
+    |> List.filter ~f:(fun (s : Backtest.Gc_trace.snapshot) ->
+        _is_step_before s.phase || _is_step_after s.phase)
+    |> List.map ~f:(fun (s : Backtest.Gc_trace.snapshot) -> s.cache)
+  in
+  let unsampled = List.count step_samples ~f:Option.is_none in
+  (* Each [Mmap] entry holds exactly one fd and each decoded entry holds none,
+     so the handle count can never exceed the entry count. A placeholder or a
+     stale copy would not respect that. *)
+  let impossible =
+    List.count step_samples ~f:(fun c ->
+        match c with
+        | None -> false
+        | Some (c : Backtest.Gc_trace.cache_sample) ->
+            c.cache_entries < 0 || c.cache_bytes < 0
+            || c.mmap_open > c.cache_entries)
+  in
+  (* The very first [_before] row is taken with an empty cache, so a positive
+     residency is only required of the LAST step row, by which point the run
+     has loaded its symbols. *)
+  let last_is_warm =
+    match List.last step_samples with
+    | Some (Some (c : Backtest.Gc_trace.cache_sample)) ->
+        c.cache_entries > 0 && c.cache_bytes > 0
+    | Some None | None -> false
+  in
+  assert_that
+    (List.length step_samples, unsampled, impossible, last_is_warm)
+    (all_of
+       [
+         field (fun (n, _, _, _) -> n) (gt (module Int_ord) 0);
+         field (fun (_, u, _, _) -> u) (equal_to 0);
+         field (fun (_, _, i, _) -> i) (equal_to 0);
+         field (fun (_, _, _, w) -> w) (equal_to true);
+       ])
+
 let suite =
   "Panel_runner_gc_trace"
   >::: [
@@ -140,6 +195,8 @@ let suite =
          >:: test_per_step_rows_appear;
          "per-step rows interleave between macro_done and fill_done"
          >:: test_step_rows_interleave_with_phase_rows;
+         "per-step rows carry snapshot-cache occupancy"
+         >:: test_step_rows_carry_cache_occupancy;
        ]
 
 let () = run_test_tt_main suite

@@ -1,13 +1,29 @@
 # Status: backtest-perf
 
-## Last updated: 2026-09-20
+## Last updated: 2026-09-21
 
 ## Status
 IN_PROGRESS
 
+**Open PR: #2888** (`feat/backtest-cache-occupancy`) — snapshot-cache occupancy
++ heap high-water telemetry (#2878). Telemetry only, no behaviour change; see
+the first `## Completed` entry.
+
 ## Weekly review (`.claude/rules/perf-review-weekly.md`, ~2 h/week — user 2026-09-20)
 
 - **2026-09-20** — first entry. Read: `perf-weekly` 2026-09-14 table — 8 PASS, **2 FAIL** (`sp500-2010-2026` 4,714 s / 716 MB, `sp500-2010-2026-longshort` 4,783 s / 715 MB; workflow still green via `continue-on-error`). Unmeasured shapes: broad top-3000 5y, PIT 26y (index-veto arm s0 8h33m vs null 5h58m; s1 killed by a 36,000 s guard at 92.5 %). Actions: mmap-handle knob PR (#2839), guard resized from the measured arm, this file. Tickets to open: tier-3 FAIL root cause; a broad-5y + PIT-smoke tier cell.
+
+- **2026-09-21** — acted on the 2026-09-20 entry's "cap questions are answered
+  from `/proc` on a live worker, not from a log" gap. PR #2888 (#2878) puts
+  cache occupancy (peaks + means), the caps actually in force, and the process
+  high-water marks (`top_heap_words`, `maxrss`) on the one
+  `Panel_runner: snapshot cache …` line every chain log already carries, and
+  adds `cache_entries,cache_bytes,mmap_open` columns to the `--gc-trace` CSV.
+  Also splits `miss_absent` out of `misses`: the ~551 PIT names absent from the
+  9,364-entry manifest were charged a miss on every read (~11k each), which made
+  a permanent negative lookup read as thrash. Still unmeasured, unchanged from
+  the 09-20 entry: broad top-3000 5y and a PIT-warehouse tier cell — those
+  tickets are still to open; this PR is the instrumentation they will report.
 
 ## Ownership boundary — READ FIRST (reconciled 2026-08-23)
 
@@ -700,6 +716,47 @@ mechanics + release-gate procedure.
   scheduled** — out-of-PR follow-up.
 
 ## Completed
+
+- [x] **Snapshot-cache occupancy + heap high-water telemetry** (2026-09-21).
+  PR #2888, issue #2878, branch `feat/backtest-cache-occupancy`. **Telemetry
+  only — bit-identical.** Nothing in the diff is read by the cache's load or
+  evict path, so residency decisions, cached values and every golden are
+  unchanged.
+  - `Daily_panels.stats` gains `miss_absent`, `n_symbols_touched`,
+    `n_symbols_absent` and a nested `occupancy` record (`max_entries`,
+    `max_bytes`, `max_mmap_open`, `avg_entries`, `avg_bytes`). Sampling point is
+    **once per insert, after cap enforcement** — inserts and the evictions they
+    trigger are the only events that change residency, so that is a complete
+    record of the resident states, and the peaks never show a transient
+    over-limit spike. `misses` keeps its original meaning; the absent split is
+    additive.
+  - New accessors `Daily_panels.resident` (live entries/bytes/mmap_open) and
+    `max_cache_bytes` / `max_mmap_handles` (the caps actually in force, not
+    re-derived from the environment).
+  - `Snapshot_cache_config.render_cache_stats_line` is a pure renderer (so the
+    line format is pinned by a test, not by whatever a run prints); the line now
+    also carries `loads_per_touched` — `(misses - miss_absent) /
+    n_symbols_touched`, immune to both an oversized universe and to permanent
+    negative lookups — the effective caps, and
+    `top_heap_bytes` / `maxrss_bytes`. `misses_per_symbol` keeps its value and
+    its position so existing greps still match.
+  - `Gc_trace.snapshot` gains an optional `cache_sample`, rendered as three new
+    CSV columns (blank when unsampled, so "not sampled" cannot be mistaken for a
+    measured zero). `Panel_runner` supplies the sampler; it is a thunk forced
+    only inside `record`'s `Some trace` branch, so `--gc-trace`-off runs pay
+    nothing. Caveat on `maxrss`: it counts mapped file pages, so on a v2
+    columnar warehouse it overstates the footprint several-fold — a per-run
+    trend number, not container headroom (`container-capacity-scheduling.md`).
+  - The occupancy accounting was extracted to `Daily_panels_occupancy` rather
+    than pushing `daily_panels.ml` past the 300-line soft limit.
+  - Files: `analysis/weinstein/snapshot_runtime/lib/daily_panels{,_occupancy}.{ml,mli}`,
+    `trading/backtest/lib/{snapshot_cache_config,gc_trace,panel_step_loop,panel_runner}.{ml,mli}`.
+  - Verify: `dune runtest analysis/weinstein/snapshot_runtime trading/backtest/test`.
+    Occupancy is pinned by a paired armed (binding cap) / control (non-binding
+    cap) pair over a fixture with strictly increasing per-symbol sizes — the
+    strict-increase precondition is itself asserted, so the byte figures cannot
+    be satisfied vacuously. The `--gc-trace` wiring is pinned end-to-end by a
+    real panel run, and the zero-overhead contract by a call counter.
 
 - [x] **P0a — kill O(n²) A-D-live macro path** (2026-06-22). PR #1722
   (`feat/ad-macro-perf`). PURE PERF, bit-identical (no golden re-pin). When A-D

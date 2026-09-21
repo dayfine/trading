@@ -142,6 +142,59 @@ let _v2_setup ~symbols ~n_days ~max_cache_mb =
   _v2_setup_with_cap ~max_mmap_handles:_builtin_handle_cap ~symbols ~n_days
     ~max_cache_mb
 
+(* Like [_v2_setup_with_cap] but each symbol carries its own row count, so the
+   fixture's entries have DISTINCT byte sizes. Required by the occupancy tests:
+   with uniformly-sized symbols [max_bytes] and [avg_bytes] are pure functions
+   of the entry count, so no mutation of the byte accounting could redden them. *)
+let _v2_setup_sized ~max_mmap_handles ~sized_symbols ~max_cache_mb =
+  let dir = _make_tmp_dir () in
+  let entries =
+    List.map sized_symbols ~f:(fun (symbol, n_days) ->
+        _v2_write_symbol ~dir ~symbol (_v2_series ~symbol ~n:n_days))
+  in
+  let manifest =
+    Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
+  in
+  match
+    Daily_panels.create_with_handle_cap ~max_mmap_handles ~snapshot_dir:dir
+      ~manifest ~max_cache_mb
+  with
+  | Ok t -> (dir, t)
+  | Error err -> assert_failure ("Daily_panels.create: " ^ Status.show err)
+
+(* Read one row, failing the test on any error. Returns unit — the occupancy
+   tests assert on the cache's counters, not on the row. *)
+let _read_ok t ~symbol =
+  match Daily_panels.read_today t ~symbol ~date:_default_start with
+  | Ok _ -> ()
+  | Error err -> assert_failure ("read_today " ^ symbol ^ ": " ^ Status.show err)
+
+(* Expected whole-[stats] record for a cache whose every occupancy sample sat at
+   the same byte residency [~bytes] (one insert, or a sequence of equal-sized
+   inserts under a binding cap). [~bytes] is read back off the live cache rather
+   than re-deriving [Backing.estimate_bytes]'s arithmetic — that is the
+   backing's business, not the counters'. Every other field is stated
+   explicitly, so a regression in any of them reddens the assertion. *)
+let _expect_stats ~hits ~misses ~miss_absent ~evictions ~n_touched ~n_absent
+    ~max_entries ~max_mmap_open ~avg_entries ~bytes =
+  ({
+     hits;
+     misses;
+     miss_absent;
+     evictions;
+     n_symbols_touched = n_touched;
+     n_symbols_absent = n_absent;
+     occupancy =
+       {
+         max_entries;
+         max_bytes = bytes;
+         max_mmap_open;
+         avg_entries;
+         avg_bytes = Float.of_int bytes;
+       };
+   }
+    : Daily_panels.stats)
+
 (* --- create / validation -------------------------------------------- *)
 
 let test_create_rejects_nonpositive_cap _ =
@@ -367,7 +420,10 @@ let test_cache_stats_first_read_is_a_miss _ =
   in
   assert_that
     (Daily_panels.cache_stats t)
-    (equal_to ({ hits = 0; misses = 1; evictions = 0 } : Daily_panels.stats))
+    (equal_to
+       (_expect_stats ~hits:0 ~misses:1 ~miss_absent:0 ~evictions:0 ~n_touched:1
+          ~n_absent:0 ~max_entries:1 ~max_mmap_open:0 ~avg_entries:1.0
+          ~bytes:(Daily_panels.cache_bytes t)))
 
 (* A second read of the same resident symbol is a hit; the miss count stays
    at one. *)
@@ -382,7 +438,10 @@ let test_cache_stats_second_read_is_a_hit _ =
   read ();
   assert_that
     (Daily_panels.cache_stats t)
-    (equal_to ({ hits = 1; misses = 1; evictions = 0 } : Daily_panels.stats))
+    (equal_to
+       (_expect_stats ~hits:1 ~misses:1 ~miss_absent:0 ~evictions:0 ~n_touched:1
+          ~n_absent:0 ~max_entries:1 ~max_mmap_open:0 ~avg_entries:1.0
+          ~bytes:(Daily_panels.cache_bytes t)))
 
 (* Under a tiny budget with several large symbols, loading them all forces at
    least one eviction; each first-touch is a miss and none are hits. *)
@@ -592,9 +651,14 @@ let test_v2_handle_cap_of_one_evicts_on_every_switch _ =
       match Daily_panels.read_today t ~symbol ~date:_default_start with
       | Ok _ -> ()
       | Error err -> assert_failure ("read_today: " ^ Status.show err));
+  (* Every sample sits at one resident entry (the cap), and the three symbols
+     are equal-sized, so the byte residency is the same at every sample. *)
   assert_that
     (Daily_panels.cache_stats t)
-    (equal_to ({ hits = 0; misses = 4; evictions = 3 } : Daily_panels.stats))
+    (equal_to
+       (_expect_stats ~hits:0 ~misses:4 ~miss_absent:0 ~evictions:3 ~n_touched:3
+          ~n_absent:0 ~max_entries:1 ~max_mmap_open:1 ~avg_entries:1.0
+          ~bytes:(Daily_panels.cache_bytes t)))
 
 (* The point of the knob: a cap at or above the symbol count keeps every v2
    reader resident, so a second full pass is all hits and nothing is evicted
@@ -612,10 +676,215 @@ let test_v2_handle_cap_at_symbol_count_never_evicts _ =
   in
   pass ();
   pass ();
+  (* Nothing is ever evicted, so residency grows 1..300 entries across the 300
+     inserts: the peak is the final state ([cache_bytes]) and the mean entry
+     count is (1+…+300)/300 = 150.5. Asserted leaf-by-leaf (rather than as one
+     [equal_to] record) only because [avg_bytes] is a float that must be
+     compared with a tolerance. *)
+  let final_bytes = Daily_panels.cache_bytes t in
+  assert_that
+    (Daily_panels.cache_stats t)
+    (all_of
+       [
+         field (fun (s : Daily_panels.stats) -> s.hits) (equal_to 300);
+         field (fun (s : Daily_panels.stats) -> s.misses) (equal_to 300);
+         field (fun (s : Daily_panels.stats) -> s.miss_absent) (equal_to 0);
+         field (fun (s : Daily_panels.stats) -> s.evictions) (equal_to 0);
+         field
+           (fun (s : Daily_panels.stats) -> s.n_symbols_touched)
+           (equal_to 300);
+         field (fun (s : Daily_panels.stats) -> s.n_symbols_absent) (equal_to 0);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_entries)
+           (equal_to 300);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_mmap_open)
+           (equal_to 300);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_bytes)
+           (equal_to final_bytes);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.avg_entries)
+           (float_equal 150.5);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.avg_bytes)
+           (float_equal (Float.of_int final_bytes *. 150.5 /. 300.0));
+       ])
+
+(* --- occupancy telemetry (#2878) ------------------------------------- *)
+
+(* Six v2 symbols with STRICTLY INCREASING row counts, so no byte figure below
+   is a pure function of the entry count. Loaded in ascending-size order, which
+   makes the final residency the peak residency under any LRU cap. *)
+let _sized_six =
+  [ ("Z1", 2); ("Z2", 4); ("Z3", 6); ("Z4", 8); ("Z5", 10); ("Z6", 12) ]
+
+(* Resident byte cost of one symbol's entry, measured by loading it alone into a
+   fresh single-symbol cache. Lets the byte assertions state exact expected sums
+   without re-deriving [Backing.estimate_bytes]'s arithmetic. *)
+let _v2_entry_bytes (symbol, n_days) =
+  let _dir, t =
+    _v2_setup_sized ~max_mmap_handles:1
+      ~sized_symbols:[ (symbol, n_days) ]
+      ~max_cache_mb:1
+  in
+  _read_ok t ~symbol;
+  let bytes = Daily_panels.cache_bytes t in
+  Daily_panels.close t;
+  bytes
+
+(* ARMED arm: the handle cap (3) binds below the symbol count (6). The peaks
+   must report the cap, the mean must sit below it (residency ramps 1,2,3 before
+   the cap starts evicting), and every symbol must still be counted as touched.
+   Pairs with the control test below, where the same fixture runs with a cap
+   that never binds. *)
+let test_occupancy_peaks_at_binding_handle_cap _ =
+  let _dir, t =
+    _v2_setup_sized ~max_mmap_handles:3 ~sized_symbols:_sized_six
+      ~max_cache_mb:1
+  in
+  List.iter _sized_six ~f:(fun (symbol, _) -> _read_ok t ~symbol);
+  (* Residency after each of the 6 inserts: 1,2,3,3,3,3 -> mean 2.5. Sizes
+     ascend, so the final residency is also the peak byte residency, and the
+     mean byte residency is strictly below it (the ramp held less). *)
+  assert_that
+    (Daily_panels.cache_stats t)
+    (all_of
+       [
+         field (fun (s : Daily_panels.stats) -> s.hits) (equal_to 0);
+         field (fun (s : Daily_panels.stats) -> s.misses) (equal_to 6);
+         field (fun (s : Daily_panels.stats) -> s.miss_absent) (equal_to 0);
+         field (fun (s : Daily_panels.stats) -> s.evictions) (equal_to 3);
+         field
+           (fun (s : Daily_panels.stats) -> s.n_symbols_touched)
+           (equal_to 6);
+         field (fun (s : Daily_panels.stats) -> s.n_symbols_absent) (equal_to 0);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_entries)
+           (equal_to 3);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_mmap_open)
+           (equal_to 3);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_bytes)
+           (equal_to (Daily_panels.cache_bytes t));
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.avg_entries)
+           (float_equal 2.5);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.avg_bytes)
+           (lt (module Float_ord) (Float.of_int (Daily_panels.cache_bytes t)));
+       ])
+
+(* CONTROL arm: same fixture, cap raised to the symbol count so it never binds.
+   Nothing is evicted, the peaks report the true residency rather than the cap,
+   and the mean rises to (1+..+6)/6 = 3.5. Without this arm "max_entries = cap"
+   could pass vacuously on an implementation that simply echoed the cap. *)
+let test_occupancy_control_unbinding_cap_reports_true_peak _ =
+  let _dir, t =
+    _v2_setup_sized ~max_mmap_handles:6 ~sized_symbols:_sized_six
+      ~max_cache_mb:1
+  in
+  List.iter _sized_six ~f:(fun (symbol, _) -> _read_ok t ~symbol);
+  assert_that
+    (Daily_panels.cache_stats t)
+    (all_of
+       [
+         field (fun (s : Daily_panels.stats) -> s.evictions) (equal_to 0);
+         field
+           (fun (s : Daily_panels.stats) -> s.n_symbols_touched)
+           (equal_to (List.length _sized_six));
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_entries)
+           (equal_to (List.length _sized_six));
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_mmap_open)
+           (equal_to (List.length _sized_six));
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_bytes)
+           (equal_to (Daily_panels.cache_bytes t));
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.avg_entries)
+           (float_equal 3.5);
+       ])
+
+(* The byte figures track the real per-entry cost, not the entry count. Under a
+   cap of one every sample holds exactly one entry, so [max_bytes] must be the
+   LARGEST symbol's own cost and [avg_bytes] the mean of the individual costs —
+   two different numbers that only a genuine byte accounting can produce. The
+   strictly-increasing precondition is asserted first: were the fixture's
+   symbols equal-sized (the vacuous case), these expectations would collapse
+   into each other and the test would stop discriminating. *)
+let test_occupancy_bytes_track_entry_sizes_not_counts _ =
+  let sizes = List.map _sized_six ~f:_v2_entry_bytes in
+  (* Equal to its own dedup-and-sort iff the sizes are strictly increasing. *)
+  assert_that sizes (equal_to (List.dedup_and_sort sizes ~compare:Int.compare));
+  let _dir, t =
+    _v2_setup_sized ~max_mmap_handles:1 ~sized_symbols:_sized_six
+      ~max_cache_mb:1
+  in
+  List.iter _sized_six ~f:(fun (symbol, _) -> _read_ok t ~symbol);
+  let expected_avg =
+    Float.of_int (List.fold sizes ~init:0 ~f:( + ))
+    /. Float.of_int (List.length sizes)
+  in
+  assert_that
+    (Daily_panels.cache_stats t)
+    (all_of
+       [
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_entries)
+           (equal_to 1);
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.max_bytes)
+           (equal_to (List.last_exn sizes));
+         field
+           (fun (s : Daily_panels.stats) -> s.occupancy.avg_bytes)
+           (float_equal expected_avg);
+       ])
+
+(* A read of a symbol absent from the manifest can never be served from cache,
+   so it is charged on EVERY read for the whole run. It counts as a miss (that
+   meaning is unchanged) AND as a [miss_absent]; the distinct absent names are
+   counted separately; and it must not touch occupancy at all (nothing was
+   loaded, so [n_symbols_touched] stays at the one real symbol). *)
+let test_absent_symbol_misses_are_split_out _ =
+  let _dir, t =
+    _v2_setup_sized ~max_mmap_handles:4
+      ~sized_symbols:[ ("Z1", 2) ]
+      ~max_cache_mb:1
+  in
+  _read_ok t ~symbol:"Z1";
+  List.iter [ "GHOST"; "PHANTOM"; "GHOST"; "PHANTOM" ] ~f:(fun symbol ->
+      assert_that
+        (Daily_panels.read_today t ~symbol ~date:_default_start)
+        (is_error_with Status.NotFound));
   assert_that
     (Daily_panels.cache_stats t)
     (equal_to
-       ({ hits = 300; misses = 300; evictions = 0 } : Daily_panels.stats))
+       (_expect_stats ~hits:0 ~misses:5 ~miss_absent:4 ~evictions:0 ~n_touched:1
+          ~n_absent:2 ~max_entries:1 ~max_mmap_open:1 ~avg_entries:1.0
+          ~bytes:(Daily_panels.cache_bytes t)))
+
+(* 1 MB in bytes — the conversion [create] applies to [max_cache_mb]. *)
+let _bytes_per_mb = 1_048_576
+
+(* [resident] reports the live residency (what a periodic tracer samples), and
+   the two cap accessors report the caps the cache was actually built with —
+   not whatever the environment happens to say. *)
+let test_resident_and_caps_report_live_state _ =
+  let _dir, t =
+    _v2_setup_sized ~max_mmap_handles:5 ~sized_symbols:_sized_six
+      ~max_cache_mb:2
+  in
+  List.iter [ "Z1"; "Z2" ] ~f:(fun symbol -> _read_ok t ~symbol);
+  assert_that (Daily_panels.resident t)
+    (equal_to
+       ({ entries = 2; bytes = Daily_panels.cache_bytes t; mmap_open = 2 }
+         : Daily_panels.resident));
+  assert_that
+    (Daily_panels.max_cache_bytes t, Daily_panels.max_mmap_handles t)
+    (equal_to (2 * _bytes_per_mb, 5))
 
 (* --- mixed v1 + v2 in one cache -------------------------------------- *)
 
@@ -720,6 +989,16 @@ let suite =
          >:: test_v2_handle_cap_of_one_evicts_on_every_switch;
          "v2 handle cap at symbol count never evicts"
          >:: test_v2_handle_cap_at_symbol_count_never_evicts;
+         "occupancy peaks at binding handle cap"
+         >:: test_occupancy_peaks_at_binding_handle_cap;
+         "occupancy control: unbinding cap reports true peak"
+         >:: test_occupancy_control_unbinding_cap_reports_true_peak;
+         "occupancy bytes track entry sizes not counts"
+         >:: test_occupancy_bytes_track_entry_sizes_not_counts;
+         "absent symbol misses are split out"
+         >:: test_absent_symbol_misses_are_split_out;
+         "resident and caps report live state"
+         >:: test_resident_and_caps_report_live_state;
          "mixed v1 and v2 both read" >:: test_mixed_v1_and_v2_both_read;
        ]
 

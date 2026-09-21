@@ -12,13 +12,17 @@ val step_failed : Status.t -> 'a
 
 val step_with_gc_trace :
   ?gc_trace:Gc_trace.t ->
+  ?cache_sampler:(unit -> Gc_trace.cache_sample) ->
   date:Date.t ->
   Simulator.t ->
   Simulator.step_outcome Status.status_or
-(** Snapshot GC stats before and after one [Simulator.step] call. *)
+(** Snapshot GC stats before and after one [Simulator.step] call.
+    [cache_sampler] is forwarded to {!Gc_trace.record}, so it is consulted only
+    when [gc_trace] is present. *)
 
 val step_loop_iter :
   ?gc_trace:Gc_trace.t ->
+  ?cache_sampler:(unit -> Gc_trace.cache_sample) ->
   date:Date.t ->
   Simulator.t ->
   [ `Done of Trading_simulation_types.Simulator_types.run_result
@@ -42,6 +46,7 @@ val record_step_into_progress :
 
 val run_simulator_with_gc_trace :
   ?gc_trace:Gc_trace.t ->
+  ?cache_sampler:(unit -> Gc_trace.cache_sample) ->
   ?progress_acc:Backtest_progress.accumulator ->
   ?on_step:
     (date:Date.t ->
@@ -50,7 +55,9 @@ val run_simulator_with_gc_trace :
   stop_log:Stop_log.t ->
   Simulator.t ->
   Trading_simulation_types.Simulator_types.run_result
-(** Drive the simulator to completion, GC-tracing each step. Calls
+(** Drive the simulator to completion, GC-tracing each step. [cache_sampler],
+    when provided, adds the snapshot-cache residency columns to every traced
+    step — observability only, and never consulted without [gc_trace]. Calls
     [Backtest_progress.record_step] on every completed step when [progress_acc]
     is provided.
 

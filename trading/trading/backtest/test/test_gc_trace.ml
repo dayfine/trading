@@ -56,7 +56,7 @@ let test_csv_header_matches_snapshot_fields _ =
   (* Pin the CSV header so it stays in sync with the [snapshot] record. *)
   assert_that Backtest.Gc_trace.csv_header
     (equal_to
-       "phase,wall_ms,minor_words,promoted_words,major_words,heap_words,top_heap_words")
+       "phase,wall_ms,minor_words,promoted_words,major_words,heap_words,top_heap_words,cache_entries,cache_bytes,mmap_open")
 
 let test_write_round_trips_first_row _ =
   (* Write a 2-snapshot collector to CSV, read it back, verify the header and
@@ -99,6 +99,66 @@ let test_write_empty_writes_header_only _ =
   let lines = In_channel.read_lines path in
   assert_that lines (elements_are [ equal_to Backtest.Gc_trace.csv_header ])
 
+(* --- snapshot-cache columns (#2878) ---------------------------------- *)
+
+(* Distinct field values so the three columns cannot be transposed without
+   reddening the row assertion below. *)
+let _sample : Backtest.Gc_trace.cache_sample =
+  { cache_entries = 12; cache_bytes = 3456; mmap_open = 7 }
+
+(* The last three columns of a CSV row. *)
+let _cache_columns row =
+  String.split row ~on:',' |> fun cs ->
+  List.drop cs (List.length cs - 3) |> String.concat ~sep:","
+
+let _write_rows snapshots =
+  let dir = Core_unix.mkdtemp "/tmp/gc_trace_test_" in
+  let path = Filename.concat dir "trace.csv" in
+  Backtest.Gc_trace.write ~out_path:path snapshots;
+  In_channel.read_lines path |> List.tl_exn
+
+(* The zero-overhead contract: with no [trace], the sampler thunk must never be
+   forced. A counter, not a comment — this is the wiring that would silently
+   rot if [record] started sampling before its [None] check. *)
+let test_cache_sampler_not_forced_without_trace _ =
+  let calls = ref 0 in
+  let sampler () =
+    Int.incr calls;
+    _sample
+  in
+  Backtest.Gc_trace.record ~cache_sampler:sampler ~phase:"start" ();
+  assert_that !calls (equal_to 0)
+
+(* With a trace, the sampler IS forced, once per [record], and its values land
+   on the snapshot. *)
+let test_cache_sampler_forced_once_per_record _ =
+  let calls = ref 0 in
+  let sampler () =
+    Int.incr calls;
+    _sample
+  in
+  let t = Backtest.Gc_trace.create () in
+  Backtest.Gc_trace.record ~trace:t ~cache_sampler:sampler ~phase:"start" ();
+  Backtest.Gc_trace.record ~trace:t ~cache_sampler:sampler ~phase:"end" ();
+  assert_that
+    ( !calls,
+      Backtest.Gc_trace.snapshot_list t
+      |> List.map ~f:(fun (s : Backtest.Gc_trace.snapshot) -> s.cache) )
+    (equal_to (2, [ Some _sample; Some _sample ]))
+
+(* A sampled row carries the three values; an unsampled row carries three EMPTY
+   fields, so a consumer can tell "not sampled" from a measured zero. *)
+let test_cache_columns_render_sampled_and_blank _ =
+  let t = Backtest.Gc_trace.create () in
+  Backtest.Gc_trace.record ~trace:t
+    ~cache_sampler:(fun () -> _sample)
+    ~phase:"sampled" ();
+  Backtest.Gc_trace.record ~trace:t ~phase:"unsampled" ();
+  assert_that
+    (_write_rows (Backtest.Gc_trace.snapshot_list t)
+    |> List.map ~f:_cache_columns)
+    (elements_are [ equal_to "12,3456,7"; equal_to ",," ])
+
 let suite =
   "Gc_trace"
   >::: [
@@ -113,6 +173,12 @@ let suite =
          "write creates parent dir" >:: test_write_creates_parent_dir;
          "write of empty list writes header only"
          >:: test_write_empty_writes_header_only;
+         "cache sampler is not forced without a trace"
+         >:: test_cache_sampler_not_forced_without_trace;
+         "cache sampler is forced once per record"
+         >:: test_cache_sampler_forced_once_per_record;
+         "cache columns render sampled values and blanks"
+         >:: test_cache_columns_render_sampled_and_blank;
        ]
 
 let () = run_test_tt_main suite
