@@ -55,8 +55,12 @@ val render_cache_stats_line :
       counters. [misses] retains its historical meaning (every non-hit read);
       [miss_absent] is the subset whose symbol is not in the manifest.
     - [n_symbols] — the caller's universe size, unchanged.
-    - [misses_per_symbol] — [misses / n_symbols], unchanged and kept in the same
-      position so existing greps still match.
+    - [misses_per_symbol] — [misses / n_symbols], unchanged in both key and
+      value, and still immediately after [n_symbols], so an existing
+      [misses_per_symbol=] grep matches as before.
+      {b A positional reader would shift}: [miss_absent] is inserted before
+      [evictions], so every field from [evictions] rightward moves one place.
+      Read this line by key, not by column index.
     - [n_symbols_touched], [n_symbols_absent] — distinct symbols loaded, and
       distinct symbols looked up but missing from the manifest.
     - [loads_per_touched] — [(misses - miss_absent) / n_symbols_touched], the
