@@ -10,7 +10,7 @@ let _bytes_per_mb = 1_048_576
 (* Default cap on resident [Mmap] backings, each of which holds an open fd.
    Sits comfortably under a typical 1024 fd ulimit. Overridable per run via
    [SNAPSHOT_MAX_MMAP_HANDLES] (see [default_max_mmap_handles]) or per cache
-   via [create ?max_mmap_handles]: a broad warehouse (~10k symbols) cycles a
+   via [create_with_handle_cap ~max_mmap_handles]: a broad warehouse (~10k symbols) cycles a
    256-entry LRU on every weekly pass, so nearly every read reopens + remaps
    its file. Raising the cap to >= n_symbols is bit-identical by construction
    (a cache is a cache) and removes that churn (#2839). *)
@@ -167,12 +167,15 @@ let create_with_handle_cap ~max_mmap_handles ~snapshot_dir ~manifest
     ~max_cache_mb =
   if max_cache_mb <= 0 then
     Status.error_invalid_argument
-      (Printf.sprintf "Daily_panels.create: max_cache_mb must be positive: %d"
+      (Printf.sprintf
+         "Daily_panels.create_with_handle_cap: max_cache_mb must be positive: \
+          %d"
          max_cache_mb)
   else if max_mmap_handles <= 0 then
     Status.error_invalid_argument
       (Printf.sprintf
-         "Daily_panels.create: max_mmap_handles must be positive: %d"
+         "Daily_panels.create_with_handle_cap: max_mmap_handles must be \
+          positive: %d"
          max_mmap_handles)
   else
     let max_cache_bytes = max_cache_mb * _bytes_per_mb in

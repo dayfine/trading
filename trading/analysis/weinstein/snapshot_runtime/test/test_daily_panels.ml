@@ -132,11 +132,15 @@ let _v2_setup_with_cap ~max_mmap_handles ~symbols ~n_days ~max_cache_mb =
   | Ok t -> (dir, t)
   | Error err -> assert_failure ("Daily_panels.create: " ^ Status.show err)
 
-(* Same, under the default (env / 256) handle cap. *)
+(* The built-in default cap (256), pinned explicitly rather than read through
+   [default_max_mmap_handles] so the suite stays deterministic when an operator
+   exports [SNAPSHOT_MAX_MMAP_HANDLES] in the test environment. *)
+let _builtin_handle_cap = 256
+
+(* Same, under the built-in 256 handle cap. *)
 let _v2_setup ~symbols ~n_days ~max_cache_mb =
-  _v2_setup_with_cap
-    ~max_mmap_handles:(Daily_panels.default_max_mmap_handles ())
-    ~symbols ~n_days ~max_cache_mb
+  _v2_setup_with_cap ~max_mmap_handles:_builtin_handle_cap ~symbols ~n_days
+    ~max_cache_mb
 
 (* --- create / validation -------------------------------------------- *)
 
@@ -525,7 +529,8 @@ let test_v2_schema_mismatch_fails_loud _ =
 
 (* --- handle-cap eviction (v2-specific) ------------------------------- *)
 
-(* More v2 symbols than the internal open-handle cap (256). Tiny rows keep the
+(* More v2 symbols than the built-in open-handle cap (256, pinned by
+   [_v2_setup]). Tiny rows keep the
    byte budget far below 1 MB, so the byte cap never fires — the open-handle
    cap is the sole eviction driver. Reading every symbol must force at least
    one eviction, and a re-read of an evicted symbol must reopen + return the
@@ -539,7 +544,7 @@ let test_v2_handle_cap_evicts_and_reopens _ =
     | Error err -> assert_failure ("read_today " ^ s ^ ": " ^ Status.show err)
   in
   List.iter symbols ~f:read_first;
-  (* The open-handle cap (256) is below the 300 symbols, so eviction fired. *)
+  (* The 256 cap is below the 300 symbols, so eviction fired. *)
   assert_that
     (Daily_panels.cache_stats t)
     (field
@@ -593,7 +598,7 @@ let test_v2_handle_cap_of_one_evicts_on_every_switch _ =
 
 (* The point of the knob: a cap at or above the symbol count keeps every v2
    reader resident, so a second full pass is all hits and nothing is evicted
-   (the same 300-symbol set evicts under the 256 default in the test above). *)
+   (the same 300-symbol set evicts under the built-in 256 cap in the test above). *)
 let test_v2_handle_cap_at_symbol_count_never_evicts _ =
   let symbols = List.init 300 ~f:(fun i -> Printf.sprintf "S%03d" i) in
   let _dir, t =
