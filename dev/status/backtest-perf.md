@@ -5,12 +5,14 @@
 ## Status
 IN_PROGRESS
 
-**Open PR: #2888** (`feat/backtest-cache-occupancy`) — snapshot-cache occupancy
-+ heap high-water telemetry (#2878). Telemetry only, no behaviour change; see
-the first `## Completed` entry.
+**#2888 MERGED 2026-09-21** (`feat/backtest-cache-occupancy`) — snapshot-cache
+occupancy + heap high-water telemetry (#2878). Telemetry only, no behaviour
+change; see the first `## Completed` entry. No open PR on this track besides the
+perf-tier fix described in the 2026-09-21 weekly-review entry below.
 
 ## Weekly review (`.claude/rules/perf-review-weekly.md`, ~2 h/week — user 2026-09-20)
 
+- **2026-09-21** — second entry (~2 h). Read: `perf-weekly` 09-21 vs 09-14 — 8 PASS, same **2 FAIL** (`sp500-2010-2026` 4,738 s / 717 MB vs 4,714 / 716; `-longshort` 4,831 s / 715 MB vs 4,783 / 715); 5y sp500 cells 889–935 s (+1–5 % w/w), RSS flat. `perf-nightly` 09-21 vs 09-20: all 6 PASS, walls within ±1 %. **Root cause of the FAIL rows:** the tier scripts never passed `--no-emit-all-eligible`, so the opt-out all-eligible diagnostic ran inside every cell — and inside the measured wall since #2616 (09-01). The daily 15y golden runs the SAME cells with the flag at 364–408 s / 550 MB (12× less wall; the tier-3 figure was ~92 % diagnostic), and every verdict chain passes it too, so the tiers timed a workload nobody runs. The 3,600 s `wall_seconds` band failed on the diagnostic alone; three weeks of FAIL rows had no readable cause because the workflows uploaded no cell logs. Fix (this entry's PR): flag added to all four tier scripts + the tier-4 wrapper; artefact upload added to `perf-nightly.yml` / `perf-weekly.yml`. Expect next week's tier-2/3 walls to drop ~10×; re-read the tables against THIS week's golden-path numbers, not last week's tier rows. Also in that PR: `goldens-custom-universe-scenarios` joins tier-3 discovery, so the weekly table gains the broad top-3000 5y shape (armed-e, 198 s / 386 MB on the 09-21 golden run) and top-500 5y. Still open: a PIT-warehouse smoke cell (needs a snapshot warehouse; local-only, cap 256 vs 12,000).
 - **2026-09-20** — first entry. Read: `perf-weekly` 2026-09-14 table — 8 PASS, **2 FAIL** (`sp500-2010-2026` 4,714 s / 716 MB, `sp500-2010-2026-longshort` 4,783 s / 715 MB; workflow still green via `continue-on-error`). Unmeasured shapes: broad top-3000 5y, PIT 26y (index-veto arm s0 8h33m vs null 5h58m; s1 killed by a 36,000 s guard at 92.5 %). Actions: mmap-handle knob PR (#2839), guard resized from the measured arm, this file. Tickets to open: tier-3 FAIL root cause; a broad-5y + PIT-smoke tier cell.
 
 - **2026-09-21** — acted on the 2026-09-20 entry's "cap questions are answered
