@@ -12,7 +12,10 @@ val resolve_cache_mb : unit -> int
     absent / unparseable / non-positive value. Logs the resolved value once to
     stderr. The default (4096 MB) holds an N~3000 PIT universe resident; the
     budget is best-effort (a single oversized symbol stays resident even when
-    its bytes exceed the cap). *)
+    its bytes exceed the cap). The same line reports the resident-mmap handle
+    cap ({!Daily_panels.default_max_mmap_handles}, env
+    [SNAPSHOT_MAX_MMAP_HANDLES]) — on a v2 warehouse that cap, not the MB
+    budget, is the effective cache size. *)
 
 val log_cache_stats : daily_panels:Daily_panels.t -> n_symbols:int -> unit
 (** [log_cache_stats ~daily_panels ~n_symbols] emits the cumulative cache

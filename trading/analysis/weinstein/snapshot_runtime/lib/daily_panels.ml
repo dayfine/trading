@@ -7,12 +7,23 @@ module Backing = Daily_panels_backing
 (* 1 MiB. Used to convert [max_cache_mb] to a byte budget. *)
 let _bytes_per_mb = 1_048_576
 
-(* Hard cap on resident [Mmap] backings, each of which holds an open fd. Sits
-   comfortably under a typical 1024 fd ulimit so the cache never exhausts file
-   descriptors even when the byte budget alone would admit far more mmap
-   entries (their heap footprint is tiny). The eviction loop closes the LRU
-   reader once this is exceeded. *)
-let _max_open_mmap_handles = 256
+(* Default cap on resident [Mmap] backings, each of which holds an open fd.
+   Sits comfortably under a typical 1024 fd ulimit. Overridable per run via
+   [SNAPSHOT_MAX_MMAP_HANDLES] (see [default_max_mmap_handles]) or per cache
+   via [create ?max_mmap_handles]: a broad warehouse (~10k symbols) cycles a
+   256-entry LRU on every weekly pass, so nearly every read reopens + remaps
+   its file. Raising the cap to >= n_symbols is bit-identical by construction
+   (a cache is a cache) and removes that churn (#2839). *)
+let _default_max_mmap_handles = 256
+let max_mmap_handles_env_var = "SNAPSHOT_MAX_MMAP_HANDLES"
+
+let max_mmap_handles_of_env raw =
+  match Option.bind raw ~f:(fun s -> Int.of_string_opt (String.strip s)) with
+  | Some n when n > 0 -> n
+  | _ -> _default_max_mmap_handles
+
+let default_max_mmap_handles () =
+  max_mmap_handles_of_env (Sys.getenv max_mmap_handles_env_var)
 
 (* Cached file for one symbol. [backing] is the format-detected store (mmap
    reader for v2, decoded rows for v1); [bytes] is the cache-budget
@@ -27,13 +38,15 @@ type t = {
   manifest : Snapshot_manifest.t;
   expected_schema : Snapshot_schema.t;
   max_cache_bytes : int;
+  (* Cap on resident [Mmap] backings (= open fds); see [create]. *)
+  max_mmap_handles : int;
   cache : (string, cache_entry Doubly_linked.Elt.t) Hashtbl.t;
   (* MRU-at-front linked list of cached symbols. Head = most recently used,
      tail = LRU. Eviction pops from tail. *)
   lru : cache_entry Doubly_linked.t;
   mutable bytes : int;
   (* Count of resident [Mmap] backings (= open fds). Capped at
-     [_max_open_mmap_handles]; eviction closes readers to keep this bounded. *)
+     [max_mmap_handles]; eviction closes readers to keep this bounded. *)
   mutable mmap_open : int;
   (* Cumulative cache-access counters since [create]. Surfaced via [cache_stats]
      for thrash diagnosis; never reset, not even by [close]. *)
@@ -78,7 +91,7 @@ let _evict_one t =
 (* True while the cache is over either limit: the byte budget OR the open-fd
    handle cap. *)
 let _over_limits t =
-  t.bytes > t.max_cache_bytes || t.mmap_open > _max_open_mmap_handles
+  t.bytes > t.max_cache_bytes || t.mmap_open > t.max_mmap_handles
 
 (* Drop entries until both limits are satisfied. Always leaves at least one
    entry resident if it was just inserted — the just-inserted entry sits at the
@@ -134,12 +147,13 @@ let _ensure_loaded t ~symbol =
 
 (* --- Public API ------------------------------------------------------- *)
 
-let _empty_cache ~snapshot_dir ~manifest ~max_cache_bytes =
+let _empty_cache ~snapshot_dir ~manifest ~max_cache_bytes ~max_mmap_handles =
   {
     snapshot_dir;
     manifest;
     expected_schema = manifest.Snapshot_manifest.schema;
     max_cache_bytes;
+    max_mmap_handles;
     cache = Hashtbl.create (module String);
     lru = Doubly_linked.create ();
     bytes = 0;
@@ -149,14 +163,25 @@ let _empty_cache ~snapshot_dir ~manifest ~max_cache_bytes =
     evictions = 0;
   }
 
-let create ~snapshot_dir ~manifest ~max_cache_mb =
+let create_with_handle_cap ~max_mmap_handles ~snapshot_dir ~manifest
+    ~max_cache_mb =
   if max_cache_mb <= 0 then
     Status.error_invalid_argument
       (Printf.sprintf "Daily_panels.create: max_cache_mb must be positive: %d"
          max_cache_mb)
+  else if max_mmap_handles <= 0 then
+    Status.error_invalid_argument
+      (Printf.sprintf
+         "Daily_panels.create: max_mmap_handles must be positive: %d"
+         max_mmap_handles)
   else
     let max_cache_bytes = max_cache_mb * _bytes_per_mb in
-    Ok (_empty_cache ~snapshot_dir ~manifest ~max_cache_bytes)
+    Ok (_empty_cache ~snapshot_dir ~manifest ~max_cache_bytes ~max_mmap_handles)
+
+let create ~snapshot_dir ~manifest ~max_cache_mb =
+  create_with_handle_cap
+    ~max_mmap_handles:(default_max_mmap_handles ())
+    ~snapshot_dir ~manifest ~max_cache_mb
 
 let schema t = t.expected_schema
 
