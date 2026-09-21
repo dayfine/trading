@@ -166,3 +166,26 @@ cap to ≥ n_symbols: the worker holds 269 fds against a 1,048,576 limit and 54,
 `vm.max_map_count` 262,144 (one mapping per reader); heap per reader is the date array (~27 KB) plus a constant, so
 ~10k readers ≈ 0.3 GB — affordable, bit-identical by construction. Proposed on #2839: make the handle cap an env knob
 (`SNAPSHOT_MAX_MMAP_HANDLES`, default 256 = unchanged), set it to 12,000 in the chain scripts, measure on the smoke.
+
+- 2026-09-20 21:08 PT — **salt 1 LOST: killed by the chain's own `timeout 36000` guard** (`exit=124`, wall 36,015 s, no
+  `actual.sexp`). Progress marker at the kill: 1,326 / 1,434 cycles (92.5 %), last completed date 2024-05-31, 629 round
+  trips closed, equity $3.37M — ~45–60 min from the end. Not a crash and not contention (load ≈ 1.0, one worker; two
+  hung `dune build` processes from the previous session were idle in `S`). Cause: the guard was sized off the null's
+  6–7 h and the arm runs ~43 % slower than its null (s0 8h33m vs 5h58m); null s1 is itself the slowest salt (7h05m), so
+  the arm's s1 projected to ~10h08m. Salt 2 auto-started on the same guard and was killed at 88 s; lane A closed.
+  Decision (user, 21:15 PT): do not relaunch on the old guard — build the mmap-handle knob first (#2839:
+  `SNAPSHOT_MAX_MMAP_HANDLES`, default 256), measure it on the 4-month smoke at 256 vs 12,000, then run salts 1 → 2 on
+  the knob build with the cap ≥ n_symbols and `CELL_TIMEOUT` sized from the measured arm. Salt 0 stays on `5577d418a`;
+  salts 1–2 will carry the knob build's SHA — bit-identical by construction (a cache is a cache; eviction changes when a
+  file is re-opened, never what it returns) plus the smoke's md5 check, recorded here when they land. Also filed the
+  weekly perf-review rule (`.claude/rules/perf-review-weekly.md`, #2881) off this loss.
+- 2026-09-20 22:22 PT — **knob smoke (PR #2882 build, `v1-index-veto-smoke.sexp`, salt 0, `SNAPSHOT_CACHE_MB=1024`):**
+  cap 256 → 27m23s, 5.64M misses (569 / symbol), 5.34M evictions; cap 12,000 → **6m15s**, 0.31M misses (31 / symbol,
+  first touch), **0 evictions**; `actual.sexp` and `trades.csv` md5 identical (10 trades, +3.17 %). 4.4× on the
+  4-month smoke with the same output byte-for-byte — the bit-identical claim is now measured, not just constructed.
+  Lanes B+ run at cap 12,000 (`chain-veto.sh` default) once #2882 is on main and the pinned worktree is rebuilt.
+- 2026-09-20 22:53 PT — **lane B launched** (salts 1 → 2, one worker) on pinned worktree `sweep-veto2` @ `477522b7c` (= main
+  after #2882), `SNAPSHOT_MAX_MMAP_HANDLES=12000`, `CELL_TIMEOUT` 60,000 s, same staged spec / warehouse (9,364 entries)
+  / null artifacts as lane A. Build drift vs salt 0's `5577d418a`: #2881 (docs), #2882 (the cache knob — smoke-verified
+  byte-identical above). The worker's cache line confirms the cap (`max mmap handles = 12000`). Expected: each cell well
+  under salt 0's 8h33m; the first cell's wall + `snapshot cache hits=…` line is the 26y measurement for #2839.
