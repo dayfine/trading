@@ -1,9 +1,13 @@
 # Status: backtest-perf
 
-## Last updated: 2026-08-23
+## Last updated: 2026-09-20
 
 ## Status
 IN_PROGRESS
+
+## Weekly review (`.claude/rules/perf-review-weekly.md`, ~2 h/week — user 2026-09-20)
+
+- **2026-09-20** — first entry. Read: `perf-weekly` 2026-09-14 table — 8 PASS, **2 FAIL** (`sp500-2010-2026` 4,714 s / 716 MB, `sp500-2010-2026-longshort` 4,783 s / 715 MB; workflow still green via `continue-on-error`). Unmeasured shapes: broad top-3000 5y, PIT 26y (index-veto arm s0 8h33m vs null 5h58m; s1 killed by a 36,000 s guard at 92.5 %). Actions: mmap-handle knob PR (#2839), guard resized from the measured arm, this file. Tickets to open: tier-3 FAIL root cause; a broad-5y + PIT-smoke tier cell.
 
 ## Ownership boundary — READ FIRST (reconciled 2026-08-23)
 
