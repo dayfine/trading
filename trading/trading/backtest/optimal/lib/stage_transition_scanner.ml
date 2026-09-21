@@ -51,6 +51,7 @@ let _permissive_screener_config (config : config) : Screener.config =
     cascade_post_stop_cooldown_weeks = 0;
     neutral_blocks_longs = false;
     deteriorating_blocks_longs = false;
+    index_stage_veto_blocks_longs = false;
     neutral_blocks_shorts = false;
     enable_slow_grind_short_gate = false;
     min_price = 0.0;

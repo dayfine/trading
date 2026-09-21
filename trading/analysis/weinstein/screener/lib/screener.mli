@@ -61,6 +61,7 @@ end
 
 (** The cascade's macro gate — {!Screener_macro_gate.longs_admitted_by_macro},
     {!Screener_macro_gate.longs_admitted_by_breadth},
+    {!Screener_macro_gate.longs_admitted_by_index_stage},
     {!Screener_macro_gate.shorts_admitted_by_macro}, and
     {!Screener_macro_gate.breadth_state_or_projection} — re-exported so callers
     keep writing [Screener.longs_admitted_by_macro]. Exposed (rather than kept
@@ -256,6 +257,24 @@ type config = {
           flag can never fire. Mirrored from the top-level
           [Weinstein_strategy.config.deteriorating_blocks_longs] field so the
           flag is a [Variant_matrix] axis. Issue #2755. *)
+  index_stage_veto_blocks_longs : bool; [@sexp.default false]
+      (** When [true], a primary index classified [Weinstein_types.Stage4 _]
+          blocks new long candidates outright. A pure extra conjunct on the
+          existing macro gate (see {!longs_admitted_by_index_stage}), so the
+          default [false] is the historical gate bit-equally — unconditionally,
+          whatever [macro_trend] / [breadth_state] / [index_stage] the caller
+          supplies.
+
+          {b Inert unless the caller supplies [?index_stage].} {!screen} passes
+          [None], and so does any {!screen_with_cooldown} caller that omits the
+          argument; [None] always admits, so with no index read wired the flag
+          cannot fire.
+
+          Authority: weinstein-book-reference.md §2.1 "Resolved 2026-09-16 —
+          veto or vote?" (Ch. 8: "Suspend buying even if you see a few stocks
+          breaking out on their charts"). Mirrored from the top-level
+          [Weinstein_strategy.config.index_stage_veto_blocks_longs] field so the
+          flag is a [Variant_matrix] axis. *)
   neutral_blocks_shorts : bool; [@sexp.default false]
       (** Short-side mirror of [neutral_blocks_longs]. When [true], a
           macro-[Neutral] tape blocks new short candidates exactly as a
@@ -564,6 +583,7 @@ val screen_with_cooldown :
   ?decline_is_slow_grind:bool ->
   ?on_candidates:((Stock_analysis.t * sector_context) list -> unit) ->
   ?breadth_state:Weinstein_types.breadth_state ->
+  ?index_stage:Weinstein_types.stage ->
   config:config ->
   macro_trend:Weinstein_types.market_trend ->
   sector_map:(string, sector_context) Core.Hashtbl.t ->
@@ -597,6 +617,16 @@ val screen_with_cooldown :
       [Weinstein_types.breadth_state_of_market_trend macro_trend], which never
       yields [Deteriorating] — so an absent argument is bit-identical to the
       three-state gate no matter how the flag is set.
+
+    @param index_stage
+      The {b primary index}'s own stage classification — the caller's
+      [Macro.result.index_stage.stage]. Read {b only} by
+      {!longs_admitted_by_index_stage}, i.e. only when
+      [config.index_stage_veto_blocks_longs] is [true], in which case a
+      [Weinstein_types.Stage4 _] index blocks every long candidate whatever
+      [macro_trend] says. Omitted (the default) it is [None], which always
+      admits — so an absent argument is bit-identical to the pre-veto cascade no
+      matter how the flag is set. The short side never reads it.
 
     @param on_candidates
       Issue #2490 gap G2. Called once, before evaluation, with the candidate

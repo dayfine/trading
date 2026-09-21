@@ -44,6 +44,7 @@
   backtest
   scenario_lib
   scripts.build_runner
+  scripts.level_pass
   weinstein.snapshot_pipeline
   scenario_snapshot_plan
   splice_detector

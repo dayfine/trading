@@ -50,6 +50,7 @@ type config = {
   cascade_post_stop_cooldown_weeks : int; [@sexp.default 0]
   neutral_blocks_longs : bool; [@sexp.default false]
   deteriorating_blocks_longs : bool; [@sexp.default false]
+  index_stage_veto_blocks_longs : bool; [@sexp.default false]
   neutral_blocks_shorts : bool; [@sexp.default false]
   enable_slow_grind_short_gate : bool; [@sexp.default false]
   min_price : float; [@sexp.default 0.0]
@@ -74,6 +75,7 @@ let default_config =
     cascade_post_stop_cooldown_weeks = 0;
     neutral_blocks_longs = false;
     deteriorating_blocks_longs = false;
+    index_stage_veto_blocks_longs = false;
     neutral_blocks_shorts = false;
     enable_slow_grind_short_gate = false;
     min_price = 0.0;
@@ -262,17 +264,31 @@ let _top_n ~ranking n lst =
 let _filter_and_cap ~ranking ~candidate_fn ~max_n candidates =
   List.filter_map candidates ~f:candidate_fn |> _top_n ~ranking max_n
 
-(** Filter, score, grade, sort, and cap long candidates. *)
+(** The long side's whole admission answer for one screen call: the
+    breadth-resolution macro gate {!longs_admitted_by_breadth} {b and} the
+    index-stage veto {!longs_admitted_by_index_stage}.
+
+    Both extra conjuncts are default-off no-ops, so at {!default_config} this is
+    exactly [longs_admitted_by_macro ~neutral_blocks_longs:false macro_trend].
+    Computed once per screen and threaded to both consumers (the watchlist's
+    [buys_active] and {!_evaluate_longs}) so the two cannot drift. *)
+let _longs_admitted ~config ~macro_trend ~breadth_state ~index_stage =
+  longs_admitted_by_index_stage
+    ~index_stage_veto_blocks_longs:config.index_stage_veto_blocks_longs
+    index_stage
+  && longs_admitted_by_breadth ~neutral_blocks_longs:config.neutral_blocks_longs
+       ~deteriorating_blocks_longs:config.deteriorating_blocks_longs
+       ~macro_trend breadth_state
+
+(** Filter, score, grade, sort, and cap long candidates. [longs_admitted] is
+    {!_longs_admitted}'s answer for this screen — the whole macro/breadth/index
+    gate, already evaluated by the caller. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
     ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
-    ~max_buy_candidates ~neutral_blocks_longs ~deteriorating_blocks_longs
-    ~ranking ~candidates ~macro_trend ~breadth_state : scored_candidate list =
-  if
-    not
-      (longs_admitted_by_breadth ~neutral_blocks_longs
-         ~deteriorating_blocks_longs ~macro_trend breadth_state)
-  then []
+    ~max_buy_candidates ~longs_admitted ~ranking ~candidates :
+    scored_candidate list =
+  if not longs_admitted then []
   else
     let candidate_fn =
       _long_candidate ~weights ~thresholds ~params ~min_grade
@@ -357,8 +373,8 @@ let _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member =
 (** Evaluate the long and short cascade paths for one screen call. Returns
     [(buy_candidates, short_candidates)]; decoupled from [_screen] so the latter
     stays within the 50-line linter cap. *)
-let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
-    ~breadth_state =
+let _evaluate_candidates ~config ~decline_is_slow_grind ~longs_admitted
+    ~candidates ~macro_trend =
   let buy_candidates =
     _evaluate_longs ~weights:config.weights ~thresholds:config.grade_thresholds
       ~params:config.candidate_params ~min_grade:config.min_grade
@@ -369,10 +385,8 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
       ~failed_breakout_tolerance_pct:config.failed_breakout_tolerance_pct
       ~early_stage2_max_weeks:config.early_stage2_max_weeks
       ~min_rs_normalized:config.min_rs_normalized
-      ~max_buy_candidates:config.max_buy_candidates
-      ~neutral_blocks_longs:config.neutral_blocks_longs
-      ~deteriorating_blocks_longs:config.deteriorating_blocks_longs
-      ~ranking:config.candidate_ranking ~candidates ~macro_trend ~breadth_state
+      ~max_buy_candidates:config.max_buy_candidates ~longs_admitted
+      ~ranking:config.candidate_ranking ~candidates
   in
   let short_candidates =
     _evaluate_shorts ~weights:config.weights ~thresholds:config.grade_thresholds
@@ -390,13 +404,11 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
   (buy_candidates, short_candidates)
 
 let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
-    ~breadth_state ~sector_map ~stocks ~held_tickers ~cooldown_set ~is_member :
-    result =
+    ~breadth_state ~index_stage ~sector_map ~stocks ~held_tickers ~cooldown_set
+    ~is_member : result =
   let held_set = String.Set.of_list held_tickers in
   let buys_active =
-    longs_admitted_by_breadth ~neutral_blocks_longs:config.neutral_blocks_longs
-      ~deteriorating_blocks_longs:config.deteriorating_blocks_longs ~macro_trend
-      breadth_state
+    _longs_admitted ~config ~macro_trend ~breadth_state ~index_stage
   in
   let total_stocks = List.length stocks in
   let candidates =
@@ -408,8 +420,8 @@ let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
   Option.iter on_candidates ~f:(fun f -> f candidates);
   let candidates_after_held = List.length candidates in
   let buy_candidates, short_candidates =
-    _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
-      ~breadth_state
+    _evaluate_candidates ~config ~decline_is_slow_grind
+      ~longs_admitted:buys_active ~candidates ~macro_trend
   in
   {
     buy_candidates;
@@ -441,12 +453,12 @@ let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
 let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   _screen ~on_candidates:None ~config ~decline_is_slow_grind:true ~macro_trend
     ~breadth_state:(breadth_state_or_projection ~macro_trend None)
-    ~sector_map ~stocks ~held_tickers ~cooldown_set:String.Set.empty
-    ~is_member:(fun _ -> true)
+    ~index_stage:None ~sector_map ~stocks ~held_tickers
+    ~cooldown_set:String.Set.empty ~is_member:(fun _ -> true)
 
 let screen_with_cooldown ?membership_at ?(decline_is_slow_grind = true)
-    ?on_candidates ?breadth_state ~config ~macro_trend ~sector_map ~stocks
-    ~held_tickers ~as_of ~last_stop_out_dates () : result =
+    ?on_candidates ?breadth_state ?index_stage ~config ~macro_trend ~sector_map
+    ~stocks ~held_tickers ~as_of ~last_stop_out_dates () : result =
   let cooldown_set =
     _cooldown_block_set ~cooldown_weeks:config.cascade_post_stop_cooldown_weeks
       ~as_of ~last_stop_out_dates
@@ -456,4 +468,4 @@ let screen_with_cooldown ?membership_at ?(decline_is_slow_grind = true)
   in
   _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
     ~breadth_state:(breadth_state_or_projection ~macro_trend breadth_state)
-    ~sector_map ~stocks ~held_tickers ~cooldown_set ~is_member
+    ~index_stage ~sector_map ~stocks ~held_tickers ~cooldown_set ~is_member

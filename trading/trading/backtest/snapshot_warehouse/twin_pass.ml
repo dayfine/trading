@@ -1,6 +1,7 @@
 open Core
 
 let report_name = "rename_twin_report.txt"
+let alias_name = "rename_twin_report.alias.sexp"
 
 (* Load a symbol's windowed daily bars and project them to the
    (date, adjusted_close) series the cross-symbol twin pass compares. Returns
@@ -29,14 +30,22 @@ let _load_series ~data_dir ~start_date ~end_date symbol =
    an output directory out of the container carries the evidence with it. A
    write failure is logged, never fatal: the build's own output is the product,
    the report is the audit trail. *)
+let _write_sidecar ~output_dir ~name ~data =
+  let path = Filename.concat output_dir name in
+  try Out_channel.write_all path ~data
+  with Sys_error msg -> Printf.eprintf "%s write failed: %s\n%!" name msg
+
 let _write_report ~output_dir report =
   (if not (Stdlib.Sys.file_exists output_dir) then
      try Stdlib.Sys.mkdir output_dir 0o755 with _ -> ());
   let text = Twin_detector.render report in
-  let path = Filename.concat output_dir report_name in
-  (try Out_channel.write_all path ~data:(text ^ "\n")
-   with Sys_error msg ->
-     Printf.eprintf "%s write failed: %s\n%!" report_name msg);
+  _write_sidecar ~output_dir ~name:report_name ~data:(text ^ "\n");
+  _write_sidecar ~output_dir ~name:alias_name
+    ~data:
+      (Sexp.to_string_hum
+         (Twin_detector.Alias_map.sexp_of_t
+            (Twin_detector.Alias_map.of_report report))
+      ^ "\n");
   Printf.eprintf "%s\n%!" text
 
 let run config ~data_dir ~start_date ~end_date ~output_dir all_symbols =
@@ -74,6 +83,15 @@ let doc_close_epsilon =
 let doc_ret_epsilon =
   "E Absolute tolerance on the daily-return difference (basis=returns)"
 
+let doc_require_direct_match =
+  "Require every dropped leg to match the group's SURVIVOR directly, not just \
+   some group member; legs that fail keep their series (rejected_transitive). \
+   Default off."
+
+let doc_max_group_size =
+  "N Hub guard: leave a twin group with more than N members intact (drop \
+   nothing, report rejected_hub). Default unlimited."
+
 let _basis_of_string = function
   | "levels" -> Twin_detector.Config.Levels
   | "returns" -> Twin_detector.Config.Returns
@@ -102,6 +120,10 @@ let params =
     flag "twin-ret-epsilon"
       (optional_with_default default.ret_epsilon float)
       ~doc:doc_ret_epsilon
+  and require_direct_match =
+    flag "twin-require-direct-match" no_arg ~doc:doc_require_direct_match
+  and max_group_size =
+    flag "twin-max-group-size" (optional int) ~doc:doc_max_group_size
   in
   {
     Twin_detector.Config.enabled;
@@ -111,4 +133,6 @@ let params =
     basis = _basis_of_string (String.lowercase basis);
     ret_epsilon;
     prefilter_rel_tol = default.prefilter_rel_tol;
+    require_direct_match;
+    max_group_size;
   }

@@ -1974,18 +1974,52 @@ fi
 # walkup_count27 == 0). `env -u REPO_ROOT` forces the var unset regardless
 # of ambient shell state, rather than relying on this script never having
 # exported it.
+#
+# H-AUDIT-27B-CUMULATIVE-COUNT: the assertion below is a DELTA over a
+# snapshot taken immediately before this scenario's own write_audit.sh
+# call, not an absolute post-run count. An absolute count is only correct
+# today because nothing else in this file writes into WALKUP_ROOT/dev/audit
+# between 27a and here; a future scenario added in between (or one reusing
+# this fixture) that wrote into WALKUP_ROOT would silently corrupt an
+# absolute assertion without this scenario's own behaviour changing at
+# all. The delta form is immune to that by construction -- it only counts
+# how many NEW files 27b's own invocation produced, regardless of what was
+# already present in WALKUP_ROOT/dev/audit when it started.
+#
+# H-AUDIT-27B-LEAKS-UNDER-PWD-REGRESSION: this scenario exercises the ONE
+# code path in _repo_root() that resolves a repo root without ever being
+# told one (REPO_ROOT unset) -- by design, in an in-tree script, from
+# whatever directory this suite itself happens to run in (normally this
+# repo's own real checkout). If _repo_root()'s walk-up ever regressed to
+# start from $PWD instead of `dirname "$0"`, and this suite is invoked
+# from inside a real checkout (the normal case), the walk-up would locate
+# the REAL repo root -- not WALKUP_ROOT -- and write_audit.sh would
+# publish a stray record into the live dev/audit/ instead of the fixture.
+# SCRATCH27B is an empty, unrelated tmp directory with no .git/.claude
+# anywhere above it up to "/"; invoking write_audit.sh with SCRATCH27B as
+# the caller's cwd means a $PWD-based regression finds nothing to walk up
+# to and the script hard-errors (rc!=0, no "OK: wrote") -- detection is
+# preserved, exactly as it is today -- rather than silently resolving to
+# the real repo root and leaking a file into it. The `cd` lives inside the
+# `$(...)` command substitution's own subshell, so it never touches this
+# script's own working directory.
 # ---------------------------------------------------------------------------
-out27b=$(env -u REPO_ROOT \
+walkup_count27b_before="$(_glob_count "${WALKUP_ROOT}/dev/audit" '*.json' '-type f')"
+
+SCRATCH27B="$(mktemp -d -t write_audit_27b_scratch.XXXXXX)"
+out27b=$(cd "${SCRATCH27B}" && env -u REPO_ROOT \
   bash "${WALKUP_ROOT}/trading/devtools/checks/write_audit.sh" \
     --date 2026-08-06 --feature "repo-root-walkup" --branch "harness/repo-root" \
     --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc27b=0 || rc27b=$?
+rm -rf "${SCRATCH27B}"
 
-walkup_count27b="$(_glob_count "${WALKUP_ROOT}/dev/audit" '*.json' '-type f')"
+walkup_count27b_after="$(_glob_count "${WALKUP_ROOT}/dev/audit" '*.json' '-type f')"
+walkup_count27b_delta=$(( walkup_count27b_after - walkup_count27b_before ))
 
-if (( rc27b == 0 )) && grep -q "^OK: wrote" <<<"${out27b}" && [[ "${walkup_count27b}" == "1" ]]; then
-  pass "scenario 27b — REPO_ROOT unset: the walk-up still locates the root and publishes the record (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE, pins the fallback branch production actually uses)"
+if (( rc27b == 0 )) && grep -q "^OK: wrote" <<<"${out27b}" && (( walkup_count27b_delta == 1 )); then
+  pass "scenario 27b — REPO_ROOT unset: the walk-up still locates the root and publishes the record (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE, pins the fallback branch production actually uses); asserts a DELTA of exactly 1 new record over a pre-call snapshot, immune to a future scenario writing into WALKUP_ROOT before this point (H-AUDIT-27B-CUMULATIVE-COUNT); invoked from a scratch cwd with no .git/.claude above it, so a \$PWD-based walk-up regression cannot resolve to and leak into the live dev/audit/ (H-AUDIT-27B-LEAKS-UNDER-PWD-REGRESSION)"
 else
-  fail "scenario 27b — expected rc=0 + 'OK: wrote' + exactly 1 record under WALKUP_ROOT; got rc=${rc27b}, walkup_count=${walkup_count27b}"
+  fail "scenario 27b — expected rc=0 + 'OK: wrote' + exactly 1 NEW record under WALKUP_ROOT (before=${walkup_count27b_before}, after=${walkup_count27b_after}, delta=${walkup_count27b_delta}); got rc=${rc27b}"
   echo "${out27b}" | sed 's/^/      /'
 fi
 

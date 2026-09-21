@@ -116,7 +116,7 @@ let _v2_write_symbol ~dir ~symbol rows =
 
 (* Build a directory of v2 columnar files (one per symbol) and a manifest under
    the default schema; return the resulting [Daily_panels.t]. *)
-let _v2_setup ~symbols ~n_days ~max_cache_mb =
+let _v2_setup_with_cap ~max_mmap_handles ~symbols ~n_days ~max_cache_mb =
   let dir = _make_tmp_dir () in
   let entries =
     List.map symbols ~f:(fun symbol ->
@@ -125,9 +125,22 @@ let _v2_setup ~symbols ~n_days ~max_cache_mb =
   let manifest =
     Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
   in
-  match Daily_panels.create ~snapshot_dir:dir ~manifest ~max_cache_mb with
+  match
+    Daily_panels.create_with_handle_cap ~max_mmap_handles ~snapshot_dir:dir
+      ~manifest ~max_cache_mb
+  with
   | Ok t -> (dir, t)
   | Error err -> assert_failure ("Daily_panels.create: " ^ Status.show err)
+
+(* The built-in default cap (256), pinned explicitly rather than read through
+   [default_max_mmap_handles] so the suite stays deterministic when an operator
+   exports [SNAPSHOT_MAX_MMAP_HANDLES] in the test environment. *)
+let _builtin_handle_cap = 256
+
+(* Same, under the built-in 256 handle cap. *)
+let _v2_setup ~symbols ~n_days ~max_cache_mb =
+  _v2_setup_with_cap ~max_mmap_handles:_builtin_handle_cap ~symbols ~n_days
+    ~max_cache_mb
 
 (* --- create / validation -------------------------------------------- *)
 
@@ -516,7 +529,8 @@ let test_v2_schema_mismatch_fails_loud _ =
 
 (* --- handle-cap eviction (v2-specific) ------------------------------- *)
 
-(* More v2 symbols than the internal open-handle cap (256). Tiny rows keep the
+(* More v2 symbols than the built-in open-handle cap (256, pinned by
+   [_v2_setup]). Tiny rows keep the
    byte budget far below 1 MB, so the byte cap never fires — the open-handle
    cap is the sole eviction driver. Reading every symbol must force at least
    one eviction, and a re-read of an evicted symbol must reopen + return the
@@ -530,7 +544,7 @@ let test_v2_handle_cap_evicts_and_reopens _ =
     | Error err -> assert_failure ("read_today " ^ s ^ ": " ^ Status.show err)
   in
   List.iter symbols ~f:read_first;
-  (* The open-handle cap (256) is below the 300 symbols, so eviction fired. *)
+  (* The 256 cap is below the 300 symbols, so eviction fired. *)
   assert_that
     (Daily_panels.cache_stats t)
     (field
@@ -546,6 +560,62 @@ let test_v2_handle_cap_evicts_and_reopens _ =
             field (fun (r : Snapshot.t) -> r.symbol) (equal_to "S000");
             field (fun (r : Snapshot.t) -> r.values.(0)) (float_equal 100.0);
           ]))
+
+(* --- handle cap as a knob (#2839) ------------------------------------ *)
+
+(* The env parser: a strictly-positive int wins (whitespace tolerated); absent,
+   unparseable, zero and negative all fall back to the built-in 256. *)
+let test_max_mmap_handles_of_env_parses_or_falls_back _ =
+  assert_that
+    (List.map
+       [ None; Some "12000"; Some " 7 "; Some "abc"; Some "0"; Some "-3" ]
+       ~f:Daily_panels.max_mmap_handles_of_env)
+    (equal_to [ 256; 12000; 7; 256; 256; 256 ])
+
+(* An explicit non-positive handle cap is rejected like a non-positive MB cap. *)
+let test_create_rejects_nonpositive_handle_cap _ =
+  let dir = _make_tmp_dir () in
+  let manifest = Snapshot_manifest.create ~schema:_test_schema ~entries:[] in
+  assert_that
+    (Daily_panels.create_with_handle_cap ~max_mmap_handles:0 ~snapshot_dir:dir
+       ~manifest ~max_cache_mb:1)
+    (is_error_with Status.Invalid_argument)
+
+(* With a cap of one, every switch to another v2 symbol evicts the resident
+   reader: A, B, C then A again is four misses and three evictions, no hit. *)
+let test_v2_handle_cap_of_one_evicts_on_every_switch _ =
+  let _dir, t =
+    _v2_setup_with_cap ~max_mmap_handles:1 ~symbols:[ "A"; "B"; "C" ] ~n_days:5
+      ~max_cache_mb:1
+  in
+  List.iter [ "A"; "B"; "C"; "A" ] ~f:(fun symbol ->
+      match Daily_panels.read_today t ~symbol ~date:_default_start with
+      | Ok _ -> ()
+      | Error err -> assert_failure ("read_today: " ^ Status.show err));
+  assert_that
+    (Daily_panels.cache_stats t)
+    (equal_to ({ hits = 0; misses = 4; evictions = 3 } : Daily_panels.stats))
+
+(* The point of the knob: a cap at or above the symbol count keeps every v2
+   reader resident, so a second full pass is all hits and nothing is evicted
+   (the same 300-symbol set evicts under the built-in 256 cap in the test above). *)
+let test_v2_handle_cap_at_symbol_count_never_evicts _ =
+  let symbols = List.init 300 ~f:(fun i -> Printf.sprintf "S%03d" i) in
+  let _dir, t =
+    _v2_setup_with_cap ~max_mmap_handles:300 ~symbols ~n_days:5 ~max_cache_mb:1
+  in
+  let pass () =
+    List.iter symbols ~f:(fun symbol ->
+        match Daily_panels.read_today t ~symbol ~date:_default_start with
+        | Ok _ -> ()
+        | Error err -> assert_failure ("read_today: " ^ Status.show err))
+  in
+  pass ();
+  pass ();
+  assert_that
+    (Daily_panels.cache_stats t)
+    (equal_to
+       ({ hits = 300; misses = 300; evictions = 0 } : Daily_panels.stats))
 
 (* --- mixed v1 + v2 in one cache -------------------------------------- *)
 
@@ -642,6 +712,14 @@ let suite =
          "v2 schema mismatch fails loud" >:: test_v2_schema_mismatch_fails_loud;
          "v2 handle cap evicts and reopens"
          >:: test_v2_handle_cap_evicts_and_reopens;
+         "max_mmap_handles env parse or fallback"
+         >:: test_max_mmap_handles_of_env_parses_or_falls_back;
+         "create rejects non-positive handle cap"
+         >:: test_create_rejects_nonpositive_handle_cap;
+         "v2 handle cap of one evicts on every switch"
+         >:: test_v2_handle_cap_of_one_evicts_on_every_switch;
+         "v2 handle cap at symbol count never evicts"
+         >:: test_v2_handle_cap_at_symbol_count_never_evicts;
          "mixed v1 and v2 both read" >:: test_mixed_v1_and_v2_both_read;
        ]
 

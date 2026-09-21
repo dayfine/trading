@@ -35,7 +35,7 @@ Weinstein uses multiple long-term indicators, weighted by agreement ("Weight of 
 
 Apply the same stage analysis to the market index itself:
 - Plot DJI (or S&P 500) with its 30-week MA
-- Stage 3 potential top on DJI → become cautious, suspend new buying
+- Stage 3 potential top on DJI → become cautious ("proceed with caution"); the suspension of new buying is the Stage-4 breakdown, not the Stage-3 top — see "Resolved 2026-09-16" below
 - DJI breaks below 30-week MA into Stage 4 → very defensive: sell poor RS stocks, tighten stops, begin looking for shorts
 - Stage 1 base forming on DJI → prepare for next bull signal
 - DJI breaks above flattening/rising 30-week MA → start aggressive buying
@@ -43,6 +43,27 @@ Apply the same stage analysis to the market index itself:
 **Key historical pattern (Ch. 8):** "No bear market in the past several decades has unfolded without this gauge flashing a negative signal." Works equally well at bottoms.
 
 **1987 crash example:** DJI made new high in late August (A), sold off sharply (B), rallied in October (C) but failed to reach August peak. A-B-C sequence = toppy. Meanwhile 30-week MA losing upside momentum, leveling out = Stage 3. Break below MA near 2,450 = Stage 4 sell signal. Days later: worst one-day crash in history.
+
+
+**Resolved 2026-09-16 — veto or vote? (tier 2, local read of Ch. 8 "Stage Analysis for the Market Averages"):**
+The index stage is a **veto on new buying once the index is in Stage 4**, not one weighted vote among the Ch. 8
+gauges. Weinstein calls it the one gauge you "have no choice" about — "if you keep up just one long term
+indicator, this is it" — and on the Stage-4 breakdown below the 30-week MA his instruction is explicit and
+unconditional: "Suspend buying even if you see a few stocks breaking out on their charts", sell poor-RS holdings,
+tighten stops. A Stage-3 top on the index is **caution, not a veto** ("proceed with caution"); the veto is the
+Stage-4 breakdown. The Weight-of-the-Evidence majority governs how *aggressive* to be (Ch. 8 opening, and the
+P/D-ratio passage: "if all of our other long-term indicators are still bullish, continue to play the long side"),
+but that sentence is about a *sentiment* gauge, never about overriding a Stage-4 index. The re-entry side is
+symmetric: after Stage 4, a temporary pop above a still-falling MA is not enough ("it's not enough for the
+industrials to temporarily pop above the MA … if the average continues pointing lower"); buy aggressively only once
+the levelled MA is penetrated on the upside.
+
+Implementation consequence: `Macro.analyze`'s composite (index stage weight 3.0 of 10.0, `confidence > 0.65 →
+Bullish`) can read Bullish with the index in Stage 4 (2022: SPX below a falling 30-week MA Jan–Nov, `trend` Bullish
+25+ weeks, 126 entries, 82 % losers — `dev/experiments/pit-universe-2026-09-14/README.md` §"Drawdown dissection").
+A faithful implementation blocks new long entries while `index_stage.stage = Stage4` regardless of composite
+confidence, and leaves the composite governing everything else. Lands default-off as `index_stage_veto_blocks_longs`
+(experiment-flag-discipline R1/R2); promotion needs the ledger.
 
 ### 2.2 NYSE Advance-Decline Line (Ch. 8)
 

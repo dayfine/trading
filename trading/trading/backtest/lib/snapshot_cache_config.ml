@@ -23,8 +23,13 @@ let resolve_cache_mb () =
     | Some n -> n
     | None -> _default_cache_mb
   in
-  eprintf "Panel_runner: snapshot cache cap = %d MB (env %s)\n%!" resolved
-    _env_var;
+  eprintf
+    "Panel_runner: snapshot cache cap = %d MB (env %s), max mmap handles = %d \
+     (env %s)\n\
+     %!"
+    resolved _env_var
+    (Daily_panels.default_max_mmap_handles ())
+    Daily_panels.max_mmap_handles_env_var;
   resolved
 
 let log_cache_stats ~daily_panels ~n_symbols =
