@@ -50,12 +50,18 @@
       entry's bytes is small (the int32 date array + a fixed per-handle constant
       — the column pages are page-cache resident, not counted). Once inserting a
       new symbol pushes tracked bytes above the cap, the LRU symbol is evicted.
-    - {b Open-handle cap.} Each [Mmap] entry holds an open fd. An internal cap
-      ([_max_open_mmap_handles], well under a typical 1024 fd ulimit) bounds the
-      number of resident [Mmap] readers; the eviction loop closes the LRU
-      reader's fd once the cap is exceeded, even if the byte budget alone would
-      admit more. This is the "LRU for handle count" the v2 plan calls for and
-      is {b not} a {!create} parameter.
+    - {b Open-handle cap.} Each [Mmap] entry holds an open fd.
+      {!create_with_handle_cap}'s [max_mmap_handles] ({!create} uses
+      {!default_max_mmap_handles}: the [SNAPSHOT_MAX_MMAP_HANDLES] env var, else
+      256 — well under a typical 1024 fd ulimit) bounds the number of resident
+      [Mmap] readers; the eviction loop closes the LRU reader's fd once the cap
+      is exceeded, even if the byte budget alone would admit more. This is the
+      "LRU for handle count" the v2 plan calls for. On a v2 warehouse the byte
+      budget rarely binds (an [Mmap] entry charges only its date index), so this
+      cap is the effective cache size: a run over N symbols with a cap below N
+      re-opens and re-maps nearly every file on every pass. Set it to >= N for a
+      warehouse whose readers fit the fd ulimit (each holds one fd + one
+      whole-file mapping; #2839).
 
     Evicting an [Mmap] entry {!Data_panel_snapshot.Snapshot_columnar.close}s its
     reader (releasing the fd + unmapping). {!close} closes every resident
@@ -79,16 +85,47 @@ type t
       mmap reader for v2 files, decoded rows for v1), ordered by recency for LRU
       eviction. *)
 
+val max_mmap_handles_env_var : string
+(** Name of the env var {!default_max_mmap_handles} reads:
+    ["SNAPSHOT_MAX_MMAP_HANDLES"]. Exposed so runners can log the knob next to
+    the resolved value. *)
+
+val max_mmap_handles_of_env : string option -> int
+(** [max_mmap_handles_of_env raw] parses the open-handle cap from an env value:
+    a strictly-positive int (surrounding whitespace tolerated) is returned as
+    is; [None], unparseable, zero or negative all fall back to the built-in
+    default of 256. Pure — {!default_max_mmap_handles} is this applied to the
+    environment. *)
+
+val default_max_mmap_handles : unit -> int
+(** [default_max_mmap_handles ()] is {!max_mmap_handles_of_env} applied to
+    [SNAPSHOT_MAX_MMAP_HANDLES]; the cap {!create} passes to
+    {!create_with_handle_cap}. Read on every {!create} call, not at module load.
+*)
+
+val create_with_handle_cap :
+  max_mmap_handles:int ->
+  snapshot_dir:string ->
+  manifest:Snapshot_pipeline.Snapshot_manifest.t ->
+  max_cache_mb:int ->
+  t Status.status_or
+(** [create_with_handle_cap ~max_mmap_handles ~snapshot_dir ~manifest
+     ~max_cache_mb] is {!create} with an explicit resident-[Mmap] reader cap
+    instead of {!default_max_mmap_handles}. Like [max_cache_mb], the cap must be
+    strictly positive (else [Error Invalid_argument]). *)
+
 val create :
   snapshot_dir:string ->
   manifest:Snapshot_pipeline.Snapshot_manifest.t ->
   max_cache_mb:int ->
   t Status.status_or
 (** [create ~snapshot_dir ~manifest ~max_cache_mb] builds a cache rooted at
-    [snapshot_dir]. The [manifest] indexes per-symbol snapshot files (typically
-    obtained via [Snapshot_pipeline.Snapshot_manifest.read]); the runtime uses
-    the manifest's [schema] field as the expected schema for every file it opens
-    (schema-skew → loud error per {!read_today} / {!read_history}).
+    [snapshot_dir] under the {!default_max_mmap_handles} handle cap (read from
+    the environment on each call). The [manifest] indexes per-symbol snapshot
+    files (typically obtained via [Snapshot_pipeline.Snapshot_manifest.read]);
+    the runtime uses the manifest's [schema] field as the expected schema for
+    every file it opens (schema-skew → loud error per {!read_today} /
+    {!read_history}).
 
     [snapshot_dir] is the directory containing the per-symbol [<SYMBOL>.snap]
     files. Manifest entries' [path] fields may be absolute or relative; when
