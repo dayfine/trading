@@ -217,7 +217,7 @@ val resident : t -> resident
 (** [resident t] returns the cache's current {!resident} residency. O(1); takes
     no sample and mutates nothing. *)
 
-type occupancy = {
+type occupancy = Daily_panels_occupancy.summary = {
   max_entries : int;
   max_bytes : int;
   max_mmap_open : int;
