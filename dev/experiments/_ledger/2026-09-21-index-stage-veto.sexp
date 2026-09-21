@@ -1,0 +1,18 @@
+((date 2026-09-21) (slug index-stage-veto)
+ (hypothesis
+  "Book-faithful index-stage veto: a Stage-4 primary index suspends long entries regardless of the macro composite's confidence (weinstein-book-reference.md §2.1, tier-2 answer written back in #2861). Motivated by the PIT-band drawdown episode (project_pit_drawdown_2021_25_macro_veto): in 2022 SPX sat below a falling 30-week MA all year while the composite trend stayed Bullish 25+ weeks and 126 entries lost 82 %. Pre-registered (README + spec + chain pushed before any cell ran): realised AND Calmar better than the null at >= 2 of 3 salts -> ACCEPT(mechanism); else REJECT-as-default, flag stays an axis.")
+ (base_scenario
+  "index-stage-veto-2026-09-16: v1-index-veto = a0-pit-null + index_stage_veto_blocks_longs true (#2863), paired per salt against the committed a0-pit-null-s{0,1,2}-v11 on _v11pit (9,364 entries, 27-entry yearly top-3000 PIT schedule 1999-2025). Salt 0 on sweep-veto @5577d418a (cap 256, 8h33m); salts 1-2 on sweep-veto2 @477522b7c (= main after #2882 mmap-handle knob, SNAPSHOT_MAX_MMAP_HANDLES=12000, 4h19m / 3h37m; smoke-verified byte-identical). V6 = 0 every cell, validator_diff -check V6 exit 0; macro_trend.sexp md5 identical to the null on every salt (composite untouched).")
+ (window_id top3000-pit-1999-2025-record-26y-3salt) (baseline_label record-pit-null-v11pit)
+ (variants
+  (
+   ((label index-veto-s0) (config_hash index-veto-on)
+    (aggregate (((mean_sharpe 0.4431) (mean_calmar 0.1730) (mean_return_pct 344.70) (mean_max_drawdown_pct 33.50)))))
+   ((label index-veto-s1) (config_hash index-veto-on)
+    (aggregate (((mean_sharpe 0.4171) (mean_calmar 0.1346) (mean_return_pct 308.77) (mean_max_drawdown_pct 40.58)))))
+   ((label index-veto-s2) (config_hash index-veto-on)
+    (aggregate (((mean_sharpe 0.2920) (mean_calmar 0.0734) (mean_return_pct 141.86) (mean_max_drawdown_pct 46.19)))))
+  ))
+ (verdict Reject)
+ (notes
+  "REJECT-as-default, KEEP AS AXIS (not do-not-revive: book-faithful, does what it says). Realised clears 1/3 (s0 $3.85M->$2.77M fail; s1 $1.67M->$2.66M clear; s2 $1.40M->$0.97M fail); Calmar clears 3/3 (0.165->0.173, 0.077->0.135, 0.069->0.073) but at s0 and s2 the ratio gain is a lower-peak artifact - the arm never makes the 2020-21 highs, and at s2 its dollar trough is $0.54M BELOW the null's on the same day (2025-04-07: $1.73M vs $2.27M). MECHANISM (3/3 salts each): earns in the 2022 grind (composite Bullish 25+ weeks while SPX below a falling 30-wk MA; removes 11-19 losing entries/yr; 2022-23 window +$0.42M/+$0.48M/+$0.56M; 2022 give-back halves) and pays on the 2020 V-recovery (index still Stage 4 for 9-12 weeks after the March low while the composite has turned; blocked Mar-May re-entry cohort ~0/+$0.47M/+$0.33M; path divergence then costs the 2020 monsters ZS/BBBY/GME/BBWI/SNBR: -$0.5M/-$0.76M/-$1.35M by entry-year). 2001-02 and 2008 inert (composite already Bearish in every deep-bear Stage-4 week; trade-identical 2000->2018/2019 every salt). Level is a monster lottery on top (ECHO 2025 +$650k on the null's side at s0, the arm's at s1, absent at s2) - never quote s1 +121pp or s0 -112pp as the mechanism. FORWARD: a regime dial for a drawdown-averse (investor) preset, or paired with a faster re-admission (veto lifts on close above the MA rather than MA slope - a §2.1 Stage 4->1 book question); not another single-lever screen on this base. RUNTIME: cap-256 arm cells 8h33m / >10h (s1 killed by the 36,000 s guard at 92.5 %, rerun) vs 4h19m / 3h37m at cap 12,000 after #2882 (misses 118.5M -> 6.3M, evictions 112M -> 0). Artifacts: index-stage-veto-2026-09-16/results/v1-index-veto-s{0,1,2}-v11-*; README §Log + §Verdict."))
