@@ -42,7 +42,6 @@ val render_cache_stats_line :
   cap_mmap_handles:int ->
   high_water:process_high_water ->
   string
-
 (** [render_cache_stats_line ~stats ~n_symbols ~cap_mb ~cap_mmap_handles
      ~high_water] renders the one-line run diagnostic {!log_cache_stats} emits.
     Pure, and separated from the emitter so the {b line format itself} — which

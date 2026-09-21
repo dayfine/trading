@@ -393,12 +393,21 @@ let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
 (* The Fill-phase step loop inside its trace span, with the caller's step hook
    bound to this run's recorders. Extracted so [run] stays under the
    function-length cap. *)
-let _run_steps ~r ~trace ~gc_trace ~progress_acc ~on_step_setup ~n_all_symbols
-    sim =
+let _run_steps ~r ~trace ~gc_trace ~cache_sampler ~progress_acc ~on_step_setup
+    ~n_all_symbols sim =
   Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
-      Panel_step_loop.run_simulator_with_gc_trace ?gc_trace ?progress_acc
+      Panel_step_loop.run_simulator_with_gc_trace ?gc_trace ~cache_sampler
+        ?progress_acc
         ?on_step:(_bind_step_hook ~r on_step_setup)
         ~stop_log:r.stop_log sim)
+
+(* The per-step snapshot-cache occupancy sample for the [--gc-trace] CSV. A
+   pure read of [daily_panels] ([Daily_panels.resident] is O(1) and mutates
+   nothing), and only ever forced when [--gc-trace] is on — see
+   [Gc_trace.record]. *)
+let _cache_sampler_of_panels ~daily_panels () : Gc_trace.cache_sample =
+  let r = Daily_panels.resident daily_panels in
+  { cache_entries = r.entries; cache_bytes = r.bytes; mmap_open = r.mmap_open }
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
@@ -437,8 +446,9 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     Panel_step_loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date
   in
   let sim_result =
-    _run_steps ~r ~trace ~gc_trace ~progress_acc ~on_step_setup ~n_all_symbols
-      sim
+    _run_steps ~r ~trace ~gc_trace
+      ~cache_sampler:(_cache_sampler_of_panels ~daily_panels)
+      ~progress_acc ~on_step_setup ~n_all_symbols sim
   in
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
