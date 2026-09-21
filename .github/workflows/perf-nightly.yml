@@ -88,3 +88,16 @@ jobs:
           else
             echo "Tier-2 perf nightly: no summary produced." >>"$GITHUB_STEP_SUMMARY"
           fi
+
+      # Per-cell logs + peak_rss/wall_sec files. Without this a FAIL row was
+      # undiagnosable: the cell's stdout/stderr goes to <cell>.log, which
+      # never reached the workflow log (2026-09-21 weekly review — the tier-3
+      # 15y FAIL rows had no readable cause for three weeks).
+      - name: Upload run artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-tier2-nightly-${{ github.run_id }}
+          path: dev/perf/tier2-nightly-*/
+          retention-days: 7
+          if-no-files-found: warn

@@ -128,6 +128,15 @@ _run_one() {
 
   printf '[run]  %s\n' "$base_name"
 
+  # --no-emit-all-eligible: the all_eligible diagnostic is opt-OUT in
+  # scenario_runner and no perf consumer reads its output, yet it ran inside
+  # every tier cell here (and, since #2616 widened the wall span, inside the
+  # measured wall). Every verdict chain and golden_sp500_postsubmit.sh already
+  # pass this flag, so the tiers were timing a workload nobody runs. Measured
+  # 2026-09-21 (GHA, same binary, same OCAMLRUNPARAM): sp500-2010-2026
+  # 4,738 s / 716 MB with the diagnostic vs 364 s / 550 MB without;
+  # sp500-2019-2023 923 s vs 88 s. The 15y cells' wall_seconds band (3,600 s)
+  # FAILed every weekly run since 2026-09-07 on the diagnostic alone.
   start_epoch=$(date +%s)
   rc=0
   # Pass --fixtures-root so the runner resolves the scenario's [universe_path]
@@ -141,6 +150,7 @@ _run_one() {
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
           --fixtures-root "$SCENARIO_ROOT" \
+          --no-emit-all-eligible \
         >"$log_path" 2>&1 || rc=$?
   else
     timeout "$TIMEOUT" \
@@ -149,6 +159,7 @@ _run_one() {
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
           --fixtures-root "$SCENARIO_ROOT" \
+          --no-emit-all-eligible \
         >"$log_path" 2>&1 || rc=$?
     printf 'UNAVAILABLE\n' >"$rss_path"
   fi
