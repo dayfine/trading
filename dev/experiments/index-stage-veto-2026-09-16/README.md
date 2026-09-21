@@ -189,3 +189,39 @@ cap to ≥ n_symbols: the worker holds 269 fds against a 1,048,576 limit and 54,
   / null artifacts as lane A. Build drift vs salt 0's `5577d418a`: #2881 (docs), #2882 (the cache knob — smoke-verified
   byte-identical above). The worker's cache line confirms the cap (`max mmap handles = 12000`). Expected: each cell well
   under salt 0's 8h33m; the first cell's wall + `snapshot cache hits=…` line is the 26y measurement for #2839.
+
+- 2026-09-21 03:12 PT — **v1-index-veto, salt 1** (lane B, knob build `477522b7c`, cap 12,000; **wall 15,523 s = 4h19m** vs the
+  cap-256 attempt killed at 36,000 s with 7.5 % left; cache line `hits=153.8M misses=6.30M evictions=0` — the residual
+  misses are the ~551 universe names absent from the 9,364-entry manifest, counted as misses on every read, not
+  reopens; `results/v1-index-veto-s1-v11-*`) vs the committed `a0-pit-null-s1-v11`. `params.sexp` reads
+  `index_stage_veto_blocks_longs true`; V6 = 0 both, `validator_diff -check V6` exit 0; V16 = 1 (CLE 2014
+  force_liquidation, the null's flag); `macro_trend.sexp` md5 identical to salt 0's (composite untouched).
+  Level **188.0 → 308.8**, trades 766 → 705, Sharpe 0.329 → 0.417, **maxDD 53.0 → 40.6**, **Calmar 0.077 → 0.135**,
+  **realised $1.67M → $2.66M (+$0.99M)**, end NAV $2.88M → $4.09M, unrealised $0.41M → $0.60M. **Clears BOTH criteria at
+  this salt** (salt 0: realised fails, Calmar clears). Exit mix stop_loss 530 → 482, laggard 223 → 211.
+  Join (`symbol|entry_date`): **619 shared** (+$1.476M → +$1.566M), null-only 147 (+$0.20M), arm-only 86 (+$1.09M).
+  **Trade-identical 2000 → 2018** again; first divergence 2019 (28 → 27 entries). Per entry-year: **2020 +$1.46M →
+  +$0.71M (−$0.76M)**; 2021 −$172k → −$308k; **2022 −$828k → −$525k (+$303k)**; 2023 −$222k → −$48k (+$174k);
+  **2024 −$795k → −$303k (+$492k)**; **2025 +$55k → +$612k (+$557k)**; 2026 −$405k → −$94k (+$311k).
+  - **2022 cohort (the mechanism read, 2nd salt):** 13 null-only 2022 entries removed, losers GETY −$109k, ALTM −$55k,
+    ADTN −$50k, ESTA −$38k, NXE −$36k …, winners removed STLD +$46k, ISEE +$16k; the 2022–23 window −$1.05M → −$574k
+    (+$477k). Same direction and similar size as salt 0 (+$419k on the window) — **the 2022 save is a property, not a draw.**
+  - **2020 (the cost, 2nd salt):** null-only 2020 = 31 entries, **+$1.64M** — BBBY +$503k, ZS +$475k, GME +$304k, WSC +$271k,
+    COHR +$154k; the arm's replacements TTEC +$454k, SNBR +$370k, AVGO +$181k. The blocked Mar-15 → May-31 re-entry
+    cohort is 12 entries **+$466k** at this salt (ZS 05-29 inside it) vs ≈ −$3k at salt 0 — so at salt 1 the veto's
+    2020 re-entry block did cost real money, not just path divergence. 2003 / 2009: identical both salts.
+  - **2025 (+$557k) is ONE trade again, on the other side this time:** ECHO 2025-08-26 is **arm-only +$652k** here (at salt 0 it
+    was null-only +$647k, skipped by the arm on `Insufficient_cash`). A lottery ticket that switches arms across salts;
+    **ex-ECHO the realised gap is +$334k**, made of 2022–24 protection (+$0.97M) against the 2020 monsters (−$0.76M).
+  - **MTM / maxDD decomposition:** null peak 2021-02-11 $5.52M → trough 2025-04-07 $2.59M (53.0 %); arm peak **2018-01-26
+    $4.62M** → trough 2025-06-10 $2.74M (40.6 %). The arm never made the 2020–21 highs, so most of the ratio gain is a
+    lower peak; the real protection is smaller — at the null's trough date the arm holds $2.77M vs $2.59M (**+$0.18M**),
+    and the 2022-01 → YE-2022 give-back is $1.06M vs $1.49M. YE NAV diff: 2019 +$0.04M, **2020 −$1.23M**, 2021 −$0.94M,
+    2022 −$0.54M, 2023 −$0.27M, 2024 +$0.09M, 2025 +$0.77M (ECHO), 2026 +$1.21M.
+  - **Two-salt read:** 2022–24 capital protection reproduces (+$0.4–0.6M realised on the 2022–23 window, smaller give-back,
+    higher NAV at the null's trough, both salts); the 2020 cost reproduces (−$0.5M path at s0, −$0.76M including a
+    +$0.47M blocked re-entry cohort at s1); the level/realised verdict is decided by monster tickets (ZS/BBBY/GME vs
+    TTEC/SNBR, ECHO's side). Pre-registered rule needs realised AND Calmar at ≥ 2/3 salts: s0 = Calmar only, s1 = both.
+    **Salt 2 decides** (running since 03:12 PT, ETA ~07:30). Whatever it says, the mechanism read is already: a 2022-style
+    grind is where the veto earns, a 2020-style V-recovery is where it pays, and the fat-tail tax on the recovery is
+    real at one salt of two.
