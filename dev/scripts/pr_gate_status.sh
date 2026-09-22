@@ -199,6 +199,9 @@ _is_docs_only() {
 # experiment dirs are exempt from code review.
 _is_results_only() {
   _files=$1
+  # An empty list is not results-only: "every path matches" is vacuous, and
+  # this lane must never be entered by accident (qc-behavioral CP4-a, #2906).
+  [ -n "$_files" ] || return 1
   for f in $_files; do
     case "$f" in
       dev/experiments/*) ;;

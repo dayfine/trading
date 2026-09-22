@@ -856,6 +856,21 @@ case "$row" in
   *)                       got=other ;;
 esac
 check "results-only e2e (gh backend): a Behavioral QC review does not satisfy the results gate" results "$got"
+# 33r-docs. Docs-only is tested FIRST: a README-only experiment change has
+# every path under dev/experiments/ AND every path *.md, so both classifiers
+# match; it must route to MERGE (docs-only), never to dispatch qc-results
+# (qc-behavioral CP4-b on #2906: this ordering was stated in three places and
+# pinned nowhere -- reversing the two tests left the suite green).
+GATE_FILES="dev/experiments/x-2026-09-21/README.md"
+GATE_REVIEWS_JSON='[]'
+export GATE_FILES GATE_REVIEWS_JSON
+row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+case "$row" in
+  *"MERGE (docs-only)"*)   got=docs ;;
+  *"dispatch qc-results"*) got=results ;;
+  *)                       got=other ;;
+esac
+check "results-only e2e (gh backend): README-only experiment change is docs-only (docs-only tested first)" docs "$got"
 # Restore case 33 state for the curl-backend cases below, which reuse it.
 GATE_FILES="trading/foo/bar.ml"
 GATE_REVIEWS_JSON=$_SAVED_REVIEWS_JSON
@@ -1922,7 +1937,7 @@ check "results-only: a dune file under dev/experiments takes three gates" no "$(
 check "results-only: README-only experiment change is docs-only first" yes "$(
   _is_docs_only "dev/experiments/x/README.md" && echo yes || echo no)"
 check "results-only: empty file list is not results-only by accident" no "$(
-  _is_results_only "" && echo no || echo no)"
+  _is_results_only "" && echo yes || echo no)"
 RESULTS_REVIEW="Reviewed SHA: $TIP
 
 ## Results QC — top-of-funnel capacity arm
