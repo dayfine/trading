@@ -371,20 +371,33 @@ in the summary.
 **Escape hatch — first run of the day:** If no prior summary exists for today AND the most recent summary (from any prior day) is more than 24 hours old, skip this check entirely and proceed to Step 2. The first run of a given day always does a full pass so the consolidation script has a non-empty base to merge.
 
 ```bash
-# Find the most recent non-plan summary for today
+# Single source of truth for "what path is THIS run's own summary" — see
+# Condition 2 below for why this must be git-tracked-file-based rather than
+# a raw `ls` count (issue #2887 CP4 rework: a raw `ls dev/daily/${DATE}*.md`
+# count double-counts a same-day summary that was written earlier in this
+# run than its own commit-and-push step, the write-early escalation).
 DATE=$(date +%F)
-PRIOR_TODAY="$(ls -t dev/daily/${DATE}*.md 2>/dev/null | grep -v '\-plan\.md' | head -1)"
-if [ -z "$PRIOR_TODAY" ]; then
-  # No prior summary today — check if there's a recent one from yesterday
-  MOST_RECENT="$(ls -t dev/daily/*.md 2>/dev/null | grep -v '\-plan\.md' | head -1)"
-  if [ -z "$MOST_RECENT" ]; then
+CURRENT_SUMMARY_PATH="$(dev/scripts/orchestrator_fastexit_gate.sh current_summary_path "$DATE")"
+
+# CURRENT_SUMMARY_PATH == "dev/daily/${DATE}.md" (unsuffixed) means N==1:
+# zero GIT-TRACKED same-day summaries exist yet, i.e. no genuine prior
+# summary for today. An uncommitted write-early skeleton, if one is already
+# on disk under that exact name, does not count as a "prior" here — it's
+# this run's own file, and current_summary_path excludes untracked files
+# from the count for exactly that reason.
+if [ "$CURRENT_SUMMARY_PATH" = "dev/daily/${DATE}.md" ]; then
+  # No prior summary today — is the most recent one (from any prior day)
+  # more than 24h old? hours_since_prior_summary reuses the same
+  # commit-date-first, filename-date-ordered, current-summary-excluding
+  # selector Condition 2 uses (dev/scripts/orchestrator_fastexit_gate.sh),
+  # so this is immune to the same checkout-flattened-mtime and write-early
+  # traps `ls -t | head -1` + raw mtime arithmetic fell into here before.
+  HOURS_AGO="$(dev/scripts/orchestrator_fastexit_gate.sh hours_since_prior_summary "$CURRENT_SUMMARY_PATH")"
+  if [ -z "$HOURS_AGO" ]; then
     # No prior summaries at all → full pass
     SATURATED_CHECK_SKIP="first_run_ever"
-  else
-    HOURS_AGO=$(( ( $(date +%s) - $(date -r "$MOST_RECENT" +%s 2>/dev/null || stat -f %m "$MOST_RECENT") ) / 3600 ))
-    if [ "$HOURS_AGO" -ge 24 ]; then
-      SATURATED_CHECK_SKIP="first_run_day"
-    fi
+  elif [ "$HOURS_AGO" -ge 24 ]; then
+    SATURATED_CHECK_SKIP="first_run_day"
   fi
 fi
 ```
@@ -444,8 +457,26 @@ FOR each track with N > 0 open PRs:
 **Condition 2 — No dev/status/*.md file modified since the prior summary's timestamp (excluding orchestrator summary commits).**
 
 ```bash
+# Compute THIS run's own summary path first (the file need not exist on
+# disk yet; passing a path that doesn't exist yet is a harmless no-op for
+# the exclusion below), via the gate script's single-source-of-truth
+# subcommand — NOT a re-derived `ls`-based count. This MUST be passed to
+# prior_summary_iso as its current-summary argument: without it, once the
+# summary is written earlier in a run than the historical commit-and-push
+# step (the write-early escalation), prior_summary_iso would select the
+# run's OWN just-written file as "prior", collapsing the drift window to
+# zero — a vacuous PASS on every condition below (issue #2887, Defect 1).
+# current_summary_path itself is immune to that same escalation: it counts
+# only GIT-TRACKED dev/daily/${DATE}*.md files, so an uncommitted
+# same-day skeleton (this run's own, written early) is never counted —
+# see the subcommand's docstring in dev/scripts/orchestrator_fastexit_gate.sh
+# for the measured off-by-one this replaces (issue #2887 CP4 rework).
+DATE=$(date +%F)
+CURRENT_SUMMARY_PATH="$(dev/scripts/orchestrator_fastexit_gate.sh current_summary_path "$DATE")"
+
 # Use the same commit-date-first lookup as the mechanical verify gate.
-PREV_ISO="$(dev/scripts/orchestrator_fastexit_gate.sh prior_summary_iso)"
+# ALWAYS pass CURRENT_SUMMARY_PATH — see the comment above.
+PREV_ISO="$(dev/scripts/orchestrator_fastexit_gate.sh prior_summary_iso "$CURRENT_SUMMARY_PATH")"
 
 # Single source of truth for this check — see the exemption note below for
 # why a bare grep pipeline over `git log --name-only` does NOT correctly
@@ -470,7 +501,9 @@ You computed this in Step 1b. If any `[drift]` warning was emitted, Condition 3 
 **Condition 4 — Harness and cleanup backlogs unchanged since prior summary.**
 
 ```bash
-# Reuse PREV_ISO from Condition 2, obtained via prior_summary_iso (not mtime).
+# Reuse PREV_ISO from Condition 2, obtained via prior_summary_iso with
+# CURRENT_SUMMARY_PATH excluded (not mtime, and not the no-arg form — see
+# Condition 2's comment; issue #2887 Defect 1).
 if [ -z "$PREV_ISO" ]; then
   CONDITION_4=FAIL
 else
@@ -488,14 +521,9 @@ If `dev/status/harness.md` or `dev/status/cleanup.md` gained new `[ ]` items sin
 If all four conditions pass, write the minimal daily summary and exit:
 
 ```bash
-# Compute run number (same logic as Step 7)
-RUN_COUNT=$(ls dev/daily/${DATE}*.md 2>/dev/null | grep -v '\-plan\.md' | wc -l | tr -d ' ')
-N=$(( RUN_COUNT + 1 ))
-if [ "$N" -eq 1 ]; then
-  FILENAME="dev/daily/${DATE}.md"
-else
-  FILENAME="dev/daily/${DATE}-run${N}.md"
-fi
+# Same single-source-of-truth subcommand Condition 2 and Step 7 use — not a
+# re-derived `ls` count (issue #2887 CP4 rework).
+FILENAME="$(dev/scripts/orchestrator_fastexit_gate.sh current_summary_path "$DATE")"
 ```
 
 Write `$FILENAME` with these sections (carry the prior summary's Integration Queue and QC Status forward verbatim):
@@ -2039,21 +2067,19 @@ The FULL-mode verify gate requires the fixed section heading.
 
 ## Step 7: Write the daily summary
 
-Determine the per-day session number N by counting existing `dev/daily/${DATE}*.md`
-files (ignoring `-plan.md` files). First session of the day writes
-`dev/daily/${DATE}.md`; subsequent sessions write `dev/daily/${DATE}-runN.md`
-**starting at `-run2` and incrementing monotonically** — N is the next unused
-integer, not 1.
+Determine the per-day session number N by counting existing, GIT-TRACKED
+`dev/daily/${DATE}*.md` files (ignoring `-plan.md` and `-summary.md` files —
+`current_summary_path` is the single source of truth for this count, shared
+with Step 0.5 Condition 2/4 and the no-op exit procedure; see its docstring
+in `dev/scripts/orchestrator_fastexit_gate.sh` for why the count must be
+git-tracked-only rather than a raw filesystem `ls`, issue #2887 CP4 rework).
+First session of the day writes `dev/daily/${DATE}.md`; subsequent sessions
+write `dev/daily/${DATE}-runN.md` **starting at `-run2` and incrementing
+monotonically** — N is the next unused integer, not 1.
 
 ```bash
 DATE=$(date +%F)
-EXISTING_COUNT=$(ls dev/daily/${DATE}*.md 2>/dev/null | grep -v '\-plan\.md' | wc -l | tr -d ' ')
-N=$((EXISTING_COUNT + 1))
-if [ "$N" -eq 1 ]; then
-  SUMMARY_FILE="dev/daily/${DATE}.md"
-else
-  SUMMARY_FILE="dev/daily/${DATE}-run${N}.md"
-fi
+SUMMARY_FILE="$(dev/scripts/orchestrator_fastexit_gate.sh current_summary_path "$DATE")"
 ```
 
 If `${DATE}.md` / `run2` / `run3` / `run4` already exist, the next session

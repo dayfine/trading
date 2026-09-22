@@ -85,10 +85,39 @@
 # places a writer name and "_in flight_" in the literal columns 3/4 the
 # parser reads, so an exact-match check stays silent (PASS) while a fuzzy
 # all-words-present check would misfire (FAIL).
+#
+# #2887 adds Scenarios 50-52, pinning the two defects found in
+# `_prior_summary_path` after it was carried over unfixed by the #2605
+# rework that fixed the identical `ls -t` trap in its sibling
+# `_prior_summary_timestamp`:
+#   - Defect 1 (call-site): every caller MUST pass the current-summary path
+#     -- Scenario 50 pins that omitting it (the exact shape
+#     lead-orchestrator.md's Condition 2/4 used before this fix) selects the
+#     run's OWN just-written, uncommitted summary as "prior", while passing
+#     it correctly excludes that file and finds the true prior.
+#   - Defect 2 (selector): `ls -t | head -1` has no real ordering
+#     information once mtimes are checkout-flattened -- Scenario 51 pins
+#     that a mtime order contradicting filename-date order still selects
+#     the highest-DATED file, which only holds once the selector reads
+#     `dev/daily/*.md` filenames instead of `ls -t`. Scenario 52 pins that
+#     the date component always decides the comparison ahead of any
+#     `-runN` suffix, so a `-run2` on a later date is never shadowed by a
+#     bare-dated file from an earlier date.
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 GATE="$HERE/orchestrator_fastexit_gate.sh"
+
+# Source the gate's internal functions (e.g. _prior_summary_path,
+# _file_iso_mtime) directly, for scenarios that need to pin the exact PATH
+# a selector chose or derive an expected value without duplicating the
+# gate's own date-parsing logic. Guarded exactly like the gate's own CLI
+# dispatch: with ORCHESTRATOR_FASTEXIT_GATE_LIB=1 set, sourcing defines
+# every function and returns before the case-dispatch runs -- no side
+# effects, no network.
+ORCHESTRATOR_FASTEXIT_GATE_LIB=1
+. "$GATE"
+unset ORCHESTRATOR_FASTEXIT_GATE_LIB
 
 fails=0
 total=0
@@ -1137,6 +1166,269 @@ rc=0
   "$GATE" verify "dev/daily/${_today}.md"
 ) >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
 check "one-argument verify call (no override, real system date) accepts a summary dated today" 0 "$rc"
+
+# =========================================================================
+# issue #2887: `_prior_summary_path` was carried over with the identical
+# `ls -t | head -1` idiom its sibling `_prior_summary_timestamp` had already
+# been fixed away from (#2605), and its callers in lead-orchestrator.md
+# Conditions 2/4 never passed the current-summary exclusion argument at
+# all. Scenarios 50-52 use dev/daily/2026-12-*.md dates -- strictly later
+# than every fixture date used anywhere else in this suite, including the
+# dynamic ${_today}/${_two_days_ago} files just above -- so the accumulated,
+# never-deleted, untracked dev/daily/ debris from scenarios 1-49 can never
+# be mistaken for the file under test.
+# =========================================================================
+
+# --- Scenario 50: the no-arg `prior_summary_iso` call (Defect 1) selects
+# the run's OWN just-written, uncommitted summary once it exists on disk --
+# exactly the failure mode Step 0.5 Conditions 2 and 4 hit before this fix,
+# since neither passed the current-summary argument. Passing it correctly
+# excludes the current file and finds the true (committed) prior instead. -
+_reset_repo_no_drift
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2026-12-01.md <<'MD'
+# Status - 2026-12-01 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2026-12-01.md
+  GIT_AUTHOR_DATE="2026-12-01T00:00:00" GIT_COMMITTER_DATE="2026-12-01T00:00:00" \
+    git commit -q -m "ops: daily orchestrator summary 2026-12-01 [run 1]"
+)
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2026-12-02.md <<'MD'
+# Status - 2026-12-02 [run 1]
+
+**Mode:** FULL
+MD
+  # Deliberately left UNCOMMITTED -- models a summary written before the
+  # run's own commit-and-push step (the write-early escalation under
+  # consideration; see issue #2887's Defect 1).
+  touch -t 202612020000 dev/daily/2026-12-02.md
+)
+expected_prior_iso=$(cd "$TMP_REPO" && git log -1 --format='%cI' -- dev/daily/2026-12-01.md)
+with_arg_iso=$(cd "$TMP_REPO" && "$GATE" prior_summary_iso dev/daily/2026-12-02.md)
+check "prior_summary_iso WITH the current-summary arg finds the true prior, never the current file" \
+  "$expected_prior_iso" "$with_arg_iso"
+
+no_arg_iso=$(cd "$TMP_REPO" && "$GATE" prior_summary_iso)
+own_file_iso=$(cd "$TMP_REPO" && _file_iso_mtime dev/daily/2026-12-02.md)
+check "prior_summary_iso WITHOUT the current-summary arg selects the run's own just-written file instead (Defect 1 vacuity)" \
+  "$own_file_iso" "$no_arg_iso"
+if [ "$no_arg_iso" = "$expected_prior_iso" ]; then _vacuous_ok=1; else _vacuous_ok=0; fi
+check_bool "the no-arg result differs from the true prior -- proves the vacuity, not a coincidental match" "$_vacuous_ok"
+
+# --- Scenario 51: `_prior_summary_path` selects the highest-DATED file
+# even when mtime order flatly contradicts filename-date order (Defect 2)
+# -- the exact shape `actions/checkout` produces, where every tracked file
+# gets one checkout-time mtime and real chronological ordering is lost.
+# Would FAIL against the pre-fix `ls -t | head -1` selector, which would
+# instead return dev/daily/2026-12-11.md (the newest MTIME, oldest date). --
+_reset_repo_no_drift
+(
+  cd "$TMP_REPO"
+  for d in 2026-12-11 2026-12-12 2026-12-13; do
+    cat > "dev/daily/${d}.md" <<MD
+# Status - ${d} [run 1]
+
+**Mode:** FULL
+MD
+  done
+  # mtime order is the exact INVERSE of filename-date order.
+  touch -t 202612310000 dev/daily/2026-12-11.md   # oldest date, newest mtime
+  touch -t 202606150000 dev/daily/2026-12-12.md   # middle date, middle mtime
+  touch -t 202601010000 dev/daily/2026-12-13.md   # newest date, OLDEST mtime
+)
+selected=$(cd "$TMP_REPO" && _prior_summary_path "")
+check "the selector picks the highest-DATED file even though it has the oldest mtime" \
+  "dev/daily/2026-12-13.md" "$selected"
+
+# --- Scenario 52: the filename date always decides the comparison ahead of
+# any -runN suffix across different dates -- a later date's -run2 file is
+# never shadowed by an earlier date's bare file. (Same-day bare-vs-runN
+# ordering is a separate, narrower subtlety not exercised here: under plain
+# lexicographic sort "YYYY-MM-DD.md" sorts AFTER "YYYY-MM-DD-runN.md" for
+# the IDENTICAL date, since "." > "-"; that only matters comparing files
+# from the same date and is not the cross-date shape Defect 2 was measured
+# against.) -----------------------------------------------------------
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2026-12-21.md <<'MD'
+# Status - 2026-12-21 [run 1]
+
+**Mode:** FULL
+MD
+  cat > dev/daily/2026-12-22-run2.md <<'MD'
+# Status - 2026-12-22 [run 2]
+
+**Mode:** FULL
+MD
+)
+selected=$(cd "$TMP_REPO" && _prior_summary_path "")
+check "a later date's -run2 file sorts after an earlier date's bare file" \
+  "dev/daily/2026-12-22-run2.md" "$selected"
+
+# =========================================================================
+# Behavioral-QC rework (CP4, issue #2887): `_prior_summary_path`'s own
+# `_current` exclusion argument (Scenario 50) is only correct if the
+# CALLER derives that argument correctly -- and lead-orchestrator.md's own
+# RUN_COUNT/N formula (Step 0.5 Condition 2/4, the no-op exit procedure,
+# and Step 7) was unexecutable Markdown prose, never pinned by this suite,
+# that RE-COUNTS an uncommitted same-day summary once write-early makes one
+# exist on disk before the formula runs -- producing an off-by-one
+# CURRENT_SUMMARY_PATH that names a file that doesn't exist, so the
+# exclusion argument excludes nothing and Defect 1 (Scenario 50) recurs.
+# Extracting the formula into `current_summary_path` (this script, the
+# single source of truth all four Markdown call sites now share) makes it
+# directly pinnable. Scenarios 53-56 use dev/daily/2027-01-*.md dates --
+# strictly later than every date used above, so accumulated debris from
+# earlier scenarios can never be mistaken for the file under test.
+# =========================================================================
+
+# --- Scenario 53: no same-day summary at all -> the bare, unsuffixed path.
+_reset_repo_no_drift
+result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-05)
+check "current_summary_path with no same-day summary returns the bare-date path" \
+  "dev/daily/2027-01-05.md" "$result"
+
+# --- Scenario 54: one COMMITTED same-day summary (a genuine earlier run
+# today) -> the count includes it, so this run is -run2.
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-01-06.md <<'MD'
+# Status - 2027-01-06 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2027-01-06.md
+  GIT_AUTHOR_DATE="2027-01-06T00:00:00" GIT_COMMITTER_DATE="2027-01-06T00:00:00" \
+    git commit -q -m "ops: daily orchestrator summary 2027-01-06 [run 1]"
+)
+result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-06)
+check "current_summary_path with one COMMITTED same-day summary returns -run2" \
+  "dev/daily/2027-01-06-run2.md" "$result"
+
+# --- Scenario 55: a write-early skeleton for THIS run already sits at the
+# bare-date path, UNCOMMITTED -- current_summary_path must still return the
+# bare-date path, not -run2, since the on-disk file is this run's own, not
+# a genuine second run. Would FAIL against the pre-fix `ls | wc -l` count,
+# which counts any file on disk regardless of git-tracked status (the exact
+# off-by-one measured in the CP4 review: RUN_COUNT=1 N=2 where the correct
+# answer is RUN_COUNT=0 N=1).
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-01-07.md <<'MD'
+# Status - 2027-01-07 [run 1]
+
+**Mode:** FULL
+MD
+  # Deliberately left UNCOMMITTED -- models Step 1 having already written
+  # this run's own skeleton before this formula runs (write-early).
+)
+result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-07)
+check "current_summary_path is NOT defeated by its own uncommitted write-early skeleton (issue #2887 CP4)" \
+  "dev/daily/2027-01-07.md" "$result"
+
+# --- Scenario 56: one COMMITTED prior run PLUS this run's own uncommitted
+# write-early skeleton (already correctly named -run2) both present at
+# once -- the count must still be driven by the committed file alone, so
+# the derived path agrees with the skeleton's own name rather than
+# over-counting to -run3.
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-01-08.md <<'MD'
+# Status - 2027-01-08 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2027-01-08.md
+  GIT_AUTHOR_DATE="2027-01-08T00:00:00" GIT_COMMITTER_DATE="2027-01-08T00:00:00" \
+    git commit -q -m "ops: daily orchestrator summary 2027-01-08 [run 1]"
+  # This run's own write-early skeleton for run 2, UNCOMMITTED.
+  cat > dev/daily/2027-01-08-run2.md <<'MD'
+# Status - 2027-01-08 [run 2]
+
+**Mode:** FULL
+MD
+)
+result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-08)
+check "current_summary_path counts only the committed run, ignoring its own uncommitted run2 skeleton" \
+  "dev/daily/2027-01-08-run2.md" "$result"
+
+# =========================================================================
+# `hours_since_prior_summary` replaces Step 0.5's escape-hatch `ls -t
+# dev/daily/*.md | head -1` + raw mtime arithmetic (advisory 2 of the CP4
+# rework review): that inline block picks "most recent by mtime" with no
+# exclusion of the current run's own file, so a write-early skeleton --
+# freshly written, therefore the newest mtime by construction -- reads as
+# zero hours old and silently defeats the "first run of the day always
+# does a full pass" guarantee. Scenarios 57-60 use dev/daily/2027-02-*.md
+# dates, later than every fixture used above.
+# =========================================================================
+
+# --- Scenario 57: no prior summary anywhere -> empty output (first run
+# ever), same "empty means no prior" contract as prior_summary_iso.
+mkdir -p "$TMP_REPO/no-daily-summary/dev/daily"
+result=$(cd "$TMP_REPO/no-daily-summary" && "$GATE" hours_since_prior_summary dev/daily/2027-02-01.md)
+check "hours_since_prior_summary with no prior summary anywhere returns empty" \
+  "" "$result"
+
+# --- Scenario 58: WITHOUT the current-summary exclusion, a write-early
+# skeleton for THIS run (uncommitted, freshly written) is selected as its
+# own "prior" and reads as ~0 hours old -- the vacuity this subcommand
+# exists to prevent once Step 0.5 calls it.
+_reset_repo_no_drift
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-02-01.md <<'MD'
+# Status - 2027-02-01 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2027-02-01.md
+  GIT_AUTHOR_DATE="2020-01-01T00:00:00" GIT_COMMITTER_DATE="2020-01-01T00:00:00" \
+    git commit -q -m "ops: daily orchestrator summary 2027-02-01 [run 1]"
+  # This run's own write-early skeleton, UNCOMMITTED.
+  cat > dev/daily/2027-02-02.md <<'MD'
+# Status - 2027-02-02 [run 1]
+
+**Mode:** FULL
+MD
+)
+without_exclusion=$(cd "$TMP_REPO" && "$GATE" hours_since_prior_summary)
+if [ "$without_exclusion" -lt 1 ]; then _no_excl_ok=0; else _no_excl_ok=1; fi
+check_bool "hours_since_prior_summary WITHOUT the current-summary arg reads near-zero (selects its own just-written skeleton)" \
+  "$_no_excl_ok"
+
+# --- Scenario 59: WITH the current-summary exclusion, the same fixture
+# correctly finds the true prior (committed 2020-01-01) and reports it as
+# comfortably >= 24 hours old -- proving the exclusion, not a coincidence
+# of "any old file", is what makes the escape hatch fire correctly.
+with_exclusion=$(cd "$TMP_REPO" && "$GATE" hours_since_prior_summary dev/daily/2027-02-02.md)
+if [ "$with_exclusion" -ge 24 ]; then _excl_ok=0; else _excl_ok=1; fi
+check_bool "hours_since_prior_summary WITH the current-summary arg correctly finds the true (old) prior, >= 24h" \
+  "$_excl_ok"
+
+# --- Scenario 60: a prior summary committed only moments ago (this test's
+# own real wall-clock "now") reads as comfortably under 24 hours -- the
+# other side of the boundary the Step 0.5 escape hatch branches on.
+_reset_repo_no_drift
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-02-10.md <<'MD'
+# Status - 2027-02-10 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2027-02-10.md
+  git commit -q -m "ops: daily orchestrator summary 2027-02-10 [run 1]"
+)
+recent=$(cd "$TMP_REPO" && "$GATE" hours_since_prior_summary dev/daily/2027-02-11.md)
+if [ "$recent" -lt 24 ]; then _recent_ok=0; else _recent_ok=1; fi
+check_bool "hours_since_prior_summary for a just-committed prior reads well under 24h" \
+  "$_recent_ok"
 
 # Render all health exit classes from captured fixtures, without network access.
 health_fixture="$TMP_REPO/health.log"

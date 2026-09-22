@@ -95,6 +95,23 @@
 #   history" escape (the current run's summary is often not yet committed at
 #   all when `verify` runs against it).
 #
+#   `_prior_summary_path` (the "which file is prior" SELECTOR, as opposed to
+#   `_prior_summary_timestamp`'s "how old is that file") carried the exact
+#   same `ls -t | head -1` idiom and was NOT fixed alongside it -- issue
+#   #2887. Measured on the 2026-09-21 GHA orchestrator run: with 388
+#   checkout-flattened `dev/daily/*.md` files, `ls -t | head -6` returned
+#   `2026-09-16.md` ahead of the true second-newest `2026-09-20.md`, a
+#   4-day error in the drift window `_status_changed_since` measures from.
+#   Fixed by selecting on the DATE ENCODED IN THE FILENAME instead of mtime:
+#   `dev/daily/YYYY-MM-DD[-runN].md` sorts correctly under a plain
+#   lexicographic `sort`, since the ISO date prefix always decides the
+#   comparison before any `-runN` suffix is reached -- so `sort | tail -1`
+#   (never `sort -r | head -1`; this file already treats "-t | head -1" as
+#   the banned idiom for a newest-file lookup, and swapping `head` for
+#   `tail` without also dropping `-t` would just be the same bug spelled
+#   differently) reproduces the mtime-based idiom's INTENT without its
+#   checkout-flattening blind spot.
+#
 #   The check compares the summary's OWN date -- parsed from its
 #   dev/daily/YYYY-MM-DD[-runN].md basename -- against an expected date. It
 #   accepts the expected date OR the day before it (UTC), so a run
@@ -532,33 +549,97 @@ _verify_full_mode_dispatch_artifacts() {
 
 # --- dev/status/ drift (Condition 2, mirrored from lead-orchestrator.md) ----
 
+# _current_summary_path <date>
+# The dev/daily/<date>[-runN].md path THIS run's own summary is (or will be)
+# written to, for a given <date> (a YYYY-MM-DD string; callers pass
+# `$(date +%F)`). Single source of truth for lead-orchestrator.md's Step 0.5
+# Condition 2/4 and Step 7, which both need this same value and previously
+# each carried their own copy of the run-count formula inline as Markdown
+# prose (issue #2887 CP4 rework).
+#
+# Counts only GIT-TRACKED dev/daily/<date>*.md files (via `git ls-files`,
+# excluding -plan.md and -summary.md) -- NOT a raw filesystem `ls`. An
+# UNTRACKED same-day file is, by construction, always THIS run's own
+# in-progress summary: every completed prior run's summary is committed (via
+# Step 8a) before the next run starts, so nothing else can leave an
+# uncommitted dev/daily/<date>*.md file lying around. Counting it would
+# double-count the run's own file once it exists on disk earlier in the run
+# than Step 8a's commit -- the write-early escalation described at
+# `_prior_summary_path` below and in dev/daily/2026-09-21.md. Reproduced with
+# the pre-fix `ls`-based formula: with no committed same-day file but an
+# uncommitted write-early skeleton already at dev/daily/<date>.md on disk,
+# `ls | wc -l` counted 1, producing N=2 and a CURRENT_SUMMARY_PATH of
+# `<date>-run2.md` -- one higher than the skeleton's real name -- so
+# `_prior_summary_path`'s exclusion argument named a file that doesn't exist,
+# excluded nothing, and the skeleton was selected as its own "prior" (the
+# exact Defect-1 vacuity this whole family of fixes exists to close).
+# `git ls-files` immunizes the count against this because the skeleton stays
+# untracked until Step 8a, regardless of when in the run it was written.
+_current_summary_path() {
+  _date="$1"
+  _run_count=$(git ls-files -- "dev/daily/${_date}*.md" 2>/dev/null \
+    | grep -v -- '-plan\.md$' \
+    | grep -v -- '-summary\.md$' \
+    | wc -l | tr -d ' ')
+  _n=$((_run_count + 1))
+  if [ "$_n" -eq 1 ]; then
+    printf 'dev/daily/%s.md' "$_date"
+  else
+    printf 'dev/daily/%s-run%s.md' "$_date" "$_n"
+  fi
+}
+
 # _prior_summary_path <current-summary-path>
 # Newest dev/daily/*.md (excluding -plan.md, -summary.md, and the current
-# summary itself), by mtime. Empty output means no prior summary exists
-# (first run ever) -- callers must treat that as "nothing to compare
-# against", not a violation.
+# summary itself), by the date ENCODED IN THE FILENAME -- not by mtime (issue
+# #2887). Empty output means no prior summary exists (first run ever) --
+# callers must treat that as "nothing to compare against", not a violation.
+#
+# `_current` must be the path THIS run's own summary is written to (or will
+# be written to), even if that file does not exist yet on disk. Passing "" or
+# omitting it disables the exclusion entirely -- and once the summary is
+# written earlier in a run than the workflow's historical commit-and-push
+# step, that makes this function select the run's OWN just-written file as
+# its "prior", comparing a timestamp against itself and silently zeroing the
+# drift window every caller below measures from. This is why EVERY call
+# site -- both here in the script and in lead-orchestrator.md's Conditions 2
+# and 4 -- always passes the current summary's path; a call missing it is a
+# regression, not a convenience shortcut (issue #2887, Defect 1).
+#
+# `ls -t | head -1` (mtime-newest) was the original selector, matching the
+# same idiom `_prior_summary_timestamp` below independently had to fix for
+# the same reason: `actions/checkout` stamps every tracked file with one
+# identical mtime, so on the runner that idiom carries no real ordering
+# information and falls back to something OS/filesystem-dependent -- not
+# "newest" in any date sense (issue #2887, Defect 2; measured on a
+# 388-file dev/daily/ tree post-checkout). `dev/daily/YYYY-MM-DD[-runN].md`
+# names already sort correctly by date under plain lexicographic `sort`, so
+# `sort | tail -1` (see the STALE-SUMMARY CHECK header comment above for why
+# not `sort -r | head -1`) reads the same "which file is most recent" intent
+# straight from committed filenames, with no mtime dependency at all.
 #
 # -summary.md (the consolidated multi-run rollup the orchestrator also
 # writes) is excluded for the same reason the workflow's own "Locate daily
 # summary" step excludes it (.github/workflows/orchestrator.yml, run
 # 24745079773 post-mortem): it is written LAST, minutes after this run's own
-# per-run summary, by the SAME run. Without this exclusion, `ls -t` can pick
-# the current run's own rollup as its "prior" summary -- comparing a
+# per-run summary, by the SAME run. Without this exclusion, the selector can
+# pick the current run's own rollup as its "prior" summary -- comparing a
 # timestamp against itself and independently zeroing the drift window,
-# regardless of the mtime-vs-commit-date fix below.
+# regardless of the mtime-vs-filename-date fix above.
 _prior_summary_path() {
   _current="$1"
-  ls -t dev/daily/*.md 2>/dev/null \
+  ls -1 dev/daily/*.md 2>/dev/null \
     | grep -v -- '-plan\.md$' \
     | grep -v -- '-summary\.md$' \
     | grep -vxF "$_current" \
-    | head -1 || true
+    | sort \
+    | tail -1 || true
 }
 
 # _file_iso_mtime <path> -- portable (BSD date on macOS, GNU date on Linux/CI)
 _file_iso_mtime() {
   date -r "$1" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null \
-    || date -d "@$(stat -f %m "$1" 2>/dev/null || stat -c %Y "$1")" '+%Y-%m-%dT%H:%M:%S'
+    || date -d "@$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1")" '+%Y-%m-%dT%H:%M:%S'
 }
 
 # _prior_summary_timestamp <path>
@@ -587,6 +668,52 @@ _prior_summary_iso() {
   _prior_path=$(_prior_summary_path "${1:-}")
   [ -n "$_prior_path" ] || return 0
   _prior_summary_timestamp "$_prior_path"
+}
+
+# _file_epoch_mtime <path> -- portable mtime: GNU `stat -c` FIRST, then BSD `stat -f` -- on GNU, `stat -f %m` succeeds with FILESYSTEM output (`File: "..."`), so it must never be the first attempt (#2918 CI)
+# as a UNIX epoch integer. Sibling of `_file_iso_mtime` above, returning an
+# epoch instead of an ISO string so callers can do plain integer arithmetic
+# without round-tripping through ISO-8601 parsing (BSD `date -j -f` cannot
+# parse a `%cI`-style offset reliably; GNU `date -d` doesn't exist on macOS
+# at all -- `_file_iso_mtime`'s own fallback already routes through this
+# same `stat` pair for exactly that reason).
+_file_epoch_mtime() {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1"
+}
+
+# _prior_summary_epoch <path> -- epoch-integer sibling of
+# `_prior_summary_timestamp`, same commit-date-first/mtime-fallback
+# preference and the same reason (checkout-flattened mtimes on GHA).
+_prior_summary_epoch() {
+  _path="$1"
+  _committed=$(git log -1 --format='%ct' -- "$_path" 2>/dev/null || true)
+  if [ -n "$_committed" ]; then
+    printf '%s' "$_committed"
+  else
+    _file_epoch_mtime "$_path"
+  fi
+}
+
+# _hours_since_prior_summary <current-summary-path>
+# Whole hours between now and the prior summary's commit date (mtime
+# fallback), excluding <current-summary-path> the same way `_prior_summary_iso`
+# does. Empty output means no prior summary exists (first run ever) --
+# callers must treat that as "nothing to compare against", not zero hours.
+# Existed to replace Step 0.5's escape-hatch mtime/`ls -t` arithmetic
+# (lead-orchestrator.md, issue #2887 CP4 rework advisory 2): that inline
+# block used `ls -t dev/daily/*.md | head -1` plus `date -r`/`stat -f %m` on
+# whatever it selected, which is defeated by write-early the same way
+# `_prior_summary_path`'s old `ls -t` selector was (Defect 2) -- an
+# uncommitted same-day skeleton has the newest mtime by construction, so it
+# would be selected as "most recent" and read as zero hours old regardless
+# of how long ago the true prior summary actually landed.
+_hours_since_prior_summary() {
+  _current="$1"
+  _prior_path=$(_prior_summary_path "$_current")
+  [ -n "$_prior_path" ] || return 0
+  _prior_epoch=$(_prior_summary_epoch "$_prior_path")
+  _now_epoch=$(date '+%s')
+  echo $(( (_now_epoch - _prior_epoch) / 3600 ))
 }
 
 # _status_changed_since <iso-timestamp>
@@ -789,12 +916,26 @@ case "${1:-}" in
   open_pr_count)
     open_pr_count
     ;;
+  current_summary_path)
+    if [ "$#" -gt 2 ]; then
+      echo "usage: $0 current_summary_path [date]" >&2
+      exit 2
+    fi
+    _current_summary_path "${2:-$(date +%F)}"
+    ;;
   prior_summary_iso)
     if [ "$#" -gt 2 ]; then
       echo "usage: $0 prior_summary_iso [current-summary-path]" >&2
       exit 2
     fi
     _prior_summary_iso "${2:-}"
+    ;;
+  hours_since_prior_summary)
+    if [ "$#" -gt 2 ]; then
+      echo "usage: $0 hours_since_prior_summary [current-summary-path]" >&2
+      exit 2
+    fi
+    _hours_since_prior_summary "${2:-}"
     ;;
   status_changed_since)
     if [ $# -lt 2 ]; then
@@ -811,7 +952,7 @@ case "${1:-}" in
     verify "$2" "${3:-}"
     ;;
   *)
-    echo "usage: $0 {open_pr_count|prior_summary_iso [current-summary-path]|status_changed_since <iso-ts>|verify <summary-path> [expected-date]}" >&2
+    echo "usage: $0 {open_pr_count|current_summary_path [date]|prior_summary_iso [current-summary-path]|hours_since_prior_summary [current-summary-path]|status_changed_since <iso-ts>|verify <summary-path> [expected-date]}" >&2
     exit 2
     ;;
 esac
