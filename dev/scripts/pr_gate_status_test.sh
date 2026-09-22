@@ -873,6 +873,12 @@ case "$url" in
     jq -n --arg n "$GATE_PR_NUMBER" '[{number: ($n | tonumber)}]'
     ;;
   */pulls/*/files*)
+    case "${GATE_META_CASE:-}" in
+      large) jq -n '[{filename:"trading/foo/bar.ml",patch:([range(140000) | "x"] | join(""))}]'; exit 0 ;;
+      http) exit 22 ;;
+      invalid) printf 'not-json'; exit 0 ;;
+      empty) exit 0 ;;
+    esac
     printf '%s\n' "$GATE_FILES" | jq -R -s 'split("\n") | map(select(length > 0) | {filename: .})'
     ;;
   */issues/*/comments*)
@@ -940,6 +946,24 @@ GATE_LABELS_JSON='[]'
 GATE_REVIEWS_JSON=$SAVED_GATE_REVIEWS
 GATE_COMMENTS_JSON='[]'
 
+# #2886: keep the large payload in stdout, never in an environment variable.
+# A single patch is larger than Linux MAX_ARG_STRLEN (131072 bytes).
+GATE_META_CASE=large
+export GATE_META_CASE
+e2e_rc=0
+e2e_out=$(_e2e_probe "$CURL_E2E_STUB_DIR" dummy-token 501) || e2e_rc=$?
+check "large REST payload exits successfully" 0 "$e2e_rc"
+check "large REST payload preserves PR row" 501 "$(printf '%s\n' "$e2e_out" | tail -1 | awk '{print $1}')"
+check "large REST payload preserves CI state" pass "$(printf '%s\n' "$e2e_out" | tail -1 | awk '{print $2}')"
+for GATE_META_CASE in http invalid empty; do
+  e2e_rc=0
+  e2e_out=$(_e2e_probe "$CURL_E2E_STUB_DIR" dummy-token 501 2>/dev/null) || e2e_rc=$?
+  check "REST $GATE_META_CASE metadata failure exits nonzero" 1 "$e2e_rc"
+  check "REST $GATE_META_CASE metadata failure has visible error row" yes "$(
+    case "$e2e_out" in *'ERROR -- could not read PR meta'*) echo yes ;; *) echo no ;; esac
+  )"
+done
+unset GATE_META_CASE
 rm -rf "$CURL_E2E_STUB_DIR"
 
 # 36b-36c. H-GATEPARSER-CURL-PROJECTION-UNPINNED (dev/status/harness.md): cases
