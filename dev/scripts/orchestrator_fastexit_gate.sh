@@ -95,6 +95,23 @@
 #   history" escape (the current run's summary is often not yet committed at
 #   all when `verify` runs against it).
 #
+#   `_prior_summary_path` (the "which file is prior" SELECTOR, as opposed to
+#   `_prior_summary_timestamp`'s "how old is that file") carried the exact
+#   same `ls -t | head -1` idiom and was NOT fixed alongside it -- issue
+#   #2887. Measured on the 2026-09-21 GHA orchestrator run: with 388
+#   checkout-flattened `dev/daily/*.md` files, `ls -t | head -6` returned
+#   `2026-09-16.md` ahead of the true second-newest `2026-09-20.md`, a
+#   4-day error in the drift window `_status_changed_since` measures from.
+#   Fixed by selecting on the DATE ENCODED IN THE FILENAME instead of mtime:
+#   `dev/daily/YYYY-MM-DD[-runN].md` sorts correctly under a plain
+#   lexicographic `sort`, since the ISO date prefix always decides the
+#   comparison before any `-runN` suffix is reached -- so `sort | tail -1`
+#   (never `sort -r | head -1`; this file already treats "-t | head -1" as
+#   the banned idiom for a newest-file lookup, and swapping `head` for
+#   `tail` without also dropping `-t` would just be the same bug spelled
+#   differently) reproduces the mtime-based idiom's INTENT without its
+#   checkout-flattening blind spot.
+#
 #   The check compares the summary's OWN date -- parsed from its
 #   dev/daily/YYYY-MM-DD[-runN].md basename -- against an expected date. It
 #   accepts the expected date OR the day before it (UTC), so a run
@@ -534,25 +551,49 @@ _verify_full_mode_dispatch_artifacts() {
 
 # _prior_summary_path <current-summary-path>
 # Newest dev/daily/*.md (excluding -plan.md, -summary.md, and the current
-# summary itself), by mtime. Empty output means no prior summary exists
-# (first run ever) -- callers must treat that as "nothing to compare
-# against", not a violation.
+# summary itself), by the date ENCODED IN THE FILENAME -- not by mtime (issue
+# #2887). Empty output means no prior summary exists (first run ever) --
+# callers must treat that as "nothing to compare against", not a violation.
+#
+# `_current` must be the path THIS run's own summary is written to (or will
+# be written to), even if that file does not exist yet on disk. Passing "" or
+# omitting it disables the exclusion entirely -- and once the summary is
+# written earlier in a run than the workflow's historical commit-and-push
+# step, that makes this function select the run's OWN just-written file as
+# its "prior", comparing a timestamp against itself and silently zeroing the
+# drift window every caller below measures from. This is why EVERY call
+# site -- both here in the script and in lead-orchestrator.md's Conditions 2
+# and 4 -- always passes the current summary's path; a call missing it is a
+# regression, not a convenience shortcut (issue #2887, Defect 1).
+#
+# `ls -t | head -1` (mtime-newest) was the original selector, matching the
+# same idiom `_prior_summary_timestamp` below independently had to fix for
+# the same reason: `actions/checkout` stamps every tracked file with one
+# identical mtime, so on the runner that idiom carries no real ordering
+# information and falls back to something OS/filesystem-dependent -- not
+# "newest" in any date sense (issue #2887, Defect 2; measured on a
+# 388-file dev/daily/ tree post-checkout). `dev/daily/YYYY-MM-DD[-runN].md`
+# names already sort correctly by date under plain lexicographic `sort`, so
+# `sort | tail -1` (see the STALE-SUMMARY CHECK header comment above for why
+# not `sort -r | head -1`) reads the same "which file is most recent" intent
+# straight from committed filenames, with no mtime dependency at all.
 #
 # -summary.md (the consolidated multi-run rollup the orchestrator also
 # writes) is excluded for the same reason the workflow's own "Locate daily
 # summary" step excludes it (.github/workflows/orchestrator.yml, run
 # 24745079773 post-mortem): it is written LAST, minutes after this run's own
-# per-run summary, by the SAME run. Without this exclusion, `ls -t` can pick
-# the current run's own rollup as its "prior" summary -- comparing a
+# per-run summary, by the SAME run. Without this exclusion, the selector can
+# pick the current run's own rollup as its "prior" summary -- comparing a
 # timestamp against itself and independently zeroing the drift window,
-# regardless of the mtime-vs-commit-date fix below.
+# regardless of the mtime-vs-filename-date fix above.
 _prior_summary_path() {
   _current="$1"
-  ls -t dev/daily/*.md 2>/dev/null \
+  ls -1 dev/daily/*.md 2>/dev/null \
     | grep -v -- '-plan\.md$' \
     | grep -v -- '-summary\.md$' \
     | grep -vxF "$_current" \
-    | head -1 || true
+    | sort \
+    | tail -1 || true
 }
 
 # _file_iso_mtime <path> -- portable (BSD date on macOS, GNU date on Linux/CI)

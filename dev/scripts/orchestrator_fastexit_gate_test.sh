@@ -85,10 +85,39 @@
 # places a writer name and "_in flight_" in the literal columns 3/4 the
 # parser reads, so an exact-match check stays silent (PASS) while a fuzzy
 # all-words-present check would misfire (FAIL).
+#
+# #2887 adds Scenarios 50-52, pinning the two defects found in
+# `_prior_summary_path` after it was carried over unfixed by the #2605
+# rework that fixed the identical `ls -t` trap in its sibling
+# `_prior_summary_timestamp`:
+#   - Defect 1 (call-site): every caller MUST pass the current-summary path
+#     -- Scenario 50 pins that omitting it (the exact shape
+#     lead-orchestrator.md's Condition 2/4 used before this fix) selects the
+#     run's OWN just-written, uncommitted summary as "prior", while passing
+#     it correctly excludes that file and finds the true prior.
+#   - Defect 2 (selector): `ls -t | head -1` has no real ordering
+#     information once mtimes are checkout-flattened -- Scenario 51 pins
+#     that a mtime order contradicting filename-date order still selects
+#     the highest-DATED file, which only holds once the selector reads
+#     `dev/daily/*.md` filenames instead of `ls -t`. Scenario 52 pins that
+#     the date component always decides the comparison ahead of any
+#     `-runN` suffix, so a `-run2` on a later date is never shadowed by a
+#     bare-dated file from an earlier date.
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 GATE="$HERE/orchestrator_fastexit_gate.sh"
+
+# Source the gate's internal functions (e.g. _prior_summary_path,
+# _file_iso_mtime) directly, for scenarios that need to pin the exact PATH
+# a selector chose or derive an expected value without duplicating the
+# gate's own date-parsing logic. Guarded exactly like the gate's own CLI
+# dispatch: with ORCHESTRATOR_FASTEXIT_GATE_LIB=1 set, sourcing defines
+# every function and returns before the case-dispatch runs -- no side
+# effects, no network.
+ORCHESTRATOR_FASTEXIT_GATE_LIB=1
+. "$GATE"
+unset ORCHESTRATOR_FASTEXIT_GATE_LIB
 
 fails=0
 total=0
@@ -1137,6 +1166,109 @@ rc=0
   "$GATE" verify "dev/daily/${_today}.md"
 ) >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
 check "one-argument verify call (no override, real system date) accepts a summary dated today" 0 "$rc"
+
+# =========================================================================
+# issue #2887: `_prior_summary_path` was carried over with the identical
+# `ls -t | head -1` idiom its sibling `_prior_summary_timestamp` had already
+# been fixed away from (#2605), and its callers in lead-orchestrator.md
+# Conditions 2/4 never passed the current-summary exclusion argument at
+# all. Scenarios 50-52 use dev/daily/2026-12-*.md dates -- strictly later
+# than every fixture date used anywhere else in this suite, including the
+# dynamic ${_today}/${_two_days_ago} files just above -- so the accumulated,
+# never-deleted, untracked dev/daily/ debris from scenarios 1-49 can never
+# be mistaken for the file under test.
+# =========================================================================
+
+# --- Scenario 50: the no-arg `prior_summary_iso` call (Defect 1) selects
+# the run's OWN just-written, uncommitted summary once it exists on disk --
+# exactly the failure mode Step 0.5 Conditions 2 and 4 hit before this fix,
+# since neither passed the current-summary argument. Passing it correctly
+# excludes the current file and finds the true (committed) prior instead. -
+_reset_repo_no_drift
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2026-12-01.md <<'MD'
+# Status - 2026-12-01 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2026-12-01.md
+  GIT_AUTHOR_DATE="2026-12-01T00:00:00" GIT_COMMITTER_DATE="2026-12-01T00:00:00" \
+    git commit -q -m "ops: daily orchestrator summary 2026-12-01 [run 1]"
+)
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2026-12-02.md <<'MD'
+# Status - 2026-12-02 [run 1]
+
+**Mode:** FULL
+MD
+  # Deliberately left UNCOMMITTED -- models a summary written before the
+  # run's own commit-and-push step (the write-early escalation under
+  # consideration; see issue #2887's Defect 1).
+  touch -t 202612020000 dev/daily/2026-12-02.md
+)
+expected_prior_iso=$(cd "$TMP_REPO" && git log -1 --format='%cI' -- dev/daily/2026-12-01.md)
+with_arg_iso=$(cd "$TMP_REPO" && "$GATE" prior_summary_iso dev/daily/2026-12-02.md)
+check "prior_summary_iso WITH the current-summary arg finds the true prior, never the current file" \
+  "$expected_prior_iso" "$with_arg_iso"
+
+no_arg_iso=$(cd "$TMP_REPO" && "$GATE" prior_summary_iso)
+own_file_iso=$(cd "$TMP_REPO" && _file_iso_mtime dev/daily/2026-12-02.md)
+check "prior_summary_iso WITHOUT the current-summary arg selects the run's own just-written file instead (Defect 1 vacuity)" \
+  "$own_file_iso" "$no_arg_iso"
+if [ "$no_arg_iso" = "$expected_prior_iso" ]; then _vacuous_ok=1; else _vacuous_ok=0; fi
+check_bool "the no-arg result differs from the true prior -- proves the vacuity, not a coincidental match" "$_vacuous_ok"
+
+# --- Scenario 51: `_prior_summary_path` selects the highest-DATED file
+# even when mtime order flatly contradicts filename-date order (Defect 2)
+# -- the exact shape `actions/checkout` produces, where every tracked file
+# gets one checkout-time mtime and real chronological ordering is lost.
+# Would FAIL against the pre-fix `ls -t | head -1` selector, which would
+# instead return dev/daily/2026-12-11.md (the newest MTIME, oldest date). --
+_reset_repo_no_drift
+(
+  cd "$TMP_REPO"
+  for d in 2026-12-11 2026-12-12 2026-12-13; do
+    cat > "dev/daily/${d}.md" <<MD
+# Status - ${d} [run 1]
+
+**Mode:** FULL
+MD
+  done
+  # mtime order is the exact INVERSE of filename-date order.
+  touch -t 202612310000 dev/daily/2026-12-11.md   # oldest date, newest mtime
+  touch -t 202606150000 dev/daily/2026-12-12.md   # middle date, middle mtime
+  touch -t 202601010000 dev/daily/2026-12-13.md   # newest date, OLDEST mtime
+)
+selected=$(cd "$TMP_REPO" && _prior_summary_path "")
+check "the selector picks the highest-DATED file even though it has the oldest mtime" \
+  "dev/daily/2026-12-13.md" "$selected"
+
+# --- Scenario 52: the filename date always decides the comparison ahead of
+# any -runN suffix across different dates -- a later date's -run2 file is
+# never shadowed by an earlier date's bare file. (Same-day bare-vs-runN
+# ordering is a separate, narrower subtlety not exercised here: under plain
+# lexicographic sort "YYYY-MM-DD.md" sorts AFTER "YYYY-MM-DD-runN.md" for
+# the IDENTICAL date, since "." > "-"; that only matters comparing files
+# from the same date and is not the cross-date shape Defect 2 was measured
+# against.) -----------------------------------------------------------
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2026-12-21.md <<'MD'
+# Status - 2026-12-21 [run 1]
+
+**Mode:** FULL
+MD
+  cat > dev/daily/2026-12-22-run2.md <<'MD'
+# Status - 2026-12-22 [run 2]
+
+**Mode:** FULL
+MD
+)
+selected=$(cd "$TMP_REPO" && _prior_summary_path "")
+check "a later date's -run2 file sorts after an earlier date's bare file" \
+  "dev/daily/2026-12-22-run2.md" "$selected"
 
 # Render all health exit classes from captured fixtures, without network access.
 health_fixture="$TMP_REPO/health.log"

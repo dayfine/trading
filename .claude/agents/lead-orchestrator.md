@@ -444,8 +444,26 @@ FOR each track with N > 0 open PRs:
 **Condition 2 — No dev/status/*.md file modified since the prior summary's timestamp (excluding orchestrator summary commits).**
 
 ```bash
+# Compute THIS run's own summary path first, using the same run-count
+# formula Step 7 uses — the file need not exist on disk yet; passing a path
+# that doesn't exist yet is a harmless no-op for the exclusion below. This
+# MUST be passed to prior_summary_iso as its current-summary argument:
+# without it, once the summary is written earlier in a run than the
+# historical commit-and-push step (a live escalation under consideration),
+# prior_summary_iso would select the run's OWN just-written file as
+# "prior", collapsing the drift window to zero — a vacuous PASS on every
+# condition below (issue #2887, Defect 1).
+RUN_COUNT=$(ls dev/daily/${DATE}*.md 2>/dev/null | grep -v '\-plan\.md' | wc -l | tr -d ' ')
+N=$(( RUN_COUNT + 1 ))
+if [ "$N" -eq 1 ]; then
+  CURRENT_SUMMARY_PATH="dev/daily/${DATE}.md"
+else
+  CURRENT_SUMMARY_PATH="dev/daily/${DATE}-run${N}.md"
+fi
+
 # Use the same commit-date-first lookup as the mechanical verify gate.
-PREV_ISO="$(dev/scripts/orchestrator_fastexit_gate.sh prior_summary_iso)"
+# ALWAYS pass CURRENT_SUMMARY_PATH — see the comment above.
+PREV_ISO="$(dev/scripts/orchestrator_fastexit_gate.sh prior_summary_iso "$CURRENT_SUMMARY_PATH")"
 
 # Single source of truth for this check — see the exemption note below for
 # why a bare grep pipeline over `git log --name-only` does NOT correctly
@@ -470,7 +488,9 @@ You computed this in Step 1b. If any `[drift]` warning was emitted, Condition 3 
 **Condition 4 — Harness and cleanup backlogs unchanged since prior summary.**
 
 ```bash
-# Reuse PREV_ISO from Condition 2, obtained via prior_summary_iso (not mtime).
+# Reuse PREV_ISO from Condition 2, obtained via prior_summary_iso with
+# CURRENT_SUMMARY_PATH excluded (not mtime, and not the no-arg form — see
+# Condition 2's comment; issue #2887 Defect 1).
 if [ -z "$PREV_ISO" ]; then
   CONDITION_4=FAIL
 else
