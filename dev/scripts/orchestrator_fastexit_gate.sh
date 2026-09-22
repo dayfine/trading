@@ -639,7 +639,7 @@ _prior_summary_path() {
 # _file_iso_mtime <path> -- portable (BSD date on macOS, GNU date on Linux/CI)
 _file_iso_mtime() {
   date -r "$1" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null \
-    || date -d "@$(stat -f %m "$1" 2>/dev/null || stat -c %Y "$1")" '+%Y-%m-%dT%H:%M:%S'
+    || date -d "@$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1")" '+%Y-%m-%dT%H:%M:%S'
 }
 
 # _prior_summary_timestamp <path>
@@ -670,7 +670,7 @@ _prior_summary_iso() {
   _prior_summary_timestamp "$_prior_path"
 }
 
-# _file_epoch_mtime <path> -- portable (BSD `stat -f`, GNU `stat -c`) mtime
+# _file_epoch_mtime <path> -- portable mtime: GNU `stat -c` FIRST, then BSD `stat -f` -- on GNU, `stat -f %m` succeeds with FILESYSTEM output (`File: "..."`), so it must never be the first attempt (#2918 CI)
 # as a UNIX epoch integer. Sibling of `_file_iso_mtime` above, returning an
 # epoch instead of an ISO string so callers can do plain integer arithmetic
 # without round-tripping through ISO-8601 parsing (BSD `date -j -f` cannot
@@ -678,7 +678,7 @@ _prior_summary_iso() {
 # at all -- `_file_iso_mtime`'s own fallback already routes through this
 # same `stat` pair for exactly that reason).
 _file_epoch_mtime() {
-  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1"
 }
 
 # _prior_summary_epoch <path> -- epoch-integer sibling of
