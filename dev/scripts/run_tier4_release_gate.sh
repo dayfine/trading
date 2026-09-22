@@ -171,7 +171,9 @@ _run_one() {
   mkdir -p "$stage_dir"
   cp "$scenario_path" "$stage_dir/"
 
-  cmd="dune exec --no-build trading/backtest/scenarios/scenario_runner.exe -- --dir $stage_dir --parallel 1 --fixtures-root $SCENARIO_ROOT $SNAPSHOT_FLAGS"
+  # --no-emit-all-eligible: same rationale as perf_tier4_release_gate.sh — the
+  # all_eligible diagnostic is not part of the measured workload.
+  cmd="dune exec --no-build trading/backtest/scenarios/scenario_runner.exe -- --dir $stage_dir --parallel 1 --fixtures-root $SCENARIO_ROOT --no-emit-all-eligible $SNAPSHOT_FLAGS"
 
   if [ "$DRY_RUN" = "1" ]; then
     printf '[dry]  %s\n' "$base_name"

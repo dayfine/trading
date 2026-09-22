@@ -22,19 +22,20 @@ highs; at salt 2 its dollar trough is $0.54M *below* the null's on the same day.
 Judge drawdown levers on the peak/trough decomposition, never the ratio.
 
 **Mechanism, 3/3 salts each:** (a) *earns in the 2022 grind* — composite stayed
-Bullish 25+ weeks while SPX sat below a falling 30-wk MA; the veto removes 11–19
-losing entries/yr, 2022–23 window +$0.42M / +$0.48M / +$0.56M, 2022 give-back
+Bullish 25+ weeks while SPX sat below a falling 30-wk MA; the veto removes 15–19 of the year's
+entries (13–16 losers, −$0.36M to −$0.49M net), 2022–23 window +$0.42M / +$0.48M / +$0.56M, 2022 give-back
 halves. (b) *pays on the 2020 V-recovery* — the index is still Stage 4 for 9–12
-weeks after the March low while the composite has turned; blocked Mar–May
-re-entry cohort ≈ 0 / +$0.47M / +$0.33M, then path divergence costs the 2020
+weeks after the March low while the composite has turned; blocked Mar-15 → May-31
+re-entry cohort +$0.56M / +$0.47M / +$0.33M (ZS null-only every salt), then path divergence costs the 2020
 monsters (ZS/BBBY/GME/BBWI/SNBR: −$0.5M / −$0.76M / −$1.35M). (c) 2001–02 and
 2008 inert — composite already Bearish there; trade-identical 2000 → 2018/19.
 (d) The level is a monster lottery on top (ECHO 2025 switched sides by salt).
 
 **How to apply:** never propose the veto as a default again; it is a regime dial
-for a drawdown-averse preset, or worth one more arm only paired with a faster
-re-admission (veto lifts on index close above the MA, not MA slope — a §2.1
-Stage 4 → 1 book question). Every "protection" lever must be read against the
+for a drawdown-averse preset, and a "faster re-admission" (lift on a close above a
+still-falling MA) is NOT faithful — §2.1 records the book's symmetric rule that a
+temporary pop above a falling MA is not enough — so the 2020 tax is the rule's
+price, not a tuning gap. Every "protection" lever must be read against the
 2020 recovery cohort before its drawdown number is believed. Related:
 [[project_pit_drawdown_2021_25_macro_veto]], [[project_edge_is_the_fat_tail]],
 [[project_funding_grid_monster_lottery]], [[project_record_rebase_2026_09_15]].

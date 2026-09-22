@@ -102,6 +102,22 @@ starts the session with new information.
   (see `memory/feedback_status_refresh_must_verify.md`), and only the
   ones the priorities doc cites are load-bearing for this session.
 
+## Step 3 — compact at ~150k, never ride to autocompact
+
+The 2026-09-21 usage panel (issue #2902) put 85 % of spend in turns above
+150k context, and the 09-08 token audit put main-context re-read at ~55 % of
+all spend. The fixed per-turn cost (memory index + rules + tools) is ~110k
+before any work happens, so a session that drifts to 300k+ pays double on
+every wake of a chain-wait loop.
+
+- `/compact` after every merge wave and before any multi-hour wait (a chain,
+  a Monitor, a CI poll). Check `/context`; above ~150k, compact.
+- Long chain-wait sessions wake many times; each wake re-reads the whole
+  context. Compact *before* arming the wait, not after it fires.
+- Keep `MEMORY.md` under its size limit (the loader truncates the index
+  silently past 24.4 KB): one line per memory, ≤ 200 chars, detail in the
+  topic file.
+
 ## Maintenance — refresh the committed memory snapshot
 
 The agent's durable project knowledge (`project`- / `reference`-typed

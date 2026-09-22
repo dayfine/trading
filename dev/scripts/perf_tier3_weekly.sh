@@ -3,7 +3,8 @@
 #
 # Discovers all scenarios with `;; perf-tier: 3` under
 # trading/test_data/backtest_scenarios/{goldens-small,goldens-broad,perf-sweep,smoke,
-# goldens-sp500,goldens-sp500-historical}/,
+# goldens-sp500,goldens-sp500-historical,
+# goldens-custom-universe-scenarios}/,
 # runs each via the scenario_runner binary with a per-scenario timeout
 # (default 7200s = 2 hours, per dev/plans/perf-scenario-catalog-2026-04-25.md
 # tier 3 budget), and prints a compact wall-time + peak-RSS table.
@@ -88,8 +89,14 @@ printf '  GNU /usr/bin/time : %s\n\n' "$HAVE_GNU_TIME"
 # here so the weekly run picks them up when data is present; when running
 # locally without committed test data they silently produce NaN panels and
 # will FAIL the expected-ranges check — that's intentional (surfaces missing data).
+# goldens-custom-universe-scenarios added 2026-09-21 (weekly perf review): its
+# two tier-3 cells are the only broad top-3000 / top-500 5y shapes in any tier
+# table (armed-e 198 s / 386 MB, top-500 119 s / 251 MB on the 2026-09-21
+# golden run) — the shape every verdict chain runs and no tier timed. Data is
+# committed under trading/test_data/goldens-custom-universe/ (44 MB), so the
+# GHA runner has it; the research-tagged full-pool cell is skipped by the tag.
 TIER3_PATHS=""
-for sub in goldens-small goldens-broad perf-sweep smoke goldens-sp500 goldens-sp500-historical; do
+for sub in goldens-small goldens-broad perf-sweep smoke goldens-sp500 goldens-sp500-historical goldens-custom-universe-scenarios; do
   dir="${SCENARIO_ROOT}/${sub}"
   [ -d "$dir" ] || continue
   for sexp in "$dir"/*.sexp; do
@@ -129,6 +136,15 @@ _run_one() {
 
   printf '[run]  %s\n' "$base_name"
 
+  # --no-emit-all-eligible: the all_eligible diagnostic is opt-OUT in
+  # scenario_runner and no perf consumer reads its output, yet it ran inside
+  # every tier cell here (and, since #2616 widened the wall span, inside the
+  # measured wall). Every verdict chain and golden_sp500_postsubmit.sh already
+  # pass this flag, so the tiers were timing a workload nobody runs. Measured
+  # 2026-09-21 (GHA, same binary, same OCAMLRUNPARAM): sp500-2010-2026
+  # 4,738 s / 716 MB with the diagnostic vs 364 s / 550 MB without;
+  # sp500-2019-2023 923 s vs 88 s. The 15y cells' wall_seconds band (3,600 s)
+  # FAILed every weekly run since 2026-09-07 on the diagnostic alone.
   start_epoch=$(date +%s)
   rc=0
   # Pass --fixtures-root so the runner resolves the scenario's [universe_path]
@@ -142,6 +158,7 @@ _run_one() {
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
           --fixtures-root "$SCENARIO_ROOT" \
+          --no-emit-all-eligible \
         >"$log_path" 2>&1 || rc=$?
   else
     timeout "$TIMEOUT" \
@@ -150,6 +167,7 @@ _run_one() {
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
           --fixtures-root "$SCENARIO_ROOT" \
+          --no-emit-all-eligible \
         >"$log_path" 2>&1 || rc=$?
     printf 'UNAVAILABLE\n' >"$rss_path"
   fi
