@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-22",
+  "feature": "gate-reader-stream",
+  "branch": "codex/2886-meta-payload",
+  "sha": "5a50465211acbbc8349b91ddd0ce47c64947e778",
+  "recorded_at_ns": 1790083795561892985,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}

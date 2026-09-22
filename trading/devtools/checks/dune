@@ -532,6 +532,14 @@
  (action
   (run sh %{dep:gnu_time_rss_smoke.sh})))
 
+; #2899: pin the diagnostic opt-out in perf/golden scripts outside Dune.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh scenario_diagnostic_flag.sh (universe))
+ (action
+  (run sh %{dep:scenario_diagnostic_flag_test.sh})))
+
 ; Rule promotion check (T3-F): verify every Lifecycle: enforced rule in
 ; docs/design/dependency-rules.md has a corresponding check script that
 ; exists on disk and is referenced by this dune file.
@@ -1172,3 +1180,11 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:codex_push_test.sh})))
+
+; Prune publication lives outside the Dune workspace, in workflow YAML.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:prune_candidates_pr_test_runner.sh})))
