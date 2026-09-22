@@ -98,3 +98,8 @@ the chain log; the summary line is scoped to `${out}/<name>/actual.sexp`). Each 
   idle at launch (326 MB). Reviewer advisory adopted: `candidates.sexp` is ~500 MB per cell and is NOT committed —
   `results/` gets the derived funnel decomposition (per-year counts by phase and sub-reason) plus the usual per-cell
   raw artifacts. `paired.sh` (this commit) is the per-salt read; columns pinned to the 09-21 `trades.csv` header.
+- 2026-09-21 20:49 PT — **d0 done: tripwire MATCH** (md5 `c1352be6…`, 457.01 % / 732 trades, V6 = 0); wall 7h25m,
+  peak RSS 7.60 GB (`--emit-candidates` ~doubles the cell; `candidates.sexp` 945 MB, kept in the container only).
+  `results/d0-funnel-decomposition.md` + `d0-funnel-by-year.csv` (via `funnel.awk`): the top-N cap binds in
+  99.1 % of weeks, ≥ 20 names cut in 96.3 %, and 33.8 A_plus names/week fall at the cap — the marginal 21–40 are
+  score-tied with the admitted 20 (alphabetical tiebreak). Arm cells `t1-topn-40` s0/s1/s2 now running.
