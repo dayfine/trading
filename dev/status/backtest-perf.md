@@ -12,6 +12,32 @@ perf-tier fix described in the 2026-09-21 weekly-review entry below.
 
 ## Weekly review (`.claude/rules/perf-review-weekly.md`, ~2 h/week — user 2026-09-20)
 
+- **2026-09-22 (PIT smoke)** — closed #2896: `dev/scripts/perf_pit_smoke.sh` +
+  `trading/test_data/backtest_scenarios/perf-pit/pit-smoke-4mo.sexp` (a
+  4-month 2020 window, the `a0-pit-null`/`t1-topn-40` null config, no tier
+  tag so it is invisible to `perf_catalog_check.sh` and every
+  `perf_tier{1,2,3,4}*.sh` discovery loop — those only scan
+  `{goldens-small,goldens-broad,perf-sweep,smoke[,goldens-sp500*,goldens-
+  custom-universe-scenarios]}`). Local-only, run by hand against the full
+  `_v11pit` warehouse (9,364 symbols) at `SNAPSHOT_MAX_MMAP_HANDLES=256` vs
+  `12000`: **cap=256: 2,629 s wall, 22,768,144 kB peak RSS** (cache
+  `hits=1,848,008 misses=5,689,646 evictions=5,385,238 max_mmap_open=256` —
+  heavy LRU thrash, one handle per touched symbol re-opened ~575×) vs
+  **cap=12000: 480 s wall, 4,505,492 kB peak RSS** (`hits=7,224,138
+  misses=313,516 evictions=0 max_mmap_open=9,364` — one load per symbol,
+  no thrash) — **5.5× wall delta** from the handle cap alone, matching the
+  #2882 PIT-26y finding at a smoke-sized cell. `actual.sexp` + `trades.csv`
+  are byte-identical between the two runs (md5
+  `c8de97dd7883fdef4482fb2ef5943511` / `f15324616bd8c2ac405284e9ac38223e`) —
+  the tripwire the script enforces on exit code. The cap=256 peak-RSS figure
+  (22.8 GB) exceeds the 7.75 GB container; per
+  `.claude/rules/container-capacity-scheduling.md` "Measure with `docker
+  stats`, not per-process RSS" this is the columnar-mmap inflation (mapped,
+  evictable pages counted as RSS), not real anonymous memory — `docker
+  stats` was not sampled during this run, so only the GNU-time figure is
+  recorded here; a future run should also capture `docker stats` for the
+  true figure. This closes weekly-review gap 1's third named shape (broad
+  top-3000 5y landed via #2894/#2899; sp500 5y/15y pre-existing).
 - **2026-09-22** — nightly read, first table after #2894 (run 35711088426 on `94a2e3780` vs 35588093641 on 09-21, same six cells, all PASS): `bull-crash-2015-2020` **707 → 122 s** / 281 → 229 MB; `covid-recovery-2020-2024` **542 → 98 s** / 241 → 201 MB; `six-year-2018-2023` **720 → 123 s** / 278 → 230 MB; the three 1-y cells 32 → 14 s, 29 → 13 s, 55 → 21 s, RSS −5 to −10 %. Wall −82 to −83 % on the 5–6 y cells, i.e. the all-eligible diagnostic was ~5.8× the backtest on tier 2 (the 09-21 entry predicted ~10× from the 15 y golden; the shorter cells carry proportionally less diagnostic). These are the new tier-2 baselines — compare next week to these rows, never to pre-09-22 rows. Still open: #2895 (close after Monday's `perf-weekly` PASSes with the flag), #2896 (PIT-warehouse smoke cell), #2899 (check that pins the flag; queued for Codex).
 - **2026-09-21** — second entry (~2 h). Read: `perf-weekly` 09-21 vs 09-14 — 8 PASS, same **2 FAIL** (`sp500-2010-2026` 4,738 s / 717 MB vs 4,714 / 716; `-longshort` 4,831 s / 715 MB vs 4,783 / 715); 5y sp500 cells 889–935 s (+1–5 % w/w), RSS flat. `perf-nightly` 09-21 vs 09-20: all 6 PASS, walls within ±1 %. **Root cause of the FAIL rows:** the tier scripts never passed `--no-emit-all-eligible`, so the opt-out all-eligible diagnostic ran inside every cell — and inside the measured wall since #2616 (09-01). The daily 15y golden runs the SAME cells with the flag at 364–408 s / 550 MB (12× less wall; the tier-3 figure was ~92 % diagnostic), and every verdict chain passes it too, so the tiers timed a workload nobody runs. The 3,600 s `wall_seconds` band failed on the diagnostic alone; three weeks of FAIL rows had no readable cause because the workflows uploaded no cell logs. Fix (this entry's PR): flag added to all four tier scripts + the tier-4 wrapper; artefact upload added to `perf-nightly.yml` / `perf-weekly.yml`. Expect next week's tier-2/3 walls to drop ~10×; re-read the tables against THIS week's golden-path numbers, not last week's tier rows. Also in that PR: `goldens-custom-universe-scenarios` joins tier-3 discovery, so the weekly table gains the broad top-3000 5y shape (armed-e, 198 s / 386 MB on the 09-21 golden run) and top-500 5y. Still open: a PIT-warehouse smoke cell (needs a snapshot warehouse; local-only, cap 256 vs 12,000).
 - **2026-09-20** — first entry. Read: `perf-weekly` 2026-09-14 table — 8 PASS, **2 FAIL** (`sp500-2010-2026` 4,714 s / 716 MB, `sp500-2010-2026-longshort` 4,783 s / 715 MB; workflow still green via `continue-on-error`). Unmeasured shapes: broad top-3000 5y, PIT 26y (index-veto arm s0 8h33m vs null 5h58m; s1 killed by a 36,000 s guard at 92.5 %). Actions: mmap-handle knob PR (#2839), guard resized from the measured arm, this file. Tickets to open: tier-3 FAIL root cause; a broad-5y + PIT-smoke tier cell.
