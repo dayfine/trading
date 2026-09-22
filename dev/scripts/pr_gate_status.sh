@@ -657,10 +657,13 @@ _list_open_prs_curl() {
 }
 _pr_meta_curl() {
   _n=$1
-  _pr=$(_curl_gh "repos/$REPO/pulls/$_n")
-  _files=$(_curl_gh "repos/$REPO/pulls/$_n/files?per_page=100")
-  _reviews=$(_curl_gh "repos/$REPO/pulls/$_n/reviews?per_page=100")
-  jq -n --argjson pr "$_pr" --argjson files "$_files" --argjson reviews "$_reviews" '{
+  _pr=$(_curl_gh "repos/$REPO/pulls/$_n") || return 1
+  _files=$(_curl_gh "repos/$REPO/pulls/$_n/files?per_page=100") || return 1
+  _reviews=$(_curl_gh "repos/$REPO/pulls/$_n/reviews?per_page=100") || return 1
+  # Shell builtin printf streams payloads, avoiding Linux's per-argument cap.
+  printf '%s\n' "$_pr" "$_files" "$_reviews" | jq -se '
+    if length != 3 then error("expected three REST payloads") else . end |
+    .[0] as $pr | .[1] as $files | .[2] as $reviews | {
     headRefOid: $pr.head.sha,
     files: ($files | map({path: .filename})),
     # commit_id (#2626): the REST review payload carries the exact commit the
@@ -804,8 +807,18 @@ fi
 printf '%-6s %-8s %-14s %-14s %-14s %s\n' PR CI STRUCT BEHAV CODEX NEXT-ACTION
 printf '%s\n' "-------------------------------------------------------------------------------------------"
 
+meta_errors=0
 for n in $PRS; do
-  meta=$(_pr_meta "$n")
+  if ! meta=$(_pr_meta "$n") ||
+     ! printf '%s' "$meta" | jq -e '
+       (.headRefOid | type == "string" and length > 0) and
+       (.files | type == "array") and (.reviews | type == "array") and
+       (.labels | type == "array")' >/dev/null 2>&1; then
+    printf '%-6s %-8s %-14s %-14s %-14s %s\n' \
+      "$n" ERROR unknown unknown unknown 'ERROR -- could not read PR meta'
+    meta_errors=1
+    continue
+  fi
   tip=$(printf '%s' "$meta" | jq -r '.headRefOid')
   files=$(printf '%s' "$meta" | jq -r '.files[].path')
   reviews=$(printf '%s' "$meta" | jq -c '.reviews')
@@ -881,3 +894,4 @@ for n in $PRS; do
 
   printf '%-6s %-8s %-14s %-14s %-14s %s\n' "$n" "$ci" "$struct" "$behav" "$codex" "${action}${comment_warning}"
 done
+exit "$meta_errors"
