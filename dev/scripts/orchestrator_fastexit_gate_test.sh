@@ -1270,6 +1270,166 @@ selected=$(cd "$TMP_REPO" && _prior_summary_path "")
 check "a later date's -run2 file sorts after an earlier date's bare file" \
   "dev/daily/2026-12-22-run2.md" "$selected"
 
+# =========================================================================
+# Behavioral-QC rework (CP4, issue #2887): `_prior_summary_path`'s own
+# `_current` exclusion argument (Scenario 50) is only correct if the
+# CALLER derives that argument correctly -- and lead-orchestrator.md's own
+# RUN_COUNT/N formula (Step 0.5 Condition 2/4, the no-op exit procedure,
+# and Step 7) was unexecutable Markdown prose, never pinned by this suite,
+# that RE-COUNTS an uncommitted same-day summary once write-early makes one
+# exist on disk before the formula runs -- producing an off-by-one
+# CURRENT_SUMMARY_PATH that names a file that doesn't exist, so the
+# exclusion argument excludes nothing and Defect 1 (Scenario 50) recurs.
+# Extracting the formula into `current_summary_path` (this script, the
+# single source of truth all four Markdown call sites now share) makes it
+# directly pinnable. Scenarios 53-56 use dev/daily/2027-01-*.md dates --
+# strictly later than every date used above, so accumulated debris from
+# earlier scenarios can never be mistaken for the file under test.
+# =========================================================================
+
+# --- Scenario 53: no same-day summary at all -> the bare, unsuffixed path.
+_reset_repo_no_drift
+result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-05)
+check "current_summary_path with no same-day summary returns the bare-date path" \
+  "dev/daily/2027-01-05.md" "$result"
+
+# --- Scenario 54: one COMMITTED same-day summary (a genuine earlier run
+# today) -> the count includes it, so this run is -run2.
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-01-06.md <<'MD'
+# Status - 2027-01-06 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2027-01-06.md
+  GIT_AUTHOR_DATE="2027-01-06T00:00:00" GIT_COMMITTER_DATE="2027-01-06T00:00:00" \
+    git commit -q -m "ops: daily orchestrator summary 2027-01-06 [run 1]"
+)
+result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-06)
+check "current_summary_path with one COMMITTED same-day summary returns -run2" \
+  "dev/daily/2027-01-06-run2.md" "$result"
+
+# --- Scenario 55: a write-early skeleton for THIS run already sits at the
+# bare-date path, UNCOMMITTED -- current_summary_path must still return the
+# bare-date path, not -run2, since the on-disk file is this run's own, not
+# a genuine second run. Would FAIL against the pre-fix `ls | wc -l` count,
+# which counts any file on disk regardless of git-tracked status (the exact
+# off-by-one measured in the CP4 review: RUN_COUNT=1 N=2 where the correct
+# answer is RUN_COUNT=0 N=1).
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-01-07.md <<'MD'
+# Status - 2027-01-07 [run 1]
+
+**Mode:** FULL
+MD
+  # Deliberately left UNCOMMITTED -- models Step 1 having already written
+  # this run's own skeleton before this formula runs (write-early).
+)
+result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-07)
+check "current_summary_path is NOT defeated by its own uncommitted write-early skeleton (issue #2887 CP4)" \
+  "dev/daily/2027-01-07.md" "$result"
+
+# --- Scenario 56: one COMMITTED prior run PLUS this run's own uncommitted
+# write-early skeleton (already correctly named -run2) both present at
+# once -- the count must still be driven by the committed file alone, so
+# the derived path agrees with the skeleton's own name rather than
+# over-counting to -run3.
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-01-08.md <<'MD'
+# Status - 2027-01-08 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2027-01-08.md
+  GIT_AUTHOR_DATE="2027-01-08T00:00:00" GIT_COMMITTER_DATE="2027-01-08T00:00:00" \
+    git commit -q -m "ops: daily orchestrator summary 2027-01-08 [run 1]"
+  # This run's own write-early skeleton for run 2, UNCOMMITTED.
+  cat > dev/daily/2027-01-08-run2.md <<'MD'
+# Status - 2027-01-08 [run 2]
+
+**Mode:** FULL
+MD
+)
+result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-08)
+check "current_summary_path counts only the committed run, ignoring its own uncommitted run2 skeleton" \
+  "dev/daily/2027-01-08-run2.md" "$result"
+
+# =========================================================================
+# `hours_since_prior_summary` replaces Step 0.5's escape-hatch `ls -t
+# dev/daily/*.md | head -1` + raw mtime arithmetic (advisory 2 of the CP4
+# rework review): that inline block picks "most recent by mtime" with no
+# exclusion of the current run's own file, so a write-early skeleton --
+# freshly written, therefore the newest mtime by construction -- reads as
+# zero hours old and silently defeats the "first run of the day always
+# does a full pass" guarantee. Scenarios 57-60 use dev/daily/2027-02-*.md
+# dates, later than every fixture used above.
+# =========================================================================
+
+# --- Scenario 57: no prior summary anywhere -> empty output (first run
+# ever), same "empty means no prior" contract as prior_summary_iso.
+mkdir -p "$TMP_REPO/no-daily-summary/dev/daily"
+result=$(cd "$TMP_REPO/no-daily-summary" && "$GATE" hours_since_prior_summary dev/daily/2027-02-01.md)
+check "hours_since_prior_summary with no prior summary anywhere returns empty" \
+  "" "$result"
+
+# --- Scenario 58: WITHOUT the current-summary exclusion, a write-early
+# skeleton for THIS run (uncommitted, freshly written) is selected as its
+# own "prior" and reads as ~0 hours old -- the vacuity this subcommand
+# exists to prevent once Step 0.5 calls it.
+_reset_repo_no_drift
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-02-01.md <<'MD'
+# Status - 2027-02-01 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2027-02-01.md
+  GIT_AUTHOR_DATE="2020-01-01T00:00:00" GIT_COMMITTER_DATE="2020-01-01T00:00:00" \
+    git commit -q -m "ops: daily orchestrator summary 2027-02-01 [run 1]"
+  # This run's own write-early skeleton, UNCOMMITTED.
+  cat > dev/daily/2027-02-02.md <<'MD'
+# Status - 2027-02-02 [run 1]
+
+**Mode:** FULL
+MD
+)
+without_exclusion=$(cd "$TMP_REPO" && "$GATE" hours_since_prior_summary)
+if [ "$without_exclusion" -lt 1 ]; then _no_excl_ok=0; else _no_excl_ok=1; fi
+check_bool "hours_since_prior_summary WITHOUT the current-summary arg reads near-zero (selects its own just-written skeleton)" \
+  "$_no_excl_ok"
+
+# --- Scenario 59: WITH the current-summary exclusion, the same fixture
+# correctly finds the true prior (committed 2020-01-01) and reports it as
+# comfortably >= 24 hours old -- proving the exclusion, not a coincidence
+# of "any old file", is what makes the escape hatch fire correctly.
+with_exclusion=$(cd "$TMP_REPO" && "$GATE" hours_since_prior_summary dev/daily/2027-02-02.md)
+if [ "$with_exclusion" -ge 24 ]; then _excl_ok=0; else _excl_ok=1; fi
+check_bool "hours_since_prior_summary WITH the current-summary arg correctly finds the true (old) prior, >= 24h" \
+  "$_excl_ok"
+
+# --- Scenario 60: a prior summary committed only moments ago (this test's
+# own real wall-clock "now") reads as comfortably under 24 hours -- the
+# other side of the boundary the Step 0.5 escape hatch branches on.
+_reset_repo_no_drift
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-02-10.md <<'MD'
+# Status - 2027-02-10 [run 1]
+
+**Mode:** FULL
+MD
+  git add dev/daily/2027-02-10.md
+  git commit -q -m "ops: daily orchestrator summary 2027-02-10 [run 1]"
+)
+recent=$(cd "$TMP_REPO" && "$GATE" hours_since_prior_summary dev/daily/2027-02-11.md)
+if [ "$recent" -lt 24 ]; then _recent_ok=0; else _recent_ok=1; fi
+check_bool "hours_since_prior_summary for a just-committed prior reads well under 24h" \
+  "$_recent_ok"
+
 # Render all health exit classes from captured fixtures, without network access.
 health_fixture="$TMP_REPO/health.log"
 printf 'OK\tweekly\trun_id=12\nNO-SCHEDULE\tmanual\t(no runs)\nSUMMARY: ok=1\n' > "$health_fixture"
