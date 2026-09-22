@@ -103,3 +103,14 @@ the chain log; the summary line is scoped to `${out}/<name>/actual.sexp`). Each 
   `results/d0-funnel-decomposition.md` + `d0-funnel-by-year.csv` (via `funnel.awk`): the top-N cap binds in
   99.1 % of weeks, ≥ 20 names cut in 96.3 %, and 33.8 A_plus names/week fall at the cap — the marginal 21–40 are
   score-tied with the admitted 20 (alphabetical tiebreak). Arm cells `t1-topn-40` s0/s1/s2 now running.
+- 2026-09-22 01:38 PT — **t1-topn-40 s0 done** (4h48m, 6.47 GB, V6 = 0): **237.38 % / 771 trades / maxDD 44.48 / Calmar 0.106 vs
+  null 457.01 / 732 / 40.64 / 0.165 — fails both metrics at this salt.** `results/t1-topn-40-s0-read.md`: arm-only 280
+  trades −$0.87 M (68 % losers, 6.8 % ≥ +20 %), null-only 241 +$1.34 M; arm *ahead* through 2019 (+$752 k at 2017),
+  loses the 2020 and 2025 monster cohorts (−$2.2 M by 2026). `join.awk` on d0's cascade: only 28 % of arm-only entries
+  were the marginal 21–40; 46 % were names the null admitted too but never filled — slot/cash reshuffle, not capacity.
+  s1 running (started 01:38 PT).
+- 2026-09-22 05:54 PT — **t1-topn-40 s1 done** (4h16m, 6.46 GB, V6 = 0): **303.97 % / 748 / maxDD 43.84 / Calmar 0.123 vs
+  null 188.05 / 766 / 53.05 / 0.077 — clears both at this salt; s2 decides.** `results/t1-topn-40-s1-read.md`: the
+  mirror of s0 — arm-only 280 trades +$0.88 M of which ECHO 2025-08-26 is +$677 k (77 %); null-only 298 trades +$4 k
+  (2018 and 2024 whipsaw cohorts, 42 losers of 56). Same cohort sizes, opposite sign: a slot re-draw. s2 running
+  (started 05:54 PT, done ~10:10 PT).
