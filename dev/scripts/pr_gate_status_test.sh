@@ -964,6 +964,15 @@ for GATE_META_CASE in http invalid empty; do
   )"
 done
 unset GATE_META_CASE
+SAVED_TIP=$GATE_TIP
+GATE_TIP=''
+e2e_rc=0
+e2e_out=$(_e2e_probe "$CURL_E2E_STUB_DIR" dummy-token 501 2>/dev/null) || e2e_rc=$?
+check "REST shape-wrong metadata exits nonzero" 1 "$e2e_rc"
+check "REST shape-wrong metadata has visible error row" yes "$(
+  case "$e2e_out" in *'ERROR -- could not read PR meta'*) echo yes ;; *) echo no ;; esac
+)"
+GATE_TIP=$SAVED_TIP
 rm -rf "$CURL_E2E_STUB_DIR"
 
 # 36b-36c. H-GATEPARSER-CURL-PROJECTION-UNPINNED (dev/status/harness.md): cases
