@@ -81,6 +81,8 @@ projects:
 
 Read the relevant design doc for this feature before reviewing any code. Do not evaluate correctness from memory — always trace claims back to the authority document.
 
+**Scope this step to the diff first.** Run `gh pr view <N> --json files --jq '.files[].path'`. If no path contains `/weinstein/` (strategy, screener, stops, portfolio_risk, stage, macro, sector, or their tests), the PR is infra / harness / experiment-results: read only the `.mli` docstrings, the PR body and the plan file, mark the whole domain block (S*/L*/C*/T*) NA with one note, and do **not** open the domain authority documents — they cost more context than the review and change nothing for such a PR. Open them only when a `/weinstein/` path is in the diff.
+
 ### Step 2: Read the diff
 
 Use the file list from `gh pr view $PR_NUMBER --json files --jq '.files[].path'` and read

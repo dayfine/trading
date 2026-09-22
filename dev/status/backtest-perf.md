@@ -1,6 +1,6 @@
 # Status: backtest-perf
 
-## Last updated: 2026-09-21
+## Last updated: 2026-09-22
 
 ## Status
 IN_PROGRESS
@@ -12,6 +12,7 @@ perf-tier fix described in the 2026-09-21 weekly-review entry below.
 
 ## Weekly review (`.claude/rules/perf-review-weekly.md`, ~2 h/week — user 2026-09-20)
 
+- **2026-09-22** — nightly read, first table after #2894 (run 35711088426 on `94a2e3780` vs 35588093641 on 09-21, same six cells, all PASS): `bull-crash-2015-2020` **707 → 122 s** / 281 → 229 MB; `covid-recovery-2020-2024` **542 → 98 s** / 241 → 201 MB; `six-year-2018-2023` **720 → 123 s** / 278 → 230 MB; the three 1-y cells 32 → 14 s, 29 → 13 s, 55 → 21 s, RSS −5 to −10 %. Wall −82 to −83 % on the 5–6 y cells, i.e. the all-eligible diagnostic was ~5.8× the backtest on tier 2 (the 09-21 entry predicted ~10× from the 15 y golden; the shorter cells carry proportionally less diagnostic). These are the new tier-2 baselines — compare next week to these rows, never to pre-09-22 rows. Still open: #2895 (close after Monday's `perf-weekly` PASSes with the flag), #2896 (PIT-warehouse smoke cell), #2899 (check that pins the flag; queued for Codex).
 - **2026-09-21** — second entry (~2 h). Read: `perf-weekly` 09-21 vs 09-14 — 8 PASS, same **2 FAIL** (`sp500-2010-2026` 4,738 s / 717 MB vs 4,714 / 716; `-longshort` 4,831 s / 715 MB vs 4,783 / 715); 5y sp500 cells 889–935 s (+1–5 % w/w), RSS flat. `perf-nightly` 09-21 vs 09-20: all 6 PASS, walls within ±1 %. **Root cause of the FAIL rows:** the tier scripts never passed `--no-emit-all-eligible`, so the opt-out all-eligible diagnostic ran inside every cell — and inside the measured wall since #2616 (09-01). The daily 15y golden runs the SAME cells with the flag at 364–408 s / 550 MB (12× less wall; the tier-3 figure was ~92 % diagnostic), and every verdict chain passes it too, so the tiers timed a workload nobody runs. The 3,600 s `wall_seconds` band failed on the diagnostic alone; three weeks of FAIL rows had no readable cause because the workflows uploaded no cell logs. Fix (this entry's PR): flag added to all four tier scripts + the tier-4 wrapper; artefact upload added to `perf-nightly.yml` / `perf-weekly.yml`. Expect next week's tier-2/3 walls to drop ~10×; re-read the tables against THIS week's golden-path numbers, not last week's tier rows. Also in that PR: `goldens-custom-universe-scenarios` joins tier-3 discovery, so the weekly table gains the broad top-3000 5y shape (armed-e, 198 s / 386 MB on the 09-21 golden run) and top-500 5y. Still open: a PIT-warehouse smoke cell (needs a snapshot warehouse; local-only, cap 256 vs 12,000).
 - **2026-09-20** — first entry. Read: `perf-weekly` 2026-09-14 table — 8 PASS, **2 FAIL** (`sp500-2010-2026` 4,714 s / 716 MB, `sp500-2010-2026-longshort` 4,783 s / 715 MB; workflow still green via `continue-on-error`). Unmeasured shapes: broad top-3000 5y, PIT 26y (index-veto arm s0 8h33m vs null 5h58m; s1 killed by a 36,000 s guard at 92.5 %). Actions: mmap-handle knob PR (#2839), guard resized from the measured arm, this file. Tickets to open: tier-3 FAIL root cause; a broad-5y + PIT-smoke tier cell.
 
