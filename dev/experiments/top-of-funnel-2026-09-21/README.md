@@ -114,3 +114,55 @@ the chain log; the summary line is scoped to `${out}/<name>/actual.sexp`). Each 
   mirror of s0 — arm-only 280 trades +$0.88 M of which ECHO 2025-08-26 is +$677 k (77 %); null-only 298 trades +$4 k
   (2018 and 2024 whipsaw cohorts, 42 losers of 56). Same cohort sizes, opposite sign: a slot re-draw. s2 running
   (started 05:54 PT, done ~10:10 PT).
+- 2026-09-22 09:53 PT — **t1-topn-40 s2 done, LANE A DONE** (3h59m, 6.45 GB, V6 = 0): **329.51 % / 766 / maxDD 44.68 /
+  Calmar 0.127 vs null 152.03 / 762 / 51.32 / 0.069 — clears both.** Rule: **2 of 3 → ACCEPT** (§Verdict below).
+  `results/t1-topn-40-s2-read.md`. Chain log archived as `results/chain-A.log`; worktree and `/tmp/funnel-run`
+  removed; `candidates.sexp` deleted (decomposition committed).
+
+## Verdict (2026-09-22, pre-registered rule: realised AND Calmar better than the null at ≥ 2 of 3 salts)
+
+| salt | null: return / maxDD / Calmar | arm (cap 40): return / maxDD / Calmar | realised | Calmar |
+|---|---|---|---|---|
+| s0 | 457.0 / 40.6 / 0.165 | 237.4 / 44.5 / 0.106 | fail (−220 pp) | fail |
+| s1 | 188.0 / 53.0 / 0.077 | 304.0 / 43.8 / 0.123 | clear (+116 pp) | clear |
+| s2 | 152.0 / 51.3 / 0.069 | 329.5 / 44.7 / 0.127 | clear (+177 pp) | clear |
+
+**ACCEPT(mechanism) by the pre-registered rule — 2 of 3 salts clear both metrics.** Not promotable on this surface
+alone (`experiment-flag-discipline.md` R3 + `promotion-confirmation.md`): one point of the knob (40) on one window and
+one breadth tier. What the three salts actually support, and what they do not:
+
+1. **The level is a salt lottery, on both sides.** Cohort sizes are the same at every salt (arm-only 280 / 280 / 265,
+   null-only 241 / 298 / 261, ~36 % of each book) and the sign of the arm-only cohort flips: −$0.87 M / +$0.88 M /
+   +$0.85 M, against null-only +$1.34 M / +$0.004 M / −$0.51 M. At s0 the null's draw holds the 2020 and 2025 monster
+   cohorts; at s1 the arm's draw holds ECHO (+$677 k of its +$0.88 M); at s2 the arm's draw holds six $230 k+ winners.
+   Never quote +177 pp or −220 pp as the mechanism (`project_clock52_promoted`: same rule for the 52-week clock).
+2. **The robust property is dispersion, not level (n = 3, PLAUSIBLE).** Arm realised 237–330 % (range 93 pp) vs null
+   152–457 % (305 pp); arm maxDD 43.8–44.7 (0.9 pt) vs null 40.6–53.0 (12.4 pt); arm Calmar 0.106–0.127 vs 0.069–0.165.
+   Means: return 290 vs 266, Calmar 0.119 vs 0.104; medians 304 vs 188 and 0.123 vs 0.077. A 40-name list makes the
+   book less dependent on which A_plus tie wins the slot. Three draws cannot separate "the arm is less path-dependent"
+   from "the null's s0 is the outlier"; the confirmation grid is the test.
+3. **Mechanism: the leak is slot policy, not screener capacity.** d0: the cap binds in 99.1 % of weeks and 33.8
+   A_plus names/week fall at it, but the book fills only ~28 entries/yr into ~5 slots (concurrency 4.67–4.85 null vs
+   5.00–5.03 arm). Joining s0's arm-only entries to the null's own cascade: 46 % were names the null had **admitted**
+   the Friday before and never filled, 28 % were the marginal ranks 21–40, 25 % older resting orders. Widening the list
+   re-draws which resting orders trigger first against the slots and the cash floor; the marginal names themselves are
+   slightly worse (score 102–103 vs 106–107 for null-only; winner rate 6.8 / 8.6 / 9.1 % vs 10.8 / 7.7 / 6.9 %, no
+   robust sign). #2490's "36 % of monsters die at top-N" is therefore mostly a **slot** loss: the monster was screened;
+   it did not win the slot that week.
+4. **Universe / basis:** every cell on the 27-entry yearly top-3000 PIT schedule, `_v11pit`, V6 = 0 at every salt,
+   d0 tripwire byte-identical to the committed null s0 — same build, same inputs, same fill model as the record band.
+
+**Classification:** ACCEPT(mechanism), keep default-off (`max_buy_candidates` stays 20) as an axis. **Promotion path**
+(if anyone wants it): confirmation grid per `promotion-confirmation.md` — (a) the surface {30, 40, 60} not one point,
+(b) a disjoint sub-window (2019–2025) on the same schedule, (c) a top-1000 schedule cell; promote only if the
+dispersion property (tighter maxDD band, median ≥ null) holds in ≥ 2 of 3 cells. Level gains are not the criterion.
+
+**Forward guidance (the transferable why):** the top of the funnel is not capacity-bound at the screener; it is
+capacity-bound at the slots. The next lever is **slot policy** — what fills first when the admitted list exceeds the
+open slots (today: whichever resting order triggers first, alphabetical among score ties), and whether a
+higher-conviction ordering (score, then RS, then volume ratio, never alphabetical) changes the fill set in a way that
+is robust across salts. That is a screener-ordering dial the book supports (RS for selection, spine item 7), cheap to
+pre-register, and it attacks the same ~36 % of each book that this arm merely re-shuffled. Not another cap-width point.
+
+**Runtime (perf-review-weekly §3):** arm cells 4h48m / 4h16m / 3h59m at cap 12,000 (peak RSS 6.45–6.47 GB); the
+60,000 s guard was 3.5× the slowest cell. `--emit-candidates` doubled d0 (7h25m, 7.60 GB) — keep it off verdict cells.
