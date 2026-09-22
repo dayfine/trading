@@ -151,5 +151,169 @@ check "prompt pins the diff to the checkout" 1 "$(printf '%s' "$p" | grep -c "gi
 check "prompt forbids the live PR diff" 1 "$(printf '%s' "$p" | grep -c "do not use 'gh pr diff'")"
 check "prompt carries no backticks" 0 "$(printf '%s' "$p" | grep -c '`')"
 
+
+# Budget guards (issue #2905): deterministic sampling + daily cap, above the seam.
+d1=$(sample_draw 2906 "$SHA"); d2=$(sample_draw 2906 "$SHA")
+check "sample_draw: deterministic in (PR, SHA)" "$d1" "$d2"
+check "sample_draw: in 0..9999" 1 "$(awk -v d="$d1" 'BEGIN { print (d >= 0 && d < 10000) ? 1 : 0 }')"
+# qc-behavioral rework iteration 1 (#2907, CP1): the prior version of this test
+# varied BOTH the PR and the SHA at once ("sample_draw 1 "$s"" vs d1's PR 2906),
+# so it only proved the draw is not a constant -- it passed even with SHA
+# dropped from the cksum input entirely (mut-1: "$1:$2" -> "$1"). Split into two
+# single-axis checks so each pins the digest actually depending on that argument.
+check "sample_draw: holding the PR fixed, varying the SHA changes the draw" 1 "$(n=0; for s in a b c d e f g h; do [ "$(sample_draw 2906 "$s")" != "$d1" ] && n=$((n+1)); done; [ "$n" -ge 1 ] && echo 1 || echo 0)"
+check "sample_draw: holding the SHA fixed, varying the PR changes the draw" 1 "$(n=0; for p in 1 2 3 4 5 6 7 8; do [ "$(sample_draw "$p" "$SHA")" != "$d1" ] && n=$((n+1)); done; [ "$n" -ge 1 ] && echo 1 || echo 0)"
+check "should_sample: P=1 always" 0 "$(should_sample 2906 "$SHA" 1 && echo 0 || echo 1)"
+check "should_sample: P=0 never" 1 "$(should_sample 2906 "$SHA" 0 && echo 0 || echo 1)"
+check "should_sample: agrees with the draw at P=0.25" "$(awk -v d="$d1" 'BEGIN { print (d / 10000 < 0.25) ? 0 : 1 }')" "$(should_sample 2906 "$SHA" 0.25 && echo 0 || echo 1)"
+check "should_sample: roughly a quarter of 400 tips at P=0.25" 1 "$(n=0; i=0; while [ $i -lt 400 ]; do should_sample $i "$SHA" 0.25 && n=$((n+1)); i=$((i+1)); done; [ "$n" -ge 60 ] && [ "$n" -le 140 ] && echo 1 || echo "0 (n=$n)")"
+check "daily_count: 0 when the log is absent" 0 "$(daily_count "$D/nolog")"
+record_run "$D/logs/reviews-today.log" 1 "$SHA"; record_run "$D/logs/reviews-today.log" 2 "$SHA"
+check "record_run + daily_count: two runs" 2 "$(daily_count "$D/logs/reviews-today.log")"
+check "record_run: line is 'PR SHA'" "2 $SHA" "$(tail -1 "$D/logs/reviews-today.log")"
+check "has_label: present" 0 "$(has_label "kind/harness
+review/codex-required" review/codex-required && echo 0 || echo 1)"
+check "has_label: prefix is not a match" 1 "$(has_label "review/codex-requested" review/codex-required && echo 0 || echo 1)"
+check "--force is accepted by the arg parser (no 'unknown flag')" 0 "$(CODEX_REVIEW_LIB= sh "$HERE/codex_review.sh" --force 2>&1 | grep -c 'unknown flag')"
+
+# Guard WIRING (qc-behavioral rework iteration 1, #2907, CP4): the checks above
+# pin should_sample/daily_count/record_run/has_label in ISOLATION, called
+# directly through the CODEX_REVIEW_LIB=1 seam. None of them drives the real
+# script past the `gh pr view` call, so the two guard blocks in the script body
+# (lines ~231-240: sampling, cap, their --force/label bypasses) and the
+# record_run CALL SITE (line ~260) were unpinned -- deleting either guard
+# block, flipping the cap boundary -ge -> -gt, or deleting the record_run call
+# all left the suite green. These tests drive the real, unmodified script
+# end-to-end through a stubbed `gh pr view` (extending the pattern already used
+# above for post_report) and --dry-run, which this script reaches only AFTER
+# both guards and BEFORE any network/git/codex call -- so a passed guard is
+# observable (the "dry run" message) without needing to fake a live PR.
+GHBIN="$D/ghbin"
+mkdir -p "$GHBIN"
+cat > "$GHBIN/gh" <<'GEOF'
+#!/bin/sh
+# Stub for `gh pr view <PR> --repo <REPO> --json headRefOid,title,files,labels`.
+# GH_STUB_SHA/GH_STUB_LABELS (newline-separated) control the JSON; the file
+# list always includes a non-docs path so is_docs_only lets the guards run.
+if [ "$1" = pr ] && [ "$2" = view ]; then
+  _labels=$(printf '%s\n' "${GH_STUB_LABELS:-}" | awk 'NF{printf "%s{\"name\":\"%s\"}", (n++ ? "," : ""), $0}')
+  printf '{"headRefOid":"%s","title":"a title","files":[{"path":"trading/x.ml"}],"labels":[%s]}\n' \
+    "${GH_STUB_SHA:?}" "$_labels"
+  exit 0
+fi
+echo "gh: unexpected stub invocation: $*" >&2
+exit 1
+GEOF
+chmod +x "$GHBIN/gh"
+# The real script runs `ROOT=$(git rev-parse --show-toplevel)` under set -eu
+# before either guard. Under dune the suite runs from _build/.sandbox/<h>/…,
+# where that command fails ("invalid gitfile format", exit 128) -- see
+# trading/devtools/checks/_check_lib.sh on why git rev-parse is unreliable in
+# this harness. Without a stub the failed substitution trips the SUITE's own
+# set -e and the run aborts with no FAIL line and no OK summary (qc-behavioral
+# CP4-B on rework iteration 1). Stub git here so guard_dry works from any cwd.
+cat > "$GHBIN/git" <<'GEOF'
+#!/bin/sh
+if [ "$1" = rev-parse ]; then echo "${GIT_STUB_ROOT:?}"; exit 0; fi
+echo "git: unexpected stub invocation: $*" >&2
+exit 1
+GEOF
+chmod +x "$GHBIN/git"
+GSHA=1111111111111111111111111111111111111111
+GPR=90001
+
+# guard_dry LABELS SAMPLE CAP LOGDIR PRESEED_LINES -> stdout+stderr of a
+# --dry-run invocation with those knobs; LOGDIR is pre-seeded with
+# PRESEED_LINES dummy "PR SHA" lines before the run (0 = leave absent).
+guard_dry() {
+  _labels=$1; _sample=$2; _cap=$3; _logdir=$4; _n=$5
+  mkdir -p "$_logdir"
+  _log="$_logdir/reviews-$(date +%F).log"
+  _i=0
+  while [ "$_i" -lt "$_n" ]; do printf '%d %s\n' "$((9000 + _i))" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa >> "$_log"; _i=$((_i + 1)); done
+  _rc=0
+  CODEX_REVIEW_LIB= GH_STUB_SHA="$GSHA" GH_STUB_LABELS="$_labels" GIT_STUB_ROOT="$D/g-root" \
+    CODEX_REVIEW_SAMPLE="$_sample" CODEX_REVIEW_MAX_PER_DAY="$_cap" CODEX_REVIEW_LOG_DIR="$_logdir" \
+    PATH="$GHBIN:$D/bin:$PATH" sh "$HERE/codex_review.sh" "$GPR" --dry-run 2>&1 || _rc=$?
+  # A non-zero exit is reported as a line the callers grep, never as an abort
+  # of this suite (set -e would otherwise kill the run at the first guard check).
+  [ "$_rc" = 0 ] || echo "guard_dry: codex_review.sh exited $_rc"
+}
+loglines() { _f="$1/reviews-$(date +%F).log"; [ -f "$_f" ] && wc -l < "$_f" | tr -d ' ' || echo 0; }
+
+# mut-6 (sampling guard deleted entirely): SAMPLE=0 always sorts out; if the
+# whole guard block were gone, the run would fall through to "dry run" instead.
+out=$(guard_dry "" 0 3 "$D/g-sampled" 0)
+check "guard: sampled out (P=0) is blocked before the live run" 1 "$(printf '%s' "$out" | grep -c 'sampled out')"
+check "guard: sampled out never reaches dry-run" 0 "$(printf '%s' "$out" | grep -c 'dry run')"
+check "guard: sampled out does not touch the run log" 0 "$(loglines "$D/g-sampled")"
+
+# mut-5 (cap guard deleted) + mut-4 (-ge -> -gt boundary): at count == CAP the
+# next run MUST be refused (this is what -ge means); at count == CAP-1 it must
+# NOT be refused. A -gt mutant only blocks at CAP+1, so it passes the second
+# check here but fails the first.
+out=$(guard_dry "" 1 3 "$D/g-cap-at" 3)
+check "guard: count==CAP is refused (cap boundary)" 1 "$(printf '%s' "$out" | grep -c 'daily cap reached')"
+check "guard: count==CAP never reaches dry-run" 0 "$(printf '%s' "$out" | grep -c 'dry run')"
+check "guard: count==CAP does not append the run log" 3 "$(loglines "$D/g-cap-at")"
+out=$(guard_dry "" 1 3 "$D/g-cap-under" 2)
+check "guard: count==CAP-1 is NOT refused, reaches dry-run" 1 "$(printf '%s' "$out" | grep -c 'dry run')"
+check "guard: count==CAP-1 prints no cap message" 0 "$(printf '%s' "$out" | grep -c 'daily cap reached')"
+
+# Bypass asymmetry (the "strongest reason to close CP4 now": only
+# review/codex-required can produce a HOLD, via the cap guard's single
+# `! has_label ... review/codex-required` conjunct -- untested before this).
+out=$(guard_dry "" 1 1 "$D/g-force" 1)  # sampled-in P=1 irrelevant; force bypasses both anyway
+out=$(CODEX_REVIEW_LIB= GH_STUB_SHA="$GSHA" GH_STUB_LABELS="" \
+      CODEX_REVIEW_SAMPLE=0 CODEX_REVIEW_MAX_PER_DAY=1 CODEX_REVIEW_LOG_DIR="$D/g-force" \
+      GIT_STUB_ROOT="$D/g-root" PATH="$GHBIN:$D/bin:$PATH" sh "$HERE/codex_review.sh" "$GPR" --dry-run --force 2>&1 || true)
+check "guard: --force bypasses BOTH sampling (P=0) and a reached cap" 1 "$(printf '%s' "$out" | grep -c 'dry run')"
+
+out=$(guard_dry "review/codex-requested" 0 1 "$D/g-requested-undercap" 0)
+check "guard: codex-requested bypasses sampling (P=0) when under cap" 1 "$(printf '%s' "$out" | grep -c 'dry run')"
+out=$(guard_dry "review/codex-requested" 0 1 "$D/g-requested-atcap" 1)
+check "guard: codex-requested does NOT bypass a reached cap" 1 "$(printf '%s' "$out" | grep -c 'daily cap reached')"
+
+out=$(guard_dry "review/codex-required" 0 1 "$D/g-required-atcap" 1)
+check "guard: codex-required bypasses BOTH sampling (P=0) and a reached cap" 1 "$(printf '%s' "$out" | grep -c 'dry run')"
+
+# mut-7 (record_run call site deleted): drive the FULL live path (guards pass,
+# no --dry-run) through stubbed git + a failing codex, and check the run log
+# was appended BEFORE codex_invoke ran -- record_run sits between the git
+# worktree setup and codex_invoke in the script body, so it executes even
+# though the stubbed codex then fails the run. Stubbing codex to fail (rather
+# than succeed) sidesteps needing a well-formed report file / gh-api stub for
+# post_report, which this test isn't about.
+FULLBIN="$D/fullbin"
+mkdir -p "$FULLBIN"
+cp "$GHBIN/gh" "$FULLBIN/gh"
+cat > "$FULLBIN/git" <<'GEOF'
+#!/bin/sh
+# Stub covering exactly the git calls codex_review.sh makes: rev-parse (the
+# ROOT), fetch/worktree add (the live-run setup), worktree remove/prune (the
+# EXIT trap's cleanup). Everything succeeds; "add" makes the target dir exist.
+if [ "$1" = rev-parse ]; then echo "$GIT_STUB_ROOT"; exit 0; fi
+if [ "$1" = -C ]; then
+  shift 2
+  if [ "$1" = worktree ] && [ "$2" = add ]; then mkdir -p "$4" 2>/dev/null || true; fi
+fi
+exit 0
+GEOF
+chmod +x "$FULLBIN/git"
+cat > "$FULLBIN/codex" <<'GEOF'
+#!/bin/sh
+exit 1
+GEOF
+chmod +x "$FULLBIN/codex"
+mkdir -p "$D/g-record-run" "$D/g-record-run-root" "$D/g-record-run-report"
+_rc=0
+GIT_STUB_ROOT="$D/g-record-run-root" GH_STUB_SHA="$GSHA" GH_STUB_LABELS="" \
+  CODEX_REVIEW_LIB= CODEX_REVIEW_SAMPLE=1 CODEX_REVIEW_MAX_PER_DAY=3 \
+  CODEX_REVIEW_LOG_DIR="$D/g-record-run" REPORT_DIR="$D/g-record-run-report" \
+  PATH="$FULLBIN:$PATH" sh "$HERE/codex_review.sh" "$GPR" >/dev/null 2>&1 || _rc=$?
+check "record_run: the codex-exec failure path (which runs AFTER record_run) does fail" 1 "$_rc"
+check "record_run: a live attempt appends the run log before codex_invoke runs" 1 "$(loglines "$D/g-record-run")"
+check "record_run: the appended line is 'PR SHA'" "$GPR $GSHA" "$(tail -1 "$D/g-record-run/reviews-$(date +%F).log" 2>/dev/null)"
+
 if [ "$fails" -gt 0 ]; then printf 'FAIL: codex_review -- %d test(s) failed.\n' "$fails"; exit 1; fi
 printf 'OK: codex_review -- %d tests clean.\n' "$total"

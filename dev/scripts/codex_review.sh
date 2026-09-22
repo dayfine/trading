@@ -11,11 +11,32 @@
 #   its own -- the controller posts the report after validating its shape.
 #
 # USAGE
-#   sh dev/scripts/codex_review.sh <PR> [--no-post] [--dry-run]
+#   sh dev/scripts/codex_review.sh <PR> [--no-post] [--dry-run] [--force]
 #     --no-post   run and validate, print the report path, do not post
 #     --dry-run   print the prompt that would be sent and exit (no codex call)
+#     --force     skip the sampling draw and the daily cap (see BUDGET)
 #   Env:
 #     CODEX_REVIEW=off   the fallback switch: exit 0 immediately, do nothing
+#     CODEX_REVIEW_SAMPLE=<p>       probability a call actually reviews (default 0.25)
+#     CODEX_REVIEW_MAX_PER_DAY=<n>  daily cap on live codex runs (default 3)
+#     CODEX_REVIEW_LOG_DIR=<dir>    where the daily run log lives (default dev/_tmp/codex)
+#
+# BUDGET (issue #2905 -- "budget some reviews by codex")
+#   The dispatcher may call this on every PR that reaches MERGE; the script
+#   decides whether a live run happens. Two guards, both above the LIB seam
+#   and offline-tested:
+#     sampling  should_sample PR SHA P -- a deterministic draw from cksum of
+#               "PR:SHA" (0..9999) / 10000 < P. Same tip, same answer, so a
+#               re-run never flips a sampled-out PR into a review or vice
+#               versa. Bypassed by --force or by a review/codex-* label.
+#     cap       daily_count LOG >= CODEX_REVIEW_MAX_PER_DAY -> exit 0 "cap".
+#               codex-cli 0.154.0 exposes NO usage or quota query (checked
+#               `codex --help`, `codex login --help`: only login status /
+#               doctor), so the per-day cap is the proxy for "check usage
+#               before running". Bypassed by --force or review/codex-required.
+#   Every live run appends "PR SHA" to /reviews-<date>.log
+#   (dev/_tmp is gitignored). The A/B side -- did Codex agree with the Claude
+#   gates? -- is dev/scripts/codex_agreement_row.sh, run at merge time.
 #     CODEX_MODEL=<m>    optional model override passed as -m
 #     REPORT_DIR=<dir>   where the report file lands (default /tmp)
 #
@@ -124,6 +145,30 @@ reader_agrees() {
 # immutable revision), never the live PR: a push during the review must not
 # change what the report's "Reviewed SHA" line vouches for (advisory Codex
 # review 5194134240 of #2798). No backticks: this text is emitted verbatim.
+# sample_draw PR SHA -> integer 0..9999, deterministic in (PR, SHA). cksum is
+# POSIX; awk does the arithmetic so no shell integer-width assumptions.
+sample_draw() {
+  printf '%s:%s' "$1" "$2" | cksum | awk '{ print $1 % 10000 }'
+}
+# should_sample PR SHA P -> 0 when this tip is in the sample (draw/10000 < P),
+# 1 otherwise. P is a decimal in [0,1]; P=1 always samples, P=0 never does.
+should_sample() {
+  _d=$(sample_draw "$1" "$2")
+  awk -v d="$_d" -v p="$3" 'BEGIN { exit !(d / 10000 < p + 0) }'
+}
+# daily_count LOG -> number of live runs recorded in LOG (0 when absent).
+daily_count() {
+  if [ -f "$1" ]; then grep -c . "$1"; else echo 0; fi
+}
+# record_run LOG PR SHA -> append one "PR SHA" line (mkdir -p the dir).
+record_run() {
+  mkdir -p "$(dirname "$1")" && printf '%s %s\n' "$2" "$3" >> "$1"
+}
+# has_label LABELS_LINES NAME -> 0 when NAME is one of the newline-separated labels.
+has_label() {
+  printf '%s\n' "$1" | grep -qx "$2"
+}
+
 build_prompt() {
   _pr=$1; _sha=$2; _title=$3; _repo=$4
   cat <<PEOF
@@ -156,27 +201,41 @@ if [ "${CODEX_REVIEW:-on}" = off ]; then
   exit 0
 fi
 
-PR=""; POST=1; DRY=0
+PR=""; POST=1; DRY=0; FORCE=0
 for a in "$@"; do
   case "$a" in
     --no-post) POST=0 ;;
     --dry-run) DRY=1 ;;
+    --force)   FORCE=1 ;;
     -*) echo "codex_review: unknown flag $a" >&2; exit 2 ;;
     *) PR=$a ;;
   esac
 done
-[ -n "$PR" ] || { echo "usage: sh dev/scripts/codex_review.sh <PR> [--no-post] [--dry-run]" >&2; exit 2; }
+[ -n "$PR" ] || { echo "usage: sh dev/scripts/codex_review.sh <PR> [--no-post] [--dry-run] [--force]" >&2; exit 2; }
 for t in gh jq git codex; do
   command -v "$t" >/dev/null 2>&1 || { echo "codex_review: $t not on PATH" >&2; exit 2; }
 done
 
 ROOT=$(git rev-parse --show-toplevel)
-META=$(gh pr view "$PR" --repo "$REPO" --json headRefOid,title,files)
+META=$(gh pr view "$PR" --repo "$REPO" --json headRefOid,title,files,labels)
 SHA=$(printf '%s' "$META" | jq -r .headRefOid)
 TITLE=$(printf '%s' "$META" | jq -r .title)
 FILES=$(printf '%s' "$META" | jq -r '.files[].path')
 if is_docs_only "$FILES"; then
   echo "codex_review: PR #$PR is docs-only; no advisory review (CI is the gate)"
+  exit 0
+fi
+LABELS=$(printf "%s" "$META" | jq -r ".labels[].name")
+SAMPLE_P=${CODEX_REVIEW_SAMPLE:-0.25}; CAP=${CODEX_REVIEW_MAX_PER_DAY:-3}
+RUN_LOG="${CODEX_REVIEW_LOG_DIR:-$ROOT/dev/_tmp/codex}/reviews-$(date +%F).log"
+if [ "$FORCE" = 0 ] && ! has_label "$LABELS" review/codex-requested && ! has_label "$LABELS" review/codex-required; then
+  if ! should_sample "$PR" "$SHA" "$SAMPLE_P"; then
+    echo "codex_review: PR #$PR at $SHA sampled out (CODEX_REVIEW_SAMPLE=$SAMPLE_P, draw $(sample_draw "$PR" "$SHA")); --force or a review/codex-* label overrides"
+    exit 0
+  fi
+fi
+if [ "$FORCE" = 0 ] && ! has_label "$LABELS" review/codex-required && [ "$(daily_count "$RUN_LOG")" -ge "$CAP" ]; then
+  echo "codex_review: daily cap reached ($(daily_count "$RUN_LOG")/$CAP live runs in $RUN_LOG); --force or review/codex-required overrides"
   exit 0
 fi
 
@@ -198,6 +257,7 @@ cleanup() { git -C "$ROOT" worktree remove --force "$WT" >/dev/null 2>&1 || true
 trap cleanup EXIT INT TERM
 git -C "$ROOT" fetch -q origin "pull/$PR/head"
 git -C "$ROOT" worktree add --detach "$WT" "$SHA" >/dev/null
+record_run "$RUN_LOG" "$PR" "$SHA"
 
 codex_invoke "$WT" "$REPORT" "$PROMPT" >/dev/null 2>"$REPORT.stderr" || {
   echo "codex_review: codex exec failed (stderr in $REPORT.stderr)" >&2; exit 1; }
