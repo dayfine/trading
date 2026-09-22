@@ -812,6 +812,55 @@ case "$row" in
 esac
 check "acceptance (c) e2e (gh backend): clean approvals + passing CI reach MERGE" MERGE "$got"
 
+# 33r. Results-only lane, END TO END (gh backend): experiment artifacts only,
+#      no review yet -> NEXT-ACTION names qc-results (never qc-behavioral,
+#      never MERGE); a "## Results QC" APPROVED at the tip -> MERGE (results-only).
+_SAVED_REVIEWS_JSON=$GATE_REVIEWS_JSON
+GATE_FILES="dev/experiments/x-2026-09-21/README.md dev/experiments/x-2026-09-21/specs/a.sexp dev/experiments/x-2026-09-21/results/s0-trades.csv dev/experiments/_ledger/2026-09-21-x.sexp"
+GATE_REVIEWS_JSON='[]'
+export GATE_FILES GATE_REVIEWS_JSON
+row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+case "$row" in
+  *"dispatch qc-results"*) got=results ;;
+  *qc-behavioral*)         got=behavioral ;;
+  *MERGE*)                 got=MERGE ;;
+  *)                       got=other ;;
+esac
+check "results-only e2e (gh backend): no review -> dispatch qc-results" results "$got"
+GATE_REVIEWS_JSON=$(jq -nc --arg r "Reviewed SHA: $TIP
+
+## Results QC — clean pass
+
+## Verdict
+
+APPROVED" '[{body: $r}]')
+export GATE_REVIEWS_JSON
+row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+case "$row" in
+  *"MERGE (results-only)"*) got=MERGE ;;
+  *)                        got=other ;;
+esac
+check "results-only e2e (gh backend): Results QC APPROVED at tip -> MERGE (results-only)" MERGE "$got"
+GATE_REVIEWS_JSON=$(jq -nc --arg b "Reviewed SHA: $TIP
+
+## Behavioral QC — clean pass
+
+## Verdict
+
+APPROVED" '[{body: $b}]')
+export GATE_REVIEWS_JSON
+row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+case "$row" in
+  *"dispatch qc-results"*) got=results ;;
+  *MERGE*)                 got=MERGE ;;
+  *)                       got=other ;;
+esac
+check "results-only e2e (gh backend): a Behavioral QC review does not satisfy the results gate" results "$got"
+# Restore case 33 state for the curl-backend cases below, which reuse it.
+GATE_FILES="trading/foo/bar.ml"
+GATE_REVIEWS_JSON=$_SAVED_REVIEWS_JSON
+export GATE_FILES GATE_REVIEWS_JSON
+
 # 35. B1 (qc-behavioral rework iteration 1, review 4991549803): the do-not-merge
 #     HARD hold (`.claude/rules/pr-merge-gates.md` Rule 0 -- the guard whose
 #     absence let #2384 merge 30 min after being drafted, a -40.91pp regression,
@@ -1858,6 +1907,40 @@ check "curl comment backend reads issue endpoint" \
   _BACKEND=curl _pr_issue_comments 2837
 )"
 
+
+# --- results-only lane (pr-merge-gates.md "Results-only PRs") ---------------
+check "results-only: experiment artifacts under dev/experiments" yes "$(
+  _is_results_only "dev/experiments/x-2026-09-21/README.md dev/experiments/x-2026-09-21/specs/a.sexp dev/experiments/x-2026-09-21/results/s0-trades.csv dev/experiments/x-2026-09-21/chain.sh dev/experiments/x-2026-09-21/funnel.awk dev/experiments/_ledger/2026-09-21-x.sexp" && echo yes || echo no)"
+check "results-only: a code file outside dev/experiments takes three gates" no "$(
+  _is_results_only "dev/experiments/x/README.md trading/trading/weinstein/screener/lib/screener.ml" && echo yes || echo no)"
+check "results-only: a golden fixture is not an experiment artifact" no "$(
+  _is_results_only "dev/experiments/x/specs/a.sexp trading/test_data/goldens-sp500/a.sexp" && echo yes || echo no)"
+check "results-only: an unknown extension under dev/experiments takes three gates" no "$(
+  _is_results_only "dev/experiments/x/results/plot.png dev/experiments/x/README.md" && echo yes || echo no)"
+check "results-only: a dune file under dev/experiments takes three gates" no "$(
+  _is_results_only "dev/experiments/x/dune dev/experiments/x/README.md" && echo yes || echo no)"
+check "results-only: README-only experiment change is docs-only first" yes "$(
+  _is_docs_only "dev/experiments/x/README.md" && echo yes || echo no)"
+check "results-only: empty file list is not results-only by accident" no "$(
+  _is_results_only "" && echo no || echo no)"
+RESULTS_REVIEW="Reviewed SHA: $TIP
+
+## Results QC — top-of-funnel capacity arm
+
+| # | Check | Status |
+|---|---|---|
+| R1 | pre-registered rule applied as written | PASS |
+
+## Verdict
+
+APPROVED"
+check "results review satisfies the results gate" ok "$(_gate "$(reviews "$RESULTS_REVIEW")" results "$TIP")"
+check "results review does not satisfy the behavioral gate" none "$(_gate "$(reviews "$RESULTS_REVIEW")" behavioral "$TIP")"
+check "results review does not satisfy the structural gate" none "$(_gate "$(reviews "$RESULTS_REVIEW")" structural "$TIP")"
+check "behavioral review does not satisfy the results gate" none "$(_gate "$(reviews "$STRUCT_WITH_BEHAV_SECTION")" results "$TIP")"
+check "codex action: results-only merge holds under required like any merge" \
+  "HOLD -- review/codex-required (codex=none): dispatch codex review, or swap to review/codex-timeout after 3h" \
+  "$(_codex_action "MERGE (results-only)" none 0 "")"
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
