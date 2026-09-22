@@ -188,6 +188,33 @@ _is_docs_only() {
   return 0
 }
 
+# A PR is results-only (ONE gate, qc-results, per pr-merge-gates.md
+# "Results-only PRs") when every path is under dev/experiments/ (the ledger
+# included) and every file is an experiment artifact: sexp / csv / sh / awk /
+# log / rss / txt / json, or md. Tested AFTER _is_docs_only, so an
+# experiment README-only change still classifies as docs-only. Any path
+# outside dev/experiments/, or any other extension (an .ml, a dune file, a
+# golden under trading/test_data/), takes the full three gates -- the lane
+# exists because two container builds review a spec + writeup, not because
+# experiment dirs are exempt from code review.
+_is_results_only() {
+  _files=$1
+  # An empty list is not results-only: "every path matches" is vacuous, and
+  # this lane must never be entered by accident (qc-behavioral CP4-a, #2906).
+  [ -n "$_files" ] || return 1
+  for f in $_files; do
+    case "$f" in
+      dev/experiments/*) ;;
+      *) return 1 ;;
+    esac
+    case "$f" in
+      *.md|*.sexp|*.csv|*.sh|*.awk|*.log|*.rss|*.txt|*.json) ;;
+      *) return 1 ;;
+    esac
+  done
+  return 0
+}
+
 # Verdict for one gate at the current tip. QC reviews are COMMENTED (see header),
 # so read the body: find every review whose body names the gate, extract each
 # one's own verdict + Reviewed SHA, then combine (see MULTI-REVIEW AGGREGATION
@@ -843,6 +870,12 @@ for n in $PRS; do
 
   if _is_docs_only "$files"; then
     struct=skip; behav=skip; codex=skip
+  elif _is_results_only "$files"; then
+    # One gate: qc-results posts under "## Results QC" and is read into the
+    # BEHAV column (kind "results"); STRUCT is skipped, never dispatched.
+    struct=skip
+    behav=$(_gate "$reviews" "results" "$tip")
+    codex=$(_gate "$reviews" "codex" "$tip")
   else
     struct=$(_gate "$reviews" "structural" "$tip")
     behav=$(_gate "$reviews" "behavioral" "$tip")
@@ -864,6 +897,14 @@ for n in $PRS; do
   case "$ci:$struct:$behav" in
     FAIL:*)          action="fix CI -- do not merge" ;;
     pending:*)       action="wait for CI" ;;
+    # Results-only lane (struct=skip): the BEHAV column carries the qc-results
+    # verdict, so name that agent in every action, never qc-behavioral.
+    *:skip:rework)   action="rework (results findings)" ;;
+    *:skip:unclear)  action="ADJUDICATE -- conflicting verdicts at $tip (results)" ;;
+    *:skip:unreadable*) action="RE-POST -- qc-results review body unreadable (newline-collapsed) at $tip" ;;
+    *:skip:none)     action="dispatch qc-results" ;;
+    *:skip:stale*)   action="re-run qc-results at $tip" ;;
+    pass:skip:ok)    action="MERGE (results-only)" ;;
     *:rework:*)      action="rework (structural findings)" ;;
     *:*:rework)      action="rework (behavioral findings)" ;;
     # "unclear" (#2432) must never fall through to MERGE -- surface it as an

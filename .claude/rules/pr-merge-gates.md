@@ -83,6 +83,36 @@ with no findings. Per 2026-05-22 user feedback: "no QC for doc only
 PR." Keeps CI as the structural safety net (linter rules catch
 malformed sexp in fixtures, magic numbers in code examples, etc.).
 
+## Results-only PRs — one gate (qc-results) instead of the pair
+
+A PR is **results-only** if every path is under `dev/experiments/` (the
+`_ledger/` included) **and** every file is an experiment artifact or record:
+`*.sexp`, `*.csv`, `*.log`, `*.rss`, `*.txt`, `*.json`, `*.md`, `*.sh`,
+`*.awk`. `pr_gate_status.sh` tests docs-only first, so an experiment
+README-only change stays docs-only; a results-only PR shows `STRUCT=skip`
+and its NEXT-ACTION reads `dispatch qc-results` / `MERGE (results-only)`.
+
+For that class the two Claude gates are replaced by **one**:
+**qc-results** (`.claude/agents/qc-results.md`) — no `dune`, no container
+slot, so it can run beside a multi-hour backtest. It checks what the pair
+was actually catching on these PRs (the 08-18 corrections were all of this
+kind): the pre-registered rule applied as written, every quoted number
+traceable to a committed per-arm artifact, the metric-glob tripwire, the V6
+gate on every paired read, same-build/same-input evidence, universe
+discipline, a paired per-event read, verdict calibration with a stated why,
+ledger/memory consistency, chain hygiene. Its verdict posts under
+`## Results QC` and is read into the BEHAV column.
+
+Why: an experiment-result PR (#2884, #2900 shape: specs + writeup + chain
+script + `trades.csv`) paid two full container builds for a review of prose
+and sexp; issue #2902. Anything outside `dev/experiments/`, any other
+extension (a dune file, a `.png`, a golden under `trading/test_data/`), or a
+mixed PR takes the full three gates as before — the lane is about what is
+reviewed, not an exemption for experiment directories.
+
+**The three-gate rule still holds for the merge:** CI green + the one
+results verdict APPROVED at the current tip; `do-not-merge` outranks it.
+
 ## Why each gate matters
 
 - **CI catches what local + QC cannot.** Local `dune build && dune runtest`
