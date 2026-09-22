@@ -4,11 +4,17 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-21 (orchestrator run 35610789642; run start `f99a1c18`, main after this run's
-auto-merge **`9b9751f5`** (#2884); `dune build` **0** and `dune runtest` **0** on `f99a1c18` with zero
-`^FAIL:` lines; `status_file_integrity` **0**, `index_size_linter` **0**, `no_python_check` **0** —
-run standalone without dune, exit codes read **unpiped** (a pipeline reports the last command's
-status, which is how a broken check reads as green).
+Last updated: 2026-09-22 (orchestrator run 35728381545; run start `94a2e378`, main after this run's
+merges **`4afa2e44`** (#2898 docs-only lane, then #2903); `dune build` **0** with zero `^FAIL:` lines;
+`status_file_integrity` **0**, `index_size_linter` **0**, `no_python_check` **0** — run standalone
+without dune, exit codes read **unpiped** (a pipeline reports the last command's status, which is how
+a broken check reads as green).
+
+**Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
+`.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
+`merged=true`. The standing note below (no `workflow` scope by **push** or **contents API**) is
+unchanged and still holds; merging is a third route and it works. So workflow fixes authored
+elsewhere (Codex, local session) can be landed here even though they cannot be written here.
 
 **This header was trimmed this run.** It had reached **18725/20480 bytes (91%)**
 of the linter cap by accreting run-by-run incident narrative, and would have
@@ -107,7 +113,7 @@ immune (#2605).
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | `Series_level` WIRED to `Build_runner` behind `-detect-series-level`, report-only default-off, MERGED #2875 (1 rework); next: arm on next rebuild + read sidecar |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
-| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | #2888 | cache occupancy + heap high-water telemetry OPEN #2888 (#2878, bit-identical); weekly perf review live (#2881); next: broad-5y + PIT-smoke tier cells |
+| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | cache occupancy telemetry MERGED `c62ec6df` (#2888); perf tiers now pass `--no-emit-all-eligible` (#2894); next: #2899 flag-pin check, broad-5y + PIT-smoke tier cells (#2896) |
 | [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | t3k factor-lens matrix SHIPPED LOCAL (#1639 2000-26 H1 r=-0.744; #1642 2011-26 confirm); next: regime-gated deploy proxy validation (LOCAL/data-gated) |
 | [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay (#1683) + scenario wiring (#1689) + floor_weight searchable axis (#1697, R2 complete) all MERGED default-off; no remaining follow-ups |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
