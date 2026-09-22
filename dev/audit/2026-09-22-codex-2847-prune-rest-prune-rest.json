@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-22",
+  "feature": "prune-rest",
+  "branch": "codex/2847-prune-rest",
+  "sha": "90aa26b046ab44aaf15ed65a2bfc30b7ccabf702",
+  "recorded_at_ns": 1790083795533912294,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
