@@ -1172,3 +1172,10 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:codex_push_test.sh})))
+
+; Prune publication lives outside the Dune workspace, in workflow YAML.
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:prune_candidates_pr_test_runner.sh})))
