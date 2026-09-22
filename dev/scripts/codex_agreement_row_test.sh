@@ -40,6 +40,11 @@ check "agree: no on rework/ok" no "$(agree rework ok)"
 check "rework_items: counts ### under NEEDS_REWORK Items" 2 "$(rework_items "$(J3 "$S_OK" "$B_RW" "$C_OK")" behavioral)"
 check "rework_items: zero when the body has no items" 0 "$(rework_items "$(J3 "$S_OK" "$B_OK" "$C_OK")" behavioral)"
 check "rework_items: zero when no body names the kind" 0 "$(rework_items "$(J3 "$S_OK" "$B_OK" "$B_OK")" codex)"
+# CP1-A (#2907 rework 1): a body whose FIRST heading is structural but which
+# quotes a behavioral heading further down must count as structural only.
+S_QUOTING=$(printf 'Reviewed SHA: %s\n\n## Structural QC — thing\n\nSee also:\n\n## Behavioral QC — quoted\n\n## Verdict\n\nNEEDS_REWORK\n%s' "$TIP" "$ITEMS")
+check "rework_items: first heading only -- quoted behavioral heading does not count" 0 "$(rework_items "$(J3 "$S_QUOTING" "$C_OK" "$C_OK")" behavioral)"
+check "rework_items: ... and the same body still counts as structural" 2 "$(rework_items "$(J3 "$S_QUOTING" "$C_OK" "$C_OK")" structural)"
 row=$(agreement_row 42 "$TIP" "$(J3 "$S_OK" "$B_OK" "$C_OK")")
 check "row: all-ok agrees" "| ok | ok | ok | yes | 0 | 0" "$(printf '%s' "$row" | cut -d'|' -f5-10 | sed 's/^ */| /; s/ *$//')"
 row=$(agreement_row 42 "$TIP" "$(J3 "$S_OK" "$B_RW" "$C_OK")")

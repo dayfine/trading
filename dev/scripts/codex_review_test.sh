@@ -205,6 +205,20 @@ echo "gh: unexpected stub invocation: $*" >&2
 exit 1
 GEOF
 chmod +x "$GHBIN/gh"
+# The real script runs `ROOT=$(git rev-parse --show-toplevel)` under set -eu
+# before either guard. Under dune the suite runs from _build/.sandbox/<h>/…,
+# where that command fails ("invalid gitfile format", exit 128) -- see
+# trading/devtools/checks/_check_lib.sh on why git rev-parse is unreliable in
+# this harness. Without a stub the failed substitution trips the SUITE's own
+# set -e and the run aborts with no FAIL line and no OK summary (qc-behavioral
+# CP4-B on rework iteration 1). Stub git here so guard_dry works from any cwd.
+cat > "$GHBIN/git" <<'GEOF'
+#!/bin/sh
+if [ "$1" = rev-parse ]; then echo "${GIT_STUB_ROOT:?}"; exit 0; fi
+echo "git: unexpected stub invocation: $*" >&2
+exit 1
+GEOF
+chmod +x "$GHBIN/git"
 GSHA=1111111111111111111111111111111111111111
 GPR=90001
 
@@ -217,9 +231,13 @@ guard_dry() {
   _log="$_logdir/reviews-$(date +%F).log"
   _i=0
   while [ "$_i" -lt "$_n" ]; do printf '%d %s\n' "$((9000 + _i))" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa >> "$_log"; _i=$((_i + 1)); done
-  CODEX_REVIEW_LIB= GH_STUB_SHA="$GSHA" GH_STUB_LABELS="$_labels" \
+  _rc=0
+  CODEX_REVIEW_LIB= GH_STUB_SHA="$GSHA" GH_STUB_LABELS="$_labels" GIT_STUB_ROOT="$D/g-root" \
     CODEX_REVIEW_SAMPLE="$_sample" CODEX_REVIEW_MAX_PER_DAY="$_cap" CODEX_REVIEW_LOG_DIR="$_logdir" \
-    PATH="$GHBIN:$D/bin:$PATH" sh "$HERE/codex_review.sh" "$GPR" --dry-run 2>&1
+    PATH="$GHBIN:$D/bin:$PATH" sh "$HERE/codex_review.sh" "$GPR" --dry-run 2>&1 || _rc=$?
+  # A non-zero exit is reported as a line the callers grep, never as an abort
+  # of this suite (set -e would otherwise kill the run at the first guard check).
+  [ "$_rc" = 0 ] || echo "guard_dry: codex_review.sh exited $_rc"
 }
 loglines() { _f="$1/reviews-$(date +%F).log"; [ -f "$_f" ] && wc -l < "$_f" | tr -d ' ' || echo 0; }
 
@@ -248,7 +266,7 @@ check "guard: count==CAP-1 prints no cap message" 0 "$(printf '%s' "$out" | grep
 out=$(guard_dry "" 1 1 "$D/g-force" 1)  # sampled-in P=1 irrelevant; force bypasses both anyway
 out=$(CODEX_REVIEW_LIB= GH_STUB_SHA="$GSHA" GH_STUB_LABELS="" \
       CODEX_REVIEW_SAMPLE=0 CODEX_REVIEW_MAX_PER_DAY=1 CODEX_REVIEW_LOG_DIR="$D/g-force" \
-      PATH="$GHBIN:$D/bin:$PATH" sh "$HERE/codex_review.sh" "$GPR" --dry-run --force 2>&1)
+      GIT_STUB_ROOT="$D/g-root" PATH="$GHBIN:$D/bin:$PATH" sh "$HERE/codex_review.sh" "$GPR" --dry-run --force 2>&1 || true)
 check "guard: --force bypasses BOTH sampling (P=0) and a reached cap" 1 "$(printf '%s' "$out" | grep -c 'dry run')"
 
 out=$(guard_dry "review/codex-requested" 0 1 "$D/g-requested-undercap" 0)

@@ -46,11 +46,15 @@ agree() {
   esac
 }
 # rework_items REVIEWS_JSON KIND -> number of "### " headings after the
-# "## NEEDS_REWORK Items" heading in the newest body whose first heading
-# names KIND (structural | behavioral | codex); 0 when none.
+# "## NEEDS_REWORK Items" heading in the newest body whose FIRST heading
+# names KIND (structural | behavioral | codex); 0 when none. First heading
+# only, as in pr_gate_status.sh first_heading_text: a structural body that
+# quotes "## Behavioral QC" further down must not count as a behavioral
+# review (pr-gate-loop.md; qc-behavioral CP1-A on #2907).
 rework_items() {
   printf '%s' "$1" | jq -r --arg kind "$2" '
-    [ .[] | select((.body // "") | test("(?m)^#{1,4} +(qc[- ])?" + $kind + "\\b"; "i")) ]
+    def first_heading: [match("(?m)^#{1,4} +(?<h>.*)$")] | if length == 0 then "" else .[0].captures[0].string end;
+    [ .[] | select(((.body // "") | first_heading) | test("^(qc[- ])?" + $kind + "\\b"; "i")) ]
     | if length == 0 then "" else (last | .body) end' \
   | awk 'f && /^### / { n++ } /^## +NEEDS_REWORK Items/ { f=1 } END { print n + 0 }'
 }
