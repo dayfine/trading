@@ -56,6 +56,27 @@ pins the reviewer to the detached checkout (`git diff origin/main...HEAD`),
 never the live PR. Docs-only PRs are
 skipped (CI is their only gate).
 
+
+### Budget (issue #2905)
+
+The dispatcher may call `codex_review.sh` on **every** PR that reaches
+`MERGE`; the script decides whether a live run happens:
+
+- **Sampling** — `CODEX_REVIEW_SAMPLE` (default `0.25`): a deterministic draw
+  from `cksum "PR:SHA"`, so the same tip always gets the same answer and a
+  re-run never flips it. `--force` or a `review/codex-*` label bypasses it.
+- **Daily cap** — `CODEX_REVIEW_MAX_PER_DAY` (default `3`) live runs, counted
+  in `dev/_tmp/codex/reviews-<date>.log`. codex-cli 0.154.0 exposes no usage
+  or quota query (only `login status` / `doctor`), so the cap is the proxy
+  for "check usage before running". `--force` or `review/codex-required`
+  bypasses it.
+- **A/B log** — when a PR that had a live Codex review reaches `MERGE`, run
+  `sh dev/scripts/codex_agreement_row.sh <PR> --append`; it derives one row
+  (struct / behav / codex verdicts at the tip, agree, finding counts) with the
+  same reader as `pr_gate_status.sh` and appends it to
+  `dev/reviews/codex-agreement.md`. That table is the evidence the promotion
+  path below asks for; read it monthly.
+
 `docs/howtos/codex_pr_reviews.md` (#2785) describes the **promotion path** —
 Codex playing the qc-structural / qc-behavioral roles under the gate headings.
 That is not enabled: it becomes an option only after the advisory column has

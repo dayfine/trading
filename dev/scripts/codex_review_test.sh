@@ -151,5 +151,23 @@ check "prompt pins the diff to the checkout" 1 "$(printf '%s' "$p" | grep -c "gi
 check "prompt forbids the live PR diff" 1 "$(printf '%s' "$p" | grep -c "do not use 'gh pr diff'")"
 check "prompt carries no backticks" 0 "$(printf '%s' "$p" | grep -c '`')"
 
+
+# Budget guards (issue #2905): deterministic sampling + daily cap, above the seam.
+d1=$(sample_draw 2906 "$SHA"); d2=$(sample_draw 2906 "$SHA")
+check "sample_draw: deterministic in (PR, SHA)" "$d1" "$d2"
+check "sample_draw: in 0..9999" 1 "$(awk -v d="$d1" 'BEGIN { print (d >= 0 && d < 10000) ? 1 : 0 }')"
+check "sample_draw: a different tip draws differently (not constant)" 1 "$(n=0; for s in a b c d e f g h; do [ "$(sample_draw 1 "$s")" != "$d1" ] && n=$((n+1)); done; [ "$n" -ge 1 ] && echo 1 || echo 0)"
+check "should_sample: P=1 always" 0 "$(should_sample 2906 "$SHA" 1 && echo 0 || echo 1)"
+check "should_sample: P=0 never" 1 "$(should_sample 2906 "$SHA" 0 && echo 0 || echo 1)"
+check "should_sample: agrees with the draw at P=0.25" "$(awk -v d="$d1" 'BEGIN { print (d / 10000 < 0.25) ? 0 : 1 }')" "$(should_sample 2906 "$SHA" 0.25 && echo 0 || echo 1)"
+check "should_sample: roughly a quarter of 400 tips at P=0.25" 1 "$(n=0; i=0; while [ $i -lt 400 ]; do should_sample $i "$SHA" 0.25 && n=$((n+1)); i=$((i+1)); done; [ "$n" -ge 60 ] && [ "$n" -le 140 ] && echo 1 || echo "0 (n=$n)")"
+check "daily_count: 0 when the log is absent" 0 "$(daily_count "$D/nolog")"
+record_run "$D/logs/reviews-today.log" 1 "$SHA"; record_run "$D/logs/reviews-today.log" 2 "$SHA"
+check "record_run + daily_count: two runs" 2 "$(daily_count "$D/logs/reviews-today.log")"
+check "record_run: line is 'PR SHA'" "2 $SHA" "$(tail -1 "$D/logs/reviews-today.log")"
+check "has_label: present" 0 "$(has_label "kind/harness
+review/codex-required" review/codex-required && echo 0 || echo 1)"
+check "has_label: prefix is not a match" 1 "$(has_label "review/codex-requested" review/codex-required && echo 0 || echo 1)"
+check "--force is accepted by the arg parser (no 'unknown flag')" 0 "$(CODEX_REVIEW_LIB= sh "$HERE/codex_review.sh" --force 2>&1 | grep -c 'unknown flag')"
 if [ "$fails" -gt 0 ]; then printf 'FAIL: codex_review -- %d test(s) failed.\n' "$fails"; exit 1; fi
 printf 'OK: codex_review -- %d tests clean.\n' "$total"
