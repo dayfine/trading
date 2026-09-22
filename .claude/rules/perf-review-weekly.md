@@ -15,6 +15,7 @@ had been sized off the null.
 | 2 | `dev/scripts/perf_tier2_nightly.sh` | `perf-nightly.yml`, 05:00 UTC daily | same, `;; perf-tier: 2` cells |
 | 3 | `dev/scripts/perf_tier3_weekly.sh` | `perf-weekly.yml`, Monday 07:00 UTC | same, `;; perf-tier: 3` cells |
 | 4 | `dev/scripts/perf_tier4_release_gate.sh` | manual / local | same |
+| local (no tier) | `dev/scripts/perf_pit_smoke.sh` (#2896) | manual, weekly review | wall + peak RSS + cache hits/misses, cap 256 vs 12,000, on the full `_v11pit` snapshot warehouse — the shape no GHA tier can run (warehouse lives in the container only). Spec: `trading/test_data/backtest_scenarios/perf-pit/pit-smoke-4mo.sexp`, untagged so every tier's discovery loop skips it. |
 
 Peak RSS parsing is shared via `dev/lib/gnu_time_rss.sh` (#2553/#2559). The
 cache diagnostics line (`Panel_runner: snapshot cache hits=… misses=…`) plus
@@ -22,11 +23,18 @@ the handle cap (`SNAPSHOT_MAX_MMAP_HANDLES`, #2839) are the per-run signals.
 
 ## The three gaps the weekly hour-pair closes
 
-1. **No tier runs the shape that costs us.** Every tier-2/3 cell is sp500 or
-   a 1–3y synthetic sweep. The workloads that actually burn the container —
-   broad top-3000 5y, and the PIT 26y cell (6–11 h, 118M cache misses per
-   cell) — have never been in a table. The mmap-handle thrash was found by
-   hand four months after the v2 warehouse shipped.
+1. **No tier runs the shape that costs us — CLOSED for the PIT shape
+   (#2896, 2026-09-22).** Every tier-2/3 cell is sp500 or a 1–3y synthetic
+   sweep; the broad top-3000 5y gap closed via #2894/#2899. The PIT-warehouse
+   shape (opens the full `_v11pit` snapshot warehouse, 9,364 symbols) now has
+   a local smoke cell: `dev/scripts/perf_pit_smoke.sh` runs a 4-month 2020
+   window at `SNAPSHOT_MAX_MMAP_HANDLES` 256 vs 12,000 and asserts the two
+   runs are byte-identical. Measured 2026-09-22: cap=256 2,629 s / 22.8 GB
+   peak RSS (heavy LRU thrash) vs cap=12,000 480 s / 4.5 GB (no thrash) — a
+   5.5× wall delta from the cap alone, at smoke scale rather than the full
+   PIT 26y chain (6–11 h, 118M cache misses per cell — still the only way to
+   see the mechanism at full scale; the smoke cell exists so a cache
+   regression is caught in minutes, not by a chain dying hours in).
 2. **FAIL rows are invisible.** `perf-nightly.yml` / `perf-weekly.yml` run
    with `continue-on-error: true`; on 2026-09-14 the weekly table carried two
    FAIL rows (`sp500-2010-2026*`, ~4,750 s) and the workflow reported success.
@@ -41,11 +49,13 @@ the handle cap (`SNAPSHOT_MAX_MMAP_HANDLES`, #2839) are the per-run signals.
    week's row. A FAIL row, or a > 20 % wall or RSS move on any cell, becomes a
    ticket **that week** (label `kind/harness`, name the cell and both
    numbers).
-2. **Keep one cell per real workload shape.** Minimum catalog: sp500 5y
-   (exists), broad top-3000 5y, and a PIT-warehouse smoke that opens more
-   symbols than the default handle cap (so cache thrash shows in the
-   `misses` line). A shape we run for verdicts but never time is a gap —
-   add the cell before the next verdict run, not after it dies.
+2. **Keep one cell per real workload shape — minimum catalog now complete.**
+   sp500 5y/15y (pre-existing), broad top-3000 5y (#2894/#2899), and a
+   PIT-warehouse smoke that opens more symbols than the default handle cap
+   (`dev/scripts/perf_pit_smoke.sh`, #2896, 2026-09-22 — cache thrash shows
+   in the `misses`/`evictions` line, cap 256 vs 12,000). A shape we run for
+   verdicts but never time is a gap — add the cell before the next verdict
+   run, not after it dies.
 3. **Local long cells carry their own numbers.** Every chain script logs the
    cache line and GNU-time peak RSS per cell (`sweep-hygiene.md` preamble),
    and the cell guard is set from the **measured arm**, not the null:
