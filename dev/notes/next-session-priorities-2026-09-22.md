@@ -61,7 +61,7 @@ faithful breakout-gate *width* dial is already a settled REJECT, so capacity is 
 
 ## Codex queue
 
-Nothing `ready-for-agent` for Codex. Candidate unchanged: `build_snapshots -twin-only`.
+Queued 09-21 evening (`ready-for-agent` + `agent/codex`, picked P then number): **#2847** prune-workflow `gh pr create` → REST (P1), **#2886** `pr_gate_status.sh` jq argv overflow (P1), **#2899** devtools check pinning `--no-emit-all-eligible` (P2, size S). Codex-authored PRs still take all three Claude gates. Candidate after those: `build_snapshots -twin-only`.
 
 ## Ops notes
 
