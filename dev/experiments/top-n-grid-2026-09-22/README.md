@@ -1,0 +1,79 @@
+# Top-N confirmation grid — sub-window cells (2026-09-22)
+
+**Status: PRE-REGISTERED** (written 15:10 PT 2026-09-22, before any cell ran; README, specs and chain pushed before the
+first launch). The promotion-confirmation grid (`.claude/rules/promotion-confirmation.md`) for the one ACCEPT on the
+table, `screening_config.max_buy_candidates` 20 → 40 (`_ledger/2026-09-22-top-of-funnel-capacity.sexp`, #2900). This
+directory holds **cell 2** of the grid (period diversity: the 2019–2025 sub-window on the same PIT schedule); cell 1 is
+the 26y record window already run in `top-of-funnel-2026-09-21/`; cell 3 (breadth tier: a top-1000 schedule) needs
+yearly top-1000 lists that do not exist yet (only `pit-v11/composition/top-3000-*.sexp`; the lists are sorted by
+`avg_dollar_volume` descending, so a top-1000 schedule is the first 1,000 entries of each — a build step, not a fetch).
+
+## Why this and not P1 #1
+
+The 09-23 priorities doc put a "slot-fill ordering dial (score → RS → volume ratio)" first. That dial exists —
+`Screener.config.candidate_ranking = Quality` (#1786) — and the ledger already holds three verdicts on it:
+`2026-06-29-candidate-ranking-tiebreak-grid` (RS-primary: REJECT, dominated in top-500, lower Calmar 3/3),
+`2026-06-29-earliness-ranking-tiebreak-grid` (earliness-primary: REJECT, Pareto-dominated 3/3),
+`2026-06-30-tiebreak-noise-floor` (uninformative sorts bracket a band both informative sorts sit inside; "candidate-
+ranking lever is dead; the productive direction is to REDUCE selection variance via capacity / concentration, not
+re-sort"). The old grids ran on thin warehouses (327 / 514 / 1,065 names with bars) and 2y fork-per-fold, so a
+basis-change re-test is arguable — but a 3-salt rule that a coin flip clears ~50 % of the time cannot resolve a sort
+whose level effect is, by the 06-30 mechanism, a re-draw. The 06-30 forward directive IS this grid: #2900's one
+plausible robust property is a tighter salt band (arm realised 237–330 % vs null 152–457 %; maxDD 43.8–44.7 vs
+40.6–53.0), i.e. capacity as a variance reducer. Memory: `feedback_check_ledger_before_proposing_a_dial`.
+
+## Cells (specs/, run by chain-grid.sh from a pinned worktree `sweep-grid` = `ad5a9e04e`, the exact build of cell 1)
+
+| cell | period | change vs `a0-pit-null` | salts |
+|---|---|---|---|
+| `a0-pit-null-sub` | 2019-01-01 → 2025-12-31 | none (cap 20) — the paired base for this window | 0 / 1 / 2 |
+| `t1-topn-40-sub` | same | `((screening_config ((max_buy_candidates 40))))` — the #2900 value | 0 / 1 / 2 |
+| `t1-topn-30-sub`, `t1-topn-60-sub` | same | cap 30 / cap 60 — the neighbours the rule asks for | 0 / 1 / 2 |
+
+Everything else is the record spec verbatim (27-entry `universe_schedule`, D1/D2 dating, `_v11pit` warehouse with 9,364
+entries — the chain aborts on any other count, `SNAPSHOT_MAX_MMAP_HANDLES=12000`). The null is re-run on this window
+(no committed null exists for it); each arm cell pairs against the null cell of the same salt from this lane
+(`validator_diff -check V6` exit 0 required for the pair to count — `mechanism-validation-rigor.md` check 8).
+
+**Order:** null s0 / s1 / s2 first (`feedback_run_the_null_control_first`), then cap 40 s0–s2, then 30, then 60. The
+lane is resumable (a `RESULT` line skips the cell); the 30 / 60 cells are lower priority and may run in a later session.
+
+## Pre-registered decision rule (dispersion, not level)
+
+The grid criterion is the property #2900 found, applied per cell: **a value V "tightens" a cell if the 3-salt range of
+realised return AND the 3-salt range of maxDD are both narrower than the null's 3-salt ranges in that cell.** Cell 1
+(26y): cap 40 tightens (93 pp vs 305 pp; 0.9 pt vs 12.4 pt).
+
+- **PROMOTE-eligible V** (proceed to the paired-golden table, `config-default-blast-radius.md`, and a promotion PR
+  citing this README + the ledger ACCEPT) only if V tightens **≥ 2 of the 3 cells** AND is **never dominated** in any
+  cell (dominated = lower mean realised AND lower mean Calmar than the null's 3-salt means). Level gains are not a
+  criterion; the mechanism rule (realised AND Calmar better at ≥ 2/3 salts) is reported per cell, not required.
+- With only cells 1 and 2 available, the strongest outcome here is **"2/3 reached, cell 3 pending"** (if 40 tightens
+  the sub-window and is not dominated) or **"cell 2 fails to tighten — 40 needs cell 3 to tighten to stay alive"**. No
+  promotion PR is opened from this directory alone.
+- Neighbours: if 30 or 60 tightens where 40 does not, the promotable candidate becomes the neighbour that tightens in
+  the most cells, per `promotion-confirmation.md` ("often a neighbour of the per-window winners").
+- n = 3 ranges are weak (three draws; the 26y null's s0 may be the outlier — #2900 §Verdict 2). The grid is the
+  pre-registered standard, not a power claim; the writeup must say PLAUSIBLE, and the ledger entry records the grid
+  outcome as an amendment to `top-of-funnel-capacity`, not a new ACCEPT.
+
+Mechanism read per (cell, salt): `paired.sh <null-trades.csv> <arm-trades.csv>` (join key `symbol|entry_date`) →
+shared / null-only / arm-only cohorts with realised P&L, first-divergence date, per-entry-year table, ≥ +20 % share.
+On this window the regime framing of `project_pit_drawdown_2021_25_macro_veto` (≥ +20 % winners 10 % → 2 % of entries
+after 2021-11) is most of the sample, so the per-entry-year read is the one that matters.
+
+## Cost / ops
+
+No 7y cell has been measured on this build class. The 26y arm cells ran 3h59m–4h48m at cap 12,000 (~11 min per
+simulated year), so ~80 min per 7y cell is the projection; the chain's `CELL_TIMEOUT=14400` is 3× that and is
+re-sized from the first cell's measured wall (≥ 1.5×). 12 cells ≈ 16 h at the projection; the first six (null + cap 40)
+≈ 8 h. One lane, container-exclusive (`container-capacity-scheduling.md` rule 1: no agents while a cell runs; QC on
+open PRs runs first, rule 0). Specs staged at `/tmp/grid-run/specs` (outside any VCS tree), artifacts at
+`/tmp/sweeps/top-n-grid/` (bind-mounted), per-cell raw artifacts committed to `results/` after each cell
+(`feedback_commit_raw_per_arm_artifacts`; the chain's summary line is scoped to `${out}/<name>/actual.sexp`). Each cell
+logs GNU-time peak RSS and the `snapshot cache` line.
+
+## Log
+
+- 2026-09-22 15:10 PT — pre-registered. Worktree `sweep-grid` pinned at `ad5a9e04e`; build + launch wait for the
+  harness agent wave (#2887 / #2891 / #2896) and its QC to clear the container.
