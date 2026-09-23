@@ -11,11 +11,13 @@
 #   human happened to look at the Actions tab. The check itself is cheap:
 #
 #     GET /repos/{owner}/{repo}/actions/workflows                  (paginated)
-#     GET /repos/{owner}/{repo}/actions/workflows/{id}/runs?event=schedule&per_page=N
+#     GET /repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=N*F
 #
-#   -- for each ACTIVE workflow, look at its N most recent scheduled
-#   (event=schedule) runs (default N=10, see RUNS PER WORKFLOW below) and
-#   classify from that history, not from a single run. This script makes
+#   -- for each ACTIVE workflow, fetch one UNFILTERED page of its most
+#   recent runs, keep the first N whose `event` field is "schedule" (the
+#   selection is CLIENT-SIDE -- see WHY NOT event=schedule SERVER-SIDE
+#   below; default N=10, F=5, see RUNS PER WORKFLOW), and classify from
+#   that history, not from a single run. This script makes
 #   that repeatable instead of re-typed from memory each session.
 #
 # WHY A SINGLE NEWEST RUN WAS NOT ENOUGH (2026-09-10..12 incident)
@@ -90,13 +92,35 @@
 # RUNS PER WORKFLOW
 #
 #   Up to RUNS-PER-WORKFLOW (default 10) of the most recent scheduled runs
-#   are fetched per workflow, in ONE API call (`per_page=<N>`) -- there is
-#   no additional pagination loop here, unlike the workflow-LIST call. 10
-#   is deliberately small: enough to see a multi-day failure streak (a
-#   daily cron produces about one run/day; the 6-run incident above fits
-#   with room to spare) without materially increasing API cost -- still
-#   exactly one request per workflow. Override with --runs-per-workflow /
-#   SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW.
+#   are kept per workflow, selected from ONE API call that fetches an
+#   UNFILTERED page of `per_page=<N * RUNS_PAGE_FACTOR>` runs (default
+#   10 * 5 = 50, capped at GitHub's per_page maximum of 100) -- there is no
+#   additional pagination loop here, unlike the workflow-LIST call. 10 is
+#   deliberately small: enough to see a multi-day failure streak (a daily
+#   cron produces about one run/day; the 6-run incident above fits with
+#   room to spare) without materially increasing API cost -- still exactly
+#   one request per workflow. The page is over-fetched by the factor
+#   because non-schedule runs (push, workflow_dispatch, pull_request)
+#   now occupy page slots. Override with --runs-per-workflow /
+#   SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW and
+#   SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR.
+#
+# WHY NOT event=schedule SERVER-SIDE (issue #2928, 2026-09-23)
+#
+#   The first version of this script asked the API to filter for us:
+#   `runs?event=schedule&per_page=N`. Measured on 2026-09-23 against the
+#   `Dependency freshness check` workflow, that filter returned 8 runs
+#   with the newest dated 2026-08-24, while the UNFILTERED list held 24
+#   runs, every one `event: schedule`, the newest 2026-09-21 -- four of
+#   the five most recent scheduled runs were invisible to the filtered
+#   call, and the two kinds of run are metadata-identical (same event,
+#   actor, branch, path, run_attempt). The observed symptom was a false
+#   STALE (age_hours=724 on a workflow that had succeeded two days
+#   earlier); the dangerous direction is a hidden failure streak reported
+#   as OK -- the exact blind-spot class of the 2026-09-10..12 incident
+#   above. The fix is to fetch unfiltered and select `.event ==
+#   "schedule"` client-side; the streak logic, the in_progress skipping
+#   and the floor discipline all carry over unchanged.
 #
 # STALENESS WINDOW
 #
@@ -150,13 +174,20 @@
 #        total, not a first-page floor. The summary line states the page
 #        count fetched, so a reader isn't left guessing whether pagination
 #        happened.
-#     2. The per-workflow RUNS call fetches a single page of
-#        `per_page=<RUNS_PER_WORKFLOW>` runs and computes the streak from
-#        exactly that page. If the page is exhausted (every fetched
+#     2. The per-workflow RUNS call fetches a single unfiltered page of
+#        `per_page=<RUNS_PER_WORKFLOW * RUNS_PAGE_FACTOR>` runs, keeps the
+#        first RUNS_PER_WORKFLOW scheduled ones, and computes the streak
+#        from exactly those. If the history is exhausted (every kept
 #        completed run was a failure, with no older non-failure run seen
-#        to close the streak) the streak is reported as a FLOOR, printed
-#        as `streak=>=N` rather than `streak=N` -- the true streak could be
-#        longer than the page this script chose to fetch. This mirrors the
+#        to close the streak) AND there may be more history past what was
+#        looked at -- either RUNS_PER_WORKFLOW scheduled runs were kept
+#        (the cap was hit), or the UNFILTERED page came back full (its
+#        non-schedule runs may have crowded older scheduled ones off the
+#        page) -- the streak is reported as a FLOOR, printed as
+#        `streak=>=N` rather than `streak=N`: the true streak could be
+#        longer than what this script chose to fetch. A page that came
+#        back short means the whole observed history was seen and the
+#        count is exact even though no success closed the streak. This mirrors the
 #        LIST call's own floor discipline (report the real count you
 #        looked at, and say so explicitly when there's more you didn't
 #        see) applied to a single-page fetch instead of a multi-page one.
@@ -195,6 +226,10 @@
 #                                          workflow (see RUNS PER WORKFLOW
 #                                          above; overridden by
 #                                          --runs-per-workflow)
+#   SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR  unfiltered runs fetched per kept
+#                                          scheduled run (default 5; the
+#                                          page is N*F capped at 100 -- see
+#                                          RUNS PER WORKFLOW above)
 #   SCHEDULED_WF_HEALTH_FETCH             injectable fetch hook (see above)
 #   SCHEDULED_WF_HEALTH_NOW_EPOCH         injectable "now", unix seconds (test only)
 #   SCHEDULED_WF_HEALTH_MAX_PAGES         bound on the workflow-list pagination
@@ -219,6 +254,7 @@ REPO="${SCHEDULED_WF_HEALTH_REPO:-dayfine/trading}"
 STALE_HOURS="${SCHEDULED_WF_HEALTH_STALE_HOURS:-216}"
 MAX_PAGES="${SCHEDULED_WF_HEALTH_MAX_PAGES:-1000}"
 RUNS_PER_WORKFLOW="${SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW:-10}"
+RUNS_PAGE_FACTOR="${SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR:-5}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -283,6 +319,18 @@ case "$RUNS_PER_WORKFLOW" in
     exit 64
     ;;
 esac
+
+case "$RUNS_PAGE_FACTOR" in
+  ''|*[!0-9]*|0)
+    echo "FAIL: SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR must be a positive integer, got '$RUNS_PAGE_FACTOR'" >&2
+    exit 64
+    ;;
+esac
+# One unfiltered page per workflow: N kept scheduled runs need up to N*F
+# slots once push / dispatch / PR runs share the page (issue #2928); GitHub
+# caps per_page at 100.
+RUNS_PAGE=$((RUNS_PER_WORKFLOW * RUNS_PAGE_FACTOR))
+[ "$RUNS_PAGE" -gt 100 ] && RUNS_PAGE=100
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "FAIL: 'jq' is not on PATH -- cannot parse GitHub API responses. Refusing to report (cannot measure)." >&2
@@ -392,26 +440,40 @@ _list_active_workflows() {
   return 0
 }
 
-# Prints up to RUNS_PER_WORKFLOW most recent scheduled runs, newest first
-# (the GitHub API's natural order), one per line as
-# "conclusion<TAB>status<TAB>created_at<TAB>run_id" -- or nothing at all if
-# the workflow has zero observed scheduled runs. A single API call
-# (`per_page=${RUNS_PER_WORKFLOW}`); see RUNS PER WORKFLOW in the header
-# for why one page is enough and how the floor case is reported.
+# Prints a FIRST line "page_full<TAB>0|1" (1 when the unfiltered page came
+# back full, i.e. RUNS_PAGE runs -- older scheduled runs may exist past it;
+# see PAGINATION-IS-A-FLOOR item 2), then up to RUNS_PER_WORKFLOW most
+# recent SCHEDULED runs, newest first (the GitHub API's natural order),
+# one per line as "conclusion<TAB>status<TAB>created_at<TAB>run_id" -- or
+# no run lines at all if the page holds zero scheduled runs. A single
+# UNFILTERED API call (`per_page=${RUNS_PAGE}`), selecting `.event ==
+# "schedule"` client-side; see WHY NOT event=schedule SERVER-SIDE and RUNS
+# PER WORKFLOW in the header for why, and how the floor case is reported.
 _recent_scheduled_runs() {
   _id="$1"
-  if ! _resp=$(_api_get_json "repos/${REPO}/actions/workflows/${_id}/runs?event=schedule&per_page=${RUNS_PER_WORKFLOW}"); then
+  if ! _resp=$(_api_get_json "repos/${REPO}/actions/workflows/${_id}/runs?per_page=${RUNS_PAGE}"); then
     return 3
   fi
-  _count=$(printf '%s' "$_resp" | jq '.workflow_runs | length')
-  if [ "$_count" -eq 0 ]; then
+  _fetched=$(printf '%s' "$_resp" | jq '.workflow_runs | length')
+  case "$_fetched" in
+    ''|*[!0-9]*)
+      echo "FAIL: runs response for workflow ${_id} has no numeric workflow_runs length (got '${_fetched}') -- cannot measure" >&2
+      return 3
+      ;;
+  esac
+  if [ "$_fetched" -ge "$RUNS_PAGE" ]; then
+    printf 'page_full\t1\n'
+  else
+    printf 'page_full\t0\n'
+  fi
+  if [ "$_fetched" -eq 0 ]; then
     return 0
   fi
-  printf '%s' "$_resp" | jq -r '.workflow_runs[] | [(.conclusion // "null"), (.status // "null"), .created_at, (.id | tostring)] | join("\t")'
+  printf '%s' "$_resp" | jq -r --argjson n "$RUNS_PER_WORKFLOW" '[.workflow_runs[] | select(.event == "schedule")] | .[:$n][] | [(.conclusion // "null"), (.status // "null"), .created_at, (.id | tostring)] | join("\t")'
   return 0
 }
 
-# _classify_recent_runs <runs-newest-first-multiline> <now-epoch> <stale-hours>
+# _classify_recent_runs <runs-newest-first-multiline> <now-epoch> <stale-hours> [<page-full 0|1>]
 #
 # Reads the run history (as produced by _recent_scheduled_runs, newest
 # first) and echoes ONE tab-separated line:
@@ -446,6 +508,7 @@ _classify_recent_runs() {
   _runs_text="$1"
   _now="$2"
   _stale_hours="$3"
+  _page_full="${4:-0}"
 
   _old_ifs="$IFS"
   IFS='
@@ -519,15 +582,17 @@ _classify_recent_runs() {
     _streak_str="$_streak"
     if [ "$_streak_open" -eq 1 ] \
       && [ "$_streak" -eq "$_completed_count" ] \
-      && [ "$_idx" -eq "$RUNS_PER_WORKFLOW" ]; then
-      # Every completed run this page contained was a failure (the
-      # streak was never closed) AND the page was full (RUNS_PER_WORKFLOW
-      # runs fetched) -- there may be more history past this page that
-      # would have closed the streak sooner. Report it as a floor, not an
-      # exact count (PAGINATION-IS-A-FLOOR). If the page came back
-      # SHORTER than RUNS_PER_WORKFLOW, we've seen the workflow's entire
-      # observed run history and the count is exact even though the
-      # streak was never "closed" by a success.
+      && { [ "$_idx" -eq "$RUNS_PER_WORKFLOW" ] || [ "$_page_full" -eq 1 ]; }; then
+      # Every completed scheduled run we kept was a failure (the streak
+      # was never closed) AND there may be more history past what was
+      # looked at -- either the kept set hit the RUNS_PER_WORKFLOW cap, or
+      # the UNFILTERED page came back full (issue #2928: non-schedule
+      # runs share the page and may have crowded older scheduled ones
+      # off it). Report it as a floor, not an exact count
+      # (PAGINATION-IS-A-FLOOR). If fewer than RUNS_PER_WORKFLOW were
+      # kept AND the page came back short, we've seen the workflow's
+      # entire observed run history and the count is exact even though
+      # the streak was never "closed" by a success.
       _streak_str=">=${_streak}"
     fi
     printf 'RED\t%s\tn/a\t%s\t%s\t%s\t%s\t%s\n' \
@@ -605,16 +670,18 @@ main() {
     _id=$(printf '%s' "$_line" | cut -f1)
     _name=$(printf '%s' "$_line" | cut -f2)
 
-    if ! _run_line=$(_recent_scheduled_runs "$_id"); then
+    if ! _fetch_out=$(_recent_scheduled_runs "$_id"); then
       exit 3
     fi
+    _page_full=$(printf '%s\n' "$_fetch_out" | head -1 | cut -f2)
+    _run_line=$(printf '%s\n' "$_fetch_out" | tail -n +2)
     if [ -z "$_run_line" ]; then
       _nosched_count=$((_nosched_count + 1))
       printf 'NO-SCHEDULE\t%s\t(no scheduled runs observed)\n' "$_name"
       continue
     fi
 
-    _class_line=$(_classify_recent_runs "$_run_line" "$_now" "$STALE_HOURS")
+    _class_line=$(_classify_recent_runs "$_run_line" "$_now" "$STALE_HOURS" "$_page_full")
     _class=$(printf '%s' "$_class_line" | cut -f1)
     _streak=$(printf '%s' "$_class_line" | cut -f2)
     _age_hours=$(printf '%s' "$_class_line" | cut -f3)

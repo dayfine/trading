@@ -111,12 +111,12 @@
 #      per-workflow line and the SUMMARY's `(streak=>=10)` annotation.
 #      Deleting the floor-detection branch makes this fetch pattern
 #      misreport the false-exact count instead.
-#  22. `--runs-per-workflow N` actually drives `per_page=N` on the
-#      per-workflow runs request (not just the printed header line) --
+#  22. `--runs-per-workflow N` actually drives `per_page=N*5` (N times the
+#      default RUNS_PAGE_FACTOR, since #2928) on the per-workflow runs request (not just the printed header line) --
 #      the flag half of the RUNS PER WORKFLOW knob, mirroring assertion 9
 #      for --stale-hours.
 #  23. `SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW` env var drives the same
-#      `per_page=N` -- the env half, mirroring assertion 14 for
+#      `per_page=N*5` -- the env half, mirroring assertion 14 for
 #      SCHEDULED_WF_HEALTH_STALE_HOURS (added there because a prior
 #      review found the env half of --stale-hours untested; this closes
 #      the structural twin for --runs-per-workflow before the same gap
@@ -141,6 +141,33 @@
 #      the RUNS PER WORKFLOW header section, which a prior review found
 #      an extra per-workflow runs call would violate silently (suite
 #      stayed green with a 3rd call where the contract says 2).
+#  27. Unfiltered page with interleaved push / workflow_dispatch / schedule
+#      runs (issue #2928): only the event=schedule runs are classified, in
+#      page order -- RED with an exact streak=2 and the scheduled run 111
+#      reported as newest, never the push success sitting on top of it.
+#      Dropping the client-side `select(.event == "schedule")` flips this
+#      to OK.
+#  28. A FULL unfiltered page (per_page = N * factor) holding fewer than N
+#      scheduled runs reports the streak as a FLOOR (`streak=>=2`), since
+#      non-schedule runs may have crowded older scheduled ones off the
+#      page -- PAGINATION-IS-A-FLOOR item 2 after #2928. Dropping the
+#      page-full clause reports the exact `streak=2` and flips this.
+#  29. More than N scheduled runs on the page (ten failures, then an older
+#      success): only the first N are classified, so the streak floors at
+#      `streak=>=10`; dropping the `.[:$n]` cut reads the eleventh run,
+#      closes the streak and prints the false-exact `streak=10`.
+#  30. `SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR` of 0 / abc -> exit 64 (empty
+#      falls back to the default via ${:-}, like every sibling knob) with the
+#      named usage error (the knob #2928 adds; mirrors 10 / 24).
+#  31. `--runs-per-workflow 30` asks for 30 x 5 = 150, capped at GitHub's
+#      per_page maximum of 100; a FULL 100-run page holding two scheduled
+#      failures floors at `streak=>=2`. Uncapped, the request would say 150,
+#      GitHub would serve 100, and the short-page read would print a
+#      false-exact count.
+#  32. `SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR=2` at the default N=10 requests
+#      `per_page=20` (shim answers only that path) -- the override effect of
+#      the knob #2928 adds, mirroring 14 / 15 / 16 / 23; a hardcoded `* 5`
+#      leaves 22 / 23 green and only this one red.
 #
 # Run: sh trading/devtools/checks/scheduled_workflow_health_test.sh
 
@@ -198,11 +225,11 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Alpha Weekly","state":"active"},{"id":2,"name":"Beta Nightly","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/1/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":222,"conclusion":"success","status":"completed","created_at":"2026-09-03T12:00:00Z"}]}'
+  *"actions/workflows/2/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":222,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-03T12:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path: $path" >&2
@@ -231,11 +258,11 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Prune candidates weekly","state":"active"},{"id":2,"name":"Build CI image","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":111,"conclusion":"failure","status":"completed","created_at":"2026-08-31T16:26:33Z"}]}'
+  *"actions/workflows/1/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-08-31T16:26:33Z"}]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":222,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/2/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":222,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path: $path" >&2
@@ -264,8 +291,8 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Weekly track pacer","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-08-01T00:00:00Z"}]}'
+  *"actions/workflows/1/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-08-01T00:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path: $path" >&2
@@ -293,11 +320,11 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Manual-only workflow","state":"active"},{"id":2,"name":"Healthy Weekly","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
+  *"actions/workflows/1/runs?per_page=50")
     echo '{"workflow_runs":[]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":222,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/2/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":222,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path: $path" >&2
@@ -375,7 +402,7 @@ case "$path" in
   *"&page=2")
     echo '{"total_count":101,"workflows":[{"id":101,"name":"wf101","state":"active"}]}'
     ;;
-  *"runs?event=schedule"*)
+  *"/runs?per_page="*)
     echo '{"workflow_runs":[]}'
     ;;
   *)
@@ -421,17 +448,17 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":4,"workflows":[{"id":1,"name":"Failure wf","state":"active"},{"id":2,"name":"Cancelled wf","state":"active"},{"id":3,"name":"Timed out wf","state":"active"},{"id":4,"name":"Action required wf","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":111,"conclusion":"failure","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/1/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":222,"conclusion":"cancelled","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/2/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":222,"event":"schedule","conclusion":"cancelled","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
-  *"actions/workflows/3/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":333,"conclusion":"timed_out","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/3/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":333,"event":"schedule","conclusion":"timed_out","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
-  *"actions/workflows/4/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":444,"conclusion":"action_required","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/4/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":444,"event":"schedule","conclusion":"action_required","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path: $path" >&2
@@ -462,11 +489,11 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Prune candidates weekly","state":"active"},{"id":2,"name":"Weekly track pacer","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
+  *"actions/workflows/1/runs?per_page=50")
     echo "simulated network failure on runs call" >&2
     exit 22
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=10")
+  *"actions/workflows/2/runs?per_page=50")
     echo "simulated network failure on runs call" >&2
     exit 22
     ;;
@@ -480,7 +507,7 @@ _finish_shim "$SHIM12"
 _run "$SHIM12" ""
 if [ "$RC" -eq 3 ] \
   && echo "$OUT" | grep -q 'GitHub API request failed' \
-  && echo "$OUT" | grep -q 'runs?event=schedule' \
+  && echo "$OUT" | grep -q 'runs?per_page=' \
   && ! echo "$OUT" | grep -q 'NO-SCHEDULE'; then
   pass "assertion 12: RUNS call failure (list succeeded) -> exit 3, never silently reclassified NO-SCHEDULE"
 else
@@ -496,7 +523,7 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Weekly start sweep (BAH SPY)","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
+  *"actions/workflows/1/runs?per_page=50")
     echo "<html>not json</html>"
     ;;
   *)
@@ -509,7 +536,7 @@ _finish_shim "$SHIM13"
 _run "$SHIM13" ""
 if [ "$RC" -eq 3 ] \
   && echo "$OUT" | grep -q 'was not valid JSON' \
-  && echo "$OUT" | grep -q 'runs?event=schedule' \
+  && echo "$OUT" | grep -q 'runs?per_page=' \
   && ! echo "$OUT" | grep -q 'NO-SCHEDULE'; then
   pass "assertion 13: RUNS call malformed JSON (list succeeded) -> exit 3, never silently reclassified NO-SCHEDULE"
 else
@@ -539,8 +566,8 @@ case "$path" in
   *"repos/some-org/some-other-repo/actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Override repo wf","state":"active"}]}'
     ;;
-  *"repos/some-org/some-other-repo/actions/workflows/1/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"repos/some-org/some-other-repo/actions/workflows/1/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path (REPO override not threaded through?): $path" >&2
@@ -581,7 +608,7 @@ case "$path" in
     done
     printf '{"total_count":999999,"workflows":[%s]}' "$wfs"
     ;;
-  *"runs?event=schedule"*)
+  *"/runs?per_page="*)
     echo '{"workflow_runs":[]}'
     ;;
   *)
@@ -610,14 +637,14 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Daily orchestrator","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
+  *"actions/workflows/1/runs?per_page=50")
     echo '{"workflow_runs":[
-      {"id":699,"conclusion":"failure","status":"completed","created_at":"2026-09-12T15:32:00Z"},
-      {"id":698,"conclusion":"failure","status":"completed","created_at":"2026-09-12T11:37:00Z"},
-      {"id":697,"conclusion":"failure","status":"completed","created_at":"2026-09-11T16:29:00Z"},
-      {"id":696,"conclusion":"failure","status":"completed","created_at":"2026-09-11T12:13:00Z"},
-      {"id":695,"conclusion":"failure","status":"completed","created_at":"2026-09-10T16:24:00Z"},
-      {"id":694,"conclusion":"failure","status":"completed","created_at":"2026-09-10T12:14:00Z"}
+      {"id":699,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-12T15:32:00Z"},
+      {"id":698,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-12T11:37:00Z"},
+      {"id":697,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T16:29:00Z"},
+      {"id":696,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T12:13:00Z"},
+      {"id":695,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-10T16:24:00Z"},
+      {"id":694,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-10T12:14:00Z"}
     ]}'
     ;;
   *)
@@ -653,15 +680,15 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Daily orchestrator","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
+  *"actions/workflows/1/runs?per_page=50")
     echo '{"workflow_runs":[
-      {"id":700,"conclusion":null,"status":"in_progress","created_at":"2026-09-12T15:32:00Z"},
-      {"id":699,"conclusion":"failure","status":"completed","created_at":"2026-09-12T15:32:00Z"},
-      {"id":698,"conclusion":"failure","status":"completed","created_at":"2026-09-12T11:37:00Z"},
-      {"id":697,"conclusion":"failure","status":"completed","created_at":"2026-09-11T16:29:00Z"},
-      {"id":696,"conclusion":"failure","status":"completed","created_at":"2026-09-11T12:13:00Z"},
-      {"id":695,"conclusion":"failure","status":"completed","created_at":"2026-09-10T16:24:00Z"},
-      {"id":694,"conclusion":"failure","status":"completed","created_at":"2026-09-10T12:14:00Z"}
+      {"id":700,"event":"schedule","conclusion":null,"status":"in_progress","created_at":"2026-09-12T15:32:00Z"},
+      {"id":699,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-12T15:32:00Z"},
+      {"id":698,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-12T11:37:00Z"},
+      {"id":697,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T16:29:00Z"},
+      {"id":696,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T12:13:00Z"},
+      {"id":695,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-10T16:24:00Z"},
+      {"id":694,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-10T12:14:00Z"}
     ]}'
     ;;
   *)
@@ -692,10 +719,10 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Recovered Weekly","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
+  *"actions/workflows/1/runs?per_page=50")
     echo '{"workflow_runs":[
-      {"id":902,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"},
-      {"id":901,"conclusion":"failure","status":"completed","created_at":"2026-08-28T00:00:00Z"}
+      {"id":902,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"},
+      {"id":901,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-08-28T00:00:00Z"}
     ]}'
     ;;
   *)
@@ -724,14 +751,14 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Mid-flight sweep","state":"active"},{"id":2,"name":"Healthy Weekly","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
+  *"actions/workflows/1/runs?per_page=50")
     echo '{"workflow_runs":[
-      {"id":800,"conclusion":null,"status":"in_progress","created_at":"2026-09-12T15:00:00Z"},
-      {"id":799,"conclusion":null,"status":"queued","created_at":"2026-09-12T14:55:00Z"}
+      {"id":800,"event":"schedule","conclusion":null,"status":"in_progress","created_at":"2026-09-12T15:00:00Z"},
+      {"id":799,"event":"schedule","conclusion":null,"status":"queued","created_at":"2026-09-12T14:55:00Z"}
     ]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":222,"conclusion":"success","status":"completed","created_at":"2026-09-12T00:00:00Z"}]}'
+  *"actions/workflows/2/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":222,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-12T00:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path: $path" >&2
@@ -761,18 +788,18 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Full-page failures","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
+  *"actions/workflows/1/runs?per_page=50")
     echo '{"workflow_runs":[
-      {"id":810,"conclusion":"failure","status":"completed","created_at":"2026-09-12T15:32:00Z"},
-      {"id":809,"conclusion":"failure","status":"completed","created_at":"2026-09-12T11:32:00Z"},
-      {"id":808,"conclusion":"failure","status":"completed","created_at":"2026-09-12T07:32:00Z"},
-      {"id":807,"conclusion":"failure","status":"completed","created_at":"2026-09-12T03:32:00Z"},
-      {"id":806,"conclusion":"failure","status":"completed","created_at":"2026-09-11T23:32:00Z"},
-      {"id":805,"conclusion":"failure","status":"completed","created_at":"2026-09-11T19:32:00Z"},
-      {"id":804,"conclusion":"failure","status":"completed","created_at":"2026-09-11T15:32:00Z"},
-      {"id":803,"conclusion":"failure","status":"completed","created_at":"2026-09-11T11:32:00Z"},
-      {"id":802,"conclusion":"failure","status":"completed","created_at":"2026-09-11T07:32:00Z"},
-      {"id":801,"conclusion":"failure","status":"completed","created_at":"2026-09-11T03:32:00Z"}
+      {"id":810,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-12T15:32:00Z"},
+      {"id":809,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-12T11:32:00Z"},
+      {"id":808,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-12T07:32:00Z"},
+      {"id":807,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-12T03:32:00Z"},
+      {"id":806,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T23:32:00Z"},
+      {"id":805,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T19:32:00Z"},
+      {"id":804,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T15:32:00Z"},
+      {"id":803,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T11:32:00Z"},
+      {"id":802,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T07:32:00Z"},
+      {"id":801,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-11T03:32:00Z"}
     ]}'
     ;;
   *)
@@ -802,8 +829,8 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Runs-per-workflow flag wf","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=3")
-    echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/1/runs?per_page=15")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path (--runs-per-workflow not threaded through?): $path" >&2
@@ -816,9 +843,9 @@ _run "$SHIM22" "$NOW1" --runs-per-workflow 3
 if [ "$RC" -eq 0 ] \
   && echo "$OUT" | grep -q 'runs_per_workflow=3' \
   && echo "$OUT" | grep -q '^OK	Runs-per-workflow flag wf'; then
-  pass "assertion 22: --runs-per-workflow 3 drives per_page=3 on the runs request"
+  pass "assertion 22: --runs-per-workflow 3 drives per_page=15 (3 x factor 5) on the runs request"
 else
-  fail "assertion 22: expected exit0 against the per_page=3 shim, got rc=$RC output=$OUT"
+  fail "assertion 22: expected exit0 against the per_page=15 shim, got rc=$RC output=$OUT"
 fi
 
 echo "=== Assertion 23: SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW env var drives per_page on the runs request ==="
@@ -830,8 +857,8 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Runs-per-workflow env wf","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=5")
-    echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/1/runs?per_page=25")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path (RUNS_PER_WORKFLOW env not threaded through?): $path" >&2
@@ -847,9 +874,9 @@ set -e
 if [ "$RC23" -eq 0 ] \
   && echo "$OUT23" | grep -q 'runs_per_workflow=5' \
   && echo "$OUT23" | grep -q '^OK	Runs-per-workflow env wf'; then
-  pass "assertion 23: SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW=5 env var drives per_page=5 on the runs request"
+  pass "assertion 23: SCHEDULED_WF_HEALTH_RUNS_PER_WORKFLOW=5 env var drives per_page=25 (5 x factor 5) on the runs request"
 else
-  fail "assertion 23: expected exit0 against the per_page=5 shim via env var, got rc=$RC23 output=$OUT23"
+  fail "assertion 23: expected exit0 against the per_page=25 shim via env var, got rc=$RC23 output=$OUT23"
 fi
 
 echo "=== Assertion 24: --runs-per-workflow 0 -> exit 64 (usage error) ==="
@@ -869,10 +896,10 @@ case "$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":1,"workflows":[{"id":1,"name":"Masked stale wf","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
+  *"actions/workflows/1/runs?per_page=50")
     echo '{"workflow_runs":[
-      {"id":902,"conclusion":null,"status":"in_progress","created_at":"2026-09-12T15:55:00Z"},
-      {"id":901,"conclusion":"success","status":"completed","created_at":"2026-08-03T00:00:00Z"}
+      {"id":902,"event":"schedule","conclusion":null,"status":"in_progress","created_at":"2026-09-12T15:55:00Z"},
+      {"id":901,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-08-03T00:00:00Z"}
     ]}'
     ;;
   *)
@@ -905,11 +932,11 @@ case "\$path" in
   *"actions/workflows?per_page=100&page=1")
     echo '{"total_count":2,"workflows":[{"id":1,"name":"Call-count wf one","state":"active"},{"id":2,"name":"Call-count wf two","state":"active"}]}'
     ;;
-  *"actions/workflows/1/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/1/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
-  *"actions/workflows/2/runs?event=schedule&per_page=10")
-    echo '{"workflow_runs":[{"id":222,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+  *"actions/workflows/2/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":222,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
     ;;
   *)
     echo "unmatched path: \$path" >&2
@@ -920,7 +947,7 @@ EOF
 _finish_shim "$SHIM26"
 _run "$SHIM26" "$NOW1"
 _list_calls26=$(grep -c 'actions/workflows?per_page=100&page=1$' "$CALL_LOG26" || true)
-_runs_calls26=$(grep -c 'runs?event=schedule&per_page=10$' "$CALL_LOG26" || true)
+_runs_calls26=$(grep -c 'runs?per_page=50$' "$CALL_LOG26" || true)
 _total_calls26=$(wc -l < "$CALL_LOG26" | tr -d ' ')
 if [ "$RC" -eq 0 ] \
   && [ "$_list_calls26" -eq 1 ] \
@@ -929,6 +956,227 @@ if [ "$RC" -eq 0 ] \
   pass "assertion 26: exactly one list call and exactly one runs call per workflow (3 total for 2 workflows)"
 else
   fail "assertion 26: expected 1 list call + 2 runs calls (3 total), got list=$_list_calls26 runs=$_runs_calls26 total=$_total_calls26 (rc=$RC)"
+fi
+
+echo "=== Assertion 27: unfiltered page with interleaved push/dispatch/schedule runs -> only event=schedule runs are classified, in page order (issue #2928) ==="
+# Newest-first page: a push SUCCESS sits on top of two scheduled FAILURES
+# (with another push success and a workflow_dispatch success between
+# them), closed by an older scheduled success. Only the scheduled runs
+# count: RED with an EXACT streak=2 (page is short -> whole history seen),
+# and the reported newest run is the scheduled 111, not the push 901.
+# Mutation: dropping `select(.event == "schedule")` from
+# _recent_scheduled_runs makes the newest completed run the push success
+# -> OK/streak=0 -> this assertion fails (verified 2026-09-23).
+SHIM27="${TMPDIR_ROOT}/fetch27.sh"
+cat > "$SHIM27" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Mixed events wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=50")
+    echo '{"workflow_runs":[{"id":901,"event":"push","conclusion":"success","status":"completed","created_at":"2026-09-04T05:00:00Z"},{"id":111,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-04T00:00:00Z"},{"id":902,"event":"push","conclusion":"success","status":"completed","created_at":"2026-09-03T15:00:00Z"},{"id":112,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-03T00:00:00Z"},{"id":903,"event":"workflow_dispatch","conclusion":"success","status":"completed","created_at":"2026-09-02T12:00:00Z"},{"id":113,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-02T00:00:00Z"}]}'
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM27"
+_run "$SHIM27" "$NOW1"
+if [ "$RC" -ne 0 ] \
+  && echo "$OUT" | grep -q '^RED	Mixed events wf' \
+  && echo "$OUT" | grep -q 'streak=2' \
+  && ! echo "$OUT" | grep -q 'streak=>=2' \
+  && echo "$OUT" | grep -q 'run_id=111' \
+  && ! echo "$OUT" | grep -q '^OK	'; then
+  pass "assertion 27: interleaved events -> RED streak=2 (exact) from the scheduled runs only, newest reported run is the scheduled 111"
+else
+  fail "assertion 27: expected RED streak=2 exact with run_id=111, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 28: FULL unfiltered page holding fewer than N scheduled runs -> streak reported as a FLOOR (issue #2928, PAGINATION-IS-A-FLOOR item 2) ==="
+# --runs-per-workflow 3 -> page = 3 x 5 = 15. The shim returns exactly 15
+# runs: 13 push successes and 2 scheduled failures, so only 2 scheduled
+# runs are kept (< N=3) but the page was FULL -- older scheduled runs may
+# have been crowded off it, so the streak must read `streak=>=2`, not
+# `streak=2`. Mutation: dropping the `|| [ "$_page_full" -eq 1 ]` clause
+# in _classify_recent_runs reports the exact `streak=2` -> this assertion
+# fails (verified 2026-09-23).
+SHIM28="${TMPDIR_ROOT}/fetch28.sh"
+cat > "$SHIM28" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Crowded page wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=15")
+    runs='{"id":111,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-04T00:00:00Z"}'
+    i=1
+    while [ "$i" -le 13 ]; do
+      runs="$runs,{\"id\":$((900 + i)),\"event\":\"push\",\"conclusion\":\"success\",\"status\":\"completed\",\"created_at\":\"2026-09-03T00:00:00Z\"}"
+      i=$((i + 1))
+    done
+    runs="$runs,{\"id\":112,\"event\":\"schedule\",\"conclusion\":\"failure\",\"status\":\"completed\",\"created_at\":\"2026-09-02T00:00:00Z\"}"
+    echo "{\"workflow_runs\":[$runs]}"
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM28"
+_run "$SHIM28" "$NOW1" --runs-per-workflow 3
+if [ "$RC" -ne 0 ] \
+  && echo "$OUT" | grep -q '^RED	Crowded page wf' \
+  && echo "$OUT" | grep -q 'streak=>=2'; then
+  pass "assertion 28: full unfiltered page with 2 of N=3 scheduled runs kept -> RED streak=>=2 (floor)"
+else
+  fail "assertion 28: expected RED streak=>=2 floor, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 29: more than N scheduled runs on the page -> only the first N are classified (keep-first-N, issue #2928 rework) ==="
+# Eleven scheduled runs on a short page: ten failures, then an older
+# success. Keeping the first N=10 sees ten failures and no close -> the
+# streak is a FLOOR `streak=>=10` (the kept set hit N). Without the
+# `.[:$n]` cut the eleventh run would close the streak and the output would
+# read the false-exact `streak=10`. Mutation: drop `.[:$n]` -> `streak=10`
+# exact -> this assertion fails (verified 2026-09-23).
+SHIM29="${TMPDIR_ROOT}/fetch29.sh"
+cat > "$SHIM29" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Eleven scheduled wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=50")
+    runs=""
+    i=1
+    while [ "$i" -le 10 ]; do
+      [ -n "$runs" ] && runs="$runs,"
+      runs="$runs{\"id\":$((100 + i)),\"event\":\"schedule\",\"conclusion\":\"failure\",\"status\":\"completed\",\"created_at\":\"2026-09-0$((11 - i > 9 ? 9 : 11 - i))T00:00:00Z\"}"
+      i=$((i + 1))
+    done
+    runs="$runs,{\"id\":111,\"event\":\"schedule\",\"conclusion\":\"success\",\"status\":\"completed\",\"created_at\":\"2026-08-20T00:00:00Z\"}"
+    echo "{\"workflow_runs\":[$runs]}"
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM29"
+_run "$SHIM29" "$NOW1"
+if [ "$RC" -ne 0 ] \
+  && echo "$OUT" | grep -q '^RED	Eleven scheduled wf' \
+  && echo "$OUT" | grep -q 'streak=>=10'; then
+  pass "assertion 29: 11 scheduled runs on the page -> only the first 10 are read -> RED streak=>=10 (floor), not the false-exact 10"
+else
+  fail "assertion 29: expected RED streak=>=10 from the first N runs only, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 30: SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR must be a positive integer -> exit 64 (issue #2928 rework) ==="
+# Mirrors assertions 10 / 24 for the knob this fix adds. Mutation: drop the
+# RUNS_PAGE_FACTOR validation case -> factor 0 yields per_page=0 and the
+# shim's unmatched-path exit 3 instead of 64 -> this assertion fails
+# (verified 2026-09-23).
+for _bad in 0 abc; do
+  set +e
+  OUT30="$(SCHEDULED_WF_HEALTH_FETCH="$SHIM1" SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR="$_bad" env -u GH_TOKEN sh "$SCRIPT" 2>&1)"
+  RC30=$?
+  set -e
+  if [ "$RC30" -eq 64 ] && echo "$OUT30" | grep -q 'SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR must be a positive integer'; then
+    pass "assertion 30: RUNS_PAGE_FACTOR='$_bad' -> exit 64 with the named usage error"
+  else
+    fail "assertion 30: RUNS_PAGE_FACTOR='$_bad' expected exit 64 + usage error, got rc=$RC30 output=$OUT30"
+  fi
+done
+
+echo "=== Assertion 31: N x factor above 100 is capped at GitHub's per_page maximum, and a FULL 100-run page still floors (issue #2928 rework) ==="
+# --runs-per-workflow 30 with the default factor 5 would ask for 150; GitHub
+# silently serves at most 100, so an uncapped request would get 100 < 150
+# back, read it as a SHORT page (page_full=0) and print a false-exact streak.
+# The shim answers ONLY `per_page=100`, with exactly 100 runs (two scheduled
+# failures among 98 pushes) -> page_full=1 -> `streak=>=2`. Mutation: drop
+# the `[ "$RUNS_PAGE" -gt 100 ] && RUNS_PAGE=100` cap -> the request says
+# per_page=150 -> unmatched path -> exit 3 -> this assertion fails
+# (verified 2026-09-23).
+SHIM31="${TMPDIR_ROOT}/fetch31.sh"
+cat > "$SHIM31" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Capped page wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=100")
+    runs='{"id":111,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-04T00:00:00Z"}'
+    i=1
+    while [ "$i" -le 98 ]; do
+      runs="$runs,{\"id\":$((900 + i)),\"event\":\"push\",\"conclusion\":\"success\",\"status\":\"completed\",\"created_at\":\"2026-09-03T00:00:00Z\"}"
+      i=$((i + 1))
+    done
+    runs="$runs,{\"id\":112,\"event\":\"schedule\",\"conclusion\":\"failure\",\"status\":\"completed\",\"created_at\":\"2026-09-02T00:00:00Z\"}"
+    echo "{\"workflow_runs\":[$runs]}"
+    ;;
+  *)
+    echo "unmatched path (per_page not capped at 100?): $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM31"
+_run "$SHIM31" "$NOW1" --runs-per-workflow 30
+if [ "$RC" -ne 0 ] \
+  && echo "$OUT" | grep -q '^RED	Capped page wf' \
+  && echo "$OUT" | grep -q 'streak=>=2'; then
+  pass "assertion 31: N=30 x 5 is capped to per_page=100; a full 100-run page with 2 scheduled failures -> RED streak=>=2 (floor)"
+else
+  fail "assertion 31: expected the capped per_page=100 request and RED streak=>=2, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 32: SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR env var drives per_page (override effect, not just the default multiplication) ==="
+# The env half of the knob this fix adds, mirroring 14 / 15 / 16 / 23 for
+# the other four env knobs: factor 2 at the default N=10 must request
+# `per_page=20`, and the shim answers ONLY that path. Assertions 22 / 23 pin
+# the multiplication at the DEFAULT factor, so neither distinguishes a live
+# knob from a hardcoded `* 5`. Mutation: replace `RUNS_PER_WORKFLOW *
+# RUNS_PAGE_FACTOR` with `RUNS_PER_WORKFLOW * 5` -> the request says
+# per_page=50 -> unmatched path -> exit 3 -> this assertion fails (verified
+# 2026-09-23; that mutant left 32/32 green before this assertion).
+SHIM32="${TMPDIR_ROOT}/fetch32.sh"
+cat > "$SHIM32" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Page-factor env wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=20")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+    ;;
+  *)
+    echo "unmatched path (RUNS_PAGE_FACTOR env not threaded through?): $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM32"
+set +e
+OUT32="$(SCHEDULED_WF_HEALTH_FETCH="$SHIM32" SCHEDULED_WF_HEALTH_NOW_EPOCH="$NOW1" SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR=2 env -u GH_TOKEN sh "$SCRIPT" 2>&1)"
+RC32=$?
+set -e
+if [ "$RC32" -eq 0 ] \
+  && echo "$OUT32" | grep -q '^OK	Page-factor env wf'; then
+  pass "assertion 32: SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR=2 drives per_page=20 (10 x 2) on the runs request"
+else
+  fail "assertion 32: expected exit0 against the per_page=20 shim via the factor env var, got rc=$RC32 output=$OUT32"
 fi
 
 echo ""
