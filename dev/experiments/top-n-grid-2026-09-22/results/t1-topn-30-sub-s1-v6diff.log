@@ -1,0 +1,4 @@
+check | null | arm | verdict
+V6    |    0 |   0 | agree
+OK: every selected check agrees across all reports
+exit=0
