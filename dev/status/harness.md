@@ -3036,6 +3036,152 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   ceiling) that made this and the concurrent sibling harness PR shell-only
   by design.
 
+## Added 2026-09-23 (harness-maintainer, harness/2922-token-usage-report, issue #2922)
+
+- [x] **H-TOKEN-USAGE-REPORT — mechanical per-dispatch token accounting from
+  the local transcripts** (branch `harness/2922-token-usage-report`, PR #2927,
+  GHA orchestrator run 35784624290). **Item 1 of 4 in #2922; items 2/3/4 are
+  NOT done** — see "Deliberately not built" below, and do not read this entry
+  as closing the issue.
+
+  **The gap it closes.** We could not see where tokens go, so we could not
+  optimise them. The only measurement that ever existed was a single hand-run
+  audit (`dev/notes/token-usage-audit-2026-09-08.md`: main-context cache READS
+  ~55% of weighted spend, subagent cache WRITES ~40%), never re-run, because
+  re-running it meant re-deriving its jq from scratch. The 2026-09-22 session
+  burned ~2.4M subagent tokens on three shell-only harness PRs and neither
+  suspected cause — stall→resume replaying a whole agent transcript for zero
+  new output, and QC reviewers rebuilding the tree where CI is already
+  authoritative — was measurable without hand-counting.
+
+  **Built:** `dev/scripts/token_usage_report.sh` (POSIX sh + jq, `dash -n`
+  clean, no Python). Walks `~/.claude/projects/<proj>/**/*.jsonl` and emits
+  one row per dispatch (`date, session, agent_type, description, ref,
+  input/output/cache_read/cache_creation, resumes, wall, outcome`), per-session
+  main-context rows, and a context-size histogram per main-session API call.
+  `--format json` emits a `dev/budget`-compatible object (`date`, `source`,
+  `totals`, `rows`, plus `sessions` / `context_histogram`) so #2922 item 3 is
+  a sink, not a rewrite. Options: `--projects-dir` (the test seam),
+  `--since` / `--until`, `--format`, `--top`.
+
+  **The load-bearing detail is the `message.id` dedup.** The transcript writes
+  ONE RECORD PER CONTENT BLOCK and every record of a message carries the SAME
+  `usage` object, so a message with thinking + text + tool_use appears three
+  times identically. Summing raw records inflates every figure ~1.7-2x — which
+  is exactly the error the 09-08 audit shipped and had to correct against
+  itself ("absolute figures above are ~2x too high").
+
+  **Agent-type attribution** prefers the sibling `agent-<id>.meta.json`
+  (`agentType`), falls back to joining the launching `Agent` tool_use's
+  `input.subagent_type` out of the parent session transcript, and reads
+  `unknown` when neither exists — never a guess. **Resumes** are counted as
+  externally-injected user prompts after the first (a `type: "user"` record
+  with no `sourceToolAssistantUUID` and no `tool_result` block); a resumed
+  agent keeps writing to the SAME transcript file, so a resume increments an
+  existing row rather than adding one.
+
+  **Exit codes never collapse "could not measure" into "measured zero":**
+  0 report produced / 2 usage error or missing `--projects-dir` / 3 dir exists
+  but holds no transcript / 4 a transcript malformed beyond a single partial
+  trailing line. A partial LAST line is tolerated with a stderr WARN (a live
+  session is routinely caught mid-write) and only its valid prefix is counted;
+  any earlier parse error is fatal, because a silently truncated prefix would
+  under-report every total in the file.
+
+  **Test:** `trading/devtools/checks/token_usage_report_test.sh`, 50 assertions
+  over a committed synthetic transcript tree
+  (`trading/devtools/checks/fixtures/token_usage/`), wired into `dune runtest`
+  via `trading/devtools/checks/dune` with `(source_tree fixtures/token_usage)`
+  + `(universe)` (the script under test lives in `dev/scripts/`, outside the
+  dune workspace root, and is resolved through `repo_root()` at run time).
+  Hermetic: every invocation passes an explicit `--projects-dir` into the
+  fixtures; the real `~/.claude` tree is never read by the test.
+
+  **Non-vacuity, first pass — 23 mutations targeting the dedup, attribution,
+  resume, outcome, exit-code, histogram and argument-validator paths; each RED
+  in isolation, GREEN restored.** This was never a claim about the suite as a
+  whole — see the rework pass below for the surfaces it did NOT reach.
+  M1 drop the `unique_by(.id)` dedup →
+  3 RED (api_calls 2→3, cache_read 3000→4000, output 150→250). M2 invert the
+  meta.json/join precedence → 1 RED. M3 `resumes` hardcoded 0 → 1 RED. M4
+  `find -mindepth 2` → `-mindepth 1` (every transcript a dispatch) → 1 RED
+  (rows 3→4). M5 malformed transcript tolerated → 1 RED (exit 4→0). M6
+  no-transcripts-found made non-fatal → 1 RED (exit 3→0, the cheerful zero).
+  M7 histogram threshold 150k→500k → 1 RED. M8 `stalled` never returned →
+  1 RED. M9 window filter disabled → 2 RED. M10 `unknown` fallback replaced
+  by a guessed type → 1 RED. M11 parent-transcript join dropped → 2 RED. M12
+  partial tail made fatal → 3 RED. M13 `--format` validator removed → 1 RED.
+  M14 absent-dir check removed → 2 RED. M15 `source` value changed → 1 RED.
+  M16 (FIXTURE mutation) the duplicated `msg_a1` record deleted → 1 RED,
+  proving the dedup fixture is what it claims. M17/M18 the NEEDS_REWORK /
+  APPROVED outcome branches made unmatchable → 1 RED each. M19 bucket
+  boundary 50k→40k → 1 RED. M20 report `date` max→min → 1 RED. M21 `totals`
+  key renamed → 1 RED. M22/M23/M24 the `--top` / `--since` / unknown-argument
+  validators removed → 1 RED each. M25 `resumes` without the -1 for the
+  dispatch brief → 2 RED. The script was verified byte-identical to its
+  committed form after the last restore.
+
+  **Rework pass (QC behavioral NEEDS_REWORK on #2927, iteration 1) — +17
+  assertions, 33 → 50.** The first 23 mutations all targeted paths the suite
+  was built around; QC probed the surfaces it was not, and **15 of 16 guarded
+  mutations there survived 33/33**. The `totals` block was asserted for key
+  *presence* only, never for any *value* — so dropping `cache_read` from
+  `subagent_tokens` turned 4491 into 891 (5x) and `main_tokens` 457063 into
+  7063 (65x) with the suite still green, on the two figures the report prints
+  last and largest. `--until`, `--top` truncation, `ref`, `wall_seconds`,
+  per-row `input_tokens`, `p50`/`p90` and the `rows` sort order had no
+  assertion at all; and the default `table` renderer — the one a human
+  actually reads, and the format 7 of the suite's 10 invocations used while
+  asserting only exit codes and stderr — had no content assertion of any kind.
+  Added: six `totals.*` values, five per-row/histogram values (`input_tokens`,
+  `ref` parsed AND its empty case, `wall_seconds`, `p50` pinned distinct from
+  `max`), the `rows` ordering, `--until` (symmetric with the existing
+  `--since` pair), and four table-content assertions (totals line by value,
+  dispatch row count, and `--top 1` both announced and applied). Re-verified
+  with a guard stronger than the first pass — each mutation asserts the
+  pattern was found exactly once, the file differs, is non-empty, and still
+  parses under `dash -n` before the suite runs, and each is scored on the
+  **specific expected RED assertion name** rather than on "some test failed":
+  **17/17 caught** (16 new + the dedup control), script `cmp`-identical to its
+  committed form after every revert.
+
+  **Non-vacuity on REAL input** (this GHA runner's own live transcripts,
+  `/home/opam/.claude/projects/`, 1 session + 2 subagents — small and
+  unrepresentative, but real and not a fixture): exit 0, 2 dispatch rows
+  correctly attributed to `harness-maintainer` with refs `#2922` / `#2921`
+  joined out of the orchestrator's Agent tool_use records. It also produced
+  its first substantive finding unprompted: **45 of 46 main-context API calls
+  (97.8%) were above 150k context, p50 222k, max 246k** — the
+  `session-rampup.md` §Step 3 "compact at ~150k" rule is not being observed
+  in the GHA orchestrator run, and the first call alone writes ~133k of cache
+  (the fixed rules + memory preamble), so it arguably cannot be. That is
+  hypothesis (c) of #2922 with a number attached for the first time. Both
+  in-flight agents read `outcome=stalled`, which is the documented
+  ambiguity — a live agent and a stalled one are indistinguishable from the
+  transcript, and the header says so rather than guessing.
+
+  **Deliberately not built** (scoped out by the dispatch, still open on
+  #2922): item 2, the Codex `codex exec --json` usage probe (`codex-cli` is
+  not installed on this runner, so the probe could not be written against
+  anything observable); item 3, the `dev/budget/local-<date>.json` sink (the
+  JSON output exists and is shaped for it, but `dev/budget/*.json` is not in
+  the docs-only allowlist in `pr-merge-gates.md` and that routing question is
+  a decision, not an implementation); item 4, the weekly §Usage review rule
+  section (`.claude/rules/**` writes are refused in this environment).
+
+  **Known limits, stated rather than implied:** no dollars (transcripts carry
+  no price, and this makes no attempt to reconcile with the orchestrator's
+  `total_cost_usd` records); no `ephemeral_1h` / `5m` cache-TTL split, which
+  the 09-08 audit's lever 3 needs and a follow-up should add; transcripts are
+  per-machine local state, so a report run on one host is not a report of all
+  spend; `outcome=stalled` cannot distinguish a stall from an in-flight agent.
+
+  **Verify:** `flock /tmp/dune.lock dev/lib/run-in-env.sh dune build @fmt`,
+  `... dune build`, `... dune runtest` — all exit 0, zero `^FAIL:` lines;
+  `dune runtest` shows `OK: token_usage_report_test -- all 33 assertions
+  passed.` Standalone: `sh trading/devtools/checks/token_usage_report_test.sh`
+  prints `=== Results: 33 passed, 0 failed ===`. Live:
+  `sh dev/scripts/token_usage_report.sh --since <date>`.
 ## Added 2026-09-23 (harness-maintainer, harness/2921-tier4-snapshot-mode, issue #2921)
 
 - **H-TIER4-SNAPSHOT-MODE-PARSER-DRIFT** (DONE): `dev/scripts/run_tier4_release_gate.sh`
