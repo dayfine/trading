@@ -167,3 +167,74 @@ What three salts on one 7-year window can and cannot say (PLAUSIBLE, n = 3 per v
 
 Ledger: `_ledger/2026-09-22-top-of-funnel-capacity.sexp` notes AMENDED 2026-09-23 with this cell (no new entry, no
 new ACCEPT; the mechanism verdict is unchanged). Memory `project_top_n_grid_lane_2026_09_22`.
+
+## Cell 3 — breadth tier (yearly top-1000 PIT schedule, 26y record window) — PRE-REGISTERED 2026-09-23
+
+**Status: PRE-REGISTERED** (written 13:10 PT 2026-09-23, before any cell-3 cell ran; lists, specs, chain and this section
+pushed before the first launch). Cell 3 is the third context the grid needs for cap 40 (cells 1 and 2 both tighten):
+`promotion-confirmation.md` §"Universe diversity — BROAD vs BROAD only" — the breadth tier, a **top-1000 schedule vs the
+top-3000 schedule, built from the same yearly lists with the same D1/D2 dating.** Period = the 26y record window
+(2000-01-01 → 2026-06-26, as cell 1), so cell 3 moves exactly one axis against cell 1 (breadth) and one against cell 2
+(period AND breadth — cell 3 is not compared to cell 2 directly).
+
+### Construction (`build-top1000.sh` → `universe/top-1000-{1999..2025}.sexp`, 27 lists)
+
+Per year Y: every entry of the as-run `pit-v11/composition/top-3000-Y.sexp` whose `avg_dollar_volume` ≥ the smallest
+`avg_dollar_volume` in `goldens-custom-universe/composition/top-1000-Y.sexp`. Both lists are sorted by
+`avg_dollar_volume` desc and the goldens top-1000 is the first 1,000 rows of the goldens top-3000 (rank of that minimum
+in the goldens top-3000 = 1,000, checked), so the cut is "the goldens top-1000 members present in the `_v11pit`
+warehouse, AFTER the 09-14 / 09-15 alias passes" (`pit-universe-2026-09-14/step4/specs/alias2.resolved` +
+`twin-scan/alias3.txt`). A plain symbol intersection would drop the aliased twins — 1999: 969 by threshold vs 958 by
+symbol, the 11 extras all alias targets (XL_old → XL, Q_old1 → IQV, HLX → HOS, ATHYQ/BGEN → BCAL, …). Entries are copied
+verbatim except `(weight)` = 1/N and `(size)` = N (the pit-v11 top-3000 lists kept `size 3000` / weight 1/3000 with
+~2,820 entries — the runner reads membership only, neither convention changes a run); `aggregate_period_return` is
+carried from the goldens top-1000 list. **Present names per year: 928 (2009) → 998 (2025)**, i.e. ~94 % of each
+top-1000 has bars, vs ~2,820 / 3,000 for the top-3000 schedule — the breadth tier is 1/3 the names, not a different
+warehouse (`_v11pit`, 9,364 entries, unchanged; the chain aborts on any other count).
+
+The lists live under `universe/` in this directory (results-only lane; `feedback_commit_raw_per_arm_artifacts`) and are
+staged by `chain-cell3.sh` into the pinned run tree as `pit-v11/composition/top-1000-YYYY.sexp` — untracked files, so
+the chain's dirty check still guards tracked code; the chain logs `md5(cat)` of the 27 lists. If cap 40 is promoted,
+the promotion PR moves the lists under `trading/test_data/backtest_scenarios/pit-v11/composition/` (a code-tree PR, full
+three gates).
+
+### Cells (`specs/`, run by `chain-cell3.sh` from `sweep-grid` re-pinned at `ad5a9e04e` — the exact build of cells 1 and 2)
+
+| cell | period | change vs the null | salts |
+|---|---|---|---|
+| `a0-pit1000-null` | 2000-01-01 → 2026-06-26 | none (cap 20) on the top-1000 schedule — the paired base for this cell | 0 / 1 / 2 |
+| `t1-topn-40-1000` | same | `((screening_config ((max_buy_candidates 40))))` — the #2900 value | 0 / 1 / 2 |
+
+Everything else is the cell-2 spec verbatim (27-entry `universe_schedule`, D1/D2 dating, `SNAPSHOT_MAX_MMAP_HANDLES=12000`,
+`universe_size 1000`). Cap 30 / 60 are NOT run here: both failed cell 2 (30 widens, 60 is dominated), so neither can
+reach 2 of 3 cells whatever cell 3 says. **Order:** null s0 / s1 / s2, then cap 40 s0 / s1 / s2 — six cells, one lane,
+container-exclusive; each arm pairs against the null of the same salt (`validator_diff -check V6` exit 0 required).
+
+### Pre-registered decision rule (unchanged from §above, applied to cell 3)
+
+Cap 40 **tightens** cell 3 if its 3-salt range of realised return AND of maxDD are both narrower than the null's on
+this schedule; **dominated** if its mean realised AND mean Calmar are both below the null's. Outcomes:
+
+- **tightens, not dominated → 3 of 3 cells → cap 40 is PROMOTE-ELIGIBLE**: next is the paired-golden table
+  (`config-default-blast-radius.md`; `max_buy_candidates` is a `screening_config` default, so `goldens-affected` will
+  fire) and a promotion PR citing this README + the ledger amendment. The promotion is still a default flip on
+  n = 3 per cell — the PR body carries the PLAUSIBLE framing and the one-trade caveats from cells 1 and 2.
+- **does not tighten, not dominated → 2 of 3 stands, cell 3 disagrees**: no promotion; record the breadth
+  dependence, keep cap 40 as an axis (`experiment-flag-discipline.md` R1–R2; the ledger ACCEPT is unchanged).
+- **dominated (either way)** → the "never dominated" clause fails → NOT promotable; ledger amendment records it.
+
+Mechanism rule (realised AND Calmar better at ≥ 2/3 salts) is reported, not required. Per-salt cohort read with
+`paired.sh` (join key `symbol|entry_date`); the top arm-only winner per salt is named, because on cells 1 and 2 the
+level was one trade (DDS-class on 26y, ADMA 2023-12-19 on the sub-window) — on a top-1000 schedule ADMA (rank 2,248 by
+dollar volume in the 2023 goldens top-3000; 2,935 in 2022, 1,712 in 2024) is not a member, so cell 3 also tests whether the tightening survives losing that one name.
+
+### Cost / ops
+
+No 26y top-1000 cell has been measured. The 26y top-3000 arm cells ran 3h59m–4h48m; fewer members should mean fewer
+screened names per week but the union warehouse and the weekly classify are unchanged (#2839), so the projection is
+2–4 h per cell, 12–24 h for six. `CELL_TIMEOUT=28800` (1.67× the slowest top-3000 arm cell); re-size from the first
+cell's wall (≥ 1.5×). Artifacts `/tmp/sweeps/top-n-grid-cell3/` (container, bind-mounted), specs and lists staged at
+`/tmp/grid-run/{specs,universe}` (outside any VCS tree), log `/tmp/grid-run/chain-C3.log`. Per-cell raw artifacts are
+committed to `results/` with the `-1000` suffix in the tag.
+
+### Log — cell 3
