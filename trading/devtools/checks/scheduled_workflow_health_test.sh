@@ -164,6 +164,10 @@
 #      failures floors at `streak=>=2`. Uncapped, the request would say 150,
 #      GitHub would serve 100, and the short-page read would print a
 #      false-exact count.
+#  32. `SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR=2` at the default N=10 requests
+#      `per_page=20` (shim answers only that path) -- the override effect of
+#      the knob #2928 adds, mirroring 14 / 15 / 16 / 23; a hardcoded `* 5`
+#      leaves 22 / 23 green and only this one red.
 #
 # Run: sh trading/devtools/checks/scheduled_workflow_health_test.sh
 
@@ -1135,6 +1139,44 @@ if [ "$RC" -ne 0 ] \
   pass "assertion 31: N=30 x 5 is capped to per_page=100; a full 100-run page with 2 scheduled failures -> RED streak=>=2 (floor)"
 else
   fail "assertion 31: expected the capped per_page=100 request and RED streak=>=2, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 32: SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR env var drives per_page (override effect, not just the default multiplication) ==="
+# The env half of the knob this fix adds, mirroring 14 / 15 / 16 / 23 for
+# the other four env knobs: factor 2 at the default N=10 must request
+# `per_page=20`, and the shim answers ONLY that path. Assertions 22 / 23 pin
+# the multiplication at the DEFAULT factor, so neither distinguishes a live
+# knob from a hardcoded `* 5`. Mutation: replace `RUNS_PER_WORKFLOW *
+# RUNS_PAGE_FACTOR` with `RUNS_PER_WORKFLOW * 5` -> the request says
+# per_page=50 -> unmatched path -> exit 3 -> this assertion fails (verified
+# 2026-09-23; that mutant left 32/32 green before this assertion).
+SHIM32="${TMPDIR_ROOT}/fetch32.sh"
+cat > "$SHIM32" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Page-factor env wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=20")
+    echo '{"workflow_runs":[{"id":111,"event":"schedule","conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+    ;;
+  *)
+    echo "unmatched path (RUNS_PAGE_FACTOR env not threaded through?): $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM32"
+set +e
+OUT32="$(SCHEDULED_WF_HEALTH_FETCH="$SHIM32" SCHEDULED_WF_HEALTH_NOW_EPOCH="$NOW1" SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR=2 env -u GH_TOKEN sh "$SCRIPT" 2>&1)"
+RC32=$?
+set -e
+if [ "$RC32" -eq 0 ] \
+  && echo "$OUT32" | grep -q '^OK	Page-factor env wf'; then
+  pass "assertion 32: SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR=2 drives per_page=20 (10 x 2) on the runs request"
+else
+  fail "assertion 32: expected exit0 against the per_page=20 shim via the factor env var, got rc=$RC32 output=$OUT32"
 fi
 
 echo ""
