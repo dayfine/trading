@@ -1219,6 +1219,7 @@
   (universe))
  (action
   (run sh %{dep:token_usage_report_test.sh})))
+
 ; #2921: parser-drift guard -- every flag a dev/scripts/*.sh passes to
 ; scenario_runner.exe must exist in that runner's own parser. Reads
 ; dev/scripts/ (outside the dune workspace root) and
