@@ -536,10 +536,22 @@ jobs:
           # issues are surfaced via ::warning:: and left for a subsequent
           # run's PR pickup rather than failing the job outright.
           # ---------------------------------------------------------------
+          # Issue #2913: a PR whose mergeable_state is `behind` NEVER becomes
+          # `clean` on its own -- something must PUT /pulls/:n/update-branch
+          # first, and the daily-summary PR is behind BY CONSTRUCTION whenever
+          # this same run merged anything else to main in between (run
+          # 35728381545 merged two PRs, then burned the whole 25-min budget
+          # polling #2911 at `behind` and left its own summary unmerged).
+          # This is the treatment lead-orchestrator.md Step 6.5 already
+          # specifies: on `behind`, update the branch (at most twice per PR,
+          # so a base that keeps moving cannot loop us), then keep polling --
+          # CI re-runs on the new tip and the state walks unknown/blocked ->
+          # clean inside the existing poll budget.
           merge_pr_when_clean() {
             _PR_NUMBER="$1"
             _TIMED_OUT=1
             _LAST_MERGEABLE_STATE="unknown"
+            _UPDATE_BRANCH_CALLS=0
             for _ in $(seq 1 300); do
               RESPONSE="$(curl -sSL \
                 -H "Authorization: Bearer ${GH_TOKEN}" \
@@ -551,6 +563,19 @@ jobs:
               if [ "$MERGEABLE" = "true" ] && [ "$MERGEABLE_STATE" = "clean" ]; then
                 _TIMED_OUT=0
                 break
+              fi
+              if [ "$MERGEABLE_STATE" = "behind" ] && [ "$_UPDATE_BRANCH_CALLS" -lt 2 ]; then
+                _UPDATE_BRANCH_CALLS=$((_UPDATE_BRANCH_CALLS + 1))
+                _UPDATE_RESPONSE="$(curl -sSL -X PUT \
+                  -H "Authorization: Bearer ${GH_TOKEN}" \
+                  -H "Accept: application/vnd.github+json" \
+                  -d '{}' \
+                  "https://api.github.com/repos/${REPO}/pulls/${_PR_NUMBER}/update-branch")"
+                echo "merge_pr_when_clean: PR #${_PR_NUMBER} is behind its base; PUT /update-branch (attempt ${_UPDATE_BRANCH_CALLS} of 2): $(printf '%s' "$_UPDATE_RESPONSE" | jq -r '.message // "no message"')" >&2
+                # The update pushes a merge commit to the head branch; give
+                # CI a moment to register on the new tip before re-polling.
+                sleep 30
+                continue
               fi
               # Progress goes to stderr: callers capture this function's
               # stdout with $(...), which must yield only the merged bool.
