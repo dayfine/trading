@@ -124,3 +124,46 @@ at s2 — better at two salts, WORSE by $48 k at s1, so NOT a robust property; a
 
 Open question for the writeup: is ADMA 2023-12-19 a rank 21–40 admission or a null-admitted-never-filled name? Needs a
 `--emit-candidates` diagnostic cell on the null s0 of this window (`d0`-style, ~2× wall) — not run in this lane.
+- 2026-09-23 07:36 PT — **LANE A DONE, 12 of 12 cells, V6 diff exit 0 on all nine pairs.** Walls 59–99 min (null),
+  60–73 min (arms); guard never approached. Peak RSS 5.05–5.13 GB, `evictions=0` throughout. `results/chain-A.log`
+  archived; worktree `sweep-grid` and `/tmp/grid-run` removed; `/tmp/sweeps/top-n-grid` (83 MB) kept in the container.
+  Interim null + cap 40 results merged as #2925 (one qc-results rework: the shared-cohort claim was 2-of-3, not 3-of-3).
+
+## Verdict — cell 2 (2019–2025 sub-window, PIT top-3000 schedule), pre-registered dispersion rule (2026-09-23)
+
+| value | s0: return / maxDD / Calmar | s1 | s2 | realised range | maxDD range | mean return | mean Calmar | tightens? | dominated? |
+|---|---|---|---|---:|---:|---:|---:|---|---|
+| null (cap 20) | 34.4 / 43.4 / 0.099 | −9.5 / 48.3 / −0.029 | 71.3 / 43.8 / 0.183 | 80.9 pp | 4.9 pt | 32.1 % | 0.084 | — | — |
+| cap 30 | 20.4 / 43.7 / 0.062 | 130.2 / 40.3 / 0.314 | 69.5 / 43.4 / 0.180 | **109.7 pp** | 3.5 pt | 73.4 % | 0.185 | **no** (realised wider) | no |
+| cap 40 | 50.7 / 43.7 / 0.138 | 88.2 / 47.0 / 0.201 | 52.9 / 44.1 / 0.142 | 37.4 pp | 3.3 pt | 63.9 % | 0.160 | **yes** | no |
+| cap 60 | 60.2 / 50.0 / 0.139 | 11.4 / 48.6 / 0.032 | −6.7 / 47.9 / −0.021 | 66.9 pp | 2.1 pt | 21.6 % | 0.050 | yes | **yes** (both means lower) |
+
+Mechanism rule per value (reported, not required — realised AND Calmar better than the null at the same salt): cap 30
+1/3 (s1), cap 40 2/3 (s0, s1), cap 60 2/3 (s0, s1).
+
+**Cap 40 is the only value that tightens cell 2 without being dominated.** Cap 30's realised band is wider than the
+null's (20 → 130 %: its s1 draw holds ADMA + TMQ + GLNG, its s0 draw holds none of them). Cap 60 has the narrowest
+bands of all four but its maxDD band (47.9–50.0) sits above the null's (43.4–48.3) at every salt but one (47.9 vs 48.3 at s2) and its mean return and
+Calmar are both below the null's — "never dominated" is exactly the clause the rule needs here: a tight band around
+a worse level is not the property being tested. The response to the cap is therefore not monotone: 30 widens, 40
+tightens, 60 tightens-and-sinks. With cell 1 (26y record window, cap 40 tightens: 93 vs 305 pp, 0.9 vs 12.4 pt), **cap
+40 has reached the ≥ 2-of-3 condition; cell 3 (a top-1000 schedule, breadth diversity) is the pending confirmation
+and no promotion PR opens from this directory** (§Decision rule). A promotion PR, if cell 3 tightens, still needs the
+paired-golden table (`config-default-blast-radius.md`) and cites this README + the ledger amendment.
+
+What three salts on one 7-year window can and cannot say (PLAUSIBLE, n = 3 per value):
+1. **The level is one trade at every cap.** ADMA 2023-12-19 is the top arm-only winner at cap 40 s0/s1/s2 ($327 k
+   each), cap 30 s1 ($399 k) and cap 60 s0 ($303 k), and absent at cap 30 s0/s2 and cap 60 s1/s2 — the widened list
+   admits it at cap 40 regardless of path, at the neighbours only on some paths. Whether it is a rank-21–40 admission
+   or a null-admitted-never-filled name needs a `--emit-candidates` diagnostic on this window (not run; ~2× wall).
+2. **Where cap 60 loses:** s2 arm-only 99 trades at −$335 k (top winner only $80 k) against null-only 80 at +$32 k —
+   the 60-name list's extra admissions are stale-entry breadth on the 2021–25 grind, the failure shape
+   `project_early_stage2_window_validated` recorded for width dials; cap 60 is the first of the three points where
+   widening is worse than the null on both means, which bounds the dial from above on this window.
+3. **The maxDD "tightening" at cap 40 is 1.6 pt on a 4.9 pt band** — realised is the axis that moved, and on the
+   26y cell it was the reverse (maxDD 0.9 vs 12.4 pt was the striking one). Two cells tightening on different axes
+   is weaker evidence than two cells tightening on the same axis; cell 3 should be read on both.
+4. The null's own band is a sign flip on 260–281 trades; every comparison here is against a noisy reference.
+
+Ledger: `_ledger/2026-09-22-top-of-funnel-capacity.sexp` notes AMENDED 2026-09-23 with this cell (no new entry, no
+new ACCEPT; the mechanism verdict is unchanged). Memory `project_top_n_grid_lane_2026_09_22`.
