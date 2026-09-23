@@ -117,9 +117,10 @@ THREE salts** (s0 $327,320 / s1 $326,602 / s2 $326,895), i.e. a cap-driven admis
 not a slot re-draw — the first arm-only name in this program that is robust to the salt, and it alone is ~+30 pp of
 the arm's mean; (3) the maxDD "tightening" is 1.6 pt on a 4.9 pt band — small in absolute terms; realised is the axis
 that moved. Per-salt cohorts: arm-only 76 / 80 / 83 trades at +$278 k / +$408 k / +$276 k, null-only 73 / 95 / 68 at
-+$241 k / −$184 k / +$352 k; shared 197 / 186 / 192 (arm pnl on the shared cohort ≥ null's at every salt: −66 vs −117,
-+6 vs +54, −66 vs −117 k$ — the second and only other robust property: the arm's shared trades lose less at s0 and s2,
-and the cause is not yet dissected).
++$241 k / −$184 k / +$352 k; shared 197 / 186 / 192 (arm vs null pnl on the shared cohort: −66 vs −117 k$ at s0, +6 vs +54 k$ at s1, −66 vs −117 k$
+at s2 — better at two salts, WORSE by $48 k at s1, so NOT a robust property; at s1, the salt where the arm beats the null by
++98 pp, none of the gain comes from shared trades — it is entirely the arm-only cohort (+$408 k) plus the null-only drag
+(−$184 k), which is where a dissection should start).
 
 Open question for the writeup: is ADMA 2023-12-19 a rank 21–40 admission or a null-admitted-never-filled name? Needs a
 `--emit-candidates` diagnostic cell on the null s0 of this window (`d0`-style, ~2× wall) — not run in this lane.
