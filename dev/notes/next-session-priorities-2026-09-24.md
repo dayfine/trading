@@ -1,9 +1,9 @@
 # Next-session priorities — 2026-09-24 (supersedes 2026-09-23)
 
-Written ~17:55 PT 2026-09-22 at the end of the 09-22 autonomous session (started 13:32 PT). Main green at
-`82496889b`. **Container BUSY: top-N grid lane A is running** (see §Lane) — no agent dispatches until it finishes
-(`container-capacity-scheduling.md` rule 1); QC on any open PR takes precedence only if the PR is code (rule 0) — the
-one open PR (#2923) is results-only → `qc-results`, no dune, fine beside the lane.
+Written ~17:55 PT 2026-09-22; **refreshed 08:05 PT 2026-09-23 after lane A finished** (session ran 13:32 PT 09-22 →
+08:05 PT 09-23). Main green at `ed1262997`. **Container IDLE** (lane A done 07:36 PT; `sweep-grid` worktree and
+`/tmp/grid-run` removed; `/tmp/sweeps/top-n-grid` 83 MB kept). Open PR: **#2931** (results-only, the cell-2 verdict +
+ledger amendment) → `dispatch qc-results` when CI is green, `--admin` merge on APPROVED.
 
 ## State in one paragraph
 
@@ -19,7 +19,17 @@ dash-only CI fix), #2919 (perf FAIL-row visibility, #2891 — one rework), #2920
 `--snapshot-mode`, which `scenario_runner.exe` rejects) and **#2922 (token-usage tracking for Claude + Codex — user
 request, design in the issue)**.
 
-## Lane — top-N grid cell 2 (read this first)
+## Lane — top-N grid cell 2: DONE 09-23 07:36 PT (12/12 cells, V6 = 0 on all nine pairs)
+
+**Verdict (pre-registered dispersion rule, README §Verdict, PR #2931):** null ranges 80.9 pp / 4.9 pt (means 32.1 % /
+Calmar 0.084). Cap 40: 37.4 pp / 3.3 pt, means 63.9 % / 0.160 → **tightens, not dominated → 2 of 3 grid cells reached
+(26y + sub-window); cell 3 pending; default stays 20, no promotion PR.** Cap 30: 109.7 pp → does not tighten. Cap 60:
+66.9 pp / 2.1 pt but means 21.6 % / 0.050 and the maxDD band above the null (47.9–50.0 vs 43.4–48.3) → tightens AND
+dominated — the dial is bounded above (cap 60 s2 arm-only 99 trades −$335 k = stale breadth). ADMA 2023-12-19 tops
+the arm-only cohort at cap 40 on all three salts, at 30/60 on one salt each. Ledger `2026-09-22-top-of-funnel-capacity`
+amended in place. Memory `project_top_n_grid_lane_2026_09_22`. The paragraphs below are the launch-time record.
+
+### Launch-time record (superseded by the verdict above)
 
 `EXPECT_HEAD=ad5a9e04e sh /tmp/grid-run/chain-grid.sh A a0-pit-null-sub:{0,1,2} t1-topn-40-sub:{0,1,2} t1-topn-30-sub:{0,1,2}
 t1-topn-60-sub:{0,1,2}` from `sweep-grid` @ `ad5a9e04e` (cell 1's exact build; runner md5 `683b4885…`), cap 12,000,
@@ -44,10 +54,13 @@ set (lists are sorted by `avg_dollar_volume` desc, 0 violations), re-weighted; t
 
 ## P1 — next work, in order
 
-1. **Read lane A** when done (above). If cap 40 tightens the sub-window and is not dominated → "2/3 reached, cell 3
-   pending"; build the cell-3 lists (small OCaml exe under `analysis/data/universe/bin/` or awk over the sexps) and run
-   cell 3 on the same build. If it fails to tighten → the value needs cell 3 to tighten to stay alive; 30/60 read the
-   same way.
+1. **Merge #2931** (qc-results, no dune), then **build and run grid cell 3** — the confirmation for cap 40: per year,
+   goldens `top-1000-YYYY.sexp` ∩ pit-v11 `top-3000-YYYY.sexp` symbol set (lists sorted by `avg_dollar_volume` desc),
+   re-weighted 1/N, written as `pit-v11/composition/top-1000-YYYY.sexp` + a `universe_schedule` spec on the 26y window
+   (same build `ad5a9e04e` or a fresh pin with a tripwire), null + cap 40 × 3 salts first (30/60 optional, both lost
+   cell 2). Pre-register the cell in the same README before launching. Cells should run faster than the top-3000
+   ones (fewer members; the union warehouse is unchanged). If cap 40 tightens cell 3 without domination → the
+   paired-golden table (`config-default-blast-radius.md`) and a promotion PR citing the README + ledger amendment.
 2. **#2922 token-usage tracking** (user request 09-22): `dev/scripts/token_usage_report.sh` over the local transcripts
    (`message.usage`, the 09-08 audit's jq as seed) + `codex exec --json` usage probe + `dev/budget/local-<date>.json`
    sink + a weekly §Usage review. The 09-22 numbers in the issue are the first dataset (≈ 2.4 M subagent tokens for
