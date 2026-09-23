@@ -378,7 +378,8 @@ _reset_mock_env
 # existing-PR path flips "already-open PR: UPDATED content reaches the
 # remote" and "already-open PR: branch is pushed" to FAIL; dropping the
 # `[ -n "$_existing" ]` short-circuit before _create_pr flips "already-open
-# PR: PR-create POST is NOT sent" to FAIL.
+# PR: PR-create POST is NOT sent" to FAIL. Dropping the `[ "$_noop" -eq 0 ] &&`
+# push guard flips the two "no-op republish against a DEAD remote" checks.
 # =============================================================================
 _init_fixture
 _write_summary 2026-09-08 "" 202609080900 >/dev/null
@@ -422,6 +423,22 @@ _out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
 check "already-open PR: no-op republish exits 0" 0 "$rc"
 check_contains "already-open PR: no-op republish says so explicitly" "$_out" "genuine no-op, nothing new to publish"
 check_contains "already-open PR: no-op republish still reports the PR" "$_out" "PR #77 (already open"
+
+# Fourth publish, still nothing new, but the remote is now UNREACHABLE: the
+# no-op path must SKIP the push (the branch tip is already on origin, as
+# recorded by the remote-tracking ref), so an idempotent republish can never
+# raise the H-DAILY-SUMMARY-PR-LOST "committed LOCALLY but NOT published"
+# alarm. Behavioral QC on PR #2936 (2026-09-23) found the `[ "$_noop" -eq 0 ]
+# && ! git push` guard as a surviving mutant: against a LIVE remote a push of
+# an up-to-date branch exits 0 either way, so only a dead remote tells the
+# two apart. Mutation: dropping `[ "$_noop" -eq 0 ] &&` -> rc 1 + the alarm
+# -> both checks below go red (verified 2026-09-23).
+(cd "$REPO_DIR" && git remote set-url origin "$DEAD_REMOTE_DIR")
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "already-open PR: no-op republish against a DEAD remote still exits 0 (push skipped)" 0 "$rc"
+check_not_contains "already-open PR: no-op republish against a DEAD remote raises no PR-LOST alarm" "$_out" "NOT published"
+check_contains "already-open PR: no-op republish against a DEAD remote still says genuine no-op" "$_out" "genuine no-op, nothing new to publish"
 _reset_mock_env
 
 # 422-on-create ("already exists") falls back to the lookup and still
