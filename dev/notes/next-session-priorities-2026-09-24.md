@@ -50,6 +50,17 @@ as an AMENDMENT to `_ledger/2026-09-22-top-of-funnel-capacity.sexp` (no new ACCE
 absent from the warehouse (2019: 58 of the top-1000). Build step: per year, goldens top-1000 ∩ pit-v11 top-3000 symbol
 set (lists are sorted by `avg_dollar_volume` desc, 0 violations), re-weighted; then a `universe_schedule` of those.
 
+## 09-23 11:30 PT update (after the GHA orchestrator's two runs)
+
+- Run 1 (05:46–09:5x PT, $9.00) merged **#2926** (daily summary) and **#2927** — `dev/scripts/token_usage_report.sh` +
+  fixture-driven check, i.e. **#2922 item 1 shipped by the orchestrator** (items 2–4: Codex `--json` usage probe,
+  `dev/budget/local-<date>.json` sink, weekly §Usage review — still open on #2922). Run 2 (10:00 PT) FAILED its own
+  verify step: `A-FASTEXIT-VACUOUS` — its summary claimed dispatches for #2928 / #2930 (two harness issues it filed)
+  with no artifact, and the FULL-mode summary lacked `## Scheduled workflows` (#2634). Neither dispatch produced a PR;
+  treat #2928 (`scheduled_workflow_health.sh` filter) and #2930 (`publish_daily_summary.sh` skips commit+push when the
+  PR exists) as open, unowned harness items. Its budget record #2933 ($9.00, one JSON) was admin-merged locally.
+- #2931 (cell 2 verdict) merged 08:22 PT; main green through the #2933 merge. No open PRs at 11:30 PT.
+
 ## P0 — nothing blocking.
 
 ## P1 — next work, in order
