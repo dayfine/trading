@@ -86,3 +86,40 @@ logs GNU-time peak RSS and the `snapshot cache` line.
   was idle at launch (345 MB; the harness wave #2918/#2919/#2920 had merged); host free 63 G after thinning 18 Time
   Machine local snapshots that pinned the day's deleted agent worktrees (15 G → 64 G). Re-size `CELL_TIMEOUT` from the
   first cell's wall before reading anything else.
+- 2026-09-23 01:11 PT — **null + cap 40 done (6 of 12 cells), V6 diff exit 0 on every pair; cap 30 s0 running.** Walls
+  99 / 78 / 59 min (null) and 66 / 72 / 73 min (cap 40) — the 14,400 s guard is 2.4× the slowest, no re-size. Peak RSS
+  5.05–5.11 GB, `evictions=0` every cell. Per-cell raw artifacts + `<tag>-v6diff.log` + per-salt `paired.sh` reads are
+  in `results/` (the `-v6diff` spelling is deliberate: the qc-results glob, per the #2923 review).
+
+## Interim read — cell 2 (2019–2025 sub-window), cap 40 (2026-09-23; cap 30 / 60 pending)
+
+| salt | null: return / maxDD / Calmar | cap 40: return / maxDD / Calmar | realised | Calmar |
+|---|---|---|---|---|
+| s0 | 34.4 / 43.4 / 0.099 | 50.7 / 43.7 / 0.138 | clear (+16 pp) | clear |
+| s1 | −9.5 / 48.3 / −0.029 | 88.2 / 47.0 / 0.201 | clear (+98 pp) | clear |
+| s2 | 71.3 / 43.8 / 0.183 | 52.9 / 44.1 / 0.142 | fail (−18 pp) | fail |
+
+**Pre-registered dispersion rule, cell 2:** null 3-salt ranges — realised **80.9 pp** (−9.5 → 71.3), maxDD **4.9 pt**
+(43.4 → 48.3); cap 40 — realised **37.4 pp** (50.7 → 88.2), maxDD **3.3 pt** (43.7 → 47.0). Both narrower → **cap 40
+TIGHTENS cell 2.** Not dominated: mean realised 63.9 vs 32.1 %, mean Calmar 0.160 vs 0.084 (both higher). Mechanism
+rule (reported, not required): 2 of 3 salts clear both metrics — the same 2/3 pattern as cell 1, with the failing salt
+again the one where the null's draw holds the strongest cohort (s2 here, s0 on 26y).
+
+**Grid status for cap 40: cells 1 and 2 both tighten → the ≥ 2-of-3 condition is REACHED, cell 3 (top-1000 schedule)
+pending as the confirmation that it is not two draws.** No promotion PR from this directory (README §Decision rule);
+the ledger amendment waits for cap 30 / 60 (a neighbour that tightens in more cells, or is never dominated where 40 is,
+would become the candidate).
+
+Caveats the writeup must carry (PLAUSIBLE, n = 3 per cell): (1) the null's realised band on this window is a sign flip
+(−9.5 → 71.3 %) on 260–281 trades — a 7y window of the 2021–25 grind (`project_pit_drawdown_2021_25_macro_veto`) is
+mostly noise; (2) the arm's level is again one trade: **ADMA 2023-12-19 (+$327 k) is the top arm-only winner at ALL
+THREE salts** (s0 $327,320 / s1 $326,602 / s2 $326,895), i.e. a cap-driven admission that is stable across path salts,
+not a slot re-draw — the first arm-only name in this program that is robust to the salt, and it alone is ~+30 pp of
+the arm's mean; (3) the maxDD "tightening" is 1.6 pt on a 4.9 pt band — small in absolute terms; realised is the axis
+that moved. Per-salt cohorts: arm-only 76 / 80 / 83 trades at +$278 k / +$408 k / +$276 k, null-only 73 / 95 / 68 at
++$241 k / −$184 k / +$352 k; shared 197 / 186 / 192 (arm pnl on the shared cohort ≥ null's at every salt: −66 vs −117,
++6 vs +54, −66 vs −117 k$ — the second and only other robust property: the arm's shared trades lose less at s0 and s2,
+and the cause is not yet dissected).
+
+Open question for the writeup: is ADMA 2023-12-19 a rank 21–40 admission or a null-admitted-never-filled name? Needs a
+`--emit-candidates` diagnostic cell on the null s0 of this window (`d0`-style, ~2× wall) — not run in this lane.
