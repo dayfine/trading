@@ -152,6 +152,18 @@
 #      non-schedule runs may have crowded older scheduled ones off the
 #      page -- PAGINATION-IS-A-FLOOR item 2 after #2928. Dropping the
 #      page-full clause reports the exact `streak=2` and flips this.
+#  29. More than N scheduled runs on the page (ten failures, then an older
+#      success): only the first N are classified, so the streak floors at
+#      `streak=>=10`; dropping the `.[:$n]` cut reads the eleventh run,
+#      closes the streak and prints the false-exact `streak=10`.
+#  30. `SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR` of 0 / abc -> exit 64 (empty
+#      falls back to the default via ${:-}, like every sibling knob) with the
+#      named usage error (the knob #2928 adds; mirrors 10 / 24).
+#  31. `--runs-per-workflow 30` asks for 30 x 5 = 150, capped at GitHub's
+#      per_page maximum of 100; a FULL 100-run page holding two scheduled
+#      failures floors at `streak=>=2`. Uncapped, the request would say 150,
+#      GitHub would serve 100, and the short-page read would print a
+#      false-exact count.
 #
 # Run: sh trading/devtools/checks/scheduled_workflow_health_test.sh
 
@@ -1021,6 +1033,108 @@ if [ "$RC" -ne 0 ] \
   pass "assertion 28: full unfiltered page with 2 of N=3 scheduled runs kept -> RED streak=>=2 (floor)"
 else
   fail "assertion 28: expected RED streak=>=2 floor, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 29: more than N scheduled runs on the page -> only the first N are classified (keep-first-N, issue #2928 rework) ==="
+# Eleven scheduled runs on a short page: ten failures, then an older
+# success. Keeping the first N=10 sees ten failures and no close -> the
+# streak is a FLOOR `streak=>=10` (the kept set hit N). Without the
+# `.[:$n]` cut the eleventh run would close the streak and the output would
+# read the false-exact `streak=10`. Mutation: drop `.[:$n]` -> `streak=10`
+# exact -> this assertion fails (verified 2026-09-23).
+SHIM29="${TMPDIR_ROOT}/fetch29.sh"
+cat > "$SHIM29" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Eleven scheduled wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=50")
+    runs=""
+    i=1
+    while [ "$i" -le 10 ]; do
+      [ -n "$runs" ] && runs="$runs,"
+      runs="$runs{\"id\":$((100 + i)),\"event\":\"schedule\",\"conclusion\":\"failure\",\"status\":\"completed\",\"created_at\":\"2026-09-0$((11 - i > 9 ? 9 : 11 - i))T00:00:00Z\"}"
+      i=$((i + 1))
+    done
+    runs="$runs,{\"id\":111,\"event\":\"schedule\",\"conclusion\":\"success\",\"status\":\"completed\",\"created_at\":\"2026-08-20T00:00:00Z\"}"
+    echo "{\"workflow_runs\":[$runs]}"
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM29"
+_run "$SHIM29" "$NOW1"
+if [ "$RC" -ne 0 ] \
+  && echo "$OUT" | grep -q '^RED	Eleven scheduled wf' \
+  && echo "$OUT" | grep -q 'streak=>=10'; then
+  pass "assertion 29: 11 scheduled runs on the page -> only the first 10 are read -> RED streak=>=10 (floor), not the false-exact 10"
+else
+  fail "assertion 29: expected RED streak=>=10 from the first N runs only, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 30: SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR must be a positive integer -> exit 64 (issue #2928 rework) ==="
+# Mirrors assertions 10 / 24 for the knob this fix adds. Mutation: drop the
+# RUNS_PAGE_FACTOR validation case -> factor 0 yields per_page=0 and the
+# shim's unmatched-path exit 3 instead of 64 -> this assertion fails
+# (verified 2026-09-23).
+for _bad in 0 abc; do
+  set +e
+  OUT30="$(SCHEDULED_WF_HEALTH_FETCH="$SHIM1" SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR="$_bad" env -u GH_TOKEN sh "$SCRIPT" 2>&1)"
+  RC30=$?
+  set -e
+  if [ "$RC30" -eq 64 ] && echo "$OUT30" | grep -q 'SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR must be a positive integer'; then
+    pass "assertion 30: RUNS_PAGE_FACTOR='$_bad' -> exit 64 with the named usage error"
+  else
+    fail "assertion 30: RUNS_PAGE_FACTOR='$_bad' expected exit 64 + usage error, got rc=$RC30 output=$OUT30"
+  fi
+done
+
+echo "=== Assertion 31: N x factor above 100 is capped at GitHub's per_page maximum, and a FULL 100-run page still floors (issue #2928 rework) ==="
+# --runs-per-workflow 30 with the default factor 5 would ask for 150; GitHub
+# silently serves at most 100, so an uncapped request would get 100 < 150
+# back, read it as a SHORT page (page_full=0) and print a false-exact streak.
+# The shim answers ONLY `per_page=100`, with exactly 100 runs (two scheduled
+# failures among 98 pushes) -> page_full=1 -> `streak=>=2`. Mutation: drop
+# the `[ "$RUNS_PAGE" -gt 100 ] && RUNS_PAGE=100` cap -> the request says
+# per_page=150 -> unmatched path -> exit 3 -> this assertion fails
+# (verified 2026-09-23).
+SHIM31="${TMPDIR_ROOT}/fetch31.sh"
+cat > "$SHIM31" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Capped page wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=100")
+    runs='{"id":111,"event":"schedule","conclusion":"failure","status":"completed","created_at":"2026-09-04T00:00:00Z"}'
+    i=1
+    while [ "$i" -le 98 ]; do
+      runs="$runs,{\"id\":$((900 + i)),\"event\":\"push\",\"conclusion\":\"success\",\"status\":\"completed\",\"created_at\":\"2026-09-03T00:00:00Z\"}"
+      i=$((i + 1))
+    done
+    runs="$runs,{\"id\":112,\"event\":\"schedule\",\"conclusion\":\"failure\",\"status\":\"completed\",\"created_at\":\"2026-09-02T00:00:00Z\"}"
+    echo "{\"workflow_runs\":[$runs]}"
+    ;;
+  *)
+    echo "unmatched path (per_page not capped at 100?): $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM31"
+_run "$SHIM31" "$NOW1" --runs-per-workflow 30
+if [ "$RC" -ne 0 ] \
+  && echo "$OUT" | grep -q '^RED	Capped page wf' \
+  && echo "$OUT" | grep -q 'streak=>=2'; then
+  pass "assertion 31: N=30 x 5 is capped to per_page=100; a full 100-run page with 2 scheduled failures -> RED streak=>=2 (floor)"
+else
+  fail "assertion 31: expected the capped per_page=100 request and RED streak=>=2, got rc=$RC output=$OUT"
 fi
 
 echo ""
