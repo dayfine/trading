@@ -143,7 +143,7 @@ Mechanism rule per value (reported, not required — realised AND Calmar better 
 
 **Cap 40 is the only value that tightens cell 2 without being dominated.** Cap 30's realised band is wider than the
 null's (20 → 130 %: its s1 draw holds ADMA + TMQ + GLNG, its s0 draw holds none of them). Cap 60 has the narrowest
-bands of all four but its whole maxDD band sits ABOVE the null's (47.9–50.0 vs 43.4–48.3) and its mean return and
+bands of all four but its maxDD band (47.9–50.0) sits above the null's (43.4–48.3) at every salt but one (47.9 vs 48.3 at s2) and its mean return and
 Calmar are both below the null's — "never dominated" is exactly the clause the rule needs here: a tight band around
 a worse level is not the property being tested. The response to the cap is therefore not monotone: 30 widens, 40
 tightens, 60 tightens-and-sinks. With cell 1 (26y record window, cap 40 tightens: 93 vs 305 pp, 0.9 vs 12.4 pt), **cap
@@ -158,8 +158,8 @@ What three salts on one 7-year window can and cannot say (PLAUSIBLE, n = 3 per v
    or a null-admitted-never-filled name needs a `--emit-candidates` diagnostic on this window (not run; ~2× wall).
 2. **Where cap 60 loses:** s2 arm-only 99 trades at −$335 k (top winner only $80 k) against null-only 80 at +$32 k —
    the 60-name list's extra admissions are stale-entry breadth on the 2021–25 grind, the failure shape
-   `project_early_stage2_window_validated` recorded for width dials; cap 60 is the first point on this surface where
-   widening turns monotone-worse, which bounds the dial from above.
+   `project_early_stage2_window_validated` recorded for width dials; cap 60 is the first of the three points where
+   widening is worse than the null on both means, which bounds the dial from above on this window.
 3. **The maxDD "tightening" at cap 40 is 1.6 pt on a 4.9 pt band** — realised is the axis that moved, and on the
    26y cell it was the reverse (maxDD 0.9 vs 12.4 pt was the striking one). Two cells tightening on different axes
    is weaker evidence than two cells tightening on the same axis; cell 3 should be read on both.
