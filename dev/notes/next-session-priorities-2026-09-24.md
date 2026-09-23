@@ -106,3 +106,26 @@ set (lists are sorted by `avg_dollar_volume` desc, 0 violations), re-weighted; t
 - **jj working copy:** `@` is a fresh commit on `main@origin` after this doc; the chain-tweak commit is on
   `exp/top-n-grid-chain-launch` (#2923). Two stale bookmarks `harness/2887-…`, `harness/2891-…`, `harness/2896-…`
   were created by jj's git import of agent branches (all merged/deleted on origin) — `jj bookmark forget` them if noisy.
+
+## 09-23 13:45 PT update (local session, started 13:00 PT)
+
+- **Cell 3 of the top-N grid is RUNNING** — lane C3 launched 13:08 PT from `sweep-grid` re-pinned at `ad5a9e04e`
+  (runner md5 `683b4885…` = cells 1–2), null s0/s1/s2 → cap 40 s0/s1/s2 on the yearly **top-1000** PIT schedule, 26y
+  window. Pre-registration merged as **#2935** (qc-results APPROVED, quality 4). Lists = `build-top1000.sh` adv-threshold
+  cut of the as-run pit-v11 top-3000 (NOT a symbol intersection — the alias twins), 928–998 names/yr, staged untracked
+  into the run tree. Log `/tmp/grid-run/chain-C3.log`, artifacts `/tmp/sweeps/top-n-grid-cell3/`, guard 28,800 s —
+  **re-size from cell 1's wall (≥ 1.5×)**; no 26y top-1000 cell has been measured (top-3000 arms were 4–4.8 h).
+  Read per README §Cell 3; results PR = results-only lane; ledger amendment; fold in the four qc-results advisories
+  (A1: ADMA IS in `top-1000-2025` — say "absent from the 2023 list that governs the 2023-12-19 entry"; A2: the §above
+  "≥ 2 of 3" clause is necessary-not-sufficient; A3: pre-commit the keep-as-axis classification on the dominated
+  branch; A4: `step4/` in the alias3 path, "~2,846 / 3,000").
+- **Four harness PRs are open and wait for the QC pair, which needs dune and cannot run beside the chain**
+  (`container-capacity-scheduling.md` rule 1; 26y cells peak ~6.5 GB): **#2936** (#2930 publish-in-place, CI green),
+  **#2937** (#2928 client-side schedule select), **#2938** (#2912 dev/status dir — STACKED on #2936, base retargets on
+  merge), **#2939** (#2913 update-branch in `merge_pr_when_clean`). All shell-only, host/dash-tested, mutation-verified
+  where a suite exists. **Plan:** when cell 1's `RESULT` line lands, stop the chain (kill the host `chain-cell3.sh` AND
+  the container `scenario_runner.exe` that just started), run structural wave (≤ 3) → behavioral wave → merges, then
+  relaunch the same command (resumable: `RESULT` = SKIP) with the guard re-sized. ~1 h of chain time.
+- Cleanup done: 12 merged `codex-*` worktrees removed, 15 stale local bookmarks forgotten; `codex-2915-spy-coverage`
+  kept (12 dirty files, Codex live on #2915). MEMORY.md compacted 24.6 → 16.8 KB (was past the 24.4 KB load limit).
+- Items 4–5 of P1: #2921 closed by #2929 (orchestrator); #2876 and #2915 unchanged. #2922 items 2–4 still open.
