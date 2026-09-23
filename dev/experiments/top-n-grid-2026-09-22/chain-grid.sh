@@ -29,6 +29,11 @@ docker exec $C test -f $WH/manifest.sexp || { log "ABORT: no warehouse manifest 
 n_wh=$(docker exec $C sh -c "grep -c '(symbol ' $WH/manifest.sexp"); log "warehouse entries=$n_wh (expect 9364)"
 [ "$n_wh" = "9364" ] || { log "ABORT: warehouse changed since the null band"; exit 1; }
 free_gb=$(df -g / | awk 'NR==2{print $4}'); log "host free ${free_gb}G"; [ "$free_gb" -ge 20 ] || { log "ABORT: host disk < 20G"; exit 1; }
+# Binary tripwire (qc-results advisory on #2917, feedback_dune_no_build_stale_exe): a git HEAD check cannot see a stale
+# _build. Build the three exes in the pinned tree (a no-op when up to date) and log the runner md5 so the results PR can
+# show every cell ran the same binary.
+run "dune build ./trading/backtest/scenarios/scenario_runner.exe ./trading/backtest/validation/bin/post_run_validator_cli.exe ./trading/backtest/validation/bin/validator_diff.exe" || { log "ABORT: dune build failed in $WTREL"; exit 1; }
+log "runner md5=$(docker exec $C md5sum $ROOT/_build/default/trading/backtest/scenarios/scenario_runner.exe | cut -c1-32)"
 for tok in "$@"; do name=${tok%%:*}; salt=${tok#*:}
   tag="$name-s$salt"; d=$WORK/$tag
   if grep -q "RESULT $tag " "$LOG_HOST" 2>/dev/null; then log "SKIP $tag"; continue; fi
@@ -46,6 +51,7 @@ for tok in "$@"; do name=${tok%%:*}; salt=${tok#*:}
     if docker exec $C test -f $ART/a0-pit-null-sub-s$salt-validator.sexp.sexp; then
       run "./_build/default/trading/backtest/validation/bin/validator_diff.exe -check V6 -report null=$ART/a0-pit-null-sub-s$salt-validator.sexp.sexp -report arm=$ART/${tag}-validator.sexp.sexp > $WORK/$tag.v6diff.log 2>&1; echo exit=\$? >> $WORK/$tag.v6diff.log"
       v6=$(docker exec $C sh -c "tail -1 $WORK/$tag.v6diff.log")
+      docker exec $C cp $WORK/$tag.v6diff.log $ART/${tag}.v6diff.log 2>/dev/null || true
     else v6="<null s$salt not run yet>"; fi;;
   esac
   log "RESULT $tag => ${m:-<no result>} ${q:-<no validator>} v6diff:${v6} ${rss} ${cache} (wall $(( $(date +%s) - start ))s)"

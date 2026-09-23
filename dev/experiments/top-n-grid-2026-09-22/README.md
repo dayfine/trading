@@ -77,3 +77,12 @@ logs GNU-time peak RSS and the `snapshot cache` line.
 
 - 2026-09-22 15:10 PT — pre-registered. Worktree `sweep-grid` pinned at `ad5a9e04e`; build + launch wait for the
   harness agent wave (#2887 / #2891 / #2896) and its QC to clear the container.
+- 2026-09-22 15:10–17:43 PT — pre-registration merged as #2917 (CI + qc-results APPROVED, quality 4; the two chain
+  advisories — a binary tripwire in the preamble and keeping each cell's V6 diff log — are the chain commit below; the
+  first preamble draft named `scenarios/bin/scenario_runner.exe`, a path that does not exist, and was fixed before
+  launch). **Lane A launched 17:43 PT** from `sweep-grid` @ `ad5a9e04e` (runner md5 `683b4885da8cbf9e3e25d760ab444131`),
+  cap 12,000, guard 14,400 s, order null s0/s1/s2 → cap 40 s0–s2 → cap 30 → cap 60; chain + specs staged under
+  `/tmp/grid-run/` (host), artifacts `/tmp/sweeps/top-n-grid/` (container), log `/tmp/grid-run/chain-A.log`. Container
+  was idle at launch (345 MB; the harness wave #2918/#2919/#2920 had merged); host free 63 G after thinning 18 Time
+  Machine local snapshots that pinned the day's deleted agent worktrees (15 G → 64 G). Re-size `CELL_TIMEOUT` from the
+  first cell's wall before reading anything else.
