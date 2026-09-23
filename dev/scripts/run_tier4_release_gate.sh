@@ -31,9 +31,24 @@
 # Snapshot-mode is mandatory: CSV-mode upper bound (RSS ≈ 67 + 3.94·N +
 # 0.19·N·(T-1)) projects ~28 GB peak for this cell, well beyond any single
 # runner. Snapshot mode (Phase E §F3 cache-bounded RSS ~50-200 MB) is what
-# makes it feasible on the user's 8 GB local box. The runner sets
-# `--snapshot-mode` explicitly to be future-proof against the F.2 default
-# ever flipping back.
+# makes it feasible on the user's 8 GB local box.
+#
+# DO NOT re-add `--snapshot-mode` here (#2921). `scenario_runner.exe` has
+# never had such an arm: its parser accepts only `--snapshot-dir <path>`
+# (see `_parse_flag` in
+# `trading/trading/backtest/scenarios/scenario_runner.ml`), and any unknown
+# token falls through to `_usage ()` → exit 1 *before a single cell runs*.
+# The flag is a legacy no-op on a DIFFERENT parser (`Backtest_runner_args`),
+# which is where the earlier "pass it explicitly to be future-proof against
+# the F.2 default ever flipping back" rationale came from — it was never
+# true of this runner, and it made every non-`--dry-run` invocation of this
+# script die at argument parsing. Snapshot mode is the default since #802
+# (Phase F.2); the runner auto-builds a snapshot when no `--snapshot-dir` is
+# given, so the correct way to pin a corpus is `--snapshot-dir` alone
+# (`PERF_TIER4_SCALE_SNAPSHOT_DIR=...`).
+# `trading/devtools/checks/scenario_runner_flag_drift.sh` now fails
+# `dune runtest` if any `dev/scripts/*.sh` passes a flag this runner's
+# parser does not accept.
 #
 # This script is SCAFFOLDING — the actual gate run is local-only on the
 # user's box once (a) coverage gate hits ≥90% and (b) the full-broad
@@ -94,9 +109,9 @@ RUN_IN_ENV="${REPO_ROOT}/dev/lib/run-in-env.sh"
 # Override via env var.
 TIMEOUT="${PERF_TIER4_SCALE_TIMEOUT:-43200}"
 
-# Snapshot-mode default-flip landed in #802 (Phase F.2). We pass the flag
-# explicitly so this script remains correct if a future change reverts the
-# default. Override via env var if you need to test a specific snapshot
+# Snapshot-mode default-flip landed in #802 (Phase F.2), so there is nothing
+# to pass for the mode itself — see the DO-NOT-RE-ADD note in the header
+# (#2921). Override via env var if you need to test a specific snapshot
 # directory; otherwise auto-build is used.
 SNAPSHOT_DIR="${PERF_TIER4_SCALE_SNAPSHOT_DIR:-}"
 
@@ -152,11 +167,12 @@ PASS_COUNT=0
 FAIL_COUNT=0
 TABLE_ROWS=""
 
-# Snapshot-mode flag set. Empty if SNAPSHOT_DIR is empty (then auto-build
-# takes over per F.2). Otherwise pass an explicit dir.
-SNAPSHOT_FLAGS="--snapshot-mode"
+# Snapshot flag set. Empty if SNAPSHOT_DIR is empty (then auto-build takes
+# over per F.2). Otherwise pass an explicit dir. `--snapshot-dir` is the ONLY
+# snapshot flag scenario_runner.exe accepts — see the header (#2921).
+SNAPSHOT_FLAGS=""
 if [ -n "$SNAPSHOT_DIR" ]; then
-  SNAPSHOT_FLAGS="--snapshot-mode --snapshot-dir $SNAPSHOT_DIR"
+  SNAPSHOT_FLAGS="--snapshot-dir $SNAPSHOT_DIR"
 fi
 
 _run_one() {

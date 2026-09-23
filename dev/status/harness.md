@@ -3182,3 +3182,82 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   passed.` Standalone: `sh trading/devtools/checks/token_usage_report_test.sh`
   prints `=== Results: 33 passed, 0 failed ===`. Live:
   `sh dev/scripts/token_usage_report.sh --since <date>`.
+## Added 2026-09-23 (harness-maintainer, harness/2921-tier4-snapshot-mode, issue #2921)
+
+- **H-TIER4-SNAPSHOT-MODE-PARSER-DRIFT** (DONE): `dev/scripts/run_tier4_release_gate.sh`
+  built `SNAPSHOT_FLAGS="--snapshot-mode"` and passed it to
+  `scenario_runner.exe`, whose parser (`_parse_flag` in
+  `trading/trading/backtest/scenarios/scenario_runner.ml`) has **never** had
+  such an arm -- only `--snapshot-dir <path>`. Any unknown token falls
+  through to `_usage ()` -> exit 1 *before a single cell runs*, so **every
+  non-`--dry-run` tier-4-scale invocation died at argument parsing**.
+  `--snapshot-mode` is a legacy no-op on a DIFFERENT parser
+  (`Backtest_runner_args`) -- the second instance of exactly this drift
+  shape (a caller written against one runner's flag vocabulary, pointed at
+  another's). Unnoticed because the tier-4 gate is manual/local and rarely
+  run. Found by qc-behavioral on #2920 (advisory A1) while checking that
+  `dev/scripts/perf_pit_smoke.sh` "reuses the `$SNAPSHOT_FLAGS` convention"
+  -- the convention it cited was the broken one.
+
+  **Fix:** drop `--snapshot-mode`; keep `--snapshot-dir` when
+  `PERF_TIER4_SCALE_SNAPSHOT_DIR` is set. The header's "we pass the flag
+  explicitly to be future-proof against the F.2 default ever flipping back"
+  rationale was never true of this runner and is replaced by an explicit
+  DO-NOT-RE-ADD note citing #2921.
+
+  **Reproduction (both forms measured, on this GHA runner):**
+  - *Wrapper, before:* `PERF_TIER4_SCALE_TIMEOUT=120 sh
+    dev/scripts/run_tier4_release_gate.sh` -> `passed: 0 failed: 2`, both
+    cells dying in 0-1s; each per-cell log contains only the
+    `Usage: scenario_runner [...]` line. *After:* same command at
+    `PERF_TIER4_SCALE_TIMEOUT=90` -> `passed: 1 failed: 1`;
+    `tier4-broad-1y` **runs to completion and PASSes in 42s** (`-19.1%`,
+    24 trades) and `tier4-broad-10y` is cut off mid-run by the artificially
+    short 90s timeout (its log shows the simulator window + snapshot cache
+    lines, i.e. real work, not an arg-parse death). A real gate run would
+    use the 43200s default.
+  - *Runner directly:* `scenario_runner.exe --dir <smoke> --parallel 1
+    --fixtures-root <...> --no-emit-all-eligible --snapshot-mode` -> usage +
+    `exit=1`; the identical command without `--snapshot-mode` -> `exit=0`,
+    `1/1 scenarios passed`.
+
+  **Durable guard (the LINTER_CANDIDATE harness gap from the issue):**
+  `trading/devtools/checks/scenario_runner_flag_drift.sh` -- every `--flag`
+  any `dev/scripts/*.sh` passes to `scenario_runner.exe` must appear in that
+  runner's own `_parse_flag` / `_usage` text. The accept-set is **extracted
+  from `scenario_runner.ml` at run time, not hardcoded**, so adding a flag
+  to the runner needs no edit here. It joins backslash continuations (same
+  technique as `scenario_diagnostic_flag.sh`), trims each command to the
+  text *after* the runner mention (so dune's own `--no-build` is correctly
+  ignored), and expands two kinds of variable indirection to a fixpoint:
+  flag-valued variables (`SNAPSHOT_FLAGS="--snapshot-mode"` -- this is what
+  catches the actual #2921 bug, where the bad flag never appears on the
+  invocation line) and runner-path variables (`"$runner_exe" --dir ...`, as
+  in `check_sp500_baseline.sh` / `promote_config.sh`). An empty accept-set
+  is a hard failure, not a pass. Wired into `dune runtest` via
+  `trading/devtools/checks/dune` with `(universe)` (H-CHECK-CACHE-BLIND --
+  it reads `dev/scripts/` outside the dune workspace root).
+
+  **Honest scope limits** (also in the script header and the PR body):
+  literals only -- a flag built by concatenation, `printf`, an appending
+  `case` branch, or an env-var default (`${X:---foo}`) is invisible;
+  `dev/scripts/*.sh` only (chain scripts under `dev/experiments/**` and
+  workflow YAML are out of scope); argument *values* are not checked; a flag
+  present in `_usage ()` with no parser arm is accepted (a different drift
+  class); the command window ends at the first line without a trailing
+  backslash, so a here-doc/`$(...)`-spread invocation would be truncated.
+
+  **Mutation evidence (RED -> GREEN, all captured verbatim in the PR body):**
+  (1) re-add `--snapshot-mode` to the real wrapper -> checker RED naming
+  script + flag, and `dune runtest devtools/checks/` RED at the
+  dune-wired rule (`FAIL: ... passes --snapshot-mode ...` /
+  `FAIL: expected exit 0, got 1`); revert -> GREEN, 49 scripts clean.
+  (2) gut the checker to `exit 0` -> the fixture test RED
+  (`FAIL: expected exit 1, got 0`); restore -> GREEN, 62 checks clean.
+  The fixture suite additionally proves the accept-set is *read*: stubbing a
+  parser that DOES accept `--snapshot-mode` turns the regression fixture
+  GREEN, and narrowing the real parser (dropping `--no-emit-all-eligible`)
+  turns a real, currently-clean script RED.
+
+  **Verify:** `sh trading/devtools/checks/scenario_runner_flag_drift_test.sh`
+  (62 checks) and `dune runtest devtools/checks/`.
