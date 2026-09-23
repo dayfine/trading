@@ -1,0 +1,8 @@
+{
+  "agentType": "qc-behavioral",
+  "description": "QC behavioral #2900",
+  "toolUseId": "toolu_A1",
+  "spawnDepth": 1,
+  "requestShape": "background",
+  "model": "opus"
+}

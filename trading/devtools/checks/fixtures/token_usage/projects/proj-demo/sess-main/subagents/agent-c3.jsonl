@@ -1,0 +1,3 @@
+{"type":"user","timestamp":"2026-09-19T08:00:00.000Z","agentId":"c3","message":{"content":"Orphan dispatch with no meta.json and no launching record."}}
+{"type":"assistant","timestamp":"2026-09-19T08:00:04.000Z","agentId":"c3","message":{"id":"msg_c1","model":"claude-opus-5","usage":{"input_tokens":1,"output_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":10},"content":[{"type":"tool_use","id":"t3","name":"Bash","input":{"command":"sleep 1"}}]}}
+{"type":"user","timestamp":"2026-09-19T08:00:06.000Z","agentId":"c3","sourceToolAssistantUUID":"x3","message":{"content":[{"type":"tool_result","tool_use_id":"t3","content":"ok"}]}}
