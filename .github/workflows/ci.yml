@@ -138,3 +138,11 @@ jobs:
       - name: orchestrator_fastexit_gate guards
         working-directory: .
         run: sh dev/scripts/orchestrator_fastexit_gate_test.sh
+
+      # merge_pr_when_clean (inline shell in orchestrator.yml, issue #2913):
+      # the function is extracted from the workflow at run time and driven
+      # with a mock curl -- pins the update-branch-at-most-twice bound whose
+      # failure mode is silent non-publication. Offline, no network.
+      - name: orchestrator_merge_gate guards
+        working-directory: .
+        run: sh dev/scripts/orchestrator_merge_gate_test.sh
