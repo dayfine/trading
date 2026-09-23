@@ -1188,3 +1188,16 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:prune_candidates_pr_test_runner.sh})))
+
+; #2891: pin the shared perf-tier summary.txt FAIL-row parser
+; (dev/lib/perf_fail_rows.sh) and that every perf-tier*.yml workflow
+; sources it rather than re-inlining its own awk. Reads dev/lib/ and
+; .github/workflows/ via repo_root() at RUN TIME (both outside the dune
+; workspace root), so (universe) is required for the same reason as
+; gnu_time_rss_smoke.sh above (H-CHECK-CACHE-BLIND).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:perf_fail_rows_smoke.sh})))

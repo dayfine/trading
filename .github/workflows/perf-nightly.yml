@@ -11,6 +11,12 @@
 # off once the budgets in dev/plans/perf-scenario-catalog-2026-04-25.md
 # tier 2 are pinned (~10 weeks of nightly data).
 #
+# Per-cell logs/RSS/wall files are uploaded as a run artefact and FAIL rows
+# are promoted to the job summary + GHA `::warning::` annotations (issue
+# #2891, artifact upload originally landed in #2894) — a FAIL row used to
+# be both invisible on the run page and undiagnosable after the fact once
+# the runner tore down.
+#
 # Tier-2 scenarios covered (kept in sync via
 # trading/devtools/checks/perf_catalog_check.sh — `;; perf-tier: 2` tag is
 # the source of truth, the discovery in the runner script auto-matches):
@@ -72,6 +78,20 @@ jobs:
         id: tier2
         continue-on-error: true
         run: dev/scripts/perf_tier2_nightly.sh
+
+      # FAIL rows promoted above the full table + into GHA annotations, via
+      # the shared parser (dev/lib/perf_fail_rows.sh, #2891) all three perf
+      # workflows use -- see that file's header for the summary.txt shape.
+      - name: Surface perf FAIL rows
+        if: always()
+        run: |
+          # shellcheck disable=SC1091  # relative to $GITHUB_WORKSPACE at runtime; shellcheck can't follow it statically
+          . dev/lib/perf_fail_rows.sh
+          summary_file=$(find dev/perf -maxdepth 2 -path 'dev/perf/tier2-nightly-*/summary.txt' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
+          if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
+            _perf_write_fail_summary "$summary_file" "Tier-2 perf nightly" >>"$GITHUB_STEP_SUMMARY"
+            _perf_emit_fail_annotations "$summary_file" "perf-tier2-nightly-${{ github.run_id }}"
+          fi
 
       - name: Publish summary
         if: always()

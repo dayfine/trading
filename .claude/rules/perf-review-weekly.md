@@ -38,6 +38,13 @@ the handle cap (`SNAPSHOT_MAX_MMAP_HANDLES`, #2839) are the per-run signals.
 2. **FAIL rows are invisible.** `perf-nightly.yml` / `perf-weekly.yml` run
    with `continue-on-error: true`; on 2026-09-14 the weekly table carried two
    FAIL rows (`sp500-2010-2026*`, ~4,750 s) and the workflow reported success.
+   **Fixed 2026-09-22 (#2894, #2891):** all three perf workflows now upload
+   the per-cell `.log` / `.error` / `.peak_rss` / `.wall_sec` files as a run
+   artefact (`if: always()`), and FAIL rows are promoted to the job summary
+   (above the full table) and to GHA `::warning::` annotations via the
+   shared `dev/lib/perf_fail_rows.sh` parser — a FAIL row is now visible on
+   the run page and root-causable from the artefact without re-running
+   anything. `continue-on-error: true` itself is unchanged; see #2891.
 3. **Nobody reads the table week to week.** Drift only surfaces when a cell
    dies.
 

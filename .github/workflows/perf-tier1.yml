@@ -17,6 +17,12 @@
 # continue-on-error: true for now — they're VISIBILITY-first while
 # their budgets warm up (~10 weeks / ~10 weekly cycles of data).
 #
+# Per-cell logs/RSS/wall files are uploaded as a run artefact and FAIL rows
+# are promoted to the job summary + GHA `::warning::` annotations (issue
+# #2891; artifact upload for tier2/tier3 shipped first in #2894) — a FAIL
+# row used to be both invisible on the run page and undiagnosable after the
+# fact once the runner tore down.
+#
 # Tier-1 scenarios covered (kept in sync via trading/devtools/checks/perf_catalog_check.sh):
 #   trading/test_data/backtest_scenarios/perf-sweep/bull-3m.sexp
 #   trading/test_data/backtest_scenarios/perf-sweep/bull-6m.sexp
@@ -59,6 +65,20 @@ jobs:
         continue-on-error: false
         run: dev/scripts/perf_tier1_smoke.sh
 
+      # FAIL rows promoted above the full table + into GHA annotations, via
+      # the shared parser (dev/lib/perf_fail_rows.sh, #2891) all three perf
+      # workflows use -- see that file's header for the summary.txt shape.
+      - name: Surface perf FAIL rows
+        if: always()
+        run: |
+          # shellcheck disable=SC1091  # relative to $GITHUB_WORKSPACE at runtime; shellcheck can't follow it statically
+          . dev/lib/perf_fail_rows.sh
+          summary_file=$(find dev/perf -maxdepth 2 -path 'dev/perf/tier1-smoke-*/summary.txt' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
+          if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
+            _perf_write_fail_summary "$summary_file" "Tier-1 perf smoke" >>"$GITHUB_STEP_SUMMARY"
+            _perf_emit_fail_annotations "$summary_file" "perf-tier1-smoke-${{ github.run_id }}"
+          fi
+
       - name: Publish summary
         if: always()
         run: |
@@ -74,3 +94,16 @@ jobs:
           else
             echo "Tier-1 perf smoke: no summary produced." >>"$GITHUB_STEP_SUMMARY"
           fi
+
+      # Per-cell logs + peak_rss/wall_sec files. Without this a FAIL row was
+      # undiagnosable: the cell's stdout/stderr goes to <cell>.log, which
+      # never reached the workflow log -- same defect as tier2/tier3 (#2894),
+      # never fixed for tier1 (#2891).
+      - name: Upload run artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-tier1-smoke-${{ github.run_id }}
+          path: dev/perf/tier1-smoke-*/
+          retention-days: 14
+          if-no-files-found: warn
