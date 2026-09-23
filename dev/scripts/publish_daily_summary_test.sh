@@ -684,15 +684,20 @@ check "publish --summary missing its value exits 2" 2 "$rc"
 # (a2) below (all four entries dirty at once, each independently asserted
 # onto the remote, plus two near-miss witnesses INSIDE dev/) closes all
 # four:
-#   (e) widen the `dev/status/_index.md` entry (a FILE) to `dev/status`
-#       (the whole DIRECTORY) -> "near-miss: dev/status/harness.md (not
-#       _index.md) is NOT on the remote" goes red (a routinely-dirty
-#       per-track status file gets swept into the daily-summary commit).
+#   (e) [SUPERSEDED by issue #2912, 2026-09-23] the `dev/status` entry used
+#       to be the single FILE `dev/status/_index.md`, and this scenario
+#       pinned that a per-track status file was NOT swept. The orchestrator's
+#       own Step 2e.1 writes `dev/status/cleanup.md`, and run 35728381545
+#       silently dropped that edit -- so the entry is now the DIRECTORY and
+#       the witness is inverted: "dev/status/cleanup.md (Step 2e.1 write)
+#       reaches the remote" goes red if the entry is narrowed back to the
+#       file. The "inside dev/ but outside the allowlist" pin moves to the
+#       dev/notes/ and dev/plans/ witnesses below.
 #   (f) drop `dev/audit` from `_RUN_ARTIFACT_PATHS` -> "all-four:
 #       dev/audit/ entry reaches the remote" goes red.
 #   (g) reduce `_RUN_ARTIFACT_PATHS` to `dev/health` alone (dropping
 #       `dev/status/_index.md`, `dev/reviews`, AND `dev/audit`) -> all
-#       three of "all-four: dev/status/_index.md (FILE entry) reaches the
+#       three of "all-four: dev/status/_index.md reaches the
 #       remote", "all-four: dev/reviews/ entry reaches the remote", and
 #       "all-four: dev/audit/ entry reaches the remote" go red at once.
 # Scenario (h) pins a `_stage_run_artifacts` guard that has no dedicated
@@ -729,22 +734,24 @@ _reset_mock_env
 # asserted onto the remote -- so dropping (or widening) any SINGLE entry
 # from `_RUN_ARTIFACT_PATHS` reddens a NAMED check here (see mutations (e),
 # (f), (g) above). Also includes two near-miss negative witnesses INSIDE
-# dev/ -- a per-track status file that is NOT _index.md, and a dev/notes/
-# file -- neither of which is allowlisted at all: unlike (b) below's
-# witness (README.md, outside dev/ entirely), these sit inside the
-# protected prefix, so they are NOT caught merely by widening the scan to
-# the whole of dev/, only by widening (or dropping) the SPECIFIC entry
-# that would sweep them in.
+# dev/ -- a dev/notes/ file and a dev/plans/ file -- neither of which is
+# allowlisted at all: unlike (b) below's witness (README.md, outside dev/
+# entirely), these sit inside the protected prefix, so they are NOT caught
+# merely by widening the scan to the whole of dev/, only by widening (or
+# dropping) the SPECIFIC entry that would sweep them in. The dev/status/
+# entry is a DIRECTORY since issue #2912, so a per-track file the run
+# edited (Step 2e.1: cleanup.md) is asserted POSITIVELY onto the remote.
 _init_fixture
 _write_summary 2026-09-08 "" 202609080900 >/dev/null
 (cd "$REPO_DIR" && git add dev/daily && git commit -q -m "add summary")
-mkdir -p "$REPO_DIR/dev/status" "$REPO_DIR/dev/reviews" "$REPO_DIR/dev/audit" "$REPO_DIR/dev/health" "$REPO_DIR/dev/notes"
+mkdir -p "$REPO_DIR/dev/status" "$REPO_DIR/dev/reviews" "$REPO_DIR/dev/audit" "$REPO_DIR/dev/health" "$REPO_DIR/dev/notes" "$REPO_DIR/dev/plans"
 printf '# index\n' >"$REPO_DIR/dev/status/_index.md"
-printf '# track status\n' >"$REPO_DIR/dev/status/harness.md"
+printf '# cleanup backlog\n' >"$REPO_DIR/dev/status/cleanup.md"
 printf '# review\n' >"$REPO_DIR/dev/reviews/qc-2026-09-08.md"
 printf '{"finding": "audit-x"}\n' >"$REPO_DIR/dev/audit/2026-09-08-audit.json"
 printf '# fast scan\n' >"$REPO_DIR/dev/health/2026-09-08-fast.md"
 printf '# scratch note\n' >"$REPO_DIR/dev/notes/scratch.md"
+printf '# draft plan\n' >"$REPO_DIR/dev/plans/scratch-plan.md"
 _reset_mock_env
 MOCK_CREATE_PR_NUMBER=1005
 MOCK_CREATE_PR_URL=https://github.com/dayfine/trading/pull/1005
@@ -754,7 +761,9 @@ _out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
 check "all-four-artifacts: publish still succeeds" 0 "$rc"
 
 _pushed_index=$(_remote_file_content ops/daily-2026-09-08 dev/status/_index.md)
-check_contains "all-four: dev/status/_index.md (FILE entry) reaches the remote" "$_pushed_index" "index"
+check_contains "all-four: dev/status/_index.md reaches the remote" "$_pushed_index" "index"
+_pushed_cleanup=$(_remote_file_content ops/daily-2026-09-08 dev/status/cleanup.md)
+check_contains "all-four: dev/status/cleanup.md (Step 2e.1 write, issue #2912) reaches the remote" "$_pushed_cleanup" "cleanup backlog"
 _pushed_review=$(_remote_file_content ops/daily-2026-09-08 dev/reviews/qc-2026-09-08.md)
 check_contains "all-four: dev/reviews/ entry reaches the remote" "$_pushed_review" "review"
 _pushed_audit2=$(_remote_file_content ops/daily-2026-09-08 dev/audit/2026-09-08-audit.json)
@@ -762,13 +771,12 @@ check_contains "all-four: dev/audit/ entry reaches the remote" "$_pushed_audit2"
 _pushed_health2=$(_remote_file_content ops/daily-2026-09-08 dev/health/2026-09-08-fast.md)
 check_contains "all-four: dev/health/ entry reaches the remote" "$_pushed_health2" "fast scan"
 
-# near-miss #1: a per-track status file (NOT _index.md) must NOT ride
-# along with the _index.md FILE entry -- catches widening it to the whole
-# dev/status/ DIRECTORY.
-_pushed_track_status=$(_remote_file_content ops/daily-2026-09-08 dev/status/harness.md)
-check "near-miss: dev/status/harness.md (not _index.md) is NOT on the remote" "" "$_pushed_track_status"
-_track_status_dirty=$(cd "$REPO_DIR" && git status --porcelain -uall -- dev/status/harness.md)
-check_contains "near-miss: dev/status/harness.md is still dirty in the working tree" "$_track_status_dirty" "harness.md"
+# near-miss #1: dev/plans/ is not an allowlisted class -- catches widening
+# the dev/status entry (or any entry) further up to the whole of dev/.
+_pushed_plan=$(_remote_file_content ops/daily-2026-09-08 dev/plans/scratch-plan.md)
+check "near-miss: dev/plans/scratch-plan.md is NOT on the remote" "" "$_pushed_plan"
+_plan_dirty=$(cd "$REPO_DIR" && git status --porcelain -uall -- dev/plans/scratch-plan.md)
+check_contains "near-miss: dev/plans/scratch-plan.md is still dirty in the working tree" "$_plan_dirty" "scratch-plan.md"
 
 # near-miss #2: dev/notes/ is not an allowlisted class at all.
 _pushed_notes=$(_remote_file_content ops/daily-2026-09-08 dev/notes/scratch.md)

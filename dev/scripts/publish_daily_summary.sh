@@ -80,7 +80,7 @@
 #       runtime) invokes this script UNCHANGED as
 #       `publish_daily_summary.sh publish --summary "$SUMMARY_FILE"`, and
 #       previously that staged only the one named file -- so
-#       `dev/status/_index.md` (Step 5.5 reconcile), `dev/reviews/*.md`
+#       `dev/status/*.md` (Step 5.5 reconcile, Step 2e.1 refreshes), `dev/reviews/*.md`
 #       (QC records), `dev/audit/*.json` (audit records), and
 #       `dev/health/*.md` (health reports) rode along in the working tree
 #       with no publisher, and were then destroyed by the orchestrator
@@ -165,13 +165,24 @@ _branch_name_for() {
 # else, so a stray dirty file anywhere else in the tree (a half-finished
 # edit from a concurrent process, leftover scratch state, etc.) can never
 # be swept into the daily-summary commit by accident. Every entry lives
-# under dev/ and matches what the orchestrator's Step 5/5.5/6.3 actually
-# write:
-#   dev/status/_index.md  -- Step 5.5 track-status reconcile
+# under dev/ and matches what the orchestrator's Step 2e.1/5/5.5/6.3
+# actually write:
+#   dev/status/           -- Step 5.5 `_index.md` reconcile AND Step 2e.1's
+#                            per-track refreshes (e.g. `cleanup.md`'s
+#                            §Backlog from the latest health scan). Issue
+#                            #2912: the entry used to be the single file
+#                            `dev/status/_index.md`, so the 2026-09-22 run's
+#                            Step 2e.1 edit to `dev/status/cleanup.md` was
+#                            silently left behind (publish reported success,
+#                            `git status` still showed it modified). On the
+#                            orchestrator runner the tree is a fresh checkout,
+#                            so any dirty `dev/status/*.md` is the run's own
+#                            documented write -- agents edit their track
+#                            files on their own branches, never here.
 #   dev/reviews/          -- Step 5 QC review records (*.md)
 #   dev/audit/            -- Step 5 stage-4 audit records (*.json)
 #   dev/health/           -- Step 6.3 health-scanner fast-scan reports (*.md)
-_RUN_ARTIFACT_PATHS="dev/status/_index.md dev/reviews dev/audit dev/health"
+_RUN_ARTIFACT_PATHS="dev/status dev/reviews dev/audit dev/health"
 
 # _stage_run_artifacts
 # Stages (via `git add`) whichever of $_RUN_ARTIFACT_PATHS exist on disk,
