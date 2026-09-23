@@ -363,14 +363,20 @@ cmd_publish() {
 
   echo "publish_daily_summary: resolved summary=$_summary branch=$_branch base=$BASE_BRANCH"
 
+  # An already-open PR means "reuse the branch", NOT "we are done" (issue
+  # #2930): the commit + push below still run so an UPDATED summary reaches
+  # the branch tip; only the PR-create POST is skipped. The earlier
+  # return-0-here shape left the second publish of a day silently landing
+  # nothing (exit 0, file still modified, origin unchanged), which blocked
+  # the publish-early mitigation for H-DAILY-SUMMARY-PR-LOST.
+  _existing=""
   if [ "$_dry_run" -eq 0 ]; then
     _existing=$(_find_open_pr_for_head "$_branch") || {
       echo "publish_daily_summary: could not check for an existing PR for $_branch (network/auth failure) -- refusing to proceed blind" >&2
       return 1
     }
     if [ -n "$_existing" ]; then
-      echo "publish_daily_summary: PR already open for $_branch: #$_existing"
-      return 0
+      echo "publish_daily_summary: PR already open for $_branch: #$_existing -- reusing the branch and updating it in place"
     fi
   else
     echo "publish_daily_summary: --dry-run, skipping existing-PR lookup"
@@ -418,9 +424,26 @@ cmd_publish() {
     return 0
   fi
 
-  if ! git push -u "$REMOTE" "$_branch"; then
+  # A GENUINE no-op (nothing new committed AND the remote branch already sits
+  # at this tip) is reported as such, distinguishably from the silent skip
+  # this script used to do. It is still exit 0: nothing was lost.
+  _noop=0
+  if [ "$_staged_something" -eq 0 ]; then
+    _remote_tip=$(git rev-parse --verify --quiet "$REMOTE/$_branch" 2>/dev/null || true)
+    if [ -n "$_remote_tip" ] && [ "$_remote_tip" = "$(git rev-parse HEAD)" ]; then
+      _noop=1
+      echo "publish_daily_summary: nothing to commit and $REMOTE/$_branch is already at $(git rev-parse --short HEAD) -- genuine no-op, nothing new to publish"
+    fi
+  fi
+
+  if [ "$_noop" -eq 0 ] && ! git push -u "$REMOTE" "$_branch"; then
     echo "publish_daily_summary: git push failed for $_branch -- the summary is committed LOCALLY but NOT published. This is the exact failure shape H-DAILY-SUMMARY-PR-LOST exists to surface loudly instead of losing silently." >&2
     return 1
+  fi
+
+  if [ -n "$_existing" ]; then
+    echo "publish_daily_summary: PR #$_existing (already open; branch $_branch updated in place, PR create skipped)"
+    return 0
   fi
 
   _body_file=$(mktemp)

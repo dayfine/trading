@@ -370,21 +370,58 @@ _reset_mock_env
 
 # =============================================================================
 # Scenario group 5: idempotency -- an already-open PR is reported, not
-# duplicated, and no git branch work happens at all
+# duplicated (the PR-create POST is skipped), but the branch IS still
+# committed to and pushed so updated content lands (issue #2930). A genuine
+# no-op (nothing new, remote already at the tip) is reported distinguishably.
+#
+# Mutation-verified 2026-09-23: restoring the pre-#2930 `return 0` on the
+# existing-PR path flips "already-open PR: UPDATED content reaches the
+# remote" and "already-open PR: branch is pushed" to FAIL; dropping the
+# `[ -n "$_existing" ]` short-circuit before _create_pr flips "already-open
+# PR: PR-create POST is NOT sent" to FAIL.
 # =============================================================================
 _init_fixture
 _write_summary 2026-09-08 "" 202609080900 >/dev/null
 (cd "$REPO_DIR" && git add dev/daily && git commit -q -m "add summary")
-_start_branch=$(cd "$REPO_DIR" && git rev-parse --abbrev-ref HEAD)
+_g5_main=$(cd "$REPO_DIR" && git rev-parse --abbrev-ref HEAD)
 _reset_mock_env
 MOCK_LOOKUP_PR_NUMBER=77
-export MOCK_LOOKUP_PR_NUMBER
+MOCK_CREATE_PAYLOAD_FILE="$MOCK_BIN_DIR/.g5_create_payload"
+export MOCK_LOOKUP_PR_NUMBER MOCK_CREATE_PAYLOAD_FILE
+rm -f "$MOCK_CREATE_PAYLOAD_FILE"
 rc=0
 _out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
 check "publish with an existing open PR succeeds (idempotent)" 0 "$rc"
 check_contains "existing-PR path reports the PR number" "$_out" "PR already open for ops/daily-2026-09-08: #77"
+check_contains "existing-PR path reports the PR as the publish result" "$_out" "PR #77 (already open"
 _branch_after=$(cd "$REPO_DIR" && git rev-parse --abbrev-ref HEAD)
-check "existing-PR path does not touch branches" "$_start_branch" "$_branch_after"
+check "already-open PR: the ops/daily branch is still created/switched to" "ops/daily-2026-09-08" "$_branch_after"
+_pushed_content=$(_remote_file_content ops/daily-2026-09-08 dev/daily/2026-09-08.md)
+check_contains "already-open PR: branch is pushed" "$_pushed_content" "Status - 2026-09-08"
+check "already-open PR: PR-create POST is NOT sent" 0 "$([ -f "$MOCK_CREATE_PAYLOAD_FILE" ] && echo 1 || echo 0)"
+
+# Second publish of the same day with MODIFIED content (the publish-early
+# flow: open at Step 6, update in place at Step 8) -- the update must reach
+# the branch tip on the remote, with the PR still not re-created.
+(cd "$REPO_DIR" && git switch -q "$_g5_main")
+printf '# Status - 2026-09-08\n\n**Mode:** FULL\n\n## Escalations\n\nA-FASTEXIT-VACUOUS\n' >"$REPO_DIR/dev/daily/2026-09-08.md"
+rm -f "$MOCK_CREATE_PAYLOAD_FILE"
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "already-open PR: second publish with modified content succeeds" 0 "$rc"
+check_contains "already-open PR: second publish still reports the PR" "$_out" "PR #77 (already open"
+_pushed_content=$(_remote_file_content ops/daily-2026-09-08 dev/daily/2026-09-08.md)
+check_contains "already-open PR: UPDATED content reaches the remote" "$_pushed_content" "A-FASTEXIT-VACUOUS"
+check "already-open PR: second publish sends no PR-create POST either" 0 "$([ -f "$MOCK_CREATE_PAYLOAD_FILE" ] && echo 1 || echo 0)"
+_dirty_after=$(cd "$REPO_DIR" && git status --porcelain -- dev/daily/2026-09-08.md)
+check "already-open PR: the summary is committed (working tree clean for it)" "" "$_dirty_after"
+
+# Third publish with NOTHING new: a genuine no-op, said explicitly, exit 0.
+rc=0
+_out=$(_run_publish_live --date 2026-09-08 2>&1) || rc=$?
+check "already-open PR: no-op republish exits 0" 0 "$rc"
+check_contains "already-open PR: no-op republish says so explicitly" "$_out" "genuine no-op, nothing new to publish"
+check_contains "already-open PR: no-op republish still reports the PR" "$_out" "PR #77 (already open"
 _reset_mock_env
 
 # 422-on-create ("already exists") falls back to the lookup and still
