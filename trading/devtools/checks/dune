@@ -968,6 +968,19 @@
  (action
   (run sh %{dep:orchestrator_fastexit_gate_test_runner.sh})))
 
+; merge_pr_when_clean fixture test (issue #2913, PR #2939 behavioral QC): the
+; inline-shell merge poller in .github/workflows/orchestrator.yml is extracted
+; at run time and driven with a mock curl/sleep on PATH (behind -> update-branch
+; at most twice -> merge; stdout exactly true/false). Same shim + (universe)
+; pattern as orchestrator_fastexit_gate_test_runner.sh above: the workflow and
+; the test both live outside the dune workspace root.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:orchestrator_merge_gate_test_runner.sh})))
+
 ; goldens_affected_check test (issue #2393): pins the PR-time detector
 ; for a config-default change that only a postsubmit golden would notice
 ; (the #2384 clock26 -38.42pp episode). goldens_affected_check.sh itself
