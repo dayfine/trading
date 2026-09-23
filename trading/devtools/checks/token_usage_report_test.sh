@@ -55,6 +55,33 @@
 #   30-31 WINDOW FILTERING, including that the agent-type join still works for
 #         a row whose parent session record is OUTSIDE the window (the index
 #         is built before filtering).
+#   32-37 TOTALS BY VALUE. Asserting only that the `totals` KEY EXISTS is the
+#         cheerful-zero hole in its purest form: every aggregate could read 0,
+#         or silently drop a whole token class, and the report still has the
+#         right shape. On this fixture, dropping `cache_read` from
+#         `subagent_tokens` turns 4491 into 891 (5x) and `main_tokens`
+#         457063 into 7063 (65x) -- both are the figures the report prints
+#         LAST and LARGEST, i.e. the ones a reader quotes. Each total is
+#         pinned to a value that differs under each of its terms being lost.
+#   38-42 PER-ROW FIELDS the earlier blocks do not reach: `input_tokens`
+#         (pinned by value, so a zeroed column is caught), `ref` parsed from
+#         the description AND its empty case (a `ref` must never be invented,
+#         same discipline as `unknown` in 5-7), `wall_seconds` derived from
+#         the timestamp span, and histogram `p50` (pinned to a value distinct
+#         from `max`, so a percentile that silently reports the max is
+#         caught).
+#   43    ROWS ORDERING. `rows` is sorted largest-total-first, and that order
+#         is the contract `--top` truncates against -- an inverted sort makes
+#         `--top N` report the N SMALLEST dispatches under a header that says
+#         otherwise.
+#   44    --until, symmetric with the --since coverage in 30-31.
+#   45-48 TABLE CONTENT. `table` is the DEFAULT format and the one a human
+#         actually reads, so the assertions above (all JSON) leave the primary
+#         renderer unpinned: it could print zeros for every headline total or
+#         emit no dispatch rows at all. These pin the totals line by value,
+#         the dispatch row count, and that --top truncation is both ANNOUNCED
+#         (47) and APPLIED (48) -- dropping the `.rows[0:$top]` slice leaves
+#         the suppression notice intact, so 47 alone does not catch it.
 #
 # Run:
 #   sh trading/devtools/checks/token_usage_report_test.sh
@@ -213,6 +240,60 @@ else
   expect_eq "--since: agent_type join survives its parent session being filtered out" \
     "harness-maintainer" "$(jq -r '.rows[0].agent_type' "$TMP/win.json")"
 fi
+
+# --- 32-37: totals.* BY VALUE (key presence alone is a cheerful-zero hole) --
+expect_eq "totals: subagent_tokens sums all four token classes over dispatches" \
+  "4491" "$(q '.totals.subagent_tokens')"
+expect_eq "totals: main_tokens sums all four token classes over sessions" \
+  "457063" "$(q '.totals.main_tokens')"
+expect_eq "totals: api_calls spans dispatches + sessions" "8" "$(q '.totals.api_calls')"
+expect_eq "totals: input_tokens spans dispatches + sessions" "24" "$(q '.totals.input_tokens')"
+expect_eq "totals: cache_read spans dispatches + sessions" \
+  "453600" "$(q '.totals.cache_read_input_tokens')"
+expect_eq "totals: resumes aggregates the per-row resume counts" "1" "$(q '.totals.resumes')"
+
+# --- 38-42: per-row fields not otherwise pinned ----------------------------
+expect_eq "row: input_tokens is summed, not zeroed" "15" "$(row a1 .input_tokens)"
+expect_eq "ref: parsed from the description" "#2922" "$(row b2 .ref)"
+expect_eq "ref: a description with no #NNNN yields empty, not invented" "" "$(row c3 .ref)"
+expect_eq "wall_seconds: last timestamp minus first" "630" "$(row b2 .wall_seconds)"
+expect_eq "histogram: p50 is a median, not the max" "161001" "$(q '.context_histogram.p50')"
+
+# --- 43: rows ordering (the contract --top truncates against) --------------
+expect_eq "rows sorted by total tokens, largest first" \
+  "a1 b2 c3" "$(q '[.rows[].agent_id] | join(" ")')"
+
+# --- 44: --until, symmetric with the --since coverage above ----------------
+set +e
+sh "$SCRIPT" --projects-dir "$FIX/projects" --until 2026-09-20 --format json \
+  >"$TMP/until.json" 2>&1
+UNTIL_RC=$?
+set -e
+if [ "$UNTIL_RC" -ne 0 ]; then
+  bad "--until window run failed (rc=$UNTIL_RC)"
+else
+  expect_eq "--until 2026-09-20 drops the later dispatch" \
+    "2" "$(jq -r '.rows | length' "$TMP/until.json")"
+fi
+
+# --- 45-47: table format -- CONTENT, not just exit code --------------------
+# `table` is the default format and the one a human reads; every assertion
+# above runs against --format json, so without these the primary renderer is
+# entirely unpinned.
+sh "$SCRIPT" --projects-dir "$FIX/projects" >"$TMP/table.txt" 2>/dev/null
+expect_eq "table: totals line carries the real headline figures" \
+  "1" "$(grep -c 'subagent_tokens 4491   main_tokens 457063' "$TMP/table.txt")"
+expect_eq "table: one line per dispatch row" \
+  "3" "$(grep -cE '^2026-09-[0-9]{2} sess-main  [a-z]' "$TMP/table.txt")"
+expect_eq "table: --top 1 truncates and says so" \
+  "1" "$(sh "$SCRIPT" --projects-dir "$FIX/projects" --top 1 2>/dev/null \
+         | grep -c 'further dispatch row(s) suppressed')"
+# The line above pins that the suppression NOTICE is printed; this one pins
+# that the truncation actually HAPPENED. Dropping the `.rows[0:$top]` slice
+# leaves the notice intact, so the notice alone does not catch it.
+expect_eq "table: --top 1 emits exactly one dispatch row" \
+  "1" "$(sh "$SCRIPT" --projects-dir "$FIX/projects" --top 1 2>/dev/null \
+         | grep -cE '^2026-09-[0-9]{2} sess-main  [a-z]')"
 
 # --------------------------------------------------------------------------
 printf '=== Results: %s passed, %s failed ===\n' "$PASS" "$FAILED"

@@ -3088,7 +3088,7 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   any earlier parse error is fatal, because a silently truncated prefix would
   under-report every total in the file.
 
-  **Test:** `trading/devtools/checks/token_usage_report_test.sh`, 33 assertions
+  **Test:** `trading/devtools/checks/token_usage_report_test.sh`, 50 assertions
   over a committed synthetic transcript tree
   (`trading/devtools/checks/fixtures/token_usage/`), wired into `dune runtest`
   via `trading/devtools/checks/dune` with `(source_tree fixtures/token_usage)`
@@ -3097,8 +3097,11 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   Hermetic: every invocation passes an explicit `--projects-dir` into the
   fixtures; the real `~/.claude` tree is never read by the test.
 
-  **Non-vacuity — 23 mutations, each RED in isolation, GREEN restored, no
-  surviving mutant on any assertion.** M1 drop the `unique_by(.id)` dedup →
+  **Non-vacuity, first pass — 23 mutations targeting the dedup, attribution,
+  resume, outcome, exit-code, histogram and argument-validator paths; each RED
+  in isolation, GREEN restored.** This was never a claim about the suite as a
+  whole — see the rework pass below for the surfaces it did NOT reach.
+  M1 drop the `unique_by(.id)` dedup →
   3 RED (api_calls 2→3, cache_read 3000→4000, output 150→250). M2 invert the
   meta.json/join precedence → 1 RED. M3 `resumes` hardcoded 0 → 1 RED. M4
   `find -mindepth 2` → `-mindepth 1` (every transcript a dispatch) → 1 RED
@@ -3117,6 +3120,30 @@ is that "filed" must mean "written to the backlog the dispatcher reads", not
   validators removed → 1 RED each. M25 `resumes` without the -1 for the
   dispatch brief → 2 RED. The script was verified byte-identical to its
   committed form after the last restore.
+
+  **Rework pass (QC behavioral NEEDS_REWORK on #2927, iteration 1) — +17
+  assertions, 33 → 50.** The first 23 mutations all targeted paths the suite
+  was built around; QC probed the surfaces it was not, and **15 of 16 guarded
+  mutations there survived 33/33**. The `totals` block was asserted for key
+  *presence* only, never for any *value* — so dropping `cache_read` from
+  `subagent_tokens` turned 4491 into 891 (5x) and `main_tokens` 457063 into
+  7063 (65x) with the suite still green, on the two figures the report prints
+  last and largest. `--until`, `--top` truncation, `ref`, `wall_seconds`,
+  per-row `input_tokens`, `p50`/`p90` and the `rows` sort order had no
+  assertion at all; and the default `table` renderer — the one a human
+  actually reads, and the format 7 of the suite's 10 invocations used while
+  asserting only exit codes and stderr — had no content assertion of any kind.
+  Added: six `totals.*` values, five per-row/histogram values (`input_tokens`,
+  `ref` parsed AND its empty case, `wall_seconds`, `p50` pinned distinct from
+  `max`), the `rows` ordering, `--until` (symmetric with the existing
+  `--since` pair), and four table-content assertions (totals line by value,
+  dispatch row count, and `--top 1` both announced and applied). Re-verified
+  with a guard stronger than the first pass — each mutation asserts the
+  pattern was found exactly once, the file differs, is non-empty, and still
+  parses under `dash -n` before the suite runs, and each is scored on the
+  **specific expected RED assertion name** rather than on "some test failed":
+  **17/17 caught** (16 new + the dedup control), script `cmp`-identical to its
+  committed form after every revert.
 
   **Non-vacuity on REAL input** (this GHA runner's own live transcripts,
   `/home/opam/.claude/projects/`, 1 session + 2 subagents — small and
