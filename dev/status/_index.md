@@ -5,7 +5,7 @@ status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
 Last updated: 2026-09-23 (orchestrator run 35862614348; run start `ed126299`, main after this run's
-merge **`92fb8bf9`** (#2929); `dune build` **0**, `dune runtest` **0**, zero `^FAIL:` lines;
+merges **`ade47abb`** (#2929 then #2927); `dune build` **0**, `dune runtest` **0**, zero `^FAIL:` lines;
 `status_file_integrity` **0** — exit codes read **unpiped** (a pipeline reports the last command's
 status, which is how a broken check reads as green). Queue was **empty** at run start (0 open PRs),
 so the whole run went to new harness work rather than the gate loop.
@@ -133,7 +133,7 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2927 | 09-23: #2921 tier-4 flag + parser-drift check MERGED #2929; #2927 token-usage report in rework (CP1: totals/table unpinned by value) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-23: #2921 tier-4 flag + drift guard MERGED #2929; #2922 item 1 token-usage report MERGED #2927; next: #2928 sched-health filter, #2930 publish-early |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (re-audited 09-16): 3 open items, all self-marked deliberate non-actions, + 1 fenced template. Prior itemization corrected |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
