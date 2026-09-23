@@ -1201,3 +1201,21 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:perf_fail_rows_smoke.sh})))
+
+; #2922 item 1: pin dev/scripts/token_usage_report.sh, the per-dispatch token
+; accounting read out of the local Claude Code transcripts. The script lives in
+; dev/scripts/ -- OUTSIDE the dune workspace root -- and the test resolves both
+; it and its fixture tree through repo_root() at RUN TIME, so `(universe)` is
+; required for the same reason as gnu_time_rss_smoke.sh / perf_fail_rows_smoke.sh
+; above (H-CHECK-CACHE-BLIND). The fixture tree is ALSO declared explicitly so a
+; fixture edit is visibly a dependency of this rule rather than relying solely on
+; (universe) to force the re-run.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (source_tree fixtures/token_usage)
+  (universe))
+ (action
+  (run sh %{dep:token_usage_report_test.sh})))
