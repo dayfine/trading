@@ -129,3 +129,26 @@ set (lists are sorted by `avg_dollar_volume` desc, 0 violations), re-weighted; t
 - Cleanup done: 12 merged `codex-*` worktrees removed, 15 stale local bookmarks forgotten; `codex-2915-spy-coverage`
   kept (12 dirty files, Codex live on #2915). MEMORY.md compacted 24.6 → 16.8 KB (was past the 24.4 KB load limit).
 - Items 4–5 of P1: #2921 closed by #2929 (orchestrator); #2876 and #2915 unchanged. #2922 items 2–4 still open.
+
+## 09-23 16:45 PT update — harness wave merged, cell 3 relaunched
+
+- **All four harness PRs merged through the three gates:** #2936 (#2930 publish-in-place), #2937 (#2928 client-side
+  schedule select; two rework iterations), #2938 (#2912 dev/status dir; rebased after #2936), #2939 (#2913
+  update-branch; one rework adding `dev/scripts/orchestrator_merge_gate_test.sh`). Each behavioral review found one
+  unpinned guard and asked for a fixture assertion — all reworks were test-only. Follow-up filed: **#2941**
+  (NO-SCHEDULE reachable by a crowded full page). Main green at every merge.
+- **Chain cell 3 was PAUSED 13:48 PT for the QC wave** (container rule 0: QC outranks an in-flight backtest; cell 1
+  had run 40 min) and **RELAUNCHED 16:40 PT** with the same command and tripwires (lists md5 `a8cdb607…`, runner
+  `683b4885…`, warehouse 9,364, host free 81 G after thinning 23 TM snapshots). Same lane name C3, same log
+  `/tmp/grid-run/chain-C3.log`; the first `RESULT` line (null s0) sizes the guard (≥ 1.5× its wall; currently
+  28,800 s). Six cells; no 26y top-1000 cell has been measured yet.
+- **Ops lessons this wave** (memories updated): three QC agents reported "posted" while the review either had the
+  literal `@file` body (`-f` vs `-F`) or never landed at the new tip — always `pr_gate_status.sh <N>` before removing
+  the agent worktree, and every brief now spells `-F body=@<file>`; `gh pr merge --delete-branch` does NOT delete the
+  remote branch from a detached-HEAD parent (delete it with `git push origin --delete` after each merge); a stacked
+  PR whose base merged reads CONFLICTING on GitHub until rebased (jj rebase was clean); MEMORY.md had crossed the
+  24.4 KB load limit and was compacted to 16.8 KB (231 links intact).
+- **Next:** read cell 3 per README §Cell 3 as cells land (paired.sh per salt, V6 exit 0 per pair), commit per-cell
+  artifacts to `results/` with the `-1000` tags, write the §Verdict + ledger amendment, results-only PR → qc-results.
+  If cap 40 tightens without domination → paired-golden table + promotion PR. Then #2922 items 2–4 and the Monday
+  perf weekly (P1 #2–#3) unchanged.
