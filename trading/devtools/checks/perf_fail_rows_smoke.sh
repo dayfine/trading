@@ -30,6 +30,10 @@
 #      the shared library rather than re-inlining its own awk parser --
 #      the mechanical guard against the #2559-shaped regression (a fix
 #      landing in one copy and failing to propagate to its siblings).
+#   7b. The guard keys on the SOURCE statement (anchored), not a comment
+#      mention -- probed by deleting the source line from a copy (#2919).
+#   8. Both readers tolerate a missing summary file (no rows, count 0).
+#   9. A malformed "failed:" line falls back to counting FAIL rows.
 #
 # Run:
 #   sh trading/devtools/checks/perf_fail_rows_smoke.sh
@@ -215,7 +219,7 @@ for rel in $CALL_SITES; do
 '
     continue
   fi
-  if grep -qE 'dev/lib/perf_fail_rows\.sh' "$path"; then
+  if grep -qE '^[[:space:]]*\.[[:space:]]+.*dev/lib/perf_fail_rows\.sh[[:space:]]*$' "$path"; then
     ok "${LABEL} — ${rel}: sources the shared perf_fail_rows.sh helper"
   else
     bad "${LABEL} — ${rel}: does not reference dev/lib/perf_fail_rows.sh (re-inlined FAIL-row parsing?)"
@@ -225,6 +229,58 @@ for rel in $CALL_SITES; do
 done
 IFS="$OLD_IFS"
 
+
+# ---------------------------------------------------------------------------
+# Assertion 7b (rework, #2919 qc-behavioral CP4): the guard above must key on
+# the SOURCE statement, not a bare mention of the path -- every workflow also
+# names dev/lib/perf_fail_rows.sh in a comment, so an unanchored grep stayed
+# green with the `. dev/lib/...` line deleted. Probe: strip the source line
+# from a copy of one workflow, keep the comment, and require the anchored
+# predicate to reject the copy while the bare-mention grep still accepts it.
+# ---------------------------------------------------------------------------
+PROBE="${WORK}/perf-weekly-no-source.yml"
+sed '/^[[:space:]]*\.[[:space:]][[:space:]]*dev\/lib\/perf_fail_rows\.sh[[:space:]]*$/d' \
+  "${REPO_ROOT_REAL}/.github/workflows/perf-weekly.yml" >"$PROBE"
+if grep -qE 'dev/lib/perf_fail_rows\.sh' "$PROBE" \
+  && ! grep -qE '^[[:space:]]*\.[[:space:]]+.*dev/lib/perf_fail_rows\.sh[[:space:]]*$' "$PROBE"; then
+  ok "${LABEL} — anchored guard rejects a workflow whose source line is gone but whose comment still names the lib"
+else
+  bad "${LABEL} — anchored guard is not load-bearing: a comment-only mention (or a missing comment) confuses it"
+fi
+
+# ---------------------------------------------------------------------------
+# Assertion 8: a missing summary file is handled by both readers -- no rows,
+# count 0 -- so a workflow step never dies on a run that produced nothing.
+# ---------------------------------------------------------------------------
+GOT8A="$(_perf_fail_row_fields "${WORK}/does-not-exist.txt")"
+GOT8B="$(_perf_failed_count "${WORK}/does-not-exist.txt")"
+if [ -z "$GOT8A" ] && [ "$GOT8B" = "0" ]; then
+  ok "${LABEL} — missing summary file: no rows, count 0"
+else
+  bad "${LABEL} — missing summary file: expected '' / '0', got '${GOT8A}' / '${GOT8B}'"
+fi
+
+# ---------------------------------------------------------------------------
+# Assertion 9: a MALFORMED "failed:" line (non-numeric) is ignored and the
+# count falls back to the FAIL rows, distinct from the missing-line case (4).
+# ---------------------------------------------------------------------------
+MALFORMED="${WORK}/malformed_summary.txt"
+cat >"$MALFORMED" <<'EOM'
+Tier-2 perf nightly summary (2026-09-21T070000Z)
+  passed: 1
+  failed: n/a
+
+STATUS  SCENARIO                          WALL      PEAK_RSS
+----------------------------------------------------------------------
+FAIL    crash-2020h1                       55s       102344kB
+PASS    recovery-2023                      41s       97120kB
+EOM
+GOT9="$(_perf_failed_count "$MALFORMED")"
+if [ "$GOT9" = "1" ]; then
+  ok "${LABEL} — malformed 'failed: n/a' line: falls back to counting 1 FAIL row"
+else
+  bad "${LABEL} — malformed 'failed:' line: expected fallback count '1', got '${GOT9}'"
+fi
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
 if [ "$FAIL" -gt 0 ]; then
