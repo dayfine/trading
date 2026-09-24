@@ -171,9 +171,12 @@ case "$TOP" in
 *) ;;
 esac
 
+# Digits only, then numerically > 0: a case pattern alone cannot reject "00" /
+# "000" without also rejecting "007" (#2948 qc-behavioral CP4).
 case "$CTX_THRESHOLD" in
-'' | *[!0-9]* | 0) die "--context-threshold must be a positive integer (tokens), got: $CTX_THRESHOLD" ;;
+'' | *[!0-9]*) die "--context-threshold must be a positive integer (tokens), got: $CTX_THRESHOLD" ;;
 esac
+[ "$CTX_THRESHOLD" -gt 0 ] || die "--context-threshold must be a positive integer (tokens), got: $CTX_THRESHOLD"
 
 command -v jq >/dev/null 2>&1 || die "jq not found on PATH"
 

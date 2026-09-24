@@ -186,6 +186,15 @@ sh "$SCRIPT" --projects-dir "$FIX/projects" --context-threshold 250k >"$TMP/o" 2
 expect_eq "histogram: non-integer --context-threshold is a usage error (exit 2)" "2" "$?"
 sh "$SCRIPT" --projects-dir "$FIX/projects" --context-threshold 0 >"$TMP/o" 2>"$TMP/e"
 expect_eq "histogram: --context-threshold 0 is a usage error (exit 2)" "2" "$?"
+sh "$SCRIPT" --projects-dir "$FIX/projects" --context-threshold 00 >"$TMP/o" 2>"$TMP/e"
+expect_eq "histogram: --context-threshold 00 (numerically zero) is a usage error (exit 2)" "2" "$?"
+# Validated BEFORE any transcript is read: against the empty fixture a bad
+# threshold must exit 2 (usage), not 3 (no transcripts).
+sh "$SCRIPT" --projects-dir "$FIX/empty" --context-threshold 250k >"$TMP/o" 2>"$TMP/e"
+expect_eq "histogram: threshold is validated before transcripts are read (exit 2, not 3)" "2" "$?"
+set -e
+expect_eq "histogram: leading zeros are fine (007 is 7, not rejected)" "3" "$(thr 007)"
+set +e
 set -e
 expect_eq "table: the above-threshold line names the threshold" "1" \
   "$(sh "$SCRIPT" --projects-dir "$FIX/projects" 2>/dev/null | grep -c '^  above 250k: 1/3 calls')"
