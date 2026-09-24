@@ -33,7 +33,7 @@ type t = {
           [notional * rate / trading_days_per_year]. This is the
           {b flat fallback}: consulted for any short whose marked price is not
           covered by a {!short_borrow_rate_tiers} band. *)
-  short_borrow_rate_tiers : Short_margin_tiers.tier list;
+  short_borrow_rate_tiers : Short_margin_tiers.tier list; [@sexp.default []]
       (** Hard-to-borrow price-tiered {b annual borrow rate} table (margin M3a),
           default [[]] (empty). When empty, every short pays the flat
           [short_borrow_fee_annual_pct] — bit-identical to pre-M3a. When armed,
@@ -44,7 +44,7 @@ type t = {
           economics. Searchable via the nested overlay key
           [margin_config.short_borrow_rate_tiers]
           ([.claude/rules/experiment-flag-discipline.md] R2). *)
-  short_maintenance_tiers : Short_margin_tiers.tier list;
+  short_maintenance_tiers : Short_margin_tiers.tier list; [@sexp.default []]
       (** Price-tiered {b maintenance equity ratio} table (margin M3a), default
           [[]] (empty). When empty, every short uses the flat
           [maintenance_margin_pct] — bit-identical to pre-M3a. When armed,
