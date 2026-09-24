@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-24",
+  "feature": "backtest-infra",
+  "branch": "feat/sweep-end-date-guard",
+  "sha": "332040dd7a5db5097630a319a6de440bcd513013",
+  "recorded_at_ns": 1790278473021980247,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 2,
+  "notes": ""
+}
