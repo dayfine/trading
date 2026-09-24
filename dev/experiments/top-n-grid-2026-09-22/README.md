@@ -48,6 +48,8 @@ realised return AND the 3-salt range of maxDD are both narrower than the null's 
   citing this README + the ledger ACCEPT) only if V tightens **≥ 2 of the 3 cells** AND is **never dominated** in any
   cell (dominated = lower mean realised AND lower mean Calmar than the null's 3-salt means). Level gains are not a
   criterion; the mechanism rule (realised AND Calmar better at ≥ 2/3 salts) is reported per cell, not required.
+  *[Clarified 2026-09-24, #2935 qc-results A2: "≥ 2 of 3" is necessary, not sufficient — all three cells must run and
+  §Cell 3 resolves it to a strict 3-of-3 requirement. Quote the §Cell 3 branch table, not this clause.]*
 - With only cells 1 and 2 available, the strongest outcome here is **"2/3 reached, cell 3 pending"** (if 40 tightens
   the sub-window and is not dominated) or **"cell 2 fails to tighten — 40 needs cell 3 to tighten to stay alive"**. No
   promotion PR is opened from this directory alone.
@@ -184,12 +186,12 @@ Per year Y: every entry of the as-run `pit-v11/composition/top-3000-Y.sexp` whos
 `avg_dollar_volume` desc and the goldens top-1000 is the first 1,000 rows of the goldens top-3000 (rank of that minimum
 in the goldens top-3000 = 1,000, checked), so the cut is "the goldens top-1000 members present in the `_v11pit`
 warehouse, AFTER the 09-14 / 09-15 alias passes" (`pit-universe-2026-09-14/step4/specs/alias2.resolved` +
-`twin-scan/alias3.txt`). A plain symbol intersection would drop the aliased twins — 1999: 969 by threshold vs 958 by
+`pit-universe-2026-09-14/step4/twin-scan/alias3.txt`). A plain symbol intersection would drop the aliased twins — 1999: 969 by threshold vs 958 by
 symbol, the 11 extras all alias targets (XL_old → XL, Q_old1 → IQV, HLX → HOS, ATHYQ/BGEN → BCAL, …). Entries are copied
 verbatim except `(weight)` = 1/N and `(size)` = N (the pit-v11 top-3000 lists kept `size 3000` / weight 1/3000 with
 ~2,820 entries — the runner reads membership only, neither convention changes a run); `aggregate_period_return` is
 carried from the goldens top-1000 list. **Present names per year: 928 (2009) → 998 (2025)**, i.e. ~94 % of each
-top-1000 has bars, vs ~2,820 / 3,000 for the top-3000 schedule — the breadth tier is 1/3 the names, not a different
+top-1000 has bars, vs ~2,846 / 3,000 (27-list mean; range 2,792–2,993) for the top-3000 schedule — the breadth tier is 1/3 the names, not a different
 warehouse (`_v11pit`, 9,364 entries, unchanged; the chain aborts on any other count).
 
 The lists live under `universe/` in this directory (results-only lane; `feedback_commit_raw_per_arm_artifacts`) and are
@@ -222,11 +224,18 @@ this schedule; **dominated** if its mean realised AND mean Calmar are both below
 - **does not tighten, not dominated → 2 of 3 stands, cell 3 disagrees**: no promotion; record the breadth
   dependence, keep cap 40 as an axis (`experiment-flag-discipline.md` R1–R2; the ledger ACCEPT is unchanged).
 - **dominated (either way)** → the "never dominated" clause fails → NOT promotable; ledger amendment records it.
+  *[Classification added 2026-09-24 per #2935 qc-results A3 — written AFTER the cell-3 result, so it is not
+  pre-registered: REJECT-as-default / keep-as-axis. The mechanism ACCEPT and the `max_buy_candidates` knob are unchanged;
+  the value is simply not promotable. It is not do-not-revive: cells 1–2 still show the dispersion property on the
+  top-3000 schedule.]*
 
 Mechanism rule (realised AND Calmar better at ≥ 2/3 salts) is reported, not required. Per-salt cohort read with
 `paired.sh` (join key `symbol|entry_date`); the top arm-only winner per salt is named, because on cells 1 and 2 the
 level was one trade (DDS-class on 26y, ADMA 2023-12-19 on the sub-window) — on a top-1000 schedule ADMA (rank 2,248 by
 dollar volume in the 2023 goldens top-3000; 2,935 in 2022, 1,712 in 2024) is not a member, so cell 3 also tests whether the tightening survives losing that one name.
+*[Corrected 2026-09-24, #2935 qc-results A1: ADMA is absent from `top-1000-2023`, the list that governs the 2023-12-19
+entry under D1/D2, so that admission cannot recur; it first enters the top-1000 in the 2025 list, which governs
+2025-05-31 → 2026-06-26. "Not a member" above means "not a member of the 2023 list".]*
 
 ### Cost / ops
 
@@ -238,3 +247,68 @@ cell's wall (≥ 1.5×). Artifacts `/tmp/sweeps/top-n-grid-cell3/` (container, b
 committed to `results/` with the `-1000` suffix in the tag.
 
 ### Log — cell 3
+
+- 2026-09-23 13:08 PT — lane C3 launched (`sweep-grid` @ `ad5a9e04e`, runner md5 `683b4885…`, lists md5(cat)
+  `a8cdb607…`, 928–998 names/yr, warehouse 9,364). Paused 13:48 PT at ~40 min into null s0 for the #2936–#2939 QC wave
+  (`container-capacity-scheduling.md` rule 0); relaunched 16:40 PT, null s0 rerun from scratch.
+- 2026-09-24 06:51 PT — lane C3 DONE, 6/6 cells. Wall 8,250–8,780 s per cell (2h18m–2h26m, **~55 % of a top-3000 26y
+  cell**); peak RSS 3.09–3.15 GB; cache 0 evictions. The 28,800 s guard was ~3.3× the measured cell — re-size any
+  future top-1000 26y lane to ≥ 13,200 s (1.5× the slowest, 8,780 s). Raw per-cell artifacts in `results/*-1000-*` +
+  `results/chain-C3.log`; per-salt reads `results/t1-topn-40-1000-s{0,1,2}-read.md`.
+
+## Verdict — cell 3 (26y record window, yearly top-1000 PIT schedule), pre-registered dispersion rule (2026-09-24)
+
+Every figure below is read from `results/<arm>-s<N>-actual.sexp` (metric-glob tripwire: one `total_return_pct` per
+file, and per line of `chain-C3.log`).
+
+| arm | s0 realised / maxDD / Calmar | s1 | s2 | realised range | maxDD range | mean realised | mean Calmar |
+|---|---|---|---|---|---|---|---|
+| null (cap 20) | 543.1 % / 32.15 / 0.226 | 465.6 / 31.36 / 0.216 | 337.3 / 31.29 / 0.183 | 205.8 pp | 0.87 pt | 448.7 % | 0.208 |
+| cap 40 | 231.5 / 36.25 / 0.128 | 225.1 / 33.15 / 0.137 | 404.1 / 39.18 / 0.161 | 179.0 pp | 6.04 pt | 286.9 % | 0.142 |
+
+**Branch (§Cell 3 table): DOMINATED → cap 40 is NOT promotable.** Mean realised 286.9 % < 448.7 % AND mean Calmar
+0.142 < 0.208. It also does **not tighten**: the realised range narrows (179.0 vs 205.8 pp) but the maxDD range widens
+~7× (6.04 vs 0.87 pt), and every cap-40 maxDD (33.1–39.2) sits above every null maxDD (31.3–32.2). Mechanism rule
+(reported, not required): realised AND Calmar better at **0 of 3** salts (s2 realised better, Calmar worse). The grid
+reads cell 1 tightens / cell 2 tightens / **cell 3 dominated** → the "never dominated in any cell" clause fails.
+Default stays 20. **Classification: REJECT-as-default / keep-as-axis** (A3 annotation above; written after the result,
+so not pre-registered). The ledger ACCEPT(mechanism) from the 26y top-3000 surface is unchanged.
+
+**V6 gate — two of three pairs fail, the verdict does not rest on them.** `validator_diff -check V6` exit 1 on s0 and s1:
+the null holds one twin, **IAC/MTCH 2012-03-15** (both tickers entered the same day, 4-day hold, stop_loss, +$719 each
+leg on ~$119 k — a ~$0.7 k duplicated P&L on a $1 M start). The arms hold different instrument sets on those salts, so
+the per-salt s0/s1 deltas are not clean mechanism reads (`mechanism-validation-rigor.md` check 8). Two bounds keep the
+verdict: (1) the direct effect is ~0.07 pp of return against a 161.8 pp gap in mean realised; (2) **the arms first
+diverge on 2000-04-04 at every salt** (`paired.sh`), 12 years before the twin, so the twin is not what separates them
+— path effects after 2012-03-15 are not bounded, but they would have to flip the sign of a gap that already exists. s2
+(exit 0) is the one clean pair and reads cap 40 +66.8 pp realised, −0.022 Calmar, +7.9 pt maxDD: better level, worse
+risk — not "tightening" either. The twin is the known chunked-build alias class (`project_pit_chunked_twin_miss`);
+it is a data defect in the top-1000 lists inherited from the top-3000 build, not new to this cell.
+
+**Per-salt cohorts (`results/t1-topn-40-1000-s{0,1,2}-read.md`, join `symbol|entry_date`).**
+
+| salt | shared n | null-only n / P&L | arm-only n / P&L | top arm-only | top null-only |
+|---|---|---|---|---|---|
+| s0 | 483 | 252 / +$1.96 M | 287 / +$0.19 M | TPL 2021-01-11 +$354 k | BBWI 2020-08-05 +$888 k, TSLA 2013-04-03 +$678 k |
+| s1 | 498 | 243 / +$2.81 M | 261 / +$0.85 M | WMB 2024-03-23 +$192 k | AMAT 2020-11-07 +$720 k, ANET 2016-11-12 +$366 k |
+| s2 | 483 | 280 / +$1.63 M | 286 / +$2.09 M | BBWI 2020-08-05 +$539 k, ANET 2016-11-12 +$334 k | TSLA 2013-04-03 +$627 k, SHOP 2020-04-14 +$497 k |
+
+The level is the same monster lottery as cells 1–2: whichever arm's draw holds BBWI-2020 / TSLA-2013 / AMAT-2020 /
+ANET-2016 wins the salt (s2 is the salt where the arm drew BBWI + ANET). ADMA 2023-12-19 — the cell-2 level trade —
+cannot enter here (absent from `top-1000-2023`, A1), and **the cell-2 tightening did not survive losing it**, which
+answers the question §Cell 3 pre-registered.
+
+**Why (hypothesis, not measured here).** On a top-1000 pool the admitted list is 1/3 the size, so ranks 21–40 are drawn
+from a thinner, lower-quality tail than on top-3000, while the book still fills ~5 slots. Widening the cap re-draws
+which resting orders trigger first (the d0 mechanism: slot policy, not screener capacity) and here the re-draw lands
+more often on the tail — the arm-only cohort is weak at 2 of 3 salts and every arm's maxDD is worse. What this rules
+in/out: the dispersion-tightening seen on top-3000 is **breadth-dependent**, so cap width is not a universe-free
+variance reducer; do not propose further cap-width points as a default. The standing forward lever from the ledger
+(slot-fill ordering when admitted > open slots) is unaffected by this cell — and per
+`feedback_check_ledger_before_proposing_a_dial` its score-ordering variant (`candidate_ranking = Quality`) is already
+REJECTED, so any follow-up must be a different ordering, checked against the ledger first.
+
+**Side observation, not a verdict:** the top-1000 null (mean 448.7 %, maxDD band 31.3–32.2) sits well above the cell-1
+top-3000 null (152–457 %, maxDD 40.6–53.0) on the same window and build. That is a cross-cell comparison the grid was
+not designed for (§Cell 3: cell 3 moves only breadth against cell 1, and n = 3); it is recorded as a lead for a
+breadth-tier question, not as evidence that narrowing the universe helps.
