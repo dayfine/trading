@@ -1231,10 +1231,12 @@ if [ "$RC" -eq 0 ] \
   && echo "$OUT" | grep -q '^NO-SCHEDULE-CROWDED	Crowded push-only wf' \
   && ! echo "$OUT" | grep -q '^NO-SCHEDULE	Crowded push-only wf' \
   && echo "$OUT" | grep -q 'no-schedule-crowded=1' \
-  && echo "$OUT" | grep -q 'no-schedule=0'; then
-  pass "assertion 33: full push-only page -> NO-SCHEDULE-CROWDED (not plain NO-SCHEDULE), exit 0, its own SUMMARY bucket"
+  && echo "$OUT" | grep -q 'no-schedule=0' \
+  && echo "$OUT" | grep -q ' ok=0 ' \
+  && echo "$OUT" | grep -q ' active=1 '; then
+  pass "assertion 33: full push-only page -> NO-SCHEDULE-CROWDED (not plain NO-SCHEDULE), exit 0, its own SUMMARY bucket, not counted as ok, active=1"
 else
-  fail "assertion 33: expected NO-SCHEDULE-CROWDED with no-schedule-crowded=1/no-schedule=0, got rc=$RC output=$OUT"
+  fail "assertion 33: expected NO-SCHEDULE-CROWDED with no-schedule-crowded=1/no-schedule=0/ok=0/active=1, got rc=$RC output=$OUT"
 fi
 
 echo "=== Assertion 34: SHORT (non-full) page holding a few push-event runs (zero schedule) -> plain NO-SCHEDULE, unchanged (issue #2941 boundary) ==="

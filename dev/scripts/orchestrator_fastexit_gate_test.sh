@@ -1449,6 +1449,20 @@ done
 printf 'UNOBSERVABLE\tweekly\tno completed run\nSUMMARY: ok=0\n' > "$health_fixture"
 rendered=$(sh "$HERE/scheduled_workflow_summary.sh" 0 "$health_fixture")
 check "renderer cannot call unobservable all OK" 1 "$(printf '%s\n' "$rendered" | grep -c '^UNMEASURABLE')"
+# A crowded-only exit-0 report (issue #2941) must render UNMEASURABLE, never
+# "all OK" -- the exact silent-green case this issue exists to close. Dropping
+# the `|| grep -q '^NO-SCHEDULE-CROWDED'` clause from the renderer's case-0
+# branch leaves both checks below red.
+printf 'NO-SCHEDULE-CROWDED\tweekly\t(page of 50 runs held no scheduled run -- crowded; raise SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR)\nSUMMARY: active=1 (1 page(s) fetched, full pagination -- a real total, not a floor) ok=0 red=0 stale=0 no-schedule=0 no-schedule-crowded=1 unobservable=0\n' > "$health_fixture"
+rendered=$(sh "$HERE/scheduled_workflow_summary.sh" 0 "$health_fixture")
+check "renderer treats a crowded-only report as UNMEASURABLE" 1 "$(printf '%s\n' "$rendered" | grep -c '^UNMEASURABLE')"
+check "renderer never calls a crowded-only report all OK" 0 "$(printf '%s\n' "$rendered" | grep -c '^all OK')"
+# Mixed OK + crowded: the crowded workflow still forces UNMEASURABLE, but the
+# genuinely-measured OK workflow is still counted in the "measured OK" tally.
+printf 'OK\tweekly\trun_id=12\nNO-SCHEDULE-CROWDED\tdaily\t(page of 50 runs held no scheduled run -- crowded; raise SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR)\nSUMMARY: active=2 (1 page(s) fetched, full pagination -- a real total, not a floor) ok=1 red=0 stale=0 no-schedule=0 no-schedule-crowded=1 unobservable=0\n' > "$health_fixture"
+rendered=$(sh "$HERE/scheduled_workflow_summary.sh" 0 "$health_fixture")
+check "renderer treats mixed OK+crowded report as UNMEASURABLE, not all OK" 1 "$(printf '%s\n' "$rendered" | grep -c '^UNMEASURABLE')"
+check "renderer mixed OK+crowded still reports the 1 measured OK" 1 "$(printf '%s\n' "$rendered" | grep -c '1 measured OK')"
 : > "$health_fixture"
 rendered=$(sh "$HERE/scheduled_workflow_summary.sh" 0 "$health_fixture")
 check "renderer missing report is unmeasurable" 1 "$(printf '%s\n' "$rendered" | grep -c '^UNMEASURABLE')"
