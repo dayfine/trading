@@ -79,6 +79,9 @@
 #     --format table|json  default table
 #     --top N              limit the dispatch table to the N largest rows
 #                          (json output is never truncated); default 0 = all
+#     --context-threshold N  main-session calls above N tokens of context are
+#                          counted as over the /compact threshold; default
+#                          250000 (session-rampup.md Step 3, #2946)
 #     -h | --help
 #
 # EXIT CODES -- "could not measure" is never reported as "measured zero"
@@ -99,6 +102,7 @@ SINCE=""
 UNTIL=""
 FORMAT="table"
 TOP=0
+CTX_THRESHOLD=250000
 
 usage() {
   sed -n '/^# USAGE/,/^# EXIT CODES/p' "$0" | sed 's/^# \{0,1\}//'
@@ -137,6 +141,11 @@ while [ $# -gt 0 ]; do
     TOP="$2"
     shift 2
     ;;
+  --context-threshold)
+    [ $# -ge 2 ] || die "--context-threshold needs a value"
+    CTX_THRESHOLD="$2"
+    shift 2
+    ;;
   -h | --help) usage 0 ;;
   *) die "unknown argument: $1" ;;
   esac
@@ -161,6 +170,13 @@ case "$TOP" in
 '' | *[!0-9]*) die "--top must be a non-negative integer, got: $TOP" ;;
 *) ;;
 esac
+
+# Digits only, then numerically > 0: a case pattern alone cannot reject "00" /
+# "000" without also rejecting "007" (#2948 qc-behavioral CP4).
+case "$CTX_THRESHOLD" in
+'' | *[!0-9]*) die "--context-threshold must be a positive integer (tokens), got: $CTX_THRESHOLD" ;;
+esac
+[ "$CTX_THRESHOLD" -gt 0 ] || die "--context-threshold must be a positive integer (tokens), got: $CTX_THRESHOLD"
 
 command -v jq >/dev/null 2>&1 || die "jq not found on PATH"
 
@@ -417,7 +433,7 @@ def at_pct($sorted; $p):
 | ($sess | map(.context_sizes) | add // []) as $ctx
 | ($ctx | sort) as $ctxs
 | ($ctx | length) as $nctx
-| ($ctx | map(select(. > 150000)) | length) as $over
+| ($ctx | map(select(. > $threshold)) | length) as $over
 | ["0-50k","50-100k","100-150k","150-200k","200-300k","300-500k","500k+"] as $labels
 | ($ctx | map(bucket(.)) | group_by(.) | map({key: .[0], value: length}) | from_entries) as $hist
 | { date: ((($disp + $sess) | map(.date) | max) // ""),
@@ -446,8 +462,9 @@ def at_pct($sorted; $p):
       p50: at_pct($ctxs; 50),
       p90: at_pct($ctxs; 90),
       max: ($ctx | max // 0),
-      calls_above_150k: $over,
-      share_above_150k_pct: pct($over; $nctx),
+      compact_threshold: $threshold,
+      calls_above_threshold: $over,
+      share_above_threshold_pct: pct($over; $nctx),
       buckets: [ $labels[] | { label: ., calls: ($hist[.] // 0),
                                share_pct: pct(($hist[.] // 0); $nctx) } ]
     },
@@ -458,7 +475,7 @@ REP
 )
 
 NOW=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-jq -s --arg now "$NOW" --arg projects_dir "$PROJECTS_DIR" \
+jq -s --arg now "$NOW" --arg projects_dir "$PROJECTS_DIR" --argjson threshold "$CTX_THRESHOLD" \
   --arg since "$SINCE" --arg until "$UNTIL" \
   "$JQ_REPORT" "$WORK/rows.jsonl" >"$WORK/report.json"
 
@@ -502,12 +519,12 @@ def hm: (. | floor) as $s | "\(($s / 3600) | floor)h\((($s % 3600) / 60) | floor
     + rpad(.output_tokens; 8) + " " + rpad(.cache_read_input_tokens; 12) + " "
     + rpad(.cache_creation_input_tokens; 10) ),
 "",
-"--- context size per main-session API call (is /compact at ~150k happening?) ---",
+"--- context size per main-session API call (is /compact at the threshold happening?) ---",
 ( .context_histogram.buckets[]
   | "  " + pad(.label; 10) + rpad(.calls; 6) + "  " + rpad(.share_pct; 5) + "%" ),
 "  ----",
 "  p50 \(.context_histogram.p50)  p90 \(.context_histogram.p90)  max \(.context_histogram.max)",
-"  above 150k: \(.context_histogram.calls_above_150k)/\(.context_histogram.calls) calls (\(.context_histogram.share_above_150k_pct)%)",
+"  above \(.context_histogram.compact_threshold / 1000 | floor)k: \(.context_histogram.calls_above_threshold)/\(.context_histogram.calls) calls (\(.context_histogram.share_above_threshold_pct)%)",
 "",
 "--- totals ---",
 "  dispatches \(.totals.dispatches)   sessions \(.totals.sessions)   resumes \(.totals.resumes)   api_calls \(.totals.api_calls)",

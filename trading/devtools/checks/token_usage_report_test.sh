@@ -39,7 +39,8 @@
 #         and hide the replay cost this column exists to expose.
 #   11-13 OUTCOME classification, including `stalled` for a transcript that
 #         ends mid tool-loop (c3).
-#   14-16 CONTEXT HISTOGRAM -- the /compact-at-150k question. Fixture context
+#   14-16 CONTEXT HISTOGRAM -- the /compact-threshold question (default 250k,
+#         --context-threshold overrides; #2946). Fixture context
 #         sizes are 45001 / 161001 / 251001, one per bucket, so a bucket
 #         boundary error shows up as a specific bucket, not as a vague total.
 #   17-20 LOUD FAILURE on absent / empty / malformed input. A missing dir, a
@@ -171,10 +172,32 @@ expect_eq "outcome: NEEDS_REWORK read from the final text" "NEEDS_REWORK" "$(row
 expect_eq "outcome: transcript ending mid tool-loop reads 'stalled'" \
   "stalled" "$(row c3 .outcome)"
 
-# --- 14-16: context histogram (the /compact-at-150k question) --------------
+# --- 14-16: context histogram (the /compact-threshold question) -------------
 expect_eq "histogram: counts one entry per main-session API call" "3" "$(q '.context_histogram.calls')"
-expect_eq "histogram: calls above 150k counted (45001/161001/251001)" \
-  "2" "$(q '.context_histogram.calls_above_150k')"
+expect_eq "histogram: default threshold is 250k" "250000" "$(q '.context_histogram.compact_threshold')"
+expect_eq "histogram: calls above the default 250k counted (45001/161001/251001)" \
+  "1" "$(q '.context_histogram.calls_above_threshold')"
+thr() { sh "$SCRIPT" --projects-dir "$FIX/projects" --format json --context-threshold "$1" 2>/dev/null | jq -r .context_histogram.calls_above_threshold; }
+expect_eq "histogram: --context-threshold 150000 counts 161001 and 251001" "2" "$(thr 150000)"
+expect_eq "histogram: threshold is strict (> N): 251001 at N=251001 is not over" "0" "$(thr 251001)"
+expect_eq "histogram: ... and 251000 counts it" "1" "$(thr 251000)"
+set +e
+sh "$SCRIPT" --projects-dir "$FIX/projects" --context-threshold 250k >"$TMP/o" 2>"$TMP/e"
+expect_eq "histogram: non-integer --context-threshold is a usage error (exit 2)" "2" "$?"
+sh "$SCRIPT" --projects-dir "$FIX/projects" --context-threshold 0 >"$TMP/o" 2>"$TMP/e"
+expect_eq "histogram: --context-threshold 0 is a usage error (exit 2)" "2" "$?"
+sh "$SCRIPT" --projects-dir "$FIX/projects" --context-threshold 00 >"$TMP/o" 2>"$TMP/e"
+expect_eq "histogram: --context-threshold 00 (numerically zero) is a usage error (exit 2)" "2" "$?"
+# Validated BEFORE any transcript is read: against the empty fixture a bad
+# threshold must exit 2 (usage), not 3 (no transcripts).
+sh "$SCRIPT" --projects-dir "$FIX/empty" --context-threshold 250k >"$TMP/o" 2>"$TMP/e"
+expect_eq "histogram: threshold is validated before transcripts are read (exit 2, not 3)" "2" "$?"
+set -e
+expect_eq "histogram: leading zeros are fine (007 is 7, not rejected)" "3" "$(thr 007)"
+set +e
+set -e
+expect_eq "table: the above-threshold line names the threshold" "1" \
+  "$(sh "$SCRIPT" --projects-dir "$FIX/projects" 2>/dev/null | grep -c '^  above 250k: 1/3 calls')"
 expect_eq "histogram: 45001 lands in the 0-50k bucket" \
   "1" "$(q '.context_histogram.buckets[] | select(.label == "0-50k") | .calls')"
 

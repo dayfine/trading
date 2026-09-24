@@ -92,7 +92,7 @@ three shell-only PRs). Same day as the perf read, same "write it down" rule.
 | tokens per merged PR (Claude, all dispatches on that `ref`) | `.claude.rows[]` grouped by `ref` | trend only |
 | tokens per QC verdict, split structural / behavioral / results | rows with `agent_type` `qc-*` | (b): tokens per QC verdict on PRs with no OCaml in the diff vs PRs with OCaml — if the no-OCaml reviews cost within ~40 % of the OCaml ones, the rebuild dominates → add a "CI-authoritative build; do not rebuild" path to QC briefs (the rows do not split tool output; this is the proxy) |
 | resume overhead | rows with `resumes > 0`, share of subagent tokens | (a): ≥ 20 % → prioritise the event-wait helper (#2738) |
-| main-session calls above 150k context | `.claude.context_histogram` | (c): > 50 % of calls → the `/compact` rule is not being followed; fix the habit before any preamble cut |
+| main-session calls above the compact threshold (default 250k, `session-rampup.md` Step 3) | `.claude.context_histogram.share_above_threshold_pct` | (c): > 50 % of calls → the `/compact` rule is not being followed; fix the habit before any preamble cut |
 | Codex cost per finding | `codex-agreement.md`: `codex tok in/out` ÷ codex-only items | (d): compare with the Claude gates' tokens per finding |
 | GHA $ per run | `<date>-<run>.json` totals | trend only |
 

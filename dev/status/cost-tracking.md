@@ -105,7 +105,7 @@ per week; inputs are `dev/budget/local-<date>.json`
 (`dev/scripts/budget_local_record.sh`), the orchestrator `<date>-<run>.json`
 records, and `dev/reviews/codex-agreement.md`.
 
-| week | tok/merged PR | tok/QC verdict | resume share | main calls >150k | codex tok/finding | GHA $ | decision |
+| week | tok/merged PR | tok/QC verdict | resume share | main calls >250k | codex tok/finding | GHA $ | decision |
 |---|---|---|---|---|---|---|---|
 
 ## Next Steps
