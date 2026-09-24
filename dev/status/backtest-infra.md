@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-09-15
+## Last updated: 2026-09-24
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,31 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-09-24 — weekly-start sweep: end-date guard + dropped cells in the report (#2915 parts 2-3)
+
+- [x] **`sweep_weekly_start` no longer annualizes over dead days past the last
+  bar, and dropped cells are visible in the `.md` report.** New module
+  `trading/trading/backtest/sweep_weekly_start/lib/end_date_guard.{ml,mli}`:
+  `resolve_coverage` compares the requested `end_date` with the symbol's last
+  CSV bar; when the gap exceeds `max_end_date_gap_days` (config field, CLI
+  `--max-end-date-gap-days`, default `default_max_end_date_gap_days = 7`) the
+  sweep **clamps** every cell to the last bar (the Monday window trails it) and
+  the report header carries a loud `WARNING -- END DATE CLAMPED` block naming
+  both dates, the gap and the tolerance. The header always records
+  `Last bar:` and `Dropped cells: N`; a `## Dropped cells` section lists each
+  dropped Monday with its reason. `sweep_result` gains `coverage` +
+  `dropped_cells` (`[@sexp.option]` / `[@sexp.list]`, so pre-#2915 goldens
+  still parse); `run_one` now returns `(cell, dropped_cell) Result.t`.
+  - Clamp chosen over fail so the scheduled workflow keeps producing a report;
+    no workflow change needed (default tolerance applies).
+  - Tests: `sweep_weekly_start/test/test_sweep_weekly_start.ml` (truncated CSV
+    fixture → clamped + annotated; full-coverage fixture → no annotation;
+    tolerance boundary 7 vs 8 days; dropped count/section rendered, including
+    with zero surviving cells; sexp round-trip). Mutation: guard forced to
+    `false` → 4 of 18 tests red.
+  - Verify: `dune runtest trading/backtest/sweep_weekly_start`.
+  - Part 1 (refresh SPY bars past 2026-05-01) stays open for ops-data.
 
 ## 2026-09-08 — `validator_diff.exe`: the validator's Invariant counts become a cross-arm gate (#2730 ask 2)
 

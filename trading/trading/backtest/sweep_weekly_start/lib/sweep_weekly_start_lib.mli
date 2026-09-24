@@ -54,7 +54,38 @@ val format_markdown : ?max_cells:int -> sweep_result -> string
     [?max_cells] caps the per-cell table to that many rows by sampling uniformly
     across [cells] (head + spread + tail) — useful when the cell count exceeds
     ~30 and the table would otherwise be unreadable. When [None] (the default),
-    every cell is rendered. *)
+    every cell is rendered.
+
+    The header always records the last-bar date when [coverage] is set, and a
+    loud [WARNING -- END DATE CLAMPED] block when [coverage.clamped]. It also
+    always carries a [Dropped cells: N] line; when [N > 0] a [## Dropped cells]
+    section lists each dropped start date with its reason (issue #2915). *)
+
+val default_max_end_date_gap_days : int
+(** Default end-date guard tolerance (7 calendar days). See
+    {!End_date_guard.default_max_end_date_gap_days}. *)
+
+val resolve_coverage :
+  requested_end_date:Date.t ->
+  last_bar_date:Date.t ->
+  tolerance_days:int ->
+  coverage
+(** The end-date guard (issue #2915): clamped iff [requested_end_date] is more
+    than [tolerance_days] past [last_bar_date]. See
+    {!End_date_guard.resolve_coverage}. *)
+
+val effective_end_date : coverage -> Date.t
+(** [last_bar_date] when clamped, else [requested_end_date]. See
+    {!End_date_guard.effective_end_date}. *)
+
+val load_coverage :
+  data_dir:Fpath.t ->
+  symbol:string ->
+  requested_end_date:Date.t ->
+  tolerance_days:int ->
+  coverage
+(** Read [symbol]'s last bar from the CSV store and apply {!resolve_coverage}.
+    See {!End_date_guard.load_coverage}. *)
 
 val skip_message : Date.t -> exn -> string
 (** [skip_message start_date exn] is the diagnostic line {!run_one} writes to
@@ -72,23 +103,24 @@ val run_one :
   config ->
   Date.t ->
   sector_map_override:(string, string) Hashtbl.t ->
-  cell option
+  (cell, dropped_cell) Result.t
 (** Run a single BAH cell starting on [start_date]. Loads SPY bars via
     {!Backtest.Runner.run_backtest} with the configured [sector_map_override]
     and [strategy_choice = Bah_benchmark { symbol }]. Pure with respect to its
     inputs (modulo CSV loading) — the same arguments always produce the same
     result.
 
-    [None] when [start_date .. cfg.end_date] holds no trading day, i.e. the
-    runner raised {!Backtest.Window_filter.Empty_measurement_window}. That
+    [Error dropped] when [start_date .. cfg.end_date] holds no trading day, i.e.
+    the runner raised {!Backtest.Window_filter.Empty_measurement_window}. That
     happens routinely here: [end_date] defaults to the run date while the
     committed bars stop at a fixed floor, so every Monday past the floor is
-    unmeasurable. Such a cell carries no entry-timing information, and
-    fabricating a flat 0%-return cell for it would drag the sweep's median /
-    mean / stddev toward zero — so it is dropped, with a line on stderr naming
-    the skipped date (issue #2632; before the fix the whole sweep died with
-    [Invalid_argument "List.last"] on the first such Monday, taking every other
-    cell down with it).
+    unmeasurable. [dropped.reason] is the rendered exception; the same text also
+    goes to stderr via {!skip_message}. Such a cell carries no entry-timing
+    information, and fabricating a flat 0%-return cell for it would drag the
+    sweep's median / mean / stddev toward zero — so it is dropped, with a line
+    on stderr naming the skipped date (issue #2632; before the fix the whole
+    sweep died with [Invalid_argument "List.last"] on the first such Monday,
+    taking every other cell down with it).
 
     Any other exception propagates: only the degenerate-window case is
     tolerated, never a genuine failure.
@@ -97,12 +129,21 @@ val run_one :
     {!run} can load the universe file once and reuse it across cells. *)
 
 val run : config -> sweep_result
-(** Top-level entry point: enumerate Mondays, run one cell per Monday,
-    summarise, and return the result. Calls {!Universe_file.load} on
-    [config.fixtures_root ^ "/" ^ config.universe_path] to build the sector-map
-    override. Sets [run_date] to [config.end_date] (today by default).
+(** Top-level entry point: apply the end-date guard, enumerate Mondays, run one
+    cell per Monday, summarise, and return the result. Calls
+    {!Universe_file.load} on [config.fixtures_root ^ "/" ^ config.universe_path]
+    to build the sector-map override. Sets [run_date] to [config.end_date]
+    (today by default).
 
-    Mondays whose window holds no trading day are skipped (see {!run_one}), so
-    [summary.n_cells] can be smaller than the Monday count — and is [0], with
-    the markdown renderer emitting its "no cells" notice, when every Monday in
-    the window is past the data floor. *)
+    The guard ({!load_coverage}, reading [symbol]'s bars under
+    [Data_path.default_data_dir ()], the same store the runner loads from) runs
+    first. When it clamps, the Monday window trails the last bar and every cell
+    is measured to it — [result.end_date] is the last bar, [result.coverage]
+    records both dates, and {!format_markdown} flags the report. Clamping
+    (rather than failing) keeps the scheduled workflow producing a report while
+    making the stale data floor impossible to miss.
+
+    Mondays whose window holds no trading day are skipped (see {!run_one}) and
+    recorded in [dropped_cells], so [summary.n_cells] can be smaller than the
+    Monday count — and is [0], with the markdown renderer emitting its "no
+    cells" notice, when every Monday in the window is past the data floor. *)

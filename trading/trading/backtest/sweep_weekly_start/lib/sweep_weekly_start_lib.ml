@@ -2,10 +2,13 @@ open Core
 module Scenario_strategy = Backtest.Strategy_choice
 module Metric_types = Trading_simulation_types.Metric_types
 
-(* The data model lives in {!Sweep_types}; re-exported so callers keep using
-   [Sweep_weekly_start_lib.cell] etc. *)
+(* Data model and end-date guard re-exported from their own modules. *)
 include Sweep_types
 
+let default_max_end_date_gap_days = End_date_guard.default_max_end_date_gap_days
+let resolve_coverage = End_date_guard.resolve_coverage
+let effective_end_date = End_date_guard.effective_end_date
+let load_coverage = End_date_guard.load_coverage
 let _epoch = Date.create_exn ~y:1970 ~m:Jan ~d:1
 
 (** Walk forward from [d] until we hit a Monday; returns the first Monday at or
@@ -127,14 +130,19 @@ let _header_block (r : sweep_result) =
     "# Weekly-start sweep -- BAH %s\n\n\
      Run date: %s\n\
      End date: %s\n\
-     Window: %d years trailing\n\
+     %sWindow: %d years trailing\n\
      Cells: %d (one per Monday)\n\
-     Initial: %s\n"
+     Dropped cells: %d\n\
+     Initial: %s\n\
+     %s"
     r.symbol
     (Date.to_string r.run_date)
     (Date.to_string r.end_date)
+    (End_date_guard.last_bar_line r)
     r.years_back r.summary.n_cells
+    (List.length r.dropped_cells)
     (_format_money r.initial_cash)
+    (End_date_guard.clamp_warning r)
 
 let _summary_block (s : summary) =
   Printf.sprintf
@@ -167,13 +175,14 @@ let _table_block ?max_cells (cells : cell list) =
   header ^ "\n" ^ row_lines ^ "\n"
 
 let format_markdown ?max_cells (r : sweep_result) =
+  let dropped = End_date_guard.dropped_block r.dropped_cells in
   if List.is_empty r.cells then
-    Printf.sprintf "%s\n(no cells in window)\n" (_header_block r)
+    Printf.sprintf "%s\n(no cells in window)\n%s" (_header_block r) dropped
   else
     let header = _header_block r in
     let summary = _summary_block r.summary in
     let table = _table_block ?max_cells r.cells in
-    header ^ summary ^ table
+    header ^ summary ^ table ^ dropped
 
 let _metric_or_default (m : Metric_types.metric_set)
     (key : Metric_types.metric_type) ~default =
@@ -235,10 +244,10 @@ let _warn_skipped_cell (start_date : Date.t) (exn : exn) =
 
 let run_one (cfg : config) (start_date : Date.t) ~sector_map_override =
   match _run_one_exn cfg start_date ~sector_map_override with
-  | cell -> Some cell
+  | cell -> Ok cell
   | exception (Backtest.Window_filter.Empty_measurement_window _ as exn) ->
       _warn_skipped_cell start_date exn;
-      None
+      Error { start_date; reason = Stdlib.Printexc.to_string exn }
 
 let _full_sector_map_unsupported path =
   failwith
@@ -263,16 +272,26 @@ let run (cfg : config) =
     _load_pinned_sector_map ~fixtures_root:cfg.fixtures_root
       ~universe_path:cfg.universe_path
   in
-  let mondays =
-    mondays_in_window ~end_date:cfg.end_date ~years_back:cfg.years_back
+  let coverage =
+    load_coverage
+      ~data_dir:(Data_path.default_data_dir ())
+      ~symbol:cfg.symbol ~requested_end_date:cfg.end_date
+      ~tolerance_days:cfg.max_end_date_gap_days
   in
-  let cells =
-    List.filter_map mondays ~f:(fun start_date ->
-        run_one cfg start_date ~sector_map_override)
+  End_date_guard.warn_if_clamped cfg.symbol coverage;
+  let end_date = effective_end_date coverage in
+  let cell_cfg = { cfg with end_date } in
+  let mondays = mondays_in_window ~end_date ~years_back:cfg.years_back in
+  let cells, dropped_cells =
+    List.partition_result
+      (List.map mondays ~f:(fun start_date ->
+           run_one cell_cfg start_date ~sector_map_override))
   in
   {
     run_date = cfg.end_date;
-    end_date = cfg.end_date;
+    end_date;
+    coverage = Some coverage;
+    dropped_cells;
     symbol = cfg.symbol;
     initial_cash = cfg.initial_cash;
     years_back = cfg.years_back;
