@@ -4,11 +4,9 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-23 (orchestrator run 35862614348; run start `ed126299`, main after this run's
-merges **`ade47abb`** (#2929 then #2927); `dune build` **0**, `dune runtest` **0**, zero `^FAIL:` lines;
-`status_file_integrity` **0** — exit codes read **unpiped** (a pipeline reports the last command's
-status, which is how a broken check reads as green). Queue was **empty** at run start (0 open PRs),
-so the whole run went to new harness work rather than the gate loop.
+Last updated: 2026-09-24 (orchestrator run 36032653844, run 2; run start `fba9089a`, main after this
+run's merges **`1dd14b25`** (#2949 cleanup, #2950 harness #2941, #2951 backtest-infra #2915 guard).
+Queue was **empty** at run start (0 open PRs).
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -133,9 +131,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-23: #2921 tier-4 flag + drift guard MERGED #2929; #2922 item 1 token-usage report MERGED #2927; next: #2928 sched-health filter, #2930 publish-early |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-24: #2941 crowded-page NO-SCHEDULE MERGED #2950; #2922 items 2-4 MERGED #2943; next: #2876 file-length linter scope |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | §Backlog has NO actionable work (re-audited 09-16): 3 open items, all self-marked deliberate non-actions, + 1 fenced template. Prior itemization corrected |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 09-24: 9 expired linter exceptions retired/re-dated MERGED #2949; remaining 3 §Backlog items are deliberate non-actions |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

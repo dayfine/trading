@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-24",
+  "feature": "harness",
+  "branch": "harness/2941-no-schedule-crowded",
+  "sha": "3b4663c274131fe83d471f751928b97a5b1e67fe",
+  "recorded_at_ns": 1790278464440775686,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
