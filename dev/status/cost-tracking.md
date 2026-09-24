@@ -1,6 +1,6 @@
 # Status: cost-tracking
 
-## Last updated: 2026-05-12
+## Last updated: 2026-09-24
 
 ## Status
 MERGED
@@ -96,6 +96,17 @@ track run-to-run cost trends and see if PRs #481/#482 moved the needle on total 
   action needing to change.
 - Consider upstreaming a feature request to `anthropics/claude-code-action` to expose
   per-subagent usage in the execution file or a separate structured output.
+
+## Usage review
+
+Weekly token-spend read, same slot as the perf review
+(`.claude/rules/perf-review-weekly.md` §Usage review, issue #2922). One row
+per week; inputs are `dev/budget/local-<date>.json`
+(`dev/scripts/budget_local_record.sh`), the orchestrator `<date>-<run>.json`
+records, and `dev/reviews/codex-agreement.md`.
+
+| week | tok/merged PR | tok/QC verdict | resume share | main calls >150k | codex tok/finding | GHA $ | decision |
+|---|---|---|---|---|---|---|---|
 
 ## Next Steps
 

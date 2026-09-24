@@ -37,6 +37,19 @@
 #   Every live run appends "PR SHA" to /reviews-<date>.log
 #   (dev/_tmp is gitignored). The A/B side -- did Codex agree with the Claude
 #   gates? -- is dev/scripts/codex_agreement_row.sh, run at merge time.
+#
+# COST (issue #2922 item 2)
+#   There is no quota query, but `codex exec --json` streams JSONL events and
+#   each `turn.completed` event carries `usage` {input_tokens,
+#   cached_input_tokens, output_tokens, reasoning_output_tokens} (0.154.0;
+#   input_tokens INCLUDES the cached part). The events land next to the report
+#   as REPORT.events.jsonl, and once codex exits -- success or failure -- the
+#   run's log line is completed in place to
+#     PR SHA in=<n> cached=<n> out=<n> reasoning=<n> wall=<s>s
+#   or, when no turn completed (quota hit, crash), the measured proxy
+#     PR SHA tokens=na events=<n> wall=<s>s
+#   so "no usage" is never recorded as zero. codex_agreement_row.sh reads the
+#   in/out figures into the A/B table's cost column.
 #     CODEX_MODEL=<m>    optional model override passed as -m
 #     REPORT_DIR=<dir>   where the report file lands (default /tmp)
 #
@@ -109,7 +122,34 @@ codex_invoke() {
   # -s read-only is explicit: `codex exec` takes the sandbox mode from user/project
   # config otherwise, so a dispatcher configured for workspace-write would
   # launch a writable reviewer (advisory Codex review 5194019340 of #2798).
-  codex -C "$_wt" exec -s read-only --ephemeral $_model_args -o "$_report" "$(cat "$_promptfile")"
+  # --json: stdout becomes the JSONL event stream the caller captures for
+  # usage_fields (COST above); the report itself still comes from -o.
+  codex -C "$_wt" exec -s read-only --ephemeral --json $_model_args -o "$_report" "$(cat "$_promptfile")"
+}
+
+# usage_fields EVENTS -> "in=N cached=N out=N reasoning=N", summed over every
+# turn.completed event's usage in the JSONL file EVENTS; "tokens=na events=N"
+# when no such event exists (absent file = 0 events). Non-JSON lines are
+# skipped, not fatal: the stream is whatever codex printed.
+usage_fields() {
+  [ -f "$1" ] || { echo "tokens=na events=0"; return 0; }
+  jq -Rrs '
+    [split("\n")[] | fromjson? | select(type == "object")] as $ev
+    | [$ev[] | select(.type == "turn.completed" and (.usage | type) == "object") | .usage] as $u
+    | if ($u | length) == 0 then "tokens=na events=\($ev | length)"
+      else "in=\([$u[].input_tokens // 0] | add) cached=\([$u[].cached_input_tokens // 0] | add) out=\([$u[].output_tokens // 0] | add) reasoning=\([$u[].reasoning_output_tokens // 0] | add)"
+      end' "$1"
+}
+
+# finish_run LOG PR SHA FIELDS -> completes the LAST line of LOG that is
+# exactly "PR SHA" (the one record_run wrote for this run) to "PR SHA FIELDS".
+# Line count is unchanged, so daily_count and the cap are unaffected. A LOG
+# with no such line is left alone (nothing to complete).
+finish_run() {
+  [ -f "$1" ] || return 0
+  _n=$(awk -v k="$2 $3" '$0 == k { n = NR } END { print n + 0 }' "$1")
+  [ "$_n" -gt 0 ] || return 0
+  awk -v n="$_n" -v f="$4" 'NR == n { $0 = $0 " " f } { print }' "$1" > "$1.tmp.$$" && mv "$1.tmp.$$" "$1"
 }
 
 # post_report PR SHA REPORT -> posts the report as a COMMENTED PR review pinned
@@ -259,7 +299,10 @@ git -C "$ROOT" fetch -q origin "pull/$PR/head"
 git -C "$ROOT" worktree add --detach "$WT" "$SHA" >/dev/null
 record_run "$RUN_LOG" "$PR" "$SHA"
 
-codex_invoke "$WT" "$REPORT" "$PROMPT" >/dev/null 2>"$REPORT.stderr" || {
+T0=$(date +%s); CODEX_RC=0
+codex_invoke "$WT" "$REPORT" "$PROMPT" >"$REPORT.events.jsonl" 2>"$REPORT.stderr" || CODEX_RC=$?
+finish_run "$RUN_LOG" "$PR" "$SHA" "$(usage_fields "$REPORT.events.jsonl") wall=$(( $(date +%s) - T0 ))s"
+[ "$CODEX_RC" = 0 ] || {
   echo "codex_review: codex exec failed (stderr in $REPORT.stderr)" >&2; exit 1; }
 
 if ! validate_report "$REPORT" "$SHA"; then

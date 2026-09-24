@@ -76,6 +76,12 @@ The dispatcher may call `codex_review.sh` on **every** PR that reaches
   same reader as `pr_gate_status.sh` and appends it to
   `dev/reviews/codex-agreement.md`. That table is the evidence the promotion
   path below asks for; read it monthly.
+- **Cost** (#2922) — `codex_review.sh` runs `codex exec --json` and completes
+  each run-log line with the `turn.completed` usage
+  (`PR SHA in= cached= out= reasoning= wall=`, or `tokens=na events=N` when no
+  turn completed — a quota hit, for one). The A/B row carries it as
+  `codex tok in/out`, so cost per finding is comparable across reviewers
+  (`perf-review-weekly.md` §Usage review).
 
 `docs/howtos/codex_pr_reviews.md` (#2785) describes the **promotion path** —
 Codex playing the qc-structural / qc-behavioral roles under the gate headings.

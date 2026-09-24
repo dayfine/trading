@@ -54,7 +54,25 @@ check "row: codex rework vs claude ok disagrees, codex items counted" "| ok | ok
 row=$(agreement_row 42 "$TIP" "$(J3 "$S_OK" "$B_OK" "$B_OK")")
 check "row: no codex review -> codex none, agree n/a" "| ok | ok | none | n/a | 0 | 0" "$(printf '%s' "$row" | cut -d'|' -f5-10 | sed 's/^ */| /; s/ *$//')"
 check "row: PR and short tip" "| #42 | 7dc57cc06" "$(printf '%s' "$row" | cut -d'|' -f3-4 | sed 's/^ */| /; s/ *$//')"
+# codex_tokens (#2922 item 2): read the run log codex_review.sh completes.
+CODEX_LOG_DIR="$D/logs"
+check "codex_tokens: no log dir -> n/a" n/a "$(codex_tokens 42 "$TIP")"
+mkdir -p "$D/logs"
+printf '42 %s tokens=na events=4 wall=2s\n' "$TIP" > "$D/logs/reviews-2026-09-20.log"
+check "codex_tokens: tokens=na run -> n/a, never 0" n/a "$(codex_tokens 42 "$TIP")"
+printf '42 %s\n' "$TIP" > "$D/logs/reviews-2026-09-21.log"
+check "codex_tokens: a bare (never-completed) line -> n/a" n/a "$(codex_tokens 42 "$TIP")"
+printf '42 %s in=4200 cached=4000 out=90 reasoning=30 wall=61s\n43 %s in=1 cached=0 out=1 reasoning=0 wall=1s\n' \
+  "$TIP" "$TIP" > "$D/logs/reviews-2026-09-22.log"
+check "codex_tokens: newest line for (PR, tip) across dated logs" 4200/90 "$(codex_tokens 42 "$TIP")"
+check "codex_tokens: another tip of the same PR does not match" n/a "$(codex_tokens 42 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+row=$(agreement_row 42 "$TIP" "$(J3 "$S_OK" "$B_OK" "$C_OK")" "a note")
+check "row: cost column sits before the note" "| 4200/90 | a note" "$(printf '%s' "$row" | cut -d'|' -f11-12 | sed 's/^ */| /; s/ *$//')"
 ensure_header "$D/agree.md"; ensure_header "$D/agree.md"
+check "ensure_header: header and row have the same column count" \
+  "$(printf '%s' "$row" | awk -F'|' '{print NF}')" "$(grep '^| date | PR |' "$D/agree.md" | awk -F'|' '{print NF}')"
+check "ensure_header: separator has the same column count" \
+  "$(printf '%s' "$row" | awk -F'|' '{print NF}')" "$(grep '^|---' "$D/agree.md" | awk -F'|' '{print NF}')"
 check "ensure_header: writes the table header exactly once" 1 "$(grep -c '^| date | PR |' "$D/agree.md")"
 rc=0; out=$(CODEX_AGREEMENT_LIB= sh "$HERE/codex_agreement_row.sh" 2>&1) || rc=$?
 check "no PR argument exits 2" 2 "$rc"

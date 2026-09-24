@@ -84,6 +84,42 @@ check "codex_invoke: passes -o REPORT" "$D/report.md" "$(awk 'p{print; exit} $0=
 check "codex_invoke: prompt is the last argument" "the prompt" "$(tail -1 "$D/argv")"
 check "codex_invoke: -C worktree first" "-C" "$(sed -n 1p "$D/argv")"
 check "codex_invoke: sandbox is explicitly read-only" "read-only" "$(awk 'p{print; exit} $0=="-s"{p=1}' "$D/argv")"
+check "codex_invoke: passes --json (the usage event stream, #2922)" 1 "$(grep -cx -- --json "$D/argv")"
+
+# usage_fields (#2922 item 2): sums usage over every turn.completed event;
+# skips non-JSON lines and other event types; "tokens=na events=N" when no
+# turn completed -- the quota-hit shape measured on 0.154.0 is
+# thread.started / turn.started / error / turn.failed, i.e. 4 events, no usage.
+cat > "$D/ev-two.jsonl" <<'JEOF'
+{"type":"thread.started","thread_id":"t"}
+{"type":"turn.started"}
+not json at all
+{"type":"turn.completed","usage":{"input_tokens":1000,"cached_input_tokens":800,"output_tokens":50,"reasoning_output_tokens":20}}
+{"type":"item.completed","usage":{"input_tokens":99999}}
+{"type":"turn.completed","usage":{"input_tokens":500,"cached_input_tokens":100,"output_tokens":7}}
+JEOF
+check "usage_fields: sums turn.completed usage only; missing field counts 0" \
+  "in=1500 cached=900 out=57 reasoning=20" "$(usage_fields "$D/ev-two.jsonl")"
+cat > "$D/ev-fail.jsonl" <<'JEOF'
+{"type":"thread.started"}
+{"type":"turn.started"}
+{"type":"error","message":"You've hit your usage limit."}
+{"type":"turn.failed","error":{"message":"You've hit your usage limit."}}
+JEOF
+check "usage_fields: no completed turn -> tokens=na with the event count" \
+  "tokens=na events=4" "$(usage_fields "$D/ev-fail.jsonl")"
+check "usage_fields: absent file -> tokens=na events=0" "tokens=na events=0" "$(usage_fields "$D/no-such.jsonl")"
+
+# finish_run: completes the LAST exact "PR SHA" line, leaves the count alone.
+printf '7 %s\n8 %s\n7 %s\n7 %sx\n' "$SHA" "$SHA" "$SHA" "$SHA" > "$D/fr.log"
+finish_run "$D/fr.log" 7 "$SHA" "in=1 cached=0 out=2 reasoning=0 wall=3s"
+check "finish_run: line count unchanged" 4 "$(wc -l < "$D/fr.log" | tr -d ' ')"
+check "finish_run: completes the last exact match" "7 $SHA in=1 cached=0 out=2 reasoning=0 wall=3s" "$(sed -n 3p "$D/fr.log")"
+check "finish_run: earlier match untouched" "7 $SHA" "$(sed -n 1p "$D/fr.log")"
+check "finish_run: prefix-only line (SHA+x) untouched" "7 ${SHA}x" "$(sed -n 4p "$D/fr.log")"
+cp "$D/fr.log" "$D/fr.before"
+finish_run "$D/fr.log" 9 "$SHA" "in=1"
+check "finish_run: no matching line -> file unchanged" 0 "$(cmp -s "$D/fr.log" "$D/fr.before"; echo $?)"
 
 # Posting (finding 2): a failed `gh api` must make post_report return non-zero;
 # the old pipe into sed masked it under POSIX sh.
@@ -313,7 +349,32 @@ GIT_STUB_ROOT="$D/g-record-run-root" GH_STUB_SHA="$GSHA" GH_STUB_LABELS="" \
   PATH="$FULLBIN:$PATH" sh "$HERE/codex_review.sh" "$GPR" >/dev/null 2>&1 || _rc=$?
 check "record_run: the codex-exec failure path (which runs AFTER record_run) does fail" 1 "$_rc"
 check "record_run: a live attempt appends the run log before codex_invoke runs" 1 "$(loglines "$D/g-record-run")"
-check "record_run: the appended line is 'PR SHA'" "$GPR $GSHA" "$(tail -1 "$D/g-record-run/reviews-$(date +%F).log" 2>/dev/null)"
+check "record_run: the appended line starts 'PR SHA'" "$GPR $GSHA" "$(tail -1 "$D/g-record-run/reviews-$(date +%F).log" 2>/dev/null | cut -d' ' -f1-2)"
+# finish_run CALL SITE (#2922): the silent failing stub prints no events, so the
+# line is completed with the no-usage proxy -- never left bare, never "in=0".
+check "finish_run wiring: a failed run with no events records tokens=na events=0" "tokens=na events=0" \
+  "$(tail -1 "$D/g-record-run/reviews-$(date +%F).log" 2>/dev/null | cut -d' ' -f3-4)"
+
+# ... and a run whose codex DID complete a turn before failing records its
+# usage: the stub prints a turn.completed event on stdout and exits 1. Pins
+# that stdout is captured as the event stream (a `>/dev/null` regression, or
+# finish_run moved after the failure exit, both leave this line bare).
+cat > "$FULLBIN/codex" <<'GEOF'
+#!/bin/sh
+echo '{"type":"turn.completed","usage":{"input_tokens":4200,"cached_input_tokens":4000,"output_tokens":90,"reasoning_output_tokens":30}}'
+exit 1
+GEOF
+_rc=0
+GIT_STUB_ROOT="$D/g-record-run-root" GH_STUB_SHA="$GSHA" GH_STUB_LABELS="" \
+  CODEX_REVIEW_LIB= CODEX_REVIEW_SAMPLE=1 CODEX_REVIEW_MAX_PER_DAY=3 \
+  CODEX_REVIEW_LOG_DIR="$D/g-usage-run" REPORT_DIR="$D/g-record-run-report" \
+  PATH="$FULLBIN:$PATH" sh "$HERE/codex_review.sh" "$GPR" >/dev/null 2>&1 || _rc=$?
+check "finish_run wiring: the failed run still exits 1" 1 "$_rc"
+check "finish_run wiring: usage from the event stream lands on the run's line" \
+  "$GPR $GSHA in=4200 cached=4000 out=90 reasoning=30" \
+  "$(tail -1 "$D/g-usage-run/reviews-$(date +%F).log" 2>/dev/null | cut -d' ' -f1-6)"
+check "finish_run wiring: wall is recorded" 1 \
+  "$(tail -1 "$D/g-usage-run/reviews-$(date +%F).log" 2>/dev/null | grep -cE ' wall=[0-9]+s$')"
 
 if [ "$fails" -gt 0 ]; then printf 'FAIL: codex_review -- %d test(s) failed.\n' "$fails"; exit 1; fi
 printf 'OK: codex_review -- %d tests clean.\n' "$total"
