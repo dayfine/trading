@@ -13,12 +13,17 @@
         [--end-date 2026-05-17] \
         [--universe-path universes/spy-only.sexp] \
         [--fixtures-root <path>] \
-        [--max-cells-in-md 30]
+        [--max-cells-in-md 30] \
+        [--max-end-date-gap-days 7]
     v}
 
     Defaults: [end_date = Date.today_exn ()] in [America/New_York]; fixtures
     root is auto-resolved by walking parents looking for
-    [trading/test_data/backtest_scenarios] (matches [test_bah_runner_e2e]). *)
+    [trading/test_data/backtest_scenarios] (matches [test_bah_runner_e2e]);
+    [max_end_date_gap_days =
+     Sweep_weekly_start_lib.default_max_end_date_gap_days] (7) — when [end_date]
+    is further than that past the symbol's last bar, every cell is clamped to
+    the last bar and the report says so (issue #2915). *)
 
 open Core
 module SWS = Sweep_weekly_start.Sweep_weekly_start_lib
@@ -38,7 +43,8 @@ type cli_args = {
 let _usage_msg =
   "Usage: sweep_weekly_start --symbol SPY --init-cash 100000 --years-back 3 \
    --out-sexp <path> --out-markdown <path> [--end-date YYYY-MM-DD] \
-   [--universe-path <path>] [--fixtures-root <path>] [--max-cells-in-md N]"
+   [--universe-path <path>] [--fixtures-root <path>] [--max-cells-in-md N] \
+   [--max-end-date-gap-days N]"
 
 let _default_universe_path = "universes/spy-only.sexp"
 
@@ -59,6 +65,18 @@ let _resolve_fixtures_root () =
         if String.equal parent dir then None else walk_up parent (tries_left - 1)
   in
   walk_up (Stdlib.Sys.getcwd ()) 10
+
+(** Pull [--max-end-date-gap-days N] out of [argv] before the main parse, so the
+    guard tolerance does not widen [_parse_args]'s already-long accumulator.
+    Returns the parsed value (if present) and the remaining arguments. *)
+let _extract_gap_days argv =
+  let rec loop acc = function
+    | [] -> (None, List.rev acc)
+    | "--max-end-date-gap-days" :: v :: rest ->
+        (Some (Int.of_string v), List.rev_append acc rest)
+    | x :: rest -> loop (x :: acc) rest
+  in
+  loop [] argv
 
 let _parse_args argv =
   let rec loop symbol init_cash years_back out_sexp out_markdown end_date
@@ -141,6 +159,7 @@ let _today () = Date.today ~zone:Time_float.Zone.utc
 
 let _main () =
   let argv = Sys.get_argv () |> Array.to_list |> List.tl_exn in
+  let gap_days, argv = _extract_gap_days argv in
   let args = _parse_args argv in
   let fixtures_root = _resolve_fixtures_root_or_fail args in
   let end_date = Option.value args.end_date ~default:(_today ()) in
@@ -152,6 +171,8 @@ let _main () =
       end_date;
       fixtures_root;
       universe_path = args.universe_path;
+      max_end_date_gap_days =
+        Option.value gap_days ~default:SWS.default_max_end_date_gap_days;
     }
   in
   eprintf

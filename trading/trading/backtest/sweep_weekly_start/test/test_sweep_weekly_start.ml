@@ -42,6 +42,8 @@ let _sample_result () : SWS.sweep_result =
     years_back = 3;
     cells;
     summary = SWS.summarize cells;
+    coverage = None;
+    dropped_cells = [];
   }
 
 (* --- tests --- *)
@@ -165,6 +167,8 @@ let test_format_markdown_empty _ =
       years_back = 0;
       cells = [];
       summary = SWS.summarize [];
+      coverage = None;
+      dropped_cells = [];
     }
   in
   let md = SWS.format_markdown r in
@@ -176,6 +180,190 @@ let test_sexp_roundtrip _ =
   let sexp = SWS.format_sexp r in
   let r' = SWS.sweep_result_of_sexp sexp in
   assert_that r' (equal_to r)
+
+(* --- end-date guard + dropped-cell fixtures (issue #2915) --- *)
+
+let _flat_bar date : Types.Daily_price.t =
+  {
+    date;
+    open_price = 100.0;
+    high_price = 100.0;
+    low_price = 100.0;
+    close_price = 100.0;
+    volume = 1_000;
+    adjusted_close = 100.0;
+    active_through = None;
+  }
+
+(** Weekday bars from [first] through [last] inclusive. *)
+let _weekday_bars ~first ~last =
+  let is_weekday d =
+    match Date.day_of_week d with
+    | Day_of_week.Sat | Day_of_week.Sun -> false
+    | _ -> true
+  in
+  Date.dates_between ~min:first ~max:last
+  |> List.filter ~f:is_weekday |> List.map ~f:_flat_bar
+
+(** Stage a temp CSV store holding SPY bars ending on [last], and return its
+    root. *)
+let _stage_spy_bars ~last =
+  let data_dir = Fpath.v (Core_unix.mkdtemp "/tmp/sweep_weekly_start_data_") in
+  let bars = _weekday_bars ~first:(_date ~y:2026 ~m:Apr ~d:1) ~last in
+  (match Csv.Csv_storage.create ~data_dir "SPY" with
+  | Error err -> assert_failure ("csv create: " ^ Status.show err)
+  | Ok storage -> (
+      match Csv.Csv_storage.save storage bars with
+      | Error err -> assert_failure ("csv save: " ^ Status.show err)
+      | Ok () -> ()));
+  data_dir
+
+(** The weekly workflow's shape: a Monday run date well past a stale floor. *)
+let _run_date = _date ~y:2026 ~m:Sep ~d:21
+
+let _coverage_for ~last =
+  SWS.load_coverage ~data_dir:(_stage_spy_bars ~last) ~symbol:"SPY"
+    ~requested_end_date:_run_date
+    ~tolerance_days:SWS.default_max_end_date_gap_days
+
+let _result_with ?coverage ?(dropped_cells = []) () : SWS.sweep_result =
+  { (_sample_result ()) with coverage; dropped_cells }
+
+(* --- end-date guard tests --- *)
+
+(** Bars stop 2026-05-01 (the committed SPY floor), run date 2026-09-21: 143
+    dead days > 7-day tolerance, so the guard clamps to the last bar. *)
+let test_truncated_bars_trigger_guard _ =
+  let last = _date ~y:2026 ~m:May ~d:1 in
+  assert_that (_coverage_for ~last)
+    (equal_to
+       ({
+          requested_end_date = _run_date;
+          last_bar_date = last;
+          tolerance_days = 7;
+          clamped = true;
+        }
+         : SWS.coverage))
+
+(** A clamped coverage measures every cell to the last bar. *)
+let test_clamped_effective_end_is_last_bar _ =
+  let last = _date ~y:2026 ~m:May ~d:1 in
+  assert_that (SWS.effective_end_date (_coverage_for ~last)) (equal_to last)
+
+(** The truncated fixture's report carries the loud clamp notice with both dates
+    and the gap, plus the last-bar line. *)
+let test_truncated_bars_report_annotated _ =
+  let coverage = _coverage_for ~last:(_date ~y:2026 ~m:May ~d:1) in
+  assert_that
+    (SWS.format_markdown (_result_with ~coverage ()))
+    (all_of
+       [
+         contains_substring "Last bar: 2026-05-01";
+         contains_substring "WARNING -- END DATE CLAMPED";
+         contains_substring
+           "Requested end date 2026-09-21 is 143 days past the last SPY bar \
+            (2026-05-01), beyond the 7-day tolerance";
+       ])
+
+(** Bars through Fri 2026-09-18, run Mon 2026-09-21: a 3-day weekend gap, so no
+    clamp and the requested end date stands. *)
+let test_full_coverage_not_clamped _ =
+  let coverage = _coverage_for ~last:(_date ~y:2026 ~m:Sep ~d:18) in
+  assert_that coverage
+    (all_of
+       [
+         field (fun (c : SWS.coverage) -> c.clamped) (equal_to false);
+         field (fun c -> SWS.effective_end_date c) (equal_to _run_date);
+       ])
+
+(** Full coverage: the header still records the last bar, but carries no clamp
+    annotation. *)
+let test_full_coverage_report_has_no_annotation _ =
+  let coverage = _coverage_for ~last:(_date ~y:2026 ~m:Sep ~d:18) in
+  assert_that
+    (SWS.format_markdown (_result_with ~coverage ()))
+    (all_of
+       [
+         contains_substring "Last bar: 2026-09-18";
+         not_ (contains_substring "WARNING");
+         not_ (contains_substring "CLAMPED");
+       ])
+
+(** Tolerance boundary: a gap of exactly [tolerance_days] passes; one more day
+    clamps. *)
+let test_resolve_coverage_boundary _ =
+  let last_bar_date = _date ~y:2026 ~m:May ~d:1 in
+  let clamped_at gap =
+    (SWS.resolve_coverage
+       ~requested_end_date:(Date.add_days last_bar_date gap)
+       ~last_bar_date ~tolerance_days:7)
+      .clamped
+  in
+  assert_that
+    (List.map [ 0; 7; 8 ] ~f:clamped_at)
+    (elements_are [ equal_to false; equal_to false; equal_to true ])
+
+(* --- dropped-cell tests --- *)
+
+let _dropped_fixture : SWS.dropped_cell list =
+  [
+    { start_date = _date ~y:2026 ~m:May ~d:4; reason = "empty window A" };
+    { start_date = _date ~y:2026 ~m:May ~d:11; reason = "empty window B" };
+  ]
+
+(** Dropped cells show in the report: a count in the header and a section naming
+    each start date with its reason. *)
+let test_dropped_cells_rendered _ =
+  assert_that
+    (SWS.format_markdown (_result_with ~dropped_cells:_dropped_fixture ()))
+    (all_of
+       [
+         contains_substring "Dropped cells: 2";
+         contains_substring "## Dropped cells";
+         contains_substring "2 cell(s) dropped";
+         contains_substring "- 2026-05-04: empty window A";
+         contains_substring "- 2026-05-11: empty window B";
+       ])
+
+(** The dropped section is rendered even when no cell survived — the case where
+    it matters most. *)
+let test_dropped_cells_rendered_when_no_cells _ =
+  let r =
+    {
+      (_result_with ~dropped_cells:_dropped_fixture ()) with
+      cells = [];
+      summary = SWS.summarize [];
+    }
+  in
+  assert_that (SWS.format_markdown r)
+    (all_of
+       [
+         contains_substring "(no cells in window)";
+         contains_substring "Dropped cells: 2";
+         contains_substring "- 2026-05-11: empty window B";
+       ])
+
+(** Nothing dropped: the header says 0 and there is no dropped section. *)
+let test_no_dropped_cells _ =
+  assert_that
+    (SWS.format_markdown (_result_with ()))
+    (all_of
+       [
+         contains_substring "Dropped cells: 0";
+         not_ (contains_substring "## Dropped cells");
+       ])
+
+(** Coverage and dropped cells survive the sexp round-trip. *)
+let test_sexp_roundtrip_with_guard_fields _ =
+  let r =
+    _result_with
+      ~coverage:
+        (SWS.resolve_coverage ~requested_end_date:_run_date
+           ~last_bar_date:(_date ~y:2026 ~m:May ~d:1)
+           ~tolerance_days:7)
+      ~dropped_cells:_dropped_fixture ()
+  in
+  assert_that (SWS.sweep_result_of_sexp (SWS.format_sexp r)) (equal_to r)
 
 let suite =
   "Sweep_weekly_start"
@@ -194,6 +382,23 @@ let suite =
          "format_markdown empty cells renders a notice"
          >:: test_format_markdown_empty;
          "sweep_result sexp round-trips" >:: test_sexp_roundtrip;
+         "truncated bars trigger the end-date guard"
+         >:: test_truncated_bars_trigger_guard;
+         "clamped effective end is the last bar"
+         >:: test_clamped_effective_end_is_last_bar;
+         "truncated bars annotate the report"
+         >:: test_truncated_bars_report_annotated;
+         "full coverage is not clamped" >:: test_full_coverage_not_clamped;
+         "full coverage report has no annotation"
+         >:: test_full_coverage_report_has_no_annotation;
+         "resolve_coverage tolerance boundary"
+         >:: test_resolve_coverage_boundary;
+         "dropped cells rendered in report" >:: test_dropped_cells_rendered;
+         "dropped cells rendered when no cell survived"
+         >:: test_dropped_cells_rendered_when_no_cells;
+         "no dropped cells renders a zero count" >:: test_no_dropped_cells;
+         "sexp round-trips coverage and dropped cells"
+         >:: test_sexp_roundtrip_with_guard_fields;
        ]
 
 let () = run_test_tt_main suite

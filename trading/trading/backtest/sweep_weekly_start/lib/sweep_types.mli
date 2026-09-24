@@ -64,12 +64,47 @@ type summary = {
     [Sweep_weekly_start_lib.summarize]; serialized as part of {!sweep_result}.
 *)
 
+type coverage = {
+  requested_end_date : Date.t;
+      (** The end date the caller asked for ([config.end_date]) — the run date
+          when the CLI's [--end-date] is omitted. *)
+  last_bar_date : Date.t;
+      (** Date of the symbol's last bar in the CSV store at run time. Always
+          rendered in the report header, so a stale data floor is visible
+          without opening the workflow log (issue #2915). *)
+  tolerance_days : int;
+      (** The [config.max_end_date_gap_days] the guard was evaluated with. *)
+  clamped : bool;
+      (** [true] when [requested_end_date] was more than [tolerance_days]
+          calendar days past [last_bar_date], so every cell was measured to
+          [last_bar_date] instead. Without the clamp the simulator's CAGR
+          annualizes over the dead calendar days after the last bar, which drags
+          every cell's CAGR down a little more each week the data is not
+          refreshed while the prices themselves are unchanged. *)
+}
+[@@deriving sexp, eq, show]
+(** Result of the end-date-vs-data-floor guard. Computed by
+    [Sweep_weekly_start_lib.resolve_coverage]. *)
+
+type dropped_cell = {
+  start_date : Date.t;  (** The Monday whose cell was not produced. *)
+  reason : string;
+      (** Why — the rendered exception, e.g. the
+          {!Backtest.Window_filter.Empty_measurement_window} window description.
+      *)
+}
+[@@deriving sexp, eq, show]
+(** A start date the sweep enumerated but could not measure. Recorded in the
+    result and rendered in the markdown report — not only on stderr — so a
+    shrinking [n_cells] is always explained in the artefact itself. *)
+
 type sweep_result = {
   run_date : Date.t;  (** Date the sweep was generated. *)
   end_date : Date.t;
-      (** End date used for every cell. Equal to [run_date] when the user does
-          not override [--end-date]; settable via the CLI / API for reproducible
-          tests and replay. *)
+      (** Effective end date used for every cell. Equal to [run_date] (the
+          requested end date) unless the end-date guard clamped it to the last
+          bar — see [coverage]. The requested date is settable via the CLI / API
+          for reproducible tests and replay. *)
   symbol : string;  (** Symbol used by the BAH strategy. *)
   initial_cash : float;
       (** Starting cash for every cell. Same value across cells — the sweep
@@ -80,6 +115,15 @@ type sweep_result = {
       (** Cells in chronological order (earliest start_date first). *)
   summary : summary;
       (** Aggregate stats. Derived from [cells] — recomputable. *)
+  coverage : coverage option; [@sexp.option]
+      (** End-date guard outcome. [None] only for results built without
+          consulting the bar store (hand-built fixtures, pre-#2915 goldens);
+          {!Sweep_weekly_start_lib.run} always sets it. When [clamped],
+          [end_date] above is [coverage.last_bar_date], not the requested date.
+      *)
+  dropped_cells : dropped_cell list; [@sexp.list]
+      (** Start dates enumerated but not measured, chronologically. Omitted from
+          the sexp when empty. *)
 }
 [@@deriving sexp, eq, show]
 (** Full result of one sweep invocation, serializable as the golden artifact. *)
@@ -88,12 +132,19 @@ type config = {
   symbol : string;  (** Symbol for the BAH strategy, e.g. ["SPY"]. *)
   initial_cash : float;  (** Starting cash for every cell. *)
   years_back : int;  (** Trailing-window length in years. *)
-  end_date : Date.t;  (** End date for every cell. *)
+  end_date : Date.t;
+      (** Requested end date for every cell; the guard may clamp the effective
+          end to the last bar (see [max_end_date_gap_days]). *)
   fixtures_root : string;
       (** Path to [trading/test_data/backtest_scenarios] used to resolve the
           single-symbol universe file. *)
   universe_path : string;
       (** Universe-file path relative to [fixtures_root], e.g.
           ["universes/spy-only.sexp"]. *)
+  max_end_date_gap_days : int;
+      (** Guard tolerance, in calendar days: when [end_date] is more than this
+          many days past the symbol's last bar, the sweep clamps the effective
+          end date to the last bar and flags the report. Default
+          [Sweep_weekly_start_lib.default_max_end_date_gap_days]. *)
 }
 (** Inputs to [Sweep_weekly_start_lib.run]. *)

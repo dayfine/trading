@@ -25,11 +25,11 @@
 
     The sweep-side cases here pin both halves of
     [Sweep_weekly_start_lib.run_one]'s documented contract: the degenerate
-    window is absorbed into [None], and {i only} the degenerate window is — any
-    other failure propagates. The second half needs its own case because the
-    mutation that breaks it (widening the handler to [| exception exn ->])
-    leaves the handler body byte-identical and is exactly the shape a later
-    simplification would take. *)
+    window is absorbed into [Error dropped], and {i only} the degenerate window
+    is — any other failure propagates. The second half needs its own case
+    because the mutation that breaks it (widening the handler to
+    [| exception exn ->]) leaves the handler body byte-identical and is exactly
+    the shape a later simplification would take. *)
 
 open OUnit2
 open Core
@@ -118,6 +118,8 @@ let _sweep_config () : Sweep_weekly_start.Sweep_weekly_start_lib.config =
     end_date = Date.of_string _end_date;
     fixtures_root = _resolve_fixtures_root ();
     universe_path = "universes/spy-only.sexp";
+    max_end_date_gap_days =
+      Sweep_weekly_start.Sweep_weekly_start_lib.default_max_end_date_gap_days;
   }
 
 let _pinned_spy_sector_map () =
@@ -148,7 +150,8 @@ let _invalid_sector_map () =
 *)
 type run_one_outcome =
   | Cell_produced
-  | Cell_skipped  (** [None] — the documented degenerate-window tolerance *)
+  | Cell_skipped
+      (** [Error dropped] — the documented degenerate-window tolerance *)
   | Empty_window_propagated
   | Other_exn_propagated of string  (** the exception text *)
 [@@deriving eq, show]
@@ -158,16 +161,17 @@ let _run_one_outcome cfg start_date ~sector_map_override =
     Sweep_weekly_start.Sweep_weekly_start_lib.run_one cfg start_date
       ~sector_map_override
   with
-  | Some (_ : Sweep_weekly_start.Sweep_weekly_start_lib.cell) -> Cell_produced
-  | None -> Cell_skipped
+  | Ok (_ : Sweep_weekly_start.Sweep_weekly_start_lib.cell) -> Cell_produced
+  | Error (_ : Sweep_weekly_start.Sweep_weekly_start_lib.dropped_cell) ->
+      Cell_skipped
   | exception Backtest.Window_filter.Empty_measurement_window _ ->
       Empty_window_propagated
   | exception e -> Other_exn_propagated (Stdlib.Printexc.to_string e)
 
 (** The sweep's own cell runner — the caller that #2632 killed — must absorb the
-    degenerate window and return [None] rather than propagate. This is the "one
-    arm must not take down the others" contract, checked at the exact function
-    [Sweep_weekly_start_lib.run] maps over the Mondays. *)
+    degenerate window and return [Error dropped] rather than propagate. This is
+    the "one arm must not take down the others" contract, checked at the exact
+    function [Sweep_weekly_start_lib.run] maps over the Mondays. *)
 let test_sweep_run_one_skips_the_cell _ =
   assert_that
     (_run_one_outcome (_sweep_config ())
@@ -179,10 +183,10 @@ let test_sweep_run_one_skips_the_cell _ =
     tolerance is scoped to the degenerate window {i only}. Widening [run_one]'s
     handler to [| exception exn ->] leaves its body byte-identical, so nothing
     about the code looks wrong afterwards — but every genuine failure would then
-    become a silently-dropped cell, and [run]'s [List.filter_map] would report a
-    successful sweep over an arm it never actually measured. That is the same
-    "silently wrong data, not an error" hazard the typed exception exists to
-    prevent, moved one layer up. *)
+    become a silently-dropped cell, and [run]'s [List.partition_result] would
+    report a successful sweep over an arm it never actually measured. That is
+    the same "silently wrong data, not an error" hazard the typed exception
+    exists to prevent, moved one layer up. *)
 let test_sweep_run_one_propagates_a_genuine_failure _ =
   assert_that
     (_run_one_outcome (_sweep_config ())
@@ -191,18 +195,18 @@ let test_sweep_run_one_propagates_a_genuine_failure _ =
     (matching
        ~msg:
          "a non-Empty_measurement_window failure must propagate out of \
-          run_one, never be swallowed into None"
+          run_one, never be swallowed into Error"
        (function Other_exn_propagated msg -> Some msg | _ -> None)
        (contains_substring "Symbol cannot be empty"))
 
-(** What the skipped cell reports. [run] drops the cell from [cells], so
-    [summary.n_cells] shrinks with no other trace — the stderr line is the only
-    record that a Monday was dropped and why. Pinning the pure
-    {!Sweep_weekly_start_lib.skip_message} pins that content; the [eprintf] side
-    effect itself is not asserted (capturing the process's stderr from inside
-    OUnit is not worth the fixture), so a mutation that stops {i printing} the
-    message still passes — what this test defends is that the message keeps
-    naming the cell and the reason. *)
+(** What the skipped cell reports on stderr. [run] drops the cell from [cells]
+    and records it in [dropped_cells] (rendered in the report since #2915); the
+    stderr line is the workflow-log copy naming the Monday and why. Pinning the
+    pure {!Sweep_weekly_start_lib.skip_message} pins that content; the [eprintf]
+    side effect itself is not asserted (capturing the process's stderr from
+    inside OUnit is not worth the fixture), so a mutation that stops
+    {i printing} the message still passes — what this test defends is that the
+    message keeps naming the cell and the reason. *)
 let test_skip_message_names_the_cell_and_the_reason _ =
   assert_that
     (Sweep_weekly_start.Sweep_weekly_start_lib.skip_message
@@ -227,8 +231,8 @@ let suite =
          "run_backtest on a bar-less window raises \
           Window_filter.Empty_measurement_window"
          >:: test_run_backtest_raises_typed_empty_window;
-         "Sweep_weekly_start.run_one returns None instead of aborting the sweep"
-         >:: test_sweep_run_one_skips_the_cell;
+         "Sweep_weekly_start.run_one returns Error dropped instead of aborting \
+          the sweep" >:: test_sweep_run_one_skips_the_cell;
          "Sweep_weekly_start.run_one propagates a non-empty-window failure"
          >:: test_sweep_run_one_propagates_a_genuine_failure;
          "Sweep_weekly_start.skip_message names the skipped cell and the reason"
