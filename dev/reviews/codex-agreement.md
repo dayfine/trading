@@ -7,5 +7,5 @@ table monthly: the promotion path in `docs/howtos/codex_pr_reviews.md` becomes a
 discussable option only after >= 20 rows with agree >= 90 % and no Codex-only
 false rework (`.claude/rules/cross-agent-review.md`).
 
-| date | PR | tip | struct | behav | codex | agree | codex-only items | claude-only items | note |
-|---|---|---|---|---|---|---|---|---|---|
+| date | PR | tip | struct | behav | codex | agree | codex-only items | claude-only items | codex tok in/out | note |
+|---|---|---|---|---|---|---|---|---|---|---|

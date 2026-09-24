@@ -18,17 +18,24 @@
 #   row whose codex column is "none" -- still useful: it records a sampled-out
 #   or failed run next to the Claude verdicts.
 #
-# ROW  | date | PR | tip | struct | behav | codex | agree | codex-only items | claude-only items | note |
+# ROW  | date | PR | tip | struct | behav | codex | agree | codex-only items | claude-only items | codex tok in/out | note |
 #   agree = yes when codex == behav-or-struct combined ("rework" if either
 #   Claude gate is rework, else "ok"); "n/a" when codex is none/stale.
 #   items = count of "### " headings under a "## NEEDS_REWORK Items" heading in
 #   each body, a proxy for findings; the note column is for the human read.
+#   codex tok in/out = the input/output tokens of the live Codex run at this
+#   tip, read from the codex_review.sh run log ($CODEX_REVIEW_LOG_DIR, default
+#   dev/_tmp/codex, any reviews-<date>.log; issue #2922 item 2). input
+#   includes the cached part. "n/a" when no run is logged or the run recorded
+#   tokens=na (no completed turn) -- a missing cost is never written as 0.
 #
 # Offline seam: CODEX_AGREEMENT_LIB=1 sources the functions only.
 set -eu
 HERE=$(dirname "$0")
 REPO=${REPO:-dayfine/trading}
-AGREEMENT_FILE=${AGREEMENT_FILE:-"$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || echo .)/dev/reviews/codex-agreement.md"}
+_ROOT=$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || echo .)
+AGREEMENT_FILE=${AGREEMENT_FILE:-"$_ROOT/dev/reviews/codex-agreement.md"}
+CODEX_LOG_DIR=${CODEX_REVIEW_LOG_DIR:-"$_ROOT/dev/_tmp/codex"}
 
 # claude_combined STRUCT BEHAV -> rework | ok | pending
 claude_combined() {
@@ -58,6 +65,20 @@ rework_items() {
     | if length == 0 then "" else (last | .body) end' \
   | awk 'f && /^### / { n++ } /^## +NEEDS_REWORK Items/ { f=1 } END { print n + 0 }'
 }
+# codex_tokens PR TIP -> "<in>/<out>" from the newest run-log line for exactly
+# (PR, TIP) across $CODEX_LOG_DIR/reviews-*.log, else "n/a" (no line, or a
+# line recorded as tokens=na / never completed by codex_review.sh finish_run).
+codex_tokens() {
+  cat "$CODEX_LOG_DIR"/reviews-*.log 2>/dev/null \
+  | awk -v pr="$1" -v sha="$2" '
+      $1 == pr && $2 == sha { i = ""; o = ""
+        for (k = 3; k <= NF; k++) {
+          if ($k ~ /^in=[0-9]+$/)  i = substr($k, 4)
+          if ($k ~ /^out=[0-9]+$/) o = substr($k, 5)
+        }
+        last = (i != "" && o != "") ? i "/" o : "n/a" }
+      END { print (last == "" ? "n/a" : last) }'
+}
 # agreement_row PR TIP REVIEWS_JSON [NOTE] -> the markdown row (no trailing newline issues).
 agreement_row() {
   _pr=$1; _tip=$2; _reviews=$3; _note=${4:-}
@@ -67,9 +88,9 @@ agreement_row() {
   _claude=$(claude_combined "$_s" "$_b")
   _codex_items=$(rework_items "$_reviews" codex)
   _claude_items=$(( $(rework_items "$_reviews" structural) + $(rework_items "$_reviews" behavioral) ))
-  printf '| %s | #%s | %s | %s | %s | %s | %s | %s | %s | %s |\n' \
+  printf '| %s | #%s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n' \
     "$(date +%F)" "$_pr" "$(printf '%s' "$_tip" | cut -c1-9)" "$_s" "$_b" "$_c" \
-    "$(agree "$_claude" "$_c")" "$_codex_items" "$_claude_items" "$_note"
+    "$(agree "$_claude" "$_c")" "$_codex_items" "$_claude_items" "$(codex_tokens "$_pr" "$_tip")" "$_note"
 }
 ensure_header() {
   if [ ! -f "$1" ]; then
@@ -82,8 +103,8 @@ ensure_header() {
       'table monthly: the promotion path in `docs/howtos/codex_pr_reviews.md` becomes a' \
       'discussable option only after >= 20 rows with agree >= 90 % and no Codex-only' \
       'false rework (`.claude/rules/cross-agent-review.md`).' '' \
-      '| date | PR | tip | struct | behav | codex | agree | codex-only items | claude-only items | note |' \
-      '|---|---|---|---|---|---|---|---|---|---|' > "$1"
+      '| date | PR | tip | struct | behav | codex | agree | codex-only items | claude-only items | codex tok in/out | note |' \
+      '|---|---|---|---|---|---|---|---|---|---|---|' > "$1"
   fi
 }
 

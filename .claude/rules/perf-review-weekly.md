@@ -71,6 +71,37 @@ the handle cap (`SNAPSHOT_MAX_MMAP_HANDLES`, #2839) are the per-run signals.
    the rows compared, deltas, tickets opened. Two lines is enough; zero lines
    means the review did not happen.
 
+## §Usage review — token spend, same slot (issue #2922 item 4)
+
+Runtime and RAM are one cost; tokens are the other, and until #2922 nobody
+could see where they went (the 09-22 hand count: ≈ 2.4 M subagent tokens for
+three shell-only PRs). Same day as the perf read, same "write it down" rule.
+
+**Inputs (all committed or local, nothing to re-run):**
+
+| source | what | how it gets there |
+|---|---|---|
+| `dev/budget/local-<date>.json` | local session: Claude main + every dispatch, Codex runs | `sh dev/scripts/budget_local_record.sh` at session end (`session-rampup.md` §Maintenance); backfill missed days with `--date` |
+| `dev/budget/<date>-<run>.json` | GHA orchestrator runs, `total_cost_usd` | the orchestrator's cost step |
+| `dev/reviews/codex-agreement.md` | Codex verdict vs Claude gates + `codex tok in/out` | `codex_agreement_row.sh <PR> --append` at merge |
+
+**The table (one row per week, in `dev/status/cost-tracking.md` §Usage review):**
+
+| metric | read from | first-decision threshold |
+|---|---|---|
+| tokens per merged PR (Claude, all dispatches on that `ref`) | `.claude.rows[]` grouped by `ref` | trend only |
+| tokens per QC verdict, split structural / behavioral / results | rows with `agent_type` `qc-*` | (b): tokens per QC verdict on PRs with no OCaml in the diff vs PRs with OCaml — if the no-OCaml reviews cost within ~40 % of the OCaml ones, the rebuild dominates → add a "CI-authoritative build; do not rebuild" path to QC briefs (the rows do not split tool output; this is the proxy) |
+| resume overhead | rows with `resumes > 0`, share of subagent tokens | (a): ≥ 20 % → prioritise the event-wait helper (#2738) |
+| main-session calls above 150k context | `.claude.context_histogram` | (c): > 50 % of calls → the `/compact` rule is not being followed; fix the habit before any preamble cut |
+| Codex cost per finding | `codex-agreement.md`: `codex tok in/out` ÷ codex-only items | (d): compare with the Claude gates' tokens per finding |
+| GHA $ per run | `<date>-<run>.json` totals | trend only |
+
+Two consecutive weeks of rows → the first optimisation decision, recorded in
+the same section with the numbers that drove it. What the sources do **not**
+cover (say it rather than infer it): dollars for local sessions (transcripts
+carry no price), transcripts from any other machine, and Codex runs made
+outside `codex_review.sh`.
+
 ## What QC can check
 
 - A PR that adds a new warehouse format, cache, or run mode adds or updates

@@ -1233,6 +1233,20 @@
  (action
   (run sh %{dep:token_usage_report_test.sh})))
 
+; #2922 item 3: pin dev/scripts/budget_local_record.sh, the committed
+; dev/budget/local-<date>.json record. Reuses the token_usage fixture tree; the
+; script and fixtures are resolved via repo_root() at RUN TIME, so (universe) is
+; required for the same reason as token_usage_report_test.sh above.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (source_tree fixtures/token_usage)
+  (universe))
+ (action
+  (run sh %{dep:budget_local_record_test.sh})))
+
 ; #2921: parser-drift guard -- every flag a dev/scripts/*.sh passes to
 ; scenario_runner.exe must exist in that runner's own parser. Reads
 ; dev/scripts/ (outside the dune workspace root) and

@@ -133,3 +133,17 @@ sh dev/scripts/export-memory.sh   # rewrites dev/agent-memory/ + its index
 It curates automatically (excludes `feedback`-typed process notes and
 dated `project_20YY-*` session logs); add superseded entries to the
 script's `STALE` list. Docs-only change → admin-merge.
+
+## Maintenance — record the session's token spend
+
+At session end, alongside the memory export, write the day's local spend
+record (issue #2922) so the weekly §Usage review
+(`perf-review-weekly.md`) reads committed files instead of re-deriving them:
+
+```bash
+sh dev/scripts/budget_local_record.sh            # today (UTC) -> dev/budget/local-<date>.json
+sh dev/scripts/budget_local_record.sh --date D   # a session that crossed UTC midnight: also D
+```
+
+Re-running for the same date overwrites that day's record. It commits with
+the handoff doc.
