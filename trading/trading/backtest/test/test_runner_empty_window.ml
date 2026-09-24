@@ -25,11 +25,11 @@
 
     The sweep-side cases here pin both halves of
     [Sweep_weekly_start_lib.run_one]'s documented contract: the degenerate
-    window is absorbed into [None], and {i only} the degenerate window is — any
-    other failure propagates. The second half needs its own case because the
-    mutation that breaks it (widening the handler to [| exception exn ->])
-    leaves the handler body byte-identical and is exactly the shape a later
-    simplification would take. *)
+    window is absorbed into [Error dropped], and {i only} the degenerate window
+    is — any other failure propagates. The second half needs its own case
+    because the mutation that breaks it (widening the handler to
+    [| exception exn ->]) leaves the handler body byte-identical and is exactly
+    the shape a later simplification would take. *)
 
 open OUnit2
 open Core
@@ -118,6 +118,8 @@ let _sweep_config () : Sweep_weekly_start.Sweep_weekly_start_lib.config =
     end_date = Date.of_string _end_date;
     fixtures_root = _resolve_fixtures_root ();
     universe_path = "universes/spy-only.sexp";
+    max_end_date_gap_days =
+      Sweep_weekly_start.Sweep_weekly_start_lib.default_max_end_date_gap_days;
   }
 
 let _pinned_spy_sector_map () =
@@ -148,7 +150,8 @@ let _invalid_sector_map () =
 *)
 type run_one_outcome =
   | Cell_produced
-  | Cell_skipped  (** [None] — the documented degenerate-window tolerance *)
+  | Cell_skipped of Sweep_weekly_start.Sweep_weekly_start_lib.dropped_cell
+      (** [Error dropped] — the documented degenerate-window tolerance *)
   | Empty_window_propagated
   | Other_exn_propagated of string  (** the exception text *)
 [@@deriving eq, show]
@@ -158,31 +161,48 @@ let _run_one_outcome cfg start_date ~sector_map_override =
     Sweep_weekly_start.Sweep_weekly_start_lib.run_one cfg start_date
       ~sector_map_override
   with
-  | Some (_ : Sweep_weekly_start.Sweep_weekly_start_lib.cell) -> Cell_produced
-  | None -> Cell_skipped
+  | Ok (_ : Sweep_weekly_start.Sweep_weekly_start_lib.cell) -> Cell_produced
+  | Error dropped -> Cell_skipped dropped
   | exception Backtest.Window_filter.Empty_measurement_window _ ->
       Empty_window_propagated
   | exception e -> Other_exn_propagated (Stdlib.Printexc.to_string e)
 
 (** The sweep's own cell runner — the caller that #2632 killed — must absorb the
-    degenerate window and return [None] rather than propagate. This is the "one
-    arm must not take down the others" contract, checked at the exact function
-    [Sweep_weekly_start_lib.run] maps over the Mondays. *)
+    degenerate window and return [Error dropped] rather than propagate. This is
+    the "one arm must not take down the others" contract, checked at the exact
+    function [Sweep_weekly_start_lib.run] maps over the Mondays. The dropped
+    record must name the Monday and carry the rendered exception as its [reason]
+    — that text is what the report's [## Dropped cells] section shows (issue
+    #2915). *)
 let test_sweep_run_one_skips_the_cell _ =
   assert_that
     (_run_one_outcome (_sweep_config ())
        (Date.of_string _start_date)
        ~sector_map_override:(_pinned_spy_sector_map ()))
-    (equal_to Cell_skipped)
+    (matching ~msg:"expected Cell_skipped"
+       (function Cell_skipped d -> Some d | _ -> None)
+       (all_of
+          [
+            field
+              (fun (d : Sweep_weekly_start.Sweep_weekly_start_lib.dropped_cell)
+                 -> d.start_date)
+              (equal_to (Date.of_string _start_date));
+            field
+              (fun (d : Sweep_weekly_start.Sweep_weekly_start_lib.dropped_cell)
+                 -> d.reason)
+              (contains_substring
+                 (Printf.sprintf "measurement window %s..%s" _start_date
+                    _end_date));
+          ]))
 
 (** The other half of the same contract, and the one that is easy to lose: the
     tolerance is scoped to the degenerate window {i only}. Widening [run_one]'s
     handler to [| exception exn ->] leaves its body byte-identical, so nothing
     about the code looks wrong afterwards — but every genuine failure would then
-    become a silently-dropped cell, and [run]'s [List.filter_map] would report a
-    successful sweep over an arm it never actually measured. That is the same
-    "silently wrong data, not an error" hazard the typed exception exists to
-    prevent, moved one layer up. *)
+    become a silently-dropped cell, and [run]'s [List.partition_result] would
+    report a successful sweep over an arm it never actually measured. That is
+    the same "silently wrong data, not an error" hazard the typed exception
+    exists to prevent, moved one layer up. *)
 let test_sweep_run_one_propagates_a_genuine_failure _ =
   assert_that
     (_run_one_outcome (_sweep_config ())
@@ -191,18 +211,18 @@ let test_sweep_run_one_propagates_a_genuine_failure _ =
     (matching
        ~msg:
          "a non-Empty_measurement_window failure must propagate out of \
-          run_one, never be swallowed into None"
+          run_one, never be swallowed into Error"
        (function Other_exn_propagated msg -> Some msg | _ -> None)
        (contains_substring "Symbol cannot be empty"))
 
-(** What the skipped cell reports. [run] drops the cell from [cells], so
-    [summary.n_cells] shrinks with no other trace — the stderr line is the only
-    record that a Monday was dropped and why. Pinning the pure
-    {!Sweep_weekly_start_lib.skip_message} pins that content; the [eprintf] side
-    effect itself is not asserted (capturing the process's stderr from inside
-    OUnit is not worth the fixture), so a mutation that stops {i printing} the
-    message still passes — what this test defends is that the message keeps
-    naming the cell and the reason. *)
+(** What the skipped cell reports on stderr. [run] drops the cell from [cells]
+    and records it in [dropped_cells] (rendered in the report since #2915); the
+    stderr line is the workflow-log copy naming the Monday and why. Pinning the
+    pure {!Sweep_weekly_start_lib.skip_message} pins that content; the [eprintf]
+    side effect itself is not asserted (capturing the process's stderr from
+    inside OUnit is not worth the fixture), so a mutation that stops
+    {i printing} the message still passes — what this test defends is that the
+    message keeps naming the cell and the reason. *)
 let test_skip_message_names_the_cell_and_the_reason _ =
   assert_that
     (Sweep_weekly_start.Sweep_weekly_start_lib.skip_message
@@ -221,18 +241,114 @@ let test_skip_message_names_the_cell_and_the_reason _ =
            (Printf.sprintf "measurement window %s..%s" _start_date _end_date);
        ])
 
+module SWS = Sweep_weekly_start.Sweep_weekly_start_lib
+
+(** How far past the last committed SPY bar the clamp test requests its
+    [end_date] — well beyond the 7-day tolerance, so the guard must clamp. *)
+let _clamp_gap_days = 60
+
+(** One year of Mondays keeps the full [run] fast while still spanning many
+    cells. *)
+let _clamp_years_back = 1
+
+(** The last committed SPY bar, read through the same guard [run] uses. Derived
+    rather than hardcoded so the test stays meaningful when [ops-data] extends
+    the series. *)
+let _last_spy_bar () =
+  (SWS.load_coverage
+     ~data_dir:(Data_path.default_data_dir ())
+     ~symbol:"SPY" ~requested_end_date:(Date.of_string _end_date)
+     ~tolerance_days:SWS.default_max_end_date_gap_days)
+    .last_bar_date
+
+let _cell_exn cfg start_date =
+  match
+    SWS.run_one cfg start_date ~sector_map_override:(_pinned_spy_sector_map ())
+  with
+  | Ok cell -> cell
+  | Error d -> assert_failure ("unexpected dropped cell: " ^ d.reason)
+
+(** Issue #2915, the wiring of [run] itself: with [end_date] far past the last
+    bar, the Monday window trails the last bar, every cell is measured to it,
+    [result.end_date] is the last bar and [result.coverage] records the clamp.
+    The CAGR check is numeric: the first cell must equal a [run_one] measured to
+    the last bar, so a [run] that still annualizes over the dead days goes red
+    even while the clamp flag says otherwise. *)
+let test_run_clamps_cells_to_last_bar _ =
+  let last_bar = _last_spy_bar () in
+  let requested = Date.add_days last_bar _clamp_gap_days in
+  let cfg =
+    {
+      (_sweep_config ()) with
+      end_date = requested;
+      years_back = _clamp_years_back;
+    }
+  in
+  let mondays =
+    SWS.mondays_in_window ~end_date:last_bar ~years_back:_clamp_years_back
+  in
+  let expected =
+    _cell_exn { cfg with end_date = last_bar } (List.hd_exn mondays)
+  in
+  assert_that (SWS.run cfg)
+    (all_of
+       [
+         field (fun (r : SWS.sweep_result) -> r.end_date) (equal_to last_bar);
+         field
+           (fun (r : SWS.sweep_result) -> r.coverage)
+           (is_some_and
+              (equal_to
+                 ({
+                    requested_end_date = requested;
+                    last_bar_date = last_bar;
+                    tolerance_days = SWS.default_max_end_date_gap_days;
+                    clamped = true;
+                  }
+                   : SWS.coverage)));
+         field
+           (fun (r : SWS.sweep_result) ->
+             List.map r.cells ~f:(fun (c : SWS.cell) -> c.start_date))
+           (equal_to mondays);
+         field (fun (r : SWS.sweep_result) -> r.dropped_cells) is_empty;
+         field
+           (fun (r : SWS.sweep_result) -> List.hd r.cells)
+           (is_some_and
+              (field (fun (c : SWS.cell) -> c.cagr) (float_equal expected.cagr)));
+       ])
+
+(** Companion to the clamp test: measuring the same cell to the requested
+    (dead-day) end gives a different CAGR, so the numeric check above can
+    actually tell the two end dates apart. *)
+let test_requested_end_changes_cagr _ =
+  let last_bar = _last_spy_bar () in
+  let cfg = { (_sweep_config ()) with years_back = _clamp_years_back } in
+  let start =
+    List.hd_exn
+      (SWS.mondays_in_window ~end_date:last_bar ~years_back:_clamp_years_back)
+  in
+  let clamped = _cell_exn { cfg with end_date = last_bar } start in
+  assert_that
+    (_cell_exn
+       { cfg with end_date = Date.add_days last_bar _clamp_gap_days }
+       start)
+    (field (fun (c : SWS.cell) -> c.cagr) (not_ (float_equal clamped.cagr)))
+
 let suite =
   "Runner_empty_window"
   >::: [
          "run_backtest on a bar-less window raises \
           Window_filter.Empty_measurement_window"
          >:: test_run_backtest_raises_typed_empty_window;
-         "Sweep_weekly_start.run_one returns None instead of aborting the sweep"
-         >:: test_sweep_run_one_skips_the_cell;
+         "Sweep_weekly_start.run_one returns Error dropped instead of aborting \
+          the sweep" >:: test_sweep_run_one_skips_the_cell;
          "Sweep_weekly_start.run_one propagates a non-empty-window failure"
          >:: test_sweep_run_one_propagates_a_genuine_failure;
          "Sweep_weekly_start.skip_message names the skipped cell and the reason"
          >:: test_skip_message_names_the_cell_and_the_reason;
+         "Sweep_weekly_start.run clamps every cell to the last bar"
+         >:: test_run_clamps_cells_to_last_bar;
+         "Measuring to the requested end changes a cell's CAGR"
+         >:: test_requested_end_changes_cagr;
        ]
 
 let () = run_test_tt_main suite
