@@ -102,7 +102,7 @@ starts the session with new information.
   (see `memory/feedback_status_refresh_must_verify.md`), and only the
   ones the priorities doc cites are load-bearing for this session.
 
-## Step 3 — compact at ~150k, never ride to autocompact
+## Step 3 — compact at ~250k, never ride to autocompact
 
 The 2026-09-21 usage panel (issue #2902) put 85 % of spend in turns above
 150k context, and the 09-08 token audit put main-context re-read at ~55 % of
@@ -110,8 +110,30 @@ all spend. The fixed per-turn cost (memory index + rules + tools) is ~110k
 before any work happens, so a session that drifts to 300k+ pays double on
 every wake of a chain-wait loop.
 
+**Why 250k, not 150k (measured 2026-09-24, 8,060 main-session calls over 24
+sessions, 08-24 → 09-24, `dev/scripts/token_usage_report.sh` data).** A
+session STARTS at 100–125k (median 112k: rules + memory index + tools) and
+lands at ~130k after a compaction, so 150k leaves ~15–20k of working room.
+Replaying the real per-call context growth with a ~135k post-compact floor:
+
+| threshold | saving vs never compacting | compactions | calls between |
+|---|---:|---:|---:|
+| 150k | 71 % | 695 | 11 |
+| 200k | 69 % | 163 | 49 |
+| **250k** | **65 %** | **89** | **90** |
+| 300k | 60 % | 60 | 133 |
+| 400k | 52 % | 35 | 229 |
+
+Most of the saving is from compacting AT ALL (in practice sessions almost
+never did: ~4 real compactions in 24 sessions, contexts rode to 500k–1M).
+200k → 300k gives up ~9 pp of saving for ~⅓ the compactions; the model
+ignores the re-reads a compaction forces, which favours the higher end. The
+~112k floor is paid on every call (~25 % of main-session spend) — trimming
+the rules / memory preamble helps at any threshold.
+
 - `/compact` after every merge wave and before any multi-hour wait (a chain,
-  a Monitor, a CI poll). Check `/context`; above ~150k, compact.
+  a Monitor, a CI poll). Check `/context`; above ~250k, compact (~300k is
+  acceptable in a long chain-wait session; never let it ride past 400k).
 - Long chain-wait sessions wake many times; each wake re-reads the whole
   context. Compact *before* arming the wait, not after it fires.
 - Keep `MEMORY.md` under its size limit (the loader truncates the index
