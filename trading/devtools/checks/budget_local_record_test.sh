@@ -85,6 +85,13 @@ expect_eq "re-run overwrites the day's record" "local-2026-09-21" "$(jq -r .run_
 rc=0; sh "$SCRIPT" --projects-dir "$FIX/does-not-exist" --date 2026-09-22 --out-dir "$TMP/out" >/dev/null 2>&1 || rc=$?
 expect_eq "report failure propagates its exit code" 2 "$rc"
 expect_eq "report failure writes nothing" 0 "$([ -f "$TMP/out/local-2026-09-22.json" ] && echo 1 || echo 0)"
+# Exit-code PASSTHROUGH (#2943 qc-behavioral advisory): the missing-dir case above
+# exits 2, which is also this script's own usage-error code, so it cannot tell
+# passthrough from a hardcoded `exit 2`. An existing dir with no transcripts
+# makes the report exit 3 -- a code only passthrough can produce.
+rc=0; sh "$SCRIPT" --projects-dir "$FIX/empty" --date 2026-09-22 --out-dir "$TMP/out" >/dev/null 2>&1 || rc=$?
+expect_eq "report exit 3 (no transcripts) is passed through, not rewritten" 3 "$rc"
+expect_eq "... and writes nothing" 0 "$([ -f "$TMP/out/local-2026-09-22.json" ] && echo 1 || echo 0)"
 
 rc=0; sh "$SCRIPT" --date 09-21 --stdout >/dev/null 2>&1 || rc=$?
 expect_eq "malformed --date is a usage error" 2 "$rc"
