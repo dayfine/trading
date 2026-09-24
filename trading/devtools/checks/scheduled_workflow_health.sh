@@ -61,6 +61,28 @@
 #                   in the YAML" from "cron exists, never fired" would
 #                   require parsing workflow source, out of scope for an
 #                   API-only script.
+#   NO-SCHEDULE-CROWDED -- a THIRD, distinct cause of zero observed
+#                   scheduled runs (issue #2941): the workflow has both a
+#                   schedule trigger and enough non-schedule (push /
+#                   workflow_dispatch / pull_request) traffic that the
+#                   unfiltered page came back FULL (page_full=1, see
+#                   PAGINATION-IS-A-FLOOR item 2) while holding zero
+#                   `.event == "schedule"` runs -- there may be scheduled
+#                   runs further back in the workflow's history that this
+#                   fetch never saw. This is NOT the same claim as
+#                   NO-SCHEDULE (which asserts the full fetched history,
+#                   short of a floor, held no scheduled run at all) --
+#                   printing it as plain NO-SCHEDULE would silently launder
+#                   "the page was too crowded to tell" into "there is
+#                   confidently no cron here", exactly the kind of
+#                   overclaim DEGRADE-HONESTLY exists to prevent.
+#                   UNOBSERVABLE-like: informational only, NEVER
+#                   contributes to a non-zero exit (there is no positive
+#                   evidence of failure, only an absence of evidence), but
+#                   counted and reported under its own SUMMARY bucket so it
+#                   is never conflated with a clean NO-SCHEDULE. Raise
+#                   --runs-per-workflow / SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR
+#                   to see past the crowding.
 #   UNOBSERVABLE -- every one of the N most-recently-fetched scheduled runs
 #                   is in_progress / queued -- i.e. there is at least one
 #                   scheduled run, but NONE of the runs this script looked
@@ -138,8 +160,8 @@
 # EXIT CODES (distinct per failure CLASS -- never collapse "couldn't
 # measure" into "measured green", see DEGRADE-HONESTLY below)
 #
-#   0   all measured workflows are OK, NO-SCHEDULE, or UNOBSERVABLE (no
-#       RED, no STALE).
+#   0   all measured workflows are OK, NO-SCHEDULE, NO-SCHEDULE-CROWDED, or
+#       UNOBSERVABLE (no RED, no STALE).
 #   1   at least one workflow is RED or STALE -- the real, gate-worthy signal.
 #   2   cannot measure: no GH_TOKEN in the environment and no
 #       SCHEDULED_WF_HEALTH_FETCH hook set, so no API call could be made at
@@ -242,8 +264,8 @@ _usage() {
   cat <<'EOF'
 Usage: scheduled_workflow_health.sh [--repo owner/name] [--stale-hours N] [--runs-per-workflow N]
 
-Reports the classification (RED / STALE / NO-SCHEDULE / UNOBSERVABLE / OK)
-of every active workflow, computed from its N most recent scheduled (cron)
+Reports the classification (RED / STALE / NO-SCHEDULE / NO-SCHEDULE-CROWDED /
+UNOBSERVABLE / OK) of every active workflow, computed from its N most recent scheduled (cron)
 runs (default N=10). Exit 0 if all clear, 1 if any RED/STALE, 2/3 if the
 API could not be queried at all, 64 on a usage error. See the header of
 this script for the full contract.
@@ -480,9 +502,10 @@ _recent_scheduled_runs() {
 #
 #   CLASS<TAB>STREAK<TAB>AGE_HOURS<TAB>NEWEST_INPROGRESS<TAB>NEWEST_CONCLUSION<TAB>NEWEST_STATUS<TAB>NEWEST_CREATED_AT<TAB>NEWEST_RUN_ID
 #
-# CLASS is one of RED / STALE / OK / UNOBSERVABLE (never NO-SCHEDULE --
-# that's decided by the caller before this function is even invoked, on
-# whether _recent_scheduled_runs returned anything at all).
+# CLASS is one of RED / STALE / OK / UNOBSERVABLE (never NO-SCHEDULE or
+# NO-SCHEDULE-CROWDED -- both are decided by the caller before this
+# function is even invoked, on whether _recent_scheduled_runs returned any
+# scheduled runs at all, and if not, whether its page came back full).
 #
 # Algorithm (see the header's CLASSIFICATION + WHY A SINGLE NEWEST RUN WAS
 # NOT ENOUGH sections for the incident this exists to fix):
@@ -642,6 +665,7 @@ main() {
   _red_count=0
   _stale_count=0
   _nosched_count=0
+  _nosched_crowded_count=0
   _unobs_count=0
   _red_names=""
   _stale_names=""
@@ -676,8 +700,23 @@ main() {
     _page_full=$(printf '%s\n' "$_fetch_out" | head -1 | cut -f2)
     _run_line=$(printf '%s\n' "$_fetch_out" | tail -n +2)
     if [ -z "$_run_line" ]; then
-      _nosched_count=$((_nosched_count + 1))
-      printf 'NO-SCHEDULE\t%s\t(no scheduled runs observed)\n' "$_name"
+      # Zero scheduled runs on the fetched page has two distinct causes
+      # (issue #2941): a page_full=1 page may simply have been crowded out
+      # by non-schedule traffic (push / workflow_dispatch / pull_request)
+      # -- older scheduled runs may exist past what this fetch saw -- vs a
+      # short (page_full=0) page, which really did see the workflow's
+      # whole observed history and hold no scheduled run at all. Printing
+      # the crowded case as plain NO-SCHEDULE would overclaim "confidently
+      # no cron here" from "the page was too crowded to tell" -- see
+      # NO-SCHEDULE-CROWDED in the header CLASSIFICATION section.
+      if [ "$_page_full" -eq 1 ]; then
+        _nosched_crowded_count=$((_nosched_crowded_count + 1))
+        printf 'NO-SCHEDULE-CROWDED\t%s\t(page of %s runs held no scheduled run -- crowded; raise SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR)\n' \
+          "$_name" "$RUNS_PAGE"
+      else
+        _nosched_count=$((_nosched_count + 1))
+        printf 'NO-SCHEDULE\t%s\t(no scheduled runs observed)\n' "$_name"
+      fi
       continue
     fi
 
@@ -715,8 +754,8 @@ main() {
     esac
   done
 
-  _active_total=$((_ok_count + _red_count + _stale_count + _nosched_count + _unobs_count))
-  echo "SUMMARY: active=${_active_total} (${_total_pages} page(s) fetched, full pagination -- a real total, not a floor) ok=${_ok_count} red=${_red_count} stale=${_stale_count} no-schedule=${_nosched_count} unobservable=${_unobs_count} -- red/stale/ok/unobservable are each computed from up to ${RUNS_PER_WORKFLOW} most-recent scheduled runs per workflow (not just the newest); red includes a per-workflow failure-streak count (see each RED line's streak=N, or streak=>=N when the fetched page was exhausted before the streak closed)"
+  _active_total=$((_ok_count + _red_count + _stale_count + _nosched_count + _nosched_crowded_count + _unobs_count))
+  echo "SUMMARY: active=${_active_total} (${_total_pages} page(s) fetched, full pagination -- a real total, not a floor) ok=${_ok_count} red=${_red_count} stale=${_stale_count} no-schedule=${_nosched_count} no-schedule-crowded=${_nosched_crowded_count} unobservable=${_unobs_count} -- red/stale/ok/unobservable are each computed from up to ${RUNS_PER_WORKFLOW} most-recent scheduled runs per workflow (not just the newest); red includes a per-workflow failure-streak count (see each RED line's streak=N, or streak=>=N when the fetched page was exhausted before the streak closed); no-schedule-crowded counts workflows whose unfiltered runs page came back full while holding zero scheduled runs -- UNOBSERVABLE-like (not measured-OK, never forces a non-zero exit), kept out of the no-schedule bucket so it is never read as a clean 'no cron here'"
   if [ "$_red_count" -gt 0 ]; then
     echo "SUMMARY: RED workflows: ${_red_names}"
   fi

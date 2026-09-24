@@ -168,6 +168,21 @@
 #      `per_page=20` (shim answers only that path) -- the override effect of
 #      the knob #2928 adds, mirroring 14 / 15 / 16 / 23; a hardcoded `* 5`
 #      leaves 22 / 23 green and only this one red.
+#  33. THE CROWDED-PAGE CASE (issue #2941): a FULL unfiltered page holding
+#      ONLY push-event runs (zero `.event == "schedule"`) -> classified
+#      NO-SCHEDULE-CROWDED, not the plain NO-SCHEDULE (there may be
+#      scheduled runs further back that a crowded page never saw) --
+#      still exit 0 (UNOBSERVABLE-like, never forces a non-zero exit) and
+#      counted under its own `no-schedule-crowded=1` SUMMARY bucket, kept
+#      out of `no-schedule=`. Mutation: reading only `_page_full` (or only
+#      "zero run lines") without the OTHER of the two prints the wrong
+#      class on this fixture.
+#  34. THE NON-CROWDED BOUNDARY (issue #2941): a SHORT (non-full)
+#      unfiltered page holding a handful of push-event runs and zero
+#      scheduled runs -> still classified plain NO-SCHEDULE (the whole
+#      observed history really was seen and really held no cron run),
+#      proving assertion 33's new branch didn't turn every push-only page
+#      into NO-SCHEDULE-CROWDED regardless of page_full.
 #
 # Run: sh trading/devtools/checks/scheduled_workflow_health_test.sh
 
@@ -1177,6 +1192,91 @@ if [ "$RC32" -eq 0 ] \
   pass "assertion 32: SCHEDULED_WF_HEALTH_RUNS_PAGE_FACTOR=2 drives per_page=20 (10 x 2) on the runs request"
 else
   fail "assertion 32: expected exit0 against the per_page=20 shim via the factor env var, got rc=$RC32 output=$OUT32"
+fi
+
+echo "=== Assertion 33: FULL unfiltered page holding only push-event runs (zero schedule) -> NO-SCHEDULE-CROWDED, not plain NO-SCHEDULE (issue #2941) ==="
+# --runs-per-workflow 3 -> page = 3 x 5 = 15. The shim returns exactly 15
+# push-event runs and zero schedule-event runs: the page came back FULL, so
+# older scheduled runs may have been crowded off it entirely -- this must
+# read as NO-SCHEDULE-CROWDED, not a confident "no cron here" NO-SCHEDULE.
+# Mutation: dropping the page_full branch (main() always printing plain
+# NO-SCHEDULE on an empty run_line) makes this assertion fail.
+SHIM33="${TMPDIR_ROOT}/fetch33.sh"
+cat > "$SHIM33" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Crowded push-only wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=15")
+    runs=""
+    i=1
+    while [ "$i" -le 15 ]; do
+      [ -n "$runs" ] && runs="$runs,"
+      runs="$runs{\"id\":$((900 + i)),\"event\":\"push\",\"conclusion\":\"success\",\"status\":\"completed\",\"created_at\":\"2026-09-03T00:00:00Z\"}"
+      i=$((i + 1))
+    done
+    echo "{\"workflow_runs\":[$runs]}"
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM33"
+_run "$SHIM33" "$NOW1" --runs-per-workflow 3
+if [ "$RC" -eq 0 ] \
+  && echo "$OUT" | grep -q '^NO-SCHEDULE-CROWDED	Crowded push-only wf' \
+  && ! echo "$OUT" | grep -q '^NO-SCHEDULE	Crowded push-only wf' \
+  && echo "$OUT" | grep -q 'no-schedule-crowded=1' \
+  && echo "$OUT" | grep -q 'no-schedule=0'; then
+  pass "assertion 33: full push-only page -> NO-SCHEDULE-CROWDED (not plain NO-SCHEDULE), exit 0, its own SUMMARY bucket"
+else
+  fail "assertion 33: expected NO-SCHEDULE-CROWDED with no-schedule-crowded=1/no-schedule=0, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 34: SHORT (non-full) page holding a few push-event runs (zero schedule) -> plain NO-SCHEDULE, unchanged (issue #2941 boundary) ==="
+# Default page (per_page=50): only 5 push-event runs come back, well short
+# of the page size -- the whole observed history really was seen and it
+# really holds no scheduled run, so this must stay the plain, confident
+# NO-SCHEDULE, proving assertion 33's new branch is gated on page_full and
+# not on "push-only" alone.
+SHIM34="${TMPDIR_ROOT}/fetch34.sh"
+cat > "$SHIM34" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Sparse push-only wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?per_page=50")
+    runs=""
+    i=1
+    while [ "$i" -le 5 ]; do
+      [ -n "$runs" ] && runs="$runs,"
+      runs="$runs{\"id\":$((900 + i)),\"event\":\"push\",\"conclusion\":\"success\",\"status\":\"completed\",\"created_at\":\"2026-09-03T00:00:00Z\"}"
+      i=$((i + 1))
+    done
+    echo "{\"workflow_runs\":[$runs]}"
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM34"
+_run "$SHIM34" "$NOW1"
+if [ "$RC" -eq 0 ] \
+  && echo "$OUT" | grep -q '^NO-SCHEDULE	Sparse push-only wf' \
+  && ! echo "$OUT" | grep -q '^NO-SCHEDULE-CROWDED' \
+  && echo "$OUT" | grep -q 'no-schedule=1' \
+  && echo "$OUT" | grep -q 'no-schedule-crowded=0'; then
+  pass "assertion 34: short push-only page -> plain NO-SCHEDULE unchanged, exit 0"
+else
+  fail "assertion 34: expected plain NO-SCHEDULE with no-schedule=1/no-schedule-crowded=0, got rc=$RC output=$OUT"
 fi
 
 echo ""

@@ -9,8 +9,8 @@ printf '## Scheduled workflows\n\n'
 case "$rc" in
   0)
     measured=$(awk -F '\t' '$1 == "OK" {n++} END {print n+0}' "$report")
-    if grep -q '^UNOBSERVABLE' "$report"; then
-      printf 'UNMEASURABLE (exit 0: some workflows have no completed scheduled runs; %s measured OK)\n' "$measured"
+    if grep -q '^UNOBSERVABLE' "$report" || grep -q '^NO-SCHEDULE-CROWDED' "$report"; then
+      printf 'UNMEASURABLE (exit 0: some workflows have no completed scheduled runs, or a crowded runs page (issue #2941) that may hold zero scheduled runs by coincidence; %s measured OK)\n' "$measured"
     elif grep -q '^SUMMARY:' "$report"; then
       printf 'all OK (%s measured; exit 0)\n' "$measured"
     else
