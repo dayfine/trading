@@ -365,6 +365,31 @@ let test_sexp_roundtrip_with_guard_fields _ =
   in
   assert_that (SWS.sweep_result_of_sexp (SWS.format_sexp r)) (equal_to r)
 
+(** A pre-#2915 artefact (no [coverage], no [dropped_cells] field, the shape of
+    the committed [weekly-start-sweep-bah-spy.sexp]) must still parse, with
+    [coverage = None] and [dropped_cells = []]. A literal is used on purpose: a
+    round-trip through [format_sexp] would write whatever shape the current
+    derivers emit and so could not catch a lost [[@sexp.option]] /
+    [[@sexp.list]]. *)
+let test_old_shape_sexp_parses _ =
+  let old_shape =
+    "((run_date 2026-05-17) (end_date 2026-05-17) (symbol SPY)\n\
+    \ (initial_cash 100000) (years_back 3)\n\
+    \ (cells (((start_date 2023-05-22) (final_value 100000) (total_return 0.1)\n\
+    \   (cagr 0.05) (max_dd 0.1) (sharpe 1))))\n\
+    \ (summary ((best_cell_start 2023-05-22) (best_cagr 0.05)\n\
+    \   (worst_cell_start 2023-05-22) (worst_cagr 0.05) (median_cagr 0.05)\n\
+    \   (mean_cagr 0.05) (stddev_cagr 0) (n_cells 1))))"
+  in
+  assert_that
+    (SWS.sweep_result_of_sexp (Sexp.of_string old_shape))
+    (all_of
+       [
+         field (fun (r : SWS.sweep_result) -> r.coverage) is_none;
+         field (fun (r : SWS.sweep_result) -> r.dropped_cells) is_empty;
+         field (fun (r : SWS.sweep_result) -> List.length r.cells) (equal_to 1);
+       ])
+
 let suite =
   "Sweep_weekly_start"
   >::: [
@@ -399,6 +424,8 @@ let suite =
          "no dropped cells renders a zero count" >:: test_no_dropped_cells;
          "sexp round-trips coverage and dropped cells"
          >:: test_sexp_roundtrip_with_guard_fields;
+         "pre-#2915 sexp (no guard fields) still parses"
+         >:: test_old_shape_sexp_parses;
        ]
 
 let () = run_test_tt_main suite
