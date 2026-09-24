@@ -1,0 +1,7 @@
+check | null | arm | verdict
+V6    |    1 |   0 | DIFFER
+
+specimens present in some reports but not all:
+  V6 IAC 2012-03-15 (twin positions: IAC/MTCH) -- only in: null
+FAIL: validator invariant counts differ -- these arms hold different instrument sets and their delta is not a paired read
+exit=1
