@@ -186,14 +186,17 @@ Per year Y: every entry of the as-run `pit-v11/composition/top-3000-Y.sexp` whos
 `avg_dollar_volume` desc and the goldens top-1000 is the first 1,000 rows of the goldens top-3000 (rank of that minimum
 in the goldens top-3000 = 1,000, checked), so the cut is "the goldens top-1000 members present in the `_v11pit`
 warehouse, AFTER the 09-14 / 09-15 alias passes" (`pit-universe-2026-09-14/step4/specs/alias2.resolved` +
-`pit-universe-2026-09-14/step4/twin-scan/alias3.txt`). A plain symbol intersection would drop the aliased twins — 1999: 969 by threshold vs 958 by
+`twin-scan/alias3.txt`). A plain symbol intersection would drop the aliased twins — 1999: 969 by threshold vs 958 by
 symbol, the 11 extras all alias targets (XL_old → XL, Q_old1 → IQV, HLX → HOS, ATHYQ/BGEN → BCAL, …). Entries are copied
 verbatim except `(weight)` = 1/N and `(size)` = N (the pit-v11 top-3000 lists kept `size 3000` / weight 1/3000 with
 ~2,820 entries — the runner reads membership only, neither convention changes a run); `aggregate_period_return` is
 carried from the goldens top-1000 list. **Present names per year: 928 (2009) → 998 (2025)**, i.e. ~94 % of each
-top-1000 has bars, vs ~2,846 / 3,000 (27-list mean; range 2,792–2,993) for the top-3000 schedule — the breadth tier is 1/3 the names, not a different
+top-1000 has bars, vs ~2,820 / 3,000 for the top-3000 schedule — the breadth tier is 1/3 the names, not a different
 warehouse (`_v11pit`, 9,364 entries, unchanged; the chain aborts on any other count).
 
+*[Annotated 2026-09-24, #2935 qc-results A4: the second alias map is `pit-universe-2026-09-14/step4/twin-scan/alias3.txt`;
+the measured top-3000 schedule is ~2,846 / 3,000 names (27-list mean, range 2,792–2,993), not ~2,820. (#2945 restored the
+original wording above, which it had first edited in place — #2945 qc-results B1.)]*
 The lists live under `universe/` in this directory (results-only lane; `feedback_commit_raw_per_arm_artifacts`) and are
 staged by `chain-cell3.sh` into the pinned run tree as `pit-v11/composition/top-1000-YYYY.sexp` — untracked files, so
 the chain's dirty check still guards tracked code; the chain logs `md5(cat)` of the 27 lists. If cap 40 is promoted,
@@ -280,7 +283,10 @@ leg on ~$119 k — a ~$0.7 k duplicated P&L on a $1 M start). The arms hold diff
 the per-salt s0/s1 deltas are not clean mechanism reads (`mechanism-validation-rigor.md` check 8). Two bounds keep the
 verdict: (1) the direct effect is ~0.07 pp of return against a 161.8 pp gap in mean realised; (2) **the arms first
 diverge on 2000-04-04 at every salt** (`paired.sh`), 12 years before the twin, so the twin is not what separates them
-— path effects after 2012-03-15 are not bounded, but they would have to flip the sign of a gap that already exists. s2
+— path effects after 2012-03-15 are not bounded, but they would have to flip the sign of a gap that already exists: on 2012-03-14, the day before the twin, the null
+led cap 40 at $1.603 M vs $1.432 M (s0) and $1.557 M vs $1.443 M (s1) (`results/*-equity_curve.csv`). Calibration (#2945
+qc-results B2): NOT-PROMOTABLE holds with s0/s1 discarded (cap 40 then has no tightening evidence on this cell at all),
+but the DOMINATED label itself rests on the two V6-failing pairs — the clean s2 pair alone is not dominated. s2
 (exit 0) is the one clean pair and reads cap 40 +66.8 pp realised, −0.022 Calmar, +7.9 pt maxDD: better level, worse
 risk — not "tightening" either. The twin is the known chunked-build alias class (`project_pit_chunked_twin_miss`);
 it is a data defect in the top-1000 lists inherited from the top-3000 build, not new to this cell.
@@ -295,8 +301,9 @@ it is a data defect in the top-1000 lists inherited from the top-3000 build, not
 
 The level is the same monster lottery as cells 1–2: whichever arm's draw holds BBWI-2020 / TSLA-2013 / AMAT-2020 /
 ANET-2016 wins the salt (s2 is the salt where the arm drew BBWI + ANET). ADMA 2023-12-19 — the cell-2 level trade —
-cannot enter here (absent from `top-1000-2023`, A1), and **the cell-2 tightening did not survive losing it**, which
-answers the question §Cell 3 pre-registered.
+cannot enter here (absent from `top-1000-2023`, A1), and the cell-2 tightening **did not survive** on this schedule, which is
+*consistent with* it having rested on that one name — not proof of it: cell 3 drops ~⅔ of the names, not one, so the
+ADMA question is confounded with breadth (#2945 qc-results B3).
 
 **Why (hypothesis, not measured here).** On a top-1000 pool the admitted list is 1/3 the size, so ranks 21–40 are drawn
 from a thinner, lower-quality tail than on top-3000, while the book still fills ~5 slots. Widening the cap re-draws
