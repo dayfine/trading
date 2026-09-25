@@ -967,6 +967,14 @@ type config = {
           2026-09-03 (user-directed D1 correctness flip, goldens re-pinned
           paired); [false] reproduces the pre-flip stale-bar fill basis. See
           [Weinstein_strategy_config.sim_exit_fill_next_open]. *)
+  sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]
+      (** Fresh-bar-only fills for StopLimit ENTRY tickets. A ticket created
+          from a Friday-close screen is otherwise first checked on the Saturday
+          step against the retained Friday bar and fills inside a range that
+          traded before it existed (99 of 100 Saturday-dated entries on the 26y
+          PIT record). When [true], such a ticket rests until the next fresh
+          bar. Default [false] = bit-identical baselines (R1). See
+          [Weinstein_strategy_config.sim_entry_stoplimit_fresh_bar_only]. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2, plan
           [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream D). The

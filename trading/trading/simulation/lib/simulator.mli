@@ -184,43 +184,19 @@ type dependencies = {
           ([enable_sim_entry_stoplimit] + [entry_extension_max_pct]); it is a
           fill-model basis change, so any default flip routes through WF-CV +
           deliberate golden re-pins per experiment-flag discipline. *)
-  sim_entry_fill_next_open : bool;
-      (** Next-bar-open Market-entry fill realism (Fix #1;
-          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C).
-          [false] (the default) is bit-identical to every existing baseline: a
-          Market entry order fills whenever the engine next matches it,
-          including against the stale signal bar retained on non-trading steps
-          (so a Friday-close decision fills at that bar's own open). [true]
-          holds a Market order routing to an [Entering] position back on any
-          step where its symbol has no fresh bar, so it fills at the next fresh
-          trading bar's open — the earliest tradeable price after the decision.
-          Scope: Market ENTRY orders only; exits, stops, and StopLimit entries
-          are untouched, and the decision-time [entry_price] used for sizing /
-          stop math is unchanged. Armed by the backtest runner from the strategy
-          config ([Weinstein_strategy_config.sim_entry_fill_next_open]); a
-          fill-model basis change, so any default flip routes through WF-CV +
-          deliberate golden re-pins per experiment-flag discipline. *)
-  sim_exit_fill_next_open : bool;
-      (** Next-bar-open Market-EXIT fill realism (Fix #1b, the exit sibling of
-          {!sim_entry_fill_next_open};
-          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C).
-          [false] (this library's own default; the backtest runner threads the
-          strategy config, whose default is [true] since 2026-09-03, PR #2648)
-          reproduces the pre-flip basis bit-for-bit: a Market exit order fills
-          whenever the engine next matches it, including against the stale
-          signal bar retained on non-trading steps — so a Friday-close exit
-          decision fills on the Saturday step at Friday's own open, a price that
-          predates the decision, and the trade is stamped Saturday. [true] holds
-          a Market order routing to an [Exiting] position back on any step where
-          its symbol has no fresh bar, so it fills at the next fresh trading
-          bar's open. Scope: Market EXIT orders only (full exits and partial
-          trims alike); entries are governed independently by
-          {!sim_entry_fill_next_open}, and stops / [StopLimit] orders are
-          untouched. The decision-time [exit_price] is unchanged. Armed by the
-          backtest runner from the strategy config
-          ([Weinstein_strategy_config.sim_exit_fill_next_open]); a fill-model
-          basis change, so any default flip routes through WF-CV + deliberate
-          golden re-pins per experiment-flag discipline. *)
+  fill_gate : Next_open_fill_gate.flags;
+      (** Which order classes wait for a fresh bar instead of filling against
+          the bar the engine retains on a non-trading (weekend/holiday) step:
+          Market entries ([sim_entry_fill_next_open], Fix #1), Market exits
+          ([sim_exit_fill_next_open], Fix #1b) and StopLimit entry tickets
+          ([sim_entry_stoplimit_fresh_bar_only]). A stale-bar fill prices an
+          order placed at a Friday close inside Friday's own bar — a range that
+          traded before the order existed — and stamps it Saturday. Built by
+          {!create_deps} from the three optional flags, each [false] by default
+          here; the backtest runner threads them from
+          [Weinstein_strategy_config], where [sim_exit_fill_next_open] is [true]
+          since 2026-09-03 (PR #2648). All off is bit-identical to the pre-gate
+          fills (R1). Semantics: {!Next_open_fill_gate}. *)
   entry_fill_retry : Entry_fill_retry.t;
       (** G2a retry budget + ledger ([dev/plans/ticket-funding-2026-08-16.md]
           §G2a): how many further attempts a triggered entry ticket gets after
@@ -273,6 +249,7 @@ val create_deps :
   ?entry_extension_max_pct:float ->
   ?sim_entry_fill_next_open:bool ->
   ?sim_exit_fill_next_open:bool ->
+  ?sim_entry_stoplimit_fresh_bar_only:bool ->
   ?entry_fill_reject_retries:int ->
   ?entry_fill_resize:Entry_fill_resize.t ->
   unit ->

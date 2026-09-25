@@ -23,37 +23,59 @@ let _is_routing_match ~state_match ~expected_side
   && state_match p
   && Trading_base.Types.equal_side (expected_side p.side) order.side
 
-let _is_market_entry_order positions (order : Trading_orders.Types.order) =
+let _is_entry_order positions (order : Trading_orders.Types.order) =
   Map.exists positions
     ~f:
       (_is_routing_match ~state_match:_is_entering
          ~expected_side:Fill_router.entry_trade_side order)
 
-let _is_market_exit_order positions (order : Trading_orders.Types.order) =
+let _is_exit_order positions (order : Trading_orders.Types.order) =
   Map.exists positions
     ~f:
       (_is_routing_match ~state_match:_is_exiting
          ~expected_side:Fill_router.exit_trade_side order)
 
-(* Whether [order] is a Market order this gate should defer past stale steps,
-   given which of the two classes the caller armed. Non-Market orders (the
-   [StopLimit] entry model) never match: they carry their own trigger price, so
-   a stale bar cannot fill them at a look-back price. *)
-let _is_deferrable ~defer_entries ~defer_exits ~positions
-    (order : Trading_orders.Types.order) =
+(* Whether [order] is an order this gate should defer past stale steps, given
+   which classes the caller armed. A [StopLimit] entry is deferrable too
+   ([defer_stoplimit_entries]): its trigger does not protect it from a stale
+   bar. A ticket placed at Friday's close is checked on the Saturday step
+   against the RETAINED Friday bar, so it fills inside a range that traded
+   before the ticket existed (measured: 99 of 100 Saturday-dated entries on
+   the 26y record sit inside Friday's own bar). *)
+let _is_deferrable ~defer_entries ~defer_exits ~defer_stoplimit_entries
+    ~positions (order : Trading_orders.Types.order) =
   match order.order_type with
   | Trading_base.Types.Market ->
-      (defer_entries && _is_market_entry_order positions order)
-      || (defer_exits && _is_market_exit_order positions order)
+      (defer_entries && _is_entry_order positions order)
+      || (defer_exits && _is_exit_order positions order)
+  | Trading_base.Types.StopLimit _ ->
+      defer_stoplimit_entries && _is_entry_order positions order
   | _ -> false
 
-let make ~defer_entries ~defer_exits ~positions ~today_bars =
+let make ~defer_entries ~defer_exits ?(defer_stoplimit_entries = false)
+    ~positions ~today_bars =
   let fresh =
     String.Set.of_list
       (List.map today_bars ~f:(fun (b : Trading_engine.Types.price_bar) ->
            b.symbol))
   in
   fun (order : Trading_orders.Types.order) ->
-    if _is_deferrable ~defer_entries ~defer_exits ~positions order then
-      Set.mem fresh order.symbol
+    if
+      _is_deferrable ~defer_entries ~defer_exits ~defer_stoplimit_entries
+        ~positions order
+    then Set.mem fresh order.symbol
     else true
+
+type flags = {
+  defer_entries : bool;
+  defer_exits : bool;
+  defer_stoplimit_entries : bool;
+}
+
+let gate { defer_entries; defer_exits; defer_stoplimit_entries } ~positions
+    ~today_bars =
+  if defer_entries || defer_exits || defer_stoplimit_entries then
+    Some
+      (make ~defer_entries ~defer_exits ~defer_stoplimit_entries ~positions
+         ~today_bars)
+  else None

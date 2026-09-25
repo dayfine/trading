@@ -158,6 +158,70 @@ let test_fresh_bar_lets_both_siblings_fill _ =
     (_decisions ~defer_entries:true ~defer_exits:true ~today_bars:[ _fresh_bar ])
     (equal_to [ ("sell/exit", true); ("buy/entry", true) ])
 
+(* The StopLimit entry model's ticket for the add (trigger 101, cap 111). *)
+let _stoplimit_entry_order =
+  {
+    (_market_order ~id:"ord-sl-entry" ~side:Buy ~quantity:5.0) with
+    order_type = Trading_base.Types.StopLimit (101.0, 111.0);
+  }
+
+(* StopLimit class armed alone, no fresh bar: the StopLimit ticket waits, while
+   the unarmed Market classes (the sibling Sell and a Market Buy) still pass. *)
+let test_stoplimit_armed_defers_only_the_stoplimit_entry _ =
+  let can_fill =
+    Gate.make ~defer_entries:false ~defer_exits:false
+      ~defer_stoplimit_entries:true ~positions:(_sibling_positions ())
+      ~today_bars:[]
+  in
+  assert_that
+    [
+      ("stoplimit/entry", can_fill _stoplimit_entry_order);
+      ("sell/exit", can_fill _sell_exit_order);
+      ("buy/entry", can_fill _buy_entry_order);
+    ]
+    (equal_to
+       [ ("stoplimit/entry", false); ("sell/exit", true); ("buy/entry", true) ])
+
+(* R1: unarmed (the default of the optional argument), a StopLimit ticket on a
+   stale step passes even with both Market classes armed; with a fresh bar it
+   passes when armed. *)
+let test_stoplimit_default_and_fresh_bar_pass _ =
+  let stale_default =
+    Gate.make ~defer_entries:true ~defer_exits:true
+      ~positions:(_sibling_positions ()) ~today_bars:[]
+  in
+  let fresh_armed =
+    Gate.make ~defer_entries:false ~defer_exits:false
+      ~defer_stoplimit_entries:true ~positions:(_sibling_positions ())
+      ~today_bars:[ _fresh_bar ]
+  in
+  assert_that
+    [ stale_default _stoplimit_entry_order; fresh_armed _stoplimit_entry_order ]
+    (equal_to [ true; true ])
+
+(* [gate] supplies no predicate at all when every class is off (so the engine
+   call is the pre-gate one) and a predicate when any class is armed. *)
+let test_gate_is_none_only_when_all_off _ =
+  let is_some flags =
+    Option.is_some
+      (Gate.gate flags ~positions:(_sibling_positions ()) ~today_bars:[])
+  in
+  let off : Gate.flags =
+    {
+      defer_entries = false;
+      defer_exits = false;
+      defer_stoplimit_entries = false;
+    }
+  in
+  assert_that
+    [
+      is_some off;
+      is_some { off with defer_entries = true };
+      is_some { off with defer_exits = true };
+      is_some { off with defer_stoplimit_entries = true };
+    ]
+    (equal_to [ false; true; true; true ])
+
 let suite =
   "next_open_fill_gate"
   >::: [
@@ -167,6 +231,12 @@ let suite =
          >:: test_entries_armed_defers_only_the_buy;
          "a fresh bar lets both siblings fill"
          >:: test_fresh_bar_lets_both_siblings_fill;
+         "stoplimit armed defers only the StopLimit entry"
+         >:: test_stoplimit_armed_defers_only_the_stoplimit_entry;
+         "stoplimit unarmed or fresh bar passes"
+         >:: test_stoplimit_default_and_fresh_bar_pass;
+         "gate is None only when all classes are off"
+         >:: test_gate_is_none_only_when_all_off;
        ]
 
 let () = run_test_tt_main suite
