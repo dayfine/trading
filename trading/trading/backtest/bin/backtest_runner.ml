@@ -1,3 +1,18 @@
+(* @large-module: CLI coordinator dispatching four run modes (single-run,
+   baseline, smoke, fuzz) that all share the same arg-parsing / output-root /
+   date-resolution plumbing below. Splitting the four `_*_run` drivers into
+   sibling modules was tried (cleanup/backtest-runner-file-length rework
+   iteration 1) and reverted: because each driver becomes a cross-module call
+   once extracted, it needs an explicit `.mli` with hand-written value
+   signatures for every optional-argument-heavy function -- ~470 raw diff
+   lines (277 insertions / 193 deletions) for a file that was already reduced
+   from 522 to 444 lines by the parent PR (dune-linter-verified: `dune build
+   @fmt`, `dune build`, `dune runtest devtools`, `dune runtest` all green).
+   That is well past this cleanup class's ~150-LOC-of-diff budget for further
+   extraction, so this file stays a single declared-large module instead.
+   review_at: when this file exceeds 500 lines (the declared-large hard
+   limit) or picks up a fifth run mode, whichever comes first. *)
+
 (** Backtest runner CLI — thin wrapper around the {!Backtest} library.
 
     Usage modes:
