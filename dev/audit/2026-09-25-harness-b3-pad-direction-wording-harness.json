@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-25",
+  "feature": "harness",
+  "branch": "harness/b3-pad-direction-wording",
+  "sha": "6debaf149824ec806da40e27d23760df33a073aa",
+  "recorded_at_ns": 1790362161880071661,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

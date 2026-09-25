@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-25 (orchestrator run 36137000433; run start `2b0b37af`, main after this run's merges
-**`8dc31171`** (#2955 harness #2876 file-length scope, #2956 harness jj intent-to-add run-counter fix).
+Last updated: 2026-09-25 (orchestrator run 36165644016, run 2; run start `25517bb8`, main after this run's merges
+**`182418d7`** (#2958 harness B3 wording, #2959 cleanup backtest_runner.ml file_length).
 Queue was **empty** at run start (0 open PRs).
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
@@ -131,9 +131,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-25: #2876 file-length scope repo-wide MERGED #2955; jj ITA run-counter fix MERGED #2956; next: ITA guard -z/WARN follow-ups |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-25: B3 pad-direction wording MERGED #2958; next: ITA guard -z/WARN follow-ups |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 18 file_length backlog rows from #2955 (review_at 2026-11-09/11-30): extract largest first (release_report.ml, trade_audit_ratings.ml) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 17 file_length rows left (backtest_runner.ml done #2959): extract largest next (release_report.ml, trade_audit_ratings.ml) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
