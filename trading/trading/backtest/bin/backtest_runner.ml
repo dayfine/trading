@@ -148,86 +148,6 @@ let _make_output_root ?experiment_name () =
       Core_unix.mkdir_p path;
       path
 
-(** Write the captured trace sexp at [path] and report on stderr. *)
-let _write_trace ~path ~trace =
-  let metrics = Backtest.Trace.snapshot trace in
-  Backtest.Trace.write ~out_path:path metrics;
-  eprintf "Trace written to: %s\n%!" path
-
-(** Sampling rate for [Memtrace.start_tracing]. The Memtrace docs warn that
-    rates above ~1e-4 carry measurable performance impact; 1e-4 yields ~10K
-    samples for a typical backtest. *)
-let _memtrace_sampling_rate = 1e-4
-
-let _write_gc_trace ~path ~gc_trace =
-  let snapshots = Backtest.Gc_trace.snapshot_list gc_trace in
-  Backtest.Gc_trace.write ~out_path:path snapshots;
-  eprintf "Gc-trace written to: %s\n%!" path
-
-let _start_memtrace ~path =
-  let _tracer : Memtrace.tracer =
-    Memtrace.start_tracing ~context:None ~sampling_rate:_memtrace_sampling_rate
-      ~filename:path
-  in
-  eprintf "Memtrace started, writing to: %s\n%!" path
-
-(** Build a [Backtest_progress.emitter] that writes [progress.sexp] under
-    [output_dir] every [n] Friday cycles, plus an unconditional final write.
-    [None] when [progress_every] is [None]. *)
-let _make_progress_emitter ~progress_every ~output_dir =
-  Option.map progress_every ~f:(fun n ->
-      let path = Filename.concat output_dir "progress.sexp" in
-      eprintf
-        "[progress] writing progress.sexp every %d Friday cycle(s) to %s\n%!" n
-        path;
-      {
-        Backtest.Backtest_progress.every_n_fridays = n;
-        on_progress =
-          (fun progress ->
-            Backtest.Backtest_progress.write_atomic ~path progress);
-      })
-
-(** Run a single backtest and write its full result set to [output_dir]. The
-    side-effecting work (trace + memtrace + gc-trace plumbing) is folded in here
-    so single-run / baseline / smoke modes all share the same per-run pipeline.
-
-    [sector_map_override], when supplied, replaces the sector map normally
-    loaded from [data/sectors.csv] — used by smoke mode to constrain each window
-    to the catalog's [universe_path]. See {!Backtest.Runner.run_backtest}.
-
-    Returns the [Backtest.Runner.result] so callers (e.g. baseline mode) can
-    feed both runs into [Backtest.Comparison.compute] without re-reading the
-    summary from disk. *)
-let _run_and_write ~start_date ~end_date ~overrides ~output_dir
-    ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
-    ?bar_data_source ?progress_every ?slippage_bps () =
-  Option.iter memtrace_path ~f:(fun path -> _start_memtrace ~path);
-  let trace = Option.map trace_path ~f:(fun _ -> Backtest.Trace.create ()) in
-  let gc_trace =
-    Option.map gc_trace_path ~f:(fun _ -> Backtest.Gc_trace.create ())
-  in
-  let progress_emitter = _make_progress_emitter ~progress_every ~output_dir in
-  Backtest.Gc_trace.record ?trace:gc_trace ~phase:"start" ();
-  let result =
-    Backtest.Runner.run_backtest ~start_date ~end_date ~overrides
-      ?sector_map_override ?trace ?gc_trace ?bar_data_source ?progress_emitter
-      ?slippage_bps ()
-  in
-  eprintf "Writing output to %s/\n%!" output_dir;
-  Backtest.Result_writer.write ~output_dir result;
-  (* Degenerate-fold + stuck-position guard (#1553/#1557): surface the finding
-     union to stderr and [<output_dir>/fold_health.sexp]. Fires the divergence
-     guard in real backtest-binary runs, not just the scenario catalog. Purely
-     diagnostic — changes no metric, never aborts. *)
-  Backtest.Fold_health_runner.emit ~output_dir result;
-  eprintf "Output written to: %s/\n%!" output_dir;
-  Option.iter (Option.both trace_path trace) ~f:(fun (path, trace) ->
-      _write_trace ~path ~trace);
-  Backtest.Gc_trace.record ?trace:gc_trace ~phase:"end" ();
-  Option.iter (Option.both gc_trace_path gc_trace) ~f:(fun (path, gc_trace) ->
-      _write_gc_trace ~path ~gc_trace);
-  result
-
 (** Single-run mode: one backtest, write to [output_dir], echo summary to
     stdout. This is the legacy code path (also reused by smoke mode for the
     no-baseline case). [overrides] are pre-merged from [--shared-override] +
@@ -236,8 +156,8 @@ let _single_run ~start_date ~end_date ~overrides ~output_dir
     ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
     ?bar_data_source ?progress_every ?slippage_bps () =
   let result =
-    _run_and_write ~start_date ~end_date ~overrides ~output_dir
-      ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
+    Backtest_execution.run_and_write ~start_date ~end_date ~overrides
+      ~output_dir ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
       ?bar_data_source ?progress_every ?slippage_bps ()
   in
   Out_channel.output_string stdout
@@ -259,14 +179,15 @@ let _baseline_run ~start_date ~end_date ~shared_overrides ~overrides
   eprintf "[baseline] running with %d shared override(s)...\n%!"
     (List.length shared_overrides);
   let baseline_result =
-    _run_and_write ~start_date ~end_date ~overrides:shared_overrides
-      ~output_dir:baseline_dir ?sector_map_override ()
+    Backtest_execution.run_and_write ~start_date ~end_date
+      ~overrides:shared_overrides ~output_dir:baseline_dir ?sector_map_override
+      ()
   in
   eprintf "[variant] running with %d shared + %d variant override(s)...\n%!"
     (List.length shared_overrides)
     (List.length overrides);
   let variant_result =
-    _run_and_write ~start_date ~end_date
+    Backtest_execution.run_and_write ~start_date ~end_date
       ~overrides:(shared_overrides @ overrides)
       ~output_dir:variant_dir ?sector_map_override ()
   in
@@ -368,8 +289,9 @@ let _fuzz_run ~start_date ~end_date ~overrides ~output_root ~fuzz_spec_raw
         in
         eprintf "[fuzz %d/%d] %s = %s\n%!" v.index n v.key_path v.label;
         let result =
-          _run_and_write ~start_date:v_start ~end_date ~overrides:v_overrides
-            ~output_dir:variant_dir ?sector_map_override ?bar_data_source ()
+          Backtest_execution.run_and_write ~start_date:v_start ~end_date
+            ~overrides:v_overrides ~output_dir:variant_dir ?sector_map_override
+            ?bar_data_source ()
         in
         (v.label, result.summary))
   in

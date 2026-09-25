@@ -54,7 +54,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [ ] file_length: devtools/sexp_default_drift_linter/sexp_default_drift_linter.ml — 674 lines, hard limit 500 (source: #2876)
 - [ ] file_length: trading/weinstein/strategy/differential/selection_trace.ml — 662 lines, hard limit 500 (source: #2876)
 - [ ] file_length: analysis/scripts/shiller_weinstein_decades/shiller_weinstein_decades.ml — 626 lines, hard limit 500 (source: #2876)
-- [ ] file_length: trading/backtest/bin/backtest_runner.ml — 522 lines, hard limit 500 (source: #2876)
+- [x] file_length: trading/backtest/bin/backtest_runner.ml — 522 -> 442 lines; extracted the shared run-and-write execution/instrumentation pipeline into new `backtest_execution.ml{,.mli}`; removed the `linter_exceptions.conf` entry (source: #2876)
 - [ ] file_length: trading/backtest/snapshot_warehouse/twin_detector.ml — 455 lines, hard limit 500 (source: #2876)
 - [ ] file_length: trading/backtest/tuner/bin/bayesian_runner.ml — 429 lines, hard limit 500 (source: #2876)
 - [ ] file_length: trading/backtest/stops_differential/stops_surface_trace.ml — 413 lines, hard limit 500 (source: #2876)
