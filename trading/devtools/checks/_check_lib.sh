@@ -152,52 +152,81 @@ die() {
 #   jj_ita_guard_restore "$REPO" "$_before"
 
 # jj_ita_guard_snapshot <repo>
-# Print the repo's currently-intent-to-added path set, one per line
-# (possibly empty). This is the "before" baseline to diff against after
-# running jj commands that might snapshot the working copy.
+# Print the repo's currently-staged-as-a-new-file path set, one per line,
+# EACH LINE KEPT AS THE FULL 2-CHAR PORCELAIN CODE PLUS PATH (possibly
+# empty). This is the "before" baseline to diff against after running jj
+# commands that might snapshot the working copy. Covers BOTH shapes a
+# new file can be staged in:
+#   " A path"  -- intent-to-add (git diff-index X=unchanged, Y=Added)
+#   "A  path"  -- a real `git add` of a new file (X=Added, Y=unchanged)
+# Capturing both, not just the ITA shape, matters for jj_ita_guard_restore
+# below: a caller's own real `git add`-staged file can itself be reshaped
+# into ITA by a LATER jj call in the same run (observed: `jj workspace
+# forget`, not just `workspace add`, re-snapshots the default workspace
+# and normalizes an already-staged new file into ITA shape too) -- if the
+# "before" snapshot only recorded ITA-shaped paths, that reshaped real-add
+# file would look indistinguishable from genuinely-new pollution and get
+# unstaged by the restore below. See dev/status/harness.md.
 #
 # NOTE: intent-to-add is NOT visible via `git diff --cached` -- git
 # deliberately suppresses ITA entries from that comparison (an ITA entry
 # carries no real staged content, just a placeholder), so `git diff
 # --cached --name-only` silently returns nothing for exactly the entries
-# this guard needs to see. The reliable signal is porcelain status: an
-# ITA entry is the only case that renders as "<space>A<space>path" (git
-# diff-index X=unchanged, Y=Added-in-worktree); a real `git add` of a new
-# file renders "A<space><space>path" (X=Added) instead. Confirmed by
-# side-by-side repro during the 2026-09-25 investigation -- see
-# dev/status/harness.md.
+# this guard needs to see. The reliable signal is porcelain status, per
+# the two shapes above. Confirmed by side-by-side repro during the
+# 2026-09-25 investigation -- see dev/status/harness.md.
 jj_ita_guard_snapshot() {
   git -C "$1" status --porcelain=v1 --untracked-files=no 2>/dev/null \
-    | grep '^ A ' \
-    | cut -c4- \
+    | grep -E '^( A |A  )' \
     || true
 }
 
 # jj_ita_guard_restore <repo> <before-snapshot>
-# Unstage (`git reset --`) any path that is staged now but was NOT staged
-# in <before-snapshot>. For a path with no HEAD blob (the intent-to-add
-# case this guard exists for), `git reset -- <path>` removes it from the
-# index entirely, returning it to plain untracked (`??`) -- exactly
-# reverting the jj-triggered export. Safe to call even if nothing
-# changed; never touches a path that was already staged before the guard
-# started (a caller's own legitimate staged changes survive untouched).
+# For every path that is CURRENTLY intent-to-add (' A'):
+#   - if it was plain untracked before the guard started (absent from
+#     <before-snapshot> in any shape) -- this is exactly the jj-triggered
+#     pollution the guard exists to undo. `git reset -- <path>` removes it
+#     from the index entirely (it has no HEAD blob), returning it to plain
+#     untracked (`??`).
+#   - if it was already staged before the guard started -- restore the
+#     shape the caller had: already-ITA-before stays as-is (no-op); a real
+#     `git add`-staged file that a later jj call reshaped into ITA gets
+#     re-staged with a real `git add -- <path>` (content matches the
+#     working tree, so this restores the full 'A ' entry, not a diff).
+# Safe to call even if nothing changed; never touches a path that was
+# already staged before the guard started, in EITHER shape (a caller's own
+# legitimate staged changes survive untouched, including their original
+# staged/ITA distinction).
 jj_ita_guard_restore() {
   _guard_repo="$1"
   _guard_before="$2"
   _guard_after=$(jj_ita_guard_snapshot "$_guard_repo")
-  # `comm` needs two sorted FILES, not process substitution (`<(...)` is a
-  # bashism -- these scripts are POSIX sh, per .claude/rules/no-python.md's
-  # "POSIX sh only" tooling rule).
   _guard_before_file=$(mktemp)
-  _guard_after_file=$(mktemp)
-  printf '%s\n' "$_guard_before" | sort >"$_guard_before_file"
-  printf '%s\n' "$_guard_after" | sort >"$_guard_after_file"
-  _guard_new=$(comm -13 "$_guard_before_file" "$_guard_after_file")
-  rm -f "$_guard_before_file" "$_guard_after_file"
-  if [ -n "$_guard_new" ]; then
-    printf '%s\n' "$_guard_new" | while IFS= read -r _guard_path; do
-      [ -n "$_guard_path" ] && git -C "$_guard_repo" reset -- "$_guard_path" >/dev/null 2>&1
-    done
-  fi
+  printf '%s\n' "$_guard_before" >"$_guard_before_file"
+
+  # Every path staged (in any shape) before the guard started -- never
+  # reset one of these, no matter what shape it shows up in now.
+  _guard_before_paths_file=$(mktemp)
+  cut -c4- "$_guard_before_file" | sort -u >"$_guard_before_paths_file"
+
+  # Paths that were specifically real-`git add`-staged (not ITA) before --
+  # if one of these now reads as ITA, a later jj call reshaped it; restore
+  # the real-add shape rather than merely leaving it alone.
+  _guard_before_add_paths_file=$(mktemp)
+  grep '^A  ' "$_guard_before_file" | cut -c4- | sort -u >"$_guard_before_add_paths_file"
+  rm -f "$_guard_before_file"
+
+  printf '%s\n' "$_guard_after" | grep '^ A ' | cut -c4- | while IFS= read -r _guard_path; do
+    [ -n "$_guard_path" ] || continue
+    if grep -Fxq "$_guard_path" "$_guard_before_add_paths_file"; then
+      git -C "$_guard_repo" add -- "$_guard_path" >/dev/null 2>&1
+    elif grep -Fxq "$_guard_path" "$_guard_before_paths_file"; then
+      : # Already ITA before the guard started -- already the right shape.
+    else
+      git -C "$_guard_repo" reset -- "$_guard_path" >/dev/null 2>&1
+    fi
+  done
+
+  rm -f "$_guard_before_paths_file" "$_guard_before_add_paths_file"
   return 0
 }

@@ -171,6 +171,52 @@ else
   bad "${LABEL} — failure-path guard broken: exit=${FAILPATH_CODE} output='${FAILPATH_OUT}' status-after='${FAILPATH_STATUS_AFTER}' (expected non-zero exit, a FAIL: jj_workspace_smoke line, and '?? dev/')"
 fi
 
+# ---------------------------------------------------------------------------
+# Part 4 (the fix, pre-existing-staged-state safety): a sandbox that ALREADY
+# has staged entries before the guard's snapshot runs -- an intent-to-add
+# path (`git add -N`, the same shape the jj-side-effect itself produces) and
+# a genuinely `git add`-staged path -- plus one plain untracked file (the
+# thing the guard is protecting). This pins the _check_lib.sh
+# jj_ita_guard_restore docstring's claim: "never touches a path that was
+# already staged before the guard started (a caller's own legitimate staged
+# changes survive untouched)". Parts 1-3 have no ITA/staged entry present
+# BEFORE the guard's baseline snapshot, so they cannot distinguish the real
+# comm-based diff from a broken restore that simply resets every currently-
+# ITA path (or, equivalently, one whose "before" snapshot was accidentally
+# emptied) -- both variants still leave a from-nothing sandbox spotless and
+# passed Parts 1-3 undetected.
+# ---------------------------------------------------------------------------
+SBX4="$(_new_sandbox)"
+mkdir -p "${SBX4}/dev/daily"
+
+# (1) A pre-existing intent-to-add file, staged BEFORE the guard runs --
+#     must survive as ' A', untouched, exactly as the caller left it.
+echo "preexisting ita content" >"${SBX4}/dev/daily/preexisting-ita.md"
+( cd "$SBX4" && git add -N dev/daily/preexisting-ita.md )
+
+# (2) A genuinely `git add`-staged file, also present BEFORE the guard
+#     runs -- must survive as 'A ', untouched.
+echo "really staged content" >"${SBX4}/dev/daily/really-staged.md"
+( cd "$SBX4" && git add dev/daily/really-staged.md )
+
+# (3) A plain untracked file -- the guard's actual target. Must NOT be left
+#     as ' A' (intent-to-add) after jj's snapshot side effect runs.
+echo "in-progress summary" >"${SBX4}/dev/daily/2099-01-01-test.md"
+
+PREEXIST_STATUS_BEFORE="$(git -C "$SBX4" status --porcelain=v1)"
+
+PREEXIST_OUT=$(JJ_CONFIG="${JJ_CFG_DIR}" REPO_ROOT="$SBX4" sh "$JJ_SMOKE" 2>&1) && PREEXIST_CODE=0 || PREEXIST_CODE=$?
+PREEXIST_STATUS_AFTER="$(git -C "$SBX4" status --porcelain=v1)"
+
+if [ "$PREEXIST_CODE" -eq 0 ] \
+  && printf '%s\n' "$PREEXIST_STATUS_AFTER" | grep -qF ' A dev/daily/preexisting-ita.md' \
+  && printf '%s\n' "$PREEXIST_STATUS_AFTER" | grep -qF 'A  dev/daily/really-staged.md' \
+  && printf '%s\n' "$PREEXIST_STATUS_AFTER" | grep -qF '?? dev/daily/2099-01-01-test.md'; then
+  ok "${LABEL} — fix (pre-existing staged state): a pre-existing intent-to-add path and a genuinely git-add-staged path both survive the guard untouched (' A' and 'A ' respectively, per before='${PREEXIST_STATUS_BEFORE}'), while the actual untracked file is restored to plain '??' and never left as intent-to-add"
+else
+  bad "${LABEL} — pre-existing staged state NOT preserved: exit=${PREEXIST_CODE} output='${PREEXIST_OUT}' before='${PREEXIST_STATUS_BEFORE}' after='${PREEXIST_STATUS_AFTER}' (expected exit 0, the pre-existing ITA path to remain ' A', the staged path to remain 'A ', and the untracked file to remain '??')"
+fi
+
 if [ "$FAIL" -gt 0 ]; then
   echo "FAIL: ${LABEL} — ${PASS} passed, ${FAIL} failed." >&2
   exit 1
