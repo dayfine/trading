@@ -1936,6 +1936,12 @@ check "results-only: a dune file under dev/experiments takes three gates" no "$(
   _is_results_only "dev/experiments/x/dune dev/experiments/x/README.md" && echo yes || echo no)"
 check "results-only: README-only experiment change is docs-only first" yes "$(
   _is_docs_only "dev/experiments/x/README.md" && echo yes || echo no)"
+check "docs-only: dev/budget spend records (json) are docs-only" yes "$(
+  _is_docs_only "dev/budget/local-2026-09-24.json dev/budget/2026-09-23-35892658019.json dev/notes/x.md" && echo yes || echo no)"
+check "docs-only: a non-json file under dev/budget is NOT docs-only" no "$(
+  _is_docs_only "dev/budget/record.sh" && echo yes || echo no)"
+check "docs-only: a json outside dev/budget is NOT docs-only" no "$(
+  _is_docs_only "dev/experiments/x/results/a.json" && echo yes || echo no)"
 check "results-only: empty file list is not results-only by accident" no "$(
   _is_results_only "" && echo yes || echo no)"
 RESULTS_REVIEW="Reviewed SHA: $TIP

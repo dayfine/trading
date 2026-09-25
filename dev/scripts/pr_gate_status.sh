@@ -174,7 +174,9 @@ REPO=dayfine/trading
 # network.
 
 # A PR is docs-only (both QC gates skipped, per pr-merge-gates.md) when every
-# path is *.md or under the doc dirs. Anything else -- including experiment
+# path is *.md or under the doc dirs. dev/budget/*.json counts as docs: those files
+# are spend records written by scripts (orchestrator cost step, budget_local_record.sh),
+# never code -- user decision 2026-09-24. Anything else -- including experiment
 # .sexp fixtures -- takes the full three gates.
 _is_docs_only() {
   _files=$1
@@ -182,6 +184,7 @@ _is_docs_only() {
     case "$f" in
       *.md) ;;
       dev/notes/*|dev/plans/*|dev/reviews/*|dev/status/*) ;;
+      dev/budget/*.json) ;;  # spend records (orchestrator runs + local-<date>.json), never code
       *) return 1 ;;
     esac
   done
