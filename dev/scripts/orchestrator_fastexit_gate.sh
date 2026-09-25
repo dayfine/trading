@@ -557,9 +557,10 @@ _verify_full_mode_dispatch_artifacts() {
 # each carried their own copy of the run-count formula inline as Markdown
 # prose (issue #2887 CP4 rework).
 #
-# Counts only GIT-TRACKED dev/daily/<date>*.md files (via `git ls-files`,
-# excluding -plan.md and -summary.md) -- NOT a raw filesystem `ls`. An
-# UNTRACKED same-day file is, by construction, always THIS run's own
+# Counts only COMMITTED dev/daily/<date>*.md files (via `git ls-tree -r
+# --name-only HEAD`, excluding -plan.md and -summary.md) -- NOT a raw
+# filesystem `ls`, and NOT `git ls-files` (see intent-to-add note below).
+# An uncommitted same-day file is, by construction, always THIS run's own
 # in-progress summary: every completed prior run's summary is committed (via
 # Step 8a) before the next run starts, so nothing else can leave an
 # uncommitted dev/daily/<date>*.md file lying around. Counting it would
@@ -573,11 +574,27 @@ _verify_full_mode_dispatch_artifacts() {
 # `_prior_summary_path`'s exclusion argument named a file that doesn't exist,
 # excluded nothing, and the skeleton was selected as its own "prior" (the
 # exact Defect-1 vacuity this whole family of fixes exists to close).
-# `git ls-files` immunizes the count against this because the skeleton stays
-# untracked until Step 8a, regardless of when in the run it was written.
+#
+# H-CHECK-ITA-COUNTED-AS-TRACKED (2026-09-25, harness item T3-ITA): `git
+# ls-files` was chosen to dodge the `ls`-based bug above, but it has its own
+# blind spot -- it lists every INDEX entry, including intent-to-add (`git
+# add -N`) placeholders for files nobody committed. A jj-colocated repo's
+# `jj` commands (e.g. `jj_workspace_smoke.sh`'s `jj -R "$REPO" workspace
+# add/list/forget`, run every `dune runtest`) snapshot the working copy as a
+# side effect and export any untracked file into the git index this way,
+# which silently promoted an in-progress `dev/daily/<date>-runN.md` from
+# "untracked, don't count" to "tracked, count it" -- observed
+# 2026-09-24-run2, flipping the run label from `-run2` to a spurious
+# `-run3`. `git ls-tree -r --name-only HEAD` reads committed history only,
+# so it cannot see index state at all (neither a real `git add` in flight
+# nor an intent-to-add placeholder) -- immune to this class of pollution by
+# construction, not just by `jj_workspace_smoke.sh`'s own guard (belt and
+# suspenders: that guard now also cleans up after itself, but this function
+# should not depend on every caller of `jj` doing so correctly).
 _current_summary_path() {
   _date="$1"
-  _run_count=$(git ls-files -- "dev/daily/${_date}*.md" 2>/dev/null \
+  _run_count=$(git ls-tree -r --name-only HEAD -- "dev/daily/" 2>/dev/null \
+    | grep -E "^dev/daily/${_date}[^/]*\.md\$" \
     | grep -v -- '-plan\.md$' \
     | grep -v -- '-summary\.md$' \
     | wc -l | tr -d ' ')

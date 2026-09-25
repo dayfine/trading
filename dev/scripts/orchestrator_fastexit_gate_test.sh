@@ -1357,6 +1357,29 @@ result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-08)
 check "current_summary_path counts only the committed run, ignoring its own uncommitted run2 skeleton" \
   "dev/daily/2027-01-08-run2.md" "$result"
 
+# --- Scenario 56b (harness item T3-ITA, 2026-09-25): a same-day file that
+# is intent-to-add (`git add -N`) rather than genuinely committed OR
+# plainly untracked. This is exactly the state a jj-colocated repo's
+# working-copy snapshot side effect produces on an in-progress file (see
+# trading/devtools/checks/jj_ita_guard_check.sh for the reproduction) --
+# `git ls-files` counts it as tracked (it's a real index entry, just with
+# no real staged content), so the pre-fix formula would over-count this
+# run's own uncommitted skeleton to -run2. `git ls-tree -r --name-only
+# HEAD` only reads committed history, so it is blind to index state
+# entirely -- immune regardless of what put the entry there.
+(
+  cd "$TMP_REPO"
+  cat > dev/daily/2027-01-09.md <<'MD'
+# Status - 2027-01-09 [run 1]
+
+**Mode:** FULL
+MD
+  git add -N dev/daily/2027-01-09.md
+)
+result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-09)
+check "current_summary_path is NOT defeated by an intent-to-add (git add -N) same-day file (harness item T3-ITA)" \
+  "dev/daily/2027-01-09.md" "$result"
+
 # =========================================================================
 # `hours_since_prior_summary` replaces Step 0.5's escape-hatch `ls -t
 # dev/daily/*.md | head -1` + raw mtime arithmetic (advisory 2 of the CP4
