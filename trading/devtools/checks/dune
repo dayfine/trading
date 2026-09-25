@@ -1247,6 +1247,20 @@
  (action
   (run sh %{dep:budget_local_record_test.sh})))
 
+; Pin dev/scripts/review_pack.sh (host-side pipeline, --no-container) over a
+; synthetic three-trade fixture: stop-breach lag, hard-stop replay, split-basis
+; fills, missing bars, JSON validity. The script and dev/lib/review_pack/ are
+; resolved via repo_root() at RUN TIME, so (universe) forces the re-run.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (source_tree fixtures/review_pack)
+  (universe))
+ (action
+  (run sh %{dep:review_pack_test.sh})))
+
 ; #2921: parser-drift guard -- every flag a dev/scripts/*.sh passes to
 ; scenario_runner.exe must exist in that runner's own parser. Reads
 ; dev/scripts/ (outside the dune workspace root) and
