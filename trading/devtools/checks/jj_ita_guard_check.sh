@@ -174,8 +174,9 @@ fi
 # ---------------------------------------------------------------------------
 # Part 4 (the fix, pre-existing-staged-state safety): a sandbox that ALREADY
 # has staged entries before the guard's snapshot runs -- an intent-to-add
-# path (`git add -N`, the same shape the jj-side-effect itself produces) and
-# a genuinely `git add`-staged path -- plus one plain untracked file (the
+# path (`git add -N`, the same shape the jj-side-effect itself produces), a
+# genuinely `git add`-staged path, and a staged-THEN-edited path (`git add`
+# followed by an edit, porcelain "AM") -- plus one plain untracked file (the
 # thing the guard is protecting). This pins the _check_lib.sh
 # jj_ita_guard_restore docstring's claim: "never touches a path that was
 # already staged before the guard started (a caller's own legitimate staged
@@ -185,6 +186,14 @@ fi
 # ITA path (or, equivalently, one whose "before" snapshot was accidentally
 # emptied) -- both variants still leave a from-nothing sandbox spotless and
 # passed Parts 1-3 undetected.
+#
+# The "AM" case (qc-behavioral rework iteration 2, #2956) is the sharpest of
+# the three: `jj workspace forget` reshapes it into ' A' with the staged
+# blob replaced by the EMPTY blob, discarding the caller's originally-staged
+# content. A restore that merely re-`git add`s the path would stage the
+# worktree's current (edited) content instead of what the caller staged --
+# silently losing the staged diff. Only restoring the exact recorded
+# mode+blob via `git update-index --add --cacheinfo` gets this right.
 # ---------------------------------------------------------------------------
 SBX4="$(_new_sandbox)"
 mkdir -p "${SBX4}/dev/daily"
@@ -199,7 +208,15 @@ echo "preexisting ita content" >"${SBX4}/dev/daily/preexisting-ita.md"
 echo "really staged content" >"${SBX4}/dev/daily/really-staged.md"
 ( cd "$SBX4" && git add dev/daily/really-staged.md )
 
-# (3) A plain untracked file -- the guard's actual target. Must NOT be left
+# (3) A staged-THEN-edited new file ("AM") -- the index holds X (the first
+#     line only), the worktree holds X+Y (both lines). Must survive with
+#     the SAME staged blob (X) and the SAME worktree content (X+Y).
+echo "staged-then-edited X" >"${SBX4}/dev/daily/am-staged.md"
+( cd "$SBX4" && git add dev/daily/am-staged.md )
+echo "staged-then-edited Y" >>"${SBX4}/dev/daily/am-staged.md"
+AM_BLOB_BEFORE="$(git -C "$SBX4" ls-files -s -- dev/daily/am-staged.md | awk '{print $2}')"
+
+# (4) A plain untracked file -- the guard's actual target. Must NOT be left
 #     as ' A' (intent-to-add) after jj's snapshot side effect runs.
 echo "in-progress summary" >"${SBX4}/dev/daily/2099-01-01-test.md"
 
@@ -207,14 +224,19 @@ PREEXIST_STATUS_BEFORE="$(git -C "$SBX4" status --porcelain=v1)"
 
 PREEXIST_OUT=$(JJ_CONFIG="${JJ_CFG_DIR}" REPO_ROOT="$SBX4" sh "$JJ_SMOKE" 2>&1) && PREEXIST_CODE=0 || PREEXIST_CODE=$?
 PREEXIST_STATUS_AFTER="$(git -C "$SBX4" status --porcelain=v1)"
+AM_BLOB_AFTER="$(git -C "$SBX4" ls-files -s -- dev/daily/am-staged.md | awk '{print $2}')"
+AM_WORKTREE_AFTER="$(cat "${SBX4}/dev/daily/am-staged.md")"
 
 if [ "$PREEXIST_CODE" -eq 0 ] \
   && printf '%s\n' "$PREEXIST_STATUS_AFTER" | grep -qF ' A dev/daily/preexisting-ita.md' \
   && printf '%s\n' "$PREEXIST_STATUS_AFTER" | grep -qF 'A  dev/daily/really-staged.md' \
-  && printf '%s\n' "$PREEXIST_STATUS_AFTER" | grep -qF '?? dev/daily/2099-01-01-test.md'; then
-  ok "${LABEL} — fix (pre-existing staged state): a pre-existing intent-to-add path and a genuinely git-add-staged path both survive the guard untouched (' A' and 'A ' respectively, per before='${PREEXIST_STATUS_BEFORE}'), while the actual untracked file is restored to plain '??' and never left as intent-to-add"
+  && printf '%s\n' "$PREEXIST_STATUS_AFTER" | grep -qF 'AM dev/daily/am-staged.md' \
+  && printf '%s\n' "$PREEXIST_STATUS_AFTER" | grep -qF '?? dev/daily/2099-01-01-test.md' \
+  && [ "$AM_BLOB_AFTER" = "$AM_BLOB_BEFORE" ] \
+  && [ "$AM_WORKTREE_AFTER" = "$(printf 'staged-then-edited X\nstaged-then-edited Y')" ]; then
+  ok "${LABEL} — fix (pre-existing staged state): a pre-existing intent-to-add path, a genuinely git-add-staged path, and a staged-then-edited ('AM') path all survive the guard untouched (' A', 'A ', and 'AM' respectively, per before='${PREEXIST_STATUS_BEFORE}') -- the AM path's staged blob (${AM_BLOB_BEFORE}) and worktree content are both bit-for-bit unchanged -- while the actual untracked file is restored to plain '??' and never left as intent-to-add"
 else
-  bad "${LABEL} — pre-existing staged state NOT preserved: exit=${PREEXIST_CODE} output='${PREEXIST_OUT}' before='${PREEXIST_STATUS_BEFORE}' after='${PREEXIST_STATUS_AFTER}' (expected exit 0, the pre-existing ITA path to remain ' A', the staged path to remain 'A ', and the untracked file to remain '??')"
+  bad "${LABEL} — pre-existing staged state NOT preserved: exit=${PREEXIST_CODE} output='${PREEXIST_OUT}' before='${PREEXIST_STATUS_BEFORE}' after='${PREEXIST_STATUS_AFTER}' am_blob_before='${AM_BLOB_BEFORE}' am_blob_after='${AM_BLOB_AFTER}' am_worktree_after='${AM_WORKTREE_AFTER}' (expected exit 0, the pre-existing ITA path to remain ' A', the staged path to remain 'A ', the AM path to remain 'AM' with its staged blob and worktree content unchanged, and the untracked file to remain '??')"
 fi
 
 if [ "$FAIL" -gt 0 ]; then
