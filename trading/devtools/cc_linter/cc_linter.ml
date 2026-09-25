@@ -1,3 +1,7 @@
+(* @large-module: AST-walking linter (compiler-libs Parsetree traversal,
+   per-construct CC accounting, report formatting) -- newly visible under the
+   repo-wide .ml scan (issue #2876); the CC-counting cases and the walker
+   that drives them are one coordinated pass over the same tree. *)
 (* Cyclomatic complexity linter: computes CC per function and warns on CC > 10.
    Uses the OCaml AST via compiler-libs for accurate measurement.
 

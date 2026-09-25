@@ -1,5 +1,6 @@
 #!/bin/sh
-# Linter: file length check for lib .ml AND .mli files in the trading codebase.
+# Linter: file length check for .ml files (repo-wide) AND lib .mli files in
+# the trading codebase.
 #
 # Two-tier limit (same numeric thresholds for both populations):
 #
@@ -67,21 +68,86 @@
 # Sibling gap, deliberately OUT OF SCOPE here: test files
 # ---------------------------------------------------------------------------
 #
-# This check's `find` still excludes everything under `*/test/*` for both
-# .ml and .mli. That is a known, separately-tracked gap -- see
+# This check's `find` still prunes everything under `*/test/*` for both .ml
+# and .mli. That is a known, separately-tracked gap -- see
 # `dev/status/cleanup.md` entry `linter_coverage` for measured numbers. Not
 # fixed here: it's a policy question (what limit should apply to test
 # files, which are allowed to be more repetitive than lib code), not a
 # linter-mechanics bug like the .mli blind spot was.
+#
+# ---------------------------------------------------------------------------
+# H-FILE-LENGTH-LIB-SCOPE-BLIND-SPOT (issue #2876, 2026-09-25 fix)
+# ---------------------------------------------------------------------------
+#
+# The `.ml` loop historically scanned only `-path "*/lib/*.ml"`, so any `.ml`
+# file whose containing directory was not literally named `lib` -- `bin/`,
+# `scripts/`, `devtools/<tool>/`, or a bare feature directory like
+# `release_report/` or `scenarios/` -- was invisible to the 300-soft /
+# 500-hard limits, same shape as the `.mli` blind spot above (a scope gap,
+# not a metric gap). Nine files were measured over the hard limit with zero
+# linter signal at the time the issue was filed, two of them over TWICE the
+# hard limit (`release_report.ml` 1005, `trade_audit_ratings.ml` 1001).
+#
+# The obvious "widen to `*/bin/*.ml` and `*/scripts/*/*.ml`" fix (the
+# issue's own suggested patch) does NOT actually close the gap: of the nine
+# measured violators, only three live under a `bin/` or `scripts/<tool>/`
+# directory (`build_runner.ml`, `shiller_weinstein_decades.ml`,
+# `backtest_runner.ml`). The other six live in directories with arbitrary
+# feature names (`release_report/`, `trade_audit_report/`, `scenarios/`,
+# `differential/`) that no small allowlist of directory names would ever
+# enumerate completely -- the actual invariant this codebase uses is "one
+# `dune` stanza directory per module", not "modules live under `lib/`".
+#
+# So the `.ml` loop is now an EXCLUSION-based full-tree scan (every `.ml`
+# under `$TRADING_DIR` except `_build/`, `.formatted/`, and `*/test/*`),
+# matching the pattern `fmt_check.sh` already uses for its repo-wide `.ml`/
+# `.mli` scan -- not an allowlist of directory names. The `.mli` loop is
+# UNCHANGED (`*/lib/*.mli` only): the issue and its measurement are `.ml`-
+# only, and widening `.mli` scope is a separate, unmeasured change.
+#
+# Newly-visible violators at the time of the fix were each given a
+# deliberate disposition (extraction, an `@large-module` marker, or a dated
+# `linter_exceptions.conf` file_length entry + `dev/status/cleanup.md`
+# backlog entry) per `.claude/rules/code-health-discipline.md` -- see the
+# `file_length` section of `linter_exceptions.conf` for the exempted set.
 
 set -e
 
 . "$(dirname "$0")/_check_lib.sh"
 
 TRADING_DIR="$(trading_dir)"
+EXCEPTIONS_CONF="$(dirname "$0")/linter_exceptions.conf"
 SOFT_LIMIT=300
 HARD_LIMIT=500
 MAX_LARGE_PCT=11
+
+# Build the file_length exclusion pattern from linter_exceptions.conf, same
+# convention as linter_mli_coverage.sh: a file is excluded if its path
+# CONTAINS the exception's path substring (not anchored). Excluded files are
+# skipped before TOTAL/LARGE_COUNT accounting, so an exception neither counts
+# against nor subsidizes the MAX_LARGE_PCT cap.
+FILE_LENGTH_EXCLUDE_PATTERN=""
+if [ -f "$EXCEPTIONS_CONF" ]; then
+  while IFS= read -r line; do
+    case "$line" in
+      '#'* | '') continue ;;
+    esac
+    linter=$(printf '%s' "$line" | awk '{print $1}')
+    path=$(printf '%s' "$line" | awk '{print $2}')
+    if [ "$linter" = "file_length" ] && [ -n "$path" ]; then
+      if [ -n "$FILE_LENGTH_EXCLUDE_PATTERN" ]; then
+        FILE_LENGTH_EXCLUDE_PATTERN="${FILE_LENGTH_EXCLUDE_PATTERN}|${path}"
+      else
+        FILE_LENGTH_EXCLUDE_PATTERN="${path}"
+      fi
+    fi
+  done < "$EXCEPTIONS_CONF"
+fi
+
+_is_file_length_excluded() {
+  [ -z "$FILE_LENGTH_EXCLUDE_PATTERN" ] && return 1
+  printf '%s' "$1" | grep -qE "$FILE_LENGTH_EXCLUDE_PATTERN"
+}
 
 # Nested-comment-aware OCaml `(* ... *)` block stripper + blank-line skip.
 # Prints the count of non-blank lines OUTSIDE any comment block for the
@@ -143,12 +209,19 @@ VIOLATIONS=""
 TOTAL=0
 LARGE_COUNT=0
 
-# Name-anchored prunes + race guard (see no_python_check.sh).
+# Name-anchored prunes + race guard (see no_python_check.sh). Repo-wide scan
+# (issue #2876) -- see the H-FILE-LENGTH-LIB-SCOPE-BLIND-SPOT header comment
+# above for why this is an exclusion (prune _build/.formatted/test) rather
+# than an allowlist of directory names (lib/bin/scripts/...).
 for ml_file in $(find "$TRADING_DIR" \
     \( -name '_build' -o -name '.formatted' \) -prune -o \
-    -path "*/lib/*.ml" \
+    -path "*/test/*" -prune -o \
+    -name "*.ml" \
     -not -name "*.pp.ml" \
     -print 2>/dev/null || true); do
+  if _is_file_length_excluded "$ml_file"; then
+    continue
+  fi
   TOTAL=$((TOTAL + 1))
   # `wc -l < "$ml_file"` is a bare command-substitution assignment under
   # `set -e`: if $ml_file vanishes between `find` printing it and this read
@@ -264,7 +337,9 @@ if [ -n "$VIOLATIONS" ]; then
   echo "  (* @large-module: <reason> *)"
   echo "Declared-large files: <= ${HARD_LIMIT} (lines / signature lines), capped at"
   echo "${MAX_LARGE_PCT}% of all files IN THEIR OWN POPULATION (.ml, .mli tracked separately)."
+  echo "For a .ml file over ${HARD_LIMIT} lines, add a dated 'file_length' entry to"
+  echo "linter_exceptions.conf instead (see its header for the format)."
   exit 1
 fi
 
-echo "OK: all lib/*.ml files within limits (${LARGE_COUNT} declared-large of ${TOTAL} total); all lib/*.mli signatures within limits (${LARGE_COUNT_MLI} declared-large of ${TOTAL_MLI} total)."
+echo "OK: all *.ml files within limits (${LARGE_COUNT} declared-large of ${TOTAL} total); all lib/*.mli signatures within limits (${LARGE_COUNT_MLI} declared-large of ${TOTAL_MLI} total)."
