@@ -120,3 +120,84 @@ die() {
   echo "FAIL: $*" >&2
   exit 1
 }
+
+# --------------------------------------------------------------------
+# jj-colocation intent-to-add guard.
+#
+# Any `jj` command invoked against a colocated repo (`-R <repo>` pointing
+# at the DEFAULT workspace's own directory) snapshots that workspace's
+# working copy as a side effect, even for commands that look read-only
+# (`workspace list`) or that operate on a DIFFERENT workspace
+# (`workspace add`). The snapshot exports untracked files sitting in that
+# working copy into the colocated git index as intent-to-add (` A`)
+# entries -- indistinguishable from `git add -N` in `git status`, and
+# counted by `git ls-files` as tracked. Reproduced 2026-09-25 (harness
+# item T3-ITA): `jj_workspace_smoke.sh`'s three `jj -R "$REPO" ...` calls
+# turned an untracked `dev/daily/<date>*.md` into ` A` in the caller's
+# real checkout, which silently changed
+# `orchestrator_fastexit_gate.sh _current_summary_path`'s run-count (it
+# counted the polluted entry via `git ls-files`). See
+# dev/status/harness.md for the full writeup.
+#
+# `jj workspace forget` (already run in the caller's cleanup) does NOT
+# undo this -- it only removes the *other* workspace's registration, not
+# the export side effect on the default workspace's index. The only
+# correct fix is to detect exactly what a jj invocation staged and
+# unstage precisely that, so real pre-existing staged state (a legitimate
+# `git add` a caller had in flight before calling us) is left untouched.
+#
+# Usage:
+#   _before=$(jj_ita_guard_snapshot "$REPO")
+#   ... run jj commands against "$REPO" ...
+#   jj_ita_guard_restore "$REPO" "$_before"
+
+# jj_ita_guard_snapshot <repo>
+# Print the repo's currently-intent-to-added path set, one per line
+# (possibly empty). This is the "before" baseline to diff against after
+# running jj commands that might snapshot the working copy.
+#
+# NOTE: intent-to-add is NOT visible via `git diff --cached` -- git
+# deliberately suppresses ITA entries from that comparison (an ITA entry
+# carries no real staged content, just a placeholder), so `git diff
+# --cached --name-only` silently returns nothing for exactly the entries
+# this guard needs to see. The reliable signal is porcelain status: an
+# ITA entry is the only case that renders as "<space>A<space>path" (git
+# diff-index X=unchanged, Y=Added-in-worktree); a real `git add` of a new
+# file renders "A<space><space>path" (X=Added) instead. Confirmed by
+# side-by-side repro during the 2026-09-25 investigation -- see
+# dev/status/harness.md.
+jj_ita_guard_snapshot() {
+  git -C "$1" status --porcelain=v1 --untracked-files=no 2>/dev/null \
+    | grep '^ A ' \
+    | cut -c4- \
+    || true
+}
+
+# jj_ita_guard_restore <repo> <before-snapshot>
+# Unstage (`git reset --`) any path that is staged now but was NOT staged
+# in <before-snapshot>. For a path with no HEAD blob (the intent-to-add
+# case this guard exists for), `git reset -- <path>` removes it from the
+# index entirely, returning it to plain untracked (`??`) -- exactly
+# reverting the jj-triggered export. Safe to call even if nothing
+# changed; never touches a path that was already staged before the guard
+# started (a caller's own legitimate staged changes survive untouched).
+jj_ita_guard_restore() {
+  _guard_repo="$1"
+  _guard_before="$2"
+  _guard_after=$(jj_ita_guard_snapshot "$_guard_repo")
+  # `comm` needs two sorted FILES, not process substitution (`<(...)` is a
+  # bashism -- these scripts are POSIX sh, per .claude/rules/no-python.md's
+  # "POSIX sh only" tooling rule).
+  _guard_before_file=$(mktemp)
+  _guard_after_file=$(mktemp)
+  printf '%s\n' "$_guard_before" | sort >"$_guard_before_file"
+  printf '%s\n' "$_guard_after" | sort >"$_guard_after_file"
+  _guard_new=$(comm -13 "$_guard_before_file" "$_guard_after_file")
+  rm -f "$_guard_before_file" "$_guard_after_file"
+  if [ -n "$_guard_new" ]; then
+    printf '%s\n' "$_guard_new" | while IFS= read -r _guard_path; do
+      [ -n "$_guard_path" ] && git -C "$_guard_repo" reset -- "$_guard_path" >/dev/null 2>&1
+    done
+  fi
+  return 0
+}

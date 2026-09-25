@@ -270,6 +270,23 @@
    %{exe:../magic_numbers_linter/magic_numbers_linter.exe}
    (run sh %{dep:sete_diagnostics_check.sh}))))
 
+; Regression test for the jj-colocation intent-to-add guard (harness item
+; T3-ITA, 2026-09-25): jj_workspace_smoke.sh's `jj -R "$REPO" ...` calls
+; snapshot the DEFAULT workspace's working copy as a side effect in a
+; colocated repo, exporting any untracked file sitting in the real repo
+; root into the git index as an intent-to-add entry -- which
+; orchestrator_fastexit_gate.sh's `git ls-files`-based run-count then
+; silently counts as tracked. Runs against hermetic sandbox repos, never
+; the real checkout; skips cleanly when jj is not on PATH. Declares
+; jj_workspace_smoke.sh as an explicit dep so the cache invalidates when
+; either script's logic changes.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh jj_workspace_smoke.sh (universe))
+ (action
+  (run sh %{dep:jj_ita_guard_check.sh})))
+
 ; Status file integrity: each dev/status/*.md must declare Status, Last updated,
 ; and (for feature files) Interface stable. Invoked by health-scanner fast scan.
 ; dev/status/ lives at the repo root (above trading/), outside the dune
