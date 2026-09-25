@@ -1,3 +1,8 @@
+(* @large-module: AST-walking linter (compiler-libs Parsetree traversal, depth
+   accounting, per-linter exception matching) -- newly visible under the
+   repo-wide .ml scan (issue #2876); splitting the walk from the depth
+   arithmetic would separate two tightly-coupled passes over the same tree
+   without reducing real complexity. *)
 (* Nesting depth linter: enforces indentation depth and structural nesting limits.
 
    Uses the OCaml AST (via compiler-libs) for function boundaries, then measures

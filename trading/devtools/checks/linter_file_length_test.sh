@@ -87,6 +87,15 @@
 #      thing that can fail these fixtures is the cap check itself and not a
 #      per-file length violation.
 #
+#   F. Issue #2876 (H-FILE-LENGTH-LIB-SCOPE-BLIND-SPOT): a 501-line `.ml`
+#      file living under `bin/`, never `lib/` -> must FAIL. Pins the
+#      repo-wide-scan fix; mutation that greens it: reverting the `.ml`
+#      loop's `find` pattern back to `-path "*/lib/*.ml"`.
+#
+#   G. The `.ml` loop's `*/test/*` prune survives the #2876 rewrite from an
+#      inclusion pattern to an exclusion-based scan: a 501-line `.ml` under
+#      `test/` must still PASS.
+#
 # How to re-verify by hand:
 #   sh trading/devtools/checks/linter_file_length_test.sh
 
@@ -346,6 +355,71 @@ if [ "$CODEE2" -ne 0 ] && echo "$OUTE2" | grep -q "Too many declared-large files
   ok "fixture E2 — the mirror: 2/10 declared-large .ml (20%) trips the .ml cap despite 9 clean .mli making the pooled share 10.5%"
 else
   bad "fixture E2 — expected non-zero exit naming the .ml cap (2/10 over 11%); got exit=$CODEE2 output=<<$OUTE2>>"
+fi
+
+# =============================================================================
+# Fixture F: a .ml file OUTSIDE lib/ (under bin/) over the 500-line hard
+# limit, no @large-module marker -> must FAIL, violator named in output.
+# Pins H-FILE-LENGTH-LIB-SCOPE-BLIND-SPOT (issue #2876): the pre-fix `.ml`
+# loop scoped to `-path "*/lib/*.ml"` only, so this exact fixture shape
+# (a large file living under `bin/`, never `lib/`) was invisible. Mutation
+# that greens this fixture: reverting the find pattern back to
+# `-path "*/lib/*.ml"` instead of the repo-wide scan -- verified by hand
+# while writing this test (reverting the pattern makes fixture F report
+# `OK` instead of naming big_bin_scope.ml).
+# =============================================================================
+
+FIXF="${BASE_DIR}/fixF"
+make_fixture_trading_dir "$FIXF"
+mkdir -p "${FIXF}/bin"
+{
+  i=1
+  while [ "$i" -le 501 ]; do
+    echo "let _line_${i} = ${i}"
+    i=$((i + 1))
+  done
+} > "${FIXF}/bin/big_bin_scope.ml"
+
+set +e
+OUTF=$(run_linter "$FIXF" 2>&1)
+CODEF=$?
+set -e
+
+if [ "$CODEF" -ne 0 ] && echo "$OUTF" | grep -q "big_bin_scope.ml: 501 lines"; then
+  ok "fixture F — 501-line .ml under bin/ (not lib/), no marker -> FAIL, names big_bin_scope.ml (issue #2876 scope widening)"
+else
+  bad "fixture F — expected non-zero exit naming big_bin_scope.ml (501 lines, under bin/); got exit=$CODEF output=<<$OUTF>>"
+fi
+
+# =============================================================================
+# Fixture G: a .ml file under test/ over the 500-line hard limit -> must
+# still PASS. Test-file exclusion is a deliberate, separately-tracked policy
+# decision (dev/status/cleanup.md entry `linter_coverage`), unchanged by the
+# #2876 scope widening -- the widened scan is exclusion-based (prune
+# _build/.formatted/test) rather than inclusion-based, so this fixture pins
+# that the prune survived the rewrite.
+# =============================================================================
+
+FIXG="${BASE_DIR}/fixG"
+make_fixture_trading_dir "$FIXG"
+mkdir -p "${FIXG}/test"
+{
+  i=1
+  while [ "$i" -le 501 ]; do
+    echo "let _line_${i} = ${i}"
+    i=$((i + 1))
+  done
+} > "${FIXG}/test/big_test_scope.ml"
+
+set +e
+OUTG=$(run_linter "$FIXG" 2>&1)
+CODEG=$?
+set -e
+
+if [ "$CODEG" -eq 0 ] && echo "$OUTG" | grep -q "^OK:"; then
+  ok "fixture G — 501-line .ml under test/ -> PASS (test-file policy exclusion survives the #2876 scope widening)"
+else
+  bad "fixture G — expected exit 0 (test/ files remain out of scope); got exit=$CODEG output=<<$OUTG>>"
 fi
 
 cleanup
