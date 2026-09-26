@@ -479,6 +479,9 @@ artifact — the book's anchor is per-cycle. See issue #2486 / PR #2492.)
 More aggressive than investor:
 - Don't wait for MA violation — exit when pattern deviates from plan
 - Use 4-6% initial stop if no nearby prior peak (place above round number)
+- Lower stop after each rally peak that fails and stock drops to new low
+- Never stay with a short that moves above its 30-week MA, even momentarily
+- Use downsloping trendlines as additional stop guide (when ≥3 touches form)
 
 **Resolved question (2026-09-25) — is the 4–6% flat initial stop an investor
 rule or a trader-only fallback?** Trader-only, on both sides. Ch. 6 ("When to
@@ -495,9 +498,6 @@ needs >15% risk the instruction is to prefer other candidates, not to
 substitute a percentage. Implementation: `require_structural_stop`
 (default off) skips candidates whose initial stop is the `Buffer_fallback`
 automatic percentage (skip reason `No_structural_stop`).
-- Lower stop after each rally peak that fails and stock drops to new low
-- Never stay with a short that moves above its 30-week MA, even momentarily
-- Use downsloping trendlines as additional stop guide (when ≥3 touches form)
 
 ### 5.4 Don'ts for Selling (Ch. 6)
 
