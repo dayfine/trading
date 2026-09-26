@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-26",
+  "feature": "cleanup",
+  "branch": "cleanup/autopsy-runner-file-length",
+  "sha": "a41b6103583c8d5283e27b578657378d5219fcb1",
+  "recorded_at_ns": 1790445597395640003,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
