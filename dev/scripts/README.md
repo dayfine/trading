@@ -49,3 +49,25 @@ bash dev/scripts/velocity_report.sh --since 2026-03-24 --out dev/notes/velocity-
 | `perf_tier1_smoke.sh` — `perf_tier4_release_gate.sh` | Performance tier gates (tier 1: fast CI, tier 4: local-only full run). |
 | `golden_sp500_postsubmit.sh` | Post-submit golden-run pipeline for S&P 500 scenarios. |
 | `prepare_ci_data.sh` | Prepare fixture data for CI runs. |
+
+## review_pack.sh
+
+Builds a human review pack for one or more backtest runs (typically the salts
+of one config): a static site with the equity curve against SPY and the macro
+gate, year/quarter tables, every trade with its chart, A–F grade and
+execution/book flags, highlights, diagnostics (flat stretches, pick vs exit
+quality, hard-stop replay, stop-fill timing, entry-time D/F predictors) and a
+cross-salt comparison. Helpers and the page live in `dev/lib/review_pack/`;
+the test is `trading/devtools/checks/review_pack_test.sh`.
+
+```sh
+P=.sweep-output/pit-null/a0-pit-null
+sh dev/scripts/review_pack.sh --out .sweep-output/review-26y \
+  --title "26-Year Record Review" \
+  s0=$P-s0-v11- s1=$P-s1-v11- s2=$P-s2-v11-
+```
+
+About 2 minutes for three 26-year salts when the stage replays already exist,
+plus ~1.3 s per trade the first time (`stage_chart` in `trading-1-dev`).
+`--no-container` skips the audit report and the stage replay. Publish
+`<out>/site/index.html` with `<out>/site/data/*` as supporting files.
