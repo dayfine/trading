@@ -18,8 +18,19 @@
     Market / next-open model: laggard rotation, Stage-3 force exits, liquidity,
     extension stop, volume eject, macro trim — and the force-liquidation
     breaker, which emits [StrategySignal { label = "force_liquidation" }] since
-    2026-09-14, not [StopLoss]. The stops-pass [StopLoss] and the single-symbol
-    SPY strategy's stop exit are the only [StopLoss] emitters.
+    2026-09-14, not [StopLoss].
+
+    {b Intraday-decided stops only.} A same-bar fill uses the bar's intraday
+    path, so it is honest only for a stop decided on that bar's intraday range.
+    A stop decided at the close would be filled at prices from before that
+    decision, which is a favourable look-ahead. Two [StopLoss] emitters decide
+    intraday: the Weinstein stops pass with [trigger_on_weekly_close = false],
+    and the single-symbol SPY strategy's stop exit. Two decide at the close: the
+    Weinstein stops pass with [trigger_on_weekly_close = true], which {!enabled}
+    turns the mechanism off for, and [Ema_strategy]
+    ([strategy/lib/ema_strategy.ml], [actual_price = current_price]). The EMA
+    case is harmless today: only [Panel_runner] arms the flag, from a Weinstein
+    config, and the EMA strategy does not run through [Panel_runner].
 
     {b Level in force.} [stop_price] is the level the stops pass checked bar T
     against, and that is the level in force BEFORE bar T:
@@ -35,6 +46,14 @@
     which the bar did not reach) — stays a Market order. Should the engine still
     leave a converted order unfilled, it is turned back into a Market order in
     place, so it fills at the next fresh open exactly as with the flag off. *)
+
+val enabled : flag:bool -> trigger_on_weekly_close:bool -> bool
+(** [enabled ~flag ~trigger_on_weekly_close] is whether same-bar stop fills are
+    armed. [flag] is the [sim_stop_exit_fill_on_trigger_bar] config knob, and
+    [trigger_on_weekly_close] is the stops config field of that name. Only
+    [(flag = true, trigger_on_weekly_close = false)] gives [true]: a stop
+    decided at the weekly close must not fill on the intraday path (see
+    "Intraday-decided stops only" above). *)
 
 val select :
   enabled:bool ->

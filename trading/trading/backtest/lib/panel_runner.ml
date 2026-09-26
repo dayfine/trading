@@ -62,8 +62,8 @@ let _entry_cap_for_sim (config : Weinstein_strategy.config) : float option =
    is decided at the close rather than resting — an intraday fill would use
    prices from before that decision. *)
 let _stop_fill_on_trigger_bar (config : Weinstein_strategy.config) =
-  config.sim_stop_exit_fill_on_trigger_bar
-  && not config.stops_config.trigger_on_weekly_close
+  Trigger_bar_stop_fill.enabled ~flag:config.sim_stop_exit_fill_on_trigger_bar
+    ~trigger_on_weekly_close:config.stops_config.trigger_on_weekly_close
 
 let _entry_fill_resize (config : Weinstein_strategy.config) =
   Entry_fill_resize.create ~enabled:config.entry_fill_size_to_available
