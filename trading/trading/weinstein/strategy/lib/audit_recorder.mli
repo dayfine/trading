@@ -58,6 +58,14 @@ type skip_reason =
           [Portfolio_risk.max_long_exposure_pct]. Only fires when the config
           field is [> 0.0] (default [0.0] => [Float.infinity] cap => no-op).
           Only emitted for [Long] candidates. *)
+  | No_structural_stop
+      (** Investor-preset gate: candidate dropped because its initial stop is
+          the automatic-percentage fallback
+          ([stop_floor_kind = Buffer_fallback]) rather than a structural support
+          floor / resistance ceiling. Only fires when
+          [Weinstein_strategy_config.config.require_structural_stop] is [true]
+          (default [false] => never emitted). Book Ch. 6: "investors should
+          never use automatic percentages". Both sides. *)
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

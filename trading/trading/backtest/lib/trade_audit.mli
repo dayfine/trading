@@ -79,6 +79,13 @@ type skip_reason =
           may lever on short proceeds at entry time. Default-off (field [0.0] =>
           [Float.infinity] cap) so the variant is never emitted under baseline
           configurations. Only emitted on [Long] candidates. *)
+  | No_structural_stop
+      (** Skipped because the candidate's initial stop would be the
+          automatic-percentage fallback ([Buffer_fallback]) rather than a
+          structural floor/ceiling, under the investor preset
+          [Weinstein_strategy_config.config.require_structural_stop] (default
+          [false] => never emitted). Book Ch. 6: "investors should never use
+          automatic percentages". *)
 [@@deriving sexp]
 
 type alternative_candidate = {

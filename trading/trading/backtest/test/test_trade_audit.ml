@@ -189,6 +189,7 @@ let test_skip_reason_sexp_round_trip _ =
       Sized_to_zero;
       Sector_concentration;
       Top_n_cutoff;
+      No_structural_stop;
     ]
   in
   let parsed =

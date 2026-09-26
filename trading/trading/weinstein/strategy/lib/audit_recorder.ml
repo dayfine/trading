@@ -10,6 +10,7 @@ type skip_reason =
   | Stop_too_wide
   | Sector_exposure_cap
   | Long_exposure_cap
+  | No_structural_stop
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

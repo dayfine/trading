@@ -379,6 +379,7 @@ closer to trading-range noise and carry no such argument.
 - Same applies at half-points (18⅝ → place at 18⅜)
 - Enter stop immediately as GTC (good-til-canceled) when you buy
 - **Pre-calculate stop before buying.** If stop requires >15% risk from entry → prefer other candidates.
+- **No automatic percentages for investors** (Ch. 6: "investors should never use automatic percentages"). The 4–6%-below-breakout stop when no reaction low exists is the trader's fallback — see the resolved question under §5.3.
 
 **Resolved question (2026-09-02) — can a stop entered at purchase be
 triggered by the entry bar's pre-fill range?** No. The book's instruction
@@ -478,6 +479,22 @@ artifact — the book's anchor is per-cycle. See issue #2486 / PR #2492.)
 More aggressive than investor:
 - Don't wait for MA violation — exit when pattern deviates from plan
 - Use 4-6% initial stop if no nearby prior peak (place above round number)
+
+**Resolved question (2026-09-25) — is the 4–6% flat initial stop an investor
+rule or a trader-only fallback?** Trader-only, on both sides. Ch. 6 ("When to
+Sell"), in the trader's XYZ breakout example: set the stop under the closest
+prior reaction low; "If there isn't any, then you can play the following
+numbers game. While investors should never use automatic percentages", the
+big-winner breakouts rarely pull back more than 4 to 6 percent below the
+breakout point, so the trader may place it there. Ch. 7 repeats the split for
+shorts: "the initial buy-stop should not be handled in the same manner as for
+the investor" — the trader uses a close prior peak, else 4–6% above the
+breakdown level. The investor's initial stop is always structural (§5.1:
+below the prior correction low; §6.3: above the prior rally peak), and if that
+needs >15% risk the instruction is to prefer other candidates, not to
+substitute a percentage. Implementation: `require_structural_stop`
+(default off) skips candidates whose initial stop is the `Buffer_fallback`
+automatic percentage (skip reason `No_structural_stop`).
 - Lower stop after each rally peak that fails and stock drops to new low
 - Never stay with a short that moves above its 30-week MA, even momentarily
 - Use downsloping trendlines as additional stop guide (when ≥3 touches form)

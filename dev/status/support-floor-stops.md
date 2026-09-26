@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-08-24
+## Last updated: 2026-09-25
 
 ## Status
 IN_PROGRESS
@@ -9,6 +9,12 @@ IN_PROGRESS
 YES
 
 ## Open PR
+- `feat/require-structural-stop` — default-off `require_structural_stop`
+  investor preset (book Ch. 6: "investors should never use automatic
+  percentages"): a candidate whose initial stop is the `Buffer_fallback`
+  automatic percentage is skipped as `No_structural_stop` (both sides). Also
+  extracts the audit-row projection out of `entry_audit_capture.ml` into
+  `Entry_audit_emit`. Follow-up: paired 26y PIT comparison run (off vs on).
 - `fix/stops-refactor-differential-2503` — **issue #2503, suspect #1 (PR #2492)
   EXONERATED, with a permanent pin.** A 3,721-line deterministic trace of the
   whole public stops surface (4,968 API calls) is **byte-identical** between
