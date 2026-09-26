@@ -62,20 +62,23 @@ function in_range(p, lo, hi,   r, q, k) {
     }
     if (d <= xd) xidx = nf
   }
-  # post-exit 65-bar path (grade rubric, as dev/experiments/yearly-trade-review-2026-09-04/grade.sh)
-  if (d > xd && ax > 0) { k++; if (k <= GRADE_BARS) { if (k == 1 || a > mxa) mxa = a; if (k == 1 || a < mna) mna = a; p13 = a } }
+  # Post-exit 65-bar path, exactly as the rubric's grade.sh
+  # (dev/experiments/yearly-trade-review-2026-09-04/grade.sh): the window starts
+  # at the first bar ON or after the exit date (a Saturday exit starts Monday),
+  # that bar's adjusted close is the reference (gx), and p13 is the 65th bar.
+  if (d >= xd) { k++; if (k == 1) gx = a; if (k <= GRADE_BARS) { if (k == 1 || a > mxa) mxa = a; if (k == 1 || a < mna) mna = a; p13 = a } }
   prev_c = c
 }
 END {
   if (ae == 0 || ax == 0) { printf "%s\tNODATA\n", pid >> out_tr; exit }
   if (!flushed) for (i = (nr > PRE_BARS ? nr - PRE_BARS : 0); i < nr; i++) emit_day(ring[i % PRE_BARS])
   pct = (xp / ep - 1) * 100
-  ma = (k > 0) ? (mxa / ax - 1) * 100 : 0; a13 = (k > 0) ? (p13 / ax - 1) * 100 : 0; mn = (k > 0) ? (mna / ax - 1) * 100 : 0
+  ma = (k > 0) ? (mxa / gx - 1) * 100 : 0; a13 = (k > 0) ? (p13 / gx - 1) * 100 : 0; mn = (k > 0) ? (mna / gx - 1) * 100 : 0
   g = "C"
   if (pct >= 20 || (pct > 0 && ma <= 10)) g = "A"; else if (pct > 0 && pct < 20) g = "B"
   if (pct <= 0) { if (ma >= 50) g = "F"; else if (ma >= 15) g = "D"; else if (a13 <= -5) g = "B"; else g = "C" }
   if (xp < ep * 0.05) g = "X"
-  if (k == 0) g = g "?"
+  if (k <= 1) g = g "?"   # no bar after the exit bar: the post-exit path is empty
   ein = on_e ? in_range(ep, el, eh) : 0
   xin = on_x ? in_range(xp, xl, xh) : 0; xsnap = (xin == 2) ? SNAP : 1
   if (esnap == "") esnap = 1
