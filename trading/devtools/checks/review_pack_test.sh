@@ -48,9 +48,11 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT INT TERM
 
 rc=0
-sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$TMP/pack" --title "Fixture" r0="$FIX/run/" r1="$FIX/run/" >"$TMP/log" 2>&1 || rc=$?
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$TMP/pack" --title "Fixture" r0="$FIX/run/" r1="$FIX/run/" >"$TMP/log" 2>"$TMP/err" || rc=$?
 expect_eq "builds: exit 0" 0 "$rc"
-[ "$rc" = 0 ] || { cat "$TMP/log" >&2; exit 1; }
+[ "$rc" = 0 ] || { cat "$TMP/log" "$TMP/err" >&2; exit 1; }
+# --no-container never writes trade_audit_report.md: nothing may complain about the absent file (#2978)
+expect_eq "no-container: stderr holds only progress lines" "" "$(grep -v '^\[review_pack ' "$TMP/err")"
 S="$TMP/pack/site"
 T="$S/data/r0_trades.json"
 q() { jq -r "$1" "$T"; }
