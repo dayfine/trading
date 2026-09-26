@@ -24,6 +24,10 @@
 #
 # Ledger: dev/status/perf-long-cells.csv (override: PERF_LONG_LEDGER), columns
 #   date,experiment,tag,universe,years,cap,head,wall_s,s_per_year
+# where date is the cell's RESULT timestamp (YYYY-MM-DDTHH:MM:SS; the year from
+# PERF_LONG_YEAR, else the log's mtime, since chain logs stamp MM-DD only), so
+# the ledger sorts in time order and "newest" means the latest run. Golden
+# specs resolve under PERF_LONG_GOLDEN_SPECS (default: the scenario fixtures).
 # shape = universe + rounded years + cap. <no result> / guard-killed cells are
 # skipped: their wall is a timeout, not a runtime.
 set -eu
@@ -63,22 +67,23 @@ spec_shape() { # $1 search dir, $2 spec name
 
 collect_one() { # $1 chain log
   exp=$(exp_dir "$1"); name_exp=$(basename "$exp"); search=${PERF_LONG_SPECS:-$exp}
-  yr=$(date -r "$1" +%Y 2>/dev/null || date +%Y)
+  # chain logs stamp MM-DD only; the year comes from PERF_LONG_YEAR, else the log mtime
+  yr=${PERF_LONG_YEAR:-$(date -r "$1" +%Y 2>/dev/null || date +%Y)}
   awk '
     /HEAD=[0-9a-f]+/ { match($0, /HEAD=[0-9a-f]+/); head = substr($0, RSTART + 5, RLENGTH - 5) }
     /SNAPSHOT_MAX_MMAP_HANDLES=[0-9]+/ { match($0, /SNAPSHOT_MAX_MMAP_HANDLES=[0-9]+/); cap = substr($0, RSTART + 26, RLENGTH - 26) }
     /^\[[0-9][0-9]-[0-9][0-9] [0-9:]+\] RESULT / && /\(wall [0-9]+s\)/ && !/<no result>/ {
-      match($0, /^\[[0-9-]+ /); md = substr($0, 2, 5)
+      md = substr($0, 2, 5); hms = substr($0, 8, 8)
       match($0, / RESULT [^ ]+/); tag = substr($0, RSTART + 8, RLENGTH - 8)
       match($0, /\(wall [0-9]+s\)/); w = substr($0, RSTART + 6, RLENGTH - 8)
-      printf "%s\t%s\t%s\t%s\t%s\n", md, tag, (cap == "" ? 256 : cap), (head == "" ? "?" : head), w
+      printf "%s\t%s\t%s\t%s\t%s\n", md "T" hms, tag, (cap == "" ? 256 : cap), (head == "" ? "?" : head), w
     }' "$1" | while IFS="$(printf '\t')" read -r md tag cap head w; do
     name=$(printf '%s\n' "$tag" | sed -E 's/-s[0-9]+(-.*)?$//')
     shape=$(spec_shape "$search" "$name")
     if [ "$shape" = "?,?" ]; then
       # golden cells are tagged <family>--<golden>-new|old; their specs are fixtures
       gname=$(printf '%s\n' "$name" | sed -E 's/^.*--//; s/-(new|old)$//')
-      shape=$(spec_shape "$REPO/trading/test_data/backtest_scenarios" "$gname")
+      shape=$(spec_shape "${PERF_LONG_GOLDEN_SPECS:-$REPO/trading/test_data/backtest_scenarios}" "$gname")
     fi
     years=${shape#*,}
     spy=$(awk -v w="$w" -v y="$years" 'BEGIN { if (y + 0 > 0) printf "%.0f", w / y; else print "?" }')

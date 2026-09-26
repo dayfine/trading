@@ -1,0 +1,5 @@
+((name "n0")
+ (period ((start_date 2000-01-01) (end_date 2010-01-01)))
+ (universe_path "pit-v11/composition/top-3000-2000.sexp")
+ (universe_schedule ((1999-05-31 "pit-v11/composition/top-3000-1999.sexp")))
+ (universe_size 3000))
