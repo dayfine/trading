@@ -46,6 +46,38 @@
   simulation_test_helpers))
 
 (test
+ (name test_sim_stop_exit_trigger_bar)
+ (modules test_sim_stop_exit_trigger_bar)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.simulation.data
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
+
+(test
+ (name test_trigger_bar_stop_fill)
+ (modules test_trigger_bar_stop_fill)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  status
+  trading.simulation
+  trading.base
+  trading.engine
+  trading.orders
+  trading.strategy
+  matchers))
+
+(test
  (name test_sim_entry_stoplimit_fresh_bar)
  (modules test_sim_entry_stoplimit_fresh_bar)
  (libraries

@@ -8,7 +8,8 @@
   test_vol_scaled_stop
   test_extension_stop
   test_stop_ratchet_freeze
-  test_weinstein_stops_callbacks_parity)
+  test_weinstein_stops_callbacks_parity
+  test_stop_hit_level_in_force)
  (libraries
   weinstein_trading.stops
   weinstein.types

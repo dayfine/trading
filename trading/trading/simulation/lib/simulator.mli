@@ -197,6 +197,15 @@ type dependencies = {
           [Weinstein_strategy_config], where [sim_exit_fill_next_open] is [true]
           since 2026-09-03 (PR #2648). All off is bit-identical to the pre-gate
           fills (R1). Semantics: {!Next_open_fill_gate}. *)
+  stop_exit_fill_on_trigger_bar : bool;
+      (** Issue #2961, default [false]. When [true], an exit whose [TriggerExit]
+          reason is [StopLoss { stop_price; _ }] is filled on the step that
+          emitted it, against that step's own bar, by a [Stop stop_price] engine
+          order (the book's resting sell-stop, §5.7) — not by a Market order at
+          the next open. Every other exit is unchanged. [false] is bit-identical
+          to the pre-flag simulator (R1). Built by {!create_deps} from
+          [?sim_stop_exit_fill_on_trigger_bar]; semantics, scope and the
+          level-in-force argument: {!Trigger_bar_stop_fill}. *)
   entry_fill_retry : Entry_fill_retry.t;
       (** G2a retry budget + ledger ([dev/plans/ticket-funding-2026-08-16.md]
           §G2a): how many further attempts a triggered entry ticket gets after
@@ -250,6 +259,7 @@ val create_deps :
   ?sim_entry_fill_next_open:bool ->
   ?sim_exit_fill_next_open:bool ->
   ?sim_entry_stoplimit_fresh_bar_only:bool ->
+  ?sim_stop_exit_fill_on_trigger_bar:bool ->
   ?entry_fill_reject_retries:int ->
   ?entry_fill_resize:Entry_fill_resize.t ->
   unit ->

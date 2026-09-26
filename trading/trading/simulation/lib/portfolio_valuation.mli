@@ -49,3 +49,8 @@ val compute :
     naming the held symbols, the date, and the underlying calculations error.
     The prior behaviour silently substituted [portfolio.current_cash],
     corrupting [equity_curve.csv] daily-derivative metrics during the gap. *)
+
+val warn_on_fallbacks : int -> unit
+(** [warn_on_fallbacks n] prints the end-of-run stderr WARN naming [n] tier-(4)
+    avg-cost fallback resolutions (see {!compute}); prints nothing when [n = 0].
+*)
