@@ -30,15 +30,20 @@ type dependencies = {
       (** See .mli. *)
   entry_extension_max_pct : float option;
       (** See .mli. #2158 Phase 2 fill model. *)
-  sim_entry_fill_next_open : bool;
-      (** See .mli. Fix #1 next-bar-open Market-entry fill (default-off). *)
-  sim_exit_fill_next_open : bool;
-      (** See .mli. Fix #1b next-bar-open Market-exit fill (default-off). *)
+  fill_gate : Next_open_fill_gate.flags;
+      (** See .mli. Fix #1 / #1b + StopLimit. *)
   entry_fill_retry : Entry_fill_retry.t;
       (** See .mli. G2a retry budget + ledger; a no-op at [0] retries. *)
   entry_fill_resize : Entry_fill_resize.t;
       (** See .mli. G2b affordable-size clamp; a no-op when disabled. *)
 }
+
+let _create_engine ~commission ~slippage_bps =
+  Trading_engine.Engine.create { Trading_engine.Types.commission; slippage_bps }
+
+let _adapter_or_default ~data_dir adapter =
+  Option.value_or_thunk adapter ~default:(fun () ->
+      Trading_simulation_data.Market_data_adapter.create ~data_dir)
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol
@@ -50,30 +55,22 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
     ?active_through_for ?(prune_universe_by_active_through = false)
     ?on_transitions ?entry_extension_max_pct ?(sim_entry_fill_next_open = false)
-    ?(sim_exit_fill_next_open = false) ?(entry_fill_reject_retries = 0)
+    ?(sim_exit_fill_next_open = false)
+    ?(sim_entry_stoplimit_fresh_bar_only = false)
+    ?(entry_fill_reject_retries = 0)
     ?(entry_fill_resize = Entry_fill_resize.disabled) () =
-  let engine_config = { Trading_engine.Types.commission; slippage_bps } in
-  let engine = Trading_engine.Engine.create engine_config in
-  let order_manager = Trading_orders.Manager.create () in
-  let market_data_adapter =
-    match market_data_adapter with
-    | Some adapter -> adapter
-    | None -> Trading_simulation_data.Market_data_adapter.create ~data_dir
-  in
-  let stale_hold_log =
-    Option.value stale_hold_log ~default:(Stale_hold.Log.create ())
-  in
   {
     symbols;
     data_dir;
     strategy;
-    engine;
-    order_manager;
-    market_data_adapter;
+    engine = _create_engine ~commission ~slippage_bps;
+    order_manager = Trading_orders.Manager.create ();
+    market_data_adapter = _adapter_or_default ~data_dir market_data_adapter;
     metric_suite;
     benchmark_symbol;
     stale_hold_policy;
-    stale_hold_log;
+    stale_hold_log =
+      Option.value_or_thunk stale_hold_log ~default:Stale_hold.Log.create;
     margin_config;
     initial_long_margin_req;
     long_margin_rate_annual_pct;
@@ -84,8 +81,12 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     prune_universe_by_active_through;
     on_transitions;
     entry_extension_max_pct;
-    sim_entry_fill_next_open;
-    sim_exit_fill_next_open;
+    fill_gate =
+      {
+        defer_entries = sim_entry_fill_next_open;
+        defer_exits = sim_exit_fill_next_open;
+        defer_stoplimit_entries = sim_entry_stoplimit_fresh_bar_only;
+      };
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
     entry_fill_resize;
@@ -367,18 +368,12 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
 
 (* Execute pending orders, apply fills, and route rejected fills through
    {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). The
-   Fix #1 / #1b next-open gate (both default-off) defers Market entry and/or
-   Market exit fills past stale-bar steps; see {!Next_open_fill_gate}. *)
+   fresh-bar gate defers the armed classes (Market entries / exits, StopLimit
+   entries) past stale-bar steps; see {!Next_open_fill_gate}. *)
 let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
   let open Result.Let_syntax in
-  let defer_entries = t.deps.sim_entry_fill_next_open in
-  let defer_exits = t.deps.sim_exit_fill_next_open in
   let can_fill =
-    if defer_entries || defer_exits then
-      Some
-        (Next_open_fill_gate.make ~defer_entries ~defer_exits ~positions
-           ~today_bars)
-    else None
+    Next_open_fill_gate.gate t.deps.fill_gate ~positions ~today_bars
   in
   let%bind execution_reports =
     Trading_engine.Engine.process_orders ?can_fill t.deps.engine

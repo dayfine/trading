@@ -1247,6 +1247,37 @@ type config = {
           Weinstein-faithful: spine untouched, only the {i fill assumption}
           changes. Plan: [dev/plans/fill-model-faithfulness-2026-08-07.md]
           Workstream C, Fix #1b. *)
+  sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]
+      (** Fresh-bar-only fills for StopLimit ENTRY tickets (the StopLimit
+          sibling of [sim_entry_fill_next_open]; armed only together with
+          [enable_sim_entry_stoplimit]).
+
+          {b The realism gap it closes.} The simulator steps one calendar day
+          and the engine retains the previous session's bar on a non-trading
+          step. A ticket created from a Friday-close screen is therefore first
+          checked on the Saturday step against Friday's retained bar, and fills
+          if Friday's range crossed the trigger — a range that traded before the
+          ticket existed. The trade is stamped Saturday. Measured on the 26y PIT
+          top-3000 null ([a0-pit-null-s0-v11], 2026-09-25 review): 100 of 732
+          entries are Saturday-dated and 99 of them sit inside Friday's own bar.
+          [Next_open_fill_gate] exempted StopLimit orders on the grounds that
+          their own trigger protects them from a stale bar; that holds for a
+          ticket that existed during the bar, not for one placed after it.
+
+          When [true], a StopLimit order that would OPEN an [Entering] position
+          is not checked on a step where its symbol has no fresh bar; it rests
+          until the next fresh bar and is checked against that bar's path.
+          Resting tickets that already saw Friday's session are unaffected (the
+          Friday step checked them). Decision-time [entry_price] and stop math
+          are unchanged.
+
+          {b Default [false] = the current stale-bar check, bit-identical to
+             every existing baseline/golden} (R1). A fill-model correctness
+          change when armed; paired run before any default flip, never bundled.
+          R2: axis-expressible as
+          [((flag sim_entry_stoplimit_fresh_bar_only) (values (true false)))].
+          Weinstein-faithful: spine untouched, only the fill assumption changes.
+      *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2).
 
