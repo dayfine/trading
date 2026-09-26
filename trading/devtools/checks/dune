@@ -31,12 +31,19 @@
   (run sh %{dep:arch_layer_test.sh} %{dep:linter_exceptions.conf})))
 
 ; File length: 300-line soft limit, 500-line declared-large limit (11% cap).
-; Scans lib/*.ml files (raw line count) AND lib/*.mli files (signature line
-; count -- comment blocks + blank lines stripped; see linter_file_length.sh
-; header for the raw-vs-signature rationale, H-MLI-FILE-LENGTH-BLIND-SPOT).
-; Both globs are required deps: without the *.mli glob, a new .mli-only
-; violation would not invalidate this rule's cache key (H-CHECK-CACHE-BLIND
-; -- see PR #943 / dune-linter-deps entry in dev/status/harness.md).
+; Scans .ml files repo-wide (raw line count, issue #2876) AND lib/*.mli files
+; (signature line count -- comment blocks + blank lines stripped; see
+; linter_file_length.sh header for the raw-vs-signature rationale,
+; H-MLI-FILE-LENGTH-BLIND-SPOT). Both globs are required deps: without the
+; *.mli glob, a new .mli-only violation would not invalidate this rule's
+; cache key (H-CHECK-CACHE-BLIND -- see PR #943 / dune-linter-deps entry in
+; dev/status/harness.md). %{dep:linter_exceptions.conf} is passed the same
+; way linter_mli_coverage.sh's rule below does: the script reads it via
+; dirname($0), not argv, but declaring it here is what makes dune copy it
+; into the sandbox next to the script -- without this, EXCEPTIONS_CONF's
+; `[ -f ... ]` check is false inside `dune runtest` and every file_length
+; exception silently stops applying (though it worked when run directly
+; against the source tree, since no sandbox is involved there).
 
 (rule
  (alias runtest)
@@ -45,7 +52,7 @@
   (glob_files_rec %{workspace_root}/*.ml)
   (glob_files_rec %{workspace_root}/*.mli))
  (action
-  (run sh %{dep:linter_file_length.sh})))
+  (run sh %{dep:linter_file_length.sh} %{dep:linter_exceptions.conf})))
 
 ; Fixture-driven self-test for linter_file_length.sh's .mli signature-line
 ; counting (H-MLI-FILE-LENGTH-BLIND-SPOT). Builds its own private fixture
@@ -269,6 +276,23 @@
    MAGIC_NUMBERS_LINTER_EXE
    %{exe:../magic_numbers_linter/magic_numbers_linter.exe}
    (run sh %{dep:sete_diagnostics_check.sh}))))
+
+; Regression test for the jj-colocation intent-to-add guard (harness item
+; T3-ITA, 2026-09-25): jj_workspace_smoke.sh's `jj -R "$REPO" ...` calls
+; snapshot the DEFAULT workspace's working copy as a side effect in a
+; colocated repo, exporting any untracked file sitting in the real repo
+; root into the git index as an intent-to-add entry -- which
+; orchestrator_fastexit_gate.sh's `git ls-files`-based run-count then
+; silently counts as tracked. Runs against hermetic sandbox repos, never
+; the real checkout; skips cleanly when jj is not on PATH. Declares
+; jj_workspace_smoke.sh as an explicit dep so the cache invalidates when
+; either script's logic changes.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh jj_workspace_smoke.sh (universe))
+ (action
+  (run sh %{dep:jj_ita_guard_check.sh})))
 
 ; Status file integrity: each dev/status/*.md must declare Status, Last updated,
 ; and (for feature files) Interface stable. Invoked by health-scanner fast scan.
