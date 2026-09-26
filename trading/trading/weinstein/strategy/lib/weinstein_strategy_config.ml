@@ -149,8 +149,7 @@ type config = {
   require_structural_stop : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_exit_fill_next_open : bool; [@sexp.default true]  (** See [.mli]. *)
-  sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]
-      (** See [.mli]. *)
+  sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]  (** .mli *)
   sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]  (** .mli *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** See [.mli]. *)
