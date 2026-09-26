@@ -32,6 +32,7 @@ type dependencies = {
       (** See .mli. #2158 Phase 2 fill model. *)
   fill_gate : Next_open_fill_gate.flags;
       (** See .mli. Fix #1 / #1b + StopLimit. *)
+  stop_exit_fill_on_trigger_bar : bool;  (** See .mli. #2961. *)
   entry_fill_retry : Entry_fill_retry.t;
       (** See .mli. G2a retry budget + ledger; a no-op at [0] retries. *)
   entry_fill_resize : Entry_fill_resize.t;
@@ -57,6 +58,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?on_transitions ?entry_extension_max_pct ?(sim_entry_fill_next_open = false)
     ?(sim_exit_fill_next_open = false)
     ?(sim_entry_stoplimit_fresh_bar_only = false)
+    ?(sim_stop_exit_fill_on_trigger_bar = false)
     ?(entry_fill_reject_retries = 0)
     ?(entry_fill_resize = Entry_fill_resize.disabled) () =
   {
@@ -87,6 +89,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
         defer_exits = sim_exit_fill_next_open;
         defer_stoplimit_entries = sim_entry_stoplimit_fresh_bar_only;
       };
+    stop_exit_fill_on_trigger_bar = sim_stop_exit_fill_on_trigger_bar;
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
     entry_fill_resize;
@@ -127,11 +130,9 @@ and t = {
 
 (** {1 Creation} *)
 
-(* Win #4: prune the per-step bar-fetch universe once, up front. Gated on its
-   own opt-in, NOT merely on [active_through_for] being supplied: since #2687
-   the lookup is also read by {!Delisted_exit_runner}, which callers arm
-   unconditionally, so the two consumers need separate switches. A [false] flag
-   (the default) or a [None] lookup preserves baselines. *)
+(* Win #4: prune the bar-fetch universe once, up front. Own opt-in, not just a
+   supplied [active_through_for] ({!Delisted_exit_runner} reads it too, #2687).
+   A [false] flag (the default) or a [None] lookup preserves baselines. *)
 let _maybe_prune_deps ~fold_start_date deps =
   match deps.active_through_for with
   | _ when not deps.prune_universe_by_active_through -> deps
@@ -256,11 +257,6 @@ let _count_stop_eligible positions =
   Map.count positions ~f:(fun pos ->
       _is_holding_state (Trading_strategy.Position.get_state pos))
 
-(* Fill routing (which position receives a fill trade, by symbol + state +
-   side) lives in {!Fill_router}. Closed positions are strategy-invisible and
-   contribute 0 to valuation; audit trails live in [Trade_audit] / [Stop_log] /
-   [final_portfolio.positions]. *)
-
 (** Build run_result from accumulated state. [final_portfolio] is the full
     {!Trading_portfolio.Portfolio.t} so reconciler writers read it directly. *)
 let _build_run_result t =
@@ -274,14 +270,7 @@ let _build_run_result t =
       ~derived_computers:t.deps.metric_suite.derived ~config:t.config
       ~base_metrics
   in
-  if !(t.valuation_failure_count) > 0 then
-    eprintf
-      "WARN: %d held-position price resolutions fell through to avg-cost \
-       fallback (zero unrealized assumption). Run still produced a valid \
-       portfolio_value series; review valuation_failure_count for cache \
-       coverage gaps.\n\
-       %!"
-      !(t.valuation_failure_count);
+  Portfolio_valuation.warn_on_fallbacks !(t.valuation_failure_count);
   {
     steps;
     final_portfolio = t.portfolio;
@@ -290,17 +279,11 @@ let _build_run_result t =
     metrics;
   }
 
-(* Notify the optional [on_transitions] observer with a batch of transitions
-   (#2057).
-
-   There are three call sites per step, not one, and their order is the order
-   the transitions were applied: the forced exits, announced by
-   {!Forced_exit_step.run} itself (they are applied before any order is even
-   executed, so they come first — #2687); then the portfolio-rejection cancels,
-   announced by {!Cancel_handler.handle_rejected_trades} itself since #2524;
-   then this one, the strategy + margin transitions. Folding any of them into a
-   later notification would report them out of order, which matters:
-   {!Backtest.Stop_log} is last-writer-wins per position. *)
+(* Notify the [on_transitions] observer (#2057). Call sites fire in apply order,
+   which matters ({!Backtest.Stop_log} is last-writer-wins per position): forced
+   exits ({!Forced_exit_step.run}, #2687), fill-rejection cancels
+   ({!Cancel_handler.handle_rejected_trades}, #2524), this one (strategy +
+   margin), then any #2961 trigger-bar stop-fill rejections. *)
 let _notify_transitions ~on_transitions transitions =
   Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
@@ -310,12 +293,10 @@ let _notify_transitions ~on_transitions transitions =
     portfolio, positions, today's bars, split events, and the realised exit
     trades (merged into the step's [trades] by the caller).
 
-    [last_known_prices] is handed to the force-exit selection as the tier-3
-    price source for the #2672 [exit_without_prior_bar] candidates — positions
-    whose symbol has no prior bar at all, so there is no close to read. It
-    carries this run's last-resolved closes (written by {!Portfolio_valuation}
-    at the end of each step, including its own tier-4 avg-cost entries), which
-    is why the two agree on what a held position is worth. *)
+    [last_known_prices] (this run's last-resolved closes, written by
+    {!Portfolio_valuation}) is the tier-3 price source for the #2672
+    [exit_without_prior_bar] candidates, so the two agree on a held position's
+    worth. *)
 let _prepare_market_state t =
   let split_events =
     Split_handler.detect_for_held_positions ~adapter:t.deps.market_data_adapter
@@ -366,20 +347,10 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
     had_market_bars = not (List.is_empty today_bars);
   }
 
-(* Execute pending orders, apply fills, and route rejected fills through
-   {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). The
-   fresh-bar gate defers the armed classes (Market entries / exits, StopLimit
-   entries) past stale-bar steps; see {!Next_open_fill_gate}. *)
-let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
+(* Apply engine fills; route rejects via {!Cancel_handler}. Shared by the
+   regular pass and the #2961 trigger-bar stop pass. *)
+let _apply_fills t ~portfolio ~positions ~all_trades =
   let open Result.Let_syntax in
-  let can_fill =
-    Next_open_fill_gate.gate t.deps.fill_gate ~positions ~today_bars
-  in
-  let%bind execution_reports =
-    Trading_engine.Engine.process_orders ?can_fill t.deps.engine
-      t.deps.order_manager
-  in
-  let all_trades = _extract_trades ~date:t.current_date execution_reports in
   let portfolio, trades, rejected_trades =
     Cancel_handler.apply_trades_best_effort ?on_trade_fill:t.deps.on_trade_fill
       ~initial_long_margin_req:t.deps.initial_long_margin_req portfolio
@@ -404,6 +375,18 @@ let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
   in
   Ok (portfolio, positions, trades)
 
+(* Execute pending orders and apply their fills; {!Next_open_fill_gate} defers
+   the armed classes past stale-bar steps. *)
+let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
+  let can_fill =
+    Next_open_fill_gate.gate t.deps.fill_gate ~positions ~today_bars
+  in
+  Result.bind
+    (Trading_engine.Engine.process_orders ?can_fill t.deps.engine
+       t.deps.order_manager) ~f:(fun reports ->
+      _apply_fills t ~portfolio ~positions
+        ~all_trades:(_extract_trades ~date:t.current_date reports))
+
 (* F2 ticket lifecycle: retire the resting orders of any strategy-cancelled
    entry ticket. Must run BEFORE the transitions are applied — [positions] still
    carries each cancelled ticket's symbol + side at that point. A no-op when no
@@ -415,6 +398,36 @@ let _retire_cancelled_entry_orders t ~positions ~transitions =
       ~order_manager:t.deps.order_manager ~positions ~transitions
   in
   ()
+
+(* Apply transitions, generate orders, run the #2961 trigger-bar stop pass
+   ({!Trigger_bar_stop_fill}). Returns (.., orders to submit, stop fills). *)
+let _apply_transitions_and_orders t ~portfolio ~positions ~today_bars
+    ~transitions =
+  let open Result.Let_syntax in
+  (* Strategy-side half only; the fill-rejection cancels were announced above. *)
+  _notify_transitions ~on_transitions:t.deps.on_transitions transitions;
+  _retire_cancelled_entry_orders t ~positions ~transitions;
+  let%bind positions =
+    Cancel_handler.apply_transitions ~positions ~transitions
+  in
+  let%bind orders, order_links =
+    Order_generator.transitions_to_orders ~current_date:t.current_date
+      ~positions ?entry_extension_max_pct:t.deps.entry_extension_max_pct
+      transitions
+  in
+  Fill_router.record t.order_links order_links;
+  let stop_orders, orders =
+    Trigger_bar_stop_fill.select ~enabled:t.deps.stop_exit_fill_on_trigger_bar
+      ~transitions ~order_links ~today_bars orders
+  in
+  let%bind all_trades =
+    Trigger_bar_stop_fill.execute ~engine:t.deps.engine
+      ~order_manager:t.deps.order_manager ~date:t.current_date stop_orders
+  in
+  if List.is_empty all_trades then Ok (portfolio, positions, orders, [])
+  else
+    let%map p, ps, trades = _apply_fills t ~portfolio ~positions ~all_trades in
+    (p, ps, orders, trades)
 
 (** Process one day: execute pending orders, call strategy, generate new orders,
     and assemble the [step_result]. Returns the next simulator state paired with
@@ -436,18 +449,11 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
       ~maintenance_long_pct:t.deps.maintenance_long_pct ~portfolio ~positions
       ~today_bars ~date:t.current_date ~strategy_transitions
   in
-  (* Strategy-side half only; the fill-rejection cancels were announced above. *)
-  _notify_transitions ~on_transitions:t.deps.on_transitions transitions;
-  _retire_cancelled_entry_orders t ~positions ~transitions;
-  let%bind positions =
-    Cancel_handler.apply_transitions ~positions ~transitions
+  let%bind portfolio, positions, orders, stop_trades =
+    _apply_transitions_and_orders t ~portfolio ~positions ~today_bars
+      ~transitions
   in
-  let%bind orders, order_links =
-    Order_generator.transitions_to_orders ~current_date:t.current_date
-      ~positions ?entry_extension_max_pct:t.deps.entry_extension_max_pct
-      transitions
-  in
-  Fill_router.record t.order_links order_links;
+  let trades = trades @ stop_trades in
   let portfolio_value =
     Portfolio_valuation.compute ~adapter:t.deps.market_data_adapter
       ~date:t.current_date ~portfolio ~today_bars

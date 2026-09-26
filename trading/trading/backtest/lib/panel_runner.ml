@@ -58,6 +58,17 @@ let _entry_cap_for_sim (config : Weinstein_strategy.config) : float option =
   then Some config.entry_extension_max_pct
   else None
 
+(* #2961 same-bar stop fills: inert under [trigger_on_weekly_close], whose stop
+   is decided at the close rather than resting — an intraday fill would use
+   prices from before that decision. *)
+let _stop_fill_on_trigger_bar (config : Weinstein_strategy.config) =
+  config.sim_stop_exit_fill_on_trigger_bar
+  && not config.stops_config.trigger_on_weekly_close
+
+let _entry_fill_resize (config : Weinstein_strategy.config) =
+  Entry_fill_resize.create ~enabled:config.entry_fill_size_to_available
+    ~min_size_fraction:config.entry_fill_min_size_fraction
+
 (* Two [stop_log] recording paths, both needed (#2057): [Strategy_wrapper]
    intercepts the strategy's own [on_market_close] result (fires only on
    strategy-call days, before margin dedup); [Simulator.on_transitions] fires
@@ -116,11 +127,10 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
       ~sim_exit_fill_next_open:input.config.sim_exit_fill_next_open
       ~sim_entry_stoplimit_fresh_bar_only:
         input.config.sim_entry_stoplimit_fresh_bar_only
+      ~sim_stop_exit_fill_on_trigger_bar:
+        (_stop_fill_on_trigger_bar input.config)
       ~entry_fill_reject_retries:input.config.entry_fill_reject_retries
-      ~entry_fill_resize:
-        (Entry_fill_resize.create
-           ~enabled:input.config.entry_fill_size_to_available
-           ~min_size_fraction:input.config.entry_fill_min_size_fraction)
+      ~entry_fill_resize:(_entry_fill_resize input.config)
       ()
   in
   let config =
