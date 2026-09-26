@@ -38,6 +38,13 @@ type dependencies = {
       (** See .mli. G2b affordable-size clamp; a no-op when disabled. *)
 }
 
+let _create_engine ~commission ~slippage_bps =
+  Trading_engine.Engine.create { Trading_engine.Types.commission; slippage_bps }
+
+let _adapter_or_default ~data_dir adapter =
+  Option.value_or_thunk adapter ~default:(fun () ->
+      Trading_simulation_data.Market_data_adapter.create ~data_dir)
+
 let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol
     ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
@@ -52,28 +59,18 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(sim_entry_stoplimit_fresh_bar_only = false)
     ?(entry_fill_reject_retries = 0)
     ?(entry_fill_resize = Entry_fill_resize.disabled) () =
-  let engine_config = { Trading_engine.Types.commission; slippage_bps } in
-  let engine = Trading_engine.Engine.create engine_config in
-  let order_manager = Trading_orders.Manager.create () in
-  let market_data_adapter =
-    match market_data_adapter with
-    | Some adapter -> adapter
-    | None -> Trading_simulation_data.Market_data_adapter.create ~data_dir
-  in
-  let stale_hold_log =
-    Option.value stale_hold_log ~default:(Stale_hold.Log.create ())
-  in
   {
     symbols;
     data_dir;
     strategy;
-    engine;
-    order_manager;
-    market_data_adapter;
+    engine = _create_engine ~commission ~slippage_bps;
+    order_manager = Trading_orders.Manager.create ();
+    market_data_adapter = _adapter_or_default ~data_dir market_data_adapter;
     metric_suite;
     benchmark_symbol;
     stale_hold_policy;
-    stale_hold_log;
+    stale_hold_log =
+      Option.value_or_thunk stale_hold_log ~default:Stale_hold.Log.create;
     margin_config;
     initial_long_margin_req;
     long_margin_rate_annual_pct;
