@@ -111,3 +111,13 @@ let compute ~adapter ~date ~portfolio ~today_bars ~last_known_prices
   with
   | Ok value -> value
   | Error err -> _fail_loud_on_missing_mark ~date ~portfolio err
+
+let warn_on_fallbacks n =
+  if n > 0 then
+    eprintf
+      "WARN: %d held-position price resolutions fell through to avg-cost \
+       fallback (zero unrealized assumption). Run still produced a valid \
+       portfolio_value series; review valuation_failure_count for cache \
+       coverage gaps.\n\
+       %!"
+      n

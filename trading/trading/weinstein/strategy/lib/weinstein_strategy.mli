@@ -975,6 +975,13 @@ type config = {
           PIT record). When [true], such a ticket rests until the next fresh
           bar. Default [false] = bit-identical baselines (R1). See
           [Weinstein_strategy_config.sim_entry_stoplimit_fresh_bar_only]. *)
+  sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]
+      (** Protective-stop ([StopLoss]) exits fill on the step whose bar traded
+          the stop, via a [Stop] engine order (the open on a gap through the
+          stop, else the first intraday-path price through it), instead of at
+          the next open (issue #2961, book §5.7). Default [false] =
+          bit-identical baselines (R1). See
+          [Weinstein_strategy_config.sim_stop_exit_fill_on_trigger_bar]. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2, plan
           [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream D). The

@@ -14,6 +14,7 @@
   simulator
   fill_router
   next_open_fill_gate
+  trigger_bar_stop_fill
   simulator_metrics
   fill_date_stamp
   split_handler

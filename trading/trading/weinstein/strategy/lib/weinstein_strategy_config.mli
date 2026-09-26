@@ -1278,6 +1278,38 @@ type config = {
           [((flag sim_entry_stoplimit_fresh_bar_only) (values (true false)))].
           Weinstein-faithful: spine untouched, only the fill assumption changes.
       *)
+  sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]
+      (** Protective-stop exits fill on the bar that traded the stop (issue
+          #2961).
+
+          {b The faithfulness gap it closes.} weinstein-book-reference.md §5.7
+          (Ch. 6): the stop is a resting GTC sell-stop that executes the day its
+          level trades. The stops pass detects that trigger on the day's bar
+          (low for a long, high for a short), but the exit it emits is a Market
+          order filled at the NEXT fresh bar's open. Measured on the 26y PIT
+          top-3000 null ([a0-pit-null-s0-v11]): 362 of 423 unraised stop exits
+          fill one bar after the stop traded, and in 177 of them the stock had
+          closed back above the stop. The P&L effect is small (about −$51k on
+          s0); this is a fill-basis correctness knob, not a return lever.
+
+          When [true], a [TriggerExit] whose reason is [StopLoss] is re-issued
+          as a [Stop stop_price] order and filled on the SAME step against that
+          bar ({!Trading_simulation.Trigger_bar_stop_fill}): at the open when
+          the bar gapped through the stop, else at the first intraday-path price
+          through it. Only [StopLoss] exits move — laggard, Stage-3, liquidity,
+          extension-stop, volume-eject, macro-trim and the force-liquidation
+          breaker ([StrategySignal]) keep the Market / next-open model. The
+          level used is the one in force BEFORE the bar (the stop machine checks
+          the hit before any raise). Inert when
+          [stops_config.trigger_on_weekly_close] is [true]: a close-triggered
+          stop is decided at the close, not a resting order, and filling it
+          intraday would use prices from before the decision.
+
+          {b Default [false] = the current next-open exit fill, bit-identical to
+             every existing baseline/golden} (R1). R2: axis-expressible as
+          [((flag sim_stop_exit_fill_on_trigger_bar) (values (true false)))].
+          Weinstein-faithful: spine untouched, only the fill assumption changes.
+      *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2).
 
