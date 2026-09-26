@@ -5,9 +5,10 @@
     candidate. {!make_entry_transition} itself now lives here (moved out of the
     strategy file alongside {!Weinstein_strategy.entries_from_candidates}, which
     calls it via {!Entry_walk.entries_from_candidates}); this module also owns
-    the audit-emission bookkeeping (the candidate-decision tagging, the
-    alternatives projection, the entry-event construction) so the strategy file
-    stays under its file-length cap. *)
+    the candidate-decision tagging and the cash / notional / sector gate chain
+    so the strategy file stays under its file-length cap. The projection of
+    those decisions into audit rows (alternatives, entry events) lives in
+    {!Entry_audit_emit}. *)
 
 type entry_meta = {
   position_id : string;
@@ -25,7 +26,7 @@ type entry_meta = {
           close from [bar_reader] at order placement, or
           [candidate.suggested_entry] when no bars are available (G14 fix). The
           dollar-denominated audit fields ([initial_position_value],
-          [initial_risk_dollars] in {!build_entry_event}) key off this rather
+          [initial_risk_dollars] in {!Entry_audit_emit.build_entry_event}) key off this rather
           than [candidate.suggested_entry] so the audit reflects the realised
           entry rather than the screener's pre-fill intent. *)
   close_at_decision : float option;
@@ -46,7 +47,7 @@ type entry_meta = {
           entered anyway" and "admitted by the mechanism".
 
           PR-5 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §4) discharges
-          PR-2's deferral: {!build_entry_event} now also carries the tag onto
+          PR-2's deferral: {!Entry_audit_emit.build_entry_event} now also carries the tag onto
           {!Audit_recorder.entry_event.sized_down_wide_stop}, from where it is
           persisted in the [Backtest.Trade_audit.entry_decision] row. The
           strategy-internal meta and the [PANEL_GOLDEN_DEBUG] candidate trace
@@ -76,6 +77,12 @@ type entry_attempt_result =
       (** [Portfolio_risk.compute_position_size] rounded shares down to 0 (risk
           dollars too small relative to per-share cost, or stop on the wrong
           side of entry). *)
+  | No_structural_stop
+      (** Investor-preset gate ([?require_structural_stop] on): the installed
+          initial stop is the automatic-percentage fallback
+          ([stop_floor_kind = Buffer_fallback]) — no qualifying structural
+          floor / ceiling — so the candidate is not entered. Mapped to
+          [Audit_recorder.skip_reason.No_structural_stop]. *)
 
 (** Per-candidate decision tag emitted by the entry walk. The [Kept] case
     carries the produced transition + audit meta; [Skipped] records why the
@@ -101,73 +108,6 @@ val classify_stop_floor_kind :
     to keep that primitive's surface clean; the cost is one extra bar walk per
     entered candidate, bounded by [stops_config.support_floor_lookback_bars]. *)
 
-val alternatives_of_decisions :
-  decisions:(Screener.scored_candidate * candidate_decision) list ->
-  exclude_position_id:string ->
-  Audit_recorder.alternative_input list
-(** Build the [alternatives_considered] list for a chosen candidate's audit row.
-    Every other candidate from the same screen call surfaces here:
-
-    - [Skipped reason] candidates pass through verbatim with the captured
-      [reason].
-    - [Kept] rivals (other entered candidates) are excluded — they have their
-      own [entry_decision] records, and cross-trade analysis joins on
-      [position_id]. *)
-
-val all_alternatives_of_decisions :
-  decisions:(Screener.scored_candidate * candidate_decision) list ->
-  Audit_recorder.alternative_input list
-(** Project the {b whole} walk's passed-over candidates, unscoped to any chosen
-    entry — the per-Friday counterpart to {!alternatives_of_decisions}.
-
-    Same per-candidate content, different addressing:
-    [alternatives_of_decisions] answers "what did {i this} funded entry
-    outrank?" and so is only reachable when something was funded, while this
-    answers "what did the walk pass over {i this Friday}?" and is therefore
-    emitted even on a Friday that funded nothing. That is issue #2490's gap G1;
-    the caller hands the result to {!Audit_recorder.cascade_event.candidates}.
-
-    [Kept] decisions are excluded — a funded candidate has its own
-    {!Audit_recorder.entry_event}, and cross-artefact joins key on
-    [position_id]. So the emitted list plus the week's [entered] count together
-    account for the screener's top-N population. *)
-
-val build_entry_event :
-  macro:Macro.result ->
-  current_date:Core.Date.t ->
-  candidate:Screener.scored_candidate ->
-  meta:entry_meta ->
-  alternatives:Audit_recorder.alternative_input list ->
-  Audit_recorder.entry_event
-(** Project [(candidate, meta, alternatives)] into an
-    {!Audit_recorder.entry_event}. Computes the dollar-denominated sizing fields
-    ([initial_position_value], [initial_risk_dollars]) from [meta.shares],
-    [meta.effective_entry_price], and [meta.installed_stop]. The audit row's
-    [candidate] field still carries the screener-original
-    [candidate.suggested_entry], so consumers can compare the screener's
-    pre-fill intent against the strategy's realised entry.
-
-    Also stamps the PR-5 placement-time ticket tags: [sized_down_wide_stop] from
-    [meta], and the F1 freshness basis + F6 §4.5 triple-confirmation
-    measurements projected off [candidate.analysis] by {!Entry_ticket_tags}. All
-    three are pure reads of values already in scope — no extra bar walk, no
-    behaviour change. *)
-
-val emit_entries :
-  audit_recorder:Audit_recorder.t ->
-  macro:Macro.result option ->
-  current_date:Core.Date.t ->
-  decisions:(Screener.scored_candidate * candidate_decision) list ->
-  unit
-(** For every [Kept] entry in [decisions], compute the [alternatives] list,
-    build an [entry_event], and route it through [audit_recorder.record_entry].
-    [Skipped] entries are silently dropped — they surface as alternatives in
-    other Kept entries' rows.
-
-    No-op when [macro] is [None] (the strategy did not run macro this tick, so
-    the entry walk is being driven from a test fixture without macro state —
-    skip audit emission rather than fabricate a Neutral macro). *)
-
 (** {1 Per-candidate entry construction}
 
     These primitives are factored out of the strategy file so the strategy stays
@@ -185,6 +125,7 @@ val make_entry_transition :
   ?min_stop_distance_pct:float ->
   ?trigger_at_suggested:bool ->
   ?stop_anchor_at_entry_base:bool ->
+  ?require_structural_stop:bool ->
   ?stop_width:Stop_width_mode.policy ->
   portfolio_risk_config:Portfolio_risk.config ->
   stops_config:Weinstein_stops.config ->
@@ -200,6 +141,11 @@ val make_entry_transition :
     - [Stop_too_wide]: the support-floor-derived initial stop sits more than
       [stops_config.max_stop_distance_pct] from [effective_entry] (G15 step 3,
       Weinstein book §5.1). No [stop_states] entry written; no position id
+      consumed.
+    - [No_structural_stop]: only under [?require_structural_stop]; the
+      initial stop is the [Buffer_fallback] automatic percentage. Checked
+      between steps (2) and (3) below, so it takes precedence over
+      [Stop_too_wide]. No [stop_states] entry written; no position id
       consumed.
     - [Sized_zero]: [Portfolio_risk.compute_position_size] rounded the share
       count to 0. No [stop_states] entry written; no position id consumed.
@@ -254,6 +200,14 @@ val make_entry_transition :
     [config.stop_anchor_at_entry_base]; default [false] is bit-identical (R1).
     See {!Entry_audit_helpers.initial_stop_and_kind} and
     {!Weinstein_strategy_config.stop_anchor_at_entry_base}.
+
+    [?require_structural_stop] (default [false]) is the investor-preset gate:
+    when [true], a candidate whose step-(2) initial stop is tagged
+    [Buffer_fallback] (no qualifying prior correction, or a support stop
+    re-anchored by [?stop_anchor_at_entry_base]) returns [No_structural_stop]
+    before step (3). Applies to both sides. Default [false] is bit-identical
+    (R1). The caller sets it to [config.require_structural_stop]; see
+    {!Weinstein_strategy_config.require_structural_stop}.
 
     [?stop_width] (default {!Stop_width_mode.default_policy}) parameterises step
     (3). Under the default [Drop_over_max] the step is bit-identical to the
@@ -364,6 +318,8 @@ val classify_candidate :
     {!Audit_recorder.skip_reason}: held, sized to zero, rejected by the running
     cash check, rejected by the running short-notional cap, rejected by the
     running long-notional cap, or rejected by the running sector-exposure cap.
+    A [make_entry] result of [No_structural_stop] maps to
+    [Skipped No_structural_stop] (no cash touched).
     Order: held-check, sizing via [make_entry], cash check, short-notional cap,
     long-notional cap, then sector-exposure cap.
 

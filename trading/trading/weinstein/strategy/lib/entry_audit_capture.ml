@@ -30,13 +30,16 @@ type stop_tags = {
     Distinguishes the two pre-cash gates the strategy applies in
     {!make_entry_transition}: a stop wider than
     [stops_config.max_stop_distance_pct] (G15 step 3 — Weinstein book §5.1
-    "reject if stop > 15%") and round-share sizing collapsing to zero. The
+    "reject if stop > 15%") and round-share sizing collapsing to zero — plus
+    the default-off investor-preset gate rejecting an automatic-percentage
+    ([Buffer_fallback]) initial stop ([require_structural_stop]). The
     caller's classifier maps these directly into [Audit_recorder.skip_reason]s
     so the audit row records WHICH gate fired. *)
 type entry_attempt_result =
   | Entry_ok of Position.transition * entry_meta
   | Stop_too_wide
   | Sized_zero
+  | No_structural_stop
 
 type candidate_decision =
   | Kept of Position.transition * entry_meta
@@ -145,8 +148,30 @@ let _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
         ~stop_distance_pct ~max_stop_distance_pct ~outcome:"Stop_too_wide";
       Stop_too_wide
 
+(* Investor-preset gate ([require_structural_stop], book Ch. 6: "investors
+   should never use automatic percentages"). Rejects a candidate whose initial
+   stop is the automatic-percentage fallback, before the width gate: a ticket
+   with no structural stop is not one the investor places at any width. Side-
+   agnostic — the fallback and its tag are shared by both sides, and Ch. 7 makes
+   the 4-6% buy-stop trader-only on the short side too. *)
+let _lacks_required_structural_stop ~require_structural_stop
+    ~(floor_kind : Audit_recorder.stop_floor_kind) =
+  require_structural_stop
+  &&
+  match floor_kind with Buffer_fallback -> true | Support_floor -> false
+
+let _reject_no_structural_stop ~effective_entry ~initial_stop
+    ~stop_distance_pct ~max_stop_distance_pct (cand : Screener.scored_candidate)
+    =
+  Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker ~score:cand.score
+    ~rationale:cand.rationale ~effective_entry
+    ~installed_stop:(Weinstein_stops.get_stop_level initial_stop)
+    ~stop_distance_pct ~max_stop_distance_pct ~outcome:"No_structural_stop";
+  No_structural_stop
+
 let make_entry_transition ?(min_stop_distance_pct = 0.0)
     ?(trigger_at_suggested = false) ?(stop_anchor_at_entry_base = false)
+    ?(require_structural_stop = false)
     ?(stop_width = Stop_width_mode.default_policy) ~portfolio_risk_config
     ~stops_config ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value
     ~current_date (cand : Screener.scored_candidate) : entry_attempt_result =
@@ -172,11 +197,20 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
     Entry_audit_helpers.stop_distance_pct ~effective_entry
       ~installed_stop:(Weinstein_stops.get_stop_level initial_stop)
   in
-  _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
-    ~stop_states ~current_date ~effective_entry ~close_at_decision ~initial_stop
-    ~floor_kind:stop_floor_kind ~basis:split_safe_basis ~stop_distance_pct
-    ~max_stop_distance_pct:stops_config.Weinstein_stops.max_stop_distance_pct
-    cand
+  let max_stop_distance_pct =
+    stops_config.Weinstein_stops.max_stop_distance_pct
+  in
+  if
+    _lacks_required_structural_stop ~require_structural_stop
+      ~floor_kind:stop_floor_kind
+  then
+    _reject_no_structural_stop ~effective_entry ~initial_stop
+      ~stop_distance_pct ~max_stop_distance_pct cand
+  else
+    _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
+      ~stop_states ~current_date ~effective_entry ~close_at_decision
+      ~initial_stop ~floor_kind:stop_floor_kind ~basis:split_safe_basis
+      ~stop_distance_pct ~max_stop_distance_pct cand
 
 (* Decide + apply the cash draw for a [CreateEntering] of [side] costing [cost].
    [borrow_ok] is [true] when long-margin leverage is engaged ([leverage_enabled],
@@ -391,97 +425,11 @@ let classify_candidate ?(leverage_enabled = false) ~held_set ~make_entry
     | Sized_zero ->
         emit "Sized_to_zero";
         Skipped Sized_to_zero
+    | No_structural_stop ->
+        emit "No_structural_stop";
+        Skipped No_structural_stop
     | Entry_ok (trans, meta) ->
         _apply_entry_ok_gates ~leverage_enabled ~remaining_cash
           ~short_notional_acc ~short_notional_cap ~long_notional_acc
           ~long_notional_cap ~sector_exposure_acc ~max_sector_exposure_pct
           ~portfolio_value ~emit ~cand:c trans meta
-
-let _alternative_of_decision ~exclude_position_id (candidate, decision) :
-    Audit_recorder.alternative_input option =
-  match decision with
-  | Skipped reason -> Some { Audit_recorder.candidate; reason }
-  | Kept (_, meta) ->
-      if String.equal meta.position_id exclude_position_id then None else None
-
-let alternatives_of_decisions ~decisions ~exclude_position_id :
-    Audit_recorder.alternative_input list =
-  List.filter_map decisions ~f:(_alternative_of_decision ~exclude_position_id)
-
-let all_alternatives_of_decisions ~decisions :
-    Audit_recorder.alternative_input list =
-  List.filter_map decisions ~f:(fun (candidate, decision) ->
-      match decision with
-      | Skipped reason -> Some { Audit_recorder.candidate; reason }
-      | Kept _ -> None)
-
-let build_entry_event ~(macro : Macro.result) ~current_date
-    ~(candidate : Screener.scored_candidate) ~(meta : entry_meta)
-    ~(alternatives : Audit_recorder.alternative_input list) :
-    Audit_recorder.entry_event =
-  (* G14 fix B: dollar quantities key off the realised entry price (the most
-     recent close from bar_reader at order placement) rather than the
-     screener's [suggested_entry] (a buffered breakout level that can sit
-     dollars above current price, or, in the cross-split-boundary case,
-     orders of magnitude away). The candidate is still passed through to
-     the audit row verbatim so [candidate.suggested_entry] remains visible
-     as the screener's intent — only the position_value / risk_dollars
-     fields are anchored to what actually got committed to capital. *)
-  let initial_position_value =
-    Float.of_int meta.shares *. meta.effective_entry_price
-  in
-  let initial_risk_dollars =
-    Float.of_int meta.shares
-    *. Float.abs (meta.effective_entry_price -. meta.installed_stop)
-  in
-  {
-    Audit_recorder.position_id = meta.position_id;
-    candidate;
-    macro;
-    current_date;
-    close_at_decision = meta.close_at_decision;
-    installed_stop = meta.installed_stop;
-    stop_floor_kind = meta.stop_floor_kind;
-    split_safe_basis = meta.split_safe_basis;
-    shares = meta.shares;
-    initial_position_value;
-    initial_risk_dollars;
-    sized_down_wide_stop = meta.sized_down_wide_stop;
-    freshness_basis =
-      Entry_ticket_tags.freshness_basis_of_analysis candidate.analysis;
-    triple_confirmation =
-      Entry_ticket_tags.triple_confirmation_of_analysis candidate.analysis;
-    alternatives;
-  }
-
-(** Record one audit entry for a [Kept] decision. [Skipped] decisions are
-    silently ignored — they appear only in the [alternatives] lists of other
-    entries. *)
-let _emit_kept_decision ~(audit_recorder : Audit_recorder.t) ~macro
-    ~current_date ~decisions candidate meta =
-  let alternatives =
-    alternatives_of_decisions ~decisions ~exclude_position_id:meta.position_id
-  in
-  let event =
-    build_entry_event ~macro ~current_date ~candidate ~meta ~alternatives
-  in
-  audit_recorder.record_entry event
-
-(** Dispatch one decision: emit an audit entry if [Kept], skip if [Skipped]. *)
-let _dispatch_one_decision ~audit_recorder ~macro ~current_date ~decisions
-    (candidate, d) =
-  match d with
-  | Skipped _ -> ()
-  | Kept (_, meta) ->
-      _emit_kept_decision ~audit_recorder ~macro ~current_date ~decisions
-        candidate meta
-
-let emit_entries ~(audit_recorder : Audit_recorder.t)
-    ~(macro : Macro.result option) ~current_date ~decisions =
-  match macro with
-  | None -> ()
-  | Some macro ->
-      let dispatch =
-        _dispatch_one_decision ~audit_recorder ~macro ~current_date ~decisions
-      in
-      List.iter decisions ~f:dispatch

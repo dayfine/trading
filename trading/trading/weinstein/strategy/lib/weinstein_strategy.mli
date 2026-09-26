@@ -231,9 +231,13 @@ module Stop_buffer_by_state = Stop_buffer_by_state
     {!Stop_buffer_by_state}. *)
 
 module Entry_audit_capture = Entry_audit_capture
-(** Per-candidate entry construction + audit emission. Factored out of the main
-    strategy file to keep it under the file-length cap. See
+(** Per-candidate entry construction + the entry gate chain. Factored out of
+    the main strategy file to keep it under the file-length cap. See
     {!Entry_audit_capture}. *)
+
+module Entry_audit_emit = Entry_audit_emit
+(** Projection of the entry walk's decisions into audit rows (alternatives,
+    entry events). See {!Entry_audit_emit}. *)
 
 module Entry_ticket_tags = Entry_ticket_tags
 (** Placement-time ticket audit tags — the F1 freshness basis and the F6 book
@@ -940,6 +944,13 @@ type config = {
           unchanged. Default [false] = off, bit-identical baselines (R1); also
           gated on the E-family, so arming alone is a no-op. See
           [Weinstein_strategy_config.stop_anchor_at_entry_base]. *)
+  require_structural_stop : bool; [@sexp.default false]
+      (** Investor-preset initial-stop rule (book Ch. 6: "investors should
+          never use automatic percentages"). When [true], a candidate whose
+          initial stop is the [Buffer_fallback] automatic percentage is skipped
+          as [Audit_recorder.No_structural_stop]; [Support_floor] stops are
+          unaffected. Both sides. Default [false] = off, bit-identical (R1).
+          See [Weinstein_strategy_config.require_structural_stop]. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]
       (** Next-bar-open fill realism for Market entries (Fix #1, plan
           [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C). When

@@ -146,6 +146,7 @@ type config = {
       [@sexp.default Entry_freshness.Ma_cross]
       (** See [.mli]. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]  (** See [.mli]. *)
+  require_structural_stop : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_exit_fill_next_open : bool; [@sexp.default true]  (** See [.mli]. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
@@ -267,6 +268,7 @@ let default_config ~universe ~index_symbol =
     entry_anchor_local_range_weeks = 0;
     entry_freshness_basis = Entry_freshness.Ma_cross;
     stop_anchor_at_entry_base = false;
+    require_structural_stop = false;
     sim_entry_fill_next_open = false;
     sim_exit_fill_next_open = true;
     freeze_entry_at_first_breakout = false;

@@ -295,7 +295,7 @@ let test_entry_event_audit_dollars_use_effective_entry _ =
   in
   let _, meta = trans_and_meta in
   let event =
-    Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
+    Entry_audit_emit.build_entry_event ~macro:_macro_fixture ~current_date
       ~candidate:cand ~meta ~alternatives:[]
   in
   let expected_position_value =
@@ -396,7 +396,7 @@ let test_meta_close_at_decision_recorded_on_both_entry_bases _ =
      hardcoded [None] — the same constant-vs-propagated trap the B1
      split_safe_basis pin exists for (qc-behavioral 2026-08-09 CP3). *)
   let event_of ~trigger_at_suggested =
-    Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
+    Entry_audit_emit.build_entry_event ~macro:_macro_fixture ~current_date
       ~candidate:cand
       ~meta:(meta_of ~trigger_at_suggested)
       ~alternatives:[]
@@ -437,7 +437,7 @@ let test_event_close_at_decision_passthrough_and_empty_reader _ =
     | _ -> OUnit2.assert_failure "make_entry_transition did not return Entry_ok"
   in
   let event =
-    Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
+    Entry_audit_emit.build_entry_event ~macro:_macro_fixture ~current_date
       ~candidate:cand ~meta ~alternatives:[]
   in
   assert_that event
@@ -528,7 +528,7 @@ let test_trigger_at_suggested_sizes_at_e _ =
     }
   in
   let event =
-    Entry_audit_capture.build_entry_event ~macro ~current_date ~candidate:cand
+    Entry_audit_emit.build_entry_event ~macro ~current_date ~candidate:cand
       ~meta ~alternatives:[]
   in
   assert_that event
@@ -956,7 +956,7 @@ let test_build_entry_event_propagates_split_safe_basis _ =
           _stub_trans_and_meta ~split_safe_basis ~side:Trading_base.Types.Long
             ~shares:100 ~effective_entry_price:100.0 ()
         in
-        (Entry_audit_capture.build_entry_event ~macro:_macro_fixture
+        (Entry_audit_emit.build_entry_event ~macro:_macro_fixture
            ~current_date ~candidate:cand ~meta ~alternatives:[])
           .Audit_recorder.split_safe_basis)
   in
@@ -989,7 +989,7 @@ let test_build_entry_event_propagates_sized_down_wide_stop _ =
       _stub_trans_and_meta ~sized_down_wide_stop ~side:Trading_base.Types.Long
         ~shares:100 ~effective_entry_price:100.0 ()
     in
-    (Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
+    (Entry_audit_emit.build_entry_event ~macro:_macro_fixture ~current_date
        ~candidate:cand ~meta ~alternatives:[])
       .Audit_recorder.sized_down_wide_stop
   in
@@ -1040,7 +1040,7 @@ let test_build_entry_event_carries_freshness_basis_and_triple_confirmation _ =
       ~effective_entry_price:100.0 ()
   in
   let event =
-    Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
+    Entry_audit_emit.build_entry_event ~macro:_macro_fixture ~current_date
       ~candidate:cand ~meta ~alternatives:[]
   in
   assert_that event
@@ -2166,7 +2166,7 @@ let test_all_alternatives_survive_a_zero_funded_walk _ =
     ]
   in
   assert_that
-    (Entry_audit_capture.all_alternatives_of_decisions ~decisions)
+    (Entry_audit_emit.all_alternatives_of_decisions ~decisions)
     (elements_are
        [
          all_of
@@ -2210,7 +2210,7 @@ let test_all_alternatives_excludes_kept _ =
         ~portfolio_value:100_000.0 ~current_date:as_of_date (cand "KEPT")
     with
     | Entry_audit_capture.Entry_ok (t, m) -> (t, m)
-    | Stop_too_wide | Sized_zero ->
+    | Stop_too_wide | Sized_zero | No_structural_stop ->
         OUnit2.assert_failure "fixture candidate failed to build an entry"
   in
   let decisions =
@@ -2220,13 +2220,186 @@ let test_all_alternatives_excludes_kept _ =
     ]
   in
   assert_that
-    (Entry_audit_capture.all_alternatives_of_decisions ~decisions)
+    (Entry_audit_emit.all_alternatives_of_decisions ~decisions)
     (elements_are
        [
          field
            (fun (a : Audit_recorder.alternative_input) -> a.candidate.ticker)
            (equal_to "SKIP");
        ])
+
+(* ------------------------------------------------------------------ *)
+(* Investor preset: require_structural_stop (book Ch. 6)               *)
+(* ------------------------------------------------------------------ *)
+
+(** Run [make_entry_transition] for [cand] over a ONE-bar reader (close $100):
+    no prior correction exists in the window, so the support-floor scan finds
+    nothing and the initial stop is the [initial_stop_buffer] automatic
+    percentage ([Buffer_fallback]). Returns the result and the [stop_states]
+    ref so callers can pin the no-side-effect contract. *)
+let _no_floor_attempt ?(initial_stop_buffer = 0.92) ~require_structural_stop
+    cand =
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date:_current_date
+      ~current_close:100.0
+  in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition ~require_structural_stop
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value:100_000.0
+      ~current_date:_current_date cand
+  in
+  (result, stop_states)
+
+let _no_floor_long () =
+  _long_candidate ~ticker:_ticker ~suggested_entry:100.0 ~suggested_stop:95.0
+    ~as_of_date:_current_date
+
+let _is_no_structural_stop =
+  matching ~msg:"Expected No_structural_stop"
+    (function Entry_audit_capture.No_structural_stop -> Some () | _ -> None)
+    (equal_to ())
+
+let _entered_with_floor_kind (kind : Audit_recorder.stop_floor_kind) =
+  matching ~msg:"Expected Entry_ok"
+    (function Entry_audit_capture.Entry_ok (_, m) -> Some m | _ -> None)
+    (field
+       (fun (m : Entry_audit_capture.entry_meta) -> m.stop_floor_kind)
+       (equal_to kind))
+
+(** R1 pin: flag OFF, a long with no qualifying prior correction is entered on
+    the automatic-percentage fallback stop, tagged [Buffer_fallback] — exactly
+    today's behaviour. *)
+let test_require_structural_stop_off_enters_buffer_fallback _ =
+  let result, _ =
+    _no_floor_attempt ~require_structural_stop:false (_no_floor_long ())
+  in
+  assert_that result (_entered_with_floor_kind Audit_recorder.Buffer_fallback)
+
+(** Flag ON: the same long is skipped as [No_structural_stop] ("investors
+    should never use automatic percentages", Ch. 6). No [stop_states] entry is
+    written. *)
+let test_require_structural_stop_on_skips_buffer_fallback _ =
+  let result, stop_states =
+    _no_floor_attempt ~require_structural_stop:true (_no_floor_long ())
+  in
+  assert_that (result, Map.length !stop_states)
+    (all_of
+       [ field fst _is_no_structural_stop; field snd (equal_to 0) ])
+
+(** The structural-stop gate runs before the width gate: a fallback stop 20%
+    below entry (which alone would be [Stop_too_wide]) records
+    [No_structural_stop] when the flag is on. *)
+let test_require_structural_stop_precedes_width_gate _ =
+  let result, _ =
+    _no_floor_attempt ~initial_stop_buffer:0.80 ~require_structural_stop:true
+      (_no_floor_long ())
+  in
+  assert_that result _is_no_structural_stop
+
+(** Shorts share the fallback and the tag, and Ch. 7 makes the 4–6% buy-stop
+    trader-only too, so the gate applies: a short with no prior rally high is
+    entered on the fallback with the flag off and skipped with it on. *)
+let test_require_structural_stop_applies_to_shorts _ =
+  let cand =
+    _short_candidate ~ticker:_ticker ~suggested_entry:100.0
+      ~suggested_stop:108.0 ~as_of_date:_current_date
+  in
+  let attempt flag = fst (_no_floor_attempt ~require_structural_stop:flag cand) in
+  assert_that
+    [ attempt false; attempt true ]
+    (elements_are
+       [
+         _entered_with_floor_kind Audit_recorder.Buffer_fallback;
+         _is_no_structural_stop;
+       ])
+
+(** A candidate with a real support floor (prior correction low $95 under the
+    $100 E entry, within the 15% limit) is entered either way, tagged
+    [Support_floor], at the same installed stop. *)
+let test_require_structural_stop_keeps_support_floor _ =
+  let bar_reader = _shallow_floor_reader ~end_date:_current_date in
+  let attempt flag =
+    Entry_audit_capture.make_entry_transition ~trigger_at_suggested:true
+      ~require_structural_stop:flag
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:1.02 ~stop_states:(ref String.Map.empty) ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date:_current_date
+      (_deep_floor_candidate ())
+  in
+  let installed = function
+    | Entry_audit_capture.Entry_ok (_, m) -> m.installed_stop
+    | _ -> Float.nan
+  in
+  let off = attempt false in
+  assert_that (attempt true)
+    (all_of
+       [
+         _entered_with_floor_kind Audit_recorder.Support_floor;
+         field installed (float_equal (installed off));
+       ])
+
+(** [classify_candidate] maps [No_structural_stop] one-to-one onto
+    [Skipped No_structural_stop] without touching the cash budget. *)
+let test_classify_maps_no_structural_stop _ =
+  let remaining_cash = ref 100_000.0 in
+  let decision =
+    Entry_audit_capture.classify_candidate ~held_set:String.Set.empty
+      ~make_entry:(fun _ -> Entry_audit_capture.No_structural_stop)
+      ~remaining_cash ~short_notional_acc:(ref 0.0)
+      ~short_notional_cap:Float.infinity ~long_notional_acc:(ref 0.0)
+      ~long_notional_cap:Float.infinity
+      ~sector_exposure_acc:(Hashtbl.create (module String))
+      ~max_sector_exposure_pct:None ~portfolio_value:100_000.0
+      (_no_floor_long ())
+  in
+  assert_that (decision, !remaining_cash)
+    (all_of
+       [
+         field fst
+           (matching ~msg:"expected Skipped No_structural_stop"
+              (function Entry_audit_capture.Skipped r -> Some r | _ -> None)
+              (equal_to
+                 (Audit_recorder.No_structural_stop
+                   : Audit_recorder.skip_reason)));
+         field snd (float_equal 100_000.0);
+       ])
+
+(** Config -> walk -> make_entry wiring: through
+    [Entry_walk.entries_from_candidates], the no-floor long funds under the
+    default config and produces no transition with [require_structural_stop]
+    set. *)
+let test_entries_from_candidates_threads_require_structural_stop _ =
+  let entries flag =
+    let config =
+      {
+        (Weinstein_strategy_config.default_config ~universe:[ _ticker ]
+           ~index_symbol:"SPY")
+        with
+        require_structural_stop = flag;
+      }
+    in
+    Entry_walk.entries_from_candidates ~config ~candidates:[ _no_floor_long () ]
+      ~stop_states:(ref String.Map.empty)
+      ~bar_reader:
+        (_bar_reader_with_current_close ~current_date:_current_date
+           ~current_close:100.0)
+      ~portfolio:
+        {
+          Trading_strategy.Portfolio_view.cash = 1_000_000.0;
+          positions = String.Map.empty;
+        }
+      ~get_price:(fun _ -> None)
+      ~current_date:_current_date ()
+    |> List.length
+  in
+  assert_that [ entries false; entries true ] (elements_are [ equal_to 1; equal_to 0 ])
+
+let test_config_default_require_structural_stop_is_off _ =
+  assert_that
+    (Weinstein_strategy.default_config ~universe:[] ~index_symbol:"")
+      .require_structural_stop (equal_to false)
 
 (** The default recorder must not opt any run into candidate capture: [noop] is
     what live mode and every non-audit test get, and the strategy skips the
@@ -2270,6 +2443,22 @@ let () =
            >:: test_stop_anchor_armed_normal_shape_unchanged;
            "stop-anchor: requires E-family (inert without trigger)"
            >:: test_stop_anchor_requires_e_family;
+           "require_structural_stop: off enters on Buffer_fallback"
+           >:: test_require_structural_stop_off_enters_buffer_fallback;
+           "require_structural_stop: on skips Buffer_fallback"
+           >:: test_require_structural_stop_on_skips_buffer_fallback;
+           "require_structural_stop: precedes the width gate"
+           >:: test_require_structural_stop_precedes_width_gate;
+           "require_structural_stop: applies to shorts"
+           >:: test_require_structural_stop_applies_to_shorts;
+           "require_structural_stop: Support_floor entered either way"
+           >:: test_require_structural_stop_keeps_support_floor;
+           "require_structural_stop: classify maps to Skipped"
+           >:: test_classify_maps_no_structural_stop;
+           "require_structural_stop: threaded through the entry walk"
+           >:: test_entries_from_candidates_threads_require_structural_stop;
+           "require_structural_stop: default config is off"
+           >:: test_config_default_require_structural_stop_is_off;
            "F5: entry_meta basis is Flag_off by default"
            >:: test_entry_meta_split_safe_basis_flag_off;
            "F5: entry_meta basis is Adjusted when the window rescales"

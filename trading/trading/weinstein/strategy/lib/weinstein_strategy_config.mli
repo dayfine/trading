@@ -1174,6 +1174,42 @@ type config = {
           [((flag stop_anchor_at_entry_base) (values (true false)))];
           default-off until a ledger ACCEPT. Note:
           [dev/notes/honest-ladder-2026-08-05.md]. *)
+  require_structural_stop : bool; [@sexp.default false]
+      (** Investor-preset initial-stop rule: never enter on an
+          automatic-percentage stop. When [true], a candidate whose installed
+          initial stop is tagged [Audit_recorder.Buffer_fallback] — the
+          support-floor scan found no qualifying prior correction low (short:
+          rally high), so the stop fell back to [initial_stop_buffer] × entry;
+          or [stop_anchor_at_entry_base] re-anchored a >15% structural stop to
+          that same fallback — is SKIPPED with the
+          [Audit_recorder.No_structural_stop] reason instead of entered.
+          Candidates whose stop is [Support_floor] are unaffected.
+
+          {b Authority.} [docs/design/weinstein-book-reference.md] §5.1 places
+          the investor's initial stop under the significant support floor (the
+          prior correction low before the breakout). Book Ch. 6, "When to
+          Sell": the trader sets the stop under the closest prior reaction low,
+          and "If there isn't any, then you can play the following numbers
+          game. While investors should never use automatic percentages", the
+          4–6%-below-breakout stop is a trader-only fallback. If the structural
+          stop needs more than ~15% risk the book says "prefer other
+          candidates" — i.e. skip, not substitute a percentage.
+
+          {b Shorts.} Applied to both sides. The fallback path and its
+          [Buffer_fallback] tag are shared by longs and shorts, and Ch. 7 makes
+          the 4–6%-above-breakdown buy-stop trader-only on the short side too
+          ("the initial buy-stop should not be handled in the same manner as
+          for the investor"); the investor's buy-stop sits above the prior
+          rally peak (§6.3).
+
+          Checked before the [max_stop_distance_pct] width gate, so a skipped
+          candidate records [No_structural_stop], not [Stop_too_wide]. INITIAL
+          stop only; trailing machinery untouched.
+
+          {b Default [false] = off, bit-identical to every existing
+             baseline/golden} (R1). R2: axis-expressible as
+          [((flag require_structural_stop) (values (true false)))]. R3:
+          default-off until a ledger ACCEPT. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]
       (** Next-bar-open fill realism for Market entries (Fix #1). Threaded from
           this config into the simulator dependencies by the backtest runner

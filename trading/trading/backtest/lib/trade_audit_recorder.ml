@@ -90,6 +90,7 @@ let _skip_reason_of_event = function
   | AR.Stop_too_wide -> Trade_audit.Stop_too_wide
   | AR.Sector_exposure_cap -> Trade_audit.Sector_exposure_cap
   | AR.Long_exposure_cap -> Trade_audit.Long_exposure_cap
+  | AR.No_structural_stop -> Trade_audit.No_structural_stop
 
 (** [weeks_advancing] for a [Stage2] classification, [None] otherwise. Surfaced
     on the near-miss so the audit need not re-derive it from [stage]. *)

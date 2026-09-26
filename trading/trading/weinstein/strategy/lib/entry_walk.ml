@@ -96,7 +96,7 @@ let _make_entry_fn ~config ~initial_stop_buffer ~bar_reader ~current_date
   in
   Entry_audit_capture.make_entry_transition ~trigger_at_suggested
     ~stop_anchor_at_entry_base:config.stop_anchor_at_entry_base
-    ~stop_width:
+    ~require_structural_stop:config.require_structural_stop ~stop_width:
       {
         Stop_width_mode.mode = config.stop_width_mode;
         size_down_max_pct = config.stop_width_size_down_max_pct;
@@ -243,11 +243,11 @@ let entries_from_candidates ?sector_lookup
         | Entry_audit_capture.Kept (trans, _) -> Some trans
         | Skipped _ -> None)
   in
-  Entry_audit_capture.emit_entries ~audit_recorder ~macro ~current_date
+  Entry_audit_emit.emit_entries ~audit_recorder ~macro ~current_date
     ~decisions;
   (* G1 (#2490): hand the whole walk's passed-over candidates to the caller so
      they land on this Friday's cascade event even when [kept] is empty. Absent
      callback = the projection is never computed. *)
   Option.iter on_candidates_considered ~f:(fun f ->
-      f (Entry_audit_capture.all_alternatives_of_decisions ~decisions));
+      f (Entry_audit_emit.all_alternatives_of_decisions ~decisions));
   kept
