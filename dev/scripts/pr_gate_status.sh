@@ -102,6 +102,21 @@
 # rather than "none" -- misleading but still fail-closed, since neither
 # reads MERGE).
 #
+# CI COLUMN VALUES (H-CI-DISPATCH, dev/status/harness.md): pending | FAIL |
+# pass | none. "none" means GitHub Actions created ZERO check-runs at all for
+# the PR's tip -- not "checks ran and failed", but "nothing ran". Live case:
+# PR #2113 (fix/lapacke-gp-cholesky) sat with no check-suite at all and no
+# actionable signal. Before this fix, "none" fell through the case statement
+# below to the generic struct=none arm ("dispatch qc-structural") exactly like
+# a PR that legitimately has no QC dispatched yet on GREEN CI -- silently
+# violating pr-gate-loop.md's "never dispatch QC against red CI" (zero
+# check-runs is a WORSE signal than red: it usually means CI never triggered
+# at all, e.g. a merge conflict, a workflow-file syntax error, or a fork PR
+# without Actions permissions). NEXT-ACTION for "none" now reads a loud
+# diagnostic instead ("no CI -- check mergeable ... or push to retrigger"),
+# distinguishing a CONFLICTING mergeable state (read from the same PR-meta
+# payload already fetched, so it's free) as the most common concrete cause.
+#
 # "unclear"'S MEASURED BASE RATE (qc-behavioral review 4991549803, B3, rework
 # iteration 1 of PR #2432/#2456; CORRECTED in rework iteration 2, review
 # 4991759359, F1 -- the "ALL FIVE" claim below was false, see that finding).
@@ -659,7 +674,11 @@ _list_open_prs_gh() {
   gh pr list --repo "$REPO" --state open --limit 50 --json number --jq '.[].number'
 }
 _pr_meta_gh() {
-  gh pr view "$1" --repo "$REPO" --json headRefOid,files,reviews,labels
+  # `mergeable` (H-CI-DISPATCH): gh's own three-value vocabulary --
+  # MERGEABLE / CONFLICTING / UNKNOWN -- read straight through with no
+  # reshaping needed, unlike the curl backend below which has to normalise
+  # REST's separate boolean + mergeable_state fields into the same three.
+  gh pr view "$1" --repo "$REPO" --json headRefOid,files,reviews,labels,mergeable
 }
 _pr_checks_gh() {
   gh pr checks "$1" --repo "$REPO" 2>/dev/null | awk '{print $2}' | sort -u | tr '\n' ' '
@@ -701,7 +720,23 @@ _pr_meta_curl() {
     # `_gate` can reach it -- an earlier version projected only `.body`, which
     # silently dropped the field before it ever reached the jq that needed it.
     reviews: ($reviews | map({body: .body, commit_id: .commit_id})),
-    labels: ($pr.labels | map({name: .name}))
+    labels: ($pr.labels | map({name: .name})),
+    # mergeable (H-CI-DISPATCH): normalise the REST fields "mergeable"
+    # (bool|null) and "mergeable_state" (string|null, e.g. dirty/clean/
+    # unstable/blocked/behind) into the SAME three-value vocabulary that
+    # "gh --json mergeable" already returns natively (MERGEABLE/CONFLICTING/
+    # UNKNOWN), so the caller CONFLICTING check is backend-agnostic.
+    # "dirty" is the explicit GitHub merge-conflict signal -- checked first,
+    # since mergeable_state carries the conflict detail the bare boolean
+    # does not. Both fields can also be null for a short window right after
+    # PR creation/push while GitHub computes them; that reads UNKNOWN here,
+    # not MERGEABLE -- it genuinely is not known yet. (No apostrophes in
+    # this comment block, deliberately: it lives inside a single-quoted jq
+    # program in sh.)
+    mergeable: (
+      if $pr.mergeable_state == "dirty" then "CONFLICTING"
+      elif $pr.mergeable == true then "MERGEABLE"
+      else "UNKNOWN" end)
   }'
 }
 _pr_checks_curl() {
@@ -861,6 +896,11 @@ for n in $PRS; do
   # cross-agent-review.md: the two Codex labels (advisory hint / soft gate).
   codex_requested=$(printf '%s' "$meta" | jq -r '[.labels[].name] | index("review/codex-requested") // empty')
   codex_required=$(printf '%s' "$meta" | jq -r '[.labels[].name] | index("review/codex-required") // empty')
+  # H-CI-DISPATCH: read from the SAME meta payload already fetched above (no
+  # extra network call) so the ci=none diagnostic below can name a conflicted
+  # PR as the likely cause. See the `mergeable` comments on `_pr_meta_gh` /
+  # `_pr_meta_curl` for the shared MERGEABLE/CONFLICTING/UNKNOWN vocabulary.
+  mergeable=$(printf '%s' "$meta" | jq -r '.mergeable // "UNKNOWN"')
 
   # CI: pending anywhere beats fail beats pass -- never merge on non-pass.
   checks=$(_pr_checks_summary "$n" "$tip")
@@ -900,6 +940,23 @@ for n in $PRS; do
   case "$ci:$struct:$behav" in
     FAIL:*)          action="fix CI -- do not merge" ;;
     pending:*)       action="wait for CI" ;;
+    # H-CI-DISPATCH (dev/status/harness.md, PR #2113 live case): zero
+    # check-runs at all is NOT "nothing to report, fall through to the
+    # generic struct=none dispatch arm below" -- without this arm, `none:*`
+    # falls through to `*:none:*` and dispatches qc-structural against a PR
+    # that never got CI in the first place, which is worse than dispatching
+    # against a FAILING CI (pr-gate-loop.md: "never dispatch QC against red
+    # CI" -- zero runs is a stronger violation of that rule than red, since
+    # there is no CI signal whatsoever, not even a bad one). Name the likely
+    # cause when it's cheap to do so: a CONFLICTING mergeable state (read
+    # from the meta payload already fetched, no extra call) is the most
+    # common reason GitHub never creates a check-suite for a tip at all.
+    none:*)
+      case "$mergeable" in
+        CONFLICTING) action="no CI -- PR has merge conflicts (mergeable=CONFLICTING); resolve conflicts to retrigger CI" ;;
+        *)           action="no CI -- check mergeable (conflicted PR?) or push to retrigger" ;;
+      esac
+      ;;
     # Results-only lane (struct=skip): the BEHAV column carries the qc-results
     # verdict, so name that agent in every action, never qc-behavioral.
     *:skip:rework)   action="rework (results findings)" ;;
