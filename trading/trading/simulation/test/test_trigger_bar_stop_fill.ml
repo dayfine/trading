@@ -18,10 +18,10 @@ let _ok_exn ~msg = function
   | Ok v -> v
   | Error err -> assert_failure (msg ^ ": " ^ Status.show err)
 
-let _market_order ~id ~side =
+let _market_order ?(symbol = "AAPL") ~id ~side () =
   Trading_orders.Create_order.create_order ~id
     {
-      symbol = "AAPL";
+      symbol;
       side;
       order_type = Trading_base.Types.Market;
       quantity = 10.0;
@@ -29,11 +29,11 @@ let _market_order ~id ~side =
     }
   |> _ok_exn ~msg:"create_order"
 
-let _bar ~open_price ~low =
+let _bar ?(symbol = "AAPL") ?(high = 100.5) ~open_price ~low () =
   {
-    Trading_engine.Types.symbol = "AAPL";
+    Trading_engine.Types.symbol;
     open_price;
-    high_price = 100.5;
+    high_price = high;
     low_price = low;
     close_price = 99.0;
   }
@@ -50,12 +50,13 @@ let _stop_loss =
     { stop_price = _stop; actual_price = 95.0; loss_percent = 0.0 }
 
 let _select ?(enabled = true) ?(exit_reason = _stop_loss)
-    ?(today_bars = [ _bar ~open_price:100.0 ~low:95.0 ]) () =
+    ?(side = Trading_base.Types.Sell)
+    ?(today_bars = [ _bar ~open_price:100.0 ~low:95.0 () ]) () =
   Stop_fill.select ~enabled
     ~transitions:[ _exit_transition exit_reason ]
     ~order_links:[ ("O1", "P1") ]
     ~today_bars
-    [ _market_order ~id:"O1" ~side:Sell ]
+    [ _market_order ~id:"O1" ~side () ]
 
 let _order_types (orders : Trading_orders.Types.order list) =
   List.map orders ~f:(fun o -> o.order_type)
@@ -95,7 +96,8 @@ let test_non_stop_loss_exit_stays_market _ =
    sell-stop, so the exit keeps the next-open Market order. *)
 let test_bar_not_reaching_the_stop_stays_market _ =
   assert_that
-    (_split_types (_select ~today_bars:[ _bar ~open_price:100.0 ~low:97.0 ] ()))
+    (_split_types
+       (_select ~today_bars:[ _bar ~open_price:100.0 ~low:97.0 () ] ()))
     (equal_to
        (([], [ Market ])
          : Trading_base.Types.order_type list
@@ -110,8 +112,50 @@ let test_no_fresh_bar_stays_market _ =
          : Trading_base.Types.order_type list
            * Trading_base.Types.order_type list))
 
-(* Engine + manager holding [bar] as the current market, zero costs. *)
-let _engine_and_manager bar =
+(* A short's exit is a Buy: it converts when the bar's HIGH trades up to the
+   stop (high 100.5 >= 96). *)
+let test_buy_exit_whose_high_reaches_the_stop_converts _ =
+  assert_that
+    (_split_types (_select ~side:Trading_base.Types.Buy ()))
+    (equal_to
+       (([ Stop _stop ], [])
+         : Trading_base.Types.order_type list
+           * Trading_base.Types.order_type list))
+
+(* A Buy exit whose bar never trades up to the stop (high 95.5 < 96) keeps the
+   next-open Market order, even though the low is below the stop. *)
+let test_buy_exit_whose_high_stays_below_the_stop_stays_market _ =
+  assert_that
+    (_split_types
+       (_select ~side:Trading_base.Types.Buy
+          ~today_bars:[ _bar ~high:95.5 ~open_price:95.0 ~low:94.0 () ]
+          ()))
+    (equal_to
+       (([], [ Market ])
+         : Trading_base.Types.order_type list
+           * Trading_base.Types.order_type list))
+
+(* The gate on [trigger_on_weekly_close]: only (flag on, intraday trigger)
+   arms same-bar fills. A close-decided stop must not fill intraday. *)
+let test_enabled_only_when_flag_on_and_trigger_intraday _ =
+  let row flag trigger_on_weekly_close =
+    ( flag,
+      trigger_on_weekly_close,
+      Stop_fill.enabled ~flag ~trigger_on_weekly_close )
+  in
+  assert_that
+    [ row true false; row true true; row false false; row false true ]
+    (equal_to
+       ([
+          (true, false, true);
+          (true, true, false);
+          (false, false, false);
+          (false, true, false);
+        ]
+         : (bool * bool * bool) list))
+
+(* Engine + manager holding [bars] as the current market, zero costs. *)
+let _engine_and_manager bars =
   let engine =
     Trading_engine.Engine.create
       {
@@ -119,16 +163,16 @@ let _engine_and_manager bar =
         slippage_bps = 0;
       }
   in
-  Trading_engine.Engine.update_market engine [ bar ];
+  Trading_engine.Engine.update_market engine bars;
   (engine, Trading_orders.Manager.create ())
 
 let _stop_order () =
-  { (_market_order ~id:"O1" ~side:Sell) with order_type = Stop _stop }
+  { (_market_order ~id:"O1" ~side:Sell ()) with order_type = Stop _stop }
 
 (* A gap through the stop fills at the bar's open, dated [date]. *)
 let test_execute_fills_a_gap_at_the_open _ =
   let engine, order_manager =
-    _engine_and_manager (_bar ~open_price:94.0 ~low:93.0)
+    _engine_and_manager [ _bar ~open_price:94.0 ~low:93.0 () ]
   in
   assert_that
     (Stop_fill.execute ~engine ~order_manager ~date:_date [ _stop_order () ])
@@ -152,7 +196,7 @@ let test_execute_fills_a_gap_at_the_open _ =
    with the flag off. *)
 let test_execute_reverts_an_unfilled_order_to_market _ =
   let engine, order_manager =
-    _engine_and_manager (_bar ~open_price:100.0 ~low:97.0)
+    _engine_and_manager [ _bar ~open_price:100.0 ~low:97.0 () ]
   in
   let trades =
     Stop_fill.execute ~engine ~order_manager ~date:_date [ _stop_order () ]
@@ -177,11 +221,50 @@ let test_execute_reverts_an_unfilled_order_to_market _ =
 
 let test_execute_empty_is_a_no_op _ =
   let engine, order_manager =
-    _engine_and_manager (_bar ~open_price:100.0 ~low:95.0)
+    _engine_and_manager [ _bar ~open_price:100.0 ~low:95.0 () ]
   in
   assert_that
     (Stop_fill.execute ~engine ~order_manager ~date:_date [])
     (is_ok_and_holds (size_is 0))
+
+(* The stop pass fills ONLY the converted orders. An unrelated order already
+   pending in the manager (here a Market order on another symbol with a fresh
+   bar, which any unrestricted engine pass would fill) must stay Pending. *)
+let test_execute_leaves_other_pending_orders_alone _ =
+  let engine, order_manager =
+    _engine_and_manager
+      [
+        _bar ~open_price:94.0 ~low:93.0 ();
+        _bar ~symbol:"MSFT" ~open_price:50.0 ~low:49.0 ();
+      ]
+  in
+  let other =
+    _market_order ~symbol:"MSFT" ~id:"O2" ~side:Trading_base.Types.Buy ()
+  in
+  Trading_orders.Manager.submit_orders order_manager [ other ]
+  |> Status.combine_status_list
+  |> _ok_exn ~msg:"submit unrelated order";
+  let trades =
+    Stop_fill.execute ~engine ~order_manager ~date:_date [ _stop_order () ]
+  in
+  assert_that
+    (trades, Trading_orders.Manager.get_order order_manager "O2")
+    (all_of
+       [
+         field fst
+           (is_ok_and_holds
+              (elements_are
+                 [
+                   field
+                     (fun (t : Trading_base.Types.trade) -> t.order_id)
+                     (equal_to "O1");
+                 ]));
+         field snd
+           (is_ok_and_holds
+              (field
+                 (fun (o : Trading_orders.Types.order) -> o.status)
+                 (equal_to (Pending : Trading_orders.Types.order_status))));
+       ])
 
 let suite =
   "trigger_bar_stop_fill"
@@ -194,6 +277,14 @@ let suite =
          "a bar not reaching the stop stays Market"
          >:: test_bar_not_reaching_the_stop_stays_market;
          "no fresh bar stays Market" >:: test_no_fresh_bar_stays_market;
+         "a Buy exit whose high reaches the stop converts"
+         >:: test_buy_exit_whose_high_reaches_the_stop_converts;
+         "a Buy exit whose high stays below the stop stays Market"
+         >:: test_buy_exit_whose_high_stays_below_the_stop_stays_market;
+         "enabled only when flag on and trigger intraday"
+         >:: test_enabled_only_when_flag_on_and_trigger_intraday;
+         "execute leaves other pending orders alone"
+         >:: test_execute_leaves_other_pending_orders_alone;
          "execute fills a gap at the open"
          >:: test_execute_fills_a_gap_at_the_open;
          "execute reverts an unfilled order to Market"

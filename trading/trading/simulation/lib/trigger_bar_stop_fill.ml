@@ -35,6 +35,8 @@ let _index_bars today_bars =
     ~f:(fun acc (b : Trading_engine.Types.price_bar) ->
       Map.set acc ~key:b.symbol ~data:b)
 
+let enabled ~flag ~trigger_on_weekly_close = flag && not trigger_on_weekly_close
+
 let select ~enabled ~transitions ~order_links ~today_bars orders =
   let stop_prices =
     if enabled then _stop_prices transitions else String.Map.empty
