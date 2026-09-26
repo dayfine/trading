@@ -1283,3 +1283,17 @@
  (deps _check_lib.sh scenario_runner_flag_drift.sh (universe))
  (action
   (run sh %{dep:scenario_runner_flag_drift_test.sh})))
+
+; Pin dev/scripts/perf_long_cells.sh (the local long-cell runtime ledger) over a
+; one-chain fixture: row shape, <no result> skip, missing-spec rows, dedupe,
+; and the >20 % per-simulated-year regression check. The script is resolved via
+; repo_root() at RUN TIME, so (universe) forces the re-run.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (source_tree fixtures/perf_long_cells)
+  (universe))
+ (action
+  (run sh %{dep:perf_long_cells_test.sh})))
