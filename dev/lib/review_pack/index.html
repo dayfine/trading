@@ -1,0 +1,709 @@
+<title>26-Year Record Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root {
+  --bg: #f3f5f8; --panel: #ffffff; --panel2: #eef1f5; --ink: #16202c; --muted: #5b6776; --line: #dbe1e8;
+  --accent: #a86a12; --accent-soft: #f6e7cf; --pos: #1d7f47; --neg: #b8352a; --pos-soft: #dcefe3; --neg-soft: #f6dedb;
+  --s1: #2f5fd0; --s2: #1f9a52; --s3: #d98e12; --s4: #cf3a2c; --neut: #8e99a7; --spy: #6d7a8a;
+  --shadow: 0 1px 2px rgba(22,32,44,.06), 0 4px 16px rgba(22,32,44,.05);
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-head: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e1319; --panel: #151c24; --panel2: #1b242e; --ink: #e5eaf0; --muted: #93a0ae; --line: #27313c;
+    --accent: #e3a44b; --accent-soft: #3a2c16; --pos: #43bf78; --neg: #f06a5b; --pos-soft: #16301f; --neg-soft: #3a1c19;
+    --s1: #6b93f0; --s2: #3fbf73; --s3: #f0ac3c; --s4: #f06a5b; --neut: #7b8795; --spy: #8e9bab;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1319; --panel: #151c24; --panel2: #1b242e; --ink: #e5eaf0; --muted: #93a0ae; --line: #27313c;
+  --accent: #e3a44b; --accent-soft: #3a2c16; --pos: #43bf78; --neg: #f06a5b; --pos-soft: #16301f; --neg-soft: #3a1c19;
+  --s1: #6b93f0; --s2: #3fbf73; --s3: #f0ac3c; --s4: #f06a5b; --neut: #7b8795; --spy: #8e9bab;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--f-body); }
+.wrap { max-width: 1320px; margin: 0 auto; padding-inline: 20px; padding-block: 0 48px; }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top-inner { max-width: 1320px; margin: 0 auto; padding-inline: 20px; padding-block: 12px 0; display: grid; gap: 8px; }
+.titlerow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+h1 { font: 600 22px/1.2 var(--f-head); margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 13px; }
+.sub code { font: 12px var(--f-mono); }
+nav.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+nav.tabs button { font: 500 13px var(--f-body); color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, tr:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+section.view { display: grid; gap: 20px; padding-top: 20px; }
+h2 { font: 600 17px/1.3 var(--f-head); margin: 0; letter-spacing: .01em; }
+h3 { font: 600 14px/1.3 var(--f-head); margin: 0; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; box-shadow: var(--shadow); display: grid; gap: 12px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 20px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.kpi { background: var(--panel); padding: 12px 14px; display: grid; gap: 2px; }
+.kpi .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.kpi .v { font: 500 20px/1.2 var(--f-mono); font-variant-numeric: tabular-nums; }
+.kpi .n { font-size: 12px; color: var(--muted); }
+.pos { color: var(--pos); } .neg { color: var(--neg); } .mut { color: var(--muted); }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.tablebox { overflow: auto; max-height: 640px; border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+thead th { position: sticky; top: 0; background: var(--panel2); font-weight: 600; font-size: 11.5px; color: var(--muted); cursor: pointer; user-select: none; z-index: 1; }
+thead th.sorted { color: var(--ink); }
+tbody tr:hover { background: var(--panel2); }
+tbody tr.sel { background: var(--accent-soft); }
+tbody tr.click { cursor: pointer; }
+.pill { display: inline-block; font: 500 11px/1.6 var(--f-body); padding: 0 7px; border-radius: 999px; background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
+.pill.exec { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.pill.book { color: var(--s1); border-color: var(--s1); }
+.pill.outcome { color: var(--neg); border-color: var(--neg); background: var(--neg-soft); }
+.g { display: inline-block; min-width: 22px; text-align: center; font: 600 11px/1.7 var(--f-mono); border-radius: 3px; }
+.gA { background: var(--pos-soft); color: var(--pos); } .gB { background: var(--panel2); color: var(--pos); }
+.gC { background: var(--panel2); color: var(--muted); } .gD { background: var(--neg-soft); color: var(--neg); }
+.gF, .gX { background: var(--neg); color: var(--panel); }
+.stg { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+select, input[type="search"] { font: 13px var(--f-body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; }
+button.btn { font: 500 12.5px var(--f-body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button.btn[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.chart { width: 100%; height: 340px; }
+.chart.sm { height: 150px; } .chart.xs { height: 44px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.trades-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .trades-layout { grid-template-columns: 1fr; } }
+.detail { position: sticky; top: 110px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 16px; font-size: 12.5px; }
+.facts div { display: grid; }
+.facts b { font-weight: 500; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.facts span { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.flaglist { display: flex; flex-wrap: wrap; gap: 6px; }
+.note { font-size: 13px; color: var(--muted); max-width: 72ch; }
+.note b { color: var(--ink); font-weight: 600; }
+ul.findings { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 90ch; }
+ul.findings li::marker { color: var(--accent); }
+.flagcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+.flagcard { border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: grid; gap: 6px; background: var(--panel); cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.flagcard:hover { border-color: var(--accent); }
+.flagcard .cnt { font: 500 18px var(--f-mono); }
+.flagcard p { margin: 0; font-size: 12.5px; color: var(--muted); }
+.bars svg { width: 100%; height: auto; display: block; }
+.spec { font: 11.5px/1.5 var(--f-mono); color: var(--muted); white-space: pre-wrap; margin: 0; }
+details summary { cursor: pointer; }
+.heat { font-family: var(--f-mono); text-align: right; }
+.empty { color: var(--muted); font-size: 13px; padding: 24px; text-align: center; }
+ol.agenda { margin: 0; padding-left: 20px; display: grid; gap: 10px; max-width: 90ch; }
+ol.agenda li b { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+@media (max-width: 560px) { .wrap, .top-inner { padding-inline: 16px; } .chart { height: 280px; } }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="titlerow">
+      <h1 id="title">Backtest Review</h1>
+      <span class="sub"><span id="subtitle"></span> · run <code id="codever"></code></span>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-v="overview" aria-selected="true">Overview</button>
+      <button role="tab" data-v="periods">Year &amp; quarter</button>
+      <button role="tab" data-v="trades">Trades</button>
+      <button role="tab" data-v="hilo">Highlights &amp; lowlights</button>
+      <button role="tab" data-v="surprises">Surprises</button>
+      <button role="tab" data-v="diag">Diagnostics</button>
+      <button role="tab" data-v="salts">Salts</button>
+      <button role="tab" data-v="agenda">Review agenda</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section class="view" id="v-overview">
+  <div class="kpis" id="kpis"></div>
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <h2>Equity vs SPY (log scale, both start at $1M)</h2>
+      <div class="legend"><span><i style="background:var(--accent)"></i>Strategy NAV</span><span><i style="background:var(--spy)"></i>SPY total return</span></div>
+    </div>
+    <div class="chart" id="c-eq"></div>
+    <div class="row" style="justify-content:space-between">
+      <h3>Drawdown from peak and exposure</h3>
+      <div class="legend"><span><i style="background:var(--neg)"></i>Drawdown %</span><span><i style="background:var(--s1)"></i>Invested, % of NAV (marked daily)</span></div>
+    </div>
+    <div class="chart sm" id="c-dd"></div>
+    <div class="row" style="justify-content:space-between">
+      <h3>Macro gate, weekly</h3>
+      <div class="legend"><span><i style="background:var(--s2)"></i>Bullish</span><span><i style="background:var(--neut)"></i>Neutral</span><span><i style="background:var(--s4)"></i>Bearish</span></div>
+    </div>
+    <div class="chart xs" id="c-macro"></div>
+  </div>
+  <div class="panel">
+    <h2>What stands out</h2>
+    <ul class="findings" id="findings"></ul>
+  </div>
+</section>
+
+<section class="view" id="v-periods" hidden>
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <h2 id="p-title">Returns by year vs SPY</h2>
+      <div class="row">
+        <label for="p-salt" class="sub">Salt</label>
+        <select id="p-salt"></select>
+        <button class="btn" id="p-y" aria-pressed="true">Yearly</button>
+        <button class="btn" id="p-q" aria-pressed="false">Quarterly</button>
+      </div>
+    </div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Strategy</span><span><i style="background:var(--spy)"></i>SPY</span><span>Bar under axis = period return below zero</span></div>
+    <div class="bars" id="p-bars"></div>
+  </div>
+  <div class="panel">
+    <p class="note">Return and drawdown are marked to market from the daily NAV. <b>Realised P&amp;L</b> counts only trades closed in the period, so it can disagree in sign with the return. <b>Invested</b> is the average of held positions marked at the adjusted close, as % of NAV; the run caps long exposure at 70% and keeps 30% cash. <b>DD from peak</b> is the deepest point below the all-time high reached during the period. Macro columns count weekly gate readings.</p>
+    <div class="tablebox"><table id="p-table"></table></div>
+  </div>
+</section>
+
+<section class="view" id="v-trades" hidden>
+  <div class="panel">
+    <div class="row">
+      <select id="t-salt" aria-label="Salt"></select>
+      <input type="search" id="t-q" placeholder="Symbol" aria-label="Filter by symbol" size="10">
+      <select id="t-year" aria-label="Entry year"></select>
+      <select id="t-trig" aria-label="Exit trigger"></select>
+      <select id="t-grade" aria-label="Grade"><option value="">All grades</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option><option>X</option></select>
+      <select id="t-flag" aria-label="Flag"></select>
+      <select id="t-out" aria-label="Outcome"><option value="">Winners and losers</option><option value="w">Winners</option><option value="l">Losers</option></select>
+      <span class="sub" id="t-count"></span>
+    </div>
+  </div>
+  <div class="trades-layout">
+    <div class="tablebox" style="max-height:760px"><table id="t-table"></table></div>
+    <div class="panel detail" id="t-detail"><div class="empty">Pick a trade to see its chart, grade and flags.</div></div>
+  </div>
+</section>
+
+<section class="view" id="v-hilo" hidden>
+  <div class="grid2" id="hilo"></div>
+</section>
+
+<section class="view" id="v-surprises" hidden>
+  <div class="panel">
+    <h2 id="flags-title">Per-trade flags</h2>
+    <p class="note">Each card counts the trades that trip one check and the net P&amp;L of those trades. <b>Execution</b> checks compare fills with the day's actual bar. <b>Book</b> checks compare the trade with Weinstein's rules (the spine in <code>weinstein-faithful-core.md</code>). <b>Outcome</b> checks use the post-exit price path. Click a card to list its trades.</p>
+    <div class="flagcards" id="flagcards"></div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <h2>Weinstein conformance (trade audit report)</h2>
+      <p class="note">Rules are checked over every entry decision, including orders that never filled, so the denominators exceed the 732 trades.</p>
+      <div class="tablebox"><table id="conf"></table></div>
+    </div>
+    <div class="panel">
+      <h2>Post-run validator</h2>
+      <p class="note">The validator stores at most 10 examples per check. The per-trade flags on this page are computed from the price data, so they list every trade.</p>
+      <div id="validator"></div>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="v-diag" hidden>
+  <div class="panel">
+    <h2>Flat stretches: a year or more below the previous high</h2>
+    <p class="note">Each row runs from a NAV high to the day NAV first exceeds it again (or to the end of the run). SPY is its total return over the same dates, so the excess is how far ahead of or behind the index the stretch left us.</p>
+    <div class="tablebox"><table id="d-flat"></table></div>
+  </div>
+  <div class="panel">
+    <h2>Were the picks bad, or the exits? By entry year</h2>
+    <p class="note"><b>Pick, 8 wk</b> is the stock’s own return from the entry fill to the close 40 trading days later, whatever our stop did; <b>SPY, 8 wk</b> is the index over the same days. A pick year near SPY with a low win rate and many D/F grades lost on exits, not on selection. Medians, so one monster does not dominate.</p>
+    <div class="tablebox"><table id="d-picks"></table></div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <h2>Loss cutting: a hard stop at X% below entry</h2>
+      <p class="note">Replays each trade on its daily bars from the day after entry to the day before the actual exit. If the low reaches entry × (1 − X), the trade exits there (or at the open, if it opened below). Otherwise the actual result stands. Static: freed cash is not redeployed, and nothing can hold longer than it did.</p>
+      <div class="tablebox"><table id="d-cut"></table></div>
+    </div>
+    <div class="panel">
+      <h2>When do stop exits fill?</h2>
+      <p class="note">Stop exits with no stop raise: trading days from the first bar whose low reached the initial stop to the exit fill. The book’s stop is a resting order that fills the day the level trades (<code>weinstein-book-reference.md</code> §5.7). <b>At stop</b> is what an intraday fill would have realised: the stop, or that day’s open if it opened below.</p>
+      <div id="d-lag"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Can D/F trades be avoided at entry?</h2>
+    <p class="note">The grade is hindsight: it uses the trade’s own result and the 65 trading days after the exit. The question is whether anything known on entry day predicts it. Each row is a cohort by an entry-time field; a useful filter needs a D/F rate well off the overall rate on a cohort with real net P&amp;L at stake.</p>
+    <div class="grid2" id="d-df"></div>
+  </div>
+</section>
+
+<section class="view" id="v-salts" hidden>
+  <div class="panel">
+    <h2>Same rules, every salt</h2>
+    <p class="note">The salt picks which intraday path each daily bar is assumed to take (high first or low first; <code>Bar_shape.seed_for_bar</code>). That moves fills and stop triggers by cents or a day, which changes cash, which changes which queued candidates get funded. The macro trace and the candidate lists are the same.</p>
+    <div class="chart" id="c-salts"></div>
+    <div class="legend" id="salt-legend"></div>
+  </div>
+  <div class="grid2">
+    <div class="panel"><h2>Yearly return by salt</h2><div class="tablebox"><table id="s-years"></table></div></div>
+    <div class="panel"><h2>Trade overlap</h2><div id="s-overlap"></div></div>
+  </div>
+</section>
+
+<section class="view" id="v-agenda" hidden>
+  <div class="panel">
+    <h2>Suggested order for the review</h2>
+    <ol class="agenda" id="agenda"></ol>
+  </div>
+  <div class="panel">
+    <h2>How the grades and flags are computed</h2>
+    <div class="note" style="display:grid;gap:8px">
+      <p style="margin:0"><b>Grade (A–F, performance).</b> Taken from the 2026-09-04 yearly review rubric (<code>dev/experiments/yearly-trade-review-2026-09-04/grade.sh</code>), using the 65 trading days after the exit. A: gain ≥ 20%, or any gain with the stock no more than 10% higher afterwards. B: gain under 20%, or a loss where the stock fell another 5% after the exit. C: loss with no big move afterwards. D: loss, then the stock rose ≥ 15%. F: loss, then it rose ≥ 50%. X: exit price under 5% of entry (a delisting stub). A trailing “?” means no bars after the exit.</p>
+      <p style="margin:0"><b>Audit grade.</b> The trade audit report's own grade scores the entry setup (stage, RS, volume). Nearly every trade scores A+, so it does not separate good trades from bad ones.</p>
+      <p style="margin:0"><b>Stage replay.</b> Weekly stages on the charts and the Stage-4 checks come from <code>stage_chart</code> with the default classifier on adjusted closes. That can differ from the strategy's own reading on a given week.</p>
+      <p style="margin:0"><b>Prices.</b> Charts use split-adjusted prices; fill and stop levels are rescaled by each bar's adjusted/raw ratio so they sit on the same scale. Execution checks use the raw bar, with half a percent of slack for rounding; a fill that sits a simple split ratio (2:1, 3:2, 4:3 …) away from the raw bar is on a later split basis, not off the bar, and is not flagged.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const el = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (html) e.innerHTML = html; return e; };
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, d = 1) => v == null || isNaN(v) ? '–' : Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (v, d = 1) => v == null || isNaN(v) ? '–' : (v > 0 ? '+' : '') + fmt(v, d) + '%';
+const usd = v => v == null || isNaN(v) ? '–' : (v < 0 ? '−$' : '$') + Math.abs(Math.round(v)).toLocaleString('en-US');
+const usdk = v => v == null || isNaN(v) ? '–' : (v < 0 ? '−$' : '$') + (Math.abs(v) >= 1e6 ? fmt(Math.abs(v) / 1e6, 2) + 'M' : fmt(Math.abs(v) / 1e3, 0) + 'k');
+const sgn = v => v > 0 ? 'pos' : v < 0 ? 'neg' : 'mut';
+const stageColor = s => ({ Stage1: css('--s1'), Stage2: css('--s2'), Stage3: css('--s3'), Stage4: css('--s4') })[s] || css('--neut');
+const macroColor = m => m === 'Bullish' ? css('--s2') : m === 'Bearish' ? css('--s4') : css('--neut');
+const gradeTag = g => g ? `<span class="g g${g[0]}">${g}</span>` : '–';
+const trigLabel = t => ({ stop_loss: 'stop', laggard_rotation: 'laggard rotation', extension_stop: 'extension stop', stage3_force_exit: 'stage 3 exit', force_liquidation: 'force liquidation', liquidity_exit: 'liquidity exit', delisted: 'delisted' })[t] || t;
+
+const FLAGS = [
+  { id: 'weekend', cat: 'exec', label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || t.onX === 0,
+    why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect).' },
+  { id: 'offbar', cat: 'exec', label: 'Fill outside the day’s high–low', test: t => (t.onE === 1 && t.inE === 0) || (t.onX === 1 && t.inX === 0),
+    why: 'The fill price never traded that day (half a percent of slack for rounding; fills on a later split basis are excluded). The validator’s V13 counts the same thing.' },
+  { id: 'gapstop', cat: 'exec', label: 'Stop filled ≥ 3 pts beyond the stop', test: t => t.trig === 'stop_loss' && t.kind === 'gap_down' && t.pct < -(t.sid * 100) - 3,
+    why: 'Opened below the stop, so the loss is larger than the risk planned at entry.' },
+  { id: 'latestop', cat: 'exec', label: 'Stop traded intraday, sold at a later open', test: t => t.trig === 'stop_loss' && t.blag >= 1,
+    why: 'The low reached the initial stop on an earlier day than the exit fill. Exits are market orders sent after the close, so they fill at the next open; the book’s stop is a resting order that fills when the level trades (reference §5.7).' },
+  { id: 'slipcap', cat: 'exec', label: 'Entry filled 2% above the trigger', test: t => t.fvt != null && t.fvt >= 1.99,
+    why: 'The entry order’s limit sits 2% above the trigger. These fills paid the whole allowance.' },
+  { id: 'quickstop', cat: 'exec', label: 'Stopped out within 2 days', test: t => t.trig === 'stop_loss' && t.days <= 2,
+    why: 'Stop hit on or right after the entry bar. With a 4% stop this is often ordinary noise.' },
+  { id: 'chase', cat: 'exec', label: 'Bought ≥ 8% above the prior close', test: t => t.gap >= 8,
+    why: 'Entry after a gap or spike, not near the breakout level. The validator’s V10 flags entry weeks up more than 60%.' },
+  { id: 'forced', cat: 'exec', label: 'Forced, liquidity or delisting exit', test: t => ['force_liquidation', 'delisted', 'liquidity_exit'].includes(t.trig),
+    why: 'Exit not chosen by the strategy’s rules.' },
+  { id: 'macro', cat: 'book', label: 'Macro not Bullish at entry', test: t => t.mE && t.mE !== 'Bullish',
+    why: 'Book Ch. 3/8: weight buying to a bullish market. The run allows Neutral-market buys (audit R8).' },
+  { id: 'macrobear', cat: 'book', label: 'Bought in a Bearish macro week', test: t => t.mE === 'Bearish',
+    why: 'A bearish tape should block all new buys (spine rule 6).' },
+  { id: 'lowvol', cat: 'book', label: 'Breakout volume under 2× average', test: t => t.vr < 2,
+    why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3).' },
+  { id: 'fallback', cat: 'book', label: '4% fallback stop, not below the base', test: t => Math.abs(t.sid - 0.04) < 1e-9,
+    why: 'Book Ch. 6: the initial stop goes under the base or the MA (spine rule 5). A flat 4% means no structural level was used.' },
+  { id: 'widestop', cat: 'book', label: 'Initial stop wider than 15%', test: t => t.sid > 0.15,
+    why: 'Structural stop far from the entry; the validator’s V12 gate is 15%.' },
+  { id: 'stage4', cat: 'book', label: 'Held ≥ 2 weeks in Stage 4 (replay)', test: t => (t.s4w || 0) >= 2,
+    why: 'Book Ch. 2/6: never ride a Stage 4 decline (spine rule 4).' },
+  { id: 'notS2', cat: 'book', label: 'Replay stage at entry is not Stage 2', test: t => t.rsE && t.rsE !== 'Stage2',
+    why: 'The chart classifier disagrees with the strategy’s Stage 2 call on the entry week.' },
+  { id: 'whipsaw', cat: 'outcome', label: 'Loss, then the stock ran ≥ 15%', test: t => /^[DF]/.test(t.g || ''),
+    why: 'Grade D or F: stopped out, then the stock rose at least 15% within 13 weeks.' },
+  { id: 'giveback', cat: 'outcome', label: 'Gave back over half of a ≥ 20% gain', test: t => t.mfe >= 20 && t.pct < t.mfe * 0.5,
+    why: 'Peak open gain at least 20%, exit under half of it.' },
+];
+const FLAG = Object.fromEntries(FLAGS.map(f => [f.id, f]));
+
+const D = {};
+const load = p => fetch('data/' + p).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); });
+const chartCache = {};
+
+const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav'];
+load('manifest.json').then(man => {
+  D.man = man; const ids = man.runs.map(r => r.id);
+  return Promise.all([...KINDS.flatMap(k => ids.map(id => load(`${id}_${k}.json`))), load('spy.json'), load('macro.json')]);
+}).then(r => {
+  const n = D.man.runs.length;
+  KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
+  D.spy = r[KINDS.length * n]; D.macro = r[KINDS.length * n + 1];
+  D.trades.forEach(ts => ts.forEach(t => { t.flags = FLAGS.filter(f => f.test(t)).map(f => f.id); t.yr = t.ed.slice(0, 4); }));
+  init();
+}).catch(e => { $('main').innerHTML = `<div class="empty">Could not load the data files (${e.message}).</div>`; });
+
+const runLabel = i => D.man.runs[i].label || D.man.runs[i].id;
+const CH = () => D.man.charts_run || 0;
+function init() {
+  $('#title').textContent = D.man.title; document.title = D.man.title; $('#subtitle').textContent = D.man.subtitle || '';
+  $('#codever').textContent = (D.meta[CH()].code_version || '').slice(0, 9);
+  const opts = (note) => D.man.runs.map((r, i) => `<option value="${i}">${runLabel(i)} (${pct(D.meta[i].metrics.totalreturnpct, 0)})${note && i !== CH() ? ' · no charts' : ''}</option>`).join('');
+  $('#p-salt').innerHTML = opts(false); $('#t-salt').innerHTML = opts(true); $('#t-salt').value = String(CH());
+  $('#flags-title').textContent = `Per-trade flags, ${runLabel(CH())}`;
+  renderOverview(); renderPeriods(); initTrades(); renderHilo(); renderSurprises(); renderDiag(); renderSalts(); renderAgenda();
+  $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
+  const h = location.hash.slice(1); if (h && $('#v-' + h)) show(h);
+}
+function show(v) {
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.v === v));
+  document.querySelectorAll('section.view').forEach(s => s.hidden = s.id !== 'v-' + v);
+  (resizers[v] || []).forEach(f => f());
+}
+const resizers = {};
+const chartOpts = (h) => ({
+  height: h, layout: { background: { color: 'transparent' }, textColor: css('--muted'), fontFamily: 'IBM Plex Mono, monospace', fontSize: 11 },
+  grid: { vertLines: { color: css('--line') }, horzLines: { color: css('--line') } },
+  rightPriceScale: { borderColor: css('--line') }, timeScale: { borderColor: css('--line') }, crosshair: { mode: 0 },
+  handleScroll: true, handleScale: true,
+});
+function mkChart(id, h, v) {
+  const box = $(id); const c = LightweightCharts.createChart(box, { ...chartOpts(h), width: box.clientWidth || 800 });
+  new ResizeObserver(() => { if (box.clientWidth) c.applyOptions({ width: box.clientWidth }); }).observe(box);
+  (resizers[v] = resizers[v] || []).push(() => { if (box.clientWidth) c.applyOptions({ width: box.clientWidth }); c.timeScale().fitContent(); });
+  return c;
+}
+
+/* ---------- Overview ---------- */
+function spyOnNavDates(nav) {
+  const m = new Map(D.spy); let last = null; const first = D.spy.find(([d]) => d >= nav[0][0]) || D.spy[0];
+  const base = +first[1]; return nav.map(([d]) => { if (m.has(d)) last = +m.get(d); return [d, 1e6 * (last ?? base) / base]; });
+}
+function renderOverview() {
+  const m = D.meta[CH()].metrics, nav = D.nav[CH()], trades = D.trades[CH()];
+  const spy = spyOnNavDates(nav); const spyRet = (spy[spy.length - 1][1] / 1e6 - 1) * 100;
+  const yrsBeat = D.years[CH()].filter(y => y.ret > y.spy).length;
+  const k = [
+    ['Total return', pct(m.totalreturnpct, 0), `SPY ${pct(spyRet, 0)} same window`],
+    ['CAGR', pct(m.cagr), 'annualised'],
+    ['Max drawdown', '−' + fmt(m.maxdrawdown) + '%', `Calmar ${fmt(m.calmarratio, 2)}`],
+    ['Sharpe', fmt(m.sharperatio, 2), `vol ${fmt(m.volatilitypctannualized)}%`],
+    ['Trades', String(trades.length), `${fmt(m.tradefrequencyannualized ?? m.tradefrequency, 1)} / yr`],
+    ['Win rate', fmt(m.winrate) + '%', `profit factor ${fmt(m.profitfactor, 2)}`],
+    ['Avg hold', fmt(m.avgholdingdays, 0) + ' d', `${m.openpositioncount} open at end`],
+    ['Years beating SPY', `${yrsBeat} / ${D.years[CH()].length}`, 'calendar years'],
+  ];
+  $('#kpis').innerHTML = k.map(([a, b, c]) => `<div class="kpi"><span class="k">${a}</span><span class="v">${b}</span><span class="n">${c}</span></div>`).join('');
+
+  const eq = mkChart('#c-eq', 340, 'overview');
+  eq.applyOptions({ rightPriceScale: { mode: 1 } });
+  eq.addLineSeries({ color: css('--spy'), lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false }).setData(spy.map(([d, v]) => ({ time: d, value: v })));
+  eq.addLineSeries({ color: css('--accent'), lineWidth: 2, priceLineVisible: false }).setData(nav.map(([d, v]) => ({ time: d, value: v })));
+  eq.timeScale().fitContent();
+
+  const dd = mkChart('#c-dd', 150, 'overview');
+  let pk = 0; const ddData = nav.map(([d, v]) => { pk = Math.max(pk, v); return { time: d, value: -100 * (1 - v / pk) }; });
+  dd.addAreaSeries({ lineColor: css('--neg'), topColor: 'rgba(0,0,0,0)', bottomColor: css('--neg') + '55', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, invertFilledArea: true }).setData(ddData);
+  const ex = dd.addLineSeries({ color: css('--s1'), lineWidth: 1, priceScaleId: 'left', priceLineVisible: false, lastValueVisible: false });
+  dd.applyOptions({ leftPriceScale: { visible: true, borderColor: css('--line') } });
+  ex.setData(weeklyAvg(nav.map(([d, , e]) => [d, e])).map(([d, v]) => ({ time: d, value: v })));
+  dd.timeScale().fitContent();
+
+  const mc = mkChart('#c-macro', 44, 'overview');
+  mc.applyOptions({ rightPriceScale: { visible: false }, timeScale: { visible: false }, grid: { vertLines: { visible: false }, horzLines: { visible: false } }, handleScroll: false, handleScale: false });
+  mc.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false, base: 0 }).setData(D.macro.map(([d, tr]) => ({ time: d, value: 1, color: macroColor(tr) })));
+  mc.timeScale().fitContent();
+  const sync = [eq, dd, mc]; let busy = false;
+  sync.forEach(c => c.timeScale().subscribeVisibleTimeRangeChange(r => { if (busy || !r) return; busy = true; sync.forEach(o => { if (o !== c) try { o.timeScale().setVisibleRange(r); } catch (e) {} }); busy = false; }));
+
+  const t = trades, fb = t.filter(x => x.flags.includes('fallback')), stops = t.filter(x => x.trig === 'stop_loss'), gap = stops.filter(x => x.kind === 'gap_down');
+  const wk = t.filter(x => x.flags.includes('weekend')); const ys = D.years[CH()];
+  const cum = (arr, k) => (arr.reduce((a, y) => a * (1 + y[k] / 100), 1) - 1) * 100;
+  let worst = null; for (let i = 0; i + 3 <= ys.length; i++) { const w = ys.slice(i, i + 3), ex = cum(w, 'ret') - cum(w, 'spy'); if (!worst || ex < worst.ex) worst = { w, ex }; }
+  const top10 = [...t].sort((a, b) => b.pnl - a.pnl).slice(0, 10), tot = t.reduce((a, x) => a + x.pnl, 0);
+  const aTr = t.filter(x => (x.g || '')[0] === 'A'), df = t.filter(x => /^[DF]/.test(x.g || '')), late = stops.filter(x => x.blag >= 1);
+  const expoAvg = ys.reduce((a, y) => a + y.expo, 0) / ys.length;
+  const inv = D.meta[CH()], rets = D.meta.map(m => m.metrics.totalreturnpct);
+  const f = [
+    worst && `<b>Worst three-year stretch: ${worst.w[0].p}–${worst.w[2].p}, ${pct(cum(worst.w, 'ret'), 1)} while SPY made ${pct(cum(worst.w, 'spy'), 1)}.</b> Bullish macro weeks: ${worst.w.map(y => y.bull).join(' / ')}; realised P&amp;L ${worst.w.map(y => usdk(y.pnl)).join(' / ')}.`,
+    `<b>Ten trades made ${usdk(top10.reduce((a, x) => a + x.pnl, 0))}</b> of the ${usdk(tot)} realised total. The ${aTr.length} A-grade trades made ${usdk(aTr.reduce((a, x) => a + x.pnl, 0))}.`,
+    `<b>${fb.length} of ${t.length} trades (${fmt(100 * fb.length / t.length, 0)}%) used the 4% fallback stop</b> rather than a stop under the base or MA.`,
+    `<b>${gap.length} of ${stops.length} stop exits filled more than 0.5% below the stop; ${late.length} sold at an open after the day the stop traded.</b> ${df.length} losers (grade D/F) then rallied ≥ 15% within 13 weeks; they lost ${usdk(df.reduce((a, x) => a + x.pnl, 0))}.`,
+    `<b>Average invested: ${fmt(expoAvg, 0)}% of NAV,</b> about ${fmt(ys.reduce((a, y) => a + y.pos, 0) / ys.length, 1)} positions on average (exposure cap and cash floor: see the run's overrides).`,
+    `<b>${wk.length} trades have a fill dated on a day with no bar</b> (the Saturday-fill defect). The validator also counts ${(inv.validator.find(v => v.id === 'V13') || {}).status || '?'} on V13.`,
+    rets.length > 1 && `<b>Salt spread: the same rules returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} salts.`,
+  ].filter(Boolean);
+  $('#findings').innerHTML = f.map(x => `<li>${x}</li>`).join('');
+}
+function weeklyAvg(rows) {
+  const out = []; let wk = null, s = 0, n = 0, last = null;
+  for (const [d, v] of rows) { const k = isoWeek(d); if (k !== wk && n) { out.push([last, s / n]); s = 0; n = 0; } wk = k; s += v; n++; last = d; }
+  if (n) out.push([last, s / n]); return out;
+}
+function isoWeek(d) { const t = new Date(d + 'T00:00:00Z'); const day = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - day); return t.toISOString().slice(0, 10); }
+
+/* ---------- Periods ---------- */
+let pGran = 'Y';
+function renderPeriods() {
+  const s = +$('#p-salt').value, rows = pGran === 'Y' ? D.years[s] : D.quarters[s];
+  $('#p-title').textContent = (pGran === 'Y' ? 'Returns by year' : 'Returns by quarter') + ' vs SPY, salt ' + s;
+  drawBars(rows);
+  const cols = [
+    ['Period', r => r.p, ''], ['Return', r => r.ret, 'pct'], ['SPY', r => r.spy, 'pct'], ['Excess', r => r.ret - r.spy, 'pct'],
+    ['Max DD in period', r => -r.mdd, 'dd'], ['DD from peak', r => -r.dd_peak, 'dd'], ['Invested', r => r.expo, 'p0'], ['Avg positions', r => r.pos, 'f1'],
+    ['Opened', r => r.opened, 'i'], ['Closed', r => r.closed, 'i'], ['Win rate', r => r.closed ? 100 * r.wins / r.closed : null, 'p0'],
+    ['Realised P&L', r => r.pnl, 'usd'], ['Macro B / N / Bear wks', r => r, 'macro'],
+  ];
+  const f = (v, k, r) => {
+    if (k === 'pct') return `<td class="num ${sgn(v)}">${pct(v)}</td>`;
+    if (k === 'dd') return `<td class="num">${v ? fmt(v) + '%' : '0.0%'}</td>`;
+    if (k === 'p0') return `<td class="num">${v == null ? '–' : fmt(v, 0) + '%'}</td>`;
+    if (k === 'f1') return `<td class="num">${fmt(v, 1)}</td>`;
+    if (k === 'i') return `<td class="num">${v}</td>`;
+    if (k === 'usd') return `<td class="num ${sgn(v)}">${usdk(v)}</td>`;
+    if (k === 'macro') { const w = r.wk || 1; return `<td><span style="display:inline-flex;width:90px;height:8px;border-radius:2px;overflow:hidden;vertical-align:middle;margin-right:6px"><i style="width:${100 * r.bull / w}%;background:var(--s2)"></i><i style="width:${100 * r.neut / w}%;background:var(--neut)"></i><i style="width:${100 * r.bear / w}%;background:var(--s4)"></i></span><span class="num">${r.bull}/${r.neut}/${r.bear}</span></td>`; }
+    return `<td><b>${v}</b></td>`;
+  };
+  $('#p-table').innerHTML = `<thead><tr>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(c => f(c[1](r), c[2], r)).join('')}</tr>`).join('')}</tbody>`;
+}
+function drawBars(rows) {
+  const W = Math.max(640, rows.length * (pGran === 'Y' ? 34 : 12)), H = 260, pad = { l: 40, r: 8, t: 10, b: 30 };
+  const vals = rows.flatMap(r => [r.ret, r.spy]); const hi = Math.max(10, ...vals), lo = Math.min(-10, ...vals);
+  const y = v => pad.t + (hi - v) / (hi - lo) * (H - pad.t - pad.b); const bw = (W - pad.l - pad.r) / rows.length;
+  const step = (hi - lo) > 60 ? 20 : 10; let g = '';
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) g += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="${v === 0 ? 1.5 : 1}"/><text x="${pad.l - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${v}%</text>`;
+  const every = pGran === 'Y' ? 1 : 4;
+  rows.forEach((r, i) => {
+    const x = pad.l + i * bw, w = Math.max(1, bw / 2 - 1.5);
+    const bar = (v, dx, col) => `<rect x="${x + dx}" y="${Math.min(y(0), y(v))}" width="${w}" height="${Math.abs(y(v) - y(0))}" fill="${col}"><title>${r.p}: ${pct(v)}</title></rect>`;
+    g += bar(r.ret, 1, 'var(--accent)') + bar(r.spy, 1 + w + 1, 'var(--spy)');
+    if (i % every === 0) g += `<text x="${x + bw / 2}" y="${H - 10}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${pGran === 'Y' ? r.p.slice(2) : r.p.slice(2, 4)}</text>`;
+  });
+  $('#p-bars').innerHTML = `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W, 900)}px" role="img" aria-label="Period returns, strategy vs SPY">${g}</svg></div>`;
+}
+$('#p-salt').addEventListener('change', renderPeriods);
+$('#p-y').addEventListener('click', () => { pGran = 'Y'; $('#p-y').setAttribute('aria-pressed', 'true'); $('#p-q').setAttribute('aria-pressed', 'false'); renderPeriods(); });
+$('#p-q').addEventListener('click', () => { pGran = 'Q'; $('#p-q').setAttribute('aria-pressed', 'true'); $('#p-y').setAttribute('aria-pressed', 'false'); renderPeriods(); });
+
+/* ---------- Trades ---------- */
+const TCOLS = [
+  ['Symbol', 'sym', t => `<b>${t.sym}</b>`], ['Entry', 'ed', t => t.ed], ['Exit', 'xd', t => t.xd], ['Days', 'days', t => t.days, 'num'],
+  ['P&L %', 'pct', t => `<span class="${sgn(t.pct)}">${pct(t.pct)}</span>`, 'num'], ['P&L $', 'pnl', t => `<span class="${sgn(t.pnl)}">${usdk(t.pnl)}</span>`, 'num'],
+  ['Grade', 'g', t => gradeTag(t.g)], ['Exit via', 'trig', t => trigLabel(t.trig)], ['Macro in', 'mE', t => `<span class="stg" style="background:${macroColor(t.mE)}"></span>${t.mE || '–'}`],
+  ['Stop', 'sid', t => fmt(t.sid * 100, 1) + '%', 'num'], ['Vol ×', 'vr', t => fmt(t.vr, 1), 'num'], ['MFE', 'mfe', t => pct(t.mfe, 0), 'num'], ['Flags', 'nflags', t => t.flags.length || '', 'num'],
+];
+let tSort = { k: 'ed', dir: 1 }, tSel = null;
+function initTrades() {
+  const years = [...new Set(D.trades[CH()].map(t => t.yr))].sort();
+  $('#t-year').innerHTML = `<option value="">All years</option>` + years.map(y => `<option>${y}</option>`).join('');
+  const trigs = [...new Set(D.trades.flat().map(t => t.trig))].sort();
+  $('#t-trig').innerHTML = `<option value="">All exits</option>` + trigs.map(t => `<option value="${t}">${trigLabel(t)}</option>`).join('');
+  $('#t-flag').innerHTML = `<option value="">Any flags</option>` + FLAGS.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
+  ['#t-salt', '#t-year', '#t-trig', '#t-grade', '#t-flag', '#t-out'].forEach(s => $(s).addEventListener('change', renderTrades));
+  $('#t-q').addEventListener('input', renderTrades);
+  renderTrades();
+}
+function filteredTrades() {
+  const s = +$('#t-salt').value, q = $('#t-q').value.trim().toUpperCase(), yr = $('#t-year').value, tr = $('#t-trig').value, g = $('#t-grade').value, fl = $('#t-flag').value, o = $('#t-out').value;
+  return D.trades[s].filter(t => (!q || t.sym.includes(q)) && (!yr || t.yr === yr) && (!tr || t.trig === tr) && (!g || (t.g || '')[0] === g) && (!fl || t.flags.includes(fl)) && (!o || (o === 'w' ? t.pnl > 0 : t.pnl <= 0)));
+}
+function renderTrades() {
+  const rows = filteredTrades(); rows.forEach(t => t.nflags = t.flags.length);
+  const k = tSort.k; rows.sort((a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * tSort.dir);
+  const net = rows.reduce((a, t) => a + t.pnl, 0);
+  $('#t-count').innerHTML = `${rows.length} trades · net <span class="${sgn(net)}">${usdk(net)}</span>`;
+  $('#t-table').innerHTML = `<thead><tr>${TCOLS.map(c => `<th data-k="${c[1]}" class="${c[1] === k ? 'sorted' : ''} ${c[3] || ''}">${c[0]}${c[1] === k ? (tSort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(t => `<tr class="click ${tSel === t.id ? 'sel' : ''}" data-id="${t.id}" tabindex="0">${TCOLS.map(c => `<td class="${c[3] || ''}">${c[2](t)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+}
+$('#t-table').addEventListener('click', e => {
+  const th = e.target.closest('th'); if (th) { const k = th.dataset.k; tSort = { k, dir: tSort.k === k ? -tSort.dir : (['pnl', 'pct', 'days', 'mfe', 'nflags', 'vr', 'sid'].includes(k) ? -1 : 1) }; renderTrades(); return; }
+  const tr = e.target.closest('tr[data-id]'); if (tr) selectTrade(tr.dataset.id);
+});
+$('#t-table').addEventListener('keydown', e => { if (e.key === 'Enter') { const tr = e.target.closest('tr[data-id]'); if (tr) selectTrade(tr.dataset.id); } });
+function openTrade(id, salt = CH()) {
+  $('#t-salt').value = String(salt); ['#t-q', '#t-year', '#t-trig', '#t-grade', '#t-flag', '#t-out'].forEach(s => $(s).value = '');
+  show('trades'); renderTrades(); selectTrade(id);
+  const row = document.querySelector(`#t-table tr[data-id="${CSS.escape(id)}"]`); if (row) row.scrollIntoView({ block: 'center' });
+}
+function filterFlag(fid) { $('#t-salt').value = String(CH()); ['#t-q', '#t-year', '#t-trig', '#t-grade', '#t-out'].forEach(s => $(s).value = ''); $('#t-flag').value = fid; show('trades'); renderTrades(); }
+let tChart = null;
+async function selectTrade(id) {
+  const s = +$('#t-salt').value; const t = D.trades[s].find(x => x.id === id); if (!t) return;
+  tSel = id; document.querySelectorAll('#t-table tr.sel').forEach(r => r.classList.remove('sel'));
+  const row = document.querySelector(`#t-table tr[data-id="${CSS.escape(id)}"]`); if (row) row.classList.add('sel');
+  const fl = t.flags.map(f => `<span class="pill ${FLAG[f].cat}" title="${FLAG[f].why.replace(/"/g, '&quot;')}">${FLAG[f].label}</span>`).join('') || '<span class="mut">No flags</span>';
+  const facts = [
+    ['Entry fill', `${fmt(t.ep, 2)} on ${t.ed}`], ['Exit fill', `${fmt(t.xp, 2)} on ${t.xd}`], ['Quantity', t.qty.toLocaleString('en-US')], ['P&L', `${usd(t.pnl)} (${pct(t.pct)})`],
+    ['Exit via', `${trigLabel(t.trig)}${t.trig === 'stop_loss' ? ' · ' + t.kind.replace('_', ' ') : ''}`], ['Initial stop', `${fmt(t.sid * 100, 1)}% below entry`],
+    ['Stop raises', `${t.nraise ?? 0}${t.maxs ? ' · max ' + fmt(t.maxs, 2) : ''}`], ['Entry vs prior close', pct(t.gap)],
+    ['Peak / worst open', `${pct(t.mfe, 0)} / ${pct(t.mae, 0)}`], ['After exit (13 wk)', `high ${pct(t.pmax, 0)} · low ${pct(t.pmin, 0)}`],
+    ['Macro in → out', `${t.mE || '–'} → ${t.mX || '–'}`], ['Bearish weeks held', `${t.bearW} of ${t.macroW}`], ['Breadth at entry', t.bE || '–'],
+    ['Volume at breakout', `${fmt(t.vr, 2)}× avg`], ['Screener score', t.score ?? '–'], ['RS at entry', t.rs || '–'],
+    ['Entry fill vs trigger', t.fvt == null ? '–' : pct(t.fvt, 2)], ['Stage (strategy / replay)', `${t.stg} / ${t.rsE || '–'}`], ['Replay weeks S3 / S4', t.holdW ? `${t.s3w} / ${t.s4w} of ${t.holdW}` : '–'],
+  ];
+  $('#t-detail').innerHTML = `<div class="row" style="justify-content:space-between"><h2>${t.sym} <span class="sub">${t.ed} → ${t.xd}, ${t.days} days</span></h2><span>${gradeTag(t.g)} <span class="${sgn(t.pnl)} num">${usdk(t.pnl)}</span></span></div>
+    <div class="flaglist">${fl}</div>
+    <div id="t-chart" class="chart" style="height:380px"></div>
+    <div class="legend"><span><i style="background:var(--s1)"></i>S1</span><span><i style="background:var(--s2)"></i>S2</span><span><i style="background:var(--s3)"></i>S3</span><span><i style="background:var(--s4)"></i>S4 (weekly close, replay)</span><span><i style="background:var(--ink)"></i>30-wk MA</span><span>Strip at bottom = macro gate</span></div>
+    <div class="facts">${facts.map(([a, b]) => `<div><b>${a}</b><span>${b}</span></div>`).join('')}</div>`;
+  if (tChart) { tChart.remove(); tChart = null; }
+  if (s !== CH()) { $('#t-chart').outerHTML = `<div class="empty">Charts are generated for ${runLabel(CH())} only.</div>`; return; }
+  const yr = t.yr; let cd;
+  try { cd = chartCache[yr] || (chartCache[yr] = await load(`charts/${yr}.json`)); } catch (e) { $('#t-chart').outerHTML = '<div class="empty">Chart data missing for this year.</div>'; return; }
+  if (tSel !== id) return;
+  drawTradeChart(t, cd[t.id]);
+}
+function drawTradeChart(t, c) {
+  const box = $('#t-chart'); if (!c) { box.outerHTML = '<div class="empty">No price data for this symbol.</div>'; return; }
+  const ch = LightweightCharts.createChart(box, { ...chartOpts(380), width: box.clientWidth || 600 }); tChart = ch;
+  new ResizeObserver(() => { if (box.clientWidth) ch.applyOptions({ width: box.clientWidth }); }).observe(box);
+  const candle = ch.addCandlestickSeries({ upColor: css('--muted'), downColor: css('--ink'), borderVisible: false, wickUpColor: css('--muted'), wickDownColor: css('--ink'), priceLineVisible: false, lastValueVisible: false });
+  candle.setData((c.d || []).map(([d, o, h, l, cl]) => ({ time: d, open: o, high: h, low: l, close: cl })));
+  const wk = c.w || [];
+  if (wk.length) {
+    ch.addLineSeries({ color: css('--ink'), lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+      .setData(wk.filter(r => r[2] > 0).map(r => ({ time: r[0], value: r[2] })));
+    ch.addLineSeries({ lineWidth: 1, lineStyle: 0, color: css('--neut'), priceLineVisible: false, lastValueVisible: false, pointMarkersVisible: true, pointMarkersRadius: 3 })
+      .setData(wk.map(r => ({ time: r[0], value: r[1], color: stageColor(r[3]) })));
+  }
+  const fe = t.fe || 1, fx = t.fx || 1;
+  const line = (price, color, title, style = 2) => price && candle.createPriceLine({ price, color, lineWidth: 1, lineStyle: style, axisLabelVisible: true, title });
+  const E = t.eadj ?? t.ep * fe, X = t.xadj ?? t.xp * fx;
+  line(E, css('--s2'), 'entry', 0);
+  line(E * (1 - t.sid), css('--neg'), 'initial stop');
+  if (t.xs) line(t.xs * X / t.xp, css('--accent'), 'stop at exit');
+  line(X, css('--muted'), 'exit', 0);
+  candle.setMarkers([
+    { time: t.ebar, position: 'belowBar', color: css('--s2'), shape: 'arrowUp', text: 'buy' },
+    { time: t.xbar, position: 'aboveBar', color: css('--neg'), shape: 'arrowDown', text: trigLabel(t.trig) },
+  ].filter(m => m.time).sort((a, b) => a.time < b.time ? -1 : 1));
+  const d0 = (c.d && c.d[0] && c.d[0][0]) || t.ed, d1 = (c.d && c.d.length && c.d[c.d.length - 1][0]) || t.xd;
+  const mac = ch.addHistogramSeries({ priceScaleId: 'macro', priceLineVisible: false, lastValueVisible: false });
+  ch.priceScale('macro').applyOptions({ scaleMargins: { top: 0.94, bottom: 0 }, visible: false });
+  mac.setData(D.macro.filter(([d]) => d >= d0 && d <= d1).map(([d, tr]) => ({ time: d, value: 1, color: macroColor(tr) })));
+  try { ch.timeScale().setVisibleRange({ from: d0, to: d1 }); } catch (e) { ch.timeScale().fitContent(); }
+}
+
+/* ---------- Highlights & lowlights ---------- */
+function list(title, note, rows, val) {
+  return `<div class="panel"><h2>${title}</h2>${note ? `<p class="note">${note}</p>` : ''}<div class="tablebox" style="max-height:none"><table><thead><tr><th>Symbol</th><th>Entry → exit</th><th class="num">P&L %</th><th class="num">P&L $</th><th>Grade</th><th class="num">${val[0]}</th></tr></thead><tbody>${rows.map(t => `<tr class="click" data-open="${t.id}"><td><b>${t.sym}</b></td><td>${t.ed} → ${t.xd}</td><td class="num ${sgn(t.pct)}">${pct(t.pct)}</td><td class="num ${sgn(t.pnl)}">${usdk(t.pnl)}</td><td>${gradeTag(t.g)}</td><td class="num">${val[1](t)}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function renderHilo() {
+  const t = D.trades[CH()]; const by = (k, d = -1) => [...t].sort((a, b) => (a[k] - b[k]) * d);
+  const days = ['Days', x => x.days];
+  const years = [...new Set(t.map(x => x.yr))].sort();
+  const yb = years.map(y => { const ts = t.filter(x => x.yr === y); const b = ts.reduce((a, x) => x.pnl > a.pnl ? x : a), w = ts.reduce((a, x) => x.pnl < a.pnl ? x : a); return { y, b, w, n: ts.length, net: ts.reduce((a, x) => a + x.pnl, 0) }; });
+  $('#hilo').innerHTML =
+    list('Biggest winners ($)', 'The fat tail that carries the run.', by('pnl').slice(0, 12), days) +
+    list('Biggest losers ($)', 'Check whether each loss was sized by a structural stop or the 4% fallback.', by('pnl', 1).slice(0, 12), days) +
+    list('Best exits (grade A, largest %)', 'Winners where the stock did not go much higher after the exit.', t.filter(x => (x.g || '')[0] === 'A').sort((a, b) => b.pct - a.pct).slice(0, 12), ['13 wk after', x => pct(x.pmax, 0)]) +
+    list('Costliest whipsaws', 'Stopped out at a loss, then the stock rallied. Sorted by the high reached within 13 weeks of the exit.', t.filter(x => /^[DF]/.test(x.g || '')).sort((a, b) => b.pmax - a.pmax).slice(0, 12), ['13 wk after', x => pct(x.pmax, 0)]) +
+    list('Largest give-backs', 'Open gain at its peak versus the gain at exit.', t.filter(x => x.mfe != null).sort((a, b) => (b.mfe - b.pct) - (a.mfe - a.pct)).slice(0, 12), ['Peak open', x => pct(x.mfe, 0)]) +
+    `<div class="panel"><h2>Best and worst trade by entry year</h2><div class="tablebox"><table><thead><tr><th>Year</th><th class="num">Trades</th><th class="num">Net</th><th>Best</th><th class="num">$</th><th>Worst</th><th class="num">$</th></tr></thead><tbody>${yb.map(r => `<tr><td><b>${r.y}</b></td><td class="num">${r.n}</td><td class="num ${sgn(r.net)}">${usdk(r.net)}</td><td class="click" data-open="${r.b.id}">${r.b.sym}</td><td class="num pos">${usdk(r.b.pnl)}</td><td class="click" data-open="${r.w.id}">${r.w.sym}</td><td class="num neg">${usdk(r.w.pnl)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  $('#hilo').addEventListener('click', e => { const r = e.target.closest('[data-open]'); if (r) openTrade(r.dataset.open, CH()); });
+}
+
+/* ---------- Surprises ---------- */
+function renderSurprises() {
+  const t = D.trades[CH()];
+  $('#flagcards').innerHTML = FLAGS.map(f => { const ts = t.filter(x => x.flags.includes(f.id)); const net = ts.reduce((a, x) => a + x.pnl, 0);
+    return `<button class="flagcard" data-flag="${f.id}"><span class="row" style="justify-content:space-between"><span class="pill ${f.cat}">${{ exec: 'Execution', book: 'Book', outcome: 'Outcome' }[f.cat]}</span><span class="cnt">${ts.length}</span></span><b>${f.label}</b><span class="num" style="text-align:left">net <span class="${sgn(net)}">${usdk(net)}</span> · ${fmt(100 * ts.length / t.length, 0)}% of trades</span><p>${f.why}</p></button>`; }).join('');
+  $('#flagcards').addEventListener('click', e => { const b = e.target.closest('[data-flag]'); if (b) filterFlag(b.dataset.flag); });
+  const cf = D.meta[CH()].conformance;
+  $('#conf').innerHTML = `<thead><tr><th>Rule</th><th>Description</th><th class="num">Passed</th><th class="num">Rate</th></tr></thead><tbody>${cf.map(r => `<tr><td><b>${r.rule}</b></td><td style="white-space:normal">${r.desc}</td><td class="num">${r.passed}</td><td class="num">${r.rate}</td></tr>`).join('')}</tbody>`;
+  $('#validator').innerHTML = D.meta[CH()].validator.map(v => { const bad = !/PASS/.test(v.status);
+    return `<details ${bad && v.sev === 'INVARIANT' ? 'open' : ''} style="border-bottom:1px solid var(--line);padding-block:6px"><summary><b>${v.id}</b> <span class="pill ${bad ? (v.sev === 'INVARIANT' ? 'outcome' : 'exec') : ''}">${v.sev.toLowerCase()}</span> <span class="${bad ? '' : 'mut'}">${v.status}</span></summary>${v.specimens.length ? `<pre class="spec">${v.specimens.join('\n')}</pre>` : ''}</details>`; }).join('');
+}
+
+/* ---------- Diagnostics ---------- */
+const median = a => { const s = a.filter(v => v != null && !isNaN(v)).sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : null; };
+const share = (a, f) => a.length ? 100 * a.filter(f).length / a.length : null;
+function spyFwd() {
+  const dates = D.spy.map(r => r[0]), px = D.spy.map(r => +r[1]);
+  return (d, n) => { let i = dates.findIndex(x => x >= d); return i < 0 || i + n >= dates.length ? null : (px[i + n] / px[i] - 1) * 100; };
+}
+function flatStretches(nav) {
+  const m = new Map(D.spy); let last = null; const spyAt = nav.map(([d]) => { if (m.has(d)) last = +m.get(d); return last; });
+  const out = []; let pk = 0, pi = 0, low = 0;
+  const push = (j, open) => { if (j - pi > 250) out.push({ from: nav[pi][0], to: nav[j][0], open, dd: 100 * (1 - low / pk), nav: 100 * (nav[j][1] / pk - 1), spy: spyAt[pi] && spyAt[j] ? 100 * (spyAt[j] / spyAt[pi] - 1) : null }); };
+  nav.forEach(([d, v], j) => { if (v >= pk) { push(j, false); pk = v; pi = j; low = v; } else low = Math.min(low, v); });
+  push(nav.length - 1, true); return out;
+}
+const tbl = (head, rows) => `<thead><tr>${head.map(h => `<th${h[1] ? ' class="num"' : ''}>${h[0]}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody>`;
+const tdp = v => `<td class="num ${sgn(v)}">${pct(v)}</td>`, tdn = (v, d = 0) => `<td class="num">${v == null ? '–' : fmt(v, d)}</td>`, tdu = v => `<td class="num ${sgn(v)}">${usdk(v)}</td>`;
+function renderDiag() {
+  const fl = D.nav.flatMap((nav, i) => flatStretches(nav).map(s => ({ ...s, i })));
+  $('#d-flat').innerHTML = tbl([['Salt'], ['From high'], ['To'], ['Days', 1], ['Deepest', 1], ['NAV vs high', 1], ['SPY', 1], ['Excess', 1]],
+    fl.map(s => `<tr><td><b>${runLabel(s.i)}</b></td><td>${s.from}</td><td>${s.to}${s.open ? ' (still below)' : ''}</td>${tdn((new Date(s.to) - new Date(s.from)) / 864e5)}<td class="num">−${fmt(s.dd)}%</td>${tdp(s.nav)}${tdp(s.spy)}${tdp(s.spy == null ? null : s.nav - s.spy)}</tr>`));
+  const t = D.trades[CH()], fwd = spyFwd(); t.forEach(x => { if (x.s40 === undefined) x.s40 = fwd(x.ed, 40); });
+  const yrs = [...new Set(t.map(x => x.yr))].sort();
+  const ydf = y => t.filter(x => x.yr === y);
+  $('#d-picks').innerHTML = tbl([['Entry year'], ['Trades', 1], ['Win rate', 1], ['Pick, 8 wk', 1], ['SPY, 8 wk', 1], ['Pick − SPY', 1], ['Picks up at 8 wk', 1], ['D/F grades', 1], ['4% fallback stop', 1], ['Net', 1]],
+    yrs.map(y => { const a = ydf(y), p = median(a.map(x => x.f40)), s = median(a.map(x => x.s40)), ex = median(a.filter(x => x.f40 != null && x.s40 != null).map(x => x.f40 - x.s40)), net = a.reduce((q, x) => q + x.pnl, 0);
+      return `<tr><td><b>${y}</b></td>${tdn(a.length)}${tdn(share(a, x => x.pnl > 0))}${tdp(p)}${tdp(s)}${tdp(ex)}${tdn(share(a.filter(x => x.f40 != null), x => x.f40 > 0))}${tdn(share(a, x => /^[DF]/.test(x.g || '')))}${tdn(share(a, x => Math.abs(x.sid - 0.04) < 1e-9))}${tdu(net)}</tr>`; }));
+  const LV = [3, 5, 6, 8, 10, 15], base = t.filter(x => x.cf && x.pct), act = base.reduce((q, x) => q + x.pnl, 0);
+  $('#d-cut').innerHTML = tbl([['Hard stop'], ['Static P&L', 1], ['vs actual', 1], ['Trades cut earlier', 1], ['…of them winners', 1]],
+    [`<tr><td><b>Actual</b></td>${tdu(act)}<td></td><td></td><td></td></tr>`, ...LV.map((l, i) => { const cut = base.filter(x => x.cf[i] < x.pct - 0.01), p = base.reduce((q, x) => q + x.pnl * x.cf[i] / x.pct, 0);
+      return `<tr><td><b>${l}%</b></td>${tdu(p)}${tdu(p - act)}${tdn(cut.length)}${tdn(cut.filter(x => x.pct > 0).length)}</tr>`; })]);
+  const st = t.filter(x => x.trig === 'stop_loss' && !x.nraise && x.blag != null && x.blag >= 0);
+  const late = st.filter(x => x.blag >= 1), groups = [[0, 'same day'], [1, 'next open'], [2, '2–5 days'], [6, '6+ days']];
+  const grp = x => x.blag === 0 ? 0 : x.blag === 1 ? 1 : x.blag <= 5 ? 2 : 6;
+  $('#d-lag').innerHTML = `<table>${tbl([['Breach → fill'], ['Exits', 1], ['Avg result', 1], ['Net', 1]], groups.map(([g, lab]) => { const a = st.filter(x => grp(x) === g);
+      return `<tr><td><b>${lab}</b></td>${tdn(a.length)}${tdp(a.length ? a.reduce((q, x) => q + x.pct, 0) / a.length : null)}${tdu(a.reduce((q, x) => q + x.pnl, 0))}</tr>`; }))}</table>
+    <p class="note" style="margin-top:8px">${late.length} of ${st.length} unraised stop exits (${fmt(share(st, x => x.blag >= 1), 0)}%) filled on a later open than the day the stop traded. Selling at the stop instead would not reliably have helped: the next open recovers about as often as it gaps further, so the difference is a faithfulness question more than a P&amp;L one. A lag of 2+ days usually means the live stop was not exactly entry × (1 − initial distance), for example because it was anchored to the trigger rather than the fill; treat those rows as unresolved.</p>`;
+  const all = t.filter(x => x.g), dfr = a => share(a, x => /^[DF]/.test(x.g || ''));
+  const q4 = (k) => { const s = all.filter(x => x[k] != null).sort((a, b) => a[k] - b[k]), n = s.length; return [0, 1, 2, 3].map(i => s.slice(Math.floor(i * n / 4), Math.floor((i + 1) * n / 4))).map((a, i) => [`Q${i + 1} ${fmt(a[0][k], 2)}–${fmt(a[a.length - 1][k], 2)}`, a]); };
+  const by = k => [...new Set(all.map(x => x[k]))].sort().map(v => [v || '–', all.filter(x => x[k] === v)]);
+  const cohort = (title, rows) => `<div class="panel" style="margin:0"><h3>${title}</h3><table>${tbl([['Cohort'], ['Trades', 1], ['D/F', 1], ['A', 1], ['Avg', 1], ['Net', 1]], rows.map(([lab, a]) => `<tr><td>${lab}</td>${tdn(a.length)}${tdn(dfr(a))}${tdn(share(a, x => (x.g || '')[0] === 'A'))}${tdp(a.length ? a.reduce((q, x) => q + x.pct, 0) / a.length : null)}${tdu(a.reduce((q, x) => q + x.pnl, 0))}</tr>`))}</table></div>`;
+  $('#d-df').innerHTML = `<p class="note" style="grid-column:1/-1">All trades: D/F ${fmt(dfr(all), 0)}% of ${all.length}.</p>` +
+    cohort('Macro at entry', by('mE')) + cohort('Breadth at entry', by('bE')) +
+    cohort('Stop type', [['4% fallback', all.filter(x => Math.abs(x.sid - 0.04) < 1e-9)], ['Structural', all.filter(x => Math.abs(x.sid - 0.04) >= 1e-9)]]) +
+    cohort('Screener score', q4('score')) + cohort('Breakout volume ×', q4('vr')) + cohort('Entry vs prior close %', q4('gap'));
+}
+
+/* ---------- Salts ---------- */
+const SALT_COLORS = ['--accent', '--s1', '--s4', '--s3', '--s2', '--neut'];
+function renderSalts() {
+  const n = D.trades.length, col = i => css(SALT_COLORS[i % SALT_COLORS.length]);
+  $('#salt-legend').innerHTML = D.man.runs.map((r, i) => `<span><i style="background:${col(i)}"></i>${runLabel(i)}</span>`).join('') + `<span><i style="background:var(--spy)"></i>SPY</span>`;
+  const c = mkChart('#c-salts', 340, 'salts'); c.applyOptions({ rightPriceScale: { mode: 1 } });
+  c.addLineSeries({ color: css('--spy'), lineWidth: 1, priceLineVisible: false, lastValueVisible: false }).setData(spyOnNavDates(D.nav[CH()]).map(([d, v]) => ({ time: d, value: v })));
+  D.nav.forEach((nav, i) => c.addLineSeries({ color: col(i), lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false }).setData(nav.map(([d, v]) => ({ time: d, value: v }))));
+  c.timeScale().fitContent();
+  const ys = D.years; const heat = v => { const a = Math.min(1, Math.abs(v) / 40); return `background:color-mix(in srgb, var(${v >= 0 ? '--pos' : '--neg'}) ${Math.round(a * 35)}%, transparent)`; };
+  $('#s-years').innerHTML = `<thead><tr><th>Year</th>${D.man.runs.map((r, i) => `<th class="num">${runLabel(i)}</th>`).join('')}<th class="num">SPY</th><th class="num">Spread</th></tr></thead><tbody>${ys[0].map((y, j) => { const v = ys.map(r => r[j]?.ret); const ok = v.filter(x => x != null); const sp = Math.max(...ok) - Math.min(...ok);
+    return `<tr><td><b>${y.p}</b></td>${v.map(x => `<td class="heat" style="${x == null ? '' : heat(x)}">${pct(x)}</td>`).join('')}<td class="heat" style="${heat(y.spy)}">${pct(y.spy)}</td><td class="num">${fmt(sp)}</td></tr>`; }).join('')}</tbody>`;
+  const key = t => t.sym + '|' + t.ed; const sets = D.trades.map(ts => new Map(ts.map(t => [key(t), t])));
+  const allK = new Set(D.trades.flat().map(key)); let nAll = 0, nSome = 0, nOne = 0; const pAll = D.trades.map(() => 0);
+  allK.forEach(k => { const inS = sets.map(s => s.has(k)); const cnt = inS.filter(Boolean).length; if (cnt === n) { nAll++; sets.forEach((s, i) => pAll[i] += s.get(k).pnl); } else if (cnt > 1) nSome++; else nOne++; });
+  const tot = D.trades.map(ts => ts.reduce((a, t) => a + t.pnl, 0));
+  const seqs = D.trades.map(ts => [...ts].sort((a, b) => a.ed < b.ed ? -1 : a.ed > b.ed ? 1 : a.sym < b.sym ? -1 : 1).map(key));
+  let div = null; for (let j = 0; j < Math.min(...seqs.map(s => s.length)); j++) if (seqs.some(s => s[j] !== seqs[0][j])) { div = seqs.map(s => s[j]); break; }
+  const uniqTop = D.trades.map((ts, i) => ts.filter(t => sets.every((s, o) => o === i || !s.has(key(t)))).sort((a, b) => b.pnl - a.pnl).slice(0, 3));
+  $('#s-overlap').innerHTML = `<p class="note">A trade counts as shared when the same symbol was entered on the same date. ${div ? `The trade lists first differ at ${div.map(k => k.replace('|', ' ')).join(' / ')}; everything before that is identical.` : ''}</p>
+    <div class="kpis"><div class="kpi"><span class="k">In every salt</span><span class="v">${nAll}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In some</span><span class="v">${nSome}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In one salt only</span><span class="v">${nOne}</span><span class="n">trades</span></div></div>
+    <table><thead><tr><th>Salt</th><th class="num">Trades</th><th class="num">Realised total</th><th class="num">From shared trades</th><th class="num">From the rest</th><th>Biggest trades only this salt took</th></tr></thead><tbody>${D.trades.map((ts, i) => `<tr><td><b>${runLabel(i)}</b></td><td class="num">${ts.length}</td>${tdu(tot[i])}${tdu(pAll[i])}${tdu(tot[i] - pAll[i])}<td>${uniqTop[i].map(t => `${t.sym} ${usdk(t.pnl)}`).join(', ')}</td></tr>`).join('')}</tbody></table>`;
+}
+
+/* ---------- Agenda ---------- */
+function renderAgenda() {
+  const ys = D.years[CH()], lag = [...ys].sort((a, b) => (a.ret - a.spy) - (b.ret - b.spy)).slice(0, 5).map(y => y.p).sort();
+  const rets = D.meta.map(m => m.metrics.totalreturnpct);
+  const items = [
+    ['Start with the equity curve against the macro strip', 'overview', `Where does the strategy lag SPY, and does the gate explain it? The five years furthest behind SPY: ${lag.join(', ')}.`],
+    ['Walk the yearly table', 'periods', 'Compare invested %, trade count and realised P&L in the years that lagged. Switch to quarterly for the worst stretch.'],
+    ['Read the diagnostics', 'diag', 'Flat stretches against SPY; pick quality against exit quality by year; what a tighter stop would have done; when stop exits fill; whether D/F trades are visible at entry.'],
+    ['Open the biggest winners', 'hilo', 'Check that each one is a textbook Stage 2 breakout: base, volume, stop under the base, trailing stop that let it run.'],
+    ['Open the biggest losers and whipsaws', 'hilo', 'Was the stop structural or the 4% fallback? Did the stock recover right after?'],
+    ['Go through the execution flags', 'surprises', 'Weekend-dated fills, fills outside the day’s range, stops sold a day late. Decide which are simulator defects and which are real market behaviour.'],
+    ['Go through the book flags', 'surprises', 'Neutral-macro entries, low breakout volume, fallback stops, Stage 4 holds. Decide which deviations are deliberate dials and which are bugs.'],
+    rets.length > 1 && ['Compare the salts', 'salts', `The same rules produce ${fmt(Math.min(...rets), 0)}–${fmt(Math.max(...rets), 0)}%. Which trades account for the gap?`],
+  ].filter(Boolean);
+  $('#agenda').innerHTML = items.map(([a, v, b]) => `<li><b><a href="#${v}" data-go="${v}">${a}</a></b><br><span class="mut">${b}</span></li>`).join('');
+  $('#agenda').addEventListener('click', e => { const a = e.target.closest('[data-go]'); if (a) { e.preventDefault(); show(a.dataset.go); } });
+}
+})();
+</script>
