@@ -1,0 +1,47 @@
+#!/bin/sh
+# Investor-preset experiment (dev/experiments/investor-preset-2026-09-26): broad investor preset vs the f2 hybrid control.
+# Both fill-model fixes on in every spec. Token = <spec>:<salt>[:<pair-spec>]; a cell with a pair spec is V6-gated
+# (validator_diff -check V6) against <pair-spec>-s<salt>, which must run EARLIER in the same chain.
+# PINNED worktree sweep-investor at main 1c2647743 (#2966 require_structural_stop). BUILD=1 builds the 3 exes first.
+# Derived from obvious-fixes-2026-09-25/chain-fixes.sh.
+# Derived from index-stage-veto-2026-09-16/chain-veto.sh (lanes B+ settings: cap 12,000, 60,000 s guard =
+# 2.1x the slowest measured 26y PIT cell, 4h48m). Usage: EXPECT_HEAD=<sha> sh chain-fixes.sh <lane> <spec>:<salt>...
+# Artifacts: /tmp/sweeps/investor-preset/ (bind-mounted). Specs staged OUTSIDE any VCS tree at /tmp/investor-run/specs.
+set -u
+LANE=$1; shift
+C=trading-1-dev; REPO=/Users/difan/Projects/trading-1; WTREL=${WTREL:-.claude/worktrees/sweep-investor}   # pinned at main 1c2647743
+WT=/workspaces/trading-1/$WTREL; ROOT=$WT/trading; FIX=$ROOT/test_data/backtest_scenarios
+SPECS_HOST=/tmp/investor-run/specs; WORK=/tmp/investor-run/$LANE; ART=/tmp/sweeps/investor-preset; WH=/tmp/snap_top3000_pit_v11pit
+LOG_HOST=/tmp/investor-run/chain-$LANE.log; LOCK=/tmp/investor-run/chain-$LANE.lock; CELL_TIMEOUT=${CELL_TIMEOUT:-60000}
+EXPECT_HEAD=${EXPECT_HEAD:?set EXPECT_HEAD to the pinned worktree short sha}
+MMAP_HANDLES=${SNAPSHOT_MAX_MMAP_HANDLES:-12000}   # #2839 knob: >= n_symbols (9,915) so the v2 warehouse LRU never cycles; 256 = pre-knob behaviour
+log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG_HOST"; }
+run() { docker exec $C bash -c "cd $ROOT && eval \$(opam env) && $1"; }
+mkdir -p /tmp/investor-run; mkdir "$LOCK" 2>/dev/null || { echo "ABORT: lock $LANE"; exit 1; }
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT
+docker exec $C mkdir -p $WORK $ART
+head=$(git -C $REPO/$WTREL rev-parse --short HEAD)
+log "lane $LANE HEAD=$head (expect $EXPECT_HEAD)"; log "cell guard CELL_TIMEOUT=${CELL_TIMEOUT}s (26y guard; 5y cells ~1h); SNAPSHOT_MAX_MMAP_HANDLES=$MMAP_HANDLES"
+[ "$head" = "$EXPECT_HEAD" ] || { log "ABORT: wrong HEAD"; exit 1; }
+[ -z "$(git -C $REPO/$WTREL status --porcelain --untracked-files=no)" ] || { log "ABORT: run tree dirty"; exit 1; }
+docker exec $C test -f $WH/manifest.sexp || { log "ABORT: no warehouse manifest at $WH"; exit 1; }
+n_wh=$(docker exec $C sh -c "grep -c '(symbol ' $WH/manifest.sexp"); log "warehouse entries=$n_wh (expect 9364)"
+[ "$n_wh" = "9364" ] || { log "ABORT: warehouse changed since the null band"; exit 1; }
+free_gb=$(df -g / | awk 'NR==2{print $4}'); log "host free ${free_gb}G"; [ "$free_gb" -ge 20 ] || { log "ABORT: host disk < 20G"; exit 1; }
+if [ "${BUILD:-0}" = 1 ]; then log "BUILD"; run "dune build trading/backtest/scenarios/scenario_runner.exe trading/backtest/validation/bin/post_run_validator_cli.exe trading/backtest/validation/bin/validator_diff.exe > /tmp/investor-run/build.log 2>&1" || { log "ABORT: build failed"; exit 1; }; log "BUILD_DONE"; fi
+for tok in "$@"; do name=${tok%%:*}; rest=${tok#*:}; salt=${rest%%:*}; pair=""; [ "$rest" != "$salt" ] && pair=${rest#*:}; tag="$name-s$salt-v11"; d=$WORK/$tag
+  if grep -q "RESULT $tag " "$LOG_HOST" 2>/dev/null; then log "SKIP $tag"; continue; fi
+  docker exec $C sh -c "mkdir -p $d && rm -rf $d/*"; docker cp "$SPECS_HOST/$name.sexp" "$C:$d/" || { log "RESULT $tag => <spec missing>"; continue; }
+  log "RUN $tag on $WH"; start=$(date +%s)
+  run "TRADING_DATA_DIR=$ROOT/test_data TRADING_PATH_SEED_SALT=$salt SNAPSHOT_CACHE_MB=1024 SNAPSHOT_MAX_MMAP_HANDLES=$MMAP_HANDLES timeout $CELL_TIMEOUT ./_build/default/trading/backtest/scenarios/scenario_runner.exe --dir $d --fixtures-root $FIX --snapshot-dir $WH --no-emit-all-eligible --parallel 1 --progress-every 26 > $WORK/$tag.log 2>&1; echo exit=\$? >> $WORK/$tag.log"
+  out=$(docker exec $C sh -c "grep 'Output root' $WORK/$tag.log | tail -1 | sed 's/.*: //'")
+  m=$(docker exec $C sh -c "grep -hoE 'total_return_pct [0-9.eE+-]+|total_trades [0-9]+|sharpe_ratio [0-9.eE+-]+|max_drawdown_pct [0-9.eE+-]+|calmar_ratio [0-9.eE+-]+' ${out}/${name}/actual.sexp 2>/dev/null | tr '\n' ' '")
+  docker exec $C sh -c "for f in actual.sexp trades.csv params.sexp summary.sexp trade_audit.sexp open_positions.csv force_liquidations.sexp equity_curve.csv macro_trend.sexp; do cp ${out}/${name}/\$f $ART/${tag}-\$f 2>/dev/null; done; cp $WORK/$tag.log $ART/${tag}.log" || true
+  run "./_build/default/trading/backtest/validation/bin/post_run_validator_cli.exe -run-dir ${out}/${name} -data-dir /workspaces/trading-1/data -out $ART/${tag}-validator.sexp > $WORK/$tag.validator.log 2>&1; echo exit=\$? >> $WORK/$tag.validator.log"
+  q=$(docker exec $C sh -c "grep -hE 'V16 EXPECTATION|V17 EXPECTATION|V6 ' $ART/${tag}-validator.sexp.md 2>/dev/null | tr '\n' ' '")
+  v6=none; if [ -n "$pair" ]; then
+    run "./_build/default/trading/backtest/validation/bin/validator_diff.exe -check V6 -report pair=$ART/$pair-s$salt-v11-validator.sexp.sexp -report arm=$ART/${tag}-validator.sexp.sexp > $WORK/$tag.v6diff.log 2>&1; echo exit=\$? >> $WORK/$tag.v6diff.log"
+    v6="$pair:$(docker exec $C sh -c "tail -1 $WORK/$tag.v6diff.log")"; fi
+  log "RESULT $tag => ${m:-<no result>} ${q:-<no validator>} v6diff:${v6} (wall $(( $(date +%s) - start ))s)"
+done
+log "LANE $LANE DONE"
