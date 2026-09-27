@@ -55,6 +55,7 @@ type config = {
   reset_anchor_on_stalled_cycle : bool; [@sexp.default true]
   stop_skip_entry_bar : bool; [@sexp.default true]
   stop_ma_same_basis : bool; [@sexp.default false]
+  correction_must_follow_peak : bool; [@sexp.default false]
 }
 [@@deriving show, eq, sexp]
 
@@ -78,4 +79,5 @@ let default_config =
     reset_anchor_on_stalled_cycle = true;
     stop_skip_entry_bar = true;
     stop_ma_same_basis = false;
+    correction_must_follow_peak = false;
   }

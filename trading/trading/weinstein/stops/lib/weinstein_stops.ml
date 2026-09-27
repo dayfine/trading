@@ -148,12 +148,15 @@ let _to_tightened ~config ~side ~stop_level ~correction_extreme ~reason =
    legitimate first-cycle anchor — see the [correction_count = 0] gate in
    [_completed_cycle_stop]. The [correction_observed_since_reset] flag starts
    [false]: it only becomes load-bearing after the first cycle, when the reset
-   value (close_price) needs a real touch to be re-validated. *)
-let _to_trailing ~side ~ma_value ~stop_level ~bar =
+   value (close_price) needs a real touch to be re-validated.
+   [config.correction_must_follow_peak] seeds the bar close instead
+   ({!Stop_anchor_rules}). *)
+let _to_trailing ~config ~side ~ma_value ~stop_level ~bar =
   Trailing
     {
       stop_level;
-      last_correction_extreme = _bar_extreme ~side ~bar;
+      last_correction_extreme =
+        Stop_anchor_rules.seed_correction_extreme ~config ~side ~bar;
       last_trend_extreme = bar.Types.Daily_price.close_price;
       ma_at_last_adjustment = ma_value;
       correction_count = 0;
@@ -198,7 +201,7 @@ let _update_initial ~config ~side ~state ~current_bar ~ma_value ~ma_direction
       ~ma_direction ~stage
   with
   | Some result -> result
-  | None -> (_to_trailing ~side ~ma_value ~stop_level ~bar, No_change)
+  | None -> (_to_trailing ~config ~side ~ma_value ~stop_level ~bar, No_change)
 
 (* ---- Correction cycle helpers ---- *)
 
@@ -365,7 +368,9 @@ let _raise_after_cycle ~config ~side ~ma_value ~correction_count
     Trailing
       {
         stop_level;
-        last_correction_extreme = new_correction_extreme;
+        last_correction_extreme =
+          Stop_anchor_rules.carried_correction_extreme ~config ~side
+            ~last_trend_extreme ~new_trend_extreme ~new_correction_extreme ~bar;
         last_trend_extreme = new_trend_extreme;
         ma_at_last_adjustment;
         correction_count;

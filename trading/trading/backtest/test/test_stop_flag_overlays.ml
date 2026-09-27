@@ -31,6 +31,18 @@ let test_stop_ma_same_basis_resolves_via_overlay_validator _ =
   assert_that c.stops_config.Weinstein_stops.stop_ma_same_basis
     (equal_to true)
 
+(* ---- correction_must_follow_peak (#2974) ---- *)
+
+let test_correction_must_follow_peak_defaults_off _ =
+  let c = _default_config () in
+  assert_that c.stops_config.Weinstein_stops.correction_must_follow_peak
+    (equal_to false)
+
+let test_correction_must_follow_peak_resolves_via_overlay_validator _ =
+  let c = _apply "((stops_config ((correction_must_follow_peak true))))" in
+  assert_that c.stops_config.Weinstein_stops.correction_must_follow_peak
+    (equal_to true)
+
 let suite =
   "stop_flag_overlays"
   >::: [
@@ -38,6 +50,10 @@ let suite =
          >:: test_stop_ma_same_basis_defaults_off;
          "stop_ma_same_basis resolves via Overlay_validator"
          >:: test_stop_ma_same_basis_resolves_via_overlay_validator;
+         "correction_must_follow_peak defaults off"
+         >:: test_correction_must_follow_peak_defaults_off;
+         "correction_must_follow_peak resolves via Overlay_validator"
+         >:: test_correction_must_follow_peak_resolves_via_overlay_validator;
        ]
 
 let () = run_test_tt_main suite

@@ -427,6 +427,38 @@ type config = {
           the #2974 replay shows the fixed ratchet is not an obvious win (it
           may give back tail), so promotion needs a paired, V6-gated broad
           run. *)
+  correction_must_follow_peak : bool; [@sexp.default false]
+      (** When [true], a correction must be printed {b after} the peak it is
+          measured from. The [Trailing] correction extreme is seeded with the
+          [Initial -> Trailing] bar's close (not its low / high), and it resets
+          to the close whenever a bar prints a new trend extreme (a closing
+          high above [last_trend_extreme] for a long; a closing low below it
+          for a short) without completing a cycle. Default [false] keeps
+          today's running extreme since the last cycle reset, which can
+          predate the current peak.
+
+          {b Why (issue #2974 comment, 2026-09-26).} The cycle test is
+          [(peak -. low) /. peak >= min_correction_pct] and a close back at the
+          peak. With the low allowed to precede the peak — for the first cycle
+          it is the entry bar's own low — a pure ~8.7% advance with no pullback
+          at all "completes" a cycle and raises the stop: 44 of the 78 replayed
+          first Trailing raises (56%) on the 26y run had no 8% low-after-peak
+          pullback since the seed.
+
+          Scope: the correction extreme is carried {e after} the bar's cycle
+          check, so a pullback that completes on a new-high bar is still
+          measured in full against the prior peak. Cycle resets
+          ([_raised_trailing] / the stalled-cycle reset), the phantom-cycle
+          guard ([correction_observed_since_reset]) and the never-lower rule
+          are unchanged.
+
+          Faithful-core: book §5.2 / Ch. 6 — "After the first substantial
+          correction of at least 8 to 10 percent", and "don't raise the stop
+          until after the stock rallies well off the low ... back close to
+          prior peak" — the correction is a decline {e from} the peak, so this
+          is a faithfulness correction of the cycle detector, not a new
+          mechanism (W1/W2). Default-off experiment axis per
+          [.claude/rules/experiment-flag-discipline.md]. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable
