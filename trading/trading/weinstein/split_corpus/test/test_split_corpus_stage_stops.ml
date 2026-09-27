@@ -1,14 +1,16 @@
 (** Split corpus x stage classifier and stop machine (issue #2973).
 
-    Two basis consumers, run over every corpus entry. Each assertion is a
-    relative quantity that must not jump when the issuer splits:
+    Two basis consumers, run over every corpus entry:
 
-    - {b Stage classifier / 30-week MA.} The classifier's close/MA (adjusted
-      close over its own MA, the pair it decides Stage 2 on) moves across each
-      split week by less than half the split's own log ratio. A classifier fed
-      RAW closes would jump by about the whole ratio (4:1 is log 4 = 1.39; the
-      corpus's week-over-week moves stay under 0.2), so the bound separates the
-      two for the smallest ratio here (C's 4:3, log = 0.29).
+    - {b Stage classifier / 30-week MA reads one basis.} A metamorphic check at
+      each split week: the weekly bars are classified once as loaded (raw
+      O/H/L/C, split-adjusted [adjusted_close]) and once with O/H/L/C restated
+      into the window's final basis (every pre-split price divided by the
+      pending split product), [adjusted_close] untouched. The two results must
+      be identical — stage, MA value, MA direction, slope, above-MA count. A
+      classifier reading a raw price field anywhere (e.g. its MA or its close
+      over [close_price]) sees a split jump in one input and not the other, so
+      its MA and stage diverge at the split week.
     - {b Initial stop across the ex-date.} The stop placed the day before the
       split and rescaled by [Stop_split_adjust.scale] (what [Stops_split_runner]
       does) reads the ex-date bar exactly as the unscaled stop reads that bar
@@ -78,6 +80,17 @@ let _scale_bar k (b : Types.Daily_price.t) : Types.Daily_price.t =
     close_price = b.close_price *. k;
   }
 
+(** Product of the ratios of the entry's splits still ahead of [date]: dividing
+    a raw price on [date] by it restates the price in the window's final basis.
+*)
+let _pending_ratio (meta : Split_corpus.meta) date =
+  List.fold meta.splits ~init:1.0 ~f:(fun acc (s : Split_corpus.split) ->
+      if Date.( > ) s.ex_date date then acc *. s.ratio else acc)
+
+(** Restates O/H/L/C (not [adjusted_close]) into the window's final basis. *)
+let _restate meta (b : Types.Daily_price.t) =
+  _scale_bar (1.0 /. _pending_ratio meta b.date) b
+
 (* ------------------------------------------------------------------ *)
 (* Stage classifier                                                     *)
 (* ------------------------------------------------------------------ *)
@@ -92,24 +105,19 @@ let _classify weekly i =
     ~bars:(Array.to_list (Array.sub weekly ~pos:0 ~len:(i + 1)))
     ~prior_stage:None
 
-let _close_over_ma weekly i =
-  weekly.(i).Types.Daily_price.adjusted_close /. (_classify weekly i).ma_value
-
 let _split_week weekly (s : Split_corpus.split) =
   fst
     (Option.value_exn
        (Array.findi weekly ~f:(fun _ (b : Types.Daily_price.t) ->
             Date.( >= ) b.date s.ex_date)))
 
-(** Half the split's |log ratio| minus the |log| move of close/MA across the
-    split week: positive when the classifier's basis is continuous. *)
-let _stage_jump_headroom weekly (s : Split_corpus.split) =
-  let i = _split_week weekly s in
-  let jump =
-    Float.abs
-      (Float.log (_close_over_ma weekly i /. _close_over_ma weekly (i - 1)))
-  in
-  (Float.abs (Float.log s.ratio) /. 2.0) -. jump
+(** [(as loaded, O/H/L/C restated)] classifications at each split week. *)
+let _split_week_classifications (entry : Split_corpus.entry) =
+  let weekly = _weekly entry in
+  let restated = Array.map weekly ~f:(_restate entry.meta) in
+  List.map entry.meta.splits ~f:(fun s ->
+      let i = _split_week weekly s in
+      (_classify weekly i, _classify restated i))
 
 (* ------------------------------------------------------------------ *)
 (* Stops                                                                *)
@@ -138,16 +146,6 @@ let _split_day_views bars (s : Split_corpus.split) =
   let ex_pre_basis = _scale_bar s.ratio ex in
   ( (_hit post_state ex, _distance post_state ex),
     (_hit pre_state ex_pre_basis, _distance pre_state ex_pre_basis) )
-
-(** Product of the ratios of the entry's splits still ahead of [date]: dividing
-    a raw price on [date] by it restates the price in the window's final basis.
-*)
-let _pending_ratio (meta : Split_corpus.meta) date =
-  List.fold meta.splits ~init:1.0 ~f:(fun acc (s : Split_corpus.split) ->
-      if Date.( > ) s.ex_date date then acc *. s.ratio else acc)
-
-let _restate meta (b : Types.Daily_price.t) =
-  _scale_bar (1.0 /. _pending_ratio meta b.date) b
 
 type paths = {
   raw : Weinstein_stops.stop_state;  (** Raw dollars, scaled at each ex-date. *)
@@ -220,15 +218,15 @@ let _raises levels =
 (* Tests                                                                *)
 (* ------------------------------------------------------------------ *)
 
-let _test_close_over_ma_continuous name _ =
-  let entry = _load name in
-  let weekly = _weekly entry in
-  assert_that
-    (List.map entry.meta.splits ~f:(_stage_jump_headroom weekly))
+let _test_classifier_reads_one_basis name _ =
+  let pairs = _split_week_classifications (_load name) in
+  assert_that (List.map pairs ~f:snd)
     (all_of
        [
          field List.length (gt (module Int_ord) 0);
-         each (gt (module Float_ord) 0.0);
+         elements_are
+           (List.map pairs ~f:(fun (loaded, _) ->
+                equal_to (loaded : Stage.result)));
        ])
 
 let _test_split_day_stop_basis_invariant name _ =
@@ -271,7 +269,7 @@ let _per_entry label test =
 
 let suite =
   "split_corpus_stage_stops"
-  >::: _per_entry "close_over_ma_continuous" _test_close_over_ma_continuous
+  >::: _per_entry "classifier_reads_one_basis" _test_classifier_reads_one_basis
        @ _per_entry "split_day_stop_basis_invariant"
            _test_split_day_stop_basis_invariant
        @ _per_entry "trailing_stop_basis_invariant"
