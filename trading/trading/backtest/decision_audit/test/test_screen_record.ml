@@ -64,6 +64,7 @@ let _entry ?(entry_date = _date "2024-03-01") ?(symbol = "AAPL")
     side = Trading_base.Types.Long;
     suggested_entry = 100.0;
     close_at_decision = None;
+    adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
     suggested_stop = 92.0;

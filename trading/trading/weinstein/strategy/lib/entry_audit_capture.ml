@@ -14,6 +14,7 @@ type entry_meta = {
   split_safe_basis : Audit_recorder.split_safe_basis;
   effective_entry_price : float;
   close_at_decision : float option;
+  adjusted_close_at_decision : float option;
   sized_down_wide_stop : bool;
 }
 
@@ -70,10 +71,19 @@ let gen_position_id symbol =
 let _sizing_side_of_cand_side (side : Trading_base.Types.position_side) =
   match side with Long -> `Long | Short -> `Short
 
+(* The decision-time bar's two closes. [close_at_decision] stays RAW (it prices
+   the ticket); the adjusted twin is on the stage classifier's MA basis, so the
+   audit can print close-vs-MA on one basis (issue #2973). Audit-only. *)
+let _raw_close_of (bar : Types.Daily_price.t option) =
+  Option.map bar ~f:(fun b -> b.Types.Daily_price.close_price)
+
+let _adjusted_close_of (bar : Types.Daily_price.t option) =
+  Option.map bar ~f:(fun b -> b.Types.Daily_price.adjusted_close)
+
 (** Size the candidate and, on success, register the stop and build the
     transition + meta. Returns [Sized_zero] when share count rounds to 0. *)
 let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
-    ~current_date ~effective_entry ~close_at_decision ~initial_stop
+    ~current_date ~effective_entry ~decision_bar ~initial_stop
     ~(stop_tags : stop_tags) ~id ~stop_distance_pct ~max_stop_distance_pct
     (cand : Screener.scored_candidate) : entry_attempt_result =
   let installed_stop_level = Weinstein_stops.get_stop_level initial_stop in
@@ -111,7 +121,8 @@ let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
         stop_floor_kind = stop_tags.floor_kind;
         split_safe_basis = stop_tags.basis;
         effective_entry_price = effective_entry;
-        close_at_decision;
+        close_at_decision = _raw_close_of decision_bar;
+        adjusted_close_at_decision = _adjusted_close_of decision_bar;
         sized_down_wide_stop = stop_tags.sized_down;
       }
     in
@@ -125,12 +136,12 @@ let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
    risk-to-stop stays [risk_per_trade_pct * portfolio_value] either way.
    Extracted so {!make_entry_transition} stays inside the fn-length cap. *)
 let _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
-    ~stop_states ~current_date ~effective_entry ~close_at_decision ~initial_stop
+    ~stop_states ~current_date ~effective_entry ~decision_bar ~initial_stop
     ~floor_kind ~basis ~stop_distance_pct ~max_stop_distance_pct
     (cand : Screener.scored_candidate) : entry_attempt_result =
   let build ~sized_down =
     _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
-      ~current_date ~effective_entry ~close_at_decision ~initial_stop
+      ~current_date ~effective_entry ~decision_bar ~initial_stop
       ~stop_tags:{ floor_kind; basis; sized_down }
       ~id:(gen_position_id cand.ticker)
       ~stop_distance_pct ~max_stop_distance_pct cand
@@ -173,12 +184,13 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
     ?(stop_width = Stop_width_mode.default_policy) ~portfolio_risk_config
     ~stops_config ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value
     ~current_date (cand : Screener.scored_candidate) : entry_attempt_result =
-  let close_at_decision =
-    Entry_audit_helpers.latest_close ~bar_reader ~current_date cand
+  let decision_bar =
+    Entry_audit_helpers.latest_bar ~bar_reader ~current_date cand
   in
   let effective_entry =
     Entry_audit_helpers.effective_entry_of_close ~trigger_at_suggested
-      ~close:close_at_decision cand
+      ~close:(_raw_close_of decision_bar)
+      cand
   in
   (* The book §5.1 stop re-anchor only fires for the E-family entry: it pairs a
      stop just under the breakout base with an entry AT the breakout, so it is
@@ -206,9 +218,9 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
       ~max_stop_distance_pct cand
   else
     _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
-      ~stop_states ~current_date ~effective_entry ~close_at_decision
-      ~initial_stop ~floor_kind:stop_floor_kind ~basis:split_safe_basis
-      ~stop_distance_pct ~max_stop_distance_pct cand
+      ~stop_states ~current_date ~effective_entry ~decision_bar ~initial_stop
+      ~floor_kind:stop_floor_kind ~basis:split_safe_basis ~stop_distance_pct
+      ~max_stop_distance_pct cand
 
 (* Decide + apply the cash draw for a [CreateEntering] of [side] costing [cost].
    [borrow_ok] is [true] when long-margin leverage is engaged ([leverage_enabled],

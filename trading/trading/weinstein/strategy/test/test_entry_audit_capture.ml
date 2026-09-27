@@ -441,7 +441,11 @@ let test_event_close_at_decision_passthrough_and_empty_reader _ =
       ~candidate:cand ~meta ~alternatives:[]
   in
   assert_that event
-    (field (fun e -> e.Audit_recorder.close_at_decision) is_none)
+    (all_of
+       [
+         field (fun e -> e.Audit_recorder.close_at_decision) is_none;
+         field (fun e -> e.Audit_recorder.adjusted_close_at_decision) is_none;
+       ])
 
 (* ------------------------------------------------------------------ *)
 (* Book-faithful E-anchored entry trigger (user decision 2026-08-05)     *)
@@ -930,6 +934,7 @@ let _stub_trans_and_meta ?(split_safe_basis = Audit_recorder.Flag_off)
       split_safe_basis;
       effective_entry_price;
       close_at_decision = None;
+      adjusted_close_at_decision = None;
       sized_down_wide_stop;
     }
   in

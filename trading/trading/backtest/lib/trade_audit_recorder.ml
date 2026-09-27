@@ -162,6 +162,7 @@ let _entry_decision_of_event (e : AR.entry_event) : Trade_audit.entry_decision =
     side = cand.side;
     suggested_entry = cand.suggested_entry;
     close_at_decision = e.close_at_decision;
+    adjusted_close_at_decision = e.adjusted_close_at_decision;
     ma_value = Some analysis.stage.ma_value;
     local_range_top = analysis.local_range_top;
     suggested_stop = cand.suggested_stop;
