@@ -151,6 +151,59 @@ die() {
 #   ... run jj commands against "$REPO" ...
 #   jj_ita_guard_restore "$REPO" "$_before"
 
+# _porcelain_lines <repo>
+# Emit one "XY<SP>PATH" record per line -- the same shape as classic
+# `git status --porcelain=v1` output -- but derived from the `-z`
+# (NUL-delimited, unquoted) form instead.
+#
+# H-ITA-GUARD-QUOTED-PATHS: classic `--porcelain=v1` C-quotes any path
+# containing a space, a double quote, a backslash, or (by default,
+# core.quotePath=true) a non-ASCII byte -- wrapping it in `"..."` with
+# backslash escapes. `cut -c4-` against that quoted line returns the
+# quoted literal (e.g. `"weird file.txt"`), not the real path
+# (`weird file.txt`), so a guarded path with any of those characters
+# would never match the snapshot the guard restores from and would be
+# left polluted. `-z` disables quoting entirely and returns raw path
+# bytes, NUL-terminated, so this helper reproduces the old callers'
+# expected line shape while sourcing unquoted paths underneath.
+#
+# Rename/copy handling: under `-z`, a renamed or copied entry (X or Y
+# = R or C) emits a SECOND NUL-terminated field -- the origin path --
+# immediately after its own "XY PATH" record (verified empirically:
+# `R  new.txt\0old.txt\0`, new path first). Left unhandled, that raw
+# origin-path line would flow into callers' line-oriented `grep '^A'` /
+# `grep '^ A '` as if it were its own status record, and could falsely
+# match if the origin path happened to start with "A " or " A ". This
+# helper consumes and discards that continuation record so it never
+# reaches callers. The guard only ever cares about newly-added / ITA
+# entries (status "A*" or " A"), which are never R/C, so no rename
+# record itself is ever a match -- only its continuation line needed
+# guarding against.
+#
+# KNOWN LIMITATION: a path containing a literal newline byte (legal on
+# Linux, vanishingly rare, and not one of the quoting cases this fix
+# targets) is still ambiguous once reduced to one-record-per-line via
+# `tr '\0' '\n'` -- POSIX sh / dash has no NUL-delimited `read`, so
+# there is no portable way to iterate a NUL-delimited stream without
+# this reduction. This is a pre-existing limitation of shell line
+# processing in this file, not a regression from this fix.
+_porcelain_lines() {
+  _pl_repo="$1"
+  git -C "$_pl_repo" status --porcelain=v1 --untracked-files=no -z 2>/dev/null \
+    | tr '\0' '\n' \
+    | awk '
+        BEGIN { skip = 0 }
+        {
+          if (skip) { skip = 0; next }
+          x = substr($0, 1, 1)
+          y = substr($0, 2, 1)
+          if (x == "R" || x == "C" || y == "R" || y == "C") { skip = 1 }
+          print
+        }
+      ' \
+    || true
+}
+
 # jj_ita_guard_snapshot <repo>
 # Print the repo's currently-staged-as-a-new-file path set, one RECORD per
 # line, each record TAB-separated as:
@@ -195,7 +248,7 @@ die() {
 # 2026-09-25 investigation -- see dev/status/harness.md.
 jj_ita_guard_snapshot() {
   _snap_repo="$1"
-  git -C "$_snap_repo" status --porcelain=v1 --untracked-files=no 2>/dev/null \
+  _porcelain_lines "$_snap_repo" \
     | grep -E '^A|^ A ' \
     | while IFS= read -r _snap_line; do
         _snap_path=$(printf '%s' "$_snap_line" | cut -c4-)
@@ -262,18 +315,28 @@ jj_ita_guard_restore() {
   done <"$_guard_before_file"
   rm -f "$_guard_before_file"
 
-  git -C "$_guard_repo" status --porcelain=v1 --untracked-files=no 2>/dev/null \
+  _porcelain_lines "$_guard_repo" \
     | grep '^ A ' \
     | cut -c4- \
     | while IFS= read -r _guard_path; do
         [ -n "$_guard_path" ] || continue
         _guard_saved_cacheinfo=$(awk -F'\t' -v p="$_guard_path" '$1 == p {print $2}' "$_guard_before_cacheinfo_file")
         if [ -n "$_guard_saved_cacheinfo" ]; then
-          git -C "$_guard_repo" update-index --add --cacheinfo "${_guard_saved_cacheinfo},${_guard_path}" >/dev/null 2>&1
+          # H-ITA-GUARD-SILENT-RESTORE-FAIL: a failed restore must not exit
+          # 0 silently -- the guard stays non-fatal (callers should not be
+          # aborted by a restore-side git failure), but the failure has to
+          # be visible, or a polluted index looks identical to a clean one.
+          if ! _guard_err=$(git -C "$_guard_repo" update-index --add --cacheinfo "${_guard_saved_cacheinfo},${_guard_path}" 2>&1); then
+            printf 'WARN: jj_ita_guard_restore: failed to restore staged content for "%s" (git update-index --cacheinfo %s): %s\n' \
+              "$_guard_path" "$_guard_saved_cacheinfo" "$_guard_err" >&2
+          fi
         elif grep -Fxq "$_guard_path" "$_guard_before_paths_file"; then
           : # Already ITA before the guard started -- already the right shape.
         else
-          git -C "$_guard_repo" reset -- "$_guard_path" >/dev/null 2>&1
+          if ! _guard_err=$(git -C "$_guard_repo" reset -- "$_guard_path" 2>&1); then
+            printf 'WARN: jj_ita_guard_restore: failed to reset intent-to-add entry for "%s" (git reset -- %s): %s\n' \
+              "$_guard_path" "$_guard_path" "$_guard_err" >&2
+          fi
         fi
       done \
     || true

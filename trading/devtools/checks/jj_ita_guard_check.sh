@@ -239,6 +239,114 @@ else
   bad "${LABEL} — pre-existing staged state NOT preserved: exit=${PREEXIST_CODE} output='${PREEXIST_OUT}' before='${PREEXIST_STATUS_BEFORE}' after='${PREEXIST_STATUS_AFTER}' am_blob_before='${AM_BLOB_BEFORE}' am_blob_after='${AM_BLOB_AFTER}' am_worktree_after='${AM_WORKTREE_AFTER}' (expected exit 0, the pre-existing ITA path to remain ' A', the staged path to remain 'A ', the AM path to remain 'AM' with its staged blob and worktree content unchanged, and the untracked file to remain '??')"
 fi
 
+# ---------------------------------------------------------------------------
+# Part 5 (H-ITA-GUARD-QUOTED-PATHS): untracked files whose names classic
+# `git status --porcelain=v1` would C-quote -- one with an embedded space,
+# one with a non-ASCII byte -- must ALSO survive the guard as plain
+# untracked, never left as ' A'. Parts 1-4 only ever use plain-ASCII,
+# no-space filenames, so they cannot distinguish a guard that correctly
+# parses `-z` (unquoted) output from one still silently broken on any path
+# `cut -c4-` against classic QUOTED porcelain output would mis-parse: the
+# quoted form is `"weird file.txt"` (quotes included) or
+# `"\346\226\207...\.md"` (octal-escaped), neither of which is the real
+# on-disk path, so a pre-fix guard would never recognize these paths as
+# its own ITA pollution and would leave them polluted.
+#
+# The final-state assertion below deliberately reads `-z` output and
+# converts NUL -> newline itself (independent of `_porcelain_lines`, which
+# is the code under test) rather than matching a literal quoted-escape
+# string -- hard-coding the exact octal escape sequence git's classic form
+# would produce is locale/version-fragile and beside the point; what
+# matters is the path is plain `??`, not ' A'.
+# ---------------------------------------------------------------------------
+SBX5="$(_new_sandbox)"
+mkdir -p "${SBX5}/dev/daily"
+echo "in-progress summary" >"${SBX5}/dev/daily/2099-01-01 run summary.md"
+echo "in-progress summary" >"${SBX5}/dev/daily/2099-01-01-run-摘要.md"
+
+QUOTED_OUT=$(JJ_CONFIG="${JJ_CFG_DIR}" REPO_ROOT="$SBX5" sh "$JJ_SMOKE" 2>&1) && QUOTED_CODE=0 || QUOTED_CODE=$?
+# --untracked-files=all: without it git collapses an entirely-untracked
+# directory into a single "?? dev/" line (the same collapsing Part 2's
+# assertion relies on for its single test file) -- with two differently-
+# named files here, per-file visibility is required to tell them apart.
+QUOTED_STATUS_AFTER="$(git -C "$SBX5" status --porcelain=v1 -z --untracked-files=all | tr '\0' '\n')"
+
+if [ "$QUOTED_CODE" -eq 0 ] \
+  && printf '%s' "$QUOTED_OUT" | grep -q '^OK: jj_workspace_smoke' \
+  && printf '%s\n' "$QUOTED_STATUS_AFTER" | grep -qF '?? dev/daily/2099-01-01 run summary.md' \
+  && printf '%s\n' "$QUOTED_STATUS_AFTER" | grep -qF '?? dev/daily/2099-01-01-run-摘要.md'; then
+  ok "${LABEL} — fix (quoted paths): jj_workspace_smoke.sh passes and leaves BOTH a space-containing path and a non-ASCII path as plain untracked ('??'), not ' A' -- proves the guard's porcelain parsing survives paths classic --porcelain=v1 would C-quote"
+else
+  bad "${LABEL} — quoted-path fix broken: exit=${QUOTED_CODE} output='${QUOTED_OUT}' status-after='${QUOTED_STATUS_AFTER}' (expected exit 0, an OK: line, and both paths as plain '??')"
+fi
+
+# ---------------------------------------------------------------------------
+# Part 6 (H-ITA-GUARD-SILENT-RESTORE-FAIL): a restore-side git failure must
+# print a named WARN: line to stderr, not be swallowed silently -- while
+# jj_ita_guard_restore still returns 0 (stays non-fatal, per its docstring
+# contract: "Safe to call even if nothing changed"). Forced deterministically
+# via a stray `.git/index.lock` file, which fails EVERY git index-writing
+# command with exit 128 regardless of file permissions -- a chmod-based
+# forcing approach would not survive running as root, which this suite does
+# in CI.
+#
+# Two sub-cases, one per failing call site the docstring names:
+#   6a: the plain-ITA-reset branch (`git reset -- <path>`).
+#   6b: the cacheinfo-restore branch (`git update-index --add --cacheinfo`).
+# Both call jj_ita_guard_snapshot/_restore DIRECTLY (available as shell
+# functions via the `. _check_lib.sh` source line above) rather than going
+# through jj_workspace_smoke.sh, so the forced git-level failure is
+# deterministic and does not depend on jj's own behaviour.
+# ---------------------------------------------------------------------------
+
+# --- 6a: git reset -- <path> fails ---
+SBX6A="$(_new_sandbox)"
+mkdir -p "${SBX6A}/dev/daily"
+echo "in-progress summary" >"${SBX6A}/dev/daily/2099-01-01-reset-fail.md"
+BEFORE_6A=$(jj_ita_guard_snapshot "$SBX6A")
+# Simulate jj's ITA side effect directly (same shape `jj workspace add/list/
+# forget` produces against a colocated repo -- see Part 1's negative control).
+( cd "$SBX6A" && git add -N dev/daily/2099-01-01-reset-fail.md )
+
+touch "${SBX6A}/.git/index.lock"
+RESTORE_6A_OUT=$(jj_ita_guard_restore "$SBX6A" "$BEFORE_6A" 2>&1) && RESTORE_6A_CODE=0 || RESTORE_6A_CODE=$?
+rm -f "${SBX6A}/.git/index.lock"
+STATUS_6A_AFTER="$(git -C "$SBX6A" status --porcelain=v1 --untracked-files=no)"
+
+if [ "$RESTORE_6A_CODE" -eq 0 ] \
+  && printf '%s\n' "$RESTORE_6A_OUT" | grep -qF 'WARN: jj_ita_guard_restore: failed to reset intent-to-add entry for "dev/daily/2099-01-01-reset-fail.md"' \
+  && printf '%s\n' "$STATUS_6A_AFTER" | grep -qF ' A dev/daily/2099-01-01-reset-fail.md'; then
+  ok "${LABEL} — forced restore failure (reset branch): jj_ita_guard_restore returns 0 (stays non-fatal) but prints a named WARN: line to stderr when 'git reset -- <path>' fails, and the path is left ' A' -- proving the WARN corresponds to a real, still-polluted failure, not a false alarm"
+else
+  bad "${LABEL} — forced restore failure (reset branch) not surfaced: exit=${RESTORE_6A_CODE} output='${RESTORE_6A_OUT}' status-after='${STATUS_6A_AFTER}' (expected exit 0, a WARN: line naming the path, and the path still ' A')"
+fi
+
+# --- 6b: git update-index --add --cacheinfo fails ---
+SBX6B="$(_new_sandbox)"
+mkdir -p "${SBX6B}/dev/daily"
+echo "staged X" >"${SBX6B}/dev/daily/2099-01-01-cacheinfo-fail.md"
+( cd "$SBX6B" && git add dev/daily/2099-01-01-cacheinfo-fail.md )
+echo "staged X edited" >>"${SBX6B}/dev/daily/2099-01-01-cacheinfo-fail.md"
+BEFORE_6B=$(jj_ita_guard_snapshot "$SBX6B")
+# Simulate jj workspace forget's reshape of a staged-then-edited ("AM") path
+# into ITA (empty blob) -- exactly the sequence documented above
+# jj_ita_guard_snapshot: git rm --cached -f (drop the index entry) then
+# git add -N (re-add as intent-to-add, empty blob), worktree left untouched.
+( cd "$SBX6B" && git rm --cached -f -q dev/daily/2099-01-01-cacheinfo-fail.md && git add -N dev/daily/2099-01-01-cacheinfo-fail.md )
+
+touch "${SBX6B}/.git/index.lock"
+RESTORE_6B_OUT=$(jj_ita_guard_restore "$SBX6B" "$BEFORE_6B" 2>&1) && RESTORE_6B_CODE=0 || RESTORE_6B_CODE=$?
+rm -f "${SBX6B}/.git/index.lock"
+STATUS_6B_AFTER="$(git -C "$SBX6B" status --porcelain=v1 --untracked-files=no)"
+
+if [ "$RESTORE_6B_CODE" -eq 0 ] \
+  && printf '%s\n' "$RESTORE_6B_OUT" | grep -qF 'WARN: jj_ita_guard_restore: failed to restore staged content for "dev/daily/2099-01-01-cacheinfo-fail.md"' \
+  && printf '%s\n' "$STATUS_6B_AFTER" | grep -qF ' A dev/daily/2099-01-01-cacheinfo-fail.md'; then
+  ok "${LABEL} — forced restore failure (cacheinfo branch): jj_ita_guard_restore returns 0 (stays non-fatal) but prints a named WARN: line to stderr when 'git update-index --add --cacheinfo' fails, and the path is left ' A' with its blob NOT restored -- proving the WARN corresponds to a real, still-polluted failure"
+else
+  bad "${LABEL} — forced restore failure (cacheinfo branch) not surfaced: exit=${RESTORE_6B_CODE} output='${RESTORE_6B_OUT}' status-after='${STATUS_6B_AFTER}' (expected exit 0, a WARN: line naming the path, and the path still ' A')"
+fi
+
 if [ "$FAIL" -gt 0 ]; then
   echo "FAIL: ${LABEL} — ${PASS} passed, ${FAIL} failed." >&2
   exit 1
