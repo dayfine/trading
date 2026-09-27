@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-27",
+  "feature": "split-corpus",
+  "branch": "feat/split-corpus",
+  "sha": "90fc404ac1db47d4f4330124f8572b00a797e0e7",
+  "recorded_at_ns": 1790530181296937244,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 3,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

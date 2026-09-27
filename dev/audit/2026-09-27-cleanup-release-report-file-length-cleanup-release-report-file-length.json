@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-27",
+  "feature": "cleanup-release-report-file-length",
+  "branch": "cleanup/release-report-file-length",
+  "sha": "78b4bb64bef1650f62506565651d3024084d0f9c",
+  "recorded_at_ns": 1790530181478252642,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

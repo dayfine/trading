@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-27",
+  "feature": "stop-decision-audit",
+  "branch": "feat/stop-decision-audit",
+  "sha": "b9c0ed4ca0e484a74ed3aefdd031445180acb388",
+  "recorded_at_ns": 1790530181226767800,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
