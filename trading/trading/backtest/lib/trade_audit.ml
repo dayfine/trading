@@ -65,6 +65,7 @@ type entry_decision = {
   side : Trading_base.Types.position_side;
   suggested_entry : float;
   close_at_decision : float option; [@sexp.option]
+  adjusted_close_at_decision : float option; [@sexp.option]
   ma_value : float option; [@sexp.option]
   local_range_top : float option; [@sexp.option]
   suggested_stop : float;
@@ -128,27 +129,8 @@ type audit_record = {
 }
 [@@deriving sexp]
 
-type cascade_summary = {
-  date : Date.t;
-  total_stocks : int;
-  candidates_after_held : int;
-  macro_trend : Weinstein_types.market_trend;
-  breadth_state : Weinstein_types.breadth_state;
-      [@sexp.default Weinstein_types.Neutral_breadth]
-  long_macro_admitted : int;
-  long_breakout_admitted : int;
-  long_sector_admitted : int;
-  long_grade_admitted : int;
-  long_top_n_admitted : int;
-  short_macro_admitted : int;
-  short_breakdown_admitted : int;
-  short_sector_admitted : int;
-  short_rs_hard_gate_admitted : int;
-  short_grade_admitted : int;
-  short_top_n_admitted : int;
-  entered : int;
-}
-[@@deriving sexp]
+(* [cascade_summary] (+ its sexp converters) lives in [Trade_audit_cascade]. *)
+include Trade_audit_cascade
 
 type audit_blob = {
   audit_records : audit_record list;

@@ -48,6 +48,7 @@ let build_entry_event ~(macro : Macro.result) ~current_date
     macro;
     current_date;
     close_at_decision = meta.close_at_decision;
+    adjusted_close_at_decision = meta.adjusted_close_at_decision;
     installed_stop = meta.installed_stop;
     stop_floor_kind = meta.stop_floor_kind;
     split_safe_basis = meta.split_safe_basis;
