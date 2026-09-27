@@ -208,8 +208,8 @@ type entry_decision = {
           split factor apart (NVDA 2021-04-23: close 610.61 vs MA 13.67). Read
           close-vs-MA as [adjusted_close_at_decision /. ma_value]; keep
           [close_at_decision] for close-vs-E, which is raw on both sides.
-          Reporting only — no decision reads it. [None] when the bar reader
-          had no bars, and absent in files written before the field existed. *)
+          Reporting only — no decision reads it. [None] when the bar reader had
+          no bars, and absent in files written before the field existed. *)
   ma_value : float option; [@sexp.option]
       (** The stage classifier's MA level at decision time
           ([Stock_analysis.t.stage.ma_value]). Complements the existing

@@ -5,10 +5,10 @@
 
     - the corpus holds exactly the pinned entries (a dropped or renamed window
       fails here rather than silently shrinking every consumer column);
-    - the production split detector ({!Types.Split_detector.detect_split}),
-      run over every consecutive bar pair, finds exactly the meta's splits —
-      same ex-dates, same ratios — and nothing else (no dividend false
-      positive inside any window);
+    - the production split detector ({!Types.Split_detector.detect_split}), run
+      over every consecutive bar pair, finds exactly the meta's splits — same
+      ex-dates, same ratios — and nothing else (no dividend false positive
+      inside any window);
     - each meta factor matches the bars' own [adjusted_close /. close] on either
       side of the ex-date, and the meta is internally consistent
       ([factor_after /. factor_before = ratio]);
@@ -44,7 +44,8 @@ let _root () =
 
 let _load name = Split_corpus.load ~root:(_root ()) name
 
-(** Every [(date, ratio)] the production detector finds over consecutive bars. *)
+(** Every [(date, ratio)] the production detector finds over consecutive bars.
+*)
 let _detected_splits (bars : Types.Daily_price.t list) =
   List.zip_exn (List.drop_last_exn bars) (List.tl_exn bars)
   |> List.filter_map ~f:(fun ((prev : Types.Daily_price.t), curr) ->
@@ -52,7 +53,8 @@ let _detected_splits (bars : Types.Daily_price.t list) =
         ~f:(fun ratio -> (curr.Types.Daily_price.date, ratio)))
 
 let _bar_on bars date =
-  List.find_exn bars ~f:(fun (b : Types.Daily_price.t) -> Date.equal b.date date)
+  List.find_exn bars ~f:(fun (b : Types.Daily_price.t) ->
+      Date.equal b.date date)
 
 let _bar_before bars date =
   List.last_exn
@@ -128,7 +130,10 @@ let _per_entry label test =
 
 let suite =
   "split_corpus"
-  >::: [ "corpus_holds_the_pinned_entries" >:: test_corpus_holds_the_pinned_entries ]
+  >::: [
+         "corpus_holds_the_pinned_entries"
+         >:: test_corpus_holds_the_pinned_entries;
+       ]
        @ _per_entry "detector_finds_exactly_the_meta_splits"
            _test_detector_finds_exactly_the_meta_splits
        @ _per_entry "meta_factors_match_bars" _test_meta_factors_match_bars

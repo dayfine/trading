@@ -2,15 +2,16 @@
 
     The 26y walkthrough read NVDA's 2021-04-23 entry as close 610.61 beside MA
     13.67. Both numbers were right, on different bases: [close_at_decision] is
-    the RAW close (it prices the ticket), while the MA is the stage classifier's,
-    built from ADJUSTED closes — and the corpus vintage back-adjusts NVDA for
-    its later 4:1 (2021) and 10:1 (2024) splits, a 40x factor.
+    the RAW close (it prices the ticket), while the MA is the stage
+    classifier's, built from ADJUSTED closes — and the corpus vintage
+    back-adjusts NVDA for its later 4:1 (2021) and 10:1 (2024) splits, a 40x
+    factor.
 
-    The trading decision was never mixed: the classifier compares adjusted
-    close with adjusted MA, and the ticket is raw on both sides. The defect was
-    the record printing one of each. The fix adds
-    [adjusted_close_at_decision], so the audit reports close-vs-MA on the
-    classifier's (adjusted) basis while [close_at_decision] stays raw.
+    The trading decision was never mixed: the classifier compares adjusted close
+    with adjusted MA, and the ticket is raw on both sides. The defect was the
+    record printing one of each. The fix adds [adjusted_close_at_decision], so
+    the audit reports close-vs-MA on the classifier's (adjusted) basis while
+    [close_at_decision] stays raw.
 
     Driven through the real [Entry_audit_capture.make_entry_transition] on the
     corpus's real NVDA bars, so a mis-wire of either close (raw where adjusted
@@ -104,8 +105,8 @@ let _macro (stage : Stage.result) : Macro.result =
     rationale = [ "split corpus" ];
   }
 
-(** The audit [entry_event] for the NVDA 2021-04-23 entry, plus the
-    classifier result it was built from. *)
+(** The audit [entry_event] for the NVDA 2021-04-23 entry, plus the classifier
+    result it was built from. *)
 let _entry_event () =
   let entry = _load () in
   let stage = _stage_on_decision_date entry in
@@ -143,7 +144,8 @@ let test_entry_audit_reports_close_vs_ma_on_one_basis _ =
            (fun (e : Audit_recorder.entry_event) -> e.close_at_decision)
            (is_some_and (float_equal _raw_close));
          field
-           (fun (e : Audit_recorder.entry_event) -> e.adjusted_close_at_decision)
+           (fun (e : Audit_recorder.entry_event) ->
+             e.adjusted_close_at_decision)
            (is_some_and (float_equal _adjusted_close));
          field
            (fun (e : Audit_recorder.entry_event) ->

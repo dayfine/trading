@@ -114,12 +114,12 @@ type entry_event = {
           lets the audit compare [candidate.suggested_entry] against the
           decision-time close without re-reading raw bars. *)
   adjusted_close_at_decision : float option;
-      (** The same bar's [adjusted_close] — the basis the stage classifier's
-          MA ([candidate.analysis.stage.ma_value]) is computed on. Pair it,
-          not the RAW [close_at_decision], with the MA: across a later split
-          the raw close sits a whole split factor away from the MA (issue
-          #2973, NVDA 2021-04-23: raw 610.61, adjusted 15.21, MA 13.67).
-          Audit-only; [None] exactly when [close_at_decision] is [None]. *)
+      (** The same bar's [adjusted_close] — the basis the stage classifier's MA
+          ([candidate.analysis.stage.ma_value]) is computed on. Pair it, not the
+          RAW [close_at_decision], with the MA: across a later split the raw
+          close sits a whole split factor away from the MA (issue #2973, NVDA
+          2021-04-23: raw 610.61, adjusted 15.21, MA 13.67). Audit-only; [None]
+          exactly when [close_at_decision] is [None]. *)
   installed_stop : float;
       (** Output of
           [Weinstein_stops.compute_initial_stop_with_floor_with_callbacks]'s

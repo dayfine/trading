@@ -10,19 +10,18 @@
       corpus's week-over-week moves stay under 0.2), so the bound separates the
       two for the smallest ratio here (C's 4:3, log = 0.29).
     - {b Initial stop across the ex-date.} The stop placed the day before the
-      split and rescaled by [Stop_split_adjust.scale] (what
-      [Stops_split_runner] does) reads the ex-date bar exactly as the unscaled
-      stop reads that bar restated in pre-split dollars: same hit decision,
-      same stop distance %.
+      split and rescaled by [Stop_split_adjust.scale] (what [Stops_split_runner]
+      does) reads the ex-date bar exactly as the unscaled stop reads that bar
+      restated in pre-split dollars: same hit decision, same stop distance %.
     - {b Trailing ratchet over the window.} The stop machine driven weekly in
       RAW dollars (scaled at each ex-date) and in the window's final basis
       (every pre-split price divided by the pending split product) keeps the
       same stop, relative to price, all window long. The MA fed to
       [Weinstein_stops.update] is the classifier's adjusted MA restated into
-      each bar's raw basis ([ma /. adjustment_factor bar]) — NOTE the
-      production [Stops_runner] does not do this restatement today (it passes
-      the adjusted MA beside a raw bar); that is reported on issue #2973 as a
-      decision-level finding, not fixed here. This test pins the machine's own
+      each bar's raw basis ([ma /. adjustment_factor bar]) — NOTE the production
+      [Stops_runner] does not do this restatement today (it passes the adjusted
+      MA beside a raw bar); that is reported on issue #2973 as a decision-level
+      finding, not fixed here. This test pins the machine's own
       basis-equivariance, which any fix will rely on. *)
 
 open OUnit2
@@ -62,7 +61,8 @@ let _load name : Split_corpus.entry =
   | None -> assert_failure "trading/test_data/split_corpus not found above cwd"
 
 let _bar_on bars date =
-  List.find_exn bars ~f:(fun (b : Types.Daily_price.t) -> Date.equal b.date date)
+  List.find_exn bars ~f:(fun (b : Types.Daily_price.t) ->
+      Date.equal b.date date)
 
 let _bar_before bars date =
   List.last_exn
@@ -106,7 +106,8 @@ let _split_week weekly (s : Split_corpus.split) =
 let _stage_jump_headroom weekly (s : Split_corpus.split) =
   let i = _split_week weekly s in
   let jump =
-    Float.abs (Float.log (_close_over_ma weekly i /. _close_over_ma weekly (i - 1)))
+    Float.abs
+      (Float.log (_close_over_ma weekly i /. _close_over_ma weekly (i - 1)))
   in
   (Float.abs (Float.log s.ratio) /. 2.0) -. jump
 
@@ -139,8 +140,8 @@ let _split_day_views bars (s : Split_corpus.split) =
     (_hit pre_state ex_pre_basis, _distance pre_state ex_pre_basis) )
 
 (** Product of the ratios of the entry's splits still ahead of [date]: dividing
-    a raw price on [date] by it restates the price in the window's final
-    basis. *)
+    a raw price on [date] by it restates the price in the window's final basis.
+*)
 let _pending_ratio (meta : Split_corpus.meta) date =
   List.fold meta.splits ~init:1.0 ~f:(fun acc (s : Split_corpus.split) ->
       if Date.( > ) s.ex_date date then acc *. s.ratio else acc)
@@ -177,8 +178,9 @@ let _step (meta : Split_corpus.meta) ~weekly ~bars acc i =
   {
     raw = _advance cls ~bar ~ma:ma_raw raw_state;
     restated =
-      _advance cls ~bar:(_scale_bar (1.0 /. k) bar) ~ma:(ma_raw /. k)
-        acc.restated;
+      _advance cls
+        ~bar:(_scale_bar (1.0 /. k) bar)
+        ~ma:(ma_raw /. k) acc.restated;
     last_date = bar.date;
   }
 

@@ -189,7 +189,8 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
   in
   let effective_entry =
     Entry_audit_helpers.effective_entry_of_close ~trigger_at_suggested
-      ~close:(_raw_close_of decision_bar) cand
+      ~close:(_raw_close_of decision_bar)
+      cand
   in
   (* The book §5.1 stop re-anchor only fires for the E-family entry: it pairs a
      stop just under the breakout base with an entry AT the breakout, so it is
@@ -217,9 +218,9 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
       ~max_stop_distance_pct cand
   else
     _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
-      ~stop_states ~current_date ~effective_entry ~decision_bar
-      ~initial_stop ~floor_kind:stop_floor_kind ~basis:split_safe_basis
-      ~stop_distance_pct ~max_stop_distance_pct cand
+      ~stop_states ~current_date ~effective_entry ~decision_bar ~initial_stop
+      ~floor_kind:stop_floor_kind ~basis:split_safe_basis ~stop_distance_pct
+      ~max_stop_distance_pct cand
 
 (* Decide + apply the cash draw for a [CreateEntering] of [side] costing [cost].
    [borrow_ok] is [true] when long-margin leverage is engaged ([leverage_enabled],
