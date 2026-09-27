@@ -4,7 +4,7 @@
     The gate rule itself ({!Screener.longs_admitted_by_index_stage}) and its
     effect on a screener-lib [config] are pinned in
     [analysis/weinstein/screener/test/test_index_stage_veto_gate.ml]. This file
-    pins the four things only the strategy can show:
+    pins the five things only the strategy can show:
 
     - the top-level config field survives a sexp round-trip under its own name
       and defaults to [false] when absent, which is what makes it a
@@ -15,8 +15,11 @@
       pre-registered experiment reads,
     - the F2 {b resting-ticket} re-screen asks the same question, so a resting
       long ticket is cancelled under a Stage-4 index rather than quietly
-      surviving a tape that rejects every fresh candidate, and
-    - the short side is untouched by the long-side veto.
+      surviving a tape that rejects every fresh candidate,
+    - the short side is untouched by the long-side veto, and
+    - (#2976) a ticket suspended under a Stage-4 index is re-issued exactly once
+      on the re-admit week: the cascade treats it as held and does not write a
+      second, fresh ticket beside it.
 
     Driven through
     {!Weinstein_strategy.Weinstein_strategy_macro.run_screen_after_macro}, which
@@ -462,6 +465,77 @@ let test_a_fresh_candidate_survives_a_stage3_index_when_the_flag_is_on _ =
          elements_are [ equal_to _fresh_symbol ];
        ])
 
+(* ------------------------------------------------------------------ *)
+(* #2976 suspension under a Stage-4 index, at the screen                *)
+(* ------------------------------------------------------------------ *)
+
+(** One real Friday screen over [_fresh_symbol] with
+    [entry_ticket_macro_suspend = On_index_stage4] (the F2 halves off, so every
+    withdrawal and re-issue is the suspension's), sharing [suspended_tickets]
+    across calls. Returns the screen's transitions. *)
+let _suspend_screen ~suspended_tickets ~positions index_stage =
+  WSM.run_screen_after_macro ~pending_entry_e:(Entry_freeze.create ())
+    ~suspended_tickets ~fold_start_date:None ~universe_membership_at:None
+    ~config:
+      {
+        (_config ~index_symbol:_fresh_index_symbol ~universe:[ _fresh_symbol ]
+           ())
+        with
+        entry_ticket_macro_suspend = Entry_ticket_suspend_mode.On_index_stage4;
+        enable_entry_ticket_rescreen = false;
+      }
+    ~stop_states:(ref String.Map.empty)
+    ~last_stop_out_dates:(Hashtbl.create (module String))
+    ~bar_reader:_fresh_bar_reader
+    ~prior_stages:(Hashtbl.create (module String))
+    ~sector_prior_stages:(Hashtbl.create (module String))
+    ~ticker_sectors:(Hashtbl.create (module String))
+    ~get_price:_fresh_get_price
+    ~portfolio:{ cash = 100_000.0; positions = _positions positions }
+    ~current_date:_friday ~index_view:_fresh_index_view
+    ~audit_recorder:Audit_recorder.noop ~macro_result:(_macro_with ~index_stage)
+
+let _cancel_reasons transitions =
+  List.filter_map transitions ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.CancelEntry { reason } -> Some (t.position_id, reason)
+      | _ -> None)
+
+let _created_symbols transitions =
+  List.filter_map transitions ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.CreateEntering { symbol; _ } -> Some symbol
+      | _ -> None)
+
+(** The re-admit week at the screen. Week 1 (Stage-4 index): the ticket resting
+    on [_fresh_symbol] is withdrawn with the suspension reason. Week 2 (Stage-2
+    index, the simulator having closed the withdrawn position, so the portfolio
+    is empty): [_fresh_symbol] also qualifies as a fresh cascade candidate, yet
+    exactly ONE [CreateEntering] goes out for it — the re-issue. The suspended
+    symbol counts as held for the cascade, so the screener does not write a
+    second ticket beside it.
+
+    MUTATION: dropping [@ suspended_held] from [_run_screener]'s [~held_tickers]
+    lets the cascade admit [_fresh_symbol] as fresh and turns week 2 into two
+    [CreateEntering]s. *)
+let test_a_suspended_ticket_is_reissued_once_not_rewritten_by_the_cascade _ =
+  let suspended_tickets = Entry_ticket_suspend.create () in
+  let week1 =
+    _suspend_screen ~suspended_tickets
+      ~positions:
+        [
+          _resting_ticket ~id:"F1" ~symbol:_fresh_symbol
+            ~side:Trading_base.Types.Long;
+        ]
+      _stage4
+  in
+  let week2 = _suspend_screen ~suspended_tickets ~positions:[] _stage2 in
+  assert_that
+    (_cancel_reasons week1, _created_symbols week2)
+    (pair
+       (elements_are [ equal_to ("F1", Entry_ticket_suspend.cancel_reason) ])
+       (elements_are [ equal_to _fresh_symbol ]))
+
 let suite =
   "index_stage_veto_blocks_longs"
   >::: [
@@ -480,6 +554,8 @@ let suite =
          >:: test_a_fresh_stage2_candidate_is_rejected_under_a_stage4_index;
          "a fresh candidate survives a Stage3 index when the flag is on"
          >:: test_a_fresh_candidate_survives_a_stage3_index_when_the_flag_is_on;
+         "a suspended ticket is re-issued once, not rewritten by the cascade"
+         >:: test_a_suspended_ticket_is_reissued_once_not_rewritten_by_the_cascade;
        ]
 
 let () = run_test_tt_main suite

@@ -32,7 +32,10 @@
       stashed ticket is re-emitted as a [CreateEntering] with the identical
       parameters (under a fresh position id — a closed position cannot be
       reopened) and its stop state re-installed, so the order that reaches the
-      simulator is the order that was withdrawn.
+      simulator is the order that was withdrawn. A re-issued ticket does not
+      re-run the entry walk's cash / sizing / exposure checks in its re-admit
+      week (nor count toward the notional that week's fresh entries are sized
+      against); the simulator's fill-time portfolio rejection still applies.
     - {b Age.} Suspension time {b counts} toward [entry_order_max_rest_weeks]: a
       ticket is as old as its first placement, not its latest re-issue. The
       alternative (pausing the clock) would let a ticket outlive the TTL by the

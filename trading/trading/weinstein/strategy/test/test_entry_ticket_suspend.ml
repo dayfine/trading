@@ -43,23 +43,32 @@ let _unwrap = function
   | Ok p -> p
   | Error err -> assert_failure ("position setup failed: " ^ Status.show err)
 
-(** A resting (wholly unfilled) [Entering] ticket. *)
-let _entering ?(side = Trading_base.Types.Long) ~id ~symbol ~created () =
-  Position.create_entering
-    {
-      position_id = id;
-      date = created;
-      kind =
-        Position.CreateEntering
-          {
-            symbol;
-            side;
-            target_quantity = 10.0;
-            entry_price = 100.0;
-            reasoning = _reasoning;
-          };
-    }
-  |> _unwrap
+(** A resting [Entering] ticket — wholly unfilled unless [filled] books a
+    partial fill of that many shares. *)
+let _entering ?(side = Trading_base.Types.Long) ?(filled = 0.0) ~id ~symbol
+    ~created () =
+  let trans kind : Position.transition =
+    { position_id = id; date = created; kind }
+  in
+  let pos =
+    Position.create_entering
+      (trans
+         (Position.CreateEntering
+            {
+              symbol;
+              side;
+              target_quantity = 10.0;
+              entry_price = 100.0;
+              reasoning = _reasoning;
+            }))
+    |> _unwrap
+  in
+  if Float.equal filled 0.0 then pos
+  else
+    Position.apply_transition pos
+      (trans
+         (Position.EntryFill { filled_quantity = filled; fill_price = 100.0 }))
+    |> _unwrap
 
 let _positions ps =
   List.map ps ~f:(fun (p : Position.t) -> (p.id, p)) |> String.Map.of_alist_exn
@@ -101,8 +110,9 @@ let _config ?(max_rest_weeks = 0) mode =
 let _no_cancels _ = []
 
 let _run ?(cancel_expired = _no_cancels) ?(stop_states = ref String.Map.empty)
-    ~store ~config ~macro_result ~positions ~date () =
-  Entry_ticket_suspend.run ~store ~config ~macro_result ~stop_states
+    ?pending_entry_e ~store ~config ~macro_result ~positions ~date () =
+  Entry_ticket_suspend.run ~store ?pending_entry_e ~config ~macro_result
+    ~stop_states
     ~portfolio:{ cash = 100_000.0; positions = _positions positions }
     ~current_date:date ~cancel_expired ()
 
@@ -326,6 +336,265 @@ let test_f2_cancel_wins_over_suspension _ =
     (pair (elements_are [ equal_to ttl_cancel ]) is_empty)
 
 (* ------------------------------------------------------------------ *)
+(* Guards: partial fills, held-elsewhere, pin release, clock wiring     *)
+(* ------------------------------------------------------------------ *)
+
+(** A partially filled long [Entering] has booked shares, so a suspending tape
+    leaves it alone: no withdrawal, nothing stashed, nothing held. A wholly
+    unfilled ticket on the same tape is the control that does get withdrawn.
+
+    MUTATION: weakening [_resting_long]'s unfilled-only guard
+    ([Float.equal e.filled_quantity 0.0]) lets the partial fill through and
+    turns the first element red. *)
+let test_partial_fill_is_not_suspended _ =
+  let suspend_of ~filled =
+    _run
+      ~store:(Entry_ticket_suspend.create ())
+      ~config:(_config Mode.On_bearish_macro)
+      ~macro_result:_bearish
+      ~positions:
+        [
+          _entering ~filled ~id:"L1" ~symbol:_long_symbol
+            ~created:(Date.add_days _friday (-_week))
+            ();
+        ]
+      ~date:_friday ()
+  in
+  assert_that
+    [ suspend_of ~filled:4.0; suspend_of ~filled:0.0 ]
+    (elements_are
+       [
+         pair is_empty is_empty;
+         pair
+           (elements_are [ equal_to (_suspension_of "L1") ])
+           (elements_are [ equal_to _long_symbol ]);
+       ])
+
+(** Minimal long [Screener.scored_candidate] for probing the {!Entry_freeze} pin
+    table — [Entry_freeze.apply] reads only [ticker] and [suggested_entry], but
+    the record must be fully populated. *)
+let _candidate ~entry : Screener.scored_candidate =
+  let stage : Stage.result =
+    {
+      stage = _stage2;
+      ma_value = entry *. 0.9;
+      ma_direction = Weinstein_types.Rising;
+      ma_slope_pct = 0.02;
+      transition = None;
+      above_ma_count = 3;
+    }
+  in
+  let analysis : Stock_analysis.t =
+    {
+      ticker = _long_symbol;
+      stage;
+      rs = None;
+      volume = None;
+      breakout_price = Some entry;
+      breakdown_price = None;
+      local_range_top = None;
+      resistance = None;
+      support = None;
+      prior_stage = None;
+      continuation = None;
+      supply = None;
+      virgin_readmission = false;
+      range_top_freshness = None;
+      require_breakout_volume = true;
+      current_close = None;
+      as_of_date = _friday;
+    }
+  in
+  {
+    ticker = _long_symbol;
+    analysis;
+    sector =
+      { sector_name = "Tech"; rating = Screener.Neutral; stage = stage.stage };
+    side = Trading_base.Types.Long;
+    grade = Weinstein_types.A;
+    score = 70;
+    suggested_entry = entry;
+    suggested_stop = entry *. 0.95;
+    risk_pct = 0.05;
+    swing_target = None;
+    rationale = [ "suspend test" ];
+  }
+
+let _pinned_entry = 100.0
+let _probe_entry = 130.0
+
+(** A pin table holding [_long_symbol] at [_pinned_entry]. *)
+let _pinned () =
+  let pins = Entry_freeze.create () in
+  let (_ : Screener.scored_candidate list) =
+    Entry_freeze.apply ~enabled:true ~pending:pins
+      ~held_set:(String.Set.singleton _long_symbol)
+      ~candidates:[ _candidate ~entry:_pinned_entry ]
+  in
+  pins
+
+(** The [E] a re-qualifying [_long_symbol] would carry: [_pinned_entry] while
+    the pin survives, the fresh [_probe_entry] once it has been released. *)
+let _entry_after_requalifying pins =
+  Entry_freeze.apply ~enabled:true ~pending:pins
+    ~held_set:(String.Set.singleton _long_symbol)
+    ~candidates:[ _candidate ~entry:_probe_entry ]
+  |> List.map ~f:(fun (c : Screener.scored_candidate) -> c.suggested_entry)
+
+(** Clock of 4 weeks, ticket placed 3 weeks before it is suspended, with a
+    no-chase pin on its symbol. Re-admitted one week later (within the clock) it
+    is re-issued and the pin is kept; two weeks later (past the clock) the
+    stashed ticket is dropped AND its pin is released, so a later
+    re-qualification earns a fresh [E].
+
+    MUTATION: removing [Entry_freeze.release] from [_drop] leaves the expired
+    arm reading [_pinned_entry] and turns the second element red. *)
+let test_expired_stash_releases_its_entry_pin _ =
+  let entry_after ~weeks_later =
+    let store = Entry_ticket_suspend.create () in
+    let pending_entry_e = _pinned () in
+    let config = _config ~max_rest_weeks:4 Mode.On_bearish_macro in
+    let long =
+      _entering ~id:"L1" ~symbol:_long_symbol
+        ~created:(Date.add_days _friday (-3 * _week))
+        ()
+    in
+    let (_ : Position.transition list * string list) =
+      _run ~pending_entry_e ~store ~config ~macro_result:_bearish
+        ~positions:[ long ] ~date:_friday ()
+    in
+    let (_ : Position.transition list * string list) =
+      _run ~pending_entry_e ~store ~config ~macro_result:_bullish ~positions:[]
+        ~date:(Date.add_days _friday (weeks_later * _week))
+        ()
+    in
+    _entry_after_requalifying pending_entry_e
+  in
+  assert_that
+    [ entry_after ~weeks_later:1; entry_after ~weeks_later:2 ]
+    (elements_are
+       [
+         elements_are [ float_equal _pinned_entry ];
+         elements_are [ float_equal _probe_entry ];
+       ])
+
+(** A stashed long whose symbol is held by another open position at re-issue
+    time (here a short entered during the suspension) is dropped, not re-issued
+    — and not deferred either: the next admitting week, with the short gone,
+    re-issues nothing. The drop releases the ticket's no-chase pin.
+
+    MUTATION: forcing [_held_elsewhere] to [false] re-issues the long beside the
+    short and turns the week-2 transitions red. *)
+let test_stash_held_elsewhere_is_dropped _ =
+  let store = Entry_ticket_suspend.create () in
+  let pending_entry_e = _pinned () in
+  let config = _config Mode.On_bearish_macro in
+  let long =
+    _entering ~id:"L1" ~symbol:_long_symbol
+      ~created:(Date.add_days _friday (-_week))
+      ()
+  in
+  let short =
+    _entering ~side:Trading_base.Types.Short ~id:"S2" ~symbol:_long_symbol
+      ~created:_friday ()
+  in
+  let run_week ~weeks_later ~macro_result ~positions =
+    _run ~pending_entry_e ~store ~config ~macro_result ~positions
+      ~date:(Date.add_days _friday (weeks_later * _week))
+      ()
+    |> fst
+  in
+  let week1 =
+    run_week ~weeks_later:0 ~macro_result:_bearish ~positions:[ long ]
+  in
+  let week2 =
+    run_week ~weeks_later:1 ~macro_result:_bullish ~positions:[ short ]
+  in
+  let week3 = run_week ~weeks_later:2 ~macro_result:_bullish ~positions:[] in
+  assert_that
+    (week1, week2, week3, _entry_after_requalifying pending_entry_e)
+    (all_of
+       [
+         field
+           (fun (w1, _, _, _) -> w1)
+           (elements_are [ equal_to (_suspension_of "L1") ]);
+         field (fun (_, w2, _, _) -> w2) is_empty;
+         field (fun (_, _, w3, _) -> w3) is_empty;
+         field
+           (fun (_, _, _, e) -> e)
+           (elements_are [ float_equal _probe_entry ]);
+       ])
+
+(** The positions a week's re-issues open, as the simulator would hold them. *)
+let _opened (transitions : Position.transition list) =
+  List.filter_map transitions ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.CreateEntering _ -> Some (_unwrap (Position.create_entering t))
+      | _ -> None)
+
+(** The real F2 clock ({!Entry_ticket_ttl.run}, clock only) as the screening
+    module wires it into [cancel_expired]. *)
+let _clock ~max_rest_weeks ~current_date
+    (portfolio : Trading_strategy.Portfolio_view.t) =
+  Entry_ticket_ttl.run ~rescreen:false ~max_rest_weeks
+    ~pending_entry_e:(Entry_freeze.create ()) ~positions:portfolio.positions
+    ~still_qualifies:(fun ~symbol:_ ~side:_ -> true)
+    ~current_date
+
+(** Two full suspend / re-issue cycles under a 6-week clock, then the real F2
+    clock on the twice-re-issued ticket. Placed 3 weeks before the first
+    suspension: suspended at age 3, re-issued at 4, suspended again at 5,
+    re-issued again at 6 (still within the clock). One week later — age 7 from
+    the ORIGINAL placement, but only 1 week from the latest re-issue — the clock
+    cancels it. So suspension time counts toward [entry_order_max_rest_weeks]
+    both while stashed and once resting again, across every cycle.
+
+    MUTATIONS: handing [cancel_expired] the raw portfolio instead of
+    [aged_portfolio] (the clock then reads the re-issue date, age 1), or
+    re-basing [origin_date] on the latest re-issue (age 3), each leave the
+    ticket alive and turn the final assertion red. *)
+let test_reissued_ticket_expires_on_its_original_clock _ =
+  let store = Entry_ticket_suspend.create () in
+  let max_rest_weeks = 6 in
+  let config = _config ~max_rest_weeks Mode.On_bearish_macro in
+  let week n = Date.add_days _friday (n * _week) in
+  let step ~n ~macro_result ~positions =
+    let current_date = week n in
+    _run
+      ~cancel_expired:(_clock ~max_rest_weeks ~current_date)
+      ~store ~config ~macro_result ~positions ~date:current_date ()
+    |> fst
+  in
+  let placed =
+    _entering ~id:"L1" ~symbol:_long_symbol ~created:(week (-3)) ()
+  in
+  let (_ : Position.transition list) =
+    step ~n:0 ~macro_result:_bearish ~positions:[ placed ]
+  in
+  let first = _opened (step ~n:1 ~macro_result:_bullish ~positions:[]) in
+  let (_ : Position.transition list) =
+    step ~n:2 ~macro_result:_bearish ~positions:first
+  in
+  let second = _opened (step ~n:3 ~macro_result:_bullish ~positions:[]) in
+  let expiring = step ~n:4 ~macro_result:_bullish ~positions:second in
+  assert_that (first, second, expiring)
+    (all_of
+       [
+         field (fun (f, _, _) -> f) (size_is 1);
+         field (fun (_, s, _) -> s) (size_is 1);
+         field
+           (fun (_, _, e) -> e)
+           (elements_are
+              [
+                field
+                  (fun (t : Position.transition) -> t.kind)
+                  (equal_to
+                     (Position.CancelEntry
+                        { reason = "entry_ticket_ttl_expired" }));
+              ]);
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Simulator, end to end                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -547,6 +816,14 @@ let () =
            >:: test_ttl_expires_a_suspended_ticket;
            "F2 cancel wins over suspension"
            >:: test_f2_cancel_wins_over_suspension;
+           "a partial fill is not suspended"
+           >:: test_partial_fill_is_not_suspended;
+           "an expired stash releases its entry pin"
+           >:: test_expired_stash_releases_its_entry_pin;
+           "a stash held elsewhere is dropped"
+           >:: test_stash_held_elsewhere_is_dropped;
+           "a re-issued ticket expires on its original clock"
+           >:: test_reissued_ticket_expires_on_its_original_clock;
            "sim: Off fills during a Bearish tape (R1 pin)"
            >:: test_sim_off_fills_during_bearish_tape;
            "sim: On withholds, then fills after re-admission"
