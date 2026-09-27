@@ -3,13 +3,14 @@
     Three contracts, all through the real runner (empty bar reader, so the MA is
     the close and the stage is the warmup Stage 2 + Rising default):
 
-    - {b Sampling.} Under the default [Daily] cadence a rare decision (here the
-      seed) is emitted on the day it happens; the frequent holds only on the
-      Friday tick.
+    - {b Every advance.} Under the default [Daily] cadence the sink sees one
+      record per held position per advancing tick — thinning holds is the
+      backtest sink's job ([Stop_decision.push]), not the runner's.
     - {b Siblings.} Two positions on one ticker share one advance but each gets
       its own record, keyed by its own position id.
     - {b Observability only.} Passing the sink changes neither the returned
-      transitions nor the stop states. *)
+      transitions nor the stop states — pinned on a tape where the stop is
+      raised and an [UpdateRiskParams] adjust flows for both siblings. *)
 
 open OUnit2
 open Core
@@ -114,23 +115,25 @@ let captured_decisions ~ids bars =
   in
   List.rev !captured
 
-let test_daily_cadence_emits_seed_and_friday_hold _ =
+let test_daily_cadence_emits_every_advance _ =
   assert_that
     (captured_decisions ~ids:[ ticker ] week)
     (elements_are
-       [
-         all_of
-           [
-             field (fun (d : D.t) -> d.date) (equal_to (Date.of_string "2024-01-08"));
-             field (fun (d : D.t) -> d.reason) (equal_to D.Seeded_trailing);
-           ];
-         all_of
-           [
-             field (fun (d : D.t) -> d.date) (equal_to (Date.of_string "2024-01-12"));
-             field (fun (d : D.t) -> d.reason) (equal_to D.No_correction_yet);
-             field (fun (d : D.t) -> d.stop_after) (float_equal 90.0);
-           ];
-       ])
+       (all_of
+          [
+            field
+              (fun (d : D.t) -> d.date)
+              (equal_to (Date.of_string "2024-01-08"));
+            field (fun (d : D.t) -> d.reason) (equal_to D.Seeded_trailing);
+          ]
+       :: List.init 4 ~f:(fun _ ->
+              all_of
+                [
+                  field
+                    (fun (d : D.t) -> d.reason)
+                    (equal_to D.No_correction_yet);
+                  field (fun (d : D.t) -> d.stop_after) (float_equal 90.0);
+                ])))
 
 let test_sibling_positions_each_get_a_record _ =
   assert_that
@@ -141,7 +144,32 @@ let test_sibling_positions_each_get_a_record _ =
          field (fun (d : D.t) -> d.position_id) (equal_to "AAPL-2");
        ])
 
-let test_sink_changes_no_decision _ =
+(* Seed 99/100, run to 115, dip, close 120 on Thursday: the first cycle
+   completes with candidate [min (99, ma = close 120) *. 0.99] -> 97.875 > 90,
+   so Thursday's tick raises the stop and emits an adjust per sibling. *)
+let raise_tape =
+  [
+    make_bar "2024-01-08" ~low:99.0 ~close:100.0;
+    make_bar "2024-01-09" ~low:105.0 ~close:115.0;
+    make_bar "2024-01-10" ~low:104.0 ~close:106.0;
+    make_bar "2024-01-11" ~low:110.0 ~close:120.0;
+  ]
+
+let _thursday_adjust_count (transitions, _) =
+  Option.map (List.nth transitions 3) ~f:(fun (_, adjusts) ->
+      List.length adjusts)
+
+let test_sink_changes_no_decision_on_a_raise _ =
+  let ids = [ "AAPL-1"; "AAPL-2" ] in
+  assert_that
+    (run ~on_stop_decision:(fun _ -> ()) ~ids raise_tape)
+    (all_of
+       [
+         equal_to (run ~ids raise_tape);
+         field _thursday_adjust_count (is_some_and (equal_to 2));
+       ])
+
+let test_sink_changes_no_decision_on_holds _ =
   assert_that
     (run ~on_stop_decision:(fun _ -> ()) ~ids:[ ticker ] week)
     (equal_to (run ~ids:[ ticker ] week))
@@ -149,11 +177,14 @@ let test_sink_changes_no_decision _ =
 let suite =
   "Stop_decision_capture"
   >::: [
-         "daily cadence emits the seed and the Friday hold"
-         >:: test_daily_cadence_emits_seed_and_friday_hold;
+         "daily cadence emits every advance"
+         >:: test_daily_cadence_emits_every_advance;
          "sibling positions each get a record"
          >:: test_sibling_positions_each_get_a_record;
-         "the sink changes no decision" >:: test_sink_changes_no_decision;
+         "the sink changes no decision on a raise"
+         >:: test_sink_changes_no_decision_on_a_raise;
+         "the sink changes no decision on holds"
+         >:: test_sink_changes_no_decision_on_holds;
        ]
 
 let () = run_test_tt_main suite

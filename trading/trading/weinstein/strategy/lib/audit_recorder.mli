@@ -309,9 +309,8 @@ type t = {
           invoked under the default (unarmed) config. *)
   record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
       (** Invoked by {!Stops_runner.update} for each held position whose stop
-          state machine advanced on the tick (issue #2977): every raise, stalled
-          cycle, seed, tightening and hit, plus the no-move holds sampled once a
-          week (Friday). Observability only — the record is built from the
+          state machine advanced on the tick (issue #2977): every advance, one per
+          position per tick (rows are thinned by the sink, not here). Observability only — the record is built from the
           advance the runner already made, so any sink leaves every decision
           unchanged. *)
   capture_candidates : bool;

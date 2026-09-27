@@ -943,6 +943,8 @@ let _stop_decision ?(position_id = "AAPL-wein-1") ~date ~reason () : SD.t =
     state_after = SD.Trailing;
     stop_before = 90.0;
     stop_after = 90.0;
+    candidate = None;
+    correction_count_before = 0;
     correction_count = 0;
     last_trend_extreme = Some 110.0;
     last_correction_extreme = Some 104.0;
@@ -980,6 +982,34 @@ let test_record_stop_decision_without_entry_is_dropped _ =
     (_stop_decision ~position_id:"GHOST-wein-9" ~date:"2024-01-19"
        ~reason:SD.Raised ());
   assert_that (TA.get_audit_records t) is_empty
+
+(** Daily holds collapse to one row per ISO week, with no look-ahead: the week
+    of 2024-03-25 ends on Thursday the 28th (Good Friday 2024-03-29 is a market
+    holiday) and still keeps exactly one hold row, dated that Thursday. The
+    next Monday's hold is a new week, so a new row; the Monday seed is not a
+    hold, so it is never collapsed. *)
+let test_record_stop_decision_collapses_holds_per_week _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_stop_decision t
+    (_stop_decision ~date:"2024-03-25" ~reason:SD.Seeded_trailing ());
+  List.iter [ "2024-03-26"; "2024-03-27"; "2024-03-28"; "2024-04-01" ]
+    ~f:(fun date ->
+      TA.record_stop_decision t
+        (_stop_decision ~date ~reason:SD.No_correction_yet ()));
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         field
+           (fun (r : TA.audit_record) ->
+             List.map r.stop_decisions ~f:(fun (d : SD.t) -> (d.date, d.reason)))
+           (equal_to
+              [
+                (_date "2024-03-25", SD.Seeded_trailing);
+                (_date "2024-03-28", SD.No_correction_yet);
+                (_date "2024-04-01", SD.No_correction_yet);
+              ]);
+       ])
 
 let test_audit_record_sexp_round_trips_stop_decisions _ =
   let record : TA.audit_record =
@@ -1048,6 +1078,8 @@ let suite =
          >:: test_record_stop_decision_appends_to_the_entry_row;
          "record_stop_decision without an entry is dropped"
          >:: test_record_stop_decision_without_entry_is_dropped;
+         "record_stop_decision collapses holds per ISO week"
+         >:: test_record_stop_decision_collapses_holds_per_week;
          "audit_record sexp round-trips stop_decisions"
          >:: test_audit_record_sexp_round_trips_stop_decisions;
          "audit_record sexp omits empty stop_decisions"

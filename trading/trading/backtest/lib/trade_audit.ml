@@ -214,11 +214,11 @@ let record_cascade_summary t (summary : cascade_summary) =
 
 let record_stop_decision t (d : Weinstein_stops.Stop_decision.t) =
   _with_bucket t ~position_id:d.position_id ~f:(fun b ->
-      b.bucket_stop_decisions <- d :: b.bucket_stop_decisions)
+      b.bucket_stop_decisions <-
+        Weinstein_stops.Stop_decision.push b.bucket_stop_decisions d)
 
-(* Fill in [bucket.bucket_external_exit] from a [TriggerExit] transition and the
-   bucket's recorded entry (for [symbol]) iff no enriched exit_ is already
-   recorded — enriched always wins, see [record_transitions]'s doc. *)
+(* Set [bucket_external_exit] from a [TriggerExit] (symbol from the entry) iff
+   no enriched exit_ is on file; enriched wins (see [record_transitions]). *)
 let _fill_in_external_exit (bucket : _bucket)
     (trans : Trading_strategy.Position.transition) ~exit_reason =
   if Option.is_none bucket.bucket_exit then

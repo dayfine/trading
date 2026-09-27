@@ -385,8 +385,8 @@ type audit_record = {
       (** The weekly trailing-stop decisions for this position, oldest first
           (issue #2977), recorded via {!record_stop_decision}: every raise,
           stalled cycle, seed, tightening and hit, plus one no-move hold per
-          week (see {!Weinstein_stops.Stop_decision.t} for the fields and
-          [Stops_runner.update] for the sampling). [@sexp.list] omits the field
+          run of holds within an ISO week (see {!Weinstein_stops.Stop_decision}
+          for the fields and [Stop_decision.push] for the collapse). [@sexp.list] omits the field
           when empty and reads an absent field as [[]], so [trade_audit.sexp]
           files written before this field existed still parse. *)
 }
@@ -559,8 +559,10 @@ val record_fill_volume :
 val record_stop_decision : t -> Weinstein_stops.Stop_decision.t -> unit
 (** Append one stop decision to the entry row keyed by its [position_id].
     Dropped when no entry was recorded for that id (mirrors {!record_exit}'s
-    no-entry contract). Decisions are kept in insertion order, which is the
-    strategy's date order. *)
+    no-entry contract). Decisions are kept in date order, with consecutive
+    no-move holds of one ISO week collapsed to the latest
+    ({!Weinstein_stops.Stop_decision.push}): a week whose Friday is a holiday
+    still keeps its hold row, dated its last trading day. *)
 
 val record_cascade_summary : t -> cascade_summary -> unit
 (** Append a per-Friday cascade summary. Append-only — recording two summaries

@@ -282,6 +282,6 @@ let update ?ma_cache ?stop_update_cadence ?prior_stage_ma_values
           ~prior_stages pos acc)
   in
   Option.iter on_stop_decision ~f:(fun on_stop_decision ->
-      Stop_decision_capture.emit ~on_stop_decision ~stops_config
-        ~is_week_close:(_is_weekly_close ~as_of) ~positions ~advanced);
+      Stop_decision_capture.emit ~on_stop_decision ~stops_config ~positions
+        ~advanced);
   transitions

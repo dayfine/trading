@@ -98,11 +98,10 @@ val update :
     position (sibling positions on one ticker each get their own record off the
     shared advance). Called after the fold, in [positions] key order; the return
     value and [stop_states] are untouched, so passing it is an exact no-op on
-    every decision. Rare decisions (a raise, a stalled cycle, the seed, a
-    tightening, a hit) are always emitted; the frequent no-move holds (see
-    {!Weinstein_stops.Stop_decision.is_hold}) only on the Friday tick, so a
-    [Daily]-cadence run yields about one hold per position per week rather than
-    one per day (a week whose Friday is a holiday has no hold row). [Weekly]
-    cadence advances only on Fridays, so every advance is emitted. Trigger-only
-    ticks (mid-week under [Weekly]) advance nothing and emit nothing. See
+    every decision. Every advance is emitted — under [Daily] cadence that is one
+    record per held position per trading day; the backtest sink
+    ([Trade_audit.record_stop_decision]) collapses runs of no-move holds to one
+    row per ISO week with {!Weinstein_stops.Stop_decision.push}, so a week whose
+    Friday is a holiday still gets its hold row. Trigger-only ticks (mid-week
+    under [Weekly]) advance nothing and emit nothing. See
     {!Stop_decision_capture}. *)

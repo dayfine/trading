@@ -30,19 +30,23 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   `Seeded_trailing`, `Entered_tightening`, `Tightened_ratchet`,
   `Tightened_hold`, `Stop_hit`, `Other_hold`, plus stop before/after, state,
   `correction_count`, the trend/correction extremes the cycle test read, and
-  the MA. `Stops_runner.update ?on_stop_decision` emits one per held position
-  after the fold (via `Stop_decision_capture`), always for rare decisions and
-  once a week (Friday) for holds; `Audit_recorder.record_stop_decision` →
+  the MA, the cycle `candidate` and `correction_count_before` (0 = seed-anchored
+  cycle). `Stops_runner.update ?on_stop_decision` emits one per held position
+  per advance, after the fold (via `Stop_decision_capture`); `Audit_recorder.record_stop_decision` →
   `Trade_audit.record_stop_decision` appends it to the position's
   `audit_record.stop_decisions` (`[@sexp.list]`: absent when empty, old files
-  parse). Always-on; ~1 row per held position-week.
+  parse), collapsing each run of same-ISO-week holds to its latest row
+  (`Stop_decision.push`, no look-ahead, holiday Fridays covered). Always-on;
+  ~1 hold row per held position-week plus the rare decisions.
   - Answers #2974 (faithful 8 % rule vs defect) without a replay.
-  - Tests: `weinstein/stops/test/test_stop_decision.ml` (raise after ≥8 %
-    correction + recovery, steady advance → `No_correction_yet`, stalled under
-    both anchor-reset settings, sexp round-trip);
-    `weinstein/strategy/test/test_stop_decision_capture.ml` (Friday sampling,
-    siblings, sink changes no transition/state); `backtest/test/test_trade_audit.ml`
-    (merge into entry row, no-entry drop, round-trip, empty omitted).
+  - Tests: `weinstein/stops/test/test_stop_decision.ml` (seed-anchored first
+    raise + pullback-driven second raise, steady advance → `No_correction_yet`,
+    `Anchor_not_fresh`, stalled under both anchor-reset settings, `Stop_hit`,
+    tighten → ratchet → hold, short side, `is_hold`, sexp round-trip);
+    `weinstein/strategy/test/test_stop_decision_capture.ml` (every advance,
+    siblings, sink changes no transition/state on holds and on a raise);
+    `backtest/test/test_trade_audit.ml` (merge into entry row, no-entry drop,
+    holiday-week collapse, round-trip, empty omitted).
   - Verify: `dune runtest trading/weinstein/stops trading/weinstein/strategy
     trading/backtest`; goldens must stay bit-identical (pending dispatcher run).
 
