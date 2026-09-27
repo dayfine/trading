@@ -637,8 +637,13 @@ let test_render_includes_trade_quality_when_present _ =
            (fun s ->
              String.is_substring s ~substring:"| Weinstein spirit score |")
            (equal_to true);
+         (* Full row, exact per-side values: current and prior differ here
+            (+0.15 vs +0.03), so a swapped or dropped side fails this
+            assertion rather than merely omitting the row. *)
          field
-           (fun s -> String.is_substring s ~substring:"| Mean R-multiple |")
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Mean R-multiple | +0.15 | +0.03 | +0.122 |")
            (equal_to true);
          field
            (fun s ->
@@ -685,10 +690,13 @@ let test_render_includes_trade_quality_when_only_current _ =
          field
            (fun s -> String.is_substring s ~substring:"## Trade quality")
            (equal_to true);
-         (* Prior side has no audit -> spirit score column shows "n/a". *)
+         (* Prior side has no audit -> full row pins both the current value
+            and the absent side rendering as "n/a" in both the prior and
+            delta cells (catches a dropped prior side). *)
          field
            (fun s ->
-             String.is_substring s ~substring:"| Weinstein spirit score |")
+             String.is_substring s
+               ~substring:"| Weinstein spirit score | 1.000 | n/a | n/a |")
            (equal_to true);
        ])
 
