@@ -40,3 +40,27 @@ Not container work (no queue slot) — the full issue list is §3 of
 | resting entry orders | never expire (`max_rest_weeks 0`) | default 52 w | ledger ACCEPT #2587 |
 | laggard rotation | on | **on** | Ch. 4 "lighten up on that position even if the sell-stop isn't hit. Move the proceeds into a new Stage 2 stock" |
 | 30-week MA, base breakouts, full size on breakout | same | same | scale-in (half on pullback) is not built (NO-BUILD memory) — known gap |
+
+## Item 3 — pre-registered reading rule (written before launch)
+
+Item 3 is a **preset comparison, not a promotion test**: no default changes whatever it shows
+(a default flip would need an ACCEPT plus the confirmation grid, `promotion-confirmation.md`).
+
+- **Gate:** every investor cell must pass `validator_diff -check V6` against its hybrid pair at the
+  same salt. A failing salt is reported and left out of the reading.
+- **Metrics, per salt:** Calmar (primary), max drawdown, total return, trades; plus the paired
+  per-salt difference investor − hybrid.
+- **"Investor preset promising"** if the investor Calmar ≥ the hybrid's in **at least 2 of 3** salts
+  **and** its max drawdown is never more than 5 pp worse than the hybrid's at the same salt.
+  → next step: queue item 4 (26y investor) and a broad-vs-broad grid cell.
+- **"Investor preset worse"** if the investor Calmar is lower in at least 2 of 3 salts.
+  → keep it as a preset, record why (which dial: skipped entries without a structural stop, or no
+  Stage-3 / extension exits), and do not queue item 4 on this basis alone.
+- **Otherwise "no difference at this power"** (3 salts, a 5y window): record it descriptively.
+- Whatever the outcome, decompose it: entries skipped by `require_structural_stop` (count and what
+  the hybrid made on them), and exits the hybrid took via Stage-3 / extension / catastrophic stops
+  that the investor held.
+
+Runtime: `chain-investor.sh` logs GNU-time peak RSS and the snapshot-cache line per cell (queue
+item 8). The obvious-fixes chain (`chain-fixes.sh`) was already running when this was added, so
+its cells record wall time only.

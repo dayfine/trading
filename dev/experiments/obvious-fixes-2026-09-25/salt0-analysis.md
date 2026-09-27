@@ -28,9 +28,9 @@ Review pack (published): https://claude.ai/artifact/AEKnAbPUqth16b1Ye7nKiA
 
 ## 1. Why salt 0 dropped from 457 % to 133 %
 
-Paired by `position_id` / symbol + entry date:
+Paired by symbol + entry date (`position_id` matches on only 287 of the 433 shared trades, so it is not the join key across arms):
 
-- **Mostly path divergence.** The Saturday gate changes the first entry (NOV,
+- **Mostly path divergence (58 % of the $2.62M gap; the other 42 % is on the 433 shared trades — the −0.61 % stop-fill cost below plus, likely, NAV-path sizing, not decomposed).** The Saturday gate changes the first entry (NOV,
   2000-01-22) and every later decision follows a different path.
   - 433 trades are shared by both arms (they made $2.41M in the null and $1.31M in the
     arm).
@@ -47,7 +47,7 @@ Paired by `position_id` / symbol + entry date:
 - **Same entry prices on shared trades** (mean diff 0.00 %) → Fix A changes which trades
   happen, not their fill price.
 
-Year by year, the arm is worse in 19 of 27 years. The biggest gaps (2021, 2025, 2026,
+Year by year, the arm has the lower NAV return in 21 of 27 years (yearly return from `equity_curve.csv`, each year based on the prior year-end; by realized P&L the count is 23/27 by exit year, 20/27 by entry year). The biggest gaps (2021, 2025, 2026,
 2016, 2011) each trace to one or two monsters only one arm caught.
 
 ## 2. Decision walkthrough (arm f2 s0, every weekly screen)
@@ -59,7 +59,7 @@ Built from `trade_audit.sexp`:
 
 Rebuild with `walk.sh` (below). Weekly stop decisions are **not** recorded (#2977).
 
-### 2a. The macro gate is not where the money went
+### 2a. The macro gate is probably not where the money went (one arm, one salt)
 
 Returns in the week after each screen, compounded by the macro state of that screen:
 
@@ -75,7 +75,7 @@ Returns in the week after each screen, compounded by the macro state of that scr
 From 2020 on, the fund was mostly invested in bullish tape and earned nothing. The
 Bearish-week cost in 2009–19 is real but secondary.
 
-### 2b. The picks are fine
+### 2b. The picks look fine (one arm, one salt)
 
 Paired per screen week, funded placements vs the cash-rejected alternatives on 26-week
 forward adjusted return from the screen date. The funded mean beat the alternatives'
@@ -113,7 +113,7 @@ populations, not an ablation.
 
 ### 2d. Year walks
 
-Week-by-week files: `walk-2021.txt`, `walk-2022.txt`, `walk-2023.txt`, rebuilt by
+Week-by-week files `walk-2021.txt`, `walk-2022.txt`, `walk-2023.txt` are not committed; regenerate them with
 `walk.sh`.
 
 - **2021** (fund −6.9 %, SPY +28.7 %; macro Bullish every week):

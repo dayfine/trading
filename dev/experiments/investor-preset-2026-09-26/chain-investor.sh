@@ -5,7 +5,7 @@
 # PINNED worktree sweep-investor at main 1c2647743 (#2966 require_structural_stop). BUILD=1 builds the 3 exes first.
 # Derived from obvious-fixes-2026-09-25/chain-fixes.sh.
 # Derived from index-stage-veto-2026-09-16/chain-veto.sh (lanes B+ settings: cap 12,000, 60,000 s guard =
-# 2.1x the slowest measured 26y PIT cell, 4h48m). Usage: EXPECT_HEAD=<sha> sh chain-fixes.sh <lane> <spec>:<salt>...
+# 2.1x the slowest measured 26y PIT cell, 4h48m). Usage: [BUILD=1] [PREFLIGHT=1] EXPECT_HEAD=<sha> sh chain-investor.sh <lane> <spec>:<salt>...
 # Artifacts: /tmp/sweeps/investor-preset/ (bind-mounted). Specs staged OUTSIDE any VCS tree at /tmp/investor-run/specs.
 set -u
 LANE=$1; shift
@@ -47,15 +47,16 @@ for tok in "$@"; do name=${tok%%:*}; rest=${tok#*:}; salt=${rest%%:*}; pair=""; 
   if grep -q "RESULT $tag " "$LOG_HOST" 2>/dev/null; then log "SKIP $tag"; continue; fi
   docker exec $C sh -c "mkdir -p $d && rm -rf $d/*"; docker cp "$SPECS_HOST/$name.sexp" "$C:$d/" || { log "RESULT $tag => <spec missing>"; continue; }
   log "RUN $tag on $WH"; start=$(date +%s)
-  run "TRADING_DATA_DIR=$ROOT/test_data TRADING_PATH_SEED_SALT=$salt SNAPSHOT_CACHE_MB=1024 SNAPSHOT_MAX_MMAP_HANDLES=$MMAP_HANDLES timeout $CELL_TIMEOUT ./_build/default/trading/backtest/scenarios/scenario_runner.exe --dir $d --fixtures-root $FIX --snapshot-dir $WH --no-emit-all-eligible --parallel 1 --progress-every 26 > $WORK/$tag.log 2>&1; echo exit=\$? >> $WORK/$tag.log"
+  run "TRADING_DATA_DIR=$ROOT/test_data TRADING_PATH_SEED_SALT=$salt SNAPSHOT_CACHE_MB=1024 SNAPSHOT_MAX_MMAP_HANDLES=$MMAP_HANDLES /usr/bin/time -f 'peak_rss_kb=%M' -o $WORK/$tag.rss timeout $CELL_TIMEOUT ./_build/default/trading/backtest/scenarios/scenario_runner.exe --dir $d --fixtures-root $FIX --snapshot-dir $WH --no-emit-all-eligible --parallel 1 --progress-every 26 > $WORK/$tag.log 2>&1; echo exit=\$? >> $WORK/$tag.log"
   out=$(docker exec $C sh -c "grep 'Output root' $WORK/$tag.log | tail -1 | sed 's/.*: //'")
   m=$(docker exec $C sh -c "grep -hoE 'total_return_pct [0-9.eE+-]+|total_trades [0-9]+|sharpe_ratio [0-9.eE+-]+|max_drawdown_pct [0-9.eE+-]+|calmar_ratio [0-9.eE+-]+' ${out}/${name}/actual.sexp 2>/dev/null | tr '\n' ' '")
-  docker exec $C sh -c "for f in actual.sexp trades.csv params.sexp summary.sexp trade_audit.sexp open_positions.csv force_liquidations.sexp equity_curve.csv macro_trend.sexp; do cp ${out}/${name}/\$f $ART/${tag}-\$f 2>/dev/null; done; cp $WORK/$tag.log $ART/${tag}.log" || true
+  docker exec $C sh -c "for f in actual.sexp trades.csv params.sexp summary.sexp trade_audit.sexp open_positions.csv force_liquidations.sexp equity_curve.csv macro_trend.sexp; do cp ${out}/${name}/\$f $ART/${tag}-\$f 2>/dev/null; done; cp $WORK/$tag.log $ART/${tag}.log; cp $WORK/$tag.rss $ART/${tag}.rss 2>/dev/null" || true
+  cache=$(docker exec $C sh -c "grep -h 'snapshot cache' $WORK/$tag.log | tail -1"); rss=$(docker exec $C sh -c "tail -1 $WORK/$tag.rss 2>/dev/null")
   run "./_build/default/trading/backtest/validation/bin/post_run_validator_cli.exe -run-dir ${out}/${name} -data-dir /workspaces/trading-1/data -out $ART/${tag}-validator.sexp > $WORK/$tag.validator.log 2>&1; echo exit=\$? >> $WORK/$tag.validator.log"
   q=$(docker exec $C sh -c "grep -hE 'V16 EXPECTATION|V17 EXPECTATION|V6 ' $ART/${tag}-validator.sexp.md 2>/dev/null | tr '\n' ' '")
   v6=none; if [ -n "$pair" ]; then
     run "./_build/default/trading/backtest/validation/bin/validator_diff.exe -check V6 -report pair=$ART/$pair-s$salt-v11-validator.sexp.sexp -report arm=$ART/${tag}-validator.sexp.sexp > $WORK/$tag.v6diff.log 2>&1; echo exit=\$? >> $WORK/$tag.v6diff.log"
     v6="$pair:$(docker exec $C sh -c "tail -1 $WORK/$tag.v6diff.log")"; fi
-  log "RESULT $tag => ${m:-<no result>} ${q:-<no validator>} v6diff:${v6} (wall $(( $(date +%s) - start ))s)"
+  log "RESULT $tag => ${m:-<no result>} ${q:-<no validator>} v6diff:${v6} ${rss} ${cache} (wall $(( $(date +%s) - start ))s)"
 done
 log "LANE $LANE DONE"

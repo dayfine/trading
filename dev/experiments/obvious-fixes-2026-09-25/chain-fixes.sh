@@ -1,7 +1,7 @@
 #!/bin/sh
 # Obvious-fixes arms (dev/experiments/obvious-fixes-2026-09-25): the PIT null with the fill-model fixes of #2963
-# (sim_entry_stoplimit_fresh_bar_only) and #2964 (sim_stop_exit_fill_on_trigger_bar), on the _v11pit union warehouse,
-# PINNED worktree sweep-fixes at the #2964 tip (contains both flags; both default-off, so a0-pit-null must reproduce
+# (sim_entry_stoplimit_fresh_bar_only) and #2967 (sim_stop_exit_fill_on_trigger_bar), on the _v11pit union warehouse,
+# PINNED worktree sweep-fixes at the #2967 merge (contains both flags; both default-off, so a0-pit-null must reproduce
 # the committed band byte-for-byte - run it first as the build check). Pairs each arm against the COMMITTED null
 # artifacts pit-universe-2026-09-14/step4/results/a0-pit-null-s<salt>-v11-* (V6 validator_diff gate).
 # Derived from index-stage-veto-2026-09-16/chain-veto.sh (lanes B+ settings: cap 12,000, 60,000 s guard =
