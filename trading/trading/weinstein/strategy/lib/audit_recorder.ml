@@ -91,6 +91,7 @@ type t = {
   record_cascade_summary : cascade_event -> unit;
   record_force_liquidation : force_liquidation_event -> unit;
   record_fill_volume : fill_volume_event -> unit;
+  record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
   capture_candidates : bool;
 }
 
@@ -101,5 +102,6 @@ let noop : t =
     record_cascade_summary = (fun _ -> ());
     record_force_liquidation = (fun _ -> ());
     record_fill_volume = (fun _ -> ());
+    record_stop_decision = (fun _ -> ());
     capture_candidates = false;
   }

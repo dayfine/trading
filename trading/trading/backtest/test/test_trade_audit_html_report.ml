@@ -150,6 +150,7 @@ let _write_audit path =
            exit_ = Some _aapl_exit;
            external_exit = None;
            execution = None;
+           stop_decisions = [];
          };
        ])
 

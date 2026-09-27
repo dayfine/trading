@@ -96,7 +96,7 @@ let make_exit ?(symbol = "AAPL") ?(exit_date = _date "2024-04-20")
 
 let make_record ?(exit_ = Some (make_exit ())) ?(external_exit = None) entry :
     TA.audit_record =
-  { entry; exit_; external_exit; execution = None }
+  { entry; exit_; external_exit; execution = None; stop_decisions = [] }
 
 (* A reason-only exit record, the shape [Trade_audit.record_transitions] writes
    when no enriched [exit_] was captured. Carries no [stage_at_exit]. *)

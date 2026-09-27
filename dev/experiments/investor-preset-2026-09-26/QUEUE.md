@@ -5,15 +5,18 @@ Times PT. Status: RUNNING / QUEUED / DONE / PROPOSED (needs a decision).
 
 | # | Status | Item | Cells | Est. wall | Why |
 |---|---|---|---|---|---|
-| 1 | RUNNING → PAUSE | obvious-fixes chain A: `f2-fills-faithful` s1 DONE (106.54 %, 6h16m); s2 running since 15:39 (week 858/1,434 at 19:08), ends ~21:30–22:00 09-26. A watcher then stops the chain BEFORE `f1-stoplimit-fresh` s0 (user 09-26: land code changes + unit tests first) | s2 only | ends ~22:00 09-26 | salt band for both fixes |
+| 1 | RUNNING → PAUSE | obvious-fixes chain A: `f2-fills-faithful` s1 DONE (106.54 %); s2 at week 1,196/1,434 at 20:54, ends ~22:00–22:10 09-26; watcher then stops the chain before `f1` | s2 only | ~22:05 | salt band for both fixes |
 | 1b | QUEUED (after the code wave merges) | `f1-stoplimit-fresh` s0 (26y): on the old `sweep-fixes` build, or the new main if #2977 is goldens-identical | 1 × ~5.5 h | | f1 separates Fix A from Fix B |
 | 2 | QUEUED (manual, after the code wave) | new pinned worktree at post-merge main; `BUILD=1 PREFLIGHT=1 EXPECT_HEAD=<new sha> WTREL=<new wt> sh chain-investor.sh I …` (`launch-after-A.sh` is superseded by the pause) | build + preflight | ~20 min | PREFLIGHT runs each spec on 2026-04..06 and aborts on a missing actual.sexp |
 | 3 | QUEUED (after 2) | 5y broad investor preset vs hybrid control, 2021-06 → 2026-06, salts 0/1/2, V6-paired | 6 × ~1 h | ~6 h | first investor-only number on the broad universe (user 09-26) |
 | 4 | PROPOSED | 26y investor preset, s0 | 1 × ~5.5 h | | long-window investor number (periodic) |
 | 5 | PROPOSED | single delta on the 26y hybrid: `require_structural_stop` only | 1–3 × ~5.5 h | | isolates the stop rule inside the hybrid |
-| 6 | PROPOSED | re-measure `enable_entry_ticket_rescreen` on the fixed sim (#2976) | 3 × ~5.5 h | | resting tickets fill in Bearish weeks (14 % of fills); REJECTED 08-18 on the old sim |
+| 6 | SUPERSEDED by 9d | ~~re-measure `enable_entry_ticket_rescreen` (#2976)~~ — the #2976 trace shows any cancel-on-condition discards the 159 fills (+$1.33M) that rest through a Bearish screen; suspend-not-cancel replaces it | | | |
 | 7 | PROPOSED | investor-preset golden in `goldens-custom-universe-scenarios` (weekly tier 3) | CI | | keep a 5y investor number tracked over time |
 | 8 | FREE (read from #1 + #3) | scaling read: s/yr of the `inv5-hybrid` 5y cells vs the `f2` 26y cells (same settings, near-identical code; the first PIT 5y measurement) | 0 | | is 26y ≈ 5.3× 5y on the PIT schedule? (user 09-26) |
+| 9 | QUEUED (after the code wave merges; builds on new main) | **5y broad screen of the tonight flags**, s0 each, paired vs `inv5-hybrid` s0, V6-gated: 9a `stop_ma_same_basis` (#2982), 9b `correction_must_follow_peak`, 9c `tightened_can_ratchet`, 9d `entry_ticket_macro_suspend On_bearish_macro` (#2976), 9e 9a+9b+9c together | 5 × ~1 h | ~5 h | cheap screen before 26y × 3 salts; a screen can only escalate, never reject (`mechanism-validation-rigor.md`) |
+| 10 | QUEUED (after 9) | 26y × 3 salts paired vs the f2 record, V6-gated, for every 9-arm that is not clearly worse; `stop_ma_same_basis` (#2982, P0) goes first regardless | 3 × ~6 h per arm | ~18 h per arm | the #2974 replay warns the basis fix may cost tail (33 later-hit raises, p10 −14 %) — must be measured, not assumed |
+| 11 | PROPOSED | `tightened_min_reaction_pct` sweep {0.04, 0.06, 0.08} on the 9c arm | 3 × ~1 h (5y) | | the book gives no topping-zone depth; Skyline "dropped a bit" suggests < 8 % |
 
 Not container work (no queue slot) — the full issue list is §3 of
 `../obvious-fixes-2026-09-25/salt0-analysis.md`:
@@ -64,3 +67,20 @@ Item 3 is a **preset comparison, not a promotion test**: no default changes what
 Runtime: `chain-investor.sh` logs GNU-time peak RSS and the snapshot-cache line per cell (queue
 item 8). The obvious-fixes chain (`chain-fixes.sh`) was already running when this was added, so
 its cells record wall time only.
+
+## Run order after the 2026-09-26 code wave (decided 09-26 night)
+
+**Stop findings (09-26).** Every stop result in this queue's earlier items — and every stop-width, stop-raise
+and exit-stack verdict in the ledger — was measured on a system where the trailing stop's raise candidate
+compared the raw correction low with an ADJUSTED 30-week MA (#2982). The ratchet could not fire for about a
+third of trades (0/73 held ≥ 13 wk raised at close/adj ≥ 1.5, vs 50 % at < 1.02). Relative reads between
+arms were like-for-like and stand as reads of that system; absolute stop behaviour was not the book's.
+
+Order once the five branches (#2977, #2973, `fix/stop-raise-count`, `feat/stop-basis-flags`,
+`feat/suspend-tickets-bearish`) merge:
+
+1. `f1-stoplimit-fresh` s0 (item 1b) — closes the obvious-fixes attribution.
+2. Item 3 (5y investor chain) and item 9 (5y flag screen) share one chain: 11 × ~1 h.
+3. Item 10 — `stop_ma_same_basis` 26y × 3 salts first.
+
+Issues tonight: #2973 #2974 #2975 #2976 #2977 #2981 #2982 (P0) #2983 #2984.
