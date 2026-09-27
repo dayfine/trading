@@ -170,6 +170,73 @@ let test_emit_feeds_recorder _ =
            (float_equal 99.0);
        ])
 
+(* Output follows [positions]' key order: two silent moves, one per holding. *)
+let test_output_follows_position_key_order _ =
+  assert_that
+    (_moves
+       ~positions:
+         (_positions
+            [
+              _holding ~id:"p2" ~ticker:"MSFT"; _holding ~id:"p1" ~ticker:"AAPL";
+            ])
+       ~before:(_states [ ("AAPL", _initial 95.0); ("MSFT", _initial 45.0) ])
+       ~after:(_states [ ("AAPL", _tightened 99.0); ("MSFT", _tightened 48.0) ])
+       ())
+    (elements_are
+       [
+         field
+           (fun (e : Audit_recorder.stop_move_event) -> e.position_id)
+           (equal_to "p1");
+         field
+           (fun (e : Audit_recorder.stop_move_event) -> e.position_id)
+           (equal_to "p2");
+       ])
+
+(* Run [split_then_update] on one AAPL holding whose stop starts at [start]:
+   [split_level] is what the split adjuster rescales it to, [update_level] (if
+   any) what the stops runner then moves it to. Returns the captured events. *)
+let _split_then_update ~start ~split_level ?update_level () =
+  let captured = ref [] in
+  let audit_recorder : Audit_recorder.t =
+    {
+      Audit_recorder.noop with
+      record_stop_move = (fun e -> captured := e :: !captured);
+    }
+  in
+  let stop_states = ref (_states [ ("AAPL", _initial start) ]) in
+  let set level = stop_states := _states [ ("AAPL", _tightened level) ] in
+  let _ :
+      Trading_strategy.Position.transition list
+      * Trading_strategy.Position.transition list =
+    Stop_move_capture.split_then_update ~audit_recorder
+      ~positions:(_positions [ _holding ~id:"p1" ~ticker:"AAPL" ])
+      ~stop_states ~current_date:_date
+      ~split_adjust:(fun () -> set split_level)
+      ~update:(fun () ->
+        Option.iter update_level ~f:set;
+        ([], []))
+  in
+  List.rev !captured
+
+(* A 1:2 reverse split on a long doubles the stop (50 -> 100) — more
+   protective in raw terms — and the machine does not move it on that bar.
+   The rescale is not a stop move: nothing is reported. Fails if the snapshot
+   is taken before the split adjuster runs. *)
+let test_split_rescale_alone_is_not_reported _ =
+  assert_that (_split_then_update ~start:50.0 ~split_level:100.0 ()) (size_is 0)
+
+(* A split followed by a real tightening on the same bar reports only the
+   tightening, at the post-update level. *)
+let test_move_after_split_is_reported _ =
+  assert_that
+    (_split_then_update ~start:50.0 ~split_level:100.0 ~update_level:105.0 ())
+    (elements_are
+       [
+         field
+           (fun (e : Audit_recorder.stop_move_event) -> e.stop_level)
+           (float_equal 105.0);
+       ])
+
 let suite =
   "Stop_move_capture"
   >::: [
@@ -182,6 +249,11 @@ let suite =
          "non-holding and unseeded positions are skipped"
          >:: test_non_holding_and_unseeded_are_skipped;
          "emit feeds the recorder" >:: test_emit_feeds_recorder;
+         "output follows position key order"
+         >:: test_output_follows_position_key_order;
+         "split rescale alone is not reported"
+         >:: test_split_rescale_alone_is_not_reported;
+         "move after a split is reported" >:: test_move_after_split_is_reported;
        ]
 
 let () = run_test_tt_main suite

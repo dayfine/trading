@@ -48,3 +48,21 @@ val emit :
 (** [emit] is {!silent_moves} fed event-by-event to
     [audit_recorder.record_stop_move]. With {!Audit_recorder.noop} the events
     are computed and dropped. *)
+
+val split_then_update :
+  audit_recorder:Audit_recorder.t ->
+  positions:Position.t Map.M(String).t ->
+  stop_states:Weinstein_stops.stop_state Map.M(String).t ref ->
+  current_date:Date.t ->
+  split_adjust:(unit -> unit) ->
+  update:(unit -> Position.transition list * Position.transition list) ->
+  Position.transition list * Position.transition list
+(** The stops pass's ordering, owned here so it is testable: run [split_adjust]
+    (which may rescale levels in [stop_states]), {b then} snapshot
+    [!stop_states], then run [update] (the stops runner, returning
+    [(exits, adjusts)]), then {!emit} the moves between the snapshot and the
+    post-update map with [exits @ adjusts] as [reported]. Returns [update]'s
+    result unchanged.
+
+    Because the snapshot follows [split_adjust], a split rescale alone is never
+    reported as a stop move. *)

@@ -135,30 +135,29 @@ let _record_force_exit ~last_stop_out_dates ~positions ~current_date
 let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
     ~prior_stage_ma_values ~get_price ~last_stop_out_dates ~audit_recorder
     ~prior_macro_result ~prior_decline_character ~current_date =
-  Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:current_date;
   (* Arm the fast-crash absolute stop from the PRIOR cycle's decline-character
      (strictly past — this cycle's classify runs later, at the macro step; a
      plain bool keeps the stops lib macro-agnostic). *)
   let catastrophic_armed =
     phys_equal !prior_decline_character Decline_character.Fast_v
   in
-  (* Snapshot AFTER the split rescale, so a split is never reported as a move
-     by the silent-move capture below (issue #2974). *)
-  let stops_before = !stop_states in
+  (* Split rescale, then snapshot, then the stops runner — so a split is never
+     reported as a move by the silent-move capture (issue #2974). *)
   let exit_transitions, adjust_transitions =
-    Stops_runner.update
-      ?ma_cache:(Bar_reader.ma_cache bar_reader)
-      ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
-      ~catastrophic_armed ~stops_config:config.stops_config
-      ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
-      ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
-      ~prior_stages ()
+    Stop_move_capture.split_then_update ~audit_recorder ~positions ~stop_states
+      ~current_date
+      ~split_adjust:(fun () ->
+        Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
+          ~as_of:current_date)
+      ~update:(fun () ->
+        Stops_runner.update
+          ?ma_cache:(Bar_reader.ma_cache bar_reader)
+          ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
+          ~catastrophic_armed ~stops_config:config.stops_config
+          ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
+          ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
+          ~prior_stages ())
   in
-  Stop_move_capture.emit ~audit_recorder ~positions ~before:stops_before
-    ~after:!stop_states
-    ~reported:(exit_transitions @ adjust_transitions)
-    ~current_date;
   List.iter exit_transitions
     ~f:
       (_handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date);

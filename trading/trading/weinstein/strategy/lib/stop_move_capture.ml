@@ -45,3 +45,13 @@ let emit ~(audit_recorder : Audit_recorder.t) ~positions ~before ~after
     ~reported ~current_date =
   silent_moves ~positions ~before ~after ~reported ~current_date
   |> List.iter ~f:audit_recorder.record_stop_move
+
+let split_then_update ~audit_recorder ~positions ~stop_states ~current_date
+    ~split_adjust ~update =
+  split_adjust ();
+  (* Snapshot AFTER the split rescale, so a split is never a move. *)
+  let before = !stop_states in
+  let ((exits, adjusts) as result) = update () in
+  emit ~audit_recorder ~positions ~before ~after:!stop_states
+    ~reported:(exits @ adjusts) ~current_date;
+  result
