@@ -144,8 +144,7 @@ let test_non_holding_and_unseeded_are_skipped _ =
               _holding ~id:"p3" ~ticker:"MSFT";
             ])
        ~before:(_states [ ("AAPL", _initial 95.0) ])
-       ~after:
-         (_states [ ("AAPL", _tightened 99.0); ("MSFT", _tightened 50.0) ])
+       ~after:(_states [ ("AAPL", _tightened 99.0); ("MSFT", _tightened 50.0) ])
        ())
     (size_is 0)
 

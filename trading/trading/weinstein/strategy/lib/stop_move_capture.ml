@@ -17,17 +17,21 @@ let _moved_level ~before ~after ticker =
 let _is_holding (pos : Position.t) =
   match Position.get_state pos with Position.Holding _ -> true | _ -> false
 
-let _event_of ~before ~after ~reported_ids ~current_date (pos : Position.t) :
-    Audit_recorder.stop_move_event option =
+let _make_event ~current_date (pos : Position.t) stop_level :
+    Audit_recorder.stop_move_event =
+  {
+    Audit_recorder.position_id = pos.id;
+    symbol = pos.symbol;
+    date = current_date;
+    stop_level;
+  }
+
+let _event_of ~before ~after ~reported_ids ~current_date (pos : Position.t) =
   if (not (_is_holding pos)) || Set.mem reported_ids pos.id then None
   else
-    Option.map (_moved_level ~before ~after pos.symbol) ~f:(fun stop_level ->
-        {
-          Audit_recorder.position_id = pos.id;
-          symbol = pos.symbol;
-          date = current_date;
-          stop_level;
-        })
+    Option.map
+      (_moved_level ~before ~after pos.symbol)
+      ~f:(_make_event ~current_date pos)
 
 let silent_moves ~positions ~before ~after ~reported ~current_date =
   let reported_ids =
@@ -35,8 +39,7 @@ let silent_moves ~positions ~before ~after ~reported ~current_date =
       (List.map reported ~f:(fun (t : Position.transition) -> t.position_id))
   in
   Map.data positions
-  |> List.filter_map
-       ~f:(_event_of ~before ~after ~reported_ids ~current_date)
+  |> List.filter_map ~f:(_event_of ~before ~after ~reported_ids ~current_date)
 
 let emit ~(audit_recorder : Audit_recorder.t) ~positions ~before ~after
     ~reported ~current_date =

@@ -2,8 +2,8 @@
 
     {!Stops_runner.update} advances each held ticker's stop state machine and
     reports a moved stop as an [UpdateRiskParams] adjust — except for
-    [Weinstein_stops.Entered_tightening], which installs the tightened level
-    in [stop_states] (where the next bar's trigger check enforces it) without
+    [Weinstein_stops.Entered_tightening], which installs the tightened level in
+    [stop_states] (where the next bar's trigger check enforces it) without
     emitting any transition. The per-trade stop log only sees transitions, so
     those moves were invisible in [trades.csv]'s [n_stop_raises] / [max_stop].
 

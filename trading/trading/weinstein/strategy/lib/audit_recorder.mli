@@ -114,8 +114,7 @@ type stop_move_event = {
 
     Observability only: emitting it changes no transition, and it is never
     produced for a split rescale ([Stops_split_runner] runs before the
-    before/after comparison) or for a move an adjust transition already
-    reports.
+    before/after comparison) or for a move an adjust transition already reports.
 
     Declared ahead of the other event records on purpose: they share the
     [position_id] / [symbol] / [date] labels, and an unannotated label resolves
