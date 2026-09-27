@@ -243,13 +243,30 @@ let _record_candidate_week ~candidate_log (e : AR.cascade_event) =
       Candidate_log.record c
         (Candidate_log.week_of ~date:e.date ~alternatives ~drops:e.drops))
 
-let of_collector ?candidate_log ~(trade_audit : Trade_audit.t)
+(* Issue #2974: the entry-decision event is the only place the Weinstein
+   strategy's installed initial stop surfaces (the simulator's [EntryComplete]
+   carries none), so book it on the stop log as the position's initial stop. *)
+let _record_installed_stop ~stop_log (e : AR.entry_event) =
+  Option.iter stop_log ~f:(fun log ->
+      let cand = e.candidate in
+      Stop_log.record_installed_stop log ~position_id:e.position_id
+        ~symbol:cand.ticker ~level:e.installed_stop)
+
+(* Issue #2974: a stop move no transition carries (the [Entered_tightening]
+   install) — counted on the stop log like an [UpdateRiskParams]. *)
+let _record_stop_move ~stop_log (e : AR.stop_move_event) =
+  Option.iter stop_log ~f:(fun log ->
+      Stop_log.record_stop_move log ~position_id:e.position_id
+        ~level:e.stop_level)
+
+let of_collector ?candidate_log ?stop_log ~(trade_audit : Trade_audit.t)
     ~(force_liquidation_log : Force_liquidation_log.t) () : AR.t =
   {
     capture_candidates = Option.is_some candidate_log;
     record_entry =
       (fun event ->
-        Trade_audit.record_entry trade_audit (_entry_decision_of_event event));
+        Trade_audit.record_entry trade_audit (_entry_decision_of_event event);
+        _record_installed_stop ~stop_log event);
     record_exit =
       (fun event ->
         Trade_audit.record_exit trade_audit (_exit_decision_of_event event));
@@ -265,5 +282,6 @@ let of_collector ?candidate_log ~(trade_audit : Trade_audit.t)
         Trade_audit.record_fill_volume trade_audit
           ~position_id:event.position_id
           (_fill_volume_check_of_event event));
+    record_stop_move = _record_stop_move ~stop_log;
     record_stop_decision = Trade_audit.record_stop_decision trade_audit;
   }

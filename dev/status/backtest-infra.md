@@ -19,6 +19,26 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-09-26 — stop-raise counting fixed in `trades.csv` (#2974, reporting only)
+
+- [x] **`n_stop_raises` off by one.** The simulator's `EntryComplete` carries no
+  stop, so `Stop_log` booked the first raise as the install (`entry_stop` blank
+  on 724/724 rows of `f2-fills-faithful-s0-v11`). The strategy's entry-audit
+  event now books `installed_stop` via `Stop_log.record_installed_stop`
+  (wired in `Trade_audit_recorder.of_collector ?stop_log`), and a stop-less
+  `EntryComplete` no longer erases it.
+- [x] **`Entered_tightening` moves counted.** The tightened level IS enforced
+  (the trigger check reads `stop_states`, not `risk_params`); only the log
+  missed it. `Weinstein_strategy.Stop_move_capture` diffs `stop_states` around
+  `Stops_runner.update` and reports each transition-less move through the new
+  `Audit_recorder.record_stop_move` → `Stop_log.record_stop_move`.
+- No transition changes; trade decisions untouched. Expected column moves in
+  `trades.csv`: `entry_stop` (now filled), `exit_stop` (filled for never-raised
+  trades; the tightened level where one applied), `max_stop`, `n_stop_raises`.
+- Verify: `dune runtest trading/backtest/test` (`test_stop_log`,
+  `test_trade_audit_recorder`) and `dune runtest trading/weinstein/strategy/test`
+  (`test_stop_move_capture`).
+
 ## 2026-09-26 — weekly trailing-stop decisions in `trade_audit.sexp` (#2977)
 
 - [ ] **Per-position stop-decision record (observability only; awaiting the
