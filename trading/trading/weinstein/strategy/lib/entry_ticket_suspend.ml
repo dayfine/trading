@@ -65,21 +65,26 @@ let aged_portfolio t (portfolio : Portfolio_view.t) =
 (* [Some ticket] for a wholly unfilled LONG [Entering] — the only shape a
    suspension withdraws. A partial fill has booked shares and is left alone,
    the same discipline {!Entry_ticket_ttl} applies. *)
+let _ticket_of t ~stop_states (pos : Position.t) ~target_quantity ~entry_price
+    ~created_date : ticket =
+  {
+    symbol = pos.symbol;
+    side = pos.side;
+    target_quantity;
+    entry_price;
+    reasoning = pos.entry_reasoning;
+    origin_date =
+      Option.value (Hashtbl.find t.origins pos.id) ~default:created_date;
+    stop_state = Map.find !stop_states pos.symbol;
+  }
+
 let _resting_long t ~stop_states (pos : Position.t) =
   match (pos.side, pos.state) with
   | Trading_base.Types.Long, Position.Entering e
     when Float.equal e.filled_quantity 0.0 ->
       Some
-        {
-          symbol = pos.symbol;
-          side = pos.side;
-          target_quantity = e.target_quantity;
-          entry_price = e.entry_price;
-          reasoning = pos.entry_reasoning;
-          origin_date =
-            Option.value (Hashtbl.find t.origins pos.id) ~default:e.created_date;
-          stop_state = Map.find !stop_states pos.symbol;
-        }
+        (_ticket_of t ~stop_states pos ~target_quantity:e.target_quantity
+           ~entry_price:e.entry_price ~created_date:e.created_date)
   | _ -> None
 
 let _cancel ~current_date (pos : Position.t) : Position.transition =

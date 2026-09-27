@@ -5,9 +5,8 @@ open Core
 let macro_bearish_no_op_cap = 0.70
 
 (* No-op default for [fast_v_min_rate_pct]: equals [Decline_character]'s own
-   [default_config.fast_v_min_rate_pct], so threading this value into the
-   classifier config reproduces [default_config] exactly (bit-identical
-   classification) until a spec sets a different fast-V arming rate threshold. *)
+   [default_config.fast_v_min_rate_pct], so classification is bit-identical
+   until a spec sets a different fast-V arming rate threshold. *)
 let fast_v_min_rate_no_op = 0.08
 
 (* Default bar-gap (calendar days) after which [stale_exit_after_days] force-
@@ -33,9 +32,8 @@ let default_dawn_max_flip_age_weeks = 78
 
 (* Default do-not-chase cap (percentage points) for [entry_extension_max_pct]:
    2.0, the value live arms in [dev/weekly-picks/live-config-overrides.sexp]
-   (user decision 2026-08-25, issue #2404) and the corpus value the staged
-   record-convention specs already use. Named so the sexp default and the
-   [default_config] literal share one source of truth. *)
+   (user decision 2026-08-25, issue #2404) and the staged record-convention
+   specs' corpus value; one source for the sexp default and [default_config]. *)
 let default_entry_extension_max_pct = 2.0
 
 type index_config = { primary : string; global : (string * string) list }
@@ -88,14 +86,17 @@ type config = {
       (** See [.mli]. *)
   neutral_blocks_longs : bool; [@sexp.default false]  (** See [.mli]. *)
   deteriorating_blocks_longs : bool; [@sexp.default false]  (** See [.mli]. *)
-  index_stage_veto_blocks_longs : bool; [@sexp.default false]  (** .mli *)
+  index_stage_veto_blocks_longs : bool; [@sexp.default false]
+      (** See [.mli]. *)
   neutral_blocks_shorts : bool; [@sexp.default true]  (** See [.mli]. *)
   enable_slow_grind_short_gate : bool; [@sexp.default false]  (** See [.mli]. *)
   fast_v_arm_on_rate_alone : bool; [@sexp.default false]  (** See [.mli]. *)
   fast_v_min_rate_pct : float; [@sexp.default fast_v_min_rate_no_op]
       (** See [.mli]. *)
-  reject_declining_ma_long_entry : bool; [@sexp.default false]  (** .mli *)
-  enable_late_stage2_stop_tighten : bool; [@sexp.default false]  (** .mli *)
+  reject_declining_ma_long_entry : bool; [@sexp.default false]
+      (** See [.mli]. *)
+  enable_late_stage2_stop_tighten : bool; [@sexp.default false]
+      (** See [.mli]. *)
   late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   enable_macro_bearish_exposure_trim : bool; [@sexp.default false]
       (** See [.mli]. *)
@@ -148,7 +149,8 @@ type config = {
   sim_exit_fill_next_open : bool; [@sexp.default true]  (** See [.mli]. *)
   sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]  (** .mli *)
   sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]  (** .mli *)
-  freeze_entry_at_first_breakout : bool; [@sexp.default false]  (** .mli *)
+  freeze_entry_at_first_breakout : bool; [@sexp.default false]
+      (** See [.mli]. *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_order_max_rest_weeks : int; [@sexp.default 52]  (** See [.mli]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
@@ -170,16 +172,14 @@ type config = {
 }
 [@@deriving sexp]
 
-(* Kept top-level so [default_config] stays a flat record literal (the
-   nesting linter caps the file average). *)
+(* Top-level so [default_config] stays a flat literal (nesting linter). *)
 let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
 (* Screening config for the promoted bundle (2026-07-23): the standard screener
    defaults with the continuous overhead-supply ranking weight armed. Pairs with
    [overhead_supply = Some Resistance_supply.default_config] in [default_config]
    — both must be armed for the continuous score to replace the binary grade
-   points (either absent falls back to the bit-identical binary path). Kept
-   top-level so [default_config] stays a flat one-line-per-field literal. *)
+   points (either absent falls back to the bit-identical binary path). *)
 let _default_screening_config =
   {
     Screener.default_config with

@@ -139,9 +139,9 @@ let run_screen_after_macro ~pending_entry_e ~suspended_tickets ~fold_start_date
   in
   Weinstein_strategy_screening.screen_universe ?active_through_for
     ?fold_start_date ?membership_at ~pending_entry_e ~suspended_tickets ~config
-    ~index_view
-    ~macro_result ~sector_map ~stop_states ~last_stop_out_dates ~portfolio
-    ~get_price ~bar_reader ~prior_stages ~current_date ~audit_recorder ()
+    ~index_view ~macro_result ~sector_map ~stop_states ~last_stop_out_dates
+    ~portfolio ~get_price ~bar_reader ~prior_stages ~current_date
+    ~audit_recorder ()
 
 (** Run the universe screen when the strategy is active (not halted, on a
     Friday, with a valid macro result). Returns the list of entry transitions,
@@ -154,11 +154,11 @@ let entry_transitions_if_active ~pending_entry_e ~suspended_tickets
     ~current_date ~index_view ~audit_recorder =
   match (halted, is_screening_day, macro_result_opt) with
   | false, true, Some macro_result ->
-      run_screen_after_macro ~pending_entry_e ~suspended_tickets ~fold_start_date
-        ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
-        ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-        ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
-        ~macro_result
+      run_screen_after_macro ~pending_entry_e ~suspended_tickets
+        ~fold_start_date ~universe_membership_at ~config ~stop_states
+        ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
+        ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
+        ~audit_recorder ~macro_result
   | _ -> []
 
 module Internal_for_test = struct

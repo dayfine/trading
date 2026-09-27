@@ -11,9 +11,9 @@
       plan), that suspension time counts toward the TTL clock, and that an F2
       cancel wins over a suspension.
     - The simulator, end to end: with the flag [Off] a resting ticket fills on
-      the cross even though that week reads Bearish (today's behaviour, R1); with
-      it on the same cross does NOT fill, and the re-issued ticket fills after
-      the gate re-admits, at a price inside the same [E]-anchored band. *)
+      the cross even though that week reads Bearish (today's behaviour, R1);
+      with it on the same cross does NOT fill, and the re-issued ticket fills
+      after the gate re-admits, at a price inside the same [E]-anchored band. *)
 
 open OUnit2
 open Core
@@ -32,7 +32,10 @@ let _week = 7
 let _long_symbol = "AAA"
 let _short_symbol = "SSS"
 let _reasoning = Position.ManualDecision { description = "suspend test" }
-let _initial_stop = Weinstein_stops.Initial { stop_level = 92.0; reference_level = 92.0 }
+
+let _initial_stop =
+  Weinstein_stops.Initial { stop_level = 92.0; reference_level = 92.0 }
+
 let _stage2 = Weinstein_types.Stage2 { weeks_advancing = 8; late = false }
 let _stage4 = Weinstein_types.Stage4 { weeks_declining = 9 }
 
@@ -133,7 +136,8 @@ let _created_date (pos : Position.t) =
     worst tape. [On_bearish_macro] follows the composite. [On_index_stage4]
     ignores a [Bearish] composite while the index is not in Stage 4, and
     suspends on a Stage-4 index even under a [Bullish] composite — the 2022
-    shape, where the composite stayed Bullish with the S&P below a falling MA. *)
+    shape, where the composite stayed Bullish with the S&P below a falling MA.
+*)
 let test_suspends_by_mode _ =
   let reads mode ~trend ~index_stage =
     Entry_ticket_suspend.suspends ~config:(_config mode)
@@ -169,8 +173,8 @@ let test_off_leaves_resting_ticket_alone _ =
       ()
   in
   let week1 =
-    _run ~store ~config ~macro_result:_bearish ~positions:[ long ]
-      ~date:_friday ()
+    _run ~store ~config ~macro_result:_bearish ~positions:[ long ] ~date:_friday
+      ()
   in
   let week2 =
     _run ~store ~config ~macro_result:_bullish ~positions:[ long ]
@@ -178,8 +182,7 @@ let test_off_leaves_resting_ticket_alone _ =
       ()
   in
   assert_that [ week1; week2 ]
-    (elements_are
-       [ pair is_empty is_empty; pair is_empty is_empty ])
+    (elements_are [ pair is_empty is_empty; pair is_empty is_empty ])
 
 (* ------------------------------------------------------------------ *)
 (* On: withdraw, then re-issue unchanged                                *)
@@ -208,27 +211,31 @@ let test_on_suspends_then_reissues_unchanged _ =
   stop_states := Map.remove !stop_states _long_symbol;
   let week2_date = Date.add_days _friday _week in
   let week2_transitions, week2_held =
-    _run ~store ~config ~stop_states ~macro_result:_bullish
-      ~positions:[ short ] ~date:week2_date ()
+    _run ~store ~config ~stop_states ~macro_result:_bullish ~positions:[ short ]
+      ~date:week2_date ()
   in
   let reissued_positions =
-    List.map week2_transitions ~f:(fun t -> _unwrap (Position.create_entering t))
+    List.map week2_transitions ~f:(fun t ->
+        _unwrap (Position.create_entering t))
   in
   let aged =
     Entry_ticket_suspend.aged_portfolio store
       { cash = 0.0; positions = _positions reissued_positions }
   in
   assert_that week1
-    (pair (elements_are [ equal_to (_suspension_of "L1") ])
+    (pair
+       (elements_are [ equal_to (_suspension_of "L1") ])
        (elements_are [ equal_to _long_symbol ]));
   assert_that week2_transitions
     (elements_are
        [
          all_of
            [
-             field (fun (t : Position.transition) -> t.kind)
+             field
+               (fun (t : Position.transition) -> t.kind)
                (equal_to _reissue_kind);
-             field (fun (t : Position.transition) -> t.date)
+             field
+               (fun (t : Position.transition) -> t.date)
                (equal_to week2_date);
              field
                (fun (t : Position.transition) ->
@@ -237,7 +244,8 @@ let test_on_suspends_then_reissues_unchanged _ =
            ];
        ]);
   assert_that week2_held (elements_are [ equal_to _long_symbol ]);
-  assert_that (Map.find !stop_states _long_symbol)
+  assert_that
+    (Map.find !stop_states _long_symbol)
     (is_some_and (equal_to _initial_stop));
   assert_that (Map.data aged.positions)
     (elements_are [ field _created_date (is_some_and (equal_to placed)) ])
@@ -253,8 +261,8 @@ let test_on_keeps_ticket_suspended_while_gate_rejects _ =
       ()
   in
   let (_ : Position.transition list * string list) =
-    _run ~store ~config ~macro_result:_bearish ~positions:[ long ]
-      ~date:_friday ()
+    _run ~store ~config ~macro_result:_bearish ~positions:[ long ] ~date:_friday
+      ()
   in
   assert_that
     (_run ~store ~config ~macro_result:_bearish ~positions:[]
@@ -359,10 +367,10 @@ let _sim_bars =
 let _bearish_from = Date.of_string "2024-01-03"
 let _bullish_from = Date.of_string "2024-01-08"
 
-(** The smallest strategy that exercises the production module: one long
-    ticket on its first call, then {!Entry_ticket_suspend.run} on every call
-    against a scripted tape. The F2 callback is empty, so every withdrawal and
-    re-issue is this module's. *)
+(** The smallest strategy that exercises the production module: one long ticket
+    on its first call, then {!Entry_ticket_suspend.run} on every call against a
+    scripted tape. The F2 callback is empty, so every withdrawal and re-issue is
+    this module's. *)
 module Scripted_suspend_strategy : sig
   include Trading_strategy.Strategy_interface.STRATEGY
 
@@ -410,8 +418,7 @@ end = struct
     | Some (bar : Types.Daily_price.t) ->
         let transitions, _held =
           Entry_ticket_suspend.run ~store:!store
-            ~config:
-              { (_config !mode) with universe = [ _sim_symbol ] }
+            ~config:{ (_config !mode) with universe = [ _sim_symbol ] }
             ~macro_result:(_macro_on bar.date)
             ~stop_states:(ref String.Map.empty) ~portfolio
             ~current_date:bar.date ~cancel_expired:_no_cancels ()
@@ -476,7 +483,8 @@ let _fills_per_step steps =
       (Date.to_string step.date, List.length step.trades))
 
 let _fill_prices steps =
-  List.concat_map steps ~f:(fun (step : Trading_simulation.Simulator.step_result) ->
+  List.concat_map steps
+    ~f:(fun (step : Trading_simulation.Simulator.step_result) ->
       List.map step.trades ~f:(fun (t : Trading_base.Types.trade) -> t.price))
 
 let _in_band =
@@ -486,8 +494,8 @@ let _in_band =
     ~high:(_sim_entry *. (1.0 +. (_sim_cap_pct /. 100.0)))
 
 (** R1 pin: flag [Off] — the ticket rests through the Bearish weeks and fills on
-    the 01-05 cross, inside the Bearish stretch. This is the 14 %-of-fills
-    shape #2976 measured. *)
+    the 01-05 cross, inside the Bearish stretch. This is the 14 %-of-fills shape
+    #2976 measured. *)
 let test_sim_off_fills_during_bearish_tape _ =
   let steps = _simulate Mode.Off in
   assert_that (_fills_per_step steps)

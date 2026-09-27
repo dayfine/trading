@@ -207,9 +207,9 @@ let _run_macro ~config ~ad_series ~breadth_series ~prior_macro
 
 let _run_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
     ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
-    ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
-    ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
-    ~audit_recorder ~is_screening_day ~macro_result_opt =
+    ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+    ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
+    ~is_screening_day ~macro_result_opt =
   let halted =
     match
       Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
@@ -219,10 +219,10 @@ let _run_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
   in
   Weinstein_strategy_macro.entry_transitions_if_active ~pending_entry_e
     ~suspended_tickets ~fold_start_date ~universe_membership_at ~halted
-    ~is_screening_day
-    ~macro_result_opt ~config ~stop_states ~last_stop_out_dates ~bar_reader
-    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-    ~current_date ~index_view ~audit_recorder
+    ~is_screening_day ~macro_result_opt ~config ~stop_states
+    ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
+    ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
+    ~audit_recorder
 
 (** Compute the macro result (mutating the macro refs via {!_run_macro}) and run
     the macro-bearish trim pass, returning both. Extracted from
@@ -335,11 +335,11 @@ let _process_market_day ~pending_entry_e ~suspended_tickets ~fold_start_date
 
 let _on_market_close ~pending_entry_e ~suspended_tickets ~fold_start_date
     ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
-    ~last_stop_out_dates
-    ~prior_macro ~prior_macro_result ~prior_decline_character ~peak_tracker
-    ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
-    ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
-    ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
+    ~last_stop_out_dates ~prior_macro ~prior_macro_result
+    ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+    ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors ~stage3_streaks
+    ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
+    ~(portfolio : Portfolio_view.t) =
   match get_price config.indices.primary with
   | None -> Ok { Strategy_interface.transitions = [] }
   | Some primary_bar ->
@@ -409,10 +409,10 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     let on_market_close =
       _on_market_close ~pending_entry_e ~suspended_tickets ~fold_start_date
         ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
-        ~last_stop_out_dates
-        ~prior_macro ~prior_macro_result ~prior_decline_character ~peak_tracker
-        ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
-        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
+        ~last_stop_out_dates ~prior_macro ~prior_macro_result
+        ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+        ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
+        ~stage3_streaks ~laggard_streaks ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 

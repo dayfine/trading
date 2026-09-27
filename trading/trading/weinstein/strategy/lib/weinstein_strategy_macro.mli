@@ -61,9 +61,9 @@ val run_screen_after_macro :
     See [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4.
 
     [~suspended_tickets] is the per-run {!Entry_ticket_suspend} store (#2976),
-    held in the {!Weinstein_strategy.make} closure beside [~pending_entry_e].
-    It is never read or written while [config.entry_ticket_macro_suspend =
-    Off], so a fresh store is always a safe argument.
+    held in the {!Weinstein_strategy.make} closure beside [~pending_entry_e]. It
+    is never read or written while [config.entry_ticket_macro_suspend = Off], so
+    a fresh store is always a safe argument.
 
     [~universe_membership_at] is the run's dated point-in-time universe
     schedule, [None] on every unscheduled run. When [Some f], the screener

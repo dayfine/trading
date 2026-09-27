@@ -437,9 +437,9 @@ let _entries_of_screen_result ?pending_entry_e ?on_candidates_considered ~config
 
 let screen_universe ?active_through_for ?fold_start_date ?membership_at
     ?pending_entry_e ?suspended_tickets ~config ~index_view
-    ~(macro_result : Macro.result) ~sector_map ~stop_states
-    ~last_stop_out_dates ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader
-    ~prior_stages ~current_date ~audit_recorder () =
+    ~(macro_result : Macro.result) ~sector_map ~stop_states ~last_stop_out_dates
+    ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
+    ~current_date ~audit_recorder () =
   let classified =
     _classify_all ?active_through_for ?fold_start_date ~config ~bar_reader
       ~prior_stages ~current_date ()

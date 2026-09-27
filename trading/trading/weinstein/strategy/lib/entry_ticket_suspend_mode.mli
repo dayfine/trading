@@ -4,12 +4,12 @@
     runner (which itself reads the config).
 
     {b Book authority.} Ch. 8 ("Stage Analysis for the Market Averages"): when
-    the market average breaks down into Stage 4, "Suspend buying even if you
-    see a few stocks breaking out on their charts" —
-    [docs/design/weinstein-book-reference.md] §2.1, block "Resolved
-    2026-09-16". The book's word is {e suspend}, not cancel; it is silent on the
-    mechanics of a standing buy-stop written before the tape turned (Ch. 3's
-    only cancel rule is "if the pattern changes"). *)
+    the market average breaks down into Stage 4, "Suspend buying even if you see
+    a few stocks breaking out on their charts" —
+    [docs/design/weinstein-book-reference.md] §2.1, block "Resolved 2026-09-16".
+    The book's word is {e suspend}, not cancel; it is silent on the mechanics of
+    a standing buy-stop written before the tape turned (Ch. 3's only cancel rule
+    is "if the pattern changes"). *)
 
 type t =
   | Off

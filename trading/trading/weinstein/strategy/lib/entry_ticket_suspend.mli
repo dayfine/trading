@@ -25,31 +25,30 @@
       {!Trading_simulation.Cancel_handler.cancel_resting_entry_orders} retires
       its order, so it cannot fill and — being closed — reserves no cash. The
       ticket itself is stashed in {!t}: symbol, side, quantity, frozen entry
-      level [E] (the order's trigger; the do-not-chase limit is re-derived
-      from [E] by the simulator's unchanged config), entry reasoning, the
-      symbol's stop-state plan, and the {b original} placement date.
+      level [E] (the order's trigger; the do-not-chase limit is re-derived from
+      [E] by the simulator's unchanged config), entry reasoning, the symbol's
+      stop-state plan, and the {b original} placement date.
     - {b Re-issue.} On the first screen where {!suspends} is [false], each
       stashed ticket is re-emitted as a [CreateEntering] with the identical
       parameters (under a fresh position id — a closed position cannot be
       reopened) and its stop state re-installed, so the order that reaches the
       simulator is the order that was withdrawn.
-    - {b Age.} Suspension time {b counts} toward [entry_order_max_rest_weeks]:
-      a ticket is as old as its first placement, not its latest re-issue. The
-      alternative (pausing the clock) would let a ticket outlive the TTL by
-      the length of every bear phase it slept through, which is the
-      stale-ticket shape the clock exists to stop. A stashed ticket past the
-      clock is dropped (and its {!Entry_freeze} pin released) instead of being
-      re-issued; a re-issued ticket reads its original date through
-      {!aged_portfolio}.
-    - {b Cancels win.} The F2 re-screen / clock cancels
-      ({!Entry_ticket_ttl}) are computed first; a ticket they retire is not
-      also suspended. Note that an armed [enable_entry_ticket_rescreen] asks
-      the same macro question, so under [On_bearish_macro] it cancels the
-      ticket before this module can suspend it — the two are rival answers
-      to one question and are meant to be run as separate arms.
+    - {b Age.} Suspension time {b counts} toward [entry_order_max_rest_weeks]: a
+      ticket is as old as its first placement, not its latest re-issue. The
+      alternative (pausing the clock) would let a ticket outlive the TTL by the
+      length of every bear phase it slept through, which is the stale-ticket
+      shape the clock exists to stop. A stashed ticket past the clock is dropped
+      (and its {!Entry_freeze} pin released) instead of being re-issued; a
+      re-issued ticket reads its original date through {!aged_portfolio}.
+    - {b Cancels win.} The F2 re-screen / clock cancels ({!Entry_ticket_ttl})
+      are computed first; a ticket they retire is not also suspended. Note that
+      an armed [enable_entry_ticket_rescreen] asks the same macro question, so
+      under [On_bearish_macro] it cancels the ticket before this module can
+      suspend it — the two are rival answers to one question and are meant to be
+      run as separate arms.
     - {b Held.} While stashed (and on the re-issue tick) the symbol counts as
-      held for the cascade, so it is never written as a second, fresh ticket.
-      A stashed ticket whose symbol has become held by another position by
+      held for the cascade, so it is never written as a second, fresh ticket. A
+      stashed ticket whose symbol has become held by another position by
       re-issue time (e.g. a short entered during the suspension) is dropped.
 
     {b Scope.} Longs only. Shorts have their own gate
@@ -73,9 +72,9 @@ val create : unit -> t
 (** A fresh, empty store. *)
 
 val cancel_reason : string
-(** ["entry_ticket_macro_suspended"] — the [CancelEntry] reason of a
-    suspension. A {e withdrawal}, not a ticket death: the same setup comes back
-    as a new position id once the gate admits. *)
+(** ["entry_ticket_macro_suspended"] — the [CancelEntry] reason of a suspension.
+    A {e withdrawal}, not a ticket death: the same setup comes back as a new
+    position id once the gate admits. *)
 
 val suspends :
   config:Weinstein_strategy_config.config -> macro_result:Macro.result -> bool
@@ -99,8 +98,7 @@ val run :
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
   portfolio:Trading_strategy.Portfolio_view.t ->
   current_date:Date.t ->
-  cancel_expired:
-    (Trading_strategy.Portfolio_view.t -> Position.transition list) ->
+  cancel_expired:(Trading_strategy.Portfolio_view.t -> Position.transition list) ->
   unit ->
   Position.transition list * string list
 (** One weekly screen's resting-ticket lifecycle. [cancel_expired] is the F2

@@ -1144,8 +1144,8 @@ type config = {
   entry_ticket_macro_suspend : Entry_ticket_suspend_mode.t;
       [@sexp.default Entry_ticket_suspend_mode.Off]
       (** #2976: suspend (withdraw, keep, re-issue unchanged) resting long entry
-          tickets while the macro gate rejects new longs — Ch. 8 "Suspend
-          buying even if you see a few stocks breaking out". Default [Off] =
+          tickets while the macro gate rejects new longs — Ch. 8 "Suspend buying
+          even if you see a few stocks breaking out". Default [Off] =
           bit-identical (R1). See {!Entry_ticket_suspend} and
           [Weinstein_strategy_config.entry_ticket_macro_suspend]. *)
 }

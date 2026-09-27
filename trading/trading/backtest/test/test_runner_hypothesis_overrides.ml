@@ -1332,8 +1332,9 @@ let test_default_entry_ticket_macro_suspend_is_off _ =
 
 (** Axis reachability (R2): both armed variants resolve through the {b real}
     [Overlay_validator.apply_overrides] with no unknown-key error, which is what
-    makes [((flag entry_ticket_macro_suspend) (values (Off On_bearish_macro
-    On_index_stage4)))] a valid [Variant_matrix] axis on landing. *)
+    makes
+    [((flag entry_ticket_macro_suspend) (values (Off On_bearish_macro
+     On_index_stage4)))] a valid [Variant_matrix] axis on landing. *)
 let test_entry_ticket_macro_suspend_axis_resolves_via_overlay_validator _ =
   let mode_after overlay =
     (Backtest.Overlay_validator.apply_overrides (_default_config ())
