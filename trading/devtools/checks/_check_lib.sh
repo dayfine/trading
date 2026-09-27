@@ -173,12 +173,15 @@ die() {
 # `R  new.txt\0old.txt\0`, new path first). Left unhandled, that raw
 # origin-path line would flow into callers' line-oriented `grep '^A'` /
 # `grep '^ A '` as if it were its own status record, and could falsely
-# match if the origin path happened to start with "A " or " A ". This
-# helper consumes and discards that continuation record so it never
-# reaches callers. The guard only ever cares about newly-added / ITA
-# entries (status "A*" or " A"), which are never R/C, so no rename
-# record itself is ever a match -- only its continuation line needed
-# guarding against.
+# match any origin path starting with a capital "A" -- not just a
+# literal "A " or " A " prefix; `grep -E '^A|^ A '` (used by
+# jj_ita_guard_snapshot below) matches ANY line beginning with "A"
+# (e.g. "ARCH.md", "AGENTS.md"), since its first alternative has no
+# trailing space. This helper consumes and discards that continuation
+# record so it never reaches callers. The guard only ever cares about
+# newly-added / ITA entries (status "A*" or " A"), which are never
+# R/C, so no rename record itself is ever a match -- only its
+# continuation line needed guarding against.
 #
 # KNOWN LIMITATION: a path containing a literal newline byte (legal on
 # Linux, vanishingly rare, and not one of the quoting cases this fix

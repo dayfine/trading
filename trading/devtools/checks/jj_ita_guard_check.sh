@@ -297,6 +297,14 @@ fi
 # functions via the `. _check_lib.sh` source line above) rather than going
 # through jj_workspace_smoke.sh, so the forced git-level failure is
 # deterministic and does not depend on jj's own behaviour.
+#
+# STDOUT and STDERR are captured SEPARATELY (via a temp file for stderr,
+# rather than a blanket `2>&1`) so the assertions below can pin the actual
+# claim -- "prints ... to stderr" -- rather than merely "prints ...
+# somewhere". A `2>&1` capture cannot distinguish a WARN correctly sent to
+# stderr from a regression that sends it to stdout instead (qc-behavioral
+# rework iteration 1, #2991: moving the WARN to stdout still passed 7/7
+# under the old `2>&1` capture).
 # ---------------------------------------------------------------------------
 
 # --- 6a: git reset -- <path> fails ---
@@ -309,16 +317,19 @@ BEFORE_6A=$(jj_ita_guard_snapshot "$SBX6A")
 ( cd "$SBX6A" && git add -N dev/daily/2099-01-01-reset-fail.md )
 
 touch "${SBX6A}/.git/index.lock"
-RESTORE_6A_OUT=$(jj_ita_guard_restore "$SBX6A" "$BEFORE_6A" 2>&1) && RESTORE_6A_CODE=0 || RESTORE_6A_CODE=$?
-rm -f "${SBX6A}/.git/index.lock"
+RESTORE_6A_ERRFILE="$(mktemp)"
+RESTORE_6A_STDOUT=$(jj_ita_guard_restore "$SBX6A" "$BEFORE_6A" 2>"$RESTORE_6A_ERRFILE") && RESTORE_6A_CODE=0 || RESTORE_6A_CODE=$?
+RESTORE_6A_STDERR="$(cat "$RESTORE_6A_ERRFILE")"
+rm -f "$RESTORE_6A_ERRFILE" "${SBX6A}/.git/index.lock"
 STATUS_6A_AFTER="$(git -C "$SBX6A" status --porcelain=v1 --untracked-files=no)"
 
 if [ "$RESTORE_6A_CODE" -eq 0 ] \
-  && printf '%s\n' "$RESTORE_6A_OUT" | grep -qF 'WARN: jj_ita_guard_restore: failed to reset intent-to-add entry for "dev/daily/2099-01-01-reset-fail.md"' \
+  && printf '%s\n' "$RESTORE_6A_STDERR" | grep -qF 'WARN: jj_ita_guard_restore: failed to reset intent-to-add entry for "dev/daily/2099-01-01-reset-fail.md"' \
+  && ! printf '%s\n' "$RESTORE_6A_STDOUT" | grep -qF 'WARN: jj_ita_guard_restore' \
   && printf '%s\n' "$STATUS_6A_AFTER" | grep -qF ' A dev/daily/2099-01-01-reset-fail.md'; then
-  ok "${LABEL} — forced restore failure (reset branch): jj_ita_guard_restore returns 0 (stays non-fatal) but prints a named WARN: line to stderr when 'git reset -- <path>' fails, and the path is left ' A' -- proving the WARN corresponds to a real, still-polluted failure, not a false alarm"
+  ok "${LABEL} — forced restore failure (reset branch): jj_ita_guard_restore returns 0 (stays non-fatal) but prints a named WARN: line to STDERR (never stdout) when 'git reset -- <path>' fails, and the path is left ' A' -- proving the WARN corresponds to a real, still-polluted failure, not a false alarm"
 else
-  bad "${LABEL} — forced restore failure (reset branch) not surfaced: exit=${RESTORE_6A_CODE} output='${RESTORE_6A_OUT}' status-after='${STATUS_6A_AFTER}' (expected exit 0, a WARN: line naming the path, and the path still ' A')"
+  bad "${LABEL} — forced restore failure (reset branch) not surfaced: exit=${RESTORE_6A_CODE} stdout='${RESTORE_6A_STDOUT}' stderr='${RESTORE_6A_STDERR}' status-after='${STATUS_6A_AFTER}' (expected exit 0, a WARN: line naming the path on stderr only, and the path still ' A')"
 fi
 
 # --- 6b: git update-index --add --cacheinfo fails ---
@@ -335,16 +346,48 @@ BEFORE_6B=$(jj_ita_guard_snapshot "$SBX6B")
 ( cd "$SBX6B" && git rm --cached -f -q dev/daily/2099-01-01-cacheinfo-fail.md && git add -N dev/daily/2099-01-01-cacheinfo-fail.md )
 
 touch "${SBX6B}/.git/index.lock"
-RESTORE_6B_OUT=$(jj_ita_guard_restore "$SBX6B" "$BEFORE_6B" 2>&1) && RESTORE_6B_CODE=0 || RESTORE_6B_CODE=$?
-rm -f "${SBX6B}/.git/index.lock"
+RESTORE_6B_ERRFILE="$(mktemp)"
+RESTORE_6B_STDOUT=$(jj_ita_guard_restore "$SBX6B" "$BEFORE_6B" 2>"$RESTORE_6B_ERRFILE") && RESTORE_6B_CODE=0 || RESTORE_6B_CODE=$?
+RESTORE_6B_STDERR="$(cat "$RESTORE_6B_ERRFILE")"
+rm -f "$RESTORE_6B_ERRFILE" "${SBX6B}/.git/index.lock"
 STATUS_6B_AFTER="$(git -C "$SBX6B" status --porcelain=v1 --untracked-files=no)"
 
 if [ "$RESTORE_6B_CODE" -eq 0 ] \
-  && printf '%s\n' "$RESTORE_6B_OUT" | grep -qF 'WARN: jj_ita_guard_restore: failed to restore staged content for "dev/daily/2099-01-01-cacheinfo-fail.md"' \
+  && printf '%s\n' "$RESTORE_6B_STDERR" | grep -qF 'WARN: jj_ita_guard_restore: failed to restore staged content for "dev/daily/2099-01-01-cacheinfo-fail.md"' \
+  && ! printf '%s\n' "$RESTORE_6B_STDOUT" | grep -qF 'WARN: jj_ita_guard_restore' \
   && printf '%s\n' "$STATUS_6B_AFTER" | grep -qF ' A dev/daily/2099-01-01-cacheinfo-fail.md'; then
-  ok "${LABEL} — forced restore failure (cacheinfo branch): jj_ita_guard_restore returns 0 (stays non-fatal) but prints a named WARN: line to stderr when 'git update-index --add --cacheinfo' fails, and the path is left ' A' with its blob NOT restored -- proving the WARN corresponds to a real, still-polluted failure"
+  ok "${LABEL} — forced restore failure (cacheinfo branch): jj_ita_guard_restore returns 0 (stays non-fatal) but prints a named WARN: line to STDERR (never stdout) when 'git update-index --add --cacheinfo' fails, and the path is left ' A' with its blob NOT restored -- proving the WARN corresponds to a real, still-polluted failure"
 else
-  bad "${LABEL} — forced restore failure (cacheinfo branch) not surfaced: exit=${RESTORE_6B_CODE} output='${RESTORE_6B_OUT}' status-after='${STATUS_6B_AFTER}' (expected exit 0, a WARN: line naming the path, and the path still ' A')"
+  bad "${LABEL} — forced restore failure (cacheinfo branch) not surfaced: exit=${RESTORE_6B_CODE} stdout='${RESTORE_6B_STDOUT}' stderr='${RESTORE_6B_STDERR}' status-after='${STATUS_6B_AFTER}' (expected exit 0, a WARN: line naming the path on stderr only, and the path still ' A')"
+fi
+
+# ---------------------------------------------------------------------------
+# Part 7 (CP4-a, qc-behavioral rework iteration 1, #2991): a staged rename
+# whose ORIGIN path starts with a capital "A" must not leak its discarded
+# continuation record into _porcelain_lines' output, and must not pollute
+# jj_ita_guard_snapshot's grep -E '^A|^ A ' with a bogus entry.
+#
+# `git mv ARCH.md d/ARCH.md` (both committed first, so the rename is a real
+# tracked-file move, not an add) produces, under `-z`: "R  d/ARCH.md" then a
+# continuation NUL field "ARCH.md" -- an origin path that itself starts with
+# "A" and would match jj_ita_guard_snapshot's grep verbatim if the
+# rename/copy `skip` logic in _porcelain_lines did not discard it (this is
+# exactly the `skip = 1` -> `skip = 0` mutation qc-behavioral's review
+# showed surviving 7/7 against the PR as first submitted).
+# ---------------------------------------------------------------------------
+SBX7="$(_new_sandbox)"
+mkdir -p "${SBX7}/d"
+echo "content" >"${SBX7}/ARCH.md"
+( cd "$SBX7" && git add ARCH.md && git commit -q -m "add ARCH.md" )
+( cd "$SBX7" && git mv ARCH.md d/ARCH.md )
+
+RENAME_LINES="$(_porcelain_lines "$SBX7")"
+RENAME_SNAPSHOT="$(jj_ita_guard_snapshot "$SBX7")"
+
+if [ "$RENAME_LINES" = "R  d/ARCH.md" ] && [ -z "$RENAME_SNAPSHOT" ]; then
+  ok "${LABEL} — rename continuation discard: staging 'git mv ARCH.md d/ARCH.md' (origin path starts with 'A') makes _porcelain_lines emit exactly 'R  d/ARCH.md' with the origin-path continuation record discarded, and jj_ita_guard_snapshot sees no entries at all -- proving the discarded continuation never falsely matches the ITA/added-entry grep"
+else
+  bad "${LABEL} — rename continuation discard broken: _porcelain_lines='${RENAME_LINES}' jj_ita_guard_snapshot='${RENAME_SNAPSHOT}' (expected _porcelain_lines to equal exactly 'R  d/ARCH.md' and jj_ita_guard_snapshot to be empty)"
 fi
 
 if [ "$FAIL" -gt 0 ]; then
