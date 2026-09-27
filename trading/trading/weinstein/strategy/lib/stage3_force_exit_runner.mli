@@ -29,6 +29,7 @@ open Trading_strategy
 val update :
   config:Stage3_force_exit.config ->
   exit_margin_pct:float ->
+  ma_same_basis:bool ->
   prior_stage_ma_values:float Hashtbl.M(String).t option ->
   is_screening_day:bool ->
   positions:Position.t Map.M(String).t ->
@@ -69,8 +70,8 @@ val update :
     {2 Margin filter (price-below-MA gate)}
 
     Layered on top of {!Stage3_force_exit.config.hysteresis_weeks}. When
-    [exit_margin_pct > 0.0] AND [prior_stage_ma_values] is [Some tbl] AND [tbl]
-    has an entry for the symbol, the runner additionally requires the current
+    [prior_stage_ma_values] is [Some tbl] AND [tbl] has a positive entry for the
+    symbol (at any [exit_margin_pct], including [0.0]), the runner additionally requires the current
     bar's close price to sit at least [exit_margin_pct] (fractional) below the
     30-week MA before emitting:
 
@@ -80,14 +81,23 @@ val update :
     position. The streak counter still advances (and resets on a non-Stage-3
     read) — only the emission decision is gated.
 
-    Backward compatibility: when [exit_margin_pct = 0.0] the inequality is
-    satisfied by every close (closes above the MA produce a negative LHS, which
-    still satisfies [>= 0.0]). When [prior_stage_ma_values = None], or the
-    symbol is absent from the table, or the recorded MA value is non-positive
-    (warmup / corrupt data), the margin filter short-circuits to "satisfied" and
-    the runner falls back to pure hysteresis-only behaviour. All four
-    short-circuits preserve bit-equality with pre-fix runs (and with the
-    previous runner signature that lacked margin support entirely).
+    [exit_margin_pct = 0.0] does {b not} disable the gate: a close above the MA
+    gives a negative LHS, which fails [>= 0.0], so whenever an MA is available
+    the runner requires [close <= ma] (issue #2974 corrected an earlier claim
+    here that 0.0 lets every close pass). When [prior_stage_ma_values = None],
+    or the symbol is absent from the table, or the recorded MA value is
+    non-positive (warmup / corrupt data), the margin filter short-circuits to
+    "satisfied" and the runner falls back to pure hysteresis-only behaviour.
+
+    {2 MA basis ([ma_same_basis])}
+
+    The table's MA values are read on the weekly view's {b adjusted} closes,
+    while [bar.close_price] is {b raw}. With [ma_same_basis = false] (the
+    [Weinstein_stops.config.stop_ma_same_basis] default) the two are compared
+    as-is — the pre-#2982 behaviour, under which a name with a later split has
+    a shrunken MA and the gate almost never passes. With [true], each held
+    symbol's MA is first restated onto its current bar's raw basis via
+    {!Stop_ma_basis.restate_to_raw}; the caller's table is not mutated.
 
     {2 Mutates}
 

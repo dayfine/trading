@@ -80,10 +80,11 @@ let _monday = Date.of_string "2024-01-08" (* Monday *)
     is identical to the pre-margin signature. New tests that exercise the margin
     filter pass the values explicitly via [~exit_margin_pct] and
     [~prior_stage_ma_values]. *)
-let run_runner ?(exit_margin_pct = 0.0) ?(prior_stage_ma_values = None) ~config
-    ~is_screening_day ~positions ~get_price ~prior_stages ~stage3_streaks
-    ~stop_exit_position_ids ~current_date () =
-  Stage3_force_exit_runner.update ~config ~exit_margin_pct
+let run_runner ?(exit_margin_pct = 0.0) ?(ma_same_basis = false)
+    ?(prior_stage_ma_values = None) ~config ~is_screening_day ~positions
+    ~get_price ~prior_stages ~stage3_streaks ~stop_exit_position_ids
+    ~current_date () =
+  Stage3_force_exit_runner.update ~config ~exit_margin_pct ~ma_same_basis
     ~prior_stage_ma_values ~is_screening_day ~positions ~get_price ~prior_stages
     ~stage3_streaks ~stop_exit_position_ids ~current_date
 
@@ -508,6 +509,60 @@ let test_combined_confirmation_met_margin_fails _ =
   assert_that (Hashtbl.find stage3_streaks "AAPL") (is_some_and (equal_to 2))
 
 (* ------------------------------------------------------------------ *)
+(* MA basis (issue #2982): stored MA is adjusted, the close is raw      *)
+(* ------------------------------------------------------------------ *)
+
+(* A name with a later 10:1 split: raw close 130, adjusted close 13. The table
+   holds the classifier's adjusted MA, 14 — i.e. 140 on the raw basis, so the
+   close really sits ~7% BELOW the MA. *)
+let _split_basis_bar () =
+  {
+    (make_bar "2024-01-05" ~close:130.0 ()) with
+    Types.Daily_price.adjusted_close = 13.0;
+  }
+
+let _run_split_basis ~ma_same_basis ~ma_values =
+  let pos = make_holding_pos "AAPL" 100.0 _friday in
+  let prior_stages = Hashtbl.create (module String) in
+  Hashtbl.set prior_stages ~key:"AAPL" ~data:stage3;
+  run_runner ~exit_margin_pct:0.0 ~ma_same_basis
+    ~prior_stage_ma_values:(Some ma_values) ~config:_cfg_k1
+    ~is_screening_day:true
+    ~positions:(String.Map.singleton "AAPL" pos)
+    ~get_price:(get_price_of [ ("AAPL", _split_basis_bar ()) ])
+    ~prior_stages
+    ~stage3_streaks:(Hashtbl.create (module String))
+    ~stop_exit_position_ids:String.Set.empty ~current_date:_friday ()
+
+let _adjusted_ma_table () =
+  let ma_values = Hashtbl.create (module String) in
+  Hashtbl.set ma_values ~key:"AAPL" ~data:14.0;
+  ma_values
+
+(* Flag off (default): raw 130 vs adjusted 14 reads as "close far ABOVE the MA",
+   and margin 0.0 still requires close <= MA — the exit is suppressed. Pins both
+   the pre-#2982 mixed basis and the corrected "0.0 still gates" docstring. *)
+let test_margin_mixed_basis_suppresses_when_flag_off _ =
+  assert_that
+    (_run_split_basis ~ma_same_basis:false ~ma_values:(_adjusted_ma_table ()))
+    is_empty
+
+(* Flag on: the MA is restated to 140 on the bar's raw basis, the close is below
+   it, and the exit fires. The caller's table keeps the adjusted value. *)
+let test_margin_same_basis_fires_when_flag_on _ =
+  let ma_values = _adjusted_ma_table () in
+  let exits = _run_split_basis ~ma_same_basis:true ~ma_values in
+  assert_that
+    (List.map exits ~f:(fun (t : Trading_strategy.Position.transition) ->
+         t.position_id),
+      Hashtbl.find ma_values "AAPL")
+    (all_of
+       [
+         field fst (elements_are [ equal_to "AAPL" ]);
+         field snd (is_some_and (float_equal 14.0));
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* runner                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -546,6 +601,10 @@ let suite =
          >:: test_combined_confirmation_and_margin;
          "combined: confirmation met but margin fails → no fire"
          >:: test_combined_confirmation_met_margin_fails;
+         "MA basis: adjusted MA vs raw close suppresses when flag off"
+         >:: test_margin_mixed_basis_suppresses_when_flag_off;
+         "MA basis: restated MA fires when stop_ma_same_basis on"
+         >:: test_margin_same_basis_fires_when_flag_on;
        ]
 
 let () = run_test_tt_main suite

@@ -48,6 +48,7 @@
   test_stops_runner
   test_stop_move_capture
   test_stop_decision_capture
+  test_stop_ma_same_basis
   test_stop_skip_entry_bar_sim
   test_long_buying_power
   test_leverage_dawn

@@ -392,6 +392,41 @@ type config = {
           promotion PR. Set [false] to reproduce a pre-2026-09-03 baseline
           bit-for-bit. Remains an experiment axis per
           [.claude/rules/experiment-flag-discipline.md] R2. *)
+  stop_ma_same_basis : bool; [@sexp.default false]
+      (** When [true], the 30-week MA handed to the stop machine is restated
+          onto the {b raw} price basis of the as-of bar before it is compared
+          with raw prices: [ma_raw = ma_adjusted *. (close /. adjusted_close)]
+          of that bar. Default [false] keeps today's mixed-basis behaviour
+          exactly, so every golden replays bit-identically.
+
+          {b Why (issue #2982).} The trailing-stop raise candidate is
+          [below (min (correction_low, MA))]. The correction low and the stop
+          are raw daily-bar prices, but the MA comes from the weekly view's
+          {e adjusted} closes, which are back-adjusted for every later split
+          and dividend. On a name with a later 4:1 split the MA reads about a
+          quarter of its raw value, the candidate collapses onto it, sits far
+          below the resting stop, and the never-lower rule blocks every raise:
+          on the 26y top-3000 run no trade with an entry-date
+          [close /. adjusted_close >= 1.5] was ever raised (0 of 73 held 13+
+          weeks). The same mix gates [Stage3_force_exit_runner]'s
+          price-below-MA margin (raw close against the stored adjusted MA);
+          the flag restates the MA there too.
+
+          Scope: only the MA {e value} is restated. The MA direction and the
+          stage are basis-invariant (ratios on one series) and are untouched.
+          Warmup (fewer than [ma_period] weekly bars), where the runner already
+          substitutes the raw bar close for the MA, is not rescaled. A bar with
+          a non-positive or non-finite [adjusted_close] or [close_price] keeps
+          the MA unchanged.
+
+          Faithful-core: book §5.2 ("new_stop = below(min(correction_low,
+          MA))") compares the correction low with the MA on one chart; feeding
+          both on one price basis is data hygiene, not a new mechanism
+          ([.claude/rules/weinstein-faithful-core.md] W1/W2). Default-off
+          experiment axis per [.claude/rules/experiment-flag-discipline.md];
+          the #2974 replay shows the fixed ratchet is not an obvious win (it
+          may give back tail), so promotion needs a paired, V6-gated broad
+          run. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

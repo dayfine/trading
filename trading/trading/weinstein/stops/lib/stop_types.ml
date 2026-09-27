@@ -54,6 +54,7 @@ type config = {
   split_safe_floors : bool; [@sexp.default false]
   reset_anchor_on_stalled_cycle : bool; [@sexp.default true]
   stop_skip_entry_bar : bool; [@sexp.default true]
+  stop_ma_same_basis : bool; [@sexp.default false]
 }
 [@@deriving show, eq, sexp]
 
@@ -76,4 +77,5 @@ let default_config =
     split_safe_floors = false;
     reset_anchor_on_stalled_cycle = true;
     stop_skip_entry_bar = true;
+    stop_ma_same_basis = false;
   }
