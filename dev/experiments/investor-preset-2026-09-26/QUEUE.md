@@ -5,9 +5,10 @@ Times PT. Status: RUNNING / QUEUED / DONE / PROPOSED (needs a decision).
 
 | # | Status | Item | Cells | Est. wall | Why |
 |---|---|---|---|---|---|
-| 1 | RUNNING | obvious-fixes chain A: `f2-fills-faithful` s1 DONE (106.54 %, 6h16m), s2 running since 15:39, then `f1-stoplimit-fresh` s0 (26y) | 2 left × 5.3–6.3 h | ends ~03:30–04:30 09-27 | salt band for both fixes; f1 separates Fix A from Fix B |
-| 2 | QUEUED (auto-launch when #1 ends) | build pinned `sweep-investor` @ 1c2647743 (has #2966) | build | ~10 min | `require_structural_stop` is not in the #1 build |
-| 3 | QUEUED (auto) | 5y broad investor preset vs hybrid control, 2021-06 → 2026-06, salts 0/1/2, V6-paired | 6 × ~1 h | ~6 h, to ~10:00–11:00 09-27 | first investor-only number on the broad universe (user 09-26) |
+| 1 | RUNNING → PAUSE | obvious-fixes chain A: `f2-fills-faithful` s1 DONE (106.54 %, 6h16m); s2 running since 15:39 (week 858/1,434 at 19:08), ends ~21:30–22:00 09-26. A watcher then stops the chain BEFORE `f1-stoplimit-fresh` s0 (user 09-26: land code changes + unit tests first) | s2 only | ends ~22:00 09-26 | salt band for both fixes |
+| 1b | QUEUED (after the code wave merges) | `f1-stoplimit-fresh` s0 (26y): on the old `sweep-fixes` build, or the new main if #2977 is goldens-identical | 1 × ~5.5 h | | f1 separates Fix A from Fix B |
+| 2 | QUEUED (manual, after the code wave) | new pinned worktree at post-merge main; `BUILD=1 PREFLIGHT=1 EXPECT_HEAD=<new sha> WTREL=<new wt> sh chain-investor.sh I …` (`launch-after-A.sh` is superseded by the pause) | build + preflight | ~20 min | PREFLIGHT runs each spec on 2026-04..06 and aborts on a missing actual.sexp |
+| 3 | QUEUED (after 2) | 5y broad investor preset vs hybrid control, 2021-06 → 2026-06, salts 0/1/2, V6-paired | 6 × ~1 h | ~6 h | first investor-only number on the broad universe (user 09-26) |
 | 4 | PROPOSED | 26y investor preset, s0 | 1 × ~5.5 h | | long-window investor number (periodic) |
 | 5 | PROPOSED | single delta on the 26y hybrid: `require_structural_stop` only | 1–3 × ~5.5 h | | isolates the stop rule inside the hybrid |
 | 6 | PROPOSED | re-measure `enable_entry_ticket_rescreen` on the fixed sim (#2976) | 3 × ~5.5 h | | resting tickets fill in Bearish weeks (14 % of fills); REJECTED 08-18 on the old sim |

@@ -29,6 +29,20 @@ n_wh=$(docker exec $C sh -c "grep -c '(symbol ' $WH/manifest.sexp"); log "wareho
 [ "$n_wh" = "9364" ] || { log "ABORT: warehouse changed since the null band"; exit 1; }
 free_gb=$(df -g / | awk 'NR==2{print $4}'); log "host free ${free_gb}G"; [ "$free_gb" -ge 20 ] || { log "ABORT: host disk < 20G"; exit 1; }
 if [ "${BUILD:-0}" = 1 ]; then log "BUILD"; run "dune build trading/backtest/scenarios/scenario_runner.exe trading/backtest/validation/bin/post_run_validator_cli.exe trading/backtest/validation/bin/validator_diff.exe > /tmp/investor-run/build.log 2>&1" || { log "ABORT: build failed"; exit 1; }; log "BUILD_DONE"; fi
+# PREFLIGHT=1: run every distinct spec over a short window (last ~3 months) and abort the whole chain unless
+# each writes actual.sexp -- a spec/override error then costs minutes, not an unattended night of 1-second cells.
+if [ "${PREFLIGHT:-0}" = 1 ]; then
+  for name in $(for tok in "$@"; do echo "${tok%%:*}"; done | sort -u); do pd=$WORK/preflight-$name
+    docker exec $C sh -c "mkdir -p $pd && rm -rf $pd/*"
+    sed 's/(period ((start_date [0-9-]*) (end_date [0-9-]*)))/(period ((start_date 2026-04-01) (end_date 2026-06-26)))/' "$SPECS_HOST/$name.sexp" > "/tmp/investor-run/preflight-$name.sexp"
+    docker cp "/tmp/investor-run/preflight-$name.sexp" "$C:$pd/$name.sexp" || { log "ABORT: preflight copy $name"; exit 1; }
+    log "PREFLIGHT $name"; t0=$(date +%s)
+    run "TRADING_DATA_DIR=$ROOT/test_data SNAPSHOT_CACHE_MB=1024 SNAPSHOT_MAX_MMAP_HANDLES=$MMAP_HANDLES timeout 3600 ./_build/default/trading/backtest/scenarios/scenario_runner.exe --dir $pd --fixtures-root $FIX --snapshot-dir $WH --no-emit-all-eligible --parallel 1 > $pd.log 2>&1"
+    pout=$(docker exec $C sh -c "grep 'Output root' $pd.log | tail -1 | sed 's/.*: //'")
+    docker exec $C test -s "${pout}/${name}/actual.sexp" || { log "ABORT: preflight $name wrote no actual.sexp (see $pd.log)"; exit 1; }
+    log "PREFLIGHT_OK $name ($(( $(date +%s) - t0 ))s)"
+  done
+fi
 for tok in "$@"; do name=${tok%%:*}; rest=${tok#*:}; salt=${rest%%:*}; pair=""; [ "$rest" != "$salt" ] && pair=${rest#*:}; tag="$name-s$salt-v11"; d=$WORK/$tag
   if grep -q "RESULT $tag " "$LOG_HOST" 2>/dev/null; then log "SKIP $tag"; continue; fi
   docker exec $C sh -c "mkdir -p $d && rm -rf $d/*"; docker cp "$SPECS_HOST/$name.sexp" "$C:$d/" || { log "RESULT $tag => <spec missing>"; continue; }
