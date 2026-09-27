@@ -2,10 +2,9 @@
 
     The Weinstein stop state machine carries every reference price as an
     {b absolute} dollar amount: [stop_level], [reference_level],
-    [last_correction_extreme], [last_trend_extreme], [ma_at_last_adjustment]
-    and the [Tightened] [swing_peak] (when [Some]) are all economic prices
-    that must rescale in lockstep with the broker-side share count when the
-    issuer splits.
+    [last_correction_extreme], [last_trend_extreme], [ma_at_last_adjustment] and
+    the [Tightened] [swing_peak] (when [Some]) are all economic prices that must
+    rescale in lockstep with the broker-side share count when the issuer splits.
 
     Without this adjustment a 4:1 forward split on a position with a pre-split
     [stop_level] of $440 would leave the stop at $440 even though the post-split

@@ -71,9 +71,9 @@ val update :
 
     Layered on top of {!Stage3_force_exit.config.hysteresis_weeks}. When
     [prior_stage_ma_values] is [Some tbl] AND [tbl] has a positive entry for the
-    symbol (at any [exit_margin_pct], including [0.0]), the runner additionally requires the current
-    bar's close price to sit at least [exit_margin_pct] (fractional) below the
-    30-week MA before emitting:
+    symbol (at any [exit_margin_pct], including [0.0]), the runner additionally
+    requires the current bar's close price to sit at least [exit_margin_pct]
+    (fractional) below the 30-week MA before emitting:
 
     {v (ma_value -. bar.close_price) /. ma_value >= exit_margin_pct v}
 
@@ -94,8 +94,8 @@ val update :
     The table's MA values are read on the weekly view's {b adjusted} closes,
     while [bar.close_price] is {b raw}. With [ma_same_basis = false] (the
     [Weinstein_stops.config.stop_ma_same_basis] default) the two are compared
-    as-is — the pre-#2982 behaviour, under which a name with a later split has
-    a shrunken MA and the gate almost never passes. With [true], each held
+    as-is — the pre-#2982 behaviour, under which a name with a later split has a
+    shrunken MA and the gate almost never passes. With [true], each held
     symbol's MA is first restated onto its current bar's raw basis via
     {!Stop_ma_basis.restate_to_raw}; the caller's table is not mutated.
 

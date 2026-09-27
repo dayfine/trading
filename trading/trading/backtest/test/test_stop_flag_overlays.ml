@@ -23,13 +23,11 @@ let _apply overlay =
 
 let test_stop_ma_same_basis_defaults_off _ =
   let c = _default_config () in
-  assert_that c.stops_config.Weinstein_stops.stop_ma_same_basis
-    (equal_to false)
+  assert_that c.stops_config.Weinstein_stops.stop_ma_same_basis (equal_to false)
 
 let test_stop_ma_same_basis_resolves_via_overlay_validator _ =
   let c = _apply "((stops_config ((stop_ma_same_basis true))))" in
-  assert_that c.stops_config.Weinstein_stops.stop_ma_same_basis
-    (equal_to true)
+  assert_that c.stops_config.Weinstein_stops.stop_ma_same_basis (equal_to true)
 
 (* ---- correction_must_follow_peak (#2974) ---- *)
 

@@ -411,15 +411,15 @@ type config = {
           {b Why (issue #2982).} The trailing-stop raise candidate is
           [below (min (correction_low, MA))]. The correction low and the stop
           are raw daily-bar prices, but the MA comes from the weekly view's
-          {e adjusted} closes, which are back-adjusted for every later split
-          and dividend. On a name with a later 4:1 split the MA reads about a
+          {e adjusted} closes, which are back-adjusted for every later split and
+          dividend. On a name with a later 4:1 split the MA reads about a
           quarter of its raw value, the candidate collapses onto it, sits far
           below the resting stop, and the never-lower rule blocks every raise:
           on the 26y top-3000 run no trade with an entry-date
           [close /. adjusted_close >= 1.5] was ever raised (0 of 73 held 13+
-          weeks). The same mix gates [Stage3_force_exit_runner]'s
-          price-below-MA margin (raw close against the stored adjusted MA);
-          the flag restates the MA there too.
+          weeks). The same mix gates [Stage3_force_exit_runner]'s price-below-MA
+          margin (raw close against the stored adjusted MA); the flag restates
+          the MA there too.
 
           Scope: only the MA {e value} is restated. The MA direction and the
           stage are basis-invariant (ratios on one series) and are untouched.
@@ -428,23 +428,22 @@ type config = {
           a non-positive or non-finite [adjusted_close] or [close_price] keeps
           the MA unchanged.
 
-          Faithful-core: book §5.2 ("new_stop = below(min(correction_low,
-          MA))") compares the correction low with the MA on one chart; feeding
-          both on one price basis is data hygiene, not a new mechanism
+          Faithful-core: book §5.2 ("new_stop = below(min(correction_low, MA))")
+          compares the correction low with the MA on one chart; feeding both on
+          one price basis is data hygiene, not a new mechanism
           ([.claude/rules/weinstein-faithful-core.md] W1/W2). Default-off
-          experiment axis per [.claude/rules/experiment-flag-discipline.md];
-          the #2974 replay shows the fixed ratchet is not an obvious win (it
-          may give back tail), so promotion needs a paired, V6-gated broad
-          run. *)
+          experiment axis per [.claude/rules/experiment-flag-discipline.md]; the
+          #2974 replay shows the fixed ratchet is not an obvious win (it may
+          give back tail), so promotion needs a paired, V6-gated broad run. *)
   correction_must_follow_peak : bool; [@sexp.default false]
       (** When [true], a correction must be printed {b after} the peak it is
           measured from. The [Trailing] correction extreme is seeded with the
           [Initial -> Trailing] bar's close (not its low / high), and it resets
-          to the close whenever a bar prints a new trend extreme (a closing
-          high above [last_trend_extreme] for a long; a closing low below it
-          for a short) without completing a cycle. Default [false] keeps
-          today's running extreme since the last cycle reset, which can
-          predate the current peak.
+          to the close whenever a bar prints a new trend extreme (a closing high
+          above [last_trend_extreme] for a long; a closing low below it for a
+          short) without completing a cycle. Default [false] keeps today's
+          running extreme since the last cycle reset, which can predate the
+          current peak.
 
           {b Why (issue #2974 comment, 2026-09-26).} The cycle test is
           [(peak -. low) /. peak >= min_correction_pct] and a close back at the
@@ -458,55 +457,54 @@ type config = {
           check, so a pullback that completes on a new-high bar is still
           measured in full against the prior peak. Cycle resets
           ([_raised_trailing] / the stalled-cycle reset), the phantom-cycle
-          guard ([correction_observed_since_reset]) and the never-lower rule
-          are unchanged.
+          guard ([correction_observed_since_reset]) and the never-lower rule are
+          unchanged.
 
           Faithful-core: book §5.2 / Ch. 6 — "After the first substantial
           correction of at least 8 to 10 percent", and "don't raise the stop
-          until after the stock rallies well off the low ... back close to
-          prior peak" — the correction is a decline {e from} the peak, so this
-          is a faithfulness correction of the cycle detector, not a new
-          mechanism (W1/W2). Default-off experiment axis per
+          until after the stock rallies well off the low ... back close to prior
+          peak" — the correction is a decline {e from} the peak, so this is a
+          faithfulness correction of the cycle detector, not a new mechanism
+          (W1/W2). Default-off experiment axis per
           [.claude/rules/experiment-flag-discipline.md]. *)
   tightened_can_ratchet : bool; [@sexp.default false]
       (** When [true], a [Tightened] stop is raised under each successive
           {b confirmed reaction low} of the topping zone (mirror: lowered above
           each reaction high for a short). Default [false] keeps today's
-          behaviour exactly: the anchor is a running min (long) that only
-          falls, so after the one tightening step the stop never moves again,
-          and [Tightened] is absorbing.
+          behaviour exactly: the anchor is a running min (long) that only falls,
+          so after the one tightening step the stop never moves again, and
+          [Tightened] is absorbing.
 
-          The rule (see {!Stop_anchor_rules.ratchet_tightened_swing}): track
-          the extreme close since the last confirmed reaction ([swing_peak])
-          and the deepest bar extreme printed after it. A reaction is
-          confirmed when that pullback is at least
-          [tightened_min_reaction_pct] from the peak {b and} a later close is
-          back at or beyond the peak — the same correction + recovery geometry
-          the [Trailing] cycle uses. On confirmation the candidate is
+          The rule (see {!Stop_anchor_rules.ratchet_tightened_swing}): track the
+          extreme close since the last confirmed reaction ([swing_peak]) and the
+          deepest bar extreme printed after it. A reaction is confirmed when
+          that pullback is at least [tightened_min_reaction_pct] from the peak
+          {b and} a later close is back at or beyond the peak — the same
+          correction + recovery geometry the [Trailing] cycle uses. On
+          confirmation the candidate is
           [nudge (low *. (1 -. tightened_stop_buffer_pct))] (no MA term, so it
           may sit above the MA), installed only if it beats the stop, and the
-          swing restarts at the recovery close. A new closing high that does
-          not confirm a reaction restarts the low at that close, so the low is
+          swing restarts at the recovery close. A new closing high that does not
+          confirm a reaction restarts the low at that close, so the low is
           always printed after its peak. Noise that never makes a qualifying
           pullback-and-recovery leaves the stop where it is.
 
-          Faithful-core: book §5.2 STAGE3_TIGHTENING ("pull stop tighter —
-          below correction_low even if ABOVE MA") and Ch. 6: once the MA
-          flattens the stop moves "under the correction low at point K even
-          though it is above" the MA, a raise to a later low that is only
-          trivially higher is optional, and a correction low is raised to only
-          after the stock "rallies well off the low ... back close to prior
-          peak". Default-off experiment axis per
-          [.claude/rules/experiment-flag-discipline.md]. *)
+          Faithful-core: book §5.2 STAGE3_TIGHTENING ("pull stop tighter — below
+          correction_low even if ABOVE MA") and Ch. 6: once the MA flattens the
+          stop moves "under the correction low at point K even though it is
+          above" the MA, a raise to a later low that is only trivially higher is
+          optional, and a correction low is raised to only after the stock
+          "rallies well off the low ... back close to prior peak". Default-off
+          experiment axis per [.claude/rules/experiment-flag-discipline.md]. *)
   tightened_min_reaction_pct : float; [@sexp.default 0.08]
       (** Minimum pullback from the swing peak for a topping-zone reaction low
-          to count under [tightened_can_ratchet] (default 0.08). Inert with
-          the flag off. The book gives no separate Stage-3 depth — its
-          topping-zone examples describe the dips only qualitatively — so the
-          default is Ch. 6's only correction figure, "at least 8 to 10
-          percent" (the same value as [min_correction_pct]). It is a separate
-          knob, not a reuse of [min_correction_pct], so the topping-zone depth
-          can be swept on its own without moving the [Trailing] cycle. *)
+          to count under [tightened_can_ratchet] (default 0.08). Inert with the
+          flag off. The book gives no separate Stage-3 depth — its topping-zone
+          examples describe the dips only qualitatively — so the default is Ch.
+          6's only correction figure, "at least 8 to 10 percent" (the same value
+          as [min_correction_pct]). It is a separate knob, not a reuse of
+          [min_correction_pct], so the topping-zone depth can be swept on its
+          own without moving the [Trailing] cycle. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

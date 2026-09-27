@@ -365,13 +365,15 @@ let _raise_after_cycle ~config ~side ~ma_value ~correction_count
     correction_observed_since_reset
     || _is_correction_touch ~side ~last_correction_extreme ~bar
   in
+  let carried_extreme =
+    Stop_anchor_rules.carried_correction_extreme ~config ~side
+      ~last_trend_extreme ~new_trend_extreme ~new_correction_extreme ~bar
+  in
   let no_change =
     Trailing
       {
         stop_level;
-        last_correction_extreme =
-          Stop_anchor_rules.carried_correction_extreme ~config ~side
-            ~last_trend_extreme ~new_trend_extreme ~new_correction_extreme ~bar;
+        last_correction_extreme = carried_extreme;
         last_trend_extreme = new_trend_extreme;
         ma_at_last_adjustment;
         correction_count;

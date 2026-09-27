@@ -50,7 +50,9 @@ let _on_confirmed ~config ~side ~stop_level ~low ~reason ~close =
   let candidate =
     Stop_geometry.tightened_stop_candidate ~config ~side ~correction_extreme:low
   in
-  let restart level = _tightened ~stop_level:level ~low:close ~peak:close ~reason in
+  let restart level =
+    _tightened ~stop_level:level ~low:close ~peak:close ~reason
+  in
   if Stop_geometry.is_better_stop ~side ~current:stop_level ~candidate then
     ( restart candidate,
       Stop_raised
@@ -65,7 +67,9 @@ let _on_confirmed ~config ~side ~stop_level ~low ~reason ~close =
    always printed after its peak); otherwise keep deepening the pullback. *)
 let _extend_swing ~side ~stop_level ~peak ~low ~reason ~close =
   let state =
-    if _is_new_trend_extreme ~side ~last_trend_extreme:peak ~new_trend_extreme:close
+    if
+      _is_new_trend_extreme ~side ~last_trend_extreme:peak
+        ~new_trend_extreme:close
     then _tightened ~stop_level ~low:close ~peak:close ~reason
     else _tightened ~stop_level ~low ~peak ~reason
   in

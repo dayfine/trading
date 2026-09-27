@@ -200,9 +200,8 @@ type config = {
           Default [0.0] still gates: a close above the MA gives a negative LHS
           and fails [>= 0.0], so the runner emits on a [Force_exit] only when
           [close <= ma] (issue #2974 corrected an earlier "any close passes"
-          claim; the MA table is always supplied in production). The MA's
-          price basis is governed by
-          [stops_config.stop_ma_same_basis] (issue #2982).
+          claim; the MA table is always supplied in production). The MA's price
+          basis is governed by [stops_config.stop_ma_same_basis] (issue #2982).
           Recommended panel values: [0.02..0.05] paired with
           [hysteresis_weeks >= 2]. *)
   laggard_rotation_config : Laggard_rotation.config;

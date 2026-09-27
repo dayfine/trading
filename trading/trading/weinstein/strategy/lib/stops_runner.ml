@@ -51,10 +51,9 @@ let _default_stage_and_ma_for_side = function
     Mid-week stop adjustments miss the cache (Friday-aligned only) and fall back
     to inline; Friday-aligned calls hit the cache.
 
-    [to_stop_basis] maps the classifier's MA value onto the basis the stop
-    machine compares it with (issue #2982, {!Stop_ma_basis.for_stops}). It is
-    applied to the returned MA only — never to the warmup [fallback_price]
-    (already raw) nor to the value mirrored into [prior_stage_ma_values]. *)
+    [to_stop_basis] maps the returned MA onto the stop machine's basis (#2982,
+    {!Stop_ma_basis.for_stops}); never applied to the raw warmup
+    [fallback_price] nor to the value mirrored into [prior_stage_ma_values]. *)
 let _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values
     ~(stage_config : Stage.config) ~lookback_bars ~bar_reader ~as_of
     ~prior_stages ~symbol ~side ~fallback_price ~to_stop_basis () =

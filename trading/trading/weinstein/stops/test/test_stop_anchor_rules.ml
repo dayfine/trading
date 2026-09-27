@@ -13,8 +13,8 @@
     {b [tightened_can_ratchet]}. Off, the [Tightened] anchor is a running min
     (long) that only falls, so the stop is frozen after one step. On, the stop
     is raised under each confirmed topping-zone reaction low: a pullback of at
-    least [tightened_min_reaction_pct] from the swing peak, then a close back
-    at the peak. Noise that never confirms a reaction moves nothing. *)
+    least [tightened_min_reaction_pct] from the swing peak, then a close back at
+    the peak. Noise that never confirms a reaction moves nothing. *)
 
 open OUnit2
 open Core
@@ -49,8 +49,7 @@ let stop_levels ~config ~side ~ma_value ~state tape =
   in
   List.folding_map tape ~init:state ~f:(fun state (low, high, close) ->
       let state, _event =
-        update ~config ~side ~state
-          ~current_bar:(bar ~low ~high ~close)
+        update ~config ~side ~state ~current_bar:(bar ~low ~high ~close)
           ~ma_value ~ma_direction ~stage
       in
       (state, get_stop_level state))
@@ -148,7 +147,8 @@ let test_short_pure_decline_mirror _ =
       (stop_levels ~config ~side:Short ~ma_value:110.0 ~state:short_initial
          pure_decline)
   in
-  assert_that (run peak_off, run peak_on)
+  assert_that
+    (run peak_off, run peak_on)
     (pair (float_equal ~epsilon:1e-9 111.1) (float_equal 120.0))
 
 (* ---- tightened_can_ratchet ---- *)
@@ -194,8 +194,7 @@ let test_tightened_frozen_when_off _ =
   assert_that
     (stop_levels ~config:ratchet_off ~side:Long ~ma_value:90.0
        ~state:long_tightened topping_swings)
-    (elements_are
-       (List.init 9 ~f:(fun _ -> float_equal ~epsilon:1e-9 84.375)))
+    (elements_are (List.init 9 ~f:(fun _ -> float_equal ~epsilon:1e-9 84.375)))
 
 let test_tightened_raises_under_reaction_lows _ =
   assert_that
@@ -252,8 +251,7 @@ let test_tightened_short_mirror _ =
     [ (99.0, 101.0, 100.0); (103.0, 109.5, 109.0); (98.0, 100.5, 99.0) ]
   in
   let run config =
-    List.last_exn
-      (stop_levels ~config ~side:Short ~ma_value:110.0 ~state tape)
+    List.last_exn (stop_levels ~config ~side:Short ~ma_value:110.0 ~state tape)
   in
   assert_that
     (run ratchet_off, run ratchet_on)

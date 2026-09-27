@@ -553,9 +553,9 @@ let test_margin_same_basis_fires_when_flag_on _ =
   let ma_values = _adjusted_ma_table () in
   let exits = _run_split_basis ~ma_same_basis:true ~ma_values in
   assert_that
-    (List.map exits ~f:(fun (t : Trading_strategy.Position.transition) ->
-         t.position_id),
-      Hashtbl.find ma_values "AAPL")
+    ( List.map exits ~f:(fun (t : Trading_strategy.Position.transition) ->
+          t.position_id),
+      Hashtbl.find ma_values "AAPL" )
     (all_of
        [
          field fst (elements_are [ equal_to "AAPL" ]);

@@ -5,8 +5,8 @@
     back-adjusted for every later split and dividend. The stop machine and the
     Stage-3 margin gate compare that MA with raw daily prices (bar lows, closes
     and stop levels). Multiplying the MA by the bar's
-    [close_price /. adjusted_close] puts it on the same basis as the bar
-    (issue #2982, [Weinstein_stops.config.stop_ma_same_basis]). *)
+    [close_price /. adjusted_close] puts it on the same basis as the bar (issue
+    #2982, [Weinstein_stops.config.stop_ma_same_basis]). *)
 
 val raw_basis_factor : Types.Daily_price.t -> float option
 (** [raw_basis_factor bar] is [Some (bar.close_price /. bar.adjusted_close)]

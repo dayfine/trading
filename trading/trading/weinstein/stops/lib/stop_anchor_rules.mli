@@ -1,7 +1,7 @@
 (** Anchor-bookkeeping rules for the stop state machine that sit behind
-    default-off config flags (issue #2974). Kept out of {!Weinstein_stops} so the
-    coordinator stays under its file-length cap; every function here returns the
-    pre-flag value when its flag is off. *)
+    default-off config flags (issue #2974). Kept out of {!Weinstein_stops} so
+    the coordinator stays under its file-length cap; every function here returns
+    the pre-flag value when its flag is off. *)
 
 open Trading_base.Types
 
@@ -49,23 +49,22 @@ val ratchet_tightened_swing :
   Stop_types.stop_state * Stop_types.stop_event
 (** One bar of the topping-zone reaction-low ratchet for a [Tightened] state,
     called (instead of the frozen running-min ratchet) when
-    [config.tightened_can_ratchet] is on and the stop was not hit. The result
-    is always [Tightened] with [swing_peak = Some _].
+    [config.tightened_can_ratchet] is on and the stop was not hit. The result is
+    always [Tightened] with [swing_peak = Some _].
 
-    - [swing_peak = None] (the bar after tightening): start the swing — peak
-      and low both at this bar's close; no stop move.
+    - [swing_peak = None] (the bar after tightening): start the swing — peak and
+      low both at this bar's close; no stop move.
     - Otherwise let [low] = the deeper of [last_correction_extreme] and this
       bar's against-trend extreme. A reaction is {b confirmed} when
-      [(peak -. low) /. peak >= config.tightened_min_reaction_pct] (mirrored
-      for shorts) and this close is back at or beyond [peak] — the
-      correction + recovery geometry of the [Trailing] cycle
-      ({!Stop_geometry.is_recovery}), chosen because Ch. 6 raises to a
-      correction low only after the stock "rallies well off the low" back
-      toward the prior peak. On confirmation the candidate is
-      {!Stop_geometry.tightened_stop_candidate} of [low] (tight buffer + round
-      number nudge, no MA term — the book allows it above the MA); it is
-      installed only when it beats the stop ([Stop_raised]), and the swing
-      restarts at this close.
+      [(peak -. low) /. peak >= config.tightened_min_reaction_pct] (mirrored for
+      shorts) and this close is back at or beyond [peak] — the correction +
+      recovery geometry of the [Trailing] cycle ({!Stop_geometry.is_recovery}),
+      chosen because Ch. 6 raises to a correction low only after the stock
+      "rallies well off the low" back toward the prior peak. On confirmation the
+      candidate is {!Stop_geometry.tightened_stop_candidate} of [low] (tight
+      buffer + round number nudge, no MA term — the book allows it above the
+      MA); it is installed only when it beats the stop ([Stop_raised]), and the
+      swing restarts at this close.
     - Not confirmed: a strictly new extreme close restarts the swing at that
       close (the low must follow its peak); otherwise peak and [low] carry
       forward. The stop never moves. *)

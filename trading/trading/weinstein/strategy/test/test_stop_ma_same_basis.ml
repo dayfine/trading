@@ -56,8 +56,7 @@ let test_restate_scales_ma_onto_raw_basis _ =
 let test_degenerate_adjusted_close_keeps_ma _ =
   let bar = { _split_bar with Types.Daily_price.adjusted_close = 0.0 } in
   assert_that
-    ( Stop_ma_basis.raw_basis_factor bar,
-      Stop_ma_basis.restate_to_raw ~bar 14.0 )
+    (Stop_ma_basis.raw_basis_factor bar, Stop_ma_basis.restate_to_raw ~bar 14.0)
     (all_of [ field fst is_none; field snd (float_equal 14.0) ])
 
 let test_for_stops_disabled_is_identity _ =
@@ -153,10 +152,7 @@ let _run_tape ~stop_ma_same_basis =
   let stop_states = ref (String.Map.singleton _symbol _trailing_state) in
   Stops_runner.update
     ~stops_config:
-      {
-        Weinstein_stops.default_config with
-        Weinstein_stops.stop_ma_same_basis;
-      }
+      { Weinstein_stops.default_config with Weinstein_stops.stop_ma_same_basis }
     ~stage_config:Stage.default_config ~lookback_bars:52
     ~positions:(String.Map.singleton _symbol pos)
     ~get_price:(fun s -> Option.some_if (String.equal s _symbol) last)
