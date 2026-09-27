@@ -47,6 +47,12 @@ module Extension_stop = Extension_stop
     ({!Extension_stop_runner}) feeds it the holding-window series. See the
     module doc for the contract. *)
 
+module Stop_decision = Stop_decision
+(** Observability record for one {!update} call: stop before -> after, state,
+    correction bookkeeping, the MA read, and a reason tag naming the decision
+    (issue #2977). Pure and read-only — never fed back into the state machine.
+    See the module doc. *)
+
 (** {1 Core Functions} *)
 
 val compute_initial_stop :
