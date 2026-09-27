@@ -376,6 +376,52 @@ let test_fill_volume_projects_every_verdict_class _ =
          is_some_and (equal_to (check TL.No_verdict TL.Held));
        ])
 
+(** Issue #2974 sink hop: with [~stop_log], [record_entry] books the event's
+    [installed_stop] as the position's initial stop, and [record_stop_move]
+    counts a transition-less move as a raise. The fixture's [installed_stop] is
+    92.0; the move to 95.0 is the one raise. *)
+let test_stop_log_receives_installed_stop_and_moves _ =
+  let stop_log = Backtest.Stop_log.create () in
+  let recorder =
+    Backtest.Trade_audit_recorder.of_collector ~stop_log
+      ~trade_audit:(TA.create ())
+      ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+      ()
+  in
+  recorder.record_entry
+    (_entry_event ~split_safe_basis:AR.Flag_off
+       ~stop_floor_kind:AR.Buffer_fallback ());
+  recorder.record_stop_move
+    {
+      AR.position_id = "ZZZZ-wein-1";
+      symbol = "ZZZZ";
+      date = _current_date;
+      stop_level = 95.0;
+    };
+  assert_that
+    (Backtest.Stop_log.get_stop_infos stop_log)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.position_id)
+               (equal_to "ZZZZ-wein-1");
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.symbol)
+               (equal_to "ZZZZ");
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.entry_stop)
+               (is_some_and (float_equal 92.0));
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+               (is_some_and (float_equal 95.0));
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+               (equal_to 1);
+           ];
+       ])
+
 let suite =
   "Trade_audit_recorder"
   >::: [
@@ -395,6 +441,8 @@ let suite =
          >:: test_entry_projection_carries_e_provenance_fields;
          "entry projection carries armed local_range_top"
          >:: test_entry_projection_carries_armed_local_range_top;
+         "stop_log receives installed stop and silent moves"
+         >:: test_stop_log_receives_installed_stop_and_moves;
        ]
 
 let () = run_test_tt_main suite

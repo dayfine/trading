@@ -816,6 +816,120 @@ let test_ratchet_side_defaults_to_long_without_create_entering _ =
            (is_some_and (float_equal 148.00));
        ])
 
+(* Issue #2974: the Weinstein path. The strategy's installed stop reaches the
+   log through [record_installed_stop] (from the entry-decision audit, BEFORE
+   the position's [CreateEntering] is recorded), and the simulator's
+   [EntryComplete] carries no stop. [moves] are applied after the transitions,
+   as the strategy's silent-move feed would. *)
+let _run_weinstein ?(moves = []) ~installed transitions :
+    Backtest.Stop_log.stop_info =
+  let log = Backtest.Stop_log.create () in
+  Backtest.Stop_log.record_installed_stop log ~position_id:_pid ~symbol:"AAPL"
+    ~level:installed;
+  Backtest.Stop_log.record_transitions log transitions;
+  List.iter moves ~f:(fun level ->
+      Backtest.Stop_log.record_stop_move log ~position_id:_pid ~level);
+  match Backtest.Stop_log.get_stop_infos log with
+  | [ info ] -> info
+  | infos ->
+      assert_failure
+        (Printf.sprintf "expected exactly one stop_info, got %d"
+           (List.length infos))
+
+(* Entry with stop S, then one raise: [entry_stop] is S and the raise counts
+   once. Before the fix the raise was booked as the install ([entry_stop]
+   blank, [n_stop_raises] 0). *)
+let test_installed_stop_then_one_raise _ =
+  assert_that
+    (_run_weinstein ~installed:142.50
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:None;
+         _update_stop ~position_id:_pid ~stop:(Some 148.00);
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.symbol)
+           (equal_to "AAPL");
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.entry_stop)
+           (is_some_and (float_equal 142.50));
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 1);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 148.00));
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.exit_stop)
+           (is_some_and (float_equal 148.00));
+       ])
+
+(* Entry with stop S and no raise: zero raises, and [entry_stop] / [max_stop] /
+   [exit_stop] all read S — the stop-less [EntryComplete] does not erase it. *)
+let test_installed_stop_no_raise _ =
+  assert_that
+    (_run_weinstein ~installed:142.50
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:None;
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.entry_stop)
+           (is_some_and (float_equal 142.50));
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 0);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 142.50));
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.exit_stop)
+           (is_some_and (float_equal 142.50));
+       ])
+
+(* A tightening move (no transition, reported via [record_stop_move]) counts
+   as a raise and becomes the high-water mark and the resting level. *)
+let test_tightening_move_is_counted _ =
+  assert_that
+    (_run_weinstein ~installed:142.50 ~moves:[ 146.00 ]
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:None;
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.entry_stop)
+           (is_some_and (float_equal 142.50));
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 1);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 146.00));
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.exit_stop)
+           (is_some_and (float_equal 146.00));
+       ])
+
+(* An ordinary ratchet raise (142.50 -> 144) followed by a tightening move
+   (144 -> 146): two raises, each against the level immediately before it. *)
+let test_raise_then_tightening_counts_both _ =
+  assert_that
+    (_run_weinstein ~installed:142.50 ~moves:[ 146.00 ]
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:None;
+         _update_stop ~position_id:_pid ~stop:(Some 144.00);
+       ])
+    (field
+       (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+       (equal_to 2))
+
 let suite =
   "Stop_log"
   >::: [
@@ -867,6 +981,11 @@ let suite =
          >:: test_ratchet_max_stop_none_when_no_stop_ever_installed;
          "ratchet: side defaults to Long without CreateEntering"
          >:: test_ratchet_side_defaults_to_long_without_create_entering;
+         "installed stop, then one raise" >:: test_installed_stop_then_one_raise;
+         "installed stop, no raise" >:: test_installed_stop_no_raise;
+         "tightening move is counted" >:: test_tightening_move_is_counted;
+         "raise then tightening counts both"
+         >:: test_raise_then_tightening_counts_both;
        ]
 
 let () = run_test_tt_main suite

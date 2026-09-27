@@ -38,6 +38,7 @@ module Resistance_sketch_reader = Resistance_sketch_reader
 module Weekly_sidetable_reader = Weekly_sidetable_reader
 module Weekly_ma_cache = Weekly_ma_cache
 module Audit_recorder = Audit_recorder
+module Stop_move_capture = Stop_move_capture
 module Cascade_trace = Cascade_trace
 module Stop_width_mode = Stop_width_mode
 module Stop_buffer_by_state = Stop_buffer_by_state
@@ -142,6 +143,9 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
   let catastrophic_armed =
     phys_equal !prior_decline_character Decline_character.Fast_v
   in
+  (* Snapshot AFTER the split rescale, so a split is never reported as a move
+     by the silent-move capture below (issue #2974). *)
+  let stops_before = !stop_states in
   let exit_transitions, adjust_transitions =
     Stops_runner.update
       ?ma_cache:(Bar_reader.ma_cache bar_reader)
@@ -151,6 +155,10 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
       ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
       ~prior_stages ()
   in
+  Stop_move_capture.emit ~audit_recorder ~positions ~before:stops_before
+    ~after:!stop_states
+    ~reported:(exit_transitions @ adjust_transitions)
+    ~current_date;
   List.iter exit_transitions
     ~f:
       (_handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date);

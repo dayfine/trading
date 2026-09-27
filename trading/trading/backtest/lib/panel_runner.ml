@@ -347,7 +347,7 @@ let _create_recorders ?candidate_log () : _recorders =
   let force_liquidation_log = Force_liquidation_log.create () in
   let stale_hold_log = Trading_simulation.Stale_hold.Log.create () in
   let audit_recorder =
-    Trade_audit_recorder.of_collector ?candidate_log ~trade_audit
+    Trade_audit_recorder.of_collector ?candidate_log ~stop_log ~trade_audit
       ~force_liquidation_log ()
   in
   {

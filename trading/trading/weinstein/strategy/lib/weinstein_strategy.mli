@@ -212,6 +212,11 @@ module Audit_recorder = Audit_recorder
     strategy emits raw events; backtest layers wrap a {!Backtest.Trade_audit.t}
     collector. See {!Audit_recorder}. *)
 
+module Stop_move_capture = Stop_move_capture
+(** Reports stop moves the stops pass makes without a transition (the
+    [Entered_tightening] install) to {!Audit_recorder.t.record_stop_move}.
+    Observability only (issue #2974). *)
+
 module Cascade_trace = Cascade_trace
 (** Per-Friday candidate-capture handle for the [candidates.sexp] artefact
     (#2490). Re-exposed alongside {!Audit_recorder} so tests can drive the
