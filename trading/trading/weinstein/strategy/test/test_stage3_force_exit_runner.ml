@@ -562,6 +562,72 @@ let test_margin_same_basis_fires_when_flag_on _ =
          field snd (is_some_and (float_equal 14.0));
        ])
 
+(* Production wiring: {!Special_exits.run} passes
+   [config.stops_config.stop_ma_same_basis] to the runner's [ma_same_basis].
+   Same split tape as above (raw close 130, adjusted MA 14 in the table), with
+   Stage-3 force-exit armed at hysteresis 1 and margin 0.0; every other channel
+   is at its default (no-op for this flat, profitable long). The Stage-3 exit
+   fires only when the STRATEGY config's stops flag is on. *)
+let _friday_index_view : Snapshot_runtime.Snapshot_bar_views.weekly_view =
+  {
+    closes = [| 130.0 |];
+    raw_closes = [| 130.0 |];
+    highs = [| 130.0 |];
+    lows = [| 130.0 |];
+    volumes = [| 1_000_000.0 |];
+    dates = [| _friday |];
+    n = 1;
+  }
+
+let _special_exits_stage3_ids ~stop_ma_same_basis =
+  let bar = _split_basis_bar () in
+  let pos = make_holding_pos "AAPL" 100.0 _friday in
+  let positions = String.Map.singleton "AAPL" pos in
+  let prior_stages = Hashtbl.create (module String) in
+  Hashtbl.set prior_stages ~key:"AAPL" ~data:stage3;
+  let default =
+    Weinstein_strategy_config.default_config ~universe:[ "AAPL" ]
+      ~index_symbol:"INDEX"
+  in
+  let config =
+    {
+      default with
+      enable_stage3_force_exit = true;
+      stage3_force_exit_config = _cfg_k1;
+      stage3_exit_margin_pct = 0.0;
+      stops_config = { default.stops_config with stop_ma_same_basis };
+    }
+  in
+  let _force_ts, _stage3_ts, _laggard_ts, _stop_ids, stage3_ids, _laggard_ids =
+    Special_exits.run ~config
+      ~record_force_exit:(fun
+          ~last_stop_out_dates:_
+          ~positions:_
+          ~current_date:_
+          ~cooldown_weeks:_
+          ~label:_
+          _
+        -> ())
+      ~positions
+      ~last_stop_out_dates:(Hashtbl.create (module String))
+      ~portfolio:{ cash = 1_000_000.0; positions }
+      ~get_price:(get_price_of [ ("AAPL", bar) ])
+      ~peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.(create ())
+      ~audit_recorder:Audit_recorder.noop ~prior_macro_result:(ref None)
+      ~prior_stages ~prior_stage_ma_values:(_adjusted_ma_table ())
+      ~stage3_streaks:(Hashtbl.create (module String))
+      ~laggard_streaks:(Hashtbl.create (module String))
+      ~bar_reader:(Bar_reader.of_in_memory_bars [ ("AAPL", [ bar ]) ])
+      ~index_view:_friday_index_view ~exit_transitions:[] ~current_date:_friday
+  in
+  Set.to_list stage3_ids
+
+let test_special_exits_wires_stop_ma_same_basis _ =
+  assert_that
+    ( _special_exits_stage3_ids ~stop_ma_same_basis:false,
+      _special_exits_stage3_ids ~stop_ma_same_basis:true )
+    (pair (elements_are []) (elements_are [ equal_to "AAPL" ]))
+
 (* ------------------------------------------------------------------ *)
 (* runner                                                                *)
 (* ------------------------------------------------------------------ *)
@@ -605,6 +671,8 @@ let suite =
          >:: test_margin_mixed_basis_suppresses_when_flag_off;
          "MA basis: restated MA fires when stop_ma_same_basis on"
          >:: test_margin_same_basis_fires_when_flag_on;
+         "Special_exits.run passes stops_config.stop_ma_same_basis"
+         >:: test_special_exits_wires_stop_ma_same_basis;
        ]
 
 let () = run_test_tt_main suite

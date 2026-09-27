@@ -143,14 +143,15 @@ let _make_holding_pos ~entry_date =
           }))
   |> unwrap
 
-(* Run one [Stops_runner.update] on the tape's last bar with the flag set as
-   given. Returns [(exits, adjusts)]. *)
-let _run_tape ~stop_ma_same_basis =
-  let bars = _split_tape () in
+(* Run one [Stops_runner.update] on the last bar of [bars] (default: the
+   80-week split tape) with the flag set as given. Returns [(exits, adjusts)].
+   [prior_stage_ma_values] and [on_stop_decision] pass through to the runner. *)
+let _run_tape ?(bars = _split_tape ()) ?prior_stage_ma_values ?on_stop_decision
+    ~stop_ma_same_basis () =
   let last = List.last_exn bars in
   let pos = _make_holding_pos ~entry_date:(Date.of_string "2023-01-06") in
   let stop_states = ref (String.Map.singleton _symbol _trailing_state) in
-  Stops_runner.update
+  Stops_runner.update ?prior_stage_ma_values ?on_stop_decision
     ~stops_config:
       { Weinstein_stops.default_config with Weinstein_stops.stop_ma_same_basis }
     ~stage_config:Stage.default_config ~lookback_bars:52
@@ -172,14 +173,14 @@ let _new_stop_of (tr : Trading_strategy.Position.transition) =
    stop, the cycle stalls, and nothing is emitted — today's behaviour. *)
 let test_split_tape_flag_off_does_not_raise _ =
   assert_that
-    (_run_tape ~stop_ma_same_basis:false)
+    (_run_tape ~stop_ma_same_basis:false ())
     (all_of [ field fst is_empty; field snd is_empty ])
 
 (* Flag on: the MA is restated to the raw basis, the correction low binds, and
    the stop is raised to 120 * 0.99 = 118.8. *)
 let test_split_tape_flag_on_raises_to_correction_low _ =
   assert_that
-    (_run_tape ~stop_ma_same_basis:true)
+    (_run_tape ~stop_ma_same_basis:true ())
     (all_of
        [
          field fst is_empty;
@@ -187,6 +188,43 @@ let test_split_tape_flag_on_raises_to_correction_low _ =
            (elements_are
               [ field _new_stop_of (is_some_and (float_equal 118.8)) ]);
        ])
+
+(* The MA each [Stop_decision] read, in emission order. *)
+let _stop_mas ?bars ?prior_stage_ma_values ~stop_ma_same_basis () =
+  let mas = ref [] in
+  let (_ : _ * _) =
+    _run_tape ?bars ?prior_stage_ma_values
+      ~on_stop_decision:(fun d ->
+        mas := d.Weinstein_stops.Stop_decision.ma_value :: !mas)
+      ~stop_ma_same_basis ()
+  in
+  List.rev !mas
+
+(* Restatement scope, mirror half: with the flag on, the stop machine reads the
+   raw-basis MA (~137.7) but the value mirrored into [prior_stage_ma_values]
+   stays the classifier's adjusted MA (~13.8). {!Stage3_force_exit_runner}
+   restates that table itself under the same flag, so a restated mirror would
+   be multiplied by the split factor twice. *)
+let test_flag_on_mirror_keeps_adjusted_ma _ =
+  let table = Hashtbl.create (module String) in
+  let stop_mas =
+    _stop_mas ~prior_stage_ma_values:table ~stop_ma_same_basis:true ()
+  in
+  assert_that
+    (stop_mas, Hashtbl.find table _symbol)
+    (pair
+       (elements_are [ is_between (module Float_ord) ~low:130.0 ~high:145.0 ])
+       (is_some_and (is_between (module Float_ord) ~low:13.0 ~high:14.5)))
+
+(* Restatement scope, warmup half: with fewer than [ma_period] weekly bars the
+   runner falls back to the bar's raw close as the MA. That value is already on
+   the raw basis, so the flag must not restate it: the stop reads 74.75 (the
+   100th bar's close), not 747.5. *)
+let test_flag_on_warmup_fallback_not_restated _ =
+  let warmup_bars = List.take (_split_tape ()) 100 in
+  assert_that
+    (_stop_mas ~bars:warmup_bars ~stop_ma_same_basis:true ())
+    (elements_are [ float_equal 74.75 ])
 
 let suite =
   "stop_ma_same_basis"
@@ -202,6 +240,10 @@ let suite =
          >:: test_split_tape_flag_off_does_not_raise;
          "later-split tape: flag on raises to the correction low"
          >:: test_split_tape_flag_on_raises_to_correction_low;
+         "flag on: prior_stage_ma_values mirror keeps the adjusted MA"
+         >:: test_flag_on_mirror_keeps_adjusted_ma;
+         "flag on: warmup raw fallback MA is not restated"
+         >:: test_flag_on_warmup_fallback_not_restated;
        ]
 
 let () = run_test_tt_main suite

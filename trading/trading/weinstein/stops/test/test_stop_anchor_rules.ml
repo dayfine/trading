@@ -126,6 +126,26 @@ let test_post_peak_correction_raises_when_on _ =
          float_equal ~epsilon:1e-9 88.875;
        ])
 
+(* The flag-on seed is the transition bar's CLOSE, not its low. A wide
+   Initial -> Trailing bar (low 91, close 100), then a bar closing exactly at
+   100 — a recovery to the peak, but not a strictly new one, so nothing resets
+   the extreme — with a 99.5 low. OFF, the seed low 91 is a 9% "correction"
+   from the 100 peak and the stop is raised to below min (91, MA 90), nudged to
+   88.875. ON, the seed is 100 and the deepest post-peak low is 99.5 (0.5%): no
+   cycle, the stop stays at 80. *)
+let wide_transition_bar = [ (91.0, 100.5, 100.0); (99.5, 100.2, 100.0) ]
+
+let test_seed_is_transition_close_when_on _ =
+  let run config =
+    stop_levels ~config ~side:Long ~ma_value:90.0 ~state:long_initial
+      wide_transition_bar
+  in
+  assert_that
+    (run peak_off, run peak_on)
+    (pair
+       (elements_are [ float_equal 80.0; float_equal ~epsilon:1e-9 88.875 ])
+       (elements_are [ float_equal 80.0; float_equal 80.0 ]))
+
 (* Short mirror: a pure decline with no counter-rally. OFF, the seed high 101
    against the prior trough 92 is a 9.8% "counter-rally" and the stop falls to
    above max (101, MA 110) = 110 * 1.01 = 111.1 on bar 6; ON it stays at 120. *)
@@ -259,6 +279,22 @@ let test_tightened_short_mirror _ =
        (float_equal ~epsilon:1e-9 115.575)
        (float_equal ~epsilon:1e-9 110.0475))
 
+(* ---- swing_peak serialisation ---- *)
+
+(* A persisted Tightened state written before [swing_peak] existed. *)
+let pre_pr_tightened_sexp =
+  "(Tightened (stop_level 80) (last_correction_extreme 85) (reason \"Stage 3 \
+   detected\"))"
+
+(* [swing_peak] is [@sexp.option]: a pre-PR sexp (no field) still parses to
+   [swing_peak = None], and a [None] state serialises back to exactly that
+   sexp, so flag-off persisted states are byte-for-byte unchanged. *)
+let test_swing_peak_none_sexp_unchanged _ =
+  let pre_pr = Sexp.of_string pre_pr_tightened_sexp in
+  assert_that
+    (stop_state_of_sexp pre_pr, sexp_of_stop_state long_tightened)
+    (pair (equal_to long_tightened) (equal_to pre_pr))
+
 let suite =
   "stop_anchor_rules"
   >::: [
@@ -277,6 +313,10 @@ let suite =
          >:: test_post_peak_correction_raises_when_on;
          "correction_must_follow_peak: short mirror"
          >:: test_short_pure_decline_mirror;
+         "correction_must_follow_peak on: seed is the transition close"
+         >:: test_seed_is_transition_close_when_on;
+         "swing_peak None: pre-PR Tightened sexp round-trips unchanged"
+         >:: test_swing_peak_none_sexp_unchanged;
        ]
 
 let () = run_test_tt_main suite
