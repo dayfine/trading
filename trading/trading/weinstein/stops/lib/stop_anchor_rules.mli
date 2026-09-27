@@ -35,3 +35,37 @@ val carried_correction_extreme :
     the carried extreme resets to the bar's close; otherwise
     [new_correction_extreme]. Called {e after} the bar's cycle check, so a
     correction that completes on a new-high bar is still seen in full. *)
+
+(** {1 [tightened_can_ratchet]} *)
+
+val ratchet_tightened_swing :
+  config:Stop_types.config ->
+  side:position_side ->
+  stop_level:float ->
+  last_correction_extreme:float ->
+  swing_peak:float option ->
+  reason:string ->
+  bar:Types.Daily_price.t ->
+  Stop_types.stop_state * Stop_types.stop_event
+(** One bar of the topping-zone reaction-low ratchet for a [Tightened] state,
+    called (instead of the frozen running-min ratchet) when
+    [config.tightened_can_ratchet] is on and the stop was not hit. The result
+    is always [Tightened] with [swing_peak = Some _].
+
+    - [swing_peak = None] (the bar after tightening): start the swing — peak
+      and low both at this bar's close; no stop move.
+    - Otherwise let [low] = the deeper of [last_correction_extreme] and this
+      bar's against-trend extreme. A reaction is {b confirmed} when
+      [(peak -. low) /. peak >= config.tightened_min_reaction_pct] (mirrored
+      for shorts) and this close is back at or beyond [peak] — the
+      correction + recovery geometry of the [Trailing] cycle
+      ({!Stop_geometry.is_recovery}), chosen because Ch. 6 raises to a
+      correction low only after the stock "rallies well off the low" back
+      toward the prior peak. On confirmation the candidate is
+      {!Stop_geometry.tightened_stop_candidate} of [low] (tight buffer + round
+      number nudge, no MA term — the book allows it above the MA); it is
+      installed only when it beats the stop ([Stop_raised]), and the swing
+      restarts at this close.
+    - Not confirmed: a strictly new extreme close restarts the swing at that
+      close (the low must follow its peak); otherwise peak and [low] carry
+      forward. The stop never moves. *)

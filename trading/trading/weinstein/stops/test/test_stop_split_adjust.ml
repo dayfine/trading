@@ -68,6 +68,7 @@ let test_tightened_forward_4_to_1 _ =
         stop_level = 440.0;
         last_correction_extreme = 460.0;
         reason = "Stage 3 detected";
+        swing_peak = None;
       }
   in
   assert_that
@@ -78,6 +79,7 @@ let test_tightened_forward_4_to_1 _ =
             stop_level = 110.0;
             last_correction_extreme = 115.0;
             reason = "Stage 3 detected";
+            swing_peak = None;
           }))
 
 (* ---- Identity case ---- *)

@@ -61,7 +61,12 @@ let _initial level =
 
 let _tightened level =
   Weinstein_stops.Tightened
-    { stop_level = level; last_correction_extreme = level; reason = "test" }
+    {
+      stop_level = level;
+      last_correction_extreme = level;
+      swing_peak = None;
+      reason = "test";
+    }
 
 let _states alist = String.Map.of_alist_exn alist
 

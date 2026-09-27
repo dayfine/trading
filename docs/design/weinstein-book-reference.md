@@ -474,6 +474,20 @@ anchor. (Implication: an implementation whose anchor is a monotone min seeded
 at entry, never resetting on a completed-but-non-improving cycle, is an
 artifact — the book's anchor is per-cycle. See issue #2486 / PR #2492.)
 
+**Resolved question (2026-09-26, `tightened_can_ratchet`, #2974):** *In the
+Stage-3 tightening zone, which lows does the stop move under, and when?* —
+**Each successive correction (reaction) low, once the stock has rallied back
+off it.** Ch. 6 XYZ: after the MA "flattened out after point I", the stop
+moves "under the correction low at point K even though it is above the MA";
+a later low only trivially above the stop need not be used ("such a trivial
+change", point M). The timing rule is the same as in Stage 2: don't raise
+"until after the stock rallies well off the low ... back close to prior peak"
+(Skyline: the stock "dropped a bit, and then advanced", and only then is the
+stop raised to that low, L). The book gives **no separate
+depth** for a topping-zone reaction — its only correction figure is "at least
+8 to 10 percent" — so the implementation defaults the depth knob to 8% and
+keeps it separately sweepable.
+
 ### 5.3 Trailing Stop — Trader Method
 
 More aggressive than investor:

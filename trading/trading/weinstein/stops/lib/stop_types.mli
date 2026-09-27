@@ -41,6 +41,15 @@ type stop_state =
       last_correction_extreme : float;
           (** Extreme of most recent correction (see [Trailing] docs) *)
       reason : string;  (** Why tightening was triggered *)
+      swing_peak : float option; [@sexp.option]
+          (** Topping-zone swing tracking, used only under
+              [config.tightened_can_ratchet]: the extreme close (Long: highest;
+              Short: lowest) since the last confirmed reaction low/high, while
+              [last_correction_extreme] then holds the deepest bar extreme
+              printed {e after} that peak. [None] = no swing tracked — always
+              the case with the flag off (so a Tightened state's sexp is
+              unchanged: the field is omitted when [None]), and on the
+              tightening bar itself with the flag on. *)
     }
 [@@deriving show, eq, sexp]
 
@@ -459,6 +468,45 @@ type config = {
           is a faithfulness correction of the cycle detector, not a new
           mechanism (W1/W2). Default-off experiment axis per
           [.claude/rules/experiment-flag-discipline.md]. *)
+  tightened_can_ratchet : bool; [@sexp.default false]
+      (** When [true], a [Tightened] stop is raised under each successive
+          {b confirmed reaction low} of the topping zone (mirror: lowered above
+          each reaction high for a short). Default [false] keeps today's
+          behaviour exactly: the anchor is a running min (long) that only
+          falls, so after the one tightening step the stop never moves again,
+          and [Tightened] is absorbing.
+
+          The rule (see {!Stop_anchor_rules.ratchet_tightened_swing}): track
+          the extreme close since the last confirmed reaction ([swing_peak])
+          and the deepest bar extreme printed after it. A reaction is
+          confirmed when that pullback is at least
+          [tightened_min_reaction_pct] from the peak {b and} a later close is
+          back at or beyond the peak — the same correction + recovery geometry
+          the [Trailing] cycle uses. On confirmation the candidate is
+          [nudge (low *. (1 -. tightened_stop_buffer_pct))] (no MA term, so it
+          may sit above the MA), installed only if it beats the stop, and the
+          swing restarts at the recovery close. A new closing high that does
+          not confirm a reaction restarts the low at that close, so the low is
+          always printed after its peak. Noise that never makes a qualifying
+          pullback-and-recovery leaves the stop where it is.
+
+          Faithful-core: book §5.2 STAGE3_TIGHTENING ("pull stop tighter —
+          below correction_low even if ABOVE MA") and Ch. 6: once the MA
+          flattens the stop moves "under the correction low at point K even
+          though it is above" the MA, a raise to a later low that is only
+          trivially higher is optional, and a correction low is raised to only
+          after the stock "rallies well off the low ... back close to prior
+          peak". Default-off experiment axis per
+          [.claude/rules/experiment-flag-discipline.md]. *)
+  tightened_min_reaction_pct : float; [@sexp.default 0.08]
+      (** Minimum pullback from the swing peak for a topping-zone reaction low
+          to count under [tightened_can_ratchet] (default 0.08). Inert with
+          the flag off. The book gives no separate Stage-3 depth — its
+          topping-zone examples describe the dips only qualitatively — so the
+          default is Ch. 6's only correction figure, "at least 8 to 10
+          percent" (the same value as [min_correction_pct]). It is a separate
+          knob, not a reuse of [min_correction_pct], so the topping-zone depth
+          can be swept on its own without moving the [Trailing] cycle. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

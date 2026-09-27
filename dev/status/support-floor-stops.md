@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-09-25
+## Last updated: 2026-09-26
 
 ## Status
 IN_PROGRESS
@@ -9,6 +9,14 @@ IN_PROGRESS
 YES
 
 ## Open PR
+- `feat/stop-basis-flags` — three default-off stop-machine flags, one commit
+  each (pushed, not yet built or PR'd): `stop_ma_same_basis` (#2982, the
+  adjusted-MA/raw-bar mix in the raise candidate and the Stage-3 margin gate),
+  `correction_must_follow_peak` (#2974, a correction must print after its
+  peak), `tightened_can_ratchet` + `tightened_min_reaction_pct` (#2974 + H1
+  below: the `Tightened` stop is raised under each confirmed topping-zone
+  reaction low; new `swing_peak` field on `Tightened`, `[@sexp.option]`).
+  Next: build, then a 3-salt paired broad run per flag, V6-gated.
 - `feat/require-structural-stop` — default-off `require_structural_stop`
   investor preset (book Ch. 6: "investors should never use automatic
   percentages"): a candidate whose initial stop is the `Buffer_fallback`

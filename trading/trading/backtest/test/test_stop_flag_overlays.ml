@@ -43,6 +43,26 @@ let test_correction_must_follow_peak_resolves_via_overlay_validator _ =
   assert_that c.stops_config.Weinstein_stops.correction_must_follow_peak
     (equal_to true)
 
+(* ---- tightened_can_ratchet + tightened_min_reaction_pct (#2974) ---- *)
+
+let test_tightened_can_ratchet_defaults_off _ =
+  let c = _default_config () in
+  assert_that
+    ( c.stops_config.Weinstein_stops.tightened_can_ratchet,
+      c.stops_config.Weinstein_stops.tightened_min_reaction_pct )
+    (pair (equal_to false) (float_equal 0.08))
+
+let test_tightened_ratchet_knobs_resolve_via_overlay_validator _ =
+  let c =
+    _apply
+      "((stops_config ((tightened_can_ratchet true) \
+       (tightened_min_reaction_pct 0.05))))"
+  in
+  assert_that
+    ( c.stops_config.Weinstein_stops.tightened_can_ratchet,
+      c.stops_config.Weinstein_stops.tightened_min_reaction_pct )
+    (pair (equal_to true) (float_equal 0.05))
+
 let suite =
   "stop_flag_overlays"
   >::: [
@@ -54,6 +74,10 @@ let suite =
          >:: test_correction_must_follow_peak_defaults_off;
          "correction_must_follow_peak resolves via Overlay_validator"
          >:: test_correction_must_follow_peak_resolves_via_overlay_validator;
+         "tightened_can_ratchet defaults off (depth knob 0.08)"
+         >:: test_tightened_can_ratchet_defaults_off;
+         "tightened ratchet knobs resolve via Overlay_validator"
+         >:: test_tightened_ratchet_knobs_resolve_via_overlay_validator;
        ]
 
 let () = run_test_tt_main suite

@@ -138,6 +138,7 @@ let _to_tightened ~config ~side ~stop_level ~correction_extreme ~reason =
         stop_level = new_stop;
         last_correction_extreme = correction_extreme;
         reason;
+        swing_peak = None;
       },
     Entered_tightening { reason } )
 
@@ -446,23 +447,34 @@ let _ratchet_tightened ~config ~side ~stop_level ~last_correction_extreme
           stop_level = candidate;
           last_correction_extreme = new_extreme;
           reason;
+          swing_peak = None;
         },
       Stop_raised
         { old_level = stop_level; new_level = candidate; reason = event_reason }
     )
   else
-    ( Tightened { stop_level; last_correction_extreme = new_extreme; reason },
+    ( Tightened
+        {
+          stop_level;
+          last_correction_extreme = new_extreme;
+          reason;
+          swing_peak = None;
+        },
       No_change )
 
 (* ---- Update: Tightened state ---- *)
 
+(* [tightened_can_ratchet]: reaction-low rule in {!Stop_anchor_rules}. *)
 let _update_tightened ~config ~side ~state ~current_bar =
   let bar = current_bar in
   match state with
-  | Tightened { stop_level; last_correction_extreme; reason } ->
+  | Tightened { stop_level; last_correction_extreme; reason; swing_peak } ->
       let on_close = config.trigger_on_weekly_close in
       if check_stop_hit ~on_close ~state ~side ~bar () then
         (state, _stop_hit_event ~on_close ~side ~stop_level ~bar ())
+      else if config.tightened_can_ratchet then
+        Stop_anchor_rules.ratchet_tightened_swing ~config ~side ~stop_level
+          ~last_correction_extreme ~swing_peak ~reason ~bar
       else
         _ratchet_tightened ~config ~side ~stop_level ~last_correction_extreme
           ~reason ~bar
