@@ -1317,6 +1317,59 @@ let test_strategy_config_parses_with_stop_buffer_by_macro_state_absent _ =
           (Weinstein_strategy.Stop_buffer_by_state.default
             : Weinstein_strategy.Stop_buffer_by_state.t)))
 
+(* -------------------------------------------------------------------- *)
+(* entry_ticket_macro_suspend — R1/R2 wiring for #2976 (default-off)      *)
+(* -------------------------------------------------------------------- *)
+
+module Suspend_mode = Weinstein_strategy.Entry_ticket_suspend_mode
+
+(** [entry_ticket_macro_suspend] defaults to [Off] — resting tickets stay live
+    whatever the tape, so every existing golden replays unchanged
+    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+let test_default_entry_ticket_macro_suspend_is_off _ =
+  assert_that (_default_config ()).entry_ticket_macro_suspend
+    (equal_to Suspend_mode.Off)
+
+(** Axis reachability (R2): both armed variants resolve through the {b real}
+    [Overlay_validator.apply_overrides] with no unknown-key error, which is what
+    makes [((flag entry_ticket_macro_suspend) (values (Off On_bearish_macro
+    On_index_stage4)))] a valid [Variant_matrix] axis on landing. *)
+let test_entry_ticket_macro_suspend_axis_resolves_via_overlay_validator _ =
+  let mode_after overlay =
+    (Backtest.Overlay_validator.apply_overrides (_default_config ())
+       [ Sexp.of_string overlay ])
+      .entry_ticket_macro_suspend
+  in
+  assert_that
+    [
+      mode_after "((entry_ticket_macro_suspend On_bearish_macro))";
+      mode_after "((entry_ticket_macro_suspend On_index_stage4))";
+    ]
+    (elements_are
+       [
+         equal_to Suspend_mode.On_bearish_macro;
+         equal_to Suspend_mode.On_index_stage4;
+       ])
+
+(** A config sexp with the field ABSENT parses and lands [Off] — every pre-#2976
+    spec on disk keeps parsing, bit-identically. *)
+let test_strategy_config_parses_with_entry_ticket_macro_suspend_absent _ =
+  let base = Weinstein_strategy.sexp_of_config (_default_config ()) in
+  let stripped =
+    match base with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom "entry_ticket_macro_suspend"; _ ] -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.entry_ticket_macro_suspend)
+       (equal_to Suspend_mode.Off))
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -1458,6 +1511,12 @@ let suite =
          >:: test_stop_buffer_by_macro_state_dot_path_resolves_via_overlay_validator;
          "strategy config parses with initial_stop_buffer_by_macro_state absent"
          >:: test_strategy_config_parses_with_stop_buffer_by_macro_state_absent;
+         "default entry_ticket_macro_suspend is Off"
+         >:: test_default_entry_ticket_macro_suspend_is_off;
+         "entry_ticket_macro_suspend axis resolves via Overlay_validator"
+         >:: test_entry_ticket_macro_suspend_axis_resolves_via_overlay_validator;
+         "strategy config parses with entry_ticket_macro_suspend absent"
+         >:: test_strategy_config_parses_with_entry_ticket_macro_suspend_absent;
        ]
 
 let () = run_test_tt_main suite

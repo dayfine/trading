@@ -88,17 +88,14 @@ type config = {
       (** See [.mli]. *)
   neutral_blocks_longs : bool; [@sexp.default false]  (** See [.mli]. *)
   deteriorating_blocks_longs : bool; [@sexp.default false]  (** See [.mli]. *)
-  index_stage_veto_blocks_longs : bool; [@sexp.default false]
-      (** See [.mli]. *)
+  index_stage_veto_blocks_longs : bool; [@sexp.default false]  (** .mli *)
   neutral_blocks_shorts : bool; [@sexp.default true]  (** See [.mli]. *)
   enable_slow_grind_short_gate : bool; [@sexp.default false]  (** See [.mli]. *)
   fast_v_arm_on_rate_alone : bool; [@sexp.default false]  (** See [.mli]. *)
   fast_v_min_rate_pct : float; [@sexp.default fast_v_min_rate_no_op]
       (** See [.mli]. *)
-  reject_declining_ma_long_entry : bool; [@sexp.default false]
-      (** See [.mli]. *)
-  enable_late_stage2_stop_tighten : bool; [@sexp.default false]
-      (** See [.mli]. *)
+  reject_declining_ma_long_entry : bool; [@sexp.default false]  (** .mli *)
+  enable_late_stage2_stop_tighten : bool; [@sexp.default false]  (** .mli *)
   late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   enable_macro_bearish_exposure_trim : bool; [@sexp.default false]
       (** See [.mli]. *)
@@ -151,8 +148,7 @@ type config = {
   sim_exit_fill_next_open : bool; [@sexp.default true]  (** See [.mli]. *)
   sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]  (** .mli *)
   sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]  (** .mli *)
-  freeze_entry_at_first_breakout : bool; [@sexp.default false]
-      (** See [.mli]. *)
+  freeze_entry_at_first_breakout : bool; [@sexp.default false]  (** .mli *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_order_max_rest_weeks : int; [@sexp.default 52]  (** See [.mli]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
@@ -168,6 +164,9 @@ type config = {
   enable_rs_positive_declining : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_max_bar_age_days : int; [@sexp.default 0]  (** See [.mli]. *)
   stale_exit_without_prior_bar : bool; [@sexp.default false]  (** See [.mli]. *)
+  entry_ticket_macro_suspend : Entry_ticket_suspend_mode.t;
+      [@sexp.default Entry_ticket_suspend_mode.Off]
+      (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -288,6 +287,7 @@ let default_config ~universe ~index_symbol =
     enable_rs_positive_declining = false;
     entry_max_bar_age_days = 0;
     stale_exit_without_prior_bar = false;
+    entry_ticket_macro_suspend = Entry_ticket_suspend_mode.Off;
   }
 
 (* F5 arming predicate — the single source of truth for both halves of the

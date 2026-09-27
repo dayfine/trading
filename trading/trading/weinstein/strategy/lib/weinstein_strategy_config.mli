@@ -1856,6 +1856,36 @@ type config = {
           first place). The stub tail that used to leave a dying series with no
           real last close to exit at is now truncated at warehouse-build time by
           [Snapshot_pipeline.Series_tail] (#2691), not by a runtime knob. *)
+  entry_ticket_macro_suspend : Entry_ticket_suspend_mode.t;
+      [@sexp.default Entry_ticket_suspend_mode.Off]
+      (** #2976 — {b suspend}, not cancel, resting long entry tickets while the
+          macro gate rejects new longs; re-issue them unchanged (same entry
+          level, trigger/limit and stop plan) on the first weekly screen where
+          it admits again. See {!Entry_ticket_suspend} for the mechanics.
+
+          {b Why.} The cascade's macro gate sees only fresh candidates; a
+          resting ticket is held, never re-asked, and the simulator keeps its
+          order until price trades through it. On the 26y walkthrough 103 of
+          724 fills (14 %) landed in Bearish-screen weeks from tickets placed
+          in a Bullish/Neutral tape.
+
+          {b Faithfulness.} Spine item 6 (the macro gate is unconditional);
+          Ch. 8, "Suspend buying even if you see a few stocks breaking out on
+          their charts" ([docs/design/weinstein-book-reference.md] §2.1,
+          "Resolved 2026-09-16"). The book's word is {e suspend}: a condition
+          cancel ({!enable_entry_ticket_rescreen}) also discards the tickets
+          that rest through a Bearish week and fill after it clears.
+
+          [On_bearish_macro] suspends whenever {!Long_entry_macro_gate.admits}
+          is [false]; [On_index_stage4] only while the primary index is Stage
+          4 (the book-literal condition). Suspension time counts toward
+          {!entry_order_max_rest_weeks}. Longs only.
+
+          {b Default [Off]} never builds the suspension path — bit-identical
+          to every existing golden (R1). R2: a [Variant_matrix] axis as
+          [((flag entry_ticket_macro_suspend) (values (Off On_bearish_macro
+          On_index_stage4)))]. R3: no default flip without a ledger ACCEPT and
+          the confirmation grid. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

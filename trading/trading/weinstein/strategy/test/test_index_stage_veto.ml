@@ -149,6 +149,7 @@ let _config ?(index_stage_veto_blocks_longs = false)
     it cancelled. *)
 let _cancelled_ids ~config ~macro_result ~positions =
   WSM.run_screen_after_macro ~pending_entry_e:(Entry_freeze.create ())
+    ~suspended_tickets:(Entry_ticket_suspend.create ())
     ~fold_start_date:None ~universe_membership_at:None ~config
     ~stop_states:(ref String.Map.empty)
     ~last_stop_out_dates:(Hashtbl.create (module String))
@@ -279,6 +280,7 @@ let _fresh_get_price symbol =
     were opened on. *)
 let _fresh_entry_symbols ~index_stage_veto_blocks_longs index_stage =
   WSM.run_screen_after_macro ~pending_entry_e:(Entry_freeze.create ())
+    ~suspended_tickets:(Entry_ticket_suspend.create ())
     ~fold_start_date:None ~universe_membership_at:None
     ~config:
       (_config ~index_stage_veto_blocks_longs ~index_symbol:_fresh_index_symbol

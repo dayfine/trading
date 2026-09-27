@@ -1,6 +1,6 @@
 # Status: arc-readiness
 
-## Last updated: 2026-09-02
+## Last updated: 2026-09-26
 
 ## Status
 IN_PROGRESS
@@ -395,6 +395,16 @@ Remaining open work:
    `params.sexp` beside its `actual.sexp` files, so `effect_null_report.exe`
    can only WARN there rather than verify. Committing a per-arm `params.sexp`
    alongside future results would make the guardrail bite by default.
+6. **#2976 resting-ticket macro suspension — CODE WRITTEN, branch
+   `feat/suspend-tickets-bearish` (unbuilt, pending the dispatcher's build).**
+   New default-`Off` config field `entry_ticket_macro_suspend`
+   (`Off | On_bearish_macro | On_index_stage4`), module
+   `Entry_ticket_suspend`: withdraws resting long tickets while the macro gate
+   rejects new longs (book Ch. 8 "Suspend buying…"), re-issues them unchanged
+   when it admits; suspension time counts toward the TTL clock; longs only.
+   Next: build + PR, then the experiment queued as item 6 of
+   `dev/experiments/investor-preset-2026-09-26/QUEUE.md` (26y × 3 salts,
+   V6-paired, on both clock-52 and clock-0 bases).
 
 ## Follow-ups
 
