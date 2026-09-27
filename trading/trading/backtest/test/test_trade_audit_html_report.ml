@@ -110,6 +110,7 @@ let _aapl_entry : TA.entry_decision =
     side = Trading_base.Types.Long;
     suggested_entry = 280.0;
     close_at_decision = None;
+    adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
     suggested_stop = 260.0;

@@ -70,6 +70,7 @@ let make_entry_decision ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     side;
     suggested_entry = 150.50;
     close_at_decision = None;
+    adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
     suggested_stop = 138.46;

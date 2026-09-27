@@ -130,6 +130,7 @@ let _seed_entry ~trade_audit ~symbol ~position_id ~entry_date =
       side = Trading_base.Types.Long;
       suggested_entry = 0.0;
       close_at_decision = None;
+      adjusted_close_at_decision = None;
       ma_value = None;
       local_range_top = None;
       suggested_stop = 0.0;
