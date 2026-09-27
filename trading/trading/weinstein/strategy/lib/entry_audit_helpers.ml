@@ -12,16 +12,23 @@ open Trading_strategy
 (* Per-candidate entry construction helpers                            *)
 (* ------------------------------------------------------------------ *)
 
-(** Most recent daily close for [cand] as of [current_date], [None] when
-    [bar_reader] has no bars for the symbol. Shared by
-    {!effective_entry_price}'s current-close path and the audit's
-    [close_at_decision] E-provenance field, so the two cannot drift. *)
+(** Most recent daily bar for [cand] as of [current_date], [None] when
+    [bar_reader] has no bars for the symbol. The entry audit reads both its raw
+    [close_price] and its [adjusted_close] off this one bar (issue #2973). *)
+let latest_bar ~bar_reader ~current_date (cand : Screener.scored_candidate) :
+    Types.Daily_price.t option =
+  List.last
+    (Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker
+       ~as_of:current_date)
+
+(** Most recent daily close for [cand] as of [current_date] — the raw-close
+    projection of {!latest_bar}. Shared by {!effective_entry_price}'s
+    current-close path and the audit's [close_at_decision] E-provenance field,
+    so the two cannot drift. *)
 let latest_close ~bar_reader ~current_date (cand : Screener.scored_candidate) :
     float option =
-  let bars =
-    Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker ~as_of:current_date
-  in
-  Option.map (List.last bars) ~f:(fun bar -> bar.Types.Daily_price.close_price)
+  Option.map (latest_bar ~bar_reader ~current_date cand) ~f:(fun bar ->
+      bar.Types.Daily_price.close_price)
 
 (** Resolve the entry price from an already-read [close] (see {!latest_close}),
     so a caller that also records [close_at_decision] performs one bar read, not

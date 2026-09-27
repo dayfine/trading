@@ -38,6 +38,7 @@ module Resistance_sketch_reader = Resistance_sketch_reader
 module Weekly_sidetable_reader = Weekly_sidetable_reader
 module Weekly_ma_cache = Weekly_ma_cache
 module Audit_recorder = Audit_recorder
+module Stop_move_capture = Stop_move_capture
 module Cascade_trace = Cascade_trace
 module Stop_width_mode = Stop_width_mode
 module Stop_buffer_by_state = Stop_buffer_by_state
@@ -134,22 +135,29 @@ let _record_force_exit ~last_stop_out_dates ~positions ~current_date
 let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
     ~prior_stage_ma_values ~get_price ~last_stop_out_dates ~audit_recorder
     ~prior_macro_result ~prior_decline_character ~current_date =
-  Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:current_date;
   (* Arm the fast-crash absolute stop from the PRIOR cycle's decline-character
      (strictly past — this cycle's classify runs later, at the macro step; a
      plain bool keeps the stops lib macro-agnostic). *)
   let catastrophic_armed =
     phys_equal !prior_decline_character Decline_character.Fast_v
   in
+  (* Split rescale, then snapshot, then the stops runner — so a split is never
+     reported as a move by the silent-move capture (issue #2974). *)
   let exit_transitions, adjust_transitions =
-    Stops_runner.update
-      ?ma_cache:(Bar_reader.ma_cache bar_reader)
-      ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
-      ~catastrophic_armed ~stops_config:config.stops_config
-      ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
-      ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
-      ~prior_stages ()
+    Stop_move_capture.split_then_update ~audit_recorder ~positions ~stop_states
+      ~current_date
+      ~split_adjust:(fun () ->
+        Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
+          ~as_of:current_date)
+      ~update:(fun () ->
+        Stops_runner.update
+          ?ma_cache:(Bar_reader.ma_cache bar_reader)
+          ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
+          ~catastrophic_armed
+          ~on_stop_decision:audit_recorder.Audit_recorder.record_stop_decision
+          ~stops_config:config.stops_config ~stage_config:config.stage_config
+          ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
+          ~bar_reader ~as_of:current_date ~prior_stages ())
   in
   List.iter exit_transitions
     ~f:

@@ -93,6 +93,34 @@ type split_safe_basis = Weinstein_stops.split_safe_basis =
           {!Weinstein_stops.split_safe_basis} for why three states are needed.
       *)
 
+type stop_move_event = {
+  position_id : string;
+      (** The held position whose stop moved — joins to
+          [entry_event.position_id] and [Stop_log.stop_info.position_id]. *)
+  symbol : string;
+  date : Date.t;  (** The bar on which the stop state machine moved it. *)
+  stop_level : float;
+      (** The new level now resting in the strategy's stop state — the level the
+          next bar's trigger check enforces. *)
+}
+(** A stop-level move that {b no transition carries}.
+
+    The stops pass reports most moves as an [UpdateRiskParams] adjust, but
+    [Weinstein_stops.update]'s [Entered_tightening] event moves the stop onto
+    the tightened candidate without one ([Stop_transitions.of_stop_event] maps
+    only [Stop_raised] to an adjust). The moved level is still enforced — the
+    trigger check reads the stop state, not [risk_params] — so only the
+    per-trade stop log missed it (issue #2974). This event is that log's feed.
+
+    Observability only: emitting it changes no transition, and it is never
+    produced for a split rescale ([Stops_split_runner] runs before the
+    before/after comparison) or for a move an adjust transition already reports.
+
+    Declared ahead of the other event records on purpose: they share the
+    [position_id] / [symbol] / [date] labels, and an unannotated label resolves
+    to the {e last} type declaring it, so declaring this one first leaves every
+    existing unannotated access resolving as before. *)
+
 type entry_event = {
   position_id : string;
       (** Position id assigned at entry — matches the [Position.transition] this
@@ -113,6 +141,13 @@ type entry_event = {
           E-provenance telemetry (entry-ticket right-basis plan, 2026-08-08):
           lets the audit compare [candidate.suggested_entry] against the
           decision-time close without re-reading raw bars. *)
+  adjusted_close_at_decision : float option;
+      (** The same bar's [adjusted_close] — the basis the stage classifier's MA
+          ([candidate.analysis.stage.ma_value]) is computed on. Pair it, not the
+          RAW [close_at_decision], with the MA: across a later split the raw
+          close sits a whole split factor away from the MA (issue #2973, NVDA
+          2021-04-23: raw 610.61, adjusted 15.21, MA 13.67). Audit-only; [None]
+          exactly when [close_at_decision] is [None]. *)
   installed_stop : float;
       (** Output of
           [Weinstein_stops.compute_initial_stop_with_floor_with_callbacks]'s
@@ -307,6 +342,16 @@ type t = {
   record_fill_volume : fill_volume_event -> unit;
       (** Invoked once per position the F5 at-fill check evaluates. Never
           invoked under the default (unarmed) config. *)
+  record_stop_move : stop_move_event -> unit;
+      (** Invoked once per held position per bar on which the stops pass moved
+          its stop without emitting a transition for it (see
+          {!stop_move_event}). *)
+  record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
+      (** Invoked by {!Stops_runner.update} for each held position whose stop
+          state machine advanced on the tick (issue #2977): every advance, one
+          per position per tick (rows are thinned by the sink, not here).
+          Observability only — the record is built from the advance the runner
+          already made, so any sink leaves every decision unchanged. *)
   capture_candidates : bool;
       (** Whether the strategy should populate {!cascade_event.candidates}.
           [false] in {!noop}, and therefore in live mode and every test that

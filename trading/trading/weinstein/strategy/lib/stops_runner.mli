@@ -29,6 +29,7 @@ val update :
   ?stop_update_cadence:stop_update_cadence ->
   ?prior_stage_ma_values:float Hashtbl.M(String).t ->
   ?catastrophic_armed:bool ->
+  ?on_stop_decision:(Weinstein_stops.Stop_decision.t -> unit) ->
   stops_config:Weinstein_stops.config ->
   stage_config:Stage.config ->
   lookback_bars:int ->
@@ -90,4 +91,17 @@ val update :
     an [UpdateRiskParams] adjust still flows. Rationale (the simulator fills
     before the strategy runs, so the entry bar's low/high predates the fill):
     see that field's docstring in {!Weinstein_stops} / [stop_types.mli]. Under
-    [false] the runner replays every pre-flip baseline bit-for-bit. *)
+    [false] the runner replays every pre-flip baseline bit-for-bit.
+
+    [on_stop_decision] (optional; issue #2977) observes every state-machine
+    advance this call made, one {!Weinstein_stops.Stop_decision.t} per held
+    position (sibling positions on one ticker each get their own record off the
+    shared advance). Called after the fold, in [positions] key order; the return
+    value and [stop_states] are untouched, so passing it is an exact no-op on
+    every decision. Every advance is emitted — under [Daily] cadence that is one
+    record per held position per trading day; the backtest sink
+    ([Trade_audit.record_stop_decision]) collapses runs of no-move holds to one
+    row per ISO week with {!Weinstein_stops.Stop_decision.push}, so a week whose
+    Friday is a holiday still gets its hold row. Trigger-only ticks (mid-week
+    under [Weekly]) advance nothing and emit nothing. See
+    {!Stop_decision_capture}. *)

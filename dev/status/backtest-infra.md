@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-09-24
+## Last updated: 2026-09-26
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,57 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-09-26 — stop-raise counting fixed in `trades.csv` (#2974, reporting only)
+
+- [x] **`n_stop_raises` off by one.** The simulator's `EntryComplete` carries no
+  stop, so `Stop_log` booked the first raise as the install (`entry_stop` blank
+  on 724/724 rows of `f2-fills-faithful-s0-v11`). The strategy's entry-audit
+  event now books `installed_stop` via `Stop_log.record_installed_stop`
+  (wired in `Trade_audit_recorder.of_collector ?stop_log`), and a stop-less
+  `EntryComplete` no longer erases it.
+- [x] **`Entered_tightening` moves counted.** The tightened level IS enforced
+  (the trigger check reads `stop_states`, not `risk_params`); only the log
+  missed it. `Weinstein_strategy.Stop_move_capture` diffs `stop_states` around
+  `Stops_runner.update` and reports each transition-less move through the new
+  `Audit_recorder.record_stop_move` → `Stop_log.record_stop_move`.
+- No transition changes; trade decisions untouched. Expected column moves in
+  `trades.csv`: `entry_stop` (now filled), `exit_stop` (filled for never-raised
+  trades; the tightened level where one applied), `max_stop`, `n_stop_raises`.
+- Verify: `dune runtest trading/backtest/test` (`test_stop_log`,
+  `test_trade_audit_recorder`) and `dune runtest trading/weinstein/strategy/test`
+  (`test_stop_move_capture`).
+
+## 2026-09-26 — weekly trailing-stop decisions in `trade_audit.sexp` (#2977)
+
+- [ ] **Per-position stop-decision record (observability only; awaiting the
+  first build + QC).** New `Weinstein_stops.Stop_decision`
+  (`trading/trading/weinstein/stops/lib/stop_decision.{ml,mli}`): a pure
+  classifier over the `(before, after, event, bar, ma)` of one
+  `Weinstein_stops.update` call — reasons `Raised`, `No_correction_yet`,
+  `Correction_not_recovered`, `Anchor_not_fresh`, `Cycle_stalled`,
+  `Seeded_trailing`, `Entered_tightening`, `Tightened_ratchet`,
+  `Tightened_hold`, `Stop_hit`, `Other_hold`, plus stop before/after, state,
+  `correction_count`, the trend/correction extremes the cycle test read, and
+  the MA, the cycle `candidate` and `correction_count_before` (0 = seed-anchored
+  cycle). `Stops_runner.update ?on_stop_decision` emits one per held position
+  per advance, after the fold (via `Stop_decision_capture`); `Audit_recorder.record_stop_decision` →
+  `Trade_audit.record_stop_decision` appends it to the position's
+  `audit_record.stop_decisions` (`[@sexp.list]`: absent when empty, old files
+  parse), collapsing each run of same-ISO-week holds to its latest row
+  (`Stop_decision.push`, no look-ahead, holiday Fridays covered). Always-on;
+  ~1 hold row per held position-week plus the rare decisions.
+  - Answers #2974 (faithful 8 % rule vs defect) without a replay.
+  - Tests: `weinstein/stops/test/test_stop_decision.ml` (seed-anchored first
+    raise + pullback-driven second raise, steady advance → `No_correction_yet`,
+    `Anchor_not_fresh`, stalled under both anchor-reset settings, `Stop_hit`,
+    tighten → ratchet → hold, short side, `is_hold`, sexp round-trip);
+    `weinstein/strategy/test/test_stop_decision_capture.ml` (every advance,
+    siblings, sink changes no transition/state on holds and on a raise);
+    `backtest/test/test_trade_audit.ml` (merge into entry row, no-entry drop,
+    holiday-week collapse, round-trip, empty omitted).
+  - Verify: `dune runtest trading/weinstein/stops trading/weinstein/strategy
+    trading/backtest`; goldens must stay bit-identical (pending dispatcher run).
 
 ## 2026-09-24 — weekly-start sweep: end-date guard + dropped cells in the report (#2915 parts 2-3)
 
