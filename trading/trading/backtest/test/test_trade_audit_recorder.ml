@@ -112,6 +112,7 @@ let _entry_event ?(candidate = _candidate) ?(sized_down_wide_stop = false)
     macro = _macro;
     current_date = _current_date;
     close_at_decision = Some 99.0;
+    adjusted_close_at_decision = Some 96.25;
     installed_stop = 92.0;
     stop_floor_kind;
     split_safe_basis;
@@ -210,13 +211,13 @@ let test_entry_projection_carries_identifying_fields _ =
        ])
 
 (** E-provenance fields (entry-ticket right-basis plan 2026-08-08):
-    [close_at_decision] must pass through from the event verbatim, [ma_value]
-    must be read off the candidate's stage analysis (the fixture's
-    [_stage_result.ma_value = 97.5], distinct from every other fixture price so
-    a mis-wire cannot pass), and [local_range_top] mirrors the candidate's
-    analysis field — [None] here because the fixture leaves the local-anchor
-    knob off. Non-default values, same reason as the enum pins: a hardcoded
-    [None]/constant at this hop must fail. *)
+    [close_at_decision] and [adjusted_close_at_decision] (issue #2973) must pass
+    through from the event verbatim, [ma_value] must be read off the candidate's
+    stage analysis (the fixture's [_stage_result.ma_value = 97.5], distinct from
+    every other fixture price so a mis-wire cannot pass), and [local_range_top]
+    mirrors the candidate's analysis field — [None] here because the fixture
+    leaves the local-anchor knob off. Non-default values, same reason as the
+    enum pins: a hardcoded [None]/constant at this hop must fail. *)
 let test_entry_projection_carries_e_provenance_fields _ =
   assert_that
     (_recorded_entry ~split_safe_basis:AR.Flag_off
@@ -226,6 +227,9 @@ let test_entry_projection_carries_e_provenance_fields _ =
          field
            (fun (e : TA.entry_decision) -> e.close_at_decision)
            (is_some_and (float_equal 99.0));
+         field
+           (fun (e : TA.entry_decision) -> e.adjusted_close_at_decision)
+           (is_some_and (float_equal 96.25));
          field
            (fun (e : TA.entry_decision) -> e.ma_value)
            (is_some_and (float_equal 97.5));

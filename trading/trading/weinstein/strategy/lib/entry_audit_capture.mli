@@ -35,6 +35,14 @@ type entry_meta = {
           the audit can always compare [candidate.suggested_entry] against the
           decision-time close. [None] when no bars were available. Carried into
           {!Audit_recorder.entry_event.close_at_decision}. *)
+  adjusted_close_at_decision : float option;
+      (** The same decision-time bar's [adjusted_close] (issue #2973). The
+          [close_at_decision] above is RAW; the stage classifier's MA is built
+          from ADJUSTED closes, so across a later split the two differ by the
+          whole split factor (NVDA 2021-04-23: raw 610.61 vs adjusted 15.21).
+          Recording the adjusted close lets the audit report close-vs-MA on the
+          one basis the classifier decided on. Audit-only: no decision reads it.
+          [None] exactly when [close_at_decision] is [None]. *)
   sized_down_wide_stop : bool;
       (** F3 audit tag ([Sized_down_wide_stop]). [true] when
           [config.stop_width_mode = Size_down] admitted this candidate even

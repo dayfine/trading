@@ -49,7 +49,8 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
         ("clean_resistance", 15);
         ("sector_strong", 10);
       ]) ?(cascade_rationale = [ "Stage2 breakout"; "RS positive rising" ])
-    ?(suggested_entry = 150.50) ?(close_at_decision = None) ?(ma_value = None)
+    ?(suggested_entry = 150.50) ?(close_at_decision = None)
+    ?(adjusted_close_at_decision = None) ?(ma_value = None)
     ?(local_range_top = None) ?(suggested_stop = 138.46)
     ?(installed_stop = 138.46) ?(stop_floor_kind = TA.Buffer_fallback)
     ?(split_safe_basis = TA.Flag_off) ?(risk_pct = 0.08)
@@ -81,6 +82,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     side;
     suggested_entry;
     close_at_decision;
+    adjusted_close_at_decision;
     ma_value;
     local_range_top;
     suggested_stop;
@@ -236,14 +238,16 @@ let test_entry_decision_sexp_tolerates_missing_split_safe_basis _ =
     (equal_to (make_entry ~split_safe_basis:TA.Flag_off () : TA.entry_decision))
 
 (* The E-provenance fields ([close_at_decision] / [ma_value] /
-   [local_range_top], entry-ticket right-basis plan 2026-08-08) are
-   [\[@sexp.option\]]: a [trade_audit.sexp] written before they existed carries
-   no such fields and must parse with all three [None]. Serialize a row that
+   [local_range_top], entry-ticket right-basis plan 2026-08-08, plus
+   [adjusted_close_at_decision], issue #2973) are [\[@sexp.option\]]: a
+   [trade_audit.sexp] written before they existed carries no such fields and
+   must parse with all four [None]. Serialize a row that
    HAS the fields, strip them, and the parse must still succeed with [None]s —
    the same tolerance contract [split_safe_basis] pins above. *)
 let test_entry_decision_sexp_tolerates_missing_e_provenance_fields _ =
   let entry =
-    make_entry ~close_at_decision:(Some 148.2) ~ma_value:(Some 140.0)
+    make_entry ~close_at_decision:(Some 148.2)
+      ~adjusted_close_at_decision:(Some 3.705) ~ma_value:(Some 140.0)
       ~local_range_top:(Some 151.0) ()
   in
   let stripped =
@@ -254,7 +258,12 @@ let test_entry_decision_sexp_tolerates_missing_e_provenance_fields _ =
             | Sexp.List (Sexp.Atom name :: _) ->
                 not
                   (List.mem
-                     [ "close_at_decision"; "ma_value"; "local_range_top" ]
+                     [
+                       "close_at_decision";
+                       "adjusted_close_at_decision";
+                       "ma_value";
+                       "local_range_top";
+                     ]
                      name ~equal:String.equal)
             | _ -> true))
     | other -> other
@@ -383,7 +392,8 @@ let test_age_weeks_clamps_at_zero _ =
 (** Populated E-provenance fields survive the codec round trip. *)
 let test_entry_decision_sexp_round_trips_e_provenance_fields _ =
   let entry =
-    make_entry ~close_at_decision:(Some 148.2) ~ma_value:(Some 140.0)
+    make_entry ~close_at_decision:(Some 148.2)
+      ~adjusted_close_at_decision:(Some 3.705) ~ma_value:(Some 140.0)
       ~local_range_top:(Some 151.0) ()
   in
   let parsed = TA.entry_decision_of_sexp (TA.sexp_of_entry_decision entry) in
