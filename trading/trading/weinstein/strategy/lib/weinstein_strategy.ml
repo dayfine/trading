@@ -50,6 +50,8 @@ module Entry_walk = Entry_walk
 module Entry_freeze = Entry_freeze
 module Entry_stop_width_order = Entry_stop_width_order
 module Entry_ticket_ttl = Entry_ticket_ttl
+module Entry_ticket_suspend_mode = Entry_ticket_suspend_mode
+module Entry_ticket_suspend = Entry_ticket_suspend
 module Screening_notional = Screening_notional
 module Long_buying_power = Long_buying_power
 module Leverage_dawn = Leverage_dawn
@@ -203,11 +205,11 @@ let _run_macro ~config ~ad_series ~breadth_series ~prior_macro
     _maybe_reset_halt ~peak_tracker ~prior_macro:prev ~current_macro:r.trend;
     Some r
 
-let _run_entries ~pending_entry_e ~fold_start_date ~universe_membership_at
-    ~config ~stop_states ~last_stop_out_dates ~peak_tracker ~bar_reader
-    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-    ~current_date ~index_view ~audit_recorder ~is_screening_day
-    ~macro_result_opt =
+let _run_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
+    ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
+    ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+    ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
+    ~is_screening_day ~macro_result_opt =
   let halted =
     match
       Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
@@ -216,10 +218,11 @@ let _run_entries ~pending_entry_e ~fold_start_date ~universe_membership_at
     | Active -> false
   in
   Weinstein_strategy_macro.entry_transitions_if_active ~pending_entry_e
-    ~fold_start_date ~universe_membership_at ~halted ~is_screening_day
-    ~macro_result_opt ~config ~stop_states ~last_stop_out_dates ~bar_reader
-    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-    ~current_date ~index_view ~audit_recorder
+    ~suspended_tickets ~fold_start_date ~universe_membership_at ~halted
+    ~is_screening_day ~macro_result_opt ~config ~stop_states
+    ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
+    ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
+    ~audit_recorder
 
 (** Compute the macro result (mutating the macro refs via {!_run_macro}) and run
     the macro-bearish trim pass, returning both. Extracted from
@@ -261,7 +264,7 @@ let _run_macro_and_trim ~config ~ad_series ~breadth_series ~positions ~portfolio
 (** Run the late-Stage-2 stop-tighten dial and the entry walk. Returns
     [(late_tighten, entries)]. Extracted from {!_process_market_day} so that
     coordinator stays within the function-length limit. *)
-let _run_dials_and_entries ~pending_entry_e ~fold_start_date
+let _run_dials_and_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
     ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
     ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
     ~get_price ~(portfolio : Portfolio_view.t) ~current_date ~index_view
@@ -271,15 +274,15 @@ let _run_dials_and_entries ~pending_entry_e ~fold_start_date
       ~index_view ~current_date
   in
   let entry_transitions =
-    _run_entries ~pending_entry_e ~fold_start_date ~universe_membership_at
-      ~config ~stop_states ~last_stop_out_dates ~peak_tracker ~bar_reader
-      ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-      ~current_date ~index_view ~audit_recorder ~is_screening_day
-      ~macro_result_opt
+    _run_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
+      ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
+      ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
+      ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
+      ~audit_recorder ~is_screening_day ~macro_result_opt
   in
   (late_tighten_transitions, entry_transitions)
 
-let _process_market_day ~pending_entry_e ~fold_start_date
+let _process_market_day ~pending_entry_e ~suspended_tickets ~fold_start_date
     ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
     ~last_stop_out_dates ~prior_macro ~prior_macro_result
     ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
@@ -318,7 +321,7 @@ let _process_market_day ~pending_entry_e ~fold_start_date
       ~force_exit_transitions
   in
   let late_tighten_transitions, entry_transitions =
-    _run_dials_and_entries ~pending_entry_e ~fold_start_date
+    _run_dials_and_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
       ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
       ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
       ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
@@ -330,17 +333,18 @@ let _process_market_day ~pending_entry_e ~fold_start_date
     ~adjust_transitions:(adjust_transitions @ late_tighten_transitions)
     ~entry_transitions ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
 
-let _on_market_close ~pending_entry_e ~fold_start_date ~universe_membership_at
-    ~config ~ad_series ~breadth_series ~stop_states ~last_stop_out_dates
-    ~prior_macro ~prior_macro_result ~prior_decline_character ~peak_tracker
-    ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
-    ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
-    ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
+let _on_market_close ~pending_entry_e ~suspended_tickets ~fold_start_date
+    ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
+    ~last_stop_out_dates ~prior_macro ~prior_macro_result
+    ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+    ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors ~stage3_streaks
+    ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
+    ~(portfolio : Portfolio_view.t) =
   match get_price config.indices.primary with
   | None -> Ok { Strategy_interface.transitions = [] }
   | Some primary_bar ->
       let current_date = primary_bar.Types.Daily_price.date in
-      _process_market_day ~pending_entry_e ~fold_start_date
+      _process_market_day ~pending_entry_e ~suspended_tickets ~fold_start_date
         ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
         ~last_stop_out_dates ~prior_macro ~prior_macro_result
         ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
@@ -398,15 +402,17 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
   in
   let breadth_series = _breadth_series_of_bars breadth_bars in
   let pending_entry_e = _make_closure_tables () in
+  let suspended_tickets = Entry_ticket_suspend.create () in
   let module M = struct
     let name = name
 
     let on_market_close =
-      _on_market_close ~pending_entry_e ~fold_start_date ~universe_membership_at
-        ~config ~ad_series ~breadth_series ~stop_states ~last_stop_out_dates
-        ~prior_macro ~prior_macro_result ~prior_decline_character ~peak_tracker
-        ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
-        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
+      _on_market_close ~pending_entry_e ~suspended_tickets ~fold_start_date
+        ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
+        ~last_stop_out_dates ~prior_macro ~prior_macro_result
+        ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+        ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
+        ~stage3_streaks ~laggard_streaks ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 
@@ -426,8 +432,10 @@ module Internal_for_test = struct
           config.macro_config.indicator_thresholds.momentum_period ad_bars
     in
     let pending_entry_e = _make_closure_tables () in
-    _on_market_close ~pending_entry_e ~fold_start_date
-      ~universe_membership_at:None ~config ~ad_series ~breadth_series:None
+    _on_market_close ~pending_entry_e
+      ~suspended_tickets:(Entry_ticket_suspend.create ())
+      ~fold_start_date ~universe_membership_at:None ~config ~ad_series
+      ~breadth_series:None
 
   let maybe_reset_halt = _maybe_reset_halt
   let positions_minus_exited = _positions_minus_exited

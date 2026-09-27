@@ -283,6 +283,16 @@ module Entry_ticket_ttl = Entry_ticket_ttl
     pin the cancel decision independently of a full screening tick. See
     {!Entry_ticket_ttl}. *)
 
+module Entry_ticket_suspend_mode = Entry_ticket_suspend_mode
+(** The [config.entry_ticket_macro_suspend] variant (#2976). Re-exposed so
+    specs, overlays and tests can name its constructors. *)
+
+module Entry_ticket_suspend = Entry_ticket_suspend
+(** #2976 resting-ticket macro suspension (default [Off]): withdraw resting long
+    tickets while the macro gate rejects new longs, re-issue them unchanged when
+    it admits. Re-exposed so tests can drive a store directly. See
+    {!Entry_ticket_suspend}. *)
+
 module Screening_notional = Screening_notional
 (** Per-Friday entry-walk notional / sector-exposure accumulator seeds. Exposed
     so tests can pin the accumulator-seeding primitives
@@ -1131,6 +1141,13 @@ type config = {
           being armed). Default [false] = off, bit-identical (R1). Threaded into
           [Trading_simulation.Stale_hold.config.exit_without_prior_bar]. See
           [Weinstein_strategy_config.stale_exit_without_prior_bar]. *)
+  entry_ticket_macro_suspend : Entry_ticket_suspend_mode.t;
+      [@sexp.default Entry_ticket_suspend_mode.Off]
+      (** #2976: suspend (withdraw, keep, re-issue unchanged) resting long entry
+          tickets while the macro gate rejects new longs — Ch. 8 "Suspend buying
+          even if you see a few stocks breaking out". Default [Off] =
+          bit-identical (R1). See {!Entry_ticket_suspend} and
+          [Weinstein_strategy_config.entry_ticket_macro_suspend]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

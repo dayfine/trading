@@ -17,6 +17,14 @@
     ([dev/notes/ticket-death-on-cash-2026-08-16.md],
     [dev/plans/delisting-data-fix-2026-09-06.md]).
 
+    {b A fifth token, a fourth category (#2976).}
+    [Weinstein_strategy.Entry_ticket_suspend] (default-off
+    [entry_ticket_macro_suspend]) emits [entry_ticket_macro_suspended] — a
+    {e withdrawal}, not a death: the setup is re-issued once the macro gate
+    admits. It is driven below as Producer 4, across every mode, so the list is
+    five tokens in four categories. This is the blind spot the next paragraph
+    predicts, closed at the moment the producer landed.
+
     {b Why a hand-written list of four literals would pin nothing.} Comparing
     four string constants against four string constants passes forever. So the
     {e reachable} side of the equality below is never written down — it is
@@ -50,6 +58,8 @@ module Position = Trading_strategy.Position
 module Cancel_handler = Trading_simulation.Cancel_handler
 module Delisted_ticket_cancel = Trading_simulation.Delisted_ticket_cancel
 module Entry_ticket_ttl = Weinstein_strategy.Entry_ticket_ttl
+module Entry_ticket_suspend = Weinstein_strategy.Entry_ticket_suspend
+module Suspend_mode = Weinstein_strategy.Entry_ticket_suspend_mode
 
 (* The documented side of the equality: the closed list exactly as the four
    docstrings name it. [Cancel_handler]'s and [Delisted_ticket_cancel]'s tokens
@@ -64,6 +74,7 @@ let _documented_cancel_reasons =
       "entry_ticket_requalification_failed";
       Cancel_handler.portfolio_rejection_reason;
       Delisted_ticket_cancel.cancel_reason;
+      Entry_ticket_suspend.cancel_reason;
     ]
 
 (* Fixtures ---------------------------------------------------------------- *)
@@ -325,6 +336,81 @@ let _delisting_transitions =
           in
           transitions))
 
+(* Producer 4 — Weinstein_strategy.Entry_ticket_suspend (#2976) ------------- *)
+
+(* A macro read whose composite trend and index stage vary independently, so
+   both armed modes ([On_bearish_macro], [On_index_stage4]) and the admitting
+   case are all reached. *)
+let _macro ~trend ~stage : Macro.result =
+  {
+    index_stage =
+      {
+        stage;
+        ma_value = _entry_price;
+        ma_direction = Weinstein_types.Flat;
+        ma_slope_pct = 0.0;
+        transition = None;
+        above_ma_count = 0;
+      };
+    indicators = [];
+    trend;
+    breadth_state = Weinstein_types.breadth_state_of_market_trend trend;
+    confidence = 0.5;
+    regime_changed = false;
+    rationale = [];
+  }
+
+let _macro_grid =
+  let stage2 = Weinstein_types.Stage2 { weeks_advancing = 8; late = false } in
+  let stage4 = Weinstein_types.Stage4 { weeks_declining = 9 } in
+  [
+    _macro ~trend:Weinstein_types.Bearish ~stage:stage2;
+    _macro ~trend:Weinstein_types.Bullish ~stage:stage4;
+    _macro ~trend:Weinstein_types.Bullish ~stage:stage2;
+  ]
+
+let _suspend_config mode =
+  {
+    (Weinstein_strategy.Weinstein_strategy_config.default_config
+       ~universe:[ "AAPL" ] ~index_symbol:"GSPCX")
+    with
+    entry_ticket_macro_suspend = mode;
+  }
+
+(* A fresh store per run, and no F2 cancels ([cancel_expired] returns []), so
+   every transition collected here is this producer's own. *)
+let _suspend_run ~mode ~macro_result ~positions =
+  fst
+    (Entry_ticket_suspend.run
+       ~store:(Entry_ticket_suspend.create ())
+       ~config:(_suspend_config mode) ~macro_result
+       ~stop_states:(ref String.Map.empty)
+       ~portfolio:{ cash = 1_000_000.0; positions }
+       ~current_date:_placement_date
+       ~cancel_expired:(fun _ -> [])
+       ())
+
+let _suspend_transitions =
+  let position_grid =
+    [
+      _positions_of [ _entering ~id:"A-1" ~symbol:"AAPL" ~filled_quantity:0.0 ];
+      _positions_of [ _entering ~id:"A-1" ~symbol:"AAPL" ~filled_quantity:40.0 ];
+      _positions_of [ _holding ~id:"A-1" ~symbol:"AAPL" ];
+      String.Map.empty;
+    ]
+  in
+  let mode_grid =
+    [
+      Suspend_mode.Off;
+      Suspend_mode.On_bearish_macro;
+      Suspend_mode.On_index_stage4;
+    ]
+  in
+  List.concat_map mode_grid ~f:(fun mode ->
+      List.concat_map position_grid ~f:(fun positions ->
+          List.concat_map _macro_grid ~f:(fun macro_result ->
+              _suspend_run ~mode ~macro_result ~positions)))
+
 (* Tests ------------------------------------------------------------------- *)
 
 (** The pin. Every token any production producer can drive into
@@ -337,7 +423,8 @@ let test_reachable_reasons_equal_the_documented_closed_list _ =
   assert_that
     (Set.to_list
        (_reachable_from
-          (_ttl_transitions @ _rejection_transitions @ _delisting_transitions)))
+          (_ttl_transitions @ _rejection_transitions @ _delisting_transitions
+         @ _suspend_transitions)))
     (equal_to (Set.to_list _documented_cancel_reasons))
 
 (** The partition the docstrings assert, pinned separately: four tokens in three
@@ -349,11 +436,13 @@ let test_each_producer_contributes_its_documented_tokens _ =
   assert_that
     ( Set.to_list (_reachable_from _ttl_transitions),
       Set.to_list (_reachable_from _rejection_transitions),
-      Set.to_list (_reachable_from _delisting_transitions) )
+      Set.to_list (_reachable_from _delisting_transitions),
+      Set.to_list (_reachable_from _suspend_transitions) )
     (equal_to
        ( [ "entry_ticket_requalification_failed"; "entry_ticket_ttl_expired" ],
          [ Cancel_handler.portfolio_rejection_reason ],
-         [ Delisted_ticket_cancel.cancel_reason ] ))
+         [ Delisted_ticket_cancel.cancel_reason ],
+         [ Entry_ticket_suspend.cancel_reason ] ))
 
 let suite =
   "cancel reason closed list"

@@ -158,11 +158,14 @@ type t = {
           {!Weinstein_strategy.Entry_ticket_ttl}'s [entry_ticket_ttl_expired] /
           [entry_ticket_requalification_failed], and
           {!Trading_simulation.Delisted_ticket_cancel.cancel_reason}
-          ([delisted], #2696).
+          ([delisted], #2696), and — only when the default-off #2976 flag is
+          armed — {!Weinstein_strategy.Entry_ticket_suspend.cancel_reason}
+          ([entry_ticket_macro_suspended]), a {b withdrawal} rather than a death
+          (the setup is re-issued once the macro gate admits).
 
-          The distinction is load-bearing, not cosmetic, and the four tokens
-          fall in {b three} categories. The two TTL tokens are {b decisions} the
-          strategy took. The rejection token is an
+          The distinction is load-bearing, not cosmetic, and the first four
+          tokens fall in {b three} categories. The two TTL tokens are
+          {b decisions} the strategy took. The rejection token is an
           {b accident of capital timing} — a ticket that triggered, filled at
           the engine, and was then refused because the book could not fund it
           (dev/notes/ticket-death-on-cash-2026-08-16.md). [delisted] is a
