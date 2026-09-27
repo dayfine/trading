@@ -14,6 +14,6 @@ awk 'function flush() { if (id != "") { printf "%s{\"id\":\"%s\",\"sev\":\"%s\",
   /^    / && id != "" { s=$0; sub(/^ +/,"",s); gsub(/\\/,"\\\\",s); gsub(/"/,"\\\"",s); sp = sp (ns++?",":"") "\"" s "\""; next }
   END { flush() }' "$D/validator.sexp.md"
 printf '],"conformance":['
-sed -n '/## Weinstein conformance/,/^## Decision/p' "$D/trade_audit_report.md" | awk -F'|' '/^\| R[0-9]/ { for(i=2;i<=7;i++){gsub(/^ +| +$/,"",$i); gsub(/"/,"\\\"",$i)}; printf "%s{\"rule\":\"%s\",\"desc\":\"%s\",\"passed\":\"%s\",\"rate\":\"%s\",\"fails\":\"%s\"}", (n++?",":""), $2,$3,$4,$5,$6 }'
+[ -s "$D/trade_audit_report.md" ] && sed -n '/## Weinstein conformance/,/^## Decision/p' "$D/trade_audit_report.md" | awk -F'|' '/^\| R[0-9]/ { for(i=2;i<=7;i++){gsub(/^ +| +$/,"",$i); gsub(/"/,"\\\"",$i)}; printf "%s{\"rule\":\"%s\",\"desc\":\"%s\",\"passed\":\"%s\",\"rate\":\"%s\",\"fails\":\"%s\"}", (n++?",":""), $2,$3,$4,$5,$6 }'
 printf ']}\n'
 }
