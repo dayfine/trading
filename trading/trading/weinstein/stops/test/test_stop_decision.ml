@@ -4,8 +4,8 @@
     Every tape below is driven through the real {!Weinstein_stops.update}; the
     record is built from the [(before, after, event, bar, ma)] that call
     returned, exactly as the strategy's stops runner does. So these tests pin
-    the classifier against the state machine, not against a re-implementation
-    of it. Unless a test says otherwise: long side, Stage 2 with a rising MA
+    the classifier against the state machine, not against a re-implementation of
+    it. Unless a test says otherwise: long side, Stage 2 with a rising MA
     (tightening never fires), default config. *)
 
 open OUnit2
@@ -148,14 +148,12 @@ let test_steady_advance_holds_with_no_correction _ =
     (elements_are
        (field (fun (d : D.t) -> d.reason) (equal_to D.Seeded_trailing)
        :: List.init 4 ~f:(fun _ ->
-              all_of
-                [
-                  field
-                    (fun (d : D.t) -> d.reason)
-                    (equal_to D.No_correction_yet);
-                  field (fun (d : D.t) -> d.stop_after) (float_equal 90.0);
-                  field (fun (d : D.t) -> d.candidate) is_none;
-                ])))
+           all_of
+             [
+               field (fun (d : D.t) -> d.reason) (equal_to D.No_correction_yet);
+               field (fun (d : D.t) -> d.stop_after) (float_equal 90.0);
+               field (fun (d : D.t) -> d.candidate) is_none;
+             ])))
 
 (* After the first raise resets both extremes to 120, price advances with every
    low above 120 — no bar touches the anchor. By the 131 peak the depth to the
@@ -172,7 +170,8 @@ let test_advance_after_reset_is_anchor_not_fresh _ =
   in
   assert_that
     (List.drop
-       (reasons (decisions ~state:(initial ~stop:90.0) (first_cycle @ after_reset)))
+       (reasons
+          (decisions ~state:(initial ~stop:90.0) (first_cycle @ after_reset)))
        4)
     (elements_are
        [
@@ -191,7 +190,8 @@ let _stalled_tail ~reset =
   List.last (decisions ~config ~state:(initial ~stop:97.0) first_cycle)
 
 let test_stalled_cycle_with_anchor_reset _ =
-  assert_that (_stalled_tail ~reset:true)
+  assert_that
+    (_stalled_tail ~reset:true)
     (is_some_and
        (all_of
           [
@@ -204,7 +204,8 @@ let test_stalled_cycle_with_anchor_reset _ =
           ]))
 
 let test_stalled_cycle_with_frozen_anchor _ =
-  assert_that (_stalled_tail ~reset:false)
+  assert_that
+    (_stalled_tail ~reset:false)
     (is_some_and
        (all_of
           [
@@ -217,7 +218,8 @@ let test_stalled_cycle_with_frozen_anchor _ =
    extreme is the pre-step seed low (99), not the bar's 89. *)
 let test_low_through_stop_is_stop_hit _ =
   assert_that
-    (List.last (decisions ~state:(initial ~stop:90.0) [ s 99. 100.; s 89. 95. ]))
+    (List.last
+       (decisions ~state:(initial ~stop:90.0) [ s 99. 100.; s 89. 95. ]))
     (is_some_and
        (all_of
           [
@@ -299,7 +301,9 @@ let test_is_hold_splits_holds_from_decisions _ =
        ]
        ~f:D.is_hold)
     (equal_to
-       [ true; true; true; true; true; false; false; false; false; false; false ])
+       [
+         true; true; true; true; true; false; false; false; false; false; false;
+       ])
 
 let test_sexp_round_trip _ =
   let d : D.t =
@@ -324,8 +328,7 @@ let test_sexp_round_trip _ =
 let suite =
   "Stop_decision"
   >::: [
-         "first and second cycles raise"
-         >:: test_first_and_second_cycles_raise;
+         "first and second cycles raise" >:: test_first_and_second_cycles_raise;
          "first raise is seed-anchored" >:: test_first_raise_is_seed_anchored;
          "second raise is pullback-driven"
          >:: test_second_raise_is_pullback_driven;

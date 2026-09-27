@@ -148,10 +148,9 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
       ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
       ~catastrophic_armed
       ~on_stop_decision:audit_recorder.Audit_recorder.record_stop_decision
-      ~stops_config:config.stops_config
-      ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
-      ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
-      ~prior_stages ()
+      ~stops_config:config.stops_config ~stage_config:config.stage_config
+      ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
+      ~bar_reader ~as_of:current_date ~prior_stages ()
   in
   List.iter exit_transitions
     ~f:

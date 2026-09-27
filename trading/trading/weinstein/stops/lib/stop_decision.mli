@@ -30,10 +30,10 @@ type reason =
       (** [Trailing]: a correction cycle completed and its candidate improved
           the stop — the ratchet moved (event [Stop_raised]). On the {b first}
           cycle ([correction_count_before = 0]) the correction extreme is the
-          running extreme since the entry-seeded bar, so a pure advance of
-          about [1 / (1 - min_correction_pct)] (~8.7 % at 0.08) above the seed
-          low, closing at a new high, qualifies with no pullback at all. Later
-          cycles anchor on a genuine post-reset counter-move. *)
+          running extreme since the entry-seeded bar, so a pure advance of about
+          [1 / (1 - min_correction_pct)] (~8.7 % at 0.08) above the seed low,
+          closing at a new high, qualifies with no pullback at all. Later cycles
+          anchor on a genuine post-reset counter-move. *)
   | No_correction_yet
       (** [Trailing]: the counter-move from the trend extreme to the running
           correction extreme is shallower than [config.min_correction_pct]. The
@@ -68,7 +68,8 @@ type reason =
           Reachable on both sides — e.g. a long's first tightened ratchet
           re-buffers the same correction low at the tighter
           [tightened_stop_buffer_pct]. *)
-  | Tightened_hold  (** [Tightened]: the tight ratchet had nothing to improve. *)
+  | Tightened_hold
+      (** [Tightened]: the tight ratchet had nothing to improve. *)
   | Stop_hit
       (** The bar crossed the stop (event [Stop_hit]). The exit itself can still
           be withheld by the strategy runner (e.g. the entry-bar skip) — this
@@ -111,8 +112,8 @@ type t = {
   correction_count_before : int;
       (** Completed cycles on the [Trailing] state entering the step; [0] when
           it was not [Trailing]. [0] on a [Raised] / [Cycle_stalled] row means
-          the cycle was anchored on the entry-seeded extreme (see {!Raised}); [>
-          0] means it was anchored on a post-reset counter-move. *)
+          the cycle was anchored on the entry-seeded extreme (see {!Raised});
+          [> 0] means it was anchored on a post-reset counter-move. *)
   correction_count : int;
       (** Completed cycles on the [Trailing] state after the step (before it, if
           the step left [Trailing]); [0] when neither side is [Trailing]. *)

@@ -81,14 +81,14 @@ let _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values
 (** Advance the shared per-ticker stop state machine
     {b at most once per [update] call}. [advanced] memoizes the whole
     {!Weinstein_stops.Stop_decision.step} per ticker: the first position on a
-    ticker advances the machine (persisting the new state into [stop_states] and the
-    new stage into [prior_stages]); subsequent same-ticker positions (sibling
-    positions, e.g. a scale-in add) replay the memoized event so each position
-    still emits its own exit / adjust transition while the machine advances
-    exactly once — {!Weinstein_stops.update}'s contract is one call per period,
-    and a second call per tick would also double-age [weeks_advancing] in
-    [prior_stages]. Sibling positions on one ticker share the position side (the
-    memoized advance uses the first position's side). *)
+    ticker advances the machine (persisting the new state into [stop_states] and
+    the new stage into [prior_stages]); subsequent same-ticker positions
+    (sibling positions, e.g. a scale-in add) replay the memoized event so each
+    position still emits its own exit / adjust transition while the machine
+    advances exactly once — {!Weinstein_stops.update}'s contract is one call per
+    period, and a second call per tick would also double-age [weeks_advancing]
+    in [prior_stages]. Sibling positions on one ticker share the position side
+    (the memoized advance uses the first position's side). *)
 let _advance_machine ?ma_cache ?prior_stage_ma_values ~stops_config
     ~stage_config ~lookback_bars ~(pos : Position.t) ~state ~bar ~stop_states
     ~ticker ~bar_reader ~as_of ~prior_stages () =
@@ -103,8 +103,13 @@ let _advance_machine ?ma_cache ?prior_stage_ma_values ~stops_config
       ~current_bar:bar ~ma_value ~ma_direction ~stage
   in
   stop_states := Map.set !stop_states ~key:ticker ~data:new_state;
-  { Weinstein_stops.Stop_decision.before = state; after = new_state; event; bar;
-    ma_value }
+  {
+    Weinstein_stops.Stop_decision.before = state;
+    after = new_state;
+    event;
+    bar;
+    ma_value;
+  }
 
 let _advance_ticker_once ?ma_cache ?prior_stage_ma_values ~advanced
     ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t) ~state ~bar
@@ -269,7 +274,8 @@ let _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
 
 let update ?ma_cache ?stop_update_cadence ?prior_stage_ma_values
     ?catastrophic_armed ?on_stop_decision ~stops_config ~stage_config
-    ~lookback_bars ~positions ~get_price ~stop_states ~bar_reader ~as_of ~prior_stages () =
+    ~lookback_bars ~positions ~get_price ~stop_states ~bar_reader ~as_of
+    ~prior_stages () =
   (* Per-call memo: ticker -> advance step. Ensures the shared per-ticker state
      machine advances once per tick even when several sibling positions hold
      the same ticker (see [_advance_ticker_once]). *)

@@ -384,11 +384,12 @@ type audit_record = {
   stop_decisions : Weinstein_stops.Stop_decision.t list; [@sexp.list]
       (** The weekly trailing-stop decisions for this position, oldest first
           (issue #2977), recorded via {!record_stop_decision}: every raise,
-          stalled cycle, seed, tightening and hit, plus one no-move hold per
-          run of holds within an ISO week (see {!Weinstein_stops.Stop_decision}
-          for the fields and [Stop_decision.push] for the collapse). [@sexp.list] omits the field
-          when empty and reads an absent field as [[]], so [trade_audit.sexp]
-          files written before this field existed still parse. *)
+          stalled cycle, seed, tightening and hit, plus one no-move hold per run
+          of holds within an ISO week (see {!Weinstein_stops.Stop_decision} for
+          the fields and [Stop_decision.push] for the collapse). [@sexp.list]
+          omits the field when empty and reads an absent field as [[]], so
+          [trade_audit.sexp] files written before this field existed still
+          parse. *)
 }
 [@@deriving sexp]
 (** A paired entry + exit record. [exit_] is [None] for positions that were

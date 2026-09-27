@@ -88,7 +88,13 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
   }
 
 let make_record entry : TA.audit_record =
-  { entry; exit_ = None; external_exit = None; execution = None; stop_decisions = [] }
+  {
+    entry;
+    exit_ = None;
+    external_exit = None;
+    execution = None;
+    stop_decisions = [];
+  }
 
 (* The [config] plumbing only reads two fields; build via [default_config] and
    override so we don't depend on unrelated defaults. *)

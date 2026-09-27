@@ -221,15 +221,16 @@ let record_stop_decision t (d : Weinstein_stops.Stop_decision.t) =
    no enriched exit_ is on file; enriched wins (see [record_transitions]). *)
 let _fill_in_external_exit (bucket : _bucket)
     (trans : Trading_strategy.Position.transition) ~exit_reason =
+  let ext : external_exit_decision =
+    {
+      symbol = bucket.bucket_entry.symbol;
+      exit_date = trans.date;
+      position_id = trans.position_id;
+      exit_trigger = Stop_log.exit_trigger_of_reason exit_reason;
+    }
+  in
   if Option.is_none bucket.bucket_exit then
-    bucket.bucket_external_exit <-
-      Some
-        {
-          symbol = bucket.bucket_entry.symbol;
-          exit_date = trans.date;
-          position_id = trans.position_id;
-          exit_trigger = Stop_log.exit_trigger_of_reason exit_reason;
-        }
+    bucket.bucket_external_exit <- Some ext
 
 (* PR-5: a cancelled ticket's resting age, anchored on [placement_date], paired
    with the transition's reason token — see [Ticket_lifecycle.cancel_reason]. *)
@@ -274,12 +275,12 @@ let get_audit_records t : audit_record list =
   Hashtbl.fold t.records ~init:[] ~f:(fun ~key:_ ~data:bucket acc ->
       _bucket_to_record bucket :: acc)
   |> List.sort ~compare:(fun (a : audit_record) b ->
-         String.compare a.entry.position_id b.entry.position_id)
+      String.compare a.entry.position_id b.entry.position_id)
 
 let get_cascade_summaries t : cascade_summary list =
   Queue.to_list t.cascade_summaries
   |> List.sort ~compare:(fun (a : cascade_summary) b ->
-         Date.compare a.date b.date)
+      Date.compare a.date b.date)
 
 let get_audit_blob t : audit_blob =
   {

@@ -46,7 +46,11 @@ let week =
 (** A long [Holding] on [ticker] with position id [id]. *)
 let make_holding id =
   let make_trans kind =
-    { Trading_strategy.Position.position_id = id; date = Date.of_string "2024-01-05"; kind }
+    {
+      Trading_strategy.Position.position_id = id;
+      date = Date.of_string "2024-01-05";
+      kind;
+    }
   in
   let unwrap = function
     | Ok p -> p
@@ -127,13 +131,11 @@ let test_daily_cadence_emits_every_advance _ =
             field (fun (d : D.t) -> d.reason) (equal_to D.Seeded_trailing);
           ]
        :: List.init 4 ~f:(fun _ ->
-              all_of
-                [
-                  field
-                    (fun (d : D.t) -> d.reason)
-                    (equal_to D.No_correction_yet);
-                  field (fun (d : D.t) -> d.stop_after) (float_equal 90.0);
-                ])))
+           all_of
+             [
+               field (fun (d : D.t) -> d.reason) (equal_to D.No_correction_yet);
+               field (fun (d : D.t) -> d.stop_after) (float_equal 90.0);
+             ])))
 
 let test_sibling_positions_each_get_a_record _ =
   assert_that

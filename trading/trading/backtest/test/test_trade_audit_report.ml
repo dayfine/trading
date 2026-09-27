@@ -118,7 +118,13 @@ let make_execution ?(designed_order_type = TA.Market)
   }
 
 let make_record ?(execution = None) entry exit_ : TA.audit_record =
-  { entry; exit_ = Some exit_; external_exit = None; execution; stop_decisions = [] }
+  {
+    entry;
+    exit_ = Some exit_;
+    external_exit = None;
+    execution;
+    stop_decisions = [];
+  }
 
 (* --- Header computation ------------------------------------------------- *)
 
@@ -484,7 +490,13 @@ let test_row_empty_trigger_when_no_exit_and_no_external _ =
   let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
   let entry = make_entry_decision () in
   let record : TA.audit_record =
-    { entry; exit_ = None; external_exit = None; execution = None; stop_decisions = [] }
+    {
+      entry;
+      exit_ = None;
+      external_exit = None;
+      execution = None;
+      stop_decisions = [];
+    }
   in
   let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
   assert_that report.rows

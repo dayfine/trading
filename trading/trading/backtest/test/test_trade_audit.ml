@@ -930,7 +930,6 @@ let test_empty_collector_returns_empty_blob _ =
          field (fun (b : TA.audit_blob) -> b.cascade_summaries) is_empty;
        ])
 
-
 (* Stop decisions (issue #2977) ----------------------------------------- *)
 
 module SD = Weinstein_stops.Stop_decision
@@ -974,8 +973,8 @@ let test_record_stop_decision_appends_to_the_entry_row _ =
               ]);
        ])
 
-(** No entry on record ⇒ the decision is dropped (the shared no-entry
-    contract). *)
+(** No entry on record ⇒ the decision is dropped (the shared no-entry contract).
+*)
 let test_record_stop_decision_without_entry_is_dropped _ =
   let t = TA.create () in
   TA.record_stop_decision t
@@ -985,9 +984,9 @@ let test_record_stop_decision_without_entry_is_dropped _ =
 
 (** Daily holds collapse to one row per ISO week, with no look-ahead: the week
     of 2024-03-25 ends on Thursday the 28th (Good Friday 2024-03-29 is a market
-    holiday) and still keeps exactly one hold row, dated that Thursday. The
-    next Monday's hold is a new week, so a new row; the Monday seed is not a
-    hold, so it is never collapsed. *)
+    holiday) and still keeps exactly one hold row, dated that Thursday. The next
+    Monday's hold is a new week, so a new row; the Monday seed is not a hold, so
+    it is never collapsed. *)
 let test_record_stop_decision_collapses_holds_per_week _ =
   let t = TA.create () in
   TA.record_entry t (make_entry ());

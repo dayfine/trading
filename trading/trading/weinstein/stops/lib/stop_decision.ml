@@ -84,27 +84,28 @@ let _trailing_hold ~config ~side ~trend_extreme ~correction_extreme
   else if correction_count > 0 && not observed then Anchor_not_fresh
   else Cycle_stalled
 
+(* A trailing no-change step whose correction count did not advance: which
+   clause of the cycle test held the stop. *)
+let _trailing_unstalled_hold ~config ~side (step : step) ~trend_extreme
+    ~last_correction_extreme ~count_before ~observed =
+  let correction_extreme =
+    _advanced_correction_extreme ~side ~last_correction_extreme ~bar:step.bar
+  in
+  _trailing_hold ~config ~side ~trend_extreme ~correction_extreme
+    ~correction_count:count_before ~observed
+    ~close:step.bar.Types.Daily_price.close_price
+
 let _classify_trailing_no_change ~config ~side (step : step) =
   match (step.before, step.after) with
-  | ( Stop_types.Trailing
-        {
-          last_trend_extreme;
-          last_correction_extreme;
-          correction_count = count_before;
-          _;
-        },
-      Stop_types.Trailing
-        { correction_count = count_after; correction_observed_since_reset; _ }
-    ) ->
-      if count_after > count_before then Cycle_stalled
-      else
-        _trailing_hold ~config ~side ~trend_extreme:last_trend_extreme
-          ~correction_extreme:
-            (_advanced_correction_extreme ~side ~last_correction_extreme
-               ~bar:step.bar)
-          ~correction_count:count_before
-          ~observed:correction_observed_since_reset
-          ~close:step.bar.Types.Daily_price.close_price
+  | Stop_types.Trailing b, Stop_types.Trailing a
+    when a.correction_count > b.correction_count ->
+      Cycle_stalled
+  | Stop_types.Trailing b, Stop_types.Trailing a ->
+      _trailing_unstalled_hold ~config ~side step
+        ~trend_extreme:b.last_trend_extreme
+        ~last_correction_extreme:b.last_correction_extreme
+        ~count_before:b.correction_count
+        ~observed:a.correction_observed_since_reset
   | _ -> Other_hold
 
 let _classify_no_change ~config ~side (step : step) =
@@ -122,7 +123,6 @@ let classify ~config ~side (step : step) =
       | Stop_types.Tightened _ -> Tightened_ratchet
       | Stop_types.Initial _ | Stop_types.Trailing _ -> Raised)
   | Stop_types.No_change -> _classify_no_change ~config ~side step
-
 
 let _correction_count (step : step) =
   match (step.after, step.before) with
@@ -145,19 +145,17 @@ let _cycle_test_ran (step : step) =
 
 (* [(last_trend_extreme, last_correction_extreme)] — see the field docs in the
    .mli for which state each side is read from. *)
+let _read_correction_extreme ~side (step : step) ~last_correction_extreme =
+  if _cycle_test_ran step then
+    _advanced_correction_extreme ~side ~last_correction_extreme ~bar:step.bar
+  else last_correction_extreme
+
 let _extremes ~side (step : step) =
   match (step.before, step.after) with
-  | Stop_types.Trailing { last_trend_extreme; last_correction_extreme; _ }, _
-    ->
-      let correction_extreme =
-        if _cycle_test_ran step then
-          _advanced_correction_extreme ~side ~last_correction_extreme
-            ~bar:step.bar
-        else last_correction_extreme
-      in
-      (Some last_trend_extreme, Some correction_extreme)
-  | _, Stop_types.Trailing { last_trend_extreme; last_correction_extreme; _ }
-    ->
+  | Stop_types.Trailing { last_trend_extreme; last_correction_extreme; _ }, _ ->
+      ( Some last_trend_extreme,
+        Some (_read_correction_extreme ~side step ~last_correction_extreme) )
+  | _, Stop_types.Trailing { last_trend_extreme; last_correction_extreme; _ } ->
       (Some last_trend_extreme, Some last_correction_extreme)
   | _, Stop_types.Tightened { last_correction_extreme; _ } ->
       (None, Some last_correction_extreme)
