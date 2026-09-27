@@ -670,7 +670,7 @@ let test_trades_csv_populates_context_from_audit_and_stop_log _ =
     _m5_2e_entry ~symbol:"AAPL" ~entry_date ~position_id:"AAPL-wein-1"
   in
   let audit : Backtest.Trade_audit.audit_record list =
-    [ { entry; exit_ = None; external_exit = None; execution = None } ]
+    [ { entry; exit_ = None; external_exit = None; execution = None; stop_decisions = [] } ]
   in
   let stop_info : Backtest.Stop_log.stop_info =
     {
@@ -868,12 +868,14 @@ let test_retraded_symbol_keys_triggers_by_position_id _ =
             exit_ = None;
             external_exit = None;
             execution = None;
+            stop_decisions = [];
           };
           {
             entry = entry2;
             exit_ = None;
             external_exit = None;
             execution = None;
+            stop_decisions = [];
           };
         ];
       cascade_summaries = [];

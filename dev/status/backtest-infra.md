@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-09-24
+## Last updated: 2026-09-26
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,33 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-09-26 — weekly trailing-stop decisions in `trade_audit.sexp` (#2977)
+
+- [ ] **Per-position stop-decision record (observability only; awaiting the
+  first build + QC).** New `Weinstein_stops.Stop_decision`
+  (`trading/trading/weinstein/stops/lib/stop_decision.{ml,mli}`): a pure
+  classifier over the `(before, after, event, bar, ma)` of one
+  `Weinstein_stops.update` call — reasons `Raised`, `No_correction_yet`,
+  `Correction_not_recovered`, `Anchor_not_fresh`, `Cycle_stalled`,
+  `Seeded_trailing`, `Entered_tightening`, `Tightened_ratchet`,
+  `Tightened_hold`, `Stop_hit`, `Other_hold`, plus stop before/after, state,
+  `correction_count`, the trend/correction extremes the cycle test read, and
+  the MA. `Stops_runner.update ?on_stop_decision` emits one per held position
+  after the fold (via `Stop_decision_capture`), always for rare decisions and
+  once a week (Friday) for holds; `Audit_recorder.record_stop_decision` →
+  `Trade_audit.record_stop_decision` appends it to the position's
+  `audit_record.stop_decisions` (`[@sexp.list]`: absent when empty, old files
+  parse). Always-on; ~1 row per held position-week.
+  - Answers #2974 (faithful 8 % rule vs defect) without a replay.
+  - Tests: `weinstein/stops/test/test_stop_decision.ml` (raise after ≥8 %
+    correction + recovery, steady advance → `No_correction_yet`, stalled under
+    both anchor-reset settings, sexp round-trip);
+    `weinstein/strategy/test/test_stop_decision_capture.ml` (Friday sampling,
+    siblings, sink changes no transition/state); `backtest/test/test_trade_audit.ml`
+    (merge into entry row, no-entry drop, round-trip, empty omitted).
+  - Verify: `dune runtest trading/weinstein/stops trading/weinstein/strategy
+    trading/backtest`; goldens must stay bit-identical (pending dispatcher run).
 
 ## 2026-09-24 — weekly-start sweep: end-date guard + dropped cells in the report (#2915 parts 2-3)
 

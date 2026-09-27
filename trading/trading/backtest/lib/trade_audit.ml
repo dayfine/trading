@@ -124,6 +124,7 @@ type audit_record = {
   exit_ : exit_decision option;
   external_exit : external_exit_decision option; [@sexp.option]
   execution : execution_faithfulness option; [@sexp.option]
+  stop_decisions : Weinstein_stops.Stop_decision.t list; [@sexp.list]
 }
 [@@deriving sexp]
 
@@ -164,6 +165,7 @@ type _bucket = {
   mutable bucket_fill_volume : Ticket_lifecycle.fill_volume_check option;
   mutable bucket_cancel_age_weeks : int option;
   mutable bucket_cancel_reason : string option;
+  mutable bucket_stop_decisions : Weinstein_stops.Stop_decision.t list;
 }
 (** Internal mutable bucket: every [record_*] merge lands here and is folded
     into the emitted [audit_record] at drain time. *)
@@ -189,6 +191,7 @@ let _fresh_bucket (entry : entry_decision) =
     bucket_fill_volume = None;
     bucket_cancel_age_weeks = None;
     bucket_cancel_reason = None;
+    bucket_stop_decisions = [];
   }
 
 let record_entry t (entry : entry_decision) =
@@ -209,25 +212,24 @@ let record_exit t (exit_ : exit_decision) =
 let record_cascade_summary t (summary : cascade_summary) =
   Queue.enqueue t.cascade_summaries summary
 
-(* Build an [external_exit_decision] from a [TriggerExit] transition and the
-   bucket's already-recorded entry (for [symbol]). *)
-let _external_exit_of_transition (bucket : _bucket)
-    (trans : Trading_strategy.Position.transition) ~exit_reason :
-    external_exit_decision =
-  {
-    symbol = bucket.bucket_entry.symbol;
-    exit_date = trans.date;
-    position_id = trans.position_id;
-    exit_trigger = Stop_log.exit_trigger_of_reason exit_reason;
-  }
+let record_stop_decision t (d : Weinstein_stops.Stop_decision.t) =
+  _with_bucket t ~position_id:d.position_id ~f:(fun b ->
+      b.bucket_stop_decisions <- d :: b.bucket_stop_decisions)
 
-(* Fill in [bucket.bucket_external_exit] from [trans] iff no enriched exit_ is
-   already recorded — enriched always wins, see [record_transitions]'s doc. *)
+(* Fill in [bucket.bucket_external_exit] from a [TriggerExit] transition and the
+   bucket's recorded entry (for [symbol]) iff no enriched exit_ is already
+   recorded — enriched always wins, see [record_transitions]'s doc. *)
 let _fill_in_external_exit (bucket : _bucket)
     (trans : Trading_strategy.Position.transition) ~exit_reason =
   if Option.is_none bucket.bucket_exit then
     bucket.bucket_external_exit <-
-      Some (_external_exit_of_transition bucket trans ~exit_reason)
+      Some
+        {
+          symbol = bucket.bucket_entry.symbol;
+          exit_date = trans.date;
+          position_id = trans.position_id;
+          exit_trigger = Stop_log.exit_trigger_of_reason exit_reason;
+        }
 
 (* PR-5: a cancelled ticket's resting age, anchored on [placement_date], paired
    with the transition's reason token — see [Ticket_lifecycle.cancel_reason]. *)
@@ -265,21 +267,19 @@ let _bucket_to_record (bucket : _bucket) : audit_record =
     exit_ = bucket.bucket_exit;
     external_exit = bucket.bucket_external_exit;
     execution = None;
+    stop_decisions = List.rev bucket.bucket_stop_decisions;
   }
-
-let _compare_by_position_id (a : audit_record) (b : audit_record) =
-  String.compare a.entry.position_id b.entry.position_id
-
-let _compare_by_date (a : cascade_summary) (b : cascade_summary) =
-  Date.compare a.date b.date
 
 let get_audit_records t : audit_record list =
   Hashtbl.fold t.records ~init:[] ~f:(fun ~key:_ ~data:bucket acc ->
       _bucket_to_record bucket :: acc)
-  |> List.sort ~compare:_compare_by_position_id
+  |> List.sort ~compare:(fun (a : audit_record) b ->
+         String.compare a.entry.position_id b.entry.position_id)
 
 let get_cascade_summaries t : cascade_summary list =
-  Queue.to_list t.cascade_summaries |> List.sort ~compare:_compare_by_date
+  Queue.to_list t.cascade_summaries
+  |> List.sort ~compare:(fun (a : cascade_summary) b ->
+         Date.compare a.date b.date)
 
 let get_audit_blob t : audit_blob =
   {

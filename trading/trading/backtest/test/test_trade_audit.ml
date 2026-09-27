@@ -450,6 +450,7 @@ let test_audit_record_sexp_round_trip _ =
       exit_ = Some (make_exit ());
       external_exit = None;
       execution = None;
+      stop_decisions = [];
     }
   in
   let parsed = TA.audit_record_of_sexp (TA.sexp_of_audit_record record) in
@@ -463,6 +464,7 @@ let test_audit_records_sexp_round_trip_through_top_level_codec _ =
         exit_ = Some (make_exit ());
         external_exit = None;
         execution = None;
+        stop_decisions = [];
       };
       {
         entry =
@@ -471,6 +473,7 @@ let test_audit_records_sexp_round_trip_through_top_level_codec _ =
         exit_ = None;
         external_exit = None;
         execution = None;
+        stop_decisions = [];
       };
     ]
   in
@@ -927,6 +930,95 @@ let test_empty_collector_returns_empty_blob _ =
          field (fun (b : TA.audit_blob) -> b.cascade_summaries) is_empty;
        ])
 
+
+(* Stop decisions (issue #2977) ----------------------------------------- *)
+
+module SD = Weinstein_stops.Stop_decision
+
+let _stop_decision ?(position_id = "AAPL-wein-1") ~date ~reason () : SD.t =
+  {
+    SD.date = _date date;
+    position_id;
+    state_before = SD.Trailing;
+    state_after = SD.Trailing;
+    stop_before = 90.0;
+    stop_after = 90.0;
+    correction_count = 0;
+    last_trend_extreme = Some 110.0;
+    last_correction_extreme = Some 104.0;
+    ma_value = 100.0;
+    reason;
+  }
+
+(** Decisions land on their entry's row in recording (= date) order. *)
+let test_record_stop_decision_appends_to_the_entry_row _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_stop_decision t
+    (_stop_decision ~date:"2024-01-19" ~reason:SD.Seeded_trailing ());
+  TA.record_stop_decision t
+    (_stop_decision ~date:"2024-01-26" ~reason:SD.No_correction_yet ());
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         field
+           (fun (r : TA.audit_record) -> r.stop_decisions)
+           (elements_are
+              [
+                field (fun (d : SD.t) -> d.reason) (equal_to SD.Seeded_trailing);
+                field
+                  (fun (d : SD.t) -> d.reason)
+                  (equal_to SD.No_correction_yet);
+              ]);
+       ])
+
+(** No entry on record ⇒ the decision is dropped (the shared no-entry
+    contract). *)
+let test_record_stop_decision_without_entry_is_dropped _ =
+  let t = TA.create () in
+  TA.record_stop_decision t
+    (_stop_decision ~position_id:"GHOST-wein-9" ~date:"2024-01-19"
+       ~reason:SD.Raised ());
+  assert_that (TA.get_audit_records t) is_empty
+
+let test_audit_record_sexp_round_trips_stop_decisions _ =
+  let record : TA.audit_record =
+    {
+      entry = make_entry ();
+      exit_ = None;
+      external_exit = None;
+      execution = None;
+      stop_decisions =
+        [
+          _stop_decision ~date:"2024-01-19" ~reason:SD.Correction_not_recovered
+            ();
+          _stop_decision ~date:"2024-01-26" ~reason:SD.Raised ();
+        ];
+    }
+  in
+  assert_that
+    (TA.audit_record_of_sexp (TA.sexp_of_audit_record record))
+    (equal_to record)
+
+(** [@sexp.list]: an empty list is omitted, so a record with no decisions
+    serialises exactly as a pre-#2977 record did — and that pre-#2977 shape
+    parses back with [stop_decisions = []]. *)
+let test_audit_record_sexp_omits_empty_stop_decisions _ =
+  let record : TA.audit_record =
+    {
+      entry = make_entry ();
+      exit_ = None;
+      external_exit = None;
+      execution = None;
+      stop_decisions = [];
+    }
+  in
+  let sexp = TA.sexp_of_audit_record record in
+  assert_that
+    ( String.is_substring (Sexp.to_string sexp) ~substring:"stop_decisions",
+      (TA.audit_record_of_sexp sexp).stop_decisions )
+    (pair (equal_to false) is_empty)
+
 let suite =
   "Trade_audit"
   >::: [
@@ -952,6 +1044,14 @@ let suite =
          >:: test_record_fill_volume_merges_into_the_entry_row;
          "record_fill_volume without an entry is dropped"
          >:: test_record_fill_volume_without_entry_is_dropped;
+         "record_stop_decision appends to the entry row"
+         >:: test_record_stop_decision_appends_to_the_entry_row;
+         "record_stop_decision without an entry is dropped"
+         >:: test_record_stop_decision_without_entry_is_dropped;
+         "audit_record sexp round-trips stop_decisions"
+         >:: test_audit_record_sexp_round_trips_stop_decisions;
+         "audit_record sexp omits empty stop_decisions"
+         >:: test_audit_record_sexp_omits_empty_stop_decisions;
          "CancelEntry records the resting age in weeks"
          >:: test_cancel_entry_records_the_resting_age_in_weeks;
          "cancel_reason distinguishes a portfolio rejection from a TTL cancel"

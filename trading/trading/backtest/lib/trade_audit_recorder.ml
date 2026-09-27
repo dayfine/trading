@@ -264,4 +264,5 @@ let of_collector ?candidate_log ~(trade_audit : Trade_audit.t)
         Trade_audit.record_fill_volume trade_audit
           ~position_id:event.position_id
           (_fill_volume_check_of_event event));
+    record_stop_decision = Trade_audit.record_stop_decision trade_audit;
   }

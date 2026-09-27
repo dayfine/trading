@@ -9,6 +9,7 @@ module Stop_widen = Stop_widen
 module Vol_scaled_stop = Vol_scaled_stop
 module Catastrophic_stop = Catastrophic_stop
 module Extension_stop = Extension_stop
+module Stop_decision = Stop_decision
 
 (* ---- Stop level extraction ---- *)
 
