@@ -1,0 +1,25 @@
+(tests
+ (names
+  test_split_corpus
+  test_split_corpus_stage_stops
+  test_split_corpus_entry_audit)
+ (libraries
+  core
+  types
+  trading.base
+  trading.strategy
+  indicators.time_period
+  weinstein.types
+  weinstein.stage
+  weinstein.stock_analysis
+  weinstein.screener
+  weinstein.macro
+  weinstein_trading.stops
+  weinstein_trading.portfolio_risk
+  weinstein_trading.strategy
+  weinstein_trading.split_corpus
+  ounit2
+  matchers)
+ (deps
+  (glob_files_rec %{workspace_root}/test_data/split_corpus/*.csv)
+  (glob_files_rec %{workspace_root}/test_data/split_corpus/*.sexp)))

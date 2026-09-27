@@ -42,6 +42,7 @@ type entry_event = {
   macro : Macro.result;
   current_date : Date.t;
   close_at_decision : float option;
+  adjusted_close_at_decision : float option;
   installed_stop : float;
   stop_floor_kind : stop_floor_kind;
   split_safe_basis : split_safe_basis;
@@ -102,6 +103,7 @@ type t = {
   record_force_liquidation : force_liquidation_event -> unit;
   record_fill_volume : fill_volume_event -> unit;
   record_stop_move : stop_move_event -> unit;
+  record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
   capture_candidates : bool;
 }
 
@@ -113,5 +115,6 @@ let noop : t =
     record_force_liquidation = (fun _ -> ());
     record_fill_volume = (fun _ -> ());
     record_stop_move = (fun _ -> ());
+    record_stop_decision = (fun _ -> ());
     capture_candidates = false;
   }

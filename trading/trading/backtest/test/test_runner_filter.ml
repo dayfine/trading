@@ -585,6 +585,7 @@ let _entry ~entry_date ~position_id ~symbol :
     side = Long;
     suggested_entry = 100.0;
     close_at_decision = None;
+    adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
     suggested_stop = 95.0;
@@ -605,6 +606,7 @@ let _audit_record ~entry_date ~position_id ~symbol :
     exit_ = None;
     external_exit = None;
     execution = None;
+    stop_decisions = [];
   }
 
 let test_filter_audit_records_drops_warmup _ =

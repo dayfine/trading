@@ -141,6 +141,13 @@ type entry_event = {
           E-provenance telemetry (entry-ticket right-basis plan, 2026-08-08):
           lets the audit compare [candidate.suggested_entry] against the
           decision-time close without re-reading raw bars. *)
+  adjusted_close_at_decision : float option;
+      (** The same bar's [adjusted_close] — the basis the stage classifier's MA
+          ([candidate.analysis.stage.ma_value]) is computed on. Pair it, not the
+          RAW [close_at_decision], with the MA: across a later split the raw
+          close sits a whole split factor away from the MA (issue #2973, NVDA
+          2021-04-23: raw 610.61, adjusted 15.21, MA 13.67). Audit-only; [None]
+          exactly when [close_at_decision] is [None]. *)
   installed_stop : float;
       (** Output of
           [Weinstein_stops.compute_initial_stop_with_floor_with_callbacks]'s
@@ -339,6 +346,12 @@ type t = {
       (** Invoked once per held position per bar on which the stops pass moved
           its stop without emitting a transition for it (see
           {!stop_move_event}). *)
+  record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
+      (** Invoked by {!Stops_runner.update} for each held position whose stop
+          state machine advanced on the tick (issue #2977): every advance, one
+          per position per tick (rows are thinned by the sink, not here).
+          Observability only — the record is built from the advance the runner
+          already made, so any sink leaves every decision unchanged. *)
   capture_candidates : bool;
       (** Whether the strategy should populate {!cascade_event.candidates}.
           [false] in {!noop}, and therefore in live mode and every test that

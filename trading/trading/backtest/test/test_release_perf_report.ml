@@ -495,6 +495,7 @@ let _make_audit_record ~symbol ~entry_date
       side;
       suggested_entry = 100.0;
       close_at_decision = None;
+      adjusted_close_at_decision = None;
       ma_value = None;
       local_range_top = None;
       suggested_stop = 90.0;
@@ -526,7 +527,13 @@ let _make_audit_record ~symbol ~entry_date
       weeks_stage_left_2 = 1;
     }
   in
-  { entry; exit_ = Some exit_; external_exit = None; execution = None }
+  {
+    entry;
+    exit_ = Some exit_;
+    external_exit = None;
+    execution = None;
+    stop_decisions = [];
+  }
 
 let _make_trade ~symbol ~entry_date ?(side = Trading_base.Types.Buy)
     ?(days_held = 100) ?(entry_price = 100.0) ?(exit_price = 110.0)

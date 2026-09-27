@@ -162,6 +162,7 @@ let _entry_decision_of_event (e : AR.entry_event) : Trade_audit.entry_decision =
     side = cand.side;
     suggested_entry = cand.suggested_entry;
     close_at_decision = e.close_at_decision;
+    adjusted_close_at_decision = e.adjusted_close_at_decision;
     ma_value = Some analysis.stage.ma_value;
     local_range_top = analysis.local_range_top;
     suggested_stop = cand.suggested_stop;
@@ -282,4 +283,5 @@ let of_collector ?candidate_log ?stop_log ~(trade_audit : Trade_audit.t)
           ~position_id:event.position_id
           (_fill_volume_check_of_event event));
     record_stop_move = _record_stop_move ~stop_log;
+    record_stop_decision = Trade_audit.record_stop_decision trade_audit;
   }

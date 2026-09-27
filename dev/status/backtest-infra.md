@@ -39,6 +39,37 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   `test_trade_audit_recorder`) and `dune runtest trading/weinstein/strategy/test`
   (`test_stop_move_capture`).
 
+## 2026-09-26 — weekly trailing-stop decisions in `trade_audit.sexp` (#2977)
+
+- [ ] **Per-position stop-decision record (observability only; awaiting the
+  first build + QC).** New `Weinstein_stops.Stop_decision`
+  (`trading/trading/weinstein/stops/lib/stop_decision.{ml,mli}`): a pure
+  classifier over the `(before, after, event, bar, ma)` of one
+  `Weinstein_stops.update` call — reasons `Raised`, `No_correction_yet`,
+  `Correction_not_recovered`, `Anchor_not_fresh`, `Cycle_stalled`,
+  `Seeded_trailing`, `Entered_tightening`, `Tightened_ratchet`,
+  `Tightened_hold`, `Stop_hit`, `Other_hold`, plus stop before/after, state,
+  `correction_count`, the trend/correction extremes the cycle test read, and
+  the MA, the cycle `candidate` and `correction_count_before` (0 = seed-anchored
+  cycle). `Stops_runner.update ?on_stop_decision` emits one per held position
+  per advance, after the fold (via `Stop_decision_capture`); `Audit_recorder.record_stop_decision` →
+  `Trade_audit.record_stop_decision` appends it to the position's
+  `audit_record.stop_decisions` (`[@sexp.list]`: absent when empty, old files
+  parse), collapsing each run of same-ISO-week holds to its latest row
+  (`Stop_decision.push`, no look-ahead, holiday Fridays covered). Always-on;
+  ~1 hold row per held position-week plus the rare decisions.
+  - Answers #2974 (faithful 8 % rule vs defect) without a replay.
+  - Tests: `weinstein/stops/test/test_stop_decision.ml` (seed-anchored first
+    raise + pullback-driven second raise, steady advance → `No_correction_yet`,
+    `Anchor_not_fresh`, stalled under both anchor-reset settings, `Stop_hit`,
+    tighten → ratchet → hold, short side, `is_hold`, sexp round-trip);
+    `weinstein/strategy/test/test_stop_decision_capture.ml` (every advance,
+    siblings, sink changes no transition/state on holds and on a raise);
+    `backtest/test/test_trade_audit.ml` (merge into entry row, no-entry drop,
+    holiday-week collapse, round-trip, empty omitted).
+  - Verify: `dune runtest trading/weinstein/stops trading/weinstein/strategy
+    trading/backtest`; goldens must stay bit-identical (pending dispatcher run).
+
 ## 2026-09-24 — weekly-start sweep: end-date guard + dropped cells in the report (#2915 parts 2-3)
 
 - [x] **`sweep_weekly_start` no longer annualizes over dead days past the last

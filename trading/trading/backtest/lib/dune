@@ -20,6 +20,7 @@
   warmup_trade_gate
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime
+  weinstein_trading.stops
   weinstein_trading.strategy
   weinstein_trading.portfolio_risk
   weinstein.macro

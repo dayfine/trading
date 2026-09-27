@@ -22,6 +22,9 @@ val of_collector :
     - [record_force_liquidation] callback appends the event to
       [force_liquidation_log] verbatim — the event already carries every
       audit-relevant field.
+    - [record_stop_decision] callback appends each stop decision to its
+      position's row via {!Trade_audit.record_stop_decision} (issue #2977) — the
+      decision record is already the on-disk shape, so no translation.
 
     [?candidate_log] (issue #2490) is the opt-in per-week candidate sink. When
     [Some c], the returned bundle carries [capture_candidates = true], so the
