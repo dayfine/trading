@@ -37,9 +37,12 @@ val portfolio_rejection_reason : string
     [entry_ticket_requalification_failed] — strategy {e decisions}, where this
     token is an {e accident of capital timing} — and
     {!Delisted_ticket_cancel.cancel_reason} ([delisted], #2696), a
-    {e data-driven death} once the symbol's series has ended. Four tokens, three
-    categories; a consumer splitting on the token must bucket all three
-    separately. The closed list is pinned by
+    {e data-driven death} once the symbol's series has ended. A fifth,
+    {!Weinstein_strategy.Entry_ticket_suspend.cancel_reason}
+    ([entry_ticket_macro_suspended], #2976, default-off), is a {e withdrawal},
+    not a death: the same setup is re-issued once the macro gate admits. Five
+    tokens, four categories; a consumer splitting on the token must bucket all
+    four separately. The closed list is pinned by
     [trading/trading/backtest/test/test_cancel_reason_closed_list.ml]. *)
 
 val transitions_for_rejected_trades :

@@ -298,24 +298,11 @@ let _still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker ~symbol
       && _macro_admits_side ~config ~macro_result ~side
       && _survives_sector_filter ~sector_map (symbol, (), stage_result)
 
-(** F2: cancel the resting entry tickets that this week's re-screen (or the
-    clock backstop) retires, releasing each cancelled symbol's frozen [E].
-
-    Runs {b before} the entry walk so the pin release lands ahead of
-    {!Entry_freeze.apply}. The cancelled symbol is not re-placed on this same
-    tick — its [Entering] position is still held until the transition is
-    applied, so the cascade still excludes it — which is the intent: cancel now,
-    re-qualify (at a fresh [E]) on a later week. No-op only when BOTH halves are
-    off ([enable_entry_ticket_rescreen = false] AND
-    [entry_order_max_rest_weeks <= 0]), where the guard below returns before the
-    predicate is even built. Since the 2026-08-27 promotion the clock defaults
-    to [52], so the default path DOES build the predicate — the 2026-08-18
-    26-flip (reverted next day) predates the ledger ACCEPT that 52 carries; see
-    [Weinstein_strategy_config.entry_order_max_rest_weeks].
-
-    The two halves are independently armed (defect C, 2026-08-16): the
-    book-supported re-screen no longer requires opting into the invented clock.
-    Neither armed ⇒ the predicate below is never even built. *)
+(** F2: cancel the resting tickets this week's re-screen (or the clock) retires,
+    releasing each one's frozen [E] ahead of {!Entry_freeze.apply}; the symbol
+    is still held this tick and re-qualifies at a fresh [E] later. The halves
+    are armed independently (defect C); neither armed ⇒ the predicate is never
+    built. The clock defaults to [52] (2026-08-27 promotion). *)
 let _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
     ~(portfolio : Portfolio_view.t) ~classified ~current_date () =
   if
@@ -335,6 +322,17 @@ let _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
       ~still_qualifies:
         (_still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker)
       ~current_date
+
+(** F2 cancels, then the #2976 suspension / re-issue over what they leave
+    ({!Entry_ticket_suspend.run}); [Off] is exactly the F2 cancels. *)
+let _resting_tickets ?pending_entry_e ?suspended_tickets ~config ~macro_result
+    ~sector_map ~stop_states ~portfolio ~classified ~current_date () =
+  let cancel_expired portfolio =
+    _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
+      ~portfolio ~classified ~current_date ()
+  in
+  Entry_ticket_suspend.run ?store:suspended_tickets ?pending_entry_e ~config
+    ~macro_result ~stop_states ~portfolio ~current_date ~cancel_expired ()
 
 (* Per-element predicates over the four-tuple shape so [screen_universe]'s
    cascade stays a flat pipeline (one filter per gate, no destructuring
@@ -377,7 +375,7 @@ let _decline_is_slow_grind ~config ~macro_result ~index_view =
     {!screen_universe} to keep that function under the 50-line linter cap. *)
 let _run_screener ?membership_at ?on_candidates ~config
     ~(macro_result : Macro.result) ~index_view ~sector_map ~stocks ~portfolio
-    ~last_stop_out_dates ~current_date () =
+    ~last_stop_out_dates ~current_date ~suspended_held () =
   let screening_config =
     {
       config.screening_config with
@@ -398,7 +396,7 @@ let _run_screener ?membership_at ?on_candidates ~config
     ~macro_trend:macro_result.Macro.trend
     ~breadth_state:macro_result.Macro.breadth_state
     ~index_stage:macro_result.Macro.index_stage.Stage.stage ~sector_map ~stocks
-    ~held_tickers:(Entry_walk.held_symbols portfolio)
+    ~held_tickers:(Entry_walk.held_symbols portfolio @ suspended_held)
     ~as_of:current_date
     ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
     ()
@@ -438,8 +436,8 @@ let _entries_of_screen_result ?pending_entry_e ?on_candidates_considered ~config
     ~get_price ~current_date ~audit_recorder ~macro:macro_result ()
 
 let screen_universe ?active_through_for ?fold_start_date ?membership_at
-    ?pending_entry_e ~config ~index_view ~(macro_result : Macro.result)
-    ~sector_map ~stop_states ~last_stop_out_dates
+    ?pending_entry_e ?suspended_tickets ~config ~index_view
+    ~(macro_result : Macro.result) ~sector_map ~stop_states ~last_stop_out_dates
     ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
     ~current_date ~audit_recorder () =
   let classified =
@@ -459,19 +457,18 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
     |> List.map ~f:analyze
   in
   _commit_prior_stages ~prior_stages classified;
+  (* F2 + #2976 before the screen: suspended symbols count as held. *)
+  let ticket_transitions, suspended_held =
+    _resting_tickets ?pending_entry_e ?suspended_tickets ~config ~macro_result
+      ~sector_map ~stop_states ~portfolio ~classified ~current_date ()
+  in
   (* G1 + G2 (#2490): inert unless the recorder opted into capture. *)
   let trace = Cascade_trace.create audit_recorder in
   let screen_result =
     _run_screener ?membership_at
       ?on_candidates:(Cascade_trace.on_candidates trace)
       ~config ~macro_result ~index_view ~sector_map ~stocks ~portfolio
-      ~last_stop_out_dates ~current_date ()
-  in
-  (* F2: retire stale resting tickets before the walk, so the pin release lands
-     ahead of [Entry_freeze.apply]. [[]] at the default TTL of 0. *)
-  let ticket_cancellations =
-    _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
-      ~portfolio ~classified ~current_date ()
+      ~last_stop_out_dates ~current_date ~suspended_held ()
   in
   let entries =
     _entries_of_screen_result ?pending_entry_e
@@ -485,7 +482,7 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
   Cascade_trace.record trace ~audit_recorder ~date:current_date
     ~config:config.screening_config ~macro:macro_result ~result:screen_result
     ~entered:(List.length entries);
-  ticket_cancellations @ entries
+  ticket_transitions @ entries
 
 (** Stops are adjusted daily; screening runs only on Fridays (weekly review).
 

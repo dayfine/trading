@@ -544,7 +544,11 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     {!Trading_simulation.Delisted_ticket_cancel.cancel_reason} ([delisted],
     #2696), is a {e data-driven death}: the symbol's series ended, so the ticket
     could never have filled against a real bar — neither a policy nor a funding
-    failure, and it needs its own bucket.
+    failure, and it needs its own bucket. The fifth,
+    [entry_ticket_macro_suspended]
+    ({!Weinstein_strategy.Entry_ticket_suspend.cancel_reason}, #2976,
+    default-off), is a {e withdrawal}, not a death: the setup is re-issued under
+    a new position id once the macro gate admits (#2989).
 
     Neither of the non-strategy populations is a corner case: the rejection
     token was ~26% of placements on the run that motivated recording the reason

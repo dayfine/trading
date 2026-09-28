@@ -29,6 +29,7 @@ val run_macro_only :
 
 val run_screen_after_macro :
   pending_entry_e:Entry_freeze.t ->
+  suspended_tickets:Entry_ticket_suspend.t ->
   fold_start_date:Date.t option ->
   universe_membership_at:(string -> Date.t -> bool) option ->
   config:Weinstein_strategy_config.config ->
@@ -59,6 +60,11 @@ val run_screen_after_macro :
     snapshot-backed [Bar_reader] callbacks. Point-in-time, NOT survivor bias.
     See [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4.
 
+    [~suspended_tickets] is the per-run {!Entry_ticket_suspend} store (#2976),
+    held in the {!Weinstein_strategy.make} closure beside [~pending_entry_e]. It
+    is never read or written while [config.entry_ticket_macro_suspend = Off], so
+    a fresh store is always a safe argument.
+
     [~universe_membership_at] is the run's dated point-in-time universe
     schedule, [None] on every unscheduled run. When [Some f], the screener
     cascade rejects any candidate for which [f symbol current_date] is [false],
@@ -68,6 +74,7 @@ val run_screen_after_macro :
 
 val entry_transitions_if_active :
   pending_entry_e:Entry_freeze.t ->
+  suspended_tickets:Entry_ticket_suspend.t ->
   fold_start_date:Date.t option ->
   universe_membership_at:(string -> Date.t -> bool) option ->
   halted:bool ->

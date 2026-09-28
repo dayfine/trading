@@ -5,9 +5,8 @@ open Core
 let macro_bearish_no_op_cap = 0.70
 
 (* No-op default for [fast_v_min_rate_pct]: equals [Decline_character]'s own
-   [default_config.fast_v_min_rate_pct], so threading this value into the
-   classifier config reproduces [default_config] exactly (bit-identical
-   classification) until a spec sets a different fast-V arming rate threshold. *)
+   [default_config.fast_v_min_rate_pct], so classification is bit-identical
+   until a spec sets a different fast-V arming rate threshold. *)
 let fast_v_min_rate_no_op = 0.08
 
 (* Default bar-gap (calendar days) after which [stale_exit_after_days] force-
@@ -33,9 +32,8 @@ let default_dawn_max_flip_age_weeks = 78
 
 (* Default do-not-chase cap (percentage points) for [entry_extension_max_pct]:
    2.0, the value live arms in [dev/weekly-picks/live-config-overrides.sexp]
-   (user decision 2026-08-25, issue #2404) and the corpus value the staged
-   record-convention specs already use. Named so the sexp default and the
-   [default_config] literal share one source of truth. *)
+   (user decision 2026-08-25, issue #2404) and the staged record-convention
+   specs' corpus value; one source for the sexp default and [default_config]. *)
 let default_entry_extension_max_pct = 2.0
 
 type index_config = { primary : string; global : (string * string) list }
@@ -168,19 +166,20 @@ type config = {
   enable_rs_positive_declining : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_max_bar_age_days : int; [@sexp.default 0]  (** See [.mli]. *)
   stale_exit_without_prior_bar : bool; [@sexp.default false]  (** See [.mli]. *)
+  entry_ticket_macro_suspend : Entry_ticket_suspend_mode.t;
+      [@sexp.default Entry_ticket_suspend_mode.Off]
+      (** See [.mli]. *)
 }
 [@@deriving sexp]
 
-(* Kept top-level so [default_config] stays a flat record literal (the
-   nesting linter caps the file average). *)
+(* Top-level so [default_config] stays a flat literal (nesting linter). *)
 let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
 (* Screening config for the promoted bundle (2026-07-23): the standard screener
    defaults with the continuous overhead-supply ranking weight armed. Pairs with
    [overhead_supply = Some Resistance_supply.default_config] in [default_config]
    — both must be armed for the continuous score to replace the binary grade
-   points (either absent falls back to the bit-identical binary path). Kept
-   top-level so [default_config] stays a flat one-line-per-field literal. *)
+   points (either absent falls back to the bit-identical binary path). *)
 let _default_screening_config =
   {
     Screener.default_config with
@@ -288,6 +287,7 @@ let default_config ~universe ~index_symbol =
     enable_rs_positive_declining = false;
     entry_max_bar_age_days = 0;
     stale_exit_without_prior_bar = false;
+    entry_ticket_macro_suspend = Entry_ticket_suspend_mode.Off;
   }
 
 (* F5 arming predicate — the single source of truth for both halves of the

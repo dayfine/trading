@@ -77,13 +77,15 @@ val cancel_reason : string
        category.} The other three are {!Weinstein_strategy.Entry_ticket_ttl}'s
     [entry_ticket_ttl_expired] / [entry_ticket_requalification_failed] —
     strategy {e decisions} — and {!Cancel_handler.portfolio_rejection_reason}
-    ([entry_fill_rejected_by_portfolio]) — an {e accident of capital timing}.
-    This one is neither: it is a {e data-driven death}, the symbol's series
-    having ended, which no policy choice and no cash collision could have
-    avoided. Any consumer that splits on [cancel_reason] — the split the
-    {!Backtest.Ticket_lifecycle.cancel_reason} docstring calls "load-bearing,
-    not cosmetic" — must give it its own bucket rather than folding it into
-    either of the other two. Pinned by
+    ([entry_fill_rejected_by_portfolio]) — an {e accident of capital timing}. A
+    fifth token, [entry_ticket_macro_suspended]
+    ({!Weinstein_strategy.Entry_ticket_suspend.cancel_reason}, #2976), is a
+    {e withdrawal} (a fourth category), not a death. This one is neither: it is
+    a {e data-driven death}, the symbol's series having ended, which no policy
+    choice and no cash collision could have avoided. Any consumer that splits on
+    [cancel_reason] — the split the {!Backtest.Ticket_lifecycle.cancel_reason}
+    docstring calls "load-bearing, not cosmetic" — must give it its own bucket
+    rather than folding it into either of the other two. Pinned by
     [trading/trading/backtest/test/test_cancel_reason_closed_list.ml]. *)
 
 val tick :
