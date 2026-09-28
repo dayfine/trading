@@ -426,9 +426,73 @@ let test_stop_log_receives_installed_stop_and_moves _ =
            ];
        ])
 
+(** Issue #2989 sink hop: a [record_reissue] event copies the original
+    placement's row forward under the re-issued id (linked back via
+    [reissued_from]) and books its installed stop on the stop log under the
+    re-issued id, so [trades.csv] and [trade_audit.sexp] both carry the
+    re-issued trade. The original's row and stop-log entry are untouched.
+
+    MUTATION: wiring [record_reissue] to [(fun _ -> ())] in [of_collector] drops
+    the second row and the second stop-log entry. *)
+let test_reissue_event_copies_the_row_and_books_its_stop _ =
+  let trade_audit = TA.create () in
+  let stop_log = Backtest.Stop_log.create () in
+  let recorder =
+    Backtest.Trade_audit_recorder.of_collector ~stop_log ~trade_audit
+      ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+      ()
+  in
+  let reissue_date = _date "2024-06-28" in
+  recorder.record_entry
+    (_entry_event ~split_safe_basis:AR.Flag_off
+       ~stop_floor_kind:AR.Support_floor ());
+  recorder.record_reissue
+    {
+      reissued_position_id = "ZZZZ-wein-9";
+      original_position_id = "ZZZZ-wein-1";
+      reissue_date;
+    };
+  assert_that
+    (TA.get_audit_records trade_audit, Backtest.Stop_log.get_stop_infos stop_log)
+    (pair
+       (elements_are
+          [
+            field
+              (fun (r : TA.audit_record) ->
+                ( r.entry.position_id,
+                  Option.bind r.entry.ticket_lifecycle ~f:(fun l ->
+                      l.reissued_from) ))
+              (equal_to ("ZZZZ-wein-1", None));
+            field
+              (fun (r : TA.audit_record) ->
+                ( r.entry.position_id,
+                  r.entry.installed_stop,
+                  Option.bind r.entry.ticket_lifecycle ~f:(fun l ->
+                      l.reissued_from) ))
+              (equal_to
+                 ( "ZZZZ-wein-9",
+                   92.0,
+                   Some
+                     ({ original_position_id = "ZZZZ-wein-1"; reissue_date }
+                       : TL.reissue) ));
+          ])
+       (elements_are
+          [
+            field
+              (fun (i : Backtest.Stop_log.stop_info) ->
+                (i.position_id, i.entry_stop))
+              (equal_to ("ZZZZ-wein-1", Some 92.0));
+            field
+              (fun (i : Backtest.Stop_log.stop_info) ->
+                (i.position_id, i.entry_stop))
+              (equal_to ("ZZZZ-wein-9", Some 92.0));
+          ]))
+
 let suite =
   "Trade_audit_recorder"
   >::: [
+         "reissue event copies the row and books its stop"
+         >:: test_reissue_event_copies_the_row_and_books_its_stop;
          "entry projection carries the placement-time lifecycle"
          >:: test_entry_projection_carries_placement_time_lifecycle;
          "entry projection defaults to Ma_cross and untagged"

@@ -96,6 +96,12 @@ type cascade_event = {
 
 type force_liquidation_event = Portfolio_risk.Force_liquidation.event
 
+type reissue_event = {
+  reissued_position_id : string;
+  original_position_id : string;
+  reissue_date : Date.t;
+}
+
 type t = {
   record_entry : entry_event -> unit;
   record_exit : exit_event -> unit;
@@ -103,6 +109,7 @@ type t = {
   record_force_liquidation : force_liquidation_event -> unit;
   record_fill_volume : fill_volume_event -> unit;
   record_stop_move : stop_move_event -> unit;
+  record_reissue : reissue_event -> unit;
   record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
   capture_candidates : bool;
 }
@@ -116,5 +123,6 @@ let noop : t =
     record_fill_volume = (fun _ -> ());
     record_stop_move = (fun _ -> ());
     record_stop_decision = (fun _ -> ());
+    record_reissue = (fun _ -> ());
     capture_candidates = false;
   }

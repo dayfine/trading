@@ -30,6 +30,9 @@ type triple_confirmation = {
 
 type entry_freshness_basis = Ma_cross | Range_top_breakout [@@deriving sexp]
 
+type reissue = { original_position_id : string; reissue_date : Date.t }
+[@@deriving sexp]
+
 type t = {
   placement_date : Date.t;
   ticket_age_weeks_at_cancel : int option; [@sexp.option]
@@ -39,6 +42,7 @@ type t = {
   freshness_basis : entry_freshness_basis;
   sized_down_wide_stop : bool;
   triple_confirmation : triple_confirmation;
+  reissued_from : reissue option; [@sexp.option]
 }
 [@@deriving sexp]
 
@@ -76,3 +80,7 @@ let _stamp_fill_age ~resolved l =
 
 let with_fill_age lifecycle ~resolved =
   Option.map lifecycle ~f:(_stamp_fill_age ~resolved)
+
+(* Extracted for the nesting linter, like [_stamp_fill_age]. *)
+let _stamp_reissue link l = { l with reissued_from = Some link }
+let with_reissue lifecycle link = Option.map lifecycle ~f:(_stamp_reissue link)

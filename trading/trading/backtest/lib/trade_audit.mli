@@ -483,6 +483,27 @@ val record_entry : t -> entry_decision -> unit
 (** Record an entry decision. Keyed by [decision.position_id]; recording the
     same id twice overwrites the prior entry. *)
 
+val record_reissue :
+  t ->
+  position_id:string ->
+  original_position_id:string ->
+  reissue_date:Date.t ->
+  entry_decision option
+(** #2989: record the entry row of a ticket re-issued under the fresh
+    [position_id] after a macro suspension
+    ({!Weinstein_strategy.Entry_ticket_suspend}). The row is the
+    {b placement-time} entry of [original_position_id] — its alternatives,
+    installed stop, floor kind and placement date — under the new id, with
+    [ticket_lifecycle.reissued_from = Some { original_position_id; reissue_date
+     }]. Only the placement-time entry is copied: the original's cancel (its
+    [entry_ticket_macro_suspended] withdrawal), fill check, exit and stop
+    decisions stay on the original row, and the new row resolves on its own. The
+    original row is untouched.
+
+    Returns the recorded row, or [None] (recording nothing) when no entry is on
+    file for [original_position_id] — the no-entry contract of {!record_exit}.
+*)
+
 val record_exit : t -> exit_decision -> unit
 (** Record an exit decision. Looks up the matching [entry] by
     [decision.position_id]; if no entry was previously recorded for that id the
@@ -548,7 +569,9 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     [entry_ticket_macro_suspended]
     ({!Weinstein_strategy.Entry_ticket_suspend.cancel_reason}, #2976,
     default-off), is a {e withdrawal}, not a death: the setup is re-issued under
-    a new position id once the macro gate admits (#2989).
+    a new position id once the macro gate admits, and that id's row
+    ({!record_reissue}) links back to this one through
+    [ticket_lifecycle.reissued_from] (#2989).
 
     Neither of the non-strategy populations is a corner case: the rejection
     token was ~26% of placements on the run that motivated recording the reason

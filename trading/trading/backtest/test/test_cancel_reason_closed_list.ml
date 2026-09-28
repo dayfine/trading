@@ -157,6 +157,7 @@ let _lifecycle : TL.t =
     fill_volume = None;
     freshness_basis = TL.Range_top_breakout;
     sized_down_wide_stop = false;
+    reissued_from = None;
     triple_confirmation = _triple;
   }
 
