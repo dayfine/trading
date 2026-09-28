@@ -757,8 +757,15 @@ let test_record_reissue_links_the_filled_copy_to_its_placement _ =
                   ({
                      original with
                      position_id = _reissued_id;
+                     (* Spelled out literally, not via [TL.with_reissue]:
+                        the copy keeps the original [placement_date] (so its
+                        fill age counts the suspended weeks) and every other
+                        placement-time lifecycle field. *)
                      ticket_lifecycle =
-                       TL.with_reissue original.ticket_lifecycle _reissue_link;
+                       Some
+                         (_lifecycle ~placement_date:_placed
+                            ~ticket_age_weeks_at_cancel:None ~cancel_reason:None
+                            ~reissued_from:(Some _reissue_link) ());
                    }
                     : TA.entry_decision));
              field

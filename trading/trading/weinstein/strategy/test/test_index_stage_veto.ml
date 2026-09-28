@@ -473,7 +473,8 @@ let test_a_fresh_candidate_survives_a_stage3_index_when_the_flag_is_on _ =
     [entry_ticket_macro_suspend = On_index_stage4] (the F2 halves off, so every
     withdrawal and re-issue is the suspension's), sharing [suspended_tickets]
     across calls. Returns the screen's transitions. *)
-let _suspend_screen ~suspended_tickets ~positions index_stage =
+let _suspend_screen ?(audit_recorder = Audit_recorder.noop) ~suspended_tickets
+    ~positions index_stage =
   WSM.run_screen_after_macro ~pending_entry_e:(Entry_freeze.create ())
     ~suspended_tickets ~fold_start_date:None ~universe_membership_at:None
     ~config:
@@ -492,8 +493,8 @@ let _suspend_screen ~suspended_tickets ~positions index_stage =
     ~ticker_sectors:(Hashtbl.create (module String))
     ~get_price:_fresh_get_price
     ~portfolio:{ cash = 100_000.0; positions = _positions positions }
-    ~current_date:_friday ~index_view:_fresh_index_view
-    ~audit_recorder:Audit_recorder.noop ~macro_result:(_macro_with ~index_stage)
+    ~current_date:_friday ~index_view:_fresh_index_view ~audit_recorder
+    ~macro_result:(_macro_with ~index_stage)
 
 let _cancel_reasons transitions =
   List.filter_map transitions ~f:(fun (t : Position.transition) ->
@@ -505,6 +506,13 @@ let _created_symbols transitions =
   List.filter_map transitions ~f:(fun (t : Position.transition) ->
       match t.kind with
       | Position.CreateEntering { symbol; _ } -> Some symbol
+      | _ -> None)
+
+(** The ids of the screen's [CreateEntering] transitions. *)
+let _created_ids transitions =
+  List.filter_map transitions ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.CreateEntering _ -> Some t.position_id
       | _ -> None)
 
 (** The re-admit week at the screen. Week 1 (Stage-4 index): the ticket resting
@@ -536,6 +544,57 @@ let test_a_suspended_ticket_is_reissued_once_not_rewritten_by_the_cascade _ =
        (elements_are [ equal_to ("F1", Entry_ticket_suspend.cancel_reason) ])
        (elements_are [ equal_to _fresh_symbol ]))
 
+(** Issue #2989 at the screen: the recorder the strategy hands
+    [run_screen_after_macro] reaches [Entry_ticket_suspend.run]. Across the same
+    withdraw (week 1, Stage-4 index) / re-issue (week 2, Stage-2 index) cycle,
+    week 1 records no re-issue and week 2 records exactly one, naming the first
+    placement ["F1"], the re-issuing Friday, and the id the week-2
+    [CreateEntering] carries.
+
+    MUTATION: passing [Audit_recorder.noop] (or dropping [~audit_recorder]) at
+    the [Entry_ticket_suspend.run] call in [_resting_tickets] records nothing
+    and turns the week-2 element red. *)
+let test_the_screen_records_one_reissue_naming_the_first_placement _ =
+  let events = ref [] in
+  let audit_recorder =
+    {
+      Audit_recorder.noop with
+      record_reissue = (fun e -> events := e :: !events);
+    }
+  in
+  let suspended_tickets = Entry_ticket_suspend.create () in
+  let (_ : Position.transition list) =
+    _suspend_screen ~audit_recorder ~suspended_tickets
+      ~positions:
+        [
+          _resting_ticket ~id:"F1" ~symbol:_fresh_symbol
+            ~side:Trading_base.Types.Long;
+        ]
+      _stage4
+  in
+  let week1_events = !events in
+  let week2 =
+    _suspend_screen ~audit_recorder ~suspended_tickets ~positions:[] _stage2
+  in
+  assert_that
+    (week1_events, List.rev !events, _created_ids week2)
+    (all_of
+       [
+         field (fun (w1, _, _) -> w1) is_empty;
+         field
+           (fun (_, all, ids) -> (all, ids))
+           (matching ~msg:"expected one re-issue event and one CreateEntering"
+              (function
+                | [ (e : Audit_recorder.reissue_event) ], [ id ] -> Some (e, id)
+                | _ -> None)
+              (field
+                 (fun ((e : Audit_recorder.reissue_event), id) ->
+                   ( e.original_position_id,
+                     e.reissue_date,
+                     String.equal e.reissued_position_id id ))
+                 (equal_to ("F1", _friday, true))));
+       ])
+
 let suite =
   "index_stage_veto_blocks_longs"
   >::: [
@@ -556,6 +615,8 @@ let suite =
          >:: test_a_fresh_candidate_survives_a_stage3_index_when_the_flag_is_on;
          "a suspended ticket is re-issued once, not rewritten by the cascade"
          >:: test_a_suspended_ticket_is_reissued_once_not_rewritten_by_the_cascade;
+         "the screen records one re-issue naming the first placement"
+         >:: test_the_screen_records_one_reissue_naming_the_first_placement;
        ]
 
 let () = run_test_tt_main suite
