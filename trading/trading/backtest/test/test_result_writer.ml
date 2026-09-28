@@ -603,7 +603,7 @@ let _m5_2e_entry ~symbol ~entry_date ~position_id :
     adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
-    suggested_stop = 92.0;
+    screener_proxy_stop = 92.0;
     installed_stop = 92.0;
     stop_floor_kind = Backtest.Trade_audit.Buffer_fallback;
     split_safe_basis = Backtest.Trade_audit.Flag_off;
