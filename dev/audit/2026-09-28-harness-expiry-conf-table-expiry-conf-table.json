@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-28",
+  "feature": "expiry-conf-table",
+  "branch": "harness/expiry-conf-table",
+  "sha": "232e9698ce6e84e3fca1d0763a4760c53c4ea137",
+  "recorded_at_ns": 1790619242956549110,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
