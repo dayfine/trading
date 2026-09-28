@@ -637,6 +637,48 @@ let test_sync_orders_follow_transition_orders_in_positions_order _ =
            ];
        ])
 
+(* Uncovered positions keep their transition mapping even with [~stop_sync]:
+   NVDA is not in the sync's [positions], so its UpdateRiskParams (95) still
+   yields its transition-mapped Stop, ahead of AAPL's sync order (140 -> 145).
+   Guards against dropping every stop update once any position is covered. *)
+let test_sync_uncovered_update_risk_params_keeps_stop _ =
+  let nvda =
+    _make_holding_position ~id:"NVDA-1" ~symbol:"NVDA" ~side:Position.Long
+      ~quantity:10.0 ~entry_price:100.0
+  in
+  let lookup = function
+    | "NVDA-1" -> Some nvda
+    | position_id -> _lookup position_id
+  in
+  let orders =
+    from_transitions
+      ~stop_sync:(_aapl_sync ~before:140.0 ~after:145.0)
+      ~transitions:
+        [ _update_risk_transition ~position_id:"NVDA-1" ~stop_loss_price:95.0 ]
+      ~get_position:lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "NVDA");
+             field (fun o -> o.side) (equal_to Trading_base.Types.Sell);
+             field (fun o -> o.shares) (equal_to 10);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 95.0));
+           ];
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "AAPL");
+             field (fun o -> o.shares) (equal_to 50);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 145.0));
+           ];
+       ])
+
 let suite =
   "order_gen"
   >::: [
@@ -688,6 +730,8 @@ let suite =
          >:: test_sync_split_rescale_lower_level_forwarded;
          "sync_orders_follow_transition_orders_in_positions_order"
          >:: test_sync_orders_follow_transition_orders_in_positions_order;
+         "sync_uncovered_update_risk_params_keeps_stop"
+         >:: test_sync_uncovered_update_risk_params_keeps_stop;
        ]
 
 let () = run_test_tt_main suite
