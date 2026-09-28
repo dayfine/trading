@@ -6,6 +6,11 @@ open Core
 
 (* Types ------------------------------------------------------------------ *)
 
+(* Split out for file length: [cascade_summary] and the execution-faithfulness
+   types (+ their sexp converters). *)
+include Trade_audit_cascade
+include Trade_audit_execution
+
 type skip_reason =
   | Insufficient_cash
   | Already_held
@@ -118,21 +123,6 @@ type external_exit_decision = {
 }
 [@@deriving sexp]
 
-type designed_order_type =
-  | Market
-  | Stop_limit of { trigger : float; limit : float }
-[@@deriving sexp]
-
-type execution_faithfulness = {
-  designed_order_type : designed_order_type;
-  designed_trigger : float;
-  fill_price : float;
-  fill_vs_trigger_pct : float;
-  fill_within_band : bool;
-  faithful : bool;
-}
-[@@deriving sexp]
-
 type audit_record = {
   entry : entry_decision;
   exit_ : exit_decision option;
@@ -141,9 +131,6 @@ type audit_record = {
   stop_decisions : Weinstein_stops.Stop_decision.t list; [@sexp.list]
 }
 [@@deriving sexp]
-
-(* [cascade_summary] (+ its sexp converters) lives in [Trade_audit_cascade]. *)
-include Trade_audit_cascade
 
 type audit_blob = {
   audit_records : audit_record list;
@@ -191,6 +178,20 @@ let _fresh_bucket (entry : entry_decision) =
 
 let record_entry t (entry : entry_decision) =
   Hashtbl.set t.records ~key:entry.position_id ~data:(_fresh_bucket entry)
+
+(* #2989: the original's placement-time row under the re-issued id, linked. *)
+let _reissued_entry ~position_id link ({ bucket_entry = e; _ } : _bucket) =
+  let ticket_lifecycle =
+    Ticket_lifecycle.with_reissue e.ticket_lifecycle link
+  in
+  { e with position_id; ticket_lifecycle }
+
+let record_reissue t ~position_id ~original_position_id ~reissue_date =
+  let link = { Ticket_lifecycle.original_position_id; reissue_date } in
+  let found = Hashtbl.find t.records original_position_id in
+  let copy = Option.map found ~f:(_reissued_entry ~position_id link) in
+  Option.iter copy ~f:(record_entry t);
+  copy
 
 (* Apply [f] to the bucket for [position_id]; a record with no entry on file is
    dropped — the no-entry contract shared by every [record_*] below. *)
