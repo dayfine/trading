@@ -121,6 +121,7 @@ let _placement_lifecycle : TL.t =
     fill_volume = None;
     freshness_basis = TL.Ma_cross;
     sized_down_wide_stop = false;
+    reissued_from = None;
     triple_confirmation =
       {
         breakout_volume_multiple = None;

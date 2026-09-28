@@ -125,6 +125,27 @@ type entry_freshness_basis =
           anchor — Weinstein §1's own Stage-2 start event. *)
 [@@deriving sexp]
 
+type reissue = {
+  original_position_id : string;
+      (** The position id of the ticket's {b first} placement — the row whose
+          [cancel_reason] reads [entry_ticket_macro_suspended]. Always the root,
+          never an intermediate re-issue, so a ticket suspended and re-issued
+          several times links every re-issue straight back to one row. *)
+  reissue_date : Date.t;
+      (** The screen on which the macro gate admitted again and the withdrawn
+          ticket was re-emitted under a fresh position id. *)
+}
+[@@deriving sexp]
+(** Link from a re-issued entry ticket to its original placement (#2989).
+
+    Under the default-off [entry_ticket_macro_suspend] flag (#2976) a resting
+    long ticket withdrawn on a Bearish screen is re-issued, unchanged, under a
+    {b new} position id once the gate admits — a closed position cannot be
+    reopened, and the simulator keys per-ticket state (fill retries, order
+    links) on that id. [position_id] is the only join key between a trade and
+    its audit row, so the re-issued row carries this link back to the placement
+    that produced its alternatives, installed stop and floor kind. *)
+
 type t = {
   placement_date : Date.t;
       (** The tick on which the resting entry ticket was written — i.e. when the
@@ -213,6 +234,13 @@ type t = {
           Always [false] under the default [Drop_over_max]. #2258 deliberately
           left this on the strategy-internal [entry_meta]; PR-5 persists it. *)
   triple_confirmation : triple_confirmation;  (** F6: the §4.5 measurements. *)
+  reissued_from : reissue option; [@sexp.option]
+      (** [Some] exactly on a row written for a re-issued ticket
+          ({!Trade_audit.record_reissue}); every placement-time field of such a
+          row, {!placement_date} included, is the original placement's — the TTL
+          clock counts suspension time too, so the fill age is measured from the
+          first placement. [None] on every ordinary row, and on every row
+          written before #2989 ([[@sexp.option]] keeps those parseable). *)
 }
 [@@deriving sexp]
 (** The lifecycle record carried by {!Trade_audit.entry_decision}. Written with
@@ -250,3 +278,7 @@ val with_fill_age : t option -> resolved:Date.t -> t option
     fill date after the collector has already been drained; an already-merged
     {!ticket_age_weeks_at_cancel} is left intact. [None] in ⇒ [None] out, same
     contract as {!resolve}. *)
+
+val with_reissue : t option -> reissue -> t option
+(** Set {!reissued_from} to [Some link], leaving every other field as is. [None]
+    in ⇒ [None] out, same contract as {!resolve}. *)

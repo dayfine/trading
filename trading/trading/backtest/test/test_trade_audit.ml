@@ -353,7 +353,7 @@ let _lifecycle ?(placement_date = _date "2024-03-01")
     ?(cancel_reason = Some "entry_ticket_ttl_expired")
     ?(ticket_age_weeks_at_fill = None) ?(fill_volume = None)
     ?(freshness_basis = TL.Range_top_breakout) ?(sized_down_wide_stop = true)
-    ?(triple_confirmation = _triple) () : TL.t =
+    ?(triple_confirmation = _triple) ?(reissued_from = None) () : TL.t =
   {
     placement_date;
     ticket_age_weeks_at_cancel;
@@ -363,6 +363,7 @@ let _lifecycle ?(placement_date = _date "2024-03-01")
     freshness_basis;
     sized_down_wide_stop;
     triple_confirmation;
+    reissued_from;
   }
 
 let _check verdict outcome : TL.fill_volume_check = { verdict; outcome }
@@ -678,6 +679,133 @@ let test_lifecycle_merges_are_inert_on_a_pre_pr5_row _ =
     (_check TL.No_verdict TL.Held);
   assert_that (TA.get_audit_records t)
     (elements_are [ field _lifecycle_of is_none ])
+
+(* #2989 — re-issued suspended tickets ----------------------------------- *)
+
+let _original_id = "AAPL-wein-1"
+let _reissued_id = "AAPL-wein-7"
+let _placed = _date "2024-03-01"
+let _suspended_on = _date "2024-03-08"
+let _reissued_on = _date "2024-03-22"
+
+let _reissue_link : TL.reissue =
+  { original_position_id = _original_id; reissue_date = _reissued_on }
+
+(** The placement row the entry walk records: unresolved lifecycle, one rival, a
+    support-floor stop — the fields a re-issued trade must be joinable to. *)
+let _placement_row () =
+  make_entry ~position_id:_original_id ~installed_stop:141.0
+    ~stop_floor_kind:TA.Support_floor
+    ~alternatives_considered:
+      [
+        _alt ~symbol:"MSFT" ~score:60 ~grade:Weinstein_types.B
+          ~reason:TA.Top_n_cutoff ();
+      ]
+    ~ticket_lifecycle:
+      (Some
+         (_lifecycle ~placement_date:_placed ~ticket_age_weeks_at_cancel:None
+            ~cancel_reason:None ()))
+    ()
+
+(** Suspend, re-issue and fill: the original placement is withdrawn with the
+    suspension token, the re-issued id gets a row that is the original's
+    placement-time entry (same alternatives, installed stop, floor kind,
+    placement date) with [reissued_from] pointing back at the original id, and
+    the re-issued position's exit attaches to that row. The original row keeps
+    its own withdrawal and gains no link.
+
+    MUTATION: making [record_reissue] a no-op leaves the exit with no row to
+    attach to (the pre-#2989 shape) and turns the second element red. *)
+let test_record_reissue_links_the_filled_copy_to_its_placement _ =
+  let t = TA.create () in
+  let original = _placement_row () in
+  TA.record_entry t original;
+  TA.record_transitions t
+    [
+      {
+        Position.position_id = _original_id;
+        date = _suspended_on;
+        kind = Position.CancelEntry { reason = "entry_ticket_macro_suspended" };
+      };
+    ];
+  let (_ : TA.entry_decision option) =
+    TA.record_reissue t ~position_id:_reissued_id
+      ~original_position_id:_original_id ~reissue_date:_reissued_on
+  in
+  TA.record_exit t (make_exit ~position_id:_reissued_id ());
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (r : TA.audit_record) -> r.entry.position_id)
+               (equal_to _original_id);
+             field
+               (fun (r : TA.audit_record) ->
+                 Option.map r.entry.ticket_lifecycle ~f:(fun l ->
+                     (l.cancel_reason, l.reissued_from)))
+               (is_some_and
+                  (equal_to (Some "entry_ticket_macro_suspended", None)));
+             field (fun (r : TA.audit_record) -> r.exit_) is_none;
+           ];
+         all_of
+           [
+             field
+               (fun (r : TA.audit_record) -> r.entry)
+               (equal_to
+                  ({
+                     original with
+                     position_id = _reissued_id;
+                     (* Spelled out literally, not via [TL.with_reissue]:
+                        the copy keeps the original [placement_date] (so its
+                        fill age counts the suspended weeks) and every other
+                        placement-time lifecycle field. *)
+                     ticket_lifecycle =
+                       Some
+                         (_lifecycle ~placement_date:_placed
+                            ~ticket_age_weeks_at_cancel:None ~cancel_reason:None
+                            ~reissued_from:(Some _reissue_link) ());
+                   }
+                    : TA.entry_decision));
+             field
+               (fun (r : TA.audit_record) ->
+                 Option.bind r.entry.ticket_lifecycle ~f:(fun l ->
+                     l.reissued_from))
+               (is_some_and (equal_to _reissue_link));
+             field
+               (fun (r : TA.audit_record) ->
+                 Option.map r.exit_ ~f:(fun e -> e.position_id))
+               (is_some_and (equal_to _reissued_id));
+           ];
+       ])
+
+(** No placement on file for the named original → nothing is recorded and [None]
+    is returned (the no-entry contract every [record_*] shares). *)
+let test_record_reissue_without_original_is_dropped _ =
+  let t = TA.create () in
+  let copy =
+    TA.record_reissue t ~position_id:_reissued_id
+      ~original_position_id:_original_id ~reissue_date:_reissued_on
+  in
+  assert_that (copy, TA.get_audit_records t) (pair is_none is_empty)
+
+(** [reissued_from] is [[@sexp.option]]: a [trade_audit.sexp] lifecycle written
+    before #2989 has no such field and parses with [None]; a populated link
+    survives the codec. The legacy record is spelled out as sexp text, not
+    derived from today's serializer, so it pins the on-disk shape. *)
+let test_ticket_lifecycle_sexp_reissued_from_is_optional _ =
+  let legacy =
+    Sexp.of_string
+      "((placement_date 2024-03-01) (freshness_basis Ma_cross) \
+       (sized_down_wide_stop false) (triple_confirmation \
+       ((breakout_volume_multiple ()) (rs_zero_cross false) \
+       (in_base_advance_pct ()))))"
+  in
+  let linked = _lifecycle ~reissued_from:(Some _reissue_link) () in
+  assert_that
+    (TL.t_of_sexp legacy, TL.t_of_sexp (TL.sexp_of_t linked))
+    (pair (field (fun (l : TL.t) -> l.reissued_from) is_none) (equal_to linked))
 
 (* Collector behaviour --------------------------------------------------- *)
 
@@ -1170,6 +1298,12 @@ let suite =
          >:: test_cancel_reason_distinguishes_rejection_from_ttl;
          "lifecycle merges are inert on a pre-PR-5 row"
          >:: test_lifecycle_merges_are_inert_on_a_pre_pr5_row;
+         "record_reissue links the filled copy to its placement"
+         >:: test_record_reissue_links_the_filled_copy_to_its_placement;
+         "record_reissue without original is dropped"
+         >:: test_record_reissue_without_original_is_dropped;
+         "ticket_lifecycle sexp: reissued_from is optional"
+         >:: test_ticket_lifecycle_sexp_reissued_from_is_optional;
          "alternative_candidate sexp round-trip"
          >:: test_alternative_candidate_sexp_round_trip;
          "entry_decision sexp round-trip"

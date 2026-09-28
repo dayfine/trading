@@ -31,11 +31,14 @@
     - {b Re-issue.} On the first screen where {!suspends} is [false], each
       stashed ticket is re-emitted as a [CreateEntering] with the identical
       parameters (under a fresh position id — a closed position cannot be
-      reopened) and its stop state re-installed, so the order that reaches the
-      simulator is the order that was withdrawn. A re-issued ticket does not
-      re-run the entry walk's cash / sizing / exposure checks in its re-admit
-      week (nor count toward the notional that week's fresh entries are sized
-      against); the simulator's fill-time portfolio rejection still applies.
+      reopened, and the simulator keys per-ticket state such as fill retries on
+      the id) and its stop state re-installed, so the order that reaches the
+      simulator is the order that was withdrawn. The audit links the fresh id
+      back to the first placement ({!Audit_recorder.reissue_event}, #2989). A
+      re-issued ticket does not re-run the entry walk's cash / sizing / exposure
+      checks in its re-admit week (nor count toward the notional that week's
+      fresh entries are sized against); the simulator's fill-time portfolio
+      rejection still applies.
     - {b Age.} Suspension time {b counts} toward [entry_order_max_rest_weeks]: a
       ticket is as old as its first placement, not its latest re-issue. The
       alternative (pausing the clock) would let a ticket outlive the TTL by the
@@ -96,6 +99,7 @@ val aged_portfolio :
 val run :
   ?store:t ->
   ?pending_entry_e:Entry_freeze.t ->
+  ?audit_recorder:Audit_recorder.t ->
   config:Weinstein_strategy_config.config ->
   macro_result:Macro.result ->
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
@@ -112,5 +116,12 @@ val run :
     suspensions or re-issues; and the symbols the cascade must treat as held
     this week (stashed or being re-issued).
 
+    [audit_recorder] (default {!Audit_recorder.noop}) receives one
+    {!Audit_recorder.reissue_event} per re-issued ticket, naming the ticket's
+    {b first} placement id — the one whose entry event the entry walk recorded
+    (issue #2989). Observability only: the returned transitions are the same
+    whatever the sink.
+
     With [config.entry_ticket_macro_suspend = Off], or no [store], this is
-    exactly [(cancel_expired portfolio, [])]. *)
+    exactly [(cancel_expired portfolio, [])] and the recorder is never called.
+*)

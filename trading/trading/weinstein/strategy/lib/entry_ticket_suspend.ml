@@ -7,22 +7,24 @@ module Portfolio_view = Trading_strategy.Portfolio_view
 let cancel_reason = "entry_ticket_macro_suspended"
 let _days_per_week = 7
 
-(* Everything needed to re-emit the withdrawn order unchanged. [origin_date] is
-   the FIRST placement date, carried across every suspend / re-issue cycle so
-   the TTL clock keeps counting. *)
+(* The ticket's FIRST placement, carried across every suspend / re-issue cycle:
+   its date keeps the TTL clock counting, its id is the audit join key (#2989). *)
+type origin = { origin_date : Date.t; origin_id : string }
+
+(* Everything needed to re-emit the withdrawn order unchanged. *)
 type ticket = {
   symbol : string;
   side : Position.position_side;
   target_quantity : float;
   entry_price : float;
   reasoning : Position.entry_reasoning;
-  origin_date : Date.t;
+  origin : origin;
   stop_state : Weinstein_stops.stop_state option;
 }
 
 type t = {
   stashed : ticket Hashtbl.M(String).t;  (** by symbol *)
-  origins : Date.t Hashtbl.M(String).t;  (** re-issued position id -> origin *)
+  origins : origin Hashtbl.M(String).t;  (** re-issued position id -> origin *)
 }
 
 let create () =
@@ -46,10 +48,10 @@ let suspends ~(config : Weinstein_strategy_config.config)
 (* A re-issued [Entering] seen with its original placement date. *)
 let _with_origin t (pos : Position.t) =
   match (Hashtbl.find t.origins pos.id, pos.state) with
-  | Some origin, Position.Entering e ->
+  | Some { origin_date; _ }, Position.Entering e ->
       {
         pos with
-        Position.state = Position.Entering { e with created_date = origin };
+        Position.state = Position.Entering { e with created_date = origin_date };
       }
   | _ -> pos
 
@@ -73,8 +75,10 @@ let _ticket_of t ~stop_states (pos : Position.t) ~target_quantity ~entry_price
     target_quantity;
     entry_price;
     reasoning = pos.entry_reasoning;
-    origin_date =
-      Option.value (Hashtbl.find t.origins pos.id) ~default:created_date;
+    origin =
+      Option.value
+        (Hashtbl.find t.origins pos.id)
+        ~default:{ origin_date = created_date; origin_id = pos.id };
     stop_state = Map.find !stop_states pos.symbol;
   }
 
@@ -106,7 +110,8 @@ let _suspend_one t ~stop_states ~current_date (pos : Position.t) =
    unbounded, otherwise a ticket older than the clock is expired. *)
 let _expired ~max_rest_weeks ~current_date (tk : ticket) =
   max_rest_weeks > 0
-  && Date.diff current_date tk.origin_date / _days_per_week > max_rest_weeks
+  && Date.diff current_date tk.origin.origin_date / _days_per_week
+     > max_rest_weeks
 
 (* Forget a stashed ticket for good, releasing its no-chase pin so a later
    re-qualification earns a fresh [E] (as an F2 cancel does). *)
@@ -129,11 +134,18 @@ let _held_elsewhere positions symbol =
       String.equal p.symbol symbol && not (Position.is_closed p))
 
 (* Re-emit the withdrawn order with identical parameters and re-install its
-   stop plan; the fresh id inherits the ticket's origin date for the clock. *)
-let _reissue_one t ~stop_states ~current_date (tk : ticket) :
+   stop plan; the fresh id inherits the ticket's origin for the clock, and the
+   recorder is told which placement it descends from (#2989 — audit only). *)
+let _reissue_one t ~audit_recorder ~stop_states ~current_date (tk : ticket) :
     Position.transition =
   let position_id = Entry_audit_capture.gen_position_id tk.symbol in
-  Hashtbl.set t.origins ~key:position_id ~data:tk.origin_date;
+  Hashtbl.set t.origins ~key:position_id ~data:tk.origin;
+  audit_recorder.Audit_recorder.record_reissue
+    {
+      reissued_position_id = position_id;
+      original_position_id = tk.origin.origin_id;
+      reissue_date = current_date;
+    };
   Option.iter tk.stop_state ~f:(fun st ->
       stop_states := Map.set !stop_states ~key:tk.symbol ~data:st);
   Hashtbl.remove t.stashed tk.symbol;
@@ -151,14 +163,15 @@ let _reissue_one t ~stop_states ~current_date (tk : ticket) :
         };
   }
 
-let _reissue t ?pending_entry_e ~stop_states ~positions ~current_date () =
+let _reissue t ?pending_entry_e ~audit_recorder ~stop_states ~positions
+    ~current_date () =
   let conflicted, free =
     List.partition_tf (_sorted_stash t) ~f:(fun (tk : ticket) ->
         _held_elsewhere positions tk.symbol)
   in
   List.iter conflicted ~f:(fun (tk : ticket) ->
       _drop t ?pending_entry_e tk.symbol);
-  List.map free ~f:(_reissue_one t ~stop_states ~current_date)
+  List.map free ~f:(_reissue_one t ~audit_recorder ~stop_states ~current_date)
 
 let _positions_minus ~cancels positions =
   let cancelled =
@@ -169,7 +182,7 @@ let _positions_minus ~cancels positions =
 
 (* The armed path: F2 cancels on the aged view, drop expired stash entries,
    then either suspend what is still resting or re-issue what is stashed. *)
-let _step t ?pending_entry_e ~config ~macro_result ~stop_states
+let _step t ?pending_entry_e ~audit_recorder ~config ~macro_result ~stop_states
     ~(portfolio : Portfolio_view.t) ~current_date ~cancel_expired () =
   let positions = portfolio.Portfolio_view.positions in
   Hashtbl.filter_keys_inplace t.origins ~f:(Map.mem positions);
@@ -191,18 +204,19 @@ let _step t ?pending_entry_e ~config ~macro_result ~stop_states
   let reissued =
     if suspending then []
     else
-      _reissue t ?pending_entry_e ~stop_states ~positions:remaining
-        ~current_date ()
+      _reissue t ?pending_entry_e ~audit_recorder ~stop_states
+        ~positions:remaining ~current_date ()
   in
   (cancels @ suspended @ reissued, held)
 
-let run ?store ?pending_entry_e ~(config : Weinstein_strategy_config.config)
-    ~macro_result ~stop_states ~portfolio ~current_date ~cancel_expired () =
+let run ?store ?pending_entry_e ?(audit_recorder = Audit_recorder.noop)
+    ~(config : Weinstein_strategy_config.config) ~macro_result ~stop_states
+    ~portfolio ~current_date ~cancel_expired () =
   match (store, config.entry_ticket_macro_suspend) with
   | None, _ | Some _, Entry_ticket_suspend_mode.Off ->
       (cancel_expired portfolio, [])
   | ( Some t,
       ( Entry_ticket_suspend_mode.On_bearish_macro
       | Entry_ticket_suspend_mode.On_index_stage4 ) ) ->
-      _step t ?pending_entry_e ~config ~macro_result ~stop_states ~portfolio
-        ~current_date ~cancel_expired ()
+      _step t ?pending_entry_e ~audit_recorder ~config ~macro_result
+        ~stop_states ~portfolio ~current_date ~cancel_expired ()
