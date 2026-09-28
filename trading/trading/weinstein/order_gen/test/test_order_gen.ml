@@ -400,14 +400,15 @@ let test_sync_unchanged_level_emits_nothing _ =
   in
   assert_that orders (size_is 0)
 
-(* The same move reported both by UpdateRiskParams and by the level diff yields
-   one Stop order, not two. *)
-let test_sync_no_duplicate_with_update_risk_params _ =
+(* Installed level wins: an UpdateRiskParams for a sync-covered position is
+   replaced by the sync order at the stop_states level, even when the prices
+   differ — one protective stop per position per tick. *)
+let test_sync_installed_level_wins_over_update_risk_params _ =
   let orders =
     from_transitions
       ~stop_sync:(_aapl_sync ~before:140.0 ~after:145.0)
       ~transitions:
-        [ _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:145.0 ]
+        [ _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:146.0 ]
       ~get_position:_lookup ()
   in
   assert_that orders
@@ -459,6 +460,181 @@ let test_no_sync_entry_complete_is_ignored _ =
   in
   assert_that orders (size_is 0)
 
+(* Unchanged level but the strategy asked for a stop update: the sync still
+   sends the stop, at the installed level. *)
+let test_sync_update_risk_params_unchanged_level_emits_installed _ =
+  let orders =
+    from_transitions
+      ~stop_sync:(_aapl_sync ~before:140.0 ~after:140.0)
+      ~transitions:
+        [ _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:146.0 ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         field
+           (fun o -> o.order_type)
+           (equal_to (Trading_base.Types.Stop 140.0));
+       ])
+
+(* Guard: an Exiting position never gets a protective stop — even with a level
+   move and an entry-fill transition — or a live broker could sell twice. *)
+let test_sync_exiting_position_gets_no_stop _ =
+  let exiting =
+    {
+      _aapl_position with
+      state =
+        Position.Exiting
+          {
+            quantity = 50.0;
+            entry_price = 150.0;
+            entry_date = Date.of_string "2024-01-01";
+            target_quantity = 50.0;
+            exit_price = 139.0;
+            filled_quantity = 0.0;
+            started_date = Date.of_string "2024-01-08";
+            risk_params =
+              {
+                Position.stop_loss_price = Some 140.0;
+                take_profit_price = None;
+                max_hold_days = None;
+              };
+          };
+    }
+  in
+  let orders =
+    from_transitions
+      ~stop_sync:
+        { (_aapl_sync ~before:140.0 ~after:145.0) with positions = [ exiting ] }
+      ~transitions:[ _entry_complete_transition ~position_id:"AAPL-1" ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders (size_is 0)
+
+(* Guard: an entry with nothing filled yet has nothing at the broker to
+   protect. *)
+let test_sync_unfilled_entering_gets_no_stop _ =
+  let unfilled =
+    {
+      _aapl_position with
+      state =
+        Position.Entering
+          {
+            target_quantity = 100.0;
+            entry_price = 150.0;
+            filled_quantity = 0.0;
+            created_date = Date.of_string "2024-01-04";
+          };
+    }
+  in
+  let orders =
+    from_transitions
+      ~stop_sync:
+        {
+          (_aapl_sync ~before:140.0 ~after:145.0) with
+          positions = [ unfilled ];
+        }
+      ~transitions:[ _entry_complete_transition ~position_id:"AAPL-1" ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders (size_is 0)
+
+(* No installed level after the tick → no sync order, even on an entry fill. *)
+let test_sync_no_after_level_emits_nothing _ =
+  let orders =
+    from_transitions
+      ~stop_sync:
+        {
+          positions = [ _aapl_position ];
+          stop_level_before = _level_of ~symbol:"AAPL" 140.0;
+          stop_level_after = (fun _ -> None);
+        }
+      ~transitions:[ _entry_complete_transition ~position_id:"AAPL-1" ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders (size_is 0)
+
+(* A split rescale lowers a long's level: order_gen forwards it (the
+   never-lower invariant lives upstream). *)
+let test_sync_split_rescale_lower_level_forwarded _ =
+  let orders =
+    from_transitions
+      ~stop_sync:(_aapl_sync ~before:140.0 ~after:70.0)
+      ~transitions:[] ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         all_of
+           [
+             field (fun o -> o.side) (equal_to Trading_base.Types.Sell);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 70.0));
+           ];
+       ])
+
+(* Ordering: transition-derived orders first, then sync orders in [positions]
+   order; AAPL's UpdateRiskParams (146) is replaced by its installed level. *)
+let test_sync_orders_follow_transition_orders_in_positions_order _ =
+  let nvda =
+    _make_holding_position ~id:"NVDA-1" ~symbol:"NVDA" ~side:Position.Long
+      ~quantity:10.0 ~entry_price:100.0
+  in
+  let levels_before = function
+    | "AAPL" -> Some 140.0
+    | "NVDA" -> Some 90.0
+    | _ -> None
+  in
+  let levels_after = function
+    | "AAPL" -> Some 145.0
+    | "NVDA" -> Some 92.0
+    | _ -> None
+  in
+  let orders =
+    from_transitions
+      ~stop_sync:
+        {
+          positions = [ _aapl_position; nvda ];
+          stop_level_before = levels_before;
+          stop_level_after = levels_after;
+        }
+      ~transitions:
+        [
+          _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:146.0;
+          _create_entering_transition ~position_id:"MSFT-1" ~symbol:"MSFT"
+            ~side:Long ~quantity:5.0 ~entry_price:300.0;
+        ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "MSFT");
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.StopLimit (300.0, 300.0)));
+           ];
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "AAPL");
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 145.0));
+           ];
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "NVDA");
+             field (fun o -> o.shares) (equal_to 10);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 92.0));
+           ];
+       ])
+
 let suite =
   "order_gen"
   >::: [
@@ -492,12 +668,24 @@ let suite =
          >:: test_sync_level_move_without_transition_emits_stop;
          "sync_unchanged_level_emits_nothing"
          >:: test_sync_unchanged_level_emits_nothing;
-         "sync_no_duplicate_with_update_risk_params"
-         >:: test_sync_no_duplicate_with_update_risk_params;
+         "sync_installed_level_wins_over_update_risk_params"
+         >:: test_sync_installed_level_wins_over_update_risk_params;
          "sync_short_entry_fill_emits_buy_stop"
          >:: test_sync_short_entry_fill_emits_buy_stop;
          "no_sync_entry_complete_is_ignored"
          >:: test_no_sync_entry_complete_is_ignored;
+         "sync_update_risk_params_unchanged_level_emits_installed"
+         >:: test_sync_update_risk_params_unchanged_level_emits_installed;
+         "sync_exiting_position_gets_no_stop"
+         >:: test_sync_exiting_position_gets_no_stop;
+         "sync_unfilled_entering_gets_no_stop"
+         >:: test_sync_unfilled_entering_gets_no_stop;
+         "sync_no_after_level_emits_nothing"
+         >:: test_sync_no_after_level_emits_nothing;
+         "sync_split_rescale_lower_level_forwarded"
+         >:: test_sync_split_rescale_lower_level_forwarded;
+         "sync_orders_follow_transition_orders_in_positions_order"
+         >:: test_sync_orders_follow_transition_orders_in_positions_order;
        ]
 
 let () = run_test_tt_main suite

@@ -46,13 +46,24 @@
     protectable position (see {!stop_sync}) that
     - (a) received an [EntryFill] or [EntryComplete] this tick — the initial
       stop at its installed level, sized to the shares now filled; or
-    - (b) has an {e after} level different from its {e before} level (a raise, a
-      tightening, a split rescale).
+    - (b) has an [UpdateRiskParams] with a stop price this tick; or
+    - (c) has an {e after} level different from its {e before} level (a raise, a
+      tightening, a split rescale — including a {e lower} level after a split;
+      this module forwards the level and does not enforce direction, the
+      never-lower invariant lives upstream in the stop state machine).
 
-    A sync order is suppressed when an [UpdateRiskParams] for the same position
-    id in [transitions] already carries the same stop price (no duplicate). A
-    ticker with no {e after} level yields no sync order. Without [~stop_sync]
-    the output is exactly the transition mapping above (pre-#2984 behaviour).
+    {b The installed level wins.} For a position the sync covers (protectable
+    and with an {e after} level), the [Stop] that its [UpdateRiskParams] would
+    have produced is dropped and only the sync order, at the {e after} level, is
+    emitted — one protective stop per position per tick, whatever price the
+    transition carried. [UpdateRiskParams] for positions the sync does not cover
+    keep the transition mapping above. A ticker with no {e after} level yields
+    no sync order. Without [~stop_sync] the output is exactly the transition
+    mapping above (pre-#2984 behaviour).
+
+    A [Stop] order means {e set / replace this position's protective stop} at
+    the broker (modify the working GTC stop, or place it if none exists) — never
+    an additional stop alongside the working one.
 
     The module stays strategy-agnostic: the levels arrive as plain lookups, so
     it takes no dependency on the Weinstein stop library.
@@ -79,9 +90,15 @@ type stop_sync = {
   positions : Trading_strategy.Position.t list;
       (** Candidate positions to protect. Only a [Holding] position, or an
           [Entering] position with a non-zero [filled_quantity], gets a sync
-          order; its share count is the held (resp. filled) quantity. The
+          order; its share count is the held (resp. filled) quantity. [Exiting]
+          and [Closed] positions never get one (a protective stop on a position
+          already being sold would risk a double exit at the broker). The
           protective stop is a [Sell] stop for a long and a [Buy] stop (above
-          price) for a short. *)
+          price) for a short.
+
+          Must be the {b post-transition} state — the positions as they stand
+          after this tick's transitions (fills) were applied — so a just-filled
+          entry is [Holding] (or partially-filled [Entering]) here. *)
   stop_level_before : string -> float option;
       (** Installed stop level by ticker at the start of the tick. *)
   stop_level_after : string -> float option;
@@ -118,7 +135,9 @@ val from_transitions :
     @param stop_sync
       Opt-in broker stop sync (issue #2984). Omitted, only the transition
       mapping runs. Given, the sync orders are appended after the
-      transition-derived orders, in [positions] order.
+      transition-derived orders, in [positions] order, and the sync replaces the
+      [UpdateRiskParams] stop of every position it covers (installed level
+      wins).
 
     @param transitions
       The [Position.transition list] returned by [Strategy.on_market_close].
