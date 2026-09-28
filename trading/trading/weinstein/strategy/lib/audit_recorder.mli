@@ -334,6 +334,26 @@ type force_liquidation_event = Portfolio_risk.Force_liquidation.event
     [force_liquidations.sexp] persistence and [trades.csv] exit-trigger
     labelling. *)
 
+type reissue_event = {
+  reissued_position_id : string;
+      (** The fresh id the re-issued [CreateEntering] carries. *)
+  original_position_id : string;
+      (** The id of the ticket's {b first} placement — the one whose
+          {!entry_event} was recorded. Always the root, never an intermediate
+          re-issue, however many suspend / re-issue cycles the ticket went
+          through. *)
+  reissue_date : Date.t;  (** The screen that re-issued the ticket. *)
+}
+(** A resting long entry ticket withdrawn by the #2976 macro suspension
+    ({!Entry_ticket_suspend}) has been re-issued under a new position id (issue
+    #2989). No {!entry_event} is recorded for the new id — the entry walk did
+    not place it — so this event is the only link from the position that may
+    fill back to the placement whose alternatives, installed stop and floor kind
+    were recorded. Only emitted when [entry_ticket_macro_suspend] is armed.
+    Observability only: the re-issue transition is identical with or without a
+    sink. Field labels are distinct from the other events' so no existing
+    unannotated [position_id] / [date] access changes resolution. *)
+
 type t = {
   record_entry : entry_event -> unit;
   record_exit : exit_event -> unit;
@@ -346,6 +366,10 @@ type t = {
       (** Invoked once per held position per bar on which the stops pass moved
           its stop without emitting a transition for it (see
           {!stop_move_event}). *)
+  record_reissue : reissue_event -> unit;
+      (** Invoked once per ticket {!Entry_ticket_suspend} re-issues (see
+          {!reissue_event}). Never invoked under the default (unarmed) config.
+      *)
   record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
       (** Invoked by {!Stops_runner.update} for each held position whose stop
           state machine advanced on the tick (issue #2977): every advance, one

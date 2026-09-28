@@ -110,9 +110,10 @@ let _config ?(max_rest_weeks = 0) mode =
 let _no_cancels _ = []
 
 let _run ?(cancel_expired = _no_cancels) ?(stop_states = ref String.Map.empty)
-    ?pending_entry_e ~store ~config ~macro_result ~positions ~date () =
-  Entry_ticket_suspend.run ~store ?pending_entry_e ~config ~macro_result
-    ~stop_states
+    ?pending_entry_e ?audit_recorder ~store ~config ~macro_result ~positions
+    ~date () =
+  Entry_ticket_suspend.run ~store ?pending_entry_e ?audit_recorder ~config
+    ~macro_result ~stop_states
     ~portfolio:{ cash = 100_000.0; positions = _positions positions }
     ~current_date:date ~cancel_expired ()
 
@@ -595,6 +596,75 @@ let test_reissued_ticket_expires_on_its_original_clock _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* #2989: the audit link from a re-issue back to its first placement    *)
+(* ------------------------------------------------------------------ *)
+
+(** Two suspend / re-issue cycles of one ticket placed as ["L1"], with a
+    recorder capturing every {!Audit_recorder.reissue_event}. Returns the events
+    in order and the ids of the positions the two re-issues opened. *)
+let _reissue_events_over_two_cycles mode =
+  let events = ref [] in
+  let audit_recorder =
+    {
+      Audit_recorder.noop with
+      record_reissue = (fun e -> events := e :: !events);
+    }
+  in
+  let store = Entry_ticket_suspend.create () in
+  let config = _config mode in
+  let week n = Date.add_days _friday (n * _week) in
+  let step ~n ~macro_result ~positions =
+    _run ~audit_recorder ~store ~config ~macro_result ~positions ~date:(week n)
+      ()
+    |> fst |> _opened
+  in
+  let placed =
+    _entering ~id:"L1" ~symbol:_long_symbol ~created:(week (-1)) ()
+  in
+  let (_ : Position.t list) =
+    step ~n:0 ~macro_result:_bearish ~positions:[ placed ]
+  in
+  let first = step ~n:1 ~macro_result:_bullish ~positions:[] in
+  let (_ : Position.t list) =
+    step ~n:2 ~macro_result:_bearish ~positions:first
+  in
+  let second = step ~n:3 ~macro_result:_bullish ~positions:[] in
+  (List.rev !events, List.map (first @ second) ~f:(fun (p : Position.t) -> p.id))
+
+(** Every re-issue tells the recorder which placement it descends from, and it
+    is always the FIRST one — ["L1"] — even for the second re-issue, whose
+    withdrawn position was itself a re-issue. That is the join key the audit
+    needs: ["L1"] is the only id the entry walk recorded an entry for. With the
+    flag [Off] the recorder is never called.
+
+    MUTATIONS: deleting the [record_reissue] call in [_reissue_one] empties the
+    events (red); defaulting [origin_id] to the withdrawn position's own id
+    instead of reading the [origins] table names the first re-issue as the
+    second's original (red). *)
+let test_reissue_event_names_the_first_placement _ =
+  let week n = Date.add_days _friday (n * _week) in
+  let events, ids = _reissue_events_over_two_cycles Mode.On_bearish_macro in
+  let expected =
+    List.map2_exn ids
+      [ week 1; week 3 ]
+      ~f:(fun id reissue_date ->
+        ({
+           reissued_position_id = id;
+           original_position_id = "L1";
+           reissue_date;
+         }
+          : Audit_recorder.reissue_event))
+  in
+  assert_that
+    (ids, events, fst (_reissue_events_over_two_cycles Mode.Off))
+    (all_of
+       [
+         field (fun (i, _, _) -> i) (size_is 2);
+         field (fun (_, e, _) -> e) (equal_to expected);
+         field (fun (_, _, off) -> off) is_empty;
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Simulator, end to end                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -824,6 +894,8 @@ let () =
            >:: test_stash_held_elsewhere_is_dropped;
            "a re-issued ticket expires on its original clock"
            >:: test_reissued_ticket_expires_on_its_original_clock;
+           "a re-issue event names the first placement"
+           >:: test_reissue_event_names_the_first_placement;
            "sim: Off fills during a Bearish tape (R1 pin)"
            >:: test_sim_off_fills_during_bearish_tape;
            "sim: On withholds, then fills after re-admission"

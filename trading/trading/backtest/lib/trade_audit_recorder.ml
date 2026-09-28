@@ -80,6 +80,7 @@ let _ticket_lifecycle_of_event (e : AR.entry_event) : Ticket_lifecycle.t =
     freshness_basis = _freshness_basis_of_event e.freshness_basis;
     sized_down_wide_stop = e.sized_down_wide_stop;
     triple_confirmation = _triple_confirmation_of_event e.triple_confirmation;
+    reissued_from = None;
   }
 
 let _skip_reason_of_event = function
@@ -259,6 +260,17 @@ let _record_stop_move ~stop_log (e : AR.stop_move_event) =
       Stop_log.record_stop_move log ~position_id:e.position_id
         ~level:e.stop_level)
 
+(* #2989: copy the original placement row forward under the re-issued id, and
+   book its installed stop there too (the re-issue re-installs the same plan). *)
+let _record_reissue ~trade_audit ~stop_log (e : AR.reissue_event) =
+  let copy =
+    Trade_audit.record_reissue trade_audit ~position_id:e.reissued_position_id
+      ~original_position_id:e.original_position_id ~reissue_date:e.reissue_date
+  in
+  Option.iter (Option.both stop_log copy) ~f:(fun (log, entry) ->
+      Stop_log.record_installed_stop log ~position_id:e.reissued_position_id
+        ~symbol:entry.symbol ~level:entry.installed_stop)
+
 let of_collector ?candidate_log ?stop_log ~(trade_audit : Trade_audit.t)
     ~(force_liquidation_log : Force_liquidation_log.t) () : AR.t =
   {
@@ -283,5 +295,6 @@ let of_collector ?candidate_log ?stop_log ~(trade_audit : Trade_audit.t)
           ~position_id:event.position_id
           (_fill_volume_check_of_event event));
     record_stop_move = _record_stop_move ~stop_log;
+    record_reissue = _record_reissue ~trade_audit ~stop_log;
     record_stop_decision = Trade_audit.record_stop_decision trade_audit;
   }
