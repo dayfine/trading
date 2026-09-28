@@ -1,0 +1,128 @@
+{
+  "run_id": "local-2026-09-28",
+  "timestamp": "2026-09-28T06:25:49Z",
+  "commit_sha": "de7bb8321edc327502e134deed7f8365a1a4c86e",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 340,
+    "output_tokens": 974,
+    "cache_read_input_tokens": 6086355,
+    "cache_creation_input_tokens": 256394,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-09-28",
+    "source": "local-transcripts",
+    "generated_at": "2026-09-28T06:25:49Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-09-28",
+      "until": "2026-09-28"
+    },
+    "totals": {
+      "dispatches": 2,
+      "sessions": 0,
+      "resumes": 3,
+      "api_calls": 57,
+      "input_tokens": 340,
+      "output_tokens": 974,
+      "cache_read_input_tokens": 6086355,
+      "cache_creation_input_tokens": 256394,
+      "subagent_tokens": 6344063,
+      "main_tokens": 0
+    },
+    "context_histogram": {
+      "calls": 0,
+      "p50": 0,
+      "p90": 0,
+      "max": 0,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 0,
+      "share_above_threshold_pct": 0,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "50-100k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "100-150k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "150-200k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "200-300k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "300-500k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "ab5a667d9157a7331",
+        "agent_type": "qc-structural",
+        "description": "qc-structural #2996 at merge tip",
+        "ref": "#2996",
+        "date": "2026-09-28",
+        "wall_seconds": 161,
+        "resumes": 2,
+        "outcome": "APPROVED",
+        "api_calls": 37,
+        "input_tokens": 300,
+        "output_tokens": 159,
+        "cache_read_input_tokens": 3531544,
+        "cache_creation_input_tokens": 110332
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "a04ee80e4d2a81619",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral #2996 re-review",
+        "ref": "#2996",
+        "date": "2026-09-28",
+        "wall_seconds": 565,
+        "resumes": 1,
+        "outcome": "done",
+        "api_calls": 20,
+        "input_tokens": 40,
+        "output_tokens": 815,
+        "cache_read_input_tokens": 2554811,
+        "cache_creation_input_tokens": 146062
+      }
+    ],
+    "sessions": []
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}

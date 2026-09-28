@@ -35,8 +35,10 @@ the verdict). The dissection **is** how you produce a transferable *why*.
   (**E-basis** — see caveat), `19 position_id`. (Newer runs append
   `stop_fill_distance_pct` — the gate-basis distance.)
 - `trade_audit.sexp` — the decision-time context per `position_id`: `suggested_entry`
-  (**E**, the resting-order level), `suggested_stop` (screener, E-derived),
-  `installed_stop` (after the floor mechanism), `stop_floor_kind`, `stage`,
+  (**E**, the resting-order level), `screener_proxy_stop` (the screener's fixed-%
+  proxy, E-derived — **not** the stop used; `suggested_stop` in pre-#2975 files),
+  `installed_stop` (the stop actually installed + sized off, after the floor
+  mechanism), `stop_floor_kind`, `stage`,
   `ma_direction`, `resistance_quality`, macro block, `alternatives_considered`.
 - Raw bars via `dump_snap` — the **close / high / low the audit does NOT record**.
   Build once: `dune build trading/backtest/snapshot_warehouse/dump_snap/`; run
@@ -56,7 +58,7 @@ join raw bars to see close-vs-E.
 
 2. **Pull both arms' audit for each top symbol.** Locate the block:
    `grep -n "(symbol SYM) (entry_date" <arm>/trade_audit.sexp`, then read
-   `suggested_entry` / `suggested_stop` / `installed_stop` / `stop_floor_kind` /
+   `suggested_entry` / `installed_stop` / `stop_floor_kind` /
    `stage` / `resistance_quality`. Tabulate A-vs-B side by side.
 
 3. **Pull the raw bars** around each decision date with `dump_snap` and read the

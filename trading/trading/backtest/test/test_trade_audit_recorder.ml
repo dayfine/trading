@@ -186,6 +186,38 @@ let test_stop_floor_kind_projects_both_states _ =
          equal_to (TA.Buffer_fallback : TA.stop_floor_kind);
        ])
 
+(** Issue #2975 sink-hop pin. The audit row's [screener_proxy_stop] is the
+    screener candidate's fixed-percentage [suggested_stop]; [installed_stop] is
+    the strategy's stop, carried from the event. On a [Buffer_fallback] entry
+    the two differ (issue example EQT: E 23.36, proxy 21.49 = E x 0.92,
+    installed 22.4256 = E x 0.96), and the row must keep them apart rather than
+    copy either into the other. *)
+let test_buffer_fallback_row_keeps_proxy_and_installed_stop_apart _ =
+  let candidate =
+    { _candidate with suggested_entry = 23.36; suggested_stop = 21.49 }
+  in
+  let event =
+    {
+      (_entry_event ~candidate ~split_safe_basis:AR.Flag_off
+         ~stop_floor_kind:AR.Buffer_fallback ())
+      with
+      installed_stop = 22.4256;
+    }
+  in
+  assert_that (_recorded_entry_of event)
+    (all_of
+       [
+         field
+           (fun (e : TA.entry_decision) -> e.screener_proxy_stop)
+           (float_equal 21.49);
+         field
+           (fun (e : TA.entry_decision) -> e.installed_stop)
+           (float_equal 22.4256);
+         field
+           (fun (e : TA.entry_decision) -> e.stop_floor_kind)
+           (equal_to (TA.Buffer_fallback : TA.stop_floor_kind));
+       ])
+
 (** Sanity pin on the rest of the projection so the two enum tests above are not
     the module's only coverage: the identifying + dollar fields the audit
     consumer keys off must survive the hop unchanged. *)
@@ -439,6 +471,8 @@ let suite =
          >:: test_split_safe_basis_projects_all_three_states;
          "stop_floor_kind projects both states"
          >:: test_stop_floor_kind_projects_both_states;
+         "Buffer_fallback row keeps proxy and installed stop apart"
+         >:: test_buffer_fallback_row_keeps_proxy_and_installed_stop_apart;
          "entry projection carries identifying fields"
          >:: test_entry_projection_carries_identifying_fields;
          "entry projection carries E-provenance fields"

@@ -2282,6 +2282,43 @@ let test_require_structural_stop_off_enters_buffer_fallback _ =
   in
   assert_that result (_entered_with_floor_kind Audit_recorder.Buffer_fallback)
 
+(** Issue #2975 relationship pin: the installed stop does not come from the
+    screener's [suggested_stop]. A long with no qualifying prior correction
+    (one-bar reader, close = E = 23.36, the issue's EQT row) whose screener
+    proxy is [E * (1 - 0.08) = 21.4912] enters on the [Buffer_fallback] stop
+    [E * initial_stop_buffer * (1 - min_correction_pct / 2)] =
+    [23.36 * 1.0 * 0.96 = 22.4256] (clear of the round-number nudge) — the ~4%
+    vs ~8% gap the audit shows as [installed_stop] vs [screener_proxy_stop]. *)
+let test_buffer_fallback_installed_stop_ignores_screener_proxy _ =
+  let entry = 23.36 in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date:_current_date
+      ~current_close:entry
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:entry
+      ~suggested_stop:21.4912 ~as_of_date:_current_date
+  in
+  let result =
+    Entry_audit_capture.make_entry_transition
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:1.0 ~stop_states:(ref String.Map.empty) ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date:_current_date cand
+  in
+  let half_correction = _stops_config.min_correction_pct /. 2.0 in
+  assert_that result
+    (matching ~msg:"Expected Entry_ok"
+       (function Entry_audit_capture.Entry_ok (_, m) -> Some m | _ -> None)
+       (all_of
+          [
+            field
+              (fun (m : Entry_audit_capture.entry_meta) -> m.installed_stop)
+              (float_equal (entry *. 1.0 *. (1.0 -. half_correction)));
+            field
+              (fun (m : Entry_audit_capture.entry_meta) -> m.stop_floor_kind)
+              (equal_to Audit_recorder.Buffer_fallback);
+          ]))
+
 (** Flag ON: the same long is skipped as [No_structural_stop] ("investors should
     never use automatic percentages", Ch. 6). No [stop_states] entry is written.
 *)
@@ -2456,6 +2493,8 @@ let () =
            >:: test_stop_anchor_requires_e_family;
            "require_structural_stop: off enters on Buffer_fallback"
            >:: test_require_structural_stop_off_enters_buffer_fallback;
+           "Buffer_fallback installed stop ignores the screener proxy"
+           >:: test_buffer_fallback_installed_stop_ignores_screener_proxy;
            "require_structural_stop: on skips Buffer_fallback"
            >:: test_require_structural_stop_on_skips_buffer_fallback;
            "require_structural_stop: precedes the width gate"
