@@ -37,6 +37,8 @@ function flush() {
   if (pid   == "") { v=grab($0,"position_id");      if (v!="") pid=v }
   if (e     == "") { v=grab($0,"suggested_entry");  if (v!="") e=v }
   if (stop  == "") { v=grab($0,"suggested_stop");   if (v!="") stop=v }
+  # issue #2975 renamed the key; read both so post-rename audits still parse.
+  if (stop  == "") { v=grab($0,"screener_proxy_stop"); if (v!="") stop=v }
   if (kind  == "-"){ v=grab($0,"stop_floor_kind");  if (v!="") kind=v }
   if (place == "") { v=grab($0,"placement_date");   if (v!="") place=v }
   # [@sexp.option] renders Some v as `(field v)` and omits the field entirely

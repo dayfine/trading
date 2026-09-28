@@ -588,7 +588,7 @@ let _entry ~entry_date ~position_id ~symbol :
     adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
-    suggested_stop = 95.0;
+    screener_proxy_stop = 95.0;
     installed_stop = 95.0;
     stop_floor_kind = Buffer_fallback;
     split_safe_basis = Flag_off;

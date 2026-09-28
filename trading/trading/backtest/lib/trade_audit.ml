@@ -68,7 +68,7 @@ type entry_decision = {
   adjusted_close_at_decision : float option; [@sexp.option]
   ma_value : float option; [@sexp.option]
   local_range_top : float option; [@sexp.option]
-  suggested_stop : float;
+  screener_proxy_stop : float;
   installed_stop : float;
   stop_floor_kind : stop_floor_kind;
   split_safe_basis : split_safe_basis; [@sexp.default Flag_off]
@@ -79,6 +79,19 @@ type entry_decision = {
   alternatives_considered : alternative_candidate list;
 }
 [@@deriving sexp]
+
+(* Issue #2975: [screener_proxy_stop] was written as [suggested_stop] before.
+   ppx_sexp_conv has no field alias, so legacy rows are read by renaming the key
+   first; [audit_record]'s derived reader, declared below, picks this up. *)
+let _rename_legacy_key = function
+  | Sexp.List [ Sexp.Atom "suggested_stop"; v ] ->
+      Sexp.List [ Sexp.Atom "screener_proxy_stop"; v ]
+  | field -> field
+
+let entry_decision_of_sexp = function
+  | Sexp.List fields ->
+      entry_decision_of_sexp (Sexp.List (List.map fields ~f:_rename_legacy_key))
+  | sexp -> entry_decision_of_sexp sexp
 
 type exit_decision = {
   symbol : string;
