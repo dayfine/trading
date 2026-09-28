@@ -75,6 +75,33 @@
 # date-expired site (the one Part 3/4 exercise) was pinned. Part 6 adds a
 # fixture + assertion + mutation-proof for each of the other four sites.
 #
+# R-4 / H-EXPIRY-GLOB-CLOSES-CLASS (2026-08-28, qc-behavioral re-review of
+# PR #2585, closed 2026-09-28): check_11_linter_expiry.sh used to wire in
+# its three conf files via three hardcoded _scan_exceptions_conf() call
+# sites -- so a fourth exceptions file could be added later and go
+# silently unscanned, same shape as BQ-1 above. check_11 now drives all
+# three (and any future addition) from a data-driven
+# _EXCEPTIONS_CONF_TABLE, plus a completeness guard that globs
+# trading/devtools/checks/ for *exceptions*.conf and warns loudly if a
+# discovered file has no table row. Part 3b's mutation was updated to
+# match: it corrupts the AE row's filename field in the table (a "delete
+# the call site" mutation no longer has a call site to delete against —
+# there's one call site in a loop). Part 10 below adds a fourth,
+# unregistered conf file and pins that the completeness guard fires for
+# it, plus a mutation-proof that deleting the guard turns that assertion
+# red.
+#
+# O1 / H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (2026-08-28, qc-behavioral on
+# PR #2589, closed 2026-09-28): 3d/3e's sed mutations fail closed on a
+# benign reword of their target call site (verified: rewording each goes
+# RED, never vacuously green), but their printed diagnosis on failure was
+# misleading -- it read as "the roll-up wiring is broken" when the real
+# cause could be "this mutation's own sed pattern stopped matching." Both
+# now assert `diff -q "$CHECK_11" "$mutant"` actually differs before
+# trusting the split assertion, and fail with "the mutation's sed pattern
+# no longer matches — update the pattern; the protection may be fine"
+# when it doesn't.
+#
 # How to re-verify the output by hand:
 #   sh trading/devtools/checks/deep_scan.sh
 #   grep '## Linter Exception Expiry' dev/health/$(date +%Y-%m-%d)-deep.md
@@ -242,10 +269,17 @@ else
   fail "expired fixture_expired_field entry was NOT surfaced (exit=$AE_CODE1) — the adapter-effectiveness scan is not wired, or is broken: $(cat "$AE_REPORT1")"
 fi
 
-# --- 3b: MUTATION — remove the _scan_exceptions_conf call for
-# adapter_effectiveness_exceptions.conf from a working copy of the real
-# script. If the wiring is what's finding the entry (not some other
-# coincidental match), the finding must disappear.
+# --- 3b: MUTATION — de-register adapter_effectiveness_exceptions.conf
+# from a working copy of the real script's exceptions-conf table (R-4,
+# H-EXPIRY-GLOB-CLOSES-CLASS): corrupt the table row's filename field so
+# it no longer names the real file on disk. Since check_11 is now
+# table-driven (a single _scan_exceptions_conf call site inside a loop,
+# not three hardcoded call-site lines), "delete the AE call line" is no
+# longer a meaningful mutation — corrupting the AE row's path is the
+# equivalent break: the loop still runs, but it scans a file that does
+# not exist instead of the real fixture, so the scan never happens. If
+# the wiring is what's finding the entry (not some other coincidental
+# match), the finding must disappear.
 #
 # The mutated copy MUST live in the SAME directory as the fixture
 # _lib.sh: when `sh <script>` runs, `$0` is the invoked path, and
@@ -253,9 +287,16 @@ fi
 # separate tmpdir would make that source fail rather than exercise the
 # mutation.
 AE_MUT_CHECK="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated.sh"
-sed '/_scan_exceptions_conf "\${TRADING_DIR}\/devtools\/checks\/adapter_effectiveness_exceptions\.conf"/d' \
+sed 's/adapter_effectiveness_exceptions\.conf|Adapter-effectiveness exception expiry|AE_EXPIRY/adapter_effectiveness_exceptions_DISABLED.conf|Adapter-effectiveness exception expiry|AE_EXPIRY/' \
   "$CHECK_11" > "$AE_MUT_CHECK"
 chmod +x "$AE_MUT_CHECK"
+
+# Vacuity guard: a sed that matched nothing would leave the "mutant"
+# byte-identical to the production script, and 3b below would then be
+# testing nothing.
+if cmp -s "$CHECK_11" "$AE_MUT_CHECK"; then
+  fail "MUTATION (3b, AE table row corrupted) sed matched nothing — the mutant is identical to the production script, so 3b would pass vacuously. The exceptions-conf table row text has probably changed; update the pattern."
+fi
 
 AE_REPORT2="$(mktemp)"
 set +e
@@ -309,6 +350,18 @@ AE_MUT_CHECK2="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_e
 sed '/add_warning.*has passed/d' "$CHECK_11" > "$AE_MUT_CHECK2"
 chmod +x "$AE_MUT_CHECK2"
 
+# Vacuity guard (O1, H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS): confirm the
+# sed above actually changed the file before trusting the split assertion
+# below. Without this, a future reformatting of the add_warning call could
+# make the sed pattern stop matching -- AE_MUT_CHECK2 would then be
+# byte-identical to CHECK_11, and the assertion below would fail with the
+# MISLEADING diagnosis "the roll-up W: line was not surfaced" (implying
+# the roll-up wiring itself is broken) when the real cause is that this
+# mutation's own sed pattern no longer matches the source.
+if diff -q "$CHECK_11" "$AE_MUT_CHECK2" >/dev/null 2>&1; then
+  fail "the mutation's sed pattern no longer matches — update the pattern; the protection may be fine"
+fi
+
 AE_REPORT4="$(mktemp)"
 AE_FINDINGS4="$(mktemp)"
 set +e
@@ -331,6 +384,16 @@ AE_MUT_CHECK3="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_e
 sed 's/add_warning "\${label}: \${decl} review date/add_warning "\${label}: (redacted) review date/' \
   "$CHECK_11" > "$AE_MUT_CHECK3"
 chmod +x "$AE_MUT_CHECK3"
+
+# Vacuity guard (O1, H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS): same reasoning
+# as 3d's guard above -- without it, a benign reword of the add_warning
+# call site could make this sed pattern stop matching, and the assertion
+# below would fail with the MISLEADING diagnosis "MUTATION D did not
+# produce the expected split" without naming the real cause (this
+# mutation's own sed pattern no longer matches the source).
+if diff -q "$CHECK_11" "$AE_MUT_CHECK3" >/dev/null 2>&1; then
+  fail "the mutation's sed pattern no longer matches — update the pattern; the protection may be fine"
+fi
 
 AE_REPORT5="$(mktemp)"
 AE_FINDINGS5="$(mktemp)"
@@ -1509,6 +1572,96 @@ if [ "$NB2_CODE_IV" -eq 0 ] \
   echo "OK: MUTATION (iv) ('never*) continue' -> 'never*) break') silently stops scanning every entry after the first never entry — 9e-1 catches the UNDER-reporting direction, which 9a-9d could not (their never entry is last, where break == continue)"
 else
   fail "MUTATION (iv) (never-branch break) did not suppress the trailing expired entry as expected (exit=$NB2_CODE_IV): $(cat "$NB2_REPORT_IV")"
+fi
+
+# ── Part 10: completeness guard — a fourth, unregistered *exceptions*.conf
+# file (R-4, H-EXPIRY-GLOB-CLOSES-CLASS, closed 2026-09-28) ────────────
+#
+# Parts 1-9 above all exercise the THREE conf files check_11 already knows
+# about. None of them prove the completeness guard actually fires for a
+# FOURTH exceptions-conf file that nobody registered in the table — the
+# exact shape that let BQ-1 happen to adapter_effectiveness_exceptions.conf
+# before it was wired in by hand. This Part adds a fourth, deliberately
+# unregistered *exceptions*.conf file to a fresh fixture root and pins
+# that the guard surfaces it loudly (both in the roll-up W: line and the
+# REPORT_FILE's new "## Exceptions-Conf Completeness" section), at exit 0
+# (WARNING severity — this check never fails the build) — then proves the
+# assertion is load-bearing by removing the guard's add_warning() call and
+# confirming the finding disappears.
+
+CG_FAKE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$AE_FAKE_ROOT" "$MS_FAKE_ROOT" "$NF_FAKE_ROOT" "$MU_FAKE_ROOT" "$UF_FAKE_ROOT" "$MR_FAKE_ROOT" "$NB_FAKE_ROOT" "$NB2_FAKE_ROOT" "$CG_FAKE_ROOT"' EXIT
+
+mkdir -p "$CG_FAKE_ROOT/trading/devtools/checks/deep_scan"
+: > "$CG_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf"
+: > "$CG_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf"
+: > "$CG_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
+# The fourth, unregistered file. Content is irrelevant — the completeness
+# guard only cares whether the FILENAME has a table row, not what's inside
+# it (it does not open or parse this file at all).
+cat > "$CG_FAKE_ROOT/trading/devtools/checks/fixture_fourth_exceptions.conf" <<'EOF'
+some_fixture_entry  # review_at: 2019-01-01
+EOF
+cp "${DEEP_SCAN_DIR}/_lib.sh" "$CG_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
+cp "$(dirname "$0")/_check_lib.sh" "$CG_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
+cp "$CHECK_11" "$CG_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
+
+# --- 10a: the REAL (unmutated) script surfaces the unregistered fourth
+# conf file, in both the roll-up W: line and the REPORT_FILE's new
+# completeness section, at exit 0.
+CG_REPORT="$(mktemp)"
+CG_FINDINGS="$(mktemp)"
+set +e
+REPO_ROOT="$CG_FAKE_ROOT" sh "$CG_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$CG_REPORT" "$CG_FINDINGS" >/dev/null 2>&1
+CG_CODE=$?
+set -e
+
+if [ "$CG_CODE" -eq 0 ] \
+  && grep -q '^W: .*fixture_fourth_exceptions\.conf.*no row in check_11_linter_expiry\.sh' "$CG_FINDINGS" \
+  && grep -q '## Exceptions-Conf Completeness' "$CG_REPORT" \
+  && grep -q 'fixture_fourth_exceptions\.conf' "$CG_REPORT"; then
+  echo "OK: an unregistered fourth *exceptions*.conf file is surfaced by the completeness guard, in both the roll-up W: line and the REPORT_FILE's new section, at exit 0 (R-4/H-EXPIRY-GLOB-CLOSES-CLASS fix verified)"
+else
+  fail "the unregistered fixture_fourth_exceptions.conf was NOT surfaced by the completeness guard (exit=$CG_CODE) — report: $(cat "$CG_REPORT"); findings: $(cat "$CG_FINDINGS")"
+fi
+
+# Sanity: the three REGISTERED conf files must NOT be flagged as
+# unregistered — the guard should fire only for the genuinely unknown
+# fourth file, not for everything it discovers.
+if grep -q 'linter_exceptions.conf matches' "$CG_FINDINGS" \
+  || grep -q 'universe_deps_exceptions.conf matches' "$CG_FINDINGS" \
+  || grep -q 'adapter_effectiveness_exceptions.conf matches' "$CG_FINDINGS"; then
+  fail "the completeness guard flagged a REGISTERED conf file as unregistered — false positive: $(cat "$CG_FINDINGS")"
+else
+  echo "OK: the completeness guard does not flag the three registered conf files as unregistered (no false positives)"
+fi
+
+# --- 10b: MUTATION — remove the completeness guard's add_warning() call,
+# leaving the _UNREGISTERED_COUNT/_UNREGISTERED_DETAILS bookkeeping (and
+# therefore the REPORT_FILE section) intact. If 10a's roll-up assertion is
+# load-bearing (not a coincidental match), the roll-up W: line must
+# disappear.
+CG_MUT="$CG_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_completeness.sh"
+sed '/add_warning "Linter exception expiry completeness guard:/d' "$CHECK_11" > "$CG_MUT"
+chmod +x "$CG_MUT"
+
+if diff -q "$CHECK_11" "$CG_MUT" >/dev/null 2>&1; then
+  fail "MUTATION (completeness guard add_warning removed) sed matched nothing — the mutant is identical to the production script; the add_warning call text has probably changed, update the pattern"
+fi
+
+CG_REPORT2="$(mktemp)"
+CG_FINDINGS2="$(mktemp)"
+set +e
+REPO_ROOT="$CG_FAKE_ROOT" sh "$CG_MUT" "$CG_REPORT2" "$CG_FINDINGS2" >/dev/null 2>&1
+CG_CODE2=$?
+set -e
+
+if [ "$CG_CODE2" -eq 0 ] \
+  && ! grep -q 'fixture_fourth_exceptions\.conf' "$CG_FINDINGS2"; then
+  echo "OK: MUTATION (completeness guard's add_warning call removed) makes the roll-up W: finding for the unregistered fourth conf file disappear — proves 10a's roll-up assertion actually pins the guard, not a coincidental match"
+else
+  fail "MUTATION (completeness guard add_warning removed) did not remove the roll-up finding as expected (exit=$CG_CODE2): $(cat "$CG_FINDINGS2")"
 fi
 
 echo "OK: deep scan Linter Exception Expiry section (T1-K) structural + functional check passed."
