@@ -203,10 +203,12 @@ let test_update_risk_with_stop_emits_stop_order _ =
   assert_that orders
     (elements_are
        [
-         (fun o ->
-           assert_that o.ticker (equal_to "AAPL");
-           assert_that o.side (equal_to Trading_base.Types.Sell);
-           assert_that o.shares (equal_to 50));
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "AAPL");
+             field (fun o -> o.side) (equal_to Trading_base.Types.Sell);
+             field (fun o -> o.shares) (equal_to 50);
+           ];
        ])
 
 let test_update_risk_no_stop_returns_empty _ =
