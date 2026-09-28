@@ -44,6 +44,7 @@
   test_breaker_spy_strategy
   test_stage3_force_exit_runner
   test_late_stage2_stop_runner
+  test_late_stage2_tighten_ratchet
   test_macro_bearish_trim_runner
   test_laggard_rotation_runner
   test_stops_runner
