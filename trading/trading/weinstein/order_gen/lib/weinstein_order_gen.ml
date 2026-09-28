@@ -122,7 +122,89 @@ let _translate_transition ~entry_extension_max_pct
   | Position.CancelExit _ | Position.ExitFill _ | Position.ExitComplete ->
       None
 
-let from_transitions ?(entry_extension_max_pct = 0.0) ~transitions ~get_position
-    () =
-  List.filter_map transitions ~f:(fun t ->
-      _translate_transition ~entry_extension_max_pct ~transition:t ~get_position)
+(* --- Stop sync: broker stops sourced from the stop-level snapshots --- *)
+
+type stop_sync = {
+  positions : Position.t list;
+  stop_level_before : string -> float option;
+  stop_level_after : string -> float option;
+}
+
+(** Shares a broker stop must protect: the held quantity, or the filled part of
+    an entry still in progress. [None] for positions with nothing at the broker
+    to protect (unfilled entries, exits in progress, closed positions). *)
+let _protected_shares (pos : Position.t) =
+  match pos.state with
+  | Position.Holding { quantity; _ } -> Some (Int.of_float quantity)
+  | Position.Entering { filled_quantity; _ } when Float.(filled_quantity > 0.0)
+    ->
+      Some (Int.of_float filled_quantity)
+  | Position.Entering _ | Position.Exiting _ | Position.Closed _ -> None
+
+let _is_entry_fill_for ~position_id (t : Position.transition) =
+  String.equal t.position_id position_id
+  &&
+  match t.kind with
+  | Position.EntryFill _ | Position.EntryComplete _ -> true
+  | _ -> false
+
+(** An [UpdateRiskParams] in this tick already emits a [Stop] at [level] for the
+    position — the sync order would duplicate it. *)
+let _already_updated_to ~position_id ~level (t : Position.transition) =
+  String.equal t.position_id position_id
+  &&
+  match t.kind with
+  | Position.UpdateRiskParams
+      { new_risk_params = { stop_loss_price = Some p; _ } } ->
+      Float.equal p level
+  | _ -> false
+
+(** Why [pos] needs a broker stop at [level] this tick, if it does: it just
+    (partially) filled its entry, or its installed level moved. *)
+let _sync_reason ~transitions ~stop_sync ~(pos : Position.t) ~level =
+  let position_id = pos.id in
+  let level_moved =
+    not
+      (Option.equal Float.equal
+         (stop_sync.stop_level_before pos.symbol)
+         (Some level))
+  in
+  if List.exists transitions ~f:(_already_updated_to ~position_id ~level) then
+    None
+  else if List.exists transitions ~f:(_is_entry_fill_for ~position_id) then
+    Some "Initial stop on entry fill"
+  else if level_moved then Some "Stop level moved"
+  else None
+
+let _sync_stop_order (pos : Position.t) ~level ~shares ~reason =
+  {
+    ticker = pos.symbol;
+    side = _exit_side_of_position_side pos.side;
+    order_type = Trading_base.Types.Stop level;
+    shares;
+    rationale =
+      Printf.sprintf "%s: stop at $%.2f (%d shares)" reason level shares;
+  }
+
+let _sync_order_for_pos ~transitions ~stop_sync (pos : Position.t) =
+  match (_protected_shares pos, stop_sync.stop_level_after pos.symbol) with
+  | Some shares, Some level ->
+      Option.map (_sync_reason ~transitions ~stop_sync ~pos ~level)
+        ~f:(fun reason -> _sync_stop_order pos ~level ~shares ~reason)
+  | _ -> None
+
+let _stop_sync_orders ~transitions stop_sync =
+  List.filter_map stop_sync.positions
+    ~f:(_sync_order_for_pos ~transitions ~stop_sync)
+
+let from_transitions ?(entry_extension_max_pct = 0.0) ?stop_sync ~transitions
+    ~get_position () =
+  let transition_orders =
+    List.filter_map transitions ~f:(fun t ->
+        _translate_transition ~entry_extension_max_pct ~transition:t
+          ~get_position)
+  in
+  let sync_orders =
+    Option.value_map stop_sync ~default:[] ~f:(_stop_sync_orders ~transitions)
+  in
+  transition_orders @ sync_orders

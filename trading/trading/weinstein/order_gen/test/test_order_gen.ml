@@ -274,6 +274,191 @@ let test_empty_transitions_returns_empty _ =
   let orders = from_transitions ~transitions:[] ~get_position:_lookup () in
   assert_that orders (size_is 0)
 
+(* --- Stop sync (issue #2984): broker stops sourced from stop-level snapshots
+   --- *)
+
+let _entry_complete_transition ~position_id =
+  {
+    Position.position_id;
+    date = Date.of_string "2024-01-05";
+    kind =
+      Position.EntryComplete
+        {
+          risk_params =
+            {
+              Position.stop_loss_price = None;
+              take_profit_price = None;
+              max_hold_days = None;
+            };
+        };
+  }
+
+(** Level lookup that knows one ticker. *)
+let _level_of ~symbol level ticker =
+  if String.equal ticker symbol then Some level else None
+
+let _aapl_sync ~before ~after =
+  {
+    positions = [ _aapl_position ];
+    stop_level_before = _level_of ~symbol:"AAPL" before;
+    stop_level_after = _level_of ~symbol:"AAPL" after;
+  }
+
+(* Entry fill: the stop level was installed when the entry was placed, so it
+   does not move this tick — the entry fill alone must put the initial stop at
+   the broker. *)
+let test_sync_entry_fill_emits_initial_stop _ =
+  let orders =
+    from_transitions
+      ~stop_sync:(_aapl_sync ~before:140.0 ~after:140.0)
+      ~transitions:[ _entry_complete_transition ~position_id:"AAPL-1" ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "AAPL");
+             field (fun o -> o.side) (equal_to Trading_base.Types.Sell);
+             field (fun o -> o.shares) (equal_to 50);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 140.0));
+           ];
+       ])
+
+(* A partial entry fill protects only the shares filled so far. *)
+let test_sync_partial_entry_fill_sizes_to_filled _ =
+  let entering =
+    {
+      _aapl_position with
+      state =
+        Position.Entering
+          {
+            target_quantity = 100.0;
+            entry_price = 150.0;
+            filled_quantity = 20.0;
+            created_date = Date.of_string "2024-01-04";
+          };
+    }
+  in
+  let fill =
+    {
+      Position.position_id = "AAPL-1";
+      date = Date.of_string "2024-01-05";
+      kind = Position.EntryFill { filled_quantity = 20.0; fill_price = 150.0 };
+    }
+  in
+  let orders =
+    from_transitions
+      ~stop_sync:
+        {
+          (_aapl_sync ~before:140.0 ~after:140.0) with
+          positions = [ entering ];
+        }
+      ~transitions:[ fill ] ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         all_of
+           [
+             field (fun o -> o.shares) (equal_to 20);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 140.0));
+           ];
+       ])
+
+(* A tightening (or split rescale) moves the installed level with no
+   transition: the sync must still send the stop modify. *)
+let test_sync_level_move_without_transition_emits_stop _ =
+  let orders =
+    from_transitions
+      ~stop_sync:(_aapl_sync ~before:140.0 ~after:145.0)
+      ~transitions:[] ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         all_of
+           [
+             field (fun o -> o.side) (equal_to Trading_base.Types.Sell);
+             field (fun o -> o.shares) (equal_to 50);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 145.0));
+           ];
+       ])
+
+let test_sync_unchanged_level_emits_nothing _ =
+  let orders =
+    from_transitions
+      ~stop_sync:(_aapl_sync ~before:140.0 ~after:140.0)
+      ~transitions:[] ~get_position:_lookup ()
+  in
+  assert_that orders (size_is 0)
+
+(* The same move reported both by UpdateRiskParams and by the level diff yields
+   one Stop order, not two. *)
+let test_sync_no_duplicate_with_update_risk_params _ =
+  let orders =
+    from_transitions
+      ~stop_sync:(_aapl_sync ~before:140.0 ~after:145.0)
+      ~transitions:
+        [ _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:145.0 ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         field
+           (fun o -> o.order_type)
+           (equal_to (Trading_base.Types.Stop 145.0));
+       ])
+
+(* Short mirror: the protective stop is a Buy stop above the short entry. *)
+let test_sync_short_entry_fill_emits_buy_stop _ =
+  let short_pos =
+    _make_holding_position ~id:"TSLA-1" ~symbol:"TSLA" ~side:Position.Short
+      ~quantity:30.0 ~entry_price:200.0
+  in
+  let orders =
+    from_transitions
+      ~stop_sync:
+        {
+          positions = [ short_pos ];
+          stop_level_before = _level_of ~symbol:"TSLA" 216.0;
+          stop_level_after = _level_of ~symbol:"TSLA" 216.0;
+        }
+      ~transitions:[ _entry_complete_transition ~position_id:"TSLA-1" ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "TSLA");
+             field (fun o -> o.side) (equal_to Trading_base.Types.Buy);
+             field (fun o -> o.shares) (equal_to 30);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 216.0));
+           ];
+       ])
+
+(* Opt-in: without [~stop_sync] an entry fill still produces no order
+   (pre-#2984 behaviour for existing callers). *)
+let test_no_sync_entry_complete_is_ignored _ =
+  let orders =
+    from_transitions
+      ~transitions:[ _entry_complete_transition ~position_id:"AAPL-1" ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders (size_is 0)
+
 let suite =
   "order_gen"
   >::: [
@@ -299,6 +484,20 @@ let suite =
          >:: test_multiple_transitions_produce_one_order_each;
          "empty_transitions_returns_empty"
          >:: test_empty_transitions_returns_empty;
+         "sync_entry_fill_emits_initial_stop"
+         >:: test_sync_entry_fill_emits_initial_stop;
+         "sync_partial_entry_fill_sizes_to_filled"
+         >:: test_sync_partial_entry_fill_sizes_to_filled;
+         "sync_level_move_without_transition_emits_stop"
+         >:: test_sync_level_move_without_transition_emits_stop;
+         "sync_unchanged_level_emits_nothing"
+         >:: test_sync_unchanged_level_emits_nothing;
+         "sync_no_duplicate_with_update_risk_params"
+         >:: test_sync_no_duplicate_with_update_risk_params;
+         "sync_short_entry_fill_emits_buy_stop"
+         >:: test_sync_short_entry_fill_emits_buy_stop;
+         "no_sync_entry_complete_is_ignored"
+         >:: test_no_sync_entry_complete_is_ignored;
        ]
 
 let () = run_test_tt_main suite

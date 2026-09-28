@@ -21,12 +21,41 @@
       one [entry_extension_max_pct] {e below} it (the short mirror).
     - [UpdateRiskParams { new_risk_params = { stop_loss_price = Some p } }] →
       [Stop] order at [p] for the existing position quantity
-    - [TriggerExit] → ignored. The [Stop] order placed via [UpdateRiskParams] is
-      already working at the broker as a GTC order; it executes automatically
-      when price hits the stop. [TriggerExit] is internal accounting for the
-      strategy — no additional broker order is needed.
-    - All other transition kinds (EntryFill, CancelEntry, etc.) → ignored
-      (simulator-internal; not relevant to the live broker)
+    - [TriggerExit] → ignored. The broker [Stop] order (from [UpdateRiskParams]
+      or the stop sync below) is already working at the broker as a GTC order;
+      it executes automatically when price hits the stop. [TriggerExit] is
+      internal accounting for the strategy — no additional broker order is
+      needed.
+    - All other transition kinds (EntryFill, CancelEntry, etc.) → no order of
+      their own (simulator-internal). [EntryFill] / [EntryComplete] do drive the
+      stop sync below.
+
+    {1 Where broker stops come from}
+
+    [UpdateRiskParams] alone does {b not} keep the broker protected (issue
+    #2984): a freshly filled position carries no stop transition until its
+    trailing stop first rises, and stop-state moves that emit no transition (a
+    tightening, a split rescale) never reach the broker at all. The enforced
+    stop lives in the strategy's stop state, not in [risk_params].
+
+    Passing [~stop_sync] closes that gap. It carries the installed stop level
+    per ticker {e before} and {e after} the tick (for the Weinstein strategy:
+    [Map.find stop_states ticker |> Option.map
+     ~f:Weinstein_stops.get_stop_level] on the two snapshots) plus the positions
+    to protect, and emits one [Stop] order at the {e after} level for each
+    protectable position (see {!stop_sync}) that
+    - (a) received an [EntryFill] or [EntryComplete] this tick — the initial
+      stop at its installed level, sized to the shares now filled; or
+    - (b) has an {e after} level different from its {e before} level (a raise, a
+      tightening, a split rescale).
+
+    A sync order is suppressed when an [UpdateRiskParams] for the same position
+    id in [transitions] already carries the same stop price (no duplicate). A
+    ticker with no {e after} level yields no sync order. Without [~stop_sync]
+    the output is exactly the transition mapping above (pre-#2984 behaviour).
+
+    The module stays strategy-agnostic: the levels arrive as plain lookups, so
+    it takes no dependency on the Weinstein stop library.
 
     {1 Location}
 
@@ -46,8 +75,25 @@ type suggested_order = {
 [@@deriving show, eq]
 (** A single suggested broker order for human review before placement. *)
 
+type stop_sync = {
+  positions : Trading_strategy.Position.t list;
+      (** Candidate positions to protect. Only a [Holding] position, or an
+          [Entering] position with a non-zero [filled_quantity], gets a sync
+          order; its share count is the held (resp. filled) quantity. The
+          protective stop is a [Sell] stop for a long and a [Buy] stop (above
+          price) for a short. *)
+  stop_level_before : string -> float option;
+      (** Installed stop level by ticker at the start of the tick. *)
+  stop_level_after : string -> float option;
+      (** Installed stop level by ticker after the tick — the level the next bar
+          enforces. *)
+}
+(** Stop-level snapshots that drive the broker stop sync (issue #2984). See the
+    module doc, "Where broker stops come from". *)
+
 val from_transitions :
   ?entry_extension_max_pct:float ->
+  ?stop_sync:stop_sync ->
   transitions:Trading_strategy.Position.transition list ->
   get_position:(string -> Trading_strategy.Position.t option) ->
   unit ->
@@ -68,6 +114,11 @@ val from_transitions :
       [entry_extension_max_pct] to arm the cap; it is the {e same} knob
       {!Entry_reconciliation} classifies the weekly report's tickets against, so
       live orders and the report share one ceiling.
+
+    @param stop_sync
+      Opt-in broker stop sync (issue #2984). Omitted, only the transition
+      mapping runs. Given, the sync orders are appended after the
+      transition-derived orders, in [positions] order.
 
     @param transitions
       The [Position.transition list] returned by [Strategy.on_market_close].
