@@ -76,7 +76,7 @@ let test_write_atomic_round_trip _ =
       cycles_done = 42;
       cycles_total = 838;
       last_completed_date = Date.create_exn ~y:2014 ~m:Month.Dec ~d:26;
-      trades_so_far = 7;
+      fills_so_far = 7;
       current_equity = 152384.21;
     }
   in
@@ -90,7 +90,7 @@ let test_write_atomic_round_trip _ =
        [
          field (fun p -> p.Backtest_progress.cycles_done) (equal_to 42);
          field (fun p -> p.Backtest_progress.cycles_total) (equal_to 838);
-         field (fun p -> p.Backtest_progress.trades_so_far) (equal_to 7);
+         field (fun p -> p.Backtest_progress.fills_so_far) (equal_to 7);
          field
            (fun p -> p.Backtest_progress.last_completed_date)
            (equal_to (Date.create_exn ~y:2014 ~m:Month.Dec ~d:26));
@@ -111,7 +111,7 @@ let test_write_atomic_does_not_crash_on_missing_parent _ =
       cycles_done = 1;
       cycles_total = 100;
       last_completed_date = Date.create_exn ~y:2010 ~m:Month.Jan ~d:1;
-      trades_so_far = 0;
+      fills_so_far = 0;
       current_equity = 100000.0;
     }
   in
