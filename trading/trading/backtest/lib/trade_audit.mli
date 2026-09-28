@@ -131,7 +131,9 @@ type alternative_candidate = {
     set from the cash-rejected near-misses. *)
 
 (** Whether the installed initial stop sat on a support floor or fell back to a
-    fixed-buffer stop below the screener's suggested level. Routed from
+    fixed buffer off the effective entry price ([Buffer_fallback]: reference
+    [effective_entry * initial_stop_buffer]). Neither case uses the screener's
+    proxy stop ({!entry_decision.screener_proxy_stop}). Routed from
     [Weinstein_stops.compute_initial_stop_with_floor]. *)
 type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
 
@@ -223,10 +225,31 @@ type entry_decision = {
           knob is at its default 0 (feature off) or no defined high existed in
           the window — so the column also records whether the local-anchor
           mechanism was armed for this entry. *)
-  suggested_stop : float;  (** From the screener. *)
+  screener_proxy_stop : float;
+      (** The screener's fixed-percentage {e proxy} stop,
+          [Screener.scored_candidate.suggested_stop]:
+          [suggested_entry * (1 - initial_stop_pct)] for a long (~8% under E at
+          the screener default), [suggested_entry * (1 + short_stop_pct)] for a
+          short.
+          {b Not the stop the position was entered with, and nothing sizes or
+             exits on it} — the strategy recomputes the initial stop from the
+          support-floor scan (or its buffer fallback); that level is
+          {!installed_stop}, and sizing keys off it. The two routinely differ:
+          on a [Buffer_fallback] long at the default config the installed stop
+          is
+          [effective_entry * initial_stop_buffer * (1 - min_correction_pct / 2)]
+          (~4% under E) while this proxy stays ~8% under E. Compare
+          {!installed_stop}, not this field, when reading where the entry's risk
+          actually sat. Kept for screener-vs-strategy comparisons only.
+
+          Issue #2975: written as [suggested_stop] before the rename; legacy
+          files carrying that key still parse (the reader maps it here). *)
   installed_stop : float;
-      (** After [Weinstein_stops.compute_initial_stop_with_floor] applies the
-          initial-stop buffer. *)
+      (** The initial stop actually registered for the position (and the one
+          position sizing and [initial_risk_dollars] use): the
+          [Weinstein_stops.compute_initial_stop_with_floor] level off the
+          support floor, or off [effective_entry * initial_stop_buffer] when no
+          floor qualified — which one is recorded in {!stop_floor_kind}. *)
   stop_floor_kind : stop_floor_kind;
   split_safe_basis : split_safe_basis; [@sexp.default Flag_off]
       (** F5 telemetry for [stops_config.split_safe_floors]. Aggregating this
