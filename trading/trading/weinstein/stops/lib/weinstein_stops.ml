@@ -138,6 +138,7 @@ let _to_tightened ~config ~side ~stop_level ~correction_extreme ~reason =
         stop_level = new_stop;
         last_correction_extreme = correction_extreme;
         reason;
+        swing_peak = None;
       },
     Entered_tightening { reason } )
 
@@ -148,12 +149,15 @@ let _to_tightened ~config ~side ~stop_level ~correction_extreme ~reason =
    legitimate first-cycle anchor — see the [correction_count = 0] gate in
    [_completed_cycle_stop]. The [correction_observed_since_reset] flag starts
    [false]: it only becomes load-bearing after the first cycle, when the reset
-   value (close_price) needs a real touch to be re-validated. *)
-let _to_trailing ~side ~ma_value ~stop_level ~bar =
+   value (close_price) needs a real touch to be re-validated.
+   [config.correction_must_follow_peak] seeds the bar close instead
+   ({!Stop_anchor_rules}). *)
+let _to_trailing ~config ~side ~ma_value ~stop_level ~bar =
   Trailing
     {
       stop_level;
-      last_correction_extreme = _bar_extreme ~side ~bar;
+      last_correction_extreme =
+        Stop_anchor_rules.seed_correction_extreme ~config ~side ~bar;
       last_trend_extreme = bar.Types.Daily_price.close_price;
       ma_at_last_adjustment = ma_value;
       correction_count = 0;
@@ -198,7 +202,7 @@ let _update_initial ~config ~side ~state ~current_bar ~ma_value ~ma_direction
       ~ma_direction ~stage
   with
   | Some result -> result
-  | None -> (_to_trailing ~side ~ma_value ~stop_level ~bar, No_change)
+  | None -> (_to_trailing ~config ~side ~ma_value ~stop_level ~bar, No_change)
 
 (* ---- Correction cycle helpers ---- *)
 
@@ -361,11 +365,15 @@ let _raise_after_cycle ~config ~side ~ma_value ~correction_count
     correction_observed_since_reset
     || _is_correction_touch ~side ~last_correction_extreme ~bar
   in
+  let carried_extreme =
+    Stop_anchor_rules.carried_correction_extreme ~config ~side
+      ~last_trend_extreme ~new_trend_extreme ~new_correction_extreme ~bar
+  in
   let no_change =
     Trailing
       {
         stop_level;
-        last_correction_extreme = new_correction_extreme;
+        last_correction_extreme = carried_extreme;
         last_trend_extreme = new_trend_extreme;
         ma_at_last_adjustment;
         correction_count;
@@ -441,23 +449,34 @@ let _ratchet_tightened ~config ~side ~stop_level ~last_correction_extreme
           stop_level = candidate;
           last_correction_extreme = new_extreme;
           reason;
+          swing_peak = None;
         },
       Stop_raised
         { old_level = stop_level; new_level = candidate; reason = event_reason }
     )
   else
-    ( Tightened { stop_level; last_correction_extreme = new_extreme; reason },
+    ( Tightened
+        {
+          stop_level;
+          last_correction_extreme = new_extreme;
+          reason;
+          swing_peak = None;
+        },
       No_change )
 
 (* ---- Update: Tightened state ---- *)
 
+(* [tightened_can_ratchet]: reaction-low rule in {!Stop_anchor_rules}. *)
 let _update_tightened ~config ~side ~state ~current_bar =
   let bar = current_bar in
   match state with
-  | Tightened { stop_level; last_correction_extreme; reason } ->
+  | Tightened { stop_level; last_correction_extreme; reason; swing_peak } ->
       let on_close = config.trigger_on_weekly_close in
       if check_stop_hit ~on_close ~state ~side ~bar () then
         (state, _stop_hit_event ~on_close ~side ~stop_level ~bar ())
+      else if config.tightened_can_ratchet then
+        Stop_anchor_rules.ratchet_tightened_swing ~config ~side ~stop_level
+          ~last_correction_extreme ~swing_peak ~reason ~bar
       else
         _ratchet_tightened ~config ~side ~stop_level ~last_correction_extreme
           ~reason ~bar

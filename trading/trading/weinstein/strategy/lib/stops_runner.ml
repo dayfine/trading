@@ -49,10 +49,14 @@ let _default_stage_and_ma_for_side = function
 
     Stage 4 PR-D: an optional [ma_cache] threads through to the panel callbacks.
     Mid-week stop adjustments miss the cache (Friday-aligned only) and fall back
-    to inline; Friday-aligned calls hit the cache. *)
+    to inline; Friday-aligned calls hit the cache.
+
+    [to_stop_basis] maps the returned MA onto the stop machine's basis (#2982,
+    {!Stop_ma_basis.for_stops}); never applied to the raw warmup
+    [fallback_price] nor to the value mirrored into [prior_stage_ma_values]. *)
 let _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values
     ~(stage_config : Stage.config) ~lookback_bars ~bar_reader ~as_of
-    ~prior_stages ~symbol ~side ~fallback_price () =
+    ~prior_stages ~symbol ~side ~fallback_price ~to_stop_basis () =
   let weekly =
     Bar_reader.weekly_view_for bar_reader ~symbol ~n:lookback_bars ~as_of
   in
@@ -72,7 +76,7 @@ let _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values
     Hashtbl.set prior_stages ~key:symbol ~data:result.stage;
     Option.iter prior_stage_ma_values ~f:(fun tbl ->
         Hashtbl.set tbl ~key:symbol ~data:result.ma_value);
-    (result.ma_direction, result.ma_value, result.stage)
+    (result.ma_direction, to_stop_basis result.ma_value, result.stage)
 
 (* Transition emission (worst-case fill price, exit/adjust builders, the
    trigger-only branch, and the stop_event → transitions mapping) lives in
@@ -96,6 +100,9 @@ let _advance_machine ?ma_cache ?prior_stage_ma_values ~stops_config
     _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values ~stage_config
       ~lookback_bars ~bar_reader ~as_of ~prior_stages ~symbol:ticker
       ~side:pos.Position.side ~fallback_price:bar.Types.Daily_price.close_price
+      ~to_stop_basis:
+        (Stop_ma_basis.for_stops
+           ~enabled:stops_config.Weinstein_stops.stop_ma_same_basis ~bar)
       ()
   in
   let new_state, event =

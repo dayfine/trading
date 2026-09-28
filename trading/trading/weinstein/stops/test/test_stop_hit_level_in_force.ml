@@ -66,7 +66,12 @@ let test_trailing_state _ =
 let test_tightened_state _ =
   assert_hit_at_pre_bar_level
     (Tightened
-       { stop_level = 96.0; last_correction_extreme = 120.0; reason = "test" })
+       {
+         stop_level = 96.0;
+         last_correction_extreme = 120.0;
+         reason = "test";
+         swing_peak = None;
+       })
 
 let suite =
   "stop_hit_level_in_force"

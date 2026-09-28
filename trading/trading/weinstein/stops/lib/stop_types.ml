@@ -18,6 +18,7 @@ type stop_state =
       stop_level : float;
       last_correction_extreme : float;
       reason : string;
+      swing_peak : float option; [@sexp.option]
     }
 [@@deriving show, eq, sexp]
 
@@ -32,6 +33,10 @@ type stop_event =
    [vol_scaled_stop_atr_period]. A named constant so the bare literal lives in
    one exempt binding rather than inline in the field's [@sexp.default]. *)
 let default_vol_scaled_stop_atr_period = 14
+
+(* Book Ch. 6 "at least 8 to 10 percent" -- the only correction depth the book
+   gives; used as the [sexp.default] for [tightened_min_reaction_pct]. *)
+let default_tightened_min_reaction_pct = 0.08
 
 type config = {
   round_number_nudge : float;
@@ -54,6 +59,11 @@ type config = {
   split_safe_floors : bool; [@sexp.default false]
   reset_anchor_on_stalled_cycle : bool; [@sexp.default true]
   stop_skip_entry_bar : bool; [@sexp.default true]
+  stop_ma_same_basis : bool; [@sexp.default false]
+  correction_must_follow_peak : bool; [@sexp.default false]
+  tightened_can_ratchet : bool; [@sexp.default false]
+  tightened_min_reaction_pct : float;
+      [@sexp.default default_tightened_min_reaction_pct]
 }
 [@@deriving show, eq, sexp]
 
@@ -76,4 +86,8 @@ let default_config =
     split_safe_floors = false;
     reset_anchor_on_stalled_cycle = true;
     stop_skip_entry_bar = true;
+    stop_ma_same_basis = false;
+    correction_must_follow_peak = false;
+    tightened_can_ratchet = false;
+    tightened_min_reaction_pct = default_tightened_min_reaction_pct;
   }

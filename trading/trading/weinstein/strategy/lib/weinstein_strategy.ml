@@ -10,6 +10,7 @@ module Sector_rotation_weinstein_strategy = Sector_rotation_weinstein_strategy
 module Breaker_spy_strategy = Breaker_spy_strategy
 module Stops_runner = Stops_runner
 module Stops_split_runner = Stops_split_runner
+module Stop_ma_basis = Stop_ma_basis
 module Force_liquidation_runner = Force_liquidation_runner
 module Stage3_force_exit_runner = Stage3_force_exit_runner
 module Late_stage2_stop_runner = Late_stage2_stop_runner

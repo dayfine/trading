@@ -75,6 +75,10 @@ module Stops_split_runner = Stops_split_runner
     stay in lockstep with the broker-side share-count rescale on a
     corporate-action split. See {!Stops_split_runner}. *)
 
+module Stop_ma_basis = Stop_ma_basis
+(** Adjusted-to-raw MA basis restatement for the stop machine and the Stage-3
+    margin gate (issue #2982). See {!Stop_ma_basis}. *)
+
 module Force_liquidation_runner = Force_liquidation_runner
 (** Force-liquidation policy runner. Invoked at the bottom of [on_market_close]
     after {!Stops_runner.update} — defense in depth beyond stops. Closes G4 from

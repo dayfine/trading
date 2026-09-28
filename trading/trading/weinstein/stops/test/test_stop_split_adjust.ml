@@ -68,6 +68,7 @@ let test_tightened_forward_4_to_1 _ =
         stop_level = 440.0;
         last_correction_extreme = 460.0;
         reason = "Stage 3 detected";
+        swing_peak = None;
       }
   in
   assert_that
@@ -78,6 +79,32 @@ let test_tightened_forward_4_to_1 _ =
             stop_level = 110.0;
             last_correction_extreme = 115.0;
             reason = "Stage 3 detected";
+            swing_peak = None;
+          }))
+
+(* A swing under [tightened_can_ratchet] carries a [swing_peak]; it is a price
+   and rescales with the split exactly like the stop and the anchor (issue
+   #2974). Left unscaled, every post-split close would sit ~75% below the peak
+   and no reaction would ever confirm. *)
+let test_tightened_swing_peak_forward_4_to_1 _ =
+  let state =
+    Tightened
+      {
+        stop_level = 440.0;
+        last_correction_extreme = 460.0;
+        reason = "Stage 3 detected";
+        swing_peak = Some 480.0;
+      }
+  in
+  assert_that
+    (Stop_split_adjust.scale ~factor:4.0 state)
+    (equal_to
+       (Tightened
+          {
+            stop_level = 110.0;
+            last_correction_extreme = 115.0;
+            reason = "Stage 3 detected";
+            swing_peak = Some 120.0;
           }))
 
 (* ---- Identity case ---- *)
@@ -129,6 +156,8 @@ let () =
            >:: test_trailing_forward_4_to_1;
            "Tightened state — every price divides; reason unchanged"
            >:: test_tightened_forward_4_to_1;
+           "Tightened state — swing_peak (Some) divides with the split"
+           >:: test_tightened_swing_peak_forward_4_to_1;
            "factor=1.0 is the identity transform"
            >:: test_factor_one_is_identity;
            "factor=0.0 raises Invalid_argument" >:: test_zero_factor_raises;
