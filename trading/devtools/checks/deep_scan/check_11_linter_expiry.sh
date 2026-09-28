@@ -38,6 +38,18 @@
 # adds new entries; expiry (has enough time passed to warrant a look) is a
 # slower-moving signal that
 # matches this weekly deep-scan's existing cadence and precedent.
+#
+# R-4 / H-EXPIRY-GLOB-CLOSES-CLASS (2026-08-28, qc-behavioral re-review of
+# PR #2585): the three conf files above used to be three hardcoded
+# _scan_exceptions_conf() call sites, so a fourth exceptions file added
+# later could again go silently unscanned -- the exact shape that allowed
+# BQ-1 in the first place. They are now driven by the data-driven
+# _EXCEPTIONS_CONF_TABLE below, and a completeness guard globs
+# trading/devtools/checks/ for *exceptions*.conf and warns loudly (does
+# NOT fail the build -- this check stays WARNING severity) if it finds one
+# with no table row. That closes the class, not just the instance: a new
+# exceptions file with no table row is loud instead of silent, even though
+# wiring it up (table row + a report section) is still a manual step.
 
 set -e
 
@@ -187,33 +199,100 @@ _scan_exceptions_conf() {
   done < "$conf_path"
 }
 
-# ── linter_exceptions.conf ─────────────────────────────────────────
-_scan_exceptions_conf "${TRADING_DIR}/devtools/checks/linter_exceptions.conf" "Linter exception expiry"
-EXPIRY_COUNT="$_SCAN_COUNT"
-EXPIRY_MISSING_COUNT="$_SCAN_MISSING_COUNT"
-EXPIRY_DETAILS="$_SCAN_DETAILS"
-EXPIRY_MISSING="$_SCAN_MISSING"
+# ── Exceptions-conf registration table (R-4, H-EXPIRY-GLOB-CLOSES-CLASS)
+# ────────────────────────────────────────────────────────────────
+#
+# Each row is "<conf filename under TRADING_DIR/devtools/checks/>|<label
+# used in this check's add_warning/report prose>|<accumulator variable
+# prefix>". This table is the single source of truth for which
+# exceptions-conf files this check scans and reports on. The completeness
+# guard below globs trading/devtools/checks/ for *exceptions*.conf and
+# warns loudly if it finds a file with no row here -- so a fourth (or
+# fifth...) exceptions file added later cannot go silently unscanned the
+# way adapter_effectiveness_exceptions.conf did before BQ-1 (dev/reviews/
+# harness-2567-2585.md). This closes the CLASS of that bug, not just the
+# three files that happened to get wired in by hand before this table
+# existed.
+_EXCEPTIONS_CONF_TABLE="linter_exceptions.conf|Linter exception expiry|EXPIRY
+universe_deps_exceptions.conf|Universe-deps exception expiry|UD_EXPIRY
+adapter_effectiveness_exceptions.conf|Adapter-effectiveness exception expiry|AE_EXPIRY"
 
-# ── universe_deps_exceptions.conf (#2148 FLAG-1 residual) ──────────
-_scan_exceptions_conf "${TRADING_DIR}/devtools/checks/universe_deps_exceptions.conf" "Universe-deps exception expiry"
-UD_EXPIRY_COUNT="$_SCAN_COUNT"
-UD_EXPIRY_MISSING_COUNT="$_SCAN_MISSING_COUNT"
-UD_EXPIRY_DETAILS="$_SCAN_DETAILS"
-UD_EXPIRY_MISSING="$_SCAN_MISSING"
+# Returns 0 (registered) or 1 (not registered) for a conf filename
+# relative to TRADING_DIR/devtools/checks/, per the table above.
+_exceptions_conf_registered() {
+  local target="$1"
+  local row row_path oldifs found
+  found=1
+  oldifs="$IFS"
+  IFS='
+'
+  for row in $_EXCEPTIONS_CONF_TABLE; do
+    IFS="$oldifs"
+    [ -z "$row" ] && continue
+    row_path="$(printf '%s' "$row" | cut -d'|' -f1)"
+    if [ "$row_path" = "$target" ]; then
+      found=0
+      break
+    fi
+    IFS='
+'
+  done
+  IFS="$oldifs"
+  return "$found"
+}
 
-# ── adapter_effectiveness_exceptions.conf (issue #2567 / BQ-1) ─────
-_scan_exceptions_conf "${TRADING_DIR}/devtools/checks/adapter_effectiveness_exceptions.conf" "Adapter-effectiveness exception expiry"
-AE_EXPIRY_COUNT="$_SCAN_COUNT"
-AE_EXPIRY_MISSING_COUNT="$_SCAN_MISSING_COUNT"
-AE_EXPIRY_DETAILS="$_SCAN_DETAILS"
-AE_EXPIRY_MISSING="$_SCAN_MISSING"
+# ── Scan every registered conf file ────────────────────────────────
+_saved_ifs="$IFS"
+IFS='
+'
+for _row in $_EXCEPTIONS_CONF_TABLE; do
+  IFS="$_saved_ifs"
+  [ -z "$_row" ] && continue
+  _conf_file="$(printf '%s' "$_row" | cut -d'|' -f1)"
+  _conf_label="$(printf '%s' "$_row" | cut -d'|' -f2)"
+  _conf_prefix="$(printf '%s' "$_row" | cut -d'|' -f3)"
 
-add_metric EXPIRY_COUNT "$EXPIRY_COUNT"
-add_metric EXPIRY_MISSING_COUNT "$EXPIRY_MISSING_COUNT"
-add_metric UD_EXPIRY_COUNT "$UD_EXPIRY_COUNT"
-add_metric UD_EXPIRY_MISSING_COUNT "$UD_EXPIRY_MISSING_COUNT"
-add_metric AE_EXPIRY_COUNT "$AE_EXPIRY_COUNT"
-add_metric AE_EXPIRY_MISSING_COUNT "$AE_EXPIRY_MISSING_COUNT"
+  _scan_exceptions_conf "${TRADING_DIR}/devtools/checks/${_conf_file}" "$_conf_label"
+  eval "${_conf_prefix}_COUNT=\$_SCAN_COUNT"
+  eval "${_conf_prefix}_MISSING_COUNT=\$_SCAN_MISSING_COUNT"
+  eval "${_conf_prefix}_DETAILS=\$_SCAN_DETAILS"
+  eval "${_conf_prefix}_MISSING=\$_SCAN_MISSING"
+  eval "add_metric ${_conf_prefix}_COUNT \"\$${_conf_prefix}_COUNT\""
+  eval "add_metric ${_conf_prefix}_MISSING_COUNT \"\$${_conf_prefix}_MISSING_COUNT\""
+  IFS='
+'
+done
+IFS="$_saved_ifs"
+
+# ── Completeness guard (R-4, H-EXPIRY-GLOB-CLOSES-CLASS) ───────────
+# Discover every *exceptions*.conf file under trading/devtools/checks/ and
+# warn loudly -- not silently -- if one has no row in the table above.
+# For the three files registered today this finds nothing and changes no
+# output; it exists for the file nobody remembers to register tomorrow.
+_UNREGISTERED_COUNT=0
+_UNREGISTERED_DETAILS=""
+_found_conf_files="$(find "${TRADING_DIR}/devtools/checks" -name '*exceptions*.conf' 2>/dev/null | sort)"
+_saved_ifs="$IFS"
+IFS='
+'
+for _found in $_found_conf_files; do
+  IFS="$_saved_ifs"
+  [ -z "$_found" ] && continue
+  _found_rel="${_found#${TRADING_DIR}/devtools/checks/}"
+  if ! _exceptions_conf_registered "$_found_rel"; then
+    _UNREGISTERED_COUNT=$((_UNREGISTERED_COUNT + 1))
+    _UNREGISTERED_DETAILS="${_UNREGISTERED_DETAILS}  - ${_found_rel}\n"
+    add_warning "Linter exception expiry completeness guard: ${_found_rel} matches *exceptions*.conf under trading/devtools/checks/ but has no row in check_11_linter_expiry.sh's exceptions-conf table -- its review_at entries are NOT being scanned for expiry. Add a table row (and a report section) before the next deep scan."
+  fi
+  IFS='
+'
+done
+IFS="$_saved_ifs"
+
+if [ "$_UNREGISTERED_COUNT" -gt 0 ]; then
+  add_metric UNREGISTERED_EXCEPTIONS_CONF_COUNT "$_UNREGISTERED_COUNT"
+fi
+
 flush_findings
 
 # Always emit the Linter Exception Expiry section (Check 11).
@@ -298,3 +377,20 @@ flush_findings
     fi
   fi
 } >> "$REPORT_FILE"
+
+# Only emitted when the completeness guard above found an unregistered
+# *exceptions*.conf file -- omitted entirely otherwise, so the report is
+# byte-identical to before this guard existed as long as every discovered
+# exceptions-conf file is registered in the table (true today, for all
+# three).
+if [ "$_UNREGISTERED_COUNT" -gt 0 ]; then
+  {
+    printf "\n## Exceptions-Conf Completeness\n\n"
+    printf "*exceptions*.conf files discovered under trading/devtools/checks/ that\n"
+    printf "have NO row in check_11_linter_expiry.sh's exceptions-conf table (R-4,\n"
+    printf "H-EXPIRY-GLOB-CLOSES-CLASS) -- their review_at entries are NOT being\n"
+    printf "scanned for expiry by this check:\n\n"
+    printf '%b' "$_UNREGISTERED_DETAILS"
+    printf "\n"
+  } >> "$REPORT_FILE"
+fi

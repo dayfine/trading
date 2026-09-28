@@ -1840,7 +1840,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   closed: 2026-09-02, branch `harness/expiry-never-branch-pin`, after one
   rework iteration driven by qc-behavioral on PR #2636)
 
-- [ ] **H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (O1)**: filed by qc-behavioral on
+- [x] **H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (O1)**: filed by qc-behavioral on
   PR #2589, non-blocking. Assertions 3c/3d/3e **fail closed** on a benign
   reword of the call site (verified: three separate rewordings all go RED, none
   goes vacuously green — the safe direction, and the #2580 shape specifically
@@ -1856,6 +1856,20 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   pattern no longer matches — update the pattern, the protection may be fine".
   `harness_gap: NONE`.
   (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O1)
+  **DONE (2026-09-28, harness/expiry-conf-table):** added a vacuity guard
+  right after 3d's and 3e's `sed` construction in
+  `trading/devtools/checks/deep_scan_linter_expiry_check.sh`: `if diff -q
+  "$CHECK_11" "$AE_MUT_CHECK2" >/dev/null 2>&1; then fail "the mutation's sed
+  pattern no longer matches — update the pattern; the protection may be
+  fine"; fi` (and the mirror for `AE_MUT_CHECK3`/3e). Verified by hand:
+  rewording the date-branch `add_warning` call's opening (`add_warning "` →
+  `add_warning  "`, an extra space) breaks 3e's narrower sed pattern while
+  leaving 3c's output-level check unaffected; with the new guard in place the
+  suite goes RED at the guard with exactly the intended message, not the old
+  misleading "MUTATION D did not produce the expected split"; reverted clean
+  afterward. Verify: `sh
+  trading/devtools/checks/deep_scan_linter_expiry_check.sh` (or `dune
+  runtest trading/devtools/checks/`), exit 0.
 
 - [ ] **H-EXPIRY-CONSUMER-HALF-UNPINNED (O4)**: filed by qc-behavioral on PR
   #2589, non-blocking, and **out of R-5's declared scope** (the header does not
@@ -1882,7 +1896,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `harness_gap: NONE`.
   (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O5)
 
-- [ ] **H-EXPIRY-GLOB-CLOSES-CLASS (R-4)**: recorded by qc-behavioral on the
+- [x] **H-EXPIRY-GLOB-CLOSES-CLASS (R-4)**: recorded by qc-behavioral on the
   #2585 re-review as explicitly non-blocking. `check_11_linter_expiry.sh` now
   scans **all three** `*exceptions*.conf` files that exist repo-wide, so there
   is **zero** currently-unprotected surface — but the list is three hardcoded
@@ -1894,6 +1908,38 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `(path, label, guard)` table — a refactor, not two lines. Closes the
   instance, not the class. Fix shape: that table. `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
+  **DONE (2026-09-28, harness/expiry-conf-table):** replaced the three
+  hardcoded `_scan_exceptions_conf()` call sites in
+  `trading/devtools/checks/deep_scan/check_11_linter_expiry.sh` with a
+  data-driven `_EXCEPTIONS_CONF_TABLE` (`path|label|accumulator-prefix` rows,
+  one per registered conf file) driving a single call site inside a loop, plus
+  a completeness guard that runs `find "${TRADING_DIR}/devtools/checks" -name
+  '*exceptions*.conf'` and calls `add_warning` (WARNING severity, does not
+  fail the build) for any discovered file with no table row, and appends a
+  new `## Exceptions-Conf Completeness` report section only when one is found
+  (so the report is byte-identical to before when — as today — every
+  discovered file is registered). `_scan_exceptions_conf()`'s body and the
+  three per-file report-emission blocks are untouched, so every prior Part
+  1-9 mutation-proof in `deep_scan_linter_expiry_check.sh` still targets real
+  source text; only Part 3b's mutation (which used to delete the AE call-site
+  line) was adapted to corrupt the AE row's filename field in the table
+  instead, since a single table-driven call site has no per-file line left to
+  delete. Verified byte-identical report + findings output for the real
+  three-file repo against a `git worktree add --detach origin/main` baseline
+  (`diff` clean, both exit 0). Added Part 10 (fixtures `10a`/sanity/`10b`) to
+  `deep_scan_linter_expiry_check.sh`: a fixture root with a fourth,
+  unregistered `fixture_fourth_exceptions.conf` pins that the guard fires
+  (roll-up `W:` line + new report section) at exit 0, that the three
+  registered files are never false-positively flagged, and a mutation
+  (removing the guard's `add_warning` call) proves the roll-up assertion is
+  load-bearing. Hand-verified per the task's request: applied the same
+  `add_warning` removal directly to the real (unmutated) script via `sed`,
+  re-ran `deep_scan_linter_expiry_check.sh` — went RED (exit 1) exactly at
+  the new completeness-guard assertion — then reverted and confirmed green
+  again. `dune build @fmt && dune build && dune runtest` all exit 0 (0
+  `FAIL:` lines) at the repo root. Verify: `sh
+  trading/devtools/checks/deep_scan_linter_expiry_check.sh` (or `dune
+  runtest trading/devtools/checks/`), exit 0.
 
 - [x] **H-EXPIRY-ROLLUP-WARNING-UNPINNED (R-5)**: pre-existing, surfaced (not
   introduced) by #2585's review and out of scope there. Deleting `add_warning`
