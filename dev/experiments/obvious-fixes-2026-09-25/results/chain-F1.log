@@ -1,0 +1,7 @@
+[09-28 05:02:22] lane F1 HEAD=f5507ad86 (expect f5507ad86)
+[09-28 05:02:22] cell guard CELL_TIMEOUT=60000s (sized from the measured arm: s0 8h33m at cap 256); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[09-28 05:02:22] warehouse entries=9364 (expect 9364)
+[09-28 05:02:22] host free 63G
+[09-28 05:02:22] RUN f1-stoplimit-fresh-s0-v11 on /tmp/snap_top3000_pit_v11pit
+[09-28 10:06:13] RESULT f1-stoplimit-fresh-s0-v11 => total_return_pct 464.83221262228335 total_trades 752 sharpe_ratio 0.47168406946357633 max_drawdown_pct 49.707784692522225 calmar_ratio 0.13591428982175166  V6 INVARIANT PASS V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff:exit=0 (wall 18231s)
+[09-28 10:06:13] LANE F1 DONE
