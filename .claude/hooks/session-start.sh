@@ -40,7 +40,11 @@ fi
 if [ -z "$(docker ps -q -f name="^${CONTAINER}$")" ]; then
   docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
   log "starting container $CONTAINER"
+  # Same user/env as .github/workflows/ci.yml: root (the repo checkout is
+  # root-owned) with HOME pointing at the opam switch in /home/opam.
   docker run -d --name "$CONTAINER" \
+    --user 0 -e HOME=/home/opam \
+    -e TRADING_DATA_DIR=/workspaces/trading-1/trading/test_data \
     -v "$REPO_DIR:/workspaces/trading-1" \
     -w /workspaces/trading-1/trading \
     "$IMAGE" sleep infinity >/dev/null
