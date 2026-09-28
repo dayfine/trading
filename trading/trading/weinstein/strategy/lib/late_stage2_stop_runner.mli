@@ -101,6 +101,11 @@ val update :
      {- Short positions and non-[Holding] states are skipped without emitting or
         writing.
      }
+     {- Documented behaviour: there is no exited-this-tick skip set. A position
+        whose stop fired earlier in the same tick is still [Holding] in
+        [positions], so it can still be tightened (transition emitted, level
+        written); harmless, since the strategy drops adjusts for exited ids.
+     }
     }
 
     {2 Never-lowered invariant}
