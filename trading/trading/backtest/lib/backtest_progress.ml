@@ -6,7 +6,7 @@ type t = {
   cycles_done : int;
   cycles_total : int;
   last_completed_date : Date.t;
-  trades_so_far : int;
+  fills_so_far : int;
   current_equity : float;
 }
 [@@deriving sexp]
@@ -40,7 +40,7 @@ type accumulator = {
   emitter : emitter option;
   started_at : float;
   mutable cycles_done : int;
-  mutable trades_so_far : int;
+  mutable fills_so_far : int;
   mutable last_step : (Date.t * float) option;
 }
 
@@ -50,7 +50,7 @@ let create_accumulator ~cycles_total ?emitter () =
     emitter;
     started_at = Core_unix.time ();
     cycles_done = 0;
-    trades_so_far = 0;
+    fills_so_far = 0;
     last_step = None;
   }
 
@@ -63,7 +63,7 @@ let _build acc ~date ~portfolio_value =
     cycles_done = acc.cycles_done;
     cycles_total = acc.cycles_total;
     last_completed_date = date;
-    trades_so_far = acc.trades_so_far;
+    fills_so_far = acc.fills_so_far;
     current_equity = portfolio_value;
   }
 
@@ -71,8 +71,8 @@ let _should_emit acc ~date e =
   _is_friday date && acc.cycles_done > 0
   && acc.cycles_done mod e.every_n_fridays = 0
 
-let record_step acc ~date ~trades_added ~portfolio_value =
-  acc.trades_so_far <- acc.trades_so_far + trades_added;
+let record_step acc ~date ~fills_added ~portfolio_value =
+  acc.fills_so_far <- acc.fills_so_far + fills_added;
   if _is_friday date then acc.cycles_done <- acc.cycles_done + 1;
   acc.last_step <- Some (date, portfolio_value);
   match acc.emitter with
