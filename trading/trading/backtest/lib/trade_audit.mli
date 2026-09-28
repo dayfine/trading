@@ -132,8 +132,9 @@ type alternative_candidate = {
 
 (** Whether the installed initial stop sat on a support floor or fell back to a
     fixed buffer off the effective entry price ([Buffer_fallback]: reference
-    [effective_entry * initial_stop_buffer]). Neither case uses the screener's
-    proxy stop ({!entry_decision.screener_proxy_stop}). Routed from
+    [effective_entry * initial_stop_buffer] for a long,
+    [effective_entry / initial_stop_buffer] for a short). Neither case uses the
+    screener's proxy stop ({!entry_decision.screener_proxy_stop}). Routed from
     [Weinstein_stops.compute_initial_stop_with_floor]. *)
 type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
 
@@ -238,9 +239,10 @@ type entry_decision = {
           on a [Buffer_fallback] long at the default config the installed stop
           is
           [effective_entry * initial_stop_buffer * (1 - min_correction_pct / 2)]
-          (~4% under E) while this proxy stays ~8% under E. Compare
-          {!installed_stop}, not this field, when reading where the entry's risk
-          actually sat. Kept for screener-vs-strategy comparisons only.
+          before the round-number nudge (~4% under E) while this proxy stays ~8%
+          under E. Compare {!installed_stop}, not this field, when reading where
+          the entry's risk actually sat. Kept for screener-vs-strategy
+          comparisons only.
 
           Issue #2975: written as [suggested_stop] before the rename; legacy
           files carrying that key still parse (the reader maps it here). *)
@@ -248,8 +250,14 @@ type entry_decision = {
       (** The initial stop actually registered for the position (and the one
           position sizing and [initial_risk_dollars] use): the
           [Weinstein_stops.compute_initial_stop_with_floor] level off the
-          support floor, or off [effective_entry * initial_stop_buffer] when no
-          floor qualified — which one is recorded in {!stop_floor_kind}. *)
+          support floor, or off the buffer reference
+          ([effective_entry * initial_stop_buffer] long,
+          [effective_entry / initial_stop_buffer] short) when no floor qualified
+          — which one is recorded in {!stop_floor_kind}. That level is then
+          optionally re-anchored to the entry base (relabelled
+          [Buffer_fallback]) and widened to the configured minimum stop distance
+          ([installed_stop_min_pct] / the vol-scaled ATR floor); both steps are
+          off by default. See [Entry_audit_helpers.initial_stop_and_kind]. *)
   stop_floor_kind : stop_floor_kind;
   split_safe_basis : split_safe_basis; [@sexp.default Flag_off]
       (** F5 telemetry for [stops_config.split_safe_floors]. Aggregating this
