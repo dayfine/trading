@@ -98,6 +98,36 @@ let run_single ?(buffer_pct = 0.05) ?(is_screening_day = true) ?stop
     ~get_price:(get_price_of [ ("AAPL", make_bar "2024-01-05" ~close) ])
     ~prior_stages ~current_date
 
+(** Run {!run_single} against a fresh [stop_states] ref seeded with [initial]
+    (default: AAPL at an [Initial] stop of 90) and return the transitions
+    together with the ref's final contents, so skip-path tests can pin that the
+    runner left [stop_states] untouched (issue #2998). *)
+let run_skip ?buffer_pct ?is_screening_day ?stop
+    ?(initial = String.Map.singleton "AAPL" (initial_stop ())) ~stage ~close
+    ~current_date ?side () =
+  let stop_states = ref initial in
+  let transitions =
+    run_single ?buffer_pct ?is_screening_day ?stop ~stop_states ~stage ~close
+      ~current_date ?side ()
+  in
+  (transitions, !stop_states)
+
+(** Matcher for a skip path: no transition AND [stop_states] equal to [initial].
+    The [.mli] contract is that every skip path returns without writing
+    [stop_states]; a transition-only check would miss a mutation that writes on
+    a skip path (issue #2998). *)
+let skipped_without_writing initial =
+  all_of
+    [
+      field fst is_empty;
+      field
+        (fun (_, states) -> Map.to_alist states)
+        (equal_to
+           (Map.to_alist initial : (string * Weinstein_stops.stop_state) list));
+    ]
+
+let default_states = String.Map.singleton "AAPL" (initial_stop ())
+
 (** Matcher for an [UpdateRiskParams] transition raising [symbol]'s stop to
     [expected_stop]. *)
 let raises_stop_to symbol expected_stop =
@@ -155,42 +185,48 @@ let test_tighten_below_close _ =
 (* ------------------------------------------------------------------ *)
 
 let test_early_stage2_no_tighten _ =
-  let transitions =
-    run_single ~stage:early_stage2 ~close:120.0 ~current_date:friday ()
-  in
-  assert_that transitions is_empty
+  assert_that
+    (run_skip ~stage:early_stage2 ~close:120.0 ~current_date:friday ())
+    (skipped_without_writing default_states)
 
 let test_stage1_no_tighten _ =
-  let transitions =
-    run_single ~stage:stage1 ~close:120.0 ~current_date:friday ()
-  in
-  assert_that transitions is_empty
+  assert_that
+    (run_skip ~stage:stage1 ~close:120.0 ~current_date:friday ())
+    (skipped_without_writing default_states)
 
 let test_stage3_no_tighten _ =
-  let transitions =
-    run_single ~stage:stage3 ~close:120.0 ~current_date:friday ()
-  in
-  assert_that transitions is_empty
+  assert_that
+    (run_skip ~stage:stage3 ~close:120.0 ~current_date:friday ())
+    (skipped_without_writing default_states)
 
 let test_stage4_no_tighten _ =
-  let transitions =
-    run_single ~stage:stage4 ~close:120.0 ~current_date:friday ()
-  in
-  assert_that transitions is_empty
+  assert_that
+    (run_skip ~stage:stage4 ~close:120.0 ~current_date:friday ())
+    (skipped_without_writing default_states)
 
 (* ------------------------------------------------------------------ *)
 (* Test 3 — never-lowered: compared against the live stop state         *)
 (* ------------------------------------------------------------------ *)
 
 (** Candidate = 120 * 0.95 = 114. A live stop already at 116 is higher, so the
-    runner must NOT lower it — no transition is emitted. *)
+    runner must NOT lower it — no transition is emitted and the state is not
+    written (issue #2998). *)
 let test_existing_higher_stop_not_lowered _ =
-  let transitions =
-    run_single ~buffer_pct:0.05 ~stop:116.0
-      ~stop_states:(stop_states_of (initial_stop ~level:116.0 ()))
-      ~stage:late_stage2 ~close:120.0 ~current_date:friday ()
-  in
-  assert_that transitions is_empty
+  let initial = String.Map.singleton "AAPL" (initial_stop ~level:116.0 ()) in
+  assert_that
+    (run_skip ~buffer_pct:0.05 ~stop:116.0 ~initial ~stage:late_stage2
+       ~close:120.0 ~current_date:friday ())
+    (skipped_without_writing initial)
+
+(** Candidate = 120 * 0.95 = 114 equals a live stop already at 114: the
+    at-or-below branch — strictly-greater is required — so nothing is emitted or
+    written. *)
+let test_existing_equal_stop_not_rewritten _ =
+  let initial = String.Map.singleton "AAPL" (initial_stop ~level:114.0 ()) in
+  assert_that
+    (run_skip ~buffer_pct:0.05 ~initial ~stage:late_stage2 ~close:120.0
+       ~current_date:friday ())
+    (skipped_without_writing initial)
 
 (** Candidate = 120 * 0.95 = 114. A live stop at 110 is lower, so the runner
     raises it to 114. *)
@@ -209,21 +245,19 @@ let test_existing_lower_stop_raised _ =
     branch would have "tightened" to 114 (a lowering in effect); the runner must
     emit nothing. *)
 let test_compares_against_state_not_risk_params _ =
-  let transitions =
-    run_single ~buffer_pct:0.05
-      ~stop_states:(stop_states_of (initial_stop ~level:116.0 ()))
-      ~stage:late_stage2 ~close:120.0 ~current_date:friday ()
-  in
-  assert_that transitions is_empty
+  let initial = String.Map.singleton "AAPL" (initial_stop ~level:116.0 ()) in
+  assert_that
+    (run_skip ~buffer_pct:0.05 ~initial ~stage:late_stage2 ~close:120.0
+       ~current_date:friday ())
+    (skipped_without_writing initial)
 
 (** A holding with no entry in [stop_states] has no enforceable stop to tighten,
     so the runner emits nothing. *)
 let test_missing_stop_state_no_op _ =
-  let transitions =
-    run_single ~stop_states:(ref String.Map.empty) ~stage:late_stage2
-      ~close:120.0 ~current_date:friday ()
-  in
-  assert_that transitions is_empty
+  assert_that
+    (run_skip ~initial:String.Map.empty ~stage:late_stage2 ~close:120.0
+       ~current_date:friday ())
+    (skipped_without_writing String.Map.empty)
 
 (** Issue #2983: the tightened level is written into [stop_states], keeping the
     state-machine phase and its tracking fields; only [stop_level] moves. *)
@@ -286,53 +320,89 @@ let test_tightened_level_triggers_exit _ =
 (* ------------------------------------------------------------------ *)
 
 let test_non_friday_no_op _ =
-  let transitions =
-    run_single ~is_screening_day:false ~stage:late_stage2 ~close:120.0
-      ~current_date:monday ()
-  in
-  assert_that transitions is_empty
+  assert_that
+    (run_skip ~is_screening_day:false ~stage:late_stage2 ~close:120.0
+       ~current_date:monday ())
+    (skipped_without_writing default_states)
 
 let test_short_side_no_tighten _ =
-  let transitions =
-    run_single ~side:Trading_base.Types.Short ~stage:late_stage2 ~close:120.0
-      ~current_date:friday ()
-  in
-  assert_that transitions is_empty
+  assert_that
+    (run_skip ~side:Trading_base.Types.Short ~stage:late_stage2 ~close:120.0
+       ~current_date:friday ())
+    (skipped_without_writing default_states)
 
-let test_empty_positions_no_op _ =
+(** Run the runner over an explicit [positions] map, [get_price] bars and
+    [prior_stages] against [default_states]; return the transitions with the
+    ref's final contents (the shape {!skipped_without_writing} reads). *)
+let run_positions ~positions ~bars ~prior_stages =
+  let stop_states = ref default_states in
   let transitions =
     Late_stage2_stop_runner.update ~buffer_pct:0.05 ~is_screening_day:true
-      ~stop_states:(ref String.Map.empty) ~positions:String.Map.empty
-      ~get_price:(get_price_of [])
-      ~prior_stages:(Hashtbl.create (module String))
+      ~stop_states ~positions ~get_price:(get_price_of bars) ~prior_stages
       ~current_date:friday
   in
-  assert_that transitions is_empty
+  (transitions, !stop_states)
+
+let late_stages_for symbol =
+  let prior_stages = Hashtbl.create (module String) in
+  Hashtbl.set prior_stages ~key:symbol ~data:late_stage2;
+  prior_stages
+
+let aapl_bar = [ ("AAPL", make_bar "2024-01-05" ~close:120.0) ]
+
+(** No positions: nothing to tighten, and a non-empty [stop_states] is left as
+    is. *)
+let test_empty_positions_no_op _ =
+  assert_that
+    (run_positions ~positions:String.Map.empty ~bars:aapl_bar
+       ~prior_stages:(late_stages_for "AAPL"))
+    (skipped_without_writing default_states)
 
 let test_missing_stage_no_op _ =
   let pos = make_holding_pos "AAPL" ~entry:100.0 ~date:friday in
-  let positions = String.Map.singleton "AAPL" pos in
-  let transitions =
-    Late_stage2_stop_runner.update ~buffer_pct:0.05 ~is_screening_day:true
-      ~stop_states:(stop_states_of (initial_stop ()))
-      ~positions
-      ~get_price:(get_price_of [ ("AAPL", make_bar "2024-01-05" ~close:120.0) ])
-      ~prior_stages:(Hashtbl.create (module String))
-      ~current_date:friday
-  in
-  assert_that transitions is_empty
+  assert_that
+    (run_positions
+       ~positions:(String.Map.singleton "AAPL" pos)
+       ~bars:aapl_bar
+       ~prior_stages:(Hashtbl.create (module String)))
+    (skipped_without_writing default_states)
 
 let test_missing_price_no_op _ =
   let pos = make_holding_pos "AAPL" ~entry:100.0 ~date:friday in
-  let positions = String.Map.singleton "AAPL" pos in
-  let prior_stages = Hashtbl.create (module String) in
-  Hashtbl.set prior_stages ~key:"AAPL" ~data:late_stage2;
-  let transitions =
-    Late_stage2_stop_runner.update ~buffer_pct:0.05 ~is_screening_day:true
-      ~stop_states:(stop_states_of (initial_stop ()))
-      ~positions ~get_price:(get_price_of []) ~prior_stages ~current_date:friday
+  assert_that
+    (run_positions
+       ~positions:(String.Map.singleton "AAPL" pos)
+       ~bars:[] ~prior_stages:(late_stages_for "AAPL"))
+    (skipped_without_writing default_states)
+
+(** A position still in [Entering] (not [Holding]) is skipped: no transition and
+    no write, even in late Stage 2 with a bar and a stop state whose level (90)
+    sits below the candidate (114). *)
+let test_non_holding_no_op _ =
+  let pos =
+    Trading_strategy.Position.create_entering
+      {
+        Trading_strategy.Position.position_id = "AAPL";
+        date = friday;
+        kind =
+          CreateEntering
+            {
+              symbol = "AAPL";
+              side = Trading_base.Types.Long;
+              target_quantity = 10.0;
+              entry_price = 100.0;
+              reasoning = ManualDecision { description = "test" };
+            };
+      }
+    |> function
+    | Ok p -> p
+    | Error _ -> OUnit2.assert_failure "position setup failed"
   in
-  assert_that transitions is_empty
+  assert_that
+    (run_positions
+       ~positions:(String.Map.singleton "AAPL" pos)
+       ~bars:aapl_bar ~prior_stages:(late_stages_for "AAPL"))
+    (skipped_without_writing default_states)
 
 let suite =
   "late_stage2_stop_runner"
@@ -345,6 +415,8 @@ let suite =
          "stage4_no_tighten" >:: test_stage4_no_tighten;
          "existing_higher_stop_not_lowered"
          >:: test_existing_higher_stop_not_lowered;
+         "existing_equal_stop_not_rewritten"
+         >:: test_existing_equal_stop_not_rewritten;
          "existing_lower_stop_raised" >:: test_existing_lower_stop_raised;
          "compares_against_state_not_risk_params"
          >:: test_compares_against_state_not_risk_params;
@@ -357,6 +429,7 @@ let suite =
          "empty_positions_no_op" >:: test_empty_positions_no_op;
          "missing_stage_no_op" >:: test_missing_stage_no_op;
          "missing_price_no_op" >:: test_missing_price_no_op;
+         "non_holding_no_op" >:: test_non_holding_no_op;
        ]
 
 let () = run_test_tt_main suite
