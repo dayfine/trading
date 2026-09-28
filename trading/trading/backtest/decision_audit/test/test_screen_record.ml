@@ -67,7 +67,7 @@ let _entry ?(entry_date = _date "2024-03-01") ?(symbol = "AAPL")
     adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
-    suggested_stop = 92.0;
+    screener_proxy_stop = 92.0;
     installed_stop = 92.0;
     stop_floor_kind = TA.Buffer_fallback;
     split_safe_basis = TA.Flag_off;
