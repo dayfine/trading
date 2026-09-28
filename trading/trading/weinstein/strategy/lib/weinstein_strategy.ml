@@ -171,12 +171,13 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
 
 (** Run the late-Stage-2 trailing-stop tightening dial (P1 stage-accuracy). On
     Friday ticks, when [config.enable_late_stage2_stop_tighten = true], raise
-    the trailing stop of every held [Stage2 { late = true }] long. Returns
+    the trailing stop of every held [Stage2 { late = true }] long: writes the
+    new level into [stop_states] (what the trigger reads) and returns matching
     [UpdateRiskParams] adjust transitions (never exits). The flag default-off
     short-circuits to [[]], so the disabled path is bit-identical to baseline.
     See {!Late_stage2_stop_runner}. *)
-let _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
-    ~index_view ~current_date =
+let _run_late_stage2_tighten ~config ~stop_states ~positions ~get_price
+    ~prior_stages ~index_view ~current_date =
   if not config.enable_late_stage2_stop_tighten then []
   else
     let is_friday =
@@ -184,7 +185,7 @@ let _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
     in
     Late_stage2_stop_runner.update
       ~buffer_pct:config.late_stage2_stop_buffer_pct ~is_screening_day:is_friday
-      ~positions ~get_price ~prior_stages ~current_date
+      ~stop_states ~positions ~get_price ~prior_stages ~current_date
 
 (** Compute the macro result for [current_date] (Friday only) and run the
     halt-reset side effect. Returns [None] on non-screening days. Mutates
@@ -271,8 +272,8 @@ let _run_dials_and_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
     ~get_price ~(portfolio : Portfolio_view.t) ~current_date ~index_view
     ~audit_recorder ~is_screening_day ~macro_result_opt ~positions =
   let late_tighten_transitions =
-    _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
-      ~index_view ~current_date
+    _run_late_stage2_tighten ~config ~stop_states ~positions ~get_price
+      ~prior_stages ~index_view ~current_date
   in
   let entry_transitions =
     _run_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
