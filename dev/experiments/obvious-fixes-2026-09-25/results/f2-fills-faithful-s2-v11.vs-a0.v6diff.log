@@ -1,0 +1,7 @@
+check | null | arm | verdict
+V6    |    0 |   1 | DIFFER
+
+specimens present in some reports but not all:
+  V6 AGYS 2006-01-09 (twin positions: AGYS/HXL) -- only in: arm
+FAIL: validator invariant counts differ -- these arms hold different instrument sets and their delta is not a paired read
+exit=1

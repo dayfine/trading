@@ -5,7 +5,7 @@ Times PT. Status: RUNNING / QUEUED / DONE / PROPOSED (needs a decision).
 
 | # | Status | Item | Cells | Est. wall | Why |
 |---|---|---|---|---|---|
-| 1 | DONE (s0–s2: 132.8 / 106.5 / 70.0 %) | obvious-fixes chain A: `f2-fills-faithful` s1 DONE (106.54 %); s2 at week 1,196/1,434 at 20:54, ends ~22:00–22:10 09-26; watcher then stops the chain before `f1` | s2 only | ~22:05 | salt band for both fixes |
+| 1 | DONE (s0–s2: 132.8 / 106.5 / 70.0 %; artifacts `../obvious-fixes-2026-09-25/results/`) | obvious-fixes chain A: `f2-fills-faithful` s1 DONE (106.54 %); s2 at week 1,196/1,434 at 20:54, ends ~22:00–22:10 09-26; watcher then stops the chain before `f1` | s2 only | ~22:05 | salt band for both fixes |
 | 1b | DONE 09-28 (464.8 %, `../obvious-fixes-2026-09-25/f1-s0-result.md`) | `f1-stoplimit-fresh` s0 (26y): on the old `sweep-fixes` build, or the new main if #2977 is goldens-identical | 1 × ~5.5 h | | f1 separates Fix A from Fix B |
 | 2 | DONE 09-27 (`launch-post2996.sh`, main f5507ad86) | new pinned worktree at post-merge main; `BUILD=1 PREFLIGHT=1 EXPECT_HEAD=<new sha> WTREL=<new wt> sh chain-investor.sh I …` (`launch-after-A.sh` is superseded by the pause) | build + preflight | ~20 min | PREFLIGHT runs each spec on 2026-04..06 and aborts on a missing actual.sexp |
 | 3 | DONE 09-28 — V6 failed all 3 salts (GOOG/GOOGL twin); `results-2026-09-28.md` §2 | 5y broad investor preset vs hybrid control, 2021-06 → 2026-06, salts 0/1/2, V6-paired | 6 × ~1 h | ~6 h | first investor-only number on the broad universe (user 09-26) |
