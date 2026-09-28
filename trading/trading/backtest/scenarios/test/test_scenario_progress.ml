@@ -63,7 +63,7 @@ let test_make_emitter_writes_under_scenario_dir _ =
       cycles_done = 4;
       cycles_total = 838;
       last_completed_date = Date.create_exn ~y:2014 ~m:Month.Dec ~d:26;
-      trades_so_far = 7;
+      fills_so_far = 7;
       current_equity = 152384.21;
     }
   in
