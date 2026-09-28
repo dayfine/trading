@@ -51,7 +51,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
       ]) ?(cascade_rationale = [ "Stage2 breakout"; "RS positive rising" ])
     ?(suggested_entry = 150.50) ?(close_at_decision = None)
     ?(adjusted_close_at_decision = None) ?(ma_value = None)
-    ?(local_range_top = None) ?(suggested_stop = 138.46)
+    ?(local_range_top = None) ?(screener_proxy_stop = 138.46)
     ?(installed_stop = 138.46) ?(stop_floor_kind = TA.Buffer_fallback)
     ?(split_safe_basis = TA.Flag_off) ?(risk_pct = 0.08)
     ?(initial_position_value = 75_000.0) ?(initial_risk_dollars = 6_000.0)
@@ -85,7 +85,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     adjusted_close_at_decision;
     ma_value;
     local_range_top;
-    suggested_stop;
+    screener_proxy_stop;
     installed_stop;
     stop_floor_kind;
     split_safe_basis;
@@ -271,6 +271,73 @@ let test_entry_decision_sexp_tolerates_missing_e_provenance_fields _ =
   assert_that
     (TA.entry_decision_of_sexp stripped)
     (equal_to (make_entry () : TA.entry_decision))
+
+(* Issue #2975: the screener's proxy stop is written under the key
+   [screener_proxy_stop] — never the legacy [suggested_stop], so a walkthrough
+   reader cannot mistake it for the stop the entry used. *)
+let _top_level_keys (sexp : Sexp.t) =
+  match sexp with
+  | Sexp.List fields ->
+      List.filter_map fields ~f:(function
+        | Sexp.List (Sexp.Atom key :: _) -> Some key
+        | _ -> None)
+  | Sexp.Atom _ -> []
+
+let test_entry_decision_sexp_writes_screener_proxy_stop_key _ =
+  let keys =
+    _top_level_keys (TA.sexp_of_entry_decision (make_entry ()))
+    |> List.filter ~f:(fun k ->
+        List.mem
+          [ "screener_proxy_stop"; "suggested_stop" ]
+          k ~equal:String.equal)
+  in
+  assert_that keys (elements_are [ equal_to "screener_proxy_stop" ])
+
+(* A [trade_audit.sexp] row written before issue #2975 carries the proxy under
+   [suggested_stop]. Literal trimmed from a real pre-rename artefact
+   ([dev/warmup-fix-runs/after-fix1-stop-log/bull-2019h2/trade_audit.sexp],
+   AAPL 2019-06-21; [volume_ratio], a required field added after that file was
+   written, is filled in) and read through the top-level codec every reader
+   uses: the legacy value must land in [screener_proxy_stop], distinct from the
+   [installed_stop] the entry actually used. *)
+let _legacy_audit_records =
+  {|(((entry
+     ((symbol AAPL) (entry_date 2019-06-21) (position_id AAPL-wein-61)
+      (macro_trend Bullish) (macro_confidence 1) (macro_indicators ())
+      (stage (Stage2 (weeks_advancing 1) (late false))) (ma_direction Rising)
+      (ma_slope_pct 0.017967958275741824) (rs_trend ()) (rs_value ())
+      (volume_quality ((Adequate 1.7052120350790312))) (volume_ratio (1.71))
+      (resistance_quality (Clean)) (support_quality (Virgin_territory))
+      (sector_name "Information Technology") (sector_rating Strong)
+      (cascade_score 65) (cascade_grade B) (cascade_score_components ())
+      (cascade_rationale ("Adequate volume"))
+      (side Long) (suggested_entry 211.17) (suggested_stop 194.2764)
+      (installed_stop 163.4592) (stop_floor_kind Support_floor)
+      (risk_pct 0.079999999999999974) (initial_position_value 130291.89)
+      (initial_risk_dollars 29437.563599999987)
+      (alternatives_considered ())))
+    (exit_ ())))|}
+
+let test_legacy_suggested_stop_key_parses_into_screener_proxy_stop _ =
+  assert_that
+    (TA.audit_records_of_sexp (Sexp.of_string _legacy_audit_records))
+    (elements_are
+       [
+         field
+           (fun (r : TA.audit_record) -> r.entry)
+           (all_of
+              [
+                field
+                  (fun (e : TA.entry_decision) -> e.screener_proxy_stop)
+                  (float_equal 194.2764);
+                field
+                  (fun (e : TA.entry_decision) -> e.installed_stop)
+                  (float_equal 163.4592);
+                field
+                  (fun (e : TA.entry_decision) -> e.split_safe_basis)
+                  (equal_to (TA.Flag_off : TA.split_safe_basis));
+              ]);
+       ])
 
 (* PR-5 ticket-lifecycle fields ---------------------------------------- *)
 
@@ -1191,6 +1258,10 @@ let suite =
          >:: test_entry_decision_sexp_tolerates_missing_split_safe_basis;
          "entry_decision sexp tolerates missing E-provenance fields"
          >:: test_entry_decision_sexp_tolerates_missing_e_provenance_fields;
+         "entry_decision sexp writes the screener_proxy_stop key"
+         >:: test_entry_decision_sexp_writes_screener_proxy_stop_key;
+         "legacy suggested_stop key parses into screener_proxy_stop"
+         >:: test_legacy_suggested_stop_key_parses_into_screener_proxy_stop;
          "entry_decision sexp round-trips E-provenance fields"
          >:: test_entry_decision_sexp_round_trips_e_provenance_fields;
          "entry_decision sexp round-trips every ticket_lifecycle verdict"
