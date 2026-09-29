@@ -36,5 +36,19 @@ check "(b) drops other-heading and [merge] lines" "$B" 'not under Done when\|che
 check "(b) omits unlabelled #101" "$B" '^#101 ' 0
 check "(b) template issue: only its real condition" "$B" '^    - \[after-merge\] golden unchanged on 2 weekly runs$' 1
 check "(b) template issue: comment and empty placeholder skipped" "$B" 'only provable\|^    - \[after-merge\]$' 0
+# Regression: a merged-PR payload larger than Linux's 128 KiB per-argument
+# cap (the live repo's 500 PRs are ~1.6 MB) must still be read -- it once
+# went to jq via --argjson and died with "Argument list too long".
+BIG=$(mktemp -d)
+trap 'rm -rf "$BIG"' EXIT
+cp "${ISSUE_FIX_AUDIT_FIXTURE_DIR}/issues.json" "$BIG/issues.json"
+pad=$(awk 'BEGIN { s = "x"; while (length(s) < 300000) s = s s; print s }')
+printf '[{"number": 950, "title": "big", "mergedAt": "2026-09-03T00:00:00Z", "body": "%s see #103"}]\n' "$pad" >"$BIG/prs.json"
+if BIG_OUT=$(ISSUE_FIX_AUDIT_FIXTURE_DIR="$BIG" sh "$SCRIPT" 2>&1); then
+  check "(a) reads a >128 KiB PR payload (not via argv)" "$BIG_OUT" '^#103 .*PR #950' 1
+else
+  echo "FAIL: script failed on a >128 KiB PR payload: $(printf '%s\n' "$BIG_OUT" | tail -1)" >&2
+  FAILED=$((FAILED + 1))
+fi
 [ "$FAILED" = 0 ] || exit 1
 echo "issue_fix_audit_test: all passed"

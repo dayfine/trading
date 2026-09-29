@@ -35,10 +35,16 @@ else
     --json number,title,body,mergedAt)
 fi
 
+# The merged-PR JSON (~1.6 MB for 500 PRs) goes to jq through a file, never
+# argv: --argjson would exceed ARG_MAX / Linux's 128 KiB per-argument cap.
+PRS_FILE=$(mktemp)
+trap 'rm -f "$PRS_FILE"' EXIT
+printf '%s\n' "$PRS" >"$PRS_FILE"
+
 echo "== (a) open issues mentioned by a merged PR =="
-printf '%s\n' "$ISSUES" | jq -r --argjson prs "$PRS" '
+printf '%s\n' "$ISSUES" | jq -r --slurpfile prs "$PRS_FILE" '
   .[] | . as $i
-  | ($prs | map(select(((.title // "") + " " + (.body // ""))
+  | ($prs[0] | map(select(((.title // "") + " " + (.body // ""))
       | test("#" + ($i.number | tostring) + "([^0-9]|$)")))) as $hits
   | select(($hits | length) > 0)
   | "#\($i.number) \($i.title) <- "
