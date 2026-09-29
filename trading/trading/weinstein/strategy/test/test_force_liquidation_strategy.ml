@@ -439,6 +439,7 @@ let test_adjust_dedup_against_force_liq_exit _ =
              stop_level = 50.0;
              last_correction_extreme = 90.0;
              reason = "test setup — primed for ratchet";
+             swing_peak = None;
            });
   let config =
     Weinstein_strategy.default_config ~universe:[] ~index_symbol:_index_symbol

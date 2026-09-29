@@ -49,8 +49,9 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
         ("clean_resistance", 15);
         ("sector_strong", 10);
       ]) ?(cascade_rationale = [ "Stage2 breakout"; "RS positive rising" ])
-    ?(suggested_entry = 150.50) ?(close_at_decision = None) ?(ma_value = None)
-    ?(local_range_top = None) ?(suggested_stop = 138.46)
+    ?(suggested_entry = 150.50) ?(close_at_decision = None)
+    ?(adjusted_close_at_decision = None) ?(ma_value = None)
+    ?(local_range_top = None) ?(screener_proxy_stop = 138.46)
     ?(installed_stop = 138.46) ?(stop_floor_kind = TA.Buffer_fallback)
     ?(split_safe_basis = TA.Flag_off) ?(risk_pct = 0.08)
     ?(initial_position_value = 75_000.0) ?(initial_risk_dollars = 6_000.0)
@@ -81,9 +82,10 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     side;
     suggested_entry;
     close_at_decision;
+    adjusted_close_at_decision;
     ma_value;
     local_range_top;
-    suggested_stop;
+    screener_proxy_stop;
     installed_stop;
     stop_floor_kind;
     split_safe_basis;
@@ -189,6 +191,7 @@ let test_skip_reason_sexp_round_trip _ =
       Sized_to_zero;
       Sector_concentration;
       Top_n_cutoff;
+      No_structural_stop;
     ]
   in
   let parsed =
@@ -235,14 +238,16 @@ let test_entry_decision_sexp_tolerates_missing_split_safe_basis _ =
     (equal_to (make_entry ~split_safe_basis:TA.Flag_off () : TA.entry_decision))
 
 (* The E-provenance fields ([close_at_decision] / [ma_value] /
-   [local_range_top], entry-ticket right-basis plan 2026-08-08) are
-   [\[@sexp.option\]]: a [trade_audit.sexp] written before they existed carries
-   no such fields and must parse with all three [None]. Serialize a row that
+   [local_range_top], entry-ticket right-basis plan 2026-08-08, plus
+   [adjusted_close_at_decision], issue #2973) are [\[@sexp.option\]]: a
+   [trade_audit.sexp] written before they existed carries no such fields and
+   must parse with all four [None]. Serialize a row that
    HAS the fields, strip them, and the parse must still succeed with [None]s —
    the same tolerance contract [split_safe_basis] pins above. *)
 let test_entry_decision_sexp_tolerates_missing_e_provenance_fields _ =
   let entry =
-    make_entry ~close_at_decision:(Some 148.2) ~ma_value:(Some 140.0)
+    make_entry ~close_at_decision:(Some 148.2)
+      ~adjusted_close_at_decision:(Some 3.705) ~ma_value:(Some 140.0)
       ~local_range_top:(Some 151.0) ()
   in
   let stripped =
@@ -253,7 +258,12 @@ let test_entry_decision_sexp_tolerates_missing_e_provenance_fields _ =
             | Sexp.List (Sexp.Atom name :: _) ->
                 not
                   (List.mem
-                     [ "close_at_decision"; "ma_value"; "local_range_top" ]
+                     [
+                       "close_at_decision";
+                       "adjusted_close_at_decision";
+                       "ma_value";
+                       "local_range_top";
+                     ]
                      name ~equal:String.equal)
             | _ -> true))
     | other -> other
@@ -261,6 +271,73 @@ let test_entry_decision_sexp_tolerates_missing_e_provenance_fields _ =
   assert_that
     (TA.entry_decision_of_sexp stripped)
     (equal_to (make_entry () : TA.entry_decision))
+
+(* Issue #2975: the screener's proxy stop is written under the key
+   [screener_proxy_stop] — never the legacy [suggested_stop], so a walkthrough
+   reader cannot mistake it for the stop the entry used. *)
+let _top_level_keys (sexp : Sexp.t) =
+  match sexp with
+  | Sexp.List fields ->
+      List.filter_map fields ~f:(function
+        | Sexp.List (Sexp.Atom key :: _) -> Some key
+        | _ -> None)
+  | Sexp.Atom _ -> []
+
+let test_entry_decision_sexp_writes_screener_proxy_stop_key _ =
+  let keys =
+    _top_level_keys (TA.sexp_of_entry_decision (make_entry ()))
+    |> List.filter ~f:(fun k ->
+        List.mem
+          [ "screener_proxy_stop"; "suggested_stop" ]
+          k ~equal:String.equal)
+  in
+  assert_that keys (elements_are [ equal_to "screener_proxy_stop" ])
+
+(* A [trade_audit.sexp] row written before issue #2975 carries the proxy under
+   [suggested_stop]. Literal trimmed from a real pre-rename artefact
+   ([dev/warmup-fix-runs/after-fix1-stop-log/bull-2019h2/trade_audit.sexp],
+   AAPL 2019-06-21; [volume_ratio], a required field added after that file was
+   written, is filled in) and read through the top-level codec every reader
+   uses: the legacy value must land in [screener_proxy_stop], distinct from the
+   [installed_stop] the entry actually used. *)
+let _legacy_audit_records =
+  {|(((entry
+     ((symbol AAPL) (entry_date 2019-06-21) (position_id AAPL-wein-61)
+      (macro_trend Bullish) (macro_confidence 1) (macro_indicators ())
+      (stage (Stage2 (weeks_advancing 1) (late false))) (ma_direction Rising)
+      (ma_slope_pct 0.017967958275741824) (rs_trend ()) (rs_value ())
+      (volume_quality ((Adequate 1.7052120350790312))) (volume_ratio (1.71))
+      (resistance_quality (Clean)) (support_quality (Virgin_territory))
+      (sector_name "Information Technology") (sector_rating Strong)
+      (cascade_score 65) (cascade_grade B) (cascade_score_components ())
+      (cascade_rationale ("Adequate volume"))
+      (side Long) (suggested_entry 211.17) (suggested_stop 194.2764)
+      (installed_stop 163.4592) (stop_floor_kind Support_floor)
+      (risk_pct 0.079999999999999974) (initial_position_value 130291.89)
+      (initial_risk_dollars 29437.563599999987)
+      (alternatives_considered ())))
+    (exit_ ())))|}
+
+let test_legacy_suggested_stop_key_parses_into_screener_proxy_stop _ =
+  assert_that
+    (TA.audit_records_of_sexp (Sexp.of_string _legacy_audit_records))
+    (elements_are
+       [
+         field
+           (fun (r : TA.audit_record) -> r.entry)
+           (all_of
+              [
+                field
+                  (fun (e : TA.entry_decision) -> e.screener_proxy_stop)
+                  (float_equal 194.2764);
+                field
+                  (fun (e : TA.entry_decision) -> e.installed_stop)
+                  (float_equal 163.4592);
+                field
+                  (fun (e : TA.entry_decision) -> e.split_safe_basis)
+                  (equal_to (TA.Flag_off : TA.split_safe_basis));
+              ]);
+       ])
 
 (* PR-5 ticket-lifecycle fields ---------------------------------------- *)
 
@@ -276,7 +353,7 @@ let _lifecycle ?(placement_date = _date "2024-03-01")
     ?(cancel_reason = Some "entry_ticket_ttl_expired")
     ?(ticket_age_weeks_at_fill = None) ?(fill_volume = None)
     ?(freshness_basis = TL.Range_top_breakout) ?(sized_down_wide_stop = true)
-    ?(triple_confirmation = _triple) () : TL.t =
+    ?(triple_confirmation = _triple) ?(reissued_from = None) () : TL.t =
   {
     placement_date;
     ticket_age_weeks_at_cancel;
@@ -286,6 +363,7 @@ let _lifecycle ?(placement_date = _date "2024-03-01")
     freshness_basis;
     sized_down_wide_stop;
     triple_confirmation;
+    reissued_from;
   }
 
 let _check verdict outcome : TL.fill_volume_check = { verdict; outcome }
@@ -382,7 +460,8 @@ let test_age_weeks_clamps_at_zero _ =
 (** Populated E-provenance fields survive the codec round trip. *)
 let test_entry_decision_sexp_round_trips_e_provenance_fields _ =
   let entry =
-    make_entry ~close_at_decision:(Some 148.2) ~ma_value:(Some 140.0)
+    make_entry ~close_at_decision:(Some 148.2)
+      ~adjusted_close_at_decision:(Some 3.705) ~ma_value:(Some 140.0)
       ~local_range_top:(Some 151.0) ()
   in
   let parsed = TA.entry_decision_of_sexp (TA.sexp_of_entry_decision entry) in
@@ -449,6 +528,7 @@ let test_audit_record_sexp_round_trip _ =
       exit_ = Some (make_exit ());
       external_exit = None;
       execution = None;
+      stop_decisions = [];
     }
   in
   let parsed = TA.audit_record_of_sexp (TA.sexp_of_audit_record record) in
@@ -462,6 +542,7 @@ let test_audit_records_sexp_round_trip_through_top_level_codec _ =
         exit_ = Some (make_exit ());
         external_exit = None;
         execution = None;
+        stop_decisions = [];
       };
       {
         entry =
@@ -470,6 +551,7 @@ let test_audit_records_sexp_round_trip_through_top_level_codec _ =
         exit_ = None;
         external_exit = None;
         execution = None;
+        stop_decisions = [];
       };
     ]
   in
@@ -597,6 +679,133 @@ let test_lifecycle_merges_are_inert_on_a_pre_pr5_row _ =
     (_check TL.No_verdict TL.Held);
   assert_that (TA.get_audit_records t)
     (elements_are [ field _lifecycle_of is_none ])
+
+(* #2989 — re-issued suspended tickets ----------------------------------- *)
+
+let _original_id = "AAPL-wein-1"
+let _reissued_id = "AAPL-wein-7"
+let _placed = _date "2024-03-01"
+let _suspended_on = _date "2024-03-08"
+let _reissued_on = _date "2024-03-22"
+
+let _reissue_link : TL.reissue =
+  { original_position_id = _original_id; reissue_date = _reissued_on }
+
+(** The placement row the entry walk records: unresolved lifecycle, one rival, a
+    support-floor stop — the fields a re-issued trade must be joinable to. *)
+let _placement_row () =
+  make_entry ~position_id:_original_id ~installed_stop:141.0
+    ~stop_floor_kind:TA.Support_floor
+    ~alternatives_considered:
+      [
+        _alt ~symbol:"MSFT" ~score:60 ~grade:Weinstein_types.B
+          ~reason:TA.Top_n_cutoff ();
+      ]
+    ~ticket_lifecycle:
+      (Some
+         (_lifecycle ~placement_date:_placed ~ticket_age_weeks_at_cancel:None
+            ~cancel_reason:None ()))
+    ()
+
+(** Suspend, re-issue and fill: the original placement is withdrawn with the
+    suspension token, the re-issued id gets a row that is the original's
+    placement-time entry (same alternatives, installed stop, floor kind,
+    placement date) with [reissued_from] pointing back at the original id, and
+    the re-issued position's exit attaches to that row. The original row keeps
+    its own withdrawal and gains no link.
+
+    MUTATION: making [record_reissue] a no-op leaves the exit with no row to
+    attach to (the pre-#2989 shape) and turns the second element red. *)
+let test_record_reissue_links_the_filled_copy_to_its_placement _ =
+  let t = TA.create () in
+  let original = _placement_row () in
+  TA.record_entry t original;
+  TA.record_transitions t
+    [
+      {
+        Position.position_id = _original_id;
+        date = _suspended_on;
+        kind = Position.CancelEntry { reason = "entry_ticket_macro_suspended" };
+      };
+    ];
+  let (_ : TA.entry_decision option) =
+    TA.record_reissue t ~position_id:_reissued_id
+      ~original_position_id:_original_id ~reissue_date:_reissued_on
+  in
+  TA.record_exit t (make_exit ~position_id:_reissued_id ());
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (r : TA.audit_record) -> r.entry.position_id)
+               (equal_to _original_id);
+             field
+               (fun (r : TA.audit_record) ->
+                 Option.map r.entry.ticket_lifecycle ~f:(fun l ->
+                     (l.cancel_reason, l.reissued_from)))
+               (is_some_and
+                  (equal_to (Some "entry_ticket_macro_suspended", None)));
+             field (fun (r : TA.audit_record) -> r.exit_) is_none;
+           ];
+         all_of
+           [
+             field
+               (fun (r : TA.audit_record) -> r.entry)
+               (equal_to
+                  ({
+                     original with
+                     position_id = _reissued_id;
+                     (* Spelled out literally, not via [TL.with_reissue]:
+                        the copy keeps the original [placement_date] (so its
+                        fill age counts the suspended weeks) and every other
+                        placement-time lifecycle field. *)
+                     ticket_lifecycle =
+                       Some
+                         (_lifecycle ~placement_date:_placed
+                            ~ticket_age_weeks_at_cancel:None ~cancel_reason:None
+                            ~reissued_from:(Some _reissue_link) ());
+                   }
+                    : TA.entry_decision));
+             field
+               (fun (r : TA.audit_record) ->
+                 Option.bind r.entry.ticket_lifecycle ~f:(fun l ->
+                     l.reissued_from))
+               (is_some_and (equal_to _reissue_link));
+             field
+               (fun (r : TA.audit_record) ->
+                 Option.map r.exit_ ~f:(fun e -> e.position_id))
+               (is_some_and (equal_to _reissued_id));
+           ];
+       ])
+
+(** No placement on file for the named original → nothing is recorded and [None]
+    is returned (the no-entry contract every [record_*] shares). *)
+let test_record_reissue_without_original_is_dropped _ =
+  let t = TA.create () in
+  let copy =
+    TA.record_reissue t ~position_id:_reissued_id
+      ~original_position_id:_original_id ~reissue_date:_reissued_on
+  in
+  assert_that (copy, TA.get_audit_records t) (pair is_none is_empty)
+
+(** [reissued_from] is [[@sexp.option]]: a [trade_audit.sexp] lifecycle written
+    before #2989 has no such field and parses with [None]; a populated link
+    survives the codec. The legacy record is spelled out as sexp text, not
+    derived from today's serializer, so it pins the on-disk shape. *)
+let test_ticket_lifecycle_sexp_reissued_from_is_optional _ =
+  let legacy =
+    Sexp.of_string
+      "((placement_date 2024-03-01) (freshness_basis Ma_cross) \
+       (sized_down_wide_stop false) (triple_confirmation \
+       ((breakout_volume_multiple ()) (rs_zero_cross false) \
+       (in_base_advance_pct ()))))"
+  in
+  let linked = _lifecycle ~reissued_from:(Some _reissue_link) () in
+  assert_that
+    (TL.t_of_sexp legacy, TL.t_of_sexp (TL.sexp_of_t linked))
+    (pair (field (fun (l : TL.t) -> l.reissued_from) is_none) (equal_to linked))
 
 (* Collector behaviour --------------------------------------------------- *)
 
@@ -926,6 +1135,124 @@ let test_empty_collector_returns_empty_blob _ =
          field (fun (b : TA.audit_blob) -> b.cascade_summaries) is_empty;
        ])
 
+(* Stop decisions (issue #2977) ----------------------------------------- *)
+
+module SD = Weinstein_stops.Stop_decision
+
+let _stop_decision ?(position_id = "AAPL-wein-1") ~date ~reason () : SD.t =
+  {
+    SD.date = _date date;
+    position_id;
+    state_before = SD.Trailing;
+    state_after = SD.Trailing;
+    stop_before = 90.0;
+    stop_after = 90.0;
+    candidate = None;
+    correction_count_before = 0;
+    correction_count = 0;
+    last_trend_extreme = Some 110.0;
+    last_correction_extreme = Some 104.0;
+    ma_value = 100.0;
+    reason;
+  }
+
+(** Decisions land on their entry's row in recording (= date) order. *)
+let test_record_stop_decision_appends_to_the_entry_row _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_stop_decision t
+    (_stop_decision ~date:"2024-01-19" ~reason:SD.Seeded_trailing ());
+  TA.record_stop_decision t
+    (_stop_decision ~date:"2024-01-26" ~reason:SD.No_correction_yet ());
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         field
+           (fun (r : TA.audit_record) -> r.stop_decisions)
+           (elements_are
+              [
+                field (fun (d : SD.t) -> d.reason) (equal_to SD.Seeded_trailing);
+                field
+                  (fun (d : SD.t) -> d.reason)
+                  (equal_to SD.No_correction_yet);
+              ]);
+       ])
+
+(** No entry on record ⇒ the decision is dropped (the shared no-entry contract).
+*)
+let test_record_stop_decision_without_entry_is_dropped _ =
+  let t = TA.create () in
+  TA.record_stop_decision t
+    (_stop_decision ~position_id:"GHOST-wein-9" ~date:"2024-01-19"
+       ~reason:SD.Raised ());
+  assert_that (TA.get_audit_records t) is_empty
+
+(** Daily holds collapse to one row per ISO week, with no look-ahead: the week
+    of 2024-03-25 ends on Thursday the 28th (Good Friday 2024-03-29 is a market
+    holiday) and still keeps exactly one hold row, dated that Thursday. The next
+    Monday's hold is a new week, so a new row; the Monday seed is not a hold, so
+    it is never collapsed. *)
+let test_record_stop_decision_collapses_holds_per_week _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_stop_decision t
+    (_stop_decision ~date:"2024-03-25" ~reason:SD.Seeded_trailing ());
+  List.iter [ "2024-03-26"; "2024-03-27"; "2024-03-28"; "2024-04-01" ]
+    ~f:(fun date ->
+      TA.record_stop_decision t
+        (_stop_decision ~date ~reason:SD.No_correction_yet ()));
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         field
+           (fun (r : TA.audit_record) ->
+             List.map r.stop_decisions ~f:(fun (d : SD.t) -> (d.date, d.reason)))
+           (equal_to
+              [
+                (_date "2024-03-25", SD.Seeded_trailing);
+                (_date "2024-03-28", SD.No_correction_yet);
+                (_date "2024-04-01", SD.No_correction_yet);
+              ]);
+       ])
+
+let test_audit_record_sexp_round_trips_stop_decisions _ =
+  let record : TA.audit_record =
+    {
+      entry = make_entry ();
+      exit_ = None;
+      external_exit = None;
+      execution = None;
+      stop_decisions =
+        [
+          _stop_decision ~date:"2024-01-19" ~reason:SD.Correction_not_recovered
+            ();
+          _stop_decision ~date:"2024-01-26" ~reason:SD.Raised ();
+        ];
+    }
+  in
+  assert_that
+    (TA.audit_record_of_sexp (TA.sexp_of_audit_record record))
+    (equal_to record)
+
+(** [@sexp.list]: an empty list is omitted, so a record with no decisions
+    serialises exactly as a pre-#2977 record did — and that pre-#2977 shape
+    parses back with [stop_decisions = []]. *)
+let test_audit_record_sexp_omits_empty_stop_decisions _ =
+  let record : TA.audit_record =
+    {
+      entry = make_entry ();
+      exit_ = None;
+      external_exit = None;
+      execution = None;
+      stop_decisions = [];
+    }
+  in
+  let sexp = TA.sexp_of_audit_record record in
+  assert_that
+    ( String.is_substring (Sexp.to_string sexp) ~substring:"stop_decisions",
+      (TA.audit_record_of_sexp sexp).stop_decisions )
+    (pair (equal_to false) is_empty)
+
 let suite =
   "Trade_audit"
   >::: [
@@ -938,6 +1265,10 @@ let suite =
          >:: test_entry_decision_sexp_tolerates_missing_split_safe_basis;
          "entry_decision sexp tolerates missing E-provenance fields"
          >:: test_entry_decision_sexp_tolerates_missing_e_provenance_fields;
+         "entry_decision sexp writes the screener_proxy_stop key"
+         >:: test_entry_decision_sexp_writes_screener_proxy_stop_key;
+         "legacy suggested_stop key parses into screener_proxy_stop"
+         >:: test_legacy_suggested_stop_key_parses_into_screener_proxy_stop;
          "entry_decision sexp round-trips E-provenance fields"
          >:: test_entry_decision_sexp_round_trips_e_provenance_fields;
          "entry_decision sexp round-trips every ticket_lifecycle verdict"
@@ -951,12 +1282,28 @@ let suite =
          >:: test_record_fill_volume_merges_into_the_entry_row;
          "record_fill_volume without an entry is dropped"
          >:: test_record_fill_volume_without_entry_is_dropped;
+         "record_stop_decision appends to the entry row"
+         >:: test_record_stop_decision_appends_to_the_entry_row;
+         "record_stop_decision without an entry is dropped"
+         >:: test_record_stop_decision_without_entry_is_dropped;
+         "record_stop_decision collapses holds per ISO week"
+         >:: test_record_stop_decision_collapses_holds_per_week;
+         "audit_record sexp round-trips stop_decisions"
+         >:: test_audit_record_sexp_round_trips_stop_decisions;
+         "audit_record sexp omits empty stop_decisions"
+         >:: test_audit_record_sexp_omits_empty_stop_decisions;
          "CancelEntry records the resting age in weeks"
          >:: test_cancel_entry_records_the_resting_age_in_weeks;
          "cancel_reason distinguishes a portfolio rejection from a TTL cancel"
          >:: test_cancel_reason_distinguishes_rejection_from_ttl;
          "lifecycle merges are inert on a pre-PR-5 row"
          >:: test_lifecycle_merges_are_inert_on_a_pre_pr5_row;
+         "record_reissue links the filled copy to its placement"
+         >:: test_record_reissue_links_the_filled_copy_to_its_placement;
+         "record_reissue without original is dropped"
+         >:: test_record_reissue_without_original_is_dropped;
+         "ticket_lifecycle sexp: reissued_from is optional"
+         >:: test_ticket_lifecycle_sexp_reissued_from_is_optional;
          "alternative_candidate sexp round-trip"
          >:: test_alternative_candidate_sexp_round_trip;
          "entry_decision sexp round-trip"

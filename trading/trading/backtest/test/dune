@@ -21,6 +21,7 @@
   test_execution_faithfulness
   test_result_writer
   test_runner_hypothesis_overrides
+  test_stop_flag_overlays
   test_panel_loader_parity
   test_snapshot_mode_parity
   test_backtest_runner_args
@@ -84,6 +85,7 @@
   weinstein_trading.portfolio_risk
   weinstein_trading.stops
   weinstein.screener
+  weinstein.macro
   weinstein.resistance
   types
   status

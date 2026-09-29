@@ -112,6 +112,7 @@ let _entry_event ?(candidate = _candidate) ?(sized_down_wide_stop = false)
     macro = _macro;
     current_date = _current_date;
     close_at_decision = Some 99.0;
+    adjusted_close_at_decision = Some 96.25;
     installed_stop = 92.0;
     stop_floor_kind;
     split_safe_basis;
@@ -185,6 +186,38 @@ let test_stop_floor_kind_projects_both_states _ =
          equal_to (TA.Buffer_fallback : TA.stop_floor_kind);
        ])
 
+(** Issue #2975 sink-hop pin. The audit row's [screener_proxy_stop] is the
+    screener candidate's fixed-percentage [suggested_stop]; [installed_stop] is
+    the strategy's stop, carried from the event. On a [Buffer_fallback] entry
+    the two differ (issue example EQT: E 23.36, proxy 21.49 = E x 0.92,
+    installed 22.4256 = E x 0.96), and the row must keep them apart rather than
+    copy either into the other. *)
+let test_buffer_fallback_row_keeps_proxy_and_installed_stop_apart _ =
+  let candidate =
+    { _candidate with suggested_entry = 23.36; suggested_stop = 21.49 }
+  in
+  let event =
+    {
+      (_entry_event ~candidate ~split_safe_basis:AR.Flag_off
+         ~stop_floor_kind:AR.Buffer_fallback ())
+      with
+      installed_stop = 22.4256;
+    }
+  in
+  assert_that (_recorded_entry_of event)
+    (all_of
+       [
+         field
+           (fun (e : TA.entry_decision) -> e.screener_proxy_stop)
+           (float_equal 21.49);
+         field
+           (fun (e : TA.entry_decision) -> e.installed_stop)
+           (float_equal 22.4256);
+         field
+           (fun (e : TA.entry_decision) -> e.stop_floor_kind)
+           (equal_to (TA.Buffer_fallback : TA.stop_floor_kind));
+       ])
+
 (** Sanity pin on the rest of the projection so the two enum tests above are not
     the module's only coverage: the identifying + dollar fields the audit
     consumer keys off must survive the hop unchanged. *)
@@ -210,13 +243,13 @@ let test_entry_projection_carries_identifying_fields _ =
        ])
 
 (** E-provenance fields (entry-ticket right-basis plan 2026-08-08):
-    [close_at_decision] must pass through from the event verbatim, [ma_value]
-    must be read off the candidate's stage analysis (the fixture's
-    [_stage_result.ma_value = 97.5], distinct from every other fixture price so
-    a mis-wire cannot pass), and [local_range_top] mirrors the candidate's
-    analysis field — [None] here because the fixture leaves the local-anchor
-    knob off. Non-default values, same reason as the enum pins: a hardcoded
-    [None]/constant at this hop must fail. *)
+    [close_at_decision] and [adjusted_close_at_decision] (issue #2973) must pass
+    through from the event verbatim, [ma_value] must be read off the candidate's
+    stage analysis (the fixture's [_stage_result.ma_value = 97.5], distinct from
+    every other fixture price so a mis-wire cannot pass), and [local_range_top]
+    mirrors the candidate's analysis field — [None] here because the fixture
+    leaves the local-anchor knob off. Non-default values, same reason as the
+    enum pins: a hardcoded [None]/constant at this hop must fail. *)
 let test_entry_projection_carries_e_provenance_fields _ =
   assert_that
     (_recorded_entry ~split_safe_basis:AR.Flag_off
@@ -226,6 +259,9 @@ let test_entry_projection_carries_e_provenance_fields _ =
          field
            (fun (e : TA.entry_decision) -> e.close_at_decision)
            (is_some_and (float_equal 99.0));
+         field
+           (fun (e : TA.entry_decision) -> e.adjusted_close_at_decision)
+           (is_some_and (float_equal 96.25));
          field
            (fun (e : TA.entry_decision) -> e.ma_value)
            (is_some_and (float_equal 97.5));
@@ -376,9 +412,119 @@ let test_fill_volume_projects_every_verdict_class _ =
          is_some_and (equal_to (check TL.No_verdict TL.Held));
        ])
 
+(** Issue #2974 sink hop: with [~stop_log], [record_entry] books the event's
+    [installed_stop] as the position's initial stop, and [record_stop_move]
+    counts a transition-less move as a raise. The fixture's [installed_stop] is
+    92.0; the move to 95.0 is the one raise. *)
+let test_stop_log_receives_installed_stop_and_moves _ =
+  let stop_log = Backtest.Stop_log.create () in
+  let recorder =
+    Backtest.Trade_audit_recorder.of_collector ~stop_log
+      ~trade_audit:(TA.create ())
+      ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+      ()
+  in
+  recorder.record_entry
+    (_entry_event ~split_safe_basis:AR.Flag_off
+       ~stop_floor_kind:AR.Buffer_fallback ());
+  recorder.record_stop_move
+    {
+      AR.position_id = "ZZZZ-wein-1";
+      symbol = "ZZZZ";
+      date = _current_date;
+      stop_level = 95.0;
+    };
+  assert_that
+    (Backtest.Stop_log.get_stop_infos stop_log)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.position_id)
+               (equal_to "ZZZZ-wein-1");
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.symbol)
+               (equal_to "ZZZZ");
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.entry_stop)
+               (is_some_and (float_equal 92.0));
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+               (is_some_and (float_equal 95.0));
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+               (equal_to 1);
+           ];
+       ])
+
+(** Issue #2989 sink hop: a [record_reissue] event copies the original
+    placement's row forward under the re-issued id (linked back via
+    [reissued_from]) and books its installed stop on the stop log under the
+    re-issued id, so [trades.csv] and [trade_audit.sexp] both carry the
+    re-issued trade. The original's row and stop-log entry are untouched.
+
+    MUTATION: wiring [record_reissue] to [(fun _ -> ())] in [of_collector] drops
+    the second row and the second stop-log entry. *)
+let test_reissue_event_copies_the_row_and_books_its_stop _ =
+  let trade_audit = TA.create () in
+  let stop_log = Backtest.Stop_log.create () in
+  let recorder =
+    Backtest.Trade_audit_recorder.of_collector ~stop_log ~trade_audit
+      ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+      ()
+  in
+  let reissue_date = _date "2024-06-28" in
+  recorder.record_entry
+    (_entry_event ~split_safe_basis:AR.Flag_off
+       ~stop_floor_kind:AR.Support_floor ());
+  recorder.record_reissue
+    {
+      reissued_position_id = "ZZZZ-wein-9";
+      original_position_id = "ZZZZ-wein-1";
+      reissue_date;
+    };
+  assert_that
+    (TA.get_audit_records trade_audit, Backtest.Stop_log.get_stop_infos stop_log)
+    (pair
+       (elements_are
+          [
+            field
+              (fun (r : TA.audit_record) ->
+                ( r.entry.position_id,
+                  Option.bind r.entry.ticket_lifecycle ~f:(fun l ->
+                      l.reissued_from) ))
+              (equal_to ("ZZZZ-wein-1", None));
+            field
+              (fun (r : TA.audit_record) ->
+                ( r.entry.position_id,
+                  r.entry.installed_stop,
+                  Option.bind r.entry.ticket_lifecycle ~f:(fun l ->
+                      l.reissued_from) ))
+              (equal_to
+                 ( "ZZZZ-wein-9",
+                   92.0,
+                   Some
+                     ({ original_position_id = "ZZZZ-wein-1"; reissue_date }
+                       : TL.reissue) ));
+          ])
+       (elements_are
+          [
+            field
+              (fun (i : Backtest.Stop_log.stop_info) ->
+                (i.position_id, i.entry_stop))
+              (equal_to ("ZZZZ-wein-1", Some 92.0));
+            field
+              (fun (i : Backtest.Stop_log.stop_info) ->
+                (i.position_id, i.entry_stop))
+              (equal_to ("ZZZZ-wein-9", Some 92.0));
+          ]))
+
 let suite =
   "Trade_audit_recorder"
   >::: [
+         "reissue event copies the row and books its stop"
+         >:: test_reissue_event_copies_the_row_and_books_its_stop;
          "entry projection carries the placement-time lifecycle"
          >:: test_entry_projection_carries_placement_time_lifecycle;
          "entry projection defaults to Ma_cross and untagged"
@@ -389,12 +535,16 @@ let suite =
          >:: test_split_safe_basis_projects_all_three_states;
          "stop_floor_kind projects both states"
          >:: test_stop_floor_kind_projects_both_states;
+         "Buffer_fallback row keeps proxy and installed stop apart"
+         >:: test_buffer_fallback_row_keeps_proxy_and_installed_stop_apart;
          "entry projection carries identifying fields"
          >:: test_entry_projection_carries_identifying_fields;
          "entry projection carries E-provenance fields"
          >:: test_entry_projection_carries_e_provenance_fields;
          "entry projection carries armed local_range_top"
          >:: test_entry_projection_carries_armed_local_range_top;
+         "stop_log receives installed stop and silent moves"
+         >:: test_stop_log_receives_installed_stop_and_moves;
        ]
 
 let () = run_test_tt_main suite

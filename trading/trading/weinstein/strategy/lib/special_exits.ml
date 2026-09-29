@@ -53,6 +53,7 @@ let _run_stage3_force_exit ~config ~record_force_exit ~positions
     if config.enable_stage3_force_exit then
       Stage3_force_exit_runner.update ~config:config.stage3_force_exit_config
         ~exit_margin_pct:config.stage3_exit_margin_pct
+        ~ma_same_basis:config.stops_config.Weinstein_stops.stop_ma_same_basis
         ~prior_stage_ma_values:(Some prior_stage_ma_values)
         ~is_screening_day:is_friday ~positions ~get_price ~prior_stages
         ~stage3_streaks ~stop_exit_position_ids:stop_exited_ids ~current_date

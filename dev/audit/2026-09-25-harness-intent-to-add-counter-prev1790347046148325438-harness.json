@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-25",
+  "feature": "harness",
+  "branch": "harness/intent-to-add-counter",
+  "sha": "da4db49c4d0d12fbb2d8beb141b0cf604c6354cb",
+  "recorded_at_ns": 1790347046148325438,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 2,
+  "notes": ""
+}

@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-26",
+  "feature": "harness",
+  "branch": "harness/ci-dispatch-none",
+  "sha": "e57e9197d5331eb84d2aa603ebf7f833053cccf4",
+  "recorded_at_ns": 1790448402367743439,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

@@ -45,6 +45,7 @@ let _tightened ~level : Stop_track.t =
           stop_level = level;
           last_correction_extreme = 180.0;
           reason = "flat MA";
+          swing_peak = None;
         };
     updated = _updated;
     raises = 1;

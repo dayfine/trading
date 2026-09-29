@@ -49,10 +49,14 @@ let _default_stage_and_ma_for_side = function
 
     Stage 4 PR-D: an optional [ma_cache] threads through to the panel callbacks.
     Mid-week stop adjustments miss the cache (Friday-aligned only) and fall back
-    to inline; Friday-aligned calls hit the cache. *)
+    to inline; Friday-aligned calls hit the cache.
+
+    [to_stop_basis] maps the returned MA onto the stop machine's basis (#2982,
+    {!Stop_ma_basis.for_stops}); never applied to the raw warmup
+    [fallback_price] nor to the value mirrored into [prior_stage_ma_values]. *)
 let _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values
     ~(stage_config : Stage.config) ~lookback_bars ~bar_reader ~as_of
-    ~prior_stages ~symbol ~side ~fallback_price () =
+    ~prior_stages ~symbol ~side ~fallback_price ~to_stop_basis () =
   let weekly =
     Bar_reader.weekly_view_for bar_reader ~symbol ~n:lookback_bars ~as_of
   in
@@ -72,23 +76,23 @@ let _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values
     Hashtbl.set prior_stages ~key:symbol ~data:result.stage;
     Option.iter prior_stage_ma_values ~f:(fun tbl ->
         Hashtbl.set tbl ~key:symbol ~data:result.ma_value);
-    (result.ma_direction, result.ma_value, result.stage)
+    (result.ma_direction, to_stop_basis result.ma_value, result.stage)
 
 (* Transition emission (worst-case fill price, exit/adjust builders, the
    trigger-only branch, and the stop_event → transitions mapping) lives in
    {!Stop_transitions} — including the G1 short-fill audit contract. *)
 
 (** Advance the shared per-ticker stop state machine
-    {b at most once per [update] call}. [advanced] memoizes
-    [(pre_advance_state, event)] per ticker: the first position on a ticker
-    advances the machine (persisting the new state into [stop_states] and the
-    new stage into [prior_stages]); subsequent same-ticker positions (sibling
-    positions, e.g. a scale-in add) replay the memoized event so each position
-    still emits its own exit / adjust transition while the machine advances
-    exactly once — {!Weinstein_stops.update}'s contract is one call per period,
-    and a second call per tick would also double-age [weeks_advancing] in
-    [prior_stages]. Sibling positions on one ticker share the position side (the
-    memoized advance uses the first position's side). *)
+    {b at most once per [update] call}. [advanced] memoizes the whole
+    {!Weinstein_stops.Stop_decision.step} per ticker: the first position on a
+    ticker advances the machine (persisting the new state into [stop_states] and
+    the new stage into [prior_stages]); subsequent same-ticker positions
+    (sibling positions, e.g. a scale-in add) replay the memoized event so each
+    position still emits its own exit / adjust transition while the machine
+    advances exactly once — {!Weinstein_stops.update}'s contract is one call per
+    period, and a second call per tick would also double-age [weeks_advancing]
+    in [prior_stages]. Sibling positions on one ticker share the position side
+    (the memoized advance uses the first position's side). *)
 let _advance_machine ?ma_cache ?prior_stage_ma_values ~stops_config
     ~stage_config ~lookback_bars ~(pos : Position.t) ~state ~bar ~stop_states
     ~ticker ~bar_reader ~as_of ~prior_stages () =
@@ -96,6 +100,9 @@ let _advance_machine ?ma_cache ?prior_stage_ma_values ~stops_config
     _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values ~stage_config
       ~lookback_bars ~bar_reader ~as_of ~prior_stages ~symbol:ticker
       ~side:pos.Position.side ~fallback_price:bar.Types.Daily_price.close_price
+      ~to_stop_basis:
+        (Stop_ma_basis.for_stops
+           ~enabled:stops_config.Weinstein_stops.stop_ma_same_basis ~bar)
       ()
   in
   let new_state, event =
@@ -103,7 +110,13 @@ let _advance_machine ?ma_cache ?prior_stage_ma_values ~stops_config
       ~current_bar:bar ~ma_value ~ma_direction ~stage
   in
   stop_states := Map.set !stop_states ~key:ticker ~data:new_state;
-  (state, event)
+  {
+    Weinstein_stops.Stop_decision.before = state;
+    after = new_state;
+    event;
+    bar;
+    ma_value;
+  }
 
 let _advance_ticker_once ?ma_cache ?prior_stage_ma_values ~advanced
     ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t) ~state ~bar
@@ -126,7 +139,7 @@ let _handle_stop_full ?ma_cache ?prior_stage_ma_values ~advanced ~stops_config
     ~stage_config ~lookback_bars ~(pos : Position.t)
     ~(risk_params : Position.risk_params) ~state ~bar ~stop_states ~ticker
     ~bar_reader ~as_of ~prior_stages ~current_date () =
-  let pre_state, event =
+  let { Weinstein_stops.Stop_decision.before = pre_state; event; _ } =
     _advance_ticker_once ?ma_cache ?prior_stage_ma_values ~advanced
       ~stops_config ~stage_config ~lookback_bars ~pos ~state ~bar ~stop_states
       ~ticker ~bar_reader ~as_of ~prior_stages ()
@@ -267,13 +280,21 @@ let _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
   | _ -> (exits, adjusts)
 
 let update ?ma_cache ?stop_update_cadence ?prior_stage_ma_values
-    ?catastrophic_armed ~stops_config ~stage_config ~lookback_bars ~positions
-    ~get_price ~stop_states ~bar_reader ~as_of ~prior_stages () =
-  (* Per-call memo: ticker -> (pre_advance_state, event). Ensures the shared
-     per-ticker state machine advances once per tick even when several sibling
-     positions hold the same ticker (see [_advance_ticker_once]). *)
+    ?catastrophic_armed ?on_stop_decision ~stops_config ~stage_config
+    ~lookback_bars ~positions ~get_price ~stop_states ~bar_reader ~as_of
+    ~prior_stages () =
+  (* Per-call memo: ticker -> advance step. Ensures the shared per-ticker state
+     machine advances once per tick even when several sibling positions hold
+     the same ticker (see [_advance_ticker_once]). *)
   let advanced = Hashtbl.create (module String) in
-  Map.fold positions ~init:([], []) ~f:(fun ~key:_ ~data:pos acc ->
-      _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
-        ?catastrophic_armed ~advanced ~stops_config ~stage_config ~lookback_bars
-        ~stop_states ~get_price ~bar_reader ~as_of ~prior_stages pos acc)
+  let transitions =
+    Map.fold positions ~init:([], []) ~f:(fun ~key:_ ~data:pos acc ->
+        _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
+          ?catastrophic_armed ~advanced ~stops_config ~stage_config
+          ~lookback_bars ~stop_states ~get_price ~bar_reader ~as_of
+          ~prior_stages pos acc)
+  in
+  Option.iter on_stop_decision ~f:(fun on_stop_decision ->
+      Stop_decision_capture.emit ~on_stop_decision ~stops_config ~positions
+        ~advanced);
+  transitions

@@ -37,9 +37,13 @@ type t = {
           day the last completed step ran on (typically a Friday at checkpoint
           emission, since checkpoints fire on Friday boundaries; on the final
           checkpoint it is whatever the simulator's last day was). *)
-  trades_so_far : int;
-      (** Cumulative count of trades observed across all simulator steps to
-          date. Each [step_result.trades] list contributes its length. *)
+  fills_so_far : int;
+      (** Cumulative count of {b fills} (entries + exits) observed across all
+          simulator steps to date. Each [step_result.trades] list contributes
+          its length, one element per fill, so a closed round trip counts twice:
+          this runs at roughly 2x the round-trip trade count in [trades.csv].
+          Named [trades_so_far] before issue #2999; progress files written
+          before the rename carry that key and do not parse with [t_of_sexp]. *)
   current_equity : float;
       (** Total portfolio value at the most recent step
           ([cash + market value of all positions]). Pulled from
@@ -77,7 +81,7 @@ type emitter = {
 
 type accumulator
 (** Mutable accumulator threaded through the simulator step loop. Tracks
-    [cycles_done] (Fridays completed), [trades_so_far] (cumulative trade count),
+    [cycles_done] (Fridays completed), [fills_so_far] (cumulative fill count),
     and the most recent step's date + portfolio value. Encapsulates the
     per-Friday emission decision so the step-loop body keeps a low nesting
     profile. *)
@@ -89,12 +93,8 @@ val create_accumulator :
     [None] every {!record_step} / {!emit_final} call becomes a cheap no-op. *)
 
 val record_step :
-  accumulator ->
-  date:Date.t ->
-  trades_added:int ->
-  portfolio_value:float ->
-  unit
-(** [record_step acc ~date ~trades_added ~portfolio_value] is invoked from the
+  accumulator -> date:Date.t -> fills_added:int -> portfolio_value:float -> unit
+(** [record_step acc ~date ~fills_added ~portfolio_value] is invoked from the
     step loop after every simulator step completes. It updates the running
     counters and, when [date] is a Friday whose cycle index is a multiple of the
     emitter's [every_n_fridays], invokes the emitter callback. *)

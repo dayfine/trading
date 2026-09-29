@@ -56,11 +56,14 @@ let _lookup_valid_ma ~prior_stage_ma_values ~symbol =
 
 (** Check the price-below-MA margin gate. Returns [true] when the close sits far
     enough below the 30-week MA to satisfy [exit_margin_pct], OR when the margin
-    filter is disabled (no MA value available, no threshold supplied).
+    filter is disabled (no MA value available).
+
+    [exit_margin_pct = 0.0] does {b not} disable the gate: the inequality
+    [(ma -. close) /. ma >= 0.0] still requires [close <= ma], so a close above
+    the MA is blocked whenever an MA is available (issue #2974; the production
+    caller always supplies the table).
 
     Disabling cases — all backward-compatible:
-    - [exit_margin_pct = 0.0] — any close (incl. above the MA) satisfies the
-      [>= 0.0] inequality; runner emits exactly as it did pre-fix.
     - [prior_stage_ma_values] omitted or symbol absent — no MA available, so the
       runner cannot evaluate the margin and falls back to hysteresis-only.
     - Recorded MA value is non-positive (warmup / corrupt data) — same.
@@ -137,11 +140,38 @@ let _fold_position ~prior_stage_ma_values ~exit_margin_pct ~config
   | Some t -> t :: acc
   | None -> acc
 
-let update ~config ~exit_margin_pct ~prior_stage_ma_values ~is_screening_day
-    ~positions ~get_price ~prior_stages ~stage3_streaks ~stop_exit_position_ids
-    ~current_date =
+(* Restate [pos]'s stored MA onto its current bar's raw basis in [restated]; a
+   symbol with no MA or no bar keeps whatever [restated] already holds. *)
+let _restate_one ~tbl ~restated ~get_price (pos : Position.t) =
+  match (Hashtbl.find tbl pos.symbol, get_price pos.symbol) with
+  | Some ma, Some bar ->
+      Hashtbl.set restated ~key:pos.symbol
+        ~data:(Stop_ma_basis.restate_to_raw ~bar ma)
+  | _ -> ()
+
+(* Under [ma_same_basis] (issue #2982), restate each held symbol's stored MA —
+   read on the weekly view's adjusted closes — onto the raw basis of that
+   symbol's current bar, so [_margin_ok] compares raw with raw. Returns a
+   restated copy; the caller's table is never mutated. Flag off (the default)
+   returns the table untouched: the pre-#2982 mixed-basis gate. *)
+let _ma_values_on_bar_basis ~ma_same_basis ~prior_stage_ma_values ~positions
+    ~get_price =
+  if not ma_same_basis then prior_stage_ma_values
+  else
+    Option.map prior_stage_ma_values ~f:(fun tbl ->
+        let restated = Hashtbl.copy tbl in
+        Map.iter positions ~f:(_restate_one ~tbl ~restated ~get_price);
+        restated)
+
+let update ~config ~exit_margin_pct ~ma_same_basis ~prior_stage_ma_values
+    ~is_screening_day ~positions ~get_price ~prior_stages ~stage3_streaks
+    ~stop_exit_position_ids ~current_date =
   if not is_screening_day then []
   else
+    let prior_stage_ma_values =
+      _ma_values_on_bar_basis ~ma_same_basis ~prior_stage_ma_values ~positions
+        ~get_price
+    in
     Map.fold positions ~init:[] ~f:(fun ~key:_ ~data:pos acc ->
         _fold_position ~prior_stage_ma_values ~exit_margin_pct ~config
           ~stage3_streaks ~prior_stages ~stop_exit_position_ids ~get_price

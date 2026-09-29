@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-28",
+  "feature": "audit-screener-proxy-stop",
+  "branch": "fix/audit-screener-proxy-stop",
+  "sha": "be4f8adacb96861e4465b581747885d9ca1587c6",
+  "recorded_at_ns": 1790619242280501090,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-25",
+  "feature": "harness",
+  "branch": "harness/file-length-scope-2876",
+  "sha": "517940fa2d2e8297be8004ca8b97ca27077a4121",
+  "recorded_at_ns": 1790351576152200555,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

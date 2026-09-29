@@ -111,7 +111,13 @@ type stop_info = {
           Populated automatically when the runner threads [set_current_date] per
           simulation step. *)
   entry_stop : float option;
-      (** Stop-loss price set when position entered Holding state *)
+      (** The initial stop installed at entry. Taken from
+          {!record_installed_stop} (the strategy's installed stop, reported at
+          the entry decision) or from the [EntryComplete] transition's
+          [stop_loss_price] when that carries one; whichever arrives last wins.
+          The simulator's [EntryComplete] carries no stop, so for the Weinstein
+          strategy the first source is the one that fills it (issue #2974).
+          [None] when neither source ever reported a level. *)
   exit_stop : float option;
       (** Stop-loss price at the time of exit (may have been updated via
           trailing) *)
@@ -120,10 +126,11 @@ type stop_info = {
   max_stop : float option;
       (** The {b most-protective} stop level ever installed on this position —
           the running maximum of every installed level for a long, the running
-          minimum for a short. Seeded from the [EntryComplete] stop, then
-          advanced by each [UpdateRiskParams] that installs a more protective
-          level. [None] when no stop was ever installed (no [EntryComplete] and
-          no [UpdateRiskParams] carrying a [stop_loss_price]).
+          minimum for a short. Seeded from the initial stop ({!entry_stop}),
+          then advanced by each [UpdateRiskParams] or {!record_stop_move} that
+          installs a more protective level. [None] when no stop was ever
+          installed (no initial stop and no [UpdateRiskParams] carrying a
+          [stop_loss_price]).
 
           Side is taken from the position's [CreateEntering] transition. The
           collector tolerates a stream that never carries one — a position first
@@ -143,14 +150,20 @@ type stop_info = {
           price scale; for a split-crossing position their ratio is not
           meaningful. *)
   n_stop_raises : int;
-      (** How many [UpdateRiskParams] transitions installed a stop level
-          {b strictly more protective} than the level installed immediately
-          before it (strictly higher for a long, strictly lower for a short).
+      (** How many stop moves installed a level {b strictly more protective}
+          than the level installed immediately before it (strictly higher for a
+          long, strictly lower for a short). A move is an [UpdateRiskParams]
+          transition or a {!record_stop_move} report (the stop state machine's
+          [Entered_tightening] install, which emits no transition).
 
-          Excludes the initial [EntryComplete] install — a position whose stop
-          never moves after entry scores 0. Also excludes the first install seen
-          on a position that had no prior level (an [UpdateRiskParams] arriving
-          before any [EntryComplete]): that is an install, not a raise.
+          Excludes the initial install ({!entry_stop}) — a position whose stop
+          never moves after entry scores 0, and one raise after entry scores 1.
+          Also excludes the first install seen on a position that had no prior
+          level (an [UpdateRiskParams] arriving before any initial stop): that
+          is an install, not a raise. Before issue #2974 the Weinstein
+          strategy's initial stop never reached this log (its [EntryComplete]
+          carries none), so every such position hit that case and under-counted
+          by one.
 
           {b Split adjustments cannot inflate this for longs.} A split rescales
           price {e and} stop {b downward} together, so the post-split level is
@@ -186,9 +199,11 @@ val record_transitions : t -> Position.transition list -> unit
     - [CreateEntering] records symbol, position_id and the position's side (the
       side decides which direction counts as "more protective" for
       {!stop_info.max_stop} / {!stop_info.n_stop_raises})
-    - [EntryComplete] records initial stop-loss price from risk_params, seeds
-      {!stop_info.max_stop} with it, and stamps {!stop_info.entry_date} with the
-      most recent {!set_current_date}.
+    - [EntryComplete] stamps {!stop_info.entry_date} with the most recent
+      {!set_current_date}, and — only when its risk_params carry a
+      [stop_loss_price] — records that level as the initial stop and seeds
+      {!stop_info.max_stop} with it. A [None] stop leaves any level already
+      booked by {!record_installed_stop} intact.
     - [UpdateRiskParams] updates current stop-loss price, advances
       {!stop_info.max_stop} when the new level is more protective, and
       increments {!stop_info.n_stop_raises} when it is strictly so
@@ -198,6 +213,27 @@ val record_transitions : t -> Position.transition list -> unit
       [ExitComplete] that follows a [TriggerExit] keeps the strategy's original
       trigger — the fallback is only applied when [exit_trigger] is still
       [None]. *)
+
+val record_installed_stop :
+  t -> position_id:string -> symbol:string -> level:float -> unit
+(** Book [level] as [position_id]'s initial stop: sets {!stop_info.entry_stop},
+    makes it the current level ({!stop_info.exit_stop} until something moves it)
+    and seeds {!stop_info.max_stop}. Never counts as a raise.
+
+    The backtest wires this to the strategy's entry-decision audit event
+    ([Audit_recorder.entry_event.installed_stop]), which fires before the
+    position's [CreateEntering] is recorded — so the position may be first seen
+    here; its side is filled in later by [CreateEntering]. This is the only
+    source of the initial stop for the Weinstein strategy, whose simulator-side
+    [EntryComplete] carries none (issue #2974). *)
+
+val record_stop_move : t -> position_id:string -> level:float -> unit
+(** Observe a stop move that no transition carries (the strategy's
+    [Entered_tightening] install, reported via
+    [Audit_recorder.t.record_stop_move]). Treated exactly like an
+    [UpdateRiskParams] to [level]: it becomes the current level, advances
+    {!stop_info.max_stop} when more protective, and increments
+    {!stop_info.n_stop_raises} when strictly so. *)
 
 val get_stop_infos : t -> stop_info list
 (** Return stop info for all positions that have been observed, sorted by

@@ -197,9 +197,11 @@ type config = {
           threshold is positive. The hysteresis streak counter is unaffected —
           only the emission decision is gated by margin.
 
-          Default [0.0] preserves prior behaviour: any close satisfies the
-          inequality, so the runner emits whenever
-          {!Stage3_force_exit.observe_position} returns [Force_exit].
+          Default [0.0] still gates: a close above the MA gives a negative LHS
+          and fails [>= 0.0], so the runner emits on a [Force_exit] only when
+          [close <= ma] (issue #2974 corrected an earlier "any close passes"
+          claim; the MA table is always supplied in production). The MA's price
+          basis is governed by [stops_config.stop_ma_same_basis] (issue #2982).
           Recommended panel values: [0.02..0.05] paired with
           [hysteresis_weeks >= 2]. *)
   laggard_rotation_config : Laggard_rotation.config;
@@ -1174,6 +1176,42 @@ type config = {
           [((flag stop_anchor_at_entry_base) (values (true false)))];
           default-off until a ledger ACCEPT. Note:
           [dev/notes/honest-ladder-2026-08-05.md]. *)
+  require_structural_stop : bool; [@sexp.default false]
+      (** Investor-preset initial-stop rule: never enter on an
+          automatic-percentage stop. When [true], a candidate whose installed
+          initial stop is tagged [Audit_recorder.Buffer_fallback] — the
+          support-floor scan found no qualifying prior correction low (short:
+          rally high), so the stop fell back to [initial_stop_buffer] × entry;
+          or [stop_anchor_at_entry_base] re-anchored a >15% structural stop to
+          that same fallback — is SKIPPED with the
+          [Audit_recorder.No_structural_stop] reason instead of entered.
+          Candidates whose stop is [Support_floor] are unaffected.
+
+          {b Authority.} [docs/design/weinstein-book-reference.md] §5.1 places
+          the investor's initial stop under the significant support floor (the
+          prior correction low before the breakout). Book Ch. 6, "When to Sell":
+          the trader sets the stop under the closest prior reaction low, and "If
+          there isn't any, then you can play the following numbers game. While
+          investors should never use automatic percentages", the
+          4–6%-below-breakout stop is a trader-only fallback. If the structural
+          stop needs more than ~15% risk the book says "prefer other candidates"
+          — i.e. skip, not substitute a percentage.
+
+          {b Shorts.} Applied to both sides. The fallback path and its
+          [Buffer_fallback] tag are shared by longs and shorts, and Ch. 7 makes
+          the 4–6%-above-breakdown buy-stop trader-only on the short side too
+          ("the initial buy-stop should not be handled in the same manner as for
+          the investor"); the investor's buy-stop sits above the prior rally
+          peak (§6.3).
+
+          Checked before the [max_stop_distance_pct] width gate, so a skipped
+          candidate records [No_structural_stop], not [Stop_too_wide]. INITIAL
+          stop only; trailing machinery untouched.
+
+          {b Default [false] = off, bit-identical to every existing
+             baseline/golden} (R1). R2: axis-expressible as
+          [((flag require_structural_stop) (values (true false)))]. R3:
+          default-off until a ledger ACCEPT. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]
       (** Next-bar-open fill realism for Market entries (Fix #1). Threaded from
           this config into the simulator dependencies by the backtest runner
@@ -1247,6 +1285,69 @@ type config = {
           Weinstein-faithful: spine untouched, only the {i fill assumption}
           changes. Plan: [dev/plans/fill-model-faithfulness-2026-08-07.md]
           Workstream C, Fix #1b. *)
+  sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]
+      (** Fresh-bar-only fills for StopLimit ENTRY tickets (the StopLimit
+          sibling of [sim_entry_fill_next_open]; armed only together with
+          [enable_sim_entry_stoplimit]).
+
+          {b The realism gap it closes.} The simulator steps one calendar day
+          and the engine retains the previous session's bar on a non-trading
+          step. A ticket created from a Friday-close screen is therefore first
+          checked on the Saturday step against Friday's retained bar, and fills
+          if Friday's range crossed the trigger — a range that traded before the
+          ticket existed. The trade is stamped Saturday. Measured on the 26y PIT
+          top-3000 null ([a0-pit-null-s0-v11], 2026-09-25 review): 100 of 732
+          entries are Saturday-dated and 99 of them sit inside Friday's own bar.
+          [Next_open_fill_gate] exempted StopLimit orders on the grounds that
+          their own trigger protects them from a stale bar; that holds for a
+          ticket that existed during the bar, not for one placed after it.
+
+          When [true], a StopLimit order that would OPEN an [Entering] position
+          is not checked on a step where its symbol has no fresh bar; it rests
+          until the next fresh bar and is checked against that bar's path.
+          Resting tickets that already saw Friday's session are unaffected (the
+          Friday step checked them). Decision-time [entry_price] and stop math
+          are unchanged.
+
+          {b Default [false] = the current stale-bar check, bit-identical to
+             every existing baseline/golden} (R1). A fill-model correctness
+          change when armed; paired run before any default flip, never bundled.
+          R2: axis-expressible as
+          [((flag sim_entry_stoplimit_fresh_bar_only) (values (true false)))].
+          Weinstein-faithful: spine untouched, only the fill assumption changes.
+      *)
+  sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]
+      (** Protective-stop exits fill on the bar that traded the stop (issue
+          #2961).
+
+          {b The faithfulness gap it closes.} weinstein-book-reference.md §5.7
+          (Ch. 6): the stop is a resting GTC sell-stop that executes the day its
+          level trades. The stops pass detects that trigger on the day's bar
+          (low for a long, high for a short), but the exit it emits is a Market
+          order filled at the NEXT fresh bar's open. Measured on the 26y PIT
+          top-3000 null ([a0-pit-null-s0-v11]): 362 of 423 unraised stop exits
+          fill one bar after the stop traded, and in 177 of them the stock had
+          closed back above the stop. The P&L effect is small (about −$51k on
+          s0); this is a fill-basis correctness knob, not a return lever.
+
+          When [true], a [TriggerExit] whose reason is [StopLoss] is re-issued
+          as a [Stop stop_price] order and filled on the SAME step against that
+          bar ({!Trading_simulation.Trigger_bar_stop_fill}): at the open when
+          the bar gapped through the stop, else at the first intraday-path price
+          through it. Only [StopLoss] exits move — laggard, Stage-3, liquidity,
+          extension-stop, volume-eject, macro-trim and the force-liquidation
+          breaker ([StrategySignal]) keep the Market / next-open model. The
+          level used is the one in force BEFORE the bar (the stop machine checks
+          the hit before any raise). Inert when
+          [stops_config.trigger_on_weekly_close] is [true]: a close-triggered
+          stop is decided at the close, not a resting order, and filling it
+          intraday would use prices from before the decision.
+
+          {b Default [false] = the current next-open exit fill, bit-identical to
+             every existing baseline/golden} (R1). R2: axis-expressible as
+          [((flag sim_stop_exit_fill_on_trigger_bar) (values (true false)))].
+          Weinstein-faithful: spine untouched, only the fill assumption changes.
+      *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2).
 
@@ -1757,6 +1858,36 @@ type config = {
           first place). The stub tail that used to leave a dying series with no
           real last close to exit at is now truncated at warehouse-build time by
           [Snapshot_pipeline.Series_tail] (#2691), not by a runtime knob. *)
+  entry_ticket_macro_suspend : Entry_ticket_suspend_mode.t;
+      [@sexp.default Entry_ticket_suspend_mode.Off]
+      (** #2976 — {b suspend}, not cancel, resting long entry tickets while the
+          macro gate rejects new longs; re-issue them unchanged (same entry
+          level, trigger/limit and stop plan) on the first weekly screen where
+          it admits again. See {!Entry_ticket_suspend} for the mechanics.
+
+          {b Why.} The cascade's macro gate sees only fresh candidates; a
+          resting ticket is held, never re-asked, and the simulator keeps its
+          order until price trades through it. On the 26y walkthrough 103 of 724
+          fills (14 %) landed in Bearish-screen weeks from tickets placed in a
+          Bullish/Neutral tape.
+
+          {b Faithfulness.} Spine item 6 (the macro gate is unconditional); Ch.
+          8, "Suspend buying even if you see a few stocks breaking out on their
+          charts" ([docs/design/weinstein-book-reference.md] §2.1, "Resolved
+          2026-09-16"). The book's word is {e suspend}: a condition cancel
+          ({!enable_entry_ticket_rescreen}) also discards the tickets that rest
+          through a Bearish week and fill after it clears.
+
+          [On_bearish_macro] suspends whenever {!Long_entry_macro_gate.admits}
+          is [false]; [On_index_stage4] only while the primary index is Stage 4
+          (the book-literal condition). Suspension time counts toward
+          {!entry_order_max_rest_weeks}. Longs only.
+
+          {b Default [Off]} never builds the suspension path — bit-identical to
+          every existing golden (R1). R2: a [Variant_matrix] axis as
+          [((flag entry_ticket_macro_suspend) (values (Off On_bearish_macro
+           On_index_stage4)))]. R3: no default flip without a ledger ACCEPT and
+          the confirmation grid. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

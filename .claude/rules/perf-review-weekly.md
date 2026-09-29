@@ -66,7 +66,16 @@ the handle cap (`SNAPSHOT_MAX_MMAP_HANDLES`, #2839) are the per-run signals.
 3. **Local long cells carry their own numbers.** Every chain script logs the
    cache line and GNU-time peak RSS per cell (`sweep-hygiene.md` preamble),
    and the cell guard is set from the **measured arm**, not the null:
-   guard ≥ 1.5 × the slowest observed cell of that arm.
+   guard ≥ 1.5 × the slowest observed cell of that arm. **The ledger is
+   `dev/status/perf-long-cells.csv`**: after every chain, run
+   `sh dev/scripts/perf_long_cells.sh update <chain.log>` (it reads the
+   `RESULT … (wall Ns)` lines, joins each cell to its spec for window +
+   universe, and normalises to seconds per simulated year); in the weekly
+   read, `sh dev/scripts/perf_long_cells.sh check` fails when the newest
+   cell of any shape (universe × years × handle cap) is > 20 % slower per
+   simulated year than that shape's median. No GHA tier runs these shapes,
+   so this file is the only runtime record they have (backfilled 2026-09-25
+   from 21 committed chain logs, 193 cells).
 4. **Write it down** in `dev/status/backtest-perf.md` §Weekly review — date,
    the rows compared, deltas, tickets opened. Two lines is enough; zero lines
    means the review did not happen.

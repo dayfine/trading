@@ -1,0 +1,7 @@
+[01-01 00:00:00] lane A HEAD=abc1234 (expect abc1234)
+[01-01 00:00:00] cell guard CELL_TIMEOUT=9000s; SNAPSHOT_MAX_MMAP_HANDLES=12000
+[01-01 01:00:00] RESULT n0-s0-v11 => total_return_pct 10.0 total_trades 5  (wall 1000s)
+[01-01 02:00:00] RESULT n0-s1-v11 => total_return_pct 11.0 total_trades 5  (wall 1100s)
+[01-01 03:00:00] RESULT n0-s2-v11 => <no result> V6 x (wall 9000s)
+[01-01 04:00:00] RESULT missing-spec-s0 => total_return_pct 1.0  (wall 500s)
+[01-01 05:00:00] RESULT n0-s3-v11 => total_return_pct 12.0 total_trades 5  (wall 1500s)

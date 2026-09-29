@@ -87,6 +87,45 @@
 #      thing that can fail these fixtures is the cap check itself and not a
 #      per-file length violation.
 #
+#   F. Issue #2876 (H-FILE-LENGTH-LIB-SCOPE-BLIND-SPOT): a 501-line `.ml`
+#      file living under `bin/`, never `lib/` -> must FAIL. Pins the
+#      repo-wide-scan fix; mutation that greens it: reverting the `.ml`
+#      loop's `find` pattern back to `-path "*/lib/*.ml"`.
+#
+#   G. The `.ml` loop's `*/test/*` prune survives the #2876 rewrite from an
+#      inclusion pattern to an exclusion-based scan: a 501-line `.ml` under
+#      `test/` must still PASS.
+#
+#   H. Issue #2876, the rejected-design case: a 501-line `.ml` file living
+#      under a BARE FEATURE DIRECTORY (`release_report/` -- neither `lib/`,
+#      `bin/` nor `scripts/`) -> must FAIL. This is what actually pins the
+#      linter's own H-FILE-LENGTH-LIB-SCOPE-BLIND-SPOT header claim: fixture
+#      F alone (a violator under `bin/`) does not distinguish the shipped
+#      exclusion-based full-tree scan from the issue's own rejected
+#      "allowlist `*/lib/*.ml`, `*/bin/*.ml`, `*/scripts/*/*.ml`" patch,
+#      because `bin/` is in that allowlist too. Mutation that greens this
+#      fixture (and only this one, of F/G/H): swapping the repo-wide
+#      `find ... -name "*.ml"` scan for that allowlist.
+#
+#   I. `linter_exceptions.conf` `file_length` exemption, both directions: a
+#      501-line `.ml` file with a matching `file_length <substring>` entry in
+#      a fixture-private `linter_exceptions.conf` -> PASS; the identical file
+#      with the entry removed -> FAIL, naming the file. Mutation that greens
+#      the FAIL half: hardcoding `_is_file_length_excluded` to always return
+#      "not excluded" (a no-op parse of the conf).
+#
+#   J. The MAX_LARGE_PCT cap denominator must NOT include exempted files. One
+#      `@large-module`-marked file plus 8 clean files (9 total, 1 marked) is
+#      1/9 = 11.11%, just over the 11% cap (integer arithmetic: 1*100=100 >
+#      9*11=99) -> the cap trips. Adding one more file that is over the hard
+#      limit but exempted via `linter_exceptions.conf` must NOT change that
+#      verdict, because the exempted file is skipped entirely, before TOTAL
+#      is incremented. Mutation that greens this fixture: incrementing TOTAL
+#      before the exclusion check/`continue`, so the exempted file grows the
+#      denominator from 9 to 10 (1/10 = 10%, under the cap) and silently
+#      passes -- exactly the "exception subsidizes the cap" bug the linter's
+#      own accounting-order comment says cannot happen.
+#
 # How to re-verify by hand:
 #   sh trading/devtools/checks/linter_file_length_test.sh
 
@@ -120,11 +159,20 @@ trap cleanup EXIT INT TERM
 # Private fixture "trading dir": a copy of the linter + _check_lib.sh two
 # directory levels below the fixture root (mirrors the real
 # trading/devtools/checks/ layout), so trading_dir()'s `$(dirname "$0")/../..`
-# resolves to the fixture root. $1 = fixture root to create.
+# resolves to the fixture root. $1 = fixture root to create. $2 = optional;
+# pass "conf" to also stage an (initially empty) linter_exceptions.conf next
+# to the copied linter, for fixtures I and J which need to control the
+# file_length exception list independently of the real repo's conf. The
+# linter reads EXCEPTIONS_CONF via `$(dirname "$0")/linter_exceptions.conf`,
+# so it must live next to the fixture's own copy of the linter, not the
+# fixture root, to be found at all.
 make_fixture_trading_dir() {
   mkdir -p "$1/devtools/checks" "$1/lib"
   cp "$LINTER" "$1/devtools/checks/linter_file_length.sh"
   cp "$LIB" "$1/devtools/checks/_check_lib.sh"
+  if [ "${2:-}" = "conf" ]; then
+    : > "$1/devtools/checks/linter_exceptions.conf"
+  fi
 }
 
 run_linter() {
@@ -346,6 +394,189 @@ if [ "$CODEE2" -ne 0 ] && echo "$OUTE2" | grep -q "Too many declared-large files
   ok "fixture E2 — the mirror: 2/10 declared-large .ml (20%) trips the .ml cap despite 9 clean .mli making the pooled share 10.5%"
 else
   bad "fixture E2 — expected non-zero exit naming the .ml cap (2/10 over 11%); got exit=$CODEE2 output=<<$OUTE2>>"
+fi
+
+# =============================================================================
+# Fixture F: a .ml file OUTSIDE lib/ (under bin/) over the 500-line hard
+# limit, no @large-module marker -> must FAIL, violator named in output.
+# Pins H-FILE-LENGTH-LIB-SCOPE-BLIND-SPOT (issue #2876): the pre-fix `.ml`
+# loop scoped to `-path "*/lib/*.ml"` only, so this exact fixture shape
+# (a large file living under `bin/`, never `lib/`) was invisible. Mutation
+# that greens this fixture: reverting the find pattern back to
+# `-path "*/lib/*.ml"` instead of the repo-wide scan -- verified by hand
+# while writing this test (reverting the pattern makes fixture F report
+# `OK` instead of naming big_bin_scope.ml).
+# =============================================================================
+
+FIXF="${BASE_DIR}/fixF"
+make_fixture_trading_dir "$FIXF"
+mkdir -p "${FIXF}/bin"
+{
+  i=1
+  while [ "$i" -le 501 ]; do
+    echo "let _line_${i} = ${i}"
+    i=$((i + 1))
+  done
+} > "${FIXF}/bin/big_bin_scope.ml"
+
+set +e
+OUTF=$(run_linter "$FIXF" 2>&1)
+CODEF=$?
+set -e
+
+if [ "$CODEF" -ne 0 ] && echo "$OUTF" | grep -q "big_bin_scope.ml: 501 lines"; then
+  ok "fixture F — 501-line .ml under bin/ (not lib/), no marker -> FAIL, names big_bin_scope.ml (issue #2876 scope widening)"
+else
+  bad "fixture F — expected non-zero exit naming big_bin_scope.ml (501 lines, under bin/); got exit=$CODEF output=<<$OUTF>>"
+fi
+
+# =============================================================================
+# Fixture G: a .ml file under test/ over the 500-line hard limit -> must
+# still PASS. Test-file exclusion is a deliberate, separately-tracked policy
+# decision (dev/status/cleanup.md entry `linter_coverage`), unchanged by the
+# #2876 scope widening -- the widened scan is exclusion-based (prune
+# _build/.formatted/test) rather than inclusion-based, so this fixture pins
+# that the prune survived the rewrite.
+# =============================================================================
+
+FIXG="${BASE_DIR}/fixG"
+make_fixture_trading_dir "$FIXG"
+mkdir -p "${FIXG}/test"
+{
+  i=1
+  while [ "$i" -le 501 ]; do
+    echo "let _line_${i} = ${i}"
+    i=$((i + 1))
+  done
+} > "${FIXG}/test/big_test_scope.ml"
+
+set +e
+OUTG=$(run_linter "$FIXG" 2>&1)
+CODEG=$?
+set -e
+
+if [ "$CODEG" -eq 0 ] && echo "$OUTG" | grep -q "^OK:"; then
+  ok "fixture G — 501-line .ml under test/ -> PASS (test-file policy exclusion survives the #2876 scope widening)"
+else
+  bad "fixture G — expected exit 0 (test/ files remain out of scope); got exit=$CODEG output=<<$OUTG>>"
+fi
+
+# =============================================================================
+# Fixture H: a .ml file OUTSIDE lib/, bin/, AND scripts/ (a bare feature
+# directory) over the 500-line hard limit -> must FAIL, violator named in
+# output. Distinguishes the shipped exclusion-based full-tree scan from
+# issue #2876's own rejected "allowlist lib|bin|scripts" patch -- fixture F
+# alone (a violator under bin/) cannot do this, because bin/ is in that
+# rejected allowlist too.
+# =============================================================================
+
+FIXH="${BASE_DIR}/fixH"
+make_fixture_trading_dir "$FIXH"
+mkdir -p "${FIXH}/release_report"
+{
+  i=1
+  while [ "$i" -le 501 ]; do
+    echo "let _line_${i} = ${i}"
+    i=$((i + 1))
+  done
+} > "${FIXH}/release_report/big_feature_scope.ml"
+
+set +e
+OUTH=$(run_linter "$FIXH" 2>&1)
+CODEH=$?
+set -e
+
+if [ "$CODEH" -ne 0 ] && echo "$OUTH" | grep -q "big_feature_scope.ml: 501 lines"; then
+  ok "fixture H — 501-line .ml under a bare feature dir (release_report/, neither lib/ bin/ nor scripts/) -> FAIL, names big_feature_scope.ml (kills the rejected lib|bin|scripts allowlist mutation)"
+else
+  bad "fixture H — expected non-zero exit naming big_feature_scope.ml (501 lines, under a bare feature dir); got exit=$CODEH output=<<$OUTH>>"
+fi
+
+# =============================================================================
+# Fixture I: a linter_exceptions.conf file_length entry exempts a 501-line
+# .ml file -> PASS. Removing that entry (the same file, unchanged) -> FAIL,
+# violator named. Pins that the exclusion mechanism is load-bearing, not a
+# no-op parse of the conf.
+# =============================================================================
+
+FIXI="${BASE_DIR}/fixI"
+make_fixture_trading_dir "$FIXI" conf
+{
+  i=1
+  while [ "$i" -le 501 ]; do
+    echo "let _line_${i} = ${i}"
+    i=$((i + 1))
+  done
+} > "${FIXI}/lib/big_exempt.ml"
+CONFI="${FIXI}/devtools/checks/linter_exceptions.conf"
+echo "file_length big_exempt.ml  fixture I: 501-line file exempted via linter_exceptions.conf  # review_at: never" > "$CONFI"
+
+set +e
+OUTI=$(run_linter "$FIXI" 2>&1)
+CODEI=$?
+set -e
+
+if [ "$CODEI" -eq 0 ] && echo "$OUTI" | grep -q "^OK:"; then
+  ok "fixture I — 501-line .ml exempted via a linter_exceptions.conf file_length entry -> PASS"
+else
+  bad "fixture I — expected exit 0 (big_exempt.ml exempted by conf entry); got exit=$CODEI output=<<$OUTI>>"
+fi
+
+# Remove the exemption -- the identical file must now FAIL. Confirms fixture
+# I's PASS above was the exclusion mechanism working, not a fixture-
+# construction accident (e.g. the file secretly being <= 300 lines).
+: > "$CONFI"
+
+set +e
+OUTI2=$(run_linter "$FIXI" 2>&1)
+CODEI2=$?
+set -e
+
+if [ "$CODEI2" -ne 0 ] && echo "$OUTI2" | grep -q "big_exempt.ml: 501 lines"; then
+  ok "fixture I (exemption removed) — the same file now FAILs, names big_exempt.ml"
+else
+  bad "fixture I (exemption removed) — expected non-zero exit naming big_exempt.ml; got exit=$CODEI2 output=<<$OUTI2>>"
+fi
+
+# =============================================================================
+# Fixture J: the MAX_LARGE_PCT cap denominator excludes exempted files. One
+# @large-module-marked file + 8 clean files = 1/9 = 11.11%, just over the 11%
+# cap -> trips. Adding one more file that is over the hard limit but exempted
+# via linter_exceptions.conf must NOT change that verdict -- the exempted
+# file is skipped before TOTAL is incremented, so it can neither subsidize
+# nor inflate the cap's denominator.
+# =============================================================================
+
+FIXJ="${BASE_DIR}/fixJ"
+make_fixture_trading_dir "$FIXJ" conf
+{
+  echo "(* @large-module: fixture J marked-large file *)"
+  echo "val a = 1"
+} > "${FIXJ}/lib/marked1.ml"
+i=1
+while [ "$i" -le 8 ]; do
+  echo "let clean${i} = 1" > "${FIXJ}/lib/clean${i}.ml"
+  i=$((i + 1))
+done
+{
+  i=1
+  while [ "$i" -le 501 ]; do
+    echo "let _line_${i} = ${i}"
+    i=$((i + 1))
+  done
+} > "${FIXJ}/lib/excluded_large.ml"
+echo "file_length excluded_large.ml  fixture J: exempted file the MAX_LARGE_PCT denominator must not count  # review_at: never" \
+  > "${FIXJ}/devtools/checks/linter_exceptions.conf"
+
+set +e
+OUTJ=$(run_linter "$FIXJ" 2>&1)
+CODEJ=$?
+set -e
+
+if [ "$CODEJ" -ne 0 ] && echo "$OUTJ" | grep -q "Too many declared-large files: 1/9"; then
+  ok "fixture J — exempted file correctly excluded from TOTAL -> cap trips at 1/9 (11.11%), not diluted to 1/10 (10%) by the exempted file"
+else
+  bad "fixture J — expected the cap to trip at 1/9 (exempted file excluded from TOTAL); got exit=$CODEJ output=<<$OUTJ>>"
 fi
 
 cleanup

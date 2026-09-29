@@ -54,7 +54,7 @@ let show_state = function
         (f last_correction_extreme)
         (f last_trend_extreme) (f ma_at_last_adjustment) correction_count
         correction_observed_since_reset
-  | Tightened { stop_level; last_correction_extreme; reason } ->
+  | Tightened { stop_level; last_correction_extreme; reason; _ } ->
       Printf.sprintf "Tightened(%s|%s|%S)" (f stop_level)
         (f last_correction_extreme)
         reason
@@ -194,7 +194,12 @@ let probe_states =
         correction_observed_since_reset = true;
       };
     Tightened
-      { stop_level = 100.25; last_correction_extreme = 101.0; reason = "probe" };
+      {
+        stop_level = 100.25;
+        last_correction_extreme = 101.0;
+        reason = "probe";
+        swing_peak = None;
+      };
   ]
 
 (* Bars whose low / high / close straddle each probe stop level exactly, one

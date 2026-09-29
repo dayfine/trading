@@ -1,6 +1,6 @@
 (executable
  (name backtest_runner)
- (modules backtest_runner)
+ (modules backtest_runner backtest_execution)
  (libraries
   core
   core_unix

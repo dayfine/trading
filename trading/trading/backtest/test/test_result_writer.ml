@@ -600,9 +600,10 @@ let _m5_2e_entry ~symbol ~entry_date ~position_id :
     side = Trading_base.Types.Long;
     suggested_entry = 100.0;
     close_at_decision = None;
+    adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
-    suggested_stop = 92.0;
+    screener_proxy_stop = 92.0;
     installed_stop = 92.0;
     stop_floor_kind = Backtest.Trade_audit.Buffer_fallback;
     split_safe_basis = Backtest.Trade_audit.Flag_off;
@@ -670,7 +671,15 @@ let test_trades_csv_populates_context_from_audit_and_stop_log _ =
     _m5_2e_entry ~symbol:"AAPL" ~entry_date ~position_id:"AAPL-wein-1"
   in
   let audit : Backtest.Trade_audit.audit_record list =
-    [ { entry; exit_ = None; external_exit = None; execution = None } ]
+    [
+      {
+        entry;
+        exit_ = None;
+        external_exit = None;
+        execution = None;
+        stop_decisions = [];
+      };
+    ]
   in
   let stop_info : Backtest.Stop_log.stop_info =
     {
@@ -868,12 +877,14 @@ let test_retraded_symbol_keys_triggers_by_position_id _ =
             exit_ = None;
             external_exit = None;
             execution = None;
+            stop_decisions = [];
           };
           {
             entry = entry2;
             exit_ = None;
             external_exit = None;
             execution = None;
+            stop_decisions = [];
           };
         ];
       cascade_summaries = [];

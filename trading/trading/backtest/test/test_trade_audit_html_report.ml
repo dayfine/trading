@@ -110,9 +110,10 @@ let _aapl_entry : TA.entry_decision =
     side = Trading_base.Types.Long;
     suggested_entry = 280.0;
     close_at_decision = None;
+    adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
-    suggested_stop = 260.0;
+    screener_proxy_stop = 260.0;
     installed_stop = 260.0;
     stop_floor_kind = TA.Buffer_fallback;
     split_safe_basis = TA.Flag_off;
@@ -149,6 +150,7 @@ let _write_audit path =
            exit_ = Some _aapl_exit;
            external_exit = None;
            execution = None;
+           stop_decisions = [];
          };
        ])
 

@@ -14,6 +14,7 @@
   test_stop_width_by_macro_state
   test_entry_ticket_tags
   test_entry_ticket_ttl
+  test_entry_ticket_suspend
   test_exit_audit_capture
   test_force_liquidation_runner
   test_force_liquidation_strategy
@@ -43,9 +44,13 @@
   test_breaker_spy_strategy
   test_stage3_force_exit_runner
   test_late_stage2_stop_runner
+  test_late_stage2_tighten_ratchet
   test_macro_bearish_trim_runner
   test_laggard_rotation_runner
   test_stops_runner
+  test_stop_move_capture
+  test_stop_decision_capture
+  test_stop_ma_same_basis
   test_stop_skip_entry_bar_sim
   test_long_buying_power
   test_leverage_dawn

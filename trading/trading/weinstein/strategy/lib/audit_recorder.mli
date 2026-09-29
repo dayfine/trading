@@ -58,6 +58,14 @@ type skip_reason =
           [Portfolio_risk.max_long_exposure_pct]. Only fires when the config
           field is [> 0.0] (default [0.0] => [Float.infinity] cap => no-op).
           Only emitted for [Long] candidates. *)
+  | No_structural_stop
+      (** Investor-preset gate: candidate dropped because its initial stop is
+          the automatic-percentage fallback
+          ([stop_floor_kind = Buffer_fallback]) rather than a structural support
+          floor / resistance ceiling. Only fires when
+          [Weinstein_strategy_config.config.require_structural_stop] is [true]
+          (default [false] => never emitted). Book Ch. 6: "investors should
+          never use automatic percentages". Both sides. *)
 
 type alternative_input = {
   candidate : Screener.scored_candidate;
@@ -85,6 +93,34 @@ type split_safe_basis = Weinstein_stops.split_safe_basis =
           {!Weinstein_stops.split_safe_basis} for why three states are needed.
       *)
 
+type stop_move_event = {
+  position_id : string;
+      (** The held position whose stop moved — joins to
+          [entry_event.position_id] and [Stop_log.stop_info.position_id]. *)
+  symbol : string;
+  date : Date.t;  (** The bar on which the stop state machine moved it. *)
+  stop_level : float;
+      (** The new level now resting in the strategy's stop state — the level the
+          next bar's trigger check enforces. *)
+}
+(** A stop-level move that {b no transition carries}.
+
+    The stops pass reports most moves as an [UpdateRiskParams] adjust, but
+    [Weinstein_stops.update]'s [Entered_tightening] event moves the stop onto
+    the tightened candidate without one ([Stop_transitions.of_stop_event] maps
+    only [Stop_raised] to an adjust). The moved level is still enforced — the
+    trigger check reads the stop state, not [risk_params] — so only the
+    per-trade stop log missed it (issue #2974). This event is that log's feed.
+
+    Observability only: emitting it changes no transition, and it is never
+    produced for a split rescale ([Stops_split_runner] runs before the
+    before/after comparison) or for a move an adjust transition already reports.
+
+    Declared ahead of the other event records on purpose: they share the
+    [position_id] / [symbol] / [date] labels, and an unannotated label resolves
+    to the {e last} type declaring it, so declaring this one first leaves every
+    existing unannotated access resolving as before. *)
+
 type entry_event = {
   position_id : string;
       (** Position id assigned at entry — matches the [Position.transition] this
@@ -105,6 +141,13 @@ type entry_event = {
           E-provenance telemetry (entry-ticket right-basis plan, 2026-08-08):
           lets the audit compare [candidate.suggested_entry] against the
           decision-time close without re-reading raw bars. *)
+  adjusted_close_at_decision : float option;
+      (** The same bar's [adjusted_close] — the basis the stage classifier's MA
+          ([candidate.analysis.stage.ma_value]) is computed on. Pair it, not the
+          RAW [close_at_decision], with the MA: across a later split the raw
+          close sits a whole split factor away from the MA (issue #2973, NVDA
+          2021-04-23: raw 610.61, adjusted 15.21, MA 13.67). Audit-only; [None]
+          exactly when [close_at_decision] is [None]. *)
   installed_stop : float;
       (** Output of
           [Weinstein_stops.compute_initial_stop_with_floor_with_callbacks]'s
@@ -291,6 +334,26 @@ type force_liquidation_event = Portfolio_risk.Force_liquidation.event
     [force_liquidations.sexp] persistence and [trades.csv] exit-trigger
     labelling. *)
 
+type reissue_event = {
+  reissued_position_id : string;
+      (** The fresh id the re-issued [CreateEntering] carries. *)
+  original_position_id : string;
+      (** The id of the ticket's {b first} placement — the one whose
+          {!entry_event} was recorded. Always the root, never an intermediate
+          re-issue, however many suspend / re-issue cycles the ticket went
+          through. *)
+  reissue_date : Date.t;  (** The screen that re-issued the ticket. *)
+}
+(** A resting long entry ticket withdrawn by the #2976 macro suspension
+    ({!Entry_ticket_suspend}) has been re-issued under a new position id (issue
+    #2989). No {!entry_event} is recorded for the new id — the entry walk did
+    not place it — so this event is the only link from the position that may
+    fill back to the placement whose alternatives, installed stop and floor kind
+    were recorded. Only emitted when [entry_ticket_macro_suspend] is armed.
+    Observability only: the re-issue transition is identical with or without a
+    sink. Field labels are distinct from the other events' so no existing
+    unannotated [position_id] / [date] access changes resolution. *)
+
 type t = {
   record_entry : entry_event -> unit;
   record_exit : exit_event -> unit;
@@ -299,6 +362,20 @@ type t = {
   record_fill_volume : fill_volume_event -> unit;
       (** Invoked once per position the F5 at-fill check evaluates. Never
           invoked under the default (unarmed) config. *)
+  record_stop_move : stop_move_event -> unit;
+      (** Invoked once per held position per bar on which the stops pass moved
+          its stop without emitting a transition for it (see
+          {!stop_move_event}). *)
+  record_reissue : reissue_event -> unit;
+      (** Invoked once per ticket {!Entry_ticket_suspend} re-issues (see
+          {!reissue_event}). Never invoked under the default (unarmed) config.
+      *)
+  record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
+      (** Invoked by {!Stops_runner.update} for each held position whose stop
+          state machine advanced on the tick (issue #2977): every advance, one
+          per position per tick (rows are thinned by the sink, not here).
+          Observability only — the record is built from the advance the runner
+          already made, so any sink leaves every decision unchanged. *)
   capture_candidates : bool;
       (** Whether the strategy should populate {!cascade_event.candidates}.
           [false] in {!noop}, and therefore in live mode and every test that

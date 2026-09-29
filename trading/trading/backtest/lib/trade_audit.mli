@@ -79,6 +79,13 @@ type skip_reason =
           may lever on short proceeds at entry time. Default-off (field [0.0] =>
           [Float.infinity] cap) so the variant is never emitted under baseline
           configurations. Only emitted on [Long] candidates. *)
+  | No_structural_stop
+      (** Skipped because the candidate's initial stop would be the
+          automatic-percentage fallback ([Buffer_fallback]) rather than a
+          structural floor/ceiling, under the investor preset
+          [Weinstein_strategy_config.config.require_structural_stop] (default
+          [false] => never emitted). Book Ch. 6: "investors should never use
+          automatic percentages". *)
 [@@deriving sexp]
 
 type alternative_candidate = {
@@ -124,7 +131,10 @@ type alternative_candidate = {
     set from the cash-rejected near-misses. *)
 
 (** Whether the installed initial stop sat on a support floor or fell back to a
-    fixed-buffer stop below the screener's suggested level. Routed from
+    fixed buffer off the effective entry price ([Buffer_fallback]: reference
+    [effective_entry * initial_stop_buffer] for a long,
+    [effective_entry / initial_stop_buffer] for a short). Neither case uses the
+    screener's proxy stop ({!entry_decision.screener_proxy_stop}). Routed from
     [Weinstein_stops.compute_initial_stop_with_floor]. *)
 type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
 
@@ -194,6 +204,15 @@ type entry_decision = {
           [trade_audit.sexp] instead of re-reading raw snapshot bars. [None]
           when the bar reader had no bars, and absent in files written before
           the field existed ([@sexp.option] keeps them parseable). *)
+  adjusted_close_at_decision : float option; [@sexp.option]
+      (** The same decision-time bar's [adjusted_close] (issue #2973).
+          [close_at_decision] is RAW, [ma_value] is on the ADJUSTED basis the
+          stage classifier decided on; across a later split the two sit a whole
+          split factor apart (NVDA 2021-04-23: close 610.61 vs MA 13.67). Read
+          close-vs-MA as [adjusted_close_at_decision /. ma_value]; keep
+          [close_at_decision] for close-vs-E, which is raw on both sides.
+          Reporting only — no decision reads it. [None] when the bar reader had
+          no bars, and absent in files written before the field existed. *)
   ma_value : float option; [@sexp.option]
       (** The stage classifier's MA level at decision time
           ([Stock_analysis.t.stage.ma_value]). Complements the existing
@@ -207,10 +226,38 @@ type entry_decision = {
           knob is at its default 0 (feature off) or no defined high existed in
           the window — so the column also records whether the local-anchor
           mechanism was armed for this entry. *)
-  suggested_stop : float;  (** From the screener. *)
+  screener_proxy_stop : float;
+      (** The screener's fixed-percentage {e proxy} stop,
+          [Screener.scored_candidate.suggested_stop]:
+          [suggested_entry * (1 - initial_stop_pct)] for a long (~8% under E at
+          the screener default), [suggested_entry * (1 + short_stop_pct)] for a
+          short.
+          {b Not the stop the position was entered with, and nothing sizes or
+             exits on it} — the strategy recomputes the initial stop from the
+          support-floor scan (or its buffer fallback); that level is
+          {!installed_stop}, and sizing keys off it. The two routinely differ:
+          on a [Buffer_fallback] long at the default config the installed stop
+          is
+          [effective_entry * initial_stop_buffer * (1 - min_correction_pct / 2)]
+          before the round-number nudge (~4% under E) while this proxy stays ~8%
+          under E. Compare {!installed_stop}, not this field, when reading where
+          the entry's risk actually sat. Kept for screener-vs-strategy
+          comparisons only.
+
+          Issue #2975: written as [suggested_stop] before the rename; legacy
+          files carrying that key still parse (the reader maps it here). *)
   installed_stop : float;
-      (** After [Weinstein_stops.compute_initial_stop_with_floor] applies the
-          initial-stop buffer. *)
+      (** The initial stop actually registered for the position (and the one
+          position sizing and [initial_risk_dollars] use): the
+          [Weinstein_stops.compute_initial_stop_with_floor] level off the
+          support floor, or off the buffer reference
+          ([effective_entry * initial_stop_buffer] long,
+          [effective_entry / initial_stop_buffer] short) when no floor qualified
+          — which one is recorded in {!stop_floor_kind}. That level is then
+          optionally re-anchored to the entry base (relabelled
+          [Buffer_fallback]) and widened to the configured minimum stop distance
+          ([installed_stop_min_pct] / the vol-scaled ATR floor); both steps are
+          off by default. See [Entry_audit_helpers.initial_stop_and_kind]. *)
   stop_floor_kind : stop_floor_kind;
   split_safe_basis : split_safe_basis; [@sexp.default Flag_off]
       (** F5 telemetry for [stops_config.split_safe_floors]. Aggregating this
@@ -374,6 +421,15 @@ type audit_record = {
           with no matched fill (still open at end-of-run). [@sexp.option] keeps
           [trade_audit.sexp] files written before this field existed parseable.
       *)
+  stop_decisions : Weinstein_stops.Stop_decision.t list; [@sexp.list]
+      (** The weekly trailing-stop decisions for this position, oldest first
+          (issue #2977), recorded via {!record_stop_decision}: every raise,
+          stalled cycle, seed, tightening and hit, plus one no-move hold per run
+          of holds within an ISO week (see {!Weinstein_stops.Stop_decision} for
+          the fields and [Stop_decision.push] for the collapse). [@sexp.list]
+          omits the field when empty and reads an absent field as [[]], so
+          [trade_audit.sexp] files written before this field existed still
+          parse. *)
 }
 [@@deriving sexp]
 (** A paired entry + exit record. [exit_] is [None] for positions that were
@@ -458,6 +514,27 @@ val record_entry : t -> entry_decision -> unit
 (** Record an entry decision. Keyed by [decision.position_id]; recording the
     same id twice overwrites the prior entry. *)
 
+val record_reissue :
+  t ->
+  position_id:string ->
+  original_position_id:string ->
+  reissue_date:Date.t ->
+  entry_decision option
+(** #2989: record the entry row of a ticket re-issued under the fresh
+    [position_id] after a macro suspension
+    ({!Weinstein_strategy.Entry_ticket_suspend}). The row is the
+    {b placement-time} entry of [original_position_id] — its alternatives,
+    installed stop, floor kind and placement date — under the new id, with
+    [ticket_lifecycle.reissued_from = Some { original_position_id; reissue_date
+     }]. Only the placement-time entry is copied: the original's cancel (its
+    [entry_ticket_macro_suspended] withdrawal), fill check, exit and stop
+    decisions stay on the original row, and the new row resolves on its own. The
+    original row is untouched.
+
+    Returns the recorded row, or [None] (recording nothing) when no entry is on
+    file for [original_position_id] — the no-entry contract of {!record_exit}.
+*)
+
 val record_exit : t -> exit_decision -> unit
 (** Record an exit decision. Looks up the matching [entry] by
     [decision.position_id]; if no entry was previously recorded for that id the
@@ -519,7 +596,13 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     {!Trading_simulation.Delisted_ticket_cancel.cancel_reason} ([delisted],
     #2696), is a {e data-driven death}: the symbol's series ended, so the ticket
     could never have filled against a real bar — neither a policy nor a funding
-    failure, and it needs its own bucket.
+    failure, and it needs its own bucket. The fifth,
+    [entry_ticket_macro_suspended]
+    ({!Weinstein_strategy.Entry_ticket_suspend.cancel_reason}, #2976,
+    default-off), is a {e withdrawal}, not a death: the setup is re-issued under
+    a new position id once the macro gate admits, and that id's row
+    ({!record_reissue}) links back to this one through
+    [ticket_lifecycle.reissued_from] (#2989).
 
     Neither of the non-strategy populations is a corner case: the rejection
     token was ~26% of placements on the run that motivated recording the reason
@@ -540,6 +623,14 @@ val record_fill_volume :
     recording twice keeps the later check — the classification is a pure
     function of a fixed historical bar, so a repeat inside the runner's two-week
     evaluation window is the same value. *)
+
+val record_stop_decision : t -> Weinstein_stops.Stop_decision.t -> unit
+(** Append one stop decision to the entry row keyed by its [position_id].
+    Dropped when no entry was recorded for that id (mirrors {!record_exit}'s
+    no-entry contract). Decisions are kept in date order, with consecutive
+    no-move holds of one ISO week collapsed to the latest
+    ({!Weinstein_stops.Stop_decision.push}): a week whose Friday is a holiday
+    still keeps its hold row, dated its last trading day. *)
 
 val record_cascade_summary : t -> cascade_summary -> unit
 (** Append a per-Friday cascade summary. Append-only — recording two summaries

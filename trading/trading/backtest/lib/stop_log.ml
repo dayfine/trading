@@ -138,18 +138,28 @@ let _install_stop record ~level ~is_raise_candidate =
       ~next:level;
   record.pos_current_stop <- Some level
 
+(* The position's initial stop: [entry_stop], the first [current] level and the
+   high-water seed. Never a raise. *)
+let _seed_entry_stop record ~level =
+  record.pos_entry_stop <- Some level;
+  _install_stop record ~level ~is_raise_candidate:false
+
 let _process_transition t (trans : Position.transition) =
   match trans.kind with
   | CreateEntering { symbol; side; _ } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol in
+      (* The record may already exist from {!record_installed_stop}, which the
+         strategy's entry audit reaches before this transition is recorded. *)
+      record.pos_symbol <- symbol;
       record.pos_side <- side
   | EntryComplete { risk_params } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
       record.pos_entry_date <- t.current_date;
-      record.pos_entry_stop <- risk_params.stop_loss_price;
+      (* The simulator's [EntryComplete] carries no stop for the Weinstein
+         strategy (issue #2974); a [None] here must not erase the install
+         {!record_installed_stop} already booked. *)
       Option.iter risk_params.stop_loss_price ~f:(fun level ->
-          _install_stop record ~level ~is_raise_candidate:false);
-      record.pos_current_stop <- risk_params.stop_loss_price
+          _seed_entry_stop record ~level)
   | UpdateRiskParams { new_risk_params } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
       Option.iter new_risk_params.stop_loss_price ~f:(fun level ->
@@ -172,6 +182,15 @@ let _process_transition t (trans : Position.transition) =
 
 let record_transitions t transitions =
   List.iter transitions ~f:(_process_transition t)
+
+let record_installed_stop t ~position_id ~symbol ~level =
+  let record = _ensure_record t ~position_id ~symbol in
+  record.pos_symbol <- symbol;
+  _seed_entry_stop record ~level
+
+let record_stop_move t ~position_id ~level =
+  let record = _ensure_record t ~position_id ~symbol:"" in
+  _install_stop record ~level ~is_raise_candidate:true
 
 let _record_to_info ~position_id record : stop_info =
   {

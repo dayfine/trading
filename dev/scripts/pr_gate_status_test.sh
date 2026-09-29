@@ -1936,6 +1936,12 @@ check "results-only: a dune file under dev/experiments takes three gates" no "$(
   _is_results_only "dev/experiments/x/dune dev/experiments/x/README.md" && echo yes || echo no)"
 check "results-only: README-only experiment change is docs-only first" yes "$(
   _is_docs_only "dev/experiments/x/README.md" && echo yes || echo no)"
+check "docs-only: dev/budget spend records (json) are docs-only" yes "$(
+  _is_docs_only "dev/budget/local-2026-09-24.json dev/budget/2026-09-23-35892658019.json dev/notes/x.md" && echo yes || echo no)"
+check "docs-only: a non-json file under dev/budget is NOT docs-only" no "$(
+  _is_docs_only "dev/budget/record.sh" && echo yes || echo no)"
+check "docs-only: a json outside dev/budget is NOT docs-only" no "$(
+  _is_docs_only "dev/experiments/x/results/a.json" && echo yes || echo no)"
 check "results-only: empty file list is not results-only by accident" no "$(
   _is_results_only "" && echo yes || echo no)"
 RESULTS_REVIEW="Reviewed SHA: $TIP
@@ -1956,6 +1962,188 @@ check "behavioral review does not satisfy the results gate" none "$(_gate "$(rev
 check "codex action: results-only merge holds under required like any merge" \
   "HOLD -- review/codex-required (codex=none): dispatch codex review, or swap to review/codex-timeout after 3h" \
   "$(_codex_action "MERGE (results-only)" none 0 "")"
+
+# --- H-CI-DISPATCH (dev/status/harness.md, live case PR #2113) --------------
+# Zero check-runs at all must never fall through to "dispatch qc-structural"
+# via the generic struct=none arm -- pr-gate-loop.md: "never dispatch QC
+# against red CI", and zero check-runs is a worse signal than red. These are
+# END-TO-END (the real script, not `_gate`/`_is_docs_only` in isolation)
+# because the fix lives entirely in the main-loop case statement below the
+# PR_GATE_STATUS_LIB seam, which `pr_gate_status_test.sh` cannot reach any
+# other way -- same reasoning as the case-32/33 e2e probes above.
+CI_NONE_GH_STUB_DIR=$(mktemp -d)
+cat > "$CI_NONE_GH_STUB_DIR/gh" <<'STUB'
+#!/bin/sh
+case "$1 $2" in
+  "pr list")
+    printf '%s\n' "$GATE_PR_NUMBER"
+    ;;
+  "pr view")
+    case "$*" in
+      *"--json comments"*) printf '%s\n' "${GATE_COMMENTS_JSON:-[]}"; exit 0 ;;
+    esac
+    # Stub fidelity (CP1-b): only emit `mergeable` when the caller's own
+    # `--json` field list actually requested it -- mirrors what real `gh`
+    # does. Without this, dropping `mergeable` from `_pr_meta_gh`'s `--json`
+    # list would go undetected: the stub would keep emitting the field from
+    # $GATE_MERGEABLE regardless, and every CONFLICTING assertion below
+    # would still pass even though the real script no longer asks for it.
+    json_fields=""
+    prev=""
+    for a in "$@"; do
+      if [ "$prev" = "--json" ]; then
+        json_fields=$a
+      fi
+      prev=$a
+    done
+    case ",$json_fields," in
+      *,mergeable,*) want_mergeable=1 ;;
+      *)              want_mergeable=0 ;;
+    esac
+    jq -n --arg tip "$GATE_TIP" --argjson reviews "$GATE_REVIEWS_JSON" --arg files "$GATE_FILES" \
+      --argjson labels "${GATE_LABELS_JSON:-[]}" --arg mergeable "${GATE_MERGEABLE:-}" \
+      --argjson want_mergeable "$want_mergeable" \
+      '{headRefOid: $tip,
+        files: ($files | split("\n") | map(select(length > 0) | {path: .})),
+        reviews: $reviews,
+        labels: $labels}
+       + (if $want_mergeable == 1 and $mergeable != "" then {mergeable: $mergeable} else {} end)'
+    ;;
+  "pr checks")
+    printf '%s\n' "$GATE_CHECKS" | awk 'NF{print "check-name\t" $0 "\tlink"}'
+    ;;
+esac
+STUB
+chmod +x "$CI_NONE_GH_STUB_DIR/gh"
+
+GATE_PR_NUMBER=502
+GATE_TIP=$TIP
+GATE_FILES="trading/foo/bar.ml"
+GATE_REVIEWS_JSON='[]'
+GATE_LABELS_JSON='[]'
+GATE_COMMENTS_JSON='[]'
+# The live #2113 shape: `gh pr checks` produced no rows at all (no
+# check-suite ever created), which is what an empty GATE_CHECKS reproduces --
+# `_pr_checks_gh`'s awk pipeline emits nothing, so `checks` is empty and the
+# `case "$checks" in ... *) ci=none ;; esac` default fires.
+GATE_CHECKS=""
+GATE_MERGEABLE=""
+export GATE_PR_NUMBER GATE_TIP GATE_FILES GATE_REVIEWS_JSON GATE_LABELS_JSON \
+  GATE_COMMENTS_JSON GATE_CHECKS GATE_MERGEABLE
+
+row=$(_e2e_probe "$CI_NONE_GH_STUB_DIR" "" 502 | tail -1)
+check "H-CI-DISPATCH e2e (gh): zero check-runs reads CI column none" \
+  none "$(printf '%s' "$row" | awk '{print $2}')"
+check "H-CI-DISPATCH e2e (gh): zero check-runs never dispatches qc-structural" no "$(
+  case "$row" in *"dispatch qc-structural"*) echo yes ;; *) echo no ;; esac
+)"
+check "H-CI-DISPATCH e2e (gh): zero check-runs, unknown mergeable -> generic no-CI diagnostic" yes "$(
+  case "$row" in *"no CI -- check mergeable (conflicted PR?) or push to retrigger"*) echo yes ;; *) echo no ;; esac
+)"
+
+GATE_MERGEABLE="CONFLICTING"
+export GATE_MERGEABLE
+row=$(_e2e_probe "$CI_NONE_GH_STUB_DIR" "" 502 | tail -1)
+check "H-CI-DISPATCH e2e (gh): zero check-runs + CONFLICTING mergeable names the conflict" yes "$(
+  case "$row" in *"no CI -- PR has merge conflicts (mergeable=CONFLICTING)"*) echo yes ;; *) echo no ;; esac
+)"
+check "H-CI-DISPATCH e2e (gh): conflict case still never dispatches qc-structural" no "$(
+  case "$row" in *"dispatch qc-structural"*) echo yes ;; *) echo no ;; esac
+)"
+
+GATE_MERGEABLE=""
+export GATE_MERGEABLE
+rm -rf "$CI_NONE_GH_STUB_DIR"
+
+# curl-backend counterpart: same shape, driven by `mergeable_state` (the REST
+# field name) instead of gh's `mergeable`, exercising `_pr_meta_curl`'s
+# dirty -> CONFLICTING normalisation.
+CI_NONE_CURL_STUB_DIR=$(mktemp -d)
+cat > "$CI_NONE_CURL_STUB_DIR/curl" <<'STUB'
+#!/bin/sh
+url=""
+for a in "$@"; do
+  case "$a" in
+    https://*) url=$a ;;
+  esac
+done
+case "$url" in
+  */pulls\?state=open*)
+    jq -n --arg n "$GATE_PR_NUMBER" '[{number: ($n | tonumber)}]'
+    ;;
+  */pulls/*/files*)
+    printf '%s\n' "$GATE_FILES" | jq -R -s 'split("\n") | map(select(length > 0) | {filename: .})'
+    ;;
+  */issues/*/comments*)
+    printf '%s\n' "${GATE_COMMENTS_JSON:-[]}"
+    ;;
+  */pulls/*/reviews*)
+    printf '%s\n' "$GATE_REVIEWS_JSON"
+    ;;
+  */commits/*/check-runs*)
+    printf '%s\n' "$GATE_CHECKS" | jq -R -s '
+      split("\n") | map(select(length > 0)) | map(
+        if . == "pending" then {status: "queued", conclusion: null}
+        elif . == "pass" then {status: "completed", conclusion: "success"}
+        else {status: "completed", conclusion: "failure"} end)
+      | {check_runs: .}'
+    ;;
+  */pulls/*)
+    jq -n --arg tip "$GATE_TIP" --argjson labels "${GATE_LABELS_JSON:-[]}" \
+      --arg mergeable_state "${GATE_MERGEABLE_STATE:-}" \
+      '{head: {sha: $tip}, labels: $labels}
+       + (if $mergeable_state == "" then {} else {mergeable_state: $mergeable_state} end)'
+    ;;
+esac
+STUB
+chmod +x "$CI_NONE_CURL_STUB_DIR/curl"
+
+GATE_CHECKS=""
+GATE_MERGEABLE_STATE=""
+export GATE_CHECKS GATE_MERGEABLE_STATE
+
+row=$(_e2e_probe "$CI_NONE_CURL_STUB_DIR" "dummy-token" 502 | tail -1)
+check "H-CI-DISPATCH e2e (curl): zero check-runs reads CI column none" \
+  none "$(printf '%s' "$row" | awk '{print $2}')"
+check "H-CI-DISPATCH e2e (curl): zero check-runs never dispatches qc-structural" no "$(
+  case "$row" in *"dispatch qc-structural"*) echo yes ;; *) echo no ;; esac
+)"
+# Empty mergeable_state (CP1-a / CP2): pins the "dirty" -> CONFLICTING branch
+# of `_pr_meta_curl`'s normalisation against the always-CONFLICTING mutation
+# (`if true then "CONFLICTING"`) -- with the mutation, this row would wrongly
+# carry the merge-conflicts diagnostic instead of the generic one.
+check "H-CI-DISPATCH e2e (curl): empty mergeable_state -> generic no-CI diagnostic" yes "$(
+  case "$row" in *"no CI -- check mergeable (conflicted PR?) or push to retrigger"*) echo yes ;; *) echo no ;; esac
+)"
+check "H-CI-DISPATCH e2e (curl): empty mergeable_state -> no merge-conflicts message" no "$(
+  case "$row" in *"merge conflicts"*) echo yes ;; *) echo no ;; esac
+)"
+
+GATE_MERGEABLE_STATE="dirty"
+export GATE_MERGEABLE_STATE
+row=$(_e2e_probe "$CI_NONE_CURL_STUB_DIR" "dummy-token" 502 | tail -1)
+check "H-CI-DISPATCH e2e (curl): zero check-runs + dirty mergeable_state names the conflict" yes "$(
+  case "$row" in *"no CI -- PR has merge conflicts (mergeable=CONFLICTING)"*) echo yes ;; *) echo no ;; esac
+)"
+
+# Non-dirty, non-empty mergeable_state ("clean"): the other half of the same
+# mutation guard -- a merely-different-from-empty state must still read as
+# the generic diagnostic, not CONFLICTING.
+GATE_MERGEABLE_STATE="clean"
+export GATE_MERGEABLE_STATE
+row=$(_e2e_probe "$CI_NONE_CURL_STUB_DIR" "dummy-token" 502 | tail -1)
+check "H-CI-DISPATCH e2e (curl): clean mergeable_state -> generic no-CI diagnostic" yes "$(
+  case "$row" in *"no CI -- check mergeable (conflicted PR?) or push to retrigger"*) echo yes ;; *) echo no ;; esac
+)"
+check "H-CI-DISPATCH e2e (curl): clean mergeable_state -> no merge-conflicts message" no "$(
+  case "$row" in *"merge conflicts"*) echo yes ;; *) echo no ;; esac
+)"
+
+GATE_MERGEABLE_STATE=""
+GATE_CHECKS=pass
+export GATE_MERGEABLE_STATE GATE_CHECKS
+rm -rf "$CI_NONE_CURL_STUB_DIR"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1

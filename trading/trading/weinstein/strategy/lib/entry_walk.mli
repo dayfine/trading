@@ -92,11 +92,11 @@ val entries_from_candidates :
       pre-P1 behaviour regardless of whether [sector_lookup] is passed.
     @param on_candidates_considered
       Issue #2490 gap G1. When present, called once after the walk with
-      {!Entry_audit_capture.all_alternatives_of_decisions} — every top-N
-      candidate the walk passed over, with its reason — so a caller can attach
-      the list to that Friday's {!Audit_recorder.cascade_event} even when
-      nothing was funded. Absent (the default) is a provable no-op: the
-      projection is never computed and nothing is allocated. Callers gate it on
+      {!Entry_audit_emit.all_alternatives_of_decisions} — every top-N candidate
+      the walk passed over, with its reason — so a caller can attach the list to
+      that Friday's {!Audit_recorder.cascade_event} even when nothing was
+      funded. Absent (the default) is a provable no-op: the projection is never
+      computed and nothing is allocated. Callers gate it on
       [audit_recorder.capture_candidates]; it is a separate parameter rather
       than a recorder callback because the list belongs to the {i week}'s
       cascade event, which the entry walk does not itself assemble.

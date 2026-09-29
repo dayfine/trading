@@ -56,6 +56,9 @@ check "docs-only: md + dev/notes paths" 0 "$(if is_docs_only "README.md
 dev/notes/x.md"; then echo 0; else echo 1; fi)"
 check "docs-only: an .ml path is not docs-only" 1 "$(if is_docs_only "trading/x.ml
 README.md"; then echo 0; else echo 1; fi)"
+check "docs-only: dev/budget json records are docs-only (same allowlist as pr_gate_status.sh)" 0 "$(if is_docs_only "dev/budget/local-2026-09-24.json
+README.md"; then echo 0; else echo 1; fi)"
+check "docs-only: a dev/budget non-json is not docs-only" 1 "$(if is_docs_only "dev/budget/x.sh"; then echo 0; else echo 1; fi)"
 
 rc=0; out=$(CODEX_REVIEW=off CODEX_REVIEW_LIB= sh "$HERE/codex_review.sh" 999999 2>&1) || rc=$?; out="$out
 rc=$rc"

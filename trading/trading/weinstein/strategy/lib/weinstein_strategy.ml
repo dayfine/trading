@@ -10,6 +10,7 @@ module Sector_rotation_weinstein_strategy = Sector_rotation_weinstein_strategy
 module Breaker_spy_strategy = Breaker_spy_strategy
 module Stops_runner = Stops_runner
 module Stops_split_runner = Stops_split_runner
+module Stop_ma_basis = Stop_ma_basis
 module Force_liquidation_runner = Force_liquidation_runner
 module Stage3_force_exit_runner = Stage3_force_exit_runner
 module Late_stage2_stop_runner = Late_stage2_stop_runner
@@ -38,16 +39,20 @@ module Resistance_sketch_reader = Resistance_sketch_reader
 module Weekly_sidetable_reader = Weekly_sidetable_reader
 module Weekly_ma_cache = Weekly_ma_cache
 module Audit_recorder = Audit_recorder
+module Stop_move_capture = Stop_move_capture
 module Cascade_trace = Cascade_trace
 module Stop_width_mode = Stop_width_mode
 module Stop_buffer_by_state = Stop_buffer_by_state
 module Entry_audit_capture = Entry_audit_capture
+module Entry_audit_emit = Entry_audit_emit
 module Entry_ticket_tags = Entry_ticket_tags
 module Entry_freshness = Entry_freshness
 module Entry_walk = Entry_walk
 module Entry_freeze = Entry_freeze
 module Entry_stop_width_order = Entry_stop_width_order
 module Entry_ticket_ttl = Entry_ticket_ttl
+module Entry_ticket_suspend_mode = Entry_ticket_suspend_mode
+module Entry_ticket_suspend = Entry_ticket_suspend
 module Screening_notional = Screening_notional
 module Long_buying_power = Long_buying_power
 module Leverage_dawn = Leverage_dawn
@@ -133,22 +138,29 @@ let _record_force_exit ~last_stop_out_dates ~positions ~current_date
 let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
     ~prior_stage_ma_values ~get_price ~last_stop_out_dates ~audit_recorder
     ~prior_macro_result ~prior_decline_character ~current_date =
-  Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:current_date;
   (* Arm the fast-crash absolute stop from the PRIOR cycle's decline-character
      (strictly past — this cycle's classify runs later, at the macro step; a
      plain bool keeps the stops lib macro-agnostic). *)
   let catastrophic_armed =
     phys_equal !prior_decline_character Decline_character.Fast_v
   in
+  (* Split rescale, then snapshot, then the stops runner — so a split is never
+     reported as a move by the silent-move capture (issue #2974). *)
   let exit_transitions, adjust_transitions =
-    Stops_runner.update
-      ?ma_cache:(Bar_reader.ma_cache bar_reader)
-      ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
-      ~catastrophic_armed ~stops_config:config.stops_config
-      ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
-      ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
-      ~prior_stages ()
+    Stop_move_capture.split_then_update ~audit_recorder ~positions ~stop_states
+      ~current_date
+      ~split_adjust:(fun () ->
+        Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
+          ~as_of:current_date)
+      ~update:(fun () ->
+        Stops_runner.update
+          ?ma_cache:(Bar_reader.ma_cache bar_reader)
+          ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
+          ~catastrophic_armed
+          ~on_stop_decision:audit_recorder.Audit_recorder.record_stop_decision
+          ~stops_config:config.stops_config ~stage_config:config.stage_config
+          ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
+          ~bar_reader ~as_of:current_date ~prior_stages ())
   in
   List.iter exit_transitions
     ~f:
@@ -159,12 +171,13 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
 
 (** Run the late-Stage-2 trailing-stop tightening dial (P1 stage-accuracy). On
     Friday ticks, when [config.enable_late_stage2_stop_tighten = true], raise
-    the trailing stop of every held [Stage2 { late = true }] long. Returns
+    the trailing stop of every held [Stage2 { late = true }] long: writes the
+    new level into [stop_states] (what the trigger reads) and returns matching
     [UpdateRiskParams] adjust transitions (never exits). The flag default-off
     short-circuits to [[]], so the disabled path is bit-identical to baseline.
     See {!Late_stage2_stop_runner}. *)
-let _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
-    ~index_view ~current_date =
+let _run_late_stage2_tighten ~config ~stop_states ~positions ~get_price
+    ~prior_stages ~index_view ~current_date =
   if not config.enable_late_stage2_stop_tighten then []
   else
     let is_friday =
@@ -172,7 +185,7 @@ let _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
     in
     Late_stage2_stop_runner.update
       ~buffer_pct:config.late_stage2_stop_buffer_pct ~is_screening_day:is_friday
-      ~positions ~get_price ~prior_stages ~current_date
+      ~stop_states ~positions ~get_price ~prior_stages ~current_date
 
 (** Compute the macro result for [current_date] (Friday only) and run the
     halt-reset side effect. Returns [None] on non-screening days. Mutates
@@ -194,11 +207,11 @@ let _run_macro ~config ~ad_series ~breadth_series ~prior_macro
     _maybe_reset_halt ~peak_tracker ~prior_macro:prev ~current_macro:r.trend;
     Some r
 
-let _run_entries ~pending_entry_e ~fold_start_date ~universe_membership_at
-    ~config ~stop_states ~last_stop_out_dates ~peak_tracker ~bar_reader
-    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-    ~current_date ~index_view ~audit_recorder ~is_screening_day
-    ~macro_result_opt =
+let _run_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
+    ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
+    ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+    ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
+    ~is_screening_day ~macro_result_opt =
   let halted =
     match
       Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
@@ -207,10 +220,11 @@ let _run_entries ~pending_entry_e ~fold_start_date ~universe_membership_at
     | Active -> false
   in
   Weinstein_strategy_macro.entry_transitions_if_active ~pending_entry_e
-    ~fold_start_date ~universe_membership_at ~halted ~is_screening_day
-    ~macro_result_opt ~config ~stop_states ~last_stop_out_dates ~bar_reader
-    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-    ~current_date ~index_view ~audit_recorder
+    ~suspended_tickets ~fold_start_date ~universe_membership_at ~halted
+    ~is_screening_day ~macro_result_opt ~config ~stop_states
+    ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
+    ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
+    ~audit_recorder
 
 (** Compute the macro result (mutating the macro refs via {!_run_macro}) and run
     the macro-bearish trim pass, returning both. Extracted from
@@ -252,25 +266,25 @@ let _run_macro_and_trim ~config ~ad_series ~breadth_series ~positions ~portfolio
 (** Run the late-Stage-2 stop-tighten dial and the entry walk. Returns
     [(late_tighten, entries)]. Extracted from {!_process_market_day} so that
     coordinator stays within the function-length limit. *)
-let _run_dials_and_entries ~pending_entry_e ~fold_start_date
+let _run_dials_and_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
     ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
     ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
     ~get_price ~(portfolio : Portfolio_view.t) ~current_date ~index_view
     ~audit_recorder ~is_screening_day ~macro_result_opt ~positions =
   let late_tighten_transitions =
-    _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
-      ~index_view ~current_date
+    _run_late_stage2_tighten ~config ~stop_states ~positions ~get_price
+      ~prior_stages ~index_view ~current_date
   in
   let entry_transitions =
-    _run_entries ~pending_entry_e ~fold_start_date ~universe_membership_at
-      ~config ~stop_states ~last_stop_out_dates ~peak_tracker ~bar_reader
-      ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-      ~current_date ~index_view ~audit_recorder ~is_screening_day
-      ~macro_result_opt
+    _run_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
+      ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
+      ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
+      ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
+      ~audit_recorder ~is_screening_day ~macro_result_opt
   in
   (late_tighten_transitions, entry_transitions)
 
-let _process_market_day ~pending_entry_e ~fold_start_date
+let _process_market_day ~pending_entry_e ~suspended_tickets ~fold_start_date
     ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
     ~last_stop_out_dates ~prior_macro ~prior_macro_result
     ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
@@ -309,7 +323,7 @@ let _process_market_day ~pending_entry_e ~fold_start_date
       ~force_exit_transitions
   in
   let late_tighten_transitions, entry_transitions =
-    _run_dials_and_entries ~pending_entry_e ~fold_start_date
+    _run_dials_and_entries ~pending_entry_e ~suspended_tickets ~fold_start_date
       ~universe_membership_at ~config ~stop_states ~last_stop_out_dates
       ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
       ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
@@ -321,17 +335,18 @@ let _process_market_day ~pending_entry_e ~fold_start_date
     ~adjust_transitions:(adjust_transitions @ late_tighten_transitions)
     ~entry_transitions ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
 
-let _on_market_close ~pending_entry_e ~fold_start_date ~universe_membership_at
-    ~config ~ad_series ~breadth_series ~stop_states ~last_stop_out_dates
-    ~prior_macro ~prior_macro_result ~prior_decline_character ~peak_tracker
-    ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
-    ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
-    ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
+let _on_market_close ~pending_entry_e ~suspended_tickets ~fold_start_date
+    ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
+    ~last_stop_out_dates ~prior_macro ~prior_macro_result
+    ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+    ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors ~stage3_streaks
+    ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
+    ~(portfolio : Portfolio_view.t) =
   match get_price config.indices.primary with
   | None -> Ok { Strategy_interface.transitions = [] }
   | Some primary_bar ->
       let current_date = primary_bar.Types.Daily_price.date in
-      _process_market_day ~pending_entry_e ~fold_start_date
+      _process_market_day ~pending_entry_e ~suspended_tickets ~fold_start_date
         ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
         ~last_stop_out_dates ~prior_macro ~prior_macro_result
         ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
@@ -389,15 +404,17 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
   in
   let breadth_series = _breadth_series_of_bars breadth_bars in
   let pending_entry_e = _make_closure_tables () in
+  let suspended_tickets = Entry_ticket_suspend.create () in
   let module M = struct
     let name = name
 
     let on_market_close =
-      _on_market_close ~pending_entry_e ~fold_start_date ~universe_membership_at
-        ~config ~ad_series ~breadth_series ~stop_states ~last_stop_out_dates
-        ~prior_macro ~prior_macro_result ~prior_decline_character ~peak_tracker
-        ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
-        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
+      _on_market_close ~pending_entry_e ~suspended_tickets ~fold_start_date
+        ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
+        ~last_stop_out_dates ~prior_macro ~prior_macro_result
+        ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+        ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
+        ~stage3_streaks ~laggard_streaks ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 
@@ -417,8 +434,10 @@ module Internal_for_test = struct
           config.macro_config.indicator_thresholds.momentum_period ad_bars
     in
     let pending_entry_e = _make_closure_tables () in
-    _on_market_close ~pending_entry_e ~fold_start_date
-      ~universe_membership_at:None ~config ~ad_series ~breadth_series:None
+    _on_market_close ~pending_entry_e
+      ~suspended_tickets:(Entry_ticket_suspend.create ())
+      ~fold_start_date ~universe_membership_at:None ~config ~ad_series
+      ~breadth_series:None
 
   let maybe_reset_halt = _maybe_reset_halt
   let positions_minus_exited = _positions_minus_exited

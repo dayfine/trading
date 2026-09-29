@@ -10,6 +10,7 @@ type skip_reason =
   | Stop_too_wide
   | Sector_exposure_cap
   | Long_exposure_cap
+  | No_structural_stop
 
 type alternative_input = {
   candidate : Screener.scored_candidate;
@@ -24,12 +25,24 @@ type split_safe_basis = Weinstein_stops.split_safe_basis =
   | Raw_fallback
   | Empty_window
 
+(* Declared before the other event records on purpose: they share the
+   [position_id] / [symbol] / [date] labels, and OCaml resolves an unannotated
+   label to the LAST type declaring it — defining this one first leaves every
+   existing unannotated access resolving exactly as before. *)
+type stop_move_event = {
+  position_id : string;
+  symbol : string;
+  date : Date.t;
+  stop_level : float;
+}
+
 type entry_event = {
   position_id : string;
   candidate : Screener.scored_candidate;
   macro : Macro.result;
   current_date : Date.t;
   close_at_decision : float option;
+  adjusted_close_at_decision : float option;
   installed_stop : float;
   stop_floor_kind : stop_floor_kind;
   split_safe_basis : split_safe_basis;
@@ -83,12 +96,21 @@ type cascade_event = {
 
 type force_liquidation_event = Portfolio_risk.Force_liquidation.event
 
+type reissue_event = {
+  reissued_position_id : string;
+  original_position_id : string;
+  reissue_date : Date.t;
+}
+
 type t = {
   record_entry : entry_event -> unit;
   record_exit : exit_event -> unit;
   record_cascade_summary : cascade_event -> unit;
   record_force_liquidation : force_liquidation_event -> unit;
   record_fill_volume : fill_volume_event -> unit;
+  record_stop_move : stop_move_event -> unit;
+  record_reissue : reissue_event -> unit;
+  record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
   capture_candidates : bool;
 }
 
@@ -99,5 +121,8 @@ let noop : t =
     record_cascade_summary = (fun _ -> ());
     record_force_liquidation = (fun _ -> ());
     record_fill_volume = (fun _ -> ());
+    record_stop_move = (fun _ -> ());
+    record_stop_decision = (fun _ -> ());
+    record_reissue = (fun _ -> ());
     capture_candidates = false;
   }

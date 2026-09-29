@@ -1,0 +1,14 @@
+[09-25 22:45:48] lane A HEAD=fe082e788 (expect fe082e788)
+[09-25 22:45:48] cell guard CELL_TIMEOUT=60000s (sized from the measured arm: s0 8h33m at cap 256); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[09-25 22:45:49] warehouse entries=9364 (expect 9364)
+[09-25 22:45:49] host free 58G
+[09-25 22:45:49] RUN a0-pit-null-s0-v11 on /tmp/snap_top3000_pit_v11pit
+[09-26 04:04:55] RESULT a0-pit-null-s0-v11 => total_return_pct 457.00690715250335 total_trades 732 sharpe_ratio 0.48200421724797948 max_drawdown_pct 40.643121141626757 calmar_ratio 0.16484401243791946  V6 INVARIANT PASS V16 EXPECTATION 2 violations V17 EXPECTATION PASS  v6diff:exit=0 (wall 19146s)
+[09-26 04:04:56] RUN f2-fills-faithful-s0-v11 on /tmp/snap_top3000_pit_v11pit
+[09-26 09:23:04] RESULT f2-fills-faithful-s0-v11 => total_return_pct 132.78268463935547 total_trades 724 sharpe_ratio 0.27609824903466945 max_drawdown_pct 54.574357229599769 calmar_ratio 0.059403247119016615  V6 INVARIANT PASS V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff:exit=0 (wall 19088s)
+[09-26 09:23:04] RUN f2-fills-faithful-s1-v11 on /tmp/snap_top3000_pit_v11pit
+[09-26 15:38:54] RESULT f2-fills-faithful-s1-v11 => total_return_pct 106.54092358646719 total_trades 746 sharpe_ratio 0.24747242157621138 max_drawdown_pct 49.060047661014536 calmar_ratio 0.0565974145753556  V6 INVARIANT PASS V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff:exit=0 (wall 22550s)
+[09-26 15:38:54] RUN f2-fills-faithful-s2-v11 on /tmp/snap_top3000_pit_v11pit
+[09-26 22:25:10] RESULT f2-fills-faithful-s2-v11 => total_return_pct 69.9990666617408 total_trades 741 sharpe_ratio 0.20230662944367298 max_drawdown_pct 56.436393887282819 calmar_ratio 0.035860283725680238  V6 INVARIANT 1 violations V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff:exit=1 (wall 24376s)
+[09-26 22:25:11] RUN f1-stoplimit-fresh-s0-v11 on /tmp/snap_top3000_pit_v11pit
+[09-26 22:25:19] PAUSED by dispatcher after s2 (user 09-26: land code changes + unit tests before f1 / investor build); f1-stoplimit-fresh:0 not run

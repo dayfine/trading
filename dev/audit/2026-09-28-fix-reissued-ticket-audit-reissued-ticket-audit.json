@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-28",
+  "feature": "reissued-ticket-audit",
+  "branch": "fix/reissued-ticket-audit",
+  "sha": "3218fcb1b7f9bc7d9531df1097ce8c0941196c0b",
+  "recorded_at_ns": 1790619242630797978,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

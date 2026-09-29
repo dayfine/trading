@@ -80,10 +80,11 @@ let _monday = Date.of_string "2024-01-08" (* Monday *)
     is identical to the pre-margin signature. New tests that exercise the margin
     filter pass the values explicitly via [~exit_margin_pct] and
     [~prior_stage_ma_values]. *)
-let run_runner ?(exit_margin_pct = 0.0) ?(prior_stage_ma_values = None) ~config
-    ~is_screening_day ~positions ~get_price ~prior_stages ~stage3_streaks
-    ~stop_exit_position_ids ~current_date () =
-  Stage3_force_exit_runner.update ~config ~exit_margin_pct
+let run_runner ?(exit_margin_pct = 0.0) ?(ma_same_basis = false)
+    ?(prior_stage_ma_values = None) ~config ~is_screening_day ~positions
+    ~get_price ~prior_stages ~stage3_streaks ~stop_exit_position_ids
+    ~current_date () =
+  Stage3_force_exit_runner.update ~config ~exit_margin_pct ~ma_same_basis
     ~prior_stage_ma_values ~is_screening_day ~positions ~get_price ~prior_stages
     ~stage3_streaks ~stop_exit_position_ids ~current_date
 
@@ -508,6 +509,126 @@ let test_combined_confirmation_met_margin_fails _ =
   assert_that (Hashtbl.find stage3_streaks "AAPL") (is_some_and (equal_to 2))
 
 (* ------------------------------------------------------------------ *)
+(* MA basis (issue #2982): stored MA is adjusted, the close is raw      *)
+(* ------------------------------------------------------------------ *)
+
+(* A name with a later 10:1 split: raw close 130, adjusted close 13. The table
+   holds the classifier's adjusted MA, 14 — i.e. 140 on the raw basis, so the
+   close really sits ~7% BELOW the MA. *)
+let _split_basis_bar () =
+  {
+    (make_bar "2024-01-05" ~close:130.0 ()) with
+    Types.Daily_price.adjusted_close = 13.0;
+  }
+
+let _run_split_basis ~ma_same_basis ~ma_values =
+  let pos = make_holding_pos "AAPL" 100.0 _friday in
+  let prior_stages = Hashtbl.create (module String) in
+  Hashtbl.set prior_stages ~key:"AAPL" ~data:stage3;
+  run_runner ~exit_margin_pct:0.0 ~ma_same_basis
+    ~prior_stage_ma_values:(Some ma_values) ~config:_cfg_k1
+    ~is_screening_day:true
+    ~positions:(String.Map.singleton "AAPL" pos)
+    ~get_price:(get_price_of [ ("AAPL", _split_basis_bar ()) ])
+    ~prior_stages
+    ~stage3_streaks:(Hashtbl.create (module String))
+    ~stop_exit_position_ids:String.Set.empty ~current_date:_friday ()
+
+let _adjusted_ma_table () =
+  let ma_values = Hashtbl.create (module String) in
+  Hashtbl.set ma_values ~key:"AAPL" ~data:14.0;
+  ma_values
+
+(* Flag off (default): raw 130 vs adjusted 14 reads as "close far ABOVE the MA",
+   and margin 0.0 still requires close <= MA — the exit is suppressed. Pins both
+   the pre-#2982 mixed basis and the corrected "0.0 still gates" docstring. *)
+let test_margin_mixed_basis_suppresses_when_flag_off _ =
+  assert_that
+    (_run_split_basis ~ma_same_basis:false ~ma_values:(_adjusted_ma_table ()))
+    is_empty
+
+(* Flag on: the MA is restated to 140 on the bar's raw basis, the close is below
+   it, and the exit fires. The caller's table keeps the adjusted value. *)
+let test_margin_same_basis_fires_when_flag_on _ =
+  let ma_values = _adjusted_ma_table () in
+  let exits = _run_split_basis ~ma_same_basis:true ~ma_values in
+  assert_that
+    ( List.map exits ~f:(fun (t : Trading_strategy.Position.transition) ->
+          t.position_id),
+      Hashtbl.find ma_values "AAPL" )
+    (all_of
+       [
+         field fst (elements_are [ equal_to "AAPL" ]);
+         field snd (is_some_and (float_equal 14.0));
+       ])
+
+(* Production wiring: {!Special_exits.run} passes
+   [config.stops_config.stop_ma_same_basis] to the runner's [ma_same_basis].
+   Same split tape as above (raw close 130, adjusted MA 14 in the table), with
+   Stage-3 force-exit armed at hysteresis 1 and margin 0.0; every other channel
+   is at its default (no-op for this flat, profitable long). The Stage-3 exit
+   fires only when the STRATEGY config's stops flag is on. *)
+let _friday_index_view : Snapshot_runtime.Snapshot_bar_views.weekly_view =
+  {
+    closes = [| 130.0 |];
+    raw_closes = [| 130.0 |];
+    highs = [| 130.0 |];
+    lows = [| 130.0 |];
+    volumes = [| 1_000_000.0 |];
+    dates = [| _friday |];
+    n = 1;
+  }
+
+let _special_exits_stage3_ids ~stop_ma_same_basis =
+  let bar = _split_basis_bar () in
+  let pos = make_holding_pos "AAPL" 100.0 _friday in
+  let positions = String.Map.singleton "AAPL" pos in
+  let prior_stages = Hashtbl.create (module String) in
+  Hashtbl.set prior_stages ~key:"AAPL" ~data:stage3;
+  let default =
+    Weinstein_strategy_config.default_config ~universe:[ "AAPL" ]
+      ~index_symbol:"INDEX"
+  in
+  let config =
+    {
+      default with
+      enable_stage3_force_exit = true;
+      stage3_force_exit_config = _cfg_k1;
+      stage3_exit_margin_pct = 0.0;
+      stops_config = { default.stops_config with stop_ma_same_basis };
+    }
+  in
+  let _force_ts, _stage3_ts, _laggard_ts, _stop_ids, stage3_ids, _laggard_ids =
+    Special_exits.run ~config
+      ~record_force_exit:(fun
+          ~last_stop_out_dates:_
+          ~positions:_
+          ~current_date:_
+          ~cooldown_weeks:_
+          ~label:_
+          _
+        -> ())
+      ~positions
+      ~last_stop_out_dates:(Hashtbl.create (module String))
+      ~portfolio:{ cash = 1_000_000.0; positions }
+      ~get_price:(get_price_of [ ("AAPL", bar) ])
+      ~peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.(create ())
+      ~audit_recorder:Audit_recorder.noop ~prior_macro_result:(ref None)
+      ~prior_stages ~prior_stage_ma_values:(_adjusted_ma_table ())
+      ~stage3_streaks:(Hashtbl.create (module String))
+      ~laggard_streaks:(Hashtbl.create (module String))
+      ~bar_reader:(Bar_reader.of_in_memory_bars [ ("AAPL", [ bar ]) ])
+      ~index_view:_friday_index_view ~exit_transitions:[] ~current_date:_friday
+  in
+  Set.to_list stage3_ids
+
+let test_special_exits_wires_stop_ma_same_basis _ =
+  assert_that
+    ( _special_exits_stage3_ids ~stop_ma_same_basis:false,
+      _special_exits_stage3_ids ~stop_ma_same_basis:true )
+    (pair (elements_are []) (elements_are [ equal_to "AAPL" ]))
+
+(* ------------------------------------------------------------------ *)
 (* runner                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -546,6 +667,12 @@ let suite =
          >:: test_combined_confirmation_and_margin;
          "combined: confirmation met but margin fails → no fire"
          >:: test_combined_confirmation_met_margin_fails;
+         "MA basis: adjusted MA vs raw close suppresses when flag off"
+         >:: test_margin_mixed_basis_suppresses_when_flag_off;
+         "MA basis: restated MA fires when stop_ma_same_basis on"
+         >:: test_margin_same_basis_fires_when_flag_on;
+         "Special_exits.run passes stops_config.stop_ma_same_basis"
+         >:: test_special_exits_wires_stop_ma_same_basis;
        ]
 
 let () = run_test_tt_main suite

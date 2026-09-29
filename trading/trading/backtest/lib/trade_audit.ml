@@ -6,6 +6,11 @@ open Core
 
 (* Types ------------------------------------------------------------------ *)
 
+(* Split out for file length: [cascade_summary] and the execution-faithfulness
+   types (+ their sexp converters). *)
+include Trade_audit_cascade
+include Trade_audit_execution
+
 type skip_reason =
   | Insufficient_cash
   | Already_held
@@ -17,6 +22,7 @@ type skip_reason =
   | Stop_too_wide
   | Sector_exposure_cap
   | Long_exposure_cap
+  | No_structural_stop
 [@@deriving sexp]
 
 type alternative_candidate = {
@@ -64,9 +70,10 @@ type entry_decision = {
   side : Trading_base.Types.position_side;
   suggested_entry : float;
   close_at_decision : float option; [@sexp.option]
+  adjusted_close_at_decision : float option; [@sexp.option]
   ma_value : float option; [@sexp.option]
   local_range_top : float option; [@sexp.option]
-  suggested_stop : float;
+  screener_proxy_stop : float;
   installed_stop : float;
   stop_floor_kind : stop_floor_kind;
   split_safe_basis : split_safe_basis; [@sexp.default Flag_off]
@@ -77,6 +84,19 @@ type entry_decision = {
   alternatives_considered : alternative_candidate list;
 }
 [@@deriving sexp]
+
+(* Issue #2975: [screener_proxy_stop] was written as [suggested_stop] before.
+   ppx_sexp_conv has no field alias, so legacy rows are read by renaming the key
+   first; [audit_record]'s derived reader, declared below, picks this up. *)
+let _rename_legacy_key = function
+  | Sexp.List [ Sexp.Atom "suggested_stop"; v ] ->
+      Sexp.List [ Sexp.Atom "screener_proxy_stop"; v ]
+  | field -> field
+
+let entry_decision_of_sexp = function
+  | Sexp.List fields ->
+      entry_decision_of_sexp (Sexp.List (List.map fields ~f:_rename_legacy_key))
+  | sexp -> entry_decision_of_sexp sexp
 
 type exit_decision = {
   symbol : string;
@@ -103,48 +123,12 @@ type external_exit_decision = {
 }
 [@@deriving sexp]
 
-type designed_order_type =
-  | Market
-  | Stop_limit of { trigger : float; limit : float }
-[@@deriving sexp]
-
-type execution_faithfulness = {
-  designed_order_type : designed_order_type;
-  designed_trigger : float;
-  fill_price : float;
-  fill_vs_trigger_pct : float;
-  fill_within_band : bool;
-  faithful : bool;
-}
-[@@deriving sexp]
-
 type audit_record = {
   entry : entry_decision;
   exit_ : exit_decision option;
   external_exit : external_exit_decision option; [@sexp.option]
   execution : execution_faithfulness option; [@sexp.option]
-}
-[@@deriving sexp]
-
-type cascade_summary = {
-  date : Date.t;
-  total_stocks : int;
-  candidates_after_held : int;
-  macro_trend : Weinstein_types.market_trend;
-  breadth_state : Weinstein_types.breadth_state;
-      [@sexp.default Weinstein_types.Neutral_breadth]
-  long_macro_admitted : int;
-  long_breakout_admitted : int;
-  long_sector_admitted : int;
-  long_grade_admitted : int;
-  long_top_n_admitted : int;
-  short_macro_admitted : int;
-  short_breakdown_admitted : int;
-  short_sector_admitted : int;
-  short_rs_hard_gate_admitted : int;
-  short_grade_admitted : int;
-  short_top_n_admitted : int;
-  entered : int;
+  stop_decisions : Weinstein_stops.Stop_decision.t list; [@sexp.list]
 }
 [@@deriving sexp]
 
@@ -163,6 +147,7 @@ type _bucket = {
   mutable bucket_fill_volume : Ticket_lifecycle.fill_volume_check option;
   mutable bucket_cancel_age_weeks : int option;
   mutable bucket_cancel_reason : string option;
+  mutable bucket_stop_decisions : Weinstein_stops.Stop_decision.t list;
 }
 (** Internal mutable bucket: every [record_*] merge lands here and is folded
     into the emitted [audit_record] at drain time. *)
@@ -188,10 +173,25 @@ let _fresh_bucket (entry : entry_decision) =
     bucket_fill_volume = None;
     bucket_cancel_age_weeks = None;
     bucket_cancel_reason = None;
+    bucket_stop_decisions = [];
   }
 
 let record_entry t (entry : entry_decision) =
   Hashtbl.set t.records ~key:entry.position_id ~data:(_fresh_bucket entry)
+
+(* #2989: the original's placement-time row under the re-issued id, linked. *)
+let _reissued_entry ~position_id link ({ bucket_entry = e; _ } : _bucket) =
+  let ticket_lifecycle =
+    Ticket_lifecycle.with_reissue e.ticket_lifecycle link
+  in
+  { e with position_id; ticket_lifecycle }
+
+let record_reissue t ~position_id ~original_position_id ~reissue_date =
+  let link = { Ticket_lifecycle.original_position_id; reissue_date } in
+  let found = Hashtbl.find t.records original_position_id in
+  let copy = Option.map found ~f:(_reissued_entry ~position_id link) in
+  Option.iter copy ~f:(record_entry t);
+  copy
 
 (* Apply [f] to the bucket for [position_id]; a record with no entry on file is
    dropped — the no-entry contract shared by every [record_*] below. *)
@@ -208,25 +208,25 @@ let record_exit t (exit_ : exit_decision) =
 let record_cascade_summary t (summary : cascade_summary) =
   Queue.enqueue t.cascade_summaries summary
 
-(* Build an [external_exit_decision] from a [TriggerExit] transition and the
-   bucket's already-recorded entry (for [symbol]). *)
-let _external_exit_of_transition (bucket : _bucket)
-    (trans : Trading_strategy.Position.transition) ~exit_reason :
-    external_exit_decision =
-  {
-    symbol = bucket.bucket_entry.symbol;
-    exit_date = trans.date;
-    position_id = trans.position_id;
-    exit_trigger = Stop_log.exit_trigger_of_reason exit_reason;
-  }
+let record_stop_decision t (d : Weinstein_stops.Stop_decision.t) =
+  _with_bucket t ~position_id:d.position_id ~f:(fun b ->
+      b.bucket_stop_decisions <-
+        Weinstein_stops.Stop_decision.push b.bucket_stop_decisions d)
 
-(* Fill in [bucket.bucket_external_exit] from [trans] iff no enriched exit_ is
-   already recorded — enriched always wins, see [record_transitions]'s doc. *)
+(* Set [bucket_external_exit] from a [TriggerExit] (symbol from the entry) iff
+   no enriched exit_ is on file; enriched wins (see [record_transitions]). *)
 let _fill_in_external_exit (bucket : _bucket)
     (trans : Trading_strategy.Position.transition) ~exit_reason =
+  let ext : external_exit_decision =
+    {
+      symbol = bucket.bucket_entry.symbol;
+      exit_date = trans.date;
+      position_id = trans.position_id;
+      exit_trigger = Stop_log.exit_trigger_of_reason exit_reason;
+    }
+  in
   if Option.is_none bucket.bucket_exit then
-    bucket.bucket_external_exit <-
-      Some (_external_exit_of_transition bucket trans ~exit_reason)
+    bucket.bucket_external_exit <- Some ext
 
 (* PR-5: a cancelled ticket's resting age, anchored on [placement_date], paired
    with the transition's reason token — see [Ticket_lifecycle.cancel_reason]. *)
@@ -264,21 +264,19 @@ let _bucket_to_record (bucket : _bucket) : audit_record =
     exit_ = bucket.bucket_exit;
     external_exit = bucket.bucket_external_exit;
     execution = None;
+    stop_decisions = List.rev bucket.bucket_stop_decisions;
   }
-
-let _compare_by_position_id (a : audit_record) (b : audit_record) =
-  String.compare a.entry.position_id b.entry.position_id
-
-let _compare_by_date (a : cascade_summary) (b : cascade_summary) =
-  Date.compare a.date b.date
 
 let get_audit_records t : audit_record list =
   Hashtbl.fold t.records ~init:[] ~f:(fun ~key:_ ~data:bucket acc ->
       _bucket_to_record bucket :: acc)
-  |> List.sort ~compare:_compare_by_position_id
+  |> List.sort ~compare:(fun (a : audit_record) b ->
+      String.compare a.entry.position_id b.entry.position_id)
 
 let get_cascade_summaries t : cascade_summary list =
-  Queue.to_list t.cascade_summaries |> List.sort ~compare:_compare_by_date
+  Queue.to_list t.cascade_summaries
+  |> List.sort ~compare:(fun (a : cascade_summary) b ->
+      Date.compare a.date b.date)
 
 let get_audit_blob t : audit_blob =
   {

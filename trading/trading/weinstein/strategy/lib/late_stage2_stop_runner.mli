@@ -48,21 +48,35 @@ open Trading_strategy
 val update :
   buffer_pct:float ->
   is_screening_day:bool ->
+  stop_states:Weinstein_stops.stop_state String.Map.t ref ->
   positions:Position.t Map.M(String).t ->
   get_price:Strategy_interface.get_price_fn ->
   prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
   current_date:Core.Date.t ->
   Position.transition list
-(** [update ~buffer_pct ~is_screening_day ~positions ~get_price ~prior_stages
-     ~current_date] returns an [UpdateRiskParams] transition for every held long
-    position whose current stage is [Stage2 { late = true }] and whose tightened
-    stop would sit strictly above its existing stop.
+(** [update ~buffer_pct ~is_screening_day ~stop_states ~positions ~get_price
+     ~prior_stages ~current_date] raises the stop of every held long position
+    whose current stage is [Stage2 { late = true }] and whose tightened stop
+    would sit strictly above its live stop level. For each raise it
+    {b writes the new level into [stop_states]} and returns a matching
+    [UpdateRiskParams] transition.
 
     The tightened stop level is [close *. (1.0 -. buffer_pct)] where [close] is
     the current bar's close from [get_price]. The runner reads the position's
     current stage from [prior_stages] (written by {!Stops_runner.update} earlier
-    in the same tick) and its existing stop from the position's [Holding]
-    risk-params.
+    in the same tick) and its live stop level from [stop_states] via
+    {!Weinstein_stops.get_stop_level}.
+
+    {2 Why [stop_states] is written}
+
+    The stop trigger ({!Weinstein_stops.check_stop_hit}, run by
+    {!Stops_runner.update} on later ticks) reads [stop_states], not
+    [Position.risk_params]. An [UpdateRiskParams] alone therefore moves a logged
+    level that never fires. Writing the level into the state is what makes a
+    later bar whose low crosses it exit the position (issue #2983). The state's
+    phase ([Initial] / [Trailing] / [Tightened]) and its tracking fields are
+    preserved; only [stop_level] changes. The [UpdateRiskParams] transition
+    keeps [risk_params] in step for consumers that read it.
 
     {2 Behaviour}
 
@@ -76,22 +90,28 @@ val update :
           A [Stage2 { late = false }] read, any other stage, or a missing stage
           entry produces no transition.
         - Skips when [get_price] has no bar for the symbol.
-        - Computes [candidate = close *. (1.0 -. buffer_pct)] and emits
-          [UpdateRiskParams] with [stop_loss_price = Some candidate]
-          {b only when} [candidate] is strictly greater than the existing stop
-          (or the position has no existing stop). This enforces the
-          never-lowered invariant: a stop already at or above the candidate is
-          left untouched.
+        - Skips when [stop_states] has no entry for the symbol (no enforceable
+          stop to tighten).
+        - Computes [candidate = close *. (1.0 -. buffer_pct)] and acts
+          {b only when} [candidate] is strictly greater than the live stop
+          level. This enforces the never-lowered invariant: a stop already at or
+          above the candidate — whether set at entry, by trailing, or by the
+          state machine's own tightening — is left untouched.
      }
-     {- Short positions and non-[Holding] states are skipped without emitting. }
+     {- Short positions and non-[Holding] states are skipped without emitting or
+        writing.
+     }
+     {- Documented behaviour: there is no exited-this-tick skip set. A position
+        whose stop fired earlier in the same tick is still [Holding] in
+        [positions], so it can still be tightened (transition emitted, level
+        written); harmless, since the strategy drops adjusts for exited ids.
+     }
     }
 
     {2 Never-lowered invariant}
 
-    The runner only ever {e raises} a stop. When the candidate sits at or below
-    the existing stop the position is skipped — the trailing stop set by
-    {!Stops_runner} (or a prior late-tighten) is preserved. A long's trailing
-    stop is monotonically non-decreasing, per book §Stop-Loss Rules.
+    The runner only ever {e raises} a stop. A long's trailing stop is
+    monotonically non-decreasing, per book §Stop-Loss Rules.
 
     {2 No-op default}
 

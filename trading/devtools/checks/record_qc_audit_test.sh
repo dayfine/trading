@@ -1841,7 +1841,7 @@ done
 if [[ -z "${offenders25}" ]] && (( seen25 == HOOK_DISABLE_EXPECTED_COUNT )); then
   pass "scenario 25a — all ${seen25} documented 'off' spellings ($(_disable_values_repr)) leave WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME disabled: write completes, record published (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
-  fail "scenario 25a — expected rc=0 + record + 'OK: wrote' for all ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings ($(_disable_values_repr)); exercised ${seen25}; offending values:${offenders25:-none}"
+  fail "scenario 25a — expected ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings, exercised ${seen25} ($(_disable_values_repr)); each exercised value must show rc=0 + record + 'OK: wrote'; offending values:${offenders25:-none}"
 fi
 
 # (b) fire direction — `1` must still abort before publishing, leaving the
@@ -1900,7 +1900,7 @@ if [[ -z "${offenders26}" ]] && (( seen26 == HOOK_DISABLE_EXPECTED_COUNT )) \
    && [[ -f "${JSON26}" ]]; then
   pass "scenario 26a — all ${seen26} documented 'off' spellings ($(_disable_values_repr)) leave WRITE_AUDIT_TEST_ABORT_AFTER_RENAME disabled: rc=0 with the 'OK:' line, no spurious failure reported for an already-published record (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
-  fail "scenario 26a — expected rc=0 + 'OK: wrote' for all ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings ($(_disable_values_repr)); exercised ${seen26}, record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no); offending values:${offenders26:-none}"
+  fail "scenario 26a — expected ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings, exercised ${seen26} ($(_disable_values_repr)); each exercised value must show rc=0 + 'OK: wrote'; record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no); offending values:${offenders26:-none}"
 fi
 
 # (b) fire direction — `1` must still abort right after the rename.

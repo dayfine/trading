@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-27",
+  "feature": "harness-ita-guard-hardening",
+  "branch": "harness/ita-guard-hardening",
+  "sha": "2d794a3303f99b66c10ce1f6bfb26ae70b9c29cd",
+  "recorded_at_ns": 1790530181403862271,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

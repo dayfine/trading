@@ -60,6 +60,9 @@ A PR is **docs-only** if its diff touches **only** files in:
 - `dev/status/`
 - `.md` files at repo root
 - `*.md` files anywhere (READMEs, in-tree docs)
+- `dev/budget/*.json` — spend records (the orchestrator's per-run cost files and
+  `budget_local_record.sh`'s `local-<date>.json`); written by scripts, never code.
+  User decision 2026-09-24 (#2922 item 3).
 
 For docs-only PRs, **both qc-structural and qc-behavioral are
 skipped**. CI is still required (`build-and-test` linters may catch

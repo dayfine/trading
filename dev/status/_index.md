@@ -4,9 +4,9 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-24 (orchestrator run 36032653844, run 2; run start `fba9089a`, main after this
-run's merges **`1dd14b25`** (#2949 cleanup, #2950 harness #2941, #2951 backtest-infra #2915 guard).
-Queue was **empty** at run start (0 open PRs).
+Last updated: 2026-09-28 (orchestrator run 36444394197; `0c9809d9` → `3f77947f`). Queue at start: 5 cloud-session PRs (#3000 #3004 #3005
+#3006 #3007) with self-run QC only; this run re-gated each with independent mutation-probe QC, reworked #3005/#3006, merged all
+(see `dev/daily/2026-09-28.md`); harness #3008 + cleanup #3009 dispatched and merged here. Queue empty at run end.
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -106,7 +106,7 @@ immune (#2605).
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | PIT migration LOCAL, do not dispatch: steps 1–6 MERGED (#2843 band 152/188/457, #2846 golden); #2823 shipped as #2862; next #2839, top-of-funnel screen |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | 09-28: cloud #3000 #3004 #3005 #3006 #3007 MERGED; #2984 open (order_gen ~stop_sync live wiring). PIT LOCAL; next #2839 |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1/v2 MERGED; twin-detector direct-match + hub guard MERGED #2862 (default-off); alias sidecar is armed-pass only (#2870); next: arm the guards on a PIT rebuild |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | `Series_level` WIRED to `Build_runner` behind `-detect-series-level`, report-only default-off, MERGED #2875 (1 rework); next: arm on next rebuild + read sidecar |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
@@ -131,9 +131,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-24: #2941 crowded-page NO-SCHEDULE MERGED #2950; #2922 items 2-4 MERGED #2943; next: #2876 file-length linter scope |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-28: exceptions-conf table + completeness guard MERGED #3008; next: pick next unblocked H-item |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 09-24: 9 expired linter exceptions retired/re-dated MERGED #2949; remaining 3 §Backlog items are deliberate non-actions |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | release_report.ml 769→636 MERGED #3009 (1 rework); next: its I/O loader cluster, then trade_audit_ratings.ml |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

@@ -56,7 +56,7 @@ let record_step_into_progress ~progress_acc ~date
   | None -> ()
   | Some acc ->
       Backtest_progress.record_step acc ~date
-        ~trades_added:(List.length step_result.trades)
+        ~fills_added:(List.length step_result.trades)
         ~portfolio_value:step_result.portfolio_value
 
 (** Step-loop replacement for [Simulator.run] that snapshots [Gc.stat] before

@@ -101,6 +101,7 @@ is_docs_only() {
     case "$f" in
       *.md) ;;
       dev/notes/*|dev/plans/*|dev/reviews/*|dev/status/*) ;;
+      dev/budget/*.json) ;;  # spend records (orchestrator runs + local-<date>.json), never code
       *) return 1 ;;
     esac
   done

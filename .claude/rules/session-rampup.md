@@ -168,4 +168,4 @@ sh dev/scripts/budget_local_record.sh --date D   # a session that crossed UTC mi
 ```
 
 Re-running for the same date overwrites that day's record. It commits with
-the handoff doc.
+the handoff doc; `dev/budget/*.json` is docs-only (`pr-merge-gates.md`), so CI + admin-merge.

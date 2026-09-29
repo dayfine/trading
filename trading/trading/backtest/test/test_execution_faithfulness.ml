@@ -74,9 +74,10 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     side;
     suggested_entry;
     close_at_decision = None;
+    adjusted_close_at_decision = None;
     ma_value = None;
     local_range_top = None;
-    suggested_stop = installed_stop;
+    screener_proxy_stop = installed_stop;
     installed_stop;
     stop_floor_kind = TA.Buffer_fallback;
     split_safe_basis = TA.Flag_off;
@@ -88,7 +89,13 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
   }
 
 let make_record entry : TA.audit_record =
-  { entry; exit_ = None; external_exit = None; execution = None }
+  {
+    entry;
+    exit_ = None;
+    external_exit = None;
+    execution = None;
+    stop_decisions = [];
+  }
 
 (* The [config] plumbing only reads two fields; build via [default_config] and
    override so we don't depend on unrelated defaults. *)
@@ -348,6 +355,7 @@ let _lifecycle ?(ticket_age_weeks_at_cancel = None) ~placement_date () : TL.t =
     fill_volume = None;
     freshness_basis = TL.Ma_cross;
     sized_down_wide_stop = false;
+    reissued_from = None;
     triple_confirmation =
       {
         breakout_volume_multiple = None;

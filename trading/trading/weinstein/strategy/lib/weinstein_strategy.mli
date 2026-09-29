@@ -75,6 +75,10 @@ module Stops_split_runner = Stops_split_runner
     stay in lockstep with the broker-side share-count rescale on a
     corporate-action split. See {!Stops_split_runner}. *)
 
+module Stop_ma_basis = Stop_ma_basis
+(** Adjusted-to-raw MA basis restatement for the stop machine and the Stage-3
+    margin gate (issue #2982). See {!Stop_ma_basis}. *)
+
 module Force_liquidation_runner = Force_liquidation_runner
 (** Force-liquidation policy runner. Invoked at the bottom of [on_market_close]
     after {!Stops_runner.update} — defense in depth beyond stops. Closes G4 from
@@ -212,6 +216,11 @@ module Audit_recorder = Audit_recorder
     strategy emits raw events; backtest layers wrap a {!Backtest.Trade_audit.t}
     collector. See {!Audit_recorder}. *)
 
+module Stop_move_capture = Stop_move_capture
+(** Reports stop moves the stops pass makes without a transition (the
+    [Entered_tightening] install) to {!Audit_recorder.t.record_stop_move}.
+    Observability only (issue #2974). *)
+
 module Cascade_trace = Cascade_trace
 (** Per-Friday candidate-capture handle for the [candidates.sexp] artefact
     (#2490). Re-exposed alongside {!Audit_recorder} so tests can drive the
@@ -231,9 +240,13 @@ module Stop_buffer_by_state = Stop_buffer_by_state
     {!Stop_buffer_by_state}. *)
 
 module Entry_audit_capture = Entry_audit_capture
-(** Per-candidate entry construction + audit emission. Factored out of the main
-    strategy file to keep it under the file-length cap. See
+(** Per-candidate entry construction + the entry gate chain. Factored out of the
+    main strategy file to keep it under the file-length cap. See
     {!Entry_audit_capture}. *)
+
+module Entry_audit_emit = Entry_audit_emit
+(** Projection of the entry walk's decisions into audit rows (alternatives,
+    entry events). See {!Entry_audit_emit}. *)
 
 module Entry_ticket_tags = Entry_ticket_tags
 (** Placement-time ticket audit tags — the F1 freshness basis and the F6 book
@@ -273,6 +286,16 @@ module Entry_ticket_ttl = Entry_ticket_ttl
     half is default-on since the 2026-08-27 promotion). Re-exposed so tests can
     pin the cancel decision independently of a full screening tick. See
     {!Entry_ticket_ttl}. *)
+
+module Entry_ticket_suspend_mode = Entry_ticket_suspend_mode
+(** The [config.entry_ticket_macro_suspend] variant (#2976). Re-exposed so
+    specs, overlays and tests can name its constructors. *)
+
+module Entry_ticket_suspend = Entry_ticket_suspend
+(** #2976 resting-ticket macro suspension (default [Off]): withdraw resting long
+    tickets while the macro gate rejects new longs, re-issue them unchanged when
+    it admits. Re-exposed so tests can drive a store directly. See
+    {!Entry_ticket_suspend}. *)
 
 module Screening_notional = Screening_notional
 (** Per-Friday entry-walk notional / sector-exposure accumulator seeds. Exposed
@@ -940,6 +963,13 @@ type config = {
           unchanged. Default [false] = off, bit-identical baselines (R1); also
           gated on the E-family, so arming alone is a no-op. See
           [Weinstein_strategy_config.stop_anchor_at_entry_base]. *)
+  require_structural_stop : bool; [@sexp.default false]
+      (** Investor-preset initial-stop rule (book Ch. 6: "investors should never
+          use automatic percentages"). When [true], a candidate whose initial
+          stop is the [Buffer_fallback] automatic percentage is skipped as
+          [Audit_recorder.No_structural_stop]; [Support_floor] stops are
+          unaffected. Both sides. Default [false] = off, bit-identical (R1). See
+          [Weinstein_strategy_config.require_structural_stop]. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]
       (** Next-bar-open fill realism for Market entries (Fix #1, plan
           [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C). When
@@ -967,6 +997,21 @@ type config = {
           2026-09-03 (user-directed D1 correctness flip, goldens re-pinned
           paired); [false] reproduces the pre-flip stale-bar fill basis. See
           [Weinstein_strategy_config.sim_exit_fill_next_open]. *)
+  sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]
+      (** Fresh-bar-only fills for StopLimit ENTRY tickets. A ticket created
+          from a Friday-close screen is otherwise first checked on the Saturday
+          step against the retained Friday bar and fills inside a range that
+          traded before it existed (99 of 100 Saturday-dated entries on the 26y
+          PIT record). When [true], such a ticket rests until the next fresh
+          bar. Default [false] = bit-identical baselines (R1). See
+          [Weinstein_strategy_config.sim_entry_stoplimit_fresh_bar_only]. *)
+  sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]
+      (** Protective-stop ([StopLoss]) exits fill on the step whose bar traded
+          the stop, via a [Stop] engine order (the open on a gap through the
+          stop, else the first intraday-path price through it), instead of at
+          the next open (issue #2961, book §5.7). Default [false] =
+          bit-identical baselines (R1). See
+          [Weinstein_strategy_config.sim_stop_exit_fill_on_trigger_bar]. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2, plan
           [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream D). The
@@ -1100,6 +1145,13 @@ type config = {
           being armed). Default [false] = off, bit-identical (R1). Threaded into
           [Trading_simulation.Stale_hold.config.exit_without_prior_bar]. See
           [Weinstein_strategy_config.stale_exit_without_prior_bar]. *)
+  entry_ticket_macro_suspend : Entry_ticket_suspend_mode.t;
+      [@sexp.default Entry_ticket_suspend_mode.Off]
+      (** #2976: suspend (withdraw, keep, re-issue unchanged) resting long entry
+          tickets while the macro gate rejects new longs — Ch. 8 "Suspend buying
+          even if you see a few stocks breaking out". Default [Off] =
+          bit-identical (R1). See {!Entry_ticket_suspend} and
+          [Weinstein_strategy_config.entry_ticket_macro_suspend]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

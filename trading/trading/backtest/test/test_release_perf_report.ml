@@ -105,6 +105,19 @@ let _make_all_eligible_summary ?(trade_count = 100) ?(winners = 30)
     trades_csv_path;
   }
 
+(* Slice a rendered report down to a single "## <header>" section, up to (but
+   excluding) the next top-level "## " header. Every scenario gets its own
+   "### <name>" block in the (always-rendered) Trading metrics section, so a
+   bare substring search for a scenario name against the whole report can't
+   distinguish "absent from this section" from "present elsewhere in the
+   report" — this scopes the search to just the section under test. *)
+let _section_of md ~header =
+  let start_idx = String.substr_index_exn md ~pattern:header in
+  let after_header_idx = start_idx + String.length header in
+  match String.substr_index md ~pos:after_header_idx ~pattern:"\n## " with
+  | Some next_idx -> String.sub md ~pos:start_idx ~len:(next_idx - start_idx)
+  | None -> String.sub md ~pos:start_idx ~len:(String.length md - start_idx)
+
 (* --- default_thresholds --- *)
 
 let test_default_thresholds_match_plan _ =
@@ -495,9 +508,10 @@ let _make_audit_record ~symbol ~entry_date
       side;
       suggested_entry = 100.0;
       close_at_decision = None;
+      adjusted_close_at_decision = None;
       ma_value = None;
       local_range_top = None;
-      suggested_stop = 90.0;
+      screener_proxy_stop = 90.0;
       installed_stop = 90.0;
       stop_floor_kind;
       split_safe_basis = Backtest.Trade_audit.Flag_off;
@@ -526,7 +540,13 @@ let _make_audit_record ~symbol ~entry_date
       weeks_stage_left_2 = 1;
     }
   in
-  { entry; exit_ = Some exit_; external_exit = None; execution = None }
+  {
+    entry;
+    exit_ = Some exit_;
+    external_exit = None;
+    execution = None;
+    stop_decisions = [];
+  }
 
 let _make_trade ~symbol ~entry_date ?(side = Trading_base.Types.Buy)
     ?(days_held = 100) ?(entry_price = 100.0) ?(exit_price = 110.0)
@@ -630,8 +650,13 @@ let test_render_includes_trade_quality_when_present _ =
            (fun s ->
              String.is_substring s ~substring:"| Weinstein spirit score |")
            (equal_to true);
+         (* Full row, exact per-side values: current and prior differ here
+            (+0.15 vs +0.03), so a swapped or dropped side fails this
+            assertion rather than merely omitting the row. *)
          field
-           (fun s -> String.is_substring s ~substring:"| Mean R-multiple |")
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Mean R-multiple | +0.15 | +0.03 | +0.122 |")
            (equal_to true);
          field
            (fun s ->
@@ -678,10 +703,13 @@ let test_render_includes_trade_quality_when_only_current _ =
          field
            (fun s -> String.is_substring s ~substring:"## Trade quality")
            (equal_to true);
-         (* Prior side has no audit -> spirit score column shows "n/a". *)
+         (* Prior side has no audit -> full row pins both the current value
+            and the absent side rendering as "n/a" in both the prior and
+            delta cells (catches a dropped prior side). *)
          field
            (fun s ->
-             String.is_substring s ~substring:"| Weinstein spirit score |")
+             String.is_substring s
+               ~substring:"| Weinstein spirit score | 1.000 | n/a | n/a |")
            (equal_to true);
        ])
 
@@ -1135,7 +1163,89 @@ let test_render_includes_all_eligible_when_present _ =
          field
            (fun s ->
              String.is_substring s
+               ~substring:"| Median return | -6.00% | -5.00% |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
                ~substring:"| Total P&L ($) | -80000 | -60000 |")
+           (equal_to true);
+       ])
+
+let test_render_all_eligible_handles_multiple_scenarios _ =
+  (* Two scenarios with data (distinct names/values) plus one scenario with
+     no data on either side. Both populated scenarios must render with their
+     own row values; the empty scenario must not get a "### <name>" block. *)
+  let cur_a =
+    _make_run ~name:"scenario-a"
+      ~all_eligible:
+        (Some
+           (_make_all_eligible_summary ~trade_count:200 ~winners:60 ~losers:130
+              ~win_rate_pct:0.30 ~mean_return_pct:(-0.04)
+              ~median_return_pct:(-0.06) ~total_pnl_dollars:(-80_000.0)
+              ~trades_csv_path:"scenario-a/all_eligible/grade-C/trades.csv" ()))
+      ()
+  in
+  let prior_a =
+    _make_run ~name:"scenario-a"
+      ~all_eligible:
+        (Some
+           (_make_all_eligible_summary ~trade_count:180 ~winners:55 ~losers:115
+              ~win_rate_pct:0.31 ~mean_return_pct:(-0.03)
+              ~median_return_pct:(-0.05) ~total_pnl_dollars:(-60_000.0)
+              ~trades_csv_path:"scenario-a/all_eligible/grade-C/trades.csv" ()))
+      ()
+  in
+  let cur_b =
+    _make_run ~name:"scenario-b"
+      ~all_eligible:
+        (Some
+           (_make_all_eligible_summary ~trade_count:50 ~winners:20 ~losers:25
+              ~win_rate_pct:0.40 ~mean_return_pct:0.02 ~median_return_pct:0.01
+              ~total_pnl_dollars:5_000.0
+              ~trades_csv_path:"scenario-b/all_eligible/grade-C/trades.csv" ()))
+      ()
+  in
+  let prior_b =
+    _make_run ~name:"scenario-b"
+      ~all_eligible:
+        (Some
+           (_make_all_eligible_summary ~trade_count:45 ~winners:18 ~losers:22
+              ~win_rate_pct:0.42 ~mean_return_pct:0.03 ~median_return_pct:0.02
+              ~total_pnl_dollars:6_000.0
+              ~trades_csv_path:"scenario-b/all_eligible/grade-C/trades.csv" ()))
+      ()
+  in
+  let cur_c = _make_run ~name:"scenario-c" () in
+  let prior_c = _make_run ~name:"scenario-c" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur_a, prior_a); (cur_b, prior_b); (cur_c, prior_c) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  let ae_section = _section_of md ~header:"## All-eligible diagnostic" in
+  assert_that ae_section
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"### scenario-a")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"### scenario-b")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"### scenario-c")
+           (equal_to false);
+         field
+           (fun s -> String.is_substring s ~substring:"| Trades | 200 | 180 |")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"| Trades | 50 | 45 |")
            (equal_to true);
        ])
 
@@ -1357,6 +1467,83 @@ let test_render_includes_benchmark_relative_when_present _ =
            (equal_to true);
        ])
 
+let test_render_benchmark_relative_handles_multiple_scenarios _ =
+  (* Two scenarios with data (distinct names/values) plus one scenario with
+     no data on either side. Both populated scenarios must render with their
+     own row values; the empty scenario must not get a "### <name>" block. *)
+  let cur_a =
+    _make_run ~name:"scenario-a"
+      ~benchmark_relative:
+        (Some
+           (_make_benchmark_relative ~alpha_pct_annualized:3.42 ~beta:0.87
+              ~information_ratio:0.51 ~tracking_error_pct_annualized:6.70
+              ~correlation:0.82 ()))
+      ()
+  in
+  let prior_a =
+    _make_run ~name:"scenario-a"
+      ~benchmark_relative:
+        (Some
+           (_make_benchmark_relative ~alpha_pct_annualized:2.00 ~beta:0.80
+              ~information_ratio:0.30 ~tracking_error_pct_annualized:6.00
+              ~correlation:0.75 ()))
+      ()
+  in
+  let cur_b =
+    _make_run ~name:"scenario-b"
+      ~benchmark_relative:
+        (Some
+           (_make_benchmark_relative ~alpha_pct_annualized:1.00 ~beta:0.50
+              ~information_ratio:0.20 ~tracking_error_pct_annualized:4.00
+              ~correlation:0.60 ()))
+      ()
+  in
+  let prior_b =
+    _make_run ~name:"scenario-b"
+      ~benchmark_relative:
+        (Some
+           (_make_benchmark_relative ~alpha_pct_annualized:0.50 ~beta:0.45
+              ~information_ratio:0.10 ~tracking_error_pct_annualized:3.50
+              ~correlation:0.55 ()))
+      ()
+  in
+  let cur_c = _make_run ~name:"scenario-c" () in
+  let prior_c = _make_run ~name:"scenario-c" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur_a, prior_a); (cur_b, prior_b); (cur_c, prior_c) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  let br_section = _section_of md ~header:"## Benchmark-relative" in
+  assert_that br_section
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"### scenario-a")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"### scenario-b")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"### scenario-c")
+           (equal_to false);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Alpha (%/yr) | +3.42% | +2.00% | +1.42 pp |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Alpha (%/yr) | +1.00% | +0.50% | +0.50 pp |")
+           (equal_to true);
+       ])
+
 let test_render_benchmark_relative_handles_one_sided _ =
   (* One scenario has the section, one doesn't — the with-bench side renders;
      the without-bench side prints "—" for current and "—" for Δ. *)
@@ -1478,6 +1665,30 @@ let test_load_scenario_run_no_benchmark_relative_when_any_missing _ =
   let run = Release_report.load_scenario_run ~dir:scenario_dir in
   assert_that run.benchmark_relative is_none
 
+let test_render_orders_benchmark_relative_before_all_eligible _ =
+  let cur =
+    _make_run ~name:"scenario"
+      ~benchmark_relative:(Some (_make_benchmark_relative ()))
+      ~all_eligible:(Some (_make_all_eligible_summary ()))
+      ()
+  in
+  let prior = _make_run ~name:"scenario" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  let br_idx = String.substr_index_exn md ~pattern:"## Benchmark-relative" in
+  let ae_idx =
+    String.substr_index_exn md ~pattern:"## All-eligible diagnostic"
+  in
+  assert_that (br_idx < ae_idx) (equal_to true)
+
 let suite =
   "release_perf_report"
   >::: [
@@ -1538,12 +1749,16 @@ let suite =
          >:: test_render_omits_all_eligible_when_both_none;
          "render includes all-eligible when present"
          >:: test_render_includes_all_eligible_when_present;
+         "render all-eligible handles multiple scenarios"
+         >:: test_render_all_eligible_handles_multiple_scenarios;
          "render all-eligible handles one-sided"
          >:: test_render_all_eligible_handles_one_sided;
          "render omits benchmark-relative when both none"
          >:: test_render_omits_benchmark_relative_when_both_none;
          "render includes benchmark-relative when present"
          >:: test_render_includes_benchmark_relative_when_present;
+         "render benchmark-relative handles multiple scenarios"
+         >:: test_render_benchmark_relative_handles_multiple_scenarios;
          "render benchmark-relative handles one-sided"
          >:: test_render_benchmark_relative_handles_one_sided;
          "load_scenario_run loads benchmark_relative when all five present"
@@ -1552,6 +1767,8 @@ let suite =
          >:: test_load_scenario_run_no_benchmark_relative_when_legacy_summary;
          "load_scenario_run no benchmark_relative when any missing"
          >:: test_load_scenario_run_no_benchmark_relative_when_any_missing;
+         "render orders benchmark-relative before all-eligible"
+         >:: test_render_orders_benchmark_relative_before_all_eligible;
        ]
 
 let () = run_test_tt_main suite

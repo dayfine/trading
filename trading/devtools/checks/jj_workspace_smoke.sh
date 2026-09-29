@@ -37,11 +37,26 @@ fi
 AGENT_ID="smoke-$$-$(date +%s)"
 AGENT_WS="/tmp/agent-ws-${AGENT_ID}"
 
+# --- Guard against jj's working-copy-snapshot side effect ---
+# Every `jj -R "$REPO" ...` call below resolves the DEFAULT workspace's
+# working-copy commit as part of running -- including `workspace add`
+# (adds a *different* workspace) and `workspace list` (looks read-only).
+# In a colocated repo that snapshot exports any untracked file sitting in
+# "$REPO" into the git index as an intent-to-add (` A`) entry, which then
+# reads as tracked to anything using `git ls-files` (e.g.
+# orchestrator_fastexit_gate.sh's run-count). `jj workspace forget` does
+# not undo this. Capture the repo's staged-path baseline now and restore
+# it in cleanup so this check never leaves the caller's real checkout
+# dirtier than it found it. See jj_ita_guard_snapshot/_restore in
+# _check_lib.sh for the mechanism and reproduction notes.
+_ITA_BEFORE=$(jj_ita_guard_snapshot "$REPO")
+
 # Ensure cleanup on exit, success or failure
 cleanup() {
   # Forget the workspace from jj's perspective (ignore errors — may already be cleaned)
   jj -R "$REPO" workspace forget "$AGENT_ID" >/dev/null 2>&1 || true
   rm -rf "$AGENT_WS"
+  jj_ita_guard_restore "$REPO" "$_ITA_BEFORE"
 }
 trap cleanup EXIT INT TERM
 
@@ -78,6 +93,7 @@ if ! jj -R "$REPO" workspace forget "$AGENT_ID" >/dev/null 2>&1; then
   exit 1
 fi
 rm -rf "$AGENT_WS"
+jj_ita_guard_restore "$REPO" "$_ITA_BEFORE"
 
 # Disarm the trap (already cleaned up manually)
 trap - EXIT INT TERM

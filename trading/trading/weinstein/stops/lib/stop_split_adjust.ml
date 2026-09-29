@@ -19,12 +19,14 @@ let _scale_trailing ~sp ~stop_level ~last_correction_extreme ~last_trend_extreme
       correction_observed_since_reset;
     }
 
-let _scale_tightened ~sp ~stop_level ~last_correction_extreme ~reason =
+let _scale_tightened ~sp ~stop_level ~last_correction_extreme ~reason
+    ~swing_peak =
   Tightened
     {
       stop_level = sp stop_level;
       last_correction_extreme = sp last_correction_extreme;
       reason;
+      swing_peak = Option.map swing_peak ~f:sp;
     }
 
 let scale ~factor state =
@@ -46,5 +48,6 @@ let scale ~factor state =
       _scale_trailing ~sp ~stop_level ~last_correction_extreme
         ~last_trend_extreme ~ma_at_last_adjustment ~correction_count
         ~correction_observed_since_reset
-  | Tightened { stop_level; last_correction_extreme; reason } ->
+  | Tightened { stop_level; last_correction_extreme; reason; swing_peak } ->
       _scale_tightened ~sp ~stop_level ~last_correction_extreme ~reason
+        ~swing_peak

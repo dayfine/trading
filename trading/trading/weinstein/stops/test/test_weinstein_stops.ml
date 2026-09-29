@@ -230,7 +230,12 @@ let test_get_stop_level_trailing _ =
 let test_get_stop_level_tightened _ =
   let state =
     Tightened
-      { stop_level = 52.0; last_correction_extreme = 51.0; reason = "test" }
+      {
+        stop_level = 52.0;
+        last_correction_extreme = 51.0;
+        reason = "test";
+        swing_peak = None;
+      }
   in
   assert_that (get_stop_level state) (float_equal 52.0)
 
@@ -502,7 +507,12 @@ let test_update_no_ratchet_insufficient_correction _ =
 let test_update_tightened_stop_hit _ =
   let state =
     Tightened
-      { stop_level = 50.0; last_correction_extreme = 51.0; reason = "Stage 3" }
+      {
+        stop_level = 50.0;
+        last_correction_extreme = 51.0;
+        reason = "Stage 3";
+        swing_peak = None;
+      }
   in
   let bar = make_bar ~low_price:49.5 ~close_price:49.8 () in
   let _new_state, event =
@@ -681,7 +691,12 @@ let test_trailing_high_of_state _ =
   assert_that
     (Catastrophic_stop.trailing_high_of_state
        (Tightened
-          { stop_level = 90.0; last_correction_extreme = 95.0; reason = "t" }))
+          {
+            stop_level = 90.0;
+            last_correction_extreme = 95.0;
+            reason = "t";
+            swing_peak = None;
+          }))
     is_none
 
 let suite =
