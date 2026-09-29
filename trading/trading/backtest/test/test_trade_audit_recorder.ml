@@ -104,8 +104,8 @@ let _no_triple_confirmation :
 
 let _entry_event ?(candidate = _candidate) ?(sized_down_wide_stop = false)
     ?(freshness_basis = Weinstein_strategy.Entry_freshness.Ma_cross)
-    ?(triple_confirmation = _no_triple_confirmation) ~split_safe_basis
-    ~stop_floor_kind () : AR.entry_event =
+    ?(triple_confirmation = _no_triple_confirmation) ?(alternatives = [])
+    ~split_safe_basis ~stop_floor_kind () : AR.entry_event =
   {
     position_id = "ZZZZ-wein-1";
     candidate;
@@ -122,7 +122,7 @@ let _entry_event ?(candidate = _candidate) ?(sized_down_wide_stop = false)
     sized_down_wide_stop;
     freshness_basis;
     triple_confirmation;
-    alternatives = [];
+    alternatives;
   }
 
 (** Drive one [entry_event] through the real recorder bundle and read back the
@@ -169,6 +169,51 @@ let test_split_safe_basis_projects_all_three_states _ =
          equal_to (TA.Raw_fallback : TA.split_safe_basis);
          equal_to (TA.Empty_window : TA.split_safe_basis);
        ])
+
+(** Every entry-walk [AR.skip_reason] projects onto its same-named [TA]
+    counterpart in [alternatives_considered]. Driven through the real recorder,
+    one alternative per constructor, so a mis-mapped reason at the
+    [Trade_audit_enum_hops] hop (e.g. #3015's [Share_class_held] collapsing into
+    [Already_held]) fails here rather than silently rewriting the on-disk audit.
+*)
+let test_skip_reason_projects_every_constructor _ =
+  let reasons =
+    [
+      AR.Insufficient_cash;
+      AR.Already_held;
+      AR.Sized_to_zero;
+      AR.Short_notional_cap;
+      AR.Stop_too_wide;
+      AR.Sector_exposure_cap;
+      AR.Long_exposure_cap;
+      AR.No_structural_stop;
+      AR.Share_class_held;
+    ]
+  in
+  let alternatives =
+    List.map reasons ~f:(fun reason : AR.alternative_input ->
+        { candidate = _candidate; reason })
+  in
+  let entry =
+    _recorded_entry_of
+      (_entry_event ~alternatives ~split_safe_basis:AR.Flag_off
+         ~stop_floor_kind:AR.Support_floor ())
+  in
+  assert_that
+    (List.map entry.TA.alternatives_considered ~f:(fun a -> a.TA.reason_skipped))
+    (elements_are
+       (List.map
+          [
+            TA.Insufficient_cash;
+            TA.Already_held;
+            TA.Sized_to_zero;
+            TA.Short_notional_cap;
+            TA.Stop_too_wide;
+            TA.Sector_exposure_cap;
+            TA.Long_exposure_cap;
+            TA.No_structural_stop;
+            TA.Share_class_held;
+          ] ~f:(fun r -> equal_to (r : TA.skip_reason))))
 
 (** The sibling tag on the same hop, pinned for the same reason: both
     constructors, both directions. *)
@@ -533,6 +578,8 @@ let suite =
          >:: test_fill_volume_projects_every_verdict_class;
          "split_safe_basis projects all three states"
          >:: test_split_safe_basis_projects_all_three_states;
+         "skip_reason projects every constructor"
+         >:: test_skip_reason_projects_every_constructor;
          "stop_floor_kind projects both states"
          >:: test_stop_floor_kind_projects_both_states;
          "Buffer_fallback row keeps proxy and installed stop apart"
