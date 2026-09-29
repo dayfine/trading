@@ -11,10 +11,11 @@ module Vr = Post_run_validator.Validator_report
 
 (* ---- builders ---------------------------------------------------------- *)
 
-let trade ?(position_id = None) ~symbol ~entry_date () : Vt.trade_row =
+let trade ?(position_id = None) ?(side = "LONG") ~symbol ~entry_date () :
+    Vt.trade_row =
   {
     symbol;
-    side = "LONG";
+    side;
     entry_date = Date.of_string entry_date;
     exit_date = Date.of_string "2021-06-01";
     entry_price = 100.0;
@@ -148,7 +149,7 @@ let test_v19_absent_audit_skips_with_reason _ =
           trade ~position_id:(Some "BBB-wein-2") ~symbol:"BBB"
             ~entry_date:"2021-03-08" ();
         ];
-      audit_absent = Some "trade_audit.sexp absent or unreadable";
+      audit_absent = Some "trade_audit.sexp absent";
     }
   in
   assert_that
@@ -158,7 +159,7 @@ let test_v19_absent_audit_skips_with_reason _ =
          outcome ~n_violations:0 ~n_skipped:2 ~passed:true;
          field
            (fun (r : Vt.check_result) -> r.skip_reason)
-           (is_some_and (equal_to "trade_audit.sexp absent or unreadable"));
+           (is_some_and (equal_to "trade_audit.sexp absent"));
        ])
 
 (* A legacy row (no position_id) has no join key: skipped, and says why. *)
@@ -181,7 +182,7 @@ let test_v19_skip_reason_rendered _ =
     {
       (Vt.empty_inputs ()) with
       trades = [ trade ~symbol:"AAA" ~entry_date:"2021-03-08" () ];
-      audit_absent = Some "trade_audit.sexp absent or unreadable";
+      audit_absent = Some "trade_audit.sexp absent";
     }
   in
   let report : Vt.report =
@@ -192,7 +193,53 @@ let test_v19_skip_reason_rendered _ =
   in
   assert_that (Vr.render_md report)
     (contains_substring
-       "V19 INVARIANT PASS (1 skipped: trade_audit.sexp absent or unreadable)")
+       "V19 INVARIANT PASS (1 skipped: trade_audit.sexp absent)")
+
+(* SHORT round trips are joined exactly like LONG ones: a matched SHORT row
+   passes, an unmatched SHORT row fires. *)
+let test_v19_short_rows _ =
+  let audit =
+    Va.build_audit_lookup
+      [
+        join_row ~position_id:"SSS-wein-1" ~symbol:"SSS"
+          ~entry_date:"2021-03-05";
+      ]
+  in
+  let trades =
+    [
+      trade ~side:"SHORT" ~position_id:(Some "SSS-wein-1") ~symbol:"SSS"
+        ~entry_date:"2021-03-08" ();
+      trade ~side:"SHORT" ~position_id:(Some "TTT-wein-2") ~symbol:"TTT"
+        ~entry_date:"2021-03-08" ();
+    ]
+  in
+  assert_that
+    (Vc.run_check ~id:"V19" (loaded ~trades ~audit))
+    (all_of
+       [
+         outcome ~n_violations:1 ~n_skipped:0 ~passed:false;
+         field
+           (fun (r : Vt.check_result) ->
+             List.map r.specimens ~f:(fun (s : Vt.specimen) -> s.symbol))
+           (equal_to [ "TTT" ]);
+       ])
+
+(* Dead join: an audit that was loaded but holds no entry matches nothing, so
+   every position_id-bearing row fires — none is skipped. *)
+let test_v19_dead_join_fires_on_every_keyed_row _ =
+  let trades =
+    [
+      trade ~position_id:(Some "AAA-wein-1") ~symbol:"AAA"
+        ~entry_date:"2021-03-08" ();
+      trade ~position_id:(Some "BBB-wein-2") ~symbol:"BBB"
+        ~entry_date:"2021-03-08" ();
+      trade ~side:"SHORT" ~position_id:(Some "CCC-wein-3") ~symbol:"CCC"
+        ~entry_date:"2021-03-08" ();
+    ]
+  in
+  assert_that
+    (Vc.run_check ~id:"V19" (loaded ~trades ~audit:(Va.build_audit_lookup [])))
+    (outcome ~n_violations:3 ~n_skipped:0 ~passed:false)
 
 (* ---- V20: close / ma_value basis band ---------------------------------- *)
 
@@ -294,6 +341,50 @@ let test_v20_absent_audit_skips_with_reason _ =
          field (fun (r : Vt.check_result) -> r.skip_reason) (is_some_and __);
        ])
 
+(* ---- load_audit: absent vs unreadable vs empty ------------------------- *)
+
+(* Write [contents] to a fresh temp file, run [f] on its path, then remove it. *)
+let with_temp_file contents ~f =
+  let path = Stdlib.Filename.temp_file "trade_audit" ".sexp" in
+  Out_channel.write_all path ~data:contents;
+  Exn.protect ~f:(fun () -> f path) ~finally:(fun () -> Stdlib.Sys.remove path)
+
+let load_error m = matching ~msg:"Expected Error" Result.error m
+
+(* No file at the path: Error, with the "absent" reason. *)
+let test_load_audit_missing_is_absent _ =
+  let path =
+    Stdlib.Filename.concat
+      (Stdlib.Filename.get_temp_dir_name ())
+      "no-such-dir-3002/trade_audit.sexp"
+  in
+  assert_that (Va.load_audit path)
+    (load_error (equal_to "trade_audit.sexp absent"))
+
+(* A file that exists but is not a readable sexp: Error, with the
+   "unreadable: <exn>" reason — distinct from "absent". *)
+let test_load_audit_broken_is_unreadable _ =
+  with_temp_file "((unbalanced" ~f:(fun path ->
+      assert_that (Va.load_audit path)
+        (load_error
+           (all_of
+              [
+                contains_substring "trade_audit.sexp unreadable: ";
+                not_ (contains_substring "absent");
+              ])))
+
+(* A valid sexp holding no parseable record: Ok of an empty lookup (a dead
+   join V19 flags), not Error. *)
+let test_load_audit_empty_is_ok_empty_lookup _ =
+  let row =
+    trade ~position_id:(Some "AAA-wein-1") ~symbol:"AAA"
+      ~entry_date:"2021-03-08" ()
+  in
+  with_temp_file "()" ~f:(fun path ->
+      assert_that (Va.load_audit path)
+        (matching ~msg:"Expected Ok" Result.ok
+           (field (fun lookup -> lookup row) is_none)))
+
 (* Registration: both ids are in the report order after V18. *)
 let test_registered _ =
   assert_that (List.drop Vc.all_check_ids 17) (equal_to [ "V18"; "V19"; "V20" ])
@@ -308,6 +399,14 @@ let suite =
          >:: test_v19_absent_audit_skips_with_reason;
          "v19 legacy row skipped" >:: test_v19_legacy_row_skipped;
          "v19 skip reason rendered" >:: test_v19_skip_reason_rendered;
+         "v19 short rows" >:: test_v19_short_rows;
+         "v19 dead join fires on every keyed row"
+         >:: test_v19_dead_join_fires_on_every_keyed_row;
+         "load_audit missing is absent" >:: test_load_audit_missing_is_absent;
+         "load_audit broken is unreadable"
+         >:: test_load_audit_broken_is_unreadable;
+         "load_audit empty is ok empty lookup"
+         >:: test_load_audit_empty_is_ok_empty_lookup;
          "v20 fires on NVDA basis mix" >:: test_v20_fires_on_nvda_basis_mix;
          "v20 clean with adjusted close" >:: test_v20_clean_with_adjusted_close;
          "v20 band boundaries" >:: test_v20_band_boundaries;

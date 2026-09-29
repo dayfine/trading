@@ -55,15 +55,12 @@ let _infer_run_end trades =
   |> List.max_elt ~compare:Date.compare
   |> Option.value ~default:far_future
 
-(* The audit lookup plus, when none could be loaded, the reason V19/V20 report. *)
+(* The audit lookup plus, when none could be loaded, the reason V19/V20 report
+   ("absent" vs "unreadable: <exn>", from [Validator_artifacts.load_audit]). *)
 let _maybe_audit path =
-  let loaded =
-    if Sys_unix.file_exists_exn path then Validator_artifacts.load_audit path
-    else None
-  in
-  match loaded with
-  | Some lookup -> (lookup, None)
-  | None -> ((fun _ -> None), Some "trade_audit.sexp absent or unreadable")
+  match Validator_artifacts.load_audit path with
+  | Ok lookup -> (lookup, None)
+  | Error reason -> ((fun _ -> None), Some reason)
 
 let _maybe_open path =
   if Sys_unix.file_exists_exn path then
