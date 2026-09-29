@@ -1,0 +1,3 @@
+(library
+ (name findings_registry_lib)
+ (libraries sexplib))
