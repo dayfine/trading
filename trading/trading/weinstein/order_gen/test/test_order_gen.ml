@@ -679,6 +679,88 @@ let test_sync_uncovered_update_risk_params_keeps_stop _ =
            ];
        ])
 
+(* --- Issue #3020: UpdateRiskParams only protects shares still at the broker --- *)
+
+let _exiting_aapl =
+  {
+    _aapl_position with
+    state =
+      Position.Exiting
+        {
+          quantity = 50.0;
+          entry_price = 150.0;
+          entry_date = Date.of_string "2024-01-01";
+          target_quantity = 50.0;
+          exit_price = 139.0;
+          filled_quantity = 0.0;
+          started_date = Date.of_string "2024-01-08";
+          risk_params =
+            {
+              Position.stop_loss_price = Some 140.0;
+              take_profit_price = None;
+              max_hold_days = None;
+            };
+        };
+  }
+
+let _closed_aapl =
+  {
+    _aapl_position with
+    state =
+      Position.Closed
+        {
+          quantity = 50.0;
+          entry_price = 150.0;
+          exit_price = 139.0;
+          gross_pnl = None;
+          entry_date = Date.of_string "2024-01-01";
+          exit_date = Date.of_string "2024-01-09";
+          days_held = 8;
+        };
+  }
+
+let _lookup_only pos position_id =
+  if String.equal position_id pos.Position.id then Some pos else None
+
+(* Guard: the exit is already working at the broker, so a Stop for the same
+   shares would sell twice. *)
+let test_update_risk_on_exiting_position_emits_nothing _ =
+  let orders =
+    from_transitions
+      ~transitions:
+        [ _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:142.0 ]
+      ~get_position:(_lookup_only _exiting_aapl)
+      ()
+  in
+  assert_that orders (size_is 0)
+
+(* Same guard with the stop sync armed: the sync does not own an Exiting
+   position, so the transition mapping is the path that must refuse it. *)
+let test_update_risk_on_exiting_position_with_sync_emits_nothing _ =
+  let orders =
+    from_transitions
+      ~stop_sync:
+        {
+          (_aapl_sync ~before:140.0 ~after:145.0) with
+          positions = [ _exiting_aapl ];
+        }
+      ~transitions:
+        [ _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:142.0 ]
+      ~get_position:(_lookup_only _exiting_aapl)
+      ()
+  in
+  assert_that orders (size_is 0)
+
+let test_update_risk_on_closed_position_emits_nothing _ =
+  let orders =
+    from_transitions
+      ~transitions:
+        [ _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:142.0 ]
+      ~get_position:(_lookup_only _closed_aapl)
+      ()
+  in
+  assert_that orders (size_is 0)
+
 let suite =
   "order_gen"
   >::: [
@@ -698,6 +780,12 @@ let suite =
          >:: test_update_risk_with_stop_emits_stop_order;
          "update_risk_no_stop_returns_empty"
          >:: test_update_risk_no_stop_returns_empty;
+         "update_risk_on_exiting_position_emits_nothing"
+         >:: test_update_risk_on_exiting_position_emits_nothing;
+         "update_risk_on_exiting_position_with_sync_emits_nothing"
+         >:: test_update_risk_on_exiting_position_with_sync_emits_nothing;
+         "update_risk_on_closed_position_emits_nothing"
+         >:: test_update_risk_on_closed_position_emits_nothing;
          "entry_fill_is_ignored" >:: test_entry_fill_is_ignored;
          "exit_complete_is_ignored" >:: test_exit_complete_is_ignored;
          "multiple_transitions_produce_one_order_each"
