@@ -460,6 +460,26 @@ let test_load_scenario_run_perf_files_strip_whitespace _ =
            (is_some_and (float_equal 9.5));
        ])
 
+let test_load_scenario_run_missing_actual_raises _ =
+  (* Pins the loader.mli contract: missing actual.sexp raises [Failure]. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_" in
+  let scenario_dir = Filename.concat dir "no-actual" in
+  Core_unix.mkdir_p scenario_dir;
+  _write_summary_sexp (Filename.concat scenario_dir "summary.sexp");
+  assert_raises
+    (Failure (sprintf "Missing actual.sexp in %s" scenario_dir))
+    (fun () -> Release_report.load_scenario_run ~dir:scenario_dir)
+
+let test_load_scenario_run_missing_summary_raises _ =
+  (* Pins the loader.mli contract: missing summary.sexp raises [Failure]. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_" in
+  let scenario_dir = Filename.concat dir "no-summary" in
+  Core_unix.mkdir_p scenario_dir;
+  _write_actual_sexp (Filename.concat scenario_dir "actual.sexp");
+  assert_raises
+    (Failure (sprintf "Missing summary.sexp in %s" scenario_dir))
+    (fun () -> Release_report.load_scenario_run ~dir:scenario_dir)
+
 let test_load_pairs_and_one_sided _ =
   let cur_root = Core_unix.mkdtemp "/tmp/rel_perf_cur_" in
   let prior_root = Core_unix.mkdtemp "/tmp/rel_perf_prior_" in
@@ -1768,6 +1788,10 @@ let suite =
          >:: test_load_scenario_run_missing_perf_files_is_none;
          "load_scenario_run: perf files tolerate surrounding whitespace"
          >:: test_load_scenario_run_perf_files_strip_whitespace;
+         "load_scenario_run missing actual.sexp raises Failure"
+         >:: test_load_scenario_run_missing_actual_raises;
+         "load_scenario_run missing summary.sexp raises Failure"
+         >:: test_load_scenario_run_missing_summary_raises;
          "load pairs scenarios and tracks one-sided"
          >:: test_load_pairs_and_one_sided;
          "load_scenario_run loads trade_quality when present"
