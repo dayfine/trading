@@ -48,19 +48,7 @@ type open_row = {
 }
 (** A parsed [open_positions.csv] row (position still held at run end). *)
 
-type entry_context = {
-  stage : Weinstein_types.stage;
-  macro_trend : Weinstein_types.market_trend;
-  ma_direction : Weinstein_types.ma_direction;
-  resistance_quality : Weinstein_types.overhead_quality option;
-  installed_stop : float; [@sexp.default 0.0]
-      (** V12: the initial protective stop the strategy actually installed
-          ([Trade_audit.entry_decision.installed_stop]). [0.0] on legacy audit
-          sexps predating capture — V12 skips those. *)
-  suggested_entry : float; [@sexp.default 0.0]
-      (** The screener's graded breakout level [E]
-          ([Trade_audit.entry_decision.suggested_entry]); carried for V12's
-          specimen detail and the faithfulness harness. *)
+type decision_bar_read = {
   close_at_decision : float option; [@sexp.option]
       (** V20: [Trade_audit.entry_decision.close_at_decision] — the RAW daily
           close the strategy saw at decision time. [None] when the audit record
@@ -74,8 +62,53 @@ type entry_context = {
           level, on the ADJUSTED basis. [None] on legacy audit files. *)
 }
 [@@deriving sexp]
+(** The three decision-bar reads V20 compares, grouped so {!entry_context} stays
+    within the record-size guideline. Every field is optional because each was
+    added to [trade_audit.sexp] at a different time. *)
+
+val no_decision_bar : decision_bar_read
+(** All three reads [None] — a legacy audit record with none of them. *)
+
+type entry_context = {
+  stage : Weinstein_types.stage;
+  macro_trend : Weinstein_types.market_trend;
+      (** The macro read at {b placement} (the screen that wrote the ticket) —
+          V2's input. Not the read at fill time; V23 reads that from
+          {!inputs.screens}. *)
+  ma_direction : Weinstein_types.ma_direction;
+  resistance_quality : Weinstein_types.overhead_quality option;
+  installed_stop : float; [@sexp.default 0.0]
+      (** V12/V21: the initial protective stop the strategy actually installed
+          ([Trade_audit.entry_decision.installed_stop]). [0.0] on legacy audit
+          sexps predating capture — V12 and V21 skip those. *)
+  screener_proxy_stop : float option; [@sexp.option]
+      (** V21: the screener's fixed-percentage proxy stop
+          ([Trade_audit.entry_decision.screener_proxy_stop], ~8% under [E] for a
+          long at the screener default). Files written before #3007 carry it
+          under the key [suggested_stop]; [Trade_audit]'s reader maps that key,
+          so they still populate this field. [None] only when a caller built the
+          context without it — V21 skips such rows. *)
+  suggested_entry : float; [@sexp.default 0.0]
+      (** The screener's graded breakout level [E]
+          ([Trade_audit.entry_decision.suggested_entry]); carried for V12's
+          specimen detail and the faithfulness harness. *)
+  decision_bar : decision_bar_read; [@sexp.default no_decision_bar]
+      (** V20's decision-bar reads. *)
+}
+[@@deriving sexp]
 (** Decision-time features a check reads from a {!Trade_audit.entry_decision},
     keyed by [(symbol, entry_date)]. *)
+
+type screen_read = {
+  screen_date : Date.t;
+      (** The Friday the screen ran ([Trade_audit.cascade_summary.date]). *)
+  screen_macro_trend : Weinstein_types.market_trend;
+      (** The macro trend that screen read
+          ([Trade_audit.cascade_summary.macro_trend]) — the same [Macro.result]
+          the #2976 suspension decided on that week. *)
+}
+(** One weekly screen's macro read, projected from [trade_audit.sexp]'s
+    [cascade_summaries]. V23's input. *)
 
 type daily_bar = {
   date : Date.t;
@@ -231,6 +264,16 @@ type check_config = {
       (** V20: upper bound of the same ratio. Default [5.0] — the NVDA
           2021-04-23 specimen (#2973) read raw close 610.61 against an adjusted
           MA of 13.67, a ratio of ~44.7. *)
+  installed_vs_proxy_stop_max_pct : float;
+      (** V21: an entry flags when its [installed_stop] sits more than this
+          fraction of the audit's [screener_proxy_stop] away from it —
+          [|installed - proxy| / proxy > installed_vs_proxy_stop_max_pct],
+          strict, so exactly this distance passes. Default [0.03]. The #2975
+          specimen (EQT: [E = 23.36], proxy [21.4912] = 8% under E, installed
+          [22.4256] = the 4% [Buffer_fallback]) sits [0.9344 / 21.4912 = 4.35%]
+          apart, so it fires at the default. See
+          {!Validator_audit_checks.check_v21} for why the proxy is the
+          denominator. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default
@@ -281,8 +324,19 @@ type inputs = {
   audit_absent : string option;
       (** [None] when a [trade_audit.sexp] was loaded (even one that matches no
           trade — that is a broken join V19 must flag). [Some reason] when no
-          audit was loaded at all; V19/V20 then skip every row and report
-          [reason]. *)
+          audit was loaded at all; V19/V20/V21/V23 then skip every row and
+          report [reason]. *)
+  screens : screen_read list;
+      (** Every weekly screen's macro read from [trade_audit.sexp]'s
+          [cascade_summaries] (V23), in any order. [[]] when no audit was loaded
+          ({!audit_absent} says why) {b or} the loaded audit carries no cascade
+          summaries — V23 skips every long in both cases, with a reason. *)
+  macro_suspend : Weinstein_strategy.Entry_ticket_suspend_mode.t option;
+      (** The run's effective [entry_ticket_macro_suspend] (#2976), read from
+          the [overrides] in the run's [params.sexp]
+          ({!Validator_artifacts.load_macro_suspend}). Picks V23's default
+          severity: [Some On_bearish_macro] makes it INVARIANT, anything else
+          EXPECTATION. [None] when the run's config could not be read. *)
   bars : string -> bars option;
   run_end : Date.t;
   config : check_config;
@@ -304,6 +358,7 @@ val load_config : string option -> check_config
 
 val empty_inputs : ?config:check_config -> unit -> inputs
 (** An {!inputs} with no trades / positions and always-[None] lookups, so
-    [audit_absent] is [Some "no trade_audit.sexp supplied"]. Tests override
-    individual fields via record update — a test that injects an audit lookup
-    and wants V19 armed must also set [audit_absent = None]. *)
+    [audit_absent] is [Some "no trade_audit.sexp supplied"], no [screens] and
+    [macro_suspend = None]. Tests override individual fields via record update —
+    a test that injects an audit lookup and wants V19 armed must also set
+    [audit_absent = None]. *)

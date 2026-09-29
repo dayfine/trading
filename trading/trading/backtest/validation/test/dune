@@ -5,7 +5,8 @@
   test_validator_store_check
   test_validator_diff
   test_series_level_v18_median_agreement
-  test_validator_audit_checks)
+  test_validator_audit_checks
+  test_validator_stop_macro_checks)
  (libraries
   core
   ounit2
@@ -14,6 +15,7 @@
   status
   types
   weinstein.snapshot_pipeline
-  weinstein.types)
+  weinstein.types
+  weinstein_trading.strategy)
  (preprocess
   (pps ppx_jane)))

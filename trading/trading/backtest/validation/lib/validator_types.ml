@@ -42,6 +42,7 @@ let _default_store_zero_volume_max = 0
 let _default_store_min_bars = 20
 let _default_audit_basis_ratio_min = 0.2
 let _default_audit_basis_ratio_max = 5.0
+let _default_installed_vs_proxy_stop_max_pct = 0.03
 let _no_audit_reason = "no trade_audit.sexp supplied"
 let far_future = Date.of_string "2100-01-01"
 
@@ -70,18 +71,36 @@ type open_row = {
   quantity : float;
 }
 
+type decision_bar_read = {
+  close_at_decision : float option; [@sexp.option]
+  adjusted_close_at_decision : float option; [@sexp.option]
+  ma_value : float option; [@sexp.option]
+}
+[@@deriving sexp]
+
+let no_decision_bar =
+  {
+    close_at_decision = None;
+    adjusted_close_at_decision = None;
+    ma_value = None;
+  }
+
 type entry_context = {
   stage : Weinstein_types.stage;
   macro_trend : Weinstein_types.market_trend;
   ma_direction : Weinstein_types.ma_direction;
   resistance_quality : Weinstein_types.overhead_quality option;
   installed_stop : float; [@sexp.default 0.0]
+  screener_proxy_stop : float option; [@sexp.option]
   suggested_entry : float; [@sexp.default 0.0]
-  close_at_decision : float option; [@sexp.option]
-  adjusted_close_at_decision : float option; [@sexp.option]
-  ma_value : float option; [@sexp.option]
+  decision_bar : decision_bar_read; [@sexp.default no_decision_bar]
 }
 [@@deriving sexp]
+
+type screen_read = {
+  screen_date : Date.t;
+  screen_macro_trend : Weinstein_types.market_trend;
+}
 
 type daily_bar = {
   date : Date.t;
@@ -132,6 +151,8 @@ type check_config = {
   store_min_bars : int; [@sexp.default _default_store_min_bars]
   audit_basis_ratio_min : float; [@sexp.default _default_audit_basis_ratio_min]
   audit_basis_ratio_max : float; [@sexp.default _default_audit_basis_ratio_max]
+  installed_vs_proxy_stop_max_pct : float;
+      [@sexp.default _default_installed_vs_proxy_stop_max_pct]
   disabled_checks : string list; [@sexp.default []]
   severity_overrides : (string * string) list; [@sexp.default []]
 }
@@ -161,6 +182,8 @@ type inputs = {
   open_positions : open_row list;
   audit : trade_row -> entry_context option;
   audit_absent : string option;
+  screens : screen_read list;
+  macro_suspend : Weinstein_strategy.Entry_ticket_suspend_mode.t option;
   bars : string -> bars option;
   run_end : Date.t;
   config : check_config;
@@ -193,6 +216,7 @@ let default_config =
     store_min_bars = _default_store_min_bars;
     audit_basis_ratio_min = _default_audit_basis_ratio_min;
     audit_basis_ratio_max = _default_audit_basis_ratio_max;
+    installed_vs_proxy_stop_max_pct = _default_installed_vs_proxy_stop_max_pct;
     disabled_checks = [];
     severity_overrides = [];
   }
@@ -207,6 +231,8 @@ let empty_inputs ?(config = default_config) () =
     open_positions = [];
     audit = (fun _ -> None);
     audit_absent = Some _no_audit_reason;
+    screens = [];
+    macro_suspend = None;
     bars = (fun _ -> None);
     run_end = far_future;
     config;

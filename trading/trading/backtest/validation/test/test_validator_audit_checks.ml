@@ -36,10 +36,9 @@ let ctx ?(close_at_decision = None) ?(adjusted_close_at_decision = None)
     ma_direction = Weinstein_types.Rising;
     resistance_quality = None;
     installed_stop = 90.0;
+    screener_proxy_stop = None;
     suggested_entry = 100.0;
-    close_at_decision;
-    adjusted_close_at_decision;
-    ma_value;
+    decision_bar = { close_at_decision; adjusted_close_at_decision; ma_value };
   }
 
 (* An audit entry leg, joined through the real [build_audit_lookup]. *)
@@ -383,11 +382,13 @@ let test_load_audit_empty_is_ok_empty_lookup _ =
   with_temp_file "()" ~f:(fun path ->
       assert_that (Va.load_audit path)
         (matching ~msg:"Expected Ok" Result.ok
-           (field (fun lookup -> lookup row) is_none)))
+           (field (fun (a : Va.loaded_audit) -> a.lookup row) is_none)))
 
 (* Registration: both ids are in the report order after V18. *)
 let test_registered _ =
-  assert_that (List.drop Vc.all_check_ids 17) (equal_to [ "V18"; "V19"; "V20" ])
+  assert_that
+    (List.drop Vc.all_check_ids 17)
+    (equal_to [ "V18"; "V19"; "V20"; "V21"; "V23" ])
 
 let suite =
   "validator_audit_checks"
