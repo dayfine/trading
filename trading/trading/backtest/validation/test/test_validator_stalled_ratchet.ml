@@ -2,13 +2,18 @@
     ({!Post_run_validator.Validator_stall_check}) — and the stop-decision
     plumbing it needs from [trade_audit.sexp].
 
-    The two real specimens are trimmed from a run of
+    The four real specimens are trimmed from a run of
     [goldens-small/six-year-2018-2023.sexp] at the commit that added V22 (the
     run is not committed; the spec and the [trading/test_data] store are):
-    CMG-wein-744 is the #2982 basis-mix stall and fires, FDX-wein-1233 stalls
-    three times and then raises inside 13 weeks, so it is clean. Every field V22
-    reads is copied verbatim; hold rows between the kept rows are omitted, which
-    changes nothing V22 reads (holds neither start nor end a stretch). *)
+    - CMG-wein-744 fires: the #2982 basis mix, two genuine stalls;
+    - KHC-wein-1463 fires on one genuine first-cycle stall;
+    - HPQ-wein-450 is clean: both its stalls are phantom-shaped;
+    - FDX-wein-1233 is clean: its stop rises inside 13 weeks.
+
+    Every row V22 reads is copied verbatim, including each stall's predecessor
+    row. Other hold rows are omitted. That changes nothing V22 reads: holds
+    neither start nor end a stretch, and only a stall's immediate predecessor is
+    consulted. *)
 
 open Core
 open OUnit2
@@ -79,10 +84,18 @@ let skip_reason m = field (fun (r : Vt.check_result) -> r.skip_reason) m
 
 (* ---- real specimens ---------------------------------------------------- *)
 
+(* A hold row: the stall's predecessor that tells a genuine cycle
+   ([Correction_not_recovered]) from a phantom ([No_correction_yet]). *)
+let cnr ?cb ~date stop = row ?cb ~date ~reason:Sd.Correction_not_recovered stop
+let ncy ?cb ~date stop = row ?cb ~date ~reason:Sd.No_correction_yet stop
+
 (* CMG-wein-744: stop 581.6544 from 2019-02-19 to 2019-11-08, never raised.
-   Four cycles completed; their candidates (10.38-14.74) sit under the adjusted
-   MA (~10-15), ~50x below raw prices — CMG's 2024 50:1 split, the #2982
-   basis mix. The first stall has [correction_count_before = 0]. *)
+   Four cycles completed, and their candidates (10.38-14.74) sit under the
+   adjusted MA (~10-15), ~50x below raw prices. That is CMG's 2024 50:1 split,
+   the #2982 basis mix. The 2019-03-19 and 2019-07-29 stalls follow
+   [No_correction_yet] (the low printed before the peak, e.g. low 717.24 on
+   07-02, peak 779.86 on 07-26) and do not count. The 2019-06-10 and 2019-08-29
+   stalls follow [Correction_not_recovered] and do. *)
 let cmg_744 =
   let stop = 581.6544 in
   let stall ~cb ~date ~candidate ~ma ~corr =
@@ -92,21 +105,65 @@ let cmg_744 =
     [
       row ~cb:0 ~date:"2019-02-19" ~reason:Sd.Seeded_trailing
         ~ma:9.91225677419355 ~corr:599.02 stop;
+      ncy ~cb:0 ~date:"2019-03-18" stop;
       stall ~cb:0 ~date:"2019-03-19" ~candidate:10.375 ~ma:10.65055741935484
         ~corr:592.73;
+      cnr ~cb:1 ~date:"2019-06-07" stop;
       stall ~cb:1 ~date:"2019-06-10" ~candidate:12.896067870967743
         ~ma:13.0263311827957 ~corr:636.73;
+      ncy ~cb:2 ~date:"2019-07-26" stop;
       stall ~cb:2 ~date:"2019-07-29" ~candidate:13.875 ~ma:14.21314322580645
         ~corr:717.24;
+      cnr ~cb:3 ~date:"2019-08-28" stop;
       stall ~cb:3 ~date:"2019-08-29" ~candidate:14.74478067096774
         ~ma:14.893717849462364 ~corr:770.53;
-      row ~cb:4 ~date:"2019-11-08" ~reason:Sd.Correction_not_recovered
-        ~ma:15.73978752688172 ~corr:730.5 stop;
+      cnr ~cb:4 ~date:"2019-11-08" stop;
     ]
 
-(* FDX-wein-1233: three stalls (the MA lagging the advance), then the MA
-   catches up and the stop rises four times — the first raise 64 days after
-   the first row. *)
+(* KHC-wein-1463: its first cycle ([correction_count_before = 0]) completes on
+   2021-03-26 after [Correction_not_recovered] and counts. The 2021-05-07 stall
+   follows [No_correction_yet] and does not. The stop holds 17 weeks. *)
+let khc_1463 =
+  let stop = 35.980799999999995 in
+  history ~symbol:"KHC" ~entry_date:"2021-02-19"
+    [
+      row ~cb:0 ~date:"2021-02-22" ~reason:Sd.Seeded_trailing stop;
+      cnr ~cb:0 ~date:"2021-03-25" stop;
+      row ~cb:0 ~date:"2021-03-26" ~reason:Sd.Cycle_stalled ~candidate:26.875
+        ~ma:27.295381935483871 ~corr:36.37 stop;
+      ncy ~cb:1 ~date:"2021-05-06" stop;
+      row ~cb:1 ~date:"2021-05-07" ~reason:Sd.Cycle_stalled
+        ~candidate:29.138891845161286 ~ma:29.4332240860215 ~corr:39.371 stop;
+      cnr ~cb:2 ~date:"2021-06-25" stop;
+    ]
+
+(* HPQ-wein-450: stalls on 2018-08-20 (cb 0) and 2018-09-24 (cb 1), each the
+   bar after [No_correction_yet] — phantom-shaped. The old
+   [correction_count_before > 0] rule fired on the second. Then
+   [Entered_tightening] moves the stop 19.776 -> 22.375 on 2018-10-29, 119 days
+   after the first row. Clean. *)
+let hpq_450 =
+  let s0 = 19.776 in
+  history ~symbol:"HPQ" ~entry_date:"2018-06-29"
+    [
+      row ~cb:0 ~date:"2018-07-02" ~reason:Sd.Seeded_trailing s0;
+      ncy ~cb:0 ~date:"2018-08-17" s0;
+      row ~cb:0 ~date:"2018-08-20" ~reason:Sd.Cycle_stalled
+        ~candidate:17.410649477419355 s0;
+      ncy ~cb:1 ~date:"2018-09-21" s0;
+      row ~cb:1 ~date:"2018-09-24" ~reason:Sd.Cycle_stalled
+        ~candidate:17.993714129032256 s0;
+      row ~cb:2 ~date:"2018-10-29" ~reason:Sd.Entered_tightening
+        ~stop_after:22.375 s0;
+      row ~cb:0 ~date:"2018-10-30" ~reason:Sd.Tightened_ratchet
+        ~stop_after:22.7258 22.375;
+      row ~cb:0 ~date:"2018-11-20" ~reason:Sd.Stop_hit 22.7258;
+    ]
+
+(* FDX-wein-1233: stalls after [Correction_not_recovered] on 2020-07-30 and
+   2020-08-27 (the 2020-08-10 one follows [No_correction_yet]), with the MA
+   lagging the advance. Then the MA catches up and the stop rises four times,
+   the first raise 64 days after the first row. Clean. *)
 let fdx_1233 =
   let raise_ ~cb ~date ~from ~to_ =
     row ~cb ~date ~reason:Sd.Raised ~stop_after:to_ ~candidate:to_ from
@@ -115,12 +172,16 @@ let fdx_1233 =
   history ~symbol:"FDX" ~entry_date:"2020-07-10"
     [
       row ~cb:0 ~date:"2020-07-13" ~reason:Sd.Seeded_trailing s0;
+      cnr ~cb:0 ~date:"2020-07-29" s0;
       row ~cb:0 ~date:"2020-07-30" ~reason:Sd.Cycle_stalled
         ~candidate:122.92382988387097 s0;
+      ncy ~cb:1 ~date:"2020-08-07" s0;
       row ~cb:1 ~date:"2020-08-10" ~reason:Sd.Cycle_stalled
         ~candidate:128.92544386451613 s0;
+      cnr ~cb:2 ~date:"2020-08-26" s0;
       row ~cb:2 ~date:"2020-08-27" ~reason:Sd.Cycle_stalled
         ~candidate:137.91059998064517 s0;
+      ncy ~cb:3 ~date:"2020-09-14" s0;
       raise_ ~cb:3 ~date:"2020-09-15" ~from:s0 ~to_:152.94794310967745;
       raise_ ~cb:4 ~date:"2020-09-28" ~from:152.94794310967745
         ~to_:164.72676106451613;
@@ -128,14 +189,18 @@ let fdx_1233 =
         ~to_:171.24003940645159;
       raise_ ~cb:6 ~date:"2020-11-24" ~from:171.24003940645159
         ~to_:210.43657076129031;
-      row ~cb:7 ~date:"2021-01-15" ~reason:Sd.Correction_not_recovered
-        210.43657076129031;
+      cnr ~cb:7 ~date:"2021-01-15" 210.43657076129031;
     ]
 
 let cmg_detail =
-  "no stop move for 37 weeks (2019-02-19..2019-11-08), 3 completed cycle(s) \
+  "no stop move for 37 weeks (2019-02-19..2019-11-08), 2 completed cycle(s) \
    stalled; last: stop 581.65, candidate 14.74, ma 14.89, correction extreme \
    770.53 (extreme/ma 51.74)"
+
+let khc_detail =
+  "no stop move for 17 weeks (2021-02-22..2021-06-25), 1 completed cycle(s) \
+   stalled; last: stop 35.98, candidate 26.88, ma 27.30, correction extreme \
+   36.37 (extreme/ma 1.33)"
 
 let test_fires_on_cmg_2982_specimen _ =
   assert_that
@@ -145,6 +210,24 @@ let test_fires_on_cmg_2982_specimen _ =
          outcome ~n_violations:1 ~n_skipped:0 ~passed:false;
          details (equal_to [ ("CMG", "2019-02-15", cmg_detail) ]);
        ])
+
+(* A first-cycle stall after [Correction_not_recovered] counts:
+   [correction_count_before] is not the discriminator. *)
+let test_fires_on_khc_first_cycle_after_correction _ =
+  assert_that
+    (v22 (loaded [ khc_1463 ]))
+    (all_of
+       [
+         outcome ~n_violations:1 ~n_skipped:0 ~passed:false;
+         details (equal_to [ ("KHC", "2021-02-19", khc_detail) ]);
+       ])
+
+(* A stall on the bar after [No_correction_yet] is phantom-shaped and does not
+   count, even at [correction_count_before > 0]. *)
+let test_clean_on_hpq_phantom_stalls _ =
+  assert_that
+    (v22 (loaded [ hpq_450 ]))
+    (outcome ~n_violations:0 ~n_skipped:0 ~passed:true)
 
 let test_clean_on_fdx_raise_within_13_weeks _ =
   assert_that
@@ -156,15 +239,27 @@ let test_clean_on_fdx_raise_within_13_weeks _ =
 
 (* ---- the rule ---------------------------------------------------------- *)
 
+(* A genuine stall on [date]: [Correction_not_recovered] the day before. *)
+let genuine ?(stop = 10.0) date =
+  let d = Date.of_string date in
+  [
+    cnr ~date:(Date.to_string (Date.add_days d (-1))) stop;
+    row ~date ~reason:Sd.Cycle_stalled ~candidate:(stop -. 1.0) stop;
+  ]
+
+let seeded date = row ~date ~reason:Sd.Seeded_trailing 10.0
+
 (* Seeded on 2020-01-03, one genuine stall, then a hold [days] later. *)
 let stalled_for days =
   let last = Date.add_days (Date.of_string "2020-01-03") days in
   history
-    [
-      row ~date:"2020-01-03" ~reason:Sd.Seeded_trailing 10.0;
-      row ~date:"2020-02-03" ~reason:Sd.Cycle_stalled ~candidate:9.0 10.0;
-      row ~date:(Date.to_string last) ~reason:Sd.No_correction_yet 10.0;
-    ]
+    ((seeded "2020-01-03" :: genuine "2020-02-03")
+    @ [ ncy ~date:(Date.to_string last) 10.0 ])
+
+let detail_prefix prefix =
+  details
+    (elements_are
+       [ field (fun (_, _, d) -> String.is_prefix d ~prefix) (equal_to true) ])
 
 (* 13 weeks = 91 calendar days, inclusive: 91 fires, 90 passes. *)
 let test_threshold_is_inclusive_91_days _ =
@@ -173,16 +268,7 @@ let test_threshold_is_inclusive_91_days _ =
     (all_of
        [
          outcome ~n_violations:1 ~n_skipped:0 ~passed:false;
-         details
-           (elements_are
-              [
-                field
-                  (fun (_, _, d) ->
-                    String.is_prefix d
-                      ~prefix:
-                        "no stop move for 13 weeks (2020-01-03..2020-04-03)")
-                  (equal_to true);
-              ]);
+         detail_prefix "no stop move for 13 weeks (2020-01-03..2020-04-03)";
        ])
 
 (* The minimum stretch comes from config: at 26 weeks a 25-week stall passes
@@ -201,35 +287,36 @@ let test_no_stall_no_fire _ =
           [
             history
               [
-                row ~date:"2020-01-03" ~reason:Sd.Seeded_trailing 10.0;
-                row ~date:"2020-03-06" ~reason:Sd.No_correction_yet 10.0;
-                row ~date:"2020-06-05" ~reason:Sd.Correction_not_recovered 10.0;
+                seeded "2020-01-03";
+                ncy ~date:"2020-03-06" 10.0;
+                cnr ~date:"2020-06-05" 10.0;
                 row ~date:"2020-09-04" ~reason:Sd.Anchor_not_fresh 10.0;
               ];
           ]))
     (outcome ~n_violations:0 ~n_skipped:0 ~passed:true)
 
-(* A first-cycle stall ([correction_count_before = 0]) counts only when
-   [stalled_ratchet_count_first_cycle] is set. *)
-let test_first_cycle_stall_needs_flag _ =
-  let h =
-    history
-      [
-        row ~cb:0 ~date:"2020-01-03" ~reason:Sd.Seeded_trailing 10.0;
-        row ~cb:0 ~date:"2020-02-03" ~reason:Sd.Cycle_stalled ~candidate:9.0
-          10.0;
-        row ~cb:1 ~date:"2020-06-05" ~reason:Sd.No_correction_yet 10.0;
-      ]
-  in
-  let first =
-    { Vt.default_config with stalled_ratchet_count_first_cycle = true }
+(* Only [Correction_not_recovered] as predecessor makes a stall count: after
+   [No_correction_yet], [Seeded_trailing] or nothing (the first row) it does
+   not. Each history is 154 days with its one stall. *)
+let test_stall_needs_correction_on_file _ =
+  let stall = row ~date:"2020-02-03" ~reason:Sd.Cycle_stalled 10.0 in
+  let last = ncy ~date:"2020-06-05" 10.0 in
+  let with_prev symbol prev =
+    history ~symbol [ seeded "2020-01-03"; prev; stall; last ]
   in
   assert_that
-    (v22 (loaded [ h ]), v22 (loaded ~config:first [ h ]))
+    (v22
+       (loaded
+          [
+            with_prev "CNR" (cnr ~date:"2020-01-31" 10.0);
+            with_prev "NCY" (ncy ~date:"2020-01-31" 10.0);
+            with_prev "SEED" (seeded "2020-01-31");
+            history ~symbol:"FIRST" [ stall; last ];
+          ]))
     (all_of
        [
-         field fst (outcome ~n_violations:0 ~n_skipped:0 ~passed:true);
-         field snd (outcome ~n_violations:1 ~n_skipped:0 ~passed:false);
+         outcome ~n_violations:1 ~n_skipped:0 ~passed:false;
+         details (elements_are [ field (fun (s, _, _) -> s) (equal_to "CNR") ]);
        ])
 
 (* A stall followed by a raise 100 days after the first row fires: the stretch
@@ -240,17 +327,15 @@ let test_stretch_closed_by_raise_counts _ =
        (loaded
           [
             history
-              [
-                row ~date:"2020-01-03" ~reason:Sd.Seeded_trailing 10.0;
-                row ~date:"2020-02-03" ~reason:Sd.Cycle_stalled ~candidate:9.0
-                  10.0;
-                row ~date:"2020-04-12" ~reason:Sd.Raised ~stop_after:11.0
-                  ~candidate:11.0 10.0;
-              ];
+              ((seeded "2020-01-03" :: genuine "2020-02-03")
+              @ [
+                  row ~date:"2020-04-12" ~reason:Sd.Raised ~stop_after:11.0
+                    ~candidate:11.0 10.0;
+                ]);
           ]))
     (outcome ~n_violations:1 ~n_skipped:0 ~passed:false)
 
-(* A move resets the stretch: the stall before the raise does not carry into
+(* A move resets the stretch: the stall before the ratchet does not carry into
    the 150-day stretch after it, which has no stall of its own. *)
 let test_move_resets_stalls _ =
   assert_that
@@ -258,14 +343,31 @@ let test_move_resets_stalls _ =
        (loaded
           [
             history
-              [
-                row ~date:"2020-01-03" ~reason:Sd.Seeded_trailing 10.0;
-                row ~date:"2020-01-17" ~reason:Sd.Cycle_stalled ~candidate:9.0
-                  10.0;
-                row ~date:"2020-02-03" ~reason:Sd.Tightened_ratchet
-                  ~stop_after:10.5 10.0;
-                row ~date:"2020-07-02" ~reason:Sd.Tightened_hold 10.5;
-              ];
+              ((seeded "2020-01-03" :: genuine "2020-01-17")
+              @ [
+                  row ~date:"2020-02-03" ~reason:Sd.Tightened_ratchet
+                    ~stop_after:10.5 10.0;
+                  row ~date:"2020-07-02" ~reason:Sd.Tightened_hold 10.5;
+                ]);
+          ]))
+    (outcome ~n_violations:0 ~n_skipped:0 ~passed:true)
+
+(* An [Entered_tightening] that MOVES the stop ends the stretch like any move:
+   the genuine stall before it sits in a 31-day stretch, and the 150 days after
+   it hold no stall. A tag-based [moved] ([Raised] / [Tightened_ratchet]) would
+   read one 181-day stretch and fire. *)
+let test_moving_tightening_ends_stretch _ =
+  assert_that
+    (v22
+       (loaded
+          [
+            history
+              ((seeded "2020-01-03" :: genuine "2020-01-17")
+              @ [
+                  row ~date:"2020-02-03" ~reason:Sd.Entered_tightening
+                    ~stop_after:10.5 10.0;
+                  row ~date:"2020-07-02" ~reason:Sd.Tightened_hold 10.5;
+                ]);
           ]))
     (outcome ~n_violations:0 ~n_skipped:0 ~passed:true)
 
@@ -277,13 +379,11 @@ let test_unmoved_tightening_does_not_reset _ =
        (loaded
           [
             history
-              [
-                row ~date:"2020-01-03" ~reason:Sd.Seeded_trailing 10.0;
-                row ~date:"2020-01-17" ~reason:Sd.Cycle_stalled ~candidate:9.0
-                  10.0;
-                row ~date:"2020-02-03" ~reason:Sd.Entered_tightening 10.0;
-                row ~date:"2020-07-02" ~reason:Sd.Tightened_hold 10.0;
-              ];
+              ((seeded "2020-01-03" :: genuine "2020-01-17")
+              @ [
+                  row ~date:"2020-02-03" ~reason:Sd.Entered_tightening 10.0;
+                  row ~date:"2020-07-02" ~reason:Sd.Tightened_hold 10.0;
+                ]);
           ]))
     (outcome ~n_violations:1 ~n_skipped:0 ~passed:false)
 
@@ -291,24 +391,27 @@ let test_unmoved_tightening_does_not_reset _ =
 let test_reports_longest_stretch _ =
   let h =
     history
-      [
-        row ~date:"2020-01-03" ~reason:Sd.Seeded_trailing 10.0;
-        row ~date:"2020-01-17" ~reason:Sd.Cycle_stalled ~candidate:9.0 10.0;
-        row ~date:"2020-04-17" ~reason:Sd.Raised ~stop_after:11.0
-          ~candidate:11.0 10.0;
-        row ~date:"2020-05-01" ~reason:Sd.Cycle_stalled ~candidate:10.0 11.0;
-        row ~date:"2020-11-13" ~reason:Sd.No_correction_yet 11.0;
-      ]
+      ((seeded "2020-01-03" :: genuine "2020-01-17")
+      @ [
+          row ~date:"2020-04-17" ~reason:Sd.Raised ~stop_after:11.0
+            ~candidate:11.0 10.0;
+        ]
+      @ genuine ~stop:11.0 "2020-05-01"
+      @ [ ncy ~date:"2020-11-13" 11.0 ])
   in
   assert_that
     (v22 (loaded [ h ]))
+    (detail_prefix "no stop move for 30 weeks (2020-04-17..2020-11-13)")
+
+(* A stall row with no correction extreme reads "n/a" for the ratio. *)
+let test_ratio_na_without_extreme _ =
+  assert_that
+    (v22 (loaded [ stalled_for 91 ]))
     (details
        (elements_are
           [
             field
-              (fun (_, _, d) ->
-                String.is_prefix d
-                  ~prefix:"no stop move for 30 weeks (2020-04-17..2020-11-13)")
+              (fun (_, _, d) -> String.is_suffix d ~suffix:"(extreme/ma n/a)")
               (equal_to true);
           ]))
 
@@ -353,6 +456,15 @@ let test_absent_audit_skips_with_reason _ =
        [
          outcome ~n_violations:0 ~n_skipped:3 ~passed:true;
          skip_reason (equal_to (Some "no trade_audit.sexp supplied"));
+       ])
+
+(* No audit and no positions: nothing to judge or skip, no reason. *)
+let test_absent_audit_no_positions_is_empty _ =
+  assert_that
+    (v22 (Vt.empty_inputs ()))
+    (all_of
+       [
+         outcome ~n_violations:0 ~n_skipped:0 ~passed:true; skip_reason is_none;
        ])
 
 let pre_2986_reason =
@@ -463,9 +575,13 @@ let test_load_audit_reads_stop_histories _ =
                         "2019-06-21",
                         [
                           "2019-02-19";
+                          "2019-03-18";
                           "2019-03-19";
+                          "2019-06-07";
                           "2019-06-10";
+                          "2019-07-26";
                           "2019-07-29";
+                          "2019-08-28";
                           "2019-08-29";
                           "2019-11-08";
                         ] );
@@ -542,19 +658,28 @@ let suite =
   "validator_stalled_ratchet"
   >::: [
          "fires on CMG #2982 specimen" >:: test_fires_on_cmg_2982_specimen;
+         "fires on KHC first cycle after correction"
+         >:: test_fires_on_khc_first_cycle_after_correction;
+         "clean on HPQ phantom stalls" >:: test_clean_on_hpq_phantom_stalls;
          "clean on FDX raise within 13 weeks"
          >:: test_clean_on_fdx_raise_within_13_weeks;
          "threshold is inclusive 91 days"
          >:: test_threshold_is_inclusive_91_days;
          "min weeks from config" >:: test_min_weeks_from_config;
          "no stall no fire" >:: test_no_stall_no_fire;
-         "first-cycle stall needs flag" >:: test_first_cycle_stall_needs_flag;
+         "stall needs correction on file"
+         >:: test_stall_needs_correction_on_file;
          "stretch closed by raise counts"
          >:: test_stretch_closed_by_raise_counts;
          "move resets stalls" >:: test_move_resets_stalls;
+         "moving tightening ends stretch"
+         >:: test_moving_tightening_ends_stretch;
          "unmoved tightening does not reset"
          >:: test_unmoved_tightening_does_not_reset;
          "reports longest stretch" >:: test_reports_longest_stretch;
+         "ratio n/a without extreme" >:: test_ratio_na_without_extreme;
+         "absent audit no positions is empty"
+         >:: test_absent_audit_no_positions_is_empty;
          "absent audit skips with reason"
          >:: test_absent_audit_skips_with_reason;
          "no stop decisions anywhere skips"

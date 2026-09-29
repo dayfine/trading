@@ -44,7 +44,6 @@ let _default_audit_basis_ratio_min = 0.2
 let _default_audit_basis_ratio_max = 5.0
 let _default_installed_tighter_than_proxy_max_pct = 0.03
 let _default_stalled_ratchet_min_weeks = 13
-let _default_stalled_ratchet_count_first_cycle = false
 let _no_audit_reason = "no trade_audit.sexp supplied"
 let far_future = Date.of_string "2100-01-01"
 
@@ -164,8 +163,6 @@ type check_config = {
       [@sexp.default _default_installed_tighter_than_proxy_max_pct]
   stalled_ratchet_min_weeks : int;
       [@sexp.default _default_stalled_ratchet_min_weeks]
-  stalled_ratchet_count_first_cycle : bool;
-      [@sexp.default _default_stalled_ratchet_count_first_cycle]
   disabled_checks : string list; [@sexp.default []]
   severity_overrides : (string * string) list; [@sexp.default []]
 }
@@ -233,8 +230,6 @@ let default_config =
     installed_tighter_than_proxy_max_pct =
       _default_installed_tighter_than_proxy_max_pct;
     stalled_ratchet_min_weeks = _default_stalled_ratchet_min_weeks;
-    stalled_ratchet_count_first_cycle =
-      _default_stalled_ratchet_count_first_cycle;
     disabled_checks = [];
     severity_overrides = [];
   }

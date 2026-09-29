@@ -302,18 +302,6 @@ type check_config = {
           horizon #2982 measured its stall on (stops held >= 13 weeks raised 0
           of 73 times at close/adjusted >= 1.5). The measured distribution
           behind it is in {!Validator_stall_check.check_v22}. *)
-  stalled_ratchet_count_first_cycle : bool;
-      (** V22: whether a [Cycle_stalled] row with [correction_count_before = 0]
-          counts as a completed correction + recovery. Default [false]: the
-          first cycle is anchored on the entry-seeded correction extreme, so a
-          pure ~8.7% advance off the entry bar's low completes it with no
-          pullback at all ([Stop_decision.Raised]'s docstring), and the record
-          alone cannot tell that phantom from a real pullback. Later cycles pass
-          the post-reset freshness guard, so they are genuine. Under the
-          non-default [reset_anchor_on_stalled_cycle = false] a stall does not
-          advance the count, so a never-raised position's stalls all read as
-          first cycles and need this flag. [true] counts the first cycle too,
-          accepting the phantoms. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default
