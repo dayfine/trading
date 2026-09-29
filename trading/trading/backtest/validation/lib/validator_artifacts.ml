@@ -96,10 +96,14 @@ let _entry_context_of (e : Backtest.Trade_audit.entry_decision) =
     ma_direction = e.ma_direction;
     resistance_quality = e.resistance_quality;
     installed_stop = e.installed_stop;
+    screener_proxy_stop = Some e.screener_proxy_stop;
     suggested_entry = e.suggested_entry;
-    close_at_decision = e.close_at_decision;
-    adjusted_close_at_decision = e.adjusted_close_at_decision;
-    ma_value = e.ma_value;
+    decision_bar =
+      {
+        close_at_decision = e.close_at_decision;
+        adjusted_close_at_decision = e.adjusted_close_at_decision;
+        ma_value = e.ma_value;
+      };
   }
 
 type audit_join_row = {
@@ -111,10 +115,17 @@ type audit_join_row = {
 
 let _sd_key ~symbol ~entry_date = symbol ^ "|" ^ Date.to_string entry_date
 
-let _records_of_sexp sexp =
-  try (Backtest.Trade_audit.audit_blob_of_sexp sexp).audit_records
+(* A blob carries records + cascade summaries; the older bare-list format
+   carries records only, so it yields no screens. *)
+let _blob_of_sexp sexp : Backtest.Trade_audit.audit_blob =
+  try Backtest.Trade_audit.audit_blob_of_sexp sexp
   with _ -> (
-    try Backtest.Trade_audit.audit_records_of_sexp sexp with _ -> [])
+    try
+      {
+        audit_records = Backtest.Trade_audit.audit_records_of_sexp sexp;
+        cascade_summaries = [];
+      }
+    with _ -> { audit_records = []; cascade_summaries = [] })
 
 (* Audit records are keyed by position_id AND (symbol, entry_date). The latter
    misses on real runs because the audit entry_date is the SIGNAL Friday while a
@@ -148,19 +159,32 @@ let _join_row_of_record (r : Backtest.Trade_audit.audit_record) =
     context = _entry_context_of e;
   }
 
-let _lookup_of_sexp sexp =
-  build_audit_lookup (List.map (_records_of_sexp sexp) ~f:_join_row_of_record)
+type loaded_audit = {
+  lookup : trade_row -> entry_context option;
+  screens : screen_read list;
+}
+
+let _screen_of_summary (s : Backtest.Trade_audit.cascade_summary) =
+  { screen_date = s.date; screen_macro_trend = s.macro_trend }
+
+let _loaded_of_sexp sexp =
+  let blob = _blob_of_sexp sexp in
+  {
+    lookup =
+      build_audit_lookup (List.map blob.audit_records ~f:_join_row_of_record);
+    screens = List.map blob.cascade_summaries ~f:_screen_of_summary;
+  }
 
 let load_audit path =
   if not (Sys_unix.file_exists_exn path) then Error "trade_audit.sexp absent"
   else
     match Sexp.load_sexp path with
-    | sexp -> Ok (_lookup_of_sexp sexp)
+    | sexp -> Ok (_loaded_of_sexp sexp)
     | exception exn ->
         Error ("trade_audit.sexp unreadable: " ^ Exn.to_string exn)
 
 let load_audit_lookup path =
-  match load_audit path with Ok lookup -> lookup | Error _ -> fun _ -> None
+  match load_audit path with Ok a -> a.lookup | Error _ -> fun _ -> None
 
 (* Two dates share an ISO trading week iff (year, week_number) match. *)
 let _same_week d1 d2 =
