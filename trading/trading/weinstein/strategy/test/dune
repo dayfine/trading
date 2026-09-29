@@ -22,6 +22,7 @@
   test_panel_callbacks
   test_rs_trend_live
   test_reserve_resting_ticket_cash
+  test_share_class_gate
   test_resistance_sketch_reader
   test_weekly_sidetable_reader
   test_pi_filter_wiring

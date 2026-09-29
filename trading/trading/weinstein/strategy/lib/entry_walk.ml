@@ -22,9 +22,9 @@ let held_symbols (portfolio : Portfolio_view.t) =
 
 (** Classify one [candidate] through the entry gates against [state], pairing it
     with its decision. Mutates [state]'s accumulators in-place. *)
-let _classify_one ~held_set ~make_entry ~portfolio_value
+let _classify_one ~gate ~held_set ~make_entry ~portfolio_value
     ~(state : Screening_notional.entry_walk_state) candidate =
-  ( candidate,
+  let decide () =
     Entry_audit_capture.classify_candidate
       ~leverage_enabled:state.leverage_enabled ~held_set ~make_entry
       ~remaining_cash:state.remaining_cash
@@ -34,27 +34,29 @@ let _classify_one ~held_set ~make_entry ~portfolio_value
       ~long_notional_cap:state.long_notional_cap
       ~sector_exposure_acc:state.sector_exposure_acc
       ~max_sector_exposure_pct:state.max_sector_exposure_pct ~portfolio_value
-      candidate )
+      candidate
+  in
+  (candidate, Share_class_gate.classify gate ~held_set candidate ~decide)
 
 (** Classify [candidates] (in order) through the entry gates against [state],
     pairing each with its decision. The walk mutates [state]'s accumulators
     in-place. *)
-let _classify_candidates ~held_set ~make_entry ~portfolio_value ~state
+let _classify_candidates ~gate ~held_set ~make_entry ~portfolio_value ~state
     candidates =
   List.map candidates
-    ~f:(_classify_one ~held_set ~make_entry ~portfolio_value ~state)
+    ~f:(_classify_one ~gate ~held_set ~make_entry ~portfolio_value ~state)
 
 (** Classify [indexed_candidates] (in original order) while charging them
     against a side-specific [remaining_cash] budget [side_cash], reusing the
     shared [short_notional_acc] / [sector_exposure_acc] in [state] so the caps
     apply across both sides. Returns the [(index, candidate, decision)] triples
     keyed by the candidate's position in the original list. *)
-let _walk_side ~held_set ~make_entry ~portfolio_value
+let _walk_side ~gate ~held_set ~make_entry ~portfolio_value
     ~(state : Screening_notional.entry_walk_state) ~side_cash indexed_candidates
     =
   let side_state = { state with remaining_cash = ref side_cash } in
   let decisions =
-    _classify_candidates ~held_set ~make_entry ~portfolio_value
+    _classify_candidates ~gate ~held_set ~make_entry ~portfolio_value
       ~state:side_state
       (List.map indexed_candidates ~f:snd)
   in
@@ -68,14 +70,14 @@ let _walk_side ~held_set ~make_entry ~portfolio_value
     [remaining_cash] refs. Decisions are re-ordered back into the original
     [candidates] order so emit/kept ordering matches the combined-walk path. See
     [project_short_funnel_crowded_out]. *)
-let _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
-    ~short_budget candidates =
+let _sleeve_decisions ~gate ~held_set ~make_entry ~portfolio_value ~state
+    ~long_cash ~short_budget candidates =
   let indexed = List.mapi candidates ~f:(fun i c -> (i, c)) in
   let is_short (_, (c : Screener.scored_candidate)) =
     Trading_base.Types.equal_position_side c.side Trading_base.Types.Short
   in
   let short_indexed, long_indexed = List.partition_tf indexed ~f:is_short in
-  let walk = _walk_side ~held_set ~make_entry ~portfolio_value ~state in
+  let walk = _walk_side ~gate ~held_set ~make_entry ~portfolio_value ~state in
   let long_walk = walk ~side_cash:long_cash long_indexed in
   let short_walk = walk ~side_cash:short_budget short_indexed in
   List.append long_walk short_walk
@@ -204,10 +206,10 @@ let _spendable_cash ~config (portfolio : Portfolio_view.t) =
     mutations with it, not only [remaining_cash] — every accumulator the walk
     threads is order-dependent, which is the whole point of demoting. *)
 let entries_from_candidates ?sector_lookup
-    ?(pending_entry_e = Entry_freeze.create ()) ~config ~candidates ~stop_states
-    ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
-    ?(audit_recorder = Audit_recorder.noop) ?macro ?on_candidates_considered ()
-    =
+    ?(pending_entry_e = Entry_freeze.create ()) ?(suspended_held = []) ~config
+    ~candidates ~stop_states ~bar_reader ~(portfolio : Portfolio_view.t)
+    ~get_price ~current_date ?(audit_recorder = Audit_recorder.noop) ?macro
+    ?on_candidates_considered () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let initial_stop_buffer = _initial_stop_buffer ~config ~macro in
   let candidates =
@@ -224,19 +226,20 @@ let entries_from_candidates ?sector_lookup
     Screening_notional.make_entry_walk_state ~cash:spendable ~config ~portfolio
       ~portfolio_value ~sector_lookup
   in
+  let gate = Share_class_gate.create ~config ~portfolio ~suspended_held in
   let decisions =
     if Float.( <= ) config.short_sleeve_fraction 0.0 then
       (* No-op default: single combined walk over [candidates], bit-identical
          to the pre-sleeve path. *)
-      _classify_candidates ~held_set ~make_entry ~portfolio_value ~state
+      _classify_candidates ~gate ~held_set ~make_entry ~portfolio_value ~state
         candidates
     else
       (* Reserved short sleeve: partition the cash budget between a long and a
          short walk that share [state]'s notional/sector accumulators. *)
       let short_budget = portfolio_value *. config.short_sleeve_fraction in
       let long_cash = Float.max 0.0 (spendable -. short_budget) in
-      _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
-        ~short_budget candidates
+      _sleeve_decisions ~gate ~held_set ~make_entry ~portfolio_value ~state
+        ~long_cash ~short_budget candidates
   in
   let kept =
     List.filter_map decisions ~f:(fun (_, d) ->

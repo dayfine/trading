@@ -1888,6 +1888,51 @@ type config = {
           [((flag entry_ticket_macro_suspend) (values (Off On_bearish_macro
            On_index_stage4)))]. R3: no default flip without a ledger ACCEPT and
           the confirmation grid. *)
+  max_one_share_class_per_issuer : bool; [@sexp.default false]
+      (** #3015 — hold at most one share class of an issuer on the long side.
+          When [true], a long entry candidate is {b skipped} (audit reason
+          [Audit_recorder.Share_class_held]) while another share class of the
+          same issuer ({!share_class_groups}; e.g. GOOG / GOOGL) has an open or
+          pending long: a position in [Entering] (a resting or partly-filled
+          ticket), [Holding] or [Exiting] (not yet closed), or a ticket stashed
+          by {!entry_ticket_macro_suspend} (it will be re-issued unchanged, so
+          it is still a claim on the group). When two classes qualify in the
+          same week, only the first {e entered} in the screener's ranking order
+          is admitted; a higher-ranked class that is skipped for another reason
+          (cash, stop width, ...) does not block its sibling. Shorts and
+          unmapped symbols are unaffected. See {!Share_class_gate}.
+
+          {b Why.} The classes are one business; holding two doubles the
+          position in one name (the broad-5y investor cells bought GOOG and
+          GOOGL the same day and lost ~$11.6k on each — the V6 twin-position
+          invariant). {b Faithfulness.} A portfolio-risk / concentration filter,
+          not a spine change ([.claude/rules/weinstein-faithful-core.md]: it
+          never admits a candidate the cascade rejected, only declines a
+          duplicate of an issuer already owned). It sits beside the existing
+          concentration limits of [docs/design/eng-design-3-portfolio-stops.md]
+          (sector concentration, max positions) — two classes of one issuer are
+          the limiting case of sector concentration. The tier-1 book reference
+          ([docs/design/weinstein-book-reference.md]) is silent on share
+          classes, so no book passage is claimed for the rule itself.
+
+          {b Map.} Read from {!share_class_groups}. The backtest runner fills
+          that field from the committed [trading/test_data/share_classes.sexp]
+          when this flag is on and the field is empty
+          ({!Share_class_gate.resolve_config}); {!Weinstein_strategy.make} fails
+          loudly if the flag is on and the map is still empty, so a missing map
+          never silently disables the rule.
+
+          {b Default [false]} never reads the map or the file — bit-identical to
+          every existing golden (R1). R2: a [Variant_matrix] axis as
+          [((flag max_one_share_class_per_issuer) (values (true false)))]. R3:
+          no default flip without a ledger ACCEPT. *)
+  share_class_groups : Share_class_map.t; [@sexp.default Share_class_map.empty]
+      (** #3015 — the issuer groups {!max_one_share_class_per_issuer} consults,
+          as a list of ticker lists ([((GOOG GOOGL) (BRK-A BRK-B))]). Data, not
+          a knob — populated by the backtest runner from the committed
+          [share_classes.sexp] (the same way the runner fills {!universe}), or
+          inline by a spec that wants a different map. Default empty; ignored
+          while the flag is off. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
