@@ -46,7 +46,7 @@ A PR is mergeable only when **all three** are green:
    entirely" (pure infra / refactor / harness PRs that touch no domain
    logic — still requires the generic CP1–CP4 review).
 
-**Issue links (#3019):** a PR that references an issue carries exactly one of `Closes #N` (every `[merge]` item of its `## Done when` met by the diff), `Refs #N -- verify: <items>` (issue has `[after-merge]` items; add `verify/pending`), or `Refs #N -- remaining: <items>`; a bare `(#N)` closes nothing (qc-structural row I1).
+**Issue links (#3019):** a PR that references an issue carries exactly one of: `Closes #N` (`Fixes`/`Resolves` count as `Closes`) -- every `[merge]` item of its `## Done when` met by the diff, each named with its test/check, and the issue has no `[after-merge]` items; `Refs #N -- verify: <items>` -- every `[merge]` item met, `[after-merge]` items remain (add `verify/pending` to the issue); `Refs #N -- remaining: <items>` -- some `[merge]` item unmet (append `; verify: <items>` if `[after-merge]` items also exist). A bare `(#N)` closes nothing; a detector-only diff never `Closes` (qc-structural row I1).
 
 Both QC verdicts are **Claude Code** reviews. A Codex review (the advisory
 `CODEX` column, `.claude/rules/cross-agent-review.md`) never substitutes for

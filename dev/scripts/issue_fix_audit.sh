@@ -14,7 +14,12 @@
 # merged PR's title or body, over the newest AUDIT_PR_LIMIT (default 500)
 # merged PRs. False positives: a PR that merely cites the issue, or a bare
 # number such as "issue #12" in an unrelated sentence. False negatives: a PR
-# older than the window. Read each hit; the report decides nothing.
+# older than the window (gh orders by creation date, not merge date), and
+# any open issue past the first 500. Read each hit; the report decides nothing.
+#
+# Limits of (b): only an H2 "## Done when" opens the section, and the next
+# "## " line (even inside a code fence) closes it. A condition is a list item
+# "- [after-merge] <text>"; HTML comments and empty placeholders are skipped.
 #
 # Test seam: ISSUE_FIX_AUDIT_FIXTURE_DIR=<dir> reads <dir>/issues.json (open
 # issues: number,title,labels,body) and <dir>/prs.json (merged PRs:
@@ -47,6 +52,8 @@ printf '%s\n' "$ISSUES" | jq -r '
   echo "#$num $title"
   printf '%s\n' "$ISSUES" | jq -r --argjson n "$num" \
     '.[] | select(.number == $n) | .body // ""' | tr -d '\r' | awk '
+    /<!--/ { in_c = 1 }
+    in_c { if ($0 ~ /-->/) in_c = 0; next }
     /^## / { in_done = ($0 ~ /^## Done when/); next }
-    in_done && /\[after-merge\]/ { print "    " $0 }'
+    in_done && /^[-*] \[after-merge\] *[^ ]/ { print "    " $0 }'
 done
