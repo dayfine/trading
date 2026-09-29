@@ -1,0 +1,6 @@
+[
+  {"number": 101, "title": "Fixed but open", "labels": [], "body": "## Done when\n- [merge] test exists\n"},
+  {"number": 102, "title": "Awaiting soak", "labels": [{"name": "verify/pending"}],
+   "body": "Intro\n## Done when\n- [merge] check added\n- [after-merge] sweep green on 2 scheduled runs\n- [after-merge] V6 = 0 on all 3 salts\n## Notes\n- [after-merge] not under Done when\n"},
+  {"number": 103, "title": "Untouched", "labels": [], "body": "nothing"}
+]

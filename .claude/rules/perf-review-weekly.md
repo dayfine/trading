@@ -76,6 +76,11 @@ the handle cap (`SNAPSHOT_MAX_MMAP_HANDLES`, #2839) are the per-run signals.
    simulated year than that shape's median. No GHA tier runs these shapes,
    so this file is the only runtime record they have (backfilled 2026-09-25
    from 21 committed chain logs, 193 cells).
+   Also run `sh dev/scripts/issue_fix_audit.sh` (#3019): it lists open issues
+   with a merged PR that mentions them and every `verify/pending` issue with
+   its `[after-merge]` conditions. Close each issue whose conditions hold
+   (evidence in the close comment) or comment on what is missing; record the
+   outcome in the same §Weekly review entry.
 4. **Write it down** in `dev/status/backtest-perf.md` §Weekly review — date,
    the rows compared, deltas, tickets opened. Two lines is enough; zero lines
    means the review did not happen.
