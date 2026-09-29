@@ -59,20 +59,46 @@ val check_v20 : inputs -> Validator_step.finding
     the trade, [ma_value] missing or [<= 0], or no close field at all. *)
 
 val check_v21 : inputs -> Validator_step.finding
-(** V21 (EXPECTATION) — installed vs suggested stop. Flags an entry whose
-    [installed_stop] sits more than [config.installed_vs_proxy_stop_max_pct]
-    (default [0.03]) away from the audit's [screener_proxy_stop]:
-    [|installed_stop - screener_proxy_stop| / screener_proxy_stop], strictly
-    greater flags. LONG and SHORT rows alike.
+(** V21 (EXPECTATION) — installed stop tighter than the screener's proxy. Flags
+    an entry whose [installed_stop] sits {b closer to entry} than the audit's
+    [screener_proxy_stop] by more than
+    [config.installed_tighter_than_proxy_max_pct] (default [0.03]) of the proxy,
+    strictly greater flags:
+    - {b LONG}: [(installed - proxy) / proxy > X] — both stops sit below entry,
+      so tighter is higher.
+    - {b SHORT} ([side = "SHORT"]): [(proxy - installed) / proxy > X] — the
+      screener places a short's proxy {i above} entry ([Screener]:
+      [entry * (1 + short_stop_pct)]) and the installed short stop sits above
+      entry too, so tighter is lower. A stop {i looser} than the proxy by any
+      distance passes.
 
-    {b What it measures.} The screener prices a candidate's risk off a fixed ~8%
+    {b What it measures.} The screener grades a candidate's risk off a fixed ~8%
     proxy; the strategy installs its own stop off the support floor or the
-    [Buffer_fallback] buffer, and sizes off that. The two routinely differ
-    (#2975: EQT, proxy 21.49 = 8% under [E = 23.36], installed 22.43 = the ~4%
-    fallback, 4.35% apart). An EXPECTATION, not an invariant: the count says how
-    often the risk the screener graded is not the risk the position carries, and
-    a large count on a run is a reason to look at the fallback rate — it is not
-    a bug on its own.
+    [Buffer_fallback] buffer, and sizes off that (risk-to-stop fixed, so shares
+    scale with [1 / stop distance]). A tighter installed stop means the position
+    carries less risk per share than the screener graded and so is {i bigger} —
+    the #2975 shape (EQT: proxy 21.49 = 8% under [E = 23.36], installed 22.43 =
+    the ~4% fallback, 4.35% tighter). A looser one (the usual support-floor
+    case: the base low sits well under 8%) sizes the position {i smaller}, which
+    is the conservative direction and not flagged.
+
+    {b Why directional, measured.} Over the 210 entries in the five committed
+    [dev/warmup-fix-runs/after-fix1-stop-log/*/trade_audit.sexp] files, an
+    unsigned [|installed - proxy| / proxy > 3%] fired on 203 (97%), so the count
+    said nothing. At the 3% default the directional rule fires on:
+    - Long [Buffer_fallback] 91/91 (tightening 5.6-6.4%);
+    - Long [Support_floor] 2/70 (68 are looser; median -15.9%);
+    - Short [Buffer_fallback] 4/4 (5.0-5.6%);
+    - Short [Support_floor] 43/45 — every one of the 43 has [installed_stop]
+      {i below} [suggested_entry], the wrong side for a short, so the stop reads
+      as "far under the proxy". That is a separate capture defect in those old
+      runs, not the #2975 shape; V21 surfaces it rather than hides it. The two
+      right-side short floors are 0.2% and 1.0% tighter and pass. Those
+      artefacts predate #3007 and store the proxy under the legacy
+      [suggested_stop] key, which [Trade_audit]'s reader maps to
+      [screener_proxy_stop]. On longs, then, the count is ~the [Buffer_fallback]
+      count: an EXPECTATION whose size is a reason to look at the fallback rate,
+      not a bug on its own.
 
     {b Why the proxy is the denominator.} Both levels are stop prices, so their
     gap relative to the one the screener published reads directly as "how far

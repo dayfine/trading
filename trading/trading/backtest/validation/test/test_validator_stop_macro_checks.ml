@@ -76,13 +76,13 @@ let specimen_symbols =
 let skip_reason m = field (fun (r : Vt.check_result) -> r.skip_reason) m
 let severity m = field (fun (r : Vt.check_result) -> r.severity) m
 
-(* ---- V21: installed stop vs screener proxy stop ------------------------ *)
+(* ---- V21: installed stop tighter than the screener proxy stop ---------- *)
 
 (* The #2975 specimen (EQT, pinned in
    [weinstein/strategy/test/test_entry_audit_capture.ml]
    [test_buffer_fallback_installed_stop_ignores_screener_proxy]): E = 23.36,
    screener proxy E * 0.92 = 21.4912, installed Buffer_fallback stop
-   E * 0.96 = 22.4256. 0.9344 / 21.4912 = 4.35% apart > the 3% default. *)
+   E * 0.96 = 22.4256 — 0.9344 / 21.4912 = 4.35% tighter > the 3% default. *)
 let eqt = ctx ~installed_stop:22.4256 ~screener_proxy_stop:(Some 21.4912)
 
 let test_v21_fires_on_2975_specimen _ =
@@ -104,37 +104,60 @@ let test_v21_fires_on_2975_specimen _ =
               [
                 all_of
                   [
-                    contains_substring "installed_stop 22.4256";
+                    contains_substring "LONG installed_stop 22.4256";
                     contains_substring "screener_proxy_stop 21.4912";
-                    contains_substring "4.35% apart";
+                    contains_substring "4.35% tighter";
                   ];
               ]);
        ])
 
-(* Clean: a support-floor stop that happens to sit within 1% of the proxy. *)
+(* Clean: a support-floor stop within 1% of the proxy, on the tight side. *)
 let test_v21_clean _ =
   let inputs =
     loaded
       ~audit:
-        [ ("OK", ctx ~installed_stop:91.5 ~screener_proxy_stop:(Some 92.0)) ]
+        [ ("OK", ctx ~installed_stop:92.5 ~screener_proxy_stop:(Some 92.0)) ]
       [ trade ~symbol:"OK" ~entry_date:"2021-03-08" () ]
   in
   assert_that
     (Vc.run_check ~id:"V21" inputs)
     (outcome ~n_violations:0 ~n_skipped:0 ~passed:true)
 
-(* Strict threshold, both directions: exactly 3% (below or above the proxy)
-   passes; just past it fires. *)
-let test_v21_threshold_boundaries _ =
+(* A stop LOOSER than the proxy by the EQT distance (0.9344, 4.35% of the proxy)
+   never fires: LONG below the proxy, SHORT above it — more risk per share, so
+   a smaller position. Nor does a far looser LONG support floor (the usual case:
+   base low well under 8%). *)
+let test_v21_looser_does_not_fire _ =
+  let proxy = Some 21.4912 in
+  let audit =
+    [
+      ( "L_LOOSE",
+        ctx ~installed_stop:(21.4912 -. 0.9344) ~screener_proxy_stop:proxy );
+      ( "S_LOOSE",
+        ctx ~installed_stop:(21.4912 +. 0.9344) ~screener_proxy_stop:proxy );
+      ("DEEP_FLOOR", ctx ~installed_stop:50.0 ~screener_proxy_stop:(Some 92.0));
+    ]
+  in
+  let trades =
+    [
+      trade ~symbol:"L_LOOSE" ~entry_date:"2021-03-08" ();
+      trade ~side:"SHORT" ~symbol:"S_LOOSE" ~entry_date:"2021-03-08" ();
+      trade ~symbol:"DEEP_FLOOR" ~entry_date:"2021-03-08" ();
+    ]
+  in
+  assert_that
+    (Vc.run_check ~id:"V21" (loaded ~audit trades))
+    (outcome ~n_violations:0 ~n_skipped:0 ~passed:true)
+
+(* Strict threshold on the tight side only. LONG, proxy 100: 103.0 (exactly 3%
+   tighter) passes, 103.1 fires; 96.9 (3.1% looser) passes. *)
+let test_v21_long_boundaries _ =
   let at installed =
     ctx ~installed_stop:installed ~screener_proxy_stop:(Some 100.0)
   in
   let audit =
     [
-      ("BELOW_AT", at 97.0);
-      ("ABOVE_AT", at 103.0);
-      ("BELOW_PAST", at 96.9);
-      ("ABOVE_PAST", at 103.1);
+      ("TIGHT_AT", at 103.0); ("TIGHT_PAST", at 103.1); ("LOOSE_PAST", at 96.9);
     ]
   in
   let trades =
@@ -145,16 +168,16 @@ let test_v21_threshold_boundaries _ =
     (Vc.run_check ~id:"V21" (loaded ~audit trades))
     (all_of
        [
-         outcome ~n_violations:2 ~n_skipped:0 ~passed:false;
-         specimen_symbols (equal_to [ "BELOW_PAST"; "ABOVE_PAST" ]);
+         outcome ~n_violations:1 ~n_skipped:0 ~passed:false;
+         specimen_symbols (equal_to [ "TIGHT_PAST" ]);
        ])
 
 (* The denominator is the proxy, not E (4.00%) or the installed stop (4.17%):
-   EQT's 4.348% gap fires at a 4.25% threshold and passes at 4.35%. *)
+   EQT's 4.348% tightening fires at a 4.25% threshold and passes at 4.35%. *)
 let test_v21_denominator_is_proxy _ =
   let run pct =
     let config =
-      { Vt.default_config with installed_vs_proxy_stop_max_pct = pct }
+      { Vt.default_config with installed_tighter_than_proxy_max_pct = pct }
     in
     (Vc.run_check ~id:"V21"
        (loaded ~config
@@ -164,26 +187,29 @@ let test_v21_denominator_is_proxy _ =
   in
   assert_that (run 0.0425, run 0.0435) (equal_to (1, 0))
 
-(* SHORT rows are compared the same way (proxy above E, installed ~4% above). *)
-let test_v21_short_rows _ =
+(* SHORT mirror: a short's proxy sits ABOVE E ([entry * (1 + short_stop_pct)]),
+   so tighter = lower. Proxy 100: 97.0 (exactly 3% tighter) passes, 96.9 fires,
+   and 103.1 (3.1% looser, above the proxy) passes — the LONG reading of the
+   same numbers (see the boundaries test) flags 103.1 and passes 96.9. *)
+let test_v21_short_mirror _ =
+  let at installed =
+    ctx ~installed_stop:installed ~screener_proxy_stop:(Some 100.0)
+  in
   let audit =
     [
-      ("SWIDE", ctx ~installed_stop:104.0 ~screener_proxy_stop:(Some 108.0));
-      ("SNEAR", ctx ~installed_stop:107.0 ~screener_proxy_stop:(Some 108.0));
+      ("S_TIGHT_AT", at 97.0); ("S_TIGHT_PAST", at 96.9); ("S_LOOSE", at 103.1);
     ]
   in
   let trades =
-    [
-      trade ~side:"SHORT" ~symbol:"SWIDE" ~entry_date:"2021-03-08" ();
-      trade ~side:"SHORT" ~symbol:"SNEAR" ~entry_date:"2021-03-08" ();
-    ]
+    List.map audit ~f:(fun (symbol, _) ->
+        trade ~side:"SHORT" ~symbol ~entry_date:"2021-03-08" ())
   in
   assert_that
     (Vc.run_check ~id:"V21" (loaded ~audit trades))
     (all_of
        [
          outcome ~n_violations:1 ~n_skipped:0 ~passed:false;
-         specimen_symbols (equal_to [ "SWIDE" ]);
+         specimen_symbols (equal_to [ "S_TIGHT_PAST" ]);
        ])
 
 (* Each un-evaluable shape is skipped and counted, never a violation — even
@@ -604,9 +630,10 @@ let suite =
   >::: [
          "v21 fires on #2975 specimen" >:: test_v21_fires_on_2975_specimen;
          "v21 clean" >:: test_v21_clean;
-         "v21 threshold boundaries" >:: test_v21_threshold_boundaries;
+         "v21 looser does not fire" >:: test_v21_looser_does_not_fire;
+         "v21 long boundaries" >:: test_v21_long_boundaries;
          "v21 denominator is proxy" >:: test_v21_denominator_is_proxy;
-         "v21 short rows" >:: test_v21_short_rows;
+         "v21 short mirror" >:: test_v21_short_mirror;
          "v21 skips unevaluable" >:: test_v21_skips_unevaluable;
          "v21 absent audit skips with reason"
          >:: test_v21_absent_audit_skips_with_reason;

@@ -264,16 +264,21 @@ type check_config = {
       (** V20: upper bound of the same ratio. Default [5.0] — the NVDA
           2021-04-23 specimen (#2973) read raw close 610.61 against an adjusted
           MA of 13.67, a ratio of ~44.7. *)
-  installed_vs_proxy_stop_max_pct : float;
-      (** V21: an entry flags when its [installed_stop] sits more than this
-          fraction of the audit's [screener_proxy_stop] away from it —
-          [|installed - proxy| / proxy > installed_vs_proxy_stop_max_pct],
-          strict, so exactly this distance passes. Default [0.03]. The #2975
-          specimen (EQT: [E = 23.36], proxy [21.4912] = 8% under E, installed
-          [22.4256] = the 4% [Buffer_fallback]) sits [0.9344 / 21.4912 = 4.35%]
-          apart, so it fires at the default. See
-          {!Validator_audit_checks.check_v21} for why the proxy is the
-          denominator. *)
+  installed_tighter_than_proxy_max_pct : float;
+      (** V21: an entry flags when its [installed_stop] is {b tighter} (closer
+          to entry) than the audit's [screener_proxy_stop] by more than this
+          fraction of the proxy — long [(installed - proxy) / proxy], short
+          [(proxy - installed) / proxy], strict, so exactly this distance passes
+          and a looser stop never flags. Default [0.03]: the #2975 specimen
+          (EQT: [E = 23.36], proxy [21.4912] = 8% under E, installed [22.4256] =
+          the 4% [Buffer_fallback]) is [0.9344 / 21.4912 = 4.35%] tighter, so it
+          fires. Measured on the 210 entries of the five
+          [dev/warmup-fix-runs/after-fix1-stop-log/*/trade_audit.sexp] files
+          (pre-#3007, legacy [suggested_stop] key, mapped by the reader): 3%
+          fires on all 91 Long [Buffer_fallback] entries (min 5.6%) and 2/70
+          Long [Support_floor] entries, and 5% would drop the EQT shape; the
+          short split and the full rationale are in
+          {!Validator_audit_checks.check_v21}. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default
@@ -334,7 +339,7 @@ type inputs = {
   macro_suspend : Weinstein_strategy.Entry_ticket_suspend_mode.t option;
       (** The run's effective [entry_ticket_macro_suspend] (#2976), read from
           the [overrides] in the run's [params.sexp]
-          ({!Validator_artifacts.load_macro_suspend}). Picks V23's default
+          ({!Validator_run_config.load_macro_suspend}). Picks V23's default
           severity: [Some On_bearish_macro] makes it INVARIANT, anything else
           EXPECTATION. [None] when the run's config could not be read. *)
   bars : string -> bars option;

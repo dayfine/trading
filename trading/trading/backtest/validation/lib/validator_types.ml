@@ -42,7 +42,7 @@ let _default_store_zero_volume_max = 0
 let _default_store_min_bars = 20
 let _default_audit_basis_ratio_min = 0.2
 let _default_audit_basis_ratio_max = 5.0
-let _default_installed_vs_proxy_stop_max_pct = 0.03
+let _default_installed_tighter_than_proxy_max_pct = 0.03
 let _no_audit_reason = "no trade_audit.sexp supplied"
 let far_future = Date.of_string "2100-01-01"
 
@@ -151,8 +151,8 @@ type check_config = {
   store_min_bars : int; [@sexp.default _default_store_min_bars]
   audit_basis_ratio_min : float; [@sexp.default _default_audit_basis_ratio_min]
   audit_basis_ratio_max : float; [@sexp.default _default_audit_basis_ratio_max]
-  installed_vs_proxy_stop_max_pct : float;
-      [@sexp.default _default_installed_vs_proxy_stop_max_pct]
+  installed_tighter_than_proxy_max_pct : float;
+      [@sexp.default _default_installed_tighter_than_proxy_max_pct]
   disabled_checks : string list; [@sexp.default []]
   severity_overrides : (string * string) list; [@sexp.default []]
 }
@@ -216,7 +216,8 @@ let default_config =
     store_min_bars = _default_store_min_bars;
     audit_basis_ratio_min = _default_audit_basis_ratio_min;
     audit_basis_ratio_max = _default_audit_basis_ratio_max;
-    installed_vs_proxy_stop_max_pct = _default_installed_vs_proxy_stop_max_pct;
+    installed_tighter_than_proxy_max_pct =
+      _default_installed_tighter_than_proxy_max_pct;
     disabled_checks = [];
     severity_overrides = [];
   }

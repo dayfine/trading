@@ -62,12 +62,22 @@ let check_v20 inputs =
       S.fold_steps inputs.trades
         ~f:(S.audit_step inputs.audit ~pred:(_v20_pred inputs.config))
 
-(* ---- V21: installed stop vs the screener's proxy stop -------------------- *)
+(* ---- V21: installed stop tighter than the screener's proxy stop ---------- *)
 
-let _v21_detail ~installed ~proxy ~dist config =
-  sprintf "installed_stop %.4f vs screener_proxy_stop %.4f: %.2f%% apart > %g%%"
-    installed proxy (dist *. 100.0)
-    (config.installed_vs_proxy_stop_max_pct *. 100.0)
+(* How much TIGHTER (closer to entry, so less risk per share) the installed
+   stop is than the proxy, as a fraction of the proxy. A long's stops sit below
+   entry, so tighter = higher: [(installed - proxy) / proxy]. A short's sit
+   above entry ([Screener]: proxy = [entry * (1 + short_stop_pct)]), so tighter
+   = lower: [(proxy - installed) / proxy]. Negative = looser. *)
+let _tightening (row : trade_row) ~installed ~proxy =
+  let gap = (installed -. proxy) /. proxy in
+  if String.equal row.side "SHORT" then -.gap else gap
+
+let _v21_detail (row : trade_row) ~installed ~proxy ~tight config =
+  sprintf
+    "%s installed_stop %.4f vs screener_proxy_stop %.4f: %.2f%% tighter > %g%%"
+    row.side installed proxy (tight *. 100.0)
+    (config.installed_tighter_than_proxy_max_pct *. 100.0)
 
 (* Legacy [installed_stop = 0.0], no proxy, or a non-positive proxy (the
    denominator) leave nothing to compare. *)
@@ -75,9 +85,9 @@ let _v21_pred config (row : trade_row) (ctx : entry_context) =
   match ctx.screener_proxy_stop with
   | Some proxy when Float.(proxy > 0.0 && ctx.installed_stop > 0.0) ->
       let installed = ctx.installed_stop in
-      let dist = Float.abs (installed -. proxy) /. proxy in
-      if Float.(dist > config.installed_vs_proxy_stop_max_pct) then
-        S.Fail (S.spec row (_v21_detail ~installed ~proxy ~dist config))
+      let tight = _tightening row ~installed ~proxy in
+      if Float.(tight > config.installed_tighter_than_proxy_max_pct) then
+        S.Fail (S.spec row (_v21_detail row ~installed ~proxy ~tight config))
       else S.Pass
   | _ -> S.Skip
 
