@@ -22,6 +22,13 @@ EOF
 )"
 ```
 
+**Every issue body must contain a `## Done when` section** listing observable conditions, each tagged:
+
+- `[merge]` -- a merged diff meets it; name the test, check or file that shows it.
+- `[after-merge]` -- provable only after merge (e.g. "weekly-start-sweep green on 2 consecutive scheduled runs").
+
+Web filing uses `.github/ISSUE_TEMPLATE/default.md`. The fixing PR carries exactly one of: `Closes #N` (`Fixes`/`Resolves` count as `Closes`; every `[merge]` item met by the diff, each named with its test/check; the issue has no `[after-merge]` items), `Refs #N -- verify: <items>` (every `[merge]` item met, `[after-merge]` items remain; add label `verify/pending` to the issue), or `Refs #N -- remaining: <items>` (some `[merge]` item unmet; append `; verify: <items>` if `[after-merge]` items also exist). A bare `(#N)` in a title closes nothing. `dev/scripts/issue_fix_audit.sh` lists the weekly leftovers; the reader closes each issue whose conditions hold, with evidence in the close comment.
+
 ### Apply / change labels
 
 ```bash
