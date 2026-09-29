@@ -20,7 +20,10 @@
       [StopLimit] sell short [shares] triggering at [entry_price], limit capped
       one [entry_extension_max_pct] {e below} it (the short mirror).
     - [UpdateRiskParams { new_risk_params = { stop_loss_price = Some p } }] →
-      [Stop] order at [p] for the existing position quantity
+      [Stop] order at [p] for the shares the position has at the broker: the
+      held quantity, or the filled part of an [Entering] position. Nothing for
+      an [Exiting] position (its exit is already working — a second sell would
+      double-exit), a [Closed] one, or an unfilled entry (issue #3020).
     - [TriggerExit] → ignored. The broker [Stop] order (from [UpdateRiskParams]
       or the stop sync below) is already working at the broker as a GTC order;
       it executes automatically when price hits the stop. [TriggerExit] is

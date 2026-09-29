@@ -72,17 +72,35 @@ let _entry_order symbol side target_quantity entry_price
           (_position_side_name side) shares entry_price cap;
     }
 
+(** Shares a broker stop must protect: the held quantity, or the filled part of
+    an entry still in progress. [None] for positions with nothing at the broker
+    to protect (unfilled entries, exits in progress, closed positions). *)
+let _protected_shares (pos : Position.t) =
+  match pos.state with
+  | Position.Holding { quantity; _ } -> Some (Int.of_float quantity)
+  | Position.Entering { filled_quantity; _ } when Float.(filled_quantity > 0.0)
+    ->
+      Some (Int.of_float filled_quantity)
+  | Position.Entering _ | Position.Exiting _ | Position.Closed _ -> None
+
+let _update_stop_order (pos : Position.t) ~stop_price ~shares =
+  {
+    ticker = pos.symbol;
+    side = _exit_side_of_position_side pos.side;
+    order_type = Trading_base.Types.Stop stop_price;
+    shares;
+    rationale =
+      Printf.sprintf "Update stop to $%.2f (%d shares)" stop_price shares;
+  }
+
+(* Issue #3020: an [UpdateRiskParams] stop only for a position with shares to
+   protect ([_protected_shares]). An [Exiting] position already has its exit
+   working at the broker, so a second [Stop] would sell (or cover) twice; a
+   [Closed] one has nothing left. [Position.apply_transition] rejects the
+   transition outside [Holding] anyway — this is the defence in depth. *)
 let _stop_order_for_pos pos stop_price =
-  let shares = _shares_of_position pos in
-  Some
-    {
-      ticker = pos.symbol;
-      side = _exit_side_of_position_side pos.side;
-      order_type = Trading_base.Types.Stop stop_price;
-      shares;
-      rationale =
-        Printf.sprintf "Update stop to $%.2f (%d shares)" stop_price shares;
-    }
+  Option.map (_protected_shares pos) ~f:(fun shares ->
+      _update_stop_order pos ~stop_price ~shares)
 
 let _market_exit_for_pos pos =
   let shares = _shares_of_position pos in
@@ -129,17 +147,6 @@ type stop_sync = {
   stop_level_before : string -> float option;
   stop_level_after : string -> float option;
 }
-
-(** Shares a broker stop must protect: the held quantity, or the filled part of
-    an entry still in progress. [None] for positions with nothing at the broker
-    to protect (unfilled entries, exits in progress, closed positions). *)
-let _protected_shares (pos : Position.t) =
-  match pos.state with
-  | Position.Holding { quantity; _ } -> Some (Int.of_float quantity)
-  | Position.Entering { filled_quantity; _ } when Float.(filled_quantity > 0.0)
-    ->
-      Some (Int.of_float filled_quantity)
-  | Position.Entering _ | Position.Exiting _ | Position.Closed _ -> None
 
 let _is_entry_fill (t : Position.transition) =
   match t.kind with
