@@ -1311,3 +1311,16 @@
   (universe))
  (action
   (run sh %{dep:perf_long_cells_test.sh})))
+
+; Pin dev/scripts/issue_fix_audit.sh (weekly issue<->PR audit, #3019) over
+; canned gh JSON: merged-PR-mentioned issue listing (digit boundary) and
+; verify/pending [after-merge] extraction. Script resolved at RUN TIME.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (source_tree fixtures/issue_fix_audit)
+  (universe))
+ (action
+  (run sh %{dep:issue_fix_audit_test.sh})))
