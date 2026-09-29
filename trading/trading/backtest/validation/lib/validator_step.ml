@@ -5,9 +5,14 @@ let _basis_lo = 0.66
 let _basis_hi = 1.5
 
 type step = Skip | Pass | Fail of specimen
-type finding = { violations : specimen list; skipped : int }
 
-let empty_finding = { violations = []; skipped = 0 }
+type finding = {
+  violations : specimen list;
+  skipped : int;
+  skip_reason : string option;
+}
+
+let empty_finding = { violations = []; skipped = 0; skip_reason = None }
 
 let _absorb acc = function
   | Skip -> { acc with skipped = acc.skipped + 1 }
