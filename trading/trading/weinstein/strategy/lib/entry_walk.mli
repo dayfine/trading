@@ -22,6 +22,7 @@ val held_symbols : Trading_strategy.Portfolio_view.t -> string list
 val entries_from_candidates :
   ?sector_lookup:(string -> string option) ->
   ?pending_entry_e:Entry_freeze.t ->
+  ?suspended_held:string list ->
   config:Weinstein_strategy_config.config ->
   candidates:Screener.scored_candidate list ->
   stop_states:Weinstein_stops.stop_state Core.String.Map.t ref ->
@@ -106,4 +107,11 @@ val entries_from_candidates :
       persists across Fridays. Only consulted when
       [config.freeze_entry_at_first_breakout = true]; when the flag is off the
       table is never touched, so an omitted argument (default fresh table) is
-      bit-identical to the pre-freeze path (R1). *)
+      bit-identical to the pre-freeze path (R1).
+    @param suspended_held
+      #3015. Symbols of entry tickets withdrawn by the macro suspension
+      ({!Entry_ticket_suspend.run}'s second result), counted as pending longs by
+      the one-share-class-per-issuer rule ({!Share_class_gate}). Only read when
+      [config.max_one_share_class_per_issuer = true]; default [[]]. With the
+      flag on, a long candidate whose issuer group already has an open or
+      pending long is recorded as [Skipped Share_class_held] and never sized. *)

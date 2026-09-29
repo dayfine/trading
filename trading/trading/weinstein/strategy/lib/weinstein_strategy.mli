@@ -320,6 +320,15 @@ module Short_borrow_gate = Short_borrow_gate
     candidates whose trailing dollar-ADV is below the borrow-supply floor.
     Exposed so tests can pin the pure {!Short_borrow_gate.filter} directly. *)
 
+module Share_class_map = Share_class_map
+(** #3015 ticker → issuer-group lookup (GOOG / GOOGL, ...) loaded from the
+    committed [share_classes.sexp]. See {!Share_class_map}. *)
+
+module Share_class_gate = Share_class_gate
+(** #3015 one-share-class-per-issuer long entry rule (default off). Exposed so
+    tests can pin the rule (the runner resolves the map via
+    {!resolve_share_class_map}). See {!Share_class_gate}. *)
+
 module Exit_audit_capture = Exit_audit_capture
 (** Exit-side trade-audit capture. Bridges [TriggerExit] transitions to
     {!Audit_recorder.exit_event}. See {!Exit_audit_capture}. *)
@@ -1152,6 +1161,15 @@ type config = {
           even if you see a few stocks breaking out". Default [Off] =
           bit-identical (R1). See {!Entry_ticket_suspend} and
           [Weinstein_strategy_config.entry_ticket_macro_suspend]. *)
+  max_one_share_class_per_issuer : bool; [@sexp.default false]
+      (** #3015: skip a long candidate while another share class of its issuer
+          (GOOG / GOOGL, ...) has an open or pending long. Default [false] =
+          bit-identical (R1). See {!Share_class_gate} and
+          [Weinstein_strategy_config.max_one_share_class_per_issuer]. *)
+  share_class_groups : Share_class_map.t; [@sexp.default Share_class_map.empty]
+      (** #3015: the issuer groups the rule above consults; filled by the
+          backtest runner from the committed [share_classes.sexp]. See
+          [Weinstein_strategy_config.share_class_groups]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
@@ -1276,9 +1294,18 @@ val stock_analysis_config_for : config:config -> Stock_analysis.config
     (default-off bit-identity + the [520] override landing on
     [resistance.min_history_bars]) without instrumenting the screener loop. *)
 
+val resolve_share_class_map : data_dir:string -> config -> config
+(** #3015: fill [config.share_class_groups] from the committed
+    [data_dir / share_classes.sexp] when [max_one_share_class_per_issuer] is on
+    and the groups are empty; otherwise [config] unchanged (the default-off path
+    never reads the file). Fails loudly on a missing or malformed map. Same
+    function as {!Share_class_gate.resolve_config}, typed at this module's
+    re-declared {!config}. Called once per run by the backtest runner. *)
+
 val entries_from_candidates :
   ?sector_lookup:(string -> string option) ->
   ?pending_entry_e:Entry_freeze.t ->
+  ?suspended_held:string list ->
   config:config ->
   candidates:Screener.scored_candidate list ->
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
@@ -1407,7 +1434,11 @@ val make :
       consults this predicate. Default [None] preserves baselines — every
       universe symbol is eligible on every date. Supplied by the scenario runner
       from a spec's [universe_schedule] field; see
-      {!Scenario_lib.Universe_schedule}. *)
+      {!Scenario_lib.Universe_schedule}.
+
+    Raises [Failure] on an inconsistent config: an invalid dawn-leverage setup
+    ({!Leverage_dawn.validate}), or [max_one_share_class_per_issuer = true] with
+    an empty [share_class_groups] ({!Share_class_gate.validate}, #3015). *)
 
 (** {1 Internal — testing only}
 

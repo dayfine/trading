@@ -237,6 +237,9 @@ let _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () =
   let universe_size = List.length universe in
   eprintf "Universe: %d stocks\n%!" universe_size;
   let config = _maybe_clear_sector_etfs { config with universe } in
+  (* #3015: fill the share-class map from the committed file iff the flag is
+     armed (no-op, no file read, when it is off). *)
+  let config = Weinstein_strategy.resolve_share_class_map ~data_dir config in
   let ad_bars = _load_ad_bars ?trace ~data_dir ~universe_size ~config () in
   let breadth_bars = _load_breadth_bars ~data_dir ~config in
   Gc_trace.record ?trace:gc_trace ~phase:"macro_done" ();

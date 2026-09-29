@@ -23,6 +23,7 @@ type skip_reason =
   | Sector_exposure_cap
   | Long_exposure_cap
   | No_structural_stop
+  | Share_class_held
 [@@deriving sexp]
 
 type alternative_candidate = {

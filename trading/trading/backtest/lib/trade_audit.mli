@@ -86,6 +86,11 @@ type skip_reason =
           [Weinstein_strategy_config.config.require_structural_stop] (default
           [false] => never emitted). Book Ch. 6: "investors should never use
           automatic percentages". *)
+  | Share_class_held
+      (** #3015: skipped because another share class of the same issuer (e.g.
+          GOOG / GOOGL) already had an open or pending long, under
+          [Weinstein_strategy_config.config.max_one_share_class_per_issuer]
+          (default [false] => never emitted). Long candidates only. *)
 [@@deriving sexp]
 
 type alternative_candidate = {

@@ -66,6 +66,12 @@ type skip_reason =
           [Weinstein_strategy_config.config.require_structural_stop] is [true]
           (default [false] => never emitted). Book Ch. 6: "investors should
           never use automatic percentages". Both sides. *)
+  | Share_class_held
+      (** #3015: LONG candidate dropped because another share class of the same
+          issuer ([Share_class_map]; e.g. GOOG / GOOGL) already has an open or
+          pending long. Only fires when
+          [Weinstein_strategy_config.config.max_one_share_class_per_issuer] is
+          [true] (default [false] => never emitted). *)
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

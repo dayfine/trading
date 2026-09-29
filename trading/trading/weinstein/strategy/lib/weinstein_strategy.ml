@@ -57,6 +57,8 @@ module Screening_notional = Screening_notional
 module Long_buying_power = Long_buying_power
 module Leverage_dawn = Leverage_dawn
 module Short_borrow_gate = Short_borrow_gate
+module Share_class_map = Share_class_map
+module Share_class_gate = Share_class_gate
 module Exit_audit_capture = Exit_audit_capture
 include Weinstein_strategy_config
 module Weinstein_strategy_macro = Weinstein_strategy_macro
@@ -65,6 +67,7 @@ module S = Weinstein_strategy_screening
 
 let held_symbols = Entry_walk.held_symbols
 let entries_from_candidates = Entry_walk.entries_from_candidates
+let resolve_share_class_map = Share_class_gate.resolve_config
 let survivors_for_screening = S.survivors_for_screening
 let prune_universe_by_active_through = S.prune_universe_by_active_through
 let stock_analysis_config_for = S._stock_analysis_config_for
@@ -377,6 +380,8 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
      the dawn requirement must be a fractional (0,1] requirement). No-op when
      [dawn_leverage_enabled = false]. *)
   Leverage_dawn.validate config;
+  (* #3015: the one-share-class rule must not run unarmed (flag on, no map). *)
+  Share_class_gate.validate config;
   let bar_reader =
     match bar_reader with Some r -> r | None -> Bar_reader.empty ()
   in
