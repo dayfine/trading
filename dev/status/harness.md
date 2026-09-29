@@ -1871,7 +1871,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   trading/devtools/checks/deep_scan_linter_expiry_check.sh` (or `dune
   runtest trading/devtools/checks/`), exit 0.
 
-- [ ] **H-EXPIRY-CONSUMER-HALF-UNPINNED (O4)**: filed by qc-behavioral on PR
+- [x] **H-EXPIRY-CONSUMER-HALF-UNPINNED (O4)**: filed by qc-behavioral on PR
   #2589, non-blocking, and **out of R-5's declared scope** (the header does not
   claim otherwise). Part 4 models `deep_scan/main.sh`'s calling convention but
   pins only the **producer** half: nothing asserts that `main.sh:47` still
@@ -1882,6 +1882,19 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   checks, so that break is far broader and louder than the one R-5 targets.
   `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O4)
+  **DONE 2026-09-29 (branch `harness/expiry-consumer-half`).** Added Part 11
+  (11a, 11b, 11c) to `trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  (3 new `OK:` lines: 53 -> 56 on the unmodified tree). Functional, not grep:
+  a copy of the real `deep_scan/main.sh` runs in a fake repo root whose 12
+  check scripts are stubs (stub 11 emits `W: `, stub 05 emits `I: `, each only
+  if handed a non-empty `$2`); the report it writes is read back. 11a asserts
+  the `W: ` line lands under `## Warnings` and the `I: ` line under `## Info`,
+  not each other's. 11b mutates the `W: ` routing (WARNING_COUNT bump) and 11c
+  the `$2` pass-through; each goes RED via 11a's assertion. Also probed by
+  editing the real `main.sh` directly (drop `$2`; rename the `"W: "*)` case):
+  both make the suite exit non-zero with the 11a FAIL, reverted clean.
+  Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  (56 `OK:` lines, exit 0) or `dune runtest devtools/checks`.
 
 - [ ] **H-EXPIRY-NOTE-OFFBYONE-COUNTS (O5)**: filed by qc-behavioral on PR
   #2589, cosmetic. Two off-by-one counts in this file's own #2589 completion

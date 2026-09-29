@@ -1664,4 +1664,105 @@ else
   fail "MUTATION (completeness guard add_warning removed) did not remove the roll-up finding as expected (exit=$CG_CODE2): $(cat "$CG_FINDINGS2")"
 fi
 
+MAIN_SH="${DEEP_SCAN_DIR}/main.sh"
+# ── Part 11: the CONSUMER half — deep_scan/main.sh's calling convention ──
+#
+# H-EXPIRY-CONSUMER-HALF-UNPINNED (O4, qc-behavioral on PR #2589). Part 4
+# above pins the PRODUCER half (check_11 writes a "W: " line into the
+# findings file it is handed as $2). Nothing pinned the CONSUMER half: that
+# main.sh's _run_check still passes a findings file as $2, and that its
+# aggregation loop still routes "W: " lines into the "## Warnings" section.
+# Breaking either silently drops check_11's roll-up in production with
+# Part 4 fully green.
+#
+# Functional, not grep-structural: run a COPY of the real main.sh inside a
+# fake repo root whose 12 check scripts are stubs. Only stub 11 writes a
+# "W: " line and stub 05 an "I: " line, each to the findings file it
+# receives as $2 (and only when $2 is non-empty). The
+# real main.sh then runs end to end and we read the report it writes.
+CS_ROOT="$(mktemp -d)"
+CS_CHECKS="$CS_ROOT/trading/devtools/checks"
+mkdir -p "$CS_CHECKS/deep_scan" "$CS_ROOT/.claude"
+cp "$(dirname "$0")/_check_lib.sh" "$CS_CHECKS/_check_lib.sh"
+for cs_n in 01_dead_code 02_design_doc_drift 03_todo_fixme 04_size_violations \
+  05_followup_items 06_qc_calibration 07_harness_scaffolding 08_trends \
+  09_arch_graph 10_status_template 11_linter_expiry 12_stale_bookmarks; do
+  echo ': stub' > "$CS_CHECKS/deep_scan/check_${cs_n}.sh"
+done
+cat > "$CS_CHECKS/deep_scan/check_11_linter_expiry.sh" <<'STUB'
+#!/bin/sh
+# $1 detail file, $2 findings file (main.sh's calling convention).
+[ -n "$2" ] || exit 0
+echo "W: consumer-half-marker-warning" >> "$2"
+STUB
+cat > "$CS_CHECKS/deep_scan/check_05_followup_items.sh" <<'STUB'
+#!/bin/sh
+[ -n "$2" ] || exit 0
+echo "I: consumer-half-marker-info" >> "$2"
+STUB
+
+# _cs_run <main.sh copy>: run it in the fake root; report path on stdout is
+# the newest *-deep.md.
+_cs_run() {
+  rm -rf "$CS_ROOT/dev" "$CS_ROOT/tmp"
+  mkdir -p "$CS_ROOT/tmp"
+  cp "$1" "$CS_CHECKS/deep_scan/main.sh"
+  set +e
+  REPO_ROOT="$CS_ROOT" TMPDIR="$CS_ROOT/tmp" sh "$CS_CHECKS/deep_scan/main.sh" >/dev/null 2>&1
+  CS_CODE=$?
+  set -e
+  CS_REPORT="$(ls "$CS_ROOT"/dev/health/*-deep.md 2>/dev/null | head -1)"
+}
+
+# _cs_section <heading-prefix> <report>: body lines of one "## " section.
+_cs_section() {
+  [ -n "$2" ] && [ -f "$2" ] || return 0
+  awk -v h="$1" 'index($0, "## ") == 1 { on = (index($0, h) == 1); next } on' "$2"
+}
+
+# --- 11a: unmutated main.sh routes W: under ## Warnings and I: under ## Info
+# (not each other's), and hands check_11 a findings file as $2.
+_cs_run "$MAIN_SH"
+CS_WARN="$(_cs_section '## Warnings' "$CS_REPORT")"
+CS_INFO="$(_cs_section '## Info' "$CS_REPORT")"
+if [ "$CS_CODE" -eq 0 ] \
+  && printf '%s\n' "$CS_WARN" | grep -q 'consumer-half-marker-warning' \
+  && ! printf '%s\n' "$CS_WARN" | grep -q 'consumer-half-marker-info' \
+  && printf '%s\n' "$CS_INFO" | grep -q 'consumer-half-marker-info' \
+  && ! printf '%s\n' "$CS_INFO" | grep -q 'consumer-half-marker-warning'; then
+  echo "OK: main.sh (consumer half) routes a check's 'W: ' finding into ## Warnings and 'I: ' into ## Info, end to end via a stubbed calling convention"
+else
+  fail "11a: real main.sh did not route stub findings as expected (exit=$CS_CODE, report='$CS_REPORT'); Warnings section: [$CS_WARN] Info section: [$CS_INFO]"
+fi
+
+
+# --- 11b: MUTATION — break the W: routing (route W: lines as Info).
+CS_MUT_W="$(mktemp)"
+sed 's/^        WARNING_COUNT=\$((WARNING_COUNT + 1))$/        INFO_COUNT=$((INFO_COUNT + 1))/' "$MAIN_SH" > "$CS_MUT_W"
+if diff -q "$MAIN_SH" "$CS_MUT_W" >/dev/null 2>&1; then
+  fail "11b: the mutation's sed pattern no longer matches main.sh — update the pattern; the protection may be fine"
+fi
+_cs_run "$CS_MUT_W"
+CS_WARN="$(_cs_section '## Warnings' "$CS_REPORT")"
+if ! printf '%s\n' "$CS_WARN" | grep -q 'consumer-half-marker-warning'; then
+  echo "OK: MUTATION (main.sh no longer counts 'W: ' lines into ## Warnings) makes the roll-up disappear from ## Warnings — proves 11a pins the W: routing"
+else
+  fail "11b: mutating main.sh's W: routing did not remove the stub warning from ## Warnings — 11a is not pinning the consumer routing"
+fi
+
+# --- 11c: MUTATION — stop passing the findings file as \$2.
+CS_MUT_A="$(mktemp)"
+sed 's|sh "\$script" "\$DETAIL_FILE" "\$findings_file"|sh "$script" "$DETAIL_FILE"|' "$MAIN_SH" > "$CS_MUT_A"
+if diff -q "$MAIN_SH" "$CS_MUT_A" >/dev/null 2>&1; then
+  fail "11c: the mutation's sed pattern no longer matches main.sh — update the pattern; the protection may be fine"
+fi
+_cs_run "$CS_MUT_A"
+CS_WARN="$(_cs_section '## Warnings' "$CS_REPORT")"
+if ! printf '%s\n' "$CS_WARN" | grep -q 'consumer-half-marker-warning'; then
+  echo "OK: MUTATION (main.sh stops passing the findings file as \$2) makes check_11's roll-up disappear — proves 11a pins the \$2 pass-through"
+else
+  fail "11c: dropping the \$2 findings-file argument did not remove the stub warning — 11a is not pinning the argument"
+fi
+rm -rf "$CS_ROOT" "$CS_MUT_W" "$CS_MUT_A"
+
 echo "OK: deep scan Linter Exception Expiry section (T1-K) structural + functional check passed."
