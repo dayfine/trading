@@ -1,0 +1,8 @@
+[
+  {"number": 101, "title": "Fixed but open", "labels": [], "body": "## Done when\n- [merge] test exists\n"},
+  {"number": 102, "title": "Awaiting soak", "labels": [{"name": "verify/pending"}],
+   "body": "Intro\n## Done when\n- [merge] check added\n- [after-merge] sweep green on 2 scheduled runs\n- [after-merge] V6 = 0 on all 3 salts\n## Notes\n- [after-merge] not under Done when\n"},
+  {"number": 103, "title": "Untouched", "labels": [], "body": "nothing"},
+  {"number": 104, "title": "From web template", "labels": [{"name": "verify/pending"}],
+   "body": "## Problem\n\nx\n\n## Done when\n\n<!-- Observable conditions, each tagged:\n- [merge] a merged diff meets it.\n- [after-merge] only provable after merge (e.g. \"weekly sweep green on 2\n  consecutive scheduled runs\"). -->\n- [merge]\n- [after-merge]\n- [after-merge] golden unchanged on 2 weekly runs\n"}
+]

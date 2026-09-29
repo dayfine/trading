@@ -86,3 +86,11 @@ Conventions:
 
 - `CLAUDE.md` §"Agent skills" → "Triage labels"
 - The `triage` skill reads this file to decide which label to apply at each state-machine transition.
+
+## Verification label (added 2026-09-29, #3019)
+
+`verify/pending` -- the fixing PR merged (`Refs #N`) but the issue's `[after-merge]` conditions are not yet shown. Listed weekly by `dev/scripts/issue_fix_audit.sh`; removed when the issue is closed with evidence. **Manual step: create it on GitHub** (no declarative label file exists):
+
+```bash
+gh label create --repo dayfine/trading verify/pending --color C5DEF5 --description "Fix merged; [after-merge] conditions awaiting verification"
+```
