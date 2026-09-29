@@ -119,10 +119,19 @@ let _semantic_errors t =
   in
   let no_reason =
     match (t.guard, t.reason) with
-    | No_guard, (None | Some "") -> [ "guard none requires a non-empty reason" ]
+    | No_guard, None -> [ "guard none requires a non-empty reason" ]
+    | No_guard, Some r when String.trim r = "" ->
+        [ "guard none requires a non-empty reason" ]
     | _ -> []
   in
-  bad_status @ no_id @ no_reason
+  let empty_test =
+    match t.guard with
+    | Guards { units; _ }
+      when List.exists (fun u -> String.trim u.test = "") units ->
+        [ "unit guard has an empty test name" ]
+    | _ -> []
+  in
+  bad_status @ no_id @ no_reason @ empty_test
 
 let _parse_row sexp =
   let ( let* ) = Result.bind in
@@ -183,11 +192,14 @@ let _check_unit ~read_file (t : t) (u : unit_guard) =
   match read_file u.file with
   | None ->
       [ Printf.sprintf "%s: unit guard file missing: %s" (label t) u.file ]
-  | Some text when contains ~haystack:text ~needle:u.test -> []
+  | Some text
+    when contains ~haystack:text ~needle:(Printf.sprintf "\"%s\"" u.test) ->
+      []
   | Some _ ->
       [
-        Printf.sprintf "%s: test name %S not found in %s" (label t) u.test
-          u.file;
+        Printf.sprintf
+          "%s: test name %S not found in %s as a quoted string literal"
+          (label t) u.test u.file;
       ]
 
 let _check_validator ~validators t id =

@@ -17,14 +17,16 @@ was renamed or deleted.
 
 - `guard`: `none`, or one or more `(unit (FILE NAME))` / `(validator Vn)` entries.
   Kind is derived: unit, validator, both, none.
-- `none` requires a `reason` (strategy observations, "record only", a validator
+- `none` requires a non-blank `reason`; a unit test name must be non-blank (strategy observations, "record only", a validator
   planned but not built -- name the issue).
 - `status`: `open | fixed | fixed-behind-flag | wontfix | observation`.
 - A row needs an `issue` or a `ref`.
 
 ## What the check verifies
 
-- a `unit` file exists and contains the test name as a literal substring;
+- a `unit` file exists and contains the test name as a **quoted string literal** (`"name"`), so a comment or
+  identifier that merely mentions the name does not satisfy it -- the name must
+  appear in quotes at its registration site;
 - a `validator` id appears in `validator_checks.ml` `_registry` (read from that
   file, not a copied list) -- never cite a validator that is not on main;
 - `guard none` has a reason; status is in the enum.
@@ -38,3 +40,6 @@ registry row in the same PR. qc-behavioral row F1 FAILs the PR when the row is
 missing. Use the test name exactly as it appears in the file (grep it). When the
 guard is a validator that lands later, use `none` with a reason naming the
 issue, then update the row when the validator merges.
+
+A **finding issue** (F1) is any issue already cited in
+`dev/findings/registry.sexp` or labelled `kind/finding`.

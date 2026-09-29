@@ -144,13 +144,17 @@
 ((issue 2982)
  (finding "stop raise mixes split-adjusted MA with raw bars")
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_stop_ma_same_basis.ml"
-                "later-split tape: flag off stalls (no raise)"))))
+                "later-split tape: flag on raises to the correction low"))))
  (status fixed-behind-flag))
 
 ((issue 2983)
  (finding "late-Stage-2 stop tighten never fired")
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_late_stage2_stop_runner.ml"
-                "late_stage2_raises_stop"))))
+                "tightened_level_triggers_exit"))
+         (unit ("trading/trading/weinstein/strategy/test/test_late_stage2_stop_runner.ml"
+                "writes_tightened_level_into_state"))
+         (unit ("trading/trading/weinstein/strategy/test/test_late_stage2_stop_runner.ml"
+                "compares_against_state_not_risk_params"))))
  (status fixed))
 
 ((issue 2984)

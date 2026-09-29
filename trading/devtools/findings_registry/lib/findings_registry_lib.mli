@@ -51,7 +51,7 @@ val label : t -> string
 val parse : Sexplib.Sexp.t list -> t list * string list
 (** Parse top-level rows. Returns the rows that parsed plus one error message
     per malformed row (unknown key, missing field, bad guard shape, bad status,
-    [none] without reason). *)
+    [none] without a non-blank reason, blank unit test name). *)
 
 val registered_validators : string -> string list
 (** [registered_validators source] returns the ids [V<n>] found as [("V<n>",]
@@ -68,4 +68,6 @@ val check_rows :
   string list
 (** Existence checks. Returns one message per violation: a [unit] guard whose
     file is missing (per [read_file], given the repo-relative path) or does not
-    contain the test name, or a [validator] id not in [validators]. *)
+    contain the test name as a quoted string literal (["name"], so a comment or
+    identifier mention does not count), or a [validator] id not in [validators].
+*)

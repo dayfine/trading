@@ -49,6 +49,9 @@ expect_red red_unknown_validator.sexp 'validator V99 is not registered'
 expect_red red_none_no_reason.sexp 'guard none requires a non-empty reason'
 expect_red red_bad_status.sexp 'unknown status'
 expect_red red_no_issue_or_ref.sexp 'needs an issue or a ref'
+expect_red red_blank_reason.sexp 'guard none requires a non-empty reason'
+expect_red red_empty_test_name.sexp 'empty test name'
+expect_red red_name_in_comment_only.sexp 'quoted string literal'
 
 if [ "$FAILED" -ne 0 ]; then exit 1; fi
-echo "OK: findings_registry_check_test -- 7 cases."
+echo "OK: findings_registry_check_test -- 10 cases."
