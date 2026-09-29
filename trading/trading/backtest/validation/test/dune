@@ -4,7 +4,8 @@
   test_validator_fallback_check
   test_validator_store_check
   test_validator_diff
-  test_series_level_v18_median_agreement)
+  test_series_level_v18_median_agreement
+  test_validator_audit_checks)
  (libraries
   core
   ounit2

@@ -61,6 +61,17 @@ type entry_context = {
       (** The screener's graded breakout level [E]
           ([Trade_audit.entry_decision.suggested_entry]); carried for V12's
           specimen detail and the faithfulness harness. *)
+  close_at_decision : float option; [@sexp.option]
+      (** V20: [Trade_audit.entry_decision.close_at_decision] — the RAW daily
+          close the strategy saw at decision time. [None] when the audit record
+          lacks it. *)
+  adjusted_close_at_decision : float option; [@sexp.option]
+      (** V20: [Trade_audit.entry_decision.adjusted_close_at_decision] — the
+          same bar's ADJUSTED close (issue #2973). [None] on audit files written
+          before the field existed. *)
+  ma_value : float option; [@sexp.option]
+      (** V20: [Trade_audit.entry_decision.ma_value] — the stage classifier's MA
+          level, on the ADJUSTED basis. [None] on legacy audit files. *)
 }
 [@@deriving sexp]
 (** Decision-time features a check reads from a {!Trade_audit.entry_decision},
@@ -210,6 +221,16 @@ type check_config = {
           series is {!Validator_step.Skip}ped and counted, never passed: a
           median over five bars is not evidence the series is sane. At least one
           bar is always required regardless of this value. *)
+  audit_basis_ratio_min : float;
+      (** V20: lower bound of the acceptable close-at-decision / [ma_value]
+          ratio on an entry decision. Default [0.2]. A ratio {i strictly}
+          outside [[audit_basis_ratio_min, audit_basis_ratio_max]] flags; the
+          bounds themselves pass. See {!Validator_audit_checks.check_v20} for
+          the band's rationale. *)
+  audit_basis_ratio_max : float;
+      (** V20: upper bound of the same ratio. Default [5.0] — the NVDA
+          2021-04-23 specimen (#2973) read raw close 610.61 against an adjusted
+          MA of 13.67, a ratio of ~44.7. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default
@@ -232,6 +253,11 @@ type check_result = {
       (** Trades the check could not evaluate (missing audit / bars / basis
           mismatch / gate unarmed). *)
   specimens : specimen list;  (** Up to 10 violating rows. *)
+  skip_reason : string option; [@sexp.option]
+      (** Why rows were skipped, when the check can state it (e.g. V19 with no
+          [trade_audit.sexp]). Rendered next to the skip count so a check that
+          could not evaluate anything never reads as a bare PASS. [None] — and
+          absent from the sexp — for every check that does not set it. *)
 }
 [@@deriving sexp]
 (** The outcome of one check. *)
@@ -252,6 +278,11 @@ type inputs = {
   trades : trade_row list;
   open_positions : open_row list;
   audit : trade_row -> entry_context option;
+  audit_absent : string option;
+      (** [None] when a [trade_audit.sexp] was loaded (even one that matches no
+          trade — that is a broken join V19 must flag). [Some reason] when no
+          audit was loaded at all; V19/V20 then skip every row and report
+          [reason]. *)
   bars : string -> bars option;
   run_end : Date.t;
   config : check_config;
@@ -272,5 +303,7 @@ val load_config : string option -> check_config
     parses a {!check_config} sexp from [path]. *)
 
 val empty_inputs : ?config:check_config -> unit -> inputs
-(** An {!inputs} with no trades / positions and always-[None] lookups. Tests
-    override individual fields via record update. *)
+(** An {!inputs} with no trades / positions and always-[None] lookups, so
+    [audit_absent] is [Some "no trade_audit.sexp supplied"]. Tests override
+    individual fields via record update — a test that injects an audit lookup
+    and wants V19 armed must also set [audit_absent = None]. *)
