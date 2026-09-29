@@ -8,6 +8,7 @@
   status
   types
   weinstein.types
+  weinstein_trading.stops
   weinstein_trading.strategy
   backtest)
  (preprocess
