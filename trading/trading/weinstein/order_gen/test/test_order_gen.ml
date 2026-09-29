@@ -208,6 +208,9 @@ let test_update_risk_with_stop_emits_stop_order _ =
              field (fun o -> o.ticker) (equal_to "AAPL");
              field (fun o -> o.side) (equal_to Trading_base.Types.Sell);
              field (fun o -> o.shares) (equal_to 50);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 142.0));
            ];
        ])
 
@@ -761,6 +764,54 @@ let test_update_risk_on_closed_position_emits_nothing _ =
   in
   assert_that orders (size_is 0)
 
+let _entering_aapl ~filled_quantity =
+  {
+    _aapl_position with
+    state =
+      Position.Entering
+        {
+          target_quantity = 50.0;
+          entry_price = 150.0;
+          filled_quantity;
+          created_date = Date.of_string "2024-01-04";
+        };
+  }
+
+(* A partly filled entry protects only the shares already bought — the stop is
+   a resting order that exists from the fill forward, never for the unfilled
+   remainder. *)
+let test_update_risk_on_partial_entry_sizes_to_filled _ =
+  let orders =
+    from_transitions
+      ~transitions:
+        [ _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:142.0 ]
+      ~get_position:(_lookup_only (_entering_aapl ~filled_quantity:20.0))
+      ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         all_of
+           [
+             field (fun o -> o.side) (equal_to Trading_base.Types.Sell);
+             field
+               (fun o -> o.order_type)
+               (equal_to (Trading_base.Types.Stop 142.0));
+             field (fun o -> o.shares) (equal_to 20);
+           ];
+       ])
+
+(* Guard: an entry with nothing filled has nothing at the broker to protect. *)
+let test_update_risk_on_unfilled_entry_emits_nothing _ =
+  let orders =
+    from_transitions
+      ~transitions:
+        [ _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:142.0 ]
+      ~get_position:(_lookup_only (_entering_aapl ~filled_quantity:0.0))
+      ()
+  in
+  assert_that orders (size_is 0)
+
 let suite =
   "order_gen"
   >::: [
@@ -786,6 +837,10 @@ let suite =
          >:: test_update_risk_on_exiting_position_with_sync_emits_nothing;
          "update_risk_on_closed_position_emits_nothing"
          >:: test_update_risk_on_closed_position_emits_nothing;
+         "update_risk_on_partial_entry_sizes_to_filled"
+         >:: test_update_risk_on_partial_entry_sizes_to_filled;
+         "update_risk_on_unfilled_entry_emits_nothing"
+         >:: test_update_risk_on_unfilled_entry_emits_nothing;
          "entry_fill_is_ignored" >:: test_entry_fill_is_ignored;
          "exit_complete_is_ignored" >:: test_exit_complete_is_ignored;
          "multiple_transitions_produce_one_order_each"
