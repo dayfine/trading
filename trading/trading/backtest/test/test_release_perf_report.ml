@@ -441,6 +441,45 @@ let test_load_scenario_run_missing_perf_files_is_none _ =
            (equal_to None);
        ])
 
+let test_load_scenario_run_perf_files_strip_whitespace _ =
+  (* Pins the strip in the first-line reader: padded values still parse. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_" in
+  _make_scenario_dir ~root:dir "padded" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "padded" in
+  _write_text (Filename.concat scenario_dir "peak_rss_kb.txt") "  777  \n";
+  _write_text (Filename.concat scenario_dir "wall_seconds.txt") " 9.5 \n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run
+    (all_of
+       [
+         field
+           (fun (r : Release_report.scenario_run) -> r.peak_rss_kb)
+           (equal_to (Some 777));
+         field
+           (fun (r : Release_report.scenario_run) -> r.wall_seconds)
+           (is_some_and (float_equal 9.5));
+       ])
+
+let test_load_scenario_run_missing_actual_raises _ =
+  (* Pins the loader.mli contract: missing actual.sexp raises [Failure]. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_" in
+  let scenario_dir = Filename.concat dir "no-actual" in
+  Core_unix.mkdir_p scenario_dir;
+  _write_summary_sexp (Filename.concat scenario_dir "summary.sexp");
+  assert_raises
+    (Failure (sprintf "Missing actual.sexp in %s" scenario_dir))
+    (fun () -> Release_report.load_scenario_run ~dir:scenario_dir)
+
+let test_load_scenario_run_missing_summary_raises _ =
+  (* Pins the loader.mli contract: missing summary.sexp raises [Failure]. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_" in
+  let scenario_dir = Filename.concat dir "no-summary" in
+  Core_unix.mkdir_p scenario_dir;
+  _write_actual_sexp (Filename.concat scenario_dir "actual.sexp");
+  assert_raises
+    (Failure (sprintf "Missing summary.sexp in %s" scenario_dir))
+    (fun () -> Release_report.load_scenario_run ~dir:scenario_dir)
+
 let test_load_pairs_and_one_sided _ =
   let cur_root = Core_unix.mkdtemp "/tmp/rel_perf_cur_" in
   let prior_root = Core_unix.mkdtemp "/tmp/rel_perf_prior_" in
@@ -1337,6 +1376,20 @@ let test_load_scenario_run_loads_all_eligible_when_present _ =
               (fun (s : Release_report.all_eligible_summary) -> s.trade_count)
               (equal_to 100);
             field
+              (fun (s : Release_report.all_eligible_summary) -> s.winners)
+              (equal_to 30);
+            field
+              (fun (s : Release_report.all_eligible_summary) -> s.losers)
+              (equal_to 65);
+            field
+              (fun (s : Release_report.all_eligible_summary) ->
+                s.mean_return_pct)
+              (float_equal (-0.05));
+            field
+              (fun (s : Release_report.all_eligible_summary) ->
+                s.median_return_pct)
+              (float_equal (-0.08));
+            field
               (fun (s : Release_report.all_eligible_summary) -> s.win_rate_pct)
               (float_equal 0.30);
             field
@@ -1665,6 +1718,25 @@ let test_load_scenario_run_no_benchmark_relative_when_any_missing _ =
   let run = Release_report.load_scenario_run ~dir:scenario_dir in
   assert_that run.benchmark_relative is_none
 
+let test_load_scenario_run_no_benchmark_relative_when_correlation_missing _ =
+  (* Each of the five labels is required: dropping only correlation (the
+     last one) must still yield [None]. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_br_nocorr_" in
+  let scenario_dir = Filename.concat dir "nocorr" in
+  Core_unix.mkdir_p scenario_dir;
+  _write_actual_sexp (Filename.concat scenario_dir "actual.sexp");
+  _write_text
+    (Filename.concat scenario_dir "summary.sexp")
+    "((start_date 2023-01-02) (end_date 2023-12-31) (universe_size 1654)\n\
+    \ (n_steps 251) (initial_cash 1000000.00) (final_portfolio_value 1122915.42)\n\
+    \ (n_round_trips 39)\n\
+    \ (metrics ((metric_types.metric_type.t.benchmarkalphapctannualized 3.42)\n\
+    \           (metric_types.metric_type.t.benchmarkbeta 0.87)\n\
+    \           (metric_types.metric_type.t.informationratio 0.51)\n\
+    \           (metric_types.metric_type.t.trackingerrorpctannualized 6.70))))\n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.benchmark_relative is_none
+
 let test_render_orders_benchmark_relative_before_all_eligible _ =
   let cur =
     _make_run ~name:"scenario"
@@ -1714,6 +1786,12 @@ let suite =
          >:: test_load_scenario_run_reads_all_fields;
          "load_scenario_run missing perf files -> None"
          >:: test_load_scenario_run_missing_perf_files_is_none;
+         "load_scenario_run: perf files tolerate surrounding whitespace"
+         >:: test_load_scenario_run_perf_files_strip_whitespace;
+         "load_scenario_run missing actual.sexp raises Failure"
+         >:: test_load_scenario_run_missing_actual_raises;
+         "load_scenario_run missing summary.sexp raises Failure"
+         >:: test_load_scenario_run_missing_summary_raises;
          "load pairs scenarios and tracks one-sided"
          >:: test_load_pairs_and_one_sided;
          "load_scenario_run loads trade_quality when present"
@@ -1767,6 +1845,8 @@ let suite =
          >:: test_load_scenario_run_no_benchmark_relative_when_legacy_summary;
          "load_scenario_run no benchmark_relative when any missing"
          >:: test_load_scenario_run_no_benchmark_relative_when_any_missing;
+         "load_scenario_run: benchmark_relative None when correlation missing"
+         >:: test_load_scenario_run_no_benchmark_relative_when_correlation_missing;
          "render orders benchmark-relative before all-eligible"
          >:: test_render_orders_benchmark_relative_before_all_eligible;
        ]

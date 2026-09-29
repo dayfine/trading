@@ -9,28 +9,36 @@ module A = Validator_audit_checks
 
 let _specimen_cap = 10
 
-let _registry : (string * severity * (inputs -> Validator_step.finding)) list =
+(* A check's default severity is usually fixed; V23's depends on the run's
+   config ([A.v23_severity]), so the registry stores it as a function. *)
+let _inv _ = Invariant
+let _exp _ = Expectation
+
+let _registry :
+    (string * (inputs -> severity) * (inputs -> Validator_step.finding)) list =
   [
-    ("V1", Invariant, R.check_v1);
-    ("V2", Invariant, R.check_v2);
-    ("V3", Invariant, B.check_v3);
-    ("V4", Invariant, B.check_v4);
-    ("V5", Invariant, R.check_v5);
-    ("V6", Invariant, R.check_v6);
-    ("V7", Invariant, B.check_v7);
-    ("V8", Expectation, R.check_v8);
-    ("V9", Expectation, B.check_v9);
-    ("V10", Expectation, B.check_v10);
-    ("V11", Expectation, R.check_v11);
-    ("V12", Invariant, R.check_v12);
-    ("V13", Invariant, B.check_v13);
-    ("V14", Expectation, B.check_v14);
-    ("V15", Expectation, S.check_v15);
-    ("V16", Expectation, F.check_v16);
-    ("V17", Expectation, F.check_v17);
-    ("V18", Expectation, St.check_v18);
-    ("V19", Invariant, A.check_v19);
-    ("V20", Invariant, A.check_v20);
+    ("V1", _inv, R.check_v1);
+    ("V2", _inv, R.check_v2);
+    ("V3", _inv, B.check_v3);
+    ("V4", _inv, B.check_v4);
+    ("V5", _inv, R.check_v5);
+    ("V6", _inv, R.check_v6);
+    ("V7", _inv, B.check_v7);
+    ("V8", _exp, R.check_v8);
+    ("V9", _exp, B.check_v9);
+    ("V10", _exp, B.check_v10);
+    ("V11", _exp, R.check_v11);
+    ("V12", _inv, R.check_v12);
+    ("V13", _inv, B.check_v13);
+    ("V14", _exp, B.check_v14);
+    ("V15", _exp, S.check_v15);
+    ("V16", _exp, F.check_v16);
+    ("V17", _exp, F.check_v17);
+    ("V18", _exp, St.check_v18);
+    ("V19", _inv, A.check_v19);
+    ("V20", _inv, A.check_v20);
+    ("V21", _exp, A.check_v21);
+    ("V23", A.v23_severity, A.check_v23);
   ]
 
 let all_check_ids = List.map _registry ~f:(fun (id, _, _) -> id)
@@ -57,7 +65,8 @@ let run_check ~id inputs =
   match List.find _registry ~f:(fun (i, _, _) -> String.equal i id) with
   | None -> failwithf "unknown check id: %s" id ()
   | Some (_, default_sev, fn) ->
-      _result_of ~id ~default_sev ~config:inputs.config (fn inputs)
+      _result_of ~id ~default_sev:(default_sev inputs) ~config:inputs.config
+        (fn inputs)
 
 (* How many trades resolved to a trade_audit record. Surfaced in the report so a
    dead join (matched = 0) can't masquerade as "PASS (all skipped)". *)

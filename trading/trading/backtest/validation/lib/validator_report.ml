@@ -57,10 +57,10 @@ let _infer_run_end trades =
 
 (* The audit lookup plus, when none could be loaded, the reason V19/V20 report
    ("absent" vs "unreadable: <exn>", from [Validator_artifacts.load_audit]). *)
-let _maybe_audit path =
+let _maybe_audit path : Validator_artifacts.loaded_audit * string option =
   match Validator_artifacts.load_audit path with
-  | Ok lookup -> (lookup, None)
-  | Error reason -> ((fun _ -> None), Some reason)
+  | Ok loaded -> (loaded, None)
+  | Error reason -> ({ lookup = (fun _ -> None); screens = [] }, Some reason)
 
 let _maybe_open path =
   if Sys_unix.file_exists_exn path then
@@ -71,10 +71,23 @@ let run ~run_dir ~data_dir ~config ~out =
   let trades = Validator_artifacts.parse_trades_csv (run_dir ^ "/trades.csv") in
   let open_positions = _maybe_open (run_dir ^ "/open_positions.csv") in
   let audit, audit_absent = _maybe_audit (run_dir ^ "/trade_audit.sexp") in
+  let macro_suspend =
+    Validator_run_config.load_macro_suspend (run_dir ^ "/params.sexp")
+  in
   let run_end = _infer_run_end trades in
   let bars = Validator_artifacts.load_bars ~data_dir ~run_end in
   let inputs =
-    { trades; open_positions; audit; audit_absent; bars; run_end; config }
+    {
+      trades;
+      open_positions;
+      audit = audit.lookup;
+      audit_absent;
+      screens = audit.screens;
+      macro_suspend;
+      bars;
+      run_end;
+      config;
+    }
   in
   let report = Validator_checks.validate inputs in
   Sexp.save_hum (out ^ ".sexp") (sexp_of_report report);

@@ -25,17 +25,29 @@ val build_audit_lookup :
     old [(symbol, entry_date)] join miss 100% of rows. A legacy row without a
     [position_id] falls back to the [(symbol, entry_date)] key. *)
 
-val load_audit : string -> (trade_row -> entry_context option, string) result
+type loaded_audit = {
+  lookup : trade_row -> entry_context option;
+      (** The {!build_audit_lookup} over the file's entry records. *)
+  screens : screen_read list;
+      (** One {!Validator_types.screen_read} per [cascade_summaries] entry, in
+          file order. [[]] for a bare-record-list file (the pre-blob format) or
+          a blob with no summaries. *)
+}
+(** A loaded [trade_audit.sexp]: the entry join and the per-screen macro reads,
+    from one parse of the file. *)
+
+val load_audit : string -> (loaded_audit, string) result
 (** [load_audit path] is {!load_audit_lookup} that distinguishes "no audit", so
-    V19/V20 can skip with a stated reason instead of reading an always-[None]
-    lookup as a broken join:
+    V19/V20/V21/V23 can skip with a stated reason instead of reading an
+    always-[None] lookup as a broken join:
 
     - [Error "trade_audit.sexp absent"] when no file exists at [path];
     - [Error "trade_audit.sexp unreadable: <exn>"] when the file exists but is
       not a readable sexp (the exception text is kept, not discarded);
-    - [Ok lookup] otherwise. A file that reads but holds no parseable record
+    - [Ok loaded] otherwise. A file that reads but holds no parseable record
       (e.g. [()], or a record schema that no longer decodes) yields [Ok] of an
-      empty lookup — a dead join, which V19 flags on every keyed row. *)
+      empty lookup and no screens — a dead join, which V19 flags on every keyed
+      row. *)
 
 val load_audit_lookup : string -> trade_row -> entry_context option
 (** [load_audit_lookup path] parses [trade_audit.sexp] and returns a lookup from
