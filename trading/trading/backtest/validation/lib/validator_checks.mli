@@ -1,14 +1,14 @@
-(** The 18 invariant / expectation checks (V1-V18) + the driver.
+(** The 20 invariant / expectation checks (V1-V20) + the driver.
 
     Each check is a pure function over parsed rows + injected lookups, so it is
     testable without files. See [dev/plans/post-run-validation-2026-07-12.md],
-    [dev/plans/delisting-data-fix-2026-09-06.md] for V16/V17, and issue #2732
-    for V18. *)
+    [dev/plans/delisting-data-fix-2026-09-06.md] for V16/V17, issue #2732 for
+    V18, and issue #3002 for V19/V20. *)
 
 open Validator_types
 
 val all_check_ids : string list
-(** The 18 check ids in report order: ["V1"] .. ["V18"]. *)
+(** The 20 check ids in report order: ["V1"] .. ["V20"]. *)
 
 val run_check : id:string -> inputs -> check_result
 (** [run_check ~id inputs] runs the single check [id] over [inputs], applying

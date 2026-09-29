@@ -37,6 +37,9 @@ let ctx ?(stage = Weinstein_types.Stage2 { weeks_advancing = 3; late = false })
     resistance_quality;
     installed_stop;
     suggested_entry;
+    close_at_decision = None;
+    adjusted_close_at_decision = None;
+    ma_value = None;
   }
 
 let audit_of assoc (row : Vt.trade_row) =

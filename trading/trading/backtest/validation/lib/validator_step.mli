@@ -9,7 +9,13 @@ open Validator_types
     violation carrying its specimen ({!Fail}). *)
 type step = Skip | Pass | Fail of specimen
 
-type finding = { violations : specimen list; skipped : int }
+type finding = {
+  violations : specimen list;
+  skipped : int;
+  skip_reason : string option;
+      (** Why rows were skipped, when the check can say; copied to
+          {!Validator_types.check_result.skip_reason}. *)
+}
 (** Accumulated violations (newest-first) + count of un-evaluable rows. *)
 
 val empty_finding : finding
