@@ -5,6 +5,7 @@ module B = Validator_bar_checks
 module S = Validator_splice_check
 module F = Validator_fallback_check
 module St = Validator_store_check
+module A = Validator_audit_checks
 
 let _specimen_cap = 10
 
@@ -28,6 +29,8 @@ let _registry : (string * severity * (inputs -> Validator_step.finding)) list =
     ("V16", Expectation, F.check_v16);
     ("V17", Expectation, F.check_v17);
     ("V18", Expectation, St.check_v18);
+    ("V19", Invariant, A.check_v19);
+    ("V20", Invariant, A.check_v20);
   ]
 
 let all_check_ids = List.map _registry ~f:(fun (id, _, _) -> id)
@@ -46,6 +49,7 @@ let _result_of ~id ~default_sev ~config (finding : Validator_step.finding) =
     passed = List.is_empty violations;
     n_violations = List.length violations;
     n_skipped = finding.skipped;
+    skip_reason = finding.skip_reason;
     specimens = List.take violations _specimen_cap;
   }
 

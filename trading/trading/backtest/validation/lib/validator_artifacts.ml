@@ -97,6 +97,9 @@ let _entry_context_of (e : Backtest.Trade_audit.entry_decision) =
     resistance_quality = e.resistance_quality;
     installed_stop = e.installed_stop;
     suggested_entry = e.suggested_entry;
+    close_at_decision = e.close_at_decision;
+    adjusted_close_at_decision = e.adjusted_close_at_decision;
+    ma_value = e.ma_value;
   }
 
 type audit_join_row = {
@@ -145,12 +148,19 @@ let _join_row_of_record (r : Backtest.Trade_audit.audit_record) =
     context = _entry_context_of e;
   }
 
+let _lookup_of_sexp sexp =
+  build_audit_lookup (List.map (_records_of_sexp sexp) ~f:_join_row_of_record)
+
+let load_audit path =
+  if not (Sys_unix.file_exists_exn path) then Error "trade_audit.sexp absent"
+  else
+    match Sexp.load_sexp path with
+    | sexp -> Ok (_lookup_of_sexp sexp)
+    | exception exn ->
+        Error ("trade_audit.sexp unreadable: " ^ Exn.to_string exn)
+
 let load_audit_lookup path =
-  match try Some (Sexp.load_sexp path) with _ -> None with
-  | None -> fun _ -> None
-  | Some sexp ->
-      build_audit_lookup
-        (List.map (_records_of_sexp sexp) ~f:_join_row_of_record)
+  match load_audit path with Ok lookup -> lookup | Error _ -> fun _ -> None
 
 (* Two dates share an ISO trading week iff (year, week_number) match. *)
 let _same_week d1 d2 =

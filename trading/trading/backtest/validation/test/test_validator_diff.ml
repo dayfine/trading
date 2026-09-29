@@ -26,6 +26,7 @@ let _check ?(severity = Vt.Invariant) ?(specimens = []) ~id n_violations :
     n_violations;
     n_skipped = 0;
     specimens;
+    skip_reason = None;
   }
 
 let _arm label checks : Vd.labeled_report =

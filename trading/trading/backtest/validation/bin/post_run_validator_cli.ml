@@ -1,8 +1,9 @@
 (** CLI for the post-run trade validator (v1, report-only).
 
-    Parses a completed scenario run's artifacts + the bar store, runs the 15
-    invariant / expectation checks, and writes [<out>.sexp] + [<out>.md]. Exit
-    code is always 0 — the verdicts live in the report. *)
+    Parses a completed scenario run's artifacts + the bar store, runs the
+    invariant / expectation checks ([Validator_checks.all_check_ids]), and
+    writes [<out>.sexp] + [<out>.md]. Exit code is always 0 — the verdicts live
+    in the report. *)
 
 open Core
 module Vt = Post_run_validator.Validator_types
@@ -12,8 +13,14 @@ let _summary_line (r : Vt.check_result) =
   let sev =
     match r.severity with Vt.Invariant -> "INV" | Vt.Expectation -> "EXP"
   in
-  if r.passed then sprintf "%s %s PASS" r.id sev
-  else sprintf "%s %s %d violations" r.id sev r.n_violations
+  let verdict =
+    if r.passed then sprintf "%s %s PASS" r.id sev
+    else sprintf "%s %s %d violations" r.id sev r.n_violations
+  in
+  match r.skip_reason with
+  | Some reason when r.n_skipped > 0 ->
+      sprintf "%s (%d skipped: %s)" verdict r.n_skipped reason
+  | _ -> verdict
 
 let _run ~run_dir ~data_dir ~config_path ~out =
   let config = Vt.load_config config_path in

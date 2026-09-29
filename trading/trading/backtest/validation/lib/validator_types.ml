@@ -40,6 +40,9 @@ let _default_store_median_close_max = 10_000.0
 let _default_store_zero_volume_move_pct = 90.0
 let _default_store_zero_volume_max = 0
 let _default_store_min_bars = 20
+let _default_audit_basis_ratio_min = 0.2
+let _default_audit_basis_ratio_max = 5.0
+let _no_audit_reason = "no trade_audit.sexp supplied"
 let far_future = Date.of_string "2100-01-01"
 
 type severity = Invariant | Expectation [@@deriving sexp, equal]
@@ -74,6 +77,9 @@ type entry_context = {
   resistance_quality : Weinstein_types.overhead_quality option;
   installed_stop : float; [@sexp.default 0.0]
   suggested_entry : float; [@sexp.default 0.0]
+  close_at_decision : float option; [@sexp.option]
+  adjusted_close_at_decision : float option; [@sexp.option]
+  ma_value : float option; [@sexp.option]
 }
 [@@deriving sexp]
 
@@ -124,6 +130,8 @@ type check_config = {
       [@sexp.default _default_store_zero_volume_move_pct]
   store_zero_volume_max : int; [@sexp.default _default_store_zero_volume_max]
   store_min_bars : int; [@sexp.default _default_store_min_bars]
+  audit_basis_ratio_min : float; [@sexp.default _default_audit_basis_ratio_min]
+  audit_basis_ratio_max : float; [@sexp.default _default_audit_basis_ratio_max]
   disabled_checks : string list; [@sexp.default []]
   severity_overrides : (string * string) list; [@sexp.default []]
 }
@@ -139,6 +147,7 @@ type check_result = {
   n_violations : int;
   n_skipped : int;
   specimens : specimen list;
+  skip_reason : string option; [@sexp.option]
 }
 [@@deriving sexp]
 
@@ -151,6 +160,7 @@ type inputs = {
   trades : trade_row list;
   open_positions : open_row list;
   audit : trade_row -> entry_context option;
+  audit_absent : string option;
   bars : string -> bars option;
   run_end : Date.t;
   config : check_config;
@@ -181,6 +191,8 @@ let default_config =
     store_zero_volume_move_pct = _default_store_zero_volume_move_pct;
     store_zero_volume_max = _default_store_zero_volume_max;
     store_min_bars = _default_store_min_bars;
+    audit_basis_ratio_min = _default_audit_basis_ratio_min;
+    audit_basis_ratio_max = _default_audit_basis_ratio_max;
     disabled_checks = [];
     severity_overrides = [];
   }
@@ -194,6 +206,7 @@ let empty_inputs ?(config = default_config) () =
     trades = [];
     open_positions = [];
     audit = (fun _ -> None);
+    audit_absent = Some _no_audit_reason;
     bars = (fun _ -> None);
     run_end = far_future;
     config;
