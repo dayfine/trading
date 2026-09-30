@@ -45,6 +45,7 @@ let _default_audit_basis_ratio_max = 5.0
 let _default_installed_tighter_than_proxy_max_pct = 0.03
 let _default_stalled_ratchet_min_weeks = 13
 let _no_audit_reason = "no trade_audit.sexp supplied"
+let _no_share_class_map_reason = "no share-class map supplied"
 let far_future = Date.of_string "2100-01-01"
 
 type severity = Invariant | Expectation [@@deriving sexp, equal]
@@ -195,6 +196,7 @@ type inputs = {
   screens : screen_read list;
   stop_histories : stop_history list;
   macro_suspend : Weinstein_strategy.Entry_ticket_suspend_mode.t option;
+  share_classes : (Weinstein_strategy.Share_class_map.t, string) Result.t;
   bars : string -> bars option;
   run_end : Date.t;
   config : check_config;
@@ -247,6 +249,7 @@ let empty_inputs ?(config = default_config) () =
     screens = [];
     stop_histories = [];
     macro_suspend = None;
+    share_classes = Error _no_share_class_map_reason;
     bars = (fun _ -> None);
     run_end = far_future;
     config;
