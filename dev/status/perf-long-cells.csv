@@ -209,3 +209,11 @@ date,experiment,tag,universe,years,cap,head,wall_s,s_per_year
 2026-09-28T05:02:21,investor-run,inv5-investor-s2-v11,pit-schedule-3000,5.07,12000,f5507ad86,1728,341
 2026-09-28T10:06:13,fixes-run,f1-stoplimit-fresh-s0-v11,pit-schedule-3000,26.49,12000,f5507ad86,18231,688
 2026-09-28T15:47:24,fixes-run,f2m-ma-basis-s0-v11,pit-schedule-3000,26.49,12000,f5507ad86,19779,747
+2026-09-28T20:34:17,obvious-fixes-2026-09-25,f2m-ma-basis-s1-v11,pit-schedule-3000,26.49,12000,f5507ad86,17213,650
+2026-09-29T01:53:36,obvious-fixes-2026-09-25,f2m-ma-basis-s2-v11,pit-schedule-3000,26.49,12000,f5507ad86,19159,723
+2026-09-29T16:19:12,investor-preset-2026-09-26,inv5sc-hybrid-s0-v11,pit-schedule-3000,5.07,12000,557e61468,2292,452
+2026-09-29T16:45:21,investor-preset-2026-09-26,inv5sc-investor-s0-v11,pit-schedule-3000,5.07,12000,557e61468,1569,309
+2026-09-29T17:22:12,investor-preset-2026-09-26,inv5sc-hybrid-s1-v11,pit-schedule-3000,5.07,12000,557e61468,2211,436
+2026-09-29T17:48:28,investor-preset-2026-09-26,inv5sc-investor-s1-v11,pit-schedule-3000,5.07,12000,557e61468,1576,311
+2026-09-29T18:26:26,investor-preset-2026-09-26,inv5sc-hybrid-s2-v11,pit-schedule-3000,5.07,12000,557e61468,2278,449
+2026-09-29T18:52:47,investor-preset-2026-09-26,inv5sc-investor-s2-v11,pit-schedule-3000,5.07,12000,557e61468,1581,312

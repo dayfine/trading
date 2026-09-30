@@ -162,7 +162,16 @@ let _join_row_of_record (r : Backtest.Trade_audit.audit_record) =
 type loaded_audit = {
   lookup : trade_row -> entry_context option;
   screens : screen_read list;
+  stop_histories : stop_history list;
 }
+
+let _history_of_record (r : Backtest.Trade_audit.audit_record) =
+  {
+    position_id = r.entry.position_id;
+    symbol = r.entry.symbol;
+    entry_date = r.entry.entry_date;
+    decisions = r.stop_decisions;
+  }
 
 let _screen_of_summary (s : Backtest.Trade_audit.cascade_summary) =
   { screen_date = s.date; screen_macro_trend = s.macro_trend }
@@ -173,6 +182,7 @@ let _loaded_of_sexp sexp =
     lookup =
       build_audit_lookup (List.map blob.audit_records ~f:_join_row_of_record);
     screens = List.map blob.cascade_summaries ~f:_screen_of_summary;
+    stop_histories = List.map blob.audit_records ~f:_history_of_record;
   }
 
 let load_audit path =

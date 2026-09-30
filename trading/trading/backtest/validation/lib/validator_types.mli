@@ -110,6 +110,22 @@ type screen_read = {
 (** One weekly screen's macro read, projected from [trade_audit.sexp]'s
     [cascade_summaries]. V23's input. *)
 
+type stop_history = {
+  position_id : string;
+      (** [Trade_audit.entry_decision.position_id] of the audit record. *)
+  symbol : string;
+  entry_date : Date.t;
+      (** The audit entry date — the {b signal} Friday, not the fill date
+          [trades.csv] carries. Used only to label V22 specimens. *)
+  decisions : Weinstein_stops.Stop_decision.t list;
+      (** [Trade_audit.audit_record.stop_decisions] (#2986), oldest first, with
+          runs of same-ISO-week holds already collapsed to their latest row
+          ([Stop_decision.push]). [[]] on an audit record that has none — either
+          the position never reached a stop update, or the file predates #2986.
+      *)
+}
+(** One audit position's weekly trailing-stop decision record. V22's input. *)
+
 type daily_bar = {
   date : Date.t;
   open_price : float;
@@ -279,6 +295,13 @@ type check_config = {
           Long [Support_floor] entries, and 5% would drop the EQT shape; the
           short split and the full rationale are in
           {!Validator_audit_checks.check_v21}. *)
+  stalled_ratchet_min_weeks : int;
+      (** V22: the shortest no-stop-move stretch, in weeks (x 7 calendar days,
+          inclusive), that flags when at least one correction cycle completed
+          inside it. Default [13] — the issue's "held >= 13 weeks", the same
+          horizon #2982 measured its stall on (stops held >= 13 weeks raised 0
+          of 73 times at close/adjusted >= 1.5). The measured distribution
+          behind it is in {!Validator_stall_check.check_v22}. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default
@@ -329,13 +352,19 @@ type inputs = {
   audit_absent : string option;
       (** [None] when a [trade_audit.sexp] was loaded (even one that matches no
           trade — that is a broken join V19 must flag). [Some reason] when no
-          audit was loaded at all; V19/V20/V21/V23 then skip every row and
-          report [reason]. *)
+          audit was loaded at all; V19-V23 then skip every row and report
+          [reason]. *)
   screens : screen_read list;
       (** Every weekly screen's macro read from [trade_audit.sexp]'s
           [cascade_summaries] (V23), in any order. [[]] when no audit was loaded
           ({!audit_absent} says why) {b or} the loaded audit carries no cascade
           summaries — V23 skips every long in both cases, with a reason. *)
+  stop_histories : stop_history list;
+      (** One {!stop_history} per [trade_audit.sexp] record, in file order
+          (V22). [[]] when no audit was loaded ({!audit_absent} says why). A
+          loaded pre-#2986 audit yields one history per record, each with
+          [decisions = []] — V22 tells that apart from a position that simply
+          has no rows and skips with a different reason. *)
   macro_suspend : Weinstein_strategy.Entry_ticket_suspend_mode.t option;
       (** The run's effective [entry_ticket_macro_suspend] (#2976), read from
           the [overrides] in the run's [params.sexp]
@@ -363,7 +392,7 @@ val load_config : string option -> check_config
 
 val empty_inputs : ?config:check_config -> unit -> inputs
 (** An {!inputs} with no trades / positions and always-[None] lookups, so
-    [audit_absent] is [Some "no trade_audit.sexp supplied"], no [screens] and
-    [macro_suspend = None]. Tests override individual fields via record update —
-    a test that injects an audit lookup and wants V19 armed must also set
-    [audit_absent = None]. *)
+    [audit_absent] is [Some "no trade_audit.sexp supplied"], no [screens], no
+    [stop_histories] and [macro_suspend = None]. Tests override individual
+    fields via record update — a test that injects an audit lookup and wants V19
+    armed must also set [audit_absent = None]. *)
