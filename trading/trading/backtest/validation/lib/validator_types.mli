@@ -379,6 +379,12 @@ type inputs = {
           {!Validator_twin_check.load_share_classes}). [Error reason] when it
           could not be loaded — V6 then runs its rename-twin pass alone and
           reports [reason]. *)
+  share_class_path : string option;
+      (** Where [share_classes] was read from
+          ({!Validator_twin_check.resolve_share_class_path}), named in V6's
+          report note on a successful load so a report says which map it checked
+          against. [None] when the map was injected directly (tests), in which
+          case a loaded map adds no note. *)
   bars : string -> bars option;
   run_end : Date.t;
   config : check_config;
@@ -402,6 +408,7 @@ val empty_inputs : ?config:check_config -> unit -> inputs
 (** An {!inputs} with no trades / positions and always-[None] lookups, so
     [audit_absent] is [Some "no trade_audit.sexp supplied"], no [screens], no
     [stop_histories], [macro_suspend = None] and
-    [share_classes = Error "no share-class map supplied"]. Tests override
-    individual fields via record update — a test that injects an audit lookup
-    and wants V19 armed must also set [audit_absent = None]. *)
+    [share_classes = Error "no share-class map supplied"],
+    [share_class_path = None]. Tests override individual fields via record
+    update — a test that injects an audit lookup and wants V19 armed must also
+    set [audit_absent = None]. *)

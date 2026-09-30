@@ -197,6 +197,7 @@ type inputs = {
   stop_histories : stop_history list;
   macro_suspend : Weinstein_strategy.Entry_ticket_suspend_mode.t option;
   share_classes : (Weinstein_strategy.Share_class_map.t, string) Result.t;
+  share_class_path : string option;
   bars : string -> bars option;
   run_end : Date.t;
   config : check_config;
@@ -250,6 +251,7 @@ let empty_inputs ?(config = default_config) () =
     stop_histories = [];
     macro_suspend = None;
     share_classes = Error _no_share_class_map_reason;
+    share_class_path = None;
     bars = (fun _ -> None);
     run_end = far_future;
     config;

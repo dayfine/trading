@@ -18,13 +18,17 @@ val render_md : report -> string
     there is one — between the header and the check lines. *)
 
 val run :
+  ?share_class_path:string ->
   run_dir:string ->
   data_dir:string ->
   config:check_config ->
   out:string ->
+  unit ->
   report
-(** Parse [run_dir]'s artifacts, load bars and V6's share-class map
-    ({!Validator_twin_check.load_share_classes}) from [data_dir], run
+(** Parse [run_dir]'s artifacts, load bars from [data_dir] and V6's share-class
+    map ({!Validator_twin_check.load_share_classes}) from [share_class_path]
+    (default: {!Validator_twin_check.share_class_source_path} of [data_dir]; the
+    CLI passes {!Validator_twin_check.resolve_share_class_path}'s answer), run
     {!validate}, and write [<out>.sexp] + [<out>.md]. Also prints
     {!quality_flag_line} to stderr when non-empty, so a fallback exit is visible
     in the run log without opening the report. Returns the report. Read-only

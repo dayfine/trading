@@ -687,7 +687,7 @@ let v22_of_run files =
   let report =
     Exn.protect
       ~f:(fun () ->
-        Vr.run ~run_dir:dir ~data_dir:dir ~config:Vt.default_config ~out)
+        Vr.run ~run_dir:dir ~data_dir:dir ~config:Vt.default_config ~out ())
       ~finally:(fun () -> remove_tree dir)
   in
   List.find report.checks ~f:(fun (c : Vt.check_result) ->

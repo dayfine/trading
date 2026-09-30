@@ -61,8 +61,14 @@ let _rename_twin_violations trades =
 let share_class_source_path ~data_dir =
   Filename.concat data_dir Scm.default_file_name
 
-let load_share_classes ~data_dir =
-  let path = share_class_source_path ~data_dir in
+let resolve_share_class_path ~explicit ~trading_data_dir ~data_dir =
+  match (explicit, trading_data_dir) with
+  | Some path, _ -> path
+  | None, Some dir when not (String.is_empty dir) ->
+      share_class_source_path ~data_dir:dir
+  | None, _ -> share_class_source_path ~data_dir
+
+let load_share_classes ~path =
   Or_error.try_with (fun () -> Scm.load path)
   |> Result.map_error ~f:Error.to_string_hum
 
@@ -147,11 +153,15 @@ let _share_class_violations map inputs =
 let _unavailable_reason reason =
   sprintf "share-class source unavailable, rename-twin pass only: %s" reason
 
+let _source_note path = sprintf "share-class map: %s" path
+
 let check_v6 inputs =
   let renames = _rename_twin_violations inputs.trades in
   let classes, skip_reason =
     match inputs.share_classes with
-    | Ok map -> (_share_class_violations map inputs, None)
+    | Ok map ->
+        ( _share_class_violations map inputs,
+          Option.map inputs.share_class_path ~f:_source_note )
     | Error reason -> ([], Some (_unavailable_reason reason))
   in
   { empty_finding with violations = renames @ classes; skip_reason }

@@ -187,7 +187,7 @@ let test_missing_map_rendered _ =
 
 let test_load_missing_file_is_error _ =
   assert_that
-    (Tw.load_share_classes ~data_dir:"/nonexistent-dir")
+    (Tw.load_share_classes ~path:"/nonexistent-dir/share_classes.sexp")
     (matching ~msg:"Expected Error"
        (function Error reason -> Some reason | Ok _ -> None)
        (contains_substring "/nonexistent-dir/share_classes.sexp"))
@@ -197,7 +197,7 @@ let test_load_missing_file_is_error _ =
 let test_committed_map_groups_fwon _ =
   let data_dir = Data_path.default_data_dir () |> Fpath.to_string in
   assert_that
-    (Tw.load_share_classes ~data_dir)
+    (Tw.load_share_classes ~path:(Tw.share_class_source_path ~data_dir))
     (matching ~msg:"Expected Ok map"
        (function Ok m -> Some m | Error _ -> None)
        (field
@@ -240,7 +240,7 @@ let _run_v6 files =
   let out = Stdlib.Filename.concat dir "report" in
   Exn.protect
     ~f:(fun () ->
-      Vr.run ~run_dir:dir ~data_dir:dir ~config:Vt.default_config ~out
+      Vr.run ~run_dir:dir ~data_dir:dir ~config:Vt.default_config ~out ()
       |> fun (r : Vt.report) ->
       List.find r.checks ~f:(fun c -> String.equal c.id "V6"))
     ~finally:(fun () -> _remove_tree dir)
@@ -251,7 +251,12 @@ let test_run_reads_map_from_data_dir _ =
        [
          ("trades.csv", _trades_csv); (Scm.default_file_name, "((FWONA FWONK))");
        ])
-    (is_some_and (all_of [ outcome ~n:1 ~passed:false; skip_reason is_none ]))
+    (is_some_and
+       (all_of
+          [
+            outcome ~n:1 ~passed:false;
+            skip_reason (is_some_and (contains_substring "share-class map: "));
+          ]))
 
 let test_run_without_map_reports_it _ =
   assert_that
@@ -264,6 +269,61 @@ let test_run_without_map_reports_it _ =
               (is_some_and
                  (contains_substring "share-class source unavailable"));
           ]))
+
+(* ---- issue #3045: the map is found independently of the bar store ------- *)
+
+(* Chain runs pass the bar store as -data-dir while the map lives under
+   trading/test_data. Bars + run artifacts in one directory, the map in
+   another: V6 must read the map and name it in the note. *)
+let test_run_reads_map_from_separate_dir _ =
+  let bars_dir = Stdlib.Filename.temp_dir "validator_bars" "" in
+  let map_dir = Stdlib.Filename.temp_dir "validator_map" "" in
+  let map_path = Stdlib.Filename.concat map_dir Scm.default_file_name in
+  Out_channel.write_all
+    (Stdlib.Filename.concat bars_dir "trades.csv")
+    ~data:_trades_csv;
+  Out_channel.write_all map_path ~data:"((FWONA FWONK))";
+  let out = Stdlib.Filename.concat bars_dir "report" in
+  let v6_result =
+    Exn.protect
+      ~f:(fun () ->
+        Vr.run ~share_class_path:map_path ~run_dir:bars_dir ~data_dir:bars_dir
+          ~config:Vt.default_config ~out ()
+        |> fun (r : Vt.report) ->
+        List.find r.checks ~f:(fun c -> String.equal c.id "V6"))
+      ~finally:(fun () ->
+        _remove_tree bars_dir;
+        _remove_tree map_dir)
+  in
+  assert_that v6_result
+    (is_some_and
+       (all_of
+          [
+            outcome ~n:1 ~passed:false;
+            skip_reason
+              (is_some_and (equal_to ("share-class map: " ^ map_path)));
+          ]))
+
+(* Resolution order: -share-classes, then $TRADING_DATA_DIR (non-empty), then
+   -data-dir. *)
+let test_resolve_share_class_path_order _ =
+  let resolve explicit trading_data_dir =
+    Tw.resolve_share_class_path ~explicit ~trading_data_dir ~data_dir:"/bars"
+  in
+  assert_that
+    [
+      resolve (Some "/x/map.sexp") (Some "/td");
+      resolve None (Some "/td");
+      resolve None (Some "");
+      resolve None None;
+    ]
+    (elements_are
+       [
+         equal_to "/x/map.sexp";
+         equal_to "/td/share_classes.sexp";
+         equal_to "/bars/share_classes.sexp";
+         equal_to "/bars/share_classes.sexp";
+       ])
 
 let suite =
   "validator_twin_check"
@@ -283,6 +343,10 @@ let suite =
          "committed map groups fwon" >:: test_committed_map_groups_fwon;
          "run reads map from data_dir" >:: test_run_reads_map_from_data_dir;
          "run without map reports it" >:: test_run_without_map_reports_it;
+         "run reads map from separate dir"
+         >:: test_run_reads_map_from_separate_dir;
+         "resolve share-class path order"
+         >:: test_resolve_share_class_path_order;
        ]
 
 let () = run_test_tt_main suite
