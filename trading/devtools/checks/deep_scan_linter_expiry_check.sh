@@ -305,7 +305,7 @@ AE_CODE2=$?
 set -e
 
 if ! grep -q '\[EXPIRED\].*fixture_expired_field' "$AE_REPORT2"; then
-  echo "OK: MUTATION (adapter-effectiveness _scan_exceptions_conf call removed) makes the expired-entry finding disappear — proves the wiring, not a coincidence, produced 3a's finding (BQ-1 mutation-proof)"
+  echo "OK: MUTATION (AE _EXCEPTIONS_CONF_TABLE row corrupted to a nonexistent filename) makes the expired-entry finding disappear — proves the table-driven wiring, not a coincidence, produced 3a's finding (BQ-1 mutation-proof)"
 else
   fail "MUTATION removed the adapter-effectiveness scan call but fixture_expired_field is STILL reported as expired — the mutation didn't take, or something else is finding it; this test does not actually pin the wiring"
 fi
@@ -359,7 +359,7 @@ chmod +x "$AE_MUT_CHECK2"
 # the roll-up wiring itself is broken) when the real cause is that this
 # mutation's own sed pattern no longer matches the source.
 if diff -q "$CHECK_11" "$AE_MUT_CHECK2" >/dev/null 2>&1; then
-  fail "the mutation's sed pattern no longer matches — update the pattern; the protection may be fine"
+  fail "MUTATION C (3d, add_warning.*has passed deletion) sed pattern no longer matches the date-branch add_warning call in check_11_linter_expiry.sh — update 3d's pattern; the protection may be fine"
 fi
 
 AE_REPORT4="$(mktemp)"
@@ -392,7 +392,7 @@ chmod +x "$AE_MUT_CHECK3"
 # produce the expected split" without naming the real cause (this
 # mutation's own sed pattern no longer matches the source).
 if diff -q "$CHECK_11" "$AE_MUT_CHECK3" >/dev/null 2>&1; then
-  fail "the mutation's sed pattern no longer matches — update the pattern; the protection may be fine"
+  fail "MUTATION D (3e, \${decl} review date -> (redacted) rewrite) sed pattern no longer matches the date-branch add_warning message in check_11_linter_expiry.sh — update 3e's pattern; the protection may be fine"
 fi
 
 AE_REPORT5="$(mktemp)"
@@ -1604,6 +1604,10 @@ some_fixture_entry  # review_at: 2019-01-01
 EOF
 cp "${DEEP_SCAN_DIR}/_lib.sh" "$CG_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
 cp "$(dirname "$0")/_check_lib.sh" "$CG_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
+mkdir -p "$CG_FAKE_ROOT/trading/devtools/checks/nested_dir"
+cat > "$CG_FAKE_ROOT/trading/devtools/checks/nested_dir/fixture_nested_exceptions.conf" <<'EOF2'
+some_nested_entry  # review_at: 2019-01-01
+EOF2
 cp "$CHECK_11" "$CG_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
 
 # --- 10a: the REAL (unmutated) script surfaces the unregistered fourth
@@ -1662,6 +1666,48 @@ if [ "$CG_CODE2" -eq 0 ] \
   echo "OK: MUTATION (completeness guard's add_warning call removed) makes the roll-up W: finding for the unregistered fourth conf file disappear — proves 10a's roll-up assertion actually pins the guard, not a coincidental match"
 else
   fail "MUTATION (completeness guard add_warning removed) did not remove the roll-up finding as expected (exit=$CG_CODE2): $(cat "$CG_FINDINGS2")"
+fi
+
+# --- 10c: a NESTED unregistered conf gets advice that actually fixes it:
+# name _EXCEPTIONS_CONF_TABLE, its file, and the subdirectory-inclusive path
+# the row needs (O-diag item 3, harness/expiry-diag-polish). Top-level
+# unregistered files get the table pointer but no nested-path hint.
+if grep -q "^W: .*nested_dir/fixture_nested_exceptions\.conf.*_EXCEPTIONS_CONF_TABLE in trading/devtools/checks/deep_scan/check_11_linter_expiry\.sh (nested file: the row's filename field must be the path relative to trading/devtools/checks/, including the subdirectory" "$CG_FINDINGS" \
+  && grep -q "^W: .*fixture_fourth_exceptions\.conf.*_EXCEPTIONS_CONF_TABLE in trading/devtools/checks/deep_scan/check_11_linter_expiry\.sh, plus a report section" "$CG_FINDINGS"; then
+  echo "OK: an unregistered NESTED *exceptions*.conf gets remediation naming _EXCEPTIONS_CONF_TABLE, its file and the subdirectory-inclusive row path; a top-level one gets the table pointer without the nested hint"
+else
+  fail "nested/top-level unregistered-conf remediation text is wrong — findings: $(cat "$CG_FINDINGS")"
+fi
+
+# --- 10d: MUTATION — drop the nested hint; 10c must go RED.
+CG_MUT2="$CG_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_nested.sh"
+sed '/_nested_hint=" (nested file/d' "$CHECK_11" > "$CG_MUT2"
+chmod +x "$CG_MUT2"
+if diff -q "$CHECK_11" "$CG_MUT2" >/dev/null 2>&1; then
+  fail "MUTATION (10d, nested-hint line deleted) sed matched nothing — update the pattern"
+fi
+CG_REPORT3="$(mktemp)"
+CG_FINDINGS3="$(mktemp)"
+set +e
+REPO_ROOT="$CG_FAKE_ROOT" sh "$CG_MUT2" "$CG_REPORT3" "$CG_FINDINGS3" >/dev/null 2>&1
+set -e
+if ! grep -q 'including the subdirectory' "$CG_FINDINGS3"; then
+  echo "OK: MUTATION (nested hint removed) drops the subdirectory advice from the nested file's warning — proves 10c pins it"
+else
+  fail "MUTATION (10d) did not remove the nested advice: $(cat "$CG_FINDINGS3")"
+fi
+
+# --- 12: the vacuity-guard diagnostics in 3d/3e must stay distinct from each
+# other (they were once byte-identical, so a failure could not say which
+# assertion fired), and 3b's OK-line must describe the table-row mutation it
+# performs, not the pre-R-4 removed-call mutation.
+if [ "$(grep -c 'fail "MUTATION C [(]3d, ' "$0")" -eq 1 ] \
+  && [ "$(grep -c 'fail "MUTATION D [(]3e, ' "$0")" -eq 1 ] \
+  && [ "$(grep -c "fail \"the [m]utation's sed pattern no longer matches" "$0")" -eq 0 ] \
+  && [ "$(grep -c 'OK: MUTATION [(]AE _EXCEPTIONS_CONF_TABLE row corrupted' "$0")" -eq 1 ]; then
+  echo "OK: 3d/3e vacuity-guard messages are distinct and 3b's OK-line names the table-row mutation"
+else
+  fail "3d/3e vacuity-guard messages are not distinct, or 3b's OK-line wording is stale"
 fi
 
 MAIN_SH="${DEEP_SCAN_DIR}/main.sh"
