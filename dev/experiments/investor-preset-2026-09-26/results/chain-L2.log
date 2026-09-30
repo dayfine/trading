@@ -1,0 +1,11 @@
+[09-30 00:52:43] lane L2 HEAD=650b18e2a (expect 650b18e2a)
+[09-30 00:52:43] cell guard CELL_TIMEOUT=60000s (26y guard; 5y cells ~1h); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[09-30 00:52:44] warehouse entries=9364 (expect 9364)
+[09-30 00:52:44] host free 40G
+[09-30 00:52:44] BUILD
+[09-30 00:53:55] BUILD_DONE
+[09-30 00:53:55] PREFLIGHT inv26sc-investor
+[09-30 01:00:26] PREFLIGHT_OK inv26sc-investor (391s)
+[09-30 01:00:26] RUN inv26sc-investor-s0-v11 on /tmp/snap_top3000_pit_v11pit
+[09-30 04:10:05] RESULT inv26sc-investor-s0-v11 => total_return_pct 623.58414156938716 total_trades 506 sharpe_ratio 0.601256046868253 max_drawdown_pct 31.076191144644504 calmar_ratio 0.24968093060253868  V6 INVARIANT PASS (share-class source unavailable, rename-twin pass only: (Failure V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff:none peak_rss_kb=5834888 Panel_runner: snapshot cache hits=150466935 misses=6303437 miss_absent=6294073 evictions=0 n_symbols=9915 misses_per_symbol=635.75 n_symbols_touched=9364 n_symbols_absent=551 loads_per_touched=1.00 max_entries=9364 max_bytes=129677940 max_mmap_open=9364 avg_entries=4682.5 avg_bytes=65605501 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2497858552 maxrss_bytes=5955584000 (wall 11379s)
+[09-30 04:10:05] LANE L2 DONE
