@@ -3,6 +3,6 @@
  (entries
   (((symbol SPY) (source unknown) (endpoint "")
     (date_range (2009-01-02 2026-09-28)) (rows_count 4461)
-    (sha256 45b51a0f5357991e8961a0b42aef471f) (vendor_revision_tag "")
+    (sha256 9d1e4fe6173648bfc86f7057bb0eca04) (vendor_revision_tag "")
     (fetched_at "2026-09-29 02:59:00.489082502Z") (fetch_id "")
     (api_key_id "")))))
