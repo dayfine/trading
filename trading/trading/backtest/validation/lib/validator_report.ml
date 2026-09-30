@@ -13,7 +13,8 @@ let _base_line (r : check_result) =
     sprintf "%s %s %s" r.id (_severity_label r.severity) (_verdict r)
   in
   match (r.n_skipped, r.skip_reason) with
-  | 0, _ -> head
+  | 0, None -> head
+  | 0, Some note -> sprintf "%s (%s)" head note
   | n, None -> sprintf "%s (%d skipped)" head n
   | n, Some reason -> sprintf "%s (%d skipped: %s)" head n reason
 
@@ -78,6 +79,7 @@ let run ~run_dir ~data_dir ~config ~out =
   in
   let run_end = _infer_run_end trades in
   let bars = Validator_artifacts.load_bars ~data_dir ~run_end in
+  let share_classes = Validator_twin_check.load_share_classes ~data_dir in
   let inputs =
     {
       trades;
@@ -87,6 +89,7 @@ let run ~run_dir ~data_dir ~config ~out =
       screens = audit.screens;
       stop_histories = audit.stop_histories;
       macro_suspend;
+      share_classes;
       bars;
       run_end;
       config;

@@ -7,14 +7,17 @@
   test_series_level_v18_median_agreement
   test_validator_audit_checks
   test_validator_stop_macro_checks
-  test_validator_stalled_ratchet)
+  test_validator_stalled_ratchet
+  test_validator_twin_check)
  (libraries
   core
   ounit2
+  fpath
   matchers
   post_run_validator
   status
   types
+  weinstein.data_source
   weinstein.snapshot_pipeline
   weinstein.types
   weinstein_trading.stops

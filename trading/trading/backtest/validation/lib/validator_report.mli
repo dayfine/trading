@@ -23,8 +23,9 @@ val run :
   config:check_config ->
   out:string ->
   report
-(** Parse [run_dir]'s artifacts, load bars from [data_dir], run {!validate}, and
-    write [<out>.sexp] + [<out>.md]. Also prints {!quality_flag_line} to stderr
-    when non-empty, so a fallback exit is visible in the run log without opening
-    the report. Returns the report. Read-only w.r.t. the run; exit code
-    semantics are the caller's (v1 is report-only). *)
+(** Parse [run_dir]'s artifacts, load bars and V6's share-class map
+    ({!Validator_twin_check.load_share_classes}) from [data_dir], run
+    {!validate}, and write [<out>.sexp] + [<out>.md]. Also prints
+    {!quality_flag_line} to stderr when non-empty, so a fallback exit is visible
+    in the run log without opening the report. Returns the report. Read-only
+    w.r.t. the run; exit code semantics are the caller's (v1 is report-only). *)
