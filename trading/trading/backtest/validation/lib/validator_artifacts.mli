@@ -32,9 +32,13 @@ type loaded_audit = {
       (** One {!Validator_types.screen_read} per [cascade_summaries] entry, in
           file order. [[]] for a bare-record-list file (the pre-blob format) or
           a blob with no summaries. *)
+  stop_histories : stop_history list;
+      (** One {!Validator_types.stop_history} per audit record, in file order,
+          carrying that record's [stop_decisions] (V22). A file written before
+          #2986 has no such field; its records decode with [decisions = []]. *)
 }
-(** A loaded [trade_audit.sexp]: the entry join and the per-screen macro reads,
-    from one parse of the file. *)
+(** A loaded [trade_audit.sexp]: the entry join, the per-screen macro reads and
+    the per-position stop decisions, from one parse of the file. *)
 
 val load_audit : string -> (loaded_audit, string) result
 (** [load_audit path] is {!load_audit_lookup} that distinguishes "no audit", so

@@ -6,6 +6,7 @@ module S = Validator_splice_check
 module F = Validator_fallback_check
 module St = Validator_store_check
 module A = Validator_audit_checks
+module Sc = Validator_stall_check
 
 let _specimen_cap = 10
 
@@ -38,6 +39,7 @@ let _registry :
     ("V19", _inv, A.check_v19);
     ("V20", _inv, A.check_v20);
     ("V21", _exp, A.check_v21);
+    ("V22", _exp, Sc.check_v22);
     ("V23", A.v23_severity, A.check_v23);
   ]
 

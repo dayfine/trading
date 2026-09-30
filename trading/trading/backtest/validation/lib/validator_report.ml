@@ -60,7 +60,9 @@ let _infer_run_end trades =
 let _maybe_audit path : Validator_artifacts.loaded_audit * string option =
   match Validator_artifacts.load_audit path with
   | Ok loaded -> (loaded, None)
-  | Error reason -> ({ lookup = (fun _ -> None); screens = [] }, Some reason)
+  | Error reason ->
+      ( { lookup = (fun _ -> None); screens = []; stop_histories = [] },
+        Some reason )
 
 let _maybe_open path =
   if Sys_unix.file_exists_exn path then
@@ -83,6 +85,7 @@ let run ~run_dir ~data_dir ~config ~out =
       audit = audit.lookup;
       audit_absent;
       screens = audit.screens;
+      stop_histories = audit.stop_histories;
       macro_suspend;
       bars;
       run_end;

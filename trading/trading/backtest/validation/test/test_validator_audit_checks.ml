@@ -388,7 +388,7 @@ let test_load_audit_empty_is_ok_empty_lookup _ =
 let test_registered _ =
   assert_that
     (List.drop Vc.all_check_ids 17)
-    (equal_to [ "V18"; "V19"; "V20"; "V21"; "V23" ])
+    (equal_to [ "V18"; "V19"; "V20"; "V21"; "V22"; "V23" ])
 
 let suite =
   "validator_audit_checks"
