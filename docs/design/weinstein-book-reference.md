@@ -296,6 +296,27 @@ A second category of buy signal that occurs within an established Stage 2 uptren
 
 **Implementation note:** Continuation buys are a distinct buy_reason enum value from initial breakouts — they share the same volume + RS checks but the MA-slope check is stricter (MA must be *clearly* trending higher, not merely flat-to-rising). Source: Ch. 3, ~lines 2214–2238.
 
+**Resolved question (2026-09-29, #3038) — does a trader classify stages and
+qualify buys on a 10-week MA instead of the 30-week?** No. The glossary entry
+"Moving Average" (opening chapter) says "a 30-week moving average (MA) is the
+best one for long-term investors, while the 10-week MA is best for traders to
+use", but the same passage defines the trader's buy against the **30-week**
+MA: "For a trader, who wants action, the ideal time to buy a stock is when it's
+already above its 30-week MA, when the MA is rising. The trader's ideal entry
+point is after a stock consolidates in a new trading range and pulls back close
+to the moving average, then breaks out again above resistance". That is the
+continuation buy above. The book mentions the 10-week MA only there and in a
+footnote defining it ("this Friday's closing price … added to the prior nine
+Friday closings and then divided by 10"). It never says what the trader
+applies it to.
+
+So a faithful trader preset keeps stage classification and buy qualification
+on the 30-week MA, and uses continuation buys as its characteristic entry.
+Using the 10-week MA for trade management (e.g. the trailing stop) is an
+adaptation, not a book rule, and must be labelled as one. A 10-week *stage*
+MA is not supported by the book. The 2026-06-01 SPY-only "trader 10wk" test
+changed exactly that, and its REJECT speaks to that interpretation only.
+
 ### 4.7 Order Mechanics — GTC Buy-Stop-Limit (Ch. 3 ~lines 2450–2490, Ch. 4 checklist ~line 4178)
 
 Weinstein's prescribed order for entering a breakout is fully specified — and

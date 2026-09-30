@@ -35,8 +35,12 @@ Markets*.
 
 ## The dials — adapt freely (Weinstein himself parameterizes these)
 
-- **MA period.** He gives **30-week for investors, 10-week for traders**
-  explicitly (daily for very short-term traders). Changing the period is faithful.
+- **MA period.** He calls the 30-week MA best for investors and the 10-week MA
+  "best for traders to use", but he defines the trader's *buy* against the
+  **30-week** MA. Stage classification and buy qualification therefore stay on
+  30 weeks for both presets. Using a shorter MA for trade management is a
+  faithful dial but an adaptation, and a 10-week *stage* MA is not book-supported
+  (`weinstein-book-reference.md` §4.6, resolved 2026-09-29).
 - **Entry mode.** Initial base breakout (investor) vs **continuation / pullback
   re-breakout** (trader, "The Trader's Way") — both his.
 - **Sizing.** Scale-in (½ on breakout, ½ on pullback — investor) vs **full size on

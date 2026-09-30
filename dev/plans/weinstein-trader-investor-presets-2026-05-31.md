@@ -1,5 +1,11 @@
 # Weinstein trader vs investor presets — design + first experiment
 
+> **⚠ Partly superseded (2026-09-29, #3038).** The "Stage MA period | 30-week | **10-week**"
+> row below is not book-supported. The book defines the trader's buy against the 30-week MA
+> and never says what the 10-week MA is applied to (`docs/design/weinstein-book-reference.md`
+> §4.6, resolved question 2026-09-29). A faithful trader preset keeps 30-week stages and adds
+> continuation buys. The current experiment design is issue #3038.
+
 **Status:** DESIGN + first experiment spec (2026-05-31). Source: Stan Weinstein,
 *Secrets for Profiting in Bull and Bear Markets* — confirmed against the book
 text (the user's PDF) this session. Reference: `docs/design/weinstein-book-reference.md`.

@@ -328,7 +328,9 @@ type check_result = {
       (** Why rows were skipped, when the check can state it (e.g. V19 with no
           [trade_audit.sexp]). Rendered next to the skip count so a check that
           could not evaluate anything never reads as a bare PASS. [None] — and
-          absent from the sexp — for every check that does not set it. *)
+          absent from the sexp — for every check that does not set it. With zero
+          rows skipped it names a source the check could not consult (V6 without
+          its share-class map), rendered beside the verdict. *)
 }
 [@@deriving sexp]
 (** The outcome of one check. *)
@@ -371,6 +373,12 @@ type inputs = {
           ({!Validator_run_config.load_macro_suspend}). Picks V23's default
           severity: [Some On_bearish_macro] makes it INVARIANT, anything else
           EXPECTATION. [None] when the run's config could not be read. *)
+  share_classes : (Weinstein_strategy.Share_class_map.t, string) Result.t;
+      (** V6's share-class source (#3035): the committed issuer-group map
+          ([share_classes.sexp] under the data directory,
+          {!Validator_twin_check.load_share_classes}). [Error reason] when it
+          could not be loaded — V6 then runs its rename-twin pass alone and
+          reports [reason]. *)
   bars : string -> bars option;
   run_end : Date.t;
   config : check_config;
@@ -393,6 +401,7 @@ val load_config : string option -> check_config
 val empty_inputs : ?config:check_config -> unit -> inputs
 (** An {!inputs} with no trades / positions and always-[None] lookups, so
     [audit_absent] is [Some "no trade_audit.sexp supplied"], no [screens], no
-    [stop_histories] and [macro_suspend = None]. Tests override individual
-    fields via record update — a test that injects an audit lookup and wants V19
-    armed must also set [audit_absent = None]. *)
+    [stop_histories], [macro_suspend = None] and
+    [share_classes = Error "no share-class map supplied"]. Tests override
+    individual fields via record update — a test that injects an audit lookup
+    and wants V19 armed must also set [audit_absent = None]. *)
