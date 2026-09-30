@@ -282,7 +282,11 @@ for _found in $_found_conf_files; do
   if ! _exceptions_conf_registered "$_found_rel"; then
     _UNREGISTERED_COUNT=$((_UNREGISTERED_COUNT + 1))
     _UNREGISTERED_DETAILS="${_UNREGISTERED_DETAILS}  - ${_found_rel}\n"
-    add_warning "Linter exception expiry completeness guard: ${_found_rel} matches *exceptions*.conf under trading/devtools/checks/ but has no row in check_11_linter_expiry.sh's exceptions-conf table -- its review_at entries are NOT being scanned for expiry. Add a table row (and a report section) before the next deep scan."
+    _nested_hint=""
+    case "$_found_rel" in
+      */*) _nested_hint=" (nested file: the row's filename field must be the path relative to trading/devtools/checks/, including the subdirectory, i.e. '${_found_rel}')" ;;
+    esac
+    add_warning "Linter exception expiry completeness guard: ${_found_rel} matches *exceptions*.conf under trading/devtools/checks/ but has no row in check_11_linter_expiry.sh's exceptions-conf table -- its review_at entries are NOT being scanned for expiry. Fix: add a row for '${_found_rel}' to _EXCEPTIONS_CONF_TABLE in trading/devtools/checks/deep_scan/check_11_linter_expiry.sh${_nested_hint}, plus a report section, before the next deep scan."
   fi
   IFS='
 '
