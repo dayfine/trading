@@ -1069,6 +1069,179 @@ let test_format_weinstein_section_lists_all_rules _ =
            (equal_to true);
        ])
 
+(* -- Markdown formatters: exact-output pins ------------------------------ *)
+
+let _outlier symbol metric : TR.outlier_trade =
+  { symbol; entry_date = _date "2024-01-15"; metric }
+
+let _quartile_stat quartile trade_count win_count win_rate_pct :
+    TR.cascade_quartile_stat =
+  { quartile; trade_count; win_count; win_rate_pct }
+
+let _quartile_header =
+  [ "| quartile | trades | wins | win_rate |"; "|---|---:|---:|---:|" ]
+
+let test_format_per_trade_extras_exact _ =
+  let rating : TR.rating =
+    {
+      symbol = "AAPL";
+      entry_date = _date "2024-01-15";
+      r_multiple = 2.5;
+      mfe_pct = 0.30;
+      mae_pct = -0.05;
+      hold_time_anomaly = TR.Stopped_immediately;
+      outcome = TR.Loss;
+      weinstein_score = Float.nan;
+    }
+  in
+  assert_that
+    (TR.format_per_trade_extras ~ratings:[ rating ])
+    (equal_to
+       [
+         "## Per-trade ratings";
+         "";
+         "| symbol | entry_date | outcome | r_multiple | mfe_% | mae_% | \
+          hold_anomaly | weinstein_score |";
+         "|---|---|---|---:|---:|---:|---|---:|";
+         "| AAPL | 2024-01-15 | L | +2.50R | +30.00% | -5.00% | stopped_imm | \
+          — |";
+         "";
+       ])
+
+let test_format_behavioral_section_exact _ =
+  let m : TR.behavioral_metrics =
+    {
+      over_trading =
+        {
+          total_trades = 10;
+          trades_per_year = 5.0;
+          exceeds_threshold = true;
+          concentrated_burst_pct = 20.0;
+          outliers = [ _outlier "AAPL" "burst" ];
+        };
+      exit_winners_too_early =
+        {
+          winners_evaluated = 3;
+          flagged_count = 1;
+          avg_left_on_table_pct = 12.5;
+          outliers = [];
+        };
+      exit_losers_too_late =
+        {
+          losers_evaluated = 4;
+          flagged_count = 2;
+          stop_discipline_pct = 75.0;
+          outliers = [];
+        };
+      entering_losers_often =
+        {
+          per_quartile =
+            [
+              _quartile_stat TR.Q1_top 2 1 50.0;
+              _quartile_stat TR.Q4_bottom 2 0 0.0;
+            ];
+          flagged_count = 1;
+          outliers = [];
+        };
+    }
+  in
+  assert_that
+    (TR.format_behavioral_section m)
+    (equal_to
+       ([
+          "## Behavioural metrics";
+          "";
+          "### (a) Over-trading";
+          "- Total trades: 10";
+          "- Trades / year: 5.0 (ABOVE threshold)";
+          "- Concentrated-burst share: 20.0%";
+          "- Outliers (top 5):";
+          "  - AAPL 2024-01-15 — burst";
+          "";
+          "### (b) Exit-winners-too-early";
+          "- Winners evaluated: 3";
+          "- Flagged (realized < 50% of MFE): 1";
+          "- Avg pp left on the table: 12.50";
+          "- Outliers (top 5):";
+          "  _none_";
+          "";
+          "### (c) Exit-losers-too-late";
+          "- Losers evaluated: 4";
+          "- Flagged (|R|>1.5 or MAE\xe2\x89\xa51.5\xc3\x97realized): 2";
+          "- Stop discipline (|R|\xe2\x89\xa41.0): 75.0%";
+          "- Outliers (top 5):";
+          "  _none_";
+          "";
+          "### (d) Entering-losers-too-often (cascade quartile vs outcome)";
+          "";
+        ]
+       @ _quartile_header
+       @ [
+           "| Q1 (top) | 2 | 1 | 50.0% |";
+           "| Q4 (bottom) | 2 | 0 | 0.0% |";
+           "";
+           "- Flagged outliers: 1";
+           "- Outliers (top 5):";
+           "  _none_";
+           "";
+         ]))
+
+let test_format_weinstein_section_exact _ =
+  let summary rule fail_count marginal_count applicable_count pass_rate_pct :
+      TR.rule_violation_summary =
+    { rule; fail_count; marginal_count; applicable_count; pass_rate_pct }
+  in
+  let agg : TR.weinstein_aggregate =
+    {
+      per_rule =
+        [
+          summary TR.R3_no_long_in_stage_4 1 0 4 75.0;
+          summary TR.R1_long_above_30w_ma_flat_or_rising 0 1 2 50.0;
+        ];
+      spirit_score = Float.nan;
+      trades_with_critical_violation = [ _outlier "AAPL" "R3" ];
+    }
+  in
+  assert_that
+    (TR.format_weinstein_section agg)
+    (equal_to
+       [
+         "## Weinstein conformance";
+         "";
+         "- Spirit score (avg per-trade): —";
+         "";
+         "| rule | description | passed/applicable | pass_rate | fails |";
+         "|---|---|---:|---:|---:|";
+         "| R3 | Never long in Stage 4 (Ch.2, CRITICAL) | 3 / 4 | 75.0% | 1 |";
+         "| R1 | Long entry above 30w MA AND MA flat-or-rising (Ch.2, \
+          \xc2\xa74.1) | 1 / 2 | 50.0% | 0 |";
+         "";
+         "- Critical R3 violations:";
+         "  - AAPL 2024-01-15 — R3";
+         "";
+       ])
+
+let test_format_decision_quality_section_exact _ =
+  let m : TR.decision_quality_matrix =
+    {
+      per_quartile = [ _quartile_stat TR.Q1_top 2 1 50.0 ];
+      total_trades = 4;
+      overall_win_rate_pct = 50.0;
+    }
+  in
+  assert_that
+    (TR.format_decision_quality_section m)
+    (equal_to
+       ([
+          "## Decision quality (cascade quartile vs outcome)";
+          "";
+          "- Total trades: 4";
+          "- Overall win rate: 50.00%";
+          "";
+        ]
+       @ _quartile_header
+       @ [ "| Q1 (top) | 2 | 1 | 50.0% |"; "" ]))
+
 (* -- Suite --------------------------------------------------------------- *)
 
 let suite =
@@ -1154,6 +1327,13 @@ let suite =
          >:: test_format_per_trade_extras_contains_header;
          "format weinstein section lists all rules"
          >:: test_format_weinstein_section_lists_all_rules;
+         "format per-trade extras exact" >:: test_format_per_trade_extras_exact;
+         "format behavioral section exact"
+         >:: test_format_behavioral_section_exact;
+         "format weinstein section exact"
+         >:: test_format_weinstein_section_exact;
+         "format decision quality section exact"
+         >:: test_format_decision_quality_section_exact;
        ]
 
 let () = run_test_tt_main suite
