@@ -7,6 +7,8 @@ HERE=$(cd "$(dirname "$0")" && pwd); OUT="$HERE/specs"; IP="$HERE/../investor-pr
 mkdir -p "$OUT"
 # overrides block of a spec: from "(config_overrides" through the closing "  ))"
 _ovr() { sed -n '/(config_overrides/,/^  ))/p' "$1"; }
+# insert one line before the overrides block's closing "  ))" (POSIX awk, no GNU sed \n)
+_add_before_close() { awk -v l="$1" '/^  \)\)$/ { print l } { print }'; }
 _expected() { sed -n '/^ (expected/,$p' "$IP/inv5sc-hybrid.sexp"; }
 # window header: name/description/period/universe_path/schedule/size
 _header() { # $1 name $2 desc $3 start $4 end $5 first-vintage $6 last-vintage
@@ -19,8 +21,8 @@ _arm_ovr() { # $1 arm -> overrides block on stdout
   case $1 in
     I)  _ovr "$IP/inv5sc-investor.sexp" ;;
     H)  _ovr "$IP/inv5sc-hybrid.sexp" ;;
-    T1) _ovr "$IP/inv5sc-hybrid.sexp" | sed 's/^  ))$/   ((enable_continuation_buys true))\n  ))/' ;;
-    T0) _ovr "$IP/inv5sc-hybrid.sexp" | sed 's/^  ))$/   ((stage_config ((ma_period 10))))\n  ))/' ;;
+    T1) _ovr "$IP/inv5sc-hybrid.sexp" | _add_before_close "   ((enable_continuation_buys true))" ;;
+    T0) _ovr "$IP/inv5sc-hybrid.sexp" | _add_before_close "   ((stage_config ((ma_period 10))))" ;;
   esac
 }
 _desc() { case $1 in
