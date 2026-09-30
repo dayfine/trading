@@ -28,6 +28,7 @@ val update :
   ?ma_cache:Weekly_ma_cache.t ->
   ?stop_update_cadence:stop_update_cadence ->
   ?prior_stage_ma_values:float Hashtbl.M(String).t ->
+  ?trailing_stop_ma_period:int ->
   ?catastrophic_armed:bool ->
   ?on_stop_decision:(Weinstein_stops.Stop_decision.t -> unit) ->
   stops_config:Weinstein_stops.config ->
@@ -72,6 +73,14 @@ val update :
     [stage3_exit_margin_pct] filter (price-below-MA margin gate). When omitted,
     no MA values are recorded — the stage3 force-exit margin filter then
     short-circuits as "margin met" and behaviour matches pre-fix runs.
+
+    [trailing_stop_ma_period] (optional, default [None]; issue #3038) sets the
+    period, in weeks, of the MA the stop machine trails against. Stage
+    classification, MA direction, [prior_stages] and the [prior_stage_ma_values]
+    mirror stay on [stage_config.ma_period]; only the MA value handed to
+    {!Weinstein_stops.update} changes. [Some n] with fewer than [n] weekly bars
+    falls back to the stage MA. [None] is bit-identical to the pre-#3038 runner.
+    See {!Stop_ma_stage.compute}.
 
     [catastrophic_armed] (optional, default [false]) arms the fast-crash
     absolute stop ([stops_config.catastrophic_stop_pct]). When [true] {b and}

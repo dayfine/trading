@@ -11,6 +11,7 @@ module Breaker_spy_strategy = Breaker_spy_strategy
 module Stops_runner = Stops_runner
 module Stops_split_runner = Stops_split_runner
 module Stop_ma_basis = Stop_ma_basis
+module Stop_ma_stage = Stop_ma_stage
 module Force_liquidation_runner = Force_liquidation_runner
 module Stage3_force_exit_runner = Stage3_force_exit_runner
 module Late_stage2_stop_runner = Late_stage2_stop_runner
@@ -159,6 +160,7 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
         Stops_runner.update
           ?ma_cache:(Bar_reader.ma_cache bar_reader)
           ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
+          ?trailing_stop_ma_period:config.trailing_stop_ma_period
           ~catastrophic_armed
           ~on_stop_decision:audit_recorder.Audit_recorder.record_stop_decision
           ~stops_config:config.stops_config ~stage_config:config.stage_config
