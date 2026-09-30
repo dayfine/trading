@@ -130,9 +130,9 @@ NEEDS_REWORK
 ## When to skip this file entirely
 
 For pure infrastructure / library / refactor / harness PRs that touch no
-domain logic — the generic CP1–CP4 in the qc-behavioral agent file alone
-constitute the full review. Mark the entire S*/L*/C*/T* block NA with a
-note: "Pure infra / harness / refactor PR; domain checklist not applicable."
+domain logic — the full review is the generic CP1–CP4 in the qc-behavioral
+agent file **plus row F1** (findings-registry consistency; F1 is not skipped
+by this carve-out, though it is NA when no finding issue is closed). Mark only the S*/L*/C*/T* block NA with a note: "Pure infra / harness / refactor PR; domain checklist not applicable."
 qc-structural's A1 row will not be flagged for such PRs because there is
 no domain logic to leak into core modules.
 
