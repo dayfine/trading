@@ -23,6 +23,7 @@
   test_runner_hypothesis_overrides
   test_stop_flag_overlays
   test_share_class_overlays
+  test_trailing_stop_ma_overlays
   test_panel_loader_parity
   test_snapshot_mode_parity
   test_backtest_runner_args

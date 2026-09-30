@@ -79,6 +79,10 @@ module Stop_ma_basis = Stop_ma_basis
 (** Adjusted-to-raw MA basis restatement for the stop machine and the Stage-3
     margin gate (issue #2982). See {!Stop_ma_basis}. *)
 
+module Stop_ma_stage = Stop_ma_stage
+(** Stage classification + the MA the trailing stop reads (optionally a shorter
+    [trailing_stop_ma_period] MA, issue #3038). See {!Stop_ma_stage}. *)
+
 module Force_liquidation_runner = Force_liquidation_runner
 (** Force-liquidation policy runner. Invoked at the bottom of [on_market_close]
     after {!Stops_runner.update} — defense in depth beyond stops. Closes G4 from
@@ -1170,6 +1174,12 @@ type config = {
       (** #3015: the issuer groups the rule above consults; filled by the
           backtest runner from the committed [share_classes.sexp]. See
           [Weinstein_strategy_config.share_class_groups]. *)
+  trailing_stop_ma_period : int option; [@sexp.default None]
+      (** #3038: period (weeks) of the MA the trailing stop trails against;
+          stage classification stays on [stage_config.ma_period]. Default [None]
+          = the stage MA, bit-identical (R1). An adaptation, not a book rule.
+          See {!Stop_ma_stage} and
+          [Weinstein_strategy_config.trailing_stop_ma_period]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

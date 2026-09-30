@@ -414,7 +414,7 @@ let test_adjust_dedup_against_force_liq_exit _ =
   let positions = String.Map.singleton symbol pos in
   (* Single-bar reader: AAPL drops to $70 (30% loss → fires per-position
      force-liq); the primary index sits at $100 so the Friday macro pass
-     and the [_compute_ma_and_stage] warmup default both stay quiet. *)
+     and the [Stop_ma_stage.compute] warmup default both stay quiet. *)
   let aapl_bar =
     {
       (_make_daily_bar ~date:current_date ~price:70.0) with

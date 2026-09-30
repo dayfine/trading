@@ -1933,6 +1933,32 @@ type config = {
           [share_classes.sexp] (the same way the runner fills {!universe}), or
           inline by a spec that wants a different map. Default empty; ignored
           while the flag is off. *)
+  trailing_stop_ma_period : int option; [@sexp.default None]
+      (** #3038 (arm T2) — period, in weeks, of the MA the trailing stop trails
+          against. [None] (default) trails on the stage MA
+          ([stage_config.ma_period], 30 weeks). [Some n] feeds the stop state
+          machine an [n]-week MA of the same {!Stage.ma_type} instead; stage
+          classification, MA direction, [prior_stages] and the
+          [prior_stage_ma_values] mirror (the Stage-3 margin gate) all stay on
+          the stage MA. With fewer than [n] weekly bars in the view the stage MA
+          is used. The trailing MA goes through the same basis restatement
+          ([Weinstein_stops.config.stop_ma_same_basis]) as the stage MA. See
+          {!Stop_ma_stage.compute}.
+
+          {b Faithfulness.} An {b adaptation, not a book rule.} The glossary
+          entry "Moving Average" says "a 30-week moving average (MA) is the best
+          one for long-term investors, while the 10-week MA is best for traders
+          to use", but never says what the trader applies it to; the book
+          defines the trader's buy against the 30-week MA
+          ([docs/design/weinstein-book-reference.md] §4.6, resolved question
+          2026-09-29). Trailing the trader preset's stop on the 10-week MA is a
+          trade-management dial; the stage framework (spine item 1) is
+          untouched.
+
+          {b R1:} default [None] is bit-identical to every existing golden.
+          {b R2:} a [Variant_matrix] axis as
+          [((flag trailing_stop_ma_period) (values (() (10))))]. {b R3:} no
+          default flip without a ledger ACCEPT. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

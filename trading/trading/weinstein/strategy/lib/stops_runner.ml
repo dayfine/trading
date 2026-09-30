@@ -11,73 +11,6 @@ type stop_update_cadence = Daily | Weekly [@@deriving show, eq, sexp]
 let _is_weekly_close ~as_of =
   Date.day_of_week as_of |> Day_of_week.equal Day_of_week.Fri
 
-(** Position-favourable stage + MA direction default for warmup periods (when
-    fewer than [stage_config.ma_period] weekly bars are available). The return
-    must drive {!Weinstein_stops.update} into a no-tighten branch:
-
-    - {!Weinstein_stops._should_tighten_long} tightens on Stage 3 / Stage 4 and
-      on Stage 2 + Flat-or-Declining MA (when [tighten_on_flat_ma] is true). The
-      only no-tighten branch for a long is Stage 2 + Rising MA.
-    - {!Weinstein_stops._should_tighten_short} tightens on Stage 1 / Stage 2 and
-      on Stage 4 + Rising-or-Flat MA. The only no-tighten branch for a short is
-      Stage 4 + Declining MA.
-
-    Returning a position-favourable warmup default avoids the G1 short-stop
-    pathology (see [dev/notes/short-side-gaps-2026-04-29.md]): hardcoding
-    [Stage2 + Flat] for shorts triggered tightening on every warmup tick,
-    dragging short stops below entry within one or two bars. *)
-let _default_stage_and_ma_for_side = function
-  | Trading_base.Types.Long ->
-      ( Weinstein_types.Stage2 { weeks_advancing = 1; late = false },
-        Weinstein_types.Rising )
-  | Trading_base.Types.Short ->
-      (Weinstein_types.Stage4 { weeks_declining = 1 }, Weinstein_types.Declining)
-
-(** Compute MA direction, value, and stage for a symbol via panel-shaped
-    callbacks. Reads and updates [prior_stages] so Stage1->Stage2 transition
-    detection works across calls. Returns [(Flat, fallback_price, default)]
-    where [default] is [_default_stage_and_ma_for_side ~side] when there aren't
-    enough weekly bars yet for the MA — see G1 fix in
-    [dev/notes/short-side-gaps-2026-04-29.md]: hardcoding [Stage2] for shorts
-    triggered spurious tightening on every warmup tick, dragging short stops
-    below entry. The position-favourable default keeps the state machine in its
-    initial pose during warmup.
-
-    Stage 4 PR-A: this no longer materialises a {!Daily_price.t list}. The
-    weekly view is read directly from panels and threaded into a
-    {!Stage.callbacks} bundle.
-
-    Stage 4 PR-D: an optional [ma_cache] threads through to the panel callbacks.
-    Mid-week stop adjustments miss the cache (Friday-aligned only) and fall back
-    to inline; Friday-aligned calls hit the cache.
-
-    [to_stop_basis] maps the returned MA onto the stop machine's basis (#2982,
-    {!Stop_ma_basis.for_stops}); never applied to the raw warmup
-    [fallback_price] nor to the value mirrored into [prior_stage_ma_values]. *)
-let _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values
-    ~(stage_config : Stage.config) ~lookback_bars ~bar_reader ~as_of
-    ~prior_stages ~symbol ~side ~fallback_price ~to_stop_basis () =
-  let weekly =
-    Bar_reader.weekly_view_for bar_reader ~symbol ~n:lookback_bars ~as_of
-  in
-  if weekly.n < stage_config.ma_period then
-    let stage, ma_direction = _default_stage_and_ma_for_side side in
-    (ma_direction, fallback_price, stage)
-  else
-    let prior_stage = Hashtbl.find prior_stages symbol in
-    let callbacks =
-      Panel_callbacks.stage_callbacks_of_weekly_view ?ma_cache ~symbol
-        ~config:stage_config ~weekly ()
-    in
-    let result =
-      Stage.classify_with_callbacks ~config:stage_config
-        ~get_ma:callbacks.get_ma ~get_close:callbacks.get_close ~prior_stage
-    in
-    Hashtbl.set prior_stages ~key:symbol ~data:result.stage;
-    Option.iter prior_stage_ma_values ~f:(fun tbl ->
-        Hashtbl.set tbl ~key:symbol ~data:result.ma_value);
-    (result.ma_direction, to_stop_basis result.ma_value, result.stage)
-
 (* Transition emission (worst-case fill price, exit/adjust builders, the
    trigger-only branch, and the stop_event → transitions mapping) lives in
    {!Stop_transitions} — including the G1 short-fill audit contract. *)
@@ -93,13 +26,14 @@ let _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values
     period, and a second call per tick would also double-age [weeks_advancing]
     in [prior_stages]. Sibling positions on one ticker share the position side
     (the memoized advance uses the first position's side). *)
-let _advance_machine ?ma_cache ?prior_stage_ma_values ~stops_config
-    ~stage_config ~lookback_bars ~(pos : Position.t) ~state ~bar ~stop_states
-    ~ticker ~bar_reader ~as_of ~prior_stages () =
+let _advance_machine ?ma_cache ?prior_stage_ma_values ?trailing_stop_ma_period
+    ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t) ~state ~bar
+    ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages () =
   let ma_direction, ma_value, stage =
-    _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values ~stage_config
-      ~lookback_bars ~bar_reader ~as_of ~prior_stages ~symbol:ticker
-      ~side:pos.Position.side ~fallback_price:bar.Types.Daily_price.close_price
+    Stop_ma_stage.compute ?ma_cache ?prior_stage_ma_values
+      ?trailing_stop_ma_period ~stage_config ~lookback_bars ~bar_reader ~as_of
+      ~prior_stages ~symbol:ticker ~side:pos.Position.side
+      ~fallback_price:bar.Types.Daily_price.close_price
       ~to_stop_basis:
         (Stop_ma_basis.for_stops
            ~enabled:stops_config.Weinstein_stops.stop_ma_same_basis ~bar)
@@ -118,16 +52,18 @@ let _advance_machine ?ma_cache ?prior_stage_ma_values ~stops_config
     ma_value;
   }
 
-let _advance_ticker_once ?ma_cache ?prior_stage_ma_values ~advanced
-    ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t) ~state ~bar
-    ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages () =
+let _advance_ticker_once ?ma_cache ?prior_stage_ma_values
+    ?trailing_stop_ma_period ~advanced ~stops_config ~stage_config
+    ~lookback_bars ~(pos : Position.t) ~state ~bar ~stop_states ~ticker
+    ~bar_reader ~as_of ~prior_stages () =
   match Hashtbl.find advanced ticker with
   | Some memo -> memo
   | None ->
       let memo =
-        _advance_machine ?ma_cache ?prior_stage_ma_values ~stops_config
-          ~stage_config ~lookback_bars ~pos ~state ~bar ~stop_states ~ticker
-          ~bar_reader ~as_of ~prior_stages ()
+        _advance_machine ?ma_cache ?prior_stage_ma_values
+          ?trailing_stop_ma_period ~stops_config ~stage_config ~lookback_bars
+          ~pos ~state ~bar ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages
+          ()
       in
       Hashtbl.set advanced ~key:ticker ~data:memo;
       memo
@@ -135,14 +71,15 @@ let _advance_ticker_once ?ma_cache ?prior_stage_ma_values ~advanced
 (** Daily-cadence branch (and Weekly-on-Friday): advance the state machine once
     per ticker (see {!_advance_ticker_once}) and emit this position's (exit,
     adjust) transition pair off the pre-advance state + event. *)
-let _handle_stop_full ?ma_cache ?prior_stage_ma_values ~advanced ~stops_config
-    ~stage_config ~lookback_bars ~(pos : Position.t)
+let _handle_stop_full ?ma_cache ?prior_stage_ma_values ?trailing_stop_ma_period
+    ~advanced ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t)
     ~(risk_params : Position.risk_params) ~state ~bar ~stop_states ~ticker
     ~bar_reader ~as_of ~prior_stages ~current_date () =
   let { Weinstein_stops.Stop_decision.before = pre_state; event; _ } =
-    _advance_ticker_once ?ma_cache ?prior_stage_ma_values ~advanced
-      ~stops_config ~stage_config ~lookback_bars ~pos ~state ~bar ~stop_states
-      ~ticker ~bar_reader ~as_of ~prior_stages ()
+    _advance_ticker_once ?ma_cache ?prior_stage_ma_values
+      ?trailing_stop_ma_period ~advanced ~stops_config ~stage_config
+      ~lookback_bars ~pos ~state ~bar ~stop_states ~ticker ~bar_reader ~as_of
+      ~prior_stages ()
   in
   Stop_transitions.of_stop_event
     ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos
@@ -228,11 +165,11 @@ let _skip_entry_bar_exit ~stops_config ~entry_date ~current_date =
     tightening read the bar's structure, not the stop trigger, so suppressing
     one hit check must not desynchronise the trail. Only the {b exit event} is
     dropped; an [UpdateRiskParams] adjust still flows. *)
-let _handle_stop ?ma_cache ?prior_stage_ma_values ?(stop_update_cadence = Daily)
-    ?(catastrophic_armed = false) ~advanced ~stops_config ~stage_config
-    ~lookback_bars ~(pos : Position.t) ~(risk_params : Position.risk_params)
-    ~entry_date ~state ~bar ~stop_states ~ticker ~bar_reader ~as_of
-    ~prior_stages () =
+let _handle_stop ?ma_cache ?prior_stage_ma_values ?trailing_stop_ma_period
+    ?(stop_update_cadence = Daily) ?(catastrophic_armed = false) ~advanced
+    ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t)
+    ~(risk_params : Position.risk_params) ~entry_date ~state ~bar ~stop_states
+    ~ticker ~bar_reader ~as_of ~prior_stages () =
   let current_date = bar.Types.Daily_price.date in
   let advance_state_machine =
     match stop_update_cadence with
@@ -245,9 +182,10 @@ let _handle_stop ?ma_cache ?prior_stage_ma_values ?(stop_update_cadence = Daily)
         ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos
         ~state ~bar ~current_date
     else
-      _handle_stop_full ?ma_cache ?prior_stage_ma_values ~advanced ~stops_config
-        ~stage_config ~lookback_bars ~pos ~risk_params ~state ~bar ~stop_states
-        ~ticker ~bar_reader ~as_of ~prior_stages ~current_date ()
+      _handle_stop_full ?ma_cache ?prior_stage_ma_values
+        ?trailing_stop_ma_period ~advanced ~stops_config ~stage_config
+        ~lookback_bars ~pos ~risk_params ~state ~bar ~stop_states ~ticker
+        ~bar_reader ~as_of ~prior_stages ~current_date ()
   in
   if _skip_entry_bar_exit ~stops_config ~entry_date ~current_date then
     (None, adjust_tr)
@@ -258,19 +196,19 @@ let _handle_stop ?ma_cache ?prior_stage_ma_values ?(stop_update_cadence = Daily)
 
 (** Process stop for one position; returns updated (exits, adjusts) accumulator.
 *)
-let _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
-    ?catastrophic_armed ~advanced ~stops_config ~stage_config ~lookback_bars
-    ~stop_states ~get_price ~bar_reader ~as_of ~prior_stages (pos : Position.t)
-    (exits, adjusts) =
+let _process_stop ?ma_cache ?prior_stage_ma_values ?trailing_stop_ma_period
+    ?stop_update_cadence ?catastrophic_armed ~advanced ~stops_config
+    ~stage_config ~lookback_bars ~stop_states ~get_price ~bar_reader ~as_of
+    ~prior_stages (pos : Position.t) (exits, adjusts) =
   let ticker = pos.symbol in
   match
     (Position.get_state pos, Map.find !stop_states ticker, get_price ticker)
   with
   | Position.Holding h, Some state, Some bar -> (
       match
-        _handle_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
-          ?catastrophic_armed ~advanced ~stops_config ~stage_config
-          ~lookback_bars ~pos ~risk_params:h.risk_params
+        _handle_stop ?ma_cache ?prior_stage_ma_values ?trailing_stop_ma_period
+          ?stop_update_cadence ?catastrophic_armed ~advanced ~stops_config
+          ~stage_config ~lookback_bars ~pos ~risk_params:h.risk_params
           ~entry_date:h.entry_date ~state ~bar ~stop_states ~ticker ~bar_reader
           ~as_of ~prior_stages ()
       with
@@ -280,19 +218,19 @@ let _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
   | _ -> (exits, adjusts)
 
 let update ?ma_cache ?stop_update_cadence ?prior_stage_ma_values
-    ?catastrophic_armed ?on_stop_decision ~stops_config ~stage_config
-    ~lookback_bars ~positions ~get_price ~stop_states ~bar_reader ~as_of
-    ~prior_stages () =
+    ?trailing_stop_ma_period ?catastrophic_armed ?on_stop_decision ~stops_config
+    ~stage_config ~lookback_bars ~positions ~get_price ~stop_states ~bar_reader
+    ~as_of ~prior_stages () =
   (* Per-call memo: ticker -> advance step. Ensures the shared per-ticker state
      machine advances once per tick even when several sibling positions hold
      the same ticker (see [_advance_ticker_once]). *)
   let advanced = Hashtbl.create (module String) in
   let transitions =
     Map.fold positions ~init:([], []) ~f:(fun ~key:_ ~data:pos acc ->
-        _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
-          ?catastrophic_armed ~advanced ~stops_config ~stage_config
-          ~lookback_bars ~stop_states ~get_price ~bar_reader ~as_of
-          ~prior_stages pos acc)
+        _process_stop ?ma_cache ?prior_stage_ma_values ?trailing_stop_ma_period
+          ?stop_update_cadence ?catastrophic_armed ~advanced ~stops_config
+          ~stage_config ~lookback_bars ~stop_states ~get_price ~bar_reader
+          ~as_of ~prior_stages pos acc)
   in
   Option.iter on_stop_decision ~f:(fun on_stop_decision ->
       Stop_decision_capture.emit ~on_stop_decision ~stops_config ~positions

@@ -69,9 +69,9 @@ let _lookup_valid_ma ~prior_stage_ma_values ~symbol =
     - Recorded MA value is non-positive (warmup / corrupt data) — same.
 
     The classifier-side warmup case (weekly bars < ma_period) is handled by
-    {!Stops_runner._compute_ma_and_stage}: during warmup the runner uses a
-    side-defaulted stage that is not [Stage3], so the detector never reaches the
-    margin check on a warmup bar in the first place. *)
+    {!Stop_ma_stage.compute}: during warmup the runner uses a side-defaulted
+    stage that is not [Stage3], so the detector never reaches the margin check
+    on a warmup bar in the first place. *)
 let _margin_ok ~prior_stage_ma_values ~exit_margin_pct ~bar ~symbol =
   match _lookup_valid_ma ~prior_stage_ma_values ~symbol with
   | None -> true
