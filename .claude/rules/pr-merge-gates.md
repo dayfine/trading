@@ -44,7 +44,8 @@ A PR is mergeable only when **all three** are green:
    GitHub PR review comment. NA only for the cases listed in
    `.claude/rules/qc-behavioral-authority.md` §"When to skip this file
    entirely" (pure infra / refactor / harness PRs that touch no domain
-   logic — still requires the generic CP1–CP4 review).
+   logic — still requires the generic CP1–CP4 review plus row F1; only the
+   S*/L*/C*/T* domain rows are skipped).
 
 **Issue links (#3019):** a PR that references an issue carries exactly one of: `Closes #N` (`Fixes`/`Resolves` count as `Closes`) -- every `[merge]` item of its `## Done when` met by the diff, each named with its test/check, and the issue has no `[after-merge]` items; `Refs #N -- verify: <items>` -- every `[merge]` item met, `[after-merge]` items remain (add `verify/pending` to the issue); `Refs #N -- remaining: <items>` -- some `[merge]` item unmet (append `; verify: <items>` if `[after-merge]` items also exist). A bare `(#N)` closes nothing; a detector-only diff never `Closes` (qc-structural row I1).
 

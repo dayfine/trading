@@ -1,0 +1,7 @@
+; Unit tests for findings_registry_lib: parsing rules, validator-id scan,
+; existence checks. End-to-end RED fixtures live in
+; ../../checks/findings_registry_check_test.sh.
+
+(tests
+ (names test_findings_registry_lib)
+ (libraries findings_registry_lib sexplib ounit2 matchers))

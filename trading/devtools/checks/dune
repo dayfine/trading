@@ -1312,6 +1312,36 @@
  (action
   (run sh %{dep:perf_long_cells_test.sh})))
 
+; Findings registry (issue #3001): dev/findings/registry.sexp must name a guard
+; that still exists for every finding. The registry, the test files it cites
+; and validator_checks.ml are outside the dune workspace root (or read at run
+; time), so (universe) is required per H-CHECK-CACHE-BLIND.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run
+   sh
+   %{dep:findings_registry_check.sh}
+   %{exe:../findings_registry/findings_registry_check.exe})))
+
+; RED-fixture self-test for the check above: one clean registry plus one
+; failing registry per failure mode (missing file, missing test name, unknown
+; validator, none without reason, bad status, no issue/ref).
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  findings_registry_check.sh
+  (source_tree fixtures/findings_registry))
+ (action
+  (run
+   sh
+   %{dep:findings_registry_check_test.sh}
+   %{exe:../findings_registry/findings_registry_check.exe})))
+
 ; Pin dev/scripts/issue_fix_audit.sh (weekly issue<->PR audit, #3019) over
 ; canned gh JSON: merged-PR-mentioned issue listing (digit boundary) and
 ; verify/pending [after-merge] extraction. Script resolved at RUN TIME.

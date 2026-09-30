@@ -47,8 +47,8 @@ below do not apply):
 ## Domain checklist (append to qc-behavioral's generic Contract Pinning Checklist)
 
 For Weinstein-feature PRs, append these rows below the CP1–CP4 rows. For
-non-Weinstein PRs (infra / refactor / harness), skip the entire block —
-mark every row NA with one explanatory note.
+non-Weinstein PRs (infra / refactor / harness), skip the entire block except F1 (which always applies) —
+mark every other row NA with one explanatory note.
 
 **Status values for S/L/C rows in a GHA/remote session** (book unreachable,
 per `.claude/rules/book-as-authority.md` "Environment-aware protocol"): PASS
@@ -80,6 +80,7 @@ review body — never PASS or FAIL on a guess.
 | T2 | Tests include a bearish macro scenario that produces zero buy candidates | PASS/FAIL/NA | |
 | T3 | Stop-loss tests verify trailing behavior over multiple price advances | PASS/FAIL/NA | |
 | T4 | Tests assert domain outcomes (correct stage, correct signal), not just "no error" | PASS/FAIL/NA | |
+| F1 | Finding-closing PR (`Closes #N` on a finding issue) adds or updates its `dev/findings/registry.sexp` row (guard named, `none` carries a reason) -- applies to every PR, not only Weinstein-feature ones | PASS/FAIL/NA | `.claude/rules/findings-registry.md`. FAIL if the PR closes a finding issue and the row is missing or stale. NA if the PR closes no finding issue. |
 ```
 
 ## Worked example — NEEDS_REWORK with domain finding
@@ -106,6 +107,7 @@ review body — never PASS or FAIL on a guess.
 | T2 | Bearish macro → zero buy candidates test | PASS | |
 | T3 | Stop trailing tests | NA | |
 | T4 | Tests assert domain outcomes | PASS | |
+| F1 | Finding-closing PR adds/updates its registry row | NA | Closes no finding issue |
 
 ## Quality Score
 
@@ -128,9 +130,9 @@ NEEDS_REWORK
 ## When to skip this file entirely
 
 For pure infrastructure / library / refactor / harness PRs that touch no
-domain logic — the generic CP1–CP4 in the qc-behavioral agent file alone
-constitute the full review. Mark the entire S*/L*/C*/T* block NA with a
-note: "Pure infra / harness / refactor PR; domain checklist not applicable."
+domain logic — the full review is the generic CP1–CP4 in the qc-behavioral
+agent file **plus row F1** (findings-registry consistency; F1 is not skipped
+by this carve-out, though it is NA when no finding issue is closed). Mark only the S*/L*/C*/T* block NA with a note: "Pure infra / harness / refactor PR; domain checklist not applicable."
 qc-structural's A1 row will not be flagged for such PRs because there is
 no domain logic to leak into core modules.
 
