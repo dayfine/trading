@@ -55,8 +55,11 @@ val check_v22 : inputs -> Validator_step.finding
     a [Correction_not_recovered] predecessor can in principle still read a low
     from before the peak (the peak rises past 8.7% over that low and the next
     close sits just under it), and a dip and recovery inside a single bar
-    counts. The filter removes the phantoms the record can identify, not all of
-    them.
+    counts. On the non-default frozen path
+    ([reset_anchor_on_stalled_cycle = false]) the anchor is not reset after a
+    stall, so any later pullback reads [Correction_not_recovered] against the
+    old low and the filter admits phantoms of arbitrary shallowness. The filter
+    removes the phantoms the record can identify, not all of them.
 
     This covers both readings of the issue in one rule: a position held [>= N]
     weeks with a completed cycle and no raise at all (the whole hold is one

@@ -304,6 +304,18 @@ let test_stall_needs_correction_on_file _ =
   let with_prev symbol prev =
     history ~symbol [ seeded "2020-01-03"; prev; stall; last ]
   in
+  (* The predecessor stall itself follows [No_correction_yet], so it does not
+     count either. *)
+  let after_stall =
+    history ~symbol:"STALL"
+      [
+        seeded "2020-01-03";
+        ncy ~date:"2020-01-30" 10.0;
+        row ~date:"2020-01-31" ~reason:Sd.Cycle_stalled 10.0;
+        stall;
+        last;
+      ]
+  in
   assert_that
     (v22
        (loaded
@@ -311,6 +323,9 @@ let test_stall_needs_correction_on_file _ =
             with_prev "CNR" (cnr ~date:"2020-01-31" 10.0);
             with_prev "NCY" (ncy ~date:"2020-01-31" 10.0);
             with_prev "SEED" (seeded "2020-01-31");
+            with_prev "ANF"
+              (row ~date:"2020-01-31" ~reason:Sd.Anchor_not_fresh 10.0);
+            after_stall;
             history ~symbol:"FIRST" [ stall; last ];
           ]))
     (all_of
@@ -318,6 +333,74 @@ let test_stall_needs_correction_on_file _ =
          outcome ~n_violations:1 ~n_skipped:0 ~passed:false;
          details (elements_are [ field (fun (s, _, _) -> s) (equal_to "CNR") ]);
        ])
+
+(* Whether a [Cycle_stalled] row after [reason] counts. Exhaustive on purpose,
+   with no wildcard: a new [Stop_decision.reason] tag fails to compile here
+   until someone decides whether it is evidence of a correction on file (and
+   adds it to [all_reasons] below). *)
+let counts_after : Sd.reason -> bool = function
+  | Sd.Correction_not_recovered -> true
+  | Sd.Raised | Sd.No_correction_yet | Sd.Anchor_not_fresh | Sd.Cycle_stalled
+  | Sd.Seeded_trailing | Sd.Entered_tightening | Sd.Tightened_ratchet
+  | Sd.Tightened_hold | Sd.Stop_hit | Sd.Other_hold ->
+      false
+
+let all_reasons =
+  Sd.
+    [
+      Raised;
+      No_correction_yet;
+      Correction_not_recovered;
+      Anchor_not_fresh;
+      Cycle_stalled;
+      Seeded_trailing;
+      Entered_tightening;
+      Tightened_ratchet;
+      Tightened_hold;
+      Stop_hit;
+      Other_hold;
+    ]
+
+(* Table over every tag as the predecessor of one stall in a 154-day no-move
+   history: V22 fires exactly where [counts_after] says. The predecessor rows
+   leave the stop where it was, so only the predecessor filter is exercised. *)
+let test_predecessor_table _ =
+  let fires reason =
+    let h =
+      history
+        [
+          seeded "2020-01-03";
+          row ~date:"2020-01-31" ~reason 10.0;
+          row ~date:"2020-02-03" ~reason:Sd.Cycle_stalled 10.0;
+          ncy ~date:"2020-06-05" 10.0;
+        ]
+    in
+    (reason, (v22 (loaded [ h ])).n_violations > 0)
+  in
+  assert_that
+    (List.map all_reasons ~f:fires)
+    (equal_to
+       (List.map all_reasons ~f:(fun r -> (r, counts_after r))
+         : (Sd.reason * bool) list))
+
+(* A stall on the update right after a real raise does not count: the raise
+   reset the cycle, so no correction was on file. The raise starts a new
+   stretch, 150 days long, which therefore holds no counted stall. *)
+let test_stall_after_raise_not_counted _ =
+  assert_that
+    (v22
+       (loaded
+          [
+            history
+              [
+                seeded "2020-01-03";
+                row ~date:"2020-02-03" ~reason:Sd.Raised ~stop_after:11.0
+                  ~candidate:11.0 10.0;
+                row ~date:"2020-02-04" ~reason:Sd.Cycle_stalled 11.0;
+                ncy ~date:"2020-07-02" 11.0;
+              ];
+          ]))
+    (outcome ~n_violations:0 ~n_skipped:0 ~passed:true)
 
 (* A stall followed by a raise 100 days after the first row fires: the stretch
    the raise closes is long enough ("last raise older than 13 weeks"). *)
@@ -669,6 +752,8 @@ let suite =
          "no stall no fire" >:: test_no_stall_no_fire;
          "stall needs correction on file"
          >:: test_stall_needs_correction_on_file;
+         "predecessor table" >:: test_predecessor_table;
+         "stall after raise not counted" >:: test_stall_after_raise_not_counted;
          "stretch closed by raise counts"
          >:: test_stretch_closed_by_raise_counts;
          "move resets stalls" >:: test_move_resets_stalls;
