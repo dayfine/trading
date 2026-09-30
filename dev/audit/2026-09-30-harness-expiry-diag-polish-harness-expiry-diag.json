@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-30",
+  "feature": "harness-expiry-diag",
+  "branch": "harness/expiry-diag-polish",
+  "sha": "b64696f440ced78b0947a7a3b6fa16db04d38627",
+  "recorded_at_ns": 1790797792576692080,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

@@ -4,9 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-28 (orchestrator run 36444394197; `0c9809d9` → `3f77947f`). Queue at start: 5 cloud-session PRs (#3000 #3004 #3005
-#3006 #3007) with self-run QC only; this run re-gated each with independent mutation-probe QC, reworked #3005/#3006, merged all
-(see `dev/daily/2026-09-28.md`); harness #3008 + cleanup #3009 dispatched and merged here. Queue empty at run end.
+Last updated: 2026-09-30 (orchestrator run 36755366727). Queue at start: #3026 (behavioral NEEDS_REWORK, stale) + #3011 (stale weekly sweep).
+This run: #3026 reworked + merged; harness #3050 + cleanup #3049 dispatched and gated (see `dev/daily/2026-09-30.md`). #3011 left for human (recommend close).
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -131,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-28: exceptions-conf table + completeness guard MERGED #3008; next: pick next unblocked H-item |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 09-30: findings registry #3026 + expiry diagnostics #3050 MERGED; next: pick next unblocked H-item |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | release_report.ml 769→636 MERGED #3009 (1 rework); next: its I/O loader cluster, then trade_audit_ratings.ml |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | release_report.ml DONE (345, #3031); trade_audit_ratings.ml 1001→654 pass 1 MERGED #3049; next: pass 2 behavioural-metric cluster |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

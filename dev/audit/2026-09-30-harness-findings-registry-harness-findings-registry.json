@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-30",
+  "feature": "harness-findings-registry",
+  "branch": "harness/findings-registry",
+  "sha": "f93f20842498d6607e69e3d903e63679e963c5eb",
+  "recorded_at_ns": 1790797792502096884,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-30",
+  "feature": "cleanup-trade-audit-ratings",
+  "branch": "cleanup/trade-audit-ratings-file-length",
+  "sha": "f3a2f85c6ced3990488aad65ecc4e7ee514571f2",
+  "recorded_at_ns": 1790797792647034909,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 3,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
