@@ -1,7 +1,7 @@
 ((symbol                      SPY)
  (last_verified               2026-09-29)
  (verification_status         Verified)
- (data_start_date             1993-01-29)
+ (data_start_date             2009-01-02)
  (data_end_date               2026-09-28)
  (has_volume                  true)
  (last_n_prices_avg_below_10  false)
