@@ -13,6 +13,7 @@
   test_trade_audit_basis
   test_trade_audit_report
   test_trade_audit_ratings
+  test_trade_audit_ratings_format
   test_trade_audit_html_report
   test_trade_score
   test_trade_context
