@@ -614,7 +614,7 @@ let test_report_run_wires_params_and_screens _ =
   in
   let report =
     with_run_dir files ~f:(fun ~dir ~out ->
-        Vr.run ~run_dir:dir ~data_dir:dir ~config:Vt.default_config ~out)
+        Vr.run ~run_dir:dir ~data_dir:dir ~config:Vt.default_config ~out ())
   in
   assert_that (find_check "V23" report)
     (is_some_and

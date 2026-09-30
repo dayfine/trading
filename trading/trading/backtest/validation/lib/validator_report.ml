@@ -70,7 +70,7 @@ let _maybe_open path =
     Validator_artifacts.parse_open_positions_csv path
   else []
 
-let run ~run_dir ~data_dir ~config ~out =
+let run ?share_class_path ~run_dir ~data_dir ~config ~out () =
   let trades = Validator_artifacts.parse_trades_csv (run_dir ^ "/trades.csv") in
   let open_positions = _maybe_open (run_dir ^ "/open_positions.csv") in
   let audit, audit_absent = _maybe_audit (run_dir ^ "/trade_audit.sexp") in
@@ -79,7 +79,13 @@ let run ~run_dir ~data_dir ~config ~out =
   in
   let run_end = _infer_run_end trades in
   let bars = Validator_artifacts.load_bars ~data_dir ~run_end in
-  let share_classes = Validator_twin_check.load_share_classes ~data_dir in
+  let share_class_path =
+    Option.value share_class_path
+      ~default:(Validator_twin_check.share_class_source_path ~data_dir)
+  in
+  let share_classes =
+    Validator_twin_check.load_share_classes ~path:share_class_path
+  in
   let inputs =
     {
       trades;
@@ -90,6 +96,7 @@ let run ~run_dir ~data_dir ~config ~out =
       stop_histories = audit.stop_histories;
       macro_suspend;
       share_classes;
+      share_class_path = Some share_class_path;
       bars;
       run_end;
       config;
