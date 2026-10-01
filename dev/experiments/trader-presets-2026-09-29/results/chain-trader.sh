@@ -2,11 +2,13 @@
 # Trader-preset matrix (dev/experiments/trader-presets-2026-09-29, #3038). Copied from investor-preset chain-investor.sh; paths only.
 # Both fill-model fixes on in every spec. Token = <spec>:<salt>[:<pair-spec>]; a cell with a pair spec is V6-gated
 # (validator_diff -check V6) against <pair-spec>-s<salt>, which must run EARLIER in the same chain.
-# PINNED worktree sweep-investor at main 1c2647743 (#2966 require_structural_stop). BUILD=1 builds the 3 exes first.
+# PINNED worktree: WTREL is passed by launch.sh (.claude/worktrees/sweep-trader at main 6bcefc0c8, #3052); the
+# default below is inherited from chain-investor.sh and unused here. BUILD=1 builds the 3 exes first.
 # Derived from obvious-fixes-2026-09-25/chain-fixes.sh.
 # Derived from index-stage-veto-2026-09-16/chain-veto.sh (lanes B+ settings: cap 12,000, 60,000 s guard =
-# 2.1x the slowest measured 26y PIT cell, 4h48m). Usage: [BUILD=1] [PREFLIGHT=1] EXPECT_HEAD=<sha> sh chain-investor.sh <lane> <spec>:<salt>...
-# Artifacts: /tmp/sweeps/investor-preset/ (bind-mounted). Specs staged OUTSIDE any VCS tree at /tmp/trader-run/specs.
+# 2.1x the slowest measured 26y PIT cell, 4h48m). This run: launch.sh sets CELL_TIMEOUT=10800 (5y cells; slowest
+# cell in this run 1h23m, chain-M.log). Usage: [BUILD=1] [PREFLIGHT=1] EXPECT_HEAD=<sha> sh chain-trader.sh <lane> <spec>:<salt>...
+# Artifacts: /tmp/sweeps/trader-presets/ (bind-mounted). Specs staged OUTSIDE any VCS tree at /tmp/trader-run/specs.
 set -u
 LANE=$1; shift
 C=trading-1-dev; REPO=/Users/difan/Projects/trading-1; WTREL=${WTREL:-.claude/worktrees/sweep-investor}   # pinned at main 1c2647743
