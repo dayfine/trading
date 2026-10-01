@@ -44,7 +44,8 @@
 ((issue 2975) (ref "salt0-analysis s3 #6")
  (finding "installed stop is about half of the audit's suggested_stop (screener proxy read as installed)")
  (guard ((unit ("trading/trading/backtest/test/test_trade_audit.ml"
-                "entry_decision sexp writes the screener_proxy_stop key"))))
+                "entry_decision sexp writes the screener_proxy_stop key"))
+         (validator V21)))
  (status fixed))
 
 ((issue 2974) (ref "salt0-analysis s3 #7")
@@ -52,7 +53,8 @@
  (guard ((unit ("trading/trading/weinstein/stops/test/test_stop_anchor_rules.ml"
                 "correction_must_follow_peak on: pure advance never raises"))
          (unit ("trading/trading/backtest/test/test_stop_log.ml"
-                "installed stop, then one raise"))))
+                "installed stop, then one raise"))
+         (validator V22)))
  (status fixed-behind-flag))
 
 ((ref "salt0-analysis s3 #8")
@@ -70,7 +72,8 @@
 ((issue 2976) (ref "salt0-analysis s3 #10")
  (finding "resting tickets fill in Bearish weeks (bypass the macro gate)")
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_entry_ticket_suspend.ml"
-                "On: withdraw, then re-issue unchanged"))))
+                "On: withdraw, then re-issue unchanged"))
+         (validator V23)))
  (status fixed-behind-flag))
 
 ((ref "salt0-analysis s3 #11")
@@ -118,7 +121,8 @@
 ((issue 2973) (ref "salt0-analysis s3 #19")
  (finding "split basis keeps recurring (audit close raw vs MA adjusted)")
  (guard ((unit ("trading/trading/weinstein/split_corpus/test/test_split_corpus_entry_audit.ml"
-                "entry_audit_reports_close_vs_ma_on_one_basis"))))
+                "entry_audit_reports_close_vs_ma_on_one_basis"))
+         (validator V20)))
  (status fixed))
 
 ((issue 2977) (ref "salt0-analysis s3 #20")
@@ -144,7 +148,8 @@
 ((issue 2982)
  (finding "stop raise mixes split-adjusted MA with raw bars")
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_stop_ma_same_basis.ml"
-                "later-split tape: flag on raises to the correction low"))))
+                "later-split tape: flag on raises to the correction low"))
+         (validator V22)))
  (status fixed-behind-flag))
 
 ((issue 2983)
@@ -166,5 +171,6 @@
 ((issue 2989)
  (finding "re-issued suspended entry tickets not linked to their original placement")
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_entry_ticket_suspend.ml"
-                "a re-issue event names the first placement"))))
+                "a re-issue event names the first placement"))
+         (validator V19)))
  (status fixed))
