@@ -139,6 +139,71 @@ let test_behavioral_nan_below_threshold_truncated _ =
        @ [ ""; "- Flagged outliers: 0"; "- Outliers (top 5):"; "  _none_"; "" ]
        ))
 
+let test_exit_winners_outlier_cap _ =
+  let m : TR.behavioral_metrics =
+    {
+      over_trading =
+        {
+          total_trades = 7;
+          trades_per_year = Float.nan;
+          exceeds_threshold = false;
+          concentrated_burst_pct = 0.0;
+          outliers = [];
+        };
+      exit_winners_too_early =
+        {
+          winners_evaluated = 6;
+          flagged_count = 6;
+          avg_left_on_table_pct = 0.0;
+          outliers = _outliers "W" 6;
+        };
+      exit_losers_too_late =
+        {
+          losers_evaluated = 0;
+          flagged_count = 0;
+          stop_discipline_pct = 0.0;
+          outliers = [];
+        };
+      entering_losers_often =
+        { per_quartile = []; flagged_count = 0; outliers = [] };
+    }
+  in
+  assert_that
+    (TR.format_behavioral_section m)
+    (equal_to
+       ([
+          "## Behavioural metrics";
+          "";
+          "### (a) Over-trading";
+          "- Total trades: 7";
+          "- Trades / year: —";
+          "- Concentrated-burst share: 0.0%";
+          "- Outliers (top 5):";
+          "  _none_";
+          "";
+          "### (b) Exit-winners-too-early";
+          "- Winners evaluated: 6";
+          "- Flagged (realized < 50% of MFE): 6";
+          "- Avg pp left on the table: 0.00";
+          "- Outliers (top 5):";
+        ]
+       @ _outlier_lines "W" 5
+       @ [
+           "";
+           "### (c) Exit-losers-too-late";
+           "- Losers evaluated: 0";
+           "- Flagged (|R|>1.5 or MAE\xe2\x89\xa51.5\xc3\x97realized): 0";
+           "- Stop discipline (|R|\xe2\x89\xa41.0): 0.0%";
+           "- Outliers (top 5):";
+           "  _none_";
+           "";
+           "### (d) Entering-losers-too-often (cascade quartile vs outcome)";
+           "";
+         ]
+       @ _quartile_header
+       @ [ ""; "- Flagged outliers: 0"; "- Outliers (top 5):"; "  _none_"; "" ]
+       ))
+
 let test_weinstein_all_rules_truncated _ =
   let agg : TR.weinstein_aggregate =
     {
@@ -214,6 +279,7 @@ let suite =
          "per-trade extras empty" >:: test_per_trade_extras_empty;
          "behavioral nan / below threshold / truncated"
          >:: test_behavioral_nan_below_threshold_truncated;
+         "exit winners outlier cap" >:: test_exit_winners_outlier_cap;
          "weinstein all rules + critical cap"
          >:: test_weinstein_all_rules_truncated;
          "decision quality nan + Q2/Q3" >:: test_decision_quality_nan_q2_q3;
