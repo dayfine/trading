@@ -777,6 +777,41 @@ let test_over_trading_burst_detection _ =
            (float_equal ~epsilon:1e-9 (200.0 /. 3.0));
        ])
 
+(* The burst window is inclusive: two same-symbol entries exactly
+   [concentrated_burst_window_days] (30) apart are both in-burst; 31 apart are
+   not. Pins the [<=] comparison against an off-by-one [<]. *)
+let test_over_trading_burst_window_boundary _ =
+  let pair symbol d1 d2 =
+    [
+      make_record (make_entry ~symbol ~entry_date:(_date d1) ());
+      make_record
+        (make_entry ~symbol ~entry_date:(_date d2) ~position_id:(symbol ^ "-2")
+           ());
+    ]
+  in
+  let trade symbol d =
+    make_trade ~symbol ~entry_date:(_date d) ~exit_date:(_date "2024-12-01") ()
+  in
+  let audit =
+    pair "AAPL" "2024-01-01" "2024-01-31"
+    @ pair "MSFT" "2024-01-01" "2024-02-01"
+  in
+  let trades =
+    [
+      trade "AAPL" "2024-01-01";
+      trade "AAPL" "2024-01-31";
+      trade "MSFT" "2024-01-01";
+      trade "MSFT" "2024-02-01";
+    ]
+  in
+  let ratings = TR.rate_all ~config:cfg ~audit ~trades () in
+  let m = TR.behavioral_metrics_of ~config:cfg ~ratings ~audit ~trades in
+  assert_that m.over_trading
+    (field
+       (fun (m : TR.over_trading) ->
+         List.map m.outliers ~f:(fun (o : TR.outlier_trade) -> o.symbol))
+       (elements_are [ equal_to "AAPL"; equal_to "AAPL" ]))
+
 (* -- Behavioural metric (b) — exit winners too early --------------------- *)
 
 let test_exit_winners_flagged_when_realized_below_half_mfe _ =
@@ -906,6 +941,44 @@ let test_entering_losers_flags_bottom_quartile_loser _ =
          field
            (fun (e : TR.entering_losers_often) -> List.length e.per_quartile)
            (equal_to 4);
+       ])
+
+(* A loser in the TOP cascade quartile is flagged as a blind spot (distinct
+   from a bottom-quartile loser). Scores 90/70/50/30; only the 90 loses. *)
+let test_entering_losers_flags_top_quartile_loser _ =
+  let make_pair ~symbol ~score ~pnl ~ed =
+    let entry =
+      make_entry ~symbol ~cascade_score:score ~initial_risk_dollars:1_000.0
+        ~entry_date:ed ()
+    in
+    let trade =
+      make_trade ~symbol ~entry_date:ed ~pnl_dollars:pnl
+        ~pnl_percent:(pnl /. 100.0) ()
+    in
+    (make_record entry, trade)
+  in
+  let pairs =
+    [
+      make_pair ~symbol:"A" ~score:90 ~pnl:(-500.0) ~ed:(_date "2024-01-01");
+      make_pair ~symbol:"B" ~score:70 ~pnl:500.0 ~ed:(_date "2024-02-01");
+      make_pair ~symbol:"C" ~score:50 ~pnl:200.0 ~ed:(_date "2024-03-01");
+      make_pair ~symbol:"D" ~score:30 ~pnl:1_000.0 ~ed:(_date "2024-04-01");
+    ]
+  in
+  let audit = List.map pairs ~f:fst in
+  let trades = List.map pairs ~f:snd in
+  let ratings = TR.rate_all ~config:cfg ~audit ~trades () in
+  let m = TR.behavioral_metrics_of ~config:cfg ~ratings ~audit ~trades in
+  assert_that m.entering_losers_often
+    (all_of
+       [
+         field
+           (fun (e : TR.entering_losers_often) -> e.flagged_count)
+           (equal_to 1);
+         field
+           (fun (e : TR.entering_losers_often) ->
+             List.map e.outliers ~f:(fun (o : TR.outlier_trade) -> o.symbol))
+           (elements_are [ equal_to "A" ]);
        ])
 
 (* -- Decision quality matrix --------------------------------------------- *)
@@ -1311,6 +1384,8 @@ let suite =
          >:: test_rate_hold_time_anomaly_indefinite;
          "rate mfe / mae threaded" >:: test_rate_mfe_mae_threaded;
          "over-trading burst detection" >:: test_over_trading_burst_detection;
+         "over-trading burst window boundary"
+         >:: test_over_trading_burst_window_boundary;
          "exit winners flagged when realized below half mfe"
          >:: test_exit_winners_flagged_when_realized_below_half_mfe;
          "exit losers flagged when r-multiple exceeds threshold"
@@ -1319,6 +1394,8 @@ let suite =
          >:: test_exit_losers_stop_discipline_pct;
          "entering losers flags bottom-quartile loser"
          >:: test_entering_losers_flags_bottom_quartile_loser;
+         "entering losers flags top-quartile loser"
+         >:: test_entering_losers_flags_top_quartile_loser;
          "decision quality matrix by score"
          >:: test_decision_quality_matrix_by_score;
          "weinstein aggregate per-rule counts"
