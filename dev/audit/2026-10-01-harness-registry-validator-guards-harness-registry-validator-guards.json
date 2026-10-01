@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-01",
+  "feature": "harness-registry-validator-guards",
+  "branch": "harness/registry-validator-guards",
+  "sha": "05bfcca9db98bd4efd7a3e546d432385a6d4d28d",
+  "recorded_at_ns": 1790870900323394534,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
