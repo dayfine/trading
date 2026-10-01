@@ -206,5 +206,6 @@
 ((issue 3045)
  (finding "V6 share-class map resolved from -data-dir, missing when data lives elsewhere")
  (guard ((unit ("trading/trading/backtest/validation/test/test_validator_twin_check.ml"
-                "run reads map from separate dir"))))
+                "run reads map from separate dir"))
+         (validator V6)))
  (status fixed))
