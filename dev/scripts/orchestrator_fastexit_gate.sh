@@ -736,7 +736,7 @@ _hours_since_prior_summary() {
 # _status_changed_since <iso-timestamp>
 # Count of dev/status/ file touches by a commit since <iso-timestamp>,
 # excluding the orchestrator's own summary-landing commits ("ops: daily
-# orchestrator summary ..." -- Step 5.5's auto-merged index reconciliation,
+# orchestrator summary ..." or "ops: daily summary ..." -- Step 5.5's auto-merged index reconciliation,
 # not new track drift). Same exemption intent as lead-orchestrator.md Step
 # 0.5 Condition 2, but resolved per-commit rather than by a single grep
 # pipeline: a `--name-only --pretty="%s"` stream interleaves each subject
@@ -752,7 +752,7 @@ _status_changed_since() {
   for _hash in $(git log --since="$_since" --pretty="format:%H" -- dev/status/); do
     _subject=$(git log -1 --pretty="format:%s" "$_hash")
     case "$_subject" in
-      "ops: daily orchestrator summary "*) continue ;;
+      "ops: daily orchestrator summary "*|"ops: daily summary "*) continue ;;
     esac
     _n=$(git show --name-only --pretty="format:" "$_hash" -- dev/status/ | grep -c '\.' || true)
     _count=$((_count + _n))
