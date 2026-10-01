@@ -174,3 +174,37 @@
                 "a re-issue event names the first placement"))
          (validator V19)))
  (status fixed))
+
+; ---- share-class twins and short-stop side (#3055) ----
+
+((issue 3015)
+ (finding "investor preset held GOOG+GOOGL, two share classes of one issuer")
+ (guard ((unit ("trading/trading/weinstein/strategy/test/test_share_class_gate.ml"
+                "flag on skips second class while first held"))
+         (validator V6)))
+ (status fixed-behind-flag))
+
+((issue 3035)
+ (finding "V6 missed held share-class pairs such as FWONA+FWONK")
+ (guard ((unit ("trading/trading/backtest/validation/test/test_validator_twin_check.ml"
+                "fwon overlap is a violation"))
+         (validator V6)))
+ (status fixed))
+
+((issue 3039)
+ (finding "short Support_floor installed stop below the entry in pre-#2986 artefacts")
+ (guard ((unit ("trading/trading/weinstein/stops/test/test_short_floor_stop_side.ml"
+                "short Support_floor stop above entry (#3039)"))))
+ (status fixed))
+
+((issue 3043)
+ (finding "split_safe_floors on: adjusted floor vs raw entry puts a short stop below entry")
+ (guard none)
+ (reason "open; default-off flag, no spec arms it; fix and its tests tracked in #3043")
+ (status open))
+
+((issue 3045)
+ (finding "V6 share-class map resolved from -data-dir, missing when data lives elsewhere")
+ (guard ((unit ("trading/trading/backtest/validation/test/test_validator_twin_check.ml"
+                "run reads map from separate dir"))))
+ (status fixed))
