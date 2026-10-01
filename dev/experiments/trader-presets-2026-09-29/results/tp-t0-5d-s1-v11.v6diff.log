@@ -1,0 +1,7 @@
+check | pair | arm | verdict
+V6    |    0 |   1 | DIFFER
+
+specimens present in some reports but not all:
+  V6 CMD 2009-06-08 (twin positions: CMD/CMN) -- only in: arm
+FAIL: validator invariant counts differ -- these arms hold different instrument sets and their delta is not a paired read
+exit=1
