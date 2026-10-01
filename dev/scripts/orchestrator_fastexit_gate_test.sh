@@ -460,6 +460,18 @@ _add_status_drift_commit "harness: direct-subcommand drift fixture"
 _got=$(cd "$TMP_REPO" && "$GATE" status_changed_since "2026-08-26T00:00:00")
 check "status_changed_since reports the drift count directly" 1 "$_got"
 
+# --- Scenario 9b: the REAL summary-commit subject shape
+# ("ops: daily summary <date> (#NNNN)", per publish_daily_summary.sh) is
+# exempt; a non-summary "ops:" commit is still counted.
+_reset_repo_no_drift
+_add_status_drift_commit "ops: daily summary 2026-10-01 (#3060)"
+_got=$(cd "$TMP_REPO" && "$GATE" status_changed_since "2026-08-26T00:00:00")
+check "real 'ops: daily summary <date> (#N)' subject is exempt" 0 "$_got"
+_reset_repo_no_drift
+_add_status_drift_commit "ops: unrelated cleanup (#1)"
+_got=$(cd "$TMP_REPO" && "$GATE" status_changed_since "2026-08-26T00:00:00")
+check "a non-summary ops: commit is still counted" 1 "$_got"
+
 # =========================================================================
 # CP1/CP4 (#2605 rework): the curl backend must fail CLOSED, not open, when
 # it cannot produce a trustworthy PR count -- both for a bare curl failure
