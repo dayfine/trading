@@ -1,4 +1,24 @@
 (library
+ (name bar_loader)
+ (public_name scripts.bar_loader)
+ (modules bar_loader)
+ (libraries core core_unix status types fpath csv bar_window)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
+ (name manifest_carry)
+ (public_name scripts.manifest_carry)
+ (modules manifest_carry)
+ (libraries
+  core
+  status
+  trading.data_panel.snapshot
+  weinstein.snapshot_pipeline)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
  (name universe_loader)
  (modules universe_loader)
  (libraries core status universe)
@@ -22,6 +42,32 @@
   (pps ppx_jane)))
 
 (library
+ (name build_cli)
+ (public_name scripts.build_cli)
+ (modules build_cli)
+ (libraries core core_unix status weinstein.snapshot_pipeline)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
+ (name symbol_builder)
+ (public_name scripts.symbol_builder)
+ (modules symbol_builder)
+ (libraries
+  core
+  core_unix
+  status
+  types
+  fpath
+  trading.data_panel.snapshot
+  bar_window
+  bar_loader
+  weinstein.snapshot_pipeline
+  csv)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
  (name build_runner)
  (public_name scripts.build_runner)
  (modules build_runner)
@@ -33,6 +79,9 @@
   fpath
   trading.data_panel.snapshot
   bar_window
+  symbol_builder
+  manifest_carry
+  build_cli
   level_pass
   weinstein.snapshot_pipeline
   csv

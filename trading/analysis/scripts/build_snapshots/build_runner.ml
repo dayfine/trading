@@ -1,12 +1,9 @@
 open Core
-module Pipeline = Snapshot_pipeline.Pipeline
+module Carry = Manifest_carry
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_verifier = Snapshot_pipeline.Snapshot_verifier
 module Series_tail = Snapshot_pipeline.Series_tail
-module Series_splice = Snapshot_pipeline.Series_splice
 module Series_level = Snapshot_pipeline.Series_level
-module Weekly_sidetable_builder = Snapshot_pipeline.Weekly_sidetable_builder
-module Snapshot_columnar = Data_panel_snapshot.Snapshot_columnar
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
 
@@ -18,57 +15,15 @@ let default_progress_every = 50
    cap), so a symbol that traded through the whole span is never a false virgin
    at the scenario start. CLIs surface this as [--sketch-deep-days]. *)
 let default_sketch_deep_days = 3650
-
-(* Slack, in calendar days, between the universe's last bar and a symbol's own
-   last bar before that symbol counts as delisted (#2693). The vendor lags a
-   few names by a day or two — a symbol whose series stops on the Wednesday of
-   the store's final week is still trading, not delisted. CLIs surface this as
-   [--survivor-tolerance-days]. *)
-let default_survivor_tolerance_days = 7
-
-(* Committed veto list for {!Series_tail}. Documented, not defaulted: the flag
-   stays optional so a build's behaviour never depends on the caller's cwd. *)
-let default_exceptions_path = "trading/test_data/warehouse_exceptions.sexp"
+let default_survivor_tolerance_days = Build_cli.default_survivor_tolerance_days
+let default_exceptions_path = Build_cli.default_exceptions_path
 let tail_report_name = "terminal_runs.csv"
-
-(* One built symbol: its manifest entry, the date of its last stored bar (None
-   when the entry was reused from a previous incremental run, so no bars were
-   read), the tail findings to report, and the store-level review row when the
-   level pass is armed and this symbol's stored series failed its rule. *)
-type built = {
-  entry : Snapshot_manifest.file_metadata;
-  last_bar : Core.Date.t option;
-  findings : Series_tail.finding list;
-  level : Series_level.finding option;
-}
-
-(* Series-hygiene knobs, bundled so the per-symbol call chain threads one
-   parameter rather than three. *)
-type hygiene_opts = {
-  config : Series_tail.Config.t;
-  exceptions : Series_tail.Exceptions.t;
-  level_config : Series_level.Config.t;
-      (* Store-level sanity ({!Series_level}), REPORT-ONLY: it classifies the
-         series this builder already decided to store and has no action type, so
-         an armed pass changes no [.snap] and no manifest entry. Defaults to
-         [enabled = false], under which [classify] reads no bar. *)
-  splice_cuts : Core.Date.t Map.M(String).t;
-      (* Symbols to cut at build time, and the date to keep bars from (#2672
-         class ii). Decided by the scanner that sees every symbol's full
-         history; applied here to the build-window bars AND to the deep-history
-         prefix that feeds the weekly side-table. Symbols the scanner DROPPED
-         never reach the runner — they are removed from [symbols]. *)
-}
-
-(* Constructor rather than an inline record literal at the call site, so [build]
-   stays a readable sequence of stages as the bundle grows a field. *)
-let _hygiene_opts ~tail_config ~tail_exceptions ~level_config ~splice_cuts =
-  {
-    config = tail_config;
-    exceptions = tail_exceptions;
-    level_config;
-    splice_cuts;
-  }
+let survivor_tolerance_param = Build_cli.survivor_tolerance_param
+let tail_params = Build_cli.tail_params
+let load_tail_exceptions = Build_cli.load_tail_exceptions
+let load_splice_exceptions = Build_cli.load_splice_exceptions
+let tail_exceptions_or_exit = Build_cli.tail_exceptions_or_exit
+let splice_exceptions_or_exit = Build_cli.splice_exceptions_or_exit
 
 type progress = {
   symbols_total : int;
@@ -79,103 +34,9 @@ type progress = {
 }
 [@@deriving sexp]
 
-let _csv_mtime ~data_dir ~symbol =
-  let dir = Csv.Csv_storage.symbol_data_dir ~data_dir symbol in
-  let csv_path = Fpath.add_seg dir "data.csv" |> Fpath.to_string in
-  if Stdlib.Sys.file_exists csv_path then
-    Some (Core_unix.stat csv_path).st_mtime
-  else None
-
-let _load_bars ~data_dir ~symbol =
-  match Csv.Csv_storage.create ~data_dir symbol with
-  | Error err ->
-      Error
-        (Status.invalid_argument_error
-           (Printf.sprintf "create %s: %s" symbol (Status.show err)))
-  | Ok storage -> Csv.Csv_storage.get storage ()
-
-(* Window a symbol's loaded bars to the inclusive [start_date, end_date] range
-   before the snapshot pipeline sees them. Mirrors [Csv_snapshot_builder]'s
-   windowing so a snapshot-mode warehouse stays cache-friendly (see
-   {!Bar_window} for the perf rationale + warmup caveat). When both bounds are
-   [None] the bars pass through unchanged. *)
-let _window_bars ~start_date ~end_date bars =
-  Bar_window.filter ?start:start_date ?end_:end_date bars
-
-let _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol =
-  match _load_bars ~data_dir ~symbol with
-  | Error _ as err -> err
-  | Ok bars -> Ok (_window_bars ~start_date ~end_date bars)
-
-(* Deep-history slice [[start_date - sketch_deep_days, start_date)] that feeds
-   ONLY the resistance sketch (resistance-v2 §D4). Empty when [start_date] is
-   [None] (full-history build already carries all bars in the window). The
-   inclusive [end_ = start - 1 day] keeps the slice strictly before the window,
-   so it never overlaps [_window_bars ~start_date]. *)
-let _deep_bars ~sketch_deep_days ~start_date bars =
-  match start_date with
-  | None -> []
-  | Some start ->
-      let deep_start = Date.add_days start (-sketch_deep_days) in
-      let deep_end = Date.add_days start (-1) in
-      Bar_window.filter ~start:deep_start ~end_:deep_end bars
-
-(* Load a symbol once, split into (deep_bars, window_bars): rows are emitted for
-   [window_bars] only, while [deep_bars] widen the sketch's weekly prefix. *)
-let _load_split_bars ~data_dir ~start_date ~end_date ~sketch_deep_days ~symbol =
-  match _load_bars ~data_dir ~symbol with
-  | Error e -> Error e
-  | Ok bars ->
-      Ok
-        ( _deep_bars ~sketch_deep_days ~start_date bars,
-          _window_bars ~start_date ~end_date bars )
-
-let _file_path ~output_dir ~symbol =
-  Filename.concat output_dir (symbol ^ ".snap")
-
-(* Sketch-v5 weekly side-table file, next to the symbol's [.snap]. *)
-let _weekly_path ~output_dir ~symbol =
-  Filename.concat output_dir (symbol ^ ".weekly")
-
 let _existing_manifest ~output_dir =
   let path = Filename.concat output_dir "manifest.sexp" in
   match Snapshot_manifest.read ~path with Ok m -> Some m | Error _ -> None
-
-let _entry_is_current ~csv_mtime (e : Snapshot_manifest.file_metadata) =
-  Float.( <= ) csv_mtime e.csv_mtime && Stdlib.Sys.file_exists e.path
-
-let _should_skip ~existing ~symbol ~csv_mtime ~schema =
-  match existing with
-  | None -> false
-  | Some (m : Snapshot_manifest.t) ->
-      String.equal m.schema_hash schema.Snapshot_schema.schema_hash
-      && Option.value_map
-           (Snapshot_manifest.find m ~symbol)
-           ~default:false
-           ~f:(_entry_is_current ~csv_mtime)
-
-let _file_metadata ~symbol ~path ~csv_mtime ~active_through =
-  let bytes = In_channel.read_all path in
-  {
-    Snapshot_manifest.symbol;
-    path;
-    byte_size = String.length bytes;
-    payload_md5 = Stdlib.Digest.to_hex (Stdlib.Digest.string bytes);
-    csv_mtime;
-    active_through;
-  }
-
-(* Last-bar [active_through] is the symbol's delisting marker when the source
-   carries one. The CSV loader sets the same value on every row of a symbol's
-   history, so reading the tail is equivalent to reading any row. In practice no
-   vendor path populates it (the EODHD parser leaves it [None]) — see
-   {!_derive_active_through} for the series-end derivation that does. *)
-let _active_through_of_bars (bars : Types.Daily_price.t list) : Date.t option =
-  List.last bars
-  |> Option.bind ~f:(fun (b : Types.Daily_price.t) -> b.active_through)
-
-let _last_bar_date (bars : Types.Daily_price.t list) : Date.t option =
-  List.last bars |> Option.map ~f:(fun (b : Types.Daily_price.t) -> b.date)
 
 (* Series end IS the delisting evidence (#2672): a symbol whose last stored bar
    falls more than [survivor_tolerance_days] behind the universe's own last bar
@@ -196,179 +57,6 @@ let _derive_active_through ~universe_end ~survivor_tolerance_days ~bar_marker
         ->
           Some last
       | _ -> None)
-
-let _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows =
-  (* Emit the v2 columnar mmap format ({!Snapshot_columnar}); it validates
-     single-symbol + single-schema and sorts rows by date, exactly the
-     preconditions a per-symbol [.snap] file already satisfies. The verifier
-     ([Snapshot_verifier]) format-detects, so v2 round-trips on read-back. *)
-  match Snapshot_columnar.write ~path rows with
-  | Error err -> Error err
-  | Ok () -> Ok (_file_metadata ~symbol ~path ~csv_mtime ~active_through)
-
-(* Sketch-v5 PR 4: ALWAYS write the sparse [SYMBOL.weekly] side-table next to
-   the [.snap], built from the SAME weekly aggregation the retired dense sketch
-   used to consume. It is now the ONLY overhead-supply representation the reader
-   has (the dense [Res_*] columns were dropped from the canonical schema), so
-   emission is unconditional rather than behind the old [--emit-weekly-sidetable]
-   flag. Best-effort — a side-table write failure is logged, not fatal, so it
-   never aborts the [.snap] warehouse build. *)
-let _write_weekly ~output_dir ~symbol ~deep_bars ~bars =
-  let path = _weekly_path ~output_dir ~symbol in
-  let entries = Weekly_sidetable_builder.of_bars ~deep_bars ~bars in
-  match Weekly_sidetable.write_file ~path entries with
-  | Ok () -> ()
-  | Error err ->
-      Printf.eprintf "weekly side-table write failed for %s: %s\n%!" symbol
-        (Status.show err)
-
-(* Phantom-bar hygiene, applied to the windowed bars BEFORE the pipeline sees
-   them: the [.snap] (and its weekly side-table) then contain only real prints.
-   [deep_bars] are strictly before the window and feed only the side-table's
-   depth, so a TRUNCATION leaves them alone — it edits the series' end, and a
-   bar before the window cannot be part of it. (The splice cut below edits the
-   series' START, so it does reach them.) *)
-let _clean_tail ~(hygiene : hygiene_opts) ~symbol bars =
-  Series_tail.apply hygiene.config ~exceptions:hygiene.exceptions ~symbol bars
-
-(* Store-level sanity reads the series the builder is ABOUT TO STORE — after the
-   splice cut and after the tail rule — because the question it asks is whether
-   what lands in the [.snap] is a plausible price series at all. Its residual
-   class is defined against exactly those bars: a mis-scale seam falling OUTSIDE
-   the build window presents, inside the window, as a uniformly mis-scaled
-   stored series with no discontinuity for either shape rule to key on. Running
-   it on the raw pre-cut bars would instead re-find defects those rules already
-   removed. Report-only: the row is carried out to the sidecar, never acted
-   on. *)
-let _classify_level ~(hygiene : hygiene_opts) ~symbol bars =
-  Series_level.classify hygiene.level_config ~symbol bars
-
-(* The #2732 prefix cut is the one tail edit that moves the series' START, so
-   unlike a truncation it DOES reach the deep prefix: the mis-scaled segment is
-   by construction older than the cut date, so every deep bar predates it and
-   leaving them would put AGR's $73,566 weekly bars into the side-table — the
-   only overhead-supply representation the reader has. Same [keep_from] the
-   splice cut uses, so the two cannot drift apart. *)
-let _cut_deep_prefix ~findings deep_bars =
-  match Series_tail.prefix_cut_from findings with
-  | None -> deep_bars
-  | Some date -> Series_splice.keep_from date deep_bars
-
-(* Splice hygiene runs BEFORE the tail rule: cutting away the earlier issuer
-   first means the tail rule then reads one company's series, which is the
-   series whose terminal run it is meant to classify.
-
-   Applied to [deep_bars] as well as the window bars, and that is not a
-   symmetry for its own sake: the scan and build windows are the same, so a cut
-   date is always inside the window and the whole deep prefix — up to
-   [sketch_deep_days] of it — is by construction the EARLIER issuer's. Cutting
-   it yields [] for a cut symbol, which is the right depth for a series that
-   starts at the cut. Leaving it would put ten years of the previous company's
-   weekly bars into the side-table, which is the only overhead-supply
-   representation the reader has — precisely the two-issuers defect the cut
-   exists to close. *)
-let _cut_splice ~(hygiene : hygiene_opts) ~symbol bars =
-  match Map.find hygiene.splice_cuts symbol with
-  | None -> bars
-  | Some date -> Series_splice.keep_from date bars
-
-(* The per-symbol checkpoint carries only the EXPLICIT marker: the universe's
-   end is not known until every symbol has been read, so the series-end
-   derivation happens once in {!_finalize_entries}. *)
-let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-    ~output_dir ~csv_mtime ~hygiene =
-  let path = _file_path ~output_dir ~symbol in
-  let deep_bars = _cut_splice ~hygiene ~symbol deep_bars in
-  let bars, findings =
-    _clean_tail ~hygiene ~symbol (_cut_splice ~hygiene ~symbol bars)
-  in
-  let deep_bars = _cut_deep_prefix ~findings deep_bars in
-  let level = _classify_level ~hygiene ~symbol bars in
-  let last_bar = _last_bar_date bars in
-  let active_through = _active_through_of_bars bars in
-  match
-    Pipeline.build_for_symbol ~symbol ~bars ~deep_bars ~schema ?benchmark_bars
-      ()
-  with
-  | Error err -> Error err
-  | Ok rows ->
-      _write_weekly ~output_dir ~symbol ~deep_bars ~bars;
-      Result.map
-        (_write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows)
-        ~f:(fun entry -> { entry; last_bar; findings; level })
-
-(* An incremental-skipped symbol reuses its previous entry verbatim, including
-   the [active_through] that build derived. No bars were read, so [last_bar] is
-   [None] and the entry is passed through the final derivation untouched — and
-   for the same reason it contributes no tail findings and no level row, which
-   keeps both sidecars scoped to the work this run actually did. *)
-let _maybe_reuse ~existing ~symbol =
-  let open Option.Let_syntax in
-  let%bind m = existing in
-  let%map entry = Snapshot_manifest.find m ~symbol in
-  { entry; last_bar = None; findings = []; level = None }
-
-let _checkpoint_manifest ~manifest_path ~schema entry =
-  match
-    Snapshot_manifest.update_for_symbol ~path:manifest_path ~schema entry
-  with
-  | Ok () -> ()
-  | Error err ->
-      Printf.eprintf "manifest checkpoint failed for %s: %s\n%!"
-        entry.Snapshot_manifest.symbol (Status.show err)
-
-let _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-    ~csv_mtime ~manifest_path ~checkpoint ~hygiene =
-  match
-    _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-      ~output_dir ~csv_mtime ~hygiene
-  with
-  | Error err ->
-      Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
-      None
-  | Ok built ->
-      if checkpoint then _checkpoint_manifest ~manifest_path ~schema built.entry;
-      Some built
-
-let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~sketch_deep_days
-    ~schema ~benchmark_bars ~output_dir ~manifest_path ~checkpoint ~csv_mtime
-    ~hygiene symbol =
-  match
-    _load_split_bars ~data_dir ~start_date ~end_date ~sketch_deep_days ~symbol
-  with
-  | Error err ->
-      Printf.eprintf "skip %s: load: %s\n%!" symbol (Status.show err);
-      None
-  | Ok (deep_bars, bars) ->
-      _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-        ~csv_mtime ~manifest_path ~checkpoint ~hygiene
-
-let _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
-    ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint ~hygiene
-    symbol =
-  match _csv_mtime ~data_dir ~symbol with
-  | None ->
-      Printf.eprintf "skip %s: no CSV\n%!" symbol;
-      None
-  | Some csv_mtime ->
-      if _should_skip ~existing ~symbol ~csv_mtime ~schema then
-        _maybe_reuse ~existing ~symbol
-      else
-        _try_build_and_checkpoint ~data_dir ~start_date ~end_date
-          ~sketch_deep_days ~schema ~benchmark_bars ~output_dir ~manifest_path
-          ~checkpoint ~csv_mtime ~hygiene symbol
-
-let _load_benchmark_bars ~data_dir ~start_date ~end_date sym =
-  match _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol:sym with
-  | Ok bars -> Some bars
-  | Error err ->
-      Printf.eprintf "warning: benchmark %s load failed: %s\n%!" sym
-        (Status.show err);
-      None
-
-let _benchmark_bars_opt ~data_dir ~start_date ~end_date ~benchmark_symbol =
-  Option.bind benchmark_symbol
-    ~f:(_load_benchmark_bars ~data_dir ~start_date ~end_date)
 
 let _verify_or_warn ~manifest_path =
   match Snapshot_verifier.verify_directory ~manifest_path with
@@ -422,75 +110,6 @@ let _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at =
     ~progress:
       (_make_progress ~symbols_total ~symbols_done ~last_completed ~started_at)
 
-(* A manifest written under a DIFFERENT schema carries another indicator set's
-   column layout, so adopting its rows would advertise columns this build's
-   readers cannot decode. Refusing across schemas mirrors
-   {!Snapshot_manifest.update_for_symbol}, which rejects a cross-schema
-   checkpoint for the same reason. Says so and carries nothing. *)
-let _refuse_cross_schema_carry ~(m : Snapshot_manifest.t) ~schema =
-  Printf.eprintf
-    "incremental: existing manifest's schema_hash %s differs from this build's \
-     %s; its %d entries are NOT carried forward\n\
-     %!"
-    m.schema_hash schema.Snapshot_schema.schema_hash (List.length m.entries);
-  []
-
-(* Entries of the pre-run manifest that are usable as carry-forward candidates:
-   all of them when the schema matches, none when it does not. *)
-let _carry_candidates ~existing ~schema =
-  match existing with
-  | None -> []
-  | Some (m : Snapshot_manifest.t) ->
-      if String.equal m.schema_hash schema.Snapshot_schema.schema_hash then
-        m.entries
-      else _refuse_cross_schema_carry ~m ~schema
-
-(* Pre-run manifest entries for symbols this run did not produce (#2669).
-
-   In incremental mode the run's symbol set may be a strict SUBSET of the
-   warehouse's — a top-up that adds one benchmark symbol, or a cron window that
-   resumes a partial rebuild with a different universe. The manifest is the
-   warehouse's only index ({!Bar_source_resolver} enumerates symbols from it),
-   so writing ONLY this run's entries deletes every other symbol from the
-   warehouse while its [.snap] files sit untouched on disk — the observed
-   failure was a 2,208-symbol warehouse reduced to one entry by a one-symbol
-   top-up, and it read as empty to every runner.
-
-   Carrying the untouched entries forward makes the final write agree with the
-   per-symbol checkpoint, which already upserts rather than replaces
-   ({!Snapshot_manifest.update_for_symbol}).
-
-   Three candidates are dropped: one whose symbol this run produced (the fresh
-   entry wins, so a rebuilt symbol is never duplicated or stale), one whose
-   [.snap] file is gone (a stale index row would fail the closing verify), and
-   one this run deliberately EXCLUDED — a twin leg the rename-twin pass dropped
-   (#2730). Carrying an excluded symbol forward would silently reinstate the
-   duplicate the pass exists to remove, and on an incremental rebuild that is
-   exactly the shape that hides it: the pass reports the drop, the manifest
-   keeps indexing it, and the backtest still holds both legs. *)
-let _carried_entries ~existing ~schema ~excluded entries =
-  let produced =
-    List.map entries ~f:(fun (e : Snapshot_manifest.file_metadata) -> e.symbol)
-    |> Set.of_list (module String)
-  in
-  let skip symbol = Set.mem produced symbol || Set.mem excluded symbol in
-  _carry_candidates ~existing ~schema
-  |> List.filter ~f:(fun (e : Snapshot_manifest.file_metadata) ->
-      (not (skip e.symbol)) && Stdlib.Sys.file_exists e.path)
-
-(* A non-empty carry set means this run's universe was not a superset of the
-   warehouse. That is legitimate (a top-up is exactly that shape), so it is a
-   warning rather than a refusal — but the operator should see it, because it
-   also flags the case where a resumed window was pointed at the wrong
-   universe file. *)
-let _log_carry_forward carried =
-  if not (List.is_empty carried) then
-    Printf.printf
-      "incremental: universe is not a superset of the existing manifest; \
-       carrying %d untouched symbol(s) forward (#2669)\n\
-       %!"
-      (List.length carried)
-
 (* Sketch-v5 PR 4: side-tables are always emitted, so the final manifest always
    stamps the side-table format hash — a reader gates the [.weekly] files on it
    ({!Weekly_sidetable_reader.load_gated}). *)
@@ -513,9 +132,9 @@ let _fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
     ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
     ~symbols_total ~started_at ~hygiene i acc symbol =
   match
-    _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
-      ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint:true
-      ~hygiene symbol
+    Symbol_builder.process_symbol ~data_dir ~start_date ~end_date
+      ~sketch_deep_days ~schema ~benchmark_bars ~output_dir ~existing
+      ~manifest_path ~checkpoint:true ~hygiene symbol
   with
   | None -> acc
   | Some built ->
@@ -529,14 +148,15 @@ let _fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
    past the store's own end silently marks every survivor delisted. Symbols
    whose series stops more than the tolerance before it are the delisted ones. *)
 let _universe_end builts =
-  List.filter_map builts ~f:(fun b -> b.last_bar)
+  List.filter_map builts ~f:(fun (b : Symbol_builder.built) -> b.last_bar)
   |> List.max_elt ~compare:Date.compare
 
 (* The universe's end is only resolvable once every symbol is read, so the
    per-symbol [active_through] is filled in here rather than at checkpoint
    time. Reused (incremental-skip) entries read no bars, so they keep the value
    their own build derived. *)
-let _entry_with_derived_marker ~universe_end ~survivor_tolerance_days b =
+let _entry_with_derived_marker ~universe_end ~survivor_tolerance_days
+    (b : Symbol_builder.built) =
   match b.last_bar with
   | None -> b.entry
   | Some _ ->
@@ -578,7 +198,9 @@ let _finalize_entries ~survivor_tolerance_days builts =
    empty — a header-only file is the positive evidence that the scan ran and
    found nothing. *)
 let _write_tail_report ~output_dir builts =
-  let findings = List.concat_map builts ~f:(fun b -> b.findings) in
+  let findings =
+    List.concat_map builts ~f:(fun (b : Symbol_builder.built) -> b.findings)
+  in
   let path = Filename.concat output_dir tail_report_name in
   (try Out_channel.write_all path ~data:(Series_tail.to_csv findings)
    with Sys_error msg ->
@@ -590,61 +212,7 @@ let _write_tail_report ~output_dir builts =
    runs, while this one is default-off, so an un-armed build leaves no file. *)
 let _write_level_report ~level_config ~output_dir builts =
   Level_pass.write_report level_config ~output_dir
-    (List.filter_map builts ~f:(fun b -> b.level))
-
-(* The ONE on-disk shape of the warehouse exceptions file. Both sections are
-   optional — a file may carry only [keep_tail], only [splice], or both — but
-   the record is STRICT: no [allow_extra_fields], so a mistyped section name
-   ([splcie]) is a parse error rather than a silently empty veto list. That
-   strictness is what makes the fatal load path below mean anything: degrading
-   to "no exceptions" would edit exactly the symbols a reviewer vetoed. *)
-type exceptions_file = {
-  keep_tail : string list; [@sexp.default []]
-  splice : Series_splice.Exceptions.rule list; [@sexp.default []]
-}
-[@@deriving of_sexp]
-
-let _empty_exceptions_file = { keep_tail = []; splice = [] }
-
-let _parse_exceptions_file p =
-  match
-    Or_error.try_with (fun () -> exceptions_file_of_sexp (Sexp.load_sexp p))
-  with
-  | Ok t -> Ok t
-  | Error e ->
-      Status.error_invalid_argument
-        (Printf.sprintf "warehouse exceptions load failed (%s): %s" p
-           (Error.to_string_hum e))
-
-(* Pure loader: the failure is a value, so both halves are testable. The CLI
-   shells turn the [Error] into an exit via [tail_exceptions_or_exit] /
-   [splice_exceptions_or_exit]. One file, ONE parse, two views — the section a
-   caller does not care about still has to be well-formed. *)
-let _load_exceptions_file = function
-  | None -> Ok _empty_exceptions_file
-  | Some p -> _parse_exceptions_file p
-
-let load_tail_exceptions path =
-  Result.map (_load_exceptions_file path) ~f:(fun f ->
-      Series_tail.Exceptions.of_symbols f.keep_tail)
-
-let load_splice_exceptions path =
-  Result.map (_load_exceptions_file path) ~f:(fun f ->
-      Series_splice.Exceptions.of_rules f.splice)
-
-(* A malformed or missing exceptions file is FATAL: silently falling back to "no
-   exceptions" would edit exactly the symbols a reviewer vetoed. *)
-let _exceptions_or_exit = function
-  | Ok t -> t
-  | Error err ->
-      Printf.eprintf "%s\n%!" (Status.show err);
-      exit 1
-
-let tail_exceptions_or_exit path =
-  _exceptions_or_exit (load_tail_exceptions path)
-
-let splice_exceptions_or_exit path =
-  _exceptions_or_exit (load_splice_exceptions path)
+    (List.filter_map builts ~f:(fun (b : Symbol_builder.built) -> b.level))
 
 let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
     ?(splice_cuts = Map.empty (module String))
@@ -662,12 +230,14 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
   let excluded = Set.of_list (module String) twin_dropped in
   let symbols_total = List.length symbols in
   let benchmark_bars =
-    _benchmark_bars_opt ~data_dir ~start_date ~end_date ~benchmark_symbol
+    Symbol_builder.benchmark_bars_opt ~data_dir ~start_date ~end_date
+      ~benchmark_symbol
   in
   let existing = if incremental then _existing_manifest ~output_dir else None in
   let manifest_path = Filename.concat output_dir "manifest.sexp" in
   let hygiene =
-    _hygiene_opts ~tail_config ~tail_exceptions ~level_config ~splice_cuts
+    Symbol_builder.make_hygiene ~tail_config ~tail_exceptions ~level_config
+      ~splice_cuts
   in
   let started_at = Core_unix.time () in
   let t0 = Time_ns.now () in
@@ -679,8 +249,8 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
            ~symbols_total ~started_at ~hygiene)
   in
   let entries = _finalize_entries ~survivor_tolerance_days builts in
-  let carried = _carried_entries ~existing ~schema ~excluded entries in
-  _log_carry_forward carried;
+  let carried = Carry.carried_entries ~existing ~schema ~excluded entries in
+  Carry.log_carry_forward carried;
   let final_entries = carried @ entries in
   _log_marker_split final_entries;
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
@@ -693,79 +263,3 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
   _write_level_report ~level_config ~output_dir builts;
   _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at;
   _verify_or_warn ~manifest_path
-
-(* Shared CLI surface for the survivor tolerance, so both builders expose the
-   same flag and default. *)
-let survivor_tolerance_param =
-  let%map_open.Command days =
-    flag "survivor-tolerance-days"
-      (optional_with_default default_survivor_tolerance_days int)
-      ~doc:
-        (Printf.sprintf
-           "N Calendar days a symbol's last bar may trail the universe's last \
-            bar and still count as still-trading (active_through stays unset). \
-            Default %d."
-           default_survivor_tolerance_days)
-  in
-  days
-
-(* Shared CLI surface for the tail knobs, so both builders expose exactly the
-   same flags and defaults. The three gate knobs, the two edit switches and the
-   prefix cut's short-tail guard are flags; the mis-scale THRESHOLD and the
-   stray-gap parameters are measured constants of the defect classes, not
-   per-build choices ({!Series_tail}). *)
-let tail_params =
-  let d = Series_tail.Config.default in
-  let%map_open.Command ratio =
-    flag "stub-ratio"
-      (optional_with_default d.stub.ratio float)
-      ~doc:"R Terminal-run close ratio below which a bar is a stub candidate"
-  and max_bars =
-    flag "stub-max-bars"
-      (optional_with_default d.stub.max_bars int)
-      ~doc:"N Longest terminal run still truncatable (longer = long low tail)"
-  and max_price =
-    flag "stub-max-price"
-      (optional_with_default d.stub.max_price float)
-      ~doc:"P The run's first close must be below this to count as a stub"
-  and no_stub_truncation =
-    flag "no-stub-truncation" no_arg
-      ~doc:"Report terminal stub tails without truncating them"
-  and no_stray_drop =
-    flag "no-stray-drop" no_arg
-      ~doc:"Report stray late bars without dropping them"
-  and cut_prefix_misscale =
-    flag "cut-prefix-misscale" no_arg
-      ~doc:
-        "Drop the mis-scaled prefix of a prefix_misscale series, keeping the \
-         real later segment (#2732). Default off: the class is reported and \
-         stored whole."
-  and misscale_min_kept_bars =
-    flag "misscale-min-kept-bars"
-      (optional_with_default d.stub.misscale_min_kept_bars int)
-      ~doc:
-        "N Refuse a prefix cut leaving fewer than N bars, storing the series \
-         whole"
-  and exceptions_path =
-    flag "tail-exceptions" (optional string)
-      ~doc:
-        (Printf.sprintf
-           "PATH Warehouse exceptions sexp, shape ((keep_tail (SYM ...)) \
-            (splice ((keep SYM) (drop SYM) (cut_at SYM DATE)))). Both sections \
-            optional. Committed list: %s"
-           default_exceptions_path)
-  in
-  ( {
-      Series_tail.Config.stub =
-        {
-          d.stub with
-          truncate = not no_stub_truncation;
-          ratio;
-          max_bars;
-          max_price;
-          misscale_cut = cut_prefix_misscale;
-          misscale_min_kept_bars;
-        };
-      stray = { d.stray with drop = not no_stray_drop };
-    },
-    exceptions_path )
