@@ -10,6 +10,7 @@ Helpers for `dev/scripts/review_pack.sh`. POSIX sh + awk + jq; no Python.
 | `meta.sh` | host | summary metrics, overrides, validator checks, audit conformance → `<run>_meta.json` |
 | `stage_sum.sh` | host | stage replay CSVs → stage at entry/exit, Stage 3/4 weeks held |
 | `chart_shards.awk` | host | per-trade weekly stage + daily bars, sharded by entry year |
+| `../../scripts/review_pack_render.sh` | host | renders a built site to PNGs (headless Chrome, data inlined behind a fetch shim so `file://` works) for the visual review step, `.claude/rules/backtest-result-review.md` |
 | `stages.sh` | trading-1-dev | `stage_chart.exe` per trade (weekly stage replay) |
 | `index.html` | browser | the page; reads `data/manifest.json` and the per-run files |
 

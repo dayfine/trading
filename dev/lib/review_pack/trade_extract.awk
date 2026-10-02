@@ -1,9 +1,12 @@
 # Per-trade extraction over ONE symbol's daily CSV store file
 # (header: date,open,high,low,close,adjusted_close,volume,...). POSIX awk.
 #
-# vars: pid ed xd ep xp qty sid out_tr out_ex out_dy
+# vars: pid ed xd ep xp qty sid es out_tr out_ex out_dy
 #   ed/xd  entry/exit date (may be a weekend -> the last bar <= date is used)
-#   ep/xp  raw fill prices; sid initial stop distance (fraction)
+#   ep/xp  raw fill prices; sid initial stop distance (fraction); es raw installed
+#          stop at entry (trades.csv entry_stop) -- the breach line. sid is measured
+#          from the decision price, not the fill, so entry x (1 - sid) can sit above
+#          the real stop (MELI 2015: 135.82 vs 134.88); it is the fallback when es is 0
 #
 # Every price comparison is on the ADJUSTED basis: bar prices are scaled by
 # adjusted_close/close, and the entry fill by the entry bar's factor (fe).
@@ -52,12 +55,13 @@ function in_range(p, lo, hi,   r, q, k) {
   }
   # bars strictly after the entry day: forward pick return, stop breach, hard-stop replays
   # entry on the bar's own basis: a fill on a later split basis is scaled back first
-  if (d > ed && fe > 0 && e == "") { esnap = 1; if (on_e && in_range(ep, el, eh) == 2) esnap = SNAP; e = ep / esnap * fe }
+  if (d > ed && fe > 0 && e == "") { esnap = 1; if (on_e && in_range(ep, el, eh) == 2) esnap = SNAP; e = ep / esnap * fe
+    stopl = (es > 0) ? es / esnap * fe : e * (1 - sid) }
   if (d > ed && fe > 0) {
     nf++
     if (nf == FWD_BARS) f40 = (a / e - 1) * 100
     if (d < xd) {
-      if (breach == "" && sid > 0 && l <= e * (1 - sid) + 1e-9) { breach = d; bidx = nf }
+      if (breach == "" && stopl > 0 && l <= stopl + 1e-9) { breach = d; bidx = nf }
       for (i = 1; i <= ncf; i++) if (cf[i] == "" && l <= e * (1 - lv[i])) cf[i] = ((o < e * (1 - lv[i]) ? o : e * (1 - lv[i])) / e - 1) * 100
     }
     if (d <= xd) xidx = nf

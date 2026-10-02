@@ -98,11 +98,11 @@ docker_steps() {
 extract_run() { # $1 run dir, $2 1 = also write daily chart bars
   d=$1; : > "$d/x_trades.tsv"; : > "$d/x_expo.tsv"; : > "$d/x_daily.tsv"
   dy=""; [ "$2" = 1 ] && dy="$d/x_daily.tsv"
-  tail -n +2 "$d/trades.csv" | while IFS=, read -r sym _side ed xd _days ep xp qty _pnl _pct _es _xs _trig _stg _vr sid rest; do
+  tail -n +2 "$d/trades.csv" | while IFS=, read -r sym _side ed xd _days ep xp qty _pnl _pct es _xs _trig _stg _vr sid rest; do
     pid=$(echo "$rest" | cut -d, -f4)
     f="$DATA/$(printf %s "$sym" | cut -c1)/$(printf %s "$sym" | rev | cut -c1)/$sym/data.csv"
     if [ ! -f "$f" ]; then printf '%s\tNOFILE\n' "$pid" >> "$d/x_trades.tsv"; continue; fi
-    awk -v pid="$pid" -v ed="$ed" -v xd="$xd" -v ep="$ep" -v xp="$xp" -v qty="$qty" -v sid="${sid:-0}" \
+    awk -v pid="$pid" -v ed="$ed" -v xd="$xd" -v ep="$ep" -v xp="$xp" -v qty="$qty" -v sid="${sid:-0}" -v es="${es:-0}" \
         -v out_tr="$d/x_trades.tsv" -v out_ex="$d/x_expo.tsv" -v out_dy="$dy" -f "$LIB/trade_extract.awk" "$f"
   done
 }
@@ -140,7 +140,9 @@ site_common() {
   [ -n "$SUBTITLE" ] || SUBTITLE="$first → $last, $(grep -oE 'universe_size [0-9]+' "$d/params.sexp" | cut -d' ' -f2) symbols, \$$(grep -oE 'initial_cash [0-9]+' "$d/params.sexp" | cut -d' ' -f2) start"
   runs_json=$(labels | awk '{printf "%s{\"id\":\"%s\",\"label\":\"%s\"}", (n++?",":""), $1, $1}')
   printf '{"title":"%s","subtitle":"%s","charts_run":%s,"runs":[%s]}\n' "$TITLE" "$SUBTITLE" "$CHARTS" "$runs_json" > "$s/manifest.json"
-  cp "$LIB/index.html" "$OUT/site/index.html"
+  # the page <title> carries --title (HTML-escaped); the template default is a placeholder
+  awk -v t="$TITLE" 'BEGIN { gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t) }
+    /^<title>.*<\/title>$/ { print "<title>" t "</title>"; next } { print }' "$LIB/index.html" > "$OUT/site/index.html"
 }
 check_json() {
   command -v jq >/dev/null 2>&1 || { log "jq not found; skipped the JSON check"; return 0; }

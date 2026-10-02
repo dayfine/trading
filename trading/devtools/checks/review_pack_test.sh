@@ -15,6 +15,9 @@
 #   - CCC: entry dated a Saturday -> the prior Friday bar is used, not dropped;
 #     exits on the last bar -> grade "A?" (no post-exit path);
 #   - DDD: loss, then +58 % within 65 bars -> F; exit fill off the bar -> code 0;
+#     its decision-time stop distance (1 %, line 39.60) is breached by the 39.50
+#     lows, but the installed stop (entry_stop 37.50) is not before the exit day
+#     -> breach lag -1: the breach line is the installed stop, not entry x (1 - sid);
 #   - EEE: exit under 5 % of entry -> X;
 #   - two runs (r0, r1) -> manifest lists both and both trade files exist;
 #   - every emitted JSON file parses (the SPY fixture carries a "321."-style
@@ -82,6 +85,10 @@ expect_eq "CCC Saturday entry uses the prior Friday" "2020-01-24 0 null" "$(q '.
 expect_eq "CCC exits on the last bar: A with no post-exit path" "A?" "$(q '.[]|select(.sym=="CCC")|.g')"
 expect_eq "DDD loses, then runs >= 50 %: F" F "$(q '.[]|select(.sym=="DDD")|.g')"
 expect_eq "DDD exit fill genuinely off the bar: code 0" 0 "$(q '.[]|select(.sym=="DDD")|.inX')"
+expect_eq "DDD breach line = installed stop, not entry x (1 - sid)" -1 "$(q '.[]|select(.sym=="DDD")|.blag')"
+expect_eq "page declares utf-8" yes "$(grep -q '<meta charset="utf-8">' "$S/index.html" && echo yes || echo no)"
+expect_eq "charts can fit a 26y daily series (minBarSpacing set)" yes "$(grep -q 'minBarSpacing: 0.01' "$S/index.html" && echo yes || echo no)"
+expect_eq "page <title> carries --title" yes "$(grep -q '^<title>Fixture</title>$' "$S/index.html" && echo yes || echo no)"
 expect_eq "EEE exits under 5 % of entry: X" X "$(q '.[]|select(.sym=="EEE")|.g')"
 expect_eq "second run r1 emitted" 6 "$(jq length "$S/data/r1_trades.json")"
 expect_eq "year table: one row" 2020 "$(jq -r '.[0].p' "$S/data/r0_years.json")"
