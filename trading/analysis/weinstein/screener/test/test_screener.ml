@@ -2678,6 +2678,143 @@ let test_entry_anchor_local_top_when_armed _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* #3056: continuation-buy entry anchor (consolidation_high)           *)
+(* ------------------------------------------------------------------ *)
+
+(** A continuation-detector result. [hit] is [is_continuation]; [high] is the
+    detector's [consolidation_high]. *)
+let continuation_result ~hit ~high : Continuation.result =
+  {
+    is_continuation = hit;
+    pullback_low = Some 110.0;
+    consolidation_high = Some high;
+    ma_slope_observed = 0.05;
+  }
+
+(** A Stage-2 long on a continuation tape: graded (old) base top [100.0], close
+    [125.0], MA [100.0]. [~mature:true] makes it a week-20 Stage 2 with no
+    Stage1 prior, so only the continuation arm can admit it; [~mature:false]
+    keeps the fresh Stage1→Stage2 prior so the freshness arm admits it. *)
+let continuation_tape ?(local_range_top = None) ~mature ~continuation () :
+    Stock_analysis.t =
+  let weeks_advancing = if mature then 20 else 2 in
+  {
+    (ranking_analysis ~ticker:"CONT" ~rs_norm:1.0 ~weeks_advancing
+       ~volume_ratio:2.5)
+    with
+    breakout_price = Some 100.0;
+    current_close = Some 125.0;
+    prior_stage =
+      (if mature then Some (Stage2 { weeks_advancing = 19; late = false })
+       else Some (Stage1 { weeks_in_base = 10 }));
+    continuation;
+    local_range_top;
+  }
+
+(** Flag on, detector hit, mature Stage 2 (continuation-only admission): the
+    ticket anchors at [consolidation_high = 120.0] → entry
+    [120.0 *. 1.005 = 120.6], stop [120.6 *. 0.92], risk 8%. [swing_target]
+    still comes from the graded [breakout = 100.0] and the base-low proxy [85.0]
+    → [115.0]. *)
+let test_continuation_anchor_at_consolidation_high _ =
+  let a =
+    continuation_tape ~mature:true
+      ~continuation:(Some (continuation_result ~hit:true ~high:120.0))
+      ()
+  in
+  assert_that (_screen_buys a)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (c : scored_candidate) -> c.suggested_entry)
+               (float_equal 120.6);
+             field (fun c -> c.suggested_stop) (float_equal (120.6 *. 0.92));
+             field (fun c -> c.risk_pct) (float_equal 0.08);
+             field (fun c -> c.swing_target) (is_some_and (float_equal 115.0));
+           ];
+       ])
+
+(** Flag off ([continuation = None]), same tapes: the fresh name keeps the
+    graded-top ticket [100.0 *. 1.005 = 100.5] and the mature name is not
+    admitted at all — admission and ticket are both pre-#3056. *)
+let test_continuation_anchor_flag_off_same_tape _ =
+  let fresh = continuation_tape ~mature:false ~continuation:None () in
+  let mature = continuation_tape ~mature:true ~continuation:None () in
+  assert_that
+    (_screen_buys fresh, _screen_buys mature)
+    (all_of
+       [
+         field fst
+           (elements_are
+              [
+                field
+                  (fun (c : scored_candidate) -> c.suggested_entry)
+                  (float_equal 100.5);
+              ]);
+         field snd is_empty;
+       ])
+
+(** Flag on, detector ran but MISSED ([is_continuation = false]) on a fresh
+    breakout: the consolidation high is ignored and the ticket stays at the
+    graded top [100.5] — a non-continuation candidate is unchanged. *)
+let test_continuation_anchor_ignored_on_detector_miss _ =
+  let a =
+    continuation_tape ~mature:false
+      ~continuation:(Some (continuation_result ~hit:false ~high:120.0))
+      ()
+  in
+  assert_that (_screen_buys a)
+    (elements_are
+       [
+         field
+           (fun (c : scored_candidate) -> c.suggested_entry)
+           (float_equal 100.5);
+       ])
+
+(** Precedence: with both the continuation hit ([120.0]) and the local-range
+    knob ([126.0]) populated, the continuation anchor wins → [120.6]; when the
+    detector misses, the local-range top applies → [126.0 *. 1.005 = 126.63]. *)
+let test_continuation_anchor_outranks_local_range_top _ =
+  let tape ~hit =
+    continuation_tape ~mature:false ~local_range_top:(Some 126.0)
+      ~continuation:(Some (continuation_result ~hit ~high:120.0))
+      ()
+  in
+  let entries a =
+    List.map (_screen_buys a) ~f:(fun (c : scored_candidate) ->
+        c.suggested_entry)
+  in
+  assert_that
+    (entries (tape ~hit:true), entries (tape ~hit:false))
+    (all_of
+       [
+         field fst (elements_are [ float_equal 120.6 ]);
+         field snd (elements_are [ float_equal 126.63 ]);
+       ])
+
+(** Shorts never take the continuation anchor: a short candidate carrying a
+    (synthetic) continuation hit keeps exactly the entry it has without one. *)
+let test_continuation_anchor_not_applied_to_shorts _ =
+  let stocks, sector_map = short_setup () in
+  let with_hit =
+    List.map stocks ~f:(fun (a : Stock_analysis.t) ->
+        {
+          a with
+          continuation = Some (continuation_result ~hit:true ~high:500.0);
+        })
+  in
+  let short_entries stocks =
+    (screen ~config:cfg ~macro_trend:Bearish ~sector_map ~stocks
+       ~held_tickers:[])
+      .short_candidates
+    |> List.map ~f:(fun (c : scored_candidate) -> c.suggested_entry)
+  in
+  let baseline = short_entries stocks in
+  assert_that (short_entries with_hit) (all_of [ size_is 1; equal_to baseline ])
+
+(* ------------------------------------------------------------------ *)
 (* G2 (#2490): named cascade trace                                      *)
 (* ------------------------------------------------------------------ *)
 
@@ -3505,6 +3642,16 @@ let suite =
          >:: test_entry_anchor_graded_top_when_off;
          "entry anchor: local top when armed, admission/grading unchanged"
          >:: test_entry_anchor_local_top_when_armed;
+         "continuation anchor: entry at consolidation_high when hit"
+         >:: test_continuation_anchor_at_consolidation_high;
+         "continuation anchor: flag off keeps graded top, no mature admit"
+         >:: test_continuation_anchor_flag_off_same_tape;
+         "continuation anchor: ignored on detector miss"
+         >:: test_continuation_anchor_ignored_on_detector_miss;
+         "continuation anchor: outranks local_range_top"
+         >:: test_continuation_anchor_outranks_local_range_top;
+         "continuation anchor: never applied to shorts"
+         >:: test_continuation_anchor_not_applied_to_shorts;
          "RS gate: negative territory admitted at the 0.0 default"
          >:: test_rs_gate_default_admits_negative_territory;
          "RS gate: negative territory rejected when armed at 1.0"

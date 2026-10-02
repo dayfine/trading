@@ -4,6 +4,7 @@
  (libraries
   screener
   stock_analysis
+  continuation
   resistance
   weinstein_types
   stage
