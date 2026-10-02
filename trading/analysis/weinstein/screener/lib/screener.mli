@@ -458,7 +458,28 @@ type scored_candidate = {
   grade : Weinstein_types.grade;
   score : int;
   suggested_entry : float;
-      (** Suggested buy-stop entry price (breakout_price + small buffer). *)
+      (** Suggested buy-stop entry price: the ticket anchor plus
+          [entry_buffer_pct]. The anchor is chosen first-match-wins:
+          + {b continuation} (#3056, longs only): when
+            [analysis.continuation = Some { is_continuation = true;
+             consolidation_high = Some h; _ }], the anchor is [h] — the top of
+            the consolidation the stock is breaking out of. Book authority:
+            [weinstein-book-reference.md] §4.6 (Ch. 3 continuation buy: the
+            stock "drops back close to its MA and consolidates. It then breaks
+            out anew above the top of its resistance zone"). The graded
+            [breakout_price] is the {i old} base top, which sits below a
+            continuation name's close, so anchoring there yields a ticket the
+            next open gaps past. Reachable only when the strategy arms the
+            detector ([Weinstein_strategy_config.enable_continuation_buys]);
+            otherwise [analysis.continuation = None] and this arm never fires.
+            It outranks [local_range_top] because it is the pattern's own
+            breakout level, whereas [local_range_top] includes the current
+            (breakout) bar and so sits above the close.
+          + {b local range}: [analysis.local_range_top] when [Some].
+          + {b default}: [breakout_price] (or the MA-based fallback).
+
+          Only entry / [suggested_stop] / [risk_pct] follow the anchor;
+          [swing_target], admission and grading still read [breakout_price]. *)
   suggested_stop : float;
       (** Suggested initial stop-loss. For longs, below the prior base low; for
           shorts, above the prior rally high. *)

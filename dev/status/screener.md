@@ -1,6 +1,6 @@
 # Status: screener
 
-## Last updated: 2026-09-05
+## Last updated: 2026-10-02
 
 ## Status
 IN_PROGRESS
@@ -26,6 +26,8 @@ grep -n 'PR OPEN' dev/status/screener.md   # then check each #N is actually open
 ```
 
 If you write `PR OPEN`, you owe this file an edit when the PR merges.
+
+**2026-10-02**: `fix(screener): anchor continuation-buy entry ticket at consolidation_high (#3056)` (branch `fix/continuation-entry-anchor`, **NOT SUBMITTED**) — `enable_continuation_buys` was inert on the broad 5y window (#3038 `tp-t1-5r-s0` = `tp-h-5r-s0`, 196 trades) partly because `Screener._build_candidate` anchored a continuation name's entry at `breakout_price` (the **old** base top, below the name's close), so the E-anchored StopLimit gapped past its limit. New private `_entry_anchor` picks first-match-wins: continuation `consolidation_high` (longs only, `is_continuation = true`) → `local_range_top` → `breakout`. Only entry / stop / risk move; `swing_target`, admission and grading still read `breakout_price`. Reachable only when the detector is armed (`a.continuation = None` with the flag off), so flag-off goldens are bit-identical; grep of `trading/test_data/` + `.github/workflows/` for `enable_continuation_buys` finds zero specs. Book: §4.6 "breaks out anew above the top of its resistance zone". 5 tests in `test_screener.ml`. After-merge: broad smoke must show continuation **entries**. Follow-up (not in this PR): a continuation stage-score weight (`_stage_long_signal` gives a week-20 Stage 2 0 points) — cause 3 of #3056.
 
 **2026-09-05**: `feat(macro): breadth-direction five-state read behind macro_config.breadth_direction (default-off)` (branch `feat/macro-breadth-direction`, **PR OPEN #2685**) — the macro gate gains a **direction** read of universe participation alongside its existing level-based trend. The gate's `market_trend` read Bullish into 2020-03-06 and Neutral through May 2020, so the COVID collapse and rebound carried one label while their entries diverged as sharply as anything in the run: below-45%-and-**falling** breadth lost in both books (−$604k / −$668k), below-45%-and-**rising** was the best cohort (+$627k / +$1.81M). Same level, opposite direction, opposite outcome — a level threshold cannot express it. Evidence: `dev/experiments/stop-width-cadence-surface-2026-09-05/README.md` §"Breadth state across 27 years".
 

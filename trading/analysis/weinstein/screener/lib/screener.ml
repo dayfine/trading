@@ -129,19 +129,36 @@ type result = {
 (* Per-candidate filters                                               *)
 (* ------------------------------------------------------------------ *)
 
+(** Continuation-buy ticket anchor (#3056): the detector's [consolidation_high]
+    when the Ch. 3 continuation pattern fired ([is_continuation = true]), else
+    [None]. [a.continuation] is [Some _] only when the strategy armed the
+    detector ([Weinstein_strategy_config.enable_continuation_buys]), so with the
+    flag off this is always [None]. *)
+let _continuation_anchor (a : Stock_analysis.t) : float option =
+  match a.continuation with
+  | Some { is_continuation = true; consolidation_high; _ } -> consolidation_high
+  | Some _ | None -> None
+
+(** Ticket-level entry anchor, first match wins:
+    + (longs only) continuation [consolidation_high] — pattern-specific, book
+      §4.6 "breaks out anew above the top of its resistance zone"; the old base
+      top in [breakout] sits below a continuation name's close;
+    + [a.local_range_top] (the generic local-range knob);
+    + [breakout] (default — bit-identical when both above are [None]). Only the
+      entry (and its derived stop / risk) moves; [breakout] still drives
+      [swing_target] and admission / grading read [breakout_price] untouched. *)
+let _entry_anchor ~breakout ~is_short (a : Stock_analysis.t) : float =
+  let continuation = if is_short then None else _continuation_anchor a in
+  Option.first_some continuation a.local_range_top
+  |> Option.value ~default:breakout
+
 let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
     ~thresholds ~is_short : scored_candidate =
   let breakout =
     Option.value a.breakout_price
       ~default:(a.stage.ma_value *. (1.0 +. params.breakout_fallback_pct))
   in
-  (* Ticket-level entry anchor. When the local-range knob is armed the analysis
-     populates [a.local_range_top] (split-safe max high over the last N bars);
-     the entry ticket then anchors there instead of the graded breakout top.
-     [None] (default) falls back to [breakout] — bit-identical. Only the entry
-     (and its derived stop / risk) moves; [breakout] still drives [swing_target]
-     below and admission/grading are untouched (they read [breakout_price]). *)
-  let entry_anchor = Option.value a.local_range_top ~default:breakout in
+  let entry_anchor = _entry_anchor ~breakout ~is_short a in
   let entry =
     suggested_entry ~entry_buffer_pct:params.entry_buffer_pct entry_anchor
   in
