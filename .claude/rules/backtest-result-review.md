@@ -23,6 +23,8 @@ CSVs and sexps:
 | "203 of 246 stop exits filled more than 0.5 % below the stop" | the code counted the `gap_down` label, which mostly tags fills a few cents under the stop. The real count is 62 |
 | "Macro not Bullish at entry: 0" with no audit report | a missing input rendered as a clean 0 |
 | the 1 remaining late stop (AAON 2024) | **a simulator defect**: a 48-week-rested ticket kept a 34 %-wide stop from its 2023 decision, and `trades.csv` misreports it (#3075) |
+| "part-1.png" repeating a mid-page band; "part-6.png" the whole page (2026-10-02, trader rerun) | `sips --cropOffset` ignores an offset of 0 and one whose crop ends exactly on the image edge, cropping the centre or nothing. The render now clamps the offset and checks each slice height |
+| "When do stop exits fill?" all 0 on a run with 130 unraised stop exits | the breach search stopped the day before the exit, so a trigger-bar fill (lag 0) was never counted. 125 of 130 now read same day; the other 5 filled above their recorded stop (#3075 class) |
 
 The `gap_down` misreading had also gone into a merged writeup (#3068, corrected in #3070). A
 picture that contradicts what the config implies is the cheapest error detector we have.
@@ -74,6 +76,7 @@ set:
 | **Eras vs SPY** | the strategy/SPY ratio, cut into built / held / eroded eras (±15 % legs, 4+ year runs within a 10 % band split out as held), with a chart and an era table |
 | **Regime × era** | each era split by SPY regime (UP / MIXED / DOWN, 30-week MA, lagged a week). The largest gap, and a second one when material, names the cause: holdings lagged in UP regimes at ≥ 40 % invested, cash through rebounds, or cash in a rising market |
 | **One-trade / salt years** | a year whose excess vs SPY is ≥ 10 pp and at least half carried by one realised trade, or whose salts end ≥ 15 pp apart |
+| **Open-position return** | the NAV move minus realised P&L is ≥ 10 % of start NAV and at least half the move (or opposite in sign): the return rests on positions still open at the end, which no trade row shows (T1 5r s0: realised −$222k, NAV +$115k, BELFB open +233 %) |
 
 On the 26y investor pack the block reads, unprompted: eroded 2016–23 (cash through rebounds,
 also holdings lagging in UP days at 62 % invested); 2024 rests on ADMA; eroded 2025–26 (holdings
