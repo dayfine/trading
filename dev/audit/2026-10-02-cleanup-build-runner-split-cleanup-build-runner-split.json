@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-02",
+  "feature": "cleanup-build-runner-split",
+  "branch": "cleanup/build-runner-split",
+  "sha": "3eea0c1c298e54c251d654e1ab6bf60769aaf879",
+  "recorded_at_ns": 1790970255105601607,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

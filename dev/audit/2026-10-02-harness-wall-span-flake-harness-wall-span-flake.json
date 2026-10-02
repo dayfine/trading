@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-02",
+  "feature": "harness-wall-span-flake",
+  "branch": "harness/wall-span-flake",
+  "sha": "dd272ba73c63d2c5b71b0bfd08866949901ca399",
+  "recorded_at_ns": 1790972960563629467,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

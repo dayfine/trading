@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-02",
+  "feature": "harness-review-pack-render-look",
+  "branch": "harness/review-pack-render-look",
+  "sha": "60ad1e69c31f29caf932e181f95250da600cf2c3",
+  "recorded_at_ns": 1790966015171676897,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
