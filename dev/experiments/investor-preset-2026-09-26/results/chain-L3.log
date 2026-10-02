@@ -1,0 +1,15 @@
+[10-01 11:39:24] lane L3 HEAD=6d84ff1c3 (expect 6d84ff1c3)
+[10-01 11:39:24] cell guard CELL_TIMEOUT=60000s (26y guard; 5y cells ~1h); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-01 11:39:24] warehouse entries=9364 (expect 9364)
+[10-01 11:39:24] host free 62G
+[10-01 11:39:24] BUILD
+[10-01 11:40:28] BUILD_DONE
+[10-01 11:40:28] PREFLIGHT inv26sc-investor
+[10-01 11:46:08] PREFLIGHT_OK inv26sc-investor (340s)
+[10-01 11:46:08] RUN inv26sc-investor-s1-v11 on /tmp/snap_top3000_pit_v11pit
+[10-01 14:49:50] RESULT inv26sc-investor-s1-v11 => total_return_pct 401.26807712182455 total_trades 520 sharpe_ratio 0.51400288178394 max_drawdown_pct 30.994972207295586 calmar_ratio 0.20247865331397805  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-investor26/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff:none peak_rss_kb=5840060 Panel_runner: snapshot cache hits=150473404 misses=6303437 miss_absent=6294073 evictions=0 n_symbols=9915 misses_per_symbol=635.75 n_symbols_touched=9364 n_symbols_absent=551 loads_per_touched=1.00 max_entries=9364 max_bytes=129677940 max_mmap_open=9364 avg_entries=4682.5 avg_bytes=65605501 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2499225328 maxrss_bytes=5956927488 (wall 11022s)
+[10-01 14:49:50] RUN inv26sc-investor-s2-v11 on /tmp/snap_top3000_pit_v11pit
+[10-01 17:58:01] RESULT inv26sc-investor-s2-v11 => total_return_pct 621.30342136165245 total_trades 510 sharpe_ratio 0.60246100819763182 max_drawdown_pct 30.992941594359657 calmar_ratio 0.24993715275701797  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-investor26/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff:none peak_rss_kb=5840932 Panel_runner: snapshot cache hits=150470572 misses=6303437 miss_absent=6294073 evictions=0 n_symbols=9915 misses_per_symbol=635.75 n_symbols_touched=9364 n_symbols_absent=551 loads_per_touched=1.00 max_entries=9364 max_bytes=129677940 max_mmap_open=9364 avg_entries=4682.5 avg_bytes=65605501 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2512262664 maxrss_bytes=5970202624 (wall 11291s)
+[10-01 17:58:01] RUN inv26sc-investor-s0-v11 on /tmp/snap_top3000_pit_v11pit
+[10-01 21:27:16] RESULT inv26sc-investor-s0-v11 => total_return_pct 623.58414156938716 total_trades 506 sharpe_ratio 0.601256046868253 max_drawdown_pct 31.076191144644504 calmar_ratio 0.24968093060253868  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-investor26/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff:none peak_rss_kb=5848240 Panel_runner: snapshot cache hits=150466935 misses=6303437 miss_absent=6294073 evictions=0 n_symbols=9915 misses_per_symbol=635.75 n_symbols_touched=9364 n_symbols_absent=551 loads_per_touched=1.00 max_entries=9364 max_bytes=129677940 max_mmap_open=9364 avg_entries=4682.5 avg_bytes=65605501 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2511543624 maxrss_bytes=5969485824 (wall 12554s)
+[10-01 21:27:16] LANE L3 DONE
