@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-01 (orchestrator run 36906697882, run 2). Queue at start: #3061, #3047 (both driven + merged by the local session).
-This run: harness #3063 + cleanup #3064 dispatched, gated and merged (see `dev/daily/2026-10-01-run2.md`).
+Last updated: 2026-10-02 (orchestrator run 37043659588). Queue at start: #3076 (local-session harness PR, unreviewed ~5h).
+This run: #3076 gated + merged; cleanup #3078 merged; harness #3079 merged after 1 rework (see `dev/daily/2026-10-02.md`).
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-01: fast-exit summary-subject exemption #3063 MERGED; next: pick next unblocked H-item |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-02: #3076 review-pack render + #3079 wall_span flake (atomic output root) MERGED; next: next unblocked H-item |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | trade_audit_ratings.ml pass 3 MERGED #3064 (197 lines, exception removed); next: top §Backlog file_length item |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | build_runner.ml split MERGED #3078 (771→266, exception removed); next: trade_audit_report.ml 691 lines |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
