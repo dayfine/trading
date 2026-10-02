@@ -88,6 +88,14 @@ let _rescaled (cbs : callbacks) : callbacks =
 type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
 [@@deriving show, eq, sexp]
 
+type _scan = {
+  bundle : callbacks;  (** The bundle the support-floor scan reads. *)
+  basis : split_safe_basis;  (** Which branch produced [bundle]. *)
+  as_of_factor : float;
+      (** Factor [f(as_of)] at [day_offset:0] when [basis = Adjusted]; [1.0] on
+          every other branch (the bundle is already on the raw basis). *)
+}
+
 (* Put a callbacks bundle on its split/dividend-adjusted basis: scale the high /
    low by each bar's factor and replace the close with the adjusted close.
    Inlined mirror of [Adjusted_basis.to_adjusted_basis]
@@ -121,10 +129,11 @@ type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
    level — it returns the flag-off answer, which is indistinguishable from a
    flag-on window that legitimately measured to the same number. So this one
    function returns BOTH the bundle the scan reads and the [split_safe_basis]
-   describing which branch produced it. Deriving the basis from a second,
-   separate evaluation of [_window_is_adjustable] would let the reported basis
-   drift from the basis actually scanned — the #2167 class of bug this track has
-   already been bitten by twice. One branch, two outputs.
+   describing which branch produced it, plus the as-of factor that restates a
+   found level on the raw entry basis (#3043). Deriving any of these from a
+   second, separate evaluation of [_window_is_adjustable] would let them drift
+   from the basis actually scanned — the #2167 class of bug this track has
+   already been bitten by twice. One branch, three outputs.
 
    The [n_days = 0] branch is what keeps the telemetry a usable {e metric}
    rather than just a tag. [_window_is_adjustable] answers [false] for an empty
@@ -132,30 +141,50 @@ type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
    report [Raw_fallback] — "the fallback fired" for a window that had nothing to
    scan — inflating the inert-fraction numerator with non-events. It is
    behaviour-preserving: the empty branch returns the bundle untouched, exactly
-   as the [Raw_fallback] branch did. *)
-let _scan_basis ~config ~(callbacks : callbacks) =
-  if not config.split_safe_floors then (callbacks, Flag_off)
-  else if callbacks.n_days = 0 then (callbacks, Empty_window)
-  else if _window_is_adjustable callbacks then (_rescaled callbacks, Adjusted)
-  else (callbacks, Raw_fallback)
+   as the [Raw_fallback] branch did.
 
-(* The bundle the support-floor scan actually reads. Single source for every
-   floor consumer — [compute_initial_stop_with_floor_with_callbacks] and
-   [floor_is_structural_with_callbacks] — so the installed stop level and its
-   [stop_is_structural] classification can never disagree. Under
-   [config.split_safe_floors] the bundle is first rescaled onto the adjusted
-   basis; default-off returns it untouched (bit-identical). *)
-let _scan_callbacks ~config ~callbacks = fst (_scan_basis ~config ~callbacks)
+   On the [Adjusted] branch [_window_is_adjustable] has just proved offset 0
+   admits a factor, so the [~default:1.0] is unreachable. *)
+let _scan_basis ~config ~(callbacks : callbacks) =
+  let unscaled basis = { bundle = callbacks; basis; as_of_factor = 1.0 } in
+  if not config.split_safe_floors then unscaled Flag_off
+  else if callbacks.n_days = 0 then unscaled Empty_window
+  else if _window_is_adjustable callbacks then
+    {
+      bundle = _rescaled callbacks;
+      basis = Adjusted;
+      as_of_factor =
+        Option.value (_adjusted_factor callbacks ~day_offset:0) ~default:1.0;
+    }
+  else unscaled Raw_fallback
 
 let split_safe_basis_of_callbacks ~config ~callbacks =
-  snd (_scan_basis ~config ~callbacks)
+  (_scan_basis ~config ~callbacks).basis
 
+(* The floor level on the ENTRY's price basis. Single source for every floor
+   consumer — [compute_initial_stop_with_floor_with_callbacks] and
+   [floor_is_structural_with_callbacks] — so the installed stop level and its
+   [stop_is_structural] classification can never disagree.
+
+   Under [config.split_safe_floors] the scan runs on the adjusted basis, whose
+   prices are scaled by each bar's factor; the entry is a raw (as-of) price. The
+   found level is therefore divided by [f(as_of)] to put it on the raw basis
+   {e relative to the as-of bar}: a bar at offset [i] contributes
+   [raw_i *. f_i /. f_0], i.e. its price restated in today's share units — the
+   correct comparator for a raw entry on either side (#3043). Without this a
+   constant 0.8 factor put a short stop at 80.29 against a 93.44 entry. On every
+   non-[Adjusted] branch the factor is [1.0] and the level passes through
+   untouched (default-off: bit-identical). *)
 let _find_level ~config ~side ~callbacks =
+  let scan = _scan_basis ~config ~callbacks in
   Support_floor.find_recent_level_with_callbacks
     ~anchor_mode:config.support_floor_anchor_mode
-    ~anchor_scope:config.support_floor_anchor_scope
-    ~callbacks:(_scan_callbacks ~config ~callbacks)
-    ~side ~min_pullback_pct:config.min_correction_pct ()
+    ~anchor_scope:config.support_floor_anchor_scope ~callbacks:scan.bundle ~side
+    ~min_pullback_pct:config.min_correction_pct ()
+  |> Option.map ~f:(fun level ->
+      match scan.basis with
+      | Adjusted -> level /. scan.as_of_factor
+      | Flag_off | Empty_window | Raw_fallback -> level)
 
 let compute_initial_stop_with_floor_with_callbacks ~config ~side ~entry_price
     ~callbacks ~fallback_buffer =

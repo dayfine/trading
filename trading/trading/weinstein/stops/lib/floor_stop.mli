@@ -39,7 +39,10 @@ val compute_initial_stop_with_floor_with_callbacks :
 (** Callback-shaped support-floor-aware initial stop. When
     [config.split_safe_floors] the bundle is rescaled onto its
     split/dividend-adjusted basis before the correction low / rally high is
-    measured (default-off scans the bundle unchanged, bit-identical). See
+    measured, and the found level is then divided by the as-of bar's factor
+    [f(as_of)] so it lands on the raw basis of [entry_price] (#3043) — for both
+    sides. Default-off scans the bundle unchanged and passes the level through
+    untouched (bit-identical). See
     {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}. *)
 
 val floor_is_structural_with_callbacks :

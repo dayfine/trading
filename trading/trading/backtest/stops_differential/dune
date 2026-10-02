@@ -15,6 +15,12 @@
 ; "I intend to change live stop behaviour", which needs a golden re-pin and an
 ; experiment-ledger entry, not a promote.
 ;
+; Re-pinned 2026-10-02 for issue #3043: 21 rows changed, every one a
+; `split_safe_floors true` row on the `adjusted` basis (the split-safe floor is
+; now restated on the entry's raw basis; old short stops sat near 31 against a
+; 100 entry). Every `flag_off` row is byte-identical, so the default path did
+; not move and no golden or ledger entry is affected.
+;
 ; Lives under trading/trading/backtest/ rather than beside the stops library
 ; because the trace links `weinstein.types` (analysis/weinstein/), and
 ; `.claude/rules/qc-structural-authority.md` A2 allow-lists analysis/ imports
