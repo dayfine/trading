@@ -17,10 +17,11 @@ YES
   Before the fix a 0.8 factor put a short stop at 80.29 against a 93.44 entry.
   Default path bit-identical; no spec in `trading/test_data` arms the flag.
   Tests: `stops/test/test_split_safe_floor_raw_basis.ml`. Registry row #3043
-  → `fixed-behind-flag`. Side note: `Entry_audit_capture.classify_stop_floor_kind`
-  scans the raw bundle (ignores `split_safe_floors`); it reads only
-  `is_some`, so no level mixes bases, but its Support_floor/Buffer_fallback
-  tag can disagree with the installed stop when the flag is on.
+  → `fixed-behind-flag`. The audit `stop_floor_kind` tag comes from
+  `Weinstein_stops.floor_is_structural_with_callbacks` (via
+  `Entry_audit_helpers.initial_stop_and_kind`), the same scan as the stop, so
+  it honours `split_safe_floors`. The unused raw-only
+  `Entry_audit_capture.classify_stop_floor_kind` was removed (#3072).
 - `feat/stop-basis-flags` — three default-off stop-machine flags, one commit
   each (pushed, not yet built or PR'd): `stop_ma_same_basis` (#2982, the
   adjusted-MA/raw-bar mix in the raise candidate and the Stage-3 margin gate),

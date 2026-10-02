@@ -102,21 +102,6 @@ type candidate_decision =
   | Kept of Trading_strategy.Position.transition * entry_meta
   | Skipped of Audit_recorder.skip_reason
 
-val classify_stop_floor_kind :
-  stops_config:Weinstein_stops.config ->
-  callbacks:Weinstein_stops.callbacks ->
-  side:Trading_base.Types.position_side ->
-  Audit_recorder.stop_floor_kind
-(** Decide [stop_floor_kind] for a freshly-installed initial stop. Mirrors
-    {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}'s internal
-    branch — [Some _] from
-    {!Weinstein_stops.Support_floor.find_recent_level_with_callbacks} →
-    [Support_floor]; [None] → [Buffer_fallback].
-
-    The lookup is repeated here rather than threaded out of the stops primitive
-    to keep that primitive's surface clean; the cost is one extra bar walk per
-    entered candidate, bounded by [stops_config.support_floor_lookback_bars]. *)
-
 (** {1 Per-candidate entry construction}
 
     These primitives are factored out of the strategy file so the strategy stays

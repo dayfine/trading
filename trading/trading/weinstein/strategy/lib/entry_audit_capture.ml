@@ -46,18 +46,6 @@ type candidate_decision =
   | Kept of Position.transition * entry_meta
   | Skipped of Audit_recorder.skip_reason
 
-let classify_stop_floor_kind ~stops_config ~callbacks ~side :
-    Audit_recorder.stop_floor_kind =
-  match
-    Weinstein_stops.Support_floor.find_recent_level_with_callbacks
-      ~anchor_mode:stops_config.Weinstein_stops.support_floor_anchor_mode
-      ~anchor_scope:stops_config.Weinstein_stops.support_floor_anchor_scope
-      ~callbacks ~side
-      ~min_pullback_pct:stops_config.Weinstein_stops.min_correction_pct ()
-  with
-  | Some _ -> Support_floor
-  | None -> Buffer_fallback
-
 (* ------------------------------------------------------------------ *)
 (* Per-candidate entry construction                                     *)
 (* ------------------------------------------------------------------ *)
