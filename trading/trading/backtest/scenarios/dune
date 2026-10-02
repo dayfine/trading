@@ -8,9 +8,11 @@
   fixtures_root
   smoke_catalog
   scenario_progress
-  bar_source_resolver)
+  bar_source_resolver
+  output_root)
  (libraries
   core
+  core_unix
   fpath
   weinstein.data_source
   weinstein.snapshot_pipeline

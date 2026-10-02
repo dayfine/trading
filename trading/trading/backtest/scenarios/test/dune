@@ -12,7 +12,8 @@
   test_scenario_runner_wall_span
   test_scenario_progress
   test_bar_source_resolver
-  test_ladder_v4_overlays)
+  test_ladder_v4_overlays
+  test_output_root)
  (modules
   test_scenario
   test_universe_file
@@ -26,7 +27,8 @@
   test_scenario_runner_wall_span
   test_scenario_progress
   test_bar_source_resolver
-  test_ladder_v4_overlays)
+  test_ladder_v4_overlays
+  test_output_root)
  (libraries
   ounit2
   core
