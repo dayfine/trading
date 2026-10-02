@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-01",
+  "feature": "cleanup",
+  "branch": "cleanup/trade-audit-ratings-pass3",
+  "sha": "938db77ca497b11e856c7d412a06b0d901f6b945",
+  "recorded_at_ns": 1790883358163391149,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
