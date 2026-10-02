@@ -145,11 +145,23 @@ val compute_initial_stop_with_floor_with_callbacks :
     [get_adjusted_close /. get_close], and the close is replaced by the adjusted
     close (not [raw *. factor] — the published value itself). Replacing the
     close matters under [Close] anchor mode, where the scan reads it: leaving it
-    raw would measure adjusted highs / lows against raw closes. Default [false]
-    scans the bundle exactly as supplied — an exact no-op. This is the {b same}
-    rescale the bar-list path gets (that path builds a bundle and calls straight
-    through to here), so a split inside the lookback window is handled
-    identically whichever path the caller uses.
+    raw would measure adjusted highs / lows against raw closes.
+
+    {b The found level is restated on the entry's raw basis.} The adjusted basis
+    scales every price by its bar's factor, while [entry_price] is a raw price.
+    Before [compute_initial_stop], the level found on the adjusted bundle is
+    divided by the as-of bar's factor [f(as_of)] (offset [0]), so a bar at
+    offset [i] contributes [raw_i *. f_i /. f_0] — its price in today's share
+    units. This applies to both sides: without it a non-unit factor puts a
+    short's structural stop below the entry (#3043) and silently mis-sizes a
+    long's. The factor comes from the same branch that chose the basis, so the
+    [Raw_fallback] / [Flag_off] / [Empty_window] cases pass the level through
+    unchanged.
+
+    Default [false] scans the bundle exactly as supplied — an exact no-op. This
+    is the {b same} rescale the bar-list path gets (that path builds a bundle
+    and calls straight through to here), so a split inside the lookback window
+    is handled identically whichever path the caller uses.
 
     {b The rescale is all-or-nothing.} A bar admits a factor only when both
     [get_close] and [get_adjusted_close] are real positive numbers. If {e any}

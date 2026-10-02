@@ -1893,7 +1893,7 @@ S3 S 100 1.02 -> Initial(127.08800000000001|122.2) | Initial(127.08800000000001|
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
-S3 S 100 1.02 -> Initial(31.772000000000002|30.550000000000001) | Initial(31.772000000000002|30.550000000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(127.08800000000001|122.2) | Initial(127.08800000000001|122.2) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
@@ -1901,15 +1901,15 @@ S3 S 100 1.02 -> Initial(126.125|121.07128) | Initial(126.125|121.07128) | true 
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
-S3 S 100 1.02 -> Initial(31.356509600000003|30.150490000000001) | Initial(31.356509600000003|30.150490000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(125.625|120.60196000000001) | Initial(125.625|120.60196000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(103.20552960000001|107.50576000000001) | Initial(103.20552960000001|107.50576000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
 S3 S 100 1.02 -> Initial(124.6671296|119.87223999999999) | Initial(124.6671296|119.87223999999999) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
-S3 L 100 1.02 -> Initial(25.299513600000001|26.353660000000001) | Initial(25.299513600000001|26.353660000000001) | true true | adjusted adjusted
+S3 L 100 1.02 -> Initial(101.1980544|105.41464000000001) | Initial(101.1980544|105.41464000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
-S3 S 100 1.02 -> Initial(30.581938399999999|29.405709999999999) | Initial(30.581938399999999|29.405709999999999) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(122.32775359999999|117.62284) | Initial(122.32775359999999|117.62284) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
@@ -1917,7 +1917,7 @@ S3 S 100 1.02 -> Initial(125.625|120.58216) | Initial(125.625|120.58216) | true 
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Window_extreme true
-S3 S 100 1.02 -> Initial(31.319288|30.114699999999999) | Initial(31.319288|30.114699999999999) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(125.277152|120.4588) | Initial(125.277152|120.4588) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest false
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | flag_off flag_off
 S3cfg Support_floor.Wick Support_floor.Nearest false
@@ -1957,7 +1957,7 @@ S3 S 100 1.02 -> Initial(127.08800000000001|122.2) | Initial(127.08800000000001|
 S3cfg Support_floor.Wick Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
-S3 S 100 1.02 -> Initial(31.772000000000002|30.550000000000001) | Initial(31.772000000000002|30.550000000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(127.08800000000001|122.2) | Initial(127.08800000000001|122.2) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
@@ -1965,23 +1965,23 @@ S3 S 100 1.02 -> Initial(126.125|121.07128) | Initial(126.125|121.07128) | true 
 S3cfg Support_floor.Wick Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
-S3 S 100 1.02 -> Initial(31.356509600000003|30.150490000000001) | Initial(31.356509600000003|30.150490000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(125.625|120.60196000000001) | Initial(125.625|120.60196000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(103.20552960000001|107.50576000000001) | Initial(103.20552960000001|107.50576000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
 S3 S 100 1.02 -> Initial(124.6671296|119.87223999999999) | Initial(124.6671296|119.87223999999999) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
-S3 L 100 1.02 -> Initial(25.299513600000001|26.353660000000001) | Initial(25.299513600000001|26.353660000000001) | true true | adjusted adjusted
+S3 L 100 1.02 -> Initial(101.1980544|105.41464000000001) | Initial(101.1980544|105.41464000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
-S3 S 100 1.02 -> Initial(30.625|29.316310000000001) | Initial(30.625|29.316310000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(122.125|117.26524000000001) | Initial(122.125|117.26524000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(104.875|109.42264) | Initial(104.875|109.42264) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
 S3 S 100 1.02 -> Initial(125.625|120.58216) | Initial(125.625|120.58216) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
-S3 L 100 1.02 -> Initial(22.985088000000001|23.942800000000002) | Initial(22.985088000000001|23.942800000000002) | true true | adjusted adjusted
+S3 L 100 1.02 -> Initial(91.940352000000004|95.771200000000007) | Initial(91.940352000000004|95.771200000000007) | true true | adjusted adjusted
 S3cfg Support_floor.Wick Support_floor.Nearest true
-S3 S 100 1.02 -> Initial(31.319288|30.114699999999999) | Initial(31.319288|30.114699999999999) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(125.277152|120.4588) | Initial(125.277152|120.4588) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme false
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | flag_off flag_off
 S3cfg Support_floor.Close Support_floor.Window_extreme false
@@ -2021,7 +2021,7 @@ S3 S 100 1.02 -> Initial(125.52800000000001|120.7) | Initial(125.52800000000001|
 S3cfg Support_floor.Close Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
-S3 S 100 1.02 -> Initial(31.625|30.175000000000001) | Initial(31.625|30.175000000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(125.52800000000001|120.7) | Initial(125.52800000000001|120.7) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
@@ -2029,7 +2029,7 @@ S3 S 100 1.02 -> Initial(124.35413120000001|119.57128) | Initial(124.35413120000
 S3cfg Support_floor.Close Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
-S3 S 100 1.02 -> Initial(31.125|29.775490000000001) | Initial(31.125|29.775490000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(123.86603840000001|119.10196000000001) | Initial(123.86603840000001|119.10196000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
@@ -2037,7 +2037,7 @@ S3 S 100 1.02 -> Initial(123.10712959999999|118.37223999999999) | Initial(123.10
 S3cfg Support_floor.Close Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
-S3 S 100 1.02 -> Initial(30.191938400000002|29.030709999999999) | Initial(30.191938400000002|29.030709999999999) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(120.76775360000001|116.12284) | Initial(120.76775360000001|116.12284) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
@@ -2045,7 +2045,7 @@ S3 S 100 1.02 -> Initial(123.8454464|119.08216) | Initial(123.8454464|119.08216)
 S3cfg Support_floor.Close Support_floor.Window_extreme true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Window_extreme true
-S3 S 100 1.02 -> Initial(31.125|29.739699999999999) | Initial(31.125|29.739699999999999) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(123.717152|118.9588) | Initial(123.717152|118.9588) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest false
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | flag_off flag_off
 S3cfg Support_floor.Close Support_floor.Nearest false
@@ -2085,7 +2085,7 @@ S3 S 100 1.02 -> Initial(125.52800000000001|120.7) | Initial(125.52800000000001|
 S3cfg Support_floor.Close Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
-S3 S 100 1.02 -> Initial(31.625|30.175000000000001) | Initial(31.625|30.175000000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(125.52800000000001|120.7) | Initial(125.52800000000001|120.7) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
@@ -2093,23 +2093,23 @@ S3 S 100 1.02 -> Initial(124.35413120000001|119.57128) | Initial(124.35413120000
 S3cfg Support_floor.Close Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
-S3 S 100 1.02 -> Initial(31.125|29.775490000000001) | Initial(31.125|29.775490000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(123.86603840000001|119.10196000000001) | Initial(123.86603840000001|119.10196000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(102.38979839999999|106.65603999999999) | Initial(102.38979839999999|106.65603999999999) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
 S3 S 100 1.02 -> Initial(123.10712959999999|118.37223999999999) | Initial(123.10712959999999|118.37223999999999) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
-S3 L 100 1.02 -> Initial(24.972403199999999|26.012920000000001) | Initial(24.972403199999999|26.012920000000001) | true true | adjusted adjusted
+S3 L 100 1.02 -> Initial(99.889612799999995|104.05168) | Initial(99.889612799999995|104.05168) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
-S3 S 100 1.02 -> Initial(30.098962400000001|28.941310000000001) | Initial(30.098962400000001|28.941310000000001) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(120.625|115.76524000000001) | Initial(120.625|115.76524000000001) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
 S3 L 100 1.02 -> Initial(95.759001599999991|99.748959999999997) | Initial(95.759001599999991|99.748959999999997) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
 S3 S 100 1.02 -> Initial(123.8454464|119.08216) | Initial(123.8454464|119.08216) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
-S3 L 100 1.02 -> Initial(23.345088000000001|24.317800000000002) | Initial(23.345088000000001|24.317800000000002) | true true | adjusted adjusted
+S3 L 100 1.02 -> Initial(93.380352000000002|97.271200000000007) | Initial(93.380352000000002|97.271200000000007) | true true | adjusted adjusted
 S3cfg Support_floor.Close Support_floor.Nearest true
-S3 S 100 1.02 -> Initial(31.125|29.739699999999999) | Initial(31.125|29.739699999999999) | true true | adjusted adjusted
+S3 S 100 1.02 -> Initial(123.717152|118.9588) | Initial(123.717152|118.9588) | true true | adjusted adjusted
 S3 L 100 1 -> Initial(95.875|100) | Initial(95.875|100) | false false | flag_off flag_off
 S3 S 100 1 -> Initial(104.125|100) | Initial(104.125|100) | false false | flag_off flag_off
 S3 L 100 1.02 -> Initial(97.920000000000002|102) | Initial(97.920000000000002|102) | false false | flag_off flag_off

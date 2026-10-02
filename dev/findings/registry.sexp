@@ -199,9 +199,9 @@
 
 ((issue 3043)
  (finding "split_safe_floors on: adjusted floor vs raw entry puts a short stop below entry")
- (guard none)
- (reason "open; default-off flag, no spec arms it; fix and its tests tracked in #3043")
- (status open))
+ (guard ((unit ("trading/trading/weinstein/stops/test/test_split_safe_floor_raw_basis.ml"
+                "split-safe short Support_floor stop above entry (#3043)"))))
+ (status fixed-behind-flag))
 
 ((issue 3045)
  (finding "V6 share-class map resolved from -data-dir, missing when data lives elsewhere")

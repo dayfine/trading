@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-09-26
+## Last updated: 2026-10-02
 
 ## Status
 IN_PROGRESS
@@ -9,6 +9,18 @@ IN_PROGRESS
 YES
 
 ## Open PR
+- `fix/split-safe-floor-raw-basis` (PR open) — **issue #3043.** Under the
+  default-off `split_safe_floors`, the floor level found on the adjusted basis
+  is now divided by the as-of bar's factor `f(as_of)` before
+  `compute_initial_stop`, so it is on the raw basis of the entry (both sides).
+  The factor comes from the same `_scan_basis` branch as the bundle and basis.
+  Before the fix a 0.8 factor put a short stop at 80.29 against a 93.44 entry.
+  Default path bit-identical; no spec in `trading/test_data` arms the flag.
+  Tests: `stops/test/test_split_safe_floor_raw_basis.ml`. Registry row #3043
+  → `fixed-behind-flag`. Side note: `Entry_audit_capture.classify_stop_floor_kind`
+  scans the raw bundle (ignores `split_safe_floors`); it reads only
+  `is_some`, so no level mixes bases, but its Support_floor/Buffer_fallback
+  tag can disagree with the installed stop when the flag is on.
 - `feat/stop-basis-flags` — three default-off stop-machine flags, one commit
   each (pushed, not yet built or PR'd): `stop_ma_same_basis` (#2982, the
   adjusted-MA/raw-bar mix in the raise candidate and the Stage-3 margin gate),

@@ -267,8 +267,12 @@ type config = {
           leaves pre-split raw highs 4x the current price, so the primitive
           anchors the "peak" on a phantom level and derives a garbage floor (the
           live FBRX [split_in_window] warning, weekly-picks record 2026-07-31).
-          Pinning the measurement to the adjusted basis puts the floor in the
-          same continuous scale as the (current-basis) entry price.
+          Pinning the measurement to the adjusted basis puts every bar of the
+          window on one continuous scale; the found level is then divided by the
+          as-of bar's factor so it is restated on the raw basis of the entry
+          price (#3043 — the adjusted series is normalised to the data's latest
+          date, not to [as_of], so without this step a non-unit as-of factor put
+          a short's stop below its entry).
 
           Scope: {b both} floor paths, as of 2026-08-05. The rescale lives at
           the callbacks-bundle level inside
