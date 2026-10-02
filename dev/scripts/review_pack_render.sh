@@ -65,9 +65,16 @@ shot top.png 1300
 shot full.png 9000
 # Slices of the full page at native resolution: a 9000 px image is downscaled
 # past legibility by any viewer, so the review reads these one at a time.
+# sips silently writes the WHOLE image when the offset is 0 ("no offset": it
+# crops the centre) or when the crop's bottom edge lands exactly on the image's,
+# so the offset is clamped to [1, 9000 - H - 1] (one pixel row lost at each end)
+# and every slice's height is checked.
 H=1500; i=0
 while [ $((i * H)) -lt 9000 ]; do i=$((i + 1))
-  sips -c $H "$W" --cropOffset $(((i - 1) * H)) 0 "$OUT/full.png" --out "$OUT/part-$i.png" >/dev/null 2>&1 ||
+  y=$(((i - 1) * H)); [ "$y" -gt 0 ] || y=1; [ "$y" -lt $((9000 - H)) ] || y=$((9000 - H - 1))
+  sips -c $H "$W" --cropOffset "$y" 0 "$OUT/full.png" --out "$OUT/part-$i.png" >/dev/null 2>&1 ||
     { echo "review_pack_render: sips crop failed (part $i)" >&2; exit 1; }
+  [ "$(sips -g pixelHeight "$OUT/part-$i.png" | awk '/pixelHeight/ {print $2}')" = "$H" ] ||
+    { echo "review_pack_render: part $i is not $H px tall (sips ignored the offset)" >&2; exit 1; }
 done
 echo "review_pack_render: $OUT/top.png $OUT/full.png $OUT/part-1..$i.png"

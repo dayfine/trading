@@ -484,6 +484,11 @@ function renderSignals(nav, spy) {
     const one = top && Math.abs(ex) >= 10 && Math.sign(topPct) === Math.sign(ex) && Math.abs(topPct) >= 0.5 * Math.abs(ex);
     if (one || spread >= 15) out.push(`<b>${y.p} rests on ${one ? `one trade` : `the salt`}:</b> ${pct(y.ret, 1)} vs SPY ${pct(y.spy, 1)}.${one ? ` ${top.sym} realised ${usdk(top.pnl)} = ${pct(topPct, 1)} of start-of-year NAV, against a ${pct(ex, 1)} gap to SPY.` : ''}${salts.length > 1 ? ` Salts made ${salts.map(v => pct(v, 1)).join(' / ')}.` : ''}`);
   }
+  // the return rests on positions still open at the end: NAV move minus realised P&L is
+  // >= 10 % of start NAV and at least half the NAV move (or of the opposite sign)
+  const nav0 = nav[0][1], move = nav[nav.length - 1][1] - nav0, real = tr.reduce((a, t) => a + t.pnl, 0), open = move - real;
+  if (Math.abs(open) >= 0.1 * nav0 && (Math.sign(real) !== Math.sign(move) || Math.abs(open) >= 0.5 * Math.abs(move)))
+    out.push(`<b>The return rests on open positions:</b> NAV moved ${usdk(move)}, closed trades realised ${usdk(real)}, so the ${D.meta[CH()].metrics.openpositioncount} positions open at the end carry ${usdk(open)} unmarked by any trade row. Check <code>open_positions.csv</code> before crediting the return to the trade list.`);
   return out;
 }
 function renderOverview() {

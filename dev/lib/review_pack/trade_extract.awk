@@ -60,8 +60,9 @@ function in_range(p, lo, hi,   r, q, k) {
   if (d > ed && fe > 0) {
     nf++
     if (nf == FWD_BARS) f40 = (a / e - 1) * 100
+    # the exit bar counts: a stop filled on its trigger bar breaches the same day (lag 0)
+    if (d <= xd && breach == "" && stopl > 0 && l <= stopl + 1e-9) { breach = d; bidx = nf }
     if (d < xd) {
-      if (breach == "" && stopl > 0 && l <= stopl + 1e-9) { breach = d; bidx = nf }
       for (i = 1; i <= ncf; i++) if (cf[i] == "" && l <= e * (1 - lv[i])) cf[i] = ((o < e * (1 - lv[i]) ? o : e * (1 - lv[i])) / e - 1) * 100
     }
     if (d <= xd) xidx = nf
@@ -87,7 +88,7 @@ END {
   xin = on_x ? in_range(xp, xl, xh) : 0; xsnap = (xin == 2) ? SNAP : 1
   if (esnap == "") esnap = 1
   gapup = (pre_c > 0) ? (ep / esnap / pre_c - 1) * 100 : 0
-  # bars from the first initial-stop breach to the exit bar (-1: never breached before the exit day)
+  # bars from the first initial-stop breach to the exit bar (0: the exit day; -1: never breached)
   blag = (breach == "") ? -1 : xidx - bidx
   cfs = ""; for (i = 1; i <= ncf; i++) cfs = cfs (i > 1 ? "," : "") (cf[i] == "" ? sprintf("%.2f", pct) : sprintf("%.2f", cf[i]))
   # pid fe fx mfe mae post_max post_min post13 grade on_e on_x in_e in_x entry_vs_prevclose ebar xbar post_bars
