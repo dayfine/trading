@@ -443,6 +443,26 @@ const REGIME_TXT = {
   DOWN: (s, m, e) => s >= m ? `cash held through declines (DOWN days: ${pct(s, 1)} vs SPY ${pct(m, 1)} at ${fmt(e, 0)}% invested)` : `in cash through rebounds (DOWN days: ${pct(s, 1)} vs SPY ${pct(m, 1)} at ${fmt(e, 0)}% invested)`,
   MIXED: (s, m, e) => `${s >= m ? 'ahead' : 'behind'} in transition weeks (MIXED days: ${pct(s, 1)} vs SPY ${pct(m, 1)} at ${fmt(e, 0)}% invested)`,
 };
+// Signal predicates: pure, top-level, one per finding, so review_pack_test.sh
+// can extract each with sed and pin it with node (#3084). Each closing brace sits
+// at column 0 for that extraction.
+// The return rests on positions still open at the end: NAV move minus realised
+// P&L is >= 10 % of start NAV and at least half the NAV move (or of the opposite
+// sign to realised).
+function openSignal(nav0, move, real) {
+  const open = move - real;
+  return Math.abs(open) >= 0.1 * nav0 && (Math.sign(real) !== Math.sign(move) || Math.abs(open) >= 0.5 * Math.abs(move));
+}
+// A year one trade decided: |excess vs SPY| >= 10 pp and the top realised trade
+// (as % of start-of-year NAV) has the same sign and is at least half of it.
+function oneTradeYear(ex, topPct) {
+  return Math.abs(ex) >= 10 && Math.sign(topPct) === Math.sign(ex) && Math.abs(topPct) >= 0.5 * Math.abs(ex);
+}
+// An era's second-largest regime gap is named too when it has the same sign as
+// the largest and is at least half of it, or >= 0.15 log (~ a 16 % cumulative gap).
+function alsoCause(gap1, gap2) {
+  return Math.sign(gap2) === Math.sign(gap1) && (Math.abs(gap2) >= 0.5 * Math.abs(gap1) || Math.abs(gap2) >= 0.15);
+}
 // Renders the ratio chart + era table; returns finding bullets (HTML strings).
 function renderSignals(nav, spy) {
   const ys = D.years[CH()], reg = spyRegimeByDay();
@@ -464,7 +484,7 @@ function renderSignals(nav, spy) {
     }
     const cells = Object.fromEntries(Object.entries(R).map(([k, a]) => [k, a[0] ? { days: a[0], expo: a[1] / a[0], s: 100 * (Math.exp(a[2]) - 1), m: 100 * (Math.exp(a[3]) - 1), gap: a[2] - a[3] } : null]));
     const order = Object.keys(cells).filter(k => cells[k]).sort((p, q) => Math.abs(cells[q].gap) - Math.abs(cells[p].gap));
-    const key = order[0], key2 = order[1] && Math.sign(cells[order[1]].gap) === Math.sign(cells[key].gap) && (Math.abs(cells[order[1]].gap) >= 0.5 * Math.abs(cells[key].gap) || Math.abs(cells[order[1]].gap) >= 0.15) ? order[1] : null; // 0.15 log ~ a 16 % cumulative gap
+    const key = order[0], key2 = order[1] && alsoCause(cells[key].gap, cells[order[1]].gap) ? order[1] : null;
     return { ...e, y0, y1, r0: pts[e.i0][1], r1: pts[e.i1][1], cells, key, key2 };
   });
   const cell = x => x ? `<span class="${sgn(x.s - x.m)}">${pct(x.s, 0)}</span> / ${pct(x.m, 0)} · ${fmt(x.expo, 0)}%` : '–';
@@ -481,13 +501,12 @@ function renderSignals(nav, spy) {
     const top = tr.filter(t => t.xd.slice(0, 4) === y.p).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl))[0];
     const salts = D.years.map(s => (s.find(q => q.p === y.p) || {}).ret).filter(v => v != null), spread = salts.length > 1 ? Math.max(...salts) - Math.min(...salts) : 0;
     const ex = y.ret - y.spy, topPct = top ? 100 * top.pnl / y.nav0 : 0;
-    const one = top && Math.abs(ex) >= 10 && Math.sign(topPct) === Math.sign(ex) && Math.abs(topPct) >= 0.5 * Math.abs(ex);
+    const one = top && oneTradeYear(ex, topPct);
     if (one || spread >= 15) out.push(`<b>${y.p} rests on ${one ? `one trade` : `the salt`}:</b> ${pct(y.ret, 1)} vs SPY ${pct(y.spy, 1)}.${one ? ` ${top.sym} realised ${usdk(top.pnl)} = ${pct(topPct, 1)} of start-of-year NAV, against a ${pct(ex, 1)} gap to SPY.` : ''}${salts.length > 1 ? ` Salts made ${salts.map(v => pct(v, 1)).join(' / ')}.` : ''}`);
   }
-  // the return rests on positions still open at the end: NAV move minus realised P&L is
-  // >= 10 % of start NAV and at least half the NAV move (or of the opposite sign)
+  // the return rests on positions still open at the end (see openSignal)
   const nav0 = nav[0][1], move = nav[nav.length - 1][1] - nav0, real = tr.reduce((a, t) => a + t.pnl, 0), open = move - real;
-  if (Math.abs(open) >= 0.1 * nav0 && (Math.sign(real) !== Math.sign(move) || Math.abs(open) >= 0.5 * Math.abs(move)))
+  if (openSignal(nav0, move, real))
     out.push(`<b>The return rests on open positions:</b> NAV moved ${usdk(move)}, closed trades realised ${usdk(real)}, so the ${D.meta[CH()].metrics.openpositioncount} positions open at the end carry ${usdk(open)} unmarked by any trade row. Check <code>open_positions.csv</code> before crediting the return to the trade list.`);
   return out;
 }

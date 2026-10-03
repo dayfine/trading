@@ -21,7 +21,10 @@
 #   - EEE: exit under 5 % of entry -> X;
 #   - two runs (r0, r1) -> manifest lists both and both trade files exist;
 #   - every emitted JSON file parses (the SPY fixture carries a "321."-style
-#     value the store really writes), manifest + year/quarter tables present.
+#     value the store really writes), manifest + year/quarter tables present;
+#   - the page's signal predicates (openSignal, oneTradeYear, alsoCause) are
+#     extracted with sed and evaluated with node over named cases (#3084);
+#     skipped with a notice when node is not installed.
 #
 # Run:
 #   sh trading/devtools/checks/review_pack_test.sh
@@ -90,6 +93,32 @@ expect_eq "page declares utf-8" yes "$(grep -q '<meta charset="utf-8">' "$S/inde
 expect_eq "charts can fit a 26y daily series (minBarSpacing set)" yes "$(grep -q 'minBarSpacing: 0.01' "$S/index.html" && echo yes || echo no)"
 expect_eq "page <title> carries --title" yes "$(grep -q '^<title>Fixture</title>$' "$S/index.html" && echo yes || echo no)"
 expect_eq "open-position signal present" yes "$(grep -q 'The return rests on open positions' "$S/index.html" && echo yes || echo no)"
+
+# Signal predicates (#3084): extract each top-level function from the shipped
+# page with sed and pin it with node over named cases. The page keeps each
+# closing brace at column 0 so the range ends where the function does.
+if command -v node >/dev/null 2>&1; then
+  FNS="$(sed -n -e '/^function openSignal(/,/^}/p' -e '/^function oneTradeYear(/,/^}/p' -e '/^function alsoCause(/,/^}/p' "$S/index.html")"
+  expect_eq "signal predicates extracted" 3 "$(printf '%s\n' "$FNS" | grep -c '^function ')"
+  sig() { node -e "$FNS
+console.log($1)"; }
+  expect_eq "openSignal: opposite-sign specimen (T1 5r s0: NAV0 1M, move +115k, realised -222k) fires" true "$(sig 'openSignal(1e6, 115e3, -222e3)')"
+  expect_eq "openSignal: open 200k of a 300k move (above half) fires" true "$(sig 'openSignal(1e6, 300e3, 100e3)')"
+  expect_eq "openSignal: open 120k of a 300k move (below half, same sign) is quiet" false "$(sig 'openSignal(1e6, 300e3, 180e3)')"
+  expect_eq "openSignal: open 80k < 10 % of NAV0 is quiet even at opposite sign" false "$(sig 'openSignal(1e6, 50e3, -30e3)')"
+  expect_eq "openSignal: negative move, open -250k of -300k fires" true "$(sig 'openSignal(1e6, -300e3, -50e3)')"
+  expect_eq "oneTradeYear: top 12 pp of a 20 pp gap fires" true "$(sig 'oneTradeYear(20, 12)')"
+  expect_eq "oneTradeYear: top 8 pp of a 20 pp gap (under half) is quiet" false "$(sig 'oneTradeYear(20, 8)')"
+  expect_eq "oneTradeYear: gap under 10 pp is quiet" false "$(sig 'oneTradeYear(8, 8)')"
+  expect_eq "oneTradeYear: negative gap, same-sign top fires" true "$(sig 'oneTradeYear(-20, -15)')"
+  expect_eq "oneTradeYear: top trade of the opposite sign is quiet" false "$(sig 'oneTradeYear(20, -15)')"
+  expect_eq "alsoCause: second gap half the first fires" true "$(sig 'alsoCause(0.4, 0.25)')"
+  expect_eq "alsoCause: second gap >= 0.15 log fires below half" true "$(sig 'alsoCause(0.6, 0.16)')"
+  expect_eq "alsoCause: small second gap is quiet" false "$(sig 'alsoCause(0.4, 0.1)')"
+  expect_eq "alsoCause: opposite-sign second gap is quiet" false "$(sig 'alsoCause(0.4, -0.3)')"
+else
+  echo "SKIP: review_pack signal-predicate cases need node"
+fi
 expect_eq "EEE exits under 5 % of entry: X" X "$(q '.[]|select(.sym=="EEE")|.g')"
 expect_eq "second run r1 emitted" 6 "$(jq length "$S/data/r1_trades.json")"
 expect_eq "year table: one row" 2020 "$(jq -r '.[0].p' "$S/data/r0_years.json")"
