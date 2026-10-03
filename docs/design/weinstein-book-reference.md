@@ -317,6 +317,28 @@ adaptation, not a book rule, and must be labelled as one. A 10-week *stage*
 MA is not supported by the book. The 2026-06-01 SPY-only "trader 10wk" test
 changed exactly that, and its REJECT speaks to that interpretation only.
 
+**Resolved question (2026-10-03, #3069) — where does the initial stop go on a
+continuation buy: below the consolidation (pullback) low, or below the original
+Stage 1 base?** Below the consolidation low. The book gives no
+continuation-specific stop rule: Ch. 3's continuation passage covers the MA
+condition, the false-breakout risk, and sizing ("the proper tactic when dealing
+with this type of breakout is to buy your entire position when it overcomes its
+significant resistance"), and says nothing about the stop. The stop comes from
+the general Ch. 6 rule, which is stated against the trading range the stock
+breaks out *of*: "Stock XYZ was in a trading range of 18¼ to 20¼ before it
+broke out … the initial stop was set under the round number", and "When you
+set your initial stop, pay less attention to the MA and more to the prior
+correction low … the stop should be placed right below the significant floor
+of support." For a continuation buy that range is the consolidation near the
+MA ("drops back close to its MA and consolidates. It then breaks out anew
+above the top of its resistance zone"), so the floor is the consolidation /
+pullback low. The original base is many weeks and often 100 %+ below; it is not
+the range the breakout leaves, and a stop there would contradict the §5.1
+sizing logic (risk measured from the breakout to the floor just under it).
+This is an application of the general rule, not a quoted continuation rule;
+label it as such in code docstrings. Because the consolidation sits close to
+the rising MA, the consolidation low and "below the MA" usually coincide.
+
 ### 4.7 Order Mechanics — GTC Buy-Stop-Limit (Ch. 3 ~lines 2450–2490, Ch. 4 checklist ~line 4178)
 
 Weinstein's prescribed order for entering a breakout is fully specified — and
