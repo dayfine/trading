@@ -56,6 +56,7 @@ let build_entry_event ~(macro : Macro.result) ~current_date
     initial_position_value;
     initial_risk_dollars;
     sized_down_wide_stop = meta.sized_down_wide_stop;
+    entry_anchor = Screener.entry_anchor_kind candidate;
     freshness_basis =
       Entry_ticket_tags.freshness_basis_of_analysis candidate.analysis;
     triple_confirmation =
@@ -66,31 +67,41 @@ let build_entry_event ~(macro : Macro.result) ~current_date
 (** Record one audit entry for a [Kept] decision. [Skipped] decisions are
     silently ignored — they appear only in the [alternatives] lists of other
     entries. *)
-let _emit_kept_decision ~(audit_recorder : Audit_recorder.t) ~macro
-    ~current_date ~decisions candidate (meta : Entry_audit_capture.entry_meta) =
+let _emit_kept_decision ~(audit_recorder : Audit_recorder.t) ~pending_entry_e
+    ~macro ~current_date ~decisions candidate
+    (meta : Entry_audit_capture.entry_meta) =
   let alternatives =
     alternatives_of_decisions ~decisions ~exclude_position_id:meta.position_id
   in
   let event =
     build_entry_event ~macro ~current_date ~candidate ~meta ~alternatives
   in
+  (* #3089: a frozen candidate's ticket rests at the pinned [E], so record the
+     arm pinned with it rather than the one the current analysis selects. *)
+  let event =
+    {
+      event with
+      entry_anchor = Entry_freeze.anchor_kind pending_entry_e candidate;
+    }
+  in
   audit_recorder.record_entry event
 
 (** Dispatch one decision: emit an audit entry if [Kept], skip if [Skipped]. *)
-let _dispatch_one_decision ~audit_recorder ~macro ~current_date ~decisions
-    (candidate, (d : Entry_audit_capture.candidate_decision)) =
+let _dispatch_one_decision ~audit_recorder ~pending_entry_e ~macro ~current_date
+    ~decisions (candidate, (d : Entry_audit_capture.candidate_decision)) =
   match d with
   | Entry_audit_capture.Skipped _ -> ()
   | Kept (_, meta) ->
-      _emit_kept_decision ~audit_recorder ~macro ~current_date ~decisions
-        candidate meta
+      _emit_kept_decision ~audit_recorder ~pending_entry_e ~macro ~current_date
+        ~decisions candidate meta
 
-let emit_entries ~(audit_recorder : Audit_recorder.t)
+let emit_entries ~(audit_recorder : Audit_recorder.t) ~pending_entry_e
     ~(macro : Macro.result option) ~current_date ~decisions =
   match macro with
   | None -> ()
   | Some macro ->
       let dispatch =
-        _dispatch_one_decision ~audit_recorder ~macro ~current_date ~decisions
+        _dispatch_one_decision ~audit_recorder ~pending_entry_e ~macro
+          ~current_date ~decisions
       in
       List.iter decisions ~f:dispatch

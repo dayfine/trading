@@ -61,10 +61,15 @@ val build_entry_event :
     [meta], and the F1 freshness basis + F6 §4.5 triple-confirmation
     measurements projected off [candidate.analysis] by {!Entry_ticket_tags}. All
     three are pure reads of values already in scope — no extra bar walk, no
-    behaviour change. *)
+    behaviour change.
+
+    [entry_anchor] is {!Screener.entry_anchor_kind}[ candidate]; {!emit_entries}
+    overrides it with {!Entry_freeze.anchor_kind}, so a frozen candidate records
+    the arm pinned with its [E] rather than the current week's arm (#3089). *)
 
 val emit_entries :
   audit_recorder:Audit_recorder.t ->
+  pending_entry_e:Entry_freeze.t ->
   macro:Macro.result option ->
   current_date:Core.Date.t ->
   decisions:
@@ -73,7 +78,9 @@ val emit_entries :
 (** For every [Kept] entry in [decisions], compute the [alternatives] list,
     build an [entry_event], and route it through [audit_recorder.record_entry].
     [Skipped] entries are silently dropped — they surface as alternatives in
-    other Kept entries' rows.
+    other Kept entries' rows. Each event's [entry_anchor] is
+    {!Entry_freeze.anchor_kind}[ pending_entry_e candidate] — the pinned arm for
+    a frozen candidate, the current arm otherwise (#3089).
 
     No-op when [macro] is [None] (the strategy did not run macro this tick, so
     the entry walk is being driven from a test fixture without macro state —

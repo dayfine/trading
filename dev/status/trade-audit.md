@@ -1,6 +1,6 @@
 # Status: trade-audit
 
-## Last updated: 2026-09-14
+## Last updated: 2026-10-03
 
 ## Status
 READY_FOR_REVIEW
@@ -54,6 +54,17 @@ aware stops, drawdown circuit breaker, segmentation classifier — see
 trade-audit work. Sister track `optimal-strategy` (counterfactual
 opportunity-cost analysis, plan #650 merged 2026-04-28) is now picking
 up the next layer of decision-trail analysis.
+
+### 2026-10-03 — `entry_anchor` pinned with the frozen E (issue #3089)
+
+- [x] Under `freeze_entry_at_first_breakout` (default off), `Entry_freeze` now
+      pins the arm (`Screener.entry_anchor_kind`) together with `E`, and
+      `Audit_recorder.entry_event` carries an explicit `entry_anchor` that the
+      trade-audit recorder reads instead of re-deriving it from the candidate's
+      current analysis. A frozen ticket's `entry_anchor` column now names the
+      arm of the level it rests at. Flag off: pin table empty, so the recorded
+      kind is `Screener.entry_anchor_kind` of the candidate, as before.
+      Branch `feat/entry-anchor-freeze-pin`.
 
 ## Goal
 

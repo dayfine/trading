@@ -105,7 +105,7 @@ let _no_triple_confirmation :
 let _entry_event ?(candidate = _candidate) ?(sized_down_wide_stop = false)
     ?(freshness_basis = Weinstein_strategy.Entry_freshness.Ma_cross)
     ?(triple_confirmation = _no_triple_confirmation) ?(alternatives = [])
-    ~split_safe_basis ~stop_floor_kind () : AR.entry_event =
+    ?entry_anchor ~split_safe_basis ~stop_floor_kind () : AR.entry_event =
   {
     position_id = "ZZZZ-wein-1";
     candidate;
@@ -120,6 +120,8 @@ let _entry_event ?(candidate = _candidate) ?(sized_down_wide_stop = false)
     initial_position_value = 10_000.0;
     initial_risk_dollars = 800.0;
     sized_down_wide_stop;
+    entry_anchor =
+      Option.value entry_anchor ~default:(Screener.entry_anchor_kind candidate);
     freshness_basis;
     triple_confirmation;
     alternatives;
@@ -436,6 +438,29 @@ let test_entry_projection_records_every_entry_anchor _ =
          is_some_and (equal_to (TL.Ma_fallback : TL.entry_anchor));
        ])
 
+(** #3089 sink-hop pin: the recorder reads the event's [entry_anchor], not the
+    candidate's current analysis. Under [freeze_entry_at_first_breakout] the
+    strategy stamps the arm pinned with the frozen [E] onto the event, so a
+    candidate whose current analysis selects [Local_range_top] but whose event
+    carries the pinned [Breakout] must record [Breakout]. Re-deriving the kind
+    from [e.candidate] at the recorder (the pre-#3089 behaviour) fails this. *)
+let test_entry_projection_records_the_events_pinned_anchor _ =
+  let candidate =
+    {
+      _candidate with
+      analysis = { _candidate.analysis with local_range_top = Some 105.0 };
+    }
+  in
+  assert_that
+    (_recorded_entry_of
+       (_entry_event ~candidate ~entry_anchor:Screener.Breakout
+          ~split_safe_basis:AR.Flag_off ~stop_floor_kind:AR.Buffer_fallback ()))
+      .TA.ticket_lifecycle
+    (is_some_and
+       (field
+          (fun (l : TL.t) -> l.entry_anchor)
+          (is_some_and (equal_to (TL.Breakout : TL.entry_anchor)))))
+
 (** Sink-hop pin for the F5 record: every {!Volume.breakout_confirmation}
     constructor — plus the [None] no-verdict case — and every
     {!AR.fill_volume_outcome} must reach its [TA] counterpart. A value dropped
@@ -617,6 +642,8 @@ let suite =
          >:: test_entry_projection_defaults_to_ma_cross_and_untagged;
          "entry anchor: every arm reaches the lifecycle (#3074)"
          >:: test_entry_projection_records_every_entry_anchor;
+         "#3089: entry projection records the event's pinned anchor"
+         >:: test_entry_projection_records_the_events_pinned_anchor;
          "fill_volume projects every verdict class"
          >:: test_fill_volume_projects_every_verdict_class;
          "split_safe_basis projects all three states"
