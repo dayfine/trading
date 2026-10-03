@@ -4,6 +4,14 @@ Written 21:30 PT 2026-10-02 by the Fable session, for a less context-rich model 
 below says what to run, what the output should look like, and what decision to make from it. Do the
 tasks in order. Do not skip a verification step because the result "looks obvious".
 
+> **Status 03:15 PT 2026-10-03.** P0 is DONE: results PR #3091 merged (dilutes 6/6, no phase 2; qc-results
+> APPROVED on iteration 2). `perf_long_cells.sh update` ran (24 rows, check ok) and the `sweep-anchor`
+> worktree is removed. P1 (#3086) is in its QC loop: structural re-run at the rework tip e71e8513a, then
+> behavioral; merge on both, then `jj workspace forget harness-reopen && rm -rf
+> .claude/worktrees/jjws-harness-reopen`. Screens 4(a)/(b) are done and merged with #3091. **What is left
+> for the next session is P2 (section 4, the user's decision) and the session-end chores (section 5).**
+> Sections 1–2 below are the record of how P0 was done; do not redo them.
+
 ## 0. Ground rules (read every one before starting)
 
 1. **Never commit, print, upload or quote the book file**
@@ -83,10 +91,11 @@ reader can recheck it.
    within range, 25 tickets were placed May–Aug 2009.
 3. **Even when filled, the 2009 recovery entries whipsawed.** ia4 s0, 25 entries May–Sep 2009
    (`awk -F, 'NR>1 && $3 ~ /^2009-0[5-9]/' .sweep-output/entry-anchor-recovery/ia4-5d-s0-v11-trades.csv`):
-   11 stopped out at −14 to −16 % within 4–50 days during the June–July 2009 pullback (13–15 % structural
-   stops, e.g. THRM −14.0 % in 4 days, ALV −15.2 % in 9, CASC1 −16.4 % in 10, PXP −14.9 % in 11); the
-   winners (EBAY +31.7 %, AWI +31.0 %, LPS +18.3 %) left by laggard rotation. Net about zero. **Any
-   anchor fix has this cap.**
+   11 exited on `stop_loss`, 10 of them losers at −13.8 to −16.4 % (NSIT +12.7 % was a trailed winner);
+   6 of the 10 in the June–July 2009 pullback (CASC1 −16.4 % in 10 days, PXP −14.9 % in 11, CHU, GIL,
+   CHCO, ARCB), THRM and ALV in mid-May, NYT and OLN in October; the winners (EBAY +31.7 %, AWI +31.0 %,
+   LPS +18.3 %) left by laggard rotation. Net −$12k. **Any anchor fix has this cap.** (Restated after
+   qc-results on #3091 caught the first wording; always re-derive such a sentence from the artifact.)
 4. **The recovery gap is not one pattern across 26 years.** On the 26y investor s0
    (`.sweep-output/investor-preset/inv26sc-investor-s0-v11-*`), for every macro-gate reopen after ≥ 8
    non-Bullish weeks (19 episodes), entries in the first 13 / 26 weeks and the 26-week return vs SPY:
