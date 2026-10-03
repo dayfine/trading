@@ -42,6 +42,10 @@ val of_collector :
     [installed_stop] via {!Stop_log.record_installed_stop} (the simulator's
     [EntryComplete] carries no stop), and [record_stop_move] feeds
     {!Stop_log.record_stop_move} (the [Entered_tightening] install, which emits
-    no transition). When absent, [record_stop_move] drops its events and
-    [record_entry] touches only [trade_audit]. Either way [trade_audit] is fed
-    exactly as before. *)
+    no transition). [record_stop_decision] additionally feeds
+    {!Stop_log.record_stop_decision} (issue #3075), so the log's [entry_stop] /
+    [max_stop] / [exit_stop] follow the level the stop machine actually held —
+    including a split rescale of a resting ticket or a held position, which no
+    transition reports. When absent, [record_stop_move] drops its events and
+    [record_entry] / [record_stop_decision] touch only [trade_audit]. Either way
+    [trade_audit] is fed exactly as before. *)
