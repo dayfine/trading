@@ -132,6 +132,17 @@ let test_stop_trigger_kind_label_distinguishes_all _ =
       TC.stop_trigger_kind_label SL.Non_stop_exit )
     (equal_to ("gap_down", "intraday", "end_of_period", "non_stop_exit"))
 
+(* #3074: every [entry_anchor] column label, one per constructor — the strings an
+   [awk] split of [trades.csv] by entry type matches on. *)
+let test_entry_anchor_label_distinguishes_all _ =
+  let module TL = Backtest.Ticket_lifecycle in
+  assert_that
+    ( TC.entry_anchor_label TL.Continuation,
+      TC.entry_anchor_label TL.Local_range_top,
+      TC.entry_anchor_label TL.Breakout,
+      TC.entry_anchor_label TL.Ma_fallback )
+    (equal_to ("continuation", "local_range_top", "breakout", "ma_fallback"))
+
 (* csv_header_fields --------------------------------------------------- *)
 
 let test_csv_header_fields_pinned _ =
@@ -148,6 +159,7 @@ let test_csv_header_fields_pinned _ =
          equal_to "stop_fill_distance_pct";
          equal_to "max_stop";
          equal_to "n_stop_raises";
+         equal_to "entry_anchor";
        ])
 
 (* of_audit_and_stop_log: full join ----------------------------------- *)
@@ -190,6 +202,53 @@ let test_of_audit_and_stop_log_populates_all_fields _ =
          field
            (fun (c : TC.t) -> c.stop_fill_distance_pct)
            (is_some_and (float_equal ~epsilon:1e-6 0.08));
+       ])
+
+(* #3074: [entry_anchor] comes from the joined record's ticket lifecycle. A
+   record with the tag renders its label; one without a lifecycle (an audit
+   written before PR-5) or without the tag (written before #3074) leaves the
+   cell empty instead of guessing a kind. *)
+let test_entry_anchor_column_reads_the_lifecycle_tag _ =
+  let module TL = Backtest.Ticket_lifecycle in
+  let lifecycle entry_anchor : TL.t =
+    {
+      placement_date = _date "2024-01-12";
+      ticket_age_weeks_at_cancel = None;
+      cancel_reason = None;
+      ticket_age_weeks_at_fill = None;
+      fill_volume = None;
+      freshness_basis = TL.Ma_cross;
+      entry_anchor;
+      sized_down_wide_stop = false;
+      triple_confirmation =
+        {
+          breakout_volume_multiple = None;
+          rs_zero_cross = false;
+          in_base_advance_pct = None;
+        };
+      reissued_from = None;
+    }
+  in
+  let anchor_of ticket_lifecycle =
+    let entry = { (make_entry ()) with ticket_lifecycle } in
+    (TC.of_audit_and_stop_log
+       ~audit:[ make_record entry ]
+       ~stop_infos:[] ~trade:(make_trade ()))
+      .entry_anchor
+  in
+  assert_that
+    [
+      anchor_of (Some (lifecycle (Some TL.Continuation)));
+      anchor_of (Some (lifecycle (Some TL.Ma_fallback)));
+      anchor_of (Some (lifecycle None));
+      anchor_of None;
+    ]
+    (elements_are
+       [
+         is_some_and (equal_to "continuation");
+         is_some_and (equal_to "ma_fallback");
+         is_none;
+         is_none;
        ])
 
 (* Fill-basis vs E-basis: when the realized fill (120) diverges from the
@@ -532,6 +591,7 @@ let test_csv_row_fields_formats_correctly _ =
       stop_fill_distance_pct = Some 0.065;
       max_stop = Some 144.5;
       n_stop_raises = Some 2;
+      entry_anchor = Some "continuation";
     }
   in
   assert_that (TC.csv_row_fields ctx)
@@ -548,6 +608,7 @@ let test_csv_row_fields_formats_correctly _ =
          (* price precision, not the %.4f ratio precision above *)
          equal_to "144.50";
          equal_to "2";
+         equal_to "continuation";
        ])
 
 let test_csv_row_fields_renders_none_as_empty _ =
@@ -565,11 +626,13 @@ let test_csv_row_fields_renders_none_as_empty _ =
       stop_fill_distance_pct = None;
       max_stop = None;
       n_stop_raises = None;
+      entry_anchor = None;
     }
   in
   assert_that (TC.csv_row_fields ctx)
     (elements_are
        [
+         equal_to "";
          equal_to "";
          equal_to "";
          equal_to "";
@@ -589,7 +652,11 @@ let suite =
          >:: test_stage_label_distinguishes_late_stage2;
          "stop_trigger_kind_label all variants"
          >:: test_stop_trigger_kind_label_distinguishes_all;
+         "entry_anchor_label all variants (#3074)"
+         >:: test_entry_anchor_label_distinguishes_all;
          "csv_header_fields pinned" >:: test_csv_header_fields_pinned;
+         "entry_anchor column reads the lifecycle tag (#3074)"
+         >:: test_entry_anchor_column_reads_the_lifecycle_tag;
          "fill basis diverges from E basis"
          >:: test_fill_basis_diverges_from_e_basis;
          "of_audit_and_stop_log full join"

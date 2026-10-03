@@ -30,6 +30,9 @@ type triple_confirmation = {
 
 type entry_freshness_basis = Ma_cross | Range_top_breakout [@@deriving sexp]
 
+type entry_anchor = Continuation | Local_range_top | Breakout | Ma_fallback
+[@@deriving sexp]
+
 type reissue = { original_position_id : string; reissue_date : Date.t }
 [@@deriving sexp]
 
@@ -40,6 +43,7 @@ type t = {
   ticket_age_weeks_at_fill : int option; [@sexp.option]
   fill_volume : fill_volume_check option; [@sexp.option]
   freshness_basis : entry_freshness_basis;
+  entry_anchor : entry_anchor option; [@sexp.option]
   sized_down_wide_stop : bool;
   triple_confirmation : triple_confirmation;
   reissued_from : reissue option; [@sexp.option]
