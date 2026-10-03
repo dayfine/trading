@@ -109,6 +109,35 @@ let _maybe_reanchor_to_entry_base ~reanchor ~stops_config ~side ~effective_entry
     in
     (buffer_stop, Audit_recorder.Buffer_fallback)
 
+(** #3069: a long Ch. 3 continuation buy's initial stop goes below the
+    consolidation / pullback low, by the general Ch. 6 rule (stop under the
+    floor of the range the stock breaks out of; [weinstein-book-reference.md]
+    §4.6, resolved in #3099). When [enabled] and [cand] is a long continuation
+    hit whose [pullback_low] sits below [effective_entry], the stop is placed
+    below [pullback_low] the same way the stops layer places one below a support
+    floor ({!Weinstein_stops.compute_initial_stop}), and is tagged
+    [Support_floor]. Otherwise [raw_stop] and its tag pass through unchanged.
+
+    [pullback_low] comes from the same weekly callbacks as the continuation
+    [consolidation_high] that anchors the ticket (#3067), so the stop's
+    reference and the entry share one price basis. *)
+let stop_at_pullback_low ~enabled ~stops_config ~effective_entry ~raw_stop
+    ~(structural_kind : Audit_recorder.stop_floor_kind)
+    (cand : Screener.scored_candidate) =
+  let pullback_low =
+    match (cand.side, cand.analysis.continuation) with
+    | Long, Some { is_continuation = true; pullback_low = Some pl; _ }
+      when Float.( < ) pl effective_entry ->
+        Some pl
+    | _ -> None
+  in
+  match pullback_low with
+  | Some reference_level when enabled ->
+      ( Weinstein_stops.compute_initial_stop ~config:stops_config ~side:Long
+          ~reference_level,
+        Audit_recorder.Support_floor )
+  | Some _ | None -> (raw_stop, structural_kind)
+
 (** Compute the support-floor-aware initial stop for [cand] entering at
     [effective_entry], plus the [stop_floor_kind] and [split_safe_basis] tags
     for audit. The [stop_floor_kind] tag comes from
@@ -139,6 +168,7 @@ let _maybe_reanchor_to_entry_base ~reanchor ~stops_config ~side ~effective_entry
     the re-anchor replaces the level but does not re-run the scan, and the tag
     describes the scan. *)
 let initial_stop_and_kind ?(min_stop_distance_pct = 0.0)
+    ?(continuation_stop_at_pullback_low = false)
     ?(reanchor_to_entry_base = false) ~stops_config ~initial_stop_buffer
     ~bar_reader ~current_date ~effective_entry
     (cand : Screener.scored_candidate) =
@@ -164,6 +194,10 @@ let initial_stop_and_kind ?(min_stop_distance_pct = 0.0)
   let split_safe_basis =
     Weinstein_stops.split_safe_basis_of_callbacks ~config:stops_config
       ~callbacks
+  in
+  let raw_stop, structural_kind =
+    stop_at_pullback_low ~enabled:continuation_stop_at_pullback_low
+      ~stops_config ~effective_entry ~raw_stop ~structural_kind cand
   in
   let raw_stop, stop_floor_kind =
     _maybe_reanchor_to_entry_base ~reanchor:reanchor_to_entry_base ~stops_config

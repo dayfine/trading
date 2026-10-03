@@ -17,6 +17,8 @@ let _distance_at ~config ~initial_stop_buffer ~bar_reader ~current_date
            ~current_date cand)
       ~reanchor_to_entry_base:
         (config.stop_anchor_at_entry_base && trigger_at_suggested)
+      ~continuation_stop_at_pullback_low:
+        config.continuation_stop_at_pullback_low
       ~stops_config:config.stops_config ~initial_stop_buffer ~bar_reader
       ~current_date ~effective_entry cand
   in

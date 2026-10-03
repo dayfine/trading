@@ -26,6 +26,7 @@ type scoring_weights = {
   w_virgin_support : int option; [@sexp.default None]
   w_sector_strong : int;
   w_late_stage2_penalty : int;
+  w_continuation : int; [@sexp.default 0]
 }
 [@@deriving sexp]
 
@@ -49,6 +50,7 @@ let default_scoring_weights =
     w_virgin_support = Some _default_virgin_support;
     w_sector_strong = 10;
     w_late_stage2_penalty = -15;
+    w_continuation = 0;
   }
 
 type grade_thresholds = { a_plus : int; a : int; b : int; c : int; d : int }
@@ -78,11 +80,19 @@ let _early_stage2_weight ~w =
 let _virgin_support_weight ~w =
   match w.w_virgin_support with Some v -> v | None -> w.w_clean_resistance
 
+(* #3069: the Ch. 3 continuation detector fired. [a.continuation] is [Some _]
+   only when the strategy armed the detector. *)
+
 (** Stage signal for long setups: Stage1→2 transition or early Stage2. The
     early-Stage2 arm fires while [weeks_advancing <= early_stage2_max_weeks]
     (default 4 at the public boundary — same window
     {!Stock_analysis.is_breakout_candidate} admits on, threaded from
     [Screener.config.early_stage2_max_weeks] so the two never drift). *)
+let _is_continuation_hit (a : Stock_analysis.t) =
+  match a.continuation with
+  | Some { is_continuation = true; _ } -> true
+  | Some _ | None -> false
+
 let _stage_long_signal ~early_stage2_max_weeks ~w ~(a : Stock_analysis.t) =
   match (a.stage.stage, a.prior_stage) with
   | Stage2 _, Some (Stage1 _) ->
@@ -90,6 +100,8 @@ let _stage_long_signal ~early_stage2_max_weeks ~w ~(a : Stock_analysis.t) =
   | Stage2 { weeks_advancing; _ }, _
     when weeks_advancing <= early_stage2_max_weeks ->
       [ (_early_stage2_weight ~w, "Early Stage2") ]
+  | Stage2 _, _ when w.w_continuation <> 0 && _is_continuation_hit a ->
+      [ (w.w_continuation, "Continuation buy") ]
   | _ -> []
 
 (** Late Stage2 deceleration penalty. *)
@@ -271,30 +283,5 @@ let grade_of_score ~thresholds score =
   else if score >= thresholds.d then D
   else F
 
-(* ------------------------------------------------------------------ *)
-(* Price helpers                                                        *)
-(* ------------------------------------------------------------------ *)
-
-(** Suggested entry: breakout price plus a configurable buffer. *)
-let suggested_entry ~entry_buffer_pct breakout_price =
-  let raw = breakout_price *. (1.0 +. entry_buffer_pct) in
-  Float.round_nearest (raw *. 100.0) /. 100.0
-
-(** Long stop: configurable fraction below entry. *)
-let suggested_stop ~initial_stop_pct entry = entry *. (1.0 -. initial_stop_pct)
-
-(** Estimate swing target using simplified Weinstein swing rule: target =
-    breakout + (breakout - base_low). *)
-let swing_target ~breakout ~base_low_opt =
-  match base_low_opt with
-  | None -> None
-  | Some base_low ->
-      if Float.(breakout > base_low) then
-        Some (breakout +. (breakout -. base_low))
-      else None
-
-(** Proxy for the prior base low: configurable fraction below the 30-week MA. *)
-let base_low ~base_low_proxy_pct (a : Stock_analysis.t) : float option =
-  match a.stage.ma_value with
-  | v when Float.(v > 0.0) -> Some (v *. (1.0 -. base_low_proxy_pct))
-  | _ -> None
+(* Price helpers live in [Screener_prices] (file-length cap). *)
+include Screener_prices

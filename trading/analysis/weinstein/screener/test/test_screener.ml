@@ -2891,6 +2891,64 @@ let test_entry_anchor_kind_short_never_continuation _ =
     (elements_are [ field entry_anchor_kind (not_ (equal_to Continuation)) ])
 
 (* ------------------------------------------------------------------ *)
+(* #3069: w_continuation ranks continuation hits                       *)
+(* ------------------------------------------------------------------ *)
+
+let _cont_score ~w_continuation a =
+  score_long
+    ~weights:{ default_scoring_weights with w_continuation }
+    ~sector:(make_sector "Tech") a
+
+let _mature_hit () =
+  continuation_tape ~mature:true
+    ~continuation:(Some (continuation_result ~hit:true ~high:120.0))
+    ()
+
+let _mature_plain () = continuation_tape ~mature:true ~continuation:None ()
+
+(* Default (0): a mature continuation hit scores exactly as the same tape with
+   no continuation result, rationale included, so flag-off is bit-identical. *)
+let test_w_continuation_default_is_a_no_op _ =
+  assert_that
+    (_cont_score ~w_continuation:0 (_mature_hit ()))
+    (equal_to (_cont_score ~w_continuation:0 (_mature_plain ())))
+
+(* Armed at the fresh-breakout weight (30): the mature hit gains exactly 30 and
+   a "Continuation buy" reason, so it outranks the plain mature Stage 2. *)
+let test_w_continuation_armed_outranks_plain_mature _ =
+  let plain_score, _ = _cont_score ~w_continuation:30 (_mature_plain ()) in
+  assert_that
+    (_cont_score ~w_continuation:30 (_mature_hit ()))
+    (all_of
+       [
+         field fst (equal_to (plain_score + 30));
+         field
+           (fun (_, reasons) ->
+             List.count reasons ~f:(String.equal "Continuation buy"))
+           (equal_to 1);
+       ])
+
+(* No double count: a fresh Stage1→Stage2 breakout that also carries a
+   continuation hit scores the breakout arm only, the same as without it. *)
+let test_w_continuation_not_added_to_fresh_breakout _ =
+  let fresh continuation = continuation_tape ~mature:false ~continuation () in
+  assert_that
+    (_cont_score ~w_continuation:30
+       (fresh (Some (continuation_result ~hit:true ~high:120.0))))
+    (equal_to (_cont_score ~w_continuation:30 (fresh None)))
+
+(* A detector miss earns nothing even when armed. *)
+let test_w_continuation_ignores_detector_miss _ =
+  let miss =
+    continuation_tape ~mature:true
+      ~continuation:(Some (continuation_result ~hit:false ~high:120.0))
+      ()
+  in
+  assert_that
+    (_cont_score ~w_continuation:30 miss)
+    (equal_to (_cont_score ~w_continuation:30 (_mature_plain ())))
+
+(* ------------------------------------------------------------------ *)
 (* G2 (#2490): named cascade trace                                      *)
 (* ------------------------------------------------------------------ *)
 
@@ -3728,6 +3786,14 @@ let suite =
          >:: test_continuation_anchor_outranks_local_range_top;
          "continuation anchor: never applied to shorts"
          >:: test_continuation_anchor_not_applied_to_shorts;
+         "w_continuation default is a no-op (#3069)"
+         >:: test_w_continuation_default_is_a_no_op;
+         "w_continuation armed outranks plain mature (#3069)"
+         >:: test_w_continuation_armed_outranks_plain_mature;
+         "w_continuation not added to a fresh breakout (#3069)"
+         >:: test_w_continuation_not_added_to_fresh_breakout;
+         "w_continuation ignores a detector miss (#3069)"
+         >:: test_w_continuation_ignores_detector_miss;
          "entry_anchor_kind Breakout (#3074)"
          >:: test_entry_anchor_kind_breakout;
          "entry_anchor_kind Local_range_top (#3074)"

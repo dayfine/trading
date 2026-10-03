@@ -119,6 +119,7 @@ val make_entry_transition :
   ?min_stop_distance_pct:float ->
   ?trigger_at_suggested:bool ->
   ?stop_anchor_at_entry_base:bool ->
+  ?continuation_stop_at_pullback_low:bool ->
   ?require_structural_stop:bool ->
   ?stop_width:Stop_width_mode.policy ->
   portfolio_risk_config:Portfolio_risk.config ->
@@ -193,6 +194,13 @@ val make_entry_transition :
     [config.stop_anchor_at_entry_base]; default [false] is bit-identical (R1).
     See {!Entry_audit_helpers.initial_stop_and_kind} and
     {!Weinstein_strategy_config.stop_anchor_at_entry_base}.
+
+    [?continuation_stop_at_pullback_low] (default [false], #3069) places a long
+    continuation buy's initial stop below its [pullback_low] instead of the
+    generic support-floor scan (see
+    {!Entry_audit_helpers.initial_stop_and_kind}). The caller sets it to
+    [config.continuation_stop_at_pullback_low]; default [false] is bit-identical
+    (R1).
 
     [?require_structural_stop] (default [false]) is the investor-preset gate:
     when [true], a candidate whose step-(2) initial stop is tagged
@@ -329,3 +337,18 @@ val classify_candidate :
     long-notional cap is a no-op ([long_notional_cap = Float.infinity]) under
     the default config, so ordering it before the sector gate does not perturb
     baseline behaviour. *)
+
+val stop_at_pullback_low :
+  enabled:bool ->
+  stops_config:Weinstein_stops.config ->
+  effective_entry:float ->
+  raw_stop:Weinstein_stops.stop_state ->
+  structural_kind:Audit_recorder.stop_floor_kind ->
+  Screener.scored_candidate ->
+  Weinstein_stops.stop_state * Audit_recorder.stop_floor_kind
+(** #3069: the step {!make_entry_transition} applies under
+    [?continuation_stop_at_pullback_low]. When [enabled] and the candidate is a
+    long continuation hit whose [pullback_low] sits below [effective_entry], the
+    result is the stop {!Weinstein_stops.compute_initial_stop} places below
+    [pullback_low], tagged [Support_floor]; otherwise [raw_stop] and
+    [structural_kind] pass through unchanged. Exposed for unit tests. *)

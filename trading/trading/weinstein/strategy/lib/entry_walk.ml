@@ -98,6 +98,7 @@ let _make_entry_fn ~config ~initial_stop_buffer ~bar_reader ~current_date
   in
   Entry_audit_capture.make_entry_transition ~trigger_at_suggested
     ~stop_anchor_at_entry_base:config.stop_anchor_at_entry_base
+    ~continuation_stop_at_pullback_low:config.continuation_stop_at_pullback_low
     ~require_structural_stop:config.require_structural_stop
     ~stop_width:
       {

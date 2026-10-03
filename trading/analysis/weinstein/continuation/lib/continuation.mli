@@ -57,9 +57,12 @@ type result = {
           high above the consolidation top. *)
   pullback_low : float option;
       (** Low of the bar identified as the pullback bar (the bar in the lookback
-          window whose [close / ma_30w] sits inside [pullback_band]). Used by
-          the caller as the structural stop floor for the continuation entry.
-          [None] when no pullback bar was identified. *)
+          window whose [close / ma_30w] sits inside [pullback_band]). When
+          [Weinstein_strategy_config.continuation_stop_at_pullback_low] is armed
+          (default off, #3069), the strategy places a long continuation entry's
+          initial stop below this level; otherwise it is report-only and the
+          entry gets the generic support-floor stop. [None] when no pullback bar
+          was identified. *)
   consolidation_high : float option;
       (** Highest [high] across the [consolidation_weeks] bars BEFORE the
           current bar (offsets 1 .. consolidation_weeks). The current bar
