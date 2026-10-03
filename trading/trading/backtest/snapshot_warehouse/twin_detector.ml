@@ -142,10 +142,12 @@ let _returns_match_stats shared ~epsilon =
   for k = 1 to Array.length shared - 1 do
     let pa, pb = shared.(k - 1) and ca, cb = shared.(k) in
     let verdict =
-      if Float.( <= ) pa 0.0 || Float.( <= ) pb 0.0 then `Skip
-      else
+      (* Written as the pre-#3057 positive test, not [pa <= 0 || pb <= 0], so a
+         NaN prior close is still skipped rather than scored as a miss. *)
+      if Float.( > ) pa 0.0 && Float.( > ) pb 0.0 then
         let ra = (ca -. pa) /. pa and rb = (cb -. pb) /. pb in
         if Float.( <= ) (Float.abs (ra -. rb)) epsilon then `Match else `Miss
+      else `Skip
     in
     t := _tally_add !t verdict
   done;

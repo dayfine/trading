@@ -588,8 +588,12 @@ let test_config_defaults_are_off _ =
    (alternating +20 % / -20 %) for the remaining days. The 29 leading return
    pairs match and the 10 trailing ones miss, so the whole-overlap fraction is
    29/39 = 0.744, below [match_fraction = 0.95]. *)
-let _corrupt_tail_pair ?(n = 40) ?(matching = 30) () =
-  let real = List.init n ~f:(fun i -> 100.0 *. (1.01 ** Float.of_int i)) in
+let _corrupt_tail_pair ?(n = 40) ?(matching = 30) ?zero_at () =
+  let real =
+    List.init n ~f:(fun i ->
+        if Option.equal Int.equal zero_at (Some i) then 0.0
+        else 100.0 *. (1.01 ** Float.of_int i))
+  in
   let junk =
     List.mapi real ~f:(fun i c ->
         if i < matching then c else if i % 2 = 0 then c *. 1.2 else c *. 0.8)
@@ -640,6 +644,26 @@ let test_run_criterion_ignores_short_coincidence _ =
       (_corrupt_tail_pair ~matching:10 ())
   in
   assert_that report.groups is_empty
+
+(* "At least n" is inclusive: the fixture's 29-pair run clears a bar of
+   exactly 29. *)
+let test_run_criterion_bar_is_inclusive _ =
+  let report =
+    Twin_detector.detect (_run_config (Some 29)) (_corrupt_tail_pair ())
+  in
+  assert_that report.groups (size_is 1)
+
+(* An incomparable unit breaks the run. A 0.0 close on day 15 of both legs
+   makes return pair 16 (prior close 0) incomparable, splitting the leading
+   matches into runs of 15 and 13. A run of 15 clears a bar of 15; the 28 the
+   two would make if the skip did not break them does not count for a bar of
+   25. *)
+let test_run_criterion_incomparable_unit_breaks_run _ =
+  let pair = _corrupt_tail_pair ~zero_at:15 () in
+  let groups n =
+    List.length (Twin_detector.detect (_run_config n) pair).groups
+  in
+  assert_that (groups (Some 15), groups (Some 25)) (equal_to (1, 0))
 
 (* The armed knob names itself in the report header; the default header is
    pinned unchanged by [render_header_unchanged_with_defaults]. *)
@@ -708,6 +732,10 @@ let suite =
          >:: test_run_criterion_catches_corrupt_tail;
          "run_criterion_respects_its_bar (#3057)"
          >:: test_run_criterion_respects_its_bar;
+         "run_criterion_bar_is_inclusive (#3057)"
+         >:: test_run_criterion_bar_is_inclusive;
+         "run_criterion_incomparable_unit_breaks_run (#3057)"
+         >:: test_run_criterion_incomparable_unit_breaks_run;
          "run_criterion_ignores_short_coincidence (#3057)"
          >:: test_run_criterion_ignores_short_coincidence;
          "render_names_run_criterion (#3057)"
