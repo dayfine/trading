@@ -3,7 +3,6 @@
 open Core
 module TA = Backtest.Trade_audit
 module Stop_log = Backtest.Stop_log
-module Csv_schema = Backtest.Trades_csv_schema
 module Split_safe = Backtest.Split_safe_metric
 
 module Trade_audit_ratings = Trade_audit_ratings
@@ -15,64 +14,8 @@ module Trade_audit_ratings = Trade_audit_ratings
 module Trade_score = Trade_score
 (** Same re-export treatment for the composite trade-quality score. *)
 
-(* Types ------------------------------------------------------------------ *)
-
-type scenario_header = {
-  scenario_name : string option;
-  period_start : Date.t option;
-  period_end : Date.t option;
-  universe_size : int option;
-  total_round_trips : int;
-  winners : int;
-  losers : int;
-  win_rate_pct : float;
-  total_realized_return_pct : float;
-}
-[@@deriving sexp]
-
-type best_worst = {
-  best : (string * Date.t * float) option;
-  worst : (string * Date.t * float) option;
-}
-[@@deriving sexp]
-
-type per_trade_row = {
-  symbol : string;
-  entry_date : Date.t;
-  exit_date : Date.t;
-  days_held : int;
-  side : Trading_base.Types.position_side;
-  entry_price : float;
-  exit_price : float;
-  pnl_dollars : float;
-  pnl_percent : float;
-  exit_trigger : string;
-  entry_stage : Weinstein_types.stage option;
-  entry_rs_trend : Weinstein_types.rs_trend option;
-  entry_macro_trend : Weinstein_types.market_trend option;
-  cascade_grade : Weinstein_types.grade option;
-  cascade_score : int option;
-  fill_vs_trigger_pct : float option;
-  faithful : bool option;
-}
-[@@deriving sexp]
-
-type analysis = {
-  ratings : Trade_audit_ratings.rating list;
-  behavioral : Trade_audit_ratings.behavioral_metrics;
-  weinstein : Trade_audit_ratings.weinstein_aggregate;
-  decision_quality : Trade_audit_ratings.decision_quality_matrix;
-}
-[@@deriving sexp]
-
-type t = {
-  header : scenario_header;
-  best_worst : best_worst;
-  rows : per_trade_row list;
-  analysis : analysis option;
-  split_safe_tally : Split_safe.tally;
-}
-[@@deriving sexp]
+include Trade_audit_report_types
+module Loader = Trade_audit_report_loader
 
 (* Render ----------------------------------------------------------------- *)
 
@@ -310,382 +253,31 @@ let render ?scenario_name ?period_start ?period_end ?universe_size
   let split_safe_tally = _compute_split_safe_tally trade_audit in
   { header; best_worst; rows; analysis; split_safe_tally }
 
-(* Markdown formatting ---------------------------------------------------- *)
-
-let _stage_label (s : Weinstein_types.stage) =
-  match s with
-  | Stage1 _ -> "Stage1"
-  | Stage2 _ -> "Stage2"
-  | Stage3 _ -> "Stage3"
-  | Stage4 _ -> "Stage4"
-
-let _rs_trend_label (rs : Weinstein_types.rs_trend) =
-  match rs with
-  | Bullish_crossover -> "Bullish_xover"
-  | Positive_rising -> "Pos_rising"
-  | Positive_flat -> "Pos_flat"
-  | Positive_declining -> "Pos_declining"
-  | Negative_improving -> "Neg_improving"
-  | Negative_declining -> "Neg_declining"
-  | Bearish_crossover -> "Bearish_xover"
-
-let _macro_label (m : Weinstein_types.market_trend) =
-  match m with
-  | Bullish -> "Bullish"
-  | Bearish -> "Bearish"
-  | Neutral -> "Neutral"
-
-let _side_label (s : Trading_base.Types.position_side) =
-  match s with Long -> "Long" | Short -> "Short"
-
-let _opt_label f = function Some v -> f v | None -> "—"
-let _opt_int = function Some i -> Int.to_string i | None -> "—"
-let _opt_date = function Some d -> Date.to_string d | None -> "—"
-let _opt_string = function Some s -> s | None -> "—"
-let _fmt_float_2 v = sprintf "%.2f" v
-let _fmt_pct v = sprintf "%+.2f%%" v
-let _fmt_pct_unsigned v = sprintf "%.1f%%" v
-
-(* [execution_faithfulness.fill_vs_trigger_pct] is a signed *fraction*
-   ([(fill -. trigger) /. trigger]); scale to a percentage for display. *)
-let _fmt_fill_vs_trigger = function
-  | Some fraction -> _fmt_pct (fraction *. 100.0)
-  | None -> "" (* blank cell when the entry had no execution record *)
-
-(* Byte glyphs: ✓ = U+2713, ✗ = U+2717, em-dash = U+2014 (the None placeholder
-   used elsewhere in the table). *)
-let _fmt_faithful = function
-  | Some true -> "\xe2\x9c\x93"
-  | Some false -> "\xe2\x9c\x97"
-  | None -> "\xe2\x80\x94"
-
-let _format_header (h : scenario_header) : string list =
-  let title =
-    sprintf "# Trade audit \xe2\x80\x94 %s" (_opt_string h.scenario_name)
-  in
-  [
-    title;
-    "";
-    sprintf "- Period: %s \xe2\x86\x92 %s" (_opt_date h.period_start)
-      (_opt_date h.period_end);
-    sprintf "- Universe: %s" (_opt_int h.universe_size);
-    sprintf "- Total round-trips: %d" h.total_round_trips;
-    sprintf "- Winners: %d / %d (%s)" h.winners h.total_round_trips
-      (_fmt_pct_unsigned h.win_rate_pct);
-    sprintf "- Total realized return (sum of pnl%%): %s"
-      (_fmt_pct h.total_realized_return_pct);
-    "";
-  ]
-
-(* One-line execution-faithfulness rollup across every row that carried an
-   [execution] record. Returns [[]] when no row had one, so the aggregate block
-   is byte-identical to a pre-execution report; the [fill_vs_trigger] mean is a
-   fraction (scaled to a percentage for display, matching the per-row column). *)
-let _execution_summary_line (rows : per_trade_row list) : string list =
-  let execs =
-    List.filter_map rows ~f:(fun (r : per_trade_row) ->
-        match (r.faithful, r.fill_vs_trigger_pct) with
-        | Some faithful, Some fraction -> Some (faithful, fraction)
-        | _ -> None)
-  in
-  match execs with
-  | [] -> []
-  | _ ->
-      let n = List.length execs in
-      let faithful_count =
-        List.count execs ~f:(fun (faithful, _) -> faithful)
-      in
-      let faithful_pct =
-        Float.of_int faithful_count /. Float.of_int n *. 100.0
-      in
-      let mean_fraction =
-        List.fold execs ~init:0.0 ~f:(fun acc (_, fraction) -> acc +. fraction)
-        /. Float.of_int n
-      in
-      [
-        sprintf "- Execution: %d records, %s faithful, mean fill_vs_trigger %s"
-          n
-          (_fmt_pct_unsigned faithful_pct)
-          (_fmt_pct (mean_fraction *. 100.0));
-      ]
-
-let _format_aggregate (bw : best_worst) (rows : per_trade_row list) :
-    string list =
-  let fmt_triple = function
-    | None -> "—"
-    | Some (sym, d, pct) ->
-        sprintf "%s %s \xe2\x86\x92 %s" sym (Date.to_string d) (_fmt_pct pct)
-  in
-  [
-    "## Aggregate summary";
-    "";
-    sprintf "- Best trade: %s" (fmt_triple bw.best);
-    sprintf "- Worst trade: %s" (fmt_triple bw.worst);
-  ]
-  @ _execution_summary_line rows
-  @ [ "" ]
-
-let _row_cells (r : per_trade_row) =
-  [
-    r.symbol;
-    Date.to_string r.entry_date;
-    _side_label r.side;
-    _fmt_float_2 r.entry_price;
-    Date.to_string r.exit_date;
-    _fmt_float_2 r.exit_price;
-    Int.to_string r.days_held;
-    _fmt_float_2 r.pnl_dollars;
-    _fmt_pct r.pnl_percent;
-    (if String.is_empty r.exit_trigger then "—" else r.exit_trigger);
-    _opt_label _stage_label r.entry_stage;
-    _opt_label _rs_trend_label r.entry_rs_trend;
-    _opt_label _macro_label r.entry_macro_trend;
-    _opt_label Weinstein_types.grade_to_string r.cascade_grade;
-    _opt_int r.cascade_score;
-    _fmt_fill_vs_trigger r.fill_vs_trigger_pct;
-    _fmt_faithful r.faithful;
-  ]
-
-let _format_row r =
-  let cells = _row_cells r in
-  "| " ^ String.concat ~sep:" | " cells ^ " |"
-
-let _format_table_header () =
-  [
-    "| symbol | entry_date | side | entry_px | exit_date | exit_px | days | \
-     pnl_$ | pnl_% | exit_trigger | stage | rs | macro | grade | score | \
-     fill_vs_trig | faithful |";
-    "|---|---|---|---:|---|---:|---:|---:|---:|---|---|---|---|---|---:|---:|---|";
-  ]
-
-let _format_table (rows : per_trade_row list) : string list =
-  let head = "## Per-trade table" :: "" :: _format_table_header () in
-  let body =
-    if List.is_empty rows then [ "_No trades._" ]
-    else List.map rows ~f:_format_row
-  in
-  head @ body @ [ "" ]
-
-(* Which of the three causes put the population in [Not_exercised]. The order
-   mirrors {!Backtest.Split_safe_metric.inertness}: a [flag_off] count is the
-   loudest signal (the flag never reached the scan at all) and so is reported
-   first even when empty windows are also present. *)
-let _not_exercised_cause (tally : Split_safe.tally) =
-  if tally.flag_off > 0 then
-    sprintf
-      "%d decision(s) carry flag_off, so none reached the basis choice. In a \
-       run configured split_safe_floors=true that is a wiring alarm, not a \
-       data point."
-      tally.flag_off
-  else if tally.empty_window > 0 then
-    sprintf
-      "the flag reached the scan, but all %d lookback window(s) were empty — \
-       the mechanism ran with nothing to act on, so this run has no exposure \
-       to it."
-      tally.empty_window
-  else "no entry decisions were captured, so this run says nothing either way."
-
-(* Always emitted. An omitted section is indistinguishable from an arm that was
-   inert, which is precisely the confusion [Split_safe_metric.inertness]
-   exists to prevent — so the undefined case gets prose, never a percentage and
-   never a blank. *)
-let _format_split_safe (tally : Split_safe.tally) : string list =
-  let total =
-    tally.flag_off + tally.adjusted + tally.raw_fallback + tally.empty_window
-  in
-  let counts =
-    sprintf
-      "- Basis of %d entry decision(s): adjusted %d, raw_fallback %d, flag_off \
-       %d, empty_window %d"
-      total tally.adjusted tally.raw_fallback tally.flag_off tally.empty_window
-  in
-  let inertness =
-    match Split_safe.inertness_of_tally tally with
-    | Split_safe.Inert_fraction f ->
-        sprintf
-          "- Inert fraction (raw_fallback / (raw_fallback + adjusted)): %s"
-          (_fmt_pct_unsigned (f *. 100.0))
-    | Split_safe.Not_exercised t ->
-        sprintf
-          "- Inert fraction: NOT EXERCISED \xe2\x80\x94 the denominator is \
-           zero, so there is no measurement here; this is not zero inertness. \
-           %s"
-          (_not_exercised_cause t)
-  in
-  [ "## Split-safe floor basis"; ""; counts; inertness; "" ]
-
-let _format_analysis (a : analysis) : string list =
-  Trade_audit_ratings.format_per_trade_extras ~ratings:a.ratings
-  @ Trade_audit_ratings.format_behavioral_section a.behavioral
-  @ Trade_audit_ratings.format_weinstein_section a.weinstein
-  @ Trade_audit_ratings.format_decision_quality_section a.decision_quality
-
-let to_markdown (t : t) : string =
-  let core_lines =
-    _format_header t.header
-    @ _format_aggregate t.best_worst t.rows
-    @ _format_table t.rows
-    @ _format_split_safe t.split_safe_tally
-  in
-  let analysis_lines =
-    match t.analysis with Some a -> _format_analysis a | None -> []
-  in
-  String.concat ~sep:"\n" (core_lines @ analysis_lines) ^ "\n"
-
-(* Loader ----------------------------------------------------------------- *)
-
-(** Map the CSV [side] column ([LONG] / [SHORT]) emitted by
-    [Backtest.Result_writer] back to the [Trading_base.Types.side] of the
-    round-trip's entry leg. Unknown labels fall back to [Buy] so pre-G2
-    trades.csv files (with no [side] column) keep parsing. *)
-let _parse_side = function
-  | "LONG" -> Trading_base.Types.Buy
-  | "SHORT" -> Trading_base.Types.Sell
-  | _ -> Trading_base.Types.Buy
-
-(** Build a [trade_metrics] from already-parsed string cells. Shared by the
-    post-G2 (with [side]) and legacy (no [side]) parser branches in
-    {!_read_trades_csv} so the field list lives in one place. [position_id] is
-    resolved by the caller from the header-derived schema — [None] for the
-    legacy layout, which has no such column. *)
-let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
-    ~entry_price ~exit_price ~quantity ~pnl_dollars ~pnl_percent ~position_id :
-    Trading_simulation.Metrics.trade_metrics =
-  {
-    symbol;
-    side = _parse_side side;
-    entry_date = Date.of_string entry_date;
-    exit_date = Date.of_string exit_date;
-    days_held = Int.of_string days_held;
-    entry_price = Float.of_string entry_price;
-    exit_price = Float.of_string exit_price;
-    quantity = Float.of_string quantity;
-    pnl_dollars = Float.of_string pnl_dollars;
-    pnl_percent = Float.of_string pnl_percent;
-    position_id;
-  }
-
-(** Match a post-G2 row layout (≥13 columns; [side] = [LONG]/[SHORT]). The head
-    13 columns carry the canonical metrics + side + stop columns; trailing
-    columns (added by M5.2e: entry_stage, entry_volume_ratio,
-    stop_initial_distance_pct, stop_trigger_kind, days_to_first_stop_trigger,
-    screener_score_at_entry; and by future schema additions) are tolerated and
-    otherwise ignored.
-
-    The one trailing column this loader does consume is [position_id], which the
-    caller resolves by name against the file's header (see
-    {!Backtest.Trades_csv_schema}) rather than by a hardcoded index — appending
-    further columns must not shift what gets read. *)
-let _match_post_g2_csv_row ~position_id cells :
-    Trading_simulation.Metrics.trade_metrics option =
-  match cells with
-  | symbol
-    :: (("LONG" | "SHORT") as side)
-    :: entry_date :: exit_date :: days_held :: entry_price :: exit_price
-    :: quantity :: pnl_dollars :: pnl_percent :: _entry_stop :: _exit_stop
-    :: _exit_trigger :: _rest ->
-      Some
-        (_trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date
-           ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
-           ~pnl_percent ~position_id)
-  | _ -> None
-
-(* The legacy layout predates the [position_id] column entirely, so there is no
-   cell to read. Resolved through {!Csv_schema.legacy} rather than written as a
-   bare [None] so the absence stays a statement about the layout, checkable
-   against the schema, instead of an incidental omission. *)
-let _legacy_position_id cells =
-  Csv_schema.position_id_of_cells Csv_schema.legacy cells
-
-(** Match a legacy (pre-G2) row layout — leading 12 columns with no [side];
-    trailing columns ignored for the same forward-compat reason as the post-G2
-    matcher. Defaults [side] to [Buy]. [position_id] is [None] by construction,
-    so {!_find_audit} falls back to date proximity for these rows. *)
-let _match_legacy_csv_row cells :
-    Trading_simulation.Metrics.trade_metrics option =
-  match cells with
-  | symbol :: entry_date :: exit_date :: days_held :: entry_price :: exit_price
-    :: quantity :: pnl_dollars :: pnl_percent :: _entry_stop :: _exit_stop
-    :: _exit_trigger :: _rest ->
-      Some
-        (_trade_metrics_of_strings ~symbol ~side:"LONG" ~entry_date ~exit_date
-           ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
-           ~pnl_percent
-           ~position_id:(_legacy_position_id cells))
-  | _ -> None
-
-(** Read trades.csv. Tolerates both the post-G2 (13-column, with [side]) and
-    legacy (12-column, no [side]) layouts. The disambiguator is whether the
-    second cell is a [LONG]/[SHORT] tag (post-G2) or a date (legacy). Legacy
-    rows default to [side = Buy] preserving the historical long-only semantics.
-*)
-let _parse_trades_csv_line ~schema path line :
-    Trading_simulation.Metrics.trade_metrics option =
-  if String.is_empty (String.strip line) then None
-  else
-    let cells = String.split line ~on:',' in
-    let position_id = Csv_schema.position_id_of_cells schema cells in
-    match _match_post_g2_csv_row ~position_id cells with
-    | Some _ as t -> t
-    | None -> (
-        match _match_legacy_csv_row cells with
-        | Some _ as t -> t
-        | None -> failwithf "Unexpected trades.csv row in %s: %s" path line ())
-
-let _read_trades_csv path : Trading_simulation.Metrics.trade_metrics list =
-  let ic = In_channel.create path in
-  let lines = In_channel.input_lines ic in
-  In_channel.close ic;
-  match lines with
-  | [] -> failwithf "trades.csv at %s is empty" path ()
-  | header :: rest ->
-      let schema = Csv_schema.of_header_line header in
-      List.filter_map rest ~f:(_parse_trades_csv_line ~schema path)
-
-type _summary_meta = {
-  start_date : Date.t;
-  end_date : Date.t;
-  universe_size : int;
-}
-[@@deriving sexp] [@@sexp.allow_extra_fields]
-(** Minimal shape of [summary.sexp] needed for the report header — we only pull
-    the run-window + universe-size fields, ignoring the rest via
-    [@@sexp.allow_extra_fields]. The canonical record [Summary.t] writes far
-    more (e.g. metrics) and exposes [sexp_of_t] only; round-tripping through
-    this local shape avoids depending on a parser that does not exist on the
-    producer side. *)
-
-let _load_summary_meta path : _summary_meta option =
-  if not (Sys_unix.file_exists_exn path) then None
-  else try Some (_summary_meta_of_sexp (Sexp.load_sexp path)) with _ -> None
+let to_markdown = Trade_audit_report_markdown.to_markdown
 
 let load ?closes_lookup ~scenario_dir () : t =
   let trades_path = Filename.concat scenario_dir "trades.csv" in
   if not (Sys_unix.file_exists_exn trades_path) then
     failwithf "Missing trades.csv in %s" scenario_dir ();
-  let trades = _read_trades_csv trades_path in
-  let audit_path = Filename.concat scenario_dir "trade_audit.sexp" in
+  let trades = Loader.read_trades_csv trades_path in
   let trade_audit =
-    if Sys_unix.file_exists_exn audit_path then begin
-      let sexp = Sexp.load_sexp audit_path in
-      (* The runner persists a full [audit_blob] envelope ([audit_records] +
-         [cascade_summaries]); older runs persisted a bare [audit_record list].
-         Parse as a blob first and fall back to the bare list so both on-disk
-         formats load. *)
-      try (TA.audit_blob_of_sexp sexp).audit_records
-      with _ -> TA.audit_records_of_sexp sexp
-    end
-    else []
+    Loader.load_trade_audit (Filename.concat scenario_dir "trade_audit.sexp")
   in
   let summary =
-    _load_summary_meta (Filename.concat scenario_dir "summary.sexp")
+    Loader.load_summary_meta (Filename.concat scenario_dir "summary.sexp")
   in
   let scenario_name =
     let bn = Filename.basename scenario_dir in
     if String.is_empty bn then None else Some bn
   in
-  let period_start = Option.map summary ~f:(fun s -> s.start_date) in
-  let period_end = Option.map summary ~f:(fun s -> s.end_date) in
-  let universe_size = Option.map summary ~f:(fun s -> s.universe_size) in
+  let period_start =
+    Option.map summary ~f:(fun (s : Loader.summary_meta) -> s.start_date)
+  in
+  let period_end =
+    Option.map summary ~f:(fun (s : Loader.summary_meta) -> s.end_date)
+  in
+  let universe_size =
+    Option.map summary ~f:(fun (s : Loader.summary_meta) -> s.universe_size)
+  in
   render ?scenario_name ?period_start ?period_end ?universe_size ?closes_lookup
     ~trade_audit ~trades ()
