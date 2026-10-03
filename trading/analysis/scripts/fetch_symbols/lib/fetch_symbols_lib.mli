@@ -1,6 +1,9 @@
 open Async
 open Core
 
+module Wick_check = Wick_check
+(** The #3028 suspicious-vendor-high/low diagnostic, re-exported for tests. *)
+
 (** Library powering the [fetch_symbols.exe] script. Exposes [fetch_one] so the
     per-symbol path can be unit-tested with an injected HTTP fetch, and [run] as
     the CLI entrypoint. *)
@@ -16,7 +19,10 @@ val fetch_one :
     On success returns [Ok symbol]. On any failure (HTTP error, empty bar list,
     metadata/CSV write failure) returns [Error symbol] without raising. An empty
     bar list is treated as a soft failure: a warning is printed and the symbol
-    is skipped. The optional [?fetch] hook allows tests to inject a mock HTTP
+    is skipped. Before the bars overwrite the stored copy, {!Wick_check}
+    compares them against it and prints a [WARN: WICK ...] / [WARN: BASIS ...]
+    line per suspicious high, low or re-based close (#3028); the bars are saved
+    unchanged. The optional [?fetch] hook allows tests to inject a mock HTTP
     client. *)
 
 val run :

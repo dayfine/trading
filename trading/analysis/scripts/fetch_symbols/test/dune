@@ -1,5 +1,5 @@
-(test
- (name test_fetch_symbols)
+(tests
+ (names test_fetch_symbols test_wick_check)
  (libraries
   fetch_symbols_lib
   core

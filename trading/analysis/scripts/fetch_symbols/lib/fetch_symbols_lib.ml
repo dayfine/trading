@@ -1,5 +1,6 @@
 open Core
 open Async
+module Wick_check = Wick_check
 
 let _resolve_token = function
   | Some key -> Ok key
@@ -15,8 +16,27 @@ let _save_bars_and_meta ~data_dir ~bars symbol =
   let meta_path = Fpath.(sym_dir / "data.metadata.sexp") in
   File_sexp.Sexp.save (module Metadata.T_sexp) meta ~path:meta_path
 
+(** The copy of [symbol] already on disk, or [[]] when there is none (first
+    fetch) or it cannot be read. Read before the overwrite so it can serve as
+    the {!Wick_check} reference. *)
+let _stored_bars ~data_dir symbol =
+  match Csv.Csv_storage.create ~data_dir symbol with
+  | Error _ -> []
+  | Ok storage -> (
+      match Csv.Csv_storage.get storage () with
+      | Ok bars -> bars
+      | Error _ -> [])
+
+(** #3028: print any suspicious vendor high/low in [bars] against the stored
+    copy. Warn-only — the bars are saved unchanged either way. *)
+let _report_wicks ~data_dir ~bars symbol =
+  Wick_check.check ~stored:(_stored_bars ~data_dir symbol) bars
+  |> Wick_check.render ~symbol
+  |> List.iter ~f:(printf "  WARN: %s\n%!")
+
 (** Log the result of caching [bars] and return [Ok symbol]. *)
 let _cache_bars ~data_dir ~bars symbol =
+  _report_wicks ~data_dir ~bars symbol;
   (match _save_bars_and_meta ~data_dir ~bars symbol with
   | Ok () -> printf "  OK: %d bars cached\n%!" (List.length bars)
   | Error e ->
