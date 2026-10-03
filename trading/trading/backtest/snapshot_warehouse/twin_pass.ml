@@ -92,6 +92,12 @@ let doc_max_group_size =
   "N Hub guard: leave a twin group with more than N members intact (drop \
    nothing, report rejected_hub). Default unlimited."
 
+let doc_min_matching_run =
+  "N Also call a pair a twin when its longest run of consecutive matching \
+   units (dates or return pairs) is at least N, even if the whole-overlap \
+   match fraction falls short -- catches a twin with one corrupt segment \
+   (#3057). Default off."
+
 let _basis_of_string = function
   | "levels" -> Twin_detector.Config.Levels
   | "returns" -> Twin_detector.Config.Returns
@@ -124,6 +130,8 @@ let params =
     flag "twin-require-direct-match" no_arg ~doc:doc_require_direct_match
   and max_group_size =
     flag "twin-max-group-size" (optional int) ~doc:doc_max_group_size
+  and min_matching_run =
+    flag "twin-min-matching-run" (optional int) ~doc:doc_min_matching_run
   in
   {
     Twin_detector.Config.enabled;
@@ -135,4 +143,5 @@ let params =
     prefilter_rel_tol = default.prefilter_rel_tol;
     require_direct_match;
     max_group_size;
+    min_matching_run;
   }

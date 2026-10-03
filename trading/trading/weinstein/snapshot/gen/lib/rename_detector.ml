@@ -125,6 +125,7 @@ let _returns_score (config : Config.t) old_leg new_leg =
          they are held at their no-op defaults. *)
       require_direct_match = false;
       max_group_size = None;
+      min_matching_run = None;
     }
   in
   let twin_series l =
