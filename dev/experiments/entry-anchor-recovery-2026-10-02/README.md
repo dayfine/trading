@@ -98,3 +98,19 @@ count, the stop-exit share and the median holding period per arm.
 - `results/chain-anchor.sh`: a copy of the trader rerun chain with paths moved to `/tmp/anchor-run` and
   `/tmp/sweeps/entry-anchor-recovery`.
 - `results/launch.sh`: `PREREG=<this commit> sh launch.sh`, phase 1.
+
+## Log
+
+- 2026-10-02 ~14:00 PT: phase 1 launched (`results/launch.sh`, pinned `sweep-anchor`, build main at launch,
+  `CELL_TIMEOUT=7200`); specs read from the pre-registration commit b0025fff1.
+- 2026-10-03 01:57 PT: `LANE A DONE`, 24 cells, 24–31 min each; V6 exit 0 on all 18 pairs.
+- 2026-10-02 (during the run, read-only): `anchor-position-screen.md` — far graded tops occur in every
+  year (a base-bounded anchor would be global); the 2025 reopen is a selection shortfall.
+
+## Verdict (2026-10-03)
+
+**Dilutes 6/6** (every value, both windows, every salt; DD guard broken everywhere). **No phase 2** (rule 6),
+no ledger entry (rule 8), no default change. Writeup: `results-2026-10-03.md`. The why, in one line: the
+knob moves every ticket in every regime, and the recovery entries it does catch whipsaw on post-crash
+volatility; on the investor preset the 2009 gap is the structural-stop rule declining a >15 % floor, not
+an unfilled ticket.
