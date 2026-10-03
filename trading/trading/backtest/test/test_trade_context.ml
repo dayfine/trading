@@ -132,6 +132,17 @@ let test_stop_trigger_kind_label_distinguishes_all _ =
       TC.stop_trigger_kind_label SL.Non_stop_exit )
     (equal_to ("gap_down", "intraday", "end_of_period", "non_stop_exit"))
 
+(* #3074: every [entry_anchor] column label, one per constructor — the strings an
+   [awk] split of [trades.csv] by entry type matches on. *)
+let test_entry_anchor_label_distinguishes_all _ =
+  let module TL = Backtest.Ticket_lifecycle in
+  assert_that
+    ( TC.entry_anchor_label TL.Continuation,
+      TC.entry_anchor_label TL.Local_range_top,
+      TC.entry_anchor_label TL.Breakout,
+      TC.entry_anchor_label TL.Ma_fallback )
+    (equal_to ("continuation", "local_range_top", "breakout", "ma_fallback"))
+
 (* csv_header_fields --------------------------------------------------- *)
 
 let test_csv_header_fields_pinned _ =
@@ -641,6 +652,8 @@ let suite =
          >:: test_stage_label_distinguishes_late_stage2;
          "stop_trigger_kind_label all variants"
          >:: test_stop_trigger_kind_label_distinguishes_all;
+         "entry_anchor_label all variants (#3074)"
+         >:: test_entry_anchor_label_distinguishes_all;
          "csv_header_fields pinned" >:: test_csv_header_fields_pinned;
          "entry_anchor column reads the lifecycle tag (#3074)"
          >:: test_entry_anchor_column_reads_the_lifecycle_tag;

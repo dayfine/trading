@@ -506,10 +506,17 @@ type scored_candidate = {
 (** A scored and graded candidate ready for the weekly report. *)
 
 val entry_anchor_kind : scored_candidate -> entry_anchor_kind
-(** [entry_anchor_kind c] is the arm that anchored [c.suggested_entry]. It is
-    computed by the same first-match function that picks the anchored level from
-    [c.analysis] and [c.side], so the kind and the level cannot disagree. A
-    short candidate never reports [Continuation]. *)
+(** [entry_anchor_kind c] is the arm that [c.analysis] and [c.side] select. For
+    a candidate as {!screen} returns it, that is the arm that anchored
+    [c.suggested_entry]: the kind and the level come from the same first-match
+    function, so they cannot disagree. A short candidate never reports
+    [Continuation].
+
+    A caller that rewrites [suggested_entry] after {!screen} breaks that link.
+    Under [Weinstein_strategy_config.freeze_entry_at_first_breakout] (default
+    off), [Entry_freeze] substitutes the level pinned in an earlier week while
+    [analysis] stays the current week's, so the kind names the current week's
+    arm, which can differ from the pinned level's (#3089). *)
 
 type cascade_diagnostics = {
   total_stocks : int;
