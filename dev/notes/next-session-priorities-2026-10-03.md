@@ -6,9 +6,9 @@ tasks in order. Do not skip a verification step because the result "looks obviou
 
 > **Status 03:15 PT 2026-10-03.** P0 is DONE: results PR #3091 merged (dilutes 6/6, no phase 2; qc-results
 > APPROVED on iteration 2). `perf_long_cells.sh update` ran (24 rows, check ok) and the `sweep-anchor`
-> worktree is removed. P1 (#3086) is in its QC loop: structural re-run at the rework tip e71e8513a, then
-> behavioral; merge on both, then `jj workspace forget harness-reopen && rm -rf
-> .claude/worktrees/jjws-harness-reopen`. Screens 4(a)/(b) are done and merged with #3091. **What is left
+> worktree is removed. P1 (#3086, the gate-reopen pack signal) **merged 03:22 PT** after two behavioral rework
+> iterations (both test-only: boundary pins and a node-pinned `reopenEpisodes`); the harness workspace is
+> forgotten and removed. Screens 4(a)/(b) are done and merged with #3091. #3092 (perf ledger) merged. **What is left
 > for the next session is P2 (section 4, the user's decision) and the session-end chores (section 5).**
 > Sections 1–2 below are the record of how P0 was done; do not redo them.
 
