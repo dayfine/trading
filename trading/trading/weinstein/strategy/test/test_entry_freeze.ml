@@ -248,6 +248,82 @@ let test_off_path_emits_chased_e _ =
     (two_week_wk2_entry ~freeze:false)
     (elements_are [ float_equal 79.81 ])
 
+(* ------------------------------------------------------------------ *)
+(* #3089: the audit records the arm pinned with the frozen E            *)
+(* ------------------------------------------------------------------ *)
+
+(** Macro snapshot for the audit path — [emit_entries] skips emission when the
+    walk runs without one. Contents are irrelevant to the anchor. *)
+let _bullish_macro (cand : Screener.scored_candidate) : Macro.result =
+  {
+    index_stage = cand.analysis.stage;
+    indicators = [];
+    trend = Weinstein_types.Bullish;
+    breadth_state = Weinstein_types.Bullish_breadth;
+    confidence = 0.8;
+    regime_changed = false;
+    rationale = [ "fixture" ];
+  }
+
+(** Run the same symbol through [entries_from_candidates] in two weeks sharing
+    one [pending_entry_e] table. Week 1 qualifies on the [Breakout] arm
+    ([local_range_top = None]); week 2's analysis sets [local_range_top], so the
+    current arm is [Local_range_top]. Returns the [entry_anchor] of every entry
+    event week 2 records. *)
+let two_week_wk2_anchors ~freeze =
+  let cfg =
+    {
+      (default_config ~universe:[ "ARMX" ] ~index_symbol:"GSPCX") with
+      freeze_entry_at_first_breakout = freeze;
+    }
+  in
+  let pending_entry_e = Entry_freeze.create () in
+  let wk1 = make_candidate ~ticker:"ARMX" ~entry:50.0 () in
+  let wk2 =
+    {
+      wk1 with
+      analysis = { wk1.analysis with local_range_top = Some 55.0 };
+      suggested_entry = 55.0;
+    }
+  in
+  let run cand =
+    let recorded = ref [] in
+    let audit_recorder =
+      {
+        Audit_recorder.noop with
+        record_entry = (fun e -> recorded := e.entry_anchor :: !recorded);
+      }
+    in
+    let _transitions : Trading_strategy.Position.transition list =
+      entries_from_candidates ~pending_entry_e ~config:cfg ~candidates:[ cand ]
+        ~stop_states:(ref String.Map.empty) ~bar_reader:(Bar_reader.empty ())
+        ~portfolio:{ cash = 1_000_000.0; positions = String.Map.empty }
+        ~get_price:(fun _ -> Some (make_bar "2000-01-21" cand.suggested_entry))
+        ~current_date:(Date.of_string "2000-01-21")
+        ~audit_recorder ~macro:(_bullish_macro cand) ()
+    in
+    List.rev !recorded
+  in
+  let _wk1 = run wk1 in
+  run wk2
+
+(** Freeze ON: week 2's ticket rests at week 1's pinned [E], so the recorded
+    anchor is week 1's [Breakout] arm, not week 2's current [Local_range_top].
+    Fails if {!Entry_freeze} does not pin the arm with [E], or the emit path
+    re-derives the kind from the candidate's current analysis. *)
+let test_frozen_entry_records_pinned_anchor _ =
+  assert_that
+    (two_week_wk2_anchors ~freeze:true)
+    (elements_are [ equal_to (Screener.Breakout : Screener.entry_anchor_kind) ])
+
+(** Control (freeze OFF): nothing is pinned, so the same week 2 records its own
+    current arm — the pre-#3089 behaviour is unchanged when the flag is off. *)
+let test_off_path_records_current_anchor _ =
+  assert_that
+    (two_week_wk2_anchors ~freeze:false)
+    (elements_are
+       [ equal_to (Screener.Local_range_top : Screener.entry_anchor_kind) ])
+
 let suite =
   "entry_freeze"
   >::: [
@@ -264,6 +340,10 @@ let suite =
          "independent pins per symbol" >:: test_independent_pins_per_symbol;
          "frozen E flows to entry price" >:: test_frozen_e_flows_to_entry_price;
          "off path emits chased E" >:: test_off_path_emits_chased_e;
+         "#3089: frozen entry records the pinned anchor"
+         >:: test_frozen_entry_records_pinned_anchor;
+         "#3089: off path records the current anchor"
+         >:: test_off_path_records_current_anchor;
        ]
 
 let () = run_test_tt_main suite

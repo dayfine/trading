@@ -51,6 +51,7 @@ type entry_event = {
   initial_position_value : float;
   initial_risk_dollars : float;
   sized_down_wide_stop : bool;
+  entry_anchor : Screener.entry_anchor_kind;
   freshness_basis : Entry_freshness.basis;
   triple_confirmation : Entry_ticket_tags.triple_confirmation;
   alternatives : alternative_input list;

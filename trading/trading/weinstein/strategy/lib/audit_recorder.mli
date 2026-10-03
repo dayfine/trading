@@ -186,6 +186,13 @@ type entry_event = {
           straight from {!Entry_audit_capture.entry_meta.sized_down_wide_stop} —
           #2258 deliberately deferred persisting it to the PR-5 audit-fields
           step. *)
+  entry_anchor : Screener.entry_anchor_kind;
+      (** #3074 / #3089: which arm anchored the ticket's level. Equals
+          {!Screener.entry_anchor_kind}[ candidate] except under
+          [freeze_entry_at_first_breakout] (default off), where it is the arm
+          {!Entry_freeze} pinned together with the frozen [E] — the arm of the
+          week the level was set, not the current week's (see
+          {!Entry_freeze.anchor_kind}). *)
   freshness_basis : Entry_freshness.basis;
       (** F1: which admission clock was in force when the candidate was
           analysed, recovered from the analysis by

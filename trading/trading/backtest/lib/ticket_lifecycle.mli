@@ -239,16 +239,14 @@ type t = {
   freshness_basis : entry_freshness_basis;
       (** F1: which clock admitted the candidate. *)
   entry_anchor : entry_anchor option; [@sexp.option]
-      (** #3074: which level the ticket was anchored at, as
-          {!Screener.entry_anchor_kind} reads it off the placing week's
-          candidate. Always [Some] on rows written by this build; [None] only on
-          audit files written before the field existed. Lets a run be split into
-          continuation and base-breakout entries; [trades.csv] carries it as the
-          [entry_anchor] column.
-
-          Caveat (#3089): under [freeze_entry_at_first_breakout] (default off) a
-          frozen ticket rests at an earlier week's level, and this field can
-          name the placing week's arm instead of that level's. *)
+      (** #3074: which level the ticket was anchored at — the
+          {!Screener.entry_anchor_kind} arm of the level the ticket rests at.
+          Under [freeze_entry_at_first_breakout] that is the arm pinned together
+          with the frozen [E] (#3089), not the placing week's arm. Always [Some]
+          on rows written by this build; [None] only on audit files written
+          before the field existed. Lets a run be split into continuation and
+          base-breakout entries; [trades.csv] carries it as the [entry_anchor]
+          column. *)
   sized_down_wide_stop : bool;
       (** F3: [true] when [stop_width_mode = Size_down] admitted this candidate
           past [max_stop_distance_pct] — the entry exists only because the §5.1

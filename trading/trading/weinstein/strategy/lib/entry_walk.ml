@@ -247,7 +247,8 @@ let entries_from_candidates ?sector_lookup
         | Entry_audit_capture.Kept (trans, _) -> Some trans
         | Skipped _ -> None)
   in
-  Entry_audit_emit.emit_entries ~audit_recorder ~macro ~current_date ~decisions;
+  Entry_audit_emit.emit_entries ~audit_recorder ~pending_entry_e ~macro
+    ~current_date ~decisions;
   (* G1 (#2490): hand the whole walk's passed-over candidates to the caller so
      they land on this Friday's cascade event even when [kept] is empty. Absent
      callback = the projection is never computed. *)

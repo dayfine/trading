@@ -19,9 +19,10 @@
     candidate list untouched and never mutates the table (R1, bit-identical). *)
 
 type t
-(** Mutable per-run pin table: symbol -> its first-qualifying [suggested_entry].
-    Grows only while a symbol keeps qualifying (or is held); released when it
-    drops out of both, so a later re-qualification earns a fresh pin. *)
+(** Mutable per-run pin table: symbol -> its first-qualifying [suggested_entry]
+    and the arm that anchored it ({!anchor_kind}). Grows only while a symbol
+    keeps qualifying (or is held); released when it drops out of both, so a
+    later re-qualification earns a fresh pin. *)
 
 val create : unit -> t
 (** A fresh, empty pin table. *)
@@ -46,14 +47,28 @@ val apply :
       earns a fresh [E].
     - {b Reuse} the pinned [E] for any candidate already in [pending]: its
       [suggested_entry] is overridden to the frozen level.
-    - {b Pin} the current [suggested_entry] for any candidate not yet in
-      [pending] (first qualification), returning it unchanged.
+    - {b Pin} the current [suggested_entry], together with its arm
+      ({!Screener.entry_anchor_kind}), for any candidate not yet in [pending]
+      (first qualification), returning it unchanged.
 
     [held_set] is the strategy's held symbols ({!Entry_walk.held_symbols}); a
     symbol resting an unfilled entry order stays held, so its pin persists
     (dormant, since held symbols are excluded from [candidates]) until the
     position closes and it drops out. Applies symmetrically to long and short
     candidates — a short breakdown level should not be chased lower either. *)
+
+val anchor_kind : t -> Screener.scored_candidate -> Screener.entry_anchor_kind
+(** [anchor_kind pending cand] is the arm that anchored [cand]'s
+    [suggested_entry] once {!apply} has run (#3089): the arm pinned together
+    with [E] when [cand.ticker] holds a pin, else
+    {!Screener.entry_anchor_kind}[ cand].
+
+    {!apply} pins the arm in the same step as the level, so a frozen candidate
+    reports the arm of the week its [E] was pinned, even when the current week's
+    [analysis] selects a different arm (the continuation detector fired,
+    [local_range_top] became [Some], or [breakout_price] dropped out). With the
+    flag off the table stays empty and this is exactly
+    {!Screener.entry_anchor_kind} — bit-identical (R1). *)
 
 val release : t -> symbol:string -> unit
 (** [release pending ~symbol] drops [symbol]'s pin so its next qualification
