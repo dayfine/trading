@@ -447,6 +447,19 @@ type config = {
 val default_config : config
 (** [default_config] returns recommended defaults. *)
 
+(** Which level a candidate's buy/sell-stop ticket was anchored at — the arm of
+    the first-match-wins rule documented on {!scored_candidate.suggested_entry}
+    that fired (#3074). Audit-only: no strategy code reads it. *)
+type entry_anchor_kind = Screener_entry_anchor.kind =
+  | Continuation
+      (** Longs only: the continuation detector's [consolidation_high]. *)
+  | Local_range_top  (** [analysis.local_range_top]. *)
+  | Breakout  (** [analysis.breakout_price]. *)
+  | Ma_fallback
+      (** No [breakout_price]: the MA-based fallback
+          ([ma_value *. (1 + breakout_fallback_pct)]). *)
+[@@deriving sexp, show, eq]
+
 type scored_candidate = {
   ticker : string;
   analysis : Stock_analysis.t;
@@ -491,6 +504,12 @@ type scored_candidate = {
       (** Human-readable list of signals that contributed to this grade. *)
 }
 (** A scored and graded candidate ready for the weekly report. *)
+
+val entry_anchor_kind : scored_candidate -> entry_anchor_kind
+(** [entry_anchor_kind c] is the arm that anchored [c.suggested_entry]. It is
+    computed by the same first-match function that picks the anchored level from
+    [c.analysis] and [c.side], so the kind and the level cannot disagree. A
+    short candidate never reports [Continuation]. *)
 
 type cascade_diagnostics = {
   total_stocks : int;

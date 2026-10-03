@@ -120,6 +120,7 @@ let _placement_lifecycle : TL.t =
     ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = TL.Ma_cross;
+    entry_anchor = None;
     sized_down_wide_stop = false;
     reissued_from = None;
     triple_confirmation =

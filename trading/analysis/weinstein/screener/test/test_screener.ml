@@ -2815,6 +2815,82 @@ let test_continuation_anchor_not_applied_to_shorts _ =
   assert_that (short_entries with_hit) (all_of [ size_is 1; equal_to baseline ])
 
 (* ------------------------------------------------------------------ *)
+(* #3074: entry_anchor_kind names the arm that anchored the ticket     *)
+(* ------------------------------------------------------------------ *)
+
+(** The screened candidate's [(entry_anchor_kind, suggested_entry)]: the kind is
+    pinned together with the level it claims to describe. *)
+let _kind_and_entry (c : scored_candidate) =
+  (entry_anchor_kind c, c.suggested_entry)
+
+let _anchor_specimen ~kind ~entry =
+  elements_are
+    [
+      all_of
+        [
+          field (fun c -> fst (_kind_and_entry c)) (equal_to kind);
+          field (fun c -> snd (_kind_and_entry c)) (float_equal entry);
+        ];
+    ]
+
+let test_entry_anchor_kind_breakout _ =
+  assert_that
+    (_screen_buys
+       (anchor_analysis ~ticker:"AAA" ~breakout_price:(Some 100.0)
+          ~local_range_top:None))
+    (_anchor_specimen ~kind:Breakout ~entry:100.5)
+
+let test_entry_anchor_kind_local_range_top _ =
+  assert_that
+    (_screen_buys
+       (anchor_analysis ~ticker:"AAA" ~breakout_price:(Some 100.0)
+          ~local_range_top:(Some 90.0)))
+    (_anchor_specimen ~kind:Local_range_top ~entry:90.45)
+
+let test_entry_anchor_kind_continuation _ =
+  assert_that
+    (_screen_buys
+       (continuation_tape ~mature:true
+          ~continuation:(Some (continuation_result ~hit:true ~high:120.0))
+          ()))
+    (_anchor_specimen ~kind:Continuation ~entry:120.6)
+
+(** No [breakout_price]: the ticket anchors at the MA fallback
+    [ma_value *. (1 + breakout_fallback_pct)], and the kind says so. The kind is
+    read off the candidate's own analysis, so the specimen rewrites the admitted
+    candidate's analysis rather than relying on [screen] admitting a name with
+    no graded top. *)
+let test_entry_anchor_kind_ma_fallback _ =
+  let c =
+    List.hd_exn
+      (_screen_buys
+         (anchor_analysis ~ticker:"AAA" ~breakout_price:(Some 100.0)
+            ~local_range_top:None))
+  in
+  assert_that
+    (entry_anchor_kind
+       { c with analysis = { c.analysis with breakout_price = None } })
+    (equal_to Ma_fallback)
+
+(** A short carrying a continuation hit never reports [Continuation]: the arm is
+    long-only, matching the anchored level (see
+    [test_continuation_anchor_not_applied_to_shorts]). *)
+let test_entry_anchor_kind_short_never_continuation _ =
+  let stocks, sector_map = short_setup () in
+  let with_hit =
+    List.map stocks ~f:(fun (a : Stock_analysis.t) ->
+        {
+          a with
+          continuation = Some (continuation_result ~hit:true ~high:500.0);
+        })
+  in
+  assert_that
+    (screen ~config:cfg ~macro_trend:Bearish ~sector_map ~stocks:with_hit
+       ~held_tickers:[])
+      .short_candidates
+    (elements_are [ field entry_anchor_kind (not_ (equal_to Continuation)) ])
+
+(* ------------------------------------------------------------------ *)
 (* G2 (#2490): named cascade trace                                      *)
 (* ------------------------------------------------------------------ *)
 
@@ -3652,6 +3728,16 @@ let suite =
          >:: test_continuation_anchor_outranks_local_range_top;
          "continuation anchor: never applied to shorts"
          >:: test_continuation_anchor_not_applied_to_shorts;
+         "entry_anchor_kind Breakout (#3074)"
+         >:: test_entry_anchor_kind_breakout;
+         "entry_anchor_kind Local_range_top (#3074)"
+         >:: test_entry_anchor_kind_local_range_top;
+         "entry_anchor_kind Continuation (#3074)"
+         >:: test_entry_anchor_kind_continuation;
+         "entry_anchor_kind Ma_fallback (#3074)"
+         >:: test_entry_anchor_kind_ma_fallback;
+         "entry_anchor_kind short never Continuation (#3074)"
+         >:: test_entry_anchor_kind_short_never_continuation;
          "RS gate: negative territory admitted at the 0.0 default"
          >:: test_rs_gate_default_admits_negative_territory;
          "RS gate: negative territory rejected when armed at 1.0"

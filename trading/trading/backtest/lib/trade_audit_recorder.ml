@@ -66,6 +66,10 @@ let _ticket_lifecycle_of_event (e : AR.entry_event) : Ticket_lifecycle.t =
     ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = _freshness_basis_of_event e.freshness_basis;
+    entry_anchor =
+      Some
+        (Trade_audit_enum_hops.entry_anchor_of_kind
+           (Screener.entry_anchor_kind e.candidate));
     sized_down_wide_stop = e.sized_down_wide_stop;
     triple_confirmation = _triple_confirmation_of_event e.triple_confirmation;
     reissued_from = None;

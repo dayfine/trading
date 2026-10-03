@@ -33,3 +33,12 @@ let skip_reason_of_event = function
   | AR.Long_exposure_cap -> Trade_audit.Long_exposure_cap
   | AR.No_structural_stop -> Trade_audit.No_structural_stop
   | AR.Share_class_held -> Trade_audit.Share_class_held
+
+(* #3074: the screener's anchor arm to [Ticket_lifecycle]'s on-disk copy.
+   Exhaustive, so a new anchor arm upstream fails this match. *)
+let entry_anchor_of_kind :
+    Screener.entry_anchor_kind -> Ticket_lifecycle.entry_anchor = function
+  | Continuation -> Ticket_lifecycle.Continuation
+  | Local_range_top -> Ticket_lifecycle.Local_range_top
+  | Breakout -> Ticket_lifecycle.Breakout
+  | Ma_fallback -> Ticket_lifecycle.Ma_fallback

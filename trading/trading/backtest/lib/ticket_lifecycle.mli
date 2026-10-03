@@ -125,6 +125,17 @@ type entry_freshness_basis =
           anchor — Weinstein §1's own Stage-2 start event. *)
 [@@deriving sexp]
 
+(** Which level the ticket was anchored at (#3074). On-disk mirror of
+    {!Screener.entry_anchor_kind}; see that type and
+    {!Screener.scored_candidate.suggested_entry} for the first-match-wins rule.
+*)
+type entry_anchor =
+  | Continuation  (** The continuation detector's [consolidation_high]. *)
+  | Local_range_top  (** [analysis.local_range_top]. *)
+  | Breakout  (** [analysis.breakout_price]. *)
+  | Ma_fallback  (** No [breakout_price]: the MA-based fallback level. *)
+[@@deriving sexp]
+
 type reissue = {
   original_position_id : string;
       (** The position id of the ticket's {b first} placement — the row whose
@@ -227,6 +238,11 @@ type t = {
           and could not judge. *)
   freshness_basis : entry_freshness_basis;
       (** F1: which clock admitted the candidate. *)
+  entry_anchor : entry_anchor option; [@sexp.option]
+      (** #3074: which level the ticket was anchored at. Always [Some] on rows
+          written by this build; [None] only on audit files written before the
+          field existed. Lets a run be split into continuation and base-breakout
+          entries; [trades.csv] carries it as the [entry_anchor] column. *)
   sized_down_wide_stop : bool;
       (** F3: [true] when [stop_width_mode = Size_down] admitted this candidate
           past [max_stop_distance_pct] — the entry exists only because the §5.1
