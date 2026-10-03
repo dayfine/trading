@@ -200,6 +200,16 @@ RUN opam update && \
     opam show ocamlformat | grep "all-installed-versions" | grep -q "0.29.0" \
       || (echo "FAIL: ocamlformat post-install is not pure 0.29.0" && exit 1)
 
+# -----------------------------------------------------------------------------
+# Node.js — needed in CI by trading/devtools/checks/review_pack_test.sh, whose
+# signal-predicate cases run `node -e` against dev/lib/review_pack/index.html
+# (they SKIP without node, so a predicate regression would pass CI silently;
+# issue #3090). The devcontainer stage inherits it (jst needs node too).
+# -----------------------------------------------------------------------------
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && \
+    sudo apt-get install -y nodejs && \
+    sudo rm -rf /var/lib/apt/lists/*
+
 # Drop any _build artifacts from opam install hooks so the ci stage stays lean.
 RUN rm -rf /workspaces/trading-1/trading/_build
 
@@ -235,12 +245,10 @@ RUN ARCH=$(dpkg --print-architecture) && \
 
 # -----------------------------------------------------------------------------
 # jj-stack (jst) — stacked-PR submission tool used by agents at session end.
-# Pulls in nodejs as a transitive dependency.
+# nodejs itself comes from the ci stage (see above).
 # -----------------------------------------------------------------------------
 ARG JST_VERSION=1.2.1
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && \
-    sudo apt-get install -y nodejs && \
-    sudo npm install -g jj-stack@${JST_VERSION} && \
+RUN sudo npm install -g jj-stack@${JST_VERSION} && \
     sudo rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------
