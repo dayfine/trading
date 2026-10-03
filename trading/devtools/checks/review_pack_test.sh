@@ -99,8 +99,8 @@ expect_eq "gate-reopen signal present" yes "$(grep -q 'Gate reopen episodes' "$S
 # page with sed and pin it with node over named cases. The page keeps each
 # closing brace at column 0 so the range ends where the function does.
 if command -v node >/dev/null 2>&1; then
-  FNS="$(sed -n -e '/^const REOPEN_CLOSED_WEEKS/p' -e '/^function openSignal(/,/^}/p' -e '/^function oneTradeYear(/,/^}/p' -e '/^function alsoCause(/,/^}/p' -e '/^function reopenFlag(/,/^}/p' "$S/index.html")"
-  expect_eq "signal predicates extracted" 4 "$(printf '%s\n' "$FNS" | grep -c '^function ')"
+  FNS="$(sed -n -e '/^const REOPEN_CLOSED_WEEKS/p' -e '/^function openSignal(/,/^}/p' -e '/^function oneTradeYear(/,/^}/p' -e '/^function alsoCause(/,/^}/p' -e '/^function reopenFlag(/,/^}/p' -e '/^function reopenEpisodes(/,/^}/p' "$S/index.html")"
+  expect_eq "signal predicates extracted" 5 "$(printf '%s\n' "$FNS" | grep -c '^function ')"
   sig() { node -e "$FNS
 console.log($1)"; }
   expect_eq "openSignal: opposite-sign specimen (T1 5r s0: NAV0 1M, move +115k, realised -222k) fires" true "$(sig 'openSignal(1e6, 115e3, -222e3)')"
@@ -124,6 +124,37 @@ console.log($1)"; }
   expect_eq "reopenFlag: 4 entries trailing a +20 % SPY by 10 pp = lagged" "lagged" "$(sig 'reopenFlag(4, 10, 20)')"
   expect_eq "reopenFlag: 2020-06 (6 entries, +25.2 % vs +16.8 %, ahead) is quiet" "" "$(sig 'reopenFlag(6, 25.2, 16.8)')"
   expect_eq "reopenFlag: missing return is quiet" "" "$(sig 'reopenFlag(0, null, 16.4)')"
+  expect_eq "reopenFlag: missing SPY is quiet" "" "$(sig 'reopenFlag(0, 5, null)')"
+  # boundaries (mutation probe on #3086: each pair kills one operator or constant mutant)
+  expect_eq "reopenFlag: e13 = 2 is sat out" "sat out" "$(sig 'reopenFlag(2, -5, 20)')"
+  expect_eq "reopenFlag: e13 = 3 is lagged" "lagged" "$(sig 'reopenFlag(3, -5, 20)')"
+  expect_eq "reopenFlag: e13 = 5 is lagged" "lagged" "$(sig 'reopenFlag(5, -5, 20)')"
+  expect_eq "reopenFlag: e13 = 6 is invested and lagged" "invested and lagged" "$(sig 'reopenFlag(6, -5, 20)')"
+  expect_eq "reopenFlag: SPY exactly 8 % with a 8 pp gap fires" "sat out" "$(sig 'reopenFlag(0, 0, 8)')"
+  expect_eq "reopenFlag: SPY 7.99 % is quiet" "" "$(sig 'reopenFlag(0, 0, 7.99)')"
+  expect_eq "reopenFlag: gap exactly 8 pp fires" "sat out" "$(sig 'reopenFlag(0, 12, 20)')"
+  expect_eq "reopenFlag: gap 7.99 pp is quiet" "" "$(sig 'reopenFlag(0, 12.01, 20)')"
+  # reopenEpisodes over synthetic series: day(n) = 2020-01-03 + n days; macro(c) = c Bearish weeks then
+  # one Bullish week on day 7c; daily(a, b, f) = rows [date, f(i), 0, 0] for days a..b.
+  EP="const day = n => new Date(Date.UTC(2020, 0, 3) + n * 864e5).toISOString().slice(0, 10);
+const macro = c => { const m = []; for (let i = 0; i < c; i++) m.push([day(7 * i), 'Bearish', 'x']); m.push([day(7 * c), 'Bullish', 'x']); return m; };
+const daily = (a, b, f) => { const r = []; for (let i = a; i <= b; i++) r.push([day(i), f(i), 0, 0]); return r; };
+const flat = daily(0, 400, () => 1000), ramp = daily(0, 400, i => 1000 + i);
+const ep = (m, nav, spy, tr) => reopenEpisodes(m, nav, spy, tr);"
+  epi() { node -e "$FNS
+$EP
+console.log($1)"; }
+  expect_eq "reopenEpisodes: 8 closed weeks make one episode, on the Bullish week" '["2020-02-28",8]' "$(epi 'JSON.stringify(ep(macro(8), flat, flat, []).map(e => [e.d, e.closed])[0])')"
+  expect_eq "reopenEpisodes: 7 closed weeks make none" 0 "$(epi 'ep(macro(7), flat, flat, []).length')"
+  expect_eq "reopenEpisodes: an entry on day 90 counts in both windows" '[1,1]' "$(epi 'JSON.stringify(ep(macro(8), flat, flat, [{ ed: day(56 + 90) }]).map(e => [e.e13, e.e26])[0])')"
+  expect_eq "reopenEpisodes: an entry on day 91 counts only in the 26-week window" '[0,1]' "$(epi 'JSON.stringify(ep(macro(8), flat, flat, [{ ed: day(56 + 91) }]).map(e => [e.e13, e.e26])[0])')"
+  expect_eq "reopenEpisodes: entries on day 182 and before the reopen count in neither" '[0,0]' "$(epi 'JSON.stringify(ep(macro(8), flat, flat, [{ ed: day(56 + 182) }, { ed: day(55) }]).map(e => [e.e13, e.e26])[0])')"
+  expect_eq "reopenEpisodes: a 26-week window past the NAV data is dropped" 0 "$(epi 'ep(macro(8), daily(0, 237, () => 1000), flat, []).length')"
+  expect_eq "reopenEpisodes: a window ending on the last NAV row is kept" 1 "$(epi 'ep(macro(8), daily(0, 238, () => 1000), flat, []).length')"
+  expect_eq "reopenEpisodes: a reopen before the NAV data is dropped" 0 "$(epi 'ep(macro(8), daily(60, 400, () => 1000), flat, []).length')"
+  expect_eq "reopenEpisodes: returns are last-row-on-or-before (NAV 1056 -> 1238 = +17.23 %)" "17.23" "$(epi 'ep(macro(8), ramp, flat, [])[0].ret.toFixed(2)')"
+  expect_eq "reopenEpisodes: a missing reopen-day row reads the prior day, not the next" "0.00" "$(epi 'ep(macro(8), flat.filter(r => r[0] !== day(56)).map(r => r[0] === day(57) ? [r[0], 2000, 0, 0] : r), flat, [])[0].ret.toFixed(2)')"
+  expect_eq "reopenEpisodes: flag comes from reopenFlag (flat SPY is quiet)" "" "$(epi 'ep(macro(8), ramp, flat, [])[0].flag')"
 else
   echo "SKIP: review_pack signal-predicate cases need node"
 fi
