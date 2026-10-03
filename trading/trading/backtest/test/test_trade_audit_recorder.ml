@@ -395,6 +395,47 @@ let test_entry_projection_defaults_to_ma_cross_and_untagged _ =
                field (fun (l : TL.t) -> l.sized_down_wide_stop) (equal_to false);
              ])))
 
+(** #3074 sink-hop pin: a candidate anchored by each arm of the screener's
+    first-match rule reaches [ticket_lifecycle.entry_anchor] as the matching
+    {!TL.entry_anchor}. One candidate per arm, all driven through the real
+    recorder, so hardcoding any single kind (or dropping the field to [None]) at
+    the recorder or the enum hop fails. The fixture analysis has no
+    [breakout_price], so the plain candidate is the MA-fallback specimen. *)
+let test_entry_projection_records_every_entry_anchor _ =
+  let with_analysis f = { _candidate with analysis = f _candidate.analysis } in
+  let continuation : Continuation.result =
+    {
+      is_continuation = true;
+      pullback_low = Some 95.0;
+      consolidation_high = Some 110.0;
+      ma_slope_observed = 0.05;
+    }
+  in
+  let candidates =
+    [
+      with_analysis (fun a -> { a with continuation = Some continuation });
+      with_analysis (fun a -> { a with local_range_top = Some 105.0 });
+      with_analysis (fun a -> { a with breakout_price = Some 100.0 });
+      _candidate;
+    ]
+  in
+  let recorded candidate =
+    (_recorded_entry_of
+       (_entry_event ~candidate ~split_safe_basis:AR.Flag_off
+          ~stop_floor_kind:AR.Buffer_fallback ()))
+      .TA.ticket_lifecycle
+    |> Option.bind ~f:(fun (l : TL.t) -> l.entry_anchor)
+  in
+  assert_that
+    (List.map candidates ~f:recorded)
+    (elements_are
+       [
+         is_some_and (equal_to (TL.Continuation : TL.entry_anchor));
+         is_some_and (equal_to (TL.Local_range_top : TL.entry_anchor));
+         is_some_and (equal_to (TL.Breakout : TL.entry_anchor));
+         is_some_and (equal_to (TL.Ma_fallback : TL.entry_anchor));
+       ])
+
 (** Sink-hop pin for the F5 record: every {!Volume.breakout_confirmation}
     constructor — plus the [None] no-verdict case — and every
     {!AR.fill_volume_outcome} must reach its [TA] counterpart. A value dropped
@@ -574,6 +615,8 @@ let suite =
          >:: test_entry_projection_carries_placement_time_lifecycle;
          "entry projection defaults to Ma_cross and untagged"
          >:: test_entry_projection_defaults_to_ma_cross_and_untagged;
+         "entry anchor: every arm reaches the lifecycle (#3074)"
+         >:: test_entry_projection_records_every_entry_anchor;
          "fill_volume projects every verdict class"
          >:: test_fill_volume_projects_every_verdict_class;
          "split_safe_basis projects all three states"

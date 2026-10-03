@@ -15,6 +15,7 @@ type t = {
   stop_fill_distance_pct : float option;
   max_stop : float option;
   n_stop_raises : int option;
+  entry_anchor : string option;
 }
 [@@deriving sexp]
 
@@ -33,6 +34,19 @@ let stop_trigger_kind_label (k : Stop_log.stop_trigger_kind) =
   | End_of_period -> "end_of_period"
   | Non_stop_exit -> "non_stop_exit"
 
+let entry_anchor_label (a : Ticket_lifecycle.entry_anchor) =
+  match a with
+  | Continuation -> "continuation"
+  | Local_range_top -> "local_range_top"
+  | Breakout -> "breakout"
+  | Ma_fallback -> "ma_fallback"
+
+(* [None] when no audit record joined, the record has no lifecycle, or it
+   predates the #3074 field: an empty cell, never a guessed kind. *)
+let _entry_anchor_label (r : Trade_audit.audit_record) =
+  Option.bind r.entry.ticket_lifecycle ~f:(fun (l : Ticket_lifecycle.t) ->
+      Option.map l.entry_anchor ~f:entry_anchor_label)
+
 let csv_header_fields =
   [
     "entry_stage";
@@ -45,6 +59,7 @@ let csv_header_fields =
     "stop_fill_distance_pct";
     "max_stop";
     "n_stop_raises";
+    "entry_anchor";
   ]
 
 let _fmt_float4_opt = function Some f -> Printf.sprintf "%.4f" f | None -> ""
@@ -67,6 +82,7 @@ let csv_row_fields (t : t) =
     _fmt_float4_opt t.stop_fill_distance_pct;
     _fmt_price_opt t.max_stop;
     _fmt_int_opt t.n_stop_raises;
+    _fmt_string_opt t.entry_anchor;
   ]
 
 (* Index construction lives in [Trade_context_index]; the lookup / fallback
@@ -229,6 +245,7 @@ let of_precomputed (pre : precomputed)
     stop_fill_distance_pct;
     max_stop;
     n_stop_raises;
+    entry_anchor = Option.bind audit_record ~f:_entry_anchor_label;
   }
 
 (** Convenience wrapper: builds [precomputed] inline. Per-trade callers in a

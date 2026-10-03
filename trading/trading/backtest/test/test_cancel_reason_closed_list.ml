@@ -156,6 +156,7 @@ let _lifecycle : TL.t =
     ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = TL.Range_top_breakout;
+    entry_anchor = None;
     sized_down_wide_stop = false;
     reissued_from = None;
     triple_confirmation = _triple;

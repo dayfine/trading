@@ -353,7 +353,8 @@ let _lifecycle ?(placement_date = _date "2024-03-01")
     ?(ticket_age_weeks_at_cancel = Some 3)
     ?(cancel_reason = Some "entry_ticket_ttl_expired")
     ?(ticket_age_weeks_at_fill = None) ?(fill_volume = None)
-    ?(freshness_basis = TL.Range_top_breakout) ?(sized_down_wide_stop = true)
+    ?(freshness_basis = TL.Range_top_breakout)
+    ?(entry_anchor = Some TL.Continuation) ?(sized_down_wide_stop = true)
     ?(triple_confirmation = _triple) ?(reissued_from = None) () : TL.t =
   {
     placement_date;
@@ -362,6 +363,7 @@ let _lifecycle ?(placement_date = _date "2024-03-01")
     ticket_age_weeks_at_fill;
     fill_volume;
     freshness_basis;
+    entry_anchor;
     sized_down_wide_stop;
     triple_confirmation;
     reissued_from;

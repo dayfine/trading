@@ -87,6 +87,10 @@ type t = {
   stop_fill_distance_pct : float option;
   max_stop : float option;
   n_stop_raises : int option;
+  entry_anchor : string option;
+      (** #3074: {!entry_anchor_label} of the joined audit record's
+          [ticket_lifecycle.entry_anchor]; [None] when no record joined or the
+          record predates the field. *)
 }
 [@@deriving sexp]
 (** One per-trade context row, keyed by [(symbol, entry_date)] for join with
@@ -101,29 +105,34 @@ val stage_label : Weinstein_types.stage -> string
     [late : bool] inside [Stage2] expands to ["Stage2_late"] vs ["Stage2"];
     other stages render as bare ["Stage1"] / ["Stage3"] / ["Stage4"]. *)
 
+val entry_anchor_label : Ticket_lifecycle.entry_anchor -> string
+(** The [entry_anchor] column label: [continuation] / [local_range_top] /
+    [breakout] / [ma_fallback]. *)
+
 val stop_trigger_kind_label : Stop_log.stop_trigger_kind -> string
 (** Render a {!Stop_log.stop_trigger_kind} as the canonical lowercase export
     label: [gap_down] / [intraday] / [end_of_period] / [non_stop_exit]. *)
 
 val csv_header_fields : string list
-(** The 10 trailing column names for [trades.csv]: the 6 M5.2e columns
+(** The 11 trailing column names for [trades.csv]: the 6 M5.2e columns
     ([entry_stage], [entry_volume_ratio], [stop_initial_distance_pct],
     [stop_trigger_kind], [days_to_first_stop_trigger],
     [screener_score_at_entry]), then [position_id], then
     [stop_fill_distance_pct], then the two stop-ratchet observability columns
-    [max_stop] and [n_stop_raises]. Producers concatenate these onto the legacy
-    13-column header so consumers can locate columns by name — see
-    {!Trades_csv_schema} for the reader side of that lookup. New columns are
-    {b appended} so every fixed base-column index used by positional readers
-    stays valid (post-run validator's [exit_trigger]=12, [stop_trigger_kind]=16,
-    [position_id]=19; faithfulness harness's [stop_initial_distance_pct]=15).
-    That is a discipline this writer keeps, not a guarantee of the format:
-    [position_id] itself landed by insertion {i inside} the trailing block,
-    ahead of [stop_fill_distance_pct]. Readers that must tolerate any producer
-    of the format resolve by name via {!Trades_csv_schema} instead. *)
+    [max_stop] and [n_stop_raises], then [entry_anchor] (#3074). Producers
+    concatenate these onto the legacy 13-column header so consumers can locate
+    columns by name — see {!Trades_csv_schema} for the reader side of that
+    lookup. New columns are {b appended} so every fixed base-column index used
+    by positional readers stays valid (post-run validator's [exit_trigger]=12,
+    [stop_trigger_kind]=16, [position_id]=19; faithfulness harness's
+    [stop_initial_distance_pct]=15). That is a discipline this writer keeps, not
+    a guarantee of the format: [position_id] itself landed by insertion
+    {i inside} the trailing block, ahead of [stop_fill_distance_pct]. Readers
+    that must tolerate any producer of the format resolve by name via
+    {!Trades_csv_schema} instead. *)
 
 val csv_row_fields : t -> string list
-(** Render a {!t} as the 10 trailing CSV cells in the same order as
+(** Render a {!t} as the 11 trailing CSV cells in the same order as
     {!csv_header_fields}. Ratio-valued floats render at %.4f, ints as decimal,
     string labels verbatim. [max_stop] is a {b price}, so it renders at %.2f to
     match the sibling [entry_stop] / [exit_stop] price columns the result writer

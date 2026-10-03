@@ -23,3 +23,8 @@ val skip_reason_of_event :
   Weinstein_strategy.Audit_recorder.skip_reason -> Trade_audit.skip_reason
 (** Every entry-walk skip reason, one-to-one (including #3015's
     [Share_class_held]). *)
+
+val entry_anchor_of_kind :
+  Screener.entry_anchor_kind -> Ticket_lifecycle.entry_anchor
+(** Constructor-by-constructor hop for the #3074 ticket-anchor tag, from
+    {!Screener.entry_anchor_kind} to {!Ticket_lifecycle.entry_anchor}. *)
