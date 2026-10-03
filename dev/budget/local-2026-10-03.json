@@ -1,0 +1,230 @@
+{
+  "run_id": "local-2026-10-03",
+  "timestamp": "2026-10-03T10:09:42Z",
+  "commit_sha": "62e70bb346854aacb1fbb37323436e4e57dc388a",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 1192,
+    "output_tokens": 4125,
+    "cache_read_input_tokens": 22313803,
+    "cache_creation_input_tokens": 1650116,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-10-03",
+    "source": "local-transcripts",
+    "generated_at": "2026-10-03T10:09:42Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-10-03",
+      "until": "2026-10-03"
+    },
+    "totals": {
+      "dispatches": 8,
+      "sessions": 0,
+      "resumes": 9,
+      "api_calls": 190,
+      "input_tokens": 1192,
+      "output_tokens": 4125,
+      "cache_read_input_tokens": 22313803,
+      "cache_creation_input_tokens": 1650116,
+      "subagent_tokens": 23969236,
+      "main_tokens": 0
+    },
+    "context_histogram": {
+      "calls": 0,
+      "p50": 0,
+      "p90": 0,
+      "max": 0,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 0,
+      "share_above_threshold_pct": 0,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "50-100k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "100-150k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "150-200k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "200-300k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "300-500k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "a59901b739b4ade20",
+        "agent_type": "qc-structural",
+        "description": "qc-structural re-review of PR #3086 at e71e8513a",
+        "ref": "#3086",
+        "date": "2026-10-03",
+        "wall_seconds": 1316,
+        "resumes": 2,
+        "outcome": "APPROVED",
+        "api_calls": 47,
+        "input_tokens": 382,
+        "output_tokens": 186,
+        "cache_read_input_tokens": 4808960,
+        "cache_creation_input_tokens": 323367
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "aa7df3ebac7e2456d",
+        "agent_type": "qc-structural",
+        "description": "qc-structural review of PR #3086",
+        "ref": "#3086",
+        "date": "2026-10-03",
+        "wall_seconds": 1430,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "api_calls": 31,
+        "input_tokens": 252,
+        "output_tokens": 57,
+        "cache_read_input_tokens": 4009137,
+        "cache_creation_input_tokens": 471491
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "a79fcc6ab6492d376",
+        "agent_type": "qc-results",
+        "description": "qc-results review of PR #3091",
+        "ref": "#3091",
+        "date": "2026-10-03",
+        "wall_seconds": 187,
+        "resumes": 1,
+        "outcome": "NEEDS_REWORK",
+        "api_calls": 21,
+        "input_tokens": 42,
+        "output_tokens": 1187,
+        "cache_read_input_tokens": 3115995,
+        "cache_creation_input_tokens": 179035
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "aad36cb56cc50e778",
+        "agent_type": "qc-structural",
+        "description": "qc-structural re-review of PR #3086 at 2a6dd7496",
+        "ref": "#3086",
+        "date": "2026-10-03",
+        "wall_seconds": 112,
+        "resumes": 1,
+        "outcome": "stalled",
+        "api_calls": 32,
+        "input_tokens": 258,
+        "output_tokens": 57,
+        "cache_read_input_tokens": 3055857,
+        "cache_creation_input_tokens": 108658
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "ac6e28a5d006afc35",
+        "agent_type": "qc-structural",
+        "description": "qc-structural review of PR #3086 (rebased tip)",
+        "ref": "#3086",
+        "date": "2026-10-03",
+        "wall_seconds": 146,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "api_calls": 23,
+        "input_tokens": 186,
+        "output_tokens": 35,
+        "cache_read_input_tokens": 2847896,
+        "cache_creation_input_tokens": 165054
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "a45a0f08a388ff336",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral re-review of PR #3086 at e71e8513a",
+        "ref": "#3086",
+        "date": "2026-10-03",
+        "wall_seconds": 215,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/trading/pull/3086",
+        "api_calls": 14,
+        "input_tokens": 28,
+        "output_tokens": 892,
+        "cache_read_input_tokens": 1781193,
+        "cache_creation_input_tokens": 152808
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "a4e08721a4966a0f9",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral review of PR #3086",
+        "ref": "#3086",
+        "date": "2026-10-03",
+        "wall_seconds": 172,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/trading/pull/3086",
+        "api_calls": 14,
+        "input_tokens": 28,
+        "output_tokens": 1065,
+        "cache_read_input_tokens": 1769363,
+        "cache_creation_input_tokens": 131364
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "aa6fe80417e1467ef",
+        "agent_type": "qc-results",
+        "description": "qc-results re-review of PR #3091 (iteration 2)",
+        "ref": "#3091",
+        "date": "2026-10-03",
+        "wall_seconds": 58,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/trading/pull/3091",
+        "api_calls": 8,
+        "input_tokens": 16,
+        "output_tokens": 646,
+        "cache_read_input_tokens": 925402,
+        "cache_creation_input_tokens": 118339
+      }
+    ],
+    "sessions": []
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}

@@ -1,6 +1,6 @@
 ---
 name: project_trader_investor_modes
-description: "Weinstein trader vs investor = config presets (MA 10wk/30wk etc.). RESULT 2026-06-01: 10wk trader REJECTED on SPY (strictly worse both windows — faster MA amplifies whipsaw). Investor 30wk = drawdown-insurance sweet spot; selection (Cell E) >> timing. PR #1401 dial."
+description: "Weinstein trader vs investor = config presets. 09-29 BOOK: trader buys on 30wk MA (continuation); 10wk stage MA NOT book-supported; #3038 queued. RESULT 2026-06-01: 10wk trader REJECTED on SPY (strictly worse both windows — faster MA amplifies whipsaw). Investor 30wk = drawdown-insurance sweet spot; selection (Cell E) >> timing. PR #1401 dial."
 metadata:
   node_type: memory
   type: project
@@ -59,3 +59,5 @@ GFC favorable round-trips — at the GFC bottom held 2.4× BAH's capital). (2)
 ma_period_weeks dial stays a default-off axis; rejection recorded. Writeups:
 `dev/notes/spy-stage-timing-trades-2026-05-31.md`, `spy-deep-window-2026-05-31.md`,
 `spy-mode-comparison-2026-06-01.md`.
+
+**⚠ CORRECTION 2026-09-29 (book read, glossary "Moving Average", ~line 739):** "30-week MA best for long-term investors, while the 10-week MA is best for traders to use" — BUT the same passage defines the trader's buy against the **30-week** MA ("already above its 30-week MA, when the MA is rising … pulls back close to the MA, then breaks out again" = continuation buy). The book never says what traders apply the 10-week MA to (only 2 mentions). So a 10-week STAGE MA (the 06-01 SPY test, and this plan's table row) is NOT book-supported; a faithful trader preset = 30wk stages + continuation buys + 4–6 % fallback stop + early Stage-3 exit + full size ≈ the current hybrid + `enable_continuation_buys`. 10wk as a trailing basis = our adaptation (needs a new dial). Experiment queued: #3038 (arms I/H/T1/T2/T0 × 5y, 5y-disjoint, 26y).

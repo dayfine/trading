@@ -139,3 +139,5 @@ give-up, and internal stage3-exit+laggard+live-A-D-macro already supply crash de
 stay default-off. P2 barbell weight cert RESOLVED: no floor, long-only pure engine = production
 stance.** Supersedes the "70/30 PROMOTE" grid framing for deployment purposes (that grid was
 A-D-inert, weak-engine windows; valid as methodology, not as the live weight).
+
+**CLOSED 06-27 (ledger `_ledger/2026-06-27-barbell-floor-sweep.sexp`, BROAD top-3000):** timing floor (Spy_only_weinstein) = no free lunch on broad (Sharpe/Calmar flat across weights 0–0.4). Buy-hold SPY floor was the positive variant (w0.30: 814 %/0.572/DD 29.9 vs engine 721/0.496/43.8) but the USER DECLINED it (Option B: passive index sleeve = portfolio construction, not Weinstein selection). Do not re-propose a barbell / idle-cash SPY sleeve as a "broad re-test" — it needs a new user faithfulness decision. (10-01: I wrongly proposed exactly that; caught by reading the ledger.)

@@ -1,0 +1,260 @@
+{
+  "run_id": "local-2026-10-02",
+  "timestamp": "2026-10-03T10:11:20Z",
+  "commit_sha": "62e70bb346854aacb1fbb37323436e4e57dc388a",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 2346,
+    "output_tokens": 379353,
+    "cache_read_input_tokens": 143397196,
+    "cache_creation_input_tokens": 2568285,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-10-02",
+    "source": "local-transcripts",
+    "generated_at": "2026-10-03T10:11:20Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-10-02",
+      "until": "2026-10-02"
+    },
+    "totals": {
+      "dispatches": 9,
+      "sessions": 1,
+      "resumes": 13,
+      "api_calls": 762,
+      "input_tokens": 2346,
+      "output_tokens": 379353,
+      "cache_read_input_tokens": 143397196,
+      "cache_creation_input_tokens": 2568285,
+      "subagent_tokens": 27023520,
+      "main_tokens": 119323660
+    },
+    "context_histogram": {
+      "calls": 541,
+      "p50": 206233,
+      "p90": 397393,
+      "max": 447823,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 225,
+      "share_above_threshold_pct": 41.5,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 7,
+          "share_pct": 1.2
+        },
+        {
+          "label": "50-100k",
+          "calls": 90,
+          "share_pct": 16.6
+        },
+        {
+          "label": "100-150k",
+          "calls": 98,
+          "share_pct": 18.1
+        },
+        {
+          "label": "150-200k",
+          "calls": 66,
+          "share_pct": 12.1
+        },
+        {
+          "label": "200-300k",
+          "calls": 136,
+          "share_pct": 25.1
+        },
+        {
+          "label": "300-500k",
+          "calls": 144,
+          "share_pct": 26.6
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "ab2d4c996f00d4e07",
+        "agent_type": "qc-structural",
+        "description": "qc-structural on PR 3067",
+        "ref": "",
+        "date": "2026-10-02",
+        "wall_seconds": 859,
+        "resumes": 2,
+        "outcome": "APPROVED",
+        "api_calls": 51,
+        "input_tokens": 412,
+        "output_tokens": 375,
+        "cache_read_input_tokens": 4876364,
+        "cache_creation_input_tokens": 210304
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "ab3c3775d2797499e",
+        "agent_type": "qc-results",
+        "description": "qc-results on PR #3081",
+        "ref": "#3081",
+        "date": "2026-10-02",
+        "wall_seconds": 275,
+        "resumes": 1,
+        "outcome": "NEEDS_REWORK",
+        "api_calls": 27,
+        "input_tokens": 54,
+        "output_tokens": 1668,
+        "cache_read_input_tokens": 3925629,
+        "cache_creation_input_tokens": 187663
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "af0f9c776fd8a85e6",
+        "agent_type": "qc-structural",
+        "description": "qc-structural on PR #3080",
+        "ref": "#3080",
+        "date": "2026-10-02",
+        "wall_seconds": 1505,
+        "resumes": 3,
+        "outcome": "APPROVED",
+        "api_calls": 37,
+        "input_tokens": 302,
+        "output_tokens": 324,
+        "cache_read_input_tokens": 3446209,
+        "cache_creation_input_tokens": 305764
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "aa685321d509ca58d",
+        "agent_type": "qc-structural",
+        "description": "qc-structural on PR 3065",
+        "ref": "",
+        "date": "2026-10-02",
+        "wall_seconds": 113,
+        "resumes": 2,
+        "outcome": "APPROVED",
+        "api_calls": 24,
+        "input_tokens": 196,
+        "output_tokens": 104,
+        "cache_read_input_tokens": 3291553,
+        "cache_creation_input_tokens": 158564
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "a7857d7e74030a154",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral on PR 3065",
+        "ref": "",
+        "date": "2026-10-02",
+        "wall_seconds": 224,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "api_calls": 22,
+        "input_tokens": 44,
+        "output_tokens": 925,
+        "cache_read_input_tokens": 2704548,
+        "cache_creation_input_tokens": 138884
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "ab7ca96bc8bb7932e",
+        "agent_type": "qc-results",
+        "description": "qc-results #3068",
+        "ref": "#3068",
+        "date": "2026-10-02",
+        "wall_seconds": 164,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "api_calls": 19,
+        "input_tokens": 38,
+        "output_tokens": 1030,
+        "cache_read_input_tokens": 2297535,
+        "cache_creation_input_tokens": 142181
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "a03f895db7deddd98",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral on PR 3067",
+        "ref": "",
+        "date": "2026-10-02",
+        "wall_seconds": 293,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "api_calls": 18,
+        "input_tokens": 36,
+        "output_tokens": 947,
+        "cache_read_input_tokens": 2197755,
+        "cache_creation_input_tokens": 138823
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "ab2b51e97bf00b7fb",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral on PR #3080",
+        "ref": "#3080",
+        "date": "2026-10-02",
+        "wall_seconds": 106,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "api_calls": 12,
+        "input_tokens": 24,
+        "output_tokens": 936,
+        "cache_read_input_tokens": 1408941,
+        "cache_creation_input_tokens": 136341
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "a322567ddefea7996",
+        "agent_type": "qc-results",
+        "description": "qc-results re-review #3081",
+        "ref": "#3081",
+        "date": "2026-10-02",
+        "wall_seconds": 76,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "api_calls": 11,
+        "input_tokens": 22,
+        "output_tokens": 619,
+        "cache_read_input_tokens": 1327181,
+        "cache_creation_input_tokens": 121225
+      }
+    ],
+    "sessions": [
+      {
+        "kind": "session",
+        "session": "2264a5ab-5c8c-48d3-bce3-de3d0c1778d2",
+        "date": "2026-10-02",
+        "wall_seconds": 91231,
+        "dispatches_launched": 0,
+        "api_calls": 541,
+        "input_tokens": 1218,
+        "output_tokens": 372425,
+        "cache_read_input_tokens": 117921481,
+        "cache_creation_input_tokens": 1028536
+      }
+    ]
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}
