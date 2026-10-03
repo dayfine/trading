@@ -131,7 +131,7 @@ console.log($1)"; }
   expect_eq "reopenFlag: e13 = 5 is lagged" "lagged" "$(sig 'reopenFlag(5, -5, 20)')"
   expect_eq "reopenFlag: e13 = 6 is invested and lagged" "invested and lagged" "$(sig 'reopenFlag(6, -5, 20)')"
   expect_eq "reopenFlag: SPY exactly 8 % with a 8 pp gap fires" "sat out" "$(sig 'reopenFlag(0, 0, 8)')"
-  expect_eq "reopenFlag: SPY 7.99 % is quiet" "" "$(sig 'reopenFlag(0, 0, 7.99)')"
+  expect_eq "reopenFlag: SPY 7.99 % is quiet even 28 pp behind" "" "$(sig 'reopenFlag(0, -20, 7.99)')"
   expect_eq "reopenFlag: gap exactly 8 pp fires" "sat out" "$(sig 'reopenFlag(0, 12, 20)')"
   expect_eq "reopenFlag: gap 7.99 pp is quiet" "" "$(sig 'reopenFlag(0, 12.01, 20)')"
   # reopenEpisodes over synthetic series: day(n) = 2020-01-03 + n days; macro(c) = c Bearish weeks then
@@ -154,7 +154,10 @@ console.log($1)"; }
   expect_eq "reopenEpisodes: a reopen before the NAV data is dropped" 0 "$(epi 'ep(macro(8), daily(60, 400, () => 1000), flat, []).length')"
   expect_eq "reopenEpisodes: returns are last-row-on-or-before (NAV 1056 -> 1238 = +17.23 %)" "17.23" "$(epi 'ep(macro(8), ramp, flat, [])[0].ret.toFixed(2)')"
   expect_eq "reopenEpisodes: a missing reopen-day row reads the prior day, not the next" "0.00" "$(epi 'ep(macro(8), flat.filter(r => r[0] !== day(56)).map(r => r[0] === day(57) ? [r[0], 2000, 0, 0] : r), flat, [])[0].ret.toFixed(2)')"
-  expect_eq "reopenEpisodes: flag comes from reopenFlag (flat SPY is quiet)" "" "$(epi 'ep(macro(8), ramp, flat, [])[0].flag')"
+  expect_eq "reopenEpisodes: flag is wired from reopenFlag (flat NAV vs SPY +17 %, no entries = sat out)" "sat out" "$(epi 'ep(macro(8), flat, ramp, [])[0].flag')"
+  expect_eq "reopenEpisodes: the flag reads e13, not e26 (3 entries after week 13 keep it sat out)" "sat out" "$(epi 'ep(macro(8), flat, ramp, [{ ed: day(56 + 100) }, { ed: day(56 + 101) }, { ed: day(56 + 102) }])[0].flag')"
+  expect_eq "reopenEpisodes: the closed-weeks counter resets (two Bullish weeks in a row = one reopen)" 1 "$(epi 'ep(macro(8).concat([[day(63), macro(1)[1][1], macro(1)[1][2]]]), flat, flat, []).length')"
+  expect_eq "reopenEpisodes: an entry on the reopen day counts" '[1,1]' "$(epi 'JSON.stringify(ep(macro(8), flat, flat, [{ ed: day(56) }]).map(e => [e.e13, e.e26])[0])')"
 else
   echo "SKIP: review_pack signal-predicate cases need node"
 fi
