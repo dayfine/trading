@@ -101,7 +101,7 @@ count, the stop-exit share and the median holding period per arm.
 
 ## Log
 
-- 2026-10-02 ~14:00 PT: phase 1 launched (`results/launch.sh`, pinned `sweep-anchor`, build main at launch,
+- 2026-10-02 13:32 PT (`chain-A.log` first line): phase 1 launched (`results/launch.sh`, pinned `sweep-anchor`, build main at launch,
   `CELL_TIMEOUT=7200`); specs read from the pre-registration commit b0025fff1.
 - 2026-10-03 01:57 PT: `LANE A DONE`, 24 cells, 24–31 min each; V6 exit 0 on all 18 pairs.
 - 2026-10-02 (during the run, read-only): `anchor-position-screen.md` — far graded tops occur in every

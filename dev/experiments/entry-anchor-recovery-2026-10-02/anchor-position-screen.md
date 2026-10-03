@@ -1,8 +1,11 @@
 # Read-only screens after the anchor experiment (2026-10-02, 26y investor s0)
 
-Two questions the anchor result raised, answered from committed artifacts only
-(`.sweep-output/investor-preset/inv26sc-investor-s0-v11-*`, build 6d84ff1c3, PR #3068) and the raw bar
-store `data/<first>/<last>/<SYM>/data.csv`. Scripts: `results/tickets_extract.awk`,
+Two questions the anchor result raised, answered from the 26y investor s0 run (build 6d84ff1c3, PR
+#3068) and the raw bar store `data/<first>/<last>/<SYM>/data.csv`. Of that run's artifacts, `trades.csv`
+and `equity_curve.csv` are committed under `dev/experiments/investor-preset-2026-09-26/results/`
+(prefix `inv26sc-investor-s0-v11-`); `trade_audit.sexp` and `macro_trend.sexp`, which the skip and
+ticket tables in §1 rest on, are not committed (size) and live under
+`.sweep-output/investor-preset/` on the host that ran the chain. Scripts: `results/tickets_extract.awk`,
 `results/alts_extract.awk`, `results/graded_top.sh`, `results/episodes.awk`, `results/skips.awk`.
 No backtest was run. These are proxy screens (`mechanism-validation-rigor.md`): they rule levers in or
 out of *prioritisation*, they do not reject a mechanism.
