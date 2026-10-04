@@ -7,7 +7,7 @@ Helpers for `dev/scripts/review_pack.sh`. POSIX sh + awk + jq; no Python.
 | `trade_extract.awk` | host | one trade over its symbol's bar CSV: MFE/MAE, post-exit path + A–F grade, fill-vs-bar checks (split-basis aware), 8-week pick return, stop-breach lag, hard-stop replays, MTM exposure rows, daily chart bars |
 | `periods.awk` | host | year or quarter table: return vs SPY, drawdowns, invested %, trades, realised P&L, macro weeks |
 | `assemble.awk` | host | joins trades.csv + extraction + audit + macro + stage replay into `<run>_trades.json` |
-| `meta.sh` | host | summary metrics, overrides, validator checks, audit conformance → `<run>_meta.json` |
+| `meta.sh` | host | summary metrics, overrides, validator checks, audit conformance, and the short leg when params enable it (tickets, fills, short P&L, Bearish weeks and those admitting a short to the top-N; #3111) → `<run>_meta.json` |
 | `stage_sum.sh` | host | stage replay CSVs → stage at entry/exit, Stage 3/4 weeks held |
 | `chart_shards.awk` | host | per-trade weekly stage + daily bars, sharded by entry year |
 | `../../scripts/review_pack_render.sh` | host | renders a built site to PNGs (headless Chrome, data inlined behind a fetch shim so `file://` works) for the visual review step, `.claude/rules/backtest-result-review.md` |
