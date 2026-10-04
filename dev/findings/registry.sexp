@@ -209,3 +209,11 @@
                 "run reads map from separate dir"))
          (validator V6)))
  (status fixed))
+
+((issue 3104)
+ (finding "split detector reads ADR dividends >5% (FUJIY 2020-09-28, DHLGY 2025-05-06) as 18:17 / 21:20 splits")
+ (guard ((unit ("trading/analysis/data/types/test/test_split_detector.ml"
+                "strict rule rejects adr dividends (fujiy, dhlgy)"))
+         (unit ("trading/analysis/data/types/test/test_split_detector.ml"
+                "real 3:2, 2:1, 1:10 detected rule on and off"))))
+ (status fixed-behind-flag))
