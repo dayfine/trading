@@ -74,7 +74,7 @@ picks-vs-universe median gap (8.9 pp) ~18 pp/yr — large if real, which is why 
    that way. So the picks-vs-universe gap is, if anything, overstated.
 5. **Surface.** One horizon (26 weeks), one window. No knob was swept; this is a pool-quality check, not a
    mechanism screen.
-6. **Paired.** Per-pick vs SPY on the same date in `results/picks.md`; 10 of 24 beat SPY.
+6. **Paired.** Per-pick vs SPY on the same date in `results/picks.md`; 9 of 24 beat SPY.
 7. **Power.** Bootstrap p ≈ 0.07–0.08 at n = 24: underpowered for the picks; the pool and universe rows are
    well powered.
 8. **V6.** Not applicable (one arm, no paired backtest).
@@ -82,14 +82,15 @@ picks-vs-universe median gap (8.9 pp) ~18 pp/yr — large if real, which is why 
 ## Verdict
 
 **No-build decision for a selection-side experiment on the 2025 shape.** The pool the ranker draws from is
-the universe's distribution; what separates 2025 from SPY is a narrow tape (about a third of the median gap)
-plus a small, high-dispersion set of picks that a random draw matches 1 time in 13. Leaning on the standing
+the universe's distribution; of the 11.9 pp median gap between the picks and SPY, about a quarter (3.0 pp, SPY vs the equal-weight
+universe) is the narrow tape, and the rest (8.9 pp) is the picks lagging their own pool, which a random
+24-name draw matches 1 time in 13: indistinguishable from chance at this n, not attributable to the tape. Leaning on the standing
 prior that selection levers have repeatedly found no edge (`project_entry_selection_closed_powered`), there is
 no specific lever to test. This is a prioritisation decision, not evidence that selection cannot matter.
 
 **Why, and what it rules out:** a ranker that does no better or worse than the universe cannot be "fixed" for
-one regime by re-weighting the same inputs. The 2025 lag is mostly exposure to the equal-weight universe in a
-cap-weighted rally. Levers that would address that are benchmark/construction levers (equal-weight vs
+one regime by re-weighting the same inputs. The tape part of the 2025 lag (the equal-weight universe trailing a cap-weighted
+rally) is the only part this screen can attribute. Levers that would address it are benchmark/construction levers (equal-weight vs
 cap-weight benchmark, size tilt), not ranking levers, and the SPY sleeve that would directly address it is
 user-declined. An equal-weight benchmark (RSP/IWM) is still missing from the data store
 (`dev/notes/next-session-priorities-2026-10-03.md` §6); with it, the review pack could show the
