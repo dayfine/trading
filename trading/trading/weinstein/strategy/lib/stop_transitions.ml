@@ -65,3 +65,27 @@ let of_stop_event ~on_close ~(pos : Position.t)
         Some (make_adjust_transition ~pos ~current_date ~risk_params ~new_level)
       )
   | _ -> (None, None)
+
+let catastrophic_exit_label = "catastrophic_stop"
+
+let _catastrophic_detail ~trigger_level ~trailing_high ~pct =
+  Printf.sprintf "stop_price=%.4f,trailing_high=%.4f,pct=%.4f" trigger_level
+    trailing_high pct
+
+let make_catastrophic_exit_transition ?(on_close = false) ~(pos : Position.t)
+    ~current_date ~trigger_level ~trailing_high ~pct ~bar () =
+  let exit_price =
+    trigger_fill_price ~on_close ~side:pos.Position.side ~bar ()
+  in
+  let exit_reason =
+    Position.StrategySignal
+      {
+        label = catastrophic_exit_label;
+        detail = Some (_catastrophic_detail ~trigger_level ~trailing_high ~pct);
+      }
+  in
+  {
+    Position.position_id = pos.id;
+    date = current_date;
+    kind = Position.TriggerExit { exit_reason; exit_price };
+  }

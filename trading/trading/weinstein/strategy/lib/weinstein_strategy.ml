@@ -98,10 +98,19 @@ let _symbol_of_position_id ~(positions : Position.t Map.M(String).t) id =
   |> List.find ~f:(fun (p : Position.t) -> String.equal p.id id)
   |> Option.map ~f:(fun (p : Position.t) -> p.symbol)
 
+(* A stops-pass exit that stamps the post-stop cooldown: the structural
+   [StopLoss], and the fast-crash catastrophic stop, which carries its own
+   [StrategySignal] label since #3101 but stamped the cooldown before it. *)
+let _is_stop_out : Position.exit_reason -> bool = function
+  | Position.StopLoss _ -> true
+  | Position.StrategySignal { label; _ } ->
+      String.equal label Stop_transitions.catastrophic_exit_label
+  | _ -> false
+
 let _handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date
     (t : Position.transition) =
   match t.kind with
-  | Position.TriggerExit { exit_reason = Position.StopLoss _; _ } -> (
+  | Position.TriggerExit { exit_reason; _ } when _is_stop_out exit_reason -> (
       match _symbol_of_position_id ~positions t.position_id with
       | Some symbol ->
           Hashtbl.set last_stop_out_dates ~key:symbol ~data:current_date

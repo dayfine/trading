@@ -668,6 +668,18 @@ let test_catastrophic_hit_short_noop_when_not_armed _ =
        ~bar ~side:Short)
     (equal_to false)
 
+(* Catastrophic_stop.trigger_level: the price check_hit compares against, and the
+   level the stops runner records on the exit (#3101). *)
+let test_catastrophic_trigger_level_long _ =
+  assert_that
+    (Catastrophic_stop.trigger_level ~pct:0.10 ~trailing_high:100.0 ~side:Long)
+    (float_equal 90.0)
+
+let test_catastrophic_trigger_level_short _ =
+  assert_that
+    (Catastrophic_stop.trigger_level ~pct:0.10 ~trailing_high:100.0 ~side:Short)
+    (float_equal 110.0)
+
 let test_trailing_high_of_state _ =
   (* Only Trailing carries last_trend_extreme; Initial / Tightened return None. *)
   let trailing =
@@ -717,6 +729,10 @@ let suite =
          "catastrophic_hit_short_noop_when_not_armed"
          >:: test_catastrophic_hit_short_noop_when_not_armed;
          "trailing_high_of_state" >:: test_trailing_high_of_state;
+         "catastrophic trigger_level long"
+         >:: test_catastrophic_trigger_level_long;
+         "catastrophic trigger_level short"
+         >:: test_catastrophic_trigger_level_short;
          "initial_stop_long" >:: test_compute_initial_stop_long;
          "initial_stop_nudge_whole"
          >:: test_compute_initial_stop_nudge_at_whole_number;

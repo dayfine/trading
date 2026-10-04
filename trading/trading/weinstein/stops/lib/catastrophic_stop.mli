@@ -22,6 +22,13 @@ val trailing_high_of_state : Stop_types.stop_state -> float option
     This is the [trailing_high] input to {!check_hit}: when it is [None] the
     fast-crash absolute stop is dormant for that position. *)
 
+val trigger_level :
+  pct:float -> trailing_high:float -> side:position_side -> float
+(** The fast-crash stop's trigger price: [trailing_high *. (1. -. pct)] for a
+    long, [trailing_high *. (1. +. pct)] for a short. {!check_hit} fires when
+    the bar's against-position extreme reaches this level; the stops runner
+    records it as the exit's stop level (issue #3101). *)
+
 val check_hit :
   armed:bool ->
   pct:float ->

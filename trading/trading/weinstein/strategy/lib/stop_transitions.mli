@@ -61,3 +61,32 @@ val of_stop_event :
 (** Translate a {!Weinstein_stops.stop_event} into the (exit, adjust) transition
     pair for one position: [Stop_hit] → exit at the pre-advance [state]'s level,
     [Stop_raised] → adjust to the new level, anything else → neither. *)
+
+val catastrophic_exit_label : string
+(** ["catastrophic_stop"] — the [StrategySignal] label every fast-crash
+    absolute-stop exit carries (issue #3101), and the [exit_trigger] token
+    trades.csv shows for it. *)
+
+val make_catastrophic_exit_transition :
+  ?on_close:bool ->
+  pos:Position.t ->
+  current_date:Core.Date.t ->
+  trigger_level:float ->
+  trailing_high:float ->
+  pct:float ->
+  bar:Types.Daily_price.t ->
+  unit ->
+  Position.transition
+(** [TriggerExit] for the fast-crash absolute stop
+    ({!Weinstein_stops.Catastrophic_stop}), at the same {!trigger_fill_price}
+    the structural exit uses.
+
+    The reason is [StrategySignal { label = catastrophic_exit_label; detail }],
+    where [detail] is ["stop_price=<trigger_level>,trailing_high=<h>,pct=<p>"].
+    It is never a [StopLoss]: until #3101 this exit reused
+    {!make_exit_transition}, so it was recorded as a structural stop-loss at the
+    structural level, which its bar never reached. Downstream tools then read
+    such exits as stops that filled above their stop. Because it is not a
+    [StopLoss], the simulator's trigger-bar stop fill does not re-type its
+    order. It never did before either, since the bar never reached the
+    structural level, so fills are unchanged. *)
