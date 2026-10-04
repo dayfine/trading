@@ -11,7 +11,10 @@
     - the cancel retires the resting buy-stop in the simulator's order manager,
       so the stale trigger cannot fill;
     - partially filled entries and held positions are never cancelled;
-    - the cancelled symbol's frozen [E] is released, so it re-pins fresh.
+    - the cancelled symbol's frozen [E] is released, so it re-pins fresh;
+    - end to end through [on_market_close]: the config flag arms the cancel (one
+      split cancel, no second clock-TTL cancel for the same ticket), and flag
+      off emits no split cancel.
 
     The specimen shape is AAON-wein-951 on the 26y investor run: a buy-stop
     resting across a split and filling on post-split prices. *)
@@ -291,6 +294,116 @@ let test_cancel_releases_frozen_entry _ =
          c.suggested_entry))
     (elements_are [ float_equal 41.7 ])
 
+(* ------------------------------------------------------------------ *)
+(* End-to-end: the CONFIG flag arms the cancel through the real        *)
+(* [on_market_close], not just the direct [Split_ticket_cancel.run].   *)
+(* ------------------------------------------------------------------ *)
+
+module FL = Portfolio_risk.Force_liquidation
+
+let _index_symbol = "GSPCX"
+
+(* A Friday, 16 weeks after the ticket was placed on [_placed]. *)
+let _e2e_day = _date "2024-04-26"
+let _e2e_bar_count = 260
+
+(* Long in-memory series ending on [_e2e_day]: the index rises (so the tick
+   runs its screening path), and [_split_symbol]'s adjusted close is continuous
+   while its raw close halves on the last bar, a 2:1 split on the as-of day. *)
+let _e2e_reader =
+  let start_date = Date.add_days _e2e_day (-(_e2e_bar_count - 1)) in
+  let series ~split =
+    List.init _e2e_bar_count ~f:(fun i ->
+        let date = Date.add_days start_date i in
+        let adjusted_close = 50.0 +. (Float.of_int i *. 0.1) in
+        let raw_factor =
+          if split && Date.( < ) date _e2e_day then 2.0 else 1.0
+        in
+        _bar ~date ~close:(adjusted_close *. raw_factor) ~adjusted_close)
+  in
+  Bar_reader.of_in_memory_bars
+    [
+      (_index_symbol, series ~split:false); (_split_symbol, series ~split:true);
+    ]
+
+let _e2e_get_price symbol =
+  List.last (Bar_reader.daily_bars_for _e2e_reader ~symbol ~as_of:_e2e_day)
+
+(* The clock backstop is armed at 8 weeks, so the 16-week-old ticket would be
+   retired by [Entry_ticket_ttl] if it were still in the view that pass sees. *)
+let _e2e_config ~cancel_on_split =
+  {
+    (Weinstein_strategy.default_config ~universe:[ _split_symbol ]
+       ~index_symbol:_index_symbol)
+    with
+    cancel_resting_entry_on_split = cancel_on_split;
+    entry_order_max_rest_weeks = 8;
+  }
+
+(* Each [CancelEntry] the tick emits, tagged by whether it is the split cancel. *)
+let _cancel_tags transitions =
+  List.filter_map transitions ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.CancelEntry { reason } ->
+          let tag =
+            if String.equal reason Split_ticket_cancel.cancel_reason then
+              "split"
+            else "other"
+          in
+          Some (t.position_id, tag)
+      | _ -> None)
+
+(** Drive one real tick through [Internal_for_test.on_market_close] (the path
+    [make] wires) with one resting ticket on the splitting symbol, and return
+    the tagged cancels it emitted. *)
+let _drive ~cancel_on_split =
+  Weinstein_strategy.Internal_for_test.on_market_close ~fold_start_date:None
+    ~config:(_e2e_config ~cancel_on_split)
+    ~ad_bars:[] ~stop_states:(ref String.Map.empty)
+    ~last_stop_out_dates:(Hashtbl.create (module String))
+    ~prior_macro:(ref Weinstein_types.Neutral)
+    ~prior_macro_result:(ref None)
+    ~prior_decline_character:(ref Decline_character.Not_declining)
+    ~peak_tracker:(FL.Peak_tracker.create ())
+    ~bar_reader:_e2e_reader
+    ~prior_stages:(Hashtbl.create (module String))
+    ~prior_stage_ma_values:(Hashtbl.create (module String))
+    ~sector_prior_stages:(Hashtbl.create (module String))
+    ~ticker_sectors:(Hashtbl.create (module String))
+    ~stage3_streaks:(Hashtbl.create (module String))
+    ~laggard_streaks:(Hashtbl.create (module String))
+    ~audit_recorder:Weinstein_strategy.Audit_recorder.noop
+    ~get_price:_e2e_get_price
+    ~get_indicator:(fun _ _ _ _ -> None)
+    ~portfolio:
+      {
+        cash = 1_000_000.0;
+        positions =
+          String.Map.singleton _split_id
+            (_position ~id:_split_id ~symbol:_split_symbol ~state:(_entering ()));
+      }
+  |> Result.map ~f:(fun (out : Trading_strategy.Strategy_interface.output) ->
+      _cancel_tags out.transitions)
+
+(** {b End to end.} The config flag, not just the module's [~enabled] argument,
+    arms the cancel in [on_market_close]:
+    - flag on: exactly one cancel for the ticket, the split one. The clock
+      backstop would also retire this ticket, so the single cancel also pins
+      that the cancelled ticket is gone from the view [Entry_ticket_ttl] sees
+      (no second [CancelEntry] for the same id);
+    - flag off (R1): no split cancel; the clock backstop retires the ticket as
+      it did before #3075. *)
+let test_config_arms_split_cancel_end_to_end _ =
+  assert_that
+    (_drive ~cancel_on_split:true, _drive ~cancel_on_split:false)
+    (all_of
+       [
+         field fst
+           (is_ok_and_holds (elements_are [ equal_to (_split_id, "split") ]));
+         field snd
+           (is_ok_and_holds (elements_are [ equal_to (_split_id, "other") ]));
+       ])
+
 let suite =
   "split_ticket_cancel"
   >::: [
@@ -301,6 +414,8 @@ let suite =
          "cancel retires resting order" >:: test_cancel_retires_resting_order;
          "partial and held are skipped" >:: test_partial_and_held_are_skipped;
          "cancel releases frozen entry" >:: test_cancel_releases_frozen_entry;
+         "config arms split cancel end to end"
+         >:: test_config_arms_split_cancel_end_to_end;
        ]
 
 let () = run_test_tt_main suite
