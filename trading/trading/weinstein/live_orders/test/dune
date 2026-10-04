@@ -1,0 +1,13 @@
+(tests
+ (names test_weinstein_live_orders)
+ (libraries
+  weinstein_trading.live_orders
+  weinstein_trading.order_gen
+  weinstein_trading.stops
+  weinstein.types
+  trading.base
+  trading.strategy
+  types
+  core
+  ounit2
+  matchers))
