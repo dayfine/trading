@@ -1,6 +1,7 @@
 (tests
  (names
   test_stop_log
+  test_stop_log_machine_sync
   test_runner_filter
   test_window_filter
   test_runner_empty_window

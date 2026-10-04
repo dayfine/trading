@@ -117,10 +117,21 @@ type stop_info = {
           [stop_loss_price] when that carries one; whichever arrives last wins.
           The simulator's [EntryComplete] carries no stop, so for the Weinstein
           strategy the first source is the one that fills it (issue #2974).
-          [None] when neither source ever reported a level. *)
+
+          When the stop machine's decisions are recorded
+          ({!record_stop_decision}), the first decision's [stop_before] — the
+          level the machine actually held at the fill — replaces the
+          decision-time install. The two differ when a ticket rested across a
+          split: the machine's state was rescaled while the ticket waited, but
+          no transition reported it (issue #3075, AAON-wein-951: installed 83.21
+          at the 2023 decision, held 55.475 at the 2024 fill).
+
+          [None] when no source ever reported a level. *)
   exit_stop : float option;
-      (** Stop-loss price at the time of exit (may have been updated via
-          trailing) *)
+      (** Stop-loss price at the time of exit: the last level installed, or the
+          last level a {!record_stop_decision} showed the machine holding,
+          whichever came later. The second source catches a split rescale while
+          the position is held, which no transition reports. *)
   exit_trigger : exit_trigger option;
       (** What caused the exit. [None] if position is still open. *)
   max_stop : float option;
@@ -144,11 +155,15 @@ type stop_info = {
           but leaves [max_stop] at the high-water mark, so the two together show
           whether the ratchet ever moved and whether it later gave ground.
 
-          {b Caveat}: it is a high-water mark over raw installed levels, so on a
-          position that went through a split it stays on the pre-split price
-          scale while [exit_stop] is post-split. Compare the two only within one
-          price scale; for a split-crossing position their ratio is not
-          meaningful. *)
+          {b Split rescales}: when a {!record_stop_decision} shows the machine
+          holding a {e less} protective level than the log's current one, that
+          gap is a split rescale (the machine never gives ground otherwise), and
+          [max_stop] is rescaled by the same factor so it stays on the current
+          price basis as [exit_stop] and the two compare directly. Without stop
+          decisions (a stream of transitions only) it remains a high-water mark
+          over raw installed levels: on a position that went through a split it
+          stays on the pre-split price scale while [exit_stop] is post-split, so
+          compare the two only within one price scale. *)
   n_stop_raises : int;
       (** How many stop moves installed a level {b strictly more protective}
           than the level installed immediately before it (strictly higher for a
@@ -234,6 +249,32 @@ val record_stop_move : t -> position_id:string -> level:float -> unit
     [UpdateRiskParams] to [level]: it becomes the current level, advances
     {!stop_info.max_stop} when more protective, and increments
     {!stop_info.n_stop_raises} when strictly so. *)
+
+val record_stop_decision :
+  t -> position_id:string -> stop_before:float -> stop_after:float -> unit
+(** Observe one advance of the position's stop state machine: the level it held
+    going into the step ([stop_before]) and the level it left ([stop_after]).
+    The backtest wires this to [Audit_recorder.t.record_stop_decision] (issue
+    #2977), so the log follows the level the machine actually enforces rather
+    than only what transitions report (issue #3075). Reporting only: nothing
+    here feeds the strategy.
+
+    - The position's {b first} decision is its fill: [stop_before] becomes
+      {!stop_info.entry_stop}, the current level and the {!stop_info.max_stop}
+      seed, replacing a decision-time install the machine no longer holds.
+    - A later decision whose [stop_before] differs from the current level is a
+      level change no transition carried. More protective: installed as a move
+      (a raise when strictly so); its transition, when it arrives, is then an
+      unchanged re-install. Less protective: a split rescale; the current level
+      takes it and {!stop_info.max_stop} is rescaled by the same factor.
+    - [stop_after] is then installed like an [UpdateRiskParams]: it becomes the
+      current level, advances {!stop_info.max_stop}, and counts as a raise when
+      strictly more protective. A move also reported by a transition counts
+      once, whichever arrives first.
+
+    A reverse split for a long (stop moved {e up} by a rescale), or a forward
+    split for a short (stop moved {e down}), reads as a raise: this function
+    sees levels, not the split factor, so it cannot tell the two apart. *)
 
 val get_stop_infos : t -> stop_info list
 (** Return stop info for all positions that have been observed, sorted by

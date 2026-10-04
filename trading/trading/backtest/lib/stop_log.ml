@@ -35,6 +35,9 @@ type _pos_record = {
   mutable pos_exit_trigger : exit_trigger option;
   mutable pos_max_stop : float option;
   mutable pos_n_stop_raises : int;
+  mutable pos_seen_decision : bool;
+      (* Whether {!record_stop_decision} has fired for this position yet: the
+         first one is the fill-time seed of the stop machine. *)
 }
 
 type t = {
@@ -96,6 +99,7 @@ let _fresh_record ~symbol =
     pos_exit_trigger = None;
     pos_max_stop = None;
     pos_n_stop_raises = 0;
+    pos_seen_decision = false;
   }
 
 let _ensure_record t ~position_id ~symbol =
@@ -191,6 +195,44 @@ let record_installed_stop t ~position_id ~symbol ~level =
 let record_stop_move t ~position_id ~level =
   let record = _ensure_record t ~position_id ~symbol:"" in
   _install_stop record ~level ~is_raise_candidate:true
+
+(* Issue #3075. The machine's level at the fill replaces the decision-time
+   install: a ticket that rested across a split was rescaled in the machine but
+   never reported here. Nothing before the fill can be a raise, so the seed,
+   the current level and the high-water mark all restart from it. *)
+let _reseed_at_fill record ~level =
+  record.pos_entry_stop <- Some level;
+  record.pos_current_stop <- Some level;
+  record.pos_max_stop <- Some level
+
+(* Bring the log back in line with a machine level no transition reported.
+   Less protective can only be a split rescale (the machine never gives ground
+   otherwise), so the high-water mark is rescaled by the same factor to stay on
+   the current price basis. More protective is a move whose transition has not
+   arrived yet: install it, so the later transition is a no-op re-install. *)
+let _rescale_to record ~current ~level =
+  let factor = level /. current in
+  record.pos_max_stop <-
+    Option.map record.pos_max_stop ~f:(fun m -> m *. factor);
+  record.pos_current_stop <- Some level
+
+let _resync_to_machine record ~level =
+  match record.pos_current_stop with
+  | Some current when Float.( = ) current level -> ()
+  | Some current
+    when _is_more_protective ~side:record.pos_side ~previous:current ~next:level
+    ->
+      _install_stop record ~level ~is_raise_candidate:true
+  | Some current when Float.( > ) current 0.0 ->
+      _rescale_to record ~current ~level
+  | Some _ | None -> ()
+
+let record_stop_decision t ~position_id ~stop_before ~stop_after =
+  let record = _ensure_record t ~position_id ~symbol:"" in
+  if record.pos_seen_decision then _resync_to_machine record ~level:stop_before
+  else _reseed_at_fill record ~level:stop_before;
+  record.pos_seen_decision <- true;
+  _install_stop record ~level:stop_after ~is_raise_candidate:true
 
 let _record_to_info ~position_id record : stop_info =
   {

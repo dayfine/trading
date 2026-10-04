@@ -240,6 +240,16 @@ let _record_stop_move ~stop_log (e : AR.stop_move_event) =
       Stop_log.record_stop_move log ~position_id:e.position_id
         ~level:e.stop_level)
 
+(* Issue #3075: the stop machine's own level, so the stop log follows what the
+   machine enforces (a split rescale of a resting ticket or a held position
+   reaches no transition). [trade_audit] records the decision as before. *)
+let _record_stop_decision ~trade_audit ~stop_log
+    (d : Weinstein_stops.Stop_decision.t) =
+  Trade_audit.record_stop_decision trade_audit d;
+  Option.iter stop_log ~f:(fun log ->
+      Stop_log.record_stop_decision log ~position_id:d.position_id
+        ~stop_before:d.stop_before ~stop_after:d.stop_after)
+
 (* #2989: copy the original placement row forward under the re-issued id, and
    book its installed stop there too (the re-issue re-installs the same plan). *)
 let _record_reissue ~trade_audit ~stop_log (e : AR.reissue_event) =
@@ -276,5 +286,5 @@ let of_collector ?candidate_log ?stop_log ~(trade_audit : Trade_audit.t)
           (_fill_volume_check_of_event event));
     record_stop_move = _record_stop_move ~stop_log;
     record_reissue = _record_reissue ~trade_audit ~stop_log;
-    record_stop_decision = Trade_audit.record_stop_decision trade_audit;
+    record_stop_decision = _record_stop_decision ~trade_audit ~stop_log;
   }

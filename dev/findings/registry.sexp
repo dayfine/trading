@@ -217,3 +217,9 @@
          (unit ("trading/analysis/data/types/test/test_split_detector.ml"
                 "real 3:2, 2:1, 1:10 detected rule on and off"))))
  (status fixed-behind-flag))
+
+((issue 3075) (ref "26y investor review pack AAON-wein-951")
+ (finding "a ticket resting across a split fills with the trigger unscaled and the stop rescaled; trades.csv stop columns showed the pre-split install")
+ (guard ((unit ("trading/trading/backtest/test/test_stop_log_machine_sync.ml"
+                "rested ticket across a split reseeds entry_stop at the fill"))))
+ (status open))
