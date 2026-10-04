@@ -103,22 +103,22 @@
 #         totals-by-model section lists every model.
 #   62-64 `totals.by_model` SUMS ACROSS ROWS of the SAME model, not just the
 #         first row's figures. The model-mix fixture never repeats a model
-#         across rows, so 51-57's single-row pins would still pass a
+#         across rows, so 51-58's single-row pins would still pass a
 #         `merge_models` that took the first row per model instead of
 #         summing (confirmed: this mutant passed 73/73 before this fix). The
 #         main `projects` fixture is entirely claude-opus-5 across its
 #         session AND all three dispatches, so its `totals.by_model` entry
 #         must equal the whole-report totals for api_calls / output_tokens /
-#         input_tokens -- a value only a real cross-row sum produces.
+#         input_tokens / cache_read_input_tokens / cache_creation_input_tokens -- a value only a real cross-row sum produces.
 #   65    `model` TIE-BREAK is alphabetical, not "last/first model wins" or
 #         reverse-alphabetical. `model-mix`'s agent-m2 dispatch uses two
 #         models (claude-haiku-5, claude-opus-5) with EQUAL output tokens
 #         (3 each); claude-haiku-5 must win because it sorts first.
-#   68-71 EMPTY-BREAKDOWN "unknown": see the no-usage fixture block below.
 #   66-67 `model` "unknown" FALLBACK, exercised (not just documented): the
 #         `partial-tail` fixture's two valid records carry no `message.model`
 #         at all, so its session's `model` and its `models` breakdown's one
 #         key must both read "unknown" -- never blank or invented.
+#   68-71 EMPTY-BREAKDOWN "unknown": see the no-usage fixture block below.
 #
 # Run:
 #   sh trading/devtools/checks/token_usage_report_test.sh
@@ -406,6 +406,10 @@ expect_eq "totals.by_model: output_tokens for the one model equals the report-wi
   "$(q '.totals.output_tokens')" "$(q '.totals.by_model["claude-opus-5"].output_tokens')"
 expect_eq "totals.by_model: input_tokens for the one model equals the report-wide total" \
   "$(q '.totals.input_tokens')" "$(q '.totals.by_model["claude-opus-5"].input_tokens')"
+expect_eq "totals.by_model: cache_read_input_tokens for the one model equals the report-wide total" \
+  "$(q '.totals.cache_read_input_tokens')" "$(q '.totals.by_model["claude-opus-5"].cache_read_input_tokens')"
+expect_eq "totals.by_model: cache_creation_input_tokens for the one model equals the report-wide total" \
+  "$(q '.totals.cache_creation_input_tokens')" "$(q '.totals.by_model["claude-opus-5"].cache_creation_input_tokens')"
 
 # --- 65: model tie-break is alphabetical, not first/last/reverse -----------
 # agent-m2 (model-mix fixture) uses claude-haiku-5 and claude-opus-5 with
