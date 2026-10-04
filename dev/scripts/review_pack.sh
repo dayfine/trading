@@ -138,10 +138,12 @@ site_common() {
   rm -rf "$s/charts"; mkdir -p "$s/charts"
   awk -v STAGE_DIR="$d/stage" -v OUT="$s/charts" -f "$LIB/chart_shards.awk" "$d/x_daily.tsv" "$d/trades.csv"
   [ -n "$SUBTITLE" ] || SUBTITLE="$first → $last, $(grep -oE 'universe_size [0-9]+' "$d/params.sexp" | cut -d' ' -f2) symbols, \$$(grep -oE 'initial_cash [0-9]+' "$d/params.sexp" | cut -d' ' -f2) start"
-  runs_json=$(labels | awk '{printf "%s{\"id\":\"%s\",\"label\":\"%s\"}", (n++?",":""), $1, $1}')
-  printf '{"title":"%s","subtitle":"%s","charts_run":%s,"runs":[%s]}\n' "$TITLE" "$SUBTITLE" "$CHARTS" "$runs_json" > "$s/manifest.json"
+  # jq --arg does the JSON escaping: a title/subtitle/label with " or \ must not break the manifest
+  runs_json=$(labels | jq -R -s -c 'split("\n") | map(select(length > 0) | {id: ., label: .})')
+  jq -n --arg title "$TITLE" --arg subtitle "$SUBTITLE" --argjson charts "$CHARTS" --argjson runs "$runs_json" \
+    '{title: $title, subtitle: $subtitle, charts_run: $charts, runs: $runs}' > "$s/manifest.json"
   # the page <title> carries --title (HTML-escaped); the template default is a placeholder
-  awk -v t="$TITLE" 'BEGIN { gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t) }
+  TITLE="$TITLE" awk 'BEGIN { t = ENVIRON["TITLE"]; gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t) }
     /^<title>.*<\/title>$/ { print "<title>" t "</title>"; next } { print }' "$LIB/index.html" > "$OUT/site/index.html"
 }
 check_json() {
