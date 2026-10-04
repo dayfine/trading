@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 13438ee6-bde6-4f74-839d-eef43a46dd35
-  modified: 2026-10-03T09:33:03.665Z
+  modified: 2026-10-04T02:28:06.190Z
 ---
 
 **Problem (user 10-02, T1 5d pack "amazingly flat"):** 2008–09 equity flat; gate reopened 2009-05-08; T1 placed 116 tickets May–Aug 2009, none filled (median 60 % above close, anchor = 8–60-week max high = pre-crash peak). Investor preset (`tp-i-5d`) 0 entries May–Aug 2009 at every salt.
@@ -18,10 +18,10 @@ metadata:
 3. **Filled recovery entries whipsaw:** ia4 s0 25 entries May–Sep 2009, 11 stop exits, 10 losers at −13.8…−16.4 % (6 in the Jun–Jul 2009 pullback, 2 in mid-May, 2 in October; 13–15 % structural stops); winners (EBAY +32, AWI +31) left by laggard rotation; net ≈ 0. Caps any anchor fix.
 4. **Per-episode (26y investor s0, 19 reopens after ≥ 8 closed weeks):** caught 2003 (+21.6 vs SPY +13.8, 15 entries/26w), 2012-08, 2020 (+25.2 vs +16.8); missed 2009 (0 entries/13w, −1.5 vs +16.4), 2019 (2, −0.5 vs +5.1), 2022-11 (0, −1.3 vs +5.3); 2010-10 lagged; **2025-05 invested and lagged** (12 entries/13w, −8.0 vs +14.5, −$379k). Now a pack signal (PR #3086 "Gate reopen episodes").
 5. **Base-bounded anchor screen (`anchor-position-screen.md`): do not build.** Skipped candidates' graded top / close ≥ 1.20 in 9–47 % of cases in EVERY year (2017 9 %, 2009 44 %, 2000 47 %); ~half of structural-stop skips are within 10 % of the top. Far anchors are not post-crash-specific → any anchor move is global.
-6. **2025 = picks, not cash, not path:** 21 of 22 entries identical in s1/s2; picks' 26-wk forward return median +4.7 % (10/22 negative) vs SPY +14.5 %; stops mostly right (TNXP/APPF/WBTN/UPWK/BALY kept falling), two cut names rallied (AIP +122 %, AD +15 %). Same shape as 2018–23 melt-up lag.
+6. **2025 = picks, not cash, not path:** 21 of 22 entries identical in s1/s2; picks' 26-wk forward return median +4.7 % (10/22 negative) vs SPY +14.5 %; stops mostly right (TNXP/APPF/WBTN/UPWK/BALY kept falling), two cut names rallied (AIP +122 %, AD +15 %). Same shape as 2018–23 melt-up lag. **Refined 10-03 (PR #3107, `dev/experiments/selection-2025-screen-2026-10-03/`, 26-wk fwd from each decision date):** SPY +9.4 % vs equal-weight PIT top-3000 +6.4 % (narrow tape, ~¼ of the 11.9 pp pick gap) vs skipped alternatives +6.1 % (ranker pool = universe, no edge either way) vs picks −2.5 % (bootstrap P≈0.07–0.08, chance at n=24). → no-build for selection-side levers on the 2025 shape; only the tape part is attributable, and its levers are benchmark/construction (equal-weight benchmark, size tilt), not ranking.
 7. Narrow structural stops (< 6 %) net +$598k/+$562k (s0/s1, 67–69 trades): NOT a lever.
 
-**Forward:** entry-timing levers for the recovery are exhausted at the ticket level (N-week high dilutes; base-bounded is global; the faithful rule "prefer other candidates" is what sits out). Remaining directions need a user decision: `entry_ticket_macro_suspend` arm (free, small expected effect), shorts liveness pair (prior record negative), selection in narrow rallies (2025 shape). SPY sleeve stays user-declined.
+**Forward:** entry-timing levers for the recovery are exhausted at the ticket level (N-week high dilutes; base-bounded is global; the faithful rule "prefer other candidates" is what sits out). Remaining directions need a user decision: `entry_ticket_macro_suspend` arm (free, small expected effect), shorts liveness pair (RAN 10-03: dead, 0 fills, [[project_shorts_liveness_dead]]), selection in narrow rallies (2025 shape). SPY sleeve stays user-declined.
 
 Links: [[project_investor_preset_broad]], [[project_trader_preset_matrix]], [[feedback_exposure_vs_market_condition]], [[feedback_render_and_look_at_review_pack]], [[project_melt_up_lag_anatomy]], [[project_barbell_on_stocks]].
 
