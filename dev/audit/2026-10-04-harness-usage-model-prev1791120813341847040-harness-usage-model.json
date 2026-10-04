@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-04",
+  "feature": "harness-usage-model",
+  "branch": "harness/usage-model",
+  "sha": "12df1fefcfe16212ad661d532d7a78f959988528",
+  "recorded_at_ns": 1791120813341847040,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
