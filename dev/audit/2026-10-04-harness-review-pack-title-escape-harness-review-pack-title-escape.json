@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-04",
+  "feature": "harness-review-pack-title-escape",
+  "branch": "harness/review-pack-title-escape",
+  "sha": "9136d103485d3291a3fcbcd3b7bd5eccdaa8b9d7",
+  "recorded_at_ns": 1791125384179574159,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

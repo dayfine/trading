@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-04",
+  "feature": "harness-usage-cache-pins",
+  "branch": "harness/usage-cache-pins",
+  "sha": "612d90f059c4eb6ec5852f08689ff2e15dea4ea1",
+  "recorded_at_ns": 1791127209632667149,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

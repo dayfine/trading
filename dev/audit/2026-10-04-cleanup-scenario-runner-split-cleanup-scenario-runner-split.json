@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-04",
+  "feature": "cleanup-scenario-runner-split",
+  "branch": "cleanup/scenario-runner-split",
+  "sha": "5bc96425c28933027474f3c5da6050ce466e60ee",
+  "recorded_at_ns": 1791125384155910591,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
