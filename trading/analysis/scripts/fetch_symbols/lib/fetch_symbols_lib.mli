@@ -10,6 +10,7 @@ module Wick_check = Wick_check
 
 val fetch_one :
   ?fetch:Eodhd.Http_client.fetch_fn ->
+  ?warn:(string -> unit) ->
   token:string ->
   data_dir:Fpath.t ->
   string ->
@@ -20,10 +21,11 @@ val fetch_one :
     metadata/CSV write failure) returns [Error symbol] without raising. An empty
     bar list is treated as a soft failure: a warning is printed and the symbol
     is skipped. Before the bars overwrite the stored copy, {!Wick_check}
-    compares them against it and prints a [WARN: WICK ...] / [WARN: BASIS ...]
-    line per suspicious high, low or re-based close (#3028); the bars are saved
-    unchanged. The optional [?fetch] hook allows tests to inject a mock HTTP
-    client. *)
+    compares them against it and passes one [WICK ...] / [BASIS ...] line per
+    suspicious high, low or re-based close to [?warn] (#3028); by default each
+    is printed as [  WARN: <line>]. The bars are saved unchanged. The optional
+    [?fetch] hook lets tests inject a mock HTTP client, and [?warn] lets them
+    collect the diagnostic lines. *)
 
 val run :
   symbols_flag:string option ->

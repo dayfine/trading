@@ -10,6 +10,7 @@
   matchers
   eodhd
   types
+  csv
   status)
  (preprocess
   (pps ppx_jane)))

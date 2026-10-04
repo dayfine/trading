@@ -29,14 +29,15 @@ let _stored_bars ~data_dir symbol =
 
 (** #3028: print any suspicious vendor high/low in [bars] against the stored
     copy. Warn-only — the bars are saved unchanged either way. *)
-let _report_wicks ~data_dir ~bars symbol =
+let _print_warning line = printf "  WARN: %s\n%!" line
+
+let _report_wicks ~warn ~data_dir ~bars symbol =
   Wick_check.check ~stored:(_stored_bars ~data_dir symbol) bars
-  |> Wick_check.render ~symbol
-  |> List.iter ~f:(printf "  WARN: %s\n%!")
+  |> Wick_check.render ~symbol |> List.iter ~f:warn
 
 (** Log the result of caching [bars] and return [Ok symbol]. *)
-let _cache_bars ~data_dir ~bars symbol =
-  _report_wicks ~data_dir ~bars symbol;
+let _cache_bars ~warn ~data_dir ~bars symbol =
+  _report_wicks ~warn ~data_dir ~bars symbol;
   (match _save_bars_and_meta ~data_dir ~bars symbol with
   | Ok () -> printf "  OK: %d bars cached\n%!" (List.length bars)
   | Error e ->
@@ -47,7 +48,7 @@ let _cache_bars ~data_dir ~bars symbol =
 (** Fetch and cache a single symbol, writing CSV + metadata. Empty bar lists are
     treated as a soft error — we warn and skip so the whole run keeps going and
     [Metadata.generate_metadata] is never called with [[]]. *)
-let fetch_one ?fetch ~token ~data_dir symbol =
+let fetch_one ?fetch ?(warn = _print_warning) ~token ~data_dir symbol =
   printf "Fetching %s ...\n%!" symbol;
   let params : Eodhd.Http_client.historical_price_params =
     { symbol; start_date = None; end_date = None; period = Types.Cadence.Daily }
@@ -59,7 +60,7 @@ let fetch_one ?fetch ~token ~data_dir symbol =
   | Ok [] ->
       printf "  WARN: no bars returned for %s, skipping\n%!" symbol;
       return (Error symbol)
-  | Ok bars -> _cache_bars ~data_dir ~bars symbol
+  | Ok bars -> _cache_bars ~warn ~data_dir ~bars symbol
 
 let _main ~symbols ~data_dir_str ~api_key_flag () =
   match _resolve_token api_key_flag with
