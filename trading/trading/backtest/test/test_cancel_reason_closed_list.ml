@@ -25,6 +25,12 @@
     five tokens in four categories. This is the blind spot the next paragraph
     predicts, closed at the moment the producer landed.
 
+    {b A sixth token (#3075).} [Weinstein_strategy.Split_ticket_cancel]
+    (default-off [cancel_resting_entry_on_split]) emits
+    [entry_ticket_split_while_resting] — a strategy {e decision}, alongside the
+    two TTL tokens: the ticket was written on a chart the split replaced. It is
+    driven below as Producer 5, so the list is six tokens.
+
     {b Why a hand-written list of four literals would pin nothing.} Comparing
     four string constants against four string constants passes forever. So the
     {e reachable} side of the equality below is never written down — it is
@@ -60,6 +66,7 @@ module Delisted_ticket_cancel = Trading_simulation.Delisted_ticket_cancel
 module Entry_ticket_ttl = Weinstein_strategy.Entry_ticket_ttl
 module Entry_ticket_suspend = Weinstein_strategy.Entry_ticket_suspend
 module Suspend_mode = Weinstein_strategy.Entry_ticket_suspend_mode
+module Split_ticket_cancel = Weinstein_strategy.Split_ticket_cancel
 
 (* The documented side of the equality: the closed list exactly as the four
    docstrings name it. [Cancel_handler]'s and [Delisted_ticket_cancel]'s tokens
@@ -75,6 +82,7 @@ let _documented_cancel_reasons =
       Cancel_handler.portfolio_rejection_reason;
       Delisted_ticket_cancel.cancel_reason;
       Entry_ticket_suspend.cancel_reason;
+      Split_ticket_cancel.cancel_reason;
     ]
 
 (* Fixtures ---------------------------------------------------------------- *)
@@ -413,6 +421,26 @@ let _suspend_transitions =
           List.concat_map _macro_grid ~f:(fun macro_result ->
               _suspend_run ~mode ~macro_result ~positions)))
 
+(* Producer 5 -- Weinstein_strategy.Split_ticket_cancel (#3075) ------------- *)
+
+(* Every position state against both a split and a no-split day, so the
+   producer's only arm (wholly unfilled [Entering] on a split day) is reached
+   and its skips are swept. *)
+let _split_transitions =
+  let position_grid =
+    [
+      _positions_of [ _entering ~id:"A-1" ~symbol:"AAPL" ~filled_quantity:0.0 ];
+      _positions_of [ _entering ~id:"A-1" ~symbol:"AAPL" ~filled_quantity:40.0 ];
+      _positions_of [ _holding ~id:"A-1" ~symbol:"AAPL" ];
+      String.Map.empty;
+    ]
+  in
+  let factor_grid = [ (fun ~symbol:_ -> Some 2.0); (fun ~symbol:_ -> None) ] in
+  List.concat_map position_grid ~f:(fun positions ->
+      List.concat_map factor_grid ~f:(fun split_factor ->
+          Split_ticket_cancel.cancellations ~positions ~split_factor
+            ~current_date:(_date "2024-03-05")))
+
 (* Tests ------------------------------------------------------------------- *)
 
 (** The pin. Every token any production producer can drive into
@@ -426,7 +454,7 @@ let test_reachable_reasons_equal_the_documented_closed_list _ =
     (Set.to_list
        (_reachable_from
           (_ttl_transitions @ _rejection_transitions @ _delisting_transitions
-         @ _suspend_transitions)))
+         @ _suspend_transitions @ _split_transitions)))
     (equal_to (Set.to_list _documented_cancel_reasons))
 
 (** The partition the docstrings assert, pinned separately: four tokens in three
@@ -439,12 +467,14 @@ let test_each_producer_contributes_its_documented_tokens _ =
     ( Set.to_list (_reachable_from _ttl_transitions),
       Set.to_list (_reachable_from _rejection_transitions),
       Set.to_list (_reachable_from _delisting_transitions),
-      Set.to_list (_reachable_from _suspend_transitions) )
+      Set.to_list (_reachable_from _suspend_transitions),
+      Set.to_list (_reachable_from _split_transitions) )
     (equal_to
        ( [ "entry_ticket_requalification_failed"; "entry_ticket_ttl_expired" ],
          [ Cancel_handler.portfolio_rejection_reason ],
          [ Delisted_ticket_cancel.cancel_reason ],
-         [ Entry_ticket_suspend.cancel_reason ] ))
+         [ Entry_ticket_suspend.cancel_reason ],
+         [ Split_ticket_cancel.cancel_reason ] ))
 
 let suite =
   "cancel reason closed list"

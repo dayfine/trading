@@ -291,6 +291,12 @@ module Entry_ticket_ttl = Entry_ticket_ttl
     pin the cancel decision independently of a full screening tick. See
     {!Entry_ticket_ttl}. *)
 
+module Split_ticket_cancel = Split_ticket_cancel
+(** #3075: cancel a resting entry ticket whose symbol splits while it rests,
+    armed by the default-off [config.cancel_resting_entry_on_split]. Re-exposed
+    so tests can pin the cancel decision directly. See {!Split_ticket_cancel}.
+*)
+
 module Entry_ticket_suspend_mode = Entry_ticket_suspend_mode
 (** The [config.entry_ticket_macro_suspend] variant (#2976). Re-exposed so
     specs, overlays and tests can name its constructors. *)
@@ -1069,6 +1075,12 @@ type config = {
           grants the authority and names no number. Split from the re-screen
           above on 2026-08-16 (defect C) — one knob used to arm both. See also
           {!Entry_ticket_ttl}. *)
+  cancel_resting_entry_on_split : bool; [@sexp.default false]
+      (** #3075: cancel a resting entry ticket on the day its symbol splits, so
+          a pre-split trigger never fills on post-split prices. [false]
+          (default) is off and bit-identical. See
+          [Weinstein_strategy_config.cancel_resting_entry_on_split] and
+          {!Split_ticket_cancel}. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3: hold back the unfilled cost of still-resting entry tickets from
           the cash the entry walk may commit this tick. [false] (default) leaves

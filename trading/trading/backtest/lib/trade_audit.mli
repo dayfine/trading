@@ -607,7 +607,11 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     default-off), is a {e withdrawal}, not a death: the setup is re-issued under
     a new position id once the macro gate admits, and that id's row
     ({!record_reissue}) links back to this one through
-    [ticket_lifecycle.reissued_from] (#2989).
+    [ticket_lifecycle.reissued_from] (#2989). The sixth,
+    [entry_ticket_split_while_resting]
+    ({!Weinstein_strategy.Split_ticket_cancel.cancel_reason}, #3075,
+    default-off), is a strategy {e decision}: the symbol split while the ticket
+    rested, so its trigger was written on a chart that no longer exists.
 
     Neither of the non-strategy populations is a corner case: the rejection
     token was ~26% of placements on the run that motivated recording the reason

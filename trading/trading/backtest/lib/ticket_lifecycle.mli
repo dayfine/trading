@@ -193,7 +193,11 @@ type t = {
           ([delisted], #2696), and — only when the default-off #2976 flag is
           armed — {!Weinstein_strategy.Entry_ticket_suspend.cancel_reason}
           ([entry_ticket_macro_suspended]), a {b withdrawal} rather than a death
-          (the setup is re-issued once the macro gate admits).
+          (the setup is re-issued once the macro gate admits). Only when the
+          default-off #3075 flag is armed,
+          {!Weinstein_strategy.Split_ticket_cancel.cancel_reason}
+          ([entry_ticket_split_while_resting]) is a strategy {b decision}: the
+          symbol split while the ticket rested.
 
           The distinction is load-bearing, not cosmetic, and the first four
           tokens fall in {b three} categories. The two TTL tokens are

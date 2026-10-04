@@ -52,6 +52,7 @@ module Entry_walk = Entry_walk
 module Entry_freeze = Entry_freeze
 module Entry_stop_width_order = Entry_stop_width_order
 module Entry_ticket_ttl = Entry_ticket_ttl
+module Split_ticket_cancel = Split_ticket_cancel
 module Entry_ticket_suspend_mode = Entry_ticket_suspend_mode
 module Entry_ticket_suspend = Entry_ticket_suspend
 module Screening_notional = Screening_notional
@@ -351,6 +352,12 @@ let _on_market_close ~pending_entry_e ~suspended_tickets ~fold_start_date
   | None -> Ok { Strategy_interface.transitions = [] }
   | Some primary_bar ->
       let current_date = primary_bar.Types.Daily_price.date in
+      (* #3075: retire resting tickets whose symbol split today, before any
+         other pass sees them (default-off => ([], portfolio) unchanged). *)
+      let split_cancels, portfolio =
+        Split_ticket_cancel.run ~enabled:config.cancel_resting_entry_on_split
+          ~pending_entry_e ~bar_reader ~portfolio ~current_date
+      in
       _process_market_day ~pending_entry_e ~suspended_tickets ~fold_start_date
         ~universe_membership_at ~config ~ad_series ~breadth_series ~stop_states
         ~last_stop_out_dates ~prior_macro ~prior_macro_result
@@ -358,6 +365,8 @@ let _on_market_close ~pending_entry_e ~suspended_tickets ~fold_start_date
         ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
         ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~portfolio
         ~current_date
+      |> Result.map ~f:(fun (out : Strategy_interface.output) ->
+          { Strategy_interface.transitions = split_cancels @ out.transitions })
 
 (** Per-run closure bookkeeping table threaded through [on_market_close]:
     [pending_entry_e] (the Fix #2 no-chase pin table, consulted only when
