@@ -65,6 +65,17 @@ q() { jq -r "$1" "$T"; }
 
 expect_eq "index.html copied" yes "$([ -s "$S/index.html" ] && echo yes || echo no)"
 expect_eq "manifest: two runs, charts run 0" "Fixture r0,r1 0" "$(jq -r '"\(.title) \(.runs|map(.id)|join(","))  \(.charts_run)"' "$S/data/manifest.json" | tr -s " ")"
+
+# --title / --subtitle with JSON- and HTML-special characters (#3076 follow-up): the manifest must stay valid
+# JSON with both round-tripping exactly, and the page <title> carries the HTML-escaped form.
+ODD_TITLE='A&B <x> "q" \d \t'
+ODD_SUB='sub "s" \n <y>'
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$TMP/odd" --title "$ODD_TITLE" --subtitle "$ODD_SUB" r0="$FIX/run/" >"$TMP/odd.log" 2>"$TMP/odd.err" || rc=$?
+expect_eq "odd title: builds, exit 0" 0 "$rc"
+expect_eq "odd title: manifest title round-trips" "$ODD_TITLE" "$(jq -r .title "$TMP/odd/site/data/manifest.json")"
+expect_eq "odd title: manifest subtitle round-trips" "$ODD_SUB" "$(jq -r .subtitle "$TMP/odd/site/data/manifest.json")"
+expect_eq "odd title: page <title> HTML-escaped" '<title>A&amp;B &lt;x&gt; "q" \d \t</title>' "$(grep '^<title>' "$TMP/odd/site/index.html")"
 bad=0; for f in "$S"/data/*.json "$S"/data/charts/*.json; do jq -e true "$f" >/dev/null 2>&1 || bad=$((bad + 1)); done
 expect_eq "every JSON file parses" 0 "$bad"
 expect_eq "spy.json clipped to the run window" 100 "$(jq length "$S/data/spy.json")"
