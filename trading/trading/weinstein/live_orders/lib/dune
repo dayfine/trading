@@ -1,0 +1,8 @@
+(library
+ (name weinstein_live_orders)
+ (public_name weinstein_trading.live_orders)
+ (libraries
+  core
+  trading.strategy
+  weinstein_trading.order_gen
+  weinstein_trading.stops))
