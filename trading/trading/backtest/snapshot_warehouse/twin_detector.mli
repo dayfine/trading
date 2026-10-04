@@ -91,6 +91,24 @@ module Config : sig
             class — they are chains through a shared near-constant series, not
             one company under many tickers. [None] (the default) leaves
             component size unlimited, which is the pre-#2823 behaviour. *)
+    min_matching_run : int option; [@sexp.option]
+        (** Run criterion (#3057). When [Some n], a pair with at least
+            [min_overlap_days] shared dates is {e also} a twin when its longest
+            run of {e consecutive} matching units (dates under [Levels], return
+            pairs under [Returns]) is at least [n], even if its whole-overlap
+            match fraction is at or below [match_fraction]. An incomparable unit
+            (a [Returns] pair with a non-positive prior close) breaks the run,
+            the same as a miss.
+
+            The whole-overlap fraction is fragile to one corrupt segment on
+            either leg: CMN/CMD (Cantel Medical before and after its 2016
+            rename) match on 3,092 of 3,099 return pairs over 2003–2015, but CMD
+            carries another instrument's quotes for most of 2016, which pulls
+            the overall fraction to 0.933 and hides the pair. A long run cannot
+            arise by coincidence between unrelated series, so [n] of about a
+            trading year is a safe bar. [None] (the default) leaves the
+            criterion off and every existing report and warehouse bit-identical.
+        *)
   }
   [@@deriving sexp, equal]
 
@@ -99,7 +117,8 @@ module Config : sig
       [match_fraction = 0.95], [close_epsilon = 1e-4], [basis = Levels],
       [ret_epsilon = 1e-3], [prefilter_rel_tol = 2e-2] — the criterion the
       visual audit used — plus both #2823 guards off
-      ([require_direct_match = false], [max_group_size = None]). *)
+      ([require_direct_match = false], [max_group_size = None]), and the #3057
+      run criterion off ([min_matching_run = None]). *)
 end
 
 type series = {

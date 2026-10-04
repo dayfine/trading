@@ -15,6 +15,7 @@ let test_config =
     prefilter_rel_tol = 2e-2;
     require_direct_match = false;
     max_group_size = None;
+    min_matching_run = None;
   }
 
 (* Same thresholds under the returns basis. *)
@@ -578,6 +579,113 @@ let test_config_defaults_are_off _ =
          field (fun (c : Twin_detector.Config.t) -> c.max_group_size) is_none;
        ])
 
+(* ------------------------------------------------------------------ *)
+(* #3057: the run criterion ([min_matching_run])                       *)
+(* ------------------------------------------------------------------ *)
+
+(* A CMN/CMD-shaped pair: both legs carry the same +1 %/day series for the
+   first [matching] days, then [CMD] switches to another instrument's quotes
+   (alternating +20 % / -20 %) for the remaining days. The 29 leading return
+   pairs match and the 10 trailing ones miss, so the whole-overlap fraction is
+   29/39 = 0.744, below [match_fraction = 0.95]. *)
+let _corrupt_tail_pair ?(n = 40) ?(matching = 30) ?zero_at () =
+  let real =
+    List.init n ~f:(fun i ->
+        if Option.equal Int.equal zero_at (Some i) then 0.0
+        else 100.0 *. (1.01 ** Float.of_int i))
+  in
+  let junk =
+    List.mapi real ~f:(fun i c ->
+        if i < matching then c else if i % 2 = 0 then c *. 1.2 else c *. 0.8)
+  in
+  [ series_of ~symbol:"CMN" real; series_of ~symbol:"CMD" junk ]
+
+let _run_config n = { returns_config with min_matching_run = n }
+
+(* Off (the default): the corrupt tail hides the pair, as on the real
+   warehouse. *)
+let test_run_criterion_off_misses_corrupt_tail _ =
+  let report =
+    Twin_detector.detect (_run_config None) (_corrupt_tail_pair ())
+  in
+  assert_that report.groups is_empty
+
+(* Armed at 25: the 29-pair leading run clears it and the pair is one twin
+   group, reported at its true (sub-threshold) whole-overlap fraction. *)
+let test_run_criterion_catches_corrupt_tail _ =
+  let report =
+    Twin_detector.detect (_run_config (Some 25)) (_corrupt_tail_pair ())
+  in
+  assert_that report.groups
+    (elements_are
+       [
+         field
+           (fun (g : Twin_detector.group) -> g.matches)
+           (elements_are
+              [
+                field
+                  (fun (m : Twin_detector.pair_match) -> m.match_fraction)
+                  (float_equal ~epsilon:1e-9 (29.0 /. 39.0));
+              ]);
+       ])
+
+(* The bar is a minimum run length: 29 consecutive matches do not clear 30. *)
+let test_run_criterion_respects_its_bar _ =
+  let report =
+    Twin_detector.detect (_run_config (Some 30)) (_corrupt_tail_pair ())
+  in
+  assert_that report.groups is_empty
+
+(* A short coincidental stretch never qualifies: 9 matching pairs, then 30
+   misses, against a bar of 25 (and a fraction far below 0.95). *)
+let test_run_criterion_ignores_short_coincidence _ =
+  let report =
+    Twin_detector.detect (_run_config (Some 25))
+      (_corrupt_tail_pair ~matching:10 ())
+  in
+  assert_that report.groups is_empty
+
+(* "At least n" is inclusive: the fixture's 29-pair run clears a bar of
+   exactly 29. *)
+let test_run_criterion_bar_is_inclusive _ =
+  let report =
+    Twin_detector.detect (_run_config (Some 29)) (_corrupt_tail_pair ())
+  in
+  assert_that report.groups (size_is 1)
+
+(* An incomparable unit breaks the run. A 0.0 close on day 15 of both legs
+   makes return pair 16 (prior close 0) incomparable, splitting the leading
+   matches into runs of 15 and 13. A run of 15 clears a bar of 15; the 28 the
+   two would make if the skip did not break them does not count for a bar of
+   25. *)
+let test_run_criterion_incomparable_unit_breaks_run _ =
+  let pair = _corrupt_tail_pair ~zero_at:15 () in
+  let groups n =
+    List.length (Twin_detector.detect (_run_config n) pair).groups
+  in
+  assert_that (groups (Some 15), groups (Some 25)) (equal_to (1, 0))
+
+(* The armed knob names itself in the report header; the default header is
+   pinned unchanged by [render_header_unchanged_with_defaults]. *)
+let test_render_names_run_criterion _ =
+  let report =
+    Twin_detector.detect (_run_config (Some 25)) (_corrupt_tail_pair ())
+  in
+  assert_that
+    (Twin_detector.render report)
+    (contains_substring "min_matching_run=25")
+
+(* The default config leaves the criterion off, and serialises without the
+   field ([@sexp.option]), so config sexps written before it existed — and
+   every default-config report header — are unchanged and still parse. *)
+let test_run_criterion_default_off_and_legacy_sexp _ =
+  let sexp = Twin_detector.Config.sexp_of_t test_config |> Sexp.to_string in
+  assert_that
+    ( Twin_detector.Config.default.min_matching_run,
+      String.is_substring sexp ~substring:"min_matching_run",
+      (Twin_detector.Config.t_of_sexp (Sexp.of_string sexp)).min_matching_run )
+    (equal_to ((None, false, None) : int option * bool * int option))
+
 let suite =
   "twin_detector"
   >::: [
@@ -618,6 +726,22 @@ let suite =
          >:: test_render_header_unchanged_with_defaults;
          "render_reports_rejected_legs" >:: test_render_reports_rejected_legs;
          "config_defaults_are_off" >:: test_config_defaults_are_off;
+         "run_criterion_off_misses_corrupt_tail (#3057)"
+         >:: test_run_criterion_off_misses_corrupt_tail;
+         "run_criterion_catches_corrupt_tail (#3057)"
+         >:: test_run_criterion_catches_corrupt_tail;
+         "run_criterion_respects_its_bar (#3057)"
+         >:: test_run_criterion_respects_its_bar;
+         "run_criterion_bar_is_inclusive (#3057)"
+         >:: test_run_criterion_bar_is_inclusive;
+         "run_criterion_incomparable_unit_breaks_run (#3057)"
+         >:: test_run_criterion_incomparable_unit_breaks_run;
+         "run_criterion_ignores_short_coincidence (#3057)"
+         >:: test_run_criterion_ignores_short_coincidence;
+         "render_names_run_criterion (#3057)"
+         >:: test_render_names_run_criterion;
+         "run_criterion_default_off_and_legacy_sexp (#3057)"
+         >:: test_run_criterion_default_off_and_legacy_sexp;
        ]
 
 let () = run_test_tt_main suite

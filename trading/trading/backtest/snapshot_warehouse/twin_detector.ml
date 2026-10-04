@@ -13,6 +13,7 @@ module Config = struct
     prefilter_rel_tol : float;
     require_direct_match : bool; [@sexp.default false]
     max_group_size : int option; [@sexp.option]
+    min_matching_run : int option; [@sexp.option]
   }
   [@@deriving sexp, equal]
 
@@ -27,6 +28,7 @@ module Config = struct
       prefilter_rel_tol = 2e-2;
       require_direct_match = false;
       max_group_size = None;
+      min_matching_run = None;
     }
 end
 
@@ -95,49 +97,89 @@ let _shared_closes a b =
   done;
   Array.of_list (List.rev !acc)
 
-(* [Levels] fraction: shared dates whose closes match within [epsilon]. *)
-let _levels_match_fraction shared ~epsilon =
-  let overlap = Array.length shared in
-  if Int.equal overlap 0 then 0.0
-  else
-    let matched =
-      Array.count shared ~f:(fun (ca, cb) ->
-          Float.( <= ) (_relative_diff ca cb) epsilon)
-    in
-    Float.of_int matched /. Float.of_int overlap
+(* Fold a sequence of per-unit verdicts into [(matched, compared, longest
+   run)]: [compared] counts the units that were comparable, [matched] those
+   that matched, and the longest run is the longest stretch of consecutive
+   matches. An incomparable unit breaks the run, the same as a miss. *)
+type _tally = { matched : int; compared : int; run : int; best : int }
 
-(* [Returns] fraction: consecutive-shared-date return pairs whose simple daily
-   returns differ by at most [epsilon] (absolute). A pair is skipped when the
-   prior close of either leg is <= 0 (undefined return); the fraction is over
-   the surviving (valid) pairs. Returns 0.0 when no valid pair exists. *)
-let _returns_match_fraction shared ~epsilon =
-  let valid = ref 0 and matched = ref 0 in
+let _tally_empty = { matched = 0; compared = 0; run = 0; best = 0 }
+
+let _tally_add t = function
+  | `Skip -> { t with run = 0 }
+  | `Miss -> { t with compared = t.compared + 1; run = 0 }
+  | `Match ->
+      let run = t.run + 1 in
+      {
+        matched = t.matched + 1;
+        compared = t.compared + 1;
+        run;
+        best = Int.max t.best run;
+      }
+
+let _tally_stats t =
+  let frac =
+    if Int.equal t.compared 0 then 0.0
+    else Float.of_int t.matched /. Float.of_int t.compared
+  in
+  (frac, t.best)
+
+(* [Levels] stats: the fraction of shared dates whose closes match within
+   [epsilon], and the longest run of consecutive matching dates. *)
+let _levels_match_stats shared ~epsilon =
+  Array.fold shared ~init:_tally_empty ~f:(fun t (ca, cb) ->
+      _tally_add t
+        (if Float.( <= ) (_relative_diff ca cb) epsilon then `Match else `Miss))
+  |> _tally_stats
+
+(* [Returns] stats over consecutive-shared-date return pairs: the fraction
+   whose simple daily returns differ by at most [epsilon] (absolute), and the
+   longest run of consecutive matching pairs. A pair is skipped when the prior
+   close of either leg is <= 0 (undefined return): it is left out of the
+   fraction and breaks the run. Fraction 0.0 when no valid pair exists. *)
+let _returns_match_stats shared ~epsilon =
+  let t = ref _tally_empty in
   for k = 1 to Array.length shared - 1 do
     let pa, pb = shared.(k - 1) and ca, cb = shared.(k) in
-    if Float.( > ) pa 0.0 && Float.( > ) pb 0.0 then begin
-      incr valid;
-      let ra = (ca -. pa) /. pa and rb = (cb -. pb) /. pb in
-      if Float.( <= ) (Float.abs (ra -. rb)) epsilon then incr matched
-    end
+    let verdict =
+      (* Written as the pre-#3057 positive test, not [pa <= 0 || pb <= 0], so a
+         NaN prior close is still skipped rather than scored as a miss. *)
+      if Float.( > ) pa 0.0 && Float.( > ) pb 0.0 then
+        let ra = (ca -. pa) /. pa and rb = (cb -. pb) /. pb in
+        if Float.( <= ) (Float.abs (ra -. rb)) epsilon then `Match else `Miss
+      else `Skip
+    in
+    t := _tally_add !t verdict
   done;
-  if Int.equal !valid 0 then 0.0
-  else Float.of_int !matched /. Float.of_int !valid
+  _tally_stats !t
 
-(* Number of shared dates and the basis-appropriate match fraction. *)
-let _overlap_and_fraction (config : Config.t) a b =
+(* Number of shared dates, the basis-appropriate match fraction, and the
+   longest contiguous matching run. *)
+let _overlap_stats (config : Config.t) a b =
   let shared = _shared_closes a b in
-  let frac =
+  let frac, run =
     match config.basis with
-    | Levels -> _levels_match_fraction shared ~epsilon:config.close_epsilon
-    | Returns -> _returns_match_fraction shared ~epsilon:config.ret_epsilon
+    | Levels -> _levels_match_stats shared ~epsilon:config.close_epsilon
+    | Returns -> _returns_match_stats shared ~epsilon:config.ret_epsilon
   in
-  (Array.length shared, frac)
+  (Array.length shared, frac, run)
 
-(* [Some (overlap, fraction)] when [a] and [b] meet the twin criterion. *)
+let _overlap_and_fraction config a b =
+  let overlap, frac, _ = _overlap_stats config a b in
+  (overlap, frac)
+
+(* The #3057 run criterion: armed only by [min_matching_run]. *)
+let _run_qualifies (config : Config.t) run =
+  Option.value_map config.min_matching_run ~default:false ~f:(fun n -> run >= n)
+
+(* [Some (overlap, fraction)] when [a] and [b] meet the twin criterion: enough
+   overlap, and either the match fraction or (when armed) the longest
+   contiguous matching run clears its bar. *)
 let _twin_stats (config : Config.t) a b =
-  let overlap, frac = _overlap_and_fraction config a.closes b.closes in
+  let overlap, frac, run = _overlap_stats config a.closes b.closes in
   if overlap < config.min_overlap_days then None
-  else if Float.( > ) frac config.match_fraction then Some (overlap, frac)
+  else if Float.( > ) frac config.match_fraction || _run_qualifies config run
+  then Some (overlap, frac)
   else None
 
 (* Index of [date] in the date-sorted array, if present. *)
@@ -434,6 +476,8 @@ let _guard_suffix (cfg : Config.t) =
         (if cfg.require_direct_match then Some "require_direct_match=true"
          else None);
         Option.map cfg.max_group_size ~f:(Printf.sprintf "max_group_size=%d");
+        Option.map cfg.min_matching_run
+          ~f:(Printf.sprintf "min_matching_run=%d");
       ]
   in
   if List.is_empty parts then "" else " " ^ String.concat ~sep:" " parts
