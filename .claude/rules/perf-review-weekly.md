@@ -109,6 +109,7 @@ three shell-only PRs). Same day as the perf read, same "write it down" rule.
 | main-session calls above the compact threshold (default 250k, `session-rampup.md` Step 3) | `.claude.context_histogram.share_above_threshold_pct` | (c): > 50 % of calls → the `/compact` rule is not being followed; fix the habit before any preamble cut |
 | Codex cost per finding | `codex-agreement.md`: `codex tok in/out` ÷ codex-only items | (d): compare with the Claude gates' tokens per finding |
 | GHA $ per run | `<date>-<run>.json` totals | trend only |
+| tokens per model | `.claude.totals.by_model` (per model: `api_calls`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`; each row's own `model`/`models` fields carry the same split per dispatch/session) | (e): once work is routed by model/effort (verdict-bearing analysis → top model at max effort, structural QC → haiku), spend should shift toward the cheaper model on bulk QC lanes — a `by_model` split that still reads top-heavy on the expensive model after routing lands is a signal the routing isn't actually being followed |
 
 Two consecutive weeks of rows → the first optimisation decision, recorded in
 the same section with the numbers that drove it. What the sources do **not**

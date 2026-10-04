@@ -83,6 +83,42 @@
 #         the dispatch row count, and that --top truncation is both ANNOUNCED
 #         (47) and APPLIED (48) -- dropping the `.rows[0:$top]` slice leaves
 #         the suppression notice intact, so 47 alone does not catch it.
+#   49-50 MODEL ON THE UNIFORM FIXTURE. Every message in the main `projects`
+#         fixture carries the same model (claude-opus-5), so `model` and the
+#         one-entry `models` breakdown must both reflect it on an ordinary
+#         row -- the trivial case a multi-model fixture alone would not cover.
+#   51-58 MODEL ATTRIBUTION on the `model-mix` fixture
+#         (fixtures/token_usage/model-mix/): a main session whose two messages
+#         use DIFFERENT models (claude-opus-5 output=10, claude-haiku-5
+#         output=50) and a subagent dispatch using a third (claude-sonnet-5).
+#         Pins: (a) `model` picks the model with the MOST OUTPUT TOKENS, not
+#         the first or last message -- a naive "last message wins" or
+#         "first model wins" reading would report opus, not haiku; (b) the
+#         per-model `models` breakdown carries BOTH models' full token
+#         classes, not just the winner's; (c) `totals.by_model` sums the
+#         breakdown ACROSS rows (session + dispatch), so a model used only by
+#         a subagent still shows up in the report-wide total.
+#   59-61 TABLE: the model column renders with the "claude-" prefix stripped
+#         (short form), on both the dispatch and session tables, and the
+#         totals-by-model section lists every model.
+#   62-64 `totals.by_model` SUMS ACROSS ROWS of the SAME model, not just the
+#         first row's figures. The model-mix fixture never repeats a model
+#         across rows, so 51-57's single-row pins would still pass a
+#         `merge_models` that took the first row per model instead of
+#         summing (confirmed: this mutant passed 73/73 before this fix). The
+#         main `projects` fixture is entirely claude-opus-5 across its
+#         session AND all three dispatches, so its `totals.by_model` entry
+#         must equal the whole-report totals for api_calls / output_tokens /
+#         input_tokens -- a value only a real cross-row sum produces.
+#   65    `model` TIE-BREAK is alphabetical, not "last/first model wins" or
+#         reverse-alphabetical. `model-mix`'s agent-m2 dispatch uses two
+#         models (claude-haiku-5, claude-opus-5) with EQUAL output tokens
+#         (3 each); claude-haiku-5 must win because it sorts first.
+#   68-71 EMPTY-BREAKDOWN "unknown": see the no-usage fixture block below.
+#   66-67 `model` "unknown" FALLBACK, exercised (not just documented): the
+#         `partial-tail` fixture's two valid records carry no `message.model`
+#         at all, so its session's `model` and its `models` breakdown's one
+#         key must both read "unknown" -- never blank or invented.
 #
 # Run:
 #   sh trading/devtools/checks/token_usage_report_test.sh
@@ -317,6 +353,94 @@ expect_eq "table: --top 1 truncates and says so" \
 expect_eq "table: --top 1 emits exactly one dispatch row" \
   "1" "$(sh "$SCRIPT" --projects-dir "$FIX/projects" --top 1 2>/dev/null \
          | grep -cE '^2026-09-[0-9]{2} sess-main  [a-z]')"
+
+# --- 49-50: model on the uniform fixture (every message is claude-opus-5) --
+expect_eq "model: uniform row reports the only model present" \
+  "claude-opus-5" "$(row a1 .model)"
+expect_eq "models: uniform row's breakdown has exactly one key" \
+  "claude-opus-5" "$(row a1 '.models | keys | join(",")')"
+
+# --- 51-58: model attribution on the model-mix fixture ---------------------
+MMFIX="${ROOT}/trading/devtools/checks/fixtures/token_usage/model-mix"
+[ -d "$MMFIX" ] || die "model-mix fixture tree not found: $MMFIX"
+sh "$SCRIPT" --projects-dir "$MMFIX" --format json >"$TMP/mm.json" 2>"$TMP/mm.err"
+MM_RC=$?
+expect_eq "model-mix fixture exits 0" "0" "$MM_RC"
+mmq() { jq -r "$1" "$TMP/mm.json"; }
+
+expect_eq "model: session with two models picks the one with more OUTPUT tokens" \
+  "claude-haiku-5" "$(mmq '.sessions[0].model')"
+expect_eq "models: session breakdown keeps BOTH models, not just the winner" \
+  "claude-haiku-5,claude-opus-5" "$(mmq '.sessions[0].models | keys | sort | join(",")')"
+expect_eq "models: the non-winning model's own output_tokens are still correct" \
+  "10" "$(mmq '.sessions[0].models["claude-opus-5"].output_tokens')"
+expect_eq "models: the winning model's own output_tokens are correct" \
+  "50" "$(mmq '.sessions[0].models["claude-haiku-5"].output_tokens')"
+expect_eq "model: a dispatch using a single model reports it trivially" \
+  "claude-sonnet-5" "$(mmq '.rows[0].model')"
+expect_eq "totals.by_model: sums across BOTH session and dispatch rows (3 models total)" \
+  "claude-haiku-5,claude-opus-5,claude-sonnet-5" \
+  "$(mmq '.totals.by_model | keys | sort | join(",")')"
+expect_eq "totals.by_model: a model used only by a subagent still totals correctly" \
+  "5" "$(mmq '.totals.by_model["claude-sonnet-5"].output_tokens')"
+
+# --- 59-61: table renders the short model form ------------------------------
+sh "$SCRIPT" --projects-dir "$MMFIX" >"$TMP/mm_table.txt" 2>/dev/null
+expect_eq "table: dispatch row shows the short model form (sonnet-5, not claude-sonnet-5)" \
+  "1" "$(grep -cE '^2026-09-25 sess-mm    unknown              sonnet-5' "$TMP/mm_table.txt")"
+expect_eq "table: session row shows the short model form (haiku-5, winner by output)" \
+  "1" "$(grep -cE '^2026-09-25 sess-mm      haiku-5' "$TMP/mm_table.txt")"
+expect_eq "table: totals-by-model section lists all three models" \
+  "3" "$(grep -cE '^  (haiku-5|opus-5|sonnet-5)  *[0-9]+ calls' "$TMP/mm_table.txt")"
+
+# --- 62-64: totals.by_model SUMS across rows of the SAME model -------------
+# The `projects` fixture is entirely claude-opus-5: its session (3 messages)
+# plus all three dispatches (a1, b2, c3). A `merge_models` that took only the
+# FIRST row's figures per model (instead of summing) would still report a
+# non-empty, plausible-looking "claude-opus-5" entry here -- just the wrong
+# one. Equality against the whole-report totals is only possible if every
+# row's contribution was actually summed.
+expect_eq "totals.by_model: api_calls for the one model equals the report-wide total" \
+  "$(q '.totals.api_calls')" "$(q '.totals.by_model["claude-opus-5"].api_calls')"
+expect_eq "totals.by_model: output_tokens for the one model equals the report-wide total" \
+  "$(q '.totals.output_tokens')" "$(q '.totals.by_model["claude-opus-5"].output_tokens')"
+expect_eq "totals.by_model: input_tokens for the one model equals the report-wide total" \
+  "$(q '.totals.input_tokens')" "$(q '.totals.by_model["claude-opus-5"].input_tokens')"
+
+# --- 65: model tie-break is alphabetical, not first/last/reverse -----------
+# agent-m2 (model-mix fixture) uses claude-haiku-5 and claude-opus-5 with
+# EQUAL output tokens (3 each); claude-haiku-5 must win the tie because it
+# sorts first alphabetically.
+expect_eq "model: an output-token tie is broken alphabetically (claude-haiku-5 < claude-opus-5)" \
+  "claude-haiku-5" "$(mmq '.rows[] | select(.agent_id == "m2") | .model')"
+
+# --- 66-67: model "unknown" fallback, exercised -----------------------------
+# partial-tail's two valid records (msg_y1, msg_y2) carry no `message.model`
+# at all. Its session's `model` and its one-entry `models` breakdown must
+# both read "unknown" -- never blank (a missing `// "unknown"`) or invented.
+tailq() { jq -r "$1" "$TMP/tail.json"; }
+expect_eq "model: absent on every record reads 'unknown', not blank" \
+  "unknown" "$(tailq '.sessions[0].model')"
+expect_eq "models: the 'unknown' breakdown is the row's only key" \
+  "unknown" "$(tailq '.sessions[0].models | keys | join(",")')"
+
+# --- 68-71: empty-breakdown "unknown" (top_model guard), exercised ----------
+# no-usage: a subagent transcript holding only a timestamped `user` record (a
+# dispatch killed before its first reply) still gets a row, with no usage
+# messages -- `models` is {} and `model` must read "unknown", and it must add
+# nothing to `totals.by_model` (only the session's claude-opus-5 appears).
+NUFIX="${ROOT}/trading/devtools/checks/fixtures/token_usage/no-usage"
+[ -d "$NUFIX" ] || die "no-usage fixture tree not found: $NUFIX"
+sh "$SCRIPT" --projects-dir "$NUFIX" --format json >"$TMP/nu.json" 2>"$TMP/nu.err"
+nuq() { jq -r "$1" "$TMP/nu.json"; }
+expect_eq "model: a row with no usage messages reads 'unknown'" \
+  "unknown" "$(nuq '.rows[] | select(.agent_id == "n1") | .model')"
+expect_eq "models: a row with no usage messages has an empty breakdown" \
+  "0" "$(nuq '.rows[] | select(.agent_id == "n1") | .models | length')"
+expect_eq "totals.by_model: the usage-less row adds no model entry" \
+  "claude-opus-5" "$(nuq '.totals.by_model | keys | join(",")')"
+expect_eq "totals.by_model: the usage-less row adds no api_calls" \
+  "1" "$(nuq '.totals.by_model["claude-opus-5"].api_calls')"
 
 # --------------------------------------------------------------------------
 printf '=== Results: %s passed, %s failed ===\n' "$PASS" "$FAILED"
