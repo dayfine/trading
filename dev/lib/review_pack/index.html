@@ -496,6 +496,16 @@ function reopenEpisodes(macro, nav, spy, trades) {
   }
   return eps.filter(e => e.ret != null && e.spy != null);
 }
+// The short leg (#3111), when params enable it: s = meta.short_leg = { tickets, fills, pnl, bearish_weeks,
+// bearish_admitted }, or null when shorts are off (no line). With 0 fills it adds the Bearish weeks and
+// how many admitted a short to the top-N. Audit-derived counts are null without the trade audit and read
+// n/a, never 0. Pure and top-level for review_pack_test.sh.
+function shortLegLine(s) {
+  if (!s) return '';
+  const na = v => v == null ? 'n/a' : String(v), usd = v => `${v < 0 ? '−' : ''}$${Math.round(Math.abs(v)).toLocaleString('en-US')}`;
+  const head = `<b>Short leg on:</b> ${na(s.tickets)} short tickets placed, ${s.fills} short entries filled, short realised P&amp;L ${usd(s.pnl)}.`;
+  return s.fills > 0 ? head : `${head} The macro read Bearish in ${na(s.bearish_weeks)} screening weeks; ${na(s.bearish_admitted)} of them admitted a short to the top-N (<code>short_top_n_admitted</code> &gt; 0).`;
+}
 // Renders the ratio chart + era table; returns finding bullets (HTML strings).
 function renderSignals(nav, spy) {
   const ys = D.years[CH()], reg = spyRegimeByDay();
@@ -548,6 +558,9 @@ function renderSignals(nav, spy) {
   $('#reopens').innerHTML = eps.length ? tbl([['Reopen'], ['Closed weeks', 1], ['Entries 13 / 26 wk', 1], ['Strategy 26 wk', 1], ['SPY 26 wk', 1], ['Read']],
     eps.map(e => `<tr><td>${e.d}</td><td class="num">${e.closed}</td><td class="num">${e.e13} / ${e.e26}</td><td class="num"><span class="${sgn(e.ret - e.spy)}">${pct(e.ret, 1)}</span></td><td class="num">${pct(e.spy, 1)}</td><td>${e.flag || (e.ret >= e.spy ? 'ahead of SPY' : '–')}</td></tr>`))
     : '<tbody><tr><td>No reopen after 8+ closed weeks inside this window.</td></tr></tbody>';
+  // the short leg: on or off, tickets, fills and the binding gate (see shortLegLine)
+  const sl = shortLegLine(D.meta[CH()].short_leg);
+  if (sl) out.push(sl);
   return out;
 }
 function renderOverview() {
