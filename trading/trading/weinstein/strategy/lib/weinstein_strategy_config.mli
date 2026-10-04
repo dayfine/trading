@@ -1487,6 +1487,28 @@ type config = {
           R2: axis-expressible as
           [((flag entry_order_max_rest_weeks) (values (0 13 26 52 156)))]. Full
           record: [dev/experiments/clock26-golden-ab-2026-08-19/]. *)
+  cancel_resting_entry_on_split : bool; [@sexp.default false]
+      (** #3075: cancel a resting (wholly unfilled) entry ticket on the day its
+          symbol splits, with reason [Split_ticket_cancel.cancel_reason]
+          ([entry_ticket_split_while_resting]), and release its frozen [E]. The
+          next weekly screen re-decides on the adjusted chart.
+
+          {b The defect it closes.} The simulator rescales held positions on a
+          split and {!Stops_split_runner} rescales resting tickets' stops, but
+          the resting entry trigger is never rescaled, so a pre-split trigger
+          fills on post-split prices at a level the screener never chose
+          (AAON-wein-951, MU-wein-76 on the 26y investor run).
+
+          {b Faithfulness (W2).} Book §5 and spine item 5: the entry and the
+          initial stop are defined by the base and MA of the chart the decision
+          read. After a split that chart no longer exists, so the faithful
+          answer is to re-decide, not to keep a stale trigger. Governs only an
+          order that has not yet become a position.
+
+          {b Default [false] = off}, bit-identical (R1):
+          {!Split_ticket_cancel.run} returns no transitions and reads no bar.
+          R2: axis-expressible as
+          [((flag cancel_resting_entry_on_split) (values (true false)))]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3 of [dev/plans/ticket-funding-2026-08-16.md]: subtract the cost the
           book has committed {b at the ticket's limit price} to {b resting}

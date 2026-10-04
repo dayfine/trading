@@ -16,7 +16,7 @@ let _last_two_bars ~bar_reader ~symbol ~as_of =
 (* Detect a split between yesterday's and today's bar for [symbol]. Returns
    [None] when no qualifying ratio fires; see [Types.Split_detector] for
    the snap-to-rational contract. *)
-let _detect_split_for_symbol ~bar_reader ~symbol ~as_of =
+let detect_split ~bar_reader ~symbol ~as_of =
   let%bind.Option prev, curr = _last_two_bars ~bar_reader ~symbol ~as_of in
   Types.Split_detector.detect_split ~prev ~curr ()
 
@@ -27,7 +27,7 @@ let _adjust_one ~bar_reader ~as_of ~stop_states symbol =
   match Map.find !stop_states symbol with
   | None -> ()
   | Some state -> (
-      match _detect_split_for_symbol ~bar_reader ~symbol ~as_of with
+      match detect_split ~bar_reader ~symbol ~as_of with
       | None -> ()
       | Some factor ->
           let scaled = Weinstein_stops.Stop_split_adjust.scale ~factor state in

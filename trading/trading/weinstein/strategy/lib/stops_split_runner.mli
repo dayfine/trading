@@ -21,6 +21,15 @@
 open Core
 open Trading_strategy
 
+val detect_split :
+  bar_reader:Bar_reader.t -> symbol:string -> as_of:Date.t -> float option
+(** [detect_split ~bar_reader ~symbol ~as_of] runs
+    {!Types.Split_detector.detect_split} on [symbol]'s last two daily bars up to
+    and including [as_of]. [Some factor] when a split happened between the prior
+    trading day and [as_of]; [None] with fewer than two bars or no qualifying
+    ratio. The one detector {!adjust} uses, shared with {!Split_ticket_cancel}
+    so the stop rescale and the resting-ticket cancel fire on the same days. *)
+
 val adjust :
   positions:Position.t Map.M(String).t ->
   stop_states:Weinstein_stops.stop_state Map.M(String).t ref ->

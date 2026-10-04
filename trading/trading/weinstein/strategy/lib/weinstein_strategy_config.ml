@@ -120,6 +120,8 @@ type config = {
       (** See [.mli]. *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_order_max_rest_weeks : int; [@sexp.default 52]  (** See [.mli]. *)
+  cancel_resting_entry_on_split : bool; [@sexp.default false]
+      (** See [.mli]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** See [.mli]. *)
   entry_fill_reject_retries : int; [@sexp.default 0]  (** See [.mli]. *)
@@ -249,6 +251,7 @@ let default_config ~universe ~index_symbol =
     freeze_entry_at_first_breakout = false;
     enable_entry_ticket_rescreen = false;
     entry_order_max_rest_weeks = 52;
+    cancel_resting_entry_on_split = false;
     reserve_cash_for_resting_tickets = false;
     entry_fill_reject_retries = 0;
     entry_fill_size_to_available = false;

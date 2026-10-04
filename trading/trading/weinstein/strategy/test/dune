@@ -15,6 +15,7 @@
   test_entry_ticket_tags
   test_entry_ticket_ttl
   test_entry_ticket_suspend
+  test_split_ticket_cancel
   test_exit_audit_capture
   test_force_liquidation_runner
   test_force_liquidation_strategy
@@ -74,6 +75,7 @@
   trading.data_panel
   trading.data_panel.snapshot
   trading.engine
+  trading.orders
   trading.portfolio
   trading.simulation
   trading.simulation.types
