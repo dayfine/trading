@@ -77,13 +77,33 @@ let _classify_ratio ~dividend_threshold ~rational_snap_tolerance
     _snap_if_split ~dividend_threshold ~rational_snap_tolerance ~max_denominator
       (adj_ratio /. raw_ratio)
 
+(* Share of the snapped factor's log-magnitude that the raw close gap carries:
+   [log (1 / raw_ratio) / log factor]. A real N:M split moves the raw close by
+   [1 / factor] (share ~1.0, give or take the day's economic move); a
+   dividend-driven drift in [adjusted_close] leaves the raw close near flat or
+   moving the wrong way (share ~0 or negative). [factor] is never 1.0 here —
+   the dividend-threshold band rejects it first. *)
+let _raw_gap_share ~raw_ratio ~factor =
+  Float.log (1.0 /. raw_ratio) /. Float.log factor
+
+(* Keep [factor] only when the raw close gap confirms it, i.e. carries at least
+   [min_share] of its log-magnitude. [None] disables the check. *)
+let _confirm_by_raw_gap ~raw_confirm_min_share ~raw_ratio factor =
+  match raw_confirm_min_share with
+  | None -> Some factor
+  | Some min_share ->
+      if Float.( >= ) (_raw_gap_share ~raw_ratio ~factor) min_share then
+        Some factor
+      else None
+
 let detect_split ?(dividend_threshold = default_dividend_threshold)
     ?(rational_snap_tolerance = default_rational_snap_tolerance)
-    ?(max_denominator = default_max_denominator) ~(prev : Daily_price.t)
-    ~(curr : Daily_price.t) () =
+    ?(max_denominator = default_max_denominator) ?raw_confirm_min_share
+    ~(prev : Daily_price.t) ~(curr : Daily_price.t) () =
   if not (_has_valid_prices ~prev ~curr) then None
   else
     let raw_ratio = curr.close_price /. prev.close_price in
     let adj_ratio = curr.adjusted_close /. prev.adjusted_close in
     _classify_ratio ~dividend_threshold ~rational_snap_tolerance
       ~max_denominator ~raw_ratio ~adj_ratio
+    |> Option.bind ~f:(_confirm_by_raw_gap ~raw_confirm_min_share ~raw_ratio)

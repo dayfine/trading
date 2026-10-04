@@ -1,11 +1,21 @@
 # Status: data-foundations
 
-## Last updated: 2026-07-12
+## Last updated: 2026-10-03
 
 ## Status
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-10-03 — split detector raw-gap confirmation, default off
+  (#3104).** `Split_detector.detect_split` gains
+  `?raw_confirm_min_share`: a snapped factor is kept only if the raw close
+  gap carries at least that share of its log-magnitude. Recommended rule:
+  `~dividend_threshold:0.10 ~raw_confirm_min_share:0.5`, which rejects
+  FUJIY 2020-09-28 / DHLGY 2025-05-06 and keeps real 3:2 / 2:1 / 1:10.
+  Bar-store counts over the 26y PIT universe are in
+  `dev/notes/split-detector-dividend-misfire-2026-10-03.md`. Default flip
+  pending a paired golden run. Verify:
+  `dune runtest analysis/data/types/test`.
 - [x] **2026-07-12 — asset-type blocklist filter (CEF/trust/SPAC leak, W14;
   fix #3 of `dev/notes/visual-trade-audit-2026-07-12.md`).** EODHD's
   exchange-symbol-list `Type` field mislabels bond/equity CEFs and

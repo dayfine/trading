@@ -19,6 +19,7 @@ val detect_split :
   ?dividend_threshold:float ->
   ?rational_snap_tolerance:float ->
   ?max_denominator:int ->
+  ?raw_confirm_min_share:float ->
   prev:Daily_price.t ->
   curr:Daily_price.t ->
   unit ->
@@ -43,4 +44,17 @@ val detect_split :
       and the candidate rational [N/M] for the snap to succeed. Default [1e-3].
     - [max_denominator]: largest denominator [M] considered when searching for
       [N/M] approximations. Default [20]. Splits in practice are tiny rationals
-      (4:1, 1:5, 3:2, 2:3, 1:10, etc.). *)
+      (4:1, 1:5, 3:2, 2:3, 1:10, etc.).
+    - [raw_confirm_min_share]: when given, a snapped factor is kept only if the
+      {b raw} close gap confirms it — i.e. [log (1 /. raw_ratio) /. log factor]
+      (the share of the factor's log-magnitude carried by the raw close move) is
+      at least this value. A real split moves the raw close by about
+      [1 /. factor] (share near [1.0]); a dividend-driven jump in
+      [adjusted_close] leaves the raw close flat or moving the wrong way (share
+      near [0] or negative). Omitted (the default) = no check, the pre-#3104
+      behaviour. Issue #3104: FUJIY 2020-09-28 (raw +2 %, factor 1.059 snapped
+      to 18/17) is rejected at [0.5]. A dividend whose raw drop happens to match
+      the factor (DHLGY 2025-05-06, 21/20) is not — raise [dividend_threshold]
+      to [0.10] for that. See
+      [dev/notes/split-detector-dividend-misfire-2026-10-03.md] for the
+      bar-store counts. *)
