@@ -40,15 +40,20 @@ let _apply_cancels ~pending_entry_e ~(portfolio : Portfolio_view.t) transitions
           Entry_freeze.release pending_entry_e ~symbol:pos.symbol);
       { acc with positions = Map.remove acc.positions t.position_id })
 
-let run ~enabled ~pending_entry_e ~bar_reader ~(portfolio : Portfolio_view.t)
+(* The armed path: detect today's splits, build the cancels, apply them. Hands
+   back the very same portfolio when nothing is cancelled. *)
+let _run_armed ~pending_entry_e ~bar_reader ~(portfolio : Portfolio_view.t)
     ~current_date =
+  let split_factor ~symbol =
+    Stops_split_runner.detect_split ~bar_reader ~symbol ~as_of:current_date
+  in
+  match
+    cancellations ~positions:portfolio.positions ~split_factor ~current_date
+  with
+  | [] -> ([], portfolio)
+  | transitions ->
+      (transitions, _apply_cancels ~pending_entry_e ~portfolio transitions)
+
+let run ~enabled ~pending_entry_e ~bar_reader ~portfolio ~current_date =
   if not enabled then ([], portfolio)
-  else
-    let split_factor ~symbol =
-      Stops_split_runner.detect_split ~bar_reader ~symbol ~as_of:current_date
-    in
-    let transitions =
-      cancellations ~positions:portfolio.positions ~split_factor ~current_date
-    in
-    if List.is_empty transitions then ([], portfolio)
-    else (transitions, _apply_cancels ~pending_entry_e ~portfolio transitions)
+  else _run_armed ~pending_entry_e ~bar_reader ~portfolio ~current_date
