@@ -1176,6 +1176,32 @@ type config = {
           [((flag stop_anchor_at_entry_base) (values (true false)))];
           default-off until a ledger ACCEPT. Note:
           [dev/notes/honest-ladder-2026-08-05.md]. *)
+  continuation_stop_at_pullback_low : bool; [@sexp.default false]
+      (** #3069: place a long Ch. 3 continuation buy's INITIAL stop below the
+          continuation detector's [pullback_low] (the low of the pullback /
+          consolidation the stock breaks out of) instead of the generic
+          support-floor scan, which can land below an older, deeper correction.
+
+          {b Authority.} [docs/design/weinstein-book-reference.md] §4.6,
+          resolved in #3099: the book has no continuation-specific stop rule;
+          the general Ch. 6 rule (stop under the floor of the trading range the
+          stock breaks out of) puts it below the consolidation / pullback low.
+
+          Applies only to a long candidate whose analysis carries a continuation
+          hit ([is_continuation = true]) with [pullback_low = Some pl] and [pl]
+          below the effective entry. Such a hit exists only when
+          [enable_continuation_buys] arms the detector, so this field is inert
+          without it. The stop is tagged [Support_floor] for the audit.
+          [stop_anchor_at_entry_base] still applies afterwards, and
+          [min_stop_distance_pct] widening still applies last. Trailing stops
+          are untouched.
+
+          A separate flag rather than riding on [enable_continuation_buys], so
+          runs that already arm continuation buys (goldens, experiment specs)
+          keep their stop. {b Default [false] = off, bit-identical} (R1). R2:
+          axis-expressible as
+          [((flag continuation_stop_at_pullback_low) (values (true false)))];
+          default-off until a ledger ACCEPT (R3). *)
   require_structural_stop : bool; [@sexp.default false]
       (** Investor-preset initial-stop rule: never enter on an
           automatic-percentage stop. When [true], a candidate whose installed

@@ -976,6 +976,11 @@ type config = {
           unchanged. Default [false] = off, bit-identical baselines (R1); also
           gated on the E-family, so arming alone is a no-op. See
           [Weinstein_strategy_config.stop_anchor_at_entry_base]. *)
+  continuation_stop_at_pullback_low : bool; [@sexp.default false]
+      (** #3069: a long continuation buy's initial stop goes below its
+          [pullback_low] (book §4.6 / Ch. 6). Default [false] = off,
+          bit-identical (R1). See
+          [Weinstein_strategy_config.continuation_stop_at_pullback_low]. *)
   require_structural_stop : bool; [@sexp.default false]
       (** Investor-preset initial-stop rule (book Ch. 6: "investors should never
           use automatic percentages"). When [true], a candidate whose initial

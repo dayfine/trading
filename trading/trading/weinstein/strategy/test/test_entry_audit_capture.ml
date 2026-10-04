@@ -2455,6 +2455,231 @@ let test_config_default_require_structural_stop_is_off _ =
 let test_noop_recorder_does_not_capture_candidates _ =
   assert_that Audit_recorder.noop.capture_candidates (equal_to false)
 
+(* ------------------------------------------------------------------ *)
+(* #3069: continuation buy's initial stop below pullback_low            *)
+(* ------------------------------------------------------------------ *)
+
+let _pb_as_of = Date.of_string "2024-06-14"
+let _pb_entry = 101.0
+let _pb_low = 90.0
+
+(* A long candidate whose analysis carries a continuation result. *)
+let _continuation_candidate ?(side = Trading_base.Types.Long)
+    ?(is_continuation = true) ?(pullback_low = Some _pb_low) () =
+  let base =
+    match side with
+    | Long ->
+        _long_candidate ~ticker:"CONT" ~suggested_entry:_pb_entry
+          ~suggested_stop:92.0 ~as_of_date:_pb_as_of
+    | Short ->
+        _short_candidate ~ticker:"CONT" ~suggested_entry:_pb_entry
+          ~suggested_stop:110.0 ~as_of_date:_pb_as_of
+  in
+  {
+    base with
+    analysis =
+      {
+        base.analysis with
+        continuation =
+          Some
+            {
+              is_continuation;
+              pullback_low;
+              consolidation_high = Some 100.0;
+              ma_slope_observed = 0.05;
+            };
+      };
+  }
+
+let _pb_stops_config = Weinstein_stops.default_config
+
+(* The generic scan's stop, standing in for a deeper, older correction low. *)
+let _pb_raw_stop =
+  Weinstein_stops.compute_initial_stop ~config:_pb_stops_config ~side:Long
+    ~reference_level:80.0
+
+(* [(installed level, audit tag)] after [stop_at_pullback_low]. *)
+let _pb_apply ?(enabled = true) ?(effective_entry = _pb_entry) cand =
+  let stop, kind =
+    Entry_audit_capture.stop_at_pullback_low ~enabled
+      ~stops_config:_pb_stops_config ~effective_entry ~raw_stop:_pb_raw_stop
+      ~structural_kind:Audit_recorder.Buffer_fallback cand
+  in
+  (Weinstein_stops.get_stop_level stop, kind)
+
+let _pb_unchanged =
+  ( Weinstein_stops.get_stop_level _pb_raw_stop,
+    (Audit_recorder.Buffer_fallback : Audit_recorder.stop_floor_kind) )
+
+(* Armed, long continuation hit: the stop is the one the stops layer places
+   below [pullback_low], strictly below it, and is tagged structural. *)
+let test_pullback_stop_armed_places_stop_below_pullback_low _ =
+  let expected =
+    Weinstein_stops.get_stop_level
+      (Weinstein_stops.compute_initial_stop ~config:_pb_stops_config ~side:Long
+         ~reference_level:_pb_low)
+  in
+  assert_that
+    (_pb_apply (_continuation_candidate ()))
+    (all_of
+       [
+         field fst
+           (all_of [ float_equal expected; lt (module Float_ord) _pb_low ]);
+         field snd
+           (equal_to
+              (Audit_recorder.Support_floor : Audit_recorder.stop_floor_kind));
+       ])
+
+(* Every case that must leave the generic stop and its tag untouched: flag off
+   (default), a detector miss, no pullback low, a short, and a pullback low at
+   or above the entry. *)
+let test_pullback_stop_passes_through_otherwise _ =
+  assert_that
+    [
+      _pb_apply ~enabled:false (_continuation_candidate ());
+      _pb_apply (_continuation_candidate ~is_continuation:false ());
+      _pb_apply (_continuation_candidate ~pullback_low:None ());
+      _pb_apply (_continuation_candidate ~side:Short ());
+      _pb_apply ~effective_entry:_pb_low (_continuation_candidate ());
+    ]
+    (elements_are (List.init 5 ~f:(fun _ -> equal_to _pb_unchanged)))
+
+(* End to end through [make_entry_transition]: with one resident bar the
+   support-floor scan finds no correction, so the default stop is the buffer
+   fallback. Armed, the continuation candidate's stop is the one placed below
+   its 100.0 pullback low, tagged structural, in both the installed stop and
+   the audit meta. *)
+let test_make_entry_transition_threads_pullback_stop _ =
+  let current_date = _pb_as_of in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:110.0
+  in
+  let cand = _continuation_candidate ~pullback_low:(Some 100.0) () in
+  let meta_of armed =
+    match
+      Entry_audit_capture.make_entry_transition
+        ~continuation_stop_at_pullback_low:armed
+        ~portfolio_risk_config:_portfolio_risk_config
+        ~stops_config:_stops_config ~initial_stop_buffer:0.92
+        ~stop_states:(ref String.Map.empty) ~bar_reader
+        ~portfolio_value:100_000.0 ~current_date cand
+    with
+    | Entry_audit_capture.Entry_ok (_, meta) ->
+        Some (meta.installed_stop, meta.stop_floor_kind)
+    | _ -> None
+  in
+  let below_pullback =
+    Weinstein_stops.get_stop_level
+      (Weinstein_stops.compute_initial_stop ~config:_stops_config ~side:Long
+         ~reference_level:100.0)
+  in
+  assert_that
+    (meta_of true, meta_of false)
+    (all_of
+       [
+         field fst
+           (is_some_and
+              (all_of
+                 [
+                   field fst (float_equal below_pullback);
+                   field snd
+                     (equal_to
+                        (Audit_recorder.Support_floor
+                          : Audit_recorder.stop_floor_kind));
+                 ]));
+         field snd
+           (is_some_and
+              (field snd
+                 (equal_to
+                    (Audit_recorder.Buffer_fallback
+                      : Audit_recorder.stop_floor_kind))));
+       ])
+
+(* Config-driven pin through [Entry_walk.entries_from_candidates], the path a
+   backtest takes: [config.continuation_stop_at_pullback_low] must reach the
+   stop installed in [stop_states]. Armed, it is the stop below the 100.0
+   pullback low; off, the generic fallback, which differs. *)
+let _walk_installed_stop ~armed =
+  let current_date = _pb_as_of in
+  let config =
+    {
+      (Weinstein_strategy_config.default_config ~universe:[ "CONT" ]
+         ~index_symbol:"SPY")
+      with
+      continuation_stop_at_pullback_low = armed;
+    }
+  in
+  let stop_states = ref String.Map.empty in
+  let _transitions =
+    Entry_walk.entries_from_candidates ~config
+      ~candidates:[ _continuation_candidate ~pullback_low:(Some 100.0) () ]
+      ~stop_states
+      ~bar_reader:
+        (_bar_reader_with_current_close ~current_date ~current_close:110.0)
+      ~portfolio:
+        {
+          Trading_strategy.Portfolio_view.cash = 1_000_000.0;
+          positions = String.Map.empty;
+        }
+      ~get_price:(fun _ -> None)
+      ~current_date ()
+  in
+  Map.data !stop_states |> List.map ~f:Weinstein_stops.get_stop_level
+
+let test_entries_from_candidates_threads_pullback_stop _ =
+  let below_pullback =
+    Weinstein_stops.get_stop_level
+      (Weinstein_stops.compute_initial_stop
+         ~config:Weinstein_stops.default_config ~side:Long
+         ~reference_level:100.0)
+  in
+  assert_that
+    (_walk_installed_stop ~armed:true, _walk_installed_stop ~armed:false)
+    (all_of
+       [
+         field fst (elements_are [ float_equal below_pullback ]);
+         field snd (elements_are [ not_ (float_equal below_pullback) ]);
+       ])
+
+(* Ordering: the pullback stop is applied BEFORE the [min_stop_distance_pct]
+   widening, so a floor wider than the pullback stop's distance still wins.
+   With a pullback stop about 2 % under the entry and a 12 % floor, the installed
+   stop is the 12 %-widened one, not the pullback level. *)
+let test_min_distance_widening_applies_after_pullback_stop _ =
+  let current_date = _pb_as_of in
+  let installed_and_entry =
+    match
+      Entry_audit_capture.make_entry_transition ~min_stop_distance_pct:0.12
+        ~continuation_stop_at_pullback_low:true
+        ~portfolio_risk_config:_portfolio_risk_config
+        ~stops_config:_stops_config ~initial_stop_buffer:0.92
+        ~stop_states:(ref String.Map.empty)
+        ~bar_reader:
+          (_bar_reader_with_current_close ~current_date ~current_close:110.0)
+        ~portfolio_value:100_000.0 ~current_date
+        (_continuation_candidate ~pullback_low:(Some 100.0) ())
+    with
+    | Entry_audit_capture.Entry_ok (_, meta) ->
+        Some (meta.installed_stop, meta.effective_entry_price)
+    | _ -> None
+  in
+  let widened_from entry_price =
+    Weinstein_stops.get_stop_level
+      (Weinstein_stops.Stop_widen.widen_initial_to_min_distance
+         ~config:_stops_config ~side:Long ~entry_price ~min_distance_pct:0.12
+         (Weinstein_stops.compute_initial_stop ~config:_stops_config ~side:Long
+            ~reference_level:100.0))
+  in
+  assert_that installed_and_entry
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (installed, entry) -> installed -. widened_from entry)
+              (float_equal 0.0);
+            field fst (lt (module Float_ord) 99.0);
+          ]))
+
 let () =
   run_test_tt_main
     ("entry_audit_capture"
@@ -2603,4 +2828,14 @@ let () =
            >:: test_walk_state_leverage_enabled_from_config;
            "M1b-1: borrowed_balance derives from debit"
            >:: test_borrowed_balance_derives_from_debit;
+           "#3069: armed pullback stop sits below pullback_low"
+           >:: test_pullback_stop_armed_places_stop_below_pullback_low;
+           "#3069: pullback stop passes through otherwise"
+           >:: test_pullback_stop_passes_through_otherwise;
+           "#3069: make_entry_transition threads the pullback stop"
+           >:: test_make_entry_transition_threads_pullback_stop;
+           "#3069: entries_from_candidates threads the config flag"
+           >:: test_entries_from_candidates_threads_pullback_stop;
+           "#3069: min-distance widening applies after the pullback stop"
+           >:: test_min_distance_widening_applies_after_pullback_stop;
          ])

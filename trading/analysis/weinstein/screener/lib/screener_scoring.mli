@@ -104,6 +104,25 @@ type scoring_weights = {
   w_sector_strong : int;  (** Weight bonus for a Strong sector. Default: 10. *)
   w_late_stage2_penalty : int;
       (** Negative weight for late Stage2 flag. Default: -15. *)
+  w_continuation : int; [@sexp.default 0]
+      (** #3069: stage-signal weight for a Ch. 3 continuation hit
+          ([analysis.continuation = Some { is_continuation = true; _ }]) that
+          neither the Stage1→Stage2 breakout arm nor the early-Stage2 arm
+          scored. A continuation hit is by definition a mature Stage 2, so
+          without this weight it earns no stage points and ranks below fresh
+          breakouts whenever funding is short. Setting it to [w_stage2_breakout]
+          (30) scores a continuation hit as a fresh breakout would. The
+          late-Stage2 penalty still applies on top.
+
+          [0] (the default) emits no signal at all, so scores and rationale
+          strings are bit-identical to before the field existed. A continuation
+          hit only exists when
+          [Weinstein_strategy_config.enable_continuation_buys] arms the
+          detector, so the weight is inert without it. [@sexp.default 0] keeps
+          the field in the serialized config, so
+          [screening_config.weights.w_continuation] resolves as a
+          [Variant_matrix] axis. Default-off per
+          [.claude/rules/experiment-flag-discipline.md]. *)
 }
 [@@deriving sexp]
 (** Scoring weights for each positive signal. All are configurable.

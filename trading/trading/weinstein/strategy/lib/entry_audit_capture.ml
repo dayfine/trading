@@ -168,6 +168,7 @@ let _reject_no_structural_stop ~effective_entry ~initial_stop ~stop_distance_pct
 
 let make_entry_transition ?(min_stop_distance_pct = 0.0)
     ?(trigger_at_suggested = false) ?(stop_anchor_at_entry_base = false)
+    ?(continuation_stop_at_pullback_low = false)
     ?(require_structural_stop = false)
     ?(stop_width = Stop_width_mode.default_policy) ~portfolio_risk_config
     ~stops_config ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value
@@ -188,8 +189,8 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
   in
   let initial_stop, stop_floor_kind, split_safe_basis =
     Entry_audit_helpers.initial_stop_and_kind ~min_stop_distance_pct
-      ~reanchor_to_entry_base ~stops_config ~initial_stop_buffer ~bar_reader
-      ~current_date ~effective_entry cand
+      ~continuation_stop_at_pullback_low ~reanchor_to_entry_base ~stops_config
+      ~initial_stop_buffer ~bar_reader ~current_date ~effective_entry cand
   in
   let stop_distance_pct =
     Entry_audit_helpers.stop_distance_pct ~effective_entry
@@ -431,3 +432,5 @@ let classify_candidate ?(leverage_enabled = false) ~held_set ~make_entry
           ~short_notional_acc ~short_notional_cap ~long_notional_acc
           ~long_notional_cap ~sector_exposure_acc ~max_sector_exposure_pct
           ~portfolio_value ~emit ~cand:c trans meta
+
+let stop_at_pullback_low = Entry_audit_helpers.stop_at_pullback_low
