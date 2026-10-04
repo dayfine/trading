@@ -60,238 +60,12 @@
 
 open Core
 module Scenario = Scenario_lib.Scenario
-module Universe_file = Scenario_lib.Universe_file
-module Universe_schedule = Scenario_lib.Universe_schedule
 module Fixtures_root = Scenario_lib.Fixtures_root
 module Scenario_progress = Scenario_lib.Scenario_progress
 module Bar_source_resolver = Scenario_lib.Bar_source_resolver
-
-(* Universe resolution *)
-
-let _sector_map_of_universe_file ~fixtures_root path =
-  (* Resolve the scenario's [universe_path] relative to the fixtures root,
-     load it, and return an optional sector-map for [Backtest.Runner] to use
-     as its universe. [None] means "use the full [data/sectors.csv]" (broad
-     tier / pre-migration behaviour). *)
-  let resolved = Filename.concat fixtures_root path in
-  Universe_file.to_sector_map_override (Universe_file.load resolved)
-
-(* Resolve a scenario's universe into the pair [Backtest.Runner] needs:
-   the [sector_map_override] to stage and the optional dated membership
-   predicate to gate screening candidates with.
-
-   Empty [universe_schedule] (every pre-existing scenario) takes the
-   [universe_path] branch unchanged, with no membership predicate — bit-equal
-   to the pre-schedule behaviour. A non-empty schedule ignores [universe_path]
-   entirely: the sector map becomes the UNION of every scheduled list (so a
-   name that has dropped out of the current list still prices while held) and
-   the predicate is the schedule's step function. *)
-let _universe_of_scenario ~fixtures_root (s : Scenario.t) =
-  match s.universe_schedule with
-  | [] -> (_sector_map_of_universe_file ~fixtures_root s.universe_path, None)
-  | schedule -> (
-      match Universe_schedule.load ~fixtures_root schedule with
-      | Error err -> failwithf "scenario %s: %s" s.name (Status.show err) ()
-      | Ok sched ->
-          ( Some (Universe_schedule.union_sector_map sched),
-            Some (Universe_schedule.is_member sched) ))
-
-(* Actual metrics extracted from a run — serialized so the parent process
-   can read back each child's result. *)
-
-type actual = {
-  total_return_pct : float;
-  total_trades : float;
-  win_rate : float;
-  sharpe_ratio : float;
-  max_drawdown_pct : float;
-  avg_holding_days : float;
-  open_positions_value : float; [@sexp.default Float.nan]
-      (* Signed mark-to-market value of open positions at run end. Defaults to
-         NaN on read so pre-rename actual.sexp files (which used the
-         [unrealized_pnl] field for this same quantity) still parse. *)
-  unrealized_pnl : float;
-      (* Post-rename: true unrealized P&L (OpenPositionsValue - cost basis).
-         Pre-rename actual.sexp files carry the legacy mtm-value here. *)
-  sortino_ratio_annualized : float; [@sexp.default Float.nan]
-      (* M5.2c Sortino — defaults to NaN on read so pre-pin actual.sexp files
-         still parse. *)
-  calmar_ratio : float; [@sexp.default Float.nan]
-      (* M5.2c Calmar (CAGR / |MaxDD|) — defaults to NaN as above. *)
-  ulcer_index : float; [@sexp.default Float.nan]
-      (* M5.2c Ulcer Index — defaults to NaN as above. *)
-  force_liquidations_count : int; [@sexp.default 0]
-      (* G4 (force-liquidation policy). Defaults to 0 on read so pre-G4
-         actual.sexp files that don't carry the field still parse. *)
-  crashed : bool; [@sexp.default false]
-      (* True when the backtest's [Backtest.Runner.run_backtest] raised an
-         exception (e.g. an unhandled simulator-state invariant trip). The
-         child writes a sentinel [actual.sexp] in that case so the parent
-         row reports a meaningful FAIL with metrics filled with sentinel
-         values rather than the silent "did not write actual.sexp" path.
-         Defaults to [false] on read so pre-flag actual.sexp files that
-         don't carry the field still parse. *)
-  crash_message : string; [@sexp.default ""]
-      (* Human-readable [Exn.to_string] of the exception that crashed the
-         child, for diagnosis. Empty string when [crashed = false]. *)
-}
-[@@deriving sexp]
-
-let _actual_of_result (r : Backtest.Runner.result) =
-  let open Trading_simulation_types.Metric_types in
-  let s = r.summary in
-  let get k = Map.find s.metrics k |> Option.value ~default:Float.nan in
-  {
-    total_return_pct =
-      (s.final_portfolio_value -. s.initial_cash) /. s.initial_cash *. 100.0;
-    total_trades = Float.of_int (List.length r.round_trips);
-    win_rate = get WinRate;
-    sharpe_ratio = get SharpeRatio;
-    max_drawdown_pct = get MaxDrawdown;
-    avg_holding_days = get AvgHoldingDays;
-    open_positions_value = get OpenPositionsValue;
-    unrealized_pnl = get UnrealizedPnl;
-    sortino_ratio_annualized = get SortinoRatioAnnualized;
-    calmar_ratio = get CalmarRatio;
-    ulcer_index = get UlcerIndex;
-    force_liquidations_count = List.length r.force_liquidations;
-    crashed = false;
-    crash_message = "";
-  }
-
-(** Build a sentinel [actual] for a crashed run. Uses out-of-range numeric
-    values (-100% return, 0 trades, very large drawdown) so the parent's range
-    checks fail explicitly rather than passing on NaN. The [crashed] flag
-    distinguishes a genuine "strategy lost almost everything" run from a true
-    unhandled-exception abort. *)
-let _crashed_actual ~msg =
-  {
-    total_return_pct = -100.0;
-    total_trades = 0.0;
-    win_rate = 0.0;
-    sharpe_ratio = 0.0;
-    max_drawdown_pct = 100.0;
-    avg_holding_days = 0.0;
-    open_positions_value = 0.0;
-    unrealized_pnl = 0.0;
-    sortino_ratio_annualized = Float.nan;
-    calmar_ratio = Float.nan;
-    ulcer_index = Float.nan;
-    force_liquidations_count = 0;
-    crashed = true;
-    crash_message = msg;
-  }
-
-(* Range checking *)
-
-type check = { name : string; value : float; range : Scenario.range; ok : bool }
-
-let _check_one name value (range : Scenario.range) =
-  let ok = Scenario.in_range range value in
-  { name; value; range; ok }
-
-(** Read the canonical [wall_seconds.txt] perf-report file from [scenario_dir].
-    Returns [NaN] when missing — same skip-the-check semantic as NaN handling in
-    {!Scenario.in_range}. *)
-let _read_wall_seconds ~scenario_dir =
-  let path = Filename.concat scenario_dir "wall_seconds.txt" in
-  try Float.of_string (String.strip (In_channel.read_all path))
-  with _ -> Float.nan
-
-let _run_checks ?(wall_seconds = Float.nan) (a : actual) (e : Scenario.expected)
-    =
-  let base =
-    [
-      _check_one "total_return_pct" a.total_return_pct e.total_return_pct;
-      _check_one "total_trades" a.total_trades e.total_trades;
-      _check_one "win_rate" a.win_rate e.win_rate;
-      _check_one "sharpe_ratio" a.sharpe_ratio e.sharpe_ratio;
-      _check_one "max_drawdown_pct" a.max_drawdown_pct e.max_drawdown_pct;
-      _check_one "avg_holding_days" a.avg_holding_days e.avg_holding_days;
-    ]
-  in
-  let append_opt name value range_opt acc =
-    match range_opt with
-    | None -> acc
-    | Some range -> acc @ [ _check_one name value range ]
-  in
-  base
-  |> append_opt "open_positions_value" a.open_positions_value
-       e.open_positions_value
-  |> append_opt "unrealized_pnl" a.unrealized_pnl e.unrealized_pnl
-  |> append_opt "sortino_ratio_annualized" a.sortino_ratio_annualized
-       e.sortino_ratio_annualized
-  |> append_opt "calmar_ratio" a.calmar_ratio e.calmar_ratio
-  |> append_opt "ulcer_index" a.ulcer_index e.ulcer_index
-  |> append_opt "wall_seconds" wall_seconds e.wall_seconds
-
-let _failure_message checks =
-  List.filter checks ~f:(fun c -> not c.ok)
-  |> List.map ~f:(fun c ->
-      if Float.(c.value < c.range.min_f) then
-        sprintf "%s low (%.2f < %.2f)" c.name c.value c.range.min_f
-      else sprintf "%s high (%.2f > %.2f)" c.name c.value c.range.max_f)
-  |> String.concat ~sep:"; "
-
-(* Output *)
-
-let _print_header () =
-  printf "%-28s %8s %7s %8s %8s   %s\n" "Scenario" "Return" "Trades" "WinRate"
-    "MaxDD" "Result";
-  printf "%s\n" (String.make 78 '-')
-
-let _format_row (s : Scenario.t) (a : actual) checks =
-  let all_ok = List.for_all checks ~f:(fun c -> c.ok) in
-  let result_str =
-    if a.crashed then sprintf "FAIL (scenario crashed: %s)" a.crash_message
-    else if all_ok then "PASS"
-    else sprintf "FAIL (%s)" (_failure_message checks)
-  in
-  printf "%-28s %7.1f%% %7.0f %7.1f%% %7.1f%%   %s\n" s.name a.total_return_pct
-    a.total_trades a.win_rate a.max_drawdown_pct result_str;
-  all_ok && not a.crashed
-
-(* Directories *)
-
-let _repo_root () =
-  Data_path.default_data_dir () |> Fpath.parent |> Fpath.to_string
-
-let _goldens_small_dir () =
-  _repo_root () ^ "trading/test_data/backtest_scenarios/goldens-small"
-
-let _goldens_broad_dir () =
-  _repo_root () ^ "trading/test_data/backtest_scenarios/goldens-broad"
-
-let _smoke_dir () = _repo_root () ^ "trading/test_data/backtest_scenarios/smoke"
-
-let _list_scenario_files dir =
-  Stdlib.Sys.readdir dir |> Array.to_list
-  |> List.filter ~f:(fun f -> String.is_suffix f ~suffix:".sexp")
-  |> List.sort ~compare:String.compare
-  |> List.map ~f:(fun f -> Filename.concat dir f)
-
-let _make_output_root () =
-  let repo_root = _repo_root () in
-  let now = Core_unix.gettimeofday () in
-  let tm = Core_unix.localtime now in
-  let ts =
-    sprintf "%04d-%02d-%02d-%02d%02d%02d" (tm.tm_year + 1900) (tm.tm_mon + 1)
-      tm.tm_mday tm.tm_hour tm.tm_min tm.tm_sec
-  in
-  let base = repo_root ^ "dev/backtest/scenarios-" ^ ts in
-  Core_unix.mkdir_p (Filename.dirname base);
-  (* The timestamp has one-second granularity, so two runners started in the
-     same second (e.g. dune running several scenario_runner-spawning tests in
-     parallel) would share one root, and one's cleanup would delete the other's
-     artefacts (flaky test_scenario_runner_wall_span). [mkdir] is atomic: the
-     loser of the race takes a pid-suffixed sibling. *)
-  Scenario_lib.Output_root.claim_output_root ~base
-
-let _scenario_dir ~output_root (s : Scenario.t) =
-  Filename.concat output_root s.name
-
-let _actual_path ~output_root (s : Scenario.t) =
-  Filename.concat (_scenario_dir ~output_root s) "actual.sexp"
+open Scenario_lib.Scenario_checks
+module Cli_args = Scenario_lib.Cli_args
+module Output_root = Scenario_lib.Output_root
 
 (* Run one scenario inside a child process *)
 
@@ -316,10 +90,10 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
   eprintf "\n>>> Running %s: %s (%s to %s)\n%!" s.name s.description
     (Date.to_string s.period.start_date)
     (Date.to_string s.period.end_date);
-  let scenario_dir = _scenario_dir ~output_root s in
+  let scenario_dir = Output_root.scenario_dir ~output_root s in
   Core_unix.mkdir_p scenario_dir;
   let sector_map_override, universe_membership_at =
-    _universe_of_scenario ~fixtures_root s
+    Scenario_lib.Scenario_universe.of_scenario ~fixtures_root s
   in
   let progress_emitter =
     Scenario_progress.make_emitter ~scenario_dir ~every_n_fridays:progress_every
@@ -347,8 +121,8 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
      cannot cost the scenario its result. No-op when the flag is off. *)
   Backtest.Candidate_log.emit ~enabled:emit_candidates ~scenario_dir
     result.candidate_weeks;
-  let a = _actual_of_result result in
-  Sexp.save_hum (_actual_path ~output_root s) (sexp_of_actual a);
+  let a = actual_of_result result in
+  Sexp.save_hum (Output_root.actual_path ~output_root s) (sexp_of_actual a);
   (* Degenerate-fold guard: surface the silent-garbage signature (zero in-window
      round-trips + flat equity + an unexplained terminal move — the A2 warmup-
      leak class) loudly to stderr and as [fold_health.sexp]. Purely a reporting
@@ -396,11 +170,11 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
     is created defensively in case the crash predates the
     [_run_scenario_in_child] mkdir call. *)
 let _write_crashed_actual ~output_root (s : Scenario.t) ~msg =
-  let scenario_dir = _scenario_dir ~output_root s in
+  let scenario_dir = Output_root.scenario_dir ~output_root s in
   Core_unix.mkdir_p scenario_dir;
   Sexp.save_hum
-    (_actual_path ~output_root s)
-    (sexp_of_actual (_crashed_actual ~msg))
+    (Output_root.actual_path ~output_root s)
+    (sexp_of_actual (crashed_actual ~msg))
 
 let _fork_scenario ~output_root ~fixtures_root ~progress_every
     ~emit_all_eligible ~emit_candidates ~bar_data_source ~scenario_path
@@ -459,183 +233,17 @@ let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
       in
       (s, status))
 
-(* Parent-side: read back the child's actual.sexp and run checks *)
-
-let _load_actual ~output_root (s : Scenario.t) =
-  try Some (actual_of_sexp (Sexp.load_sexp (_actual_path ~output_root s)))
-  with _ -> None
-
-let _print_crashed_row (s : Scenario.t) =
-  printf "%-28s %8s %7s %8s %8s   %s\n" s.name "-" "-" "-" "-"
-    "FAIL (scenario crashed or did not write actual.sexp)"
-
-let _process_result ~output_root (s, _status) =
-  (* On both [Succeeded] and [Crashed] statuses, attempt to load the child's
-     [actual.sexp] first. The child now writes a sentinel actual.sexp (with
-     [crashed = true]) on the unhandled-exception path before exiting non-zero,
-     so a [Crashed] status with a parseable actual.sexp is the new graceful-
-     degradation path. The fallback [_print_crashed_row] is kept for genuinely
-     silent failures (e.g. SIGKILL, child exit before [_run_scenario_in_child]'s
-     mkdir, or filesystem errors during the sentinel write). *)
-  match _load_actual ~output_root s with
-  | Some a ->
-      let scenario_dir = _scenario_dir ~output_root s in
-      let wall_seconds = _read_wall_seconds ~scenario_dir in
-      let checks = _run_checks ~wall_seconds a s.expected in
-      _format_row s a checks
-  | None ->
-      _print_crashed_row s;
-      false
-
-(* CLI *)
-
-type _cli_args = {
-  dir : string;
-  parallel : int;
-  fixtures_root : string option;
-  snapshot_dir : string option;
-      (* When [Some dir], every cell reads OHLCV from the snapshot warehouse at
-         [dir] (streaming / snapshot mode) instead of building per-symbol bars
-         in-process from CSVs. Resolved once at parse time via
-         [Bar_source_resolver.resolve]; the resulting [Bar_data_source.t] is
-         reused for every cell in the [--dir] run. [None] (the default) keeps
-         the pre-existing CSV behaviour bit-identical. The load-bearing use is
-         large-N goldens (e.g. N=3000) that OOM the dev container in CSV mode
-         (~14 GB resident). *)
-  progress_every : int;
-      (* Friday-cycle cadence for [progress.sexp] emission, threaded into each
-         scenario's [Backtest.Runner.run_backtest] call. Always populated:
-         defaults to [Scenario_progress.default_every_n_fridays] (≈ monthly)
-         when [--progress-every] is omitted, so the long-running multi-scenario
-         exe gets recoverability by default. *)
-  emit_all_eligible : bool;
-      (* When [true] (the default), each scenario's child process invokes
-         [Backtest_all_eligible.Scenario_post_step.emit] after writing
-         actual.sexp, producing
-         [<scenario_dir>/all_eligible/grade-C/{trades.csv,summary.md,config.sexp}].
-         The [--no-emit-all-eligible] flag flips this off for perf sweeps /
-         quick smoke pipelines that don't want to pay the diagnostic's scan +
-         score cost. *)
-  emit_candidates : bool;
-      (* When [true], each scenario runs with
-         [Backtest.Runner.run_backtest ?candidate_log] (a collector built by
-         [Backtest.Candidate_log.create_if]) and its child
-         writes [<scenario_dir>/candidates.sexp] (#2490). Default [false]: this
-         one opts IN, because unlike the all-eligible diagnostic it costs
-         strategy-side work on every screened Friday. *)
-}
-
-let _default_parallel = 4
-
-let _usage () =
-  eprintf
-    "Usage: scenario_runner [--goldens-small | --goldens-broad | --goldens | \
-     --smoke | --dir <path>] [--parallel N] [--fixtures-root <path>] \
-     [--snapshot-dir <path>] [--progress-every N] [--no-emit-all-eligible] \
-     [--emit-candidates]\n";
-  Stdlib.exit 1
-
-let _parse_progress_every n_str =
-  match Int.of_string_opt n_str with
-  | Some n when n >= 1 -> n
-  | _ ->
-      eprintf "--progress-every requires a positive integer argument\n";
-      Stdlib.exit 1
-
-(* Mutable accumulator for the parse. Using a record (rather than threading 7
-   positionals through a recursive [loop]) keeps each flag case a one-line field
-   update and stays well under the function-length limit as flags grow. *)
-type _parse_acc = {
-  mutable dir : string option;
-  mutable parallel : int option;
-  mutable fixtures_root : string option;
-  mutable snapshot_dir : string option;
-  mutable progress_every : int option;
-  mutable emit_all_eligible : bool;
-  mutable emit_candidates : bool;
-}
-
-let _finalize_acc (acc : _parse_acc) : _cli_args =
-  {
-    dir = Option.value acc.dir ~default:(_goldens_small_dir ());
-    parallel = Option.value acc.parallel ~default:_default_parallel;
-    fixtures_root = acc.fixtures_root;
-    snapshot_dir = acc.snapshot_dir;
-    progress_every =
-      Option.value acc.progress_every
-        ~default:Scenario_progress.default_every_n_fridays;
-    emit_all_eligible = acc.emit_all_eligible;
-    emit_candidates = acc.emit_candidates;
-  }
-
-let _parse_flag args =
-  let acc =
-    {
-      dir = None;
-      parallel = None;
-      fixtures_root = None;
-      snapshot_dir = None;
-      progress_every = None;
-      emit_all_eligible = true;
-      emit_candidates = false;
-    }
-  in
-  let rec loop args =
-    match args with
-    | [] -> _finalize_acc acc
-    | "--goldens-small" :: rest | "--goldens" :: rest ->
-        acc.dir <- Some (_goldens_small_dir ());
-        loop rest
-    | "--goldens-broad" :: rest ->
-        acc.dir <- Some (_goldens_broad_dir ());
-        loop rest
-    | "--smoke" :: rest ->
-        acc.dir <- Some (_smoke_dir ());
-        loop rest
-    | "--dir" :: path :: rest ->
-        acc.dir <- Some path;
-        loop rest
-    | "--parallel" :: n :: rest ->
-        acc.parallel <- Some (Int.of_string n);
-        loop rest
-    | "--fixtures-root" :: path :: rest ->
-        acc.fixtures_root <- Some path;
-        loop rest
-    | "--snapshot-dir" :: path :: rest ->
-        acc.snapshot_dir <- Some path;
-        loop rest
-    | [ "--snapshot-dir" ] ->
-        eprintf "--snapshot-dir requires a directory-path argument\n";
-        Stdlib.exit 1
-    | "--progress-every" :: n :: rest ->
-        acc.progress_every <- Some (_parse_progress_every n);
-        loop rest
-    | "--no-emit-all-eligible" :: rest ->
-        acc.emit_all_eligible <- false;
-        loop rest
-    | "--emit-candidates" :: rest ->
-        acc.emit_candidates <- true;
-        loop rest
-    | _ -> _usage ()
-  in
-  loop args
-
-let _parse_args () =
-  let argv = Sys.get_argv () in
-  _parse_flag (List.tl_exn (Array.to_list argv))
-
 let () =
-  let ({
-         dir;
-         parallel;
-         fixtures_root;
-         snapshot_dir;
-         progress_every;
-         emit_all_eligible;
-         emit_candidates;
-       }
-        : _cli_args) =
-    _parse_args ()
+  let {
+    Cli_args.dir;
+    parallel;
+    fixtures_root;
+    snapshot_dir;
+    progress_every;
+    emit_all_eligible;
+    emit_candidates;
+  } =
+    Cli_args.parse_args ()
   in
   let fixtures_root = Fixtures_root.resolve ?fixtures_root () in
   (* Resolve the snapshot warehouse once at parse time; the same
@@ -643,7 +251,7 @@ let () =
      pre-existing CSV behaviour bit-identical. Exits 1 on a missing/corrupt
      manifest. *)
   let bar_data_source = Bar_source_resolver.resolve snapshot_dir in
-  let files = _list_scenario_files dir in
+  let files = Output_root.list_scenario_files dir in
   if List.is_empty files then (
     eprintf "No .sexp scenario files found in %s\n" dir;
     Stdlib.exit 1);
@@ -664,15 +272,19 @@ let () =
   let scenarios_with_paths =
     List.map files ~f:(fun file -> (file, Scenario.load file))
   in
-  let output_root = _make_output_root () in
+  let output_root =
+    Output_root.make_timestamped_root ~repo_root:(Cli_args.repo_root ())
+  in
   eprintf "Output root: %s\n%!" output_root;
   let results =
     _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
       ~progress_every ~emit_all_eligible ~emit_candidates ~bar_data_source
       scenarios_with_paths
   in
-  _print_header ();
-  let pass_flags = List.map results ~f:(_process_result ~output_root) in
+  print_header ();
+  let pass_flags =
+    List.map results ~f:(fun (s, _) -> process_result ~output_root s)
+  in
   let all_pass = List.for_all pass_flags ~f:Fn.id in
   let n_pass = List.count pass_flags ~f:Fn.id in
   let n_total = List.length pass_flags in
