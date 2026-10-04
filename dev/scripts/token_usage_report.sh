@@ -30,7 +30,7 @@
 #
 # Measured, per dispatch (one subagent transcript = one dispatch) and per
 # main-context session, in BOTH the `rows[]`/`sessions[]` list and the JSON
-# `totals` block (issue #2922 item... routing work by model/effort needs to
+# `totals` block (issue #2922 item 4 -- routing work by model/effort needs to
 # see spend split by model):
 #   agent_type   -- `agentType` from the sibling `agent-<id>.meta.json`, else
 #                   the launching Agent tool_use's `input.subagent_type`
