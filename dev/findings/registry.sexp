@@ -223,3 +223,9 @@
  (guard ((unit ("trading/trading/backtest/test/test_stop_log_machine_sync.ml"
                 "rested ticket across a split reseeds entry_stop at the fill"))))
  (status open))
+
+((issue 3101) (ref "trader rerun tp-t1-5r-s0-v11 JOE/CTO/EC/BOKF/AEG")
+ (finding "catastrophic (fast-crash) exits were recorded as structural StopLoss at the untouched structural stop, reading as stops that filled above their stop")
+ (guard ((unit ("trading/trading/weinstein/strategy/test/test_stops_runner.ml"
+                "catastrophic exit carries its own reason and level (#3101)"))))
+ (status fixed))

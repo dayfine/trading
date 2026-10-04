@@ -620,6 +620,58 @@ let test_catastrophic_armed_fires_trigger_exit _ =
            ];
        ])
 
+(* The detail the JOE-shaped exit below must carry: its own trigger level. *)
+let _joe_catastrophic_detail =
+  "stop_price=54.0000,trailing_high=60.0000,pct=0.1000"
+
+(** JOE-shaped specimen (issue #3101, trader rerun [tp-t1-5r-s0-v11]): the
+    structural stop sits at $49.632 and the day's low ($51.07) never reaches it,
+    but the fast-crash stop (trail high $60, pct 0.10 → $54.00) does. The exit
+    must carry the catastrophic reason and its own trigger level — not a
+    [StopLoss] stamped with the untouched structural $49.632, which downstream
+    tools read as a stop that filled above its stop. *)
+let test_catastrophic_exit_carries_own_reason_and_level _ =
+  let ticker = "JOE" in
+  let entry_date = Date.of_string "2024-01-05" in
+  let pos = make_holding_pos ticker 55.0 entry_date in
+  let stop_states =
+    ref
+      (String.Map.singleton ticker
+         (_trailing_state ~stop_level:49.632 ~trend_extreme:60.0))
+  in
+  let stops_config =
+    { default_cfg with Weinstein_stops.catastrophic_stop_pct = 0.10 }
+  in
+  let bar = make_bar "2024-01-12" ~close:52.0 ~low:51.07 ~high:53.0 () in
+  let exits, _adjusts =
+    Stops_runner.update ~catastrophic_armed:true ~stops_config
+      ~stage_config:default_stage_cfg ~lookback_bars:52
+      ~positions:(String.Map.singleton ticker pos)
+      ~get_price:(get_price_of [ (ticker, bar) ])
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
+      ~as_of:(Date.of_string "2024-01-12")
+      ~prior_stages:(Hashtbl.create (module String))
+      ()
+  in
+  assert_that exits
+    (elements_are
+       [
+         field
+           (fun (tr : Trading_strategy.Position.transition) -> tr.kind)
+           (equal_to
+              (Trading_strategy.Position.TriggerExit
+                 {
+                   exit_reason =
+                     StrategySignal
+                       {
+                         label = "catastrophic_stop";
+                         detail = Some _joe_catastrophic_detail;
+                       };
+                   exit_price = 51.07;
+                 }
+                : Trading_strategy.Position.transition_kind));
+       ])
+
 (** Not armed → the catastrophic stop is dormant; no exit (structural
     unchanged). *)
 let test_catastrophic_not_armed_no_exit _ =
@@ -958,6 +1010,8 @@ let () =
            >:: test_catastrophic_not_armed_no_exit;
            "Build2: catastrophic stop no-op at pct=0.0"
            >:: test_catastrophic_pct_zero_no_exit;
+           "catastrophic exit carries its own reason and level (#3101)"
+           >:: test_catastrophic_exit_carries_own_reason_and_level;
            "update with no positions returns empty"
            >:: test_update_no_positions_returns_empty;
            "update with position but no stop state returns empty"

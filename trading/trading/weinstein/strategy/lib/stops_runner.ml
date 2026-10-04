@@ -95,26 +95,30 @@ let _handle_stop_full ?ma_cache ?prior_stage_ma_values ?trailing_stop_ma_period
     via {!Weinstein_stops.trailing_high_of_state} — only a [Trailing] state
     carries one, so the catastrophic stop is dormant until a trend leg exists.
     No exit when [catastrophic_armed = false] or [pct = 0.0] (the default), so
-    existing callers / goldens are bit-identical. The exit fill price reuses the
-    structural [Stop_transitions.make_exit_transition] (bar low for longs / high
-    for shorts). *)
-let _catastrophic_hit ~catastrophic_armed ~stops_config ~(pos : Position.t)
-    ~state ~bar =
-  match Weinstein_stops.Catastrophic_stop.trailing_high_of_state state with
-  | None -> false
-  | Some trailing_high ->
-      Weinstein_stops.Catastrophic_stop.check_hit ~armed:catastrophic_armed
-        ~pct:stops_config.Weinstein_stops.catastrophic_stop_pct ~trailing_high
-        ~bar ~side:pos.Position.side
-
+    existing callers / goldens are bit-identical. The exit carries its own
+    [StrategySignal "catastrophic_stop"] reason with the catastrophic trigger
+    level as its stop price (issue #3101) — see
+    {!Stop_transitions.make_catastrophic_exit_transition}. *)
 let _catastrophic_exit ~catastrophic_armed ~stops_config ~(pos : Position.t)
     ~state ~bar ~current_date =
-  if _catastrophic_hit ~catastrophic_armed ~stops_config ~pos ~state ~bar then
-    Some
-      (Stop_transitions.make_exit_transition
-         ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos
-         ~current_date ~state ~bar ())
-  else None
+  let pct = stops_config.Weinstein_stops.catastrophic_stop_pct in
+  let side = pos.Position.side in
+  let open Option.Let_syntax in
+  let%bind trailing_high =
+    Weinstein_stops.Catastrophic_stop.trailing_high_of_state state
+  in
+  let%map () =
+    Option.some_if
+      (Weinstein_stops.Catastrophic_stop.check_hit ~armed:catastrophic_armed
+         ~pct ~trailing_high ~bar ~side)
+      ()
+  in
+  Stop_transitions.make_catastrophic_exit_transition
+    ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos
+    ~current_date
+    ~trigger_level:
+      (Weinstein_stops.Catastrophic_stop.trigger_level ~pct ~trailing_high ~side)
+    ~trailing_high ~pct ~bar ()
 
 (** The structural stop takes precedence; the fast-crash absolute stop
     ([_catastrophic_exit]) is consulted only when the structural path produced

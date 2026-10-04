@@ -134,6 +134,18 @@ let _is_force_liquidation (trigger : Backtest.Stop_log.exit_trigger) =
       String.equal label _force_liquidation_exit_label
   | _ -> false
 
+(* The fast-crash catastrophic stop's exit label, as
+   [Weinstein_strategy.Stop_transitions.catastrophic_exit_label] spells it (this
+   layer sits below the strategy layer that owns the token). Until #3101 that
+   exit was stamped [Stop_loss]; it is a protective stop exit all the same. *)
+let _catastrophic_stop_exit_label = "catastrophic_stop"
+
+let _is_catastrophic_stop (trigger : Backtest.Stop_log.exit_trigger) =
+  match trigger with
+  | Strategy_signal { label; _ } ->
+      String.equal label _catastrophic_stop_exit_label
+  | _ -> false
+
 (* R7's verdict from an exit trigger plus the entry/exit stage shape. Two
    distinct failure modes, checked in this order:
 
@@ -144,13 +156,17 @@ let _is_force_liquidation (trigger : Backtest.Stop_log.exit_trigger) =
       also catches the breaker firing on a short, or while the classifier
       still reads Stage 2/3 (the case where the stop most clearly failed).
    2. Held through Stage3 -> Stage4 — a long entered in Stage 2/3 and exited
-      in Stage 4 on anything other than [Stop_loss] / [Signal_reversal] rode
+      in Stage 4 on anything other than a protective stop ([Stop_loss], or the
+      catastrophic stop's [Strategy_signal], #3101) or [Signal_reversal] rode
       the transition down instead of exiting on signal. *)
 let _r7_of_trigger ~entered_long ~entered_stage_2_or_3 ~exited_in_stage_4
     (trigger : Backtest.Stop_log.exit_trigger) =
   if _is_force_liquidation trigger then Fail
   else if entered_long && entered_stage_2_or_3 && exited_in_stage_4 then
-    match trigger with Stop_loss _ | Signal_reversal _ -> Pass | _ -> Fail
+    match trigger with
+    | Stop_loss _ | Signal_reversal _ -> Pass
+    | t when _is_catastrophic_stop t -> Pass
+    | _ -> Fail
   else Pass
 
 (** R7 reads the enriched [exit_] when the record has one. When it does not, the

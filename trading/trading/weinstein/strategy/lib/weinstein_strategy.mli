@@ -1525,6 +1525,20 @@ module Internal_for_test : sig
       existing screener cooldown gate (issue #889 §F1). Exposed for tests; not
       part of the public strategy API. *)
 
+  val handle_stop_out_transition :
+    last_stop_out_dates:Date.t Hashtbl.M(String).t ->
+    positions:Trading_strategy.Position.t Map.M(String).t ->
+    current_date:Date.t ->
+    Trading_strategy.Position.transition ->
+    unit
+  (** The stops pass's post-stop cooldown stamp: records
+      [(symbol, current_date)] in [last_stop_out_dates] for a [TriggerExit] that
+      is a stop-out. That is a structural [StopLoss], or the fast-crash
+      catastrophic stop's [StrategySignal] labelled
+      {!Stop_transitions.catastrophic_exit_label} (#3101). Any other exit, and a
+      position id not in [positions], is a no-op. Exposed for tests; not part of
+      the public strategy API. *)
+
   val maybe_reset_halt :
     peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->
     prior_macro:Weinstein_types.market_trend ->

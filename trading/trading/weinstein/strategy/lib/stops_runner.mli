@@ -86,8 +86,11 @@ val update :
     absolute stop ([stops_config.catastrophic_stop_pct]). When [true] {b and}
     that knob is [> 0.0], a position whose bar low (long) / high (short)
     breaches [trailing_high *. (1 ∓ pct)] gets a [TriggerExit] alongside the
-    structural stop — see {!Weinstein_stops.check_catastrophic_hit}. The arming
-    decision is made one level up in the strategy lib from the prior cycle's
+    structural stop — see {!Weinstein_stops.check_catastrophic_hit}. That exit
+    carries [StrategySignal "catastrophic_stop"], never a structural [StopLoss],
+    and records the catastrophic trigger level as its stop price (issue #3101,
+    {!Stop_transitions.make_catastrophic_exit_transition}). The arming decision
+    is made one level up in the strategy lib from the prior cycle's
     {!Decline_character.t} (a fast-V decline), keeping this runner and the stops
     lib macro-agnostic. The default [false] (and the knob's default [0.0]) is an
     exact no-op, so every existing caller and golden replays bit-identically.
