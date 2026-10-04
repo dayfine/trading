@@ -25,6 +25,10 @@
 #   - the page's signal predicates (openSignal, oneTradeYear, alsoCause) are
 #     extracted with sed and evaluated with node over named cases (#3084);
 #     skipped with a notice when node is not installed.
+#   - short leg (#3111): a run whose params enable shorts gets meta.short_leg
+#     (tickets, fills, short P&L, Bearish weeks, weeks with short_top_n_admitted
+#     > 0) over a fixture shaped like shorts-liveness s0-shB; audit counts are
+#     null without trade_audit.sexp; shorts off -> null; shortLegLine pinned.
 #
 # Run:
 #   sh trading/devtools/checks/review_pack_test.sh
@@ -105,13 +109,14 @@ expect_eq "charts can fit a 26y daily series (minBarSpacing set)" yes "$(grep -q
 expect_eq "page <title> carries --title" yes "$(grep -q '^<title>Fixture</title>$' "$S/index.html" && echo yes || echo no)"
 expect_eq "open-position signal present" yes "$(grep -q 'The return rests on open positions' "$S/index.html" && echo yes || echo no)"
 expect_eq "gate-reopen signal present" yes "$(grep -q 'Gate reopen episodes' "$S/index.html" && echo yes || echo no)"
+expect_eq "short-leg signal wired into What stands out" yes "$(grep -q 'const sl = shortLegLine(D.meta\[CH()\].short_leg);' "$S/index.html" && echo yes || echo no)"
 
 # Signal predicates (#3084): extract each top-level function from the shipped
 # page with sed and pin it with node over named cases. The page keeps each
 # closing brace at column 0 so the range ends where the function does.
 if command -v node >/dev/null 2>&1; then
-  FNS="$(sed -n -e '/^const REOPEN_CLOSED_WEEKS/p' -e '/^function openSignal(/,/^}/p' -e '/^function oneTradeYear(/,/^}/p' -e '/^function alsoCause(/,/^}/p' -e '/^function reopenFlag(/,/^}/p' -e '/^function reopenEpisodes(/,/^}/p' "$S/index.html")"
-  expect_eq "signal predicates extracted" 5 "$(printf '%s\n' "$FNS" | grep -c '^function ')"
+  FNS="$(sed -n -e '/^const REOPEN_CLOSED_WEEKS/p' -e '/^function openSignal(/,/^}/p' -e '/^function oneTradeYear(/,/^}/p' -e '/^function alsoCause(/,/^}/p' -e '/^function reopenFlag(/,/^}/p' -e '/^function reopenEpisodes(/,/^}/p' -e '/^function shortLegLine(/,/^}/p' "$S/index.html")"
+  expect_eq "signal predicates extracted" 6 "$(printf '%s\n' "$FNS" | grep -c '^function ')"
   sig() { node -e "$FNS
 console.log($1)"; }
   expect_eq "openSignal: opposite-sign specimen (T1 5r s0: NAV0 1M, move +115k, realised -222k) fires" true "$(sig 'openSignal(1e6, 115e3, -222e3)')"
@@ -171,6 +176,38 @@ console.log($1)"; }
   expect_eq "reopenEpisodes: an entry on the reopen day counts" '[1,1]' "$(epi 'JSON.stringify(ep(macro(8), flat, flat, [{ ed: day(56) }]).map(e => [e.e13, e.e26])[0])')"
 else
   echo "SKIP: review_pack signal-predicate cases need node"
+fi
+
+# Short leg (#3111): params with (enable_short_side true) -> meta.short_leg, from trades.csv (fills, P&L)
+# and trade_audit.sexp (tickets, Bearish weeks, weeks with short_top_n_admitted > 0). The fixture is shaped
+# like shorts-liveness-2026-10-03 s0-shB: two short tickets, neither filled. A shorts-off run gets null.
+SHRUN="$TMP/shrun"; mkdir -p "$SHRUN"
+cp "$FIX"/run/* "$SHRUN"/; cp "$FIX"/shorts/params.sexp "$FIX"/shorts/trade_audit.sexp "$SHRUN"/
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$TMP/shpack" r0="$FIX/run/" sh="$SHRUN/" >"$TMP/sh.log" 2>"$TMP/sh.err" || rc=$?
+expect_eq "short leg: pack with a shorts run builds" 0 "$rc"
+SL0="$TMP/shpack/site/data/sh_meta.json"
+expect_eq "short leg: shorts-off run has no short leg" null "$(jq -c .short_leg "$TMP/shpack/site/data/r0_meta.json")"
+expect_eq "short leg: 0-fill run (shB shape)" '{"fills":0,"pnl":0,"tickets":2,"bearish_weeks":2,"bearish_admitted":1}' "$(jq -c ".short_leg|.pnl+=0" "$SL0")"
+rm "$SHRUN/trade_audit.sexp"
+expect_eq "short leg: no trade audit -> audit counts null, never 0" '{"fills":0,"pnl":0,"tickets":null,"bearish_weeks":null,"bearish_admitted":null}' "$(sh "$ROOT/dev/lib/review_pack/meta.sh" "$SHRUN" | jq -c ".short_leg|.pnl+=0")"
+sed 's/^AAA,LONG,/AAA,SHORT,/' "$FIX/run/trades.csv" > "$SHRUN/trades.csv"
+expect_eq "short leg: a SHORT row counts as a fill with its P&L" '{"fills":1,"pnl":-3000}' "$(sh "$ROOT/dev/lib/review_pack/meta.sh" "$SHRUN" | jq -c '.short_leg|{fills,pnl:(.pnl+0)}')"
+if command -v node >/dev/null 2>&1; then
+  slp() { node -e "$FNS
+console.log(shortLegLine($1))"; }
+  expect_eq "shortLegLine: 0-fill line names tickets, fills, P&L, Bearish weeks and the top-N gate" \
+    '<b>Short leg on:</b> 2 short tickets placed, 0 short entries filled, short realised P&amp;L $0. The macro read Bearish in 2 screening weeks; 1 of them admitted a short to the top-N (<code>short_top_n_admitted</code> &gt; 0).' \
+    "$(slp "$(jq -c .short_leg "$SL0")")"
+  expect_eq "shortLegLine: missing audit reads n/a, never 0" \
+    '<b>Short leg on:</b> n/a short tickets placed, 0 short entries filled, short realised P&amp;L $0. The macro read Bearish in n/a screening weeks; n/a of them admitted a short to the top-N (<code>short_top_n_admitted</code> &gt; 0).' \
+    "$(slp '{fills: 0, pnl: 0, tickets: null, bearish_weeks: null, bearish_admitted: null}')"
+  expect_eq "shortLegLine: with fills, no gate clause" \
+    '<b>Short leg on:</b> 3 short tickets placed, 1 short entries filled, short realised P&amp;L −$3,000.' \
+    "$(slp '{fills: 1, pnl: -3000, tickets: 3, bearish_weeks: 5, bearish_admitted: 2}')"
+  expect_eq "shortLegLine: shorts off prints nothing" "" "$(slp null)"
+else
+  echo "SKIP: review_pack short-leg predicate cases need node"
 fi
 expect_eq "EEE exits under 5 % of entry: X" X "$(q '.[]|select(.sym=="EEE")|.g')"
 expect_eq "second run r1 emitted" 6 "$(jq length "$S/data/r1_trades.json")"
