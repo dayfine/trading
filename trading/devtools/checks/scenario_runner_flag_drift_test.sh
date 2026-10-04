@@ -20,7 +20,7 @@ set -eu
 . "$(dirname "$0")/_check_lib.sh"
 root=$(repo_root)
 checker="$(dirname "$0")/scenario_runner_flag_drift.sh"
-runner_ml="$root/trading/trading/backtest/scenarios/scenario_runner.ml"
+runner_ml="$root/trading/trading/backtest/scenarios/cli_args.ml"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT INT TERM
 checks=0

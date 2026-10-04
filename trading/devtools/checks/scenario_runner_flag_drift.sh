@@ -15,7 +15,7 @@
 # WHAT IT DOES
 #   1. Extracts the accept-set from the runner's own parser: every `"--flag"`
 #      string literal inside the `_parse_flag` function body of
-#      `trading/trading/backtest/scenarios/scenario_runner.ml`, plus the
+#      `trading/trading/backtest/scenarios/cli_args.ml`, plus the
 #      literals in `_usage ()`. That is the source of truth; nothing is
 #      hardcoded here, so adding a flag to the runner needs no edit to this
 #      check.
@@ -61,9 +61,9 @@ set -eu
 . "$(dirname "$0")/_check_lib.sh"
 
 root=$(repo_root)
-runner_ml="${SCENARIO_RUNNER_ML:-$root/trading/trading/backtest/scenarios/scenario_runner.ml}"
+runner_ml="${SCENARIO_RUNNER_ML:-$root/trading/trading/backtest/scenarios/cli_args.ml}"
 
-[ -f "$runner_ml" ] || die "scenario_runner.ml not found: $runner_ml"
+[ -f "$runner_ml" ] || die "cli_args.ml not found: $runner_ml"
 
 # --- 1. Accept-set from the runner's own parser + usage string. ------------
 # Non-vacuity guard: a rename of `_parse_flag` / `_usage` that silently

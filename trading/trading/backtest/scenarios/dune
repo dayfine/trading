@@ -9,7 +9,10 @@
   smoke_catalog
   scenario_progress
   bar_source_resolver
-  output_root)
+  output_root
+  scenario_checks
+  scenario_universe
+  cli_args)
  (libraries
   core
   core_unix
