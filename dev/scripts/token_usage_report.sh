@@ -28,7 +28,10 @@
 #   ("Correction (21:55 PT, same day) -- absolute figures above are ~2x too
 #   high"). See the `dedup` assertion in the fixture test.
 #
-# Measured, per dispatch (one subagent transcript = one dispatch):
+# Measured, per dispatch (one subagent transcript = one dispatch) and per
+# main-context session, in BOTH the `rows[]`/`sessions[]` list and the JSON
+# `totals` block (issue #2922 item... routing work by model/effort needs to
+# see spend split by model):
 #   agent_type   -- `agentType` from the sibling `agent-<id>.meta.json`, else
 #                   the launching Agent tool_use's `input.subagent_type`
 #                   joined from the parent session transcript, else "unknown".
@@ -47,6 +50,18 @@
 #   wall         -- last timestamp minus first timestamp, in seconds.
 #   outcome      -- NEEDS_REWORK / APPROVED / a PR URL / done / stalled, in
 #                   that precedence, read off the agent's final text.
+#   model        -- `message.model` from the row's assistant records. A row
+#                   that used more than one model (a mid-transcript model
+#                   switch) reports the model carrying the most OUTPUT tokens,
+#                   ties broken alphabetically for determinism; absent on
+#                   every record reads "unknown", never invented or blank.
+#   models       -- `{model: {api_calls, input_tokens, output_tokens,
+#                   cache_read_input_tokens, cache_creation_input_tokens}}`
+#                   for every model seen in the row -- the full per-model
+#                   breakdown `model` is a summary of.
+# The JSON `totals.by_model` block sums `models` across every row (dispatches
+# + sessions) into one `{model: {api_calls, input_tokens, ...}}` map -- the
+# answer to "tokens per model" without re-deriving it from `rows[]`.
 #
 # NOT measured -- do not infer these from this report:
 #   * Dollars. Transcripts carry no price. The per-run cost records under
@@ -199,6 +214,7 @@ def usage_msgs:
     | select(.type == "assistant" and (.message | type) == "object"
               and .message.id != null and (.message.usage | type) == "object")
     | { id: .message.id,
+        model: (.message.model // "unknown"),
         input: (.message.usage.input_tokens // 0),
         output: (.message.usage.output_tokens // 0),
         cache_read: (.message.usage.cache_read_input_tokens // 0),
@@ -211,6 +227,26 @@ def totals_of:
     output_tokens: (map(.output) | add // 0),
     cache_read_input_tokens: (map(.cache_read) | add // 0),
     cache_creation_input_tokens: (map(.cache_creation) | add // 0) };
+
+# Per-model breakdown of a usage_msgs array: {model: {api_calls, input_tokens,
+# output_tokens, cache_read_input_tokens, cache_creation_input_tokens}}.
+def model_breakdown:
+  group_by(.model)
+  | map({ key: .[0].model,
+          value: { api_calls: length,
+                   input_tokens: (map(.input) | add // 0),
+                   output_tokens: (map(.output) | add // 0),
+                   cache_read_input_tokens: (map(.cache_read) | add // 0),
+                   cache_creation_input_tokens: (map(.cache_creation) | add // 0) } })
+  | from_entries;
+
+# The model carrying the most output tokens in a model_breakdown object; ties
+# broken alphabetically so the same input always reports the same model. A
+# row with no usage messages at all (model_breakdown == {}) reads "unknown".
+def top_model:
+  (to_entries) as $es
+  | if ($es | length) == 0 then "unknown"
+    else ($es | sort_by([-(.value.output_tokens), .key]) | .[0].key) end;
 
 def first_ts: [ .[] | .timestamp | select(. != null) ] | first;
 def last_ts:  [ .[] | .timestamp | select(. != null) ] | last;
@@ -288,6 +324,7 @@ JQ_SESSION=$(
   cat <<'SESS'
 usage_msgs as $m
 | ($m | map(.input + .cache_read + .cache_creation)) as $ctx
+| ($m | model_breakdown) as $mb
 | { kind: "session",
     session: $session,
     date: day_of,
@@ -296,6 +333,8 @@ usage_msgs as $m
       ([ .[] | select(.type == "assistant" and (.message | type) == "object")
              | .message.content[]?
              | select(type == "object" and .type == "tool_use" and .name == "Agent") ] | length),
+    model: ($mb | top_model),
+    models: $mb,
     context_sizes: $ctx }
   + ($m | totals_of)
 SESS
@@ -303,18 +342,22 @@ SESS
 
 JQ_DISPATCH=$(
   cat <<'DISP'
-{ kind: "dispatch",
-  session: $session,
-  agent_id: $agent_id,
-  agent_type: $agent_type,
-  description: $description,
-  ref: (if ($description | test("#[0-9]+"))
-        then ($description | capture("(?<r>#[0-9]+)") | .r) else "" end),
-  date: day_of,
-  wall_seconds: wall_seconds,
-  resumes: ([injected_prompts - 1, 0] | max),
-  outcome: outcome }
-+ (usage_msgs | totals_of)
+usage_msgs as $m
+| ($m | model_breakdown) as $mb
+| { kind: "dispatch",
+    session: $session,
+    agent_id: $agent_id,
+    agent_type: $agent_type,
+    description: $description,
+    ref: (if ($description | test("#[0-9]+"))
+          then ($description | capture("(?<r>#[0-9]+)") | .r) else "" end),
+    date: day_of,
+    wall_seconds: wall_seconds,
+    resumes: ([injected_prompts - 1, 0] | max),
+    outcome: outcome,
+    model: ($mb | top_model),
+    models: $mb }
+  + ($m | totals_of)
 DISP
 )
 
@@ -416,6 +459,20 @@ JQ_REPORT=$(
   cat <<'REP'
 def sum_class($rows; $k): ($rows | map(.[$k]) | add) // 0;
 def pct($n; $d): if $d == 0 then 0 else (($n * 1000 / $d) | floor) / 10 end;
+# Merge every row's per-model breakdown (dispatches + sessions) into one
+# {model: {api_calls, input_tokens, output_tokens, cache_read_input_tokens,
+# cache_creation_input_tokens}} map -- tokens-per-model across the whole
+# report, not just the one dominant model each row's `.model` field names.
+def merge_models($rows):
+  [ $rows[] | (.models // {}) | to_entries[] ]
+  | group_by(.key)
+  | map({ key: .[0].key,
+          value: { api_calls: (map(.value.api_calls) | add // 0),
+                   input_tokens: (map(.value.input_tokens) | add // 0),
+                   output_tokens: (map(.value.output_tokens) | add // 0),
+                   cache_read_input_tokens: (map(.value.cache_read_input_tokens) | add // 0),
+                   cache_creation_input_tokens: (map(.value.cache_creation_input_tokens) | add // 0) } })
+  | from_entries;
 def bucket($c):
   if   $c <  50000 then "0-50k"
   elif $c < 100000 then "50-100k"
@@ -455,7 +512,8 @@ def at_pct($sorted; $p):
                         + sum_class($disp; "cache_creation_input_tokens")),
       main_tokens: (sum_class($sess; "input_tokens") + sum_class($sess; "output_tokens")
                     + sum_class($sess; "cache_read_input_tokens")
-                    + sum_class($sess; "cache_creation_input_tokens"))
+                    + sum_class($sess; "cache_creation_input_tokens")),
+      by_model: merge_models($disp + $sess)
     },
     context_histogram: {
       calls: $nctx,
@@ -491,16 +549,21 @@ def pad($s; $n): ($s | tostring) as $t
 def rpad($s; $n): ($s | tostring) as $t
   | if ($t | length) >= $n then $t[0:$n] else ((" " * ($n - ($t | length))) + $t) end;
 def hm: (. | floor) as $s | "\(($s / 3600) | floor)h\((($s % 3600) / 60) | floor)m";
+# A short display form: the "claude-" prefix is implied everywhere in this
+# repo, so stripping it (claude-opus-5 -> opus-5) buys back column width.
+def short_model: sub("^claude-"; "");
 
 "=== token usage: \(.projects_dir)  window[\(.window.since // "-")..\(.window.until // "-")]  generated \(.generated_at)",
 "",
 "--- dispatches (one row per subagent transcript) ---",
 (pad("date"; 10) + " " + pad("session"; 10) + " " + pad("agent_type"; 20) + " "
+ + pad("model"; 10) + " "
  + pad("ref"; 7) + " " + rpad("res"; 3) + " " + rpad("wall"; 7) + " "
  + rpad("calls"; 5) + " " + rpad("input"; 8) + " " + rpad("output"; 8) + " "
  + rpad("cache_rd"; 11) + " " + rpad("cache_wr"; 10) + " " + pad("outcome"; 14) + " description"),
 ( (if $top > 0 then .rows[0:$top] else .rows end)[]
   | pad(.date; 10) + " " + pad(.session; 10) + " " + pad(.agent_type; 20) + " "
+    + pad((.model | short_model); 10) + " "
     + pad(.ref; 7) + " " + rpad(.resumes; 3) + " " + rpad((.wall_seconds | hm); 7) + " "
     + rpad(.api_calls; 5) + " " + rpad(.input_tokens; 8) + " " + rpad(.output_tokens; 8) + " "
     + rpad(.cache_read_input_tokens; 11) + " " + rpad(.cache_creation_input_tokens; 10) + " "
@@ -510,14 +573,22 @@ def hm: (. | floor) as $s | "\(($s / 3600) | floor)h\((($s % 3600) / 60) | floor
  else empty end),
 "",
 "--- main-context sessions ---",
-(pad("date"; 10) + " " + pad("session"; 12) + " " + rpad("calls"; 5) + " "
+(pad("date"; 10) + " " + pad("session"; 12) + " " + pad("model"; 10) + " " + rpad("calls"; 5) + " "
  + rpad("disp"; 4) + " " + rpad("input"; 8) + " " + rpad("output"; 8) + " "
  + rpad("cache_rd"; 12) + " " + rpad("cache_wr"; 10)),
 ( .sessions[]
-  | pad(.date; 10) + " " + pad(.session; 12) + " " + rpad(.api_calls; 5) + " "
+  | pad(.date; 10) + " " + pad(.session; 12) + " " + pad((.model | short_model); 10) + " "
+    + rpad(.api_calls; 5) + " "
     + rpad(.dispatches_launched; 4) + " " + rpad(.input_tokens; 8) + " "
     + rpad(.output_tokens; 8) + " " + rpad(.cache_read_input_tokens; 12) + " "
     + rpad(.cache_creation_input_tokens; 10) ),
+"",
+"--- totals by model ---",
+( .totals.by_model | to_entries[]
+  | "  " + pad((.key | short_model); 10) + rpad(.value.api_calls; 6) + " calls  input "
+    + rpad(.value.input_tokens; 8) + " output " + rpad(.value.output_tokens; 8)
+    + " cache_read " + rpad(.value.cache_read_input_tokens; 10)
+    + " cache_creation " + rpad(.value.cache_creation_input_tokens; 10) ),
 "",
 "--- context size per main-session API call (is /compact at the threshold happening?) ---",
 ( .context_histogram.buckets[]

@@ -83,6 +83,23 @@
 #         the dispatch row count, and that --top truncation is both ANNOUNCED
 #         (47) and APPLIED (48) -- dropping the `.rows[0:$top]` slice leaves
 #         the suppression notice intact, so 47 alone does not catch it.
+#   49-50 MODEL ON THE UNIFORM FIXTURE. Every message in the main `projects`
+#         fixture carries the same model (claude-opus-5), so `model` and the
+#         one-entry `models` breakdown must both reflect it on an ordinary
+#         row -- the trivial case a multi-model fixture alone would not cover.
+#   51-57 MODEL ATTRIBUTION on the `model-mix` fixture
+#         (fixtures/token_usage/model-mix/): a main session whose two messages
+#         use DIFFERENT models (claude-opus-5 output=10, claude-haiku-5
+#         output=50) and a subagent dispatch using a third (claude-sonnet-5).
+#         Pins: (a) `model` picks the model with the MOST OUTPUT TOKENS, not
+#         the first or last message -- a naive "last message wins" or
+#         "first model wins" reading would report opus, not haiku; (b) the
+#         per-model `models` breakdown carries BOTH models' full token
+#         classes, not just the winner's; (c) `totals.by_model` sums the
+#         breakdown ACROSS rows (session + dispatch), so a model used only by
+#         a subagent still shows up in the report-wide total.
+#   58-59 TABLE: the model column renders with the "claude-" prefix stripped
+#         (short form), on both the dispatch and session tables.
 #
 # Run:
 #   sh trading/devtools/checks/token_usage_report_test.sh
@@ -317,6 +334,45 @@ expect_eq "table: --top 1 truncates and says so" \
 expect_eq "table: --top 1 emits exactly one dispatch row" \
   "1" "$(sh "$SCRIPT" --projects-dir "$FIX/projects" --top 1 2>/dev/null \
          | grep -cE '^2026-09-[0-9]{2} sess-main  [a-z]')"
+
+# --- 49-50: model on the uniform fixture (every message is claude-opus-5) --
+expect_eq "model: uniform row reports the only model present" \
+  "claude-opus-5" "$(row a1 .model)"
+expect_eq "models: uniform row's breakdown has exactly one key" \
+  "claude-opus-5" "$(row a1 '.models | keys | join(",")')"
+
+# --- 51-57: model attribution on the model-mix fixture ---------------------
+MMFIX="${ROOT}/trading/devtools/checks/fixtures/token_usage/model-mix"
+[ -d "$MMFIX" ] || die "model-mix fixture tree not found: $MMFIX"
+sh "$SCRIPT" --projects-dir "$MMFIX" --format json >"$TMP/mm.json" 2>"$TMP/mm.err"
+MM_RC=$?
+expect_eq "model-mix fixture exits 0" "0" "$MM_RC"
+mmq() { jq -r "$1" "$TMP/mm.json"; }
+
+expect_eq "model: session with two models picks the one with more OUTPUT tokens" \
+  "claude-haiku-5" "$(mmq '.sessions[0].model')"
+expect_eq "models: session breakdown keeps BOTH models, not just the winner" \
+  "claude-haiku-5,claude-opus-5" "$(mmq '.sessions[0].models | keys | sort | join(",")')"
+expect_eq "models: the non-winning model's own output_tokens are still correct" \
+  "10" "$(mmq '.sessions[0].models["claude-opus-5"].output_tokens')"
+expect_eq "models: the winning model's own output_tokens are correct" \
+  "50" "$(mmq '.sessions[0].models["claude-haiku-5"].output_tokens')"
+expect_eq "model: a dispatch using a single model reports it trivially" \
+  "claude-sonnet-5" "$(mmq '.rows[0].model')"
+expect_eq "totals.by_model: sums across BOTH session and dispatch rows (3 models total)" \
+  "claude-haiku-5,claude-opus-5,claude-sonnet-5" \
+  "$(mmq '.totals.by_model | keys | sort | join(",")')"
+expect_eq "totals.by_model: a model used only by a subagent still totals correctly" \
+  "5" "$(mmq '.totals.by_model["claude-sonnet-5"].output_tokens')"
+
+# --- 58-59: table renders the short model form ------------------------------
+sh "$SCRIPT" --projects-dir "$MMFIX" >"$TMP/mm_table.txt" 2>/dev/null
+expect_eq "table: dispatch row shows the short model form (sonnet-5, not claude-sonnet-5)" \
+  "1" "$(grep -cE '^2026-09-25 sess-mm    unknown              sonnet-5' "$TMP/mm_table.txt")"
+expect_eq "table: session row shows the short model form (haiku-5, winner by output)" \
+  "1" "$(grep -cE '^2026-09-25 sess-mm      haiku-5' "$TMP/mm_table.txt")"
+expect_eq "table: totals-by-model section lists all three models" \
+  "3" "$(grep -cE '^  (haiku-5|opus-5|sonnet-5)  *[0-9]+ calls' "$TMP/mm_table.txt")"
 
 # --------------------------------------------------------------------------
 printf '=== Results: %s passed, %s failed ===\n' "$PASS" "$FAILED"
