@@ -67,6 +67,10 @@ tickets; neither filled. Both arms are identical apart from `position_id` number
 
 `validator_diff -check V6` exit 0 (`results/chain-S.log`, `v6diff:sh0-5d:exit=0`).
 
+### Null tripwire
+
+`sh0` reproduces `../entry-anchor-recovery-2026-10-02/results/ia0-5d-s0-v11-*` on a newer HEAD (29e81f888 vs 4b90a8cc7): `actual.sexp` metrics identical, and `trades.csv` identical on every shared column except the stop-report columns of 3 rows (MMSI, BCH, AAON: `exit_stop` / `max_stop` / `n_stop_raises`), which #3100 corrected (reporting only; dates, prices and P&L unchanged). The new file adds `entry_anchor`.
+
 ### Rule 2 — long leg
 
 All 72 long trades are shared, identical in every column except `position_id`: the two short tickets took two ids
@@ -84,7 +88,7 @@ Weekly funnel from the `shB` trade audit (`results/s0-shB-short-funnel.csv`, 255
 | Neutral | 25 | 25 | 0 (`neutral_blocks_shorts`) |
 | Bullish | 92 | 0 | 0 |
 
-1. **The slow-grind gate is the main block.** In 117 of 138 Bearish weeks, 50–200 graded short candidates
+1. **The slow-grind gate is the main block.** In 117 of 138 Bearish weeks, 7–590 graded short candidates (median 163, p25 59, p75 286)
    reached the last cascade stage, and `short_top_n_admitted` was 0. With the macro admitting shorts, that stage
    returns nothing only when `decline_is_slow_grind` is false (`screener.ml`, `slow_grind_admits`). The 21 open
    weeks were 2008-02-22 → 04-11 (5), 2008-08-08 → 09-19 (6), 2008-12-12 → 2009-01-16 (6), 2011-09-23 → 10-14 (4).
@@ -104,7 +108,7 @@ Short P&L, win count, hold and exit split: none (no fills). Margin force-covers:
 
 ### Rule 4 — portfolio (descriptive)
 
-Both arms: return +18.47 %, max DD 14.42 %, Calmar 0.235, 72 trades, NAV at 2009-03-31 ,054. The NAV gap is
+Both arms: return +18.47 %, max DD 14.42 %, Calmar 0.235, 72 trades, NAV at 2009-03-31 $967,054.29. The NAV gap is
 zero, so there is no regime split to make.
 
 ### Rule 5 — review-pack look
