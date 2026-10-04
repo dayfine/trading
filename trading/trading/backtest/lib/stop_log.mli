@@ -272,9 +272,9 @@ val record_stop_decision :
       strictly more protective. A move also reported by a transition counts
       once, whichever arrives first.
 
-    A reverse split (stop moved {e up} by a rescale) reads as a raise for a
-    long: this function sees levels, not the split factor, so it cannot tell the
-    two apart. *)
+    A reverse split for a long (stop moved {e up} by a rescale), or a forward
+    split for a short (stop moved {e down}), reads as a raise: this function
+    sees levels, not the split factor, so it cannot tell the two apart. *)
 
 val get_stop_infos : t -> stop_info list
 (** Return stop info for all positions that have been observed, sorted by

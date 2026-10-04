@@ -21,6 +21,7 @@ open Matchers
 module TA = Backtest.Trade_audit
 module TL = Backtest.Ticket_lifecycle
 module AR = Weinstein_strategy.Audit_recorder
+module SD = Weinstein_stops.Stop_decision
 
 (* ------------------------------------------------------------------ *)
 (* Fixtures                                                             *)
@@ -569,6 +570,69 @@ let test_stop_log_receives_installed_stop_and_moves _ =
            ];
        ])
 
+(** Issue #3075 sink hop: [record_stop_decision] feeds the stop log as well as
+    the audit row, so [trades.csv]'s stop columns follow the stop machine. The
+    first decision's [stop_before] (85.0, the level the machine holds at the
+    fill) differs from the decision-time [installed_stop] (92.0) and must become
+    [entry_stop]; the audit row still carries the decision.
+
+    MUTATION: wiring [record_stop_decision] to
+    [Trade_audit.record_stop_decision trade_audit] in [of_collector] leaves
+    [entry_stop] at 92.0. *)
+let test_stop_decision_reaches_stop_log_and_audit_row _ =
+  let trade_audit = TA.create () in
+  let stop_log = Backtest.Stop_log.create () in
+  let recorder =
+    Backtest.Trade_audit_recorder.of_collector ~stop_log ~trade_audit
+      ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+      ()
+  in
+  recorder.record_entry
+    (_entry_event ~split_safe_basis:AR.Flag_off
+       ~stop_floor_kind:AR.Buffer_fallback ());
+  recorder.record_stop_decision
+    {
+      SD.date = _date "2024-06-21";
+      position_id = "ZZZZ-wein-1";
+      state_before = SD.Trailing;
+      state_after = SD.Trailing;
+      stop_before = 85.0;
+      stop_after = 85.0;
+      candidate = None;
+      correction_count_before = 0;
+      correction_count = 0;
+      last_trend_extreme = Some 110.0;
+      last_correction_extreme = Some 104.0;
+      ma_value = 100.0;
+      reason = SD.No_correction_yet;
+    };
+  assert_that
+    (Backtest.Stop_log.get_stop_infos stop_log)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.entry_stop)
+               (is_some_and (float_equal 85.0));
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+               (is_some_and (float_equal 85.0));
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+               (equal_to 0);
+           ];
+       ]);
+  assert_that
+    (TA.get_audit_records trade_audit)
+    (elements_are
+       [
+         field
+           (fun (r : TA.audit_record) -> r.stop_decisions)
+           (elements_are
+              [ field (fun (d : SD.t) -> d.stop_before) (float_equal 85.0) ]);
+       ])
+
 (** Issue #2989 sink hop: a [record_reissue] event copies the original
     placement's row forward under the re-issued id (linked back via
     [reissued_from]) and books its installed stop on the stop log under the
@@ -662,6 +726,8 @@ let suite =
          >:: test_entry_projection_carries_armed_local_range_top;
          "stop_log receives installed stop and silent moves"
          >:: test_stop_log_receives_installed_stop_and_moves;
+         "#3075: stop decision reaches the stop log and the audit row"
+         >:: test_stop_decision_reaches_stop_log_and_audit_row;
        ]
 
 let () = run_test_tt_main suite
