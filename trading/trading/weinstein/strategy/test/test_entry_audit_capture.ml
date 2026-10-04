@@ -2595,6 +2595,91 @@ let test_make_entry_transition_threads_pullback_stop _ =
                       : Audit_recorder.stop_floor_kind))));
        ])
 
+(* Config-driven pin through [Entry_walk.entries_from_candidates], the path a
+   backtest takes: [config.continuation_stop_at_pullback_low] must reach the
+   stop installed in [stop_states]. Armed, it is the stop below the 100.0
+   pullback low; off, the generic fallback, which differs. *)
+let _walk_installed_stop ~armed =
+  let current_date = _pb_as_of in
+  let config =
+    {
+      (Weinstein_strategy_config.default_config ~universe:[ "CONT" ]
+         ~index_symbol:"SPY")
+      with
+      continuation_stop_at_pullback_low = armed;
+    }
+  in
+  let stop_states = ref String.Map.empty in
+  let _transitions =
+    Entry_walk.entries_from_candidates ~config
+      ~candidates:[ _continuation_candidate ~pullback_low:(Some 100.0) () ]
+      ~stop_states
+      ~bar_reader:
+        (_bar_reader_with_current_close ~current_date ~current_close:110.0)
+      ~portfolio:
+        {
+          Trading_strategy.Portfolio_view.cash = 1_000_000.0;
+          positions = String.Map.empty;
+        }
+      ~get_price:(fun _ -> None)
+      ~current_date ()
+  in
+  Map.data !stop_states |> List.map ~f:Weinstein_stops.get_stop_level
+
+let test_entries_from_candidates_threads_pullback_stop _ =
+  let below_pullback =
+    Weinstein_stops.get_stop_level
+      (Weinstein_stops.compute_initial_stop
+         ~config:Weinstein_stops.default_config ~side:Long
+         ~reference_level:100.0)
+  in
+  assert_that
+    (_walk_installed_stop ~armed:true, _walk_installed_stop ~armed:false)
+    (all_of
+       [
+         field fst (elements_are [ float_equal below_pullback ]);
+         field snd (elements_are [ not_ (float_equal below_pullback) ]);
+       ])
+
+(* Ordering: the pullback stop is applied BEFORE the [min_stop_distance_pct]
+   widening, so a floor wider than the pullback stop's distance still wins.
+   With a pullback stop about 2 % under the entry and a 12 % floor, the installed
+   stop is the 12 %-widened one, not the pullback level. *)
+let test_min_distance_widening_applies_after_pullback_stop _ =
+  let current_date = _pb_as_of in
+  let installed_and_entry =
+    match
+      Entry_audit_capture.make_entry_transition ~min_stop_distance_pct:0.12
+        ~continuation_stop_at_pullback_low:true
+        ~portfolio_risk_config:_portfolio_risk_config
+        ~stops_config:_stops_config ~initial_stop_buffer:0.92
+        ~stop_states:(ref String.Map.empty)
+        ~bar_reader:
+          (_bar_reader_with_current_close ~current_date ~current_close:110.0)
+        ~portfolio_value:100_000.0 ~current_date
+        (_continuation_candidate ~pullback_low:(Some 100.0) ())
+    with
+    | Entry_audit_capture.Entry_ok (_, meta) ->
+        Some (meta.installed_stop, meta.effective_entry_price)
+    | _ -> None
+  in
+  let widened_from entry_price =
+    Weinstein_stops.get_stop_level
+      (Weinstein_stops.Stop_widen.widen_initial_to_min_distance
+         ~config:_stops_config ~side:Long ~entry_price ~min_distance_pct:0.12
+         (Weinstein_stops.compute_initial_stop ~config:_stops_config ~side:Long
+            ~reference_level:100.0))
+  in
+  assert_that installed_and_entry
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (installed, entry) -> installed -. widened_from entry)
+              (float_equal 0.0);
+            field fst (lt (module Float_ord) 99.0);
+          ]))
+
 let () =
   run_test_tt_main
     ("entry_audit_capture"
@@ -2749,4 +2834,8 @@ let () =
            >:: test_pullback_stop_passes_through_otherwise;
            "#3069: make_entry_transition threads the pullback stop"
            >:: test_make_entry_transition_threads_pullback_stop;
+           "#3069: entries_from_candidates threads the config flag"
+           >:: test_entries_from_candidates_threads_pullback_stop;
+           "#3069: min-distance widening applies after the pullback stop"
+           >:: test_min_distance_widening_applies_after_pullback_stop;
          ])
