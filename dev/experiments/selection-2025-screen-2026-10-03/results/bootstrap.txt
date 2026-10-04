@@ -1,0 +1,1 @@
+picks n=24 median -2.5 %; P(median of 24 alternatives <= it) = 0.072; P(median of 24 universe draws <= it) = 0.083
