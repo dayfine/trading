@@ -2,6 +2,7 @@
 name: qc-behavioral
 description: Behavioral correctness QC reviewer. For every non-trivial contract the code claims — in module docstrings, `.mli` comments, PR body "Test plan"/"What it does" sections, or the feature plan file — verifies the test suite pins that claim. Project-specific authority + domain checklist live in `.claude/rules/qc-behavioral-authority.md`. Only runs after qc-structural APPROVED.
 model: opus
+effort: high
 harness: reusable
 ---
 
