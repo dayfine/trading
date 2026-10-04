@@ -1439,6 +1439,49 @@ let test_record_force_exit_label_mismatch_is_noop _ =
   assert_that (Hashtbl.length last_stop_out_dates) (equal_to 0)
 
 (* ------------------------------------------------------------------ *)
+(* handle_stop_out_transition — the stops pass's post-stop cooldown     *)
+(* stamp (#3101: the catastrophic stop's StrategySignal exit stamps it  *)
+(* as its former StopLoss exit did).                                    *)
+(* ------------------------------------------------------------------ *)
+
+(* Run the stamp over one exit for an AAPL position and return the table as a
+   sorted alist, so each case asserts the whole table. *)
+let _stamp_after exit_reason =
+  let last_stop_out_dates = Hashtbl.create (module String) in
+  let pos = _make_holding_position ~symbol:"AAPL" ~id:"pos_a" in
+  let positions = Map.singleton (module String) "pos_a" pos in
+  let current_date = Date.of_string "2024-02-15" in
+  Internal_for_test.handle_stop_out_transition ~last_stop_out_dates ~positions
+    ~current_date
+    {
+      position_id = "pos_a";
+      date = current_date;
+      kind = TriggerExit { exit_reason; exit_price = 51.07 };
+    };
+  Hashtbl.to_alist last_stop_out_dates
+  |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+
+let test_stop_out_stamp_structural_stop_loss _ =
+  assert_that
+    (_stamp_after
+       (StopLoss
+          { stop_price = 49.632; actual_price = 51.07; loss_percent = 0.0 }))
+    (equal_to
+       ([ ("AAPL", Date.of_string "2024-02-15") ] : (string * Date.t) list))
+
+let test_stop_out_stamp_catastrophic_stop _ =
+  assert_that
+    (_stamp_after
+       (StrategySignal { label = "catastrophic_stop"; detail = None }))
+    (equal_to
+       ([ ("AAPL", Date.of_string "2024-02-15") ] : (string * Date.t) list))
+
+let test_stop_out_stamp_other_signal_is_noop _ =
+  assert_that
+    (_stamp_after (StrategySignal { label = "extension_stop"; detail = None }))
+    (equal_to ([] : (string * Date.t) list))
+
+(* ------------------------------------------------------------------ *)
 (* suppress_warmup_trading default (measurement-correctness invariant)  *)
 (* ------------------------------------------------------------------ *)
 
@@ -1498,6 +1541,12 @@ let () =
            >:: test_record_force_exit_positive_cooldown_records_date;
            "record_force_exit: label mismatch is no-op"
            >:: test_record_force_exit_label_mismatch_is_noop;
+           "stop-out stamp: structural StopLoss stamps"
+           >:: test_stop_out_stamp_structural_stop_loss;
+           "stop-out stamp: catastrophic stop stamps (#3101)"
+           >:: test_stop_out_stamp_catastrophic_stop;
+           "stop-out stamp: other strategy signal is no-op"
+           >:: test_stop_out_stamp_other_signal_is_noop;
            "make produces strategy" >:: test_make_produces_strategy;
            "empty universe no transitions"
            >:: test_empty_universe_no_transitions;

@@ -467,4 +467,5 @@ module Internal_for_test = struct
   let maybe_reset_halt = _maybe_reset_halt
   let positions_minus_exited = _positions_minus_exited
   let record_force_exit = _record_force_exit
+  let handle_stop_out_transition = _handle_stop_out_transition
 end

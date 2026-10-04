@@ -550,6 +550,20 @@ let test_r7_fail_force_liquidation_on_short _ =
        ())
     (equal_to TR.Fail)
 
+(* #3101: the fast-crash catastrophic stop now exits as
+   [Strategy_signal "catastrophic_stop"] instead of [Stop_loss]. It is still a
+   protective stop exit, so a long it takes out in Stage 4 keeps the [Pass] it
+   had as a [Stop_loss]. *)
+let test_r7_pass_catastrophic_stop_in_stage_4 _ =
+  assert_that
+    (_r7_of_exit
+       ~stage_at_exit:(WT.Stage4 { weeks_declining = 2 })
+       ~exit_trigger:
+         (Backtest.Stop_log.Strategy_signal
+            { label = "catastrophic_stop"; detail = None })
+       ())
+    (equal_to TR.Pass)
+
 (* Blast-radius guard: only the breaker's own label fails stage-independently.
    Another [Strategy_signal] exit in a healthy stage keeps the prior verdict. *)
 let test_r7_pass_other_strategy_signal_outside_stage_4 _ =
@@ -1360,6 +1374,8 @@ let suite =
          >:: test_r7_fail_force_liquidation_still_in_stage_2;
          "R7 fail force liquidation on short"
          >:: test_r7_fail_force_liquidation_on_short;
+         "R7 pass catastrophic stop in stage 4"
+         >:: test_r7_pass_catastrophic_stop_in_stage_4;
          "R7 pass other strategy signal outside stage 4"
          >:: test_r7_pass_other_strategy_signal_outside_stage_4;
          "R7 fail other strategy signal held through stage 4"
