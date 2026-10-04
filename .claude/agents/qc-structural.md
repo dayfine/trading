@@ -2,6 +2,7 @@
 name: qc-structural
 description: Structural and mechanical QC reviewer. Checks build health, code patterns, and architecture constraints. Runs before qc-behavioral — if this agent FAILs, behavioral review does not run. Project-specific architecture rules live in `.claude/rules/qc-structural-authority.md`.
 model: haiku
+effort: medium
 harness: reusable
 ---
 
