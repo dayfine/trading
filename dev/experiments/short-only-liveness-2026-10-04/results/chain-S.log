@@ -1,0 +1,15 @@
+[10-04 22:48:31] lane S HEAD=303b341fd (expect 303b341fd)
+[10-04 22:48:31] cell guard CELL_TIMEOUT=5400s (26y guard; 5y cells ~1h); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-04 22:48:32] warehouse entries=9364 (expect 9364)
+[10-04 22:48:32] host free 92G
+[10-04 22:48:32] BUILD
+[10-04 22:49:53] BUILD_DONE
+[10-04 22:49:53] PREFLIGHT soT-5d
+[10-04 22:52:38] PREFLIGHT_OK soT-5d (165s)
+[10-04 22:52:39] PREFLIGHT soTs-5d
+[10-04 22:55:15] PREFLIGHT_OK soTs-5d (156s)
+[10-04 22:55:15] RUN soT-5d-s0-v11 on /tmp/snap_top3000_pit_v11pit
+[10-04 23:57:42] RESULT soT-5d-s0-v11 => total_return_pct -8.3857511163738554 total_trades 175 sharpe_ratio -0.07620027198179212 max_drawdown_pct 21.9561788933636 calmar_ratio -0.077870299055873157  V6 INVARIANT 3 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-shortonly/trading/test_data/share_classes.sexp) V16 EXPECTATION 68 violations V17 EXPECTATION PASS  v6diff:none peak_rss_kb=3532140 Panel_runner: snapshot cache hits=17293849 misses=582432 miss_absent=578454 evictions=0 n_symbols=4207 misses_per_symbol=138.44 n_symbols_touched=3978 n_symbols_absent=229 loads_per_touched=1.00 max_entries=3978 max_bytes=79313656 max_mmap_open=3978 avg_entries=1989.5 avg_bytes=39808886 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1521181096 maxrss_bytes=3615100928 (wall 3747s)
+[10-04 23:57:42] RUN soTs-5d-s0-v11 on /tmp/snap_top3000_pit_v11pit
+[10-05 00:21:04] RESULT soTs-5d-s0-v11 => total_return_pct -9.5233844077544987 total_trades 116 sharpe_ratio -0.0889717154886493 max_drawdown_pct 32.268536657491218 calmar_ratio -0.060469583744690608  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-shortonly/trading/test_data/share_classes.sexp) V16 EXPECTATION 50 violations V17 EXPECTATION PASS  v6diff:soT-5d:exit=1 peak_rss_kb=3504132 Panel_runner: snapshot cache hits=17322634 misses=582432 miss_absent=578454 evictions=0 n_symbols=4207 misses_per_symbol=138.44 n_symbols_touched=3978 n_symbols_absent=229 loads_per_touched=1.00 max_entries=3978 max_bytes=79313656 max_mmap_open=3978 avg_entries=1989.5 avg_bytes=39808886 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1491745712 maxrss_bytes=3586658304 (wall 1402s)
+[10-05 00:21:04] LANE S DONE
