@@ -1,0 +1,13 @@
+((events
+  (((symbol ALX) (position_id ALX-wein-967) (date 2008-11-24) (side Short)
+    (entry_price 171.05) (current_price 203.35) (quantity 626)
+    (cost_basis 107077.3) (unrealized_pnl -20219.799999999988)
+    (unrealized_pnl_pct -0.18883367436422088) (reason Per_position))
+   ((symbol SUN1) (position_id SUN1-wein-1066) (date 2009-05-06) (side Short)
+    (entry_price 26.87) (current_price 31.44) (quantity 2682)
+    (cost_basis 72065.34) (unrealized_pnl -12256.740000000002)
+    (unrealized_pnl_pct -0.17007815407517682) (reason Per_position))
+   ((symbol SSC) (position_id SSC-wein-1512) (date 2011-09-08) (side Short)
+    (entry_price 337.5) (current_price 393.75) (quantity 278)
+    (cost_basis 93825) (unrealized_pnl -15637.5)
+    (unrealized_pnl_pct -0.16666666666666666) (reason Per_position)))))

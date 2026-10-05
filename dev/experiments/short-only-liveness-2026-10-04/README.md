@@ -42,3 +42,4 @@ $1M, margin model on (maintenance 0.30, borrow/maintenance tiers), 2 % stop-limi
 ## Log
 
 - 2026-10-04 — pre-registered.
+- 2026-10-05 — Phase A results: live in both arms, both negative (`results-2026-10-05.md`).
