@@ -114,7 +114,7 @@ let _unwrap = function
 
 (** A resting (unfilled) [Entering] ticket — the F2 cancel's only candidate
     shape. *)
-let _resting_ticket ~id ~symbol ~side =
+let _resting_ticket ?(entry_price = 100.0) ~id ~symbol ~side () =
   let created = Date.add_days _friday (-7) in
   Position.create_entering
     {
@@ -126,7 +126,7 @@ let _resting_ticket ~id ~symbol ~side =
             symbol;
             side;
             target_quantity = 10.0;
-            entry_price = 100.0;
+            entry_price;
             reasoning = ManualDecision { description = "index-stage veto test" };
           };
     }
@@ -178,7 +178,7 @@ let _long_ticket_cancelled_in ?index_stage_veto_blocks_longs index_stage =
       (_positions
          [
            _resting_ticket ~id:"L1" ~symbol:_long_symbol
-             ~side:Trading_base.Types.Long;
+             ~side:Trading_base.Types.Long ();
          ])
 
 (* ------------------------------------------------------------------ *)
@@ -274,6 +274,11 @@ let _fresh_index_view =
     ~as_of:_friday
 
 let _fresh_last_bar = List.last _fresh_bars
+
+(* A resting long's trigger above [_fresh_symbol]'s last close: the breakout is
+   still ahead, so a re-admit re-arms it (#3126 drops one the market is above). *)
+let _above_fresh_close =
+  (Option.value_exn _fresh_last_bar).Types.Daily_price.close_price *. 1.05
 
 let _fresh_get_price symbol =
   if String.equal symbol _fresh_symbol then _fresh_last_bar else None
@@ -411,7 +416,7 @@ let test_a_resting_short_ticket_is_untouched_by_the_long_veto _ =
         (_positions
            [
              _resting_ticket ~id:"S1" ~symbol:_short_symbol
-               ~side:Trading_base.Types.Short;
+               ~side:Trading_base.Types.Short ();
            ])
   in
   assert_that
@@ -532,8 +537,8 @@ let test_a_suspended_ticket_is_reissued_once_not_rewritten_by_the_cascade _ =
     _suspend_screen ~suspended_tickets
       ~positions:
         [
-          _resting_ticket ~id:"F1" ~symbol:_fresh_symbol
-            ~side:Trading_base.Types.Long;
+          _resting_ticket ~entry_price:_above_fresh_close ~id:"F1"
+            ~symbol:_fresh_symbol ~side:Trading_base.Types.Long ();
         ]
       _stage4
   in
@@ -567,8 +572,8 @@ let test_the_screen_records_one_reissue_naming_the_first_placement _ =
     _suspend_screen ~audit_recorder ~suspended_tickets
       ~positions:
         [
-          _resting_ticket ~id:"F1" ~symbol:_fresh_symbol
-            ~side:Trading_base.Types.Long;
+          _resting_ticket ~entry_price:_above_fresh_close ~id:"F1"
+            ~symbol:_fresh_symbol ~side:Trading_base.Types.Long ();
         ]
       _stage4
   in

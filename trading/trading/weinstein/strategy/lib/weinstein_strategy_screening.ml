@@ -326,15 +326,18 @@ let _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
 (** F2 cancels, then the #2976 suspension / re-issue over what they leave
     ({!Entry_ticket_suspend.run}); [Off] is exactly the F2 cancels. *)
 let _resting_tickets ?pending_entry_e ?suspended_tickets ~audit_recorder ~config
-    ~macro_result ~sector_map ~stop_states ~portfolio ~classified ~current_date
-    () =
+    ~macro_result ~sector_map ~stop_states ~get_price ~portfolio ~classified
+    ~current_date () =
   let cancel_expired portfolio =
     _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
       ~portfolio ~classified ~current_date ()
   in
+  let current_close symbol =
+    Option.map (get_price symbol) ~f:(fun b -> b.Types.Daily_price.close_price)
+  in
   Entry_ticket_suspend.run ?store:suspended_tickets ?pending_entry_e
-    ~audit_recorder ~config ~macro_result ~stop_states ~portfolio ~current_date
-    ~cancel_expired ()
+    ~audit_recorder ~config ~macro_result ~stop_states ~current_close ~portfolio
+    ~current_date ~cancel_expired ()
 
 (* Per-element predicates over the four-tuple shape so [screen_universe]'s
    cascade stays a flat pipeline (one filter per gate, no destructuring
@@ -459,7 +462,7 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
   (* F2 + #2976 before the screen: suspended symbols count as held. *)
   let ticket_transitions, suspended_held =
     _resting_tickets ?pending_entry_e ?suspended_tickets ~audit_recorder ~config
-      ~macro_result ~sector_map ~stop_states ~portfolio ~classified
+      ~macro_result ~sector_map ~stop_states ~get_price ~portfolio ~classified
       ~current_date ()
   in
   (* G1 + G2 (#2490): inert unless the recorder opted into capture. *)

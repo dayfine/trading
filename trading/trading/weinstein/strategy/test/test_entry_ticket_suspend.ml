@@ -108,12 +108,13 @@ let _config ?(max_rest_weeks = 0) mode =
   }
 
 let _no_cancels _ = []
+let _no_close _ = None
 
 let _run ?(cancel_expired = _no_cancels) ?(stop_states = ref String.Map.empty)
-    ?pending_entry_e ?audit_recorder ~store ~config ~macro_result ~positions
-    ~date () =
+    ?(current_close = _no_close) ?pending_entry_e ?audit_recorder ~store ~config
+    ~macro_result ~positions ~date () =
   Entry_ticket_suspend.run ~store ?pending_entry_e ?audit_recorder ~config
-    ~macro_result ~stop_states
+    ~macro_result ~stop_states ~current_close
     ~portfolio:{ cash = 100_000.0; positions = _positions positions }
     ~current_date:date ~cancel_expired ()
 
@@ -526,6 +527,68 @@ let test_stash_held_elsewhere_is_dropped _ =
            (elements_are [ float_equal _probe_entry ]);
        ])
 
+(** #3126, STN shape: the ticket (trigger [E = 100]) is withdrawn in a Bearish
+    week; at re-admit the close is [close]. Returns the re-admit week's
+    transitions, its held symbols, and the [E] a re-qualifying symbol would
+    carry (the pin survives only while the ticket does). *)
+let _readmit_at ~close =
+  let store = Entry_ticket_suspend.create () in
+  let pending_entry_e = _pinned () in
+  let config = _config Mode.On_bearish_macro in
+  let long =
+    _entering ~id:"L1" ~symbol:_long_symbol
+      ~created:(Date.add_days _friday (-_week))
+      ()
+  in
+  let current_close s =
+    if String.equal s _long_symbol then Some close else None
+  in
+  let (_ : Position.transition list * string list) =
+    _run ~pending_entry_e ~store ~config ~macro_result:_bearish
+      ~positions:[ long ] ~date:_friday ()
+  in
+  let transitions, held =
+    _run ~current_close ~pending_entry_e ~store ~config ~macro_result:_bullish
+      ~positions:[]
+      ~date:(Date.add_days _friday _week)
+      ()
+  in
+  ( List.map transitions ~f:(fun t -> t.kind),
+    held,
+    _entry_after_requalifying pending_entry_e )
+
+(** Above the trigger at re-admit (STN: trigger 88.86, close ~99): the ticket is
+    dropped, not re-armed — no order, so nothing can fill from above. The symbol
+    is not held and its pin is released, so the screener may re-qualify it at a
+    fresh level ([_probe_entry]).
+
+    MUTATION: skipping [_drop_above_market] re-issues the ticket (first element
+    red); comparing [>=] instead of [>] turns the at-trigger case red. *)
+let test_readmit_above_trigger_drops_the_ticket _ =
+  assert_that (_readmit_at ~close:108.0)
+    (all_of
+       [
+         field (fun (k, _, _) -> k) is_empty;
+         field (fun (_, h, _) -> h) is_empty;
+         field (fun (_, _, e) -> e) (elements_are [ float_equal _probe_entry ]);
+       ])
+
+(** At or below the trigger the ticket is re-armed unchanged: a breakout from
+    below is still ahead of it, as for a ticket that never slept. *)
+let test_readmit_at_or_below_trigger_reissues _ =
+  let reissued (k, h, e) = (k, h, e) in
+  assert_that
+    (List.map [ 95.0; 100.0 ] ~f:(fun close -> reissued (_readmit_at ~close)))
+    (each
+       (all_of
+          [
+            field (fun (k, _, _) -> k) (elements_are [ equal_to _reissue_kind ]);
+            field (fun (_, h, _) -> h) (elements_are [ equal_to _long_symbol ]);
+            field
+              (fun (_, _, e) -> e)
+              (elements_are [ float_equal _pinned_entry ]);
+          ]))
+
 (** The positions a week's re-issues open, as the simulator would hold them. *)
 let _opened (transitions : Position.transition list) =
   List.filter_map transitions ~f:(fun (t : Position.transition) ->
@@ -759,8 +822,10 @@ end = struct
           Entry_ticket_suspend.run ~store:!store
             ~config:{ (_config !mode) with universe = [ _sim_symbol ] }
             ~macro_result:(_macro_on bar.date)
-            ~stop_states:(ref String.Map.empty) ~portfolio
-            ~current_date:bar.date ~cancel_expired:_no_cancels ()
+            ~stop_states:(ref String.Map.empty)
+            ~current_close:(fun s ->
+              if String.equal s _sim_symbol then Some bar.close_price else None)
+            ~portfolio ~current_date:bar.date ~cancel_expired:_no_cancels ()
         in
         Ok
           {
@@ -790,7 +855,7 @@ let _sim_config =
 (** Run the six-bar simulation under [mode] and return its steps. The
     simulator steps every calendar day in [start_date, end_date), so the
     01-06/01-07 weekend appears as two bar-less steps. *)
-let _simulate mode =
+let _simulate ?(bars = _sim_bars) mode =
   let data_dir = Core_unix.mkdtemp "/tmp/test_entry_ticket_suspend" in
   Fun.protect
     ~finally:(fun () ->
@@ -799,7 +864,7 @@ let _simulate mode =
       in
       ())
     (fun () ->
-      _write_bars ~data_dir _sim_bars;
+      _write_bars ~data_dir bars;
       Scripted_suspend_strategy.reset mode;
       let deps =
         Trading_simulation.Simulator.create_deps ~symbols:[ _sim_symbol ]
@@ -871,6 +936,25 @@ let test_sim_on_withholds_then_fills_after_readmission _ =
        ]);
   assert_that (_fill_prices steps) (elements_are [ _in_band ])
 
+(** #3126 end to end, STN shape: the same Bearish withdrawal, but the tape
+    re-admits on 01-08 with the close at 170, above [E = 160]; 01-09 opens 172
+    and falls to 158, trading down through [E]. A re-armed ticket would fill
+    there from above (the defect). Dropped at re-admit, nothing fills. *)
+let _sim_bars_above_at_readmit =
+  List.take _sim_bars 4
+  @ [
+      _bar ~date:"2024-01-08" ~open_price:168.0 ~high:172.0 ~low:167.0
+        ~close:170.0;
+      _bar ~date:"2024-01-09" ~open_price:172.0 ~high:173.0 ~low:158.0
+        ~close:159.0;
+    ]
+
+let test_sim_on_no_fill_from_above_after_readmission _ =
+  let steps =
+    _simulate ~bars:_sim_bars_above_at_readmit Mode.On_bearish_macro
+  in
+  assert_that (_fill_prices steps) is_empty
+
 let () =
   run_test_tt_main
     ("entry_ticket_suspend"
@@ -900,4 +984,10 @@ let () =
            >:: test_sim_off_fills_during_bearish_tape;
            "sim: On withholds, then fills after re-admission"
            >:: test_sim_on_withholds_then_fills_after_readmission;
+           "re-admit above the trigger drops the ticket (#3126)"
+           >:: test_readmit_above_trigger_drops_the_ticket;
+           "re-admit at or below the trigger re-issues (#3126)"
+           >:: test_readmit_at_or_below_trigger_reissues;
+           "sim: no fill from above after re-admission (#3126)"
+           >:: test_sim_on_no_fill_from_above_after_readmission;
          ])
