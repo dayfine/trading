@@ -108,8 +108,9 @@ let test_seed_equal_to_install_changes_nothing _ =
        ~n_stop_raises:1)
 
 (* A 2:1 split while held: the next decision shows the machine at half the
-   level, with no transition. [exit_stop] takes the post-split level and
-   [max_stop] is rescaled with it, so it never sits on the pre-split basis. *)
+   level, with no transition. [exit_stop] takes the post-split level, and
+   [max_stop] and [entry_stop] are rescaled with it (#3127), so no stop column
+   sits on the pre-split basis. *)
 let test_split_while_held_rescales_exit_and_max _ =
   assert_that
     (_run ~installed:30.00
@@ -121,7 +122,23 @@ let test_split_while_held_rescales_exit_and_max _ =
          Trans (_update_stop 36.00);
          Decision (18.00, 18.00);
        ])
-    (_columns ~entry_stop:30.00 ~max_stop:18.00 ~exit_stop:18.00
+    (_columns ~entry_stop:15.00 ~max_stop:18.00 ~exit_stop:18.00
+       ~n_stop_raises:1)
+
+(* The CTO-2021 shape (#3127): installed 50.38 at the fill, a 3:1 split while
+   held, then a raise to 18.49 on the post-split basis. Before #3127 the row
+   read entry_stop 50.38 beside an entry price restated to 19.48. *)
+let test_cto_split_while_held_restates_entry_stop _ =
+  assert_that
+    (_run ~installed:50.38
+       [
+         Trans _create_entering;
+         Trans _entry_complete_no_stop;
+         Decision (50.38, 50.38);
+         Decision (50.38 /. 3.0, 18.49);
+         Trans (_update_stop 18.49);
+       ])
+    (_columns ~entry_stop:(50.38 /. 3.0) ~max_stop:18.49 ~exit_stop:18.49
        ~n_stop_raises:1)
 
 (* A move the machine made outside a decision (e.g. the late-Stage-2 tighten)
@@ -140,6 +157,87 @@ let test_unreported_raise_counts_once _ =
     (_columns ~entry_stop:100.00 ~max_stop:106.00 ~exit_stop:106.00
        ~n_stop_raises:1)
 
+(* trades.csv rows (#3127) ----------------------------------------------- *)
+
+let _price_columns = [ "entry_price"; "exit_price"; "entry_stop"; "exit_stop" ]
+
+(* Render one AAON-keyed round-trip with [info] through the real [trades.csv]
+   writer and read back the four price columns by name. [entry_price] is given
+   already restated onto the exit basis, as the round-trip extractor writes it. *)
+let _row ~(info : Stop_log.stop_info) ~entry_price ~exit_price =
+  let trade : Trading_simulation.Metrics.trade_metrics =
+    {
+      symbol = "AAON";
+      side = Trading_base.Types.Buy;
+      entry_date = _date;
+      exit_date = Date.add_days _date 60;
+      days_held = 60;
+      entry_price;
+      exit_price;
+      quantity = 100.0;
+      pnl_dollars = 0.0;
+      pnl_percent = 0.0;
+      position_id = Some _pid;
+    }
+  in
+  let dir = Filename_unix.temp_dir "stop_log_basis" "" in
+  let path = dir ^ "/trades.csv" in
+  Exn.protect
+    ~f:(fun () ->
+      Backtest.Trades_stream.write_all ~output_dir:dir
+        { round_trips = [ trade ]; stop_infos = [ info ]; audit = [] };
+      let lines = In_channel.read_lines path in
+      let cells l = String.split l ~on:',' in
+      let header = cells (List.hd_exn lines)
+      and row = cells (List.nth_exn lines 1) in
+      List.map _price_columns ~f:(fun col ->
+          let i, _ = List.findi_exn header ~f:(fun _ h -> String.equal h col) in
+          List.nth_exn row i))
+    ~finally:(fun () ->
+      Core_unix.remove path;
+      Core_unix.rmdir dir)
+
+let _cents = Printf.sprintf "%.2f"
+
+(* The CTO-2021 row: a 3:1 split while held. Every stop column is on the
+   post-split basis the entry price is restated onto (entry 19.48, stop 16.79),
+   not entry_stop 50.38 beside it. *)
+let test_cto_row_stop_columns_on_price_basis _ =
+  let info =
+    _run ~installed:50.38
+      [
+        Trans _create_entering;
+        Trans _entry_complete_no_stop;
+        Decision (50.38, 50.38);
+        Decision (50.38 /. 3.0, 18.49);
+        Trans (_update_stop 18.49);
+      ]
+  in
+  assert_that
+    (_row ~info ~entry_price:19.48 ~exit_price:18.49)
+    (equal_to [ "19.48"; "18.49"; _cents (50.38 /. 3.0); "18.49" ])
+
+(* The AAON-2024 row: the ticket rested across the 3:2 split and filled after
+   it, so the fill (83.43) and the stop the machine held there (55.475, the
+   #3075 reseed) are both post-split. The gap between them is the #3075
+   unscaled-trigger defect's real economics, not a basis mix. *)
+let test_aaon_row_stop_columns_on_fill_basis _ =
+  let info =
+    _run ~installed:83.21
+      [
+        Trans _create_entering;
+        Trans _entry_complete_no_stop;
+        Decision (55.475, 55.475);
+        Decision (55.475, 72.15);
+        Trans (_update_stop 72.15);
+        Decision (72.15, 79.18);
+        Trans (_update_stop 79.18);
+      ]
+  in
+  assert_that
+    (_row ~info ~entry_price:83.43 ~exit_price:79.18)
+    (equal_to [ "83.43"; "79.18"; _cents 55.475; "79.18" ])
+
 let suite =
   "Stop_log machine sync"
   >::: [
@@ -150,6 +248,12 @@ let suite =
          "split while held rescales exit_stop and max_stop"
          >:: test_split_while_held_rescales_exit_and_max;
          "unreported raise counts once" >:: test_unreported_raise_counts_once;
+         "split while held restates entry_stop (CTO, #3127)"
+         >:: test_cto_split_while_held_restates_entry_stop;
+         "trades.csv CTO row: stop columns on the price basis (#3127)"
+         >:: test_cto_row_stop_columns_on_price_basis;
+         "trades.csv AAON row: stop columns on the fill basis (#3127)"
+         >:: test_aaon_row_stop_columns_on_fill_basis;
        ]
 
 let () = run_test_tt_main suite

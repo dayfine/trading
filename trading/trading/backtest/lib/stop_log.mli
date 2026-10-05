@@ -126,6 +126,14 @@ type stop_info = {
           no transition reported it (issue #3075, AAON-wein-951: installed 83.21
           at the 2023 decision, held 55.475 at the 2024 fill).
 
+          {b Split while held} (issue #3127): when a later stop decision shows
+          the machine rescaled by a split, this level is rescaled by the same
+          factor, like {!max_stop}. It is then on the price basis of the exit,
+          the basis [trades.csv] restates [entry_price] onto, so [entry_stop],
+          [max_stop] and [exit_stop] of one row compare directly with its prices
+          (CTO 2021: 50.38 pre-split became 16.79 beside an entry of 19.48).
+          Without stop decisions it stays the level as installed.
+
           [None] when no source ever reported a level. *)
   exit_stop : float option;
       (** Stop-loss price at the time of exit: the last level installed, or the
@@ -266,7 +274,8 @@ val record_stop_decision :
       level change no transition carried. More protective: installed as a move
       (a raise when strictly so); its transition, when it arrives, is then an
       unchanged re-install. Less protective: a split rescale; the current level
-      takes it and {!stop_info.max_stop} is rescaled by the same factor.
+      takes it and {!stop_info.max_stop} and {!stop_info.entry_stop} are
+      rescaled by the same factor (#3127).
     - [stop_after] is then installed like an [UpdateRiskParams]: it becomes the
       current level, advances {!stop_info.max_stop}, and counts as a raise when
       strictly more protective. A move also reported by a transition counts

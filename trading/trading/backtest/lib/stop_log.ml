@@ -207,13 +207,17 @@ let _reseed_at_fill record ~level =
 
 (* Bring the log back in line with a machine level no transition reported.
    Less protective can only be a split rescale (the machine never gives ground
-   otherwise), so the high-water mark is rescaled by the same factor to stay on
-   the current price basis. More protective is a move whose transition has not
-   arrived yet: install it, so the later transition is a no-op re-install. *)
+   otherwise), so the high-water mark AND the initial stop are rescaled by the
+   same factor: every stop column then sits on the current price basis, the one
+   [trades.csv] restates [entry_price] onto (issue #3127, CTO 2021: entry_stop
+   50.38 pre-split beside entry_price 19.48 post-split). More protective is a
+   move whose transition has not arrived yet: install it, so the later
+   transition is a no-op re-install. *)
 let _rescale_to record ~current ~level =
   let factor = level /. current in
-  record.pos_max_stop <-
-    Option.map record.pos_max_stop ~f:(fun m -> m *. factor);
+  let rescale = Option.map ~f:(fun m -> m *. factor) in
+  record.pos_max_stop <- rescale record.pos_max_stop;
+  record.pos_entry_stop <- rescale record.pos_entry_stop;
   record.pos_current_stop <- Some level
 
 let _resync_to_machine record ~level =
