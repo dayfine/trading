@@ -183,7 +183,7 @@ ol.agenda li b { font-weight: 600; }
     <div class="bars" id="p-bars"></div>
   </div>
   <div class="panel">
-    <p class="note">Return and drawdown are marked to market from the daily NAV. <b>Realised P&amp;L</b> counts only trades closed in the period, so it can disagree in sign with the return. <b>Invested</b> is the average of held positions marked at the adjusted close, as % of NAV; the run caps long exposure at 70% and keeps 30% cash when it buys (the record config; check the run's params), so marked-to-market winners can push Invested above 70%. <b>DD from peak</b> is the deepest point below the all-time high reached during the period. Macro columns count weekly gate readings.</p>
+    <p class="note">Return and drawdown are marked to market from the daily NAV. <b>Realised P&amp;L</b> counts only trades closed in the period, so it can disagree in sign with the return. <b>Invested</b> is the average of held positions, including those still open at the window end, marked at the adjusted close, as % of NAV over trading days (market holidays are left out). <b>DD from peak</b> is the deepest point below the all-time high reached during the period. Macro columns count weekly gate readings.</p>
     <div class="tablebox"><table id="p-table"></table></div>
   </div>
 </section>
@@ -308,8 +308,8 @@ const gradeTag = g => g ? `<span class="g g${g[0]}">${g}</span>` : '–';
 const trigLabel = t => ({ stop_loss: 'stop', laggard_rotation: 'laggard rotation', extension_stop: 'extension stop', stage3_force_exit: 'stage 3 exit', force_liquidation: 'force liquidation', liquidity_exit: 'liquidity exit', delisted: 'delisted' })[t] || t;
 
 const FLAGS = [
-  { id: 'weekend', cat: 'exec', label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || t.onX === 0,
-    why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect).' },
+  { id: 'weekend', cat: 'exec', label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || (t.onX === 0 && t.trig !== 'delisted'),
+    why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect). A delisting exit has no bar on its date by construction and is left out.' },
   { id: 'offbar', cat: 'exec', label: 'Fill outside the day’s high–low', test: t => (t.onE === 1 && t.inE === 0) || (t.onX === 1 && t.inX === 0),
     why: 'The fill price never traded that day (half a percent of slack for rounding; fills on a later split basis are excluded). The validator’s V13 counts the same thing.' },
   { id: 'gapstop', cat: 'exec', label: 'Stop filled ≥ 3 pts beyond the stop', test: t => t.trig === 'stop_loss' && t.xs > 0 && (t.xs - t.xp) / t.xs >= 0.03,
@@ -324,9 +324,9 @@ const FLAGS = [
     why: 'Entry after a gap or spike, not near the breakout level. The validator’s V10 flags entry weeks up more than 60%.' },
   { id: 'forced', cat: 'exec', label: 'Forced, liquidity or delisting exit', test: t => ['force_liquidation', 'delisted', 'liquidity_exit'].includes(t.trig),
     why: 'Exit not chosen by the strategy’s rules.' },
-  { id: 'macro', cat: 'book', needs: 'mE', label: 'Macro not Bullish at entry', test: t => t.mE && t.mE !== 'Bullish',
+  { id: 'macro', cat: 'book', needs: 'mE', open: true, label: 'Macro not Bullish at entry', test: t => t.mE && t.mE !== 'Bullish',
     why: 'Book Ch. 3/8: weight buying to a bullish market. The run allows Neutral-market buys (audit R8).' },
-  { id: 'macrobear', cat: 'book', needs: 'mE', label: 'Bought in a Bearish macro week', test: t => t.mE === 'Bearish',
+  { id: 'macrobear', cat: 'book', needs: 'mE', open: true, label: 'Bought in a Bearish macro week', test: t => t.mE === 'Bearish',
     why: 'A bearish tape should block all new buys (spine rule 6).' },
   { id: 'lowvol', cat: 'book', label: 'Breakout volume under 2× average', test: t => t.vr < 2,
     why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3).' },
@@ -344,12 +344,24 @@ const FLAGS = [
     why: 'Peak open gain at least 20%, exit under half of it.' },
 ];
 const FLAG = Object.fromEntries(FLAGS.map(f => [f.id, f]));
+// Positions open at the window end have no trades.csv row; a flag marked open: true (it reads only
+// entry-time fields) counts them too (#3125: the 5d null read 6 Bearish-week buys, true 9).
+function openHits(f, open) {
+  return f.open ? open.filter(f.test).length : 0;
+}
+// The last-day exposure check (#3125): what the pack marks as held on the window's last day must
+// match actual.sexp's open_positions_value. A miss means exposure is missing positions.
+function openCheckMiss(c) {
+  if (!c || c.actual == null) return false;
+  const e = Math.abs(c.pack - c.actual);
+  return e > 1 && e > 0.01 * Math.max(Math.abs(c.pack), Math.abs(c.actual));
+}
 
 const D = {};
 const load = p => fetch('data/' + p).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); });
 const chartCache = {};
 
-const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav'];
+const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open'];
 load('manifest.json').then(man => {
   D.man = man; const ids = man.runs.map(r => r.id);
   return Promise.all([...KINDS.flatMap(k => ids.map(id => load(`${id}_${k}.json`))), load('spy.json'), load('macro.json')]);
@@ -569,7 +581,10 @@ function renderOverview() {
   const eq = mkChart('#c-eq', 340, 'overview');
   eq.applyOptions({ rightPriceScale: { mode: 1 } });
   eq.addLineSeries({ color: css('--spy'), lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false }).setData(spy.map(([d, v]) => ({ time: d, value: v })));
-  eq.addLineSeries({ color: css('--accent'), lineWidth: 2, priceLineVisible: false }).setData(nav.map(([d, v]) => ({ time: d, value: v })));
+  const navLine = eq.addLineSeries({ color: css('--accent'), lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+  navLine.setData(nav.map(([d, v]) => ({ time: d, value: v })));
+  // the axis label carries the FINAL NAV, not the last point in the visible range
+  navLine.createPriceLine({ price: nav[nav.length - 1][1], color: css('--accent'), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'final' });
   eq.timeScale().fitContent();
 
   const dd = mkChart('#c-dd', 150, 'overview');
@@ -594,13 +609,14 @@ function renderOverview() {
   const top10 = [...t].sort((a, b) => b.pnl - a.pnl).slice(0, 10), tot = t.reduce((a, x) => a + x.pnl, 0);
   const aTr = t.filter(x => (x.g || '')[0] === 'A'), df = t.filter(x => /^[DF]/.test(x.g || '')), late = stops.filter(x => x.blag >= 1);
   const expoAvg = ys.reduce((a, y) => a + y.expo, 0) / ys.length;
-  const inv = D.meta[CH()], rets = D.meta.map(m => m.metrics.totalreturnpct);
+  const inv = D.meta[CH()], rets = D.meta.map(m => m.metrics.totalreturnpct), oc = D.open[CH()].check;
   const f = [
+    openCheckMiss(oc) && `<b>Exposure check failed on ${oc.date}:</b> the pack marks ${usd(oc.pack)} held, actual.sexp has ${usd(oc.actual)} in open positions. Every invested figure on this page is suspect.`,
     worst && `<b>Worst three-year stretch: ${worst.w[0].p}–${worst.w[2].p}, ${pct(cum(worst.w, 'ret'), 1)} while SPY made ${pct(cum(worst.w, 'spy'), 1)}.</b> Bullish macro weeks: ${worst.w.map(y => y.bull).join(' / ')}; realised P&amp;L ${worst.w.map(y => usdk(y.pnl)).join(' / ')}.`,
     `<b>Ten trades made ${usdk(top10.reduce((a, x) => a + x.pnl, 0))}</b> of the ${usdk(tot)} realised total. The ${aTr.length} A-grade trades made ${usdk(aTr.reduce((a, x) => a + x.pnl, 0))}.`,
     `<b>${fb.length} of ${t.length} trades (${fmt(100 * fb.length / t.length, 0)}%) used the 4% fallback stop</b> rather than a stop under the base or MA.`,
     `<b>${gap.length} of ${stops.length} stop exits filled more than 0.5% below the stop; ${late.length} sold at an open after the day the stop traded.</b> ${df.length} losers (grade D/F) then rallied ≥ 15% within 13 weeks; they lost ${usdk(df.reduce((a, x) => a + x.pnl, 0))}.`,
-    `<b>Average invested: ${fmt(expoAvg, 0)}% of NAV,</b> about ${fmt(ys.reduce((a, y) => a + y.pos, 0) / ys.length, 1)} positions on average (exposure cap and cash floor: see the run's overrides).`,
+    `<b>Average invested: ${fmt(expoAvg, 0)}% of NAV,</b> about ${fmt(ys.reduce((a, y) => a + y.pos, 0) / ys.length, 1)} positions on average.`,
     `<b>${wk.length} trades have a fill dated on a day with no bar</b> (the Saturday-fill defect). The validator also counts ${(inv.validator.find(v => v.id === 'V13') || {}).status || '?'} on V13.`,
     rets.length > 1 && `<b>Salt spread: the same rules returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} salts.`,
   ].filter(Boolean);
@@ -777,11 +793,11 @@ function renderHilo() {
 
 /* ---------- Surprises ---------- */
 function renderSurprises() {
-  const t = D.trades[CH()];
-  $('#flagcards').innerHTML = FLAGS.map(f => { const ts = t.filter(x => x.flags.includes(f.id)); const net = ts.reduce((a, x) => a + x.pnl, 0);
+  const t = D.trades[CH()], open = D.open[CH()].rows;
+  $('#flagcards').innerHTML = FLAGS.map(f => { const ts = t.filter(x => x.flags.includes(f.id)); const net = ts.reduce((a, x) => a + x.pnl, 0), no = openHits(f, open);
     // a check whose input field no trade carries (macro needs the audit report, absent under --no-container) is n/a, not a clean 0
     const na = f.needs && !t.some(x => x[f.needs] != null && x[f.needs] !== '');
-    return `<button class="flagcard" data-flag="${f.id}"><span class="row" style="justify-content:space-between"><span class="pill ${f.cat}">${{ exec: 'Execution', book: 'Book', outcome: 'Outcome' }[f.cat]}</span><span class="cnt">${na ? 'n/a' : ts.length}</span></span><b>${f.label}</b><span class="num" style="text-align:left">net <span class="${sgn(net)}">${usdk(net)}</span> · ${fmt(100 * ts.length / t.length, 0)}% of trades</span><p>${f.why}</p></button>`; }).join('');
+    return `<button class="flagcard" data-flag="${f.id}"><span class="row" style="justify-content:space-between"><span class="pill ${f.cat}">${{ exec: 'Execution', book: 'Book', outcome: 'Outcome' }[f.cat]}</span><span class="cnt">${na ? 'n/a' : ts.length + no}</span></span><b>${f.label}</b><span class="num" style="text-align:left">net <span class="${sgn(net)}">${usdk(net)}</span> · ${fmt(100 * ts.length / t.length, 0)}% of trades${no ? ` · plus ${no} still open` : ''}</span><p>${f.why}</p></button>`; }).join('');
   $('#flagcards').addEventListener('click', e => { const b = e.target.closest('[data-flag]'); if (b) filterFlag(b.dataset.flag); });
   const cf = D.meta[CH()].conformance;
   $('#conf').innerHTML = `<thead><tr><th>Rule</th><th>Description</th><th class="num">Passed</th><th class="num">Rate</th></tr></thead><tbody>${cf.map(r => `<tr><td><b>${r.rule}</b></td><td style="white-space:normal">${r.desc}</td><td class="num">${r.passed}</td><td class="num">${r.rate}</td></tr>`).join('')}</tbody>`;

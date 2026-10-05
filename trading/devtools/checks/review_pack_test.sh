@@ -20,6 +20,12 @@
 #     -> breach lag -1: the breach line is the installed stop, not entry x (1 - sid);
 #   - EEE: exit under 5 % of entry -> X;
 #   - two runs (r0, r1) -> manifest lists both and both trade files exist;
+#   - open at the window end (#3125): an open_positions.csv row joins the
+#     exposure series (last day 11.9 % = 12,000 / 101,000), the macro cards
+#     count it, and the last-day check vs actual.sexp open_positions_value
+#     warns on a mismatch; a market holiday (no SPY bar) is dropped from the
+#     exposure series and from the period Invested average; a delisting exit
+#     is not counted as the Saturday-fill defect;
 #   - every emitted JSON file parses (the SPY fixture carries a "321."-style
 #     value the store really writes), manifest + year/quarter tables present;
 #   - the page's signal predicates (openSignal, oneTradeYear, alsoCause) are
@@ -178,5 +184,55 @@ expect_eq "year table: one row" 2020 "$(jq -r '.[0].p' "$S/data/r0_years.json")"
 expect_eq "quarter table: two rows" "2020Q1 2020Q2" "$(jq -r 'map(.p)|join(" ")' "$S/data/r0_quarters.json")"
 expect_eq "validator check parsed" V13 "$(jq -r '.validator[1].id' "$S/data/r0_meta.json")"
 
+
+# Open positions at the window end (#3125). A copy of the fixture run gains
+# open_positions.csv (AAA, 100 sh from 2020-04-02, a Bearish macro week) and an
+# actual.sexp whose open_positions_value is AAA's last close x 100 = 12,000; a
+# copy of the bar store drops 2020-04-10 (Good Friday) from every symbol, so the
+# equity curve's carried-forward row for it is a market holiday.
+mkdir -p "$TMP/oe"
+cp -R "$FIX/run" "$TMP/oe/run"; cp -R "$FIX/data" "$TMP/oe/data"
+printf 'symbol,side,entry_date,entry_price,quantity\nAAA,LONG,2020-04-02,120.00,100\n' > "$TMP/oe/run/open_positions.csv"
+printf '((total_return_pct 1.0) (open_positions_value 12000.00))\n' > "$TMP/oe/run/actual.sexp"
+for f in "$TMP"/oe/data/*/*/*/data.csv; do grep -v '^2020-04-10,' "$f" > "$f.x"; mv "$f.x" "$f"; done
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/oe/data" --out "$TMP/oe/pack" r0="$TMP/oe/run/" >"$TMP/oe.log" 2>"$TMP/oe.err" || rc=$?
+expect_eq "open-at-end: builds, exit 0" 0 "$rc"
+OD="$TMP/oe/pack/site/data"
+expect_eq "open-at-end: the open position is listed with its entry macro week" "AAA 2020-04-02 Bearish" "$(jq -r '.rows[]|"\(.sym) \(.ed) \(.mE)"' "$OD/r0_open.json")"
+expect_eq "open-at-end: last-day exposure check, pack vs actual.sexp" "2020-05-20 12000 12000" "$(jq -r '.check|"\(.date) \(.pack+0) \(.actual+0)"' "$OD/r0_open.json")"
+expect_eq "open-at-end: last day reads the open position as invested (12,000 / 101,000 NAV)" "11.9 1" "$(jq -r '.[-1]|"\(.[2]) \(.[3])"' "$OD/r0_nav.json")"
+expect_eq "open-at-end: matching check -> no warning" "" "$(grep 'WARN' "$TMP/oe.err" || true)"
+expect_eq "holiday: no 2020-04-10 row in the exposure series" 0 "$(jq '[.[]|select(.[0]=="2020-04-10")]|length' "$OD/r0_nav.json")"
+expect_eq "holiday: the other 99 days are kept" 99 "$(jq length "$OD/r0_nav.json")"
+expect_eq "holiday: the quarter's Invested is the mean over its trading days" yes \
+  "$(jq -rn --slurpfile n "$OD/r0_nav.json" --slurpfile q "$OD/r0_quarters.json" '([$n[0][]|select(.[0]>="2020-04-01")|.[2]]|add/length) as $m | ($q[0][]|select(.p=="2020Q2")|.expo) as $e | if ($m-$e) < 0.05 and ($e-$m) < 0.05 then "yes" else "no: \($m) vs \($e)" end')"
+# the detector fires when the pack misses a position: actual.sexp holds 20,000
+printf '((open_positions_value 20000.00))\n' > "$TMP/oe/run/actual.sexp"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/oe/data" --out "$TMP/oe/miss" r0="$TMP/oe/run/" >"$TMP/miss.log" 2>"$TMP/miss.err" || rc=$?
+expect_eq "open-at-end mismatch: still builds" 0 "$rc"
+expect_eq "open-at-end mismatch: warns on stderr" 1 "$(grep -c 'WARN open positions on 2020-05-20: pack marks 12000.00, actual.sexp open_positions_value 20000.00' "$TMP/miss.err" || true)"
+expect_eq "no actual.sexp: the check reads null, not 0" null "$(jq -r .check.actual "$S/data/r0_open.json")"
+expect_eq "cap/cash-floor text removed" 0 "$(grep -c 'caps long exposure\|exposure cap and cash floor' "$S/index.html" || true)"
+expect_eq "final NAV carried on the equity axis" yes "$(grep -q "title: 'final'" "$S/index.html" && echo yes || echo no)"
+if command -v node >/dev/null 2>&1; then
+  OFNS="$(sed -n -e '/^const FLAGS = \[/,/^\];/p' -e '/^function openHits(/,/^}/p' -e '/^function openCheckMiss(/,/^}/p' "$S/index.html")"
+  oc() { node -e "$OFNS
+const OPEN = $(jq -c .rows "$OD/r0_open.json"), F = id => FLAGS.find(f => f.id === id);
+console.log($1)"; }
+  expect_eq "openHits: the Bearish-week card counts the open AAA" 1 "$(oc 'openHits(F("macrobear"), OPEN)')"
+  expect_eq "openHits: the not-Bullish card counts it too" 1 "$(oc 'openHits(F("macro"), OPEN)')"
+  expect_eq "openHits: an exit-time card never counts open positions" 0 "$(oc 'openHits(F("whipsaw"), OPEN)')"
+  expect_eq "openCheckMiss: 12,000 vs 20,000 misses" true "$(oc 'openCheckMiss({pack: 12000, actual: 20000})')"
+  expect_eq "openCheckMiss: equal values pass" false "$(oc 'openCheckMiss({pack: 12000, actual: 12000})')"
+  expect_eq "openCheckMiss: within 1 % passes" false "$(oc 'openCheckMiss({pack: 12000, actual: 12100})')"
+  expect_eq "openCheckMiss: no actual.sexp is not a miss" false "$(oc 'openCheckMiss({pack: 0, actual: null})')"
+  expect_eq "openCheckMiss: nothing open but actual holds 5,000 misses" true "$(oc 'openCheckMiss({pack: 0, actual: 5000})')"
+  expect_eq "weekend flag: a delisting exit with no bar is not the Saturday defect" false "$(oc 'F("weekend").test({ onE: 1, onX: 0, trig: "delisted" })')"
+  expect_eq "weekend flag: a stop exit with no bar still is" true "$(oc 'F("weekend").test({ onE: 1, onX: 0, trig: "stop_loss" })')"
+else
+  echo "SKIP: review_pack open-position page cases need node"
+fi
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
