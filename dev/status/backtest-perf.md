@@ -12,6 +12,47 @@ perf-tier fix described in the 2026-09-21 weekly-review entry below.
 
 ## Weekly review (`.claude/rules/perf-review-weekly.md`, ~2 h/week — user 2026-09-20)
 
+- **2026-10-05 (issue-fix audit, first run; #3019 `[after-merge]`)**: ran
+  `dev/scripts/issue_fix_audit.sh` against the live repo: 36 open issues, the
+  newest 500 merged PRs. (The cloud session's `gh` is api-only, so it ran
+  through the script's `ISSUE_FIX_AUDIT_FIXTURE_DIR` seam, with the two JSON
+  files built from `gh api`.)
+
+  **Section (a): 27 open issues that a merged PR mentions.**
+  - Closed: **#2922**. All four items shipped (#2927, #2943, #2953).
+  - Commented "keep open, partial", naming the unmet asks:
+    - #2775: the `orchestrator.yml` `git clean -fd` guard;
+    - #2770: claude-code-action is still on floating `@v1`, with no failure alert;
+    - #2650: tier-2 is still `continue-on-error`, and goldens-small/broad are
+      not in the goldens-affected set;
+    - #2973: 7 of 8–12 corpus windows; still missing the resistance scan,
+      entry ticket and stop-fill consumers.
+  - Status already current (a dated status comment since 09-26, nothing new
+    to add): #3104, #3069, #3057, #3038, #2984, #2982, #2961, #2810, #2803,
+    #2747, #2408.
+  - Mentions from the filing PR (#3128): #3125, #3126, #3127, which are being
+    worked now.
+  - False positive (the PR only cites the number): #2782 (#2783/#2807 are
+    docs).
+  - Not re-assessed this week: #2839 (09-21), #2539 (09-14, blocked on
+    live-workflow validation), #2672 (09-08), #2489 (08-26).
+
+  **Section (b): `verify/pending`.**
+  - #3019: this entry is its `[after-merge]` item.
+  - #3069 and #3056 need the broad top-3000 smoke. The top-3000 point-in-time
+    warehouse is absent in the cloud session, so a sp500 liveness smoke (the
+    flag fires; not a measurement, per `universe-discipline.md`) ran instead.
+    The result is on the issues, and both stay `verify/pending` for a local
+    run.
+  - #2984 needs a live or paper session, and no live runner exists. Stays
+    open.
+
+  **Script defects seen:**
+  - (b) prints only the first line of a wrapped `- [after-merge]` item.
+    #3019's condition was cut at "...recorded in `dev/status/backtest-perf.md`".
+  - Issues whose conditions live in comments rather than a body `## Done when`
+    (#3056, #2984) print with no conditions.
+
 - **2026-09-22 (PIT smoke)** — closed #2896: `dev/scripts/perf_pit_smoke.sh` +
   `trading/test_data/backtest_scenarios/perf-pit/pit-smoke-4mo.sexp` (a
   4-month 2020 window, the `a0-pit-null`/`t1-topn-40` null config, no tier
