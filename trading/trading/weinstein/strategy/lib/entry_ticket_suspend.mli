@@ -46,8 +46,8 @@
       item 3; specimen STN, trigger 88.86, filled 2026-02-12 at 90.64 on a bar
       that opened 99.75). Its {!Entry_freeze} pin is released and it is not
       counted as held, so the screener may re-qualify the symbol at a fresh
-      breakout level and stop. A ticket at or below the close is re-issued
-      unchanged, as a resting ticket that never slept would be.
+      breakout level and stop. A ticket whose trigger is at or above the close
+      is re-issued unchanged, as a resting ticket that never slept would be.
     - {b Age.} Suspension time {b counts} toward [entry_order_max_rest_weeks]: a
       ticket is as old as its first placement, not its latest re-issue. The
       alternative (pausing the clock) would let a ticket outlive the TTL by the

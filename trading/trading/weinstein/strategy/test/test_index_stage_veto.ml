@@ -280,6 +280,10 @@ let _fresh_last_bar = List.last _fresh_bars
 let _above_fresh_close =
   (Option.value_exn _fresh_last_bar).Types.Daily_price.close_price *. 1.05
 
+(* A resting long's trigger the market already trades above at re-admit (#3126). *)
+let _below_fresh_close =
+  (Option.value_exn _fresh_last_bar).Types.Daily_price.close_price *. 0.9
+
 let _fresh_get_price symbol =
   if String.equal symbol _fresh_symbol then _fresh_last_bar else None
 
@@ -600,6 +604,57 @@ let test_the_screen_records_one_reissue_naming_the_first_placement _ =
                  (equal_to ("F1", _friday, true))));
        ])
 
+(** The [(symbol, entry_price)] of the screen's [CreateEntering] transitions. *)
+let _created_entries transitions =
+  List.filter_map transitions ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.CreateEntering { symbol; entry_price; _ } ->
+          Some (symbol, entry_price)
+      | _ -> None)
+
+(** Issue #3126 at the screen: the production wiring of [current_close] (from
+    [get_price] in [_resting_tickets]). The ticket withdrawn in the Stage-4 week
+    rests at a trigger 10 % under [_fresh_symbol]'s close. At the Stage-2
+    re-admit the market is above it, so it is NOT re-issued (no re-issue event)
+    and the symbol is not held: the cascade writes the one [CreateEntering] for
+    it, at its own fresh level rather than the stale trigger.
+
+    MUTATION: wiring [current_close] as [fun _ -> None] in [_resting_tickets]
+    re-issues the stale ticket (one re-issue event, entry at the old trigger)
+    and turns both elements red. *)
+let test_the_screen_drops_a_ticket_the_market_is_above _ =
+  let events = ref [] in
+  let audit_recorder =
+    {
+      Audit_recorder.noop with
+      record_reissue = (fun e -> events := e :: !events);
+    }
+  in
+  let suspended_tickets = Entry_ticket_suspend.create () in
+  let (_ : Position.transition list) =
+    _suspend_screen ~audit_recorder ~suspended_tickets
+      ~positions:
+        [
+          _resting_ticket ~entry_price:_below_fresh_close ~id:"F1"
+            ~symbol:_fresh_symbol ~side:Trading_base.Types.Long ();
+        ]
+      _stage4
+  in
+  let week2 =
+    _suspend_screen ~audit_recorder ~suspended_tickets ~positions:[] _stage2
+  in
+  assert_that
+    (!events, _created_entries week2)
+    (pair is_empty
+       (elements_are
+          [
+            all_of
+              [
+                field fst (equal_to _fresh_symbol);
+                field snd (not_ (float_equal _below_fresh_close));
+              ];
+          ]))
+
 let suite =
   "index_stage_veto_blocks_longs"
   >::: [
@@ -622,6 +677,8 @@ let suite =
          >:: test_a_suspended_ticket_is_reissued_once_not_rewritten_by_the_cascade;
          "the screen records one re-issue naming the first placement"
          >:: test_the_screen_records_one_reissue_naming_the_first_placement;
+         "the screen drops a ticket the market is above (#3126)"
+         >:: test_the_screen_drops_a_ticket_the_market_is_above;
        ]
 
 let () = run_test_tt_main suite
