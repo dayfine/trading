@@ -91,3 +91,33 @@ Docs-only PR (this file + exports + `dev/status/perf-long-cells.csv` + budget JS
 - Proposing a 26y phase for macro-suspend (rule 6 not met) or a default flip (rule 8).
 - Deleting Time Machine snapshots to free disk.
 - Everything in the 10-03 doc §7 still holds.
+
+## Addendum — 2026-10-05 01:30 PT (late-session work; supersedes §2–§3 where they differ)
+
+Merged since the handoff: #3128 (macro-suspend second read), #3129 (margin-realism + experiment-platform
+COMPLETED; resistance-v2 bundle verified ACTIVE on `_v11pit`), #3130 (SPY 26y benchmark: SPY-30w 326.8 % /
+Calmar 0.219; BAH 400.8 % / 0.112 — price-only), #3135 (short-only Phase A). Cloud PRs from `env/cloud`:
+#3120, #3121, #3122, #3142 (macro-suspend re-arm, #3126).
+
+**Findings that change how the record reads**
+- **The sim is price-only** (`project_sim_price_only_accounting`): no cash interest, no dividends. With T-bill
+  interest on the ~49 % cash and dividends, the 26y investor is ≈ 9.3 % CAGR (s0/s2) vs SPY TR 8.1–8.2 %. #3137.
+- s1's gap to s0 is one at-fill cash cancellation (ADMA, 96 % funded) — #3138.
+- Dollar-volume look-ahead in PIT ranking / liquidity gates (split-adjusted volume × raw close) — #3136 (P1).
+- #3109 measured: no unconfirmed splits on held positions, but five dividend-type misfires pass the raw-confirm
+  rule; phantom +$36k–109k realised per run (−4 to −11 pp total return). Needs an adjusted-series tightness test.
+- Worst years vs SPY (2019, 2023, 2025; also 2009, 2016) = re-entry lag after V-bottoms: 12–17 Bullish weeks
+  with zero tickets because ~97 % of candidates skip `No_structural_stop`; plus a narrow mega-cap tape.
+- 26y deep-dive (user's six questions): capture of ≥ +100 % breakout episodes ≈ 1 % in every forward bucket;
+  faithfulness career grade B− (volume at fill and laggard exits of healthy leaders are the gaps); P&L is
+  tail-carried (top 20 trades ≈ 100 % of net; winner α 1.3–1.8, loser α 6–7) — do not optimise whipsaws.
+  Report features filed: #3139 (weekly decision record), #3140 (missed winners / faithfulness / P&L anatomy),
+  #3141 (pack defects).
+- **Short-only Phase A** (#3135): live, but the clean book ≈ −22 % / −17 % (2007–12, salt 0); NAV rose in 2008,
+  gains given back 2009–12. Defects: #3131 (ticket at base top AND the $17 gate reads the base-top price →
+  sub-$17 margin churn), #3145 (short Tightened stop never lowered), #3146–#3149.
+
+**Decisions owed by the user (as of 01:30 PT)**
+1. #3137 cash interest + dividends — recommended next (changes every SPY comparison).
+2. #3136 — measure membership change per vintage before any rebuild.
+3. Shorts — fix #3131 and run #3145 as its own stop study before any money read, or stop (record P0a + Phase A).
