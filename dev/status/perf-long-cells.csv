@@ -293,3 +293,17 @@ date,experiment,tag,universe,years,cap,head,wall_s,s_per_year
 2026-10-03T00:58:59,entry-anchor-recovery-2026-10-02,ia4-5r-s2-v11,pit-schedule-3000,5.07,12000,4b90a8cc7,1792,353
 2026-10-03T01:28:34,entry-anchor-recovery-2026-10-02,ia13-5r-s2-v11,pit-schedule-3000,5.07,12000,4b90a8cc7,1774,350
 2026-10-03T01:57:42,entry-anchor-recovery-2026-10-02,ia26-5r-s2-v11,pit-schedule-3000,5.07,12000,4b90a8cc7,1748,345
+2026-10-03T22:57:23,shorts-liveness-2026-10-03,sh0-5d-s0-v11,pit-schedule-3000,5.08,12000,29e81f888,2692,530
+2026-10-03T23:36:41,shorts-liveness-2026-10-03,shB-5d-s0-v11,pit-schedule-3000,5.08,12000,29e81f888,2358,464
+2026-10-04T10:48:01,msusp-run,ms0-5d-s0-v11,pit-schedule-3000,5.08,12000,81da500d5,2676,527
+2026-10-04T11:24:48,msusp-run,msB-5d-s0-v11,pit-schedule-3000,5.08,12000,81da500d5,2206,434
+2026-10-04T12:11:16,msusp-run,ms0-5d-s1-v11,pit-schedule-3000,5.08,12000,81da500d5,2787,549
+2026-10-04T12:33:54,msusp-run,msB-5d-s1-v11,pit-schedule-3000,5.08,12000,81da500d5,1357,267
+2026-10-04T12:57:41,msusp-run,ms0-5d-s2-v11,pit-schedule-3000,5.08,12000,81da500d5,1427,281
+2026-10-04T13:27:23,msusp-run,msB-5d-s2-v11,pit-schedule-3000,5.08,12000,81da500d5,1782,351
+2026-10-04T13:55:10,msusp-run,ms0-5r-s0-v11,pit-schedule-3000,5.07,12000,81da500d5,1667,329
+2026-10-04T14:23:03,msusp-run,msB-5r-s0-v11,pit-schedule-3000,0.24,12000,81da500d5,1673,6971
+2026-10-04T14:50:57,msusp-run,ms0-5r-s1-v11,pit-schedule-3000,5.07,12000,81da500d5,1673,330
+2026-10-04T15:18:52,msusp-run,msB-5r-s1-v11,pit-schedule-3000,0.24,12000,81da500d5,1675,6979
+2026-10-04T15:46:53,msusp-run,ms0-5r-s2-v11,pit-schedule-3000,5.07,12000,81da500d5,1681,332
+2026-10-04T16:21:59,msusp-run,msB-5r-s2-v11,pit-schedule-3000,0.24,12000,81da500d5,2106,8775

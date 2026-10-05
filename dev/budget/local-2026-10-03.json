@@ -1,15 +1,15 @@
 {
   "run_id": "local-2026-10-03",
-  "timestamp": "2026-10-03T10:09:42Z",
-  "commit_sha": "62e70bb346854aacb1fbb37323436e4e57dc388a",
+  "timestamp": "2026-10-05T01:39:29Z",
+  "commit_sha": "e9457c3eca65c482e737608fe8aa368e20a130de",
   "source": "local-session",
   "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
   "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
   "totals": {
-    "input_tokens": 1192,
-    "output_tokens": 4125,
-    "cache_read_input_tokens": 22313803,
-    "cache_creation_input_tokens": 1650116,
+    "input_tokens": 2798,
+    "output_tokens": 221782,
+    "cache_read_input_tokens": 165200019,
+    "cache_creation_input_tokens": 6759198,
     "total_cost_usd": null,
     "codex_input_tokens": null,
     "codex_output_tokens": null,
@@ -18,37 +18,60 @@
   "claude": {
     "date": "2026-10-03",
     "source": "local-transcripts",
-    "generated_at": "2026-10-03T10:09:42Z",
+    "generated_at": "2026-10-05T01:39:29Z",
     "projects_dir": "/Users/difan/.claude/projects",
     "window": {
       "since": "2026-10-03",
       "until": "2026-10-03"
     },
     "totals": {
-      "dispatches": 8,
-      "sessions": 0,
-      "resumes": 9,
-      "api_calls": 190,
-      "input_tokens": 1192,
-      "output_tokens": 4125,
-      "cache_read_input_tokens": 22313803,
-      "cache_creation_input_tokens": 1650116,
-      "subagent_tokens": 23969236,
-      "main_tokens": 0
+      "dispatches": 13,
+      "sessions": 1,
+      "resumes": 15,
+      "api_calls": 814,
+      "input_tokens": 2798,
+      "output_tokens": 221782,
+      "cache_read_input_tokens": 165200019,
+      "cache_creation_input_tokens": 6759198,
+      "subagent_tokens": 67474517,
+      "main_tokens": 104709280,
+      "by_model": {
+        "<synthetic>": {
+          "api_calls": 1,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        },
+        "claude-haiku-4-5-20251001": {
+          "api_calls": 176,
+          "input_tokens": 1426,
+          "output_tokens": 655,
+          "cache_read_input_tokens": 20120585,
+          "cache_creation_input_tokens": 1616474
+        },
+        "claude-opus-5-5": {
+          "api_calls": 637,
+          "input_tokens": 1372,
+          "output_tokens": 221127,
+          "cache_read_input_tokens": 145079434,
+          "cache_creation_input_tokens": 5142724
+        }
+      }
     },
     "context_histogram": {
-      "calls": 0,
-      "p50": 0,
-      "p90": 0,
-      "max": 0,
+      "calls": 412,
+      "p50": 245214,
+      "p90": 395588,
+      "max": 429943,
       "compact_threshold": 250000,
-      "calls_above_threshold": 0,
-      "share_above_threshold_pct": 0,
+      "calls_above_threshold": 192,
+      "share_above_threshold_pct": 46.6,
       "buckets": [
         {
           "label": "0-50k",
-          "calls": 0,
-          "share_pct": 0
+          "calls": 1,
+          "share_pct": 0.2
         },
         {
           "label": "50-100k",
@@ -57,23 +80,23 @@
         },
         {
           "label": "100-150k",
-          "calls": 0,
-          "share_pct": 0
+          "calls": 30,
+          "share_pct": 7.2
         },
         {
           "label": "150-200k",
-          "calls": 0,
-          "share_pct": 0
+          "calls": 97,
+          "share_pct": 23.5
         },
         {
           "label": "200-300k",
-          "calls": 0,
-          "share_pct": 0
+          "calls": 185,
+          "share_pct": 44.9
         },
         {
           "label": "300-500k",
-          "calls": 0,
-          "share_pct": 0
+          "calls": 99,
+          "share_pct": 24
         },
         {
           "label": "500k+",
@@ -85,6 +108,60 @@
     "rows": [
       {
         "kind": "dispatch",
+        "session": "0bdb1704-90a7-4760-bb6e-40335d5259c0",
+        "agent_id": "a68694eb7c2da2f3a",
+        "agent_type": "feat-weinstein",
+        "description": "Fix #3075 trades.csv stop columns",
+        "ref": "#3075",
+        "date": "2026-10-03",
+        "wall_seconds": 2727,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 90,
+            "input_tokens": 180,
+            "output_tokens": 1053,
+            "cache_read_input_tokens": 22092802,
+            "cache_creation_input_tokens": 1307899
+          }
+        },
+        "api_calls": 90,
+        "input_tokens": 180,
+        "output_tokens": 1053,
+        "cache_read_input_tokens": 22092802,
+        "cache_creation_input_tokens": 1307899
+      },
+      {
+        "kind": "dispatch",
+        "session": "0bdb1704-90a7-4760-bb6e-40335d5259c0",
+        "agent_id": "aa2a9146242799ebf",
+        "agent_type": "feat-backtest",
+        "description": "Rework PR 3100 iteration 1",
+        "ref": "",
+        "date": "2026-10-03",
+        "wall_seconds": 2950,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 43,
+            "input_tokens": 86,
+            "output_tokens": 1498,
+            "cache_read_input_tokens": 8085848,
+            "cache_creation_input_tokens": 1119903
+          }
+        },
+        "api_calls": 43,
+        "input_tokens": 86,
+        "output_tokens": 1498,
+        "cache_read_input_tokens": 8085848,
+        "cache_creation_input_tokens": 1119903
+      },
+      {
+        "kind": "dispatch",
         "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
         "agent_id": "a59901b739b4ade20",
         "agent_type": "qc-structural",
@@ -94,11 +171,75 @@
         "wall_seconds": 1316,
         "resumes": 2,
         "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 47,
+            "input_tokens": 382,
+            "output_tokens": 186,
+            "cache_read_input_tokens": 4808960,
+            "cache_creation_input_tokens": 323367
+          }
+        },
         "api_calls": 47,
         "input_tokens": 382,
         "output_tokens": 186,
         "cache_read_input_tokens": 4808960,
         "cache_creation_input_tokens": 323367
+      },
+      {
+        "kind": "dispatch",
+        "session": "0bdb1704-90a7-4760-bb6e-40335d5259c0",
+        "agent_id": "af0b6e4621c4a5b93",
+        "agent_type": "qc-structural",
+        "description": "qc-structural on PR 3100",
+        "ref": "",
+        "date": "2026-10-03",
+        "wall_seconds": 1559,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 35,
+            "input_tokens": 282,
+            "output_tokens": 71,
+            "cache_read_input_tokens": 4223989,
+            "cache_creation_input_tokens": 377757
+          }
+        },
+        "api_calls": 35,
+        "input_tokens": 282,
+        "output_tokens": 71,
+        "cache_read_input_tokens": 4223989,
+        "cache_creation_input_tokens": 377757
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "aad36cb56cc50e778",
+        "agent_type": "qc-structural",
+        "description": "qc-structural re-review of PR #3086 at 2a6dd7496",
+        "ref": "#3086",
+        "date": "2026-10-03",
+        "wall_seconds": 802,
+        "resumes": 2,
+        "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 40,
+            "input_tokens": 324,
+            "output_tokens": 306,
+            "cache_read_input_tokens": 4230603,
+            "cache_creation_input_tokens": 278805
+          }
+        },
+        "api_calls": 40,
+        "input_tokens": 324,
+        "output_tokens": 306,
+        "cache_read_input_tokens": 4230603,
+        "cache_creation_input_tokens": 278805
       },
       {
         "kind": "dispatch",
@@ -111,11 +252,48 @@
         "wall_seconds": 1430,
         "resumes": 1,
         "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 31,
+            "input_tokens": 252,
+            "output_tokens": 57,
+            "cache_read_input_tokens": 4009137,
+            "cache_creation_input_tokens": 471491
+          }
+        },
         "api_calls": 31,
         "input_tokens": 252,
         "output_tokens": 57,
         "cache_read_input_tokens": 4009137,
         "cache_creation_input_tokens": 471491
+      },
+      {
+        "kind": "dispatch",
+        "session": "0bdb1704-90a7-4760-bb6e-40335d5259c0",
+        "agent_id": "a1fc51971652deac2",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral on PR 3100",
+        "ref": "",
+        "date": "2026-10-03",
+        "wall_seconds": 1439,
+        "resumes": 1,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 24,
+            "input_tokens": 48,
+            "output_tokens": 373,
+            "cache_read_input_tokens": 2977455,
+            "cache_creation_input_tokens": 439250
+          }
+        },
+        "api_calls": 24,
+        "input_tokens": 48,
+        "output_tokens": 373,
+        "cache_read_input_tokens": 2977455,
+        "cache_creation_input_tokens": 439250
       },
       {
         "kind": "dispatch",
@@ -128,28 +306,21 @@
         "wall_seconds": 187,
         "resumes": 1,
         "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 21,
+            "input_tokens": 42,
+            "output_tokens": 1187,
+            "cache_read_input_tokens": 3115995,
+            "cache_creation_input_tokens": 179035
+          }
+        },
         "api_calls": 21,
         "input_tokens": 42,
         "output_tokens": 1187,
         "cache_read_input_tokens": 3115995,
         "cache_creation_input_tokens": 179035
-      },
-      {
-        "kind": "dispatch",
-        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
-        "agent_id": "aad36cb56cc50e778",
-        "agent_type": "qc-structural",
-        "description": "qc-structural re-review of PR #3086 at 2a6dd7496",
-        "ref": "#3086",
-        "date": "2026-10-03",
-        "wall_seconds": 112,
-        "resumes": 1,
-        "outcome": "stalled",
-        "api_calls": 32,
-        "input_tokens": 258,
-        "output_tokens": 57,
-        "cache_read_input_tokens": 3055857,
-        "cache_creation_input_tokens": 108658
       },
       {
         "kind": "dispatch",
@@ -162,6 +333,16 @@
         "wall_seconds": 146,
         "resumes": 1,
         "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 23,
+            "input_tokens": 186,
+            "output_tokens": 35,
+            "cache_read_input_tokens": 2847896,
+            "cache_creation_input_tokens": 165054
+          }
+        },
         "api_calls": 23,
         "input_tokens": 186,
         "output_tokens": 35,
@@ -179,6 +360,16 @@
         "wall_seconds": 215,
         "resumes": 1,
         "outcome": "https://github.com/dayfine/trading/pull/3086",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 14,
+            "input_tokens": 28,
+            "output_tokens": 892,
+            "cache_read_input_tokens": 1781193,
+            "cache_creation_input_tokens": 152808
+          }
+        },
         "api_calls": 14,
         "input_tokens": 28,
         "output_tokens": 892,
@@ -196,11 +387,48 @@
         "wall_seconds": 172,
         "resumes": 1,
         "outcome": "https://github.com/dayfine/trading/pull/3086",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 14,
+            "input_tokens": 28,
+            "output_tokens": 1065,
+            "cache_read_input_tokens": 1769363,
+            "cache_creation_input_tokens": 131364
+          }
+        },
         "api_calls": 14,
         "input_tokens": 28,
         "output_tokens": 1065,
         "cache_read_input_tokens": 1769363,
         "cache_creation_input_tokens": 131364
+      },
+      {
+        "kind": "dispatch",
+        "session": "13438ee6-bde6-4f74-839d-eef43a46dd35",
+        "agent_id": "ae5a21378f8b9bd11",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral re-review of PR #3086 at 2a6dd7496",
+        "ref": "#3086",
+        "date": "2026-10-03",
+        "wall_seconds": 89,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 12,
+            "input_tokens": 24,
+            "output_tokens": 853,
+            "cache_read_input_tokens": 1397303,
+            "cache_creation_input_tokens": 133399
+          }
+        },
+        "api_calls": 12,
+        "input_tokens": 24,
+        "output_tokens": 853,
+        "cache_read_input_tokens": 1397303,
+        "cache_creation_input_tokens": 133399
       },
       {
         "kind": "dispatch",
@@ -213,6 +441,16 @@
         "wall_seconds": 58,
         "resumes": 1,
         "outcome": "https://github.com/dayfine/trading/pull/3091",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 8,
+            "input_tokens": 16,
+            "output_tokens": 646,
+            "cache_read_input_tokens": 925402,
+            "cache_creation_input_tokens": 118339
+          }
+        },
         "api_calls": 8,
         "input_tokens": 16,
         "output_tokens": 646,
@@ -220,7 +458,37 @@
         "cache_creation_input_tokens": 118339
       }
     ],
-    "sessions": []
+    "sessions": [
+      {
+        "kind": "session",
+        "session": "0bdb1704-90a7-4760-bb6e-40335d5259c0",
+        "date": "2026-10-03",
+        "wall_seconds": 99389,
+        "dispatches_launched": 29,
+        "model": "claude-opus-5-5",
+        "models": {
+          "<synthetic>": {
+            "api_calls": 1,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0
+          },
+          "claude-opus-5-5": {
+            "api_calls": 411,
+            "input_tokens": 920,
+            "output_tokens": 213560,
+            "cache_read_input_tokens": 102934073,
+            "cache_creation_input_tokens": 1560727
+          }
+        },
+        "api_calls": 412,
+        "input_tokens": 920,
+        "output_tokens": 213560,
+        "cache_read_input_tokens": 102934073,
+        "cache_creation_input_tokens": 1560727
+      }
+    ]
   },
   "codex": {
     "runs": 0,
