@@ -79,3 +79,4 @@ the gate reopens, at the same level, so `msB` keeps most of the null's trade lis
 ## Log
 
 - 2026-10-04 — pre-registered.
+- 2026-10-04 — results: "dilutes" in both windows, no phase 2 (`results-2026-10-04.md`).
