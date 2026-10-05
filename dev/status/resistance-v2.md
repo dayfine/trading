@@ -4,7 +4,7 @@
 
 IN_PROGRESS
 
-## Last updated: 2026-07-17
+## Last updated: 2026-10-04
 
 ## Interface stable
 
@@ -138,6 +138,15 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   re-run happens post-merge.
 
 ## Next steps
+
+0. **Liveness verified on the PIT warehouse (2026-10-04).** The promoted bundle is ACTIVE in `_v11pit` runs:
+   default-on at `weinstein_strategy_config.ml:231-232` (+ `w_overhead_supply` via `_default_screening_config`),
+   not overridden by the investor-preset specs; `_v11pit` carries a weekly side-table per `.snap` (9,597 / 9,597,
+   manifest `weekly_sidetable_format_hash`), so `panel_runner.ml:234-260` sets `sketch_warehouse` and the reader
+   (`resistance_sketch_reader.ml:95-130`) would fail loud on a missing table. Evidence: all 252 audit entries of
+   `macro-suspend-investor` ms0-5d s0–s2 carry "Overhead supply (continuous)" in `cascade_rationale`.
+   Virgin-crossing readmission is wired with its data present but has no per-trade marker (inferred, not observed).
+   Every PIT result since 2026-09-14 includes the bundle; CSV/panel goldens do not (inert there).
 
 1. **CONFIRMATION GRID 3/3 — mechanism ACCEPT (2026-07-17).** Home curve is
    a concave hump peaking w≈45 (.691→.897→.772 at 60); sp500 cell confirms

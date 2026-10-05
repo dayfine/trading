@@ -1,9 +1,9 @@
 # Status: experiment-platform
 
-## Last updated: 2026-06-21
+## Last updated: 2026-10-04
 
 ## Status
-IN_PROGRESS
+MERGED
 
 ## Notes
 
@@ -220,3 +220,38 @@ Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && 
   BO tuner (this PR ships the pure libs + tests only).
 - Any change to the WF runner / gate / report (reused unchanged).
 - Promotion automation (stays manual, ledger-backed).
+
+## Evaluation 2026-10-04
+
+**Verdict: COMPLETED (status MERGED).** Track-pacer 2026-10-04 flagged
+platform code idle 33+ days (4th cycle) and asked to close or name a
+successor.
+
+- **Intent.** Plan `dev/plans/experiment-platform-2026-05-29.md`: make
+  mechanism exploration systematic: variant matrices (Gap A), loud override
+  validation (B), WF-CV ranking with Deflated Sharpe (C), an append-only
+  ledger (D), a flag-discipline rule (E), and a gap-closing skill (F).
+- **State (verified on main 2026-10-04).** All six gaps delivered:
+  `Walk_forward.Variant_matrix` / `Spec` axes, `Experiment_ledger`,
+  `Backtest_stats.Deflated_sharpe` + `Normal_dist`,
+  `Walk_forward.Variant_ranking`, the `rank_variants` CLI (the only
+  non-test consumer of DSR; `walk_forward/bin/dune`),
+  `.claude/rules/experiment-flag-discipline.md`, and the
+  `experiment-gap-closing` skill. The ledger is heavily used:
+  `dev/experiments/_ledger/` holds 70 entries (60 since June; newest
+  2026-10-02-continuation-buys-trader-rerun). Platform code is idle because
+  it is finished, not abandoned.
+- **Superseded items.** The sp500-2010-2026 data-coverage P0 was already
+  superseded (2026-06-21). Next-Step 2 (wire DSR into the BO tuner) has not
+  happened; the BO / tuner tracks are parked, so it is not a platform
+  deliverable and is carried by those tracks if revived.
+- **Tail work (none required).** Stale index Next-task cell (force-exit grid
+  / continuation recheck) was reconciled in this evaluation: the
+  continuation-buy recheck ran (#3081, not promotable). Optional, needs
+  code: DSR wiring into the BO tuner.
+
+## Next Steps
+
+None for this track. New experiments are recorded as ledger entries and
+specs under `dev/experiments/`; platform code changes only on demand, as a
+new track.
