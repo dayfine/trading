@@ -140,8 +140,34 @@ let test_entry_anchor_label_distinguishes_all _ =
     ( TC.entry_anchor_label TL.Continuation,
       TC.entry_anchor_label TL.Local_range_top,
       TC.entry_anchor_label TL.Breakout,
+      TC.entry_anchor_label TL.Breakdown,
       TC.entry_anchor_label TL.Ma_fallback )
-    (equal_to ("continuation", "local_range_top", "breakout", "ma_fallback"))
+    (equal_to
+       ( "continuation",
+         "local_range_top",
+         "breakout",
+         "breakdown",
+         "ma_fallback" ))
+
+(* #3131: the screener's anchor arm reaches the audit as the same arm, one per
+   constructor, so a short's [Breakdown] is never recorded as a long's
+   [Breakout] (the label Phase B's short-liveness read splits on). *)
+let test_entry_anchor_of_kind_maps_each_arm _ =
+  let module TL = Backtest.Ticket_lifecycle in
+  let hop = Backtest.Trade_audit_enum_hops.entry_anchor_of_kind in
+  assert_that
+    (List.map
+       Screener.
+         [ Continuation; Local_range_top; Breakout; Breakdown; Ma_fallback ]
+       ~f:(fun k -> TC.entry_anchor_label (hop k)))
+    (equal_to
+       [
+         "continuation";
+         "local_range_top";
+         "breakout";
+         "breakdown";
+         "ma_fallback";
+       ])
 
 (* csv_header_fields --------------------------------------------------- *)
 
@@ -654,6 +680,8 @@ let suite =
          >:: test_stop_trigger_kind_label_distinguishes_all;
          "entry_anchor_label all variants (#3074)"
          >:: test_entry_anchor_label_distinguishes_all;
+         "entry_anchor_of_kind maps each arm (#3131)"
+         >:: test_entry_anchor_of_kind_maps_each_arm;
          "csv_header_fields pinned" >:: test_csv_header_fields_pinned;
          "entry_anchor column reads the lifecycle tag (#3074)"
          >:: test_entry_anchor_column_reads_the_lifecycle_tag;
