@@ -1,0 +1,57 @@
+Loading 2 scenarios from /tmp/sweeps/spybench/specs (parallel=2)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/jjws-spy/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: enabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-10-05-054039
+
+>>> Running spy30w-26y: SPY-only Weinstein investor (30wk MA, long/flat), 2000-01-01 to 2026-06-26, same window as inv26sc-investor. (2000-01-01 to 2026-06-26)
+
+>>> Running spybah-26y: Buy-and-hold SPY, 2000-01-01 to 2026-06-26, same window as inv26sc-investor. (2000-01-01 to 2026-06-26)
+Using scenario-provided sector map (1 symbols)...
+Using scenario-provided sector map (1 symbols)...
+Universe: 1 stocks
+Loading AD breadth bars...
+Universe: 1 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 16
+Running backtest (2000-01-01 to 2026-06-26, warmup from 2000-01-01)...
+Panel_runner: simulator window 2000-01-01..2026-06-26 (warmup 0 days, strategy Bah_benchmark(SPY))
+Total symbols (universe + index + sector ETFs): 16
+Running backtest (2000-01-01 to 2026-06-26, warmup from 1999-01-02)...
+Panel_runner: simulator window 1999-01-02..2026-06-26 (warmup 364 days, strategy Spy_only_weinstein(SPY,ma=30wk))
+Panel_runner: in-process snapshot built (16 symbols, /tmp/panel_runner_csv_snapshot_d06b3d)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 256 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 6910 days) for strategy
+Panel_runner: in-process snapshot built (16 symbols, /tmp/panel_runner_csv_snapshot_ea5c19)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 256 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 7170 days) for strategy
+WARN: portfolio rejected fill for SPY (side=Types.Buy qty=5599.0000 price=147.0000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 823108.99, Available: 820539.90997031936, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=177585 misses=16 miss_absent=0 evictions=0 n_symbols=16 misses_per_symbol=1.00 n_symbols_touched=16 n_symbols_absent=0 loads_per_touched=1.00 max_entries=16 max_bytes=16437992 max_mmap_open=0 avg_entries=8.5 avg_bytes=8844261 cap_mb=4096 cap_mmap_handles=256 top_heap_bytes=66176248 maxrss_bytes=85807104
+WARN: fold-health: zero in-window round-trips across 6894 steps (positions likely opened during warmup and never round-tripped in-window)
+WARN: fold-health: terminal NAV moved 400.79% from the starting stake with zero in-window round-trips (likely warmup-window P&L leaked into the measurement window)
+all_eligible: loading scenario /tmp/sweeps/spybench/specs/spybah-26y.sexp
+all_eligible post-step: scenario:/tmp/sweeps/spybench/specs/spybah-26y.sexp failed: (Sys_error
+  "/workspaces/trading-1/data/backtest_scenarios/universes/spy-only.sexp: No such file or directory")
+WARN: portfolio rejected fill for SPY (side=Types.Buy qty=8037.0000 price=314.1700): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 2525064.66, Available: 2505516.7481471538, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for SPY (side=Types.Buy qty=8267.0000 price=306.0510): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 2530206.2870000005, Available: 2505516.7481471538, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=217132 misses=16 miss_absent=0 evictions=0 n_symbols=16 misses_per_symbol=1.00 n_symbols_touched=16 n_symbols_absent=0 loads_per_touched=1.00 max_entries=16 max_bytes=16988360 max_mmap_open=0 avg_entries=8.5 avg_bytes=9130344 cap_mb=4096 cap_mmap_handles=256 top_heap_bytes=101504208 maxrss_bytes=123535360
+all_eligible: loading scenario /tmp/sweeps/spybench/specs/spy30w-26y.sexp
+all_eligible post-step: scenario:/tmp/sweeps/spybench/specs/spy30w-26y.sexp failed: (Sys_error
+  "/workspaces/trading-1/data/backtest_scenarios/universes/spy-only.sexp: No such file or directory")
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+spy30w-26y                     326.8%      21    52.4%    25.8%   PASS
+spybah-26y                     400.8%       0     nan%    56.0%   PASS
+
+2/2 scenarios passed.
