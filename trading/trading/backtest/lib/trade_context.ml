@@ -39,6 +39,7 @@ let entry_anchor_label (a : Ticket_lifecycle.entry_anchor) =
   | Continuation -> "continuation"
   | Local_range_top -> "local_range_top"
   | Breakout -> "breakout"
+  | Breakdown -> "breakdown"
   | Ma_fallback -> "ma_fallback"
 
 (* [None] when no audit record joined, the record has no lifecycle, or it

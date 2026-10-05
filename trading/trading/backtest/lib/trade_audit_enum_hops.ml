@@ -41,4 +41,5 @@ let entry_anchor_of_kind :
   | Continuation -> Ticket_lifecycle.Continuation
   | Local_range_top -> Ticket_lifecycle.Local_range_top
   | Breakout -> Ticket_lifecycle.Breakout
+  | Breakdown -> Ticket_lifecycle.Breakdown
   | Ma_fallback -> Ticket_lifecycle.Ma_fallback

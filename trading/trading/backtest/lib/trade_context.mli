@@ -107,7 +107,7 @@ val stage_label : Weinstein_types.stage -> string
 
 val entry_anchor_label : Ticket_lifecycle.entry_anchor -> string
 (** The [entry_anchor] column label: [continuation] / [local_range_top] /
-    [breakout] / [ma_fallback]. *)
+    [breakout] / [breakdown] (shorts, #3131) / [ma_fallback]. *)
 
 val stop_trigger_kind_label : Stop_log.stop_trigger_kind -> string
 (** Render a {!Stop_log.stop_trigger_kind} as the canonical lowercase export
