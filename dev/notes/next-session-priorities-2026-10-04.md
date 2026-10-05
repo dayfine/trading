@@ -39,19 +39,18 @@ decision (section 3).
 `.claude/worktrees/jjws-msusp` (bookmark `experiments/macro-suspend`), second commit, re-run qc-results.
 Then `jj workspace forget` that workspace and remove the directory.
 
-### The transferable why across this session's three experiments
+### The transferable why (corrected by the results-analyst second read of #3123)
 
-All three hit the same wall: **a resting level that outlives the base that justified it.**
-- Long recovery entries (10-02): far graded tops in every year, not just 2009 — no base-bounded anchor fix.
-- Shorts (10-03): both tickets sat 21–34 % above market at a transition-week level and never traded.
-- Macro-suspend (10-04): suspended tickets re-issue *unchanged*, so they fill months later at the old
-  trigger (DLX +7 months, STN +11 months) and stop out within days. Removing bear-week fills is otherwise a
-  coin-flip: those fills cluster at market turns (5d −$27k, 5r +$33k incl. AIT and STN at recovery starts),
-  and the re-shuffled slots net only −$3k to −$5k at 5d — the stale re-issue is a per-trade defect, not the driver.
+- Long recovery entries (10-02): far graded tops in every year — no base-bounded anchor fix.
+- Shorts (10-03): both tickets sat 21–34 % above market and never traded.
+- Macro-suspend (10-04): Bearish-week fills are timed near market turns but are ordinary in quality; removing
+  them is negative expected value on a fat-tailed book, and the dollar result is a tail lottery (5d = ONXX
+  alone). Re-issued tickets fill from above as dip-buys with stale stops (#3126) — a correctness defect of the
+  axis, not a lever. Keep the knob default-off as a book-faithful axis.
 
-Forward: stop proposing levers that *move or time* a resting entry level (N-week anchors, suspend/resume,
-re-time). The coherent remaining variant is "cancel and re-screen against the current base" — a different
-mechanism; it is **not** proposed and needs its own pre-registration if the user wants it.
+Forward: do not propose cancel-and-re-screen as an improvement (it shares the dominant term). Levers that add
+or remove a handful of fills cannot be measured by a 5y × 3-salt Calmar test (one draw per window); they need
+a paired per-event estimand or the 26y window plus a truncation check.
 
 ## 2. Open correctness items (local data needed — no `env/cloud`)
 
@@ -87,8 +86,8 @@ Docs-only PR (this file + exports + `dev/status/perf-long-cells.csv` + budget JS
 
 - Counting Bearish-week fills from `trades.csv` alone — open positions at the window end count too
   (the 5d macro-suspend count was 6 from trades, 9 with open positions).
-- Reading the 5d macro-suspend realised P&L (+$22k–24k for the knob) as a win: the verdict includes the
-  value of positions open at the end, and the pre-registered rule reads Calmar on NAV.
+- Calling the 5d macro-suspend result a window-end artefact: it is decided by ONXX, a Bearish-week breakout
+  that msB could never have bought.
 - Proposing a 26y phase for macro-suspend (rule 6 not met) or a default flip (rule 8).
 - Deleting Time Machine snapshots to free disk.
 - Everything in the 10-03 doc §7 still holds.
