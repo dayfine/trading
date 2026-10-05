@@ -1,9 +1,9 @@
 # Status: margin-realism
 
-## Last updated: 2026-07-25
+## Last updated: 2026-10-04
 
 ## Status
-IN_PROGRESS
+MERGED
 
 ## Interface stable
 NO
@@ -376,3 +376,43 @@ and M1b (follow-up).
   −$607k/0.85% immaterial but real).
 - #2060 — mean-ADV liquidity gate spoofable by single block-print day (LINK
   −$1.58M specimen; median/k-of-N candidates, default-off).
+
+## Evaluation 2026-10-04
+
+**Verdict: COMPLETED (status MERGED).** Track-pacer 2026-10-04 flagged it
+stalled (last PR #2077, 72 days, no `## Next Steps`) and asked to close it.
+
+- **Intent.** Plan `dev/plans/levered-longshort-margin-realism-2026-07-14.md`:
+  a margin model that prices leverage and survives squeezes, so a levered
+  long-short config can be quoted with honest costs. Milestones M1-M4, each
+  default-off (R1/R2).
+- **State (verified on main 2026-10-04).** M1a/M1b-1/M1b-2 (#1990, #2005),
+  M2, M3a/M3b and the M4 validation protocol all shipped; follow-ups #2057
+  (#2074) and #2076 (#2085) shipped; the leverage-dawn regime-conditional
+  knob (#2077) shipped. Config fields exist in
+  `weinstein_strategy_config.ml` (`initial_long_margin_req` default 1.0,
+  `long_margin_rate_annual_pct` default 0.0, `dawn_initial_long_margin_req`
+  default 1.0, `margin_config`) and are R1 no-ops at default. The short-side
+  margin model is armed in live-liveness specs
+  (`dev/experiments/shorts-liveness-2026-10-03/specs/shB-5d.sexp`:
+  `margin_config`, tiers, `short_borrow_min_dollar_adv`), so the delivered
+  machinery is in use.
+- **Outcome.** M4 verdict was leverage REJECT (ledger
+  `dev/experiments/_ledger/2026-07-24-margin-m4-leverage-surface.sexp`;
+  note `dev/notes/margin-m4-validation-2026-07-23.md`): all six leverage
+  cells fail the fold gate; no default flips. The track's purpose (honest
+  costs, safe-by-default levered path, a decisive answer) is met; the answer
+  is "do not lever".
+- **Tail work (none required for closure).** (a) #2059 and #2060 listed
+  under Follow-ups are record-basis / liquidity-gate issues owned by their
+  own tracks, not margin work. (b) Optional, needs code so NOT done here:
+  the long-leverage knobs (`initial_long_margin_req`,
+  `long_margin_rate_annual_pct`, `dawn_initial_long_margin_req`) are a
+  REJECT-as-default; whether they are do-not-revive (experiment-flag-discipline
+  Rule 4 retirement) is unclassified in the ledger entry, so no removal is
+  eligible until a human records that classification.
+
+## Next Steps
+
+None. Track closed. Revive only if a leverage thesis changes (new financing
+cost assumption or a regime-conditional design), via a new plan.
