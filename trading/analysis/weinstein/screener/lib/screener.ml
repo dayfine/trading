@@ -88,6 +88,7 @@ type entry_anchor_kind = Screener_entry_anchor.kind =
   | Continuation
   | Local_range_top
   | Breakout
+  | Breakdown
   | Ma_fallback
 [@@deriving sexp, show, eq]
 
@@ -148,12 +149,21 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
     Option.value a.breakout_price
       ~default:(a.stage.ma_value *. (1.0 +. params.breakout_fallback_pct))
   in
+  (* #3131: a short's default is the MA fallback mirrored below the MA, and its
+     buffer goes downward (a sell-stop a little under the breakdown). *)
+  let side_sign = if is_short then -1.0 else 1.0 in
+  let default_anchor =
+    if is_short then a.stage.ma_value *. (1.0 -. params.breakout_fallback_pct)
+    else breakout
+  in
   let entry_anchor =
     snd (Screener_entry_anchor.choose ~is_short a)
-    |> Option.value ~default:breakout
+    |> Option.value ~default:default_anchor
   in
   let entry =
-    suggested_entry ~entry_buffer_pct:params.entry_buffer_pct entry_anchor
+    suggested_entry
+      ~entry_buffer_pct:(side_sign *. params.entry_buffer_pct)
+      entry_anchor
   in
   let stop_ =
     if is_short then entry *. (1.0 +. params.short_stop_pct)

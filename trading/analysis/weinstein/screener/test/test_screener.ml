@@ -2891,6 +2891,71 @@ let test_entry_anchor_kind_short_never_continuation _ =
     (elements_are [ field entry_anchor_kind (not_ (equal_to Continuation)) ])
 
 (* ------------------------------------------------------------------ *)
+(* #3131: a short ticket rests at the breakdown, not the base top      *)
+(* ------------------------------------------------------------------ *)
+
+(** RMD 2008-02-22 shape: base top 54.58 (the old [suggested_entry] 54.85 is
+    that plus the 0.5 % buffer), support floor 44.00 well below it, a
+    [local_range_top] above the top (an arm a short must not take either). The
+    close at decision was 41.07, so a top-anchored sell-stop sat 34 % above the
+    market and never filled. *)
+let _rmd_short_candidates ~breakdown_price =
+  let stocks, sector_map = short_setup () in
+  let rmd =
+    List.map stocks ~f:(fun (a : Stock_analysis.t) ->
+        {
+          a with
+          breakout_price = Some 54.58;
+          breakdown_price;
+          local_range_top = Some 55.0;
+        })
+  in
+  (screen ~config:cfg ~macro_trend:Bearish ~sector_map ~stocks:rmd
+     ~held_tickers:[])
+    .short_candidates
+
+(* The sell-stop rests at the breakdown with the buffer mirrored downward:
+   44.00 * (1 - 0.005) = 43.78, and the short's stop sits above it. *)
+let test_short_ticket_anchors_at_breakdown _ =
+  assert_that
+    (_rmd_short_candidates ~breakdown_price:(Some 44.0))
+    (elements_are
+       [
+         all_of
+           [
+             field entry_anchor_kind (equal_to Breakdown);
+             field (fun c -> c.suggested_entry) (float_equal 43.78);
+             field
+               (fun c -> c.suggested_stop)
+               (float_equal
+                  (43.78 *. (1.0 +. cfg.candidate_params.short_stop_pct)));
+           ];
+       ])
+
+(* No support floor: the short falls back to the MA mirrored below it,
+   [ma_value * (1 - breakout_fallback_pct)] less the buffer, never the top. *)
+let test_short_ticket_ma_fallback_below_ma _ =
+  let expected (c : scored_candidate) =
+    let p = cfg.candidate_params in
+    let raw =
+      c.analysis.stage.ma_value
+      *. (1.0 -. p.breakout_fallback_pct)
+      *. (1.0 -. p.entry_buffer_pct)
+    in
+    Float.round_nearest (raw *. 100.0) /. 100.0
+  in
+  assert_that
+    (_rmd_short_candidates ~breakdown_price:None)
+    (elements_are
+       [
+         all_of
+           [
+             field entry_anchor_kind (equal_to Ma_fallback);
+             field (fun c -> c.suggested_entry -. expected c) (float_equal 0.0);
+           ];
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* #3069: w_continuation ranks continuation hits                       *)
 (* ------------------------------------------------------------------ *)
 
@@ -3804,6 +3869,10 @@ let suite =
          >:: test_entry_anchor_kind_ma_fallback;
          "entry_anchor_kind short never Continuation (#3074)"
          >:: test_entry_anchor_kind_short_never_continuation;
+         "#3131: short ticket anchors at the breakdown"
+         >:: test_short_ticket_anchors_at_breakdown;
+         "#3131: short MA fallback sits below the MA"
+         >:: test_short_ticket_ma_fallback_below_ma;
          "RS gate: negative territory admitted at the 0.0 default"
          >:: test_rs_gate_default_admits_negative_territory;
          "RS gate: negative territory rejected when armed at 1.0"

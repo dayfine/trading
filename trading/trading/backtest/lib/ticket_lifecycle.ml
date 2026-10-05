@@ -30,7 +30,12 @@ type triple_confirmation = {
 
 type entry_freshness_basis = Ma_cross | Range_top_breakout [@@deriving sexp]
 
-type entry_anchor = Continuation | Local_range_top | Breakout | Ma_fallback
+type entry_anchor =
+  | Continuation
+  | Local_range_top
+  | Breakout
+  | Breakdown
+  | Ma_fallback
 [@@deriving sexp]
 
 type reissue = { original_position_id : string; reissue_date : Date.t }

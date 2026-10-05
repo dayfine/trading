@@ -453,11 +453,13 @@ val default_config : config
 type entry_anchor_kind = Screener_entry_anchor.kind =
   | Continuation
       (** Longs only: the continuation detector's [consolidation_high]. *)
-  | Local_range_top  (** [analysis.local_range_top]. *)
-  | Breakout  (** [analysis.breakout_price]. *)
+  | Local_range_top  (** Longs only: [analysis.local_range_top]. *)
+  | Breakout  (** Longs only: [analysis.breakout_price]. *)
+  | Breakdown  (** Shorts only: [analysis.breakdown_price] (#3131). *)
   | Ma_fallback
-      (** No [breakout_price]: the MA-based fallback
-          ([ma_value *. (1 + breakout_fallback_pct)]). *)
+      (** No base level: the MA-based fallback
+          ([ma_value *. (1 + breakout_fallback_pct)] for a long,
+          [ma_value *. (1 - breakout_fallback_pct)] for a short). *)
 [@@deriving sexp, show, eq]
 
 type scored_candidate = {
@@ -490,6 +492,11 @@ type scored_candidate = {
             (breakout) bar and so sits above the close.
           + {b local range}: [analysis.local_range_top] when [Some].
           + {b default}: [breakout_price] (or the MA-based fallback).
+
+          A {b short} candidate (#3131) anchors at [analysis.breakdown_price]
+          (the support floor), else the MA fallback mirrored below the MA, and
+          its buffer goes {i downward}: a sell-stop a little under the breakdown
+          (book Ch. 7), never at the top of the range.
 
           Only entry / [suggested_stop] / [risk_pct] follow the anchor;
           [swing_target], admission and grading still read [breakout_price]. *)

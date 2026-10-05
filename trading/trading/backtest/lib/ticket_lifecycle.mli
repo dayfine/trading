@@ -133,7 +133,8 @@ type entry_anchor =
   | Continuation  (** The continuation detector's [consolidation_high]. *)
   | Local_range_top  (** [analysis.local_range_top]. *)
   | Breakout  (** [analysis.breakout_price]. *)
-  | Ma_fallback  (** No [breakout_price]: the MA-based fallback level. *)
+  | Breakdown  (** Shorts: [analysis.breakdown_price] (#3131). *)
+  | Ma_fallback  (** No base level: the MA-based fallback level. *)
 [@@deriving sexp]
 
 type reissue = {

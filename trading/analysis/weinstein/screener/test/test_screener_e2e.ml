@@ -220,9 +220,10 @@ let test_candidate_fields_populated _ =
     \+ Adequate breakdown volume + RS negative & declining + Moderate support
     below), all clearing the grade-C floor. The remaining four tickers fail the
     short-side gate. The test pins the exact short_candidates list and shape
-    (entry, stop>entry, risk_pct) and asserts that no buy candidates leak
-    through under Bearish macro. This is the deterministic counterpart to the
-    bullish test. *)
+    (entry, stop>entry, risk_pct); the entry is the sell-stop under the prior
+    base's support floor ([breakdown_price] less the buffer, #3131), not the
+    base top and asserts that no buy candidates leak through under Bearish
+    macro. This is the deterministic counterpart to the bullish test. *)
 let test_short_candidate_populated _ =
   let stocks =
     _analyze_universe
@@ -238,14 +239,14 @@ let test_short_candidate_populated _ =
   assert_that result.Screener.short_candidates
     (elements_are
        [
-         _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:72
-           ~entry_low:139.0 ~entry_high:144.0 ~stop_low:151.0 ~stop_high:155.0
-           ~risk_low:0.075 ~risk_high:0.085;
-         _candidate_matcher ~side:`Short ~ticker:"KO" ~score:55 ~entry_low:56.0
-           ~entry_high:60.0 ~stop_low:61.0 ~stop_high:65.0 ~risk_low:0.075
+         _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:72 ~entry_low:99.0
+           ~entry_high:104.0 ~stop_low:107.0 ~stop_high:112.0 ~risk_low:0.075
+           ~risk_high:0.085;
+         _candidate_matcher ~side:`Short ~ticker:"KO" ~score:55 ~entry_low:44.0
+           ~entry_high:48.0 ~stop_low:47.5 ~stop_high:51.5 ~risk_low:0.075
            ~risk_high:0.085;
          _candidate_matcher ~side:`Short ~ticker:"CVX" ~score:52
-           ~entry_low:125.0 ~entry_high:130.0 ~stop_low:135.0 ~stop_high:141.0
+           ~entry_low:107.5 ~entry_high:112.5 ~stop_low:116.0 ~stop_high:121.0
            ~risk_low:0.075 ~risk_high:0.085;
        ])
 
@@ -310,10 +311,10 @@ let test_ch11_spotcheck_2022_bear _ =
     (elements_are
        [
          _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:45
-           ~entry_low:171.0 ~entry_high:176.0 ~stop_low:185.0 ~stop_high:190.0
+           ~entry_low:112.0 ~entry_high:117.0 ~stop_low:121.0 ~stop_high:126.0
            ~risk_low:0.075 ~risk_high:0.085;
          _candidate_matcher ~side:`Short ~ticker:"MSFT" ~score:45
-           ~entry_low:349.0 ~entry_high:354.0 ~stop_low:377.0 ~stop_high:382.0
+           ~entry_low:243.0 ~entry_high:248.0 ~stop_low:262.0 ~stop_high:267.0
            ~risk_low:0.075 ~risk_high:0.085;
        ])
 
