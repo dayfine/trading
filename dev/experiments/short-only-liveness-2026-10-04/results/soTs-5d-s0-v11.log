@@ -1,0 +1,25 @@
+[snapshot-mode] loaded manifest at /tmp/snap_top3000_pit_v11pit/manifest.sexp (schema_hash=060588c0224b7d7e73f367fbd1801084, 9364 entries)
+Loading 1 scenarios from /tmp/shortonly-run/S/soTs-5d-s0-v11 (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-shortonly/trading/test_data/backtest_scenarios
+Bar data source: snapshot mode (/tmp/snap_top3000_pit_v11pit)
+Progress emission: every 26 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-shortonly/trading/dev/backtest/scenarios-2026-10-05-065742
+
+>>> Running soTs-5d: short-only trader shorts, structural stop (Nearest), 5d (2007-06-01 to 2012-06-29)
+Using scenario-provided sector map (4192 symbols)...
+Universe: 4192 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 4207
+Running backtest (2007-06-01 to 2012-06-29, warmup from 2006-06-02)...
+Panel_runner: simulator window 2006-06-02..2012-06-29 (warmup 364 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 1586 days) for strategy
+Panel_runner: snapshot cache hits=17322634 misses=582432 miss_absent=578454 evictions=0 n_symbols=4207 misses_per_symbol=138.44 n_symbols_touched=3978 n_symbols_absent=229 loads_per_touched=1.00 max_entries=3978 max_bytes=79313656 max_mmap_open=3978 avg_entries=1989.5 avg_bytes=39808886 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1491745712 maxrss_bytes=3586658304
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+soTs-5d                         -9.5%     116    39.7%    32.3%   PASS
+
+1/1 scenarios passed.
+exit=0
