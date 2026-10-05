@@ -39,6 +39,15 @@
       checks in its re-admit week (nor count toward the notional that week's
       fresh entries are sized against); the simulator's fill-time portfolio
       rejection still applies.
+    - {b Not above the market} (#3126). A stashed ticket whose trigger the
+      current close already trades {e above} is dropped, not re-issued:
+      re-armed, its stop-limit would fill from above on the next down bar — a
+      dip-buy carrying the decision-time stop, not a breakout from below (spine
+      item 3; specimen STN, trigger 88.86, filled 2026-02-12 at 90.64 on a bar
+      that opened 99.75). Its {!Entry_freeze} pin is released and it is not
+      counted as held, so the screener may re-qualify the symbol at a fresh
+      breakout level and stop. A ticket whose trigger is at or above the close
+      is re-issued unchanged, as a resting ticket that never slept would be.
     - {b Age.} Suspension time {b counts} toward [entry_order_max_rest_weeks]: a
       ticket is as old as its first placement, not its latest re-issue. The
       alternative (pausing the clock) would let a ticket outlive the TTL by the
@@ -103,6 +112,7 @@ val run :
   config:Weinstein_strategy_config.config ->
   macro_result:Macro.result ->
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
+  current_close:(string -> float option) ->
   portfolio:Trading_strategy.Portfolio_view.t ->
   current_date:Date.t ->
   cancel_expired:(Trading_strategy.Portfolio_view.t -> Position.transition list) ->
@@ -115,6 +125,9 @@ val run :
     Returns [(transitions, suspended_held)]: the F2 cancels, then this week's
     suspensions or re-issues; and the symbols the cascade must treat as held
     this week (stashed or being re-issued).
+
+    [current_close symbol] is the symbol's latest raw close (the trigger's
+    basis); [None] (no bar) never drops a ticket. Read only on a re-admit week.
 
     [audit_recorder] (default {!Audit_recorder.noop}) receives one
     {!Audit_recorder.reissue_event} per re-issued ticket, naming the ticket's

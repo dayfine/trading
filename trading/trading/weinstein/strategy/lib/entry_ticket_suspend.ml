@@ -173,6 +173,21 @@ let _reissue t ?pending_entry_e ~audit_recorder ~stop_states ~positions
       _drop t ?pending_entry_e tk.symbol);
   List.map free ~f:(_reissue_one t ~audit_recorder ~stop_states ~current_date)
 
+(* #3126: the market already trades above a stashed long's trigger. Re-armed,
+   its stop-limit would fill from above on the next down bar — a dip-buy, not a
+   breakout from below (spine item 3), carrying the decision-time stop. *)
+let _above_market ~current_close (tk : ticket) =
+  match current_close tk.symbol with
+  | Some close -> Float.( > ) close tk.entry_price
+  | None -> false
+
+(* Drop such tickets instead of re-issuing them, releasing their no-chase pin
+   so the screener can re-qualify the symbol at a fresh breakout level. *)
+let _drop_above_market t ?pending_entry_e ~current_close () =
+  _sorted_stash t
+  |> List.filter ~f:(_above_market ~current_close)
+  |> List.iter ~f:(fun (tk : ticket) -> _drop t ?pending_entry_e tk.symbol)
+
 let _positions_minus ~cancels positions =
   let cancelled =
     List.map cancels ~f:(fun (tr : Position.transition) -> tr.position_id)
@@ -183,7 +198,8 @@ let _positions_minus ~cancels positions =
 (* The armed path: F2 cancels on the aged view, drop expired stash entries,
    then either suspend what is still resting or re-issue what is stashed. *)
 let _step t ?pending_entry_e ~audit_recorder ~config ~macro_result ~stop_states
-    ~(portfolio : Portfolio_view.t) ~current_date ~cancel_expired () =
+    ~current_close ~(portfolio : Portfolio_view.t) ~current_date ~cancel_expired
+    () =
   let positions = portfolio.Portfolio_view.positions in
   Hashtbl.filter_keys_inplace t.origins ~f:(Map.mem positions);
   let cancels = cancel_expired (aged_portfolio t portfolio) in
@@ -198,8 +214,10 @@ let _step t ?pending_entry_e ~audit_recorder ~config ~macro_result ~stop_states
         ~f:(_suspend_one t ~stop_states ~current_date)
     else []
   in
+  if not suspending then _drop_above_market t ?pending_entry_e ~current_close ();
   (* Read after suspending and before re-issuing: this week's stash plus the
-     tickets about to be re-issued, none of which the cascade may re-admit. *)
+     tickets about to be re-issued, none of which the cascade may re-admit. A
+     ticket dropped above the market is not held: it may re-qualify now. *)
   let held = Hashtbl.keys t.stashed in
   let reissued =
     if suspending then []
@@ -211,7 +229,7 @@ let _step t ?pending_entry_e ~audit_recorder ~config ~macro_result ~stop_states
 
 let run ?store ?pending_entry_e ?(audit_recorder = Audit_recorder.noop)
     ~(config : Weinstein_strategy_config.config) ~macro_result ~stop_states
-    ~portfolio ~current_date ~cancel_expired () =
+    ~current_close ~portfolio ~current_date ~cancel_expired () =
   match (store, config.entry_ticket_macro_suspend) with
   | None, _ | Some _, Entry_ticket_suspend_mode.Off ->
       (cancel_expired portfolio, [])
@@ -219,4 +237,4 @@ let run ?store ?pending_entry_e ?(audit_recorder = Audit_recorder.noop)
       ( Entry_ticket_suspend_mode.On_bearish_macro
       | Entry_ticket_suspend_mode.On_index_stage4 ) ) ->
       _step t ?pending_entry_e ~audit_recorder ~config ~macro_result
-        ~stop_states ~portfolio ~current_date ~cancel_expired ()
+        ~stop_states ~current_close ~portfolio ~current_date ~cancel_expired ()

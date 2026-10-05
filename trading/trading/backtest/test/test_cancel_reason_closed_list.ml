@@ -395,6 +395,7 @@ let _suspend_run ~mode ~macro_result ~positions =
        ~store:(Entry_ticket_suspend.create ())
        ~config:(_suspend_config mode) ~macro_result
        ~stop_states:(ref String.Map.empty)
+       ~current_close:(fun _ -> None)
        ~portfolio:{ cash = 1_000_000.0; positions }
        ~current_date:_placement_date
        ~cancel_expired:(fun _ -> [])

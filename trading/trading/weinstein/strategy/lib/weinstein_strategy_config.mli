@@ -1911,7 +1911,9 @@ type config = {
       (** #2976 — {b suspend}, not cancel, resting long entry tickets while the
           macro gate rejects new longs; re-issue them unchanged (same entry
           level, trigger/limit and stop plan) on the first weekly screen where
-          it admits again. See {!Entry_ticket_suspend} for the mechanics.
+          it admits again, unless the close already trades above the trigger, in
+          which case the ticket is dropped for the screener to re-qualify
+          (#3126). See {!Entry_ticket_suspend} for the mechanics.
 
           {b Why.} The cascade's macro gate sees only fresh candidates; a
           resting ticket is held, never re-asked, and the simulator keeps its
@@ -1943,10 +1945,10 @@ type config = {
           same issuer ({!share_class_groups}; e.g. GOOG / GOOGL) has an open or
           pending long: a position in [Entering] (a resting or partly-filled
           ticket), [Holding] or [Exiting] (not yet closed), or a ticket stashed
-          by {!entry_ticket_macro_suspend} (it will be re-issued unchanged, so
-          it is still a claim on the group). When two classes qualify in the
-          same week, only the first {e entered} in the screener's ranking order
-          is admitted; a higher-ranked class that is skipped for another reason
+          by {!entry_ticket_macro_suspend} (it may be re-issued unchanged, so it
+          is still a claim on the group). When two classes qualify in the same
+          week, only the first {e entered} in the screener's ranking order is
+          admitted; a higher-ranked class that is skipped for another reason
           (cash, stop width, ...) does not block its sibling. Shorts and
           unmapped symbols are unaffected. See {!Share_class_gate}.
 
