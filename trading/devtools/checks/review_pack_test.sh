@@ -212,7 +212,7 @@ printf '((open_positions_value 20000.00))\n' > "$TMP/oe/run/actual.sexp"
 rc=0
 sh "$SCRIPT" --no-container --data-dir "$TMP/oe/data" --out "$TMP/oe/miss" r0="$TMP/oe/run/" >"$TMP/miss.log" 2>"$TMP/miss.err" || rc=$?
 expect_eq "open-at-end mismatch: still builds" 0 "$rc"
-expect_eq "open-at-end mismatch: warns on stderr" 1 "$(grep -c 'WARN open positions on 2020-05-20: pack marks 12000.00, actual.sexp open_positions_value 20000.00' "$TMP/miss.err" || true)"
+expect_eq "open-at-end mismatch: warns on stderr" 1 "$(grep -c 'WARN open positions on 2020-05-20: pack marks 12000, actual.sexp open_positions_value 20000' "$TMP/miss.err" || true)"
 expect_eq "no actual.sexp: the check reads null, not 0" null "$(jq -r .check.actual "$S/data/r0_open.json")"
 expect_eq "cap/cash-floor text removed" 0 "$(grep -c 'caps long exposure\|exposure cap and cash floor' "$S/index.html" || true)"
 expect_eq "final NAV carried on the equity axis" yes "$(grep -q "title: 'final'" "$S/index.html" && echo yes || echo no)"

@@ -153,7 +153,7 @@ host_run() { # $1 label, $2 index
   jq -r 'def abs: if . < 0 then -. else . end;
     .check | select(.actual != null) | ((.pack - .actual) | abs) as $e
     | select($e > 1 and $e > 0.01 * ([.pack, .actual] | map(abs) | max))
-    | "WARN open positions on \(.date): pack marks \(.pack), actual.sexp open_positions_value \(.actual)"' "$s/$1_open.json" |
+    | "WARN open positions on \(.date): pack marks \(.pack + 0), actual.sexp open_positions_value \(.actual + 0)"' "$s/$1_open.json" |
     while IFS= read -r w; do log "$1: $w"; done
 }
 site_common() {
