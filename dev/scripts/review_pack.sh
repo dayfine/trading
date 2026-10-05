@@ -100,11 +100,27 @@ extract_run() { # $1 run dir, $2 1 = also write daily chart bars
   dy=""; [ "$2" = 1 ] && dy="$d/x_daily.tsv"
   tail -n +2 "$d/trades.csv" | while IFS=, read -r sym _side ed xd _days ep xp qty _pnl _pct es _xs _trig _stg _vr sid rest; do
     pid=$(echo "$rest" | cut -d, -f4)
-    f="$DATA/$(printf %s "$sym" | cut -c1)/$(printf %s "$sym" | rev | cut -c1)/$sym/data.csv"
+    f=$(sym_csv "$sym")
     if [ ! -f "$f" ]; then printf '%s\tNOFILE\n' "$pid" >> "$d/x_trades.tsv"; continue; fi
     awk -v pid="$pid" -v ed="$ed" -v xd="$xd" -v ep="$ep" -v xp="$xp" -v qty="$qty" -v sid="${sid:-0}" -v es="${es:-0}" \
         -v out_tr="$d/x_trades.tsv" -v out_ex="$d/x_expo.tsv" -v out_dy="$dy" -f "$LIB/trade_extract.awk" "$f"
   done
+  extract_open "$d"
+}
+sym_csv() { printf '%s/%s/%s/%s/data.csv' "$DATA" "$(printf %s "$1" | cut -c1)" "$(printf %s "$1" | rev | cut -c1)" "$1"; }
+extract_open() { # $1 run dir: positions still held at the window end join the exposure series (#3125)
+  d=$1; : > "$d/x_open.tsv"; [ -s "$d/open_positions.csv" ] || return 0
+  last=$(tail -1 "$d/equity_curve.csv" | cut -d, -f1)
+  tail -n +2 "$d/open_positions.csv" | while IFS=, read -r sym _side ed ep qty _rest; do
+    printf '%s\t%s\t%s\t%s\n' "$sym" "$ed" "$ep" "$qty" >> "$d/x_open.tsv"
+    f=$(sym_csv "$sym"); [ -f "$f" ] || continue
+    awk -v pid="open:$sym:$ed" -v ed="$ed" -v last="$last" -v qty="$qty" -v out_ex="$d/x_expo.tsv" -f "$LIB/open_extract.awk" "$f"
+  done
+}
+open_json() { # $1 run dir -> <run>_open.json: open rows + the last-day exposure check vs actual.sexp
+  d=$1; last=$(tail -1 "$d/equity_curve.csv" | cut -d, -f1); act=""
+  [ -f "$d/actual.sexp" ] && act=$(grep -oE 'open_positions_value [-0-9.e]+' "$d/actual.sexp" | cut -d' ' -f2)
+  awk -v last="$last" -v actual="$act" -f "$LIB/open_json.awk" "$d/x_open.tsv" "$d/x_macro.tsv" "$d/x_expo.tsv"
 }
 audit_rows() { # per-trade table of the audit report -> sym entry rs macro grade score fill_vs_trig faithful
   [ -s "$1/trade_audit_report.md" ] || return 0
@@ -112,9 +128,13 @@ audit_rows() { # per-trade table of the audit report -> sym entry rs macro grade
     | awk -F'|' 'NR>4 && NF>15 { for (i=2;i<=18;i++) gsub(/^ +| +$/,"",$i); printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",$2,$3,$13,$14,$15,$16,$17,$18 }' | sed 's/%//'
 }
 nav_json() { # daily [date, nav, invested % of nav, open positions]
-  awk 'FNR==1{fi++} fi==1{split($0,a,"\t"); ex[a[1]]+=a[2]; np[a[1]]++; next}
-       fi==2&&FNR>1{split($0,a,","); v=a[2]+0; printf "%s[\"%s\",%.0f,%.1f,%d]", (n++?",":"["), a[1], v, (v>0?100*ex[a[1]]/v:0), np[a[1]]}
-       END{print "]"}' "$1/x_expo.tsv" "$1/equity_curve.csv"
+  # A weekday with no SPY bar (inside SPY's range) is a market holiday: the NAV is carried
+  # forward and no position has a bar, so the row would read 0 % invested. Dropped (#3125).
+  # files told apart by ARGV, not an FNR==1 counter: an empty x_expo.tsv must not shift them
+  awk 'FILENAME==ARGV[1]{if(FNR>1){split($0,a,","); spy[a[1]]=1; if(a[1]>sl) sl=a[1]} next}
+       FILENAME==ARGV[2]{split($0,a,"\t"); ex[a[1]]+=a[2]; np[a[1]]++; next}
+       FNR>1{split($0,a,","); if(!(a[1] in spy) && a[1]<=sl) next; v=a[2]+0; printf "%s[\"%s\",%.0f,%.1f,%d]", (n++?",":"["), a[1], v, (v>0?100*ex[a[1]]/v:0), np[a[1]]}
+       END{if(!n) printf "["; print "]"}' "$SPY_CSV" "$1/x_expo.tsv" "$1/equity_curve.csv"
 }
 host_run() { # $1 label, $2 index
   d="$OUT/runs/$1"; s="$OUT/site/data"; is_ch=0; [ "$2" = "$CHARTS" ] && is_ch=1
@@ -128,6 +148,13 @@ host_run() { # $1 label, $2 index
   sh "$LIB/meta.sh" "$d" > "$s/$1_meta.json"
   cp "$d/x_pY.json" "$s/$1_years.json"; cp "$d/x_pQ.json" "$s/$1_quarters.json"
   nav_json "$d" > "$s/$1_nav.json"
+  open_json "$d" > "$s/$1_open.json"
+  # the detector: more than $1 and 1 % apart -> a warning line, and the page's findings say so
+  jq -r 'def abs: if . < 0 then -. else . end;
+    .check | select(.actual != null) | ((.pack - .actual) | abs) as $e
+    | select($e > 1 and $e > 0.01 * ([.pack, .actual] | map(abs) | max))
+    | "WARN open positions on \(.date): pack marks \(.pack + 0), actual.sexp open_positions_value \(.actual + 0)"' "$s/$1_open.json" |
+    while IFS= read -r w; do log "$1: $w"; done
 }
 site_common() {
   s="$OUT/site/data"; cl=$(charts_label); d="$OUT/runs/$cl"
