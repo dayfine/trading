@@ -2,7 +2,7 @@
 
 User decision 2026-10-04: rerun the SPY 30-week-MA reference strategy once on the current build as a benchmark
 for the 26y investor baseline, then close the `spy-only-reference` track. Not an experiment with a verdict —
-a reference row. Build: `main` at 63b14a8a7 (workspace `jjws-spy`), CSV mode, bars from the full data store
+a reference row. Build: code_version e9457c3ec per both `results/*-params.sexp` (workspace `jjws-spy` at `main` 63b14a8a7, code-identical — the two differ only under `dev/`), CSV mode, bars from the full data store
 (`TRADING_DATA_DIR=/workspaces/trading-1/data`; the `trading/test_data` SPY file starts 2009-01-02 and must not
 be used for this window — a first attempt did and silently ran 2009–2026).
 
@@ -30,9 +30,15 @@ roughly double buy-and-hold. The investor's edge over a one-instrument timing ru
 salt-dependent; its drawdown is ~5 pp deeper. The investor numbers include the #3109 dividend-split phantom
 (−4.9 to −10.9 pp of total return; issue comment 2026-10-04) and predate #3100/#3075/#3101.
 
-SPY-30w trade list: 21 round trips, 11 losers (most in 2000–02, −6.95 %, −11.98 % …); the winners are the long
+SPY-30w trade list: 21 round trips, 11 winners and 10 losers (5 of the losers in 2000–02, e.g. −6.95 %, −11.98 %); the winners are the long
 holds (2003-05 → 2004-07 +17.6 %, 2012-07 → 2015-08 etc.).
 
+Fill convention differs from the investor rows: all 21 SPY-30w entries (and the open position) are dated
+Saturday and fill on the prior Friday bar — the known Saturday stale-fill class
+(`project_saturday_stale_fill_defect`); the investor runs use `sim_entry_stoplimit_fresh_bar_only true`. Re-priced
+at the next real bar, 5 entries cost 0.08–0.73 % more and 8 would not have filled that Monday; the Calmar
+ordering is unchanged (SPY-30w ≈ 0.216 vs investor s1 0.202). Note also that investor s1 (401.3 %) only matches
+buy-and-hold on this price-only basis.
 ## Files
 
-`results/` — actual, summary, params, trades, equity curve, open positions, macro trend per spec; `run.log`.
+`results/` — actual, summary, params, trades, equity curve, open positions, macro trend per spec; `spybench-runner.log` (scenario_runner output; `run.log` is gitignored).
