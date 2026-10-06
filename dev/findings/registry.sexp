@@ -247,3 +247,12 @@
          (unit ("trading/trading/weinstein/stops/test/test_short_tightened_ratchet.ml"
                 "#3145: long Tightened path unaffected"))))
  (status fixed-behind-flag))
+
+((issue 3146) (ref "short-only Phase A soT HEI / HEI-A 2009-03")
+ (finding "the share-class gate was long-only: the short book held HEI and HEI-A together (V6 twin position)")
+ (guard ((unit ("trading/trading/weinstein/strategy/test/test_share_class_gate.ml"
+                "#3146: covers_shorts on skips HEI-A short while HEI short held"))
+         (unit ("trading/trading/weinstein/strategy/test/test_share_class_gate.ml"
+                "#3146: covers_shorts on either side held blocks either side"))
+         (validator V6)))
+ (status fixed-behind-flag))

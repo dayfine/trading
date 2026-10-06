@@ -1,9 +1,29 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-07-26
+## Last updated: 2026-10-06
 
 ## Status
 IN_PROGRESS
+
+## 2026-10-06 — shorts Phase B v0 fixes, three default-off flags (branch `feat/shorts-phase-b-fixes`)
+
+Plan: `dev/plans/total-return-and-shorts-phase-b-2026-10-05.md` decision 7 (v0 arm =
+these fixes only). One commit per issue; every flag defaults to today's behaviour.
+
+- **#3131 (second half)** — `short_min_price_on_order_price` (strategy config). The
+  sub-$17 floor gates the ticket's order price (`Entry_audit_helpers.effective_entry_price`:
+  the breakdown ticket when E-anchored, else the decision close) instead of
+  `suggested_entry`. The breakdown anchor itself shipped in #3133. Tests:
+  `test_short_min_price_order_price.ml` (UMPQ shape; base top > $17 / breakdown < $17).
+- **#3145** — `Weinstein_stops.config.short_tightened_ratchet_follows_decline`. The
+  legacy Tightened ratchet anchors shorts on the running min of highs, so the buy-stop
+  is lowered through a decline (ADSK shape). Tests: `stops/test/test_short_tightened_ratchet.ml`.
+- **#3146** — `share_class_gate_covers_shorts` (strategy config, inert unless
+  `max_one_share_class_per_issuer`). Either side held → skip either side (HEI / HEI-A).
+  Tests: `test_share_class_gate.ml` `#3146:` cases.
+
+Next: Phase B v0 arm sets all three flags on (`[after-merge]` items on #3131 / #3145:
+≥ 10 short fills with ≥ 5 in 2008; per-trade replay of the Phase A audits).
 
 ## 2026-07-24 — spoof-robust dollar-ADV aggregation, default-off (#2060, branch `feat/liquidity-adv-robust`)
 

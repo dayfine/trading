@@ -1999,6 +1999,23 @@ type config = {
           every existing golden (R1). R2: a [Variant_matrix] axis as
           [((flag max_one_share_class_per_issuer) (values (true false)))]. R3:
           no default flip without a ledger ACCEPT. *)
+  share_class_gate_covers_shorts : bool; [@sexp.default false]
+      (** #3146 — extend {!max_one_share_class_per_issuer} to the short book.
+          [false] (default) keeps the rule long-only, bit-identical (R1). [true]
+          makes open-or-pending {b short} positions occupy their issuer group
+          too, and applies the skip to short candidates: a candidate of either
+          side is skipped ([Audit_recorder.Share_class_held]) while another
+          class of its issuer is held on either side. Inert while
+          {!max_one_share_class_per_issuer} is [false].
+
+          {b Why.} Short-only Phase A shorted HEI (2009-03-16) and HEI-A
+          (2009-03-23) together through 2009-04-02 — a doubled short in one
+          business and a V6 twin-position violation. {b Faithfulness.} The same
+          concentration filter as the long rule (no book passage claimed; see
+          above), never admits a candidate the cascade rejected. R2: a
+          [Variant_matrix] axis as
+          [((flag share_class_gate_covers_shorts) (values (true false)))]. R3:
+          no default flip without a ledger ACCEPT. *)
   share_class_groups : Share_class_map.t; [@sexp.default Share_class_map.empty]
       (** #3015 — the issuer groups {!max_one_share_class_per_issuer} consults,
           as a list of ticker lists ([((GOOG GOOGL) (BRK-A BRK-B))]). Data, not

@@ -27,7 +27,9 @@ let _goog = "GOOG"
 let _googl = "GOOGL"
 let _unmapped_a = "AAA"
 let _unmapped_b = "BBB"
-let _groups = [ [ _goog; _googl ]; [ "BRK-A"; "BRK-B" ] ]
+let _hei = "HEI"
+let _hei_a = "HEI-A"
+let _groups = [ [ _goog; _googl ]; [ "BRK-A"; "BRK-B" ]; [ _hei; _hei_a ] ]
 
 let _bar ~date ~close : Types.Daily_price.t =
   {
@@ -113,7 +115,7 @@ let _candidate ?(side = Trading_base.Types.Long) ticker :
     rationale = [ "test breakout" ];
   }
 
-let _config ~enabled =
+let _config ?(covers_shorts = false) ~enabled () =
   let base =
     Weinstein_strategy_config.default_config
       ~universe:[ _goog; _googl; _unmapped_a; _unmapped_b ]
@@ -123,13 +125,14 @@ let _config ~enabled =
     base with
     max_one_share_class_per_issuer = enabled;
     share_class_groups = Share_class_map.of_groups _groups;
+    share_class_gate_covers_shorts = covers_shorts;
   }
 
-let _position ~symbol ~state : Position.t =
+let _position ?(side = Trading_base.Types.Long) ~symbol ~state () : Position.t =
   {
     id = symbol ^ "-pos";
     symbol;
-    side = Trading_base.Types.Long;
+    side;
     entry_reasoning = Position.PricePattern "test breakout";
     exit_reason = None;
     state;
@@ -140,8 +143,8 @@ let _position ~symbol ~state : Position.t =
 let _no_risk : Position.risk_params =
   { stop_loss_price = None; take_profit_price = None; max_hold_days = None }
 
-let _holding symbol =
-  _position ~symbol
+let _holding ?side symbol =
+  _position ?side ~symbol
     ~state:
       (Position.Holding
          {
@@ -150,6 +153,7 @@ let _holding symbol =
            entry_date = _current_date;
            risk_params = _no_risk;
          })
+    ()
 
 let _entering symbol =
   _position ~symbol
@@ -161,6 +165,7 @@ let _entering symbol =
            filled_quantity = 0.0;
            created_date = _current_date;
          })
+    ()
 
 let _exiting symbol =
   _position ~symbol
@@ -176,6 +181,7 @@ let _exiting symbol =
            started_date = _current_date;
            risk_params = _no_risk;
          })
+    ()
 
 let _closed symbol =
   _position ~symbol
@@ -190,9 +196,11 @@ let _closed symbol =
            exit_date = _current_date;
            days_held = 0;
          })
+    ()
 
 (* Run the walk and return (entered symbols, passed-over (symbol, reason)). *)
-let _walk_full ?(suspended_held = []) ~enabled ~positions tickers =
+let _walk_full ?(suspended_held = []) ?covers_shorts ~enabled ~positions tickers
+    =
   let portfolio =
     {
       Trading_strategy.Portfolio_view.cash = 1_000_000.0;
@@ -204,7 +212,7 @@ let _walk_full ?(suspended_held = []) ~enabled ~positions tickers =
   let considered = ref [] in
   let entered =
     Entry_walk.entries_from_candidates ~suspended_held
-      ~config:(_config ~enabled)
+      ~config:(_config ?covers_shorts ~enabled ())
       ~candidates:(List.map tickers ~f:_candidate)
       ~stop_states:(ref String.Map.empty) ~bar_reader:_bar_reader ~portfolio
       ~get_price:(fun _ -> None)
@@ -222,8 +230,8 @@ let _walk_full ?(suspended_held = []) ~enabled ~positions tickers =
   in
   (entered, passed)
 
-let _walk ?suspended_held ~enabled ~positions tickers =
-  fst (_walk_full ?suspended_held ~enabled ~positions tickers)
+let _walk ?suspended_held ?covers_shorts ~enabled ~positions tickers =
+  fst (_walk_full ?suspended_held ?covers_shorts ~enabled ~positions tickers)
 
 (* ---- the entry walk ---------------------------------------------------- *)
 
@@ -313,8 +321,9 @@ let test_flag_on_records_share_class_held_reason _ =
 
 (* ---- Share_class_gate.classify with a stub decide ---------------------- *)
 
-let _gate ?(positions = []) () =
-  Share_class_gate.create ~config:(_config ~enabled:true)
+let _gate ?(positions = []) ?covers_shorts () =
+  Share_class_gate.create
+    ~config:(_config ?covers_shorts ~enabled:true ())
     ~portfolio:
       {
         Trading_strategy.Portfolio_view.cash = 0.0;
@@ -339,7 +348,8 @@ let _stub result =
 (** The gate's default-off construction is [None]. *)
 let test_create_is_none_when_flag_off _ =
   assert_that
-    (Share_class_gate.create ~config:(_config ~enabled:false)
+    (Share_class_gate.create
+       ~config:(_config ~enabled:false ())
        ~portfolio:
          {
            Trading_strategy.Portfolio_view.cash = 0.0;
@@ -400,6 +410,69 @@ let test_skipped_first_class_does_not_occupy _ =
       (_candidate _googl) ~decide:decide_second
   in
   assert_that (_is_share_class_held d, !calls) (equal_to (false, 1))
+
+(* ---- #3146: share_class_gate_covers_shorts ------------------------------ *)
+
+let _short_held symbol = _holding ~side:Trading_base.Types.Short symbol
+let _short_cand symbol = _candidate ~side:Trading_base.Types.Short symbol
+
+(* Classify [cand] against a gate seeded with [positions]; returns
+   (skipped as Share_class_held?, decide calls). *)
+let _classify_hei ~covers_shorts ~positions cand =
+  let decide, calls = _stub (Entry_audit_capture.Skipped Insufficient_cash) in
+  let d =
+    Share_class_gate.classify
+      (_gate ~positions ~covers_shorts ())
+      ~held_set:String.Set.empty cand ~decide
+  in
+  (_is_share_class_held d, !calls)
+
+(** Flag off (default): HEI held short, an HEI-A short passes straight to
+    [decide] — today's long-only rule, bit-identical. *)
+let test_covers_shorts_off_passes_hei_a_short _ =
+  assert_that
+    (_classify_hei ~covers_shorts:false
+       ~positions:[ _short_held _hei ]
+       (_short_cand _hei_a))
+    (equal_to (false, 1))
+
+(** Flag on: the HEI / HEI-A pair of short-only Phase A. HEI held short skips an
+    HEI-A short without calling [decide]. *)
+let test_covers_shorts_on_skips_hei_a_short _ =
+  assert_that
+    (_classify_hei ~covers_shorts:true
+       ~positions:[ _short_held _hei ]
+       (_short_cand _hei_a))
+    (equal_to (true, 0))
+
+(** Flag on: either side held rejects either side — a long HEI blocks an HEI-A
+    short, a short HEI blocks an HEI-A long. *)
+let test_covers_shorts_on_either_side_blocks _ =
+  assert_that
+    [
+      _classify_hei ~covers_shorts:true
+        ~positions:[ _holding _hei ]
+        (_short_cand _hei_a);
+      _classify_hei ~covers_shorts:true
+        ~positions:[ _short_held _hei ]
+        (_candidate _hei_a);
+    ]
+    (elements_are [ equal_to (true, 0); equal_to (true, 0) ])
+
+(** Long behaviour is bit-identical under the flag: with only longs in the book
+    the covers-shorts walk equals the long-only one. *)
+let test_covers_shorts_on_long_walk_unchanged _ =
+  let run covers_shorts =
+    _walk ~covers_shorts ~enabled:true
+      ~positions:[ _holding _goog ]
+      [ _googl; _unmapped_a; _unmapped_b ]
+  in
+  assert_that (run true)
+    (all_of
+       [
+         equal_to (run false);
+         elements_are [ equal_to _unmapped_a; equal_to _unmapped_b ];
+       ])
 
 (* ---- Share_class_map --------------------------------------------------- *)
 
@@ -496,6 +569,14 @@ let suite =
          >:: test_held_symbol_defers_to_already_held;
          "skipped first class does not occupy"
          >:: test_skipped_first_class_does_not_occupy;
+         "#3146: covers_shorts off passes HEI-A short"
+         >:: test_covers_shorts_off_passes_hei_a_short;
+         "#3146: covers_shorts on skips HEI-A short while HEI short held"
+         >:: test_covers_shorts_on_skips_hei_a_short;
+         "#3146: covers_shorts on either side held blocks either side"
+         >:: test_covers_shorts_on_either_side_blocks;
+         "#3146: covers_shorts on long walk unchanged"
+         >:: test_covers_shorts_on_long_walk_unchanged;
          "map lookup and round trip" >:: test_map_lookup_and_round_trip;
          "map rejects malformed groups" >:: test_map_rejects_malformed_groups;
          "map load missing file fails" >:: test_map_load_missing_file_fails;

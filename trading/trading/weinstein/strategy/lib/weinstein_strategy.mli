@@ -1193,6 +1193,10 @@ type config = {
           (GOOG / GOOGL, ...) has an open or pending long. Default [false] =
           bit-identical (R1). See {!Share_class_gate} and
           [Weinstein_strategy_config.max_one_share_class_per_issuer]. *)
+  share_class_gate_covers_shorts : bool; [@sexp.default false]
+      (** #3146: apply the share-class rule to shorts too (either side held →
+          skip). Default [false] = bit-identical (R1). See
+          [Weinstein_strategy_config.share_class_gate_covers_shorts]. *)
   share_class_groups : Share_class_map.t; [@sexp.default Share_class_map.empty]
       (** #3015: the issuer groups the rule above consults; filled by the
           backtest runner from the committed [share_classes.sexp]. See

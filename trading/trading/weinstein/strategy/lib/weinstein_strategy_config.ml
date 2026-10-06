@@ -144,6 +144,8 @@ type config = {
       (** See [.mli]. *)
   max_one_share_class_per_issuer : bool; [@sexp.default false]
       (** See [.mli]. *)
+  share_class_gate_covers_shorts : bool; [@sexp.default false]
+      (** See [.mli]. *)
   share_class_groups : Share_class_map.t; [@sexp.default Share_class_map.empty]
       (** See [.mli]. *)
   trailing_stop_ma_period : int option; [@sexp.default None]  (** See [.mli]. *)
@@ -270,6 +272,7 @@ let default_config ~universe ~index_symbol =
     stale_exit_without_prior_bar = false;
     entry_ticket_macro_suspend = Entry_ticket_suspend_mode.Off;
     max_one_share_class_per_issuer = false;
+    share_class_gate_covers_shorts = false;
     share_class_groups = Share_class_map.empty;
     trailing_stop_ma_period = None;
   }
