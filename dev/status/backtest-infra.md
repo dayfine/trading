@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-09-26
+## Last updated: 2026-10-05
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,28 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-10-05 — default-off cash yield on positive cash + T-bill series (#3137 part 1)
+
+- [x] **`cash_yield` / `cash_yield_fee_bp` config fields** (`No_yield` default
+  = exact no-op, 10 bp fee). `Constant pct` or `Series path`; net rate
+  `max 0 (rate - fee)`, ACT/360 simple daily on every calendar step from the
+  measurement-window start (no warmup accrual), before fills and the strategy
+  call. Base = cash net of long-margin debit and short proceeds, floored at 0.
+  Reported as metric `CashInterestTotal` (absent at the default). Sharpe is
+  on excess return over the same rate when armed. Library:
+  `trading/trading/simulation/lib/cash_yield/`; wiring in `Simulator`,
+  `Backtest.Runner` / `Panel_runner` / `Runner_metrics`.
+- [x] **Series:** FRED DTB3 committed at `trading/test_data/macro/tbill_3m_dtb3.csv`
+  (1954-01-04 → 2026-10-02). Refresh:
+  `curl -sSL 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3' -o trading/test_data/macro/tbill_3m_dtb3.csv`.
+  A date before the series start fails the run (Status error).
+- [ ] Dividend crediting for held longs (separate PR, after the dividend fetch).
+- [ ] Paired pre-registered 3-salt 26y A/B (implementation check ≈ +0.24 log).
+- Verify: `dune runtest trading/simulation/lib/cash_yield/test`,
+  `dune runtest trading/simulation/test` (`test_cash_yield_sim`,
+  `test_sharpe_excess`), `dune runtest trading/backtest/test`
+  (`test_cash_yield_overlays`).
 
 ## 2026-09-26 — stop-raise counting fixed in `trades.csv` (#2974, reporting only)
 

@@ -1,0 +1,12 @@
+(test
+ (name test_cash_yield)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  status
+  trading.base
+  trading.portfolio
+  trading.simulation.cash_yield
+  matchers)
+ (deps dtb3_fixture.csv))

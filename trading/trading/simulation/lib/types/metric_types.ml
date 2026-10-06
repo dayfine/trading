@@ -79,6 +79,7 @@ module Metric_type = struct
       | PositionTurnover
       | PositionConcentrationHhi
       | MaxUnderwaterVsInitialPct
+      | CashInterestTotal
     [@@deriving show, eq, compare, sexp]
   end
 
@@ -159,6 +160,7 @@ type metric_type = Metric_type.t =
   | PositionTurnover
   | PositionConcentrationHhi
   | MaxUnderwaterVsInitialPct
+  | CashInterestTotal
 [@@deriving show, eq, compare, sexp]
 
 include (Metric_type : Comparator.S with type t := metric_type)

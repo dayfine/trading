@@ -84,6 +84,12 @@ type config = {
   initial_long_margin_req : float; [@sexp.default 1.0]  (** See [.mli]. *)
   long_margin_rate_annual_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   maintenance_long_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  cash_yield : Trading_simulation_cash_yield.Cash_yield.source;
+      [@sexp.default Trading_simulation_cash_yield.Cash_yield.No_yield]
+      (** See [.mli]. *)
+  cash_yield_fee_bp : float;
+      [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
+      (** See [.mli]. *)
   resistance_min_history_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   resistance_lookback_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   overhead_supply : Resistance_supply.config option; [@sexp.default None]
@@ -226,6 +232,8 @@ let default_config ~universe ~index_symbol =
     initial_long_margin_req = 1.0;
     long_margin_rate_annual_pct = 0.0;
     maintenance_long_pct = 0.0;
+    cash_yield = Trading_simulation_cash_yield.Cash_yield.No_yield;
+    cash_yield_fee_bp = Trading_simulation_cash_yield.Cash_yield.default_fee_bp;
     resistance_min_history_bars = 0;
     resistance_lookback_bars = 0;
     overhead_supply = Some Resistance_supply.default_config;

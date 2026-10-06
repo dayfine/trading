@@ -22,7 +22,14 @@ type input = {
   breadth_bars : Macro.breadth_bar list;
   config : Weinstein_strategy.config;
   all_symbols : string list;
+  cash_yield : Trading_simulation_cash_yield.Cash_yield.t option;
 }
+
+(* #3137: a fresh per-run accrual, armed from [start_date] so warmup earns no
+   interest. [None] (the default config) leaves the simulator untouched. *)
+let _cash_yield_accrual (input : input) ~start_date =
+  Option.map input.cash_yield ~f:(fun rate ->
+      Trading_simulation_cash_yield.Cash_yield.Accrual.create rate ~start_date)
 
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's
    callback adapter, sharing the LRU cache with the strategy bar reader. Going
@@ -131,6 +138,7 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
         (_stop_fill_on_trigger_bar input.config)
       ~entry_fill_reject_retries:input.config.entry_fill_reject_retries
       ~entry_fill_resize:(_entry_fill_resize input.config)
+      ?cash_yield:(_cash_yield_accrual input ~start_date)
       ()
   in
   let config =

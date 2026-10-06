@@ -229,6 +229,37 @@
   simulation_test_helpers))
 
 (test
+ (name test_sharpe_excess)
+ (modules test_sharpe_excess)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.cash_yield
+  trading.simulation.types
+  trading.engine
+  types
+  matchers))
+
+(test
+ (name test_cash_yield_sim)
+ (modules test_cash_yield_sim)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.cash_yield
+  trading.simulation.types
+  trading.simulation.data
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
+
+(test
  (name test_metrics)
  (modules test_metrics)
  (libraries

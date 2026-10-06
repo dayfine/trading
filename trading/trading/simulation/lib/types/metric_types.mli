@@ -269,6 +269,12 @@ module Metric_type : sig
             its starting money reads positive. Captures psychological depth in
             capital terms. Reported as [0.0] when no initial cash is supplied
             ([initial_cash] absent or ≤ 0). *)
+    (* ---- Cash yield (#3137) ---- *)
+    | CashInterestTotal
+        (** Dollars of interest credited on positive cash over the measurement
+            window ({!Trading_simulation_cash_yield.Cash_yield}). Emitted only
+            when a cash yield is configured, so a run at the default [No_yield]
+            carries no such key and its metric set is unchanged. *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -348,6 +354,7 @@ type metric_type = Metric_type.t =
   | PositionTurnover
   | PositionConcentrationHhi
   | MaxUnderwaterVsInitialPct
+  | CashInterestTotal
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)

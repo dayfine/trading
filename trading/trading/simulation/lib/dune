@@ -4,6 +4,7 @@
  (libraries
   trading.simulation.types
   trading.simulation.data
+  trading.simulation.cash_yield
   trading.base
   trading.portfolio
   trading.engine

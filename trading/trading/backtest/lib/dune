@@ -13,6 +13,7 @@
   trading.base
   trading.engine
   trading.simulation
+  trading.simulation.cash_yield
   trading.simulation.data
   trading.simulation.types
   trading.strategy

@@ -799,6 +799,14 @@ type config = {
           held longs weakest-first until the ratio is restored. Default [0.0]
           (cash account, no requirement) => exact no-op (R1); an unlevered book
           never fires. See [Weinstein_strategy_config.maintenance_long_pct]. *)
+  cash_yield : Trading_simulation_cash_yield.Cash_yield.source;
+      [@sexp.default Trading_simulation_cash_yield.Cash_yield.No_yield]
+      (** Interest on positive cash (#3137). Default [No_yield] => exact no-op
+          (R1). See [Weinstein_strategy_config.cash_yield]. *)
+  cash_yield_fee_bp : float;
+      [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
+      (** Fee in bp off the [cash_yield] rate, net floored at 0. See
+          [Weinstein_strategy_config.cash_yield_fee_bp]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into the per-screen
           [Stock_analysis.config.resistance.min_history_bars] (and, via the

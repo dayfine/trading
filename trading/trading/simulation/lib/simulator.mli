@@ -233,6 +233,14 @@ type dependencies = {
           triggered price, so it is strictly cheaper than a retry, and retry
           budget is only spent on refusals the resize declined. See
           {!Entry_fill_resize}. *)
+  cash_yield : Trading_simulation_cash_yield.Cash_yield.Accrual.t option;
+      (** Issue #3137, default [None]. When armed, every step (calendar day)
+          first credits one day's interest on positive cash
+          ({!Trading_simulation_cash_yield.Cash_yield.accrue}) before fills and
+          the strategy call, from the accrual's [start_date] on, and the run's
+          metrics gain [CashInterestTotal]. A rate lookup before a series' first
+          observation fails the step with that error. [None] is bit-identical to
+          the pre-#3137 simulator (R1). *)
 }
 
 val create_deps :
@@ -262,6 +270,7 @@ val create_deps :
   ?sim_stop_exit_fill_on_trigger_bar:bool ->
   ?entry_fill_reject_retries:int ->
   ?entry_fill_resize:Entry_fill_resize.t ->
+  ?cash_yield:Trading_simulation_cash_yield.Cash_yield.Accrual.t ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and

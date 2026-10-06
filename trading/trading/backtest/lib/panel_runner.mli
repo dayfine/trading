@@ -34,6 +34,10 @@ type input = {
   breadth_bars : Macro.breadth_bar list;
   config : Weinstein_strategy.config;
   all_symbols : string list;
+  cash_yield : Trading_simulation_cash_yield.Cash_yield.t option;
+      (** The resolved [config.cash_yield] (#3137). When [Some], the simulator
+          accrues interest on positive cash from [start_date] (never during
+          warmup). [None] (the default config) is bit-identical to before. *)
 }
 (** Minimal subset of {!Runner._deps} that [Panel_runner] needs. Kept as a plain
     record so [Runner] can build it without exporting its private [_deps] type.

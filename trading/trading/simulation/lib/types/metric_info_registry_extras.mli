@@ -13,7 +13,7 @@ val info_for_stability_turnover :
   Metric_types.metric_type -> Metric_info_types.metric_info option
 (** Stability + turnover family: [RollingSharpeStability],
     [TradeFrequencyAnnualized], [PositionTurnover], [PositionConcentrationHhi].
-*)
+    Also the cash-yield [CashInterestTotal] (#3137). *)
 
 val info_for_distribution_antifragility :
   Metric_types.metric_type -> Metric_info_types.metric_info option

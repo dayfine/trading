@@ -27,3 +27,11 @@ let benchmark_return ~adapter ~benchmark_symbol ~date =
   else
     let curr_close = curr.Types.Daily_price.adjusted_close in
     Some ((curr_close -. prev_close) /. prev_close *. 100.0)
+
+let with_cash_interest metrics cash_yield =
+  match cash_yield with
+  | None -> metrics
+  | Some acc ->
+      Map.set metrics
+        ~key:Trading_simulation_types.Metric_types.CashInterestTotal
+        ~data:(Trading_simulation_cash_yield.Cash_yield.Accrual.total acc)
