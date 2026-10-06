@@ -1,7 +1,12 @@
 open Async
 open Core
 
-type dividend = { date : Date.t; amount : float } [@@deriving show, eq]
+type dividend = {
+  date : Date.t;
+  amount : float;
+  unadjusted_amount : float option;
+}
+[@@deriving show, eq]
 
 let _api_host = "eodhd.com"
 let _default_exchange = "US"
@@ -33,6 +38,12 @@ let _float_of_yojson = function
       Status.error_invalid_argument
         ("Expected number, got: " ^ Yojson.Safe.to_string v)
 
+(* An absent or [null] field is [None]; any other value must be numeric. *)
+let _optional_float fields name =
+  match List.Assoc.find ~equal:String.equal fields name with
+  | None | Some `Null -> Ok None
+  | Some v -> Result.map (_float_of_yojson v) ~f:Option.some
+
 let _parse_date_string s =
   try Ok (Date.of_string s)
   with _ -> Status.error_invalid_argument ("Invalid date: " ^ s)
@@ -43,7 +54,8 @@ let _parse_dividend_row = function
       let%bind date_str = _find_field fields "date" >>= _string_of_yojson in
       let%bind date = _parse_date_string date_str in
       let%bind amount = _find_field fields "value" >>= _float_of_yojson in
-      Ok { date; amount }
+      let%bind unadjusted_amount = _optional_float fields "unadjustedValue" in
+      Ok { date; amount; unadjusted_amount }
   | v ->
       Status.error_invalid_argument
         ("Expected dividend row object, got: " ^ Yojson.Safe.to_string v)

@@ -27,13 +27,25 @@ let test_get_dividends_happy_path _ =
        (elements_are
           [
             equal_to
-              ({ date = Date.of_string "2024-03-15"; amount = 0.485 }
+              ({
+                 date = Date.of_string "2024-03-15";
+                 amount = 0.485;
+                 unadjusted_amount = None;
+               }
                 : Dividends_endpoint.dividend);
             equal_to
-              ({ date = Date.of_string "2024-06-14"; amount = 0.485 }
+              ({
+                 date = Date.of_string "2024-06-14";
+                 amount = 0.485;
+                 unadjusted_amount = None;
+               }
                 : Dividends_endpoint.dividend);
             equal_to
-              ({ date = Date.of_string "2024-09-13"; amount = 0.485 }
+              ({
+                 date = Date.of_string "2024-09-13";
+                 amount = 0.485;
+                 unadjusted_amount = None;
+               }
                 : Dividends_endpoint.dividend);
           ]))
 
@@ -47,7 +59,41 @@ let test_get_dividends_string_amount _ =
        (elements_are
           [
             equal_to
-              ({ date = Date.of_string "2024-06-14"; amount = 0.485 }
+              ({
+                 date = Date.of_string "2024-06-14";
+                 amount = 0.485;
+                 unadjusted_amount = None;
+               }
+                : Dividends_endpoint.dividend);
+          ]))
+
+let test_get_dividends_unadjusted_value _ =
+  (* [unadjustedValue] is the cash paid per share on the ex-date; [value] is
+     split-adjusted. A [null] unadjusted value reads as [None]. Shapes taken
+     from the live AAPL response. *)
+  let body =
+    {|[ { "date": "1987-05-11", "value": 0.00054, "unadjustedValue": 0.12096 },
+        { "date": "1987-08-10", "value": 0.00054, "unadjustedValue": null } ]|}
+  in
+  let fetch _uri = Deferred.return (Ok body) in
+  let result = _run_get_dividends ~fetch () in
+  assert_that result
+    (is_ok_and_holds
+       (elements_are
+          [
+            equal_to
+              ({
+                 date = Date.of_string "1987-05-11";
+                 amount = 0.00054;
+                 unadjusted_amount = Some 0.12096;
+               }
+                : Dividends_endpoint.dividend);
+            equal_to
+              ({
+                 date = Date.of_string "1987-08-10";
+                 amount = 0.00054;
+                 unadjusted_amount = None;
+               }
                 : Dividends_endpoint.dividend);
           ]))
 
@@ -77,6 +123,8 @@ let suite =
   >::: [
          "get_dividends_happy_path" >:: test_get_dividends_happy_path;
          "get_dividends_string_amount" >:: test_get_dividends_string_amount;
+         "get_dividends_unadjusted_value"
+         >:: test_get_dividends_unadjusted_value;
          "get_dividends_empty_response" >:: test_get_dividends_empty_response;
          "get_dividends_http_error" >:: test_get_dividends_http_error;
          "get_dividends_malformed_json" >:: test_get_dividends_malformed_json;

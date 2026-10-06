@@ -1,0 +1,12 @@
+(executable
+ (name fetch_corporate_actions)
+ (libraries
+  core
+  core_unix.command_unix
+  async
+  async_ssl
+  fpath
+  weinstein.data_source
+  fetch_corporate_actions_lib)
+ (preprocess
+  (pps ppx_jane)))
