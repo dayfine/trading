@@ -21,3 +21,9 @@
  (libraries unix)
  (deps
   (file ../sexp_default_drift_linter.exe)))
+
+(test
+ (name test_drift_detection)
+ (libraries unix)
+ (deps
+  (file ../sexp_default_drift_linter.exe)))
