@@ -21,6 +21,11 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
 ## 2026-10-06 — default-off dividend crediting for held positions (#3137 part 2)
 
+With #3156 (part 1) this meets every `[merge]` item of #3137; the `[after-merge]`
+paired 26y A/B (implementation check vs the +0.24 / +0.13 log estimates) remains
+(`verify/pending`). It runs as part of the combined baseline re-run in
+`dev/plans/total-return-and-shorts-phase-b-2026-10-05.md`.
+
 - [x] **`dividend_crediting : bool` config field** (default `false` = exact no-op:
   no file read, no metric key; Overlay_validator axis). Armed: on each ex-date
   in the measurement window, positions held when that step starts are
