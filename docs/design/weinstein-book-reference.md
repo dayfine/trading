@@ -640,6 +640,22 @@ An active position-management rule that fires *before* the trailing stop is hit 
 - When MA levels out (Stage 1 base forming): place stop above resistance even if below MA
 - Use downsloping trendlines for partial profit-taking
 
+**Resolved question (2026-10-06, PR #3157 review) — when, and to where, is an investor's short buy-stop
+lowered?** Only after a failed rally, never bar by bar. Ch. 7 (the protective buy-stop walk-through,
+Chart 7-34): while the short is below its declining 30-week MA, "give it plenty of room to swing". After
+the first selloff low and "the first significant oversold rally of at least 8 percent", you "get set to
+lower" the stop, but "don't actually alter the buy-stop until after the rally reaches its peak" and the
+stock "moves back toward its prior low". The new level is right above that rally peak (round number), and
+while the MA is still declining it goes above the MA if the peak fell short of it. "When the MA levels
+out, become more aggressive" — press the stop right above the rally peak. Once a Stage 1 base forms and
+the MA no longer declines, the stop goes above the significant resistance even if that is below the MA.
+A nudge slightly above the declining MA is "only a cause for concern if it moves significantly above
+it". Implementation: `tightened_can_ratchet = true` (`ratchet_tightened_swing`, both sides: 8 % reaction
+plus recovery) is the faithful short trail. `short_tightened_ratchet_follows_decline` (#3145, default off)
+anchors on the running minimum of single-bar highs — side-correct but tighter than the book (any bar
+~0.5 % above the lowest high exits, no failed rally required); it is a stop-study arm, not the faithful
+baseline.
+
 ## 7. Order Execution Notes (Ch. 3, 7)
 
 - **Buy entries:** Use GTC buy-stop orders. `Buy 1,000 XYZ at 25⅛ stop – 25⅜ limit – GTC` (limit ¼ point above stop for active stocks)
