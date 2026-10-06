@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-06",
+  "feature": "harness-usage-row-model-pins",
+  "branch": "harness/usage-row-model-pins",
+  "sha": "4546ce1cf7e9befef2770ba26f0747ca6257d9c2",
+  "recorded_at_ns": 1791302529543287228,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
