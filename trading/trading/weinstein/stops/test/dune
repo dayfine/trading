@@ -13,7 +13,8 @@
   test_stop_hit_level_in_force
   test_stop_decision
   test_short_floor_stop_side
-  test_split_safe_floor_raw_basis)
+  test_split_safe_floor_raw_basis
+  test_short_tightened_ratchet)
  (libraries
   weinstein_trading.stops
   weinstein.types

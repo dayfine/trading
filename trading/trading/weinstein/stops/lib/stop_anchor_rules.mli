@@ -68,3 +68,18 @@ val ratchet_tightened_swing :
     - Not confirmed: a strictly new extreme close restarts the swing at that
       close (the low must follow its peak); otherwise peak and [low] carry
       forward. The stop never moves. *)
+
+(** {1 [short_tightened_ratchet_follows_decline]} *)
+
+val tightened_running_anchor :
+  config:Stop_types.config ->
+  side:position_side ->
+  last_correction_extreme:float ->
+  extreme:float ->
+  float
+(** The running anchor of the legacy [Tightened] ratchet (taken when
+    [config.tightened_can_ratchet] is off), given this bar's against-trend
+    [extreme]. Long: the running min of lows. Short, flag off: the running max
+    of highs — it can only rise, so the buy-stop is never lowered (#3145).
+    Short, flag on: the running min of highs, so the stop follows the decline
+    down. *)

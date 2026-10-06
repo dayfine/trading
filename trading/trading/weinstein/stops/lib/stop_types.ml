@@ -64,6 +64,7 @@ type config = {
   tightened_can_ratchet : bool; [@sexp.default false]
   tightened_min_reaction_pct : float;
       [@sexp.default default_tightened_min_reaction_pct]
+  short_tightened_ratchet_follows_decline : bool; [@sexp.default false]
 }
 [@@deriving show, eq, sexp]
 
@@ -90,4 +91,5 @@ let default_config =
     correction_must_follow_peak = false;
     tightened_can_ratchet = false;
     tightened_min_reaction_pct = default_tightened_min_reaction_pct;
+    short_tightened_ratchet_follows_decline = false;
   }

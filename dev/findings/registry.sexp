@@ -239,3 +239,11 @@
          (unit ("trading/trading/weinstein/strategy/test/test_short_min_price_order_price.ml"
                 "#3131: armed ticket gates the breakdown level"))))
  (status fixed-behind-flag))
+
+((issue 3145) (ref "short-only Phase A soTs ADSK-wein-314, TPL, CINF, TECK")
+ (finding "a Tightened short stop tracked the running MAX of highs, so it could never move down: ADSK held at 41.75 for 137 decisions while the stock fell 70 %")
+ (guard ((unit ("trading/trading/weinstein/stops/test/test_short_tightened_ratchet.ml"
+                "#3145: short Tightened stop lowered across a decline"))
+         (unit ("trading/trading/weinstein/stops/test/test_short_tightened_ratchet.ml"
+                "#3145: long Tightened path unaffected"))))
+ (status fixed-behind-flag))
