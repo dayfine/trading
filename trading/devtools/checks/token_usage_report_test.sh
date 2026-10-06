@@ -101,7 +101,7 @@
 #   59-61 TABLE: the model column renders with the "claude-" prefix stripped
 #         (short form), on both the dispatch and session tables, and the
 #         totals-by-model section lists every model.
-#   62-64 `totals.by_model` SUMS ACROSS ROWS of the SAME model, not just the
+#   62-66 `totals.by_model` SUMS ACROSS ROWS of the SAME model, not just the
 #         first row's figures. The model-mix fixture never repeats a model
 #         across rows, so 51-58's single-row pins would still pass a
 #         `merge_models` that took the first row per model instead of
@@ -110,15 +110,25 @@
 #         session AND all three dispatches, so its `totals.by_model` entry
 #         must equal the whole-report totals for api_calls / output_tokens /
 #         input_tokens / cache_read_input_tokens / cache_creation_input_tokens -- a value only a real cross-row sum produces.
-#   65    `model` TIE-BREAK is alphabetical, not "last/first model wins" or
+#   67    `model` TIE-BREAK is alphabetical, not "last/first model wins" or
 #         reverse-alphabetical. `model-mix`'s agent-m2 dispatch uses two
 #         models (claude-haiku-5, claude-opus-5) with EQUAL output tokens
 #         (3 each); claude-haiku-5 must win because it sorts first.
-#   66-67 `model` "unknown" FALLBACK, exercised (not just documented): the
+#   68-69 `model` "unknown" FALLBACK, exercised (not just documented): the
 #         `partial-tail` fixture's two valid records carry no `message.model`
 #         at all, so its session's `model` and its `models` breakdown's one
 #         key must both read "unknown" -- never blank or invented.
-#   68-71 EMPTY-BREAKDOWN "unknown": see the no-usage fixture block below.
+#   70-73 EMPTY-BREAKDOWN "unknown": see the no-usage fixture block below.
+#   74-85 PER-ROW `models.<model>` CLASSES on the model-mix fixture. 51-58 pin
+#         only output_tokens per model and totals.by_model; a mutant charging
+#         the whole row's totals to every model in the row (or swapping
+#         token classes) survived because the row-level input / cache_read /
+#         cache_creation figures were never pinned. Here each model of the
+#         mixed session (opus 1/100/10, haiku 2/200/20 = input/cache_read/
+#         cache_creation, output 10 / 50) and the mixed dispatch m2 (output
+#         3 each) is pinned per class, plus the single-model dispatch m1
+#         (sonnet 1/10/1, output 5); distinct values per class so a swap
+#         is caught.
 #
 # Run:
 #   sh trading/devtools/checks/token_usage_report_test.sh
@@ -393,7 +403,7 @@ expect_eq "table: session row shows the short model form (haiku-5, winner by out
 expect_eq "table: totals-by-model section lists all three models" \
   "3" "$(grep -cE '^  (haiku-5|opus-5|sonnet-5)  *[0-9]+ calls' "$TMP/mm_table.txt")"
 
-# --- 62-64: totals.by_model SUMS across rows of the SAME model -------------
+# --- 62-66: totals.by_model SUMS across rows of the SAME model -------------
 # The `projects` fixture is entirely claude-opus-5: its session (3 messages)
 # plus all three dispatches (a1, b2, c3). A `merge_models` that took only the
 # FIRST row's figures per model (instead of summing) would still report a
@@ -411,14 +421,14 @@ expect_eq "totals.by_model: cache_read_input_tokens for the one model equals the
 expect_eq "totals.by_model: cache_creation_input_tokens for the one model equals the report-wide total" \
   "$(q '.totals.cache_creation_input_tokens')" "$(q '.totals.by_model["claude-opus-5"].cache_creation_input_tokens')"
 
-# --- 65: model tie-break is alphabetical, not first/last/reverse -----------
+# --- 67: model tie-break is alphabetical, not first/last/reverse -----------
 # agent-m2 (model-mix fixture) uses claude-haiku-5 and claude-opus-5 with
 # EQUAL output tokens (3 each); claude-haiku-5 must win the tie because it
 # sorts first alphabetically.
 expect_eq "model: an output-token tie is broken alphabetically (claude-haiku-5 < claude-opus-5)" \
   "claude-haiku-5" "$(mmq '.rows[] | select(.agent_id == "m2") | .model')"
 
-# --- 66-67: model "unknown" fallback, exercised -----------------------------
+# --- 68-69: model "unknown" fallback, exercised -----------------------------
 # partial-tail's two valid records (msg_y1, msg_y2) carry no `message.model`
 # at all. Its session's `model` and its one-entry `models` breakdown must
 # both read "unknown" -- never blank (a missing `// "unknown"`) or invented.
@@ -428,7 +438,7 @@ expect_eq "model: absent on every record reads 'unknown', not blank" \
 expect_eq "models: the 'unknown' breakdown is the row's only key" \
   "unknown" "$(tailq '.sessions[0].models | keys | join(",")')"
 
-# --- 68-71: empty-breakdown "unknown" (top_model guard), exercised ----------
+# --- 70-73: empty-breakdown "unknown" (top_model guard), exercised ----------
 # no-usage: a subagent transcript holding only a timestamped `user` record (a
 # dispatch killed before its first reply) still gets a row, with no usage
 # messages -- `models` is {} and `model` must read "unknown", and it must add
@@ -445,6 +455,28 @@ expect_eq "totals.by_model: the usage-less row adds no model entry" \
   "claude-opus-5" "$(nuq '.totals.by_model | keys | join(",")')"
 expect_eq "totals.by_model: the usage-less row adds no api_calls" \
   "1" "$(nuq '.totals.by_model["claude-opus-5"].api_calls')"
+
+# --- 74-85: per-row models.<model> token CLASSES (see header) ---------------
+for spec in \
+  "claude-opus-5 input_tokens 1" \
+  "claude-opus-5 cache_read_input_tokens 100" \
+  "claude-opus-5 cache_creation_input_tokens 10" \
+  "claude-haiku-5 input_tokens 2" \
+  "claude-haiku-5 cache_read_input_tokens 200" \
+  "claude-haiku-5 cache_creation_input_tokens 20"; do
+  set -- $spec
+  expect_eq "models: mixed session $1 $2 is that model's own figure" \
+    "$3" "$(mmq ".sessions[0].models[\"$1\"].$2")"
+done
+expect_eq "models: mixed dispatch m2 haiku output_tokens is its own (3)" \
+  "3" "$(mmq '.rows[] | select(.agent_id == "m2") | .models["claude-haiku-5"].output_tokens')"
+expect_eq "models: mixed dispatch m2 opus output_tokens is its own (3)" \
+  "3" "$(mmq '.rows[] | select(.agent_id == "m2") | .models["claude-opus-5"].output_tokens')"
+for spec in "input_tokens 1" "cache_read_input_tokens 10" "cache_creation_input_tokens 1" "output_tokens 5"; do
+  set -- $spec
+  expect_eq "models: single-model dispatch m1 sonnet $1 is its own figure" \
+    "$2" "$(mmq ".rows[] | select(.agent_id == \"m1\") | .models[\"claude-sonnet-5\"].$1")"
+done
 
 # --------------------------------------------------------------------------
 printf '=== Results: %s passed, %s failed ===\n' "$PASS" "$FAILED"
