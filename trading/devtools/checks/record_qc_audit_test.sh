@@ -1349,6 +1349,46 @@ else
   [[ -f "${JSON20}" ]] && echo "      json: $(cat "${JSON20}")"
 fi
 
+
+# ---------------------------------------------------------------------------
+# Scenario 20c — H-AUDIT-ATOMICITY-PARTIAL-PIN: publish is an atomic rename,
+# not an in-place overwrite. Scenarios 19/20 only prove "abort BEFORE publish
+# leaves the target intact"; a mutant that keeps the temp file but publishes
+# with `cat "$TMP_FILE" > "$OUTPUT_FILE"; rm -f "$TMP_FILE"` passes both.
+# Behavioural distinguisher: rename replaces the directory entry, so the
+# published file's inode differs from the pre-existing target's; `cat >`
+# truncates in place and keeps the inode. (A hardlink keeps the old inode
+# number alive so it cannot be recycled between the two reads.)
+# ---------------------------------------------------------------------------
+FEATURE20C="atomic-publish-inode"
+JSON20C="${TMP_REPO}/dev/audit/2026-07-29-harness-atomic-${FEATURE20C}.json"
+
+_write20c() {
+  REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
+    --date 2026-07-29 --feature "${FEATURE20C}" --branch "harness/atomic" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED \
+    --quality-score "$1" 2>&1
+}
+_inode() { ls -i "$1" 2>/dev/null | awk '{print $1}'; }
+
+_write20c 3 >/dev/null && rc20c_1=0 || rc20c_1=$?
+if [[ ! -f "${JSON20C}" ]]; then
+  fail "scenario 20c — setup: first write did not produce ${JSON20C} (rc=${rc20c_1})"
+else
+  ln "${JSON20C}" "${JSON20C}.pin"
+  INODE20C_BEFORE="$(_inode "${JSON20C}")"
+  out20c_2=$(_write20c 5) && rc20c_2=0 || rc20c_2=$?
+  INODE20C_AFTER="$(_inode "${JSON20C}")"
+  rm -f "${JSON20C}.pin"
+  if (( rc20c_2 == 0 )) && [[ -n "${INODE20C_BEFORE}" ]] \
+     && [[ "${INODE20C_BEFORE}" != "${INODE20C_AFTER}" ]] \
+     && grep -q '"quality_score": *5' "${JSON20C}"; then
+    pass "scenario 20c — republish replaces the target's directory entry (new inode): publish is an atomic rename, not an in-place overwrite (H-AUDIT-ATOMICITY-PARTIAL-PIN)"
+  else
+    fail "scenario 20c — expected rc=0, new content, and inode change (rename); got rc=${rc20c_2}, inode before=${INODE20C_BEFORE} after=${INODE20C_AFTER}"
+    echo "${out20c_2}" | sed 's/^/      /'
+  fi
+fi
 # ---------------------------------------------------------------------------
 # Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
 # OWN failure-safety claim (added on QC rework, PR #2266): the comment
