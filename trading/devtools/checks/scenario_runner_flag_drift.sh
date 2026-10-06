@@ -14,7 +14,8 @@
 #
 # WHAT IT DOES
 #   1. Extracts the accept-set from the runner's own parser: every `"--flag"`
-#      string literal inside the `_parse_flag` function body of
+#      string literal inside the `_parse_flag` function body (up to the next
+#      top-level `let`/`and`) of
 #      `trading/trading/backtest/scenarios/cli_args.ml`, plus the
 #      literals in `_usage ()`. That is the source of truth; nothing is
 #      hardcoded here, so adding a flag to the runner needs no edit to this
@@ -71,8 +72,11 @@ runner_ml="${SCENARIO_RUNNER_ML:-$root/trading/trading/backtest/scenarios/cli_ar
 # empty extraction is a hard failure rather than a pass.
 accept_set=$(
   awk '
+    # Close on the NEXT top-level definition, not on a named marker: the
+    # entry point was renamed `_parse_args` -> `parse_args` (#3115) and a
+    # named close marker silently stopped firing (accept-set ran to EOF).
+    in_parse && /^(let|and) / { in_parse = 0 }
     /^let _parse_flag/ { in_parse = 1 }
-    /^let _parse_args/ { in_parse = 0 }
     /^let _usage/      { in_usage = 1 }
     in_usage && /Stdlib[.]exit/ { in_usage = 0 }
     (in_parse || in_usage) {

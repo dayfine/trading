@@ -127,6 +127,34 @@ SCENARIO_RUNNER_ML="$work/narrowed_runner.ml" \
 grep -q -- '--no-emit-all-eligible' "$work/output" \
   || die "narrowed-accept-set case did not name the dropped flag"
 
+# --- the _parse_flag region must close at the next top-level definition ----
+# Shape of the real cli_args.ml after #3115: the entry point is `parse_args`
+# (no underscore), so a close marker keyed on `_parse_args` never fires and
+# the accept-set silently runs to EOF. A `--bogus-flag` literal AFTER the
+# parser (here in a later helper) must NOT be accepted.
+cat >"$work/trailing_runner.ml" <<'EOF2'
+let _usage () =
+  eprintf "Usage: scenario_runner [--dir <path>]\n";
+  Stdlib.exit 1
+
+let _parse_flag args =
+  let rec loop args =
+    match args with
+    | [] -> ()
+    | "--dir" :: _ :: rest -> loop rest
+    | _ -> _usage ()
+  in
+  loop args
+
+let parse_args () = _parse_flag []
+
+let _later_helper () = print_endline "--bogus-flag"
+EOF2
+printf '%s\n' 'scenario_runner.exe -- --dir one --bogus-flag' >"$work/bogus.sh"
+SCENARIO_RUNNER_ML="$work/trailing_runner.ml" expect 1 "$work/bogus.sh"
+grep -q -- '--bogus-flag' "$work/output" || die "trailing-literal case did not name the flag"
+SCENARIO_RUNNER_ML="$work/trailing_runner.ml" expect 0 "$work/dune_flags.sh"
+
 # --- non-vacuity guard on the accept-set itself ----------------------------
 # A runner file whose parser markers have moved must be a HARD FAIL, never a
 # silent pass -- an empty accept-set would otherwise bless every script.
