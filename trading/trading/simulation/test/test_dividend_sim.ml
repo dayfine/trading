@@ -167,8 +167,87 @@ let test_credited_before_strategy_not_on_fill_day _ =
                 ])))
        (is_some_and (float_equal 25.0)))
 
+(* A position sold by a fill ON the ex-date was held when that step started,
+   so it still receives the dividend. *)
+(* QC PROBE (temporary): sale filling on the ex-date still gets paid. *)
+let _exit_strategy seen : (module Strategy_interface.STRATEGY) =
+  let module S : Strategy_interface.STRATEGY = struct
+    let name = "BuyThenExitOnEve"
+
+    let on_market_close ~get_price ~get_indicator:_ ~portfolio =
+      match get_price "AAPL" with
+      | None -> Ok { Strategy_interface.transitions = [] }
+      | Some (bar : Types.Daily_price.t) ->
+          let first = List.is_empty !seen in
+          seen :=
+            (bar.date, portfolio.Trading_strategy.Portfolio_view.cash) :: !seen;
+          let exit_tr =
+            {
+              Trading_strategy.Position.position_id = "AAPL-hold";
+              date = bar.date;
+              kind =
+                TriggerExit
+                  {
+                    exit_reason =
+                      Trading_strategy.Position.SignalReversal
+                        { description = "exit before ex-date" };
+                    exit_price = 50.0;
+                  };
+            }
+          in
+          Ok
+            {
+              Strategy_interface.transitions =
+                (if first then [ _entry bar ]
+                 else if Date.equal bar.date (_date "2024-01-04") then
+                   [ exit_tr ]
+                 else []);
+            }
+  end
+  in
+  (module S)
+
+let test_sale_filling_on_ex_date_still_paid _ =
+  let seen = ref [] in
+  let divs : Corporate_actions.dividend list =
+    [
+      {
+        ex_date = _date "2024-01-05";
+        unadjusted_amount = Some 0.25;
+        adjusted_amount = 0.25;
+      };
+    ]
+  in
+  let result =
+    with_test_data "dividend_sim_sale_on_ex_date"
+      [ ("AAPL", _bars) ]
+      ~f:(fun data_dir ->
+        let deps =
+          create_deps ~symbols:[ "AAPL" ] ~data_dir
+            ~strategy:(_exit_strategy seen) ~commission:_config.commission
+            ~dividends:(_crediting [ ("AAPL", divs) ])
+            ()
+        in
+        run (create_exn ~config:_config ~deps))
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (r : run_result) -> r.metrics)
+              (contains_entry Metric_types.DividendIncomeTotal
+                 (float_equal 25.0));
+            field
+              (fun (r : run_result) ->
+                r.final_portfolio.Trading_portfolio.Portfolio.current_cash)
+              (float_equal 100_025.0);
+          ]))
+
 (* Per-step (portfolio summary, value). Whole [step_result]s are not compared:
-   trades carry wall-clock timestamps that differ between two runs. *)
+   [orders_submitted] carry wall-clock created_at / updated_at from
+   Trading_orders that differ between two runs (trades are equal, restamped by
+   Fill_date_stamp). *)
 let _marks (r : run_result) =
   List.map r.steps ~f:(fun (s : step_result) ->
       (s.portfolio, s.portfolio_value))
@@ -199,6 +278,8 @@ let suite =
          >:: test_credited_before_strategy_not_on_fill_day;
          "default off: identical outputs and no new keys"
          >:: test_default_off_identical_and_no_keys;
+         "sale filling on ex-date still paid"
+         >:: test_sale_filling_on_ex_date_still_paid;
        ]
 
 let () = run_test_tt_main suite
