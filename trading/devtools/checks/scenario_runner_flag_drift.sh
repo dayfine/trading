@@ -75,10 +75,10 @@ accept_set=$(
     # Close on the NEXT top-level definition, not on a named marker: the
     # entry point was renamed `_parse_args` -> `parse_args` (#3115) and a
     # named close marker silently stopped firing (accept-set ran to EOF).
-    in_parse && /^(let|and) / { in_parse = 0 }
+    # Both regions (_parse_flag, _usage) share this one closer.
+    /^(let|and) / { in_parse = 0; in_usage = 0 }
     /^let _parse_flag/ { in_parse = 1 }
     /^let _usage/      { in_usage = 1 }
-    in_usage && /Stdlib[.]exit/ { in_usage = 0 }
     (in_parse || in_usage) {
       line = $0
       while (match(line, /--[A-Za-z][A-Za-z0-9-]*/)) {

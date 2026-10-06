@@ -155,6 +155,54 @@ SCENARIO_RUNNER_ML="$work/trailing_runner.ml" expect 1 "$work/bogus.sh"
 grep -q -- '--bogus-flag' "$work/output" || die "trailing-literal case did not name the flag"
 SCENARIO_RUNNER_ML="$work/trailing_runner.ml" expect 0 "$work/dune_flags.sh"
 
+# --- parser-only flag / `and` sibling / usage closer (H-FLAG-DRIFT-REGION-PINS)
+# (a) a flag present in `_parse_flag` but ABSENT from `_usage` must be
+# accepted: pins the parser region's own contribution.
+cat >"$work/parser_only_runner.ml" <<'EOF2'
+let _usage () =
+  eprintf "Usage: scenario_runner [--dir <path>]\n";
+  Stdlib.exit 1
+
+let _parse_flag args =
+  let rec loop args =
+    match args with
+    | [] -> ()
+    | "--dir" :: _ :: rest -> loop rest
+    | "--parser-only" :: rest -> loop rest
+    | _ -> _usage ()
+  in
+  loop args
+
+let parse_args () = _parse_flag []
+EOF2
+printf '%s\n' 'scenario_runner.exe -- --dir one --parser-only' >"$work/parser_only.sh"
+SCENARIO_RUNNER_ML="$work/parser_only_runner.ml" expect 0 "$work/parser_only.sh"
+
+# (b) an `and` sibling after `_parse_flag` carrying a literal must NOT widen
+# the accept-set (`and` closes the region too).
+cat >"$work/and_runner.ml" <<'EOF2'
+let _usage () =
+  eprintf "Usage: scenario_runner [--dir <path>]\n";
+  Stdlib.exit 1
+
+let rec _parse_flag args = match args with _ -> _sibling args
+and _sibling _ = print_endline "--bogus-flag"
+EOF2
+sed -i 's/^let rec _parse_flag/let _parse_flag/' "$work/and_runner.ml"
+printf '%s\n' 'scenario_runner.exe -- --dir one --bogus-flag' >"$work/bogus_and.sh"
+SCENARIO_RUNNER_ML="$work/and_runner.ml" expect 1 "$work/bogus_and.sh"
+
+# (c) the `_usage` region closes at the next top-level item, not on
+# `Stdlib.exit`: a usage with no `Stdlib.exit` must not swallow a later helper.
+cat >"$work/usage_noexit_runner.ml" <<'EOF2'
+let _usage () = eprintf "Usage: scenario_runner [--dir <path>]\n"
+
+let _parse_flag args = match args with _ -> _usage ()
+
+let _later_helper () = print_endline "--bogus-flag"
+EOF2
+SCENARIO_RUNNER_ML="$work/usage_noexit_runner.ml" expect 1 "$work/bogus_and.sh"
+
 # --- non-vacuity guard on the accept-set itself ----------------------------
 # A runner file whose parser markers have moved must be a HARD FAIL, never a
 # silent pass -- an empty accept-set would otherwise bless every script.
