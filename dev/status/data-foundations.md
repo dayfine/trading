@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-10-03
+## Last updated: 2026-10-05
 
 ## Status
 IN_PROGRESS
@@ -346,6 +346,23 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 (M5.3 streaming Phases A through F COMPLETE on main as of 2026-05-06.
 Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
 fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
+
+### READY_FOR_REVIEW — EODHD dividends + splits bulk fetcher (2026-10-05, #3137 / #3136)
+
+- `trading/analysis/data/storage/csv/corporate_actions/` (`csv.corporate_actions`):
+  per-symbol `dividends.csv` (`ex_date,unadjusted_amount,adjusted_amount`)
+  and `splits.csv` (`date,factor`) next to `data.csv`; typed reader/writer,
+  header-only = fetched-empty, missing = `NotFound`, temp+rename writes.
+- `trading/analysis/scripts/fetch_corporate_actions/` lib + bin
+  `fetch_corporate_actions.exe` (`-api-key` / `$EODHD_API_KEY`, `-data-dir`,
+  `-symbols-file`, `-limit`, `-refresh`, `-sleep-ms`, `-parallel`); default
+  universe = every symbol dir holding `data.csv` (`_old` legs included; dir
+  name is the EODHD code, `.` splits code/exchange like the price fetcher).
+- `Eodhd.Dividends_endpoint.dividend` gains `unadjusted_amount` (EODHD
+  `unadjustedValue`): `value` is split-adjusted and rounded to 5 dp, so
+  #3137 crediting against raw prices must use the unadjusted column.
+- Live `-limit 3` smoke (AAPL, KO, APC_old) OK. Full fetch: dispatcher, after merge.
+- Verify: `dune runtest analysis/data/storage/csv/corporate_actions analysis/scripts/fetch_corporate_actions analysis/data/sources/eodhd`.
 
 ### READY_FOR_REVIEW — Eligibility-filter universe builder (live-universe) — 2026-06-14
 

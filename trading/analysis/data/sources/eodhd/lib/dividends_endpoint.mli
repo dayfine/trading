@@ -22,7 +22,14 @@ open Core
 type dividend = {
   date : Date.t;  (** Ex-date of the dividend. *)
   amount : float;
-      (** Cash amount per share, in the security's quote currency. Positive. *)
+      (** EODHD's [value]: cash per share, in the quote currency, {b adjusted}
+          for every later split (AAPL's 1987-05-11 dividend reads [0.00054]),
+          and rounded to five decimals. Positive. *)
+  unadjusted_amount : float option;
+      (** EODHD's [unadjustedValue]: the cash actually paid per share held on
+          the ex-date ([0.12096] for that AAPL dividend). This is the amount to
+          credit against raw (unadjusted) prices. [None] when the field is
+          absent or [null]. *)
 }
 [@@deriving show, eq]
 (** A single cash-dividend event. *)

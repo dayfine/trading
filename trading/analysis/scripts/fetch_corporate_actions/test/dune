@@ -1,0 +1,17 @@
+(test
+ (name test_fetch_corporate_actions)
+ (libraries
+  fetch_corporate_actions_lib
+  csv.corporate_actions
+  core
+  core_unix
+  core_unix.filename_unix
+  async
+  async_unix
+  fpath
+  ounit2
+  matchers
+  status
+  uri)
+ (preprocess
+  (pps ppx_jane)))

@@ -1,0 +1,11 @@
+(test
+ (name test_corporate_actions)
+ (libraries
+  corporate_actions
+  core
+  core_unix
+  core_unix.filename_unix
+  fpath
+  ounit2
+  matchers
+  status))

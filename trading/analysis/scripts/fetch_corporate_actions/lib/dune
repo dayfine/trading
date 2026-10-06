@@ -1,0 +1,12 @@
+(library
+ (name fetch_corporate_actions_lib)
+ (libraries
+  core
+  core_unix.sys_unix
+  async
+  fpath
+  status
+  eodhd
+  csv.corporate_actions)
+ (preprocess
+  (pps ppx_jane ppx_deriving.show ppx_deriving.eq)))
