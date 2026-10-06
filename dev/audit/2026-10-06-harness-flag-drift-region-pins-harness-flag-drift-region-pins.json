@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-06",
+  "feature": "harness-flag-drift-region-pins",
+  "branch": "harness/flag-drift-region-pins",
+  "sha": "566d6d563fa6647dcb7b65b0a7352d0b00436a32",
+  "recorded_at_ns": 1791314004368138011,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

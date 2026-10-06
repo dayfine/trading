@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-06",
+  "feature": "harness-audit-atomic-publish-pin",
+  "branch": "harness/audit-atomic-publish-pin",
+  "sha": "849435f1a8a639791fc0ea9517ea661e9568f076",
+  "recorded_at_ns": 1791316110539018427,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
