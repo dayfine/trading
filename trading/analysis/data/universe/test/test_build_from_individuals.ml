@@ -408,6 +408,42 @@ let test_size_zero_rejected _ =
   _cleanup_dir root;
   assert_that result (is_error_with Status.Invalid_argument)
 
+(* Issue #3136: AAA does a confirmed 10:1 forward split after the build date
+   (close 120 -> 12 on 2021-06-02), so its stored volume is restated 10x and
+   its true dollar volume is 10M, not 100M. On the true-dollar basis it falls
+   below CCC (20M). BBB and CCC have no splits.csv and score with F = 1. *)
+let _add_aaa_forward_split ~bars_root =
+  let path = _bars_path ~root:bars_root "AAA" in
+  Out_channel.with_file path ~append:true ~f:(fun oc ->
+      Out_channel.output_string oc
+        "2021-06-01,120.00,120.00,120.00,120.00,120.00,1000\n\
+         2021-06-02,12.00,12.00,12.00,12.00,12.00,1000\n");
+  Corporate_actions.write_splits ~data_dir:(Fpath.v bars_root) "AAA"
+    [ { date = Date.create_exn ~y:2021 ~m:Month.Jun ~d:2; factor = 10.0 } ]
+
+let _symbols_on_basis ~dollar_volume =
+  let root, config = _setup_baseline_fixture ~size:3 in
+  let split_written = _add_aaa_forward_split ~bars_root:config.bars_root in
+  let snapshot = _build_or_fail ~config:{ config with dollar_volume } in
+  _cleanup_dir root;
+  (split_written, List.map snapshot.entries ~f:(fun e -> e.symbol))
+
+let test_true_dollar_basis_reranks_future_splitter _ =
+  assert_that
+    ( _symbols_on_basis ~dollar_volume:Dollar_volume_basis.legacy_config,
+      _symbols_on_basis ~dollar_volume:Dollar_volume_basis.true_dollars_config
+    )
+    (all_of
+       [
+         field
+           (fun ((_, legacy), _) -> legacy)
+           (elements_are [ equal_to "AAA"; equal_to "BBB"; equal_to "CCC" ]);
+         field (fun (_, (written, _)) -> written) is_ok;
+         field
+           (fun (_, (_, true_basis)) -> true_basis)
+           (elements_are [ equal_to "BBB"; equal_to "CCC"; equal_to "AAA" ]);
+       ])
+
 (* Insufficient survivors → Invalid_argument with a descriptive message.
    Asking for size=10 from a 5-symbol fixture must surface as an error,
    not a truncated snapshot. *)
@@ -436,6 +472,8 @@ let suite =
          "test_size_zero_rejected" >:: test_size_zero_rejected;
          "test_insufficient_survivors_rejected"
          >:: test_insufficient_survivors_rejected;
+         "test_true_dollar_basis_reranks_future_splitter"
+         >:: test_true_dollar_basis_reranks_future_splitter;
        ]
 
 let () = run_test_tt_main suite

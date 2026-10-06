@@ -48,7 +48,8 @@
   build_composition_universes_runner_lib
   core
   core_unix.command_unix
-  status)
+  status
+  universe)
  (preprocess
   (pps ppx_jane)))
 
@@ -105,5 +106,24 @@
  (name cross_validation_runner)
  (modules cross_validation_runner)
  (libraries core core_unix.command_unix cross_validation_runner_lib status)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
+ (name dollar_volume_measurement_lib)
+ (modules dollar_volume_scan dollar_volume_report)
+ (libraries core core_unix csv.corporate_actions fpath status universe)
+ (preprocess
+  (pps ppx_let)))
+
+(executable
+ (name dollar_volume_measurement)
+ (modules dollar_volume_measurement)
+ (libraries
+  core
+  core_unix.command_unix
+  dollar_volume_measurement_lib
+  status
+  universe)
  (preprocess
   (pps ppx_jane)))

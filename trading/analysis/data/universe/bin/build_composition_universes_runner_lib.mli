@@ -18,6 +18,7 @@ type result = {
 (** Summary returned by {!run}. *)
 
 val run :
+  dollar_volume:Universe.Dollar_volume_basis.config ->
   bars_root:string ->
   symbol_types_path:string ->
   sectors_csv_path:string ->
@@ -34,4 +35,8 @@ val run :
     {!Universe.Build_from_individuals.default_config}, and on [Ok] saves the
     snapshot to [{out_dir}/top-{top_n}-{year}.sexp]. On [Error] the pair is
     recorded in the result's [skip_reasons] and the loop continues — never
-    raises. *)
+    raises.
+
+    [dollar_volume] sets the ranker's dollar-volume basis (issue #3136);
+    {!Universe.Dollar_volume_basis.legacy_config} reproduces the committed
+    lists. *)

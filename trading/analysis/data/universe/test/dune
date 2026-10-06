@@ -13,7 +13,9 @@
   test_composition_policy_report
   test_apply_composition_policy_runner
   test_enrich_composition_volume_runner
-  test_cross_validation)
+  test_cross_validation
+  test_dollar_volume_basis
+  test_dollar_volume_scan)
  (deps
   (glob_files data/*.sexp))
  (libraries
@@ -21,7 +23,11 @@
   build_composition_universes_runner_lib
   build_synthetic_universes_runner_lib
   core
+  core_unix
+  csv.corporate_actions
+  fpath
   cross_validation_runner_lib
+  dollar_volume_measurement_lib
   enrich_composition_volume_runner_lib
   eodhd
   kenneth_french

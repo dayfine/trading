@@ -118,8 +118,9 @@ let test_smoke_writes_one_file _ =
   in
   let out_dir = Filename.concat root "out" in
   let result =
-    Runner.run ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path
-      ~out_dir ~start_year:2020 ~end_year:2020 ~top_ns:[ 3 ]
+    Runner.run ~dollar_volume:Universe.Dollar_volume_basis.legacy_config
+      ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path ~out_dir
+      ~start_year:2020 ~end_year:2020 ~top_ns:[ 3 ]
   in
   let files = _files_in_dir out_dir in
   let snapshot_path = Filename.concat out_dir "top-3-2020.sexp" in
@@ -150,8 +151,9 @@ let test_skip_on_insufficient_signal _ =
   (* Asking for size=10 from a 5-symbol fixture must surface as a skip,
      not a crash. *)
   let result =
-    Runner.run ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path
-      ~out_dir ~start_year:2020 ~end_year:2020 ~top_ns:[ 10 ]
+    Runner.run ~dollar_volume:Universe.Dollar_volume_basis.legacy_config
+      ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path ~out_dir
+      ~start_year:2020 ~end_year:2020 ~top_ns:[ 10 ]
   in
   let files = _files_in_dir out_dir in
   _cleanup_dir root;
@@ -179,8 +181,9 @@ let test_multi_size_writes_one_file_per_size _ =
   in
   let out_dir = Filename.concat root "out" in
   let result =
-    Runner.run ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path
-      ~out_dir ~start_year:2020 ~end_year:2020 ~top_ns:[ 2; 3; 5 ]
+    Runner.run ~dollar_volume:Universe.Dollar_volume_basis.legacy_config
+      ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path ~out_dir
+      ~start_year:2020 ~end_year:2020 ~top_ns:[ 2; 3; 5 ]
   in
   let files = _files_in_dir out_dir in
   _cleanup_dir root;

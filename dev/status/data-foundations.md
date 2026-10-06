@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-10-05
+## Last updated: 2026-10-06
 
 ## Status
 IN_PROGRESS
@@ -346,6 +346,29 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 (M5.3 streaming Phases A through F COMPLETE on main as of 2026-05-06.
 Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
 fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
+
+### READY_FOR_REVIEW — dollar volume on one basis + measurement (2026-10-06, #3136)
+
+- [x] Basis lib `analysis/data/universe/lib/dollar_volume_basis.{ml,mli}`:
+  true dollars = `close * volume / F(t)`, where F multiplies only the splits
+  the raw close confirms (re-dated to the confirming bar, ±2-bar search) and
+  whose stored volume is restated (3:1-or-larger splits checked). Bars above
+  $200B/day are rejected and listed. Wired into
+  `Build_from_individuals.config.dollar_volume` (default `legacy_config`, so
+  the committed lists are reproduced bit-for-bit) and into the composition
+  runner's `--true-dollar-volume` flag, which refuses the committed
+  composition dir.
+- [x] Measurement exe `analysis/data/universe/bin/dollar_volume_measurement.exe`
+  (+ `dollar_volume_scan` / `dollar_volume_report`). Report:
+  `dev/notes/dollar-volume-basis-measurement-2026-10-06.md`. The basis alone
+  moves 2-4 % of the top-3000 per vintage (5-14 % of the top-1000 before 2014).
+  Entry-gate ($1M) flips: 4-7 % of member-weeks 1998-2003, under 0.5 % after
+  2014.
+- Liquidity gate NOT changed: snapshot bars carry no split factors, so a fix
+  needs a schema change (see the note).
+- Open: the rebuild decision (user), and a currency/listing filter for the
+  non-basis junk at the top of the lists (HSBA, SBER, LHC-UN).
+- Verify: `dune runtest analysis/data/universe/test`.
 
 ### READY_FOR_REVIEW — EODHD dividends + splits bulk fetcher (2026-10-05, #3137 / #3136)
 

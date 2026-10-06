@@ -49,11 +49,12 @@ let _print_summary (result : Build_composition_universes_runner_lib.result) =
     List.iter (List.rev result.skip_reasons) ~f:(fun (year, top_n, reason) ->
         Stdlib.Printf.printf "  skip year=%d top_n=%d: %s\n" year top_n reason)
 
-let _run ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path
-    ~out_dir ~start_year ~end_year ~top_ns =
+let _run ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
+    ~inventory_path ~out_dir ~start_year ~end_year ~top_ns =
   let result =
-    Build_composition_universes_runner_lib.run ~bars_root ~symbol_types_path
-      ~sectors_csv_path ~inventory_path ~out_dir ~start_year ~end_year ~top_ns
+    Build_composition_universes_runner_lib.run ~dollar_volume ~bars_root
+      ~symbol_types_path ~sectors_csv_path ~inventory_path ~out_dir ~start_year
+      ~end_year ~top_ns
   in
   _print_summary result
 
@@ -61,6 +62,23 @@ let _default_out_dir = "trading/test_data/goldens-custom-universe/composition/"
 let _default_top_n_raw = "500,1000,3000"
 let _default_start_year = 1998
 let _default_end_year = 2026
+
+(* The true-dollar basis (#3136) must never overwrite the committed PIT lists:
+   any --out-dir naming the committed composition directory is refused. *)
+let _committed_dir_suffix = "goldens-custom-universe/composition"
+
+let _is_committed_dir out_dir =
+  String.is_suffix
+    (String.rstrip out_dir ~drop:(Char.equal '/'))
+    ~suffix:_committed_dir_suffix
+
+let _dollar_volume_of_flag ~true_dollars ~out_dir =
+  if not true_dollars then Universe.Dollar_volume_basis.legacy_config
+  else if _is_committed_dir out_dir then
+    _exit_with_error
+      "--true-dollar-volume writes new lists; pass an --out-dir other than the \
+       committed composition directory"
+  else Universe.Dollar_volume_basis.true_dollars_config
 
 let command =
   Command.basic
@@ -103,10 +121,17 @@ let command =
          ~doc:
            (Printf.sprintf "LIST comma-separated top-N sizes (default: %s)"
               _default_top_n_raw)
+     and true_dollars =
+       flag "--true-dollar-volume" no_arg
+         ~doc:
+           " rank on true dollars traded (split-only basis, implausible bars \
+            dropped; issue #3136). Requires an --out-dir other than the \
+            default."
      in
      fun () ->
        let top_ns = _parse_top_n_list top_n_raw in
-       _run ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path
-         ~out_dir ~start_year ~end_year ~top_ns)
+       let dollar_volume = _dollar_volume_of_flag ~true_dollars ~out_dir in
+       _run ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
+         ~inventory_path ~out_dir ~start_year ~end_year ~top_ns)
 
 let () = Command_unix.run command
