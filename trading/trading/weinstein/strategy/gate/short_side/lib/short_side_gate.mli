@@ -25,10 +25,11 @@
 val combine :
   enable_short_side:bool ->
   short_min_price:float ->
+  short_price_of:(Screener.scored_candidate -> float) ->
   buy_candidates:Screener.scored_candidate list ->
   short_candidates:Screener.scored_candidate list ->
   Screener.scored_candidate list
-(** [combine ~enable_short_side ~short_min_price ~buy_candidates
+(** [combine ~enable_short_side ~short_min_price ~short_price_of ~buy_candidates
      ~short_candidates] is the entry-candidate list fed to
     {!Weinstein_strategy.entries_from_candidates}.
 
@@ -37,10 +38,13 @@ val combine :
       zero short entries regardless of the screener's [short_candidates]. This
       is the long-only baseline contract.
     - When [enable_short_side = true] (the default): returns
-      [buy_candidates @ Short_min_price_gate.filter ~short_min_price
-       short_candidates] — i.e. shorts are admitted, after the
-      sub-[short_min_price] economic-margin floor is applied (no-op when
-      [short_min_price <= 0.0]).
+      [buy_candidates @ Short_min_price_gate.filter ~price_of:short_price_of
+       ~short_min_price short_candidates] — i.e. shorts are admitted, after the
+      sub-[short_min_price] economic-margin floor is applied to the price
+      [short_price_of] reads (no-op when [short_min_price <= 0.0]). Pass
+      {!Short_min_price_gate.suggested_entry_price} for the screener level; the
+      strategy passes the ticket's order price under
+      [Weinstein_strategy_config.short_min_price_on_order_price] (#3131).
 
     Pure. Order-preserving (longs first, then admitted shorts) so existing
     goldens replay bit-identically. *)

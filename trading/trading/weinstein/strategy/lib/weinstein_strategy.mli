@@ -465,6 +465,12 @@ type config = {
           ([dev/notes/long-short-margin-mechanics-2026-06-12.md]) as a
           default-off, searchable {!Walk_forward.Variant_matrix} axis. Not wired
           into any default config or preset. *)
+  short_min_price_on_order_price : bool; [@sexp.default false]
+      (** #3131: gate {!short_min_price} on the short ticket's order price (the
+          decision close, or [suggested_entry] when the E-anchored ticket is
+          armed) instead of [suggested_entry]. Default [false] = bit-identical
+          (R1). See [Weinstein_strategy_config.short_min_price_on_order_price].
+      *)
   short_borrow_min_dollar_adv : float; [@sexp.default 0.0]
       (** Borrow-availability floor for short candidates (margin M3a): shorts
           whose trailing dollar-ADV (no-lookahead, over {!liquidity_config}'s

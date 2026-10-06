@@ -81,6 +81,7 @@ let _tickers candidates = List.map candidates ~f:(fun c -> c.Screener.ticker)
 let test_disabled_drops_all_shorts _ =
   let combined =
     Short_side_gate.combine ~enable_short_side:false ~short_min_price:0.0
+      ~short_price_of:Short_min_price_gate.suggested_entry_price
       ~buy_candidates:[ _long ~ticker:"BULL" ~suggested_entry:50.0 ]
       ~short_candidates:
         [
@@ -105,6 +106,7 @@ let test_disabled_drops_all_shorts _ =
 let test_disabled_with_no_longs_is_empty _ =
   let combined =
     Short_side_gate.combine ~enable_short_side:false ~short_min_price:0.0
+      ~short_price_of:Short_min_price_gate.suggested_entry_price
       ~buy_candidates:[]
       ~short_candidates:[ _short ~ticker:"BEAR" ~suggested_entry:40.0 ]
   in
@@ -115,6 +117,7 @@ let test_disabled_with_no_longs_is_empty _ =
 let test_enabled_admits_shorts_after_longs _ =
   let combined =
     Short_side_gate.combine ~enable_short_side:true ~short_min_price:0.0
+      ~short_price_of:Short_min_price_gate.suggested_entry_price
       ~buy_candidates:[ _long ~ticker:"BULL" ~suggested_entry:50.0 ]
       ~short_candidates:[ _short ~ticker:"BEAR" ~suggested_entry:40.0 ]
   in
@@ -139,6 +142,7 @@ let test_enabled_admits_shorts_after_longs _ =
 let test_enabled_applies_short_min_price_floor _ =
   let combined =
     Short_side_gate.combine ~enable_short_side:true ~short_min_price:17.0
+      ~short_price_of:Short_min_price_gate.suggested_entry_price
       ~buy_candidates:[ _long ~ticker:"BULL" ~suggested_entry:50.0 ]
       ~short_candidates:
         [
@@ -259,6 +263,7 @@ let test_disabled_suppresses_short_transitions_e2e _ =
   in
   let candidates =
     Short_side_gate.combine ~enable_short_side:false ~short_min_price:0.0
+      ~short_price_of:Short_min_price_gate.suggested_entry_price
       ~buy_candidates:screen_result.Screener.buy_candidates
       ~short_candidates:screen_result.Screener.short_candidates
   in
@@ -290,6 +295,7 @@ let test_enabled_emits_short_transitions_e2e _ =
   in
   let candidates =
     Short_side_gate.combine ~enable_short_side:true ~short_min_price:0.0
+      ~short_price_of:Short_min_price_gate.suggested_entry_price
       ~buy_candidates:screen_result.Screener.buy_candidates
       ~short_candidates:screen_result.Screener.short_candidates
   in

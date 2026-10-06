@@ -229,3 +229,13 @@
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_stops_runner.ml"
                 "catastrophic exit carries its own reason and level (#3101)"))))
  (status fixed))
+
+((issue 3131) (ref "shorts-liveness shB RMD 2008-02-22; short-only soT-5d UMPQ/UCB")
+ (finding "short tickets anchored at the base top never fill (RMD 34 % above market); short_min_price gated the screener level, not the order price, so sub-$17 shorts were admitted and margin-called")
+ (guard ((unit ("trading/analysis/weinstein/screener/test/test_screener.ml"
+                "#3131: short ticket anchors at the breakdown"))
+         (unit ("trading/trading/weinstein/strategy/test/test_short_min_price_order_price.ml"
+                "#3131: close-priced ticket gates the close"))
+         (unit ("trading/trading/weinstein/strategy/test/test_short_min_price_order_price.ml"
+                "#3131: armed ticket gates the breakdown level"))))
+ (status fixed-behind-flag))
