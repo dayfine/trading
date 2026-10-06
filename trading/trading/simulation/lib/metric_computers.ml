@@ -116,6 +116,10 @@ let create_computer (metric_type : Metric_types.metric_type) :
   (* Not step-derivable: the simulator's cash-yield accrual reports it. *)
   | CashInterestTotal ->
       _derived_only_stub ~name:"cash_interest_stub" CashInterestTotal
+  (* Not step-derivable: the simulator's dividend crediting reports these. *)
+  | ( DividendIncomeTotal | DividendPaidShortTotal
+    | DividendSkippedNoAmountCount | DividendMissingFileCount ) as m ->
+      _derived_only_stub ~name:"dividend_stub" m
 
 (** {1 Default Computer Set} *)
 

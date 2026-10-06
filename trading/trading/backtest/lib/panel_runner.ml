@@ -31,6 +31,14 @@ let _cash_yield_accrual (input : input) ~start_date =
   Option.map input.cash_yield ~f:(fun rate ->
       Trading_simulation_cash_yield.Cash_yield.Accrual.create rate ~start_date)
 
+(* #3137: dividend crediting reads per-symbol [dividends.csv] lazily from the
+   [TRADING_DATA_DIR] store ([data_dir_fpath]), never the snapshot warehouse,
+   from [start_date] on. [None] (the default config) reads no file. *)
+let _dividend_crediting (input : input) ~start_date =
+  Option.some_if input.config.dividend_crediting
+    (Trading_simulation_dividends.Dividend_crediting.of_data_dir
+       ~data_dir:input.data_dir_fpath ~start_date)
+
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's
    callback adapter, sharing the LRU cache with the strategy bar reader. Going
    through [Bar_data_source.build_adapter (Snapshot {...})] would instead call
@@ -105,16 +113,17 @@ let _on_transitions ~stop_log ~trade_audit ts =
   Stop_log.record_transitions stop_log ts;
   Trade_audit.record_transitions trade_audit ts
 
+(* Default-off [Warmup_trade_gate] (#1549 A2); identity unless the flag is on. *)
+let _wrap_strategy (input : input) ~stop_log ~start_date strategy =
+  Strategy_wrapper.wrap ~stop_log strategy
+  |> Warmup_trade_gate.wrap_strategy
+       ~suppress:input.config.suppress_warmup_trading ~start_date
+
 let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
     ~start_date ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
     ?on_trade_fill ~active_through_for ~prune_universe_by_active_through
     ~strategy ~market_data_adapter () =
-  (* Default-off [Warmup_trade_gate] (#1549 A2); identity unless the flag is on. *)
-  let strategy =
-    Strategy_wrapper.wrap ~stop_log strategy
-    |> Warmup_trade_gate.wrap_strategy
-         ~suppress:input.config.suppress_warmup_trading ~start_date
-  in
+  let strategy = _wrap_strategy input ~stop_log ~start_date strategy in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
       ~data_dir:input.data_dir_fpath ~strategy ~commission
@@ -139,6 +148,7 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
       ~entry_fill_reject_retries:input.config.entry_fill_reject_retries
       ~entry_fill_resize:(_entry_fill_resize input.config)
       ?cash_yield:(_cash_yield_accrual input ~start_date)
+      ?dividends:(_dividend_crediting input ~start_date)
       ()
   in
   let config =

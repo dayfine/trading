@@ -260,6 +260,26 @@
   simulation_test_helpers))
 
 (test
+ (name test_dividend_sim)
+ (modules test_dividend_sim)
+ (libraries
+  ounit2
+  core
+  status
+  csv.corporate_actions
+  trading.simulation
+  trading.simulation.dividends
+  trading.simulation.types
+  trading.simulation.data
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
+
+(test
  (name test_metrics)
  (modules test_metrics)
  (libraries

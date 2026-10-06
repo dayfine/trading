@@ -92,6 +92,7 @@ type config = {
   cash_yield_fee_bp : float;
       [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
       (** See [.mli]. *)
+  dividend_crediting : bool; [@sexp.default false]  (** See [.mli]. *)
   resistance_min_history_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   resistance_lookback_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   overhead_supply : Resistance_supply.config option; [@sexp.default None]
@@ -239,6 +240,7 @@ let default_config ~universe ~index_symbol =
     maintenance_long_pct = 0.0;
     cash_yield = Trading_simulation_cash_yield.Cash_yield.No_yield;
     cash_yield_fee_bp = Trading_simulation_cash_yield.Cash_yield.default_fee_bp;
+    dividend_crediting = false;
     resistance_min_history_bars = 0;
     resistance_lookback_bars = 0;
     overhead_supply = Some Resistance_supply.default_config;

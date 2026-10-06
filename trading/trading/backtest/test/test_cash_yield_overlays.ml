@@ -5,7 +5,8 @@
     rate file or accrues interest. R2: both fields resolve through the real
     [Overlay_validator.apply_overrides] (the sweep / WF-CV path), including a
     variant-to-variant override. The committed [macro/tbill_3m_dtb3.csv] (FRED
-    DTB3) parses and covers the full 26y window from 2000-01-03. *)
+    DTB3) parses and covers the full 26y window from 2000-01-03. The part-2
+    [dividend_crediting] flag gets the same R1 / R2 pins. *)
 
 open OUnit2
 open Core
@@ -46,6 +47,20 @@ let test_axis_resolves_via_overlay_validator _ =
 
 (* The committed series, read the way the runner resolves it (relative to
    [TRADING_DATA_DIR], which tests point at [trading/test_data/]). *)
+(* #3137 part 2: [dividend_crediting] defaults off (R1) and is an axis via the
+   real [Overlay_validator] (R2), including flipping back to [false]. *)
+let test_dividend_crediting_default_off_and_axis _ =
+  let flag (c : Weinstein_strategy.config) = c.dividend_crediting in
+  assert_that
+    [
+      flag (_default_config ());
+      flag (_after [ "((dividend_crediting true))" ]);
+      flag
+        (_after
+           [ "((dividend_crediting true))"; "((dividend_crediting false))" ]);
+    ]
+    (elements_are [ equal_to false; equal_to true; equal_to false ])
+
 let test_committed_tbill_series_covers_window _ =
   let data_dir = Fpath.to_string (Data_path.default_data_dir ()) in
   let resolved =
@@ -67,6 +82,8 @@ let suite =
          "default is no yield" >:: test_default_is_no_yield;
          "axis resolves via overlay validator"
          >:: test_axis_resolves_via_overlay_validator;
+         "dividend crediting default off and an axis"
+         >:: test_dividend_crediting_default_off_and_axis;
          "committed T-bill series covers the window"
          >:: test_committed_tbill_series_covers_window;
        ]
