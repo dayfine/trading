@@ -27,6 +27,8 @@ type config = {
   full_compute_tail_days : int option;
   enable_short_side : bool; [@sexp.default true]
   short_min_price : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  short_min_price_on_order_price : bool; [@sexp.default false]
+      (** See [.mli]. *)
   short_borrow_min_dollar_adv : float; [@sexp.default 0.0]  (** See [.mli]. *)
   suppress_warmup_trading : bool; [@sexp.default true]  (** See [.mli]. *)
   stop_update_cadence : Stops_runner.stop_update_cadence;
@@ -142,6 +144,8 @@ type config = {
       (** See [.mli]. *)
   max_one_share_class_per_issuer : bool; [@sexp.default false]
       (** See [.mli]. *)
+  share_class_gate_covers_shorts : bool; [@sexp.default false]
+      (** See [.mli]. *)
   share_class_groups : Share_class_map.t; [@sexp.default Share_class_map.empty]
       (** See [.mli]. *)
   trailing_stop_ma_period : int option; [@sexp.default None]  (** See [.mli]. *)
@@ -192,6 +196,7 @@ let default_config ~universe ~index_symbol =
     full_compute_tail_days = None;
     enable_short_side = true;
     short_min_price = 0.0;
+    short_min_price_on_order_price = false;
     short_borrow_min_dollar_adv = 0.0;
     suppress_warmup_trading = true;
     stop_update_cadence = Stops_runner.Daily;
@@ -267,6 +272,7 @@ let default_config ~universe ~index_symbol =
     stale_exit_without_prior_bar = false;
     entry_ticket_macro_suspend = Entry_ticket_suspend_mode.Off;
     max_one_share_class_per_issuer = false;
+    share_class_gate_covers_shorts = false;
     share_class_groups = Share_class_map.empty;
     trailing_stop_ma_period = None;
   }

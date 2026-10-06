@@ -20,40 +20,48 @@ let validate (config : config) =
       "max_one_share_class_per_issuer is on but share_class_groups is empty: \
        load the map (Share_class_gate.resolve_config) or set it in the spec"
 
-type t = { map : Share_class_map.t; occupied : String.Set.t ref }
+type t = {
+  map : Share_class_map.t;
+  occupied : String.Set.t ref;
+  covers_shorts : bool;
+}
 
-(* A long the book still has a stake in: anything not yet [Closed]. The match
-   is exhaustive so a new position state forces this decision to be revisited. *)
-let _open_long_symbol (p : Position.t) =
+(* A position the book still has a stake in: anything not yet [Closed]. Shorts
+   count only under [covers_shorts] (#3146). The match is exhaustive so a new
+   position state forces this decision to be revisited. *)
+let _open_symbol ~covers_shorts (p : Position.t) =
   match (p.side, p.state) with
-  | Trading_base.Types.Short, _ -> None
-  | Trading_base.Types.Long, (Entering _ | Holding _ | Exiting _) ->
+  | Trading_base.Types.Short, _ when not covers_shorts -> None
+  | (Trading_base.Types.Long | Short), (Entering _ | Holding _ | Exiting _) ->
       Some p.symbol
-  | Trading_base.Types.Long, Closed _ -> None
+  | (Trading_base.Types.Long | Short), Closed _ -> None
 
 let create ~(config : config) ~(portfolio : Trading_strategy.Portfolio_view.t)
     ~suspended_held =
   if not config.max_one_share_class_per_issuer then None
   else
     let map = config.share_class_groups in
-    let open_longs =
-      List.filter_map (Map.data portfolio.positions) ~f:_open_long_symbol
+    let covers_shorts = config.share_class_gate_covers_shorts in
+    let open_positions =
+      List.filter_map
+        (Map.data portfolio.positions)
+        ~f:(_open_symbol ~covers_shorts)
     in
     let occupied =
       List.filter_map
-        (open_longs @ suspended_held)
+        (open_positions @ suspended_held)
         ~f:(Share_class_map.group_of map)
       |> String.Set.of_list
     in
-    Some { map; occupied = ref occupied }
+    Some { map; occupied = ref occupied; covers_shorts }
 
 (* The group the rule must check for [c], or [None] when the rule does not
-   apply: a short, an already-held symbol (left to [Already_held]), or an
-   unmapped symbol. *)
+   apply: a short (unless [covers_shorts]), an already-held symbol (left to
+   [Already_held]), or an unmapped symbol. *)
 let _group_to_check t ~held_set (c : Screener.scored_candidate) =
   match c.side with
-  | Trading_base.Types.Short -> None
-  | Trading_base.Types.Long ->
+  | Trading_base.Types.Short when not t.covers_shorts -> None
+  | Trading_base.Types.Long | Short ->
       if Set.mem held_set c.ticker then None
       else Share_class_map.group_of t.map c.ticker
 

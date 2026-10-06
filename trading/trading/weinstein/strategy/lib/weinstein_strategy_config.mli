@@ -145,6 +145,29 @@ type config = {
           a default-off, searchable [Variant_matrix] axis; not wired into any
           default config or preset. See
           [dev/notes/long-short-margin-mechanics-2026-06-12.md]. *)
+  short_min_price_on_order_price : bool; [@sexp.default false]
+      (** #3131 — which price {!short_min_price} gates. [false] (default) gates
+          {!Screener.scored_candidate.suggested_entry}, bit-identical to today
+          (R1). [true] gates the price the short ticket is actually placed at:
+          [suggested_entry] (the breakdown level, #3133) when the E-anchored
+          ticket is armed
+          ([sim_entry_trigger_at_suggested && enable_sim_entry_stoplimit]),
+          otherwise the decision-day close — the same price
+          [Entry_audit_helpers.effective_entry_price] installs.
+
+          {b Why.} With the close-priced ticket a name that has already
+          collapsed through support passes the gate on its stale level (UMPQ
+          2009-01-12: level above $17, filled at 10.33), and the margin model
+          then force-covers it in the sub-$17 maintenance tier. Inert while
+          [short_min_price <= 0.0]. Long candidates are never touched.
+
+          {b Faithfulness.} An eligibility dial on the short book, not a spine
+          change: the book's short-sale entry is a sell-stop under support (Ch.
+          7, [docs/design/weinstein-book-reference.md] §6 "Short-Selling
+          Criteria" and §7); this only declines a short the margin floor would
+          reject. R2: a [Variant_matrix] axis as
+          [((flag short_min_price_on_order_price) (values (true false)))]. R3:
+          no default flip without a ledger ACCEPT. *)
   short_borrow_min_dollar_adv : float; [@sexp.default 0.0]
       (** Borrow-availability floor for short candidates (margin M3a): the
           minimum trailing dollar-ADV a name must trade for its shares to be
@@ -1975,6 +1998,23 @@ type config = {
           {b Default [false]} never reads the map or the file — bit-identical to
           every existing golden (R1). R2: a [Variant_matrix] axis as
           [((flag max_one_share_class_per_issuer) (values (true false)))]. R3:
+          no default flip without a ledger ACCEPT. *)
+  share_class_gate_covers_shorts : bool; [@sexp.default false]
+      (** #3146 — extend {!max_one_share_class_per_issuer} to the short book.
+          [false] (default) keeps the rule long-only, bit-identical (R1). [true]
+          makes open-or-pending {b short} positions occupy their issuer group
+          too, and applies the skip to short candidates: a candidate of either
+          side is skipped ([Audit_recorder.Share_class_held]) while another
+          class of its issuer is held on either side. Inert while
+          {!max_one_share_class_per_issuer} is [false].
+
+          {b Why.} Short-only Phase A shorted HEI (2009-03-16) and HEI-A
+          (2009-03-23) together through 2009-04-02 — a doubled short in one
+          business and a V6 twin-position violation. {b Faithfulness.} The same
+          concentration filter as the long rule (no book passage claimed; see
+          above), never admits a candidate the cascade rejected. R2: a
+          [Variant_matrix] axis as
+          [((flag share_class_gate_covers_shorts) (values (true false)))]. R3:
           no default flip without a ledger ACCEPT. *)
   share_class_groups : Share_class_map.t; [@sexp.default Share_class_map.empty]
       (** #3015 — the issuer groups {!max_one_share_class_per_issuer} consults,

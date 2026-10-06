@@ -229,3 +229,30 @@
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_stops_runner.ml"
                 "catastrophic exit carries its own reason and level (#3101)"))))
  (status fixed))
+
+((issue 3131) (ref "shorts-liveness shB RMD 2008-02-22; short-only soT-5d UMPQ/UCB")
+ (finding "short tickets anchored at the base top never fill (RMD 34 % above market); short_min_price gated the screener level, not the order price, so sub-$17 shorts were admitted and margin-called")
+ (guard ((unit ("trading/analysis/weinstein/screener/test/test_screener.ml"
+                "#3131: short ticket anchors at the breakdown"))
+         (unit ("trading/trading/weinstein/strategy/test/test_short_min_price_order_price.ml"
+                "#3131: close-priced ticket gates the close"))
+         (unit ("trading/trading/weinstein/strategy/test/test_short_min_price_order_price.ml"
+                "#3131: armed ticket gates the breakdown level"))))
+ (status fixed-behind-flag))
+
+((issue 3145) (ref "short-only Phase A soTs ADSK-wein-314, TPL, CINF, TECK")
+ (finding "a Tightened short stop tracked the running MAX of highs, so it could never move down: ADSK held at 41.75 for 137 decisions while the stock fell 70 %")
+ (guard ((unit ("trading/trading/weinstein/stops/test/test_short_tightened_ratchet.ml"
+                "#3145: short Tightened stop lowered across a decline"))
+         (unit ("trading/trading/weinstein/stops/test/test_short_tightened_ratchet.ml"
+                "#3145: long Tightened path unaffected"))))
+ (status fixed-behind-flag))
+
+((issue 3146) (ref "short-only Phase A soT HEI / HEI-A 2009-03")
+ (finding "the share-class gate was long-only: the short book held HEI and HEI-A together (V6 twin position)")
+ (guard ((unit ("trading/trading/weinstein/strategy/test/test_share_class_gate.ml"
+                "#3146: covers_shorts on skips HEI-A short while HEI short held"))
+         (unit ("trading/trading/weinstein/strategy/test/test_share_class_gate.ml"
+                "#3146: covers_shorts on either side held blocks either side"))
+         (validator V6)))
+ (status fixed-behind-flag))

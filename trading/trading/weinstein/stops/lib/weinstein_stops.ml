@@ -433,36 +433,29 @@ let _update_trailing ~config ~side ~state ~current_bar ~ma_value ~ma_direction
 (* Ratchets the tightened stop in the position's favour as new extremes are set. *)
 let _ratchet_tightened ~config ~side ~stop_level ~last_correction_extreme
     ~reason ~bar =
-  let extreme = _bar_extreme ~side ~bar in
   let new_extreme =
-    match side with
-    | Long -> Float.min last_correction_extreme extreme
-    | Short -> Float.max last_correction_extreme extreme
+    Stop_anchor_rules.tightened_running_anchor ~config ~side
+      ~last_correction_extreme ~extreme:(_bar_extreme ~side ~bar)
   in
   let candidate =
     _tightened_stop_candidate ~config ~side ~correction_extreme:new_extreme
   in
+  let tightened level =
+    Tightened
+      {
+        stop_level = level;
+        last_correction_extreme = new_extreme;
+        reason;
+        swing_peak = None;
+      }
+  in
   if _is_better_stop ~side ~current:stop_level ~candidate then
     let event_reason = Printf.sprintf "%s (tightened ratchet)" reason in
-    ( Tightened
-        {
-          stop_level = candidate;
-          last_correction_extreme = new_extreme;
-          reason;
-          swing_peak = None;
-        },
+    ( tightened candidate,
       Stop_raised
         { old_level = stop_level; new_level = candidate; reason = event_reason }
     )
-  else
-    ( Tightened
-        {
-          stop_level;
-          last_correction_extreme = new_extreme;
-          reason;
-          swing_peak = None;
-        },
-      No_change )
+  else (tightened stop_level, No_change)
 
 (* ---- Update: Tightened state ---- *)
 

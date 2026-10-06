@@ -465,6 +465,12 @@ type config = {
           ([dev/notes/long-short-margin-mechanics-2026-06-12.md]) as a
           default-off, searchable {!Walk_forward.Variant_matrix} axis. Not wired
           into any default config or preset. *)
+  short_min_price_on_order_price : bool; [@sexp.default false]
+      (** #3131: gate {!short_min_price} on the short ticket's order price (the
+          decision close, or [suggested_entry] when the E-anchored ticket is
+          armed) instead of [suggested_entry]. Default [false] = bit-identical
+          (R1). See [Weinstein_strategy_config.short_min_price_on_order_price].
+      *)
   short_borrow_min_dollar_adv : float; [@sexp.default 0.0]
       (** Borrow-availability floor for short candidates (margin M3a): shorts
           whose trailing dollar-ADV (no-lookahead, over {!liquidity_config}'s
@@ -1187,6 +1193,10 @@ type config = {
           (GOOG / GOOGL, ...) has an open or pending long. Default [false] =
           bit-identical (R1). See {!Share_class_gate} and
           [Weinstein_strategy_config.max_one_share_class_per_issuer]. *)
+  share_class_gate_covers_shorts : bool; [@sexp.default false]
+      (** #3146: apply the share-class rule to shorts too (either side held →
+          skip). Default [false] = bit-identical (R1). See
+          [Weinstein_strategy_config.share_class_gate_covers_shorts]. *)
   share_class_groups : Share_class_map.t; [@sexp.default Share_class_map.empty]
       (** #3015: the issuer groups the rule above consults; filled by the
           backtest runner from the committed [share_classes.sexp]. See

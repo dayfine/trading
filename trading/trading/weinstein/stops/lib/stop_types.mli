@@ -509,6 +509,26 @@ type config = {
           as [min_correction_pct]). It is a separate knob, not a reuse of
           [min_correction_pct], so the topping-zone depth can be swept on its
           own without moving the [Trailing] cycle. *)
+  short_tightened_ratchet_follows_decline : bool; [@sexp.default false]
+      (** #3145 — the side-correct anchor for a {b short} [Tightened] stop on
+          the running-extreme path (taken when [tightened_can_ratchet] is
+          [false]). [false] (default) keeps today's behaviour exactly: the
+          short's anchor is a running {e max} of bar highs, so the candidate can
+          only rise and, once tightened, the buy-stop is never lowered however
+          far the stock falls (ADSK 2008-06 → 2011-01: 137 decisions held at
+          41.75 while the close went 39.25 → 11.78). [true] makes the anchor a
+          running {e min} of bar highs, so the stop is lowered to
+          [nudge (min_high *. (1 +. tightened_stop_buffer_pct))] as the decline
+          prints lower highs, and never raised (the never-raise rule is
+          unchanged). Long stops are untouched by this flag.
+
+          Faithful-core: book §6.3 (Ch. 7) — the short's buy-stop is trailed
+          down "as stock declines, lowering after each rally peak that fails"; a
+          short stop that can only rise is the mirror of the long-side Tightened
+          freeze, not a book rule. Default-off experiment axis per
+          [.claude/rules/experiment-flag-discipline.md]: the long-side analogue
+          cut winners when unfrozen, so this is a measured lever, not a presumed
+          win. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

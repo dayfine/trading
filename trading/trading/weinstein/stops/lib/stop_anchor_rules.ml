@@ -88,3 +88,12 @@ let ratchet_tightened_swing ~config ~side ~stop_level ~last_correction_extreme
       if _reaction_confirmed ~config ~side ~peak ~low ~close then
         _on_confirmed ~config ~side ~stop_level ~low ~reason ~close
       else _extend_swing ~side ~stop_level ~peak ~low ~reason ~close
+
+(* ---- short_tightened_ratchet_follows_decline (#3145) ---- *)
+
+let tightened_running_anchor ~config ~side ~last_correction_extreme ~extreme =
+  match side with
+  | Long -> Float.min last_correction_extreme extreme
+  | Short when config.short_tightened_ratchet_follows_decline ->
+      Float.min last_correction_extreme extreme
+  | Short -> Float.max last_correction_extreme extreme
