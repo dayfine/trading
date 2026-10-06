@@ -43,3 +43,20 @@ area is documented here and in each results writeup, not left implicit.
   list and annotate, not silently mix bases.
 - **#3136 rebuild** cost (warehouse + PIT lists, hours) is decided only after the measurement.
 - **Long–short integration** criteria come after short-only passes; not in scope here.
+
+## Progress log
+
+- **2026-10-06.** #3157 merged: three default-off flags — `short_min_price_on_order_price` (#3131
+  remainder; #3133 had already moved the short ticket to `breakdown_price`), `short_tightened_ratchet_follows_decline`
+  (#3145), `share_class_gate_covers_shorts` (#3146). #3156 (cash yield, part 1 of #3137) and #3158
+  (EODHD dividends + splits fetcher) in review. Full corporate-actions fetch running into `data/`
+  (11,888 symbols with bars).
+- **Phase B stop arms (from #3157 behavioral QC, book Ch. 7 read).** `short_tightened_ratchet_follows_decline`
+  anchors on the running min of single-bar highs — side-correct but **tighter than the book**: any bar ~0.5 %
+  above the lowest high exits. Weinstein lowers a short's buy-stop only after an oversold rally of at least
+  8 % has peaked and failed, then places it just above that rally peak. The book-faithful short trail already
+  exists as `tightened_can_ratchet = true` (`ratchet_tightened_swing`, both sides, 8 % reaction + recovery).
+  So v0's stop setting is **not** the new flag by default: the Phase B pair runs v0 with
+  `tightened_can_ratchet true`, and the new flag is a stop-study arm, not the baseline.
+- **Owed (gaps list):** write the Ch. 7 short-stop answer into `docs/design/weinstein-book-reference.md`
+  §6.3 (local session only); reword `stop_types.mli`'s "Faithful-core: book §6.3" note on the new flag.
