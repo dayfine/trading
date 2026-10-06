@@ -33,7 +33,9 @@ let _config =
   }
 
 let _sharpe ?risk_free_rate ?cash_yield steps =
-  let c = Metric_computers.sharpe_ratio_computer ?risk_free_rate ?cash_yield () in
+  let c =
+    Metric_computers.sharpe_ratio_computer ?risk_free_rate ?cash_yield ()
+  in
   Map.find (c.run ~config:_config ~steps) SharpeRatio
 
 (* 36 %/yr with no fee = exactly 0.001 per calendar day (ACT/360). *)

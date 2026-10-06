@@ -311,8 +311,7 @@ let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
     stale_held_symbols;
     metrics =
       Runner_metrics.align_summary_metrics ?cash_yield:deps.cash_yield
-        ~sim_result ~round_trips
-        ~steps_in_range ~start_date ~end_date ();
+        ~sim_result ~round_trips ~steps_in_range ~start_date ~end_date ();
   }
 
 (** Symbol accessor for [portfolio_position]. *)

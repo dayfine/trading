@@ -40,7 +40,8 @@ let _idle_strategy : (module Strategy_interface.STRATEGY) =
 
     let on_market_close ~get_price:_ ~get_indicator:_ ~portfolio:_ =
       Ok { Strategy_interface.transitions = [] }
-  end in
+  end
+  in
   (module S)
 
 (* Steps run 2024-01-01 .. 2024-01-09 (end date exclusive): 9 calendar days. *)
@@ -55,7 +56,9 @@ let _config =
 
 let _run ~test_name ?cash_yield () =
   let result = ref None in
-  with_test_data test_name [ ("AAPL", _bars) ] ~f:(fun data_dir ->
+  with_test_data test_name
+    [ ("AAPL", _bars) ]
+    ~f:(fun data_dir ->
       let deps =
         create_deps ~symbols:[ "AAPL" ] ~data_dir ~strategy:_idle_strategy
           ~commission:_config.commission ?cash_yield ()
@@ -84,7 +87,9 @@ let test_default_accrues_nothing _ =
 (* Armed from 01-03: days 01-03 .. 01-09 accrue (7 days, weekend included);
    01-01 and 01-02 are the "warmup" and earn nothing. *)
 let test_armed_accrues_from_start_date _ =
-  let acc = Cash_yield.Accrual.create _one_bp_a_day ~start_date:(_date "2024-01-03") in
+  let acc =
+    Cash_yield.Accrual.create _one_bp_a_day ~start_date:(_date "2024-01-03")
+  in
   let interest = _initial_cash *. ((1.0001 ** 7.0) -. 1.0) in
   assert_that
     (_run ~test_name:"cash_yield_armed" ~cash_yield:acc ())

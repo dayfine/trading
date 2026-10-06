@@ -1,5 +1,5 @@
-(** Experiment-flag discipline pins for the #3137 cash yield (R1 default-off,
-    R2 axis reachability), plus the committed T-bill series.
+(** Experiment-flag discipline pins for the #3137 cash yield (R1 default-off, R2
+    axis reachability), plus the committed T-bill series.
 
     R1: the shipped default is [No_yield] with a 10 bp fee, so no run reads a
     rate file or accrues interest. R2: both fields resolve through the real
@@ -34,8 +34,8 @@ let test_axis_resolves_via_overlay_validator _ =
         (_after
            [
              "((cash_yield (Constant 4.5)))";
-             "((cash_yield (Series macro/tbill_3m_dtb3.csv)) (cash_yield_fee_bp \
-              35))";
+             "((cash_yield (Series macro/tbill_3m_dtb3.csv)) \
+              (cash_yield_fee_bp 35))";
            ]);
     ]
     (elements_are

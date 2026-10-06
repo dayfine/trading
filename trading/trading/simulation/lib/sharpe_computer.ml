@@ -58,18 +58,16 @@ let _period_excess cash_yield (d0, d1, ret) =
   | Ok rf -> ret -. rf
   | Error e -> failwith ("Sharpe_computer: " ^ Status.show e)
 
+let _sharpe_of_periods ~risk_free_rate ~cash_yield periods =
+  match cash_yield with
+  | None ->
+      _compute_sharpe (List.map periods ~f:(fun (_, _, r) -> r)) risk_free_rate
+  | Some cy -> _compute_sharpe (List.map periods ~f:(_period_excess cy)) 0.0
+
 let _sharpe_of_marks ~risk_free_rate ~cash_yield marks =
   match marks with
   | [] | [ _ ] -> 0.0
-  | _ -> (
-      let periods = _period_returns marks in
-      match cash_yield with
-      | None ->
-          _compute_sharpe
-            (List.map periods ~f:(fun (_, _, r) -> r))
-            risk_free_rate
-      | Some cy -> _compute_sharpe (List.map periods ~f:(_period_excess cy)) 0.0
-      )
+  | _ -> _sharpe_of_periods ~risk_free_rate ~cash_yield (_period_returns marks)
 
 let _update ~state ~step =
   if not (Metric_computer_utils.is_trading_day_step step) then state
