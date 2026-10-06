@@ -132,15 +132,15 @@ let parse_symbols contents =
   |> List.filter ~f:(fun l ->
       (not (String.is_empty l)) && not (String.is_prefix l ~prefix:"#"))
 
+let _dir_entry path name =
+  let p = Fpath.(path / name) in
+  match Sys_unix.is_directory (Fpath.to_string p) with
+  | `Yes -> Some (name, p)
+  | `No | `Unknown -> None
+
 let _subdirs path =
   match Sys_unix.readdir (Fpath.to_string path) with
-  | entries ->
-      Array.to_list entries
-      |> List.filter_map ~f:(fun name ->
-          let p = Fpath.(path / name) in
-          match Sys_unix.is_directory (Fpath.to_string p) with
-          | `Yes -> Some (name, p)
-          | `No | `Unknown -> None)
+  | entries -> Array.to_list entries |> List.filter_map ~f:(_dir_entry path)
   | exception _ -> []
 
 let symbols_in_data_dir data_dir =

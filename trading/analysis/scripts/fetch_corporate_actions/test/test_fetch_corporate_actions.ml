@@ -35,6 +35,27 @@ let test_eodhd_ticker _ =
     (equal_to
        [ ("AAPL", "US"); ("APC_old", "US"); ("GSPC", "INDX"); ("BRK", "B") ])
 
+let _dividend ~ex_date ?unadjusted adjusted : CA.dividend =
+  {
+    ex_date = _d ex_date;
+    unadjusted_amount = unadjusted;
+    adjusted_amount = adjusted;
+  }
+
+let _aapl_dividends =
+  elements_are
+    [
+      equal_to (_dividend ~ex_date:"2024-02-09" ~unadjusted:0.96 0.24);
+      equal_to (_dividend ~ex_date:"2024-05-10" 0.25);
+    ]
+
+let _aapl_splits =
+  elements_are
+    [ equal_to ({ date = _d "2020-08-31"; factor = 4.0 } : CA.split) ]
+
+let _summary ~ok ~empty ~error ~skipped : Lib.summary =
+  { ok; empty; error; skipped }
+
 let test_fetch_symbol_with_events _ =
   let data_dir = _fresh_dir () in
   let requested = ref [] in
@@ -52,34 +73,8 @@ let test_fetch_symbol_with_events _ =
          field
            (fun (o, _, _) -> o)
            (equal_to (Lib.Fetched { dividends = 2; splits = 1 }));
-         field
-           (fun (_, d, _) -> d)
-           (is_ok_and_holds
-              (elements_are
-                 [
-                   equal_to
-                     ({
-                        ex_date = _d "2024-02-09";
-                        unadjusted_amount = Some 0.96;
-                        adjusted_amount = 0.24;
-                      }
-                       : CA.dividend);
-                   equal_to
-                     ({
-                        ex_date = _d "2024-05-10";
-                        unadjusted_amount = None;
-                        adjusted_amount = 0.25;
-                      }
-                       : CA.dividend);
-                 ]));
-         field
-           (fun (_, _, s) -> s)
-           (is_ok_and_holds
-              (elements_are
-                 [
-                   equal_to
-                     ({ date = _d "2020-08-31"; factor = 4.0 } : CA.split);
-                 ]));
+         field (fun (_, d, _) -> d) (is_ok_and_holds _aapl_dividends);
+         field (fun (_, _, s) -> s) (is_ok_and_holds _aapl_splits);
        ])
 
 let test_fetch_symbol_empty _ =
@@ -119,29 +114,24 @@ let test_run_counts_and_skips _ =
   let data_dir = _fresh_dir () in
   let requested = ref [] in
   let fetch = _stub_fetch ~requested in
-  let symbols = [ "AAPL"; "XYZ"; "ERR" ] in
-  let log _ = () in
-  let first =
+  let run () =
     _run_async (fun () ->
-        Lib.run ~fetch ~log ~token:"t" (_config data_dir) symbols)
+        Lib.run ~fetch ~log:ignore ~token:"t" (_config data_dir)
+          [ "AAPL"; "XYZ"; "ERR" ])
   in
+  let first = run () in
   requested := [];
-  let second =
-    _run_async (fun () ->
-        Lib.run ~fetch ~log ~token:"t" (_config data_dir) symbols)
-  in
+  let second = run () in
   assert_that
     (first, second, List.rev !requested)
     (all_of
        [
          field
            (fun (f, _, _) -> f)
-           (equal_to
-              ({ ok = 1; empty = 1; error = 1; skipped = 0 } : Lib.summary));
+           (equal_to (_summary ~ok:1 ~empty:1 ~error:1 ~skipped:0));
          field
            (fun (_, s, _) -> s)
-           (equal_to
-              ({ ok = 0; empty = 0; error = 1; skipped = 2 } : Lib.summary));
+           (equal_to (_summary ~ok:0 ~empty:0 ~error:1 ~skipped:2));
          field
            (fun (_, _, r) -> r)
            (equal_to [ "/api/div/ERR.US"; "/api/splits/ERR.US" ]);
@@ -181,17 +171,20 @@ let test_symbols_in_data_dir _ =
     (Lib.symbols_in_data_dir data_dir)
     (equal_to [ "AAPL"; "APC_old" ])
 
+let _expected_summary_lines =
+  [
+    "ok (events)     : 3";
+    "empty (none)    : 2";
+    "error           : 1";
+    "skipped (cached): 4";
+    "total           : 10";
+  ]
+
 let test_render_summary _ =
+  let summary = _summary ~ok:3 ~empty:2 ~error:1 ~skipped:4 in
   assert_that
-    (Lib.render_summary { ok = 3; empty = 2; error = 1; skipped = 4 })
-    (all_of
-       [
-         contains_substring "ok (events)     : 3";
-         contains_substring "empty (none)    : 2";
-         contains_substring "error           : 1";
-         contains_substring "skipped (cached): 4";
-         contains_substring "total           : 10";
-       ])
+    (Lib.render_summary summary)
+    (all_of (List.map ~f:contains_substring _expected_summary_lines))
 
 let suite =
   "fetch_corporate_actions"
