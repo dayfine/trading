@@ -37,7 +37,7 @@ type dependencies = {
       (** See .mli. G2a retry budget + ledger; a no-op at [0] retries. *)
   entry_fill_resize : Entry_fill_resize.t;
       (** See .mli. G2b affordable-size clamp; a no-op when disabled. *)
-  cash_yield : Trading_simulation_cash_yield.Cash_yield.Accrual.t option;
+  cash_credits : Cash_credits.t;  (** See .mli. #3137 interest + dividends. *)
 }
 
 let _create_engine ~commission ~slippage_bps =
@@ -61,7 +61,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(sim_entry_stoplimit_fresh_bar_only = false)
     ?(sim_stop_exit_fill_on_trigger_bar = false)
     ?(entry_fill_reject_retries = 0)
-    ?(entry_fill_resize = Entry_fill_resize.disabled) ?cash_yield () =
+    ?(entry_fill_resize = Entry_fill_resize.disabled) ?cash_yield ?dividends ()
+    =
   {
     symbols;
     data_dir;
@@ -94,7 +95,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
     entry_fill_resize;
-    cash_yield;
+    cash_credits = { cash_yield; dividends };
   }
 
 (* See .mli. Win #4 point-in-time pruning. *)
@@ -271,7 +272,7 @@ let _build_run_result t =
     Simulator_metrics.compute_derived
       ~derived_computers:t.deps.metric_suite.derived ~config:t.config
       ~base_metrics
-    |> Fn.flip Simulator_metrics.with_cash_interest t.deps.cash_yield
+    |> Cash_credits.add_metrics t.deps.cash_credits
   in
   Portfolio_valuation.warn_on_fallbacks !(t.valuation_failure_count);
   {
@@ -428,14 +429,13 @@ let _apply_transitions_and_orders t ~portfolio ~positions ~today_bars
     let%map p, ps, trades = _apply_fills t ~portfolio ~positions ~all_trades in
     (p, ps, orders, trades)
 
-(** Process one day: accrue cash interest (#3137), execute pending orders, call
-    strategy, generate new orders, and assemble the [step_result]. *)
+(** Process one day: credit interest + dividends (#3137), fill pending orders,
+    call the strategy, generate orders, build the [step_result]. *)
 let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
     ~forced_exit_trades =
   let open Result.Let_syntax in
   let%bind portfolio =
-    Trading_simulation_cash_yield.Cash_yield.Accrual.step t.deps.cash_yield
-      ~date:t.current_date portfolio
+    Cash_credits.step t.deps.cash_credits ~date:t.current_date portfolio
   in
   let%bind portfolio, positions, fill_trades =
     _process_fills_and_cancels t ~portfolio ~positions ~today_bars

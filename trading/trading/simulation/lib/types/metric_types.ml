@@ -80,6 +80,10 @@ module Metric_type = struct
       | PositionConcentrationHhi
       | MaxUnderwaterVsInitialPct
       | CashInterestTotal
+      | DividendIncomeTotal
+      | DividendPaidShortTotal
+      | DividendSkippedNoAmountCount
+      | DividendMissingFileCount
     [@@deriving show, eq, compare, sexp]
   end
 
@@ -161,6 +165,10 @@ type metric_type = Metric_type.t =
   | PositionConcentrationHhi
   | MaxUnderwaterVsInitialPct
   | CashInterestTotal
+  | DividendIncomeTotal
+  | DividendPaidShortTotal
+  | DividendSkippedNoAmountCount
+  | DividendMissingFileCount
 [@@deriving show, eq, compare, sexp]
 
 include (Metric_type : Comparator.S with type t := metric_type)

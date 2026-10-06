@@ -233,15 +233,28 @@ type dependencies = {
           triggered price, so it is strictly cheaper than a retry, and retry
           budget is only spent on refusals the resize declined. See
           {!Entry_fill_resize}. *)
-  cash_yield : Trading_simulation_cash_yield.Cash_yield.Accrual.t option;
-      (** Issue #3137, default [None]. When armed, every step (calendar day)
-          first credits one day's interest on positive cash
+  cash_credits : Cash_credits.t;
+      (** Issue #3137: interest on positive cash and dividends on held
+          positions, both default [None] (bit-identical to the pre-#3137
+          simulator, R1). Built by {!create_deps} from [?cash_yield] and
+          [?dividends].
+
+          Interest: when armed, every step (calendar day) first credits one
+          day's interest on positive cash
           ({!Trading_simulation_cash_yield.Cash_yield.accrue}) after split /
           forced-exit handling and before pending-order fills and the strategy
           call, from the accrual's [start_date] on, and the run's metrics gain
           [CashInterestTotal]. A rate lookup before a series' first observation
-          fails the step with that error. [None] is bit-identical to the
-          pre-#3137 simulator (R1). *)
+          fails the step with that error.
+
+          Dividends: when armed, right after the interest accrual (same slot:
+          after splits / forced exits, before fills and the strategy call), each
+          position held at that point is credited (long) or charged (short) the
+          cash dividends whose ex-date fell since the previous step
+          ({!Trading_simulation_dividends.Dividend_crediting}), and the run's
+          metrics gain [DividendIncomeTotal], [DividendPaidShortTotal],
+          [DividendSkippedNoAmountCount] and [DividendMissingFileCount]. See
+          {!Cash_credits}. *)
 }
 
 val create_deps :
@@ -272,6 +285,7 @@ val create_deps :
   ?entry_fill_reject_retries:int ->
   ?entry_fill_resize:Entry_fill_resize.t ->
   ?cash_yield:Trading_simulation_cash_yield.Cash_yield.Accrual.t ->
+  ?dividends:Trading_simulation_dividends.Dividend_crediting.t ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and

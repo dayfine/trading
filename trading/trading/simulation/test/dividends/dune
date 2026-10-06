@@ -1,0 +1,17 @@
+(test
+ (name test_dividend_crediting)
+ (libraries
+  ounit2
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.time_ns_unix
+  fpath
+  status
+  csv.corporate_actions
+  trading.base
+  trading.portfolio
+  trading.simulation.dividends
+  matchers)
+ (preprocess
+  (pps ppx_let)))

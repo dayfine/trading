@@ -275,6 +275,18 @@ module Metric_type : sig
             window ({!Trading_simulation_cash_yield.Cash_yield}). Emitted only
             when a cash yield is configured, so a run at the default [No_yield]
             carries no such key and its metric set is unchanged. *)
+    (* ---- Dividend crediting (#3137) ---- *)
+    | DividendIncomeTotal
+        (** Dollars of cash dividends credited to held longs over the
+            measurement window ({!Trading_simulation_dividends}). This and the
+            three below are emitted only when dividend crediting is armed. *)
+    | DividendPaidShortTotal
+        (** Dollars of cash dividends paid by open shorts ([>= 0]). *)
+    | DividendSkippedNoAmountCount
+        (** Held-position dividend events skipped because the vendor reported no
+            unadjusted amount. *)
+    | DividendMissingFileCount
+        (** Distinct held symbols with no [dividends.csv] (coverage gap). *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -355,6 +367,10 @@ type metric_type = Metric_type.t =
   | PositionConcentrationHhi
   | MaxUnderwaterVsInitialPct
   | CashInterestTotal
+  | DividendIncomeTotal
+  | DividendPaidShortTotal
+  | DividendSkippedNoAmountCount
+  | DividendMissingFileCount
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)

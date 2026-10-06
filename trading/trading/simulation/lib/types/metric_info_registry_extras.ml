@@ -66,6 +66,30 @@ let info_for_stability_turnover : metric_type -> metric_info option = function
             constant rate net of the fund fee; #3137). Absent when no cash \
             yield is configured."
            Dollars)
+  | DividendIncomeTotal ->
+      Some
+        (_info "Dividend Income"
+           "Cash dividends credited to held longs on their ex-dates (#3137). \
+            Absent when dividend crediting is off."
+           Dollars)
+  | DividendPaidShortTotal ->
+      Some
+        (_info "Dividends Paid (Shorts)"
+           "Cash dividends paid by open shorts on their ex-dates (#3137). \
+            Absent when dividend crediting is off."
+           Dollars)
+  | DividendSkippedNoAmountCount ->
+      Some
+        (_info "Dividends Skipped (No Amount)"
+           "Held-position dividend events skipped because the vendor reported \
+            no unadjusted amount (#3137)."
+           Count)
+  | DividendMissingFileCount ->
+      Some
+        (_info "Dividend Files Missing"
+           "Distinct held symbols with no dividends.csv, credited nothing \
+            (#3137 coverage gap)."
+           Count)
   | _ -> None
 
 let info_for_distribution_antifragility : metric_type -> metric_info option =

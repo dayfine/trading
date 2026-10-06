@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-10-05
+## Last updated: 2026-10-06
 
 ## Status
 IN_PROGRESS
@@ -19,6 +19,33 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-10-06 — default-off dividend crediting for held positions (#3137 part 2)
+
+- [x] **`dividend_crediting : bool` config field** (default `false` = exact no-op:
+  no file read, no metric key; Overlay_validator axis). Armed: on each ex-date
+  in the measurement window, positions held when that step starts are
+  credited (long, `qty * unadjusted_amount`) or charged (short,
+  `|qty| * unadjusted_amount`). Specials are ordinary rows. `None` amounts are
+  skipped and counted, never replaced by `adjusted_amount`. An ex-date with no
+  step is credited on the next step. Held symbols with no `dividends.csv` credit
+  nothing and are counted.
+- [x] **Step slot:** `Cash_credits.step` at the start of
+  `Simulator._process_step_day` — after splits / forced exits, before fills and
+  the strategy call; interest accrues first, then dividends.
+- [x] **Data:** read lazily per held symbol from `TRADING_DATA_DIR`
+  (`Panel_runner.input.data_dir_fpath`) via `Corporate_actions.read_dividends`
+  (#3158), cached per run; the snapshot warehouse is untouched.
+- [x] **Metrics (armed only):** `DividendIncomeTotal`, `DividendPaidShortTotal`,
+  `DividendSkippedNoAmountCount`, `DividendMissingFileCount`.
+- Library: `trading/trading/simulation/lib/dividends/`; combinator
+  `trading/trading/simulation/lib/cash_credits.ml`.
+- Verify: `dune runtest trading/simulation/test/dividends`,
+  `dune runtest trading/simulation/test` (`test_dividend_sim`),
+  `dune runtest trading/backtest/test` (`test_cash_yield_overlays`).
+- [ ] Paired pre-registered 3-salt 26y A/B with both `cash_yield` and
+  `dividend_crediting` (implementation check ≈ +0.24 log interest, ≈ +0.13 log
+  dividends; read the missing-file / skipped counts for coverage).
+
 ## 2026-10-05 — default-off cash yield on positive cash + T-bill series (#3137 part 1)
 
 - [x] **`cash_yield` / `cash_yield_fee_bp` config fields** (`No_yield` default
@@ -34,7 +61,7 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   (1954-01-04 → 2026-10-02). Refresh:
   `curl -sSL 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3' -o trading/test_data/macro/tbill_3m_dtb3.csv`.
   A date before the series start fails the run (Status error).
-- [ ] Dividend crediting for held longs (separate PR, after the dividend fetch).
+- [x] Dividend crediting (part 2, `feat/dividend-crediting`): see the 2026-10-06 entry above.
 - [ ] Paired pre-registered 3-salt 26y A/B (implementation check ≈ +0.24 log).
 - Verify: `dune runtest trading/simulation/lib/cash_yield/test`,
   `dune runtest trading/simulation/test` (`test_cash_yield_sim`,

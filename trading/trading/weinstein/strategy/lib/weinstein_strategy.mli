@@ -813,6 +813,9 @@ type config = {
       [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
       (** Fee in bp off the [cash_yield] rate, net floored at 0. See
           [Weinstein_strategy_config.cash_yield_fee_bp]. *)
+  dividend_crediting : bool; [@sexp.default false]
+      (** Cash dividends on held positions (#3137). Default [false] => exact
+          no-op (R1). See [Weinstein_strategy_config.dividend_crediting]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into the per-screen
           [Stock_analysis.config.resistance.min_history_bars] (and, via the

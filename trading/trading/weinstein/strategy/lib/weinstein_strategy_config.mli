@@ -706,6 +706,22 @@ type config = {
       (** Annual fee in basis points subtracted from the [cash_yield] rate,
           floored at a 0 net rate (decision 3a). Default [10.0] (SGOV/BIL
           class); [35.0] = money-market-fund class. Inert under [No_yield]. *)
+  dividend_crediting : bool; [@sexp.default false]
+      (** Cash dividends on held positions (issue #3137) — an accounting-realism
+          dial like [cash_yield], not a strategy mechanism. [false] (default) =
+          {b EXACT no-op}: no dividend file is read and no metric key is added
+          (R1). [true]: on each ex-date in the measurement window, held longs
+          receive and open shorts pay [|quantity| * unadjusted_amount] from the
+          symbol's [dividends.csv] under [TRADING_DATA_DIR] (the snapshot
+          warehouse is not touched); specials included; a [None] amount is
+          skipped and counted, never replaced by the split-adjusted amount; a
+          held symbol with no file credits nothing and is counted. Reported as
+          [DividendIncomeTotal] / [DividendPaidShortTotal] /
+          [DividendSkippedNoAmountCount] / [DividendMissingFileCount].
+          Semantics: {!Trading_simulation_dividends.Dividend_crediting}. Flip to
+          on is planned with [cash_yield] after the paired re-run
+          ([dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decisions
+          2-3). R2: real config field, an axis via [Overlay_validator]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into
           [Stock_analysis.config.resistance.min_history_bars] (and, because
