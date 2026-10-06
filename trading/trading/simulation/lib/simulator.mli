@@ -236,11 +236,12 @@ type dependencies = {
   cash_yield : Trading_simulation_cash_yield.Cash_yield.Accrual.t option;
       (** Issue #3137, default [None]. When armed, every step (calendar day)
           first credits one day's interest on positive cash
-          ({!Trading_simulation_cash_yield.Cash_yield.accrue}) before fills and
-          the strategy call, from the accrual's [start_date] on, and the run's
-          metrics gain [CashInterestTotal]. A rate lookup before a series' first
-          observation fails the step with that error. [None] is bit-identical to
-          the pre-#3137 simulator (R1). *)
+          ({!Trading_simulation_cash_yield.Cash_yield.accrue}) after split /
+          forced-exit handling and before pending-order fills and the strategy
+          call, from the accrual's [start_date] on, and the run's metrics gain
+          [CashInterestTotal]. A rate lookup before a series' first observation
+          fails the step with that error. [None] is bit-identical to the
+          pre-#3137 simulator (R1). *)
 }
 
 val create_deps :

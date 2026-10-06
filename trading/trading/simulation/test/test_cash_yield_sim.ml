@@ -105,6 +105,36 @@ let test_armed_accrues_from_start_date _ =
                  (float_equal ~epsilon:1e-6 interest));
           ]))
 
+(* The strategy must already see the day's interest: on the first step it is
+   handed [initial_cash * 1.0001], not [initial_cash]. *)
+let test_interest_credited_before_strategy_call _ =
+  let first_cash = ref None in
+  let module S : Strategy_interface.STRATEGY = struct
+    let name = "RecordCash"
+
+    let on_market_close ~get_price:_ ~get_indicator:_ ~portfolio =
+      if Option.is_none !first_cash then
+        first_cash := Some portfolio.Trading_strategy.Portfolio_view.cash;
+      Ok { Strategy_interface.transitions = [] }
+  end
+  in
+  let acc =
+    Cash_yield.Accrual.create _one_bp_a_day ~start_date:(_date "2024-01-01")
+  in
+  let result = ref None in
+  with_test_data "cash_yield_before_strategy"
+    [ ("AAPL", _bars) ]
+    ~f:(fun data_dir ->
+      let deps =
+        create_deps ~symbols:[ "AAPL" ] ~data_dir
+          ~strategy:(module S : Strategy_interface.STRATEGY)
+          ~commission:_config.commission ~cash_yield:acc ()
+      in
+      result := Some (run (create_exn ~config:_config ~deps)));
+  assert_that !result (is_some_and is_ok);
+  assert_that !first_cash
+    (is_some_and (float_equal ~epsilon:1e-6 (_initial_cash *. 1.0001)))
+
 let test_series_starting_late_fails_the_run _ =
   let late =
     Option.value_exn
@@ -121,6 +151,8 @@ let suite =
   >::: [
          "default accrues nothing" >:: test_default_accrues_nothing;
          "armed accrues from start date" >:: test_armed_accrues_from_start_date;
+         "interest credited before the strategy call"
+         >:: test_interest_credited_before_strategy_call;
          "series starting late fails the run"
          >:: test_series_starting_late_fails_the_run;
        ]
