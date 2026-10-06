@@ -1,0 +1,6 @@
+(library
+ (public_name trading.simulation.cash_yield)
+ (name trading_simulation_cash_yield)
+ (libraries core status trading.portfolio)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

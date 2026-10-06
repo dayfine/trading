@@ -32,3 +32,11 @@ val benchmark_return :
     configured, when either bar is missing, or when the prior close is
     non-positive. Populates [step_result.benchmark_return], which the
     antifragility computer reads. *)
+
+val with_cash_interest :
+  Trading_simulation_types.Metric_types.metric_set ->
+  Trading_simulation_cash_yield.Cash_yield.Accrual.t option ->
+  Trading_simulation_types.Metric_types.metric_set
+(** Add [CashInterestTotal] (the accrual's running total) when a cash yield is
+    armed (#3137). [None] returns [metrics] unchanged, so a default run's metric
+    set carries no new key. *)

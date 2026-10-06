@@ -59,6 +59,13 @@ let info_for_stability_turnover : metric_type -> metric_info option = function
             every Friday and averaged. 1.0 = single position; lower = more \
             diversified."
            Ratio)
+  | CashInterestTotal ->
+      Some
+        (_info "Cash Interest"
+           "Interest credited on positive cash over the window (T-bill or \
+            constant rate net of the fund fee; #3137). Absent when no cash \
+            yield is configured."
+           Dollars)
   | _ -> None
 
 let info_for_distribution_antifragility : metric_type -> metric_info option =

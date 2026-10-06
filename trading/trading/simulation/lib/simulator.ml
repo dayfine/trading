@@ -37,6 +37,7 @@ type dependencies = {
       (** See .mli. G2a retry budget + ledger; a no-op at [0] retries. *)
   entry_fill_resize : Entry_fill_resize.t;
       (** See .mli. G2b affordable-size clamp; a no-op when disabled. *)
+  cash_yield : Trading_simulation_cash_yield.Cash_yield.Accrual.t option;
 }
 
 let _create_engine ~commission ~slippage_bps =
@@ -60,7 +61,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(sim_entry_stoplimit_fresh_bar_only = false)
     ?(sim_stop_exit_fill_on_trigger_bar = false)
     ?(entry_fill_reject_retries = 0)
-    ?(entry_fill_resize = Entry_fill_resize.disabled) () =
+    ?(entry_fill_resize = Entry_fill_resize.disabled) ?cash_yield () =
   {
     symbols;
     data_dir;
@@ -93,6 +94,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
     entry_fill_resize;
+    cash_yield;
   }
 
 (* See .mli. Win #4 point-in-time pruning. *)
@@ -269,6 +271,7 @@ let _build_run_result t =
     Simulator_metrics.compute_derived
       ~derived_computers:t.deps.metric_suite.derived ~config:t.config
       ~base_metrics
+    |> Fn.flip Simulator_metrics.with_cash_interest t.deps.cash_yield
   in
   Portfolio_valuation.warn_on_fallbacks !(t.valuation_failure_count);
   {
@@ -279,11 +282,9 @@ let _build_run_result t =
     metrics;
   }
 
-(* Notify the [on_transitions] observer (#2057). Call sites fire in apply order,
-   which matters ({!Backtest.Stop_log} is last-writer-wins per position): forced
-   exits ({!Forced_exit_step.run}, #2687), fill-rejection cancels
-   ({!Cancel_handler.handle_rejected_trades}, #2524), this one (strategy +
-   margin), then any #2961 trigger-bar stop-fill rejections. *)
+(* Notify the [on_transitions] observer (#2057), in apply order (Stop_log is
+   last-writer-wins): forced exits (#2687), fill-rejection cancels (#2524),
+   this one (strategy + margin), then #2961 trigger-bar stop-fill rejections. *)
 let _notify_transitions ~on_transitions transitions =
   Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
@@ -291,12 +292,10 @@ let _notify_transitions ~on_transitions transitions =
     run the forced-exit phase ({!Forced_exit_step}: marked delistings first,
     then the stale safety net). Returns the post-split / post-force-exit
     portfolio, positions, today's bars, split events, and the realised exit
-    trades (merged into the step's [trades] by the caller).
-
-    [last_known_prices] (this run's last-resolved closes, written by
-    {!Portfolio_valuation}) is the tier-3 price source for the #2672
-    [exit_without_prior_bar] candidates, so the two agree on a held position's
-    worth. *)
+    trades (merged into the step's [trades] by the caller). [last_known_prices]
+    (written by {!Portfolio_valuation}) is the tier-3 price source for the #2672
+    [exit_without_prior_bar] candidates, so the two agree on a position's worth.
+*)
 let _prepare_market_state t =
   let split_events =
     Split_handler.detect_for_held_positions ~adapter:t.deps.market_data_adapter
@@ -429,12 +428,15 @@ let _apply_transitions_and_orders t ~portfolio ~positions ~today_bars
     let%map p, ps, trades = _apply_fills t ~portfolio ~positions ~all_trades in
     (p, ps, orders, trades)
 
-(** Process one day: execute pending orders, call strategy, generate new orders,
-    and assemble the [step_result]. Returns the next simulator state paired with
-    this day's [step_result]. *)
+(** Process one day: accrue cash interest (#3137), execute pending orders, call
+    strategy, generate new orders, and assemble the [step_result]. *)
 let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
     ~forced_exit_trades =
   let open Result.Let_syntax in
+  let%bind portfolio =
+    Trading_simulation_cash_yield.Cash_yield.Accrual.step t.deps.cash_yield
+      ~date:t.current_date portfolio
+  in
   let%bind portfolio, positions, fill_trades =
     _process_fills_and_cancels t ~portfolio ~positions ~today_bars
   in

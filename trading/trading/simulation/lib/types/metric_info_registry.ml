@@ -416,7 +416,7 @@ let get_metric_info = function
     | ConcavityCoef | BucketAsymmetry | BenchmarkAlphaPctAnnualized
     | BenchmarkBeta | TrackingErrorPctAnnualized | InformationRatio
     | CorrelationToBenchmark | RollingSharpeStability | TradeFrequencyAnnualized
-    | PositionTurnover | PositionConcentrationHhi ) as t ->
+    | PositionTurnover | PositionConcentrationHhi | CashInterestTotal ) as t ->
       let open Metric_info_registry_extras in
       Option.value_exn
         (List.find_map

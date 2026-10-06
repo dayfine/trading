@@ -684,6 +684,28 @@ type config = {
           paths are M3/M4, documented in {!Trading_simulation.Long_maintenance}.
           R2: real config field; default-off until a ledger ACCEPT plus the
           promotion-confirmation grid. *)
+  cash_yield : Trading_simulation_cash_yield.Cash_yield.source;
+      [@sexp.default Trading_simulation_cash_yield.Cash_yield.No_yield]
+      (** Interest on positive cash (issue #3137) — an accounting-realism dial,
+          not a strategy mechanism: Weinstein (Ch. 9) parks out-of-market cash
+          in a money-market fund. [No_yield] (default) = {b EXACT no-op}, no
+          accrual and no new metric key (R1). [Constant pct] = a flat annualised
+          rate; [Series path] = a dated rate CSV, e.g. the committed 3-month
+          T-bill series [macro/tbill_3m_dtb3.csv] (relative paths resolve
+          against [TRADING_DATA_DIR]). Accrued ACT/360 every calendar day of the
+          measurement window on cash net of margin debit and short proceeds,
+          before the strategy step; reported as [CashInterestTotal], and Sharpe
+          becomes excess over the same rate. A simulated date before the series
+          start fails the run. Semantics:
+          {!Trading_simulation_cash_yield.Cash_yield}. Flip to on is planned as
+          an accounting change after the paired re-run
+          ([dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decision
+          3). R2: real config field, an axis via [Overlay_validator]. *)
+  cash_yield_fee_bp : float;
+      [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
+      (** Annual fee in basis points subtracted from the [cash_yield] rate,
+          floored at a 0 net rate (decision 3a). Default [10.0] (SGOV/BIL
+          class); [35.0] = money-market-fund class. Inert under [No_yield]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into
           [Stock_analysis.config.resistance.min_history_bars] (and, because

@@ -113,6 +113,9 @@ let create_computer (metric_type : Metric_types.metric_type) :
       _derived_only_stub ~name:"trade_freq_annualized_stub"
         TradeFrequencyAnnualized
   | MaxUnderwaterVsInitialPct -> capital_relative_drawdown_computer ()
+  (* Not step-derivable: the simulator's cash-yield accrual reports it. *)
+  | CashInterestTotal ->
+      _derived_only_stub ~name:"cash_interest_stub" CashInterestTotal
 
 (** {1 Default Computer Set} *)
 

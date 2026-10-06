@@ -106,7 +106,18 @@ type _deps = {
   breadth_bars : Macro.breadth_bar list;
   config : Weinstein_strategy.config;
   all_symbols : string list;
+  cash_yield : Trading_simulation_cash_yield.Cash_yield.t option;
+      (** #3137: [config.cash_yield] resolved once; [None] at the default. *)
 }
+
+(* #3137: resolve the cash-yield source (reads the series file iff armed). An
+   unreadable or empty series fails the run loudly rather than earning 0. *)
+let _resolve_cash_yield ~data_dir (config : Weinstein_strategy.config) =
+  Trading_simulation_cash_yield.Cash_yield.resolve config.cash_yield
+    ~fee_bp:config.cash_yield_fee_bp ~data_dir
+  |> Result.map_error ~f:(fun e ->
+      "Backtest.Runner: cash_yield: " ^ Status.show e)
+  |> Result.ok_or_failwith
 
 let _resolve_ticker_sectors ~data_dir sector_map_override =
   match sector_map_override with
@@ -253,6 +264,7 @@ let _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () =
     breadth_bars;
     config;
     all_symbols;
+    cash_yield = _resolve_cash_yield ~data_dir config;
   }
 
 (* Simulation *)
@@ -267,6 +279,7 @@ let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
     breadth_bars = deps.breadth_bars;
     config = deps.config;
     all_symbols = deps.all_symbols;
+    cash_yield = deps.cash_yield;
   }
 
 let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
@@ -297,8 +310,8 @@ let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
     n_round_trips = List.length round_trips;
     stale_held_symbols;
     metrics =
-      Runner_metrics.align_summary_metrics ~sim_result ~round_trips
-        ~steps_in_range ~start_date ~end_date;
+      Runner_metrics.align_summary_metrics ?cash_yield:deps.cash_yield
+        ~sim_result ~round_trips ~steps_in_range ~start_date ~end_date ();
   }
 
 (** Symbol accessor for [portfolio_position]. *)

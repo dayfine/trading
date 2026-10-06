@@ -21,7 +21,8 @@ let _empty_date_sentinel_year = 2000
     folds the warmup window's drawdown, return volatility, and total return into
     the published values; this overlay restores the metrics' values to "what
     happened during the measurement window only". *)
-let recompute_in_window_step_metrics ~steps_in_range ~start_date ~end_date =
+let recompute_in_window_step_metrics ?cash_yield ~steps_in_range ~start_date
+    ~end_date () =
   let config : Trading_simulation_types.Simulator_types.config =
     {
       start_date;
@@ -33,7 +34,7 @@ let recompute_in_window_step_metrics ~steps_in_range ~start_date ~end_date =
   in
   let computers =
     [
-      Metric_computers.sharpe_ratio_computer ();
+      Metric_computers.sharpe_ratio_computer ?cash_yield ();
       Metric_computers.max_drawdown_computer ();
       Metric_computers.cagr_computer ();
     ]
@@ -74,8 +75,8 @@ let recompute_calmar_ratio ~base_metrics =
 
     3. Recompute [CalmarRatio] from the overlaid CAGR / MaxDrawdown so the
     derived metric stays consistent with its components. *)
-let align_summary_metrics ~sim_result ~round_trips ~steps_in_range ~start_date
-    ~end_date =
+let align_summary_metrics ?cash_yield ~sim_result ~round_trips ~steps_in_range
+    ~start_date ~end_date () =
   let merge = Trading_simulation_types.Metric_types.merge in
   let after_round_trips =
     merge sim_result.Trading_simulation_types.Simulator_types.metrics
@@ -83,6 +84,7 @@ let align_summary_metrics ~sim_result ~round_trips ~steps_in_range ~start_date
   in
   let after_step =
     merge after_round_trips
-      (recompute_in_window_step_metrics ~steps_in_range ~start_date ~end_date)
+      (recompute_in_window_step_metrics ?cash_yield ~steps_in_range ~start_date
+         ~end_date ())
   in
   merge after_step (recompute_calmar_ratio ~base_metrics:after_step)

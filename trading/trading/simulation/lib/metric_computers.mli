@@ -19,12 +19,18 @@ val summary_computer : unit -> Simulator.any_metric_computer
 (** {1 Sharpe Ratio Computer} *)
 
 val sharpe_ratio_computer :
-  ?risk_free_rate:float -> unit -> Simulator.any_metric_computer
+  ?risk_free_rate:float ->
+  ?cash_yield:Trading_simulation_cash_yield.Cash_yield.t ->
+  unit ->
+  Simulator.any_metric_computer
 (** Metric computer that calculates the annualized Sharpe ratio.
 
     @param risk_free_rate
       Annual risk-free rate (default: 0.0). This is divided by 252 to get the
       daily rate.
+    @param cash_yield
+      When given (#3137), Sharpe is on excess return over the cash yield each
+      period earned, and [risk_free_rate] is ignored. See {!Sharpe_computer}.
 
     Metrics produced:
     - sharpe_ratio: Annualized Sharpe ratio

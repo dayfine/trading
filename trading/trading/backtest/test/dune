@@ -25,6 +25,7 @@
   test_runner_hypothesis_overrides
   test_stop_flag_overlays
   test_share_class_overlays
+  test_cash_yield_overlays
   test_trailing_stop_ma_overlays
   test_panel_loader_parity
   test_snapshot_mode_parity
@@ -82,6 +83,7 @@
   trading.portfolio
   backtest_cost_model
   trading.simulation
+  trading.simulation.cash_yield
   trading.simulation.data
   trading.simulation.types
   trading.strategy
