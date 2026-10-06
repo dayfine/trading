@@ -3,8 +3,16 @@ open Core
 
 let _us_exchange = "US"
 
+(* A one-letter suffix is a US share class (BRK.B), which EODHD addresses as
+   BRK-B.US; a longer suffix is an exchange (GSPC.INDX, ISF.LSE). *)
+let _share_class_suffix_len = 1
+
 let eodhd_ticker symbol =
   match String.rsplit2 symbol ~on:'.' with
+  | Some (code, suffix)
+    when (not (String.is_empty code))
+         && String.length suffix = _share_class_suffix_len ->
+      (code ^ "-" ^ suffix, _us_exchange)
   | Some (code, exchange)
     when (not (String.is_empty code)) && not (String.is_empty exchange) ->
       (code, exchange)

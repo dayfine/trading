@@ -14,8 +14,11 @@ open Async
 
 val eodhd_ticker : string -> string * string
 (** [eodhd_ticker symbol] is the [(code, exchange)] pair passed to the EODHD
-    corporate-action endpoints: split at the last ['.'] when [symbol] contains
-    one ([("GSPC", "INDX")] for ["GSPC.INDX"]), else [(symbol, "US")]. *)
+    corporate-action endpoints. A one-letter suffix after the last ['.'] is a US
+    share class and maps to EODHD's dash form ([("BRK-B", "US")] for ["BRK.B"],
+    the instrument whose bars the store holds under [BRK.B]); a longer suffix is
+    an exchange ([("GSPC", "INDX")] for ["GSPC.INDX"]); otherwise
+    [(symbol, "US")]. *)
 
 (** Result of one symbol's fetch. *)
 type outcome =

@@ -10,7 +10,8 @@ let _fresh_dir () = Fpath.v (Filename_unix.temp_dir "fetch_corp_act_" "")
 let _d = Date.of_string
 
 (* Stub HTTP layer keyed on the request path: AAPL has two dividends and a
-   split, XYZ has none, ERR fails at the transport. Records every path. *)
+   split, XYZ has none, PART answers dividends but fails splits, ERR fails at the
+   transport. Records every path. *)
 let _stub_fetch ~requested uri =
   let path = Uri.path uri in
   requested := path :: !requested;
@@ -22,6 +23,7 @@ let _stub_fetch ~requested uri =
     | "/api/splits/AAPL.US" ->
         Ok {|[{"date":"2020-08-31","split":"4.000000/1.000000"}]|}
     | "/api/div/XYZ.US" | "/api/splits/XYZ.US" -> Ok "[]"
+    | "/api/div/PART.US" -> Ok "[]"
     | _ -> Error (Status.internal_error ("stub: no route for " ^ path))
   in
   return body
@@ -33,7 +35,7 @@ let test_eodhd_ticker _ =
   assert_that
     (List.map [ "AAPL"; "APC_old"; "GSPC.INDX"; "BRK.B" ] ~f:Lib.eodhd_ticker)
     (equal_to
-       [ ("AAPL", "US"); ("APC_old", "US"); ("GSPC", "INDX"); ("BRK", "B") ])
+       [ ("AAPL", "US"); ("APC_old", "US"); ("GSPC", "INDX"); ("BRK-B", "US") ])
 
 let _dividend ~ex_date ?unadjusted adjusted : CA.dividend =
   {
@@ -108,6 +110,24 @@ let test_fetch_symbol_error_writes_nothing _ =
        (matching ~msg:"Expected Failed"
           (function Lib.Failed msg -> Some msg | _ -> None)
           (contains_substring "dividends"))
+       (equal_to false))
+
+let test_fetch_symbol_partial_failure_writes_nothing _ =
+  let data_dir = _fresh_dir () in
+  let requested = ref [] in
+  let outcome =
+    _run_async (fun () ->
+        Lib.fetch_symbol ~fetch:(_stub_fetch ~requested) ~token:"t" ~data_dir
+          "PART")
+  in
+  assert_that
+    ( outcome,
+      Stdlib.Sys.file_exists
+        (Fpath.to_string (CA.dividends_path ~data_dir "PART")) )
+    (pair
+       (matching ~msg:"Expected Failed"
+          (function Lib.Failed msg -> Some msg | _ -> None)
+          (contains_substring "splits"))
        (equal_to false))
 
 let test_run_counts_and_skips _ =
@@ -194,6 +214,8 @@ let suite =
          "fetch_symbol_empty" >:: test_fetch_symbol_empty;
          "fetch_symbol_error_writes_nothing"
          >:: test_fetch_symbol_error_writes_nothing;
+         "fetch_symbol_partial_failure_writes_nothing"
+         >:: test_fetch_symbol_partial_failure_writes_nothing;
          "run_counts_and_skips" >:: test_run_counts_and_skips;
          "run_refresh_refetches" >:: test_run_refresh_refetches;
          "parse_symbols" >:: test_parse_symbols;
