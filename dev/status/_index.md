@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-04 (orchestrator run 37204883241 — see `dev/daily/2026-10-04.md`). Queue at start: #3113 (local harness PR), #3114 (pacer).
-This run: #3114 merged (docs-only); #3113 merged after rework 2/2; cleanup #3115, harness #3116 + #3117 merged. 10-03 had no published summary (2 runs lost it).
+Last updated: 2026-10-06 (orchestrator run 37477191156 — see `dev/daily/2026-10-06.md`). Queue at start: #3160 (local-session PR, left to that session).
+This run: cleanup #3161, harness #3162 + #3163 merged; local #3160 merged by its session, #3164 local open. 10-04 run 2 and both 10-05 runs published no summary (`Daily orchestrator` RED streak=3).
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-04: #3113 usage-model, #3116 review-pack escape, #3117 cache pins MERGED; next: per-row `models` cache-class pins on model-mix |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-06: #3162 flag-drift end marker, #3163 usage row pins MERGED; next: H-FLAG-DRIFT-REGION-PINS |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | scenario_runner.ml split MERGED #3115 (680→292, exception removed); next: sexp_default_drift_linter.ml 674 lines |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | sexp_default_drift_linter split MERGED #3161 (674→193 + 4 modules, exception removed); next: selection_trace.ml 662 lines |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

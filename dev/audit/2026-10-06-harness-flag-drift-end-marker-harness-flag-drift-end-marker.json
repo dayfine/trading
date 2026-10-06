@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-06",
+  "feature": "harness-flag-drift-end-marker",
+  "branch": "harness/flag-drift-end-marker",
+  "sha": "be783298d34951342d02dc703f07fcb8424a1104",
+  "recorded_at_ns": 1791300445552077315,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
