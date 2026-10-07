@@ -42,6 +42,13 @@ check passed for interest (+0.232 log every salt vs a +0.24 estimate,
   `goldens-custom-universe-scenarios/` pin `((cash_yield No_yield))` (and
   declare it in `deviates_from_live`), so they stay byte-identical. Smoke /
   perf-sweep sanity cells take the new default. Paired table in the PR body.
+- [x] **Deviation from plan decision 3 ("goldens re-pinned once"):** the PR
+  pins the OLD basis (`No_yield`) instead of re-pinning. Reason: the at-fill
+  knife-edge (#3138) moves tight-range goldens, so a re-pin now would mix the
+  yield change with that drift. Re-pin once, after #3138 / the v12 re-baseline.
+- [x] **Rework pins (QC iter 1):** `test_bah_runner_e2e` also asserts the
+  default run's Sharpe is strictly below the `No_yield` run's (runner passes the
+  rate into Sharpe), and a missing `Series` file makes `run_backtest` raise.
 - [x] **Synthetic data dirs:** a data dir without `macro/` must pin `No_yield`
   (done for `test_walk_forward_snapshot_parity`) or carry the file. Note: the
   container default `/workspaces/trading-1/data` has no `macro/` — chains set
