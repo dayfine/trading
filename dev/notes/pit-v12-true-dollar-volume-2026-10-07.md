@@ -221,8 +221,8 @@ A dry harness (`trading/devtools/checks/build_pit_warehouse_v12_guard_smoke.sh`,
 resume and D6 against a fake build.
 
 Verification (`verify`): manifest == `.snap` set (after the prune) and <= the handle cap; D6 (every list symbol is in the
-manifest except the v12 expected-absent set: MEL, built from two interleaved issuers and excluded in
-`warehouse_exceptions.sexp`, plus the legs of `alias-v12-new.txt` and the in-chunk alias map, which the lists lose when the
+manifest except the v12 expected-absent set: MEL, built from two interleaved issuers and excluded in the
+`superset` phase (not in `warehouse_exceptions.sexp`), plus the legs of `alias-v12-new.txt` and the in-chunk alias map, which the lists lose when the
 delta is applied. The v11 exemptions do not carry over: all 9,273 v12 list symbols have a CSV, including the 251 `_old`,
 and none of the 109 fetch-miss or 3 quarantined names is in a v12 list, so an `_old` series missing from the warehouse is
 a real drop; anything unexpected aborts `verify`); six sample symbols (AAPL, AMZN, C, JPM, GSPC.INDX, AAAGY) with `.snap` size vs manifest `byte_size` and
