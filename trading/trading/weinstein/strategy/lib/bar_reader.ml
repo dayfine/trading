@@ -43,6 +43,7 @@ type t = {
   weekly_sidetable_for : symbol:string -> Weekly_sidetable.entry list option;
   sketch_warehouse : bool;
   sidetable_basis : Weekly_sidetable_reader.basis;
+  split_guard : Split_dividend_guard.t option;
 }
 
 let ma_cache t = t.ma_cache
@@ -50,6 +51,8 @@ let snapshot_callbacks t = t.snapshot_callbacks
 let weekly_sidetable_for t = t.weekly_sidetable_for
 let sketch_warehouse t = t.sketch_warehouse
 let sidetable_basis t = t.sidetable_basis
+let split_guard t = t.split_guard
+let with_split_guard t guard = { t with split_guard = Some guard }
 
 (* Memoize the per-symbol sketch-v5 side-table load: the [.weekly] file for a
    symbol is read (and manifest-format-hash-gated) at most once per reader, then
@@ -110,6 +113,7 @@ let empty () =
     weekly_sidetable_for = _memoized_sidetable_for None;
     sketch_warehouse = false;
     sidetable_basis = Weekly_sidetable_reader.Raw;
+    split_guard = None;
   }
 
 (* {1 Snapshot-backed constructor (Phase F.2 PR 2)}
@@ -192,6 +196,7 @@ let of_snapshot_views ?calendar ?weekly_sidetable_loader
        [Adjusted_close]; [Raw] (the default) keeps the pre-migration [Close]
        anchor. *)
     sidetable_basis;
+    split_guard = None;
   }
 
 (* {1 In-memory-bars constructor (Phase F.3.a-1)}

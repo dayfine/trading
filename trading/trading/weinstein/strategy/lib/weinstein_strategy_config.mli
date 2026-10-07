@@ -722,6 +722,21 @@ type config = {
           on is planned with [cash_yield] after the paired re-run
           ([dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decisions
           2-3). R2: real config field, an axis via [Overlay_validator]. *)
+  split_dividend_guard : bool; [@sexp.default false]
+      (** Reject a detected split that is really a cash dividend (issue #3173) —
+          a data-correctness dial, not a strategy mechanism. [false] (default) =
+          {b EXACT no-op}: no corporate-action file is read and every split the
+          detector reports is applied, as before (R1). [true]: a split detected
+          on bar [d] is dropped, in the simulator's held-position split step and
+          in the strategy's stop rescale / resting-ticket cancel alike, when the
+          symbol's [dividends.csv] under [TRADING_DATA_DIR] has an ex-date
+          within 2 bars of [d], its [splits.csv] has no split within 2 bars, and
+          the dividend's implied factor [P / (P - D)] is within 0.01 of the
+          detected one. A symbol missing either file keeps its splits and is
+          counted. Semantics: {!Split_dividend_guard}. Fixes TDG 2013 / WING
+          2018 / BCH 2010 phantom shares, which [dividend_crediting] would
+          otherwise credit a second time. R2: real config field, an axis via
+          [Overlay_validator]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into
           [Stock_analysis.config.resistance.min_history_bars] (and, because

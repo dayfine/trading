@@ -222,6 +222,18 @@ let test_gate_is_none_only_when_all_off _ =
     ]
     (equal_to [ false; true; true; true ])
 
+(* [make_flags] maps each argument to its own field. *)
+let test_make_flags_maps_each_class _ =
+  assert_that
+    (Gate.make_flags ~entries:true ~exits:false ~stoplimit_entries:true)
+    (equal_to
+       ({
+          defer_entries = true;
+          defer_exits = false;
+          defer_stoplimit_entries = true;
+        }
+         : Gate.flags))
+
 let suite =
   "next_open_fill_gate"
   >::: [
@@ -237,6 +249,7 @@ let suite =
          >:: test_stoplimit_default_and_fresh_bar_pass;
          "gate is None only when all classes are off"
          >:: test_gate_is_none_only_when_all_off;
+         "make_flags maps each class" >:: test_make_flags_maps_each_class;
        ]
 
 let () = run_test_tt_main suite

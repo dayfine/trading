@@ -255,6 +255,12 @@ type dependencies = {
           metrics gain [DividendIncomeTotal], [DividendPaidShortTotal],
           [DividendSkippedNoAmountCount] and [DividendMissingFileCount]. See
           {!Cash_credits}. *)
+  split_guard : Split_dividend_guard.t option;
+      (** Issue #3173: when [Some], the daily split step
+          ({!Split_handler.detect_and_apply}) drops a detected split that the
+          vendor files show is a cash dividend (no phantom shares on held
+          positions). [None] (the {!create_deps} default) is the pre-#3173
+          behaviour, bit-identical. *)
 }
 
 val create_deps :
@@ -286,6 +292,7 @@ val create_deps :
   ?entry_fill_resize:Entry_fill_resize.t ->
   ?cash_yield:Trading_simulation_cash_yield.Cash_yield.Accrual.t ->
   ?dividends:Trading_simulation_dividends.Dividend_crediting.t ->
+  ?split_guard:Split_dividend_guard.t ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and

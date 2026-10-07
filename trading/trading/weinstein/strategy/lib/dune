@@ -10,6 +10,7 @@
   trading.data_panel.snapshot
   trading.portfolio
   trading.simulation.cash_yield
+  csv.split_dividend_guard
   trading.strategy
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime

@@ -15,6 +15,7 @@
   trading.simulation
   trading.simulation.cash_yield
   trading.simulation.dividends
+  csv.split_dividend_guard
   trading.simulation.data
   trading.simulation.types
   trading.strategy

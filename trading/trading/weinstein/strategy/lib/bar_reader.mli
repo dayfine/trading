@@ -192,6 +192,18 @@ val sidetable_basis : t -> Weekly_sidetable_reader.basis
     pre-migration behaviour) for {!empty}, {!of_in_memory_bars}, and any
     warehouse whose manifest carries no side-table format hash. *)
 
+val split_guard : t -> Split_dividend_guard.t option
+(** [split_guard t] is the guard {!Stops_split_runner.detect_split} applies to
+    every split it detects through this reader (issue #3173): a detected split
+    that the vendor files show is a cash dividend is dropped, so the stop state
+    is not rescaled and no resting ticket is cancelled for it, matching the
+    simulator, which applies the same guard to held positions. [None] (every
+    constructor's default) keeps every detected split. *)
+
+val with_split_guard : t -> Split_dividend_guard.t -> t
+(** [with_split_guard t guard] is [t] with {!split_guard} set to [Some guard];
+    every read is unchanged. *)
+
 val daily_bars_for :
   t -> symbol:string -> as_of:Date.t -> Types.Daily_price.t list
 (** [daily_bars_for t ~symbol ~as_of] returns daily bars for [symbol] up to and

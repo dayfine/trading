@@ -67,6 +67,11 @@ type flags = {
 }
 (** The three independently armed classes, as the simulator carries them. *)
 
+val make_flags : entries:bool -> exits:bool -> stoplimit_entries:bool -> flags
+(** [make_flags ~entries ~exits ~stoplimit_entries] is
+    [{ defer_entries = entries; defer_exits = exits; defer_stoplimit_entries =
+     stoplimit_entries }]. *)
+
 val gate :
   flags ->
   positions:Trading_strategy.Position.t String.Map.t ->

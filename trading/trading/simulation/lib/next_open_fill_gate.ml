@@ -72,6 +72,13 @@ type flags = {
   defer_stoplimit_entries : bool;
 }
 
+let make_flags ~entries ~exits ~stoplimit_entries =
+  {
+    defer_entries = entries;
+    defer_exits = exits;
+    defer_stoplimit_entries = stoplimit_entries;
+  }
+
 let gate { defer_entries; defer_exits; defer_stoplimit_entries } ~positions
     ~today_bars =
   if defer_entries || defer_exits || defer_stoplimit_entries then

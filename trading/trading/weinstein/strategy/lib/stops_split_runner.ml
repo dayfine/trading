@@ -18,7 +18,12 @@ let _last_two_bars ~bar_reader ~symbol ~as_of =
    the snap-to-rational contract. *)
 let detect_split ~bar_reader ~symbol ~as_of =
   let%bind.Option prev, curr = _last_two_bars ~bar_reader ~symbol ~as_of in
-  Types.Split_detector.detect_split ~prev ~curr ()
+  let detected = Types.Split_detector.detect_split ~prev ~curr () in
+  match Bar_reader.split_guard bar_reader with
+  | None -> detected
+  | Some guard ->
+      Split_dividend_guard.filter guard ~symbol ~date:curr.date
+        ~prev_close:prev.close_price detected
 
 (* Rescale a single symbol's stop_state in place. No-ops when no entry is
    present in [stop_states] (position with no stop registered yet) or when

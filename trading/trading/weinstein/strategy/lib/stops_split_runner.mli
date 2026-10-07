@@ -28,7 +28,12 @@ val detect_split :
     and including [as_of]. [Some factor] when a split happened between the prior
     trading day and [as_of]; [None] with fewer than two bars or no qualifying
     ratio. The one detector {!adjust} uses, shared with {!Split_ticket_cancel}
-    so the stop rescale and the resting-ticket cancel fire on the same days. *)
+    so the stop rescale and the resting-ticket cancel fire on the same days.
+
+    When [bar_reader] carries a {!Bar_reader.split_guard} (issue #3173), a
+    detected split the guard identifies as a vendor cash dividend returns
+    [None], the same verdict the simulator's held-position split step reaches.
+*)
 
 val adjust :
   positions:Position.t Map.M(String).t ->

@@ -31,14 +31,6 @@ let _cash_yield_accrual (input : input) ~start_date =
   Option.map input.cash_yield ~f:(fun rate ->
       Trading_simulation_cash_yield.Cash_yield.Accrual.create rate ~start_date)
 
-(* #3137: dividend crediting reads per-symbol [dividends.csv] lazily from the
-   [TRADING_DATA_DIR] store ([data_dir_fpath]), never the snapshot warehouse,
-   from [start_date] on. [None] (the default config) reads no file. *)
-let _dividend_crediting (input : input) ~start_date =
-  Option.some_if input.config.dividend_crediting
-    (Trading_simulation_dividends.Dividend_crediting.of_data_dir
-       ~data_dir:input.data_dir_fpath ~start_date)
-
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's
    callback adapter, sharing the LRU cache with the strategy bar reader. Going
    through [Bar_data_source.build_adapter (Snapshot {...})] would instead call
@@ -120,9 +112,9 @@ let _wrap_strategy (input : input) ~stop_log ~start_date strategy =
        ~suppress:input.config.suppress_warmup_trading ~start_date
 
 let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
-    ~start_date ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
-    ?on_trade_fill ~active_through_for ~prune_universe_by_active_through
-    ~strategy ~market_data_adapter () =
+    ?split_guard ~start_date ~warmup_start ~end_date ~initial_cash ~commission
+    ?slippage_bps ?on_trade_fill ~active_through_for
+    ~prune_universe_by_active_through ~strategy ~market_data_adapter () =
   let strategy = _wrap_strategy input ~stop_log ~start_date strategy in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
@@ -148,8 +140,10 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
       ~entry_fill_reject_retries:input.config.entry_fill_reject_retries
       ~entry_fill_resize:(_entry_fill_resize input.config)
       ?cash_yield:(_cash_yield_accrual input ~start_date)
-      ?dividends:(_dividend_crediting input ~start_date)
-      ()
+      ?dividends:
+        (Panel_corporate_actions.dividend_crediting ~config:input.config
+           ~data_dir:input.data_dir_fpath ~start_date)
+      ?split_guard ()
   in
   let config =
     Simulator.
@@ -312,13 +306,14 @@ let fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date =
    [fold_start_date] is the Win #4 opt-in: [Some d] enables screener pre-pruning
    (forwarded to {!Panel_strategy_builder.build}) and the simulator-side
    bar-fetch prune (the returned [active_through_for]); [None] is bit-equal. *)
-let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
-    ~shared_panels ~warmup_start ~end_date ~audit_recorder ?fold_start_date
-    ?universe_membership_at () =
+let _setup_hybrid (input : input) ?split_guard ~strategy_choice ~snapshot_dir
+    ~manifest ~shared_panels ~warmup_start ~end_date ~audit_recorder
+    ?fold_start_date ?universe_membership_at () =
   let daily_panels = _resolve_panels ~shared_panels ~snapshot_dir ~manifest in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let bar_reader =
     _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest
+    |> Panel_corporate_actions.guard_bar_reader split_guard
   in
   let strategy =
     Panel_strategy_builder.build ~ad_bars:input.ad_bars
@@ -406,8 +401,8 @@ let _finish_panels ~daily_panels ~n_all_symbols ~shared_panels =
    stays within the function-length limit. [active_through_for] is the run's
    delisting-marker lookup (always supplied);
    [prune_universe_by_active_through] is the separate Win #4 prune opt-in. *)
-let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
-    ~commission ?slippage_bps ?cost_model ~active_through_for
+let _build_sim input ~r ?split_guard ~start_date ~warmup_start ~end_date
+    ~initial_cash ~commission ?slippage_bps ?cost_model ~active_through_for
     ~prune_universe_by_active_through ~strategy ~market_data_adapter () =
   let on_trade_fill = _on_trade_fill_of_cost_model cost_model in
   let effective_commission, effective_slippage_bps =
@@ -415,8 +410,8 @@ let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
       ?default_slippage_bps:slippage_bps ?cost_model ()
   in
   _make_simulator input ~stop_log:r.stop_log ~trade_audit:r.trade_audit
-    ~stale_hold_log:r.stale_hold_log ~start_date ~warmup_start ~end_date
-    ~initial_cash ~commission:effective_commission
+    ~stale_hold_log:r.stale_hold_log ?split_guard ~start_date ~warmup_start
+    ~end_date ~initial_cash ~commission:effective_commission
     ?slippage_bps:effective_slippage_bps ?on_trade_fill ~active_through_for
     ~prune_universe_by_active_through ~strategy ~market_data_adapter ()
 
@@ -439,6 +434,20 @@ let _cache_sampler_of_panels ~daily_panels () : Gc_trace.cache_sample =
   let r = Daily_panels.resident daily_panels in
   { cache_entries = r.entries; cache_bytes = r.bytes; mmap_open = r.mmap_open }
 
+(* The run-window line every backtest prints first. *)
+let _log_window ~warmup_start ~end_date ~warmup_days strategy_choice =
+  eprintf
+    "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
+    (Date.to_string warmup_start)
+    (Date.to_string end_date) warmup_days
+    (Strategy_choice.name strategy_choice)
+
+(* #3173: one guard per run, shared by the strategy and the simulator; [None]
+   unless [split_dividend_guard]. *)
+let _split_guard (input : input) =
+  Panel_corporate_actions.split_guard ~config:input.config
+    ~data_dir:input.data_dir_fpath
+
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
@@ -448,12 +457,9 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date
   in
   let warmup_start = Date.add_days start_date (-warmup_days) in
-  eprintf
-    "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
-    (Date.to_string warmup_start)
-    (Date.to_string end_date) warmup_days
-    (Strategy_choice.name strategy_choice);
+  _log_window ~warmup_start ~end_date ~warmup_days strategy_choice;
   let r = _create_recorders ?candidate_log () in
+  let split_guard = _split_guard input in
   let n_all_symbols = List.length input.all_symbols in
   let snapshot_dir, manifest =
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source
@@ -463,13 +469,13 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
         final_close_prices_thunk,
         daily_panels,
         active_through_for ) =
-    _setup_hybrid input ~strategy_choice ~snapshot_dir ~manifest ~shared_panels
-      ~warmup_start ~end_date ~audit_recorder:r.audit_recorder ?fold_start_date
-      ?universe_membership_at ()
+    _setup_hybrid input ?split_guard ~strategy_choice ~snapshot_dir ~manifest
+      ~shared_panels ~warmup_start ~end_date ~audit_recorder:r.audit_recorder
+      ?fold_start_date ?universe_membership_at ()
   in
   let sim =
-    _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
-      ~commission ?slippage_bps ?cost_model ~active_through_for
+    _build_sim input ~r ?split_guard ~start_date ~warmup_start ~end_date
+      ~initial_cash ~commission ?slippage_bps ?cost_model ~active_through_for
       ~prune_universe_by_active_through ~strategy ~market_data_adapter ()
   in
   let progress_acc =
@@ -483,6 +489,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
   _finish_panels ~daily_panels ~n_all_symbols ~shared_panels;
+  Panel_corporate_actions.log_split_guard split_guard;
   ( sim_result,
     r.stop_log,
     r.trade_audit,

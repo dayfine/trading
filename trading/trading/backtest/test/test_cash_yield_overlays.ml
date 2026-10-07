@@ -61,6 +61,48 @@ let test_dividend_crediting_default_off_and_axis _ =
     ]
     (elements_are [ equal_to false; equal_to true; equal_to false ])
 
+(* #3173: [split_dividend_guard] defaults off (R1), is an axis via the real
+   [Overlay_validator] (R2), and arms [Panel_corporate_actions.split_guard]
+   only when on. *)
+let test_split_dividend_guard_default_off_and_axis _ =
+  let flag (c : Weinstein_strategy.config) = c.split_dividend_guard in
+  let armed config =
+    Option.is_some
+      (Backtest.Panel_corporate_actions.split_guard ~config
+         ~data_dir:(Fpath.v "/nonexistent"))
+  in
+  let on = _after [ "((split_dividend_guard true))" ] in
+  assert_that
+    [
+      (flag (_default_config ()), armed (_default_config ()));
+      (flag on, armed on);
+      ( flag
+          (_after
+             [
+               "((split_dividend_guard true))"; "((split_dividend_guard false))";
+             ]),
+        false );
+    ]
+    (elements_are
+       [
+         equal_to (false, false); equal_to (true, true); equal_to (false, false);
+       ])
+
+(* Unarmed, the strategy's bar reader is handed back physically unchanged;
+   armed, it carries the guard. The end-of-run line names both counts. *)
+let test_split_guard_reader_and_summary _ =
+  let reader = Weinstein_strategy.Bar_reader.empty () in
+  let guard = Split_dividend_guard.of_data_dir ~data_dir:(Fpath.v "/x") () in
+  let module P = Backtest.Panel_corporate_actions in
+  assert_that
+    ( phys_equal (P.guard_bar_reader None reader) reader,
+      Option.is_some
+        (Weinstein_strategy.Bar_reader.split_guard
+           (P.guard_bar_reader (Some guard) reader)),
+      P.split_guard_summary guard )
+    (equal_to
+       (true, true, "Panel_runner: split_dividend_guard rejected=0 no_files=0"))
+
 let test_committed_tbill_series_covers_window _ =
   let data_dir = Fpath.to_string (Data_path.default_data_dir ()) in
   let resolved =
@@ -84,6 +126,10 @@ let suite =
          >:: test_axis_resolves_via_overlay_validator;
          "dividend crediting default off and an axis"
          >:: test_dividend_crediting_default_off_and_axis;
+         "split dividend guard default off and an axis"
+         >:: test_split_dividend_guard_default_off_and_axis;
+         "split guard reader and summary"
+         >:: test_split_guard_reader_and_summary;
          "committed T-bill series covers the window"
          >:: test_committed_tbill_series_covers_window;
        ]

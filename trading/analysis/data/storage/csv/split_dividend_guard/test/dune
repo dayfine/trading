@@ -1,0 +1,13 @@
+(test
+ (name test_split_dividend_guard)
+ (libraries
+  split_dividend_guard
+  types
+  corporate_actions
+  core
+  core_unix
+  core_unix.filename_unix
+  fpath
+  ounit2
+  matchers
+  status))

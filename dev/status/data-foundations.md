@@ -1,11 +1,25 @@
 # Status: data-foundations
 
-## Last updated: 2026-10-06
+## Last updated: 2026-10-07
 
 ## Status
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-10-07 — reject detected splits that are vendor cash dividends,
+  default off (#3173).** New lib
+  `analysis/data/storage/csv/split_dividend_guard/` (`Split_dividend_guard`):
+  a detected split on bar d is dropped when `dividends.csv` has an ex-date
+  within 2 bars (weekdays), `splits.csv` has no split within 2 bars, and
+  `P/(P−D)` is within 0.01 of the detected factor. Missing / unreadable
+  files keep the split and are counted. Applied in both consumers —
+  `Split_handler` (simulator held-position step) and
+  `Stops_split_runner.detect_split` (stop rescale + resting-ticket cancel,
+  via `Bar_reader.with_split_guard`) — armed by config
+  `split_dividend_guard` through `Panel_corporate_actions`. Verify:
+  `dune runtest analysis/data/storage/csv/split_dividend_guard
+  trading/simulation/test trading/weinstein/strategy/test`. After merge: the
+  26y TR pair re-run should credit TDG/WING/BCH once.
 - [x] **2026-10-03 — split detector raw-gap confirmation, default off
   (#3104).** `Split_detector.detect_split` gains
   `?raw_confirm_min_share`: a snapped factor is kept only if the raw close
