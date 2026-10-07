@@ -54,7 +54,7 @@ HANDLE_CAP=${SNAPSHOT_MAX_MMAP_HANDLES:-12000}
 mkdir -p "$WORK"
 log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$WORK/build.log"; }
 die() { log "ABORT: $*"; exit 1; }
-dx() { if [ -n "${DX_LOCAL:-}" ]; then "$@"; else docker exec "$CONTAINER" "$@"; fi; }   # DX_LOCAL: dry-harness hook
+dx() { docker exec "$CONTAINER" "$@"; }                    # the dry harness redefines dx after sourcing this file
 n_manifest() { dx sh -c "grep -c '(symbol ' $OUT/manifest.sexp 2>/dev/null || echo 0"; }
 manifest_syms() { dx grep -o '((symbol [^)]*)' "$OUT/manifest.sexp" | sed 's/((symbol //; s/)$//' | LC_ALL=C sort -u; }
 
@@ -111,7 +111,7 @@ phase_preflight() {
   host_tree=$(echo "$RUN_TREE" | sed "s#^/workspaces/trading-1#$HOST_ROOT#")
   git -C "$host_tree" rev-parse --git-dir >/dev/null 2>&1 || die "run tree $host_tree is not a git tree (RUN_TREE outside /workspaces/trading-1? set HOST_ROOT)"
   [ -z "$(git -C "$host_tree" status --porcelain)" ] || die "run tree $host_tree is dirty"
-  git -C "$host_tree" log --oneline --grep='#2724' | grep -q . || die "run tree lacks #2724 (-incremental manifest merge): rebase it onto main"
+  git -C "$host_tree" merge-base --is-ancestor 6141b23c3239cca9e9c4a0927694ec163adfb610 HEAD || die "run tree lacks #2724 (-incremental manifest merge, commit 6141b23c3): rebase it onto main"
   log "run tree HEAD=$(git -C "$host_tree" rev-parse --short HEAD) (#2724 verified present; #2882 handle cap is an env knob)"
   # container-exclusive: no other long job
   if dx pgrep -f 'build_snapshots|scenario_runner|panel_runner|bayesian_runner' >/dev/null; then die "another build/backtest is running in $CONTAINER"; fi
@@ -128,6 +128,7 @@ phase_preflight() {
 }
 
 phase_superset() {
+  rm -f "$WORK/twinfix.plan"                                 # a new universe starts a new run: never inherit an old plan
   quarantine=$(awk '{print $1}' "$V11EXP/results/quarantine.txt")
   {
     for f in "$V12"/composition/top-3000-199[9].sexp "$V12"/composition/top-3000-20*.sexp; do grep -o '(symbol [^)]*)' "$f"; done | sed 's/(symbol //; s/)$//'
@@ -215,9 +216,9 @@ _twinfix_plan() {
     awk '/^  survivor/ { s = $2 } /^    [^ ]+ \(overlap=/ { o = $2; m = $3; gsub(/[^0-9]/, "", o); gsub(/[^0-9.]/, "", m); print s, $1, o, m }' "$r" > "$r.pairs"
     awk '{ print $1 }' "$r.pairs" | sort | uniq -c | awk '$1 > 4 { print $2 }' > "$r.hubs"
     awk '$3 >= 200 && $4 >= 0.95' "$r.pairs" | while read -r s d o m; do
-      grep -q -x "$s" "$r.hubs" && continue
-      grep -q -x "$s" "$WORK/manifest-syms.txt" && grep -q -x "$d" "$WORK/manifest-syms.txt" || continue
-      grep -q -x "$d" "$WORK/false-legs.txt" && continue
+      grep -q -x -F "$s" "$r.hubs" && continue
+      grep -q -x -F "$s" "$WORK/manifest-syms.txt" && grep -q -x -F "$d" "$WORK/manifest-syms.txt" || continue
+      grep -q -x -F "$d" "$WORK/false-legs.txt" && continue
       echo "$s $d"
     done >> "$WORK/to-drop-pairs.txt"
   done
@@ -226,8 +227,11 @@ _twinfix_plan() {
   awk '{ print $1; print $2 }' "$WORK/to-drop-pairs.txt" | LC_ALL=C sort -u > "$WORK/pairs-universe.txt"
   # the lists must follow the warehouse: alias the dropped legs into them (written BEFORE the build that drops them)
   { awk '{ print $2, $1 }' "$WORK/to-drop-pairs.txt"; cat "$WORK/alias-inchunk.txt"; } | LC_ALL=C sort -u > "$WORK/alias-v12-new.txt"
-  echo "manifest_before=$(wc -l < "$WORK/manifest-syms.txt" | tr -d ' ')" > "$WORK/twinfix.plan"
+  { echo "manifest_before=$(wc -l < "$WORK/manifest-syms.txt" | tr -d ' ')"; echo "union_id=$(_union_id)"; } > "$WORK/twinfix.plan"
 }
+
+# Identity of this run's symbol universe (the chunk files). A plan saved by an older run in the same $WORK carries another id.
+_union_id() { cat "$WORK"/chunk-[1-4].txt 2>/dev/null | cksum | awk '{ print $1 "-" $2 }'; }
 
 # Guard 2, repair half. A cross-chunk leg is real only on a DIRECT edge (overlap >= 200, match >= 0.95), whose
 # survivor is not a hub (> 4 legs: the flat-series class of #2823), whose leg is not a restored false leg, and with both
@@ -236,10 +240,17 @@ _twinfix_plan() {
 # stay on disk (their chunk builds wrote them): chunk6's guard allows exactly the pairs' symbols as orphans, and the
 # orphans of the dropped legs are deleted afterwards. Resumable: the plan is saved before chunk6; a rerun reuses it.
 phase_twinfix() {
-  if [ -s "$WORK/twinfix.plan" ]; then log "twinfix: reusing saved plan ($WORK/twinfix.plan, $WORK/to-drop-pairs.txt, $WORK/alias-v12-new.txt)"; else _twinfix_plan; fi
+  if [ -s "$WORK/twinfix.plan" ]; then
+    [ "$(sed -n 's/^union_id=//p' "$WORK/twinfix.plan")" = "$(_union_id)" ] || die "$WORK/twinfix.plan is from a different run (symbol universe changed): delete it and the old twin-scan/ outputs, or use a fresh WORK"
+    log "twinfix: reusing saved plan ($WORK/twinfix.plan, $WORK/to-drop-pairs.txt, $WORK/alias-v12-new.txt)"
+  else _twinfix_plan; fi
   np=$(wc -l < "$WORK/to-drop-pairs.txt" | tr -d ' ')
-  [ "$np" -gt 0 ] || { log "twinfix: no cross-chunk twins (v11 had 233 legs)"; return 0; }
-  before=$(sed 's/^manifest_before=//' "$WORK/twinfix.plan")
+  if [ "$np" -eq 0 ]; then
+    log "twinfix: no cross-chunk twins (v11 had 233 legs). Still apply the in-chunk map: $WORK/alias-v12-new.txt"
+    log "  perl dev/experiments/pit-universe-2026-09-14/step4/twin-scan/alias-lists.pl $WORK/alias-v12-new.txt $V12/composition/top-*.sexp"
+    return 0
+  fi
+  before=$(sed -n 's/^manifest_before=//p' "$WORK/twinfix.plan")
   ORPHAN_OK="$WORK/pairs-universe.txt"
   pinned_spec "$WORK/pairs-universe.txt" > "$WORK/chunk-6.sexp"
   run_build chunk6 "$WORK/chunk-6.sexp" -dedupe-rename-twins -twin-basis returns
@@ -265,12 +276,12 @@ phase_verify() {
   # D6: every list symbol must be in the manifest, except the expected-absent set. In v12 every list symbol has a CSV
   # (the lists are built from the inventory), so the v11 exemptions (_old without CSV, fetch misses, quarantine) do not
   # apply: an `_old` series missing here is a real drop. Expected absent = MEL (built from two interleaved issuers,
-  # excluded in warehouse_exceptions.sexp and in `superset`) + the legs the alias delta maps away (in-chunk drops from
+  # excluded in `superset`, not in warehouse_exceptions.sexp) + the legs the alias delta maps away (in-chunk drops from
   # `classify`, cross-chunk drops from `twinfix`), which the lists lose when alias-lists.pl is applied.
   for f in "$V12"/composition/top-3000-199[9].sexp "$V12"/composition/top-3000-20*.sexp; do grep -o '(symbol [^)]*)' "$f"; done | sed 's/(symbol //; s/)$//' | LC_ALL=C sort -u > "$WORK/list-union.txt"
   LC_ALL=C comm -23 "$WORK/list-union.txt" "$WORK/manifest-syms.txt" > "$WORK/absent.txt"
   { echo MEL; [ -s "$WORK/alias-v12-new.txt" ] && awk '{ print $1 }' "$WORK/alias-v12-new.txt"; [ -s "$WORK/alias-inchunk.txt" ] && awk '{ print $1 }' "$WORK/alias-inchunk.txt"; } | LC_ALL=C sort -u > "$WORK/expected-absent.txt"
-  grep -v -x -f "$WORK/expected-absent.txt" "$WORK/absent.txt" > "$WORK/unexpected-absent.txt"
+  grep -v -x -F -f "$WORK/expected-absent.txt" "$WORK/absent.txt" > "$WORK/unexpected-absent.txt"
   log "D6: absent=$(wc -l < "$WORK/absent.txt" | tr -d ' ') of which expected (MEL + alias-delta legs) $(( $(wc -l < "$WORK/absent.txt") - $(wc -l < "$WORK/unexpected-absent.txt") )); UNEXPECTED absent=$(wc -l < "$WORK/unexpected-absent.txt" | tr -d ' ') (must be 0)"
   [ ! -s "$WORK/unexpected-absent.txt" ] || die "D6: list symbols missing from the warehouse and not aliased: see $WORK/unexpected-absent.txt (twin component dropped an unaliased series, or list/alias out of sync)"
   # sample symbols: manifest entry present, byte_size == file size, active_through == last CSV date for ended series
@@ -286,7 +297,7 @@ phase_verify() {
   log "VERIFY DONE. Then: md5 the lists, copy terminal_runs.csv + rename_twin reports into the experiment dir, and re-run the V6=0 check on the first null cell."
 }
 
-[ -z "${V12_LIB_ONLY:-}" ] || return 0 2>/dev/null || exit 0   # dry-harness hook: define functions only
+[ -z "${V12_LIB_ONLY:-}" ] || { echo "V12_LIB_ONLY set: functions defined, no phase run" >&2; return 0 2>/dev/null || exit 0; }   # dry-harness hook
 
 case "$PHASE" in
   preflight) phase_preflight ;;

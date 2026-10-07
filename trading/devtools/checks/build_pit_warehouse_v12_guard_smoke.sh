@@ -13,6 +13,9 @@
 #   b. a clobbered (tiny) manifest still aborts: on a plain chunk build and on chunk6 despite its orphan allowance.
 #   c. a rerun of twinfix after chunk6 reuses the saved plan: the alias delta is unchanged and the run still succeeds
 #      (before the fix it logged "no cross-chunk twins" and lost the delta).
+#   e. guard half (a): a manifest entry without a .snap aborts.
+#   f. prune_orphans keeps the .snap of a planned leg still in the manifest (v11 EMBT); the warning is logged.
+#   g. a saved plan from a different run (union id mismatch) is refused.  h. no pairs: apply-alias instruction printed.
 #   d. D6: the expected-absent set is MEL + alias-delta legs only; an unaliased absent list symbol (also an `_old` one)
 #      aborts verify, and a list that follows the alias delta passes.
 #
@@ -136,6 +139,42 @@ echo '((symbol ZZZ_old))' >> "$list"
 rc=0; ( phase_verify ) > "$WORK/d2.out" 2>&1 || rc=$?
 expect "d2: an unaliased absent _old symbol aborts verify (no blanket _old exemption)" 1 "$rc"
 grep -q 'ZZZ_old' "$WORK/unexpected-absent.txt" && ok "d2: it is listed as unexpected" || bad "d2: unexpected list"
+
+# e. guard half (a): a manifest entry whose .snap is gone aborts -------------------------------------------------------------
+fresh
+unset FAKE_DROP_FILE
+rm -f "$OUT/S05.snap"
+rc=0; ( assert_manifest_matches final_e ) > "$WORK/e.out" 2>&1 || rc=$?
+expect "e: a manifest entry without a .snap aborts the guard" 1 "$rc"
+grep -q 'have no .snap' "$WORK/e.out" && grep -q 'S05' "$WORK/e.out" && ok "e: abort names the missing-.snap condition and S05" || bad "e: abort message"
+
+# f. prune keeps the .snap of a planned leg the detector left in the manifest (v11 EMBT "still indexed") ----------------------
+fresh
+printf 'S02\n' > "$WORK/fake-drop-s02.txt"
+FAKE_DROP_FILE="$WORK/fake-drop-s02.txt"; export FAKE_DROP_FILE
+rc=0; ( phase_twinfix ) > "$WORK/f.out" 2>&1 || rc=$?
+expect "f: twinfix with one planned leg (S04) left indexed exits 0" 0 "$rc"
+[ -e "$OUT/S04.snap" ] && ok "f: S04.snap (still in the manifest) was not pruned" || bad "f: S04.snap was deleted"
+[ ! -e "$OUT/S02.snap" ] && ok "f: S02.snap (orphan dropped leg) was pruned" || bad "f: S02.snap survived"
+grep -q 'dropped legs still indexed' "$WORK/f.out" && ok "f: the 'still indexed' warning is logged" || bad "f: no 'still indexed' warning"
+assert_manifest_matches final_f > /dev/null 2>&1 && ok "f: strict guard passes afterwards" || bad "f: strict guard"
+
+# g. a stale plan from another run is refused ---------------------------------------------------------------------------------
+fresh
+rc=0; ( phase_twinfix ) > "$WORK/g0.out" 2>&1 || rc=$?
+expect "g0: twinfix setup" 0 "$rc"
+echo S99 > "$WORK/chunk-1.txt"
+rc=0; ( phase_twinfix ) > "$WORK/g.out" 2>&1 || rc=$?
+expect "g: a plan whose union id differs from this run aborts" 1 "$rc"
+grep -q 'different run' "$WORK/g.out" && ok "g: abort says the plan is from a different run" || bad "g: abort message"
+
+# h. no cross-chunk pairs still tells the operator to apply the in-chunk alias map -----------------------------------------------
+fresh
+: > "$WORK/twin-scan/pair-12.report"
+rc=0; ( phase_twinfix ) > "$WORK/h.out" 2>&1 || rc=$?
+expect "h: twinfix with no cross-chunk pairs exits 0" 0 "$rc"
+grep -q 'no cross-chunk twins' "$WORK/h.out" && grep -q 'alias-lists.pl' "$WORK/h.out" && grep -q '^S19 S18$' "$WORK/alias-v12-new.txt" \
+  && ok "h: the apply-alias instruction is printed and the file holds the in-chunk map" || bad "h: no apply instruction"
 
 echo "build_pit_warehouse_v12_guard_smoke: $PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]
