@@ -267,8 +267,16 @@
                 "bch dividend adjusted amount fallback rejected"))
          (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
                 "real split with vendor row kept"))
+         (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
+                "dividend two bars off rejected"))
+         (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
+                "vendor split two bars off kept"))
          (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"
                 "guard drops dividend split"))
+         (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"
+                "detect_and_apply guard keeps held position"))
+         (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"
+                "detect_and_apply no guard scales held position"))
          (unit ("trading/trading/weinstein/strategy/test/test_stops_split_dividend_guard.ml"
                 "guarded reader drops dividend split"))))
  (status fixed-behind-flag))

@@ -133,6 +133,32 @@ let test_dividend_outside_window_kept _ =
     (_detect_then_filter guard ~symbol:"TDG" _tdg_pair)
     (_kept_split (22.0 /. 19.0))
 
+(* The window boundary: a matching dividend on Tue 07-09, exactly two bars
+   before Thu 07-11, is inside the default window and rejects the split. *)
+let test_dividend_two_bars_off_rejected _ =
+  let guard =
+    _guard ~dividends:[ _div "2013-07-09" ~unadjusted:22.0 22.0 ] ~splits:[]
+  in
+  assert_that
+    (_detect_then_filter guard ~symbol:"TDG" _tdg_pair)
+    _rejected_split
+
+(* The window boundary for the vendor split row: a split on Mon 07-15, exactly
+   two bars after Thu 07-11, still wins over a matching same-day dividend. *)
+let test_vendor_split_two_bars_off_kept _ =
+  let guard =
+    _guard
+      ~dividends:[ _div "2013-07-11" ~unadjusted:22.0 22.0 ]
+      ~splits:[ _split "2013-07-15" (22.0 /. 19.0) ]
+  in
+  assert_that
+    (_detect_then_filter guard ~symbol:"TDG" _tdg_pair)
+    (_kept_split (22.0 /. 19.0))
+
+let test_default_config _ =
+  assert_that G.default_config
+    (equal_to ({ window_bars = 2; factor_tolerance = 0.01 } : G.config))
+
 (* A same-day dividend whose implied factor (160.80 / 159.80) is far from the
    detected 22/19 is a different event. *)
 let test_inconsistent_dividend_amount_kept _ =
@@ -255,6 +281,11 @@ let suite =
          "vendor split beats same day dividend"
          >:: test_vendor_split_beats_same_day_dividend;
          "dividend outside window kept" >:: test_dividend_outside_window_kept;
+         "dividend two bars off rejected"
+         >:: test_dividend_two_bars_off_rejected;
+         "vendor split two bars off kept"
+         >:: test_vendor_split_two_bars_off_kept;
+         "default config" >:: test_default_config;
          "inconsistent dividend amount kept"
          >:: test_inconsistent_dividend_amount_kept;
          "missing files keep split and count"

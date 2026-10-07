@@ -717,6 +717,10 @@
  (libraries
   ounit2
   core
+  core_unix.time_ns_unix
+  status
+  trading.base
+  trading.strategy
   trading.simulation
   trading.simulation.data
   trading.portfolio
