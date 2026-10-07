@@ -62,29 +62,32 @@ let _entry_of_csv fpath =
   Option.map (_csv_date_range fpath) ~f:(fun (data_start_date, data_end_date) ->
       { symbol; data_start_date; data_end_date })
 
-let build ~data_dir =
-  let from_metadata = ref [] and csv_paths = ref [] in
-  _walk_dir data_dir ~f:(fun fpath ->
-      match Fpath.filename fpath with
-      | "data.metadata.sexp" -> (
-          match File_sexp.Sexp.load (module Metadata.T_sexp) ~path:fpath with
-          | Error _ -> ()
-          | Ok meta ->
-              from_metadata := _entry_of_metadata meta :: !from_metadata)
-      | "data.csv" -> csv_paths := fpath :: !csv_paths
-      | _ -> ());
+(* Collect one file found by the walk: a loaded [data.metadata.sexp] entry, or a
+   [data.csv] path to fall back on. *)
+let _collect ~from_metadata ~csv_paths fpath =
+  match Fpath.filename fpath with
+  | "data.metadata.sexp" ->
+      File_sexp.Sexp.load (module Metadata.T_sexp) ~path:fpath
+      |> Result.iter ~f:(fun meta ->
+          from_metadata := _entry_of_metadata meta :: !from_metadata)
+  | "data.csv" -> csv_paths := fpath :: !csv_paths
+  | _ -> ()
+
+(* Entries from [data.csv] files whose symbol has no metadata entry. *)
+let _csv_only_entries ~from_metadata csv_paths =
   let known =
     Hash_set.of_list
       (module String)
-      (List.map !from_metadata ~f:(fun e -> e.symbol))
+      (List.map from_metadata ~f:(fun e -> e.symbol))
   in
+  List.filter_map csv_paths ~f:_entry_of_csv
+  |> List.filter ~f:(fun e -> not (Hash_set.mem known e.symbol))
+
+let build ~data_dir =
+  let from_metadata = ref [] and csv_paths = ref [] in
+  _walk_dir data_dir ~f:(_collect ~from_metadata ~csv_paths);
   (* Symbols fetched without a metadata file (e.g. bulk gap fetches) still count. *)
-  let from_csv =
-    List.filter_map !csv_paths ~f:(fun p ->
-        match _entry_of_csv p with
-        | Some e when not (Hash_set.mem known e.symbol) -> Some e
-        | _ -> None)
-  in
+  let from_csv = _csv_only_entries ~from_metadata:!from_metadata !csv_paths in
   let symbols =
     List.sort (!from_metadata @ from_csv) ~compare:(fun a b ->
         String.compare a.symbol b.symbol)
