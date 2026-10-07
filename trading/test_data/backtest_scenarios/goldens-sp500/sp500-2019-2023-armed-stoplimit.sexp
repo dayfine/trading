@@ -141,7 +141,8 @@
  ;; golden_live_drift linter (#2403). Data-only: Scenario.t is
  ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
  (deviates_from_live
-  (;; NOTE (2026-08-26): enable_sim_entry_stoplimit + entry_extension_max_pct
+  ((cash_yield "price-only regression pin (#3137); the code default (and live config) arm the 3-month T-bill series")
+   ;; NOTE (2026-08-26): enable_sim_entry_stoplimit + entry_extension_max_pct
    ;; are no longer declared here — the fill-model default flip (#2405) made
    ;; both the code default AND live, and this cell arms them at exactly those
    ;; values, so a declaration would be a stale one and fail the drift check.

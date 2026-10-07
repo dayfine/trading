@@ -85,7 +85,8 @@
  ;; golden_live_drift linter (#2403). Data-only: Scenario.t is
  ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
  (deviates_from_live
-  ((portfolio_config "record-convention concentration arming (position 0.14 / exposure 0.70 / min_cash 0.30); live runs the code defaults")
+  ((cash_yield "price-only regression pin (#3137); the code default (and live config) arm the 3-month T-bill series")
+   (portfolio_config "record-convention concentration arming (position 0.14 / exposure 0.70 / min_cash 0.30); live runs the code defaults")
    (enable_stage3_force_exit "record-convention Stage-3 force-exit arming; live leaves it default-off")
    (stage3_force_exit_config "hysteresis_weeks 1 belongs to the arming above; the code default is 2")
    (enable_laggard_rotation "record-convention laggard-rotation arming; live leaves it default-off")

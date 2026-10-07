@@ -24,7 +24,8 @@
  ;; golden_live_drift linter (#2403). Data-only: Scenario.t is
  ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
  (deviates_from_live
-  ((fast_v_arm_on_rate_alone "the fast-V rate-alone arming this -armon cell isolates; live runs the code default")
+  ((cash_yield "price-only regression pin (#3137); the code default (and live config) arm the 3-month T-bill series")
+   (fast_v_arm_on_rate_alone "the fast-V rate-alone arming this -armon cell isolates; live runs the code default")
    (stops_config "catastrophic-stop arming this -catstop cell isolates (catastrophic_stop_pct 0.10); live runs the 0.0 default")
    (enable_short_side "long-only cell: arms the short leg off; the code default (and therefore live) is on")
    (portfolio_config "record-convention concentration arming (position 0.14 / exposure 0.70 / min_cash 0.30); live runs the code defaults")
