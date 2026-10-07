@@ -14,7 +14,8 @@
  (universe_path "../goldens-custom-universe/composition/top-3000-2000.sexp")
  (universe_size 3000)
  (config_overrides
-  (((enable_short_side false))
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((enable_short_side false))
    ((stops_config ((catastrophic_stop_pct 0.10))))
    ((portfolio_config ((max_position_pct_long 0.14))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))

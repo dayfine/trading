@@ -108,7 +108,8 @@
  (universe_path "universes/sp500.sexp")
  (universe_size 500)
  (config_overrides
-  (;; --- the armed StopLimit entry stack (the point of this golden) ---
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ;; --- the armed StopLimit entry stack (the point of this golden) ---
    ((enable_sim_entry_stoplimit true))
    ((sim_entry_trigger_at_suggested true))
    ((entry_anchor_local_range_weeks 4))

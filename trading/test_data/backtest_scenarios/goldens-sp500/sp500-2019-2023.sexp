@@ -58,7 +58,8 @@
  ;;   sortino_ratio_annualized 0.75   calmar_ratio 0.40   ulcer_index 8.41
  ;; MaxDD cut 12pp (34 → 22), trade count 3.3x. Tolerances ±15%.
  (config_overrides
-  (((portfolio_config ((max_position_pct_long 0.14))))
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((portfolio_config ((max_position_pct_long 0.14))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
    ((enable_stage3_force_exit true))

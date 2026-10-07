@@ -693,25 +693,25 @@ type config = {
           ({!Trading_simulation_cash_yield.Cash_yield.default_source}, the
           committed FRED 3-month T-bill series from 1954-01-04) net of
           [cash_yield_fee_bp]. Flipped on as an accounting change, not a
-          strategy ACCEPT (precedent #1926), after the paired 26y
-          implementation check passed for interest
+          strategy ACCEPT (precedent #1926), after the paired 26y implementation
+          check passed for interest
           ([dev/experiments/total-return-26y-2026-10-06/results-2026-10-07.md]:
           +0.232 log every salt vs a +0.24 estimate;
-          [dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decision
-          3). [No_yield] = the pre-#3137 price-only basis, an {b EXACT no-op}:
-          no accrual and no new metric key — pin it in [config_overrides] to
-          keep a pre-flip regression golden byte-identical. [Constant pct] = a
-          flat annualised rate. A relative [Series] path resolves against
+          [dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decision 3).
+          [No_yield] = the pre-#3137 price-only basis, an {b EXACT no-op}: no
+          accrual and no new metric key — pin it in [config_overrides] to keep a
+          pre-flip regression golden byte-identical. [Constant pct] = a flat
+          annualised rate. A relative [Series] path resolves against
           [TRADING_DATA_DIR]; a missing or unreadable file fails the run at
           load, and a simulated date before the series start fails the run —
           never a silent zero. A data dir without [macro/] (a synthetic test
-          fixture) must either carry the series file or pin [No_yield].
-          Accrued ACT/360 every calendar day of the measurement window on cash
-          net of margin debit and short proceeds, before the strategy step;
-          reported as [CashInterestTotal], and Sharpe becomes excess over the
-          same net rate. Accounting only: the strategy's order generation never
-          reads it. Semantics: {!Trading_simulation_cash_yield.Cash_yield}. R2:
-          real config field, an axis via [Overlay_validator]. *)
+          fixture) must either carry the series file or pin [No_yield]. Accrued
+          ACT/360 every calendar day of the measurement window on cash net of
+          margin debit and short proceeds, before the strategy step; reported as
+          [CashInterestTotal], and Sharpe becomes excess over the same net rate.
+          Accounting only: the strategy's order generation never reads it.
+          Semantics: {!Trading_simulation_cash_yield.Cash_yield}. R2: real
+          config field, an axis via [Overlay_validator]. *)
   cash_yield_fee_bp : float;
       [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
       (** Annual fee in basis points subtracted from the [cash_yield] rate,

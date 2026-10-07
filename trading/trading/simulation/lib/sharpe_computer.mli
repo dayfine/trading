@@ -15,4 +15,9 @@ val computer :
     ({!Trading_simulation_cash_yield.Cash_yield.period_rate}), i.e. Sharpe on
     excess return over the same rate the book's cash earns; [risk_free_rate] is
     then ignored. Raises [Failure] if a mark precedes the rate series' first
-    observation. *)
+    observation.
+
+    Weinstein backtests pass [cash_yield] by default since the #3137 default-on
+    flip ([Weinstein_strategy_config.cash_yield] = [Cash_yield.default_source]),
+    so their [SharpeRatio] is excess over the net 3-month T-bill rate unless the
+    run pins [((cash_yield No_yield))]. *)

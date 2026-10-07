@@ -299,7 +299,9 @@ let _make_base ~universe_path : Scenario.t =
     period = { start_date = _fixture_start; end_date = _ymd 2021 1 1 };
     universe_path;
     universe_schedule = [];
-    config_overrides = [];
+    (* #3137: the synthetic CSV data dir has no [macro/] T-bill series, so pin
+       the price-only basis (the cash-yield default would fail to load it). *)
+    config_overrides = [ Sexp.of_string "((cash_yield No_yield))" ];
     strategy = Backtest.Strategy_choice.default;
     slippage_bps = None;
     cost_model = None;

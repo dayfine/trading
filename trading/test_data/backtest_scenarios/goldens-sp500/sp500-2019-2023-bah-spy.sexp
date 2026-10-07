@@ -148,7 +148,8 @@
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))
  (universe_path "universes/spy-only.sexp")
  (universe_size 1)
- (config_overrides ())
+ (config_overrides
+  (((cash_yield No_yield)))) ;; #3137: price-only pin, keeps this regression golden byte-identical
  (strategy (Bah_benchmark (symbol SPY)))
  (expected
   ((total_return_pct       ((min  89.00)      (max   93.00)))

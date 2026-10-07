@@ -60,7 +60,8 @@
  (universe_path "universes/sp500-historical/sp500-2010-01-01.sexp")
  (universe_size 510)
  (config_overrides
-  (((enable_short_side true))
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((enable_short_side true))
    ((portfolio_config ((max_position_pct_long 0.14))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))

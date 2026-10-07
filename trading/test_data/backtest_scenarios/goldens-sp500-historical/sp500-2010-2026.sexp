@@ -69,7 +69,8 @@
  ;; Cell E rotation cuts MaxDD by 10pp vs the no-rotation 0.14/0.70 variant
  ;; (28 → 18.4) while running 22x more trades (40 → 806). Tolerances ±15%.
  (config_overrides
-  (((enable_short_side false))
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((enable_short_side false))
    ((portfolio_config ((max_position_pct_long 0.30))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))

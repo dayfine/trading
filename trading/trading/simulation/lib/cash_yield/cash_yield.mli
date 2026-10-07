@@ -49,8 +49,8 @@ val default_series_path : string
     series (1954-01-04 onward), relative to the data directory. *)
 
 val default_source : source
-(** [Series default_series_path] — the strategy-config default since the
-    #3137 default-on flip (accounting realism, approved by the paired 26y
+(** [Series default_series_path] — the strategy-config default since the #3137
+    default-on flip (accounting realism, approved by the paired 26y
     implementation check in
     [dev/experiments/total-return-26y-2026-10-06/results-2026-10-07.md]). *)
 

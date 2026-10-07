@@ -57,7 +57,8 @@
  (universe_path "../goldens-custom-universe/composition/top-3000-2019.sexp")
  (universe_size 3000)
  (config_overrides
-  (;; --- the armed StopLimit / E-anchored entry stack (the point of this cell) ---
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ;; --- the armed StopLimit / E-anchored entry stack (the point of this cell) ---
    ((enable_sim_entry_stoplimit true))
    ((sim_entry_trigger_at_suggested true))
    ((entry_extension_max_pct 2.0))

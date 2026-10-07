@@ -54,7 +54,8 @@
  (universe_size 3000)
  ;; Cell E config — identical to sp500-2010-2026.sexp.
  (config_overrides
-  (((enable_short_side false))
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((enable_short_side false))
    ((portfolio_config ((max_position_pct_long 0.30))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
