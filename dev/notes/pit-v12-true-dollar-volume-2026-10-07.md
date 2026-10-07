@@ -204,8 +204,8 @@ Phases are individually runnable (`preflight superset chunks classify chunk5 twi
 |---|---|
 | single-pass build of ~10k names OOM (exit 137 at 7.75 GB, v11) | four chunks (~2,320 names each), keyed on the symbol without `_old[N]` so a twin pair never straddles a boundary; any non-zero exit aborts and names exit=137 as OOM |
 | chunked `-incremental` misses cross-chunk rename twins (233 legs in v11) | `twinscan` (six chunk-pair twin passes, killed once the report exists) + `twinfix` (direct edges only: overlap >= 200, match >= 0.95, survivor not a >4-leg hub, leg not a restored false leg) + one dedupe rebuild + collateral rebuild; prints the `alias-lists.pl` command that applies the delta to the lists |
-| false transitive drops (86 in v11) | `classify` splits in-chunk drops at match 0.95 (reproduces v11: 360 legit / 86 false on v11's chunk reports); `chunk5` rebuilds the false legs as their own series |
-| `-incremental` manifest clobber (#2669, fixed #2724) | manifest entry count must equal the `.snap` count after every build step, else abort; run tree must contain #2724 |
+| false transitive drops (86 in v11) | `classify` splits in-chunk drops at match 0.95 (reproduces v11: 360 legit / 86 false on v11's chunk reports; v11's hand-made false-legs file had 84 because IMPX_old and WCAP_old were removed by hand, and v12 deliberately restores them like the other 84); `chunk5` rebuilds the false legs as their own series; an alias cycle aborts |
+| `-incremental` manifest clobber (#2669, fixed #2724) | after every build step every manifest entry must have a `.snap` and no `.snap` may be orphaned (in `$OUT`, not in the manifest), else abort. The one legitimate orphan source is the `twinfix` rebuild (chunk6): it drops cross-chunk legs from the manifest but leaves the `.snap` files the chunk builds wrote (v11: 9,364 manifest vs 9,597 `.snap`, 233 legs). Chunk6 is therefore checked with its own symbol set as the orphan allowance, and the dropped legs' `.snap` are deleted afterwards. A clobber orphans thousands of files, so it still aborts. `preflight` also requires #2724 in the run tree's history |
 | handle cap (#2882) | `verify` aborts if the manifest exceeds `SNAPSHOT_MAX_MMAP_HANDLES` (default 12,000); every chain on this warehouse exports it |
 | contention / disk | `preflight`: no other build/backtest process in the container, host free > 30 GB, refuses an existing `$OUT`, run tree clean |
 | store edit | `preflight` asserts the SGP_old1 tail cut (no rows after 2009-11-03) is still in the store |
@@ -215,9 +215,17 @@ the 3 quarantined; v11: 9,900 union, 9,364 manifest after dedupe, 3.5 GB). Chunk
 pair scans 33 to 38 min each (about 3.6 h), fixes about 1 min: **about 6 h wall, budget 7**. The warehouse should come
 out near 3.3 GB and roughly 9,000 entries. Container-exclusive (a chunk build sits at 5 to 6 GB; the pair scan at about 4.3 GB).
 
-Verification (`verify`): manifest == `.snap` count and <= the handle cap; D6 (every list symbol is in the manifest
-except the expected-absent set: `_old` synthetics, the 97 MISS names, 3 quarantined, MEL; anything else is printed as
-UNEXPECTED); six sample symbols (AAPL, AMZN, C, JPM, GSPC.INDX, AAAGY) with `.snap` size vs manifest `byte_size` and
+Resume: `twinfix` computes its plan (drop pairs, drop legs, `alias-v12-new.txt`) once, before the chunk6 build, and saves it
+(`twinfix.plan`); a rerun reuses it instead of rescanning the post-chunk6 manifest, where the dropped legs are already gone.
+A dry harness (`trading/devtools/checks/build_pit_warehouse_v12_guard_smoke.sh`, in `dune runtest`) pins the guard, the
+resume and D6 against a fake build.
+
+Verification (`verify`): manifest == `.snap` set (after the prune) and <= the handle cap; D6 (every list symbol is in the
+manifest except the v12 expected-absent set: MEL, built from two interleaved issuers and excluded in
+`warehouse_exceptions.sexp`, plus the legs of `alias-v12-new.txt` and the in-chunk alias map, which the lists lose when the
+delta is applied. The v11 exemptions do not carry over: all 9,273 v12 list symbols have a CSV, including the 251 `_old`,
+and none of the 109 fetch-miss or 3 quarantined names is in a v12 list, so an `_old` series missing from the warehouse is
+a real drop; anything unexpected aborts `verify`); six sample symbols (AAPL, AMZN, C, JPM, GSPC.INDX, AAAGY) with `.snap` size vs manifest `byte_size` and
 `active_through` vs the last CSV row; warehouse size. Afterwards: copy `terminal_runs.csv`, `splice_actions.csv` and the
 rename-twin reports to an experiment dir, and require **V6 = 0** on the first null cell.
 
