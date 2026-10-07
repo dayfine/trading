@@ -36,15 +36,58 @@ let rec _walk_dir dir ~f =
         (Fpath.to_string dir) msg
   | Ok entries -> List.iter entries ~f:(_dispatch_entry ~walk:_walk_dir ~f)
 
+(* First and last date of a [data.csv] (first column of the first and last data
+   rows; the header row is skipped). [None] when the file has no data rows or
+   an unparseable date. *)
+let _csv_date_range path =
+  let date_of_line line =
+    match String.lsplit2 line ~on:',' with
+    | Some (d, _) -> Option.try_with (fun () -> Date.of_string d)
+    | None -> None
+  in
+  match In_channel.read_lines (Fpath.to_string path) with
+  | exception _ -> None
+  | _ :: (_ :: _ as rows) -> (
+      match
+        (date_of_line (List.hd_exn rows), date_of_line (List.last_exn rows))
+      with
+      | Some first, Some last -> Some (first, last)
+      | _ -> None)
+  | _ -> None
+
+(* Entry derived from a [data.csv] whose directory has no readable
+   [data.metadata.sexp]. The symbol is the directory name. *)
+let _entry_of_csv fpath =
+  let symbol = Fpath.(basename (parent fpath)) in
+  Option.map (_csv_date_range fpath) ~f:(fun (data_start_date, data_end_date) ->
+      { symbol; data_start_date; data_end_date })
+
 let build ~data_dir =
-  let entries = ref [] in
+  let from_metadata = ref [] and csv_paths = ref [] in
   _walk_dir data_dir ~f:(fun fpath ->
-      if String.equal (Fpath.filename fpath) "data.metadata.sexp" then
-        match File_sexp.Sexp.load (module Metadata.T_sexp) ~path:fpath with
-        | Error _ -> ()
-        | Ok meta -> entries := _entry_of_metadata meta :: !entries);
+      match Fpath.filename fpath with
+      | "data.metadata.sexp" -> (
+          match File_sexp.Sexp.load (module Metadata.T_sexp) ~path:fpath with
+          | Error _ -> ()
+          | Ok meta ->
+              from_metadata := _entry_of_metadata meta :: !from_metadata)
+      | "data.csv" -> csv_paths := fpath :: !csv_paths
+      | _ -> ());
+  let known =
+    Hash_set.of_list
+      (module String)
+      (List.map !from_metadata ~f:(fun e -> e.symbol))
+  in
+  (* Symbols fetched without a metadata file (e.g. bulk gap fetches) still count. *)
+  let from_csv =
+    List.filter_map !csv_paths ~f:(fun p ->
+        match _entry_of_csv p with
+        | Some e when not (Hash_set.mem known e.symbol) -> Some e
+        | _ -> None)
+  in
   let symbols =
-    List.sort !entries ~compare:(fun a b -> String.compare a.symbol b.symbol)
+    List.sort (!from_metadata @ from_csv) ~compare:(fun a b ->
+        String.compare a.symbol b.symbol)
   in
   { generated_at = Date.today ~zone:Time_float.Zone.utc; symbols }
 

@@ -1,5 +1,9 @@
 (tests
- (names test_live_source test_historical_source test_sector_map)
+ (names
+  test_live_source
+  test_historical_source
+  test_sector_map
+  test_inventory)
  (libraries
   data_source
   core
