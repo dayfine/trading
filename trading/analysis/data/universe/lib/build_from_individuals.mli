@@ -67,6 +67,17 @@ type config = {
           default to empty sector. *)
   inventory_path : string;
       (** Path to [inventory.sexp] (see [weinstein.data_source]). *)
+  dollar_volume : Dollar_volume_basis.config;
+      [@sexp.default Dollar_volume_basis.legacy_config]
+      (** Basis the ranker scores on (issue #3136). Default
+          {!Dollar_volume_basis.legacy_config}: [close * volume] as stored,
+          whose score is bit-identical to pre-#3136 (same order, products,
+          fold); a rebuild on a changed store or inventory still differs from
+          the committed PIT lists. With
+          {!Dollar_volume_basis.true_dollars_config} each symbol's [splits.csv]
+          (next to its [data.csv]) is read and the score is true dollars traded,
+          implausible bars dropped; a symbol with no [splits.csv] is scored with
+          no splits ([F = 1]). *)
 }
 [@@deriving sexp]
 
@@ -79,7 +90,8 @@ val default_config :
   config
 (** [default_config ~size ~bars_root ~symbol_types_path ~sectors_csv_path
      ~inventory_path] sets [trailing_window_days = 60] and
-    [min_window_bars = 30]. *)
+    [min_window_bars = 30] and
+    [dollar_volume = Dollar_volume_basis.legacy_config]. *)
 
 val avg_dollar_volume_for_bars :
   date:Date.t ->
@@ -94,8 +106,9 @@ val avg_dollar_volume_for_bars :
     [min_window_bars] bars fall inside it, else [None] (the same condition under
     which {!build} drops a symbol). Pure helper over an already-read [bar list]
     so a caller that needs both this score and {!latest_close_for_bars} reads
-    the CSV once. This is the exact scoring {!avg_dollar_volume_for_symbol} and
-    {!build}'s ranker apply. *)
+    the CSV once. This is the scoring {!avg_dollar_volume_for_symbol} and
+    {!build}'s ranker apply under the default (legacy) [dollar_volume] basis; it
+    always uses that basis. *)
 
 val latest_close_for_bars :
   date:Date.t -> Composition_bar_reader.bar list -> float option
@@ -110,8 +123,8 @@ val avg_dollar_volume_for_symbol :
     symbol's trailing dollar-volume score using the *exact* same logic {!build}
     applies when ranking the universe: read the symbol's bars from
     [config.bars_root], window to [[date - config.trailing_window_days, date]],
-    and return [Some (avg (close * volume))] over the window when at least
-    [config.min_window_bars] bars fall inside it, else [None].
+    and return the mean dollar volume on [config.dollar_volume]'s basis over the
+    window when at least [config.min_window_bars] bars are kept, else [None].
 
     Exposed so a snapshot-enrichment pass can backfill the per-entry
     [avg_dollar_volume] field for an *existing* symbol set without re-ranking
@@ -119,8 +132,8 @@ val avg_dollar_volume_for_symbol :
     [data.csv] is missing / unreadable or the window has too few bars — the same
     conditions under which {!build} would have dropped the symbol. Only
     [config.bars_root], [config.trailing_window_days], and
-    [config.min_window_bars] are consulted; the inventory / sector / size fields
-    are unused. *)
+    [config.min_window_bars] and [config.dollar_volume] are consulted; the
+    inventory / sector / size fields are unused. *)
 
 val build : date:Date.t -> config:config -> Snapshot.t Status.status_or
 (** [build ~date ~config] runs the algorithm described in the module docstring

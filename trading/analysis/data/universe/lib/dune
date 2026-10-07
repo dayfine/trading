@@ -9,12 +9,21 @@
   staleness
   composition_inputs
   composition_bar_reader
+  dollar_volume_basis
   composition_policy_types
   asset_type_blocklist
   dual_class
   composition_policy
   composition_policy_report
   cross_validation)
- (libraries core eodhd kenneth_french shiller status synthetic)
+ (libraries
+  core
+  csv.corporate_actions
+  fpath
+  eodhd
+  kenneth_french
+  shiller
+  status
+  synthetic)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

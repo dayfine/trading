@@ -21,6 +21,8 @@ type config = {
   symbol_types_path : string;
   sectors_csv_path : string;
   inventory_path : string;
+  dollar_volume : Dollar_volume_basis.config;
+      [@sexp.default Dollar_volume_basis.legacy_config]
 }
 [@@deriving sexp]
 
@@ -34,6 +36,7 @@ let default_config ~size ~bars_root ~symbol_types_path ~sectors_csv_path
     symbol_types_path;
     sectors_csv_path;
     inventory_path;
+    dollar_volume = Dollar_volume_basis.legacy_config;
   }
 
 (* ------------------------------------------------------------------ *)
@@ -84,10 +87,19 @@ let avg_dollar_volume_for_bars ~date ~trailing_window_days ~min_window_bars bars
     in
     Some (total /. Float.of_int n)
 
-let _dollar_volume_score ~date ~config bars =
-  avg_dollar_volume_for_bars ~date
-    ~trailing_window_days:config.trailing_window_days
-    ~min_window_bars:config.min_window_bars bars
+(* Scores on [config.dollar_volume]'s basis. A missing [splits.csv] under the
+   true-dollar basis scores with no splits (F = 1). *)
+let _dollar_volume_score ~date ~config ~symbol bars =
+  let dv = config.dollar_volume in
+  let splits =
+    Dollar_volume_basis.read_applied_splits dv ~bars_root:config.bars_root
+      symbol bars
+    |> Option.value ~default:[]
+  in
+  (Dollar_volume_basis.score_window dv ~splits ~date
+     ~trailing_window_days:config.trailing_window_days
+     ~min_window_bars:config.min_window_bars bars)
+    .avg
 
 (* ------------------------------------------------------------------ *)
 (* Forward-return calculation                                          *)
@@ -136,7 +148,7 @@ let _score_symbol ~date ~config symbol : _scored option =
   match BR.read_bars ~bars_root:config.bars_root symbol with
   | None -> None
   | Some bars -> (
-      match _dollar_volume_score ~date ~config bars with
+      match _dollar_volume_score ~date ~config ~symbol bars with
       | None -> None
       | Some score ->
           let forward_return = _forward_return ~date bars in
@@ -215,7 +227,7 @@ let _build_validated ~date ~config ~inventory ~equity_like_lookup ~sector_lookup
 let avg_dollar_volume_for_symbol ~date ~config symbol =
   match BR.read_bars ~bars_root:config.bars_root symbol with
   | None -> None
-  | Some bars -> _dollar_volume_score ~date ~config bars
+  | Some bars -> _dollar_volume_score ~date ~config ~symbol bars
 
 let build ~date ~config =
   let open Result.Let_syntax in
