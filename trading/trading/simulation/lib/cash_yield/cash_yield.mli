@@ -27,10 +27,11 @@
 
 open Core
 
-(** Where the gross rate comes from. A strategy-config axis: the default
-    [No_yield] is the exact pre-#3137 behaviour (no accrual at all). *)
+(** Where the gross rate comes from. A strategy-config axis: [No_yield] is the
+    exact pre-#3137 behaviour (no accrual at all); the strategy-config default
+    is {!default_source}. *)
 type source =
-  | No_yield  (** No interest on cash (default). *)
+  | No_yield  (** No interest on cash (the pre-#3137 price-only basis). *)
   | Constant of float
       (** A flat annualised rate in percent ([4.0] = 4 %/yr). *)
   | Series of string
@@ -42,6 +43,16 @@ type source =
 
 val default_fee_bp : float
 (** [10.0] bp/yr — an SGOV/BIL-class T-bill fund expense ratio. *)
+
+val default_series_path : string
+(** ["macro/tbill_3m_dtb3.csv"] — the committed FRED [DTB3] 3-month T-bill
+    series (1954-01-04 onward), relative to the data directory. *)
+
+val default_source : source
+(** [Series default_series_path] — the strategy-config default since the
+    #3137 default-on flip (accounting realism, approved by the paired 26y
+    implementation check in
+    [dev/experiments/total-return-26y-2026-10-06/results-2026-10-07.md]). *)
 
 type t
 (** A resolved rate source net of its fee. *)

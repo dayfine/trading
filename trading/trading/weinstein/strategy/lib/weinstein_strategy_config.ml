@@ -87,7 +87,7 @@ type config = {
   long_margin_rate_annual_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   maintenance_long_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   cash_yield : Trading_simulation_cash_yield.Cash_yield.source;
-      [@sexp.default Trading_simulation_cash_yield.Cash_yield.No_yield]
+      [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_source]
       (** See [.mli]. *)
   cash_yield_fee_bp : float;
       [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
@@ -238,7 +238,7 @@ let default_config ~universe ~index_symbol =
     initial_long_margin_req = 1.0;
     long_margin_rate_annual_pct = 0.0;
     maintenance_long_pct = 0.0;
-    cash_yield = Trading_simulation_cash_yield.Cash_yield.No_yield;
+    cash_yield = Trading_simulation_cash_yield.Cash_yield.default_source;
     cash_yield_fee_bp = Trading_simulation_cash_yield.Cash_yield.default_fee_bp;
     dividend_crediting = false;
     resistance_min_history_bars = 0;

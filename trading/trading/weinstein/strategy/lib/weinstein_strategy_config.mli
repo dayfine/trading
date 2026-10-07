@@ -685,22 +685,33 @@ type config = {
           R2: real config field; default-off until a ledger ACCEPT plus the
           promotion-confirmation grid. *)
   cash_yield : Trading_simulation_cash_yield.Cash_yield.source;
-      [@sexp.default Trading_simulation_cash_yield.Cash_yield.No_yield]
+      [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_source]
       (** Interest on positive cash (issue #3137) — an accounting-realism dial,
           not a strategy mechanism: Weinstein (Ch. 9) parks out-of-market cash
-          in a money-market fund. [No_yield] (default) = {b EXACT no-op}, no
-          accrual and no new metric key (R1). [Constant pct] = a flat annualised
-          rate; [Series path] = a dated rate CSV, e.g. the committed 3-month
-          T-bill series [macro/tbill_3m_dtb3.csv] (relative paths resolve
-          against [TRADING_DATA_DIR]). Accrued ACT/360 every calendar day of the
-          measurement window on cash net of margin debit and short proceeds,
-          before the strategy step; reported as [CashInterestTotal], and Sharpe
-          becomes excess over the same rate. A simulated date before the series
-          start fails the run. Semantics:
-          {!Trading_simulation_cash_yield.Cash_yield}. Flip to on is planned as
-          an accounting change after the paired re-run
-          ([dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decision
-          3). R2: real config field, an axis via [Overlay_validator]. *)
+          in a money-market fund. {b Default:}
+          [Series "macro/tbill_3m_dtb3.csv"]
+          ({!Trading_simulation_cash_yield.Cash_yield.default_source}, the
+          committed FRED 3-month T-bill series from 1954-01-04) net of
+          [cash_yield_fee_bp]. Flipped on as an accounting change, not a
+          strategy ACCEPT (precedent #1926), after the paired 26y
+          implementation check passed for interest
+          ([dev/experiments/total-return-26y-2026-10-06/results-2026-10-07.md]:
+          +0.232 log every salt vs a +0.24 estimate;
+          [dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decision
+          3). [No_yield] = the pre-#3137 price-only basis, an {b EXACT no-op}:
+          no accrual and no new metric key — pin it in [config_overrides] to
+          keep a pre-flip regression golden byte-identical. [Constant pct] = a
+          flat annualised rate. A relative [Series] path resolves against
+          [TRADING_DATA_DIR]; a missing or unreadable file fails the run at
+          load, and a simulated date before the series start fails the run —
+          never a silent zero. A data dir without [macro/] (a synthetic test
+          fixture) must either carry the series file or pin [No_yield].
+          Accrued ACT/360 every calendar day of the measurement window on cash
+          net of margin debit and short proceeds, before the strategy step;
+          reported as [CashInterestTotal], and Sharpe becomes excess over the
+          same net rate. Accounting only: the strategy's order generation never
+          reads it. Semantics: {!Trading_simulation_cash_yield.Cash_yield}. R2:
+          real config field, an axis via [Overlay_validator]. *)
   cash_yield_fee_bp : float;
       [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
       (** Annual fee in basis points subtracted from the [cash_yield] rate,
@@ -718,8 +729,9 @@ type config = {
           held symbol with no file credits nothing and is counted. Reported as
           [DividendIncomeTotal] / [DividendPaidShortTotal] /
           [DividendSkippedNoAmountCount] / [DividendMissingFileCount].
-          Semantics: {!Trading_simulation_dividends.Dividend_crediting}. Flip to
-          on is planned with [cash_yield] after the paired re-run
+          Semantics: {!Trading_simulation_dividends.Dividend_crediting}. Stays
+          off: the paired 26y check did not pass for dividends (phantom-split
+          double count, #3173); the flip waits on that fix
           ([dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decisions
           2-3). R2: real config field, an axis via [Overlay_validator]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
