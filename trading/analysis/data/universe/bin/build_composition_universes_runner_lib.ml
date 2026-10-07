@@ -64,3 +64,36 @@ let run ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
       List.fold top_ns ~init:acc ~f:(fun acc top_n ->
           _step ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
             ~inventory_path ~out_dir ~top_n ~year acc))
+
+let _committed_components = [ "goldens-custom-universe"; "composition" ]
+
+(* Resolve symlinks when the path exists; otherwise fall back to the lexical
+   absolute path. Either way "." and ".." components are then collapsed. *)
+let _canonical_components out_dir =
+  let abs =
+    match Filename_unix.realpath out_dir with
+    | p -> p
+    | exception _ ->
+        if Filename.is_absolute out_dir then out_dir
+        else Filename.concat (Sys_unix.getcwd ()) out_dir
+  in
+  String.split abs ~on:'/'
+  |> List.fold ~init:[] ~f:(fun acc c ->
+      match c with
+      | "" | "." -> acc
+      | ".." -> ( match acc with _ :: rest -> rest | [] -> [])
+      | c -> c :: acc)
+  |> List.rev
+
+let is_committed_dir out_dir =
+  List.is_suffix
+    (_canonical_components out_dir)
+    ~suffix:_committed_components ~equal:String.equal
+
+let dollar_volume_of_flag ~true_dollars ~out_dir =
+  if not true_dollars then Ok Universe.Dollar_volume_basis.legacy_config
+  else if is_committed_dir out_dir then
+    Error
+      "--true-dollar-volume writes new lists; pass an --out-dir other than the \
+       committed composition directory"
+  else Ok Universe.Dollar_volume_basis.true_dollars_config

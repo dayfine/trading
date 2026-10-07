@@ -19,7 +19,13 @@
 (library
  (name build_composition_universes_runner_lib)
  (modules build_composition_universes_runner_lib)
- (libraries core status universe)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  status
+  universe)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
 

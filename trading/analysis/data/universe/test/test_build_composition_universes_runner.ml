@@ -201,6 +201,59 @@ let test_multi_size_writes_one_file_per_size _ =
          equal_to "top-5-2020.sexp";
        ])
 
+let _mk_committed () =
+  let root = _make_tmp_dir "committed" in
+  let dir = Filename.concat root "goldens-custom-universe/composition" in
+  ignore
+    (Stdlib.Sys.command (Printf.sprintf "mkdir -p %s" (Filename.quote dir))
+      : int);
+  (root, dir)
+
+let _refused ~out_dir =
+  Result.is_error (Runner.dollar_volume_of_flag ~true_dollars:true ~out_dir)
+
+let test_committed_dir_refused _ =
+  let root, dir = _mk_committed () in
+  let other = Filename.concat root "other" in
+  ignore
+    (Stdlib.Sys.command (Printf.sprintf "mkdir -p %s" (Filename.quote other))
+      : int);
+  let link = Filename.concat root "link" in
+  Core_unix.symlink ~target:dir ~link_name:link;
+  assert_that
+    [
+      _refused ~out_dir:dir;
+      _refused ~out_dir:(dir ^ "/");
+      _refused ~out_dir:(dir ^ "/.");
+      _refused ~out_dir:(other ^ "/../goldens-custom-universe/composition");
+      _refused ~out_dir:link;
+    ]
+    (elements_are
+       [
+         equal_to true;
+         equal_to true;
+         equal_to true;
+         equal_to true;
+         equal_to true;
+       ]);
+  _cleanup_dir root
+
+let test_other_dir_and_legacy_accepted _ =
+  let root, dir = _mk_committed () in
+  let other = Filename.concat root "elsewhere" in
+  assert_that
+    ( _refused ~out_dir:other,
+      Result.ok (Runner.dollar_volume_of_flag ~true_dollars:false ~out_dir:dir)
+    )
+    (all_of
+       [
+         field (fun (a, _) -> a) (equal_to false);
+         field
+           (fun (_, b) -> b)
+           (is_some_and (equal_to Universe.Dollar_volume_basis.legacy_config));
+       ]);
+  _cleanup_dir root
+
 let suite =
   "Build_composition_universes_runner"
   >::: [
@@ -208,6 +261,9 @@ let suite =
          "test_skip_on_insufficient_signal" >:: test_skip_on_insufficient_signal;
          "test_multi_size_writes_one_file_per_size"
          >:: test_multi_size_writes_one_file_per_size;
+         "test_committed_dir_refused" >:: test_committed_dir_refused;
+         "test_other_dir_and_legacy_accepted"
+         >:: test_other_dir_and_legacy_accepted;
        ]
 
 let () = run_test_tt_main suite

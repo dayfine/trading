@@ -355,7 +355,8 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
   whose stored volume is restated (3:1-or-larger splits checked). Bars above
   $200B/day are rejected and listed. Wired into
   `Build_from_individuals.config.dollar_volume` (default `legacy_config`, so
-  the committed lists are reproduced bit-for-bit) and into the composition
+  the score is bit-identical to pre-#3136; a rebuild on today's store differs
+  from the committed lists) and into the composition
   runner's `--true-dollar-volume` flag, which refuses the committed
   composition dir.
 - [x] Measurement exe `analysis/data/universe/bin/dollar_volume_measurement.exe`

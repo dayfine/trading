@@ -71,7 +71,9 @@ type config = {
       [@sexp.default Dollar_volume_basis.legacy_config]
       (** Basis the ranker scores on (issue #3136). Default
           {!Dollar_volume_basis.legacy_config}: [close * volume] as stored,
-          which reproduces the committed PIT lists. With
+          whose score is bit-identical to pre-#3136 (same order, products,
+          fold); a rebuild on a changed store or inventory still differs from
+          the committed PIT lists. With
           {!Dollar_volume_basis.true_dollars_config} each symbol's [splits.csv]
           (next to its [data.csv]) is read and the score is true dollars traded,
           implausible bars dropped; a symbol with no [splits.csv] is scored with

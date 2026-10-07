@@ -38,5 +38,20 @@ val run :
     raises.
 
     [dollar_volume] sets the ranker's dollar-volume basis (issue #3136);
-    {!Universe.Dollar_volume_basis.legacy_config} reproduces the committed
-    lists. *)
+    {!Universe.Dollar_volume_basis.legacy_config} scores bit-identically to
+    pre-#3136 (same order, products and fold); a rebuild on today's store and
+    candidate set will not reproduce the committed lists. *)
+
+val is_committed_dir : string -> bool
+(** [is_committed_dir path] is true when [path], after resolving symlinks (when
+    it exists) and collapsing [.] / [..] / trailing [/], ends in the components
+    [goldens-custom-universe/composition] — the committed PIT lists. *)
+
+val dollar_volume_of_flag :
+  true_dollars:bool ->
+  out_dir:string ->
+  (Universe.Dollar_volume_basis.config, string) Result.t
+(** Maps the [--true-dollar-volume] flag to a basis config. Without the flag:
+    [Ok legacy_config] for any [out_dir]. With it: [Error _] when
+    {!is_committed_dir} [out_dir] (the true basis must never overwrite the
+    committed lists), else [Ok true_dollars_config]. *)

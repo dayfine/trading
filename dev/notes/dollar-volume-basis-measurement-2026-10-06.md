@@ -80,8 +80,7 @@ empty.
 
 `L` is the list rebuilt from today's store on the stored basis, `T` the list on
 the true basis, and `C` the committed list. "basis" = |L\T| / N, which isolates
-the fix. "vs committed" = |C\T| / |C|, what a rebuild would move against what
-backtests read today.
+the fix. "vs committed" = |C\T| / |C|, the basis effect plus store and candidate-set drift (see below). It is what a rebuild would move against what backtests read today only if the inventory is regenerated too.
 
 | vintage | top-3000 basis | top-3000 vs committed | top-1000 basis | top-1000 vs committed |
 |---|---:|---:|---:|---:|
@@ -119,10 +118,7 @@ which is exactly the look-ahead.
   splitters are large caps, near the top-1000 cut.
 - The effect fades toward the present because fewer future splits remain.
 
-**Store drift is larger than the basis effect in two vintages.** 1998 (C\L 519
-of 3000) and 2025 (570 of 3000) were evidently built from a different store
-state. A rebuild would replace those two vintages substantially whatever the
-basis.
+**Store drift is at least as large as the basis effect in most top-3000 vintages.** By the per-vintage table, C\L exceeds L\T in 22 of 28 top-3000 vintages (e.g. 2004: 127 vs 86; 2009: 128 vs 97; 2014: 121 vs 103) and in 1 of 28 top-1000 vintages, so for the top-3000 the "vs committed" column is mostly drift, not basis. C\L combines two things: (a) symbols gone from the store (508 of the 1998 committed members have no `data.csv` today; only 7 of the 2025 members are missing, so 2025 570 is mostly candidate-set expansion), and (b) the candidate set: this measurement takes 11,859 bar-based candidates from every `data.csv`, while a real rebuild via `Build_from_individuals` filters by `inventory.sexp` (5,734 symbols, generated 2026-07-12). The "vs committed" column therefore describes a rebuild only if the inventory is regenerated from the store too; a rebuild on the committed inventory would move a different, probably smaller, set (not measured here).
 
 ## Liquidity gates: not built, measured
 
@@ -175,9 +171,7 @@ would be the same.
 ## Decision for the user (the [after-merge] item)
 
 Whether to rebuild the PIT lists, and with them the warehouse and every
-record, on the true basis. The numbers above are the input: 2-4 % of the
-top-3000 per vintage from the basis alone (3-14 % for the top-1000), plus store
-drift that a rebuild would carry in anyway. The liquidity-gate fix needs a
+record, on the true basis. The numbers above are the input: 2-4 % of the top-3000 per vintage from the basis alone (3-14 % for the top-1000). For the top-3000 the rebuild decision is mostly a store and inventory refresh decision (drift exceeds the basis effect in 22 of 28 vintages), with the basis a 2-4 % component; the move against the committed lists holds only if the inventory is regenerated too. The liquidity-gate fix needs a
 snapshot-schema change and is a separate decision.
 
 ---

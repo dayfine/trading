@@ -65,21 +65,6 @@ let _default_end_year = 2026
 
 (* The true-dollar basis (#3136) must never overwrite the committed PIT lists:
    any --out-dir naming the committed composition directory is refused. *)
-let _committed_dir_suffix = "goldens-custom-universe/composition"
-
-let _is_committed_dir out_dir =
-  String.is_suffix
-    (String.rstrip out_dir ~drop:(Char.equal '/'))
-    ~suffix:_committed_dir_suffix
-
-let _dollar_volume_of_flag ~true_dollars ~out_dir =
-  if not true_dollars then Universe.Dollar_volume_basis.legacy_config
-  else if _is_committed_dir out_dir then
-    _exit_with_error
-      "--true-dollar-volume writes new lists; pass an --out-dir other than the \
-       committed composition directory"
-  else Universe.Dollar_volume_basis.true_dollars_config
-
 let command =
   Command.basic
     ~summary:
@@ -130,7 +115,14 @@ let command =
      in
      fun () ->
        let top_ns = _parse_top_n_list top_n_raw in
-       let dollar_volume = _dollar_volume_of_flag ~true_dollars ~out_dir in
+       let dollar_volume =
+         match
+           Build_composition_universes_runner_lib.dollar_volume_of_flag
+             ~true_dollars ~out_dir
+         with
+         | Ok c -> c
+         | Error msg -> _exit_with_error msg
+       in
        _run ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
          ~inventory_path ~out_dir ~start_year ~end_year ~top_ns)
 
