@@ -6,6 +6,7 @@
   trading.simulation.data
   trading.simulation.cash_yield
   trading.simulation.dividends
+  csv.split_dividend_guard
   trading.base
   trading.portfolio
   trading.engine

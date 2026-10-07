@@ -816,6 +816,10 @@ type config = {
   dividend_crediting : bool; [@sexp.default false]
       (** Cash dividends on held positions (#3137). Default [false] => exact
           no-op (R1). See [Weinstein_strategy_config.dividend_crediting]. *)
+  split_dividend_guard : bool; [@sexp.default false]
+      (** Drop a detected split that the vendor files show is a cash dividend
+          (#3173). Default [false] => exact no-op (R1). See
+          [Weinstein_strategy_config.split_dividend_guard]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into the per-screen
           [Stock_analysis.config.resistance.min_history_bars] (and, via the

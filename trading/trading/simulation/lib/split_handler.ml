@@ -1,6 +1,14 @@
 open Core
 
-let detect_for_symbol ~adapter ~date ~symbol =
+(* #3173: with no guard the detected factor passes through unchanged. *)
+let _guard split_guard ~symbol ~date ~(prev : Types.Daily_price.t) detected =
+  match split_guard with
+  | None -> detected
+  | Some guard ->
+      Split_dividend_guard.filter guard ~symbol ~date
+        ~prev_close:prev.close_price detected
+
+let detect_for_symbol ?split_guard ~adapter ~date ~symbol () =
   let curr =
     Trading_simulation_data.Market_data_adapter.get_price adapter ~symbol ~date
   in
@@ -10,13 +18,14 @@ let detect_for_symbol ~adapter ~date ~symbol =
   in
   let%bind.Option curr = curr in
   let%bind.Option prev = prev in
-  let%map.Option factor = Types.Split_detector.detect_split ~prev ~curr () in
+  let detected = Types.Split_detector.detect_split ~prev ~curr () in
+  let%map.Option factor = _guard split_guard ~symbol ~date ~prev detected in
   { Trading_portfolio.Split_event.symbol; date; factor }
 
-let detect_for_held_positions ~adapter ~date ~portfolio =
+let detect_for_held_positions ?split_guard ~adapter ~date ~portfolio () =
   List.filter_map portfolio.Trading_portfolio.Portfolio.positions
     ~f:(fun (pos : Trading_portfolio.Types.portfolio_position) ->
-      detect_for_symbol ~adapter ~date ~symbol:pos.symbol)
+      detect_for_symbol ?split_guard ~adapter ~date ~symbol:pos.symbol ())
 
 let apply_events portfolio events =
   List.fold events ~init:portfolio ~f:(fun acc event ->
@@ -83,3 +92,9 @@ let apply_to_positions (positions : Trading_strategy.Position.t String.Map.t)
     Trading_strategy.Position.t String.Map.t =
   List.fold events ~init:positions ~f:(fun acc event ->
       Map.map acc ~f:(_apply_event_to_position event))
+
+let detect_and_apply ?split_guard ~adapter ~date ~portfolio ~positions () =
+  let events =
+    detect_for_held_positions ?split_guard ~adapter ~date ~portfolio ()
+  in
+  (apply_events portfolio events, apply_to_positions positions events, events)

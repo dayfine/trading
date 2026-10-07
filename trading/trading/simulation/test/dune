@@ -710,3 +710,21 @@
   types
   matchers
   simulation_test_helpers))
+
+(test
+ (name test_split_handler_dividend_guard)
+ (modules test_split_handler_dividend_guard)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  status
+  trading.base
+  trading.strategy
+  trading.simulation
+  trading.simulation.data
+  trading.portfolio
+  csv.corporate_actions
+  csv.split_dividend_guard
+  types
+  matchers))

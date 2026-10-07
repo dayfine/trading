@@ -59,6 +59,7 @@
   test_long_buying_power
   test_leverage_dawn
   test_stops_split_runner
+  test_stops_split_dividend_guard
   test_weekly_ma_cache
   test_weinstein_strategy
   test_weinstein_strategy_smoke
@@ -71,6 +72,8 @@
   status
   bos
   csv
+  csv.corporate_actions
+  csv.split_dividend_guard
   fpath
   trading.base
   trading.data_panel

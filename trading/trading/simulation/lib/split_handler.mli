@@ -15,24 +15,32 @@
 open Core
 
 val detect_for_symbol :
+  ?split_guard:Split_dividend_guard.t ->
   adapter:Trading_simulation_data.Market_data_adapter.t ->
   date:Date.t ->
   symbol:string ->
+  unit ->
   Trading_portfolio.Split_event.t option
 (** Detect a split for [symbol] between the prior trading day's bar and today's
     bar. Returns [Some event] when both bars exist and
     {!Types.Split_detector.detect_split} fires; otherwise [None]. Pure with
-    respect to the adapter's cache. *)
+    respect to the adapter's cache.
+
+    [split_guard] (issue #3173, default absent = the pre-#3173 behaviour) drops
+    a detected split that {!Split_dividend_guard.filter} identifies as a vendor
+    cash dividend, so a held position gains no phantom shares. *)
 
 val detect_for_held_positions :
+  ?split_guard:Split_dividend_guard.t ->
   adapter:Trading_simulation_data.Market_data_adapter.t ->
   date:Date.t ->
   portfolio:Trading_portfolio.Portfolio.t ->
+  unit ->
   Trading_portfolio.Split_event.t list
-(** For every symbol currently held in [portfolio], call {!detect_for_symbol}.
-    Symbols with no current bar (weekends/holidays) or no prior bar (first
-    appearance) yield no event. Order follows [portfolio.positions] (sorted by
-    symbol). *)
+(** For every symbol currently held in [portfolio], call {!detect_for_symbol}
+    (with [split_guard]). Symbols with no current bar (weekends/holidays) or no
+    prior bar (first appearance) yield no event. Order follows
+    [portfolio.positions] (sorted by symbol). *)
 
 val apply_events :
   Trading_portfolio.Portfolio.t ->
@@ -65,3 +73,18 @@ val apply_to_positions :
     event matches positions by symbol; multiple positions on the same symbol
     (lots reopened after a prior close) all get scaled. Order matches
     {!apply_events}: events are folded in detection order. Pure. *)
+
+val detect_and_apply :
+  ?split_guard:Split_dividend_guard.t ->
+  adapter:Trading_simulation_data.Market_data_adapter.t ->
+  date:Date.t ->
+  portfolio:Trading_portfolio.Portfolio.t ->
+  positions:Trading_strategy.Position.t String.Map.t ->
+  unit ->
+  Trading_portfolio.Portfolio.t
+  * Trading_strategy.Position.t String.Map.t
+  * Trading_portfolio.Split_event.t list
+(** The simulator's daily split step: {!detect_for_held_positions} on
+    [portfolio] (with [split_guard]), then {!apply_events} and
+    {!apply_to_positions} with the same events. Returns
+    [(portfolio, positions, events)]. *)

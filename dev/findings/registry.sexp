@@ -256,3 +256,27 @@
                 "#3146: covers_shorts on either side held blocks either side"))
          (validator V6)))
  (status fixed-behind-flag))
+
+((issue 3173) (ref "total-return-26y-2026-10-06 Defect 1: TDG 2013-07-11, WING 2018-02-08, BCH 2010-03-17")
+ (finding "large cash dividends on held positions read as 22:19 / 15:14 splits: phantom shares in both arms, credited again under dividend_crediting")
+ (guard ((unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
+                "tdg special dividend rejected"))
+         (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
+                "wing dividend one bar off rejected"))
+         (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
+                "bch dividend adjusted amount fallback rejected"))
+         (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
+                "real split with vendor row kept"))
+         (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
+                "dividend two bars off rejected"))
+         (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
+                "vendor split two bars off kept"))
+         (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"
+                "guard drops dividend split"))
+         (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"
+                "detect_and_apply guard keeps held position"))
+         (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"
+                "detect_and_apply no guard scales held position"))
+         (unit ("trading/trading/weinstein/strategy/test/test_stops_split_dividend_guard.ml"
+                "guarded reader drops dividend split"))))
+ (status fixed-behind-flag))

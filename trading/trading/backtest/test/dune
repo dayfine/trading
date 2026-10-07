@@ -86,6 +86,7 @@
   trading.simulation.cash_yield
   trading.simulation.data
   trading.simulation.types
+  csv.split_dividend_guard
   trading.strategy
   weinstein_trading.strategy
   weinstein_trading.portfolio_risk

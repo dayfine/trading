@@ -38,6 +38,7 @@ type dependencies = {
   entry_fill_resize : Entry_fill_resize.t;
       (** See .mli. G2b affordable-size clamp; a no-op when disabled. *)
   cash_credits : Cash_credits.t;  (** See .mli. #3137 interest + dividends. *)
+  split_guard : Split_dividend_guard.t option;  (** See .mli. #3173. *)
 }
 
 let _create_engine ~commission ~slippage_bps =
@@ -61,8 +62,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(sim_entry_stoplimit_fresh_bar_only = false)
     ?(sim_stop_exit_fill_on_trigger_bar = false)
     ?(entry_fill_reject_retries = 0)
-    ?(entry_fill_resize = Entry_fill_resize.disabled) ?cash_yield ?dividends ()
-    =
+    ?(entry_fill_resize = Entry_fill_resize.disabled) ?cash_yield ?dividends
+    ?split_guard () =
   {
     symbols;
     data_dir;
@@ -86,16 +87,15 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     on_transitions;
     entry_extension_max_pct;
     fill_gate =
-      {
-        defer_entries = sim_entry_fill_next_open;
-        defer_exits = sim_exit_fill_next_open;
-        defer_stoplimit_entries = sim_entry_stoplimit_fresh_bar_only;
-      };
+      Next_open_fill_gate.make_flags ~entries:sim_entry_fill_next_open
+        ~exits:sim_exit_fill_next_open
+        ~stoplimit_entries:sim_entry_stoplimit_fresh_bar_only;
     stop_exit_fill_on_trigger_bar = sim_stop_exit_fill_on_trigger_bar;
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
     entry_fill_resize;
     cash_credits = { cash_yield; dividends };
+    split_guard;
   }
 
 (* See .mli. Win #4 point-in-time pruning. *)
@@ -298,12 +298,11 @@ let _notify_transitions ~on_transitions transitions =
     [exit_without_prior_bar] candidates, so the two agree on a position's worth.
 *)
 let _prepare_market_state t =
-  let split_events =
-    Split_handler.detect_for_held_positions ~adapter:t.deps.market_data_adapter
-      ~date:t.current_date ~portfolio:t.portfolio
+  let portfolio, positions, split_events =
+    Split_handler.detect_and_apply ?split_guard:t.deps.split_guard
+      ~adapter:t.deps.market_data_adapter ~date:t.current_date
+      ~portfolio:t.portfolio ~positions:t.positions ()
   in
-  let portfolio = Split_handler.apply_events t.portfolio split_events in
-  let positions = Split_handler.apply_to_positions t.positions split_events in
   let today_bars = _get_today_bars t in
   if not (List.is_empty today_bars) then
     List.iter
