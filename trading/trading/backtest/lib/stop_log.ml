@@ -63,6 +63,14 @@ let exit_trigger_of_reason (reason : Position.exit_reason) : exit_trigger =
   | PortfolioRebalancing -> Portfolio_rebalancing
   | StrategySignal { label; detail } -> Strategy_signal { label; detail }
 
+let with_fill_price trigger ~fill_price =
+  match trigger with
+  | Stop_loss { stop_price; _ } ->
+      Stop_loss { stop_price; actual_price = fill_price }
+  | Take_profit { target_price; _ } ->
+      Take_profit { target_price; actual_price = fill_price }
+  | other -> other
+
 type stop_trigger_kind = Gap_down | Intraday | End_of_period | Non_stop_exit
 [@@deriving show, eq, sexp]
 

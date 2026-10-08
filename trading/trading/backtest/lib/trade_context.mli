@@ -20,7 +20,8 @@
       quantity the strategy's [Stop_too_wide] gate bounds and the V12 validator
       checks; [fill] is the round trip's realized entry price. [None] when the
       audit is missing or fill/stop is non-positive.
-    - [stop_trigger_kind] — string label from
+    - [stop_trigger_kind] — uses the round-trip exit fill price, not the
+      strategy's trigger-bar observation; string label from
       {!Stop_log.classify_stop_trigger_kind}: [gap_down] / [intraday] /
       [end_of_period] / [non_stop_exit].
     - [days_to_first_stop_trigger] — calendar days from entry to exit when the
