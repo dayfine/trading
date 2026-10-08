@@ -25,6 +25,7 @@ BEGIN {
   sd = (side == "SHORT") ? -1 : 1  # +1 long, -1 short: the sign of a favourable move
   FS = ","; PRE_BARS = 63; POST_BARS = 42; GRADE_BARS = 65; FWD_BARS = 40
   TOL = 0.005                      # fill-in-range tolerance (cent rounding)
+  SPLIT_FAC_LO = 0.8; SPLIT_FAC_HI = 1.05   # adjustment factor / split ratio: dividends pull it under 1
   ncf = split("3 5 6 8 10 15", lv, " ")
   for (i = 1; i <= ncf; i++) { cf[i] = ""; lv[i] = lv[i] / 100 }
 }
@@ -34,12 +35,21 @@ function emit_day(line) { if (out_dy != "") print line >> out_dy }
 # 1 = fill inside the bar's range; 2 = outside, but a simple split ratio
 # (k/q, q <= 5) away from the bar -> the fill is on a later split basis;
 # 0 = genuinely outside the range. Sets SNAP to the ratio (1 unless 2).
-function in_range(p, lo, hi,   r, q, k) {
+# Two ways to be a ratio away: the fill vs the bar's midpoint within 2 %, or the
+# fill scaled back by the ratio inside the bar's range when the bar's own
+# adjustment factor fac (adjusted_close / close) carries that ratio, i.e. a split
+# after the bar really exists (#3177: AVD 2005-03-21, a 2:1 split on 2005-04-18,
+# filled near the edge of a wide bar so the midpoint test missed it).
+function in_range(p, lo, hi, fac,   r, q, k, s) {
   SNAP = 1
   if (p >= lo * (1 - TOL) && p <= hi * (1 + TOL)) return 1
   r = p / ((lo + hi) / 2)
   for (q = 1; q <= 5; q++) for (k = 1; k <= 10; k++)
     if (k != q && r > (k / q) * 0.98 && r < (k / q) * 1.02) { SNAP = k / q; return 2 }
+  for (q = 1; q <= 5; q++) for (k = 1; k <= 10; k++) {
+    s = k / q
+    if (k != q && fac / s > SPLIT_FAC_LO && fac / s < SPLIT_FAC_HI && p / s >= lo * (1 - TOL) && p / s <= hi * (1 + TOL)) { SNAP = s; return 2 }
+  }
   return 0
 }
 # a resting stop at s trades on this bar: the low for a long, the high for a short
@@ -70,7 +80,7 @@ function hard_stop(o, l, h, lvl,   p) {
   }
   # bars strictly after the entry day: forward pick return, stop breach, hard-stop replays
   # entry on the bar's own basis: a fill on a later split basis is scaled back first
-  if (d > ed && fe > 0 && e == "") { esnap = 1; if (on_e && in_range(ep, el, eh) == 2) esnap = SNAP; e = ep / esnap * fe
+  if (d > ed && fe > 0 && e == "") { esnap = 1; if (on_e && in_range(ep, el, eh, fe) == 2) esnap = SNAP; e = ep / esnap * fe
     stopl = (es > 0) ? es / esnap * fe : e * (1 - sd * sid) }
   if (d > ed && fe > 0) {
     nf++
@@ -101,8 +111,8 @@ END {
   if (pct <= 0) { if (ma >= 50) g = "F"; else if (ma >= 15) g = "D"; else if (a13 <= -5) g = "B"; else g = "C" }
   if (sd > 0 && xp < ep * 0.05) g = "X"   # a long sold for scraps; a short covered there is its best case
   if (k <= 1) g = g "?"   # no bar after the exit bar: the post-exit path is empty
-  ein = on_e ? in_range(ep, el, eh) : 0
-  xin = on_x ? in_range(xp, xl, xh) : 0; xsnap = (xin == 2) ? SNAP : 1
+  ein = on_e ? in_range(ep, el, eh, fe) : 0
+  xin = on_x ? in_range(xp, xl, xh, fx) : 0; xsnap = (xin == 2) ? SNAP : 1
   if (esnap == "") esnap = 1
   gapup = (pre_c > 0) ? sd * (ep / esnap / pre_c - 1) * 100 : 0
   # bars from the first initial-stop breach to the exit bar (0: the exit day; -1: never breached)

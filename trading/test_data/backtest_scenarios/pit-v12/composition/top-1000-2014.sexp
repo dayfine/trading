@@ -1198,7 +1198,7 @@
     (synthetic false) (avg_dollar_volume 80335791.40476191))
    ((symbol TNL) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 80237338.066666663))
-   ((symbol GLT) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAGN) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 79848603.9154762))
    ((symbol CBI) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 79546856.109285727))

@@ -25,7 +25,9 @@
 #     count it, and the last-day check vs actual.sexp open_positions_value
 #     warns on a mismatch; a market holiday (no SPY bar) is dropped from the
 #     exposure series and from the period Invested average; a delisting exit
-#     is not counted as the Saturday-fill defect;
+#     is not counted as the Saturday-fill defect; a SHORT open at the end is
+#     signed negative in that check and a name with no bar on the last day is
+#     carried at its last close (#3144);
 #   - every emitted JSON file parses (the SPY fixture carries a "321."-style
 #     value the store really writes), manifest + year/quarter tables present;
 #   - the page's signal predicates (openSignal, oneTradeYear, alsoCause) are
@@ -35,6 +37,12 @@
 #     (tickets, fills, short P&L, Bearish weeks, weeks with short_top_n_admitted
 #     > 0) over a fixture shaped like shorts-liveness s0-shB; audit counts are
 #     null without trade_audit.sexp; shorts off -> null; shortLegLine pinned.
+#   - #3177: the render's slice plan covers any measured page height and a
+#     page that failed to load stops the render (stub Chrome); the return
+#     basis (price / total return / mixed; cash_yield from the overrides or
+#     the default of the run's code_version) picks the SPY column
+#     and labels; the fallback card keys on the audit stop kind; an AVD-shaped
+#     later-split fill near a wide bar's edge is code 2, not off-bar;
 #   - short trades (#3149): every trade statistic and flag side-aware over
 #     three SHORT rows (breach on the high, signed P&L / MFE / grades, the
 #     audit stop_floor_kind for the fallback card, installed-stop width,
@@ -268,6 +276,24 @@ rc=0
 sh "$SCRIPT" --no-container --data-dir "$TMP/oe/data" --out "$TMP/oe/miss" r0="$TMP/oe/run/" >"$TMP/miss.log" 2>"$TMP/miss.err" || rc=$?
 expect_eq "open-at-end mismatch: still builds" 0 "$rc"
 expect_eq "open-at-end mismatch: warns on stderr" 1 "$(grep -c 'WARN open positions on 2020-05-20: pack marks 64000, actual.sexp open_positions_value 20000' "$TMP/miss.err" || true)"
+# #3144: a SHORT still open at the end is marked negative in the last-day check (the simulator's
+# open_positions_value is NAV minus equity cash), and a position with no bar on the last equity date
+# is carried at its last known close. Copy of the open-at-end case plus CCC 100 sh SHORT (last close
+# 80 -> -8,000), with BBB's last bar (2020-05-20) dropped and its 2020-05-19 close set to 25
+# (2,000 x 25 = 50,000): 12,000 + 50,000 - 8,000 = 54,000.
+cp -R "$TMP/oe" "$TMP/oe2"; rm -rf "$TMP/oe2/pack" "$TMP/oe2/miss"
+printf 'CCC,SHORT,2020-04-01,80.00,100\n' >> "$TMP/oe2/run/open_positions.csv"
+printf '((total_return_pct 1.0) (open_positions_value 54000.00))\n' > "$TMP/oe2/run/actual.sexp"
+BBB_CSV="$TMP/oe2/data/B/B/BBB/data.csv"
+grep -v '^2020-05-20,' "$BBB_CSV" | sed 's/^2020-05-19,26.00,26.50,25.50,26.00,26.00,/2020-05-19,25.00,25.50,24.50,25.00,25.00,/' > "$BBB_CSV.x"; mv "$BBB_CSV.x" "$BBB_CSV"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/oe2/data" --out "$TMP/oe2/pack" r0="$TMP/oe2/run/" >"$TMP/oe2.log" 2>"$TMP/oe2.err" || rc=$?
+expect_eq "open short + no last bar: builds, exit 0" 0 "$rc"
+expect_eq "open short + no last bar: pack 54,000 = actual (short signed, BBB carried at 25)" "54000 54000" "$(jq -r '.check|"\(.pack+0) \(.actual+0)"' "$TMP/oe2/pack/site/data/r0_open.json")"
+expect_eq "open short + no last bar: no warning" "" "$(grep 'WARN' "$TMP/oe2.err" || true)"
+expect_eq "open short: the open row carries its side" SHORT "$(jq -r '.rows[]|select(.sym=="CCC")|.side' "$TMP/oe2/pack/site/data/r0_open.json")"
+expect_eq "no last bar: BBB's carried row on 2020-05-20 = 2,000 x 25" "50000.00" "$(awk -F'\t' '$3 == "open:BBB:2020-02-03" && $1 == "2020-05-20" { print $2 }' "$TMP/oe2/pack/runs/r0/x_expo.tsv")"
+expect_eq "open short: exposure stays gross, the last day reads 12,000 + 50,000 + 8,000 = 70,000 of a 101,000 NAV over 3 positions" "69.3 3" "$(jq -r '.[-1]|"\(.[2]) \(.[3])"' "$TMP/oe2/pack/site/data/r0_nav.json")"
 expect_eq "no actual.sexp: the check reads null, not 0" null "$(jq -r .check.actual "$S/data/r0_open.json")"
 expect_eq "cap/cash-floor text removed" 0 "$(grep -c 'caps long exposure\|exposure cap and cash floor' "$S/index.html" || true)"
 expect_eq "final NAV carried on the equity axis" yes "$(grep -q "title: 'final'" "$S/index.html" && echo yes || echo no)"
@@ -400,5 +426,149 @@ console.log($1)"; }
   expect_eq "short EEE gap: chase fires" yes "$(gfl 'ids("EEE-wein-g2").split(" ").includes("chase") ? "yes" : "no"')"
   expect_eq "short AAA replay: held 2 Stage 2 weeks -> stage4 fires; entered on Stage 4 -> notS2 quiet" "true false" "$(gfl '["stage4", "notS2"].map(i => ids("AAA-wein-g1").split(" ").includes(i)).join(" ")')"
 fi
+# #3177. Render: the slice plan covers a page of any measured height (every pixel row lands in some
+# part; the last part is the bottom 1500 px), and a page that failed to load its data stops the render
+# instead of slicing an error banner. A stub Chrome stands in for the browser.
+RENDER="${ROOT}/dev/scripts/review_pack_render.sh"
+expect_eq "render plan: 20,000 px page -> 14 parts, the last ending one row above the bottom" "14 18499 1500" "$(sh "$RENDER" --plan 20000 | tail -1)"
+expect_eq "render plan: parts start at 1 and step 1500" "1 1 1500|2 1500 1500" "$(sh "$RENDER" --plan 20000 | head -2 | paste -sd'|' -)"
+expect_eq "render plan: a page under two slices is one whole part" "1 0 1400" "$(sh "$RENDER" --plan 1400)"
+expect_eq "render plan: covers every row (max y + height >= height - 1)" yes "$(sh "$RENDER" --plan 9051 | awk '{ e = $2 + $3; if (e > m) m = e } END { print (m >= 9050 ? "yes" : "no: " m) }')"
+STUB="$TMP/stub-chrome"
+printf '#!/bin/sh\nfor a in "$@"; do case "$a" in --dump-dom) echo "<html data-page-h=\\"5000\\"><div class=\\"empty\\">Could not load the data files (LightweightCharts is not defined).</div></html>"; exit 0 ;; esac; done\nexit 0\n' > "$STUB"; chmod +x "$STUB"
+rc=0; CHROME="$STUB" sh "$RENDER" --site "$S" --out "$TMP/render" >"$TMP/render.log" 2>&1 || rc=$?
+expect_eq "render: a page that failed to load stops with exit 1" 1 "$rc"
+expect_eq "render: and names the page's own error" 1 "$(grep -c 'the page failed to load: Could not load the data files (LightweightCharts is not defined)' "$TMP/render.log" || true)"
+
+# SPY basis. cash_yield is default-on since #3184, so the basis reads the overrides first and, when
+# cash_yield is absent, the default of the code that ran (git places code_version vs #3184's commit;
+# an unplaceable SHA, like this fixture's 0123456789abcdef, assumes the current default and says so).
+#   px  : (cash_yield No_yield), no dividends            -> price
+#   tr  : cash_yield Series + (dividend_crediting true)  -> tr
+#   mix : (cash_yield No_yield) + dividends              -> mixed
+#   asm : the fixture as is (no cash_yield, unknown SHA) -> cash yield assumed on, mixed
+# The fixture SPY's adjusted_close is 0.9 x close before 2020-03-01 here, so the two bases differ:
+# price 301 -> 400 = +32.89 %, total return 270.9 -> 400 = +47.66 %.
+mkdir -p "$TMP/tr"; cp -R "$FIX/data" "$TMP/tr/data"
+SPY_CSV="$TMP/tr/data/S/Y/SPY/data.csv"
+awk -F, 'BEGIN { OFS = "," } NR > 1 && $1 < "2020-03-01" { $6 = sprintf("%.2f", $5 * 0.9) } { print }' "$SPY_CSV" > "$SPY_CSV.x"; mv "$SPY_CSV.x" "$SPY_CSV"
+basis_run() { # $1 name, $2 extra overrides
+  mkdir -p "$TMP/tr/$1"; cp "$FIX"/run/* "$TMP/tr/$1/"
+  sed "s/(overrides (((enable_short_side false))))/(overrides (((enable_short_side false))$2))/" "$FIX/run/params.sexp" > "$TMP/tr/$1/params.sexp"
+}
+basis_run px ' ((cash_yield No_yield))'
+basis_run tr ' ((cash_yield (Series macro\/tbill_3m_dtb3.csv))) ((dividend_crediting true))'
+basis_run mix ' ((cash_yield No_yield)) ((dividend_crediting true))'
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/tr/data" --out "$TMP/tr/pack" px="$TMP/tr/px/" tr="$TMP/tr/tr/" mix="$TMP/tr/mix/" asm="$FIX/run/" >"$TMP/tr.log" 2>&1 || rc=$?
+expect_eq "basis: builds, exit 0" 0 "$rc"
+TD="$TMP/tr/pack/site/data"
+expect_eq "basis: price-only run (No_yield, no dividends)" '{"spy":"price","cash_yield":false,"dividends":false,"cash_yield_src":"explicit"}' "$(jq -c .basis "$TD/px_meta.json")"
+expect_eq "basis: total-return run (both armed)" '{"spy":"tr","cash_yield":true,"dividends":true,"cash_yield_src":"explicit"}' "$(jq -c .basis "$TD/tr_meta.json")"
+expect_eq "basis: dividends only is mixed" '{"spy":"mixed","cash_yield":false,"dividends":true,"cash_yield_src":"explicit"}' "$(jq -c .basis "$TD/mix_meta.json")"
+expect_eq "basis: no cash_yield and an unknown code_version assumes the current default (on)" '{"spy":"mixed","cash_yield":true,"dividends":false,"cash_yield_src":"assumed"}' "$(jq -c .basis "$TD/asm_meta.json")"
+expect_eq "basis: the price-only run's year table reads SPY price (+32.89 %)" 32.89 "$(jq -r '.[0].spy' "$TD/px_years.json")"
+expect_eq "basis: the total-return run's year table reads SPY TR (+47.66 %)" 47.66 "$(jq -r '.[0].spy' "$TD/tr_years.json")"
+expect_eq "basis: both SPY series are published" "301 270.9" "$(jq -r '.[0][1]+0' "$TD/spy_price.json") $(jq -r '.[0][1]+0' "$TD/spy.json")"
+# The version default, where this checkout holds the commits (a shallow CI clone may not): 14db1a8e
+# (the total-return-26y tr0 run) predates #3184 -> No_yield; 725507d9 contains it -> on.
+if git -C "$ROOT" cat-file -e 14db1a8e523171ae32c1fd3729925248def75076^{commit} 2>/dev/null && git -C "$ROOT" cat-file -e 725507d9ccf95d4c5e98758985c3115b9b3c50e4^{commit} 2>/dev/null && git -C "$ROOT" cat-file -e 99f0b3218787c8abde82400eeccecfb2fe241d2c^{commit} 2>/dev/null; then
+  for v in 14db1a8e523171ae32c1fd3729925248def75076:false 725507d9ccf95d4c5e98758985c3115b9b3c50e4:true; do
+    mkdir -p "$TMP/tr/ver"; cp "$FIX"/run/* "$TMP/tr/ver/"
+    sed "s/(code_version 0123456789abcdef)/(code_version ${v%%:*})/" "$FIX/run/params.sexp" > "$TMP/tr/ver/params.sexp"
+    expect_eq "basis: no cash_yield override at ${v%%:*} -> the default of that code (cash yield ${v#*:})" "${v#*:} default" "$(sh "$ROOT/dev/lib/review_pack/meta.sh" "$TMP/tr/ver" | jq -r '.basis|"\(.cash_yield) \(.cash_yield_src)"')"
+  done
+else
+  echo "SKIP: review_pack version-default basis cases need the full git history"
+fi
+if command -v node >/dev/null 2>&1; then
+  BFNS="$(sed -n -e '/^function spyBasis(/,/^}/p' -e '/^function spyBasisLabel(/,/^}/p' -e '/^function sharpeBasis(/,/^}/p' "$S/index.html")"
+  bas() { node -e "$BFNS
+console.log($1)"; }
+  expect_eq "spyBasisLabel: price" "SPY price only" "$(bas 'spyBasisLabel({ spy: "price", cash_yield: false, dividends: false })')"
+  expect_eq "spyBasisLabel: total return" "SPY total return" "$(bas 'spyBasisLabel({ spy: "tr", cash_yield: true, dividends: true })')"
+  expect_eq "spyBasisLabel: mixed names what the run credits" "SPY total return (run credits dividends only)" "$(bas 'spyBasisLabel({ spy: "mixed", cash_yield: false, dividends: true })')"
+  expect_eq "spyBasis: an older meta without basis reads total return" tr "$(bas 'spyBasis(undefined)')"
+  expect_eq "sharpeBasis: cash yield armed = excess over net T-bill" "excess over net T-bill" "$(bas 'sharpeBasis({ cash_yield: true })')"
+  expect_eq "sharpeBasis: no cash yield = raw" "raw, no cash yield" "$(bas 'sharpeBasis({ cash_yield: false })')"
+  expect_eq "sharpeBasis: an assumed cash yield says so" "excess over net T-bill (assumed: code_version not in this checkout)" "$(bas 'sharpeBasis({ cash_yield: true, cash_yield_src: "assumed" })')"
+  FB="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' "$S/index.html")"
+  fbk() { node -e "$FB
+const F = FLAGS.find(f => f.id === 'fallback');
+console.log($1)"; }
+  expect_eq "fallback: keyed on the audit's stop kind, not a 4 % distance (GBX: Support_floor at exactly 4 %)" "false true false" "$(fbk '[{ sid: 0.04, sfk: "Support_floor" }, { sid: 0.07, sfk: "Buffer_fallback" }, { sid: 0.04 }].map(F.test).join(" ")')"
+  expect_eq "fallback: needs the audit (n/a without it)" sfk "$(fbk 'F.needs')"
+else
+  echo "SKIP: review_pack basis page cases need node"
+fi
+# AVD shape (2005-03-21, a 2:1 split on 2005-04-18): an entry filled on the post-split basis near the
+# edge of a wide pre-split bar. FFF: raw bars 36-48 (mid 42) adjusted at 0.5 until a 2:1 split on
+# 2020-03-02; filled at 23.50 = 47 / 2 (vs the mid: 0.56, outside the 2 % midpoint test) -> code 2.
+# GGG: the same bars without the split (factor 1) -> genuinely off the bar, code 0.
+mkdir -p "$TMP/avd/data/F/F/FFF" "$TMP/avd/data/G/G/GGG" "$TMP/avd/data/S/Y"; cp -R "$FIX/data/S/Y/SPY" "$TMP/avd/data/S/Y/"
+awk -F, -v fac=0.5 'NR == 1 { print; next } { if ($1 < "2020-03-02") printf "%s,40.00,48.00,36.00,40.00,%.2f,100000,\n", $1, 40 * fac; else printf "%s,20.00,24.00,18.00,20.00,20.00,100000,\n", $1 }' "$FIX/data/A/A/AAA/data.csv" > "$TMP/avd/data/F/F/FFF/data.csv"
+awk -F, 'NR == 1 { print; next } { printf "%s,40.00,48.00,36.00,40.00,40.00,100000,\n", $1 }' "$FIX/data/A/A/AAA/data.csv" > "$TMP/avd/data/G/G/GGG/data.csv"
+mkdir -p "$TMP/avd/run"; cp "$FIX"/run/* "$TMP/avd/run/"
+{ head -1 "$FIX/run/trades.csv"
+  echo "FFF,LONG,2020-01-29,2020-04-01,63,23.50,20.00,1000,-3500.00,-14.89,,,laggard_rotation,Stage2,2.5000,0.0800,non_stop_exit,,100,FFF-wein-1,,,0"
+  echo "GGG,LONG,2020-01-29,2020-04-01,63,23.50,40.00,1000,16500.00,70.21,,,laggard_rotation,Stage2,2.5000,0.0800,non_stop_exit,,100,GGG-wein-2,,,0"; } > "$TMP/avd/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/avd/data" --out "$TMP/avd/pack" r0="$TMP/avd/run/" >"$TMP/avd.log" 2>&1 || rc=$?
+expect_eq "AVD shape: builds, exit 0" 0 "$rc"
+expect_eq "AVD shape: a later split's fill near a wide bar's edge is code 2, not off-bar" 2 "$(jq -r '.[]|select(.sym=="FFF")|.inE' "$TMP/avd/pack/site/data/r0_trades.json")"
+expect_eq "AVD shape: without a split behind the factor it stays off-bar (code 0)" 0 "$(jq -r '.[]|select(.sym=="GGG")|.inE' "$TMP/avd/pack/site/data/r0_trades.json")"
+# #3177: a .panel grid stretched to its taller sibling spread the conformance table's rows over the
+# validator's height (the table read blank in a capped capture); panels now pack their rows at the top.
+# An empty conformance table says n/a instead of drawing a blank table.
+expect_eq "panels pack rows at the top (align-content: start)" 1 "$(grep -c '^\.panel {.*align-content: start;' "$S/index.html")"
+expect_eq "conformance table without a trade audit report reads n/a" 1 "$(grep -c "^const CONF_NA = '<tr><td colspan=\"4\" style=\"white-space:normal\">n/a: no trade audit report" "$S/index.html")"
+expect_eq "conformance n/a is wired into the table" 1 "$(grep -c '<tbody>${cf.length ? rows : CONF_NA}</tbody>' "$S/index.html")"
+# #3177 QC rework: the capture follows the MEASURED height. A stub Chrome answers --dump-dom with a
+# page height and records each --screenshot with its --window-size; it writes a real PNG of that size
+# when ImageMagick is present (then the parts are cut and checked too). A page with no height falls back
+# to 9000 px and says so.
+STUBOK="$TMP/stub-ok"
+cat > "$STUBOK" <<'STUB'
+#!/bin/sh
+for a in "$@"; do case "$a" in
+  --dump-dom) [ -n "${STUB_H:-}" ] && echo "<html data-page-h=\"$STUB_H\"><body>ok</body></html>" || echo "<html><body>ok</body></html>"; exit 0 ;;
+  --screenshot=*) out=${a#--screenshot=} ;; --window-size=*) ws=${a#--window-size=} ;; esac; done
+echo "$(basename "$out") $ws" >> "$STUB_LOG"
+if command -v convert >/dev/null 2>&1; then convert -size "${ws%,*}x${ws#*,}" xc:white "$out"; else echo png > "$out"; fi
+STUB
+chmod +x "$STUBOK"
+rc=0; STUB_H=5000 STUB_LOG="$TMP/stub.log" CHROME="$STUBOK" sh "$RENDER" --site "$S" --out "$TMP/render-ok" >"$TMP/render-ok.log" 2>&1 || rc=$?
+expect_eq "render: full.png is captured at the measured height (5000), top.png at the first screen" "top.png 1400,1300|full.png 1400,5000" "$(paste -sd'|' - < "$TMP/stub.log")"
+if command -v convert >/dev/null 2>&1 || command -v magick >/dev/null 2>&1 || command -v sips >/dev/null 2>&1; then
+  expect_eq "render: a 5000 px page is cut into the --plan 5000 parts, 1500 px each" "0 4 1500 1500 1500 1500" "$rc $(ls "$TMP/render-ok"/part-*.png | wc -l | tr -d ' ') $(for p in 1 2 3 4; do identify -format '%h ' "$TMP/render-ok/part-$p.png"; done | sed 's/ $//')"
+else
+  echo "SKIP: review_pack render slicing needs ImageMagick or sips"
+fi
+rc=0; STUB_LOG="$TMP/stub-fb.log" CHROME="$STUBOK" sh "$RENDER" --site "$S" --out "$TMP/render-fb" >"$TMP/render-fb.log" 2>&1 || rc=$?
+expect_eq "render: no measured height falls back to 9000 px" "full.png 1400,9000" "$(grep '^full.png' "$TMP/stub-fb.log")"
+expect_eq "render: and says it could not measure the page" 1 "$(grep -c 'could not measure the page; using 9000 px' "$TMP/render-fb.log")"
+
+# What the conformance and validator panels render (confTable / validatorList, the functions the
+# page calls), and the basis object every basis call site reads (basisView).
+if command -v node >/dev/null 2>&1; then
+  PFNS="$(sed -n -e '/^const CONF_NA = /p' -e '/^function confTable(/,/^}/p' -e '/^function validatorList(/,/^}/p' -e '/^function spyBasis(/,/^}/p' -e '/^function spyBasisLabel(/,/^}/p' -e '/^function sharpeBasis(/,/^}/p' -e '/^function basisView(/,/^}/p' "$S/index.html")"
+  pg() { node -e "$PFNS
+const cf = [1, 2, 3, 6, 7, 8].map(i => ({ rule: 'R' + i, desc: 'rule ' + i, passed: '618/618', rate: '100%', fails: '0' }));
+const vs = Array.from({ length: 17 }, (_, i) => ({ id: 'V' + (i + 1), sev: 'INVARIANT', status: i === 16 ? '2 violations' : 'PASS', specimens: i === 16 ? ['ZZZ specimen'] : [] }));
+console.log($1)"; }
+  expect_eq "confTable: six conformance rows render, R1..R8" "6 R1 R8" "$(pg '[(confTable(cf).match(/<tr><td><b>R/g) || []).length, ...["R1", "R8"].filter(r => confTable(cf).includes("<b>" + r + "</b>"))].join(" ")')"
+  expect_eq "confTable: no rows reads n/a" yes "$(pg 'confTable([]).includes("n/a: no trade audit report") ? "yes" : "no"')"
+  expect_eq "validatorList: V1..V17 all render, V9 and V17 included" "17 yes yes" "$(pg '[(validatorList(vs).match(/<summary>/g) || []).length, validatorList(vs).includes("<b>V9</b>") ? "yes" : "no", validatorList(vs).includes("<b>V17</b>") ? "yes" : "no"].join(" ")')"
+  expect_eq "validatorList: a failing invariant opens with its specimens" yes "$(pg '/<details open[^>]*><summary><b>V17<\/b>.*ZZZ specimen/.test(validatorList(vs)) ? "yes" : "no"')"
+  expect_eq "basisView: price -> SPY price series, no dashed line" '{"series":"spyPrice","total":"SPY price only","legend":"SPY price only","priceLine":false}' "$(pg 'JSON.stringify((({ series, total, legend, priceLine }) => ({ series, total, legend, priceLine }))(basisView({ spy: "price", cash_yield: false, dividends: false })))')"
+  expect_eq "basisView: mixed -> TR series plus the dashed price line, legend says so" '{"series":"spyTR","legend":"SPY total return (run credits dividends only) · dashed: SPY price only","priceLine":true}' "$(pg 'JSON.stringify((({ series, legend, priceLine }) => ({ series, legend, priceLine }))(basisView({ spy: "mixed", cash_yield: false, dividends: true })))')"
+  expect_eq "basisView: total return -> TR series; Sharpe label excess over net T-bill" '{"series":"spyTR","sharpe":"excess over net T-bill","priceLine":false}' "$(pg 'JSON.stringify((({ series, sharpe, priceLine }) => ({ series, sharpe, priceLine }))(basisView({ spy: "tr", cash_yield: true, dividends: true })))')"
+else
+  echo "SKIP: review_pack panel/basis page cases need node"
+fi
+# the call sites read those functions (a page that bypasses them fails here)
+expect_eq "wiring: D.spy is the basisView series" 1 "$(grep -c '^  D.spy = D\[basisView(D.meta\[D.man.charts_run || 0\].basis).series\];$' "$S/index.html")"
+expect_eq "wiring: KPI total return, Sharpe, legend and the dashed line read basisView" 4 "$(grep -c 'BV\.total\|BV\.sharpe\|BV\.legend\|if (BV\.priceLine)' "$S/index.html")"
+expect_eq "wiring: the panels render through confTable / validatorList" 2 "$(grep -c "^  \$('#conf').innerHTML = confTable(cf);\$\|^  \$('#validator').innerHTML = validatorList(D.meta\[CH()\].validator);\$" "$S/index.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

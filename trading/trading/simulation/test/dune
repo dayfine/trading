@@ -325,6 +325,8 @@
   trading.engine
   trading.portfolio
   trading.strategy
+  csv.corporate_actions
+  csv.split_dividend_guard
   types
   matchers
   simulation_test_helpers))

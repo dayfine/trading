@@ -1,0 +1,49 @@
+[10-07 17:44:45] run tree HEAD=ccf1befbb (#2724 verified present; #2882 handle cap is an env knob)
+[10-07 17:44:46] container mem in use: 422.7MiB (need >= 6 GB free of 7.75 GB: expect < 1.5 GB)
+[10-07 17:44:46] preflight OK; HANDLE CAP for every chain on this warehouse: export SNAPSHOT_MAX_MMAP_HANDLES=12000 (must be >= manifest size)
+[10-07 17:44:51] run tree HEAD=ccf1befbb (#2724 verified present; #2882 handle cap is an env knob)
+[10-07 17:44:52] container mem in use: 423MiB (need >= 6 GB free of 7.75 GB: expect < 1.5 GB)
+[10-07 17:44:52] preflight OK; HANDLE CAP for every chain on this warehouse: export SNAPSHOT_MAX_MMAP_HANDLES=12000 (must be >= manifest size)
+[10-07 17:44:52] chunk 1: 2323 symbols
+[10-07 17:44:52] chunk 2: 2322 symbols
+[10-07 17:44:52] chunk 3: 2322 symbols
+[10-07 17:44:52] chunk 4: 2320 symbols
+[10-07 17:44:52] union=9286 (+GSPC.INDX); v11 comparison: union 9,900, manifest 9,364 after twin dedupe
+[10-07 17:44:53] BUILD chunk1 (2323 symbols) -> /tmp/snap_top3000_pit_v12pit
+[10-07 18:11:56] chunk1: manifest=2303 snaps=2303 expected-orphans=0 OK
+[10-07 18:11:56] BUILD chunk2 (2322 symbols) -> /tmp/snap_top3000_pit_v12pit
+[10-07 18:38:59] chunk2: manifest=4600 snaps=4600 expected-orphans=0 OK
+[10-07 18:38:59] BUILD chunk3 (2322 symbols) -> /tmp/snap_top3000_pit_v12pit
+[10-07 19:08:20] chunk3: manifest=6906 snaps=6906 expected-orphans=0 OK
+[10-07 19:08:20] BUILD chunk4 (2320 symbols) -> /tmp/snap_top3000_pit_v12pit
+[10-07 19:41:29] chunk4: manifest=9211 snaps=9211 expected-orphans=0 OK
+[10-07 19:41:29] classify: 36 legit legs (alias), 40 false legs (v11 by this rule: 360 / 86; v11 hand-removed IMPX_old and WCAP_old from its false-legs file, so its file had 84; v12 deliberately restores those two in chunk5)
+[10-07 19:41:29] BUILD chunk5 (40 symbols) -> /tmp/snap_top3000_pit_v12pit
+[10-07 19:42:38] chunk5: manifest=9251 snaps=9251 expected-orphans=0 OK
+[10-07 19:42:39] SCAN pair-12 (4645 symbols)
+[10-07 20:30:20] RESULT pair-12 => 11 group(s), 83 symbol(s) dropped (wall 2861s)
+[10-07 20:30:20] SCAN pair-13 (4645 symbols)
+[10-07 21:05:42] RESULT pair-13 => 6 group(s), 64 symbol(s) dropped (wall 2122s)
+[10-07 21:05:43] SCAN pair-14 (4643 symbols)
+[10-07 21:49:33] RESULT pair-14 => 9 group(s), 61 symbol(s) dropped (wall 2630s)
+[10-07 21:49:33] SCAN pair-23 (4645 symbols)
+[10-07 22:33:07] RESULT pair-23 => 12 group(s), 84 symbol(s) dropped (wall 2614s)
+[10-07 22:33:07] SCAN pair-24 (4643 symbols)
+[10-07 23:15:00] RESULT pair-24 => 6 group(s), 64 symbol(s) dropped (wall 2513s)
+[10-07 23:15:00] SCAN pair-34 (4643 symbols)
+[10-08 00:10:25] RESULT pair-34 => 16 group(s), 55 symbol(s) dropped (wall 3325s)
+[10-08 00:10:26] BUILD chunk6 (30 symbols) -> /tmp/snap_top3000_pit_v12pit
+[10-08 00:10:48] chunk6: manifest=9236 snaps=9251 expected-orphans=15 OK
+[10-08 00:10:50] pruned 15 orphan .snap files of dropped twin legs
+[10-08 00:10:50] twinfix: 15 pairs, 15 legs dropped; manifest 9251 -> 9236. Next: apply /tmp/pit-v12-work/alias-v12-new.txt to the lists
+[10-08 00:10:50]   perl dev/experiments/pit-universe-2026-09-14/step4/twin-scan/alias-lists.pl /tmp/pit-v12-work/alias-v12-new.txt /Users/difan/Projects/trading-1/.claude/worktrees/sweep-pit-v12/trading/test_data/backtest_scenarios/pit-v12/composition/top-*.sexp
+[10-08 00:10:51] final: manifest=9236 snaps=9236 expected-orphans=0 OK
+[10-08 00:10:51] D6: absent=52 of which expected (MEL + alias-delta legs) 52; UNEXPECTED absent=0 (must be 0)
+[10-08 00:10:52] sample AAPL: snap_size=777560 manifest_size=777560 active_through=2026-08-17 csv_last=2026-08-17
+[10-08 00:10:52] sample AMZN: snap_size=777560 manifest_size=777560 active_through=2026-08-17 csv_last=2026-08-17
+[10-08 00:10:53] sample C: snap_size=777557 manifest_size=777557 active_through=2026-08-17 csv_last=2026-08-17
+[10-08 00:10:53] sample JPM: snap_size=777559 manifest_size=777559 active_through=2026-08-17 csv_last=2026-08-17
+[10-08 00:10:54] sample GSPC.INDX: snap_size=777673 manifest_size=777673 active_through=2026-08-18 csv_last=2026-08-18
+[10-08 00:10:55] sample AAAGY: snap_size=223845 manifest_size=223845 active_through=2010-08-12 csv_last=2010-08-12
+[10-08 00:10:55] size: 3.4G (v11: 3.5G / 9,364 entries)
+[10-08 00:10:55] VERIFY DONE. Then: md5 the lists, copy terminal_runs.csv + rename_twin reports into the experiment dir, and re-run the V6=0 check on the first null cell.

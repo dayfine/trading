@@ -1840,7 +1840,7 @@
     (avg_dollar_volume 44324775.121951222))
    ((symbol OIS) (weight 0.001) (sector Energy) (synthetic false)
     (avg_dollar_volume 44222695.469756112))
-   ((symbol GLT) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAGN) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 44156690.867804885))
    ((symbol PPC) (weight 0.001) (sector "Consumer Staples") (synthetic false)
     (avg_dollar_volume 44054254.419634156))

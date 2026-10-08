@@ -271,6 +271,8 @@
                 "dividend two bars off rejected"))
          (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
                 "vendor split two bars off kept"))
+         (unit ("trading/trading/simulation/test/test_split_day_mtm.ml"
+                "create_deps_split_guard_keeps_tdg_held"))
          (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"
                 "guard drops dividend split"))
          (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"
@@ -279,6 +281,18 @@
                 "detect_and_apply no guard scales held position"))
          (unit ("trading/trading/weinstein/strategy/test/test_stops_split_dividend_guard.ml"
                 "guarded reader drops dividend split"))))
+ (status fixed-behind-flag))
+
+((issue 3174) (ref "total-return-26y-2026-10-06: AD 2025-08-20, BKE 2021-12-17")
+ (finding "resting sell stops not reduced by the cash dividend on the ex-date: large specials stopped out at the open on the dividend drop")
+ (guard ((unit ("trading/analysis/data/storage/csv/ex_dividend_stop/test/test_ex_dividend_stop.ml"
+                "AD stop reduced below low"))
+         (unit ("trading/analysis/data/storage/csv/ex_dividend_stop/test/test_ex_dividend_stop.ml"
+                "BKE stop reduced below low"))
+         (unit ("trading/trading/weinstein/strategy/test/test_stops_dividend_runner.ml"
+                "AD stop reduced, not hit"))
+         (unit ("trading/trading/weinstein/strategy/test/test_stops_dividend_runner.ml"
+                "BKE stop reduced, not hit"))))
  (status fixed-behind-flag))
 
 ((issue 3147) (ref "short-only Phase A (#3135) D6: ALX 2008-11-25, SUN1 2009-05-07; 74 of 106 soT gap labels")

@@ -1418,7 +1418,7 @@
     (avg_dollar_volume 51963975.261904761))
    ((symbol WEC) (weight 0.001) (sector Utilities) (synthetic false)
     (avg_dollar_volume 51612890.476190478))
-   ((symbol GLT) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAGN) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 51520149.518809512))
    ((symbol SNBR) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 51449099.8452381))

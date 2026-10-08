@@ -1162,7 +1162,7 @@
     (avg_dollar_volume 72954795.105533957))
    ((symbol CNI) (weight 0.001) (sector Industrials) (synthetic false)
     (avg_dollar_volume 72787400.733636349))
-   ((symbol GLT) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAGN) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 72751749.442272723))
    ((symbol FIO) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 72515774.2265909))

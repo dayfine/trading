@@ -8,9 +8,10 @@
 # stop counting the day before their exit), so it should equal check.actual.
 function q(s) { gsub(/"/, "", s); return "\"" s "\"" }
 # files told apart by ARGV: x_open.tsv / x_macro.tsv may be empty, which an FNR==1 counter skips
-FILENAME == ARGV[1] { split($0, a, "\t"); no++; os[no] = a[1]; oe[no] = a[2]; op[no] = a[3]; oq[no] = a[4]; osd[no] = a[5]; next }
+FILENAME == ARGV[1] { split($0, a, "\t"); no++; os[no] = a[1]; oe[no] = a[2]; op[no] = a[3]; oq[no] = a[4]; osd[no] = a[5]; if (a[5] == "SHORT") short["open:" a[1] ":" a[2]] = 1; next }
 FILENAME == ARGV[2] { split($0, a, "\t"); nm++; md[nm] = a[1]; mtr[nm] = a[2]; next }
-FILENAME == ARGV[3] { split($0, a, "\t"); if (a[1] == last) pack += a[2]; next }
+# a short is marked negative, as the simulator signs it (NAV minus equity cash; #3144)
+FILENAME == ARGV[3] { split($0, a, "\t"); if (a[1] == last) pack += (a[3] in short ? -1 : 1) * a[2]; next }
 function macro_at(d,   i, r) { r = 0; for (i = 1; i <= nm && md[i] <= d; i++) r = i; return r }
 END {
   printf "{\"rows\":["
