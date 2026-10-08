@@ -155,12 +155,14 @@ host_run() { # $1 label, $2 index
   log "host: $1 extract ($(($(wc -l < "$d/trades.csv") - 1)) trades)"
   extract_run "$d" "$is_ch"
   sed -nE 's/.*\(date ([0-9-]+)\) \(trend ([A-Za-z]+)\) \(breadth_state ([A-Za-z_]+)\).*/\1	\2	\3/p' "$d/macro_trend.sexp" > "$d/x_macro.tsv"
-  for g in Y Q; do awk -v gran=$g -f "$LIB/periods.awk" "$SPY_CSV" "$d/equity_curve.csv" "$d/x_expo.tsv" "$d/trades.csv" "$d/x_macro.tsv" > "$d/x_p$g.json"; done
+  # the year/quarter SPY column on the run's own basis (#3177): price-only runs read close, else adjusted_close
+  sh "$LIB/meta.sh" "$d" > "$s/$1_meta.json"
+  spycol=6; grep -q '"spy":"price"' "$s/$1_meta.json" && spycol=5
+  for g in Y Q; do awk -v gran=$g -v spycol=$spycol -f "$LIB/periods.awk" "$SPY_CSV" "$d/equity_curve.csv" "$d/x_expo.tsv" "$d/trades.csv" "$d/x_macro.tsv" > "$d/x_p$g.json"; done
   audit_rows "$d" > "$d/x_audit.tsv"
   if [ -d "$d/stage" ]; then sh "$LIB/stage_sum.sh" "$d" > "$d/x_stage.tsv"; else : > "$d/x_stage.tsv"; fi
   stop_floor_kinds "$d" > "$d/x_sfk.tsv"
   awk -f "$LIB/assemble.awk" "$d/trades.csv" "$d/x_trades.tsv" "$d/x_audit.tsv" "$d/x_macro.tsv" "$d/x_stage.tsv" "$d/x_sfk.tsv" > "$s/$1_trades.json"
-  sh "$LIB/meta.sh" "$d" > "$s/$1_meta.json"
   cp "$d/x_pY.json" "$s/$1_years.json"; cp "$d/x_pQ.json" "$s/$1_quarters.json"
   nav_json "$d" > "$s/$1_nav.json"
   open_json "$d" > "$s/$1_open.json"
@@ -175,7 +177,10 @@ site_common() {
   s="$OUT/site/data"; cl=$(charts_label); d="$OUT/runs/$cl"
   first=$(sed -n 2p "$d/equity_curve.csv" | cut -d, -f1); last=$(tail -1 "$d/equity_curve.csv" | cut -d, -f1)
   # %.4f: the store writes values like "741." which strict JSON rejects
-  awk -F, -v a="$first" -v b="$last" 'NR>1 && $1>=a && $1<=b && $6+0>0 {printf "%s[\"%s\",%.4f]", (n++?",":"["), $1, $6+0} END{print "]"}' "$SPY_CSV" > "$s/spy.json"
+  # spy.json total return (adjusted_close), spy_price.json price only (close): the page picks by basis (#3177)
+  for c in 6:spy 5:spy_price; do
+    awk -F, -v a="$first" -v b="$last" -v col="${c%%:*}" 'NR>1 && $1>=a && $1<=b && $col+0>0 {printf "%s[\"%s\",%.4f]", (n++?",":"["), $1, $col+0} END{print "]"}' "$SPY_CSV" > "$s/${c#*:}.json"
+  done
   awk -F'\t' '{printf "%s[\"%s\",\"%s\",\"%s\"]", (n++?",":"["), $1,$2,$3} END{print "]"}' "$d/x_macro.tsv" > "$s/macro.json"
   rm -rf "$s/charts"; mkdir -p "$s/charts"
   awk -v STAGE_DIR="$d/stage" -v OUT="$s/charts" -f "$LIB/chart_shards.awk" "$d/x_daily.tsv" "$d/trades.csv"
