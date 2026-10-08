@@ -127,9 +127,7 @@ let test_fetch_symbol_partial_failure_writes_nothing _ =
     (pair
        (matching ~msg:"Expected Failed"
           (function Lib.Failed msg -> Some msg | _ -> None)
-          (matching ~msg:"splits failure prefix"
-             (fun msg -> Some (String.is_prefix msg ~prefix:"splits: "))
-             (equal_to true)))
+          (field (String.is_prefix ~prefix:"splits: ") (equal_to true)))
        (equal_to false))
 
 let test_run_counts_and_skips _ =
