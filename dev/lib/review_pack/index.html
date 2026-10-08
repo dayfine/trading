@@ -324,6 +324,15 @@ const stopDist = t => isShort(t) ? t.isd : t.sid;
 // from its base-top suggested entry). Without the trade audit it is unknown: the card reads n/a.
 const isFallback = t => t.sfk === 'Buffer_fallback';
 const hasStopKind = ts => ts.some(t => t.sfk != null);
+// The fallback-stop overview finding and the Diagnostics fallback share: n/a (never a clean 0) when no
+// trade carries the audit's stop_floor_kind. Pure, for review_pack_test.sh.
+function fallbackFinding(ts) {
+  const fb = ts.filter(isFallback);
+  return hasStopKind(ts) ? `<b>${fb.length} of ${ts.length} trades (${fmt(100 * fb.length / ts.length, 0)}%) used the 4% fallback stop</b> rather than a stop under the base or MA.` : `<b>Fallback stops: n/a</b> (needs the trade audit's stop_floor_kind; build the pack with the container steps).`;
+}
+function fallbackShare(all, cohort) {
+  return hasStopKind(all) ? share(cohort, isFallback) : null;
+}
 const withMacro = t => isShort(t) ? 'Bearish' : 'Bullish', againstMacro = t => isShort(t) ? 'Bullish' : 'Bearish';
 const ownStage = t => isShort(t) ? 'Stage4' : 'Stage2';
 const FLAGS = [
@@ -674,7 +683,7 @@ function renderOverview() {
   const sync = [eq, dd, mc]; let busy = false;
   sync.forEach(c => c.timeScale().subscribeVisibleTimeRangeChange(r => { if (busy || !r) return; busy = true; sync.forEach(o => { if (o !== c) try { o.timeScale().setVisibleRange(r); } catch (e) {} }); busy = false; }));
 
-  const t = trades, fb = t.filter(x => x.flags.includes('fallback')), stops = t.filter(x => x.trig === 'stop_loss'), gap = stops.filter(x => stopSlip(x) > 0.005);
+  const t = trades, stops = t.filter(x => x.trig === 'stop_loss'), gap = stops.filter(x => stopSlip(x) > 0.005);
   const wk = t.filter(x => x.flags.includes('weekend')); const ys = D.years[CH()];
   const cum = (arr, k) => (arr.reduce((a, y) => a * (1 + y[k] / 100), 1) - 1) * 100;
   let worst = null; for (let i = 0; i + 3 <= ys.length; i++) { const w = ys.slice(i, i + 3), ex = cum(w, 'ret') - cum(w, 'spy'); if (!worst || ex < worst.ex) worst = { w, ex }; }
@@ -686,7 +695,7 @@ function renderOverview() {
     openCheckMiss(oc) && `<b>Exposure check failed on ${oc.date}:</b> the pack marks ${usd(oc.pack)} held, actual.sexp has ${usd(oc.actual)} in open positions. Every invested figure on this page is suspect.`,
     worst && `<b>Worst three-year stretch: ${worst.w[0].p}–${worst.w[2].p}, ${pct(cum(worst.w, 'ret'), 1)} while SPY made ${pct(cum(worst.w, 'spy'), 1)}.</b> Bullish macro weeks: ${worst.w.map(y => y.bull).join(' / ')}; realised P&amp;L ${worst.w.map(y => usdk(y.pnl)).join(' / ')}.`,
     `<b>Ten trades made ${usdk(top10.reduce((a, x) => a + x.pnl, 0))}</b> of the ${usdk(tot)} realised total. The ${aTr.length} A-grade trades made ${usdk(aTr.reduce((a, x) => a + x.pnl, 0))}.`,
-    hasStopKind(t) ? `<b>${fb.length} of ${t.length} trades (${fmt(100 * fb.length / t.length, 0)}%) used the 4% fallback stop</b> rather than a stop under the base or MA.` : `<b>Fallback stops: n/a</b> (needs the trade audit's stop_floor_kind; build the pack with the container steps).`,
+    fallbackFinding(t),
     `<b>${gap.length} of ${stops.length} stop exits filled more than 0.5% beyond the stop; ${late.length} sold at an open after the day the stop traded.</b> ${df.length} losers (grade D/F) then moved ≥ 15% the trade’s way within 13 weeks; they lost ${usdk(df.reduce((a, x) => a + x.pnl, 0))}.`,
     `<b>Average invested: ${fmt(expoAvg, 0)}% of NAV,</b> about ${fmt(ys.reduce((a, y) => a + y.pos, 0) / ys.length, 1)} positions on average.`,
     `<b>${wk.length} trades have a fill dated on a day with no bar</b> (the Saturday-fill defect). The validator also counts ${(inv.validator.find(v => v.id === 'V13') || {}).status || '?'} on V13.`,
@@ -914,7 +923,7 @@ function renderDiag() {
   const ydf = y => t.filter(x => x.yr === y);
   $('#d-picks').innerHTML = tbl([['Entry year'], ['Trades', 1], ['Win rate', 1], ['Pick, 8 wk', 1], ['SPY, 8 wk', 1], ['Pick − SPY', 1], ['Picks up at 8 wk', 1], ['D/F grades', 1], ['4% fallback stop', 1], ['Net', 1]],
     yrs.map(y => { const a = ydf(y), p = median(a.map(x => x.f40)), s = median(a.map(x => x.s40)), ex = median(a.filter(x => x.f40 != null && x.s40 != null).map(x => x.f40 - x.s40)), net = a.reduce((q, x) => q + x.pnl, 0);
-      return `<tr><td><b>${y}</b></td>${tdn(a.length)}${tdn(share(a, x => x.pnl > 0))}${tdp(p)}${tdp(s)}${tdp(ex)}${tdn(share(a.filter(x => x.f40 != null), x => x.f40 > 0))}${tdn(share(a, x => /^[DF]/.test(x.g || '')))}${tdn(hasStopKind(t) ? share(a, isFallback) : null)}${tdu(net)}</tr>`; }));
+      return `<tr><td><b>${y}</b></td>${tdn(a.length)}${tdn(share(a, x => x.pnl > 0))}${tdp(p)}${tdp(s)}${tdp(ex)}${tdn(share(a.filter(x => x.f40 != null), x => x.f40 > 0))}${tdn(share(a, x => /^[DF]/.test(x.g || '')))}${tdn(fallbackShare(t, a))}${tdu(net)}</tr>`; }));
   const LV = [3, 5, 6, 8, 10, 15], base = t.filter(x => x.cf && x.pct), act = base.reduce((q, x) => q + x.pnl, 0);
   $('#d-cut').innerHTML = tbl([['Hard stop'], ['Static P&L', 1], ['vs actual', 1], ['Trades cut earlier', 1], ['…of them winners', 1]],
     [`<tr><td><b>Actual</b></td>${tdu(act)}<td></td><td></td><td></td></tr>`, ...LV.map((l, i) => { const cut = base.filter(x => x.cf[i] < x.pct - 0.01), p = base.reduce((q, x) => q + x.pnl * x.cf[i] / x.pct, 0);

@@ -603,5 +603,19 @@ console.log($1)"; }
 else
   echo "SKIP: review_pack #3141 page cases need node"
 fi
+# #3199 QC follow-up: the overview fallback finding and the Diagnostics fallback share read n/a, never a
+# clean 0, when no trade carries the audit's stop_floor_kind; the page renders them through these functions.
+if command -v node >/dev/null 2>&1; then
+  FFNS="$(sed -n -e '/^const fmt = /p' -e '/^const share = /p' -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' "$S/index.html")"
+  ffb() { node -e "$FFNS
+const withKind = [{ sfk: 'Buffer_fallback' }, { sfk: 'Support_floor' }, { sfk: 'Support_floor' }, { sfk: 'Support_floor' }], noKind = [{ sid: 0.04 }, { sid: 0.08 }];
+console.log($1)"; }
+  expect_eq "fallbackFinding: with stop kinds, counts the Buffer_fallback trades" "<b>1 of 4 trades (25%) used the 4% fallback stop</b> rather than a stop under the base or MA." "$(ffb 'fallbackFinding(withKind)')"
+  expect_eq "fallbackFinding: without stop kinds reads n/a, not 0 (even with a 4 % sid)" yes "$(ffb 'fallbackFinding(noKind).startsWith("<b>Fallback stops: n/a</b>") ? "yes" : "no"')"
+  expect_eq "fallbackShare: a cohort's share with stop kinds, null (n/a) without" "25 null" "$(ffb '[fallbackShare(withKind, withKind), fallbackShare(noKind, noKind)].join(" ").replace(/ $/, " null")')"
+else
+  echo "SKIP: review_pack fallback guard cases need node"
+fi
+expect_eq "wiring: the overview finding and the Diagnostics column read fallbackFinding / fallbackShare" 2 "$(grep -c '^    fallbackFinding(t),$\|${tdn(fallbackShare(t, a))}' "$S/index.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

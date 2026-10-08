@@ -21,7 +21,7 @@
 #                   conformance table out of every slice)
 #   OUT/part-N.png  full.png cut into 1500 px slices, readable one by one; the
 #                   last slice is the bottom 1500 px, so every pixel row of the
-#                   page is in some part
+#                   page is in some part but the first and the last (sips clamps)
 #
 # The page height is measured by loading the page once in Chrome (--dump-dom)
 # with a probe that writes document height into <html data-page-h>. A page that
