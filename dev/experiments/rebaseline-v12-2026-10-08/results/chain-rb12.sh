@@ -12,7 +12,7 @@ SPECS_HOST=/tmp/rb12-run/specs; WORK=/tmp/rb12-run/$LANE; ART=/tmp/sweeps/rebase
 LOG_HOST=/tmp/rb12-run/chain-$LANE.log; LOCK=/tmp/rb12-run/chain-$LANE.lock; CELL_TIMEOUT=${CELL_TIMEOUT:-60000}
 EXPECT_HEAD=${EXPECT_HEAD:?set EXPECT_HEAD to the pinned worktree short sha}
 EXPECT_WH=${EXPECT_WH:?set EXPECT_WH to the v12 manifest entry count}
-MMAP_HANDLES=${SNAPSHOT_MAX_MMAP_HANDLES:-12000}   # #2839 knob: >= n_symbols (9,915) so the v2 warehouse LRU never cycles; 256 = pre-knob behaviour
+MMAP_HANDLES=${SNAPSHOT_MAX_MMAP_HANDLES:-12000}   # #2839 knob: >= n_symbols (v12 manifest ~9.3k, checked by EXPECT_WH) so the v2 warehouse LRU never cycles; 256 = pre-knob behaviour
 log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG_HOST"; }
 run() { docker exec $C bash -c "cd $ROOT && eval \$(opam env) && $1"; }
 mkdir -p /tmp/rb12-run; mkdir "$LOCK" 2>/dev/null || { echo "ABORT: lock $LANE"; exit 1; }

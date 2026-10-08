@@ -1,5 +1,6 @@
 #!/bin/sh
-# rebaseline-v12-2026-10-08 launcher. Usage: PREREG=<sha> sh launch.sh   (after the v12 warehouse build's verify phase passed)
+# rebaseline-v12-2026-10-08 launcher. Usage: mkdir -p /tmp/rb12-run && PREREG=<sha> sh launch.sh 2>&1 | tee /tmp/rb12-run/launch-pre.log
+# (the tee keeps the lists md5 line; run only after the v12 warehouse build logged VERIFY DONE)
 # Copy of ../../total-return-26y-2026-10-06/results/launch.sh with the run tree, arms and paths moved; also stages
 # splits.csv (split_dividend_guard reads the vendor split file next to dividends.csv, #3181).
 set -eu
@@ -27,6 +28,8 @@ echo "v12 warehouse entries=$EXPECT_WH"
 L=$WTREL/trading/test_data/backtest_scenarios/pit-v12/composition
 for f in $L/top-3000-1999.sexp $L/top-3000-20*.sexp; do grep -o '(symbol [^)]*)' "$f"; done \
   | sed 's/(symbol //; s/)$//' | LC_ALL=C sort -u > /tmp/rb12-lists-union.txt
+n_files=$(ls $L/top-3000-1999.sexp $L/top-3000-20*.sexp | wc -l | tr -d " "); n_union=$(wc -l < /tmp/rb12-lists-union.txt | tr -d " ")
+[ "$n_files" = 27 ] && [ "$n_union" -ge 9000 ] || { echo "ABORT: schedule lists look wrong (files=$n_files, union=$n_union; expect 27 and >= 9000)"; exit 1; }
 docker exec trading-1-dev grep -o '((symbol [^)]*)' $WH/manifest.sexp | sed 's/((symbol //; s/)$//' | LC_ALL=C sort -u > /tmp/rb12-manifest.txt
 LC_ALL=C comm -23 /tmp/rb12-lists-union.txt /tmp/rb12-manifest.txt | grep -v -x -F MEL > /tmp/rb12-absent.txt || true
 [ ! -s /tmp/rb12-absent.txt ] || { echo "ABORT: $(wc -l < /tmp/rb12-absent.txt | tr -d ' ') list symbols not in the v12 manifest (e.g. $(head -5 /tmp/rb12-absent.txt | tr '\n' ' ')): apply the alias delta to the lists and merge it first"; exit 1; }

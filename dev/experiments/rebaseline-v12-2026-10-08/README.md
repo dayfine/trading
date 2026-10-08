@@ -32,21 +32,27 @@ The guard is on in **both** arms: a dividend misread as a split creates phantom 
      reported as such; if two or more salts are excluded, the run is not read and the warehouse is fixed first.
    - Every cell writes `actual.sexp`; a `<no result>` is traced (OOM vs input) before relaunch.
 2. **#3173 after-merge check.** Per cell, report the guard summary line
-   (`Panel_runner: split_dividend_guard rejected=N no_files=M`) and list every rejected event (symbol, date, implied
-   factor, matching dividend). For each specimen (TDG 2013-07, WING, BCH), per cell: if a position is held over the
-   event date, it passes when there is no split event and no quantity jump on that date and (rb1) the dividend is
-   credited once — evidence from trades / open positions / equity curve rows. If no cell holds it, the specimen is
-   **NA-unheld** and passes only if the guard's rejected list names it in every cell where the strategy's bar reader
-   saw the event (i.e. the guard fired even though nothing was held). The item passes when every held instance
-   passes and no specimen is missed by the guard; NA-unheld specimens are stated as such, not counted as tested on
-   positions.
+   (`Panel_runner: split_dividend_guard rejected=N no_files=M`); the guard prints counts only, and it is consulted
+   only for held positions and resting entry tickets, so no per-event list is produced and an unheld symbol is never
+   checked. For each specimen (TDG 2013-07, WING, BCH), per cell: it is **held** if a position or a resting entry
+   ticket spans the event date. A held instance passes when there is no split event and no quantity jump (or ticket
+   rescale) on that date and (rb1) the dividend is credited once — evidence from trades / open positions / equity
+   curve rows. A specimen held in no cell is **not tested by this run** (reason: never held), stated as such.
+   - The item **passes** if at least one specimen is held somewhere and every held instance passes. It **fails** if
+     any held instance fails.
+   - If **no specimen is held in any cell**, the item is **not tested**: #3173 stays `verify/pending`, and item 3 and
+     the `split_dividend_guard` default flip rest on #3181's unit tests (the TDG / WING / BCH guard cases and the
+     `detect_and_apply` held-position tests) plus `rejected` counts that are equal across rb0 and rb1 of each salt.
+     The results writeup says so explicitly.
 3. **Dividend implementation check (rb1 vs rb0, per salt).** Report `DividendIncomeTotal`,
    `DividendPaidShortTotal` (0 expected: shorts off), `DividendMissingFileCount`, `DividendSkippedNoAmountCount`,
    and the dividend log contribution computed from the equity curve as in total-return-26y. Split it into
    **ordinary** events (amount < 5 % of the prior close) and **specials** (≥ 5 %), with the 10 largest events by
    dollars listed. **Pass** if the ordinary part lands within ±50 % of the +0.13 log estimate on every salt, coverage
-   holds (missing files ≤ 2 % of distinct held symbols; skipped-no-amount = 0 or each one listed), item 2 passes,
-   and V6 agrees. Specials are real cash and are reported, not gated; their size is the answer to why the v11 run
+   holds (missing files ≤ 2 % of distinct held symbols; skipped-no-amount = 0, or each one listed with its
+   amount, and their sum < 1 % of the ordinary dividend dollars — above that, item 3 fails), item 2 passes or is
+   not tested (as defined there), and V6 agrees. The 5 % cut and the +0.13 band come from total-return-26y
+   `results-2026-10-07.md` §1 (ordinary "everything else" 0.118–0.120 log, stable for cuts of 3–10 %). Specials are real cash and are reported, not gated; their size is the answer to why the v11 run
    came out at +0.21–0.23.
 4. **The re-based record (rb0, and rb1 if item 3 passes).** Per salt: total return, CAGR, max DD, Calmar, Sharpe
    (excess over the net T-bill rate), trades, win rate; SPY on the matching basis (rb0: SPY price-only, fully invested so it earns no interest;
@@ -76,7 +82,7 @@ The guard is on in **both** arms: a dividend misread as a split creates phantom 
 
 - **#3136 is fixed in the list ranking only, not in the simulator's liquidity gates.** These specs arm
   `min_entry_dollar_adv` $1M and `min_hold_dollar_adv` $500k, which still compute dollar volume on the mixed
-  (adjusted close × split-adjusted volume) basis. The #3136 measurement note puts the effect at 3.9–6.8 % of
+  (raw close × split-restated volume) basis. The #3136 measurement note puts the effect at 3.9–6.8 % of
   symbol-weeks flipping in 1998–2003 (smaller later). The record is therefore **not #3136-clean**; it is "v12 lists,
   v11-basis liquidity gates". Fixing the gates is a separate change with its own paired read.
 
