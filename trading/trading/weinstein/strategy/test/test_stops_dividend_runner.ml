@@ -182,6 +182,24 @@ let test_short_unchanged _ =
     (equal_to (_trailing 80.0))
 
 (* Entered on the ex-date: its stop was set on ex-dividend prices already. *)
+(* #3193 review: a tick with no bar for the symbol (08-21 here: a halt or a
+   vendor gap) must not reuse the 08-19..08-20 window and reduce the stop a
+   second time. *)
+let test_no_bar_tick_does_not_reduce_again _ =
+  assert_that
+    (_run ~dividends:_ad_dividend ~symbol:"AD" ~bars:(List.take _ad_bars 2)
+       ~stop:(_trailing 44.46) ~as_of:"2025-08-21" ())
+    (equal_to (_trailing 44.46))
+
+(* An ex-date with no bar of its own (08-20 missing) is applied on the next
+   bar's tick, whose window starts at the bar before (08-19). *)
+let test_ex_date_without_bar_applied_next_bar _ =
+  let bars = [ List.nth_exn _ad_bars 0; List.nth_exn _ad_bars 2 ] in
+  assert_that
+    (_run ~dividends:_ad_dividend ~symbol:"AD" ~bars ~stop:(_trailing 67.46)
+       ~as_of:"2025-08-21" ())
+    (equal_to (_trailing 44.46))
+
 let test_entry_on_ex_date_unchanged _ =
   assert_that
     (_run ~dividends:_ad_dividend ~entry_date:"2025-08-20" ~symbol:"AD"
@@ -226,6 +244,10 @@ let suite =
          "day after ex-date unchanged" >:: test_day_after_ex_date_unchanged;
          "short unchanged" >:: test_short_unchanged;
          "entry on ex-date unchanged" >:: test_entry_on_ex_date_unchanged;
+         "no-bar tick does not reduce again"
+         >:: test_no_bar_tick_does_not_reduce_again;
+         "ex-date without a bar applied on the next bar"
+         >:: test_ex_date_without_bar_applied_next_bar;
          "with_stop_level initial" >:: test_with_stop_level_initial;
          "with_stop_level tightened" >:: test_with_stop_level_tightened;
        ]

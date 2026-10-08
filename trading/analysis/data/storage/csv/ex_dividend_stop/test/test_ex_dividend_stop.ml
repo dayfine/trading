@@ -60,8 +60,8 @@ let test_window_is_half_open _ =
        ~through:(_d "2025-08-20") 60.0)
     (float_equal 58.0)
 
-(* A skipped weekend: Friday's and Monday's ex-dates both land on Monday's
-   tick, each reduced in turn. *)
+(* Two ex-dates in one window: a vendor ex-date on Saturday 2025-08-23 (no
+   bar) and Monday's both land on Monday's tick, each reduced in turn. *)
 let test_two_ex_dates_in_window _ =
   let dividends = [ _div "2025-08-25" 1.0; _div "2025-08-23" 2.0 ] in
   assert_that

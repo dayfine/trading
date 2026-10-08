@@ -17,12 +17,15 @@ let _held_long_entry_date (pos : Position.t) =
   | _ -> None
 
 (* The tick's window [(after, through]]: [None] unless the position is a
-   [Holding] long and its symbol has two bars up to [as_of]. *)
+   [Holding] long whose symbol has a bar ON [as_of] and one before it. Without
+   today's bar the last two bars would repeat the previous tick's window and
+   reduce the stop again (#3193 review); an ex-date that falls on a no-bar day
+   is picked up by the next real bar's window, which starts at the bar before. *)
 let _window ~bar_reader ~as_of (pos : Position.t) =
   let%bind.Option entry_date = _held_long_entry_date pos in
   let bars = Bar_reader.daily_bars_for bar_reader ~symbol:pos.symbol ~as_of in
   match List.rev bars with
-  | curr :: prev :: _ ->
+  | curr :: prev :: _ when Date.equal curr.Types.Daily_price.date as_of ->
       Some (Date.max prev.Types.Daily_price.date entry_date, curr.date)
   | _ -> None
 

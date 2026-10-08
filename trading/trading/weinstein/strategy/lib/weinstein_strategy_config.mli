@@ -761,8 +761,8 @@ type config = {
           [unadjusted_amount] are skipped; a symbol with no [dividends.csv]
           under [TRADING_DATA_DIR] keeps its stop and is counted. Shorts are
           untouched (their buy-stop is not adjusted by the rule). Fixes AD
-          2025-08-20 (.00 special: stop 67.46, open 51.26) and BKE 2021-12-17,
-          stopped out at the open on the dividend drop. Semantics:
+          2025-08-20 ($23.00 special: stop 67.46, open 51.26) and BKE
+          2021-12-17, stopped out at the open on the dividend drop. Semantics:
           {!Ex_dividend_stop}, {!Stops_dividend_runner}. R2: real config field,
           an axis via [Overlay_validator]. *)
   resistance_min_history_bars : int; [@sexp.default 0]

@@ -16,12 +16,14 @@
     the holder's notes. This lowers a stop, which the trail itself never does
     (L2); it is an order adjustment by the broker, not a strategy decision.
 
-    {b Window.} For [as_of]'s tick, the ex-dates in [(prev, as_of_bar]], where
-    [as_of_bar] is the symbol's latest bar on or before [as_of] and [prev] the
-    later of the bar before it and the position's [entry_date] (a stop placed
-    after an ex-date open already sits on ex-dividend prices). The strategy
-    runs once per trading day, so each ex-date falls in exactly one tick's
-    window.
+    {b Window.} Only on a tick where the symbol has a bar dated [as_of]: the
+    ex-dates in [(prev, as_of]], where [prev] is the later of the symbol's
+    previous bar and the position's [entry_date] (a stop placed after an
+    ex-date open already sits on ex-dividend prices). A tick with no bar for
+    the symbol (a halt, a vendor gap) reduces nothing, so it cannot repeat the
+    previous window, and an ex-date that fell on such a day lands in the next
+    bar's window. Successive windows tile the calendar, so each ex-date is
+    applied exactly once per position.
 
     The strategy invokes {!adjust} after {!Stops_split_runner.adjust} and
     before [Stops_runner.update] reads [stop_states]. With no reducer on the
