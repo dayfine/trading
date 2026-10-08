@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-06 (orchestrator run 2 — see `dev/daily/2026-10-06-run2.md`). Queue at start: #3164 (local-session PR, left to that session).
-This run: cleanup #3161, harness #3162 + #3163 merged; local #3160 merged by its session, #3164 local open. 10-04 run 2 and both 10-05 runs published no summary (`Daily orchestrator` RED streak=3).
+Last updated: 2026-10-08 (orchestrator — see `dev/daily/2026-10-08.md`). Queue at start: #3207 (Codex PR, CI red, left to its session).
+This run: harness #3210 (recovered orphan branch) + #3211, cleanup #3212 merged. 10-07 (x2) and 10-08 run 1 published no summary (H-ORCH-SUMMARY-SILENT-LOSS).
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-06 run2: #3167 flag-drift region pins, #3169 audit atomic-publish pin MERGED; next: H-FLAG-DRIFT-USAGE-PIN |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-08: #3210 audit rm-then-mv pin + #3211 flag-drift usage pin MERGED; next: H-ORCH-SUMMARY-SILENT-LOSS |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | selection_trace.ml split MERGED #3168 (662→289 + 2 modules, exception removed); next: shiller_weinstein_decades.ml 626 lines |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | shiller_weinstein_decades.ml split MERGED #3212 (626→140 + 5 modules, exception removed); next: twin_detector.ml 455 lines |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
