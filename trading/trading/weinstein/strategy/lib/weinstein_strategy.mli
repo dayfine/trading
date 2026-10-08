@@ -75,6 +75,10 @@ module Stops_split_runner = Stops_split_runner
     stay in lockstep with the broker-side share-count rescale on a
     corporate-action split. See {!Stops_split_runner}. *)
 
+module Stops_dividend_runner = Stops_dividend_runner
+(** Per-tick ex-dividend reduction of held longs' stop levels (#3174), run right
+    after {!Stops_split_runner}. See {!Stops_dividend_runner}. *)
+
 module Stop_ma_basis = Stop_ma_basis
 (** Adjusted-to-raw MA basis restatement for the stop machine and the Stage-3
     margin gate (issue #2982). See {!Stop_ma_basis}. *)
@@ -821,6 +825,10 @@ type config = {
       (** Drop a detected split that the vendor files show is a cash dividend
           (#3173). Default [false] => exact no-op (R1). See
           [Weinstein_strategy_config.split_dividend_guard]. *)
+  ex_dividend_stop_adjust : bool; [@sexp.default false]
+      (** Reduce a held long's stop level by the cash dividend on its ex-date
+          (#3174). Default [false] => exact no-op (R1). See
+          [Weinstein_strategy_config.ex_dividend_stop_adjust]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into the per-screen
           [Stock_analysis.config.resistance.min_history_bars] (and, via the

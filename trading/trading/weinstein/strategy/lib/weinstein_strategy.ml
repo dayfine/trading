@@ -10,6 +10,7 @@ module Sector_rotation_weinstein_strategy = Sector_rotation_weinstein_strategy
 module Breaker_spy_strategy = Breaker_spy_strategy
 module Stops_runner = Stops_runner
 module Stops_split_runner = Stops_split_runner
+module Stops_dividend_runner = Stops_dividend_runner
 module Stop_ma_basis = Stop_ma_basis
 module Stop_ma_stage = Stop_ma_stage
 module Force_liquidation_runner = Force_liquidation_runner
@@ -158,13 +159,15 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
   let catastrophic_armed =
     phys_equal !prior_decline_character Decline_character.Fast_v
   in
-  (* Split rescale, then snapshot, then the stops runner — so a split is never
+  (* Split rescale and ex-dividend stop reduction (#3174), then snapshot, then the stops runner — so neither is ever
      reported as a move by the silent-move capture (issue #2974). *)
   let exit_transitions, adjust_transitions =
     Stop_move_capture.split_then_update ~audit_recorder ~positions ~stop_states
       ~current_date
       ~split_adjust:(fun () ->
         Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
+          ~as_of:current_date;
+        Stops_dividend_runner.adjust ~positions ~stop_states ~bar_reader
           ~as_of:current_date)
       ~update:(fun () ->
         Stops_runner.update
