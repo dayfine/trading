@@ -271,6 +271,8 @@
                 "dividend two bars off rejected"))
          (unit ("trading/analysis/data/storage/csv/split_dividend_guard/test/test_split_dividend_guard.ml"
                 "vendor split two bars off kept"))
+         (unit ("trading/trading/simulation/test/test_split_day_mtm.ml"
+                "create_deps_split_guard_keeps_tdg_held"))
          (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"
                 "guard drops dividend split"))
          (unit ("trading/trading/simulation/test/test_split_handler_dividend_guard.ml"

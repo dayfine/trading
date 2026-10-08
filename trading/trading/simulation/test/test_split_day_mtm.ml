@@ -32,6 +32,7 @@ open Trading_simulation.Simulator
 open Matchers
 open Test_helpers
 module Split_event = Trading_portfolio.Split_event
+module Portfolio_summary = Trading_simulation_types.Portfolio_summary
 
 let _date s = Date.of_string s
 
@@ -361,11 +362,92 @@ let test_split_day_with_no_position_held _ =
         (elements_are
            (List.init (List.length result.steps) ~f:(fun _ -> expected_step))))
 
+(* One setup bar submits the entry; the 07-10 bar fills 100 shares before
+   the TDG special dividend. Without the guard, 07-11 applies a phantom 22/19
+   split. Exercise create_deps and step so losing either forwarding seam is
+   observable in the held quantity and emitted events. *)
+let _tdg_prices =
+  List.map
+    [
+      ("2013-07-09", 160.80, 138.80);
+      ("2013-07-10", 160.80, 138.80);
+      ("2013-07-11", 139.50, 139.50);
+    ]
+    ~f:(fun (date, close, adjusted_close) ->
+      _make_bar ~date:(_date date) ~open_:close ~high:close ~low:close ~close
+        ~adjusted_close ~volume:1_000_000)
+
+let _tdg_guard () =
+  Split_dividend_guard.create
+    ~load_dividends:(fun _ ->
+      Ok
+        [
+          {
+            Corporate_actions.ex_date = _date "2013-07-11";
+            unadjusted_amount = Some 22.0;
+            adjusted_amount = 22.0;
+          };
+        ])
+    ~load_splits:(fun _ -> Ok []) ()
+
+let _tdg_step_matches ~date ~quantity ~events =
+  all_of
+    [
+      field (fun (s : step_result) -> s.date) (equal_to (_date date));
+      field
+        (fun s -> s.portfolio.positions)
+        (elements_are
+           [
+             all_of
+               [
+                 field
+                   (fun (p : Portfolio_summary.position_summary) -> p.symbol)
+                   (equal_to "TDG");
+                 field (fun p -> p.quantity) (float_equal quantity);
+               ];
+           ]);
+      field (fun s -> s.splits_applied) (size_is events);
+    ]
+
+let test_create_deps_split_guard_keeps_tdg_held _ =
+  with_test_data "split_day_mtm_tdg_guard" [ ("TDG", _tdg_prices) ]
+    ~f:(fun data_dir ->
+      List.iter [ false; true ] ~f:(fun guarded ->
+          let module Hold = Make_buy_and_hold (struct
+            let symbol = "TDG"
+            let target_quantity = 100.0
+          end) in
+          let config =
+            {
+              _split_config with
+              start_date = _date "2013-07-09";
+              end_date = _date "2013-07-12";
+            }
+          in
+          let deps =
+            create_deps ~symbols:[ "TDG" ] ~data_dir
+              ~strategy:(module Hold)
+              ~commission:config.commission
+              ?split_guard:(if guarded then Some (_tdg_guard ()) else None)
+              ()
+          in
+          let sim, _ = step_exn (create_exn ~config ~deps) in
+          let sim, held = step_exn sim in
+          assert_that held
+            (_tdg_step_matches ~date:"2013-07-10" ~quantity:100.0 ~events:0);
+          let _, dividend_day = step_exn sim in
+          assert_that dividend_day
+            (_tdg_step_matches ~date:"2013-07-11"
+               ~quantity:(if guarded then 100.0 else 100.0 *. 22.0 /. 19.0)
+               ~events:(if guarded then 0 else 1))))
+
 let suite =
   "split_day_mtm"
   >::: [
          "portfolio_value_continuous_through_split"
          >:: test_portfolio_value_continuous_through_split;
+         "create_deps_split_guard_keeps_tdg_held"
+         >:: test_create_deps_split_guard_keeps_tdg_held;
          "no_split_window_unchanged" >:: test_no_split_window_unchanged;
          "split_day_with_no_position_held"
          >:: test_split_day_with_no_position_held;
