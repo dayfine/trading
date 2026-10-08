@@ -42,6 +42,15 @@ short_leg() {
     printf ',"tickets":null,"bearish_weeks":null,"bearish_admitted":null}'
   fi
 }
+# At-fill cash rejections (#3138): entry tickets cancelled because the book could not fund the fill,
+# from each ticket_lifecycle (cash_rejection ((required R) (available A))) in trade_audit.sexp. count, and
+# how many were at least 90 % funded (A / R >= 0.9). null, never 0, when the trade audit is missing.
+cash_rejections() {
+  [ -s "$D/trade_audit.sexp" ] || { printf 'null'; return; }
+  tr -s '\n\t ' '   ' < "$D/trade_audit.sexp" | grep -oE '\(cash_rejection \(\(required [-0-9.e+]+\) \(available [-0-9.e+]+\)\)\)' |
+    awk '{ r = $3; a = $5; gsub(/[()]/, "", r); gsub(/[()]/, "", a); n++; if (r > 0 && a / r >= 0.9) k++ }
+      END { printf "{\"count\":%d,\"near\":%d}", n, k }'
+}
 esc() { sed 's/\\/\\\\/g; s/"/\\"/g'; }
 {
 printf '{"metrics":{'
@@ -56,5 +65,5 @@ awk 'function flush() { if (id != "") { printf "%s{\"id\":\"%s\",\"sev\":\"%s\",
   END { flush() }' "$D/validator.sexp.md"
 printf '],"conformance":['
 [ -s "$D/trade_audit_report.md" ] && sed -n '/## Weinstein conformance/,/^## Decision/p' "$D/trade_audit_report.md" | awk -F'|' '/^\| R[0-9]/ { for(i=2;i<=7;i++){gsub(/^ +| +$/,"",$i); gsub(/"/,"\\\"",$i)}; printf "%s{\"rule\":\"%s\",\"desc\":\"%s\",\"passed\":\"%s\",\"rate\":\"%s\",\"fails\":\"%s\"}", (n++?",":""), $2,$3,$4,$5,$6 }'
-printf '],"short_leg":%s,"basis":%s}\n' "$(short_leg)" "$(basis)"
+printf '],"short_leg":%s,"basis":%s,"cash_rejections":%s}\n' "$(short_leg)" "$(basis)" "$(cash_rejections)"
 }

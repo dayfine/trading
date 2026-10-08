@@ -357,6 +357,7 @@ let _lifecycle ?(ticket_age_weeks_at_cancel = None) ~placement_date () : TL.t =
     entry_anchor = None;
     sized_down_wide_stop = false;
     reissued_from = None;
+    cash_rejection = None;
     triple_confirmation =
       {
         breakout_volume_multiple = None;

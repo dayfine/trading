@@ -367,6 +367,7 @@ let _lifecycle ?(placement_date = _date "2024-03-01")
     sized_down_wide_stop;
     triple_confirmation;
     reissued_from;
+    cash_rejection = None;
   }
 
 let _check verdict outcome : TL.fill_volume_check = { verdict; outcome }
@@ -853,6 +854,29 @@ let test_record_exit_without_entry_is_dropped _ =
   TA.record_exit t (make_exit ~position_id:"ORPHAN-1" ());
   assert_that (TA.get_audit_records t) is_empty
 
+(* #3138: a cash rejection for a position id with no recorded entry is
+   dropped, like every sibling [record_*]; the entry on file is untouched. *)
+let test_record_cash_rejection_without_entry_is_dropped _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_cash_rejection t
+    {
+      position_id = "ORPHAN-1";
+      symbol = "ORPH";
+      date = _date "2024-05-01";
+      required = 1_000.0;
+      available = 400.0;
+    };
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         field
+           (fun (r : TA.audit_record) ->
+             Option.bind r.entry.ticket_lifecycle
+               ~f:(fun (l : Backtest.Ticket_lifecycle.t) -> l.cash_rejection))
+           is_none;
+       ])
+
 (* record_transitions (#2076) --------------------------------------------- *)
 
 let _external_exit_of t ~position_id =
@@ -1323,6 +1347,8 @@ let suite =
          >:: test_record_exit_attaches_to_existing_entry;
          "record_exit without entry is dropped"
          >:: test_record_exit_without_entry_is_dropped;
+         "record_cash_rejection without entry is dropped"
+         >:: test_record_cash_rejection_without_entry_is_dropped;
          "record_transitions captures margin_call as external_exit"
          >:: test_record_transitions_captures_margin_call_as_external_exit;
          "record_transitions captures any StrategySignal label"

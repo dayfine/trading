@@ -6,8 +6,7 @@ open Core
 
 (* Types ------------------------------------------------------------------ *)
 
-(* Split out for file length: [cascade_summary] and the execution-faithfulness
-   types (+ their sexp converters). *)
+(* Split out for file length: [cascade_summary] + execution-faithfulness types. *)
 include Trade_audit_cascade
 include Trade_audit_execution
 
@@ -86,9 +85,8 @@ type entry_decision = {
 }
 [@@deriving sexp]
 
-(* Issue #2975: [screener_proxy_stop] was written as [suggested_stop] before.
-   ppx_sexp_conv has no field alias, so legacy rows are read by renaming the key
-   first; [audit_record]'s derived reader, declared below, picks this up. *)
+(* #2975: legacy rows say [suggested_stop]; ppx_sexp_conv has no field alias,
+   so rename the key first ([audit_record]'s derived reader picks this up). *)
 let _rename_legacy_key = function
   | Sexp.List [ Sexp.Atom "suggested_stop"; v ] ->
       Sexp.List [ Sexp.Atom "screener_proxy_stop"; v ]
@@ -148,16 +146,15 @@ type _bucket = {
   mutable bucket_fill_volume : Ticket_lifecycle.fill_volume_check option;
   mutable bucket_cancel_age_weeks : int option;
   mutable bucket_cancel_reason : string option;
+  mutable bucket_cash_rejection : Ticket_lifecycle.cash_rejection option;
   mutable bucket_stop_decisions : Weinstein_stops.Stop_decision.t list;
 }
-(** Internal mutable bucket: every [record_*] merge lands here and is folded
-    into the emitted [audit_record] at drain time. *)
+(** Per-position bucket: every [record_*] lands here; folded at drain. *)
 
 type t = {
   records : (string, _bucket) Hashtbl.t;
   cascade_summaries : cascade_summary Queue.t;
-      (** Per-Friday cascade summaries in insertion order, sorted by [date] on
-          retrieval — cross-backtest/thread ordering is not relied on. *)
+      (** Per-Friday summaries in insertion order; sorted by [date] on read. *)
 }
 
 let create () =
@@ -174,6 +171,7 @@ let _fresh_bucket (entry : entry_decision) =
     bucket_fill_volume = None;
     bucket_cancel_age_weeks = None;
     bucket_cancel_reason = None;
+    bucket_cash_rejection = None;
     bucket_stop_decisions = [];
   }
 
@@ -201,6 +199,10 @@ let _with_bucket t ~position_id ~f =
 
 let record_fill_volume t ~position_id check =
   _with_bucket t ~position_id ~f:(fun b -> b.bucket_fill_volume <- Some check)
+
+let record_cash_rejection t (r : Trading_simulation.Entry_cash_rejection.t) =
+  _with_bucket t ~position_id:r.position_id ~f:(fun b ->
+      b.bucket_cash_rejection <- Some (Ticket_lifecycle.cash_rejection_of r))
 
 let record_exit t (exit_ : exit_decision) =
   _with_bucket t ~position_id:exit_.position_id ~f:(fun b ->
@@ -256,7 +258,8 @@ let _entry_with_lifecycle (bucket : _bucket) : entry_decision =
       Ticket_lifecycle.resolve bucket.bucket_entry.ticket_lifecycle
         ~fill_volume:bucket.bucket_fill_volume
         ~cancel_age_weeks:bucket.bucket_cancel_age_weeks
-        ~cancel_reason:bucket.bucket_cancel_reason;
+        ~cancel_reason:bucket.bucket_cancel_reason
+        ~cash_rejection:bucket.bucket_cash_rejection;
   }
 
 let _bucket_to_record (bucket : _bucket) : audit_record =

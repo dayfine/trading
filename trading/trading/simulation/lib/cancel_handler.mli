@@ -108,6 +108,7 @@ val apply_to_positions :
 
 val apply_trades_best_effort :
   ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
+  ?on_reject:(Trading_base.Types.trade -> available_cash:float -> unit) ->
   ?initial_long_margin_req:float ->
   Trading_portfolio.Portfolio.t ->
   Trading_base.Types.trade list ->
@@ -130,7 +131,12 @@ val apply_trades_best_effort :
     leverage dial (margin M1b-2): when [< 1.0] a levered long BUY funds its cash
     shortfall into [Portfolio.long_margin_debit] instead of being
     floor-rejected. At the default the apply is bit-equal to
-    [Portfolio.apply_single_trade]. *)
+    [Portfolio.apply_single_trade].
+
+    [on_reject] (default: ignore) is called once per refused trade, after the
+    WARN, with the portfolio's [current_cash] at the moment of the refusal: the
+    running portfolio, so earlier trades of the same batch are already booked
+    (#3138, {!Entry_cash_rejection.note}). *)
 
 val apply_transitions :
   positions:Position.t String.Map.t ->
@@ -190,26 +196,31 @@ val revert_rejected_exits :
     backstop to the [filled_quantity = 0.0] match guard above. *)
 
 val handle_rejected_trades :
+  ?cash_rejections:Entry_cash_rejection.pending ->
   date:Date.t ->
   positions:Position.t String.Map.t ->
   rejected_trades:Trading_base.Types.trade list ->
   order_manager:Trading_orders.Manager.order_manager ->
   entry_fill_retry:Entry_fill_retry.t ->
   on_transitions:(Position.transition list -> unit) option ->
+  unit ->
   Position.t String.Map.t Status.status_or
-(** [handle_rejected_trades ~date ~positions ~rejected_trades ~order_manager
-     ~entry_fill_retry ~on_transitions] settles the fills the portfolio refused,
-    in order: {b (1) retry} — spend [entry_fill_retry]'s G2a budget re-offering
-    what it can afford ({!Entry_fill_retry.handle_rejected_entries});
-    {b (2) cancel} — build a [CancelEntry] transition for each trade that
-    survives the retry ({!transitions_for_rejected_trades}); {b (3) announce} —
-    hand those transitions to [on_transitions] (when present) {e before}
-    applying them, matching the caller's existing announce-before-apply ordering
-    for every other transition source; {b (4) apply} — fold them onto
-    [positions] via {!apply_transitions}; {b (5) revert} — walk the
-    {e full, unfiltered} [rejected_trades] (entries included) through
-    {!revert_rejected_exits} so any stranded [Exiting] position goes back to
-    [Holding] for the stop to re-fire next cycle.
+(** [handle_rejected_trades ?cash_rejections ~date ~positions ~rejected_trades
+     ~order_manager ~entry_fill_retry ~on_transitions] settles the fills the
+    portfolio refused, in order: {b (1) retry} — spend [entry_fill_retry]'s G2a
+    budget re-offering what it can afford
+    ({!Entry_fill_retry.handle_rejected_entries}); {b (2) cancel} — build a
+    [CancelEntry] transition for each trade that survives the retry
+    ({!transitions_for_rejected_trades}) and, when [cash_rejections] is given,
+    send one {!Entry_cash_rejection.t} per cancel (#3138; the refusals were
+    noted by {!apply_trades_best_effort}'s [on_reject]); {b (3) announce} — hand
+    those transitions to [on_transitions] (when present) {e before} applying
+    them, matching the caller's existing announce-before-apply ordering for
+    every other transition source; {b (4) apply} — fold them onto [positions]
+    via {!apply_transitions}; {b (5) revert} — walk the {e full, unfiltered}
+    [rejected_trades] (entries included) through {!revert_rejected_exits} so any
+    stranded [Exiting] position goes back to [Holding] for the stop to re-fire
+    next cycle.
 
     The [CancelEntry]s built in step 2 are the ONLY resolution a
     portfolio-rejected entry ticket gets; unannounced, they left a quarter of

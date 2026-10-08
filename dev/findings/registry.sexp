@@ -295,6 +295,13 @@
                 "BKE stop reduced, not hit"))))
  (status fixed-behind-flag))
 
+((issue 3138) (ref "26y investor deep-dive 2026-10-05: s1 ADMA $446.7k needed, $427.5k available")
+ (finding "an at-fill cash rejection cancels the entry ticket outright and was visible only in the stderr WARN, with no amounts in the artifacts")
+ (guard ((unit ("trading/trading/simulation/test/test_entry_cash_rejection.ml"
+                "cancelled ticket recorded"))
+         (unit ("trading/trading/backtest/test/test_ticket_cancel_observability.ml"
+                "a portfolio-rejected fill records a cancel in trade_audit"))))
+
 ((issue 3147) (ref "short-only Phase A (#3135) D6: ALX 2008-11-25, SUN1 2009-05-07; 74 of 106 soT gap labels")
  (finding "trades.csv labelled a same-day force cover or stop-out as margin_call, and a short's gap through its stop as gap_down")
  (guard ((unit ("trading/trading/backtest/test/test_stop_log.ml"
