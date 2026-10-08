@@ -185,10 +185,9 @@ let _usage () =
   eprintf "Usage: scenario_runner [--dir <path>]\n";
   Stdlib.exit 1
 
-let rec _parse_flag args = match args with _ -> _sibling args
+let _parse_flag args = match args with _ -> _sibling args
 and _sibling _ = print_endline "--bogus-flag"
 EOF2
-sed -i 's/^let rec _parse_flag/let _parse_flag/' "$work/and_runner.ml"
 printf '%s\n' 'scenario_runner.exe -- --dir one --bogus-flag' >"$work/bogus_and.sh"
 SCENARIO_RUNNER_ML="$work/and_runner.ml" expect 1 "$work/bogus_and.sh"
 
@@ -202,6 +201,20 @@ let _parse_flag args = match args with _ -> _usage ()
 let _later_helper () = print_endline "--bogus-flag"
 EOF2
 SCENARIO_RUNNER_ML="$work/usage_noexit_runner.ml" expect 1 "$work/bogus_and.sh"
+
+# (d) a flag present ONLY in `_usage` (no parser arm) must be accepted: pins
+# the usage region's own contribution to the accept-set.
+cat >"$work/usage_only_runner.ml" <<'EOF2'
+let _usage () =
+  eprintf "Usage: scenario_runner [--dir <path>] [--usage-only]\n";
+  Stdlib.exit 1
+
+let _parse_flag args = match args with _ -> _usage ()
+
+let parse_args () = _parse_flag []
+EOF2
+printf '%s\n' 'scenario_runner.exe -- --dir one --usage-only' >"$work/usage_only.sh"
+SCENARIO_RUNNER_ML="$work/usage_only_runner.ml" expect 0 "$work/usage_only.sh"
 
 # --- non-vacuity guard on the accept-set itself ----------------------------
 # A runner file whose parser markers have moved must be a HARD FAIL, never a
