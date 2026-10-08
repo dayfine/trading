@@ -93,13 +93,13 @@ type t = {
       (** FINRA-exact short maintenance (issue #3148), default [false] (R1
           no-op). When [true], {!maintenance_pct_for_price} returns
           {!Short_margin_tiers.finra_short_maintenance} (greater of the
-          per-share floor and the percentage: [max 0.30 (5 /. price)] at and up,
-          [max 1.0 (2.5 /. price)] below) for every price, superseding both
+          per-share floor and the percentage: [max 0.30 (5 /. price)] at $5 and
+          up, [max 1.0 (2.5 /. price)] below) for every price, superseding both
           {!short_maintenance_tiers} and the flat {!maintenance_margin_pct}. The
-          M3a tier step (-17 at 0.83) applies the /share floor at its value
-          across the band; FINRA requires 0.50 at and 0.30 at .67, so the step
-          margin-calls winning shorts (UBSI 2009-02-18 at an equity ratio of
-          about 0.70). Searchable via the nested overlay key
+          M3a tier step ($5-17 at 0.83) applies the $5/share floor at its $6
+          value across the band; FINRA requires 0.50 at $10 and 0.30 at $16.67,
+          so the step margin-calls winning shorts (UBSI 2009-02-18 at an equity
+          ratio of about 0.70). Searchable via the nested overlay key
           [margin_config.short_maintenance_finra] (R2). *)
 }
 [@@deriving show, eq, sexp]

@@ -44,7 +44,7 @@ let test_order_independent _ =
     (float_equal 1.0)
 
 (* #3148: FINRA Rule 4210(c), the greater of the per-share floor and the
-   percentage.  -> 0.50 and .67 -> 0.30 are the issue's two pins. *)
+   percentage. $10 -> 0.50 and $16.67 -> 0.30 are the issue's two pins. *)
 let test_finra_short_maintenance _ =
   assert_that
     (List.map [ 10.0; 16.67; 6.0; 20.0; 4.0; 2.0; 0.0 ] ~f:(fun price ->

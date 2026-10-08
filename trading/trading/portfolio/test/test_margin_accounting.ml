@@ -547,7 +547,7 @@ let test_maintenance_tiered_flags_cheap_short _ =
 
 (* #3148, UBSI-wein-1023 shape: a short filled at 19.21 marked at 16.99 (+11.6 %
    for the short) has an equity ratio of (19.21 + 9.605 - 16.99) / 16.99 = 0.696.
-   The M3a step (0.83 below ) margin-calls it; FINRA (0.30 there) does not,
+   The M3a step (0.83 below $17) margin-calls it; FINRA (0.30 there) does not,
    and armed FINRA supersedes the tier table. *)
 let _ubsi_short () =
   apply_trades_with_margin_exn ~margin_config:on_config
