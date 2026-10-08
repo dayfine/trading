@@ -35,6 +35,14 @@
 #     (tickets, fills, short P&L, Bearish weeks, weeks with short_top_n_admitted
 #     > 0) over a fixture shaped like shorts-liveness s0-shB; audit counts are
 #     null without trade_audit.sexp; shorts off -> null; shortLegLine pinned.
+#   - short trades (#3149): every trade statistic and flag side-aware over
+#     three SHORT rows (breach on the high, signed P&L / MFE / grades, the
+#     audit stop_floor_kind for the fallback card, installed-stop width,
+#     margin_call as forced, macro / stage / slippage flags per side, the
+#     short book's gate reopening on Bearish); salts vs arms in the manifest;
+#     gap-through hard-stop fills (short at the open above, long at the open
+#     below), a short entered far below its prior close, and the Stage 2
+#     weeks of a short through stage_sum.sh (QC rework on #3192).
 #
 # Run:
 #   sh trading/devtools/checks/review_pack_test.sh
@@ -273,7 +281,7 @@ expect_eq "no actual.sexp: the check reads null, not 0" null "$(jq -r .check.act
 expect_eq "cap/cash-floor text removed" 0 "$(grep -c 'caps long exposure\|exposure cap and cash floor' "$S/index.html" || true)"
 expect_eq "final NAV carried on the equity axis" yes "$(grep -q "title: 'final'" "$S/index.html" && echo yes || echo no)"
 if command -v node >/dev/null 2>&1; then
-  OFNS="$(sed -n -e '/^const FLAGS = \[/,/^\];/p' -e '/^function openHits(/,/^}/p' -e '/^function openCheckMiss(/,/^}/p' "$S/index.html")"
+  OFNS="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' -e '/^function openHits(/,/^}/p' -e '/^function openCheckMiss(/,/^}/p' "$S/index.html")"
   oc() { node -e "$OFNS
 const OPEN = $(jq -c .rows "$OD/r0_open.json"), F = id => FLAGS.find(f => f.id === id);
 console.log($1)"; }
@@ -289,6 +297,117 @@ console.log($1)"; }
   expect_eq "weekend flag: a stop exit with no bar still is" true "$(oc 'F("weekend").test({ onE: 1, onX: 0, trig: "stop_loss" })')"
 else
   echo "SKIP: review_pack open-position page cases need node"
+fi
+# Short trades read side-aware (#3149). A run of three SHORT rows over the long fixtures' bars:
+#   AAA short 100 -> covered 110 (stop_loss): the HIGH first reaches the 105 entry_stop on the exit bar
+#       (lag 0; the long reading had the low under 105 on day 1); filled 4.8 % above the stop (gapstop);
+#       MFE +3 % (the 97 close); the stock then holds 110-120, against the short -> B; 8-week pick -20 %;
+#       the trade audit says Buffer_fallback -> the fallback card counts it (sid 0.50 is not 4 %);
+#   DDD short 40 -> 38 (margin_call): +5 %, installed stop 48 = 20 % above the fill -> widestop
+#       (its sid 0.04 would have read as the long 4 % fallback); the stock then runs to 60 -> A;
+#   EEE short 10 -> covered 10.20 (stop_loss, -2 %), then the stock falls 97 % -> F (a short whipsaw);
+#       its 10.50 stop is never reached by a high -> lag -1.
+# All three enter in a Bullish macro week -> 'Entered against the macro'.
+SW="$TMP/short"; mkdir -p "$SW/run"; cp "$FIX"/run/* "$SW/run/"
+cat > "$SW/run/trades.csv" <<'CSV'
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises
+AAA,SHORT,2020-01-29,2020-02-07,9,100.00,110.00,1000,-10000.00,-10.00,105.00,105.00,stop_loss,Stage4,1.5000,0.5000,gap_down,9,100,AAA-wein-s1,0.0476,105.00,0
+DDD,SHORT,2020-01-15,2020-01-22,7,40.00,38.00,500,1000.00,5.00,48.00,48.00,margin_call,Stage4,1.2000,0.0400,non_stop_exit,,100,DDD-wein-s2,,,0
+EEE,SHORT,2020-01-29,2020-02-07,9,10.00,10.20,1000,-200.00,-2.00,10.50,10.50,stop_loss,Stage4,2.5000,0.0400,intraday,9,100,EEE-wein-s3,,10.50,0
+CSV
+cat > "$SW/run/trade_audit.sexp" <<'SEXP'
+((audit_records
+  (((entry
+     ((symbol AAA) (entry_date 2020-01-29) (position_id AAA-wein-s1)
+      (side Short) (suggested_entry 101) (installed_stop 105)
+      (stop_floor_kind Buffer_fallback) (split_safe_basis Flag_off))))
+   ((entry
+     ((symbol EEE) (entry_date 2020-01-29) (position_id EEE-wein-s3)
+      (side Short) (suggested_entry 10) (installed_stop 10.5)
+      (stop_floor_kind Support_floor) (split_safe_basis Flag_off)))))))
+SEXP
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/pack" null-s0="$SW/run/" null-s1="$SW/run/" >"$SW/log" 2>"$SW/err" || rc=$?
+expect_eq "short: builds, exit 0" 0 "$rc"
+ST="$SW/pack/site/data/null-s0_trades.json"
+sq() { jq -r "$1" "$ST"; }
+expect_eq "short AAA: P&L % side-signed, grade B (the stock held above the cover)" "-10 B" "$(sq '.[]|select(.sym=="AAA")|"\(.pct) \(.g)"')"
+expect_eq "short AAA: breach = high reaches the stop above, on the exit bar (lag 0)" 0 "$(sq '.[]|select(.sym=="AAA")|.blag')"
+expect_eq "short AAA: MFE / MAE / 8-week pick side-signed" "3 -10 -20" "$(sq '.[]|select(.sym=="AAA")|"\(.mfe+0) \(.mae+0) \(.f40+0)"')"
+expect_eq "short AAA: no hard stop above the entry trades before the exit" "-10,-10,-10,-10,-10,-10" "$(sq '.[]|select(.sym=="AAA")|.cf|map(.+0|tostring)|join(",")')"
+expect_eq "short AAA: stop_floor_kind joined from the trade audit" Buffer_fallback "$(sq '.[]|select(.sym=="AAA")|.sfk')"
+expect_eq "short DDD: +5 %, installed stop 20 % above the fill, grade A" "5 0.2 A" "$(sq '.[]|select(.sym=="DDD")|"\(.pct) \(.isd+0) \(.g)"')"
+expect_eq "short EEE: covered, then the stock fell 97 % -> F; stop never reached -> lag -1" "F 97 -1" "$(sq '.[]|select(.sym=="EEE")|"\(.g) \(.pmax+0) \(.blag)"')"
+expect_eq "short EEE: an exit far below entry is not X for a short" F "$(sq '.[]|select(.sym=="EEE")|.g')"
+expect_eq "short: the macro week reaches the trades without the container (mE joined)" Bullish "$(sq '.[0].mE')"
+expect_eq "run kind: null-s0 / null-s1 read as salts" salt "$(jq -r .run_kind "$SW/pack/site/data/manifest.json")"
+expect_eq "run kind: r0 / r1 read as arms" arm "$(jq -r .run_kind "$S/data/manifest.json")"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/arms" null-s0="$SW/run/" map-s0="$SW/run/" >"$SW/arms.log" 2>&1 || rc=$?
+expect_eq "run kind: null-s0 / map-s0 read as arms" arm "$(jq -r .run_kind "$SW/arms/site/data/manifest.json")"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/forced" --run-kind salt a="$SW/run/" b="$SW/run/" >"$SW/forced.log" 2>&1 || rc=$?
+expect_eq "run kind: --run-kind salt overrides auto" salt "$(jq -r .run_kind "$SW/forced/site/data/manifest.json")"
+if command -v node >/dev/null 2>&1; then
+  SFNS="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' -e '/^const REOPEN_CLOSED_WEEKS/p' -e '/^function reopenFlag(/,/^}/p' -e '/^function reopenEpisodes(/,/^}/p' "$SW/pack/site/index.html")"
+  fl() { node -e "$SFNS
+const T = $(jq -c . "$ST");
+const ids = s => FLAGS.filter(f => f.test(T.find(t => t.sym === s))).map(f => f.id).join(' ');
+console.log($1)"; }
+  expect_eq "short AAA flags: gapstop, against the macro, fallback (from the audit)" "gapstop macro macrobear fallback" "$(fl 'ids("AAA")')"
+  expect_eq "short DDD flags: margin call is forced; 20 % stop is wide; no long-only volume or 4 % flags" "forced macro macrobear widestop" "$(fl 'ids("DDD")')"
+  expect_eq "short EEE flags: whipsaw (the stock fell after the cover)" "macro macrobear whipsaw" "$(fl 'ids("EEE")')"
+  expect_eq "macro flag: a short in a Bearish week is with the macro" "false false" "$(fl '["macro", "macrobear"].map(i => FLAGS.find(x => x.id === i).test({ side: "SHORT", mE: "Bearish" })).join(" ")')"
+  expect_eq "macro flag: a long in a Bearish week is against it" "true true" "$(fl '["macro", "macrobear"].map(i => FLAGS.find(x => x.id === i).test({ side: "LONG", mE: "Bearish" })).join(" ")')"
+  expect_eq "stage flags: a short held 2 Stage 2 weeks, entered on a Stage 4 replay" "true false" "$(fl '["stage4", "notS2"].map(i => FLAGS.find(x => x.id === i).test({ side: "SHORT", s2w: 2, s4w: 9, rsE: "Stage4" })).join(" ")')"
+  expect_eq "slipcap: a short filled 2 % under its trigger paid the allowance" "true false" "$(fl '[-2, 2].map(v => FLAGS.find(x => x.id === "slipcap").test({ side: "SHORT", fvt: v })).join(" ")')"
+  # reopenEpisodes, dir -1: 8 non-Bearish weeks then a Bearish week reopen a short book's gate; SPY is inverted
+  rep() { node -e "$SFNS
+const day = n => new Date(Date.UTC(2020, 0, 3) + n * 864e5).toISOString().slice(0, 10);
+const m = []; for (let i = 0; i < 8; i++) m.push([day(7 * i), 'Bullish', 'x']); m.push([day(56), 'Bearish', 'x']);
+const flat = [], fall = []; for (let i = 0; i <= 400; i++) { flat.push([day(i), 1000, 0, 0]); fall.push([day(i), 1400 - i, 0, 0]); }
+console.log($1)"; }
+  expect_eq "reopenEpisodes dir -1: the gate reopens on Bearish" '["2020-02-28",8]' "$(rep 'JSON.stringify(reopenEpisodes(m, flat, fall, [], -1).map(e => [e.d, e.closed])[0])')"
+  expect_eq "reopenEpisodes dir -1: a falling SPY reads as a rise for the short book -> sat out" "sat out" "$(rep 'reopenEpisodes(m, flat, fall, [], -1)[0].flag')"
+  expect_eq "reopenEpisodes dir 1: the same macro has no Bullish reopen" 0 "$(rep 'reopenEpisodes(m, flat, fall, []).length')"
+else
+  echo "SKIP: review_pack short-side page cases need node"
+fi
+# Rework (QC CP4 on #3192): gap-through hard-stop fills, the entry-vs-prior-close sign and the Stage 2
+# weeks of a short, each pinned. A second short run "g":
+#   AAA short 100 -> 110 (2020-02-10): the 2020-02-07 bar OPENS at 110, above the 3/5/6/8/10 % levels
+#       (103..110), so each fills at the open (-10 %), not at its level; 15 % (115) is never reached;
+#   EEE short at 0.30 on 2020-02-13 after a 10.00 close: entered 97 % below the prior close -> gap +97,
+#       chase fires (unsigned it would read -97 and stay quiet);
+#   DDD long 40 -> 39 (2020-01-24): the 2020-01-22 bar opens 38 under the 3 % level (38.80) -> -5 %, not
+#       -3 %; 6 % (37.60) is inside the bar -> -6 %; 8 % (36.80) is never reached -> the actual -2.5 %.
+# A stage replay sidecar for the AAA short (Stage 4 into the entry, two Stage 2 weeks in the hold) is put
+# where the container step writes it and the pack rebuilt: stage_sum.sh's Stage 2 count reaches s2w.
+GW="$TMP/gap"; mkdir -p "$GW/run"; cp "$FIX"/run/* "$GW/run/"
+{ head -1 "$FIX/run/trades.csv"
+  echo "AAA,SHORT,2020-01-29,2020-02-10,12,100.00,110.00,1000,-10000.00,-10.00,120.00,120.00,laggard_rotation,Stage4,1.5000,0.2000,non_stop_exit,,100,AAA-wein-g1,,,0"
+  echo "EEE,SHORT,2020-02-13,2020-02-20,7,0.30,0.30,1000,0.00,0.00,0.40,0.40,laggard_rotation,Stage4,1.5000,0.3300,non_stop_exit,,100,EEE-wein-g2,,,0"
+  echo "DDD,LONG,2020-01-15,2020-01-24,9,40.00,39.00,500,-500.00,-2.50,30.00,30.00,laggard_rotation,Stage2,2.5000,0.2500,non_stop_exit,,100,DDD-wein-g3,,,0"; } > "$GW/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$GW/pack" g="$GW/run/" >"$GW/log" 2>&1 || rc=$?
+expect_eq "gap run: builds, exit 0" 0 "$rc"
+mkdir -p "$GW/pack/runs/g/stage"
+printf 'week,date,close,ma,stage,weeks_in_stage,late\n1,2020-01-24,100,101,Stage4,3,0\n2,2020-01-31,100,100,Stage2,1,0\n3,2020-02-07,110,100,Stage2,2,0\n' > "$GW/pack/runs/g/stage/AAA-wein-g1.png.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$GW/pack" g="$GW/run/" >"$GW/log2" 2>&1 || rc=$?
+expect_eq "gap run: rebuilds over the stage sidecar, exit 0" 0 "$rc"
+GT="$GW/pack/site/data/g_trades.json"
+expect_eq "short gap-through: each hard stop the 2020-02-07 open jumps fills at that open" "-10,-10,-10,-10,-10,-10" "$(jq -r '.[]|select(.id=="AAA-wein-g1")|.cf|map(.+0|tostring)|join(",")' "$GT")"
+expect_eq "long gap-through: 3 % fills at the 38 open (-5), 6 % at its level, 8 % never reached" "-5,-5,-6,-2.5,-2.5,-2.5" "$(jq -r '.[]|select(.id=="DDD-wein-g3")|.cf|map(.+0|tostring)|join(",")' "$GT")"
+expect_eq "short entry vs prior close: 97 % below reads +97 (the trade's favour)" 97 "$(jq -r '.[]|select(.id=="EEE-wein-g2")|.gap+0' "$GT")"
+expect_eq "short Stage 2 weeks: stage_sum.sh -> s2w 2, replay entry stage Stage4" "2 0 Stage4" "$(jq -r '.[]|select(.id=="AAA-wein-g1")|"\(.s2w) \(.s4w) \(.rsE)"' "$GT")"
+if command -v node >/dev/null 2>&1; then
+  gfl() { node -e "$SFNS
+const T = $(jq -c . "$GT");
+const ids = id => FLAGS.filter(f => f.test(T.find(t => t.id === id))).map(f => f.id).join(' ');
+console.log($1)"; }
+  expect_eq "short EEE gap: chase fires" yes "$(gfl 'ids("EEE-wein-g2").split(" ").includes("chase") ? "yes" : "no"')"
+  expect_eq "short AAA replay: held 2 Stage 2 weeks -> stage4 fires; entered on Stage 4 -> notS2 quiet" "true false" "$(gfl '["stage4", "notS2"].map(i => ids("AAA-wein-g1").split(" ").includes(i)).join(" ")')"
 fi
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
