@@ -209,6 +209,8 @@ let _cascade_summary_of_event (e : AR.cascade_event) :
     short_grade_admitted = d.short_grade_admitted;
     short_top_n_admitted = d.short_top_n_admitted;
     entered = e.entered;
+    decisions =
+      List.map e.decisions ~f:Trade_audit_enum_hops.weekly_decision_of_event;
   }
 
 (** Drain one cascade event into [candidate_log] as a week. The near-miss

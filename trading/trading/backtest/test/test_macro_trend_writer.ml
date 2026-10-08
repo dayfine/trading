@@ -35,6 +35,7 @@ let _make_cascade ?(date = _date "2024-01-19")
     short_grade_admitted = 0;
     short_top_n_admitted = 0;
     entered = 1;
+    decisions = [];
   }
 
 (* of_cascade_summaries projection ---------------------------------------- *)

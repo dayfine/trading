@@ -24,6 +24,11 @@ val skip_reason_of_event :
 (** Every entry-walk skip reason, one-to-one (including #3015's
     [Share_class_held]). *)
 
+val weekly_decision_of_event :
+  Weinstein_strategy.Audit_recorder.walk_decision -> Trade_audit.weekly_decision
+(** One row of the weekly decision record (#3139): the candidate's ticker and
+    side, [Placed] or its skip reason via {!skip_reason_of_event}. *)
+
 val entry_anchor_of_kind :
   Screener.entry_anchor_kind -> Ticket_lifecycle.entry_anchor
 (** Constructor-by-constructor hop for the #3074 ticket-anchor tag, from

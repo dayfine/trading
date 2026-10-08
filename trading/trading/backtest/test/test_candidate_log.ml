@@ -236,6 +236,54 @@ let _recorder ?candidate_log () =
     ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
     ()
 
+(* #3139: with no candidate collector (capture off), the walk's decisions
+   still reach [trade_audit.sexp]'s cascade summary, one outcome per name. *)
+let test_decisions_reach_the_summary_without_capture _ =
+  let trade_audit = TA.create () in
+  let recorder =
+    Backtest.Trade_audit_recorder.of_collector ~trade_audit
+      ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+      ()
+  in
+  recorder.record_cascade_summary
+    {
+      date = _date "2024-06-14";
+      diagnostics = _diagnostics ~long_top_n:2;
+      breadth_state = Weinstein_types.Bullish_breadth;
+      entered = 1;
+      candidates = [];
+      drops = [];
+      decisions =
+        [
+          { AR.ranked = _scored_candidate; outcome = AR.Placed };
+          {
+            AR.ranked = _scored_candidate;
+            outcome = AR.Skipped AR.Insufficient_cash;
+          };
+        ];
+    };
+  assert_that
+    (TA.get_cascade_summaries trade_audit)
+    (elements_are
+       [
+         field
+           (fun (s : TA.cascade_summary) -> s.decisions)
+           (equal_to
+              ([
+                 {
+                   symbol = _ticker;
+                   side = Trading_base.Types.Long;
+                   outcome = Placed;
+                 };
+                 {
+                   symbol = _ticker;
+                   side = Trading_base.Types.Long;
+                   outcome = Skipped Insufficient_cash;
+                 };
+               ]
+                : TA.weekly_decision list));
+       ])
+
 let test_capture_is_off_without_a_collector _ =
   assert_that (_recorder ()).capture_candidates (equal_to false)
 
@@ -259,6 +307,7 @@ let test_zero_funded_week_still_carries_its_candidates _ =
       candidates =
         [ { AR.candidate = _scored_candidate; reason = AR.Insufficient_cash } ];
       drops = [];
+      decisions = [];
     };
   assert_that (CL.weeks c)
     (elements_are
@@ -312,6 +361,7 @@ let _week_with ~drops ~candidates =
       entered = 0;
       candidates;
       drops;
+      decisions = [];
     };
   match CL.weeks c with
   | [ w ] -> w.candidates
@@ -513,6 +563,8 @@ let () =
   run_test_tt_main
     ("candidate_log"
     >::: [
+           "#3139: decisions reach the summary without capture"
+           >:: test_decisions_reach_the_summary_without_capture;
            "G3: breakout drops carry their sub-gate"
            >:: test_breakout_drops_carry_their_sub_gate;
            "G3: non-breakout rows carry no sub-gate"
