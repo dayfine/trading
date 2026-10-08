@@ -21,7 +21,7 @@ type trade_row = {
   quantity : float;
   exit_trigger : string;  (** [exit_trigger] column, e.g. ["stop_loss"]. *)
   stop_trigger_kind : string;
-      (** [stop_trigger_kind] column: [gap_down] / [intraday] / [end_of_period]
+      (** [stop_trigger_kind] column: [gap_down] / [gap_up] / [intraday] / [end_of_period]
           / [non_stop_exit]; empty string when absent. *)
   stop_initial_distance_pct : float option;
       (** [stop_initial_distance_pct] column; [None] when the cell is empty. *)

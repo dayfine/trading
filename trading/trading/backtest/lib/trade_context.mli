@@ -109,9 +109,13 @@ val entry_anchor_label : Ticket_lifecycle.entry_anchor -> string
 (** The [entry_anchor] column label: [continuation] / [local_range_top] /
     [breakout] / [breakdown] (shorts, #3131) / [ma_fallback]. *)
 
-val stop_trigger_kind_label : Stop_log.stop_trigger_kind -> string
+val stop_trigger_kind_label :
+  side:Trading_base.Types.position_side -> Stop_log.stop_trigger_kind -> string
 (** Render a {!Stop_log.stop_trigger_kind} as the canonical lowercase export
-    label: [gap_down] / [intraday] / [end_of_period] / [non_stop_exit]. *)
+    label: [gap_down] (long) or [gap_up] (short) for
+    {!Stop_log.stop_trigger_kind.Gap_through}, then [intraday] /
+    [end_of_period] / [non_stop_exit]. Side-aware since #3147: a short stop
+    fills {e above} its level on a gap, which the old [gap_down] misnamed. *)
 
 val csv_header_fields : string list
 (** The 11 trailing column names for [trades.csv]: the 6 M5.2e columns

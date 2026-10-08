@@ -126,11 +126,29 @@ let test_stage_label_distinguishes_late_stage2 _ =
 
 let test_stop_trigger_kind_label_distinguishes_all _ =
   assert_that
-    ( TC.stop_trigger_kind_label SL.Gap_down,
-      TC.stop_trigger_kind_label SL.Intraday,
-      TC.stop_trigger_kind_label SL.End_of_period,
-      TC.stop_trigger_kind_label SL.Non_stop_exit )
-    (equal_to ("gap_down", "intraday", "end_of_period", "non_stop_exit"))
+    [
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Long SL.Gap_through;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Short SL.Gap_through;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Long SL.Intraday;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Short SL.Intraday;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Long SL.End_of_period;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Long SL.Non_stop_exit;
+    ]
+    (equal_to
+       [
+         "gap_down"; "gap_up"; "intraday"; "intraday"; "end_of_period";
+         "non_stop_exit";
+       ])
+
+(* #3147: a short squeezed through its stop fills above it; [trades.csv] reads
+   [gap_up], not [gap_down] (74 of 106 soT short exits were mislabelled). *)
+let test_short_gap_through_labelled_gap_up _ =
+  let side = Trading_base.Types.Short in
+  assert_that
+    (TC.stop_trigger_kind_label ~side
+       (SL.classify_stop_trigger_kind ~side
+          (SL.Stop_loss { stop_price = 20.0; actual_price = 21.0 })))
+    (equal_to "gap_up")
 
 (* #3074: every [entry_anchor] column label, one per constructor — the strings an
    [awk] split of [trades.csv] by entry type matches on. *)
@@ -678,6 +696,8 @@ let suite =
          >:: test_stage_label_distinguishes_late_stage2;
          "stop_trigger_kind_label all variants"
          >:: test_stop_trigger_kind_label_distinguishes_all;
+         "short gap-through labelled gap_up"
+         >:: test_short_gap_through_labelled_gap_up;
          "entry_anchor_label all variants (#3074)"
          >:: test_entry_anchor_label_distinguishes_all;
          "entry_anchor_of_kind maps each arm (#3131)"
