@@ -1,7 +1,12 @@
 # Per-trade extraction over ONE symbol's daily CSV store file
 # (header: date,open,high,low,close,adjusted_close,volume,...). POSIX awk.
 #
-# vars: pid ed xd ep xp qty sid es out_tr out_ex out_dy
+# vars: pid side ed xd ep xp qty sid es out_tr out_ex out_dy
+#   side   trades.csv side; SHORT flips every trade-level statistic (#3149): the
+#          P&L %, MFE/MAE, 8-week pick return, post-exit path (a short's whipsaw is
+#          the stock FALLING after the cover), entry vs prior close and the
+#          hard-stop replays are signed so + is in the trade's favour, and the
+#          stop is breached when the HIGH reaches it (the stop sits above a short)
 #   ed/xd  entry/exit date (may be a weekend -> the last bar <= date is used)
 #   ep/xp  raw fill prices; sid initial stop distance (fraction); es raw installed
 #          stop at entry (trades.csv entry_stop) -- the breach line. sid is measured
@@ -17,6 +22,7 @@
 #   out_dy : "pid<TAB>date<TAB>o<TAB>h<TAB>l<TAB>c" adjusted daily bars,
 #            PRE_BARS before the entry through POST_BARS after the exit
 BEGIN {
+  sd = (side == "SHORT") ? -1 : 1  # +1 long, -1 short: the sign of a favourable move
   FS = ","; PRE_BARS = 63; POST_BARS = 42; GRADE_BARS = 65; FWD_BARS = 40
   TOL = 0.005                      # fill-in-range tolerance (cent rounding)
   ncf = split("3 5 6 8 10 15", lv, " ")
@@ -36,6 +42,15 @@ function in_range(p, lo, hi,   r, q, k) {
     if (k != q && r > (k / q) * 0.98 && r < (k / q) * 1.02) { SNAP = k / q; return 2 }
   return 0
 }
+# a resting stop at s trades on this bar: the low for a long, the high for a short
+function stop_hit(l, h, s) { return sd > 0 ? l <= s + 1e-9 : h >= s - 1e-9 }
+# a static hard stop at lvl: the side-signed % return of a fill at lvl, or at the
+# open when it gaps through; "" while the bar does not reach it
+function hard_stop(o, l, h, lvl,   p) {
+  if (sd > 0) { if (l > lvl) return ""; p = (o < lvl) ? o : lvl }
+  else { if (h < lvl) return ""; p = (o > lvl) ? o : lvl }
+  return sd * (p / e - 1) * 100
+}
 {
   d = $cd; c = $cc + 0; a = $ca + 0; if (c <= 0 || a <= 0) next
   f = a / c; o = $co * f; h = $ch * f; l = $cl * f
@@ -50,20 +65,20 @@ function in_range(p, lo, hi,   r, q, k) {
   if (d > ed && (d <= xd || nx < POST_BARS)) { emit_day(day); if (d > xd) nx++ }
   # hold window path (adjusted), MFE/MAE vs the entry bar's adjusted close
   if (d >= ed && d <= xd && ae > 0) {
-    r = a / ae - 1; if (nh == 0 || r > mfe) mfe = r; if (nh == 0 || r < mae) mae = r; nh++
+    r = sd * (a / ae - 1); if (nh == 0 || r > mfe) mfe = r; if (nh == 0 || r < mae) mae = r; nh++
     if (d < xd) printf "%s\t%.2f\t%s\n", d, qty * ep * a / ae, pid >> out_ex
   }
   # bars strictly after the entry day: forward pick return, stop breach, hard-stop replays
   # entry on the bar's own basis: a fill on a later split basis is scaled back first
   if (d > ed && fe > 0 && e == "") { esnap = 1; if (on_e && in_range(ep, el, eh) == 2) esnap = SNAP; e = ep / esnap * fe
-    stopl = (es > 0) ? es / esnap * fe : e * (1 - sid) }
+    stopl = (es > 0) ? es / esnap * fe : e * (1 - sd * sid) }
   if (d > ed && fe > 0) {
     nf++
-    if (nf == FWD_BARS) f40 = (a / e - 1) * 100
+    if (nf == FWD_BARS) f40 = sd * (a / e - 1) * 100
     # the exit bar counts: a stop filled on its trigger bar breaches the same day (lag 0)
-    if (d <= xd && breach == "" && stopl > 0 && l <= stopl + 1e-9) { breach = d; bidx = nf }
+    if (d <= xd && breach == "" && stopl > 0 && stop_hit(l, h, stopl)) { breach = d; bidx = nf }
     if (d < xd) {
-      for (i = 1; i <= ncf; i++) if (cf[i] == "" && l <= e * (1 - lv[i])) cf[i] = ((o < e * (1 - lv[i]) ? o : e * (1 - lv[i])) / e - 1) * 100
+      for (i = 1; i <= ncf; i++) if (cf[i] == "") cf[i] = hard_stop(o, l, h, e * (1 - sd * lv[i]))
     }
     if (d <= xd) xidx = nf
   }
@@ -77,23 +92,27 @@ function in_range(p, lo, hi,   r, q, k) {
 END {
   if (ae == 0 || ax == 0) { printf "%s\tNODATA\n", pid >> out_tr; exit }
   if (!flushed) for (i = (nr > PRE_BARS ? nr - PRE_BARS : 0); i < nr; i++) emit_day(ring[i % PRE_BARS])
-  pct = (xp / ep - 1) * 100
-  ma = (k > 0) ? (mxa / gx - 1) * 100 : 0; a13 = (k > 0) ? (p13 / gx - 1) * 100 : 0; mn = (k > 0) ? (mna / gx - 1) * 100 : 0
+  pct = sd * (xp / ep - 1) * 100
+  # post-exit path in the trade's favour: a long's rally, a short's decline (#3149)
+  if (sd > 0) { hi = mxa; lo = mna } else { hi = mna; lo = mxa }
+  ma = (k > 0) ? sd * (hi / gx - 1) * 100 : 0; a13 = (k > 0) ? sd * (p13 / gx - 1) * 100 : 0; mn = (k > 0) ? sd * (lo / gx - 1) * 100 : 0
   g = "C"
   if (pct >= 20 || (pct > 0 && ma <= 10)) g = "A"; else if (pct > 0 && pct < 20) g = "B"
   if (pct <= 0) { if (ma >= 50) g = "F"; else if (ma >= 15) g = "D"; else if (a13 <= -5) g = "B"; else g = "C" }
-  if (xp < ep * 0.05) g = "X"
+  if (sd > 0 && xp < ep * 0.05) g = "X"   # a long sold for scraps; a short covered there is its best case
   if (k <= 1) g = g "?"   # no bar after the exit bar: the post-exit path is empty
   ein = on_e ? in_range(ep, el, eh) : 0
   xin = on_x ? in_range(xp, xl, xh) : 0; xsnap = (xin == 2) ? SNAP : 1
   if (esnap == "") esnap = 1
-  gapup = (pre_c > 0) ? (ep / esnap / pre_c - 1) * 100 : 0
+  gapup = (pre_c > 0) ? sd * (ep / esnap / pre_c - 1) * 100 : 0
   # bars from the first initial-stop breach to the exit bar (0: the exit day; -1: never breached)
   blag = (breach == "") ? -1 : xidx - bidx
   cfs = ""; for (i = 1; i <= ncf; i++) cfs = cfs (i > 1 ? "," : "") (cf[i] == "" ? sprintf("%.2f", pct) : sprintf("%.2f", cf[i]))
+  # installed stop distance from the entry fill (trades.csv entry_stop), side-aware; null without one
+  isd = (es > 0) ? sprintf("%.4f", -sd * (es / ep - 1)) : "null"
   # pid fe fx mfe mae post_max post_min post13 grade on_e on_x in_e in_x entry_vs_prevclose ebar xbar post_bars
-  #   fwd40 breach_lag hardstop_cf entry_adj exit_adj   (the last two: fills on the chart's adjusted basis)
-  printf "%s\t%.6f\t%.6f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%s\t%d\t%d\t%d\t%d\t%.2f\t%s\t%s\t%d\t%s\t%d\t%s\t%.4f\t%.4f\n", \
+  #   fwd40 breach_lag hardstop_cf entry_adj exit_adj isd   (entry/exit_adj: fills on the chart's adjusted basis)
+  printf "%s\t%.6f\t%.6f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%s\t%d\t%d\t%d\t%d\t%.2f\t%s\t%s\t%d\t%s\t%d\t%s\t%.4f\t%.4f\t%s\n", \
     pid, fe, fx, mfe * 100, mae * 100, ma, mn, a13, g, on_e, on_x, ein, xin, gapup, ebar, xbar, k, \
-    (f40 == "" ? "null" : sprintf("%.2f", f40)), blag, cfs, ep / esnap * fe, xp / xsnap * fx >> out_tr
+    (f40 == "" ? "null" : sprintf("%.2f", f40)), blag, cfs, ep / esnap * fe, xp / xsnap * fx, isd >> out_tr
 }

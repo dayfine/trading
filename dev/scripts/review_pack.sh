@@ -20,6 +20,10 @@
 #   --snapshot-dir W   snapshot warehouse for trade_audit_report (container path,
 #                      default /tmp/snap_top3000_pit_v11pit); missing -> audit skipped
 #   --data-dir D       CSV bar store (default <repo>/data)
+#   --run-kind K       salt | arm | auto (default auto): salts are one config under
+#                      different path seeds, arms are different configs; the page
+#                      words its comparison accordingly. auto = salt when every label
+#                      is <base>s<N> with one shared base (s0 s1, null-s0 null-s1), else arm
 #   --no-container     skip the three docker steps (audit report, stage replay,
 #                      their build): the site still builds, without conformance
 #                      rows, audit fields or weekly stage overlays
@@ -43,7 +47,7 @@ CONTAINER="${CONTAINER:-trading-1-dev}"
 CROOT=/workspaces/trading-1
 
 OUT=""; TITLE="Backtest Review"; SUBTITLE=""; CHARTS=0
-SNAP=/tmp/snap_top3000_pit_v11pit; DATA="$REPO/data"; DOCKER=1; RUNS=""
+SNAP=/tmp/snap_top3000_pit_v11pit; DATA="$REPO/data"; DOCKER=1; RUNS=""; RUN_KIND=auto
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT=$2; shift 2 ;;
@@ -52,8 +56,9 @@ while [ $# -gt 0 ]; do
     --charts-run) CHARTS=$2; shift 2 ;;
     --snapshot-dir) SNAP=$2; shift 2 ;;
     --data-dir) DATA=$2; shift 2 ;;
+    --run-kind) RUN_KIND=$2; shift 2 ;;
     --no-container) DOCKER=0; shift ;;
-    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,41p' "$0"; exit 0 ;;
     *=*) RUNS="$RUNS $1"; shift ;;
     *) echo "review_pack: unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -65,6 +70,10 @@ SPY_CSV="$DATA/S/Y/SPY/data.csv"
 
 log() { printf '[review_pack %s] %s\n' "$(date +%H:%M:%S)" "$*" >&2; }
 labels() { for r in $RUNS; do printf '%s\n' "${r%%=*}"; done; }
+run_kind() { # salt | arm: auto = salt when every label is <base>s<N> with one shared base (#3149)
+  case "$RUN_KIND" in salt|arm) echo "$RUN_KIND"; return ;; esac
+  [ "$(labels | grep -cvE '(^|[^A-Za-z0-9])s[0-9]+$')" = 0 ] && [ "$(labels | sed -E 's/s[0-9]+$//' | sort -u | wc -l | tr -d ' ')" = 1 ] && echo salt || echo arm
+}
 charts_label() { labels | sed -n "$((CHARTS + 1))p"; }
 
 # ---- 1. stage ---------------------------------------------------------------
@@ -98,11 +107,11 @@ docker_steps() {
 extract_run() { # $1 run dir, $2 1 = also write daily chart bars
   d=$1; : > "$d/x_trades.tsv"; : > "$d/x_expo.tsv"; : > "$d/x_daily.tsv"
   dy=""; [ "$2" = 1 ] && dy="$d/x_daily.tsv"
-  tail -n +2 "$d/trades.csv" | while IFS=, read -r sym _side ed xd _days ep xp qty _pnl _pct es _xs _trig _stg _vr sid rest; do
+  tail -n +2 "$d/trades.csv" | while IFS=, read -r sym side ed xd _days ep xp qty _pnl _pct es _xs _trig _stg _vr sid rest; do
     pid=$(echo "$rest" | cut -d, -f4)
     f=$(sym_csv "$sym")
     if [ ! -f "$f" ]; then printf '%s\tNOFILE\n' "$pid" >> "$d/x_trades.tsv"; continue; fi
-    awk -v pid="$pid" -v ed="$ed" -v xd="$xd" -v ep="$ep" -v xp="$xp" -v qty="$qty" -v sid="${sid:-0}" -v es="${es:-0}" \
+    awk -v pid="$pid" -v side="$side" -v ed="$ed" -v xd="$xd" -v ep="$ep" -v xp="$xp" -v qty="$qty" -v sid="${sid:-0}" -v es="${es:-0}" \
         -v out_tr="$d/x_trades.tsv" -v out_ex="$d/x_expo.tsv" -v out_dy="$dy" -f "$LIB/trade_extract.awk" "$f"
   done
   extract_open "$d"
@@ -111,8 +120,8 @@ sym_csv() { printf '%s/%s/%s/%s/data.csv' "$DATA" "$(printf %s "$1" | cut -c1)" 
 extract_open() { # $1 run dir: positions still held at the window end join the exposure series (#3125)
   d=$1; : > "$d/x_open.tsv"; [ -s "$d/open_positions.csv" ] || return 0
   last=$(tail -1 "$d/equity_curve.csv" | cut -d, -f1)
-  tail -n +2 "$d/open_positions.csv" | while IFS=, read -r sym _side ed ep qty _rest; do
-    printf '%s\t%s\t%s\t%s\n' "$sym" "$ed" "$ep" "$qty" >> "$d/x_open.tsv"
+  tail -n +2 "$d/open_positions.csv" | while IFS=, read -r sym side ed ep qty _rest; do
+    printf '%s\t%s\t%s\t%s\t%s\n' "$sym" "$ed" "$ep" "$qty" "$side" >> "$d/x_open.tsv"
     f=$(sym_csv "$sym"); [ -f "$f" ] || continue
     awk -v pid="open:$sym:$ed" -v ed="$ed" -v last="$last" -v qty="$qty" -v out_ex="$d/x_expo.tsv" -f "$LIB/open_extract.awk" "$f"
   done
@@ -126,6 +135,11 @@ audit_rows() { # per-trade table of the audit report -> sym entry rs macro grade
   [ -s "$1/trade_audit_report.md" ] || return 0
   sed -n '/## Per-trade table/,/^## Split/p' "$1/trade_audit_report.md" \
     | awk -F'|' 'NR>4 && NF>15 { for (i=2;i<=18;i++) gsub(/^ +| +$/,"",$i); printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",$2,$3,$13,$14,$15,$16,$17,$18 }' | sed 's/%//'
+}
+stop_floor_kinds() { # trade_audit.sexp -> pid<TAB>stop_floor_kind (Support_floor | Buffer_fallback) per entry (#3149)
+  [ -s "$1/trade_audit.sexp" ] || return 0
+  awk 'match($0, /\(position_id [^)]+\)/) { pid = substr($0, RSTART + 13, RLENGTH - 14) }
+    match($0, /\(stop_floor_kind [A-Za-z_]+\)/) { if (pid != "") printf "%s\t%s\n", pid, substr($0, RSTART + 17, RLENGTH - 18); pid = "" }' "$1/trade_audit.sexp"
 }
 nav_json() { # daily [date, nav, invested % of nav, open positions]
   # A weekday with no SPY bar (inside SPY's range) is a market holiday: the NAV is carried
@@ -144,7 +158,8 @@ host_run() { # $1 label, $2 index
   for g in Y Q; do awk -v gran=$g -f "$LIB/periods.awk" "$SPY_CSV" "$d/equity_curve.csv" "$d/x_expo.tsv" "$d/trades.csv" "$d/x_macro.tsv" > "$d/x_p$g.json"; done
   audit_rows "$d" > "$d/x_audit.tsv"
   if [ -d "$d/stage" ]; then sh "$LIB/stage_sum.sh" "$d" > "$d/x_stage.tsv"; else : > "$d/x_stage.tsv"; fi
-  awk -f "$LIB/assemble.awk" "$d/trades.csv" "$d/x_trades.tsv" "$d/x_audit.tsv" "$d/x_macro.tsv" "$d/x_stage.tsv" > "$s/$1_trades.json"
+  stop_floor_kinds "$d" > "$d/x_sfk.tsv"
+  awk -f "$LIB/assemble.awk" "$d/trades.csv" "$d/x_trades.tsv" "$d/x_audit.tsv" "$d/x_macro.tsv" "$d/x_stage.tsv" "$d/x_sfk.tsv" > "$s/$1_trades.json"
   sh "$LIB/meta.sh" "$d" > "$s/$1_meta.json"
   cp "$d/x_pY.json" "$s/$1_years.json"; cp "$d/x_pQ.json" "$s/$1_quarters.json"
   nav_json "$d" > "$s/$1_nav.json"
@@ -167,8 +182,8 @@ site_common() {
   [ -n "$SUBTITLE" ] || SUBTITLE="$first → $last, $(grep -oE 'universe_size [0-9]+' "$d/params.sexp" | cut -d' ' -f2) symbols, \$$(grep -oE 'initial_cash [0-9]+' "$d/params.sexp" | cut -d' ' -f2) start"
   # jq --arg does the JSON escaping: a title/subtitle/label with " or \ must not break the manifest
   runs_json=$(labels | jq -R -s -c 'split("\n") | map(select(length > 0) | {id: ., label: .})')
-  jq -n --arg title "$TITLE" --arg subtitle "$SUBTITLE" --argjson charts "$CHARTS" --argjson runs "$runs_json" \
-    '{title: $title, subtitle: $subtitle, charts_run: $charts, runs: $runs}' > "$s/manifest.json"
+  jq -n --arg title "$TITLE" --arg subtitle "$SUBTITLE" --argjson charts "$CHARTS" --argjson runs "$runs_json" --arg kind "$(run_kind)" \
+    '{title: $title, subtitle: $subtitle, charts_run: $charts, runs: $runs, run_kind: $kind}' > "$s/manifest.json"
   # the page <title> carries --title (HTML-escaped); the template default is a placeholder
   TITLE="$TITLE" awk 'BEGIN { t = ENVIRON["TITLE"]; gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t) }
     /^<title>.*<\/title>$/ { print "<title>" t "</title>"; next } { print }' "$LIB/index.html" > "$OUT/site/index.html"
