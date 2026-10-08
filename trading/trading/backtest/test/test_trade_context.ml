@@ -253,6 +253,7 @@ let test_entry_anchor_column_reads_the_lifecycle_tag _ =
           in_base_advance_pct = None;
         };
       reissued_from = None;
+      cash_rejection = None;
     }
   in
   let anchor_of ticket_lifecycle =

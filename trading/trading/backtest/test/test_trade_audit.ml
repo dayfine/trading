@@ -367,6 +367,7 @@ let _lifecycle ?(placement_date = _date "2024-03-01")
     sized_down_wide_stop;
     triple_confirmation;
     reissued_from;
+    cash_rejection = None;
   }
 
 let _check verdict outcome : TL.fill_volume_check = { verdict; outcome }

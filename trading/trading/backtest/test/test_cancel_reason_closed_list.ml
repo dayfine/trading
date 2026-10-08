@@ -167,6 +167,7 @@ let _lifecycle : TL.t =
     entry_anchor = None;
     sized_down_wide_stop = false;
     reissued_from = None;
+    cash_rejection = None;
     triple_confirmation = _triple;
   }
 

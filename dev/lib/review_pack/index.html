@@ -518,6 +518,13 @@ function shortLegLine(s) {
   const head = `<b>Short leg on:</b> ${na(s.tickets)} short tickets placed, ${s.fills} short entries filled, short realised P&amp;L ${usd(s.pnl)}.`;
   return s.fills > 0 ? head : `${head} The macro read Bearish in ${na(s.bearish_weeks)} screening weeks; ${na(s.bearish_admitted)} of them admitted a short to the top-N (<code>short_top_n_admitted</code> &gt; 0).`;
 }
+// At-fill cash rejections (#3138): c = meta.cash_rejections = { count, near }, or null without the trade
+// audit (no line). Entry tickets that triggered and filled at the engine but that the book could not fund,
+// so the ticket was cancelled; near = how many were at least 90 % funded. Pure, for review_pack_test.sh.
+function cashRejectionLine(c) {
+  if (!c || !c.count) return '';
+  return `<b>Entries cancelled at the fill for cash:</b> ${c.count} ${c.count === 1 ? 'ticket' : 'tickets'} filled at the engine but the book could not fund ${c.count === 1 ? 'it' : 'them'}; ${c.near} ${c.near === 1 ? 'was' : 'were'} at least 90 % funded (<code>cash_rejection</code> in <code>trade_audit.sexp</code>).`;
+}
 // Renders the ratio chart + era table; returns finding bullets (HTML strings).
 function renderSignals(nav, spy) {
   const ys = D.years[CH()], reg = spyRegimeByDay();
@@ -573,6 +580,8 @@ function renderSignals(nav, spy) {
   // the short leg: on or off, tickets, fills and the binding gate (see shortLegLine)
   const sl = shortLegLine(D.meta[CH()].short_leg);
   if (sl) out.push(sl);
+  const cr = cashRejectionLine(D.meta[CH()].cash_rejections);
+  if (cr) out.push(cr);
   return out;
 }
 function renderOverview() {

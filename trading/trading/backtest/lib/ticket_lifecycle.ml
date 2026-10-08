@@ -41,6 +41,8 @@ type entry_anchor =
 type reissue = { original_position_id : string; reissue_date : Date.t }
 [@@deriving sexp]
 
+type cash_rejection = { required : float; available : float } [@@deriving sexp]
+
 type t = {
   placement_date : Date.t;
   ticket_age_weeks_at_cancel : int option; [@sexp.option]
@@ -52,6 +54,7 @@ type t = {
   sized_down_wide_stop : bool;
   triple_confirmation : triple_confirmation;
   reissued_from : reissue option; [@sexp.option]
+  cash_rejection : cash_rejection option; [@sexp.option]
 }
 [@@deriving sexp]
 
@@ -66,17 +69,25 @@ let age_weeks_from lifecycle ~resolved =
 
 (* Extracted for the same reason [_stamp_fill_age] is: a record update this wide
    inside the [Option.map] closure trips the nesting linter. *)
-let _merge_resolutions ~fill_volume ~cancel_age_weeks ~cancel_reason l =
+let cash_rejection_of (r : Trading_simulation.Entry_cash_rejection.t) =
+  { required = r.required; available = r.available }
+
+let _merge_resolutions ~fill_volume ~cancel_age_weeks ~cancel_reason
+    ~cash_rejection l =
   {
     l with
     fill_volume;
     ticket_age_weeks_at_cancel = cancel_age_weeks;
     cancel_reason;
+    cash_rejection;
   }
 
-let resolve lifecycle ~fill_volume ~cancel_age_weeks ~cancel_reason =
+let resolve lifecycle ~fill_volume ~cancel_age_weeks ~cancel_reason
+    ~cash_rejection =
   Option.map lifecycle
-    ~f:(_merge_resolutions ~fill_volume ~cancel_age_weeks ~cancel_reason)
+    ~f:
+      (_merge_resolutions ~fill_volume ~cancel_age_weeks ~cancel_reason
+         ~cash_rejection)
 
 (* Extracted so [with_fill_age] stays a one-liner: inlining this record update
    inside the [Option.map] closure trips the nesting linter. *)
