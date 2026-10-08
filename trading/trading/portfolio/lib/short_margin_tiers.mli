@@ -51,3 +51,14 @@ val tier_value : tiers:tier list -> flat_fallback:float -> price:float -> float
 
     Order-independent: the tightest covering band is chosen regardless of list
     order. Pure. *)
+
+val finra_short_maintenance : price:float -> float
+(** FINRA Rule 4210(c) short-sale maintenance as an equity ratio of the
+    position's market value, for a short marked at [price] (issue #3148):
+    - [price < 5]: [max 1.0 (2.50 /. price)] (the greater of $2.50 per share and
+      100 % of market value);
+    - [price >= 5]: [max 0.30 (5.00 /. price)] (the greater of $5.00 per share
+      and 30 %). So 0.50 at $10, 0.30 from $16.67 up, 1.0 between $2.50 and $5,
+      1.25 at $2. A non-positive [price] returns [1.0]. A continuous function,
+      unlike a tier step (the $5-17 band at 0.83 overstates it everywhere above
+      $6.02). Pure. *)

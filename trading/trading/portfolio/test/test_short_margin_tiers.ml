@@ -43,9 +43,27 @@ let test_order_independent _ =
     (Tiers.tier_value ~tiers:reversed ~flat_fallback ~price:3.0)
     (float_equal 1.0)
 
+(* #3148: FINRA Rule 4210(c), the greater of the per-share floor and the
+   percentage.  -> 0.50 and .67 -> 0.30 are the issue's two pins. *)
+let test_finra_short_maintenance _ =
+  assert_that
+    (List.map [ 10.0; 16.67; 6.0; 20.0; 4.0; 2.0; 0.0 ] ~f:(fun price ->
+         Tiers.finra_short_maintenance ~price))
+    (elements_are
+       [
+         float_equal 0.50;
+         float_equal 0.30;
+         float_equal ~epsilon:1e-9 (5.0 /. 6.0);
+         float_equal 0.30;
+         float_equal 1.0;
+         float_equal 1.25;
+         float_equal 1.0;
+       ])
+
 let suite =
   "short_margin_tiers"
   >::: [
+         "test_finra_short_maintenance" >:: test_finra_short_maintenance;
          "test_empty_table_returns_fallback"
          >:: test_empty_table_returns_fallback;
          "test_tightest_band_wins_low_price"

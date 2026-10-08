@@ -89,6 +89,18 @@ type t = {
           vary them orthogonally. That low-priced names are the hard-to-borrow
           ones mirrors the M3a price-tier philosophy. Searchable via the nested
           overlay key [margin_config.short_buyin_htb_price_below] (R2). *)
+  short_maintenance_finra : bool; [@sexp.default false]
+      (** FINRA-exact short maintenance (issue #3148), default [false] (R1
+          no-op). When [true], {!maintenance_pct_for_price} returns
+          {!Short_margin_tiers.finra_short_maintenance} (greater of the
+          per-share floor and the percentage: [max 0.30 (5 /. price)] at and up,
+          [max 1.0 (2.5 /. price)] below) for every price, superseding both
+          {!short_maintenance_tiers} and the flat {!maintenance_margin_pct}. The
+          M3a tier step (-17 at 0.83) applies the /share floor at its value
+          across the band; FINRA requires 0.50 at and 0.30 at .67, so the step
+          margin-calls winning shorts (UBSI 2009-02-18 at an equity ratio of
+          about 0.70). Searchable via the nested overlay key
+          [margin_config.short_maintenance_finra] (R2). *)
 }
 [@@deriving show, eq, sexp]
 
@@ -138,7 +150,8 @@ val daily_borrow_rate_for_price : t -> price:float -> float
 
 val maintenance_pct_for_price : t -> price:float -> float
 (** Maintenance equity-ratio threshold for a short marked at [price] (margin
-    M3a): the price-tiered value from {!short_maintenance_tiers} when a band
-    covers [price], else the flat {!maintenance_margin_pct}. An empty tier table
-    always returns the flat threshold, so a disarmed config is bit-identical to
-    pre-M3a. *)
+    M3a): {!Short_margin_tiers.finra_short_maintenance} when
+    {!short_maintenance_finra} is armed (#3148); otherwise the price-tiered
+    value from {!short_maintenance_tiers} when a band covers [price], else the
+    flat {!maintenance_margin_pct}. An empty tier table always returns the flat
+    threshold, so a disarmed config is bit-identical to pre-M3a. *)
