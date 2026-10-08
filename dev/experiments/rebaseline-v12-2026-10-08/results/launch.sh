@@ -33,7 +33,7 @@ n_files=$(ls $L/top-3000-1999.sexp $L/top-3000-20*.sexp | wc -l | tr -d " "); n_
 docker exec trading-1-dev grep -o '((symbol [^)]*)' $WH/manifest.sexp | sed 's/((symbol //; s/)$//' | LC_ALL=C sort -u > /tmp/rb12-manifest.txt
 LC_ALL=C comm -23 /tmp/rb12-lists-union.txt /tmp/rb12-manifest.txt | grep -v -x -F MEL > /tmp/rb12-absent.txt || true
 [ ! -s /tmp/rb12-absent.txt ] || { echo "ABORT: $(wc -l < /tmp/rb12-absent.txt | tr -d ' ') list symbols not in the v12 manifest (e.g. $(head -5 /tmp/rb12-absent.txt | tr '\n' ' ')): apply the alias delta to the lists and merge it first"; exit 1; }
-echo "lists md5 (run tree $SHA): $(cat $L/top-3000-*.sexp | md5 -q)  union=$(wc -l < /tmp/rb12-lists-union.txt | tr -d ' ') absent=0 (MEL excepted)"
+echo "lists md5 (run tree $SHA): $(cat $L/top-3000-1999.sexp $L/top-3000-20*.sexp | md5 -q)  union=$(wc -l < /tmp/rb12-lists-union.txt | tr -d ' ') absent=0 (MEL excepted)"
 # Dividend crediting and the split-dividend guard read <TRADING_DATA_DIR>/<shard>/<SYM>/{dividends,splits}.csv; the chain
 # runs with TRADING_DATA_DIR=<run tree>/trading/test_data. Untracked files only (the dirty check uses
 # --untracked-files=no); both arms see the same tree.
