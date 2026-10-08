@@ -39,7 +39,13 @@ val path : data_dir:Fpath.t -> Fpath.t
 val build : data_dir:Fpath.t -> t
 (** [build ~data_dir] walks [data_dir] recursively, reads every
     [data.metadata.sexp] file, and returns an inventory sorted by symbol. Files
-    that cannot be read are silently skipped. *)
+    that cannot be read are silently skipped.
+
+    A [data.csv] whose symbol (its directory name) has no readable metadata file
+    is still indexed, with its range read from the first and last rows: bulk gap
+    fetches (e.g. the 2026-09-14 PIT union fetch) write bars without metadata,
+    and the metadata-only scan missed 6,154 of 11,888 cached symbols (#3136).
+    Metadata wins when both exist. *)
 
 val save : t -> data_dir:Fpath.t -> (unit, Status.t) result
 (** Write inventory to [data_dir/inventory.sexp]. *)

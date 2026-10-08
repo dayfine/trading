@@ -1354,3 +1354,14 @@
   (universe))
  (action
   (run sh %{dep:issue_fix_audit_test.sh})))
+
+; #3182: dry harness for dev/scripts/build_pit_warehouse_v12.sh -- the manifest/.snap guard (expected twin-drop
+; orphans pass, a clobbered manifest still aborts), the twinfix resume contract and the D6 expected-absent set.
+; The script lives outside the dune workspace root and is read via repo_root() at RUN TIME, so (universe) is
+; required, as for gnu_time_rss_smoke.sh above (H-CHECK-CACHE-BLIND).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:build_pit_warehouse_v12_guard_smoke.sh})))
