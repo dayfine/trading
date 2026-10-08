@@ -23,6 +23,15 @@ val alternatives_of_decisions :
       own [entry_decision] records, and cross-trade analysis joins on
       [position_id]. *)
 
+val walk_decisions_of :
+  decisions:
+    (Screener.scored_candidate * Entry_audit_capture.candidate_decision) list ->
+  Audit_recorder.walk_decision list
+(** The weekly decision record (#3139): every candidate of the walk, in walk
+    order, with one outcome — [Placed] for a [Kept] decision, [Skipped reason]
+    otherwise. Unlike {!all_alternatives_of_decisions} it keeps the funded
+    names, so one Friday's rows say what happened to each top-N name. *)
+
 val all_alternatives_of_decisions :
   decisions:
     (Screener.scored_candidate * Entry_audit_capture.candidate_decision) list ->

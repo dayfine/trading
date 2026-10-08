@@ -58,7 +58,7 @@ let of_screen ~config ~macro_trend ~candidates ~result =
 type t = {
   enabled : bool;
   cascade : (Stock_analysis.t * Screener.sector_context) list ref;
-  walk : Audit_recorder.alternative_input list ref;
+  walk : Audit_recorder.walk_decision list ref;
 }
 
 let create (recorder : Audit_recorder.t) =
@@ -67,8 +67,17 @@ let create (recorder : Audit_recorder.t) =
 let on_candidates t =
   if t.enabled then Some (fun cs -> t.cascade := cs) else None
 
-let on_walk_candidates t =
-  if t.enabled then Some (fun alts -> t.walk := alts) else None
+(* Always installed (#3139): the weekly decision record is unconditional. *)
+let on_walk_candidates t = Some (fun decisions -> t.walk := decisions)
+
+(* The pre-#3139 [candidates] projection: the passed-over rows, capture only. *)
+let _passed_over t =
+  if not t.enabled then []
+  else
+    List.filter_map !(t.walk) ~f:(fun (d : Audit_recorder.walk_decision) ->
+        match d.outcome with
+        | Skipped reason -> Some { Audit_recorder.candidate = d.ranked; reason }
+        | Placed -> None)
 
 let _drops t ~config ~macro_trend ~result =
   if not t.enabled then []
@@ -82,6 +91,7 @@ let record t ~(audit_recorder : Audit_recorder.t) ~date ~config
       diagnostics = result.cascade_diagnostics;
       breadth_state = macro.breadth_state;
       entered;
-      candidates = !(t.walk);
+      candidates = _passed_over t;
+      decisions = !(t.walk);
       drops = _drops t ~config ~macro_trend:macro.trend ~result;
     }

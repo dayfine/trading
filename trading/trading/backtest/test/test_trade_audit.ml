@@ -1038,7 +1038,8 @@ let make_cascade_summary ?(date = _date "2024-01-19") ?(total_stocks = 20)
     ?(long_top_n_admitted = 3) ?(short_macro_admitted = 18)
     ?(short_breakdown_admitted = 0) ?(short_sector_admitted = 0)
     ?(short_rs_hard_gate_admitted = 0) ?(short_grade_admitted = 0)
-    ?(short_top_n_admitted = 0) ?(entered = 1) () : TA.cascade_summary =
+    ?(short_top_n_admitted = 0) ?(entered = 1) ?(decisions = []) () :
+    TA.cascade_summary =
   {
     date;
     total_stocks;
@@ -1057,6 +1058,7 @@ let make_cascade_summary ?(date = _date "2024-01-19") ?(total_stocks = 20)
     short_grade_admitted;
     short_top_n_admitted;
     entered;
+    decisions;
   }
 
 let test_cascade_summary_sexp_round_trip _ =
@@ -1084,6 +1086,39 @@ let test_cascade_summary_without_breadth_state_defaults _ =
   assert_that
     (TA.cascade_summary_of_sexp legacy)
     (equal_to { s with breadth_state = Weinstein_types.Neutral_breadth })
+
+(* #3139: the weekly decision record round-trips with every outcome shape, and
+   a summary written before the field existed parses to [decisions = []]. *)
+let test_cascade_summary_decisions_round_trip _ =
+  let decisions : TA.weekly_decision list =
+    [
+      { symbol = "CCCC"; side = Trading_base.Types.Long; outcome = Placed };
+      {
+        symbol = "AAAA";
+        side = Trading_base.Types.Long;
+        outcome = Skipped No_structural_stop;
+      };
+      {
+        symbol = "SSSS";
+        side = Trading_base.Types.Short;
+        outcome = Skipped Insufficient_cash;
+      };
+    ]
+  in
+  let s = make_cascade_summary ~decisions () in
+  let legacy =
+    match TA.sexp_of_cascade_summary s with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom "decisions" :: _) -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    ( TA.cascade_summary_of_sexp (TA.sexp_of_cascade_summary s),
+      TA.cascade_summary_of_sexp legacy )
+    (pair (equal_to s) (equal_to { s with decisions = [] }))
 
 let test_record_cascade_summary_appears_in_collector _ =
   let t = TA.create () in
@@ -1259,6 +1294,8 @@ let test_audit_record_sexp_omits_empty_stop_decisions _ =
 let suite =
   "Trade_audit"
   >::: [
+         "cascade summary decisions round trip (#3139)"
+         >:: test_cascade_summary_decisions_round_trip;
          "skip_reason sexp round-trip" >:: test_skip_reason_sexp_round_trip;
          "stop_floor_kind sexp round-trip"
          >:: test_stop_floor_kind_sexp_round_trip;

@@ -11,21 +11,6 @@ open Core
 include Trade_audit_cascade
 include Trade_audit_execution
 
-type skip_reason =
-  | Insufficient_cash
-  | Already_held
-  | Below_min_grade
-  | Sized_to_zero
-  | Sector_concentration
-  | Top_n_cutoff
-  | Short_notional_cap
-  | Stop_too_wide
-  | Sector_exposure_cap
-  | Long_exposure_cap
-  | No_structural_stop
-  | Share_class_held
-[@@deriving sexp]
-
 type alternative_candidate = {
   symbol : string;
   side : Trading_base.Types.position_side;
