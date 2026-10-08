@@ -34,15 +34,18 @@ The guard is on in **both** arms: a dividend misread as a split creates phantom 
 2. **#3173 after-merge check.** Per cell, report the guard summary line
    (`Panel_runner: split_dividend_guard rejected=N no_files=M`); the guard prints counts only, and it is consulted
    only for held positions and resting entry tickets, so no per-event list is produced and an unheld symbol is never
-   checked. For each specimen (TDG 2013-07, WING, BCH), per cell: it is **held** if a position or a resting entry
-   ticket spans the event date. A held instance passes when there is no split event and no quantity jump (or ticket
+   checked. For each specimen (TDG 2013-07, WING 2018-02-08, BCH 2010-03-17), per cell: it is **held** if a position or a resting entry
+   ticket spans the event date. A held instance passes when there is no split event and no quantity jump (or stop-state
    rescale) on that date and (rb1) the dividend is credited once — evidence from trades / open positions / equity
-   curve rows. A specimen held in no cell is **not tested by this run** (reason: never held), stated as such.
+   curve rows. A specimen held in no cell is **not tested by this run** (reason: never held), stated as such. A
+   resting ticket that never fills leaves no evidence either way and counts as not tested, not as a pass. The
+   per-cell `splits.csv` (splits applied to held positions) is committed and is the direct evidence.
    - The item **passes** if at least one specimen is held somewhere and every held instance passes. It **fails** if
      any held instance fails.
    - If **no specimen is held in any cell**, the item is **not tested**: #3173 stays `verify/pending`, and item 3 and
      the `split_dividend_guard` default flip rest on #3181's unit tests (the TDG / WING / BCH guard cases and the
-     `detect_and_apply` held-position tests) plus `rejected` counts that are equal across rb0 and rb1 of each salt.
+     `detect_and_apply` held-position tests) plus `rejected` counts that are equal across rb0 and rb1 of each salt. If the counts differ on a salt (paths diverge), that salt does not support the flip, and item 3 and
+     the flip do not proceed on it.
      The results writeup says so explicitly.
 3. **Dividend implementation check (rb1 vs rb0, per salt).** Report `DividendIncomeTotal`,
    `DividendPaidShortTotal` (0 expected: shorts off), `DividendMissingFileCount`, `DividendSkippedNoAmountCount`,
@@ -65,7 +68,9 @@ The guard is on in **both** arms: a dividend misread as a split creates phantom 
    measured terms as a rough guide, and say that the remainder is basis + candidate set + warehouse **jointly**. Name the largest membership-driven trade differences
    (names held in one universe and absent from the other) for s0.
 6. **Path effects.** Trades, open positions at end, and the 3 largest per-trade divergences rb1 vs rb0 per salt
-   (dividend cash changes sizing; the #3138 at-fill knife-edge applies).
+   (dividend cash changes sizing; the #3138 at-fill knife-edge applies). Trades are joined across arms on
+   `symbol|entry_date`; `position_id` is not a cross-arm key (v11 s0 pair: 236 of 474 shared trades differ in id).
+   If item 2 fails, rb0 carries the same guard miss; the writeup sizes it in both arms.
 7. **Review pack** for rb1 s0–s2 (and rb0), built, rendered and looked at before any analysis (RV1–RV3). The reading
    goes to `results-analyst` (direction-class); `qc-results` reviews the PR.
 
