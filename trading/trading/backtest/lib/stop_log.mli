@@ -57,8 +57,8 @@ val exit_trigger_of_reason : Position.exit_reason -> exit_trigger
 
     - [Gap_through]: actual fill was significantly worse than the stop level
       (more than {!gap_down_threshold_pct} past the stop): for a long, below it
-      (the bar gapped down through the stop); for a short, above it (gapped
-      up). Indicates a price gap past the stop, not a clean stop-hit. Named
+      (the bar gapped down through the stop); for a short, above it (gapped up).
+      Indicates a price gap past the stop, not a clean stop-hit. Named
       side-neutrally since #3147; [trades.csv] labels it by side
       ([Trade_context.stop_trigger_kind_label]: [gap_down] long, [gap_up]
       short).
@@ -69,12 +69,16 @@ val exit_trigger_of_reason : Position.exit_reason -> exit_trigger
       {!exit_trigger.End_of_period}).
     - [Non_stop_exit]: the exit was not a stop trigger — take-profit,
       signal-reversal, time-expiry, or rebalance. *)
-type stop_trigger_kind = Gap_through | Intraday | End_of_period | Non_stop_exit
+type stop_trigger_kind =
+  | Gap_through
+  | Intraday
+  | End_of_period
+  | Non_stop_exit
 [@@deriving show, eq, sexp]
 
 val gap_down_threshold_pct : float
-(** Threshold gap (as a fraction of stop price) that distinguishes a {!Gap_through}
-    fill from an {!Intraday} fill. A long stop with
+(** Threshold gap (as a fraction of stop price) that distinguishes a
+    {!Gap_through} fill from an {!Intraday} fill. A long stop with
     [actual_price < stop_price * (1 - threshold)] counts as a gap-down
     (symmetric for shorts). Default 0.005 (50 basis points) — conservative
     enough that typical bid-ask noise on liquid US equities does not trip it but

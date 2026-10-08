@@ -65,7 +65,11 @@ let exit_trigger_of_reason (reason : Position.exit_reason) : exit_trigger =
   | PortfolioRebalancing -> Portfolio_rebalancing
   | StrategySignal { label; detail } -> Strategy_signal { label; detail }
 
-type stop_trigger_kind = Gap_through | Intraday | End_of_period | Non_stop_exit
+type stop_trigger_kind =
+  | Gap_through
+  | Intraday
+  | End_of_period
+  | Non_stop_exit
 [@@deriving show, eq, sexp]
 
 let gap_down_threshold_pct = 0.005
@@ -152,7 +156,8 @@ let _seed_entry_stop record ~level =
   _install_stop record ~level ~is_raise_candidate:false
 
 (* The simulator's forced-exit labels ({!Trading_simulation.Margin_runner}). *)
-let _margin_exit_labels = [ "margin_call"; "buyin_stress"; "maintenance_reduce" ]
+let _margin_exit_labels =
+  [ "margin_call"; "buyin_stress"; "maintenance_reduce" ]
 
 let _is_margin_trigger = function
   | Strategy_signal { label; _ } ->
@@ -169,7 +174,8 @@ let _record_exit_trigger record ~date trigger =
     Option.equal Date.equal record.pos_exit_trigger_date (Some date)
   in
   let keep_strategy =
-    same_day && Option.is_some record.pos_exit_trigger
+    same_day
+    && Option.is_some record.pos_exit_trigger
     && _is_margin_trigger trigger
   in
   if not keep_strategy then (

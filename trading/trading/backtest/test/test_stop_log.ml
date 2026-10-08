@@ -983,12 +983,15 @@ let test_squeeze_stop_keeps_stop_loss_label _ =
        ])
     (is_some_and
        (equal_to
-          (Backtest.Stop_log.Stop_loss { stop_price = 20.0; actual_price = 21.0 })))
+          (Backtest.Stop_log.Stop_loss
+             { stop_price = 20.0; actual_price = 21.0 })))
 
 (* Controls: a margin call alone is labelled [margin_call]; so is one a day
    after an earlier strategy exit (reverted and re-held in between). *)
 let test_margin_call_alone_or_later_day_labelled_margin_call _ =
-  let margin = Backtest.Stop_log.Strategy_signal { label = "margin_call"; detail = None } in
+  let margin =
+    Backtest.Stop_log.Strategy_signal { label = "margin_call"; detail = None }
+  in
   assert_that
     ( _short_exit_trigger
         [ _entered; [ _exit ~d:"2008-11-25" (_signal "margin_call") ] ],

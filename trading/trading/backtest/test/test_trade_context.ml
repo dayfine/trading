@@ -136,7 +136,11 @@ let test_stop_trigger_kind_label_distinguishes_all _ =
     ]
     (equal_to
        [
-         "gap_down"; "gap_up"; "intraday"; "intraday"; "end_of_period";
+         "gap_down";
+         "gap_up";
+         "intraday";
+         "intraday";
+         "end_of_period";
          "non_stop_exit";
        ])
 

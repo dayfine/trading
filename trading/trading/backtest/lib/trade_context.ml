@@ -195,7 +195,8 @@ let _stop_columns ~entry ~stop_info ~entry_date ~exit_date =
       ~f:(fun (e : Trade_audit.entry_decision) -> e.side)
   in
   ( Option.map trigger ~f:(fun t ->
-        stop_trigger_kind_label ~side (Stop_log.classify_stop_trigger_kind ~side t)),
+        stop_trigger_kind_label ~side
+          (Stop_log.classify_stop_trigger_kind ~side t)),
     _days_to_first_stop_trigger ~entry_date ~exit_date ~trigger )
 
 (* The two stop-ratchet observability columns. [n_stop_raises] stays [None] —
