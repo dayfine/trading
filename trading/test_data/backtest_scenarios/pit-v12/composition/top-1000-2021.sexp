@@ -756,7 +756,7 @@
     (avg_dollar_volume 210095933.75146335))
    ((symbol WSM) (weight 0.001) (sector "Consumer Discretionary")
     (synthetic false) (avg_dollar_volume 209768192.56097561))
-   ((symbol PIXY) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAYA) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 209081125.59695122))
    ((symbol O) (weight 0.001) (sector "Real Estate") (synthetic false)
     (avg_dollar_volume 209055658.64601055))
