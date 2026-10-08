@@ -12,10 +12,10 @@
       structurally valid artefact — one week per Friday, every list empty —
       which reads as "the walk passed nothing over", the exact inverse of what
       the artefact exists to say.
-    - {b Inert.} With [capture_candidates = false] (the default, and every
-      non-audit context) {!Cascade_trace.on_walk_candidates} is [None], so the
-      entry walk never computes the projection, and the emitted event carries
-      [candidates = []] — bit-identical to the pre-#2490 cascade event.
+    - {b Capture off.} With [capture_candidates = false] (the default)
+      {!Cascade_trace.on_walk_candidates} still returns a sink (#3139): the
+      event's [decisions] carry every walk row, while [candidates] stays [[]] —
+      the passed-over list is still opt-in, as before #2490's capture.
 
     A third arm pins {!Cascade_trace.of_screen} directly: which sides a given
     macro tape traces, in what order, and that a macro-blocked side is omitted
