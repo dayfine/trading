@@ -969,22 +969,28 @@ let test_force_cover_keeps_force_liquidation_label _ =
              { label = "force_liquidation"; detail = None })))
 
 (* A short squeezed through its stop the day the maintenance check flags it
-   (SUN1 2009-05-07 shape): the stop-loss label survives the margin cover. *)
+   (SUN1 2009-05-07 shape): the stop-loss label survives the margin cover,
+   whether the cover is a [buyin_stress] or a [maintenance_reduce]. *)
 let test_squeeze_stop_keeps_stop_loss_label _ =
   let stop : Position.exit_reason =
     StopLoss { stop_price = 20.0; actual_price = 21.0; loss_percent = 5.0 }
   in
+  let after_margin label =
+    _short_exit_trigger
+      [
+        _entered;
+        [ _exit ~d:"2009-05-07" stop ];
+        [ _exit ~d:"2009-05-07" (_signal label) ];
+      ]
+  in
+  let stop_loss =
+    is_some_and
+      (equal_to
+         (Backtest.Stop_log.Stop_loss { stop_price = 20.0; actual_price = 21.0 }))
+  in
   assert_that
-    (_short_exit_trigger
-       [
-         _entered;
-         [ _exit ~d:"2009-05-07" stop ];
-         [ _exit ~d:"2009-05-07" (_signal "buyin_stress") ];
-       ])
-    (is_some_and
-       (equal_to
-          (Backtest.Stop_log.Stop_loss
-             { stop_price = 20.0; actual_price = 21.0 })))
+    (after_margin "buyin_stress", after_margin "maintenance_reduce")
+    (pair stop_loss stop_loss)
 
 (* Controls: a margin call alone is labelled [margin_call]; so is one a day
    after an earlier strategy exit (reverted and re-held in between). *)
