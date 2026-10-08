@@ -37,6 +37,11 @@
 #     (tickets, fills, short P&L, Bearish weeks, weeks with short_top_n_admitted
 #     > 0) over a fixture shaped like shorts-liveness s0-shB; audit counts are
 #     null without trade_audit.sexp; shorts off -> null; shortLegLine pinned.
+#   - #3177: the render's slice plan covers any measured page height and a
+#     page that failed to load stops the render (stub Chrome); the return
+#     basis (price / total return / mixed) from params picks the SPY column
+#     and labels; the fallback card keys on the audit stop kind; an AVD-shaped
+#     later-split fill near a wide bar's edge is code 2, not off-bar;
 #   - short trades (#3149): every trade statistic and flag side-aware over
 #     three SHORT rows (breach on the high, signed P&L / MFE / grades, the
 #     audit stop_floor_kind for the fallback card, installed-stop width,
@@ -420,5 +425,73 @@ console.log($1)"; }
   expect_eq "short EEE gap: chase fires" yes "$(gfl 'ids("EEE-wein-g2").split(" ").includes("chase") ? "yes" : "no"')"
   expect_eq "short AAA replay: held 2 Stage 2 weeks -> stage4 fires; entered on Stage 4 -> notS2 quiet" "true false" "$(gfl '["stage4", "notS2"].map(i => ids("AAA-wein-g1").split(" ").includes(i)).join(" ")')"
 fi
+# #3177. Render: the slice plan covers a page of any measured height (every pixel row lands in some
+# part; the last part is the bottom 1500 px), and a page that failed to load its data stops the render
+# instead of slicing an error banner. A stub Chrome stands in for the browser.
+RENDER="${ROOT}/dev/scripts/review_pack_render.sh"
+expect_eq "render plan: 20,000 px page -> 14 parts, the last ending one row above the bottom" "14 18499 1500" "$(sh "$RENDER" --plan 20000 | tail -1)"
+expect_eq "render plan: parts start at 1 and step 1500" "1 1 1500|2 1500 1500" "$(sh "$RENDER" --plan 20000 | head -2 | paste -sd'|' -)"
+expect_eq "render plan: a page under two slices is one whole part" "1 0 1400" "$(sh "$RENDER" --plan 1400)"
+expect_eq "render plan: covers every row (max y + height >= height - 1)" yes "$(sh "$RENDER" --plan 9051 | awk '{ e = $2 + $3; if (e > m) m = e } END { print (m >= 9050 ? "yes" : "no: " m) }')"
+STUB="$TMP/stub-chrome"
+printf '#!/bin/sh\nfor a in "$@"; do case "$a" in --dump-dom) echo "<html data-page-h=\\"5000\\"><div class=\\"empty\\">Could not load the data files (LightweightCharts is not defined).</div></html>"; exit 0 ;; esac; done\nexit 0\n' > "$STUB"; chmod +x "$STUB"
+rc=0; CHROME="$STUB" sh "$RENDER" --site "$S" --out "$TMP/render" >"$TMP/render.log" 2>&1 || rc=$?
+expect_eq "render: a page that failed to load stops with exit 1" 1 "$rc"
+expect_eq "render: and names the page's own error" 1 "$(grep -c 'the page failed to load: Could not load the data files (LightweightCharts is not defined)' "$TMP/render.log" || true)"
+
+# SPY basis: the fixture run arms neither cash_yield nor dividend_crediting -> price only; a copy that
+# arms both -> total return. The fixture SPY's adjusted_close is 0.9 x close before 2020-03-01 here, so
+# the two bases differ: price 301 -> 400 = +32.89 %, total return 270.9 -> 400 = +47.66 %.
+mkdir -p "$TMP/tr"; cp -R "$FIX/data" "$TMP/tr/data"; cp -R "$FIX/run" "$TMP/tr/run"
+SPY_CSV="$TMP/tr/data/S/Y/SPY/data.csv"
+awk -F, 'BEGIN { OFS = "," } NR > 1 && $1 < "2020-03-01" { $6 = sprintf("%.2f", $5 * 0.9) } { print }' "$SPY_CSV" > "$SPY_CSV.x"; mv "$SPY_CSV.x" "$SPY_CSV"
+sed 's/(overrides (((enable_short_side false))))/(overrides (((enable_short_side false)) ((cash_yield (Series macro\/tbill_3m_dtb3.csv))) ((dividend_crediting true))))/' "$FIX/run/params.sexp" > "$TMP/tr/run/params.sexp"
+mkdir -p "$TMP/tr/mix"; cp "$FIX"/run/* "$TMP/tr/mix/"
+sed 's/(overrides (((enable_short_side false))))/(overrides (((enable_short_side false)) ((dividend_crediting true))))/' "$FIX/run/params.sexp" > "$TMP/tr/mix/params.sexp"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/tr/data" --out "$TMP/tr/pack" px="$FIX/run/" tr="$TMP/tr/run/" mix="$TMP/tr/mix/" >"$TMP/tr.log" 2>&1 || rc=$?
+expect_eq "basis: builds, exit 0" 0 "$rc"
+TD="$TMP/tr/pack/site/data"
+expect_eq "basis: price-only run (both flags off, the default)" '{"spy":"price","cash_yield":false,"dividends":false}' "$(jq -c .basis "$TD/px_meta.json")"
+expect_eq "basis: total-return run (both armed)" '{"spy":"tr","cash_yield":true,"dividends":true}' "$(jq -c .basis "$TD/tr_meta.json")"
+expect_eq "basis: dividends only is mixed" '{"spy":"mixed","cash_yield":false,"dividends":true}' "$(jq -c .basis "$TD/mix_meta.json")"
+expect_eq "basis: the price-only run's year table reads SPY price (+32.89 %)" 32.89 "$(jq -r '.[0].spy' "$TD/px_years.json")"
+expect_eq "basis: the total-return run's year table reads SPY TR (+47.66 %)" 47.66 "$(jq -r '.[0].spy' "$TD/tr_years.json")"
+expect_eq "basis: both SPY series are published" "301 270.9" "$(jq -r '.[0][1]+0' "$TD/spy_price.json") $(jq -r '.[0][1]+0' "$TD/spy.json")"
+if command -v node >/dev/null 2>&1; then
+  BFNS="$(sed -n -e '/^function spyBasis(/,/^}/p' -e '/^function spyBasisLabel(/,/^}/p' -e '/^function sharpeBasis(/,/^}/p' "$S/index.html")"
+  bas() { node -e "$BFNS
+console.log($1)"; }
+  expect_eq "spyBasisLabel: price" "SPY price only" "$(bas 'spyBasisLabel({ spy: "price", cash_yield: false, dividends: false })')"
+  expect_eq "spyBasisLabel: total return" "SPY total return" "$(bas 'spyBasisLabel({ spy: "tr", cash_yield: true, dividends: true })')"
+  expect_eq "spyBasisLabel: mixed names what the run credits" "SPY total return (run credits dividends only)" "$(bas 'spyBasisLabel({ spy: "mixed", cash_yield: false, dividends: true })')"
+  expect_eq "spyBasis: an older meta without basis reads total return" tr "$(bas 'spyBasis(undefined)')"
+  expect_eq "sharpeBasis: cash yield armed = excess over net T-bill" "excess over net T-bill" "$(bas 'sharpeBasis({ cash_yield: true })')"
+  expect_eq "sharpeBasis: no cash yield = raw" "raw, no cash yield" "$(bas 'sharpeBasis({ cash_yield: false })')"
+  FB="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' "$S/index.html")"
+  fbk() { node -e "$FB
+const F = FLAGS.find(f => f.id === 'fallback');
+console.log($1)"; }
+  expect_eq "fallback: keyed on the audit's stop kind, not a 4 % distance (GBX: Support_floor at exactly 4 %)" "false true false" "$(fbk '[{ sid: 0.04, sfk: "Support_floor" }, { sid: 0.07, sfk: "Buffer_fallback" }, { sid: 0.04 }].map(F.test).join(" ")')"
+  expect_eq "fallback: needs the audit (n/a without it)" sfk "$(fbk 'F.needs')"
+else
+  echo "SKIP: review_pack basis page cases need node"
+fi
+# AVD shape (2005-03-21, a 2:1 split on 2005-04-18): an entry filled on the post-split basis near the
+# edge of a wide pre-split bar. FFF: raw bars 36-48 (mid 42) adjusted at 0.5 until a 2:1 split on
+# 2020-03-02; filled at 23.50 = 47 / 2 (vs the mid: 0.56, outside the 2 % midpoint test) -> code 2.
+# GGG: the same bars without the split (factor 1) -> genuinely off the bar, code 0.
+mkdir -p "$TMP/avd/data/F/F/FFF" "$TMP/avd/data/G/G/GGG" "$TMP/avd/data/S/Y"; cp -R "$FIX/data/S/Y/SPY" "$TMP/avd/data/S/Y/"
+awk -F, -v fac=0.5 'NR == 1 { print; next } { if ($1 < "2020-03-02") printf "%s,40.00,48.00,36.00,40.00,%.2f,100000,\n", $1, 40 * fac; else printf "%s,20.00,24.00,18.00,20.00,20.00,100000,\n", $1 }' "$FIX/data/A/A/AAA/data.csv" > "$TMP/avd/data/F/F/FFF/data.csv"
+awk -F, 'NR == 1 { print; next } { printf "%s,40.00,48.00,36.00,40.00,40.00,100000,\n", $1 }' "$FIX/data/A/A/AAA/data.csv" > "$TMP/avd/data/G/G/GGG/data.csv"
+mkdir -p "$TMP/avd/run"; cp "$FIX"/run/* "$TMP/avd/run/"
+{ head -1 "$FIX/run/trades.csv"
+  echo "FFF,LONG,2020-01-29,2020-04-01,63,23.50,20.00,1000,-3500.00,-14.89,,,laggard_rotation,Stage2,2.5000,0.0800,non_stop_exit,,100,FFF-wein-1,,,0"
+  echo "GGG,LONG,2020-01-29,2020-04-01,63,23.50,40.00,1000,16500.00,70.21,,,laggard_rotation,Stage2,2.5000,0.0800,non_stop_exit,,100,GGG-wein-2,,,0"; } > "$TMP/avd/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/avd/data" --out "$TMP/avd/pack" r0="$TMP/avd/run/" >"$TMP/avd.log" 2>&1 || rc=$?
+expect_eq "AVD shape: builds, exit 0" 0 "$rc"
+expect_eq "AVD shape: a later split's fill near a wide bar's edge is code 2, not off-bar" 2 "$(jq -r '.[]|select(.sym=="FFF")|.inE' "$TMP/avd/pack/site/data/r0_trades.json")"
+expect_eq "AVD shape: without a split behind the factor it stays off-bar (code 0)" 0 "$(jq -r '.[]|select(.sym=="GGG")|.inE' "$TMP/avd/pack/site/data/r0_trades.json")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
