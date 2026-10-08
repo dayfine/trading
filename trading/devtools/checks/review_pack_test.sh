@@ -101,6 +101,11 @@ expect_eq "BBB entry on a later split basis" 2 "$(q '.[]|select(.sym=="BBB")|.in
 expect_eq "BBB adjusted entry on the bar basis" 25.1 "$(q '.[]|select(.sym=="BBB")|.eadj+0')"
 expect_eq "BBB entry vs prior close, split-corrected" 0.4 "$(q '.[]|select(.sym=="BBB")|.gap+0')"
 
+# dividends_received (#3175): the trailing trades.csv column reaches the trade JSON; AAA carries one.
+expect_eq "AAA dividends_received reaches the trade JSON" 450 "$(q '.[]|select(.sym=="AAA")|.div')"
+expect_eq "BBB (no dividend) reads 0, not null" 0 "$(q '.[]|select(.sym=="BBB")|.div')"
+expect_eq "page shows a total-return P&L column and fact" yes "$(grep -q "'TR P&L \$'" "$S/index.html" && grep -q "'Total-return P&L'" "$S/index.html" && echo yes || echo no)"
+
 expect_eq "ZZZ has no bars" true "$(q '.[]|select(.sym=="ZZZ")|.nodata')"
 
 # Saturday-dated entry: the last bar on/before the date (Friday) is used, the
@@ -121,15 +126,19 @@ expect_eq "short-leg signal wired into What stands out" yes "$(grep -q 'const sl
 # page with sed and pin it with node over named cases. The page keeps each
 # closing brace at column 0 so the range ends where the function does.
 if command -v node >/dev/null 2>&1; then
-  FNS="$(sed -n -e '/^const REOPEN_CLOSED_WEEKS/p' -e '/^function openSignal(/,/^}/p' -e '/^function oneTradeYear(/,/^}/p' -e '/^function alsoCause(/,/^}/p' -e '/^function reopenFlag(/,/^}/p' -e '/^function reopenEpisodes(/,/^}/p' -e '/^function shortLegLine(/,/^}/p' "$S/index.html")"
-  expect_eq "signal predicates extracted" 6 "$(printf '%s\n' "$FNS" | grep -c '^function ')"
-  sig() { node -e "$FNS
+  FNS="$(sed -n -e '/^const REOPEN_CLOSED_WEEKS/p' -e '/^function openSignal(/,/^}/p' -e '/^function oneTradeYear(/,/^}/p' -e '/^function alsoCause(/,/^}/p' -e '/^function reopenFlag(/,/^}/p' -e '/^function reopenEpisodes(/,/^}/p' -e '/^function shortLegLine(/,/^}/p' -e '/^function tradeTR(/p' -e '/^function realisedTotalNote(/,/^}/p' "$S/index.html")"
+  expect_eq "signal predicates extracted" 8 "$(printf '%s\n' "$FNS" | grep -c '^function ')"
+  sig() { node -e "const usdk = v => '\$' + v;
+$FNS
 console.log($1)"; }
   expect_eq "openSignal: opposite-sign specimen (T1 5r s0: NAV0 1M, move +115k, realised -222k) fires" true "$(sig 'openSignal(1e6, 115e3, -222e3)')"
   expect_eq "openSignal: open 200k of a 300k move (above half) fires" true "$(sig 'openSignal(1e6, 300e3, 100e3)')"
   expect_eq "openSignal: open 120k of a 300k move (below half, same sign) is quiet" false "$(sig 'openSignal(1e6, 300e3, 180e3)')"
   expect_eq "openSignal: open 80k < 10 % of NAV0 is quiet even at opposite sign" false "$(sig 'openSignal(1e6, 50e3, -30e3)')"
   expect_eq "openSignal: negative move, open -250k of -300k fires" true "$(sig 'openSignal(1e6, -300e3, -50e3)')"
+  expect_eq "tradeTR: price-only pnl plus dividends; a missing div reads as 0" "-2550 -3000" "$(sig 'tradeTR({pnl:-3000,div:450}) + " " + tradeTR({pnl:-3000})')"
+  expect_eq "realisedTotalNote: dividends and interest named separately (#3175)" yes "$(sig 'realisedTotalNote(1310000, 910000)' | grep -q 'of dividends.*and .*of cash interest' && echo yes || echo no)"
+  expect_eq "realisedTotalNote: price-only run adds nothing" "" "$(sig 'realisedTotalNote(0, undefined)')"
   expect_eq "oneTradeYear: top 12 pp of a 20 pp gap fires" true "$(sig 'oneTradeYear(20, 12)')"
   expect_eq "oneTradeYear: top 8 pp of a 20 pp gap (under half) is quiet" false "$(sig 'oneTradeYear(20, 8)')"
   expect_eq "oneTradeYear: gap under 10 pp is quiet" false "$(sig 'oneTradeYear(8, 8)')"

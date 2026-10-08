@@ -369,7 +369,7 @@ load('manifest.json').then(man => {
   const n = D.man.runs.length;
   KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
   D.spy = r[KINDS.length * n]; D.macro = r[KINDS.length * n + 1];
-  D.trades.forEach(ts => ts.forEach(t => { t.flags = FLAGS.filter(f => f.test(t)).map(f => f.id); t.yr = t.ed.slice(0, 4); }));
+  D.trades.forEach(ts => ts.forEach(t => { t.flags = FLAGS.filter(f => f.test(t)).map(f => f.id); t.yr = t.ed.slice(0, 4); t.tr = tradeTR(t); }));
   init();
 }).catch(e => { $('main').innerHTML = `<div class="empty">Could not load the data files (${e.message}).</div>`; });
 
@@ -626,7 +626,7 @@ function renderOverview() {
   const f = [
     openCheckMiss(oc) && `<b>Exposure check failed on ${oc.date}:</b> the pack marks ${usd(oc.pack)} held, actual.sexp has ${usd(oc.actual)} in open positions. Every invested figure on this page is suspect.`,
     worst && `<b>Worst three-year stretch: ${worst.w[0].p}–${worst.w[2].p}, ${pct(cum(worst.w, 'ret'), 1)} while SPY made ${pct(cum(worst.w, 'spy'), 1)}.</b> Bullish macro weeks: ${worst.w.map(y => y.bull).join(' / ')}; realised P&amp;L ${worst.w.map(y => usdk(y.pnl)).join(' / ')}.`,
-    `<b>Ten trades made ${usdk(top10.reduce((a, x) => a + x.pnl, 0))}</b> of the ${usdk(tot)} realised total. The ${aTr.length} A-grade trades made ${usdk(aTr.reduce((a, x) => a + x.pnl, 0))}.`,
+    `<b>Ten trades made ${usdk(top10.reduce((a, x) => a + x.pnl, 0))}</b> of the ${usdk(tot)} realised total. The ${aTr.length} A-grade trades made ${usdk(aTr.reduce((a, x) => a + x.pnl, 0))}.${realisedTotalNote(t.reduce((a, x) => a + (x.div || 0), 0), inv.metrics.cashinteresttotal)}`,
     `<b>${fb.length} of ${t.length} trades (${fmt(100 * fb.length / t.length, 0)}%) used the 4% fallback stop</b> rather than a stop under the base or MA.`,
     `<b>${gap.length} of ${stops.length} stop exits filled more than 0.5% below the stop; ${late.length} sold at an open after the day the stop traded.</b> ${df.length} losers (grade D/F) then rallied ≥ 15% within 13 weeks; they lost ${usdk(df.reduce((a, x) => a + x.pnl, 0))}.`,
     `<b>Average invested: ${fmt(expoAvg, 0)}% of NAV,</b> about ${fmt(ys.reduce((a, y) => a + y.pos, 0) / ys.length, 1)} positions on average.`,
@@ -687,9 +687,21 @@ $('#p-y').addEventListener('click', () => { pGran = 'Y'; $('#p-y').setAttribute(
 $('#p-q').addEventListener('click', () => { pGran = 'Q'; $('#p-q').setAttribute('aria-pressed', 'true'); $('#p-y').setAttribute('aria-pressed', 'false'); renderPeriods(); });
 
 /* ---------- Trades ---------- */
+// Total-return P&L of one trade (#3175): price-only pnl plus the dividends credited while it was held.
+// trades.csv gains dividends_received last; an older file has none (div null), read as 0.
+function tradeTR(t) { return t.pnl + (t.div || 0); }
+// The sentence appended to the realised-total signal (#3175). Trade rows are price-only; dividends and
+// interest are cash credits outside them. Empty when neither was credited (price-only run).
+function realisedTotalNote(divs, interest) {
+  const parts = [];
+  if (divs) parts.push(`${usdk(divs)} of dividends (inside the trade rows' Div $ column, not in P&amp;L $)`);
+  if (interest) parts.push(`${usdk(interest)} of cash interest (in no trade row)`);
+  return parts.length ? ` Trade P&amp;L is price-only: add ${parts.join(' and ')} for the total-return figure.` : '';
+}
 const TCOLS = [
   ['Symbol', 'sym', t => `<b>${t.sym}</b>`], ['Entry', 'ed', t => t.ed], ['Exit', 'xd', t => t.xd], ['Days', 'days', t => t.days, 'num'],
   ['P&L %', 'pct', t => `<span class="${sgn(t.pct)}">${pct(t.pct)}</span>`, 'num'], ['P&L $', 'pnl', t => `<span class="${sgn(t.pnl)}">${usdk(t.pnl)}</span>`, 'num'],
+  ['Div $', 'div', t => (t.div == null ? '–' : usdk(t.div)), 'num'], ['TR P&L $', 'tr', t => `<span class="${sgn(tradeTR(t))}">${usdk(tradeTR(t))}</span>`, 'num'],
   ['Grade', 'g', t => gradeTag(t.g)], ['Exit via', 'trig', t => trigLabel(t.trig)], ['Macro in', 'mE', t => `<span class="stg" style="background:${macroColor(t.mE)}"></span>${t.mE || '–'}`],
   ['Stop', 'sid', t => fmt(t.sid * 100, 1) + '%', 'num'], ['Vol ×', 'vr', t => fmt(t.vr, 1), 'num'], ['MFE', 'mfe', t => pct(t.mfe, 0), 'num'], ['Flags', 'nflags', t => t.flags.length || '', 'num'],
 ];
@@ -717,7 +729,7 @@ function renderTrades() {
     <tbody>${rows.map(t => `<tr class="click ${tSel === t.id ? 'sel' : ''}" data-id="${t.id}" tabindex="0">${TCOLS.map(c => `<td class="${c[3] || ''}">${c[2](t)}</td>`).join('')}</tr>`).join('')}</tbody>`;
 }
 $('#t-table').addEventListener('click', e => {
-  const th = e.target.closest('th'); if (th) { const k = th.dataset.k; tSort = { k, dir: tSort.k === k ? -tSort.dir : (['pnl', 'pct', 'days', 'mfe', 'nflags', 'vr', 'sid'].includes(k) ? -1 : 1) }; renderTrades(); return; }
+  const th = e.target.closest('th'); if (th) { const k = th.dataset.k; tSort = { k, dir: tSort.k === k ? -tSort.dir : (['pnl', 'pct', 'days', 'mfe', 'nflags', 'vr', 'sid', 'div', 'tr'].includes(k) ? -1 : 1) }; renderTrades(); return; }
   const tr = e.target.closest('tr[data-id]'); if (tr) selectTrade(tr.dataset.id);
 });
 $('#t-table').addEventListener('keydown', e => { if (e.key === 'Enter') { const tr = e.target.closest('tr[data-id]'); if (tr) selectTrade(tr.dataset.id); } });
@@ -734,7 +746,7 @@ async function selectTrade(id) {
   const row = document.querySelector(`#t-table tr[data-id="${CSS.escape(id)}"]`); if (row) row.classList.add('sel');
   const fl = t.flags.map(f => `<span class="pill ${FLAG[f].cat}" title="${FLAG[f].why.replace(/"/g, '&quot;')}">${FLAG[f].label}</span>`).join('') || '<span class="mut">No flags</span>';
   const facts = [
-    ['Entry fill', `${fmt(t.ep, 2)} on ${t.ed}`], ['Exit fill', `${fmt(t.xp, 2)} on ${t.xd}`], ['Quantity', t.qty.toLocaleString('en-US')], ['P&L', `${usd(t.pnl)} (${pct(t.pct)})`],
+    ['Entry fill', `${fmt(t.ep, 2)} on ${t.ed}`], ['Exit fill', `${fmt(t.xp, 2)} on ${t.xd}`], ['Quantity', t.qty.toLocaleString('en-US')], ['P&L (price only)', `${usd(t.pnl)} (${pct(t.pct)})`], ['Dividends received', t.div == null ? '–' : usd(t.div)], ['Total-return P&L', usd(tradeTR(t))],
     ['Exit via', `${trigLabel(t.trig)}${t.trig === 'stop_loss' ? ' · ' + t.kind.replace('_', ' ') : ''}`], ['Initial stop', `${fmt(t.sid * 100, 1)}% (distance at decision)`],
     ['Stop raises', `${t.nraise ?? 0}${t.maxs ? ' · max ' + fmt(t.maxs, 2) : ''}`], ['Entry vs prior close', pct(t.gap)],
     ['Peak / worst open', `${pct(t.mfe, 0)} / ${pct(t.mae, 0)}`], ['After exit (13 wk)', `high ${pct(t.pmax, 0)} · low ${pct(t.pmin, 0)}`],

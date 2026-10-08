@@ -45,10 +45,24 @@ let _write_params ~output_dir (result : Runner.result) =
    mid-run incremental appender (#2502) so a streamed row and this final row are
    produced by one renderer. This is the end-of-run authority write: it
    truncates whatever the stream left behind and rewrites the whole file. *)
-let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
+let _trade_dividends (result : Runner.result) =
+  (* Crediting is armed iff the run reported its dividend totals. *)
+  if
+    Map.mem result.summary.metrics
+      Trading_simulation_types.Metric_types.DividendIncomeTotal
+  then
+    let data_dir = Data_path.default_data_dir () in
+    Some
+      (Trade_dividends.create
+         ~load:(Corporate_actions.read_dividends ~data_dir)
+         ~start_date:result.summary.start_date)
+  else None
+
+let _write_trades ~output_dir ~dividends
+    ~(round_trips : Metrics.trade_metrics list)
     ~(stop_infos : Stop_log.stop_info list)
     ~(audit : Trade_audit.audit_record list) =
-  Trades_stream.write_all ~output_dir
+  Trades_stream.write_all ~output_dir ?dividends
     { Trades_stream.round_trips; stop_infos; audit }
 
 let _write_equity_curve ~output_dir
@@ -129,8 +143,9 @@ let write ~output_dir (result : Runner.result) =
   Sexp.save_hum
     (output_dir ^ "/summary.sexp")
     (Summary.sexp_of_t result.summary);
-  _write_trades ~output_dir ~round_trips:result.round_trips
-    ~stop_infos:result.stop_infos ~audit:result.audit;
+  _write_trades ~output_dir ~dividends:(_trade_dividends result)
+    ~round_trips:result.round_trips ~stop_infos:result.stop_infos
+    ~audit:result.audit;
   _write_equity_curve ~output_dir ~steps:result.steps;
   _write_trade_audit ~output_dir ~audit:result.audit
     ~cascade_summaries:result.cascade_summaries;

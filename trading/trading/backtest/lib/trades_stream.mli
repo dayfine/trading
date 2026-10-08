@@ -71,19 +71,27 @@ type batch = {
 
 val header : string
 (** The [trades.csv] header line (without the trailing newline): 13 base columns
-    followed by {!Trade_context.csv_header_fields}. Readers must address columns
-    by name — see {!Trades_csv_schema}. *)
+    followed by {!Trade_context.csv_header_fields} and a trailing
+    [dividends_received]. Readers must address columns by name — see
+    {!Trades_csv_schema}. *)
 
 val default_every_n_fridays : int
 (** Flush cadence used when a caller opens a stream without specifying one.
     Matches [Scenario_progress.default_every_n_fridays] so [trades.csv] and
     [progress.sexp] advance together under the scenario runner. *)
 
-val write_all : output_dir:string -> batch -> unit
+val write_all :
+  output_dir:string -> ?dividends:Trade_dividends.t -> batch -> unit
 (** [write_all ~output_dir batch] creates (truncating) [output_dir/trades.csv],
     writes {!header} plus one row per [batch.round_trips] entry in list order,
     and closes the file. This is the end-of-run authority path called by
-    {!Result_writer.write}. *)
+    {!Result_writer.write}.
+
+    The last column, [dividends_received] (#3175), is
+    {!Trade_dividends.received} when [dividends] is given (dividend crediting
+    armed), else [0.00]. It is the {b last} column so every existing column
+    keeps its index. Streamed rows (see {!create}) carry the same [0.00]; the
+    end-of-run rewrite is the authority. *)
 
 type t
 (** An open incremental [trades.csv] appender. Holds the output channel, the

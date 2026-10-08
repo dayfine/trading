@@ -5,7 +5,7 @@
 function q(s) { gsub(/"/, "", s); return "\"" s "\"" }
 function n(s) { return (s == "" ? "null" : s + 0) }
 FNR == 1 { fi++ }
-fi == 1 { if (FNR == 1) next; nt++; row[nt] = $0; next }
+fi == 1 { if (FNR == 1) { n_h = split($0, hd, ","); for (i = 1; i <= n_h; i++) if (hd[i] == "dividends_received") dcol = i; next }; nt++; row[nt] = $0; next }
 fi == 2 { split($0, a, "\t"); x[a[1]] = $0; next }
 fi == 3 { split($0, a, "\t"); au[a[1] "|" a[2]] = $0; next }
 fi == 4 { split($0, a, "\t"); nm++; md[nm] = a[1]; mtr[nm] = a[2]; mbr[nm] = a[3]; next }
@@ -17,8 +17,8 @@ END {
     split(row[t], c, ",")
     pid = c[20]; ie = macro_at(c[3]); ix = macro_at(c[4]); bw = 0; hw = 0
     for (i = ie; i <= ix && i > 0; i++) { hw++; if (mtr[i] == "Bearish") bw++ }
-    printf "%s{\"id\":%s,\"sym\":%s,\"ed\":%s,\"xd\":%s,\"days\":%s,\"ep\":%s,\"xp\":%s,\"qty\":%s,\"pnl\":%s,\"pct\":%s,\"xs\":%s,\"trig\":%s,\"stg\":%s,\"vr\":%s,\"sid\":%s,\"kind\":%s,\"d1st\":%s,\"score\":%s,\"sfd\":%s,\"maxs\":%s,\"nraise\":%s", \
-      (t > 1 ? ",\n" : ""), q(pid), q(c[1]), q(c[3]), q(c[4]), n(c[5]), n(c[6]), n(c[7]), n(c[8]), n(c[9]), n(c[10]), n(c[12]), q(c[13]), q(c[14]), n(c[15]), n(c[16]), q(c[17]), n(c[18]), n(c[19]), n(c[21]), n(c[22]), n(c[23])
+    printf "%s{\"id\":%s,\"sym\":%s,\"ed\":%s,\"xd\":%s,\"days\":%s,\"ep\":%s,\"xp\":%s,\"qty\":%s,\"pnl\":%s,\"pct\":%s,\"xs\":%s,\"trig\":%s,\"stg\":%s,\"vr\":%s,\"sid\":%s,\"kind\":%s,\"d1st\":%s,\"score\":%s,\"sfd\":%s,\"maxs\":%s,\"nraise\":%s,\"div\":%s", \
+      (t > 1 ? ",\n" : ""), q(pid), q(c[1]), q(c[3]), q(c[4]), n(c[5]), n(c[6]), n(c[7]), n(c[8]), n(c[9]), n(c[10]), n(c[12]), q(c[13]), q(c[14]), n(c[15]), n(c[16]), q(c[17]), n(c[18]), n(c[19]), n(c[21]), n(c[22]), n(c[23]), n(dcol ? c[dcol] : "")
     printf ",\"mE\":%s,\"bE\":%s,\"mX\":%s,\"bearW\":%d,\"macroW\":%d", q(ie ? mtr[ie] : ""), q(ie ? mbr[ie] : ""), q(ix ? mtr[ix] : ""), bw, hw
     if (pid in x) { split(x[pid], e, "\t")
       if (e[2] ~ /^NO/) printf ",\"nodata\":true"
