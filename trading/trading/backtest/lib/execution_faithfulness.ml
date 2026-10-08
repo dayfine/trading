@@ -99,8 +99,7 @@ let _execution_of ~entry_order_kind ~(entry : Trade_audit.entry_decision)
    replaces the decision-time observation in the audit exit reason. *)
 let _add_fill ~pre acc (trade : Trading_simulation.Metrics.trade_metrics) =
   match (Trade_context.of_precomputed pre ~trade).position_id with
-  | Some pid when not (Map.mem acc pid) ->
-      Map.set acc ~key:pid ~data:trade
+  | Some pid when not (Map.mem acc pid) -> Map.set acc ~key:pid ~data:trade
   | _ -> acc
 
 (* position_id -> round-trip. Reuses [Trade_context]'s

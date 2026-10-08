@@ -53,8 +53,8 @@ val exit_trigger_of_reason : Position.exit_reason -> exit_trigger
 
 val with_fill_price : exit_trigger -> fill_price:float -> exit_trigger
 (** Replace a stop-loss or take-profit trigger's [actual_price] with the
-    executed fill price. Strategy reasons carry the observed bar price until
-    a fill is joined; that observation must not classify an executed exit.
+    executed fill price. Strategy reasons carry the observed bar price until a
+    fill is joined; that observation must not classify an executed exit.
     Preserves the trigger level and all other exit reasons. *)
 
 (** Granular classification of how a stop-driven exit fired, derived from the

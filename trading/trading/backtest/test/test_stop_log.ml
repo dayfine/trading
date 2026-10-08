@@ -1033,7 +1033,6 @@ let suite =
   "Stop_log"
   >::: [
          "fill price preserves reason" >:: test_with_fill_price_preserves_reason;
-
          "#3147 force cover keeps force_liquidation label"
          >:: test_force_cover_keeps_force_liquidation_label;
          "#3147 squeeze stop keeps stop_loss label"
