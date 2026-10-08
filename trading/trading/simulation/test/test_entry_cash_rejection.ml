@@ -102,7 +102,7 @@ let _rejections ~test_name ~cash ~entry_fill_reject_retries =
       in
       match run (create_exn ~config:(_config ~cash) ~deps) with
       | Ok _ -> !seen
-      | Error err -> assert_failure ("run failed: " ^ Status.show err))
+      | Error err -> failwith ("run failed: " ^ Status.show err))
 
 (* No retry budget: the d2 refusal cancels the ticket and is recorded once,
    dated d2, with the fill's cost and the cash the book held. *)
@@ -177,7 +177,7 @@ let _entering ~id ~symbol =
       }
   with
   | Ok p -> p
-  | Error err -> assert_failure (Status.show err)
+  | Error err -> failwith (Status.show err)
 
 let _cancel id : Position.transition =
   {
