@@ -283,6 +283,18 @@
                 "guarded reader drops dividend split"))))
  (status fixed-behind-flag))
 
+((issue 3174) (ref "total-return-26y-2026-10-06: AD 2025-08-20, BKE 2021-12-17")
+ (finding "resting sell stops not reduced by the cash dividend on the ex-date: large specials stopped out at the open on the dividend drop")
+ (guard ((unit ("trading/analysis/data/storage/csv/ex_dividend_stop/test/test_ex_dividend_stop.ml"
+                "AD stop reduced below low"))
+         (unit ("trading/analysis/data/storage/csv/ex_dividend_stop/test/test_ex_dividend_stop.ml"
+                "BKE stop reduced below low"))
+         (unit ("trading/trading/weinstein/strategy/test/test_stops_dividend_runner.ml"
+                "AD stop reduced, not hit"))
+         (unit ("trading/trading/weinstein/strategy/test/test_stops_dividend_runner.ml"
+                "BKE stop reduced, not hit"))))
+ (status fixed-behind-flag))
+
 ((issue 3138) (ref "26y investor deep-dive 2026-10-05: s1 ADMA $446.7k needed, $427.5k available")
  (finding "an at-fill cash rejection cancels the entry ticket outright and was visible only in the stderr WARN, with no amounts in the artifacts")
  (guard ((unit ("trading/trading/simulation/test/test_entry_cash_rejection.ml"

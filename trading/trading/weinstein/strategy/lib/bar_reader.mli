@@ -204,6 +204,17 @@ val with_split_guard : t -> Split_dividend_guard.t -> t
 (** [with_split_guard t guard] is [t] with {!split_guard} set to [Some guard];
     every read is unchanged. *)
 
+val ex_dividend_stops : t -> Ex_dividend_stop.t option
+(** [ex_dividend_stops t] is the per-run ex-dividend stop reducer
+    {!Stops_dividend_runner.adjust} applies to every held long (issue #3174): on
+    an ex-date its resting sell-stop level is reduced by the cash dividend, as
+    FINRA Rule 5330 has a broker do. [None] (every constructor's default) leaves
+    every stop where it is. *)
+
+val with_ex_dividend_stops : t -> Ex_dividend_stop.t -> t
+(** [with_ex_dividend_stops t eds] is [t] with {!ex_dividend_stops} set to
+    [Some eds]; every read is unchanged. *)
+
 val daily_bars_for :
   t -> symbol:string -> as_of:Date.t -> Types.Daily_price.t list
 (** [daily_bars_for t ~symbol ~as_of] returns daily bars for [symbol] up to and

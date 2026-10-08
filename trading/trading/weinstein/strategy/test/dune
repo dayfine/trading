@@ -60,6 +60,7 @@
   test_leverage_dawn
   test_stops_split_runner
   test_stops_split_dividend_guard
+  test_stops_dividend_runner
   test_weekly_ma_cache
   test_weinstein_strategy
   test_weinstein_strategy_smoke
@@ -74,6 +75,7 @@
   csv
   csv.corporate_actions
   csv.split_dividend_guard
+  csv.ex_dividend_stop
   fpath
   trading.base
   trading.data_panel
