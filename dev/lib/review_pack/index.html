@@ -327,8 +327,8 @@ const hasStopKind = ts => ts.some(t => t.sfk != null);
 const withMacro = t => isShort(t) ? 'Bearish' : 'Bullish', againstMacro = t => isShort(t) ? 'Bullish' : 'Bearish';
 const ownStage = t => isShort(t) ? 'Stage4' : 'Stage2';
 const FLAGS = [
-  { id: 'weekend', cat: 'exec', label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || (t.onX === 0 && t.trig !== 'delisted'),
-    why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect). A delisting exit has no bar on its date by construction and is left out.' },
+  { id: 'weekend', cat: 'exec', label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || (t.onX === 0 && t.trig !== 'delisted' && !t.xpast),
+    why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect). A delisting exit has no bar on its date by construction and is left out, as is any exit dated after the symbol’s last bar (MIME 2022-05-20, LACO 2020-10-09: a delisting stamped the next day).' },
   { id: 'offbar', cat: 'exec', label: 'Fill outside the day’s high–low', test: t => (t.onE === 1 && t.inE === 0) || (t.onX === 1 && t.inX === 0),
     why: 'The fill price never traded that day (half a percent of slack for rounding; fills on a later split basis are excluded). The validator’s V13 counts the same thing.' },
   { id: 'gapstop', cat: 'exec', label: 'Stop filled ≥ 3 pts beyond the stop', test: t => t.trig === 'stop_loss' && stopSlip(t) >= 0.03,
@@ -347,13 +347,13 @@ const FLAGS = [
     why: 'Book Ch. 3/8: weight buying to a bullish market and shorting to a bearish one. A long entered when the macro was not Bullish, a short when it was not Bearish. The run allows Neutral-market buys (audit R8).' },
   { id: 'macrobear', cat: 'book', needs: 'mE', open: true, label: 'Entered against the macro', test: t => t.mE === againstMacro(t),
     why: 'A long bought in a Bearish macro week or a short sold in a Bullish one: the macro gate should block both (spine rule 6).' },
-  { id: 'lowvol', cat: 'book', label: 'Long breakout volume under 2× average', test: t => !isShort(t) && t.vr < 2,
-    why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3). Shorts are left out: a breakdown does not need volume (reference Ch. 2, Stage 4 detail).' },
+  { id: 'lowvol', cat: 'book', needs: 'fvr', label: 'Long fill-week volume under 2× average', test: t => !isShort(t) && t.fvr != null && t.fvr < 2,
+    why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3). Read on the week the order FILLED (its volume vs the 4 weeks before), not the screen week trades.csv records. Shorts are left out: a breakdown does not need volume (reference Ch. 2, Stage 4 detail).' },
   { id: 'fallback', cat: 'book', needs: 'sfk', label: '4% fallback stop, not below the base', test: isFallback,
     why: 'Book Ch. 6: the initial stop goes under the base or the MA (spine rule 5), above the top of the base for a short. A flat 4% means no structural level was used. Read from the trade audit’s stop_floor_kind (Buffer_fallback), not the 4% distance: a structural floor can land on exactly 4%. n/a without the audit.' },
   { id: 'widestop', cat: 'book', label: 'Initial stop wider than 15%', test: t => stopDist(t) > 0.15,
     why: 'Structural stop far from the entry; the validator’s V12 gate is 15%. A short’s distance is its installed stop vs the entry fill.' },
-  { id: 'stage4', cat: 'book', label: 'Held ≥ 2 weeks in the wrong stage (replay)', test: t => (isShort(t) ? t.s2w || 0 : t.s4w || 0) >= 2,
+  { id: 'stage4', cat: 'book', needs: 'holdW', label: 'Held ≥ 2 weeks in the wrong stage (replay)', test: t => (isShort(t) ? t.s2w || 0 : t.s4w || 0) >= 2,
     why: 'Book Ch. 2/6: never ride a Stage 4 decline (spine rule 4). For a short, the wrong stage is Stage 2.' },
   { id: 'notS2', cat: 'book', needs: 'rsE', label: 'Replay stage at entry is not the side’s stage', test: t => t.rsE && t.rsE !== ownStage(t),
     why: 'The chart classifier disagrees with the strategy’s call on the entry week: Stage 2 for a long, Stage 4 for a short.' },
@@ -798,7 +798,7 @@ async function selectTrade(id) {
     ['Stop raises', `${t.nraise ?? 0}${t.maxs ? ' · max ' + fmt(t.maxs, 2) : ''}`], ['Entry vs prior close', pct(t.gap)],
     ['Peak / worst open', `${pct(t.mfe, 0)} / ${pct(t.mae, 0)}`], ['After exit (13 wk)', `${isShort(t) ? 'trade’s way (down)' : 'high'} ${pct(t.pmax, 0)} · ${isShort(t) ? 'against (up)' : 'low'} ${pct(t.pmin, 0)}`],
     ['Macro in → out', `${t.mE || '–'} → ${t.mX || '–'}`], ['Bearish weeks held', `${t.bearW} of ${t.macroW}`], ['Breadth at entry', t.bE || '–'],
-    ['Volume at breakout', `${fmt(t.vr, 2)}× avg`], ['Screener score', t.score ?? '–'], ['RS at entry', t.rs || '–'],
+    ['Volume vs average', `${fmt(t.vr, 2)}× screen week · ${t.fvr == null ? '–' : fmt(t.fvr, 2) + '×'} fill week`], ['Screener score', t.score ?? '–'], ['RS at entry', t.rs || '–'],
     ['Entry fill vs trigger', t.fvt == null ? '–' : pct(t.fvt, 2)], ['Stage (strategy / replay)', `${t.stg} / ${t.rsE || '–'}`], ['Replay weeks S3 / S4', t.holdW ? `${t.s3w} / ${t.s4w} of ${t.holdW}` : '–'],
   ];
   $('#t-detail').innerHTML = `<div class="row" style="justify-content:space-between"><h2>${t.sym} <span class="sub">${t.ed} → ${t.xd}, ${t.days} days</span></h2><span>${gradeTag(t.g)} <span class="${sgn(t.pnl)} num">${usdk(t.pnl)}</span></span></div>

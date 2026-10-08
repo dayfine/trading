@@ -43,6 +43,9 @@
 #     the default of the run's code_version) picks the SPY column
 #     and labels; the fallback card keys on the audit stop kind; an AVD-shaped
 #     later-split fill near a wide bar's edge is code 2, not off-bar;
+#   - #3141: the fill-week volume ratio (per bar vs the 4 prior weeks) drives
+#     the low-volume card, not the screen week; an exit dated after the last
+#     bar is not the Saturday-fill defect; the Stage-4 card needs the replay;
 #   - short trades (#3149): every trade statistic and flag side-aware over
 #     three SHORT rows (breach on the high, signed P&L / MFE / grades, the
 #     audit stop_floor_kind for the fallback card, installed-stop width,
@@ -570,5 +573,35 @@ fi
 expect_eq "wiring: D.spy is the basisView series" 1 "$(grep -c '^  D.spy = D\[basisView(D.meta\[D.man.charts_run || 0\].basis).series\];$' "$S/index.html")"
 expect_eq "wiring: KPI total return, Sharpe, legend and the dashed line read basisView" 4 "$(grep -c 'BV\.total\|BV\.sharpe\|BV\.legend\|if (BV\.priceLine)' "$S/index.html")"
 expect_eq "wiring: the panels render through confTable / validatorList" 2 "$(grep -c "^  \$('#conf').innerHTML = confTable(cf);\$\|^  \$('#validator').innerHTML = validatorList(D.meta\[CH()\].validator);\$" "$S/index.html")"
+# #3141. HHH: flat 100,000-share weeks, then 300,000 a day in the week the entry FILLED (2020-01-27..31)
+# -> fill-week volume ratio 3.00 while its screen-week entry_volume_ratio says 1.5; III: the bars end on
+# 2020-03-31 and a stop exit is dated 2020-04-01 (a delisting stamped the day after the last bar) ->
+# not the Saturday-fill defect.
+mkdir -p "$TMP/v41/data/H/H/HHH" "$TMP/v41/data/I/I/III" "$TMP/v41/data/S/Y" "$TMP/v41/run"; cp -R "$FIX/data/S/Y/SPY" "$TMP/v41/data/S/Y/"
+awk -F, 'NR == 1 { print; next } { v = ($1 >= "2020-01-27" && $1 <= "2020-01-31") ? 300000 : 100000; printf "%s,10.00,10.50,9.50,10.00,10.00,%d,\n", $1, v }' "$FIX/data/A/A/AAA/data.csv" > "$TMP/v41/data/H/H/HHH/data.csv"
+awk -F, 'NR == 1 { print; next } $1 <= "2020-03-31" { printf "%s,10.00,10.50,9.50,10.00,10.00,100000,\n", $1 }' "$FIX/data/A/A/AAA/data.csv" > "$TMP/v41/data/I/I/III/data.csv"
+cp "$FIX"/run/* "$TMP/v41/run/"
+{ head -1 "$FIX/run/trades.csv"
+  echo "HHH,LONG,2020-01-29,2020-03-02,33,10.00,10.00,1000,0.00,0.00,,,laggard_rotation,Stage2,1.5000,0.0800,non_stop_exit,,100,HHH-wein-1,,,0"
+  echo "III,LONG,2020-01-29,2020-04-01,63,10.00,9.60,1000,-400.00,-4.00,9.60,9.60,stop_loss,Stage2,2.5000,0.0400,intraday,63,100,III-wein-2,,,0"; } > "$TMP/v41/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/v41/data" --out "$TMP/v41/pack" r0="$TMP/v41/run/" >"$TMP/v41.log" 2>&1 || rc=$?
+expect_eq "#3141: builds, exit 0" 0 "$rc"
+V41="$TMP/v41/pack/site/data/r0_trades.json"
+expect_eq "#3141: fill-week volume ratio = the fill week vs its 4 prior weeks (3.00), not the screen week (1.5)" "3 1.5" "$(jq -r '.[]|select(.sym=="HHH")|"\(.fvr+0) \(.vr+0)"' "$V41")"
+expect_eq "#3141: flat volume reads 1.00" 1 "$(jq -r '.[]|select(.sym=="III")|.fvr+0' "$V41")"
+expect_eq "#3141: an exit dated after the last bar is marked" "0 1" "$(jq -r '.[]|select(.sym=="III")|"\(.onX) \(.xpast)"' "$V41")"
+if command -v node >/dev/null 2>&1; then
+  V41F="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' "$S/index.html")"
+  v41() { node -e "$V41F
+const T = $(jq -c . "$V41"), F = id => FLAGS.find(f => f.id === id);
+console.log($1)"; }
+  expect_eq "#3141: the Saturday-fill card leaves out an exit past the last bar (III)" false "$(v41 'F("weekend").test(T.find(t => t.sym === "III"))')"
+  expect_eq "#3141: the low-volume card reads the fill week (HHH 3.00: quiet; III 1.00: flagged)" "false true" "$(v41 '["HHH", "III"].map(s => F("lowvol").test(T.find(t => t.sym === s))).join(" ")')"
+  expect_eq "#3141: the Stage-4 card needs the stage replay (n/a, not 0, without it)" holdW "$(v41 'F("stage4").needs')"
+  expect_eq "#3141: the low-volume card needs the fill-week ratio" fvr "$(v41 'F("lowvol").needs')"
+else
+  echo "SKIP: review_pack #3141 page cases need node"
+fi
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
