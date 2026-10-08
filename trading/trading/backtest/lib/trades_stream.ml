@@ -61,10 +61,19 @@ let header =
       "exit_trigger";
     ]
   in
-  String.concat ~sep:"," (base @ Trade_context.csv_header_fields)
+  String.concat ~sep:","
+    (base @ Trade_context.csv_header_fields @ [ "dividends_received" ])
 
-let _write_trade_row oc ~ctx_pre (t : Trading_simulation.Metrics.trade_metrics)
-    =
+(** The trailing [dividends_received] cell: the trip's dividend cash when a
+    {!Trade_dividends.t} is supplied, else ["0.00"] (crediting off, or a mid-run
+    streamed row — the end-of-run rewrite is the authority). *)
+let _dividend_cell dividends t =
+  match dividends with
+  | Some d -> sprintf "%.2f" (Trade_dividends.received d t)
+  | None -> "0.00"
+
+let _write_trade_row oc ~ctx_pre ~dividends
+    (t : Trading_simulation.Metrics.trade_metrics) =
   (* Resolve the stop_info via the same position-keyed join {!Trade_context}
      uses for [stop_trigger_kind], so [entry_stop] / [exit_stop] / [exit_trigger]
      stay consistent with it. The prior symbol-keyed FIFO pop misaligned against
@@ -89,7 +98,11 @@ let _write_trade_row oc ~ctx_pre (t : Trading_simulation.Metrics.trade_metrics)
       exit_trigger;
     ]
   in
-  let cells = base_cells @ Trade_context.csv_row_fields ctx in
+  let cells =
+    base_cells
+    @ Trade_context.csv_row_fields ctx
+    @ [ _dividend_cell dividends t ]
+  in
   fprintf oc "%s\n" (String.concat ~sep:"," cells)
 
 (** Render [round_trips] onto [oc] using the audit/stop-log indexes built once
@@ -97,18 +110,18 @@ let _write_trade_row oc ~ctx_pre (t : Trading_simulation.Metrics.trade_metrics)
     map per row — O(N²) on a 15y cell (~3 700 round-trips × ~3 700 audit
     records). The same [ctx_pre] backs the per-row stop_info join, so
     [exit_trigger] and [stop_trigger_kind] resolve against one index. *)
-let _write_rows oc ~(batch : batch) ~round_trips =
+let _write_rows oc ?dividends ~(batch : batch) ~round_trips () =
   let ctx_pre =
     Trade_context.precompute ~audit:batch.audit ~stop_infos:batch.stop_infos
   in
-  List.iter round_trips ~f:(_write_trade_row oc ~ctx_pre)
+  List.iter round_trips ~f:(_write_trade_row oc ~ctx_pre ~dividends)
 
 let _path ~output_dir = output_dir ^ "/trades.csv"
 
-let write_all ~output_dir batch =
+let write_all ~output_dir ?dividends batch =
   let oc = Out_channel.create (_path ~output_dir) in
   fprintf oc "%s\n" header;
-  _write_rows oc ~batch ~round_trips:batch.round_trips;
+  _write_rows oc ?dividends ~batch ~round_trips:batch.round_trips ();
   Out_channel.close oc
 
 (* ------------------------------------------------------------------ *)
@@ -180,7 +193,7 @@ let _flush t =
   in
   t.emitted_per_symbol <- emitted;
   let rows = List.sort fresh ~compare:_row_order in
-  _write_rows t.oc ~batch ~round_trips:rows;
+  _write_rows t.oc ~batch ~round_trips:rows ();
   t.rows_written <- t.rows_written + List.length rows;
   Out_channel.flush t.oc
 

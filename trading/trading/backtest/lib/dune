@@ -4,6 +4,7 @@
   core
   core_unix
   csv
+  csv.corporate_actions
   fpath
   status
   types

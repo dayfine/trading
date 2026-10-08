@@ -20,6 +20,7 @@
   test_trade_context
   test_trades_csv_schema
   test_trades_stream
+  test_trade_dividends
   test_execution_faithfulness
   test_result_writer
   test_runner_hypothesis_overrides
@@ -76,6 +77,7 @@
   weinstein.snapshot_runtime
   weinstein.types
   trading.base
+  csv.corporate_actions
   trading.data_panel
   trading.data_panel.snapshot
   trading.engine

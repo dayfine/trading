@@ -1026,7 +1026,7 @@ let test_load_missing_trades_csv_raises _ =
     appends entry_anchor (new columns are appended so positional readers stay
     valid). *)
 let _canonical_post_g2_header =
-  "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises,entry_anchor"
+  "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises,entry_anchor,dividends_received"
 
 (* AAPL LONG round-trip: bought at 280, sold at 404, +12 400 / +44.20%. *)
 let _post_g2_long_row =
