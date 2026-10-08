@@ -130,6 +130,7 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
         input.config.portfolio_config.exempt_closing_trades_from_cash_floor
       ?on_trade_fill ~active_through_for ~prune_universe_by_active_through
       ~on_transitions:(_on_transitions ~stop_log ~trade_audit)
+      ~on_entry_cash_rejection:(Trade_audit.record_cash_rejection trade_audit)
       ?entry_extension_max_pct:(_entry_cap_for_sim input.config)
       ~sim_entry_fill_next_open:input.config.sim_entry_fill_next_open
       ~sim_exit_fill_next_open:input.config.sim_exit_fill_next_open

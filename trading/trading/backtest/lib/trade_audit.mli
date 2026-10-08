@@ -623,6 +623,16 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     The closed list is pinned by
     [trading/trading/backtest/test/test_cancel_reason_closed_list.ml]. *)
 
+val record_cash_rejection :
+  t -> Trading_simulation.Entry_cash_rejection.t -> unit
+(** Record that the entry ticket [r.position_id] was cancelled because the
+    portfolio could not fund its fill (#3138), wired to
+    {!Trading_simulation.Simulator.dependencies.on_entry_cash_rejection}. Merged
+    into that entry's [ticket_lifecycle.cash_rejection] at drain time, beside
+    the [cancel_reason] ([entry_fill_rejected_by_portfolio]) and cancel age the
+    same step's [CancelEntry] sets through {!record_transitions}. Dropped when
+    no entry was recorded for the id (mirrors {!record_exit}). *)
+
 val record_fill_volume :
   t -> position_id:string -> Ticket_lifecycle.fill_volume_check -> unit
 (** Record the F5 at-fill §4.2 verdict, paired with what the run did about it,

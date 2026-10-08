@@ -234,6 +234,30 @@ console.log(shortLegLine($1))"; }
 else
   echo "SKIP: review_pack short-leg predicate cases need node"
 fi
+
+# At-fill cash rejections (#3138): each ticket_lifecycle (cash_rejection ((required R) (available A))) in
+# trade_audit.sexp is counted, with how many were >= 90 % funded. The fixture is save_hum-shaped, the pair
+# split across lines. No trade audit -> null; an audit with no rejection -> count 0 (no line).
+CRRUN="$TMP/crrun"; mkdir -p "$CRRUN"; cp "$FIX"/run/* "$CRRUN"/
+printf '%s\n' '((audit_records' '  (((entry ((ticket_lifecycle ((cash_rejection' '     ((required 446712.52)' '      (available 427489.55)))))))))' \
+  '   ((entry ((ticket_lifecycle ((cash_rejection ((required 1000.) (available 400.)))))))))))' > "$CRRUN/trade_audit.sexp"
+expect_eq "cash rejections: two counted, one >= 90 % funded" '{"count":2,"near":1}' "$(sh "$ROOT/dev/lib/review_pack/meta.sh" "$CRRUN" | jq -c .cash_rejections)"
+printf '%s\n' '((audit_records ()))' > "$CRRUN/trade_audit.sexp"
+expect_eq "cash rejections: audit with none -> 0" '{"count":0,"near":0}' "$(sh "$ROOT/dev/lib/review_pack/meta.sh" "$CRRUN" | jq -c .cash_rejections)"
+rm "$CRRUN/trade_audit.sexp"
+expect_eq "cash rejections: no trade audit -> null, never 0" null "$(sh "$ROOT/dev/lib/review_pack/meta.sh" "$CRRUN" | jq -c .cash_rejections)"
+if command -v node >/dev/null 2>&1; then
+  CRF="$(sed -n -e '/^function cashRejectionLine(/,/^}/p' "$S/index.html")"
+  crl() { node -e "$CRF
+console.log(cashRejectionLine($1))"; }
+  expect_eq "cashRejectionLine: count and near" \
+    '<b>Entries cancelled at the fill for cash:</b> 2 tickets filled at the engine but the book could not fund them; 1 was at least 90 % funded (<code>cash_rejection</code> in <code>trade_audit.sexp</code>).' \
+    "$(crl '{count: 2, near: 1}')"
+  expect_eq "cashRejectionLine: none or no audit prints nothing" "|" "$(crl '{count: 0, near: 0}')|$(crl null)"
+  expect_eq "cash-rejection line wired into What stands out" yes "$(grep -q 'const cr = cashRejectionLine(D.meta\[CH()\].cash_rejections);' "$S/index.html" && echo yes || echo no)"
+else
+  echo "SKIP: review_pack cash-rejection line cases need node"
+fi
 expect_eq "EEE exits under 5 % of entry: X" X "$(q '.[]|select(.sym=="EEE")|.g')"
 expect_eq "second run r1 emitted" 6 "$(jq length "$S/data/r1_trades.json")"
 expect_eq "year table: one row" 2020 "$(jq -r '.[0].p' "$S/data/r0_years.json")"

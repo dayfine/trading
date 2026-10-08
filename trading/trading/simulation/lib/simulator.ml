@@ -19,24 +19,19 @@ type dependencies = {
   stale_hold_log : Stale_hold.Log.t;
   margin_config : Trading_portfolio.Margin_config.t;  (** See .mli. *)
   initial_long_margin_req : float;  (** See .mli. Margin M1b-2 leverage dial. *)
-  long_margin_rate_annual_pct : float;
-      (** See .mli. Margin M1b-2 debit rate. *)
+  long_margin_rate_annual_pct : float;  (** See .mli. M1b-2 debit rate. *)
   maintenance_long_pct : float;  (** See .mli. Margin M2 long maintenance. *)
   exempt_closing_trades_from_cash_floor : bool;  (** See .mli. *)
   on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
   active_through_for : (string -> Core.Date.t option) option;  (** See .mli. *)
   prune_universe_by_active_through : bool;  (** See .mli. Win #4 opt-in. *)
   on_transitions : (Trading_strategy.Position.transition list -> unit) option;
-      (** See .mli. *)
-  entry_extension_max_pct : float option;
-      (** See .mli. #2158 Phase 2 fill model. *)
-  fill_gate : Next_open_fill_gate.flags;
-      (** See .mli. Fix #1 / #1b + StopLimit. *)
+  on_entry_cash_rejection : (Entry_cash_rejection.t -> unit) option;
+  entry_extension_max_pct : float option;  (** See .mli. #2158. *)
+  fill_gate : Next_open_fill_gate.flags;  (** See .mli. Fix #1 / #1b. *)
   stop_exit_fill_on_trigger_bar : bool;  (** See .mli. #2961. *)
-  entry_fill_retry : Entry_fill_retry.t;
-      (** See .mli. G2a retry budget + ledger; a no-op at [0] retries. *)
-  entry_fill_resize : Entry_fill_resize.t;
-      (** See .mli. G2b affordable-size clamp; a no-op when disabled. *)
+  entry_fill_retry : Entry_fill_retry.t;  (** See .mli. G2a retry. *)
+  entry_fill_resize : Entry_fill_resize.t;  (** See .mli. G2b resize. *)
   cash_credits : Cash_credits.t;  (** See .mli. #3137 interest + dividends. *)
   split_guard : Split_dividend_guard.t option;  (** See .mli. #3173. *)
 }
@@ -57,8 +52,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
     ?active_through_for ?(prune_universe_by_active_through = false)
-    ?on_transitions ?entry_extension_max_pct ?(sim_entry_fill_next_open = false)
-    ?(sim_exit_fill_next_open = false)
+    ?on_transitions ?on_entry_cash_rejection ?entry_extension_max_pct
+    ?(sim_entry_fill_next_open = false) ?(sim_exit_fill_next_open = false)
     ?(sim_entry_stoplimit_fresh_bar_only = false)
     ?(sim_stop_exit_fill_on_trigger_bar = false)
     ?(entry_fill_reject_retries = 0)
@@ -85,6 +80,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     active_through_for;
     prune_universe_by_active_through;
     on_transitions;
+    on_entry_cash_rejection;
     entry_extension_max_pct;
     fill_gate =
       Next_open_fill_gate.make_flags ~entries:sim_entry_fill_next_open
@@ -350,8 +346,13 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
    regular pass and the #2961 trigger-bar stop pass. *)
 let _apply_fills t ~portfolio ~positions ~all_trades =
   let open Result.Let_syntax in
+  let cash_rejections =
+    Entry_cash_rejection.pending ~date:t.current_date
+      ~emit:t.deps.on_entry_cash_rejection
+  in
   let portfolio, trades, rejected_trades =
     Cancel_handler.apply_trades_best_effort ?on_trade_fill:t.deps.on_trade_fill
+      ~on_reject:(Entry_cash_rejection.note cash_rejections)
       ~initial_long_margin_req:t.deps.initial_long_margin_req portfolio
       all_trades
   in
@@ -367,10 +368,10 @@ let _apply_fills t ~portfolio ~positions ~all_trades =
       ~date:t.current_date ~positions ~trades ()
   in
   let%bind positions =
-    Cancel_handler.handle_rejected_trades ~date:t.current_date ~positions
-      ~rejected_trades ~order_manager:t.deps.order_manager
+    Cancel_handler.handle_rejected_trades ~cash_rejections ~date:t.current_date
+      ~positions ~rejected_trades ~order_manager:t.deps.order_manager
       ~entry_fill_retry:t.deps.entry_fill_retry
-      ~on_transitions:t.deps.on_transitions
+      ~on_transitions:t.deps.on_transitions ()
   in
   Ok (portfolio, positions, trades)
 

@@ -206,8 +206,8 @@ let revert_rejected_exits ~date ~positions ~rejected_trades =
    exit fill was rejected would otherwise stay stuck forever (stops only
    re-evaluate [Holding]), so it goes back to [Holding] and the stop re-fires
    next cycle. *)
-let handle_rejected_trades ~date ~positions ~rejected_trades ~order_manager
-    ~entry_fill_retry ~on_transitions =
+let handle_rejected_trades ?cash_rejections ~date ~positions ~rejected_trades
+    ~order_manager ~entry_fill_retry ~on_transitions () =
   let open Result.Let_syntax in
   let cancel_transitions =
     transitions_for_rejected_trades ~date ~positions
@@ -215,6 +215,8 @@ let handle_rejected_trades ~date ~positions ~rejected_trades ~order_manager
         (Entry_fill_retry.handle_rejected_entries entry_fill_retry
            ~order_manager ~positions ~rejected_trades)
   in
+  Option.iter cash_rejections ~f:(fun p ->
+      Entry_cash_rejection.emit p ~positions ~cancels:cancel_transitions);
   Option.iter on_transitions ~f:(fun observe -> observe cancel_transitions);
   let%bind positions =
     apply_transitions ~positions ~transitions:cancel_transitions
@@ -259,20 +261,25 @@ let _warn_rejected_trade (trade : Trading_base.Types.trade) err =
 (* One fold step: apply [trade] (after the [hook]) and bucket it accepted /
    rejected, warning loudly on rejection. Extracted to keep the fold body flat
    (nesting linter). *)
-let _bucket_trade ~hook ~initial_long_margin_req (portfolio, accepted, rejected)
-    trade =
+let _bucket_trade ~hook ~on_reject ~initial_long_margin_req
+    (portfolio, accepted, rejected) trade =
   let trade = hook trade in
   match _try_apply_trade ~initial_long_margin_req portfolio trade with
   | portfolio, `Accepted t -> (portfolio, t :: accepted, rejected)
   | portfolio, `Rejected (t, err) ->
       _warn_rejected_trade t err;
+      on_reject t
+        ~available_cash:portfolio.Trading_portfolio.Portfolio.current_cash;
       (portfolio, accepted, t :: rejected)
 
-let apply_trades_best_effort ?on_trade_fill ?(initial_long_margin_req = 1.0)
-    portfolio trades =
+let _ignore_reject (_ : Trading_base.Types.trade) ~available_cash:(_ : float) =
+  ()
+
+let apply_trades_best_effort ?on_trade_fill ?(on_reject = _ignore_reject)
+    ?(initial_long_margin_req = 1.0) portfolio trades =
   let hook = Option.value on_trade_fill ~default:Fn.id in
   let portfolio, accepted_rev, rejected_rev =
     List.fold trades ~init:(portfolio, [], [])
-      ~f:(_bucket_trade ~hook ~initial_long_margin_req)
+      ~f:(_bucket_trade ~hook ~on_reject ~initial_long_margin_req)
   in
   (portfolio, List.rev accepted_rev, List.rev rejected_rev)

@@ -71,6 +71,7 @@ let _ticket_lifecycle_of_event (e : AR.entry_event) : Ticket_lifecycle.t =
     sized_down_wide_stop = e.sized_down_wide_stop;
     triple_confirmation = _triple_confirmation_of_event e.triple_confirmation;
     reissued_from = None;
+    cash_rejection = None;
   }
 
 (** [weeks_advancing] for a [Stage2] classification, [None] otherwise. Surfaced

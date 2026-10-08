@@ -123,6 +123,7 @@ let _placement_lifecycle : TL.t =
     entry_anchor = None;
     sized_down_wide_stop = false;
     reissued_from = None;
+    cash_rejection = None;
     triple_confirmation =
       {
         breakout_volume_multiple = None;
@@ -194,7 +195,9 @@ let _lifecycle_after_run ~test_name ~initial_cash ~quantity =
     ~f:(fun data_dir ->
       let deps =
         create_deps ~symbols:[ _symbol ] ~data_dir ~strategy
-          ~commission:_commission ~on_transitions ()
+          ~commission:_commission ~on_transitions
+          ~on_entry_cash_rejection:(TA.record_cash_rejection trade_audit)
+          ()
       in
       let sim =
         match create ~config:(_config ~initial_cash) ~deps with
@@ -227,6 +230,12 @@ let test_portfolio_rejected_fill_records_a_cancel _ =
               (fun (l : TL.t) -> l.cancel_reason)
               (is_some_and (equal_to Cancel_handler.portfolio_rejection_reason));
             field (fun (l : TL.t) -> l.ticket_age_weeks_at_fill) is_none;
+            field
+              (fun (l : TL.t) -> l.cash_rejection)
+              (is_some_and
+                 (equal_to
+                    ({ required = 100_000.0; available = 5_000.0 }
+                      : TL.cash_rejection)));
           ]))
 
 (** The negative control, and the reason this is a regression test rather than a
@@ -242,7 +251,30 @@ let test_affordable_fill_records_no_cancel _ =
           [
             field (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel) is_none;
             field (fun (l : TL.t) -> l.cancel_reason) is_none;
+            field (fun (l : TL.t) -> l.cash_rejection) is_none;
           ]))
+
+(* #3138: the field persists through [trade_audit.sexp]'s sexp form, and a row
+   without it (every row before #3138, every non-rejection row) omits it. *)
+let test_cash_rejection_sexp_round_trip _ =
+  let with_rejection =
+    {
+      _placement_lifecycle with
+      cash_rejection = Some { required = 446_712.52; available = 427_489.55 };
+    }
+  in
+  assert_that
+    ( TL.t_of_sexp (TL.sexp_of_t with_rejection),
+      String.is_substring ~substring:"cash_rejection"
+        (Sexp.to_string (TL.sexp_of_t _placement_lifecycle)) )
+    (pair
+       (field
+          (fun (l : TL.t) -> l.cash_rejection)
+          (is_some_and
+             (equal_to
+                ({ required = 446_712.52; available = 427_489.55 }
+                  : TL.cash_rejection))))
+       (equal_to false))
 
 let suite =
   "ticket cancel observability"
@@ -251,6 +283,8 @@ let suite =
          >:: test_portfolio_rejected_fill_records_a_cancel;
          "an affordable fill records no cancel"
          >:: test_affordable_fill_records_no_cancel;
+         "cash rejection sexp round trip"
+         >:: test_cash_rejection_sexp_round_trip;
        ]
 
 let () = run_test_tt_main suite
