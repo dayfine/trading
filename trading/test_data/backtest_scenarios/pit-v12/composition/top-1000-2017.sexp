@@ -1838,7 +1838,7 @@
     (avg_dollar_volume 50436686.36585366))
    ((symbol MSCC) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 50391667.96317073))
-   ((symbol GLT) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAGN) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 50381474.332926817))
    ((symbol ABBNY) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 50349713.06516096))

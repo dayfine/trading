@@ -172,6 +172,16 @@ type dependencies = {
           transitions, generated after the strategy's own [on_market_close] call
           returns, were invisible to any transition observer wired only at the
           strategy-call boundary. See issue #2057. *)
+  on_entry_cash_rejection : (Entry_cash_rejection.t -> unit) option;
+      (** Optional observer of entry tickets cancelled because the portfolio
+          could not fund their fill (issue #3138): one {!Entry_cash_rejection.t}
+          (position id, step date, the fill's cost and the cash at the moment it
+          was refused) per cancellation, sent from inside {!Cancel_handler} just
+          before that step's [CancelEntry] batch is announced on
+          [on_transitions]. Refusals rescued by the retry or the resize are not
+          cancellations and are not sent. [None] (the default) is a no-op;
+          purely observational, like [on_transitions]. The backtest layer wires
+          it to [Trade_audit.record_cash_rejection]. *)
   entry_extension_max_pct : float option;
       (** Entry fill model (#2158 Phase 2). [None] (the default) keeps the
           historical Market-order entry fills — every existing baseline is
@@ -283,6 +293,7 @@ val create_deps :
   ?active_through_for:(string -> Core.Date.t option) ->
   ?prune_universe_by_active_through:bool ->
   ?on_transitions:(Trading_strategy.Position.transition list -> unit) ->
+  ?on_entry_cash_rejection:(Entry_cash_rejection.t -> unit) ->
   ?entry_extension_max_pct:float ->
   ?sim_entry_fill_next_open:bool ->
   ?sim_exit_fill_next_open:bool ->

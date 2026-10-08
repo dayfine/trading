@@ -1,0 +1,32 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+5 group(s), 25 symbol(s) dropped
+  survivor EJH <- [DPW; DRX; DRYS; EBAYL; ETRM; EUA; FAL; FPC; GBSN; GPUS; HIVE; HMBL; HSE; HTG; IISX; IMPX_old; INPX; IOM; ISG; JPR; KER]
+    DPW (overlap=192, match=0.0524)
+    DRX (overlap=0, match=0.0000)
+    DRYS (overlap=0, match=0.0000)
+    EBAYL (overlap=260, match=1.0000)
+    ETRM (overlap=0, match=0.0000)
+    EUA (overlap=0, match=0.0000)
+    FAL (overlap=0, match=0.0000)
+    FPC (overlap=202, match=1.0000)
+    GBSN (overlap=0, match=0.0000)
+    GPUS (overlap=1286, match=0.0685)
+    HIVE (overlap=1286, match=0.0093)
+    HMBL (overlap=1256, match=0.0367)
+    HSE (overlap=0, match=0.0000)
+    HTG (overlap=0, match=0.0000)
+    IISX (overlap=0, match=0.0000)
+    IMPX_old (overlap=0, match=0.0000)
+    INPX (overlap=712, match=0.0352)
+    IOM (overlap=0, match=0.0000)
+    ISG (overlap=260, match=1.0000)
+    JPR (overlap=0, match=0.0000)
+    KER (overlap=0, match=0.0000)
+  survivor EURN <- [ESIMF]
+    ESIMF (overlap=907, match=0.9536)
+  survivor FPAC <- [FPAC-U]
+    FPAC-U (overlap=710, match=0.9873)
+  survivor IVF <- [INVO]
+    INVO (overlap=3618, match=0.9743)
+  survivor KFX <- [EVEQ]
+    EVEQ (overlap=770, match=0.9870)

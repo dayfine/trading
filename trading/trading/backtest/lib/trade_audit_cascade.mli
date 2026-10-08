@@ -8,6 +8,30 @@
 
 open Core
 
+type skip_reason =
+  | Insufficient_cash
+  | Already_held
+  | Below_min_grade
+  | Sized_to_zero
+  | Sector_concentration
+  | Top_n_cutoff
+  | Short_notional_cap
+  | Stop_too_wide
+  | Sector_exposure_cap
+  | Long_exposure_cap
+  | No_structural_stop
+  | Share_class_held
+[@@deriving sexp]
+
+type weekly_outcome = Placed | Skipped of skip_reason [@@deriving sexp]
+
+type weekly_decision = {
+  symbol : string;
+  side : Trading_base.Types.position_side;
+  outcome : weekly_outcome;
+}
+[@@deriving sexp]
+
 type cascade_summary = {
   date : Date.t;
   total_stocks : int;
@@ -27,6 +51,7 @@ type cascade_summary = {
   short_grade_admitted : int;
   short_top_n_admitted : int;
   entered : int;
+  decisions : weekly_decision list; [@sexp.default []]
 }
 [@@deriving sexp]
 (** See {!Trade_audit.cascade_summary}. *)

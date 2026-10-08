@@ -158,6 +158,23 @@ type reissue = {
     its audit row, so the re-issued row carries this link back to the placement
     that produced its alternatives, installed stop and floor kind. *)
 
+type cash_rejection = {
+  required : float;
+      (** The refused fill's cost, [quantity * price + commission]. For a short,
+          the ticket's notional (a short is refused on collateral). *)
+  available : float;
+      (** The portfolio's cash at the moment the fill was refused. *)
+}
+[@@deriving sexp]
+(** What the book could not fund when a triggered entry was refused at the fill
+    (#3138). The date is the row's cancel: the refusal and the [CancelEntry]
+    fall on the same step. *)
+
+val cash_rejection_of :
+  Trading_simulation.Entry_cash_rejection.t -> cash_rejection
+(** The on-disk projection of a simulator record: its [required] and
+    [available]; the position id and date are the row's own. *)
+
 type t = {
   placement_date : Date.t;
       (** The tick on which the resting entry ticket was written — i.e. when the
@@ -266,6 +283,13 @@ type t = {
           clock counts suspension time too, so the fill age is measured from the
           first placement. [None] on every ordinary row, and on every row
           written before #2989 ([[@sexp.option]] keeps those parseable). *)
+  cash_rejection : cash_rejection option; [@sexp.option]
+      (** [Some] exactly on a ticket cancelled because the portfolio could not
+          fund its fill: {!cancel_reason} then reads
+          [entry_fill_rejected_by_portfolio] (#3138). [available /. required] is
+          how close it came (the 26y investor s1 ADMA ticket: 0.957). Set by
+          {!Trade_audit.record_cash_rejection}; [None] on every other row and on
+          rows written before #3138. *)
 }
 [@@deriving sexp]
 (** The lifecycle record carried by {!Trade_audit.entry_decision}. Written with
@@ -286,16 +310,17 @@ val resolve :
   fill_volume:fill_volume_check option ->
   cancel_age_weeks:int option ->
   cancel_reason:string option ->
+  cash_rejection:cash_rejection option ->
   t option
 (** Fold the collector-side observations (the F5 fill-week check and the cancel
-    age + reason) into a placement-time record. [None] in ⇒ [None] out: a
-    [trade_audit.sexp] row written before PR-5 has no lifecycle to merge into
-    and is never given one. All three labelled arguments are [None] on a row
-    whose ticket simply filled under an unarmed F5 config — the no-observation
-    case, not a zero. [cancel_age_weeks] and [cancel_reason] always travel
-    together: a row carries both or neither, because a cancel is exactly one
-    observation with two fields. Never touches {!ticket_age_weeks_at_fill},
-    which only the enrichment pass can know. *)
+    age + reason, and the #3138 at-fill cash rejection) into a placement-time
+    record. [None] in ⇒ [None] out: a [trade_audit.sexp] row written before PR-5
+    has no lifecycle to merge into and is never given one. All four labelled
+    arguments are [None] on a row whose ticket simply filled under an unarmed F5
+    config — the no-observation case, not a zero. [cancel_age_weeks] and
+    [cancel_reason] always travel together: a row carries both or neither,
+    because a cancel is exactly one observation with two fields. Never touches
+    {!ticket_age_weeks_at_fill}, which only the enrichment pass can know. *)
 
 val with_fill_age : t option -> resolved:Date.t -> t option
 (** Stamp only {!ticket_age_weeks_at_fill}, from [resolved] against the record's

@@ -34,6 +34,17 @@ let skip_reason_of_event = function
   | AR.No_structural_stop -> Trade_audit.No_structural_stop
   | AR.Share_class_held -> Trade_audit.Share_class_held
 
+let weekly_decision_of_event (d : AR.walk_decision) :
+    Trade_audit.weekly_decision =
+  {
+    symbol = d.ranked.ticker;
+    side = d.ranked.side;
+    outcome =
+      (match d.outcome with
+      | Placed -> Placed
+      | Skipped reason -> Skipped (skip_reason_of_event reason));
+  }
+
 (* #3074: the screener's anchor arm to [Ticket_lifecycle]'s on-disk copy.
    Exhaustive, so a new anchor arm upstream fails this match. *)
 let entry_anchor_of_kind :

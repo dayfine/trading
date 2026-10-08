@@ -11,6 +11,7 @@
   trading.portfolio
   trading.simulation.cash_yield
   csv.split_dividend_guard
+  csv.ex_dividend_stop
   trading.strategy
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime

@@ -24,6 +24,7 @@
   split_handler
   cancel_handler
   entry_fill_retry
+  entry_cash_rejection
   entry_fill_resize
   order_generator
   metrics

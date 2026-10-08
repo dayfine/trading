@@ -89,6 +89,7 @@
   trading.simulation.data
   trading.simulation.types
   csv.split_dividend_guard
+  csv.ex_dividend_stop
   trading.strategy
   weinstein_trading.strategy
   weinstein_trading.portfolio_risk

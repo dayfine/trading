@@ -250,9 +250,9 @@ let entries_from_candidates ?sector_lookup
   in
   Entry_audit_emit.emit_entries ~audit_recorder ~pending_entry_e ~macro
     ~current_date ~decisions;
-  (* G1 (#2490): hand the whole walk's passed-over candidates to the caller so
+  (* G1 (#2490) + #3139: hand the whole walk's decisions to the caller so
      they land on this Friday's cascade event even when [kept] is empty. Absent
      callback = the projection is never computed. *)
   Option.iter on_candidates_considered ~f:(fun f ->
-      f (Entry_audit_emit.all_alternatives_of_decisions ~decisions));
+      f (Entry_audit_emit.walk_decisions_of ~decisions));
   kept

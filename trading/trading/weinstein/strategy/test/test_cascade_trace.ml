@@ -12,10 +12,10 @@
       structurally valid artefact — one week per Friday, every list empty —
       which reads as "the walk passed nothing over", the exact inverse of what
       the artefact exists to say.
-    - {b Inert.} With [capture_candidates = false] (the default, and every
-      non-audit context) {!Cascade_trace.on_walk_candidates} is [None], so the
-      entry walk never computes the projection, and the emitted event carries
-      [candidates = []] — bit-identical to the pre-#2490 cascade event.
+    - {b Capture off.} With [capture_candidates = false] (the default)
+      {!Cascade_trace.on_walk_candidates} still returns a sink (#3139): the
+      event's [decisions] carry every walk row, while [candidates] stays [[]] —
+      the passed-over list is still opt-in, as before #2490's capture.
 
     A third arm pins {!Cascade_trace.of_screen} directly: which sides a given
     macro tape traces, in what order, and that a macro-blocked side is omitted
@@ -85,11 +85,22 @@ let _candidate ~ticker : Screener.scored_candidate =
 (* Two elements, distinct in both ticker and reason, so a [record] that dropped
    one, reordered them, or substituted a constant fails the pin rather than
    passing by coincidence. *)
-let _walk_contents : AR.alternative_input list =
+(* The walk's decisions (#3139): one funded name, then two passed over. *)
+let _walk_contents : AR.walk_decision list =
   [
-    { candidate = _candidate ~ticker:"AAAA"; reason = AR.Insufficient_cash };
-    { candidate = _candidate ~ticker:"BBBB"; reason = AR.Sector_exposure_cap };
+    { ranked = _candidate ~ticker:"CCCC"; outcome = AR.Placed };
+    {
+      ranked = _candidate ~ticker:"AAAA";
+      outcome = AR.Skipped Insufficient_cash;
+    };
+    {
+      ranked = _candidate ~ticker:"BBBB";
+      outcome = AR.Skipped Sector_exposure_cap;
+    };
   ]
+
+let _decision_tickers (e : AR.cascade_event) =
+  List.map e.decisions ~f:(fun (d : AR.walk_decision) -> d.ranked.ticker)
 
 let _diagnostics : Screener.cascade_diagnostics =
   {
@@ -176,8 +187,8 @@ let _run_one_friday ~capture_candidates =
 (* ------------------------------------------------------------------ *)
 
 (** The load-bearing pin: what the walk handed the sink is what the recorded
-    event carries — same tickers, same reasons, same order. [entered = 0] keeps
-    it on the G1 shape (a Friday that funded nothing still reports its walk). *)
+    event carries — [candidates] the passed-over names with their reasons, in
+    order, and (#3139) [decisions] every name, the [Placed] one included. *)
 let test_capture_on_routes_walk_contents_to_the_event _ =
   let _, event = _run_one_friday ~capture_candidates:true in
   assert_that event
@@ -188,6 +199,7 @@ let test_capture_on_routes_walk_contents_to_the_event _ =
               (fun (e : AR.cascade_event) -> e.date)
               (equal_to _current_date);
             field (fun (e : AR.cascade_event) -> e.entered) (equal_to 0);
+            field _decision_tickers (equal_to [ "CCCC"; "AAAA"; "BBBB" ]);
             field
               (fun (e : AR.cascade_event) -> e.candidates)
               (elements_are
@@ -224,15 +236,16 @@ let test_capture_on_offers_a_sink _ =
 (* Inert arm — the default path                                         *)
 (* ------------------------------------------------------------------ *)
 
-(** No sink when the recorder did not opt in, so the entry walk never computes
-    [all_alternatives_of_decisions] and the default path allocates nothing. *)
-let test_capture_off_offers_no_sink _ =
+(** #3139: the walk sink is offered whatever [capture_candidates] says, so the
+    weekly decision record is written on every Friday. *)
+let test_capture_off_still_offers_a_sink _ =
   let sink, _ = _run_one_friday ~capture_candidates:false in
-  assert_that sink is_none
+  assert_that (Option.is_some sink) (equal_to true)
 
-(** The inert handle still records the Friday's event — counts and date are
-    unchanged from the pre-#2490 shape — but with an empty candidate list. *)
-let test_capture_off_records_an_empty_candidate_list _ =
+(** With capture off the Friday's event keeps the pre-#2490 shape — counts and
+    date, an empty [candidates] list — and, since #3139, the walk's decisions
+    with one outcome per name, the funded one included. *)
+let test_capture_off_records_decisions_but_no_candidates _ =
   let _, event = _run_one_friday ~capture_candidates:false in
   assert_that event
     (is_some_and
@@ -245,6 +258,7 @@ let test_capture_off_records_an_empty_candidate_list _ =
               (fun (e : AR.cascade_event) -> e.diagnostics.long_top_n_admitted)
               (equal_to 2);
             field (fun (e : AR.cascade_event) -> e.candidates) (size_is 0);
+            field _decision_tickers (equal_to [ "CCCC"; "AAAA"; "BBBB" ]);
           ]))
 
 (* ------------------------------------------------------------------ *)
@@ -318,9 +332,10 @@ let () =
            "capture on routes the walk's contents to the event"
            >:: test_capture_on_routes_walk_contents_to_the_event;
            "capture on offers a sink" >:: test_capture_on_offers_a_sink;
-           "capture off offers no sink" >:: test_capture_off_offers_no_sink;
-           "capture off records an empty candidate list"
-           >:: test_capture_off_records_an_empty_candidate_list;
+           "capture off still offers a sink (#3139)"
+           >:: test_capture_off_still_offers_a_sink;
+           "capture off records decisions but no candidates"
+           >:: test_capture_off_records_decisions_but_no_candidates;
            "of_screen: bearish tape omits the long side"
            >:: test_of_screen_bearish_tape_omits_the_long_side;
            "of_screen: bullish tape omits the short side"

@@ -88,13 +88,13 @@ let _entry_fill_resize (config : Weinstein_strategy.config) =
    reasons ([margin_call] / [buyin_stress] / [maintenance_reduce]) never reach
    [stop_log] at all. [Stop_log.record_transitions] is idempotent w.r.t.
    re-recording the same transition, so the two paths overlapping on
-   strategy-only days is harmless; on a same-tick collision the later
-   [on_transitions] call correctly overwrites the wrapper's stale
-   strategy-side trigger with the winning margin one — pinned by
-   [test_margin_exit_observability.ml:test_stop_log_records_margin_call_on_strategy_collision].
-   This is the correct outcome, not a race: [Margin_runner.dedup_strategy_exits_for_margin]
-   drops the strategy's colliding [TriggerExit] before [_apply_transitions]
-   runs, so only margin's exit actually executes.
+   strategy-only days is harmless. On a same-tick collision
+   [Margin_runner.dedup_strategy_exits_for_margin] drops the strategy's
+   [TriggerExit] and only margin's executes, but since #3147 the later
+   [on_transitions] call does not overwrite the wrapper's same-day strategy
+   trigger: the label keeps the stop-loss / force liquidation the audit records
+   (pinned by [test_margin_exit_observability.ml]
+   [test_stop_log_keeps_stop_loss_on_strategy_collision]).
 
    [Simulator.dependencies.on_transitions] is a single optional slot, so the
    two observers that need it ([Stop_log.record_transitions] above, and
@@ -130,6 +130,7 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
         input.config.portfolio_config.exempt_closing_trades_from_cash_floor
       ?on_trade_fill ~active_through_for ~prune_universe_by_active_through
       ~on_transitions:(_on_transitions ~stop_log ~trade_audit)
+      ~on_entry_cash_rejection:(Trade_audit.record_cash_rejection trade_audit)
       ?entry_extension_max_pct:(_entry_cap_for_sim input.config)
       ~sim_entry_fill_next_open:input.config.sim_entry_fill_next_open
       ~sim_exit_fill_next_open:input.config.sim_exit_fill_next_open
@@ -306,14 +307,14 @@ let fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date =
    [fold_start_date] is the Win #4 opt-in: [Some d] enables screener pre-pruning
    (forwarded to {!Panel_strategy_builder.build}) and the simulator-side
    bar-fetch prune (the returned [active_through_for]); [None] is bit-equal. *)
-let _setup_hybrid (input : input) ?split_guard ~strategy_choice ~snapshot_dir
-    ~manifest ~shared_panels ~warmup_start ~end_date ~audit_recorder
-    ?fold_start_date ?universe_membership_at () =
+let _setup_hybrid (input : input) ~ca ~strategy_choice ~snapshot_dir ~manifest
+    ~shared_panels ~warmup_start ~end_date ~audit_recorder ?fold_start_date
+    ?universe_membership_at () =
   let daily_panels = _resolve_panels ~shared_panels ~snapshot_dir ~manifest in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let bar_reader =
     _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest
-    |> Panel_corporate_actions.guard_bar_reader split_guard
+    |> Panel_corporate_actions.arm_bar_reader ca
   in
   let strategy =
     Panel_strategy_builder.build ~ad_bars:input.ad_bars
@@ -401,17 +402,18 @@ let _finish_panels ~daily_panels ~n_all_symbols ~shared_panels =
    stays within the function-length limit. [active_through_for] is the run's
    delisting-marker lookup (always supplied);
    [prune_universe_by_active_through] is the separate Win #4 prune opt-in. *)
-let _build_sim input ~r ?split_guard ~start_date ~warmup_start ~end_date
-    ~initial_cash ~commission ?slippage_bps ?cost_model ~active_through_for
-    ~prune_universe_by_active_through ~strategy ~market_data_adapter () =
+let _build_sim input ~r ~(ca : Panel_corporate_actions.t) ~start_date
+    ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps ?cost_model
+    ~active_through_for ~prune_universe_by_active_through ~strategy
+    ~market_data_adapter () =
   let on_trade_fill = _on_trade_fill_of_cost_model cost_model in
   let effective_commission, effective_slippage_bps =
     engine_costs_with_overlay ~default_commission:commission
       ?default_slippage_bps:slippage_bps ?cost_model ()
   in
   _make_simulator input ~stop_log:r.stop_log ~trade_audit:r.trade_audit
-    ~stale_hold_log:r.stale_hold_log ?split_guard ~start_date ~warmup_start
-    ~end_date ~initial_cash ~commission:effective_commission
+    ~stale_hold_log:r.stale_hold_log ?split_guard:ca.split_guard ~start_date
+    ~warmup_start ~end_date ~initial_cash ~commission:effective_commission
     ?slippage_bps:effective_slippage_bps ?on_trade_fill ~active_through_for
     ~prune_universe_by_active_through ~strategy ~market_data_adapter ()
 
@@ -442,10 +444,10 @@ let _log_window ~warmup_start ~end_date ~warmup_days strategy_choice =
     (Date.to_string end_date) warmup_days
     (Strategy_choice.name strategy_choice)
 
-(* #3173: one guard per run, shared by the strategy and the simulator; [None]
-   unless [split_dividend_guard]. *)
-let _split_guard (input : input) =
-  Panel_corporate_actions.split_guard ~config:input.config
+(* #3173 / #3174: one set of corporate-action readers per run, shared by the
+   strategy and the simulator; each [None] unless its flag is on. *)
+let _corporate_actions (input : input) =
+  Panel_corporate_actions.create ~config:input.config
     ~data_dir:input.data_dir_fpath
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
@@ -459,7 +461,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   let warmup_start = Date.add_days start_date (-warmup_days) in
   _log_window ~warmup_start ~end_date ~warmup_days strategy_choice;
   let r = _create_recorders ?candidate_log () in
-  let split_guard = _split_guard input in
+  let ca = _corporate_actions input in
   let n_all_symbols = List.length input.all_symbols in
   let snapshot_dir, manifest =
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source
@@ -469,13 +471,13 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
         final_close_prices_thunk,
         daily_panels,
         active_through_for ) =
-    _setup_hybrid input ?split_guard ~strategy_choice ~snapshot_dir ~manifest
+    _setup_hybrid input ~ca ~strategy_choice ~snapshot_dir ~manifest
       ~shared_panels ~warmup_start ~end_date ~audit_recorder:r.audit_recorder
       ?fold_start_date ?universe_membership_at ()
   in
   let sim =
-    _build_sim input ~r ?split_guard ~start_date ~warmup_start ~end_date
-      ~initial_cash ~commission ?slippage_bps ?cost_model ~active_through_for
+    _build_sim input ~r ~ca ~start_date ~warmup_start ~end_date ~initial_cash
+      ~commission ?slippage_bps ?cost_model ~active_through_for
       ~prune_universe_by_active_through ~strategy ~market_data_adapter ()
   in
   let progress_acc =
@@ -489,7 +491,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
   _finish_panels ~daily_panels ~n_all_symbols ~shared_panels;
-  Panel_corporate_actions.log_split_guard split_guard;
+  Panel_corporate_actions.log ca;
   ( sim_result,
     r.stop_log,
     r.trade_audit,
