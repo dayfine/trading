@@ -403,7 +403,9 @@ let _tdg_step_matches ~date ~quantity ~events =
                  field
                    (fun (p : Portfolio_summary.position_summary) -> p.symbol)
                    (equal_to "TDG");
-                 field (fun p -> p.quantity) (float_equal quantity);
+                 field
+                   (fun (p : Portfolio_summary.position_summary) -> p.quantity)
+                   (float_equal quantity);
                ];
            ]);
       field (fun s -> s.splits_applied) (size_is events);
