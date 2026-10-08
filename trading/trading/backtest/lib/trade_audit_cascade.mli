@@ -25,7 +25,6 @@ type skip_reason =
 
 type weekly_outcome = Placed | Skipped of skip_reason [@@deriving sexp]
 
-
 type weekly_decision = {
   symbol : string;
   side : Trading_base.Types.position_side;

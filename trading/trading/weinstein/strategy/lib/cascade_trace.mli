@@ -64,9 +64,9 @@ val create : Audit_recorder.t -> t
 (** A capture handle for one Friday. The G1/G2 capture is {b inert} unless
     [recorder.capture_candidates] is [true]: {!on_candidates} then returns
     [None] (the screener installs no callback) and {!record} emits an event
-    whose [candidates] and [drops] are empty. The weekly decision record
-    (#3139) is not gated: {!on_walk_candidates} always offers a sink and the
-    event's [decisions] always carries the walk's top-N outcomes. *)
+    whose [candidates] and [drops] are empty. The weekly decision record (#3139)
+    is not gated: {!on_walk_candidates} always offers a sink and the event's
+    [decisions] always carries the walk's top-N outcomes. *)
 
 val on_candidates :
   t -> ((Stock_analysis.t * Screener.sector_context) list -> unit) option
@@ -75,9 +75,9 @@ val on_candidates :
 
 val on_walk_candidates : t -> (Audit_recorder.walk_decision list -> unit) option
 (** Pass straight to {!Entry_walk.entries_from_candidates}'s
-    [?on_candidates_considered]. Always [Some] since #3139: the walk's
-    decisions feed {!Audit_recorder.cascade_event.decisions} on every Friday,
-    and, when capture is on, its passed-over rows feed [candidates]. *)
+    [?on_candidates_considered]. Always [Some] since #3139: the walk's decisions
+    feed {!Audit_recorder.cascade_event.decisions} on every Friday, and, when
+    capture is on, its passed-over rows feed [candidates]. *)
 
 val record :
   t ->

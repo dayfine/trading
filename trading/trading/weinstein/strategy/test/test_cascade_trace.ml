@@ -89,7 +89,10 @@ let _candidate ~ticker : Screener.scored_candidate =
 let _walk_contents : AR.walk_decision list =
   [
     { ranked = _candidate ~ticker:"CCCC"; outcome = AR.Placed };
-    { ranked = _candidate ~ticker:"AAAA"; outcome = AR.Skipped Insufficient_cash };
+    {
+      ranked = _candidate ~ticker:"AAAA";
+      outcome = AR.Skipped Insufficient_cash;
+    };
     {
       ranked = _candidate ~ticker:"BBBB";
       outcome = AR.Skipped Sector_exposure_cap;

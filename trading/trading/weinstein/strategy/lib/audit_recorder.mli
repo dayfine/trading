@@ -85,7 +85,10 @@ type alternative_input = {
     passed over. *)
 type walk_outcome = Placed | Skipped of skip_reason
 
-type walk_decision = { ranked : Screener.scored_candidate; outcome : walk_outcome }
+type walk_decision = {
+  ranked : Screener.scored_candidate;
+  outcome : walk_outcome;
+}
 (** One row of the weekly decision record: a top-N candidate the entry walk
     classified, with its one outcome. *)
 

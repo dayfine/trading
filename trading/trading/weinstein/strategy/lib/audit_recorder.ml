@@ -19,7 +19,11 @@ type alternative_input = {
 }
 
 type walk_outcome = Placed | Skipped of skip_reason
-type walk_decision = { ranked : Screener.scored_candidate; outcome : walk_outcome }
+
+type walk_decision = {
+  ranked : Screener.scored_candidate;
+  outcome : walk_outcome;
+}
 
 type stop_floor_kind = Support_floor | Buffer_fallback
 

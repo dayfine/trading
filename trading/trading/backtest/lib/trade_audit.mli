@@ -105,8 +105,8 @@ type weekly_decision = {
   outcome : weekly_outcome;
 }
 [@@deriving sexp]
-(** One top-N candidate of one screening Friday and what the entry walk did
-    with it. See {!cascade_summary.decisions}. *)
+(** One top-N candidate of one screening Friday and what the entry walk did with
+    it. See {!cascade_summary.decisions}. *)
 
 type alternative_candidate = {
   symbol : string;
@@ -501,11 +501,11 @@ type cascade_summary = {
       (** The weekly decision record (#3139): every top-N candidate the entry
           walk classified this Friday, in walk order, each with one outcome —
           [Placed], or the {!skip_reason} it was passed over for. Written on
-          every screening Friday, including Fridays that placed nothing, so
-          "why did we buy nothing for 12 weeks" is answered from the artefact
-          rather than a re-run with [--emit-candidates]. [[]] when the walk had
-          no candidates (a macro-blocked tape or an empty top-N: the counts
-          above say which), and on files written before #3139. *)
+          every screening Friday, including Fridays that placed nothing, so "why
+          did we buy nothing for 12 weeks" is answered from the artefact rather
+          than a re-run with [--emit-candidates]. [[]] when the walk had no
+          candidates (a macro-blocked tape or an empty top-N: the counts above
+          say which), and on files written before #3139. *)
 }
 [@@deriving sexp]
 (** Per-Friday cascade-rejection counts — complements [audit_record]'s per-trade

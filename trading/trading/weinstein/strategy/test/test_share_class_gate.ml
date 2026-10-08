@@ -225,8 +225,10 @@ let _walk_full ?(suspended_held = []) ?covers_shorts ~enabled ~positions tickers
         | _ -> None)
   in
   let passed =
-    List.map !considered ~f:(fun (a : Audit_recorder.alternative_input) ->
-        (a.candidate.ticker, a.reason))
+    List.filter_map !considered ~f:(fun (d : Audit_recorder.walk_decision) ->
+        match d.outcome with
+        | Skipped reason -> Some (d.ranked.ticker, reason)
+        | Placed -> None)
   in
   (entered, passed)
 
