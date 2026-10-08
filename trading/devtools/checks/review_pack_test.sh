@@ -615,6 +615,7 @@ console.log($1)"; }
   expect_eq "fallbackFinding: with stop kinds, counts the Buffer_fallback trades" "<b>1 of 4 trades (25%) used the 4% fallback stop</b> rather than a stop under the base or MA." "$(ffb 'fallbackFinding(withKind)')"
   expect_eq "fallbackFinding: without stop kinds reads n/a, not 0 (even with a 4 % sid)" yes "$(ffb 'fallbackFinding(noKind).startsWith("<b>Fallback stops: n/a</b>") ? "yes" : "no"')"
   expect_eq "fallbackShare: a cohort's share with stop kinds, null (n/a) without" "25 null" "$(ffb '[fallbackShare(withKind, withKind), fallbackShare(noKind, noKind)].join(" ").replace(/ $/, " null")')"
+  expect_eq "fallbackShare: the cohort's share, not the whole run's (1 of 1 in the cohort = 100, run 25)" 100 "$(ffb 'fallbackShare(withKind, [withKind[0]])')"
 else
   echo "SKIP: review_pack fallback guard cases need node"
 fi
@@ -657,8 +658,10 @@ if command -v node >/dev/null 2>&1; then
 const T = $(jq -c . "$V42T"), F = id => FLAGS.find(f => f.id === id);
 console.log($1)"; }
   expect_eq "low-volume card: a null fill-week ratio is left out; 2.20 is not under 2; 2.04 is not either" "false false false" "$(v42n '["JJJ", "MMM", "LLL"].map(s => F("lowvol").test(T.find(t => t.sym === s))).join(" ")')"
+  expect_eq "low-volume card: the threshold is strictly under 2 (2.00 passes, 1.99 is flagged)" "false true" "$(v42n '[2, 1.99].map(v => F("lowvol").test({ side: "LONG", fvr: v })).join(" ")')"
 else
   echo "SKIP: review_pack #3203 rework page cases need node"
+fi
 # #3140 part 3, P&L anatomy: pure functions extracted from the page and pinned with node.
 if command -v node >/dev/null 2>&1; then
   AFNS="$(sed -n -e '/^function hillAlpha(/,/^}/p' -e '/^function anatomyRow(/,/^}/p' -e '/^function anatomyShape(/,/^}/p' "$S/index.html")"
