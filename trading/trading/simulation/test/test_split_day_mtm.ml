@@ -388,7 +388,8 @@ let _tdg_guard () =
             adjusted_amount = 22.0;
           };
         ])
-    ~load_splits:(fun _ -> Ok []) ()
+    ~load_splits:(fun _ -> Ok [])
+    ()
 
 let _tdg_step_matches ~date ~quantity ~events =
   all_of
@@ -412,7 +413,8 @@ let _tdg_step_matches ~date ~quantity ~events =
     ]
 
 let test_create_deps_split_guard_keeps_tdg_held _ =
-  with_test_data "split_day_mtm_tdg_guard" [ ("TDG", _tdg_prices) ]
+  with_test_data "split_day_mtm_tdg_guard"
+    [ ("TDG", _tdg_prices) ]
     ~f:(fun data_dir ->
       List.iter [ false; true ] ~f:(fun guarded ->
           let module Hold = Make_buy_and_hold (struct
