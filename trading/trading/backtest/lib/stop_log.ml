@@ -65,6 +65,14 @@ let exit_trigger_of_reason (reason : Position.exit_reason) : exit_trigger =
   | PortfolioRebalancing -> Portfolio_rebalancing
   | StrategySignal { label; detail } -> Strategy_signal { label; detail }
 
+let with_fill_price trigger ~fill_price =
+  match trigger with
+  | Stop_loss { stop_price; _ } ->
+      Stop_loss { stop_price; actual_price = fill_price }
+  | Take_profit { target_price; _ } ->
+      Take_profit { target_price; actual_price = fill_price }
+  | other -> other
+
 type stop_trigger_kind =
   | Gap_through
   | Intraday
@@ -285,10 +293,7 @@ let _record_to_info ~position_id record : stop_info =
     n_stop_raises = record.pos_n_stop_raises;
   }
 
-let _compare_by_position_id (a : stop_info) (b : stop_info) =
-  String.compare a.position_id b.position_id
-
 let get_stop_infos t : stop_info list =
   Hashtbl.fold t.positions ~init:[] ~f:(fun ~key:position_id ~data:record acc ->
       _record_to_info ~position_id record :: acc)
-  |> List.sort ~compare:_compare_by_position_id
+  |> List.sort ~compare:(fun a b -> String.compare a.position_id b.position_id)

@@ -338,7 +338,7 @@ let test_late_stage2_label _ =
 
 (* Gap-down stop flows through to stop_trigger_kind label. *)
 let test_gap_down_stop_classified _ =
-  let trade = make_trade () in
+  let trade = make_trade ~exit_price:125.0 () in
   let entry = make_entry () in
   let stop_info =
     make_stop_info ~position_id:"AAPL-wein-1" ~symbol:"AAPL"
@@ -351,6 +351,21 @@ let test_gap_down_stop_classified _ =
       ~stop_infos:[ stop_info ] ~trade
   in
   assert_that ctx.stop_trigger_kind (is_some_and (equal_to "gap_down"))
+
+(* #3141: the bar low is not the execution price. *)
+let test_stop_classification_uses_fill ~side ~exit_price ~expected _ =
+  let trade = make_trade ~exit_price () in
+  let stop_info =
+    make_stop_info ~position_id:"AAPL-wein-1" ~symbol:"AAPL"
+      ~exit_trigger:(SL.Stop_loss { stop_price = 138.0; actual_price = 125.0 })
+      ()
+  in
+  let ctx =
+    TC.of_audit_and_stop_log
+      ~audit:[ make_record (make_entry ~side ()) ]
+      ~stop_infos:[ stop_info ] ~trade
+  in
+  assert_that ctx.stop_trigger_kind (is_some_and (equal_to expected))
 
 (* Take-profit exit yields non_stop_exit + None days_to_first_stop_trigger. *)
 let test_take_profit_exit_is_non_stop _ =
@@ -699,6 +714,15 @@ let suite =
   >::: [
          "stage_label distinguishes Stage2_late"
          >:: test_stage_label_distinguishes_late_stage2;
+         "long stop classification uses fill"
+         >:: test_stop_classification_uses_fill ~side:Long ~exit_price:138.0
+               ~expected:"intraday";
+         "short stop classification uses fill"
+         >:: test_stop_classification_uses_fill ~side:Short ~exit_price:138.0
+               ~expected:"intraday";
+         "short gap uses fill"
+         >:: test_stop_classification_uses_fill ~side:Short ~exit_price:145.0
+               ~expected:"gap_up";
          "stop_trigger_kind_label all variants"
          >:: test_stop_trigger_kind_label_distinguishes_all;
          "short gap-through labelled gap_up"

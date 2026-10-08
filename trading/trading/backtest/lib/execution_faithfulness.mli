@@ -53,6 +53,11 @@ val enrich :
     resolved through {!Trade_context} — the first round-trip matched to a given
     position supplies its entry fill.
 
+    For matched records, stop-loss and take-profit [actual_price] in [exit_] and
+    [external_exit] is replaced with the round-trip's [exit_price]. This is the
+    executed price, not the strategy's trigger-bar observation (#3141). Trigger
+    levels, other exit reasons and unmatched records are preserved.
+
     Also stamps the fill-side half of the PR-5 ticket-lifecycle record: a
     matched record's [entry.ticket_lifecycle.ticket_age_weeks_at_fill] is set to
     whole weeks between its [placement_date] and the matched round-trip's

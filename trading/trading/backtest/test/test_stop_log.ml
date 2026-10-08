@@ -930,6 +930,26 @@ let test_raise_then_tightening_counts_both _ =
        (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
        (equal_to 2))
 
+let test_with_fill_price_preserves_reason _ =
+  let open Backtest.Stop_log in
+  assert_that
+    (List.map
+       [
+         Stop_loss { stop_price = 100.0; actual_price = 80.0 };
+         Take_profit { target_price = 110.0; actual_price = 120.0 };
+         Strategy_signal { label = "delisted"; detail = Some "last bar" };
+         End_of_period;
+       ]
+       ~f:(fun trigger -> with_fill_price trigger ~fill_price:105.0))
+    (elements_are
+       [
+         equal_to (Stop_loss { stop_price = 100.0; actual_price = 105.0 });
+         equal_to (Take_profit { target_price = 110.0; actual_price = 105.0 });
+         equal_to
+           (Strategy_signal { label = "delisted"; detail = Some "last bar" });
+         equal_to (End_of_period : exit_trigger);
+       ])
+
 (* #3147 ---------------------------------------------------------------- *)
 
 let _exit ~d reason : Position.transition =
@@ -1012,6 +1032,7 @@ let test_margin_call_alone_or_later_day_labelled_margin_call _ =
 let suite =
   "Stop_log"
   >::: [
+         "fill price preserves reason" >:: test_with_fill_price_preserves_reason;
          "#3147 force cover keeps force_liquidation label"
          >:: test_force_cover_keeps_force_liquidation_label;
          "#3147 squeeze stop keeps stop_loss label"

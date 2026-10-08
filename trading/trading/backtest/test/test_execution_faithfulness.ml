@@ -456,9 +456,72 @@ let test_enrich_leaves_a_pre_pr5_row_without_a_lifecycle _ =
            ];
        ])
 
+(* #3141: both audit exit paths must use the matched execution, while
+   retaining the stop level and decision-time diagnostics. *)
+let test_enrich_exit_fill_price _ =
+  let module SL = Backtest.Stop_log in
+  let entry = make_entry () in
+  let trigger = SL.Stop_loss { stop_price = 138.0; actual_price = 125.0 } in
+  let external_exit : TA.external_exit_decision =
+    {
+      symbol = entry.symbol;
+      position_id = entry.position_id;
+      exit_date = _date "2024-04-20";
+      exit_trigger = trigger;
+    }
+  in
+  let exit_ : TA.exit_decision =
+    {
+      symbol = entry.symbol;
+      position_id = entry.position_id;
+      exit_date = external_exit.exit_date;
+      exit_trigger = trigger;
+      macro_trend_at_exit = Weinstein_types.Neutral;
+      macro_confidence_at_exit = 0.45;
+      stage_at_exit = Weinstein_types.Stage3 { weeks_topping = 2 };
+      rs_trend_at_exit = None;
+      distance_from_ma_pct = -0.025;
+      max_favorable_excursion_pct = 0.08;
+      max_adverse_excursion_pct = -0.09;
+      weeks_macro_was_bearish = 0;
+      weeks_stage_left_2 = 1;
+    }
+  in
+  let audit =
+    [
+      {
+        (make_record entry) with
+        exit_ = Some exit_;
+        external_exit = Some external_exit;
+      };
+    ]
+  in
+  let corrected = SL.Stop_loss { stop_price = 138.0; actual_price = 138.0 } in
+  let enriched =
+    EF.enrich ~audit ~round_trips:[ make_trade () ] ~entry_order_kind:Market
+  in
+  assert_that enriched
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (r : TA.audit_record) -> r.exit_)
+               (is_some_and (equal_to { exit_ with exit_trigger = corrected }));
+             field
+               (fun (r : TA.audit_record) -> r.external_exit)
+               (is_some_and
+                  (equal_to { external_exit with exit_trigger = corrected }));
+           ];
+       ]);
+  assert_that
+    (EF.enrich ~audit ~round_trips:[] ~entry_order_kind:Market)
+    (equal_to audit)
+
 let suite =
   "execution_faithfulness"
   >::: [
+         "enrich exit fill price" >:: test_enrich_exit_fill_price;
          "enrich stamps the ticket age at fill"
          >:: test_enrich_stamps_ticket_age_at_fill;
          "enrich stamps a multi-week age via position_id"
