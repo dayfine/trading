@@ -1,0 +1,6 @@
+incremental: universe is not a superset of the existing manifest; carrying 9211 untouched symbol(s) forward (#2669)
+active_through: 8915 marked, 336 survivors (of 9251 symbols)
+wrote 9251 entries to /tmp/snap_top3000_pit_v12pit/manifest.sexp in 49.06s
+series_tail: 11 findings (0 truncated, 1 stray_dropped, 10 kept, 0 kept_by_exception, 0 cut_prefix, 0 cut_refused_short_tail)
+verify: 9251/9251 files OK (failed=0)
+exit=0

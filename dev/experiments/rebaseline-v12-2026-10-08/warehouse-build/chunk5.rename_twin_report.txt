@@ -1,0 +1,23 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+6 group(s), 15 symbol(s) dropped
+  survivor RICO <- [TNO]
+    TNO (overlap=361, match=0.9556)
+  survivor SAIH <- [SAI]
+    SAI (overlap=852, match=0.9965)
+  survivor SNCA <- [ROSG; WCAP_old]
+    ROSG (overlap=2829, match=0.3129)
+    WCAP_old (overlap=252, match=0.9562)
+  survivor SYTA <- [SBMC; SLNK; SUG; TND; WWY]
+    SBMC (overlap=1888, match=0.9804)
+    SLNK (overlap=1645, match=0.9787)
+    SUG (overlap=785, match=0.9515)
+    TND (overlap=572, match=0.9702)
+    WWY (overlap=456, match=0.9538)
+  survivor VELO <- [VLD-WS]
+    VLD-WS (overlap=231, match=0.9913)
+  survivor VNTR <- [SFP; SHU; SOBI; SRR; UPR]
+    SFP (overlap=101, match=0.9800)
+    SHU (overlap=120, match=0.9916)
+    SOBI (overlap=120, match=1.0000)
+    SRR (overlap=120, match=0.9664)
+    UPR (overlap=269, match=0.9888)

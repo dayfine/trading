@@ -302,7 +302,7 @@
     (avg_dollar_volume 330713854.54418606))
    ((symbol WBA) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 329453814.69813961))
-   ((symbol PIXY) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAYA) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 329239009.48883718))
    ((symbol CI) (weight 0.001) (sector "Health Care") (synthetic false)
     (avg_dollar_volume 327793374.18604654))
