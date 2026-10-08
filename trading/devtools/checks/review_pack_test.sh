@@ -39,7 +39,8 @@
 #     null without trade_audit.sexp; shorts off -> null; shortLegLine pinned.
 #   - #3177: the render's slice plan covers any measured page height and a
 #     page that failed to load stops the render (stub Chrome); the return
-#     basis (price / total return / mixed) from params picks the SPY column
+#     basis (price / total return / mixed; cash_yield from the overrides or
+#     the default of the run's code_version) picks the SPY column
 #     and labels; the fallback card keys on the audit stop kind; an AVD-shaped
 #     later-split fill near a wide bar's edge is code 2, not off-bar;
 #   - short trades (#3149): every trade statistic and flag side-aware over
@@ -439,25 +440,47 @@ rc=0; CHROME="$STUB" sh "$RENDER" --site "$S" --out "$TMP/render" >"$TMP/render.
 expect_eq "render: a page that failed to load stops with exit 1" 1 "$rc"
 expect_eq "render: and names the page's own error" 1 "$(grep -c 'the page failed to load: Could not load the data files (LightweightCharts is not defined)' "$TMP/render.log" || true)"
 
-# SPY basis: the fixture run arms neither cash_yield nor dividend_crediting -> price only; a copy that
-# arms both -> total return. The fixture SPY's adjusted_close is 0.9 x close before 2020-03-01 here, so
-# the two bases differ: price 301 -> 400 = +32.89 %, total return 270.9 -> 400 = +47.66 %.
-mkdir -p "$TMP/tr"; cp -R "$FIX/data" "$TMP/tr/data"; cp -R "$FIX/run" "$TMP/tr/run"
+# SPY basis. cash_yield is default-on since #3184, so the basis reads the overrides first and, when
+# cash_yield is absent, the default of the code that ran (git places code_version vs #3184's commit;
+# an unplaceable SHA, like this fixture's 0123456789abcdef, assumes the current default and says so).
+#   px  : (cash_yield No_yield), no dividends            -> price
+#   tr  : cash_yield Series + (dividend_crediting true)  -> tr
+#   mix : (cash_yield No_yield) + dividends              -> mixed
+#   asm : the fixture as is (no cash_yield, unknown SHA) -> cash yield assumed on, mixed
+# The fixture SPY's adjusted_close is 0.9 x close before 2020-03-01 here, so the two bases differ:
+# price 301 -> 400 = +32.89 %, total return 270.9 -> 400 = +47.66 %.
+mkdir -p "$TMP/tr"; cp -R "$FIX/data" "$TMP/tr/data"
 SPY_CSV="$TMP/tr/data/S/Y/SPY/data.csv"
 awk -F, 'BEGIN { OFS = "," } NR > 1 && $1 < "2020-03-01" { $6 = sprintf("%.2f", $5 * 0.9) } { print }' "$SPY_CSV" > "$SPY_CSV.x"; mv "$SPY_CSV.x" "$SPY_CSV"
-sed 's/(overrides (((enable_short_side false))))/(overrides (((enable_short_side false)) ((cash_yield (Series macro\/tbill_3m_dtb3.csv))) ((dividend_crediting true))))/' "$FIX/run/params.sexp" > "$TMP/tr/run/params.sexp"
-mkdir -p "$TMP/tr/mix"; cp "$FIX"/run/* "$TMP/tr/mix/"
-sed 's/(overrides (((enable_short_side false))))/(overrides (((enable_short_side false)) ((dividend_crediting true))))/' "$FIX/run/params.sexp" > "$TMP/tr/mix/params.sexp"
+basis_run() { # $1 name, $2 extra overrides
+  mkdir -p "$TMP/tr/$1"; cp "$FIX"/run/* "$TMP/tr/$1/"
+  sed "s/(overrides (((enable_short_side false))))/(overrides (((enable_short_side false))$2))/" "$FIX/run/params.sexp" > "$TMP/tr/$1/params.sexp"
+}
+basis_run px ' ((cash_yield No_yield))'
+basis_run tr ' ((cash_yield (Series macro\/tbill_3m_dtb3.csv))) ((dividend_crediting true))'
+basis_run mix ' ((cash_yield No_yield)) ((dividend_crediting true))'
 rc=0
-sh "$SCRIPT" --no-container --data-dir "$TMP/tr/data" --out "$TMP/tr/pack" px="$FIX/run/" tr="$TMP/tr/run/" mix="$TMP/tr/mix/" >"$TMP/tr.log" 2>&1 || rc=$?
+sh "$SCRIPT" --no-container --data-dir "$TMP/tr/data" --out "$TMP/tr/pack" px="$TMP/tr/px/" tr="$TMP/tr/tr/" mix="$TMP/tr/mix/" asm="$FIX/run/" >"$TMP/tr.log" 2>&1 || rc=$?
 expect_eq "basis: builds, exit 0" 0 "$rc"
 TD="$TMP/tr/pack/site/data"
-expect_eq "basis: price-only run (both flags off, the default)" '{"spy":"price","cash_yield":false,"dividends":false}' "$(jq -c .basis "$TD/px_meta.json")"
-expect_eq "basis: total-return run (both armed)" '{"spy":"tr","cash_yield":true,"dividends":true}' "$(jq -c .basis "$TD/tr_meta.json")"
-expect_eq "basis: dividends only is mixed" '{"spy":"mixed","cash_yield":false,"dividends":true}' "$(jq -c .basis "$TD/mix_meta.json")"
+expect_eq "basis: price-only run (No_yield, no dividends)" '{"spy":"price","cash_yield":false,"dividends":false,"cash_yield_src":"explicit"}' "$(jq -c .basis "$TD/px_meta.json")"
+expect_eq "basis: total-return run (both armed)" '{"spy":"tr","cash_yield":true,"dividends":true,"cash_yield_src":"explicit"}' "$(jq -c .basis "$TD/tr_meta.json")"
+expect_eq "basis: dividends only is mixed" '{"spy":"mixed","cash_yield":false,"dividends":true,"cash_yield_src":"explicit"}' "$(jq -c .basis "$TD/mix_meta.json")"
+expect_eq "basis: no cash_yield and an unknown code_version assumes the current default (on)" '{"spy":"mixed","cash_yield":true,"dividends":false,"cash_yield_src":"assumed"}' "$(jq -c .basis "$TD/asm_meta.json")"
 expect_eq "basis: the price-only run's year table reads SPY price (+32.89 %)" 32.89 "$(jq -r '.[0].spy' "$TD/px_years.json")"
 expect_eq "basis: the total-return run's year table reads SPY TR (+47.66 %)" 47.66 "$(jq -r '.[0].spy' "$TD/tr_years.json")"
 expect_eq "basis: both SPY series are published" "301 270.9" "$(jq -r '.[0][1]+0' "$TD/spy_price.json") $(jq -r '.[0][1]+0' "$TD/spy.json")"
+# The version default, where this checkout holds the commits (a shallow CI clone may not): 14db1a8e
+# (the total-return-26y tr0 run) predates #3184 -> No_yield; 725507d9 contains it -> on.
+if git -C "$ROOT" cat-file -e 14db1a8e523171ae32c1fd3729925248def75076^{commit} 2>/dev/null && git -C "$ROOT" cat-file -e 725507d9ccf95d4c5e98758985c3115b9b3c50e4^{commit} 2>/dev/null && git -C "$ROOT" cat-file -e 99f0b3218787c8abde82400eeccecfb2fe241d2c^{commit} 2>/dev/null; then
+  for v in 14db1a8e523171ae32c1fd3729925248def75076:false 725507d9ccf95d4c5e98758985c3115b9b3c50e4:true; do
+    mkdir -p "$TMP/tr/ver"; cp "$FIX"/run/* "$TMP/tr/ver/"
+    sed "s/(code_version 0123456789abcdef)/(code_version ${v%%:*})/" "$FIX/run/params.sexp" > "$TMP/tr/ver/params.sexp"
+    expect_eq "basis: no cash_yield override at ${v%%:*} -> the default of that code (cash yield ${v#*:})" "${v#*:} default" "$(sh "$ROOT/dev/lib/review_pack/meta.sh" "$TMP/tr/ver" | jq -r '.basis|"\(.cash_yield) \(.cash_yield_src)"')"
+  done
+else
+  echo "SKIP: review_pack version-default basis cases need the full git history"
+fi
 if command -v node >/dev/null 2>&1; then
   BFNS="$(sed -n -e '/^function spyBasis(/,/^}/p' -e '/^function spyBasisLabel(/,/^}/p' -e '/^function sharpeBasis(/,/^}/p' "$S/index.html")"
   bas() { node -e "$BFNS
@@ -468,6 +491,7 @@ console.log($1)"; }
   expect_eq "spyBasis: an older meta without basis reads total return" tr "$(bas 'spyBasis(undefined)')"
   expect_eq "sharpeBasis: cash yield armed = excess over net T-bill" "excess over net T-bill" "$(bas 'sharpeBasis({ cash_yield: true })')"
   expect_eq "sharpeBasis: no cash yield = raw" "raw, no cash yield" "$(bas 'sharpeBasis({ cash_yield: false })')"
+  expect_eq "sharpeBasis: an assumed cash yield says so" "excess over net T-bill (assumed: code_version not in this checkout)" "$(bas 'sharpeBasis({ cash_yield: true, cash_yield_src: "assumed" })')"
   FB="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' "$S/index.html")"
   fbk() { node -e "$FB
 const F = FLAGS.find(f => f.id === 'fallback');

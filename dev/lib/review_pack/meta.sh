@@ -2,16 +2,27 @@
 # meta.json for one salt dir: summary metrics, params overrides, validator checks, audit conformance,
 # and the short leg when params enable it.
 D=$1
-# Return basis (#3177): cash_yield armed (any value but No_yield; absent = the No_yield default) and
-# dividend_crediting true. Both -> "tr" (compare with SPY total return), neither -> "price" (SPY price
-# only), one -> "mixed" (the page shows both SPY lines). The Sharpe is excess over the net T-bill rate
-# when cash_yield is armed, raw otherwise.
+# Return basis (#3177): cash yield credited and dividend_crediting true. Both -> "tr" (compare with SPY
+# total return), neither -> "price" (SPY price only), one -> "mixed" (the page shows both SPY lines). The
+# Sharpe is excess over the net T-bill rate when cash yield is credited, raw otherwise.
+# cash_yield is read from the overrides when present (any value but No_yield credits). Absent, it takes the
+# default of the code that ran: No_yield before #3184 (99f0b321, default-on), the T-bill series from it on.
+# When git cannot place the run's code_version (an unknown or shallow-cloned SHA) the current default (on)
+# is assumed and the page says so: cash_yield_src = explicit | default | assumed.
+CASH_YIELD_DEFAULT_ON=99f0b3218787c8abde82400eeccecfb2fe241d2c
+REPO_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 basis() {
-  cy=false; dv=false
-  grep -qE '\(cash_yield \(?[A-Z]' "$D/params.sexp" 2>/dev/null && ! grep -q '(cash_yield No_yield)' "$D/params.sexp" && cy=true
-  grep -q '(dividend_crediting true)' "$D/params.sexp" 2>/dev/null && dv=true
+  dv=false; grep -q '(dividend_crediting true)' "$D/params.sexp" 2>/dev/null && dv=true
+  if grep -q '(cash_yield No_yield)' "$D/params.sexp" 2>/dev/null; then cy=false; src=explicit
+  elif grep -qE '\(cash_yield \(' "$D/params.sexp" 2>/dev/null; then cy=true; src=explicit
+  else
+    cv=$(grep -oE 'code_version [0-9a-f]+' "$D/params.sexp" 2>/dev/null | cut -d' ' -f2)
+    if [ -n "$cv" ] && git -C "$REPO_DIR" cat-file -e "$cv^{commit}" 2>/dev/null && git -C "$REPO_DIR" cat-file -e "$CASH_YIELD_DEFAULT_ON^{commit}" 2>/dev/null; then
+      src=default; cy=false; git -C "$REPO_DIR" merge-base --is-ancestor "$CASH_YIELD_DEFAULT_ON" "$cv" 2>/dev/null && cy=true
+    else cy=true; src=assumed; fi
+  fi
   case "$cy$dv" in truetrue) b=tr ;; falsefalse) b=price ;; *) b=mixed ;; esac
-  printf '{"spy":"%s","cash_yield":%s,"dividends":%s}' "$b" "$cy" "$dv"
+  printf '{"spy":"%s","cash_yield":%s,"dividends":%s,"cash_yield_src":"%s"}' "$b" "$cy" "$dv" "$src"
 }
 esc() { sed 's/\\/\\\\/g; s/"/\\"/g'; }
 # Short leg (#3111): null unless params.sexp has (enable_short_side true). Fills and realised P&L come

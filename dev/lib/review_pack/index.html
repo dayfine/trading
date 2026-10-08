@@ -388,7 +388,8 @@ function spyBasisLabel(b) {
   return s === 'price' ? 'SPY price only' : s === 'mixed' ? 'SPY total return (run credits ' + (b.cash_yield ? 'cash yield' : 'dividends') + ' only)' : 'SPY total return';
 }
 function sharpeBasis(b) {
-  return !b ? 'basis unknown' : b.cash_yield ? 'excess over net T-bill' : 'raw, no cash yield';
+  const s = !b ? 'basis unknown' : b.cash_yield ? 'excess over net T-bill' : 'raw, no cash yield';
+  return b && b.cash_yield_src === 'assumed' ? s + ' (assumed: code_version not in this checkout)' : s;
 }
 const D = {};
 const load = p => fetch('data/' + p).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); });
