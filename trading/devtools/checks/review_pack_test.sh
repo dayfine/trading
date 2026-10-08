@@ -287,7 +287,7 @@ expect_eq "open short + no last bar: pack 54,000 = actual (short signed, BBB car
 expect_eq "open short + no last bar: no warning" "" "$(grep 'WARN' "$TMP/oe2.err" || true)"
 expect_eq "open short: the open row carries its side" SHORT "$(jq -r '.rows[]|select(.sym=="CCC")|.side' "$TMP/oe2/pack/site/data/r0_open.json")"
 expect_eq "no last bar: BBB's carried row on 2020-05-20 = 2,000 x 25" "50000.00" "$(awk -F'\t' '$3 == "open:BBB:2020-02-03" && $1 == "2020-05-20" { print $2 }' "$TMP/oe2/pack/runs/r0/x_expo.tsv")"
-expect_eq "open short: exposure stays gross (last day 12,000 + 50,000 + 8,000 = 70,000 of NAV)" "3" "$(jq -r '.[-1][3]' "$TMP/oe2/pack/site/data/r0_nav.json")"
+expect_eq "open short: exposure stays gross, the last day reads 12,000 + 50,000 + 8,000 = 70,000 of a 101,000 NAV over 3 positions" "69.3 3" "$(jq -r '.[-1]|"\(.[2]) \(.[3])"' "$TMP/oe2/pack/site/data/r0_nav.json")"
 expect_eq "no actual.sexp: the check reads null, not 0" null "$(jq -r .check.actual "$S/data/r0_open.json")"
 expect_eq "cap/cash-floor text removed" 0 "$(grep -c 'caps long exposure\|exposure cap and cash floor' "$S/index.html" || true)"
 expect_eq "final NAV carried on the equity axis" yes "$(grep -q "title: 'final'" "$S/index.html" && echo yes || echo no)"
