@@ -26,6 +26,7 @@
   test_stop_flag_overlays
   test_share_class_overlays
   test_cash_yield_overlays
+  test_panel_income_arming
   test_trailing_stop_ma_overlays
   test_panel_loader_parity
   test_snapshot_mode_parity
