@@ -25,7 +25,9 @@
 #     count it, and the last-day check vs actual.sexp open_positions_value
 #     warns on a mismatch; a market holiday (no SPY bar) is dropped from the
 #     exposure series and from the period Invested average; a delisting exit
-#     is not counted as the Saturday-fill defect;
+#     is not counted as the Saturday-fill defect; a SHORT open at the end is
+#     signed negative in that check and a name with no bar on the last day is
+#     carried at its last close (#3144);
 #   - every emitted JSON file parses (the SPY fixture carries a "321."-style
 #     value the store really writes), manifest + year/quarter tables present;
 #   - the page's signal predicates (openSignal, oneTradeYear, alsoCause) are
@@ -268,6 +270,24 @@ rc=0
 sh "$SCRIPT" --no-container --data-dir "$TMP/oe/data" --out "$TMP/oe/miss" r0="$TMP/oe/run/" >"$TMP/miss.log" 2>"$TMP/miss.err" || rc=$?
 expect_eq "open-at-end mismatch: still builds" 0 "$rc"
 expect_eq "open-at-end mismatch: warns on stderr" 1 "$(grep -c 'WARN open positions on 2020-05-20: pack marks 64000, actual.sexp open_positions_value 20000' "$TMP/miss.err" || true)"
+# #3144: a SHORT still open at the end is marked negative in the last-day check (the simulator's
+# open_positions_value is NAV minus equity cash), and a position with no bar on the last equity date
+# is carried at its last known close. Copy of the open-at-end case plus CCC 100 sh SHORT (last close
+# 80 -> -8,000), with BBB's last bar (2020-05-20) dropped and its 2020-05-19 close set to 25
+# (2,000 x 25 = 50,000): 12,000 + 50,000 - 8,000 = 54,000.
+cp -R "$TMP/oe" "$TMP/oe2"; rm -rf "$TMP/oe2/pack" "$TMP/oe2/miss"
+printf 'CCC,SHORT,2020-04-01,80.00,100\n' >> "$TMP/oe2/run/open_positions.csv"
+printf '((total_return_pct 1.0) (open_positions_value 54000.00))\n' > "$TMP/oe2/run/actual.sexp"
+BBB_CSV="$TMP/oe2/data/B/B/BBB/data.csv"
+grep -v '^2020-05-20,' "$BBB_CSV" | sed 's/^2020-05-19,26.00,26.50,25.50,26.00,26.00,/2020-05-19,25.00,25.50,24.50,25.00,25.00,/' > "$BBB_CSV.x"; mv "$BBB_CSV.x" "$BBB_CSV"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/oe2/data" --out "$TMP/oe2/pack" r0="$TMP/oe2/run/" >"$TMP/oe2.log" 2>"$TMP/oe2.err" || rc=$?
+expect_eq "open short + no last bar: builds, exit 0" 0 "$rc"
+expect_eq "open short + no last bar: pack 54,000 = actual (short signed, BBB carried at 25)" "54000 54000" "$(jq -r '.check|"\(.pack+0) \(.actual+0)"' "$TMP/oe2/pack/site/data/r0_open.json")"
+expect_eq "open short + no last bar: no warning" "" "$(grep 'WARN' "$TMP/oe2.err" || true)"
+expect_eq "open short: the open row carries its side" SHORT "$(jq -r '.rows[]|select(.sym=="CCC")|.side' "$TMP/oe2/pack/site/data/r0_open.json")"
+expect_eq "no last bar: BBB's carried row on 2020-05-20 = 2,000 x 25" "50000.00" "$(awk -F'\t' '$3 == "open:BBB:2020-02-03" && $1 == "2020-05-20" { print $2 }' "$TMP/oe2/pack/runs/r0/x_expo.tsv")"
+expect_eq "open short: exposure stays gross, the last day reads 12,000 + 50,000 + 8,000 = 70,000 of a 101,000 NAV over 3 positions" "69.3 3" "$(jq -r '.[-1]|"\(.[2]) \(.[3])"' "$TMP/oe2/pack/site/data/r0_nav.json")"
 expect_eq "no actual.sexp: the check reads null, not 0" null "$(jq -r .check.actual "$S/data/r0_open.json")"
 expect_eq "cap/cash-floor text removed" 0 "$(grep -c 'caps long exposure\|exposure cap and cash floor' "$S/index.html" || true)"
 expect_eq "final NAV carried on the equity axis" yes "$(grep -q "title: 'final'" "$S/index.html" && echo yes || echo no)"
