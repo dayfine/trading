@@ -49,7 +49,7 @@ let _holding ?(side = Trading_base.Types.Long) ~symbol ~entry_date () =
   let trans kind =
     Position.{ position_id = symbol; date = Date.of_string entry_date; kind }
   in
-  let unwrap = function Ok p -> p | Error _ -> assert_failure "pos setup" in
+  let unwrap = function Ok p -> p | Error _ -> failwith "pos setup" in
   let p =
     Position.create_entering
       (trans
