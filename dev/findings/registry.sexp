@@ -301,6 +301,7 @@
                 "cancelled ticket recorded"))
          (unit ("trading/trading/backtest/test/test_ticket_cancel_observability.ml"
                 "a portfolio-rejected fill records a cancel in trade_audit"))))
+ (status fixed))
 
 ((issue 3147) (ref "short-only Phase A (#3135) D6: ALX 2008-11-25, SUN1 2009-05-07; 74 of 106 soT gap labels")
  (finding "trades.csv labelled a same-day force cover or stop-out as margin_call, and a short's gap through its stop as gap_down")
