@@ -522,6 +522,53 @@ expect_eq "AVD shape: without a split behind the factor it stays off-bar (code 0
 # An empty conformance table says n/a instead of drawing a blank table.
 expect_eq "panels pack rows at the top (align-content: start)" 1 "$(grep -c '^\.panel {.*align-content: start;' "$S/index.html")"
 expect_eq "conformance table without a trade audit report reads n/a" 1 "$(grep -c "^const CONF_NA = '<tr><td colspan=\"4\" style=\"white-space:normal\">n/a: no trade audit report" "$S/index.html")"
-expect_eq "conformance n/a is wired into the table" 1 "$(grep -c '<tbody>${cf.length ? .. : CONF_NA}' "$S/index.html")"
+expect_eq "conformance n/a is wired into the table" 1 "$(grep -c '<tbody>${cf.length ? rows : CONF_NA}</tbody>' "$S/index.html")"
+# #3177 QC rework: the capture follows the MEASURED height. A stub Chrome answers --dump-dom with a
+# page height and records each --screenshot with its --window-size; it writes a real PNG of that size
+# when ImageMagick is present (then the parts are cut and checked too). A page with no height falls back
+# to 9000 px and says so.
+STUBOK="$TMP/stub-ok"
+cat > "$STUBOK" <<'STUB'
+#!/bin/sh
+for a in "$@"; do case "$a" in
+  --dump-dom) [ -n "${STUB_H:-}" ] && echo "<html data-page-h=\"$STUB_H\"><body>ok</body></html>" || echo "<html><body>ok</body></html>"; exit 0 ;;
+  --screenshot=*) out=${a#--screenshot=} ;; --window-size=*) ws=${a#--window-size=} ;; esac; done
+echo "$(basename "$out") $ws" >> "$STUB_LOG"
+if command -v convert >/dev/null 2>&1; then convert -size "${ws%,*}x${ws#*,}" xc:white "$out"; else echo png > "$out"; fi
+STUB
+chmod +x "$STUBOK"
+rc=0; STUB_H=5000 STUB_LOG="$TMP/stub.log" CHROME="$STUBOK" sh "$RENDER" --site "$S" --out "$TMP/render-ok" >"$TMP/render-ok.log" 2>&1 || rc=$?
+expect_eq "render: full.png is captured at the measured height (5000), top.png at the first screen" "top.png 1400,1300|full.png 1400,5000" "$(paste -sd'|' - < "$TMP/stub.log")"
+if command -v convert >/dev/null 2>&1 || command -v magick >/dev/null 2>&1 || command -v sips >/dev/null 2>&1; then
+  expect_eq "render: a 5000 px page is cut into the --plan 5000 parts, 1500 px each" "0 4 1500 1500 1500 1500" "$rc $(ls "$TMP/render-ok"/part-*.png | wc -l | tr -d ' ') $(for p in 1 2 3 4; do identify -format '%h ' "$TMP/render-ok/part-$p.png"; done | sed 's/ $//')"
+else
+  echo "SKIP: review_pack render slicing needs ImageMagick or sips"
+fi
+rc=0; STUB_LOG="$TMP/stub-fb.log" CHROME="$STUBOK" sh "$RENDER" --site "$S" --out "$TMP/render-fb" >"$TMP/render-fb.log" 2>&1 || rc=$?
+expect_eq "render: no measured height falls back to 9000 px" "full.png 1400,9000" "$(grep '^full.png' "$TMP/stub-fb.log")"
+expect_eq "render: and says it could not measure the page" 1 "$(grep -c 'could not measure the page; using 9000 px' "$TMP/render-fb.log")"
+
+# What the conformance and validator panels render (confTable / validatorList, the functions the
+# page calls), and the basis object every basis call site reads (basisView).
+if command -v node >/dev/null 2>&1; then
+  PFNS="$(sed -n -e '/^const CONF_NA = /p' -e '/^function confTable(/,/^}/p' -e '/^function validatorList(/,/^}/p' -e '/^function spyBasis(/,/^}/p' -e '/^function spyBasisLabel(/,/^}/p' -e '/^function sharpeBasis(/,/^}/p' -e '/^function basisView(/,/^}/p' "$S/index.html")"
+  pg() { node -e "$PFNS
+const cf = [1, 2, 3, 6, 7, 8].map(i => ({ rule: 'R' + i, desc: 'rule ' + i, passed: '618/618', rate: '100%', fails: '0' }));
+const vs = Array.from({ length: 17 }, (_, i) => ({ id: 'V' + (i + 1), sev: 'INVARIANT', status: i === 16 ? '2 violations' : 'PASS', specimens: i === 16 ? ['ZZZ specimen'] : [] }));
+console.log($1)"; }
+  expect_eq "confTable: six conformance rows render, R1..R8" "6 R1 R8" "$(pg '[(confTable(cf).match(/<tr><td><b>R/g) || []).length, ...["R1", "R8"].filter(r => confTable(cf).includes("<b>" + r + "</b>"))].join(" ")')"
+  expect_eq "confTable: no rows reads n/a" yes "$(pg 'confTable([]).includes("n/a: no trade audit report") ? "yes" : "no"')"
+  expect_eq "validatorList: V1..V17 all render, V9 and V17 included" "17 yes yes" "$(pg '[(validatorList(vs).match(/<summary>/g) || []).length, validatorList(vs).includes("<b>V9</b>") ? "yes" : "no", validatorList(vs).includes("<b>V17</b>") ? "yes" : "no"].join(" ")')"
+  expect_eq "validatorList: a failing invariant opens with its specimens" yes "$(pg '/<details open[^>]*><summary><b>V17<\/b>.*ZZZ specimen/.test(validatorList(vs)) ? "yes" : "no"')"
+  expect_eq "basisView: price -> SPY price series, no dashed line" '{"series":"spyPrice","total":"SPY price only","legend":"SPY price only","priceLine":false}' "$(pg 'JSON.stringify((({ series, total, legend, priceLine }) => ({ series, total, legend, priceLine }))(basisView({ spy: "price", cash_yield: false, dividends: false })))')"
+  expect_eq "basisView: mixed -> TR series plus the dashed price line, legend says so" '{"series":"spyTR","legend":"SPY total return (run credits dividends only) · dashed: SPY price only","priceLine":true}' "$(pg 'JSON.stringify((({ series, legend, priceLine }) => ({ series, legend, priceLine }))(basisView({ spy: "mixed", cash_yield: false, dividends: true })))')"
+  expect_eq "basisView: total return -> TR series; Sharpe label excess over net T-bill" '{"series":"spyTR","sharpe":"excess over net T-bill","priceLine":false}' "$(pg 'JSON.stringify((({ series, sharpe, priceLine }) => ({ series, sharpe, priceLine }))(basisView({ spy: "tr", cash_yield: true, dividends: true })))')"
+else
+  echo "SKIP: review_pack panel/basis page cases need node"
+fi
+# the call sites read those functions (a page that bypasses them fails here)
+expect_eq "wiring: D.spy is the basisView series" 1 "$(grep -c '^  D.spy = D\[basisView(D.meta\[D.man.charts_run || 0\].basis).series\];$' "$S/index.html")"
+expect_eq "wiring: KPI total return, Sharpe, legend and the dashed line read basisView" 4 "$(grep -c 'BV\.total\|BV\.sharpe\|BV\.legend\|if (BV\.priceLine)' "$S/index.html")"
+expect_eq "wiring: the panels render through confTable / validatorList" 2 "$(grep -c "^  \$('#conf').innerHTML = confTable(cf);\$\|^  \$('#validator').innerHTML = validatorList(D.meta\[CH()\].validator);\$" "$S/index.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

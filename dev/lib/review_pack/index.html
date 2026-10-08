@@ -391,6 +391,13 @@ function sharpeBasis(b) {
   const s = !b ? 'basis unknown' : b.cash_yield ? 'excess over net T-bill' : 'raw, no cash yield';
   return b && b.cash_yield_src === 'assumed' ? s + ' (assumed: code_version not in this checkout)' : s;
 }
+// What the page shows for a basis: which SPY series it compares with (D.spyPrice / D.spyTR), the KPI
+// labels, the chart legend and whether the dashed SPY-price line is drawn. Every basis call site reads
+// this one object, so pinning it pins the wiring. Pure, for the test.
+function basisView(b) {
+  const s = spyBasis(b), label = spyBasisLabel(b);
+  return { series: s === 'price' ? 'spyPrice' : 'spyTR', total: label, sharpe: sharpeBasis(b), legend: label + (s === 'mixed' ? ' · dashed: SPY price only' : ''), priceLine: s === 'mixed' };
+}
 const D = {};
 const load = p => fetch('data/' + p).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); });
 const chartCache = {};
@@ -403,7 +410,7 @@ load('manifest.json').then(man => {
   const n = D.man.runs.length;
   KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
   D.spyTR = r[KINDS.length * n]; D.macro = r[KINDS.length * n + 1]; D.spyPrice = r[KINDS.length * n + 2];
-  D.spy = spyBasis(D.meta[D.man.charts_run || 0].basis) === 'price' ? D.spyPrice : D.spyTR;
+  D.spy = D[basisView(D.meta[D.man.charts_run || 0].basis).series];
   D.trades.forEach(ts => ts.forEach(t => { t.flags = FLAGS.filter(f => f.test(t)).map(f => f.id); t.yr = t.ed.slice(0, 4); }));
   init();
 }).catch(e => { $('main').innerHTML = `<div class="empty">Could not load the data files (${e.message}).</div>`; });
@@ -625,14 +632,14 @@ function renderSignals(nav, spy) {
   return out;
 }
 function renderOverview() {
-  const m = D.meta[CH()].metrics, nav = D.nav[CH()], trades = D.trades[CH()], B = D.meta[CH()].basis;
+  const m = D.meta[CH()].metrics, nav = D.nav[CH()], trades = D.trades[CH()], BV = basisView(D.meta[CH()].basis);
   const spy = spyOnNavDates(nav); const spyRet = (spy[spy.length - 1][1] / 1e6 - 1) * 100;
   const yrsBeat = D.years[CH()].filter(y => y.ret > y.spy).length;
   const k = [
-    ['Total return', pct(m.totalreturnpct, 0), `${spyBasisLabel(B)} ${pct(spyRet, 0)} same window`],
+    ['Total return', pct(m.totalreturnpct, 0), `${BV.total} ${pct(spyRet, 0)} same window`],
     ['CAGR', pct(m.cagr), 'annualised'],
     ['Max drawdown', '−' + fmt(m.maxdrawdown) + '%', `Calmar ${fmt(m.calmarratio, 2)}`],
-    ['Sharpe', fmt(m.sharperatio, 2), `${sharpeBasis(B)} · vol ${fmt(m.volatilitypctannualized)}%`],
+    ['Sharpe', fmt(m.sharperatio, 2), `${BV.sharpe} · vol ${fmt(m.volatilitypctannualized)}%`],
     ['Trades', String(trades.length), `${fmt(m.tradefrequencyannualized ?? m.tradefrequency, 1)} / yr`],
     ['Win rate', fmt(m.winrate) + '%', `profit factor ${fmt(m.profitfactor, 2)}`],
     ['Avg hold', fmt(m.avgholdingdays, 0) + ' d', `${m.openpositioncount} open at end`],
@@ -648,8 +655,8 @@ function renderOverview() {
   // the axis label carries the FINAL NAV, not the last point in the visible range
   navLine.createPriceLine({ price: nav[nav.length - 1][1], color: css('--accent'), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'final' });
   // a mixed-basis run (#3177) also gets SPY price, dashed, so neither comparison is hidden
-  $('#spy-legend').innerHTML = `<i style="background:var(--spy)"></i>${spyBasisLabel(B)}${spyBasis(B) === 'mixed' ? ' · dashed: SPY price only' : ''}`;
-  if (spyBasis(B) === 'mixed') eq.addLineSeries({ color: css('--spy'), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }).setData(spyOnNavDates(nav, D.spyPrice).map(([d, v]) => ({ time: d, value: v })));
+  $('#spy-legend').innerHTML = `<i style="background:var(--spy)"></i>${BV.legend}`;
+  if (BV.priceLine) eq.addLineSeries({ color: css('--spy'), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }).setData(spyOnNavDates(nav, D.spyPrice).map(([d, v]) => ({ time: d, value: v })));
   eq.timeScale().fitContent();
 
   const dd = mkChart('#c-dd', 150, 'overview');
@@ -860,6 +867,16 @@ function renderHilo() {
 /* ---------- Surprises ---------- */
 // No conformance rows means no trade audit report: say so rather than draw an empty table (#3177)
 const CONF_NA = '<tr><td colspan="4" style="white-space:normal">n/a: no trade audit report (the pack was built with --no-container, or the audit failed; see runs/&lt;run&gt;/audit.log).</td></tr>';
+// The conformance table and the validator list as markup, from meta.conformance / meta.validator. Pure and
+// top-level so review_pack_test.sh pins what the panels render (#3177: the table read blank in a capture).
+function confTable(cf) {
+  const rows = cf.map(r => `<tr><td><b>${r.rule}</b></td><td style="white-space:normal">${r.desc}</td><td class="num">${r.passed}</td><td class="num">${r.rate}</td></tr>`).join('');
+  return `<thead><tr><th>Rule</th><th>Description</th><th class="num">Passed</th><th class="num">Rate</th></tr></thead><tbody>${cf.length ? rows : CONF_NA}</tbody>`;
+}
+function validatorList(vs) {
+  return vs.map(v => { const bad = !/PASS/.test(v.status), inv = v.sev === 'INVARIANT';
+    return `<details ${bad && inv ? 'open' : ''} style="border-bottom:1px solid var(--line);padding-block:6px"><summary><b>${v.id}</b> <span class="pill ${bad ? (inv ? 'outcome' : 'exec') : ''}">${v.sev.toLowerCase()}</span> <span class="${bad ? '' : 'mut'}">${v.status}</span></summary>${v.specimens.length ? `<pre class="spec">${v.specimens.join('\n')}</pre>` : ''}</details>`; }).join('');
+}
 function renderSurprises() {
   const t = D.trades[CH()], open = D.open[CH()].rows;
   $('#flagcards').innerHTML = FLAGS.map(f => { const ts = t.filter(x => x.flags.includes(f.id)); const net = ts.reduce((a, x) => a + x.pnl, 0), no = openHits(f, open);
@@ -868,9 +885,8 @@ function renderSurprises() {
     return `<button class="flagcard" data-flag="${f.id}"><span class="row" style="justify-content:space-between"><span class="pill ${f.cat}">${{ exec: 'Execution', book: 'Book', outcome: 'Outcome' }[f.cat]}</span><span class="cnt">${na ? 'n/a' : ts.length + no}</span></span><b>${f.label}</b><span class="num" style="text-align:left">net <span class="${sgn(net)}">${usdk(net)}</span> · ${fmt(100 * ts.length / t.length, 0)}% of trades${no ? ` · plus ${no} still open` : ''}</span><p>${f.why}</p></button>`; }).join('');
   $('#flagcards').addEventListener('click', e => { const b = e.target.closest('[data-flag]'); if (b) filterFlag(b.dataset.flag); });
   const cf = D.meta[CH()].conformance;
-  $('#conf').innerHTML = `<thead><tr><th>Rule</th><th>Description</th><th class="num">Passed</th><th class="num">Rate</th></tr></thead><tbody>${cf.length ? '' : CONF_NA}${cf.map(r => `<tr><td><b>${r.rule}</b></td><td style="white-space:normal">${r.desc}</td><td class="num">${r.passed}</td><td class="num">${r.rate}</td></tr>`).join('')}</tbody>`;
-  $('#validator').innerHTML = D.meta[CH()].validator.map(v => { const bad = !/PASS/.test(v.status);
-    return `<details ${bad && v.sev === 'INVARIANT' ? 'open' : ''} style="border-bottom:1px solid var(--line);padding-block:6px"><summary><b>${v.id}</b> <span class="pill ${bad ? (v.sev === 'INVARIANT' ? 'outcome' : 'exec') : ''}">${v.sev.toLowerCase()}</span> <span class="${bad ? '' : 'mut'}">${v.status}</span></summary>${v.specimens.length ? `<pre class="spec">${v.specimens.join('\n')}</pre>` : ''}</details>`; }).join('');
+  $('#conf').innerHTML = confTable(cf);
+  $('#validator').innerHTML = validatorList(D.meta[CH()].validator);
 }
 
 /* ---------- Diagnostics ---------- */
