@@ -32,6 +32,10 @@
    ((margin_config
      ((short_borrow_rate_tiers
        (((price_below 5.0) (value 1.00)) ((price_below 17.0) (value 0.25)))))))
+   ;; #3148: this step applies the $5/share floor at its $6 value (0.83) across $5-17, which
+   ;; overstates FINRA 4210(c) max($5/p, 30 %) everywhere above $6.02 (0.50 at $10, 0.30 from
+   ;; $16.67) and margin-called winning shorts (UBSI 2009-02-18). Kept as run; a rerun should use
+   ;; ((margin_config ((short_maintenance_finra true)))) instead.
    ((margin_config
      ((short_maintenance_tiers
        (((price_below 5.0) (value 1.00)) ((price_below 17.0) (value 0.83)))))))
