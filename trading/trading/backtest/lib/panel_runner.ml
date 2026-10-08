@@ -88,13 +88,13 @@ let _entry_fill_resize (config : Weinstein_strategy.config) =
    reasons ([margin_call] / [buyin_stress] / [maintenance_reduce]) never reach
    [stop_log] at all. [Stop_log.record_transitions] is idempotent w.r.t.
    re-recording the same transition, so the two paths overlapping on
-   strategy-only days is harmless; on a same-tick collision the later
-   [on_transitions] call correctly overwrites the wrapper's stale
-   strategy-side trigger with the winning margin one — pinned by
-   [test_margin_exit_observability.ml:test_stop_log_records_margin_call_on_strategy_collision].
-   This is the correct outcome, not a race: [Margin_runner.dedup_strategy_exits_for_margin]
-   drops the strategy's colliding [TriggerExit] before [_apply_transitions]
-   runs, so only margin's exit actually executes.
+   strategy-only days is harmless. On a same-tick collision
+   [Margin_runner.dedup_strategy_exits_for_margin] drops the strategy's
+   [TriggerExit] and only margin's executes, but since #3147 the later
+   [on_transitions] call does not overwrite the wrapper's same-day strategy
+   trigger: the label keeps the stop-loss / force liquidation the audit records
+   (pinned by [test_margin_exit_observability.ml]
+   [test_stop_log_keeps_stop_loss_on_strategy_collision]).
 
    [Simulator.dependencies.on_transitions] is a single optional slot, so the
    two observers that need it ([Stop_log.record_transitions] above, and
