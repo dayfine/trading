@@ -670,11 +670,15 @@ const tr = (pct, pnl, extra) => Object.assign({ ed: '2020-01-02', qty: 100, ep: 
 console.log($1)"; }
   expect_eq "hillAlpha: k=2 over 8, 4, 2 = 2 / (ln(8/2) + ln(4/2))" "0.962" "$(an 'hillAlpha([8, 4, 2], 2).toFixed(3)')"
   expect_eq "hillAlpha: too few values -> null" null "$(an 'hillAlpha([8, 4], 2)')"
+  expect_eq "hillAlpha: k < 2 -> null even with enough values" null "$(an 'hillAlpha([8, 4], 1)')"
   expect_eq "anatomyRow: 2 wins (+20, +10 %), 2 losses (-5, -5 %) at a 100k NAV, 10k each" \
     '{"n":4,"weight":10,"p":50,"aw":15,"al":5,"payoff":3,"exp":5,"navpct":2}' \
     "$(an 'JSON.stringify(anatomyRow([tr(20, 2000), tr(10, 1000), tr(-5, -500), tr(-5, -500)], () => 100000))')"
-  expect_eq "anatomyShape: top-1 share, hindsight counts" '{"topShare":200,"whipsaw":1,"goodStop":1,"regret":1}' \
-    "$(an 'JSON.stringify((({ topShare, whipsaw, goodStop, regret }) => ({ topShare, whipsaw, goodStop, regret }))(anatomyShape([tr(20, 2000, { trig: "laggard_rotation", pmax: 30 }), tr(-5, -500, { trig: "stop_loss", g: "D", p13: 10 }), tr(-5, -500, { trig: "stop_loss", g: "B", p13: -8 })], 1)))')"
+  # decoys, each failing exactly one conjunct: a winning stop exit and a losing rotation exit that kept
+  # falling (not good stops), a stop exit that ran (not a regret), a rotation exit that ran 14.99 % (under 15)
+  expect_eq "anatomyShape: top-1 share, hindsight counts (each decoy misses one condition)" '{"topShare":200,"whipsaw":1,"goodStop":1,"regret":1}' \
+    "$(an 'JSON.stringify((({ topShare, whipsaw, goodStop, regret }) => ({ topShare, whipsaw, goodStop, regret }))(anatomyShape([tr(20, 2000, { trig: "laggard_rotation", pmax: 15 }), tr(-5, -500, { trig: "stop_loss", g: "D", p13: 10 }), tr(-5, -500, { trig: "stop_loss", g: "B", p13: -8 }),
+      tr(5, 500, { trig: "stop_loss", g: "B", p13: -8 }), tr(-5, -500, { trig: "laggard_rotation", g: "B", p13: -8 }), tr(-5, -500, { trig: "stop_loss", g: "B", pmax: 20 }), tr(5, 500, { trig: "laggard_rotation", g: "B", pmax: 14.99 })], 1)))')"
   expect_eq "anatomyShape: Hill alpha over k = min(20, n / 4) (12 wins of 1k..12k -> k 3, 3 / (ln 12/9 + ln 11/9 + ln 10/9) = 5.05); no losses -> null" "5.05 null" \
     "$(an '((s) => [s.alphaW.toFixed(2), String(s.alphaL)].join(" "))(anatomyShape(Array.from({ length: 12 }, (_, i) => tr(1, 1000 * (i + 1)))))')"
 else
