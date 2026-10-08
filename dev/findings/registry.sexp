@@ -280,3 +280,13 @@
          (unit ("trading/trading/weinstein/strategy/test/test_stops_split_dividend_guard.ml"
                 "guarded reader drops dividend split"))))
  (status fixed-behind-flag))
+
+((issue 3147) (ref "short-only Phase A (#3135) D6: ALX 2008-11-25, SUN1 2009-05-07; 74 of 106 soT gap labels")
+ (finding "trades.csv labelled a same-day force cover or stop-out as margin_call, and a short's gap through its stop as gap_down")
+ (guard ((unit ("trading/trading/backtest/test/test_stop_log.ml"
+                "#3147 force cover keeps force_liquidation label"))
+         (unit ("trading/trading/backtest/test/test_stop_log.ml"
+                "#3147 squeeze stop keeps stop_loss label"))
+         (unit ("trading/trading/backtest/test/test_trade_context.ml"
+                "short gap-through labelled gap_up"))))
+ (status fixed))
