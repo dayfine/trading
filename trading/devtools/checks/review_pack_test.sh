@@ -46,6 +46,8 @@
 #   - #3141: the fill-week volume ratio (per bar vs the 4 prior weeks) drives
 #     the low-volume card, not the screen week; an exit dated after the last
 #     bar is not the Saturday-fill defect; the Stage-4 card needs the replay;
+#   - #3140 part 3: the P&L anatomy functions (Hill alpha, per-cohort row,
+#     run shape and hindsight counts);
 #   - short trades (#3149): every trade statistic and flag side-aware over
 #     three SHORT rows (breach on the high, signed P&L / MFE / grades, the
 #     audit stop_floor_kind for the fallback card, installed-stop width,
@@ -637,6 +639,7 @@ console.log($1)"; }
   expect_eq "fallbackFinding: with stop kinds, counts the Buffer_fallback trades" "<b>1 of 4 trades (25%) used the 4% fallback stop</b> rather than a stop under the base or MA." "$(ffb 'fallbackFinding(withKind)')"
   expect_eq "fallbackFinding: without stop kinds reads n/a, not 0 (even with a 4 % sid)" yes "$(ffb 'fallbackFinding(noKind).startsWith("<b>Fallback stops: n/a</b>") ? "yes" : "no"')"
   expect_eq "fallbackShare: a cohort's share with stop kinds, null (n/a) without" "25 null" "$(ffb '[fallbackShare(withKind, withKind), fallbackShare(noKind, noKind)].join(" ").replace(/ $/, " null")')"
+  expect_eq "fallbackShare: the cohort's share, not the whole run's (1 of 1 in the cohort = 100, run 25)" 100 "$(ffb 'fallbackShare(withKind, [withKind[0]])')"
 else
   echo "SKIP: review_pack fallback guard cases need node"
 fi
@@ -679,8 +682,32 @@ if command -v node >/dev/null 2>&1; then
 const T = $(jq -c . "$V42T"), F = id => FLAGS.find(f => f.id === id);
 console.log($1)"; }
   expect_eq "low-volume card: a null fill-week ratio is left out; 2.20 is not under 2; 2.04 is not either" "false false false" "$(v42n '["JJJ", "MMM", "LLL"].map(s => F("lowvol").test(T.find(t => t.sym === s))).join(" ")')"
+  expect_eq "low-volume card: the threshold is strictly under 2 (2.00 passes, 1.99 is flagged)" "false true" "$(v42n '[2, 1.99].map(v => F("lowvol").test({ side: "LONG", fvr: v })).join(" ")')"
 else
   echo "SKIP: review_pack #3203 rework page cases need node"
 fi
+# #3140 part 3, P&L anatomy: pure functions extracted from the page and pinned with node.
+if command -v node >/dev/null 2>&1; then
+  AFNS="$(sed -n -e '/^function hillAlpha(/,/^}/p' -e '/^function anatomyRow(/,/^}/p' -e '/^function anatomyShape(/,/^}/p' "$S/index.html")"
+  an() { node -e "$AFNS
+const tr = (pct, pnl, extra) => Object.assign({ ed: '2020-01-02', qty: 100, ep: 100, pct, pnl }, extra || {});
+console.log($1)"; }
+  expect_eq "hillAlpha: k=2 over 8, 4, 2 = 2 / (ln(8/2) + ln(4/2))" "0.962" "$(an 'hillAlpha([8, 4, 2], 2).toFixed(3)')"
+  expect_eq "hillAlpha: too few values -> null" null "$(an 'hillAlpha([8, 4], 2)')"
+  expect_eq "hillAlpha: k < 2 -> null even with enough values" null "$(an 'hillAlpha([8, 4], 1)')"
+  expect_eq "anatomyRow: 2 wins (+20, +10 %), 2 losses (-5, -5 %) at a 100k NAV, 10k each" \
+    '{"n":4,"weight":10,"p":50,"aw":15,"al":5,"payoff":3,"exp":5,"navpct":2}' \
+    "$(an 'JSON.stringify(anatomyRow([tr(20, 2000), tr(10, 1000), tr(-5, -500), tr(-5, -500)], () => 100000))')"
+  # decoys, each failing exactly one conjunct: a winning stop exit and a losing rotation exit that kept
+  # falling (not good stops), a stop exit that ran (not a regret), a rotation exit that ran 14.99 % (under 15)
+  expect_eq "anatomyShape: top-1 share, hindsight counts (each decoy misses one condition)" '{"topShare":200,"whipsaw":1,"goodStop":1,"regret":1}' \
+    "$(an 'JSON.stringify((({ topShare, whipsaw, goodStop, regret }) => ({ topShare, whipsaw, goodStop, regret }))(anatomyShape([tr(20, 2000, { trig: "laggard_rotation", pmax: 15 }), tr(-5, -500, { trig: "stop_loss", g: "D", p13: 10 }), tr(-5, -500, { trig: "stop_loss", g: "B", p13: -8 }),
+      tr(5, 500, { trig: "stop_loss", g: "B", p13: -8 }), tr(-5, -500, { trig: "laggard_rotation", g: "B", p13: -8 }), tr(-5, -500, { trig: "stop_loss", g: "B", pmax: 20 }), tr(5, 500, { trig: "laggard_rotation", g: "B", pmax: 14.99 })], 1)))')"
+  expect_eq "anatomyShape: Hill alpha over k = min(20, n / 4) (12 wins of 1k..12k -> k 3, 3 / (ln 12/9 + ln 11/9 + ln 10/9) = 5.05); no losses -> null" "5.05 null" \
+    "$(an '((s) => [s.alphaW.toFixed(2), String(s.alphaL)].join(" "))(anatomyShape(Array.from({ length: 12 }, (_, i) => tr(1, 1000 * (i + 1)))))')"
+else
+  echo "SKIP: review_pack anatomy cases need node"
+fi
+expect_eq "wiring: the P&L anatomy card is rendered on load" 1 "$(grep -c 'renderDiag(); renderAnatomy(); renderSalts();' "$S/index.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
