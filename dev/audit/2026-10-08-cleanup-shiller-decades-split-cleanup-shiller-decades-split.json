@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-08",
+  "feature": "cleanup-shiller-decades-split",
+  "branch": "cleanup/shiller-decades-split",
+  "sha": "f095337da031b50088d8e94d4a51ce7e47ac7b4b",
+  "recorded_at_ns": 1791489684224213743,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
