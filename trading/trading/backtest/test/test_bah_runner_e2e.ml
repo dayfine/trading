@@ -382,6 +382,82 @@ let test_bah_runner_e2e_gap_up_monday ctx =
     (is_some_and
        (field (fun t -> t.Trading_base.Types.symbol) (equal_to "SPY")))
 
+(* Run the BAH-SPY 2019-2023 scenario with the given overrides and return
+   (final equity, CashInterestTotal if reported). *)
+let _bah_spy_equity_and_interest ~overrides =
+  let fixtures_root = _resolve_fixtures_root () in
+  let s = _load_scenario_exn fixtures_root in
+  let sector_map_override = _sector_map_override fixtures_root s in
+  let result =
+    Backtest.Runner.run_backtest ~start_date:s.period.start_date
+      ~end_date:s.period.end_date ~overrides ?sector_map_override
+      ~strategy_choice:s.strategy ()
+  in
+  ( result.summary.final_portfolio_value,
+    Map.find result.summary.metrics
+      Trading_simulation_types.Metric_types.CashInterestTotal,
+    Map.find result.summary.metrics
+      Trading_simulation_types.Metric_types.SharpeRatio )
+
+(** #3137 default-on flip, pinned end to end through {!Backtest.Runner}: with no
+    override the default [cash_yield] (the committed T-bill series under
+    [TRADING_DATA_DIR]) accrues a positive [CashInterestTotal] and lifts final
+    equity above the price-only run; an explicit [((cash_yield No_yield))]
+    override reports no [CashInterestTotal] key and reproduces the pre-flip
+    pinned baseline ({!_expected_final_equity}). *)
+let test_bah_default_cash_yield_accrues _ =
+  skip_if (not (_spy_data_present ())) "SPY data unavailable";
+  let no_yield_equity, no_yield_interest, no_yield_sharpe =
+    _bah_spy_equity_and_interest
+      ~overrides:[ Sexp.of_string "((cash_yield No_yield))" ]
+  in
+  let default_equity, default_interest, default_sharpe =
+    _bah_spy_equity_and_interest ~overrides:[]
+  in
+  let tol = _expected_final_equity *. _equity_tolerance_pct /. 100.0 in
+  assert_that
+    ( no_yield_equity,
+      no_yield_interest,
+      default_equity,
+      default_interest,
+      default_sharpe )
+    (all_of
+       [
+         field
+           (fun (e, _, _, _, _) -> e)
+           (is_between
+              (module Float_ord)
+              ~low:(_expected_final_equity -. tol)
+              ~high:(_expected_final_equity +. tol));
+         field (fun (_, i, _, _, _) -> i) is_none;
+         field
+           (fun (_, _, e, _, _) -> e)
+           (gt (module Float_ord) no_yield_equity);
+         field
+           (fun (_, _, _, i, _) -> i)
+           (is_some_and (gt (module Float_ord) 0.0));
+         (* Sharpe is excess over the net T-bill rate by default. *)
+         field
+           (fun (_, _, _, _, s) -> s)
+           (is_some_and
+              (lt (module Float_ord) (Option.value_exn no_yield_sharpe)));
+       ])
+
+(** #3137: an armed [Series] pointing at a missing file fails the run at load
+    (never silently earns 0). *)
+let test_missing_cash_yield_series_fails_run _ =
+  skip_if (not (_spy_data_present ())) "SPY data unavailable";
+  let raised =
+    try
+      ignore
+        (_bah_spy_equity_and_interest
+           ~overrides:
+             [ Sexp.of_string "((cash_yield (Series macro/no_such_file.csv)))" ]);
+      false
+    with _ -> true
+  in
+  assert_that raised (equal_to true)
+
 let suite =
   "Bah_runner_e2e"
   >::: [
@@ -389,6 +465,10 @@ let suite =
          >:: test_bah_runner_e2e;
          "BAH-BRK-B 2019-2023 through Backtest.Runner matches pinned baseline"
          >:: test_bah_runner_e2e_brk_b_5y;
+         "BAH-SPY default cash_yield accrues interest; No_yield reproduces the \
+          pinned baseline" >:: test_bah_default_cash_yield_accrues;
+         "BAH-SPY missing cash_yield series file fails the run"
+         >:: test_missing_cash_yield_series_fails_run;
          "BAH-SPY gap-up Monday 2023-06-12 enters (zero-trade regression)"
          >:: test_bah_runner_e2e_gap_up_monday;
          "scenarios without [strategy] field default to Weinstein (back-compat)"

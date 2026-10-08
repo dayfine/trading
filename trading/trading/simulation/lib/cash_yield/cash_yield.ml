@@ -7,6 +7,8 @@ type source = No_yield | Constant of float | Series of string
 [@@deriving sexp, eq, show]
 
 let default_fee_bp = 10.0
+let default_series_path = "macro/tbill_3m_dtb3.csv"
+let default_source = Series default_series_path
 let _bp_per_pct = 100.0
 let _pct_per_unit = 100.0
 

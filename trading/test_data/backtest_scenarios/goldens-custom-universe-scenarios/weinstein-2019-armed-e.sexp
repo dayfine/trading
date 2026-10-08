@@ -57,7 +57,8 @@
  (universe_path "../goldens-custom-universe/composition/top-3000-2019.sexp")
  (universe_size 3000)
  (config_overrides
-  (;; --- the armed StopLimit / E-anchored entry stack (the point of this cell) ---
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ;; --- the armed StopLimit / E-anchored entry stack (the point of this cell) ---
    ((enable_sim_entry_stoplimit true))
    ((sim_entry_trigger_at_suggested true))
    ((entry_extension_max_pct 2.0))
@@ -90,7 +91,8 @@
    ((stops_config ((max_stop_distance_pct 0.15))))
    ((stops_config ((support_floor_anchor_scope Window_extreme))))))
  (deviates_from_live
-  (;; NOTE: entries exist ONLY for knobs whose value here DIFFERS from live —
+  ((cash_yield "price-only regression pin (#3137); the code default (and live config) arm the 3-month T-bill series")
+   ;; NOTE: entries exist ONLY for knobs whose value here DIFFERS from live —
    ;; the golden_live_drift linter FAILs on declarations matching live. The
    ;; armed stack's enable_sim_entry_stoplimit / entry_extension_max_pct /
    ;; extension_stop_config / reject_declining_ma_long_entry /

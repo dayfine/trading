@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-10-06
+## Last updated: 2026-10-07
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,46 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-10-07 — `cash_yield` default-on: 3-month T-bill − 10 bp (#3137)
+
+User decision 2026-10-07 ("interest now, dividends after #3173"). Accounting
+realism, not a strategy ACCEPT (precedent #1926): the paired 26y implementation
+check passed for interest (+0.232 log every salt vs a +0.24 estimate,
+`dev/experiments/total-return-26y-2026-10-06/results-2026-10-07.md`, #3178).
+`dividend_crediting` stays default `false` until #3173.
+
+- [x] **Default flip:** `Weinstein_strategy_config.cash_yield` default
+  `No_yield` → `Cash_yield.default_source` = `Series "macro/tbill_3m_dtb3.csv"`
+  (fee stays `default_fee_bp` = 10 bp). Resolved once in `Backtest.Runner`
+  against `TRADING_DATA_DIR` — the only path to a simulator (`Panel_runner` holds the
+  only non-test `Simulator.create`; scenario_runner, backtest_runner, tuner,
+  walk-forward, rolling-start and barbell all go through it). A missing/unreadable file fails the run at load; a date before
+  1954-01-04 fails the run. Live / weekly-picks generation
+  (`generate_weekly_snapshot`) builds no simulator and never reads it.
+- [x] **Sharpe basis:** `SharpeRatio` is now excess over the net T-bill rate by
+  default (docstrings: `Metric_types.SharpeRatio`, `Sharpe_computer.computer`).
+- [x] **Goldens:** the 19 regression goldens under `goldens-small/`,
+  `goldens-sp500/`, `goldens-sp500-historical/`,
+  `goldens-custom-universe-scenarios/` pin `((cash_yield No_yield))` (and
+  declare it in `deviates_from_live`), so they stay byte-identical. Smoke /
+  perf-sweep sanity cells take the new default. Paired table in the PR body.
+- [x] **Deviation from plan decision 3 ("goldens re-pinned once"):** the PR
+  pins the OLD basis (`No_yield`) instead of re-pinning. Reason: the at-fill
+  knife-edge (#3138) moves tight-range goldens, so a re-pin now would mix the
+  yield change with that drift. Re-pin once, after #3138 / the v12 re-baseline.
+- [x] **Rework pins (QC iter 1):** `test_bah_runner_e2e` also asserts the
+  default run's Sharpe is strictly below the `No_yield` run's (runner passes the
+  rate into Sharpe), and a missing `Series` file makes `run_backtest` raise.
+- [x] **Synthetic data dirs:** a data dir without `macro/` must pin `No_yield`
+  (done for `test_walk_forward_snapshot_parity`) or carry the file. Note: the
+  container default `/workspaces/trading-1/data` has no `macro/` — chains set
+  `TRADING_DATA_DIR=<worktree>/trading/test_data` (which has it), or copy the
+  file there.
+- Verify: `dune runtest trading/backtest/test` (`test_cash_yield_overlays`
+  default pin; `test_bah_runner_e2e` default accrues `CashInterestTotal`,
+  `No_yield` reproduces the pinned baseline), `dune runtest
+  trading/backtest/golden_drift`.
 
 ## 2026-10-06 — default-off dividend crediting for held positions (#3137 part 2)
 

@@ -115,7 +115,8 @@
  (period ((start_date 2011-01-03) (end_date 2026-04-30)))
  (universe_path "universes/brk-b-only.sexp")
  (universe_size 1)
- (config_overrides ())
+ (config_overrides
+  (((cash_yield No_yield)))) ;; #3137: price-only pin, keeps this regression golden byte-identical
  (strategy (Bah_benchmark (symbol BRK-B)))
  (expected
   ((total_return_pct       ((min 481.00)      (max  501.00)))

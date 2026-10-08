@@ -16,7 +16,12 @@ module Metric_type : sig
     | WinCount  (** Number of winning trades *)
     | LossCount  (** Number of losing trades *)
     | WinRate  (** Win percentage *)
-    | SharpeRatio  (** Risk-adjusted return metric *)
+    | SharpeRatio
+        (** Risk-adjusted return metric. Since the #3137 [cash_yield] default-on
+            flip, Weinstein backtests report it as excess return over the net
+            3-month T-bill rate the book's cash earns; a [No_yield] run keeps
+            the pre-#3137 basis (excess over a flat [0.0]). See
+            [Trading_simulation.Sharpe_computer]. *)
     | MaxDrawdown  (** Maximum peak-to-trough decline *)
     | ProfitFactor  (** Gross profit / gross loss *)
     | CAGR  (** Compound annual growth rate *)

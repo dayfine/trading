@@ -42,7 +42,8 @@
  (period ((start_date 2018-01-02) (end_date 2023-12-29)))
  (universe_size 302)
  (config_overrides
-  (((portfolio_config ((max_position_pct_long 0.14))))
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((portfolio_config ((max_position_pct_long 0.14))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
    ((enable_stage3_force_exit true))

@@ -69,7 +69,8 @@
  ;; Cell E rotation cuts MaxDD by 10pp vs the no-rotation 0.14/0.70 variant
  ;; (28 → 18.4) while running 22x more trades (40 → 806). Tolerances ±15%.
  (config_overrides
-  (((enable_short_side false))
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((enable_short_side false))
    ((portfolio_config ((max_position_pct_long 0.30))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
@@ -82,7 +83,8 @@
  ;; golden_live_drift linter (#2403). Data-only: Scenario.t is
  ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
  (deviates_from_live
-  ((enable_short_side "long-only cell: arms the short leg off; the code default (and therefore live) is on")
+  ((cash_yield "price-only regression pin (#3137); the code default (and live config) arm the 3-month T-bill series")
+   (enable_short_side "long-only cell: arms the short leg off; the code default (and therefore live) is on")
    (portfolio_config "record-convention concentration arming (exposure 0.70 / min_cash 0.30, plus position 0.14 where armed); live runs the code defaults")
    (enable_stage3_force_exit "record-convention Stage-3 force-exit arming; live leaves it default-off")
    (stage3_force_exit_config "hysteresis_weeks 1 belongs to the arming above; the code default is 2")

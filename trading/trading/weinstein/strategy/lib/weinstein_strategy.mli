@@ -806,9 +806,10 @@ type config = {
           (cash account, no requirement) => exact no-op (R1); an unlevered book
           never fires. See [Weinstein_strategy_config.maintenance_long_pct]. *)
   cash_yield : Trading_simulation_cash_yield.Cash_yield.source;
-      [@sexp.default Trading_simulation_cash_yield.Cash_yield.No_yield]
-      (** Interest on positive cash (#3137). Default [No_yield] => exact no-op
-          (R1). See [Weinstein_strategy_config.cash_yield]. *)
+      [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_source]
+      (** Interest on positive cash (#3137). Default [Cash_yield.default_source]
+          (3-month T-bill series, on since the #3137 flip); [No_yield] => exact
+          pre-#3137 no-op. See [Weinstein_strategy_config.cash_yield]. *)
   cash_yield_fee_bp : float;
       [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
       (** Fee in bp off the [cash_yield] rate, net floored at 0. See
