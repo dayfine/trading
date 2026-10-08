@@ -6,14 +6,31 @@ set -eu
 REPO=/Users/difan/Projects/trading-1; cd $REPO
 git fetch -q origin main; SHA=$(git rev-parse --short=9 origin/main)
 WTREL=.claude/worktrees/sweep-rb12
-[ -d $WTREL ] || git worktree add --detach $WTREL $SHA
+# A pre-existing run tree must sit at origin/main; never reuse a stale one (its HEAD would pass EXPECT_HEAD).
+if [ -d $WTREL ]; then
+  [ "$(git -C $WTREL rev-parse --short=9 HEAD)" = "$SHA" ] || { echo "ABORT: $WTREL is not at origin/main $SHA; remove it first"; exit 1; }
+else git worktree add --detach $WTREL $SHA; fi
 for k in split_dividend_guard dividend_crediting cash_yield_fee_bp; do
   git -C $WTREL grep -q "$k" -- trading/trading/weinstein/strategy/lib/weinstein_strategy_config.ml || { echo "ABORT: $k not in $SHA"; exit 1; }
 done
-# The v12 build must have finished and verified (build_pit_warehouse_v12.sh verify); its manifest count pins the chain.
-grep -q 'VERIFY DONE' /tmp/pit-v12-work/build.log && ! grep -q 'ABORT' /tmp/pit-v12-work/build.log || { echo "ABORT: v12 build not verified (see /tmp/pit-v12-work/build.log)"; exit 1; }
-EXPECT_WH=$(docker exec trading-1-dev sh -c "grep -c '(symbol ' /tmp/snap_top3000_pit_v12pit/manifest.sexp")
+# The v12 build must have finished and verified: the LAST verify after the LAST abort (a resumed build may log an
+# earlier ABORT). Its manifest count pins the chain.
+BL=/tmp/pit-v12-work/build.log
+last_ok=$(grep -n 'VERIFY DONE' $BL | tail -1 | cut -d: -f1); last_ab=$(grep -n 'ABORT' $BL | tail -1 | cut -d: -f1)
+[ -n "$last_ok" ] && [ "$last_ok" -gt "${last_ab:-0}" ] || { echo "ABORT: v12 build not verified after its last abort (see $BL)"; exit 1; }
+WH=/tmp/snap_top3000_pit_v12pit
+EXPECT_WH=$(docker exec trading-1-dev sh -c "grep -c '(symbol ' $WH/manifest.sexp")
 echo "v12 warehouse entries=$EXPECT_WH"
+# Lists vs warehouse, fail-closed (#3188 review R5): verify passes before the twin alias delta is applied to the
+# lists, so the run tree's lists must already carry it. Every symbol in the run's schedule (top-3000 1999..2025)
+# must be in the manifest, except MEL (excluded in superset). Otherwise a dropped twin leg reads as "no bar".
+L=$WTREL/trading/test_data/backtest_scenarios/pit-v12/composition
+for f in $L/top-3000-1999.sexp $L/top-3000-20*.sexp; do grep -o '(symbol [^)]*)' "$f"; done \
+  | sed 's/(symbol //; s/)$//' | LC_ALL=C sort -u > /tmp/rb12-lists-union.txt
+docker exec trading-1-dev grep -o '((symbol [^)]*)' $WH/manifest.sexp | sed 's/((symbol //; s/)$//' | LC_ALL=C sort -u > /tmp/rb12-manifest.txt
+LC_ALL=C comm -23 /tmp/rb12-lists-union.txt /tmp/rb12-manifest.txt | grep -v -x -F MEL > /tmp/rb12-absent.txt || true
+[ ! -s /tmp/rb12-absent.txt ] || { echo "ABORT: $(wc -l < /tmp/rb12-absent.txt | tr -d ' ') list symbols not in the v12 manifest (e.g. $(head -5 /tmp/rb12-absent.txt | tr '\n' ' ')): apply the alias delta to the lists and merge it first"; exit 1; }
+echo "lists md5 (run tree $SHA): $(cat $L/top-3000-*.sexp | md5 -q)  union=$(wc -l < /tmp/rb12-lists-union.txt | tr -d ' ') absent=0 (MEL excepted)"
 # Dividend crediting and the split-dividend guard read <TRADING_DATA_DIR>/<shard>/<SYM>/{dividends,splits}.csv; the chain
 # runs with TRADING_DATA_DIR=<run tree>/trading/test_data. Untracked files only (the dirty check uses
 # --untracked-files=no); both arms see the same tree.

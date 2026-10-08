@@ -22,14 +22,24 @@ The guard is on in **both** arms: a dividend misread as a split creates phantom 
 ## Pre-registered reading (decided before launch)
 
 1. **Validity gates.**
-   - V6 = 0 on `rb0-26` s0 (first null cell on a new warehouse, per the build script's hand-off line). V6 > 0 →
-     stop, trace the twin, rebuild before reading anything.
-   - `validator_diff -check V6` rb0 vs rb1 per salt (the chain does it). Exit 1 → that salt's pair is not a
-     dividend read; say so.
+   - **Lists = warehouse.** `launch.sh` refuses to start unless every symbol of the run tree's top-3000 schedule is
+     in the v12 manifest (MEL excepted), and logs the lists md5. The run uses the lists at the launch SHA
+     (`origin/main` at launch), which must therefore include the build's alias-delta lists commit; that SHA and md5
+     go in the results writeup. Each cell's `n_symbols_absent` (snapshot cache line) is reported.
+   - **V6 = 0 on all six cells** (absolute, from each cell's validator report), and `validator_diff -check V6`
+     rb0 vs rb1 exits 0 per salt (the chain does it). rb0 s0 V6 > 0 → stop the chain, trace the twin, rebuild
+     before reading anything. Any other cell V6 > 0, or a diff exit 1 → that salt is excluded from items 3–6 and
+     reported as such; if two or more salts are excluded, the run is not read and the warehouse is fixed first.
    - Every cell writes `actual.sexp`; a `<no result>` is traced (OOM vs input) before relaunch.
-2. **#3173 after-merge check.** In `rb1` (and `rb0`), TDG 2013-07, WING and BCH show no split event and no
-   position-quantity jump on those dates; in `rb1` each event's cash is credited once. Pass/fail per event, with the
-   evidence (trades/open positions/equity curve rows) cited.
+2. **#3173 after-merge check.** Per cell, report the guard summary line
+   (`Panel_runner: split_dividend_guard rejected=N no_files=M`) and list every rejected event (symbol, date, implied
+   factor, matching dividend). For each specimen (TDG 2013-07, WING, BCH), per cell: if a position is held over the
+   event date, it passes when there is no split event and no quantity jump on that date and (rb1) the dividend is
+   credited once — evidence from trades / open positions / equity curve rows. If no cell holds it, the specimen is
+   **NA-unheld** and passes only if the guard's rejected list names it in every cell where the strategy's bar reader
+   saw the event (i.e. the guard fired even though nothing was held). The item passes when every held instance
+   passes and no specimen is missed by the guard; NA-unheld specimens are stated as such, not counted as tested on
+   positions.
 3. **Dividend implementation check (rb1 vs rb0, per salt).** Report `DividendIncomeTotal`,
    `DividendPaidShortTotal` (0 expected: shorts off), `DividendMissingFileCount`, `DividendSkippedNoAmountCount`,
    and the dividend log contribution computed from the equity curve as in total-return-26y. Split it into
@@ -39,13 +49,14 @@ The guard is on in **both** arms: a dividend misread as a split creates phantom 
    and V6 agrees. Specials are real cash and are reported, not gated; their size is the answer to why the v11 run
    came out at +0.21–0.23.
 4. **The re-based record (rb0, and rb1 if item 3 passes).** Per salt: total return, CAGR, max DD, Calmar, Sharpe
-   (excess over the net T-bill rate), trades, win rate; SPY on the matching basis (rb0: SPY price + T-bill on its
-   uninvested 0 %, i.e. SPY price; rb1: SPY total return with dividends reinvested). The regime split by period
+   (excess over the net T-bill rate), trades, win rate; SPY on the matching basis (rb0: SPY price-only, fully invested so it earns no interest;
+   rb1: SPY total return with dividends reinvested). The regime split by period
    (`backtest-result-review.md` RV2) on the rb1 basis.
-5. **v11 → v12 shift (descriptive, not decomposed).** `rb0` vs total-return-26y `tr0` differs in three ways at once:
-   the dollar-volume basis, the candidate set (inventory 5,734 → 11,888 symbols), and cash interest (+0.232 log
-   measured on v11, #3178). Report the per-salt gap, subtract the measured interest term as a rough guide, and say
-   that the remainder is basis + candidate set **jointly**. Name the largest membership-driven trade differences
+5. **v11 → v12 shift (descriptive, not decomposed).** `rb0` vs total-return-26y `tr0` differs in five ways at once:
+   the list-ranking dollar-volume basis, the candidate set (inventory 5,734 → 11,888 symbols), the rebuilt
+   warehouse itself, cash interest (+0.232 log measured on v11, #3178), and `split_dividend_guard` (the #3173
+   phantom shares, which inflated both v11 arms by 0.033 / 0.016 / 0.033 log per salt, #3178 results §1). Report the per-salt gap, subtract the two
+   measured terms as a rough guide, and say that the remainder is basis + candidate set + warehouse **jointly**. Name the largest membership-driven trade differences
    (names held in one universe and absent from the other) for s0.
 6. **Path effects.** Trades, open positions at end, and the 3 largest per-trade divergences rb1 vs rb0 per salt
    (dividend cash changes sizing; the #3138 at-fill knife-edge applies).
@@ -62,6 +73,12 @@ The guard is on in **both** arms: a dividend misread as a split creates phantom 
   part of this run.
 
 ## Known gaps (stated up front)
+
+- **#3136 is fixed in the list ranking only, not in the simulator's liquidity gates.** These specs arm
+  `min_entry_dollar_adv` $1M and `min_hold_dollar_adv` $500k, which still compute dollar volume on the mixed
+  (adjusted close × split-adjusted volume) basis. The #3136 measurement note puts the effect at 3.9–6.8 % of
+  symbol-weeks flipping in 1998–2003 (smaller later). The record is therefore **not #3136-clean**; it is "v12 lists,
+  v11-basis liquidity gates". Fixing the gates is a separate change with its own paired read.
 
 - #3138: an at-fill cash shortfall cancels an entry outright, so small cash differences fork paths. Pairs diverge
   for that reason as well as for the lever.
