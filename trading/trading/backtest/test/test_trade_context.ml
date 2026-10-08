@@ -613,7 +613,7 @@ let test_stop_ratchet_columns_join_from_stop_info _ =
   in
   let ctx =
     TC.of_audit_and_stop_log
-      ~audit:[ make_record (make_entry ~side ()) ]
+      ~audit:[ make_record (make_entry ()) ]
       ~stop_infos:[ stop_info ] ~trade
   in
   assert_that ctx
