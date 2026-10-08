@@ -947,7 +947,7 @@ let _short_exit_trigger batches =
   List.iter batches ~f:(Backtest.Stop_log.record_transitions log);
   match Backtest.Stop_log.get_stop_infos log with
   | [ info ] -> info.exit_trigger
-  | _ -> assert_failure "expected one stop_info"
+  | _ -> failwith "expected one stop_info"
 
 let _entered = [ _create_entering ~position_id:"ALX-1" ~side:Position.Short ]
 
