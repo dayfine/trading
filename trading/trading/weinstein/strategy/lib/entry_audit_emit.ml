@@ -14,7 +14,9 @@ let alternatives_of_decisions ~decisions ~exclude_position_id :
     Audit_recorder.alternative_input list =
   List.filter_map decisions ~f:(_alternative_of_decision ~exclude_position_id)
 
-let _walk_outcome_of : Entry_audit_capture.candidate_decision -> Audit_recorder.walk_outcome = function
+let _walk_outcome_of :
+    Entry_audit_capture.candidate_decision -> Audit_recorder.walk_outcome =
+  function
   | Entry_audit_capture.Kept _ -> Placed
   | Entry_audit_capture.Skipped reason -> Skipped reason
 
