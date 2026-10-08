@@ -4,7 +4,7 @@ Helpers for `dev/scripts/review_pack.sh`. POSIX sh + awk + jq; no Python.
 
 | file | runs on | does |
 |---|---|---|
-| `trade_extract.awk` | host | one trade over its symbol's bar CSV: MFE/MAE, post-exit path + A–F grade, fill-vs-bar checks (split-basis aware), 8-week pick return, stop-breach lag, hard-stop replays, installed-stop distance, MTM exposure rows, daily chart bars. Side-aware: a SHORT row signs every statistic so + is in its favour and breaches its stop on the high (#3149) |
+| `trade_extract.awk` | host | one trade over its symbol's bar CSV: MFE/MAE, post-exit path + A–F grade, fill-vs-bar checks (split-basis aware), 8-week pick return, stop-breach lag, hard-stop replays, installed-stop distance, fill-week volume ratio (#3141), MTM exposure rows, daily chart bars. Side-aware: a SHORT row signs every statistic so + is in its favour and breaches its stop on the high (#3149) |
 | `open_extract.awk` | host | one position still open at the window end (`open_positions.csv`) over its bar CSV: daily MTM exposure rows through the last day (#3125), the last bar carried onto the last day when the name has no bar there (#3144) |
 | `open_json.awk` | host | open positions + their side and entry macro week, and the last-day exposure check vs `actual.sexp` `open_positions_value` (shorts signed negative, as the simulator marks them; #3144) → `<run>_open.json` |
 | `periods.awk` | host | year or quarter table: return vs SPY on the run's basis (price or total return, #3177), drawdowns, invested %, trades, realised P&L, macro weeks |

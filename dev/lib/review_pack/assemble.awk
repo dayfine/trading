@@ -26,8 +26,8 @@ END {
     if (pid in sfk) printf ",\"sfk\":%s", q(sfk[pid])
     if (pid in x) { split(x[pid], e, "\t")
       if (e[2] ~ /^NO/) printf ",\"nodata\":true"
-      else printf ",\"fe\":%s,\"fx\":%s,\"mfe\":%s,\"mae\":%s,\"pmax\":%s,\"pmin\":%s,\"p13\":%s,\"g\":%s,\"onE\":%s,\"onX\":%s,\"inE\":%s,\"inX\":%s,\"gap\":%s,\"ebar\":%s,\"xbar\":%s,\"postN\":%s,\"f40\":%s,\"blag\":%s,\"cf\":[%s],\"eadj\":%s,\"xadj\":%s,\"isd\":%s", \
-        e[2], e[3], e[4], e[5], e[6], e[7], e[8], q(e[9]), e[10], e[11], e[12], e[13], e[14], q(e[15]), q(e[16]), e[17], e[18], e[19], e[20], e[21], e[22], (e[23] == "" ? "null" : e[23]) }
+      else printf ",\"fe\":%s,\"fx\":%s,\"mfe\":%s,\"mae\":%s,\"pmax\":%s,\"pmin\":%s,\"p13\":%s,\"g\":%s,\"onE\":%s,\"onX\":%s,\"inE\":%s,\"inX\":%s,\"gap\":%s,\"ebar\":%s,\"xbar\":%s,\"postN\":%s,\"f40\":%s,\"blag\":%s,\"cf\":[%s],\"eadj\":%s,\"xadj\":%s,\"isd\":%s,\"fvr\":%s,\"xpast\":%s", \
+        e[2], e[3], e[4], e[5], e[6], e[7], e[8], q(e[9]), e[10], e[11], e[12], e[13], e[14], q(e[15]), q(e[16]), e[17], e[18], e[19], e[20], e[21], e[22], (e[23] == "" ? "null" : e[23]), (e[24] == "" ? "null" : e[24]), (e[25] == "" ? 0 : e[25]) }
     k = c[1] "|" c[3]
     if (k in au) { split(au[k], u, "\t"); printf ",\"rs\":%s,\"aMacro\":%s,\"aGrade\":%s,\"aScore\":%s,\"fvt\":%s,\"faithful\":%s", q(u[3]), q(u[4]), q(u[5]), n(u[6]), n(u[7]), (u[8] == "✓" ? "true" : "false") }
     if (pid in st) { split(st[pid], s, "\t"); printf ",\"rsE\":%s,\"rsX\":%s,\"s3w\":%s,\"s4w\":%s,\"holdW\":%s,\"s2w\":%s", q(s[2]), q(s[3]), s[4], s[5], s[6], (s[7] == "" ? 0 : s[7]) }
