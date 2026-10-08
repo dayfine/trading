@@ -18,7 +18,9 @@
     [Available] pair the cash-floor error reports. For a short entry, [required]
     is the same notional cost, while the portfolio refuses a short on its
     collateral rule, so read short rows as "the size of the ticket", not the
-    size of the shortfall.
+    size of the shortfall. The floor also charges the book's unrealized-loss
+    drag, so a long can be refused with [available >= required] (see
+    {!funded_fraction}).
 
     {b What is recorded.} Only refusals that end in a [CancelEntry]. A refusal
     the retry re-offers or the resize refills is not a cancellation and is not
@@ -39,7 +41,8 @@ type t = {
 
 val funded_fraction : t -> float
 (** [available /. required], or [0.0] when [required <= 0.0]: how close the
-    ticket came to being fundable (ADMA: 0.957). *)
+    ticket came to being fundable (ADMA: 0.957). Above 1 when the cash floor's
+    unrealized-loss drag, not the price, refused the fill. *)
 
 type pending
 (** One step's refusals noted so far, by symbol, plus where to send the records.
