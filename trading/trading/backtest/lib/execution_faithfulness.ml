@@ -121,6 +121,21 @@ let _with_ticket_age (entry : Trade_audit.entry_decision) ~fill_date =
       Ticket_lifecycle.with_fill_age entry.ticket_lifecycle ~resolved:fill_date;
   }
 
+(* Replace the decision-time observation in both audit exit reasons with the
+   round-trip's realised exit fill. *)
+let _with_exit_fill (r : Trade_audit.audit_record) ~fill_price =
+  let refill trigger = Stop_log.with_fill_price trigger ~fill_price in
+  {
+    r with
+    exit_ =
+      Option.map r.exit_ ~f:(fun (e : Trade_audit.exit_decision) ->
+          { e with exit_trigger = refill e.exit_trigger });
+    external_exit =
+      Option.map r.external_exit
+        ~f:(fun (e : Trade_audit.external_exit_decision) ->
+          { e with exit_trigger = refill e.exit_trigger });
+  }
+
 let _enriched_record ~fill_by_pid ~entry_order_kind
     (r : Trade_audit.audit_record) =
   match Map.find fill_by_pid r.entry.position_id with
@@ -130,26 +145,10 @@ let _enriched_record ~fill_by_pid ~entry_order_kind
         _execution_of ~entry_order_kind ~entry:r.entry
           ~fill_price:trade.entry_price
       in
+      let r = _with_exit_fill r ~fill_price:trade.exit_price in
       {
         r with
         entry = _with_ticket_age r.entry ~fill_date:trade.entry_date;
-        exit_ =
-          Option.map r.exit_ ~f:(fun (e : Trade_audit.exit_decision) ->
-              {
-                e with
-                exit_trigger =
-                  Stop_log.with_fill_price e.exit_trigger
-                    ~fill_price:trade.exit_price;
-              });
-        external_exit =
-          Option.map r.external_exit
-            ~f:(fun (e : Trade_audit.external_exit_decision) ->
-              {
-                e with
-                exit_trigger =
-                  Stop_log.with_fill_price e.exit_trigger
-                    ~fill_price:trade.exit_price;
-              });
         execution = Some execution;
       }
 
