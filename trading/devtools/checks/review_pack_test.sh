@@ -493,5 +493,11 @@ sh "$SCRIPT" --no-container --data-dir "$TMP/avd/data" --out "$TMP/avd/pack" r0=
 expect_eq "AVD shape: builds, exit 0" 0 "$rc"
 expect_eq "AVD shape: a later split's fill near a wide bar's edge is code 2, not off-bar" 2 "$(jq -r '.[]|select(.sym=="FFF")|.inE' "$TMP/avd/pack/site/data/r0_trades.json")"
 expect_eq "AVD shape: without a split behind the factor it stays off-bar (code 0)" 0 "$(jq -r '.[]|select(.sym=="GGG")|.inE' "$TMP/avd/pack/site/data/r0_trades.json")"
+# #3177: a .panel grid stretched to its taller sibling spread the conformance table's rows over the
+# validator's height (the table read blank in a capped capture); panels now pack their rows at the top.
+# An empty conformance table says n/a instead of drawing a blank table.
+expect_eq "panels pack rows at the top (align-content: start)" 1 "$(grep -c '^\.panel {.*align-content: start;' "$S/index.html")"
+expect_eq "conformance table without a trade audit report reads n/a" 1 "$(grep -c "^const CONF_NA = '<tr><td colspan=\"4\" style=\"white-space:normal\">n/a: no trade audit report" "$S/index.html")"
+expect_eq "conformance n/a is wired into the table" 1 "$(grep -c '<tbody>${cf.length ? .. : CONF_NA}' "$S/index.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

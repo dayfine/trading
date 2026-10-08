@@ -46,7 +46,7 @@ nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input
 section.view { display: grid; gap: 20px; padding-top: 20px; }
 h2 { font: 600 17px/1.3 var(--f-head); margin: 0; letter-spacing: .01em; }
 h3 { font: 600 14px/1.3 var(--f-head); margin: 0; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; box-shadow: var(--shadow); display: grid; gap: 12px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; box-shadow: var(--shadow); display: grid; gap: 12px; min-width: 0; align-content: start; }
 .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 20px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -857,6 +857,8 @@ function renderHilo() {
 }
 
 /* ---------- Surprises ---------- */
+// No conformance rows means no trade audit report: say so rather than draw an empty table (#3177)
+const CONF_NA = '<tr><td colspan="4" style="white-space:normal">n/a: no trade audit report (the pack was built with --no-container, or the audit failed; see runs/&lt;run&gt;/audit.log).</td></tr>';
 function renderSurprises() {
   const t = D.trades[CH()], open = D.open[CH()].rows;
   $('#flagcards').innerHTML = FLAGS.map(f => { const ts = t.filter(x => x.flags.includes(f.id)); const net = ts.reduce((a, x) => a + x.pnl, 0), no = openHits(f, open);
@@ -865,7 +867,7 @@ function renderSurprises() {
     return `<button class="flagcard" data-flag="${f.id}"><span class="row" style="justify-content:space-between"><span class="pill ${f.cat}">${{ exec: 'Execution', book: 'Book', outcome: 'Outcome' }[f.cat]}</span><span class="cnt">${na ? 'n/a' : ts.length + no}</span></span><b>${f.label}</b><span class="num" style="text-align:left">net <span class="${sgn(net)}">${usdk(net)}</span> · ${fmt(100 * ts.length / t.length, 0)}% of trades${no ? ` · plus ${no} still open` : ''}</span><p>${f.why}</p></button>`; }).join('');
   $('#flagcards').addEventListener('click', e => { const b = e.target.closest('[data-flag]'); if (b) filterFlag(b.dataset.flag); });
   const cf = D.meta[CH()].conformance;
-  $('#conf').innerHTML = `<thead><tr><th>Rule</th><th>Description</th><th class="num">Passed</th><th class="num">Rate</th></tr></thead><tbody>${cf.map(r => `<tr><td><b>${r.rule}</b></td><td style="white-space:normal">${r.desc}</td><td class="num">${r.passed}</td><td class="num">${r.rate}</td></tr>`).join('')}</tbody>`;
+  $('#conf').innerHTML = `<thead><tr><th>Rule</th><th>Description</th><th class="num">Passed</th><th class="num">Rate</th></tr></thead><tbody>${cf.length ? '' : CONF_NA}${cf.map(r => `<tr><td><b>${r.rule}</b></td><td style="white-space:normal">${r.desc}</td><td class="num">${r.passed}</td><td class="num">${r.rate}</td></tr>`).join('')}</tbody>`;
   $('#validator').innerHTML = D.meta[CH()].validator.map(v => { const bad = !/PASS/.test(v.status);
     return `<details ${bad && v.sev === 'INVARIANT' ? 'open' : ''} style="border-bottom:1px solid var(--line);padding-block:6px"><summary><b>${v.id}</b> <span class="pill ${bad ? (v.sev === 'INVARIANT' ? 'outcome' : 'exec') : ''}">${v.sev.toLowerCase()}</span> <span class="${bad ? '' : 'mut'}">${v.status}</span></summary>${v.specimens.length ? `<pre class="spec">${v.specimens.join('\n')}</pre>` : ''}</details>`; }).join('');
 }
