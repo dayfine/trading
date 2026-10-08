@@ -522,13 +522,12 @@ type config = {
           prints lower highs, and never raised (the never-raise rule is
           unchanged). Long stops are untouched by this flag.
 
-          Faithful-core: book §6.3 (Ch. 7) — the short's buy-stop is trailed
-          down "as stock declines, lowering after each rally peak that fails"; a
-          short stop that can only rise is the mirror of the long-side Tightened
-          freeze, not a book rule. Default-off experiment axis per
-          [.claude/rules/experiment-flag-discipline.md]: the long-side analogue
-          cut winners when unfrozen, so this is a measured lever, not a presumed
-          win. *)
+          Study arm, not the faithful short trail: the running minimum of
+          individual bar highs is tighter than a confirmed rally peak. The
+          faithful short trail uses [tightened_can_ratchet = true]; see
+          [docs/design/weinstein-book-reference.md] §6.3. This flag remains a
+          default-off experiment axis per
+          [.claude/rules/experiment-flag-discipline.md]. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable
