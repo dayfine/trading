@@ -80,6 +80,18 @@ type alternative_input = {
 (** A candidate that scored at the same screen call as the chosen one but was
     not entered. *)
 
+(** What the entry walk did with one top-N candidate on a screening Friday
+    (#3139): [Placed] when it wrote the entry ticket, else the reason it was
+    passed over. *)
+type walk_outcome = Placed | Skipped of skip_reason
+
+type walk_decision = {
+  ranked : Screener.scored_candidate;
+  outcome : walk_outcome;
+}
+(** One row of the weekly decision record: a top-N candidate the entry walk
+    classified, with its one outcome. *)
+
 (** Whether the installed initial stop sat on a real support floor (or short:
     resistance ceiling) derived from bar history, or fell back to the
     fixed-buffer proxy. Mirrors {!Backtest.Trade_audit.stop_floor_kind}. *)
@@ -324,6 +336,13 @@ type cascade_event = {
           [[]] when [capture_candidates] is [false], which is the default and
           every non-audit context — the projection is not even computed, so the
           default path allocates nothing. *)
+  decisions : walk_decision list;
+      (** Every top-N candidate the entry walk classified this Friday, in walk
+          order, each with one outcome: [Placed] or the skip reason (#3139).
+          {b Always} populated, whatever [capture_candidates] says: at most the
+          screener's top-N rows per Friday, so the weekly record costs nothing
+          worth gating. [[]] on a Friday whose walk had no candidates (a
+          macro-blocked tape, an empty top-N); [diagnostics] says which. *)
   drops : cascade_drop list;
       (** Every candidate the {i cascade} evaluated this Friday and where each
           one fell out (G2). Supersedes {!candidates} as the artefact's

@@ -652,6 +652,7 @@ let _cascade_summary ~date : Backtest.Trade_audit.cascade_summary =
     short_grade_admitted = 0;
     short_top_n_admitted = 0;
     entered = 0;
+    decisions = [];
   }
 
 let test_filter_cascade_summaries_drops_warmup _ =

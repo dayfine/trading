@@ -447,16 +447,22 @@ let test_bah_default_cash_yield_accrues _ =
     (never silently earns 0). *)
 let test_missing_cash_yield_series_fails_run _ =
   skip_if (not (_spy_data_present ())) "SPY data unavailable";
-  let raised =
+  let error =
     try
       ignore
         (_bah_spy_equity_and_interest
            ~overrides:
              [ Sexp.of_string "((cash_yield (Series macro/no_such_file.csv)))" ]);
-      false
-    with _ -> true
+      None
+    with exn -> Some (Exn.to_string exn)
   in
-  assert_that raised (equal_to true)
+  assert_that error
+    (is_some_and
+       (all_of
+          [
+            contains_substring "cash_yield";
+            contains_substring "macro/no_such_file.csv";
+          ]))
 
 let suite =
   "Bah_runner_e2e"

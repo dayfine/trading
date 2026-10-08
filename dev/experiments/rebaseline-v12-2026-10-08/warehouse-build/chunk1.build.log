@@ -1,0 +1,33 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+6 group(s), 20 symbol(s) dropped
+  survivor AIM <- [AIMI]
+    AIMI (overlap=7106, match=0.9849)
+  survivor AKTX <- [CPU]
+    CPU (overlap=156, match=0.9677)
+  survivor ASTI <- [ARV; CADMQ; CALAQ; CENN; CYDS; DCIX]
+    ARV (overlap=2244, match=0.9666)
+    CADMQ (overlap=1705, match=0.6526)
+    CALAQ (overlap=2424, match=0.8873)
+    CENN (overlap=3460, match=0.4747)
+    CYDS (overlap=1353, match=0.6220)
+    DCIX (overlap=2333, match=0.6883)
+  survivor BAS <- [CNTV]
+    CNTV (overlap=245, match=0.9549)
+  survivor CFRX <- [ABWG; ACME; BIOC; CSKI]
+    ABWG (overlap=152, match=0.9801)
+    ACME (overlap=304, match=0.9604)
+    BIOC (overlap=2337, match=0.1498)
+    CSKI (overlap=267, match=1.0000)
+  survivor CNSP <- [AEA; APVO; ARJ; BDRX; BLC; CFI; CNLG]
+    AEA (overlap=0, match=0.0000)
+    APVO (overlap=1665, match=0.3233)
+    ARJ (overlap=0, match=0.0000)
+    BDRX (overlap=1665, match=0.3179)
+    BLC (overlap=411, match=0.9732)
+    CFI (overlap=235, match=0.9744)
+    CNLG (overlap=0, match=0.0000)
+active_through: 2196 marked, 107 survivors (of 2303 symbols)
+wrote 2303 entries to /tmp/snap_top3000_pit_v12pit/manifest.sexp in 1190.29s
+series_tail: 68 findings (20 truncated, 9 stray_dropped, 39 kept, 0 kept_by_exception, 0 cut_prefix, 0 cut_refused_short_tail)
+verify: 2303/2303 files OK (failed=0)
+exit=0

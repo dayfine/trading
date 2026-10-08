@@ -61,11 +61,13 @@ val with_fill_price : exit_trigger -> fill_price:float -> exit_trigger
     {!exit_trigger} variant + the gap between trigger level and actual fill.
     Surfaced on per-trade context exports for downstream tuner / ML use.
 
-    - [Gap_down]: actual fill was significantly worse than the stop level (more
-      than {!gap_down_threshold_pct} away from stop). For longs, the bar opened
-      or traded below the stop with a large gap; for shorts, the bar gapped up
-      through the stop. Indicates a price gap past the stop — not a clean
-      stop-hit.
+    - [Gap_through]: actual fill was significantly worse than the stop level
+      (more than {!gap_down_threshold_pct} past the stop): for a long, below it
+      (the bar gapped down through the stop); for a short, above it (gapped up).
+      Indicates a price gap past the stop, not a clean stop-hit. Named
+      side-neutrally since #3147; [trades.csv] labels it by side
+      ([Trade_context.stop_trigger_kind_label]: [gap_down] long, [gap_up]
+      short).
     - [Intraday]: actual fill at or near the stop level. The typical case where
       the stop was hit during normal trading.
     - [End_of_period]: position was force-closed at end-of-run by the simulator
@@ -73,12 +75,16 @@ val with_fill_price : exit_trigger -> fill_price:float -> exit_trigger
       {!exit_trigger.End_of_period}).
     - [Non_stop_exit]: the exit was not a stop trigger — take-profit,
       signal-reversal, time-expiry, or rebalance. *)
-type stop_trigger_kind = Gap_down | Intraday | End_of_period | Non_stop_exit
+type stop_trigger_kind =
+  | Gap_through
+  | Intraday
+  | End_of_period
+  | Non_stop_exit
 [@@deriving show, eq, sexp]
 
 val gap_down_threshold_pct : float
-(** Threshold gap (as a fraction of stop price) that distinguishes a {!Gap_down}
-    fill from an {!Intraday} fill. A long stop with
+(** Threshold gap (as a fraction of stop price) that distinguishes a
+    {!Gap_through} fill from an {!Intraday} fill. A long stop with
     [actual_price < stop_price * (1 - threshold)] counts as a gap-down
     (symmetric for shorts). Default 0.005 (50 basis points) — conservative
     enough that typical bid-ask noise on liquid US equities does not trip it but
@@ -93,9 +99,9 @@ val classify_stop_trigger_kind :
     on a {!Stop_loss} variant.
 
     For [Stop_loss { stop_price; actual_price }]:
-    - Long: [actual_price < stop_price * (1 - gap)] → [Gap_down]; else
+    - Long: [actual_price < stop_price * (1 - gap)] → [Gap_through]; else
       [Intraday].
-    - Short: [actual_price > stop_price * (1 + gap)] → [Gap_down]; else
+    - Short: [actual_price > stop_price * (1 + gap)] → [Gap_through]; else
       [Intraday].
 
     The {!End_of_period} variant maps to {!stop_trigger_kind.End_of_period}. All
@@ -236,7 +242,14 @@ val record_transitions : t -> Position.transition list -> unit
     - [UpdateRiskParams] updates current stop-loss price, advances
       {!stop_info.max_stop} when the new level is more protective, and
       increments {!stop_info.n_stop_raises} when it is strictly so
-    - [TriggerExit] records exit trigger and final stop level
+    - [TriggerExit] records exit trigger and final stop level. A simulator
+      margin exit ([margin_call] / [buyin_stress] / [maintenance_reduce]) does
+      {b not} overwrite a trigger already recorded for the same position on the
+      same transition date (#3147): [Margin_runner] drops a colliding strategy
+      exit (a stop-loss, a force liquidation) in favour of its own, and the
+      label keeps the strategy's decision, as [trade_audit.sexp] and
+      [force_liquidations.sexp] record it. A margin exit with no same-day
+      strategy exit is still labelled by its own label.
     - [ExitComplete] without a preceding [TriggerExit] tags
       [exit_trigger = End_of_period] (simulator end-of-run auto-close). An
       [ExitComplete] that follows a [TriggerExit] keeps the strategy's original

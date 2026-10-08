@@ -590,7 +590,7 @@ let test_classify_long_stop_with_gap_is_gap_down _ =
     Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Long
       trigger
   in
-  assert_that kind (equal_to Backtest.Stop_log.Gap_down)
+  assert_that kind (equal_to Backtest.Stop_log.Gap_through)
 
 let test_classify_short_stop_with_gap_is_gap_down _ =
   let trigger : Backtest.Stop_log.exit_trigger =
@@ -600,7 +600,7 @@ let test_classify_short_stop_with_gap_is_gap_down _ =
     Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Short
       trigger
   in
-  assert_that kind (equal_to Backtest.Stop_log.Gap_down)
+  assert_that kind (equal_to Backtest.Stop_log.Gap_through)
 
 let test_classify_short_stop_no_gap_is_intraday _ =
   let trigger : Backtest.Stop_log.exit_trigger =
@@ -653,7 +653,7 @@ let test_classify_custom_threshold_changes_classification _ =
   in
   assert_that
     (default_kind, strict_kind)
-    (equal_to (Backtest.Stop_log.Intraday, Backtest.Stop_log.Gap_down))
+    (equal_to (Backtest.Stop_log.Intraday, Backtest.Stop_log.Gap_through))
 
 (* Stop-ratchet observability (max_stop / n_stop_raises) ---------------- *)
 
@@ -950,10 +950,96 @@ let test_with_fill_price_preserves_reason _ =
          equal_to (End_of_period : exit_trigger);
        ])
 
+(* #3147 ---------------------------------------------------------------- *)
+
+let _exit ~d reason : Position.transition =
+  {
+    position_id = "ALX-1";
+    date = Date.of_string d;
+    kind = TriggerExit { exit_reason = reason; exit_price = 100.0 };
+  }
+
+let _signal label : Position.exit_reason =
+  StrategySignal { label; detail = None }
+
+let _short_exit_trigger batches =
+  let log = Backtest.Stop_log.create () in
+  List.iter batches ~f:(Backtest.Stop_log.record_transitions log);
+  match Backtest.Stop_log.get_stop_infos log with
+  | [ info ] -> info.exit_trigger
+  | _ -> failwith "expected one stop_info"
+
+let _entered = [ _create_entering ~position_id:"ALX-1" ~side:Position.Short ]
+
+(* ALX 2008-11-25: the strategy's force liquidation and the margin runner's
+   cover fire on the same day; [Margin_runner] keeps its own transition, so the
+   post-dedup batch carries only [margin_call]. The label keeps the force
+   liquidation, as [force_liquidations.sexp] records it. *)
+let test_force_cover_keeps_force_liquidation_label _ =
+  assert_that
+    (_short_exit_trigger
+       [
+         _entered;
+         [ _exit ~d:"2008-11-25" (_signal "force_liquidation") ];
+         [ _exit ~d:"2008-11-25" (_signal "margin_call") ];
+       ])
+    (is_some_and
+       (equal_to
+          (Backtest.Stop_log.Strategy_signal
+             { label = "force_liquidation"; detail = None })))
+
+(* A short squeezed through its stop the day the maintenance check flags it
+   (SUN1 2009-05-07 shape): the stop-loss label survives the margin cover,
+   whether the cover is a [buyin_stress] or a [maintenance_reduce]. *)
+let test_squeeze_stop_keeps_stop_loss_label _ =
+  let stop : Position.exit_reason =
+    StopLoss { stop_price = 20.0; actual_price = 21.0; loss_percent = 5.0 }
+  in
+  let after_margin label =
+    _short_exit_trigger
+      [
+        _entered;
+        [ _exit ~d:"2009-05-07" stop ];
+        [ _exit ~d:"2009-05-07" (_signal label) ];
+      ]
+  in
+  let stop_loss =
+    is_some_and
+      (equal_to
+         (Backtest.Stop_log.Stop_loss { stop_price = 20.0; actual_price = 21.0 }))
+  in
+  assert_that
+    (after_margin "buyin_stress", after_margin "maintenance_reduce")
+    (pair stop_loss stop_loss)
+
+(* Controls: a margin call alone is labelled [margin_call]; so is one a day
+   after an earlier strategy exit (reverted and re-held in between). *)
+let test_margin_call_alone_or_later_day_labelled_margin_call _ =
+  let margin =
+    Backtest.Stop_log.Strategy_signal { label = "margin_call"; detail = None }
+  in
+  assert_that
+    ( _short_exit_trigger
+        [ _entered; [ _exit ~d:"2008-11-25" (_signal "margin_call") ] ],
+      _short_exit_trigger
+        [
+          _entered;
+          [ _exit ~d:"2008-11-24" (_signal "force_liquidation") ];
+          [ _exit ~d:"2008-11-25" (_signal "margin_call") ];
+        ] )
+    (pair (is_some_and (equal_to margin)) (is_some_and (equal_to margin)))
+
 let suite =
   "Stop_log"
   >::: [
          "fill price preserves reason" >:: test_with_fill_price_preserves_reason;
+
+         "#3147 force cover keeps force_liquidation label"
+         >:: test_force_cover_keeps_force_liquidation_label;
+         "#3147 squeeze stop keeps stop_loss label"
+         >:: test_squeeze_stop_keeps_stop_loss_label;
+         "#3147 margin call alone or a later day is margin_call"
+         >:: test_margin_call_alone_or_later_day_labelled_margin_call;
          "create_entering records symbol"
          >:: test_create_entering_records_symbol;
          "entry_complete records stop" >:: test_entry_complete_records_stop;
@@ -972,9 +1058,9 @@ let suite =
          >:: test_unset_current_date_leaves_entry_date_none;
          "classify long stop no gap = Intraday"
          >:: test_classify_long_stop_no_gap_is_intraday;
-         "classify long stop with gap = Gap_down"
+         "classify long stop with gap = Gap_through"
          >:: test_classify_long_stop_with_gap_is_gap_down;
-         "classify short stop with gap = Gap_down"
+         "classify short stop with gap = Gap_through"
          >:: test_classify_short_stop_with_gap_is_gap_down;
          "classify short stop no gap = Intraday"
          >:: test_classify_short_stop_no_gap_is_intraday;

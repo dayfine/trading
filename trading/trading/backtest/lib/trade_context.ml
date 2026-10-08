@@ -27,12 +27,14 @@ let stage_label (s : Weinstein_types.stage) =
   | Stage3 _ -> "Stage3"
   | Stage4 _ -> "Stage4"
 
-let stop_trigger_kind_label (k : Stop_log.stop_trigger_kind) =
-  match k with
-  | Gap_down -> "gap_down"
-  | Intraday -> "intraday"
-  | End_of_period -> "end_of_period"
-  | Non_stop_exit -> "non_stop_exit"
+let stop_trigger_kind_label ~(side : Trading_base.Types.position_side)
+    (k : Stop_log.stop_trigger_kind) =
+  match (k, side) with
+  | Gap_through, Long -> "gap_down"
+  | Gap_through, Short -> "gap_up"
+  | Intraday, _ -> "intraday"
+  | End_of_period, _ -> "end_of_period"
+  | Non_stop_exit, _ -> "non_stop_exit"
 
 let entry_anchor_label (a : Ticket_lifecycle.entry_anchor) =
   match a with
@@ -194,7 +196,7 @@ let _stop_columns ~entry ~stop_info ~entry_date ~exit_date ~exit_price =
   in
   ( Option.map trigger ~f:(fun t ->
         let trigger = Stop_log.with_fill_price t ~fill_price:exit_price in
-        stop_trigger_kind_label
+        stop_trigger_kind_label ~side
           (Stop_log.classify_stop_trigger_kind ~side trigger)),
     _days_to_first_stop_trigger ~entry_date ~exit_date ~trigger )
 

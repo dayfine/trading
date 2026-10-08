@@ -18,6 +18,13 @@ type alternative_input = {
   reason : skip_reason;
 }
 
+type walk_outcome = Placed | Skipped of skip_reason
+
+type walk_decision = {
+  ranked : Screener.scored_candidate;
+  outcome : walk_outcome;
+}
+
 type stop_floor_kind = Support_floor | Buffer_fallback
 
 type split_safe_basis = Weinstein_stops.split_safe_basis =
@@ -93,6 +100,7 @@ type cascade_event = {
   breadth_state : Weinstein_types.breadth_state;
   entered : int;
   candidates : alternative_input list;
+  decisions : walk_decision list;
   drops : cascade_drop list;
 }
 

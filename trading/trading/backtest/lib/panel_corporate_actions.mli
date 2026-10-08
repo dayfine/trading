@@ -35,3 +35,36 @@ val split_guard_summary : Split_dividend_guard.t -> string
 
 val log_split_guard : Split_dividend_guard.t option -> unit
 (** Prints {!split_guard_summary} to stderr when armed; nothing otherwise. *)
+
+val ex_dividend_stops :
+  config:Weinstein_strategy.config ->
+  data_dir:Fpath.t ->
+  Ex_dividend_stop.t option
+(** #3174: [Some] fresh ex-dividend stop reducer iff
+    [config.ex_dividend_stop_adjust]; [None] otherwise. *)
+
+val ex_dividend_stops_summary : Ex_dividend_stop.t -> string
+(** One stderr line with the run's reducer counts:
+    ["Panel_runner: ex_dividend_stop_adjust reduced=<n> skipped_no_amount=<k>
+     no_files=<m>"]. *)
+
+type t = {
+  split_guard : Split_dividend_guard.t option;
+      (** {!split_guard}: shared by the simulator and the strategy. *)
+  ex_dividend_stops : Ex_dividend_stop.t option;
+      (** {!ex_dividend_stops}: strategy side only (the stop state). *)
+}
+(** The strategy-and-simulator corporate-action readers of one run. *)
+
+val create : config:Weinstein_strategy.config -> data_dir:Fpath.t -> t
+(** Both readers, each [Some] only when its flag is on. *)
+
+val arm_bar_reader :
+  t -> Weinstein_strategy.Bar_reader.t -> Weinstein_strategy.Bar_reader.t
+(** [arm_bar_reader t reader] attaches the split guard ({!guard_bar_reader}) and
+    the ex-dividend reducer
+    ({!Weinstein_strategy.Bar_reader.with_ex_dividend_stops}) present in [t];
+    [reader] itself (physically) when both are [None]. *)
+
+val log : t -> unit
+(** {!log_split_guard}, then {!ex_dividend_stops_summary} when armed. *)

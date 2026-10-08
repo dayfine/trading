@@ -71,6 +71,7 @@ let _ticket_lifecycle_of_event (e : AR.entry_event) : Ticket_lifecycle.t =
     sized_down_wide_stop = e.sized_down_wide_stop;
     triple_confirmation = _triple_confirmation_of_event e.triple_confirmation;
     reissued_from = None;
+    cash_rejection = None;
   }
 
 (** [weeks_advancing] for a [Stage2] classification, [None] otherwise. Surfaced
@@ -208,6 +209,8 @@ let _cascade_summary_of_event (e : AR.cascade_event) :
     short_grade_admitted = d.short_grade_admitted;
     short_top_n_admitted = d.short_top_n_admitted;
     entered = e.entered;
+    decisions =
+      List.map e.decisions ~f:Trade_audit_enum_hops.weekly_decision_of_event;
   }
 
 (** Drain one cascade event into [candidate_log] as a week. The near-miss

@@ -46,7 +46,7 @@ nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input
 section.view { display: grid; gap: 20px; padding-top: 20px; }
 h2 { font: 600 17px/1.3 var(--f-head); margin: 0; letter-spacing: .01em; }
 h3 { font: 600 14px/1.3 var(--f-head); margin: 0; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; box-shadow: var(--shadow); display: grid; gap: 12px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; box-shadow: var(--shadow); display: grid; gap: 12px; min-width: 0; align-content: start; }
 .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 20px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -134,7 +134,7 @@ ol.agenda li b { font-weight: 600; }
   <div class="panel">
     <div class="row" style="justify-content:space-between">
       <h2>Equity vs SPY (log scale, both start at $1M)</h2>
-      <div class="legend"><span><i style="background:var(--accent)"></i>Strategy NAV</span><span><i style="background:var(--spy)"></i>SPY total return</span></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>Strategy NAV</span><span id="spy-legend"><i style="background:var(--spy)"></i>SPY total return</span></div>
     </div>
     <div class="chart" id="c-eq"></div>
     <div class="row" style="justify-content:space-between">
@@ -242,6 +242,12 @@ ol.agenda li b { font-weight: 600; }
     <p class="note"><b>Pick, 8 wk</b> is the stock’s own return from the entry fill to the close 40 trading days later, whatever our stop did; <b>SPY, 8 wk</b> is the index over the same days. A pick year near SPY with a low win rate and many D/F grades lost on exits, not on selection. Medians, so one monster does not dominate.</p>
     <div class="tablebox"><table id="d-picks"></table></div>
   </div>
+  <div class="panel">
+    <h2>P&amp;L anatomy by entry year</h2>
+    <p class="note">Per entry year: average position weight at entry (entry value ÷ NAV that day), win rate, average win and loss (side-signed %), payoff (avg win ÷ avg loss), expectancy per trade (p × win − (1 − p) × loss) and the sum of each trade's P&amp;L as a share of NAV at its entry. The line below reads the whole run's shape: how concentrated the result is, how fat each tail is, and hindsight outcome counts.</p>
+    <div class="tablebox"><table id="d-anat"></table></div>
+    <p class="note" id="d-anat-shape" style="margin-top:8px"></p>
+  </div>
   <div class="grid2">
     <div class="panel">
       <h2>Loss cutting: a hard stop at X% below entry</h2>
@@ -305,41 +311,69 @@ const sgn = v => v > 0 ? 'pos' : v < 0 ? 'neg' : 'mut';
 const stageColor = s => ({ Stage1: css('--s1'), Stage2: css('--s2'), Stage3: css('--s3'), Stage4: css('--s4') })[s] || css('--neut');
 const macroColor = m => m === 'Bullish' ? css('--s2') : m === 'Bearish' ? css('--s4') : css('--neut');
 const gradeTag = g => g ? `<span class="g g${g[0]}">${g}</span>` : '–';
-const trigLabel = t => ({ stop_loss: 'stop', laggard_rotation: 'laggard rotation', extension_stop: 'extension stop', stage3_force_exit: 'stage 3 exit', force_liquidation: 'force liquidation', liquidity_exit: 'liquidity exit', delisted: 'delisted' })[t] || t;
+const trigLabel = t => ({ stop_loss: 'stop', laggard_rotation: 'laggard rotation', extension_stop: 'extension stop', stage3_force_exit: 'stage 3 exit', force_liquidation: 'force liquidation', liquidity_exit: 'liquidity exit', margin_call: 'margin call', delisted: 'delisted' })[t] || t;
 
+// Side-aware trade helpers (#3149). A SHORT is in its favour when the price falls: its stop sits
+// above the entry, a stop exit fills too far ABOVE the stop, its trigger fill is below the trigger,
+// its macro tailwind is Bearish, its wrong-side stage is Stage 2 and its own is Stage 4. P&L %,
+// MFE, grades, the breach lag and the entry-vs-prior-close gap arrive already side-signed from
+// trade_extract.awk.
+const isShort = t => t.side === 'SHORT';
+const sideSgn = t => isShort(t) ? -1 : 1;
+// how far the stop exit filled beyond the stop, as a fraction of the stop (+ = worse than planned)
+const stopSlip = t => t.xs > 0 ? sideSgn(t) * (t.xs - t.xp) / t.xs : null;
+// the initial stop distance: a long's decision-time distance (trades.csv stop_initial_distance_pct);
+// a short's is measured from its base-top suggested entry, so it is read from the installed stop vs the fill
+const stopDist = t => isShort(t) ? t.isd : t.sid;
+// the fallback stop is the audit's stop_floor_kind Buffer_fallback, for either side (#3177): a 4 % distance
+// is not a test (a structural floor can land on exactly 4 %: GBX 2024-11-04; a short's distance is measured
+// from its base-top suggested entry). Without the trade audit it is unknown: the card reads n/a.
+const isFallback = t => t.sfk === 'Buffer_fallback';
+const hasStopKind = ts => ts.some(t => t.sfk != null);
+// The fallback-stop overview finding and the Diagnostics fallback share: n/a (never a clean 0) when no
+// trade carries the audit's stop_floor_kind. Pure, for review_pack_test.sh.
+function fallbackFinding(ts) {
+  const fb = ts.filter(isFallback);
+  return hasStopKind(ts) ? `<b>${fb.length} of ${ts.length} trades (${fmt(100 * fb.length / ts.length, 0)}%) used the 4% fallback stop</b> rather than a stop under the base or MA.` : `<b>Fallback stops: n/a</b> (needs the trade audit's stop_floor_kind; build the pack with the container steps).`;
+}
+function fallbackShare(all, cohort) {
+  return hasStopKind(all) ? share(cohort, isFallback) : null;
+}
+const withMacro = t => isShort(t) ? 'Bearish' : 'Bullish', againstMacro = t => isShort(t) ? 'Bullish' : 'Bearish';
+const ownStage = t => isShort(t) ? 'Stage4' : 'Stage2';
 const FLAGS = [
-  { id: 'weekend', cat: 'exec', label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || (t.onX === 0 && t.trig !== 'delisted'),
-    why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect). A delisting exit has no bar on its date by construction and is left out.' },
+  { id: 'weekend', cat: 'exec', label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || (t.onX === 0 && t.trig !== 'delisted' && !t.xpast),
+    why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect). A delisting exit has no bar on its date by construction and is left out, as is any exit dated after the symbol’s last bar (MIME 2022-05-20, LACO 2020-10-09: a delisting stamped the next day).' },
   { id: 'offbar', cat: 'exec', label: 'Fill outside the day’s high–low', test: t => (t.onE === 1 && t.inE === 0) || (t.onX === 1 && t.inX === 0),
     why: 'The fill price never traded that day (half a percent of slack for rounding; fills on a later split basis are excluded). The validator’s V13 counts the same thing.' },
-  { id: 'gapstop', cat: 'exec', label: 'Stop filled ≥ 3 pts beyond the stop', test: t => t.trig === 'stop_loss' && t.xs > 0 && (t.xs - t.xp) / t.xs >= 0.03,
-    why: 'Opened below the stop, so the loss is larger than the risk planned at entry.' },
+  { id: 'gapstop', cat: 'exec', label: 'Stop filled ≥ 3 pts beyond the stop', test: t => t.trig === 'stop_loss' && stopSlip(t) >= 0.03,
+    why: 'Opened through the stop (below it for a long, above it for a short), so the loss is larger than the risk planned at entry.' },
   { id: 'latestop', cat: 'exec', label: 'Stop breached before the exit day', test: t => t.trig === 'stop_loss' && t.blag >= 1,
-    why: 'The low reached the installed stop (trades.csv entry_stop) on an earlier day than the exit fill. Under the default fill model exits are market orders sent after the close and fill at the next open; with sim_stop_exit_fill_on_trigger_bar on (the record and investor configs) a stop fills on the bar that trades it, so a count here is a stop-level mismatch worth opening (e.g. #3075). Book: the stop is a resting order (reference §5.7).' },
-  { id: 'slipcap', cat: 'exec', needs: 'fvt', label: 'Entry filled 2% above the trigger', test: t => t.fvt != null && t.fvt >= 1.99,
-    why: 'The entry order’s limit sits 2% above the trigger. These fills paid the whole allowance.' },
+    why: 'The price reached the installed stop (trades.csv entry_stop; the low for a long, the high for a short) on an earlier day than the exit fill. Under the default fill model exits are market orders sent after the close and fill at the next open; with sim_stop_exit_fill_on_trigger_bar on (the record and investor configs) a stop fills on the bar that trades it, so a count here is a stop-level mismatch worth opening (e.g. #3075). Book: the stop is a resting order (reference §5.7).' },
+  { id: 'slipcap', cat: 'exec', needs: 'fvt', label: 'Entry filled 2% past the trigger', test: t => t.fvt != null && sideSgn(t) * t.fvt >= 1.99,
+    why: 'The entry order’s limit sits 2% past the trigger (above it for a long, below it for a short). These fills paid the whole allowance.' },
   { id: 'quickstop', cat: 'exec', label: 'Stopped out within 2 days', test: t => t.trig === 'stop_loss' && t.days <= 2,
     why: 'Stop hit on or right after the entry bar. With a 4% stop this is often ordinary noise.' },
-  { id: 'chase', cat: 'exec', label: 'Bought ≥ 8% above the prior close', test: t => t.gap >= 8,
-    why: 'Entry after a gap or spike, not near the breakout level. The validator’s V10 flags entry weeks up more than 60%.' },
-  { id: 'forced', cat: 'exec', label: 'Forced, liquidity or delisting exit', test: t => ['force_liquidation', 'delisted', 'liquidity_exit'].includes(t.trig),
-    why: 'Exit not chosen by the strategy’s rules.' },
-  { id: 'macro', cat: 'book', needs: 'mE', open: true, label: 'Macro not Bullish at entry', test: t => t.mE && t.mE !== 'Bullish',
-    why: 'Book Ch. 3/8: weight buying to a bullish market. The run allows Neutral-market buys (audit R8).' },
-  { id: 'macrobear', cat: 'book', needs: 'mE', open: true, label: 'Bought in a Bearish macro week', test: t => t.mE === 'Bearish',
-    why: 'A bearish tape should block all new buys (spine rule 6).' },
-  { id: 'lowvol', cat: 'book', label: 'Breakout volume under 2× average', test: t => t.vr < 2,
-    why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3).' },
-  { id: 'fallback', cat: 'book', label: '4% fallback stop, not below the base', test: t => Math.abs(t.sid - 0.04) < 1e-9,
-    why: 'Book Ch. 6: the initial stop goes under the base or the MA (spine rule 5). A flat 4% means no structural level was used.' },
-  { id: 'widestop', cat: 'book', label: 'Initial stop wider than 15%', test: t => t.sid > 0.15,
-    why: 'Structural stop far from the entry; the validator’s V12 gate is 15%.' },
-  { id: 'stage4', cat: 'book', label: 'Held ≥ 2 weeks in Stage 4 (replay)', test: t => (t.s4w || 0) >= 2,
-    why: 'Book Ch. 2/6: never ride a Stage 4 decline (spine rule 4).' },
-  { id: 'notS2', cat: 'book', needs: 'rsE', label: 'Replay stage at entry is not Stage 2', test: t => t.rsE && t.rsE !== 'Stage2',
-    why: 'The chart classifier disagrees with the strategy’s Stage 2 call on the entry week.' },
-  { id: 'whipsaw', cat: 'outcome', label: 'Loss, then the stock ran ≥ 15%', test: t => /^[DF]/.test(t.g || ''),
-    why: 'Grade D or F: stopped out, then the stock rose at least 15% within 13 weeks.' },
+  { id: 'chase', cat: 'exec', label: 'Entered ≥ 8% past the prior close', test: t => t.gap >= 8,
+    why: 'Entry after a gap or spike (a long ≥ 8% above the prior close, a short ≥ 8% below it), not near the breakout level. The validator’s V10 flags entry weeks up more than 60%.' },
+  { id: 'forced', cat: 'exec', label: 'Forced, margin, liquidity or delisting exit', test: t => ['force_liquidation', 'margin_call', 'delisted', 'liquidity_exit'].includes(t.trig),
+    why: 'Exit not chosen by the strategy’s rules. A margin call buys a short back when its loss passes the margin limit.' },
+  { id: 'macro', cat: 'book', needs: 'mE', open: true, label: 'Macro not with the side at entry', test: t => t.mE && t.mE !== withMacro(t),
+    why: 'Book Ch. 3/8: weight buying to a bullish market and shorting to a bearish one. A long entered when the macro was not Bullish, a short when it was not Bearish. The run allows Neutral-market buys (audit R8).' },
+  { id: 'macrobear', cat: 'book', needs: 'mE', open: true, label: 'Entered against the macro', test: t => t.mE === againstMacro(t),
+    why: 'A long bought in a Bearish macro week or a short sold in a Bullish one: the macro gate should block both (spine rule 6).' },
+  { id: 'lowvol', cat: 'book', needs: 'fvr', label: 'Long fill-week volume under 2× average', test: t => !isShort(t) && t.fvr != null && t.fvr < 2,
+    why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3). Read on the week the order FILLED (its volume vs the 4 weeks before), not the screen week trades.csv records. Shorts are left out: a breakdown does not need volume (reference Ch. 2, Stage 4 detail).' },
+  { id: 'fallback', cat: 'book', needs: 'sfk', label: '4% fallback stop, not below the base', test: isFallback,
+    why: 'Book Ch. 6: the initial stop goes under the base or the MA (spine rule 5), above the top of the base for a short. A flat 4% means no structural level was used. Read from the trade audit’s stop_floor_kind (Buffer_fallback), not the 4% distance: a structural floor can land on exactly 4%. n/a without the audit.' },
+  { id: 'widestop', cat: 'book', label: 'Initial stop wider than 15%', test: t => stopDist(t) > 0.15,
+    why: 'Structural stop far from the entry; the validator’s V12 gate is 15%. A short’s distance is its installed stop vs the entry fill.' },
+  { id: 'stage4', cat: 'book', needs: 'holdW', label: 'Held ≥ 2 weeks in the wrong stage (replay)', test: t => (isShort(t) ? t.s2w || 0 : t.s4w || 0) >= 2,
+    why: 'Book Ch. 2/6: never ride a Stage 4 decline (spine rule 4). For a short, the wrong stage is Stage 2.' },
+  { id: 'notS2', cat: 'book', needs: 'rsE', label: 'Replay stage at entry is not the side’s stage', test: t => t.rsE && t.rsE !== ownStage(t),
+    why: 'The chart classifier disagrees with the strategy’s call on the entry week: Stage 2 for a long, Stage 4 for a short.' },
+  { id: 'whipsaw', cat: 'outcome', label: 'Loss, then the stock ran ≥ 15% the trade’s way', test: t => /^[DF]/.test(t.g || ''),
+    why: 'Grade D or F: stopped out, then within 13 weeks the stock rose at least 15% (a long) or fell at least 15% (a short).' },
   { id: 'giveback', cat: 'outcome', label: 'Gave back over half of a ≥ 20% gain', test: t => t.mfe >= 20 && t.pct < t.mfe * 0.5,
     why: 'Peak open gain at least 20%, exit under half of it.' },
 ];
@@ -357,6 +391,28 @@ function openCheckMiss(c) {
   return e > 1 && e > 0.01 * Math.max(Math.abs(c.pack), Math.abs(c.actual));
 }
 
+// Return basis (#3177), from meta.basis = { spy: 'tr' | 'price' | 'mixed', cash_yield, dividends }. The run
+// is compared with the SPY series on its own basis: SPY total return when both cash yield and dividends
+// are credited, SPY price when neither is; a mixed run is compared with total return and also shows the
+// price line. A pack without basis (older meta) reads total return, as before. Pure, for the test.
+function spyBasis(b) {
+  return b && b.spy ? b.spy : 'tr';
+}
+function spyBasisLabel(b) {
+  const s = spyBasis(b);
+  return s === 'price' ? 'SPY price only' : s === 'mixed' ? 'SPY total return (run credits ' + (b.cash_yield ? 'cash yield' : 'dividends') + ' only)' : 'SPY total return';
+}
+function sharpeBasis(b) {
+  const s = !b ? 'basis unknown' : b.cash_yield ? 'excess over net T-bill' : 'raw, no cash yield';
+  return b && b.cash_yield_src === 'assumed' ? s + ' (assumed: code_version not in this checkout)' : s;
+}
+// What the page shows for a basis: which SPY series it compares with (D.spyPrice / D.spyTR), the KPI
+// labels, the chart legend and whether the dashed SPY-price line is drawn. Every basis call site reads
+// this one object, so pinning it pins the wiring. Pure, for the test.
+function basisView(b) {
+  const s = spyBasis(b), label = spyBasisLabel(b);
+  return { series: s === 'price' ? 'spyPrice' : 'spyTR', total: label, sharpe: sharpeBasis(b), legend: label + (s === 'mixed' ? ' · dashed: SPY price only' : ''), priceLine: s === 'mixed' };
+}
 const D = {};
 const load = p => fetch('data/' + p).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); });
 const chartCache = {};
@@ -364,15 +420,26 @@ const chartCache = {};
 const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open'];
 load('manifest.json').then(man => {
   D.man = man; const ids = man.runs.map(r => r.id);
-  return Promise.all([...KINDS.flatMap(k => ids.map(id => load(`${id}_${k}.json`))), load('spy.json'), load('macro.json')]);
+  return Promise.all([...KINDS.flatMap(k => ids.map(id => load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json')]);
 }).then(r => {
   const n = D.man.runs.length;
   KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
-  D.spy = r[KINDS.length * n]; D.macro = r[KINDS.length * n + 1];
-  D.trades.forEach(ts => ts.forEach(t => { t.flags = FLAGS.filter(f => f.test(t)).map(f => f.id); t.yr = t.ed.slice(0, 4); }));
+  D.spyTR = r[KINDS.length * n]; D.macro = r[KINDS.length * n + 1]; D.spyPrice = r[KINDS.length * n + 2];
+  D.spy = D[basisView(D.meta[D.man.charts_run || 0].basis).series];
+  D.trades.forEach(ts => ts.forEach(t => { t.flags = FLAGS.filter(f => f.test(t)).map(f => f.id); t.yr = t.ed.slice(0, 4); t.tr = tradeTR(t); }));
   init();
 }).catch(e => { $('main').innerHTML = `<div class="empty">Could not load the data files (${e.message}).</div>`; });
 
+// salts = one config under different path seeds; arms = different configs (manifest run_kind, #3149)
+const RK = () => D.man && D.man.run_kind === 'arm' ? 'arm' : 'salt';
+const RKC = () => RK()[0].toUpperCase() + RK().slice(1);
+function labelRunKind() {
+  if (RK() === 'salt') return;
+  $('[data-v="salts"]').textContent = 'Arms'; $('label[for="p-salt"]').textContent = 'Arm'; $('#t-salt').setAttribute('aria-label', 'Arm');
+  $('#v-salts h2').textContent = 'Every arm, side by side';
+  $('#v-salts p.note').textContent = 'These runs are arms: different configs, not salts of one. Their differences are the levers’ effect plus path noise, not path noise alone.';
+  $('#s-years').closest('.panel').querySelector('h2').textContent = 'Yearly return by arm';
+}
 const runLabel = i => D.man.runs[i].label || D.man.runs[i].id;
 const CH = () => D.man.charts_run || 0;
 function init() {
@@ -381,7 +448,7 @@ function init() {
   const opts = (note) => D.man.runs.map((r, i) => `<option value="${i}">${runLabel(i)} (${pct(D.meta[i].metrics.totalreturnpct, 0)})${note && i !== CH() ? ' · no charts' : ''}</option>`).join('');
   $('#p-salt').innerHTML = opts(false); $('#t-salt').innerHTML = opts(true); $('#t-salt').value = String(CH());
   $('#flags-title').textContent = `Per-trade flags, ${runLabel(CH())}`;
-  renderOverview(); renderPeriods(); initTrades(); renderHilo(); renderSurprises(); renderDiag(); renderSalts(); renderAgenda();
+  labelRunKind(); renderOverview(); renderPeriods(); initTrades(); renderHilo(); renderSurprises(); renderDiag(); renderAnatomy(); renderSalts(); renderAgenda();
   $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
   const h = location.hash.slice(1); if (h && $('#v-' + h)) show(h);
 }
@@ -405,8 +472,8 @@ function mkChart(id, h, v) {
 }
 
 /* ---------- Overview ---------- */
-function spyOnNavDates(nav) {
-  const m = new Map(D.spy); let last = null; const first = D.spy.find(([d]) => d >= nav[0][0]) || D.spy[0];
+function spyOnNavDates(nav, series = D.spy) {
+  const m = new Map(series); let last = null; const first = series.find(([d]) => d >= nav[0][0]) || series[0];
   const base = +first[1]; return nav.map(([d]) => { if (m.has(d)) last = +m.get(d); return [d, 1e6 * (last ?? base) / base]; });
 }
 /* ---------- Signals: eras vs SPY, regime x era, one-trade years ---------- */
@@ -480,7 +547,8 @@ function oneTradeYear(ex, topPct) {
 function alsoCause(gap1, gap2) {
   return Math.sign(gap2) === Math.sign(gap1) && (Math.abs(gap2) >= 0.5 * Math.abs(gap1) || Math.abs(gap2) >= 0.15);
 }
-// Gate reopen episodes: the macro gate turns Bullish after REOPEN_CLOSED_WEEKS+ non-Bullish weeks.
+// Gate reopen episodes: the macro gate turns Bullish after REOPEN_CLOSED_WEEKS+ non-Bullish weeks (Bearish
+// after non-Bearish weeks for a short-only book).
 // Per episode: entries in the first 13 / 26 weeks, strategy and SPY return over the next 26 weeks.
 const REOPEN_CLOSED_WEEKS = 8, REOPEN_SPY_MIN = 8, REOPEN_GAP_PP = 8, REOPEN_FEW = 2, REOPEN_MANY = 6;
 // A reopen is flagged when SPY made >= REOPEN_SPY_MIN % over the 26 weeks and the strategy trailed it
@@ -493,17 +561,20 @@ function reopenFlag(e13, ret, spy) {
 // macro = [[date, trend, ...]] weekly; nav = [[date, value, ...]] and spy = [[date, value]] daily on the same
 // dates; trades carry `ed` (entry date). Values are read from the last row on or before a date. An episode
 // is dropped when it starts before the NAV data or its 26-week window runs past the last NAV row.
-function reopenEpisodes(macro, nav, spy, trades) {
+// dir = -1 reads a short-only book (#3149): its gate opens when the macro turns Bearish, and e.spy is the
+// inverse of SPY's move (a short book's benchmark gains when SPY falls), so reopenFlag reads it unchanged.
+function reopenEpisodes(macro, nav, spy, trades, dir = 1) {
+  const opens = dir < 0 ? 'Bearish' : 'Bullish';
   const at = (arr, d) => { let v = null; for (const r of arr) { if (r[0] > d) break; v = r[1]; } return v; };
   const addDays = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n * 86400e3).toISOString().slice(0, 10);
   const last = nav.length ? nav[nav.length - 1][0] : '';
   const eps = []; let closed = 0;
-  for (const [d, trend] of macro) { if (trend === 'Bullish') { if (closed >= REOPEN_CLOSED_WEEKS) eps.push({ d, closed }); closed = 0; } else closed++; }
+  for (const [d, trend] of macro) { if (trend === opens) { if (closed >= REOPEN_CLOSED_WEEKS) eps.push({ d, closed }); closed = 0; } else closed++; }
   for (const e of eps) {
     const d13 = addDays(e.d, 91), d26 = addDays(e.d, 182);
     e.e13 = trades.filter(t => t.ed >= e.d && t.ed < d13).length; e.e26 = trades.filter(t => t.ed >= e.d && t.ed < d26).length;
     const n0 = at(nav, e.d), n1 = d26 <= last ? at(nav, d26) : null, s0 = at(spy, e.d), s1 = d26 <= last ? at(spy, d26) : null;
-    e.ret = n0 && n1 ? 100 * (n1 / n0 - 1) : null; e.spy = s0 && s1 ? 100 * (s1 / s0 - 1) : null;
+    e.ret = n0 && n1 ? 100 * (n1 / n0 - 1) : null; e.spy = s0 && s1 ? dir * 100 * (s1 / s0 - 1) : null;
     e.flag = reopenFlag(e.e13, e.ret, e.spy);
   }
   return eps.filter(e => e.ret != null && e.spy != null);
@@ -517,6 +588,13 @@ function shortLegLine(s) {
   const na = v => v == null ? 'n/a' : String(v), usd = v => `${v < 0 ? '−' : ''}$${Math.round(Math.abs(v)).toLocaleString('en-US')}`;
   const head = `<b>Short leg on:</b> ${na(s.tickets)} short tickets placed, ${s.fills} short entries filled, short realised P&amp;L ${usd(s.pnl)}.`;
   return s.fills > 0 ? head : `${head} The macro read Bearish in ${na(s.bearish_weeks)} screening weeks; ${na(s.bearish_admitted)} of them admitted a short to the top-N (<code>short_top_n_admitted</code> &gt; 0).`;
+}
+// At-fill cash rejections (#3138): c = meta.cash_rejections = { count, near }, or null without the trade
+// audit (no line). Entry tickets that triggered and filled at the engine but that the book could not fund,
+// so the ticket was cancelled; near = how many were at least 90 % funded. Pure, for review_pack_test.sh.
+function cashRejectionLine(c) {
+  if (!c || !c.count) return '';
+  return `<b>Entries cancelled at the fill for cash:</b> ${c.count} ${c.count === 1 ? 'ticket' : 'tickets'} filled at the engine but the book could not fund ${c.count === 1 ? 'it' : 'them'}; ${c.near} ${c.near === 1 ? 'was' : 'were'} at least 90 % funded (<code>cash_rejection</code> in <code>trade_audit.sexp</code>).`;
 }
 // Renders the ratio chart + era table; returns finding bullets (HTML strings).
 function renderSignals(nav, spy) {
@@ -557,33 +635,35 @@ function renderSignals(nav, spy) {
     const salts = D.years.map(s => (s.find(q => q.p === y.p) || {}).ret).filter(v => v != null), spread = salts.length > 1 ? Math.max(...salts) - Math.min(...salts) : 0;
     const ex = y.ret - y.spy, topPct = top ? 100 * top.pnl / y.nav0 : 0;
     const one = top && oneTradeYear(ex, topPct);
-    if (one || spread >= 15) out.push(`<b>${y.p} rests on ${one ? `one trade` : `the salt`}:</b> ${pct(y.ret, 1)} vs SPY ${pct(y.spy, 1)}.${one ? ` ${top.sym} realised ${usdk(top.pnl)} = ${pct(topPct, 1)} of start-of-year NAV, against a ${pct(ex, 1)} gap to SPY.` : ''}${salts.length > 1 ? ` Salts made ${salts.map(v => pct(v, 1)).join(' / ')}.` : ''}`);
+    if (one || spread >= 15) out.push(`<b>${y.p} rests on ${one ? `one trade` : `the ${RK()}`}:</b> ${pct(y.ret, 1)} vs SPY ${pct(y.spy, 1)}.${one ? ` ${top.sym} realised ${usdk(top.pnl)} = ${pct(topPct, 1)} of start-of-year NAV, against a ${pct(ex, 1)} gap to SPY.` : ''}${salts.length > 1 ? ` ${RKC()}s made ${salts.map(v => pct(v, 1)).join(' / ')}.` : ''}`);
   }
   // the return rests on positions still open at the end (see openSignal)
   const nav0 = nav[0][1], move = nav[nav.length - 1][1] - nav0, real = tr.reduce((a, t) => a + t.pnl, 0), open = move - real;
   if (openSignal(nav0, move, real))
     out.push(`<b>The return rests on open positions:</b> NAV moved ${usdk(move)}, closed trades realised ${usdk(real)}, so the ${D.meta[CH()].metrics.openpositioncount} positions open at the end carry ${usdk(open)} unmarked by any trade row. Check <code>open_positions.csv</code> before crediting the return to the trade list.`);
   // gate reopen episodes: the flat-through-the-recovery shape (2008-09) and its opposite (invested, lagged)
-  const eps = reopenEpisodes(D.macro, nav, spy, tr), ep = e => `${e.d.slice(0, 7)} (${e.e13} ${e.e13 === 1 ? 'entry' : 'entries'} in 13 wk, ${pct(e.ret, 1)} vs SPY ${pct(e.spy, 1)})`;
+  const shortBook = tr.length > 0 && tr.every(isShort), eps = reopenEpisodes(D.macro, nav, spy, tr, shortBook ? -1 : 1), ep = e => `${e.d.slice(0, 7)} (${e.e13} ${e.e13 === 1 ? 'entry' : 'entries'} in 13 wk, ${pct(e.ret, 1)} vs SPY ${pct(e.spy, 1)})`;
   const groups = [['sat out', 'Sat out the recovery'], ['invested and lagged', 'Invested and lagged'], ['lagged', 'Lagged']].map(([k, label]) => [label, eps.filter(e => e.flag === k)]).filter(([, l]) => l.length);
-  if (eps.length) out.push(`<b>Gate reopen episodes:</b> ${eps.length} ${eps.length === 1 ? 'reopen' : 'reopens'} after ${REOPEN_CLOSED_WEEKS}+ closed weeks. ${groups.length ? groups.map(([label, l]) => `${label}: ${l.map(ep).join('; ')}.`).join(' ') : `None was followed by a ${REOPEN_GAP_PP} pp lag behind a SPY rise of ${REOPEN_SPY_MIN} % or more.`}`);
+  if (eps.length) out.push(`<b>Gate reopen episodes:</b> ${eps.length} ${eps.length === 1 ? 'reopen' : 'reopens'} after ${REOPEN_CLOSED_WEEKS}+ closed weeks${shortBook ? ' (short-only book: the gate reopens on Bearish and SPY is read inverted)' : ''}. ${groups.length ? groups.map(([label, l]) => `${label}: ${l.map(ep).join('; ')}.`).join(' ') : `None was followed by a ${REOPEN_GAP_PP} pp lag behind a SPY rise of ${REOPEN_SPY_MIN} % or more.`}`);
   $('#reopens').innerHTML = eps.length ? tbl([['Reopen'], ['Closed weeks', 1], ['Entries 13 / 26 wk', 1], ['Strategy 26 wk', 1], ['SPY 26 wk', 1], ['Read']],
     eps.map(e => `<tr><td>${e.d}</td><td class="num">${e.closed}</td><td class="num">${e.e13} / ${e.e26}</td><td class="num"><span class="${sgn(e.ret - e.spy)}">${pct(e.ret, 1)}</span></td><td class="num">${pct(e.spy, 1)}</td><td>${e.flag || (e.ret >= e.spy ? 'ahead of SPY' : '–')}</td></tr>`))
     : '<tbody><tr><td>No reopen after 8+ closed weeks inside this window.</td></tr></tbody>';
   // the short leg: on or off, tickets, fills and the binding gate (see shortLegLine)
   const sl = shortLegLine(D.meta[CH()].short_leg);
   if (sl) out.push(sl);
+  const cr = cashRejectionLine(D.meta[CH()].cash_rejections);
+  if (cr) out.push(cr);
   return out;
 }
 function renderOverview() {
-  const m = D.meta[CH()].metrics, nav = D.nav[CH()], trades = D.trades[CH()];
+  const m = D.meta[CH()].metrics, nav = D.nav[CH()], trades = D.trades[CH()], BV = basisView(D.meta[CH()].basis);
   const spy = spyOnNavDates(nav); const spyRet = (spy[spy.length - 1][1] / 1e6 - 1) * 100;
   const yrsBeat = D.years[CH()].filter(y => y.ret > y.spy).length;
   const k = [
-    ['Total return', pct(m.totalreturnpct, 0), `SPY ${pct(spyRet, 0)} same window`],
+    ['Total return', pct(m.totalreturnpct, 0), `${BV.total} ${pct(spyRet, 0)} same window`],
     ['CAGR', pct(m.cagr), 'annualised'],
     ['Max drawdown', '−' + fmt(m.maxdrawdown) + '%', `Calmar ${fmt(m.calmarratio, 2)}`],
-    ['Sharpe', fmt(m.sharperatio, 2), `vol ${fmt(m.volatilitypctannualized)}%`],
+    ['Sharpe', fmt(m.sharperatio, 2), `${BV.sharpe} · vol ${fmt(m.volatilitypctannualized)}%`],
     ['Trades', String(trades.length), `${fmt(m.tradefrequencyannualized ?? m.tradefrequency, 1)} / yr`],
     ['Win rate', fmt(m.winrate) + '%', `profit factor ${fmt(m.profitfactor, 2)}`],
     ['Avg hold', fmt(m.avgholdingdays, 0) + ' d', `${m.openpositioncount} open at end`],
@@ -598,6 +678,9 @@ function renderOverview() {
   navLine.setData(nav.map(([d, v]) => ({ time: d, value: v })));
   // the axis label carries the FINAL NAV, not the last point in the visible range
   navLine.createPriceLine({ price: nav[nav.length - 1][1], color: css('--accent'), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'final' });
+  // a mixed-basis run (#3177) also gets SPY price, dashed, so neither comparison is hidden
+  $('#spy-legend').innerHTML = `<i style="background:var(--spy)"></i>${BV.legend}`;
+  if (BV.priceLine) eq.addLineSeries({ color: css('--spy'), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }).setData(spyOnNavDates(nav, D.spyPrice).map(([d, v]) => ({ time: d, value: v })));
   eq.timeScale().fitContent();
 
   const dd = mkChart('#c-dd', 150, 'overview');
@@ -615,7 +698,7 @@ function renderOverview() {
   const sync = [eq, dd, mc]; let busy = false;
   sync.forEach(c => c.timeScale().subscribeVisibleTimeRangeChange(r => { if (busy || !r) return; busy = true; sync.forEach(o => { if (o !== c) try { o.timeScale().setVisibleRange(r); } catch (e) {} }); busy = false; }));
 
-  const t = trades, fb = t.filter(x => x.flags.includes('fallback')), stops = t.filter(x => x.trig === 'stop_loss'), gap = stops.filter(x => x.xs > 0 && (x.xs - x.xp) / x.xs > 0.005);
+  const t = trades, stops = t.filter(x => x.trig === 'stop_loss'), gap = stops.filter(x => stopSlip(x) > 0.005);
   const wk = t.filter(x => x.flags.includes('weekend')); const ys = D.years[CH()];
   const cum = (arr, k) => (arr.reduce((a, y) => a * (1 + y[k] / 100), 1) - 1) * 100;
   let worst = null; for (let i = 0; i + 3 <= ys.length; i++) { const w = ys.slice(i, i + 3), ex = cum(w, 'ret') - cum(w, 'spy'); if (!worst || ex < worst.ex) worst = { w, ex }; }
@@ -626,12 +709,12 @@ function renderOverview() {
   const f = [
     openCheckMiss(oc) && `<b>Exposure check failed on ${oc.date}:</b> the pack marks ${usd(oc.pack)} held, actual.sexp has ${usd(oc.actual)} in open positions. Every invested figure on this page is suspect.`,
     worst && `<b>Worst three-year stretch: ${worst.w[0].p}–${worst.w[2].p}, ${pct(cum(worst.w, 'ret'), 1)} while SPY made ${pct(cum(worst.w, 'spy'), 1)}.</b> Bullish macro weeks: ${worst.w.map(y => y.bull).join(' / ')}; realised P&amp;L ${worst.w.map(y => usdk(y.pnl)).join(' / ')}.`,
-    `<b>Ten trades made ${usdk(top10.reduce((a, x) => a + x.pnl, 0))}</b> of the ${usdk(tot)} realised total. The ${aTr.length} A-grade trades made ${usdk(aTr.reduce((a, x) => a + x.pnl, 0))}.`,
-    `<b>${fb.length} of ${t.length} trades (${fmt(100 * fb.length / t.length, 0)}%) used the 4% fallback stop</b> rather than a stop under the base or MA.`,
-    `<b>${gap.length} of ${stops.length} stop exits filled more than 0.5% below the stop; ${late.length} sold at an open after the day the stop traded.</b> ${df.length} losers (grade D/F) then rallied ≥ 15% within 13 weeks; they lost ${usdk(df.reduce((a, x) => a + x.pnl, 0))}.`,
+    `<b>Ten trades made ${usdk(top10.reduce((a, x) => a + x.pnl, 0))}</b> of the ${usdk(tot)} realised total. The ${aTr.length} A-grade trades made ${usdk(aTr.reduce((a, x) => a + x.pnl, 0))}.${realisedTotalNote(t.reduce((a, x) => a + (x.div || 0), 0), inv.metrics.cashinteresttotal)}`,
+    fallbackFinding(t),
+    `<b>${gap.length} of ${stops.length} stop exits filled more than 0.5% beyond the stop; ${late.length} sold at an open after the day the stop traded.</b> ${df.length} losers (grade D/F) then moved ≥ 15% the trade’s way within 13 weeks; they lost ${usdk(df.reduce((a, x) => a + x.pnl, 0))}.`,
     `<b>Average invested: ${fmt(expoAvg, 0)}% of NAV,</b> about ${fmt(ys.reduce((a, y) => a + y.pos, 0) / ys.length, 1)} positions on average.`,
     `<b>${wk.length} trades have a fill dated on a day with no bar</b> (the Saturday-fill defect). The validator also counts ${(inv.validator.find(v => v.id === 'V13') || {}).status || '?'} on V13.`,
-    rets.length > 1 && `<b>Salt spread: the same rules returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} salts.`,
+    rets.length > 1 && (RK() === 'salt' ? `<b>Salt spread: the same rules returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} salts.` : `<b>The ${rets.length} arms returned ${rets.map(r => pct(r, 0)).join(', ')}</b> (different configs, not salts of one).`),
   ].filter(Boolean);
   // the signals lead: era and one-trade-year bullets come before the run-level counts
   $('#findings').innerHTML = [...renderSignals(nav, spy), ...f].map(x => `<li>${x}</li>`).join('');
@@ -647,7 +730,7 @@ function isoWeek(d) { const t = new Date(d + 'T00:00:00Z'); const day = (t.getUT
 let pGran = 'Y';
 function renderPeriods() {
   const s = +$('#p-salt').value, rows = pGran === 'Y' ? D.years[s] : D.quarters[s];
-  $('#p-title').textContent = (pGran === 'Y' ? 'Returns by year' : 'Returns by quarter') + ' vs SPY, salt ' + s;
+  $('#p-title').textContent = (pGran === 'Y' ? 'Returns by year' : 'Returns by quarter') + ' vs SPY, ' + RK() + ' ' + runLabel(s);
   drawBars(rows);
   const cols = [
     ['Period', r => r.p, ''], ['Return', r => r.ret, 'pct'], ['SPY', r => r.spy, 'pct'], ['Excess', r => r.ret - r.spy, 'pct'],
@@ -687,11 +770,23 @@ $('#p-y').addEventListener('click', () => { pGran = 'Y'; $('#p-y').setAttribute(
 $('#p-q').addEventListener('click', () => { pGran = 'Q'; $('#p-q').setAttribute('aria-pressed', 'true'); $('#p-y').setAttribute('aria-pressed', 'false'); renderPeriods(); });
 
 /* ---------- Trades ---------- */
+// Total-return P&L of one trade (#3175): price-only pnl plus the dividends credited while it was held.
+// trades.csv gains dividends_received last; an older file has none (div null), read as 0.
+function tradeTR(t) { return t.pnl + (t.div || 0); }
+// The sentence appended to the realised-total signal (#3175). Trade rows are price-only; dividends and
+// interest are cash credits outside them. Empty when neither was credited (price-only run).
+function realisedTotalNote(divs, interest) {
+  const parts = [];
+  if (divs) parts.push(`${usdk(divs)} of dividends (inside the trade rows' Div $ column, not in P&amp;L $)`);
+  if (interest) parts.push(`${usdk(interest)} of cash interest (in no trade row)`);
+  return parts.length ? ` Trade P&amp;L is price-only: add ${parts.join(' and ')} for the total-return figure.` : '';
+}
 const TCOLS = [
   ['Symbol', 'sym', t => `<b>${t.sym}</b>`], ['Entry', 'ed', t => t.ed], ['Exit', 'xd', t => t.xd], ['Days', 'days', t => t.days, 'num'],
   ['P&L %', 'pct', t => `<span class="${sgn(t.pct)}">${pct(t.pct)}</span>`, 'num'], ['P&L $', 'pnl', t => `<span class="${sgn(t.pnl)}">${usdk(t.pnl)}</span>`, 'num'],
+  ['Div $', 'div', t => (t.div == null ? '–' : usdk(t.div)), 'num'], ['TR P&L $', 'tr', t => `<span class="${sgn(tradeTR(t))}">${usdk(tradeTR(t))}</span>`, 'num'],
   ['Grade', 'g', t => gradeTag(t.g)], ['Exit via', 'trig', t => trigLabel(t.trig)], ['Macro in', 'mE', t => `<span class="stg" style="background:${macroColor(t.mE)}"></span>${t.mE || '–'}`],
-  ['Stop', 'sid', t => fmt(t.sid * 100, 1) + '%', 'num'], ['Vol ×', 'vr', t => fmt(t.vr, 1), 'num'], ['MFE', 'mfe', t => pct(t.mfe, 0), 'num'], ['Flags', 'nflags', t => t.flags.length || '', 'num'],
+  ['Stop', 'sid', t => stopDist(t) == null ? '–' : fmt(stopDist(t) * 100, 1) + '%', 'num'], ['Vol ×', 'vr', t => fmt(t.vr, 1), 'num'], ['MFE', 'mfe', t => pct(t.mfe, 0), 'num'], ['Flags', 'nflags', t => t.flags.length || '', 'num'],
 ];
 let tSort = { k: 'ed', dir: 1 }, tSel = null;
 function initTrades() {
@@ -717,7 +812,7 @@ function renderTrades() {
     <tbody>${rows.map(t => `<tr class="click ${tSel === t.id ? 'sel' : ''}" data-id="${t.id}" tabindex="0">${TCOLS.map(c => `<td class="${c[3] || ''}">${c[2](t)}</td>`).join('')}</tr>`).join('')}</tbody>`;
 }
 $('#t-table').addEventListener('click', e => {
-  const th = e.target.closest('th'); if (th) { const k = th.dataset.k; tSort = { k, dir: tSort.k === k ? -tSort.dir : (['pnl', 'pct', 'days', 'mfe', 'nflags', 'vr', 'sid'].includes(k) ? -1 : 1) }; renderTrades(); return; }
+  const th = e.target.closest('th'); if (th) { const k = th.dataset.k; tSort = { k, dir: tSort.k === k ? -tSort.dir : (['pnl', 'pct', 'days', 'mfe', 'nflags', 'vr', 'sid', 'div', 'tr'].includes(k) ? -1 : 1) }; renderTrades(); return; }
   const tr = e.target.closest('tr[data-id]'); if (tr) selectTrade(tr.dataset.id);
 });
 $('#t-table').addEventListener('keydown', e => { if (e.key === 'Enter') { const tr = e.target.closest('tr[data-id]'); if (tr) selectTrade(tr.dataset.id); } });
@@ -734,12 +829,12 @@ async function selectTrade(id) {
   const row = document.querySelector(`#t-table tr[data-id="${CSS.escape(id)}"]`); if (row) row.classList.add('sel');
   const fl = t.flags.map(f => `<span class="pill ${FLAG[f].cat}" title="${FLAG[f].why.replace(/"/g, '&quot;')}">${FLAG[f].label}</span>`).join('') || '<span class="mut">No flags</span>';
   const facts = [
-    ['Entry fill', `${fmt(t.ep, 2)} on ${t.ed}`], ['Exit fill', `${fmt(t.xp, 2)} on ${t.xd}`], ['Quantity', t.qty.toLocaleString('en-US')], ['P&L', `${usd(t.pnl)} (${pct(t.pct)})`],
-    ['Exit via', `${trigLabel(t.trig)}${t.trig === 'stop_loss' ? ' · ' + t.kind.replace('_', ' ') : ''}`], ['Initial stop', `${fmt(t.sid * 100, 1)}% (distance at decision)`],
+    ['Entry fill', `${fmt(t.ep, 2)} on ${t.ed}`], ['Exit fill', `${fmt(t.xp, 2)} on ${t.xd}`], ['Quantity', t.qty.toLocaleString('en-US')], ['P&L (price only)', `${usd(t.pnl)} (${pct(t.pct)})`], ['Dividends received', t.div == null ? '–' : usd(t.div)], ['Total-return P&L', usd(tradeTR(t))],
+    ['Exit via', `${trigLabel(t.trig)}${t.trig === 'stop_loss' ? ' · ' + t.kind.replace('_', ' ') : ''}`], ['Initial stop', isShort(t) ? (t.isd == null ? '–' : `${fmt(t.isd * 100, 1)}% above the fill (installed)`) : `${fmt(t.sid * 100, 1)}% (distance at decision)`],
     ['Stop raises', `${t.nraise ?? 0}${t.maxs ? ' · max ' + fmt(t.maxs, 2) : ''}`], ['Entry vs prior close', pct(t.gap)],
-    ['Peak / worst open', `${pct(t.mfe, 0)} / ${pct(t.mae, 0)}`], ['After exit (13 wk)', `high ${pct(t.pmax, 0)} · low ${pct(t.pmin, 0)}`],
+    ['Peak / worst open', `${pct(t.mfe, 0)} / ${pct(t.mae, 0)}`], ['After exit (13 wk)', `${isShort(t) ? 'trade’s way (down)' : 'high'} ${pct(t.pmax, 0)} · ${isShort(t) ? 'against (up)' : 'low'} ${pct(t.pmin, 0)}`],
     ['Macro in → out', `${t.mE || '–'} → ${t.mX || '–'}`], ['Bearish weeks held', `${t.bearW} of ${t.macroW}`], ['Breadth at entry', t.bE || '–'],
-    ['Volume at breakout', `${fmt(t.vr, 2)}× avg`], ['Screener score', t.score ?? '–'], ['RS at entry', t.rs || '–'],
+    ['Volume vs average', `${fmt(t.vr, 2)}× screen week · ${t.fvr == null ? '–' : fmt(t.fvr, 2) + '×'} fill week`], ['Screener score', t.score ?? '–'], ['RS at entry', t.rs || '–'],
     ['Entry fill vs trigger', t.fvt == null ? '–' : pct(t.fvt, 2)], ['Stage (strategy / replay)', `${t.stg} / ${t.rsE || '–'}`], ['Replay weeks S3 / S4', t.holdW ? `${t.s3w} / ${t.s4w} of ${t.holdW}` : '–'],
   ];
   $('#t-detail').innerHTML = `<div class="row" style="justify-content:space-between"><h2>${t.sym} <span class="sub">${t.ed} → ${t.xd}, ${t.days} days</span></h2><span>${gradeTag(t.g)} <span class="${sgn(t.pnl)} num">${usdk(t.pnl)}</span></span></div>
@@ -771,12 +866,13 @@ function drawTradeChart(t, c) {
   const line = (price, color, title, style = 2) => price && candle.createPriceLine({ price, color, lineWidth: 1, lineStyle: style, axisLabelVisible: true, title });
   const E = t.eadj ?? t.ep * fe, X = t.xadj ?? t.xp * fx;
   line(E, css('--s2'), 'entry', 0);
-  line(E * (1 - t.sid), css('--neg'), 'initial stop');
+  // a short's stop sits above the entry: the installed stop on the entry fill's adjusted basis
+  line(isShort(t) ? (t.es ? t.es * E / t.ep : E * (1 + t.sid)) : E * (1 - t.sid), css('--neg'), 'initial stop');
   if (t.xs) line(t.xs * X / t.xp, css('--accent'), 'stop at exit');
   line(X, css('--muted'), 'exit', 0);
   candle.setMarkers([
-    { time: t.ebar, position: 'belowBar', color: css('--s2'), shape: 'arrowUp', text: 'buy' },
-    { time: t.xbar, position: 'aboveBar', color: css('--neg'), shape: 'arrowDown', text: trigLabel(t.trig) },
+    isShort(t) ? { time: t.ebar, position: 'aboveBar', color: css('--s4'), shape: 'arrowDown', text: 'short' } : { time: t.ebar, position: 'belowBar', color: css('--s2'), shape: 'arrowUp', text: 'buy' },
+    isShort(t) ? { time: t.xbar, position: 'belowBar', color: css('--neg'), shape: 'arrowUp', text: 'cover · ' + trigLabel(t.trig) } : { time: t.xbar, position: 'aboveBar', color: css('--neg'), shape: 'arrowDown', text: trigLabel(t.trig) },
   ].filter(m => m.time).sort((a, b) => a.time < b.time ? -1 : 1));
   const d0 = (c.d && c.d[0] && c.d[0][0]) || t.ed, d1 = (c.d && c.d.length && c.d[c.d.length - 1][0]) || t.xd;
   const mac = ch.addHistogramSeries({ priceScaleId: 'macro', priceLineVisible: false, lastValueVisible: false });
@@ -798,13 +894,25 @@ function renderHilo() {
     list('Biggest winners ($)', 'The fat tail that carries the run.', by('pnl').slice(0, 12), days) +
     list('Biggest losers ($)', 'Check whether each loss was sized by a structural stop or the 4% fallback.', by('pnl', 1).slice(0, 12), days) +
     list('Best exits (grade A, largest %)', 'Winners where the stock did not go much higher after the exit.', t.filter(x => (x.g || '')[0] === 'A').sort((a, b) => b.pct - a.pct).slice(0, 12), ['13 wk after', x => pct(x.pmax, 0)]) +
-    list('Costliest whipsaws', 'Stopped out at a loss, then the stock rallied. Sorted by the high reached within 13 weeks of the exit.', t.filter(x => /^[DF]/.test(x.g || '')).sort((a, b) => b.pmax - a.pmax).slice(0, 12), ['13 wk after', x => pct(x.pmax, 0)]) +
+    list('Costliest whipsaws', 'Stopped out at a loss, then the stock moved the trade’s way (up for a long, down for a short). Sorted by that move within 13 weeks of the exit.', t.filter(x => /^[DF]/.test(x.g || '')).sort((a, b) => b.pmax - a.pmax).slice(0, 12), ['13 wk after', x => pct(x.pmax, 0)]) +
     list('Largest give-backs', 'Open gain at its peak versus the gain at exit.', t.filter(x => x.mfe != null).sort((a, b) => (b.mfe - b.pct) - (a.mfe - a.pct)).slice(0, 12), ['Peak open', x => pct(x.mfe, 0)]) +
     `<div class="panel"><h2>Best and worst trade by entry year</h2><div class="tablebox"><table><thead><tr><th>Year</th><th class="num">Trades</th><th class="num">Net</th><th>Best</th><th class="num">$</th><th>Worst</th><th class="num">$</th></tr></thead><tbody>${yb.map(r => `<tr><td><b>${r.y}</b></td><td class="num">${r.n}</td><td class="num ${sgn(r.net)}">${usdk(r.net)}</td><td class="click" data-open="${r.b.id}">${r.b.sym}</td><td class="num pos">${usdk(r.b.pnl)}</td><td class="click" data-open="${r.w.id}">${r.w.sym}</td><td class="num neg">${usdk(r.w.pnl)}</td></tr>`).join('')}</tbody></table></div></div>`;
   $('#hilo').addEventListener('click', e => { const r = e.target.closest('[data-open]'); if (r) openTrade(r.dataset.open, CH()); });
 }
 
 /* ---------- Surprises ---------- */
+// No conformance rows means no trade audit report: say so rather than draw an empty table (#3177)
+const CONF_NA = '<tr><td colspan="4" style="white-space:normal">n/a: no trade audit report (the pack was built with --no-container, or the audit failed; see runs/&lt;run&gt;/audit.log).</td></tr>';
+// The conformance table and the validator list as markup, from meta.conformance / meta.validator. Pure and
+// top-level so review_pack_test.sh pins what the panels render (#3177: the table read blank in a capture).
+function confTable(cf) {
+  const rows = cf.map(r => `<tr><td><b>${r.rule}</b></td><td style="white-space:normal">${r.desc}</td><td class="num">${r.passed}</td><td class="num">${r.rate}</td></tr>`).join('');
+  return `<thead><tr><th>Rule</th><th>Description</th><th class="num">Passed</th><th class="num">Rate</th></tr></thead><tbody>${cf.length ? rows : CONF_NA}</tbody>`;
+}
+function validatorList(vs) {
+  return vs.map(v => { const bad = !/PASS/.test(v.status), inv = v.sev === 'INVARIANT';
+    return `<details ${bad && inv ? 'open' : ''} style="border-bottom:1px solid var(--line);padding-block:6px"><summary><b>${v.id}</b> <span class="pill ${bad ? (inv ? 'outcome' : 'exec') : ''}">${v.sev.toLowerCase()}</span> <span class="${bad ? '' : 'mut'}">${v.status}</span></summary>${v.specimens.length ? `<pre class="spec">${v.specimens.join('\n')}</pre>` : ''}</details>`; }).join('');
+}
 function renderSurprises() {
   const t = D.trades[CH()], open = D.open[CH()].rows;
   $('#flagcards').innerHTML = FLAGS.map(f => { const ts = t.filter(x => x.flags.includes(f.id)); const net = ts.reduce((a, x) => a + x.pnl, 0), no = openHits(f, open);
@@ -813,9 +921,8 @@ function renderSurprises() {
     return `<button class="flagcard" data-flag="${f.id}"><span class="row" style="justify-content:space-between"><span class="pill ${f.cat}">${{ exec: 'Execution', book: 'Book', outcome: 'Outcome' }[f.cat]}</span><span class="cnt">${na ? 'n/a' : ts.length + no}</span></span><b>${f.label}</b><span class="num" style="text-align:left">net <span class="${sgn(net)}">${usdk(net)}</span> · ${fmt(100 * ts.length / t.length, 0)}% of trades${no ? ` · plus ${no} still open` : ''}</span><p>${f.why}</p></button>`; }).join('');
   $('#flagcards').addEventListener('click', e => { const b = e.target.closest('[data-flag]'); if (b) filterFlag(b.dataset.flag); });
   const cf = D.meta[CH()].conformance;
-  $('#conf').innerHTML = `<thead><tr><th>Rule</th><th>Description</th><th class="num">Passed</th><th class="num">Rate</th></tr></thead><tbody>${cf.map(r => `<tr><td><b>${r.rule}</b></td><td style="white-space:normal">${r.desc}</td><td class="num">${r.passed}</td><td class="num">${r.rate}</td></tr>`).join('')}</tbody>`;
-  $('#validator').innerHTML = D.meta[CH()].validator.map(v => { const bad = !/PASS/.test(v.status);
-    return `<details ${bad && v.sev === 'INVARIANT' ? 'open' : ''} style="border-bottom:1px solid var(--line);padding-block:6px"><summary><b>${v.id}</b> <span class="pill ${bad ? (v.sev === 'INVARIANT' ? 'outcome' : 'exec') : ''}">${v.sev.toLowerCase()}</span> <span class="${bad ? '' : 'mut'}">${v.status}</span></summary>${v.specimens.length ? `<pre class="spec">${v.specimens.join('\n')}</pre>` : ''}</details>`; }).join('');
+  $('#conf').innerHTML = confTable(cf);
+  $('#validator').innerHTML = validatorList(D.meta[CH()].validator);
 }
 
 /* ---------- Diagnostics ---------- */
@@ -836,14 +943,14 @@ const tbl = (head, rows) => `<thead><tr>${head.map(h => `<th${h[1] ? ' class="nu
 const tdp = v => `<td class="num ${sgn(v)}">${pct(v)}</td>`, tdn = (v, d = 0) => `<td class="num">${v == null ? '–' : fmt(v, d)}</td>`, tdu = v => `<td class="num ${sgn(v)}">${usdk(v)}</td>`;
 function renderDiag() {
   const fl = D.nav.flatMap((nav, i) => flatStretches(nav).map(s => ({ ...s, i })));
-  $('#d-flat').innerHTML = tbl([['Salt'], ['From high'], ['To'], ['Days', 1], ['Deepest', 1], ['NAV vs high', 1], ['SPY', 1], ['Excess', 1]],
+  $('#d-flat').innerHTML = tbl([[RKC()], ['From high'], ['To'], ['Days', 1], ['Deepest', 1], ['NAV vs high', 1], ['SPY', 1], ['Excess', 1]],
     fl.map(s => `<tr><td><b>${runLabel(s.i)}</b></td><td>${s.from}</td><td>${s.to}${s.open ? ' (still below)' : ''}</td>${tdn((new Date(s.to) - new Date(s.from)) / 864e5)}<td class="num">−${fmt(s.dd)}%</td>${tdp(s.nav)}${tdp(s.spy)}${tdp(s.spy == null ? null : s.nav - s.spy)}</tr>`));
   const t = D.trades[CH()], fwd = spyFwd(); t.forEach(x => { if (x.s40 === undefined) x.s40 = fwd(x.ed, 40); });
   const yrs = [...new Set(t.map(x => x.yr))].sort();
   const ydf = y => t.filter(x => x.yr === y);
   $('#d-picks').innerHTML = tbl([['Entry year'], ['Trades', 1], ['Win rate', 1], ['Pick, 8 wk', 1], ['SPY, 8 wk', 1], ['Pick − SPY', 1], ['Picks up at 8 wk', 1], ['D/F grades', 1], ['4% fallback stop', 1], ['Net', 1]],
     yrs.map(y => { const a = ydf(y), p = median(a.map(x => x.f40)), s = median(a.map(x => x.s40)), ex = median(a.filter(x => x.f40 != null && x.s40 != null).map(x => x.f40 - x.s40)), net = a.reduce((q, x) => q + x.pnl, 0);
-      return `<tr><td><b>${y}</b></td>${tdn(a.length)}${tdn(share(a, x => x.pnl > 0))}${tdp(p)}${tdp(s)}${tdp(ex)}${tdn(share(a.filter(x => x.f40 != null), x => x.f40 > 0))}${tdn(share(a, x => /^[DF]/.test(x.g || '')))}${tdn(share(a, x => Math.abs(x.sid - 0.04) < 1e-9))}${tdu(net)}</tr>`; }));
+      return `<tr><td><b>${y}</b></td>${tdn(a.length)}${tdn(share(a, x => x.pnl > 0))}${tdp(p)}${tdp(s)}${tdp(ex)}${tdn(share(a.filter(x => x.f40 != null), x => x.f40 > 0))}${tdn(share(a, x => /^[DF]/.test(x.g || '')))}${tdn(fallbackShare(t, a))}${tdu(net)}</tr>`; }));
   const LV = [3, 5, 6, 8, 10, 15], base = t.filter(x => x.cf && x.pct), act = base.reduce((q, x) => q + x.pnl, 0);
   $('#d-cut').innerHTML = tbl([['Hard stop'], ['Static P&L', 1], ['vs actual', 1], ['Trades cut earlier', 1], ['…of them winners', 1]],
     [`<tr><td><b>Actual</b></td>${tdu(act)}<td></td><td></td><td></td></tr>`, ...LV.map((l, i) => { const cut = base.filter(x => x.cf[i] < x.pct - 0.01), p = base.reduce((q, x) => q + x.pnl * x.cf[i] / x.pct, 0);
@@ -855,13 +962,58 @@ function renderDiag() {
       return `<tr><td><b>${lab}</b></td>${tdn(a.length)}${tdp(a.length ? a.reduce((q, x) => q + x.pct, 0) / a.length : null)}${tdu(a.reduce((q, x) => q + x.pnl, 0))}</tr>`; }))}</table>
     <p class="note" style="margin-top:8px">${late.length} of ${st.length} unraised stop exits (${fmt(share(st, x => x.blag >= 1), 0)}%) filled on a later open than the day the stop traded. Selling at the stop instead would not reliably have helped: the next open recovers about as often as it gaps further, so the difference is a faithfulness question more than a P&amp;L one. A lag of 2+ days usually means the live stop was not exactly entry × (1 − initial distance), for example because it was anchored to the trigger rather than the fill; treat those rows as unresolved.</p>`;
   const all = t.filter(x => x.g), dfr = a => share(a, x => /^[DF]/.test(x.g || ''));
-  const q4 = (k) => { const s = all.filter(x => x[k] != null).sort((a, b) => a[k] - b[k]), n = s.length; return [0, 1, 2, 3].map(i => s.slice(Math.floor(i * n / 4), Math.floor((i + 1) * n / 4))).map((a, i) => [`Q${i + 1} ${fmt(a[0][k], 2)}–${fmt(a[a.length - 1][k], 2)}`, a]); };
+  const q4 = (k) => { const s = all.filter(x => x[k] != null).sort((a, b) => a[k] - b[k]), n = s.length; return [0, 1, 2, 3].map(i => s.slice(Math.floor(i * n / 4), Math.floor((i + 1) * n / 4))).map((a, i) => [`Q${i + 1} ${a.length ? `${fmt(a[0][k], 2)}–${fmt(a[a.length - 1][k], 2)}` : '(empty)'}`, a]); };
   const by = k => [...new Set(all.map(x => x[k]))].sort().map(v => [v || '–', all.filter(x => x[k] === v)]);
   const cohort = (title, rows) => `<div class="panel" style="margin:0"><h3>${title}</h3><table>${tbl([['Cohort'], ['Trades', 1], ['D/F', 1], ['A', 1], ['Avg', 1], ['Net', 1]], rows.map(([lab, a]) => `<tr><td>${lab}</td>${tdn(a.length)}${tdn(dfr(a))}${tdn(share(a, x => (x.g || '')[0] === 'A'))}${tdp(a.length ? a.reduce((q, x) => q + x.pct, 0) / a.length : null)}${tdu(a.reduce((q, x) => q + x.pnl, 0))}</tr>`))}</table></div>`;
   $('#d-df').innerHTML = `<p class="note" style="grid-column:1/-1">All trades: D/F ${fmt(dfr(all), 0)}% of ${all.length}.</p>` +
     cohort('Macro at entry', by('mE')) + cohort('Breadth at entry', by('bE')) +
-    cohort('Stop type', [['4% fallback', all.filter(x => Math.abs(x.sid - 0.04) < 1e-9)], ['Structural', all.filter(x => Math.abs(x.sid - 0.04) >= 1e-9)]]) +
+    (hasStopKind(all) ? cohort('Stop type', [['4% fallback', all.filter(isFallback)], ['Structural', all.filter(x => x.sfk === 'Support_floor')]]) : '') +
     cohort('Screener score', q4('score')) + cohort('Breakout volume ×', q4('vr')) + cohort('Entry vs prior close %', q4('gap'));
+}
+
+/* ---------- P&L anatomy (#3140 part 3) ---------- */
+// Hill tail index of the k largest values of xs (all > 0): k / sum ln(x_i / x_(k+1)). Larger = thinner
+// tail. null with fewer than k + 1 values or k < 2. Pure, for review_pack_test.sh.
+function hillAlpha(xs, k) {
+  const s = xs.filter(x => x > 0).sort((a, b) => b - a);
+  if (k < 2 || s.length <= k) return null;
+  let sum = 0; for (let i = 0; i < k; i++) sum += Math.log(s[i] / s[k]);
+  return sum > 0 ? k / sum : null;
+}
+// One cohort's anatomy: trades ts (pct = side-signed P&L %, pnl $, qty, ep), navAt(date) -> NAV on or
+// before the date. Weight = entry value / NAV at entry; Σ NAV-relative = Σ pnl / NAV at entry, in %.
+// Expectancy = p × avg win − (1 − p) × avg loss, in % per trade. Pure, for review_pack_test.sh.
+function anatomyRow(ts, navAt) {
+  const w = ts.filter(t => t.pnl > 0), l = ts.filter(t => t.pnl <= 0), avg = a => a.length ? a.reduce((q, x) => q + x, 0) / a.length : null;
+  const p = ts.length ? w.length / ts.length : null, aw = avg(w.map(t => t.pct)), al = avg(l.map(t => -t.pct));
+  const nav = t => navAt(t.ed) || null;
+  return { n: ts.length, weight: avg(ts.filter(nav).map(t => 100 * t.qty * t.ep / nav(t))), p: p == null ? null : 100 * p, aw, al,
+    payoff: aw != null && al ? aw / al : null, exp: p == null ? null : p * (aw || 0) - (1 - p) * (al || 0),
+    navpct: ts.filter(nav).reduce((q, t) => q + 100 * t.pnl / nav(t), 0) };
+}
+// Run-level shape: the share of net P&L the top `top` trades carry, Hill alphas of winners' and losers'
+// $ P&L (k = min(20, n / 4)), and hindsight outcome counts: whipsaw (grade D/F), good stop (a losing stop
+// exit after which the stock kept moving against the trade: post-13-week ≤ −5 %), rotation regret (a
+// laggard-rotation exit after which the stock ran ≥ 15 % the trade's way). Pure, for review_pack_test.sh.
+function anatomyShape(ts, top = 20) {
+  const net = ts.reduce((q, t) => q + t.pnl, 0), byPnl = [...ts].sort((a, b) => b.pnl - a.pnl);
+  const topSum = byPnl.slice(0, top).reduce((q, t) => q + t.pnl, 0);
+  const wins = ts.filter(t => t.pnl > 0).map(t => t.pnl), losses = ts.filter(t => t.pnl < 0).map(t => -t.pnl);
+  const k = n => Math.min(20, Math.floor(n / 4));
+  return { topShare: net ? 100 * topSum / net : null, alphaW: hillAlpha(wins, k(wins.length)), alphaL: hillAlpha(losses, k(losses.length)),
+    whipsaw: ts.filter(t => /^[DF]/.test(t.g || '')).length,
+    goodStop: ts.filter(t => t.trig === 'stop_loss' && t.pnl <= 0 && t.p13 != null && t.p13 <= -5).length,
+    regret: ts.filter(t => t.trig === 'laggard_rotation' && t.pmax != null && t.pmax >= 15).length };
+}
+function renderAnatomy() {
+  const t = D.trades[CH()], nav = D.nav[CH()];
+  const navAt = d => { let lo = 0, hi = nav.length - 1, r = null; while (lo <= hi) { const m = (lo + hi) >> 1; if (nav[m][0] <= d) { r = nav[m][1]; lo = m + 1; } else hi = m - 1; } return r; };
+  const yrs = [...new Set(t.map(x => x.yr))].sort(), row = (lab, ts) => { const r = anatomyRow(ts, navAt);
+    return `<tr><td><b>${lab}</b></td>${tdn(r.n)}${tdn(r.weight, 1)}${tdn(r.p)}${tdp(r.aw)}${tdp(r.al == null ? null : -r.al)}${tdn(r.payoff, 2)}${tdp(r.exp)}${tdp(r.navpct)}</tr>`; };
+  $('#d-anat').innerHTML = tbl([['Entry year'], ['Trades', 1], ['Avg weight %', 1], ['Win rate', 1], ['Avg win', 1], ['Avg loss', 1], ['Payoff', 1], ['Expectancy', 1], ['Σ P&L / NAV', 1]],
+    [...yrs.map(y => row(y, t.filter(x => x.yr === y))), row('All', t)]);
+  const s = anatomyShape(t);
+  $('#d-anat-shape').innerHTML = `The top 20 trades carry <b>${s.topShare == null ? '–' : fmt(s.topShare, 0) + '%'}</b> of net realised P&amp;L. Tail index (Hill, $ P&amp;L): winners α ${fmt(s.alphaW, 1)}, losers α ${fmt(s.alphaL, 1)} (lower = fatter tail). Hindsight, 13 weeks after the exit: <b>${s.whipsaw}</b> whipsaws (grade D/F) : <b>${s.goodStop}</b> good stops (the loss kept going) : <b>${s.regret}</b> rotation regrets (sold for a laggard, then ran ≥ 15%).`;
 }
 
 /* ---------- Salts ---------- */
@@ -884,8 +1036,8 @@ function renderSalts() {
   let div = null; for (let j = 0; j < Math.min(...seqs.map(s => s.length)); j++) if (seqs.some(s => s[j] !== seqs[0][j])) { div = seqs.map(s => s[j]); break; }
   const uniqTop = D.trades.map((ts, i) => ts.filter(t => sets.every((s, o) => o === i || !s.has(key(t)))).sort((a, b) => b.pnl - a.pnl).slice(0, 3));
   $('#s-overlap').innerHTML = `<p class="note">A trade counts as shared when the same symbol was entered on the same date. ${div ? `The trade lists first differ at ${div.map(k => k.replace('|', ' ')).join(' / ')}; everything before that is identical.` : ''}</p>
-    <div class="kpis"><div class="kpi"><span class="k">In every salt</span><span class="v">${nAll}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In some</span><span class="v">${nSome}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In one salt only</span><span class="v">${nOne}</span><span class="n">trades</span></div></div>
-    <table><thead><tr><th>Salt</th><th class="num">Trades</th><th class="num">Realised total</th><th class="num">From shared trades</th><th class="num">From the rest</th><th>Biggest trades only this salt took</th></tr></thead><tbody>${D.trades.map((ts, i) => `<tr><td><b>${runLabel(i)}</b></td><td class="num">${ts.length}</td>${tdu(tot[i])}${tdu(pAll[i])}${tdu(tot[i] - pAll[i])}<td>${uniqTop[i].map(t => `${t.sym} ${usdk(t.pnl)}`).join(', ')}</td></tr>`).join('')}</tbody></table>`;
+    <div class="kpis"><div class="kpi"><span class="k">In every ${RK()}</span><span class="v">${nAll}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In some</span><span class="v">${nSome}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In one ${RK()} only</span><span class="v">${nOne}</span><span class="n">trades</span></div></div>
+    <table><thead><tr><th>${RKC()}</th><th class="num">Trades</th><th class="num">Realised total</th><th class="num">From shared trades</th><th class="num">From the rest</th><th>Biggest trades only this ${RK()} took</th></tr></thead><tbody>${D.trades.map((ts, i) => `<tr><td><b>${runLabel(i)}</b></td><td class="num">${ts.length}</td>${tdu(tot[i])}${tdu(pAll[i])}${tdu(tot[i] - pAll[i])}<td>${uniqTop[i].map(t => `${t.sym} ${usdk(t.pnl)}`).join(', ')}</td></tr>`).join('')}</tbody></table>`;
 }
 
 /* ---------- Agenda ---------- */
@@ -900,7 +1052,7 @@ function renderAgenda() {
     ['Open the biggest losers and whipsaws', 'hilo', 'Was the stop structural or the 4% fallback? Did the stock recover right after?'],
     ['Go through the execution flags', 'surprises', 'Weekend-dated fills, fills outside the day’s range, stops sold a day late. Decide which are simulator defects and which are real market behaviour.'],
     ['Go through the book flags', 'surprises', 'Neutral-macro entries, low breakout volume, fallback stops, Stage 4 holds. Decide which deviations are deliberate dials and which are bugs.'],
-    rets.length > 1 && ['Compare the salts', 'salts', `The same rules produce ${fmt(Math.min(...rets), 0)}–${fmt(Math.max(...rets), 0)}%. Which trades account for the gap?`],
+    rets.length > 1 && [`Compare the ${RK()}s`, 'salts', `${RK() === 'salt' ? 'The same rules produce' : 'The arms produce'} ${fmt(Math.min(...rets), 0)}–${fmt(Math.max(...rets), 0)}%. Which trades account for the gap?`],
   ].filter(Boolean);
   $('#agenda').innerHTML = items.map(([a, v, b]) => `<li><b><a href="#${v}" data-go="${v}">${a}</a></b><br><span class="mut">${b}</span></li>`).join('');
   $('#agenda').addEventListener('click', e => { const a = e.target.closest('[data-go]'); if (a) { e.preventDefault(); show(a.dataset.go); } });

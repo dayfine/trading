@@ -749,6 +749,22 @@ type config = {
           2018 / BCH 2010 phantom shares, which [dividend_crediting] would
           otherwise credit a second time. R2: real config field, an axis via
           [Overlay_validator]. *)
+  ex_dividend_stop_adjust : bool; [@sexp.default false]
+      (** Reduce a held long's stop level by the cash dividend on its ex-date
+          (issue #3174) — a fill-realism dial, not a strategy mechanism. [false]
+          (default) = {b EXACT no-op}: no dividend file is read and every stop
+          stays where the trail put it (R1). [true]: on each tick, a [Holding]
+          long whose symbol went ex-dividend since its previous bar (and after
+          its entry) has its stop level reduced by [unadjusted_amount] per
+          share, rounded down to the cent, as FINRA Rule 5330 has a broker do to
+          a resting sell-stop. Dividends below one cent and rows without
+          [unadjusted_amount] are skipped; a symbol with no [dividends.csv]
+          under [TRADING_DATA_DIR] keeps its stop and is counted. Shorts are
+          untouched (their buy-stop is not adjusted by the rule). Fixes AD
+          2025-08-20 ($23.00 special: stop 67.46, open 51.26) and BKE
+          2021-12-17, stopped out at the open on the dividend drop. Semantics:
+          {!Ex_dividend_stop}, {!Stops_dividend_runner}. R2: real config field,
+          an axis via [Overlay_validator]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into
           [Stock_analysis.config.resistance.min_history_bars] (and, because
