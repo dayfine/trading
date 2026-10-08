@@ -129,6 +129,7 @@ phase_preflight() {
 
 phase_superset() {
   rm -f "$WORK/twinfix.plan"                                 # a new universe starts a new run: never inherit an old plan
+  rm -rf "$WORK/twin-scan"  # scan reports belong to the previous universe too
   quarantine=$(awk '{print $1}' "$V11EXP/results/quarantine.txt")
   {
     for f in "$V12"/composition/top-3000-199[9].sexp "$V12"/composition/top-3000-20*.sexp; do grep -o '(symbol [^)]*)' "$f"; done | sed 's/(symbol //; s/)$//'
