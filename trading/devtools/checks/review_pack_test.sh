@@ -672,8 +672,11 @@ console.log($1)"; }
     "$(an 'JSON.stringify(anatomyRow([tr(20, 2000), tr(10, 1000), tr(-5, -500), tr(-5, -500)], () => 100000))')"
   expect_eq "anatomyShape: top-1 share, hindsight counts" '{"topShare":200,"whipsaw":1,"goodStop":1,"regret":1}' \
     "$(an 'JSON.stringify((({ topShare, whipsaw, goodStop, regret }) => ({ topShare, whipsaw, goodStop, regret }))(anatomyShape([tr(20, 2000, { trig: "laggard_rotation", pmax: 30 }), tr(-5, -500, { trig: "stop_loss", g: "D", p13: 10 }), tr(-5, -500, { trig: "stop_loss", g: "B", p13: -8 })], 1)))')"
+  expect_eq "anatomyShape: Hill alpha over k = min(20, n / 4) (12 wins of 1k..12k -> k 3, 3 / (ln 12/9 + ln 11/9 + ln 10/9) = 5.05); no losses -> null" "5.05 null" \
+    "$(an '((s) => [s.alphaW.toFixed(2), String(s.alphaL)].join(" "))(anatomyShape(Array.from({ length: 12 }, (_, i) => tr(1, 1000 * (i + 1)))))')"
 else
   echo "SKIP: review_pack anatomy cases need node"
 fi
+expect_eq "wiring: the P&L anatomy card is rendered on load" 1 "$(grep -c 'renderDiag(); renderAnatomy(); renderSalts();' "$S/index.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
