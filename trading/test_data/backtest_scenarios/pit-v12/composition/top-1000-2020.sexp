@@ -626,7 +626,7 @@
     (avg_dollar_volume 226996444.63414633))
    ((symbol SPCE) (weight 0.001) (sector Industrials) (synthetic false)
     (avg_dollar_volume 226883393.87804878))
-   ((symbol PIXY) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAYA) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 226687611.27991468))
    ((symbol DOW) (weight 0.001) (sector Materials) (synthetic false)
     (avg_dollar_volume 226608761.12195122))

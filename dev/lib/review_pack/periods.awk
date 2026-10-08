@@ -1,9 +1,10 @@
 # Period (year or quarter) table -> JSON array on stdout.
-# usage: awk -v gran=Y|Q -f periods.awk SPY.csv equity_curve.csv expo.tsv trades.csv macro.tsv
+# usage: awk -v gran=Y|Q [-v spycol=5|6] -f periods.awk SPY.csv equity_curve.csv expo.tsv trades.csv macro.tsv
+#   spycol: the SPY CSV column, 6 adjusted_close (total return, default) or 5 close (price only, #3177)
 function key(d,   y, m) { y = substr(d, 1, 4); if (gran == "Y") return y; m = substr(d, 6, 2) + 0; return y "Q" int((m - 1) / 3) + 1 }
 # files told apart by ARGV, not an FNR==1 counter: an empty file (x_expo.tsv with no
 # trades, x_macro.tsv with no macro trend) must not shift the rest
-FILENAME == ARGV[1] { if (FNR == 1) { FS = ","; next } split($0, a, ","); spy[a[1]] = a[6]; if (a[1] > spy_last) spy_last = a[1]; next }
+FILENAME == ARGV[1] { if (FNR == 1) { FS = ","; next } split($0, a, ","); spy[a[1]] = a[spycol ? spycol : 6]; if (a[1] > spy_last) spy_last = a[1]; next }
 FILENAME == ARGV[2] { if (FNR == 1) next; split($0, a, ","); nd++; nds[nd] = a[1]; nav[a[1]] = a[2]; next }
 FILENAME == ARGV[3] { split($0, a, "\t"); ex[a[1]] += a[2]; np[a[1]]++; next }
 FILENAME == ARGV[4] { if (FNR == 1) next; split($0, a, ",")

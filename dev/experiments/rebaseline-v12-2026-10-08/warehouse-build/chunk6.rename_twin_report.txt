@@ -1,0 +1,32 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+15 group(s), 15 symbol(s) dropped
+  survivor ACR <- [RSO]
+    RSO (overlap=3097, match=0.9961)
+  survivor AGIG <- [HUSA]
+    HUSA (overlap=6012, match=1.0000)
+  survivor AIFU <- [FANH]
+    FANH (overlap=4274, match=0.9965)
+  survivor BCIC <- [KCAP]
+    KCAP (overlap=3102, match=0.9710)
+  survivor BTM <- [GSRM]
+    GSRM (overlap=244, match=1.0000)
+  survivor ITP <- [ONP]
+    ONP (overlap=2506, match=0.9968)
+  survivor KRRO <- [FREQ]
+    FREQ (overlap=1033, match=0.9796)
+  survivor KYNB <- [FGEN]
+    FGEN (overlap=2804, match=0.9732)
+  survivor LFWD <- [RWLK]
+    RWLK (overlap=2367, match=0.9746)
+  survivor LRMR <- [ZFGN]
+    ZFGN (overlap=1496, match=1.0000)
+  survivor MAGN <- [GLT]
+    GLT (overlap=6754, match=0.9916)
+  survivor QTTB <- [FIXX]
+    FIXX (overlap=1509, match=0.9954)
+  survivor SOGP <- [LIZI]
+    LIZI (overlap=1055, match=0.9972)
+  survivor TPST <- [OVAS]
+    OVAS (overlap=1510, match=0.9887)
+  survivor VIP <- [GREE]
+    GREE (overlap=6523, match=1.0000)

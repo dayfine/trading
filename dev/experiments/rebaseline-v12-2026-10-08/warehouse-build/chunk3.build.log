@@ -1,0 +1,30 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+6 group(s), 16 symbol(s) dropped
+  survivor LOTE <- [MAXW; NETE; ORIG]
+    MAXW (overlap=644, match=0.9518)
+    NETE (overlap=2491, match=0.1791)
+    ORIG (overlap=1817, match=0.3464)
+  survivor MAYA <- [LNR; MVL; PCZ; PIXY]
+    LNR (overlap=1280, match=0.5833)
+    MVL (overlap=2505, match=0.2356)
+    PCZ (overlap=1969, match=0.3674)
+    PIXY (overlap=114, match=1.0000)
+  survivor MILGF <- [LJPC; LOCK1; MADGQ; OHGI; PCO; PRSF]
+    LJPC (overlap=5254, match=0.4110)
+    LOCK1 (overlap=1085, match=0.8533)
+    MADGQ (overlap=3539, match=0.8629)
+    OHGI (overlap=4023, match=0.5226)
+    PCO (overlap=3424, match=0.8726)
+    PRSF (overlap=1231, match=1.0000)
+  survivor OBK <- [OBNK]
+    OBNK (overlap=1338, match=0.9940)
+  survivor PFX <- [MCC]
+    MCC (overlap=2525, match=0.9913)
+  survivor PLUR <- [PSTI]
+    PSTI (overlap=4860, match=0.9963)
+incremental: universe is not a superset of the existing manifest; carrying 4600 untouched symbol(s) forward (#2669)
+active_through: 6579 marked, 327 survivors (of 6906 symbols)
+wrote 6906 entries to /tmp/snap_top3000_pit_v12pit/manifest.sexp in 1310.66s
+series_tail: 79 findings (26 truncated, 8 stray_dropped, 45 kept, 0 kept_by_exception, 0 cut_prefix, 0 cut_refused_short_tail)
+verify: 6906/6906 files OK (failed=0)
+exit=0

@@ -1664,7 +1664,7 @@
     (avg_dollar_volume 51756110.869247176))
    ((symbol ITC) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 51720797.230000004))
-   ((symbol GLT) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAGN) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 51691972.564761892))
    ((symbol TM) (weight 0.001) (sector "Consumer Discretionary")
     (synthetic false) (avg_dollar_volume 51566143.166666664))
