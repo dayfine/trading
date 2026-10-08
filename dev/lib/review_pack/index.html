@@ -768,7 +768,7 @@ async function selectTrade(id) {
     ['Entry fill', `${fmt(t.ep, 2)} on ${t.ed}`], ['Exit fill', `${fmt(t.xp, 2)} on ${t.xd}`], ['Quantity', t.qty.toLocaleString('en-US')], ['P&L', `${usd(t.pnl)} (${pct(t.pct)})`],
     ['Exit via', `${trigLabel(t.trig)}${t.trig === 'stop_loss' ? ' · ' + t.kind.replace('_', ' ') : ''}`], ['Initial stop', isShort(t) ? (t.isd == null ? '–' : `${fmt(t.isd * 100, 1)}% above the fill (installed)`) : `${fmt(t.sid * 100, 1)}% (distance at decision)`],
     ['Stop raises', `${t.nraise ?? 0}${t.maxs ? ' · max ' + fmt(t.maxs, 2) : ''}`], ['Entry vs prior close', pct(t.gap)],
-    ['Peak / worst open', `${pct(t.mfe, 0)} / ${pct(t.mae, 0)}`], ['After exit (13 wk)', `high ${pct(t.pmax, 0)} · low ${pct(t.pmin, 0)}`],
+    ['Peak / worst open', `${pct(t.mfe, 0)} / ${pct(t.mae, 0)}`], ['After exit (13 wk)', `${isShort(t) ? 'trade’s way (down)' : 'high'} ${pct(t.pmax, 0)} · ${isShort(t) ? 'against (up)' : 'low'} ${pct(t.pmin, 0)}`],
     ['Macro in → out', `${t.mE || '–'} → ${t.mX || '–'}`], ['Bearish weeks held', `${t.bearW} of ${t.macroW}`], ['Breadth at entry', t.bE || '–'],
     ['Volume at breakout', `${fmt(t.vr, 2)}× avg`], ['Screener score', t.score ?? '–'], ['RS at entry', t.rs || '–'],
     ['Entry fill vs trigger', t.fvt == null ? '–' : pct(t.fvt, 2)], ['Stage (strategy / replay)', `${t.stg} / ${t.rsE || '–'}`], ['Replay weeks S3 / S4', t.holdW ? `${t.s3w} / ${t.s4w} of ${t.holdW}` : '–'],

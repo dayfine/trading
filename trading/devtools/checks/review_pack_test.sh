@@ -39,7 +39,10 @@
 #     three SHORT rows (breach on the high, signed P&L / MFE / grades, the
 #     audit stop_floor_kind for the fallback card, installed-stop width,
 #     margin_call as forced, macro / stage / slippage flags per side, the
-#     short book's gate reopening on Bearish); salts vs arms in the manifest.
+#     short book's gate reopening on Bearish); salts vs arms in the manifest;
+#     gap-through hard-stop fills (short at the open above, long at the open
+#     below), a short entered far below its prior close, and the Stage 2
+#     weeks of a short through stage_sum.sh (QC rework on #3192).
 #
 # Run:
 #   sh trading/devtools/checks/review_pack_test.sh
@@ -360,6 +363,42 @@ console.log($1)"; }
   expect_eq "reopenEpisodes dir 1: the same macro has no Bullish reopen" 0 "$(rep 'reopenEpisodes(m, flat, fall, []).length')"
 else
   echo "SKIP: review_pack short-side page cases need node"
+fi
+# Rework (QC CP4 on #3192): gap-through hard-stop fills, the entry-vs-prior-close sign and the Stage 2
+# weeks of a short, each pinned. A second short run "g":
+#   AAA short 100 -> 110 (2020-02-10): the 2020-02-07 bar OPENS at 110, above the 3/5/6/8/10 % levels
+#       (103..110), so each fills at the open (-10 %), not at its level; 15 % (115) is never reached;
+#   EEE short at 0.30 on 2020-02-13 after a 10.00 close: entered 97 % below the prior close -> gap +97,
+#       chase fires (unsigned it would read -97 and stay quiet);
+#   DDD long 40 -> 39 (2020-01-24): the 2020-01-22 bar opens 38 under the 3 % level (38.80) -> -5 %, not
+#       -3 %; 6 % (37.60) is inside the bar -> -6 %; 8 % (36.80) is never reached -> the actual -2.5 %.
+# A stage replay sidecar for the AAA short (Stage 4 into the entry, two Stage 2 weeks in the hold) is put
+# where the container step writes it and the pack rebuilt: stage_sum.sh's Stage 2 count reaches s2w.
+GW="$TMP/gap"; mkdir -p "$GW/run"; cp "$FIX"/run/* "$GW/run/"
+{ head -1 "$FIX/run/trades.csv"
+  echo "AAA,SHORT,2020-01-29,2020-02-10,12,100.00,110.00,1000,-10000.00,-10.00,120.00,120.00,laggard_rotation,Stage4,1.5000,0.2000,non_stop_exit,,100,AAA-wein-g1,,,0"
+  echo "EEE,SHORT,2020-02-13,2020-02-20,7,0.30,0.30,1000,0.00,0.00,0.40,0.40,laggard_rotation,Stage4,1.5000,0.3300,non_stop_exit,,100,EEE-wein-g2,,,0"
+  echo "DDD,LONG,2020-01-15,2020-01-24,9,40.00,39.00,500,-500.00,-2.50,30.00,30.00,laggard_rotation,Stage2,2.5000,0.2500,non_stop_exit,,100,DDD-wein-g3,,,0"; } > "$GW/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$GW/pack" g="$GW/run/" >"$GW/log" 2>&1 || rc=$?
+expect_eq "gap run: builds, exit 0" 0 "$rc"
+mkdir -p "$GW/pack/runs/g/stage"
+printf 'week,date,close,ma,stage,weeks_in_stage,late\n1,2020-01-24,100,101,Stage4,3,0\n2,2020-01-31,100,100,Stage2,1,0\n3,2020-02-07,110,100,Stage2,2,0\n' > "$GW/pack/runs/g/stage/AAA-wein-g1.png.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$GW/pack" g="$GW/run/" >"$GW/log2" 2>&1 || rc=$?
+expect_eq "gap run: rebuilds over the stage sidecar, exit 0" 0 "$rc"
+GT="$GW/pack/site/data/g_trades.json"
+expect_eq "short gap-through: each hard stop the 2020-02-07 open jumps fills at that open" "-10,-10,-10,-10,-10,-10" "$(jq -r '.[]|select(.id=="AAA-wein-g1")|.cf|map(.+0|tostring)|join(",")' "$GT")"
+expect_eq "long gap-through: 3 % fills at the 38 open (-5), 6 % at its level, 8 % never reached" "-5,-5,-6,-2.5,-2.5,-2.5" "$(jq -r '.[]|select(.id=="DDD-wein-g3")|.cf|map(.+0|tostring)|join(",")' "$GT")"
+expect_eq "short entry vs prior close: 97 % below reads +97 (the trade's favour)" 97 "$(jq -r '.[]|select(.id=="EEE-wein-g2")|.gap+0' "$GT")"
+expect_eq "short Stage 2 weeks: stage_sum.sh -> s2w 2, replay entry stage Stage4" "2 0 Stage4" "$(jq -r '.[]|select(.id=="AAA-wein-g1")|"\(.s2w) \(.s4w) \(.rsE)"' "$GT")"
+if command -v node >/dev/null 2>&1; then
+  gfl() { node -e "$SFNS
+const T = $(jq -c . "$GT");
+const ids = id => FLAGS.filter(f => f.test(T.find(t => t.id === id))).map(f => f.id).join(' ');
+console.log($1)"; }
+  expect_eq "short EEE gap: chase fires" yes "$(gfl 'ids("EEE-wein-g2").split(" ").includes("chase") ? "yes" : "no"')"
+  expect_eq "short AAA replay: held 2 Stage 2 weeks -> stage4 fires; entered on Stage 4 -> notS2 quiet" "true false" "$(gfl '["stage4", "notS2"].map(i => ids("AAA-wein-g1").split(" ").includes(i)).join(" ")')"
 fi
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
