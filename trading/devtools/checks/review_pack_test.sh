@@ -617,5 +617,46 @@ else
   echo "SKIP: review_pack fallback guard cases need node"
 fi
 expect_eq "wiring: the overview finding and the Diagnostics column read fallbackFinding / fallbackShare" 2 "$(grep -c '^    fallbackFinding(t),$\|${tdn(fallbackShare(t, a))}' "$S/index.html")"
+# #3203 QC rework 1: the fill-week ratio's window, null rules and threshold, and the xpast boundary.
+#   JJJ: bars start 2020-01-21, so the fill week (2020-01-27) has 1 prior week -> fvr null (needs 2);
+#        the low-volume card leaves a null ratio out, and the JSON carries null, not 0;
+#   KKK: no volume before the fill week -> fvr null (no division by a zero average), the trade still graded;
+#   LLL: 500,000 a day in the oldest of the 4 prior weeks (2 bars), 100,000 in the 3 after, 300,000 in
+#        the fill week -> 300,000 / (2,500,000 / 17 bars) = 2.04; a 3-week window would read 3.00;
+#   MMM: 220,000 a day in the fill week vs 100,000 -> 2.20, not flagged (the card is < 2);
+#   NNN: bars end 2020-03-31 and the exit is dated 2020-03-31 -> on the last bar, xpast 0.
+V42="$TMP/v42"; mkdir -p "$V42/run"; cp "$FIX"/run/* "$V42/run/"
+for s in JJJ KKK LLL MMM NNN; do mkdir -p "$V42/data/$(printf %s "$s" | cut -c1)/$(printf %s "$s" | rev | cut -c1)/$s"; done
+mkdir -p "$V42/data/S/Y"; cp -R "$FIX/data/S/Y/SPY" "$V42/data/S/Y/"
+bars() { # $1 symbol, $2 awk program printing the volume v for date $1 (empty = no bar)
+  awk -F, "NR == 1 { print; next } { $2; if (v != \"\") printf \"%s,10.00,10.50,9.50,10.00,10.00,%d,\\n\", \$1, v }" "$FIX/data/A/A/AAA/data.csv" > "$V42/data/$(printf %s "$1" | cut -c1)/$(printf %s "$1" | rev | cut -c1)/$1/data.csv"
+}
+bars JJJ 'v = ($1 >= "2020-01-21") ? 100000 : ""'
+bars KKK 'v = ($1 >= "2020-01-27") ? 100000 : 0'
+bars LLL 'v = ($1 < "2020-01-06") ? 500000 : ($1 >= "2020-01-27" && $1 <= "2020-01-31") ? 300000 : 100000'
+bars MMM 'v = ($1 >= "2020-01-27" && $1 <= "2020-01-31") ? 220000 : 100000'
+bars NNN 'v = ($1 <= "2020-03-31") ? 100000 : ""'
+{ head -1 "$FIX/run/trades.csv"
+  for s in JJJ KKK LLL MMM; do echo "$s,LONG,2020-01-29,2020-03-02,33,10.00,10.00,1000,0.00,0.00,,,laggard_rotation,Stage2,2.5000,0.0800,non_stop_exit,,100,$s-wein-1,,,0"; done
+  echo "NNN,LONG,2020-01-29,2020-03-31,62,10.00,9.60,1000,-400.00,-4.00,9.60,9.60,stop_loss,Stage2,2.5000,0.0400,intraday,62,100,NNN-wein-1,,,0"; } > "$V42/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$V42/data" --out "$V42/pack" r0="$V42/run/" >"$V42/log" 2>&1 || rc=$?
+expect_eq "#3203 rework: builds, exit 0" 0 "$rc"
+V42T="$V42/pack/site/data/r0_trades.json"
+v42() { jq -r ".[]|select(.sym==\"$1\")|$2" "$V42T"; }
+expect_eq "fvr: one prior week -> null in the JSON (not 0)" null "$(v42 JJJ '.fvr')"
+expect_eq "fvr: no prior volume -> null, and the trade is still extracted (graded)" "null true" "$(v42 KKK '"\(.fvr) \(.g != null)"')"
+expect_eq "fvr: the window is the 4 prior weeks, per bar (2.04; 3 weeks would read 3.00)" 2.04 "$(v42 LLL '.fvr+0')"
+expect_eq "fvr: 2.20 in the fill week" 2.2 "$(v42 MMM '.fvr+0')"
+expect_eq "xpast: an exit on the last bar is not past it" "1 0" "$(v42 NNN '"\(.onX) \(.xpast)"')"
+if command -v node >/dev/null 2>&1; then
+  V42F="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' "$S/index.html")"
+  v42n() { node -e "$V42F
+const T = $(jq -c . "$V42T"), F = id => FLAGS.find(f => f.id === id);
+console.log($1)"; }
+  expect_eq "low-volume card: a null fill-week ratio is left out; 2.20 is not under 2; 2.04 is not either" "false false false" "$(v42n '["JJJ", "MMM", "LLL"].map(s => F("lowvol").test(T.find(t => t.sym === s))).join(" ")')"
+else
+  echo "SKIP: review_pack #3203 rework page cases need node"
+fi
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
