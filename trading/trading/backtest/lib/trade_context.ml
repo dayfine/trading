@@ -27,12 +27,14 @@ let stage_label (s : Weinstein_types.stage) =
   | Stage3 _ -> "Stage3"
   | Stage4 _ -> "Stage4"
 
-let stop_trigger_kind_label (k : Stop_log.stop_trigger_kind) =
-  match k with
-  | Gap_down -> "gap_down"
-  | Intraday -> "intraday"
-  | End_of_period -> "end_of_period"
-  | Non_stop_exit -> "non_stop_exit"
+let stop_trigger_kind_label ~(side : Trading_base.Types.position_side)
+    (k : Stop_log.stop_trigger_kind) =
+  match (k, side) with
+  | Gap_through, Long -> "gap_down"
+  | Gap_through, Short -> "gap_up"
+  | Intraday, _ -> "intraday"
+  | End_of_period, _ -> "end_of_period"
+  | Non_stop_exit, _ -> "non_stop_exit"
 
 let entry_anchor_label (a : Ticket_lifecycle.entry_anchor) =
   match a with
@@ -184,7 +186,7 @@ let stop_info_for_trade (pre : precomputed)
 
 (* The two stop-log-derived columns. They share a [trigger] and the entry side
    that classifies it, so they resolve together. *)
-let _stop_columns ~entry ~stop_info ~entry_date ~exit_date =
+let _stop_columns ~entry ~stop_info ~entry_date ~exit_date ~exit_price =
   let trigger =
     Option.bind stop_info ~f:(fun (i : Stop_log.stop_info) -> i.exit_trigger)
   in
@@ -193,7 +195,9 @@ let _stop_columns ~entry ~stop_info ~entry_date ~exit_date =
       ~f:(fun (e : Trade_audit.entry_decision) -> e.side)
   in
   ( Option.map trigger ~f:(fun t ->
-        stop_trigger_kind_label (Stop_log.classify_stop_trigger_kind ~side t)),
+        let trigger = Stop_log.with_fill_price t ~fill_price:exit_price in
+        stop_trigger_kind_label ~side
+          (Stop_log.classify_stop_trigger_kind ~side trigger)),
     _days_to_first_stop_trigger ~entry_date ~exit_date ~trigger )
 
 (* The two stop-ratchet observability columns. [n_stop_raises] stays [None] —
@@ -230,7 +234,7 @@ let of_precomputed (pre : precomputed)
   in
   let stop_trigger_kind, days_to_first_stop_trigger =
     _stop_columns ~entry ~stop_info ~entry_date:trade.entry_date
-      ~exit_date:trade.exit_date
+      ~exit_date:trade.exit_date ~exit_price:trade.exit_price
   in
   let max_stop, n_stop_raises = _stop_ratchet_columns stop_info in
   {

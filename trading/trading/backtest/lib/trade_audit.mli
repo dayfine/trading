@@ -93,6 +93,21 @@ type skip_reason =
           (default [false] => never emitted). Long candidates only. *)
 [@@deriving sexp]
 
+(** One outcome of the weekly decision record (#3139). *)
+type weekly_outcome =
+  | Placed  (** The entry walk wrote the ticket. *)
+  | Skipped of skip_reason  (** Passed over, with the reason. *)
+[@@deriving sexp]
+
+type weekly_decision = {
+  symbol : string;
+  side : Trading_base.Types.position_side;
+  outcome : weekly_outcome;
+}
+[@@deriving sexp]
+(** One top-N candidate of one screening Friday and what the entry walk did with
+    it. See {!cascade_summary.decisions}. *)
+
 type alternative_candidate = {
   symbol : string;
   side : Trading_base.Types.position_side;
@@ -482,6 +497,15 @@ type cascade_summary = {
           [long_top_n_admitted + short_top_n_admitted] because cash limits,
           sector concentration, and round-share sizing all drop further
           candidates between the screener output and actual entry. *)
+  decisions : weekly_decision list; [@sexp.default []]
+      (** The weekly decision record (#3139): every top-N candidate the entry
+          walk classified this Friday, in walk order, each with one outcome —
+          [Placed], or the {!skip_reason} it was passed over for. Written on
+          every screening Friday, including Fridays that placed nothing, so "why
+          did we buy nothing for 12 weeks" is answered from the artefact rather
+          than a re-run with [--emit-candidates]. [[]] when the walk had no
+          candidates (a macro-blocked tape or an empty top-N: the counts above
+          say which), and on files written before #3139. *)
 }
 [@@deriving sexp]
 (** Per-Friday cascade-rejection counts — complements [audit_record]'s per-trade
@@ -622,6 +646,16 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
 
     The closed list is pinned by
     [trading/trading/backtest/test/test_cancel_reason_closed_list.ml]. *)
+
+val record_cash_rejection :
+  t -> Trading_simulation.Entry_cash_rejection.t -> unit
+(** Record that the entry ticket [r.position_id] was cancelled because the
+    portfolio could not fund its fill (#3138), wired to
+    {!Trading_simulation.Simulator.dependencies.on_entry_cash_rejection}. Merged
+    into that entry's [ticket_lifecycle.cash_rejection] at drain time, beside
+    the [cancel_reason] ([entry_fill_rejected_by_portfolio]) and cancel age the
+    same step's [CancelEntry] sets through {!record_transitions}. Dropped when
+    no entry was recorded for the id (mirrors {!record_exit}). *)
 
 val record_fill_volume :
   t -> position_id:string -> Ticket_lifecycle.fill_volume_check -> unit

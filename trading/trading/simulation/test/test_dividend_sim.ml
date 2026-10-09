@@ -169,18 +169,15 @@ let test_credited_before_strategy_not_on_fill_day _ =
 
 (* A position sold by a fill ON the ex-date was held when that step started,
    so it still receives the dividend. *)
-(* QC PROBE (temporary): sale filling on the ex-date still gets paid. *)
-let _exit_strategy seen : (module Strategy_interface.STRATEGY) =
+let _exit_strategy () : (module Strategy_interface.STRATEGY) =
   let module S : Strategy_interface.STRATEGY = struct
     let name = "BuyThenExitOnEve"
 
-    let on_market_close ~get_price ~get_indicator:_ ~portfolio =
+    let on_market_close ~get_price ~get_indicator:_ ~portfolio:_ =
       match get_price "AAPL" with
       | None -> Ok { Strategy_interface.transitions = [] }
       | Some (bar : Types.Daily_price.t) ->
-          let first = List.is_empty !seen in
-          seen :=
-            (bar.date, portfolio.Trading_strategy.Portfolio_view.cash) :: !seen;
+          let first = Date.equal bar.date _config.start_date in
           let exit_tr =
             {
               Trading_strategy.Position.position_id = "AAPL-hold";
@@ -207,8 +204,15 @@ let _exit_strategy seen : (module Strategy_interface.STRATEGY) =
   in
   (module S)
 
+let _sell_dates (r : run_result) =
+  List.filter_map r.steps ~f:(fun (s : step_result) ->
+      if
+        List.exists s.trades ~f:(fun t ->
+            match t.Trading_base.Types.side with Sell -> true | Buy -> false)
+      then Some s.date
+      else None)
+
 let test_sale_filling_on_ex_date_still_paid _ =
-  let seen = ref [] in
   let divs : Corporate_actions.dividend list =
     [
       {
@@ -224,7 +228,7 @@ let test_sale_filling_on_ex_date_still_paid _ =
       ~f:(fun data_dir ->
         let deps =
           create_deps ~symbols:[ "AAPL" ] ~data_dir
-            ~strategy:(_exit_strategy seen) ~commission:_config.commission
+            ~strategy:(_exit_strategy ()) ~commission:_config.commission
             ~dividends:(_crediting [ ("AAPL", divs) ])
             ()
         in
@@ -242,6 +246,10 @@ let test_sale_filling_on_ex_date_still_paid _ =
               (fun (r : run_result) ->
                 r.final_portfolio.Trading_portfolio.Portfolio.current_cash)
               (float_equal 100_025.0);
+            field
+              (fun (r : run_result) -> r.final_portfolio.positions)
+              (elements_are []);
+            field _sell_dates (elements_are [ equal_to (_date "2024-01-05") ]);
           ]))
 
 (* Per-step (portfolio summary, value). Whole [step_result]s are not compared:

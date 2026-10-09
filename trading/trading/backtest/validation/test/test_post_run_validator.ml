@@ -108,6 +108,10 @@ let test_v5 _ =
           (* Stop-loss with gap_down is consistent. *)
           trade ~symbol:"OK" ~entry_date:"2020-02-07" ~exit_trigger:"stop_loss"
             ~stop_trigger_kind:"gap_down" ();
+          (* A short's buy-stop gapped through from below (#3147) is a stop
+             exit too. *)
+          trade ~symbol:"SHORTGAP" ~entry_date:"2020-03-06"
+            ~exit_trigger:"stop_loss" ~stop_trigger_kind:"gap_up" ();
         ];
     }
   in

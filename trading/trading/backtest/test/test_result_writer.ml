@@ -666,7 +666,9 @@ let _col_idx header ~name =
 let test_trades_csv_populates_context_from_audit_and_stop_log _ =
   let entry_date = _date "2024-01-02" in
   let exit_date = _date "2024-04-29" in
-  let trade = _make_trade ~symbol:"AAPL" ~entry_date ~exit_date () in
+  let trade =
+    _make_trade ~symbol:"AAPL" ~entry_date ~exit_date ~exit_price:91.99 ()
+  in
   let entry =
     _m5_2e_entry ~symbol:"AAPL" ~entry_date ~position_id:"AAPL-wein-1"
   in
@@ -755,7 +757,9 @@ let test_trades_csv_populates_context_from_audit_and_stop_log _ =
 let test_trades_csv_context_falls_back_to_empty_when_no_audit _ =
   let entry_date = _date "2024-01-02" in
   let exit_date = _date "2024-04-29" in
-  let trade = _make_trade ~symbol:"AAPL" ~entry_date ~exit_date () in
+  let trade =
+    _make_trade ~symbol:"AAPL" ~entry_date ~exit_date ~exit_price:91.99 ()
+  in
   let stop_info : Backtest.Stop_log.stop_info =
     {
       position_id = "AAPL-wein-1";
@@ -819,7 +823,8 @@ let test_retraded_symbol_keys_triggers_by_position_id _ =
   let entry2_date = _date "2024-03-01" in
   let exit2_date = _date "2024-04-29" in
   let trade1 =
-    _make_trade ~symbol:"AAPL" ~entry_date:entry1_date ~exit_date:exit1_date ()
+    _make_trade ~symbol:"AAPL" ~entry_date:entry1_date ~exit_date:exit1_date
+      ~exit_price:91.99 ()
   in
   let trade2 =
     _make_trade ~symbol:"AAPL" ~entry_date:entry2_date ~exit_date:exit2_date ()

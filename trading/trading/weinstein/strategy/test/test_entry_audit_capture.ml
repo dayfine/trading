@@ -2196,10 +2196,8 @@ let test_all_alternatives_survive_a_zero_funded_walk _ =
            ];
        ])
 
-(** Funded candidates are deliberately absent: each has its own [entry_event] /
-    [Trade_audit.entry_decision] row and cross-artefact joins key on
-    [position_id], so repeating them here would double-count the week. *)
-let test_all_alternatives_excludes_kept _ =
+(** A two-name walk: [KEPT] funded, [SKIP] passed over as already held. *)
+let _kept_and_skipped_decisions () =
   let as_of_date = Date.of_string "2020-06-05" in
   let cand ticker =
     _long_candidate ~ticker ~suggested_entry:100.0 ~suggested_stop:90.0
@@ -2218,12 +2216,16 @@ let test_all_alternatives_excludes_kept _ =
     | Stop_too_wide | Sized_zero | No_structural_stop ->
         OUnit2.assert_failure "fixture candidate failed to build an entry"
   in
-  let decisions =
-    [
-      (cand "KEPT", Entry_audit_capture.Kept (kept_trans, kept_meta));
-      (cand "SKIP", Entry_audit_capture.Skipped Audit_recorder.Already_held);
-    ]
-  in
+  [
+    (cand "KEPT", Entry_audit_capture.Kept (kept_trans, kept_meta));
+    (cand "SKIP", Entry_audit_capture.Skipped Audit_recorder.Already_held);
+  ]
+
+(** Funded candidates are deliberately absent: each has its own [entry_event] /
+    [Trade_audit.entry_decision] row and cross-artefact joins key on
+    [position_id], so repeating them here would double-count the week. *)
+let test_all_alternatives_excludes_kept _ =
+  let decisions = _kept_and_skipped_decisions () in
   assert_that
     (Entry_audit_emit.all_alternatives_of_decisions ~decisions)
     (elements_are
@@ -2231,6 +2233,29 @@ let test_all_alternatives_excludes_kept _ =
          field
            (fun (a : Audit_recorder.alternative_input) -> a.candidate.ticker)
            (equal_to "SKIP");
+       ])
+
+(** #3139: the weekly decision record keeps the funded name the G1 projection
+    drops — [Kept] becomes [Placed], each skip keeps its reason, walk order. *)
+let test_walk_decisions_keep_placed _ =
+  let decisions = _kept_and_skipped_decisions () in
+  let row ticker outcome =
+    all_of
+      [
+        field
+          (fun (d : Audit_recorder.walk_decision) -> d.ranked.ticker)
+          (equal_to ticker);
+        field
+          (fun (d : Audit_recorder.walk_decision) -> d.outcome)
+          (equal_to outcome);
+      ]
+  in
+  assert_that
+    (Entry_audit_emit.walk_decisions_of ~decisions)
+    (elements_are
+       [
+         row "KEPT" Audit_recorder.Placed;
+         row "SKIP" (Audit_recorder.Skipped Audit_recorder.Already_held);
        ])
 
 (* ------------------------------------------------------------------ *)
@@ -2688,6 +2713,8 @@ let () =
            >:: test_all_alternatives_survive_a_zero_funded_walk;
            "G1: all_alternatives excludes Kept"
            >:: test_all_alternatives_excludes_kept;
+           "#3139: walk_decisions_of keeps Placed"
+           >:: test_walk_decisions_keep_placed;
            "G1: noop recorder does not capture candidates"
            >:: test_noop_recorder_does_not_capture_candidates;
            "G14: effective_entry overrides cand.suggested_entry"

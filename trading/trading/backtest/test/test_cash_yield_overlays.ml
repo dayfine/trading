@@ -114,6 +114,61 @@ let test_split_guard_reader_and_summary _ =
     (equal_to
        (true, true, "Panel_runner: split_dividend_guard rejected=0 no_files=0"))
 
+(* #3174: [ex_dividend_stop_adjust] defaults off (R1), is an axis via the real
+   [Overlay_validator] (R2), and arms [Panel_corporate_actions.create]'s
+   reducer only when on. *)
+let test_ex_dividend_stop_adjust_default_off_and_axis _ =
+  let flag (c : Weinstein_strategy.config) = c.ex_dividend_stop_adjust in
+  let armed config =
+    Option.is_some
+      (Backtest.Panel_corporate_actions.create ~config
+         ~data_dir:(Fpath.v "/nonexistent"))
+        .ex_dividend_stops
+  in
+  let on = _after [ "((ex_dividend_stop_adjust true))" ] in
+  let off =
+    _after
+      [
+        "((ex_dividend_stop_adjust true))"; "((ex_dividend_stop_adjust false))";
+      ]
+  in
+  assert_that
+    [
+      (flag (_default_config ()), armed (_default_config ()));
+      (flag on, armed on);
+      (flag off, armed off);
+    ]
+    (elements_are
+       [
+         equal_to (false, false); equal_to (true, true); equal_to (false, false);
+       ])
+
+(* Both flags off: the bar reader is handed back physically unchanged. The
+   reducer alone attaches only the reducer. The end-of-run line names all
+   three counts. *)
+let test_arm_bar_reader_and_summary _ =
+  let reader = Weinstein_strategy.Bar_reader.empty () in
+  let eds = Ex_dividend_stop.of_data_dir ~data_dir:(Fpath.v "/x") in
+  let module P = Backtest.Panel_corporate_actions in
+  let armed =
+    P.arm_bar_reader { split_guard = None; ex_dividend_stops = Some eds } reader
+  in
+  assert_that
+    ( phys_equal
+        (P.arm_bar_reader
+           { split_guard = None; ex_dividend_stops = None }
+           reader)
+        reader,
+      Option.is_some (Weinstein_strategy.Bar_reader.ex_dividend_stops armed),
+      Option.is_some (Weinstein_strategy.Bar_reader.split_guard armed),
+      P.ex_dividend_stops_summary eds )
+    (equal_to
+       ( true,
+         true,
+         false,
+         "Panel_runner: ex_dividend_stop_adjust reduced=0 skipped_no_amount=0 \
+          no_files=0" ))
+
 let test_committed_tbill_series_covers_window _ =
   let data_dir = Fpath.to_string (Data_path.default_data_dir ()) in
   let resolved =
@@ -142,6 +197,9 @@ let suite =
          >:: test_split_dividend_guard_default_off_and_axis;
          "split guard reader and summary"
          >:: test_split_guard_reader_and_summary;
+         "ex-dividend stop adjust default off and an axis"
+         >:: test_ex_dividend_stop_adjust_default_off_and_axis;
+         "arm bar reader and summary" >:: test_arm_bar_reader_and_summary;
          "committed T-bill series covers the window"
          >:: test_committed_tbill_series_covers_window;
        ]

@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-08",
+  "feature": "harness-flag-drift-usage-pin",
+  "branch": "harness/flag-drift-usage-pin",
+  "sha": "75cbbc78404b71c85c3cc3b6fb3883954634176d",
+  "recorded_at_ns": 1791490043811100941,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

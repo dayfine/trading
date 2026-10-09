@@ -94,18 +94,15 @@ let _execution_of ~entry_order_kind ~(entry : Trade_audit.entry_decision)
         faithful = within;
       }
 
-(* Add one round-trip's entry leg to the [position_id -> (fill price, fill date)]
-   map, keyed by the position [Trade_context] resolves for it (first match
-   wins). The fill date is carried alongside the price for the PR-5 ticket-age
-   stamp below; it costs nothing extra — this join is the only place the
-   placement tick and the fill tick are both in hand. *)
+(* Index the first round-trip matched by [Trade_context] to each position.
+   Entry price/date supply execution faithfulness and ticket age; exit price
+   replaces the decision-time observation in the audit exit reason. *)
 let _add_fill ~pre acc (trade : Trading_simulation.Metrics.trade_metrics) =
   match (Trade_context.of_precomputed pre ~trade).position_id with
-  | Some pid when not (Map.mem acc pid) ->
-      Map.set acc ~key:pid ~data:(trade.entry_price, trade.entry_date)
+  | Some pid when not (Map.mem acc pid) -> Map.set acc ~key:pid ~data:trade
   | _ -> acc
 
-(* position_id -> (entry fill price, entry fill date). Reuses [Trade_context]'s
+(* position_id -> round-trip. Reuses [Trade_context]'s
    join to resolve each round-trip's position: the id the round-trip carries,
    else the legacy (symbol, entry_date) date-proximity fallback. *)
 let _fill_by_position_id ~audit ~round_trips =
@@ -124,17 +121,34 @@ let _with_ticket_age (entry : Trade_audit.entry_decision) ~fill_date =
       Ticket_lifecycle.with_fill_age entry.ticket_lifecycle ~resolved:fill_date;
   }
 
+(* Replace the decision-time observation in both audit exit reasons with the
+   round-trip's realised exit fill. *)
+let _with_exit_fill (r : Trade_audit.audit_record) ~fill_price =
+  let refill trigger = Stop_log.with_fill_price trigger ~fill_price in
+  {
+    r with
+    exit_ =
+      Option.map r.exit_ ~f:(fun (e : Trade_audit.exit_decision) ->
+          { e with exit_trigger = refill e.exit_trigger });
+    external_exit =
+      Option.map r.external_exit
+        ~f:(fun (e : Trade_audit.external_exit_decision) ->
+          { e with exit_trigger = refill e.exit_trigger });
+  }
+
 let _enriched_record ~fill_by_pid ~entry_order_kind
     (r : Trade_audit.audit_record) =
   match Map.find fill_by_pid r.entry.position_id with
   | None -> r
-  | Some (fill_price, fill_date) ->
+  | Some (trade : Trading_simulation.Metrics.trade_metrics) ->
       let execution =
-        _execution_of ~entry_order_kind ~entry:r.entry ~fill_price
+        _execution_of ~entry_order_kind ~entry:r.entry
+          ~fill_price:trade.entry_price
       in
+      let r = _with_exit_fill r ~fill_price:trade.exit_price in
       {
         r with
-        entry = _with_ticket_age r.entry ~fill_date;
+        entry = _with_ticket_age r.entry ~fill_date:trade.entry_date;
         execution = Some execution;
       }
 

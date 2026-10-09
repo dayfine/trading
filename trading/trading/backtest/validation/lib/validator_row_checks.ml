@@ -92,7 +92,8 @@ let check_v12 inputs =
 
 (* ---- V5: exit_trigger vs stop_trigger_kind consistency ----------------- *)
 
-(* Triggers whose row must carry a real stop kind ([gap_down] / [intraday]).
+(* Triggers whose row must carry a real stop kind ([gap_down] / [gap_up] /
+   [intraday]; [gap_up] is a short's gap through its stop, #3147).
    The two legacy [force_liquidation_*] labels belong here because the relabel
    that produced them (removed 2026-09-14) overwrote rows whose underlying exit
    really was a stop-out. The token the breaker emits today,
@@ -104,7 +105,7 @@ let _stop_triggers =
 
 let _expected_kinds trigger =
   if List.mem _stop_triggers trigger ~equal:String.equal then
-    [ "gap_down"; "intraday" ]
+    [ "gap_down"; "gap_up"; "intraday" ]
   else if String.equal trigger "end_of_period" then [ "end_of_period" ]
   else [ "non_stop_exit" ]
 

@@ -126,11 +126,33 @@ let test_stage_label_distinguishes_late_stage2 _ =
 
 let test_stop_trigger_kind_label_distinguishes_all _ =
   assert_that
-    ( TC.stop_trigger_kind_label SL.Gap_down,
-      TC.stop_trigger_kind_label SL.Intraday,
-      TC.stop_trigger_kind_label SL.End_of_period,
-      TC.stop_trigger_kind_label SL.Non_stop_exit )
-    (equal_to ("gap_down", "intraday", "end_of_period", "non_stop_exit"))
+    [
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Long SL.Gap_through;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Short SL.Gap_through;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Long SL.Intraday;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Short SL.Intraday;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Long SL.End_of_period;
+      TC.stop_trigger_kind_label ~side:Trading_base.Types.Long SL.Non_stop_exit;
+    ]
+    (equal_to
+       [
+         "gap_down";
+         "gap_up";
+         "intraday";
+         "intraday";
+         "end_of_period";
+         "non_stop_exit";
+       ])
+
+(* #3147: a short squeezed through its stop fills above it; [trades.csv] reads
+   [gap_up], not [gap_down] (74 of 106 soT short exits were mislabelled). *)
+let test_short_gap_through_labelled_gap_up _ =
+  let side = Trading_base.Types.Short in
+  assert_that
+    (TC.stop_trigger_kind_label ~side
+       (SL.classify_stop_trigger_kind ~side
+          (SL.Stop_loss { stop_price = 20.0; actual_price = 21.0 })))
+    (equal_to "gap_up")
 
 (* #3074: every [entry_anchor] column label, one per constructor — the strings an
    [awk] split of [trades.csv] by entry type matches on. *)
@@ -253,6 +275,7 @@ let test_entry_anchor_column_reads_the_lifecycle_tag _ =
           in_base_advance_pct = None;
         };
       reissued_from = None;
+      cash_rejection = None;
     }
   in
   let anchor_of ticket_lifecycle =
@@ -315,7 +338,7 @@ let test_late_stage2_label _ =
 
 (* Gap-down stop flows through to stop_trigger_kind label. *)
 let test_gap_down_stop_classified _ =
-  let trade = make_trade () in
+  let trade = make_trade ~exit_price:125.0 () in
   let entry = make_entry () in
   let stop_info =
     make_stop_info ~position_id:"AAPL-wein-1" ~symbol:"AAPL"
@@ -328,6 +351,21 @@ let test_gap_down_stop_classified _ =
       ~stop_infos:[ stop_info ] ~trade
   in
   assert_that ctx.stop_trigger_kind (is_some_and (equal_to "gap_down"))
+
+(* #3141: the bar low is not the execution price. *)
+let test_stop_classification_uses_fill ~side ~exit_price ~expected _ =
+  let trade = make_trade ~exit_price () in
+  let stop_info =
+    make_stop_info ~position_id:"AAPL-wein-1" ~symbol:"AAPL"
+      ~exit_trigger:(SL.Stop_loss { stop_price = 138.0; actual_price = 125.0 })
+      ()
+  in
+  let ctx =
+    TC.of_audit_and_stop_log
+      ~audit:[ make_record (make_entry ~side ()) ]
+      ~stop_infos:[ stop_info ] ~trade
+  in
+  assert_that ctx.stop_trigger_kind (is_some_and (equal_to expected))
 
 (* Take-profit exit yields non_stop_exit + None days_to_first_stop_trigger. *)
 let test_take_profit_exit_is_non_stop _ =
@@ -676,8 +714,19 @@ let suite =
   >::: [
          "stage_label distinguishes Stage2_late"
          >:: test_stage_label_distinguishes_late_stage2;
+         "long stop classification uses fill"
+         >:: test_stop_classification_uses_fill ~side:Long ~exit_price:138.0
+               ~expected:"intraday";
+         "short stop classification uses fill"
+         >:: test_stop_classification_uses_fill ~side:Short ~exit_price:138.0
+               ~expected:"intraday";
+         "short gap uses fill"
+         >:: test_stop_classification_uses_fill ~side:Short ~exit_price:145.0
+               ~expected:"gap_up";
          "stop_trigger_kind_label all variants"
          >:: test_stop_trigger_kind_label_distinguishes_all;
+         "short gap-through labelled gap_up"
+         >:: test_short_gap_through_labelled_gap_up;
          "entry_anchor_label all variants (#3074)"
          >:: test_entry_anchor_label_distinguishes_all;
          "entry_anchor_of_kind maps each arm (#3131)"

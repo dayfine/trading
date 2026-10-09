@@ -545,6 +545,52 @@ let test_maintenance_tiered_flags_cheap_short _ =
        [ ("CHEAP", 10.0) ])
     (elements_are [ equal_to "CHEAP" ])
 
+(* #3148, UBSI-wein-1023 shape: a short filled at 19.21 marked at 16.99 (+11.6 %
+   for the short) has an equity ratio of (19.21 + 9.605 - 16.99) / 16.99 = 0.696.
+   The M3a step (0.83 below $17) margin-calls it; FINRA (0.30 there) does not,
+   and armed FINRA supersedes the tier table. *)
+let _ubsi_short () =
+  apply_trades_with_margin_exn ~margin_config:on_config
+    (create ~initial_cash:10_000.0 ())
+    [
+      make_trade ~id:"t1" ~order_id:"o1" ~symbol:"UBSI" ~side:Sell
+        ~quantity:100.0 ~price:19.21 ();
+    ]
+    ~error_msg:"ubsi short"
+
+let test_finra_maintenance_spares_ubsi_winner _ =
+  let step =
+    {
+      on_config with
+      Margin_config.short_maintenance_tiers =
+        [
+          {
+            Trading_portfolio.Short_margin_tiers.price_below = 17.0;
+            value = 0.83;
+          };
+        ];
+    }
+  in
+  let finra = { step with Margin_config.short_maintenance_finra = true } in
+  let flagged margin_config =
+    check_maintenance_margin ~margin_config (_ubsi_short ()) [ ("UBSI", 16.99) ]
+  in
+  assert_that
+    ( flagged step,
+      flagged finra,
+      Margin_config.maintenance_pct_for_price finra ~price:10.0,
+      Margin_config.maintenance_pct_for_price Margin_config.default_config
+        ~price:10.0 )
+    (all_of
+       [
+         field (fun (s, _, _, _) -> s) (elements_are [ equal_to "UBSI" ]);
+         field (fun (_, f, _, _) -> f) (elements_are []);
+         field (fun (_, _, p, _) -> p) (float_equal 0.50);
+         field
+           (fun (_, _, _, d) -> d)
+           (float_equal Margin_config.default_config.maintenance_margin_pct);
+       ])
+
 let test_margin_config_round_trip_preserves_tiers _ =
   let armed =
     {
@@ -566,6 +612,7 @@ let test_margin_config_round_trip_preserves_tiers _ =
       (* M3b buy-in stress fields also survive the sexp round-trip. *)
       Margin_config.short_buyin_stress_mode = true;
       Margin_config.short_buyin_htb_price_below = 5.0;
+      Margin_config.short_maintenance_finra = true;
     }
   in
   assert_that
@@ -612,6 +659,9 @@ let test_pre_m3a_margin_config_sexp_parses_with_empty_tiers _ =
        [
          field (fun c -> c.Margin_config.short_borrow_rate_tiers) (size_is 0);
          field (fun c -> c.Margin_config.short_maintenance_tiers) (size_is 0);
+         field
+           (fun c -> c.Margin_config.short_maintenance_finra)
+           (equal_to false);
        ])
 
 (* ========================================================================== *)
@@ -825,6 +875,8 @@ let test_default_config_factor_matches_book _ =
 let suite =
   "test_margin_accounting"
   >::: [
+         "finra maintenance spares UBSI winner"
+         >:: test_finra_maintenance_spares_ubsi_winner;
          "test_flag_off_short_entry_matches_legacy"
          >:: test_flag_off_short_entry_matches_legacy;
          "test_flag_off_long_only_sequence_bit_equal"

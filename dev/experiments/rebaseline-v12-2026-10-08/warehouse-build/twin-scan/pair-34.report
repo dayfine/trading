@@ -1,0 +1,73 @@
+rename-twin report: basis=returns enabled=true min_overlap_days=100 match_fraction=0.9500 close_epsilon=0.0001 ret_epsilon=0.001
+16 group(s), 55 symbol(s) dropped
+  survivor LFG <- [RICE]
+    RICE (overlap=191, match=1.0000)
+  survivor LFWD <- [RWLK]
+    RWLK (overlap=2367, match=0.9746)
+  survivor LNSPF <- [NHL; ORCH; SBMC; SLNK; SUG; SUPX_old1; SYTA; TND; WWY]
+    NHL (overlap=1764, match=0.9387)
+    ORCH (overlap=1202, match=0.9459)
+    SBMC (overlap=1921, match=0.9714)
+    SLNK (overlap=1645, match=0.9659)
+    SUG (overlap=785, match=0.9247)
+    SUPX_old1 (overlap=107, match=0.9528)
+    SYTA (overlap=2786, match=0.6571)
+    TND (overlap=605, match=0.9685)
+    WWY (overlap=489, match=0.9508)
+  survivor LOTE <- [LJPC; LOCK1; MADGQ; MAJR; MAXW; MILGF; NETE; OHGI; ORIG; PCO; PRSF; RGSE; SBFM; SKE; SPEX; SUZ; TIO; VRTL_old; WATG]
+    LJPC (overlap=3138, match=0.0692)
+    LOCK1 (overlap=0, match=0.0000)
+    MADGQ (overlap=1423, match=0.6653)
+    MAJR (overlap=274, match=0.8828)
+    MAXW (overlap=644, match=0.9518)
+    MILGF (overlap=4185, match=0.5968)
+    NETE (overlap=2491, match=0.1791)
+    OHGI (overlap=1940, match=0.0954)
+    ORIG (overlap=1817, match=0.3464)
+    PCO (overlap=1993, match=0.5231)
+    PRSF (overlap=0, match=0.0000)
+    RGSE (overlap=2354, match=0.3991)
+    SBFM (overlap=4134, match=0.3444)
+    SKE (overlap=4169, match=0.2683)
+    SPEX (overlap=2558, match=0.2753)
+    SUZ (overlap=2963, match=0.0214)
+    TIO (overlap=3914, match=0.2673)
+    VRTL_old (overlap=0, match=0.0000)
+    WATG (overlap=713, match=0.2205)
+  survivor LRMR <- [ZFGN]
+    ZFGN (overlap=1496, match=1.0000)
+  survivor MAYA <- [LNR; MVL; PCZ; PIXY; SFP; SHU; SKS; SOBI; SRR; TMD; UPR; VNTR]
+    LNR (overlap=1280, match=0.5833)
+    MVL (overlap=2505, match=0.2356)
+    PCZ (overlap=1969, match=0.3674)
+    PIXY (overlap=114, match=1.0000)
+    SFP (overlap=2365, match=0.4657)
+    SHU (overlap=2498, match=0.5198)
+    SKS (overlap=2504, match=0.1794)
+    SOBI (overlap=2500, match=0.4374)
+    SRR (overlap=1999, match=0.4039)
+    TMD (overlap=2506, match=0.3625)
+    UPR (overlap=2478, match=0.5418)
+    VNTR (overlap=91, match=1.0000)
+  survivor NPLS <- [TCAP]
+    TCAP (overlap=149, match=0.9932)
+  survivor OBK <- [OBNK]
+    OBNK (overlap=1338, match=0.9940)
+  survivor PALI <- [ROSG; SNCA; WCAP_old]
+    ROSG (overlap=2829, match=0.2963)
+    SNCA (overlap=3611, match=0.7305)
+    WCAP_old (overlap=252, match=0.9562)
+  survivor PFX <- [MCC]
+    MCC (overlap=2525, match=0.9913)
+  survivor PLUR <- [PSTI]
+    PSTI (overlap=4860, match=0.9963)
+  survivor RICO <- [TNO]
+    TNO (overlap=361, match=0.9556)
+  survivor SAIH <- [SAI]
+    SAI (overlap=852, match=0.9965)
+  survivor SOGP <- [LIZI]
+    LIZI (overlap=1055, match=0.9972)
+  survivor TPST <- [OVAS]
+    OVAS (overlap=1510, match=0.9887)
+  survivor VELO <- [VLD-WS]
+    VLD-WS (overlap=231, match=0.9913)

@@ -94,6 +94,7 @@ type config = {
       (** See [.mli]. *)
   dividend_crediting : bool; [@sexp.default false]  (** See [.mli]. *)
   split_dividend_guard : bool; [@sexp.default false]  (** See [.mli]. *)
+  ex_dividend_stop_adjust : bool; [@sexp.default false]  (** See [.mli]. *)
   resistance_min_history_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   resistance_lookback_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   overhead_supply : Resistance_supply.config option; [@sexp.default None]
@@ -242,6 +243,7 @@ let default_config ~universe ~index_symbol =
     cash_yield_fee_bp = Trading_simulation_cash_yield.Cash_yield.default_fee_bp;
     dividend_crediting = false;
     split_dividend_guard = false;
+    ex_dividend_stop_adjust = false;
     resistance_min_history_bars = 0;
     resistance_lookback_bars = 0;
     overhead_supply = Some Resistance_supply.default_config;
@@ -290,9 +292,8 @@ let default_config ~universe ~index_symbol =
     trailing_stop_ma_period = None;
   }
 
-(* F5 arming predicate — the single source of truth for both halves of the
-   mechanism (placement waiver + at-fill eject), so the two can never drift out
-   of step. See [.mli]. *)
+(* F5 arming predicate, the one source for both halves (placement waiver +
+   at-fill eject), so they cannot drift apart. See [.mli]. *)
 let volume_confirm_at_fill_armed (c : config) : bool =
   c.volume_confirm_at_fill && c.sim_entry_trigger_at_suggested
   && c.enable_sim_entry_stoplimit

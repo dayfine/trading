@@ -33,6 +33,8 @@ type _pos_record = {
   mutable pos_entry_stop : float option;
   mutable pos_current_stop : float option;
   mutable pos_exit_trigger : exit_trigger option;
+  mutable pos_exit_trigger_date : Date.t option;
+      (* The transition date [pos_exit_trigger] was recorded on (#3147). *)
   mutable pos_max_stop : float option;
   mutable pos_n_stop_raises : int;
   mutable pos_seen_decision : bool;
@@ -63,7 +65,19 @@ let exit_trigger_of_reason (reason : Position.exit_reason) : exit_trigger =
   | PortfolioRebalancing -> Portfolio_rebalancing
   | StrategySignal { label; detail } -> Strategy_signal { label; detail }
 
-type stop_trigger_kind = Gap_down | Intraday | End_of_period | Non_stop_exit
+let with_fill_price trigger ~fill_price =
+  match trigger with
+  | Stop_loss { stop_price; _ } ->
+      Stop_loss { stop_price; actual_price = fill_price }
+  | Take_profit { target_price; _ } ->
+      Take_profit { target_price; actual_price = fill_price }
+  | other -> other
+
+type stop_trigger_kind =
+  | Gap_through
+  | Intraday
+  | End_of_period
+  | Non_stop_exit
 [@@deriving show, eq, sexp]
 
 let gap_down_threshold_pct = 0.005
@@ -79,7 +93,7 @@ let classify_stop_trigger_kind ?(gap_threshold_pct = gap_down_threshold_pct)
   match trigger with
   | Stop_loss { stop_price; actual_price } ->
       if _is_gap_down ~side ~stop_price ~actual_price ~gap_threshold_pct then
-        Gap_down
+        Gap_through
       else Intraday
   | End_of_period -> End_of_period
   | Take_profit _ | Signal_reversal _ | Time_expired _ | Underperforming _
@@ -97,6 +111,7 @@ let _fresh_record ~symbol =
     pos_entry_stop = None;
     pos_current_stop = None;
     pos_exit_trigger = None;
+    pos_exit_trigger_date = None;
     pos_max_stop = None;
     pos_n_stop_raises = 0;
     pos_seen_decision = false;
@@ -148,6 +163,33 @@ let _seed_entry_stop record ~level =
   record.pos_entry_stop <- Some level;
   _install_stop record ~level ~is_raise_candidate:false
 
+(* The simulator's forced-exit labels ({!Trading_simulation.Margin_runner}). *)
+let _margin_exit_labels =
+  [ "margin_call"; "buyin_stress"; "maintenance_reduce" ]
+
+let _is_margin_trigger = function
+  | Strategy_signal { label; _ } ->
+      List.mem _margin_exit_labels label ~equal:String.equal
+  | _ -> false
+
+(* #3147: a margin exit does not overwrite a trigger the strategy recorded for
+   the same position on the same day. [Margin_runner] drops that strategy exit
+   (stop-loss, force liquidation) in favour of its own, which fills the same
+   way unless trigger-bar stop fills are armed; the label keeps the decision
+   the audit and [force_liquidations.sexp] record. *)
+let _record_exit_trigger record ~date trigger =
+  let same_day =
+    Option.equal Date.equal record.pos_exit_trigger_date (Some date)
+  in
+  let keep_strategy =
+    same_day
+    && Option.is_some record.pos_exit_trigger
+    && _is_margin_trigger trigger
+  in
+  if not keep_strategy then (
+    record.pos_exit_trigger <- Some trigger;
+    record.pos_exit_trigger_date <- Some date)
+
 let _process_transition t (trans : Position.transition) =
   match trans.kind with
   | CreateEntering { symbol; side; _ } ->
@@ -171,7 +213,8 @@ let _process_transition t (trans : Position.transition) =
       record.pos_current_stop <- new_risk_params.stop_loss_price
   | TriggerExit { exit_reason; _ } | TriggerPartialExit { exit_reason; _ } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
-      record.pos_exit_trigger <- Some (exit_trigger_of_reason exit_reason)
+      _record_exit_trigger record ~date:trans.date
+        (exit_trigger_of_reason exit_reason)
   | ExitComplete ->
       (* Simulator's end-of-period auto-close path emits [ExitFill] +
          [ExitComplete] without a preceding [TriggerExit]. Tag the position
@@ -250,10 +293,7 @@ let _record_to_info ~position_id record : stop_info =
     n_stop_raises = record.pos_n_stop_raises;
   }
 
-let _compare_by_position_id (a : stop_info) (b : stop_info) =
-  String.compare a.position_id b.position_id
-
 let get_stop_infos t : stop_info list =
   Hashtbl.fold t.positions ~init:[] ~f:(fun ~key:position_id ~data:record acc ->
       _record_to_info ~position_id record :: acc)
-  |> List.sort ~compare:_compare_by_position_id
+  |> List.sort ~compare:(fun a b -> String.compare a.position_id b.position_id)

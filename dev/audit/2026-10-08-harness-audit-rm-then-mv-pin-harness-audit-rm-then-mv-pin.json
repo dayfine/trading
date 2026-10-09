@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-08",
+  "feature": "harness-audit-rm-then-mv-pin",
+  "branch": "harness/audit-rm-then-mv-pin",
+  "sha": "d5acd01ac57821aa36647362c394ccdd00419009",
+  "recorded_at_ns": 1791487977369776758,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

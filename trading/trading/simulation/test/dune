@@ -325,6 +325,8 @@
   trading.engine
   trading.portfolio
   trading.strategy
+  csv.corporate_actions
+  csv.split_dividend_guard
   types
   matchers
   simulation_test_helpers))
@@ -575,6 +577,7 @@
   status
   trading.simulation
   trading.base
+  trading.portfolio
   trading.orders
   trading.strategy
   matchers))
@@ -728,3 +731,21 @@
   csv.split_dividend_guard
   types
   matchers))
+
+(test
+ (name test_entry_cash_rejection)
+ (modules test_entry_cash_rejection)
+ (libraries
+  ounit2
+  core
+  core_unix
+  core_unix.time_ns_unix
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.strategy
+  types
+  matchers
+  status
+  simulation_test_helpers))

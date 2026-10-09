@@ -404,7 +404,7 @@ let test_handle_rejected_trades_reverts_off_the_full_list_not_the_filtered_one
   let result =
     Cancel_handler.handle_rejected_trades ~date:_build_date ~positions
       ~rejected_trades:rejected ~order_manager ~entry_fill_retry
-      ~on_transitions:None
+      ~on_transitions:None ()
   in
   assert_that result
     (is_ok_and_holds
@@ -433,9 +433,28 @@ let test_handle_rejected_trades_reverts_off_the_full_list_not_the_filtered_one
               ];
           ]))
 
+(* #3138: [on_reject] sees the cash at the moment of the refusal: the first
+   trade (5,001 with commission) is booked from 6,000, so the second is refused
+   against the 999 left, not the 6,000 the batch started with. *)
+let test_on_reject_sees_cash_at_the_refusal _ =
+  let seen = ref [] in
+  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:6_000.0 () in
+  let _, accepted, rejected =
+    Cancel_handler.apply_trades_best_effort
+      ~on_reject:(fun t ~available_cash ->
+        seen := !seen @ [ (t.Trading_base.Types.symbol, available_cash) ])
+      portfolio
+      [ _make_trade ~symbol:"MSFT" (); _make_trade ~symbol:"AAPL" () ]
+  in
+  assert_that
+    (List.length accepted, List.length rejected, !seen)
+    (equal_to (1, 1, [ ("AAPL", 999.0) ]))
+
 let suite =
   "Cancel_handler"
   >::: [
+         "on_reject sees cash at the refusal"
+         >:: test_on_reject_sees_cash_at_the_refusal;
          "transitions_for_rejected_trades emits one transition per matched \
           symbol" >:: test_transitions_for_rejected_trades_emits_per_symbol;
          "transitions_for_rejected_trades drops rejected trades with no \

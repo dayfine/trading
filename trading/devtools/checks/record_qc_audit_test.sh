@@ -1390,6 +1390,28 @@ else
   fi
 fi
 # ---------------------------------------------------------------------------
+# Scenario 20d — H-AUDIT-RM-THEN-MV-UNPINNED: source-order pin, same style
+# as scenario 24. The `rm -f "$OUTPUT_FILE"; mv -f "$TMP_FILE" "$OUTPUT_FILE"`
+# mutant passes 20/20c (the mv still yields a new inode) yet opens a window
+# where the record does not exist. No code line (comments blanked, line
+# numbers preserved) may rm/unlink "$OUTPUT_FILE" before the publish mv; the
+# publish mv line itself must exist. `|| true` guards mirror scenario 24
+# (grep exit 1 on no match must not abort under set -euo pipefail).
+# ---------------------------------------------------------------------------
+CODE_ONLY_20D="$(sed -E 's/^[[:space:]]*#.*$//' "${WRITE_AUDIT}" 2>/dev/null)" || true
+MV_LINE_20D="$(printf '%s\n' "${CODE_ONLY_20D}" | grep -n 'mv -f "\$TMP_FILE" "\$OUTPUT_FILE"' | head -1 | cut -d: -f1 || true)"
+RM_OUT_COUNT_20D=0
+if [[ -n "${MV_LINE_20D}" ]]; then
+  RM_OUT_COUNT_20D="$(printf '%s\n' "${CODE_ONLY_20D}" | head -n "${MV_LINE_20D}" \
+    | grep -cE '(^|[^[:alnum:]_])(rm|unlink)[[:space:]].*\$\{?OUTPUT_FILE' || true)"
+  [ -z "${RM_OUT_COUNT_20D}" ] && RM_OUT_COUNT_20D=0
+fi
+if [[ -n "${CODE_ONLY_20D}" ]] && [[ -n "${MV_LINE_20D}" ]] && (( RM_OUT_COUNT_20D == 0 )); then
+  pass "scenario 20d — no rm/unlink of \$OUTPUT_FILE precedes the publish mv (no window where the record is absent; H-AUDIT-RM-THEN-MV-UNPINNED)"
+else
+  fail "scenario 20d — expected publish mv line present and zero rm/unlink targeting \$OUTPUT_FILE at or before it; got mv_line=${MV_LINE_20D}, rm_count=${RM_OUT_COUNT_20D}"
+fi
+# ---------------------------------------------------------------------------
 # Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
 # OWN failure-safety claim (added on QC rework, PR #2266): the comment
 # directly above the `cp -p "$OUTPUT_FILE" "$PRESERVED_FILE"` call in

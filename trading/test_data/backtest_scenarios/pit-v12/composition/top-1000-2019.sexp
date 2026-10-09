@@ -390,7 +390,7 @@
     (synthetic false) (avg_dollar_volume 276612876.7660743))
    ((symbol KMI) (weight 0.001) (sector Energy) (synthetic false)
     (avg_dollar_volume 269414847.39534885))
-   ((symbol PIXY) (weight 0.001) (sector "") (synthetic false)
+   ((symbol MAYA) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 266318919.36697671))
    ((symbol CXO) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 263354364.71790695))

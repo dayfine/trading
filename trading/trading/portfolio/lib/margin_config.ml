@@ -16,6 +16,7 @@ type t = {
   short_maintenance_tiers : Short_margin_tiers.tier list; [@sexp.default []]
   short_buyin_stress_mode : bool; [@sexp.default false]
   short_buyin_htb_price_below : float; [@sexp.default 0.0]
+  short_maintenance_finra : bool; [@sexp.default false]
 }
 [@@deriving show, eq, sexp]
 
@@ -37,6 +38,7 @@ let default_config =
     short_maintenance_tiers = [];
     short_buyin_stress_mode = default_short_buyin_stress_mode;
     short_buyin_htb_price_below = default_short_buyin_htb_price_below;
+    short_maintenance_finra = false;
   }
 
 let total_collateral_factor (cfg : t) : float = 1.0 +. cfg.initial_margin_pct
@@ -64,9 +66,13 @@ let daily_borrow_rate (cfg : t) : float =
 let daily_borrow_rate_for_price (cfg : t) ~(price : float) : float =
   borrow_fee_annual_for_price cfg ~price /. trading_days_per_year
 
-(* Maintenance equity-ratio threshold for a short marked at [price]: the
+(* Maintenance equity-ratio threshold for a short marked at [price]: FINRA's
+   continuous rule when [short_maintenance_finra] (#3148), else the
    price-tiered value when [short_maintenance_tiers] is armed, else the flat
    [maintenance_margin_pct]. Empty table (the default) → flat fallback. *)
 let maintenance_pct_for_price (cfg : t) ~(price : float) : float =
-  Short_margin_tiers.tier_value ~tiers:cfg.short_maintenance_tiers
-    ~flat_fallback:cfg.maintenance_margin_pct ~price
+  if cfg.short_maintenance_finra then
+    Short_margin_tiers.finra_short_maintenance ~price
+  else
+    Short_margin_tiers.tier_value ~tiers:cfg.short_maintenance_tiers
+      ~flat_fallback:cfg.maintenance_margin_pct ~price
