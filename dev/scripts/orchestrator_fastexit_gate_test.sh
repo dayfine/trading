@@ -1070,8 +1070,8 @@ MOCK_DAILY_PR_STATE=open
 # STALE-SUMMARY CHECK header comment in orchestrator_fastexit_gate.sh), and
 # `verify` validated a 2-day-old dev/daily/2026-09-14.md as if it were
 # today's run. Scenarios 42-49 cover: stale-by-2-days rejected (via the CLI
-# override, deterministic); exactly-today accepted; the day before accepted
-# (midnight-straddle tolerance); the ORCHESTRATOR_EXPECTED_DATE=any escape
+# override, deterministic); exactly-today accepted; the day before REJECTED
+# unless ORCHESTRATOR_RUN_START_DATE names it (midnight straddle); the ORCHESTRATOR_EXPECTED_DATE=any escape
 # hatch bypassing the check on a badly-stale (multi-year) date, contrasted
 # with the SAME fixture failing once the hatch is off (proves the pass
 # above is the hatch's doing, not an unrelated bug); an unparsable basename
@@ -1115,13 +1115,31 @@ rc=0
   >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
 check "a summary dated exactly the expected date is accepted" 0 "$rc"
 
-# --- Scenario 44: dated the day before the expected date (UTC-midnight
-# straddle) -> PASS --------------------------------------------------------
+# --- Scenario 44: dated the day before the expected date: REJECTED unless the
+# job start date names it (UTC-midnight straddle). NOTE: the suite exports
+# ORCHESTRATOR_EXPECTED_DATE=any (top of file); Scenarios 42-44 pass the
+# expected date as arg 2, which pins arg2 > env precedence.
+# ----------------------------------------------------------------------
 _write_daily_fixture dev/daily/2026-09-15.md NO-OP
 rc=0
 ( cd "$TMP_REPO" && "$GATE" verify dev/daily/2026-09-15.md 2026-09-16 ) \
   >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
-check "a summary dated the day before the expected date is accepted (midnight straddle)" 0 "$rc"
+check "a summary dated the day before the expected date is REJECTED (H-ORCH-SUMMARY-SILENT-LOSS)" 1 "$rc"
+if grep -q H-ORCH-SUMMARY-SILENT-LOSS /tmp/orchestrator_fastexit_gate_test.out; then _cite_ok=0; else _cite_ok=1; fi
+check_bool "1-day-stale rejection names H-ORCH-SUMMARY-SILENT-LOSS" "$_cite_ok"
+rc=0
+( cd "$TMP_REPO" && ORCHESTRATOR_RUN_START_DATE=2026-09-15 "$GATE" verify dev/daily/2026-09-15.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "day-before summary accepted when ORCHESTRATOR_RUN_START_DATE names it (midnight straddle)" 0 "$rc"
+rc=0
+( cd "$TMP_REPO" && ORCHESTRATOR_RUN_START_DATE=2026-09-16 "$GATE" verify dev/daily/2026-09-15.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "START_DATE differing from the summary date does not excuse a 1-day-stale summary" 1 "$rc"
+_write_daily_fixture dev/daily/2026-09-14.md NO-OP
+rc=0
+( cd "$TMP_REPO" && ORCHESTRATOR_RUN_START_DATE=2026-09-14 "$GATE" verify dev/daily/2026-09-14.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "START_DATE matching a 2-day-stale summary is still rejected" 1 "$rc"
 
 # --- Scenario 45: ORCHESTRATOR_EXPECTED_DATE=any bypasses the check even on
 # a badly (multi-year) stale summary -> PASS ------------------------------

@@ -112,12 +112,19 @@
 #   differently) reproduces the mtime-based idiom's INTENT without its
 #   checkout-flattening blind spot.
 #
+#   H-ORCH-SUMMARY-SILENT-LOSS (2026-10-09) TIGHTENING: the original check also
+#   accepted a summary dated the day before, which let runs 37637639584 and
+#   37670748190 go green on dev/daily/2026-10-06-run2.md (1 day stale on 10-07).
+#   Now ONLY the expected date passes; the day before is accepted solely when
+#   $ORCHESTRATOR_RUN_START_DATE (YYYY-MM-DD, the job start date) equals the
+#   summary date AND is exactly the day before the expected date, i.e. a run
+#   legitimately straddling UTC midnight. Unset = strict.
+#
 #   The check compares the summary's OWN date -- parsed from its
 #   dev/daily/YYYY-MM-DD[-runN].md basename -- against an expected date. It
-#   accepts the expected date OR the day before it (UTC), so a run
-#   straddling UTC midnight is never falsely rejected; the guard only fires
-#   at >=2 days stale, unambiguously the defect class (today's incident was
-#   exactly 2 days stale). The expected date is resolved, in order: an
+#   accepts only the expected date (or, with the START_DATE condition above,
+#   the day before it); anything else is the defect class (the original
+#   incident was 2 days stale). The expected date is resolved, in order: an
 #   explicit second positional argument to `verify` (for callers that want
 #   to pin a specific date), else $ORCHESTRATOR_EXPECTED_DATE (set to `any`
 #   to disable the check entirely -- the escape hatch the fixture suite uses,
@@ -827,11 +834,16 @@ _verify_summary_freshness() {
     return 0
   fi
 
-  _yesterday=$(_prior_calendar_date "$_expected")
-  if [ -n "$_yesterday" ] && [ "$_actual" = "$_yesterday" ]; then
+  # Midnight-straddle tolerance (H-ORCH-SUMMARY-SILENT-LOSS tightened this):
+  # a summary dated the day before is accepted ONLY when the caller states the
+  # job started on that day via $ORCHESTRATOR_RUN_START_DATE. Without it, a
+  # 1-day-stale file is the defect class (runs 37637639584, 37670748190).
+  if [ -n "${ORCHESTRATOR_RUN_START_DATE:-}" ] && [ "$_actual" = "$ORCHESTRATOR_RUN_START_DATE" ] \
+    && [ "$_actual" = "$(_prior_calendar_date "$_expected")" ]; then
     return 0
   fi
 
+  echo "::error::H-ORCH-SUMMARY-SILENT-LOSS: summary dated $_actual is not the run date $_expected (silent-loss defect class: the run wrote no summary of its own)." >&2
   echo "::error::A-FASTEXIT-VACUOUS (issue #2850): $_summary is dated $_actual but the expected run date is $_expected -- no daily summary was written for $_expected, and this STALE summary is being verified instead of it. Per run 35096884441 (2026-09-16): checkout-flattened mtimes broke an \`ls -t\` fallback into picking a 2-day-old file, and verify validated it blind. See the STALE-SUMMARY CHECK header comment above for the full mechanism." >&2
   return 1
 }
