@@ -181,8 +181,7 @@ let _default_screening_config =
   }
 
 (* Flat record literal, one line per field (no logic); OCaml has no partial
-   record literals, so splitting would only add indirection.
-   @large-function: flat default-config record literal, one line per field *)
+   record literals. @large-function: flat default-config record literal *)
 let default_config ~universe ~index_symbol =
   {
     universe;
