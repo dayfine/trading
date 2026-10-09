@@ -21,19 +21,24 @@ let _bars =
         active_through = None;
       })
 
-let _run name overrides =
+let _write_aapl_dividend data_dir =
+  Corporate_actions.write_dividends ~data_dir "AAPL"
+    [
+      {
+        Corporate_actions.ex_date = _date "2024-01-05";
+        unadjusted_amount = Some 0.25;
+        adjusted_amount = 0.25;
+      };
+    ]
+  |> Test_helpers.ok_or_fail_status
+
+(* [with_dividend_file:false] runs on a data dir with no [dividends.csv] (and
+   no [splits.csv]) at all, the shape of the committed [trading/test_data]. *)
+let _run ?(with_dividend_file = true) name overrides =
   Test_helpers.with_test_data name
     [ ("AAPL", _bars) ]
     ~f:(fun data_dir ->
-      Corporate_actions.write_dividends ~data_dir "AAPL"
-        [
-          {
-            Corporate_actions.ex_date = _date "2024-01-05";
-            unadjusted_amount = Some 0.25;
-            adjusted_amount = 0.25;
-          };
-        ]
-      |> Test_helpers.ok_or_fail_status;
+      if with_dividend_file then _write_aapl_dividend data_dir;
       let config =
         Weinstein_strategy.default_config ~universe:[ "AAPL" ]
           ~index_symbol:"AAPL"
@@ -77,15 +82,28 @@ let test_cash_yield_arming _ =
     (pair (is_some_and (gt (module Float_ord) 0.0)) is_none)
 
 let test_dividend_arming _ =
-  (* The enabled run pays a held position; the default emits no income key. *)
-  let off = _run "panel_dividend_off" [ "((cash_yield No_yield))" ] in
-  let on =
-    _run "panel_dividend_on"
-      [ "((cash_yield No_yield) (dividend_crediting true))" ]
+  (* Dividend crediting now defaults ON: the default run pays the held
+     position; [dividend_crediting false] emits no income key. *)
+  let default = _run "panel_dividend_default" [ "((cash_yield No_yield))" ] in
+  let off =
+    _run "panel_dividend_off"
+      [ "((cash_yield No_yield) (dividend_crediting false))" ]
   in
   assert_that
-    (Map.find off M.DividendIncomeTotal, Map.find on M.DividendIncomeTotal)
-    (pair is_none (is_some_and (gt (module Float_ord) 0.0)))
+    (Map.find default M.DividendIncomeTotal, Map.find off M.DividendIncomeTotal)
+    (pair (is_some_and (gt (module Float_ord) 0.0)) is_none)
+
+let test_dividend_default_without_files _ =
+  (* The default on a data dir with no corporate-action files completes, credits
+     nothing and counts the held symbol's missing file — never a failure. *)
+  let metrics =
+    _run ~with_dividend_file:false "panel_dividend_no_files"
+      [ "((cash_yield No_yield))" ]
+  in
+  assert_that
+    ( Map.find metrics M.DividendIncomeTotal,
+      Map.find metrics M.DividendMissingFileCount )
+    (pair (is_some_and (float_equal 0.0)) (is_some_and (float_equal 1.0)))
 
 let () =
   run_test_tt_main
@@ -93,6 +111,8 @@ let () =
     >::: [
            "cash yield default arms panel runner; No_yield disarms it"
            >:: test_cash_yield_arming;
-           "dividend flag arms panel runner; default omits metric"
+           "dividend default arms panel runner; false omits metric"
            >:: test_dividend_arming;
+           "dividend default without files counts the missing file"
+           >:: test_dividend_default_without_files;
          ])

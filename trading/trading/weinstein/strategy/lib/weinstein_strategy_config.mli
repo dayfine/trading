@@ -717,37 +717,53 @@ type config = {
       (** Annual fee in basis points subtracted from the [cash_yield] rate,
           floored at a 0 net rate (decision 3a). Default [10.0] (SGOV/BIL
           class); [35.0] = money-market-fund class. Inert under [No_yield]. *)
-  dividend_crediting : bool; [@sexp.default false]
+  dividend_crediting : bool; [@sexp.default true]
       (** Cash dividends on held positions (issue #3137) — an accounting-realism
-          dial like [cash_yield], not a strategy mechanism. [false] (default) =
-          {b EXACT no-op}: no dividend file is read and no metric key is added
-          (R1). [true]: on each ex-date in the measurement window, held longs
-          receive and open shorts pay [|quantity| * unadjusted_amount] from the
-          symbol's [dividends.csv] under [TRADING_DATA_DIR] (the snapshot
-          warehouse is not touched); specials included; a [None] amount is
-          skipped and counted, never replaced by the split-adjusted amount; a
-          held symbol with no file credits nothing and is counted. Reported as
+          dial like [cash_yield], not a strategy mechanism. {b Default:} [true].
+          Flipped on as an accounting change, not a strategy ACCEPT (precedent
+          #1926), after the pre-registered 26y implementation check passed on
+          every salt ([dev/experiments/rebaseline-v12-2026-10-08/] item 3,
+          results #3219: ordinary dividends +0.142 / +0.142 / +0.143 log against
+          a 0.065-0.195 band, [DividendIncomeTotal] reconstructed to under $1,
+          no missing files;
+          [dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decision 3).
+          [false] = the pre-#3137 basis, an {b EXACT no-op}: no dividend file is
+          read and no metric key is added — pin it in [config_overrides] to keep
+          a pre-flip regression golden's metric set byte-identical. [true]: on
+          each ex-date in the measurement window, held longs receive and open
+          shorts pay [|quantity| * unadjusted_amount] from the symbol's
+          [dividends.csv] under [TRADING_DATA_DIR] (the snapshot warehouse is
+          not touched); specials included; a [None] amount is skipped and
+          counted, never replaced by the split-adjusted amount; a held symbol
+          with no file credits nothing and is counted, never a failure (a data
+          dir with no [dividends.csv] at all, such as [trading/test_data], runs
+          unchanged apart from the added metric keys). Reported as
           [DividendIncomeTotal] / [DividendPaidShortTotal] /
           [DividendSkippedNoAmountCount] / [DividendMissingFileCount].
-          Semantics: {!Trading_simulation_dividends.Dividend_crediting}. Stays
-          off: the paired 26y check did not pass for dividends (phantom-split
-          double count, #3173); the flip waits on that fix
-          ([dev/plans/total-return-and-shorts-phase-b-2026-10-05.md] decisions
-          2-3). R2: real config field, an axis via [Overlay_validator]. *)
-  split_dividend_guard : bool; [@sexp.default false]
+          Semantics: {!Trading_simulation_dividends.Dividend_crediting}. Flipped
+          together with [split_dividend_guard], which removes the #3173 phantom
+          shares this would otherwise credit a second time. R2: real config
+          field, an axis via [Overlay_validator]. *)
+  split_dividend_guard : bool; [@sexp.default true]
       (** Reject a detected split that is really a cash dividend (issue #3173) —
-          a data-correctness dial, not a strategy mechanism. [false] (default) =
-          {b EXACT no-op}: no corporate-action file is read and every split the
-          detector reports is applied, as before (R1). [true]: a split detected
-          on bar [d] is dropped, in the simulator's held-position split step and
-          in the strategy's stop rescale / resting-ticket cancel alike, when the
-          symbol's [dividends.csv] under [TRADING_DATA_DIR] has an ex-date
-          within 2 bars of [d], its [splits.csv] has no split within 2 bars, and
-          the dividend's implied factor [P / (P - D)] is within 0.01 of the
-          detected one. A symbol missing either file keeps its splits and is
-          counted. Semantics: {!Split_dividend_guard}. Fixes TDG 2013 / WING
-          2018 / BCH 2010 phantom shares, which [dividend_crediting] would
-          otherwise credit a second time. R2: real config field, an axis via
+          a data-correctness dial, not a strategy mechanism. {b Default:}
+          [true], flipped with [dividend_crediting] on the same evidence
+          ([dev/experiments/rebaseline-v12-2026-10-08/] items 2-3, #3219: WING
+          2018 held in 6 of 6 cells and TDG 2013 in 3, every held instance
+          clean; each path rejected 2-3 events, all dividends). [false] = the
+          pre-#3173 basis, an {b EXACT no-op}: no corporate-action file is read
+          and every split the detector reports is applied. [true]: a split
+          detected on bar [d] is dropped, in the simulator's held-position split
+          step and in the strategy's stop rescale / resting-ticket cancel alike,
+          when the symbol's [dividends.csv] under [TRADING_DATA_DIR] has an
+          ex-date within 2 bars of [d], its [splits.csv] has no split within 2
+          bars, and the dividend's implied factor [P / (P - D)] is within 0.01
+          of the detected one. A symbol missing either file keeps its splits and
+          is counted in [no_files], never a failure, so a data dir without
+          corporate-action files applies every detected split exactly as [false]
+          does. Semantics: {!Split_dividend_guard}. Fixes TDG 2013 / WING 2018 /
+          BCH 2010 phantom shares, which [dividend_crediting] would otherwise
+          credit a second time. R2: real config field, an axis via
           [Overlay_validator]. *)
   ex_dividend_stop_adjust : bool; [@sexp.default false]
       (** Reduce a held long's stop level by the cash dividend on its ex-date

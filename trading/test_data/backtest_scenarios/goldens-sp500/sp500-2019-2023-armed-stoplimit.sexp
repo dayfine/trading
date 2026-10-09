@@ -109,6 +109,7 @@
  (universe_size 500)
  (config_overrides
   (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((dividend_crediting false) (split_dividend_guard false)) ;; #3137/#3173: no-dividend pin, keeps the metric set byte-identical
    ;; --- the armed StopLimit entry stack (the point of this golden) ---
    ((enable_sim_entry_stoplimit true))
    ((sim_entry_trigger_at_suggested true))
@@ -142,6 +143,8 @@
  ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
  (deviates_from_live
   ((cash_yield "price-only regression pin (#3137); the code default (and live config) arm the 3-month T-bill series")
+   (dividend_crediting "no-dividend regression pin (#3137); the code default (and live config) credit cash dividends")
+   (split_dividend_guard "no-guard regression pin (#3173); the code default (and live config) reject dividend-shaped splits")
    ;; NOTE (2026-08-26): enable_sim_entry_stoplimit + entry_extension_max_pct
    ;; are no longer declared here — the fill-model default flip (#2405) made
    ;; both the code default AND live, and this cell arms them at exactly those
