@@ -1115,13 +1115,19 @@ rc=0
   >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
 check "a summary dated exactly the expected date is accepted" 0 "$rc"
 
-# --- Scenario 44: dated the day before the expected date (UTC-midnight
+# --- Scenario 44: dated the day before the expected date: REJECTED unless the job start date names it (UTC-midnight
 # straddle) -> PASS --------------------------------------------------------
 _write_daily_fixture dev/daily/2026-09-15.md NO-OP
 rc=0
 ( cd "$TMP_REPO" && "$GATE" verify dev/daily/2026-09-15.md 2026-09-16 ) \
   >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
-check "a summary dated the day before the expected date is accepted (midnight straddle)" 0 "$rc"
+check "a summary dated the day before the expected date is REJECTED (H-ORCH-SUMMARY-SILENT-LOSS)" 1 "$rc"
+if grep -q H-ORCH-SUMMARY-SILENT-LOSS /tmp/orchestrator_fastexit_gate_test.out; then _cite_ok=0; else _cite_ok=1; fi
+check_bool "1-day-stale rejection names H-ORCH-SUMMARY-SILENT-LOSS" "$_cite_ok"
+rc=0
+( cd "$TMP_REPO" && ORCHESTRATOR_RUN_START_DATE=2026-09-15 "$GATE" verify dev/daily/2026-09-15.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "day-before summary accepted when ORCHESTRATOR_RUN_START_DATE names it (midnight straddle)" 0 "$rc"
 
 # --- Scenario 45: ORCHESTRATOR_EXPECTED_DATE=any bypasses the check even on
 # a badly (multi-year) stale summary -> PASS ------------------------------
