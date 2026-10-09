@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-09",
+  "feature": "harness-flag-drift-usage-specific",
+  "branch": "harness/flag-drift-usage-specific",
+  "sha": "61901def4ef60d9fdf954df25fb346e35a4a994c",
+  "recorded_at_ns": 1791575530383176473,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

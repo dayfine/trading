@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-09 (orchestrator — see `dev/daily/2026-10-09.md`). Queue at start: #3221 (cloud-session PR, all gates green; merged here).
-This run: harness #3226 + #3229, cleanup #3228 merged; #3221 merged on its own green gates.
+Last updated: 2026-10-09 run 2 (orchestrator — see `dev/daily/2026-10-09-run2.md`). Queue at start: empty.
+Run 2: harness #3231 + #3232, cleanup #3233 merged (run 1: #3221 #3226 #3228 #3229).
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-09: #3226 verify rejects stale-dated summary + #3229 20d alias pins MERGED; next: H-FLAG-DRIFT-USAGE-SPECIFIC |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-09 run2: #3231 flag-drift usage pin + #3232 START_DATE P3c pin MERGED; next: H-AUDIT-20D-ONELINE-FN-ALIAS |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | twin_detector.ml split MERGED #3228 (499→274 + 3 modules, exception removed); next: bayesian_runner.ml 429 lines |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | bayesian_runner.ml split MERGED #3233 (429→256, exception removed); next: delete its dead duplicate label constants |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
