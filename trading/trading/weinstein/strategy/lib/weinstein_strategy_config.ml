@@ -128,14 +128,17 @@ type config = {
   sim_exit_fill_next_open : bool; [@sexp.default true]  (** See [.mli]. *)
   sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]  (** .mli *)
   sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]  (** .mli *)
-  freeze_entry_at_first_breakout : bool; [@sexp.default false]  (** .mli *)
+  freeze_entry_at_first_breakout : bool; [@sexp.default false]
+      (** See [.mli]. *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_order_max_rest_weeks : int; [@sexp.default 52]  (** See [.mli]. *)
-  short_cancel_on_non_bearish : bool; [@sexp.default false]  (** See [.mli]. *)
+  short_cancel_on_non_bearish : bool; [@sexp.default false]  (** .mli *)
   short_entry_order_max_rest_weeks : int option; [@sexp.default None]
       (** See [.mli]. *)
-  cancel_resting_entry_on_split : bool; [@sexp.default false]  (** .mli *)
-  reserve_cash_for_resting_tickets : bool; [@sexp.default false]  (** .mli *)
+  cancel_resting_entry_on_split : bool; [@sexp.default false]
+      (** See [.mli]. *)
+  reserve_cash_for_resting_tickets : bool; [@sexp.default false]
+      (** See [.mli]. *)
   entry_fill_reject_retries : int; [@sexp.default 0]  (** See [.mli]. *)
   entry_fill_size_to_available : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_fill_min_size_fraction : float; [@sexp.default 0.5]  (** See [.mli]. *)
@@ -150,8 +153,10 @@ type config = {
   entry_ticket_macro_suspend : Entry_ticket_suspend_mode.t;
       [@sexp.default Entry_ticket_suspend_mode.Off]
       (** See [.mli]. *)
-  max_one_share_class_per_issuer : bool; [@sexp.default false]  (** .mli *)
-  share_class_gate_covers_shorts : bool; [@sexp.default false]  (** .mli *)
+  max_one_share_class_per_issuer : bool; [@sexp.default false]
+      (** See [.mli]. *)
+  share_class_gate_covers_shorts : bool; [@sexp.default false]
+      (** See [.mli]. *)
   share_class_groups : Share_class_map.t; [@sexp.default Share_class_map.empty]
       (** See [.mli]. *)
   trailing_stop_ma_period : int option; [@sexp.default None]  (** See [.mli]. *)
@@ -161,11 +166,9 @@ type config = {
 (* Top-level so [default_config] stays a flat literal (nesting linter). *)
 let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
-(* Screening config for the promoted bundle (2026-07-23): the standard screener
-   defaults with the continuous overhead-supply ranking weight armed. Pairs with
-   [overhead_supply = Some Resistance_supply.default_config] in [default_config]
-   — both must be armed for the continuous score to replace the binary grade
-   points (either absent falls back to the bit-identical binary path). *)
+(* Promoted-bundle screening config (2026-07-23): standard defaults with the
+   continuous overhead-supply weight armed. Pairs with [overhead_supply = Some
+   Resistance_supply.default_config] in [default_config]; both must be armed. *)
 let _default_screening_config =
   {
     Screener.default_config with
@@ -176,10 +179,8 @@ let _default_screening_config =
       };
   }
 
-(* Flat record literal over every config field — exactly one line per field
-   by construction (no logic), growing one line per new default-off
-   experiment knob. OCaml has no partial record literals, so splitting is
-   impossible and extracting field groups would only add indirection.
+(* Flat record literal, one line per field (no logic); OCaml has no partial
+   record literals, so splitting would only add indirection.
    @large-function: flat default-config record literal, one line per field *)
 let default_config ~universe ~index_symbol =
   {
