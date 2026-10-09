@@ -45,10 +45,8 @@ let _daily_bars ~n ~start_price ~step =
         ~date:(Date.add_days start_date i)
         ~price:(start_price +. (Float.of_int i *. step)))
 
-(* [_long_symbol] rises for five years (Stage 2 under a rising 30-week MA), so
-   a resting LONG ticket on it survives the stage half of the F2 re-screen and
-   only the macro half can cancel it. [_short_symbol] falls (Stage 4), the
-   mirror for the short-side arm. *)
+(* [_long_symbol] rises (Stage 2) and [_short_symbol] falls (Stage 4) over
+   260 daily bars (~37 weeks). *)
 let _bar_reader =
   Bar_reader.of_in_memory_bars
     [
@@ -61,12 +59,7 @@ let _index_view =
   Bar_reader.weekly_view_for _bar_reader ~symbol:_index_symbol ~n:52
     ~as_of:_friday
 
-(** A macro result whose composite reads {b Bullish} while the index itself
-    carries [index_stage]. That pairing is the whole point: [Macro.analyze]
-    weighs the index stage at 3.0 of 10.0, so a [confidence > 0.65] composite
-    can stay [Bullish] with the index below a falling 30-week MA — which it did
-    for most of 2022. Nothing but the new veto separates the two arms below;
-    [trend] is held at [Bullish] so the three-state gate always admits. *)
+(** A macro result carrying [index_stage]; callers override [trend]. *)
 let _macro_with ~(index_stage : Weinstein_types.stage) : Macro.result =
   {
     index_stage =
@@ -217,11 +210,9 @@ let test_override_keeps_short_within_limit _ =
 
 let test_no_override_inherits_long_limit _ =
   assert_that
-    (_cancels
-       ~config:(_config ~long_weeks:52 ())
-       ~trend:Weinstein_types.Bearish
+    (_cancels ~config:(_config ~long_weeks:4 ()) ~trend:Weinstein_types.Bearish
        ~positions:[ _short ~weeks_old:5 ])
-    (size_is 0)
+    (elements_are [ equal_to _ttl_cancel ])
 
 let test_long_clock_still_expires_long_under_override _ =
   assert_that
@@ -231,6 +222,124 @@ let test_long_clock_still_expires_long_under_override _ =
        ~trend:Weinstein_types.Bearish
        ~positions:[ _long ~weeks_old:5; _short ~weeks_old:5 ])
     (elements_are [ equal_to ("L1", "entry_ticket_ttl_expired") ])
+
+let _fill pos ~quantity =
+  Position.apply_transition pos
+    {
+      position_id = pos.Position.id;
+      date = _friday;
+      kind =
+        Position.EntryFill { filled_quantity = quantity; fill_price = 100.0 };
+    }
+  |> _unwrap
+
+let _held pos =
+  Position.apply_transition (_fill pos ~quantity:10.0)
+    {
+      position_id = pos.Position.id;
+      date = _friday;
+      kind =
+        Position.EntryComplete
+          {
+            risk_params =
+              {
+                stop_loss_price = None;
+                take_profit_price = None;
+                max_hold_days = None;
+              };
+          };
+    }
+  |> _unwrap
+
+let _named pos ~id = { pos with Position.id }
+
+(** Only a wholly unfilled short is cancelled: a part-filled short, a held short
+    and a resting long are all skipped (open shorts are never covered). *)
+let test_macro_cancellations_skip_filled_held_and_long _ =
+  let part_filled =
+    _fill (_named (_short ~weeks_old:1) ~id:"S2") ~quantity:4.0
+  in
+  let held = _held (_named (_short ~weeks_old:1) ~id:"S3") in
+  assert_that
+    (Short_ticket_policy.macro_cancellations
+       ~positions:
+         (_positions
+            [ _short ~weeks_old:1; part_filled; held; _long ~weeks_old:1 ])
+       ~current_date:_friday
+    |> List.map ~f:(fun (t : Position.transition) -> t.position_id))
+    (elements_are [ equal_to "S1" ])
+
+let _candidate ~ticker ~entry : Screener.scored_candidate =
+  let base =
+    Stock_analysis.analyze ~config:Stock_analysis.default_config ~ticker
+      ~bars:[] ~benchmark_bars:[] ~prior_stage:None ~as_of_date:_friday
+  in
+  {
+    ticker;
+    analysis = base;
+    side = Trading_base.Types.Short;
+    sector =
+      {
+        sector_name = "Tech";
+        rating = Screener.Neutral;
+        stage = base.stage.stage;
+      };
+    grade = Weinstein_types.A;
+    score = 70;
+    suggested_entry = entry;
+    suggested_stop = entry *. 1.05;
+    risk_pct = 0.05;
+    swing_target = None;
+    rationale = [];
+  }
+
+let _pin_apply pending ?(held_set = String.Set.empty) candidates =
+  Entry_freeze.apply ~enabled:true ~pending ~held_set ~candidates
+
+(** A macro cancel releases the ticket's frozen [E], so the symbol re-pins at
+    the fresh level (60), not the cancelled ticket's (50). The symbol is still
+    held on the cancelling tick, so [apply]'s own stale-release rule would keep
+    the pin. MUTATION: drop the release loop in [Short_ticket_policy.run] and
+    this reads 50.0. *)
+let test_macro_cancel_releases_pin_so_symbol_repins_fresh _ =
+  let pending = Entry_freeze.create () in
+  let _wk1 =
+    _pin_apply pending [ _candidate ~ticker:_short_symbol ~entry:50.0 ]
+  in
+  let cancelled =
+    Short_ticket_policy.run
+      (_config ~short_cancel_on_non_bearish:true ())
+      ~macro_result:(_macro ~trend:Weinstein_types.Neutral)
+      ~pending_entry_e:pending
+      ~positions:(_positions [ _short ~weeks_old:1 ])
+      ~still_qualifies:(fun ~symbol:_ ~side:_ -> true)
+      ~current_date:_friday
+  in
+  let _same_tick =
+    _pin_apply pending ~held_set:(String.Set.of_list [ _short_symbol ]) []
+  in
+  let later =
+    _pin_apply pending [ _candidate ~ticker:_short_symbol ~entry:60.0 ]
+  in
+  assert_that
+    ( List.length cancelled,
+      List.map later ~f:(fun (c : Screener.scored_candidate) ->
+          c.suggested_entry) )
+    (equal_to (1, [ 60.0 ]))
+
+(** A short that is both macro-cancelled and TTL-expired gets exactly one
+    [CancelEntry], the macro one: the TTL pass sees only the remaining
+    positions. MUTATION: pass [positions] instead of [remaining] to [_ttl_pass]
+    and this emits two. *)
+let test_macro_cancelled_short_is_not_cancelled_twice _ =
+  assert_that
+    (_cancels
+       ~config:
+         (_config ~short_cancel_on_non_bearish:true
+            ~short_entry_order_max_rest_weeks:(Some 4) ())
+       ~trend:Weinstein_types.Neutral
+       ~positions:[ _short ~weeks_old:5 ])
+    (elements_are [ equal_to _macro_cancel ])
 
 let test_both_fields_default_to_the_no_op _ =
   let c =
@@ -260,6 +369,12 @@ let suite =
          >:: test_no_override_inherits_long_limit;
          "long clock still expires long under override"
          >:: test_long_clock_still_expires_long_under_override;
+         "macro cancellations skip filled, held and long"
+         >:: test_macro_cancellations_skip_filled_held_and_long;
+         "macro cancel releases pin so symbol re-pins fresh"
+         >:: test_macro_cancel_releases_pin_so_symbol_repins_fresh;
+         "macro cancelled short is not cancelled twice"
+         >:: test_macro_cancelled_short_is_not_cancelled_twice;
          "both fields default to the no-op"
          >:: test_both_fields_default_to_the_no_op;
        ]
