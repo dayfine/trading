@@ -1394,22 +1394,33 @@ fi
 # as scenario 24. The `rm -f "$OUTPUT_FILE"; mv -f "$TMP_FILE" "$OUTPUT_FILE"`
 # mutant passes 20/20c (the mv still yields a new inode) yet opens a window
 # where the record does not exist. No code line (comments blanked, line
-# numbers preserved) may rm/unlink "$OUTPUT_FILE" before the publish mv; the
-# publish mv line itself must exist. `|| true` guards mirror scenario 24
-# (grep exit 1 on no match must not abort under set -euo pipefail).
+# numbers preserved) may rm/unlink "$OUTPUT_FILE", "$OUTPUT_BASENAME" (e.g.
+# "$AUDIT_DIR/$OUTPUT_BASENAME"), or a simple local alias of either
+# (`old_rec="$OUTPUT_FILE"`; H-AUDIT-20D-ALIAS-PATHS) at or before the publish
+# mv line (the mv line itself is counted); the publish mv line must exist.
+# `|| true` guards mirror scenario 24 (grep exit 1 on no match must not abort
+# under set -euo pipefail).
 # ---------------------------------------------------------------------------
 CODE_ONLY_20D="$(sed -E 's/^[[:space:]]*#.*$//' "${WRITE_AUDIT}" 2>/dev/null)" || true
 MV_LINE_20D="$(printf '%s\n' "${CODE_ONLY_20D}" | grep -n 'mv -f "\$TMP_FILE" "\$OUTPUT_FILE"' | head -1 | cut -d: -f1 || true)"
 RM_OUT_COUNT_20D=0
 if [[ -n "${MV_LINE_20D}" ]]; then
-  RM_OUT_COUNT_20D="$(printf '%s\n' "${CODE_ONLY_20D}" | head -n "${MV_LINE_20D}" \
-    | grep -cE '(^|[^[:alnum:]_])(rm|unlink)[[:space:]].*\$\{?OUTPUT_FILE' || true)"
+  PRE_MV_20D="$(printf '%s\n' "${CODE_ONLY_20D}" | head -n "${MV_LINE_20D}")"
+  # Simple aliases: NAME="$OUTPUT_FILE" / NAME=$OUTPUT_BASENAME /
+  # NAME="$AUDIT_DIR/$OUTPUT_BASENAME" (optional `local`).
+  ALIASES_20D="$(printf '%s\n' "${PRE_MV_20D}" | tr ';' '\n' \
+    | sed -nE 's/^[[:space:]]*(local[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)="?(\$\{?AUDIT_DIR\}?\/)?\$\{?OUTPUT_(FILE|BASENAME)\}?"?[[:space:]]*$/\2/p' \
+    | tr '\n' '|' | sed 's/|$//')"
+  TARGETS_20D='OUTPUT_FILE|OUTPUT_BASENAME'
+  [ -n "${ALIASES_20D}" ] && TARGETS_20D="${TARGETS_20D}|${ALIASES_20D}"
+  RM_OUT_COUNT_20D="$(printf '%s\n' "${PRE_MV_20D}" \
+    | grep -cE "(^|[^[:alnum:]_])(rm|unlink)[[:space:]].*\\$\\{?(${TARGETS_20D})([^[:alnum:]_]|\$)" || true)"
   [ -z "${RM_OUT_COUNT_20D}" ] && RM_OUT_COUNT_20D=0
 fi
 if [[ -n "${CODE_ONLY_20D}" ]] && [[ -n "${MV_LINE_20D}" ]] && (( RM_OUT_COUNT_20D == 0 )); then
   pass "scenario 20d — no rm/unlink of \$OUTPUT_FILE precedes the publish mv (no window where the record is absent; H-AUDIT-RM-THEN-MV-UNPINNED)"
 else
-  fail "scenario 20d — expected publish mv line present and zero rm/unlink targeting \$OUTPUT_FILE at or before it; got mv_line=${MV_LINE_20D}, rm_count=${RM_OUT_COUNT_20D}"
+  fail "scenario 20d — expected publish mv line present and zero rm/unlink targeting \$OUTPUT_FILE / \$OUTPUT_BASENAME / a local alias at or before it; got mv_line=${MV_LINE_20D}, rm_count=${RM_OUT_COUNT_20D}"
 fi
 # ---------------------------------------------------------------------------
 # Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
