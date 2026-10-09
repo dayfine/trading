@@ -55,7 +55,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] file_length: trading/weinstein/strategy/differential/selection_trace.ml — 662 lines, hard limit 500 (source: #2876) -- split into selection_trace_{fixtures,cases}.ml (662 -> 289 lines); exception removed
 - [x] file_length: analysis/scripts/shiller_weinstein_decades/shiller_weinstein_decades.ml — DONE 2026-10-08: 626 -> 140 lines + 5 sibling modules (csv/metrics/stage/report/chart), file_length exception removed, CLI output md5-identical (source: #2876)
 - [x] file_length: trading/backtest/bin/backtest_runner.ml — 522 -> 444 lines via `backtest_execution.ml{,.mli}` extraction (PR #2959), still over the widened 300-line normal limit (#2876/#2955); rework iteration 1 added an `@large-module` marker (459 lines, well under the 500 hard limit; declared-large 21/648 = 3.2%, headroom under the 11% cap) after a full per-mode-module split measured at ~470 diff LOC, over this cleanup class's budget (source: #2876)
-- [~] file_length: trading/backtest/tuner/bin/bayesian_runner.ml — 429 lines, hard limit 500 (source: #2876)
+- [x] file_length: trading/backtest/tuner/bin/bayesian_runner.ml — 429 -> 256 lines via bayesian_runner_cli + bayesian_runner_wf_helpers siblings; exception removed (2026-10-09)
 - [ ] file_length: trading/backtest/stops_differential/stops_surface_trace.ml — 413 lines, hard limit 500 (source: #2876)
 - [ ] file_length: trading/backtest/tuner/bin/bayesian_runner_runner.ml — 354 lines, hard limit 500 (source: #2876)
 - [ ] file_length: trading/backtest/trade_audit_html/html_report.ml — 354 lines, hard limit 500 (source: #2876)
