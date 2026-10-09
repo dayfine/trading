@@ -117,15 +117,14 @@
 #   37670748190 go green on dev/daily/2026-10-06-run2.md (1 day stale on 10-07).
 #   Now ONLY the expected date passes; the day before is accepted solely when
 #   $ORCHESTRATOR_RUN_START_DATE (YYYY-MM-DD, the job start date) equals the
-#   summary date, i.e. a run legitimately straddling UTC midnight. Unset =
-#   strict. The paragraph below describes the older day-before tolerance.
+#   summary date AND is exactly the day before the expected date, i.e. a run
+#   legitimately straddling UTC midnight. Unset = strict.
 #
 #   The check compares the summary's OWN date -- parsed from its
 #   dev/daily/YYYY-MM-DD[-runN].md basename -- against an expected date. It
-#   accepts the expected date OR the day before it (UTC), so a run
-#   straddling UTC midnight is never falsely rejected; the guard only fires
-#   at >=2 days stale, unambiguously the defect class (today's incident was
-#   exactly 2 days stale). The expected date is resolved, in order: an
+#   accepts only the expected date (or, with the START_DATE condition above,
+#   the day before it); anything else is the defect class (the original
+#   incident was 2 days stale). The expected date is resolved, in order: an
 #   explicit second positional argument to `verify` (for callers that want
 #   to pin a specific date), else $ORCHESTRATOR_EXPECTED_DATE (set to `any`
 #   to disable the check entirely -- the escape hatch the fixture suite uses,
@@ -839,7 +838,8 @@ _verify_summary_freshness() {
   # a summary dated the day before is accepted ONLY when the caller states the
   # job started on that day via $ORCHESTRATOR_RUN_START_DATE. Without it, a
   # 1-day-stale file is the defect class (runs 37637639584, 37670748190).
-  if [ -n "${ORCHESTRATOR_RUN_START_DATE:-}" ] && [ "$_actual" = "$ORCHESTRATOR_RUN_START_DATE" ]; then
+  if [ -n "${ORCHESTRATOR_RUN_START_DATE:-}" ] && [ "$_actual" = "$ORCHESTRATOR_RUN_START_DATE" ] \
+    && [ "$_actual" = "$(_prior_calendar_date "$_expected")" ]; then
     return 0
   fi
 
