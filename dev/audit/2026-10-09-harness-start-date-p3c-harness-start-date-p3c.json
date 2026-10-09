@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-09",
+  "feature": "harness-start-date-p3c",
+  "branch": "harness/start-date-p3c",
+  "sha": "82fd837ebb527dba0ef5e79f4b9c8e87e3ccf589",
+  "recorded_at_ns": 1791575530408410004,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
