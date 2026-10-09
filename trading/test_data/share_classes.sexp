@@ -33,4 +33,11 @@
  (CENT CENTA)
  (PBR PBR-A)
  (EBR EBR-B)
- (AKO-A AKO-B))
+ (AKO-A AKO-B)
+ ;; Vendor duplicate series: these "-WS" symbols carry the parent's own price history
+ ;; (identical closes), not a warrant line. Grouped so the share-class gate and V6 treat
+ ;; them as one issuer. AIG/AIG-WS was shorted twice in shorts Phase B v0 (#3183).
+ (AIG AIG-WS)
+ (BAC BAC-WS-A BAC-WS-B)
+ (CMA CMA-WS)
+ (GM GM-WS-B))
