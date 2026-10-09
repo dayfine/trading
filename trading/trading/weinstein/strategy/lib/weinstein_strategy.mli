@@ -291,6 +291,9 @@ module Entry_ticket_ttl = Entry_ticket_ttl
     pin the cancel decision independently of a full screening tick. See
     {!Entry_ticket_ttl}. *)
 
+module Short_ticket_policy = Short_ticket_policy
+(** #3218: short-only resting-ticket policy. See {!Short_ticket_policy}. *)
+
 module Split_ticket_cancel = Split_ticket_cancel
 (** #3075: cancel a resting entry ticket whose symbol splits while it rests,
     armed by the default-off [config.cancel_resting_entry_on_split]. Re-exposed
@@ -1097,6 +1100,14 @@ type config = {
           grants the authority and names no number. Split from the re-screen
           above on 2026-08-16 (defect C) — one knob used to arm both. See also
           {!Entry_ticket_ttl}. *)
+  short_cancel_on_non_bearish : bool; [@sexp.default false]
+      (** #3218: cancel resting short tickets when macro is not Bearish. Default
+          [false] = bit-identical (R1). See
+          [Weinstein_strategy_config.short_cancel_on_non_bearish]. *)
+  short_entry_order_max_rest_weeks : int option; [@sexp.default None]
+      (** #3218: short-only override of [entry_order_max_rest_weeks]. Default
+          [None] = inherit (R1). See
+          [Weinstein_strategy_config.short_entry_order_max_rest_weeks]. *)
   cancel_resting_entry_on_split : bool; [@sexp.default false]
       (** #3075: cancel a resting entry ticket on the day its symbol splits, so
           a pre-split trigger never fills on post-split prices. [false]

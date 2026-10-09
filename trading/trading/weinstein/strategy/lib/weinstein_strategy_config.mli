@@ -1601,6 +1601,37 @@ type config = {
           R2: axis-expressible as
           [((flag entry_order_max_rest_weeks) (values (0 13 26 52 156)))]. Full
           record: [dev/experiments/clock26-golden-ab-2026-08-19/]. *)
+  short_cancel_on_non_bearish : bool; [@sexp.default false]
+      (** #3218 (Shorts Phase B v1) — when the weekly macro read is no longer
+          Bearish (Neutral or Bullish), {b cancel} every resting short entry
+          ticket (not suspend; reason {!Short_ticket_policy.cancel_reason},
+          [entry_ticket_short_macro_not_bearish], visible in the trade audit's
+          ticket lifecycle). Short side only; long tickets are untouched.
+
+          {b Faithfulness (W2).} Book reference §6.1 item 1: a short requires a
+          bearish market (DJI Stage 4, long-term indicators negative); a ticket
+          resting through a non-Bearish week has lost that premise. Mirrors the
+          long-side {!entry_ticket_macro_suspend}, but cancels because a short
+          setup is re-decided from scratch next Bearish week.
+          {b Covering open shorts on Bullish is NOT proposed} — only unfilled
+          tickets are touched.
+
+          Default [false] = bit-identical (R1). R2: axis
+          [((flag short_cancel_on_non_bearish) (values (false true)))]. R3: no
+          default flip without a ledger ACCEPT and the confirmation grid. *)
+  short_entry_order_max_rest_weeks : int option; [@sexp.default None]
+      (** #3218 (Shorts Phase B v1) — short-only override of
+          {!entry_order_max_rest_weeks}. [None] (default) inherits the long
+          value, so merging changes nothing (R1). [Some n] with [n > 0] expires
+          a resting short ticket after [n] whole weekly reviews while long
+          tickets keep {!entry_order_max_rest_weeks}; [Some n] with [n <= 0]
+          means unbounded for shorts, same reading as the long knob.
+
+          {b Faithfulness (W2): BOOK-NEUTRAL dial.} §6.2: a breakdown is shorted
+          at once and only ~50% pull back, so a short setup goes stale faster
+          than a long; the book names no number. R2: axis
+          [((flag short_entry_order_max_rest_weeks) (values (None (Some 4) (Some
+           13))))]. *)
   cancel_resting_entry_on_split : bool; [@sexp.default false]
       (** #3075: cancel a resting (wholly unfilled) entry ticket on the day its
           symbol splits, with reason [Split_ticket_cancel.cancel_reason]
