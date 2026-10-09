@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-08 (orchestrator — see `dev/daily/2026-10-08.md`). Queue at start: #3207 (Codex PR, CI red, left to its session).
-This run: harness #3210 (recovered orphan branch) + #3211, cleanup #3212 merged. 10-07 (x2) and 10-08 run 1 published no summary (H-ORCH-SUMMARY-SILENT-LOSS).
+Last updated: 2026-10-09 (orchestrator — see `dev/daily/2026-10-09.md`). Queue at start: #3221 (cloud-session PR, all gates green; merged here).
+This run: harness #3226 + #3229, cleanup #3228 merged; #3221 merged on its own green gates.
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-08: #3210 audit rm-then-mv pin + #3211 flag-drift usage pin MERGED; next: H-ORCH-SUMMARY-SILENT-LOSS |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-09: #3226 verify rejects stale-dated summary + #3229 20d alias pins MERGED; next: H-FLAG-DRIFT-USAGE-SPECIFIC |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | shiller_weinstein_decades.ml split MERGED #3212 (626→140 + 5 modules, exception removed); next: twin_detector.ml 455 lines |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | twin_detector.ml split MERGED #3228 (499→274 + 3 modules, exception removed); next: bayesian_runner.ml 429 lines |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
