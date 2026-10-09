@@ -203,18 +203,52 @@ EOF2
 SCENARIO_RUNNER_ML="$work/usage_noexit_runner.ml" expect 1 "$work/bogus_and.sh"
 
 # (d) a flag present ONLY in `_usage` (no parser arm) must be accepted: pins
-# the usage region's own contribution to the accept-set.
+# the usage region's own contribution to the accept-set. The parser carries a
+# `"--dir"` arm so that removing the usage region leaves a NON-empty
+# accept-set: the failure must then come from the specific "flag not
+# accepted" check, not from the empty-accept-set guard (which would mask a
+# broken `_usage` extractor behind a generic die).
 cat >"$work/usage_only_runner.ml" <<'EOF2'
 let _usage () =
   eprintf "Usage: scenario_runner [--dir <path>] [--usage-only]\n";
   Stdlib.exit 1
 
-let _parse_flag args = match args with _ -> _usage ()
+let _parse_flag args =
+  match args with
+  | "--dir" :: _ :: _ -> ()
+  | _ -> _usage ()
 
 let parse_args () = _parse_flag []
 EOF2
 printf '%s\n' 'scenario_runner.exe -- --dir one --usage-only' >"$work/usage_only.sh"
 SCENARIO_RUNNER_ML="$work/usage_only_runner.ml" expect 0 "$work/usage_only.sh"
+
+# (d-neg) negative control: the same runner with the usage-only flag removed
+# from `_usage` must FAIL naming `--usage-only` via the flag-not-accepted
+# message (and not via the empty-accept-set guard).
+sed 's/ \[--usage-only\]//' "$work/usage_only_runner.ml" >"$work/usage_gone_runner.ml"
+SCENARIO_RUNNER_ML="$work/usage_gone_runner.ml" expect 1 "$work/usage_only.sh"
+grep -q -- 'passes --usage-only' "$work/output" \
+  || die "usage-region negative control did not fail on --usage-only"
+if grep -q 'EMPTY accept-set' "$work/output"; then
+  die "usage-region negative control tripped the empty-accept-set guard"
+fi
+
+# (e) a ONE-LINE `_usage` whose flag appears only on the opener line is
+# still part of the accept-set (the region opens and is scanned on the same
+# line).
+cat >"$work/usage_oneline_runner.ml" <<'EOF2'
+let _usage () = eprintf "Usage: scenario_runner [--dir <path>] [--opener-only]\n"
+
+let _parse_flag args =
+  match args with
+  | "--dir" :: _ :: _ -> ()
+  | _ -> _usage ()
+
+let parse_args () = _parse_flag []
+EOF2
+printf '%s\n' 'scenario_runner.exe -- --dir one --opener-only' >"$work/opener_only.sh"
+SCENARIO_RUNNER_ML="$work/usage_oneline_runner.ml" expect 0 "$work/opener_only.sh"
 
 # --- non-vacuity guard on the accept-set itself ----------------------------
 # A runner file whose parser markers have moved must be a HARD FAIL, never a
