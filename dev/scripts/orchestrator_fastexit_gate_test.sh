@@ -1140,6 +1140,12 @@ rc=0
 ( cd "$TMP_REPO" && ORCHESTRATOR_RUN_START_DATE=2026-09-14 "$GATE" verify dev/daily/2026-09-14.md 2026-09-16 ) \
   >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
 check "START_DATE matching a 2-day-stale summary is still rejected" 1 "$rc"
+# P3c: START_DATE equal to the prior day of the expected date must not excuse a
+# summary whose OWN date differs (summary 09-14, START 09-15, expected 09-16).
+rc=0
+( cd "$TMP_REPO" && ORCHESTRATOR_RUN_START_DATE=2026-09-15 "$GATE" verify dev/daily/2026-09-14.md 2026-09-16 ) \
+  >/tmp/orchestrator_fastexit_gate_test.out 2>&1 || rc=$?
+check "START_DATE = prior day of expected does not excuse a summary with a different own date" 1 "$rc"
 
 # --- Scenario 45: ORCHESTRATOR_EXPECTED_DATE=any bypasses the check even on
 # a badly (multi-year) stale summary -> PASS ------------------------------
