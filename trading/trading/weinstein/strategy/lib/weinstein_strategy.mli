@@ -818,12 +818,14 @@ type config = {
       [@sexp.default Trading_simulation_cash_yield.Cash_yield.default_fee_bp]
       (** Fee in bp off the [cash_yield] rate, net floored at 0. See
           [Weinstein_strategy_config.cash_yield_fee_bp]. *)
-  dividend_crediting : bool; [@sexp.default false]
-      (** Cash dividends on held positions (#3137). Default [false] => exact
-          no-op (R1). See [Weinstein_strategy_config.dividend_crediting]. *)
-  split_dividend_guard : bool; [@sexp.default false]
+  dividend_crediting : bool; [@sexp.default true]
+      (** Cash dividends on held positions (#3137). Default [true] (on since the
+          rebaseline-v12 flip); [false] => exact pre-#3137 no-op. See
+          [Weinstein_strategy_config.dividend_crediting]. *)
+  split_dividend_guard : bool; [@sexp.default true]
       (** Drop a detected split that the vendor files show is a cash dividend
-          (#3173). Default [false] => exact no-op (R1). See
+          (#3173). Default [true] (on since the rebaseline-v12 flip); [false] =>
+          exact pre-#3173 no-op. See
           [Weinstein_strategy_config.split_dividend_guard]. *)
   ex_dividend_stop_adjust : bool; [@sexp.default false]
       (** Reduce a held long's stop level by the cash dividend on its ex-date

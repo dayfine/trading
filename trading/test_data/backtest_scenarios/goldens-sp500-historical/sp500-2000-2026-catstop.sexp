@@ -9,6 +9,7 @@
  (universe_size 515)
  (config_overrides
   (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((dividend_crediting false) (split_dividend_guard false)) ;; #3137/#3173: no-dividend pin, keeps the metric set byte-identical
    ((enable_short_side false))
    ((stops_config ((catastrophic_stop_pct 0.10))))
    ((portfolio_config ((max_position_pct_long 0.14))))
@@ -24,6 +25,8 @@
  ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
  (deviates_from_live
   ((cash_yield "price-only regression pin (#3137); the code default (and live config) arm the 3-month T-bill series")
+   (dividend_crediting "no-dividend regression pin (#3137); the code default (and live config) credit cash dividends")
+   (split_dividend_guard "no-guard regression pin (#3173); the code default (and live config) reject dividend-shaped splits")
    (stops_config "catastrophic-stop arming this -catstop cell isolates (catastrophic_stop_pct 0.10); live runs the 0.0 default")
    (enable_short_side "long-only cell: arms the short leg off; the code default (and therefore live) is on")
    (portfolio_config "record-convention concentration arming (position 0.14 / exposure 0.70 / min_cash 0.30); live runs the code defaults")

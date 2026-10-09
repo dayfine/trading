@@ -7,8 +7,9 @@
     resolve through the real [Overlay_validator.apply_overrides] (the sweep /
     WF-CV path), including a variant-to-variant override. The committed
     [macro/tbill_3m_dtb3.csv] (FRED DTB3) parses and covers the full 26y window
-    from 2000-01-03. The part-2 [dividend_crediting] flag gets the same R1 / R2
-    pins. *)
+    from 2000-01-03. The part-2 [dividend_crediting] flag and the #3173
+    [split_dividend_guard] get the same default / R2 pins (both default-on since
+    the rebaseline-v12 flip). *)
 
 open OUnit2
 open Core
@@ -58,46 +59,75 @@ let test_axis_resolves_via_overlay_validator _ =
 
 (* The committed series, read the way the runner resolves it (relative to
    [TRADING_DATA_DIR], which tests point at [trading/test_data/]). *)
-(* #3137 part 2: [dividend_crediting] defaults off (R1) and is an axis via the
-   real [Overlay_validator] (R2), including flipping back to [false]. *)
-let test_dividend_crediting_default_off_and_axis _ =
+(* #3137 part 2: [dividend_crediting] defaults on (the rebaseline-v12 flip) and
+   is an axis via the real [Overlay_validator] (R2): [false] restores the
+   pre-#3137 basis, and a later override turns it back on. *)
+let test_dividend_crediting_default_on_and_axis _ =
   let flag (c : Weinstein_strategy.config) = c.dividend_crediting in
   assert_that
     [
       flag (_default_config ());
-      flag (_after [ "((dividend_crediting true))" ]);
+      flag (_after [ "((dividend_crediting false))" ]);
       flag
         (_after
-           [ "((dividend_crediting true))"; "((dividend_crediting false))" ]);
+           [ "((dividend_crediting false))"; "((dividend_crediting true))" ]);
     ]
-    (elements_are [ equal_to false; equal_to true; equal_to false ])
+    (elements_are [ equal_to true; equal_to false; equal_to true ])
 
-(* #3173: [split_dividend_guard] defaults off (R1), is an axis via the real
-   [Overlay_validator] (R2), and arms [Panel_corporate_actions.split_guard]
-   only when on. *)
-let test_split_dividend_guard_default_off_and_axis _ =
+(* #3173: [split_dividend_guard] defaults on (the rebaseline-v12 flip), is an
+   axis via the real [Overlay_validator] (R2), and arms
+   [Panel_corporate_actions.split_guard] only when on. *)
+let test_split_dividend_guard_default_on_and_axis _ =
   let flag (c : Weinstein_strategy.config) = c.split_dividend_guard in
   let armed config =
     Option.is_some
       (Backtest.Panel_corporate_actions.split_guard ~config
          ~data_dir:(Fpath.v "/nonexistent"))
   in
-  let on = _after [ "((split_dividend_guard true))" ] in
+  let off = _after [ "((split_dividend_guard false))" ] in
+  let back_on =
+    _after [ "((split_dividend_guard false))"; "((split_dividend_guard true))" ]
+  in
   assert_that
     [
       (flag (_default_config ()), armed (_default_config ()));
-      (flag on, armed on);
-      ( flag
-          (_after
-             [
-               "((split_dividend_guard true))"; "((split_dividend_guard false))";
-             ]),
-        false );
+      (flag off, armed off);
+      (flag back_on, armed back_on);
     ]
     (elements_are
-       [
-         equal_to (false, false); equal_to (true, true); equal_to (false, false);
-       ])
+       [ equal_to (true, true); equal_to (false, false); equal_to (true, true) ])
+
+(* The default (guard on) with no corporate-action files under the data dir
+   keeps a detected split and counts the symbol in [no_files] — never a
+   failure, so a fixture without vendor files applies splits as before. *)
+let test_split_guard_default_no_files_keeps_split _ =
+  let ca =
+    Backtest.Panel_corporate_actions.create ~config:(_default_config ())
+      ~data_dir:(Fpath.v "/nonexistent")
+  in
+  let kept =
+    Option.map ca.split_guard ~f:(fun g ->
+        (* [let] fixes the order: tuple components evaluate right to left. *)
+        let factor =
+          Split_dividend_guard.filter g ~symbol:"GOOG"
+            ~date:(Date.of_string "2022-07-18")
+            ~prev_close:2_255.34 (Some 20.0)
+        in
+        (factor, Split_dividend_guard.counts g))
+  in
+  assert_that kept
+    (is_some_and
+       (pair
+          (is_some_and (float_equal 20.0))
+          (all_of
+             [
+               field
+                 (fun (c : Split_dividend_guard.counts) -> c.rejected)
+                 (equal_to 0);
+               field
+                 (fun (c : Split_dividend_guard.counts) -> c.no_files)
+                 (equal_to 1);
+             ])))
 
 (* Unarmed, the strategy's bar reader is handed back physically unchanged;
    armed, it carries the guard. The end-of-run line names both counts. *)
@@ -191,10 +221,12 @@ let suite =
          >:: test_default_is_tbill_series;
          "axis resolves via overlay validator"
          >:: test_axis_resolves_via_overlay_validator;
-         "dividend crediting default off and an axis"
-         >:: test_dividend_crediting_default_off_and_axis;
-         "split dividend guard default off and an axis"
-         >:: test_split_dividend_guard_default_off_and_axis;
+         "dividend crediting default on and an axis"
+         >:: test_dividend_crediting_default_on_and_axis;
+         "split dividend guard default on and an axis"
+         >:: test_split_dividend_guard_default_on_and_axis;
+         "split guard default with no files keeps split"
+         >:: test_split_guard_default_no_files_keeps_split;
          "split guard reader and summary"
          >:: test_split_guard_reader_and_summary;
          "ex-dividend stop adjust default off and an axis"

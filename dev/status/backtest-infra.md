@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-10-07
+## Last updated: 2026-10-09
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,25 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-10-09 — `dividend_crediting` + `split_dividend_guard` default-on (#3137, #3173)
+
+Accounting-realism flip, not a strategy ACCEPT (precedent #1926). Evidence:
+`dev/experiments/rebaseline-v12-2026-10-08/` item 3 passed on every salt
+(results #3219; ordinary dividends +0.142 / +0.142 / +0.143 log vs the
+0.065–0.195 band, no missing files), which the README names as the trigger
+(plan `total-return-and-shorts-phase-b-2026-10-05.md` decision 3).
+
+- [x] Both `[@sexp.default]` values and `default_config` fields flipped to
+  `true` in `weinstein_strategy_config.{ml,mli}` / `weinstein_strategy.mli`.
+- [x] The 19 regression goldens already pinned to `No_yield` (#3184) also pin
+  `((dividend_crediting false) (split_dividend_guard false))`, declared in
+  `deviates_from_live` where the spec has that block. `trading/test_data` has
+  no `dividends.csv` / `splits.csv`, so goldens are trade-identical either way;
+  the pin keeps their metric set byte-identical.
+- Verify: `dune runtest trading/backtest/test` (`test_cash_yield_overlays`:
+  default-on + axis + no-files guard; `test_panel_income_arming`: default
+  credits, `false` omits the key, no-files run counts `DividendMissingFileCount`).
 
 ## 2026-10-07 — `cash_yield` default-on: 3-month T-bill − 10 bp (#3137)
 
