@@ -64,126 +64,13 @@ module Runner = Tuner_bin.Bayesian_runner_runner
 module Wf_spec = Walk_forward.Spec
 module Wf_window = Walk_forward.Window_spec
 module Wf_executor = Walk_forward.Walk_forward_executor
-module Wf_report = Walk_forward.Walk_forward_report
 module Oos_validator = Tuner_bin.Bayesian_runner_oos_validator
 module Out_dir_check = Tuner_bin.Bayesian_runner_out_dir_check
 module Successive_halving = Tuner_bin.Bayesian_runner_successive_halving
+module Cli = Tuner_bin.Bayesian_runner_cli
+module Wf_helpers = Tuner_bin.Bayesian_runner_wf_helpers
 
-let _usage_msg =
-  "Usage: bayesian_runner.exe --spec <spec.sexp> --out-dir <dir>\n\
-  \  [--fixtures-root <path>]\n\
-  \  [--parallel N]    (default 1, max 16)\n\
-  \  [--walk-forward-spec <spec.sexp> --baseline-aggregate <aggregate.sexp>]\n\
-  \  [--fidelity-strategy single|successive_halving]   (default single; \
-   successive_halving requires a Tiered walk-forward window_spec)"
-
-(** Selector for {!Tuner_bin.Bayesian_runner_successive_halving} mode. [Single]
-    preserves the legacy single-tier behaviour bit-for-bit; [Successive_halving]
-    enables M1 T1.2's multi-fidelity promotion loop. Plan:
-    [dev/plans/tuning-research-driven-program-v2-2026-05-25.md]. *)
-type fidelity_strategy = Single | Successive_halving
-
-let _default_fidelity_strategy = Single
-
-let _parse_fidelity_strategy raw =
-  match String.lowercase raw with
-  | "single" -> Single
-  | "successive_halving" -> Successive_halving
-  | other ->
-      eprintf
-        "Error: --fidelity-strategy expects 'single' or 'successive_halving', \
-         got %S\n\
-         %s\n"
-        other _usage_msg;
-      Stdlib.exit 1
-
-(** Default [--parallel] value. [1] preserves the pre-#1197 sequential path
-    bit-exactly (no fork, no marshal). *)
-let _default_parallel = 1
-
-(** Parse and validate the [--parallel N] flag at CLI time. Out-of-range values
-    would otherwise surface from inside [Fork_pool.run_parallel] as an
-    [Invalid_argument] after the spec has loaded — failing fast at parse time
-    gives the operator a clearer error. *)
-let _parse_parallel raw =
-  let n =
-    try Int.of_string raw
-    with _ ->
-      eprintf "Error: --parallel expects an integer, got %S\n%s\n" raw
-        _usage_msg;
-      Stdlib.exit 1
-  in
-  if n < 1 || n > Fork_pool.max_parallel then begin
-    eprintf "Error: --parallel must be in [1, %d], got %d\n%s\n"
-      Fork_pool.max_parallel n _usage_msg;
-    Stdlib.exit 1
-  end;
-  n
-
-(** Label assigned to the best cell when it is re-executed end-to-end for OOS
-    validation. Distinct from the [bo-iter-N] labels the evaluator's iteration
-    counter emits during the BO loop. *)
-let _walk_forward_candidate_label = "bo-iter-best"
-
-(** Synthetic scenario label injected into [bo_log.csv]'s [scenario] column in
-    walk-forward mode (the Bayesian spec's own [scenarios] list is empty in
-    production walk-forward specs). *)
-let _walk_forward_scenarios_label = "walk-forward"
-
-type cli_args = {
-  spec_path : string;
-  out_dir : string;
-  fixtures_root : string option;
-  walk_forward_spec_path : string option;
-  baseline_aggregate_path : string option;
-  parallel : int;
-  fidelity_strategy : fidelity_strategy;
-}
-
-let _parse_args argv =
-  let rec loop spec out fixtures wf_spec baseline parallel fidelity = function
-    | [] -> (
-        match (spec, out) with
-        | Some s, Some o ->
-            {
-              spec_path = s;
-              out_dir = o;
-              fixtures_root = fixtures;
-              walk_forward_spec_path = wf_spec;
-              baseline_aggregate_path = baseline;
-              parallel = Option.value parallel ~default:_default_parallel;
-              fidelity_strategy =
-                Option.value fidelity ~default:_default_fidelity_strategy;
-            }
-        | _ ->
-            eprintf "%s\n" _usage_msg;
-            Stdlib.exit 1)
-    | "--spec" :: p :: rest ->
-        loop (Some p) out fixtures wf_spec baseline parallel fidelity rest
-    | "--out-dir" :: p :: rest ->
-        loop spec (Some p) fixtures wf_spec baseline parallel fidelity rest
-    | "--fixtures-root" :: p :: rest ->
-        loop spec out (Some p) wf_spec baseline parallel fidelity rest
-    | "--walk-forward-spec" :: p :: rest ->
-        loop spec out fixtures (Some p) baseline parallel fidelity rest
-    | "--baseline-aggregate" :: p :: rest ->
-        loop spec out fixtures wf_spec (Some p) parallel fidelity rest
-    | "--parallel" :: n :: rest ->
-        loop spec out fixtures wf_spec baseline
-          (Some (_parse_parallel n))
-          fidelity rest
-    | "--fidelity-strategy" :: raw :: rest ->
-        loop spec out fixtures wf_spec baseline parallel
-          (Some (_parse_fidelity_strategy raw))
-          rest
-    | "--help" :: _ | "-h" :: _ ->
-        printf "%s\n" _usage_msg;
-        Stdlib.exit 0
-    | unknown :: _ ->
-        eprintf "Error: unknown argument %S\n%s\n" unknown _usage_msg;
-        Stdlib.exit 1
-  in
-  loop None None None None None None None argv
+let _usage_msg = Cli.usage_msg
 
 (* -------------- legacy per-scenario mode -------------- *)
 
@@ -194,7 +81,7 @@ let _load_scenarios paths =
       Hashtbl.set table ~key:p ~data:s);
   table
 
-let _run_legacy_mode ~(args : cli_args) ~(spec : Spec.t) =
+let _run_legacy_mode ~(args : Cli.cli_args) ~(spec : Spec.t) =
   let fixtures_root =
     Fixtures_root.resolve ?fixtures_root:args.fixtures_root ()
   in
@@ -222,68 +109,7 @@ let _run_legacy_mode ~(args : cli_args) ~(spec : Spec.t) =
 
 (* -------------- walk-forward mode (PR-E) -------------- *)
 
-(** Load an [aggregate.sexp] file (the structured walk-forward report shape
-    Phase 2 pinned). Used both for the BO scorer's [baseline_aggregate] arg and
-    for OOS validation. *)
-let _load_aggregate path =
-  try Wf_report.aggregate_of_sexp (Sexp.load_sexp path)
-  with exn ->
-    failwithf "bayesian_runner: failed to load aggregate.sexp %s: %s" path
-      (Exn.to_string exn) ()
-
-(** Synthesise a placeholder [scenarios] list of length 1 so the runner's
-    [bo_log.csv] writer (which pairs scenarios with per-iteration metric_sets
-    via [List.iter2_exn]) does not raise on the production walk-forward fixture
-    (which carries [scenarios = []]). The evaluator returns
-    [(score, [ metric_set ])] in walk-forward mode — exactly one element. *)
-let _wf_spec_with_placeholder_scenario (s : Spec.t) : Spec.t =
-  { s with scenarios = [ _walk_forward_scenarios_label ] }
-
-(** Re-execute the walk-forward sweep for the BO's best cell. Returns the
-    fold_actuals list (per-fold, per-variant rows) that
-    {!Oos_validator.validate} partitions into in-sample vs OOS slices. The
-    [parallel] degree is threaded through so the OOS re-run fans out the same
-    way the BO loop's per-iteration sweeps did. *)
-let _execute_best_cell_walk_forward ?(int_keys = [])
-    ~(best_params : (string * float) list) ~(walk_forward_spec : Wf_spec.t)
-    ~(base : Scenario.t) ~(fixtures_root : string) ~(parallel : int) () :
-    Wf_report.fold_actual list =
-  let candidate =
-    {
-      Walk_forward.Walk_forward_runner.label = _walk_forward_candidate_label;
-      overrides = Tuner.Grid_search.cell_to_overrides ~int_keys best_params;
-    }
-  in
-  let two_variant_spec : Wf_spec.t =
-    {
-      walk_forward_spec with
-      variants =
-        [
-          { label = walk_forward_spec.baseline_label; overrides = [] };
-          candidate;
-        ];
-    }
-  in
-  eprintf
-    "[bayesian_runner] re-running walk-forward on best cell for OOS validation \
-     (parallel=%d)\n\
-     %!"
-    parallel;
-  let result =
-    Wf_executor.execute_spec ~base ~spec:two_variant_spec ~fixtures_root
-      ~progress:Wf_executor.noop_progress ~parallel ()
-  in
-  result.fold_actuals
-
-let _write_oos_report ~(out_dir : string)
-    ~(oos_result : Oos_validator.oos_result) ~(spec_path : string)
-    ~(baseline_label : string) : unit =
-  let path = Filename.concat out_dir "oos_report.md" in
-  Oos_validator.write_report path oos_result ~spec_path ~baseline_label;
-  eprintf "[bayesian_runner] wrote %s (verdict=%s)\n%!" path
-    (Sexp.to_string (Oos_validator.sexp_of_verdict oos_result.verdict))
-
-let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
+let _run_walk_forward_mode ~(args : Cli.cli_args) ~(spec : Spec.t)
     ~(walk_forward_spec_path : string) ~(baseline_aggregate_path : string) =
   let fixtures_root =
     Fixtures_root.resolve ?fixtures_root:args.fixtures_root ()
@@ -293,7 +119,7 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
     Filename.concat fixtures_root walk_forward_spec.base_scenario
   in
   let base = Scenario.load base_scenario_path in
-  let baseline_aggregate = _load_aggregate baseline_aggregate_path in
+  let baseline_aggregate = Wf_helpers.load_aggregate baseline_aggregate_path in
   let holdout_folds = Option.value spec.holdout_folds ~default:[] in
   let objective = Spec.to_grid_objective spec.objective in
   let obj_label = Tuner.Grid_search.objective_label objective in
@@ -310,7 +136,7 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
       ~executor:(Evaluator.make_executor ~parallel:args.parallel ())
       ~base ~walk_forward_spec ~baseline_aggregate ~objective ~fixtures_root ()
   in
-  let runner_spec = _wf_spec_with_placeholder_scenario spec in
+  let runner_spec = Wf_helpers.wf_spec_with_placeholder_scenario spec in
   let result =
     Runner.run_and_write ~spec:runner_spec ~out_dir:args.out_dir ~evaluator
   in
@@ -323,16 +149,17 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
   (* OOS validation: re-run walk-forward on the best cell, partition the
      per-fold results, emit oos_report.md. *)
   let fold_actuals =
-    _execute_best_cell_walk_forward ~int_keys:spec.int_keys
+    Wf_helpers.execute_best_cell_walk_forward ~int_keys:spec.int_keys
       ~best_params:result.best_params ~walk_forward_spec ~base ~fixtures_root
       ~parallel:args.parallel ()
   in
   let oos_result =
-    Oos_validator.validate ~candidate_label:_walk_forward_candidate_label
-      ~holdout_folds ~fold_actuals
+    Oos_validator.validate
+      ~candidate_label:Wf_helpers.walk_forward_candidate_label ~holdout_folds
+      ~fold_actuals
   in
-  _write_oos_report ~out_dir:args.out_dir ~oos_result ~spec_path:args.spec_path
-    ~baseline_label:walk_forward_spec.baseline_label;
+  Wf_helpers.write_oos_report ~out_dir:args.out_dir ~oos_result
+    ~spec_path:args.spec_path ~baseline_label:walk_forward_spec.baseline_label;
   eprintf "[bayesian_runner] outputs written under %s\n%!" args.out_dir
 
 (* -------------- successive-halving mode (M1 T1.2) -------------- *)
@@ -353,7 +180,7 @@ let _require_tiered (wf : Wf_spec.t) : Wf_window.tiered_spec =
         _usage_msg;
       Stdlib.exit 1
 
-let _run_successive_halving_mode ~(args : cli_args) ~(spec : Spec.t)
+let _run_successive_halving_mode ~(args : Cli.cli_args) ~(spec : Spec.t)
     ~(walk_forward_spec_path : string) ~(baseline_aggregate_path : string) =
   let fixtures_root =
     Fixtures_root.resolve ?fixtures_root:args.fixtures_root ()
@@ -364,7 +191,7 @@ let _run_successive_halving_mode ~(args : cli_args) ~(spec : Spec.t)
     Filename.concat fixtures_root walk_forward_spec.base_scenario
   in
   let base = Scenario.load base_scenario_path in
-  let baseline_aggregate = _load_aggregate baseline_aggregate_path in
+  let baseline_aggregate = Wf_helpers.load_aggregate baseline_aggregate_path in
   let objective = Spec.to_grid_objective spec.objective in
   let obj_label = Tuner.Grid_search.objective_label objective in
   eprintf
@@ -395,7 +222,7 @@ let _run_successive_halving_mode ~(args : cli_args) ~(spec : Spec.t)
 
 let _main () =
   let argv = Sys.get_argv () |> Array.to_list |> List.tl_exn in
-  let args = _parse_args argv in
+  let args = Cli.parse_args argv in
   (* Belt-and-suspenders even if launch_sweep.sh was bypassed. *)
   Out_dir_check.validate_or_exit ~out_dir:args.out_dir;
   let spec = Spec.load args.spec_path in
@@ -404,21 +231,21 @@ let _main () =
       args.walk_forward_spec_path,
       args.baseline_aggregate_path )
   with
-  | Single, None, None -> _run_legacy_mode ~args ~spec
-  | Single, Some wf_path, Some baseline_path ->
+  | Cli.Single, None, None -> _run_legacy_mode ~args ~spec
+  | Cli.Single, Some wf_path, Some baseline_path ->
       _run_walk_forward_mode ~args ~spec ~walk_forward_spec_path:wf_path
         ~baseline_aggregate_path:baseline_path
-  | Successive_halving, Some wf_path, Some baseline_path ->
+  | Cli.Successive_halving, Some wf_path, Some baseline_path ->
       _run_successive_halving_mode ~args ~spec ~walk_forward_spec_path:wf_path
         ~baseline_aggregate_path:baseline_path
-  | Successive_halving, _, _ ->
+  | Cli.Successive_halving, _, _ ->
       eprintf
         "Error: --fidelity-strategy successive_halving requires both \
          --walk-forward-spec and --baseline-aggregate\n\
          %s\n"
         _usage_msg;
       Stdlib.exit 1
-  | Single, _, _ ->
+  | Cli.Single, _, _ ->
       eprintf
         "Error: --walk-forward-spec and --baseline-aggregate must be supplied \
          together\n\
