@@ -112,6 +112,16 @@ let test_csv_column_is_last_and_carries_the_dividend _ =
       _last_cell (List.nth_exn off 1) )
     (equal_to ("dividends_received", "2300.00", "0.00"))
 
+(* Crediting armed (the default since the rebaseline-v12 flip), a short with
+   no dividend in its hold prints ["0.00"], not ["-0.00"]. *)
+let test_short_without_dividend_prints_plain_zero _ =
+  let short =
+    _trip ~symbol:"NOFILE" ~side:Trading_base.Types.Sell ~quantity:50.0
+      ~entry:"2021-12-01" ~exit_:"2021-12-30"
+  in
+  let armed = _csv_with ~dividends:(_source []) [ short ] in
+  assert_that (_last_cell (List.nth_exn armed 1)) (equal_to "0.00")
+
 let suite =
   "trade_dividends"
   >::: [
@@ -126,6 +136,8 @@ let suite =
          >:: test_missing_amount_missing_file_and_multiple_rows;
          "trades.csv column is last and carries the dividend"
          >:: test_csv_column_is_last_and_carries_the_dividend;
+         "a short without a dividend prints plain zero"
+         >:: test_short_without_dividend_prints_plain_zero;
        ]
 
 let () = run_test_tt_main suite

@@ -31,4 +31,6 @@ let received t (trade : Trading_simulation.Metrics.trade_metrics) =
   let sign =
     match trade.side with Trading_base.Types.Buy -> 1.0 | Sell -> -1.0
   in
-  sign *. per_share *. trade.quantity
+  (* No dividend is exactly [0.0], never [-0.0]: a short's [-1 * 0] would print
+     as ["-0.00"] in [trades.csv]. *)
+  if Float.equal per_share 0.0 then 0.0 else sign *. per_share *. trade.quantity
