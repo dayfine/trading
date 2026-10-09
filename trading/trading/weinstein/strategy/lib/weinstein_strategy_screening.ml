@@ -302,13 +302,11 @@ let _still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker ~symbol
     releasing each one's frozen [E] ahead of {!Entry_freeze.apply}; the symbol
     is still held this tick and re-qualifies at a fresh [E] later. The halves
     are armed independently (defect C); neither armed ⇒ the predicate is never
-    built. The clock defaults to [52] (2026-08-27 promotion). *)
+    built. The clock defaults to [52] (2026-08-27 promotion). #3218 adds the
+    short-only macro cancel and rest-limit override (both default off). *)
 let _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
     ~(portfolio : Portfolio_view.t) ~classified ~current_date () =
-  if
-    (not config.enable_entry_ticket_rescreen)
-    && config.entry_order_max_rest_weeks <= 0
-  then []
+  if not (Short_ticket_policy.armed config) then []
   else
     let stage_by_ticker = Hashtbl.create (module String) in
     List.iter classified ~f:(fun (ticker, _view, _prior, sr) ->
@@ -316,8 +314,7 @@ let _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
     let pending_entry_e =
       match pending_entry_e with Some t -> t | None -> Entry_freeze.create ()
     in
-    Entry_ticket_ttl.run ~rescreen:config.enable_entry_ticket_rescreen
-      ~max_rest_weeks:config.entry_order_max_rest_weeks ~pending_entry_e
+    Short_ticket_policy.run config ~macro_result ~pending_entry_e
       ~positions:portfolio.positions
       ~still_qualifies:
         (_still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker)

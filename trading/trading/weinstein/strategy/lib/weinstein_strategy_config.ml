@@ -133,6 +133,9 @@ type config = {
       (** See [.mli]. *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_order_max_rest_weeks : int; [@sexp.default 52]  (** See [.mli]. *)
+  short_cancel_on_non_bearish : bool; [@sexp.default false]  (** .mli *)
+  short_entry_order_max_rest_weeks : int option; [@sexp.default None]
+      (** See [.mli]. *)
   cancel_resting_entry_on_split : bool; [@sexp.default false]
       (** See [.mli]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
@@ -164,11 +167,9 @@ type config = {
 (* Top-level so [default_config] stays a flat literal (nesting linter). *)
 let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
-(* Screening config for the promoted bundle (2026-07-23): the standard screener
-   defaults with the continuous overhead-supply ranking weight armed. Pairs with
-   [overhead_supply = Some Resistance_supply.default_config] in [default_config]
-   — both must be armed for the continuous score to replace the binary grade
-   points (either absent falls back to the bit-identical binary path). *)
+(* Promoted-bundle screening config (2026-07-23): standard defaults with the
+   continuous overhead-supply weight armed. Pairs with [overhead_supply = Some
+   Resistance_supply.default_config] in [default_config]; both must be armed. *)
 let _default_screening_config =
   {
     Screener.default_config with
@@ -179,11 +180,8 @@ let _default_screening_config =
       };
   }
 
-(* Flat record literal over every config field — exactly one line per field
-   by construction (no logic), growing one line per new default-off
-   experiment knob. OCaml has no partial record literals, so splitting is
-   impossible and extracting field groups would only add indirection.
-   @large-function: flat default-config record literal, one line per field *)
+(* Flat record literal, one line per field (no logic); OCaml has no partial
+   record literals. @large-function: flat default-config record literal *)
 let default_config ~universe ~index_symbol =
   {
     universe;
@@ -273,6 +271,8 @@ let default_config ~universe ~index_symbol =
     freeze_entry_at_first_breakout = false;
     enable_entry_ticket_rescreen = false;
     entry_order_max_rest_weeks = 52;
+    short_cancel_on_non_bearish = false;
+    short_entry_order_max_rest_weeks = None;
     cancel_resting_entry_on_split = false;
     reserve_cash_for_resting_tickets = false;
     entry_fill_reject_retries = 0;

@@ -54,6 +54,7 @@ module Entry_freeze = Entry_freeze
 module Entry_stop_width_order = Entry_stop_width_order
 module Entry_ticket_ttl = Entry_ticket_ttl
 module Split_ticket_cancel = Split_ticket_cancel
+module Short_ticket_policy = Short_ticket_policy
 module Entry_ticket_suspend_mode = Entry_ticket_suspend_mode
 module Entry_ticket_suspend = Entry_ticket_suspend
 module Screening_notional = Screening_notional

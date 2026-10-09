@@ -31,6 +31,11 @@
     two TTL tokens: the ticket was written on a chart the split replaced. It is
     driven below as Producer 5, so the list is six tokens.
 
+    {b A seventh token (#3218).} [Weinstein_strategy.Short_ticket_policy]
+    (default-off [short_cancel_on_non_bearish]) emits
+    [entry_ticket_short_macro_not_bearish] — a strategy {e decision}: a resting
+    short whose bearish-market premise lapsed. Producer 6, so seven tokens.
+
     {b Why a hand-written list of four literals would pin nothing.} Comparing
     four string constants against four string constants passes forever. So the
     {e reachable} side of the equality below is never written down — it is
@@ -67,6 +72,7 @@ module Entry_ticket_ttl = Weinstein_strategy.Entry_ticket_ttl
 module Entry_ticket_suspend = Weinstein_strategy.Entry_ticket_suspend
 module Suspend_mode = Weinstein_strategy.Entry_ticket_suspend_mode
 module Split_ticket_cancel = Weinstein_strategy.Split_ticket_cancel
+module Short_ticket_policy = Weinstein_strategy.Short_ticket_policy
 
 (* The documented side of the equality: the closed list exactly as the four
    docstrings name it. [Cancel_handler]'s and [Delisted_ticket_cancel]'s tokens
@@ -83,6 +89,7 @@ let _documented_cancel_reasons =
       Delisted_ticket_cancel.cancel_reason;
       Entry_ticket_suspend.cancel_reason;
       Split_ticket_cancel.cancel_reason;
+      Short_ticket_policy.cancel_reason;
     ]
 
 (* Fixtures ---------------------------------------------------------------- *)
@@ -443,6 +450,35 @@ let _split_transitions =
           Split_ticket_cancel.cancellations ~positions ~split_factor
             ~current_date:(_date "2024-03-05")))
 
+(* Producer 6 -- Weinstein_strategy.Short_ticket_policy (#3218) ------------- *)
+
+(* A resting short is the only arm; a resting long, a part-filled short and a
+   held position sweep the skips. *)
+let _short_policy_transitions =
+  let resting_short =
+    {
+      (_entering ~id:"S-1" ~symbol:"TSLA" ~filled_quantity:0.0) with
+      side = Position.Short;
+    }
+  in
+  let partly_filled_short =
+    {
+      (_entering ~id:"S-2" ~symbol:"TSLA" ~filled_quantity:40.0) with
+      side = Position.Short;
+    }
+  in
+  List.concat_map
+    [
+      _positions_of [ resting_short ];
+      _positions_of [ partly_filled_short ];
+      _positions_of [ _entering ~id:"A-1" ~symbol:"AAPL" ~filled_quantity:0.0 ];
+      _positions_of [ _holding ~id:"A-1" ~symbol:"AAPL" ];
+      String.Map.empty;
+    ]
+    ~f:(fun positions ->
+      Short_ticket_policy.macro_cancellations ~positions
+        ~current_date:(_date "2024-03-05"))
+
 (* Tests ------------------------------------------------------------------- *)
 
 (** The pin. Every token any production producer can drive into
@@ -456,7 +492,8 @@ let test_reachable_reasons_equal_the_documented_closed_list _ =
     (Set.to_list
        (_reachable_from
           (_ttl_transitions @ _rejection_transitions @ _delisting_transitions
-         @ _suspend_transitions @ _split_transitions)))
+         @ _suspend_transitions @ _split_transitions @ _short_policy_transitions
+          )))
     (equal_to (Set.to_list _documented_cancel_reasons))
 
 (** The partition the docstrings assert, pinned separately: four tokens in three
@@ -470,13 +507,15 @@ let test_each_producer_contributes_its_documented_tokens _ =
       Set.to_list (_reachable_from _rejection_transitions),
       Set.to_list (_reachable_from _delisting_transitions),
       Set.to_list (_reachable_from _suspend_transitions),
-      Set.to_list (_reachable_from _split_transitions) )
+      Set.to_list (_reachable_from _split_transitions),
+      Set.to_list (_reachable_from _short_policy_transitions) )
     (equal_to
        ( [ "entry_ticket_requalification_failed"; "entry_ticket_ttl_expired" ],
          [ Cancel_handler.portfolio_rejection_reason ],
          [ Delisted_ticket_cancel.cancel_reason ],
          [ Entry_ticket_suspend.cancel_reason ],
-         [ Split_ticket_cancel.cancel_reason ] ))
+         [ Split_ticket_cancel.cancel_reason ],
+         [ Short_ticket_policy.cancel_reason ] ))
 
 let suite =
   "cancel reason closed list"
