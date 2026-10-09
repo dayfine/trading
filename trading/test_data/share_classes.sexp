@@ -34,10 +34,21 @@
  (PBR PBR-A)
  (EBR EBR-B)
  (AKO-A AKO-B)
- ;; Vendor duplicate series: these "-WS" symbols carry the parent's own price history
- ;; (identical closes), not a warrant line. Grouped so the share-class gate and V6 treat
- ;; them as one issuer. AIG/AIG-WS was shorted twice in shorts Phase B v0 (#3183).
+ ;; Warrant symbols whose vendor series copies the parent's closes up to a cutoff
+ ;; (AIG-WS to 2011-01-12; the bank and GM -WS lines to 2014-09-19; the SPAC -WT lines
+ ;; to 2021-12-17) and trades as the real warrant afterwards. Both phases are the same
+ ;; issuer's exposure, so the share-class gate and V6 treat each group as one issuer.
+ ;; AIG/AIG-WS was shorted twice in shorts Phase B v0 (#3183). SunTrust is STI_old in
+ ;; the lists; the bare STI is an unrelated later company.
  (AIG AIG-WS)
  (BAC BAC-WS-A BAC-WS-B)
  (CMA CMA-WS)
- (GM GM-WS-B))
+ (GM GM-WS-B)
+ (C C-WS-A)
+ (COF COF-WS)
+ (WFC WFC-WS)
+ (VLY VLY-WS)
+ (STI_old STI-WS-A STI-WS-B)
+ (HYLN HYLN-WT)
+ (IPOF IPOF-WT)
+ (TPGY TPGY-WT))
