@@ -8,7 +8,7 @@
 (library
  (name twin_detector)
  (public_name trading.backtest.twin_detector)
- (modules twin_detector)
+ (modules twin_detector twin_types twin_match_stats twin_prefilter)
  (libraries core)
  (preprocess
   (pps ppx_jane)))

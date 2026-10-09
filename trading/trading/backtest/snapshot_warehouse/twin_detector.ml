@@ -1,166 +1,16 @@
 open Core
-
-module Config = struct
-  type basis = Levels | Returns [@@deriving sexp, equal]
-
-  type t = {
-    enabled : bool;
-    min_overlap_days : int;
-    match_fraction : float;
-    close_epsilon : float;
-    basis : basis; [@sexp.default Levels]
-    ret_epsilon : float; [@sexp.default 1e-3]
-    prefilter_rel_tol : float;
-    require_direct_match : bool; [@sexp.default false]
-    max_group_size : int option; [@sexp.option]
-    min_matching_run : int option; [@sexp.option]
-  }
-  [@@deriving sexp, equal]
-
-  let default =
-    {
-      enabled = false;
-      min_overlap_days = 100;
-      match_fraction = 0.95;
-      close_epsilon = 1e-4;
-      basis = Levels;
-      ret_epsilon = 1e-3;
-      prefilter_rel_tol = 2e-2;
-      require_direct_match = false;
-      max_group_size = None;
-      min_matching_run = None;
-    }
-end
-
-type series = {
-  symbol : string;
-  data_end : Date.t;
-  closes : (Date.t * float) array;
-}
-[@@deriving sexp_of]
-
-type pair_match = {
-  survivor : string;
-  dropped : string;
-  overlap_days : int;
-  match_fraction : float;
-}
-[@@deriving sexp_of, equal]
-
-type group = {
-  survivor : string;
-  dropped : string list;
-  matches : pair_match list;
-}
-[@@deriving sexp_of, equal]
-
-type rejection_reason = Transitive | Hub [@@deriving sexp, equal]
-
-type rejection = {
-  reason : rejection_reason;
-  survivor : string;
-  kept : string;
-  overlap_days : int;
-  match_fraction : float;
-}
-[@@deriving sexp, equal]
-
-type report = {
-  config : Config.t;
-  groups : group list;
-  dropped_symbols : string list;
-  rejected : rejection list;
-}
-[@@deriving sexp_of]
-
-(* Relative distance between two closes, guarded against a zero magnitude. *)
-let _relative_diff a b =
-  let denom = Float.max (Float.abs a) (Float.abs b) in
-  if Float.( <= ) denom 0.0 then 0.0 else Float.abs (a -. b) /. denom
-
-(* Merge two date-sorted close arrays into the (close_a, close_b) pairs on the
-   dates both series have, in ascending date order. *)
-let _shared_closes a b =
-  let la = Array.length a and lb = Array.length b in
-  let i = ref 0 and j = ref 0 in
-  let acc = ref [] in
-  while !i < la && !j < lb do
-    let da, ca = a.(!i) and db, cb = b.(!j) in
-    let c = Date.compare da db in
-    if c < 0 then incr i
-    else if c > 0 then incr j
-    else begin
-      acc := (ca, cb) :: !acc;
-      incr i;
-      incr j
-    end
-  done;
-  Array.of_list (List.rev !acc)
-
-(* Fold a sequence of per-unit verdicts into [(matched, compared, longest
-   run)]: [compared] counts the units that were comparable, [matched] those
-   that matched, and the longest run is the longest stretch of consecutive
-   matches. An incomparable unit breaks the run, the same as a miss. *)
-type _tally = { matched : int; compared : int; run : int; best : int }
-
-let _tally_empty = { matched = 0; compared = 0; run = 0; best = 0 }
-
-let _tally_add t = function
-  | `Skip -> { t with run = 0 }
-  | `Miss -> { t with compared = t.compared + 1; run = 0 }
-  | `Match ->
-      let run = t.run + 1 in
-      {
-        matched = t.matched + 1;
-        compared = t.compared + 1;
-        run;
-        best = Int.max t.best run;
-      }
-
-let _tally_stats t =
-  let frac =
-    if Int.equal t.compared 0 then 0.0
-    else Float.of_int t.matched /. Float.of_int t.compared
-  in
-  (frac, t.best)
-
-(* [Levels] stats: the fraction of shared dates whose closes match within
-   [epsilon], and the longest run of consecutive matching dates. *)
-let _levels_match_stats shared ~epsilon =
-  Array.fold shared ~init:_tally_empty ~f:(fun t (ca, cb) ->
-      _tally_add t
-        (if Float.( <= ) (_relative_diff ca cb) epsilon then `Match else `Miss))
-  |> _tally_stats
-
-(* [Returns] stats over consecutive-shared-date return pairs: the fraction
-   whose simple daily returns differ by at most [epsilon] (absolute), and the
-   longest run of consecutive matching pairs. A pair is skipped when the prior
-   close of either leg is <= 0 (undefined return): it is left out of the
-   fraction and breaks the run. Fraction 0.0 when no valid pair exists. *)
-let _returns_match_stats shared ~epsilon =
-  let t = ref _tally_empty in
-  for k = 1 to Array.length shared - 1 do
-    let pa, pb = shared.(k - 1) and ca, cb = shared.(k) in
-    let verdict =
-      (* Written as the pre-#3057 positive test, not [pa <= 0 || pb <= 0], so a
-         NaN prior close is still skipped rather than scored as a miss. *)
-      if Float.( > ) pa 0.0 && Float.( > ) pb 0.0 then
-        let ra = (ca -. pa) /. pa and rb = (cb -. pb) /. pb in
-        if Float.( <= ) (Float.abs (ra -. rb)) epsilon then `Match else `Miss
-      else `Skip
-    in
-    t := _tally_add !t verdict
-  done;
-  _tally_stats !t
+include Twin_types
 
 (* Number of shared dates, the basis-appropriate match fraction, and the
    longest contiguous matching run. *)
 let _overlap_stats (config : Config.t) a b =
-  let shared = _shared_closes a b in
+  let shared = Twin_match_stats.shared_closes a b in
   let frac, run =
     match config.basis with
-    | Levels -> _levels_match_stats shared ~epsilon:config.close_epsilon
-    | Returns -> _returns_match_stats shared ~epsilon:config.ret_epsilon
+    | Levels ->
+        Twin_match_stats.levels_match_stats shared ~epsilon:config.close_epsilon
+    | Returns ->
+        Twin_match_stats.returns_match_stats shared ~epsilon:config.ret_epsilon
   in
   (Array.length shared, frac, run)
 
@@ -182,102 +32,27 @@ let _twin_stats (config : Config.t) a b =
   then Some (overlap, frac)
   else None
 
-(* Index of [date] in the date-sorted array, if present. *)
-let _index_on arr ~date =
-  Array.binary_search arr
-    ~compare:(fun (d1, _) (d2, _) -> Date.compare d1 d2)
-    `First_equal_to (date, Float.nan)
-
-(* Adjusted close on [date] via binary search of the sorted array. *)
-let _close_on arr ~date =
-  Option.map (_index_on arr ~date) ~f:(fun i -> snd arr.(i))
-
-(* Simple daily return on [date] — close on [date] vs the leg's own prior bar.
-   [None] when [date] is the leg's first bar (no prior) or the prior close is
-   non-positive (undefined return). *)
-let _return_on arr ~date =
-  match _index_on arr ~date with
-  | Some i when i > 0 ->
-      let prev = snd arr.(i - 1) and cur = snd arr.(i) in
-      if Float.( > ) prev 0.0 then Some ((cur -. prev) /. prev) else None
-  | _ -> None
-
-(* Anchor key of series [s] on [date] under the configured basis: the close
+(* Anchor key of a close array on [date] under the configured basis: the close
    ([Levels]) or the anchor-date return ([Returns]). *)
-let _anchor_key (config : Config.t) s ~date =
+let _anchor_key (config : Config.t) closes ~date =
   match config.basis with
-  | Levels -> _close_on s.closes ~date
-  | Returns -> _return_on s.closes ~date
+  | Levels -> Twin_prefilter.close_on closes ~date
+  | Returns -> Twin_prefilter.return_on closes ~date
 
 (* Whether two anchor keys are near enough to co-run in the prefilter: a
    relative close gap ([Levels]) or an absolute return gap ([Returns]). *)
 let _prefilter_close_enough (config : Config.t) a b =
   match config.basis with
-  | Levels -> Float.( <= ) (_relative_diff a b) config.prefilter_rel_tol
+  | Levels ->
+      Float.( <= ) (Twin_match_stats.relative_diff a b) config.prefilter_rel_tol
   | Returns -> Float.( <= ) (Float.abs (a -. b)) config.prefilter_rel_tol
 
-(* Every distinct date across all series, sorted ascending. *)
-let _unique_sorted_dates series_arr =
-  let seen = Hash_set.create (module Date) in
-  Array.iter series_arr ~f:(fun s ->
-      Array.iter s.closes ~f:(fun (d, _) -> Hash_set.add seen d));
-  Hash_set.to_list seen |> List.sort ~compare:Date.compare |> Array.of_list
-
-(* Anchor dates: every [stride]-th distinct date. Because [stride <
-   min_overlap_days], any twin pair with a dense >=[min_overlap_days]
-   overlap shares at least one anchor, so the prefilter keeps it. *)
-let _anchor_dates ~stride series_arr =
-  let all = _unique_sorted_dates series_arr in
-  Array.filteri all ~f:(fun idx _ -> idx % stride = 0)
-
-(* Series with a defined anchor key on [date], as (index, key) sorted ascending
-   by key. Under [Returns] a leg without a prior bar on [date] is omitted. *)
-let _actives_at (config : Config.t) series_arr ~date =
-  Array.filter_mapi series_arr ~f:(fun i s ->
-      Option.map (_anchor_key config s ~date) ~f:(fun k -> (i, k)))
-  |> Array.to_list
-  |> List.sort ~compare:(fun (_, k1) (_, k2) -> Float.compare k1 k2)
-
-(* Partition a key-sorted (index, key) list into maximal runs whose consecutive
-   keys stay near per [close_enough]. Twins land in one run. *)
-let _group_runs ~close_enough sorted =
-  match sorted with
-  | [] -> []
-  | (i0, k0) :: tl ->
-      let runs, cur, _ =
-        List.fold tl ~init:([], [ i0 ], k0)
-          ~f:(fun (runs, cur, prev_k) (i, k) ->
-            if close_enough prev_k k then (runs, i :: cur, k)
-            else (cur :: runs, [ i ], k))
-      in
-      cur :: runs
-
-(* All unordered index pairs within a run, canonicalised as (min, max). *)
-let _run_pairs run =
-  let arr = Array.of_list run in
-  let acc = ref [] in
-  for a = 0 to Array.length arr - 1 do
-    for b = a + 1 to Array.length arr - 1 do
-      let x = arr.(a) and y = arr.(b) in
-      acc := (Int.min x y, Int.max x y) :: !acc
-    done
-  done;
-  !acc
-
-(* Deduplicated candidate index pairs from the anchor-date prefilter. *)
+(* Candidate index pairs from the anchor-date prefilter under [config]. *)
 let _candidate_pairs (config : Config.t) series_arr =
-  let n = Array.length series_arr in
-  let stride = Int.max 1 (config.min_overlap_days / 2) in
-  let anchors = _anchor_dates ~stride series_arr in
-  let seen = Hash_set.create (module Int) in
-  let close_enough = _prefilter_close_enough config in
-  Array.iter anchors ~f:(fun date ->
-      _actives_at config series_arr ~date
-      |> _group_runs ~close_enough
-      |> List.iter ~f:(fun run ->
-          List.iter (_run_pairs run) ~f:(fun (i, j) ->
-              Hash_set.add seen ((i * n) + j))));
-  Hash_set.to_list seen |> List.map ~f:(fun k -> (k / n, k % n))
+  Twin_prefilter.candidate_pairs ~min_overlap_days:config.min_overlap_days
+    ~anchor_key:(_anchor_key config)
+    ~close_enough:(_prefilter_close_enough config)
+    (Array.map series_arr ~f:(fun s -> s.closes))
 
 (* Minimal index union-find. *)
 let _uf_make n = Array.init n ~f:Fn.id
