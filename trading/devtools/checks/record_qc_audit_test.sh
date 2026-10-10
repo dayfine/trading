@@ -33,7 +33,32 @@ fi
 # write_audit.sh writes the audit JSON to dev/audit/. We don't want test runs
 # to pollute that dir; the test uses a temp REPO_ROOT override.
 TMP_REPO="$(mktemp -d -t record_qc_audit_test.XXXXXX)"
-trap 'rm -rf "${TMP_REPO}"' EXIT
+# Abort diagnostics (H-AUDIT-TEST-SILENT-ABORT-FLAKE): under `set -e` a failing
+# command used to kill this script with no output (seen once in a full parallel
+# `dune runtest`, cut off after "PASS: scenario 12"). The ERR trap records the
+# failing line + command; the EXIT trap, on a non-zero exit with no tallied
+# FAIL (i.e. an abort rather than an ordinary assertion failure), names the
+# scenario in progress (nearest "# Scenario" header above that line) and the
+# last PASS/FAIL label printed.
+set -E
+ABORT_LINE=""
+ABORT_CMD=""
+LAST_LABEL="(none yet)"
+_on_err() { ABORT_LINE="$1"; ABORT_CMD="$2"; }
+trap '_on_err "${LINENO}" "${BASH_COMMAND}"' ERR
+_on_exit() {
+  local rc=$?
+  if (( rc != 0 )) && (( ${FAIL_COUNT:-0} == 0 )); then
+    local hdr="unknown"
+    if [[ -n "${ABORT_LINE}" ]]; then
+      hdr="$(awk -v n="${ABORT_LINE}" 'NR<=n && /^# [Ss]cenario [0-9]/ {h=$0} END{print h}' \
+        "${SCRIPT_DIR}/record_qc_audit_test.sh" | cut -c1-80)"
+    fi
+    echo "ABORT: record_qc_audit_test died rc=${rc} during scenario [${hdr}] at line ${ABORT_LINE:-?} running: ${ABORT_CMD:-?}; last labelled result: ${LAST_LABEL}" >&2
+  fi
+  rm -rf "${TMP_REPO:-}"
+}
+trap _on_exit EXIT
 
 mkdir -p "${TMP_REPO}/dev/reviews" "${TMP_REPO}/dev/audit" \
          "${TMP_REPO}/trading/devtools/checks" "${TMP_REPO}/.claude"
@@ -50,8 +75,8 @@ chmod +x "${TMP_REPO}/trading/devtools/checks/"*.sh
 
 PASS_COUNT=0
 FAIL_COUNT=0
-pass() { echo "  PASS: $*"; PASS_COUNT=$(( PASS_COUNT + 1 )); }
-fail() { echo "  FAIL: $*" >&2; FAIL_COUNT=$(( FAIL_COUNT + 1 )); }
+pass() { LAST_LABEL="PASS: ${1:0:40}"; echo "  PASS: $*"; PASS_COUNT=$(( PASS_COUNT + 1 )); }
+fail() { LAST_LABEL="FAIL: ${1:0:40}"; echo "  FAIL: $*" >&2; FAIL_COUNT=$(( FAIL_COUNT + 1 )); }
 
 # report_conjuncts <label1> <ok1> [<label2> <ok2> ...]
 #
