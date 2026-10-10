@@ -1,0 +1,26 @@
+[snapshot-mode] loaded manifest at /tmp/snap_top3000_pit_v12pit/manifest.sexp (schema_hash=060588c0224b7d7e73f367fbd1801084, 9236 entries)
+Loading 1 scenarios from /tmp/spb-run/B/v1-26-s0-v12 (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-spb-B/trading/test_data/backtest_scenarios
+Bar data source: snapshot mode (/tmp/snap_top3000_pit_v12pit)
+Progress emission: every 26 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-spb-B/trading/dev/backtest/scenarios-2026-10-10-025420
+
+>>> Running v1-26: short-only book, v1 = v0 + cancel short tickets off-Bearish + 4-week short ticket rest, 26y, pit-v12 (2000-01-01 to 2026-06-26)
+Using scenario-provided sector map (9222 symbols)...
+Universe: 9222 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 9237
+Running backtest (2000-01-01 to 2026-06-26, warmup from 1999-01-02)...
+Panel_runner: simulator window 1999-01-02..2026-06-26 (warmup 364 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 7170 days) for strategy
+Panel_runner: snapshot cache hits=147606662 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2427553552 maxrss_bytes=5849530368
+Panel_runner: split_dividend_guard rejected=0 no_files=0
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+v1-26                          -26.4%     167    18.6%    39.9%   PASS
+
+1/1 scenarios passed.
+exit=0
