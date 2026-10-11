@@ -1,0 +1,8 @@
+Preparing worktree (detached HEAD 10f725ffe)
+HEAD is now at 10f725ffe data(share-classes): group vendor duplicate -WS series with their parent (AIG, BAC, CMA, GM) (#3227)
+v12 warehouse entries=9236
+lists md5 (run tree 10f725ffe): deca56c7c7b38e7df5fd0abeaa7ccc53  union=9222 absent=0 (MEL excepted)
+  (rebaseline-v12 ran on lists md5 b62da7e2c4958c42a9805c89222c2d88, union 9222; a different md5 is reported in the writeup)
+staged 11880 dividends.csv, 11880 splits.csv
+SHA=10f725ffe lane=A tokens: v0-26:0 v0-26:1 v0-26:2
+launched pid 3292

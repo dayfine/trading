@@ -258,3 +258,15 @@ New, found while writing this:
 ## Log
 
 - 2026-10-09 — pre-registered (v0 launchable; v1 waits on #3218).
+- 2026-10-09 02:39 PT — lane A launched at 904746e8c. **Stopped 07:42 by the dispatcher** after s0 and s1 both
+  read V6 = 1 (gate 2): AIG and AIG-WS, the vendor `-WS` series that copies AIG's closes to 2011-01-12, were held as
+  two shorts. s2 would follow the same path, so it was not run. The stopped chain log is `results/chain-A-stopped.log`
+  (s0 −36.96 %, s1 −37.58 %, 197 trades each; excluded from every read). Fix: #3227 (10f725ffe) groups the copied
+  `-WS`/`-WT` series with their parents in `share_classes.sexp`.
+- 2026-10-09 09:31 PT — lane A relaunched at 10f725ffe (lists md5 `deca56c7…`, union 9,222, warehouse 9,236,
+  11,880 dividends/splits files staged). Done 17:07; V6 = 0 on all three salts.
+- 2026-10-09 17:09 PT — #3218 merged as #3221; both v1-only keys (`short_cancel_on_non_bearish`,
+  `short_entry_order_max_rest_weeks`) found in the merged `.mli` under the spec's names, so no spec amendment. Lane B
+  launched at 27881ae05 (same lists md5). Its v0 s0 replay was byte-identical to lane A's (gate 4), so lane A's
+  v0 s1/s2 stand as partners. Done 2026-10-10 05:42; V6 = 0 and `validator_diff -check V6` v1 vs v0 exit 0 on all
+  three salts.

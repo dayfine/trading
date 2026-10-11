@@ -1,0 +1,8 @@
+Preparing worktree (detached HEAD 27881ae05)
+HEAD is now at 27881ae05 ops: daily summary 2026-10-09-run2 (#3234)
+v12 warehouse entries=9236
+lists md5 (run tree 27881ae05): deca56c7c7b38e7df5fd0abeaa7ccc53  union=9222 absent=0 (MEL excepted)
+  (rebaseline-v12 ran on lists md5 b62da7e2c4958c42a9805c89222c2d88, union 9222; a different md5 is reported in the writeup)
+staged 11880 dividends.csv, 11880 splits.csv
+SHA=27881ae05 lane=B tokens: v0-26:0 v1-26:0:v0-26 v0-26:1 v1-26:1:v0-26 v0-26:2 v1-26:2:v0-26
+launched pid 55252
