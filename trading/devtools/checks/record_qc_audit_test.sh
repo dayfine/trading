@@ -44,15 +44,26 @@ set -E
 ABORT_LINE=""
 ABORT_CMD=""
 LAST_LABEL="(none yet)"
+# SUMMARY_REACHED flips to 1 once the final summary starts; a non-zero exit
+# before that point is an abort even if some FAIL was already tallied. A
+# `set -u` abort has no ERR-trap line, so it prints "[unknown] at line ?".
+SUMMARY_REACHED=0
+# _scenario_header_at <file> <line>: the nearest REAL scenario header at or
+# above <line>. Anchored to the capitalised "# Scenario <n>" shape: lowercase
+# "# scenario 27 pinned ..." appears mid-comment prose in several scenarios
+# (7d, 17, 30, 48, 50) and must not be taken as a header. Pinned by 20f.
+_scenario_header_at() {
+  awk -v n="$2" 'NR<=n && /^# Scenario [0-9]/ {h=$0} END{print h}' "$1" | cut -c1-80
+}
 _on_err() { ABORT_LINE="$1"; ABORT_CMD="$2"; }
 trap '_on_err "${LINENO}" "${BASH_COMMAND}"' ERR
+# The trap never calls `exit`, so the original rc is preserved.
 _on_exit() {
   local rc=$?
-  if (( rc != 0 )) && (( ${FAIL_COUNT:-0} == 0 )); then
+  if (( rc != 0 )) && (( SUMMARY_REACHED == 0 )); then
     local hdr="unknown"
     if [[ -n "${ABORT_LINE}" ]]; then
-      hdr="$(awk -v n="${ABORT_LINE}" 'NR<=n && /^# [Ss]cenario [0-9]/ {h=$0} END{print h}' \
-        "${SCRIPT_DIR}/record_qc_audit_test.sh" | cut -c1-80)"
+      hdr="$(_scenario_header_at "${SCRIPT_DIR}/record_qc_audit_test.sh" "${ABORT_LINE}")"
     fi
     echo "ABORT: record_qc_audit_test died rc=${rc} during scenario [${hdr}] at line ${ABORT_LINE:-?} running: ${ABORT_CMD:-?}; last labelled result: ${LAST_LABEL}" >&2
   fi
@@ -1485,6 +1496,25 @@ if (( CNT_ONELINE_20E >= 1 )) && (( CNT_MULTI_20E >= 1 )) && (( CNT_CLEAN_20E ==
   pass "scenario 20e — 20d detector flags one-line and multi-line function-local aliases of \$OUTPUT_FILE and passes a clean fixture (H-AUDIT-20D-ONELINE-FN-ALIAS)"
 else
   fail "scenario 20e — expected counts oneline>=1, multiline>=1, clean==0; got ${CNT_ONELINE_20E}/${CNT_MULTI_20E}/${CNT_CLEAN_20E}"
+fi
+# ---------------------------------------------------------------------------
+# Scenario 20f — ABORT-header lookup pin: _scenario_header_at must return the
+# capitalised real header for a line inside a scenario whose body contains
+# lowercase "# scenario N" prose (scenario 30), and for the header's own line.
+# ---------------------------------------------------------------------------
+SELF_20F="${SCRIPT_DIR}/record_qc_audit_test.sh"
+H30_LINE_20F="$(grep -n '^# Scenario 30 ' "${SELF_20F}" | head -1 | cut -d: -f1)"
+PROSE_LINE_20F="$(grep -n '^# scenario 27 pinned' "${SELF_20F}" | head -1 | cut -d: -f1)"
+H_OWN_20F="$(_scenario_header_at "${SELF_20F}" "${H30_LINE_20F:-1}")"
+H_PROSE_20F="$(_scenario_header_at "${SELF_20F}" "${PROSE_LINE_20F:-1}")"
+H_AFTER_20F="$(_scenario_header_at "${SELF_20F}" "$(( ${PROSE_LINE_20F:-1} + 1 ))")"
+if [[ -n "${H30_LINE_20F}" && -n "${PROSE_LINE_20F}" ]] \
+   && [[ "${H_OWN_20F}" == "# Scenario 30 "* ]] \
+   && [[ "${H_PROSE_20F}" == "# Scenario "* ]] \
+   && [[ "${H_AFTER_20F}" == "# Scenario "* ]]; then
+  pass "scenario 20f — _scenario_header_at returns a capitalised real header on and after lowercase-prose lines (ABORT scenario naming)"
+else
+  fail "scenario 20f — expected real '# Scenario' headers; got own='${H_OWN_20F}' prose='${H_PROSE_20F}' after='${H_AFTER_20F}' (h30=${H30_LINE_20F:-none} prose_line=${PROSE_LINE_20F:-none})"
 fi
 # ---------------------------------------------------------------------------
 # Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
@@ -4156,6 +4186,7 @@ fi
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
+SUMMARY_REACHED=1
 echo ""
 echo "record_qc_audit_test: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
 
