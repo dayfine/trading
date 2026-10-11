@@ -51,16 +51,6 @@ let _parse_parallel raw =
   end;
   n
 
-(** Label assigned to the best cell when it is re-executed end-to-end for OOS
-    validation. Distinct from the [bo-iter-N] labels the evaluator's iteration
-    counter emits during the BO loop. *)
-let _walk_forward_candidate_label = "bo-iter-best"
-
-(** Synthetic scenario label injected into [bo_log.csv]'s [scenario] column in
-    walk-forward mode (the Bayesian spec's own [scenarios] list is empty in
-    production walk-forward specs). *)
-let _walk_forward_scenarios_label = "walk-forward"
-
 type cli_args = {
   spec_path : string;
   out_dir : string;
