@@ -32,3 +32,12 @@ Links: [[project_trader_investor_modes]], [[project_decision_walkthrough_next]].
 **10-02 regime split + review pack:** artifact https://claude.ai/artifact/YPxRVNbDqpmWJMJjTxJEJN. In SPY UP regimes (67 % of days) the preset beats SPY (+11.3 vs +10.3 %/yr, 63 % exposure); in MIXED +0.3 vs −4.5. The SPY gap is all DOWN regimes: SPY makes +10.3 %/yr there because lagging DOWN labels cover V-rebounds (2003, 2011, 2015, 2019, 2020, 2022, 2025), and the preset is ~14 % invested. That whole-window read is superseded BY PERIOD: s0 was 1.30× SPY at end-2024 and 0.90× by mid-2026. 2025–26 UP days: SPY +23.1 % vs −19.9 % (53 % exposure). There were 36 stop exits with 4 winners (−$2.11M); AD −29 % and TNXP −25 % gapped through ~5 % stops (−$564k). MMYT's +$1.1M realised in 2025 had already been marked in 2024. 2018–23 eroded 1.91 → 1.07 inside UP regimes. Equal-weight benchmark (RSP/IWM) not yet in the data store ([[feedback-exposure-vs-market-condition]]).
 
 **10-03 recovery re-entry gap:** the local-range anchor (4/13/26 w) dilutes the investor preset 6/6 (5d + 5r); the 2009 gap on THIS preset is `No_structural_stop` skips (floor > 15 % away after a crash), and filled recovery entries whipsaw. Base-bounded anchor ruled out by screen; 2025 lag = picks. See [[project_recovery_reentry_gap]].
+
+**10-07 MATCHED-BASIS CORRECTION (PR #3178, `dev/experiments/total-return-26y-2026-10-06/results-2026-10-07.md`): the "CAGR < SPY / trails SPY on exposure" readings above (10-01, 10-02) compared this price-only sim with SPY TOTAL return — superseded.** Matched: price-only tr0 CAGR 7.76/6.28/7.75 % vs SPY price 6.31 %; total-return tr1 (cash yield + dividends) 9.40/9.07/9.81 % vs SPY TR 8.20 %, Calmar 0.41/0.39/0.41 vs 0.15, DD 23 % (vs 31 % price-only). End ratio 1.34/1.24/1.48× SPY TR (was "0.90×" mismatched). The 2009 sit-out and 2025–26 "holdings lagged in UP regimes" diagnoses survive on the TR basis. See [[project_sim_price_only_accounting]].
+
+**Update 2026-10-09 (rebaseline-v12, PR #3219), now the record.** v12 lists + v12 warehouse + `split_dividend_guard` + dividends + DTB3 − 10 bp cash; 26y, 3 salts (rb1):
+- CAGR 8.88 / 8.73 / 8.69 % vs SPY total return 8.20 %.
+- Max DD 22.5 / 22.2 / 22.2 % vs 55.2 %; Calmar 0.39 vs 0.15; excess Sharpe 0.54 / 0.53 / 0.53 vs 0.41.
+- The v11 TR CAGR of 9.1–9.8 % is superseded. The CAGR margin is thin; the drawdown and Calmar edge is robust (three separate ~21 % episodes).
+- 2025–26 is picks: UP-regime days −19.8 % vs SPY +22.8 % at 62 % invested.
+- Price-only rb0 vs SPY price: 7.5–8.0 % vs 6.31 %.

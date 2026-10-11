@@ -1,0 +1,130 @@
+{
+  "run_id": "local-2026-10-11",
+  "timestamp": "2026-10-11T07:16:44Z",
+  "commit_sha": "3f75baae48ad10786a7e7cfeb87881b2a21cd90d",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 32,
+    "output_tokens": 410,
+    "cache_read_input_tokens": 2329549,
+    "cache_creation_input_tokens": 184101,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-10-11",
+    "source": "local-transcripts",
+    "generated_at": "2026-10-11T07:16:44Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-10-11",
+      "until": "2026-10-11"
+    },
+    "totals": {
+      "dispatches": 1,
+      "sessions": 0,
+      "resumes": 1,
+      "api_calls": 16,
+      "input_tokens": 32,
+      "output_tokens": 410,
+      "cache_read_input_tokens": 2329549,
+      "cache_creation_input_tokens": 184101,
+      "subagent_tokens": 2514092,
+      "main_tokens": 0,
+      "by_model": {
+        "claude-opus-5-5": {
+          "api_calls": 16,
+          "input_tokens": 32,
+          "output_tokens": 410,
+          "cache_read_input_tokens": 2329549,
+          "cache_creation_input_tokens": 184101
+        }
+      }
+    },
+    "context_histogram": {
+      "calls": 0,
+      "p50": 0,
+      "p90": 0,
+      "max": 0,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 0,
+      "share_above_threshold_pct": 0,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "50-100k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "100-150k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "150-200k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "200-300k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "300-500k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "0bdb1704-90a7-4760-bb6e-40335d5259c0",
+        "agent_id": "af7c3a8b00599d223",
+        "agent_type": "qc-results",
+        "description": "qc-results on PR 3237",
+        "ref": "",
+        "date": "2026-10-11",
+        "wall_seconds": 98,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 16,
+            "input_tokens": 32,
+            "output_tokens": 410,
+            "cache_read_input_tokens": 2329549,
+            "cache_creation_input_tokens": 184101
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 32,
+        "output_tokens": 410,
+        "cache_read_input_tokens": 2329549,
+        "cache_creation_input_tokens": 184101
+      }
+    ],
+    "sessions": []
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}
