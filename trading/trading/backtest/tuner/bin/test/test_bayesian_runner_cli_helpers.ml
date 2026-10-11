@@ -23,6 +23,50 @@ let test_parse_args_defaults _ =
          field
            (fun (a : Cli.cli_args) -> a.fixtures_root)
            (equal_to (None : string option));
+         field
+           (fun (a : Cli.cli_args) -> a.walk_forward_spec_path)
+           (equal_to (None : string option));
+         field
+           (fun (a : Cli.cli_args) -> a.baseline_aggregate_path)
+           (equal_to (None : string option));
+       ])
+
+let test_parse_args_all_flags _ =
+  assert_that
+    (Cli.parse_args
+       [
+         "--spec";
+         "s.sexp";
+         "--out-dir";
+         "o";
+         "--parallel";
+         "4";
+         "--walk-forward-spec";
+         "wf.sexp";
+         "--baseline-aggregate";
+         "agg.sexp";
+         "--fidelity-strategy";
+         "successive_halving";
+         "--fixtures-root";
+         "fx";
+       ])
+    (all_of
+       [
+         field (fun (a : Cli.cli_args) -> a.spec_path) (equal_to "s.sexp");
+         field (fun (a : Cli.cli_args) -> a.out_dir) (equal_to "o");
+         field (fun (a : Cli.cli_args) -> a.parallel) (equal_to 4);
+         field
+           (fun (a : Cli.cli_args) -> a.walk_forward_spec_path)
+           (equal_to (Some "wf.sexp"));
+         field
+           (fun (a : Cli.cli_args) -> a.baseline_aggregate_path)
+           (equal_to (Some "agg.sexp"));
+         field
+           (fun (a : Cli.cli_args) -> a.fidelity_strategy)
+           (equal_to Cli.Successive_halving);
+         field
+           (fun (a : Cli.cli_args) -> a.fixtures_root)
+           (equal_to (Some "fx"));
        ])
 
 let test_walk_forward_candidate_label _ =
@@ -38,7 +82,7 @@ let test_placeholder_scenario _ =
       seed = None;
       n_acquisition_candidates = None;
       objective = Spec.Sharpe;
-      scenarios = [];
+      scenarios = [ "a"; "b" ];
       holdout_folds = None;
       sentinel_bounds = None;
       length_scales = None;
@@ -48,8 +92,8 @@ let test_placeholder_scenario _ =
     }
   in
   assert_that
-    (Wf.wf_spec_with_placeholder_scenario spec)
-    (field (fun (s : Spec.t) -> s.scenarios) (equal_to [ "walk-forward" ]))
+    (Spec.sexp_of_t (Wf.wf_spec_with_placeholder_scenario spec))
+    (equal_to (Spec.sexp_of_t { spec with scenarios = [ "walk-forward" ] }))
 
 let test_load_aggregate_error_message _ =
   let path = "/nonexistent/aggregate.sexp" in
@@ -59,14 +103,18 @@ let test_load_aggregate_error_message _ =
       ""
     with Failure m -> m
   in
-  assert_that msg
-    (contains_substring
-       ("bayesian_runner: failed to load aggregate.sexp " ^ path ^ ": "))
+  let expected_prefix =
+    "bayesian_runner: failed to load aggregate.sexp " ^ path ^ ": "
+  in
+  assert_that
+    (String.prefix msg (String.length expected_prefix))
+    (equal_to expected_prefix)
 
 let suite =
   "bayesian_runner_cli_helpers"
   >::: [
          "parse_args defaults" >:: test_parse_args_defaults;
+         "parse_args all flags" >:: test_parse_args_all_flags;
          "walk_forward_candidate_label" >:: test_walk_forward_candidate_label;
          "placeholder scenario" >:: test_placeholder_scenario;
          "load_aggregate error message" >:: test_load_aggregate_error_message;
