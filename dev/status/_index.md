@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-09 run 2 (orchestrator — see `dev/daily/2026-10-09-run2.md`). Queue at start: empty.
-Run 2: harness #3231 + #3232, cleanup #3233 merged (run 1: #3221 #3226 #3228 #3229).
+Last updated: 2026-10-11 (orchestrator — see `dev/daily/2026-10-11.md`). Queue at start: 3 (#3244 #3236 #3235).
+10-11: #3244, #3235, #3236 merged; both 10-10 runs failed (is_error, no summary).
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-09 run2: #3231 flag-drift usage pin + #3232 START_DATE P3c pin MERGED; next: H-AUDIT-20D-ONELINE-FN-ALIAS |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-11: #3236 audit-test ABORT trap + 20d one-line alias MERGED (rework 1/2); next: top open T1/T3 item |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | bayesian_runner.ml split MERGED #3233 (429→256, exception removed); next: delete its dead duplicate label constants |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-11: dead label constants removed #3235; next: bayesian tuner bin test_gap (parse_args / wf helpers) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

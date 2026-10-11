@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-11",
+  "feature": "cleanup-bayes-cli-dead-labels",
+  "branch": "cleanup/bayes-cli-dead-labels",
+  "sha": "5309e3d525306055f42ec90b7168a42337d4d7dd",
+  "recorded_at_ns": 1791729271469599137,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
