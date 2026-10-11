@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-11",
+  "feature": "harness-audit-trap-exit-mask",
+  "branch": "harness/audit-trap-exit-mask",
+  "sha": "a584283a05da9cddfdb109298db66dce173b86b2",
+  "recorded_at_ns": 1791748942729286145,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

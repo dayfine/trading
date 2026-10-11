@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-11",
+  "feature": "cleanup-tuner-cli-flag-tests",
+  "branch": "cleanup/tuner-cli-flag-tests",
+  "sha": "8938793c4359c0c6018feb57e39c3174d2ecef45",
+  "recorded_at_ns": 1791748942762230482,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
