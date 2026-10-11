@@ -1547,17 +1547,21 @@ _run_trap_fixture_20g '(exit 7)'
 RC_ABORT_20G="${FIX_RC_20G}"; ERR_ABORT_20G="${FIX_ERR_20G}"
 _run_trap_fixture_20g 'SUMMARY_REACHED=1; (exit 5)'
 RC_POST_20G="${FIX_RC_20G}"; ERR_POST_20G="${FIX_ERR_20G}"
+_run_trap_fixture_20g 'FAIL_COUNT=1; (exit 7)'
+RC_TALLY_20G="${FIX_RC_20G}"; ERR_TALLY_20G="${FIX_ERR_20G}"
 rm -rf "${FIX_20G}"
 if [[ "${RC_ABORT_20G}" == "7" ]] \
    && [[ "${ERR_ABORT_20G}" == *"ABORT: record_qc_audit_test died rc=7 during scenario [# Scenario 77"* ]] \
    && [[ "${RC_POST_20G}" == "5" ]] \
-   && [[ "${ERR_POST_20G}" != *"ABORT"* ]]; then
+   && [[ "${ERR_POST_20G}" != *"ABORT"* ]] \
+   && [[ "${RC_TALLY_20G}" == "7" ]] \
+   && [[ "${ERR_TALLY_20G}" == *"ABORT: record_qc_audit_test died rc=7"* ]]; then
   pass "scenario 20g — EXIT trap names the aborting scenario via _scenario_header_at, preserves the original exit code, and stays silent after the summary starts"
 else
-  fail "scenario 20g — abort rc=${RC_ABORT_20G} (want 7) err='${ERR_ABORT_20G}'; post-summary rc=${RC_POST_20G} (want 5) err='${ERR_POST_20G}'"
+  fail "scenario 20g — abort rc=${RC_ABORT_20G} (want 7) err='${ERR_ABORT_20G}'; post-summary rc=${RC_POST_20G} (want 5) err='${ERR_POST_20G}'; tallied-FAIL abort rc=${RC_TALLY_20G} (want 7) err='${ERR_TALLY_20G}'"
 fi
 # ---------------------------------------------------------------------------
-# Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND,the `cp -p` preservation copy's
+# Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
 # OWN failure-safety claim (added on QC rework, PR #2266): the comment
 # directly above the `cp -p "$OUTPUT_FILE" "$PRESERVED_FILE"` call in
 # write_audit.sh says that if this copy fails under `set -euo pipefail`,
@@ -4243,6 +4247,9 @@ if ! _derived_scenario_report "${SELF_FILE}" "$(( PASS_COUNT + FAIL_COUNT ))"; t
 fi
 
 if (( FAIL_COUNT > 0 )); then
+  # Swap in a cleanup-only EXIT trap so the failing rc cannot be masked by
+  # _on_exit (e.g. a stray `exit 0` there); pinned by a mutation check (H-AUDIT-TRAP-EXIT-MASK).
+  trap 'rm -rf "${TMP_REPO:-}"' EXIT
   exit 1
 fi
 exit 0
