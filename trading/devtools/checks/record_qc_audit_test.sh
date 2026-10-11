@@ -33,7 +33,43 @@ fi
 # write_audit.sh writes the audit JSON to dev/audit/. We don't want test runs
 # to pollute that dir; the test uses a temp REPO_ROOT override.
 TMP_REPO="$(mktemp -d -t record_qc_audit_test.XXXXXX)"
-trap 'rm -rf "${TMP_REPO}"' EXIT
+# Abort diagnostics (H-AUDIT-TEST-SILENT-ABORT-FLAKE): under `set -e` a failing
+# command used to kill this script with no output (seen once in a full parallel
+# `dune runtest`, cut off after "PASS: scenario 12"). The ERR trap records the
+# failing line + command; the EXIT trap, on a non-zero exit with no tallied
+# FAIL (i.e. an abort rather than an ordinary assertion failure), names the
+# scenario in progress (nearest "# Scenario" header above that line) and the
+# last PASS/FAIL label printed.
+set -E
+ABORT_LINE=""
+ABORT_CMD=""
+LAST_LABEL="(none yet)"
+# SUMMARY_REACHED flips to 1 once the final summary starts; a non-zero exit
+# before that point is an abort even if some FAIL was already tallied. A
+# `set -u` abort has no ERR-trap line, so it prints "[unknown] at line ?".
+SUMMARY_REACHED=0
+# _scenario_header_at <file> <line>: the nearest REAL scenario header at or
+# above <line>. Anchored to the capitalised "# Scenario <n>" shape: lowercase
+# "# scenario 27 pinned ..." appears mid-comment prose in several scenarios
+# (7d, 17, 30, 48, 50) and must not be taken as a header. Pinned by 20f.
+_scenario_header_at() {
+  awk -v n="$2" 'NR<=n && /^# Scenario [0-9]/ {h=$0} END{print h}' "$1" | cut -c1-80
+}
+_on_err() { ABORT_LINE="$1"; ABORT_CMD="$2"; }
+trap '_on_err "${LINENO}" "${BASH_COMMAND}"' ERR
+# The trap never calls `exit`, so the original rc is preserved.
+_on_exit() {
+  local rc=$?
+  if (( rc != 0 )) && (( SUMMARY_REACHED == 0 )); then
+    local hdr="unknown"
+    if [[ -n "${ABORT_LINE}" ]]; then
+      hdr="$(_scenario_header_at "${SCRIPT_DIR}/record_qc_audit_test.sh" "${ABORT_LINE}")"
+    fi
+    echo "ABORT: record_qc_audit_test died rc=${rc} during scenario [${hdr}] at line ${ABORT_LINE:-?} running: ${ABORT_CMD:-?}; last labelled result: ${LAST_LABEL}" >&2
+  fi
+  rm -rf "${TMP_REPO:-}"
+}
+trap _on_exit EXIT
 
 mkdir -p "${TMP_REPO}/dev/reviews" "${TMP_REPO}/dev/audit" \
          "${TMP_REPO}/trading/devtools/checks" "${TMP_REPO}/.claude"
@@ -50,8 +86,8 @@ chmod +x "${TMP_REPO}/trading/devtools/checks/"*.sh
 
 PASS_COUNT=0
 FAIL_COUNT=0
-pass() { echo "  PASS: $*"; PASS_COUNT=$(( PASS_COUNT + 1 )); }
-fail() { echo "  FAIL: $*" >&2; FAIL_COUNT=$(( FAIL_COUNT + 1 )); }
+pass() { LAST_LABEL="PASS: ${1:0:40}"; echo "  PASS: $*"; PASS_COUNT=$(( PASS_COUNT + 1 )); }
+fail() { LAST_LABEL="FAIL: ${1:0:40}"; echo "  FAIL: $*" >&2; FAIL_COUNT=$(( FAIL_COUNT + 1 )); }
 
 # report_conjuncts <label1> <ok1> [<label2> <ok2> ...]
 #
@@ -1401,26 +1437,84 @@ fi
 # `|| true` guards mirror scenario 24 (grep exit 1 on no match must not abort
 # under set -euo pipefail).
 # ---------------------------------------------------------------------------
+# _rm_count_20d <code-only-text>: prints "<mv-line|none> <rm-count>".
+# A one-line function body (`f() { local v="$OUTPUT_FILE"; rm -f "$v"; }`)
+# is handled by stripping a leading `name() {` from each `;`-split statement
+# before matching the alias assignment (H-AUDIT-20D-ONELINE-FN-ALIAS).
+# Known false-FAIL, deliberately left: `rm -f "$OUTPUT_FILE.tmp"` (a different
+# file) matches, since `.` is a non-identifier char after the variable name;
+# excluding `.` would also hide `rm "$OUTPUT_FILE.json"`-style typos, so it
+# is not trivially safe. Alias-of-alias is out of scope.
+_rm_count_20d() {
+  local code="$1" mv_line pre aliases targets cnt
+  mv_line="$(printf '%s\n' "${code}" | grep -n 'mv -f "\$TMP_FILE" "\$OUTPUT_FILE"' | head -1 | cut -d: -f1 || true)"
+  cnt=0
+  if [[ -n "${mv_line}" ]]; then
+    pre="$(printf '%s\n' "${code}" | head -n "${mv_line}")"
+    # Simple aliases: NAME="$OUTPUT_FILE" / NAME=$OUTPUT_BASENAME /
+    # NAME="$AUDIT_DIR/$OUTPUT_BASENAME" (optional `local`).
+    aliases="$(printf '%s\n' "${pre}" | tr ';' '\n' \
+      | sed -E 's/^[[:space:]]*(function[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*[[:space:]]*(\(\))?[[:space:]]*\{[[:space:]]*//' \
+      | sed -nE 's/^[[:space:]]*(local[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)="?(\$\{?AUDIT_DIR\}?\/)?\$\{?OUTPUT_(FILE|BASENAME)\}?"?[[:space:]]*$/\2/p' \
+      | tr '\n' '|' | sed 's/|$//')"
+    targets='OUTPUT_FILE|OUTPUT_BASENAME'
+    [ -n "${aliases}" ] && targets="${targets}|${aliases}"
+    cnt="$(printf '%s\n' "${pre}" \
+      | grep -cE "(^|[^[:alnum:]_])(rm|unlink)[[:space:]].*\\$\\{?(${targets})([^[:alnum:]_]|\$)" || true)"
+    [ -z "${cnt}" ] && cnt=0
+  fi
+  echo "${mv_line:-none} ${cnt}"
+}
 CODE_ONLY_20D="$(sed -E 's/^[[:space:]]*#.*$//' "${WRITE_AUDIT}" 2>/dev/null)" || true
-MV_LINE_20D="$(printf '%s\n' "${CODE_ONLY_20D}" | grep -n 'mv -f "\$TMP_FILE" "\$OUTPUT_FILE"' | head -1 | cut -d: -f1 || true)"
-RM_OUT_COUNT_20D=0
-if [[ -n "${MV_LINE_20D}" ]]; then
-  PRE_MV_20D="$(printf '%s\n' "${CODE_ONLY_20D}" | head -n "${MV_LINE_20D}")"
-  # Simple aliases: NAME="$OUTPUT_FILE" / NAME=$OUTPUT_BASENAME /
-  # NAME="$AUDIT_DIR/$OUTPUT_BASENAME" (optional `local`).
-  ALIASES_20D="$(printf '%s\n' "${PRE_MV_20D}" | tr ';' '\n' \
-    | sed -nE 's/^[[:space:]]*(local[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)="?(\$\{?AUDIT_DIR\}?\/)?\$\{?OUTPUT_(FILE|BASENAME)\}?"?[[:space:]]*$/\2/p' \
-    | tr '\n' '|' | sed 's/|$//')"
-  TARGETS_20D='OUTPUT_FILE|OUTPUT_BASENAME'
-  [ -n "${ALIASES_20D}" ] && TARGETS_20D="${TARGETS_20D}|${ALIASES_20D}"
-  RM_OUT_COUNT_20D="$(printf '%s\n' "${PRE_MV_20D}" \
-    | grep -cE "(^|[^[:alnum:]_])(rm|unlink)[[:space:]].*\\$\\{?(${TARGETS_20D})([^[:alnum:]_]|\$)" || true)"
-  [ -z "${RM_OUT_COUNT_20D}" ] && RM_OUT_COUNT_20D=0
-fi
+read -r MV_LINE_20D RM_OUT_COUNT_20D <<<"$(_rm_count_20d "${CODE_ONLY_20D}")"
+[[ "${MV_LINE_20D}" == "none" ]] && MV_LINE_20D=""
 if [[ -n "${CODE_ONLY_20D}" ]] && [[ -n "${MV_LINE_20D}" ]] && (( RM_OUT_COUNT_20D == 0 )); then
   pass "scenario 20d — no rm/unlink of \$OUTPUT_FILE precedes the publish mv (no window where the record is absent; H-AUDIT-RM-THEN-MV-UNPINNED)"
 else
   fail "scenario 20d — expected publish mv line present and zero rm/unlink targeting \$OUTPUT_FILE / \$OUTPUT_BASENAME / a local alias at or before it; got mv_line=${MV_LINE_20D}, rm_count=${RM_OUT_COUNT_20D}"
+fi
+# ---------------------------------------------------------------------------
+# Scenario 20e — H-AUDIT-20D-ONELINE-FN-ALIAS: fixture-pins the 20d detector
+# itself (it only ever ran against the real, clean write_audit.sh, so a
+# detector blind spot was invisible). Three synthetic scripts: the one-line
+# function alias form and the multi-line form must each be flagged (count
+# >= 1); a clean script must not (count 0).
+# ---------------------------------------------------------------------------
+FIX_ONELINE_20E='f() { local v="${OUTPUT_FILE}"; rm -f "${v}"; }
+mv -f "$TMP_FILE" "$OUTPUT_FILE"'
+FIX_MULTI_20E='f() {
+  local v="${OUTPUT_FILE}"
+  rm -f "${v}"
+}
+mv -f "$TMP_FILE" "$OUTPUT_FILE"'
+FIX_CLEAN_20E='f() { local v="${TMP_FILE}"; rm -f "${v}"; }
+mv -f "$TMP_FILE" "$OUTPUT_FILE"'
+read -r _ CNT_ONELINE_20E <<<"$(_rm_count_20d "${FIX_ONELINE_20E}")"
+read -r _ CNT_MULTI_20E <<<"$(_rm_count_20d "${FIX_MULTI_20E}")"
+read -r _ CNT_CLEAN_20E <<<"$(_rm_count_20d "${FIX_CLEAN_20E}")"
+if (( CNT_ONELINE_20E >= 1 )) && (( CNT_MULTI_20E >= 1 )) && (( CNT_CLEAN_20E == 0 )); then
+  pass "scenario 20e — 20d detector flags one-line and multi-line function-local aliases of \$OUTPUT_FILE and passes a clean fixture (H-AUDIT-20D-ONELINE-FN-ALIAS)"
+else
+  fail "scenario 20e — expected counts oneline>=1, multiline>=1, clean==0; got ${CNT_ONELINE_20E}/${CNT_MULTI_20E}/${CNT_CLEAN_20E}"
+fi
+# ---------------------------------------------------------------------------
+# Scenario 20f — ABORT-header lookup pin: _scenario_header_at must return the
+# capitalised real header for a line inside a scenario whose body contains
+# lowercase "# scenario N" prose (scenario 30), and for the header's own line.
+# ---------------------------------------------------------------------------
+SELF_20F="${SCRIPT_DIR}/record_qc_audit_test.sh"
+H30_LINE_20F="$(grep -n '^# Scenario 30 ' "${SELF_20F}" | head -1 | cut -d: -f1)"
+PROSE_LINE_20F="$(grep -n '^# scenario 27 pinned' "${SELF_20F}" | head -1 | cut -d: -f1)"
+H_OWN_20F="$(_scenario_header_at "${SELF_20F}" "${H30_LINE_20F:-1}")"
+H_PROSE_20F="$(_scenario_header_at "${SELF_20F}" "${PROSE_LINE_20F:-1}")"
+H_AFTER_20F="$(_scenario_header_at "${SELF_20F}" "$(( ${PROSE_LINE_20F:-1} + 1 ))")"
+if [[ -n "${H30_LINE_20F}" && -n "${PROSE_LINE_20F}" ]] \
+   && [[ "${H_OWN_20F}" == "# Scenario 30 "* ]] \
+   && [[ "${H_PROSE_20F}" == "# Scenario "* ]] \
+   && [[ "${H_AFTER_20F}" == "# Scenario "* ]]; then
+  pass "scenario 20f — _scenario_header_at returns a capitalised real header on and after lowercase-prose lines (ABORT scenario naming)"
+else
+  fail "scenario 20f — expected real '# Scenario' headers; got own='${H_OWN_20F}' prose='${H_PROSE_20F}' after='${H_AFTER_20F}' (h30=${H30_LINE_20F:-none} prose_line=${PROSE_LINE_20F:-none})"
 fi
 # ---------------------------------------------------------------------------
 # Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
@@ -4092,6 +4186,7 @@ fi
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
+SUMMARY_REACHED=1
 echo ""
 echo "record_qc_audit_test: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
 
