@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-11 (orchestrator — see `dev/daily/2026-10-11.md`). Queue at start: 3 (#3244 #3236 #3235).
-10-11: #3244, #3235, #3236 merged; both 10-10 runs failed (is_error, no summary).
+Last updated: 2026-10-11 (orchestrator run 2 — see `dev/daily/2026-10-11-run2.md`). Queue at start: 0.
+10-11: #3244, #3235, #3236 merged (run 1); #3246, #3247, #3248, #3249 merged (run 2). Both 10-10 runs failed (is_error, no summary).
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-11: #3236 audit-test ABORT trap + 20d one-line alias MERGED (rework 1/2); next: top open T1/T3 item |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-11: audit-test trap pins #3246 + exit-mask #3248 MERGED; next: H-AUDIT-TRAP-SWAP-UNPINNED or top open T1/T3 item |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-11: dead label constants removed #3235; next: bayesian tuner bin test_gap (parse_args / wf helpers) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-11: tuner bin CLI tests #3247 + #3249 MERGED; next: twin_match_stats Levels epsilon test_gap |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

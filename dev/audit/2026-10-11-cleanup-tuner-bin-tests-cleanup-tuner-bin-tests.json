@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-11",
+  "feature": "cleanup-tuner-bin-tests",
+  "branch": "cleanup/tuner-bin-tests",
+  "sha": "51035b86d1eef848b00950c77ad567ea23b4f76d",
+  "recorded_at_ns": 1791745113068537677,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
