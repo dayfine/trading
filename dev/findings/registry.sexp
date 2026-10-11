@@ -312,3 +312,11 @@
          (unit ("trading/trading/backtest/test/test_trade_context.ml"
                 "short gap-through labelled gap_up"))))
  (status fixed))
+
+((issue 3238) (ref "shorts Phase B reading #3237: A-D Momentum Index constant -11.0 before 2017")
+ (finding "committed NYSE breadth fixture held one 1965 row then 2017+, and Ad_bars.load filled only the tail, so 26y runs had no A-D breadth 2000-2016")
+ (guard ((unit ("trading/trading/weinstein/strategy/test/test_ad_bars_fixture.ml"
+                "fixture: composed breadth has no gap over 1998-2020"))
+         (unit ("trading/trading/weinstein/strategy/test/test_ad_bars_compose.ml"
+                "compose: Synthetic fills an interior Unicorn gap"))))
+ (status fixed))

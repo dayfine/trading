@@ -4,6 +4,7 @@
   test_ad_series_cache
   test_ad_bars_unicorn
   test_ad_bars_compose
+  test_ad_bars_fixture
   test_ad_bars_weekly_e2e
   test_bar_reader
   test_cascade_trace
@@ -114,5 +115,8 @@
   async
   ounit2
   matchers)
+ ; test_ad_bars_fixture reads the committed breadth fixture (issue #3238).
+ (deps
+  (glob_files %{workspace_root}/test_data/breadth/*.csv))
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))

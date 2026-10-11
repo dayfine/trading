@@ -175,19 +175,29 @@
 
 
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
-  ((total_return_pct ((min 345.1137) (max 466.9185)))
-   (total_trades ((min 567.8000) (max 768.2000)))
-   (win_rate ((min 27.9940) (max 37.8743)))
-   (sharpe_ratio ((min 0.3541) (max 0.4790)))
-   (max_drawdown_pct ((min 67.2212) (max 90.9463)))
-   (avg_holding_days ((min 52.9329) (max 71.6150)))
+  ;; RE-PINNED 2026-10-11 for the breadth-fixture fix (#3238): the committed
+  ;; NYSE A-D fixture held one 1965 row then 2017+, so 2009-2016 (warmup + the
+  ;; first 7 years) ran with no A-D breadth (frozen A-D macro votes). Paired by
+  ;; hand, same base eda54e591, old fixture vs full Unicorn archive:
+  ;;   old: ret 406.02  trades 668  win 32.93  sharpe 0.417  maxDD 79.08
+  ;;        (= the 2026-09-03 pin centre)
+  ;;   new: ret 675.00  trades 621  win 36.07  sharpe 0.470  maxDD 79.08
+  ;;        hold 64.38  OPV 1,884,056  sortino 0.535  calmar 0.169  ulcer 33.00
+  ;; ±15% around the new actual. Correctness re-pin of a data defect: no
+  ;; return claim attaches to the delta.
+  ((total_return_pct ((min 573.7523) (max 776.2531)))
+   (total_trades ((min 527.8500) (max 714.1500)))
+   (win_rate ((min 30.6602) (max 41.4815)))
+   (sharpe_ratio ((min 0.3997) (max 0.5408)))
+   (max_drawdown_pct ((min 67.2214) (max 90.9466)))
+   (avg_holding_days ((min 54.7203) (max 74.0333)))
    ;; OPV re-pinned ~2.18M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): $1M-ADV entry gate + stale-exit 5d
    ;; lighten the terminal book. Headline metrics stayed in-band (ret 387.5 /
    ;; 784 / Sharpe 0.777 / DD 21.35). Was ~3.76M pre-flip.
-   (open_positions_value ((min 1467314.9225) (max 1985190.7775)))
-   (sortino_ratio_annualized ((min 0.3587) (max 0.4853)))
-   (calmar_ratio ((min 0.1122) (max 0.1518)))
-   (ulcer_index ((min 28.4961) (max 38.5536)))
+   (open_positions_value ((min 1601447.8805) (max 2166664.7795)))
+   (sortino_ratio_annualized ((min 0.4544) (max 0.6147)))
+   (calmar_ratio ((min 0.1436) (max 0.1943)))
+   (ulcer_index ((min 28.0478) (max 37.9470)))
    ;; Wall floor lowered 600→100, then floored at 0 per #2547 (a min guards nothing; the 364 run measured ~391s locally).
    (wall_seconds       ((min 0.0)           (max 2400.0))))))

@@ -217,6 +217,136 @@ let test_load_real_data_composed _ =
   assert_that unique_count (equal_to (List.length dates))
 
 (* ------------------------------------------------------------------ *)
+(* Interior-gap fill (issue #3238)                                      *)
+(* ------------------------------------------------------------------ *)
+
+let _bar date advancing declining : Macro.ad_bar =
+  { Macro.date = date_of_string date; advancing; declining }
+
+(* Unicorn: 1965-03-01, then 2017-01-02 and 2017-01-03 — the shape of the old
+   fixture. Synthetic covers 1998-01-05, 1998-01-06 (inside the hole), 1964-12-31
+   (before Unicorn starts) and 2017-01-03 (overlap). *)
+let test_compose_fills_interior_gap _ =
+  with_breadth_files
+    ~unicorn_advn:(Some "19650301, 550\n20170102, 1360\n20170103, 2308\n")
+    ~unicorn_decln:(Some "19650301, 400\n20170102, 1600\n20170103, 700\n")
+    ~synthetic_advn:
+      (Some "19641231, 1\n19980105, 184\n19980106, 112\n20170103, 9999\n")
+    ~synthetic_decln:
+      (Some "19641231, 2\n19980105, 120\n19980106, 190\n20170103, 8888\n")
+    (fun data_dir ->
+      assert_that
+        (Weinstein_strategy.Ad_bars.load ~data_dir)
+        (elements_are
+           [
+             equal_to (_bar "1965-03-01" 550 400);
+             equal_to (_bar "1998-01-05" 184 120);
+             equal_to (_bar "1998-01-06" 112 190);
+             equal_to (_bar "2017-01-02" 1360 1600);
+             equal_to (_bar "2017-01-03" 2308 700);
+           ]))
+
+(* A Unicorn hole exactly at the threshold (2001-09-10 -> 2001-09-17, 7 days)
+   is a real market closure and stays unfilled; Synthetic bars inside it are
+   dropped. *)
+let test_compose_leaves_hole_at_threshold _ =
+  with_breadth_files ~unicorn_advn:(Some "20010910, 1000\n20010917, 500\n")
+    ~unicorn_decln:(Some "20010910, 900\n20010917, 2500\n")
+    ~synthetic_advn:(Some "20010912, 7\n")
+    ~synthetic_decln:(Some "20010912, 8\n") (fun data_dir ->
+      assert_that
+        (Weinstein_strategy.Ad_bars.load ~data_dir)
+        (elements_are
+           [
+             equal_to (_bar "2001-09-10" 1000 900);
+             equal_to (_bar "2001-09-17" 500 2500);
+           ]))
+
+(* The threshold is configurable: with [load_with ~max_interior_gap_days:3] the
+   same 7-day hole is filled. *)
+let test_load_with_custom_threshold_fills _ =
+  with_breadth_files ~unicorn_advn:(Some "20010910, 1000\n20010917, 500\n")
+    ~unicorn_decln:(Some "20010910, 900\n20010917, 2500\n")
+    ~synthetic_advn:(Some "20010912, 7\n")
+    ~synthetic_decln:(Some "20010912, 8\n") (fun data_dir ->
+      assert_that
+        (Weinstein_strategy.Ad_bars.load_with ~max_interior_gap_days:3 ~data_dir)
+        (elements_are
+           [
+             equal_to (_bar "2001-09-10" 1000 900);
+             equal_to (_bar "2001-09-12" 7 8);
+             equal_to (_bar "2001-09-17" 500 2500);
+           ]))
+
+(* ------------------------------------------------------------------ *)
+(* Gap detection                                                        *)
+(* ------------------------------------------------------------------ *)
+
+let _d = date_of_string
+
+let _gap_bars =
+  [
+    _bar "2000-01-03" 1 1;
+    _bar "2000-01-04" 1 1;
+    _bar "2000-01-20" 1 1;
+    _bar "2000-01-21" 1 1;
+    _bar "2000-03-01" 1 1;
+  ]
+
+let test_gaps_reports_wide_holes_in_order _ =
+  assert_that
+    (Weinstein_strategy.Ad_bars.gaps _gap_bars ~max_gap_days:14)
+    (equal_to
+       [
+         (_d "2000-01-04", _d "2000-01-20"); (_d "2000-01-21", _d "2000-03-01");
+       ])
+
+let test_gaps_exact_threshold_not_reported _ =
+  (* 2000-01-04 -> 2000-01-20 is 16 days: reported at 15, not at 16. *)
+  assert_that
+    ( Weinstein_strategy.Ad_bars.gaps _gap_bars ~max_gap_days:15,
+      Weinstein_strategy.Ad_bars.gaps _gap_bars ~max_gap_days:40 )
+    (equal_to
+       ( [
+           (_d "2000-01-04", _d "2000-01-20"); (_d "2000-01-21", _d "2000-03-01");
+         ],
+         [] ))
+
+let test_gaps_short_series _ =
+  assert_that
+    ( Weinstein_strategy.Ad_bars.gaps [] ~max_gap_days:1,
+      Weinstein_strategy.Ad_bars.gaps [ _bar "2000-01-03" 1 1 ] ~max_gap_days:1
+    )
+    (equal_to ([], []))
+
+let test_gaps_in_window_edges_and_clip _ =
+  (* Window 1999-12-01 .. 2000-02-01: leading sentinel gap to the first bar,
+     the interior hole, and a trailing gap to the end sentinel; the March bar
+     is outside the window. *)
+  assert_that
+    (Weinstein_strategy.Ad_bars.gaps_in_window _gap_bars
+       ~start_date:(_d "1999-12-01") ~end_date:(_d "2000-02-01") ~max_gap_days:7)
+    (equal_to
+       [
+         (_d "1999-12-01", _d "2000-01-03");
+         (_d "2000-01-04", _d "2000-01-20");
+         (_d "2000-01-21", _d "2000-02-01");
+       ])
+
+let test_gaps_in_window_empty_series _ =
+  assert_that
+    (Weinstein_strategy.Ad_bars.gaps_in_window [] ~start_date:(_d "2000-01-01")
+       ~end_date:(_d "2000-12-31") ~max_gap_days:14)
+    (equal_to [ (_d "2000-01-01", _d "2000-12-31") ])
+
+let test_gaps_in_window_covered _ =
+  assert_that
+    (Weinstein_strategy.Ad_bars.gaps_in_window _gap_bars
+       ~start_date:(_d "2000-01-03") ~end_date:(_d "2000-01-04")
+       ~max_gap_days:14)
+    is_empty
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -235,6 +365,23 @@ let suite =
          "Synthetic.load returns [] for missing files"
          >:: test_synthetic_load_missing_files;
          "real data: composed result is valid" >:: test_load_real_data_composed;
+         "compose: Synthetic fills an interior Unicorn gap"
+         >:: test_compose_fills_interior_gap;
+         "compose: hole at the threshold stays unfilled"
+         >:: test_compose_leaves_hole_at_threshold;
+         "load_with: custom threshold fills the hole"
+         >:: test_load_with_custom_threshold_fills;
+         "gaps: wide holes reported in order"
+         >:: test_gaps_reports_wide_holes_in_order;
+         "gaps: hole equal to threshold not reported"
+         >:: test_gaps_exact_threshold_not_reported;
+         "gaps: empty and single-bar series" >:: test_gaps_short_series;
+         "gaps_in_window: edge sentinels and clipping"
+         >:: test_gaps_in_window_edges_and_clip;
+         "gaps_in_window: empty series is one gap"
+         >:: test_gaps_in_window_empty_series;
+         "gaps_in_window: covered window has no gap"
+         >:: test_gaps_in_window_covered;
        ]
 
 let () = run_test_tt_main suite

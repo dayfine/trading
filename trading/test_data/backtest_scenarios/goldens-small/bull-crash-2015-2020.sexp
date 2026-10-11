@@ -80,10 +80,19 @@
   ;;   ret 48.72  trades 292  win 36.99  sharpe 0.562  maxDD 19.72  hold 42.25
   ;;   OPV 1,330,211  sortino 0.72  calmar 0.35  ulcer 6.68  force_liqs 0
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + notes in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips and the tier-2 nightly runs continue-on-error. Correctness re-pin: no return claim attaches to the delta.
-  ((total_return_pct ((min -14.9139) (max -4.9139)))
-   (total_trades ((min 199.7500) (max 270.2500)))
-   (win_rate ((min 24.2340) (max 32.7872)))
-   (sharpe_ratio ((min -0.0494) (max -0.0365)))
-   (max_drawdown_pct ((min 30.9459) (max 41.8680)))
-   (avg_holding_days ((min 48.9636) (max 66.2449)))
-   (open_positions_value ((min 549252.0225) (max 743105.6775))))))
+  ;; RE-PINNED 2026-10-11 for the breadth-fixture fix (#3238): the committed
+  ;; NYSE A-D fixture held one 1965 row then 2017+, so this window's warmup and
+  ;; 2015-2016 ran with no A-D breadth (frozen A-D macro votes). Paired by hand,
+  ;; same build base eda54e591, old fixture vs full Unicorn archive:
+  ;;   old: ret -9.91  trades 235  win 28.51 maxDD 36.41  (= the old pin centre)
+  ;;   new: ret 36.42  trades 210  win 31.43 maxDD 32.33  sharpe 0.420
+  ;;        hold 67.11  OPV 985,268.61
+  ;; ±15% around the new actual (total_return_pct: at least ±5pp). Correctness
+  ;; re-pin of a data defect: no return claim attaches to the delta.
+  ((total_return_pct ((min 30.9598) (max 41.8867)))
+   (total_trades ((min 178.5000) (max 241.5000)))
+   (win_rate ((min 26.7143) (max 36.1429)))
+   (sharpe_ratio ((min 0.3569) (max 0.4829)))
+   (max_drawdown_pct ((min 27.4831) (max 37.1831)))
+   (avg_holding_days ((min 57.0431) (max 77.1760)))
+   (open_positions_value ((min 837478.3185) (max 1133058.9015))))))
