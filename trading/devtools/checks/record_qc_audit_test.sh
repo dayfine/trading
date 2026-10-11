@@ -36,10 +36,13 @@ TMP_REPO="$(mktemp -d -t record_qc_audit_test.XXXXXX)"
 # Abort diagnostics (H-AUDIT-TEST-SILENT-ABORT-FLAKE): under `set -e` a failing
 # command used to kill this script with no output (seen once in a full parallel
 # `dune runtest`, cut off after "PASS: scenario 12"). The ERR trap records the
-# failing line + command; the EXIT trap, on a non-zero exit with no tallied
-# FAIL (i.e. an abort rather than an ordinary assertion failure), names the
-# scenario in progress (nearest "# Scenario" header above that line) and the
-# last PASS/FAIL label printed.
+# failing line + command; the EXIT trap, on any non-zero exit before the
+# final summary starts (SUMMARY_REACHED=0 -- even if some FAIL was already
+# tallied), reports an abort naming the scenario in progress (nearest
+# "# Scenario" header above that line) and the last PASS/FAIL label printed.
+# A non-zero exit after the summary starts is an ordinary assertion failure
+# and prints no ABORT line. The trap never exits itself, so the script's
+# original exit code is preserved (pinned by scenario 20g).
 set -E
 ABORT_LINE=""
 ABORT_CMD=""
@@ -1510,14 +1513,51 @@ H_PROSE_20F="$(_scenario_header_at "${SELF_20F}" "${PROSE_LINE_20F:-1}")"
 H_AFTER_20F="$(_scenario_header_at "${SELF_20F}" "$(( ${PROSE_LINE_20F:-1} + 1 ))")"
 if [[ -n "${H30_LINE_20F}" && -n "${PROSE_LINE_20F}" ]] \
    && [[ "${H_OWN_20F}" == "# Scenario 30 "* ]] \
-   && [[ "${H_PROSE_20F}" == "# Scenario "* ]] \
-   && [[ "${H_AFTER_20F}" == "# Scenario "* ]]; then
+   && [[ "${H_PROSE_20F}" == "# Scenario 30 "* ]] \
+   && [[ "${H_AFTER_20F}" == "# Scenario 30 "* ]]; then
   pass "scenario 20f — _scenario_header_at returns a capitalised real header on and after lowercase-prose lines (ABORT scenario naming)"
 else
   fail "scenario 20f — expected real '# Scenario' headers; got own='${H_OWN_20F}' prose='${H_PROSE_20F}' after='${H_AFTER_20F}' (h30=${H30_LINE_20F:-none} prose_line=${PROSE_LINE_20F:-none})"
 fi
 # ---------------------------------------------------------------------------
-# Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
+# Scenario 20g — ABORT-trap behavioural pin: extract the real trap block
+# (`set -E` .. `trap _on_exit EXIT`) from this file into a fixture script
+# that aborts under `set -e` at a line below a known "# Scenario 77" header.
+# Pins (a) _on_exit really calls _scenario_header_at (the ABORT line names
+# the fixture's scenario, not "unknown"), (b) the original exit code is
+# preserved through the trap, (c) no ABORT line once SUMMARY_REACHED=1.
+# ---------------------------------------------------------------------------
+FIX_20G="$(mktemp -d -t abort_trap_20g.XXXXXX)"
+_run_trap_fixture_20g() {
+  # $1 = statement(s) to run after the scenario header
+  {
+    echo '#!/usr/bin/env bash'
+    echo 'set -euo pipefail'
+    echo "SCRIPT_DIR='${FIX_20G}'"
+    echo "TMP_REPO='${FIX_20G}/tmprepo'"
+    echo 'mkdir -p "${TMP_REPO}"'
+    sed -n '/^set -E$/,/^trap _on_exit EXIT$/p' "${SELF_20F}"
+    echo '# Scenario 77 — trap fixture'
+    echo "$1"
+  } > "${FIX_20G}/record_qc_audit_test.sh"
+  FIX_RC_20G=0
+  FIX_ERR_20G="$(bash "${FIX_20G}/record_qc_audit_test.sh" 2>&1 >/dev/null)" || FIX_RC_20G=$?
+}
+_run_trap_fixture_20g '(exit 7)'
+RC_ABORT_20G="${FIX_RC_20G}"; ERR_ABORT_20G="${FIX_ERR_20G}"
+_run_trap_fixture_20g 'SUMMARY_REACHED=1; (exit 5)'
+RC_POST_20G="${FIX_RC_20G}"; ERR_POST_20G="${FIX_ERR_20G}"
+rm -rf "${FIX_20G}"
+if [[ "${RC_ABORT_20G}" == "7" ]] \
+   && [[ "${ERR_ABORT_20G}" == *"ABORT: record_qc_audit_test died rc=7 during scenario [# Scenario 77"* ]] \
+   && [[ "${RC_POST_20G}" == "5" ]] \
+   && [[ "${ERR_POST_20G}" != *"ABORT"* ]]; then
+  pass "scenario 20g — EXIT trap names the aborting scenario via _scenario_header_at, preserves the original exit code, and stays silent after the summary starts"
+else
+  fail "scenario 20g — abort rc=${RC_ABORT_20G} (want 7) err='${ERR_ABORT_20G}'; post-summary rc=${RC_POST_20G} (want 5) err='${ERR_POST_20G}'"
+fi
+# ---------------------------------------------------------------------------
+# Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND,the `cp -p` preservation copy's
 # OWN failure-safety claim (added on QC rework, PR #2266): the comment
 # directly above the `cp -p "$OUTPUT_FILE" "$PRESERVED_FILE"` call in
 # write_audit.sh says that if this copy fails under `set -euo pipefail`,
