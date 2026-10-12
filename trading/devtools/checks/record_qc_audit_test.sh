@@ -111,6 +111,17 @@ report_conjuncts() {
   done
 }
 
+# _grep_ok <grep-args...> -- prints 1 if `grep -q <args>` matches, else 0.
+# Evaluates a grep conjunct as a report_conjuncts 0/1 flag.
+_grep_ok() { if grep -q "$@" 2>/dev/null; then echo 1; else echo 0; fi; }
+
+# _json_actual <file> <key> -- prints `"key": value` as found in <file>, or a
+# placeholder, for embedding the observed value in a report_conjuncts label.
+_json_actual() {
+  [[ -f "$1" ]] || { echo '<file missing>'; return 0; }
+  grep -o "\"$2\":[^,}]*" "$1" 2>/dev/null | head -1 || true
+}
+
 # _glob_count <dir> <name-pattern> [extra-find-predicate]
 #
 # Counts entries under <dir> (maxdepth 1) matching glob <name-pattern>,
@@ -3169,6 +3180,16 @@ if (( rc40_1 == 0 )) && (( rc40_2 == 0 )) && (( rc40_3 == 0 )) \
   pass "scenario 40 — 3 consecutive PR-mode NEEDS_REWORK calls with no Reviewed SHA line: sha stays empty AND consecutive_rework_count stays 1 (not 3) end to end, no preserved-aside file (H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED, empty-sha degrade-to-overwrite path)"
 else
   fail "scenario 40 — expected rc=0/0/0 + exactly 1 audit file + sha \"\" + overall NEEDS_REWORK + consecutive_rework_count=1; got rc=${rc40_1}/${rc40_2}/${rc40_3}, audit_count=${audit_count_40}"
+  report_conjuncts \
+    "rc40_1==0 (actual=${rc40_1})" "$(( rc40_1 == 0 ? 1 : 0 ))" \
+    "rc40_2==0 (actual=${rc40_2})" "$(( rc40_2 == 0 ? 1 : 0 ))" \
+    "rc40_3==0 (actual=${rc40_3})" "$(( rc40_3 == 0 ? 1 : 0 ))" \
+    "JSON40 exists" "$([[ -f "${JSON40}" ]] && echo 1 || echo 0)" \
+    "exactly 1 audit file (actual: ${audit_count_40})" "$([[ "${audit_count_40}" == "1" ]] && echo 1 || echo 0)" \
+    "sha == \"\" (actual: $(_json_actual "${JSON40}" sha))" "$(_grep_ok '"sha": *""' "${JSON40}")" \
+    "overall_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON40}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON40}")" \
+    "consecutive_rework_count == 1 (actual: $(_json_actual "${JSON40}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *1,' "${JSON40}")" \
+    "stdout of 3rd call has consecutive_rework_count=1" "$(_grep_ok 'consecutive_rework_count=1' <<<"${out40_3}")"
   echo "${out40_1}" | sed 's/^/      /'
   echo "${out40_2}" | sed 's/^/      /'
   echo "${out40_3}" | sed 's/^/      /'
@@ -3491,6 +3512,14 @@ if (( rc44 == 0 )) && [[ -f "${JSON44}" ]] \
   pass "scenario 44 — PR #2504's real two-pass review file extracts APPROVED/APPROVED/APPROVED (sha 6b979c77, consecutive_rework_count=0), not the pre-fix NEEDS_REWORK/APPROVED/NEEDS_REWORK inversion (H-AUDIT-REWORK-VERDICT-STALE, #2509)"
 else
   fail "scenario 44 — expected rc=0 + structural/behavioral/overall all APPROVED + sha 6b979c77 + consecutive_rework_count=0; got rc=${rc44}, output:"
+  report_conjuncts \
+    "rc44==0 (actual=${rc44})" "$(( rc44 == 0 ? 1 : 0 ))" \
+    "JSON44 exists" "$([[ -f "${JSON44}" ]] && echo 1 || echo 0)" \
+    "sha == \"6b979c77\" (actual: $(_json_actual "${JSON44}" sha))" "$(_grep_ok '"sha": *"6b979c77"' "${JSON44}")" \
+    "structural_qc == APPROVED (actual: $(_json_actual "${JSON44}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON44}")" \
+    "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON44}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON44}")" \
+    "overall_qc == APPROVED (actual: $(_json_actual "${JSON44}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON44}")" \
+    "consecutive_rework_count == 0 (actual: $(_json_actual "${JSON44}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *0,' "${JSON44}")"
   echo "${out44}" | sed 's/^/      /'
   [[ -f "${JSON44}" ]] && echo "      json: $(cat "${JSON44}")"
 fi
@@ -3550,6 +3579,14 @@ if (( rc45 == 0 )) && [[ -f "${JSON45}" ]] \
   pass "scenario 45 — a rework that fixes a STRUCTURAL finding clears structural_qc to APPROVED instead of freezing on pass 1's stale NEEDS_REWORK (H-AUDIT-REWORK-VERDICT-STALE, #2509)"
 else
   fail "scenario 45 — expected rc=0 + structural/behavioral/overall all APPROVED + consecutive_rework_count=0; got rc=${rc45}, output:"
+  report_conjuncts \
+    "rc45==0 (actual=${rc45})" "$(( rc45 == 0 ? 1 : 0 ))" \
+    "JSON45 exists" "$([[ -f "${JSON45}" ]] && echo 1 || echo 0)" \
+    "sha == \"sha2bbb45\" (actual: $(_json_actual "${JSON45}" sha))" "$(_grep_ok '"sha": *"sha2bbb45"' "${JSON45}")" \
+    "structural_qc == APPROVED (actual: $(_json_actual "${JSON45}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON45}")" \
+    "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON45}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON45}")" \
+    "overall_qc == APPROVED (actual: $(_json_actual "${JSON45}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON45}")" \
+    "consecutive_rework_count == 0 (actual: $(_json_actual "${JSON45}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *0,' "${JSON45}")"
   echo "${out45}" | sed 's/^/      /'
   [[ -f "${JSON45}" ]] && echo "      json: $(cat "${JSON45}")"
 fi
@@ -3611,6 +3648,14 @@ if (( rc46 == 0 )) && [[ -f "${JSON46}" ]] \
   pass "scenario 46 — behavioral_qc reads its OWN clean APPROVED, not inherited from a still-failing structural re-check that happens to be written last in the file (H-AUDIT-REWORK-VERDICT-STALE, #2509)"
 else
   fail "scenario 46 — expected rc=0 + structural NEEDS_REWORK + behavioral APPROVED + overall NEEDS_REWORK + consecutive_rework_count=1; got rc=${rc46}, output:"
+  report_conjuncts \
+    "rc46==0 (actual=${rc46})" "$(( rc46 == 0 ? 1 : 0 ))" \
+    "JSON46 exists" "$([[ -f "${JSON46}" ]] && echo 1 || echo 0)" \
+    "sha == \"sha2ddd46\" (actual: $(_json_actual "${JSON46}" sha))" "$(_grep_ok '"sha": *"sha2ddd46"' "${JSON46}")" \
+    "structural_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON46}" structural_qc))" "$(_grep_ok '"structural_qc": *"NEEDS_REWORK"' "${JSON46}")" \
+    "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON46}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON46}")" \
+    "overall_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON46}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON46}")" \
+    "consecutive_rework_count == 1 (actual: $(_json_actual "${JSON46}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *1,' "${JSON46}")"
   echo "${out46}" | sed 's/^/      /'
   [[ -f "${JSON46}" ]] && echo "      json: $(cat "${JSON46}")"
 fi
@@ -4268,7 +4313,7 @@ if (( FAIL_COUNT > 0 )); then
   # Swap in a cleanup-only EXIT trap so the failing rc cannot be masked by
   # _on_exit (e.g. a stray `exit 0` there); pinned by scenario 20g (e).
   # Known residual: an `exit 0` in _on_exit plus a separate abort BEFORE this
-  # swap would still exit 0 (SUMMARY_REACHED=1 also silences the ABORT line).
+  # swap would still exit 0 (SUMMARY_REACHED=1 silences the ABORT line only for an abort after the summary line).
   trap 'rm -rf "${TMP_REPO:-}"' EXIT
   exit 1
 fi
