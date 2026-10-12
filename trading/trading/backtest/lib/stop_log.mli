@@ -183,10 +183,10 @@ type stop_info = {
           [max_stop] is rescaled by the same factor so it stays on the current
           price basis as [exit_stop] and the two compare directly;
           {!record_stop_split} does the same explicitly. With neither (a stream
-          of transitions only) it remains a high-water mark
-          over raw installed levels: on a position that went through a split it
-          stays on the pre-split price scale while [exit_stop] is post-split, so
-          compare the two only within one price scale. *)
+          of transitions only) it remains a high-water mark over raw installed
+          levels: on a position that went through a split it stays on the
+          pre-split price scale while [exit_stop] is post-split, so compare the
+          two only within one price scale. *)
   n_stop_raises : int;
       (** How many stop moves installed a level {b strictly more protective}
           than the level installed immediately before it (strictly higher for a

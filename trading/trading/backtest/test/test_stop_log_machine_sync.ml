@@ -303,8 +303,9 @@ let test_cto_split_event_then_decision_rescales_once _ =
    basis (25.10), exit 21.90, and every stop column on that basis too. *)
 let test_avd_row_stop_columns_on_price_basis _ =
   assert_that
-    (_row ~info:(_run ~installed:40.00 _avd_steps) ~entry_price:25.10
-       ~exit_price:21.90)
+    (_row
+       ~info:(_run ~installed:40.00 _avd_steps)
+       ~entry_price:25.10 ~exit_price:21.90)
     (equal_to [ "25.10"; "21.90"; "20.00"; "22.00" ])
 
 let suite =
