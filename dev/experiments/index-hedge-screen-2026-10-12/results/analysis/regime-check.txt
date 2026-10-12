@@ -1,0 +1,4 @@
+lagged SMA30, 4-week slope (pack rule):   UP n 4432  +10.5%/yr  MIXED n  907   +1.2%/yr  DOWN n 1319  +13.2%/yr
+lagged SMA30, 8-week slope:               UP n 4348   +9.8%/yr  MIXED n 1084   +9.6%/yr  DOWN n 1226   +9.6%/yr
+lagged WMA30 (classifier), 4-week slope:  UP n 4389   +8.5%/yr  MIXED n  868  +16.6%/yr  DOWN n 1401   +9.4%/yr
+same-week SMA30/4 (look-ahead, reference):  UP n 4426  +24.5%/yr  MIXED n  905  -17.0%/yr  DOWN n 1327  -21.1%/yr

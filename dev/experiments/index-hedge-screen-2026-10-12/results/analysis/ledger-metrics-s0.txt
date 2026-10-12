@@ -1,0 +1,10 @@
+base      return   849.28%  maxdd  22.52% (2024-11-26 -> 2026-06-24)  calmar 0.3939  sharpe 0.5262
+G1 h=0.25 return   668.43%  maxdd  26.24% (2024-11-26 -> 2026-06-24)  calmar 0.3051  sharpe 0.4705
+G1 h=0.5  return   503.68%  maxdd  29.89% (2024-11-26 -> 2026-06-24)  calmar 0.2350  sharpe 0.3944
+G1 h=1    return   240.25%  maxdd  42.21% (2018-09-14 -> 2023-10-27)  calmar 0.1121  sharpe 0.2383
+G2 h=0.25 return   776.93%  maxdd  23.70% (2024-11-26 -> 2026-06-24)  calmar 0.3605  sharpe 0.5018
+G2 h=0.5  return   690.87%  maxdd  25.08% (2021-06-01 -> 2023-10-27)  calmar 0.3238  sharpe 0.4591
+G2 h=1    return   498.17%  maxdd  30.04% (2008-11-20 -> 2010-02-04)  calmar 0.2326  sharpe 0.3545
+G3 h=0.25 return   713.70%  maxdd  23.70% (2024-11-26 -> 2026-06-24)  calmar 0.3476  sharpe 0.4829
+G3 h=0.5  return   578.98%  maxdd  25.42% (2021-06-01 -> 2023-10-27)  calmar 0.2951  sharpe 0.4211
+G3 h=1    return   335.82%  maxdd  33.01% (2011-05-10 -> 2012-01-24)  calmar 0.1732  sharpe 0.2880

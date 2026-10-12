@@ -1,0 +1,11 @@
+base log 2.2528 maxdd 22.52% bears 0.1402 -0.0507 -0.0817
+G1 h=0.25 days_on 1211 overlay -0.2114 comb 2.0414 d_log -0.2114 maxdd 26.24% d_dd -3.72pp bears +0.0789 +0.1155 -0.0133 beats 2/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.0543(145) DOWN -0.1571(1066)
+G1 h=0.5 days_on 1211 overlay -0.4527 comb 1.8001 d_log -0.4527 maxdd 29.89% d_dd -7.37pp bears +0.1515 +0.2189 -0.0283 beats 2/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.1099(145) DOWN -0.3427(1066)
+G1 h=1.0 days_on 1211 overlay -1.0260 comb 1.2268 d_log -1.0260 maxdd 42.19% d_dd -19.67pp bears +0.2777 +0.3895 -0.0637 beats 2/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.2255(145) DOWN -0.8005(1066)
+G2 h=0.25 days_on 1080 overlay -0.0737 comb 2.1791 d_log -0.0737 maxdd 23.70% d_dd -1.18pp bears +0.0789 +0.1155 +0.0035 beats 3/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.0184(106) DOWN -0.0553(974)
+G2 h=0.5 days_on 1080 overlay -0.1734 comb 2.0794 d_log -0.1734 maxdd 25.14% d_dd -2.62pp bears +0.1515 +0.2189 +0.0056 beats 3/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.0380(106) DOWN -0.1354(974)
+G2 h=1.0 days_on 1080 overlay -0.4513 comb 1.8015 d_log -0.4513 maxdd 29.56% d_dd -7.04pp bears +0.2777 +0.3895 +0.0058 beats 3/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.0808(106) DOWN -0.3705(974)
+G3 h=0.25 days_on 1964 overlay -0.1765 comb 2.0763 d_log -0.1765 maxdd 23.70% d_dd -1.18pp bears +0.0994 +0.1240 +0.0013 beats 3/3 c1 0 c2 0 c3 1 | UP +0.0132(273) MIXED -0.0852(473) DOWN -0.1045(1218)
+G3 h=0.5 days_on 1964 overlay -0.3865 comb 1.8663 d_log -0.3865 maxdd 25.47% d_dd -2.95pp bears +0.1914 +0.2354 +0.0011 beats 3/3 c1 0 c2 0 c3 1 | UP +0.0251(273) MIXED -0.1744(473) DOWN -0.2371(1218)
+G3 h=1.0 days_on 1964 overlay -0.9071 comb 1.3457 d_log -0.9071 maxdd 30.21% d_dd -7.69pp bears +0.3531 +0.4201 -0.0035 beats 2/3 c1 0 c2 0 c3 1 | UP +0.0445(273) MIXED -0.3647(473) DOWN -0.5868(1218)
+O macro trend counts:  398 Bearish; 748 Bullish; 189 Neutral;

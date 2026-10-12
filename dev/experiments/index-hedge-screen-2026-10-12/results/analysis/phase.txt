@@ -1,0 +1,105 @@
+post-trough windows end 2003-01-09 2009-06-09 2020-06-23 2023-01-12
+
+G1 h=0.25 overlay log (SPY sessions) by phase:  bear-leg +0.1875 (735)  post-trough -0.2311 (153)  other -0.1677 (323)
+  phase x regime:  bear-leg/MIXED +0.0082 (44)  bear-leg/DOWN +0.1793 (691)  post-trough/MIXED -0.0047 (20)  post-trough/DOWN -0.2264 (133)  other/UP -0.0111 (5)  other/MIXED +0.0422 (58)  other/DOWN -0.1987 (260)
+  period x regime:
+    2000-02 total +0.0358 (404)   UP +0.0000 (  0)   MIXED +0.0008 ( 29)   DOWN +0.0350 (375)
+    2003-07 total -0.0302 ( 59)   UP +0.0000 (  0)   MIXED +0.0082 (  5)   DOWN -0.0384 ( 54)
+    2008-09 total +0.0539 (284)   UP +0.0000 (  0)   MIXED +0.0008 (  5)   DOWN +0.0531 (279)
+    2010-19 total -0.0922 (221)   UP +0.0000 (  0)   MIXED +0.0287 ( 39)   DOWN -0.1209 (182)
+    2020-21 total -0.0886 ( 53)   UP +0.0000 (  0)   MIXED -0.0122 (  5)   DOWN -0.0764 ( 48)
+    2022-23 total -0.0409 (142)   UP +0.0000 (  0)   MIXED +0.0141 ( 25)   DOWN -0.0550 (117)
+    2024-26 total -0.0492 ( 48)   UP -0.0111 (  5)   MIXED +0.0052 ( 14)   DOWN -0.0433 ( 29)
+
+G2 h=0.25 overlay log (SPY sessions) by phase:  bear-leg +0.1699 (661)  post-trough -0.1298 (82)  other -0.1194 (187)
+  phase x regime:  bear-leg/MIXED -0.0013 (29)  bear-leg/DOWN +0.1712 (632)  post-trough/MIXED +0.0052 (5)  post-trough/DOWN -0.1350 (77)  other/MIXED +0.0112 (10)  other/DOWN -0.1306 (177)
+  period x regime:
+    2000-02 total +0.0408 (394)   UP +0.0000 (  0)   MIXED +0.0008 ( 29)   DOWN +0.0400 (365)
+    2003-07 total -0.0347 ( 44)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN -0.0347 ( 44)
+    2008-09 total +0.0288 (246)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0288 (246)
+    2010-19 total -0.0732 (134)   UP +0.0000 (  0)   MIXED +0.0112 ( 10)   DOWN -0.0844 (124)
+    2020-21 total +0.0000 (  0)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0000 (  0)
+    2022-23 total -0.0257 ( 98)   UP +0.0000 (  0)   MIXED +0.0031 (  5)   DOWN -0.0288 ( 93)
+    2024-26 total -0.0154 ( 14)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN -0.0154 ( 14)
+
+G3 h=0.25 overlay log (SPY sessions) by phase:  bear-leg +0.1547 (767)  post-trough -0.1298 (100)  other -0.1790 (284)
+  phase x regime:  bear-leg/UP -0.0031 (39)  bear-leg/MIXED -0.0145 (72)  bear-leg/DOWN +0.1723 (656)  post-trough/MIXED +0.0052 (5)  post-trough/DOWN -0.1350 (95)  other/UP -0.0074 (20)  other/MIXED -0.0245 (49)  other/DOWN -0.1471 (215)
+  period x regime:
+    2000-02 total +0.0066 (526)   UP -0.0085 ( 54)   MIXED -0.0288 ( 73)   DOWN +0.0438 (399)
+    2003-07 total -0.0514 ( 80)   UP -0.0020 (  5)   MIXED -0.0050 ( 10)   DOWN -0.0444 ( 65)
+    2008-09 total +0.0385 (256)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0385 (256)
+    2010-19 total -0.1045 (173)   UP +0.0000 (  0)   MIXED -0.0009 ( 34)   DOWN -0.1036 (139)
+    2020-21 total +0.0000 (  0)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0000 (  0)
+    2022-23 total -0.0279 (102)   UP +0.0000 (  0)   MIXED +0.0009 (  9)   DOWN -0.0288 ( 93)
+    2024-26 total -0.0154 ( 14)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN -0.0154 ( 14)
+
+post-trough windows end 2003-04-09 2009-09-09 2020-09-23 2023-04-12
+
+G1 h=0.25 overlay log (SPY sessions) by phase:  bear-leg +0.1875 (735)  post-trough -0.2453 (187)  other -0.1536 (289)
+  phase x regime:  bear-leg/MIXED +0.0082 (44)  bear-leg/DOWN +0.1793 (691)  post-trough/MIXED +0.0035 (25)  post-trough/DOWN -0.2487 (162)  other/UP -0.0111 (5)  other/MIXED +0.0340 (53)  other/DOWN -0.1764 (231)
+  period x regime:
+    2000-02 total +0.0358 (404)   UP +0.0000 (  0)   MIXED +0.0008 ( 29)   DOWN +0.0350 (375)
+    2003-07 total -0.0302 ( 59)   UP +0.0000 (  0)   MIXED +0.0082 (  5)   DOWN -0.0384 ( 54)
+    2008-09 total +0.0539 (284)   UP +0.0000 (  0)   MIXED +0.0008 (  5)   DOWN +0.0531 (279)
+    2010-19 total -0.0922 (221)   UP +0.0000 (  0)   MIXED +0.0287 ( 39)   DOWN -0.1209 (182)
+    2020-21 total -0.0886 ( 53)   UP +0.0000 (  0)   MIXED -0.0122 (  5)   DOWN -0.0764 ( 48)
+    2022-23 total -0.0409 (142)   UP +0.0000 (  0)   MIXED +0.0141 ( 25)   DOWN -0.0550 (117)
+    2024-26 total -0.0492 ( 48)   UP -0.0111 (  5)   MIXED +0.0052 ( 14)   DOWN -0.0433 ( 29)
+
+G2 h=0.25 overlay log (SPY sessions) by phase:  bear-leg +0.1699 (661)  post-trough -0.1521 (111)  other -0.0971 (158)
+  phase x regime:  bear-leg/MIXED -0.0013 (29)  bear-leg/DOWN +0.1712 (632)  post-trough/MIXED +0.0052 (5)  post-trough/DOWN -0.1573 (106)  other/MIXED +0.0112 (10)  other/DOWN -0.1083 (148)
+  period x regime:
+    2000-02 total +0.0408 (394)   UP +0.0000 (  0)   MIXED +0.0008 ( 29)   DOWN +0.0400 (365)
+    2003-07 total -0.0347 ( 44)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN -0.0347 ( 44)
+    2008-09 total +0.0288 (246)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0288 (246)
+    2010-19 total -0.0732 (134)   UP +0.0000 (  0)   MIXED +0.0112 ( 10)   DOWN -0.0844 (124)
+    2020-21 total +0.0000 (  0)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0000 (  0)
+    2022-23 total -0.0257 ( 98)   UP +0.0000 (  0)   MIXED +0.0031 (  5)   DOWN -0.0288 ( 93)
+    2024-26 total -0.0154 ( 14)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN -0.0154 ( 14)
+
+G3 h=0.25 overlay log (SPY sessions) by phase:  bear-leg +0.1547 (767)  post-trough -0.1426 (147)  other -0.1662 (237)
+  phase x regime:  bear-leg/UP -0.0031 (39)  bear-leg/MIXED -0.0145 (72)  bear-leg/DOWN +0.1723 (656)  post-trough/MIXED +0.0085 (8)  post-trough/DOWN -0.1512 (139)  other/UP -0.0074 (20)  other/MIXED -0.0279 (46)  other/DOWN -0.1309 (171)
+  period x regime:
+    2000-02 total +0.0066 (526)   UP -0.0085 ( 54)   MIXED -0.0288 ( 73)   DOWN +0.0438 (399)
+    2003-07 total -0.0514 ( 80)   UP -0.0020 (  5)   MIXED -0.0050 ( 10)   DOWN -0.0444 ( 65)
+    2008-09 total +0.0385 (256)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0385 (256)
+    2010-19 total -0.1045 (173)   UP +0.0000 (  0)   MIXED -0.0009 ( 34)   DOWN -0.1036 (139)
+    2020-21 total +0.0000 (  0)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0000 (  0)
+    2022-23 total -0.0279 (102)   UP +0.0000 (  0)   MIXED +0.0009 (  9)   DOWN -0.0288 ( 93)
+    2024-26 total -0.0154 ( 14)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN -0.0154 ( 14)
+
+post-trough windows end 2003-10-09 2010-03-09 2021-03-23 2023-10-12
+
+G1 h=0.25 overlay log (SPY sessions) by phase:  bear-leg +0.1875 (735)  post-trough -0.2453 (187)  other -0.1536 (289)
+  phase x regime:  bear-leg/MIXED +0.0082 (44)  bear-leg/DOWN +0.1793 (691)  post-trough/MIXED +0.0035 (25)  post-trough/DOWN -0.2487 (162)  other/UP -0.0111 (5)  other/MIXED +0.0340 (53)  other/DOWN -0.1764 (231)
+  period x regime:
+    2000-02 total +0.0358 (404)   UP +0.0000 (  0)   MIXED +0.0008 ( 29)   DOWN +0.0350 (375)
+    2003-07 total -0.0302 ( 59)   UP +0.0000 (  0)   MIXED +0.0082 (  5)   DOWN -0.0384 ( 54)
+    2008-09 total +0.0539 (284)   UP +0.0000 (  0)   MIXED +0.0008 (  5)   DOWN +0.0531 (279)
+    2010-19 total -0.0922 (221)   UP +0.0000 (  0)   MIXED +0.0287 ( 39)   DOWN -0.1209 (182)
+    2020-21 total -0.0886 ( 53)   UP +0.0000 (  0)   MIXED -0.0122 (  5)   DOWN -0.0764 ( 48)
+    2022-23 total -0.0409 (142)   UP +0.0000 (  0)   MIXED +0.0141 ( 25)   DOWN -0.0550 (117)
+    2024-26 total -0.0492 ( 48)   UP -0.0111 (  5)   MIXED +0.0052 ( 14)   DOWN -0.0433 ( 29)
+
+G2 h=0.25 overlay log (SPY sessions) by phase:  bear-leg +0.1699 (661)  post-trough -0.1521 (111)  other -0.0971 (158)
+  phase x regime:  bear-leg/MIXED -0.0013 (29)  bear-leg/DOWN +0.1712 (632)  post-trough/MIXED +0.0052 (5)  post-trough/DOWN -0.1573 (106)  other/MIXED +0.0112 (10)  other/DOWN -0.1083 (148)
+  period x regime:
+    2000-02 total +0.0408 (394)   UP +0.0000 (  0)   MIXED +0.0008 ( 29)   DOWN +0.0400 (365)
+    2003-07 total -0.0347 ( 44)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN -0.0347 ( 44)
+    2008-09 total +0.0288 (246)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0288 (246)
+    2010-19 total -0.0732 (134)   UP +0.0000 (  0)   MIXED +0.0112 ( 10)   DOWN -0.0844 (124)
+    2020-21 total +0.0000 (  0)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0000 (  0)
+    2022-23 total -0.0257 ( 98)   UP +0.0000 (  0)   MIXED +0.0031 (  5)   DOWN -0.0288 ( 93)
+    2024-26 total -0.0154 ( 14)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN -0.0154 ( 14)
+
+G3 h=0.25 overlay log (SPY sessions) by phase:  bear-leg +0.1547 (767)  post-trough -0.1520 (158)  other -0.1568 (226)
+  phase x regime:  bear-leg/UP -0.0031 (39)  bear-leg/MIXED -0.0145 (72)  bear-leg/DOWN +0.1723 (656)  post-trough/UP -0.0020 (5)  post-trough/MIXED +0.0082 (10)  post-trough/DOWN -0.1582 (143)  other/UP -0.0054 (15)  other/MIXED -0.0275 (44)  other/DOWN -0.1239 (167)
+  period x regime:
+    2000-02 total +0.0066 (526)   UP -0.0085 ( 54)   MIXED -0.0288 ( 73)   DOWN +0.0438 (399)
+    2003-07 total -0.0514 ( 80)   UP -0.0020 (  5)   MIXED -0.0050 ( 10)   DOWN -0.0444 ( 65)
+    2008-09 total +0.0385 (256)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0385 (256)
+    2010-19 total -0.1045 (173)   UP +0.0000 (  0)   MIXED -0.0009 ( 34)   DOWN -0.1036 (139)
+    2020-21 total +0.0000 (  0)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN +0.0000 (  0)
+    2022-23 total -0.0279 (102)   UP +0.0000 (  0)   MIXED +0.0009 (  9)   DOWN -0.0288 ( 93)
+    2024-26 total -0.0154 ( 14)   UP +0.0000 (  0)   MIXED +0.0000 (  0)   DOWN -0.0154 ( 14)
+
