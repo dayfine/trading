@@ -97,6 +97,11 @@ ul.findings li::marker { color: var(--accent); }
 .flagcard:hover { border-color: var(--accent); }
 .flagcard .cnt { font: 500 18px var(--f-mono); }
 .flagcard p { margin: 0; font-size: 12.5px; color: var(--muted); }
+.flagcard.sev-alert { border-left: 3px solid var(--neg); }
+.flagcard.sev-watch { border-left: 3px solid var(--accent); }
+.flagcard.sev-info { opacity: .8; }
+.flagcard .sevwhy { font-size: 12px; color: var(--muted); }
+.pill.sev { text-transform: uppercase; letter-spacing: .04em; }
 .bars svg { width: 100%; height: auto; display: block; }
 .spec { font: 11.5px/1.5 var(--f-mono); color: var(--muted); white-space: pre-wrap; margin: 0; }
 details summary { cursor: pointer; }
@@ -151,6 +156,7 @@ ol.agenda li b { font-weight: 600; }
   <div class="panel">
     <h2>What stands out</h2>
     <ul class="findings" id="findings"></ul>
+    <details id="rests" hidden><summary class="note">Years that rest on one trade or on the salt (expected for a fat-tail strategy; not a concern)</summary><ul class="findings" id="rests-list"></ul></details>
   </div>
   <div class="panel">
     <div class="row" style="justify-content:space-between">
@@ -215,7 +221,9 @@ ol.agenda li b { font-weight: 600; }
   <div class="panel">
     <h2 id="flags-title">Per-trade flags</h2>
     <p class="note">Each card counts the trades that trip one check and the net P&amp;L of those trades. <b>Execution</b> checks compare fills with the day's actual bar. <b>Book</b> checks compare the trade with Weinstein's rules (the spine in <code>weinstein-faithful-core.md</code>). <b>Outcome</b> checks use the post-exit price path. Click a card to list its trades.</p>
+    <p class="note" id="flag-rule"></p>
     <div class="flagcards" id="flagcards"></div>
+    <p class="note" id="flagclear"></p>
   </div>
   <div class="grid2">
     <div class="panel">
@@ -342,13 +350,13 @@ function fallbackShare(all, cohort) {
 const withMacro = t => isShort(t) ? 'Bearish' : 'Bullish', againstMacro = t => isShort(t) ? 'Bullish' : 'Bearish';
 const ownStage = t => isShort(t) ? 'Stage4' : 'Stage2';
 const FLAGS = [
-  { id: 'weekend', cat: 'exec', label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || (t.onX === 0 && t.trig !== 'delisted' && !t.xpast),
+  { id: 'weekend', cat: 'exec', zero: true, label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || (t.onX === 0 && t.trig !== 'delisted' && !t.xpast),
     why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect). A delisting exit has no bar on its date by construction and is left out, as is any exit dated after the symbol’s last bar (MIME 2022-05-20, LACO 2020-10-09: a delisting stamped the next day).' },
-  { id: 'offbar', cat: 'exec', label: 'Fill outside the day’s high–low', test: t => (t.onE === 1 && t.inE === 0) || (t.onX === 1 && t.inX === 0),
+  { id: 'offbar', cat: 'exec', zero: true, label: 'Fill outside the day’s high–low', test: t => (t.onE === 1 && t.inE === 0) || (t.onX === 1 && t.inX === 0),
     why: 'The fill price never traded that day (half a percent of slack for rounding; fills on a later split basis are excluded). The validator’s V13 counts the same thing.' },
   { id: 'gapstop', cat: 'exec', label: 'Stop filled ≥ 3 pts beyond the stop', test: t => t.trig === 'stop_loss' && stopSlip(t) >= 0.03,
     why: 'Opened through the stop (below it for a long, above it for a short), so the loss is larger than the risk planned at entry.' },
-  { id: 'latestop', cat: 'exec', label: 'Stop breached before the exit day', test: t => t.trig === 'stop_loss' && t.blag >= 1,
+  { id: 'latestop', cat: 'exec', zero: true, label: 'Stop breached before the exit day', test: t => t.trig === 'stop_loss' && t.blag >= 1,
     why: 'The price reached the installed stop (trades.csv entry_stop; the low for a long, the high for a short) on an earlier day than the exit fill. Under the default fill model exits are market orders sent after the close and fill at the next open; with sim_stop_exit_fill_on_trigger_bar on (the record and investor configs) a stop fills on the bar that trades it, so a count here is a stop-level mismatch worth opening (e.g. #3075). Book: the stop is a resting order (reference §5.7).' },
   { id: 'slipcap', cat: 'exec', needs: 'fvt', label: 'Entry filled 2% past the trigger', test: t => t.fvt != null && sideSgn(t) * t.fvt >= 1.99,
     why: 'The entry order’s limit sits 2% past the trigger (above it for a long, below it for a short). These fills paid the whole allowance.' },
@@ -360,7 +368,7 @@ const FLAGS = [
     why: 'Exit not chosen by the strategy’s rules. A margin call buys a short back when its loss passes the margin limit.' },
   { id: 'macro', cat: 'book', needs: 'mE', open: true, label: 'Macro not with the side at entry', test: t => t.mE && t.mE !== withMacro(t),
     why: 'Book Ch. 3/8: weight buying to a bullish market and shorting to a bearish one. A long entered when the macro was not Bullish, a short when it was not Bearish. The run allows Neutral-market buys (audit R8).' },
-  { id: 'macrobear', cat: 'book', needs: 'mE', open: true, label: 'Entered against the macro', test: t => t.mE === againstMacro(t),
+  { id: 'macrobear', cat: 'book', needs: 'mE', open: true, zero: true, label: 'Entered against the macro', test: t => t.mE === againstMacro(t),
     why: 'A long bought in a Bearish macro week or a short sold in a Bullish one: the macro gate should block both (spine rule 6).' },
   { id: 'lowvol', cat: 'book', needs: 'fvr', label: 'Long fill-week volume under 2× average', test: t => !isShort(t) && t.fvr != null && t.fvr < 2,
     why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3). Read on the week the order FILLED (its volume vs the 4 weeks before), not the screen week trades.csv records. Shorts are left out: a breakdown does not need volume (reference Ch. 2, Stage 4 detail).' },
@@ -382,6 +390,48 @@ const FLAG = Object.fromEntries(FLAGS.map(f => [f.id, f]));
 // entry-time fields) counts them too (#3125: the 5d null read 6 Bearish-week buys, true 9).
 function openHits(f, open) {
   return f.open ? open.filter(f.test).length : 0;
+}
+// Per-trade flag severity (#3214). A card is alert / watch / info by named thresholds: its share of the
+// run's trades, and its net loss as a percentage of the start NAV (a net gain never raises severity). A flag
+// marked zero: true is a check the run's config implies is ~0 (a gate that should block, a fill model that
+// should not miss a bar), so any hit is at least watch. The thresholds print on the page and on each card.
+const FLAG_WATCH_SHARE_PCT = 3, FLAG_ALERT_SHARE_PCT = 10, FLAG_WATCH_LOSS_PCT = 10, FLAG_ALERT_LOSS_PCT = 50;
+const FLAG_SEV_RANK = { alert: 0, watch: 1, na: 2, info: 3 };
+function flagSeverity(f, c, nav0) {
+  const share = c.total ? 100 * c.closed / c.total : 0, loss = nav0 ? -100 * c.net / nav0 : 0;
+  const s = `${fmt(share, 0)}% of trades`, l = `net loss ${fmt(loss, 0)}% of start NAV`;
+  if (share >= FLAG_ALERT_SHARE_PCT) return ['alert', `${s}, at or over ${FLAG_ALERT_SHARE_PCT}%`];
+  if (loss >= FLAG_ALERT_LOSS_PCT) return ['alert', `${l}, at or over ${FLAG_ALERT_LOSS_PCT}%`];
+  if (f.zero) return ['watch', 'the config implies about none'];
+  if (share >= FLAG_WATCH_SHARE_PCT) return ['watch', `${s}, at or over ${FLAG_WATCH_SHARE_PCT}%`];
+  if (loss >= FLAG_WATCH_LOSS_PCT) return ['watch', `${l}, at or over ${FLAG_WATCH_LOSS_PCT}%`];
+  return ['info', 'under the watch thresholds'];
+}
+// The cards to draw, sorted by severity then |net $|, and the labels of the checks hidden because they
+// found nothing. A check whose input no trade carries (macro needs the audit report) is an n/a card,
+// never hidden: a missing input must not read as a clean 0.
+function flagPlan(flags, t, open, nav0) {
+  const cards = [], clear = [];
+  for (const f of flags) {
+    const ts = t.filter(x => x.flags.includes(f.id)), no = openHits(f, open);
+    const c = { f, n: ts.length + no, closed: ts.length, no, total: t.length, net: ts.reduce((a, x) => a + x.pnl, 0) };
+    if (f.needs && !t.some(x => x[f.needs] != null && x[f.needs] !== '')) cards.push({ ...c, sev: 'na', why: 'no input for this check' });
+    else if (c.n === 0) clear.push(f.label);
+    else { const [sev, why] = flagSeverity(f, c, nav0); cards.push({ ...c, sev, why }); }
+  }
+  cards.sort((a, b) => FLAG_SEV_RANK[a.sev] - FLAG_SEV_RANK[b.sev] || Math.abs(b.net) - Math.abs(a.net));
+  return { cards, clear };
+}
+const FLAG_CAT = { exec: 'Execution', book: 'Book', outcome: 'Outcome' };
+function flagCardHtml(c) {
+  const f = c.f;
+  return `<button class="flagcard sev-${c.sev}" data-flag="${f.id}"><span class="row" style="justify-content:space-between"><span class="row"><span class="pill ${f.cat}">${FLAG_CAT[f.cat]}</span><span class="pill sev" title="${c.why}">${c.sev === 'na' ? 'n/a' : c.sev}</span></span><span class="cnt">${c.sev === 'na' ? 'n/a' : c.n}</span></span><b>${f.label}</b><span class="num" style="text-align:left">net <span class="${sgn(c.net)}">${usdk(c.net)}</span> · ${fmt(c.total ? 100 * c.closed / c.total : 0, 0)}% of trades${c.no ? ` · plus ${c.no} still open` : ''}</span><span class="sevwhy">${c.sev}: ${c.why}</span><p>${f.why}</p></button>`;
+}
+function flagClearLine(clear) {
+  return clear.length ? `<b>All clear:</b> ${clear.length} ${clear.length === 1 ? 'check' : 'checks'} found no trades and ${clear.length === 1 ? 'is' : 'are'} not drawn: ${clear.join('; ')}.` : '';
+}
+function flagRuleNote() {
+  return `Cards are graded by share of trades and net loss as a share of the start NAV: <b>alert</b> at ${FLAG_ALERT_SHARE_PCT}% of trades or a ${FLAG_ALERT_LOSS_PCT}% loss, <b>watch</b> at ${FLAG_WATCH_SHARE_PCT}% or a ${FLAG_WATCH_LOSS_PCT}% loss, or on any hit of a check the config implies is about zero; otherwise <b>info</b>. Sorted by severity, then |net P&amp;L|. A check with nothing to count is listed under the cards, and one with no input shows n/a.`;
 }
 // The last-day exposure check (#3125): what the pack marks as held on the window's last day must
 // match actual.sexp's open_positions_value. A miss means exposure is missing positions.
@@ -544,6 +594,16 @@ function openSignal(nav0, move, real, open = move - real) {
 function oneTradeYear(ex, topPct) {
   return Math.abs(ex) >= 10 && Math.sign(topPct) === Math.sign(ex) && Math.abs(topPct) >= 0.5 * Math.abs(ex);
 }
+// The "<year> rests on one trade / the salt" bullet, or '' when neither holds: the year's excess vs SPY is
+// decided by its top realised trade (oneTradeYear), or the salts end the year >= 15 pp apart. kind is
+// RK() ('salt' | 'arm'). Pure, for the test.
+function yearRestsBullet(y, top, salts, kind) {
+  const spread = salts.length > 1 ? Math.max(...salts) - Math.min(...salts) : 0;
+  const ex = y.ret - y.spy, topPct = top ? 100 * top.pnl / y.nav0 : 0, one = top && oneTradeYear(ex, topPct);
+  if (!one && spread < 15) return '';
+  const K = kind[0].toUpperCase() + kind.slice(1);
+  return `<b>${y.p} rests on ${one ? 'one trade' : `the ${kind}`}:</b> ${pct(y.ret, 1)} vs SPY ${pct(y.spy, 1)}.${one ? ` ${top.sym} realised ${usdk(top.pnl)} = ${pct(topPct, 1)} of start-of-year NAV, against a ${pct(ex, 1)} gap to SPY.` : ''}${salts.length > 1 ? ` ${K}s made ${salts.map(v => pct(v, 1)).join(' / ')}.` : ''}`;
+}
 // An era's second-largest regime gap is named too when it has the same sign as
 // the largest and is at least half of it, or >= 0.15 log (~ a 16 % cumulative gap).
 function alsoCause(gap1, gap2) {
@@ -670,7 +730,7 @@ function givebackLine(g) {
   if (!g || !g.fires) return '';
   return `<b>Gave back open gains after the NAV peak:</b> NAV peaked at ${usdk(g.peak)} on ${g.d} with about ${usdk(g.openAtPeak)} unrealised in the ${g.held} positions then held (NAV above start, less P&amp;L realised by then), and ended at ${usdk(g.end)}: ${usdk(g.giveback)} below the peak. The closed trades among those positions realised ${usdk(g.heldPnl)} in all. The window's return is read at a low point of a held book, not at what it earned.`;
 }
-// Renders the ratio chart + era table; returns finding bullets (HTML strings).
+// Renders the ratio chart + era table; returns { lead: finding bullets, rests: one-trade / salt-year bullets } (HTML strings).
 function renderSignals(nav, spy) {
   const ys = D.years[CH()], reg = spyRegimeByDay();
   const rel = nav.map(([d, v], i) => [d, v / spy[i][1]]);
@@ -701,15 +761,14 @@ function renderSignals(nav, spy) {
   const out = [`<b>Eras vs SPY:</b> ${rows.map(r => `${r.label} ${span(r)} (${fmt(r.r0, 2)}→${fmt(r.r1, 2)}×)`).join('; ')}. The ratio ends at ${fmt(pts[pts.length - 1][1], 2)}× SPY${Math.max(...pts.map(p => p[1])) > 1 && pts[pts.length - 1][1] < 1 ? `, after peaking at ${fmt(Math.max(...pts.map(p => p[1])), 2)}×: a whole-window "trails SPY" depends on the end date` : ''}.`];
   for (const r of rows.filter(r => r.label === 'eroded' && r.key)) { const x = r.cells[r.key]; const x2 = r.key2 && r.cells[r.key2];
     out.push(`<b>Eroded ${span(r)} (${fmt(r.r0, 2)}→${fmt(r.r1, 2)}×):</b> mostly ${REGIME_TXT[r.key](x.s, x.m, x.expo)}${x2 ? `; also ${REGIME_TXT[r.key2](x2.s, x2.m, x2.expo)}` : ''}.`); }
-  // years one trade or the salt decided: |excess vs SPY| >= 10 pp and the top realised trade (as % of
-  // start-of-year NAV, same sign) is at least half of it, or the salts end the year >= 15 pp apart
-  const tr = D.trades[CH()];
+  // years one trade or the salt decided (yearRestsBullet): kept out of the lead list (#3214), shown in a
+  // collapsed note under it, because a fat-tail strategy is expected to rest on a few trades
+  const tr = D.trades[CH()], rests = [];
   for (const y of ys) {
     const top = tr.filter(t => t.xd.slice(0, 4) === y.p).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl))[0];
-    const salts = D.years.map(s => (s.find(q => q.p === y.p) || {}).ret).filter(v => v != null), spread = salts.length > 1 ? Math.max(...salts) - Math.min(...salts) : 0;
-    const ex = y.ret - y.spy, topPct = top ? 100 * top.pnl / y.nav0 : 0;
-    const one = top && oneTradeYear(ex, topPct);
-    if (one || spread >= 15) out.push(`<b>${y.p} rests on ${one ? `one trade` : `the ${RK()}`}:</b> ${pct(y.ret, 1)} vs SPY ${pct(y.spy, 1)}.${one ? ` ${top.sym} realised ${usdk(top.pnl)} = ${pct(topPct, 1)} of start-of-year NAV, against a ${pct(ex, 1)} gap to SPY.` : ''}${salts.length > 1 ? ` ${RKC()}s made ${salts.map(v => pct(v, 1)).join(' / ')}.` : ''}`);
+    const salts = D.years.map(s => (s.find(q => q.p === y.p) || {}).ret).filter(v => v != null);
+    const b = yearRestsBullet(y, top, salts, RK());
+    if (b) rests.push(b);
   }
   // the return rests on positions still open at the end (see openSignal)
   const nav0 = nav[0][1], move = nav[nav.length - 1][1] - nav0, real = tr.reduce((a, t) => a + t.pnl, 0), openRows = D.open[CH()].rows || [];
@@ -734,7 +793,7 @@ function renderSignals(nav, spy) {
   if (sl) out.push(sl);
   const cr = cashRejectionLine(D.meta[CH()].cash_rejections);
   if (cr) out.push(cr);
-  return out;
+  return { lead: out, rests };
 }
 function renderOverview() {
   const m = D.meta[CH()].metrics, nav = D.nav[CH()], trades = D.trades[CH()], BV = basisView(D.meta[CH()].basis);
@@ -797,8 +856,11 @@ function renderOverview() {
     `<b>${wk.length} trades have a fill dated on a day with no bar</b> (the Saturday-fill defect). The validator also counts ${(inv.validator.find(v => v.id === 'V13') || {}).status || '?'} on V13.`,
     rets.length > 1 && (RK() === 'salt' ? `<b>Salt spread: the same rules returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} salts.` : `<b>The ${rets.length} arms returned ${rets.map(r => pct(r, 0)).join(', ')}</b> (different configs, not salts of one).`),
   ].filter(Boolean);
-  // the signals lead: era and one-trade-year bullets come before the run-level counts
-  $('#findings').innerHTML = [...renderSignals(nav, spy), ...f].map(x => `<li>${x}</li>`).join('');
+  // the signals lead: era bullets come before the run-level counts; one-trade and salt years sit in a collapsed note (#3214)
+  const sig = renderSignals(nav, spy);
+  $('#findings').innerHTML = [...sig.lead, ...f].map(x => `<li>${x}</li>`).join('');
+  $('#rests').hidden = !sig.rests.length;
+  $('#rests-list').innerHTML = sig.rests.map(x => `<li>${x}</li>`).join('');
 }
 function weeklyAvg(rows) {
   const out = []; let wk = null, s = 0, n = 0, last = null;
@@ -996,10 +1058,10 @@ function validatorList(vs) {
 }
 function renderSurprises() {
   const t = D.trades[CH()], open = D.open[CH()].rows;
-  $('#flagcards').innerHTML = FLAGS.map(f => { const ts = t.filter(x => x.flags.includes(f.id)); const net = ts.reduce((a, x) => a + x.pnl, 0), no = openHits(f, open);
-    // a check whose input field no trade carries (macro needs the audit report, absent under --no-container) is n/a, not a clean 0
-    const na = f.needs && !t.some(x => x[f.needs] != null && x[f.needs] !== '');
-    return `<button class="flagcard" data-flag="${f.id}"><span class="row" style="justify-content:space-between"><span class="pill ${f.cat}">${{ exec: 'Execution', book: 'Book', outcome: 'Outcome' }[f.cat]}</span><span class="cnt">${na ? 'n/a' : ts.length + no}</span></span><b>${f.label}</b><span class="num" style="text-align:left">net <span class="${sgn(net)}">${usdk(net)}</span> · ${fmt(100 * ts.length / t.length, 0)}% of trades${no ? ` · plus ${no} still open` : ''}</span><p>${f.why}</p></button>`; }).join('');
+  const plan = flagPlan(FLAGS, t, open, D.nav[CH()][0][1]);
+  $('#flagcards').innerHTML = plan.cards.map(flagCardHtml).join('');
+  $('#flagclear').innerHTML = flagClearLine(plan.clear);
+  $('#flag-rule').innerHTML = flagRuleNote();
   $('#flagcards').addEventListener('click', e => { const b = e.target.closest('[data-flag]'); if (b) filterFlag(b.dataset.flag); });
   const cf = D.meta[CH()].conformance;
   $('#conf').innerHTML = confTable(cf);

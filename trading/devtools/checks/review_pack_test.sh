@@ -43,6 +43,8 @@
 #     the default of the run's code_version) picks the SPY column
 #     and labels; the fallback card keys on the audit stop kind; an AVD-shaped
 #     later-split fill near a wide bar's edge is code 2, not off-bar;
+#   - #3214: per-trade flag cards: a zero card is hidden and named in an all-clear line (an n/a check stays drawn),
+#     cards sort by named-threshold severity then |net $|, and one-trade / salt-year bullets leave the lead list;
 #   - #3141: the fill-week volume ratio (per bar vs the 4 prior weeks) drives
 #     the low-volume card, not the screen week; an exit dated after the last
 #     bar is not the Saturday-fill defect; the Stage-4 card needs the replay;
@@ -802,5 +804,48 @@ else
 fi
 expect_eq "#3194 wiring: What stands out uses openPnl, the give-back and the margin-churn lines" 3 \
   "$(grep -c 'const op = openPnl(D.meta\[CH()\].metrics\|const gb = givebackLine(navPeakGiveback(\|const mc = marginChurnLine(marginChurn(tr)' "$S/index.html")"
+# #3214 flag cards and year bullets: pure functions extracted from the page and pinned with node.
+if command -v node >/dev/null 2>&1; then
+  FCF="$(sed -n -e '/^const fmt = /p' -e '/^const pct = /p' -e '/^const usdk = /p' -e '/^const sgn = /p' -e '/^const FLAG_WATCH_SHARE_PCT/p' -e '/^const FLAG_SEV_RANK/p' -e '/^const FLAG_CAT/p' -e '/^function openHits(/,/^}/p' -e '/^function flagSeverity(/,/^}/p' -e '/^function flagPlan(/,/^}/p' -e '/^function flagCardHtml(/,/^}/p' -e '/^function flagClearLine(/,/^}/p' -e '/^function flagRuleNote(/,/^}/p' -e '/^function oneTradeYear(/,/^}/p' -e '/^function yearRestsBullet(/,/^}/p' "$S/index.html")"
+  expect_eq "flag cards: all page functions extracted" 8 "$(printf '%s\n' "$FCF" | grep -c '^function ')"
+  fc() { node -e "$FCF
+// n trades carrying flag id, each with the given pnl; total = 520 closed trades, start NAV 1M
+const mk = (id, n, pnl) => Array.from({ length: n }, () => ({ flags: [id], pnl }));
+const mkAll = parts => parts.flat().concat(Array.from({ length: 520 - parts.flat().length }, () => ({ flags: [], pnl: 0 })));
+const FL = (id, extra) => Object.assign({ id, cat: 'exec', label: 'L-' + id, why: 'w' }, extra);
+console.log($1)"; }
+  # zero card hidden and named; a check with no input stays as an n/a card, never in the all-clear list
+  expect_eq "flag cards: a zero card is not drawn, is named in the all-clear line; the n/a card stays (#3214)" \
+    '{"drawn":["hit","miss"],"clear":["L-none"],"sev":["watch","na"],"line":true}' \
+    "$(fc 'JSON.stringify((p => ({ drawn: p.cards.map(c => c.f.id), clear: p.clear, sev: p.cards.map(c => c.sev), line: /All clear.*1 check found no trades and is not drawn: L-none\./.test(flagClearLine(p.clear)) }))(
+      flagPlan([FL("none"), FL("hit", { zero: true }), FL("miss", { needs: "mE" })], mkAll([mk("hit", 2, -100)]), [], 1e6)))')"
+  expect_eq "flag cards: nothing hidden -> no all-clear line" "" "$(fc 'flagClearLine([])')"
+  # rb1 s0 shape (520 trades, 1M start NAV): whipsaw 130 -> $-5.63M and quickstop 33 -> $-1.96M alert, the
+  # Bearish-week buys 38 -> +$494k watch (config implies ~0), a 1 % card with a small loss info; the n/a card sits between
+  expect_eq "flag cards: sorted alert (by |net|), watch, n/a, info" \
+    '[["whipsaw","alert"],["quickstop","alert"],["macrobear","watch"],["miss","na"],["small","info"]]' \
+    "$(fc 'JSON.stringify(flagPlan([FL("small"), FL("macrobear", { zero: true }), FL("miss", { needs: "mE" }), FL("quickstop"), FL("whipsaw")],
+      mkAll([mk("macrobear", 38, 494e3 / 38), mk("quickstop", 33, -1.96e6 / 33), mk("whipsaw", 130, -5.63e6 / 130), mk("small", 5, -2000)]), [], 1e6).cards.map(c => [c.f.id, c.sev]))')"
+  expect_eq "flag severity: thresholds are at-or-over (10 % share alert, 3 % watch, 50 % loss alert, 10 % loss watch) and a gain never raises it" \
+    "alert watch info alert watch info" \
+    "$(fc '[[52, 0], [16, 0], [15, 0], [3, -5e5], [3, -1e5], [3, 9e5]].map(([n, net]) => flagSeverity(FL("x"), { total: 520, closed: n, net }, 1e6)[0]).join(" ")')"
+  expect_eq "flag severity: a zero-implied card hit only by an open position is still watch" "watch" \
+    "$(fc 'flagPlan([FL("m", { zero: true, open: true, test: () => true })], mkAll([]), [{}], 1e6).cards[0].sev')"
+  expect_eq "flag cards: the card text carries its severity and why; the page note names the thresholds" "yes yes" \
+    "$(fc '[/sev-alert.*>alert<.*alert: 25% of trades, at or over 10%/.test(flagCardHtml(flagPlan([FL("w")], mkAll([mk("w", 130, -100)]), [], 1e6).cards[0])), /alert<\/b> at 10% of trades or a 50% loss.*watch<\/b> at 3% or a 10% loss/.test(flagRuleNote())].map(b => b ? "yes" : "no").join(" ")')"
+  # one-trade / salt-year bullets: still built, but by yearRestsBullet, not the lead list
+  expect_eq "yearRestsBullet: top trade carries a 20 pp gap -> one-trade bullet; a quiet year -> empty; salts 20 pp apart -> salt bullet" \
+    "yes|-|yes" \
+    "$(fc '[ /2013 rests on one trade.*ABC realised/.test(yearRestsBullet({ p: "2013", ret: 30, spy: 10, nav0: 1000 }, { sym: "ABC", pnl: 150 }, [30], "salt")) ? "yes" : "no",
+      yearRestsBullet({ p: "2014", ret: 5, spy: 4, nav0: 1000 }, { sym: "ABC", pnl: 10 }, [5, 6], "salt") || "-",
+      /2015 rests on the salt.*Salts made/.test(yearRestsBullet({ p: "2015", ret: 5, spy: 4, nav0: 1000 }, { sym: "ABC", pnl: 10 }, [5, 25], "salt")) ? "yes" : "no"].join("|")')"
+else
+  echo "SKIP: review_pack #3214 flag-card cases need node"
+fi
+# wiring (#3214): the lead list gets era bullets only; one-trade / salt years go to the collapsed, initially hidden note
+expect_eq "wiring: renderSignals sends yearRestsBullet to rests, never to the lead list" "1 0" "$(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'rests.push(b)') $(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'out.push(.*yearRestsBullet')"
+expect_eq "wiring: renderSignals returns lead + rests; the findings list takes lead only" "1 1" "$(grep -c 'return { lead: out, rests };' "$S/index.html") $(grep -c '\[\.\.\.sig\.lead, \.\.\.f\]' "$S/index.html")"
+expect_eq "wiring: the rests note is a hidden <details>; the cards are drawn from flagPlan and the all-clear line is wired" "1 1 1" \
+  "$(grep -c '<details id="rests" hidden>' "$S/index.html") $(grep -c "flagPlan(FLAGS, t, open" "$S/index.html") $(grep -c "'#flagclear').innerHTML = flagClearLine" "$S/index.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
