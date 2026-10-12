@@ -22,3 +22,5 @@ Same law as [[project_edge_is_the_fat_tail]], [[project_cascade_selection_invers
 **Process:** #2759 needed two QC rounds — the first behavioral pass found the fresh-candidate thread
 unpinned (two severing mutations green) and flag-off not bit-identical when `neutral_blocks_longs` was
 also on; the rework threaded `~macro_trend` so the gate is a pure conjunct. Flag stays default-off as a legitimate axis; NOT on the Rule-4 retirement worklist (#2780: do-not-revive needs a second vintage cell failing both criteria; salts are not independent contexts). Calmar gate 0.100/0.133/0.105 vs null 0.163/0.168/0.183.
+
+**Caveat 2026-10-12:** ran on the frozen A-D input (2000–16: constant Bearish momentum vote, no A-D vote); post-2016 legs unaffected. See [[project_breadth_fix_ad_frozen]].

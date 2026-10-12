@@ -39,3 +39,5 @@ price, not a tuning gap. Every "protection" lever must be read against the
 2020 recovery cohort before its drawdown number is believed. Related:
 [[project_pit_drawdown_2021_25_macro_veto]], [[project_edge_is_the_fat_tail]],
 [[project_funding_grid_monster_lottery]], [[project_record_rebase_2026_09_15]].
+
+**Caveat 2026-10-12:** ran on the frozen A-D input (2000–16: constant Bearish momentum vote, no A-D vote); post-2016 legs unaffected. See [[project_breadth_fix_ad_frozen]].

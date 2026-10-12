@@ -41,3 +41,11 @@ Links: [[project_trader_investor_modes]], [[project_decision_walkthrough_next]].
 - The v11 TR CAGR of 9.1–9.8 % is superseded. The CAGR margin is thin; the drawdown and Calmar edge is robust (three separate ~21 % episodes).
 - 2025–26 is picks: UP-regime days −19.8 % vs SPY +22.8 % at 62 % invested.
 - Price-only rb0 vs SPY price: 7.5–8.0 % vs 6.31 %.
+
+**Update 2026-10-12 (breadth-fix-rb1, #3238, PR #3261): the record is N** — rb1 on the full NYSE A-D fixture (#3252);
+the old fixture froze two macro votes over 2000–16. 26y, 3 salts: +849 / +836 / +878 %; CAGR 8.87 / 8.81 / 8.99 % vs
+SPY TR 8.20 %; max DD 22.5 / 22.2 / 22.2 % (2024-11 → 2026-06 episode, unchanged) vs 55.2 %; Calmar 0.39 / 0.40 / 0.41;
+trades 570 / 575 / 568. N − O = −0.003 / +0.019 / +0.073 log = noise. Pre-2017 max DD 18.9–19.8 % (was 16.8–16.9).
+Early bears worse (2000–02 +9 vs +15 %, 2007–09 −10 vs −5 %), 2010–16 better (+0.09 to +0.11 log). Tail: PEGA/GPN/JNS
+in, CHDN/GTIV/INVX out. Pair every 26y arm against N s0–s2 (artifacts
+`dev/experiments/breadth-fix-rb1-2026-10-11/results/N-*`). See [[project_breadth_fix_ad_frozen]].
