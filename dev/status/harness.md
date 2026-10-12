@@ -1209,6 +1209,18 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   mutation-test proof per the standard this file's H-PREV-VERDICT-PIPEFAIL
   entry and the #2440 fix were held to — don't bulk-transform without
   per-conjunct verification.
+  - **Progress 2026-10-12 (slice 1, harness/report-conjuncts-slice1):**
+    converted scenarios 40 (8 conjuncts, hand-counted), 44, 45, 46 (7 each)
+    to call `report_conjuncts` in the `else` branch (decision logic in the
+    `if` untouched; pass count 81 before and after). Added two small helpers
+    `_grep_ok` / `_json_actual` to evaluate grep conjuncts as 0/1 flags and
+    show observed values in labels. Mutation evidence (one expected literal
+    broken in the test, suite exit 1, 80 passed / 1 failed, exactly one
+    conjunct line each): 40 `consecutive_rework_count == 1`; 44
+    `sha == "6b979c77"`; 45 `behavioral_qc == APPROVED`; 46
+    `overall_qc == NEEDS_REWORK`. Remaining highest-count candidates for the
+    next slice (by hand count): scenarios 7a/7b (lines ~572, ~606, ~647: 6-7),
+    47, 48, 41 (~3225, 7), 20g (~1570, 7), 8 (~866, 6), 7e (~706, 6), 5, 6.
 - [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
   `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
   harness/scenario22-race-2440, issue #2440). This turned out to BE the
