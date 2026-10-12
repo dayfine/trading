@@ -88,12 +88,12 @@ let test_placeholder_scenario _ =
       length_scales = None;
       early_stop = None;
       gate_penalty_value = None;
-      int_keys = [];
+      int_keys = [ "k"; "unbound" ];
     }
   in
   assert_that
-    (Spec.sexp_of_t (Wf.wf_spec_with_placeholder_scenario spec))
-    (equal_to (Spec.sexp_of_t { spec with scenarios = [ "walk-forward" ] }))
+    (Wf.wf_spec_with_placeholder_scenario spec)
+    (equal_to ({ spec with scenarios = [ "walk-forward" ] } : Spec.t))
 
 let test_load_aggregate_error_message _ =
   let path = "/nonexistent/aggregate.sexp" in
