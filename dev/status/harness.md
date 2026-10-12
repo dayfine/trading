@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-10-11
+## Last updated: 2026-10-12
 
 ## Recent activity (2026-05-09..22, since last refresh)
 
@@ -1221,6 +1221,14 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     `overall_qc == NEEDS_REWORK`. Remaining highest-count candidates for the
     next slice (by hand count): scenarios 7a/7b (lines ~572, ~606, ~647: 6-7),
     47, 48, 41 (~3225, 7), 20g (~1570, 7), 8 (~866, 6), 7e (~706, 6), 5, 6.
+  - **QC corrections to slice 1 (#3268 merged `7e15b49f`, qc-behavioral 5496910717):**
+    scenario 40 has **9** conjuncts, not 8 (the report already names all 9);
+    47 and 48 count **6**, not 7; the candidate line numbers above are ~11
+    lower than at main. Drift risk for the next slices: each predicate is
+    written twice (`if` and `else`), so editing only the `if` fails with no
+    named conjunct. Before slice 2, consider evaluating each conjunct once
+    into a 0/1 variable and building both the `if` and the report from those.
+    `_json_actual` prints empty (not a placeholder) when the key is missing.
 - [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
   `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
   harness/scenario22-race-2440, issue #2440). This turned out to BE the

@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-12",
+  "feature": "cleanup-twin-match-levels-eps",
+  "branch": "cleanup/twin-match-levels-eps",
+  "sha": "27afef43777ea0191a90e1222a5d992c00630601",
+  "recorded_at_ns": 1791842373472566521,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
