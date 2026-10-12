@@ -317,6 +317,10 @@
  (finding "committed NYSE breadth fixture held one 1965 row then 2017+, and Ad_bars.load filled only the tail, so 26y runs had no A-D breadth 2000-2016")
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_ad_bars_fixture.ml"
                 "fixture: composed breadth has no gap over 1998-2020"))
+         (unit ("trading/trading/weinstein/strategy/test/test_ad_bars_fixture.ml"
+                "fixture: Unicorn breadth alone has no gap over 1998-2020"))
          (unit ("trading/trading/weinstein/strategy/test/test_ad_bars_compose.ml"
-                "compose: Synthetic fills an interior Unicorn gap"))))
+                "compose: Synthetic fills an interior Unicorn gap"))
+         (unit ("trading/trading/weinstein/strategy/test/test_ad_bars_compose.ml"
+                "gap_warnings: one documented line per wide hole"))))
  (status fixed))

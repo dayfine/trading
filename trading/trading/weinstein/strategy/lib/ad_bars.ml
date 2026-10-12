@@ -123,6 +123,18 @@ let gaps_in_window bars ~start_date ~end_date ~max_gap_days =
   in
   _date_gaps ((start_date :: inside) @ [ end_date ]) ~max_gap_days
 
+let _format_gap_warning (lo, hi) =
+  sprintf
+    "WARNING: AD breadth gap %s -> %s (%d calendar days) inside the run \
+     window; A-D macro indicators are frozen there"
+    (Date.to_string lo) (Date.to_string hi) (Date.diff hi lo)
+
+let gap_warnings bars ~skip ~start_date ~end_date ~max_gap_days =
+  if skip then []
+  else
+    gaps_in_window bars ~start_date ~end_date ~max_gap_days
+    |> List.map ~f:_format_gap_warning
+
 (* ------------------------------------------------------------------ *)
 (* Composition: Unicorn preferred, Synthetic fills tail + interior gaps *)
 (* ------------------------------------------------------------------ *)

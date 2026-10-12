@@ -99,6 +99,21 @@ val gaps_in_window :
     [max_gap_days]. Used at backtest setup to warn when breadth is missing
     inside the run. *)
 
+val gap_warnings :
+  Macro.ad_bar list ->
+  skip:bool ->
+  start_date:Core.Date.t ->
+  end_date:Core.Date.t ->
+  max_gap_days:int ->
+  string list
+(** [gap_warnings bars ~skip ~start_date ~end_date ~max_gap_days] formats one
+    line per {!gaps_in_window} gap, in order, without a trailing newline:
+    [WARNING: AD breadth gap <lo> -> <hi> (<n> calendar days) inside the run
+     window; A-D macro indicators are frozen there]. Returns [[]] when [skip] is
+    [true] (the caller armed [skip_ad_breadth], a degraded mode announced at
+    load). The backtest runner prints these to stderr at setup so a missing
+    breadth input is never a silent frozen indicator (issue #3238). *)
+
 (** {1 Composed loader} *)
 
 val load_with :

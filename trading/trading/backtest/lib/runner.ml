@@ -381,23 +381,14 @@ let _ad_breadth_warn_gap_days = 14
     hole wider than [_ad_breadth_warn_gap_days] inside
     [[warmup_start, end_date]]. A missing breadth input otherwise reads to the
     macro analyzer as a frozen indicator, never as n/a (issue #3238). Silent
-    when [skip_ad_breadth] is armed: that degraded mode is announced at load. *)
-let _print_ad_breadth_gap (lo, hi) =
-  eprintf
-    "WARNING: AD breadth gap %s -> %s (%d calendar days) inside the run \
-     window; A-D macro indicators are frozen there\n\
-     %!"
-    (Date.to_string lo) (Date.to_string hi) (Date.diff hi lo)
-
+    when [skip_ad_breadth] is armed: that degraded mode is announced at load.
+    The lines come from {!Weinstein_strategy.Ad_bars.gap_warnings}, which is
+    unit-tested in [test_ad_bars_compose.ml]. *)
 let _warn_ad_breadth_gaps ~(deps : _deps) ~warmup_start ~end_date =
-  let gaps =
-    if deps.config.skip_ad_breadth then []
-    else
-      Weinstein_strategy.Ad_bars.gaps_in_window deps.ad_bars
-        ~start_date:warmup_start ~end_date
-        ~max_gap_days:_ad_breadth_warn_gap_days
-  in
-  List.iter gaps ~f:_print_ad_breadth_gap
+  Weinstein_strategy.Ad_bars.gap_warnings deps.ad_bars
+    ~skip:deps.config.skip_ad_breadth ~start_date:warmup_start ~end_date
+    ~max_gap_days:_ad_breadth_warn_gap_days
+  |> List.iter ~f:(eprintf "%s\n%!")
 
 let _log_backtest_window ~start_date ~end_date ~warmup_start ~deps =
   _warn_ad_breadth_gaps ~deps ~warmup_start ~end_date;

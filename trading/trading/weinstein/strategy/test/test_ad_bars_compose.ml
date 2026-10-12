@@ -225,16 +225,29 @@ let _bar date advancing declining : Macro.ad_bar =
 
 (* Unicorn: 1965-03-01, then 2017-01-02 and 2017-01-03 — the shape of the old
    fixture. Synthetic covers 1998-01-05, 1998-01-06 (inside the hole), 1964-12-31
-   (before Unicorn starts) and 2017-01-03 (overlap). *)
+   (before Unicorn starts), 2017-01-03 (tail-cutoff overlap), and sentinel rows
+   ON the hole endpoints 1965-03-01 and 2017-01-02 (7777/6666). The hole is open
+   at both ends, so Unicorn keeps the endpoint dates and no sentinel appears. *)
 let test_compose_fills_interior_gap _ =
   with_breadth_files
     ~unicorn_advn:(Some "19650301, 550\n20170102, 1360\n20170103, 2308\n")
     ~unicorn_decln:(Some "19650301, 400\n20170102, 1600\n20170103, 700\n")
     ~synthetic_advn:
-      (Some "19641231, 1\n19980105, 184\n19980106, 112\n20170103, 9999\n")
+      (Some
+         "19641231, 1\n\
+          19650301, 7777\n\
+          19980105, 184\n\
+          19980106, 112\n\
+          20170102, 7777\n\
+          20170103, 9999\n")
     ~synthetic_decln:
-      (Some "19641231, 2\n19980105, 120\n19980106, 190\n20170103, 8888\n")
-    (fun data_dir ->
+      (Some
+         "19641231, 2\n\
+          19650301, 6666\n\
+          19980105, 120\n\
+          19980106, 190\n\
+          20170102, 6666\n\
+          20170103, 8888\n") (fun data_dir ->
       assert_that
         (Weinstein_strategy.Ad_bars.load ~data_dir)
         (elements_are
@@ -347,6 +360,42 @@ let test_gaps_in_window_covered _ =
     is_empty
 
 (* ------------------------------------------------------------------ *)
+(* Run-level gap warnings (the runner prints these at setup)            *)
+(* ------------------------------------------------------------------ *)
+
+(* The runner's threshold: 14 calendar days. *)
+let _warn_gap_days = 14
+
+let test_gap_warnings_one_line_per_wide_hole _ =
+  (* 2000-01-04 -> 2000-01-20 is 16 days: one warning, documented text. *)
+  assert_that
+    (Weinstein_strategy.Ad_bars.gap_warnings _gap_bars ~skip:false
+       ~start_date:(_d "2000-01-03") ~end_date:(_d "2000-01-21")
+       ~max_gap_days:_warn_gap_days)
+    (elements_are
+       [
+         equal_to
+           "WARNING: AD breadth gap 2000-01-04 -> 2000-01-20 (16 calendar \
+            days) inside the run window; A-D macro indicators are frozen there";
+       ])
+
+let test_gap_warnings_silent_on_skip _ =
+  assert_that
+    (Weinstein_strategy.Ad_bars.gap_warnings _gap_bars ~skip:true
+       ~start_date:(_d "2000-01-03") ~end_date:(_d "2000-01-21")
+       ~max_gap_days:_warn_gap_days)
+    is_empty
+
+let test_gap_warnings_silent_on_market_closure _ =
+  (* The 2001-09-10 -> 2001-09-17 NYSE closure (7 days) is not a data gap. *)
+  assert_that
+    (Weinstein_strategy.Ad_bars.gap_warnings
+       [ _bar "2001-09-10" 1 1; _bar "2001-09-17" 1 1 ]
+       ~skip:false ~start_date:(_d "2001-09-10") ~end_date:(_d "2001-09-17")
+       ~max_gap_days:_warn_gap_days)
+    is_empty
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -382,6 +431,12 @@ let suite =
          >:: test_gaps_in_window_empty_series;
          "gaps_in_window: covered window has no gap"
          >:: test_gaps_in_window_covered;
+         "gap_warnings: one documented line per wide hole"
+         >:: test_gap_warnings_one_line_per_wide_hole;
+         "gap_warnings: silent when skip_ad_breadth is armed"
+         >:: test_gap_warnings_silent_on_skip;
+         "gap_warnings: silent on a 7-day market closure"
+         >:: test_gap_warnings_silent_on_market_closure;
        ]
 
 let () = run_test_tt_main suite
