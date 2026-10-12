@@ -28,7 +28,8 @@ let detect_split ~bar_reader ~symbol ~as_of =
 (* Rescale a single symbol's stop_state in place. No-ops when no entry is
    present in [stop_states] (position with no stop registered yet) or when
    no split is detected. *)
-let _adjust_one ~bar_reader ~as_of ~stop_states symbol =
+let _adjust_one ~on_split ~bar_reader ~as_of ~stop_states (pos : Position.t) =
+  let symbol = pos.symbol in
   match Map.find !stop_states symbol with
   | None -> ()
   | Some state -> (
@@ -36,8 +37,9 @@ let _adjust_one ~bar_reader ~as_of ~stop_states symbol =
       | None -> ()
       | Some factor ->
           let scaled = Weinstein_stops.Stop_split_adjust.scale ~factor state in
-          stop_states := Map.set !stop_states ~key:symbol ~data:scaled)
+          stop_states := Map.set !stop_states ~key:symbol ~data:scaled;
+          on_split ~position_id:pos.id ~factor)
 
-let adjust ~positions ~stop_states ~bar_reader ~as_of =
-  Map.iter positions ~f:(fun (pos : Position.t) ->
-      _adjust_one ~bar_reader ~as_of ~stop_states pos.symbol)
+let adjust ?(on_split = fun ~position_id:_ ~factor:_ -> ()) ~positions
+    ~stop_states ~bar_reader ~as_of () =
+  Map.iter positions ~f:(_adjust_one ~on_split ~bar_reader ~as_of ~stop_states)

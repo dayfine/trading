@@ -144,7 +144,9 @@ type stop_info = {
           the basis [trades.csv] restates [entry_price] onto, so [entry_stop],
           [max_stop] and [exit_stop] of one row compare directly with its prices
           (CTO 2021: 50.38 pre-split became 16.79 beside an entry of 19.48).
-          Without stop decisions it stays the level as installed.
+          {!record_stop_split} applies the same rescale explicitly, whether or
+          not a stop decision follows the split. With neither, it stays the
+          level as installed.
 
           [None] when no source ever reported a level. *)
   exit_stop : float option;
@@ -179,8 +181,9 @@ type stop_info = {
           holding a {e less} protective level than the log's current one, that
           gap is a split rescale (the machine never gives ground otherwise), and
           [max_stop] is rescaled by the same factor so it stays on the current
-          price basis as [exit_stop] and the two compare directly. Without stop
-          decisions (a stream of transitions only) it remains a high-water mark
+          price basis as [exit_stop] and the two compare directly;
+          {!record_stop_split} does the same explicitly. With neither (a stream
+          of transitions only) it remains a high-water mark
           over raw installed levels: on a position that went through a split it
           stays on the pre-split price scale while [exit_stop] is post-split, so
           compare the two only within one price scale. *)
@@ -301,8 +304,25 @@ val record_stop_decision :
       once, whichever arrives first.
 
     A reverse split for a long (stop moved {e up} by a rescale), or a forward
-    split for a short (stop moved {e down}), reads as a raise: this function
-    sees levels, not the split factor, so it cannot tell the two apart. *)
+    split for a short (stop moved {e down}), reads as a raise {e here}: this
+    function sees levels, not the split factor, so it cannot tell the two apart.
+    When the backtest wires {!record_stop_split}, the rescale arrives first and
+    this function sees no gap at all. *)
+
+val record_stop_split : t -> position_id:string -> factor:float -> unit
+(** Observe a split rescale of [position_id]'s stop (issue #3127). The backtest
+    wires this to [Audit_recorder.t.record_stop_split], which
+    [Stops_split_runner.adjust] fires before the tick's stop decisions.
+
+    {!stop_info.entry_stop}, the current level ({!stop_info.exit_stop}) and
+    {!stop_info.max_stop} are each divided by [factor], the same arithmetic the
+    stop machine applies to its own state. Every stop column then sits on the
+    price basis [trades.csv] restates [entry_price] onto, even when no stop
+    decision follows the split before the exit (the AVD-wein-175 shape). The
+    rescale is never a raise, so {!stop_info.n_stop_raises} is unchanged in
+    either direction, and a reverse split on a long no longer counts as one.
+
+    A position the log has never seen is ignored. *)
 
 val get_stop_infos : t -> stop_info list
 (** Return stop info for all positions that have been observed, sorted by

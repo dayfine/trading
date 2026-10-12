@@ -133,6 +133,7 @@ let noop : t =
     record_fill_volume = (fun _ -> ());
     record_stop_move = (fun _ -> ());
     record_stop_decision = (fun _ -> ());
+    record_stop_split = (fun ~position_id:_ ~factor:_ -> ());
     record_reissue = (fun _ -> ());
     capture_candidates = false;
   }

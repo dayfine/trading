@@ -146,7 +146,7 @@ let test_no_split_leaves_stop_state_untouched _ =
   in
   let stop_states = ref (String.Map.singleton symbol initial_stop) in
   Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:(Date.of_string "2024-08-27");
+    ~as_of:(Date.of_string "2024-08-27") ();
   assert_that
     (Map.find !stop_states symbol)
     (is_some_and (equal_to initial_stop))
@@ -167,7 +167,7 @@ let test_forward_4_to_1_scales_initial_stop _ =
   in
   let stop_states = ref (String.Map.singleton symbol initial_stop) in
   Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:(Date.of_string "2024-08-28");
+    ~as_of:(Date.of_string "2024-08-28") ();
   assert_that
     (Map.find !stop_states symbol)
     (is_some_and
@@ -198,7 +198,7 @@ let test_forward_4_to_1_scales_trailing_stop _ =
   in
   let stop_states = ref (String.Map.singleton symbol trailing) in
   Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:(Date.of_string "2024-08-28");
+    ~as_of:(Date.of_string "2024-08-28") ();
   assert_that
     (Map.find !stop_states symbol)
     (is_some_and
@@ -236,7 +236,7 @@ let test_split_day_no_spurious_stop_hit _ =
             { stop_level = 440.0; reference_level = 448.0 }))
   in
   Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:(Date.of_string "2024-08-28");
+    ~as_of:(Date.of_string "2024-08-28") ();
   let split_day_bar =
     List.nth_exn bars 2
     (* the split day: low 124 *)
@@ -285,7 +285,7 @@ let test_real_adverse_move_after_split_still_triggers _ =
   in
   (* Run on the split day (bar index 1 = today). *)
   Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:(Date.of_string "2024-08-27");
+    ~as_of:(Date.of_string "2024-08-27") ();
   (* Now check the post-split adverse bar. *)
   let adverse_bar = List.nth_exn bars 2 in
   let scaled = Map.find_exn !stop_states symbol in
@@ -306,8 +306,47 @@ let test_position_without_stop_state_is_noop _ =
   let positions = String.Map.singleton symbol pos in
   let stop_states = ref String.Map.empty in
   Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:(Date.of_string "2024-08-28");
+    ~as_of:(Date.of_string "2024-08-28") ();
   assert_that (Map.is_empty !stop_states) (equal_to true)
+
+
+(* Pin (#3127): [on_split] reports the rescale it made — the position id and
+   the factor every level was divided by — so the per-trade stop log can apply
+   the same rescale. Called once for the 4:1 split day, never on a flat day. *)
+let _on_split_calls ~bars ~as_of =
+  let symbol = "AAPL" in
+  let bar_reader = _bar_reader_of_one_symbol ~symbol bars in
+  let pos =
+    _make_holding_pos ~symbol ~entry_price:500.0
+      ~entry_date:(Date.of_string "2024-08-26")
+  in
+  let stop_states =
+    ref
+      (String.Map.singleton symbol
+         (Weinstein_stops.Initial { stop_level = 440.0; reference_level = 448.0 }))
+  in
+  let calls = ref [] in
+  Stops_split_runner.adjust
+    ~on_split:(fun ~position_id ~factor ->
+      calls := (position_id, factor) :: !calls)
+    ~positions:(String.Map.singleton symbol pos)
+    ~stop_states ~bar_reader ~as_of:(Date.of_string as_of) ();
+  List.rev !calls
+
+let test_on_split_reports_position_and_factor _ =
+  assert_that
+    (_on_split_calls ~bars:(_split_bars ~symbol:"AAPL") ~as_of:"2024-08-28")
+    (elements_are
+       [
+         all_of
+           [
+             field fst (equal_to "AAPL");
+             field snd (float_equal 4.0);
+           ];
+       ])
+
+let test_on_split_silent_without_split _ =
+  assert_that (_on_split_calls ~bars:_flat_bars ~as_of:"2024-08-27") (size_is 0)
 
 (* Suite. *)
 
@@ -328,4 +367,8 @@ let () =
            >:: test_real_adverse_move_after_split_still_triggers;
            "position without stop_state entry is a no-op"
            >:: test_position_without_stop_state_is_noop;
+           "on_split reports the position and factor (#3127)"
+           >:: test_on_split_reports_position_and_factor;
+           "on_split is silent without a split (#3127)"
+           >:: test_on_split_silent_without_split;
          ])

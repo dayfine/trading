@@ -36,7 +36,11 @@ let _update_stop level =
 
 (* One step of the drive: a transition the strategy returned, or a stop-machine
    decision the strategy reported through its audit recorder. *)
-type step = Trans of Position.transition | Decision of float * float
+type step =
+  | Trans of Position.transition
+  | Decision of float * float
+  | Split of float
+      (** The strategy rescaled the stop for a split by this factor (#3127). *)
 
 (* Book [installed] the way the entry-decision audit does, then replay
    [steps] in order, and return the position's single [stop_info]. *)
@@ -48,7 +52,8 @@ let _run ~installed steps : Stop_log.stop_info =
     | Trans t -> Stop_log.record_transitions log [ t ]
     | Decision (stop_before, stop_after) ->
         Stop_log.record_stop_decision log ~position_id:_pid ~stop_before
-          ~stop_after);
+          ~stop_after
+    | Split factor -> Stop_log.record_stop_split log ~position_id:_pid ~factor);
   match Stop_log.get_stop_infos log with
   | [ info ] -> info
   | infos ->
@@ -238,6 +243,70 @@ let test_aaon_row_stop_columns_on_fill_basis _ =
     (_row ~info ~entry_price:83.43 ~exit_price:79.18)
     (equal_to [ "83.43"; "79.18"; _cents 55.475; "79.18" ])
 
+(* Explicit split events (#3127, remaining shapes) ------------------------ *)
+
+(* The AVD-wein-175 shape: a 2:1 split while held and no stop decision between
+   it and the exit. Without the split event every stop column stayed on the
+   pre-split basis (entry 40, max 44, exit 44) beside a restated entry price.
+   With it all three are halved, and the rescale is not a raise. *)
+let _avd_steps =
+  [
+    Trans _create_entering;
+    Trans _entry_complete_no_stop;
+    Decision (40.00, 40.00);
+    Decision (40.00, 44.00);
+    Trans (_update_stop 44.00);
+    Split 2.0;
+  ]
+
+let test_avd_split_without_decision_rescales_every_column _ =
+  assert_that
+    (_run ~installed:40.00 _avd_steps)
+    (_columns ~entry_stop:20.00 ~max_stop:22.00 ~exit_stop:22.00
+       ~n_stop_raises:1)
+
+(* A 1:10 reverse split on a long moves the stop UP by the rescale. Before the
+   split event the log read that as a raise (entry 2.00 pre-split, max and exit
+   20.00, one raise). Now it is the same stop on a new basis: every column
+   reads 20.00 and nothing counts as a raise. *)
+let test_reverse_split_long_is_not_a_raise _ =
+  assert_that
+    (_run ~installed:2.00
+       [
+         Trans _create_entering;
+         Trans _entry_complete_no_stop;
+         Decision (2.00, 2.00);
+         Split 0.1;
+         Decision (2.00 /. 0.1, 2.00 /. 0.1);
+       ])
+    (_columns ~entry_stop:20.00 ~max_stop:20.00 ~exit_stop:20.00
+       ~n_stop_raises:0)
+
+(* The CTO shape with the split event arriving before the decision, as the
+   strategy orders them: the decision then shows no gap, so the columns are
+   rescaled once, not twice. *)
+let test_cto_split_event_then_decision_rescales_once _ =
+  assert_that
+    (_run ~installed:50.38
+       [
+         Trans _create_entering;
+         Trans _entry_complete_no_stop;
+         Decision (50.38, 50.38);
+         Split 3.0;
+         Decision (50.38 /. 3.0, 18.49);
+         Trans (_update_stop 18.49);
+       ])
+    (_columns ~entry_stop:(50.38 /. 3.0) ~max_stop:18.49 ~exit_stop:18.49
+       ~n_stop_raises:1)
+
+(* The AVD row through the real writer: entry price restated to the exit
+   basis (25.10), exit 21.90, and every stop column on that basis too. *)
+let test_avd_row_stop_columns_on_price_basis _ =
+  assert_that
+    (_row ~info:(_run ~installed:40.00 _avd_steps) ~entry_price:25.10
+       ~exit_price:21.90)
+    (equal_to [ "25.10"; "21.90"; "20.00"; "22.00" ])
+
 let suite =
   "Stop_log machine sync"
   >::: [
@@ -254,6 +323,14 @@ let suite =
          >:: test_cto_row_stop_columns_on_price_basis;
          "trades.csv AAON row: stop columns on the fill basis (#3127)"
          >:: test_aaon_row_stop_columns_on_fill_basis;
+         "split without a later decision rescales every column (AVD, #3127)"
+         >:: test_avd_split_without_decision_rescales_every_column;
+         "reverse split on a long is not a raise (#3127)"
+         >:: test_reverse_split_long_is_not_a_raise;
+         "split event then decision rescales once (CTO, #3127)"
+         >:: test_cto_split_event_then_decision_rescales_once;
+         "trades.csv AVD row: stop columns on the price basis (#3127)"
+         >:: test_avd_row_stop_columns_on_price_basis;
        ]
 
 let () = run_test_tt_main suite

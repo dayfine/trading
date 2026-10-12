@@ -253,6 +253,13 @@ let _record_stop_decision ~trade_audit ~stop_log
       Stop_log.record_stop_decision log ~position_id:d.position_id
         ~stop_before:d.stop_before ~stop_after:d.stop_after)
 
+(* Issue #3127: the strategy rescaled this position's stop state for a split;
+   the stop log rescales its levels by the same factor, so every stop column
+   stays on the basis [trades.csv] restates the entry onto. *)
+let _record_stop_split ~stop_log ~position_id ~factor =
+  Option.iter stop_log ~f:(fun log ->
+      Stop_log.record_stop_split log ~position_id ~factor)
+
 (* #2989: copy the original placement row forward under the re-issued id, and
    book its installed stop there too (the re-issue re-installs the same plan). *)
 let _record_reissue ~trade_audit ~stop_log (e : AR.reissue_event) =
@@ -290,4 +297,5 @@ let of_collector ?candidate_log ?stop_log ~(trade_audit : Trade_audit.t)
     record_stop_move = _record_stop_move ~stop_log;
     record_reissue = _record_reissue ~trade_audit ~stop_log;
     record_stop_decision = _record_stop_decision ~trade_audit ~stop_log;
+    record_stop_split = _record_stop_split ~stop_log;
   }

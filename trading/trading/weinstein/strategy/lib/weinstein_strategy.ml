@@ -166,8 +166,9 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
     Stop_move_capture.split_then_update ~audit_recorder ~positions ~stop_states
       ~current_date
       ~split_adjust:(fun () ->
-        Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-          ~as_of:current_date;
+        Stops_split_runner.adjust
+          ~on_split:audit_recorder.Audit_recorder.record_stop_split ~positions
+          ~stop_states ~bar_reader ~as_of:current_date ();
         Stops_dividend_runner.adjust ~positions ~stop_states ~bar_reader
           ~as_of:current_date)
       ~update:(fun () ->

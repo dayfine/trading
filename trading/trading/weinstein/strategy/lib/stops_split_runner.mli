@@ -36,10 +36,12 @@ val detect_split :
 *)
 
 val adjust :
+  ?on_split:(position_id:string -> factor:float -> unit) ->
   positions:Position.t Map.M(String).t ->
   stop_states:Weinstein_stops.stop_state Map.M(String).t ref ->
   bar_reader:Bar_reader.t ->
   as_of:Date.t ->
+  unit ->
   unit
 (** [adjust ~positions ~stop_states ~bar_reader ~as_of] mutates [stop_states] so
     any stop level on a symbol that just split (between the prior trading day's
@@ -59,5 +61,11 @@ val adjust :
     [Stop_split_adjust.scale], which only rejects non-positive factors — a
     contract guaranteed by [Split_detector.detect_split]).
 
+    [on_split], when given, is called once per held position whose stop state
+    was rescaled, with the position id and the factor used (issue #3127). It is
+    an observability hook: [Stop_log] uses it to rescale its stop columns by the
+    same factor, so they stay on the price basis of the exit. Defaults to a
+    no-op; the rescale itself is identical with or without it.
+
     Pure with respect to [bar_reader] and [positions]; the only side-effect is
-    the in-place update of [stop_states]. *)
+    the in-place update of [stop_states] and the [on_split] calls. *)

@@ -274,6 +274,18 @@ let _resync_to_machine record ~level =
       _rescale_to record ~current ~level
   | Some _ | None -> ()
 
+(* Issue #3127: an explicit split rescale. Every level is divided by [factor]
+   exactly as [Stop_split_adjust.scale] divides the machine's, so the next
+   decision's [stop_before] equals the current level and [_resync_to_machine]
+   is a no-op. Never a raise, in either direction: a reverse split on a long
+   moves the stop up, but it is the same stop on a new basis. *)
+let record_stop_split t ~position_id ~factor =
+  Option.iter (Hashtbl.find t.positions position_id) ~f:(fun record ->
+      let rescale = Option.map ~f:(fun level -> level /. factor) in
+      record.pos_entry_stop <- rescale record.pos_entry_stop;
+      record.pos_current_stop <- rescale record.pos_current_stop;
+      record.pos_max_stop <- rescale record.pos_max_stop)
+
 let record_stop_decision t ~position_id ~stop_before ~stop_after =
   let record = _ensure_record t ~position_id ~symbol:"" in
   if record.pos_seen_decision then _resync_to_machine record ~level:stop_before

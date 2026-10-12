@@ -408,6 +408,13 @@ type t = {
           per position per tick (rows are thinned by the sink, not here).
           Observability only — the record is built from the advance the runner
           already made, so any sink leaves every decision unchanged. *)
+  record_stop_split : position_id:string -> factor:float -> unit;
+      (** Invoked by {!Stops_split_runner.adjust} once per position whose stop
+          state it rescaled for a split, with the factor it divided every level
+          by (issue #3127). It runs before the tick's stop decisions, so a
+          per-trade stop log can rescale its levels by the same factor and stay
+          on the basis of the exit. Observability only: the rescale is identical
+          with or without a sink. *)
   capture_candidates : bool;
       (** Whether the strategy should populate {!cascade_event.candidates}.
           [false] in {!noop}, and therefore in live mode and every test that
