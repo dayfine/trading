@@ -420,12 +420,13 @@ const chartCache = {};
 const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open'];
 load('manifest.json').then(man => {
   D.man = man; const ids = man.runs.map(r => r.id);
-  return Promise.all([...KINDS.flatMap(k => ids.map(id => load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json')]);
+  return Promise.all([...KINDS.flatMap(k => ids.map(id => load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json'), load('spy_warmup.json').catch(() => [])]);
 }).then(r => {
   const n = D.man.runs.length;
   KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
   D.spyTR = r[KINDS.length * n]; D.macro = r[KINDS.length * n + 1]; D.spyPrice = r[KINDS.length * n + 2];
   D.spy = D[basisView(D.meta[D.man.charts_run || 0].basis).series];
+  D.spyRegime = withWarmup(r[KINDS.length * n + 3], D.spy, D.meta[D.man.charts_run || 0].basis);
   D.trades.forEach(ts => ts.forEach(t => { t.flags = FLAGS.filter(f => f.test(t)).map(f => f.id); t.yr = t.ed.slice(0, 4); t.tr = tradeTR(t); }));
   init();
 }).catch(e => { $('main').innerHTML = `<div class="empty">Could not load the data files (${e.message}).</div>`; });
@@ -479,11 +480,12 @@ function spyOnNavDates(nav, series = D.spy) {
 /* ---------- Signals: eras vs SPY, regime x era, one-trade years ---------- */
 // SPY regime per day, by the book's lens: the weekly close vs its 30-week MA and
 // the MA's 4-week slope. A week's regime is known at its last close and applies to
-// the FOLLOWING week's days (no look-ahead). '' until 34 weeks of history exist.
-function spyRegimeByDay() {
+// the FOLLOWING week's days (no look-ahead). '' until 34 weeks of history exist, so the
+// page passes D.spyRegime: the in-window SPY behind its pre-window warm-up (withWarmup, #3194).
+function spyRegimeByDay(series = D.spyRegime || D.spy) {
   const closes = [], out = new Map(); let wk = null, last = null, cur = '';
   const ma = n => { let s = 0; for (let i = n - 30; i < n; i++) s += closes[i]; return s / 30; };
-  for (const [d, v] of D.spy) {
+  for (const [d, v] of series) {
     const k = isoWeek(d);
     if (k !== wk && last != null) {
       closes.push(last); const n = closes.length;
@@ -532,9 +534,9 @@ const REGIME_TXT = {
 // at column 0 for that extraction.
 // The return rests on positions still open at the end: NAV move minus realised
 // P&L is >= 10 % of start NAV and at least half the NAV move (or of the opposite
-// sign to realised).
-function openSignal(nav0, move, real) {
-  const open = move - real;
+// sign to realised). open is that P&L with the run's cash flows netted (openPnl, #3194);
+// it defaults to the raw remainder move - real.
+function openSignal(nav0, move, real, open = move - real) {
   return Math.abs(open) >= 0.1 * nav0 && (Math.sign(real) !== Math.sign(move) || Math.abs(open) >= 0.5 * Math.abs(move));
 }
 // A year one trade decided: |excess vs SPY| >= 10 pp and the top realised trade
@@ -596,6 +598,78 @@ function cashRejectionLine(c) {
   if (!c || !c.count) return '';
   return `<b>Entries cancelled at the fill for cash:</b> ${c.count} ${c.count === 1 ? 'ticket' : 'tickets'} filled at the engine but the book could not fund ${c.count === 1 ? 'it' : 'them'}; ${c.near} ${c.near === 1 ? 'was' : 'were'} at least 90 % funded (<code>cash_rejection</code> in <code>trade_audit.sexp</code>).`;
 }
+// Regime warm-up (#3194): spy_warmup.json holds the SPY bars before the window, [date, adjusted_close,
+// close], published for the regime only (review_pack.sh REGIME_WARMUP_ROWS). The regime reads that warm-up
+// on the run's basis (price -> close) followed by the in-window series, so the window's first 34 weeks get
+// UP / MIXED / DOWN too. Pure, for the test.
+function withWarmup(warm, spy, basis) {
+  const col = spyBasis(basis) === 'price' ? 2 : 1, first = spy.length ? spy[0][0] : '';
+  return [...(warm || []).filter(r => r[0] < first).map(r => [r[0], +r[col]]), ...spy];
+}
+// The commission the backtest runner charges per fill (runner.ml: $0.01 a share, $1 minimum).
+const COMMISSION_PER_SHARE = 0.01, COMMISSION_MIN = 1;
+// Open-position P&L at the window end (#3194), for openSignal. The run's UnrealizedPnl (marked value minus
+// cost basis) when the summary carries it. Otherwise the NAV move minus realised P&L with the run's other
+// cash flows taken out: dividends received (DividendIncomeTotal, else the trade rows' Div $), dividends
+// paid on shorts, cash interest, and the commission on every fill (two per closed trade, one per position
+// still open). Margin interest and borrow fees have no metric and stay in that remainder. m = meta.metrics;
+// open = <run>_open.json rows. Returns { open, src: 'unrealised' | 'netted', costs }. Pure, for the test.
+function openPnl(m, move, real, trades, open) {
+  if (m.unrealizedpnl != null) return { open: m.unrealizedpnl, src: 'unrealised', costs: 0 };
+  const fee = q => Math.max(COMMISSION_MIN, COMMISSION_PER_SHARE * Math.abs(q || 0));
+  const comm = trades.reduce((a, t) => a + 2 * fee(t.qty), 0) + (open || []).reduce((a, o) => a + fee(o.qty), 0);
+  const divs = m.dividendincometotal != null ? m.dividendincometotal : trades.reduce((a, t) => a + (t.div || 0), 0);
+  const costs = divs - (m.dividendpaidshorttotal || 0) + (m.cashinteresttotal || 0) - comm;
+  return { open: move - real - costs, src: 'netted', costs };
+}
+// Sub-$17 margin-call churn (#3194): shorts bought back by a margin call (the exits V16 counts as fallback),
+// and how many were entered under MARGIN_CHURN_PRICE. On the short-only Phase A pack (soT) V16 showed 68 vs
+// 50 margin calls between arms, clustered on low-priced shorts. Fires at >= MARGIN_CHURN_MIN such calls
+// that are also >= MARGIN_CHURN_SHARE of all margin calls. repeat = low-priced symbols called more than
+// once (the churn: re-shorted after a buy-back). Pure, for the test.
+const MARGIN_CHURN_PRICE = 17, MARGIN_CHURN_MIN = 5, MARGIN_CHURN_SHARE = 0.5;
+function marginChurn(trades) {
+  const calls = trades.filter(t => t.trig === 'margin_call' && t.side === 'SHORT'), low = calls.filter(t => t.ep < MARGIN_CHURN_PRICE), per = {};
+  low.forEach(t => { per[t.sym] = (per[t.sym] || 0) + 1; });
+  const counts = Object.values(per);
+  return { calls: calls.length, low: low.length, syms: counts.length, repeat: counts.filter(n => n > 1).length, pnl: low.reduce((a, t) => a + t.pnl, 0),
+    fires: low.length >= MARGIN_CHURN_MIN && low.length >= MARGIN_CHURN_SHARE * calls.length };
+}
+// V16's violation count from meta.validator ('N violations' or 'PASS'); null when the report has no V16.
+function v16Count(validator) {
+  const v = (validator || []).find(x => x.id === 'V16');
+  if (!v) return null;
+  const m = /(\d+) violations?/.exec(v.status || '');
+  return m ? +m[1] : 0;
+}
+// The margin-churn bullet, or '' when it does not fire. v16 = v16Count(..); runs = [[label, low count]]
+// for every run when there is more than one. Pure, for the test.
+function marginChurnLine(c, v16, runs) {
+  if (!c.fires) return '';
+  return `<b>Margin-call churn under $${MARGIN_CHURN_PRICE}:</b> ${c.low} of ${c.calls} margin calls bought back shorts entered under $${MARGIN_CHURN_PRICE}, on ${c.syms} ${c.syms === 1 ? 'symbol' : 'symbols'} (${c.repeat} called more than once), for ${usdk(c.pnl)}${v16 != null ? `; V16 counts ${v16} fallback exits in all` : ''}.${runs && runs.length > 1 ? ` By run: ${runs.map(([l, n]) => `${l} ${n}`).join(', ')}.` : ''} A cheap short moves furthest per dollar of margin, so a small rally forces the buy-back: read the short leg's price floor before its P&amp;L.`;
+}
+// Give-back after the NAV peak (#3194): open gains held at the NAV peak and given back before the window
+// ends. Open gain at the peak = NAV at the peak minus start NAV minus the P&L of trades closed by then (an
+// upper read: cash flows to date sit in it, as in the un-netted open-position remainder). Fires when that
+// open gain is >= GIVEBACK_OPEN_PCT % of start NAV and the NAV falls from the peak to the end by
+// >= GIVEBACK_SHARE of it. nav = [[date, value, ...]]; trades carry ed, xd, pnl; open = rows still held at
+// the end (ed). null when the peak is the last day. Pure, for the test.
+const GIVEBACK_OPEN_PCT = 10, GIVEBACK_SHARE = 0.5;
+function navPeakGiveback(nav, trades, open) {
+  if (nav.length < 2) return null;
+  let p = 0; nav.forEach((r, i) => { if (r[1] > nav[p][1]) p = i; });
+  if (p === nav.length - 1) return null;
+  const d = nav[p][0], nav0 = nav[0][1], peak = nav[p][1], end = nav[nav.length - 1][1];
+  const realBy = trades.filter(t => t.xd <= d).reduce((a, t) => a + t.pnl, 0), held = trades.filter(t => t.ed <= d && t.xd > d);
+  const openAtPeak = peak - nav0 - realBy, giveback = peak - end;
+  return { d, peak, end, openAtPeak, giveback, held: held.length + (open || []).filter(o => o.ed <= d).length, heldPnl: held.reduce((a, t) => a + t.pnl, 0),
+    fires: openAtPeak >= GIVEBACK_OPEN_PCT / 100 * nav0 && giveback >= GIVEBACK_SHARE * openAtPeak };
+}
+// The give-back bullet, or '' when g is null or does not fire. Pure, for the test.
+function givebackLine(g) {
+  if (!g || !g.fires) return '';
+  return `<b>Gave back open gains after the NAV peak:</b> NAV peaked at ${usdk(g.peak)} on ${g.d} with about ${usdk(g.openAtPeak)} unrealised in the ${g.held} positions then held (NAV above start, less P&amp;L realised by then), and ended at ${usdk(g.end)}: ${usdk(g.giveback)} below the peak. The closed trades among those positions realised ${usdk(g.heldPnl)} in all. The window's return is read at a low point of a held book, not at what it earned.`;
+}
 // Renders the ratio chart + era table; returns finding bullets (HTML strings).
 function renderSignals(nav, spy) {
   const ys = D.years[CH()], reg = spyRegimeByDay();
@@ -638,9 +712,16 @@ function renderSignals(nav, spy) {
     if (one || spread >= 15) out.push(`<b>${y.p} rests on ${one ? `one trade` : `the ${RK()}`}:</b> ${pct(y.ret, 1)} vs SPY ${pct(y.spy, 1)}.${one ? ` ${top.sym} realised ${usdk(top.pnl)} = ${pct(topPct, 1)} of start-of-year NAV, against a ${pct(ex, 1)} gap to SPY.` : ''}${salts.length > 1 ? ` ${RKC()}s made ${salts.map(v => pct(v, 1)).join(' / ')}.` : ''}`);
   }
   // the return rests on positions still open at the end (see openSignal)
-  const nav0 = nav[0][1], move = nav[nav.length - 1][1] - nav0, real = tr.reduce((a, t) => a + t.pnl, 0), open = move - real;
-  if (openSignal(nav0, move, real))
-    out.push(`<b>The return rests on open positions:</b> NAV moved ${usdk(move)}, closed trades realised ${usdk(real)}, so the ${D.meta[CH()].metrics.openpositioncount} positions open at the end carry ${usdk(open)} unmarked by any trade row. Check <code>open_positions.csv</code> before crediting the return to the trade list.`);
+  const nav0 = nav[0][1], move = nav[nav.length - 1][1] - nav0, real = tr.reduce((a, t) => a + t.pnl, 0), openRows = D.open[CH()].rows || [];
+  const op = openPnl(D.meta[CH()].metrics, move, real, tr, openRows), open = op.open;
+  if (openSignal(nav0, move, real, open))
+    out.push(`<b>The return rests on open positions:</b> NAV moved ${usdk(move)}, closed trades realised ${usdk(real)}, so the ${D.meta[CH()].metrics.openpositioncount} positions open at the end carry ${usdk(open)} unmarked by any trade row (${op.src === 'unrealised' ? 'the run’s UnrealizedPnl' : `after taking out ${usdk(op.costs)} of dividends, cash interest and commissions; margin interest and borrow fees are not reported and stay in it`}). Check <code>open_positions.csv</code> before crediting the return to the trade list.`);
+  // open gains held at the NAV peak and given back by the end (see navPeakGiveback)
+  const gb = givebackLine(navPeakGiveback(nav, tr, openRows));
+  if (gb) out.push(gb);
+  // margin calls clustered on low-priced shorts (see marginChurn)
+  const mc = marginChurnLine(marginChurn(tr), v16Count(D.meta[CH()].validator), D.trades.map((ts, i) => [runLabel(i), marginChurn(ts).low]));
+  if (mc) out.push(mc);
   // gate reopen episodes: the flat-through-the-recovery shape (2008-09) and its opposite (invested, lagged)
   const shortBook = tr.length > 0 && tr.every(isShort), eps = reopenEpisodes(D.macro, nav, spy, tr, shortBook ? -1 : 1), ep = e => `${e.d.slice(0, 7)} (${e.e13} ${e.e13 === 1 ? 'entry' : 'entries'} in 13 wk, ${pct(e.ret, 1)} vs SPY ${pct(e.spy, 1)})`;
   const groups = [['sat out', 'Sat out the recovery'], ['invested and lagged', 'Invested and lagged'], ['lagged', 'Lagged']].map(([k, label]) => [label, eps.filter(e => e.flag === k)]).filter(([, l]) => l.length);
