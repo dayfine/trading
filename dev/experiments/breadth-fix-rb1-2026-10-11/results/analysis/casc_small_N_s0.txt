@@ -1,0 +1,2683 @@
+W 2000-01-07 Neutral Neutral_breadth 2448 20 2
+D 2000-01-07 DXC Long Placed
+D 2000-01-07 FR Long Placed
+W 2000-01-14 Neutral Neutral_breadth 2473 20 2
+D 2000-01-14 TWX1 Long Placed
+D 2000-01-14 DIS Long Placed
+W 2000-01-21 Neutral Neutral_breadth 2487 20 0
+W 2000-01-28 Bearish Bearish_breadth 0 0 0
+W 2000-02-04 Neutral Neutral_breadth 2392 20 2
+D 2000-02-04 BKI_old Long Placed
+D 2000-02-04 SFAM Long Placed
+W 2000-02-11 Bearish Bearish_breadth 0 0 0
+W 2000-02-18 Bearish Bearish_breadth 0 0 0
+W 2000-02-25 Bearish Bearish_breadth 0 0 0
+W 2000-03-03 Bearish Bearish_breadth 0 0 0
+W 2000-03-10 Bearish Bearish_breadth 0 0 0
+W 2000-03-17 Neutral Neutral_breadth 2445 20 2
+D 2000-03-17 AMSY Long Placed
+D 2000-03-17 ATYT Long Placed
+W 2000-03-24 Neutral Neutral_breadth 2455 20 1
+D 2000-03-24 TRW1 Long Placed
+W 2000-03-31 Neutral Neutral_breadth 2496 20 1
+D 2000-03-31 APA Long Placed
+D 2000-03-31 CCTYQ Long Skipped_Sized_to_zero
+W 2000-04-07 Neutral Neutral_breadth 2261 20 2
+D 2000-04-07 AXE Long Skipped_Sized_to_zero
+D 2000-04-07 STT Long Placed
+D 2000-04-07 MLKN Long Placed
+D 2000-04-07 TLB Long Skipped_Sized_to_zero
+W 2000-04-14 Neutral Deteriorating 2260 20 2
+D 2000-04-14 EOG Long Placed
+D 2000-04-14 PENN Long Placed
+W 2000-04-28 Neutral Neutral_breadth 2346 20 1
+D 2000-04-28 MGM Long Placed
+W 2000-05-05 Bearish Bearish_breadth 0 0 0
+W 2000-05-12 Bearish Bearish_breadth 0 0 0
+W 2000-05-19 Bearish Bearish_breadth 0 0 0
+W 2000-05-26 Bearish Bearish_breadth 0 0 0
+W 2000-06-02 Bearish Bearish_breadth 0 0 0
+W 2000-06-09 Bearish Bearish_breadth 0 0 0
+W 2000-06-16 Bearish Bearish_breadth 0 0 0
+W 2000-06-23 Neutral Neutral_breadth 2212 20 0
+W 2000-06-30 Bearish Bearish_breadth 0 0 0
+W 2000-07-07 Bearish Bearish_breadth 0 0 0
+W 2000-07-14 Neutral Neutral_breadth 2197 20 0
+W 2000-07-21 Neutral Neutral_breadth 2303 20 1
+D 2000-07-21 BSC_old Long Placed
+W 2000-07-28 Neutral Deteriorating 2326 20 0
+W 2000-08-04 Bearish Bearish_breadth 0 0 0
+W 2000-08-11 Neutral Neutral_breadth 2298 20 1
+D 2000-08-11 WRB Long Placed
+W 2000-08-18 Neutral Neutral_breadth 2359 20 0
+W 2000-08-25 Bullish Bullish_breadth 2277 20 1
+D 2000-08-25 ELGX Long Placed
+W 2000-09-01 Bullish Bullish_breadth 2278 20 1
+D 2000-09-01 MOND_old Long Placed
+W 2000-09-08 Bullish Bullish_breadth 2321 20 1
+D 2000-09-08 ATLC Long Placed
+W 2000-09-15 Bullish Bullish_breadth 2317 20 0
+W 2000-09-22 Bearish Bearish_breadth 0 0 0
+W 2000-09-29 Bearish Bearish_breadth 0 0 0
+W 2000-10-06 Bearish Bearish_breadth 0 0 0
+W 2000-10-13 Bearish Bearish_breadth 0 0 0
+W 2000-10-20 Bearish Bearish_breadth 0 0 0
+W 2000-10-27 Bearish Bearish_breadth 0 0 0
+W 2000-11-03 Bearish Bearish_breadth 0 0 0
+W 2000-11-10 Bearish Bearish_breadth 0 0 0
+W 2000-11-17 Bearish Bearish_breadth 0 0 0
+W 2000-11-24 Bearish Bearish_breadth 0 0 0
+W 2000-12-01 Bearish Bearish_breadth 0 0 0
+W 2000-12-08 Bearish Bearish_breadth 0 0 0
+W 2000-12-15 Bearish Bearish_breadth 0 0 0
+W 2000-12-22 Bearish Bearish_breadth 0 0 0
+W 2000-12-29 Bearish Bearish_breadth 0 0 0
+W 2001-01-05 Bearish Bearish_breadth 0 0 0
+W 2001-01-12 Bearish Bearish_breadth 0 0 0
+W 2001-01-19 Bearish Bearish_breadth 0 0 0
+W 2001-01-26 Bearish Bearish_breadth 0 0 0
+W 2001-02-02 Bearish Bearish_breadth 0 0 0
+W 2001-02-09 Bearish Bearish_breadth 0 0 0
+W 2001-02-16 Bearish Bearish_breadth 0 0 0
+W 2001-02-23 Bearish Bearish_breadth 0 0 0
+W 2001-03-02 Bearish Bearish_breadth 0 0 0
+W 2001-03-09 Bearish Bearish_breadth 0 0 0
+W 2001-03-16 Bearish Bearish_breadth 0 0 0
+W 2001-03-23 Bearish Bearish_breadth 0 0 0
+W 2001-03-30 Bearish Bearish_breadth 0 0 0
+W 2001-04-06 Bearish Bearish_breadth 0 0 0
+W 2001-04-20 Bearish Bearish_breadth 0 0 0
+W 2001-04-27 Bearish Bearish_breadth 0 0 0
+W 2001-05-04 Bearish Bearish_breadth 0 0 0
+W 2001-05-11 Bearish Bearish_breadth 0 0 0
+W 2001-05-18 Bearish Bearish_breadth 0 0 0
+W 2001-05-25 Neutral Neutral_breadth 2295 20 0
+W 2001-06-01 Neutral Neutral_breadth 2324 20 1
+D 2001-06-01 EXPD Long Placed
+W 2001-06-08 Neutral Neutral_breadth 2354 20 0
+W 2001-06-15 Neutral Neutral_breadth 2323 20 1
+D 2001-06-15 DIN Long Placed
+W 2001-06-22 Neutral Neutral_breadth 2330 20 0
+W 2001-06-29 Neutral Neutral_breadth 2335 20 0
+W 2001-07-06 Neutral Neutral_breadth 2346 20 0
+W 2001-07-13 Neutral Neutral_breadth 2255 20 0
+W 2001-07-20 Bearish Bearish_breadth 0 0 0
+W 2001-07-27 Bearish Bearish_breadth 0 0 0
+W 2001-08-03 Bearish Bearish_breadth 0 0 0
+W 2001-08-10 Bearish Bearish_breadth 0 0 0
+W 2001-08-17 Bearish Bearish_breadth 0 0 0
+W 2001-08-24 Bearish Bearish_breadth 0 0 0
+W 2001-08-31 Bearish Bearish_breadth 0 0 0
+W 2001-09-07 Bearish Bearish_breadth 0 0 0
+W 2001-09-21 Bearish Bearish_breadth 0 0 0
+W 2001-09-28 Bearish Bearish_breadth 0 0 0
+W 2001-10-05 Bearish Bearish_breadth 0 0 0
+W 2001-10-12 Bearish Bearish_breadth 0 0 0
+W 2001-10-19 Bearish Bearish_breadth 0 0 0
+W 2001-10-26 Bearish Bearish_breadth 0 0 0
+W 2001-11-02 Bearish Bearish_breadth 0 0 0
+W 2001-11-09 Bearish Bearish_breadth 0 0 0
+W 2001-11-16 Bearish Bearish_breadth 0 0 0
+W 2001-11-23 Bearish Bearish_breadth 0 0 0
+W 2001-11-30 Bearish Bearish_breadth 0 0 0
+W 2001-12-07 Neutral Neutral_breadth 2324 20 0
+W 2001-12-14 Neutral Neutral_breadth 2295 20 0
+W 2001-12-21 Neutral Neutral_breadth 2372 20 0
+W 2001-12-28 Neutral Neutral_breadth 2232 20 0
+W 2002-01-04 Neutral Neutral_breadth 2327 20 0
+W 2002-01-11 Neutral Neutral_breadth 2247 20 0
+W 2002-01-18 Neutral Neutral_breadth 2135 20 0
+W 2002-01-25 Neutral Neutral_breadth 2155 20 0
+W 2002-02-01 Neutral Neutral_breadth 2106 20 0
+W 2002-02-08 Bearish Bearish_breadth 0 0 0
+W 2002-02-15 Bearish Bearish_breadth 0 0 0
+W 2002-02-22 Bearish Bearish_breadth 0 0 0
+W 2002-03-01 Bearish Bearish_breadth 0 0 0
+W 2002-03-08 Neutral Neutral_breadth 2245 20 0
+W 2002-03-15 Neutral Neutral_breadth 2251 20 0
+W 2002-03-22 Bullish Bullish_breadth 2308 20 0
+W 2002-04-05 Neutral Neutral_breadth 2415 20 1
+D 2002-04-05 AJRD Long Placed
+W 2002-04-12 Neutral Neutral_breadth 2413 20 0
+W 2002-04-19 Neutral Neutral_breadth 2259 20 0
+W 2002-04-26 Neutral Neutral_breadth 2227 20 2
+D 2002-04-26 CPJ Long Placed
+D 2002-04-26 GPN Long Placed
+W 2002-05-03 Bearish Bearish_breadth 0 0 0
+W 2002-05-10 Bearish Bearish_breadth 0 0 0
+W 2002-05-17 Bearish Bearish_breadth 0 0 0
+W 2002-05-24 Bearish Bearish_breadth 0 0 0
+W 2002-05-31 Bearish Bearish_breadth 0 0 0
+W 2002-06-07 Bearish Bearish_breadth 0 0 0
+W 2002-06-14 Bearish Bearish_breadth 0 0 0
+W 2002-06-21 Bearish Bearish_breadth 0 0 0
+W 2002-06-28 Bearish Bearish_breadth 0 0 0
+W 2002-07-05 Bearish Bearish_breadth 0 0 0
+W 2002-07-12 Bearish Bearish_breadth 0 0 0
+W 2002-07-19 Bearish Bearish_breadth 0 0 0
+W 2002-07-26 Bearish Bearish_breadth 0 0 0
+W 2002-08-02 Bearish Bearish_breadth 0 0 0
+W 2002-08-09 Bearish Bearish_breadth 0 0 0
+W 2002-08-16 Bearish Bearish_breadth 0 0 0
+W 2002-08-23 Bearish Bearish_breadth 0 0 0
+W 2002-08-30 Bearish Bearish_breadth 0 0 0
+W 2002-09-06 Bearish Bearish_breadth 0 0 0
+W 2002-09-13 Bearish Bearish_breadth 0 0 0
+W 2002-09-20 Bearish Bearish_breadth 0 0 0
+W 2002-09-27 Bearish Bearish_breadth 0 0 0
+W 2002-10-04 Bearish Bearish_breadth 0 0 0
+W 2002-10-11 Bearish Bearish_breadth 0 0 0
+W 2002-10-18 Bearish Bearish_breadth 0 0 0
+W 2002-10-25 Bearish Bearish_breadth 0 0 0
+W 2002-11-01 Bearish Bearish_breadth 0 0 0
+W 2002-11-08 Bearish Bearish_breadth 0 0 0
+W 2002-11-15 Bearish Bearish_breadth 0 0 0
+W 2002-11-22 Bearish Bearish_breadth 0 0 0
+W 2002-11-29 Bearish Bearish_breadth 0 0 0
+W 2002-12-06 Bearish Bearish_breadth 0 0 0
+W 2002-12-13 Bearish Bearish_breadth 0 0 0
+W 2002-12-20 Bearish Bearish_breadth 0 0 0
+W 2002-12-27 Bearish Bearish_breadth 0 0 0
+W 2003-01-03 Neutral Neutral_breadth 2246 20 0
+W 2003-01-10 Neutral Neutral_breadth 2201 20 0
+W 2003-01-17 Neutral Neutral_breadth 2113 20 0
+W 2003-01-24 Bearish Bearish_breadth 0 0 0
+W 2003-01-31 Bearish Bearish_breadth 0 0 0
+W 2003-02-07 Bearish Bearish_breadth 0 0 0
+W 2003-02-14 Bearish Bearish_breadth 0 0 0
+W 2003-02-21 Bearish Bearish_breadth 0 0 0
+W 2003-02-28 Bearish Bearish_breadth 0 0 0
+W 2003-03-07 Bearish Bearish_breadth 0 0 0
+W 2003-03-14 Bearish Bearish_breadth 0 0 0
+W 2003-03-21 Neutral Neutral_breadth 2238 20 0
+W 2003-03-28 Bearish Bearish_breadth 0 0 0
+W 2003-04-04 Bearish Bearish_breadth 0 0 0
+W 2003-04-11 Bearish Bearish_breadth 0 0 0
+W 2003-04-25 Neutral Neutral_breadth 2235 20 0
+W 2003-05-02 Bullish Bullish_breadth 2116 20 0
+W 2003-05-09 Bullish Bullish_breadth 2129 20 0
+W 2003-05-16 Bullish Bullish_breadth 2287 20 1
+D 2003-05-16 COLM Long Placed
+W 2003-05-23 Bullish Bullish_breadth 2398 20 0
+W 2003-05-30 Bullish Bullish_breadth 2484 20 0
+W 2003-06-06 Bullish Bullish_breadth 2512 20 0
+W 2003-06-13 Bullish Bullish_breadth 2553 20 0
+D 2003-06-13 GNSS Long Skipped_Sized_to_zero
+W 2003-06-20 Bullish Bullish_breadth 2596 20 0
+W 2003-06-27 Bullish Bullish_breadth 2604 20 2
+D 2003-06-27 SEIC Long Placed
+D 2003-06-27 FRX_old Long Placed
+W 2003-07-11 Bullish Bullish_breadth 2579 20 3
+D 2003-07-11 BGO Long Placed
+D 2003-07-11 NMR Long Placed
+D 2003-07-11 SPIL Long Placed
+W 2003-07-18 Bullish Bullish_breadth 2507 20 3
+D 2003-07-18 AUOTY Long Placed
+D 2003-07-18 FNB Long Placed
+D 2003-07-18 WIND Long Placed
+W 2003-07-25 Bullish Bullish_breadth 2498 20 0
+W 2003-08-01 Bullish Bullish_breadth 2390 20 2
+D 2003-08-01 MSM Long Placed
+D 2003-08-01 FCNCA Long Placed
+W 2003-08-08 Bullish Bullish_breadth 2408 20 2
+D 2003-08-08 CNI Long Placed
+D 2003-08-08 RDN Long Placed
+W 2003-08-15 Bullish Bullish_breadth 2389 20 2
+D 2003-08-15 LII Long Placed
+D 2003-08-15 MAN Long Placed
+W 2003-08-22 Bullish Bullish_breadth 2380 20 0
+D 2003-08-22 KCP Long Skipped_Insufficient_cash
+D 2003-08-22 CDE Long Skipped_Sized_to_zero
+W 2003-08-29 Bullish Bullish_breadth 2416 20 0
+W 2003-09-05 Bullish Bullish_breadth 2443 20 0
+W 2003-09-12 Bullish Bullish_breadth 2460 20 0
+D 2003-09-12 ADSK Long Skipped_Insufficient_cash
+D 2003-09-12 ISPH Long Skipped_Insufficient_cash
+W 2003-09-19 Bullish Bullish_breadth 2472 20 0
+W 2003-09-26 Bullish Bullish_breadth 2428 20 0
+D 2003-09-26 RHP Long Skipped_Insufficient_cash
+D 2003-09-26 WDC Long Skipped_Insufficient_cash
+D 2003-09-26 BANF Long Skipped_Insufficient_cash
+D 2003-09-26 CVLG Long Skipped_Insufficient_cash
+W 2003-10-03 Bullish Bullish_breadth 2475 20 1
+D 2003-10-03 CBT Long Skipped_Insufficient_cash
+D 2003-10-03 NKRSF Long Skipped_Insufficient_cash
+D 2003-10-03 RHP Long Skipped_Insufficient_cash
+D 2003-10-03 WDC Long Skipped_Insufficient_cash
+D 2003-10-03 BANF Long Placed
+W 2003-10-10 Bullish Bullish_breadth 2472 20 0
+D 2003-10-10 NKRSF Long Skipped_Insufficient_cash
+D 2003-10-10 WDFC Long Skipped_Insufficient_cash
+W 2003-10-17 Bullish Bullish_breadth 2454 20 0
+D 2003-10-17 WDFC Long Skipped_Insufficient_cash
+W 2003-10-24 Bullish Bullish_breadth 2469 20 1
+D 2003-10-24 RYAAY Long Placed
+D 2003-10-24 BBVA Long Skipped_Insufficient_cash
+D 2003-10-24 CATY Long Skipped_Insufficient_cash
+D 2003-10-24 LECO Long Skipped_Insufficient_cash
+W 2003-10-31 Bullish Bullish_breadth 2467 20 0
+W 2003-11-07 Bullish Bullish_breadth 2374 20 0
+W 2003-11-14 Bullish Bullish_breadth 2366 20 2
+D 2003-11-14 USON Long Skipped_Sized_to_zero
+D 2003-11-14 WLP1 Long Placed
+D 2003-11-14 BRCD Long Placed
+W 2003-11-21 Bullish Bullish_breadth 2359 20 2
+D 2003-11-21 TRMB Long Placed
+D 2003-11-21 CFFN Long Placed
+D 2003-11-21 DXC Long Skipped_Insufficient_cash
+W 2003-11-28 Bullish Bullish_breadth 2356 20 1
+D 2003-11-28 DXC Long Placed
+W 2003-12-05 Bullish Bullish_breadth 2401 20 0
+W 2003-12-12 Bullish Bullish_breadth 2425 20 1
+D 2003-12-12 BRC Long Placed
+W 2003-12-19 Bullish Bullish_breadth 2493 20 0
+W 2003-12-26 Bullish Bullish_breadth 2504 20 1
+D 2003-12-26 HOS Long Placed
+W 2004-01-02 Bullish Bullish_breadth 2517 20 0
+D 2004-01-02 CHE Long Skipped_Sized_to_zero
+W 2004-01-09 Bullish Bullish_breadth 2514 20 1
+D 2004-01-09 BIO Long Placed
+W 2004-01-16 Bullish Bullish_breadth 2532 20 1
+D 2004-01-16 STK1 Long Placed
+D 2004-01-16 OVRL Long Skipped_Insufficient_cash
+W 2004-01-23 Bullish Bullish_breadth 2516 20 1
+D 2004-01-23 AGIXQ Long Skipped_Sized_to_zero
+D 2004-01-23 KOF Long Skipped_Insufficient_cash
+D 2004-01-23 MEI Long Placed
+W 2004-01-30 Bullish Bullish_breadth 2549 20 0
+W 2004-02-06 Bullish Bullish_breadth 2552 20 1
+D 2004-02-06 ALXN Long Placed
+W 2004-02-13 Bullish Bullish_breadth 2530 20 0
+W 2004-02-20 Bullish Bullish_breadth 2478 20 1
+D 2004-02-20 BFH Long Placed
+W 2004-02-27 Bullish Bullish_breadth 2467 20 1
+D 2004-02-27 BK Long Placed
+W 2004-03-05 Bullish Bullish_breadth 2392 20 1
+D 2004-03-05 CNX Long Placed
+W 2004-03-12 Bullish Bullish_breadth 2284 20 1
+D 2004-03-12 ESA1 Long Skipped_Sized_to_zero
+D 2004-03-12 PKG Long Placed
+W 2004-03-19 Bullish Bullish_breadth 2267 20 0
+D 2004-03-19 ESA1 Long Skipped_Sized_to_zero
+W 2004-03-26 Bullish Bullish_breadth 2239 20 1
+D 2004-03-26 ENB Long Placed
+D 2004-03-26 ESA1 Long Skipped_Sized_to_zero
+D 2004-03-26 GDYS Long Skipped_Sized_to_zero
+W 2004-04-02 Bullish Bullish_breadth 2269 20 1
+D 2004-04-02 CLX Long Placed
+W 2004-04-16 Bullish Bullish_breadth 2163 20 1
+D 2004-04-16 PBSOQ Long Placed
+W 2004-04-23 Bullish Bullish_breadth 2057 20 1
+D 2004-04-23 AGCO Long Placed
+D 2004-04-23 KNSY Long Skipped_Insufficient_cash
+W 2004-04-30 Bullish Bullish_breadth 2127 20 1
+D 2004-04-30 BAX Long Placed
+W 2004-05-07 Bullish Deteriorating 1980 20 1
+D 2004-05-07 GWW Long Placed
+D 2004-05-07 ODFL Long Skipped_Insufficient_cash
+W 2004-05-14 Bullish Deteriorating 2069 20 0
+D 2004-05-14 NSC Long Skipped_Insufficient_cash
+D 2004-05-14 BLUD Long Skipped_Insufficient_cash
+W 2004-05-21 Bullish Deteriorating 2256 20 0
+D 2004-05-21 BLUD Long Skipped_Sized_to_zero
+D 2004-05-21 NSC Long Skipped_Insufficient_cash
+D 2004-05-21 RAH Long Skipped_Insufficient_cash
+W 2004-05-28 Bullish Bullish_breadth 2270 20 1
+D 2004-05-28 NSC Long Placed
+W 2004-06-04 Bullish Bullish_breadth 2179 20 1
+D 2004-06-04 DDS Long Skipped_Insufficient_cash
+D 2004-06-04 LZ_old Long Placed
+D 2004-06-04 BLUD Long Skipped_Sized_to_zero
+W 2004-06-18 Bullish Bullish_breadth 2050 20 0
+W 2004-06-25 Bullish Bullish_breadth 2044 20 0
+W 2004-07-02 Bullish Bullish_breadth 2010 20 0
+W 2004-07-09 Bullish Bullish_breadth 2010 20 0
+W 2004-07-16 Bullish Bullish_breadth 2038 20 0
+W 2004-07-23 Bullish Deteriorating 2148 20 1
+D 2004-07-23 FHR Long Placed
+W 2004-07-30 Neutral Deteriorating 2099 20 0
+W 2004-08-06 Bearish Bearish_breadth 0 0 0
+W 2004-08-13 Bearish Bearish_breadth 0 0 0
+W 2004-08-20 Neutral Recovering 2248 20 2
+D 2004-08-20 CLF Long Placed
+D 2004-08-20 MDCC Long Placed
+W 2004-08-27 Neutral Neutral_breadth 2201 20 0
+W 2004-09-03 Neutral Neutral_breadth 2114 20 0
+W 2004-09-10 Bullish Bullish_breadth 2180 20 0
+W 2004-09-17 Bullish Bullish_breadth 2246 20 0
+W 2004-09-24 Bullish Bullish_breadth 2169 20 0
+W 2004-10-01 Bullish Bullish_breadth 2243 20 0
+W 2004-10-08 Bullish Bullish_breadth 2303 20 0
+W 2004-10-15 Bullish Bullish_breadth 2194 20 3
+D 2004-10-15 AEM Long Placed
+D 2004-10-15 OLN Long Placed
+D 2004-10-15 CRAI Long Placed
+W 2004-10-22 Bullish Bullish_breadth 2195 20 0
+W 2004-10-29 Bullish Bullish_breadth 2191 20 2
+D 2004-10-29 KFRC Long Placed
+D 2004-10-29 MSTR Long Placed
+W 2004-11-05 Bullish Bullish_breadth 2191 20 0
+W 2004-11-12 Bullish Bullish_breadth 2247 20 0
+W 2004-11-19 Bullish Bullish_breadth 2247 20 0
+W 2004-11-26 Bullish Bullish_breadth 2335 20 0
+W 2004-12-03 Bullish Bullish_breadth 2359 20 0
+W 2004-12-10 Bullish Bullish_breadth 2410 20 0
+W 2004-12-17 Bullish Bullish_breadth 2440 20 0
+W 2004-12-31 Bullish Bullish_breadth 2485 20 0
+W 2005-01-07 Bullish Bullish_breadth 2439 20 1
+D 2005-01-07 PRSU Long Placed
+W 2005-01-14 Bullish Bullish_breadth 2307 20 0
+W 2005-01-21 Bullish Bullish_breadth 2200 20 0
+W 2005-01-28 Bullish Bullish_breadth 2013 20 0
+W 2005-02-04 Bullish Bullish_breadth 2150 20 1
+D 2005-02-04 AIN Long Placed
+W 2005-02-11 Bullish Bullish_breadth 2222 20 1
+D 2005-02-11 ARCH Long Placed
+W 2005-02-18 Bullish Bullish_breadth 2215 20 1
+D 2005-02-18 CRL Long Placed
+W 2005-02-25 Bullish Bullish_breadth 2250 20 2
+D 2005-02-25 MNT Long Placed
+D 2005-02-25 ATMI Long Placed
+W 2005-03-04 Bullish Bullish_breadth 2247 20 2
+D 2005-03-04 CENX Long Placed
+D 2005-03-04 STMP Long Placed
+W 2005-03-11 Bullish Bullish_breadth 2137 20 3
+D 2005-03-11 RS Long Placed
+D 2005-03-11 AVD Long Placed
+D 2005-03-11 MECA Long Placed
+W 2005-03-18 Bullish Bullish_breadth 2135 20 1
+D 2005-03-18 HRB Long Placed
+D 2005-03-18 PPP Long Skipped_Insufficient_cash
+W 2005-04-01 Bullish Bullish_breadth 2027 20 1
+D 2005-04-01 CELG Long Placed
+W 2005-04-08 Bullish Bullish_breadth 1982 20 0
+W 2005-04-15 Bullish Deteriorating 2104 20 1
+D 2005-04-15 CPB Long Placed
+W 2005-04-22 Bullish Bullish_breadth 2098 20 0
+D 2005-04-22 SKO Long Skipped_Sized_to_zero
+W 2005-04-29 Bullish Deteriorating 2105 20 2
+D 2005-04-29 GILD Long Placed
+D 2005-04-29 PEET Long Placed
+D 2005-04-29 DNA_old Long Skipped_Sized_to_zero
+W 2005-05-06 Bullish Bullish_breadth 2065 20 0
+W 2005-05-13 Bullish Bullish_breadth 2060 20 1
+D 2005-05-13 EGP Long Placed
+W 2005-05-20 Bullish Bullish_breadth 2112 20 0
+W 2005-05-27 Bullish Bullish_breadth 2081 20 0
+W 2005-06-03 Bullish Bullish_breadth 2041 20 1
+D 2005-06-03 MHX Long Placed
+W 2005-06-10 Bullish Bullish_breadth 2130 20 0
+W 2005-06-17 Bullish Bullish_breadth 1963 20 1
+D 2005-06-17 PARL Long Placed
+W 2005-06-24 Bullish Bullish_breadth 2055 20 0
+W 2005-07-01 Bullish Bullish_breadth 1983 20 0
+W 2005-07-08 Bullish Bullish_breadth 2148 20 0
+W 2005-07-15 Bullish Bullish_breadth 2088 20 0
+W 2005-07-22 Bullish Bullish_breadth 2227 20 0
+W 2005-07-29 Bullish Bullish_breadth 2250 20 0
+W 2005-08-05 Bullish Bullish_breadth 2171 20 1
+D 2005-08-05 CXT Long Placed
+W 2005-08-12 Bullish Bullish_breadth 2336 20 2
+D 2005-08-12 TGI Long Placed
+D 2005-08-12 GPI Long Placed
+D 2005-08-12 GDI1 Long Skipped_Insufficient_cash
+W 2005-08-19 Bullish Bullish_breadth 2118 20 1
+D 2005-08-19 DP Long Placed
+D 2005-08-19 INVX Long Skipped_Insufficient_cash
+D 2005-08-19 MSTR Long Skipped_Insufficient_cash
+W 2005-08-26 Bullish Bullish_breadth 1894 20 1
+D 2005-08-26 BEXP Long Placed
+D 2005-08-26 INVX Long Skipped_Insufficient_cash
+W 2005-09-02 Bullish Bullish_breadth 1889 20 0
+W 2005-09-09 Bullish Bullish_breadth 1899 20 1
+D 2005-09-09 FSH Long Placed
+D 2005-09-09 GSK Long Skipped_Insufficient_cash
+W 2005-09-16 Bullish Bullish_breadth 1901 20 1
+D 2005-09-16 NJR Long Placed
+W 2005-09-23 Bullish Bullish_breadth 2177 20 0
+W 2005-09-30 Bullish Bullish_breadth 2143 20 0
+W 2005-10-07 Bullish Bullish_breadth 2148 20 0
+W 2005-10-14 Bullish Bullish_breadth 2201 20 3
+D 2005-10-14 KELYA Long Placed
+D 2005-10-14 RNWK Long Placed
+D 2005-10-14 DEL Long Placed
+W 2005-10-21 Bullish Bullish_breadth 2273 20 0
+W 2005-10-28 Bullish Bullish_breadth 2148 20 0
+W 2005-11-04 Bullish Bullish_breadth 1996 20 0
+W 2005-11-11 Bullish Bullish_breadth 1987 20 1
+D 2005-11-11 CVG Long Placed
+W 2005-11-18 Bullish Bullish_breadth 2107 20 0
+W 2005-11-25 Bullish Bullish_breadth 2134 20 0
+W 2005-12-02 Bullish Bullish_breadth 2221 20 0
+W 2005-12-09 Bullish Bullish_breadth 2151 20 1
+D 2005-12-09 ARJ Long Placed
+W 2005-12-16 Bullish Bullish_breadth 2221 20 0
+W 2005-12-23 Bullish Bullish_breadth 2186 20 0
+W 2005-12-30 Bullish Bullish_breadth 2045 20 0
+W 2006-01-06 Bullish Bullish_breadth 2217 20 0
+W 2006-01-13 Bullish Bullish_breadth 2181 20 1
+D 2006-01-13 NABZY Long Placed
+W 2006-01-20 Bullish Bullish_breadth 2255 20 1
+D 2006-01-20 FORM Long Placed
+W 2006-01-27 Bullish Bullish_breadth 2289 20 0
+W 2006-02-03 Bullish Bullish_breadth 2246 20 0
+D 2006-02-03 WTNY Long Skipped_Insufficient_cash
+W 2006-02-10 Bullish Bullish_breadth 2177 20 1
+D 2006-02-10 ESE Long Placed
+D 2006-02-10 GD Long Skipped_Insufficient_cash
+D 2006-02-10 IDCC Long Skipped_Sized_to_zero
+W 2006-02-17 Bullish Bullish_breadth 2181 20 0
+D 2006-02-17 IDCC Long Skipped_Sized_to_zero
+W 2006-02-24 Bullish Bullish_breadth 2179 20 1
+D 2006-02-24 MTB Long Placed
+W 2006-03-03 Bullish Bullish_breadth 2124 20 0
+W 2006-03-10 Bullish Bullish_breadth 2145 20 1
+D 2006-03-10 ALSK Long Placed
+W 2006-03-17 Bullish Bullish_breadth 2211 20 2
+D 2006-03-17 ADP Long Placed
+D 2006-03-17 EWBC Long Placed
+W 2006-03-24 Bullish Bullish_breadth 2221 20 1
+D 2006-03-24 LDG Long Placed
+D 2006-03-24 GNW Long Skipped_Insufficient_cash
+W 2006-03-31 Bullish Bullish_breadth 2222 20 0
+W 2006-04-07 Bullish Bullish_breadth 2183 20 0
+W 2006-04-21 Bullish Bullish_breadth 2192 20 0
+W 2006-04-28 Bullish Bullish_breadth 2084 20 0
+W 2006-05-05 Bullish Bullish_breadth 2081 20 0
+D 2006-05-05 HCSG Long Skipped_Insufficient_cash
+D 2006-05-05 MROI Long Skipped_Sized_to_zero
+W 2006-05-12 Bullish Bullish_breadth 2089 20 1
+D 2006-05-12 WWW Long Placed
+D 2006-05-12 DWSN1 Long Skipped_Insufficient_cash
+W 2006-05-19 Bullish Bullish_breadth 2081 20 0
+W 2006-05-26 Bullish Bullish_breadth 2085 20 1
+D 2006-05-26 BRC Long Placed
+D 2006-05-26 IFF Long Skipped_Insufficient_cash
+W 2006-06-02 Bullish Bullish_breadth 1991 20 0
+W 2006-06-09 Bullish Bullish_breadth 1967 20 1
+D 2006-06-09 HOPE Long Placed
+D 2006-06-09 CNW Long Skipped_Insufficient_cash
+W 2006-06-16 Bullish Deteriorating 2091 20 2
+D 2006-06-16 NRG Long Placed
+D 2006-06-16 PSS Long Placed
+D 2006-06-16 CXW Long Skipped_Sized_to_zero
+D 2006-06-16 LECO Long Skipped_Insufficient_cash
+W 2006-06-23 Neutral Deteriorating 2071 20 1
+D 2006-06-23 GEF Long Placed
+D 2006-06-23 POM_old Long Skipped_Insufficient_cash
+D 2006-06-23 EXPD Long Skipped_Insufficient_cash
+D 2006-06-23 LECO Long Skipped_Insufficient_cash
+D 2006-06-23 SPXC Long Skipped_Insufficient_cash
+W 2006-06-30 Neutral Neutral_breadth 2159 20 0
+D 2006-06-30 SEPR Long Skipped_Insufficient_cash
+W 2006-07-07 Neutral Neutral_breadth 2130 20 0
+W 2006-07-14 Neutral Deteriorating 2153 20 0
+W 2006-07-21 Neutral Deteriorating 2212 20 0
+W 2006-07-28 Neutral Neutral_breadth 2054 20 0
+W 2006-08-04 Neutral Neutral_breadth 2086 20 0
+W 2006-08-11 Bullish Recovering 2099 20 0
+W 2006-08-18 Bullish Bullish_breadth 2047 20 0
+W 2006-08-25 Bullish Bullish_breadth 2016 20 0
+W 2006-09-01 Bullish Bullish_breadth 2105 20 0
+W 2006-09-08 Bullish Bullish_breadth 2149 20 0
+W 2006-09-15 Bullish Bullish_breadth 2052 20 0
+W 2006-09-22 Bullish Bullish_breadth 2040 20 0
+W 2006-09-29 Bullish Bullish_breadth 2064 20 0
+W 2006-10-06 Bullish Bullish_breadth 2011 20 0
+W 2006-10-13 Bullish Bullish_breadth 2079 20 1
+D 2006-10-13 ACN Long Placed
+W 2006-10-20 Bullish Bullish_breadth 2074 20 0
+W 2006-10-27 Bullish Bullish_breadth 2246 20 0
+W 2006-11-03 Bullish Bullish_breadth 2262 20 1
+D 2006-11-03 NTGR Long Placed
+W 2006-11-10 Bullish Bullish_breadth 2283 20 0
+W 2006-11-17 Bullish Bullish_breadth 2162 20 0
+W 2006-11-24 Bullish Bullish_breadth 2225 20 1
+D 2006-11-24 DOV Long Placed
+W 2006-12-01 Bullish Bullish_breadth 2342 20 0
+D 2006-12-01 DLB Long Skipped_Sized_to_zero
+W 2006-12-08 Bullish Bullish_breadth 2351 20 0
+W 2006-12-15 Bullish Bullish_breadth 2407 20 2
+D 2006-12-15 AIPC Long Skipped_Sized_to_zero
+D 2006-12-15 CLE Long Placed
+D 2006-12-15 LAYN Long Placed
+W 2006-12-22 Bullish Bullish_breadth 2378 20 1
+D 2006-12-22 ON Long Placed
+W 2006-12-29 Bullish Bullish_breadth 2379 20 0
+W 2007-01-05 Bullish Bullish_breadth 2282 20 1
+D 2007-01-05 BSAC Long Placed
+W 2007-01-12 Bullish Bullish_breadth 2251 20 1
+D 2007-01-12 APOG Long Placed
+W 2007-01-19 Bullish Bullish_breadth 2241 20 1
+D 2007-01-19 ETN Long Placed
+W 2007-01-26 Bullish Bullish_breadth 2231 20 1
+D 2007-01-26 NXY Long Placed
+W 2007-02-02 Bullish Bullish_breadth 2284 20 0
+W 2007-02-09 Bullish Bullish_breadth 2276 20 0
+W 2007-02-16 Bullish Bullish_breadth 2309 20 0
+W 2007-02-23 Bullish Bullish_breadth 2321 20 1
+D 2007-02-23 HC Long Placed
+D 2007-02-23 BMO Long Skipped_Insufficient_cash
+W 2007-03-02 Bullish Bullish_breadth 2298 20 2
+D 2007-03-02 AXE Long Placed
+D 2007-03-02 CSL Long Placed
+D 2007-03-02 EXC Long Skipped_Insufficient_cash
+D 2007-03-02 LFUS Long Skipped_Insufficient_cash
+D 2007-03-02 NPO Long Skipped_Insufficient_cash
+D 2007-03-02 PH Long Skipped_Insufficient_cash
+D 2007-03-02 CNL_old1 Long Skipped_Insufficient_cash
+W 2007-03-09 Bullish Bullish_breadth 2198 20 2
+D 2007-03-09 NPO Long Placed
+D 2007-03-09 EXC Long Placed
+D 2007-03-09 HS Long Skipped_Insufficient_cash
+W 2007-03-16 Bullish Bullish_breadth 1996 20 0
+W 2007-03-23 Bullish Bullish_breadth 2086 20 1
+D 2007-03-23 GAS1 Long Placed
+W 2007-03-30 Bullish Bullish_breadth 2087 20 0
+W 2007-04-13 Bullish Bullish_breadth 2067 20 0
+D 2007-04-13 BAK Long Skipped_Insufficient_cash
+D 2007-04-13 ACAD Long Skipped_Insufficient_cash
+W 2007-04-20 Bullish Bullish_breadth 2094 20 0
+D 2007-04-20 SMSC Long Skipped_Insufficient_cash
+W 2007-04-27 Bullish Bullish_breadth 2116 20 0
+W 2007-05-04 Bullish Bullish_breadth 2123 20 0
+D 2007-05-04 BAK Long Skipped_Sized_to_zero
+W 2007-05-11 Bullish Bullish_breadth 2236 20 1
+D 2007-05-11 WST Long Placed
+D 2007-05-11 TDY Long Skipped_Insufficient_cash
+W 2007-05-18 Bullish Bullish_breadth 2321 20 0
+D 2007-05-18 TFSM Long Skipped_Insufficient_cash
+D 2007-05-18 TDY Long Skipped_Insufficient_cash
+W 2007-05-25 Bullish Bullish_breadth 2284 20 0
+W 2007-06-01 Bullish Bullish_breadth 2250 20 1
+D 2007-06-01 ARA_old Long Placed
+W 2007-06-08 Bullish Bullish_breadth 2220 20 2
+D 2007-06-08 FTEK Long Placed
+D 2007-06-08 DRX Long Placed
+W 2007-06-15 Bullish Bullish_breadth 2271 20 0
+D 2007-06-15 WDR Long Skipped_Insufficient_cash
+W 2007-06-22 Bullish Bullish_breadth 2078 20 0
+D 2007-06-22 PNB Long Skipped_Sized_to_zero
+D 2007-06-22 LNN Long Skipped_Sized_to_zero
+D 2007-06-22 OPSW Long Skipped_Insufficient_cash
+D 2007-06-22 CKXE Long Skipped_Insufficient_cash
+D 2007-06-22 CASY Long Skipped_Insufficient_cash
+W 2007-06-29 Bullish Bullish_breadth 1979 20 0
+D 2007-06-29 CLC Long Skipped_Insufficient_cash
+D 2007-06-29 LNN Long Skipped_Sized_to_zero
+W 2007-07-06 Bullish Bullish_breadth 2078 20 1
+D 2007-07-06 CLC Long Placed
+D 2007-07-06 DDS Long Skipped_Insufficient_cash
+D 2007-07-06 TX Long Skipped_Insufficient_cash
+W 2007-07-13 Bullish Bullish_breadth 2115 20 0
+W 2007-07-20 Bullish Bullish_breadth 2191 20 1
+D 2007-07-20 KSL Long Placed
+D 2007-07-20 HCSG Long Skipped_Insufficient_cash
+W 2007-07-27 Bullish Deteriorating 2065 20 0
+D 2007-07-27 CHKP Long Skipped_Insufficient_cash
+D 2007-07-27 B Long Skipped_Insufficient_cash
+D 2007-07-27 KEP Long Skipped_Insufficient_cash
+D 2007-07-27 AOS Long Skipped_Sized_to_zero
+D 2007-07-27 HLT1 Long Skipped_Sized_to_zero
+D 2007-07-27 DJO Long Skipped_Sized_to_zero
+D 2007-07-27 ACO Long Skipped_Insufficient_cash
+D 2007-07-27 HPC Long Skipped_Insufficient_cash
+W 2007-08-03 Bullish Deteriorating 2046 20 2
+D 2007-08-03 CHKP Long Placed
+D 2007-08-03 LMT Long Placed
+D 2007-08-03 B Long Skipped_Insufficient_cash
+D 2007-08-03 LII Long Skipped_Insufficient_cash
+D 2007-08-03 AOS Long Skipped_Sized_to_zero
+D 2007-08-03 LRCX Long Skipped_Insufficient_cash
+D 2007-08-03 ACO Long Skipped_Insufficient_cash
+D 2007-08-03 HPC Long Skipped_Insufficient_cash
+W 2007-08-10 Bullish Deteriorating 2025 20 2
+D 2007-08-10 DCI Long Placed
+D 2007-08-10 CBST Long Placed
+D 2007-08-10 EXPD Long Skipped_Insufficient_cash
+D 2007-08-10 ORA Long Skipped_Insufficient_cash
+D 2007-08-10 TVTY Long Skipped_Insufficient_cash
+D 2007-08-10 WDFC Long Skipped_Insufficient_cash
+D 2007-08-10 ACO Long Skipped_Insufficient_cash
+D 2007-08-10 PLMD Long Skipped_Insufficient_cash
+D 2007-08-10 BRC Long Skipped_Insufficient_cash
+D 2007-08-10 FWRD Long Skipped_Insufficient_cash
+W 2007-08-17 Neutral Deteriorating 2124 20 2
+D 2007-08-17 IRM Long Placed
+D 2007-08-17 WTRG Long Placed
+D 2007-08-17 ADVS Long Skipped_Insufficient_cash
+D 2007-08-17 FO Long Skipped_Insufficient_cash
+D 2007-08-17 PLMD Long Skipped_Insufficient_cash
+D 2007-08-17 TVTY Long Skipped_Insufficient_cash
+D 2007-08-17 BRC Long Skipped_Insufficient_cash
+D 2007-08-17 ROL Long Skipped_Insufficient_cash
+W 2007-08-24 Neutral Neutral_breadth 2057 20 2
+D 2007-08-24 FO Long Placed
+D 2007-08-24 PLMD Long Placed
+D 2007-08-24 BRC Long Skipped_Insufficient_cash
+D 2007-08-24 HMSY Long Skipped_Insufficient_cash
+D 2007-08-24 ITC Long Skipped_Insufficient_cash
+D 2007-08-24 PHRM Long Skipped_Sized_to_zero
+W 2007-08-31 Neutral Recovering 2029 20 1
+D 2007-08-31 TYL Long Placed
+D 2007-08-31 BRC Long Skipped_Insufficient_cash
+W 2007-09-07 Neutral Neutral_breadth 2092 20 0
+D 2007-09-07 BLKB Long Skipped_Insufficient_cash
+W 2007-09-14 Bullish Recovering 2083 20 0
+W 2007-09-21 Bullish Bullish_breadth 2043 20 1
+D 2007-09-21 OTEX Long Placed
+W 2007-09-28 Bullish Bullish_breadth 1973 20 0
+D 2007-09-28 GIGM Long Skipped_Insufficient_cash
+D 2007-09-28 NTO Long Skipped_Insufficient_cash
+W 2007-10-05 Bullish Bullish_breadth 1994 20 0
+W 2007-10-12 Bullish Bullish_breadth 2118 20 0
+W 2007-10-19 Neutral Deteriorating 1997 20 0
+D 2007-10-19 LOGI Long Skipped_Sized_to_zero
+W 2007-10-26 Bullish Bullish_breadth 2011 20 0
+W 2007-11-02 Bullish Deteriorating 1963 20 2
+D 2007-11-02 SCSC Long Placed
+D 2007-11-02 KOF Long Placed
+W 2007-11-09 Neutral Deteriorating 2015 20 2
+D 2007-11-09 FLEX Long Placed
+D 2007-11-09 KAI Long Placed
+D 2007-11-09 MSFT Long Skipped_Sized_to_zero
+W 2007-11-16 Neutral Deteriorating 2166 20 0
+W 2007-11-23 Bearish Bearish_breadth 0 0 0
+W 2007-11-30 Bearish Bearish_breadth 0 0 0
+W 2007-12-07 Neutral Recovering 2316 20 1
+D 2007-12-07 BKH Long Placed
+W 2007-12-14 Neutral Deteriorating 2284 20 0
+W 2007-12-21 Neutral Recovering 2285 20 0
+W 2007-12-28 Neutral Neutral_breadth 2199 20 0
+W 2008-01-04 Bearish Bearish_breadth 0 0 0
+W 2008-01-11 Bearish Bearish_breadth 0 0 0
+W 2008-01-18 Bearish Bearish_breadth 0 0 0
+W 2008-01-25 Bearish Bearish_breadth 0 0 0
+W 2008-02-01 Neutral Neutral_breadth 2456 20 0
+W 2008-02-08 Bearish Bearish_breadth 0 0 0
+W 2008-02-15 Bearish Bearish_breadth 0 0 0
+W 2008-02-22 Bearish Bearish_breadth 0 0 0
+W 2008-02-29 Bearish Bearish_breadth 0 0 0
+W 2008-03-07 Bearish Bearish_breadth 0 0 0
+W 2008-03-14 Bearish Bearish_breadth 0 0 0
+W 2008-03-28 Bearish Bearish_breadth 0 0 0
+W 2008-04-04 Bearish Bearish_breadth 0 0 0
+W 2008-04-11 Bearish Bearish_breadth 0 0 0
+W 2008-04-18 Neutral Recovering 2206 20 0
+W 2008-04-25 Neutral Neutral_breadth 2142 20 0
+W 2008-05-02 Neutral Neutral_breadth 2161 20 1
+D 2008-05-02 WMB Long Placed
+W 2008-05-09 Bullish Bullish_breadth 2160 20 0
+W 2008-05-16 Bullish Bullish_breadth 2079 20 0
+W 2008-05-23 Neutral Neutral_breadth 2019 20 0
+W 2008-05-30 Bullish Bullish_breadth 1978 20 0
+W 2008-06-06 Bullish Bullish_breadth 2025 20 0
+W 2008-06-13 Neutral Neutral_breadth 2093 20 0
+W 2008-06-20 Bearish Bearish_breadth 0 0 0
+W 2008-06-27 Bearish Bearish_breadth 0 0 0
+W 2008-07-11 Bearish Bearish_breadth 0 0 0
+W 2008-07-18 Bearish Bearish_breadth 0 0 0
+W 2008-07-25 Bearish Bearish_breadth 0 0 0
+W 2008-08-01 Bearish Bearish_breadth 0 0 0
+W 2008-08-08 Bearish Bearish_breadth 0 0 0
+W 2008-08-15 Bearish Bearish_breadth 0 0 0
+W 2008-08-22 Bearish Bearish_breadth 0 0 0
+W 2008-08-29 Bearish Bearish_breadth 0 0 0
+W 2008-09-05 Bearish Bearish_breadth 0 0 0
+W 2008-09-12 Bearish Bearish_breadth 0 0 0
+W 2008-09-19 Bearish Bearish_breadth 0 0 0
+W 2008-09-26 Bearish Bearish_breadth 0 0 0
+W 2008-10-03 Bearish Bearish_breadth 0 0 0
+W 2008-10-10 Bearish Bearish_breadth 0 0 0
+W 2008-10-17 Bearish Bearish_breadth 0 0 0
+W 2008-10-24 Bearish Bearish_breadth 0 0 0
+W 2008-10-31 Bearish Bearish_breadth 0 0 0
+W 2008-11-07 Bearish Bearish_breadth 0 0 0
+W 2008-11-14 Bearish Bearish_breadth 0 0 0
+W 2008-11-21 Bearish Bearish_breadth 0 0 0
+W 2008-11-28 Bearish Bearish_breadth 0 0 0
+W 2008-12-05 Bearish Bearish_breadth 0 0 0
+W 2008-12-12 Bearish Bearish_breadth 0 0 0
+W 2008-12-19 Bearish Bearish_breadth 0 0 0
+W 2008-12-26 Bearish Bearish_breadth 0 0 0
+W 2009-01-02 Neutral Recovering 2587 20 0
+W 2009-01-09 Bearish Bearish_breadth 0 0 0
+W 2009-01-16 Bearish Bearish_breadth 0 0 0
+W 2009-01-23 Bearish Bearish_breadth 0 0 0
+W 2009-01-30 Bearish Bearish_breadth 0 0 0
+W 2009-02-06 Bearish Bearish_breadth 0 0 0
+W 2009-02-13 Neutral Neutral_breadth 2598 20 0
+W 2009-02-20 Bearish Bearish_breadth 0 0 0
+W 2009-02-27 Bearish Bearish_breadth 0 0 0
+W 2009-03-06 Bearish Bearish_breadth 0 0 0
+W 2009-03-13 Bearish Bearish_breadth 0 0 0
+W 2009-03-20 Bearish Bearish_breadth 0 0 0
+W 2009-03-27 Bearish Bearish_breadth 0 0 0
+W 2009-04-03 Neutral Recovering 2488 20 0
+W 2009-04-17 Neutral Neutral_breadth 2187 20 0
+W 2009-04-24 Neutral Neutral_breadth 2150 20 0
+W 2009-05-01 Bullish Bullish_breadth 2222 20 0
+W 2009-05-08 Bullish Bullish_breadth 2219 20 0
+W 2009-05-15 Bullish Bullish_breadth 2295 20 0
+W 2009-05-22 Bullish Bullish_breadth 2259 20 0
+W 2009-05-29 Bullish Bullish_breadth 2296 20 0
+W 2009-06-05 Bullish Bullish_breadth 2406 20 0
+W 2009-06-12 Bullish Bullish_breadth 2395 20 0
+W 2009-06-19 Bullish Bullish_breadth 2422 20 0
+W 2009-06-26 Bullish Bullish_breadth 2485 20 1
+D 2009-06-26 NCIT Long Placed
+W 2009-07-10 Bullish Bullish_breadth 2021 20 0
+W 2009-07-17 Bullish Bullish_breadth 2209 20 0
+W 2009-07-24 Bullish Bullish_breadth 2393 20 0
+W 2009-07-31 Bullish Bullish_breadth 2365 20 0
+W 2009-08-07 Bullish Bullish_breadth 2464 20 0
+W 2009-08-14 Bullish Bullish_breadth 2526 20 0
+W 2009-08-21 Bullish Bullish_breadth 2570 20 0
+W 2009-08-28 Bullish Bullish_breadth 2589 20 0
+W 2009-09-04 Bullish Bullish_breadth 2556 20 0
+W 2009-09-11 Bullish Bullish_breadth 2569 20 1
+D 2009-09-11 B Long Placed
+W 2009-09-18 Bullish Bullish_breadth 2554 20 0
+W 2009-09-25 Bullish Bullish_breadth 2555 20 1
+D 2009-09-25 MNRO Long Placed
+W 2009-10-02 Bullish Bullish_breadth 2557 20 2
+D 2009-10-02 FMC Long Placed
+D 2009-10-02 AGNC Long Placed
+W 2009-10-09 Bullish Bullish_breadth 2559 20 0
+W 2009-10-16 Bullish Bullish_breadth 2541 20 0
+D 2009-10-16 CVI Long Skipped_Sized_to_zero
+W 2009-10-23 Bullish Bullish_breadth 2516 20 3
+D 2009-10-23 AOS Long Placed
+D 2009-10-23 ASR Long Placed
+D 2009-10-23 BX Long Placed
+W 2009-10-30 Bullish Bullish_breadth 2490 20 5
+D 2009-10-30 CNH Long Placed
+D 2009-10-30 E Long Placed
+D 2009-10-30 MTX Long Placed
+D 2009-10-30 AOS Long Placed
+D 2009-10-30 AWI Long Skipped_Sized_to_zero
+D 2009-10-30 COHR Long Placed
+D 2009-10-30 CXT Long Skipped_Sized_to_zero
+W 2009-11-06 Bullish Bullish_breadth 2347 20 1
+D 2009-11-06 PAYX Long Placed
+D 2009-11-06 CXT Long Skipped_Sized_to_zero
+D 2009-11-06 DBI Long Skipped_Sized_to_zero
+D 2009-11-06 DECK Long Skipped_Insufficient_cash
+W 2009-11-13 Bullish Bullish_breadth 2286 20 0
+D 2009-11-13 AAPL Long Skipped_Insufficient_cash
+D 2009-11-13 CMD Long Skipped_Insufficient_cash
+D 2009-11-13 CMN Long Skipped_Insufficient_cash
+D 2009-11-13 CXT Long Skipped_Insufficient_cash
+D 2009-11-13 DECK Long Skipped_Insufficient_cash
+W 2009-11-20 Bullish Bullish_breadth 2307 20 1
+D 2009-11-20 CAS_old1 Long Placed
+W 2009-11-27 Bullish Bullish_breadth 2297 20 2
+D 2009-11-27 AOS Long Placed
+D 2009-11-27 CRM Long Placed
+W 2009-12-04 Bullish Bullish_breadth 2270 20 3
+D 2009-12-04 DCI Long Placed
+D 2009-12-04 WERN Long Placed
+D 2009-12-04 CGNX Long Placed
+W 2009-12-11 Bullish Bullish_breadth 2278 20 1
+D 2009-12-11 RHB Long Skipped_Sized_to_zero
+D 2009-12-11 ARCC Long Placed
+W 2009-12-18 Bullish Bullish_breadth 2182 20 1
+D 2009-12-18 GFF Long Placed
+W 2010-01-08 Bullish Bullish_breadth 2390 20 0
+W 2010-01-15 Bullish Bullish_breadth 2373 20 0
+D 2010-01-15 WOR Long Skipped_Insufficient_cash
+D 2010-01-15 CF Long Skipped_Insufficient_cash
+W 2010-01-22 Bullish Bullish_breadth 2297 20 0
+D 2010-01-22 WOR Long Skipped_Insufficient_cash
+D 2010-01-22 RHI Long Skipped_Insufficient_cash
+D 2010-01-22 TFC Long Skipped_Insufficient_cash
+W 2010-01-29 Bullish Bullish_breadth 2149 20 2
+D 2010-01-29 FUN Long Placed
+D 2010-01-29 BWA Long Placed
+W 2010-02-05 Bullish Bullish_breadth 2144 20 2
+D 2010-02-05 DLX Long Placed
+D 2010-02-05 CMG Long Placed
+D 2010-02-05 NVS Long Skipped_Insufficient_cash
+W 2010-02-12 Bullish Bullish_breadth 2064 20 1
+D 2010-02-12 JJSF Long Placed
+W 2010-02-19 Bullish Bullish_breadth 2056 20 0
+D 2010-02-19 CPE Long Skipped_Insufficient_cash
+D 2010-02-19 CSCO Long Skipped_Insufficient_cash
+W 2010-02-26 Bullish Bullish_breadth 2005 20 0
+D 2010-02-26 AME Long Skipped_Insufficient_cash
+D 2010-02-26 MGRC Long Skipped_Insufficient_cash
+D 2010-02-26 CSCO Long Skipped_Insufficient_cash
+W 2010-03-05 Bullish Bullish_breadth 1958 20 0
+W 2010-03-12 Bullish Bullish_breadth 2091 20 0
+W 2010-03-19 Bullish Bullish_breadth 2172 20 0
+D 2010-03-19 HNR Long Skipped_Insufficient_cash
+W 2010-03-26 Bullish Bullish_breadth 2300 20 0
+D 2010-03-26 SVVS Long Skipped_Insufficient_cash
+W 2010-04-09 Bullish Bullish_breadth 2412 20 0
+D 2010-04-09 SIMO Long Skipped_Sized_to_zero
+W 2010-04-16 Bullish Bullish_breadth 2399 20 0
+D 2010-04-16 TWI Long Skipped_Insufficient_cash
+W 2010-04-23 Bullish Bullish_breadth 2357 20 0
+D 2010-04-23 TWI Long Skipped_Insufficient_cash
+W 2010-04-30 Bullish Bullish_breadth 2364 20 0
+D 2010-04-30 HRI Long Skipped_Sized_to_zero
+W 2010-05-07 Bullish Bullish_breadth 2051 20 0
+D 2010-05-07 FIS Long Skipped_Sized_to_zero
+D 2010-05-07 USNA Long Skipped_Insufficient_cash
+D 2010-05-07 UFCS Long Skipped_Insufficient_cash
+D 2010-05-07 AJG Long Skipped_Insufficient_cash
+D 2010-05-07 CTBI Long Skipped_Insufficient_cash
+W 2010-05-14 Bullish Bullish_breadth 2113 20 0
+D 2010-05-14 FIS Long Skipped_Sized_to_zero
+D 2010-05-14 HTLD Long Skipped_Insufficient_cash
+D 2010-05-14 JKHY Long Skipped_Insufficient_cash
+D 2010-05-14 PRK Long Skipped_Insufficient_cash
+W 2010-05-21 Bullish Bullish_breadth 1987 20 0
+D 2010-05-21 FIS Long Skipped_Insufficient_cash
+D 2010-05-21 TDC Long Skipped_Insufficient_cash
+D 2010-05-21 AIT Long Skipped_Insufficient_cash
+D 2010-05-21 ERIE Long Skipped_Insufficient_cash
+W 2010-05-28 Bullish Bullish_breadth 2106 20 1
+D 2010-05-28 PTV Long Skipped_Insufficient_cash
+D 2010-05-28 IRBTQ Long Skipped_Insufficient_cash
+D 2010-05-28 TDC Long Placed
+W 2010-06-04 Neutral Deteriorating 1992 20 1
+D 2010-06-04 BOP Long Placed
+D 2010-06-04 H Long Skipped_Insufficient_cash
+D 2010-06-04 PII Long Skipped_Insufficient_cash
+D 2010-06-04 YUM Long Skipped_Insufficient_cash
+D 2010-06-04 PTV Long Skipped_Insufficient_cash
+W 2010-06-11 Neutral Neutral_breadth 2061 20 1
+D 2010-06-11 QSFT Long Skipped_Insufficient_cash
+D 2010-06-11 AAP Long Skipped_Insufficient_cash
+D 2010-06-11 DG Long Skipped_Insufficient_cash
+D 2010-06-11 PII Long Placed
+D 2010-06-11 ARG Long Skipped_Insufficient_cash
+W 2010-06-18 Neutral Neutral_breadth 1940 20 1
+D 2010-06-18 QSFT Long Skipped_Insufficient_cash
+D 2010-06-18 UGI Long Placed
+D 2010-06-18 JBLU Long Skipped_Insufficient_cash
+W 2010-06-25 Neutral Neutral_breadth 2073 20 0
+D 2010-06-25 SO Long Skipped_Insufficient_cash
+D 2010-06-25 WGL Long Skipped_Insufficient_cash
+D 2010-06-25 MGA Long Skipped_Insufficient_cash
+W 2010-07-02 Neutral Deteriorating 2077 20 0
+D 2010-07-02 PEG Long Skipped_Insufficient_cash
+D 2010-07-02 SBS Long Skipped_Insufficient_cash
+D 2010-07-02 ENH Long Skipped_Insufficient_cash
+D 2010-07-02 STEC_old1 Long Skipped_Insufficient_cash
+W 2010-07-09 Neutral Deteriorating 2035 20 2
+D 2010-07-09 PEG Long Placed
+D 2010-07-09 SBS Long Placed
+W 2010-07-16 Neutral Deteriorating 2053 20 0
+W 2010-07-23 Neutral Neutral_breadth 2113 20 0
+W 2010-07-30 Neutral Neutral_breadth 1881 20 0
+W 2010-08-06 Bullish Bullish_breadth 1805 20 0
+D 2010-08-06 HCSG Long Skipped_Insufficient_cash
+W 2010-08-13 Bullish Bullish_breadth 1807 20 0
+D 2010-08-13 FOSL Long Skipped_Insufficient_cash
+W 2010-08-20 Neutral Deteriorating 2067 20 0
+W 2010-08-27 Neutral Deteriorating 1971 20 1
+D 2010-08-27 ONTO Long Placed
+W 2010-09-03 Neutral Neutral_breadth 2033 20 0
+W 2010-09-10 Neutral Neutral_breadth 2067 20 1
+D 2010-09-10 FIRE Long Placed
+W 2010-09-17 Bullish Bullish_breadth 2007 20 1
+D 2010-09-17 PFCB Long Placed
+W 2010-09-24 Bullish Bullish_breadth 1947 20 1
+D 2010-09-24 GIII Long Placed
+W 2010-10-01 Bullish Bullish_breadth 2017 20 0
+W 2010-10-08 Bullish Bullish_breadth 2038 20 0
+W 2010-10-15 Bullish Bullish_breadth 2124 20 0
+W 2010-10-22 Bullish Bullish_breadth 2166 20 0
+W 2010-10-29 Bullish Bullish_breadth 2198 20 2
+D 2010-10-29 CCME Long Placed
+D 2010-10-29 CYOU Long Placed
+W 2010-11-05 Bullish Bullish_breadth 2378 20 0
+W 2010-11-12 Bullish Bullish_breadth 2362 20 0
+W 2010-11-19 Bullish Bullish_breadth 2369 20 1
+D 2010-11-19 CACI Long Placed
+W 2010-11-26 Bullish Bullish_breadth 2343 20 1
+D 2010-11-26 NUAN Long Placed
+W 2010-12-03 Bullish Bullish_breadth 2192 20 0
+W 2010-12-10 Bullish Bullish_breadth 2353 20 0
+W 2010-12-17 Bullish Bullish_breadth 2400 20 0
+W 2010-12-31 Bullish Bullish_breadth 2490 20 1
+D 2010-12-31 BOOM Long Placed
+D 2010-12-31 CBPO Long Skipped_Sized_to_zero
+W 2011-01-07 Bullish Bullish_breadth 2475 20 0
+W 2011-01-14 Bullish Bullish_breadth 2514 20 0
+D 2011-01-14 EPRS Long Skipped_Insufficient_cash
+D 2011-01-14 ITT Long Skipped_Insufficient_cash
+W 2011-01-21 Bullish Bullish_breadth 2475 20 1
+D 2011-01-21 DXCM Long Placed
+D 2011-01-21 ITT Long Skipped_Insufficient_cash
+D 2011-01-21 NVDA Long Skipped_Sized_to_zero
+W 2011-01-28 Bullish Bullish_breadth 2482 20 0
+D 2011-01-28 HE Long Skipped_Insufficient_cash
+D 2011-01-28 ITT Long Skipped_Insufficient_cash
+D 2011-01-28 MSTR Long Skipped_Sized_to_zero
+W 2011-02-04 Bullish Bullish_breadth 2505 20 0
+W 2011-02-11 Bullish Bullish_breadth 2495 20 0
+W 2011-02-18 Bullish Bullish_breadth 2506 20 0
+W 2011-02-25 Bullish Bullish_breadth 2495 20 2
+D 2011-02-25 NSIT Long Placed
+D 2011-02-25 SIMO Long Skipped_Sized_to_zero
+D 2011-02-25 BWLD Long Placed
+D 2011-02-25 ICUI Long Skipped_Insufficient_cash
+D 2011-02-25 CSL Long Skipped_Insufficient_cash
+D 2011-02-25 OIIM Long Skipped_Insufficient_cash
+W 2011-03-04 Bullish Bullish_breadth 2459 20 3
+D 2011-03-04 AAWW Long Placed
+D 2011-03-04 ICUI Long Placed
+D 2011-03-04 CSL Long Placed
+W 2011-03-11 Bullish Bullish_breadth 2309 20 2
+D 2011-03-11 FDO Long Placed
+D 2011-03-11 MMSI Long Placed
+W 2011-03-18 Bullish Bullish_breadth 2247 20 3
+D 2011-03-18 FMS Long Placed
+D 2011-03-18 MRX_old Long Placed
+D 2011-03-18 BTI Long Placed
+D 2011-03-18 HAE Long Skipped_Insufficient_cash
+D 2011-03-18 LII Long Skipped_Insufficient_cash
+W 2011-03-25 Bullish Bullish_breadth 2003 20 0
+D 2011-03-25 HTLD Long Skipped_Insufficient_cash
+D 2011-03-25 LII Long Skipped_Insufficient_cash
+D 2011-03-25 AAWW Long Skipped_Insufficient_cash
+W 2011-04-01 Bullish Bullish_breadth 2191 20 0
+D 2011-04-01 HTLD Long Skipped_Insufficient_cash
+W 2011-04-08 Bullish Bullish_breadth 2266 20 0
+D 2011-04-08 OXM Long Skipped_Sized_to_zero
+D 2011-04-08 AZZ Long Skipped_Insufficient_cash
+W 2011-04-15 Bullish Bullish_breadth 2277 20 0
+D 2011-04-15 VHC Long Skipped_Insufficient_cash
+D 2011-04-15 EIX Long Skipped_Insufficient_cash
+D 2011-04-15 OXM Long Skipped_Insufficient_cash
+D 2011-04-15 WPRT Long Skipped_Insufficient_cash
+W 2011-04-29 Bullish Bullish_breadth 2134 20 0
+W 2011-05-06 Bullish Bullish_breadth 2090 20 0
+D 2011-05-06 HXL Long Skipped_Insufficient_cash
+D 2011-05-06 RGLD Long Skipped_Insufficient_cash
+D 2011-05-06 HITK Long Skipped_Insufficient_cash
+W 2011-05-13 Bullish Bullish_breadth 2027 20 0
+D 2011-05-13 EBF Long Skipped_Insufficient_cash
+W 2011-05-20 Bullish Bullish_breadth 2054 20 0
+D 2011-05-20 CPA Long Skipped_Insufficient_cash
+W 2011-05-27 Bullish Bullish_breadth 1950 20 0
+D 2011-05-27 CPA Long Skipped_Insufficient_cash
+W 2011-06-03 Bullish Bullish_breadth 1973 20 1
+D 2011-06-03 TGI Long Placed
+D 2011-06-03 IPAR Long Skipped_Insufficient_cash
+D 2011-06-03 BKS Long Skipped_Insufficient_cash
+D 2011-06-03 EXLS Long Skipped_Insufficient_cash
+D 2011-06-03 RBC Long Skipped_Insufficient_cash
+D 2011-06-03 KKD Long Skipped_Insufficient_cash
+W 2011-06-10 Bullish Bullish_breadth 1997 20 1
+D 2011-06-10 BKS Long Placed
+D 2011-06-10 GEF Long Skipped_Insufficient_cash
+D 2011-06-10 NUS Long Skipped_Sized_to_zero
+W 2011-06-17 Bullish Deteriorating 2005 20 0
+D 2011-06-17 NUS Long Skipped_Sized_to_zero
+W 2011-06-24 Bullish Bullish_breadth 2079 20 0
+D 2011-06-24 KKD Long Skipped_Sized_to_zero
+D 2011-06-24 TGI Long Skipped_Insufficient_cash
+D 2011-06-24 DG Long Skipped_Insufficient_cash
+W 2011-07-01 Bullish Bullish_breadth 2018 20 1
+D 2011-07-01 DG Long Placed
+D 2011-07-01 PCYC Long Skipped_Sized_to_zero
+W 2011-07-08 Bullish Bullish_breadth 2003 20 0
+W 2011-07-15 Bullish Bullish_breadth 2014 20 1
+D 2011-07-15 MLKN Long Placed
+W 2011-07-22 Bullish Bullish_breadth 1868 20 1
+D 2011-07-22 EDU Long Placed
+W 2011-07-29 Bullish Deteriorating 1977 20 1
+D 2011-07-29 WDFC Long Skipped_Insufficient_cash
+D 2011-07-29 KYOCY Long Placed
+W 2011-08-05 Bullish Deteriorating 2024 20 5
+D 2011-08-05 EPC Long Placed
+D 2011-08-05 FRFHF Long Placed
+D 2011-08-05 WDFC Long Placed
+D 2011-08-05 NLC Long Placed
+D 2011-08-05 AUY Long Placed
+D 2011-08-05 DECK Long Skipped_Insufficient_cash
+W 2011-08-12 Neutral Deteriorating 2014 20 3
+D 2011-08-12 DCMYY Long Placed
+D 2011-08-12 KSL Long Placed
+D 2011-08-12 IDCC Long Skipped_Sized_to_zero
+D 2011-08-12 ATHN Long Placed
+W 2011-08-19 Bearish Bearish_breadth 0 0 0
+W 2011-08-26 Neutral Deteriorating 2446 20 2
+D 2011-08-26 BIP Long Placed
+D 2011-08-26 PAET Long Placed
+W 2011-09-02 Neutral Neutral_breadth 2490 20 2
+D 2011-09-02 PPDI Long Placed
+D 2011-09-02 GOLD1 Long Placed
+D 2011-09-02 JAZZ Long Skipped_Sized_to_zero
+W 2011-09-09 Neutral Neutral_breadth 2450 20 2
+D 2011-09-09 ZD Long Placed
+D 2011-09-09 CHG Long Skipped_Insufficient_cash
+D 2011-09-09 FRT Long Placed
+W 2011-09-16 Neutral Recovering 2409 20 0
+W 2011-09-23 Bearish Bearish_breadth 0 0 0
+W 2011-09-30 Bearish Bearish_breadth 0 0 0
+W 2011-10-07 Bearish Bearish_breadth 0 0 0
+W 2011-10-14 Neutral Neutral_breadth 2469 20 1
+D 2011-10-14 CMS Long Placed
+W 2011-10-21 Bearish Bearish_breadth 0 0 0
+W 2011-10-28 Neutral Neutral_breadth 2282 20 0
+W 2011-11-04 Bullish Recovering 2072 20 1
+D 2011-11-04 SNBR Long Placed
+D 2011-11-04 BPFH Long Skipped_Insufficient_cash
+D 2011-11-04 CHDN Long Skipped_Insufficient_cash
+D 2011-11-04 EGOV Long Skipped_Insufficient_cash
+W 2011-11-11 Bullish Bullish_breadth 1973 20 0
+D 2011-11-11 STX Long Skipped_Insufficient_cash
+D 2011-11-11 FEIC Long Skipped_Insufficient_cash
+W 2011-11-18 Bullish Bullish_breadth 2027 20 1
+D 2011-11-18 ABMD Long Placed
+D 2011-11-18 ENOV Long Skipped_Insufficient_cash
+W 2011-11-25 Bearish Bearish_breadth 0 0 0
+W 2011-12-02 Neutral Neutral_breadth 2061 20 0
+W 2011-12-09 Neutral Neutral_breadth 2172 20 0
+W 2011-12-16 Neutral Neutral_breadth 1988 20 0
+W 2011-12-23 Neutral Neutral_breadth 1991 20 1
+D 2011-12-23 MOV Long Placed
+W 2011-12-30 Neutral Neutral_breadth 1874 20 0
+W 2012-01-06 Bullish Bullish_breadth 1887 20 0
+W 2012-01-13 Bullish Bullish_breadth 2094 20 0
+W 2012-01-20 Bullish Bullish_breadth 2050 20 0
+W 2012-01-27 Bullish Bullish_breadth 2137 20 0
+W 2012-02-03 Bullish Bullish_breadth 2219 20 0
+W 2012-02-10 Bullish Bullish_breadth 2345 20 1
+D 2012-02-10 MWIV Long Placed
+W 2012-02-17 Bullish Bullish_breadth 2438 20 1
+D 2012-02-17 EGY Long Placed
+W 2012-02-24 Bullish Bullish_breadth 2501 20 0
+W 2012-03-02 Bullish Bullish_breadth 2483 20 0
+W 2012-03-09 Bullish Bullish_breadth 2488 20 0
+W 2012-03-16 Bullish Bullish_breadth 2488 20 0
+W 2012-03-23 Bullish Bullish_breadth 2495 20 0
+W 2012-03-30 Bullish Bullish_breadth 2418 20 0
+W 2012-04-13 Bullish Bullish_breadth 2286 20 2
+D 2012-04-13 QDEL Long Placed
+D 2012-04-13 CBRL Long Placed
+W 2012-04-20 Bullish Bullish_breadth 2265 20 2
+D 2012-04-20 BMI Long Placed
+D 2012-04-20 AEO Long Placed
+W 2012-04-27 Bullish Bullish_breadth 2218 20 0
+W 2012-05-04 Bullish Bullish_breadth 2145 20 2
+D 2012-05-04 DUK Long Placed
+D 2012-05-04 ONXX Long Placed
+W 2012-05-11 Bullish Bullish_breadth 1952 20 3
+D 2012-05-11 AGN Long Placed
+D 2012-05-11 POWI Long Placed
+D 2012-05-11 WST Long Placed
+W 2012-05-18 Bullish Deteriorating 1808 20 4
+D 2012-05-18 WWW Long Placed
+D 2012-05-18 SKX Long Placed
+D 2012-05-18 TXRH Long Placed
+D 2012-05-18 SUN1 Long Skipped_Sized_to_zero
+D 2012-05-18 TLK Long Placed
+W 2012-05-25 Bullish Bullish_breadth 1852 20 0
+D 2012-05-25 VRTX Long Skipped_Sized_to_zero
+D 2012-05-25 SUN1 Long Skipped_Sized_to_zero
+W 2012-06-01 Neutral Deteriorating 1934 20 0
+D 2012-06-01 VRTX Long Skipped_Insufficient_cash
+D 2012-06-01 ACHC Long Skipped_Insufficient_cash
+W 2012-06-08 Neutral Neutral_breadth 1999 20 0
+W 2012-06-15 Neutral Neutral_breadth 2046 20 1
+D 2012-06-15 DBI Long Placed
+D 2012-06-15 EAT Long Skipped_Insufficient_cash
+W 2012-06-22 Neutral Neutral_breadth 1913 20 0
+W 2012-06-29 Neutral Neutral_breadth 1966 20 0
+W 2012-07-06 Bullish Bullish_breadth 1812 20 0
+W 2012-07-13 Bullish Bullish_breadth 1837 20 1
+D 2012-07-13 CHH Long Placed
+W 2012-07-20 Bullish Bullish_breadth 1852 20 1
+D 2012-07-20 MDU Long Placed
+D 2012-07-20 DGX Long Skipped_Insufficient_cash
+W 2012-07-27 Bullish Bullish_breadth 1973 20 0
+D 2012-07-27 DHC Long Skipped_Insufficient_cash
+W 2012-08-03 Bullish Bullish_breadth 1973 20 0
+W 2012-08-10 Bullish Bullish_breadth 2027 20 0
+D 2012-08-10 LAMR Long Skipped_Insufficient_cash
+D 2012-08-10 ALJ Long Skipped_Insufficient_cash
+W 2012-08-17 Bullish Bullish_breadth 1930 20 0
+W 2012-08-24 Bullish Bullish_breadth 1858 20 1
+D 2012-08-24 DIN Long Placed
+W 2012-08-31 Bullish Bullish_breadth 1992 20 0
+W 2012-09-07 Bullish Bullish_breadth 2063 20 0
+W 2012-09-14 Bullish Bullish_breadth 2053 20 0
+W 2012-09-21 Bullish Bullish_breadth 2121 20 1
+D 2012-09-21 BHC Long Placed
+W 2012-09-28 Bullish Bullish_breadth 2131 20 3
+D 2012-09-28 CMRE Long Placed
+D 2012-09-28 LULU Long Placed
+D 2012-09-28 VMC Long Placed
+W 2012-10-05 Bullish Bullish_breadth 2215 20 1
+D 2012-10-05 WPC Long Placed
+W 2012-10-12 Bullish Bullish_breadth 2140 20 1
+D 2012-10-12 FULT Long Placed
+W 2012-10-19 Bullish Bullish_breadth 2026 20 0
+W 2012-10-26 Bullish Bullish_breadth 2102 20 0
+W 2012-11-02 Bullish Bullish_breadth 2009 20 1
+D 2012-11-02 ABEV Long Placed
+W 2012-11-09 Bullish Bullish_breadth 1976 20 2
+D 2012-11-09 ETD Long Placed
+D 2012-11-09 CNH Long Placed
+W 2012-11-16 Bullish Bullish_breadth 1839 20 1
+D 2012-11-16 ZBH Long Placed
+W 2012-11-23 Bullish Bullish_breadth 1843 20 2
+D 2012-11-23 DKS Long Placed
+D 2012-11-23 NNI Long Placed
+W 2012-11-30 Bullish Bullish_breadth 1961 20 0
+W 2012-12-07 Bullish Bullish_breadth 1906 20 1
+D 2012-12-07 FLO Long Placed
+W 2012-12-14 Bullish Bullish_breadth 1882 20 0
+W 2012-12-21 Bullish Bullish_breadth 1967 20 1
+D 2012-12-21 VRSK Long Placed
+W 2012-12-28 Bullish Bullish_breadth 1972 20 0
+W 2013-01-04 Bullish Bullish_breadth 2027 20 0
+W 2013-01-11 Bullish Bullish_breadth 2046 20 0
+W 2013-01-18 Bullish Bullish_breadth 2054 20 0
+W 2013-01-25 Bullish Bullish_breadth 2161 20 0
+W 2013-02-01 Bullish Bullish_breadth 2149 20 0
+D 2013-02-01 ATNI Long Skipped_Insufficient_cash
+W 2013-02-08 Bullish Bullish_breadth 2205 20 0
+D 2013-02-08 ATNI Long Skipped_Insufficient_cash
+W 2013-02-15 Bullish Bullish_breadth 2204 20 0
+D 2013-02-15 ZG Long Skipped_Insufficient_cash
+D 2013-02-15 ATNI Long Skipped_Insufficient_cash
+W 2013-02-22 Bullish Bullish_breadth 2367 20 0
+D 2013-02-22 SKX Long Skipped_Insufficient_cash
+D 2013-02-22 MKC Long Skipped_Insufficient_cash
+W 2013-03-01 Bullish Bullish_breadth 2131 20 0
+D 2013-03-01 SKX Long Skipped_Insufficient_cash
+W 2013-03-08 Bullish Bullish_breadth 2127 20 1
+D 2013-03-08 HURN Long Placed
+D 2013-03-08 MBI Long Skipped_Insufficient_cash
+W 2013-03-15 Bullish Bullish_breadth 2169 20 0
+D 2013-03-15 MBI Long Skipped_Insufficient_cash
+D 2013-03-15 BWXT Long Skipped_Insufficient_cash
+W 2013-03-22 Bullish Bullish_breadth 2304 20 2
+D 2013-03-22 MBI Long Placed
+D 2013-03-22 COP Long Placed
+D 2013-03-22 BWXT Long Skipped_Insufficient_cash
+W 2013-04-05 Bullish Bullish_breadth 2388 20 1
+D 2013-04-05 SNN Long Placed
+W 2013-04-12 Bullish Bullish_breadth 2311 20 1
+D 2013-04-12 HCI Long Placed
+D 2013-04-12 TSLA Long Skipped_Insufficient_cash
+W 2013-04-19 Bullish Bullish_breadth 2100 20 2
+D 2013-04-19 UNH Long Placed
+D 2013-04-19 BN Long Placed
+W 2013-04-26 Bullish Bullish_breadth 2079 20 2
+D 2013-04-26 ANEN Long Placed
+D 2013-04-26 SHOO Long Placed
+W 2013-05-03 Bullish Bullish_breadth 2142 20 0
+W 2013-05-10 Bullish Bullish_breadth 2166 20 0
+W 2013-05-17 Bullish Bullish_breadth 2210 20 0
+W 2013-05-24 Bullish Bullish_breadth 2205 20 1
+D 2013-05-24 MYGN Long Placed
+D 2013-05-24 PATK Long Skipped_Insufficient_cash
+W 2013-05-31 Bullish Bullish_breadth 2291 20 0
+D 2013-05-31 HTH Long Skipped_Sized_to_zero
+D 2013-05-31 DRC Long Skipped_Insufficient_cash
+W 2013-06-07 Bullish Bullish_breadth 2323 20 1
+D 2013-06-07 KBR Long Placed
+D 2013-06-07 HTH Long Skipped_Sized_to_zero
+W 2013-06-14 Bullish Bullish_breadth 2206 20 0
+W 2013-06-21 Bullish Bullish_breadth 2156 20 1
+D 2013-06-21 CAL Long Placed
+D 2013-06-21 HTH Long Skipped_Sized_to_zero
+W 2013-06-28 Bullish Bullish_breadth 1963 20 2
+D 2013-06-28 UBSI Long Placed
+D 2013-06-28 EXAS Long Placed
+W 2013-07-05 Bullish Bullish_breadth 2027 20 1
+D 2013-07-05 TDG Long Placed
+W 2013-07-12 Bullish Bullish_breadth 2114 20 1
+D 2013-07-12 TDG Long Placed
+W 2013-07-19 Bullish Bullish_breadth 2083 20 1
+D 2013-07-19 WNC Long Placed
+W 2013-07-26 Bullish Bullish_breadth 2141 20 0
+W 2013-08-02 Bullish Bullish_breadth 2273 20 0
+W 2013-08-09 Bullish Bullish_breadth 2227 20 0
+D 2013-08-09 EXTR Long Skipped_Insufficient_cash
+W 2013-08-16 Bullish Bullish_breadth 2215 20 0
+D 2013-08-16 BC Long Skipped_Insufficient_cash
+W 2013-08-23 Bullish Bullish_breadth 2116 20 2
+D 2013-08-23 IHG Long Placed
+D 2013-08-23 WIT Long Placed
+W 2013-08-30 Bullish Bullish_breadth 2046 20 3
+D 2013-08-30 MMS Long Placed
+D 2013-08-30 OKE Long Placed
+D 2013-08-30 AVGO Long Placed
+D 2013-08-30 AXON Long Skipped_Sized_to_zero
+W 2013-09-06 Bullish Bullish_breadth 2067 20 2
+D 2013-09-06 AN Long Placed
+D 2013-09-06 ACIW Long Placed
+W 2013-09-13 Bullish Bullish_breadth 2063 20 1
+D 2013-09-13 GSKNF Long Placed
+D 2013-09-13 AMZN Long Skipped_Insufficient_cash
+D 2013-09-13 APD Long Skipped_Insufficient_cash
+D 2013-09-13 BC Long Skipped_Insufficient_cash
+W 2013-09-20 Bullish Bullish_breadth 2067 20 0
+D 2013-09-20 MMS Long Skipped_Insufficient_cash
+D 2013-09-20 AIT Long Skipped_Insufficient_cash
+D 2013-09-20 AME Long Skipped_Insufficient_cash
+W 2013-09-27 Bullish Bullish_breadth 2124 20 0
+D 2013-09-27 ALSN Long Skipped_Insufficient_cash
+D 2013-09-27 FIVE Long Skipped_Insufficient_cash
+D 2013-09-27 SRPT Long Skipped_Insufficient_cash
+D 2013-09-27 TIMB Long Skipped_Insufficient_cash
+W 2013-10-04 Bullish Bullish_breadth 2139 20 0
+D 2013-10-04 FIVE Long Skipped_Insufficient_cash
+W 2013-10-11 Bullish Bullish_breadth 2147 20 0
+W 2013-10-18 Bullish Bullish_breadth 2148 20 0
+W 2013-10-25 Bullish Bullish_breadth 2181 20 1
+D 2013-10-25 GASS Long Placed
+W 2013-11-01 Bullish Bullish_breadth 2281 20 0
+D 2013-11-01 BLDR Long Skipped_Insufficient_cash
+W 2013-11-08 Bullish Bullish_breadth 2236 20 0
+D 2013-11-08 SKYW Long Skipped_Insufficient_cash
+D 2013-11-08 PRDO Long Skipped_Insufficient_cash
+D 2013-11-08 AEIS Long Skipped_Insufficient_cash
+D 2013-11-08 AZO Long Skipped_Insufficient_cash
+W 2013-11-15 Bullish Bullish_breadth 2224 20 1
+D 2013-11-15 SKYW Long Skipped_Insufficient_cash
+D 2013-11-15 BLDR Long Placed
+D 2013-11-15 AEIS Long Skipped_Insufficient_cash
+W 2013-11-22 Bullish Bullish_breadth 2235 20 1
+D 2013-11-22 SKYW Long Placed
+D 2013-11-22 ENOC Long Skipped_Insufficient_cash
+W 2013-11-29 Bullish Bullish_breadth 2226 20 0
+D 2013-11-29 CMI Long Skipped_Insufficient_cash
+W 2013-12-06 Bullish Bullish_breadth 2238 20 0
+W 2013-12-13 Bullish Bullish_breadth 2132 20 2
+D 2013-12-13 SYY Long Placed
+D 2013-12-13 IMOS Long Placed
+D 2013-12-13 POST Long Skipped_Insufficient_cash
+D 2013-12-13 CMI Long Skipped_Insufficient_cash
+W 2013-12-20 Bullish Bullish_breadth 2113 20 0
+W 2013-12-27 Bullish Bullish_breadth 2162 20 1
+D 2013-12-27 UTIW Long Placed
+W 2014-01-03 Bullish Bullish_breadth 2228 20 1
+D 2014-01-03 QDEL Long Placed
+W 2014-01-10 Bullish Bullish_breadth 2215 20 1
+D 2014-01-10 KEYW Long Placed
+W 2014-01-17 Bullish Bullish_breadth 2073 20 0
+D 2014-01-17 NPO Long Skipped_Sized_to_zero
+W 2014-01-24 Bullish Bullish_breadth 2019 20 1
+D 2014-01-24 CMRE Long Placed
+D 2014-01-24 DB Long Skipped_Insufficient_cash
+D 2014-01-24 NPO Long Skipped_Sized_to_zero
+D 2014-01-24 NWG Long Skipped_Insufficient_cash
+W 2014-01-31 Bullish Bullish_breadth 1982 20 1
+D 2014-01-31 NBIX Long Placed
+D 2014-01-31 MLM Long Skipped_Insufficient_cash
+D 2014-01-31 NTAP Long Skipped_Insufficient_cash
+D 2014-01-31 RF Long Skipped_Insufficient_cash
+D 2014-01-31 CSV Long Skipped_Insufficient_cash
+W 2014-02-07 Bullish Bullish_breadth 1944 20 1
+D 2014-02-07 NTAP Long Placed
+D 2014-02-07 NPO Long Skipped_Sized_to_zero
+W 2014-02-14 Bullish Bullish_breadth 1850 20 0
+W 2014-02-21 Bullish Bullish_breadth 1981 20 0
+W 2014-02-28 Bullish Bullish_breadth 1979 20 1
+D 2014-02-28 MYGN Long Placed
+W 2014-03-07 Bullish Bullish_breadth 1984 20 0
+W 2014-03-14 Bullish Bullish_breadth 2003 20 2
+D 2014-03-14 RNR Long Placed
+D 2014-03-14 BOH Long Placed
+W 2014-03-21 Bullish Bullish_breadth 2068 20 2
+D 2014-03-21 WFRD Long Placed
+D 2014-03-21 MTRN Long Placed
+W 2014-03-28 Bullish Bullish_breadth 1978 20 1
+D 2014-03-28 MHLD Long Placed
+W 2014-04-04 Bullish Bullish_breadth 1942 20 0
+W 2014-04-11 Bullish Bullish_breadth 1803 20 2
+D 2014-04-11 BCPC Long Placed
+D 2014-04-11 GLNG Long Skipped_Insufficient_cash
+D 2014-04-11 MLKN Long Placed
+W 2014-04-25 Bullish Bullish_breadth 1826 20 1
+D 2014-04-25 SNX Long Skipped_Insufficient_cash
+D 2014-04-25 SON Long Placed
+D 2014-04-25 EW Long Skipped_Insufficient_cash
+W 2014-05-02 Bullish Bullish_breadth 1810 20 1
+D 2014-05-02 EW Long Placed
+W 2014-05-09 Bullish Bullish_breadth 1908 20 1
+D 2014-05-09 PBF Long Placed
+W 2014-05-16 Bullish Bullish_breadth 1921 20 1
+D 2014-05-16 GSK Long Placed
+W 2014-05-23 Bullish Bullish_breadth 1936 20 0
+W 2014-05-30 Bullish Bullish_breadth 1928 20 1
+D 2014-05-30 CMCO Long Placed
+W 2014-06-06 Bullish Bullish_breadth 1820 20 0
+D 2014-06-06 GTIV Long Skipped_Insufficient_cash
+W 2014-06-13 Bullish Bullish_breadth 1857 20 0
+D 2014-06-13 ENSG Long Skipped_Sized_to_zero
+W 2014-06-20 Bullish Bullish_breadth 1980 20 0
+D 2014-06-20 ENSG Long Skipped_Sized_to_zero
+W 2014-06-27 Bullish Bullish_breadth 2005 20 1
+D 2014-06-27 VRTX Long Placed
+D 2014-06-27 MCRS Long Skipped_Sized_to_zero
+W 2014-07-11 Bullish Bullish_breadth 2133 20 1
+D 2014-07-11 MEI Long Placed
+W 2014-07-18 Bullish Bullish_breadth 2095 20 1
+D 2014-07-18 MATW Long Placed
+W 2014-07-25 Bullish Bullish_breadth 1912 20 0
+W 2014-08-01 Bullish Bullish_breadth 1880 20 1
+D 2014-08-01 AMED Long Placed
+W 2014-08-08 Bullish Bullish_breadth 1831 20 1
+D 2014-08-08 EHC Long Placed
+W 2014-08-15 Bullish Bullish_breadth 1770 20 0
+W 2014-08-22 Bullish Bullish_breadth 1737 20 2
+D 2014-08-22 BLK Long Placed
+D 2014-08-22 BYI Long Placed
+W 2014-08-29 Bullish Bullish_breadth 1779 20 0
+D 2014-08-29 MNST Long Skipped_Sized_to_zero
+W 2014-09-05 Bullish Bullish_breadth 1816 20 0
+W 2014-09-12 Bullish Bullish_breadth 1868 20 1
+D 2014-09-12 IP Long Placed
+W 2014-09-19 Bullish Bullish_breadth 1957 20 2
+D 2014-09-19 MED Long Placed
+D 2014-09-19 AABA Long Placed
+W 2014-09-26 Bullish Bullish_breadth 1747 20 0
+W 2014-10-03 Bullish Deteriorating 1684 20 1
+D 2014-10-03 FHN Long Placed
+W 2014-10-10 Bullish Deteriorating 1668 20 1
+D 2014-10-10 JNS Long Placed
+W 2014-10-17 Neutral Deteriorating 1671 20 2
+D 2014-10-17 GPN Long Placed
+D 2014-10-17 AUXL Long Placed
+W 2014-10-24 Bullish Bullish_breadth 1945 20 0
+W 2014-10-31 Bullish Bullish_breadth 1731 20 1
+D 2014-10-31 AFSI Long Placed
+W 2014-11-07 Bullish Bullish_breadth 1764 20 0
+W 2014-11-14 Bullish Bullish_breadth 1738 20 0
+W 2014-11-21 Bullish Bullish_breadth 1979 20 0
+W 2014-11-28 Bullish Bullish_breadth 2042 20 0
+W 2014-12-05 Bullish Bullish_breadth 2098 20 0
+W 2014-12-12 Bullish Deteriorating 2136 20 0
+W 2014-12-19 Bullish Bullish_breadth 2135 20 1
+D 2014-12-19 CDW Long Placed
+W 2014-12-26 Bullish Bullish_breadth 2087 20 1
+D 2014-12-26 DDS Long Placed
+W 2015-01-02 Bullish Bullish_breadth 2172 20 0
+W 2015-01-09 Bullish Bullish_breadth 2218 20 0
+D 2015-01-09 IPHI Long Skipped_Insufficient_cash
+W 2015-01-16 Bullish Bullish_breadth 1972 20 1
+D 2015-01-16 BIIB Long Placed
+D 2015-01-16 BUD Long Skipped_Insufficient_cash
+D 2015-01-16 PDM Long Skipped_Insufficient_cash
+D 2015-01-16 FMI Long Skipped_Insufficient_cash
+W 2015-01-23 Bullish Bullish_breadth 1908 20 0
+D 2015-01-23 PDM Long Skipped_Insufficient_cash
+D 2015-01-23 FMI Long Skipped_Insufficient_cash
+W 2015-01-30 Bullish Bullish_breadth 2163 20 1
+D 2015-01-30 LPL Long Placed
+D 2015-01-30 SBGL Long Skipped_Insufficient_cash
+W 2015-02-06 Bullish Bullish_breadth 2173 20 0
+W 2015-02-13 Bullish Bullish_breadth 2061 20 0
+W 2015-02-20 Bullish Bullish_breadth 1873 20 0
+W 2015-02-27 Bullish Bullish_breadth 1988 20 0
+W 2015-03-06 Bullish Bullish_breadth 2074 20 0
+W 2015-03-13 Bullish Bullish_breadth 2044 20 0
+D 2015-03-13 OMF Long Skipped_Sized_to_zero
+W 2015-03-20 Bullish Bullish_breadth 1931 20 0
+D 2015-03-20 AMRN Long Skipped_Sized_to_zero
+W 2015-03-27 Bullish Bullish_breadth 1967 20 0
+W 2015-04-10 Bullish Bullish_breadth 1861 20 0
+D 2015-04-10 PRGO Long Skipped_Sized_to_zero
+W 2015-04-17 Bullish Bullish_breadth 1880 20 0
+D 2015-04-17 PRGO Long Skipped_Sized_to_zero
+W 2015-04-24 Bullish Bullish_breadth 1828 20 0
+D 2015-04-24 PRGO Long Skipped_Sized_to_zero
+W 2015-05-01 Bullish Bullish_breadth 1743 20 2
+D 2015-05-01 UEC Long Placed
+D 2015-05-01 ARRS Long Placed
+W 2015-05-08 Bullish Bullish_breadth 1872 20 2
+D 2015-05-08 CALM Long Placed
+D 2015-05-08 MELI Long Placed
+W 2015-05-15 Bullish Bullish_breadth 1862 20 3
+D 2015-05-15 CVC Long Placed
+D 2015-05-15 AVD Long Placed
+D 2015-05-15 AVT Long Placed
+W 2015-05-22 Bullish Bullish_breadth 1879 20 1
+D 2015-05-22 RPM Long Placed
+W 2015-05-29 Bullish Bullish_breadth 1856 20 0
+W 2015-06-05 Bullish Bullish_breadth 1769 20 1
+D 2015-06-05 GRA Long Placed
+W 2015-06-12 Bullish Bullish_breadth 1806 20 0
+W 2015-06-19 Bullish Bullish_breadth 1874 20 1
+D 2015-06-19 VYX Long Placed
+W 2015-06-26 Bullish Bullish_breadth 1949 20 0
+W 2015-07-10 Bullish Bullish_breadth 1891 20 1
+D 2015-07-10 WTM Long Placed
+W 2015-07-17 Bullish Bullish_breadth 2018 20 0
+W 2015-07-24 Bullish Deteriorating 2027 20 2
+D 2015-07-24 NEOG Long Skipped_Sized_to_zero
+D 2015-07-24 CB1 Long Skipped_Sized_to_zero
+D 2015-07-24 CINF Long Placed
+D 2015-07-24 GOOGL Long Skipped_Sized_to_zero
+D 2015-07-24 CHT Long Placed
+W 2015-07-31 Bullish Bullish_breadth 2011 20 2
+D 2015-07-31 GOOGL Long Skipped_Sized_to_zero
+D 2015-07-31 NEOG Long Skipped_Sized_to_zero
+D 2015-07-31 CELG Long Placed
+D 2015-07-31 ALXN Long Placed
+W 2015-08-07 Neutral Neutral_breadth 1972 20 1
+D 2015-08-07 ZLTQ Long Placed
+D 2015-08-07 GOOG Long Skipped_Insufficient_cash
+D 2015-08-07 GOOGL Long Skipped_Sized_to_zero
+D 2015-08-07 NEOG Long Skipped_Sized_to_zero
+W 2015-08-14 Neutral Neutral_breadth 1984 20 2
+D 2015-08-14 ACH Long Placed
+D 2015-08-14 MZTI Long Placed
+D 2015-08-14 AMGN Long Skipped_Insufficient_cash
+D 2015-08-14 HRB Long Skipped_Insufficient_cash
+D 2015-08-14 NEOG Long Skipped_Insufficient_cash
+W 2015-08-21 Bearish Bearish_breadth 0 0 0
+W 2015-08-28 Bearish Bearish_breadth 0 0 0
+W 2015-09-04 Bearish Bearish_breadth 0 0 0
+W 2015-09-11 Bearish Bearish_breadth 0 0 0
+W 2015-09-18 Bearish Bearish_breadth 0 0 0
+W 2015-09-25 Bearish Bearish_breadth 0 0 0
+W 2015-10-02 Bearish Bearish_breadth 0 0 0
+W 2015-10-09 Bearish Bearish_breadth 0 0 0
+W 2015-10-16 Bearish Bearish_breadth 0 0 0
+W 2015-10-23 Bearish Bearish_breadth 0 0 0
+W 2015-10-30 Neutral Recovering 2002 20 0
+D 2015-10-30 NTGR Long Skipped_Sized_to_zero
+W 2015-11-06 Neutral Neutral_breadth 1860 20 1
+D 2015-11-06 LLL_old Long Placed
+W 2015-11-13 Bearish Bearish_breadth 0 0 0
+W 2015-11-20 Neutral Neutral_breadth 1825 20 0
+W 2015-11-27 Neutral Neutral_breadth 2026 20 0
+W 2015-12-04 Neutral Neutral_breadth 1979 20 0
+W 2015-12-11 Neutral Deteriorating 1832 20 0
+W 2015-12-18 Neutral Deteriorating 1925 20 1
+D 2015-12-18 ARMK Long Placed
+W 2016-01-08 Bearish Bearish_breadth 0 0 0
+W 2016-01-15 Bearish Bearish_breadth 0 0 0
+W 2016-01-22 Bearish Bearish_breadth 0 0 0
+W 2016-01-29 Bearish Bearish_breadth 0 0 0
+W 2016-02-05 Bearish Bearish_breadth 0 0 0
+W 2016-02-12 Bearish Bearish_breadth 0 0 0
+W 2016-02-19 Bearish Bearish_breadth 0 0 0
+W 2016-02-26 Neutral Recovering 2313 20 0
+W 2016-03-04 Neutral Neutral_breadth 2008 20 0
+W 2016-03-11 Bullish Bullish_breadth 1882 20 0
+W 2016-03-18 Bullish Bullish_breadth 1868 20 1
+D 2016-03-18 MSI Long Placed
+W 2016-04-01 Bullish Bullish_breadth 1970 20 0
+W 2016-04-08 Bullish Bullish_breadth 2099 20 0
+W 2016-04-15 Bullish Bullish_breadth 2063 20 0
+W 2016-04-22 Bullish Bullish_breadth 2046 20 0
+W 2016-04-29 Bullish Bullish_breadth 1991 20 0
+W 2016-05-06 Bullish Bullish_breadth 1998 20 0
+W 2016-05-13 Bullish Bullish_breadth 1974 20 0
+W 2016-05-20 Bullish Bullish_breadth 1864 20 0
+W 2016-05-27 Bullish Bullish_breadth 1972 20 0
+W 2016-06-03 Bullish Bullish_breadth 2152 20 0
+W 2016-06-10 Bullish Bullish_breadth 2172 20 0
+W 2016-06-17 Bullish Bullish_breadth 2185 20 1
+D 2016-06-17 DY Long Placed
+W 2016-06-24 Bullish Bullish_breadth 1886 20 3
+D 2016-06-24 AGX Long Placed
+D 2016-06-24 HELE Long Placed
+D 2016-06-24 DCUB Long Placed
+W 2016-07-01 Bullish Bullish_breadth 1895 20 0
+W 2016-07-08 Bullish Bullish_breadth 1965 20 0
+W 2016-07-15 Bullish Bullish_breadth 2033 20 0
+W 2016-07-22 Bullish Bullish_breadth 2107 20 0
+W 2016-07-29 Bullish Bullish_breadth 2174 20 0
+W 2016-08-05 Bullish Bullish_breadth 2323 20 0
+W 2016-08-12 Bullish Bullish_breadth 2268 20 0
+W 2016-08-19 Bullish Bullish_breadth 2352 20 0
+W 2016-08-26 Bullish Bullish_breadth 2359 20 0
+W 2016-09-02 Bullish Bullish_breadth 2222 20 2
+D 2016-09-02 PDCE Long Placed
+D 2016-09-02 ROL Long Placed
+W 2016-09-09 Bullish Bullish_breadth 2044 20 1
+D 2016-09-09 AMWD Long Placed
+W 2016-09-16 Bullish Bullish_breadth 1986 20 1
+D 2016-09-16 VRSK Long Placed
+W 2016-09-23 Bullish Bullish_breadth 1866 20 1
+D 2016-09-23 RBA Long Placed
+W 2016-09-30 Bullish Bullish_breadth 1875 20 0
+W 2016-10-07 Bullish Bullish_breadth 1873 20 0
+W 2016-10-14 Bullish Bullish_breadth 1860 20 1
+D 2016-10-14 TECD Long Placed
+W 2016-10-21 Bullish Bullish_breadth 1856 20 1
+D 2016-10-21 ACN Long Placed
+W 2016-10-28 Bullish Bullish_breadth 1933 20 1
+D 2016-10-28 PEGA Long Placed
+W 2016-11-04 Bullish Deteriorating 1918 20 0
+W 2016-11-11 Bullish Bullish_breadth 1913 20 0
+W 2016-11-18 Bullish Bullish_breadth 1898 20 1
+D 2016-11-18 EXPD Long Placed
+W 2016-11-25 Bullish Bullish_breadth 1987 20 2
+D 2016-11-25 SHOO Long Placed
+D 2016-11-25 VMC Long Placed
+W 2016-12-02 Bullish Bullish_breadth 2035 20 1
+D 2016-12-02 BEN Long Placed
+W 2016-12-09 Bullish Bullish_breadth 2074 20 0
+W 2016-12-16 Bullish Bullish_breadth 2108 20 0
+D 2016-12-16 APOG Long Skipped_Insufficient_cash
+W 2016-12-23 Bullish Bullish_breadth 2114 20 0
+D 2016-12-23 BX Long Skipped_Insufficient_cash
+W 2016-12-30 Bullish Bullish_breadth 2175 20 0
+D 2016-12-30 NICE Long Skipped_Insufficient_cash
+W 2017-01-06 Bullish Bullish_breadth 2235 20 0
+W 2017-01-13 Bullish Bullish_breadth 2113 20 2
+D 2017-01-13 STRP Long Placed
+D 2017-01-13 AB Long Placed
+W 2017-01-20 Bullish Bullish_breadth 2166 20 2
+D 2017-01-20 LMT Long Placed
+D 2017-01-20 DEI Long Placed
+W 2017-01-27 Bullish Bullish_breadth 2030 20 2
+D 2017-01-27 CP Long Placed
+D 2017-01-27 EGHT Long Placed
+W 2017-02-03 Bullish Bullish_breadth 2144 20 0
+W 2017-02-10 Bullish Bullish_breadth 2182 20 0
+W 2017-02-17 Bullish Bullish_breadth 2172 20 0
+W 2017-02-24 Bullish Bullish_breadth 2163 20 1
+D 2017-02-24 EGP Long Placed
+W 2017-03-03 Bullish Bullish_breadth 2116 20 1
+D 2017-03-03 BLDR Long Placed
+W 2017-03-10 Bullish Bullish_breadth 2097 20 3
+D 2017-03-10 UN Long Placed
+D 2017-03-10 NOAH Long Placed
+D 2017-03-10 BSAC Long Placed
+W 2017-03-17 Bullish Bullish_breadth 2029 20 1
+D 2017-03-17 GRMN Long Placed
+D 2017-03-17 IQV Long Skipped_Insufficient_cash
+W 2017-03-24 Bullish Bullish_breadth 2086 20 1
+D 2017-03-24 DY Long Placed
+D 2017-03-24 CHDN Long Skipped_Insufficient_cash
+W 2017-03-31 Bullish Bullish_breadth 2098 20 1
+D 2017-03-31 IQV Long Placed
+D 2017-03-31 NKTR Long Skipped_Sized_to_zero
+D 2017-03-31 TRNO Long Skipped_Insufficient_cash
+W 2017-04-07 Bullish Bullish_breadth 2062 20 0
+D 2017-04-07 TRNO Long Skipped_Insufficient_cash
+D 2017-04-07 KCG Long Skipped_Sized_to_zero
+D 2017-04-07 PSB Long Skipped_Insufficient_cash
+D 2017-04-07 IPAR Long Skipped_Insufficient_cash
+D 2017-04-07 NKTR Long Skipped_Insufficient_cash
+W 2017-04-21 Bullish Bullish_breadth 2009 20 0
+W 2017-04-28 Bullish Bullish_breadth 1967 20 1
+D 2017-04-28 TTS Long Placed
+W 2017-05-05 Bullish Bullish_breadth 1979 20 0
+W 2017-05-12 Bullish Bullish_breadth 2037 20 1
+D 2017-05-12 WING Long Placed
+D 2017-05-12 FWRD Long Skipped_Insufficient_cash
+W 2017-05-19 Bullish Bullish_breadth 1991 20 1
+D 2017-05-19 PFPT Long Placed
+D 2017-05-19 TXRH Long Skipped_Insufficient_cash
+D 2017-05-19 BOKF Long Skipped_Insufficient_cash
+W 2017-05-26 Bullish Bullish_breadth 1993 20 2
+D 2017-05-26 TXRH Long Placed
+D 2017-05-26 NJDCY Long Placed
+W 2017-06-02 Bullish Bullish_breadth 2058 20 0
+D 2017-06-02 IRWD Long Skipped_Insufficient_cash
+D 2017-06-02 DIOD Long Skipped_Insufficient_cash
+W 2017-06-09 Bullish Bullish_breadth 2012 20 0
+D 2017-06-09 CIEN Long Skipped_Insufficient_cash
+D 2017-06-09 AKBA Long Skipped_Sized_to_zero
+W 2017-06-16 Bullish Bullish_breadth 2003 20 0
+D 2017-06-16 BG Long Skipped_Insufficient_cash
+D 2017-06-16 CIEN Long Skipped_Insufficient_cash
+D 2017-06-16 RYAM Long Skipped_Insufficient_cash
+W 2017-06-23 Bullish Bullish_breadth 2109 20 0
+D 2017-06-23 CIEN Long Skipped_Insufficient_cash
+D 2017-06-23 RYN Long Skipped_Insufficient_cash
+W 2017-06-30 Bullish Bullish_breadth 1927 20 1
+D 2017-06-30 FCNCA Long Skipped_Insufficient_cash
+D 2017-06-30 SNX Long Skipped_Insufficient_cash
+D 2017-06-30 AUOTY Long Skipped_Insufficient_cash
+D 2017-06-30 BRK-A Long Placed
+W 2017-07-07 Bullish Bullish_breadth 1894 20 0
+D 2017-07-07 AUOTY Long Skipped_Insufficient_cash
+D 2017-07-07 NDRM Long Skipped_Insufficient_cash
+W 2017-07-14 Bullish Bullish_breadth 1822 20 0
+D 2017-07-14 AUOTY Long Skipped_Insufficient_cash
+W 2017-07-21 Bullish Bullish_breadth 1880 20 0
+D 2017-07-21 TDY Long Skipped_Insufficient_cash
+D 2017-07-21 ADP Long Skipped_Insufficient_cash
+W 2017-07-28 Bullish Bullish_breadth 1954 20 0
+D 2017-07-28 OEC Long Skipped_Insufficient_cash
+D 2017-07-28 PRTA Long Skipped_Insufficient_cash
+W 2017-08-04 Bullish Bullish_breadth 2046 20 0
+D 2017-08-04 ADP Long Skipped_Insufficient_cash
+W 2017-08-11 Bullish Bullish_breadth 1920 20 1
+D 2017-08-11 VOYA Long Placed
+D 2017-08-11 ADP Long Skipped_Insufficient_cash
+D 2017-08-11 ADTN Long Skipped_Insufficient_cash
+W 2017-08-18 Bullish Bullish_breadth 1790 20 1
+D 2017-08-18 ADTN Long Placed
+D 2017-08-18 BAK Long Skipped_Insufficient_cash
+W 2017-08-25 Bullish Bullish_breadth 1800 20 0
+W 2017-09-01 Bullish Bullish_breadth 1762 20 2
+D 2017-09-01 NEOG Long Placed
+D 2017-09-01 SLAB Long Placed
+W 2017-09-08 Bullish Bullish_breadth 1781 20 0
+W 2017-09-15 Bullish Bullish_breadth 1765 20 1
+D 2017-09-15 NGVT Long Placed
+W 2017-09-22 Bullish Bullish_breadth 1852 20 1
+D 2017-09-22 IDTI Long Placed
+W 2017-09-29 Bullish Bullish_breadth 1814 20 0
+W 2017-10-06 Bullish Bullish_breadth 1742 20 0
+W 2017-10-13 Bullish Bullish_breadth 2045 20 0
+W 2017-10-20 Bullish Bullish_breadth 2166 20 0
+W 2017-10-27 Bullish Bullish_breadth 2147 20 0
+D 2017-10-27 QGEN Long Skipped_Insufficient_cash
+D 2017-10-27 CEVA Long Skipped_Insufficient_cash
+W 2017-11-03 Bullish Bullish_breadth 2192 20 1
+D 2017-11-03 NTTYY Long Placed
+W 2017-11-10 Bullish Bullish_breadth 2032 20 1
+D 2017-11-10 STRA Long Placed
+W 2017-11-17 Bullish Bullish_breadth 1823 20 1
+D 2017-11-17 AXTA Long Placed
+W 2017-11-24 Bullish Bullish_breadth 1664 20 0
+D 2017-11-24 NTES Long Skipped_Insufficient_cash
+W 2017-12-01 Bullish Bullish_breadth 2098 20 1
+D 2017-12-01 AFAM Long Placed
+D 2017-12-01 SAGE Long Skipped_Insufficient_cash
+D 2017-12-01 ALLE Long Skipped_Insufficient_cash
+W 2017-12-08 Bullish Bullish_breadth 2148 20 0
+D 2017-12-08 AMWD Long Skipped_Sized_to_zero
+W 2017-12-15 Bullish Bullish_breadth 2134 20 2
+D 2017-12-15 CNR_old2 Long Placed
+D 2017-12-15 BLMN Long Placed
+D 2017-12-15 AMWD Long Skipped_Sized_to_zero
+D 2017-12-15 ARMK Long Skipped_Insufficient_cash
+W 2017-12-22 Bullish Bullish_breadth 2062 20 0
+D 2017-12-22 CSX Long Skipped_Insufficient_cash
+W 2017-12-29 Bullish Bullish_breadth 2053 20 0
+D 2017-12-29 GEF Long Skipped_Insufficient_cash
+W 2018-01-05 Bullish Bullish_breadth 2100 20 0
+D 2018-01-05 GHDX Long Skipped_Insufficient_cash
+W 2018-01-12 Bullish Bullish_breadth 2165 20 0
+W 2018-01-19 Bullish Bullish_breadth 2124 20 2
+D 2018-01-19 GGB Long Placed
+D 2018-01-19 ATRA Long Skipped_Sized_to_zero
+D 2018-01-19 IBOC Long Placed
+W 2018-01-26 Bullish Bullish_breadth 2192 20 0
+W 2018-02-02 Bullish Bullish_breadth 2249 20 1
+D 2018-02-02 BBD Long Placed
+D 2018-02-02 GILD Long Skipped_Insufficient_cash
+D 2018-02-02 MDXG Long Skipped_Insufficient_cash
+W 2018-02-09 Bullish Bullish_breadth 2061 20 4
+D 2018-02-09 GD Long Placed
+D 2018-02-09 LOGI Long Placed
+D 2018-02-09 EA Long Placed
+D 2018-02-09 RACE Long Placed
+D 2018-02-09 AFL Long Skipped_Insufficient_cash
+D 2018-02-09 AUB Long Skipped_Insufficient_cash
+D 2018-02-09 FFIV Long Skipped_Insufficient_cash
+W 2018-02-16 Bullish Bullish_breadth 1820 20 1
+D 2018-02-16 BPOP Long Placed
+D 2018-02-16 AFL Long Skipped_Insufficient_cash
+D 2018-02-16 AUB Long Skipped_Insufficient_cash
+D 2018-02-16 CACI Long Skipped_Insufficient_cash
+D 2018-02-16 ORI Long Skipped_Insufficient_cash
+D 2018-02-16 RLI Long Skipped_Insufficient_cash
+W 2018-02-23 Bullish Bullish_breadth 1817 20 2
+D 2018-02-23 QRVO Long Placed
+D 2018-02-23 ESLT Long Placed
+D 2018-02-23 AUB Long Skipped_Insufficient_cash
+D 2018-02-23 CACI Long Skipped_Insufficient_cash
+D 2018-02-23 MSI Long Skipped_Insufficient_cash
+D 2018-02-23 RLI Long Skipped_Insufficient_cash
+W 2018-03-02 Bullish Bullish_breadth 1843 20 1
+D 2018-03-02 AUB Long Placed
+W 2018-03-09 Bullish Bullish_breadth 1892 20 0
+D 2018-03-09 TLND Long Skipped_Insufficient_cash
+W 2018-03-16 Bullish Bullish_breadth 1993 20 0
+D 2018-03-16 AAON Long Skipped_Insufficient_cash
+W 2018-03-23 Bullish Bullish_breadth 1811 20 1
+D 2018-03-23 DOX Long Placed
+D 2018-03-23 PEGA Long Skipped_Insufficient_cash
+D 2018-03-23 LITE Long Skipped_Insufficient_cash
+D 2018-03-23 ADSK Long Skipped_Insufficient_cash
+W 2018-04-06 Neutral Neutral_breadth 1924 20 2
+D 2018-04-06 SMTC Long Placed
+D 2018-04-06 PEGA Long Placed
+W 2018-04-13 Neutral Neutral_breadth 2003 20 0
+W 2018-04-20 Bullish Bullish_breadth 1985 20 0
+D 2018-04-20 CAL Long Skipped_Insufficient_cash
+D 2018-04-20 GES Long Skipped_Sized_to_zero
+D 2018-04-20 PLOW Long Skipped_Insufficient_cash
+W 2018-04-27 Bullish Bullish_breadth 1923 20 0
+D 2018-04-27 CAL Long Skipped_Insufficient_cash
+D 2018-04-27 GES Long Skipped_Sized_to_zero
+W 2018-05-04 Bullish Bullish_breadth 1843 20 0
+D 2018-05-04 ANDV Long Skipped_Sized_to_zero
+W 2018-05-11 Bullish Bullish_breadth 1716 20 0
+W 2018-05-18 Bullish Bullish_breadth 1843 20 0
+D 2018-05-18 BIDU Long Skipped_Insufficient_cash
+W 2018-05-25 Bullish Bullish_breadth 1874 20 0
+D 2018-05-25 SABR Long Skipped_Insufficient_cash
+W 2018-06-01 Bullish Bullish_breadth 1722 20 0
+W 2018-06-08 Bullish Bullish_breadth 1842 20 1
+D 2018-06-08 AMD Long Placed
+D 2018-06-08 ENBL Long Skipped_Insufficient_cash
+W 2018-06-15 Bullish Bullish_breadth 1784 20 0
+D 2018-06-15 FIT Long Skipped_Insufficient_cash
+W 2018-06-22 Bullish Bullish_breadth 1784 20 0
+W 2018-06-29 Bullish Bullish_breadth 1841 20 1
+D 2018-06-29 KMX Long Placed
+W 2018-07-06 Bullish Bullish_breadth 1871 20 0
+W 2018-07-13 Bullish Bullish_breadth 1864 20 0
+W 2018-07-20 Bullish Bullish_breadth 1873 20 1
+D 2018-07-20 XLRN Long Placed
+W 2018-07-27 Bullish Bullish_breadth 2005 20 1
+D 2018-07-27 BIIB Long Placed
+D 2018-07-27 VRAY Long Skipped_Sized_to_zero
+W 2018-08-03 Bullish Bullish_breadth 2121 20 1
+D 2018-08-03 CHKP Long Placed
+W 2018-08-10 Bullish Bullish_breadth 2107 20 1
+D 2018-08-10 NMIH Long Placed
+W 2018-08-17 Bullish Bullish_breadth 2039 20 1
+D 2018-08-17 HDP Long Placed
+W 2018-08-24 Bullish Bullish_breadth 1764 20 1
+D 2018-08-24 LZB Long Placed
+W 2018-08-31 Bullish Bullish_breadth 1816 20 1
+D 2018-08-31 YELP Long Placed
+D 2018-08-31 CGC Long Skipped_Sized_to_zero
+W 2018-09-07 Bullish Bullish_breadth 1883 20 0
+W 2018-09-14 Bullish Bullish_breadth 1944 20 0
+W 2018-09-21 Bullish Bullish_breadth 1966 20 1
+D 2018-09-21 BRC Long Placed
+D 2018-09-21 MCFT Long Skipped_Sized_to_zero
+D 2018-09-21 CRON Long Skipped_Insufficient_cash
+W 2018-09-28 Bullish Bullish_breadth 1879 20 2
+D 2018-09-28 GLPG Long Placed
+D 2018-09-28 SYK Long Placed
+W 2018-10-05 Bullish Bullish_breadth 1807 20 2
+D 2018-10-05 SCHL Long Placed
+D 2018-10-05 EW Long Placed
+W 2018-10-12 Bullish Deteriorating 1701 20 4
+D 2018-10-12 EOG Long Placed
+D 2018-10-12 E Long Placed
+D 2018-10-12 CXO Long Placed
+D 2018-10-12 LIN Long Placed
+D 2018-10-12 PYX Long Skipped_Sized_to_zero
+W 2018-10-19 Bullish Deteriorating 1628 20 1
+D 2018-10-19 PYX Long Placed
+W 2018-10-26 Neutral Deteriorating 1950 20 1
+D 2018-10-26 EVRG Long Placed
+W 2018-11-02 Neutral Deteriorating 2055 20 0
+D 2018-11-02 CIG Long Skipped_Sized_to_zero
+W 2018-11-09 Bullish Bullish_breadth 2028 20 0
+D 2018-11-09 CIG Long Skipped_Sized_to_zero
+W 2018-11-16 Neutral Neutral_breadth 2013 20 4
+D 2018-11-16 CIG Long Skipped_Sized_to_zero
+D 2018-11-16 MLNX Long Placed
+D 2018-11-16 OFIX Long Placed
+D 2018-11-16 DAR Long Placed
+D 2018-11-16 SMP Long Placed
+W 2018-11-23 Bearish Bearish_breadth 0 0 0
+W 2018-11-30 Bearish Bearish_breadth 0 0 0
+W 2018-12-07 Bearish Bearish_breadth 0 0 0
+W 2018-12-14 Bearish Bearish_breadth 0 0 0
+W 2018-12-21 Bearish Bearish_breadth 0 0 0
+W 2018-12-28 Bearish Bearish_breadth 0 0 0
+W 2019-01-04 Bearish Bearish_breadth 0 0 0
+W 2019-01-11 Bearish Bearish_breadth 0 0 0
+W 2019-01-18 Bearish Bearish_breadth 0 0 0
+W 2019-01-25 Bearish Bearish_breadth 0 0 0
+W 2019-02-01 Bearish Bearish_breadth 0 0 0
+W 2019-02-08 Bearish Bearish_breadth 0 0 0
+W 2019-02-15 Bullish Bullish_breadth 1904 20 0
+W 2019-02-22 Bullish Bullish_breadth 1951 20 0
+W 2019-03-01 Bullish Bullish_breadth 1785 20 0
+W 2019-03-08 Bullish Bullish_breadth 2002 20 0
+W 2019-03-15 Bullish Bullish_breadth 2127 20 0
+W 2019-03-22 Bullish Bullish_breadth 1740 20 0
+W 2019-03-29 Bullish Bullish_breadth 1790 20 0
+W 2019-04-05 Bullish Bullish_breadth 1776 20 0
+W 2019-04-12 Bullish Bullish_breadth 1780 20 0
+W 2019-04-26 Bullish Bullish_breadth 2104 20 0
+W 2019-05-03 Bullish Bullish_breadth 2136 20 0
+W 2019-05-10 Bullish Bullish_breadth 2076 20 1
+D 2019-05-10 QCOM Long Skipped_Sized_to_zero
+D 2019-05-10 SLAB Long Placed
+W 2019-05-17 Bullish Bullish_breadth 1996 20 0
+W 2019-05-24 Bullish Bullish_breadth 1769 20 1
+D 2019-05-24 JBSS Long Placed
+W 2019-05-31 Bullish Deteriorating 1617 20 3
+D 2019-05-31 VYX Long Placed
+D 2019-05-31 ATEX Long Placed
+D 2019-05-31 ADC Long Placed
+W 2019-06-07 Bullish Bullish_breadth 1723 20 0
+W 2019-06-14 Bullish Bullish_breadth 1879 20 0
+D 2019-06-14 APPS Long Skipped_Sized_to_zero
+W 2019-06-21 Bullish Bullish_breadth 1844 20 0
+D 2019-06-21 APPS Long Skipped_Sized_to_zero
+W 2019-06-28 Bullish Bullish_breadth 1973 20 1
+D 2019-06-28 CIEN Long Placed
+W 2019-07-05 Bullish Bullish_breadth 1996 20 2
+D 2019-07-05 DXCM Long Placed
+D 2019-07-05 B Long Placed
+W 2019-07-12 Bullish Bullish_breadth 2091 20 1
+D 2019-07-12 AMRN Long Placed
+W 2019-07-19 Bullish Bullish_breadth 2054 20 0
+W 2019-07-26 Bullish Bullish_breadth 1981 20 0
+W 2019-08-02 Bullish Bullish_breadth 1764 20 2
+D 2019-08-02 DIOD Long Placed
+D 2019-08-02 MPWR Long Placed
+W 2019-08-09 Bullish Bullish_breadth 1572 20 0
+W 2019-08-16 Bullish Bullish_breadth 1578 20 0
+W 2019-08-23 Bullish Deteriorating 1647 20 0
+W 2019-08-30 Bullish Bullish_breadth 1747 20 0
+W 2019-09-06 Bullish Bullish_breadth 1724 20 0
+W 2019-09-13 Bullish Bullish_breadth 1925 20 1
+D 2019-09-13 FNMA Long Placed
+W 2019-09-20 Bullish Bullish_breadth 1879 20 1
+D 2019-09-20 ZUMZ Long Skipped_Sized_to_zero
+D 2019-09-20 FMCC Long Skipped_Sized_to_zero
+D 2019-09-20 FRPT Long Placed
+W 2019-09-27 Bullish Bullish_breadth 1739 20 1
+D 2019-09-27 GWRE Long Placed
+W 2019-10-04 Bullish Bullish_breadth 1866 20 2
+D 2019-10-04 SCS Long Placed
+D 2019-10-04 DKS Long Placed
+W 2019-10-11 Bullish Bullish_breadth 1782 20 3
+D 2019-10-11 KLIC Long Placed
+D 2019-10-11 REG Long Placed
+D 2019-10-11 SGEN Long Placed
+W 2019-10-18 Bullish Bullish_breadth 1730 20 0
+W 2019-10-25 Bullish Bullish_breadth 1855 20 0
+W 2019-11-01 Bullish Bullish_breadth 1914 20 0
+W 2019-11-08 Bullish Bullish_breadth 1798 20 1
+D 2019-11-08 FN Long Placed
+W 2019-11-15 Bullish Bullish_breadth 1877 20 0
+D 2019-11-15 ZWS Long Skipped_Insufficient_cash
+W 2019-11-22 Bullish Bullish_breadth 1783 20 1
+D 2019-11-22 FIT Long Placed
+W 2019-11-29 Bullish Bullish_breadth 1972 20 0
+D 2019-11-29 CRSP Long Skipped_Sized_to_zero
+W 2019-12-06 Bullish Bullish_breadth 2012 20 0
+D 2019-12-06 CRMT Long Skipped_Insufficient_cash
+W 2019-12-13 Bullish Bullish_breadth 2114 20 1
+D 2019-12-13 GCO Long Placed
+D 2019-12-13 CRMT Long Skipped_Insufficient_cash
+D 2019-12-13 GBT Long Skipped_Sized_to_zero
+W 2019-12-20 Bullish Bullish_breadth 2048 20 1
+D 2019-12-20 NOVT Long Placed
+W 2019-12-27 Bullish Bullish_breadth 2102 20 0
+W 2020-01-03 Bullish Bullish_breadth 2106 20 0
+W 2020-01-10 Bullish Bullish_breadth 1951 20 0
+W 2020-01-17 Bullish Bullish_breadth 2139 20 0
+W 2020-01-24 Bullish Bullish_breadth 2062 20 1
+D 2020-01-24 VNET Long Placed
+W 2020-01-31 Bullish Bullish_breadth 2060 20 1
+D 2020-01-31 TTWO Long Placed
+W 2020-02-07 Bullish Bullish_breadth 1871 20 0
+W 2020-02-14 Bullish Bullish_breadth 2114 20 0
+W 2020-02-21 Bullish Bullish_breadth 1958 20 1
+D 2020-02-21 ADNT Long Placed
+W 2020-02-28 Bullish Deteriorating 1715 20 4
+D 2020-02-28 GILD Long Placed
+D 2020-02-28 MCK Long Placed
+D 2020-02-28 CCS Long Placed
+D 2020-02-28 NFLX Long Placed
+W 2020-03-06 Bullish Deteriorating 1713 20 4
+D 2020-03-06 CASY Long Placed
+D 2020-03-06 AMH Long Placed
+D 2020-03-06 AMN Long Skipped_Sized_to_zero
+D 2020-03-06 BEP Long Placed
+D 2020-03-06 CCI Long Placed
+W 2020-03-13 Neutral Deteriorating 1777 20 5
+D 2020-03-13 CCOI Long Placed
+D 2020-03-13 CLX Long Placed
+D 2020-03-13 AYR Long Placed
+D 2020-03-13 CPB Long Placed
+D 2020-03-13 CSGP Long Placed
+D 2020-03-13 KR Long Skipped_Insufficient_cash
+W 2020-03-20 Neutral Deteriorating 2439 20 1
+D 2020-03-20 QDEL Long Skipped_Sized_to_zero
+D 2020-03-20 KR Long Skipped_Sized_to_zero
+D 2020-03-20 SHEN Long Placed
+W 2020-03-27 Neutral Deteriorating 2556 20 2
+D 2020-03-27 QDEL Long Placed
+D 2020-03-27 KR Long Placed
+W 2020-04-03 Neutral Deteriorating 2676 20 1
+D 2020-04-03 GC Long Placed
+D 2020-04-03 REGN Long Skipped_Sized_to_zero
+W 2020-04-17 Neutral Recovering 2577 20 2
+D 2020-04-17 EGOV Long Placed
+D 2020-04-17 XLRN Long Placed
+W 2020-04-24 Neutral Recovering 2321 20 1
+D 2020-04-24 MOH Long Placed
+D 2020-04-24 PDD Long Skipped_Sized_to_zero
+D 2020-04-24 QTS Long Skipped_Insufficient_cash
+W 2020-05-01 Neutral Recovering 2291 20 0
+D 2020-05-01 CDNS Long Skipped_Insufficient_cash
+D 2020-05-01 AUDC Long Skipped_Insufficient_cash
+D 2020-05-01 SHOP Long Skipped_Insufficient_cash
+D 2020-05-01 SWCH Long Skipped_Insufficient_cash
+D 2020-05-01 AKAM Long Skipped_Insufficient_cash
+W 2020-05-08 Neutral Recovering 2179 20 0
+W 2020-05-15 Neutral Neutral_breadth 2123 20 1
+D 2020-05-15 NTRA Long Placed
+D 2020-05-15 TWLO Long Skipped_Sized_to_zero
+D 2020-05-15 ASND Long Skipped_Insufficient_cash
+D 2020-05-15 AUDC Long Skipped_Sized_to_zero
+D 2020-05-15 FLWS Long Skipped_Insufficient_cash
+W 2020-05-22 Neutral Recovering 1939 20 1
+D 2020-05-22 LACO Long Placed
+W 2020-05-29 Neutral Recovering 1972 20 0
+D 2020-05-29 CWH Long Skipped_Sized_to_zero
+D 2020-05-29 TWLO Long Skipped_Sized_to_zero
+W 2020-06-05 Bullish Bullish_breadth 1914 20 0
+W 2020-06-12 Bullish Recovering 1980 20 0
+D 2020-06-12 DECK Long Skipped_Insufficient_cash
+D 2020-06-12 APPS Long Skipped_Insufficient_cash
+W 2020-06-19 Bullish Recovering 1894 20 0
+W 2020-06-26 Bullish Bullish_breadth 1972 20 1
+D 2020-06-26 SMCI Long Placed
+D 2020-06-26 YETI Long Skipped_Sized_to_zero
+W 2020-07-10 Bullish Recovering 1891 20 0
+W 2020-07-17 Bullish Bullish_breadth 1959 20 0
+W 2020-07-24 Bullish Bullish_breadth 2064 20 0
+W 2020-07-31 Bullish Bullish_breadth 2079 20 3
+D 2020-07-31 AN Long Placed
+D 2020-07-31 BBWI Long Placed
+D 2020-07-31 AG Long Placed
+W 2020-08-07 Bullish Bullish_breadth 2128 20 1
+D 2020-08-07 LECO Long Placed
+D 2020-08-07 BMCH Long Skipped_Insufficient_cash
+W 2020-08-14 Bullish Bullish_breadth 2199 20 1
+D 2020-08-14 SSTK Long Placed
+W 2020-08-21 Bullish Bullish_breadth 2165 20 0
+W 2020-08-28 Bullish Bullish_breadth 2352 20 0
+W 2020-09-04 Bullish Bullish_breadth 2220 20 2
+D 2020-09-04 GME Long Placed
+D 2020-09-04 EAT Long Placed
+W 2020-09-11 Bullish Bullish_breadth 2154 20 0
+W 2020-09-18 Bullish Bullish_breadth 2110 20 0
+W 2020-09-25 Bullish Bullish_breadth 2160 20 2
+D 2020-09-25 AAON Long Placed
+D 2020-09-25 ADM Long Placed
+W 2020-10-02 Bullish Bullish_breadth 2019 20 1
+D 2020-10-02 FLO Long Placed
+W 2020-10-09 Bullish Bullish_breadth 2183 20 1
+D 2020-10-09 FLNA Long Placed
+W 2020-10-16 Bullish Bullish_breadth 2301 20 1
+D 2020-10-16 CVNA Long Placed
+W 2020-10-23 Bullish Bullish_breadth 2256 20 0
+D 2020-10-23 GPRO Long Skipped_Sized_to_zero
+W 2020-10-30 Bullish Bullish_breadth 2221 20 0
+W 2020-11-06 Bullish Bullish_breadth 2115 20 0
+D 2020-11-06 ANAB Long Skipped_Sized_to_zero
+W 2020-11-13 Bullish Bullish_breadth 2187 20 1
+D 2020-11-13 FCNCA Long Placed
+D 2020-11-13 AMAT Long Skipped_Insufficient_cash
+D 2020-11-13 COHR Long Skipped_Insufficient_cash
+W 2020-11-20 Bullish Bullish_breadth 2267 20 0
+W 2020-11-27 Bullish Bullish_breadth 2368 20 0
+W 2020-12-04 Bullish Bullish_breadth 2401 20 0
+W 2020-12-11 Bullish Bullish_breadth 2442 20 1
+D 2020-12-11 IGMS Long Placed
+W 2020-12-18 Bullish Bullish_breadth 2462 20 0
+D 2020-12-18 CCJ Long Skipped_Insufficient_cash
+D 2020-12-18 MCY Long Skipped_Insufficient_cash
+W 2021-01-08 Bullish Bullish_breadth 2373 20 2
+D 2021-01-08 QLYS Long Placed
+D 2021-01-08 MIME Long Placed
+D 2021-01-08 MCY Long Skipped_Insufficient_cash
+D 2021-01-08 DMS Long Skipped_Insufficient_cash
+W 2021-01-15 Bullish Bullish_breadth 2475 20 1
+D 2021-01-15 IBRX Long Skipped_Sized_to_zero
+D 2021-01-15 RYTM Long Placed
+W 2021-01-22 Bullish Bullish_breadth 2402 20 1
+D 2021-01-22 HCM Long Placed
+D 2021-01-22 INSG Long Skipped_Sized_to_zero
+D 2021-01-22 IZEA Long Skipped_Sized_to_zero
+W 2021-01-29 Bullish Bullish_breadth 2151 20 1
+D 2021-01-29 CVM Long Placed
+D 2021-01-29 IRM Long Skipped_Insufficient_cash
+D 2021-01-29 THO Long Skipped_Insufficient_cash
+D 2021-01-29 VIRT Long Skipped_Insufficient_cash
+D 2021-01-29 WGO Long Skipped_Insufficient_cash
+D 2021-01-29 KMX Long Skipped_Sized_to_zero
+D 2021-01-29 AG Long Skipped_Sized_to_zero
+W 2021-02-05 Bullish Bullish_breadth 2451 20 1
+D 2021-02-05 KBH Long Placed
+D 2021-02-05 KMX Long Skipped_Sized_to_zero
+D 2021-02-05 THO Long Skipped_Insufficient_cash
+D 2021-02-05 AKAM Long Skipped_Insufficient_cash
+D 2021-02-05 AOS Long Skipped_Insufficient_cash
+W 2021-02-12 Bullish Bullish_breadth 2455 20 1
+D 2021-02-12 THO Long Placed
+D 2021-02-12 KMX Long Skipped_Sized_to_zero
+W 2021-02-19 Bullish Bullish_breadth 2423 20 1
+D 2021-02-19 BZUN Long Placed
+D 2021-02-19 HUYA Long Skipped_Insufficient_cash
+W 2021-02-26 Bullish Bullish_breadth 2181 20 2
+D 2021-02-26 WIX Long Placed
+D 2021-02-26 CMC Long Skipped_Sized_to_zero
+D 2021-02-26 PLUS Long Placed
+W 2021-03-05 Bullish Bullish_breadth 1990 20 1
+D 2021-03-05 AB Long Placed
+D 2021-03-05 ABR Long Skipped_Insufficient_cash
+W 2021-03-12 Bullish Bullish_breadth 1954 20 0
+D 2021-03-12 MBI Long Skipped_Sized_to_zero
+D 2021-03-12 ABM Long Skipped_Sized_to_zero
+W 2021-03-19 Bullish Bullish_breadth 2124 20 1
+D 2021-03-19 MBI Long Skipped_Sized_to_zero
+D 2021-03-19 EVOP Long Placed
+W 2021-03-26 Bullish Bullish_breadth 2130 20 3
+D 2021-03-26 MBI Long Skipped_Sized_to_zero
+D 2021-03-26 NHC Long Placed
+D 2021-03-26 HNI Long Placed
+D 2021-03-26 NTRS Long Placed
+D 2021-03-26 PBA Long Skipped_Insufficient_cash
+D 2021-03-26 ABM Long Skipped_Sized_to_zero
+W 2021-04-09 Bullish Bullish_breadth 2439 20 2
+D 2021-04-09 MBI Long Skipped_Sized_to_zero
+D 2021-04-09 GE Long Placed
+D 2021-04-09 GPRO Long Placed
+W 2021-04-16 Bullish Bullish_breadth 2339 20 1
+D 2021-04-16 ARDX Long Placed
+W 2021-04-23 Bullish Bullish_breadth 2366 20 1
+D 2021-04-23 NVDA Long Placed
+W 2021-04-30 Bullish Bullish_breadth 2401 20 0
+W 2021-05-07 Bullish Bullish_breadth 2387 20 1
+D 2021-05-07 NVCR Long Placed
+D 2021-05-07 CRI Long Skipped_Insufficient_cash
+W 2021-05-14 Bullish Bullish_breadth 2188 20 2
+D 2021-05-14 EQT Long Placed
+D 2021-05-14 KREF Long Skipped_Insufficient_cash
+D 2021-05-14 ARNC Long Skipped_Sized_to_zero
+D 2021-05-14 ABR Long Skipped_Insufficient_cash
+D 2021-05-14 AGM Long Placed
+D 2021-05-14 AXIA Long Skipped_Insufficient_cash
+W 2021-05-21 Bullish Bullish_breadth 1970 20 0
+D 2021-05-21 KREF Long Skipped_Insufficient_cash
+W 2021-05-28 Bullish Bullish_breadth 1958 20 0
+D 2021-05-28 ASH Long Skipped_Insufficient_cash
+D 2021-05-28 ARNC Long Skipped_Sized_to_zero
+W 2021-06-04 Bullish Bullish_breadth 2174 20 0
+D 2021-06-04 REXR Long Skipped_Insufficient_cash
+W 2021-06-11 Bullish Bullish_breadth 2101 20 0
+D 2021-06-11 BIIB Long Skipped_Insufficient_cash
+W 2021-06-18 Bullish Bullish_breadth 2238 20 0
+D 2021-06-18 FRHC Long Skipped_Insufficient_cash
+W 2021-06-25 Bullish Bullish_breadth 1875 20 2
+D 2021-06-25 FRHC Long Placed
+D 2021-06-25 TXG Long Placed
+W 2021-07-02 Bullish Bullish_breadth 1836 20 0
+W 2021-07-09 Bullish Bullish_breadth 1870 20 1
+D 2021-07-09 SHOP Long Placed
+W 2021-07-16 Bullish Bullish_breadth 1898 20 3
+D 2021-07-16 WB Long Placed
+D 2021-07-16 IEX Long Placed
+D 2021-07-16 LECO Long Placed
+W 2021-07-23 Bullish Bullish_breadth 1880 20 1
+D 2021-07-23 MSEX Long Placed
+W 2021-07-30 Bullish Bullish_breadth 1852 20 0
+W 2021-08-06 Bullish Bullish_breadth 1897 20 0
+W 2021-08-13 Bullish Bullish_breadth 1866 20 0
+W 2021-08-20 Bullish Bullish_breadth 1777 20 1
+D 2021-08-20 ON Long Placed
+W 2021-08-27 Bullish Bullish_breadth 2075 20 0
+W 2021-09-03 Bullish Bullish_breadth 1865 20 0
+W 2021-09-10 Bullish Bullish_breadth 1746 20 0
+W 2021-09-17 Bullish Bullish_breadth 1670 20 0
+W 2021-09-24 Bullish Bullish_breadth 1603 20 0
+W 2021-10-01 Bullish Bullish_breadth 1594 20 1
+D 2021-10-01 SWN Long Placed
+W 2021-10-08 Bullish Bullish_breadth 1597 20 3
+D 2021-10-08 TGNA Long Placed
+D 2021-10-08 CTRA Long Skipped_Sized_to_zero
+D 2021-10-08 MUFG Long Placed
+D 2021-10-08 NXST Long Placed
+W 2021-10-15 Bullish Bullish_breadth 1631 20 1
+D 2021-10-15 FRO Long Placed
+W 2021-10-22 Bullish Bullish_breadth 1673 20 0
+W 2021-10-29 Bullish Bullish_breadth 1683 20 1
+D 2021-10-29 CNX Long Placed
+W 2021-11-05 Bullish Bullish_breadth 1824 20 0
+W 2021-11-12 Bullish Bullish_breadth 1836 20 0
+W 2021-11-19 Bullish Bullish_breadth 2099 20 3
+D 2021-11-19 WOLF_old2 Long Placed
+D 2021-11-19 UA Long Placed
+D 2021-11-19 YETI Long Placed
+W 2021-11-26 Bullish Bullish_breadth 1967 20 4
+D 2021-11-26 EXTR Long Placed
+D 2021-11-26 MTRN Long Skipped_Sized_to_zero
+D 2021-11-26 BKE Long Placed
+D 2021-11-26 ENVA Long Placed
+D 2021-11-26 SMCI Long Placed
+D 2021-11-26 GOOS Long Skipped_Insufficient_cash
+W 2021-12-03 Bullish Deteriorating 1737 20 3
+D 2021-12-03 LRCX Long Placed
+D 2021-12-03 QCOM Long Placed
+D 2021-12-03 VGR Long Placed
+W 2021-12-10 Bullish Bullish_breadth 1659 20 1
+D 2021-12-10 CPRI Long Placed
+W 2021-12-17 Bullish Deteriorating 1494 20 0
+D 2021-12-17 SIMO Long Skipped_Insufficient_cash
+D 2021-12-17 HPQ Long Skipped_Insufficient_cash
+W 2021-12-31 Bullish Bullish_breadth 1597 20 1
+D 2021-12-31 EVTC Long Skipped_Insufficient_cash
+D 2021-12-31 ITCI Long Skipped_Sized_to_zero
+D 2021-12-31 BIP Long Placed
+W 2022-01-07 Bullish Bullish_breadth 1520 20 0
+D 2022-01-07 RDWR Long Skipped_Insufficient_cash
+W 2022-01-14 Bullish Bullish_breadth 1776 20 0
+W 2022-01-21 Bullish Deteriorating 1549 20 0
+D 2022-01-21 BCS Long Skipped_Insufficient_cash
+D 2022-01-21 AUB Long Skipped_Insufficient_cash
+D 2022-01-21 FNB Long Skipped_Insufficient_cash
+D 2022-01-21 HOPE Long Skipped_Insufficient_cash
+D 2022-01-21 HPE Long Skipped_Insufficient_cash
+W 2022-01-28 Bullish Deteriorating 1967 20 3
+D 2022-01-28 AUB Long Placed
+D 2022-01-28 EGBN Long Placed
+D 2022-01-28 FNB Long Placed
+D 2022-01-28 WSFS Long Skipped_Insufficient_cash
+W 2022-02-04 Bullish Deteriorating 2027 20 1
+D 2022-02-04 GLNG Long Placed
+W 2022-02-11 Bullish Deteriorating 2094 20 1
+D 2022-02-11 MA Long Placed
+W 2022-02-18 Bearish Bearish_breadth 0 0 0
+W 2022-02-25 Bearish Bearish_breadth 0 0 0
+W 2022-03-04 Neutral Deteriorating 2196 20 0
+W 2022-03-11 Neutral Deteriorating 2269 20 1
+D 2022-03-11 STLD Long Placed
+W 2022-03-18 Neutral Neutral_breadth 2147 20 1
+D 2022-03-18 JOE Long Placed
+W 2022-03-25 Neutral Neutral_breadth 2291 20 0
+W 2022-04-01 Neutral Neutral_breadth 1869 20 0
+W 2022-04-08 Neutral Recovering 1811 20 0
+W 2022-04-22 Neutral Deteriorating 1822 20 1
+D 2022-04-22 SMPL Long Placed
+W 2022-04-29 Bearish Bearish_breadth 0 0 0
+W 2022-05-06 Bearish Bearish_breadth 0 0 0
+W 2022-05-13 Bearish Bearish_breadth 0 0 0
+W 2022-05-20 Bearish Bearish_breadth 0 0 0
+W 2022-05-27 Neutral Neutral_breadth 2170 20 0
+W 2022-06-03 Bearish Bearish_breadth 0 0 0
+W 2022-06-10 Bearish Bearish_breadth 0 0 0
+W 2022-06-17 Bearish Bearish_breadth 0 0 0
+W 2022-06-24 Bearish Bearish_breadth 0 0 0
+W 2022-07-01 Bearish Bearish_breadth 0 0 0
+W 2022-07-08 Bearish Bearish_breadth 0 0 0
+W 2022-07-15 Bearish Bearish_breadth 0 0 0
+W 2022-07-22 Bearish Bearish_breadth 0 0 0
+W 2022-07-29 Neutral Recovering 2392 20 0
+W 2022-08-05 Neutral Recovering 2283 20 0
+W 2022-08-12 Neutral Neutral_breadth 1771 20 0
+D 2022-08-12 SMCI Long Skipped_Sized_to_zero
+W 2022-08-19 Bullish Bullish_breadth 1944 20 0
+W 2022-08-26 Bullish Bullish_breadth 1873 20 1
+D 2022-08-26 AIT Long Placed
+W 2022-09-02 Bullish Deteriorating 1988 20 0
+W 2022-09-09 Neutral Deteriorating 1814 20 0
+W 2022-09-16 Neutral Deteriorating 1760 20 1
+D 2022-09-16 ISEE Long Placed
+W 2022-09-23 Bearish Bearish_breadth 0 0 0
+W 2022-09-30 Bearish Bearish_breadth 0 0 0
+W 2022-10-07 Bearish Bearish_breadth 0 0 0
+W 2022-10-14 Bearish Bearish_breadth 0 0 0
+W 2022-10-21 Bearish Bearish_breadth 0 0 0
+W 2022-10-28 Bearish Bearish_breadth 0 0 0
+W 2022-11-04 Bearish Bearish_breadth 0 0 0
+W 2022-11-11 Neutral Neutral_breadth 2137 20 0
+W 2022-11-18 Neutral Neutral_breadth 1736 20 0
+W 2022-11-25 Bullish Bullish_breadth 1744 20 0
+W 2022-12-02 Bullish Bullish_breadth 1929 20 0
+W 2022-12-09 Bullish Bullish_breadth 1881 20 0
+W 2022-12-16 Neutral Neutral_breadth 1813 20 0
+W 2022-12-23 Bullish Bullish_breadth 1630 20 0
+W 2022-12-30 Bullish Bullish_breadth 1625 20 0
+W 2023-01-06 Bullish Bullish_breadth 1663 20 0
+W 2023-01-13 Bullish Bullish_breadth 1686 20 0
+W 2023-01-20 Bullish Bullish_breadth 1669 20 0
+W 2023-01-27 Bullish Bullish_breadth 1809 20 0
+W 2023-02-03 Bullish Bullish_breadth 1902 20 0
+W 2023-02-10 Bullish Bullish_breadth 1977 20 0
+W 2023-02-17 Bullish Bullish_breadth 1961 20 0
+W 2023-02-24 Bullish Bullish_breadth 1756 20 0
+W 2023-03-03 Bullish Bullish_breadth 1677 20 0
+W 2023-03-10 Neutral Deteriorating 1698 20 1
+D 2023-03-10 KEX Long Placed
+W 2023-03-17 Bullish Deteriorating 1502 20 1
+D 2023-03-17 AAON Long Placed
+W 2023-03-24 Bullish Deteriorating 1554 20 3
+D 2023-03-24 HURN Long Placed
+D 2023-03-24 CRUS Long Skipped_Sized_to_zero
+D 2023-03-24 FWONK Long Placed
+D 2023-03-24 GE Long Placed
+W 2023-03-31 Bullish Bullish_breadth 1738 20 0
+W 2023-04-14 Bullish Bullish_breadth 1880 20 0
+W 2023-04-21 Bullish Bullish_breadth 1778 20 0
+W 2023-04-28 Bullish Bullish_breadth 1779 20 1
+D 2023-04-28 TECK Long Placed
+W 2023-05-05 Bullish Bullish_breadth 1851 20 1
+D 2023-05-05 WCN Long Placed
+W 2023-05-12 Bullish Bullish_breadth 1746 20 0
+W 2023-05-19 Bullish Bullish_breadth 1627 20 0
+W 2023-05-26 Bullish Deteriorating 1618 20 2
+D 2023-05-26 ARCO Long Placed
+D 2023-05-26 AMX Long Placed
+W 2023-06-02 Bullish Bullish_breadth 1598 20 2
+D 2023-06-02 NSSC Long Placed
+D 2023-06-02 ANET Long Placed
+W 2023-06-09 Bullish Bullish_breadth 1603 20 1
+D 2023-06-09 MVIS Long Skipped_Sized_to_zero
+D 2023-06-09 MRVL Long Placed
+W 2023-06-16 Bullish Bullish_breadth 1646 20 1
+D 2023-06-16 SDA Long Placed
+W 2023-06-23 Bullish Bullish_breadth 1695 20 1
+D 2023-06-23 KAI Long Placed
+D 2023-06-23 PSTG Long Skipped_Sized_to_zero
+W 2023-06-30 Bullish Bullish_breadth 1759 20 1
+D 2023-06-30 HPE Long Placed
+W 2023-07-07 Bullish Bullish_breadth 1718 20 0
+D 2023-07-07 PSTG Long Skipped_Sized_to_zero
+W 2023-07-14 Bullish Bullish_breadth 1865 20 0
+W 2023-07-21 Bullish Bullish_breadth 1957 20 1
+D 2023-07-21 SIRI Long Placed
+W 2023-07-28 Bullish Bullish_breadth 1974 20 0
+D 2023-07-28 PSQH Long Skipped_Sized_to_zero
+W 2023-08-04 Bullish Bullish_breadth 1890 20 1
+D 2023-08-04 PJT Long Placed
+D 2023-08-04 ARGX Long Skipped_Sized_to_zero
+W 2023-08-11 Bullish Bullish_breadth 1813 20 2
+D 2023-08-11 MNKD Long Placed
+D 2023-08-11 CENTA Long Placed
+W 2023-08-18 Bullish Bullish_breadth 1763 20 3
+D 2023-08-18 R Long Placed
+D 2023-08-18 ADMA Long Placed
+D 2023-08-18 PKG Long Placed
+W 2023-08-25 Bullish Bullish_breadth 1787 20 0
+W 2023-09-01 Bullish Bullish_breadth 1602 20 1
+D 2023-09-01 X Long Placed
+W 2023-09-08 Bullish Bullish_breadth 1694 20 1
+D 2023-09-08 TDS Long Placed
+W 2023-09-15 Bullish Bullish_breadth 1816 20 0
+W 2023-09-22 Bullish Deteriorating 1617 20 0
+W 2023-09-29 Bullish Deteriorating 1637 20 0
+W 2023-10-06 Neutral Deteriorating 1662 20 2
+D 2023-10-06 MMYT Long Placed
+D 2023-10-06 SUN Long Placed
+W 2023-10-13 Neutral Deteriorating 1869 20 1
+D 2023-10-13 E Long Placed
+W 2023-10-20 Neutral Deteriorating 1851 20 0
+W 2023-10-27 Neutral Deteriorating 2138 20 0
+W 2023-11-03 Bullish Recovering 2235 20 2
+D 2023-11-03 OKE Long Placed
+D 2023-11-03 TK Long Placed
+D 2023-11-03 TNK Long Skipped_Insufficient_cash
+W 2023-11-10 Bullish Bullish_breadth 1883 20 1
+D 2023-11-10 AGYS Long Placed
+D 2023-11-10 EPAC Long Skipped_Insufficient_cash
+D 2023-11-10 AROC Long Skipped_Insufficient_cash
+D 2023-11-10 BRO Long Skipped_Insufficient_cash
+W 2023-11-17 Bullish Bullish_breadth 1755 20 0
+D 2023-11-17 MSTR Long Skipped_Insufficient_cash
+W 2023-11-24 Bullish Bullish_breadth 1682 20 0
+W 2023-12-01 Bullish Bullish_breadth 1811 20 0
+W 2023-12-08 Bullish Bullish_breadth 1818 20 0
+D 2023-12-08 IOT Long Skipped_Insufficient_cash
+W 2023-12-15 Bullish Bullish_breadth 1866 20 0
+W 2023-12-22 Bullish Bullish_breadth 1801 20 0
+W 2023-12-29 Bullish Bullish_breadth 1924 20 0
+W 2024-01-05 Bullish Bullish_breadth 2034 20 1
+D 2024-01-05 FOLD Long Placed
+D 2024-01-05 GKOS Long Skipped_Insufficient_cash
+D 2024-01-05 PLAB Long Skipped_Sized_to_zero
+D 2024-01-05 ATKR Long Skipped_Insufficient_cash
+W 2024-01-12 Bullish Bullish_breadth 2186 20 1
+D 2024-01-12 XERS Long Placed
+W 2024-01-19 Bullish Bullish_breadth 1860 20 1
+D 2024-01-19 VTRS Long Placed
+W 2024-01-26 Bullish Bullish_breadth 1883 20 0
+W 2024-02-02 Bullish Bullish_breadth 2089 20 0
+D 2024-02-02 AVGO Long Skipped_Sized_to_zero
+W 2024-02-09 Bullish Bullish_breadth 2140 20 1
+D 2024-02-09 OSIS Long Placed
+W 2024-02-16 Bullish Bullish_breadth 2002 20 1
+D 2024-02-16 APPF Long Placed
+W 2024-02-23 Bullish Bullish_breadth 1914 20 1
+D 2024-02-23 PEGA Long Skipped_Sized_to_zero
+D 2024-02-23 KNSL Long Skipped_Sized_to_zero
+D 2024-02-23 ODFL Long Placed
+W 2024-03-01 Bullish Bullish_breadth 2002 20 0
+D 2024-03-01 SOUN Long Skipped_Sized_to_zero
+W 2024-03-08 Bullish Bullish_breadth 2066 20 1
+D 2024-03-08 ANIP Long Placed
+D 2024-03-08 SOUN Long Skipped_Insufficient_cash
+W 2024-03-15 Bullish Bullish_breadth 2128 20 0
+D 2024-03-15 HUYA Long Skipped_Insufficient_cash
+D 2024-03-15 ATI Long Skipped_Insufficient_cash
+D 2024-03-15 WTTR Long Skipped_Insufficient_cash
+D 2024-03-15 ERF Long Skipped_Insufficient_cash
+W 2024-03-22 Bullish Bullish_breadth 2164 20 1
+D 2024-03-22 ATI Long Skipped_Insufficient_cash
+D 2024-03-22 ERF Long Placed
+D 2024-03-22 HUYA Long Skipped_Insufficient_cash
+D 2024-03-22 REAL Long Skipped_Insufficient_cash
+W 2024-04-05 Bullish Bullish_breadth 2227 20 1
+D 2024-04-05 NCMI Long Placed
+D 2024-04-05 BBW Long Skipped_Insufficient_cash
+W 2024-04-12 Bullish Bullish_breadth 1948 20 1
+D 2024-04-12 QFIN Long Placed
+W 2024-04-19 Bullish Bullish_breadth 1875 20 2
+D 2024-04-19 WPM Long Placed
+D 2024-04-19 MEOH Long Placed
+D 2024-04-19 AGI Long Skipped_Insufficient_cash
+D 2024-04-19 CHX Long Skipped_Insufficient_cash
+D 2024-04-19 GFI Long Skipped_Insufficient_cash
+D 2024-04-19 MUR Long Skipped_Insufficient_cash
+D 2024-04-19 FSM Long Skipped_Sized_to_zero
+W 2024-04-26 Bullish Bullish_breadth 1640 20 0
+D 2024-04-26 PSLV Long Skipped_Insufficient_cash
+D 2024-04-26 MUR Long Skipped_Insufficient_cash
+D 2024-04-26 BBW Long Skipped_Insufficient_cash
+D 2024-04-26 BRY Long Skipped_Insufficient_cash
+W 2024-05-03 Bullish Bullish_breadth 1950 20 0
+D 2024-05-03 SAH Long Skipped_Insufficient_cash
+D 2024-05-03 AEG Long Skipped_Insufficient_cash
+W 2024-05-10 Bullish Bullish_breadth 1839 20 1
+D 2024-05-10 FUTU Long Skipped_Insufficient_cash
+D 2024-05-10 ARLP Long Placed
+D 2024-05-10 PSMT Long Skipped_Insufficient_cash
+D 2024-05-10 APPF Long Skipped_Insufficient_cash
+W 2024-05-17 Bullish Bullish_breadth 1789 20 0
+D 2024-05-17 SAH Long Skipped_Insufficient_cash
+D 2024-05-17 LOPE Long Skipped_Insufficient_cash
+W 2024-05-24 Bullish Bullish_breadth 1970 20 0
+W 2024-05-31 Bullish Bullish_breadth 2060 20 1
+D 2024-05-31 HPQ Long Placed
+D 2024-05-31 AGYS Long Skipped_Insufficient_cash
+W 2024-06-07 Bullish Bullish_breadth 1640 20 1
+D 2024-06-07 AGYS Long Placed
+D 2024-06-07 AD Long Skipped_Sized_to_zero
+D 2024-06-07 INOD Long Skipped_Insufficient_cash
+W 2024-06-14 Bullish Bullish_breadth 1541 20 0
+D 2024-06-14 AD Long Skipped_Insufficient_cash
+D 2024-06-14 INOD Long Skipped_Insufficient_cash
+W 2024-06-21 Bullish Bullish_breadth 1540 20 0
+D 2024-06-21 CRDO Long Skipped_Sized_to_zero
+D 2024-06-21 AD Long Skipped_Insufficient_cash
+D 2024-06-21 AVGO Long Skipped_Sized_to_zero
+W 2024-06-28 Bullish Bullish_breadth 1554 20 0
+D 2024-06-28 BBY Long Skipped_Insufficient_cash
+W 2024-07-05 Bullish Bullish_breadth 1750 20 0
+W 2024-07-12 Bullish Bullish_breadth 1910 20 0
+D 2024-07-12 LZB Long Skipped_Insufficient_cash
+W 2024-07-19 Bullish Bullish_breadth 1573 20 0
+D 2024-07-19 FNB Long Skipped_Insufficient_cash
+W 2024-07-26 Bullish Bullish_breadth 1557 20 1
+D 2024-07-26 WABC Long Placed
+W 2024-08-02 Bullish Bullish_breadth 1648 20 2
+D 2024-08-02 ESRT Long Placed
+D 2024-08-02 USB Long Placed
+D 2024-08-02 AUB Long Skipped_Insufficient_cash
+D 2024-08-02 CG Long Skipped_Insufficient_cash
+D 2024-08-02 PB Long Skipped_Insufficient_cash
+D 2024-08-02 UBSI Long Skipped_Insufficient_cash
+D 2024-08-02 AGM Long Skipped_Insufficient_cash
+D 2024-08-02 BX Long Skipped_Insufficient_cash
+D 2024-08-02 FDX Long Skipped_Insufficient_cash
+D 2024-08-02 FNB Long Skipped_Insufficient_cash
+W 2024-08-09 Bullish Bullish_breadth 1672 20 1
+D 2024-08-09 ALLE Long Placed
+D 2024-08-09 VCYT Long Skipped_Insufficient_cash
+D 2024-08-09 WFG Long Skipped_Insufficient_cash
+D 2024-08-09 BX Long Skipped_Insufficient_cash
+D 2024-08-09 GTY Long Skipped_Insufficient_cash
+D 2024-08-09 HOMB Long Skipped_Insufficient_cash
+D 2024-08-09 PNFP Long Skipped_Insufficient_cash
+D 2024-08-09 SLGN Long Skipped_Insufficient_cash
+D 2024-08-09 FR Long Skipped_Insufficient_cash
+D 2024-08-09 FA Long Skipped_Insufficient_cash
+D 2024-08-09 AMG Long Skipped_Insufficient_cash
+W 2024-08-16 Bullish Bullish_breadth 1876 20 1
+D 2024-08-16 ESE Long Placed
+W 2024-08-23 Bullish Bullish_breadth 1886 20 0
+D 2024-08-23 VISN Long Skipped_Insufficient_cash
+W 2024-08-30 Bullish Bullish_breadth 2037 20 0
+D 2024-08-30 FN Long Skipped_Insufficient_cash
+D 2024-08-30 BBW Long Skipped_Insufficient_cash
+W 2024-09-06 Bullish Bullish_breadth 1931 20 1
+D 2024-09-06 BBW Long Skipped_Insufficient_cash
+D 2024-09-06 CAKE Long Placed
+W 2024-09-13 Bullish Bullish_breadth 1968 20 1
+D 2024-09-13 BBW Long Placed
+D 2024-09-13 ROST Long Skipped_Insufficient_cash
+W 2024-09-20 Bullish Bullish_breadth 1971 20 0
+W 2024-09-27 Bullish Bullish_breadth 1983 20 0
+D 2024-09-27 MBC Long Skipped_Insufficient_cash
+D 2024-09-27 WOOF Long Skipped_Insufficient_cash
+D 2024-09-27 LOMA Long Skipped_Insufficient_cash
+W 2024-10-04 Bullish Bullish_breadth 1898 20 0
+D 2024-10-04 MBC Long Skipped_Insufficient_cash
+W 2024-10-11 Bullish Bullish_breadth 2010 20 0
+D 2024-10-11 ATHM Long Skipped_Sized_to_zero
+W 2024-10-18 Bullish Bullish_breadth 2193 20 0
+D 2024-10-18 YMM Long Skipped_Insufficient_cash
+D 2024-10-18 FUTU Long Skipped_Sized_to_zero
+D 2024-10-18 BEKE Long Skipped_Insufficient_cash
+D 2024-10-18 ATHM Long Skipped_Insufficient_cash
+W 2024-10-25 Bullish Bullish_breadth 2035 20 0
+D 2024-10-25 TIGR Long Skipped_Insufficient_cash
+D 2024-10-25 OKLO Long Skipped_Insufficient_cash
+D 2024-10-25 BEKE Long Skipped_Insufficient_cash
+W 2024-11-01 Bullish Bullish_breadth 2026 20 1
+D 2024-11-01 GBX Long Skipped_Insufficient_cash
+D 2024-11-01 PAYC Long Skipped_Insufficient_cash
+D 2024-11-01 KMPR Long Placed
+D 2024-11-01 OKLO Long Skipped_Sized_to_zero
+W 2024-11-08 Bullish Bullish_breadth 1974 20 0
+D 2024-11-08 LMND Long Skipped_Sized_to_zero
+D 2024-11-08 UPWK Long Skipped_Insufficient_cash
+D 2024-11-08 OKLO Long Skipped_Insufficient_cash
+W 2024-11-15 Bullish Bullish_breadth 1927 20 0
+D 2024-11-15 BROS Long Skipped_Insufficient_cash
+D 2024-11-15 FIHL Long Skipped_Insufficient_cash
+D 2024-11-15 TGI Long Skipped_Insufficient_cash
+D 2024-11-15 XYZ Long Skipped_Insufficient_cash
+W 2024-11-22 Bullish Bullish_breadth 1974 20 0
+D 2024-11-22 SMLR Long Skipped_Sized_to_zero
+D 2024-11-22 DXPE Long Skipped_Sized_to_zero
+D 2024-11-22 FIHL Long Skipped_Insufficient_cash
+W 2024-11-29 Bullish Bullish_breadth 2054 20 0
+D 2024-11-29 WWD Long Skipped_Insufficient_cash
+D 2024-11-29 FIHL Long Skipped_Insufficient_cash
+W 2024-12-06 Bullish Bullish_breadth 2097 20 2
+D 2024-12-06 GOLF Long Placed
+D 2024-12-06 MGNI Long Skipped_Insufficient_cash
+D 2024-12-06 NTAP Long Placed
+D 2024-12-06 PRCH Long Skipped_Insufficient_cash
+W 2024-12-13 Bullish Bullish_breadth 2043 20 1
+D 2024-12-13 MNSO Long Placed
+D 2024-12-13 ASAN Long Skipped_Sized_to_zero
+D 2024-12-13 PRCH Long Skipped_Sized_to_zero
+W 2024-12-20 Bullish Bullish_breadth 1701 20 0
+D 2024-12-20 GOOGL Long Skipped_Insufficient_cash
+D 2024-12-20 GOOG Long Skipped_Insufficient_cash
+W 2024-12-27 Bullish Bullish_breadth 1673 20 2
+D 2024-12-27 SKYT Long Placed
+D 2024-12-27 GOOG Long Placed
+D 2024-12-27 GOOGL Long Skipped_Share_class_held
+W 2025-01-03 Bullish Bullish_breadth 1872 20 0
+D 2025-01-03 GOOGL Long Skipped_Share_class_held
+D 2025-01-03 JOYY Long Skipped_Insufficient_cash
+W 2025-01-10 Bullish Bullish_breadth 1647 20 2
+D 2025-01-10 JPM Long Placed
+D 2025-01-10 PHYS Long Placed
+D 2025-01-10 AM Long Skipped_Insufficient_cash
+D 2025-01-10 BKE Long Skipped_Insufficient_cash
+D 2025-01-10 CFR Long Skipped_Insufficient_cash
+W 2025-01-17 Bullish Bullish_breadth 1671 20 0
+W 2025-01-24 Bullish Bullish_breadth 1990 20 0
+W 2025-01-31 Bullish Bullish_breadth 1741 20 0
+W 2025-02-07 Bullish Bullish_breadth 1992 20 2
+D 2025-02-07 WRLD Long Placed
+D 2025-02-07 DOV Long Placed
+D 2025-02-07 ABG Long Skipped_Insufficient_cash
+W 2025-02-14 Bullish Bullish_breadth 2085 20 1
+D 2025-02-14 ABG Long Placed
+W 2025-02-21 Bullish Bullish_breadth 2066 20 1
+D 2025-02-21 BRK-B Long Placed
+D 2025-02-21 DKNG Long Skipped_Insufficient_cash
+D 2025-02-21 FLG Long Skipped_Insufficient_cash
+W 2025-02-28 Bullish Bullish_breadth 1944 20 0
+W 2025-03-07 Bullish Deteriorating 1669 20 1
+D 2025-03-07 ASND Long Placed
+W 2025-03-14 Neutral Deteriorating 1955 20 1
+D 2025-03-14 NOMD Long Placed
+W 2025-03-21 Neutral Deteriorating 1660 20 1
+D 2025-03-21 STN Long Placed
+W 2025-03-28 Neutral Deteriorating 1887 20 1
+D 2025-03-28 DHLGY Long Placed
+W 2025-04-04 Neutral Deteriorating 2199 20 1
+D 2025-04-04 PTGX Long Placed
+D 2025-04-04 SLNO Long Skipped_Sized_to_zero
+W 2025-04-11 Bearish Bearish_breadth 0 0 0
+W 2025-04-25 Bearish Bearish_breadth 0 0 0
+W 2025-05-02 Neutral Recovering 2383 20 0
+W 2025-05-09 Neutral Recovering 1965 20 0
+W 2025-05-16 Neutral Neutral_breadth 2058 20 0
+W 2025-05-23 Bullish Recovering 1560 20 1
+D 2025-05-23 AVPT Long Placed
+W 2025-05-30 Bullish Recovering 1470 20 1
+D 2025-05-30 ATAT Long Placed
+W 2025-06-06 Bullish Bullish_breadth 1591 20 2
+D 2025-06-06 TNXP Long Placed
+D 2025-06-06 BBW Long Placed
+W 2025-06-13 Bullish Bullish_breadth 1647 20 0
+D 2025-06-13 TGB Long Skipped_Sized_to_zero
+W 2025-06-20 Bullish Bullish_breadth 1577 20 1
+D 2025-06-20 BOX Long Placed
+W 2025-06-27 Bullish Bullish_breadth 1598 20 0
+W 2025-07-11 Bullish Bullish_breadth 1842 20 1
+D 2025-07-11 PTC Long Placed
+W 2025-07-18 Bullish Bullish_breadth 1849 20 3
+D 2025-07-18 IIIV Long Placed
+D 2025-07-18 HWC Long Placed
+D 2025-07-18 TCBI Long Placed
+W 2025-07-25 Bullish Bullish_breadth 2000 20 0
+W 2025-08-01 Bullish Bullish_breadth 1910 20 3
+D 2025-08-01 KN Long Placed
+D 2025-08-01 AD Long Placed
+D 2025-08-01 CVLT Long Placed
+W 2025-08-08 Bullish Bullish_breadth 1823 20 1
+D 2025-08-08 APPF Long Placed
+W 2025-08-15 Bullish Bullish_breadth 1464 20 1
+D 2025-08-15 BLBD Long Placed
+W 2025-08-22 Bullish Bullish_breadth 1802 20 1
+D 2025-08-22 ATMU Long Placed
+W 2025-08-29 Bullish Bullish_breadth 2023 20 0
+W 2025-09-05 Bullish Bullish_breadth 2177 20 1
+D 2025-09-05 UTHR Long Placed
+W 2025-09-12 Bullish Bullish_breadth 2170 20 0
+W 2025-09-19 Bullish Bullish_breadth 2166 20 0
+W 2025-09-26 Bullish Bullish_breadth 2096 20 2
+D 2025-09-26 INOD Long Placed
+D 2025-09-26 UPWK Long Placed
+W 2025-10-03 Bullish Bullish_breadth 2144 20 0
+W 2025-10-10 Bullish Bullish_breadth 2071 20 0
+D 2025-10-10 PATH Long Skipped_Sized_to_zero
+W 2025-10-17 Bullish Bullish_breadth 1779 20 1
+D 2025-10-17 IBM Long Placed
+W 2025-10-24 Bullish Bullish_breadth 1680 20 0
+W 2025-10-31 Bullish Bullish_breadth 2086 20 1
+D 2025-10-31 PUMP Long Placed
+W 2025-11-07 Bullish Bullish_breadth 1984 20 0
+W 2025-11-14 Bullish Bullish_breadth 1972 20 1
+D 2025-11-14 AUPH Long Placed
+D 2025-11-14 BBIO Long Skipped_Sized_to_zero
+W 2025-11-21 Bullish Bullish_breadth 1533 20 1
+D 2025-11-21 BKV Long Placed
+D 2025-11-21 ANAB Long Skipped_Sized_to_zero
+W 2025-11-28 Bullish Bullish_breadth 1585 20 0
+W 2025-12-05 Bullish Bullish_breadth 1607 20 1
+D 2025-12-05 ALIZY Long Placed
+W 2025-12-12 Bullish Bullish_breadth 1594 20 2
+D 2025-12-12 AMTM Long Skipped_Sized_to_zero
+D 2025-12-12 MAR Long Placed
+D 2025-12-12 SOLV Long Placed
+W 2025-12-19 Bullish Bullish_breadth 1713 20 0
+D 2025-12-19 CVNA Long Skipped_Sized_to_zero
+W 2025-12-26 Bullish Bullish_breadth 1722 20 2
+D 2025-12-26 AAOI Long Placed
+D 2025-12-26 CVNA Long Placed
+W 2026-01-02 Bullish Bullish_breadth 1895 20 0
+D 2026-01-02 AMTM Long Skipped_Sized_to_zero
+W 2026-01-09 Bullish Bullish_breadth 1748 20 1
+D 2026-01-09 EC Long Placed
+W 2026-01-16 Bullish Bullish_breadth 1937 20 1
+D 2026-01-16 CRAI Long Placed
+D 2026-01-16 QXO Long Skipped_Insufficient_cash
+W 2026-01-23 Bullish Bullish_breadth 1539 20 0
+D 2026-01-23 RCAT Long Skipped_Insufficient_cash
+D 2026-01-23 SARO Long Skipped_Insufficient_cash
+D 2026-01-23 SLAB Long Skipped_Insufficient_cash
+W 2026-01-30 Bullish Bullish_breadth 1665 20 1
+D 2026-01-30 ALGM Long Placed
+D 2026-01-30 HUYA Long Skipped_Insufficient_cash
+D 2026-01-30 QGEN Long Skipped_Sized_to_zero
+W 2026-02-06 Bullish Bullish_breadth 1585 20 0
+D 2026-02-06 SKM Long Skipped_Sized_to_zero
+W 2026-02-13 Bullish Bullish_breadth 1633 20 1
+D 2026-02-13 DNOW Long Placed
+W 2026-02-20 Bullish Bullish_breadth 1880 20 0
+W 2026-02-27 Bullish Bullish_breadth 1822 20 1
+D 2026-02-27 LMAT Long Placed
+D 2026-02-27 BLBD Long Skipped_Insufficient_cash
+D 2026-02-27 MPC Long Skipped_Insufficient_cash
+W 2026-03-06 Bullish Bullish_breadth 1926 20 0
+W 2026-03-13 Bullish Deteriorating 1878 20 2
+D 2026-03-13 IPI Long Skipped_Sized_to_zero
+D 2026-03-13 DK Long Placed
+D 2026-03-13 T Long Placed
+W 2026-03-20 Bullish Deteriorating 1816 20 1
+D 2026-03-20 CLDX Long Placed
+W 2026-03-27 Neutral Deteriorating 1965 20 1
+D 2026-03-27 SATL Long Placed
+D 2026-03-27 CF Long Skipped_Sized_to_zero
+W 2026-04-10 Neutral Neutral_breadth 1892 20 0
+D 2026-04-10 DEC Long Skipped_Insufficient_cash
+D 2026-04-10 ECG Long Skipped_Insufficient_cash
+D 2026-04-10 FDX Long Skipped_Insufficient_cash
+W 2026-04-17 Bullish Bullish_breadth 1603 20 0
+D 2026-04-17 NBIS Long Skipped_Sized_to_zero
+D 2026-04-17 YOU Long Skipped_Sized_to_zero
+W 2026-04-24 Bullish Bullish_breadth 1662 20 1
+D 2026-04-24 CAR Long Placed
+D 2026-04-24 SPIR Long Skipped_Sized_to_zero
+W 2026-05-01 Bullish Bullish_breadth 1756 20 1
+D 2026-05-01 SANM Long Skipped_Sized_to_zero
+D 2026-05-01 SXT Long Placed
+D 2026-05-01 ARM Long Skipped_Sized_to_zero
+W 2026-05-08 Bullish Bullish_breadth 1894 20 0
+W 2026-05-15 Bullish Bullish_breadth 1777 20 1
+D 2026-05-15 QCOM Long Placed
+D 2026-05-15 CEVA Long Skipped_Sized_to_zero
+D 2026-05-15 NVTS Long Skipped_Sized_to_zero
+W 2026-05-22 Bullish Bullish_breadth 1755 20 2
+D 2026-05-22 HLIT Long Placed
+D 2026-05-22 QCOM Long Placed
+D 2026-05-22 SANM Long Skipped_Sized_to_zero
+W 2026-05-29 Bullish Bullish_breadth 1765 20 2
+D 2026-05-29 INOD Long Placed
+D 2026-05-29 CLFD Long Placed
+W 2026-06-05 Bullish Bullish_breadth 1972 20 2
+D 2026-06-05 APPS Long Placed
+D 2026-06-05 LOGI Long Placed
+D 2026-06-05 OKTA Long Skipped_Sized_to_zero
+D 2026-06-05 FTK Long Skipped_Sized_to_zero
+D 2026-06-05 DDOG Long Skipped_Sized_to_zero
+D 2026-06-05 PANW Long Skipped_Sized_to_zero
+W 2026-06-12 Bullish Bullish_breadth 1950 20 0
+D 2026-06-12 OKTA Long Skipped_Sized_to_zero

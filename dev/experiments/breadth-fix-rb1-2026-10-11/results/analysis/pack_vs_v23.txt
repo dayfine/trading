@@ -1,0 +1,12 @@
+O s0 pack-rule against-macro fills: 38  net 494027
+O s0 V23-rule  fills after a Bearish screen (strictly before): 40  net 502910
+N s0 pack-rule against-macro fills: 14  net 62271
+N s0 V23-rule  fills after a Bearish screen (strictly before): 16  net 88865
+O s1 pack-rule against-macro fills: 37  net 423225
+O s1 V23-rule  fills after a Bearish screen (strictly before): 39  net 445384
+N s1 pack-rule against-macro fills: 14  net 54750
+N s1 V23-rule  fills after a Bearish screen (strictly before): 16  net 81156
+O s2 pack-rule against-macro fills: 34  net 374291
+O s2 V23-rule  fills after a Bearish screen (strictly before): 36  net 395350
+N s2 pack-rule against-macro fills: 14  net 61014
+N s2 V23-rule  fills after a Bearish screen (strictly before): 15  net 89637

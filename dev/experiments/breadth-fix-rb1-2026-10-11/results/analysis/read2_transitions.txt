@@ -1,0 +1,5 @@
+Bearish->Neutral 91
+Neutral->Bearish 11
+Neutral->Bullish 111
+Bearish->Bullish 85
+Bullish->Neutral 7

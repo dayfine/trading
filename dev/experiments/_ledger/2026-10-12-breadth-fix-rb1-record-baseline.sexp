@@ -1,0 +1,16 @@
+((date 2026-10-12) (slug breadth-fix-rb1-record-baseline)
+ (hypothesis
+  "Not a mechanism test: the record (rb1, rebaseline-v12) re-run on the full NYSE A-D breadth fixture (#3238, #3252). Until #3252 the fixture held one 1965 row and then 2017+, so for 2000-2016 the macro composite carried a constant Momentum Index vote 'negative (-11.0)' and no A-D Line vote. Pre-registered in dev/experiments/breadth-fix-rb1-2026-10-11/README.md at b42dfb9d9: N replaces rb1 as the record whatever the direction unless >= 2 salts fail V6.")
+ (base_scenario
+  "O = eda54e591 (main before #3252), N = 524bc2df0 (#3252); trees differ by #3252 only, each lane built in its own pinned tree; rb1-26 spec byte-identical to rebaseline-v12; warehouse /tmp/snap_top3000_pit_v12pit 9,236 entries; 2000-01-01 -> 2026-06-26; salts 0/1/2. O replays rebaseline-v12 rb1 byte-for-byte (actual, equity, macro, open positions). V6 = 0 in all six cells; validator_diff -check V6 N vs O exit 0 per salt.")
+ (window_id top3000-pitv12-1999-2025-record-26y-3salt-tr-adfull) (baseline_label record-rb1-n-adfull)
+ (variants
+  (((label n-s0) (config_hash rb1-26-tr-guard-div@524bc2df0) (aggregate (((mean_sharpe 0.5262) (mean_calmar 0.3938) (mean_return_pct 849.28) (mean_max_drawdown_pct 22.52)))))
+   ((label n-s1) (config_hash rb1-26-tr-guard-div@524bc2df0) (aggregate (((mean_sharpe 0.5222) (mean_calmar 0.3970) (mean_return_pct 835.99) (mean_max_drawdown_pct 22.19)))))
+   ((label n-s2) (config_hash rb1-26-tr-guard-div@524bc2df0) (aggregate (((mean_sharpe 0.5342) (mean_calmar 0.4052) (mean_return_pct 878.27) (mean_max_drawdown_pct 22.19)))))
+   ((label o-s0) (config_hash rb1-26-tr-guard-div@eda54e591) (aggregate (((mean_sharpe 0.5418) (mean_calmar 0.3943) (mean_return_pct 851.83) (mean_max_drawdown_pct 22.52)))))
+   ((label o-s1) (config_hash rb1-26-tr-guard-div@eda54e591) (aggregate (((mean_sharpe 0.5329) (mean_calmar 0.3934) (mean_return_pct 818.39) (mean_max_drawdown_pct 22.19)))))
+   ((label o-s2) (config_hash rb1-26-tr-guard-div@eda54e591) (aggregate (((mean_sharpe 0.5326) (mean_calmar 0.3917) (mean_return_pct 809.51) (mean_max_drawdown_pct 22.19)))))))
+ (verdict Inconclusive)
+ (notes
+  "BASELINE ENTRY (data correction; the band is the result). New record = N: +849 / +836 / +878 %, CAGR 8.87 / 8.81 / 8.99 % vs SPY TR 8.20 %, max DD 22.5 / 22.2 / 22.2 % (2024-11-26 -> 2026-06-24, unchanged) vs 55.2 %, Calmar 0.39 / 0.40 / 0.41 vs 0.15, 570 / 575 / 568 trades. N - O = -0.003 / +0.019 / +0.073 log (mean +0.030), inside either arm's salt spread (0.044-0.046). Bearish weeks 398 -> 233, all 2000-2016. By period: 2000-02 -0.04, 2008-09 -0.06, 2010-16 +0.09 to +0.11 log, 2003-07 salt-dependent; trade lists identical from 2018-09-25. Capital-bound: N placed 70-75 more tickets in 2000-16 and turned 114-122 more away for cash; the tail swaps PEGA/GPN/JNS (N) for CHDN/GTIV/INVX (O) in every salt. Pre-2017 max DD 16.8-16.9 -> 18.9-19.8 %. Macro-dependent verdicts that ran on the frozen input: macro-suspend 5d, index-stage veto 2000-16 leg, shorts Phase B exposure path, A-D default-flip grid (data dir unclear). CONSEQUENCES: every later 26y comparison pairs against N s0-s2 at the same salt (validator_diff -check V6); the index-short overlay screen uses N's NAV and N's macro_trend for G2/G3. Writeup: dev/experiments/breadth-fix-rb1-2026-10-11/README.md."))
