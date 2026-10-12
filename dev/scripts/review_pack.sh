@@ -45,6 +45,7 @@ LIB="$(cd "$(dirname "$0")/../lib/review_pack" && pwd)"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 CONTAINER="${CONTAINER:-trading-1-dev}"
 CROOT=/workspaces/trading-1
+REGIME_WARMUP_ROWS=180   # SPY bars published before the window for the regime warm-up (#3194)
 
 OUT=""; TITLE="Backtest Review"; SUBTITLE=""; CHARTS=0
 SNAP=/tmp/snap_top3000_pit_v11pit; DATA="$REPO/data"; DOCKER=1; RUNS=""; RUN_KIND=auto
@@ -181,6 +182,11 @@ site_common() {
   for c in 6:spy 5:spy_price; do
     awk -F, -v a="$first" -v b="$last" -v col="${c%%:*}" 'NR>1 && $1>=a && $1<=b && $col+0>0 {printf "%s[\"%s\",%.4f]", (n++?",":"["), $1, $col+0} END{print "]"}' "$SPY_CSV" > "$s/${c#*:}.json"
   done
+  # the regime's warm-up (#3194): the REGIME_WARMUP_ROWS SPY bars before the window, [date, adjusted_close,
+  # close], read by the page for the regime only. 180 bars span at least 35 weeks (at most 5 a week), so the
+  # 30-week MA and its 4-week slope (34 weekly closes) exist on the window's first day.
+  awk -F, -v a="$first" -v k="$REGIME_WARMUP_ROWS" 'NR>1 && $1<a && $6+0>0 && $5+0>0 { r[n++ % k] = sprintf("[\"%s\",%.4f,%.4f]", $1, $6+0, $5+0) }
+    END { m = n < k ? n : k; printf "["; for (i = n - m; i < n; i++) printf "%s%s", (i > n - m ? "," : ""), r[i % k]; print "]" }' "$SPY_CSV" > "$s/spy_warmup.json"
   awk -F'\t' '{printf "%s[\"%s\",\"%s\",\"%s\"]", (n++?",":"["), $1,$2,$3} END{print "]"}' "$d/x_macro.tsv" > "$s/macro.json"
   rm -rf "$s/charts"; mkdir -p "$s/charts"
   awk -v STAGE_DIR="$d/stage" -v OUT="$s/charts" -f "$LIB/chart_shards.awk" "$d/x_daily.tsv" "$d/trades.csv"

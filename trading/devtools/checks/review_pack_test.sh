@@ -56,6 +56,10 @@
 #     gap-through hard-stop fills (short at the open above, long at the open
 #     below), a short entered far below its prior close, and the Stage 2
 #     weeks of a short through stage_sum.sh (QC rework on #3192).
+#   - #3194: the regime warm-up (spy_warmup.json, the SPY bars before the
+#     window; the first window day gets a regime), the open-position read net
+#     of dividends, cash interest and commissions (or UnrealizedPnl), the
+#     sub-$17 margin-call churn card and the NAV-peak give-back card.
 #
 # Run:
 #   sh trading/devtools/checks/review_pack_test.sh
@@ -718,5 +722,85 @@ else
   echo "SKIP: review_pack anatomy cases need node"
 fi
 expect_eq "wiring: the P&L anatomy card is rendered on load" 1 "$(grep -c 'renderDiag(); renderAnatomy(); renderSalts();' "$S/index.html")"
+# #3194 short-book follow-ups.
+# 1. Regime warm-up: spy_warmup.json carries the REGIME_WARMUP_ROWS SPY bars before the window, so the
+#    window's first day has a regime. W adds 2019's weekdays (261, rising) in front of the fixture's SPY.
+W="$TMP/w3194"; mkdir -p "$W"; cp -R "$FIX/data" "$W/data"
+{ head -1 "$FIX/data/S/Y/SPY/data.csv"
+  awk 'BEGIN { split("31 28 31 30 31 30 31 31 30 31 30 31", ml, " "); wd = 2; p = 200 # 2019-01-01 was a Tuesday
+    for (m = 1; m <= 12; m++) for (d = 1; d <= ml[m]; d++) { if (wd >= 1 && wd <= 5) { p += 0.25; printf "2019-%02d-%02d,%.2f,%.2f,%.2f,%.2f,%.2f,1000000,\n", m, d, p, p + 1, p - 1, p, p - 10 } wd = (wd + 1) % 7 } }'
+  tail -n +2 "$FIX/data/S/Y/SPY/data.csv"; } > "$W/spy.csv"
+mv "$W/spy.csv" "$W/data/S/Y/SPY/data.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$W/data" --out "$W/pack" r0="$FIX/run/" >"$W/log" 2>&1 || rc=$?
+expect_eq "#3194 warm-up: builds, exit 0" 0 "$rc"
+WD="$W/pack/site/data"
+expect_eq "#3194 warm-up: 180 pre-window bars, ending the day before the window" "180 2019-12-31" "$(jq -r '"\(length) \(.[-1][0])"' "$WD/spy_warmup.json")"
+expect_eq "#3194 warm-up: [date, adjusted_close, close] per bar" "2019-12-31 255.25 265.25" "$(jq -r '.[-1] | [.[0], (.[1:] | map(. + 0 | tostring)[])] | join(" ")' "$WD/spy_warmup.json")"
+expect_eq "#3194 warm-up: spy.json stays clipped to the window" 100 "$(jq length "$WD/spy.json")"
+expect_eq "#3194 warm-up: no SPY history before the window -> empty warm-up" 0 "$(jq length "$S/data/spy_warmup.json")"
+if command -v node >/dev/null 2>&1; then
+  RFNS="$(sed -n -e '/^function spyBasis(/,/^}/p' -e '/^function withWarmup(/,/^}/p' -e '/^function spyRegimeByDay(/,/^}/p' -e '/^function isoWeek(/p' "$S/index.html")"
+  rg() { node -e "const D = {};
+$RFNS
+const warm = $(jq -c . "$WD/spy_warmup.json"), spy = $(jq -c . "$WD/spy.json");
+console.log($1)"; }
+  expect_eq "#3194 regime: the window's first day reads UP with the warm-up, '' without it" "UP|" "$(rg '[spyRegimeByDay(withWarmup(warm, spy, { spy: "tr" })).get(spy[0][0]), spyRegimeByDay(spy).get(spy[0][0])].join("|")')"
+  expect_eq "#3194 regime: withWarmup reads close on a price basis, adjusted_close otherwise" "265.25 255.25" "$(rg '[withWarmup(warm, spy, { spy: "price" })[179][1], withWarmup(warm, spy, { spy: "tr" })[179][1]].join(" ")')"
+  expect_eq "#3194 regime: withWarmup keeps the window and drops warm-up rows dated inside it" "100 2020-01-02" "$(rg '((s) => [s.length, s[0][0]].join(" "))(withWarmup([["2020-01-02", 1, 1]], spy, null))')"
+  expect_eq "#3194 regime: the default series is D.spyRegime (the page sets it)" "UP" "$(rg '(D.spyRegime = withWarmup(warm, spy, null), spyRegimeByDay().get(spy[0][0]))')"
+else
+  echo "SKIP: review_pack #3194 regime cases need node"
+fi
+expect_eq "#3194 wiring: the page loads spy_warmup.json and sets D.spyRegime" 2 "$(grep -c "load('spy_warmup.json')\|D.spyRegime = withWarmup(" "$S/index.html")"
+# 2-4. Cost netting, margin churn, NAV-peak give-back: pure functions pinned with node.
+if command -v node >/dev/null 2>&1; then
+  CFNS="$(sed -n -e '/^const fmt = /p' -e '/^const pct = /p' -e '/^const usdk = /p' -e '/^const COMMISSION_PER_SHARE/p' -e '/^const MARGIN_CHURN_PRICE/p' -e '/^const GIVEBACK_OPEN_PCT/p' \
+    -e '/^function openSignal(/,/^}/p' -e '/^function openPnl(/,/^}/p' -e '/^function marginChurn(/,/^}/p' -e '/^function v16Count(/,/^}/p' -e '/^function marginChurnLine(/,/^}/p' \
+    -e '/^function navPeakGiveback(/,/^}/p' -e '/^function givebackLine(/,/^}/p' "$S/index.html")"
+  cs() { node -e "$CFNS
+const tr = (sym, ep, trig, pnl, extra) => Object.assign({ sym, ep, trig, pnl, side: 'SHORT', qty: 100, ed: '2020-01-02', xd: '2020-02-03' }, extra || {});
+console.log($1)"; }
+  # openPnl: UnrealizedPnl wins; else move - real - (div in - div paid short + interest - commission).
+  # 2 closed trades of 100 and 50 shares (fees 1, 1 each fill = 4) + 1 open of 1,000 shares (fee 10) = 14.
+  expect_eq "#3194 openPnl: the run's UnrealizedPnl when the summary has it" "unrealised 42000" "$(cs '((o) => o.src + " " + o.open)(openPnl({ unrealizedpnl: 42000 }, 300e3, 100e3, [], []))')"
+  expect_eq "#3194 openPnl: netted = move - real - (div 5k - short div 1k + interest 30k - commission 14)" "netted 166014 33986" \
+    "$(cs '((o) => [o.src, o.open, o.costs].join(" "))(openPnl({ dividendincometotal: 5000, dividendpaidshorttotal: 1000, cashinteresttotal: 30000 }, 300e3, 100e3, [{ qty: 100 }, { qty: 50 }], [{ qty: 1000 }]))')"
+  expect_eq "#3194 openPnl: without DividendIncomeTotal the trade rows' Div \$ (less 2 x \$1 commission) is netted" "199552" "$(cs 'openPnl({}, 300e3, 100e3, [{ qty: 100, div: 450 }], []).open')"
+  # specimen: a 1M book, NAV +300k, realised 180k: raw remainder 120k (under half, quiet); 100k of cash
+  # interest made it look bigger before, and a 280k remainder of which 150k is interest is not open P&L
+  expect_eq "#3194 openSignal: 280k raw remainder fires, the same after 150k of interest is netted is quiet" "true false" \
+    "$(cs '[openSignal(1e6, 300e3, 20e3), openSignal(1e6, 300e3, 20e3, openPnl({ cashinteresttotal: 150e3 }, 300e3, 20e3, [], []).open)].join(" ")')"
+  # marginChurn: 6 short margin calls, 5 entered under 17 on 3 symbols (AAA twice, BBB twice); decoys: a
+  # long margin call, a short stopped out under 17, a short margin call at exactly 17 (not under)
+  MC='[tr("AAA", 5, "margin_call", -100), tr("AAA", 6, "margin_call", -100), tr("BBB", 16.99, "margin_call", -100), tr("BBB", 12, "margin_call", -100), tr("CCC", 3, "margin_call", -100),
+    tr("DDD", 17, "margin_call", -100), tr("EEE", 5, "margin_call", -100, { side: "LONG" }), tr("FFF", 5, "stop_loss", -100)]'
+  expect_eq "#3194 marginChurn: 5 of 6 short margin calls under \$17, 3 symbols, 2 repeated, fires" '{"calls":6,"low":5,"syms":3,"repeat":2,"pnl":-500,"fires":true}' "$(cs "JSON.stringify(marginChurn($MC))")"
+  expect_eq "#3194 marginChurn: 4 low-priced calls (under 5) is quiet" false "$(cs "marginChurn($MC.slice(1)).fires")"
+  expect_eq "#3194 marginChurn: 5 low of 11 calls (under half) is quiet" false "$(cs "marginChurn([...$MC, ...Array.from({ length: 5 }, (_, i) => tr('H' + i, 40, 'margin_call', -100))]).fires")"
+  expect_eq "#3194 v16Count: 'N violations' -> N, PASS -> 0, absent -> null" "68 0 null" "$(cs '[v16Count([{ id: "V16", status: "68 violations" }]), v16Count([{ id: "V16", status: "PASS" }]), v16Count([])].map(String).join(" ")')"
+  expect_eq "#3194 marginChurnLine: names the counts, V16 and each run's low count" yes \
+    "$(cs "marginChurnLine(marginChurn($MC), 68, [['soT', 68], ['soT2', 50]])" | grep -q '5 of 6 margin calls.*on 3 symbols (2 called more than once).*V16 counts 68.*By run: soT 68, soT2 50' && echo yes || echo no)"
+  expect_eq "#3194 marginChurnLine: quiet when it does not fire" "" "$(cs "marginChurnLine(marginChurn($MC.slice(1)), 68, [])")"
+  # navPeakGiveback: start 1M, peak 1.4M on day 2 with 100k realised by then -> 300k open at the peak;
+  # ends at 1.2M -> 200k given back (>= half of 300k): fires. Held at the peak: B (closed later, +50k) and
+  # one open row entered before it.
+  GB="const nav = [['2020-01-02', 1e6], ['2020-02-03', 1.1e6], ['2020-03-02', 1.4e6], ['2020-04-01', 1.3e6], ['2020-05-01', ENDV]];
+const T = [{ ed: '2020-01-02', xd: '2020-02-03', pnl: 100e3 }, { ed: '2020-01-10', xd: '2020-04-01', pnl: 50e3 }], O = [{ ed: '2020-02-10' }, { ed: '2020-04-10' }];"
+  gbk() { node -e "$CFNS
+$(printf '%s' "$GB" | sed "s/ENDV/$1/")
+console.log($2)"; }
+  expect_eq "#3194 navPeakGiveback: 300k open at the 1.4M peak, 200k given back, 2 held, fires" '{"d":"2020-03-02","peak":1400000,"end":1200000,"openAtPeak":300000,"giveback":200000,"held":2,"heldPnl":50000,"fires":true}' "$(gbk 1.2e6 'JSON.stringify(navPeakGiveback(nav, T, O))')"
+  expect_eq "#3194 navPeakGiveback: 140k given back of 300k (under half) is quiet" false "$(gbk 1.26e6 'navPeakGiveback(nav, T, O).fires')"
+  expect_eq "#3194 navPeakGiveback: exactly half given back fires" true "$(gbk 1.25e6 'navPeakGiveback(nav, T, O).fires')"
+  expect_eq "#3194 navPeakGiveback: peak on the last day -> null" null "$(gbk 1.5e6 'navPeakGiveback(nav, T, O)')"
+  expect_eq "#3194 navPeakGiveback: open gain under 10 % of start NAV is quiet" false "$(gbk 1e6 'navPeakGiveback(nav, [{ ed: "2020-01-02", xd: "2020-02-03", pnl: 320e3 }], []).fires')"
+  expect_eq "#3194 givebackLine: names the peak, the open gain and the give-back; quiet when it does not fire" "yes " \
+    "$(gbk 1.2e6 '[givebackLine(navPeakGiveback(nav, T, O)).includes("peaked at $1.40M on 2020-03-02 with about $300k unrealised in the 2 positions") ? "yes" : "no", givebackLine(null)].join(" ")')"
+else
+  echo "SKIP: review_pack #3194 detector cases need node"
+fi
+expect_eq "#3194 wiring: What stands out uses openPnl, the give-back and the margin-churn lines" 3 \
+  "$(grep -c 'const op = openPnl(D.meta\[CH()\].metrics\|const gb = givebackLine(navPeakGiveback(\|const mc = marginChurnLine(marginChurn(tr)' "$S/index.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

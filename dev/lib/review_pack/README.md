@@ -9,6 +9,7 @@ Helpers for `dev/scripts/review_pack.sh`. POSIX sh + awk + jq; no Python.
 | `open_json.awk` | host | open positions + their side and entry macro week, and the last-day exposure check vs `actual.sexp` `open_positions_value` (shorts signed negative, as the simulator marks them; #3144) → `<run>_open.json` |
 | `periods.awk` | host | year or quarter table: return vs SPY on the run's basis (price or total return, #3177), drawdowns, invested %, trades, realised P&L, macro weeks |
 | `assemble.awk` | host | joins trades.csv + extraction + audit + macro + stage replay + the audit's `stop_floor_kind` into `<run>_trades.json` |
+| `../../scripts/review_pack.sh` | host | also publishes `spy_warmup.json`: the 180 SPY bars before the window, read by the page for the regime only, so the window's first 34 weeks get UP / MIXED / DOWN (#3194) |
 | `meta.sh` | host | summary metrics, the return basis (cash yield / dividends -> SPY price, total return or mixed; #3177), overrides, validator checks, audit conformance, and the short leg when params enable it (tickets, fills, short P&L, Bearish weeks and those admitting a short to the top-N; #3111) → `<run>_meta.json` |
 | `stage_sum.sh` | host | stage replay CSVs → stage at entry/exit, Stage 2/3/4 weeks held |
 | `chart_shards.awk` | host | per-trade weekly stage + daily bars, sharded by entry year |
