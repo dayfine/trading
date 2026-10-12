@@ -31,24 +31,27 @@ let test_config_flag_defaults_off _ =
 (* End to end                                                          *)
 (* ------------------------------------------------------------------ *)
 
+let _ok_or_fail what r =
+  Result.map_error r ~f:Status.show
+  |> Result.map_error ~f:(fun e -> what ^ " failed: " ^ e)
+  |> Result.ok_or_failwith
+
 let _resting_ticket ~created =
   let trans kind : Position.transition =
     { position_id = "ZZZ-1"; date = created; kind }
   in
-  match
-    Position.create_entering
-      (trans
-         (Position.CreateEntering
-            {
-              symbol = "ZZZ";
-              side = Trading_base.Types.Long;
-              target_quantity = 10.0;
-              entry_price = 100.0;
-              reasoning = ManualDecision { description = "3139 test" };
-            }))
-  with
-  | Ok p -> String.Map.singleton p.id p
-  | Error err -> assert_failure ("position setup failed: " ^ Status.show err)
+  Position.create_entering
+    (trans
+       (Position.CreateEntering
+          {
+            symbol = "ZZZ";
+            side = Trading_base.Types.Long;
+            target_quantity = 10.0;
+            entry_price = 100.0;
+            reasoning = ManualDecision { description = "3139 test" };
+          }))
+  |> _ok_or_fail "position setup"
+  |> fun (p : Position.t) -> String.Map.singleton p.id p
 
 let _daily_bar ~date ~price =
   {
@@ -127,11 +130,8 @@ let _drive ~screen_holiday_friday_weeks ~current_date =
           positions = _resting_ticket ~created:(Date.add_days current_date (-7));
         }
   in
-  assert_that result is_ok;
-  match result with
-  | Ok output ->
-      _cancelled_ids output.Trading_strategy.Strategy_interface.transitions
-  | Error _ -> []
+  let output = _ok_or_fail "on_market_close" result in
+  _cancelled_ids output.Trading_strategy.Strategy_interface.transitions
 
 (** The Thursday before Good Friday: screened (ticket cancelled by the weekly
     re-screen) with the flag on, skipped (ticket rests) with it off. *)
