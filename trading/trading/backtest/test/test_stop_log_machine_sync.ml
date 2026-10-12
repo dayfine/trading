@@ -308,6 +308,29 @@ let test_avd_row_stop_columns_on_price_basis _ =
        ~entry_price:25.10 ~exit_price:21.90)
     (equal_to [ "25.10"; "21.90"; "20.00"; "22.00" ])
 
+(* A split for a position the log has never seen is ignored: no row is created
+   for it (it would read symbol "" with no stops), and the known position is
+   untouched. *)
+let test_split_for_unknown_position_is_ignored _ =
+  let log = Stop_log.create () in
+  Stop_log.record_installed_stop log ~position_id:_pid ~symbol:"AAON"
+    ~level:40.00;
+  Stop_log.record_stop_split log ~position_id:"UNSEEN-wein-9" ~factor:2.0;
+  assert_that
+    (Stop_log.get_stop_infos log)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (i : Stop_log.stop_info) -> i.position_id)
+               (equal_to _pid);
+             field
+               (fun (i : Stop_log.stop_info) -> i.entry_stop)
+               (is_some_and (float_equal 40.00));
+           ];
+       ])
+
 let suite =
   "Stop_log machine sync"
   >::: [
@@ -332,6 +355,8 @@ let suite =
          >:: test_cto_split_event_then_decision_rescales_once;
          "trades.csv AVD row: stop columns on the price basis (#3127)"
          >:: test_avd_row_stop_columns_on_price_basis;
+         "split for an unknown position is ignored (#3127)"
+         >:: test_split_for_unknown_position_is_ignored;
        ]
 
 let () = run_test_tt_main suite

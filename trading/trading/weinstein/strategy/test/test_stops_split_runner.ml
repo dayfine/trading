@@ -49,8 +49,8 @@ let _bar_reader_of_one_symbol ~symbol bars =
 (** Build a Holding-state position for [symbol] — minimal scaffold to feed
     [Stops_split_runner.adjust]. We only need [symbol]; the state machine
     transitions don't matter here. *)
-let _make_holding_pos ~symbol ~entry_price ~entry_date =
-  let pos_id = symbol in
+let _make_holding_pos ?pos_id ~symbol ~entry_price ~entry_date () =
+  let pos_id = Option.value pos_id ~default:symbol in
   let make_trans kind =
     Position.{ position_id = pos_id; date = entry_date; kind }
   in
@@ -139,6 +139,7 @@ let test_no_split_leaves_stop_state_untouched _ =
   let pos =
     _make_holding_pos ~symbol ~entry_price:100.0
       ~entry_date:(Date.of_string "2024-08-26")
+      ()
   in
   let positions = String.Map.singleton symbol pos in
   let initial_stop =
@@ -161,6 +162,7 @@ let test_forward_4_to_1_scales_initial_stop _ =
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
+      ()
   in
   let positions = String.Map.singleton symbol pos in
   let initial_stop =
@@ -185,6 +187,7 @@ let test_forward_4_to_1_scales_trailing_stop _ =
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
+      ()
   in
   let positions = String.Map.singleton symbol pos in
   let trailing =
@@ -230,6 +233,7 @@ let test_split_day_no_spurious_stop_hit _ =
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
+      ()
   in
   let positions = String.Map.singleton symbol pos in
   let stop_states =
@@ -279,6 +283,7 @@ let test_real_adverse_move_after_split_still_triggers _ =
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
+      ()
   in
   let positions = String.Map.singleton symbol pos in
   let stop_states =
@@ -307,6 +312,7 @@ let test_position_without_stop_state_is_noop _ =
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
+      ()
   in
   let positions = String.Map.singleton symbol pos in
   let stop_states = ref String.Map.empty in
@@ -317,13 +323,15 @@ let test_position_without_stop_state_is_noop _ =
 
 (* Pin (#3127): [on_split] reports the rescale it made — the position id and
    the factor every level was divided by — so the per-trade stop log can apply
-   the same rescale. Called once for the 4:1 split day, never on a flat day. *)
+   the same rescale. The id differs from the symbol on purpose: the log keys by
+   position id, and a symbol would be silently ignored there. Called once for the 4:1 split day, never on a flat day. *)
 let _on_split_calls ~bars ~as_of =
   let symbol = "AAPL" in
   let bar_reader = _bar_reader_of_one_symbol ~symbol bars in
   let pos =
-    _make_holding_pos ~symbol ~entry_price:500.0
+    _make_holding_pos ~pos_id:"AAPL-wein-1" ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
+      ()
   in
   let stop_states =
     ref
@@ -343,7 +351,10 @@ let test_on_split_reports_position_and_factor _ =
   assert_that
     (_on_split_calls ~bars:(_split_bars ~symbol:"AAPL") ~as_of:"2024-08-28")
     (elements_are
-       [ all_of [ field fst (equal_to "AAPL"); field snd (float_equal 4.0) ] ])
+       [
+         all_of
+           [ field fst (equal_to "AAPL-wein-1"); field snd (float_equal 4.0) ];
+       ])
 
 let test_on_split_silent_without_split _ =
   assert_that (_on_split_calls ~bars:_flat_bars ~as_of:"2024-08-27") (size_is 0)
