@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-12",
+  "feature": "cleanup-placeholder-int-keys",
+  "branch": "cleanup/placeholder-int-keys",
+  "sha": "8ae569bd2d74a8682f06d2c41ffebc2d05d272ea",
+  "recorded_at_ns": 1791846454346916373,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

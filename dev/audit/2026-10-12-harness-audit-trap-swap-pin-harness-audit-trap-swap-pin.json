@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-12",
+  "feature": "harness-audit-trap-swap-pin",
+  "branch": "harness/audit-trap-swap-pin",
+  "sha": "59f4f358141a61a0dece606e98ef3eb2e9ebf16b",
+  "recorded_at_ns": 1791842373505540699,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
