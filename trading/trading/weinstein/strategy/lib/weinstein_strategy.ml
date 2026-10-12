@@ -151,6 +151,16 @@ let _record_force_exit ~last_stop_out_dates ~positions ~current_date
           t.position_id
     | _ -> ()
 
+(* Split rescale (reported to the audit recorder, #3127), then the ex-dividend
+   stop reduction (#3174). The [split_adjust] step of the stops pass. *)
+let _split_adjust ~audit_recorder ~positions ~stop_states ~bar_reader
+    ~current_date () =
+  Stops_split_runner.adjust
+    ~on_split:audit_recorder.Audit_recorder.record_stop_split ~positions
+    ~stop_states ~bar_reader ~as_of:current_date ();
+  Stops_dividend_runner.adjust ~positions ~stop_states ~bar_reader
+    ~as_of:current_date
+
 let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
     ~prior_stage_ma_values ~get_price ~last_stop_out_dates ~audit_recorder
     ~prior_macro_result ~prior_decline_character ~current_date =
@@ -165,13 +175,9 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
   let exit_transitions, adjust_transitions =
     Stop_move_capture.split_then_update ~audit_recorder ~positions ~stop_states
       ~current_date
-      ~split_adjust:(fun () ->
-        Stops_split_runner.adjust
-          ~on_split:audit_recorder.Audit_recorder.record_stop_split ~positions
-          ~stop_states ~bar_reader ~as_of:current_date ();
-        Stops_dividend_runner.adjust ~positions ~stop_states ~bar_reader
-          ~as_of:current_date)
-      ~update:(fun () ->
+      ~split_adjust:
+        (_split_adjust ~audit_recorder ~positions ~stop_states ~bar_reader
+           ~current_date) ~update:(fun () ->
         Stops_runner.update
           ?ma_cache:(Bar_reader.ma_cache bar_reader)
           ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
