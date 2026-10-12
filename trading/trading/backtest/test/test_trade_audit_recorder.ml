@@ -695,6 +695,42 @@ let test_reissue_event_copies_the_row_and_books_its_stop _ =
               (equal_to ("ZZZZ-wein-9", Some 92.0));
           ]))
 
+(** Issue #3127 sink hop: [record_stop_split] reaches the stop log, which
+    divides every stop column by the factor. The fixture's [installed_stop] is
+    92.0; a 2:1 split leaves 46.0 on every column and no raise. *)
+let test_stop_split_reaches_stop_log _ =
+  let stop_log = Backtest.Stop_log.create () in
+  let recorder =
+    Backtest.Trade_audit_recorder.of_collector ~stop_log
+      ~trade_audit:(TA.create ())
+      ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+      ()
+  in
+  recorder.record_entry
+    (_entry_event ~split_safe_basis:AR.Flag_off
+       ~stop_floor_kind:AR.Buffer_fallback ());
+  recorder.record_stop_split ~position_id:"ZZZZ-wein-1" ~factor:2.0;
+  assert_that
+    (Backtest.Stop_log.get_stop_infos stop_log)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.entry_stop)
+               (is_some_and (float_equal 46.0));
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.exit_stop)
+               (is_some_and (float_equal 46.0));
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+               (is_some_and (float_equal 46.0));
+             field
+               (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+               (equal_to 0);
+           ];
+       ])
+
 let suite =
   "Trade_audit_recorder"
   >::: [
@@ -728,6 +764,8 @@ let suite =
          >:: test_stop_log_receives_installed_stop_and_moves;
          "#3075: stop decision reaches the stop log and the audit row"
          >:: test_stop_decision_reaches_stop_log_and_audit_row;
+         "stop split reaches the stop log (#3127)"
+         >:: test_stop_split_reaches_stop_log;
        ]
 
 let () = run_test_tt_main suite

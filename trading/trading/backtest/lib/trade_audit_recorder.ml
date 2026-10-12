@@ -290,4 +290,9 @@ let of_collector ?candidate_log ?stop_log ~(trade_audit : Trade_audit.t)
     record_stop_move = _record_stop_move ~stop_log;
     record_reissue = _record_reissue ~trade_audit ~stop_log;
     record_stop_decision = _record_stop_decision ~trade_audit ~stop_log;
+    record_stop_split =
+      (fun ~position_id ~factor ->
+        (* #3127: rescale the stop columns by the machine's split factor *)
+        Option.iter stop_log
+          ~f:(Stop_log.record_stop_split ~position_id ~factor));
   }

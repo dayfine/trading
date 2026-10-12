@@ -121,6 +121,7 @@ type t = {
   record_stop_move : stop_move_event -> unit;
   record_reissue : reissue_event -> unit;
   record_stop_decision : Weinstein_stops.Stop_decision.t -> unit;
+  record_stop_split : position_id:string -> factor:float -> unit;
   capture_candidates : bool;
 }
 
@@ -133,6 +134,7 @@ let noop : t =
     record_fill_volume = (fun _ -> ());
     record_stop_move = (fun _ -> ());
     record_stop_decision = (fun _ -> ());
+    record_stop_split = (fun ~position_id:_ ~factor:_ -> ());
     record_reissue = (fun _ -> ());
     capture_candidates = false;
   }
