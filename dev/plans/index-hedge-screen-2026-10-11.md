@@ -1,6 +1,6 @@
-# Index-short overlay screen — pre-registration DRAFT (2026-10-11)
+# Index-short overlay screen — pre-registration (2026-10-11)
 
-**Status: DRAFT, held `do-not-merge` until the user confirms the design (raised 2026-10-11 11:00 PT).**
+**Status: CONFIRMED by the user (design 2026-10-11 14:10 PT; hold lifted 2026-10-12 11:35 PT). Runs on the breadth-fix N arm after its results PR merges.**
 Sequencing (user, 2026-10-11): #3238 breadth fix + paired rb1 rerun first, then this screen.
 
 ## Question
