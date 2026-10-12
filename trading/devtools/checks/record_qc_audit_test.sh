@@ -1525,7 +1525,10 @@ fi
 # that aborts under `set -e` at a line below a known "# Scenario 77" header.
 # Pins (a) _on_exit really calls _scenario_header_at (the ABORT line names
 # the fixture's scenario, not "unknown"), (b) the original exit code is
-# preserved through the trap, (c) no ABORT line once SUMMARY_REACHED=1.
+# preserved through the trap, (c) no ABORT line once SUMMARY_REACHED=1,
+# (d) ABORT still fires after a tallied FAIL, and (e) the cleanup-only EXIT-trap
+# swap in the final `if (( FAIL_COUNT > 0 ))` block (extracted from this file)
+# keeps rc 1 even when _on_exit is redefined to end in `exit 0`.
 # ---------------------------------------------------------------------------
 FIX_20G="$(mktemp -d -t abort_trap_20g.XXXXXX)"
 _run_trap_fixture_20g() {
@@ -1549,16 +1552,31 @@ _run_trap_fixture_20g 'SUMMARY_REACHED=1; (exit 5)'
 RC_POST_20G="${FIX_RC_20G}"; ERR_POST_20G="${FIX_ERR_20G}"
 _run_trap_fixture_20g 'FAIL_COUNT=1; (exit 7)'
 RC_TALLY_20G="${FIX_RC_20G}"; ERR_TALLY_20G="${FIX_ERR_20G}"
+# (e) final-block swap pin: run the REAL final failure block with an _on_exit
+# that masks rc via `exit 0`; the swap must make the script still exit 1.
+{
+  echo '#!/usr/bin/env bash'
+  echo 'set -euo pipefail'
+  echo "TMP_REPO='${FIX_20G}/tmprepo_e'"
+  echo '_on_exit() { rm -rf "${TMP_REPO:-}"; exit 0; }'
+  echo 'trap _on_exit EXIT'
+  echo 'FAIL_COUNT=1'
+  sed -n '/^if (( FAIL_COUNT > 0 )); then$/,/^fi$/p' "${SELF_20F}"
+  echo 'exit 0'
+} > "${FIX_20G}/final_block.sh"
+RC_SWAP_20G=0
+bash "${FIX_20G}/final_block.sh" >/dev/null 2>&1 || RC_SWAP_20G=$?
 rm -rf "${FIX_20G}"
-if [[ "${RC_ABORT_20G}" == "7" ]] \
+if [[ "${RC_SWAP_20G}" == "1" ]] \
+   && [[ "${RC_ABORT_20G}" == "7" ]] \
    && [[ "${ERR_ABORT_20G}" == *"ABORT: record_qc_audit_test died rc=7 during scenario [# Scenario 77"* ]] \
    && [[ "${RC_POST_20G}" == "5" ]] \
    && [[ "${ERR_POST_20G}" != *"ABORT"* ]] \
    && [[ "${RC_TALLY_20G}" == "7" ]] \
    && [[ "${ERR_TALLY_20G}" == *"ABORT: record_qc_audit_test died rc=7"* ]]; then
-  pass "scenario 20g — EXIT trap names the aborting scenario via _scenario_header_at, preserves the original exit code, and stays silent after the summary starts"
+  pass "scenario 20g — EXIT trap names the aborting scenario via _scenario_header_at, preserves the original exit code, and stays silent after the summary starts, still aborts loudly after a tallied FAIL, and the final-block trap swap keeps rc 1 against an exit-0 _on_exit"
 else
-  fail "scenario 20g — abort rc=${RC_ABORT_20G} (want 7) err='${ERR_ABORT_20G}'; post-summary rc=${RC_POST_20G} (want 5) err='${ERR_POST_20G}'; tallied-FAIL abort rc=${RC_TALLY_20G} (want 7) err='${ERR_TALLY_20G}'"
+  fail "scenario 20g — abort rc=${RC_ABORT_20G} (want 7) err='${ERR_ABORT_20G}'; post-summary rc=${RC_POST_20G} (want 5) err='${ERR_POST_20G}'; tallied-FAIL abort rc=${RC_TALLY_20G} (want 7) err='${ERR_TALLY_20G}'; final-block swap rc=${RC_SWAP_20G} (want 1)"
 fi
 # ---------------------------------------------------------------------------
 # Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
@@ -4248,7 +4266,9 @@ fi
 
 if (( FAIL_COUNT > 0 )); then
   # Swap in a cleanup-only EXIT trap so the failing rc cannot be masked by
-  # _on_exit (e.g. a stray `exit 0` there); pinned by a mutation check (H-AUDIT-TRAP-EXIT-MASK).
+  # _on_exit (e.g. a stray `exit 0` there); pinned by scenario 20g (e).
+  # Known residual: an `exit 0` in _on_exit plus a separate abort BEFORE this
+  # swap would still exit 0 (SUMMARY_REACHED=1 also silences the ABORT line).
   trap 'rm -rf "${TMP_REPO:-}"' EXIT
   exit 1
 fi
