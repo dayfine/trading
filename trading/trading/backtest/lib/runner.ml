@@ -372,9 +372,28 @@ let _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
     force_liquidations,
     stale_holds )
 
-let _log_backtest_window ~start_date ~end_date ~warmup_start ~all_symbols =
+(* Widest breadth hole, in calendar days, that setup accepts silently. 14
+   calendar days can hold at most 10 trading days, so any reported gap is more
+   than 10 missing sessions (issue #3238). *)
+let _ad_breadth_warn_gap_days = 14
+
+(** Warn on stderr, one line per gap, when the composed A-D breadth series has a
+    hole wider than [_ad_breadth_warn_gap_days] inside
+    [[warmup_start, end_date]]. A missing breadth input otherwise reads to the
+    macro analyzer as a frozen indicator, never as n/a (issue #3238). Silent
+    when [skip_ad_breadth] is armed: that degraded mode is announced at load.
+    The lines come from {!Weinstein_strategy.Ad_bars.gap_warnings}, which is
+    unit-tested in [test_ad_bars_compose.ml]. *)
+let _warn_ad_breadth_gaps ~(deps : _deps) ~warmup_start ~end_date =
+  Weinstein_strategy.Ad_bars.gap_warnings deps.ad_bars
+    ~skip:deps.config.skip_ad_breadth ~start_date:warmup_start ~end_date
+    ~max_gap_days:_ad_breadth_warn_gap_days
+  |> List.iter ~f:(eprintf "%s\n%!")
+
+let _log_backtest_window ~start_date ~end_date ~warmup_start ~deps =
+  _warn_ad_breadth_gaps ~deps ~warmup_start ~end_date;
   eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
-    (List.length all_symbols);
+    (List.length deps.all_symbols);
   eprintf "Running backtest (%s to %s, warmup from %s)...\n%!"
     (Date.to_string start_date)
     (Date.to_string end_date)
@@ -440,8 +459,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
   let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
   let warmup_days = warmup_days_for strategy_choice in
   let warmup_start = Date.add_days start_date (-warmup_days) in
-  _log_backtest_window ~start_date ~end_date ~warmup_start
-    ~all_symbols:deps.all_symbols;
+  _log_backtest_window ~start_date ~end_date ~warmup_start ~deps;
   let ( sim_result,
         stop_log,
         trade_audit,

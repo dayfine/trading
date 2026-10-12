@@ -1,11 +1,20 @@
 # Status: data-foundations
 
-## Last updated: 2026-10-07
+## Last updated: 2026-10-11
 
 ## Status
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-10-11 — NYSE A-D breadth fixture gap 2000-2016 (#3238, PR
+  open).** `trading/test_data/breadth/nyse_{advn,decln}.csv` replaced with the
+  full Unicorn archive (1965-03-01 → 2020-02-14, 13,872 rows; every prior
+  2017+ row identical). `Ad_bars.load` now also fills interior Unicorn holes
+  wider than `default_max_interior_gap_days` (7) from Synthetic; new pure
+  `Ad_bars.gaps` / `gaps_in_window`; `Runner` warns on stderr per breadth gap
+  > 14 calendar days inside `[warmup_start, end_date]`. Pinned by
+  `test_ad_bars_fixture.ml`. [after-merge, dispatcher] paired 26y rb1 read
+  (full vs old breadth, V6-gated).
 - [x] **2026-10-07 — reject detected splits that are vendor cash dividends,
   default off (#3173).** New lib
   `analysis/data/storage/csv/split_dividend_guard/` (`Split_dividend_guard`):

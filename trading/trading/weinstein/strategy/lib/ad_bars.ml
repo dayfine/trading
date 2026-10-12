@@ -94,35 +94,83 @@ module Synthetic = struct
 end
 
 (* ------------------------------------------------------------------ *)
-(* Composition: Unicorn preferred, Synthetic fills the tail            *)
+(* Gap detection                                                        *)
 (* ------------------------------------------------------------------ *)
 
-(** Find the last date in a sorted ad_bar list. *)
-let _last_date bars =
-  match List.last bars with
-  | Some (bar : Macro.ad_bar) -> Some bar.date
-  | None -> None
+(* Longest Unicorn hole (calendar days between consecutive bars) left alone
+   by composition. The longest legitimate NYSE closure in the archive is the
+   2001-09-10 -> 2001-09-17 stretch (7 days); anything wider is missing data. *)
+let default_max_interior_gap_days = 7
 
-(** [_splice_after u cutoff s] appends every [s] bar strictly after [cutoff] to
-    [u]. Extracted from [_compose] so the outer match doesn't nest. *)
-let _splice_after u cutoff s =
-  let tail =
-    List.filter s ~f:(fun (bar : Macro.ad_bar) -> Date.( > ) bar.date cutoff)
+(** Consecutive pairs of a sorted date list more than [max_gap_days] calendar
+    days apart, in order. *)
+let _date_gaps dates ~max_gap_days =
+  let rec loop acc = function
+    | a :: (b :: _ as rest) ->
+        let acc = if Date.diff b a > max_gap_days then (a, b) :: acc else acc in
+        loop acc rest
+    | [] | [ _ ] -> List.rev acc
   in
-  u @ tail
+  loop [] dates
 
-(** Compose Unicorn and Synthetic: Unicorn wins for dates it covers, Synthetic
-    fills everything after Unicorn's last date. *)
-let _compose ~unicorn ~synthetic =
-  match (unicorn, synthetic) with
-  | [], s -> s
-  | u, [] -> u
-  | u, s -> (
-      match _last_date u with
-      | None -> s
-      | Some cutoff -> _splice_after u cutoff s)
+let _bar_dates bars = List.map bars ~f:(fun (bar : Macro.ad_bar) -> bar.date)
+let gaps bars ~max_gap_days = _date_gaps (_bar_dates bars) ~max_gap_days
 
-let load ~data_dir =
+let gaps_in_window bars ~start_date ~end_date ~max_gap_days =
+  let inside =
+    List.filter (_bar_dates bars) ~f:(fun d ->
+        Date.between d ~low:start_date ~high:end_date)
+  in
+  _date_gaps ((start_date :: inside) @ [ end_date ]) ~max_gap_days
+
+let _format_gap_warning (lo, hi) =
+  sprintf
+    "WARNING: AD breadth gap %s -> %s (%d calendar days) inside the run \
+     window; A-D macro indicators are frozen there"
+    (Date.to_string lo) (Date.to_string hi) (Date.diff hi lo)
+
+let gap_warnings bars ~skip ~start_date ~end_date ~max_gap_days =
+  if skip then []
+  else
+    gaps_in_window bars ~start_date ~end_date ~max_gap_days
+    |> List.map ~f:_format_gap_warning
+
+(* ------------------------------------------------------------------ *)
+(* Composition: Unicorn preferred, Synthetic fills tail + interior gaps *)
+(* ------------------------------------------------------------------ *)
+
+(** [true] when [d] lies strictly inside one of the [(lo, hi)] holes. *)
+let _in_any_hole holes d =
+  List.exists holes ~f:(fun (lo, hi) -> Date.( > ) d lo && Date.( < ) d hi)
+
+let _compare_bar_dates (a : Macro.ad_bar) (b : Macro.ad_bar) =
+  Date.compare a.date b.date
+
+(** Keep the Synthetic bars [s] that fall after [cutoff] (Unicorn's last date)
+    or inside a Unicorn hole wider than [max_gap_days], and merge them into the
+    sorted Unicorn series [u]. *)
+let _fill_from_synthetic ~max_gap_days ~cutoff u s =
+  let holes = gaps u ~max_gap_days in
+  let fill =
+    List.filter s ~f:(fun (bar : Macro.ad_bar) ->
+        Date.( > ) bar.date cutoff || _in_any_hole holes bar.date)
+  in
+  List.merge u fill ~compare:_compare_bar_dates
+
+(** Compose Unicorn and Synthetic: Unicorn wins for every date it covers;
+    Synthetic fills everything after Unicorn's last date and every interior
+    Unicorn gap wider than [max_gap_days]. *)
+let _compose ~max_gap_days ~unicorn ~synthetic =
+  match (synthetic, List.last unicorn) with
+  | s, None -> s
+  | [], Some _ -> unicorn
+  | s, Some (last : Macro.ad_bar) ->
+      _fill_from_synthetic ~max_gap_days ~cutoff:last.date unicorn s
+
+let load_with ~max_interior_gap_days ~data_dir =
   let unicorn = Unicorn.load ~data_dir in
   let synthetic = Synthetic.load ~data_dir in
-  _compose ~unicorn ~synthetic
+  _compose ~max_gap_days:max_interior_gap_days ~unicorn ~synthetic
+
+let load ~data_dir =
+  load_with ~max_interior_gap_days:default_max_interior_gap_days ~data_dir
