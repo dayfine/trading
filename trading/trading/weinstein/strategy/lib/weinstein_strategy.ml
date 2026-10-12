@@ -54,6 +54,7 @@ module Entry_freeze = Entry_freeze
 module Entry_stop_width_order = Entry_stop_width_order
 module Entry_ticket_ttl = Entry_ticket_ttl
 module Split_ticket_cancel = Split_ticket_cancel
+module Exchange_calendar = Exchange_calendar
 module Short_ticket_policy = Short_ticket_policy
 module Entry_ticket_suspend_mode = Entry_ticket_suspend_mode
 module Entry_ticket_suspend = Entry_ticket_suspend
@@ -206,9 +207,7 @@ let _run_late_stage2_tighten ~config ~stop_states ~positions ~get_price
     ~prior_stages ~index_view ~current_date =
   if not config.enable_late_stage2_stop_tighten then []
   else
-    let is_friday =
-      Weinstein_strategy_screening.is_screening_day_view index_view
-    in
+    let is_friday = Screening_day.for_config config index_view in
     Late_stage2_stop_runner.update
       ~buffer_pct:config.late_stage2_stop_buffer_pct ~is_screening_day:is_friday
       ~stop_states ~positions ~get_price ~prior_stages ~current_date
@@ -338,9 +337,7 @@ let _process_market_day ~pending_entry_e ~suspended_tickets ~fold_start_date
       ~prior_macro_result ~prior_stages ~prior_stage_ma_values ~stage3_streaks
       ~laggard_streaks ~bar_reader ~index_view ~exit_transitions ~current_date
   in
-  let is_screening_day =
-    Weinstein_strategy_screening.is_screening_day_view index_view
-  in
+  let is_screening_day = Screening_day.for_config config index_view in
   let macro_result_opt, macro_trim_transitions =
     _run_macro_and_trim ~config ~ad_series ~breadth_series ~positions ~portfolio
       ~prior_macro ~prior_macro_result ~prior_decline_character ~peak_tracker

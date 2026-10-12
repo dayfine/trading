@@ -136,10 +136,9 @@ type config = {
   short_cancel_on_non_bearish : bool; [@sexp.default false]  (** .mli *)
   short_entry_order_max_rest_weeks : int option; [@sexp.default None]
       (** See [.mli]. *)
-  cancel_resting_entry_on_split : bool; [@sexp.default false]
-      (** See [.mli]. *)
-  reserve_cash_for_resting_tickets : bool; [@sexp.default false]
-      (** See [.mli]. *)
+  cancel_resting_entry_on_split : bool; [@sexp.default false]  (** .mli *)
+  screen_holiday_friday_weeks : bool; [@sexp.default false]  (** .mli *)
+  reserve_cash_for_resting_tickets : bool; [@sexp.default false]  (** .mli *)
   entry_fill_reject_retries : int; [@sexp.default 0]  (** See [.mli]. *)
   entry_fill_size_to_available : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_fill_min_size_fraction : float; [@sexp.default 0.5]  (** See [.mli]. *)
@@ -274,6 +273,7 @@ let default_config ~universe ~index_symbol =
     short_cancel_on_non_bearish = false;
     short_entry_order_max_rest_weeks = None;
     cancel_resting_entry_on_split = false;
+    screen_holiday_friday_weeks = false;
     reserve_cash_for_resting_tickets = false;
     entry_fill_reject_retries = 0;
     entry_fill_size_to_available = false;

@@ -1686,6 +1686,31 @@ type config = {
           {!Split_ticket_cancel.run} returns no transitions and reads no bar.
           R2: axis-expressible as
           [((flag cancel_resting_entry_on_split) (values (true false)))]. *)
+  screen_holiday_friday_weeks : bool; [@sexp.default false]
+      (** #3139: screen a week whose Friday is an exchange holiday on that
+          week's last trading day (e.g. the Thursday before Good Friday) instead
+          of skipping the week. Today ~45 of 1,380 weekly reviews over 26 years
+          are lost this way (2025-04-18 mid-crash, 2019-04-19, 2025-07-04): the
+          macro read, the entry walk and every Friday-cadence exit pass run on
+          no bar at all that week.
+
+          {b How the day is known.} The strategy only runs on days with an index
+          bar, so on the Thursday its own data cannot show that Friday is
+          closed. The decision uses {!Exchange_calendar}, the exchange's
+          published holiday rules, which are public years ahead — a calendar
+          lookup, not lookahead on prices. The screen sees the same weekly bar
+          (Monday-Thursday) it would have seen a day later minus one session.
+
+          {b Faithfulness (W2): BOOK-NEUTRAL dial; spine untouched.} Weinstein
+          reviews the chart weekly, at the end of the week; a holiday-shortened
+          week still ends, on its last session. Which day closes the weekly
+          review is cadence, not a stage, entry or stop rule. Only the
+          {i screening day} moves; the stops runner's own weekly-close marker
+          (Friday) is unchanged.
+
+          {b Default [false] = off}, bit-identical (R1): the screening-day
+          predicate is the plain Friday test. R2: axis-expressible as
+          [((flag screen_holiday_friday_weeks) (values (true false)))]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3 of [dev/plans/ticket-funding-2026-08-16.md]: subtract the cost the
           book has committed {b at the ticket's limit price} to {b resting}
