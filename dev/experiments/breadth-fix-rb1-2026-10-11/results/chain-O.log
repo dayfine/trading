@@ -1,0 +1,20 @@
+[10-11 19:53:55] lane O HEAD=eda54e591 (expect eda54e591)
+[10-11 19:53:55] cell guard CELL_TIMEOUT=36000s (26y guard; 5y cells ~1h); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-11 19:53:55] warehouse entries=9236 (expect 9236)
+[10-11 19:53:56] host free 90G
+[10-11 19:53:56] BUILD
+[10-11 19:57:31] BUILD_DONE
+[10-11 19:57:32] PREFLIGHT rb1-26
+[10-11 20:05:07] PREFLIGHT_OK rb1-26 (455s)
+[10-11 20:05:07] RUN rb1-26-s0-v12 on /tmp/snap_top3000_pit_v12pit
+[10-11 23:02:21] RESULT rb1-26-s0-v12 => total_return_pct 851.83370233620769 total_trades 511 sharpe_ratio 0.54180683073987979 max_drawdown_pct 22.519245280727151 calmar_ratio 0.39427515773910282  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-bp-O/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff:none peak_rss_kb=5796912 Panel_runner: snapshot cache hits=148490492 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2491493264 maxrss_bytes=5915238400 (wall 10634s)
+[10-11 23:02:21] LANE O DONE
+[10-11 23:02:21] lane O HEAD=eda54e591 (expect eda54e591)
+[10-11 23:02:21] cell guard CELL_TIMEOUT=36000s (26y guard; 5y cells ~1h); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-11 23:02:21] warehouse entries=9236 (expect 9236)
+[10-11 23:02:21] host free 92G
+[10-11 23:02:21] RUN rb1-26-s1-v12 on /tmp/snap_top3000_pit_v12pit
+[10-12 01:42:54] RESULT rb1-26-s1-v12 => total_return_pct 818.39002846357471 total_trades 512 sharpe_ratio 0.53286844446668524 max_drawdown_pct 22.19351856502929 calmar_ratio 0.39344040367529554  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-bp-O/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff:none peak_rss_kb=5767136 Panel_runner: snapshot cache hits=148488575 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2471231728 maxrss_bytes=5893201920 (wall 9633s)
+[10-12 01:42:54] RUN rb1-26-s2-v12 on /tmp/snap_top3000_pit_v12pit
+[10-12 04:08:02] RESULT rb1-26-s2-v12 => total_return_pct 809.50917535185192 total_trades 510 sharpe_ratio 0.53260251375554257 max_drawdown_pct 22.187484264073291 calmar_ratio 0.39174963832620696  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-bp-O/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff:none peak_rss_kb=5803604 Panel_runner: snapshot cache hits=148488681 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2494531768 maxrss_bytes=5918093312 (wall 8708s)
+[10-12 04:08:02] LANE O DONE
