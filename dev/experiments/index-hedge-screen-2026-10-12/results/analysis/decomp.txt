@@ -1,0 +1,4 @@
+all SPY sessions: 6658, SPY TR mean +9.764 %/yr arith, mean r^2 0.000148
+G1: sessions 1211, SPY TR mean +16.102 %/yr arith | price log move +0.4611 -> -0.1153 | variance terms -0.0744 | dividends -0.0189 | borrow -0.0030 | sum -0.2116 | exact -0.2114
+G2: sessions 930, SPY TR mean +7.045 %/yr arith | price log move +0.0067 -> -0.0017 | variance terms -0.0598 | dividends -0.0156 | borrow -0.0023 | sum -0.0793 | exact -0.0793
+G3: sessions 1151, SPY TR mean +12.073 %/yr arith | price log move +0.2655 -> -0.0664 | variance terms -0.0669 | dividends -0.0181 | borrow -0.0029 | sum -0.1542 | exact -0.1541

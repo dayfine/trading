@@ -1,0 +1,10 @@
+form sum: base log 2.2360 maxdd 22.19%
+G1 h=0.25 d_log -0.1979 maxdd 25.90% d_dd -3.71pp bears +0.0801 +0.1161 -0.0107 beats 2/3 c1 0 c2 0 c3 1
+G1 h=0.5 d_log -0.4256 maxdd 29.55% d_dd -7.35pp bears +0.1538 +0.2201 -0.0231 beats 2/3 c1 0 c2 0 c3 1
+G1 h=1.0 d_log -0.9718 maxdd 41.65% d_dd -19.46pp bears +0.2823 +0.3918 -0.0532 beats 2/3 c1 0 c2 0 c3 1
+G2 h=0.25 d_log -0.0731 maxdd 23.39% d_dd -1.19pp bears +0.0850 +0.0831 +0.0057 beats 3/3 c1 0 c2 0 c3 1
+G2 h=0.5 d_log -0.1702 maxdd 24.57% d_dd -2.38pp bears +0.1638 +0.1545 +0.0100 beats 3/3 c1 0 c2 0 c3 1
+G2 h=1.0 d_log -0.4370 maxdd 30.15% d_dd -7.96pp bears +0.3026 +0.2618 +0.0145 beats 3/3 c1 0 c2 0 c3 1
+G3 h=0.25 d_log -0.1460 maxdd 23.39% d_dd -1.19pp bears +0.0710 +0.0849 +0.0036 beats 3/3 c1 0 c2 0 c3 1
+G3 h=0.5 d_log -0.3188 maxdd 24.70% d_dd -2.50pp bears +0.1349 +0.1580 +0.0058 beats 3/3 c1 0 c2 0 c3 1
+G3 h=1.0 d_log -0.7459 maxdd 32.69% d_dd -10.50pp bears +0.2413 +0.2681 +0.0057 beats 3/3 c1 0 c2 0 c3 1

@@ -1,0 +1,9 @@
+G1 h=0.25 overlay log      n 20  positive  4  sum -0.2113  mean -0.0106  median -0.0106  p10 -0.0290  p25 -0.0202  p75 -0.0056  p90 +0.0090  min -0.0886  max +0.0600
+G1 h=1 short log           n 20  positive  3  sum -1.0139  mean -0.0507  median -0.0461  p10 -0.1169  p25 -0.0830  p75 -0.0257  p90 +0.0223  min -0.3667  max +0.1670
+G1 SPY move %              n 20  positive 16  sum +69.8600  mean +3.4930  median +4.0550  p10 -6.0030  p25 +1.5000  p75 +7.1125  p90 +11.9810  min -30.6100  max +39.5700
+G2 h=0.25 overlay log      n 23  positive  7  sum -0.0794  mean -0.0035  median -0.0085  p10 -0.0196  p25 -0.0126  p75 +0.0018  p90 +0.0144  min -0.0268  max +0.0516
+G2 h=1 short log           n 23  positive  7  sum -0.4524  mean -0.0197  median -0.0340  p10 -0.0800  p25 -0.0528  p75 +0.0065  p90 +0.0525  min -0.1161  max +0.1500
+G2 SPY move %              n 23  positive 16  sum +14.6800  mean +0.6383  median +3.2200  p10 -6.7160  p25 -0.8400  p75 +4.7000  p90 +7.7580  min -26.0900  max +9.6100
+G3 h=0.25 overlay log      n 31  positive  7  sum -0.1541  mean -0.0050  median -0.0102  p10 -0.0181  p25 -0.0154  p75 -0.0024  p90 +0.0163  min -0.0268  max +0.0593
+G3 h=1 short log           n 31  positive  7  sum -0.7670  mean -0.0247  median -0.0413  p10 -0.0732  p25 -0.0631  p75 -0.0107  p90 +0.0609  min -0.1161  max +0.1805
+G3 SPY move %              n 31  positive 24  sum +43.9700  mean +1.4184  median +4.0600  p10 -7.1100  p25 +0.7450  p75 +5.8150  p90 +7.3200  min -28.3700  max +9.6100

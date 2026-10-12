@@ -1,0 +1,12 @@
+G1 K= 3: SPY log after 20 covers: sum -0.1069, down after 12; largest 2010-08-09 -0.0279; sum without it -0.0790
+G1 K= 5: SPY log after 20 covers: sum -0.1972, down after 12; largest 2020-06-08 -0.0485; sum without it -0.1487
+G1 K=10: SPY log after 20 covers: sum -0.0588, down after 10; largest 2022-08-22 -0.0735; sum without it +0.0147
+G1 K=20: SPY log after 20 covers: sum -0.1076, down after 8; largest 2022-04-04 -0.0887; sum without it -0.0189
+G2 K= 3: SPY log after 23 covers: sum -0.2281, down after 16; largest 2009-02-17 -0.0569; sum without it -0.1711
+G2 K= 5: SPY log after 23 covers: sum -0.3050, down after 15; largest 2009-02-17 -0.1031; sum without it -0.2019
+G2 K=10: SPY log after 23 covers: sum -0.2024, down after 13; largest 2009-02-17 -0.1589; sum without it -0.0435
+G2 K=20: SPY log after 23 covers: sum -0.1644, down after 10; largest 2009-01-05 -0.1184; sum without it -0.0460
+G3 K= 3: SPY log after 31 covers: sum -0.1895, down after 17; largest 2009-02-17 -0.0569; sum without it -0.1326
+G3 K= 5: SPY log after 31 covers: sum -0.1942, down after 17; largest 2009-02-17 -0.1031; sum without it -0.0910
+G3 K=10: SPY log after 31 covers: sum -0.3125, down after 19; largest 2009-02-17 -0.1589; sum without it -0.1536
+G3 K=20: SPY log after 31 covers: sum -0.3727, down after 16; largest 2009-01-05 -0.1184; sum without it -0.2543

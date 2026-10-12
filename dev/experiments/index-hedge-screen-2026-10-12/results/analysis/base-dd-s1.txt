@@ -1,0 +1,19 @@
+DD 9.09% peak 2000-02-10 trough 2000-04-17 recovered 2000-06-29
+DD 9.08% peak 2000-10-05 trough 2000-10-12 recovered 2000-12-26
+DD 12.52% peak 2004-06-29 trough 2004-08-17 recovered 2005-03-04
+DD 9.25% peak 2005-03-04 trough 2005-05-13 recovered 2005-07-05
+DD 13.79% peak 2006-05-05 trough 2006-08-09 recovered 2007-02-02
+DD 9.46% peak 2007-02-22 trough 2007-03-05 recovered 2007-04-16
+DD 19.07% peak 2007-07-12 trough 2010-02-04 recovered 2010-04-06
+DD 13.44% peak 2010-04-29 trough 2010-05-20 recovered 2010-09-20
+DD 16.80% peak 2011-05-10 trough 2011-10-04 recovered 2013-01-22
+DD 8.74% peak 2014-01-22 trough 2014-04-11 recovered 2014-07-01
+DD 8.38% peak 2014-07-03 trough 2014-10-13 recovered 2014-11-05
+DD 11.84% peak 2015-05-29 trough 2015-08-24 recovered 2016-11-22
+DD 9.70% peak 2018-01-26 trough 2018-02-08 recovered 2018-06-18
+DD 8.07% peak 2018-06-18 trough 2018-08-01 recovered 2018-09-10
+DD 21.00% peak 2018-09-14 trough 2020-03-23 recovered 2020-11-10
+DD 8.07% peak 2021-01-12 trough 2021-01-27 recovered 2021-02-08
+DD 20.68% peak 2021-06-01 trough 2023-10-27 recovered 2024-03-21
+DD 9.17% peak 2024-07-23 trough 2024-08-05 recovered 2024-08-09
+DD 22.19% peak 2024-11-26 trough 2026-06-24 (open at the end, 2026-06-25)

@@ -1,0 +1,10 @@
+base log 2.2501 maxdd 22.52% bears 0.0847 -0.1011 -0.0817
+G1 h=0.25 days_on 1213 overlay -0.1262 comb 2.1239 d_log -0.1262 maxdd 26.78% d_dd -4.26pp bears +0.1079 +0.1154 -0.0091 beats 2/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.0232(147) DOWN -0.1030(1066)
+G1 h=0.5 days_on 1213 overlay -0.2809 comb 1.9692 d_log -0.2809 maxdd 30.88% d_dd -8.36pp bears +0.2097 +0.2188 -0.0199 beats 2/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.0482(147) DOWN -0.2327(1066)
+G1 h=1.0 days_on 1213 overlay -0.6763 comb 1.5738 d_log -0.6763 maxdd 38.66% d_dd -16.15pp bears +0.3950 +0.3893 -0.0464 beats 2/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.1034(147) DOWN -0.5729(1066)
+G2 h=0.25 days_on 931 overlay -0.0336 comb 2.2165 d_log -0.0336 maxdd 23.84% d_dd -1.32pp bears +0.1048 +0.0957 -0.0098 beats 2/3 c1 1 c2 0 c3 1 | UP +0.0000(0) MIXED -0.0038(59) DOWN -0.0298(872)
+G2 h=0.5 days_on 931 overlay -0.0908 comb 2.1594 d_log -0.0908 maxdd 26.66% d_dd -4.14pp bears +0.2036 +0.1798 -0.0207 beats 2/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.0083(59) DOWN -0.0824(872)
+G2 h=1.0 days_on 931 overlay -0.2762 comb 1.9739 d_log -0.2762 maxdd 32.40% d_dd -9.88pp bears +0.3832 +0.3129 -0.0462 beats 2/3 c1 0 c2 0 c3 1 | UP +0.0000(0) MIXED -0.0197(59) DOWN -0.2565(872)
+G3 h=0.25 days_on 1148 overlay -0.0673 comb 2.1828 d_log -0.0673 maxdd 23.84% d_dd -1.32pp bears +0.0929 +0.1091 -0.0067 beats 2/3 c1 0 c2 0 c3 1 | UP -0.0162(45) MIXED -0.0268(145) DOWN -0.0243(958)
+G3 h=0.5 days_on 1148 overlay -0.1604 comb 2.0897 d_log -0.1604 maxdd 26.21% d_dd -3.69pp bears +0.1790 +0.2066 -0.0146 beats 2/3 c1 0 c2 0 c3 1 | UP -0.0327(45) MIXED -0.0554(145) DOWN -0.0723(958)
+G3 h=1.0 days_on 1148 overlay -0.4250 comb 1.8251 d_log -0.4250 maxdd 31.57% d_dd -9.05pp bears +0.3303 +0.3659 -0.0341 beats 2/3 c1 0 c2 0 c3 1 | UP -0.0666(45) MIXED -0.1178(145) DOWN -0.2406(958)
