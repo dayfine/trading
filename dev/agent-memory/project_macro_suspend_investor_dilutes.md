@@ -17,3 +17,5 @@ metadata:
 4. Re-issues fill FROM ABOVE as dip-buys with stale stops (STN 2026-02-12 opened 99.75 vs trigger 88.86) → #3126. Opposite of the far-anchor shape in [[project_recovery_reentry_gap]].
 
 **How to apply:** don't propose cancel-and-re-screen as an improvement (shares the dominant term; max gain = re-issue term −$4–6k). Fix #3126 only as axis correctness. Few-fill levers: 5y×3-salt Calmar ≈ one draw per window (same fill set every salt) → need a paired per-event estimand or 26y + truncation check. Count Bearish-week fills over trades.csv AND open_positions.csv. Pack exposure omits open positions → #3125. My first look missed that; the analyst caught it ([[feedback_results_analyst_when_absent]]). Packs: 5d TdVJjCRWwHPmkG9xQsUtvY, 5r FTqbLrE4S1HDCuXfK6PyNf.
+
+**Caveat 2026-10-12:** ran on the frozen A-D input (2000–16: constant Bearish momentum vote, no A-D vote); post-2016 legs unaffected. See [[project_breadth_fix_ad_frozen]].

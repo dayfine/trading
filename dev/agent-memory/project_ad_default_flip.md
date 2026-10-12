@@ -79,3 +79,5 @@ grid-confirmed, 2026-06-23.
 
 Local data: the runner reads gitignored repo-root `data/` (`TRADING_DATA_DIR` override);
 `data/breadth/synthetic_*.csv` (1998–2026) is the validated source copied into test_data.
+
+**Caveat 2026-10-12:** ran on the frozen A-D input (2000–16: constant Bearish momentum vote, no A-D vote); post-2016 legs unaffected. See [[project_breadth_fix_ad_frozen]].
