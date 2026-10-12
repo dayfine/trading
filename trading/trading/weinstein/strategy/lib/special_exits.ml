@@ -260,9 +260,7 @@ let run ~config ~record_force_exit ~positions ~last_stop_out_dates
     _build_force_exit_channel ~config ~positions ~get_price ~cash:portfolio.cash
       ~peak_tracker ~audit_recorder ~exit_transitions ~current_date
   in
-  let is_friday =
-    Weinstein_strategy_screening.is_screening_day_view index_view
-  in
+  let is_friday = Screening_day.for_config config index_view in
   let stage3_ts =
     _run_stage3_force_exit ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~prior_stage_ma_values ~stage3_streaks ~get_price

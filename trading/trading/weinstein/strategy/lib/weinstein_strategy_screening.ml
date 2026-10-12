@@ -483,14 +483,3 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
     ~config:config.screening_config ~macro:macro_result ~result:screen_result
     ~entered:(List.length entries);
   ticket_transitions @ entries
-
-(** Stops are adjusted daily; screening runs only on Fridays (weekly review).
-
-    Stage 4 PR-A: takes the panel weekly view directly. The screening day is the
-    date of the most recent bar in the view (the Friday of the latest week, by
-    week-bucket aggregation). *)
-let is_screening_day_view
-    (view : Snapshot_runtime.Snapshot_bar_views.weekly_view) =
-  view.n > 0
-  && Day_of_week.equal Day_of_week.Fri
-       (Date.day_of_week view.dates.(view.n - 1))

@@ -304,6 +304,11 @@ module Split_ticket_cancel = Split_ticket_cancel
     so tests can pin the cancel decision directly. See {!Split_ticket_cancel}.
 *)
 
+module Exchange_calendar = Exchange_calendar
+(** #3139: exchange full-day closure calendar behind the default-off
+    [config.screen_holiday_friday_weeks]. Re-exposed so tests can pin it. See
+    {!Exchange_calendar}. *)
+
 module Entry_ticket_suspend_mode = Entry_ticket_suspend_mode
 (** The [config.entry_ticket_macro_suspend] variant (#2976). Re-exposed so
     specs, overlays and tests can name its constructors. *)
@@ -1124,6 +1129,12 @@ type config = {
           (default) is off and bit-identical. See
           [Weinstein_strategy_config.cancel_resting_entry_on_split] and
           {!Split_ticket_cancel}. *)
+  screen_holiday_friday_weeks : bool; [@sexp.default false]
+      (** #3139: when a week's Friday is an exchange holiday, screen on its last
+          trading day instead of skipping the week. [false] (default) is off and
+          bit-identical. See
+          [Weinstein_strategy_config.screen_holiday_friday_weeks] and
+          {!Exchange_calendar}. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3: hold back the unfilled cost of still-resting entry tickets from
           the cash the entry walk may commit this tick. [false] (default) leaves
