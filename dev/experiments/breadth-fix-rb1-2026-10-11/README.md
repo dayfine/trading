@@ -88,6 +88,14 @@ Pre-registration `b42dfb9d9`; README, spec and chain scripts unchanged at the ar
 `results-analyst`; scripts and outputs in `results/analysis/` (`run.sh` regenerates every figure from the committed
 artifacts, the sweep-output `trade_audit.sexp` files, `data/S/Y/SPY/data.csv` and the two packs' daily series).
 
+- **Exposure inputs are committed:** every invested-% figure comes from the packs' daily NAV/invested series, saved as
+  `results/analysis/expo_{O,N}_s{0,1,2}.csv` (date, NAV, invested, positions). The O pack itself was host-only and is not
+  published. Pack NAV matches `equity_curve.csv` to ±$0.50.
+- **Memory updated (local store):** `project_investor_preset_broad` (record = N, with the numbers above) and the new
+  `project_breadth_fix_ad_frozen` (the frozen-vote finding and its how-to-apply), plus a one-line frozen-input caveat on
+  `project_index_stage_veto_verdict`, `project_shorts_liveness_dead`, `project_macro_suspend_investor_dilutes`,
+  `project_ad_default_flip` and `project_deteriorating_gate_reject`.
+
 **Setup.**
 - Arms: O = `eda54e591` (main just before #3252), N = `524bc2df0` (the #3252 squash); OLD = NEW^, so the trees differ by
   #3252 only. Each lane built in its own pinned tree; BUILD and HEAD checks pass (`results/chain-{O,N}.log`).
@@ -212,7 +220,7 @@ Sources: `results/*-actual.sexp`; CAGR from `results/*-summary.sexp`; log = ln(1
 
 - SPY TR, same dates: +705.8 %, log 2.0866, CAGR 8.20 %, max DD 55.2 % (2007-10-09 → 2009-03-09); base = the 2000-01-03
   adjusted close (the pack's and the ledger's convention).
-- Scale: the mean delta is +0.11 pp/yr of CAGR; each arm's salt spread is wider than it. Only s2's +0.073 falls outside,
+- Scale: the mean delta is about +0.12 pp/yr of CAGR; each arm's salt spread is wider than it. Only s2's +0.073 falls outside,
   and it comes from 2003–07.
 - The max drawdown cannot move: it is the 2024-11-26 → 2026-06-24 episode in all six cells, on identical trades.
 
@@ -403,7 +411,7 @@ The fix freed the gate, but the gate was not what limited the book.
    much was at work (+5 pp invested over 26 years).
 3. **Fat tail.** The unlocked cohort has a losing median and its sum is three trades (PEGA, GPN, JNS); the displaced tail is
    three trades too (CHDN, GTIV, INVX). The swap nets +$0.35M in s0; smaller common trades take it back (N entered 2010
-   with 5–10 % less NAV after the early bears, −$0.10M to −$0.25M in 2010–16), and so does the displaced set's better
+   with 5.2–10.6 % less NAV after the early bears, −$0.10M to −$0.25M in 2010–16), and so does the displaced set's better
    middle (+$0.20M to +$0.44M without its top 3).
 4. **Timing, by period.** Real breadth reopened the gate earlier after bull-market corrections (N 2010-08-06, 2011-11-04,
    2016-03-11 vs O 2010-10-08, 2012-01-20, 2016-04-22), which bought the 2010–16 V-rebounds (DOWN-day exposure 54 % vs 21 %,
@@ -421,7 +429,7 @@ The fix freed the gate, but the gate was not what limited the book.
 
 - **Confirms** the fat-tail edge, the funding-grid monster lottery, the top-N capacity verdict and the concentration/deploy
   probe: at this capacity an admission change re-draws which monsters get funded — the same law seen from the macro side.
-- **Confirms** macro-suspend dilutes (#3123): all 16 / 16 / 15 of N's fills after a Bearish screen (V23) are resting
+- **Consistent with** macro-suspend dilutes (#3123): all 16 / 16 / 15 of N's fills after a Bearish screen (V23) are resting
   tickets placed in Neutral or Bullish weeks, 1–33 weeks old (GRA placed 2015-06-05, filled 2016-01-22, −$70,526; ISEE
   2022-09-16 → 2022-09-30, −$71,974; STN 2025-03-21 → 2025-05-01, +$184,630).
 - **Refines** the record's era story: part of "eroded 2009–12 … also cash through rebounds", and of the 2010–16 rebound
@@ -527,6 +535,8 @@ Signal bullets (RV3):
 | Gate reopens: 2009-05 sat out; 2025-05 invested and lagged | **Confirm.** O reopened a week later (2009-05-08); both sat out until 2009-10 |
 | 41 cash-cancelled entries | **Refine.** O 35 / 36 / 36 → N 41 / 39 / 39: the capital constraint, the same one behind +115 `Insufficient_cash` skips at placement |
 | Worst three years 2019–21 (+43.2 % vs +99.9 %) | **Confirm.** Identical in O |
+| Ten trades made $8.29M of the $5.84M realised total; the 143 A-grade trades made $17.00M | **Confirm.** The fat-tail shape is unchanged by the fix: O s0 top ten $8.31M of $6.03M (A-grade 134, $16.73M); N s1 / s2 $8.18M of $5.71M / $8.52M of $6.06M. Computed from the packs' `s<N>_trades.json` with the page's own rule |
+| 74 of 287 stop exits filled > 0.5 % beyond the stop; 146 D/F losers then ran ≥ 15 % the trade's way, −$5.85M | **Confirm, scaled.** O s0: 63 of 254 and 130 losers, −$5.63M. N adds ~33 stop exits and ~16 whipsaws with its ~60 extra trades; the shares (≈ 25 % of stop exits, ≈ 25 % of trades) are unchanged. A known cost of the 4–15 % structural stops, not something the fix created |
 
 Patterns found by eye that the pack did not flag, each with a proposed detector: the pack-vs-V23 disagreement (Defect 1:
 a consistency signal whenever the card and V23 differ); a stale pack tree (Defect 2: stamp the pack SHA); the NLC terminal
