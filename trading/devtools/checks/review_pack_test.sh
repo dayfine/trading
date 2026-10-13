@@ -892,7 +892,7 @@ else
   echo "SKIP: review_pack #3262 page cases need node"
 fi
 # (3) The page header carries the pack code SHA and the snapshot dir: the manifest has both, the page shows them.
-expect_eq "#3262: manifest pack_sha is the repo HEAD (short), -dirty allowed" "$(git -C "$ROOT" rev-parse --short=12 HEAD)" "$(jq -r .pack_sha "$F62/pack/site/data/manifest.json" | sed 's/-dirty$//')"
+expect_eq "#3262: manifest pack_sha is the repo HEAD (short; unknown when git cannot read the tree, as in the dune sandbox), -dirty allowed" "$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)" "$(jq -r .pack_sha "$F62/pack/site/data/manifest.json" | sed 's/-dirty$//')"
 expect_eq "#3262: --no-container records no snapshot dir" none "$(jq -r .snapshot_dir "$F62/pack/site/data/manifest.json")"
 rc=0
 sh "$SCRIPT" --no-container --snapshot-dir /tmp/snap_x --data-dir "$F62/data" --out "$F62/pack2" r0="$F62/run/" >"$F62/log2" 2>&1 || rc=$?
