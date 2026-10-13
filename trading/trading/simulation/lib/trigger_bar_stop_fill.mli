@@ -83,3 +83,19 @@ val execute :
     [date] ({!Fill_date_stamp}). A converted order the pass did not fill is
     reverted to [Market] in the order manager. [[]] in, [Ok []] out, with no
     engine or manager call. *)
+
+val stop_price_by_position :
+  Trading_strategy.Position.transition list -> float Core.String.Map.t
+(** [stop_price_by_position transitions] maps [position_id] to the [stop_price]
+    of every [TriggerExit] in [transitions] whose reason is [StopLoss]. *)
+
+val bar_reaches_stop :
+  side:Trading_base.Types.side ->
+  stop_price:float ->
+  Trading_engine.Types.price_bar ->
+  bool
+(** [bar_reaches_stop ~side ~stop_price bar] is whether [bar] trades through
+    [stop_price] on the side the exit order takes: low [<=] stop for a [Sell]
+    (closing a long), high [>=] stop for a [Buy] (covering a short). The
+    conversion guard of {!select}, shared with
+    {!Margin_runner.drop_margin_exits_for_traded_stops}. *)

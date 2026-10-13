@@ -1494,6 +1494,40 @@ type config = {
           [((flag sim_stop_exit_fill_on_trigger_bar) (values (true false)))].
           Weinstein-faithful: spine untouched, only the fill assumption changes.
       *)
+  sim_stop_beats_margin_cover : bool; [@sexp.default false]
+      (** A protective stop that traded on the bar beats a same-day margin or
+          force-liquidation cover (issue #3206).
+
+          {b The gap it closes.} With [sim_stop_exit_fill_on_trigger_bar] armed,
+          a stop fills on the bar that traded it. But when the same position is
+          also flagged on that bar by a close-time maintenance check — short
+          maintenance cover, buy-in stress cover, long maintenance reduce — the
+          simulator's same-tick collision rule
+          ([Margin_runner.dedup_strategy_exits_for_margin], #1266) keeps the
+          margin transition and drops the stop, so the position exits at the
+          NEXT open instead. Specimens (shorts Phase B, #3237): DOX 2001-04-18,
+          stop traded intraday at 52.52, filled 04-19 at 56.50 (−$8.4k extra);
+          14 / 13 short stop exits per arm filled a bar late, about −$33k /
+          −$39k net. weinstein-book-reference.md §5.7 (Ch. 6): the stop is a
+          resting order that executes the day its level trades, while the
+          maintenance check runs on the close, so the stop fires first.
+
+          When [true] AND [sim_stop_exit_fill_on_trigger_bar] is in force (inert
+          otherwise, including under [stops_config.trigger_on_weekly_close]), a
+          margin transition is dropped for any position whose strategy
+          [StopLoss] stop level its own bar traded through today
+          ([Margin_runner.drop_margin_exits_for_traded_stops]); the stop then
+          fills on the trigger bar. A stop the bar did not reach keeps
+          margin-wins. Strategy-side force-liquidation ([Per_position]) already
+          yields to a same-tick stop exit inside the strategy
+          ([Special_exits._build_force_exit_channel]), so only the simulator's
+          margin family is affected.
+
+          {b Default [false] = margin-wins, bit-identical to every existing
+             baseline/golden} (R1). R2: axis-expressible as
+          [((flag sim_stop_beats_margin_cover) (values (true false)))].
+          Weinstein-faithful: spine untouched, only the fill-precedence
+          assumption changes. Needs an ACCEPT before any default flip (R3). *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2).
 

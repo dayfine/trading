@@ -93,10 +93,29 @@ val dedup_strategy_exits_for_margin :
     Only [TriggerExit] kinds are filtered. Other strategy transitions on the
     same position-id (e.g. [UpdateRiskParams]) pass through unchanged. *)
 
+val drop_margin_exits_for_traded_stops :
+  strategy_transitions:Position.transition list ->
+  margin_trans:Position.transition list ->
+  positions:Position.t String.Map.t ->
+  today_bars:Trading_engine.Types.price_bar list ->
+  Position.transition list
+(** Issue #3206. Remove from [margin_trans] every transition whose position has
+    a [StopLoss] [TriggerExit] in [strategy_transitions] AND whose own bar in
+    [today_bars] trades through that stop level
+    ({!Trigger_bar_stop_fill.bar_reaches_stop}; side from the position: long
+    stop = Sell, short stop = Buy). With trigger-bar stop fills armed the stop
+    is a resting order that fills intraday on that bar (book §5.7), while the
+    maintenance checks run on the close, so the stop wins and the later
+    {!dedup_strategy_exits_for_margin} then finds nothing to collide with. A
+    stop the bar did not reach (e.g. a catastrophic-stop exit) or a position
+    with no bar today keeps the margin-wins rule. Margin transitions for
+    positions without a strategy [StopLoss] pass through unchanged. *)
+
 val tick :
   margin_config:Margin_config.t ->
   long_margin_rate_annual_pct:float ->
   maintenance_long_pct:float ->
+  stop_beats_margin_cover:bool ->
   portfolio:Portfolio.t ->
   positions:Position.t String.Map.t ->
   today_bars:Trading_engine.Types.price_bar list ->
@@ -124,4 +143,12 @@ val tick :
     crash this prevents. Within the margin sources, a short flagged by both the
     maintenance check and the buy-in mode is covered once — the maintenance
     [margin_call] wins (richer forensic detail), the duplicate [buyin_stress] is
-    dropped. *)
+    dropped.
+
+    [stop_beats_margin_cover] (issue #3206, default off upstream): when [true],
+    a margin transition is first dropped for any position whose strategy
+    [StopLoss] exit traded on today's bar
+    ({!drop_margin_exits_for_traded_stops}), so the stop (filled on the trigger
+    bar when the caller armed [Trigger_bar_stop_fill]) wins the collision
+    instead of the margin cover. [false] keeps margin-wins, bit-identical. The
+    caller passes [true] only when trigger-bar stop fills are armed. *)

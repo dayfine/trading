@@ -72,29 +72,28 @@ let _stop_fill_on_trigger_bar (config : Weinstein_strategy.config) =
   Trigger_bar_stop_fill.enabled ~flag:config.sim_stop_exit_fill_on_trigger_bar
     ~trigger_on_weekly_close:config.stops_config.trigger_on_weekly_close
 
+let _stop_beats_margin_cover (c : Weinstein_strategy.config) =
+  c.sim_stop_beats_margin_cover && _stop_fill_on_trigger_bar c
+
 let _entry_fill_resize (config : Weinstein_strategy.config) =
   Entry_fill_resize.create ~enabled:config.entry_fill_size_to_available
     ~min_size_fraction:config.entry_fill_min_size_fraction
 
 (* Two [stop_log] recording paths, both needed (#2057): [Strategy_wrapper]
-   intercepts the strategy's own [on_market_close] result (fires only on
-   strategy-call days, before margin dedup); [Simulator.on_transitions] fires
-   TWICE per step (#2348) — first the [CancelEntry]-only portfolio-rejection
-   batch, before the strategy is called ([simulator.ml:406]), then the final
-   list of the strategy's transitions plus any margin-driven ones from
-   [Margin_runner.tick], after same-tick collision dedup ([simulator.ml:452])
-   — and both fire on EVERY step, since margin runs unconditionally
-   regardless of strategy cadence. Without the latter, margin-driven exit
-   reasons ([margin_call] / [buyin_stress] / [maintenance_reduce]) never reach
-   [stop_log] at all. [Stop_log.record_transitions] is idempotent w.r.t.
-   re-recording the same transition, so the two paths overlapping on
+   intercepts the strategy's own [on_market_close] result (strategy-call days
+   only, before margin dedup); [Simulator.on_transitions] fires TWICE per step
+   (#2348) — first the [CancelEntry]-only portfolio-rejection batch, before the
+   strategy is called, then the final list of the strategy's transitions plus
+   any margin-driven ones from [Margin_runner.tick], after same-tick collision
+   dedup — and both fire on EVERY step (margin runs unconditionally). Without the
+   latter, margin-driven exit reasons ([margin_call] / [buyin_stress] /
+   [maintenance_reduce]) never reach [stop_log] at all. [Stop_log.record_transitions] is idempotent, so overlap on
    strategy-only days is harmless. On a same-tick collision
    [Margin_runner.dedup_strategy_exits_for_margin] drops the strategy's
    [TriggerExit] and only margin's executes, but since #3147 the later
    [on_transitions] call does not overwrite the wrapper's same-day strategy
    trigger: the label keeps the stop-loss / force liquidation the audit records
-   (pinned by [test_margin_exit_observability.ml]
-   [test_stop_log_keeps_stop_loss_on_strategy_collision]).
+   (pinned in [test_margin_exit_observability.ml]).
 
    [Simulator.dependencies.on_transitions] is a single optional slot, so the
    two observers that need it ([Stop_log.record_transitions] above, and
@@ -138,6 +137,7 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
         input.config.sim_entry_stoplimit_fresh_bar_only
       ~sim_stop_exit_fill_on_trigger_bar:
         (_stop_fill_on_trigger_bar input.config)
+      ~stop_beats_margin_cover:(_stop_beats_margin_cover input.config)
       ~entry_fill_reject_retries:input.config.entry_fill_reject_retries
       ~entry_fill_resize:(_entry_fill_resize input.config)
       ?cash_yield:(_cash_yield_accrual input ~start_date)

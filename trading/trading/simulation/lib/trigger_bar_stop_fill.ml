@@ -3,7 +3,7 @@
 open Core
 
 (* position_id -> stop_price for every [TriggerExit] carrying [StopLoss]. *)
-let _stop_prices transitions =
+let stop_price_by_position transitions =
   List.fold transitions ~init:String.Map.empty
     ~f:(fun acc (tr : Trading_strategy.Position.transition) ->
       match tr.kind with
@@ -12,7 +12,7 @@ let _stop_prices transitions =
       | _ -> acc)
 
 (* Whether [bar] trades through [stop_price] on the side [side] exits at. *)
-let _bar_reaches_stop ~side ~stop_price (bar : Trading_engine.Types.price_bar) =
+let bar_reaches_stop ~side ~stop_price (bar : Trading_engine.Types.price_bar) =
   match (side : Trading_base.Types.side) with
   | Sell -> Float.( <= ) bar.low_price stop_price
   | Buy -> Float.( >= ) bar.high_price stop_price
@@ -26,7 +26,7 @@ let _as_stop_order ~stop_prices ~position_of ~bar_of
   let%bind position_id = Map.find position_of order.id in
   let%bind stop_price = Map.find stop_prices position_id in
   let%bind bar = Map.find bar_of order.symbol in
-  if _bar_reaches_stop ~side:order.side ~stop_price bar then
+  if bar_reaches_stop ~side:order.side ~stop_price bar then
     Some { order with order_type = Trading_base.Types.Stop stop_price }
   else None
 
@@ -39,7 +39,7 @@ let enabled ~flag ~trigger_on_weekly_close = flag && not trigger_on_weekly_close
 
 let select ~enabled ~transitions ~order_links ~today_bars orders =
   let stop_prices =
-    if enabled then _stop_prices transitions else String.Map.empty
+    if enabled then stop_price_by_position transitions else String.Map.empty
   in
   if Map.is_empty stop_prices then ([], orders)
   else

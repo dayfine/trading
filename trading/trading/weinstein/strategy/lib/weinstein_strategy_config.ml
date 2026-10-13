@@ -27,8 +27,7 @@ type config = {
   full_compute_tail_days : int option;
   enable_short_side : bool; [@sexp.default true]
   short_min_price : float; [@sexp.default 0.0]  (** See [.mli]. *)
-  short_min_price_on_order_price : bool; [@sexp.default false]
-      (** See [.mli]. *)
+  short_min_price_on_order_price : bool; [@sexp.default false]  (** .mli *)
   short_borrow_min_dollar_adv : float; [@sexp.default 0.0]  (** See [.mli]. *)
   suppress_warmup_trading : bool; [@sexp.default true]  (** See [.mli]. *)
   stop_update_cadence : Stops_runner.stop_update_cadence;
@@ -55,8 +54,7 @@ type config = {
       (** See [.mli]. *)
   neutral_blocks_longs : bool; [@sexp.default false]  (** See [.mli]. *)
   deteriorating_blocks_longs : bool; [@sexp.default false]  (** See [.mli]. *)
-  index_stage_veto_blocks_longs : bool; [@sexp.default false]
-      (** See [.mli]. *)
+  index_stage_veto_blocks_longs : bool; [@sexp.default false]  (** .mli *)
   neutral_blocks_shorts : bool; [@sexp.default true]  (** See [.mli]. *)
   enable_slow_grind_short_gate : bool; [@sexp.default false]  (** See [.mli]. *)
   fast_v_arm_on_rate_alone : bool; [@sexp.default false]  (** See [.mli]. *)
@@ -129,6 +127,7 @@ type config = {
   sim_exit_fill_next_open : bool; [@sexp.default true]  (** See [.mli]. *)
   sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]  (** .mli *)
   sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]  (** .mli *)
+  sim_stop_beats_margin_cover : bool; [@sexp.default false]  (** .mli *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** See [.mli]. *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
@@ -267,6 +266,7 @@ let default_config ~universe ~index_symbol =
     sim_exit_fill_next_open = true;
     sim_entry_stoplimit_fresh_bar_only = false;
     sim_stop_exit_fill_on_trigger_bar = false;
+    sim_stop_beats_margin_cover = false;
     freeze_entry_at_first_breakout = false;
     enable_entry_ticket_rescreen = false;
     entry_order_max_rest_weeks = 52;
