@@ -78,12 +78,9 @@ let _entry_fill_resize (config : Weinstein_strategy.config) =
 (* Two [stop_log] recording paths, both needed (#2057): [Strategy_wrapper]
    intercepts the strategy's own [on_market_close] result (fires only on
    strategy-call days, before margin dedup); [Simulator.on_transitions] fires
-   TWICE per step (#2348) — first the [CancelEntry]-only portfolio-rejection
-   batch, before the strategy is called ([simulator.ml:406]), then the final
-   list of the strategy's transitions plus any margin-driven ones from
-   [Margin_runner.tick], after same-tick collision dedup ([simulator.ml:452])
-   — and both fire on EVERY step, since margin runs unconditionally
-   regardless of strategy cadence. Without the latter, margin-driven exit
+   TWICE per step (#2348), on EVERY step (margin runs regardless of cadence):
+   the [CancelEntry]-only portfolio-rejection batch before the strategy call,
+   then the strategy's transitions plus [Margin_runner.tick]'s, post-dedup. Without the latter, margin-driven exit
    reasons ([margin_call] / [buyin_stress] / [maintenance_reduce]) never reach
    [stop_log] at all. [Stop_log.record_transitions] is idempotent w.r.t.
    re-recording the same transition, so the two paths overlapping on
@@ -108,6 +105,17 @@ let _wrap_strategy (input : input) ~stop_log ~start_date strategy =
   Strategy_wrapper.wrap ~stop_log strategy
   |> Warmup_trade_gate.wrap_strategy
        ~suppress:input.config.suppress_warmup_trading ~start_date
+
+(* Daily-cadence simulator window, starting at the warmup start. *)
+let _sim_config ~warmup_start ~end_date ~initial_cash ~commission =
+  Simulator.
+    {
+      start_date = warmup_start;
+      end_date;
+      initial_cash;
+      commission;
+      strategy_cadence = Types.Cadence.Daily;
+    }
 
 let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
     ?split_guard ~start_date ~warmup_start ~end_date ~initial_cash ~commission
@@ -146,17 +154,9 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
            ~data_dir:input.data_dir_fpath ~start_date)
       ?split_guard ()
   in
-  let config =
-    Simulator.
-      {
-        start_date = warmup_start;
-        end_date;
-        initial_cash;
-        commission;
-        strategy_cadence = Types.Cadence.Daily;
-      }
-  in
-  Simulator.create ~config ~deps:sim_deps
+  Simulator.create
+    ~config:(_sim_config ~warmup_start ~end_date ~initial_cash ~commission)
+    ~deps:sim_deps
   |> Result.map_error ~f:(fun e ->
       "Backtest.Panel_runner: failed to create simulator: " ^ Status.show e)
   |> Result.ok_or_failwith

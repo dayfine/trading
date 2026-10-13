@@ -44,6 +44,9 @@ let _adapter_or_default ~data_dir adapter =
   Option.value_or_thunk adapter ~default:(fun () ->
       Trading_simulation_data.Market_data_adapter.create ~data_dir)
 
+let _log_or_default log =
+  Option.value_or_thunk log ~default:Stale_hold.Log.create
+
 let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol
     ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
@@ -70,8 +73,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     metric_suite;
     benchmark_symbol;
     stale_hold_policy;
-    stale_hold_log =
-      Option.value_or_thunk stale_hold_log ~default:Stale_hold.Log.create;
+    stale_hold_log = _log_or_default stale_hold_log;
     margin_config;
     initial_long_margin_req;
     long_margin_rate_annual_pct;
@@ -88,8 +90,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
         ~exits:sim_exit_fill_next_open
         ~stoplimit_entries:sim_entry_stoplimit_fresh_bar_only;
     stop_exit_fill_on_trigger_bar = sim_stop_exit_fill_on_trigger_bar;
-    stop_fill_beats_margin_cover =
-      sim_stop_exit_fill_on_trigger_bar && sim_stop_fill_beats_margin_cover;
+    stop_fill_beats_margin_cover = sim_stop_fill_beats_margin_cover;
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
     entry_fill_resize;
@@ -435,7 +436,9 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
   in
   let portfolio, transitions =
     Margin_runner.tick
-      ~stop_fill_beats_margin_cover:t.deps.stop_fill_beats_margin_cover
+      ~stop_fill_beats_margin_cover:
+        (t.deps.stop_exit_fill_on_trigger_bar
+       && t.deps.stop_fill_beats_margin_cover)
       ~margin_config:t.deps.margin_config
       ~long_margin_rate_annual_pct:t.deps.long_margin_rate_annual_pct
       ~maintenance_long_pct:t.deps.maintenance_long_pct ~portfolio ~positions
