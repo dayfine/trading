@@ -12,7 +12,9 @@ FILENAME == ARGV[1] { split($0, a, "\t"); no++; os[no] = a[1]; oe[no] = a[2]; op
 FILENAME == ARGV[2] { split($0, a, "\t"); nm++; md[nm] = a[1]; mtr[nm] = a[2]; next }
 # a short is marked negative, as the simulator signs it (NAV minus equity cash; #3144)
 FILENAME == ARGV[3] { split($0, a, "\t"); if (a[1] == last) pack += (a[3] in short ? -1 : 1) * a[2]; next }
-function macro_at(d,   i, r) { r = 0; for (i = 1; i <= nm && md[i] <= d; i++) r = i; return r }
+# the last screen strictly before d (#3262): a screen runs at its day's close, so a fill on a screen
+# day (a Friday) has not seen it yet. V23's rule (validator_audit_checks.ml _last_screen_before).
+function macro_at(d,   i, r) { r = 0; for (i = 1; i <= nm && md[i] < d; i++) r = i; return r }
 END {
   printf "{\"rows\":["
   for (i = 1; i <= no; i++) { m = macro_at(oe[i])

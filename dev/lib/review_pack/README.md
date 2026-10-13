@@ -8,13 +8,14 @@ Helpers for `dev/scripts/review_pack.sh`. POSIX sh + awk + jq; no Python.
 | `open_extract.awk` | host | one position still open at the window end (`open_positions.csv`) over its bar CSV: daily MTM exposure rows through the last day (#3125), the last bar carried onto the last day when the name has no bar there (#3144) |
 | `open_json.awk` | host | open positions + their side and entry macro week, and the last-day exposure check vs `actual.sexp` `open_positions_value` (shorts signed negative, as the simulator marks them; #3144) → `<run>_open.json` |
 | `periods.awk` | host | year or quarter table: return vs SPY on the run's basis (price or total return, #3177), drawdowns, invested %, trades, realised P&L, macro weeks |
-| `assemble.awk` | host | joins trades.csv + extraction + audit + macro + stage replay + the audit's `stop_floor_kind` into `<run>_trades.json` |
-| `../../scripts/review_pack.sh` | host | also publishes `spy_warmup.json`: the 180 SPY bars before the window, read by the page for the regime only, so the window's first 34 weeks get UP / MIXED / DOWN (#3194) |
+| `assemble.awk` | host | joins trades.csv + extraction + audit + macro + stage replay + the audit's `stop_floor_kind` into `<run>_trades.json`; the macro week of a fill is the last screen strictly before it, V23's rule (#3262) |
+| `../../scripts/review_pack.sh` | host | stamps the pack code's commit and the snapshot dir in the manifest for the page header (#3262); also publishes `spy_warmup.json`: the 180 SPY bars before the window, read by the page for the regime only, so the window's first 34 weeks get UP / MIXED / DOWN (#3194) |
 | `meta.sh` | host | summary metrics, the return basis (cash yield / dividends -> SPY price, total return or mixed; #3177), overrides, validator checks, audit conformance, and the short leg when params enable it (tickets, fills, short P&L, Bearish weeks and those admitting a short to the top-N; #3111) → `<run>_meta.json` |
 | `stage_sum.sh` | host | stage replay CSVs → stage at entry/exit, Stage 2/3/4 weeks held |
 | `chart_shards.awk` | host | per-trade weekly stage + daily bars, sharded by entry year |
 | `../../scripts/review_pack_render.sh` | host | renders a built site to PNGs (headless Chrome, data inlined behind a fetch shim so `file://` works) for the visual review step, `.claude/rules/backtest-result-review.md`: the whole page at its measured height, cut into 1500 px parts with sips or ImageMagick (#3177) |
-| `stages.sh` | trading-1-dev | `stage_chart.exe` per trade (weekly stage replay) |
+| `stages.sh` | trading-1-dev | `stage_chart.exe` per trade (weekly stage replay), over the bar store the host passes (#3262) |
+| `croot.sh` | host | the container path of this checkout: the bind mount plus its path below the mount source, so a worktree builds and runs its own tree (#3262) |
 | `index.html` | browser | the page; reads `data/manifest.json` and the per-run files |
 
 The A–F grade is hindsight (it reads the 65 trading days after the exit); the
