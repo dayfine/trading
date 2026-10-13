@@ -1,8 +1,13 @@
 open Core
 
-(* Two dates are in the same ISO week iff they share (year, week_number). *)
+(* Two dates are in the same ISO week iff they share (week_number,
+   week-numbering year). The ISO week-year, not the calendar year: a week that
+   crosses 1 January (e.g. 2001-12-31 .. 2002-01-04, ISO 2002-W01) is one week
+   (#3266). *)
 let _is_same_week (d1 : Date.t) (d2 : Date.t) : bool =
-  Date.week_number d1 = Date.week_number d2 && Date.year d1 = Date.year d2
+  let w1, y1 = Date.week_number_and_year d1 in
+  let w2, y2 = Date.week_number_and_year d2 in
+  w1 = w2 && y1 = y2
 
 let _ordering_error_msg =
   "Data must be sorted chronologically by date with no duplicates"

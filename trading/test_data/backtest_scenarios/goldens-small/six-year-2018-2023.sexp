@@ -73,10 +73,11 @@
   ;; 38.01 / 0.72 / 19.05 / 40.55 / OPV 1,465,187 / force_liqs 0). Liquid 302-symbol
   ;; universe → gate + stale-exit no-op. Bands unchanged.
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + notes in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips and the tier-2 nightly runs continue-on-error. Correctness re-pin: no return claim attaches to the delta.
-  ((total_return_pct ((min -31.5947) (max -21.5947)))
-   (total_trades ((min 216.7500) (max 293.2500)))
-   (win_rate ((min 23.3333) (max 31.5686)))
-   (sharpe_ratio ((min -0.2975) (max -0.2199)))
-   (max_drawdown_pct ((min 30.3600) (max 41.0753)))
-   (avg_holding_days ((min 45.2633) (max 61.2386)))
-   (open_positions_value ((min 406734.4350) (max 550287.7650))))))
+  ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in the PR. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min -22.2722) (max -12.2722)))
+   (total_trades ((min 208.2500) (max 281.7500)))
+   (win_rate ((min 23.2449) (max 31.4490)))
+   (sharpe_ratio ((min -0.1628) (max -0.1204)))
+   (max_drawdown_pct ((min 30.4054) (max 41.1367)))
+   (avg_holding_days ((min 46.9998) (max 63.5880)))
+   (open_positions_value ((min 458354.5185) (max 620126.7015))))))

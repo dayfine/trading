@@ -200,16 +200,17 @@
 
 
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
-  ((total_return_pct ((min 34.5120) (max 46.6927)))
-   (total_trades ((min 160.6500) (max 217.3500)))
-   (win_rate ((min 23.8360) (max 32.2487)))
-   (sharpe_ratio ((min 0.4109) (max 0.5559)))
-   (max_drawdown_pct ((min 32.4418) (max 43.8918)))
-   (avg_holding_days ((min 52.3177) (max 70.7828)))
-   (open_positions_value ((min 972125.3395) (max 1315228.4005)))
-   (sortino_ratio_annualized ((min 0.4938) (max 0.6681)))
-   (calmar_ratio ((min 0.1575) (max 0.2130)))
-   (ulcer_index ((min 13.6071) (max 18.4096)))
+  ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in the PR. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 121.0992) (max 163.8401)))
+   (total_trades ((min 157.2500) (max 212.7500)))
+   (win_rate ((min 25.2703) (max 34.1892)))
+   (sharpe_ratio ((min 0.4937) (max 0.6679)))
+   (max_drawdown_pct ((min 49.2371) (max 66.6149)))
+   (avg_holding_days ((min 52.3784) (max 70.8649)))
+   (open_positions_value ((min 1676731.0205) (max 2268518.4395)))
+   (sortino_ratio_annualized ((min 0.5117) (max 0.6923)))
+   (calmar_ratio ((min 0.2851) (max 0.3857)))
+   (ulcer_index ((min 26.0275) (max 35.2137)))
    ;; wall_seconds guards only the MAX (catastrophic slowdown). The old
    ;; min 100.0 was the 2026-08-25 "GHA flake" (#2547 root cause, read
    ;; from the first #2549-uploaded per-cell artifact): fast warm-cache

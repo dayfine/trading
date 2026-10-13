@@ -196,9 +196,12 @@ let load_audit path =
 let load_audit_lookup path =
   match load_audit path with Ok a -> a.lookup | Error _ -> fun _ -> None
 
-(* Two dates share an ISO trading week iff (year, week_number) match. *)
+(* Two dates share an ISO trading week iff (week_number, ISO week-year) match;
+   the calendar year would split a week that crosses 1 January (#3266). *)
 let _same_week d1 d2 =
-  Date.week_number d1 = Date.week_number d2 && Date.year d1 = Date.year d2
+  let w1, y1 = Date.week_number_and_year d1 in
+  let w2, y2 = Date.week_number_and_year d2 in
+  w1 = w2 && y1 = y2
 
 (* Last daily bar of each ISO week, dropping a trailing week whose last
    observed day is not a Friday. Mirrors

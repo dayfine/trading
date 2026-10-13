@@ -8,7 +8,8 @@
   test_adjusted_basis
   test_series_tail
   test_series_splice
-  test_series_level)
+  test_series_level
+  test_weekly_prefix)
  (libraries
   core
   core_unix
