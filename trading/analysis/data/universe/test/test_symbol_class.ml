@@ -29,7 +29,7 @@ let test_units _ =
 
 let test_non_usd_specimens _ =
   assert_that
-    (List.map [ "HSBA"; "SBER"; "CELSIA"; "LDG"; "CTRA_old"; "hsba" ] ~f:_cls)
+    (List.map [ "HSBA"; "SBER"; "CELSIA"; "CTRA_old"; "hsba" ] ~f:_cls)
     (each (equal_to (Some SC.Non_usd_listing)))
 
 let test_extra_non_usd_extends_seed _ =
@@ -42,7 +42,9 @@ let test_extra_non_usd_extends_seed _ =
 let test_ordinary_symbols_unclassed _ =
   assert_that
     (List.map
-       [ "AAPL"; "AMZN"; "BRK-B"; "GOOGL"; "UN"; "WS"; "COMP_old"; "UNP" ]
+       [
+         "AAPL"; "AMZN"; "BRK-B"; "GOOGL"; "UN"; "WS"; "COMP_old"; "UNP"; "LDG";
+       ]
        ~f:_cls)
     (each (equal_to (None : SC.t option)))
 
@@ -53,6 +55,13 @@ let test_precedence_suffix_over_set _ =
     (SC.classify ~extra_non_usd:[ "X-WS" ] "X-WS")
     (equal_to (Some SC.Warrant))
 
+let test_precedence_warrant_unit_non_usd _ =
+  assert_that
+    ( SC.classify "X-WS-UN",
+      SC.classify ~extra_non_usd:[ "Y-UN" ] "Y-UN",
+      SC.classify "HSBA" )
+    (equal_to (Some SC.Warrant, Some SC.Unit, Some SC.Non_usd_listing))
+
 let suite =
   "symbol_class"
   >::: [
@@ -62,6 +71,8 @@ let suite =
          "test_extra_non_usd_extends_seed" >:: test_extra_non_usd_extends_seed;
          "test_ordinary_symbols_unclassed" >:: test_ordinary_symbols_unclassed;
          "test_precedence_suffix_over_set" >:: test_precedence_suffix_over_set;
+         "test_precedence_warrant_unit_non_usd"
+         >:: test_precedence_warrant_unit_non_usd;
        ]
 
 let () = run_test_tt_main suite

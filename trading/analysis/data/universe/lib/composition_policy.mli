@@ -10,10 +10,12 @@
 
     {b 0. Symbol-class exclusion} (issue #3183) runs first: when
     [config.excluded_symbol_classes] is non-empty, drop warrant / unit / non-USD
-    candidates per {!Symbol_class}. It precedes the dedup so a warrant
-    outranking its parent cannot win the dedup and then be dropped, losing the
-    entity. Default-off: with [[]] it is a no-op and the kept list is
-    bit-identical.
+    candidates per {!Symbol_class}. It precedes the dedup so an excluded symbol
+    that outranks a kept sibling of the same entity (e.g. a non-USD [BRK-A] over
+    [BRK-B]) cannot win the dedup and then be dropped, losing the entity. For
+    warrants and units the ordering is defensive only: their [WS] / [UN] token
+    already keeps them out of any parent's entity key. Default-off: with [[]] it
+    is a no-op and the kept list is bit-identical.
 
     Filters run in this order, each consuming the previous filter's survivors:
 

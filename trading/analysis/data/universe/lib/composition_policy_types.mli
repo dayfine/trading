@@ -63,8 +63,9 @@ type config = {
       (** Symbol classes (warrant / unit / non-USD listing, see {!Symbol_class})
           to drop. Default [[]] — current behaviour keeps them (issue #3183,
           default-off per [experiment-flag-discipline.md] R1). Runs {b before}
-          the dual-class dedup so a warrant that outranks its parent cannot win
-          the dedup and then be dropped, taking the whole entity with it. *)
+          the dual-class dedup so an excluded symbol that outranks a kept
+          sibling of the same entity cannot win the dedup and then be dropped,
+          taking the whole entity with it. *)
   extra_non_usd_symbols : string list;
       (** Additional non-USD symbols beyond {!Symbol_class.curated_non_usd};
           consulted only when [Non_usd_listing] is in [excluded_symbol_classes].

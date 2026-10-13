@@ -2,7 +2,7 @@ open Core
 
 type t = Warrant | Unit | Non_usd_listing [@@deriving sexp, eq, show]
 
-let curated_non_usd = [ "HSBA"; "SBER"; "CELSIA"; "LDG"; "CTRA_old" ]
+let curated_non_usd = [ "HSBA"; "SBER"; "CELSIA"; "CTRA_old" ]
 
 (* Dash-separated tokens after the first: "C-WS-A" -> ["WS"; "A"]. The first
    token is the root ticker, so a bare ticker named "UN" or "WS" is not a

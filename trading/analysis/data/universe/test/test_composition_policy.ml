@@ -252,23 +252,35 @@ let test_symbol_class_extra_non_usd_symbols _ =
        (fun r -> _dropped_symbols (_report r "symbol_class_exclusion"))
        (elements_are [ equal_to "HSBA"; equal_to "MSFT" ]))
 
-(* A warrant ranked above its parent must not win the dual-class dedup and then
-   be dropped: the symbol-class filter runs first so the parent survives. *)
+(* Ordering matters when a symbol in the excluded set shares an entity key with
+   a kept sibling and outranks it. BRK-A (marked non-USD) at rank 0 and BRK-B at
+   rank 1 share the key BRK. Filter-first drops BRK-A and keeps BRK-B; a
+   dedup-first order would keep BRK-A, then drop it, losing the entity. *)
 let test_symbol_class_runs_before_dual_class_dedup _ =
-  let candidates = [ _candidate ~rank:0 "AIG-A"; _candidate ~rank:1 "AIG" ] in
-  let candidates =
-    _candidate ~rank:0 "AIG-WS-A" :: candidates
-    |> List.mapi ~f:(fun i c -> { c with CPT.rank = i })
+  let config =
+    {
+      CPT.default_config with
+      excluded_symbol_classes = [ Symbol_class.Non_usd_listing ];
+      extra_non_usd_symbols = [ "BRK-A" ];
+    }
   in
+  assert_that
+    (CP.apply ~config
+       [ _candidate ~rank:0 "BRK-A"; _candidate ~rank:1 "BRK-B" ])
+    (field _kept_symbols (elements_are [ equal_to "BRK-B" ]))
+
+(* extra_non_usd_symbols is consulted only when Non_usd_listing is excluded. *)
+let test_extra_non_usd_inert_unless_class_excluded _ =
   let config =
     {
       CPT.default_config with
       excluded_symbol_classes = [ Symbol_class.Warrant ];
+      extra_non_usd_symbols = [ "MSFT" ];
     }
   in
   assert_that
-    (CP.apply ~config candidates)
-    (field _kept_symbols (elements_are [ equal_to "AIG-A" ]))
+    (CP.apply ~config _symbol_class_pool)
+    (field _kept_symbols (size_is 5))
 
 (* ---------------------------------------------------------------------- *)
 (* Single-report attribution + reconciliation                              *)
@@ -356,6 +368,8 @@ let suite =
          "test_symbol_class_drops_non_usd" >:: test_symbol_class_drops_non_usd;
          "test_symbol_class_extra_non_usd_symbols"
          >:: test_symbol_class_extra_non_usd_symbols;
+         "test_extra_non_usd_inert_unless_class_excluded"
+         >:: test_extra_non_usd_inert_unless_class_excluded;
          "test_symbol_class_runs_before_dual_class_dedup"
          >:: test_symbol_class_runs_before_dual_class_dedup;
          "test_multi_criteria_drop_attributed_to_first_filter_only"

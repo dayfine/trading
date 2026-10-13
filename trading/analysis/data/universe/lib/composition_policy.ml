@@ -32,8 +32,9 @@ let _split (candidates : candidate list)
 (* Filter 0: symbol-class exclusion (default-off, runs first)          *)
 (* ------------------------------------------------------------------ *)
 
-(* Runs before the dual-class dedup: a warrant ranked above its parent would
-   otherwise win the dedup and then be dropped here, losing the entity. *)
+(* Runs before the dual-class dedup: an excluded symbol ranked above a kept
+   sibling of the same entity would otherwise win the dedup and then be dropped
+   here, losing the entity. *)
 let _symbol_class_reason ~config ~excluded (c : candidate) =
   Symbol_class.classify ~extra_non_usd:config.extra_non_usd_symbols c.symbol
   |> Option.filter ~f:(List.mem excluded ~equal:Symbol_class.equal)
