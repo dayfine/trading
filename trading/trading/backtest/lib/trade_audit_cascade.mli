@@ -8,6 +8,15 @@
 
 open Core
 
+type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
+
+type stop_floor_detail = {
+  floor_kind : stop_floor_kind;
+  floor_price : float;
+  distance_pct : float;
+}
+[@@deriving sexp]
+
 type skip_reason =
   | Insufficient_cash
   | Already_held
@@ -29,6 +38,7 @@ type weekly_decision = {
   symbol : string;
   side : Trading_base.Types.position_side;
   outcome : weekly_outcome;
+  stop_floor : stop_floor_detail option; [@sexp.option]
 }
 [@@deriving sexp]
 

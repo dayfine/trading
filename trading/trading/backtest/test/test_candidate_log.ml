@@ -260,6 +260,17 @@ let test_decisions_reach_the_summary_without_capture _ =
             AR.ranked = _scored_candidate;
             outcome = AR.Skipped AR.Insufficient_cash;
           };
+          {
+            AR.ranked = _scored_candidate;
+            outcome =
+              AR.Skipped
+                (AR.No_structural_stop
+                   {
+                     floor_kind = AR.Buffer_fallback;
+                     floor_price = 46.0;
+                     distance_pct = 0.08;
+                   });
+          };
         ];
     };
   assert_that
@@ -274,11 +285,25 @@ let test_decisions_reach_the_summary_without_capture _ =
                    symbol = _ticker;
                    side = Trading_base.Types.Long;
                    outcome = Placed;
+                   stop_floor = None;
                  };
                  {
                    symbol = _ticker;
                    side = Trading_base.Types.Long;
                    outcome = Skipped Insufficient_cash;
+                   stop_floor = None;
+                 };
+                 {
+                   symbol = _ticker;
+                   side = Trading_base.Types.Long;
+                   outcome = Skipped No_structural_stop;
+                   stop_floor =
+                     Some
+                       {
+                         floor_kind = Buffer_fallback;
+                         floor_price = 46.0;
+                         distance_pct = 0.08;
+                       };
                  };
                ]
                 : TA.weekly_decision list));

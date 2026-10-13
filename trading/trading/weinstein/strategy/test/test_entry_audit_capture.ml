@@ -2213,7 +2213,7 @@ let _kept_and_skipped_decisions () =
         ~portfolio_value:100_000.0 ~current_date:as_of_date (cand "KEPT")
     with
     | Entry_audit_capture.Entry_ok (t, m) -> (t, m)
-    | Stop_too_wide | Sized_zero | No_structural_stop ->
+    | Stop_too_wide | Sized_zero | No_structural_stop _ ->
         OUnit2.assert_failure "fixture candidate failed to build an entry"
   in
   [
@@ -2288,7 +2288,7 @@ let _no_floor_long () =
 
 let _is_no_structural_stop =
   matching ~msg:"Expected No_structural_stop"
-    (function Entry_audit_capture.No_structural_stop -> Some () | _ -> None)
+    (function Entry_audit_capture.No_structural_stop _ -> Some () | _ -> None)
     (equal_to ())
 
 let _entered_with_floor_kind (kind : Audit_recorder.stop_floor_kind) =
@@ -2409,13 +2409,56 @@ let test_require_structural_stop_keeps_support_floor _ =
          field installed (float_equal (installed off));
        ])
 
+(* A stand-in rejected floor for the classifier tests, which stub [make_entry]. *)
+let _no_floor_detail : Audit_recorder.stop_floor_detail =
+  {
+    floor_kind = Audit_recorder.Buffer_fallback;
+    floor_price = 96.0;
+    distance_pct = 0.04;
+  }
+
+(** #3139: the [No_structural_stop] result carries the stop the walk would have
+    installed with the flag off: the [Buffer_fallback] kind, that stop's level,
+    and its distance from the effective entry as a fraction. Observation only:
+    the flag-off arm still enters on exactly that stop. *)
+let test_no_structural_stop_carries_rejected_floor _ =
+  let off, _ =
+    _no_floor_attempt ~require_structural_stop:false (_no_floor_long ())
+  in
+  let on, _ =
+    _no_floor_attempt ~require_structural_stop:true (_no_floor_long ())
+  in
+  let installed, entry =
+    match off with
+    | Entry_audit_capture.Entry_ok (_, m) ->
+        (m.installed_stop, m.effective_entry_price)
+    | _ -> (Float.nan, Float.nan)
+  in
+  assert_that on
+    (matching ~msg:"Expected No_structural_stop"
+       (function
+         | Entry_audit_capture.No_structural_stop d -> Some d | _ -> None)
+       (all_of
+          [
+            field
+              (fun (d : Audit_recorder.stop_floor_detail) -> d.floor_kind)
+              (equal_to Audit_recorder.Buffer_fallback);
+            field
+              (fun (d : Audit_recorder.stop_floor_detail) -> d.floor_price)
+              (float_equal installed);
+            field
+              (fun (d : Audit_recorder.stop_floor_detail) -> d.distance_pct)
+              (float_equal (Float.abs (installed -. entry) /. entry));
+          ]))
+
 (** [classify_candidate] maps [No_structural_stop] one-to-one onto
     [Skipped No_structural_stop] without touching the cash budget. *)
 let test_classify_maps_no_structural_stop _ =
   let remaining_cash = ref 100_000.0 in
   let decision =
     Entry_audit_capture.classify_candidate ~held_set:String.Set.empty
-      ~make_entry:(fun _ -> Entry_audit_capture.No_structural_stop)
+      ~make_entry:(fun _ ->
+        Entry_audit_capture.No_structural_stop _no_floor_detail)
       ~remaining_cash ~short_notional_acc:(ref 0.0)
       ~short_notional_cap:Float.infinity ~long_notional_acc:(ref 0.0)
       ~long_notional_cap:Float.infinity
@@ -2431,7 +2474,7 @@ let test_classify_maps_no_structural_stop _ =
            (matching ~msg:"expected Skipped No_structural_stop"
               (function Entry_audit_capture.Skipped r -> Some r | _ -> None)
               (equal_to
-                 (Audit_recorder.No_structural_stop
+                 (Audit_recorder.No_structural_stop _no_floor_detail
                    : Audit_recorder.skip_reason)));
          field snd (float_equal 100_000.0);
        ])
@@ -2755,6 +2798,8 @@ let () =
            >:: test_require_structural_stop_applies_to_shorts;
            "require_structural_stop: Support_floor entered either way"
            >:: test_require_structural_stop_keeps_support_floor;
+           "No_structural_stop carries the rejected floor"
+           >:: test_no_structural_stop_carries_rejected_floor;
            "require_structural_stop: classify maps to Skipped"
            >:: test_classify_maps_no_structural_stop;
            "require_structural_stop: threaded through the entry walk"

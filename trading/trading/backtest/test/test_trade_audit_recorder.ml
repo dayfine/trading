@@ -189,7 +189,12 @@ let test_skip_reason_projects_every_constructor _ =
       AR.Stop_too_wide;
       AR.Sector_exposure_cap;
       AR.Long_exposure_cap;
-      AR.No_structural_stop;
+      AR.No_structural_stop
+        {
+          floor_kind = AR.Buffer_fallback;
+          floor_price = 46.0;
+          distance_pct = 0.08;
+        };
       AR.Share_class_held;
     ]
   in

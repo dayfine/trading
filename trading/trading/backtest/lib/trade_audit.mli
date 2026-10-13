@@ -93,6 +93,26 @@ type skip_reason =
           (default [false] => never emitted). Long candidates only. *)
 [@@deriving sexp]
 
+(** Whether the installed initial stop sat on a support floor or fell back to a
+    fixed buffer off the effective entry price ([Buffer_fallback]: reference
+    [effective_entry * initial_stop_buffer] for a long,
+    [effective_entry / initial_stop_buffer] for a short). Neither case uses the
+    screener's proxy stop ({!entry_decision.screener_proxy_stop}). Routed from
+    [Weinstein_stops.compute_initial_stop_with_floor]. *)
+type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
+
+type stop_floor_detail = {
+  floor_kind : stop_floor_kind;
+      (** [Buffer_fallback] on every row the gate writes: the gate rejects
+          exactly the automatic-percentage fallback. *)
+  floor_price : float;  (** The rejected initial stop level. *)
+  distance_pct : float;
+      (** [|floor_price - effective_entry| / effective_entry], a fraction. *)
+}
+[@@deriving sexp]
+(** The initial stop a [No_structural_stop] candidate would have been given:
+    floor kind, floor price and distance from the entry (#3139). *)
+
 (** One outcome of the weekly decision record (#3139). *)
 type weekly_outcome =
   | Placed  (** The entry walk wrote the ticket. *)
@@ -103,6 +123,10 @@ type weekly_decision = {
   symbol : string;
   side : Trading_base.Types.position_side;
   outcome : weekly_outcome;
+  stop_floor : stop_floor_detail option; [@sexp.option]
+      (** [Some] exactly when [outcome = Skipped No_structural_stop]; omitted
+          from the sexp otherwise, so rows and files written before the field
+          existed read and print unchanged. *)
 }
 [@@deriving sexp]
 (** One top-N candidate of one screening Friday and what the entry walk did with
@@ -149,14 +173,6 @@ type alternative_candidate = {
     ([stage], [rs_value], [volume_ratio], [sector_name], ...) so the per-screen
     faithfulness audit can ask whether any captured signal separates the funded
     set from the cash-rejected near-misses. *)
-
-(** Whether the installed initial stop sat on a support floor or fell back to a
-    fixed buffer off the effective entry price ([Buffer_fallback]: reference
-    [effective_entry * initial_stop_buffer] for a long,
-    [effective_entry / initial_stop_buffer] for a short). Neither case uses the
-    screener's proxy stop ({!entry_decision.screener_proxy_stop}). Routed from
-    [Weinstein_stops.compute_initial_stop_with_floor]. *)
-type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
 
 (** Which price basis the entry's support-floor scan ran on. Mirrors
     {!Weinstein_strategy.Audit_recorder.split_safe_basis} /

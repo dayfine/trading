@@ -27,7 +27,9 @@ val skip_reason_of_event :
 val weekly_decision_of_event :
   Weinstein_strategy.Audit_recorder.walk_decision -> Trade_audit.weekly_decision
 (** One row of the weekly decision record (#3139): the candidate's ticker and
-    side, [Placed] or its skip reason via {!skip_reason_of_event}. *)
+    side, [Placed] or its skip reason via {!skip_reason_of_event}, and for a
+    [No_structural_stop] row the rejected stop's floor kind, price and distance
+    ([stop_floor]; [None] on every other row). *)
 
 val entry_anchor_of_kind :
   Screener.entry_anchor_kind -> Ticket_lifecycle.entry_anchor
