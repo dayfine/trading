@@ -97,3 +97,70 @@ re-draw.
 
 `demo.sh` renders the step-1 demo set (RMD 2002-10-11 and 2008-10-10, TWTR 2015-06-26 and 2021-12-31, MP 2021-12-31
 and 2024-06-28, the market pack at 2008-10-10 and 2021-12-31) into `.sweep-output/fresh-eyes/demo/`.
+
+# Step 2: the stepper (plan §4 layer (ii))
+
+The forward pass, one symbol per run dir: at each checkpoint the reader gets the stock pages (both frames), the
+last-bar JSON, the market pages and a status block, and answers with one decision; a deterministic simulator then
+plays the daily bars to the next checkpoint. The reader never sees a bar after the cut.
+
+```sh
+E=dev/experiments/fresh-eyes-2026-10-13; R=.sweep-output/fresh-eyes/run
+DATA=data sh $E/scripts/market_pages.sh $R/pages        # shared market pack, every Friday 2000-2026, once (~25 min, 4 jobs)
+DATA=data sh $E/scripts/step.sh OMC $R/OMC init auto    # first cut; writes $R/OMC/pending.txt
+DATA=data sh $E/scripts/step.sh OMC $R/OMC apply d.json # exit 0 next cut, 3 rejected (re-ask), 4 finished
+DATA=data sh $E/scripts/step.sh OMC $R/OMC pending      # resume after a failed render
+sh $E/scripts/stepper_check.sh                          # fixtures; must print "stepper check: PASS"
+DATA=data sh $E/scripts/dry_run.sh OMC                  # whole loop with a dummy reader, timed
+```
+
+**Decision** (JSON or key=value lines; `decision.awk` normalises it): `stage`, `action` (`none`, `buy_stop`,
+`short_stop`, `cancel`, `set_stop`, `exit`), `trigger`, `limit` (optional), `stop`, `reason`. Levels are on the
+chart's scale at the cut. `buy_stop` / `short_stop` need a trigger and the protective stop that goes live on the
+fill; they need a flat book and replace any resting order.
+
+**Validation** (a rejected decision leaves the state unchanged, `pending.txt` carries the message, exit 3): a long
+stop below the trigger, a short stop above it; a buy limit at or above the trigger, a short limit at or below it;
+`set_stop` may not lower a long stop or raise a short stop (on a resting order it moves the stop-on-fill); `cancel`
+needs an order and `exit` a position.
+
+**Prices.** The chart shows the vendor's adjusted series rescaled so the cut week's close is its raw close, i.e.
+chart = adjusted x k(t) with k(t) = raw close / adjusted close of the cut week. A level the reader gives at cut t is
+stored as level / k(t); the simulation runs on daily adjusted OHLC (raw x adjusted_close / close), so dividends and
+splits after the cut neither trigger nor move anything. The status block shows the stored levels x k at the current
+cut, so a resting order's trigger drifts slightly between cuts as dividends accrue (OMC: 107.61 at 2000-03-03,
+107.37 at 2000-03-31). Closed trades are shown as dates and returns.
+
+**Fills** (`sim.awk`). Buy-stop: the day's high >= trigger fills at max(open, trigger); with a limit, a day that
+opens above the limit does not fill. Short-stop mirrors it. A protective stop is live from the day after the fill
+(long: low <= stop fills at min(open, stop); short: high >= stop at max(open, stop)). `exit` fills at the next
+day's open. No commissions, no borrow fee beyond the dividends a short pays (the adjusted series charges them).
+
+**Checkpoints.** 4 weeks after the cut; or the Friday ending the week of a fill, a stop exit or an exit; or the
+Friday 8 weeks after an order was placed, whichever is first. At that 8-week checkpoint the order must be re-issued
+(`buy_stop` / `short_stop` again, which restarts the clock) or it is cancelled. The run ends at the symbol's last bar
+or at `END` (2026-06-26); an open position is marked to that close as `open_at_end`. The first cut (`init auto`) is
+the first Friday on or after 2000-01-07 with a 30-week MA. One position per symbol at a time, one unit of capital
+per trade.
+
+**Trade log** (`trades.csv`): side, entry and exit date and price (adjusted), how it ended (`stop`, `exit`,
+`open_at_end`), return, the SPY leg over the same days (long: SPY long; short: SPY short; SPY's adjusted open on
+the entry day to its adjusted close on the exit day, or its open when the exit fills at the open), and the excess.
+`log.csv` has one row per checkpoint; `decisions/<cut>.txt` keeps each applied decision as given.
+
+**Rendering cost.** Headless Chrome dominates (about 1.7 s a launch; the SVGs take about 0.1 s). `render.sh` puts
+both frames of a page on one HTML page, takes one screenshot and crops the two frames out with `sips` (a 1 px margin
+avoids its offset-0 and edge bugs), so a stock or market page pair costs about 2.5 s. Each launch is killed after
+60 s and retried up to 3 times. Market pages depend only on the cut, so `market_pages.sh` renders them once for every
+Friday and all symbols share them.
+
+| script | does |
+|---|---|
+| `decision.awk`, `decision.sh` | normalise one decision to key=value |
+| `sim.awk` | validate, apply and simulate to the next checkpoint |
+| `status.awk` | the status block, on the chart's scale |
+| `start.awk` | the first cut |
+| `step.sh` | init / apply / pending |
+| `market_pages.sh`, `market_one.sh` | the shared market pack for every Friday |
+| `fixture.awk`, `stepper_check.sh` | fixture checks of the fill, stop, rest and checkpoint rules |
+| `dummy_agent.awk`, `dry_run.sh` | the loop end to end with a stand-in reader (not a strategy) |
