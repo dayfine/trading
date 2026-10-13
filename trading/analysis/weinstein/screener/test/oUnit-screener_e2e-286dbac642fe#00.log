@@ -1,0 +1,249 @@
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Runner: processes
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Chooser: simple
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration suite_name = "screener_e2e"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration cache_filename = "/workspaces/trading-1/trading/analysis/weinstein/screener/test/oUnit-$(suite_name).cache"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration run_gc_full_major = "true"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration display = "true"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration results_style_1_X = "false"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration testdata_dir = "none"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration health_check_interval = "1."
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration verbose = "false"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration chooser = "simple"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration output_html_dir = "none"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration processes_kill_period = "5."
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration runner = "processes"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration shards = "4"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration processes_grace_period = "5."
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration log_encoding = "utf-8"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration output_junit_file = "none"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration ci = "false"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Configuration output_file = "/workspaces/trading-1/trading/analysis/weinstein/screener/test/oUnit-$(suite_name)-$(shard_id).log"
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Using 4 workers maximum.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Starting worker number 286dbac642fe#01.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Worker 286dbac642fe#01 started.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Starting worker number 286dbac642fe#02.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Worker 286dbac642fe#02 started.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Starting worker number 286dbac642fe#03.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Worker 286dbac642fe#03 started.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Starting worker number 286dbac642fe#04.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Worker 286dbac642fe#04 started.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:1:bearish macro gates all buys, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Start test screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: Start test screener_e2e:1:bearish macro gates all buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:2:held tickers excluded from output.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:1:bearish macro gates all buys, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Start test screener_e2e:3:candidate output fields populated (neutral macro).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:1:bearish macro gates all buys, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:1:bearish macro gates all buys, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: Test screener_e2e:1:bearish macro gates all buys is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:1:bearish macro gates all buys, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: End test screener_e2e:1:bearish macro gates all buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:1:bearish macro gates all buys, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:4:short candidates populated under bearish macro, screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: Start test screener_e2e:4:short candidates populated under bearish macro.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:4:short candidates populated under bearish macro, screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:4:short candidates populated under bearish macro, screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:2:held tickers excluded from output is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:4:short candidates populated under bearish macro, screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:2:held tickers excluded from output.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:4:short candidates populated under bearish macro, screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:2:held tickers excluded from output, screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:4:short candidates populated under bearish macro, screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:4:short candidates populated under bearish macro, screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 E: Test screener_e2e:4:short candidates populated under bearish macro has failed.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 E: Expected value in [99., 104.] but got 97.6 in test screener_e2e:4:short candidates populated under bearish macro.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 E: Raised at OUnitAssert.assert_failure in file "src/lib/ounit2/advanced/oUnitAssert.ml", line 45, characters 2-27
+2026-10-13T03:43:16+00:00 286dbac642fe#02 E: Called from Base__List0.iter in file "src/list0.ml", line 66, characters 4-7
+2026-10-13T03:43:16+00:00 286dbac642fe#02 E: Called from Dune__exe__Test_screener_e2e._candidate_matcher in file "analysis/weinstein/screener/test/test_screener_e2e.ml", lines 60-77, characters 2-9
+2026-10-13T03:43:16+00:00 286dbac642fe#02 E: Called from Base__List0.iter2_ok in file "src/list0.ml", line 74, characters 4-11
+2026-10-13T03:43:16+00:00 286dbac642fe#02 E: Called from OUnitRunner.run_one_test.(fun) in file "src/lib/ounit2/advanced/oUnitRunner.ml", line 83, characters 13-26
+2026-10-13T03:43:16+00:00 286dbac642fe#02 E: 
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:4:short candidates populated under bearish macro, screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: End test screener_e2e:4:short candidates populated under bearish macro.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:4:short candidates populated under bearish macro, screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: Start test screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Test screener_e2e:3:candidate output fields populated (neutral macro) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: End test screener_e2e:3:candidate output fields populated (neutral macro).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:3:candidate output fields populated (neutral macro), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Start test screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Test screener_e2e:0:full cascade — bullish macro, 7-stock universe is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: End test screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM), screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM).
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Start test screener_e2e:8:neutral_blocks_longs on blocks neutral buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window), screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window).
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: Test screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window).
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: End test screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved), screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: Start test screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:13:a bullish tape refined to Deteriorating / Recovering, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:13:a bullish tape refined to Deteriorating / Recovering.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:13:a bullish tape refined to Deteriorating / Recovering, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:13:a bullish tape refined to Deteriorating / Recovering is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:13:a bullish tape refined to Deteriorating / Recovering, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:13:a bullish tape refined to Deteriorating / Recovering.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:13:a bullish tape refined to Deteriorating / Recovering, screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Test screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: End test screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys, screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Start test screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Test screener_e2e:8:neutral_blocks_longs on blocks neutral buys is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: End test screener_e2e:8:neutral_blocks_longs on blocks neutral buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged, screener_e2e:8:neutral_blocks_longs on blocks neutral buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Start test screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved), screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: Test screener_e2e:10:neutral_blocks_longs leaves short side unchanged is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: End test screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Test screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys, screener_e2e:10:neutral_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: End test screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 4 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#02 I: Start test screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 4 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Start test screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 4 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Test screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 4 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: End test screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 4 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 4 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked, screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 3 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 3 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 3 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 3 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 3 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 3 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied, screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 2 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 2 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Test screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 2 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 2 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: End test screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 2 tests running : screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 2 tests running: screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged, screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: Still 1 tests running : screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:16+00:00 286dbac642fe#00 I: 1 tests running: screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Still 1 tests running : screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: 1 tests running: screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:17+00:00 286dbac642fe#02 I: Test screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Still 1 tests running : screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: 1 tests running: screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:17+00:00 286dbac642fe#02 I: End test screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Still 1 tests running : screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: 1 tests running: screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: 0 tests running: .
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Worker 286dbac642fe#03 has ended.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Worker 286dbac642fe#01 has ended.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Worker 286dbac642fe#02 died unexpectedly.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Worker 286dbac642fe#04 died unexpectedly.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Used 4 worker during test execution.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Run 3 tests with shard 286dbac642fe#04.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Run 9 tests with shard 286dbac642fe#03.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Run 4 tests with shard 286dbac642fe#01.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Run 5 tests with shard 286dbac642fe#02.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Check health of shard 286dbac642fe#04, 12 times.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Check health of shard 286dbac642fe#03, 8 times.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Check health of shard 286dbac642fe#01, 5 times.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Check health of shard 286dbac642fe#02, 2 times.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: ==============
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Summary:
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:19:deteriorating_blocks_longs is inert with no breadth state supplied is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:10:neutral_blocks_longs leaves short side unchanged is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved) is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:8:neutral_blocks_longs on blocks neutral buys is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved) is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower) is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:13:a bullish tape refined to Deteriorating / Recovering is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:6:Ch.11 negative: bullish macro emits zero shorts (2022 window) is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM) is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:0:full cascade — bullish macro, 7-stock universe is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:3:candidate output fields populated (neutral macro) is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 E: Test screener_e2e:4:short candidates populated under bearish macro has failed.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 E: Expected value in [99., 104.] but got 97.6 in test screener_e2e:4:short candidates populated under bearish macro.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 E: Raised at OUnitAssert.assert_failure in file "src/lib/ounit2/advanced/oUnitAssert.ml", line 45, characters 2-27
+2026-10-13T03:43:17+00:00 286dbac642fe#00 E: Called from Base__List0.iter in file "src/list0.ml", line 66, characters 4-7
+2026-10-13T03:43:17+00:00 286dbac642fe#00 E: Called from Dune__exe__Test_screener_e2e._candidate_matcher in file "analysis/weinstein/screener/test/test_screener_e2e.ml", lines 60-77, characters 2-9
+2026-10-13T03:43:17+00:00 286dbac642fe#00 E: Called from Base__List0.iter2_ok in file "src/list0.ml", line 74, characters 4-11
+2026-10-13T03:43:17+00:00 286dbac642fe#00 E: Called from OUnitRunner.run_one_test.(fun) in file "src/lib/ounit2/advanced/oUnitRunner.ml", line 83, characters 13-26
+2026-10-13T03:43:17+00:00 286dbac642fe#00 E: 
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:2:held tickers excluded from output is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Test screener_e2e:1:bearish macro gates all buys is successful.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Ran: 21 tests in: 1.10 seconds.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Cases: 21.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Tried: 21.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Errors: 0.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Failures: 1.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Skip: 0.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Todo: 0.
+2026-10-13T03:43:17+00:00 286dbac642fe#00 I: Timeout: 0.

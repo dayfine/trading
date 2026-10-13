@@ -1,0 +1,27 @@
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:2:held tickers excluded from output.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:2:held tickers excluded from output is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:2:held tickers excluded from output.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:5:Ch.11 spot-check: 2022 bear shorts (MSFT + JPM).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:9:neutral_blocks_longs on leaves bullish buys unaffected.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:11:longs_admitted_by_breadth truth table over every trend x state.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:12:deteriorating_blocks_longs off = the three-state gate at every pair.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:13:a bullish tape refined to Deteriorating / Recovering.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:13:a bullish tape refined to Deteriorating / Recovering is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:13:a bullish tape refined to Deteriorating / Recovering.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:14:neutral_blocks_longs also blocks Recovering (why #2755 is narrower).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:15:deteriorating_blocks_longs off = identity (deteriorating buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Start test screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: Test screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#03 I: End test screener_e2e:18:deteriorating_blocks_longs leaves bearish blocked.

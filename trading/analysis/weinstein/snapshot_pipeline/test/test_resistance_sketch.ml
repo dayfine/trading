@@ -28,8 +28,8 @@ let _day ~w ~d = Date.add_days _week_start ((7 * w) + d)
 (* [n_weeks] Mon-Fri weeks of bars. Every bar of week [w] carries the same
    (high, low) from [week_shape w], so the weekly aggregate's high/low are
    exactly the override regardless of how the production week-bucketing
-   groups the days (it splits at calendar-year boundaries, so week COUNTS
-   must never be hand-derived from [n_weeks] in assertions). *)
+   groups the days (week COUNTS must never be hand-derived from [n_weeks] in
+   assertions). *)
 let _weeks_bars ~n_weeks ~week_shape =
   List.init n_weeks ~f:(fun w ->
       let high, low = Option.value (week_shape w) ~default:(6.0, 4.0) in

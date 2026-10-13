@@ -324,3 +324,11 @@
          (unit ("trading/trading/weinstein/strategy/test/test_ad_bars_compose.ml"
                 "gap_warnings: one documented line per wide hole"))))
  (status fixed))
+
+((issue 3266) (ref "index-hedge screen #3265 §9 defect 2: SPY 2001-12-31 / 2002-01-04 two weekly bars")
+ (finding "week_bucketing keyed weeks on week_number plus the calendar year, so a week crossing 1 January became two weekly bars")
+ (guard ((unit ("trading/analysis/technical/indicators/time_period/test/test_week_bucketing.ml"
+                "test_week_crossing_new_year_is_one_bucket"))
+         (unit ("trading/analysis/technical/indicators/time_period/test/test_week_bucketing.ml"
+                "test_week_53_crossing_new_year_is_one_bucket"))))
+ (status fixed))

@@ -1,0 +1,9 @@
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Start test screener_e2e:3:candidate output fields populated (neutral macro).
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Test screener_e2e:3:candidate output fields populated (neutral macro) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: End test screener_e2e:3:candidate output fields populated (neutral macro).
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Start test screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Test screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved) is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: End test screener_e2e:7:neutral_blocks_longs off = identity (neutral buys preserved).
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Start test screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: Test screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#04 I: End test screener_e2e:16:deteriorating_blocks_longs on blocks deteriorating buys.

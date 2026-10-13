@@ -223,7 +223,11 @@ let test_candidate_fields_populated _ =
     (entry, stop>entry, risk_pct); the entry is the sell-stop under the prior
     base's support floor ([breakdown_price] less the buffer, #3131), not the
     base top and asserts that no buy candidates leak through under Bearish
-    macro. This is the deterministic counterpart to the bullish test. *)
+    macro. This is the deterministic counterpart to the bullish test.
+
+    JPM's entry / stop moved 99-104 / 107-112 -> 97.60 / 105.41 with the #3266
+    ISO-week fix, which makes the 2018-12-31 and 2019-12-30 weeks one weekly bar
+    each in this window (the support-floor path was not traced further). *)
 let test_short_candidate_populated _ =
   let stocks =
     _analyze_universe
@@ -239,8 +243,8 @@ let test_short_candidate_populated _ =
   assert_that result.Screener.short_candidates
     (elements_are
        [
-         _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:72 ~entry_low:99.0
-           ~entry_high:104.0 ~stop_low:107.0 ~stop_high:112.0 ~risk_low:0.075
+         _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:72 ~entry_low:95.0
+           ~entry_high:100.0 ~stop_low:103.0 ~stop_high:108.0 ~risk_low:0.075
            ~risk_high:0.085;
          _candidate_matcher ~side:`Short ~ticker:"KO" ~score:55 ~entry_low:44.0
            ~entry_high:48.0 ~stop_low:47.5 ~stop_high:51.5 ~risk_low:0.075

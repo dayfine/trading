@@ -222,9 +222,17 @@ let test_six_year_full_lifecycle _ =
      move on one 7-symbol fixture is noise, and no return improvement was
      expected or is asserted (rs_value carries no measurable ranking edge —
      permutation p = 0.182, issue #2380). *)
+  (* ISO week-year bucketing (2026-10-13, issue #3266): a week crossing 1
+     January (2018-12-31 .. 2019-01-04, 2019-12-30 .. 2020-01-03, ...) is now
+     one weekly bar instead of two. Every 30-week indicator in this window
+     loses the spurious partial bar at those year-ends. Observed: buys 30 -> 29,
+     sells 26 -> 25, round-trips 26 -> 25, losses 22 -> 21 (wins unchanged at
+     4), final value 487,853.30 -> 490,335.27, realized max drawdown 4.41% ->
+     3.93%. Same 7-symbol set, same 2187 steps. A correctness re-pin; no
+     mechanism is claimed for the direction on a 7-symbol fixture. *)
   assert_that (List.length result.steps) (equal_to 2187);
-  assert_that n_buys (equal_to 30);
-  assert_that n_sells (equal_to 26);
+  assert_that n_buys (equal_to 29);
+  assert_that n_sells (equal_to 25);
   assert_that symbols
     (elements_are
        [
@@ -236,19 +244,19 @@ let test_six_year_full_lifecycle _ =
          equal_to "KO";
          equal_to "MSFT";
        ]);
-  assert_that (List.length round_trips) (equal_to 26);
+  assert_that (List.length round_trips) (equal_to 25);
   assert_that stats
     (is_some_and
        (all_of
           [
             field (fun s -> s.Metrics.win_count) (equal_to 4);
-            field (fun s -> s.Metrics.loss_count) (equal_to 22);
+            field (fun s -> s.Metrics.loss_count) (equal_to 21);
           ]));
-  (* Final value $487,853.30 under the 2026-08-25 RS-trend fix (was
-     $491,691.09); band re-centred at ±$3K around the new value. *)
+  (* Final value $490,335.27 under the #3266 ISO-week fix (was $487,853.30);
+     band re-centred at ±$3K around the new value. *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:484_853.30 ~high:490_853.30);
-  (* Realized max drawdown ~4.4% under the fix; pin loose at < 0.60. *)
+    (is_between (module Float_ord) ~low:487_335.27 ~high:493_335.27);
+  (* Realized max drawdown ~3.9% under the fix; pin loose at < 0.60. *)
   assert_that max_drawdown_pct (lt (module Float_ord) 0.60)
 
 (* ------------------------------------------------------------------ *)
@@ -298,24 +306,29 @@ let test_entry_exit_cycle_around_covid _ =
      land back on 7 sells with a different win/loss split (2W/5L -> 1W/6L):
      one winner that used to be trailed out now runs into the crash and closes
      red. Entry count and symbol set are unchanged. *)
+  (* ISO week-year bucketing (2026-10-13, issue #3266): the year-crossing
+     weeks 2018-12-31 .. 2019-01-04 and 2019-12-30 .. 2020-01-03 are each one
+     weekly bar now. One fewer round-trip in this window: buys 8 -> 7, sells
+     7 -> 6, round-trips 7 -> 6, losses 6 -> 5 (wins unchanged at 1), final
+     value 494,474.24 -> 496,758.67. Same symbol set, same 545 steps. *)
   assert_that (List.length result.steps) (equal_to 545);
-  assert_that n_buys (equal_to 8);
-  assert_that n_sells (equal_to 7);
+  assert_that n_buys (equal_to 7);
+  assert_that n_sells (equal_to 6);
   assert_that symbols
     (elements_are
        [ equal_to "AAPL"; equal_to "HD"; equal_to "JNJ"; equal_to "KO" ]);
-  assert_that (List.length round_trips) (equal_to 7);
+  assert_that (List.length round_trips) (equal_to 6);
   assert_that stats
     (is_some_and
        (all_of
           [
             field (fun s -> s.Metrics.win_count) (equal_to 1);
-            field (fun s -> s.Metrics.loss_count) (equal_to 6);
+            field (fun s -> s.Metrics.loss_count) (equal_to 5);
           ]));
-  (* 2026-08-24 stops-basis flips: final value $494,474.24 ± $5K (was
-     $506,145.21 at the G15 step-3 pin). *)
+  (* #3266 ISO-week fix: final value $496,758.67 ± $5K (was $494,474.24
+     after the 2026-08-24 stops-basis flips). *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:489_474.24 ~high:499_474.24);
+    (is_between (module Float_ord) ~low:491_758.67 ~high:501_758.67);
   (* G15 step 3 (2026-05-01): max drawdown 48.59%; pin loose at < 0.52. *)
   assert_that max_drawdown_pct (lt (module Float_ord) 0.52)
 

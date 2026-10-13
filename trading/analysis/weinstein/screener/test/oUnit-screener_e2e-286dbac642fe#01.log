@@ -1,0 +1,12 @@
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Start test screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Test screener_e2e:0:full cascade — bullish macro, 7-stock universe is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: End test screener_e2e:0:full cascade — bullish macro, 7-stock universe.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Start test screener_e2e:8:neutral_blocks_longs on blocks neutral buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Test screener_e2e:8:neutral_blocks_longs on blocks neutral buys is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: End test screener_e2e:8:neutral_blocks_longs on blocks neutral buys.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Start test screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Test screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: End test screener_e2e:17:deteriorating_blocks_longs on leaves the other admitting states.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Start test screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: Test screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged is successful.
+2026-10-13T03:43:16+00:00 286dbac642fe#01 I: End test screener_e2e:20:deteriorating_blocks_longs leaves short side unchanged.

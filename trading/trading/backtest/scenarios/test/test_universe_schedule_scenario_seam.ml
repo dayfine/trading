@@ -24,7 +24,8 @@
     the drop) disappearing while the AAPL and JPM round trips (both entered
     2019-05-04, BEFORE it) survive — so the assertion distinguishes the
     scheduled arm from the [universe_path] arm rather than merely observing
-    "some trades happened".
+    "some trades happened". A survivor (CVX, entered 2019-05-18) also round
+    trips since the #3266 ISO-week bucketing fix; it is in both arms.
 
     Authority: [scenario.mli]'s [universe_schedule] field doc;
     [dev/plans/pit-universe-migration-2026-09-14.md] §Step 3a D1/D4/D6/D7. *)
@@ -38,8 +39,9 @@ let _exit_code_not_found = 127
 let _scenario_name = "universe-schedule-seam"
 
 (* Symbols expected to round-trip under the SCHEDULED arm, sorted. The
-   [universe_path] arm would additionally hold JNJ; see the module doc. *)
-let _expected_scheduled_symbols = [ "AAPL"; "JPM" ]
+   [universe_path] arm would additionally hold JNJ; see the module doc. CVX is a
+   survivor (in both arms), trading since the #3266 ISO-week fix. *)
+let _expected_scheduled_symbols = [ "AAPL"; "CVX"; "JPM" ]
 
 (* The exe lives one directory up from this test's own exe in _build, kept
    there by test/dune's (deps ...) — same locator and same hazard
