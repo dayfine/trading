@@ -89,7 +89,7 @@ Verifies: none
   6. "RS falling" means the 52-week Mansfield RS is below its value 4 weeks earlier.
   7. The stage replay (`scripts/replay.sh`) ran the parent tree's `stage_chart.exe`, built 2026-10-09, without a
      recorded HEAD. The classifier code on main is unchanged since 2026-08-12.
-  6. The "advance" is the Stage-3 high over the lowest weekly close of the 104 weeks through the breakdown week.
+  8. The "advance" is the Stage-3 high over the lowest weekly close of the 104 weeks through the breakdown week.
 
 ## 2. The decision rule, as written (O2 excess vs the SPY short)
 
@@ -583,8 +583,8 @@ from `analysis.txt` §dividends. E1 entry, all events.
   - Non-payers' mean is much worse (−5.86 % vs −0.06 %), which is the squeeze tail.
 - **Corrected after the second read: the large-dividend row is look-ahead biased (defect 8).** `events.awk` compares
   each ex-date amount with the raw close the day before the ex-date, which falls inside the hold. A stock that falls
-  turns an ordinary quarterly into a "≥ 3 %" dividend. 174 of the 1,136 flagged events qualify only because the price
-  fell, and they read beat 72.4 % and mean +14.0 %. Specimen: TGH 2008-09-26. A $0.23 quarterly was 1.33 % of the
+  turns an ordinary quarterly into a "≥ 3 %" dividend. 176 of the 1,136 flagged events qualify only because the price
+  fell, and they read beat 72.2 % and mean +14.06 % (the committed flags; the second read quoted 174 / 72.4 % / +14.0 %). Specimen: TGH 2008-09-26. A $0.23 quarterly was 1.33 % of the
   $17.25 decision-time close; it was flagged after the stock fell to $5.45, for an excess of +23.3 %.
   - **The decision-time split** (`results/analysis/divsplit.sh`, output `divsplit.txt`): an event is flagged when an
     ex-date after the E1 entry and up to the +120th bar carries `unadjusted_amount` of at least 3 % of the
@@ -595,7 +595,7 @@ from `analysis.txt` §dividends. E1 entry, all events.
     failed the in-hold test because their price rose (beat 12.0 %; e.g. AB, AFG, APAM). Its comparison group was also
     a different one. The committed split supersedes it.
   - The favourable rows above (beat 38.1 %, and the per-half O1 figures) are therefore not evidence that big dividends
-    help a short. A known large dividend makes a slightly worse short, as expected when the short pays it.
+    help a short. A large dividend inside the hold (the ex-date can be up to 120 bars after entry, so it is not always known at entry) makes a slightly worse short, as expected when the short pays it.
 - **In P1,** payers and non-payers are the same: O2 beat 30.1 % vs 29.0 %, O1 +120 beat 47.2 % vs 47.0 %.
 
 The AD 2025-08-20 special that prompted the question is a real cost when it lands, and the adjusted closes charge it.
@@ -668,7 +668,7 @@ not protect a broken stock, and payers are no worse to short.
    qc-results reproduced all 1,136 flags. Found by the second read; the first read missed it. The 3 % test divides by the raw close the day before each ex-date inside the hold, not by the
    decision-time close. Specimen: TGH 2008-09-26 (§10). It affects only the descriptive `bigdiv_in_hold` split, which
    cannot trigger anything. It is not fixed in this PR; the split is reported as biased.
-9. **The prior-advance low can come after the Stage-3 high** (3.8 % of events, 5.8 % of P1). This includes the
+9. **The prior-advance low can come after the Stage-3 high** (about 3.6 % of events on a qc-results recompute, 3.8 % in the second read; 5.8 % of P1; no committed script produces this figure). This includes the
    2020-03-20 cohort (MHO room 213 %, GTLS 245 %), which supplies 5 of P1's 6 worst events. Without them, P1's beat
    rate is 28.9 %. This is the same root as 6(c).
 
