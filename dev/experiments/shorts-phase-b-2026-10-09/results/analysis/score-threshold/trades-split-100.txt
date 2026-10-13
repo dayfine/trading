@@ -1,0 +1,12 @@
+== v0 s0 
+  score >= 100: n= 26 win= 31% mean=-4.12% median=-4.10% pnl=$-82k
+  score <  100: n=170 win= 16% mean=-4.78% median=-7.89% pnl=$-528k
+== v0 s0 excluding HRC-wein-121
+  score >= 100: n= 25 win= 32% mean=-0.57% median=-3.94% pnl=$-29k
+  score <  100: n=170 win= 16% mean=-4.78% median=-7.89% pnl=$-528k
+== v1 s0 
+  score >= 100: n= 25 win= 32% mean=-1.13% median=-4.10% pnl=$-36k
+  score <  100: n=142 win= 16% mean=-4.94% median=-8.07% pnl=$-510k
+== v1 s0 excluding HRC-wein-121
+  score >= 100: n= 25 win= 32% mean=-1.13% median=-4.10% pnl=$-36k
+  score <  100: n=142 win= 16% mean=-4.94% median=-8.07% pnl=$-510k

@@ -1,0 +1,16 @@
+== v0 s0 filled shorts by sector/RS
+Neutral/Bearish_crossover      n= 75 win= 15% mean= -6.9% pnl=$-356k
+Neutral/Negative_declining     n=  4 win= 50% mean=+23.9% pnl=$+91k
+Neutral/Negative_improving     n=  1 win=100% mean= +2.4% pnl=$+2k
+Weak/                          n=  1 win=  0% mean= -5.2% pnl=$-5k
+Weak/Bearish_crossover         n= 95 win= 19% mean= -3.8% pnl=$-254k
+Weak/Negative_declining        n= 19 win= 16% mean= -6.9% pnl=$-86k
+Weak/Negative_improving        n=  1 win=  0% mean= -4.6% pnl=$-3k
+== v1 s0 filled shorts by sector/RS
+Neutral/Bearish_crossover      n= 60 win= 15% mean= -5.8% pnl=$-260k
+Neutral/Negative_declining     n=  2 win= 50% mean=+18.8% pnl=$+32k
+Neutral/Negative_improving     n=  1 win=100% mean= +2.4% pnl=$+2k
+Weak/                          n=  1 win=  0% mean= -5.2% pnl=$-4k
+Weak/Bearish_crossover         n= 87 win= 22% mean= -3.2% pnl=$-221k
+Weak/Negative_declining        n= 15 win=  7% mean= -8.9% pnl=$-92k
+Weak/Negative_improving        n=  1 win=  0% mean= -4.6% pnl=$-3k

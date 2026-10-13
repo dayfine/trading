@@ -1,0 +1,18 @@
+== v0 s0 filled shorts
+score>= 40 n=196 win= 18% mean= -4.7% pnl=$-610k
+score>= 50 n=195 win= 18% mean= -4.7% pnl=$-606k
+score>= 60 n=195 win= 18% mean= -4.7% pnl=$-606k
+score>= 70 n=193 win= 18% mean= -4.7% pnl=$-605k
+score>= 80 n=181 win= 17% mean= -5.5% pnl=$-698k
+score>= 90 n=136 win= 19% mean= -5.1% pnl=$-493k
+score>=100 n= 26 win= 31% mean= -4.1% pnl=$-82k
+score>=110 n=  1 win=100% mean=+45.2% pnl=$+23k
+== v1 s0 filled shorts
+score>= 40 n=167 win= 19% mean= -4.4% pnl=$-546k
+score>= 50 n=166 win= 19% mean= -4.4% pnl=$-542k
+score>= 60 n=166 win= 19% mean= -4.4% pnl=$-542k
+score>= 70 n=164 win= 18% mean= -4.4% pnl=$-540k
+score>= 80 n=157 win= 18% mean= -4.9% pnl=$-591k
+score>= 90 n=122 win= 20% mean= -4.2% pnl=$-404k
+score>=100 n= 25 win= 32% mean= -1.1% pnl=$-36k
+score>=110 n=  1 win=100% mean=+45.2% pnl=$+24k
