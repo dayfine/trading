@@ -116,6 +116,8 @@ This screen answers each one.
 - **O1 +60:** non-payers beat 53.1 %, against 49.2–50.4 % for payers. The gap is mostly in 2000–12, and it vanishes
   inside P1.
 - **Cost:** dividends are already charged through the adjusted closes, at about yield × holding period.
+- **Correction (qc-results):** the 962-event figure below is mis-defined. The committed decision-time split is 1,093
+  events at a beat of 29.5 % (README §10, `divsplit.txt`).
 - **The `bigdiv` split is look-ahead biased (defect 4 below).** At decision time, the 962 events with a dividend of
   3 % or more do slightly worse: beat 31.9 % and mean −1.92 %, against 34.1 % and −1.33 %.
 

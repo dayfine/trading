@@ -6,7 +6,7 @@ the event extraction: the per-symbol event files are dated 22:07–22:13 PT, and
 not outcomes. The plan on disk is byte-identical to `d65968e28`. The rule is applied as written. The choices the text
 leaves open are listed under Method.
 
-**Artifacts** (`results/`, commit `5aa014545`):
+**Artifacts** (`results/`, PR #3286):
 - `summary-floor5.txt` is the primary result and `summary-floor17.txt` the $17 sensitivity;
 - `events/<year>.csv` holds the 45,599 events (one header per file; the columns are `scripts/header.txt` plus `sector`
   and `group_rel`);
@@ -48,9 +48,11 @@ Verifies: none
   charged the dividends.
   - On the rule's outcome, payers and non-payers have the same beat rate (34.2 %), and payers have the better median
     (−2.68 % vs −3.53 %).
-  - The "≥ 3 % dividend inside the hold" split cannot answer the question as built. It is conditioned on the
-    outcome (defect 8). Measured at decision time instead, the 962 events with a ≥ 3 % dividend do slightly worse:
-    beat 31.9 %, against 34.1 % for the rest. The cost is small and is already charged.
+  - The pre-registered "≥ 3 % dividend inside the hold" split cannot answer the question as built: its definition
+    measures the dividend against an in-hold price, so it is conditioned on the outcome (defect 8). With a
+    decision-time definition (an ex-date in the hold of at least 3 % of the breakdown-week close), the 1,093 such events
+    do worse: beat 29.5 % and mean −2.73 %, against 34.3 % and −1.24 % for the other 44,506 (`results/analysis/divsplit.txt`).
+    The cost is real but small, and the adjusted closes already charge it.
   - Do not exclude payers on this evidence. AD-type specials are better caught by a narrower check for an announced
     special before entry, and even that is moot until a short setup shows an edge.
 - **Next (the user's call; options in §9).** On this evidence, close single-name shorts as a strategy track. The one
@@ -84,6 +86,9 @@ Verifies: none
      need both. §5.8 shows the verdict does not depend on it.
   4. Intraday highs and opens are put on the adjusted basis by each bar's adjusted/raw close ratio.
   5. The $17 cells filter the $5 event set, so the de-duplication was done at $5.
+  6. "RS falling" means the 52-week Mansfield RS is below its value 4 weeks earlier.
+  7. The stage replay (`scripts/replay.sh`) ran the parent tree's `stage_chart.exe`, built 2026-10-09, without a
+     recorded HEAD. The classifier code on main is unchanged since 2026-08-12.
   6. The "advance" is the Stage-3 high over the lowest weekly close of the 104 weeks through the breakdown week.
 
 ## 2. The decision rule, as written (O2 excess vs the SPY short)
@@ -165,7 +170,7 @@ its shorts make money. P2 has a median of −4.70 %, and 20.9 % make money.
 - **Stopped under O2:** 31,399 E1 shorts (68.9 %) and 28,801 E2 shorts (79.8 %). In P1, 72.9 % (`analysis.txt`
   §support); in P2, 81.8 % (§paired).
 
-**By year** (`analysis.txt` §years): P1's median O2 excess is negative in 21 of the 22 years that have P1 events. The
+**By year** (`analysis.txt` §years): P1's median O2 excess is negative in 20 of the 21 years that have P1 events. The
 exception is 2002 (n = 26, median +3.43 %, beat 57.7 %). Its beat rate is below 38 % in every other year. The worst
 no-stop year is 2020 (n = 270, O1 +60 median −9.86 %), the COVID V-rebound.
 
@@ -581,11 +586,16 @@ from `analysis.txt` §dividends. E1 entry, all events.
   turns an ordinary quarterly into a "≥ 3 %" dividend. 174 of the 1,136 flagged events qualify only because the price
   fell, and they read beat 72.4 % and mean +14.0 %. Specimen: TGH 2008-09-26. A $0.23 quarterly was 1.33 % of the
   $17.25 decision-time close; it was flagged after the stock fell to $5.45, for an excess of +23.3 %.
-  - Measured at decision time instead (dividend ≥ 3 % of the breakdown-week close), the 962 such events do slightly
-    worse: beat 31.9 % and mean −1.92 %, against 34.1 % and −1.33 %.
+  - **The decision-time split** (`results/analysis/divsplit.sh`, output `divsplit.txt`): an event is flagged when an
+    ex-date after the E1 entry and up to the +120th bar carries `unadjusted_amount` of at least 3 % of the
+    breakdown-week raw close. 1,093 events are flagged: beat 29.5 % and mean −2.73 %, against 34.3 % and −1.24 % for the
+    other 44,506.
+  - The second read first quoted 962 events at a beat of 31.9 % against 34.1 % and −1.33 %. qc-results found that
+    figure mis-defined: it kept only events passing both tests, so it dropped the 133 decision-time qualifiers that
+    failed the in-hold test because their price rose (beat 12.0 %; e.g. AB, AFG, APAM). Its comparison group was also
+    a different one. The committed split supersedes it.
   - The favourable rows above (beat 38.1 %, and the per-half O1 figures) are therefore not evidence that big dividends
-    help a short. This blind-read figure is not in a committed script; it is recorded in
-    `results/analysis/blind-read.md`.
+    help a short. A known large dividend makes a slightly worse short, as expected when the short pays it.
 - **In P1,** payers and non-payers are the same: O2 beat 30.1 % vs 29.0 %, O1 +120 beat 47.2 % vs 47.0 %.
 
 The AD 2025-08-20 special that prompted the question is a real cost when it lands, and the adjusted closes charge it.
@@ -622,11 +632,11 @@ not protect a broken stock, and payers are no worse to short.
    - The open, high, low and close columns are the sentinel `999999.9999` on every row through 2007 (e.g.
      2005-01-03), and on some rows in 2008–10. Elsewhere in 2008–13 they run at about 5,000× the adjusted close (e.g.
      2011-10-14: raw close 55,264.404, adjusted 10.9468). The adjusted close is fine.
-   - Here it gives 3 events (2004-05-14, 2007-07-27, 2008-01-25; the first in P1) a breakdown close that passes any
+   - Here it gives 5 events (2004-05-14, 2007-07-27, 2008-01-25, 2011-10-14 and 2013-06-21; only the first is in P1) a breakdown close that passes any
      price floor, a dividend yield of about 0, and a close-only intraday high.
    - 43 other event symbols carry sentinel rows, some inside the window: LJPC has 3,239 rows in 1994–2008, MGDDY 312
      in 2008–10, and PEGX 10 in 2024–25. None falls inside one of that symbol's own event windows, so only AKR's
-     three events are affected.
+     five events are affected.
    - Any reader of the raw close is exposed: price floors, dollar volume and yields. The simulator's raw-close paths
      are worth a check.
 2. **BCE 2000-05-09: an uncredited distribution** (`data/B/E/BCE/data.csv`).
@@ -653,8 +663,9 @@ not protect a broken stock, and payers are no worse to short.
    continuous outcomes, but it overflows macOS awk's stack on large tied arrays: it crashed when the analyst reused it
    on 45,599 integer hold lengths. No committed number is affected. `results/analysis/lib.awk` uses a 3-way partition.
 
-8. **`bigdiv` look-ahead (`scripts/events.awk`, the large-dividend block).** Found by the second read; the first
-   read missed it. The 3 % test divides by the raw close the day before each ex-date inside the hold, not by the
+8. **`bigdiv` look-ahead: a flaw in the pre-registered split's definition** (amendment 1 measures the dividend
+   against "the prior raw close", which falls inside the hold). `scripts/events.awk` implements that wording as written;
+   qc-results reproduced all 1,136 flags. Found by the second read; the first read missed it. The 3 % test divides by the raw close the day before each ex-date inside the hold, not by the
    decision-time close. Specimen: TGH 2008-09-26 (§10). It affects only the descriptive `bigdiv_in_hold` split, which
    cannot trigger anything. It is not fixed in this PR; the split is reported as biased.
 9. **The prior-advance low can come after the Stage-3 high** (3.8 % of events, 5.8 % of P1). This includes the
