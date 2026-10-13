@@ -62,6 +62,12 @@
 #     window; the first window day gets a regime), the open-position read net
 #     of dividends, cash interest and commissions (or UnrealizedPnl), the
 #     sub-$17 margin-call churn card and the NAV-peak give-back card.
+#   - #3262: the macro join reads the screen strictly before the fill (V23's rule, a Friday-fill
+#     fixture); the against-macro card words placement vs fill; an exit after an issuer's last bar
+#     whose next bar is over a year on (a reused ticker) is not the non-trading-day defect; the
+#     header stamps the pack SHA and snapshot dir; carried from #3214: CROOT from the mount source,
+#     the SPY-truncation abort, a later split under a further split (AVD), side-signed pick vs SPY
+#     and both-sides wording, the replay stage cards' wording.
 #
 # Run:
 #   sh trading/devtools/checks/review_pack_test.sh
@@ -368,7 +374,7 @@ fi
 #       (its sid 0.04 would have read as the long 4 % fallback); the stock then runs to 60 -> A;
 #   EEE short 10 -> covered 10.20 (stop_loss, -2 %), then the stock falls 97 % -> F (a short whipsaw);
 #       its 10.50 stop is never reached by a high -> lag -1.
-# All three enter in a Bullish macro week -> 'Entered against the macro'.
+# All three enter in a Bullish macro week -> 'Filled against the macro'.
 SW="$TMP/short"; mkdir -p "$SW/run"; cp "$FIX"/run/* "$SW/run/"
 cat > "$SW/run/trades.csv" <<'CSV'
 symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises
@@ -847,5 +853,119 @@ expect_eq "wiring: renderSignals sends yearRestsBullet to rests, never to the le
 expect_eq "wiring: renderSignals returns lead + rests; the findings list takes lead only" "1 1" "$(grep -c 'return { lead: out, rests };' "$S/index.html") $(grep -c '\[\.\.\.sig\.lead, \.\.\.f\]' "$S/index.html")"
 expect_eq "wiring: the rests note is a hidden <details>; the cards are drawn from flagPlan and the all-clear line is wired" "1 1 1" \
   "$(grep -c '<details id="rests" hidden>' "$S/index.html") $(grep -c "flagPlan(FLAGS, t, open" "$S/index.html") $(grep -c "'#flagclear').innerHTML = flagClearLine" "$S/index.html")"
+# #3262 item 1: the macro join reads the screen strictly BEFORE the fill, V23's rule
+# (validator_audit_checks.ml _last_screen_before). Screens dated Fridays, all Bullish but 2020-01-17:
+#   F1 fills Fri 2020-01-17: that day's Bearish screen runs at the close, after the fill -> Bullish (01-10);
+#   F2 fills Fri 2020-01-24: the 01-24 screen (Bullish) is after it -> Bearish (01-17), V23 counts it;
+#   F3 fills Tue 2020-01-21 -> Bearish (01-17); an open position filled Fri 2020-01-17 -> Bullish.
+FR="$TMP/fri"; mkdir -p "$FR"; cp -R "$FIX/run" "$FR/run"
+awk 'BEGIN { split("03 10 17 24 31", jd, " "); printf "("
+  for (i = 1; i <= 5; i++) printf "%s((date 2020-01-%s) (trend %s) (breadth_state Bullish_breadth))\n", (i > 1 ? " " : ""), jd[i], (jd[i] == "17" ? "Bearish" : "Bullish")
+  print " ((date 2020-02-07) (trend Bullish) (breadth_state Bullish_breadth)))" }' > "$FR/run/macro_trend.sexp"
+{ head -1 "$FIX/run/trades.csv"
+  for r in "F1 2020-01-17" "F2 2020-01-24" "F3 2020-01-21"; do set -- $r
+    echo "AAA,LONG,$2,2020-02-05,10,100.00,100.00,10,0.00,0.00,,,laggard_rotation,Stage2,2.5000,0.0400,non_stop_exit,,100,AAA-$1,,,0"; done; } > "$FR/run/trades.csv"
+printf 'symbol,side,entry_date,entry_price,quantity\nBBB,LONG,2020-01-17,25.00,100\n' > "$FR/run/open_positions.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$FR/pack" r0="$FR/run/" >"$FR/log" 2>&1 || rc=$?
+expect_eq "#3262 Friday fill: builds, exit 0" 0 "$rc"
+expect_eq "#3262 Friday fill: macro at entry is the screen strictly before the fill (F1 F2 F3)" "Bullish Bearish Bearish" \
+  "$(jq -r '[.[] | .mE] | join(" ")' "$FR/pack/site/data/r0_trades.json")"
+expect_eq "#3262 Friday fill: the exit week too (exit Wed 2020-02-05 reads the 01-31 screen)" Bullish "$(jq -r '.[0].mX' "$FR/pack/site/data/r0_trades.json")"
+expect_eq "#3262 Friday fill: an open position filled on a screen day reads the screen before it" Bullish "$(jq -r '.rows[0].mE' "$FR/pack/site/data/r0_open.json")"
+if command -v node >/dev/null 2>&1; then
+  FRF="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' "$S/index.html")"
+  frn() { node -e "$FRF
+const T = $(jq -c . "$FR/pack/site/data/r0_trades.json"), F = id => FLAGS.find(f => f.id === id);
+console.log($1)"; }
+  expect_eq "#3262: the against-macro card counts F2 and F3 (V23's longs), not the Friday F1" "AAA-F2 AAA-F3" "$(frn 'T.filter(t => F("macrobear").test(t)).map(t => t.id).join(" ")')"
+  expect_eq "#3262 item 2: the against-macro card says the gate blocks placement, not the fill" "yes yes yes" \
+    "$(frn '[/^Filled against/.test(F("macrobear").label), /placement, not its fill/.test(F("macrobear").why), /entry_ticket_macro_suspend Off/.test(F("macrobear").why)].map(b => b ? "yes" : "no").join(" ")')"
+else
+  echo "SKIP: review_pack #3262 macro card cases need node"
+fi
+# #3262 item 3: a reused ticker. RRR's bars stop 2020-02-28 and resume 2021-06-01 (another listing, > 1 year
+# later); a stale_force_exit dated Tue 2020-03-03 is past the issuer's last bar (xpast 1), so the
+# non-trading-day card leaves it out. SSS's bars resume 2021-02-26 (within a year of 2020-02-28): a gap in one
+# listing, so the same exit stays off a bar (xpast 0) and the card counts it. TTT resumes 2021-03-01, a year
+# and a day later: past.
+RT="$TMP/reused"; mkdir -p "$RT/run" "$RT/data/S/Y"; cp "$FIX"/run/* "$RT/run/"; cp -R "$FIX/data/S/Y/SPY" "$RT/data/S/Y/"
+for r in "RRR 2021-06-01" "SSS 2021-02-26" "TTT 2021-03-01"; do set -- $r
+  dd="$RT/data/$(printf %s "$1" | cut -c1)/$(printf %s "$1" | rev | cut -c1)/$1"; mkdir -p "$dd"
+  { awk -F, 'NR == 1 { print; next } $1 <= "2020-02-28" { printf "%s,10.00,10.50,9.50,10.00,10.00,100000,\n", $1 }' "$FIX/data/A/A/AAA/data.csv"
+    printf '%s,20.00,20.50,19.50,20.00,20.00,100000,\n' "$2"; } > "$dd/data.csv"; done
+{ head -1 "$FIX/run/trades.csv"
+  for s in RRR SSS TTT; do echo "$s,LONG,2020-01-29,2020-03-03,34,10.00,10.00,1000,0.00,0.00,,,stale_force_exit,Stage2,2.5000,0.0800,non_stop_exit,,100,$s-wein-1,,,0"; done; } > "$RT/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$RT/data" --out "$RT/pack" r0="$RT/run/" >"$RT/log" 2>&1 || rc=$?
+expect_eq "#3262 reused ticker: builds, exit 0" 0 "$rc"
+expect_eq "#3262 reused ticker: next bar > 1 year after the last -> past it; within a year -> not (RRR SSS TTT)" "0:1 0:0 0:1" \
+  "$(jq -r '[.[] | "\(.onX):\(.xpast)"] | join(" ")' "$RT/pack/site/data/r0_trades.json")"
+if command -v node >/dev/null 2>&1; then
+  RTF="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' "$S/index.html")"
+  expect_eq "#3262 reused ticker: the non-trading-day card counts only SSS" SSS "$(node -e "$RTF
+const T = $(jq -c . "$RT/pack/site/data/r0_trades.json");
+console.log(T.filter(t => FLAGS.find(f => f.id === 'weekend').test(t)).map(t => t.sym).join(' '))")"
+else
+  echo "SKIP: review_pack #3262 reused-ticker card case needs node"
+fi
+# #3262 item 4: the header stamps the pack code's commit and the snapshot dir (none under --no-container)
+expect_eq "#3262 header: manifest pack_sha is the repo HEAD (or -dirty), snapshot_dir empty with --no-container" "yes " \
+  "$(jq -r --arg h "$(git -C "$ROOT" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)" '"\(if (.pack_sha | startswith($h)) then "yes" else .pack_sha end) \(.snapshot_dir)"' "$S/data/manifest.json")"
+if command -v node >/dev/null 2>&1; then
+  PSF="$(sed -n '/^const packStamp = /p' "$S/index.html")"
+  expect_eq "#3262 header: packStamp names both, and says when no snapshot was read" \
+    "pack abc123def · snapshot /tmp/snap_x|pack unknown · snapshot none (--no-container)" \
+    "$(node -e "$PSF
+console.log([packStamp({ pack_sha: 'abc123def', snapshot_dir: '/tmp/snap_x' }), packStamp({ pack_sha: '', snapshot_dir: '' })].join('|'))")"
+else
+  echo "SKIP: review_pack #3262 header case needs node"
+fi
+expect_eq "#3262 header: the page writes packStamp into the header" 1 "$(grep -c "^  \$('#packstamp').textContent = packStamp(D.man);\$" "$S/index.html")"
+# #3262 (from #3214) AVD 2:1 under a further later split: FFF's shape, but the factor before 2020-03-02 is
+# 1/3 (the 2:1 plus a 3:2 after it), so fac / s = 0.67 sat under the 0.8 band -> still code 2. HHH: a
+# fill at 90 on a factor-1 36-48 bar: halved (45) it sits inside, but no reverse split is behind the factor -> code 0.
+mkdir -p "$TMP/avd2/data/F/F/FFF" "$TMP/avd2/data/H/H/HHH" "$TMP/avd2/data/S/Y" "$TMP/avd2/run"; cp -R "$FIX/data/S/Y/SPY" "$TMP/avd2/data/S/Y/"; cp "$FIX"/run/* "$TMP/avd2/run/"
+awk -F, 'NR == 1 { print; next } { if ($1 < "2020-03-02") printf "%s,40.00,48.00,36.00,40.00,%.4f,100000,\n", $1, 40 / 3; else printf "%s,20.00,24.00,18.00,20.00,13.3333,100000,\n", $1 }' "$FIX/data/A/A/AAA/data.csv" > "$TMP/avd2/data/F/F/FFF/data.csv"
+awk -F, 'NR == 1 { print; next } { printf "%s,40.00,48.00,36.00,40.00,40.00,100000,\n", $1 }' "$FIX/data/A/A/AAA/data.csv" > "$TMP/avd2/data/H/H/HHH/data.csv"
+{ head -1 "$FIX/run/trades.csv"
+  echo "FFF,LONG,2020-01-29,2020-04-01,63,23.50,20.00,1000,-3500.00,-14.89,,,laggard_rotation,Stage2,2.5000,0.0800,non_stop_exit,,100,FFF-wein-1,,,0"
+  echo "HHH,LONG,2020-01-29,2020-04-01,63,90.00,40.00,1000,0.00,0.00,,,laggard_rotation,Stage2,2.5000,0.0800,non_stop_exit,,100,HHH-wein-2,,,0"; } > "$TMP/avd2/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/avd2/data" --out "$TMP/avd2/pack" r0="$TMP/avd2/run/" >"$TMP/avd2.log" 2>&1 || rc=$?
+expect_eq "#3262 AVD under a further split: builds, exit 0" 0 "$rc"
+expect_eq "#3262 AVD under a further split: a 2:1 fill under a 1/3 factor is code 2; 2x a factor-1 bar stays 0" "2 0" \
+  "$(jq -r '[.[] | .inE] | join(" ")' "$TMP/avd2/pack/site/data/r0_trades.json")"
+# #3262 (from #3214) SPY truncation: SPY bars that start after the run's first equity date abort the build
+# with a message naming both dates, instead of charting the run from SPY's first bar.
+mkdir -p "$TMP/spyshort/data/S/Y/SPY"; cp -R "$FIX/data/A" "$TMP/spyshort/data/"
+awk -F, 'NR == 1 || $1 >= "2020-02-03"' "$FIX/data/S/Y/SPY/data.csv" > "$TMP/spyshort/data/S/Y/SPY/data.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$TMP/spyshort/data" --out "$TMP/spyshort/pack" r0="$FIX/run/" >"$TMP/spyshort.log" 2>&1 || rc=$?
+expect_eq "#3262 SPY truncation: SPY starting after the run aborts (exit 2) and names SPY's first bar" "2 1" \
+  "$rc $(grep -c "SPY bars at .* start 2020-02-03, after run r0's first equity date" "$TMP/spyshort.log")"
+# #3262 (from #3214) CROOT: the container path of a worktree under the bind-mounted checkout is the mount
+# plus its path below the mount source, not the mount root; a repo outside the mount source fails.
+. "$ROOT/dev/lib/review_pack/croot.sh"
+expect_eq "#3262 croot_for: the mount root, a worktree under it, and a path outside it" "/w|/w/.claude/worktrees/x|fail" \
+  "$(croot_for /h/repo /h/repo /w)|$(croot_for /h/repo /h/repo/.claude/worktrees/x /w)|$(croot_for /h/repo /h/repo2 /w || echo fail)"
+expect_eq "#3262 CROOT wiring: docker_steps sets CROOT from the mount source; the stage replay gets the data dir; an empty audit warns" "1 1 1" \
+  "$(grep -c '^  CROOT=$(croot_for "$src" "$REPO" "$MOUNT")' "$SCRIPT") $(grep -c 'stages.sh" "$CROOT" .* "$cdata"$' "$SCRIPT") $(grep -c 'WARNING: $l: trade_audit_report.md is missing or empty' "$SCRIPT")"
+expect_eq "#3262 CROOT: no fixed container root is left in the script" 0 "$(grep -c '^CROOT=/workspaces' "$SCRIPT")"
+# #3262 (from #3214) short-side reading: the pick-vs-SPY excess is side-signed (a short beats SPY by f40 + s40)
+if command -v node >/dev/null 2>&1; then
+  PXF="$(sed -n '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' "$S/index.html")"
+  expect_eq "#3262 pickExcess: long f40 - s40, short f40 + s40, null without either" "-3|8|null|null" \
+    "$(node -e "$PXF
+console.log([{ side: 'LONG', f40: 2, s40: 5 }, { side: 'SHORT', f40: 3, s40: 5 }, { side: 'SHORT', f40: null, s40: 5 }, { side: 'LONG', f40: 1 }].map(pickExcess).map(String).join('|'))")"
+else
+  echo "SKIP: review_pack #3262 pickExcess case needs node"
+fi
+expect_eq "#3262 short wording: the picks table reads pickExcess; the reopen table names inverted SPY on a short book" "1 1 1" \
+  "$(grep -c 'ex = median(a.map(pickExcess)' "$S/index.html") $(grep -c "shortBook ? 'SPY 26 wk, inverted'" "$S/index.html") $(grep -c "shortBook ? 'ahead of inverted SPY'" "$S/index.html")"
+expect_eq "#3262 short wording: hard stop, breach lag, grade rubric and agenda name both sides; no long-only phrasing left" "1 1 1 1 0" \
+  "$(grep -c 'for a short, the high reaches entry × (1 + X)' "$S/index.html") $(grep -c 'its low for a long, its high for a short' "$S/index.html") $(grep -c 'rose for a long, fell for a short' "$S/index.html") $(grep -c 'a Stage 4 breakdown for a short' "$S/index.html") $(grep -c 'X% below entry\|whose low reached\|then the stock rose ≥ 15%' "$S/index.html")"
+expect_eq "#3262 stage cards: both replay cards say the replay classifier is a second opinion vs the audited reading" 2 \
+  "$(sed -n '/^const FLAGS = \[/,/^\];/p' "$S/index.html" | grep -c 'replay classifier (stage_chart: the default stage config on adjusted weekly closes).*R1/R3')"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

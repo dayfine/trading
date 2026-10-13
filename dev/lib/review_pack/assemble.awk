@@ -13,7 +13,9 @@ FILENAME == ARGV[3] { split($0, a, "\t"); au[a[1] "|" a[2]] = $0; next }
 FILENAME == ARGV[4] { split($0, a, "\t"); nm++; md[nm] = a[1]; mtr[nm] = a[2]; mbr[nm] = a[3]; next }
 FILENAME == ARGV[5] { split($0, a, "\t"); st[a[1]] = $0; next }
 FILENAME == ARGV[6] { split($0, a, "\t"); sfk[a[1]] = a[2]; next }
-function macro_at(d,   i, r) { r = 0; for (i = 1; i <= nm && md[i] <= d; i++) r = i; return r }
+# the last screen strictly before d (#3262): a screen runs at its day's close, so a fill on a screen
+# day (a Friday) has not seen it yet. V23's rule (validator_audit_checks.ml _last_screen_before).
+function macro_at(d,   i, r) { r = 0; for (i = 1; i <= nm && md[i] < d; i++) r = i; return r }
 END {
   printf "["
   for (t = 1; t <= nt; t++) {
