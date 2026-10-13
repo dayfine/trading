@@ -222,10 +222,10 @@ type dependencies = {
           exit (short cover, long reduce, buy-in) for the same position keeps
           the stop: it trades intraday, before the close-time maintenance check.
           [false] keeps the #1266 precedence (margin wins), bit-identical to the
-          pre-flag simulator (R1). Built by {!create_deps} as
-          [sim_stop_exit_fill_on_trigger_bar &&
-           sim_stop_fill_beats_margin_cover], so it is inert unless same-bar
-          stop fills are armed. Semantics: {!Margin_runner.tick}. *)
+          pre-flag simulator (R1). Built by {!create_deps} from
+          [?sim_stop_fill_beats_margin_cover]. Inert unless
+          [stop_exit_fill_on_trigger_bar] is also [true]: the step passes their
+          conjunction to {!Margin_runner.tick}, which has the semantics. *)
   entry_fill_retry : Entry_fill_retry.t;
       (** G2a retry budget + ledger ([dev/plans/ticket-funding-2026-08-16.md]
           §G2a): how many further attempts a triggered entry ticket gets after
