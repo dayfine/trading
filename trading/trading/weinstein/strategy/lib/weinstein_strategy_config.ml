@@ -1,5 +1,4 @@
 open Core
-
 include Weinstein_strategy_config_defaults
 
 type index_config = { primary : string; global : (string * string) list }
