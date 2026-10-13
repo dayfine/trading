@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-13",
+  "feature": "harness-report-conjuncts-slice2",
+  "branch": "harness/report-conjuncts-slice2",
+  "sha": "16ef56c412f01020ea13c59f3ab6fde07629c2be",
+  "recorded_at_ns": 1791910912819635690,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
