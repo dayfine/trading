@@ -19,9 +19,9 @@
 #   --max-seconds N   same, in seconds (overrides --max-minutes)
 #   --interval S      seconds between checks (default 30)
 #
-# Exit: 0 the condition holds; 2 timed out; 1 usage error. Every exit path
-# prints one line with the UTC wall-clock time and the elapsed seconds, so a
-# resumed session can tell "fired late" from "never fired".
+# Exit: 0 the condition holds; 2 timed out; 1 usage error. Every fired or
+# timed-out exit prints one line with the UTC wall-clock time and the elapsed
+# seconds, so a resumed session can tell "fired late" from "never fired".
 #
 # `proc` ignores zombie (Z) processes: a docker exec killed at its time limit
 # leaves defunct dune entries that `pgrep -x dune` still matches (#2738,
@@ -91,7 +91,10 @@ _cond_reviews() {
 
 # Live (non-zombie) processes whose args match the ERE; fires when none is left.
 _cond_proc() {
-  live=$($PS_CMD 2>/dev/null | awk '$1 !~ /^Z/' | grep -E -- "$1" |
+  # Snapshot first: a filter in the same pipeline as `ps` is itself a live
+  # process whose args hold the pattern, so it would always match.
+  snap=$($PS_CMD 2>/dev/null) || true
+  live=$(printf '%s\n' "$snap" | awk '$1 !~ /^Z/' | grep -E -- "$1" |
     grep -v 'wait_for' || true)
   [ -z "$live" ]
 }

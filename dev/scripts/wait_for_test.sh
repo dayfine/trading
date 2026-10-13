@@ -82,6 +82,19 @@ _run "proc ignores zombies" 0 "fired" $T proc 'dune'
 printf 'Ss bash\nRl dune build @runtest\n' >"$TMP/ps"
 _run "proc waits on a live match" 2 "timeout" $T proc 'dune'
 
+# proc through the REAL default `ps` (no WAIT_FOR_PS stub): a pattern that
+# matches its own text and no live process must fire. A filter running in the
+# same pipeline as `ps` would see its own args and never fire (#3300 QC).
+out=$(unset WAIT_FOR_PS; sh "$WAIT_FOR" --max-seconds 3 --interval 1 \
+  proc 'zzqqnotaprocess' 2>&1)
+got=$?
+if [ "$got" -ne 0 ] || ! printf '%s' "$out" | grep -q -- "fired"; then
+  echo "FAIL: wait_for_test -- proc with the real ps fires on an absent" \
+    "pattern: want exit 0 + 'fired', got $got"
+  echo "  output: $out"
+  failures=$((failures + 1))
+fi
+
 # usage
 _run "unknown condition is a usage error" 1 "usage" $T bogus
 _run "non-numeric PR is a usage error" 1 "usage" $T checks abc

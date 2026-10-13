@@ -17,9 +17,9 @@ costs 2.3× one at 150k.
    | a chain cell / lane | `sh dev/scripts/wait_for.sh --max-minutes 240 log <chain.log> '^RESULT <tag>'` |
    | CI on a PR | `sh dev/scripts/wait_for.sh --max-minutes 60 checks <PR>` |
    | a QC review to post | `sh dev/scripts/wait_for.sh --max-minutes 60 reviews <PR> <count>` |
-   | dune in the container | `WAIT_FOR_PS='docker exec trading-1-dev ps -eo stat=,args=' sh dev/scripts/wait_for.sh proc 'dune (build\|runtest)'` |
+   | dune in the container | the `proc` command under "Dune lock" below |
 
-   It exits 0 when the condition holds and 2 on timeout. Every exit prints the UTC time and the elapsed
+   It exits 0 when the condition holds and 2 on timeout. Every fired or timed-out exit prints the UTC time and the elapsed
    seconds. A `checks` exit says only that every check run registered on the PR head has completed: read
    `fail=` in its line before acting. The PR conditions use `gh api` (REST), so they also work in Claude
    cloud sessions, where `gh pr checks` and `gh pr view` (GraphQL) are refused.
@@ -45,7 +45,8 @@ costs 2.3× one at 150k.
   `pgrep -x dune` keeps matching after dune has exited. `wait_for.sh proc` ignores `Z` state.
 - **Dune lock.** A backgrounded build that outlives its tool call still holds the dune lock, and the next
   foreground `dune` aborts with "Another Dune instance is currently running". Wait on
-  `proc 'dune (build|runtest)'` before starting the next build.
+  `proc 'dune (build|runtest)'` before starting the next build:
+  `WAIT_FOR_PS='docker exec trading-1-dev ps -eo stat=,args=' sh dev/scripts/wait_for.sh proc 'dune (build|runtest)'`.
 
 ## Related
 
