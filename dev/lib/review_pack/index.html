@@ -117,7 +117,7 @@ ol.agenda li b { font-weight: 600; }
   <div class="top-inner">
     <div class="titlerow">
       <h1 id="title">Backtest Review</h1>
-      <span class="sub"><span id="subtitle"></span> · run <code id="codever"></code></span>
+      <span class="sub"><span id="subtitle"></span> · run <code id="codever"></code> · <span id="packstamp"></span></span>
     </div>
     <nav class="tabs" role="tablist" id="tabs">
       <button role="tab" data-v="overview" aria-selected="true">Overview</button>
@@ -247,7 +247,7 @@ ol.agenda li b { font-weight: 600; }
   </div>
   <div class="panel">
     <h2>Were the picks bad, or the exits? By entry year</h2>
-    <p class="note"><b>Pick, 8 wk</b> is the stock’s own return from the entry fill to the close 40 trading days later, whatever our stop did; <b>SPY, 8 wk</b> is the index over the same days. A pick year near SPY with a low win rate and many D/F grades lost on exits, not on selection. Medians, so one monster does not dominate.</p>
+    <p class="note"><b>Pick, 8 wk</b> is the stock’s own move from the entry fill to the close 40 trading days later, whatever our stop did, signed so + is in the trade’s favour (a short gains when the stock falls); <b>SPY, 8 wk</b> is the index over the same days, unsigned. <b>Pick vs SPY</b> is the pick less SPY for a long and the pick plus SPY for a short (a short beats the index when it falls further). A pick year near SPY with a low win rate and many D/F grades lost on exits, not on selection. Medians, so one monster does not dominate.</p>
     <div class="tablebox"><table id="d-picks"></table></div>
   </div>
   <div class="panel">
@@ -258,13 +258,13 @@ ol.agenda li b { font-weight: 600; }
   </div>
   <div class="grid2">
     <div class="panel">
-      <h2>Loss cutting: a hard stop at X% below entry</h2>
-      <p class="note">Replays each trade on its daily bars from the day after entry to the day before the actual exit. If the low reaches entry × (1 − X), the trade exits there (or at the open, if it opened below). Otherwise the actual result stands. Static: freed cash is not redeployed, and nothing can hold longer than it did.</p>
+      <h2>Loss cutting: a hard stop X% against the entry</h2>
+      <p class="note">Replays each trade on its daily bars from the day after entry to the day before the actual exit. If the low reaches entry × (1 − X) (for a short, the high reaches entry × (1 + X)), the trade exits there (or at the open, if it opened through the level). Otherwise the actual result stands. Static: freed cash is not redeployed, and nothing can hold longer than it did.</p>
       <div class="tablebox"><table id="d-cut"></table></div>
     </div>
     <div class="panel">
       <h2>When do stop exits fill?</h2>
-      <p class="note">Stop exits with no stop raise: trading days from the first bar whose low reached the initial stop to the exit fill. The book’s stop is a resting order that fills the day the level trades (<code>weinstein-book-reference.md</code> §5.7). <b>At stop</b> is what an intraday fill would have realised: the stop, or that day’s open if it opened below.</p>
+      <p class="note">Stop exits with no stop raise: trading days from the first bar that reached the initial stop (its low for a long, its high for a short) to the exit fill. The book’s stop is a resting order that fills the day the level trades (<code>weinstein-book-reference.md</code> §5.7). <b>At stop</b> is what an intraday fill would have realised: the stop, or that day’s open if it opened through it.</p>
       <div id="d-lag"></div>
     </div>
   </div>
@@ -296,7 +296,7 @@ ol.agenda li b { font-weight: 600; }
   <div class="panel">
     <h2>How the grades and flags are computed</h2>
     <div class="note" style="display:grid;gap:8px">
-      <p style="margin:0"><b>Grade (A–F, performance).</b> Taken from the 2026-09-04 yearly review rubric (<code>dev/experiments/yearly-trade-review-2026-09-04/grade.sh</code>), using the 65 trading days after the exit. A: gain ≥ 20%, or any gain with the stock no more than 10% higher afterwards. B: gain under 20%, or a loss where the stock fell another 5% after the exit. C: loss with no big move afterwards. D: loss, then the stock rose ≥ 15%. F: loss, then it rose ≥ 50%. X: exit price under 5% of entry (a delisting stub). A trailing “?” means no bars after the exit.</p>
+      <p style="margin:0"><b>Grade (A–F, performance).</b> Taken from the 2026-09-04 yearly review rubric (<code>dev/experiments/yearly-trade-review-2026-09-04/grade.sh</code>), using the 65 trading days after the exit. A: gain ≥ 20%, or any gain with the stock no more than 10% further the trade’s way afterwards. B: gain under 20%, or a loss where the stock moved another 5% against the trade after the exit. C: loss with no big move afterwards. D: loss, then the stock moved ≥ 15% the trade’s way (rose for a long, fell for a short). F: loss, then ≥ 50% the trade’s way. X: a long’s exit price under 5% of entry (a delisting stub). A trailing “?” means no bars after the exit.</p>
       <p style="margin:0"><b>Audit grade.</b> The trade audit report's own grade scores the entry setup (stage, RS, volume). Nearly every trade scores A+, so it does not separate good trades from bad ones.</p>
       <p style="margin:0"><b>Stage replay.</b> Weekly stages on the charts and the Stage-4 checks come from <code>stage_chart</code> with the default classifier on adjusted closes. That can differ from the strategy's own reading on a given week.</p>
       <p style="margin:0"><b>Prices.</b> Charts use split-adjusted prices; fill and stop levels are rescaled by each bar's adjusted/raw ratio so they sit on the same scale. Execution checks use the raw bar, with half a percent of slack for rounding; a fill that sits a simple split ratio (2:1, 3:2, 4:3 …) away from the raw bar is on a later split basis, not off the bar, and is not flagged.</p>
@@ -333,6 +333,9 @@ const stopSlip = t => t.xs > 0 ? sideSgn(t) * (t.xs - t.xp) / t.xs : null;
 // the initial stop distance: a long's decision-time distance (trades.csv stop_initial_distance_pct);
 // a short's is measured from its base-top suggested entry, so it is read from the installed stop vs the fill
 const stopDist = t => isShort(t) ? t.isd : t.sid;
+// the 8-week pick return in excess of SPY, side-signed (#3262, from #3214): f40 is already signed so + is in
+// the trade's favour, so a short beats SPY by f40 + s40 (a long by f40 - s40); null without either
+const pickExcess = t => t.f40 == null || t.s40 == null ? null : t.f40 - sideSgn(t) * t.s40;
 // the fallback stop is the audit's stop_floor_kind Buffer_fallback, for either side (#3177): a 4 % distance
 // is not a test (a structural floor can land on exactly 4 %: GBX 2024-11-04; a short's distance is measured
 // from its base-top suggested entry). Without the trade audit it is unknown: the card reads n/a.
@@ -368,8 +371,8 @@ const FLAGS = [
     why: 'Exit not chosen by the strategy’s rules. A margin call buys a short back when its loss passes the margin limit.' },
   { id: 'macro', cat: 'book', needs: 'mE', open: true, label: 'Macro not with the side at entry', test: t => t.mE && t.mE !== withMacro(t),
     why: 'Book Ch. 3/8: weight buying to a bullish market and shorting to a bearish one. A long entered when the macro was not Bullish, a short when it was not Bearish. The run allows Neutral-market buys (audit R8).' },
-  { id: 'macrobear', cat: 'book', needs: 'mE', open: true, zero: true, label: 'Entered against the macro', test: t => t.mE === againstMacro(t),
-    why: 'A long bought in a Bearish macro week or a short sold in a Bullish one: the macro gate should block both (spine rule 6).' },
+  { id: 'macrobear', cat: 'book', needs: 'mE', open: true, zero: true, label: 'Filled against the macro (screen before the fill)', test: t => t.mE === againstMacro(t),
+    why: 'A long filled when the last macro screen before the fill read Bearish, or a short when it read Bullish (V23’s rule: a Friday fill has not seen that day’s screen). The gate (spine rule 6) blocks the ticket’s placement, not its fill: with entry_ticket_macro_suspend Off (the default) a ticket placed in a with-macro week keeps resting and can fill after the screen turns. Compare V23 for longs.' },
   { id: 'lowvol', cat: 'book', needs: 'fvr', label: 'Long fill-week volume under 2× average', test: t => !isShort(t) && t.fvr != null && t.fvr < 2,
     why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3). Read on the week the order FILLED (its volume vs the 4 weeks before), not the screen week trades.csv records. Shorts are left out: a breakdown does not need volume (reference Ch. 2, Stage 4 detail).' },
   { id: 'fallback', cat: 'book', needs: 'sfk', label: '4% fallback stop, not below the base', test: isFallback,
@@ -377,9 +380,9 @@ const FLAGS = [
   { id: 'widestop', cat: 'book', label: 'Initial stop wider than 15%', test: t => stopDist(t) > 0.15,
     why: 'Structural stop far from the entry; the validator’s V12 gate is 15%. A short’s distance is its installed stop vs the entry fill.' },
   { id: 'stage4', cat: 'book', needs: 'holdW', label: 'Held ≥ 2 weeks in the wrong stage (replay)', test: t => (isShort(t) ? t.s2w || 0 : t.s4w || 0) >= 2,
-    why: 'Book Ch. 2/6: never ride a Stage 4 decline (spine rule 4). For a short, the wrong stage is Stage 2.' },
+    why: 'Book Ch. 2/6: never ride a Stage 4 decline (spine rule 4); for a short the wrong stage is Stage 2. Read by the replay classifier (stage_chart: the default stage config on adjusted weekly closes), not by the strategy, whose own reading the audit checks at each decision (R1/R3). A hit is a disagreement to trace on the trade’s chart, not a rule break by itself.' },
   { id: 'notS2', cat: 'book', needs: 'rsE', label: 'Replay stage at entry is not the side’s stage', test: t => t.rsE && t.rsE !== ownStage(t),
-    why: 'The chart classifier disagrees with the strategy’s call on the entry week: Stage 2 for a long, Stage 4 for a short.' },
+    why: 'The replay classifier (stage_chart: the default stage config on adjusted weekly closes) disagrees with the strategy’s call on the entry week, Stage 2 for a long and Stage 4 for a short (spine rule 2). The strategy’s own reading is audited at decision time (R1/R3); a hit is a disagreement to trace on the chart, not by itself a buy outside Stage 2.' },
   { id: 'whipsaw', cat: 'outcome', label: 'Loss, then the stock ran ≥ 15% the trade’s way', test: t => /^[DF]/.test(t.g || ''),
     why: 'Grade D or F: stopped out, then within 13 weeks the stock rose at least 15% (a long) or fell at least 15% (a short).' },
   { id: 'giveback', cat: 'outcome', label: 'Gave back over half of a ≥ 20% gain', test: t => t.mfe >= 20 && t.pct < t.mfe * 0.5,
@@ -491,11 +494,14 @@ function labelRunKind() {
   $('#v-salts p.note').textContent = 'These runs are arms: different configs, not salts of one. Their differences are the levers’ effect plus path noise, not path noise alone.';
   $('#s-years').closest('.panel').querySelector('h2').textContent = 'Yearly return by arm';
 }
+// the header stamp (#3262): which pack code built the page, and which snapshot dir the audit read
+const packStamp = m => `pack ${m.pack_sha || 'unknown'} · snapshot ${m.snapshot_dir || 'none (--no-container)'}`;
 const runLabel = i => D.man.runs[i].label || D.man.runs[i].id;
 const CH = () => D.man.charts_run || 0;
 function init() {
   $('#title').textContent = D.man.title; document.title = D.man.title; $('#subtitle').textContent = D.man.subtitle || '';
   $('#codever').textContent = (D.meta[CH()].code_version || '').slice(0, 9);
+  $('#packstamp').textContent = packStamp(D.man);
   const opts = (note) => D.man.runs.map((r, i) => `<option value="${i}">${runLabel(i)} (${pct(D.meta[i].metrics.totalreturnpct, 0)})${note && i !== CH() ? ' · no charts' : ''}</option>`).join('');
   $('#p-salt').innerHTML = opts(false); $('#t-salt').innerHTML = opts(true); $('#t-salt').value = String(CH());
   $('#flags-title').textContent = `Per-trade flags, ${runLabel(CH())}`;
@@ -706,7 +712,7 @@ function v16Count(validator) {
 // for every run when there is more than one. Pure, for the test.
 function marginChurnLine(c, v16, runs) {
   if (!c.fires) return '';
-  return `<b>Margin-call churn under $${MARGIN_CHURN_PRICE}:</b> ${c.low} of ${c.calls} margin calls bought back shorts entered under $${MARGIN_CHURN_PRICE}, on ${c.syms} ${c.syms === 1 ? 'symbol' : 'symbols'} (${c.repeat} called more than once), for ${usdk(c.pnl)}${v16 != null ? `; V16 counts ${v16} fallback exits in all` : ''}.${runs && runs.length > 1 ? ` By run: ${runs.map(([l, n]) => `${l} ${n}`).join(', ')}.` : ''} A cheap short moves furthest per dollar of margin, so a small rally forces the buy-back: read the short leg's price floor before its P&amp;L.`;
+  return `<b>Margin-call churn under $${MARGIN_CHURN_PRICE}:</b> ${c.low} of ${c.calls} margin calls bought back shorts entered under $${MARGIN_CHURN_PRICE}, on ${c.syms} ${c.syms === 1 ? 'symbol' : 'symbols'} (${c.repeat} called more than once), for ${usdk(c.pnl)}${v16 != null ? `; V16 counts ${v16} fallback ${v16 === 1 ? 'exit' : 'exits'} in all` : ''}.${runs && runs.length > 1 ? ` By run: ${runs.map(([l, n]) => `${l} ${n}`).join(', ')}.` : ''} A cheap short moves furthest per dollar of margin, so a small rally forces the buy-back: read the short leg's price floor before its P&amp;L.`;
 }
 // Give-back after the NAV peak (#3194): open gains held at the NAV peak and given back before the window
 // ends. Open gain at the peak = NAV at the peak minus start NAV minus the P&L of trades closed by then (an
@@ -785,8 +791,8 @@ function renderSignals(nav, spy) {
   const shortBook = tr.length > 0 && tr.every(isShort), eps = reopenEpisodes(D.macro, nav, spy, tr, shortBook ? -1 : 1), ep = e => `${e.d.slice(0, 7)} (${e.e13} ${e.e13 === 1 ? 'entry' : 'entries'} in 13 wk, ${pct(e.ret, 1)} vs SPY ${pct(e.spy, 1)})`;
   const groups = [['sat out', 'Sat out the recovery'], ['invested and lagged', 'Invested and lagged'], ['lagged', 'Lagged']].map(([k, label]) => [label, eps.filter(e => e.flag === k)]).filter(([, l]) => l.length);
   if (eps.length) out.push(`<b>Gate reopen episodes:</b> ${eps.length} ${eps.length === 1 ? 'reopen' : 'reopens'} after ${REOPEN_CLOSED_WEEKS}+ closed weeks${shortBook ? ' (short-only book: the gate reopens on Bearish and SPY is read inverted)' : ''}. ${groups.length ? groups.map(([label, l]) => `${label}: ${l.map(ep).join('; ')}.`).join(' ') : `None was followed by a ${REOPEN_GAP_PP} pp lag behind a SPY rise of ${REOPEN_SPY_MIN} % or more.`}`);
-  $('#reopens').innerHTML = eps.length ? tbl([['Reopen'], ['Closed weeks', 1], ['Entries 13 / 26 wk', 1], ['Strategy 26 wk', 1], ['SPY 26 wk', 1], ['Read']],
-    eps.map(e => `<tr><td>${e.d}</td><td class="num">${e.closed}</td><td class="num">${e.e13} / ${e.e26}</td><td class="num"><span class="${sgn(e.ret - e.spy)}">${pct(e.ret, 1)}</span></td><td class="num">${pct(e.spy, 1)}</td><td>${e.flag || (e.ret >= e.spy ? 'ahead of SPY' : '–')}</td></tr>`))
+  $('#reopens').innerHTML = eps.length ? tbl([['Reopen'], ['Closed weeks', 1], ['Entries 13 / 26 wk', 1], ['Strategy 26 wk', 1], [shortBook ? 'SPY 26 wk, inverted' : 'SPY 26 wk', 1], ['Read']],
+    eps.map(e => `<tr><td>${e.d}</td><td class="num">${e.closed}</td><td class="num">${e.e13} / ${e.e26}</td><td class="num"><span class="${sgn(e.ret - e.spy)}">${pct(e.ret, 1)}</span></td><td class="num">${pct(e.spy, 1)}</td><td>${e.flag || (e.ret >= e.spy ? (shortBook ? 'ahead of inverted SPY' : 'ahead of SPY') : '–')}</td></tr>`))
     : '<tbody><tr><td>No reopen after 8+ closed weeks inside this window.</td></tr></tbody>';
   // the short leg: on or off, tickets, fills and the binding gate (see shortLegLine)
   const sl = shortLegLine(D.meta[CH()].short_leg);
@@ -853,7 +859,7 @@ function renderOverview() {
     fallbackFinding(t),
     `<b>${gap.length} of ${stops.length} stop exits filled more than 0.5% beyond the stop; ${late.length} sold at an open after the day the stop traded.</b> ${df.length} losers (grade D/F) then moved ≥ 15% the trade’s way within 13 weeks; they lost ${usdk(df.reduce((a, x) => a + x.pnl, 0))}.`,
     `<b>Average invested: ${fmt(expoAvg, 0)}% of NAV,</b> about ${fmt(ys.reduce((a, y) => a + y.pos, 0) / ys.length, 1)} positions on average.`,
-    `<b>${wk.length} trades have a fill dated on a day with no bar</b> (the Saturday-fill defect). The validator also counts ${(inv.validator.find(v => v.id === 'V13') || {}).status || '?'} on V13.`,
+    `<b>${wk.length} ${wk.length === 1 ? 'trade has' : 'trades have'} a fill dated on a day with no bar</b> (the Saturday-fill defect). The validator also counts ${(inv.validator.find(v => v.id === 'V13') || {}).status || '?'} on V13.`,
     rets.length > 1 && (RK() === 'salt' ? `<b>Salt spread: the same rules returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} salts.` : `<b>The ${rets.length} arms returned ${rets.map(r => pct(r, 0)).join(', ')}</b> (different configs, not salts of one).`),
   ].filter(Boolean);
   // the signals lead: era bullets come before the run-level counts; one-trade and salt years sit in a collapsed note (#3214)
@@ -1091,8 +1097,8 @@ function renderDiag() {
   const t = D.trades[CH()], fwd = spyFwd(); t.forEach(x => { if (x.s40 === undefined) x.s40 = fwd(x.ed, 40); });
   const yrs = [...new Set(t.map(x => x.yr))].sort();
   const ydf = y => t.filter(x => x.yr === y);
-  $('#d-picks').innerHTML = tbl([['Entry year'], ['Trades', 1], ['Win rate', 1], ['Pick, 8 wk', 1], ['SPY, 8 wk', 1], ['Pick − SPY', 1], ['Picks up at 8 wk', 1], ['D/F grades', 1], ['4% fallback stop', 1], ['Net', 1]],
-    yrs.map(y => { const a = ydf(y), p = median(a.map(x => x.f40)), s = median(a.map(x => x.s40)), ex = median(a.filter(x => x.f40 != null && x.s40 != null).map(x => x.f40 - x.s40)), net = a.reduce((q, x) => q + x.pnl, 0);
+  $('#d-picks').innerHTML = tbl([['Entry year'], ['Trades', 1], ['Win rate', 1], ['Pick, 8 wk', 1], ['SPY, 8 wk', 1], ['Pick vs SPY (side-signed)', 1], ['Picks in their favour at 8 wk', 1], ['D/F grades', 1], ['4% fallback stop', 1], ['Net', 1]],
+    yrs.map(y => { const a = ydf(y), p = median(a.map(x => x.f40)), s = median(a.map(x => x.s40)), ex = median(a.map(pickExcess).filter(v => v != null)), net = a.reduce((q, x) => q + x.pnl, 0);
       return `<tr><td><b>${y}</b></td>${tdn(a.length)}${tdn(share(a, x => x.pnl > 0))}${tdp(p)}${tdp(s)}${tdp(ex)}${tdn(share(a.filter(x => x.f40 != null), x => x.f40 > 0))}${tdn(share(a, x => /^[DF]/.test(x.g || '')))}${tdn(fallbackShare(t, a))}${tdu(net)}</tr>`; }));
   const LV = [3, 5, 6, 8, 10, 15], base = t.filter(x => x.cf && x.pct), act = base.reduce((q, x) => q + x.pnl, 0);
   $('#d-cut').innerHTML = tbl([['Hard stop'], ['Static P&L', 1], ['vs actual', 1], ['Trades cut earlier', 1], ['…of them winners', 1]],
@@ -1191,7 +1197,7 @@ function renderAgenda() {
     ['Start with the equity curve against the macro strip', 'overview', `Where does the strategy lag SPY, and does the gate explain it? The five years furthest behind SPY: ${lag.join(', ')}.`],
     ['Walk the yearly table', 'periods', 'Compare invested %, trade count and realised P&L in the years that lagged. Switch to quarterly for the worst stretch.'],
     ['Read the diagnostics', 'diag', 'Flat stretches against SPY; pick quality against exit quality by year; what a tighter stop would have done; when stop exits fill; whether D/F trades are visible at entry.'],
-    ['Open the biggest winners', 'hilo', 'Check that each one is a textbook Stage 2 breakout: base, volume, stop under the base, trailing stop that let it run.'],
+    ['Open the biggest winners', 'hilo', 'Check that each one is a textbook Stage 2 breakout (a Stage 4 breakdown for a short): base, volume, stop beyond the base, trailing stop that let it run.'],
     ['Open the biggest losers and whipsaws', 'hilo', 'Was the stop structural or the 4% fallback? Did the stock recover right after?'],
     ['Go through the execution flags', 'surprises', 'Weekend-dated fills, fills outside the day’s range, stops sold a day late. Decide which are simulator defects and which are real market behaviour.'],
     ['Go through the book flags', 'surprises', 'Neutral-macro entries, low breakout volume, fallback stops, Stage 4 holds. Decide which deviations are deliberate dials and which are bugs.'],

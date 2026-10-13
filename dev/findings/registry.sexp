@@ -325,6 +325,14 @@
                 "gap_warnings: one documented line per wide hole"))))
  (status fixed))
 
+((issue 2672) (ref "record-rebase 26y trades: STMP 2021 / CLE 2014 stop fills at stub prints")
+ (finding "a delisted symbol's post-delisting stub prints (STMP $327.75 -> $0.04) filled stops at ~$0 and resting entry tickets could fill past the delisting marker")
+ (guard ((unit ("trading/analysis/weinstein/snapshot_pipeline/test/test_series_tail.ml"
+                "stmp_stub_tail_truncated"))
+         (unit ("trading/trading/simulation/test/test_delisted_ticket_cancel_sim.ml"
+                "with a marker the ticket never fills"))))
+ (status fixed))
+
 ((issue 3266) (ref "index-hedge screen #3265 §9 defect 2: SPY 2001-12-31 / 2002-01-04 two weekly bars")
  (finding "week_bucketing keyed weeks on week_number plus the calendar year, so a week crossing 1 January became two weekly bars")
  (guard ((unit ("trading/analysis/technical/indicators/time_period/test/test_week_bucketing.ml"

@@ -37,6 +37,12 @@ function week_of(d,   y, m, dd) {
   return int((365 * y + int(y / 4) - int(y / 100) + int(y / 400) + int((153 * (m - 3) + 2) / 5) + dd + 1) / 7)
 }
 function emit_day(line) { if (out_dy != "") print line >> out_dy }
+# the same calendar day a year on (YYYY-MM-DD strings compare as dates)
+function year_on(d) { return sprintf("%04d%s", substr(d, 1, 4) + 1, substr(d, 5)) }
+# 1 when the bar's adjustment factor fac carries a later split of ratio s (fill / bar). A forward split (s < 1) needs
+# fac / s under SPLIT_FAC_HI only: dividends and any FURTHER later split pull fac lower still (#3262: AVD's
+# 2005 2:1 read fac / s under the 0.8 band, likely from a further split after it). A reverse split (s > 1) keeps the band.
+function carries(fac, s) { return fac / s < SPLIT_FAC_HI && (s < 1 || fac / s > SPLIT_FAC_LO) }
 # 1 = fill inside the bar's range; 2 = outside, but a simple split ratio
 # (k/q, q <= 5) away from the bar -> the fill is on a later split basis;
 # 0 = genuinely outside the range. Sets SNAP to the ratio (1 unless 2).
@@ -53,7 +59,7 @@ function in_range(p, lo, hi, fac,   r, q, k, s) {
     if (k != q && r > (k / q) * 0.98 && r < (k / q) * 1.02) { SNAP = k / q; return 2 }
   for (q = 1; q <= 5; q++) for (k = 1; k <= 10; k++) {
     s = k / q
-    if (k != q && fac / s > SPLIT_FAC_LO && fac / s < SPLIT_FAC_HI && p / s >= lo * (1 - TOL) && p / s <= hi * (1 + TOL)) { SNAP = s; return 2 }
+    if (k != q && carries(fac, s) && p / s >= lo * (1 - TOL) && p / s <= hi * (1 + TOL)) { SNAP = s; return 2 }
   }
   return 0
 }
@@ -77,6 +83,7 @@ function hard_stop(o, l, h, lvl,   p) {
   if (d <= xd) { fx = f; ax = a; xbar = d; xl = $cl + 0; xh = $ch + 0 }
   if (d == ed) on_e = 1
   if (d == xd) on_x = 1
+  if (d > xd && nxt == "") nxt = d   # the first bar after the exit date
   if (d > ed && !flushed) { flushed = 1; for (i = (nr > PRE_BARS ? nr - PRE_BARS : 0); i < nr; i++) emit_day(ring[i % PRE_BARS]) }
   if (d > ed && (d <= xd || nx < POST_BARS)) { emit_day(day); if (d > xd) nx++ }
   # hold window path (adjusted), MFE/MAE vs the entry bar's adjusted close
@@ -131,7 +138,9 @@ END {
   # is the week the candidate was screened, not the week it filled); null with under 2 prior weeks
   nw = 0; pv = 0; pn = 0; for (i = 1; i <= 4; i++) if ((ewk - i) in wv) { nw++; pv += wv[ewk - i]; pn += wn[ewk - i] }
   fvr = (cv && nw >= 2 && pv > 0) ? sprintf("%.2f", (wv[ewk] / wn[ewk]) / (pv / pn)) : "null"
-  xpast = (xd > lastd) ? 1 : 0   # the exit is dated after the symbol's last bar (a delisting stamp)
+  # the exit is dated after the issuer's last bar (a delisting stamp): after the symbol's last bar, or off a
+  # bar with the next bar over a year later, i.e. a reused ticker's next listing (#3262: NLC 2011 vs 2013)
+  xpast = (xd > lastd || (!on_x && nxt > year_on(xbar))) ? 1 : 0
   # pid fe fx mfe mae post_max post_min post13 grade on_e on_x in_e in_x entry_vs_prevclose ebar xbar post_bars
   #   fwd40 breach_lag hardstop_cf entry_adj exit_adj isd fill_week_vol_ratio exit_past_last_bar
   #   (entry/exit_adj: fills on the chart's adjusted basis)

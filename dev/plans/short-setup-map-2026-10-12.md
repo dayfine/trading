@@ -61,6 +61,16 @@ So we have not yet measured the book's short setup. This screen maps it before a
 | RS (Mansfield, 52-week, vs SPY) | negative and falling / positive but falling ("topped") / rising (the book: never short) |
 | group (sector from `data/sectors.csv`) | the sector's median 26-week return among that year's list members, minus SPY's: < 0 (weak) / ≥ 0 |
 | stop room (entry to the O2 stop) | ≤ 15 % / 15–30 % / > 30 % |
+| dividend yield (amendment 1) | trailing-12-month sum of `unadjusted_amount` ex-dates up to the breakdown week, over the breakdown week's raw close: none / < 2 % / 2–5 % / > 5 % |
+| large dividend in the hold (amendment 1) | a single ex-date between E1 entry and +120 bars whose `unadjusted_amount` is ≥ 3 % of the prior raw close: yes / no |
+
+**Amendment 1 (2026-10-12, before any event or outcome was computed).** The user asked whether to avoid shorting
+dividend payers altogether, after the AD 2025-08-20 $23 special (#3174). The two dividend rows above are descriptive
+splits only. They do not join the primary cells and cannot trigger a build; like every other split, a dividend cell
+can only propose its own pre-registration, at the ≥ 58 % beat-rate bar. O1 already charges the short the dividends it
+owes, because it uses adjusted closes. The book's short-selling chapters do not discuss dividends.
+Source: per-symbol `data/<A>/<B>/<SYM>/dividends.csv` (`ex_date, unadjusted_amount, adjusted_amount`); a symbol with
+no file counts as "none".
 
 ## Decision rule (fixed before any number is seen)
 

@@ -76,8 +76,13 @@
 #   regardless of what's on PATH (see pr_gate_status_test.sh's e2e probes).
 #
 # OUTPUT: one row per PR --
-#   PR  CI  STRUCT  BEHAV  NEXT-ACTION
+#   PR  CI  STRUCT  BEHAV  CODEX  VERIFIES  NEXT-ACTION
 # where STRUCT/BEHAV are ok | rework | unclear | stale(<sha>) | unreadable(<sha>) | none.
+# VERIFIES (#3275, .claude/rules/issue-hygiene.md B) is read only on a
+# results-only PR: ok (a "Verifies #N: <item>" body line) | none ("Verifies:
+# none") | missing (neither; the action keeps its MERGE but gains a
+# "[+ Verifies line missing]" hint, qc-results owns the FAIL). Every other PR
+# shows "-". See `_verifies_state`.
 # "unclear" (#2432) means the gate's reviews disagree in a way this script
 # will not guess through -- NEXT-ACTION reads "ADJUDICATE", never "MERGE".
 # "unreadable(<sha>)" (H-QC-VERDICT-NEWLINE-COLLAPSE, PR #2663) means a review
@@ -678,7 +683,7 @@ _pr_meta_gh() {
   # MERGEABLE / CONFLICTING / UNKNOWN -- read straight through with no
   # reshaping needed, unlike the curl backend below which has to normalise
   # REST's separate boolean + mergeable_state fields into the same three.
-  gh pr view "$1" --repo "$REPO" --json headRefOid,files,reviews,labels,mergeable
+  gh pr view "$1" --repo "$REPO" --json headRefOid,files,reviews,labels,mergeable,body
 }
 _pr_checks_gh() {
   gh pr checks "$1" --repo "$REPO" 2>/dev/null | awk '{print $2}' | sort -u | tr '\n' ' '
@@ -721,6 +726,7 @@ _pr_meta_curl() {
     # silently dropped the field before it ever reached the jq that needed it.
     reviews: ($reviews | map({body: .body, commit_id: .commit_id})),
     labels: ($pr.labels | map({name: .name})),
+    body: ($pr.body // ""),
     # mergeable (H-CI-DISPATCH): normalise the REST fields "mergeable"
     # (bool|null) and "mergeable_state" (string|null, e.g. dirty/clean/
     # unstable/blocked/behind) into the SAME three-value vocabulary that
@@ -809,6 +815,23 @@ _qc_comment_warning() {
   fi
 }
 
+# _verifies_state BODY -> ok | none | missing, the VERIFIES column of a
+# results-only PR (.claude/rules/issue-hygiene.md B, #3275). "ok": at least one
+# "Verifies #N: <item>" line; "none": an explicit "Verifies: none"; "missing":
+# neither. A line may carry a list marker ("- ") and leading spaces; the match
+# is case-sensitive, and a claim line wins over a stray "Verifies: none".
+# Whether each claimed item is actually met is qc-results' call, not this one.
+_verifies_state() {
+  _vbody=$(printf '%s\n' "$1" | tr -d '\r')
+  if printf '%s\n' "$_vbody" | grep -Eq '^[[:space:]]*([-*][[:space:]]+)?Verifies #[0-9]+:'; then
+    printf ok
+  elif printf '%s\n' "$_vbody" | grep -Eq '^[[:space:]]*([-*][[:space:]]+)?Verifies: none([[:space:].]|$)'; then
+    printf none
+  else
+    printf missing
+  fi
+}
+
 # _codex_action ACTION CODEX REQUIRED REQUESTED -> the NEXT-ACTION after the
 # advisory CODEX column is applied (cross-agent-review.md). REQUIRED /
 # REQUESTED are non-empty when the matching review/codex-* label is present.
@@ -869,7 +892,7 @@ else
   PRS=$(_list_open_prs)
 fi
 
-printf '%-6s %-8s %-14s %-14s %-14s %s\n' PR CI STRUCT BEHAV CODEX NEXT-ACTION
+printf '%-6s %-8s %-14s %-14s %-14s %-9s %s\n' PR CI STRUCT BEHAV CODEX VERIFIES NEXT-ACTION
 printf '%s\n' "-------------------------------------------------------------------------------------------"
 
 meta_errors=0
@@ -879,8 +902,8 @@ for n in $PRS; do
        (.headRefOid | type == "string" and length > 0) and
        (.files | type == "array") and (.reviews | type == "array") and
        (.labels | type == "array")' >/dev/null 2>&1; then
-    printf '%-6s %-8s %-14s %-14s %-14s %s\n' \
-      "$n" ERROR unknown unknown unknown 'ERROR -- could not read PR meta'
+    printf '%-6s %-8s %-14s %-14s %-14s %-9s %s\n' \
+      "$n" ERROR unknown unknown unknown unknown 'ERROR -- could not read PR meta'
     meta_errors=1
     continue
   fi
@@ -911,6 +934,7 @@ for n in $PRS; do
     *)         ci=none ;;
   esac
 
+  verifies=-
   if _is_docs_only "$files"; then
     struct=skip; behav=skip; codex=skip
   elif _is_results_only "$files"; then
@@ -918,6 +942,8 @@ for n in $PRS; do
     # BEHAV column (kind "results"); STRUCT is skipped, never dispatched.
     struct=skip
     behav=$(_gate "$reviews" "results" "$tip")
+    # issue-hygiene.md B: a results PR names the issue items it satisfies.
+    verifies=$(_verifies_state "$(printf '%s' "$meta" | jq -r '.body // ""')")
     codex=$(_gate "$reviews" "codex" "$tip")
   else
     struct=$(_gate "$reviews" "structural" "$tip")
@@ -931,8 +957,8 @@ for n in $PRS; do
   # does not run until structural is APPROVED), then behavioral, then merge.
   case "$ci:$struct:$behav" in
     *)               if [ -n "$held" ]; then
-                       printf '%-6s %-8s %-14s %-14s %-14s %s\n' \
-                         "$n" "$ci" "$struct" "$behav" "$codex" "HOLD -- do-not-merge label${comment_warning}"
+                       printf '%-6s %-8s %-14s %-14s %-14s %-9s %s\n' \
+                         "$n" "$ci" "$struct" "$behav" "$codex" "$verifies" "HOLD -- do-not-merge label${comment_warning}"
                        continue
                      fi ;;
   esac
@@ -993,6 +1019,10 @@ for n in $PRS; do
   # otherwise MERGE. See _codex_action above the LIB seam (offline-tested).
   action=$(_codex_action "$action" "$codex" "$codex_required" "$codex_requested")
 
-  printf '%-6s %-8s %-14s %-14s %-14s %s\n' "$n" "$ci" "$struct" "$behav" "$codex" "${action}${comment_warning}"
+  # A missing Verifies line never blocks (the MERGE stays MERGE); qc-results
+  # owns the FAIL. The hint just makes the gap visible at every action.
+  if [ "$verifies" = missing ]; then action="$action [+ Verifies line missing]"; fi
+
+  printf '%-6s %-8s %-14s %-14s %-14s %-9s %s\n' "$n" "$ci" "$struct" "$behav" "$codex" "$verifies" "${action}${comment_warning}"
 done
 exit "$meta_errors"

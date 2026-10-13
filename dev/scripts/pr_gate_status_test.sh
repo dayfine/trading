@@ -755,11 +755,12 @@ case "$1 $2" in
       *"--json comments"*) printf '%s\n' "${GATE_COMMENTS_JSON:-[]}"; exit 0 ;;
     esac
     jq -n --arg tip "$GATE_TIP" --argjson reviews "$GATE_REVIEWS_JSON" --arg files "$GATE_FILES" \
-      --argjson labels "${GATE_LABELS_JSON:-[]}" \
+      --argjson labels "${GATE_LABELS_JSON:-[]}" --arg body "${GATE_BODY:-}" --arg args "$*" \
       '{headRefOid: $tip,
         files: ($files | split("\n") | map(select(length > 0) | {path: .})),
         reviews: $reviews,
-        labels: $labels}'
+        labels: $labels}
+       + (if ($args | test("--json [^ ]*body")) then {body: $body} else {} end)'
     ;;
   "pr checks")
     printf '%s\n' "$GATE_CHECKS" | awk 'NF{print "check-name\t" $0 "\tlink"}'
@@ -916,6 +917,64 @@ GATE_LABELS_JSON='[]'
 GATE_REVIEWS_JSON=$SAVED_GATE_REVIEWS
 GATE_COMMENTS_JSON='[]'
 
+
+# VERIFIES column (#3275, .claude/rules/issue-hygiene.md B). Unit: the body
+# parser's three states and its edges.
+check "VERIFIES unit: Verifies #N: line -> ok" ok "$(_verifies_state 'intro
+Verifies #3275: [after-merge] sweep green -- dev/experiments/x/results/s0.sexp')"
+check "VERIFIES unit: list-marker claim line -> ok" ok "$(_verifies_state '  - Verifies #12: item -- path')"
+check "VERIFIES unit: Verifies: none -> none" none "$(_verifies_state 'Verifies: none')"
+check "VERIFIES unit: CRLF body still parses" none "$(_verifies_state "$(printf 'intro\r\nVerifies: none\r\n')")"
+check "VERIFIES unit: a claim wins over a stray none" ok "$(_verifies_state 'Verifies: none
+Verifies #7: x -- y')"
+check "VERIFIES unit: no line -> missing" missing "$(_verifies_state 'Refs #3275 -- verify: sweep green')"
+check "VERIFIES unit: claim without colon -> missing" missing "$(_verifies_state 'Verifies #3275 sweep green')"
+check "VERIFIES unit: mid-sentence mention -> missing" missing "$(_verifies_state 'this PR Verifies #3275: x')"
+check "VERIFIES unit: 'Verifies: nonexistent' is not none" missing "$(_verifies_state 'Verifies: nonexistent')"
+check "VERIFIES unit: empty body -> missing" missing "$(_verifies_state '')"
+
+# End to end (gh backend): a results-only PR at "## Results QC" APPROVED, one
+# body per state. ok / none keep a bare MERGE; missing keeps MERGE and gains
+# the hint; a code PR shows "-" and never the hint.
+VERIFIES_RESULTS_APPROVED=$(jq -nc --arg r "Reviewed SHA: $TIP
+
+## Results QC — clean pass
+
+## Verdict
+
+APPROVED" '[{body: $r}]')
+_SAVED_FILES=$GATE_FILES; _SAVED_REVIEWS=$GATE_REVIEWS_JSON
+GATE_FILES="dev/experiments/x-2026-09-21/README.md dev/experiments/x-2026-09-21/specs/a.sexp"
+GATE_REVIEWS_JSON=$VERIFIES_RESULTS_APPROVED
+export GATE_FILES GATE_REVIEWS_JSON
+for _vcase in ok none missing; do
+  case "$_vcase" in
+    ok)      GATE_BODY="Verifies #3275: [after-merge] sweep green -- dev/experiments/x/results/s0.sexp" ;;
+    none)    GATE_BODY="Verifies: none" ;;
+    missing) GATE_BODY="Refs #3275 -- verify: sweep green" ;;
+  esac
+  export GATE_BODY
+  row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+  check "VERIFIES e2e (gh): $_vcase body -> column $_vcase" "$_vcase" "$(printf '%s' "$row" | awk '{print $6}')"
+  case "$_vcase:$row" in
+    missing:*'MERGE (results-only) [+ Verifies line missing]') got=merge+hint ;;
+    *'[+ Verifies line missing]'*) got=hint ;;
+    *'MERGE (results-only)') got=merge ;;
+    *) got=other ;;
+  esac
+  case "$_vcase" in missing) want=merge+hint ;; *) want=merge ;; esac
+  check "VERIFIES e2e (gh): $_vcase body -> $want" "$want" "$got"
+done
+GATE_FILES="trading/foo/bar.ml"
+GATE_BODY="Refs #3275 -- verify: sweep green"
+export GATE_FILES GATE_BODY
+row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+check "VERIFIES e2e (gh): code PR shows - in the column" - "$(printf '%s' "$row" | awk '{print $6}')"
+check "VERIFIES e2e (gh): code PR never gets the hint" no "$(
+  case "$row" in *'Verifies line missing'*) echo yes ;; *) echo no ;; esac
+)"
+GATE_FILES=$_SAVED_FILES; GATE_REVIEWS_JSON=$_SAVED_REVIEWS; GATE_BODY=""
+export GATE_FILES GATE_REVIEWS_JSON GATE_BODY
 rm -rf "$GH_E2E_STUB_DIR"
 
 # 34. Defect 2's NICE-TO-HAVE, END TO END (curl backend): with `gh` absent
@@ -960,8 +1019,8 @@ case "$url" in
       | {check_runs: .}'
     ;;
   */pulls/*)
-    jq -n --arg tip "$GATE_TIP" --argjson labels "${GATE_LABELS_JSON:-[]}" \
-      '{head: {sha: $tip}, labels: $labels}'
+    jq -n --arg tip "$GATE_TIP" --argjson labels "${GATE_LABELS_JSON:-[]}" --arg body "${GATE_BODY:-}" \
+      '{head: {sha: $tip}, labels: $labels, body: $body}'
     ;;
 esac
 STUB
@@ -1037,6 +1096,18 @@ check "REST shape-wrong metadata has visible error row" yes "$(
   case "$e2e_out" in *'ERROR -- could not read PR meta'*) echo yes ;; *) echo no ;; esac
 )"
 GATE_TIP=$SAVED_TIP
+
+# VERIFIES (#3275) through the curl backend: the REST pull payload's `body`
+# reaches the column (a dropped `body:` in _pr_meta_curl reads "missing").
+_SAVED_FILES=$GATE_FILES; _SAVED_REVIEWS=$GATE_REVIEWS_JSON
+GATE_FILES="dev/experiments/x-2026-09-21/specs/a.sexp"
+GATE_REVIEWS_JSON=$VERIFIES_RESULTS_APPROVED
+GATE_BODY="Verifies #3275: [after-merge] sweep green -- dev/experiments/x/results/s0.sexp"
+export GATE_FILES GATE_REVIEWS_JSON GATE_BODY
+row=$(_e2e_probe "$CURL_E2E_STUB_DIR" dummy-token 501 | tail -1)
+check "VERIFIES e2e (curl): Verifies #N line reads ok" ok "$(printf '%s' "$row" | awk '{print $6}')"
+GATE_FILES=$_SAVED_FILES; GATE_REVIEWS_JSON=$_SAVED_REVIEWS; GATE_BODY=""
+export GATE_FILES GATE_REVIEWS_JSON GATE_BODY
 rm -rf "$CURL_E2E_STUB_DIR"
 
 # 36b-36c. H-GATEPARSER-CURL-PROJECTION-UNPINNED (dev/status/harness.md): cases

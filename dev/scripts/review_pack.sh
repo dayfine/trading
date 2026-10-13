@@ -44,7 +44,8 @@ set -eu
 LIB="$(cd "$(dirname "$0")/../lib/review_pack" && pwd)"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 CONTAINER="${CONTAINER:-trading-1-dev}"
-CROOT=/workspaces/trading-1
+MOUNT=/workspaces/trading-1   # where the container bind-mounts the host checkout; CROOT is set from it
+. "$LIB/croot.sh"
 REGIME_WARMUP_ROWS=180   # SPY bars published before the window for the regime warm-up (#3194)
 
 OUT=""; TITLE="Backtest Review"; SUBTITLE=""; CHARTS=0
@@ -87,11 +88,24 @@ stage_run() { # $1 label, $2 prefix
   [ -s "$d/trades.csv" ] || { echo "review_pack: $1: no trades.csv under prefix $2" >&2; exit 2; }
 }
 
+spy_covers_runs() { # SPY bars must start by every run's first equity date (#3262, from #3214): nav_json keeps a
+  # NAV row only on a SPY bar day, so a short SPY series silently cut a 2000-2026 run to 2009 on the charts
+  sf=$(sed -n 2p "$SPY_CSV" | cut -d, -f1)
+  for l in $(labels); do
+    rf=$(sed -n 2p "$OUT/runs/$l/equity_curve.csv" | cut -d, -f1)
+    [ -z "$rf" ] || ! awk -v a="$sf" -v b="$rf" 'BEGIN { exit !(a > b) }' || { echo "review_pack: SPY bars at $SPY_CSV start $sf, after run $l's first equity date $rf; the NAV chart and every SPY comparison would start at $sf. Pass a --data-dir whose SPY covers the window." >&2; exit 2; }
+  done
+}
+
 # ---- 2. docker ----------------------------------------------------------------
 container_path() { # host path -> container path (must sit under the repo)
   case "$1" in "$REPO"/*) printf '%s%s' "$CROOT" "${1#"$REPO"}" ;; *) return 1 ;; esac
 }
 docker_steps() {
+  # this checkout's container path, not the mount root: a worktree builds and runs its own tree (#3262)
+  src=$(mount_source "$CONTAINER" "$MOUNT"); [ -n "$src" ] || { src=$REPO; log "docker: no mount at $MOUNT found by docker inspect; assuming it is $REPO"; }
+  CROOT=$(croot_for "$src" "$REPO" "$MOUNT") || { echo "review_pack: $REPO is not under $src, the directory $CONTAINER mounts at $MOUNT" >&2; exit 2; }
+  cdata=$(croot_for "$src" "$DATA" "$MOUNT") || { cdata=$MOUNT/data; log "docker: --data-dir $DATA is outside the mount; the stage replay reads $cdata"; }
   cout=$(container_path "$OUT") || { echo "review_pack: --out must be inside $REPO for container steps (or pass --no-container)" >&2; exit 2; }
   log "docker: building trade_audit_report_bin + stage_chart"
   docker exec "$CONTAINER" bash -c "cd $CROOT/trading && eval \$(opam env) && dune build trading/backtest/bin/trade_audit_report_bin.exe analysis/scripts/stage_chart/bin/stage_chart.exe" >&2
@@ -99,9 +113,10 @@ docker_steps() {
     log "docker: trade audit report $l"
     docker exec "$CONTAINER" bash -c "[ -d $SNAP ] || exit 3; $CROOT/trading/_build/default/trading/backtest/bin/trade_audit_report_bin.exe --scenario-dir $cout/runs/$l --snapshot-dir $SNAP --out $cout/runs/$l/trade_audit_report.md --html $cout/runs/$l/trade_audit_report.html --benchmark-symbol SPY" > "$OUT/runs/$l/audit.log" 2>&1 \
       || log "audit $l failed or no snapshot dir (see runs/$l/audit.log); continuing without it"
+    [ -s "$OUT/runs/$l/trade_audit_report.md" ] || log "WARNING: $l: trade_audit_report.md is missing or empty, so the conformance panel and the audit cards read n/a (runs/$l/audit.log)"
   done
   cl=$(charts_label); log "docker: stage replay for $cl ($(($(wc -l < "$OUT/runs/$cl/trades.csv") - 1)) trades)"
-  docker exec "$CONTAINER" sh "$CROOT/dev/lib/review_pack/stages.sh" "$CROOT" "${cout#"$CROOT"/}/runs/$cl"
+  docker exec "$CONTAINER" sh "$CROOT/dev/lib/review_pack/stages.sh" "$CROOT" "${cout#"$CROOT"/}/runs/$cl" "$cdata"
 }
 
 # ---- 3. host ------------------------------------------------------------------
@@ -174,6 +189,11 @@ host_run() { # $1 label, $2 index
     | "WARN open positions on \(.date): pack marks \(.pack + 0), actual.sexp open_positions_value \(.actual + 0)"' "$s/$1_open.json" |
     while IFS= read -r w; do log "$1: $w"; done
 }
+pack_sha() { # the pack code's commit, "-dirty" when its files differ from it; "unknown" outside git (#3262)
+  v=$(git -C "$REPO" rev-parse --short=9 HEAD 2>/dev/null) || { echo unknown; return; }
+  [ -z "$(git -C "$REPO" status --porcelain -- dev/lib/review_pack dev/scripts/review_pack.sh 2>/dev/null)" ] || v="$v-dirty"
+  echo "$v"
+}
 site_common() {
   s="$OUT/site/data"; cl=$(charts_label); d="$OUT/runs/$cl"
   first=$(sed -n 2p "$d/equity_curve.csv" | cut -d, -f1); last=$(tail -1 "$d/equity_curve.csv" | cut -d, -f1)
@@ -192,9 +212,12 @@ site_common() {
   awk -v STAGE_DIR="$d/stage" -v OUT="$s/charts" -f "$LIB/chart_shards.awk" "$d/x_daily.tsv" "$d/trades.csv"
   [ -n "$SUBTITLE" ] || SUBTITLE="$first → $last, $(grep -oE 'universe_size [0-9]+' "$d/params.sexp" | cut -d' ' -f2) symbols, \$$(grep -oE 'initial_cash [0-9]+' "$d/params.sexp" | cut -d' ' -f2) start"
   # jq --arg does the JSON escaping: a title/subtitle/label with " or \ must not break the manifest
+  # the page header stamps the pack code and the snapshot dir the audit read (#3262): a stale tree is visible
+  snap_used=""; [ "$DOCKER" = 1 ] && snap_used=$SNAP
   runs_json=$(labels | jq -R -s -c 'split("\n") | map(select(length > 0) | {id: ., label: .})')
   jq -n --arg title "$TITLE" --arg subtitle "$SUBTITLE" --argjson charts "$CHARTS" --argjson runs "$runs_json" --arg kind "$(run_kind)" \
-    '{title: $title, subtitle: $subtitle, charts_run: $charts, runs: $runs, run_kind: $kind}' > "$s/manifest.json"
+    --arg pack_sha "$(pack_sha)" --arg snap "$snap_used" \
+    '{title: $title, subtitle: $subtitle, charts_run: $charts, runs: $runs, run_kind: $kind, pack_sha: $pack_sha, snapshot_dir: $snap}' > "$s/manifest.json"
   # the page <title> carries --title (HTML-escaped); the template default is a placeholder
   TITLE="$TITLE" awk 'BEGIN { t = ENVIRON["TITLE"]; gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t) }
     /^<title>.*<\/title>$/ { print "<title>" t "</title>"; next } { print }' "$LIB/index.html" > "$OUT/site/index.html"
@@ -207,6 +230,7 @@ check_json() {
 }
 
 for r in $RUNS; do stage_run "${r%%=*}" "${r#*=}"; done
+spy_covers_runs
 [ "$DOCKER" = 1 ] && docker_steps
 mkdir -p "$OUT/site/data"
 i=0; for l in $(labels); do host_run "$l" "$i"; i=$((i + 1)); done

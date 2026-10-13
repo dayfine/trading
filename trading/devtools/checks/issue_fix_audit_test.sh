@@ -20,7 +20,7 @@ export ISSUE_FIX_AUDIT_FIXTURE_DIR="${ROOT}/trading/devtools/checks/fixtures/iss
 [ -f "$SCRIPT" ] || { echo "FAIL: script not found: $SCRIPT" >&2; exit 1; }
 OUT="$(sh "$SCRIPT")"
 A=$(printf '%s\n' "$OUT" | sed -n '/^== (a)/,/^== (b)/p')
-B=$(printf '%s\n' "$OUT" | sed -n '/^== (b)/,$p')
+B=$(printf '%s\n' "$OUT" | sed -n '/^== (b)/,/^== (c)/p')
 FAILED=0
 check() { # label, haystack, pattern, expected-count
   n=$(printf '%s\n' "$2" | grep -c -- "$3" || true)
