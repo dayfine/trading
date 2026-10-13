@@ -29,7 +29,7 @@ beat 51.3 %, halves −2.79 / +1.79 %.
 - O2 stopped: 4,580 (18.5 %). The stop sits above the whole right shoulder, so room is wide: 16,396 events (66 %) have
   room > 30 %, 980 have ≤ 15 %.
 - The mean and the ±100 %-clipped mean differ in sign (−2.12 % vs +1.13 %): the negative mean is carried by a short
-  tail: 136 events lose more than 100 % and 21 gain more than 100 % (some are vendor splices, as in the setup map, #3239). The median and beat do not move.
+  tail: 136 events lose more than 100 % and 20 gain more than 100 % on O2 excess (some are vendor splices, as in the setup map, #3239). The median and beat do not move.
 - Room split (O2 beat): ≤ 15 % 45.5 %, 15–30 % 49.5 %, > 30 % 53.5 %.
 - SPY phase split (O2 beat): s4_early 47.2 %, s4_late 46.7 %, s3 50.3 %, s12 55.3 %.
 - Bear years (O2 beat): 2000–02 48.0 %, 2007–09 55.1 %, 2022 48.9 %.
@@ -75,7 +75,7 @@ formula. Bootstraps are seeded; two runs gave identical output.
   base rate runs 43 % to 66 % by year (cap-weighted SPY vs an equal-weighted, mostly small/mid-cap universe).
 - **The one event-specific effect is adverse.** In early SPY Stage 4, the book's timing window, 45.4 % of events beat
   the date's random member (CI [43.2, 47.4] %): broken names rebound harder when the index turns.
-- **Forward.** Price-shape short screens are exhausted. Short interest is the one book lever left, and it is
+- **Forward.** More price-shape short screens are not worth prioritizing. Short interest is the one book lever left, and it is
   data-gated. Any future screen pre-registers against a calendar-matched null, not only an SPY short.
 
 ## 1. The rule, as written
@@ -277,3 +277,11 @@ universe factor, not the book's setup, and its crash risk is exactly the early-S
    above the whole right shoulder" — true by definition, but in 84 % of events that range includes the head; "the
    negative mean is carried by a short tail" — two splices carry more than all of it.
 6. Timing evidence is commit and push order only (the run's output directory is not on disk).
+
+## Short-interest data (dispatcher note, 2026-10-13)
+
+Source for the "data-gated" statement above: FINRA's free equity short interest files carry exchange-listed securities
+only from June 2021 (OTC from 2014) (finra.org, Equity Short Interest files page); our EODHD key returns "Forbidden" on
+the fundamentals endpoint, the only one that carries short interest (probed 2026-10-13); full 2000+ coverage with
+delisted names is Compustat (WRDS) or the paid NYSE Group and Nasdaq Trader files. The user chose option (c), pursuing
+short interest; the data choice is open.
