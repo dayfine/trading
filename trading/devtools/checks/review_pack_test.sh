@@ -62,6 +62,10 @@
 #     window; the first window day gets a regime), the open-position read net
 #     of dividends, cash interest and commissions (or UnrealizedPnl), the
 #     sub-$17 margin-call churn card and the NAV-peak give-back card.
+#   - #3262: macro at entry is the latest screen strictly before the fill (V23's rule; a Friday-fill
+#     fixture, open positions too), the against-macro card words placement vs fill, an exit after an
+#     issuer's last bar with a reused ticker (next bar > 1 year later) is not a Saturday fill, and the
+#     manifest/page header carry the pack code SHA and snapshot dir.
 #
 # Run:
 #   sh trading/devtools/checks/review_pack_test.sh
@@ -847,5 +851,52 @@ expect_eq "wiring: renderSignals sends yearRestsBullet to rests, never to the le
 expect_eq "wiring: renderSignals returns lead + rests; the findings list takes lead only" "1 1" "$(grep -c 'return { lead: out, rests };' "$S/index.html") $(grep -c '\[\.\.\.sig\.lead, \.\.\.f\]' "$S/index.html")"
 expect_eq "wiring: the rests note is a hidden <details>; the cards are drawn from flagPlan and the all-clear line is wired" "1 1 1" \
   "$(grep -c '<details id="rests" hidden>' "$S/index.html") $(grep -c "flagPlan(FLAGS, t, open" "$S/index.html") $(grep -c "'#flagclear').innerHTML = flagClearLine" "$S/index.html")"
+# #3262. (1) Macro at entry reads the latest screen STRICTLY before the fill, as V23 does
+# (validator_audit_checks.ml _last_screen_before): the screen runs at the week's close, so a fill on a screen
+# date has not seen that day's reading. The fixture screens Thursdays; 2020-03-05 is Bullish, 2020-03-12 the
+# first Bearish. FRA fills ON 2020-03-12 -> Bullish (the 03-05 read; the old <= join said Bearish); FRB fills
+# the day after -> Bearish; an exit keeps the <= join (FRA exits on 2020-03-26, a screen date: Bearish).
+# An open position entered on 2020-03-12 reads Bullish for the same reason.
+# (2) A reused ticker: RRR has bars to 2020-02-14, then another listing from 2021-06-01. An exit dated
+# 2020-02-20 is after the issuer's last bar (next bar > 1 year later) -> xpast 1; a Saturday exit with bars
+# the next Monday (AAA 2020-02-01) is not.
+F62="$TMP/f62"; mkdir -p "$F62/run" "$F62/data/R/R/RRR"; cp -R "$FIX/data/S" "$F62/data/"; cp -R "$FIX/data/A" "$F62/data/"; cp "$FIX"/run/* "$F62/run/"
+{ awk -F, 'NR == 1 || $1 <= "2020-02-14"' "$FIX/data/A/A/AAA/data.csv"
+  printf '2021-06-01,10.00,10.50,9.50,10.00,10.00,100000,\n2021-06-02,10.00,10.50,9.50,10.00,10.00,100000,\n'; } > "$F62/data/R/R/RRR/data.csv"
+{ head -1 "$FIX/run/trades.csv"
+  echo "AAA,LONG,2020-03-12,2020-03-26,14,100.00,101.00,100,100.00,1.00,,,laggard_rotation,Stage2,2.0000,0.0400,non_stop_exit,,100,FRA-wein-1,,,0"
+  echo "AAA,LONG,2020-03-13,2020-03-26,13,100.00,101.00,100,100.00,1.00,,,laggard_rotation,Stage2,2.0000,0.0400,non_stop_exit,,100,FRB-wein-2,,,0"
+  echo "RRR,LONG,2020-01-29,2020-02-20,22,10.00,9.60,1000,-400.00,-4.00,9.60,9.60,stop_loss,Stage2,2.5000,0.0400,intraday,22,100,RRR-wein-3,,,0"
+  echo "AAA,LONG,2020-01-15,2020-02-01,17,100.00,101.00,100,100.00,1.00,,,laggard_rotation,Stage2,2.0000,0.0400,non_stop_exit,,100,SAT-wein-4,,,0"; } > "$F62/run/trades.csv"
+printf 'symbol,side,entry_date,entry_price,quantity\nAAA,LONG,2020-03-12,100.00,10\n' > "$F62/run/open_positions.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$F62/data" --out "$F62/pack" r0="$F62/run/" >"$F62/log" 2>"$F62/err" || rc=$?
+expect_eq "#3262: builds, exit 0" 0 "$rc"
+F62T="$F62/pack/site/data/r0_trades.json"
+f62() { jq -r ".[]|select(.id==\"$1\")|$2" "$F62T"; }
+expect_eq "#3262: a fill ON a screen date reads the screen before it (Bullish), as V23" "Bullish Bearish" "$(f62 FRA-wein-1 '"\(.mE) \(.mX)"')"
+expect_eq "#3262: a fill the day after a screen reads that screen (Bearish)" Bearish "$(f62 FRB-wein-2 '.mE')"
+expect_eq "#3262: the macro weeks held count from the strictly-before screen (FRA: 03-05..03-26 = 4, 3 Bearish)" "4 3" "$(f62 FRA-wein-1 '"\(.macroW) \(.bearW)"')"
+expect_eq "#3262: an open position filled ON a screen date reads the screen before it" Bullish "$(jq -r '.rows[0].mE' "$F62/pack/site/data/r0_open.json")"
+expect_eq "#3262: reused ticker, exit after the issuer's last bar (next bar > 1 year later) is marked past" "0 1" "$(f62 RRR-wein-3 '"\(.onX) \(.xpast)"')"
+expect_eq "#3262: a Saturday exit with a bar the next Monday is not past the last bar" "0 0" "$(f62 SAT-wein-4 '"\(.onX) \(.xpast)"')"
+if command -v node >/dev/null 2>&1; then
+  F62F="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' "$S/index.html")"
+  f62n() { node -e "$F62F
+const T = $(jq -c . "$F62T"), F = id => FLAGS.find(f => f.id === id);
+console.log($1)"; }
+  expect_eq "#3262: the non-trading-day card leaves out the reused-ticker exit (RRR) but still flags a genuine Saturday exit" "false true" "$(f62n '["RRR-wein-3", "SAT-wein-4"].map(i => F("weekend").test(T.find(t => t.id === i))).join(" ")')"
+  expect_eq "#3262: the against-macro card keys on the strictly-before reading (FRA Bullish: quiet; FRB Bearish: flagged)" "false true" "$(f62n '["FRA-wein-1", "FRB-wein-2"].map(i => F("macrobear").test(T.find(t => t.id === i))).join(" ")')"
+  expect_eq "#3262: the against-macro card words placement vs fill and points at V23" "yes yes yes" "$(f62n '[/PLACING a ticket, not filling one/, /entry_ticket_macro_suspend Off/, /Read V23/].map(r => r.test(F("macrobear").why) ? "yes" : "no").join(" ")')"
+else
+  echo "SKIP: review_pack #3262 page cases need node"
+fi
+# (3) The page header carries the pack code SHA and the snapshot dir: the manifest has both, the page shows them.
+expect_eq "#3262: manifest pack_sha is the repo HEAD (short), -dirty allowed" "$(git -C "$ROOT" rev-parse --short=12 HEAD)" "$(jq -r .pack_sha "$F62/pack/site/data/manifest.json" | sed 's/-dirty$//')"
+expect_eq "#3262: --no-container records no snapshot dir" none "$(jq -r .snapshot_dir "$F62/pack/site/data/manifest.json")"
+rc=0
+sh "$SCRIPT" --no-container --snapshot-dir /tmp/snap_x --data-dir "$F62/data" --out "$F62/pack2" r0="$F62/run/" >"$F62/log2" 2>&1 || rc=$?
+expect_eq "#3262: --snapshot-dir reaches the manifest only when the audit would use it (none under --no-container)" "0 none" "$rc $(jq -r .snapshot_dir "$F62/pack2/site/data/manifest.json")"
+expect_eq "#3262: the page header shows the pack SHA and snapshot dir from the manifest" "1 1" "$(grep -c "\$('#packsha').textContent = D.man.pack_sha" "$S/index.html") $(grep -c "\$('#snapdir').textContent = D.man.snapshot_dir" "$S/index.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

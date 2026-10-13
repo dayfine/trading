@@ -25,6 +25,7 @@ BEGIN {
   sd = (side == "SHORT") ? -1 : 1  # +1 long, -1 short: the sign of a favourable move
   FS = ","; PRE_BARS = 63; POST_BARS = 42; GRADE_BARS = 65; FWD_BARS = 40
   TOL = 0.005                      # fill-in-range tolerance (cent rounding)
+  REUSE_GAP_DAYS = 365          # a next bar this far past the exit is another listing of a reused ticker
   SPLIT_FAC_LO = 0.8; SPLIT_FAC_HI = 1.05   # adjustment factor / split ratio: dividends pull it under 1
   ncf = split("3 5 6 8 10 15", lv, " ")
   for (i = 1; i <= ncf; i++) { cf[i] = ""; lv[i] = lv[i] / 100 }
@@ -32,10 +33,11 @@ BEGIN {
 NR == 1 { for (i = 1; i <= NF; i++) { if ($i == "date") cd = i; if ($i == "open") co = i; if ($i == "high") ch = i
             if ($i == "low") cl = i; if ($i == "close") cc = i; if ($i == "adjusted_close") ca = i; if ($i == "volume") cv = i }; next }
 # Monday-based week index of a YYYY-MM-DD date (days from civil; Mondays are 6 mod 7)
-function week_of(d,   y, m, dd) {
+function day_of(d,   y, m, dd) {
   y = substr(d, 1, 4) + 0; m = substr(d, 6, 2) + 0; dd = substr(d, 9, 2) + 0; if (m < 3) { y--; m += 12 }
-  return int((365 * y + int(y / 4) - int(y / 100) + int(y / 400) + int((153 * (m - 3) + 2) / 5) + dd + 1) / 7)
+  return 365 * y + int(y / 4) - int(y / 100) + int(y / 400) + int((153 * (m - 3) + 2) / 5) + dd + 1
 }
+function week_of(d) { return int(day_of(d) / 7) }
 function emit_day(line) { if (out_dy != "") print line >> out_dy }
 # 1 = fill inside the bar's range; 2 = outside, but a simple split ratio
 # (k/q, q <= 5) away from the bar -> the fill is on a later split basis;
@@ -102,7 +104,7 @@ function hard_stop(o, l, h, lvl,   p) {
   # (dev/experiments/yearly-trade-review-2026-09-04/grade.sh): the window starts
   # at the first bar ON or after the exit date (a Saturday exit starts Monday),
   # that bar's adjusted close is the reference (gx), and p13 is the 65th bar.
-  if (d >= xd) { k++; if (k == 1) gx = a; if (k <= GRADE_BARS) { if (k == 1 || a > mxa) mxa = a; if (k == 1 || a < mna) mna = a; p13 = a } }
+  if (d >= xd) { k++; if (k == 1) { gx = a; nxt = d }; if (k <= GRADE_BARS) { if (k == 1 || a > mxa) mxa = a; if (k == 1 || a < mna) mna = a; p13 = a } }
   prev_c = c
 }
 END {
@@ -131,7 +133,9 @@ END {
   # is the week the candidate was screened, not the week it filled); null with under 2 prior weeks
   nw = 0; pv = 0; pn = 0; for (i = 1; i <= 4; i++) if ((ewk - i) in wv) { nw++; pv += wv[ewk - i]; pn += wn[ewk - i] }
   fvr = (cv && nw >= 2 && pv > 0) ? sprintf("%.2f", (wv[ewk] / wn[ewk]) / (pv / pn)) : "null"
-  xpast = (xd > lastd) ? 1 : 0   # the exit is dated after the symbol's last bar (a delisting stamp)
+  # the exit is dated after the issuer's last bar (a delisting stamp): no bar on or after it, or the next bar is
+  # over a year later and not the exit day itself -- a reused ticker, another listing (#3262: NLC 2011-12-06)
+  xpast = (k == 0 || (nxt != xd && day_of(nxt) - day_of(xd) > REUSE_GAP_DAYS)) ? 1 : 0
   # pid fe fx mfe mae post_max post_min post13 grade on_e on_x in_e in_x entry_vs_prevclose ebar xbar post_bars
   #   fwd40 breach_lag hardstop_cf entry_adj exit_adj isd fill_week_vol_ratio exit_past_last_bar
   #   (entry/exit_adj: fills on the chart's adjusted basis)

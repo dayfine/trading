@@ -193,8 +193,14 @@ site_common() {
   [ -n "$SUBTITLE" ] || SUBTITLE="$first → $last, $(grep -oE 'universe_size [0-9]+' "$d/params.sexp" | cut -d' ' -f2) symbols, \$$(grep -oE 'initial_cash [0-9]+' "$d/params.sexp" | cut -d' ' -f2) start"
   # jq --arg does the JSON escaping: a title/subtitle/label with " or \ must not break the manifest
   runs_json=$(labels | jq -R -s -c 'split("\n") | map(select(length > 0) | {id: ., label: .})')
+  # which pack code built this page, and which snapshot warehouse the audit read (#3262: a pack built from a stale
+  # parent tree went unnoticed); "-dirty" when the pack code has uncommitted edits
+  PACK_SHA=$(git -C "$REPO" rev-parse --short=12 HEAD 2>/dev/null) || PACK_SHA=unknown
+  [ -z "$(git -C "$REPO" status --porcelain -- dev/lib/review_pack dev/scripts/review_pack.sh 2>/dev/null)" ] || PACK_SHA="$PACK_SHA-dirty"
+  SNAP_SHOWN=$SNAP; [ "$DOCKER" = 1 ] || SNAP_SHOWN=none
   jq -n --arg title "$TITLE" --arg subtitle "$SUBTITLE" --argjson charts "$CHARTS" --argjson runs "$runs_json" --arg kind "$(run_kind)" \
-    '{title: $title, subtitle: $subtitle, charts_run: $charts, runs: $runs, run_kind: $kind}' > "$s/manifest.json"
+    --arg pack_sha "$PACK_SHA" --arg snapshot_dir "$SNAP_SHOWN" \
+    '{title: $title, subtitle: $subtitle, charts_run: $charts, runs: $runs, run_kind: $kind, pack_sha: $pack_sha, snapshot_dir: $snapshot_dir}' > "$s/manifest.json"
   # the page <title> carries --title (HTML-escaped); the template default is a placeholder
   TITLE="$TITLE" awk 'BEGIN { t = ENVIRON["TITLE"]; gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t) }
     /^<title>.*<\/title>$/ { print "<title>" t "</title>"; next } { print }' "$LIB/index.html" > "$OUT/site/index.html"

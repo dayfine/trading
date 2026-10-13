@@ -117,7 +117,7 @@ ol.agenda li b { font-weight: 600; }
   <div class="top-inner">
     <div class="titlerow">
       <h1 id="title">Backtest Review</h1>
-      <span class="sub"><span id="subtitle"></span> · run <code id="codever"></code></span>
+      <span class="sub"><span id="subtitle"></span> · run <code id="codever"></code> · pack <code id="packsha"></code> · snapshot <code id="snapdir"></code></span>
     </div>
     <nav class="tabs" role="tablist" id="tabs">
       <button role="tab" data-v="overview" aria-selected="true">Overview</button>
@@ -351,7 +351,7 @@ const withMacro = t => isShort(t) ? 'Bearish' : 'Bullish', againstMacro = t => i
 const ownStage = t => isShort(t) ? 'Stage4' : 'Stage2';
 const FLAGS = [
   { id: 'weekend', cat: 'exec', zero: true, label: 'Fill dated on a non-trading day', test: t => t.onE === 0 || (t.onX === 0 && t.trig !== 'delisted' && !t.xpast),
-    why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect). A delisting exit has no bar on its date by construction and is left out, as is any exit dated after the symbol’s last bar (MIME 2022-05-20, LACO 2020-10-09: a delisting stamped the next day).' },
+    why: 'No bar exists on the fill date, usually a Saturday. Known simulator defect: the order fills at Friday’s open and is stamped Saturday (memory: project_saturday_stale_fill_defect). A delisting exit has no bar on its date by construction and is left out, as is any exit dated after the issuer’s last bar (MIME 2022-05-20, LACO 2020-10-09: a delisting stamped the next day), including one whose ticker was reused: the symbol’s next bar is over a year later, another listing (NLC 2011-12-06).' },
   { id: 'offbar', cat: 'exec', zero: true, label: 'Fill outside the day’s high–low', test: t => (t.onE === 1 && t.inE === 0) || (t.onX === 1 && t.inX === 0),
     why: 'The fill price never traded that day (half a percent of slack for rounding; fills on a later split basis are excluded). The validator’s V13 counts the same thing.' },
   { id: 'gapstop', cat: 'exec', label: 'Stop filled ≥ 3 pts beyond the stop', test: t => t.trig === 'stop_loss' && stopSlip(t) >= 0.03,
@@ -369,7 +369,7 @@ const FLAGS = [
   { id: 'macro', cat: 'book', needs: 'mE', open: true, label: 'Macro not with the side at entry', test: t => t.mE && t.mE !== withMacro(t),
     why: 'Book Ch. 3/8: weight buying to a bullish market and shorting to a bearish one. A long entered when the macro was not Bullish, a short when it was not Bearish. The run allows Neutral-market buys (audit R8).' },
   { id: 'macrobear', cat: 'book', needs: 'mE', open: true, zero: true, label: 'Entered against the macro', test: t => t.mE === againstMacro(t),
-    why: 'A long bought in a Bearish macro week or a short sold in a Bullish one: the macro gate should block both (spine rule 6).' },
+    why: 'The latest weekly screen strictly before the fill (the join V23 uses) read Bearish for a long, or Bullish for a short. The macro gate (spine rule 6) blocks PLACING a ticket, not filling one: with entry_ticket_macro_suspend Off (the default) a resting ticket placed in a with-the-macro week still fills after the macro turns, so a count here is mostly resting tickets, not a gate failure. Read V23 for the placement-side check.' },
   { id: 'lowvol', cat: 'book', needs: 'fvr', label: 'Long fill-week volume under 2× average', test: t => !isShort(t) && t.fvr != null && t.fvr < 2,
     why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3). Read on the week the order FILLED (its volume vs the 4 weeks before), not the screen week trades.csv records. Shorts are left out: a breakdown does not need volume (reference Ch. 2, Stage 4 detail).' },
   { id: 'fallback', cat: 'book', needs: 'sfk', label: '4% fallback stop, not below the base', test: isFallback,
@@ -496,6 +496,7 @@ const CH = () => D.man.charts_run || 0;
 function init() {
   $('#title').textContent = D.man.title; document.title = D.man.title; $('#subtitle').textContent = D.man.subtitle || '';
   $('#codever').textContent = (D.meta[CH()].code_version || '').slice(0, 9);
+  $('#packsha').textContent = D.man.pack_sha || 'unknown'; $('#snapdir').textContent = D.man.snapshot_dir || 'unknown';
   const opts = (note) => D.man.runs.map((r, i) => `<option value="${i}">${runLabel(i)} (${pct(D.meta[i].metrics.totalreturnpct, 0)})${note && i !== CH() ? ' · no charts' : ''}</option>`).join('');
   $('#p-salt').innerHTML = opts(false); $('#t-salt').innerHTML = opts(true); $('#t-salt').value = String(CH());
   $('#flags-title').textContent = `Per-trade flags, ${runLabel(CH())}`;

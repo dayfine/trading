@@ -13,12 +13,15 @@ FILENAME == ARGV[3] { split($0, a, "\t"); au[a[1] "|" a[2]] = $0; next }
 FILENAME == ARGV[4] { split($0, a, "\t"); nm++; md[nm] = a[1]; mtr[nm] = a[2]; mbr[nm] = a[3]; next }
 FILENAME == ARGV[5] { split($0, a, "\t"); st[a[1]] = $0; next }
 FILENAME == ARGV[6] { split($0, a, "\t"); sfk[a[1]] = a[2]; next }
+# the screen runs at the week's close, so a fill that day has not seen that day's reading: an entry reads the latest
+# screen STRICTLY before it, as V23 does (validator_audit_checks.ml _last_screen_before; #3262). An exit keeps <=.
+function macro_before(d,   i, r) { r = 0; for (i = 1; i <= nm && md[i] < d; i++) r = i; return r }
 function macro_at(d,   i, r) { r = 0; for (i = 1; i <= nm && md[i] <= d; i++) r = i; return r }
 END {
   printf "["
   for (t = 1; t <= nt; t++) {
     split(row[t], c, ",")
-    pid = c[20]; ie = macro_at(c[3]); ix = macro_at(c[4]); bw = 0; hw = 0
+    pid = c[20]; ie = macro_before(c[3]); ix = macro_at(c[4]); bw = 0; hw = 0
     for (i = ie; i <= ix && i > 0; i++) { hw++; if (mtr[i] == "Bearish") bw++ }
     printf "%s{\"id\":%s,\"sym\":%s,\"ed\":%s,\"xd\":%s,\"days\":%s,\"ep\":%s,\"xp\":%s,\"qty\":%s,\"pnl\":%s,\"pct\":%s,\"xs\":%s,\"trig\":%s,\"stg\":%s,\"vr\":%s,\"sid\":%s,\"kind\":%s,\"d1st\":%s,\"score\":%s,\"sfd\":%s,\"maxs\":%s,\"nraise\":%s,\"div\":%s", \
       (t > 1 ? ",\n" : ""), q(pid), q(c[1]), q(c[3]), q(c[4]), n(c[5]), n(c[6]), n(c[7]), n(c[8]), n(c[9]), n(c[10]), n(c[12]), q(c[13]), q(c[14]), n(c[15]), n(c[16]), q(c[17]), n(c[18]), n(c[19]), n(c[21]), n(c[22]), n(c[23]), n(dcol ? c[dcol] : "")
