@@ -218,6 +218,14 @@
                 "real 3:2, 2:1, 1:10 detected rule on and off"))))
  (status fixed-behind-flag))
 
+((issue 3109)
+ (finding "split detector fires on adjusted-series steps with no raw gap (AABA 2000-02-14, KKD 2001-06-15) and on frozen-adjusted-close days")
+ (guard ((unit ("trading/analysis/data/types/test/test_split_detector_misalignment.ml"
+                "strict rule rejects aaba, kkd, frozen days"))
+         (unit ("trading/analysis/data/types/test/test_split_detector_misalignment.ml"
+                "real 2:1 and 1:5 on frozen adjusted close kept"))))
+ (status fixed-behind-flag))
+
 ((issue 3075) (ref "26y investor review pack AAON-wein-951")
  (finding "a ticket resting across a split fills with the trigger unscaled and the stop rescaled; trades.csv stop columns showed the pre-split install")
  (guard ((unit ("trading/trading/backtest/test/test_stop_log_machine_sync.ml"

@@ -22,8 +22,13 @@ open Core
 open Trading_strategy
 
 val detect_split :
-  bar_reader:Bar_reader.t -> symbol:string -> as_of:Date.t -> float option
-(** [detect_split ~bar_reader ~symbol ~as_of] runs
+  ?raw_confirm_min_share:float ->
+  bar_reader:Bar_reader.t ->
+  symbol:string ->
+  as_of:Date.t ->
+  unit ->
+  float option
+(** [detect_split ~bar_reader ~symbol ~as_of ()] runs
     {!Types.Split_detector.detect_split} on [symbol]'s last two daily bars up to
     and including [as_of]. [Some factor] when a split happened between the prior
     trading day and [as_of]; [None] with fewer than two bars or no qualifying
@@ -33,10 +38,17 @@ val detect_split :
     When [bar_reader] carries a {!Bar_reader.split_guard} (issue #3173), a
     detected split the guard identifies as a vendor cash dividend returns
     [None], the same verdict the simulator's held-position split step reaches.
-*)
+
+    [raw_confirm_min_share] (issue #3109, default absent = the pre-#3109
+    behaviour) is passed to {!Types.Split_detector.detect_split}: a factor the
+    raw close gap does not confirm, or a small factor on a frozen-adjusted day,
+    is not a split. A caller that sets it here should set it on
+    [Split_handler.detect_and_apply] too, so the stop and the share count
+    rescale on the same days. *)
 
 val adjust :
   ?on_split:(position_id:string -> factor:float -> unit) ->
+  ?raw_confirm_min_share:float ->
   positions:Position.t Map.M(String).t ->
   stop_states:Weinstein_stops.stop_state Map.M(String).t ref ->
   bar_reader:Bar_reader.t ->
@@ -68,4 +80,7 @@ val adjust :
     no-op; the rescale itself is identical with or without it.
 
     Pure with respect to [bar_reader] and [positions]; the only side-effect is
-    the in-place update of [stop_states] and the [on_split] calls. *)
+    the in-place update of [stop_states] and the [on_split] calls.
+
+    [raw_confirm_min_share] is passed to {!detect_split} for every held
+    position; absent (the default) leaves the detection unchanged. *)

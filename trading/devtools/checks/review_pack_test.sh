@@ -68,6 +68,10 @@
 #     header stamps the pack SHA and snapshot dir; carried from #3214: CROOT from the mount source,
 #     the SPY-truncation abort, a later split under a further split (AVD), side-signed pick vs SPY
 #     and both-sides wording, the replay stage cards' wording.
+#   - #3262 leftovers: the stop breach on raw bars, split-corrected (a dividend payer, both sides, and a
+#     2:1 split mid-hold); a short-only book's eras read against SPY inverted, with short-side wording;
+#     dividends from the run when trades.csv has no dividends_received column; the plurals; a Friday
+#     exit; pack_sha's -dirty; conformance stacked above the validator; the capture unscrolls tables.
 #
 # Run:
 #   sh trading/devtools/checks/review_pack_test.sh
@@ -967,5 +971,125 @@ expect_eq "#3262 short wording: hard stop, breach lag, grade rubric and agenda n
   "$(grep -c 'for a short, the high reaches entry × (1 + X)' "$S/index.html") $(grep -c 'its low for a long, its high for a short' "$S/index.html") $(grep -c 'rose for a long, fell for a short' "$S/index.html") $(grep -c 'a Stage 4 breakdown for a short' "$S/index.html") $(grep -c 'X% below entry\|whose low reached\|then the stock rose ≥ 15%' "$S/index.html")"
 expect_eq "#3262 stage cards: both replay cards say the replay classifier is a second opinion vs the audited reading" 2 \
   "$(sed -n '/^const FLAGS = \[/,/^\];/p' "$S/index.html" | grep -c 'replay classifier (stage_chart: the default stage config on adjusted weekly closes).*R1/R3')"
+# #3262 (from #3214 item 8) the stop breach reads RAW bars against the raw stop, moved only by a split: the
+# adjusted basis drifts across the line on every dividend. Each name's factor steps on Mon 2020-02-10
+# (bars to 02-07 carry it, from 02-10 it is 1); all enter Wed 2020-01-29 and exit Fri 2020-02-21 on stop_loss.
+#   DVS short 100, stop 105, factor 0.97 (a 3 % dividend; a 5 % one snaps to 20/19, the simulator's #3104 misfire): raw highs 101 then 103, 106 on the exit bar -> lag 0.
+#       The adjusted reading (stop 101.85 on the entry basis, highs 103 from the ex-date) breached on 02-10, lag 9.
+#   DVL long 100, stop 95, factor 0.97: raw lows 99 then 94.5 from 02-10 -> breached on 02-10, lag 9.
+#       The adjusted reading (stop 92.15) never saw it: lag -1.
+#   SPL long 100, stop 90, factor 0.5 (a 2:1 split on 02-10): raw lows 99, then 46 (stop 45 after the split),
+#       44 on the exit bar -> lag 0. Without the split correction the 46 lows read as a breach on 02-10.
+BR="$TMP/breach"; mkdir -p "$BR/run" "$BR/data/S/Y"; cp "$FIX"/run/* "$BR/run/"; cp -R "$FIX/data/S/Y/SPY" "$BR/data/S/Y/"
+brbars() { # $1 symbol, $2 factor before 02-10, then pre / post / exit-bar "open high low close" (raw)
+  dd="$BR/data/$(printf %s "$1" | cut -c1)/$(printf %s "$1" | rev | cut -c1)/$1"; mkdir -p "$dd"
+  awk -F, -v fac="$2" -v pre="$3" -v post="$4" -v xb="$5" 'NR == 1 { print; next }
+    { b = ($1 < "2020-02-10") ? pre : ($1 == "2020-02-21") ? xb : post; split(b, p, " ")
+      printf "%s,%.2f,%.2f,%.2f,%.2f,%.4f,100000,\n", $1, p[1], p[2], p[3], p[4], p[4] * ($1 < "2020-02-10" ? fac : 1) }' \
+    "$FIX/data/A/A/AAA/data.csv" > "$dd/data.csv"
+}
+brbars DVS 0.97 "100 101 99 100" "100 103 98 100" "104 106 103 105"
+brbars DVL 0.97 "100 101 99 100" "96 97 94.5 96" "96 97 94 95"
+brbars SPL 0.5 "100 101 99 100" "48 50 46 48" "46 47 44 45"
+# 6:5 and an 11:10 stock dividend: under the 1.25 jump the first rework used, so their post-split lows read as
+# a breach on 02-10 (lag 9); the simulator's rule (over 5 %, snaps to N/M) moves the line -> lag 0 (QC rework 1)
+brbars SSX 0.833333 "100 101 99 100" "80 82 76 80" "78 79 74 75"
+brbars SEL 0.909091 "100 101 99 100" "88 90 82.5 88" "85 86 81 82"
+# a 7 % special dividend (x = 1.0753, no N/M within 1e-3: 14/13 is 1.6e-3 away) is not a split for the simulator,
+# so its stop and the line stay put: DV7's raw lows of 94.5 breach the 95 stop on 02-10 (lag 9; QC rework 2)
+brbars DV7 0.93 "100 101 99 100" "96 97 94.5 96" "96 97 94 95"
+{ head -1 "$FIX/run/trades.csv"
+  echo "DVS,SHORT,2020-01-29,2020-02-21,23,100.00,105.00,1000,-5000.00,-5.00,105.00,105.00,stop_loss,Stage4,1.5000,0.0500,intraday,23,100,DVS-wein-1,,105.00,0"
+  echo "DVL,LONG,2020-01-29,2020-02-21,23,100.00,95.00,1000,-5000.00,-5.00,95.00,95.00,stop_loss,Stage2,1.5000,0.0500,intraday,23,100,DVL-wein-1,,95.00,0"
+  echo "SPL,LONG,2020-01-29,2020-02-21,23,100.00,45.00,1000,-10000.00,-10.00,90.00,45.00,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SPL-wein-1,,90.00,0"
+  echo "SSX,LONG,2020-01-29,2020-02-21,23,100.00,75.00,1000,-5000.00,-5.00,90.00,75.00,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SSX-wein-1,,90.00,0"
+  echo "SEL,LONG,2020-01-29,2020-02-21,23,100.00,82.00,1000,-1000.00,-1.00,90.00,81.82,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SEL-wein-1,,90.00,0"
+  echo "DV7,LONG,2020-01-29,2020-02-21,23,100.00,95.00,1000,-5000.00,-5.00,95.00,95.00,stop_loss,Stage2,1.5000,0.0500,intraday,23,100,DV7-wein-1,,95.00,0"; } > "$BR/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$BR/data" --out "$BR/pack" r0="$BR/run/" >"$BR/log" 2>&1 || rc=$?
+expect_eq "#3262 raw breach: builds, exit 0" 0 "$rc"
+expect_eq "#3262 raw breach: a dividend does not move the line (DVS 0, DVL 9); a 2:1, a 6:5 and an 11:10 split do (SPL SSX SEL 0); a 7 % special dividend that snaps to no N/M does not (DV7 9)" "DVS:0 DVL:9 SPL:0 SSX:0 SEL:0 DV7:9" \
+  "$(jq -r '[.[] | "\(.sym):\(.blag)"] | join(" ")' "$BR/pack/site/data/r0_trades.json")"
+# #3262 (from #3214 item 5) a short-only book reads the eras against SPY inverted: the year-end ratio
+# compounds -SPY, the daily benchmark earns minus SPY's daily move, and the regime wording names what a short
+# book does in each regime (cash in a rising market protects it; cash through a decline misses it).
+if command -v node >/dev/null 2>&1; then
+  ERF="$(sed -n -e '/^const fmt = /p' -e '/^const pct = /p' -e '/^const REGIME_CASH_PCT/p' -e '/^function regimeText(/,/^}/p' -e '/^function eraPoints(/,/^}/p' -e '/^function benchSeries(/,/^}/p' "$S/index.html")"
+  er() { node -e "$ERF
+console.log($1)"; }
+  expect_eq "#3262 eras: all three era functions extracted" 3 "$(printf '%s\n' "$ERF" | grep -c '^function ')"
+  expect_eq "#3262 eraPoints: a long book compounds the year table's SPY (+10 % vs +10 % = 1; then +21 % vs +21 % = 1)" "1.000 1.000" \
+    "$(er '[eraPoints([{ p: "2001", ret: 10, spy: 10 }])[1][1], eraPoints([{ p: "2001", ret: 10, spy: 10 }, { p: "2002", ret: 21, spy: 21 }])[2][1]].map(v => v.toFixed(3)).join(" ")')"
+  # QC rework 1: a short book's year-end points read the daily-inverted series the chart reads. Three years of
+  # SPY alternating +-1.2 % a day with a flat NAV: the ratio column's end equals the chart's last point
+  # (NAV / benchSeries, both from 1), and differs from inverting each year's SPY return (the volatility drag).
+  expect_eq "#3262 eraPoints: a short book's ratio ends at the chart's last point, not at the per-year inversion" "same differs" \
+    "$(er '(() => { const spy = []; let v = 100; for (let i = 0; i < 756; i++) { v *= i % 2 ? 0.988 : 1.012; spy.push([`${2001 + Math.floor(i / 252)}-01-01`, v]); }
+      const yr = y => spy.filter(r => r[0].startsWith(y)), b = benchSeries(spy, -1);
+      const ys = ["2001", "2002", "2003"].map((y, k) => ({ p: y, ret: 0, spy: 100 * (yr(y).slice(-1)[0][1] / (k ? yr(String(2000 + k)).slice(-1)[0][1] : spy[0][1]) - 1) }));
+      const end = eraPoints(ys, b).slice(-1)[0][1], chart = 1 / (b.slice(-1)[0][1] / b[0][1]);
+      let m = 1; ys.forEach(y => { m *= 1 - y.spy / 100; });
+      return [Math.abs(end - chart) < 1e-9 ? "same" : "chart " + chart + " vs " + end, Math.abs(end - 1 / m) > 0.01 ? "differs" : "equal"].join(" "); })()')"
+  expect_eq "#3262 benchSeries: SPY unchanged for a long book; inverted day by day for a short book (100, 110, 99 -> 100, 90, 99: -10 %, then +10 %)" "same|100.00,90.00,99.00" \
+    "$(er '(s => [benchSeries(s) === s ? "same" : "copy", benchSeries(s, -1).map(r => r[1].toFixed(2)).join(",")].join("|"))([["a", 100], ["b", 110], ["c", 99]])')"
+  expect_eq "#3262 regimeText: a long book's cash in a rising market is a miss; a short book's is protection" \
+    "in cash while the market rose|held up while the market rose|shorts lost more than the market rose" \
+    "$(er '[regimeText("UP", 2, 20, 10), regimeText("UP", -2, -20, 10, -1), regimeText("UP", -30, -20, 80, -1)].map(s => s.split(" (")[0]).join("|")')"
+  expect_eq "#3262 regimeText: a short book in a decline led, sat in cash, or lagged; the text names inverted SPY and % short" \
+    "shorts led the decline|in cash through the decline|shorts lagged the decline|yes" \
+    "$(er '[regimeText("DOWN", 25, 20, 80, -1), regimeText("DOWN", 2, 20, 10, -1), regimeText("DOWN", 8, 20, 80, -1)].map(s => s.split(" (")[0]).concat(/DOWN days: \+25\.0% vs inverted SPY \+20\.0% at 80% short/.test(regimeText("DOWN", 25, 20, 80, -1)) ? "yes" : "no").join("|")')"
+  expect_eq "#3262 regimeText: the long wording is unchanged (UP lagged at 62 %, DOWN rebounds, MIXED)" \
+    "holdings lagged while the market rose (UP days: +1.0% vs SPY +9.0% at 62% invested) — not an exposure effect|in cash through rebounds|behind in transition weeks" \
+    "$(er '[regimeText("UP", 1, 9, 62), regimeText("DOWN", 1, 9, 20).split(" (")[0], regimeText("MIXED", 1, 9, 20).split(" (")[0]].join("|")')"
+else
+  echo "SKIP: review_pack #3262 era cases need node"
+fi
+expect_eq "#3262 eras wiring: renderSignals reads eraPoints / benchSeries / regimeText with the book's dir; the heading names the benchmark" "1 1 2 1" \
+  "$(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'const pts = eraPoints(ys, shortBook ? bench : null);') $(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'bench = benchSeries(spy, dir)') $(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -o 'regimeText(r.key2\{0,1\}, x2\{0,1\}.s, x2\{0,1\}.m, x2\{0,1\}.expo, dir)' | wc -l | tr -d ' ') $(grep -c "\$('#eras-h').textContent = \`Eras vs \${BL}\`" "$S/index.html")"
+expect_eq "#3262 raw breach: the late-stop card says it reads raw bars, split-corrected" 1 "$(grep -c 'Read on raw bars against the raw stop, moved only by a split since the entry' "$S/index.html")"
+# #3262 QC follow-ups on #3281 and the #3214 first comment: plurals, dividends without the column, a Friday
+# exit, the -dirty stamp, the stacked conformance panel and the unscrolled capture.
+if command -v node >/dev/null 2>&1; then
+  PLF="$(sed -n -e '/^const fmt = /p' -e '/^const usdk = /p' -e '/^const MARGIN_CHURN_PRICE/p' -e '/^function marginChurnLine(/,/^}/p' -e '/^function noBarFillLine(/,/^}/p' -e '/^function realisedDivs(/,/^}/p' -e '/^function realisedTotalNote(/,/^}/p' "$S/index.html")"
+  pl() { node -e "$PLF
+console.log($1)"; }
+  expect_eq "#3262 plurals: no-bar fills 1 / 2 and V16 fallback exits 1 / 68 agree with their counts" \
+    "1 trade has|2 trades have|1 fallback exit in all|68 fallback exits in all" \
+    "$(pl '[noBarFillLine(1, "PASS"), noBarFillLine(2, "PASS")].map(s => s.match(/\d+ trades? ha(s|ve)/)[0]).concat([1, 68].map(v => marginChurnLine({ fires: true, low: 5, calls: 6, syms: 2, repeat: 1, pnl: -1e3 }, v, []).match(/\d+ fallback exits? in all/)[0])).join("|")')"
+  expect_eq "#3262 realisedDivs: the trade rows when trades.csv has the column (a 0 is still the column); the run's DividendIncomeTotal when every row is null" \
+    '[{"v":450,"src":"rows"},{"v":0,"src":"rows"},{"v":1230000,"src":"run"},{"v":0,"src":"run"}]' \
+    "$(pl 'JSON.stringify([realisedDivs([{ div: 450 }, { div: 0 }], { dividendincometotal: 9 }), realisedDivs([{ div: 0 }], { dividendincometotal: 9 }), realisedDivs([{ div: null }, {}], { dividendincometotal: 1230000 }), realisedDivs([{ div: null }], {})])')"
+  expect_eq "#3262 realisedTotalNote: a run total says where it came from" yes \
+    "$(pl '/\$1\.23M of dividends \(the run.s DividendIncomeTotal: this trades.csv has no dividends_received column\)/.test(realisedTotalNote(1230000, 914000, "run")) ? "yes" : "no"')"
+else
+  echo "SKIP: review_pack #3262 plural / dividend cases need node"
+fi
+expect_eq "#3262 wiring: the overview reads noBarFillLine and realisedDivs" "1 1" \
+  "$(grep -c '^    noBarFillLine(wk.length, ' "$S/index.html") $(grep -c 'realisedTotalNote(dv.v, inv.metrics.cashinteresttotal, dv.src))(realisedDivs(t, inv.metrics))' "$S/index.html")"
+# Friday EXIT: the exit week is the screen strictly before the exit too. G1 exits Fri 2020-01-24, the day of a
+# Bullish screen that runs after the close -> Bearish (01-17); with <= it would read Bullish.
+FX="$TMP/friexit"; mkdir -p "$FX"; cp -R "$FR/run" "$FX/run"; rm -f "$FX/run/open_positions.csv"
+{ head -1 "$FIX/run/trades.csv"
+  echo "AAA,LONG,2020-01-08,2020-01-24,12,100.00,100.00,10,0.00,0.00,,,laggard_rotation,Stage2,2.5000,0.0400,non_stop_exit,,100,AAA-G1,,,0"; } > "$FX/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$FX/pack" r0="$FX/run/" >"$FX/log" 2>&1 || rc=$?
+expect_eq "#3262 Friday exit: builds; the exit reads the screen before it (Bearish 01-17), entry the 01-03 screen" "0 Bullish Bearish" \
+  "$rc $(jq -r '.[0] | "\(.mE) \(.mX)"' "$FX/pack/site/data/r0_trades.json")"
+# pack_sha: HEAD, HEAD-dirty when the pack code is edited, HEAD again when only another path is, unknown outside git
+. "$ROOT/dev/lib/review_pack/pack_sha.sh"
+GR="$TMP/gitrepo"; mkdir -p "$GR/dev/lib/review_pack" "$GR/other"
+( cd "$GR" && git init -q && echo a > dev/lib/review_pack/x && echo a > other/y && git add . &&
+  git -c user.name=t -c user.email=t@t commit -qm init ) >/dev/null 2>&1
+h=$(git -C "$GR" rev-parse --short=9 HEAD 2>/dev/null || echo none)
+c1=$(pack_sha "$GR"); echo b > "$GR/other/y"; c2=$(pack_sha "$GR"); echo b > "$GR/dev/lib/review_pack/x"; c3=$(pack_sha "$GR")
+expect_eq "#3262 pack_sha: clean, another path edited, the pack code edited, not a git checkout" "$h|$h|$h-dirty|unknown" "$c1|$c2|$c3|$(pack_sha "$TMP/nogit-$$")"
+expect_eq "#3262 pack_sha: review_pack.sh sources it and stamps the repo's" "1 1" \
+  "$(grep -c '^\. "$LIB/pack_sha.sh"$' "$SCRIPT") $(grep -c -- '--arg pack_sha "$(pack_sha "$REPO")"' "$SCRIPT")"
+# conformance above the validator, full width: side by side, a long validator list left the table's column blank
+expect_eq "#3262 conformance panel: stacked above the validator, not in a grid2 beside it" "1 1 0" \
+  "$(grep -c '^  <div class="panel" id="conf-panel">$' "$S/index.html") $(grep -c '^  <div class="panel" id="validator-panel">$' "$S/index.html") $(sed -n '/<section class="view" id="v-surprises"/,/<\/section>/p' "$S/index.html" | grep -c 'class="grid2"')"
+# the capture unscrolls every table box but the per-trade one (inline.html from the stub render above)
+expect_eq "#3262 render: the capture unscrolls every table box but the per-trade one" 1 \
+  "$(grep -c '^<style>.tablebox:not(:has(#t-table)) { max-height: none !important; }</style>$' "$TMP/render-ok/inline.html")"
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

@@ -14,7 +14,8 @@
 #
 # Writes OUT/inline.html (the page with every data/*.json embedded behind a
 # fetch shim, so it loads from file:// -- the published page fetches data/
-# relative to itself, which file:// cannot do) and the screenshots:
+# relative to itself, which file:// cannot do; every table box but the per-trade one is
+# unscrolled, so a long year or quarter table is captured whole) and the screenshots:
 #   OUT/top.png     the first screen: KPIs, equity vs SPY, drawdown + exposure, macro gate
 #   OUT/full.png    the WHOLE page at its measured height (#3177: a fixed 9000 px
 #                   capture cut the page after the validator's V8 and left the
@@ -84,6 +85,9 @@ data=$OUT/data.json
   printf '    var body = JSON.stringify(window.__PACK__[k]);\n'
   printf '    return Promise.resolve(new Response(body, { headers: { "Content-Type": "application/json" } })); }\n'
   printf '  return real.call(this, u, o); }; })();</script>\n'
+  # the capture shows every bounded table whole (#3262, from #3214: "Returns by year" and "Were the picks
+  # bad" scrolled inside their boxes and were cut at 2022/2023); only the per-trade table keeps its scroll box
+  printf '<style>.tablebox:not(:has(#t-table)) { max-height: none !important; }</style>\n'
   grep -v '^<meta charset="utf-8">$' "$SITE/index.html"
   printf '<script>setInterval(function () { document.documentElement.setAttribute("data-page-h", document.documentElement.scrollHeight); }, 200);</script>\n'
 } > "$OUT/inline.html"

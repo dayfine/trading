@@ -1,3 +1,6 @@
 (tests
- (names test_split_detector test_daily_price)
+ (names
+  test_split_detector
+  test_split_detector_misalignment
+  test_daily_price)
  (libraries core ounit2 matchers types))

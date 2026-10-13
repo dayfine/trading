@@ -46,6 +46,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 CONTAINER="${CONTAINER:-trading-1-dev}"
 MOUNT=/workspaces/trading-1   # where the container bind-mounts the host checkout; CROOT is set from it
 . "$LIB/croot.sh"
+. "$LIB/pack_sha.sh"
 REGIME_WARMUP_ROWS=180   # SPY bars published before the window for the regime warm-up (#3194)
 
 OUT=""; TITLE="Backtest Review"; SUBTITLE=""; CHARTS=0
@@ -189,11 +190,6 @@ host_run() { # $1 label, $2 index
     | "WARN open positions on \(.date): pack marks \(.pack + 0), actual.sexp open_positions_value \(.actual + 0)"' "$s/$1_open.json" |
     while IFS= read -r w; do log "$1: $w"; done
 }
-pack_sha() { # the pack code's commit, "-dirty" when its files differ from it; "unknown" outside git (#3262)
-  v=$(git -C "$REPO" rev-parse --short=9 HEAD 2>/dev/null) || { echo unknown; return; }
-  [ -z "$(git -C "$REPO" status --porcelain -- dev/lib/review_pack dev/scripts/review_pack.sh 2>/dev/null)" ] || v="$v-dirty"
-  echo "$v"
-}
 site_common() {
   s="$OUT/site/data"; cl=$(charts_label); d="$OUT/runs/$cl"
   first=$(sed -n 2p "$d/equity_curve.csv" | cut -d, -f1); last=$(tail -1 "$d/equity_curve.csv" | cut -d, -f1)
@@ -216,7 +212,7 @@ site_common() {
   snap_used=""; [ "$DOCKER" = 1 ] && snap_used=$SNAP
   runs_json=$(labels | jq -R -s -c 'split("\n") | map(select(length > 0) | {id: ., label: .})')
   jq -n --arg title "$TITLE" --arg subtitle "$SUBTITLE" --argjson charts "$CHARTS" --argjson runs "$runs_json" --arg kind "$(run_kind)" \
-    --arg pack_sha "$(pack_sha)" --arg snap "$snap_used" \
+    --arg pack_sha "$(pack_sha "$REPO")" --arg snap "$snap_used" \
     '{title: $title, subtitle: $subtitle, charts_run: $charts, runs: $runs, run_kind: $kind, pack_sha: $pack_sha, snapshot_dir: $snap}' > "$s/manifest.json"
   # the page <title> carries --title (HTML-escaped); the template default is a placeholder
   TITLE="$TITLE" awk 'BEGIN { t = ENVIRON["TITLE"]; gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t) }
