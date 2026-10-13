@@ -41,19 +41,29 @@ let ex_dividend_stops_summary eds =
 type t = {
   split_guard : Split_dividend_guard.t option;
   ex_dividend_stops : Ex_dividend_stop.t option;
+  split_divisor : (symbol:string -> Date.t -> float) option;
 }
+
+(* Splits are read lazily, only for a symbol a liquidity reading asks about. *)
+let split_divisor ~(config : Weinstein_strategy.config) ~data_dir =
+  Option.some_if config.liquidity_config.true_dollar_volume
+    (True_dollar_divisor.of_data_dir ~data_dir)
 
 let create ~config ~data_dir =
   {
     split_guard = split_guard ~config ~data_dir;
     ex_dividend_stops = ex_dividend_stops ~config ~data_dir;
+    split_divisor = split_divisor ~config ~data_dir;
   }
 
 let arm_bar_reader t reader =
   let reader = guard_bar_reader t.split_guard reader in
-  match t.ex_dividend_stops with
-  | None -> reader
-  | Some eds -> Weinstein_strategy.Bar_reader.with_ex_dividend_stops reader eds
+  let reader =
+    Option.value_map t.ex_dividend_stops ~default:reader
+      ~f:(Weinstein_strategy.Bar_reader.with_ex_dividend_stops reader)
+  in
+  Option.value_map t.split_divisor ~default:reader
+    ~f:(Weinstein_strategy.Bar_reader.with_split_divisor reader)
 
 let log t =
   log_split_guard t.split_guard;

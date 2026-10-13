@@ -215,6 +215,18 @@ val with_ex_dividend_stops : t -> Ex_dividend_stop.t -> t
 (** [with_ex_dividend_stops t eds] is [t] with {!ex_dividend_stops} set to
     [Some eds]; every read is unchanged. *)
 
+val split_divisor_for : t -> symbol:string -> (Date.t -> float) option
+(** [split_divisor_for t ~symbol] is [symbol]'s split divisor [F]: for a bar
+    dated [d], the product of the factors of the splits after [d] that the
+    stored volume is restated for (issue #3136). {!Liquidity_metric.dollar_adv}
+    divides each bar's [close *. volume] by it, giving true dollars traded.
+    [None] (every constructor's default) keeps the stored product. *)
+
+val with_split_divisor : t -> (symbol:string -> Date.t -> float) -> t
+(** [with_split_divisor t f] is [t] with {!split_divisor_for} reading [f]; every
+    read is unchanged. Armed by the backtest when
+    [Liquidity_config.true_dollar_volume] is on. *)
+
 val daily_bars_for :
   t -> symbol:string -> as_of:Date.t -> Types.Daily_price.t list
 (** [daily_bars_for t ~symbol ~as_of] returns daily bars for [symbol] up to and

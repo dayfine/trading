@@ -8,6 +8,7 @@
   fpath
   status
   types
+  universe
   weinstein.data_source
   trading.data_panel
   trading.data_panel.snapshot

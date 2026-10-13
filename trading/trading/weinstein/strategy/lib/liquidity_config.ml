@@ -32,6 +32,7 @@ type t = {
   adv_aggregation : Liquidity_metric.aggregation;
       [@sexp.default default_adv_aggregation]
   adv_trim_pct : float; [@sexp.default default_adv_trim_pct]
+  true_dollar_volume : bool; [@sexp.default false]
 }
 [@@deriving sexp]
 
@@ -42,4 +43,5 @@ let default_config =
     min_hold_dollar_adv = 0.0;
     adv_aggregation = default_adv_aggregation;
     adv_trim_pct = default_adv_trim_pct;
+    true_dollar_volume = false;
   }

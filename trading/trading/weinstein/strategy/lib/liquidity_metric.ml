@@ -9,9 +9,11 @@ type aggregation = Mean | Median | Trimmed_mean
    the body of the distribution. *)
 let default_trim_pct = 0.1
 
-(** Dollar volume of a single bar: close price times share volume. *)
-let _bar_dollar_volume (bar : Types.Daily_price.t) =
-  bar.close_price *. Float.of_int bar.volume
+(** Dollar volume of a single bar: close price times share volume, divided by
+    [split_divisor bar.date] when given (issue #3136). *)
+let _bar_dollar_volume ?split_divisor (bar : Types.Daily_price.t) =
+  let stored = bar.close_price *. Float.of_int bar.volume in
+  match split_divisor with None -> stored | Some f -> stored /. f bar.date
 
 (** [bars] is oldest-first; take the trailing [lookback_days] bars (or all of
     them when fewer are available — never pads). *)
@@ -60,11 +62,13 @@ let _aggregate ~aggregation ~trim_pct values =
   | Trimmed_mean -> _trimmed_mean ~trim_pct (_sorted_array values)
 
 let dollar_adv ?(aggregation = Mean) ?(trim_pct = default_trim_pct)
-    ~lookback_days (bars : Types.Daily_price.t list) =
+    ?split_divisor ~lookback_days (bars : Types.Daily_price.t list) =
   if lookback_days <= 0 then None
   else
     match _trailing_window ~lookback_days bars with
     | [] -> None
     | window ->
-        let dollar_volumes = List.map window ~f:_bar_dollar_volume in
+        let dollar_volumes =
+          List.map window ~f:(_bar_dollar_volume ?split_divisor)
+        in
         Some (_aggregate ~aggregation ~trim_pct dollar_volumes)

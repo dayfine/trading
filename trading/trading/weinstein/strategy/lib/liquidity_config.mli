@@ -67,6 +67,19 @@ type t = {
       (** Fraction trimmed from {i each} tail of the sorted window when
           [adv_aggregation = Trimmed_mean]. {b Ignored} for [Mean] and [Median].
           Default {!Liquidity_metric.default_trim_pct} ([0.1]). *)
+  true_dollar_volume : bool;
+      (** Score every threshold above on true dollars traded (raw close times
+          raw volume, issue #3136) instead of the stored [close *. volume],
+          whose volume is restated for later splits. When [true] the backtest
+          arms the bar reader with a per-symbol split divisor
+          ({!Bar_reader.with_split_divisor}) read from each symbol's
+          [splits.csv]; a symbol with no file reads [1.0] (no splits).
+          {b Default [false]} (the pre-#3136 reading, bit-identical) and
+          unpromoted: it moves the entry gate, the held-position exit and
+          {!Short_borrow_gate}, so a default flip needs a paired golden run
+          ([config-default-blast-radius.md]). Axis:
+          [((key (liquidity_config true_dollar_volume)) (values (false true)))].
+      *)
 }
 [@@deriving sexp]
 

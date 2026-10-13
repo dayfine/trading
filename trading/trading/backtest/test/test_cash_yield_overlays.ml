@@ -181,12 +181,18 @@ let test_arm_bar_reader_and_summary _ =
   let eds = Ex_dividend_stop.of_data_dir ~data_dir:(Fpath.v "/x") in
   let module P = Backtest.Panel_corporate_actions in
   let armed =
-    P.arm_bar_reader { split_guard = None; ex_dividend_stops = Some eds } reader
+    P.arm_bar_reader
+      { split_guard = None; ex_dividend_stops = Some eds; split_divisor = None }
+      reader
   in
   assert_that
     ( phys_equal
         (P.arm_bar_reader
-           { split_guard = None; ex_dividend_stops = None }
+           {
+             split_guard = None;
+             ex_dividend_stops = None;
+             split_divisor = None;
+           }
            reader)
         reader,
       Option.is_some (Weinstein_strategy.Bar_reader.ex_dividend_stops armed),
