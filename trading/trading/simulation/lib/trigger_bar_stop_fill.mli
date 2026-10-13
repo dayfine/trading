@@ -83,3 +83,18 @@ val execute :
     [date] ({!Fill_date_stamp}). A converted order the pass did not fill is
     reverted to [Market] in the order manager. [[]] in, [Ok []] out, with no
     engine or manager call. *)
+
+val stop_fill_position_ids :
+  positions:Trading_strategy.Position.t Core.String.Map.t ->
+  today_bars:Trading_engine.Types.price_bar list ->
+  Trading_strategy.Position.transition list ->
+  Core.String.Set.t
+(** [stop_fill_position_ids ~positions ~today_bars transitions] is the set of
+    position ids whose [TriggerExit] in [transitions] carries
+    [StopLoss { stop_price; _ }] AND passes the conversion guard above: the
+    position's symbol has a fresh bar in [today_bars] that trades through
+    [stop_price] on the position's exit side (low [<=] stop for a long, high
+    [>=] stop for a short). These are the exits {!select} would re-type as
+    same-bar [Stop] orders when armed. A position id absent from [positions] is
+    not included. Used by {!Margin_runner.tick} to let such a stop fill win a
+    same-day margin-cover collision (issue #3206). *)

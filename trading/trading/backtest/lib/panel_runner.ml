@@ -66,8 +66,7 @@ let _entry_cap_for_sim (config : Weinstein_strategy.config) : float option =
   else None
 
 (* #2961 same-bar stop fills: inert under [trigger_on_weekly_close], whose stop
-   is decided at the close rather than resting — an intraday fill would use
-   prices from before that decision. *)
+   is decided at the close, so an intraday fill would precede the decision. *)
 let _stop_fill_on_trigger_bar (config : Weinstein_strategy.config) =
   Trigger_bar_stop_fill.enabled ~flag:config.sim_stop_exit_fill_on_trigger_bar
     ~trigger_on_weekly_close:config.stops_config.trigger_on_weekly_close
@@ -88,12 +87,11 @@ let _entry_fill_resize (config : Weinstein_strategy.config) =
    reasons ([margin_call] / [buyin_stress] / [maintenance_reduce]) never reach
    [stop_log] at all. [Stop_log.record_transitions] is idempotent w.r.t.
    re-recording the same transition, so the two paths overlapping on
-   strategy-only days is harmless. On a same-tick collision
-   [Margin_runner.dedup_strategy_exits_for_margin] drops the strategy's
-   [TriggerExit] and only margin's executes, but since #3147 the later
-   [on_transitions] call does not overwrite the wrapper's same-day strategy
-   trigger: the label keeps the stop-loss / force liquidation the audit records
-   (pinned by [test_margin_exit_observability.ml]
+   strategy-only days is harmless. On a same-tick collision margin's exit
+   executes (unless #3206's stop-fill precedence is armed), but since #3147
+   the later [on_transitions] call keeps the wrapper's same-day label (the
+   stop-loss / force liquidation the audit records; pinned by
+   [test_margin_exit_observability.ml]
    [test_stop_log_keeps_stop_loss_on_strategy_collision]).
 
    [Simulator.dependencies.on_transitions] is a single optional slot, so the
@@ -138,6 +136,8 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
         input.config.sim_entry_stoplimit_fresh_bar_only
       ~sim_stop_exit_fill_on_trigger_bar:
         (_stop_fill_on_trigger_bar input.config)
+      ~sim_stop_fill_beats_margin_cover:
+        input.config.sim_stop_fill_beats_margin_cover
       ~entry_fill_reject_retries:input.config.entry_fill_reject_retries
       ~entry_fill_resize:(_entry_fill_resize input.config)
       ?cash_yield:(_cash_yield_accrual input ~start_date)

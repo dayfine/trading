@@ -122,15 +122,14 @@ type config = {
       [@sexp.default Entry_freshness.Ma_cross]
       (** See [.mli]. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]  (** See [.mli]. *)
-  continuation_stop_at_pullback_low : bool; [@sexp.default false]
-      (** See [.mli]. *)
+  continuation_stop_at_pullback_low : bool; [@sexp.default false]  (** .mli *)
   require_structural_stop : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_exit_fill_next_open : bool; [@sexp.default true]  (** See [.mli]. *)
   sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]  (** .mli *)
   sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]  (** .mli *)
-  freeze_entry_at_first_breakout : bool; [@sexp.default false]
-      (** See [.mli]. *)
+  sim_stop_fill_beats_margin_cover : bool; [@sexp.default false]  (** .mli *)
+  freeze_entry_at_first_breakout : bool; [@sexp.default false]  (** .mli *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_order_max_rest_weeks : int; [@sexp.default 52]  (** See [.mli]. *)
   short_cancel_on_non_bearish : bool; [@sexp.default false]  (** .mli *)
@@ -267,6 +266,7 @@ let default_config ~universe ~index_symbol =
     sim_exit_fill_next_open = true;
     sim_entry_stoplimit_fresh_bar_only = false;
     sim_stop_exit_fill_on_trigger_bar = false;
+    sim_stop_fill_beats_margin_cover = false;
     freeze_entry_at_first_breakout = false;
     enable_entry_ticket_rescreen = false;
     entry_order_max_rest_weeks = 52;

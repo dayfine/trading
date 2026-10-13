@@ -113,8 +113,24 @@ let _drop_buyins_colliding_with_covers ~short_cover_trans ~buyin_trans =
     List.filter buyin_trans ~f:(fun (t : Position.transition) ->
         not (Set.mem cover_ids t.position_id))
 
-let tick ~margin_config ~long_margin_rate_annual_pct ~maintenance_long_pct
-    ~portfolio ~positions ~today_bars ~date ~strategy_transitions =
+(* #3206: with [stop_fill_beats_margin_cover], a strategy [StopLoss] exit that
+   fills on today's bar (the stop traded intraday, before the close-time
+   maintenance check) keeps its exit; the colliding margin exit is dropped.
+   Off: every margin exit is kept, as before. *)
+let _drop_margin_exits_preempted_by_stops ~stop_fill_beats_margin_cover
+    ~positions ~today_bars ~strategy_transitions margin_trans =
+  if not stop_fill_beats_margin_cover then margin_trans
+  else
+    let stop_ids =
+      Trigger_bar_stop_fill.stop_fill_position_ids ~positions ~today_bars
+        strategy_transitions
+    in
+    List.filter margin_trans ~f:(fun (t : Position.transition) ->
+        not (Set.mem stop_ids t.position_id))
+
+let tick ~stop_fill_beats_margin_cover ~margin_config
+    ~long_margin_rate_annual_pct ~maintenance_long_pct ~portfolio ~positions
+    ~today_bars ~date ~strategy_transitions =
   let prices = mark_prices today_bars in
   let portfolio = accrue_borrow_fee ~margin_config ~portfolio ~prices in
   let portfolio =
@@ -132,7 +148,11 @@ let tick ~margin_config ~long_margin_rate_annual_pct ~maintenance_long_pct
     |> fun buyin_trans ->
     _drop_buyins_colliding_with_covers ~short_cover_trans ~buyin_trans
   in
-  let margin_trans = short_cover_trans @ long_reduce_trans @ buyin_trans in
+  let margin_trans =
+    short_cover_trans @ long_reduce_trans @ buyin_trans
+    |> _drop_margin_exits_preempted_by_stops ~stop_fill_beats_margin_cover
+         ~positions ~today_bars ~strategy_transitions
+  in
   let strategy_transitions =
     dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans
   in

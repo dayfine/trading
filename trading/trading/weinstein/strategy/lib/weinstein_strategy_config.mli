@@ -1494,6 +1494,33 @@ type config = {
           [((flag sim_stop_exit_fill_on_trigger_bar) (values (true false)))].
           Weinstein-faithful: spine untouched, only the fill assumption changes.
       *)
+  sim_stop_fill_beats_margin_cover : bool; [@sexp.default false]
+      (** A protective stop that fills on its trigger bar beats a same-day
+          margin exit for the same position (issue #3206).
+
+          {b The gap it closes.} With [sim_stop_exit_fill_on_trigger_bar] armed,
+          a [StopLoss] exit fills intraday on the bar that traded the stop. When
+          the margin pass flags the same position that day (a short's
+          maintenance cover, a long's maintenance reduce, a buy-in), the #1266
+          collision rule keeps the margin exit and drops the stop, so the
+          position is covered at the NEXT open instead, often well past the stop
+          on a squeeze. The stop is a resting order that trades during the bar;
+          the maintenance check runs on the close, after it. Specimens: ALX
+          2008-11-25 and SUN1 2009-05-07 on the short-only Phase A soT run
+          (#3135 D6, #3147).
+
+          When [true] (and same-bar stop fills are armed and in force), a
+          [StopLoss] exit whose bar trades through its stop keeps its exit and
+          the colliding margin exits are dropped
+          ({!Trading_simulation.Margin_runner.tick}). A [StopLoss] whose bar
+          does not reach the stop, and every other strategy exit, still lose to
+          margin. Inert without [sim_stop_exit_fill_on_trigger_bar] (both exits
+          then fill at the next open, so precedence only moves the label).
+
+          {b Default [false] = the #1266 precedence, bit-identical to every
+             existing baseline/golden} (R1). R2: axis-expressible as
+          [((flag sim_stop_fill_beats_margin_cover) (values (true false)))].
+          Weinstein-faithful: spine untouched, only fill precedence changes. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2).
 

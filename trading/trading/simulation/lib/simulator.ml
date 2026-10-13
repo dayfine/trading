@@ -30,6 +30,7 @@ type dependencies = {
   entry_extension_max_pct : float option;  (** See .mli. #2158. *)
   fill_gate : Next_open_fill_gate.flags;  (** See .mli. Fix #1 / #1b. *)
   stop_exit_fill_on_trigger_bar : bool;  (** See .mli. #2961. *)
+  stop_fill_beats_margin_cover : bool;  (** See .mli. #3206. *)
   entry_fill_retry : Entry_fill_retry.t;  (** See .mli. G2a retry. *)
   entry_fill_resize : Entry_fill_resize.t;  (** See .mli. G2b resize. *)
   cash_credits : Cash_credits.t;  (** See .mli. #3137 interest + dividends. *)
@@ -56,7 +57,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(sim_entry_fill_next_open = false) ?(sim_exit_fill_next_open = false)
     ?(sim_entry_stoplimit_fresh_bar_only = false)
     ?(sim_stop_exit_fill_on_trigger_bar = false)
-    ?(entry_fill_reject_retries = 0)
+    ?(sim_stop_fill_beats_margin_cover = false) ?(entry_fill_reject_retries = 0)
     ?(entry_fill_resize = Entry_fill_resize.disabled) ?cash_yield ?dividends
     ?split_guard () =
   {
@@ -87,6 +88,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
         ~exits:sim_exit_fill_next_open
         ~stoplimit_entries:sim_entry_stoplimit_fresh_bar_only;
     stop_exit_fill_on_trigger_bar = sim_stop_exit_fill_on_trigger_bar;
+    stop_fill_beats_margin_cover =
+      sim_stop_exit_fill_on_trigger_bar && sim_stop_fill_beats_margin_cover;
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
     entry_fill_resize;
@@ -183,25 +186,10 @@ let _submit_orders t orders =
 
 let _is_complete t = Date.( >= ) t.current_date t.config.end_date
 
-(** Convert Daily_price to engine price_bar *)
-let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
-    Trading_engine.Types.price_bar =
-  {
-    Trading_engine.Types.symbol;
-    open_price = daily_price.open_price;
-    high_price = daily_price.high_price;
-    low_price = daily_price.low_price;
-    close_price = daily_price.close_price;
-  }
-
-(** Get all price bars for today using market data adapter *)
+(** Today's price bars for the universe ({!Today_bars}). *)
 let _get_today_bars t =
-  let get_bar symbol =
-    Trading_simulation_data.Market_data_adapter.get_price
-      t.deps.market_data_adapter ~symbol ~date:t.current_date
-    |> Option.map ~f:(_to_price_bar symbol)
-  in
-  List.filter_map t.deps.symbols ~f:get_bar
+  Today_bars.get ~adapter:t.deps.market_data_adapter ~symbols:t.deps.symbols
+    ~date:t.current_date
 
 (** Extract fills, re-stamped with the simulated [date] (G1;
     {!Fill_date_stamp}). *)
@@ -446,7 +434,9 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
     _call_strategy { t with portfolio; positions }
   in
   let portfolio, transitions =
-    Margin_runner.tick ~margin_config:t.deps.margin_config
+    Margin_runner.tick
+      ~stop_fill_beats_margin_cover:t.deps.stop_fill_beats_margin_cover
+      ~margin_config:t.deps.margin_config
       ~long_margin_rate_annual_pct:t.deps.long_margin_rate_annual_pct
       ~maintenance_long_pct:t.deps.maintenance_long_pct ~portfolio ~positions
       ~today_bars ~date:t.current_date ~strategy_transitions

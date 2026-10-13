@@ -18,6 +18,7 @@
   fill_router
   next_open_fill_gate
   trigger_bar_stop_fill
+  today_bars
   simulator_metrics
   cash_credits
   fill_date_stamp

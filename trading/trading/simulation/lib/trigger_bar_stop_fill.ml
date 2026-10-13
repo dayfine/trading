@@ -96,3 +96,24 @@ let _execute_nonempty ~engine ~order_manager ~date stop_orders =
 let execute ~engine ~order_manager ~date stop_orders =
   if List.is_empty stop_orders then Ok []
   else _execute_nonempty ~engine ~order_manager ~date stop_orders
+
+(* The exit side of a position: a long is sold, a short is bought back. *)
+let _exit_side (pos : Trading_strategy.Position.t) : Trading_base.Types.side =
+  match pos.side with Long -> Sell | Short -> Buy
+
+(* Whether [position_id]'s fresh bar today trades through [stop_price]. *)
+let _stop_reached ~positions ~bar_of position_id stop_price =
+  let reached =
+    let open Option.Let_syntax in
+    let%bind pos = Map.find positions position_id in
+    let%map bar = Map.find bar_of pos.Trading_strategy.Position.symbol in
+    _bar_reaches_stop ~side:(_exit_side pos) ~stop_price bar
+  in
+  Option.value reached ~default:false
+
+let stop_fill_position_ids ~positions ~today_bars transitions =
+  let bar_of = _index_bars today_bars in
+  _stop_prices transitions
+  |> Map.filteri ~f:(fun ~key ~data ->
+      _stop_reached ~positions ~bar_of key data)
+  |> Map.keys |> String.Set.of_list

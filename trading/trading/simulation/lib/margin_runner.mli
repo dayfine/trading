@@ -94,6 +94,7 @@ val dedup_strategy_exits_for_margin :
     same position-id (e.g. [UpdateRiskParams]) pass through unchanged. *)
 
 val tick :
+  stop_fill_beats_margin_cover:bool ->
   margin_config:Margin_config.t ->
   long_margin_rate_annual_pct:float ->
   maintenance_long_pct:float ->
@@ -124,4 +125,18 @@ val tick :
     crash this prevents. Within the margin sources, a short flagged by both the
     maintenance check and the buy-in mode is covered once — the maintenance
     [margin_call] wins (richer forensic detail), the duplicate [buyin_stress] is
-    dropped. *)
+    dropped.
+
+    {b Stop fill beats margin cover} ([stop_fill_beats_margin_cover], issue
+    #3206; the simulator passes [true] only when
+    [sim_stop_fill_beats_margin_cover] AND same-bar stop fills
+    ({!Trigger_bar_stop_fill}) are both armed). When [true], a strategy
+    [TriggerExit] carrying [StopLoss] that {!Trigger_bar_stop_fill} would fill
+    on today's bar ({!Trigger_bar_stop_fill.stop_fill_position_ids}: the bar
+    trades through the stop) inverts the collision: the stop is resting intraday
+    and trades before the close-time maintenance check, so the strategy exit is
+    kept and every margin exit (short cover, long reduce, buy-in) for that
+    position-id is dropped. A [StopLoss] exit whose bar does not reach the stop,
+    and every non-[StopLoss] strategy exit, still loses to margin as above.
+    [false] (the default wiring) is bit-identical to the pre-#3206 precedence.
+*)
