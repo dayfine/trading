@@ -360,7 +360,7 @@ const FLAGS = [
   { id: 'gapstop', cat: 'exec', label: 'Stop filled ≥ 3 pts beyond the stop', test: t => t.trig === 'stop_loss' && stopSlip(t) >= 0.03,
     why: 'Opened through the stop (below it for a long, above it for a short), so the loss is larger than the risk planned at entry.' },
   { id: 'latestop', cat: 'exec', zero: true, label: 'Stop breached before the exit day', test: t => t.trig === 'stop_loss' && t.blag >= 1,
-    why: 'The price reached the installed stop (trades.csv entry_stop; the low for a long, the high for a short) on an earlier day than the exit fill. Read on raw bars against the raw stop, moved only by a split since the entry: a dividend does not shift the line. Under the default fill model exits are market orders sent after the close and fill at the next open; with sim_stop_exit_fill_on_trigger_bar on (the record and investor configs) a stop fills on the bar that trades it, so a count here is a stop-level mismatch worth opening (e.g. #3075). Book: the stop is a resting order (reference §5.7).' },
+    why: 'The price reached the installed stop (trades.csv entry_stop; the low for a long, the high for a short) on an earlier day than the exit fill. Read on raw bars against the raw stop, moved only by a split since the entry, detected by the simulator’s own rule (a factor move over 5 % that snaps to N/M, M ≤ 20): a dividend does not shift the line. Under the default fill model exits are market orders sent after the close and fill at the next open; with sim_stop_exit_fill_on_trigger_bar on (the record and investor configs) a stop fills on the bar that trades it, so a count here is a stop-level mismatch worth opening (e.g. #3075). Book: the stop is a resting order (reference §5.7).' },
   { id: 'slipcap', cat: 'exec', needs: 'fvt', label: 'Entry filled 2% past the trigger', test: t => t.fvt != null && sideSgn(t) * t.fvt >= 1.99,
     why: 'The entry order’s limit sits 2% past the trigger (above it for a long, below it for a short). These fills paid the whole allowance.' },
   { id: 'quickstop', cat: 'exec', label: 'Stopped out within 2 days', test: t => t.trig === 'stop_loss' && t.days <= 2,
@@ -592,11 +592,19 @@ function regimeText(k, s, m, e, dir = 1) {
     : `holdings lagged while the market rose (${at})${e >= REGIME_FULL_PCT ? ' — not an exposure effect' : ''}`;
   return `${s >= m ? 'cash held through declines' : 'in cash through rebounds'} (${at})`;
 }
-// Year-end ratio points [['start', 1], [year, strategy / benchmark], ...] from the year table; dir = -1
-// compounds SPY inverted (a short-only book's benchmark). Pure, for the test.
-function eraPoints(ys, dir = 1) {
+// Year-end ratio points [['start', 1], [year, strategy / benchmark], ...]: the strategy compounded from the
+// year table. The benchmark is the year table's SPY, or, given bench (a short-only book's benchSeries, SPY
+// inverted day by day), that series' level at the year's last day over its first: the same benchmark the
+// chart and the era cells read, so the era cut and the ratio column agree with the chart (#3262 QC rework;
+// inverting each year's SPY return instead drifts from it by the volatility drag). Pure, for the test.
+function eraPoints(ys, bench = null) {
+  const yEnd = new Map(); if (bench) for (const [d, v] of bench) yEnd.set(d.slice(0, 4), +v);
   let n = 1, m = 1; const pts = [['start', 1]];
-  for (const y of ys) { n *= 1 + y.ret / 100; m *= 1 + dir * y.spy / 100; pts.push([y.p, n / m]); }
+  for (const y of ys) {
+    n *= 1 + y.ret / 100;
+    m = !bench ? m * (1 + y.spy / 100) : yEnd.has(y.p) ? yEnd.get(y.p) / bench[0][1] : m;
+    pts.push([y.p, n / m]);
+  }
   return pts;
 }
 // The daily benchmark [[date, level]] on spy's dates: SPY itself, or for dir = -1 SPY inverted day by day
@@ -770,7 +778,7 @@ function renderSignals(nav, spy) {
   line.createPriceLine({ price: 1, color: css('--muted'), lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
   c.timeScale().fitContent();
   // year-end ratio points (strategy and SPY compounded from the year table, as the table shows them)
-  const pts = eraPoints(ys, dir);
+  const pts = eraPoints(ys, shortBook ? bench : null);
   const eras = eraSplit(pts);
   const rows = eras.map(e => {
     const y0 = pts[e.i0 + 1][0], y1 = pts[e.i1][0]; const R = { UP: [0, 0, 0, 0], DOWN: [0, 0, 0, 0], MIXED: [0, 0, 0, 0] };
@@ -945,8 +953,6 @@ $('#p-q').addEventListener('click', () => { pGran = 'Q'; $('#p-q').setAttribute(
 // Total-return P&L of one trade (#3175): price-only pnl plus the dividends credited while it was held.
 // trades.csv gains dividends_received last; an older file has none (div null), read as 0.
 function tradeTR(t) { return t.pnl + (t.div || 0); }
-// The sentence appended to the realised-total signal (#3175). Trade rows are price-only; dividends and
-// interest are cash credits outside them. Empty when neither was credited (price-only run).
 // The overview's no-bar fill count (the Saturday-fill defect) beside V13's status, with the verb agreeing
 // with the count (#3262: "1 trades have"). Pure, for the test.
 function noBarFillLine(n, v13) {
@@ -959,6 +965,9 @@ function realisedDivs(trades, m) {
   if (trades.some(t => t.div != null)) return { v: trades.reduce((a, t) => a + (t.div || 0), 0), src: 'rows' };
   return { v: (m || {}).dividendincometotal || 0, src: 'run' };
 }
+// The sentence appended to the realised-total signal (#3175). Trade rows are price-only; dividends and
+// interest are cash credits outside them. Empty when neither was credited (price-only run).
+// src = 'run' names the run's DividendIncomeTotal as the dividends' source (realisedDivs).
 function realisedTotalNote(divs, interest, src = 'rows') {
   const parts = [];
   if (divs) parts.push(`${usdk(divs)} of dividends (${src === 'run' ? 'the run’s DividendIncomeTotal: this trades.csv has no dividends_received column' : 'inside the trade rows’ Div $ column, not in P&amp;L $'})`);

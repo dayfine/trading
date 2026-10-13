@@ -974,10 +974,10 @@ expect_eq "#3262 stage cards: both replay cards say the replay classifier is a s
 # #3262 (from #3214 item 8) the stop breach reads RAW bars against the raw stop, moved only by a split: the
 # adjusted basis drifts across the line on every dividend. Each name's factor steps on Mon 2020-02-10
 # (bars to 02-07 carry it, from 02-10 it is 1); all enter Wed 2020-01-29 and exit Fri 2020-02-21 on stop_loss.
-#   DVS short 100, stop 105, factor 0.95 (a dividend): raw highs 101 then 103, 106 on the exit bar -> lag 0.
-#       The adjusted reading (stop 99.75 on the entry basis, highs 103 from the ex-date) breached on 02-10, lag 9.
-#   DVL long 100, stop 95, factor 0.95: raw lows 99 then 94.5 from 02-10 -> breached on 02-10, lag 9.
-#       The adjusted reading (stop 90.25) never saw it: lag -1.
+#   DVS short 100, stop 105, factor 0.97 (a 3 % dividend; a 5 % one snaps to 20/19, the simulator's #3104 misfire): raw highs 101 then 103, 106 on the exit bar -> lag 0.
+#       The adjusted reading (stop 101.85 on the entry basis, highs 103 from the ex-date) breached on 02-10, lag 9.
+#   DVL long 100, stop 95, factor 0.97: raw lows 99 then 94.5 from 02-10 -> breached on 02-10, lag 9.
+#       The adjusted reading (stop 92.15) never saw it: lag -1.
 #   SPL long 100, stop 90, factor 0.5 (a 2:1 split on 02-10): raw lows 99, then 46 (stop 45 after the split),
 #       44 on the exit bar -> lag 0. Without the split correction the 46 lows read as a breach on 02-10.
 BR="$TMP/breach"; mkdir -p "$BR/run" "$BR/data/S/Y"; cp "$FIX"/run/* "$BR/run/"; cp -R "$FIX/data/S/Y/SPY" "$BR/data/S/Y/"
@@ -988,17 +988,23 @@ brbars() { # $1 symbol, $2 factor before 02-10, then pre / post / exit-bar "open
       printf "%s,%.2f,%.2f,%.2f,%.2f,%.4f,100000,\n", $1, p[1], p[2], p[3], p[4], p[4] * ($1 < "2020-02-10" ? fac : 1) }' \
     "$FIX/data/A/A/AAA/data.csv" > "$dd/data.csv"
 }
-brbars DVS 0.95 "100 101 99 100" "100 103 98 100" "104 106 103 105"
-brbars DVL 0.95 "100 101 99 100" "96 97 94.5 96" "96 97 94 95"
+brbars DVS 0.97 "100 101 99 100" "100 103 98 100" "104 106 103 105"
+brbars DVL 0.97 "100 101 99 100" "96 97 94.5 96" "96 97 94 95"
 brbars SPL 0.5 "100 101 99 100" "48 50 46 48" "46 47 44 45"
+# 6:5 and an 11:10 stock dividend: under the 1.25 jump the first rework used, so their post-split lows read as
+# a breach on 02-10 (lag 9); the simulator's rule (over 5 %, snaps to N/M) moves the line -> lag 0 (QC rework 1)
+brbars SSX 0.833333 "100 101 99 100" "80 82 76 80" "78 79 74 75"
+brbars SEL 0.909091 "100 101 99 100" "88 90 82.5 88" "85 86 81 82"
 { head -1 "$FIX/run/trades.csv"
   echo "DVS,SHORT,2020-01-29,2020-02-21,23,100.00,105.00,1000,-5000.00,-5.00,105.00,105.00,stop_loss,Stage4,1.5000,0.0500,intraday,23,100,DVS-wein-1,,105.00,0"
   echo "DVL,LONG,2020-01-29,2020-02-21,23,100.00,95.00,1000,-5000.00,-5.00,95.00,95.00,stop_loss,Stage2,1.5000,0.0500,intraday,23,100,DVL-wein-1,,95.00,0"
-  echo "SPL,LONG,2020-01-29,2020-02-21,23,100.00,45.00,1000,-10000.00,-10.00,90.00,45.00,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SPL-wein-1,,90.00,0"; } > "$BR/run/trades.csv"
+  echo "SPL,LONG,2020-01-29,2020-02-21,23,100.00,45.00,1000,-10000.00,-10.00,90.00,45.00,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SPL-wein-1,,90.00,0"
+  echo "SSX,LONG,2020-01-29,2020-02-21,23,100.00,75.00,1000,-5000.00,-5.00,90.00,75.00,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SSX-wein-1,,90.00,0"
+  echo "SEL,LONG,2020-01-29,2020-02-21,23,100.00,82.00,1000,-1000.00,-1.00,90.00,81.82,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SEL-wein-1,,90.00,0"; } > "$BR/run/trades.csv"
 rc=0
 sh "$SCRIPT" --no-container --data-dir "$BR/data" --out "$BR/pack" r0="$BR/run/" >"$BR/log" 2>&1 || rc=$?
 expect_eq "#3262 raw breach: builds, exit 0" 0 "$rc"
-expect_eq "#3262 raw breach: a dividend does not move the line (DVS 0, DVL 9); a 2:1 split does (SPL 0)" "DVS:0 DVL:9 SPL:0" \
+expect_eq "#3262 raw breach: a dividend does not move the line (DVS 0, DVL 9); a 2:1, a 6:5 and an 11:10 split do (SPL SSX SEL 0)" "DVS:0 DVL:9 SPL:0 SSX:0 SEL:0" \
   "$(jq -r '[.[] | "\(.sym):\(.blag)"] | join(" ")' "$BR/pack/site/data/r0_trades.json")"
 # #3262 (from #3214 item 5) a short-only book reads the eras against SPY inverted: the year-end ratio
 # compounds -SPY, the daily benchmark earns minus SPY's daily move, and the regime wording names what a short
@@ -1008,8 +1014,18 @@ if command -v node >/dev/null 2>&1; then
   er() { node -e "$ERF
 console.log($1)"; }
   expect_eq "#3262 eras: all three era functions extracted" 3 "$(printf '%s\n' "$ERF" | grep -c '^function ')"
-  expect_eq "#3262 eraPoints: long +10 % vs SPY +10 % = 1; short +10 % vs SPY -10 % (inverted +10 %) = 1" "1.000 1.000" \
-    "$(er '[eraPoints([{ p: "2001", ret: 10, spy: 10 }])[1][1], eraPoints([{ p: "2001", ret: 10, spy: -10 }], -1)[1][1]].map(v => v.toFixed(3)).join(" ")')"
+  expect_eq "#3262 eraPoints: a long book compounds the year table's SPY (+10 % vs +10 % = 1; then +21 % vs +21 % = 1)" "1.000 1.000" \
+    "$(er '[eraPoints([{ p: "2001", ret: 10, spy: 10 }])[1][1], eraPoints([{ p: "2001", ret: 10, spy: 10 }, { p: "2002", ret: 21, spy: 21 }])[2][1]].map(v => v.toFixed(3)).join(" ")')"
+  # QC rework 1: a short book's year-end points read the daily-inverted series the chart reads. Three years of
+  # SPY alternating +-1.2 % a day with a flat NAV: the ratio column's end equals the chart's last point
+  # (NAV / benchSeries, both from 1), and differs from inverting each year's SPY return (the volatility drag).
+  expect_eq "#3262 eraPoints: a short book's ratio ends at the chart's last point, not at the per-year inversion" "same differs" \
+    "$(er '(() => { const spy = []; let v = 100; for (let i = 0; i < 756; i++) { v *= i % 2 ? 0.988 : 1.012; spy.push([`${2001 + Math.floor(i / 252)}-01-01`, v]); }
+      const yr = y => spy.filter(r => r[0].startsWith(y)), b = benchSeries(spy, -1);
+      const ys = ["2001", "2002", "2003"].map((y, k) => ({ p: y, ret: 0, spy: 100 * (yr(y).slice(-1)[0][1] / (k ? yr(String(2000 + k)).slice(-1)[0][1] : spy[0][1]) - 1) }));
+      const end = eraPoints(ys, b).slice(-1)[0][1], chart = 1 / (b.slice(-1)[0][1] / b[0][1]);
+      let m = 1; ys.forEach(y => { m *= 1 - y.spy / 100; });
+      return [Math.abs(end - chart) < 1e-9 ? "same" : "chart " + chart + " vs " + end, Math.abs(end - 1 / m) > 0.01 ? "differs" : "equal"].join(" "); })()')"
   expect_eq "#3262 benchSeries: SPY unchanged for a long book; inverted day by day for a short book (100, 110, 99 -> 100, 90, 99: -10 %, then +10 %)" "same|100.00,90.00,99.00" \
     "$(er '(s => [benchSeries(s) === s ? "same" : "copy", benchSeries(s, -1).map(r => r[1].toFixed(2)).join(",")].join("|"))([["a", 100], ["b", 110], ["c", 99]])')"
   expect_eq "#3262 regimeText: a long book's cash in a rising market is a miss; a short book's is protection" \
@@ -1025,7 +1041,7 @@ else
   echo "SKIP: review_pack #3262 era cases need node"
 fi
 expect_eq "#3262 eras wiring: renderSignals reads eraPoints / benchSeries / regimeText with the book's dir; the heading names the benchmark" "1 1 2 1" \
-  "$(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'const pts = eraPoints(ys, dir);') $(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'bench = benchSeries(spy, dir)') $(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -o 'regimeText(r.key2\{0,1\}, x2\{0,1\}.s, x2\{0,1\}.m, x2\{0,1\}.expo, dir)' | wc -l | tr -d ' ') $(grep -c "\$('#eras-h').textContent = \`Eras vs \${BL}\`" "$S/index.html")"
+  "$(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'const pts = eraPoints(ys, shortBook ? bench : null);') $(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'bench = benchSeries(spy, dir)') $(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -o 'regimeText(r.key2\{0,1\}, x2\{0,1\}.s, x2\{0,1\}.m, x2\{0,1\}.expo, dir)' | wc -l | tr -d ' ') $(grep -c "\$('#eras-h').textContent = \`Eras vs \${BL}\`" "$S/index.html")"
 expect_eq "#3262 raw breach: the late-stop card says it reads raw bars, split-corrected" 1 "$(grep -c 'Read on raw bars against the raw stop, moved only by a split since the entry' "$S/index.html")"
 # #3262 QC follow-ups on #3281 and the #3214 first comment: plurals, dividends without the column, a Friday
 # exit, the -dirty stamp, the stacked conformance panel and the unscrolled capture.

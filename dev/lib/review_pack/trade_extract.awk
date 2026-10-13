@@ -26,7 +26,9 @@ BEGIN {
   FS = ","; PRE_BARS = 63; POST_BARS = 42; GRADE_BARS = 65; FWD_BARS = 40
   TOL = 0.005                      # fill-in-range tolerance (cent rounding)
   SPLIT_FAC_LO = 0.8; SPLIT_FAC_HI = 1.05   # adjustment factor / split ratio: dividends pull it under 1
-  SPLIT_JUMP = 1.25                # a day-on-day factor move this large (either way) is a split, not a dividend
+  # a split, by the simulator's own rule (Split_detector.detect_split defaults, which move its stops): the
+  # day-on-day factor move x = f / pf is over 5 % from 1 and snaps to N/M, M <= 20, within 1e-3 (#3262 QC rework)
+  SPLIT_DIV_BAND = 0.05; SPLIT_SNAP_TOL = 0.001; SPLIT_MAX_DEN = 20
   spl = 1                          # splits since the entry bar: raw prices are divided by it (#3262)
   ncf = split("3 5 6 8 10 15", lv, " ")
   for (i = 1; i <= ncf; i++) { cf[i] = ""; lv[i] = lv[i] / 100 }
@@ -65,6 +67,13 @@ function in_range(p, lo, hi, fac,   r, q, k, s) {
   }
   return 0
 }
+# the split factor N/M of a day-on-day factor move x, or 1 when x is a dividend / noise: the simulator's rule
+# (Split_detector: |x - 1| over SPLIT_DIV_BAND, then the smallest denominator M <= SPLIT_MAX_DEN within SPLIT_SNAP_TOL)
+function split_of(x,   m, n, c) {
+  if ((x > 1 ? x - 1 : 1 - x) <= SPLIT_DIV_BAND) return 1
+  for (m = 1; m <= SPLIT_MAX_DEN; m++) { n = int(x * m + 0.5); c = n / m; if (n > 0 && (x > c ? x - c : c - x) <= SPLIT_SNAP_TOL) return c }
+  return 1
+}
 # a resting stop at s trades on this bar: the low for a long, the high for a short
 function stop_hit(l, h, s) { return sd > 0 ? l <= s + 1e-9 : h >= s - 1e-9 }
 # a static hard stop at lvl: the side-signed % return of a fill at lvl, or at the
@@ -98,7 +107,7 @@ function hard_stop(o, l, h, lvl,   p) {
   # the breach line stays RAW, on the entry bar's basis (stopr), moved only by a split since (spl): the adjusted
   # basis drifts across it on every dividend (#3262, from #3214 item 8: a short's adjusted high rose through
   # its stop on an ex-date, CAT 64 bars early)
-  if (d > ed && pf > 0 && (f / pf >= SPLIT_JUMP || pf / f >= SPLIT_JUMP)) spl *= f / pf
+  if (d > ed && pf > 0) spl *= split_of(f / pf)
   if (d > ed && fe > 0 && e == "") { esnap = 1; if (on_e && in_range(ep, el, eh, fe) == 2) esnap = SNAP; e = ep / esnap * fe
     stopr = (es > 0) ? es / esnap : ep / esnap * (1 - sd * sid) }
   if (d > ed && fe > 0) {
