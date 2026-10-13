@@ -1237,7 +1237,11 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     (`report_conjuncts "${C40[@]}"`) are built from it, so they cannot
     drift. Slice-1 scenarios 40 (9 conjuncts), 44, 45, 46 (7 each) moved to
     that shape; new: 41 (7), 7a (7), 7b (6), 20g (7). Pass count 81 before
-    and after (`record_qc_audit_test: 81 passed, 0 failed`). Mutation
+    and after (`record_qc_audit_test: 82 passed, 0 failed` once scenario 43b
+    is added; 81 before it). QC rework 1 added scenario 43b, a direct pin of
+    `_pairs_ok` / `_eq` / `_flag` killing helper mutants: `_pairs_ok` no-op,
+    inverted polarity, `shift 1`, off-by-one (skips last pair), `_eq` always
+    1, `_flag` always 1. Mutation
     evidence (one expected literal broken; suite exit 1, 80 passed / 1
     failed, exactly one `conjunct FAILED` line naming it): 40
     `consecutive_rework_count == 1`; 44 `sha == "6b979c77"`; 45

@@ -3429,6 +3429,41 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 43b — _pairs_ok / _eq / _flag contract pin, DIRECT invocation
+# (QC rework #3289: 8 converted scenarios decide pass/fail through these
+# helpers, so a helper broken in the permissive direction passes them all
+# vacuously). Modelled on scenario 43. Calls the helpers with known data.
+#
+# Helper mutants this kills:
+#   - `_pairs_ok` no-op (`return 0` first): the middle-0, last-0 and
+#     empty-flag cases return 0.
+#   - `_pairs_ok` inverted polarity (`== "0"`): the all-1 case returns
+#     non-zero (and the 0-flag cases return 0).
+#   - `_pairs_ok` `shift 1`: flags and labels mis-pair; the all-1 case
+#     reads a label as a flag and returns non-zero.
+#   - `_pairs_ok` early exit / off-by-one loop (skips the last pair): the
+#     last-flag-0 case returns 0.
+#   - `_eq` always 1: `_eq a b` prints 1.
+#   - `_flag` always 1: `_flag false` prints 1.
+# ---------------------------------------------------------------------------
+c43b_rc_all=0; _pairs_ok "A" 1 "B" 1 "C" 1 || c43b_rc_all=$?
+c43b_rc_mid=0; _pairs_ok "A" 1 "B" 0 "C" 1 || c43b_rc_mid=$?
+c43b_rc_last=0; _pairs_ok "A" 1 "B" 1 "C" 0 || c43b_rc_last=$?
+c43b_rc_empty=0; _pairs_ok "A" 1 "B" "" "C" 1 || c43b_rc_empty=$?
+c43b_eq_same="$(_eq a a)"
+c43b_eq_diff="$(_eq a b)"
+c43b_flag_t="$(_flag true)"
+c43b_flag_f="$(_flag false)"
+
+if [[ "${c43b_rc_all}" == "0" && "${c43b_rc_mid}" != "0" && "${c43b_rc_last}" != "0" \
+      && "${c43b_rc_empty}" != "0" && "${c43b_eq_same}" == "1" && "${c43b_eq_diff}" == "0" \
+      && "${c43b_flag_t}" == "1" && "${c43b_flag_f}" == "0" ]]; then
+  pass "scenario 43b — _pairs_ok/_eq/_flag helper contracts pinned (all-1 ok; middle-0, last-0, empty fail; _eq and _flag print 1/0 correctly)"
+else
+  fail "scenario 43b — helper contract broken: _pairs_ok rc all-1=${c43b_rc_all} (want 0) middle-0=${c43b_rc_mid} last-0=${c43b_rc_last} empty=${c43b_rc_empty} (want non-zero); _eq a a='${c43b_eq_same}' (want 1) _eq a b='${c43b_eq_diff}' (want 0); _flag true='${c43b_flag_t}' (want 1) _flag false='${c43b_flag_f}' (want 0)"
+fi
+
+# ---------------------------------------------------------------------------
 # Scenario 44 — H-AUDIT-REWORK-VERDICT-STALE (#2509) regression, live
 # reproduction: file mode against a fixture reproducing the STRUCTURE of the
 # real PR #2504 review file (dev/reviews/audit-scenario22-diagnosability-2440.md
