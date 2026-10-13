@@ -1076,6 +1076,11 @@ type config = {
           the next open (issue #2961, book §5.7). Default [false] =
           bit-identical baselines (R1). See
           [Weinstein_strategy_config.sim_stop_exit_fill_on_trigger_bar]. *)
+  sim_stop_beats_margin_cover : bool; [@sexp.default false]
+      (** A stop that traded on the bar beats a same-day margin cover (issue
+          #3206). Inert unless [sim_stop_exit_fill_on_trigger_bar]. Default
+          [false] = bit-identical baselines (R1). See
+          [Weinstein_strategy_config.sim_stop_beats_margin_cover]. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2, plan
           [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream D). The

@@ -30,6 +30,7 @@ type dependencies = {
   entry_extension_max_pct : float option;  (** See .mli. #2158. *)
   fill_gate : Next_open_fill_gate.flags;  (** See .mli. Fix #1 / #1b. *)
   stop_exit_fill_on_trigger_bar : bool;  (** See .mli. #2961. *)
+  stop_beats_margin_cover : bool;  (** See .mli. #3206. *)
   entry_fill_retry : Entry_fill_retry.t;  (** See .mli. G2a retry. *)
   entry_fill_resize : Entry_fill_resize.t;  (** See .mli. G2b resize. *)
   cash_credits : Cash_credits.t;  (** See .mli. #3137 interest + dividends. *)
@@ -46,7 +47,7 @@ let _adapter_or_default ~data_dir adapter =
 let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol
     ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
-    ?stale_hold_log ?(slippage_bps = 0)
+    ?(stale_hold_log = Stale_hold.Log.create ()) ?(slippage_bps = 0)
     ?(margin_config = Trading_portfolio.Margin_config.default_config)
     ?(initial_long_margin_req = 1.0) ?(long_margin_rate_annual_pct = 0.0)
     ?(maintenance_long_pct = 0.0)
@@ -56,7 +57,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(sim_entry_fill_next_open = false) ?(sim_exit_fill_next_open = false)
     ?(sim_entry_stoplimit_fresh_bar_only = false)
     ?(sim_stop_exit_fill_on_trigger_bar = false)
-    ?(entry_fill_reject_retries = 0)
+    ?(stop_beats_margin_cover = false) ?(entry_fill_reject_retries = 0)
     ?(entry_fill_resize = Entry_fill_resize.disabled) ?cash_yield ?dividends
     ?split_guard () =
   {
@@ -69,8 +70,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     metric_suite;
     benchmark_symbol;
     stale_hold_policy;
-    stale_hold_log =
-      Option.value_or_thunk stale_hold_log ~default:Stale_hold.Log.create;
+    stale_hold_log;
     margin_config;
     initial_long_margin_req;
     long_margin_rate_annual_pct;
@@ -87,6 +87,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
         ~exits:sim_exit_fill_next_open
         ~stoplimit_entries:sim_entry_stoplimit_fresh_bar_only;
     stop_exit_fill_on_trigger_bar = sim_stop_exit_fill_on_trigger_bar;
+    stop_beats_margin_cover;
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
     entry_fill_resize;
@@ -393,11 +394,9 @@ let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
    [CancelEntry] names a resting [Entering], which is every run at the default
    config ([entry_order_ttl_weeks = 0] emits none). *)
 let _retire_cancelled_entry_orders t ~positions ~transitions =
-  let (_ : Trading_orders.Types.order_id list) =
-    Cancel_handler.cancel_resting_entry_orders
-      ~order_manager:t.deps.order_manager ~positions ~transitions
-  in
-  ()
+  Cancel_handler.cancel_resting_entry_orders ~order_manager:t.deps.order_manager
+    ~positions ~transitions
+  |> ignore
 
 (* Apply transitions, generate orders, run the #2961 trigger-bar stop pass
    ({!Trigger_bar_stop_fill}). Returns (.., orders to submit, stop fills). *)
@@ -448,8 +447,9 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
   let portfolio, transitions =
     Margin_runner.tick ~margin_config:t.deps.margin_config
       ~long_margin_rate_annual_pct:t.deps.long_margin_rate_annual_pct
-      ~maintenance_long_pct:t.deps.maintenance_long_pct ~portfolio ~positions
-      ~today_bars ~date:t.current_date ~strategy_transitions
+      ~maintenance_long_pct:t.deps.maintenance_long_pct
+      ~stop_beats_margin_cover:t.deps.stop_beats_margin_cover ~portfolio
+      ~positions ~today_bars ~date:t.current_date ~strategy_transitions
   in
   let%bind portfolio, positions, orders, stop_trades =
     _apply_transitions_and_orders t ~portfolio ~positions ~today_bars

@@ -749,3 +749,35 @@
   matchers
   status
   simulation_test_helpers))
+
+(test
+ (name test_margin_stop_precedence)
+ (modules test_margin_stop_precedence)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  trading.simulation
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  status
+  matchers))
+
+(test
+ (name test_sim_stop_beats_margin)
+ (modules test_sim_stop_beats_margin)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.simulation.data
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))

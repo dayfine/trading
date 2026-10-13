@@ -266,9 +266,27 @@ let test_execute_leaves_other_pending_orders_alone _ =
                  (equal_to (Pending : Trading_orders.Types.order_status))));
        ])
 
+(* #3206: the flag takes effect only with same-bar stop fills in force. *)
+let test_beats_margin_enabled_truth_table _ =
+  let combos =
+    List.cartesian_product [ true; false ]
+      (List.cartesian_product [ true; false ] [ true; false ])
+  in
+  assert_that
+    (List.filter_map combos
+       ~f:(fun (flag, (stop_fill_flag, trigger_on_weekly_close)) ->
+         if
+           Stop_fill.beats_margin_enabled ~flag ~stop_fill_flag
+             ~trigger_on_weekly_close
+         then Some (flag, stop_fill_flag, trigger_on_weekly_close)
+         else None))
+    (elements_are [ equal_to (true, true, false) ])
+
 let suite =
   "trigger_bar_stop_fill"
   >::: [
+         "beats_margin_enabled only for (flag, fill, not weekly close)"
+         >:: test_beats_margin_enabled_truth_table;
          "a StopLoss exit converts to Stop at the stop level"
          >:: test_stop_loss_exit_converts_to_stop_at_the_stop_level;
          "disabled converts nothing" >:: test_disabled_converts_nothing;
