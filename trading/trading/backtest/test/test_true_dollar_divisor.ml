@@ -57,7 +57,7 @@ let _write_symbol ~root ~symbol rows splits =
     ("date,open,high,low,close,adjusted_close,volume" :: List.map rows ~f:line);
   match CA.write_splits ~data_dir:(Fpath.v root) symbol splits with
   | Ok () -> ()
-  | Error err -> assert_failure (Status.show err)
+  | Error err -> failwith (Status.show err)
 
 let _d = Date.of_string
 
