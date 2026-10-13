@@ -995,16 +995,20 @@ brbars SPL 0.5 "100 101 99 100" "48 50 46 48" "46 47 44 45"
 # a breach on 02-10 (lag 9); the simulator's rule (over 5 %, snaps to N/M) moves the line -> lag 0 (QC rework 1)
 brbars SSX 0.833333 "100 101 99 100" "80 82 76 80" "78 79 74 75"
 brbars SEL 0.909091 "100 101 99 100" "88 90 82.5 88" "85 86 81 82"
+# a 7 % special dividend (x = 1.0753, no N/M within 1e-3: 14/13 is 1.6e-3 away) is not a split for the simulator,
+# so its stop and the line stay put: DV7's raw lows of 94.5 breach the 95 stop on 02-10 (lag 9; QC rework 2)
+brbars DV7 0.93 "100 101 99 100" "96 97 94.5 96" "96 97 94 95"
 { head -1 "$FIX/run/trades.csv"
   echo "DVS,SHORT,2020-01-29,2020-02-21,23,100.00,105.00,1000,-5000.00,-5.00,105.00,105.00,stop_loss,Stage4,1.5000,0.0500,intraday,23,100,DVS-wein-1,,105.00,0"
   echo "DVL,LONG,2020-01-29,2020-02-21,23,100.00,95.00,1000,-5000.00,-5.00,95.00,95.00,stop_loss,Stage2,1.5000,0.0500,intraday,23,100,DVL-wein-1,,95.00,0"
   echo "SPL,LONG,2020-01-29,2020-02-21,23,100.00,45.00,1000,-10000.00,-10.00,90.00,45.00,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SPL-wein-1,,90.00,0"
   echo "SSX,LONG,2020-01-29,2020-02-21,23,100.00,75.00,1000,-5000.00,-5.00,90.00,75.00,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SSX-wein-1,,90.00,0"
-  echo "SEL,LONG,2020-01-29,2020-02-21,23,100.00,82.00,1000,-1000.00,-1.00,90.00,81.82,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SEL-wein-1,,90.00,0"; } > "$BR/run/trades.csv"
+  echo "SEL,LONG,2020-01-29,2020-02-21,23,100.00,82.00,1000,-1000.00,-1.00,90.00,81.82,stop_loss,Stage2,1.5000,0.1000,intraday,23,100,SEL-wein-1,,90.00,0"
+  echo "DV7,LONG,2020-01-29,2020-02-21,23,100.00,95.00,1000,-5000.00,-5.00,95.00,95.00,stop_loss,Stage2,1.5000,0.0500,intraday,23,100,DV7-wein-1,,95.00,0"; } > "$BR/run/trades.csv"
 rc=0
 sh "$SCRIPT" --no-container --data-dir "$BR/data" --out "$BR/pack" r0="$BR/run/" >"$BR/log" 2>&1 || rc=$?
 expect_eq "#3262 raw breach: builds, exit 0" 0 "$rc"
-expect_eq "#3262 raw breach: a dividend does not move the line (DVS 0, DVL 9); a 2:1, a 6:5 and an 11:10 split do (SPL SSX SEL 0)" "DVS:0 DVL:9 SPL:0 SSX:0 SEL:0" \
+expect_eq "#3262 raw breach: a dividend does not move the line (DVS 0, DVL 9); a 2:1, a 6:5 and an 11:10 split do (SPL SSX SEL 0); a 7 % special dividend that snaps to no N/M does not (DV7 9)" "DVS:0 DVL:9 SPL:0 SSX:0 SEL:0 DV7:9" \
   "$(jq -r '[.[] | "\(.sym):\(.blag)"] | join(" ")' "$BR/pack/site/data/r0_trades.json")"
 # #3262 (from #3214 item 5) a short-only book reads the eras against SPY inverted: the year-end ratio
 # compounds -SPY, the daily benchmark earns minus SPY's daily move, and the regime wording names what a short

@@ -777,7 +777,8 @@ function renderSignals(nav, spy) {
   line.setData(rel.map(([d, v]) => ({ time: d, value: v })));
   line.createPriceLine({ price: 1, color: css('--muted'), lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
   c.timeScale().fitContent();
-  // year-end ratio points (strategy and SPY compounded from the year table, as the table shows them)
+  // year-end ratio points: the strategy from the year table; the benchmark from the year table (long) or from the
+  // daily-inverted bench at each year end (short-only), so the era cut matches the chart (see eraPoints)
   const pts = eraPoints(ys, shortBook ? bench : null);
   const eras = eraSplit(pts);
   const rows = eras.map(e => {
