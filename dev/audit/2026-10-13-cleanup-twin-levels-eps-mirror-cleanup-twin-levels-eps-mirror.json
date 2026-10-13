@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-13",
+  "feature": "cleanup-twin-levels-eps-mirror",
+  "branch": "cleanup/twin-levels-eps-mirror",
+  "sha": "93815f6642464baa2be1786c2114b85baae8313e",
+  "recorded_at_ns": 1791907793075343559,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

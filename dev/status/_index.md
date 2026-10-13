@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-12 (orchestrator run 38309601935 — see `dev/daily/2026-10-12.md`). Queue at start: 3.
-10-12: run 38279659999 failed (no summary; #3257/#3258 left open); this run merged #3257, #3258, #3269, #3268. 10-11: 7 PRs merged.
+Last updated: 2026-10-13 (orchestrator run 38419016316 — see `dev/daily/2026-10-13.md`). Queue at start: 3.
+10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-12: trap-swap pin #3258 + report_conjuncts slice 1 #3268 MERGED; next: report_conjuncts slice 2 (dedupe if/else predicates first) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-13: report_conjuncts slice 2 #3289 MERGED (dedupe + helper pins); next: slice 3 (scenarios 47, 48, 8, 7e) |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-12: Levels epsilon #3257 + placeholder int_keys #3269 MERGED; next: mirrored Levels epsilon case or shiller decades golden |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-13: Levels mirror #3288 + shiller golden #3290 MERGED; next: shiller chart `30mo MA` label bug, or file_length entries |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
