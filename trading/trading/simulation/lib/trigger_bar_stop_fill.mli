@@ -55,6 +55,14 @@ val enabled : flag:bool -> trigger_on_weekly_close:bool -> bool
     decided at the weekly close must not fill on the intraday path (see
     "Intraday-decided stops only" above). *)
 
+val beats_margin_enabled :
+  flag:bool -> stop_fill_flag:bool -> trigger_on_weekly_close:bool -> bool
+(** [beats_margin_enabled ~flag ~stop_fill_flag ~trigger_on_weekly_close] is
+    whether a traded stop beats a same-day margin cover (issue #3206): [flag] is
+    the [sim_stop_beats_margin_cover] knob, and it takes effect only when
+    same-bar stop fills are armed ({!enabled} of [stop_fill_flag] and
+    [trigger_on_weekly_close]). [true] only for [(true, true, false)]. *)
+
 val select :
   enabled:bool ->
   transitions:Trading_strategy.Position.transition list ->

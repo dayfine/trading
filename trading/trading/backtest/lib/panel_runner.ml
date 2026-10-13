@@ -73,7 +73,9 @@ let _stop_fill_on_trigger_bar (config : Weinstein_strategy.config) =
     ~trigger_on_weekly_close:config.stops_config.trigger_on_weekly_close
 
 let _stop_beats_margin_cover (c : Weinstein_strategy.config) =
-  c.sim_stop_beats_margin_cover && _stop_fill_on_trigger_bar c
+  Trigger_bar_stop_fill.beats_margin_enabled ~flag:c.sim_stop_beats_margin_cover
+    ~stop_fill_flag:c.sim_stop_exit_fill_on_trigger_bar
+    ~trigger_on_weekly_close:c.stops_config.trigger_on_weekly_close
 
 let _entry_fill_resize (config : Weinstein_strategy.config) =
   Entry_fill_resize.create ~enabled:config.entry_fill_size_to_available
@@ -85,15 +87,13 @@ let _entry_fill_resize (config : Weinstein_strategy.config) =
    (#2348) — first the [CancelEntry]-only portfolio-rejection batch, before the
    strategy is called, then the final list of the strategy's transitions plus
    any margin-driven ones from [Margin_runner.tick], after same-tick collision
-   dedup — and both fire on EVERY step (margin runs unconditionally). Without the
-   latter, margin-driven exit reasons ([margin_call] / [buyin_stress] /
-   [maintenance_reduce]) never reach [stop_log] at all. [Stop_log.record_transitions] is idempotent, so overlap on
-   strategy-only days is harmless. On a same-tick collision
+   dedup — and both fire on EVERY step (margin runs unconditionally). Without
+   the latter, margin-driven exit reasons ([margin_call] / [buyin_stress] /
+   [maintenance_reduce]) never reach [stop_log]. [Stop_log.record_transitions]
+   is idempotent, so overlap is harmless. On a same-tick collision
    [Margin_runner.dedup_strategy_exits_for_margin] drops the strategy's
-   [TriggerExit] and only margin's executes, but since #3147 the later
-   [on_transitions] call does not overwrite the wrapper's same-day strategy
-   trigger: the label keeps the stop-loss / force liquidation the audit records
-   (pinned in [test_margin_exit_observability.ml]).
+   [TriggerExit], but since #3147 the later [on_transitions] call keeps the
+   wrapper's same-day strategy label (stop-loss / force liquidation).
 
    [Simulator.dependencies.on_transitions] is a single optional slot, so the
    two observers that need it ([Stop_log.record_transitions] above, and

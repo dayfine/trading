@@ -764,3 +764,20 @@
   trading.strategy
   status
   matchers))
+
+(test
+ (name test_sim_stop_beats_margin)
+ (modules test_sim_stop_beats_margin)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.simulation.data
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))

@@ -37,6 +37,9 @@ let _index_bars today_bars =
 
 let enabled ~flag ~trigger_on_weekly_close = flag && not trigger_on_weekly_close
 
+let beats_margin_enabled ~flag ~stop_fill_flag ~trigger_on_weekly_close =
+  flag && enabled ~flag:stop_fill_flag ~trigger_on_weekly_close
+
 let select ~enabled ~transitions ~order_links ~today_bars orders =
   let stop_prices =
     if enabled then stop_price_by_position transitions else String.Map.empty
