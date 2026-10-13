@@ -1108,6 +1108,25 @@ let test_bars_of_daily_keeps_raw_and_adjusted_apart _ =
            ];
        ])
 
+(* #3266: one weekly bar per ISO week. 2001-12-31 (Mon) .. 2002-01-04 (Fri) is
+   ISO 2002-W01, so it is one weekly bar dated 2002-01-04. Keying on the
+   calendar year split it, giving an extra 2001-12-31 weekly date. *)
+let test_bars_of_daily_year_crossing_week_is_one_bar _ =
+  let bars =
+    Va.bars_of_daily
+      (List.map
+         [
+           "2001-12-27"; "2001-12-28"; "2001-12-31"; "2002-01-02"; "2002-01-04";
+         ] ~f:(fun date -> stored_bar ~date ~raw:10.0 ~adj:10.0))
+  in
+  assert_that
+    (Array.to_list bars.weekly_dates)
+    (elements_are
+       [
+         equal_to (Date.of_string "2001-12-28");
+         equal_to (Date.of_string "2002-01-04");
+       ])
+
 (* ---- audit join: position_id vs symbol|date ---------------------------- *)
 
 let join_row ?(context = ctx ()) ~position_id ~symbol ~entry_date () :
@@ -1271,6 +1290,8 @@ let suite =
          >:: test_v15_respects_configured_bounds;
          "bars_of_daily_keeps_raw_and_adjusted_apart"
          >:: test_bars_of_daily_keeps_raw_and_adjusted_apart;
+         "bars_of_daily_year_crossing_week_is_one_bar"
+         >:: test_bars_of_daily_year_crossing_week_is_one_bar;
          "join_by_position_id_survives_date_skew"
          >:: test_join_by_position_id_survives_date_skew;
          "join_legacy_falls_back_to_symbol_date"
