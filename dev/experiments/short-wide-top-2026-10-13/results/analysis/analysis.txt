@@ -1,0 +1,305 @@
+# short-wide-top-2026-10-13: results-analyst re-derivation (run_all.sh)
+
+## 1. Independent re-derivation vs the committed table (first 17 columns)
+committed 24790, re-derived 24791, identical rows 24789
+only committed:
+MOD,2018-05-04,17.35000,2017-11-10,25,s3
+only re-derived:
+MOD,2018-07-27,17.10000,2017-11-10,37,s12
+WGRD,2004-07-23,5.18000,2004-02-13,23,s3
+the two differences are exact 30-week-MA ties (sum30(i) = sum30(i-4) in integer units):
+  MOD 2018-05-04: sum30(i)=65240000  sum30(i-4)=65240000  (units 1e-5; equal => MA(i) <= MA(i-4) holds exactly)
+  WGRD 2004-07-23: sum30(i)=20604000  sum30(i-4)=20604000  (units 1e-5; equal => MA(i) <= MA(i-4) holds exactly)
+
+## 2. Headline distributions recomputed from the committed events ($5 floor)
+O1+120                       n= 24790 mean=  -1.47% med=  +1.85% p10= -29.3 p25= -12.4 p75= +16.3 p90= +32.4 beat= 53.4%
+O1+20                        n= 24790 mean=  +0.13% med=  +0.09% p10= -12.6 p25=  -5.6 p75=  +5.9 p90= +13.4 beat= 50.4%
+O1+60                        n= 24790 mean=  -2.19% med=  +0.50% p10= -21.0 p25=  -9.5 p75= +10.8 p90= +22.7 beat= 51.3%
+O1+60|h1                     n= 12118 mean=  -4.34% med=  -0.30% p10= -22.4 p25= -10.7 p75= +10.6 p90= +23.4 beat= 49.1%
+O1+60|h2                     n= 12672 mean=  -0.12% med=  +1.27% p10= -19.3 p25=  -8.3 p75= +11.1 p90= +22.2 beat= 53.5%
+O2                           n= 24790 mean=  -2.12% med=  +1.10% p10= -28.4 p25= -13.6 p75= +16.1 p90= +32.3 beat= 52.0%
+O2 abs short ret             n= 24790 mean=  -7.93% med=  -5.23% p10= -37.2 p25= -21.0 p75= +12.2 p90= +30.6 beat= 41.6%
+O2 clipped                   n= 24790 mean=  +1.13% med=  +1.10% p10= -28.4 p25= -13.6 p75= +16.1 p90= +32.3 beat= 52.0%
+O2|h1                        n= 12118 mean=  -6.56% med=  -1.18% p10= -30.5 p25= -15.8 p75= +14.1 p90= +30.4 beat= 47.7%
+O2|h2                        n= 12672 mean=  +2.13% med=  +3.48% p10= -25.8 p25= -11.5 p75= +17.7 p90= +33.6 beat= 56.0%
+unstopped 20210 (|O2 - O1+120| > 1e-4: 0), stopped 4580; the stop flips a beat to a loss on 391 events and a loss to a beat on 27
+room:
+room                         n= 24790 mean=+919.82% med= +38.40% p10= +18.8 p25= +25.9 p75= +60.9 p90=+102.9 beat=100.0%
+the ten most negative O2 excesses and their share of the mean:
+  BELM      2005-10-21 exc  -46743.08% room    +57.6% contrib -1.886 pp cum -1.886 pp
+  CGE       2001-07-06 exc  -13857.09% room    +91.7% contrib -0.559 pp cum -2.445 pp
+  NLCS      2014-09-26 exc   -5631.84% room  +5587.0% contrib -0.227 pp cum -2.672 pp
+  CAA       2005-07-29 exc   -2481.09% room  +2481.1% contrib -0.100 pp cum -2.772 pp
+  CCBL      2007-08-31 exc   -1941.70% room    +41.1% contrib -0.078 pp cum -2.850 pp
+  PUB       2014-07-11 exc   -1639.81% room    +20.2% contrib -0.066 pp cum -2.916 pp
+  KARO_old  2021-01-15 exc   -1207.38% room    +50.8% contrib -0.049 pp cum -2.965 pp
+  ARCH      2006-07-21 exc    -805.26% room    +75.4% contrib -0.032 pp cum -2.997 pp
+  GR        2001-01-05 exc    -777.71% room    +33.9% contrib -0.031 pp cum -3.029 pp
+  SPM       2021-05-21 exc    -591.89% room   +430.7% contrib -0.024 pp cum -3.053 pp
+O2 excess < -100 %: 136, > +100 %: 20
+clipped / trimmed halves:
+clip O2|h1                   n= 12118 mean=  -0.88% med=  -1.18% p10= -30.5 p25= -15.8 p75= +14.1 p90= +30.4 beat= 47.7%
+clip O2|h2                   n= 12672 mean=  +3.05% med=  +3.48% p10= -25.8 p25= -11.5 p75= +17.7 p90= +33.6 beat= 56.0%
+trim O1+60|h1                n= 10436 mean=  -0.64% med=  -0.65% p10= -20.6 p25= -10.2 p75=  +9.2 p90= +19.9 beat= 48.0%
+trim O1+60|h2                n= 11696 mean=  +1.22% med=  +1.32% p10= -17.4 p25=  -7.7 p75= +10.6 p90= +20.9 beat= 53.9%
+trim O2|h1                   n= 10436 mean=  -1.65% med=  -1.93% p10= -28.7 p25= -15.5 p75= +11.8 p90= +26.3 beat= 46.1%
+trim O2|h2                   n= 11696 mean=  +3.15% med=  +3.19% p10= -24.1 p25= -11.2 p75= +16.7 p90= +31.7 beat= 55.8%
+
+## 3. By breakdown year (c2 O2 excess, c3 O1+60, c4 absolute short return, c5 SPY return over the O2 hold)
+2000       n= 1038 | c2 med  +3.71% >0  54.9% | c3 med  +1.16% >0  52.0% | c4 med  +9.87% >0  59.8% | c5 med  -5.09% >0  26.0%
+2001       n=  751 | c2 med  -8.18% >0  35.2% | c3 med  -4.10% >0  41.3% | c4 med -10.86% >0  37.4% | c5 med  -4.28% >0  44.7%
+2002       n= 1032 | c2 med  +0.11% >0  50.3% | c3 med  -0.04% >0  49.9% | c4 med  -1.17% >0  47.1% | c5 med  +1.11% >0  59.6%
+2003       n=  254 | c2 med  -7.07% >0  39.8% | c3 med  -1.78% >0  44.9% | c4 med -17.76% >0  17.3% | c5 med +13.10% >0  98.8%
+2004       n= 1204 | c2 med  -1.99% >0  46.9% | c3 med  -0.34% >0  48.8% | c4 med  -8.52% >0  35.5% | c5 med  +6.58% >0  81.1%
+2005       n=  845 | c2 med  -3.20% >0  42.1% | c3 med  -2.48% >0  41.7% | c4 med  -9.22% >0  30.7% | c5 med  +5.32% >0  96.9%
+2006       n= 1039 | c2 med  -1.75% >0  45.5% | c3 med  -1.34% >0  45.9% | c4 med -12.31% >0  27.3% | c5 med +10.45% >0  96.2%
+2007       n= 1244 | c2 med  +4.90% >0  60.0% | c3 med  +3.32% >0  60.3% | c4 med  +9.43% >0  66.0% | c5 med  -4.98% >0  23.8%
+2008       n= 1452 | c2 med  -0.36% >0  49.6% | c3 med  +0.18% >0  50.5% | c4 med +10.05% >0  63.6% | c5 med  -9.17% >0  24.9%
+2009       n=  175 | c2 med  +9.71% >0  65.7% | c3 med  +4.47% >0  56.6% | c4 med -15.97% >0  27.4% | c5 med +21.76% >0  90.9%
+2010       n=  979 | c2 med  -5.33% >0  39.3% | c3 med  -1.73% >0  44.8% | c4 med -19.05% >0  18.6% | c5 med +13.26% >0  91.6%
+2011       n= 1591 | c2 med  -1.18% >0  46.7% | c3 med  +0.00% >0  50.1% | c4 med -13.11% >0  29.8% | c5 med +13.67% >0  76.9%
+2012       n=  514 | c2 med  -2.75% >0  44.6% | c3 med  -1.44% >0  45.1% | c4 med -12.71% >0  20.4% | c5 med  +9.18% >0  99.6%
+2013       n=  530 | c2 med  -0.57% >0  48.5% | c3 med  +0.38% >0  51.1% | c4 med -10.76% >0  27.9% | c5 med  +9.99% >0 100.0%
+2014       n= 1240 | c2 med  +1.84% >0  52.4% | c3 med  +1.51% >0  55.0% | c4 med  -5.54% >0  39.4% | c5 med  +7.01% >0  99.5%
+2015       n= 1210 | c2 med  +4.42% >0  59.3% | c3 med  +1.19% >0  54.0% | c4 med  +3.61% >0  56.8% | c5 med  +2.08% >0  63.6%
+2016       n=  723 | c2 med  -0.81% >0  47.6% | c3 med  -1.04% >0  46.1% | c4 med -12.54% >0  24.5% | c5 med +10.57% >0  99.6%
+2017       n=  816 | c2 med  +2.58% >0  55.1% | c3 med  +2.29% >0  57.0% | c4 med  -5.52% >0  38.7% | c5 med  +8.22% >0  99.6%
+2018       n= 1667 | c2 med  +3.55% >0  56.9% | c3 med  +0.95% >0  53.0% | c4 med  -1.51% >0  46.8% | c5 med  +5.34% >0  74.4%
+2019       n=  436 | c2 med  +6.80% >0  63.5% | c3 med  +1.28% >0  55.7% | c4 med  +1.75% >0  53.9% | c5 med  +6.38% >0  69.5%
+2020       n= 1214 | c2 med  +8.50% >0  60.0% | c3 med  +3.12% >0  55.7% | c4 med -24.63% >0  23.4% | c5 med +31.69% >0  97.3%
+2021       n=  951 | c2 med  +6.87% >0  60.0% | c3 med  +2.17% >0  54.3% | c4 med  +5.72% >0  58.8% | c5 med  +0.56% >0  55.4%
+2022       n= 1308 | c2 med  -0.46% >0  48.9% | c3 med  -1.07% >0  46.9% | c4 med  +1.42% >0  52.7% | c5 med  -3.16% >0  43.7%
+2023       n=  765 | c2 med  +5.94% >0  57.8% | c3 med  +2.53% >0  57.4% | c4 med  -9.62% >0  33.3% | c5 med +15.16% >0  99.2%
+2024       n=  739 | c2 med  +7.57% >0  62.4% | c3 med  +2.09% >0  55.2% | c4 med  +1.11% >0  51.2% | c5 med  +6.73% >0  78.5%
+2025       n= 1073 | c2 med  +4.22% >0  57.0% | c3 med  +2.44% >0  55.6% | c4 med -10.02% >0  34.2% | c5 med +11.35% >0  94.6%
+
+## 4. Random-member null, every 4th Friday (c2 O1+60, c3 O1+120)
+ALL        n=864415 | c2 med  +0.60% >0  51.8% | c3 med  +1.41% >0  52.9%
+h1         n=429089 | c2 med  -0.38% >0  48.9% | c3 med  -0.45% >0  49.1%
+h2         n=435326 | c2 med  +1.52% >0  54.6% | c3 med  +3.16% >0  56.7%
+
+## 5. Events vs the calendar-matched null (nearest 4-week sample date)
+ALL               24774 |  51.3% /  52.3%            |  53.4% /  53.4%            |  52.0% /  53.4%       |  49.1%   50.3%   49.1%
+events without a null bucket: 17
+group                 n | O1+60 beat: event / null    | O1+120 beat: event / null   | O2 beat event / null120 | share of events worse-for-the-stock than the date's null median: O1+60, O1+120, O2
+h1                12119 |  49.1% /  50.2%            |  48.9% /  49.6%            |  47.8% /  49.6%       |  48.8%   49.5%   48.3%
+h2                12655 |  53.5% /  54.3%            |  57.8% /  57.0%            |  56.0% /  57.0%       |  49.3%   51.2%   49.8%
+phase s12         12846 |  53.7% /  53.6%            |  57.0% /  55.3%            |  55.3% /  55.3%       |  50.4%   52.2%   51.0%
+phase s3           4884 |  51.4% /  51.2%            |  51.6% /  52.2%            |  50.3% /  52.2%       |  50.0%   49.7%   48.4%
+phase s4_early     4603 |  45.9% /  50.3%            |  48.9% /  51.4%            |  47.2% /  51.4%       |  45.4%   47.3%   45.6%
+phase s4_late      2441 |  48.8% /  51.5%            |  47.2% /  49.6%            |  46.7% /  49.6%       |  47.2%   47.6%   47.2%
+
+## 6. By year: events vs the calendar-matched null
+year      n   O2 beat  O1+120 beat  matched-null O1+120 beat  event-minus-null  share above the date's null median
+2000   1038    54.9%     55.3%         46.9%                 +8.4 pp          58.9%
+2001    751    35.2%     35.6%         45.9%                -10.3 pp          40.7%
+2002   1032    50.3%     50.6%         54.4%                 -3.9 pp          46.5%
+2003    254    39.8%     42.1%         43.0%                 -0.9 pp          46.9%
+2004   1205    47.0%     48.0%         44.5%                 +3.5 pp          52.8%
+2005    845    42.1%     43.6%         44.8%                 -1.2 pp          49.1%
+2006   1039    45.5%     47.6%         51.7%                 -4.1 pp          47.0%
+2007   1244    60.0%     61.2%         55.6%                 +5.6 pp          55.9%
+2008   1452    49.6%     50.1%         49.7%                 +0.4 pp          50.1%
+2009    175    65.7%     67.4%         42.2%                +25.2 pp          72.0%
+2010    979    39.3%     40.3%         48.1%                 -7.8 pp          42.9%
+2011   1591    46.7%     47.8%         53.6%                 -5.7 pp          45.1%
+2012    514    44.6%     48.4%         48.4%                 +0.1 pp          49.0%
+2013    530    48.5%     49.4%         53.3%                 -3.8 pp          49.1%
+2014   1240    52.4%     54.3%         54.9%                 -0.6 pp          50.8%
+2015   1210    59.3%     60.1%         60.2%                 -0.1 pp          49.8%
+2016    723    47.6%     49.4%         48.4%                 +1.0 pp          51.5%
+2017    816    55.1%     58.6%         55.2%                 +3.3 pp          53.9%
+2018   1667    56.9%     57.8%         55.6%                 +2.2 pp          52.3%
+2019    436    63.5%     65.4%         66.1%                 -0.8 pp          49.3%
+2020   1214    60.0%     62.0%         60.3%                 +1.7 pp          51.6%
+2021    951    60.0%     61.8%         60.6%                 +1.3 pp          53.8%
+2022   1308    48.9%     49.6%         51.9%                 -2.3 pp          47.2%
+2023    765    57.8%     62.4%         61.3%                 +1.1 pp          51.8%
+2024    739    62.4%     64.4%         58.8%                 +5.6 pp          56.4%
+2025   1056    57.0%     59.4%         58.8%                 +0.6 pp          49.0%
+
+## 7. Halves cutoff sweep vs the matched null
+cut   late-half n   event O2 beat   matched null (O1+120)   event - null
+2004+   21699         52.6%           54.1%                  -1.4 pp
+2006+   19649         53.4%           55.0%                  -1.6 pp
+2008+   17366         53.4%           55.2%                  -1.8 pp
+2010+   15739         53.7%           55.9%                  -2.2 pp
+2012+   13169         55.6%           56.7%                  -1.1 pp
+2014+   12125         56.3%           57.2%                  -0.9 pp
+2016+    9675         56.5%           57.1%                  -0.7 pp
+2018+    8136         57.4%           58.1%                  -0.7 pp
+2020+    6033         57.1%           58.2%                  -1.1 pp
+
+## 8. Setup-map breakdowns (45,599, close entry) vs the same null
+ALL               45561 |  51.4% /  52.2%            |  53.0% /  53.5%            |  34.2% /  53.5%       |  49.1%   49.5%   33.9%
+events without a null bucket: 38
+group                 n | O1+60 beat: event / null    | O1+120 beat: event / null   | O2 beat event / null120 | share of events worse-for-the-stock than the date's null median: O1+60, O1+120, O2
+h1                22148 |  49.6% /  50.1%            |  49.0% /  49.6%            |  33.1% /  49.6%       |  49.6%   49.5%   38.3%
+h2                23413 |  53.1% /  54.1%            |  56.7% /  57.2%            |  35.3% /  57.2%       |  48.7%   49.6%   29.8%
+phase s12         26034 |  52.5% /  53.0%            |  55.1% /  54.9%            |  33.8% /  54.9%       |  49.5%   50.4%   32.1%
+phase s3           9025 |  50.4% /  51.5%            |  51.6% /  53.1%            |  32.7% /  53.1%       |  48.7%   48.1%   32.3%
+phase s4_early     6966 |  49.4% /  50.5%            |  50.6% /  51.1%            |  35.5% /  51.1%       |  48.9%   49.4%   36.7%
+phase s4_late      3536 |  49.7% /  51.1%            |  45.7% /  49.1%            |  38.7% /  49.1%       |  48.4%   47.1%   45.9%
+
+## 9. Overlap with the setup map
+wide-top events: 24790; a setup-map event on the same symbol within 4 weeks: 10385 (41.9%), within 13 weeks: 17295 (69.8%); setup-map event 0-26 weeks BEFORE the wide-top breakdown: 18950 (76.4%); symbol with no setup-map event at all: 357
+no setup-map event in the 52 weeks before: 4108 (16.6%)
+setup-map event 0..0 weeks before: cum 7.8%
+setup-map event 0..4 weeks before: cum 36.3%
+setup-map event 0..8 weeks before: cum 52.5%
+setup-map event 0..13 weeks before: cum 63.7%
+setup-map event 0..26 weeks before: cum 77.6%
+setup-map event 0..52 weeks before: cum 83.4%
+
+## 10. Entry convention and entry-bar stop check (re-derived events)
+O1+120 close entry           n= 24791 mean=  -1.74% med=  +1.59% p10= -29.6 p25= -12.6 p75= +16.1 p90= +31.9 beat= 53.0%
+O1+60 close entry            n= 24791 mean=  -2.44% med=  +0.40% p10= -21.2 p25=  -9.6 p75= +10.6 p90= +22.4 beat= 51.1%
+O1+60 open                   n= 24791 mean=  -2.18% med=  +0.50% p10= -21.0 p25=  -9.5 p75= +10.8 p90= +22.7 beat= 51.3%
+O1+60 open - close           n= 24791 mean=  +0.25% med=  +0.11% p10=  -2.6 p25=  -1.0 p75=  +1.3 p90=  +3.2 beat= 52.7%
+O2 close entry               n= 24791 mean=  -2.40% med=  +0.85% p10= -28.5 p25= -13.6 p75= +15.9 p90= +31.8 beat= 51.4%
+entry-bar stop check changes O2 on 1 events
+
+## 11. Entry vs the top week's high, and weeks H -> breakdown (c2 O1+60, c3 O1+120, c4 O2)
+a >-20%    n=11549 | c2 med  -0.03% >0  49.9% | c3 med  +0.66% >0  51.6% | c4 med  -0.24% >0  49.4%
+b -20..-30% n= 7088 | c2 med  +0.73% >0  51.7% | c3 med  +1.82% >0  52.9% | c4 med  +1.11% >0  51.8%
+c -30..-40% n= 3383 | c2 med  +1.74% >0  52.9% | c3 med  +4.49% >0  55.4% | c4 med  +4.04% >0  54.8%
+d -40..-50% n= 1445 | c2 med  +2.35% >0  53.9% | c3 med  +6.73% >0  57.6% | c4 med  +6.40% >0  57.3%
+e <-50%    n= 1326 | c2 med  +3.83% >0  54.8% | c3 med +12.79% >0  62.6% | c4 med +12.49% >0  62.2%
+wk 13-20   n= 4122 | c2 med  +1.20% >0  53.1% | c3 med  +2.60% >0  54.3% | c4 med  +1.68% >0  52.4%
+wk 21-30   n= 9405 | c2 med  +0.26% >0  50.7% | c3 med  +1.70% >0  53.4% | c4 med  +0.93% >0  51.8%
+wk 31-40   n= 5320 | c2 med  +0.00% >0  50.0% | c3 med  +0.91% >0  51.9% | c4 med  +0.52% >0  51.0%
+wk 41-52   n= 3362 | c2 med  +0.82% >0  52.1% | c3 med  +2.26% >0  54.6% | c4 med  +2.04% >0  53.9%
+wk 8-12    n= 2582 | c2 med  +0.90% >0  52.4% | c3 med  +2.33% >0  54.1% | c4 med  +1.00% >0  51.6%
+null by distance from the trailing 52-week high (c2 O1+60, c3 O1+120):
+null a >-20% n=507235 | c2 med  +0.26% >0  50.9% | c3 med  +0.68% >0  51.7%
+null b -20..-30% n=124945 | c2 med  +0.85% >0  52.2% | c3 med  +1.95% >0  53.6%
+null c -30..-40% n=83484 | c2 med  +1.13% >0  52.5% | c3 med  +2.68% >0  54.2%
+null d -40..-50% n=55019 | c2 med  +1.56% >0  52.9% | c3 med  +3.58% >0  54.8%
+null e <-50% n=82568 | c2 med  +2.60% >0  53.8% | c3 med  +5.59% >0  55.6%
+events vs the date x distance matched null:
+a>-20            n=11543  O1+120 beat event  51.6% vs matched null  53.1% | share above the cell null median  48.5% | mean (event - null median)  -1.14 pp
+ALL              n=24774  O1+120 beat event  53.4% vs matched null  54.2% | share above the cell null median  49.6% | mean (event - null median)  -4.14 pp
+b-20..-30        n= 7083  O1+120 beat event  52.9% vs matched null  54.0% | share above the cell null median  50.3% | mean (event - null median)  -9.95 pp
+c-30..-40        n= 3381  O1+120 beat event  55.4% vs matched null  55.5% | share above the cell null median  51.0% | mean (event - null median)  -1.91 pp
+d-40..-50        n= 1444  O1+120 beat event  57.7% vs matched null  56.4% | share above the cell null median  50.9% | mean (event - null median)  -1.74 pp
+e<-50            n= 1323  O1+120 beat event  62.7% vs matched null  59.4% | share above the cell null median  50.6% | mean (event - null median)  -7.51 pp
+h1 a>-20         n= 4962  O1+120 beat event  45.3% vs matched null  50.1% | share above the cell null median  44.8% | mean (event - null median)  -2.21 pp
+h1 b-20..-30     n= 3650  O1+120 beat event  47.9% vs matched null  50.1% | share above the cell null median  49.2% | mean (event - null median) -17.86 pp
+h1 c-30..-40     n= 1832  O1+120 beat event  51.3% vs matched null  51.6% | share above the cell null median  50.4% | mean (event - null median)  -1.53 pp
+h1 d-40..-50     n=  811  O1+120 beat event  55.4% vs matched null  53.2% | share above the cell null median  53.1% | mean (event - null median)  +1.07 pp
+h1 e<-50         n=  864  O1+120 beat event  62.6% vs matched null  58.4% | share above the cell null median  51.7% | mean (event - null median)  -3.53 pp
+h2 a>-20         n= 6581  O1+120 beat event  56.3% vs matched null  55.3% | share above the cell null median  51.4% | mean (event - null median)  -0.32 pp
+h2 b-20..-30     n= 3433  O1+120 beat event  58.3% vs matched null  58.2% | share above the cell null median  51.4% | mean (event - null median)  -1.53 pp
+h2 c-30..-40     n= 1549  O1+120 beat event  60.4% vs matched null  60.1% | share above the cell null median  51.8% | mean (event - null median)  -2.37 pp
+h2 d-40..-50     n=  633  O1+120 beat event  60.7% vs matched null  60.6% | share above the cell null median  48.0% | mean (event - null median)  -5.35 pp
+h2 e<-50         n=  459  O1+120 beat event  62.7% vs matched null  61.4% | share above the cell null median  48.4% | mean (event - null median) -14.99 pp
+mode=all; events skipped (no null cell with >= 20 rows): 17
+same, null restricted to members below a falling 30-week MA:
+a>-20            n=11480  O1+120 beat event  51.6% vs matched null  53.3% | share above the cell null median  48.5% | mean (event - null median)  -1.21 pp
+ALL              n=24703  O1+120 beat event  53.5% vs matched null  54.1% | share above the cell null median  49.8% | mean (event - null median)  -3.96 pp
+b-20..-30        n= 7083  O1+120 beat event  52.9% vs matched null  53.8% | share above the cell null median  50.6% | mean (event - null median)  -9.65 pp
+c-30..-40        n= 3378  O1+120 beat event  55.4% vs matched null  54.8% | share above the cell null median  51.5% | mean (event - null median)  -1.23 pp
+d-40..-50        n= 1439  O1+120 beat event  57.7% vs matched null  55.8% | share above the cell null median  52.5% | mean (event - null median)  -0.86 pp
+e<-50            n= 1323  O1+120 beat event  62.7% vs matched null  59.4% | share above the cell null median  50.0% | mean (event - null median)  -7.59 pp
+h1 a>-20         n= 4904  O1+120 beat event  45.3% vs matched null  49.9% | share above the cell null median  44.7% | mean (event - null median)  -2.17 pp
+h1 b-20..-30     n= 3650  O1+120 beat event  47.9% vs matched null  48.6% | share above the cell null median  50.4% | mean (event - null median) -17.05 pp
+h1 c-30..-40     n= 1829  O1+120 beat event  51.2% vs matched null  49.5% | share above the cell null median  51.7% | mean (event - null median)  -0.12 pp
+h1 d-40..-50     n=  806  O1+120 beat event  55.3% vs matched null  51.1% | share above the cell null median  56.1% | mean (event - null median)  +3.13 pp
+h1 e<-50         n=  864  O1+120 beat event  62.6% vs matched null  58.1% | share above the cell null median  51.6% | mean (event - null median)  -3.48 pp
+h2 a>-20         n= 6576  O1+120 beat event  56.3% vs matched null  55.9% | share above the cell null median  51.3% | mean (event - null median)  -0.50 pp
+h2 b-20..-30     n= 3433  O1+120 beat event  58.3% vs matched null  59.4% | share above the cell null median  50.9% | mean (event - null median)  -1.78 pp
+h2 c-30..-40     n= 1549  O1+120 beat event  60.4% vs matched null  61.0% | share above the cell null median  51.1% | mean (event - null median)  -2.55 pp
+h2 d-40..-50     n=  633  O1+120 beat event  60.7% vs matched null  61.7% | share above the cell null median  48.0% | mean (event - null median)  -5.93 pp
+h2 e<-50         n=  459  O1+120 beat event  62.7% vs matched null  61.9% | share above the cell null median  47.1% | mean (event - null median) -15.32 pp
+mode=fall; events skipped (no null cell with >= 20 rows): 88
+room buckets vs the calendar-matched null:
+phase room <=15%    977 |  50.5% /  53.0%            |  53.2% /  54.5%            |  45.5% /  54.5%       |  45.8%   46.0%   40.0%
+phase room >100%   2619 |  53.3% /  50.7%            |  59.0% /  51.1%            |  58.8% /  51.1%       |  53.0%   58.5%   58.3%
+phase room 15-30%   7412 |  50.3% /  52.6%            |  51.8% /  54.0%            |  49.5% /  54.0%       |  47.3%   47.3%   45.2%
+phase room 30-60%  10034 |  51.4% /  52.5%            |  53.0% /  53.6%            |  52.1% /  53.6%       |  49.0%   50.0%   49.3%
+phase room 60-100%   3731 |  52.1% /  52.0%            |  54.0% /  53.0%            |  53.6% /  53.0%       |  50.7%   52.7%   52.3%
+room buckets vs the date x distance matched null:
+h1 room<=15      n=  394  O1+120 beat event  49.7% vs matched null  49.7% | share above the cell null median  48.0% | mean (event - null median)  -0.49 pp
+h1 room>100      n= 1659  O1+120 beat event  58.7% vs matched null  54.8% | share above the cell null median  53.0% | mean (event - null median)  -1.07 pp
+h1 room15-30     n= 3039  O1+120 beat event  46.3% vs matched null  49.6% | share above the cell null median  46.7% | mean (event - null median)  -1.16 pp
+h1 room30-60     n= 5011  O1+120 beat event  46.6% vs matched null  50.8% | share above the cell null median  46.8% | mean (event - null median) -14.04 pp
+h1 room60-100    n= 2016  O1+120 beat event  50.3% vs matched null  51.5% | share above the cell null median  48.9% | mean (event - null median)  -2.63 pp
+h2 room<=15      n=  583  O1+120 beat event  55.6% vs matched null  54.9% | share above the cell null median  48.9% | mean (event - null median)  +0.24 pp
+h2 room>100      n=  960  O1+120 beat event  59.4% vs matched null  60.3% | share above the cell null median  48.3% | mean (event - null median) -10.74 pp
+h2 room15-30     n= 4373  O1+120 beat event  55.7% vs matched null  55.2% | share above the cell null median  50.7% | mean (event - null median)  -0.66 pp
+h2 room30-60     n= 5024  O1+120 beat event  59.5% vs matched null  57.7% | share above the cell null median  52.5% | mean (event - null median)  -0.50 pp
+h2 room60-100    n= 1715  O1+120 beat event  58.3% vs matched null  59.8% | share above the cell null median  50.7% | mean (event - null median)  -3.38 pp
+room<=15         n=  977  O1+120 beat event  53.2% vs matched null  52.8% | share above the cell null median  48.5% | mean (event - null median)  -0.05 pp
+room>100         n= 2619  O1+120 beat event  59.0% vs matched null  56.8% | share above the cell null median  51.3% | mean (event - null median)  -4.62 pp
+room15-30        n= 7412  O1+120 beat event  51.8% vs matched null  52.9% | share above the cell null median  49.1% | mean (event - null median)  -0.86 pp
+room30-60        n=10035  O1+120 beat event  53.0% vs matched null  54.2% | share above the cell null median  49.7% | mean (event - null median)  -7.26 pp
+room60-100       n= 3731  O1+120 beat event  54.0% vs matched null  55.3% | share above the cell null median  49.7% | mean (event - null median)  -2.97 pp
+
+## 12. Where the stop sits: shoulder high vs the top week's high
+shoulder high above the H week high (stop above the head): 20865 of 24791 (84.2%)
+phase head-in-shoulder  20851 |  50.7% /  52.3%            |  52.8% /  53.4%            |  51.6% /  53.4%       |  48.4%   49.6%   48.6%
+phase lower-right-shoulder   3922 |  54.5% /  52.4%            |  56.7% /  53.3%            |  54.1% /  53.3%       |  52.4%   54.2%   52.0%
+phase ratio <=0.90    288 |  63.9% /  50.8%            |  69.1% /  51.0%            |  65.6% /  51.0%       |  64.2%   69.1%   66.0%
+phase ratio >1.25   2726 |  51.4% /  51.0%            |  55.1% /  51.6%            |  55.0% /  51.6%       |  50.8%   54.4%   54.2%
+phase ratio 0.90-0.95    527 |  54.1% /  51.9%            |  59.0% /  52.4%            |  56.9% /  52.4%       |  50.9%   56.0%   54.1%
+phase ratio 0.95-1.00   3107 |  53.7% /  52.6%            |  55.2% /  53.7%            |  52.6% /  53.7%       |  51.5%   52.5%   50.4%
+phase ratio 1.00-1.10  11627 |  51.1% /  52.7%            |  52.6% /  53.9%            |  50.7% /  53.9%       |  48.1%   48.7%   47.0%
+phase ratio 1.10-1.25   6498 |  49.8% /  52.2%            |  52.2% /  53.3%            |  51.7% /  53.3%       |  48.0%   49.3%   48.9%
+
+## 13. Week- and month-clustered bootstrap (B = 1,000)
+O1+60 beat, week clusters: point 51.3%  95% CI [50.3, 52.4]%  (clusters 1327, n 24790)
+O1+60 beat, month clusters: point 51.3%  95% CI [49.8, 52.8]%  (clusters 312, n 24790)
+O2 beat 2013-25, week clusters: point 56.0%  95% CI [54.5, 57.6]%  (clusters 673, n 12672)
+lower-right-shoulder O1+60 beat, week clusters: point 54.4%  95% CI [52.6, 56.3]%  (clusters 1048, n 3926)
+s4_early: share above the date's null median at +60, week clusters: point 45.4%  95% CI [43.2, 47.4]%  (clusters 127, n 4603)
+s4_late: share above the date's null median at +60, week clusters: point 47.2%  95% CI [43.1, 50.9]%  (clusters 113, n 2441)
+s3: share above the date's null median at +60, week clusters: point 50.0%  95% CI [47.8, 52.1]%  (clusters 149, n 4884)
+s12: share above the date's null median at +60, week clusters: point 50.4%  95% CI [49.1, 51.5]%  (clusters 916, n 12846)
+ALL: share above the date's null median at +60, week clusters: point 49.1%  95% CI [48.1, 50.0]%  (clusters 1304, n 24774)
+
+## 14. Economic scale (sum of excess over the sum of bars held, x 252)
+O2: mean hold 110.7 bars; excess per year: raw -4.8%, clipped +2.6%, trimmed +2.0%; absolute short return per year, clipped -10.3%
+null O1+120, clipped: +0.8%/yr; 2000-12 -3.0%/yr, 2013-25 +4.5%/yr
+events O1+120, clipped: +2.5%/yr; 2000-12 -2.0%/yr, 2013-25 +6.8%/yr
+
+## 15a. Additions quoted by the Reading
+entry vs the top week's weekly high, and stop room:
+entry vs H weekly high       n= 24791 mean= -24.03% med= -20.95% p10= -41.4 p25= -29.9 p75= -14.6 p90= -10.6 beat=  0.0%
+share stopped by room bucket (committed events):
+  room <=15%   n=  980 stopped  46.2%
+  room >30%    n=16396 stopped  12.7%
+  room 15-30%  n= 7414 stopped  27.5%
+year-level event minus matched null (O1+120 beat):
+  mean +0.7 pp, SD 6.3 pp; without 2009 mean -0.3, SD 4.1; positive in 14 of 26 years
+top width (weeks H -> breakdown) vs the calendar-matched null:
+phase wk 13-20     4119 |  53.1% /  52.9%            |  54.3% /  53.9%            |  52.4% /  53.9%       |  49.7%   51.1%   49.2%
+phase wk 21-30     9393 |  50.7% /  52.4%            |  53.3% /  53.6%            |  51.7% /  53.6%       |  48.4%   49.7%   48.5%
+phase wk 31-40     5320 |  50.0% /  52.2%            |  51.9% /  53.1%            |  51.0% /  53.1%       |  48.5%   49.3%   48.4%
+phase wk 41-52     3361 |  52.1% /  51.7%            |  54.7% /  53.1%            |  53.9% /  53.1%       |  50.0%   51.5%   51.0%
+phase wk 8-12      2580 |  52.4% /  52.0%            |  54.1% /  53.0%            |  51.7% /  53.0%       |  50.3%   52.1%   50.2%
+spike check, shoulder/head ratio <= 0.90 specimens: the H week's max intraday high over its max close
+  VMC   H 2008-09-19: high 81.995, close 67.886, high/close 1.21
+  HOPE  H 2008-09-19: high 10.166, close 8.763, high/close 1.16
+  PB    H 2008-09-19: high 30.115, close 25.268, high/close 1.19
+  HTBX  H 2015-03-13: high 53410.000, close 40670.000, high/close 1.31
+  IMNN  H 2020-06-19: high 1105.861, close 894.896, high/close 1.24
+BOUBYAN trading weekdays (0=Sun .. 6=Sat):
+  0:0  1:644  2:707  3:714  4:602  5:0  6:0
+
+## 15. Data checks
++120-bar windows longer than 250 calendar days: 17; with a bar gap > 365 days: 10
+  sym,entry,days to +120,days to O2 exit,largest gap (days),gap starts after
+  ECLP,2010-07-06,4752,4752,4579,2010-08-24
+  ATH,2004-10-25,4567,21,4392,2004-11-30
+  KFX,2006-07-24,2797,2797,2625,2006-09-28
+  LMS,2007-08-13,2619,2619,2450,2007-11-05
+  CCBL,2007-09-04,2536,2470,2369,2007-12-14
+  APL,2014-12-15,1450,1450,1277,2015-02-27
+  NBIS,2021-12-27,1143,1143,969,2022-02-25
+  LRI,2013-09-30,540,485,368,2013-12-13
+  PNB,2004-08-30,540,95,367,2004-12-17
+  NDN,2015-12-07,541,541,366,2015-12-15
+events on unit: 11
+events on non-USD: 40
+events on warrant: 66
+phase label differs between the last-bar date and the week Friday: 2
