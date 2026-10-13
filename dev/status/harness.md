@@ -1229,6 +1229,26 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     named conjunct. Before slice 2, consider evaluating each conjunct once
     into a 0/1 variable and building both the `if` and the report from those.
     `_json_actual` prints empty (not a placeholder) when the key is missing.
+  - **Progress 2026-10-13 (slice 2, harness/report-conjuncts-slice2):**
+    deduped slice 1 and converted four more. New helpers `_flag` / `_eq` /
+    `_pairs_ok`: each scenario now defines its conjuncts ONCE as a
+    label/0-1-flag array (`C40=(...)`), and both the decision
+    (`if _pairs_ok "${C40[@]}"`) and the failure output
+    (`report_conjuncts "${C40[@]}"`) are built from it, so they cannot
+    drift. Slice-1 scenarios 40 (9 conjuncts), 44, 45, 46 (7 each) moved to
+    that shape; new: 41 (7), 7a (7), 7b (6), 20g (7). Pass count 81 before
+    and after (`record_qc_audit_test: 82 passed, 0 failed` once scenario 43b
+    is added; 81 before it). QC rework 1 added scenario 43b, a direct pin of
+    `_pairs_ok` / `_eq` / `_flag` killing helper mutants: `_pairs_ok` no-op,
+    inverted polarity, `shift 1`, off-by-one (skips last pair), `_eq` always
+    1, `_flag` always 1. Mutation
+    evidence (one expected literal broken; suite exit 1, 80 passed / 1
+    failed, exactly one `conjunct FAILED` line naming it): 40
+    `consecutive_rework_count == 1`; 44 `sha == "6b979c77"`; 45
+    `behavioral_qc == APPROVED`; 46 `overall_qc == NEEDS_REWORK`; 41 `day B
+    consecutive_rework_count == 2`; 7a `JSON7A quality_score == 4`; 7b `JSON7B
+    quality_score == 5`; 20g `abort rc == 7`. Remaining (by hand count):
+    47, 48 (6 each), 8 (5), 7e (6), 5, 6, and the lower-count scenarios.
 - [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
   `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
   harness/scenario22-race-2440, issue #2440). This turned out to BE the
