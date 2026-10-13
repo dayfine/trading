@@ -1,6 +1,6 @@
 # Short setup map — pre-registration (2026-10-12)
 
-**Status: DRAFT, awaiting the user's confirmation of the design and thresholds.** Direction chosen by the user on
+**Status: CONFIRMED by the user 2026-10-12 ~18:40 PT ("sg") — design and thresholds as written.** Direction chosen by the user on
 2026-10-12 ("map setups first"), after: *"I think it's still worth pursuing. We are just not doing it very well."*
 
 ## Why

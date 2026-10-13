@@ -27,3 +27,22 @@ Links: [[project_p0_levers_no_build_2026_06_20]], [[project_p1a_deep_short_scree
 - Defects it surfaced: forced cover pre-empts the trigger-bar short stop fill (labelled stop_loss); HRC 2005-12 splice; A-D breadth fixture stuck pre-2017 (shared with the long record); foreign-currency listings (HSBA, CELSIA) in pit-v12 lists. Ledger `2026-10-10-shorts-phase-b-round1`.
 
 **Caveat 2026-10-12:** ran on the frozen A-D input (2000–16: constant Bearish momentum vote, no A-D vote); post-2016 legs unaffected. See [[project_breadth_fix_ad_frozen]].
+
+**Index-hedge screen 2026-10-12 (decision-10 hand-off, PR #3265): NO-BUILD** — the index-shaped short also fails (see
+[[project_index_hedge_screen_no_build]]); bear protection via shorts is closed in both forms. Rule-4 recommendation (user
+decides): short-only flags #3131 short_min_price_on_order_price, #3146 share_class_gate_covers_shorts, #3148
+short_maintenance_finra, #3145 study arm short_tightened_ratchet_follows_decline = do-not-revive → retire after 3 unused
+sessions; enable_short_side NOT eligible (default true, live weekly "Short candidates", 202 specs inherit);
+tightened_can_ratchet NOT eligible (long-side stop).
+
+**Score-threshold addendum 2026-10-12 (PR #3273, exploratory):** a stricter short score is NOT reliably better. Filled
+shorts at score ≥ 100: 25 trades, win 32 %, mean −0.6 % (v0 ex-HRC) / −1.1 % (v1) vs < 100 at −4.8 / −4.9 % — a weak tilt
+carried by DB/TAC/M, still negative. The 1,491-candidate pool (no stops, vs SPY short) is a coin flip at every
+threshold. "Weakest stock in weakest sector" (Weak sector + RS negative-declining) is the worst filled cohort (−6.9 /
+−8.9 %). Lesson (QC caught it): I first said a flat "no" — the filled split said "weakly better, unconfirmed".
+
+**USER 2026-10-12: shorts are STILL WORTH PURSUING — "we are just not doing it very well."** Flags stay keep-as-axis
+(no Rule-4 retirement). Gaps vs the book: long-designed stop room (2,024/2,184 top candidates skipped
+No_structural_stop), breakdown-only entry (no half-on-pullback), macro-composite market timing (book: index early
+Stage 4), no H&S detection, mirrored score that doesn't rank. Next: pre-registered short SETUP MAP over all Stage 3→4
+breakdowns (dev/plans/short-setup-map-2026-10-12.md, PR #3274, held do-not-merge until the user confirms).
