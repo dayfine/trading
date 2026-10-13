@@ -3,3 +3,25 @@
  (libraries core core_unix.command_unix shiller)
  (preprocess
   (pps ppx_jane)))
+
+; Golden: the exe's stdout on the committed Shiller fixture must match
+; expected_output.txt (default 30w MA, decades 1920 and 2000 charted).
+
+(rule
+ (alias runtest)
+ (deps
+  expected_output.txt
+  ../../data/sources/shiller/fixture/shiller-monthly-2026-05-19.csv)
+ (action
+  (progn
+   (with-stdout-to
+    actual_output.txt
+    (run
+     %{exe:shiller_weinstein_decades.exe}
+     -csv
+     ../../data/sources/shiller/fixture/shiller-monthly-2026-05-19.csv
+     -ma-window
+     30w
+     -chart-decades
+     1920,2000))
+   (diff expected_output.txt actual_output.txt))))
