@@ -8,10 +8,11 @@ open Core
     bars, A-D breadth bars, ...) can share the same week-boundary logic and
     chronological-ordering invariants without duplicating the fold.
 
-    Two items are considered to be in the same week iff they agree on both
-    {!Date.week_number} and {!Date.year} (so the ISO week number, scoped by
-    year, is the bucket key). The first and last week of the input may be
-    partial — both are emitted.
+    Two items are considered to be in the same week iff they agree on
+    {!Date.week_number_and_year}: the ISO week number scoped by the ISO
+    week-numbering year, not the calendar year. A week that crosses 1 January
+    (e.g. 2001-12-31 .. 2002-01-04, ISO 2002-W01) is therefore one bucket. The
+    first and last week of the input may be partial — both are emitted.
 
     All functions are pure. *)
 

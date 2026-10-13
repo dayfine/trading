@@ -149,12 +149,81 @@ let test_record_input _ =
              : observation);
        ])
 
+let test_week_crossing_new_year_is_one_bucket _ =
+  (* 2001-12-31 (Mon) .. 2002-01-04 (Fri) is ISO week 2002-W01: one bucket,
+     although it spans two calendar years (#3266). 2001-12-28 is 2001-W52. *)
+  let items =
+    [
+      (d ~y:2001 ~m:Month.Dec ~day:28, 1);
+      (d ~y:2001 ~m:Month.Dec ~day:31, 2);
+      (d ~y:2002 ~m:Month.Jan ~day:2, 3);
+      (d ~y:2002 ~m:Month.Jan ~day:4, 4);
+      (d ~y:2002 ~m:Month.Jan ~day:7, 5);
+    ]
+  in
+  let result =
+    Week_bucketing.bucket_weekly ~get_date:tagged_get_date ~aggregate:tagged_sum
+      items
+  in
+  assert_that result
+    (elements_are
+       [
+         equal_to ((d ~y:2001 ~m:Month.Dec ~day:28, 1) : tagged);
+         equal_to ((d ~y:2002 ~m:Month.Jan ~day:4, 2 + 3 + 4) : tagged);
+         equal_to ((d ~y:2002 ~m:Month.Jan ~day:7, 5) : tagged);
+       ])
+
+let test_week_53_crossing_new_year_is_one_bucket _ =
+  (* 2009-12-28 (Mon) .. 2010-01-01 (Fri) is ISO week 2009-W53: the January
+     day belongs to the previous ISO week-year, so the week stays whole. *)
+  let items =
+    [
+      (d ~y:2009 ~m:Month.Dec ~day:28, 1);
+      (d ~y:2009 ~m:Month.Dec ~day:31, 2);
+      (d ~y:2010 ~m:Month.Jan ~day:1, 3);
+      (d ~y:2010 ~m:Month.Jan ~day:4, 4);
+    ]
+  in
+  let result =
+    Week_bucketing.bucket_weekly ~get_date:tagged_get_date ~aggregate:tagged_sum
+      items
+  in
+  assert_that result
+    (elements_are
+       [
+         equal_to ((d ~y:2010 ~m:Month.Jan ~day:1, 1 + 2 + 3) : tagged);
+         equal_to ((d ~y:2010 ~m:Month.Jan ~day:4, 4) : tagged);
+       ])
+
+let test_same_week_number_different_years_split _ =
+  (* An ordinary week: 2023-W10 and 2024-W10 share a week number but are a
+     year apart, so they stay separate buckets. *)
+  let items =
+    [ (d ~y:2023 ~m:Month.Mar ~day:8, 1); (d ~y:2024 ~m:Month.Mar ~day:6, 2) ]
+  in
+  let result =
+    Week_bucketing.bucket_weekly ~get_date:tagged_get_date ~aggregate:tagged_sum
+      items
+  in
+  assert_that result
+    (elements_are
+       [
+         equal_to ((d ~y:2023 ~m:Month.Mar ~day:8, 1) : tagged);
+         equal_to ((d ~y:2024 ~m:Month.Mar ~day:6, 2) : tagged);
+       ])
+
 let suite =
   "Week_bucketing tests"
   >::: [
          "test_empty_input" >:: test_empty_input;
          "test_single_element" >:: test_single_element;
          "test_multi_week_preserves_order" >:: test_multi_week_preserves_order;
+         "test_week_crossing_new_year_is_one_bucket"
+         >:: test_week_crossing_new_year_is_one_bucket;
+         "test_week_53_crossing_new_year_is_one_bucket"
+         >:: test_week_53_crossing_new_year_is_one_bucket;
+         "test_same_week_number_different_years_split"
+         >:: test_same_week_number_different_years_split;
          "test_partial_head_and_tail_weeks_emitted"
          >:: test_partial_head_and_tail_weeks_emitted;
          "test_unsorted_input_raises" >:: test_unsorted_input_raises;
