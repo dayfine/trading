@@ -45,11 +45,13 @@ sh dev/scripts/pr_gate_status.sh            # every open PR + its ONE next actio
 sh dev/scripts/pr_gate_status.sh 2265 2280  # specific PRs
 ```
 
-Prints `PR | CI | STRUCT | BEHAV | CODEX | NEXT-ACTION`, where a gate is `ok` / `rework` /
+Prints `PR | CI | STRUCT | BEHAV | CODEX | VERIFIES | NEXT-ACTION`, where a gate is `ok` / `rework` /
 `stale(<sha>)` / `none` / `skip` (docs-only, or STRUCT on a results-only PR whose single
 gate is `qc-results` — `pr-merge-gates.md` §"Results-only PRs"). `CODEX` is the advisory cross-agent
 column (`cross-agent-review.md`): it changes NEXT-ACTION only under the
-`review/codex-*` labels and never stands in for STRUCT or BEHAV. Run it **at session start, and
+`review/codex-*` labels and never stands in for STRUCT or BEHAV. `VERIFIES` (results-only PRs,
+`issue-hygiene.md` B) reads the body's `Verifies #N:` / `Verifies: none` line as `ok` / `none` /
+`missing`; `missing` adds a `[+ Verifies line missing]` hint and never blocks. Run it **at session start, and
 after every agent wave.** It encodes two things a by-hand `gh` read gets wrong:
 
 1. QC verdicts land as **COMMENTED** reviews, never `APPROVED` — GitHub blocks

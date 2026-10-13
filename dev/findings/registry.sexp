@@ -324,3 +324,11 @@
          (unit ("trading/trading/weinstein/strategy/test/test_ad_bars_compose.ml"
                 "gap_warnings: one documented line per wide hole"))))
  (status fixed))
+
+((issue 2672) (ref "record-rebase 26y trades: STMP 2021 / CLE 2014 stop fills at stub prints")
+ (finding "a delisted symbol's post-delisting stub prints (STMP $327.75 -> $0.04) filled stops at ~$0 and resting entry tickets could fill past the delisting marker")
+ (guard ((unit ("trading/analysis/weinstein/snapshot_pipeline/test/test_series_tail.ml"
+                "stmp_stub_tail_truncated"))
+         (unit ("trading/trading/simulation/test/test_delisted_ticket_cancel_sim.ml"
+                "with a marker the ticket never fills"))))
+ (status fixed))

@@ -1355,6 +1355,20 @@
  (action
   (run sh %{dep:issue_fix_audit_test.sh})))
 
+; Pin the issue-hygiene sections of dev/scripts/issue_fix_audit.sh (#3275,
+; .claude/rules/issue-hygiene.md) over canned gh JSON + a fixed clock: the
+; open-count/cap header, (c) untriaged, (d) stale verify (timeline label date,
+; updatedAt fallback), (e) idle, (f) owner/user latest comment.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (source_tree fixtures/issue_fix_audit_hygiene)
+  (universe))
+ (action
+  (run sh %{dep:issue_fix_audit_hygiene_test.sh})))
+
 ; #3182: dry harness for dev/scripts/build_pit_warehouse_v12.sh -- the manifest/.snap guard (expected twin-drop
 ; orphans pass, a clobbered manifest still aborts), the twinfix resume contract and the D6 expected-absent set.
 ; The script lives outside the dune workspace root and is read via repo_root() at RUN TIME, so (universe) is

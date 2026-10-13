@@ -38,8 +38,9 @@ For the experiment directory in the diff, read in this order: `README.md` (pre-r
 | R8 | **Verdict calibration + the why.** The verdict claims only what the design supports (a screen may say no-build, not "decisively rejected"); §Verdict attributes the result to a mechanism and states forward guidance. A REJECT is classified do-not-revive or keep-as-axis (`experiment-flag-discipline.md` Rule 4). | PASS/FAIL | |
 | R9 | **Ledger + memory consistency.** The ledger entry's verdict, baseline, window and salts match the README; the PR body names the memory file updated (or says why none). | PASS/FAIL/NA | |
 | R10 | **Chain hygiene.** The chain script's `CELL_TIMEOUT` cites the measurement it was sized from (`perf-review-weekly.md` §3); per-cell log + `.rss` are committed; no `candidates.sexp`-class artifact (> 50 MB) is in the diff. | PASS/FAIL/NA | |
+| R11 | **Verifies line.** The PR body carries `Verifies #N: <item> — <evidence path>` for each [after-merge] item of an issue it satisfies, or `Verifies: none` (`issue-hygiene.md` B; `pr_gate_status.sh` VERIFIES column). FAIL when neither line is present. For each `Verifies #N` claim, open the issue's `## Done when`, confirm `<item>` is one of its [after-merge] items, and confirm the cited path is committed in this PR (or on main) and shows the item met — the number or count the item names, read from the artifact itself. A claim whose evidence does not meet the item is a FAIL. `Verifies: none` is a PASS only if no issue the README or PR body cites has an [after-merge] item this PR's artifacts meet. | PASS/FAIL | quote each claim + the evidence read |
 
-A FAIL on R1, R2, R4 or R8 is NEEDS_REWORK. R3, R5, R6, R7, R9, R10 FAILs are NEEDS_REWORK unless the README already records the gap as a known limitation with a reason — then note it and PASS with the caveat quoted.
+A FAIL on R1, R2, R4, R8 or R11 is NEEDS_REWORK. R3, R5, R6, R7, R9, R10 FAILs are NEEDS_REWORK unless the README already records the gap as a known limitation with a reason — then note it and PASS with the caveat quoted.
 
 ## Step 3 — quality score and verdict
 
