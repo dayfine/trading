@@ -56,6 +56,7 @@ let test_default_config_passes_clean_pool_through _ =
            (fun r -> List.map r.CPT.reports ~f:(fun rep -> rep.CPT.filter))
            (elements_are
               [
+                equal_to "symbol_class_exclusion";
                 equal_to "dual_class_dedup";
                 equal_to "reit_policy";
                 equal_to "adr_liquidity_floor";
@@ -177,6 +178,99 @@ let test_preferred_exclusion_drops_preferred _ =
        ])
 
 (* ---------------------------------------------------------------------- *)
+(* Symbol-class exclusion (issue #3183)                                    *)
+(* ---------------------------------------------------------------------- *)
+
+let _symbol_class_pool =
+  [
+    _candidate ~rank:0 "HSBA";
+    _candidate ~rank:1 "AAPL";
+    _candidate ~rank:2 "AIG-WS";
+    _candidate ~rank:3 "AIG";
+    _candidate ~rank:4 "LHC-UN";
+    _candidate ~rank:5 "MSFT";
+  ]
+
+(* Default-off: the full pool, specimens included, passes through in order. *)
+let test_symbol_class_default_off_is_bit_identical _ =
+  let result = CP.apply ~config:CPT.default_config _symbol_class_pool in
+  assert_that result
+    (all_of
+       [
+         field _kept_symbols
+           (elements_are
+              [
+                equal_to "HSBA";
+                equal_to "AAPL";
+                equal_to "AIG-WS";
+                equal_to "AIG";
+                equal_to "LHC-UN";
+                equal_to "MSFT";
+              ]);
+         field
+           (fun r -> _dropped_symbols (_report r "symbol_class_exclusion"))
+           (size_is 0);
+       ])
+
+let _only cls = { CPT.default_config with excluded_symbol_classes = [ cls ] }
+
+let _drop_check cls ~dropped =
+  let result = CP.apply ~config:(_only cls) _symbol_class_pool in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun r -> _dropped_symbols (_report r "symbol_class_exclusion"))
+           (elements_are [ equal_to dropped ]);
+         field
+           (fun r ->
+             List.filter_map (_report r "symbol_class_exclusion").dropped
+               ~f:(fun d -> Some d.CPT.reason))
+           (elements_are [ equal_to (CPT.Symbol_class_excluded cls) ]);
+         field _kept_symbols (size_is 5);
+       ])
+
+let test_symbol_class_drops_warrant _ =
+  _drop_check Symbol_class.Warrant ~dropped:"AIG-WS"
+
+let test_symbol_class_drops_unit _ =
+  _drop_check Symbol_class.Unit ~dropped:"LHC-UN"
+
+let test_symbol_class_drops_non_usd _ =
+  _drop_check Symbol_class.Non_usd_listing ~dropped:"HSBA"
+
+let test_symbol_class_extra_non_usd_symbols _ =
+  let config =
+    {
+      (_only Symbol_class.Non_usd_listing) with
+      extra_non_usd_symbols = [ "MSFT" ];
+    }
+  in
+  let result = CP.apply ~config _symbol_class_pool in
+  assert_that result
+    (field
+       (fun r -> _dropped_symbols (_report r "symbol_class_exclusion"))
+       (elements_are [ equal_to "HSBA"; equal_to "MSFT" ]))
+
+(* A warrant ranked above its parent must not win the dual-class dedup and then
+   be dropped: the symbol-class filter runs first so the parent survives. *)
+let test_symbol_class_runs_before_dual_class_dedup _ =
+  let candidates = [ _candidate ~rank:0 "AIG-A"; _candidate ~rank:1 "AIG" ] in
+  let candidates =
+    _candidate ~rank:0 "AIG-WS-A" :: candidates
+    |> List.mapi ~f:(fun i c -> { c with CPT.rank = i })
+  in
+  let config =
+    {
+      CPT.default_config with
+      excluded_symbol_classes = [ Symbol_class.Warrant ];
+    }
+  in
+  assert_that
+    (CP.apply ~config candidates)
+    (field _kept_symbols (elements_are [ equal_to "AIG-A" ]))
+
+(* ---------------------------------------------------------------------- *)
 (* Single-report attribution + reconciliation                              *)
 (* ---------------------------------------------------------------------- *)
 
@@ -255,6 +349,15 @@ let suite =
          >:: test_adr_floor_drops_small_adr_only;
          "test_preferred_exclusion_drops_preferred"
          >:: test_preferred_exclusion_drops_preferred;
+         "test_symbol_class_default_off_is_bit_identical"
+         >:: test_symbol_class_default_off_is_bit_identical;
+         "test_symbol_class_drops_warrant" >:: test_symbol_class_drops_warrant;
+         "test_symbol_class_drops_unit" >:: test_symbol_class_drops_unit;
+         "test_symbol_class_drops_non_usd" >:: test_symbol_class_drops_non_usd;
+         "test_symbol_class_extra_non_usd_symbols"
+         >:: test_symbol_class_extra_non_usd_symbols;
+         "test_symbol_class_runs_before_dual_class_dedup"
+         >:: test_symbol_class_runs_before_dual_class_dedup;
          "test_multi_criteria_drop_attributed_to_first_filter_only"
          >:: test_multi_criteria_drop_attributed_to_first_filter_only;
          "test_apply_is_deterministic" >:: test_apply_is_deterministic;

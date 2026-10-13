@@ -2,6 +2,7 @@ open Core
 open Composition_policy_types
 
 (* Stable filter names used in the drop reports. *)
+let _filter_symbol_class = "symbol_class_exclusion"
 let _filter_dual_class = "dual_class_dedup"
 let _filter_reit = "reit_policy"
 let _filter_adr_floor = "adr_liquidity_floor"
@@ -26,6 +27,23 @@ let _split (candidates : candidate list)
         | Some reason -> (kept, { symbol = c.symbol; reason } :: dropped))
   in
   (List.rev kept_rev, List.rev dropped_rev)
+
+(* ------------------------------------------------------------------ *)
+(* Filter 0: symbol-class exclusion (default-off, runs first)          *)
+(* ------------------------------------------------------------------ *)
+
+(* Runs before the dual-class dedup: a warrant ranked above its parent would
+   otherwise win the dedup and then be dropped here, losing the entity. *)
+let _symbol_class_reason ~config ~excluded (c : candidate) =
+  Symbol_class.classify ~extra_non_usd:config.extra_non_usd_symbols c.symbol
+  |> Option.filter ~f:(List.mem excluded ~equal:Symbol_class.equal)
+  |> Option.map ~f:(fun cls -> Symbol_class_excluded cls)
+
+let _apply_symbol_class_policy ~config candidates =
+  match config.excluded_symbol_classes with
+  | [] -> (candidates, [])
+  | excluded ->
+      _split candidates ~classify:(_symbol_class_reason ~config ~excluded)
 
 (* ------------------------------------------------------------------ *)
 (* Filter 1: dual-class dedup (always active)                          *)
@@ -97,12 +115,14 @@ let _apply_preferred_policy ~config candidates =
 (* ------------------------------------------------------------------ *)
 
 let apply ~config candidates =
-  let kept1, dropped1 = _dedup_dual_class candidates in
+  let kept0, dropped0 = _apply_symbol_class_policy ~config candidates in
+  let kept1, dropped1 = _dedup_dual_class kept0 in
   let kept2, dropped2 = _apply_reit_policy ~config kept1 in
   let kept3, dropped3 = _apply_adr_floor ~config kept2 in
   let kept4, dropped4 = _apply_preferred_policy ~config kept3 in
   let reports =
     [
+      _make_report ~filter:_filter_symbol_class ~kept:kept0 ~dropped:dropped0;
       _make_report ~filter:_filter_dual_class ~kept:kept1 ~dropped:dropped1;
       _make_report ~filter:_filter_reit ~kept:kept2 ~dropped:dropped2;
       _make_report ~filter:_filter_adr_floor ~kept:kept3 ~dropped:dropped3;

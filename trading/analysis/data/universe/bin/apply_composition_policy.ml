@@ -24,12 +24,14 @@ let _exit_with_error msg =
   Stdlib.flush Stdlib.stderr;
   Stdlib.exit 1
 
-let _config_of_flags ~exclude_reits ~exclude_preferred ~adr_min_dollar_volume =
+let _config_of_flags ~exclude_reits ~exclude_preferred ~adr_min_dollar_volume
+    ~excluded_symbol_classes =
   {
     CPT.default_config with
     reit_policy = (if exclude_reits then CPT.Exclude else CPT.Include);
     exclude_preferred;
     adr_min_dollar_volume;
+    excluded_symbol_classes;
   }
 
 let _run ~snapshot_path ~symbol_types_path ~out_snapshot_path ~out_report_path
@@ -72,11 +74,29 @@ let command =
          ~doc:
            "FLOAT drop ADR/GDR members below this avg dollar volume (default: \
             keep all)"
+     and exclude_warrants =
+       flag "--exclude-warrants" no_arg
+         ~doc:" drop warrant (-WS) members (default: keep)"
+     and exclude_units =
+       flag "--exclude-units" no_arg
+         ~doc:" drop SPAC unit (-UN) members (default: keep)"
+     and exclude_non_usd =
+       flag "--exclude-non-usd" no_arg
+         ~doc:" drop curated non-USD listings, e.g. HSBA (default: keep)"
      in
      fun () ->
+       let excluded_symbol_classes =
+         List.filter_map
+           [
+             (exclude_warrants, Universe.Symbol_class.Warrant);
+             (exclude_units, Unit);
+             (exclude_non_usd, Non_usd_listing);
+           ]
+           ~f:(fun (on, cls) -> if on then Some cls else None)
+       in
        let config =
          _config_of_flags ~exclude_reits ~exclude_preferred
-           ~adr_min_dollar_volume
+           ~adr_min_dollar_volume ~excluded_symbol_classes
        in
        _run ~snapshot_path ~symbol_types_path ~out_snapshot_path
          ~out_report_path ~config)
