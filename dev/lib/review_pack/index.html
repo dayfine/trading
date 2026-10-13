@@ -160,10 +160,10 @@ ol.agenda li b { font-weight: 600; }
   </div>
   <div class="panel">
     <div class="row" style="justify-content:space-between">
-      <h2>Eras vs SPY</h2>
-      <div class="legend"><span><i style="background:var(--accent)"></i>Strategy NAV ÷ SPY (1.0 = level with SPY)</span></div>
+      <h2 id="eras-h">Eras vs SPY</h2>
+      <div class="legend"><span><i style="background:var(--accent)"></i><span id="eras-lg">Strategy NAV ÷ SPY (1.0 = level with SPY)</span></span></div>
     </div>
-    <p class="note">The ratio of strategy NAV to SPY, both starting at 1. Eras come from the year-end ratio: a leg that moves the ratio 15 % or more is <b>built</b> or <b>eroded</b>; inside a leg of six or more years, the longest four-plus-year run that stays within a 10 % band is split out as <b>held</b>. Each era is split by the SPY regime of the day: weekly close vs its 30-week MA and the MA's four-week slope, known at the prior week's close. The largest regime gap names the era's cause: <b>UP</b> means holdings lagged or led while the market rose, <b>DOWN</b> means cash during declines or rebounds.</p>
+    <p class="note">The ratio of strategy NAV to SPY, both starting at 1. Eras come from the year-end ratio: a leg that moves the ratio 15 % or more is <b>built</b> or <b>eroded</b>; inside a leg of six or more years, the longest four-plus-year run that stays within a 10 % band is split out as <b>held</b>. Each era is split by the SPY regime of the day: weekly close vs its 30-week MA and the MA's four-week slope, known at the prior week's close. The largest regime gap names the era's cause: <b>UP</b> means holdings lagged or led while the market rose, <b>DOWN</b> means cash during declines or rebounds. A short-only book is read against SPY inverted day by day: there <b>UP</b> is where shorts lose and <b>DOWN</b> is where they earn, and cash in a rising market is protection, not a miss.</p>
     <div class="chart sm" id="c-rel"></div>
     <div class="tablebox"><table id="eras"></table></div>
   </div>
@@ -225,17 +225,17 @@ ol.agenda li b { font-weight: 600; }
     <div class="flagcards" id="flagcards"></div>
     <p class="note" id="flagclear"></p>
   </div>
-  <div class="grid2">
-    <div class="panel">
-      <h2>Weinstein conformance (trade audit report)</h2>
-      <p class="note">Rules are checked over every entry decision, including orders that never filled, so the denominators exceed the trade count.</p>
-      <div class="tablebox"><table id="conf"></table></div>
-    </div>
-    <div class="panel">
-      <h2>Post-run validator</h2>
-      <p class="note">The validator stores at most 10 examples per check. The per-trade flags on this page are computed from the price data, so they list every trade.</p>
-      <div id="validator"></div>
-    </div>
+  <!-- conformance and validator stacked, not side by side: a long validator list beside the short
+       conformance table left a mostly blank column (#3262, from #3214) -->
+  <div class="panel" id="conf-panel">
+    <h2>Weinstein conformance (trade audit report)</h2>
+    <p class="note">Rules are checked over every entry decision, including orders that never filled, so the denominators exceed the trade count.</p>
+    <div class="tablebox"><table id="conf"></table></div>
+  </div>
+  <div class="panel" id="validator-panel">
+    <h2>Post-run validator</h2>
+    <p class="note">The validator stores at most 10 examples per check. The per-trade flags on this page are computed from the price data, so they list every trade.</p>
+    <div id="validator"></div>
   </div>
 </section>
 
@@ -360,7 +360,7 @@ const FLAGS = [
   { id: 'gapstop', cat: 'exec', label: 'Stop filled ≥ 3 pts beyond the stop', test: t => t.trig === 'stop_loss' && stopSlip(t) >= 0.03,
     why: 'Opened through the stop (below it for a long, above it for a short), so the loss is larger than the risk planned at entry.' },
   { id: 'latestop', cat: 'exec', zero: true, label: 'Stop breached before the exit day', test: t => t.trig === 'stop_loss' && t.blag >= 1,
-    why: 'The price reached the installed stop (trades.csv entry_stop; the low for a long, the high for a short) on an earlier day than the exit fill. Under the default fill model exits are market orders sent after the close and fill at the next open; with sim_stop_exit_fill_on_trigger_bar on (the record and investor configs) a stop fills on the bar that trades it, so a count here is a stop-level mismatch worth opening (e.g. #3075). Book: the stop is a resting order (reference §5.7).' },
+    why: 'The price reached the installed stop (trades.csv entry_stop; the low for a long, the high for a short) on an earlier day than the exit fill. Read on raw bars against the raw stop, moved only by a split since the entry, detected by the simulator’s own rule (a factor move over 5 % that snaps to N/M, M ≤ 20): a dividend does not shift the line. Under the default fill model exits are market orders sent after the close and fill at the next open; with sim_stop_exit_fill_on_trigger_bar on (the record and investor configs) a stop fills on the bar that trades it, so a count here is a stop-level mismatch worth opening (e.g. #3075). Book: the stop is a resting order (reference §5.7).' },
   { id: 'slipcap', cat: 'exec', needs: 'fvt', label: 'Entry filled 2% past the trigger', test: t => t.fvt != null && sideSgn(t) * t.fvt >= 1.99,
     why: 'The entry order’s limit sits 2% past the trigger (above it for a long, below it for a short). These fills paid the whole allowance.' },
   { id: 'quickstop', cat: 'exec', label: 'Stopped out within 2 days', test: t => t.trig === 'stop_loss' && t.days <= 2,
@@ -578,13 +578,42 @@ function eraSplit(pts) {
   }
   return out;
 }
-const REGIME_TXT = {
-  UP: (s, m, e) => s >= m ? `led while the market rose (UP days: ${pct(s, 1)} vs SPY ${pct(m, 1)} at ${fmt(e, 0)}% invested)`
-    : e < 40 ? `in cash while the market rose (UP days: ${pct(s, 1)} vs SPY ${pct(m, 1)} at ${fmt(e, 0)}% invested)`
-    : `holdings lagged while the market rose (UP days: ${pct(s, 1)} vs SPY ${pct(m, 1)} at ${fmt(e, 0)}% invested)${e >= 50 ? ' — not an exposure effect' : ''}`,
-  DOWN: (s, m, e) => s >= m ? `cash held through declines (DOWN days: ${pct(s, 1)} vs SPY ${pct(m, 1)} at ${fmt(e, 0)}% invested)` : `in cash through rebounds (DOWN days: ${pct(s, 1)} vs SPY ${pct(m, 1)} at ${fmt(e, 0)}% invested)`,
-  MIXED: (s, m, e) => `${s >= m ? 'ahead' : 'behind'} in transition weeks (MIXED days: ${pct(s, 1)} vs SPY ${pct(m, 1)} at ${fmt(e, 0)}% invested)`,
-};
+// The era cause for regime k (UP / DOWN / MIXED): s = strategy and m = benchmark % over the era's k days, e =
+// average invested % (gross: a short counts at its market value). dir = -1 reads a short-only book (#3262, from
+// #3214 item 5): the benchmark is SPY inverted, a rising market is where shorts lose and a decline is where they
+// earn, so "in cash while the market rose" (a long book's miss) is a short book's protection. Pure, for the test.
+const REGIME_CASH_PCT = 40, REGIME_FULL_PCT = 50;
+function regimeText(k, s, m, e, dir = 1) {
+  const L = dir < 0 ? 'inverted SPY' : 'SPY', at = `${k} days: ${pct(s, 1)} vs ${L} ${pct(m, 1)} at ${fmt(e, 0)}% ${dir < 0 ? 'short' : 'invested'}`;
+  if (k === 'MIXED') return `${s >= m ? 'ahead' : 'behind'} in transition weeks (${at})`;
+  if (dir < 0) return k === 'UP' ? `${s >= m ? 'held up while the market rose' : 'shorts lost more than the market rose'} (${at})`
+    : `${s >= m ? 'shorts led the decline' : e < REGIME_CASH_PCT ? 'in cash through the decline' : 'shorts lagged the decline'} (${at})`;
+  if (k === 'UP') return s >= m ? `led while the market rose (${at})` : e < REGIME_CASH_PCT ? `in cash while the market rose (${at})`
+    : `holdings lagged while the market rose (${at})${e >= REGIME_FULL_PCT ? ' — not an exposure effect' : ''}`;
+  return `${s >= m ? 'cash held through declines' : 'in cash through rebounds'} (${at})`;
+}
+// Year-end ratio points [['start', 1], [year, strategy / benchmark], ...]: the strategy compounded from the
+// year table. The benchmark is the year table's SPY, or, given bench (a short-only book's benchSeries, SPY
+// inverted day by day), that series' level at the year's last day over its first: the same benchmark the
+// chart and the era cells read, so the era cut and the ratio column agree with the chart (#3262 QC rework;
+// inverting each year's SPY return instead drifts from it by the volatility drag). Pure, for the test.
+function eraPoints(ys, bench = null) {
+  const yEnd = new Map(); if (bench) for (const [d, v] of bench) yEnd.set(d.slice(0, 4), +v);
+  let n = 1, m = 1; const pts = [['start', 1]];
+  for (const y of ys) {
+    n *= 1 + y.ret / 100;
+    m = !bench ? m * (1 + y.spy / 100) : yEnd.has(y.p) ? yEnd.get(y.p) / bench[0][1] : m;
+    pts.push([y.p, n / m]);
+  }
+  return pts;
+}
+// The daily benchmark [[date, level]] on spy's dates: SPY itself, or for dir = -1 SPY inverted day by day
+// (each day earns minus SPY's daily return), starting at SPY's first level. Pure, for the test.
+function benchSeries(spy, dir = 1) {
+  if (dir > 0) return spy;
+  const out = []; spy.forEach(([d, v], i) => out.push([d, i ? out[i - 1][1] * (2 - v / spy[i - 1][1]) : +v]));
+  return out;
+}
 // Signal predicates: pure, top-level, one per finding, so review_pack_test.sh
 // can extract each with sed and pin it with node (#3084). Each closing brace sits
 // at column 0 for that extraction.
@@ -738,22 +767,25 @@ function givebackLine(g) {
 }
 // Renders the ratio chart + era table; returns { lead: finding bullets, rests: one-trade / salt-year bullets } (HTML strings).
 function renderSignals(nav, spy) {
-  const ys = D.years[CH()], reg = spyRegimeByDay();
-  const rel = nav.map(([d, v], i) => [d, v / spy[i][1]]);
+  const ys = D.years[CH()], reg = spyRegimeByDay(), tr = D.trades[CH()];
+  // a short-only book reads against SPY inverted (#3262, from #3214 item 5): the ratio, the era cells and the wording
+  const shortBook = tr.length > 0 && tr.every(isShort), dir = shortBook ? -1 : 1, bench = benchSeries(spy, dir), BL = shortBook ? 'inverted SPY' : 'SPY';
+  $('#eras-h').textContent = `Eras vs ${BL}`; $('#eras-lg').textContent = `Strategy NAV ÷ ${BL} (1.0 = level with ${BL})`;
+  const rel = nav.map(([d, v], i) => [d, v / bench[i][1]]);
   const c = mkChart('#c-rel', 150, 'overview');
   const line = c.addLineSeries({ color: css('--accent'), lineWidth: 1.5, priceLineVisible: false });
   line.setData(rel.map(([d, v]) => ({ time: d, value: v })));
   line.createPriceLine({ price: 1, color: css('--muted'), lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
   c.timeScale().fitContent();
-  // year-end ratio points (strategy and SPY compounded from the year table, as the table shows them)
-  let n = 1, m = 1; const pts = [['start', 1]];
-  for (const y of ys) { n *= 1 + y.ret / 100; m *= 1 + y.spy / 100; pts.push([y.p, n / m]); }
+  // year-end ratio points: the strategy from the year table; the benchmark from the year table (long) or from the
+  // daily-inverted bench at each year end (short-only), so the era cut matches the chart (see eraPoints)
+  const pts = eraPoints(ys, shortBook ? bench : null);
   const eras = eraSplit(pts);
   const rows = eras.map(e => {
     const y0 = pts[e.i0 + 1][0], y1 = pts[e.i1][0]; const R = { UP: [0, 0, 0, 0], DOWN: [0, 0, 0, 0], MIXED: [0, 0, 0, 0] };
     for (let i = 1; i < nav.length; i++) {
       const d = nav[i][0], y = d.slice(0, 4), r = reg.get(d); if (y < y0 || y > y1 || !r) continue;
-      const a = R[r]; a[0]++; a[1] += nav[i][2]; a[2] += Math.log(nav[i][1] / nav[i - 1][1]); a[3] += Math.log(spy[i][1] / spy[i - 1][1]);
+      const a = R[r]; a[0]++; a[1] += nav[i][2]; a[2] += Math.log(nav[i][1] / nav[i - 1][1]); a[3] += Math.log(bench[i][1] / bench[i - 1][1]);
     }
     const cells = Object.fromEntries(Object.entries(R).map(([k, a]) => [k, a[0] ? { days: a[0], expo: a[1] / a[0], s: 100 * (Math.exp(a[2]) - 1), m: 100 * (Math.exp(a[3]) - 1), gap: a[2] - a[3] } : null]));
     const order = Object.keys(cells).filter(k => cells[k]).sort((p, q) => Math.abs(cells[q].gap) - Math.abs(cells[p].gap));
@@ -761,15 +793,15 @@ function renderSignals(nav, spy) {
     return { ...e, y0, y1, r0: pts[e.i0][1], r1: pts[e.i1][1], cells, key, key2 };
   });
   const cell = x => x ? `<span class="${sgn(x.s - x.m)}">${pct(x.s, 0)}</span> / ${pct(x.m, 0)} · ${fmt(x.expo, 0)}%` : '–';
-  const head = [['Era'], ['Years'], ['Ratio vs SPY', 1], ['UP days: strategy / SPY · invested', 1], ['MIXED days', 1], ['DOWN days', 1], ['Largest gap']];
+  const head = [['Era'], ['Years'], [`Ratio vs ${BL}`, 1], [`UP days: strategy / ${BL} · ${shortBook ? 'short' : 'invested'}`, 1], ['MIXED days', 1], ['DOWN days', 1], ['Largest gap']];
   $('#eras').innerHTML = tbl(head, rows.map(r => `<tr>${[`<b>${r.label}</b>`, r.y0 === r.y1 ? r.y0 : `${r.y0}–${r.y1}`, `${fmt(r.r0, 2)} → ${fmt(r.r1, 2)}`, cell(r.cells.UP), cell(r.cells.MIXED), cell(r.cells.DOWN), r.key || '–'].map((v, i) => `<td${head[i][1] ? ' class="num"' : ''}>${v}</td>`).join('')}</tr>`));
   const span = r => r.y0 === r.y1 ? r.y0 : `${r.y0}–${r.y1}`;
-  const out = [`<b>Eras vs SPY:</b> ${rows.map(r => `${r.label} ${span(r)} (${fmt(r.r0, 2)}→${fmt(r.r1, 2)}×)`).join('; ')}. The ratio ends at ${fmt(pts[pts.length - 1][1], 2)}× SPY${Math.max(...pts.map(p => p[1])) > 1 && pts[pts.length - 1][1] < 1 ? `, after peaking at ${fmt(Math.max(...pts.map(p => p[1])), 2)}×: a whole-window "trails SPY" depends on the end date` : ''}.`];
+  const out = [`<b>Eras vs ${BL}${shortBook ? ' (short-only book)' : ''}:</b> ${rows.map(r => `${r.label} ${span(r)} (${fmt(r.r0, 2)}→${fmt(r.r1, 2)}×)`).join('; ')}. The ratio ends at ${fmt(pts[pts.length - 1][1], 2)}× ${BL}${Math.max(...pts.map(p => p[1])) > 1 && pts[pts.length - 1][1] < 1 ? `, after peaking at ${fmt(Math.max(...pts.map(p => p[1])), 2)}×: a whole-window "trails ${BL}" depends on the end date` : ''}.`];
   for (const r of rows.filter(r => r.label === 'eroded' && r.key)) { const x = r.cells[r.key]; const x2 = r.key2 && r.cells[r.key2];
-    out.push(`<b>Eroded ${span(r)} (${fmt(r.r0, 2)}→${fmt(r.r1, 2)}×):</b> mostly ${REGIME_TXT[r.key](x.s, x.m, x.expo)}${x2 ? `; also ${REGIME_TXT[r.key2](x2.s, x2.m, x2.expo)}` : ''}.`); }
+    out.push(`<b>Eroded ${span(r)} (${fmt(r.r0, 2)}→${fmt(r.r1, 2)}×):</b> mostly ${regimeText(r.key, x.s, x.m, x.expo, dir)}${x2 ? `; also ${regimeText(r.key2, x2.s, x2.m, x2.expo, dir)}` : ''}.`); }
   // years one trade or the salt decided (yearRestsBullet): kept out of the lead list (#3214), shown in a
   // collapsed note under it, because a fat-tail strategy is expected to rest on a few trades
-  const tr = D.trades[CH()], rests = [];
+  const rests = [];
   for (const y of ys) {
     const top = tr.filter(t => t.xd.slice(0, 4) === y.p).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl))[0];
     const salts = D.years.map(s => (s.find(q => q.p === y.p) || {}).ret).filter(v => v != null);
@@ -788,7 +820,7 @@ function renderSignals(nav, spy) {
   const mc = marginChurnLine(marginChurn(tr), v16Count(D.meta[CH()].validator), D.trades.map((ts, i) => [runLabel(i), marginChurn(ts).low]));
   if (mc) out.push(mc);
   // gate reopen episodes: the flat-through-the-recovery shape (2008-09) and its opposite (invested, lagged)
-  const shortBook = tr.length > 0 && tr.every(isShort), eps = reopenEpisodes(D.macro, nav, spy, tr, shortBook ? -1 : 1), ep = e => `${e.d.slice(0, 7)} (${e.e13} ${e.e13 === 1 ? 'entry' : 'entries'} in 13 wk, ${pct(e.ret, 1)} vs SPY ${pct(e.spy, 1)})`;
+  const eps = reopenEpisodes(D.macro, nav, spy, tr, dir), ep = e => `${e.d.slice(0, 7)} (${e.e13} ${e.e13 === 1 ? 'entry' : 'entries'} in 13 wk, ${pct(e.ret, 1)} vs ${BL} ${pct(e.spy, 1)})`;
   const groups = [['sat out', 'Sat out the recovery'], ['invested and lagged', 'Invested and lagged'], ['lagged', 'Lagged']].map(([k, label]) => [label, eps.filter(e => e.flag === k)]).filter(([, l]) => l.length);
   if (eps.length) out.push(`<b>Gate reopen episodes:</b> ${eps.length} ${eps.length === 1 ? 'reopen' : 'reopens'} after ${REOPEN_CLOSED_WEEKS}+ closed weeks${shortBook ? ' (short-only book: the gate reopens on Bearish and SPY is read inverted)' : ''}. ${groups.length ? groups.map(([label, l]) => `${label}: ${l.map(ep).join('; ')}.`).join(' ') : `None was followed by a ${REOPEN_GAP_PP} pp lag behind a SPY rise of ${REOPEN_SPY_MIN} % or more.`}`);
   $('#reopens').innerHTML = eps.length ? tbl([['Reopen'], ['Closed weeks', 1], ['Entries 13 / 26 wk', 1], ['Strategy 26 wk', 1], [shortBook ? 'SPY 26 wk, inverted' : 'SPY 26 wk', 1], ['Read']],
@@ -855,11 +887,11 @@ function renderOverview() {
   const f = [
     openCheckMiss(oc) && `<b>Exposure check failed on ${oc.date}:</b> the pack marks ${usd(oc.pack)} held, actual.sexp has ${usd(oc.actual)} in open positions. Every invested figure on this page is suspect.`,
     worst && `<b>Worst three-year stretch: ${worst.w[0].p}–${worst.w[2].p}, ${pct(cum(worst.w, 'ret'), 1)} while SPY made ${pct(cum(worst.w, 'spy'), 1)}.</b> Bullish macro weeks: ${worst.w.map(y => y.bull).join(' / ')}; realised P&amp;L ${worst.w.map(y => usdk(y.pnl)).join(' / ')}.`,
-    `<b>Ten trades made ${usdk(top10.reduce((a, x) => a + x.pnl, 0))}</b> of the ${usdk(tot)} realised total. The ${aTr.length} A-grade trades made ${usdk(aTr.reduce((a, x) => a + x.pnl, 0))}.${realisedTotalNote(t.reduce((a, x) => a + (x.div || 0), 0), inv.metrics.cashinteresttotal)}`,
+    `<b>Ten trades made ${usdk(top10.reduce((a, x) => a + x.pnl, 0))}</b> of the ${usdk(tot)} realised total. The ${aTr.length} A-grade trades made ${usdk(aTr.reduce((a, x) => a + x.pnl, 0))}.${(dv => realisedTotalNote(dv.v, inv.metrics.cashinteresttotal, dv.src))(realisedDivs(t, inv.metrics))}`,
     fallbackFinding(t),
     `<b>${gap.length} of ${stops.length} stop exits filled more than 0.5% beyond the stop; ${late.length} sold at an open after the day the stop traded.</b> ${df.length} losers (grade D/F) then moved ≥ 15% the trade’s way within 13 weeks; they lost ${usdk(df.reduce((a, x) => a + x.pnl, 0))}.`,
     `<b>Average invested: ${fmt(expoAvg, 0)}% of NAV,</b> about ${fmt(ys.reduce((a, y) => a + y.pos, 0) / ys.length, 1)} positions on average.`,
-    `<b>${wk.length} ${wk.length === 1 ? 'trade has' : 'trades have'} a fill dated on a day with no bar</b> (the Saturday-fill defect). The validator also counts ${(inv.validator.find(v => v.id === 'V13') || {}).status || '?'} on V13.`,
+    noBarFillLine(wk.length, (inv.validator.find(v => v.id === 'V13') || {}).status),
     rets.length > 1 && (RK() === 'salt' ? `<b>Salt spread: the same rules returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} salts.` : `<b>The ${rets.length} arms returned ${rets.map(r => pct(r, 0)).join(', ')}</b> (different configs, not salts of one).`),
   ].filter(Boolean);
   // the signals lead: era bullets come before the run-level counts; one-trade and salt years sit in a collapsed note (#3214)
@@ -922,11 +954,24 @@ $('#p-q').addEventListener('click', () => { pGran = 'Q'; $('#p-q').setAttribute(
 // Total-return P&L of one trade (#3175): price-only pnl plus the dividends credited while it was held.
 // trades.csv gains dividends_received last; an older file has none (div null), read as 0.
 function tradeTR(t) { return t.pnl + (t.div || 0); }
+// The overview's no-bar fill count (the Saturday-fill defect) beside V13's status, with the verb agreeing
+// with the count (#3262: "1 trades have"). Pure, for the test.
+function noBarFillLine(n, v13) {
+  return `<b>${n} ${n === 1 ? 'trade has' : 'trades have'} a fill dated on a day with no bar</b> (the Saturday-fill defect). The validator also counts ${v13 || '?'} on V13.`;
+}
+// The dividends to add to price-only trade P&L: the trade rows' Div $ when trades.csv carries the column
+// (dividends_received, #3197; without it every row reads null), else the run's DividendIncomeTotal (#3262, from
+// #3214: an older trades.csv left rb1 s0's $1.23M of dividends out of the note). Pure, for the test.
+function realisedDivs(trades, m) {
+  if (trades.some(t => t.div != null)) return { v: trades.reduce((a, t) => a + (t.div || 0), 0), src: 'rows' };
+  return { v: (m || {}).dividendincometotal || 0, src: 'run' };
+}
 // The sentence appended to the realised-total signal (#3175). Trade rows are price-only; dividends and
 // interest are cash credits outside them. Empty when neither was credited (price-only run).
-function realisedTotalNote(divs, interest) {
+// src = 'run' names the run's DividendIncomeTotal as the dividends' source (realisedDivs).
+function realisedTotalNote(divs, interest, src = 'rows') {
   const parts = [];
-  if (divs) parts.push(`${usdk(divs)} of dividends (inside the trade rows' Div $ column, not in P&amp;L $)`);
+  if (divs) parts.push(`${usdk(divs)} of dividends (${src === 'run' ? 'the run’s DividendIncomeTotal: this trades.csv has no dividends_received column' : 'inside the trade rows’ Div $ column, not in P&amp;L $'})`);
   if (interest) parts.push(`${usdk(interest)} of cash interest (in no trade row)`);
   return parts.length ? ` Trade P&amp;L is price-only: add ${parts.join(' and ')} for the total-return figure.` : '';
 }
