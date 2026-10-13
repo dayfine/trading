@@ -51,14 +51,14 @@ let _tdg_dividend : CA.dividend =
     adjusted_amount = 22.0;
   }
 
-let _detect ?guard ~symbol ~as_of bars =
+let _detect ?guard ?raw_confirm_min_share ~symbol ~as_of bars =
   let reader = Bar_reader.of_in_memory_bars [ (symbol, bars) ] in
   let bar_reader =
     Option.value_map guard ~default:reader
       ~f:(Bar_reader.with_split_guard reader)
   in
-  Stops_split_runner.detect_split ~bar_reader ~symbol
-    ~as_of:(Date.of_string as_of)
+  Stops_split_runner.detect_split ?raw_confirm_min_share ~bar_reader ~symbol
+    ~as_of:(Date.of_string as_of) ()
 
 (* No guard on the reader: today's behaviour, the dividend reads as 22/19. *)
 let test_unguarded_reader_reports_dividend_as_split _ =
@@ -81,6 +81,26 @@ let test_guarded_reader_keeps_vendor_split _ =
     (_detect ~guard ~symbol:"AAPL" ~as_of:"2020-08-31" _aapl_bars)
     (is_some_and (float_equal 4.0))
 
+(* Issue #3109: [raw_confirm_min_share] reaches the detector. AABA-shaped
+   bars: the adjusted close doubles while the raw close moves +1 %. *)
+let _aaba_bars =
+  [
+    _bar "2000-02-11" ~close:400.0 ~adjusted:200.0;
+    _bar "2000-02-14" ~close:404.0 ~adjusted:404.0;
+  ]
+
+let test_raw_confirm_rejects_unconfirmed_step _ =
+  assert_that
+    [
+      _detect ~symbol:"AABA" ~as_of:"2000-02-14" _aaba_bars;
+      _detect ~raw_confirm_min_share:0.5 ~symbol:"AABA" ~as_of:"2000-02-14"
+        _aaba_bars;
+      _detect ~raw_confirm_min_share:0.5 ~symbol:"AAPL" ~as_of:"2020-08-31"
+        _aapl_bars;
+    ]
+    (elements_are
+       [ is_some_and (float_equal 2.0); is_none; is_some_and (float_equal 4.0) ])
+
 let suite =
   "stops_split_dividend_guard"
   >::: [
@@ -90,6 +110,8 @@ let suite =
          >:: test_guarded_reader_drops_dividend_split;
          "guarded reader keeps vendor split"
          >:: test_guarded_reader_keeps_vendor_split;
+         "raw confirm rejects unconfirmed adjusted step"
+         >:: test_raw_confirm_rejects_unconfirmed_step;
        ]
 
 let () = run_test_tt_main suite

@@ -21,6 +21,14 @@ let default_rational_snap_tolerance = 1e-3
    anything we expect to see in practice. *)
 let default_max_denominator = 20
 
+(* Smallest |factor - 1| a split may have on a frozen-adjusted day (adjusted
+   close bit-identical to the prior bar). Below it the "factor" is the raw
+   move snapped to a rational, not a share-count change: 55 % of the 0.05-0.10
+   band and 46 % of the 0.10-0.25 band are frozen days, against 2 % of the
+   >= 0.25 band, where they are real splits (issue #3109,
+   dev/notes/split-detector-dividend-misfire-2026-10-03.md). *)
+let default_frozen_adjusted_min_deviation = 0.25
+
 (* ------------------------------------------------------------------ *)
 (* Helpers                                                              *)
 (* ------------------------------------------------------------------ *)
@@ -96,14 +104,41 @@ let _confirm_by_raw_gap ~raw_confirm_min_share ~raw_ratio factor =
         Some factor
       else None
 
+(* Reject a small factor on a frozen-adjusted day (issue #3109): the adjusted
+   close did not move, so the "factor" is only the raw move snapped to a
+   rational. Active only with the raw-gap check on ([raw_confirm_min_share]
+   given), so the default path is unchanged. A factor at or beyond
+   [min_deviation] is kept: real splits on a flat adjusted close exist. *)
+let _reject_frozen_adjusted ~raw_confirm_min_share ~min_deviation ~adj_ratio
+    factor =
+  let frozen = Float.( = ) adj_ratio 1.0 in
+  let small = Float.( < ) (Float.abs (factor -. 1.0)) min_deviation in
+  match raw_confirm_min_share with
+  | Some _ when frozen && small -> None
+  | _ -> Some factor
+
+(* The two raw-close checks, in order. Both are no-ops when
+   [raw_confirm_min_share] is [None]. *)
+let _confirmed ~raw_confirm_min_share ~min_deviation ~raw_ratio ~adj_ratio
+    factor =
+  Option.bind
+    (_confirm_by_raw_gap ~raw_confirm_min_share ~raw_ratio factor)
+    ~f:
+      (_reject_frozen_adjusted ~raw_confirm_min_share ~min_deviation ~adj_ratio)
+
 let detect_split ?(dividend_threshold = default_dividend_threshold)
     ?(rational_snap_tolerance = default_rational_snap_tolerance)
     ?(max_denominator = default_max_denominator) ?raw_confirm_min_share
+    ?(frozen_adjusted_min_deviation = default_frozen_adjusted_min_deviation)
     ~(prev : Daily_price.t) ~(curr : Daily_price.t) () =
   if not (_has_valid_prices ~prev ~curr) then None
   else
     let raw_ratio = curr.close_price /. prev.close_price in
     let adj_ratio = curr.adjusted_close /. prev.adjusted_close in
+    let min_deviation = frozen_adjusted_min_deviation in
+    let confirm =
+      _confirmed ~raw_confirm_min_share ~min_deviation ~raw_ratio ~adj_ratio
+    in
     _classify_ratio ~dividend_threshold ~rational_snap_tolerance
       ~max_denominator ~raw_ratio ~adj_ratio
-    |> Option.bind ~f:(_confirm_by_raw_gap ~raw_confirm_min_share ~raw_ratio)
+    |> Option.bind ~f:confirm

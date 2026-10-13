@@ -16,6 +16,7 @@ open Core
 
 val detect_for_symbol :
   ?split_guard:Split_dividend_guard.t ->
+  ?raw_confirm_min_share:float ->
   adapter:Trading_simulation_data.Market_data_adapter.t ->
   date:Date.t ->
   symbol:string ->
@@ -28,19 +29,25 @@ val detect_for_symbol :
 
     [split_guard] (issue #3173, default absent = the pre-#3173 behaviour) drops
     a detected split that {!Split_dividend_guard.filter} identifies as a vendor
-    cash dividend, so a held position gains no phantom shares. *)
+    cash dividend, so a held position gains no phantom shares.
+
+    [raw_confirm_min_share] (issue #3109, default absent = the pre-#3109
+    behaviour) is passed to {!Types.Split_detector.detect_split}: a factor the
+    raw close gap does not confirm, or a small factor on a frozen-adjusted day,
+    is not a split. *)
 
 val detect_for_held_positions :
   ?split_guard:Split_dividend_guard.t ->
+  ?raw_confirm_min_share:float ->
   adapter:Trading_simulation_data.Market_data_adapter.t ->
   date:Date.t ->
   portfolio:Trading_portfolio.Portfolio.t ->
   unit ->
   Trading_portfolio.Split_event.t list
 (** For every symbol currently held in [portfolio], call {!detect_for_symbol}
-    (with [split_guard]). Symbols with no current bar (weekends/holidays) or no
-    prior bar (first appearance) yield no event. Order follows
-    [portfolio.positions] (sorted by symbol). *)
+    (with [split_guard] and [raw_confirm_min_share]). Symbols with no current
+    bar (weekends/holidays) or no prior bar (first appearance) yield no event.
+    Order follows [portfolio.positions] (sorted by symbol). *)
 
 val apply_events :
   Trading_portfolio.Portfolio.t ->
@@ -76,6 +83,7 @@ val apply_to_positions :
 
 val detect_and_apply :
   ?split_guard:Split_dividend_guard.t ->
+  ?raw_confirm_min_share:float ->
   adapter:Trading_simulation_data.Market_data_adapter.t ->
   date:Date.t ->
   portfolio:Trading_portfolio.Portfolio.t ->
@@ -85,6 +93,6 @@ val detect_and_apply :
   * Trading_strategy.Position.t String.Map.t
   * Trading_portfolio.Split_event.t list
 (** The simulator's daily split step: {!detect_for_held_positions} on
-    [portfolio] (with [split_guard]), then {!apply_events} and
-    {!apply_to_positions} with the same events. Returns
+    [portfolio] (with [split_guard] and [raw_confirm_min_share]), then
+    {!apply_events} and {!apply_to_positions} with the same events. Returns
     [(portfolio, positions, events)]. *)
