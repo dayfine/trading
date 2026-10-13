@@ -89,10 +89,11 @@
   ;;        hold 67.11  OPV 985,268.61
   ;; ±15% around the new actual (total_return_pct: at least ±5pp). Correctness
   ;; re-pin of a data defect: no return claim attaches to the delta.
-  ((total_return_pct ((min 30.9598) (max 41.8867)))
-   (total_trades ((min 178.5000) (max 241.5000)))
-   (win_rate ((min 26.7143) (max 36.1429)))
-   (sharpe_ratio ((min 0.3569) (max 0.4829)))
-   (max_drawdown_pct ((min 27.4831) (max 37.1831)))
-   (avg_holding_days ((min 57.0431) (max 77.1760)))
-   (open_positions_value ((min 837478.3185) (max 1133058.9015))))))
+  ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in the PR. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 57.3752) (max 77.6252)))
+   (total_trades ((min 175.9500) (max 238.0500)))
+   (win_rate ((min 29.9758) (max 40.5556)))
+   (sharpe_ratio ((min 0.5762) (max 0.7796)))
+   (max_drawdown_pct ((min 18.7180) (max 25.3244)))
+   (avg_holding_days ((min 58.0012) (max 78.4722)))
+   (open_positions_value ((min 1233142.4045) (max 1668369.1355))))))
