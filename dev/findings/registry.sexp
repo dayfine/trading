@@ -281,7 +281,7 @@
                 "detect_and_apply no guard scales held position"))
          (unit ("trading/trading/weinstein/strategy/test/test_stops_split_dividend_guard.ml"
                 "guarded reader drops dividend split"))))
- (status fixed-behind-flag))
+ (status fixed))
 
 ((issue 3174) (ref "total-return-26y-2026-10-06: AD 2025-08-20, BKE 2021-12-17")
  (finding "resting sell stops not reduced by the cash dividend on the ex-date: large specials stopped out at the open on the dividend drop")

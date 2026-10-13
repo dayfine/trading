@@ -25,6 +25,29 @@ let _after overlays =
 
 let _fields (c : Weinstein_strategy.config) = (c.cash_yield, c.cash_yield_fee_bp)
 
+(* Exercise absent-field deserialization, not just the constructor defaults. *)
+let test_omitted_income_flags_default_on _ =
+  let sexp = Weinstein_strategy.sexp_of_config (_default_config ()) in
+  let fields =
+    match sexp with
+    | Sexp.List fields -> fields
+    | Sexp.Atom _ -> failwith "expected config record"
+  in
+  let legacy =
+    Sexp.List
+      (List.filter fields ~f:(function
+        | Sexp.List (Sexp.Atom name :: _) ->
+            not
+              (List.mem
+                 [ "dividend_crediting"; "split_dividend_guard" ]
+                 name ~equal:String.equal)
+        | _ -> true))
+  in
+  let config = Weinstein_strategy.config_of_sexp legacy in
+  assert_that
+    (config.dividend_crediting, config.split_dividend_guard)
+    (equal_to (true, true))
+
 let test_default_is_tbill_series _ =
   assert_that
     [
@@ -217,6 +240,8 @@ let test_committed_tbill_series_covers_window _ =
 let suite =
   "cash_yield_overlays"
   >::: [
+         "omitted income flags deserialize as enabled"
+         >:: test_omitted_income_flags_default_on;
          "default is the T-bill series; No_yield override restores price-only"
          >:: test_default_is_tbill_series;
          "axis resolves via overlay validator"
