@@ -19,6 +19,8 @@ type config = {
   reit_sector_label : string;
   adr_min_dollar_volume : float option;
   exclude_preferred : bool;
+  excluded_symbol_classes : Symbol_class.t list; [@sexp.default []]
+  extra_non_usd_symbols : string list; [@sexp.default []]
 }
 [@@deriving sexp, eq, show]
 
@@ -28,6 +30,8 @@ let default_config =
     reit_sector_label = _default_reit_sector_label;
     adr_min_dollar_volume = None;
     exclude_preferred = false;
+    excluded_symbol_classes = [];
+    extra_non_usd_symbols = [];
   }
 
 type drop_reason =
@@ -35,6 +39,7 @@ type drop_reason =
   | Reit_excluded
   | Adr_below_liquidity_floor of { floor : float; avg_dollar_volume : float }
   | Preferred_excluded
+  | Symbol_class_excluded of Symbol_class.t
 [@@deriving sexp, eq, show]
 
 type drop = { symbol : string; reason : drop_reason }

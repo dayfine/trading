@@ -59,6 +59,17 @@ type config = {
           common stock and are poor Weinstein-stage instruments). Default
           [false] — current behaviour keeps preferred shares, since
           {!Eodhd.Asset_type.is_equity_like} admits them. *)
+  excluded_symbol_classes : Symbol_class.t list;
+      (** Symbol classes (warrant / unit / non-USD listing, see {!Symbol_class})
+          to drop. Default [[]] — current behaviour keeps them (issue #3183,
+          default-off per [experiment-flag-discipline.md] R1). Runs {b before}
+          the dual-class dedup so an excluded symbol that outranks a kept
+          sibling of the same entity cannot win the dedup and then be dropped,
+          taking the whole entity with it. *)
+  extra_non_usd_symbols : string list;
+      (** Additional non-USD symbols beyond {!Symbol_class.curated_non_usd};
+          consulted only when [Non_usd_listing] is in [excluded_symbol_classes].
+          Default [[]]. *)
 }
 [@@deriving sexp, eq, show]
 (** Policy flags. {!default_config} sets every field to the current (pre-policy)
@@ -67,10 +78,11 @@ type config = {
 val default_config : config
 (** The no-op policy: [reit_policy = Include],
     [reit_sector_label = "Real Estate"], [adr_min_dollar_volume = None],
-    [exclude_preferred = false]. Running the policy with this config keeps every
-    candidate (the dual-class dedup in {!Composition_policy} is the one filter
-    that is always active, because holding two classes of one entity is a bug,
-    not a policy choice — see that module's docstring). *)
+    [exclude_preferred = false], [excluded_symbol_classes = []],
+    [extra_non_usd_symbols = []]. Running the policy with this config keeps
+    every candidate (the dual-class dedup in {!Composition_policy} is the one
+    filter that is always active, because holding two classes of one entity is a
+    bug, not a policy choice — see that module's docstring). *)
 
 (** Why a candidate was dropped. Each constructor maps to exactly one policy
     filter so the drop report is unambiguous. *)
@@ -81,6 +93,8 @@ type drop_reason =
   | Reit_excluded
   | Adr_below_liquidity_floor of { floor : float; avg_dollar_volume : float }
   | Preferred_excluded
+  | Symbol_class_excluded of Symbol_class.t
+      (** Dropped by the symbol-class filter (issue #3183). *)
 [@@deriving sexp, eq, show]
 
 type drop = { symbol : string; reason : drop_reason }

@@ -46,6 +46,8 @@ let _render_reason (reason : CPT.drop_reason) =
       Printf.sprintf "ADR below liquidity floor (%.0f < %.0f)" avg_dollar_volume
         floor
   | Preferred_excluded -> "preferred stock excluded"
+  | Symbol_class_excluded cls ->
+      Printf.sprintf "symbol class excluded (%s)" (Symbol_class.show cls)
 
 let _render_drop (d : CPT.drop) =
   Printf.sprintf "    - %s: %s" d.symbol (_render_reason d.reason)

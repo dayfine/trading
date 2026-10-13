@@ -13,6 +13,7 @@
   composition_policy_types
   asset_type_blocklist
   dual_class
+  symbol_class
   composition_policy
   composition_policy_report
   cross_validation)
