@@ -1396,3 +1396,13 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:build_pit_warehouse_v12_guard_smoke.sh})))
+
+; wait_for test (issue #2738 Ask 2): dev/scripts/wait_for.sh is the
+; dispatcher's background wait helper (.claude/rules/dispatcher-cadence.md).
+; Same shim + (universe) pattern as dispatch_disk_guard_test_runner.sh above.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:wait_for_test_runner.sh})))
