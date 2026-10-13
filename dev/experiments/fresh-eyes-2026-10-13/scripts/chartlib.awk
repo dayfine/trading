@@ -35,7 +35,7 @@ function year_axis(top, bot, label,   y, z) {
 }
 # Grey block over the hidden future, from just after the cut week to the right edge, for one panel band.
 function future_block(top, bot, label,   x) {
-  x = xw(CUTZ) + BW / 2; if (x >= PR) return
+  x = xw(CUTZ) + BW / 2; if (x >= PR - BW / 2) return   # under one bar wide: no block, no label
   printf "<rect x=\"%s\" y=\"%s\" width=\"%s\" height=\"%s\" fill=\"#cfcfcf\"/>\n", f2(x), f2(top), f2(PR - x), f2(bot - top)
   if (label) txt((x + PR) / 2, (top + bot) / 2, "future (hidden)", 14, "middle", " fill=\"#777\"")
 }

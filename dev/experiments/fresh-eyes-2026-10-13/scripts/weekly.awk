@@ -6,7 +6,7 @@
 #   back-adjusted from the data end, so its LEVEL encodes future splits and dividends; chart.awk rescales every
 #   series so the cut week's close equals its raw close, which leaves only actions up to the cut in the picture.
 # - vol_base: the week's volume in "base" shares. The vendor volume is already split-adjusted to the data end
-#   (AAPL 2014-06-06: 349.9M, about 7x the raw count), so base = vendor volume / product of all split factors;
+#   (AAPL 2014-06-06: 349.9M, about 28x the raw count: 7:1 in 2014 x 4:1 in 2020), so base = vendor volume / product of all split factors;
 #   x split_index at the cut gives the share count a reader saw then, without knowing later splits.
 # - ma30: 30-week simple MA of close (empty until 30 weeks). rs: Mansfield RS vs SPY in percent,
 #   100 x (ratio / 52-week mean ratio - 1), ratio = close / SPY close (empty until 52 weeks with SPY).

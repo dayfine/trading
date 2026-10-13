@@ -1,7 +1,8 @@
 #!/bin/sh
 # Causality check (plan §7.1): a chart for cut t drawn from data truncated at t must be byte-identical to the one
 # drawn from the full data. Any difference means a future bar reached the picture (a series, a scale, a label).
-# Stocks: 3 symbols x 3 cuts x 2 frames, with the daily input truncated before weekly.sh runs.
+# Stocks: 3 symbols x 3 cuts x (2 frames + the last-bar JSON), with the daily input truncated before weekly.sh runs.
+# Market: the SPY panel includes its volume band.
 # Market: SPY and the A-D line regenerated from truncated inputs; sector rows truncated (sector.awk is a trailing
 # 182-day window by construction, and regenerating it per cut would re-read every symbol).
 # Run from the repo root; DATA = daily store. Exit 1 on any mismatch.
@@ -19,6 +20,10 @@ for s in $SYMS; do
       awk -F, -v cut=$c -v frame=$fr -v sym="$s" -v sector=x -f $S/days.awk -f $S/chartlib.awk -f $S/chart.awk $T/trunc.csv > $T/b.svg
       if cmp -s $T/a.svg $T/b.svg; then echo "ok    $s $c $fr"; else echo "DIFF  $s $c $fr"; fail=1; fi
     done
+    # The last-bar JSON the reader also gets.
+    awk -F, -v cut=$c -v sym="$s" -v sector=x -f $S/days.awk -f $S/lastbar.awk $T/full.csv > $T/a.json
+    awk -F, -v cut=$c -v sym="$s" -v sector=x -f $S/days.awk -f $S/lastbar.awk $T/trunc.csv > $T/b.json
+    if cmp -s $T/a.json $T/b.json; then echo "ok    $s $c json"; else echo "DIFF  $s $c json"; fail=1; fi
   done
 done
 for c in $CUTS; do
