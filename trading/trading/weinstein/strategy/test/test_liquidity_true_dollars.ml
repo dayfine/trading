@@ -131,6 +131,70 @@ let test_short_borrow_gate_reads_true_dollars _ =
     (elements_are
        [ elements_are [ equal_to "AMZN" ]; elements_are [ equal_to "C" ] ])
 
+(* A long held since [_as_of] at a nominal price; only its symbol matters to
+   the liquidity exit. *)
+let _holding ticker =
+  let open Trading_strategy.Position in
+  let tr kind = { position_id = ticker; date = _as_of; kind } in
+  let ok = function Ok p -> p | Error _ -> assert_failure "position setup" in
+  let p =
+    create_entering
+      (tr
+         (CreateEntering
+            {
+              symbol = ticker;
+              side = Trading_base.Types.Long;
+              target_quantity = 10.0;
+              entry_price = 10.0;
+              reasoning = ManualDecision { description = "test" };
+            }))
+    |> ok
+  in
+  let p =
+    apply_transition p
+      (tr (EntryFill { filled_quantity = 10.0; fill_price = 10.0 }))
+    |> ok
+  in
+  apply_transition p
+    (tr
+       (EntryComplete
+          {
+            risk_params =
+              {
+                stop_loss_price = None;
+                take_profit_price = None;
+                max_hold_days = None;
+              };
+          }))
+  |> ok
+
+(* The held-position exit at a $1M hold floor (#3301 QC CP1). Stored dollars
+   exit C (stored $500k/day); true dollars exit AMZN (true $75k/day) instead. *)
+let test_hold_exit_flips_on_true_dollars _ =
+  let positions =
+    String.Map.of_alist_exn [ ("AMZN", _holding "AMZN"); ("C", _holding "C") ]
+  in
+  let exited ~armed =
+    Liquidity_exit_runner.update
+      ~config:
+        {
+          Liquidity_config.default_config with
+          min_hold_dollar_adv = 1_000_000.0;
+        }
+      ~is_screening_day:true ~positions ~bar_reader:(_reader ~armed)
+      ~get_price:(fun symbol ->
+        Option.bind
+          (List.Assoc.find [ _amzn; _c ] symbol ~equal:String.equal)
+          ~f:List.last)
+      ~skip_position_ids:String.Set.empty ~current_date:_as_of
+    |> List.map ~f:(fun (t : Trading_strategy.Position.transition) ->
+        t.position_id)
+  in
+  assert_that
+    [ exited ~armed:false; exited ~armed:true ]
+    (elements_are
+       [ elements_are [ equal_to "C" ]; elements_are [ equal_to "AMZN" ] ])
+
 let test_unarmed_reader_has_no_divisor _ =
   assert_that
     ( Bar_reader.split_divisor_for (_reader ~armed:false) ~symbol:"AMZN",
@@ -147,6 +211,8 @@ let suite =
          >:: test_entry_gate_flips_on_true_dollars;
          "short borrow gate reads true dollars"
          >:: test_short_borrow_gate_reads_true_dollars;
+         "hold exit flips on true dollars (#3301)"
+         >:: test_hold_exit_flips_on_true_dollars;
          "unarmed reader has no divisor" >:: test_unarmed_reader_has_no_divisor;
        ]
 
