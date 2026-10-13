@@ -246,6 +246,17 @@ let test_levels_uses_close_epsilon _ =
   assert_that report.groups is_empty;
   assert_that report.dropped_symbols is_empty
 
+(* Mirror of the above: with [close_epsilon] wider than [ret_epsilon] the same
+   1.0005-apart pair IS a twin, so the Levels call site cannot be using
+   [ret_epsilon] or [min] of the two. *)
+let test_levels_wide_close_epsilon_matches _ =
+  let closes = ramp ~n:20 ~base:100.0 in
+  let big = series_of ~symbol:"BIG" closes in
+  let near = scaled_series ~symbol:"NEAR" ~factor:1.0005 closes in
+  let config = { test_config with close_epsilon = 1e-3; ret_epsilon = 1e-4 } in
+  let report = Twin_detector.detect config [ big; near ] in
+  assert_that report.groups (size_is 1)
+
 (* (b) Drifting-ratio twin — [OLDCO] equals [NEWCO] for the first 20 shared days
    then carries an extra 2:1 adjustment (halved) for the next 20. Returns match
    on every consecutive pair except the single boundary day (38/39 = 0.974 >
@@ -701,6 +712,8 @@ let suite =
   >::: [
          "true_twin_pair" >:: test_true_twin_pair;
          "levels_uses_close_epsilon" >:: test_levels_uses_close_epsilon;
+         "levels_wide_close_epsilon_matches"
+         >:: test_levels_wide_close_epsilon_matches;
          "brief_coincidence_not_twin" >:: test_brief_coincidence_not_twin;
          "triple_group" >:: test_triple_group;
          "old_suffix_leg_dropped" >:: test_old_suffix_leg_dropped;
