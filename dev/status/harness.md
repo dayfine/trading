@@ -1215,7 +1215,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     `if` untouched; pass count 81 before and after). Added two small helpers
     `_grep_ok` / `_json_actual` to evaluate grep conjuncts as 0/1 flags and
     show observed values in labels. Mutation evidence (one expected literal
-    broken in the test, suite exit 1, 80 passed / 1 failed, exactly one
+    broken in the test, suite exit 1, 81 passed / 1 failed, exactly one
     conjunct line each): 40 `consecutive_rework_count == 1`; 44
     `sha == "6b979c77"`; 45 `behavioral_qc == APPROVED`; 46
     `overall_qc == NEEDS_REWORK`. Remaining highest-count candidates for the
@@ -1242,13 +1242,26 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     `_pairs_ok` / `_eq` / `_flag` killing helper mutants: `_pairs_ok` no-op,
     inverted polarity, `shift 1`, off-by-one (skips last pair), `_eq` always
     1, `_flag` always 1. Mutation
-    evidence (one expected literal broken; suite exit 1, 80 passed / 1
+    evidence (one expected literal broken; suite exit 1, 81 passed / 1
     failed, exactly one `conjunct FAILED` line naming it): 40
     `consecutive_rework_count == 1`; 44 `sha == "6b979c77"`; 45
     `behavioral_qc == APPROVED`; 46 `overall_qc == NEEDS_REWORK`; 41 `day B
     consecutive_rework_count == 2`; 7a `JSON7A quality_score == 4`; 7b `JSON7B
     quality_score == 5`; 20g `abort rc == 7`. Remaining (by hand count):
     47, 48 (6 each), 8 (5), 7e (6), 5, 6, and the lower-count scenarios.
+  - **Progress 2026-10-13 (slice 3, harness/report-conjuncts-slice3):**
+    converted 47 (6 conjuncts), 48 (6), 8 (6), 7e (6) to the slice-2 shape
+    (`C47=(...)` etc.; `if _pairs_ok`, `report_conjuncts` in the `else`).
+    Hand-counted: 8 and 7e each have 6 (rc x3, file exists, JSON count grep,
+    third-call stdout grep), not 5 as the brief said. Decision logic
+    unchanged; pass count 82 before and after. Mutation evidence (one
+    expected literal broken; suite exit 1, 81 passed / 1 failed, exactly one
+    `conjunct FAILED` line naming it): 47 `sha == "5474a511"`; 48
+    `structural_qc == SKIPPED`; 8 `third-call stdout reports
+    consecutive_rework_count=1`; 7e `third-call stdout reports
+    consecutive_rework_count=3`; each reverted. Also corrected the earlier
+    "80 passed / 1 failed" wording to 81/1 (82 scenarios). Remaining: 5, 6
+    and the lower-count scenarios.
 - [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
   `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
   harness/scenario22-race-2440, issue #2440). This turned out to BE the
