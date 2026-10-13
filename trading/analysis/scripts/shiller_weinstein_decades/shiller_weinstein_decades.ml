@@ -39,7 +39,7 @@ let load_series ~csv_path =
   let body = In_channel.read_all csv_path in
   Shiller_decades_csv.parse_derived_csv body
 
-let maybe_chart_decades ~chart_decades ~prices ~ma ~stages ~obs =
+let maybe_chart_decades ~ma_label ~chart_decades ~prices ~ma ~stages ~obs =
   let stage_dates = Array.map obs ~f:(fun o -> o.Client.period) in
   let n = Array.length prices in
   List.iter chart_decades ~f:(fun dec ->
@@ -57,7 +57,7 @@ let maybe_chart_decades ~chart_decades ~prices ~ma ~stages ~obs =
       | Some f, Some t ->
           Shiller_decades_chart.ascii_chart ~prices ~ma ~stages
             ~dates:stage_dates ~from_idx:f ~to_idx:t
-            ~title:(sprintf "%ds chart" dec)
+            ~title:(sprintf "%ds chart" dec) ~ma_label
       | _ -> ())
 
 let run ~csv_path ~chart_decades ~ma_window =
@@ -103,7 +103,9 @@ let run ~csv_path ~chart_decades ~ma_window =
      Stage transitions (whipsaw count): %d over %d months (%.1f per decade)\n"
     beta transitions (Array.length stages)
     (Float.of_int transitions /. Float.of_int (Array.length stages) *. 120.0);
-  maybe_chart_decades ~chart_decades ~prices ~ma ~stages ~obs
+  maybe_chart_decades
+    ~ma_label:(format_ma_window ma_window)
+    ~chart_decades ~prices ~ma ~stages ~obs
 
 let command =
   Command.basic

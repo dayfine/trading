@@ -11,7 +11,7 @@ let chart_width = 80
 let chart_height = 12
 
 (* @large-function: ASCII chart renderer; range scan + canvas plot + stage strip in one place is simplest *)
-let ascii_chart ~prices ~ma ~stages ~dates ~from_idx ~to_idx ~title =
+let ascii_chart ~prices ~ma ~stages ~dates ~from_idx ~to_idx ~title ~ma_label =
   let n = to_idx - from_idx + 1 in
   if n <= 0 then ()
   else
@@ -50,7 +50,7 @@ let ascii_chart ~prices ~ma ~stages ~dates ~from_idx ~to_idx ~title =
       end
     done;
     printf "\n=== %s ===\n" title;
-    printf "(* = price, - = 30mo MA, # = both; log y-axis)\n";
+    printf "(* = price, - = %s MA, # = both; log y-axis)\n" ma_label;
     for row = 0 to chart_height - 1 do
       printf "  %s\n" (String.of_array canvas.(row))
     done;

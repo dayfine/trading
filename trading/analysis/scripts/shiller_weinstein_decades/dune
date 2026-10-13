@@ -25,3 +25,25 @@
      -chart-decades
      1920,2000))
    (diff expected_output.txt actual_output.txt))))
+
+; Golden for a non-default window: the chart legend must name the window in
+; use ("20w MA"), so a re-hardcoded label goes RED.
+
+(rule
+ (alias runtest)
+ (deps
+  expected_output_20w.txt
+  ../../data/sources/shiller/fixture/shiller-monthly-2026-05-19.csv)
+ (action
+  (progn
+   (with-stdout-to
+    actual_output_20w.txt
+    (run
+     %{exe:shiller_weinstein_decades.exe}
+     -csv
+     ../../data/sources/shiller/fixture/shiller-monthly-2026-05-19.csv
+     -ma-window
+     20w
+     -chart-decades
+     2000))
+   (diff expected_output_20w.txt actual_output_20w.txt))))
