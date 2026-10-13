@@ -15,11 +15,20 @@ CHROME=${CHROME:-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"}
 fri=$(awk -v c="$cut" -f $S/days.awk -f $S/isfriday.awk)
 [ "$fri" = 1 ] || { echo "render.sh: cut $cut is not a Friday" >&2; exit 2; }
 mkdir -p "$out" "$WEEKLY"
-png() {  # png <svg> <png> <height>
+png() {  # png <svg> <png> <height>: up to 3 attempts, each killed after 60 s (headless Chrome can hang)
   [ -n "$NOPNG" ] && return 0
-  "$CHROME" --headless=new --disable-gpu --hide-scrollbars --window-size="1600,$3" \
-    --screenshot="$2" "file://$(cd "$(dirname "$1")" && pwd)/$(basename "$1")" >/dev/null 2>&1 || true
-  [ -s "$2" ] || { echo "render.sh: no PNG written for $1" >&2; exit 1; }
+  u="file://$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+  for try in 1 2 3; do
+    rm -f "$2"
+    "$CHROME" --headless=new --disable-gpu --hide-scrollbars --window-size="1600,$3" \
+      --screenshot="$2" "$u" >/dev/null 2>&1 &
+    cpid=$!; t=0
+    while kill -0 $cpid 2>/dev/null && [ $t -lt 300 ]; do sleep 0.2; t=$((t + 1)); done
+    kill -0 $cpid 2>/dev/null && { kill $cpid 2>/dev/null; sleep 1; kill -9 $cpid 2>/dev/null || true; }
+    wait $cpid 2>/dev/null || true
+    [ -s "$2" ] && return 0
+  done
+  echo "render.sh: no PNG written for $1 after 3 attempts" >&2; exit 1
 }
 if [ "$s" = MARKET ]; then
   M=$E/results/market

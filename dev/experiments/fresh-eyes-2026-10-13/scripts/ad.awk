@@ -1,8 +1,8 @@
 # Fresh-eyes study: the cumulative advance-decline line, weekly (value at the week's last trading day).
 # Usage: awk -f days.awk -f ad.awk nyse_advn.csv nyse_decln.csv synthetic_advn.csv synthetic_decln.csv
-# Rows are "YYYYMMDD, count". NYSE counts are used through SPLICE (2020-02-14, their last real day; later rows
-# are zero placeholders), the universe-computed synthetic counts after it. A day with advances + declines = 0 is
-# a placeholder and is skipped. The line starts at 0 on 1999-01-01.
+# Rows are "YYYYMMDD, count". NYSE counts are used through SPLICE (2020-02-14; the last real NYSE day is
+# 2020-02-10, and 02-11..14 are zero placeholders), the universe-computed synthetic counts after it. A day with
+# advances + declines = 0 is a placeholder and is skipped. The line starts at 0 on 1999-01-01.
 # Output: week,ad_cum,source   (source nyse | synthetic; the first synthetic week marks the splice; ad_cum rounded).
 BEGIN { FS = ","; SPLICE = "20200214"; START = "19990101" }
 FNR == 1 { fi++ }

@@ -42,8 +42,8 @@ function spy_volume(top, bot,   i, vmax, sx) {
   txt(PL + 6, top + 14, "SPY weekly volume", 12, "start", " fill=\"#555\"")
   future_block(top, bot, 0); panel_box(top, bot)
 }
-function ad_panel(top, bot,   i, lo, hi, nv, d, x, spl) {
-  for (i = 1; i <= na; i++) if (inframe(az[i])) { if (nv == 0 || av[i] < lo) lo = av[i]; if (nv == 0 || av[i] > hi) hi = av[i]; nv++ }
+function ad_panel(top, bot,   i, lo, hi, nv, d, x, spl, syn) {
+  for (i = 1; i <= na; i++) if (inframe(az[i])) { syn = (as[i] == "synthetic"); if (nv == 0 || av[i] < lo) lo = av[i]; if (nv == 0 || av[i] > hi) hi = av[i]; nv++ }
   year_axis(top, bot, 1)
   if (nv > 0) {
     linscale(top + 4, bot - 4, lo, hi)
@@ -54,7 +54,7 @@ function ad_panel(top, bot,   i, lo, hi, nv, d, x, spl) {
     }
     txt(PR + 6, top + 12, sprintf("%.0f", hi), 11, "start", " fill=\"#444\""); txt(PR + 6, bot - 2, sprintf("%.0f", lo), 11, "start", " fill=\"#444\"")
   }
-  txt(PL + 6, top + 16, "Advance-decline line (cumulative)" (spl ? "  |  dashed line: from 2020-02-14 the counts come from a stock universe (scaled to NYSE size), not the NYSE" : ""), 12, "start", " fill=\"#6a1b9a\"")
+  txt(PL + 6, top + 16, "Advance-decline line (cumulative)" (spl ? "  |  dashed line: from 2020-02-14 the counts come from a stock universe (scaled to NYSE size), not the NYSE" : (syn ? "  |  counts from a stock universe (scaled to NYSE size), not the NYSE" : "")), 12, "start", " fill=\"#6a1b9a\"")
   future_block(top, bot, 0); panel_box(top, bot)
 }
 # 11 sectors in a 4 x 3 grid, alphabetical, one shared symmetric y-range; the 12th cell ranks sectors at the cut.
