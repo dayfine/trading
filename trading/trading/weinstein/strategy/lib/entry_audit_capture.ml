@@ -40,7 +40,7 @@ type entry_attempt_result =
   | Entry_ok of Position.transition * entry_meta
   | Stop_too_wide
   | Sized_zero
-  | No_structural_stop
+  | No_structural_stop of Audit_recorder.stop_floor_detail
 
 type candidate_decision =
   | Kept of Position.transition * entry_meta
@@ -158,13 +158,15 @@ let _lacks_required_structural_stop ~require_structural_stop
   require_structural_stop
   && match floor_kind with Buffer_fallback -> true | Support_floor -> false
 
-let _reject_no_structural_stop ~effective_entry ~initial_stop ~stop_distance_pct
-    ~max_stop_distance_pct (cand : Screener.scored_candidate) =
+let _reject_no_structural_stop ~effective_entry ~initial_stop ~floor_kind
+    ~stop_distance_pct ~max_stop_distance_pct (cand : Screener.scored_candidate)
+    =
+  let floor_price = Weinstein_stops.get_stop_level initial_stop in
   Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker ~score:cand.score
-    ~rationale:cand.rationale ~effective_entry
-    ~installed_stop:(Weinstein_stops.get_stop_level initial_stop)
+    ~rationale:cand.rationale ~effective_entry ~installed_stop:floor_price
     ~stop_distance_pct ~max_stop_distance_pct ~outcome:"No_structural_stop";
   No_structural_stop
+    { Audit_recorder.floor_kind; floor_price; distance_pct = stop_distance_pct }
 
 let make_entry_transition ?(min_stop_distance_pct = 0.0)
     ?(trigger_at_suggested = false) ?(stop_anchor_at_entry_base = false)
@@ -203,8 +205,8 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
     _lacks_required_structural_stop ~require_structural_stop
       ~floor_kind:stop_floor_kind
   then
-    _reject_no_structural_stop ~effective_entry ~initial_stop ~stop_distance_pct
-      ~max_stop_distance_pct cand
+    _reject_no_structural_stop ~effective_entry ~initial_stop
+      ~floor_kind:stop_floor_kind ~stop_distance_pct ~max_stop_distance_pct cand
   else
     _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
       ~stop_states ~current_date ~effective_entry ~decision_bar ~initial_stop
@@ -424,9 +426,9 @@ let classify_candidate ?(leverage_enabled = false) ~held_set ~make_entry
     | Sized_zero ->
         emit "Sized_to_zero";
         Skipped Sized_to_zero
-    | No_structural_stop ->
+    | No_structural_stop detail ->
         emit "No_structural_stop";
-        Skipped No_structural_stop
+        Skipped (No_structural_stop detail)
     | Entry_ok (trans, meta) ->
         _apply_entry_ok_gates ~leverage_enabled ~remaining_cash
           ~short_notional_acc ~short_notional_cap ~long_notional_acc

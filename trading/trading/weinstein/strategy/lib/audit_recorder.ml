@@ -2,6 +2,14 @@
 
 open Core
 
+type stop_floor_kind = Support_floor | Buffer_fallback
+
+type stop_floor_detail = {
+  floor_kind : stop_floor_kind;
+  floor_price : float;
+  distance_pct : float;
+}
+
 type skip_reason =
   | Insufficient_cash
   | Already_held
@@ -10,7 +18,7 @@ type skip_reason =
   | Stop_too_wide
   | Sector_exposure_cap
   | Long_exposure_cap
-  | No_structural_stop
+  | No_structural_stop of stop_floor_detail
   | Share_class_held
 
 type alternative_input = {
@@ -24,8 +32,6 @@ type walk_decision = {
   ranked : Screener.scored_candidate;
   outcome : walk_outcome;
 }
-
-type stop_floor_kind = Support_floor | Buffer_fallback
 
 type split_safe_basis = Weinstein_stops.split_safe_basis =
   | Flag_off

@@ -31,8 +31,23 @@ let skip_reason_of_event = function
   | AR.Stop_too_wide -> Trade_audit.Stop_too_wide
   | AR.Sector_exposure_cap -> Trade_audit.Sector_exposure_cap
   | AR.Long_exposure_cap -> Trade_audit.Long_exposure_cap
-  | AR.No_structural_stop -> Trade_audit.No_structural_stop
+  | AR.No_structural_stop _ -> Trade_audit.No_structural_stop
   | AR.Share_class_held -> Trade_audit.Share_class_held
+
+(* #3139: the floor a [No_structural_stop] row would have been given; [None]
+   for every other outcome. *)
+let _stop_floor_detail_of_event (d : AR.stop_floor_detail) :
+    Trade_audit.stop_floor_detail =
+  {
+    floor_kind = stop_floor_kind_of_event d.floor_kind;
+    floor_price = d.floor_price;
+    distance_pct = d.distance_pct;
+  }
+
+let _stop_floor_of_outcome :
+    AR.walk_outcome -> Trade_audit.stop_floor_detail option = function
+  | Skipped (No_structural_stop d) -> Some (_stop_floor_detail_of_event d)
+  | Placed | Skipped _ -> None
 
 let weekly_decision_of_event (d : AR.walk_decision) :
     Trade_audit.weekly_decision =
@@ -43,6 +58,7 @@ let weekly_decision_of_event (d : AR.walk_decision) :
       (match d.outcome with
       | Placed -> Placed
       | Skipped reason -> Skipped (skip_reason_of_event reason));
+    stop_floor = _stop_floor_of_outcome d.outcome;
   }
 
 (* #3074: the screener's anchor arm to [Ticket_lifecycle]'s on-disk copy.

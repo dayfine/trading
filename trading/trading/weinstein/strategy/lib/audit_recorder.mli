@@ -13,6 +13,27 @@
 
 open Core
 
+(** Whether the installed initial stop sat on a real support floor (or short:
+    resistance ceiling) derived from bar history, or fell back to the
+    fixed-buffer proxy. Mirrors {!Backtest.Trade_audit.stop_floor_kind}. *)
+type stop_floor_kind = Support_floor | Buffer_fallback
+
+type stop_floor_detail = {
+  floor_kind : stop_floor_kind;
+      (** How the rejected initial stop was derived. [Buffer_fallback] whenever
+          the [No_structural_stop] gate fires: that gate rejects exactly the
+          fallback. Carried rather than implied so the on-disk row is
+          self-describing. *)
+  floor_price : float;
+      (** The rejected initial stop level: what [entry_event.installed_stop]
+          would have been had the gate admitted it. *)
+  distance_pct : float;
+      (** [|floor_price - effective_entry| / effective_entry], a fraction (0.08
+          = 8%), on the same basis as the [max_stop_distance_pct] gate. *)
+}
+(** The initial stop a [No_structural_stop] candidate would have been given
+    (#3139). Observation only: computed by the walk before it rejects. *)
+
 (** Why a candidate produced by the screener was not entered.
 
     Tagged at the strategy boundary where [_make_entry_transition] is called.
@@ -58,7 +79,7 @@ type skip_reason =
           [Portfolio_risk.max_long_exposure_pct]. Only fires when the config
           field is [> 0.0] (default [0.0] => [Float.infinity] cap => no-op).
           Only emitted for [Long] candidates. *)
-  | No_structural_stop
+  | No_structural_stop of stop_floor_detail
       (** Investor-preset gate: candidate dropped because its initial stop is
           the automatic-percentage fallback
           ([stop_floor_kind = Buffer_fallback]) rather than a structural support
@@ -91,11 +112,6 @@ type walk_decision = {
 }
 (** One row of the weekly decision record: a top-N candidate the entry walk
     classified, with its one outcome. *)
-
-(** Whether the installed initial stop sat on a real support floor (or short:
-    resistance ceiling) derived from bar history, or fell back to the
-    fixed-buffer proxy. Mirrors {!Backtest.Trade_audit.stop_floor_kind}. *)
-type stop_floor_kind = Support_floor | Buffer_fallback
 
 type split_safe_basis = Weinstein_stops.split_safe_basis =
   | Flag_off

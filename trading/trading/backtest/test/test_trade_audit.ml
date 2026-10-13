@@ -1116,16 +1116,29 @@ let test_cascade_summary_without_breadth_state_defaults _ =
 let test_cascade_summary_decisions_round_trip _ =
   let decisions : TA.weekly_decision list =
     [
-      { symbol = "CCCC"; side = Trading_base.Types.Long; outcome = Placed };
+      {
+        symbol = "CCCC";
+        side = Trading_base.Types.Long;
+        outcome = Placed;
+        stop_floor = None;
+      };
       {
         symbol = "AAAA";
         side = Trading_base.Types.Long;
         outcome = Skipped No_structural_stop;
+        stop_floor =
+          Some
+            {
+              floor_kind = Buffer_fallback;
+              floor_price = 46.0;
+              distance_pct = 0.08;
+            };
       };
       {
         symbol = "SSSS";
         side = Trading_base.Types.Short;
         outcome = Skipped Insufficient_cash;
+        stop_floor = None;
       };
     ]
   in
@@ -1143,6 +1156,32 @@ let test_cascade_summary_decisions_round_trip _ =
     ( TA.cascade_summary_of_sexp (TA.sexp_of_cascade_summary s),
       TA.cascade_summary_of_sexp legacy )
     (pair (equal_to s) (equal_to { s with decisions = [] }))
+
+(* #3139: a row without a stop floor prints exactly as it did before the field
+   existed, and a [No_structural_stop] row carries its floor kind, price and
+   distance. *)
+let test_weekly_decision_stop_floor_sexp _ =
+  let row ?stop_floor outcome : TA.weekly_decision =
+    { symbol = "AAAA"; side = Trading_base.Types.Long; outcome; stop_floor }
+  in
+  assert_that
+    ( Sexp.to_string (TA.sexp_of_weekly_decision (row Placed)),
+      Sexp.to_string
+        (TA.sexp_of_weekly_decision
+           (row
+              ~stop_floor:
+                {
+                  floor_kind = Buffer_fallback;
+                  floor_price = 46.0;
+                  distance_pct = 0.08;
+                }
+              (Skipped No_structural_stop))) )
+    (pair
+       (equal_to "((symbol AAAA)(side Long)(outcome Placed))")
+       (equal_to
+          "((symbol AAAA)(side Long)(outcome(Skipped \
+           No_structural_stop))(stop_floor((floor_kind \
+           Buffer_fallback)(floor_price 46)(distance_pct 0.08))))"))
 
 let test_record_cascade_summary_appears_in_collector _ =
   let t = TA.create () in
@@ -1320,6 +1359,8 @@ let suite =
   >::: [
          "cascade summary decisions round trip (#3139)"
          >:: test_cascade_summary_decisions_round_trip;
+         "weekly_decision stop_floor sexp"
+         >:: test_weekly_decision_stop_floor_sexp;
          "skip_reason sexp round-trip" >:: test_skip_reason_sexp_round_trip;
          "stop_floor_kind sexp round-trip"
          >:: test_stop_floor_kind_sexp_round_trip;

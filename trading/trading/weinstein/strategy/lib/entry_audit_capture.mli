@@ -86,12 +86,13 @@ type entry_attempt_result =
       (** [Portfolio_risk.compute_position_size] rounded shares down to 0 (risk
           dollars too small relative to per-share cost, or stop on the wrong
           side of entry). *)
-  | No_structural_stop
+  | No_structural_stop of Audit_recorder.stop_floor_detail
       (** Investor-preset gate ([?require_structural_stop] on): the installed
           initial stop is the automatic-percentage fallback
           ([stop_floor_kind = Buffer_fallback]) — no qualifying structural floor
           / ceiling — so the candidate is not entered. Mapped to
-          [Audit_recorder.skip_reason.No_structural_stop]. *)
+          [Audit_recorder.skip_reason.No_structural_stop], carrying the rejected
+          stop's floor kind, level and distance (#3139). *)
 
 (** Per-candidate decision tag emitted by the entry walk. The [Kept] case
     carries the produced transition + audit meta; [Skipped] records why the
