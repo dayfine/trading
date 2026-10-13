@@ -20,6 +20,7 @@ val detect_split :
   ?rational_snap_tolerance:float ->
   ?max_denominator:int ->
   ?raw_confirm_min_share:float ->
+  ?frozen_adjusted_min_deviation:float ->
   prev:Daily_price.t ->
   curr:Daily_price.t ->
   unit ->
@@ -57,4 +58,23 @@ val detect_split :
       the factor (DHLGY 2025-05-06, 21/20) is not — raise [dividend_threshold]
       to [0.10] for that. See
       [dev/notes/split-detector-dividend-misfire-2026-10-03.md] for the
-      bar-store counts. *)
+      bar-store counts.
+
+    With [raw_confirm_min_share] given, a {b frozen-adjusted} day
+    ([curr.adjusted_close = prev.adjusted_close] exactly) is also rejected when
+    [|factor -. 1.0| < frozen_adjusted_min_deviation]: the adjusted series did
+    not move, so the factor is only the raw move snapped to a rational (issue
+    #3109; 55 % of the 0.05-0.10 band, 46 % of the 0.10-0.25 band). The raw-gap
+    check cannot catch these, because the raw close did move.
+    - [frozen_adjusted_min_deviation]: the smallest [|factor -. 1.0|] kept on a
+      frozen-adjusted day. Default [0.25]: real splits (2:1, 3:2, 1:5 ...) on a
+      flat adjusted close exist (2 % of the [>= 0.25] band) and are kept.
+      Ignored when [raw_confirm_min_share] is omitted, so the default path is
+      unchanged.
+
+    Adjusted-only steps with no raw gap (AABA 2000-02-14, KKD 2001-06-15: the
+    adjusted close steps by the split factor on a day the raw close does not)
+    have a raw-gap share near [0] and are rejected by [raw_confirm_min_share].
+    Dividend-shaped misfires whose raw drop matches the factor (WING 2018-02-08
+    15/14, EC 2022-04-19 13/12) pass both checks; see the issue #3109 10-05
+    comment. *)

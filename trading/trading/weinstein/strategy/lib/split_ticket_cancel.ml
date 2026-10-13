@@ -45,7 +45,7 @@ let _apply_cancels ~pending_entry_e ~(portfolio : Portfolio_view.t) transitions
 let _run_armed ~pending_entry_e ~bar_reader ~(portfolio : Portfolio_view.t)
     ~current_date =
   let split_factor ~symbol =
-    Stops_split_runner.detect_split ~bar_reader ~symbol ~as_of:current_date
+    Stops_split_runner.detect_split ~bar_reader ~symbol ~as_of:current_date ()
   in
   match
     cancellations ~positions:portfolio.positions ~split_factor ~current_date

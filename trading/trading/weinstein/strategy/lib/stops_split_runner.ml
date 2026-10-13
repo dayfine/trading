@@ -16,9 +16,11 @@ let _last_two_bars ~bar_reader ~symbol ~as_of =
 (* Detect a split between yesterday's and today's bar for [symbol]. Returns
    [None] when no qualifying ratio fires; see [Types.Split_detector] for
    the snap-to-rational contract. *)
-let detect_split ~bar_reader ~symbol ~as_of =
+let detect_split ?raw_confirm_min_share ~bar_reader ~symbol ~as_of () =
   let%bind.Option prev, curr = _last_two_bars ~bar_reader ~symbol ~as_of in
-  let detected = Types.Split_detector.detect_split ~prev ~curr () in
+  let detected =
+    Types.Split_detector.detect_split ?raw_confirm_min_share ~prev ~curr ()
+  in
   match Bar_reader.split_guard bar_reader with
   | None -> detected
   | Some guard ->
@@ -28,18 +30,24 @@ let detect_split ~bar_reader ~symbol ~as_of =
 (* Rescale a single symbol's stop_state in place. No-ops when no entry is
    present in [stop_states] (position with no stop registered yet) or when
    no split is detected. *)
-let _adjust_one ~on_split ~bar_reader ~as_of ~stop_states (pos : Position.t) =
+let _adjust_one ~on_split ?raw_confirm_min_share ~bar_reader ~as_of ~stop_states
+    (pos : Position.t) =
   let symbol = pos.symbol in
   match Map.find !stop_states symbol with
   | None -> ()
   | Some state -> (
-      match detect_split ~bar_reader ~symbol ~as_of with
+      match
+        detect_split ?raw_confirm_min_share ~bar_reader ~symbol ~as_of ()
+      with
       | None -> ()
       | Some factor ->
           let scaled = Weinstein_stops.Stop_split_adjust.scale ~factor state in
           stop_states := Map.set !stop_states ~key:symbol ~data:scaled;
           on_split ~position_id:pos.id ~factor)
 
-let adjust ?(on_split = fun ~position_id:_ ~factor:_ -> ()) ~positions
-    ~stop_states ~bar_reader ~as_of () =
-  Map.iter positions ~f:(_adjust_one ~on_split ~bar_reader ~as_of ~stop_states)
+let adjust ?(on_split = fun ~position_id:_ ~factor:_ -> ())
+    ?raw_confirm_min_share ~positions ~stop_states ~bar_reader ~as_of () =
+  Map.iter positions
+    ~f:
+      (_adjust_one ~on_split ?raw_confirm_min_share ~bar_reader ~as_of
+         ~stop_states)

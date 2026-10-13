@@ -53,9 +53,9 @@ let _tdg_guard () =
       ]
     ~splits:[]
 
-let _detect ?split_guard ~symbol ~prev ~curr () =
-  Split_handler.detect_for_symbol ?split_guard ~adapter:(_adapter ~prev ~curr)
-    ~date:curr.Types.Daily_price.date ~symbol ()
+let _detect ?split_guard ?raw_confirm_min_share ~symbol ~prev ~curr () =
+  Split_handler.detect_for_symbol ?split_guard ?raw_confirm_min_share
+    ~adapter:(_adapter ~prev ~curr) ~date:curr.Types.Daily_price.date ~symbol ()
 
 (* Flag off: no guard, the pre-#3173 behaviour (the phantom 22/19 split). *)
 let test_no_guard_applies_detected_split _ =
@@ -138,11 +138,11 @@ let _tdg_held_positions () : Position.t String.Map.t =
       portfolio_lot_ids = [];
     }
 
-let _detect_and_apply ?split_guard () =
-  Split_handler.detect_and_apply ?split_guard
-    ~adapter:(_adapter ~prev:_tdg_prev ~curr:_tdg_curr)
-    ~date:_tdg_curr.date ~portfolio:(_tdg_held_portfolio ())
-    ~positions:(_tdg_held_positions ()) ()
+let _detect_and_apply ?split_guard ?raw_confirm_min_share ?(prev = _tdg_prev)
+    ?(curr = _tdg_curr) () =
+  Split_handler.detect_and_apply ?split_guard ?raw_confirm_min_share
+    ~adapter:(_adapter ~prev ~curr) ~date:curr.Types.Daily_price.date
+    ~portfolio:(_tdg_held_portfolio ()) ~positions:(_tdg_held_positions ()) ()
 
 let _lot_quantity portfolio =
   Option.map
@@ -181,6 +181,44 @@ let test_detect_and_apply_guard_keeps_held _ =
     (_detect_and_apply ~split_guard:(_tdg_guard ()) ())
     (_held_after ~shares:_tdg_shares ~events:0)
 
+(* Issue #3109: [raw_confirm_min_share] reaches the detector through both
+   entry points. AABA-shaped bars: the adjusted close doubles while the raw
+   close moves +1 %, which the default reads as a 2:1 split. *)
+let _aaba_prev = _bar "2000-02-11" ~close:400.0 ~adjusted:200.0
+let _aaba_curr = _bar "2000-02-14" ~close:404.0 ~adjusted:404.0
+
+let _event_factor factor =
+  field
+    (fun (e : Trading_portfolio.Split_event.t) -> e.factor)
+    (float_equal factor)
+
+let test_raw_confirm_rejects_unconfirmed_step _ =
+  assert_that
+    [
+      _detect ~symbol:"AABA" ~prev:_aaba_prev ~curr:_aaba_curr ();
+      _detect ~raw_confirm_min_share:0.5 ~symbol:"AABA" ~prev:_aaba_prev
+        ~curr:_aaba_curr ();
+    ]
+    (elements_are [ is_some_and (_event_factor 2.0); is_none ])
+
+(* Frozen adjusted close with the raw close -6.7 %: a phantom 15/14 on a held
+   position by default, no event with the raw-confirm rule on. *)
+let _frozen_prev = _bar "2013-07-10" ~close:30.0 ~adjusted:20.0
+let _frozen_curr = _bar "2013-07-11" ~close:28.0 ~adjusted:20.0
+
+let test_detect_and_apply_raw_confirm_keeps_held _ =
+  assert_that
+    [
+      _detect_and_apply ~prev:_frozen_prev ~curr:_frozen_curr ();
+      _detect_and_apply ~raw_confirm_min_share:0.5 ~prev:_frozen_prev
+        ~curr:_frozen_curr ();
+    ]
+    (elements_are
+       [
+         _held_after ~shares:(_tdg_shares *. 15.0 /. 14.0) ~events:1;
+         _held_after ~shares:_tdg_shares ~events:0;
+       ])
+
 let suite =
   "split_handler_dividend_guard"
   >::: [
@@ -192,6 +230,10 @@ let suite =
          >:: test_detect_and_apply_no_guard_scales_held;
          "detect_and_apply guard keeps held position"
          >:: test_detect_and_apply_guard_keeps_held;
+         "raw confirm rejects unconfirmed adjusted step"
+         >:: test_raw_confirm_rejects_unconfirmed_step;
+         "detect_and_apply raw confirm keeps held position"
+         >:: test_detect_and_apply_raw_confirm_keeps_held;
        ]
 
 let () = run_test_tt_main suite
