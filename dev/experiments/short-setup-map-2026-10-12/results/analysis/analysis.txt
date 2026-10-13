@@ -1,0 +1,450 @@
+events: 45599 committed, 45599 joined
+
+== support
+breakdown weekly close below the broken support: 23681 of 45599 (51.9%); P1: 2351 of 4235 (55.5%)
+close at/above support: 21918 -> E2 found 92.5%, in week 1 77.0% | close below support: 23681 -> E2 found 66.7%, in week 1 26.9%
+week-1 E2 entries whose breakdown close was not below support: 16875 of 23256 (72.6%)
+entry close at/above its own stop (room <= 0): E1 1639 of 45599 (3.6%); E2 4621 of 36085 (12.8%)
+P1: room <= 15% 61.5%, O2 stopped 72.9% (n=4235)
+data ends < 120 bars after E1: 443 (0.97%); their O1+120 mean -16.67%, beat 32.1%; O2 rows truncated (bars<120, not stopped): 113 (0.25%)
+
+== surface
+-- breakdown close vs the max weekly close of the prior 52 weeks
+ALL n=45599 mean= -22.59% med=-19.43% p10= -39.0 p25= -27.9 p75= -14.0 p90= -10.6 beat=  0.0%
+P1  n= 4235 mean= -23.02% med=-19.98% p10= -39.6 p25= -28.0 p75= -14.7 p90= -11.2 beat=  0.0%
+-- stop room from the E1 entry: pre-reg (1 % above the Stage-3 high), 1 % above the 26- / 52-week high
+ALL room pre-reg: n=45599 mean= +14.97% med=+10.23% p10=  +2.7 p25=  +5.9 p75= +16.5 p90= +26.0 beat= 96.4%
+P1  room pre-reg: n= 4235 mean= +17.79% med=+12.11% p10=  +3.1 p25=  +6.9 p75= +20.2 p90= +33.9 beat= 96.8%
+ALL room 26wk: n=45599 mean= +34.29% med=+25.77% p10= +13.8 p25= +18.3 p75= +38.0 p90= +56.5 beat=100.0%
+P1  room 26wk: n= 4235 mean= +36.61% med=+28.10% p10= +14.9 p25= +19.7 p75= +41.4 p90= +64.1 beat=100.0%
+ALL room 52wk: n=45599 mean=+139.16% med=+28.98% p10= +14.6 p25= +19.7 p75= +46.0 p90= +75.8 beat=100.0%
+P1  room 52wk: n= 4235 mean= +40.73% med=+29.35% p10= +15.3 p25= +20.4 p75= +45.3 p90= +76.5 beat=100.0%
+-- E1 stop-width surface: excess vs the SPY short, hold to the buy-stop or +120 bars
+ALL O2 pre-reg         n=45599 mean=  -1.28% med= -3.02% p10= -15.3 p25=  -8.5 p75=  +4.1 p90= +23.8 beat= 34.2%
+ALL s05                n=45599 mean=  -0.16% med= -3.01% p10=  -6.7 p25=  -4.8 p75=  -0.1 p90= +10.8 beat= 24.5% stopped=86.7%
+ALL s10                n=45599 mean=  -0.43% med= -5.26% p10= -11.1 p25=  -8.5 p75=  +2.9 p90= +22.0 beat= 29.9% stopped=72.1%
+ALL s15                n=45599 mean=  -0.45% med= -6.30% p10= -15.3 p25= -11.9 p75=  +9.3 p90= +25.9 beat= 36.8% stopped=57.9%
+ALL s20                n=45599 mean=  -0.47% med= -5.00% p10= -19.1 p25= -14.9 p75= +11.8 p90= +27.7 beat= 42.5% stopped=45.6%
+ALL s30                n=45599 mean=  -1.97% med= -0.75% p10= -26.5 p25= -18.2 p75= +13.9 p90= +29.5 beat= 48.6% stopped=27.6%
+ALL s50                n=45599 mean=  -3.03% med= +0.91% p10= -35.4 p25= -13.9 p75= +15.0 p90= +30.5 beat= 51.8% stopped=10.9%
+ALL s100               n=45599 mean=  -3.25% med= +1.41% p10= -29.8 p25= -12.8 p75= +15.4 p90= +30.9 beat= 52.8% stopped=2.0%
+ALL sh26               n=45599 mean=  -1.02% med= -1.15% p10= -25.8 p25= -13.9 p75= +14.5 p90= +30.4 beat= 48.0% stopped=33.1%
+ALL sh52               n=45599 mean=  -1.03% med= -0.43% p10= -26.7 p25= -13.7 p75= +14.7 p90= +30.6 beat= 49.2% stopped=27.8%
+ALL O1+120 no stop     n=45599 mean=  -2.74% med= +1.47% p10= -29.3 p25= -12.6 p75= +15.4 p90= +31.0 beat= 53.0%
+P1 O2 pre-reg          n= 4235 mean=  -2.44% med= -3.76% p10= -16.8 p25=  -9.7 p75=  +1.0 p90= +18.4 beat= 29.7%
+P1 s05                 n= 4235 mean=  -0.90% med= -2.53% p10=  -6.2 p25=  -4.2 p75=  -0.3 p90=  +4.1 beat= 23.8% stopped=92.2%
+P1 s10                 n= 4235 mean=  -1.47% med= -4.80% p10= -10.4 p25=  -7.7 p75=  -0.4 p90= +13.6 beat= 23.8% stopped=80.9%
+P1 s15                 n= 4235 mean=  -1.75% med= -6.49% p10= -14.0 p25= -10.8 p75=  +2.9 p90= +19.4 beat= 29.3% stopped=68.6%
+P1 s20                 n= 4235 mean=  -2.18% med= -7.86% p10= -17.9 p25= -13.9 p75=  +6.7 p90= +21.8 beat= 34.4% stopped=57.0%
+P1 s30                 n= 4235 mean=  -2.51% med= -5.17% p10= -24.9 p25= -18.3 p75=  +9.7 p90= +24.0 beat= 41.2% stopped=37.4%
+P1 s50                 n= 4235 mean=  -2.98% med= -2.77% p10= -34.8 p25= -17.5 p75= +11.4 p90= +25.6 beat= 44.8% stopped=16.6%
+P1 s100                n= 4235 mean=  -3.27% med= -1.42% p10= -34.1 p25= -15.4 p75= +12.1 p90= +26.6 beat= 47.0% stopped=3.6%
+P1 sh26                n= 4235 mean=  -2.83% med= -4.21% p10= -27.6 p25= -15.3 p75= +11.2 p90= +26.1 beat= 42.1% stopped=37.7%
+P1 sh52                n= 4235 mean=  -2.88% med= -3.69% p10= -28.1 p25= -15.2 p75= +11.4 p90= +26.4 beat= 42.7% stopped=34.7%
+P1 O1+120 no stop      n= 4235 mean=  -3.43% med= -1.35% p10= -32.6 p25= -15.3 p75= +12.2 p90= +26.7 beat= 47.2%
+
+== checklist
+O1+60 all events                           n=45599 med= +0.49% beat= 51.4% mean=  -1.64%
+O1+60 advance >= 30%                       n=36540 med= +0.38% beat= 51.0% mean=  -2.04%
+O1+60 RS not rising                        n=41775 med= +0.43% beat= 51.2% mean=  -1.90%
+O1+60 group weak                           n=17575 med= +0.18% beat= 50.5% mean=  -0.52%
+O1+60 advance+RS+group, other phases       n= 8656 med= +0.58% beat= 51.6% mean=  +0.02%
+O1+60 phase=s12                            n=26072 med= +0.88% beat= 52.5% mean=  -0.40%
+O1+120 phase=s12                           n=26072 med= +2.48% beat= 55.1% mean=  +1.08%
+O2 phase=s12                               n=26072 med= -3.02% beat= 33.7% mean=  +0.37%
+O1+120 rs=pos_falling                      n= 9144 med= -0.54% beat= 49.0% mean=  -8.76%
+O1+120 rs=pos_falling h1                   n= 6119 med= -1.82% beat= 46.5% mean= -13.41%
+room rs=pos_falling                        n= 9144 med= +8.82% beat= 92.1% mean= +10.59%
+O1+120 rs=neg_falling                      n=32631 med= +1.79% beat= 53.8% mean=  -1.40%
+O1+120 rs=neg_falling h1                   n=13903 med= -0.21% beat= 49.5% mean=  -6.06%
+room rs=neg_falling                        n=32631 med=+10.81% beat= 97.7% mean= +16.66%
+O1+60 market s3|s4_early                   n=15991 med= -0.02% beat= 49.9% mean=  -3.84%
+O1+60 phase=s4_early                       n= 6966 med= -0.25% beat= 49.4% mean=  -1.41%
+O1+120 phase=s4_early                      n= 6966 med= +0.37% beat= 50.6% mean= -11.99%
+O2 phase=s4_early                          n= 6966 med= -3.02% beat= 35.5% mean=  -1.31%
+O2 checklist without group (na kept)       n=11483 med= -3.53% beat= 32.5% mean=  -5.63%
+O2 checklist, group=na only                n= 4497 med= -3.59% beat= 34.8% mean= -11.45%
+O1+60 checklist without group (na kept)    n=11483 med= -0.30% beat= 49.2% mean=  -5.40%
+O1+60 checklist, group=na only             n= 4497 med= +0.71% beat= 51.5% mean= -10.98%
+O1+60 all four = P1                        n= 4235 med= -1.29% beat= 46.2% mean=  -2.69%
+O1+60 phase=s3                             n= 9025 med= +0.12% beat= 50.4% mean=  -5.72%
+O1+120 phase=s3                            n= 9025 med= +0.76% beat= 51.6% mean=  -6.44%
+O2 phase=s3                                n= 9025 med= -3.00% beat= 32.7% mean=  -5.78%
+O1+120 rs=na                               n=  515 med= +6.89% beat= 60.4% mean=  -2.25%
+O1+120 rs=na h1                            n=  300 med= +5.75% beat= 58.0% mean=  -8.92%
+room rs=na                                 n=  515 med=+12.45% beat= 96.7% mean= +15.97%
+O1+120 rs=rising                           n= 3309 med= +2.11% beat= 54.9% mean=  +0.61%
+O1+120 rs=rising h1                        n= 1826 med= +1.17% beat= 52.5% mean=  -0.19%
+room rs=rising                             n= 3309 med= +8.01% beat= 95.5% mean= +10.27%
+O1+60 phase=s4_late                        n= 3536 med= -0.12% beat= 49.7% mean=  -0.84%
+O1+120 phase=s4_late                       n= 3536 med= -2.34% beat= 45.7% mean=  -3.27%
+O2 phase=s4_late                           n= 3536 med= -3.13% beat= 38.7% mean=  -1.90%
+O1+120 rs=neg_falling h2                   n=18728 med= +3.45% beat= 56.9% mean=  +2.06%
+O1+120 rs=pos_falling h2                   n= 3025 med= +2.59% beat= 54.2% mean=  +0.64%
+O1+120 rs=rising h2                        n= 1483 med= +3.25% beat= 57.8% mean=  +1.60%
+O1+120 rs=na h2                            n=  215 med= +9.37% beat= 63.7% mean=  +7.06%
+
+== lateness
+ALL dd52 c -20..-30% O1+60         n=12277 med= +0.98% beat= 52.3% mean=  -0.12%
+ALL dd52 c -20..-30% O1+60 h1      n= 6319 med= -0.11% beat= 49.8% mean=  -1.27%
+ALL dd52 c -20..-30% O1+120        n=12277 med= +1.91% beat= 53.3% mean=  -0.29%
+ALL dd52 c -20..-30% O2            n=12277 med= -4.03% beat= 33.6% mean=  -0.26%
+ALL below_sup=1 O1+60              n=23681 med= +0.30% beat= 50.7% mean=  -3.02%
+ALL below_sup=1 O2                 n=23681 med= -4.35% beat= 35.7% mean=  -2.24%
+ALL dd52 d <-30% O1+60             n= 9527 med= +1.50% beat= 52.6% mean=  -7.26%
+ALL dd52 d <-30% O1+60 h1          n= 5273 med= +1.82% beat= 53.0% mean=  -9.71%
+ALL dd52 d <-30% O1+120            n= 9527 med= +4.80% beat= 55.9% mean=  -5.56%
+ALL dd52 d <-30% O2                n= 9527 med= -5.39% beat= 37.0% mean=  -5.67%
+ALL below_sup=0 O1+60              n=21918 med= +0.70% beat= 52.0% mean=  -0.15%
+ALL below_sup=0 O2                 n=21918 med= -2.21% beat= 32.6% mean=  -0.24%
+P1 dd52 d <-30% O1+60              n=  887 med= -3.85% beat= 43.2% mean=  -7.58%
+P1 dd52 d <-30% O2                 n=  887 med= -8.33% beat= 33.3% mean=  -5.62%
+P1 below_sup=1 O1+60               n= 2351 med= -2.11% beat= 44.6% mean=  -3.63%
+P1 below_sup=1 O2                  n= 2351 med= -5.49% beat= 29.6% mean=  -3.17%
+P1 below_sup=0 O1+60               n= 1884 med= -0.55% beat= 48.2% mean=  -1.51%
+P1 below_sup=0 O2                  n= 1884 med= -2.49% beat= 29.7% mean=  -1.54%
+ALL dd52 b -10..-20% O1+60         n=20171 med= +0.07% beat= 50.2% mean=  -0.22%
+ALL dd52 b -10..-20% O1+60 h1      n= 9067 med= -0.72% beat= 47.8% mean=  -0.83%
+ALL dd52 b -10..-20% O1+120        n=20171 med= +0.59% beat= 51.4% mean=  -3.49%
+ALL dd52 b -10..-20% O2            n=20171 med= -2.62% beat= 32.9% mean=  -0.09%
+P1 dd52 b -10..-20% O1+60          n= 1863 med= -0.55% beat= 47.9% mean=  -0.74%
+P1 dd52 b -10..-20% O2             n= 1863 med= -2.87% beat= 29.6% mean=  -0.97%
+ALL dd52 a >-10% O1+60             n= 3624 med= +0.21% beat= 51.3% mean=  +0.10%
+ALL dd52 a >-10% O1+60 h1          n= 1489 med= -0.68% beat= 47.1% mean=  -0.81%
+ALL dd52 a >-10% O1+120            n= 3624 med= +0.99% beat= 53.0% mean=  +0.51%
+ALL dd52 a >-10% O2                n= 3624 med= -1.46% beat= 36.0% mean=  +0.17%
+P1 dd52 c -20..-30% O1+60          n= 1225 med= -2.35% beat= 44.3% mean=  -2.89%
+P1 dd52 c -20..-30% O2             n= 1225 med= -5.29% beat= 26.4% mean=  -2.75%
+P1 dd52 a >-10% O1+60              n=  260 med= +0.55% beat= 53.8% mean=  +1.03%
+P1 dd52 a >-10% O2                 n=  260 med= -1.58% beat= 33.1% mean=  -0.68%
+ALL dd52 b -10..-20% O1+60 h2      n=11104 med= +0.68% beat= 52.1% mean=  +0.27%
+ALL dd52 c -20..-30% O1+60 h2      n= 5958 med= +2.12% beat= 55.0% mean=  +1.11%
+ALL dd52 a >-10% O1+60 h2          n= 2135 med= +0.87% beat= 54.1% mean=  +0.73%
+ALL dd52 d <-30% O1+60 h2          n= 4254 med= +0.97% beat= 52.1% mean=  -4.23%
+
+== topwidth
+share w09-12   1351 (3.0%)
+share w06-08   3215 (7.1%)
+share w13-20    369 (0.8%)
+share w21+       43 (0.1%)
+share w04-05   4161 (9.1%)
+share w01     13907 (30.5%)
+share w02     15599 (34.2%)
+share w03      6954 (15.3%)
+w04-05 e1 O1+120               n= 4161 med= +0.76% beat= 51.6% mean=  -0.21%
+w04-05 e1 O2                   n= 4161 med= -3.86% beat= 36.0% mean=  -0.06%
+w01 e1 O1+120                  n=13907 med= +1.96% beat= 53.3% mean=  -4.44%
+w01 e1 O2                      n=13907 med= -2.95% beat= 31.1% mean=  -0.29%
+w01 e2 O2                      n=10824 med= -1.33% beat= 31.6% mean=  -0.01%
+w02 e1 O1+120                  n=15599 med= +1.79% beat= 53.7% mean=  -3.60%
+w02 e1 O2                      n=15599 med= -2.67% beat= 34.0% mean=  -3.34%
+w03 e1 O1+120                  n= 6954 med= +1.18% beat= 52.3% mean=  -0.85%
+w03 e1 O2                      n= 6954 med= -3.28% beat= 36.5% mean=  -0.37%
+w03 e2 O2                      n= 5582 med= -2.33% beat= 34.1% mean=  -0.65%
+w02 e2 O2                      n=12615 med= -1.57% beat= 32.5% mean=  -3.29%
+w04-05 e2 O2                   n= 3191 med= -2.66% beat= 32.9% mean=  -0.02%
+w06-08 e1 O1+120               n= 3215 med= +0.44% beat= 51.1% mean=  -0.49%
+w06-08 e1 O2                   n= 3215 med= -4.11% beat= 37.0% mean=  -0.29%
+w06-08 e2 O2                   n= 2507 med= -2.76% beat= 34.5% mean=  +0.05%
+w09-12 e1 O1+120               n= 1351 med= +0.72% beat= 52.1% mean=  +0.43%
+w09-12 e1 O2                   n= 1351 med= -2.96% beat= 40.1% mean=  +0.60%
+w09-12 e2 O2                   n= 1042 med= -2.70% beat= 34.9% mean=  +0.33%
+w13-20 e1 O1+120               n=  369 med= +1.66% beat= 54.5% mean=  +0.78%
+w13-20 e1 O2                   n=  369 med= -2.35% beat= 43.4% mean=  +1.42%
+w13-20 e2 O2                   n=  285 med= -1.99% beat= 39.6% mean=  +0.54%
+w21+ e1 O1+120                 n=   43 med= +4.56% beat= 67.4% mean=  +6.17%
+w21+ e1 O2                     n=   43 med= +3.15% beat= 60.5% mean=  +4.20%
+w21+ e2 O2                     n=   39 med= +3.87% beat= 61.5% mean=  +6.03%
+w21+ e1 O2 h1                  n=   20 med= +1.91% beat= 60.0% mean=  +6.21%
+w21+ e2 O2 h1                  n=   19 med= +6.61% beat= 68.4% mean=  +8.41%
+w21+ e1 O1+60                  n=   43 med= +0.21% beat= 51.2% mean=  +1.06%
+w21+ e2 O1+60                  n=   39 med= +1.01% beat= 61.5% mean=  +2.00%
+w21+ e1 O2 h2                  n=   23 med= +3.15% beat= 60.9% mean=  +2.44%
+w21+ e2 O2 h2                  n=   20 med= +3.01% beat= 55.0% mean=  +3.77%
+w21+ e1: n=43, group=na 22; O2 mean +4.20%; without its two largest (YRCW 2010-10-22 +67.2%, EIG 2020-03-20 +60.1%) +1.30%
+
+== dividends
+non-payer O2               n=21058 med= -3.53% beat= 34.2% mean=  -2.63%
+non-payer O1+120           n=21058 med= +2.95% beat= 54.5% mean=  -5.86%
+non-payer O1+120 h1        n=11548 med= +1.13% beat= 51.9% mean= -12.35%
+yield=none O2              n=21058 med= -3.53% beat= 34.2% mean=  -2.63%
+yield=none O1+120          n=21058 med= +2.95% beat= 54.5% mean=  -5.86%
+yield=none O1+120 h1       n=11548 med= +1.13% beat= 51.9% mean= -12.35%
+bigdiv=0 O2                n=44463 med= -3.03% beat= 34.1% mean=  -1.33%
+bigdiv=0 O1+120            n=44463 med= +1.43% beat= 52.9% mean=  -2.85%
+bigdiv=0 O1+120 h1         n=21658 med= -0.46% beat= 49.0% mean=  -7.76%
+non-payer E2 O2            n=16255 med= -1.89% beat= 32.8% mean=  -2.61%
+P1 non-payer O2            n= 1657 med= -4.82% beat= 29.0% mean=  -3.02%
+P1 non-payer O1+120        n= 1657 med= -1.65% beat= 47.0% mean=  -5.28%
+P1 bigdiv=0 O1+120         n= 4132 med= -1.42% beat= 47.1% mean=  -3.49%
+payer O2                   n=24541 med= -2.68% beat= 34.2% mean=  -0.12%
+payer O1+120               n=24541 med= +0.69% beat= 51.6% mean=  -0.06%
+payer O1+120 h1            n=10600 med= -1.88% beat= 45.9% mean=  -2.52%
+payer E2 O2                n=19830 med= -1.59% beat= 32.8% mean=  -0.10%
+yield=<2% O2               n=10289 med= -2.87% beat= 33.1% mean=  -0.12%
+yield=<2% O1+120           n=10289 med= +0.81% beat= 51.7% mean=  -0.15%
+yield=<2% O1+120 h1        n= 4831 med= -1.08% beat= 47.8% mean=  -1.86%
+P1 payer O2                n= 2578 med= -3.40% beat= 30.1% mean=  -2.07%
+P1 payer O1+120            n= 2578 med= -1.26% beat= 47.2% mean=  -2.25%
+yield=2-5% O2              n= 9496 med= -2.56% beat= 34.1% mean=  -0.23%
+yield=2-5% O1+120          n= 9496 med= +0.50% beat= 51.3% mean=  +0.05%
+yield=2-5% O1+120 h1       n= 3732 med= -2.15% beat= 44.7% mean=  -2.72%
+yield=>5% O2               n= 4756 med= -2.52% beat= 36.7% mean=  +0.12%
+yield=>5% O1+120           n= 4756 med= +0.91% beat= 52.1% mean=  -0.09%
+yield=>5% O1+120 h1        n= 2037 med= -2.87% beat= 43.7% mean=  -3.72%
+bigdiv=1 O2                n= 1136 med= -2.59% beat= 38.1% mean=  +0.53%
+bigdiv=1 O1+120            n= 1136 med= +3.06% beat= 56.7% mean=  +1.33%
+bigdiv=1 O1+120 h1         n=  490 med= +1.33% beat= 52.2% mean=  -2.58%
+P1 bigdiv=1 O1+120         n=  103 med= +1.14% beat= 50.5% mean=  -0.98%
+payer O1+120 h2            n=13941 med= +2.49% beat= 56.0% mean=  +1.81%
+yield=2-5% O1+120 h2       n= 5764 med= +2.04% beat= 55.5% mean=  +1.85%
+bigdiv=0 O1+120 h2         n=22805 med= +3.30% beat= 56.6% mean=  +1.82%
+non-payer O1+120 h2        n= 9510 med= +5.33% beat= 57.7% mean=  +2.01%
+yield=none O1+120 h2       n= 9510 med= +5.33% beat= 57.7% mean=  +2.01%
+yield=>5% O1+120 h2        n= 2719 med= +3.47% beat= 58.4% mean=  +2.63%
+yield=<2% O1+120 h2        n= 5458 med= +2.49% beat= 55.3% mean=  +1.36%
+bigdiv=1 O1+120 h2         n=  646 med= +4.30% beat= 60.1% mean=  +4.29%
+
+== years
+2000 all=1508 | P1 O2 n=  134 med= -6.68% beat= 26.1% mean=  -3.71% | P1 O1+60 n=  134 med= -6.76% beat= 38.1% mean=  -5.64% | P2 O2 n=  113 med= -2.89% beat= 27.4% mean=  -2.33%
+2001 all=1544 | P1 O2 n=    9 med= -7.80% beat= 33.3% mean=  -6.19% | P1 O1+60 n=    9 med=+11.89% beat= 55.6% mean=  -0.48% | P2 O2 n=    6 med= -2.98% beat= 50.0% mean=  -2.76%
+2002 all=1954 | P1 O2 n=   26 med= +3.43% beat= 57.7% mean=  +8.49% | P1 O1+60 n=   26 med=+19.08% beat= 80.8% mean= +17.28% | P2 O2 n=    8 med= -1.96% beat= 50.0% mean=  -0.08%
+2003 all=1114 | P1 O2 n=   55 med= -3.23% beat= 25.5% mean=  -2.80% | P1 O1+60 n=   55 med= -2.44% beat= 41.8% mean=  -8.19% | P2 O2 n=   46 med= -3.37% beat= 21.7% mean=  -2.78%
+2004 all=1813 | P1 O2 n=  173 med= -4.37% beat= 24.9% mean=  -3.16% | P1 O1+60 n=  173 med= -2.68% beat= 38.7% mean=  -3.57% | P2 O2 n=  154 med= -2.42% beat= 22.1% mean=  -2.60%
+2005 all=2030 | P1 O2 n=  180 med= -3.99% beat= 21.7% mean=  -2.67% | P1 O1+60 n=  180 med= -4.50% beat= 31.7% mean=  -4.88% | P2 O2 n=  158 med= -2.32% beat= 24.1% mean=  -1.78%
+2006 all=1785 | P1 O2 n=  170 med= -3.92% beat= 29.4% mean=  -2.21% | P1 O1+60 n=  170 med= -2.44% beat= 42.9% mean=  -1.60% | P2 O2 n=  139 med= -2.31% beat= 29.5% mean=  -0.87%
+2007 all=2038 | P1 O2 n=  199 med= -4.65% beat= 26.6% mean=  -1.90% | P1 O1+60 n=  199 med= +0.88% beat= 54.3% mean=  +0.50% | P2 O2 n=  181 med= -1.91% beat= 31.5% mean=  -0.60%
+2008 all=1956 | P1 O2 n=  131 med= -6.53% beat= 29.8% mean=  -4.04% | P1 O1+60 n=  131 med= -2.37% beat= 45.0% mean=  -1.58% | P2 O2 n=  107 med= -3.99% beat= 27.1% mean=  -1.61%
+2009 all= 732 | P1 O2 n=0 | P1 O1+60 n=0 | P2 O2 n=0
+2010 all=1738 | P1 O2 n=   85 med= -6.15% beat= 17.6% mean=  -7.17% | P1 O1+60 n=   85 med= -6.69% beat= 35.3% mean=  -7.53% | P2 O2 n=   78 med= -2.96% beat= 23.1% mean=  -2.21%
+2011 all=2122 | P1 O2 n=  346 med= -3.36% beat= 30.6% mean=  -2.51% | P1 O1+60 n=  346 med= +0.29% beat= 51.2% mean=  +0.24% | P2 O2 n=  272 med= -1.29% beat= 32.4% mean=  -0.68%
+2012 all=1814 | P1 O2 n=  133 med= -3.19% beat= 28.6% mean=  -1.01% | P1 O1+60 n=  133 med= -0.98% beat= 45.9% mean=  -0.39% | P2 O2 n=  126 med= -2.22% beat= 23.0% mean=  -0.96%
+2013 all=1313 | P1 O2 n=0 | P1 O1+60 n=0 | P2 O2 n=0
+2014 all=2056 | P1 O2 n=  107 med= -1.84% beat= 32.7% mean=  +1.16% | P1 O1+60 n=  107 med= +4.41% beat= 66.4% mean=  +6.35% | P2 O2 n=  100 med= -0.55% beat= 36.0% mean=  +0.74%
+2015 all=1995 | P1 O2 n=  279 med= -3.08% beat= 37.6% mean=  +3.48% | P1 O1+60 n=  279 med= +0.62% beat= 52.7% mean=  +1.45% | P2 O2 n=  189 med= -1.01% beat= 35.4% mean=  +2.12%
+2016 all=1583 | P1 O2 n=  240 med= -3.76% beat= 20.8% mean=  -3.27% | P1 O1+60 n=  240 med= -1.93% beat= 44.6% mean=  -2.58% | P2 O2 n=  210 med= -1.79% beat= 27.1% mean=  -0.93%
+2017 all=1572 | P1 O2 n=0 | P1 O1+60 n=0 | P2 O2 n=0
+2018 all=2559 | P1 O2 n=  545 med= -3.70% beat= 31.0% mean=  -1.19% | P1 O1+60 n=  545 med= -1.91% beat= 44.2% mean=  -2.72% | P2 O2 n=  445 med= -2.59% beat= 29.0% mean=  -0.78%
+2019 all=1433 | P1 O2 n=   73 med= -1.86% beat= 23.3% mean=  -1.34% | P1 O1+60 n=   73 med= -3.25% beat= 43.8% mean=  -3.09% | P2 O2 n=   70 med= -0.57% beat= 30.0% mean=  -0.24%
+2020 all=1605 | P1 O2 n=  270 med= -6.39% beat= 34.8% mean= -10.78% | P1 O1+60 n=  270 med= -9.86% beat= 35.2% mean= -16.29% | P2 O2 n=  203 med= -0.90% beat= 43.8% mean=  -0.81%
+2021 all=1809 | P1 O2 n=0 | P1 O1+60 n=0 | P2 O2 n=0
+2022 all=1808 | P1 O2 n=  461 med= -4.19% beat= 31.2% mean=  -3.07% | P1 O1+60 n=  461 med= -0.52% beat= 49.0% mean=  -1.55% | P2 O2 n=  386 med= -1.57% beat= 37.3% mean=  -0.53%
+2023 all=2022 | P1 O2 n=  324 med= -4.55% beat= 25.9% mean=  -2.73% | P1 O1+60 n=  324 med= -0.85% beat= 45.4% mean=  -4.23% | P2 O2 n=  287 med= -1.44% beat= 34.8% mean=  -1.97%
+2024 all=1732 | P1 O2 n=0 | P1 O1+60 n=0 | P2 O2 n=0
+2025 all=1964 | P1 O2 n=  295 med= -3.56% beat= 36.6% mean=  -0.96% | P1 O1+60 n=  295 med= +1.75% beat= 54.2% mean=  -1.38% | P2 O2 n=  252 med= -1.95% beat= 33.3% mean=  -0.02%
+
+== robust
+P1 as computed                           n= 4235 med= -3.76% beat= 29.7% mean=  -2.44%
+P1 drop |exc|>50%                        n= 4156 med= -3.76% beat= 29.3% mean=  -2.28%
+P1 drop room>100%                        n= 4180 med= -3.73% beat= 29.6% mean=  -2.02%
+P1 drop entry at/above own stop          n= 4101 med= -4.08% beat= 28.8% mean=  -2.51%
+P1 drop room<=2%                         n= 3941 med= -4.44% beat= 28.5% mean=  -2.62%
+P1 only real closes below support        n= 2351 med= -5.49% beat= 29.6% mean=  -3.17%
+P2 as computed                           n= 3530 med= -1.91% beat= 31.4% mean=  -0.85%
+P2 drop |exc|>50%                        n= 3504 med= -1.94% beat= 31.1% mean=  -0.96%
+P2 drop room>100%                        n= 3522 med= -1.90% beat= 31.4% mean=  -0.78%
+P2 drop entry at/above own stop          n= 3078 med= -2.62% beat= 28.8% mean=  -0.97%
+P2 drop room<=2%                         n= 2792 med= -3.15% beat= 28.1% mean=  -1.10%
+P2 only real closes below support        n= 1725 med= -2.44% beat= 30.8% mean=  -0.91%
+P1 events beyond +-100%: 8: LIVN/2004-08-27(-108%) GTLS/2020-03-20(-206%) JACK/2020-03-20(-167%) CRMT/2020-03-20(-118%) PMT/2020-03-20(-129%) AMWD/2020-03-20(-109%) MHO/2020-03-20(-166%) EYPT/2023-10-27(-275%)
+P2 events beyond +-100%: 2: LIVN/2004-08-27(-120%) EYPT/2023-10-27(-179%)
+
+== paired
+ALL E2-E1 O2                   n=36085 med= +1.63% beat= 68.5% mean=  +3.00%
+ALL E2-E1 O2 wk1               n=23256 med= +1.05% beat= 64.5% mean=  +2.02%
+ALL E2 entry vs E1 entry wk1   n=23256 med= +1.89% beat= 72.6% mean=  +2.74%
+P2 E2-E1 O2                    n= 3530 med= +1.88% beat= 70.4% mean=  +3.37%
+P2 E2-E1 O2 wk1                n= 2240 med= +1.20% beat= 65.9% mean=  +2.03%
+P2 E2-E1 O1+60                 n= 3530 med= +1.86% beat= 64.9% mean=  +3.50%
+P2 E2 entry vs E1 entry        n= 3530 med= +3.90% beat= 81.7% mean=  +6.11%
+P2 events: their E1 O2         n= 3530 med= -4.35% beat= 24.0% mean=  -4.22%
+P2 E2 O2 wk1                   n= 2240 med= -1.52% beat= 32.0% mean=  -0.77%
+ALL E2-E1 O2 wk2-8             n=12829 med= +3.42% beat= 75.7% mean=  +4.77%
+ALL E2 entry vs E1 entry wk2-8 n=12829 med= +5.24% beat= 90.5% mean=  +8.06%
+P2 E2-E1 O2 wk2-8              n= 1290 med= +4.04% beat= 78.1% mean=  +5.71%
+P2 E2 O2 wk2-8                 n= 1290 med= -2.56% beat= 30.4% mean=  -0.99%
+P2: n=3530, entry at/above own stop 12.8%, stopped 81.8%
+
+== phase
+P1 s4_early O2                     n= 1742 med= -4.30% beat= 30.5% mean=  -3.98%
+P1 s4_early O1+60                  n= 1742 med= -2.70% beat= 44.4% mean=  -4.96%
+P1 s4_early O1+120                 n= 1742 med= -2.24% beat= 45.4% mean=  -6.15%
+P1 s4_early absolute O2 short ret  n= 1742 med=-11.31% beat= 16.1% mean= -14.07%
+P2 s4_early O2                     n= 1459 med= -1.99% beat= 33.4% mean=  -1.17%
+P1 all absolute O2 short ret       n= 4235 med= -8.48% beat= 18.6% mean=  -8.77%
+P1 s3 O2                           n= 2493 med= -3.54% beat= 29.1% mean=  -1.37%
+P1 s3 O1+60                        n= 2493 med= -0.64% beat= 47.5% mean=  -1.10%
+P1 s3 O1+120                       n= 2493 med= -0.80% beat= 48.4% mean=  -1.53%
+P1 s3 absolute O2 short ret        n= 2493 med= -7.17% beat= 20.3% mean=  -5.06%
+P2 s3 O2                           n= 2071 med= -1.86% beat= 30.0% mean=  -0.62%
+
+== tail
+P1 O1+120: n=4235 mean -3.43% (clipped +-100%: -2.92%); < -50%: 195 (4.6%, sum -16508 pp); > +50%: 65 (1.5%, sum +4067 pp)
+ALL O1+120: n=45599 mean -2.74% (clipped +-100%: +0.62%); < -50%: 1701 (3.7%, sum -278707 pp); > +50%: 1360 (3.0%, sum +87329 pp)
+
+== scale
+P1    n= 4235 hold bars mean 54.7, p25 11, median 38, p75 120 | excess -11.3%/yr (clipped -10.7%/yr) | absolute short -40.4%/yr
+P2    n= 3530 hold bars mean 39.9, p25 3, median 18, p75 70 | excess -5.4%/yr (clipped -5.2%/yr) | absolute short -23.9%/yr
+ALL1  n=45599 hold bars mean 58.3, p25 11, median 43, p75 120 | excess -5.5%/yr (clipped +0.7%/yr) | absolute short -18.4%/yr
+ALL2  n=36085 hold bars mean 41.2, p25 3, median 17, p75 79 | excess -7.5%/yr (clipped +1.5%/yr) | absolute short -18.2%/yr
+
+== survivor
+group known  events=28425, symbol delisted before 2026: 0.9%
+group=na     events=17174, symbol delisted before 2026: 91.2%
+ALL live O2                            n=29688 med= -3.01% beat= 33.5% mean=  -0.16%
+ALL live O1+120                        n=29688 med= +1.08% beat= 52.3% mean=  -0.11%
+ALL delisted O2                        n=15911 med= -3.06% beat= 35.5% mean=  -3.37%
+ALL delisted O1+120                    n=15911 med= +2.21% beat= 54.2% mean=  -7.66%
+checklist w/o group, delisted, O2      n= 4228 med= -3.64% beat= 34.4% mean= -12.28%
+checklist w/o group, delisted, O1+120  n= 4228 med= +1.19% beat= 51.8% mean= -29.91%
+checklist w/o group, live, O2          n= 7255 med= -3.48% beat= 31.5% mean=  -1.75%
+checklist w/o group, live, O1+120      n= 7255 med= -0.89% beat= 48.1% mean=  -2.79%
+
+== criteria floor 5
+e1 phase=s12               n=26072 mean=  +0.37% med= -3.02% beat= 33.7% halves -1.03/+1.20 O1+60 -0.40 | met 1/6
+e1 advance=>=100%          n=12636 mean=  -1.29% med= -4.22% beat= 31.7% halves -1.94/-0.46 O1+60 -1.68 | met 3/6
+e1 top_width=<=8           n=43836 mean=  -1.37% med= -3.03% beat= 33.9% halves -3.64/+0.81 O1+60 -1.71 | met 2/6
+e1 hs=0                    n=45581 mean=  -1.28% med= -3.02% beat= 34.2% halves -3.54/+0.86 O1+60 -1.64 | met 2/6
+e1 rs=pos_falling          n= 9144 mean=  -1.14% med= -2.84% beat= 31.4% halves -1.49/-0.42 O1+60 -0.69 | met 3/6
+e1 group=weak              n=17575 mean=  -0.00% med= -3.15% beat= 33.4% halves -1.70/+0.61 O1+60 -0.52 | met 2/6
+e1 room=15-30%             n=10021 mean=  +0.04% med= -6.98% beat= 39.6% halves -1.77/+2.09 O1+60 +0.41 | met 2/6
+e1 yield=none              n=21058 mean=  -2.63% med= -3.53% beat= 34.2% halves -5.47/+0.81 O1+60 -3.01 | met 2/6
+e1 bigdiv_in_hold=0        n=44463 mean=  -1.33% med= -3.03% beat= 34.1% halves -3.57/+0.81 O1+60 -1.70 | met 2/6
+e1 bear 2000-02            n= 5006 mean=  -2.15% med= -4.16% beat= 35.1% halves -2.15/+0.00 O1+60 -0.80 | met 2/6
+e1 advance=<30%            n= 9058 mean=  +0.76% med= -2.29% beat= 36.2% halves -1.49/+2.27 O1+60 -0.04 | met 1/6
+e1 rs=neg_falling          n=32631 mean=  -1.44% med= -3.27% beat= 34.4% halves -4.80/+1.05 O1+60 -2.24 | met 2/6
+e1 group=na                n=17174 mean=  -3.04% med= -3.01% beat= 35.8% halves -5.33/+1.59 O1+60 -3.39 | met 2/6
+e1 room=<=15%              n=32202 mean=  -0.07% med= -2.75% beat= 31.0% halves -0.96/+0.70 O1+60 -0.23 | met 2/6
+e2 phase=s12               n=20468 mean=  +0.32% med= -1.72% beat= 32.4% halves -0.53/+0.83 O1+60 +0.12 | met 2/6
+e2 advance=<30%            n= 7197 mean=  +0.10% med= -1.42% beat= 34.2% halves -1.62/+1.26 O1+60 -0.55 | met 1/6
+e2 top_width=<=8           n=34719 mean=  -1.30% med= -1.70% beat= 32.7% halves -3.32/+0.61 O1+60 -1.41 | met 2/6
+e2 hs=0                    n=36072 mean=  -1.23% med= -1.71% beat= 32.8% halves -3.22/+0.64 O1+60 -1.36 | met 2/6
+e2 rs=neg_falling          n=25060 mean=  -1.63% med= -1.91% beat= 32.5% halves -4.95/+0.80 O1+60 -1.94 | met 2/6
+e2 group=na                n=13280 mean=  -3.30% med= -1.75% beat= 33.5% halves -5.51/+1.16 O1+60 -3.26 | met 2/6
+e2 room=<=15%              n=32154 mean=  -0.08% med= -1.63% beat= 31.7% halves -0.70/+0.48 O1+60 -0.18 | met 2/6
+e2 yield=none              n=16255 mean=  -2.61% med= -1.89% beat= 32.8% halves -5.48/+0.79 O1+60 -2.73 | met 2/6
+e2 bigdiv_in_hold=0        n=35207 mean=  -1.26% med= -1.71% beat= 32.8% halves -3.25/+0.61 O1+60 -1.40 | met 2/6
+e2 bear 2000-02            n= 3780 mean=  -0.73% med= -2.35% beat= 33.2% halves -0.73/+0.00 O1+60 -0.36 | met 2/6
+e1 room=>30%               n= 3376 mean= -16.69% med= -1.80% beat= 48.4% halves -30.00/-1.19 O1+60 -21.19 | met 3/6
+e2 advance=>=100%          n= 9928 mean=  -0.30% med= -2.09% beat= 30.9% halves -0.85/+0.40 O1+60 +0.22 | met 1/6
+e2 room=>30%               n=  783 mean= -55.70% med= +3.14% beat= 52.2% halves -110.45/+2.07 O1+60 -60.06 | met 3/6
+e1 phase=s4_early          n= 6966 mean=  -1.31% med= -3.02% beat= 35.5% halves -1.59/-0.96 O1+60 -1.41 | met 3/6
+e1 advance=30-100%         n=23904 mean=  -2.05% med= -2.87% beat= 34.8% halves -5.17/+0.83 O1+60 -2.22 | met 2/6
+e2 phase=s4_early          n= 5714 mean=  -0.38% med= -1.66% beat= 34.5% halves -0.87/+0.18 O1+60 -0.59 | met 2/6
+e2 advance=30-100%         n=18959 mean=  -2.22% med= -1.63% beat= 33.3% halves -5.20/+0.47 O1+60 -2.49 | met 2/6
+e2 group=weak              n=13938 mean=  +0.12% med= -1.76% beat= 32.1% halves -0.86/+0.48 O1+60 -0.06 | met 1/6
+e2 rs=pos_falling          n= 7750 mean=  -0.58% med= -1.43% beat= 32.2% halves -0.88/-0.02 O1+60 -0.38 | met 3/6
+e1 phase=s3                n= 9025 mean=  -5.78% med= -3.00% beat= 32.7% halves -10.65/+1.16 O1+60 -5.72 | met 2/6
+e2 phase=s3                n= 7321 mean=  -6.11% med= -1.67% beat= 31.8% halves -10.51/+0.49 O1+60 -6.07 | met 2/6
+e2 room=15-30%             n= 3148 mean=  +0.61% med= -7.54% beat= 39.7% halves -0.68/+2.03 O1+60 +1.23 | met 2/6
+e1 yield=<2%               n=10289 mean=  -0.12% med= -2.87% beat= 33.1% halves -0.90/+0.58 O1+60 -0.30 | met 2/6
+e2 yield=<2%               n= 8263 mean=  -0.12% med= -1.58% beat= 32.7% halves -0.57/+0.27 O1+60 -0.31 | met 2/6
+e1 group=not_weak          n=10850 mean=  -0.56% med= -2.81% beat= 33.0% halves -1.54/+0.65 O1+60 -0.68 | met 2/6
+e2 group=not_weak          n= 8867 mean=  -0.25% med= -1.60% beat= 32.9% halves -0.85/+0.47 O1+60 -0.54 | met 2/6
+e1 yield=2-5%              n= 9496 mean=  -0.23% med= -2.56% beat= 34.1% halves -1.73/+0.74 O1+60 -0.51 | met 2/6
+e1 rs=na                   n=  515 mean=  -3.34% med= -2.99% beat= 38.3% halves -9.29/+4.98 O1+60 +5.32 | met 1/6
+e1 yield=>5%               n= 4756 mean=  +0.12% med= -2.52% beat= 36.7% halves -2.17/+1.83 O1+60 -0.71 | met 1/6
+e2 yield=>5%               n= 3801 mean=  +0.21% med= -1.59% beat= 33.4% halves -1.35/+1.46 O1+60 -0.37 | met 1/6
+e2 rs=na                   n=  378 mean=  +3.62% med= -1.58% beat= 40.5% halves +2.70/+4.77 O1+60 +6.14 | met 4/6
+e1 rs=rising               n= 3309 mean=  +0.24% med= -1.52% beat= 39.2% halves +0.12/+0.40 O1+60 +0.56 | met 3/6
+e2 rs=rising               n= 2897 mean=  -0.14% med= -1.13% beat= 36.5% halves -0.00/-0.30 O1+60 +0.06 | met 2/6
+e1 phase=s4_late           n= 3536 mean=  -1.90% med= -3.13% beat= 38.7% halves -1.76/-3.73 O1+60 -0.84 | met 3/6
+e2 phase=s4_late           n= 2582 mean=  -1.56% med= -1.96% beat= 35.1% halves -1.44/-2.86 O1+60 -1.40 | met 3/6
+e2 yield=2-5%              n= 7766 mean=  -0.22% med= -1.62% beat= 32.5% halves -1.11/+0.37 O1+60 -0.09 | met 2/6
+e1 top_width=9-20          n= 1720 mean=  +0.78% med= -2.87% beat= 40.8% halves -0.79/+1.89 O1+60 +0.19 | met 2/6
+e1 bigdiv_in_hold=1        n= 1136 mean=  +0.53% med= -2.59% beat= 38.1% halves -2.07/+2.50 O1+60 +0.56 | met 2/6
+e2 top_width=9-20          n= 1327 mean=  +0.37% med= -2.47% beat= 35.9% halves -0.66/+1.11 O1+60 -0.08 | met 1/6
+e2 bigdiv_in_hold=1        n=  878 mean=  +0.15% med= -1.75% beat= 33.5% halves -1.93/+1.77 O1+60 +0.55 | met 2/6
+e1 top_width=>20           n=   43 mean=  +4.20% med= +3.15% beat= 60.5% halves +6.21/+2.44 O1+60 +1.06 | met 5/6
+e2 top_width=>20           n=   39 mean=  +6.03% med= +3.87% beat= 61.5% halves +8.41/+3.77 O1+60 +2.00 | met 5/6
+e1 hs=1                    n=   18 mean=  -0.19% med= -5.88% beat= 44.4% halves +2.06/-1.99 O1+60 -0.47 | met 1/6
+e2 hs=1                    n=   13 mean=  -3.23% med= -7.76% beat= 30.8% halves +0.98/-5.85 O1+60 -3.60 | met 1/6
+e1 bear 2007-09            n= 4726 mean=  -1.41% med= -3.18% beat= 37.2% halves -1.41/+0.00 O1+60 -0.28 | met 2/6
+e2 bear 2007-09            n= 3574 mean=  -1.31% med= -1.80% beat= 34.4% halves -1.31/+0.00 O1+60 -0.42 | met 2/6
+e1 advance=na              n=    1 mean=  +5.84% med= +5.84% beat=100.0% halves +0.00/+5.84 O1+60 +4.92 | met 4/6
+e2 advance=na              n=    1 mean=  +8.20% med= +8.20% beat=100.0% halves +0.00/+8.20 O1+60 +8.38 | met 4/6
+e1 bear 2022               n= 1808 mean=  -2.38% med= -3.73% beat= 32.7% halves +0.00/-2.38 O1+60 -1.57 | met 2/6
+e2 bear 2022               n= 1468 mean=  -1.20% med= -2.15% beat= 31.5% halves +0.00/-1.20 O1+60 -1.11 | met 2/6
+cells meeting all six (beat >= 58%): 0
+
+== criteria floor 17
+e1 phase=s12               n=19207 mean=  +0.15% med= -2.91% beat= 33.5% halves -1.70/+1.11 O1+60 -0.60 | met 1/6
+e1 advance=>=100%          n= 8812 mean=  -0.91% med= -3.91% beat= 31.9% halves -1.63/-0.15 O1+60 -1.56 | met 3/6
+e1 top_width=<=8           n=32495 mean=  -0.33% med= -2.87% beat= 33.8% halves -1.64/+0.77 O1+60 -0.55 | met 2/6
+e1 hs=0                    n=33893 mean=  -0.28% med= -2.86% beat= 34.2% halves -1.60/+0.84 O1+60 -0.52 | met 2/6
+e1 rs=pos_falling          n= 6986 mean=  -1.18% med= -2.59% beat= 32.2% halves -1.59/-0.44 O1+60 -0.73 | met 3/6
+e1 group=weak              n=14102 mean=  -0.03% med= -3.02% beat= 33.2% halves -1.78/+0.56 O1+60 -0.46 | met 2/6
+e1 room=15-30%             n= 6834 mean=  +0.15% med= -6.07% beat= 40.5% halves -1.48/+1.73 O1+60 +0.37 | met 2/6
+e1 yield=none              n=13780 mean=  -0.46% med= -3.26% beat= 34.3% halves -1.93/+1.02 O1+60 -0.75 | met 2/6
+e1 bigdiv_in_hold=0        n=33261 mean=  -0.29% med= -2.86% beat= 34.1% halves -1.60/+0.80 O1+60 -0.55 | met 2/6
+e1 bear 2000-02            n= 3422 mean=  -2.90% med= -3.90% beat= 34.5% halves -2.90/+0.00 O1+60 -0.79 | met 2/6
+e1 rs=neg_falling          n=23985 mean=  +0.02% med= -3.14% beat= 34.1% halves -1.50/+1.00 O1+60 -0.66 | met 1/6
+e1 group=na                n=11212 mean=  -0.26% med= -2.76% beat= 36.5% halves -1.44/+1.85 O1+60 -0.45 | met 2/6
+e1 room=>30%               n= 1891 mean=  -2.46% med= -2.14% beat= 47.8% halves -5.13/+0.13 O1+60 -6.62 | met 2/6
+e2 phase=s12               n=15195 mean=  +0.18% med= -1.62% beat= 32.4% halves -1.07/+0.83 O1+60 +0.02 | met 2/6
+e2 advance=>=100%          n= 6952 mean=  +0.00% med= -1.90% beat= 31.3% halves -0.62/+0.67 O1+60 +0.66 | met 2/6
+e2 top_width=<=8           n=26045 mean=  -0.06% med= -1.58% beat= 32.8% halves -0.90/+0.64 O1+60 +0.05 | met 1/6
+e2 hs=0                    n=27127 mean=  -0.03% med= -1.60% beat= 33.0% halves -0.88/+0.67 O1+60 +0.05 | met 1/6
+e2 rs=neg_falling          n=18635 mean=  +0.06% med= -1.78% beat= 32.5% halves -1.08/+0.78 O1+60 +0.02 | met 2/6
+e2 group=na                n= 8731 mean=  -0.01% med= -1.57% beat= 34.1% halves -0.85/+1.52 O1+60 +0.58 | met 1/6
+e2 room=>30%               n=  404 mean=  +1.71% med= +3.79% beat= 53.7% halves +0.54/+2.73 O1+60 +2.15 | met 4/6
+e2 yield=none              n=10768 mean=  -0.04% med= -1.70% beat= 32.9% halves -1.06/+0.97 O1+60 +0.32 | met 1/6
+e2 bigdiv_in_hold=0        n=26635 mean=  -0.05% med= -1.59% beat= 33.0% halves -0.89/+0.64 O1+60 +0.04 | met 1/6
+e2 bear 2000-02            n= 2635 mean=  -0.80% med= -2.07% beat= 33.5% halves -0.80/+0.00 O1+60 +0.02 | met 1/6
+e1 phase=s4_early          n= 5335 mean=  -0.89% med= -2.66% beat= 36.3% halves -1.38/-0.38 O1+60 -0.68 | met 3/6
+e1 room=<=15%              n=25185 mean=  -0.23% med= -2.67% beat= 31.4% halves -1.35/+0.66 O1+60 -0.31 | met 2/6
+e2 rs=pos_falling          n= 5942 mean=  -0.59% med= -1.36% beat= 32.5% halves -0.86/-0.14 O1+60 -0.30 | met 3/6
+e2 room=<=15%              n=24727 mean=  -0.15% med= -1.55% beat= 32.0% halves -0.98/+0.53 O1+60 -0.12 | met 2/6
+e2 phase=s4_early          n= 4430 mean=  -0.09% med= -1.49% beat= 35.3% halves -0.56/+0.37 O1+60 +0.07 | met 1/6
+e1 phase=s3                n= 6910 mean=  -0.50% med= -2.90% beat= 32.3% halves -1.64/+0.96 O1+60 -0.29 | met 2/6
+e2 phase=s3                n= 5688 mean=  -0.21% med= -1.60% beat= 31.6% halves -0.76/+0.54 O1+60 +0.22 | met 1/6
+e2 group=weak              n=11306 mean=  +0.11% med= -1.67% beat= 32.2% halves -0.87/+0.46 O1+60 -0.02 | met 1/6
+e2 room=15-30%             n= 2009 mean=  +1.06% med= -6.01% beat= 41.1% halves -0.08/+2.11 O1+60 +1.60 | met 2/6
+e1 advance=30-100%         n=18352 mean=  -0.30% med= -2.78% beat= 34.2% halves -1.48/+0.69 O1+60 -0.14 | met 2/6
+e1 yield=<2%               n= 9011 mean=  -0.17% med= -2.86% beat= 32.9% halves -0.81/+0.37 O1+60 -0.36 | met 2/6
+e2 advance=30-100%         n=14790 mean=  -0.06% med= -1.56% beat= 33.1% halves -0.59/+0.38 O1+60 +0.04 | met 1/6
+e2 yield=<2%               n= 7271 mean=  -0.05% med= -1.57% beat= 32.7% halves -0.44/+0.26 O1+60 -0.24 | met 2/6
+e1 group=not_weak          n= 8596 mean=  -0.68% med= -2.71% beat= 32.7% halves -1.72/+0.55 O1+60 -0.71 | met 2/6
+e2 group=not_weak          n= 7103 mean=  -0.31% med= -1.52% beat= 32.9% halves -0.93/+0.41 O1+60 -0.52 | met 2/6
+e1 advance=<30%            n= 6745 mean=  +0.62% med= -2.06% beat= 37.0% halves -1.96/+2.21 O1+60 -0.20 | met 1/6
+e2 advance=<30%            n= 5397 mean=  -0.03% med= -1.33% beat= 34.7% halves -2.30/+1.36 O1+60 -0.74 | met 2/6
+e1 yield=2-5%              n= 8073 mean=  -0.30% med= -2.50% beat= 34.3% halves -1.76/+0.60 O1+60 -0.35 | met 2/6
+e1 rs=na                   n=  361 mean=  -7.12% med= -3.21% beat= 36.6% halves -17.27/+4.54 O1+60 +4.02 | met 1/6
+e1 yield=>5%               n= 3046 mean=  +0.33% med= -2.48% beat= 36.6% halves -1.93/+2.17 O1+60 -0.43 | met 1/6
+e2 yield=>5%               n= 2469 mean=  +0.46% med= -1.54% beat= 33.7% halves -0.94/+1.70 O1+60 -0.26 | met 1/6
+e1 rs=rising               n= 2578 mean=  +0.41% med= -1.37% beat= 39.7% halves -0.12/+1.00 O1+60 +0.70 | met 2/6
+e2 rs=rising               n= 2292 mean=  +0.30% med= -1.01% beat= 37.6% halves +0.01/+0.62 O1+60 +0.52 | met 3/6
+e2 rs=na                   n=  271 mean=  +3.06% med= -1.96% beat= 39.5% halves +1.21/+4.91 O1+60 +5.24 | met 4/6
+e1 phase=s4_late           n= 2458 mean=  -1.64% med= -2.57% beat= 39.9% halves -1.54/-2.97 O1+60 -0.20 | met 3/6
+e2 phase=s4_late           n= 1827 mean=  -1.12% med= -1.65% beat= 36.1% halves -0.97/-2.65 O1+60 -0.41 | met 3/6
+e2 yield=2-5%              n= 6632 mean=  -0.19% med= -1.51% beat= 33.1% halves -1.05/+0.35 O1+60 +0.02 | met 1/6
+e1 top_width=9-20          n= 1381 mean=  +0.97% med= -2.73% beat= 41.3% halves -0.88/+2.22 O1+60 +0.21 | met 2/6
+e2 top_width=9-20          n= 1063 mean=  +0.38% med= -2.40% beat= 36.0% halves -0.81/+1.17 O1+60 -0.10 | met 1/6
+e1 bigdiv_in_hold=1        n=  649 mean=  +0.62% med= -2.92% beat= 36.7% halves -1.88/+2.88 O1+60 +0.68 | met 2/6
+e2 bigdiv_in_hold=1        n=  505 mean=  +0.81% med= -1.73% beat= 32.9% halves -0.69/+2.14 O1+60 +0.09 | met 2/6
+e1 hs=1                    n=   17 mean=  -0.50% med= -5.88% beat= 41.2% halves +2.06/-2.78 O1+60 -0.84 | met 1/6
+e2 hs=1                    n=   13 mean=  -3.23% med= -7.76% beat= 30.8% halves +0.98/-5.85 O1+60 -3.60 | met 1/6
+e1 top_width=>20           n=   34 mean=  +5.22% med= +2.25% beat= 61.8% halves +6.22/+4.22 O1+60 +0.97 | met 5/6
+e2 top_width=>20           n=   32 mean=  +6.75% med= +5.03% beat= 62.5% halves +9.23/+4.27 O1+60 +1.58 | met 5/6
+e1 bear 2007-09            n= 3485 mean=  -1.12% med= -2.91% beat= 37.8% halves -1.12/+0.00 O1+60 -0.35 | met 2/6
+e2 bear 2007-09            n= 2643 mean=  -1.54% med= -1.76% beat= 34.2% halves -1.54/+0.00 O1+60 -0.94 | met 2/6
+e1 advance=na              n=    1 mean=  +5.84% med= +5.84% beat=100.0% halves +0.00/+5.84 O1+60 +4.92 | met 4/6
+e2 advance=na              n=    1 mean=  +8.20% med= +8.20% beat=100.0% halves +0.00/+8.20 O1+60 +8.38 | met 4/6
+e1 bear 2022               n= 1530 mean=  -2.20% med= -3.56% beat= 33.1% halves +0.00/-2.20 O1+60 -1.73 | met 2/6
+e2 bear 2022               n= 1252 mean=  -1.02% med= -1.97% beat= 31.9% halves +0.00/-1.02 O1+60 -1.10 | met 2/6
+cells meeting all six (beat >= 58%): 0
+
+== bootstrap
+P1 e1_o2_exc  week    events=4235 clusters=264 | beat 95% CI [27.5, 31.6]% | median [-4.34, -3.34]% | mean [-3.69, -1.41]%
+P1 e1_o1_60   week    events=4235 clusters=264 | beat 95% CI [43.8, 48.6]% | median [-2.37, -0.50]% | mean [-4.30, -1.31]%
+P1 e1_o1_120  week    events=4235 clusters=264 | beat 95% CI [44.9, 49.3]% | median [-2.43, -0.40]% | mean [-4.69, -2.09]%
+P2 e2_o2_exc  week    events=3530 clusters=260 | beat 95% CI [29.2, 33.5]% | median [-2.25, -1.51]% | mean [-1.33, -0.42]%
+P2 e2_o1_60   week    events=3530 clusters=260 | beat 95% CI [45.9, 50.9]% | median [-1.19, +0.22]% | mean [-1.86, -0.01]%
+P1 e1_o2_exc  quarter events=4235 clusters=48 | beat 95% CI [27.3, 32.3]% | median [-4.27, -3.35]% | mean [-3.90, -1.13]%
+P1 e1_o1_60   quarter events=4235 clusters=48 | beat 95% CI [42.8, 50.0]% | median [-2.59, -0.05]% | mean [-4.74, -0.96]%
+P1 e1_o1_120  quarter events=4235 clusters=48 | beat 95% CI [43.9, 50.0]% | median [-3.06, -0.01]% | mean [-5.55, -1.45]%
+P2 e2_o2_exc  quarter events=3530 clusters=48 | beat 95% CI [28.6, 34.3]% | median [-2.29, -1.42]% | mean [-1.32, -0.37]%
+P2 e2_o1_60   quarter events=3530 clusters=48 | beat 95% CI [45.3, 52.0]% | median [-1.35, +0.78]% | mean [-2.01, +0.21]%
+
+== trace check
+traced events 21; committed fields compared 450; mismatched 0

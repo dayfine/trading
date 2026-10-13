@@ -1,0 +1,717 @@
+=== BCE breakdown week 2000-06-02
+committed: sym=BCE date=2000-06-02 raw_close=21.48060 top_width=3 advance=4.42532 hs=0 rs=-0.69636 rs_class=neg_falling phase=s3 yield=3.68369 bigdiv=0 stop=30.17055 e1_date=2000-06-05 e1_px=6.04400 e1_o1_20=-0.01792 e1_o1_60=0.07620 e1_o1_120=-0.22879 e1_o2_ret=-0.13132 e1_o2_exc=-0.22879 e1_o2_bars=120 e1_o2_stopped=0 e1_room=3.99182 e2_weeks=1 e2_date=2000-06-09 e2_px=6.48700 e2_o1_20=0.02489 e2_o1_60=0.14921 e2_o1_120=-0.15673 e2_o2_ret=-0.07142 e2_o2_exc=-0.15673 e2_o2_bars=120 e2_o2_stopped=0 e2_room=3.65093 sector=Communication Services group_rel=-0.12959
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2000-03-10 Stage2  csvclose=   30.900 ma=   23.010 | adjclose=   30.9035 adjhigh=   31.5993
+  2000-03-17 Stage2  csvclose=   30.650 ma=   23.720 | adjclose=   30.6471 adjhigh=   31.4540
+  2000-03-24 Stage2  csvclose=   34.030 ma=   24.620 | adjclose=   34.0330 adjhigh=   34.6184
+  2000-03-31 Stage2  csvclose=   31.750 ma=   25.320 | adjclose=   31.7546 adjhigh=   34.8082
+  2000-04-07 Stage2  csvclose=   30.880 ma=   25.930 | adjclose=   30.8844 adjhigh=   31.9602
+  2000-04-14 Stage2  csvclose=   24.300 ma=   26.070 | adjclose=   24.3025 adjhigh=   31.6122
+  2000-04-20 Stage2  csvclose=   26.420 ma=   26.320 | adjclose=   26.4226 adjhigh=   27.7042
+  2000-04-28 Stage2  csvclose=   29.050 ma=   26.710 | adjclose=   29.0491 adjhigh=   30.3940
+  2000-05-05 Stage2  csvclose=   30.110 ma=   27.130 | adjclose=   30.1091 adjhigh=   31.0426
+  2000-05-12 Stage3  csvclose=    6.470 ma=   25.990 | adjclose=    6.4712 adjhigh=   29.8718
+  2000-05-19 Stage3  csvclose=    5.660 ma=   24.810 | adjclose=    5.6642 adjhigh=    6.7243
+  2000-05-26 Stage3  csvclose=    5.510 ma=   23.650 | adjclose=    5.5060 adjhigh=    6.0439
+  2000-06-02 Stage4  csvclose=    6.000 ma=   22.530 | adjclose=    5.9965 adjhigh=    6.1073  <== breakdown
+  2000-06-09 Stage4  csvclose=    6.490 ma=   21.470 | adjclose=    6.4870 adjhigh=    6.5661
+  2000-06-16 Stage4  csvclose=    6.080 ma=   20.400 | adjclose=    6.0773 adjhigh=    6.6294
+  2000-06-23 Stage4  csvclose=    6.130 ma=   19.360 | adjclose=    6.1251 adjhigh=    6.4123
+Stage-3 run 2000-05-12..2000-05-26 (3 wk); top high 29.8718 (week 2000-05-12); stop = 30.1706
+breakdown week close adj 5.9965 raw 21.4806; broken support (10-wk low close) 5.5060; close at/above support
+E1 entry 2000-06-05 adj close 6.0440 (raw 21.6506); SPY adj 92.4201; room to stop 399.18%
+   O1+20 at 2000-07-03: stock 6.1730 (+2.13%) SPY 92.7364 (+0.34%) excess(short-short) -1.79%
+   O1+60 at 2000-08-29: stock 5.7901 (-4.20%) SPY 95.5797 (+3.42%) excess(short-short) +7.62%
+   O1+120 at 2000-11-22: stock 6.8377 (+13.13%) SPY 83.4122 (-9.75%) excess(short-short) -22.88%
+   O2 exit 2000-11-22 (bar +120) held to +120 fill 6.8377 (bar adj O/H/L/C 6.5481/6.8699/6.5481/6.8377; raw C 24.0878); SPY 83.4122 (-9.75%)
+   O2 short ret -13.13%, excess vs SPY short -22.88%; lowest adj low in hold 5.3595 (-11.3% from entry)
+E2: pullback in week +1
+E2 entry 2000-06-09 adj close 6.4870 (raw 23.2376); SPY adj 92.0865; room to stop 365.09%
+   O1+20 at 2000-07-10: stock 6.3963 (-1.40%) SPY 93.0906 (+1.09%) excess(short-short) +2.49%
+   O1+60 at 2000-09-05: stock 5.7423 (-11.48%) SPY 95.2550 (+3.44%) excess(short-short) +14.92%
+   O1+120 at 2000-11-29: stock 6.9503 (+7.14%) SPY 84.2309 (-8.53%) excess(short-short) -15.67%
+   O2 exit 2000-11-29 (bar +120) held to +120 fill 6.9503 (bar adj O/H/L/C 7.0790/7.0951/6.9342/6.9503; raw C 24.4846); SPY 84.2309 (-8.53%)
+   O2 short ret -7.14%, excess vs SPY short -15.67%; lowest adj low in hold 5.3595 (-17.4% from entry)
+
+=== AIR breakdown week 2007-09-14
+committed: sym=AIR date=2007-09-14 raw_close=30.46000 top_width=5 advance=1.27244 hs=0 rs=-0.00718 rs_class=neg_falling phase=s3 yield=0.00000 bigdiv=0 stop=31.78230 e1_date=2007-09-17 e1_px=27.74910 e1_o1_20=0.01398 e1_o1_60=-0.06858 e1_o1_120=0.09558 e1_o2_ret=-0.14535 e1_o2_exc=-0.11360 e1_o2_bars=59 e1_o2_stopped=1 e1_room=0.14535 e2_weeks=1 e2_date=2007-09-21 e2_px=26.89380 e2_o1_20=-0.01447 e2_o1_60=-0.11136 e2_o1_120=0.04353 e2_o2_ret=-0.18177 e2_o2_exc=-0.18105 e2_o2_bars=55 e2_o2_stopped=1 e2_room=0.18177 sector=Industrials group_rel=-0.00454
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2007-06-22 Stage2  csvclose=   29.840 ma=   28.030 | adjclose=   29.8379 adjhigh=   31.3596
+  2007-06-29 Stage2  csvclose=   29.720 ma=   28.190 | adjclose=   29.7209 adjhigh=   30.2251
+  2007-07-06 Stage2  csvclose=   31.200 ma=   28.440 | adjclose=   31.1975 adjhigh=   31.3596
+  2007-07-13 Stage2  csvclose=   31.390 ma=   28.690 | adjclose=   31.3866 adjhigh=   31.4226
+  2007-07-20 Stage2  csvclose=   29.500 ma=   28.800 | adjclose=   29.5048 adjhigh=   31.3866
+  2007-07-27 Stage2  csvclose=   26.920 ma=   28.730 | adjclose=   26.9208 adjhigh=   29.6128
+  2007-08-03 Stage2  csvclose=   25.660 ma=   28.590 | adjclose=   25.6603 adjhigh=   28.0192
+  2007-08-10 Stage3  csvclose=   29.670 ma=   28.700 | adjclose=   29.6669 adjhigh=   31.4676
+  2007-08-17 Stage3  csvclose=   28.600 ma=   28.730 | adjclose=   28.6044 adjhigh=   30.0090
+  2007-08-24 Stage3  csvclose=   27.250 ma=   28.670 | adjclose=   27.2539 adjhigh=   29.2797
+  2007-08-31 Stage3  csvclose=   28.270 ma=   28.680 | adjclose=   28.2713 adjhigh=   28.5054
+  2007-09-07 Stage3  csvclose=   27.100 ma=   28.600 | adjclose=   27.1008 adjhigh=   28.8926
+  2007-09-14 Stage4  csvclose=   27.430 ma=   28.550 | adjclose=   27.4250 adjhigh=   28.1363  <== breakdown
+  2007-09-21 Stage4  csvclose=   26.890 ma=   28.460 | adjclose=   26.8938 adjhigh=   30.1801
+  2007-09-28 Stage4  csvclose=   27.320 ma=   28.400 | adjclose=   27.3169 adjhigh=   27.5600
+  2007-10-05 Stage1  csvclose=   29.240 ma=   28.460 | adjclose=   29.2437 adjhigh=   29.5318
+Stage-3 run 2007-08-10..2007-09-07 (5 wk); top high 31.4676 (week 2007-08-10); stop = 31.7823
+breakdown week close adj 27.4250 raw 30.4600; broken support (10-wk low close) 25.6603; close at/above support
+E1 entry 2007-09-17 adj close 27.7491 (raw 30.8200); SPY adj 104.4307; room to stop 14.53%
+   O1+20 at 2007-10-15: stock 28.7935 (+3.76%) SPY 109.8216 (+5.16%) excess(short-short) +1.40%
+   O1+60 at 2007-12-11: stock 29.7479 (+7.20%) SPY 104.7914 (+0.35%) excess(short-short) -6.86%
+   O1+120 at 2008-03-10: stock 21.5726 (-22.26%) SPY 91.1671 (-12.70%) excess(short-short) +9.56%
+   O2 exit 2007-12-10 (bar +59) STOPPED fill 31.7823 (bar adj O/H/L/C 31.4496/32.2600/31.0985/31.6207; raw C 35.1200); SPY 107.7457 (+3.17%)
+   O2 short ret -14.53%, excess vs SPY short -11.36%; lowest adj low in hold 25.9034 (-6.7% from entry)
+E2: pullback in week +1
+E2 entry 2007-09-21 adj close 26.8938 (raw 29.8700); SPY adj 107.6678; room to stop 18.18%
+   O1+20 at 2007-10-19: stock 26.8758 (-0.07%) SPY 106.0383 (-1.51%) excess(short-short) -1.45%
+   O1+60 at 2007-12-17: stock 28.6675 (+6.60%) SPY 102.7793 (-4.54%) excess(short-short) -11.14%
+   O1+120 at 2008-03-14: stock 21.8878 (-18.61%) SPY 92.3138 (-14.26%) excess(short-short) +4.35%
+   O2 exit 2007-12-10 (bar +55) STOPPED fill 31.7823 (bar adj O/H/L/C 31.4496/32.2600/31.0985/31.6207; raw C 35.1200); SPY 107.7457 (+0.07%)
+   O2 short ret -18.18%, excess vs SPY short -18.10%; lowest adj low in hold 26.0024 (-3.3% from entry)
+
+=== AVA breakdown week 2004-05-21
+committed: sym=AVA date=2004-05-21 raw_close=16.29000 top_width=3 advance=0.99863 hs=0 rs=-0.04356 rs_class=neg_falling phase=s3 yield=0.02302 bigdiv=0 stop=7.50764 e1_date=2004-05-24 e1_px=6.74200 e1_o1_20=-0.06506 e1_o1_60=-0.06811 e1_o1_120=-0.04068 e1_o2_ret=-0.11356 e1_o2_exc=-0.06914 e1_o2_bars=20 e1_o2_stopped=1 e1_room=0.11356 e2_weeks=1 e2_date=2004-05-28 e2_px=6.99350 e2_o1_20=-0.06593 e2_o1_60=-0.06282 e2_o1_120=-0.00576 e2_o2_ret=-0.07352 e2_o2_exc=-0.05306 e2_o2_bars=16 e2_o2_stopped=1 e2_room=0.07352 sector=Utilities group_rel=-0.05242
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2004-02-27 Stage2  csvclose=    7.390 ma=    7.150 | adjclose=    7.3924 adjhigh=    7.4661
+  2004-03-05 Stage2  csvclose=    7.520 ma=    7.180 | adjclose=    7.5233 adjhigh=    7.6420
+  2004-03-12 Stage2  csvclose=    7.410 ma=    7.210 | adjclose=    7.4129 adjhigh=    7.6337
+  2004-03-19 Stage2  csvclose=    7.530 ma=    7.250 | adjclose=    7.5315 adjhigh=    7.5970
+  2004-03-26 Stage2  csvclose=    7.470 ma=    7.280 | adjclose=    7.4742 adjhigh=    7.6624
+  2004-04-02 Stage2  csvclose=    7.700 ma=    7.320 | adjclose=    7.7033 adjhigh=    7.9488
+  2004-04-08 Stage2  csvclose=    7.490 ma=    7.340 | adjclose=    7.4865 adjhigh=    7.7688
+  2004-04-16 Stage2  csvclose=    7.360 ma=    7.360 | adjclose=    7.3638 adjhigh=    7.5969
+  2004-04-23 Stage2  csvclose=    7.380 ma=    7.370 | adjclose=    7.3802 adjhigh=    7.4825
+  2004-04-30 Stage3  csvclose=    6.910 ma=    7.350 | adjclose=    6.9138 adjhigh=    7.4333
+  2004-05-07 Stage3  csvclose=    6.530 ma=    7.300 | adjclose=    6.5251 adjhigh=    7.0324
+  2004-05-14 Stage3  csvclose=    6.440 ma=    7.250 | adjclose=    6.4433 adjhigh=    6.6274
+  2004-05-21 Stage4  csvclose=    6.660 ma=    7.210 | adjclose=    6.6642 adjhigh=    6.6642  <== breakdown
+  2004-05-28 Stage4  csvclose=    6.990 ma=    7.200 | adjclose=    6.9935 adjhigh=    7.0512
+  2004-06-04 Stage4  csvclose=    7.120 ma=    7.190 | adjclose=    7.1172 adjhigh=    7.1708
+  2004-06-10 Stage4  csvclose=    7.270 ma=    7.190 | adjclose=    7.2656 adjhigh=    7.2945
+Stage-3 run 2004-04-30..2004-05-14 (3 wk); top high 7.4333 (week 2004-04-30); stop = 7.5076
+breakdown week close adj 6.6642 raw 16.2900; broken support (10-wk low close) 6.4433; close at/above support
+E1 entry 2004-05-24 adj close 6.7420 (raw 16.4800); SPY adj 73.2618; room to stop 11.36%
+   O1+20 at 2004-06-23: stock 7.4801 (+10.95%) SPY 76.5163 (+4.44%) excess(short-short) -6.51%
+   O1+60 at 2004-08-19: stock 7.1914 (+6.67%) SPY 73.1556 (-0.14%) excess(short-short) -6.81%
+   O1+120 at 2004-11-12: stock 7.5940 (+12.64%) SPY 79.5398 (+8.57%) excess(short-short) -4.07%
+   O2 exit 2004-06-23 (bar +20) STOPPED fill 7.5076 (bar adj O/H/L/C 7.4224/7.5626/7.3894/7.4801; raw C 18.1400); SPY 76.5163 (+4.44%)
+   O2 short ret -11.36%, excess vs SPY short -6.91%; lowest adj low in hold 6.6925 (-0.7% from entry)
+E2: pullback in week +1
+E2 entry 2004-05-28 adj close 6.9935 (raw 16.9600); SPY adj 74.9825; room to stop 7.35%
+   O1+20 at 2004-06-29: stock 7.5460 (+7.90%) SPY 75.9629 (+1.31%) excess(short-short) -6.59%
+   O1+60 at 2004-08-25: stock 7.3489 (+5.08%) SPY 74.0825 (-1.20%) excess(short-short) -6.28%
+   O1+120 at 2004-11-18: stock 7.4777 (+6.92%) SPY 79.7420 (+6.35%) excess(short-short) -0.58%
+   O2 exit 2004-06-23 (bar +16) STOPPED fill 7.5076 (bar adj O/H/L/C 7.4224/7.5626/7.3894/7.4801; raw C 18.1400); SPY 76.5163 (+2.05%)
+   O2 short ret -7.35%, excess vs SPY short -5.31%; lowest adj low in hold 6.9234 (-1.0% from entry)
+
+=== OSPN breakdown week 2007-11-16
+committed: sym=OSPN date=2007-11-16 raw_close=21.27000 top_width=1 advance=2.37679 hs=0 rs=-0.02534 rs_class=neg_falling phase=s3 yield=0.00000 bigdiv=0 stop=22.61435 e1_date=2007-11-19 e1_px=20.79380 e1_o1_20=-0.10540 e1_o1_60=0.15416 e1_o1_120=0.45065 e1_o2_ret=-0.08755 e1_o2_exc=-0.03761 e1_o2_bars=12 e1_o2_stopped=1 e1_room=0.08755 e2_weeks=1 e2_date=2007-11-23 e2_px=19.92040 e2_o1_20=-0.21007 e2_o1_60=0.40316 e2_o1_120=0.44506 e2_o2_ret=-0.13524 e2_o2_exc=-0.08799 e2_o2_bars=9 e2_o2_stopped=1 e2_room=0.13524 sector=Information Technology group_rel=-0.00478
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2007-08-24 Stage2  csvclose=   29.390 ma=   22.270 | adjclose=   29.3875 adjhigh=   30.1482
+  2007-08-31 Stage2  csvclose=   29.420 ma=   22.870 | adjclose=   29.4156 adjhigh=   30.0543
+  2007-09-07 Stage2  csvclose=   30.380 ma=   23.510 | adjclose=   30.3830 adjhigh=   33.1818
+  2007-09-14 Stage2  csvclose=   30.710 ma=   24.130 | adjclose=   30.7117 adjhigh=   32.4868
+  2007-09-21 Stage2  csvclose=   32.460 ma=   24.820 | adjclose=   32.4586 adjhigh=   35.1823
+  2007-09-28 Stage2  csvclose=   33.160 ma=   25.530 | adjclose=   33.1630 adjhigh=   34.3746
+  2007-10-05 Stage2  csvclose=   36.430 ma=   26.410 | adjclose=   36.4314 adjhigh=   37.0043
+  2007-10-12 Stage2  csvclose=   39.470 ma=   27.450 | adjclose=   39.4650 adjhigh=   40.5827
+  2007-10-19 Stage2  csvclose=   35.280 ma=   28.160 | adjclose=   35.2762 adjhigh=   41.5595
+  2007-10-26 Stage2  csvclose=   23.490 ma=   28.070 | adjclose=   23.4893 adjhigh=   38.2911
+  2007-11-02 Stage2  csvclose=   23.040 ma=   27.940 | adjclose=   23.0385 adjhigh=   26.5416
+  2007-11-09 Stage3  csvclose=   18.450 ma=   27.500 | adjclose=   18.4458 adjhigh=   22.3904
+  2007-11-16 Stage4  csvclose=   19.980 ma=   27.160 | adjclose=   19.9767 adjhigh=   22.4374  <== breakdown
+  2007-11-23 Stage4  csvclose=   19.920 ma=   26.800 | adjclose=   19.9204 adjhigh=   21.4794
+  2007-11-30 Stage4  csvclose=   21.080 ma=   26.530 | adjclose=   21.0756 adjhigh=   21.9678
+  2007-12-07 Stage4  csvclose=   23.800 ma=   26.420 | adjclose=   23.7992 adjhigh=   23.9401
+Stage-3 run 2007-11-09..2007-11-09 (1 wk); top high 22.3904 (week 2007-11-09); stop = 22.6144
+breakdown week close adj 19.9767 raw 21.2700; broken support (10-wk low close) 18.4458; close at/above support
+E1 entry 2007-11-19 adj close 20.7938 (raw 22.1400); SPY adj 101.8512; room to stop 8.76%
+   O1+20 at 2007-12-18: stock 23.2921 (+12.01%) SPY 103.3531 (+1.47%) excess(short-short) -10.54%
+   O1+60 at 2008-02-15: stock 16.4453 (-20.91%) SPY 96.2525 (-5.50%) excess(short-short) +15.42%
+   O1+120 at 2008-05-13: stock 11.1577 (-46.34%) SPY 100.5512 (-1.28%) excess(short-short) +45.06%
+   O2 exit 2007-12-06 (bar +12) STOPPED fill 22.6144 (bar adj O/H/L/C 22.2496/23.1230/22.0805/22.9164; raw C 24.4000); SPY 106.9381 (+4.99%)
+   O2 short ret -8.76%, excess vs SPY short -3.76%; lowest adj low in hold 19.2911 (-7.2% from entry)
+E2: pullback in week +1
+E2 entry 2007-11-23 adj close 19.9204 (raw 21.2100); SPY adj 102.1133; room to stop 13.52%
+   O1+20 at 2007-12-21: stock 24.7666 (+24.33%) SPY 105.5045 (+3.32%) excess(short-short) -21.01%
+   O1+60 at 2008-02-21: stock 10.6974 (-46.30%) SPY 96.0032 (-5.98%) excess(short-short) +40.32%
+   O1+120 at 2008-05-16: stock 11.0543 (-44.51%) SPY 102.1115 (-0.00%) excess(short-short) +44.51%
+   O2 exit 2007-12-06 (bar +9) STOPPED fill 22.6144 (bar adj O/H/L/C 22.2496/23.1230/22.0805/22.9164; raw C 24.4000); SPY 106.9381 (+4.72%)
+   O2 short ret -13.52%, excess vs SPY short -8.80%; lowest adj low in hold 19.7137 (-1.0% from entry)
+
+=== PLUS breakdown week 2016-02-26
+committed: sym=PLUS date=2016-02-26 raw_close=75.10000 top_width=2 advance=0.58202 hs=0 rs=-0.07568 rs_class=neg_falling phase=s4_early yield=0.00000 bigdiv=0 stop=19.61895 e1_date=2016-02-29 e1_px=18.53600 e1_o1_20=0.01577 e1_o1_60=-0.05331 e1_o1_120=0.01433 e1_o2_ret=-0.05842 e1_o2_exc=-0.01089 e1_o2_bars=9 e1_o2_stopped=1 e1_room=0.05842 e2_weeks=1 e2_date=2016-03-04 e2_px=18.56320 e2_o1_20=-0.02922 e2_o1_60=-0.11162 e2_o1_120=-0.08238 e2_o2_ret=-0.05687 e2_o2_exc=-0.04525 e2_o2_bars=5 e2_o2_stopped=1 e2_room=0.05687 sector=Information Technology group_rel=-0.00253
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2015-12-04 Stage2  csvclose=   21.790 ma=   20.610 | adjclose=   21.7945 adjhigh=   22.6807
+  2015-12-11 Stage2  csvclose=   23.940 ma=   20.850 | adjclose=   23.9396 adjhigh=   24.3593
+  2015-12-18 Stage2  csvclose=   24.790 ma=   21.140 | adjclose=   24.7937 adjhigh=   25.0899
+  2015-12-24 Stage2  csvclose=   23.050 ma=   21.310 | adjclose=   23.0534 adjhigh=   25.6577
+  2015-12-31 Stage2  csvclose=   23.020 ma=   21.470 | adjclose=   23.0213 adjhigh=   24.5197
+  2016-01-08 Stage2  csvclose=   22.820 ma=   21.610 | adjclose=   22.8214 adjhigh=   23.2707
+  2016-01-15 Stage2  csvclose=   22.900 ma=   21.750 | adjclose=   22.9004 adjhigh=   23.4607
+  2016-01-22 Stage2  csvclose=   22.980 ma=   21.880 | adjclose=   22.9818 adjhigh=   23.5002
+  2016-01-29 Stage2  csvclose=   23.380 ma=   22.040 | adjclose=   23.3793 adjhigh=   23.6311
+  2016-02-05 Stage2  csvclose=   18.640 ma=   21.880 | adjclose=   18.6397 adjhigh=   23.7471
+  2016-02-12 Stage3  csvclose=   17.640 ma=   21.660 | adjclose=   17.6350 adjhigh=   19.4247
+  2016-02-19 Stage3  csvclose=   18.630 ma=   21.510 | adjclose=   18.6348 adjhigh=   18.8915
+  2016-02-26 Stage4  csvclose=   18.540 ma=   21.350 | adjclose=   18.5385 adjhigh=   19.3655  <== breakdown
+  2016-03-04 Stage4  csvclose=   18.560 ma=   21.190 | adjclose=   18.5632 adjhigh=   19.0322
+  2016-03-11 Stage4  csvclose=   19.790 ma=   21.120 | adjclose=   19.7876 adjhigh=   19.7925
+  2016-03-18 Stage4  csvclose=   19.620 ma=   21.030 | adjclose=   19.6173 adjhigh=   20.2961
+Stage-3 run 2016-02-12..2016-02-19 (2 wk); top high 19.4247 (week 2016-02-12); stop = 19.6189
+breakdown week close adj 18.5385 raw 75.1000; broken support (10-wk low close) 17.6350; close at/above support
+E1 entry 2016-02-29 adj close 18.5360 (raw 75.0900); SPY adj 163.1789; room to stop 5.84%
+   O1+20 at 2016-03-29: stock 19.4519 (+4.94%) SPY 173.8160 (+6.52%) excess(short-short) +1.58%
+   O1+60 at 2016-05-24: stock 20.9972 (+13.28%) SPY 176.1464 (+7.95%) excess(short-short) -5.33%
+   O1+120 at 2016-08-18: stock 20.9108 (+12.81%) SPY 186.4240 (+14.25%) excess(short-short) +1.43%
+   O2 exit 2016-03-11 (bar +9) STOPPED fill 19.6189 (bar adj O/H/L/C 18.7780/19.7925/18.6274/19.7876; raw C 80.1600); SPY 170.9349 (+4.75%)
+   O2 short ret -5.84%, excess vs SPY short -1.09%; lowest adj low in hold 18.2200 (-1.7% from entry)
+E2: pullback in week +1
+E2 entry 2016-03-04 adj close 18.5632 (raw 75.2000); SPY adj 168.9706; room to stop 5.69%
+   O1+20 at 2016-04-04: stock 19.7432 (+6.36%) SPY 174.7736 (+3.43%) excess(short-short) -2.92%
+   O1+60 at 2016-05-31: stock 21.6069 (+16.40%) SPY 177.8157 (+5.23%) excess(short-short) -11.16%
+   O1+120 at 2016-08-24: stock 21.9154 (+18.06%) SPY 185.5637 (+9.82%) excess(short-short) -8.24%
+   O2 exit 2016-03-11 (bar +5) STOPPED fill 19.6189 (bar adj O/H/L/C 18.7780/19.7925/18.6274/19.7876; raw C 80.1600); SPY 170.9349 (+1.16%)
+   O2 short ret -5.69%, excess vs SPY short -4.52%; lowest adj low in hold 18.3065 (-1.4% from entry)
+
+=== KRNT breakdown week 2018-12-28
+committed: sym=KRNT date=2018-12-28 raw_close=18.81000 top_width=1 advance=0.44427 hs=0 rs=0.18694 rs_class=pos_falling phase=s4_early yield=0.00000 bigdiv=0 stop=18.45270 e1_date=2018-12-31 e1_px=18.72000 e1_o1_20=0.00175 e1_o1_60=-0.16459 e1_o1_120=-0.31255 e1_o2_ret=0.00908 e1_o2_exc=0.01012 e1_o2_bars=1 e1_o2_stopped=1 e1_room=-0.01428 e2_weeks=1 e2_date=2018-12-31 e2_px=18.72000 e2_o1_20=0.00175 e2_o1_60=-0.16459 e2_o1_120=-0.31255 e2_o2_ret=0.00908 e2_o2_exc=0.01012 e2_o2_bars=1 e2_o2_stopped=1 e2_room=-0.01428 sector=Industrials group_rel=-0.05555
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2018-10-05 Stage2  csvclose=   20.490 ma=   18.940 | adjclose=   20.4900 adjhigh=   22.1800
+  2018-10-12 Stage2  csvclose=   19.320 ma=   19.060 | adjclose=   19.3200 adjhigh=   20.9000
+  2018-10-19 Stage2  csvclose=   18.630 ma=   19.120 | adjclose=   18.6300 adjhigh=   19.9900
+  2018-10-26 Stage2  csvclose=   17.890 ma=   19.120 | adjclose=   17.8900 adjhigh=   18.9200
+  2018-11-02 Stage2  csvclose=   18.910 ma=   19.180 | adjclose=   18.9100 adjhigh=   19.0200
+  2018-11-09 Stage2  csvclose=   20.060 ma=   19.290 | adjclose=   20.0600 adjhigh=   21.4241
+  2018-11-16 Stage2  csvclose=   22.370 ma=   19.550 | adjclose=   22.3700 adjhigh=   23.8995
+  2018-11-23 Stage2  csvclose=   21.350 ma=   19.720 | adjclose=   21.3500 adjhigh=   22.7900
+  2018-11-30 Stage2  csvclose=   23.020 ma=   19.980 | adjclose=   23.0200 adjhigh=   23.0800
+  2018-12-07 Stage2  csvclose=   18.660 ma=   19.950 | adjclose=   18.6600 adjhigh=   23.7000
+  2018-12-14 Stage2  csvclose=   17.820 ma=   19.850 | adjclose=   17.8200 adjhigh=   19.2400
+  2018-12-21 Stage3  csvclose=   17.090 ma=   19.710 | adjclose=   17.0900 adjhigh=   18.2700
+  2018-12-28 Stage4  csvclose=   18.810 ma=   19.670 | adjclose=   18.8100 adjhigh=   18.8500  <== breakdown
+  2018-12-31 Stage4  csvclose=   18.720 ma=   19.630 | adjclose=   18.7200 adjhigh=   18.9500
+  2019-01-04 Stage4  csvclose=   17.940 ma=   19.530 | adjclose=   17.9400 adjhigh=   18.8200
+  2019-01-11 Stage4  csvclose=   19.830 ma=   19.560 | adjclose=   19.8300 adjhigh=   20.1000
+Stage-3 run 2018-12-21..2018-12-21 (1 wk); top high 18.2700 (week 2018-12-21); stop = 18.4527
+breakdown week close adj 18.8100 raw 18.8100; broken support (10-wk low close) 17.0900; close at/above support
+E1 entry 2018-12-31 adj close 18.7200 (raw 18.7200); SPY adj 223.5684; room to stop -1.43%
+   O1+20 at 2019-01-30: stock 20.0100 (+6.89%) SPY 239.3663 (+7.07%) excess(short-short) +0.18%
+   O1+60 at 2019-03-28: stock 24.2000 (+29.27%) SPY 252.2181 (+12.81%) excess(short-short) -16.46%
+   O1+120 at 2019-06-24: stock 28.0500 (+49.84%) SPY 265.1186 (+18.59%) excess(short-short) -31.25%
+   O2 exit 2019-01-02 (bar +1) STOPPED fill 18.5500 (bar adj O/H/L/C 18.5500/18.8200/18.3100/18.6100; raw C 18.6100); SPY 223.8010 (+0.10%)
+   O2 short ret +0.91%, excess vs SPY short +1.01%; lowest adj low in hold 18.3100 (-2.2% from entry)
+E2: pullback in week +1
+E2 entry 2018-12-31 adj close 18.7200 (raw 18.7200); SPY adj 223.5684; room to stop -1.43%
+   O1+20 at 2019-01-30: stock 20.0100 (+6.89%) SPY 239.3663 (+7.07%) excess(short-short) +0.18%
+   O1+60 at 2019-03-28: stock 24.2000 (+29.27%) SPY 252.2181 (+12.81%) excess(short-short) -16.46%
+   O1+120 at 2019-06-24: stock 28.0500 (+49.84%) SPY 265.1186 (+18.59%) excess(short-short) -31.25%
+   O2 exit 2019-01-02 (bar +1) STOPPED fill 18.5500 (bar adj O/H/L/C 18.5500/18.8200/18.3100/18.6100; raw C 18.6100); SPY 223.8010 (+0.10%)
+   O2 short ret +0.91%, excess vs SPY short +1.01%; lowest adj low in hold 18.3100 (-2.2% from entry)
+
+=== WM breakdown week 2020-03-27
+committed: sym=WM date=2020-03-27 raw_close=95.30000 top_width=2 advance=0.47082 hs=0 rs=-0.01059 rs_class=neg_falling phase=s4_early yield=0.02187 bigdiv=0 stop=105.21463 e1_date=2020-03-30 e1_px=85.47800 e1_o1_20=0.01740 e1_o1_60=0.09043 e1_o1_120=0.04393 e1_o2_ret=-0.23090 e1_o2_exc=0.06836 e1_o2_bars=116 e1_o2_stopped=1 e1_room=0.23090 e2_weeks=2 e2_date=2020-04-09 e2_px=90.22180 e2_o1_20=0.03997 e2_o1_60=0.07988 e2_o1_120=0.06942 e2_o2_ret=-0.16618 e2_o2_exc=0.05578 e2_o2_bars=108 e2_o2_stopped=1 e2_room=0.16618 sector=Industrials group_rel=-0.11696
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2020-01-03 Stage3  csvclose=  103.740 ma=  102.230 | adjclose=  103.7369 adjhigh=  103.8628
+  2020-01-10 Stage3  csvclose=  104.520 ma=  102.340 | adjclose=  104.5195 adjhigh=  105.3470
+  2020-01-17 Stage3  csvclose=  107.620 ma=  102.640 | adjclose=  107.6227 adjhigh=  108.1264
+  2020-01-24 Stage2  csvclose=  108.840 ma=  103.010 | adjclose=  108.8370 adjhigh=  109.6735
+  2020-01-31 Stage2  csvclose=  109.470 ma=  103.410 | adjclose=  109.4666 adjhigh=  110.8158
+  2020-02-07 Stage2  csvclose=  111.450 ma=  103.920 | adjclose=  111.4544 adjhigh=  111.8682
+  2020-02-14 Stage2  csvclose=  113.110 ma=  104.530 | adjclose=  113.1095 adjhigh=  113.1095
+  2020-02-21 Stage2  csvclose=  112.040 ma=  105.060 | adjclose=  112.0391 adjhigh=  114.0450
+  2020-02-28 Stage2  csvclose=   99.670 ma=  104.770 | adjclose=   99.6713 adjhigh=  113.1185
+  2020-03-06 Stage2  csvclose=  105.840 ma=  104.890 | adjclose=  105.8355 adjhigh=  108.5172
+  2020-03-13 Stage3  csvclose=   95.160 ma=  104.320 | adjclose=   95.1643 adjhigh=  104.1729
+  2020-03-20 Stage3  csvclose=   88.830 ma=  103.360 | adjclose=   88.8303 adjhigh=  100.1610
+  2020-03-27 Stage4  csvclose=   86.110 ma=  102.260 | adjclose=   86.1105 adjhigh=   89.9054  <== breakdown
+  2020-04-03 Stage4  csvclose=   80.440 ma=  100.850 | adjclose=   80.4361 adjhigh=   88.2520
+  2020-04-09 Stage4  csvclose=   90.220 ma=  100.100 | adjclose=   90.2218 adjhigh=   92.1283
+  2020-04-17 Stage4  csvclose=   90.600 ma=   99.410 | adjclose=   90.6013 adjhigh=   90.9718
+Stage-3 run 2020-03-13..2020-03-20 (2 wk); top high 104.1729 (week 2020-03-13); stop = 105.2146
+breakdown week close adj 86.1105 raw 95.3000; broken support (10-wk low close) 88.8303; close BELOW support
+E1 entry 2020-03-30 adj close 85.4780 (raw 94.6000); SPY adj 239.8952; room to stop 23.09%
+   O1+20 at 2020-04-28: stock 91.8572 (+7.46%) SPY 261.9731 (+9.20%) excess(short-short) +1.74%
+   O1+60 at 2020-06-24: stock 92.0504 (+7.69%) SPY 280.0337 (+16.73%) excess(short-short) +9.04%
+   O1+120 at 2020-09-18: stock 105.1746 (+23.04%) SPY 305.7116 (+27.44%) excess(short-short) +4.39%
+   O2 exit 2020-09-14 (bar +116) STOPPED fill 105.2146 (bar adj O/H/L/C 103.8607/106.3790/103.6964/106.1691; raw C 116.3600); SPY 311.6847 (+29.93%)
+   O2 short ret -23.09%, excess vs SPY short +6.84%; lowest adj low in hold 78.5205 (-8.1% from entry)
+E2: pullback in week +2
+E2 entry 2020-04-09 adj close 90.2218 (raw 99.8500); SPY adj 255.0692; room to stop 16.62%
+   O1+20 at 2020-05-08: stock 91.2338 (+1.12%) SPY 268.1252 (+5.12%) excess(short-short) +4.00%
+   O1+60 at 2020-07-07: stock 95.0016 (+5.30%) SPY 288.9571 (+13.29%) excess(short-short) +7.99%
+   O1+120 at 2020-09-30: stock 103.2585 (+14.45%) SPY 309.6318 (+21.39%) excess(short-short) +6.94%
+   O2 exit 2020-09-14 (bar +108) STOPPED fill 105.2146 (bar adj O/H/L/C 103.8607/106.3790/103.6964/106.1691; raw C 116.3600); SPY 311.6847 (+22.20%)
+   O2 short ret -16.62%, excess vs SPY short +5.58%; lowest adj low in hold 85.0533 (-5.7% from entry)
+
+=== ING breakdown week 2011-07-29
+committed: sym=ING date=2011-07-29 raw_close=10.74000 top_width=7 advance=0.79860 hs=0 rs=-0.07785 rs_class=neg_falling phase=s3 yield=0.00000 bigdiv=0 stop=6.71664 e1_date=2011-08-01 e1_px=5.56450 e1_o1_20=0.15917 e1_o1_60=0.12350 e1_o1_120=0.16574 e1_o2_ret=0.13196 e1_o2_exc=0.16574 e1_o2_bars=120 e1_o2_stopped=0 e1_room=0.20705 e2_weeks=0 e2_date= e2_px= e2_o1_20= e2_o1_60= e2_o1_120= e2_o2_ret= e2_o2_exc= e2_o2_bars= e2_o2_stopped= e2_room= sector=Financials group_rel=-0.04605
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2011-05-06 Stage2  csvclose=    6.650 ma=    6.290 | adjclose=    6.6501 adjhigh=    7.0330
+  2011-05-13 Stage2  csvclose=    6.370 ma=    6.310 | adjclose=    6.3721 adjhigh=    6.7969
+  2011-05-20 Stage2  csvclose=    6.140 ma=    6.320 | adjclose=    6.1361 adjhigh=    6.3773
+  2011-05-27 Stage2  csvclose=    6.270 ma=    6.330 | adjclose=    6.2672 adjhigh=    6.2777
+  2011-06-03 Stage2  csvclose=    6.280 ma=    6.350 | adjclose=    6.2777 adjhigh=    6.3931
+  2011-06-10 Stage3  csvclose=    5.950 ma=    6.340 | adjclose=    5.9526 adjhigh=    6.3197
+  2011-06-17 Stage3  csvclose=    6.150 ma=    6.340 | adjclose=    6.1466 adjhigh=    6.2358
+  2011-06-24 Stage3  csvclose=    5.830 ma=    6.320 | adjclose=    5.8320 adjhigh=    6.3407
+  2011-07-01 Stage3  csvclose=    6.630 ma=    6.360 | adjclose=    6.6344 adjhigh=    6.6501
+  2011-07-08 Stage3  csvclose=    6.300 ma=    6.370 | adjclose=    6.2987 adjhigh=    6.6082
+  2011-07-15 Stage3  csvclose=    5.630 ma=    6.330 | adjclose=    5.6274 adjhigh=    5.8635
+  2011-07-22 Stage3  csvclose=    6.070 ma=    6.320 | adjclose=    6.0732 adjhigh=    6.1781
+  2011-07-29 Stage4  csvclose=    5.630 ma=    6.280 | adjclose=    5.6327 adjhigh=    6.0207  <== breakdown
+  2011-08-05 Stage4  csvclose=    5.020 ma=    6.200 | adjclose=    5.0243 adjhigh=    5.8425
+  2011-08-12 Stage4  csvclose=    4.600 ma=    6.090 | adjclose=    4.5995 adjhigh=    4.7306
+  2011-08-19 Stage4  csvclose=    4.100 ma=    5.950 | adjclose=    4.0960 adjhigh=    4.7778
+Stage-3 run 2011-06-10..2011-07-22 (7 wk); top high 6.6501 (week 2011-07-01); stop = 6.7166
+breakdown week close adj 5.6327 raw 10.7400; broken support (10-wk low close) 5.6274; close at/above support
+E1 entry 2011-08-01 adj close 5.5645 (raw 10.6100); SPY adj 98.9071; room to stop 20.71%
+   O1+20 at 2011-08-29: stock 4.3582 (-21.68%) SPY 93.2083 (-5.76%) excess(short-short) +15.92%
+   O1+60 at 2011-10-25: stock 4.6572 (-16.31%) SPY 94.9952 (-3.96%) excess(short-short) +12.35%
+   O1+120 at 2012-01-23: stock 4.8302 (-13.20%) SPY 102.2481 (+3.38%) excess(short-short) +16.57%
+   O2 exit 2012-01-23 (bar +120) held to +120 fill 4.8302 (bar adj O/H/L/C 4.8302/4.9036/4.7778/4.8302; raw C 9.2100); SPY 102.2481 (+3.38%)
+   O2 short ret +13.20%, excess vs SPY short +16.57%; lowest adj low in hold 3.0419 (-45.3% from entry)
+E2: no pullback within 8 weeks
+
+=== CSL breakdown week 2020-03-20
+committed: sym=CSL date=2020-03-20 raw_close=104.24000 top_width=2 advance=0.65913 hs=0 rs=-0.06248 rs_class=neg_falling phase=s4_early yield=0.01823 bigdiv=0 stop=144.70004 e1_date=2020-03-23 e1_px=93.21910 e1_o1_20=0.05328 e1_o1_60=0.16151 e1_o1_120=0.28714 e1_o2_ret=-0.21782 e1_o2_exc=0.28714 e1_o2_bars=120 e1_o2_stopped=0 e1_room=0.55226 e2_weeks=0 e2_date= e2_px= e2_o1_20= e2_o1_60= e2_o1_120= e2_o2_ret= e2_o2_exc= e2_o2_bars= e2_o2_stopped= e2_room= sector=Industrials group_rel=-0.10447
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2019-12-31 Stage2  csvclose=  149.950 ma=  140.590 | adjclose=  149.9528 adjhigh=  150.8515
+  2020-01-03 Stage2  csvclose=  149.430 ma=  141.450 | adjclose=  149.4339 adjhigh=  152.1209
+  2020-01-10 Stage2  csvclose=  148.520 ma=  142.200 | adjclose=  148.5166 adjhigh=  150.8238
+  2020-01-17 Stage2  csvclose=  151.910 ma=  143.130 | adjclose=  151.9078 adjhigh=  152.6954
+  2020-01-24 Stage2  csvclose=  145.020 ma=  143.570 | adjclose=  145.0235 adjhigh=  151.6855
+  2020-01-31 Stage2  csvclose=  144.750 ma=  143.950 | adjclose=  144.7548 adjhigh=  147.7012
+  2020-02-07 Stage2  csvclose=  150.800 ma=  144.680 | adjclose=  150.7959 adjhigh=  157.3837
+  2020-02-14 Stage2  csvclose=  151.310 ma=  145.380 | adjclose=  151.3148 adjhigh=  152.2136
+  2020-02-21 Stage2  csvclose=  150.890 ma=  146.000 | adjclose=  150.8885 adjhigh=  153.0474
+  2020-02-28 Stage2  csvclose=  135.030 ma=  145.550 | adjclose=  135.0329 adjhigh=  148.7137
+  2020-03-06 Stage3  csvclose=  134.010 ma=  145.030 | adjclose=  134.0105 adjhigh=  143.2674
+  2020-03-13 Stage3  csvclose=  122.850 ma=  143.780 | adjclose=  122.8484 adjhigh=  135.6462
+  2020-03-20 Stage4  csvclose=   96.880 ma=  140.860 | adjclose=   96.8809 adjhigh=  116.1009  <== breakdown
+  2020-03-27 Stage4  csvclose=  110.300 ma=  138.880 | adjclose=  110.3015 adjhigh=  120.5806
+  2020-04-03 Stage4  csvclose=  104.860 ma=  136.600 | adjclose=  104.8645 adjhigh=  117.2998
+  2020-04-09 Stage4  csvclose=  117.740 ma=  135.230 | adjclose=  117.7367 adjhigh=  120.8223
+Stage-3 run 2020-03-06..2020-03-13 (2 wk); top high 143.2674 (week 2020-03-06); stop = 144.7000
+breakdown week close adj 96.8809 raw 104.2400; broken support (10-wk low close) 122.8484; close BELOW support
+E1 entry 2020-03-23 adj close 93.2191 (raw 100.3000); SPY adj 204.4129; room to stop 55.23%
+   O1+20 at 2020-04-21: stock 109.1955 (+17.14%) SPY 250.3382 (+22.47%) excess(short-short) +5.33%
+   O1+60 at 2020-06-17: stock 115.2546 (+23.64%) SPY 285.7472 (+39.79%) excess(short-short) +16.15%
+   O1+120 at 2020-09-11: stock 113.5242 (+21.78%) SPY 307.6328 (+50.50%) excess(short-short) +28.71%
+   O2 exit 2020-09-11 (bar +120) held to +120 fill 113.5242 (bar adj O/H/L/C 114.1244/115.2686/112.9521/113.5242; raw C 121.0500); SPY 307.6328 (+50.50%)
+   O2 short ret -21.78%, excess vs SPY short +28.71%; lowest adj low in hold 91.1035 (-2.3% from entry)
+E2: no pullback within 8 weeks
+
+=== LFST breakdown week 2025-04-04
+committed: sym=LFST date=2025-04-04 raw_close=6.64000 top_width=2 advance=0.44196 hs=0 rs=0.09805 rs_class=pos_falling phase=s4_early yield=0.00000 bigdiv=0 stop=7.15080 e1_date=2025-04-07 e1_px=6.51000 e1_o1_20=0.10175 e1_o1_60=0.50771 e1_o1_120=0.49084 e1_o2_ret=0.16743 e1_o2_exc=0.49084 e1_o2_bars=120 e1_o2_stopped=0 e1_room=0.09843 e2_weeks=1 e2_date=2025-04-11 e2_px=6.84000 e2_o1_20=0.23660 e2_o1_60=0.48404 e2_o1_120=0.45500 e2_o2_ret=0.19444 e2_o2_exc=0.45500 e2_o2_bars=120 e2_o2_stopped=0 e2_room=0.04544 sector=Health Care group_rel=-0.15712
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2025-01-10 Stage2  csvclose=    7.730 ma=    7.090 | adjclose=    7.7300 adjhigh=    7.9600
+  2025-01-17 Stage2  csvclose=    7.990 ma=    7.180 | adjclose=    7.9900 adjhigh=    8.1000
+  2025-01-24 Stage2  csvclose=    7.970 ma=    7.250 | adjclose=    7.9700 adjhigh=    8.1550
+  2025-01-31 Stage2  csvclose=    7.970 ma=    7.330 | adjclose=    7.9700 adjhigh=    8.2500
+  2025-02-07 Stage2  csvclose=    7.910 ma=    7.390 | adjclose=    7.9100 adjhigh=    8.2050
+  2025-02-14 Stage2  csvclose=    7.970 ma=    7.450 | adjclose=    7.9700 adjhigh=    8.0700
+  2025-02-21 Stage2  csvclose=    7.700 ma=    7.490 | adjclose=    7.7000 adjhigh=    8.2000
+  2025-02-28 Stage2  csvclose=    7.790 ma=    7.530 | adjclose=    7.7900 adjhigh=    8.2050
+  2025-03-07 Stage2  csvclose=    7.590 ma=    7.550 | adjclose=    7.5900 adjhigh=    8.2950
+  2025-03-14 Stage2  csvclose=    6.920 ma=    7.530 | adjclose=    6.9200 adjhigh=    7.5800
+  2025-03-21 Stage3  csvclose=    6.850 ma=    7.490 | adjclose=    6.8500 adjhigh=    7.0100
+  2025-03-28 Stage3  csvclose=    6.700 ma=    7.450 | adjclose=    6.7000 adjhigh=    7.0800
+  2025-04-04 Stage4  csvclose=    6.640 ma=    7.410 | adjclose=    6.6400 adjhigh=    6.7950  <== breakdown
+  2025-04-11 Stage4  csvclose=    6.840 ma=    7.380 | adjclose=    6.8400 adjhigh=    7.0200
+  2025-04-17 Stage4  csvclose=    6.700 ma=    7.330 | adjclose=    6.7000 adjhigh=    6.9500
+  2025-04-25 Stage4  csvclose=    6.530 ma=    7.280 | adjclose=    6.5300 adjhigh=    6.7400
+Stage-3 run 2025-03-21..2025-03-28 (2 wk); top high 7.0800 (week 2025-03-28); stop = 7.1508
+breakdown week close adj 6.6400 raw 6.6400; broken support (10-wk low close) 6.7000; close BELOW support
+E1 entry 2025-04-07 adj close 6.5100 (raw 6.5100); SPY adj 497.3742; room to stop 9.84%
+   O1+20 at 2025-05-06: stock 6.5500 (+0.61%) SPY 551.0383 (+10.79%) excess(short-short) +10.18%
+   O1+60 at 2025-07-03: stock 4.7900 (-26.42%) SPY 618.4869 (+24.35%) excess(short-short) +50.77%
+   O1+120 at 2025-09-29: stock 5.4200 (-16.74%) SPY 658.2267 (+32.34%) excess(short-short) +49.08%
+   O2 exit 2025-09-29 (bar +120) held to +120 fill 5.4200 (bar adj O/H/L/C 5.4600/5.5800/5.4100/5.4200; raw C 5.4200); SPY 658.2267 (+32.34%)
+   O2 short ret +16.74%, excess vs SPY short +49.08%; lowest adj low in hold 3.7400 (-42.5% from entry)
+E2: pullback in week +1
+E2 entry 2025-04-11 adj close 6.8400 (raw 6.8400); SPY adj 526.5236; room to stop 4.54%
+   O1+20 at 2025-05-12: stock 5.8500 (-14.47%) SPY 574.8923 (+9.19%) excess(short-short) +23.66%
+   O1+60 at 2025-07-10: stock 4.7300 (-30.85%) SPY 618.9617 (+17.56%) excess(short-short) +48.40%
+   O1+120 at 2025-10-03: stock 5.5100 (-19.44%) SPY 663.7113 (+26.06%) excess(short-short) +45.50%
+   O2 exit 2025-10-03 (bar +120) held to +120 fill 5.5100 (bar adj O/H/L/C 5.3900/5.6250/5.3900/5.5100; raw C 5.5100); SPY 663.7113 (+26.06%)
+   O2 short ret +19.44%, excess vs SPY short +45.50%; lowest adj low in hold 3.7400 (-45.3% from entry)
+
+=== PLXS breakdown week 2022-02-11
+committed: sym=PLXS date=2022-02-11 raw_close=79.20000 top_width=3 advance=1.04419 hs=0 rs=-0.14226 rs_class=neg_falling phase=s3 yield=0.00000 bigdiv=0 stop=88.77900 e1_date=2022-02-14 e1_px=80.31000 e1_o1_20=-0.05293 e1_o1_60=-0.11805 e1_o1_120=-0.20956 e1_o2_ret=-0.10545 e1_o2_exc=-0.18517 e1_o2_bars=112 e1_o2_stopped=1 e1_room=0.10545 e2_weeks=1 e2_date=2022-02-18 e2_px=81.83000 e2_o1_20=-0.02805 e2_o1_60=-0.09488 e2_o1_120=-0.16394 e2_o2_ret=-0.08492 e2_o2_exc=-0.15448 e2_o2_bars=108 e2_o2_stopped=1 e2_room=0.08492 sector=Information Technology group_rel=-0.09476
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2021-11-19 Stage3  csvclose=   91.190 ma=   91.110 | adjclose=   91.1900 adjhigh=   93.6600
+  2021-11-26 Stage3  csvclose=   85.740 ma=   90.730 | adjclose=   85.7400 adjhigh=   92.5700
+  2021-12-03 Stage3  csvclose=   88.900 ma=   90.570 | adjclose=   88.9000 adjhigh=   90.1800
+  2021-12-10 Stage3  csvclose=   93.270 ma=   90.700 | adjclose=   93.2700 adjhigh=   96.1800
+  2021-12-17 Stage3  csvclose=   92.430 ma=   90.790 | adjclose=   92.4300 adjhigh=   95.4300
+  2021-12-23 Stage3  csvclose=   95.190 ma=   91.070 | adjclose=   95.1900 adjhigh=   95.9700
+  2021-12-31 Stage2  csvclose=   95.890 ma=   91.400 | adjclose=   95.8900 adjhigh=   98.0000
+  2022-01-07 Stage2  csvclose=   92.830 ma=   91.540 | adjclose=   92.8300 adjhigh=   99.1150
+  2022-01-14 Stage2  csvclose=   92.860 ma=   91.680 | adjclose=   92.8600 adjhigh=   93.2950
+  2022-01-21 Stage3  csvclose=   80.890 ma=   91.040 | adjclose=   80.8900 adjhigh=   87.9000
+  2022-01-28 Stage3  csvclose=   75.430 ma=   90.060 | adjclose=   75.4300 adjhigh=   81.4850
+  2022-02-04 Stage3  csvclose=   78.130 ma=   89.290 | adjclose=   78.1300 adjhigh=   79.7700
+  2022-02-11 Stage4  csvclose=   79.200 ma=   88.620 | adjclose=   79.2000 adjhigh=   80.4200  <== breakdown
+  2022-02-18 Stage4  csvclose=   81.830 ma=   88.130 | adjclose=   81.8300 adjhigh=   83.3200
+  2022-02-25 Stage4  csvclose=   81.590 ma=   87.630 | adjclose=   81.5900 adjhigh=   82.2100
+  2022-03-04 Stage4  csvclose=   80.460 ma=   87.080 | adjclose=   80.4600 adjhigh=   82.2250
+Stage-3 run 2022-01-21..2022-02-04 (3 wk); top high 87.9000 (week 2022-01-21); stop = 88.7790
+breakdown week close adj 79.2000 raw 79.2000; broken support (10-wk low close) 75.4300; close at/above support
+E1 entry 2022-02-14 adj close 80.3100 (raw 80.3100); SPY adj 413.0749; room to stop 10.55%
+   O1+20 at 2022-03-15: stock 82.2100 (+2.37%) SPY 400.9843 (-2.93%) excess(short-short) -5.29%
+   O1+60 at 2022-05-11: stock 81.5500 (+1.54%) SPY 370.6874 (-10.26%) excess(short-short) -11.81%
+   O1+120 at 2022-08-08: stock 92.9400 (+15.73%) SPY 391.4741 (-5.23%) excess(short-short) -20.96%
+   O2 exit 2022-07-27 (bar +112) STOPPED fill 88.7790 (bar adj O/H/L/C 87.8300/89.6700/86.1900/89.0500; raw C 89.0500); SPY 380.1466 (-7.97%)
+   O2 short ret -10.55%, excess vs SPY short -18.52%; lowest adj low in hold 74.5300 (-7.2% from entry)
+E2: pullback in week +1
+E2 entry 2022-02-18 adj close 81.8300 (raw 81.8300); SPY adj 408.5680; room to stop 8.49%
+   O1+20 at 2022-03-21: stock 86.3000 (+5.46%) SPY 419.4265 (+2.66%) excess(short-short) -2.80%
+   O1+60 at 2022-05-17: stock 84.9500 (+3.81%) SPY 385.3828 (-5.67%) excess(short-short) -9.49%
+   O1+120 at 2022-08-12: stock 94.5000 (+15.48%) SPY 404.8490 (-0.91%) excess(short-short) -16.39%
+   O2 exit 2022-07-27 (bar +108) STOPPED fill 88.7790 (bar adj O/H/L/C 87.8300/89.6700/86.1900/89.0500; raw C 89.0500); SPY 380.1466 (-6.96%)
+   O2 short ret -8.49%, excess vs SPY short -15.45%; lowest adj low in hold 74.5300 (-8.9% from entry)
+
+=== DOO breakdown week 2022-09-23
+committed: sym=DOO date=2022-09-23 raw_close=62.93000 top_width=3 advance=0.64271 hs=0 rs=-0.05167 rs_class=neg_falling phase=s4_early yield=0.03332 bigdiv=0 stop=69.31410 e1_date=2022-09-26 e1_px=55.34820 e1_o1_20=0.03621 e1_o1_60=-0.17121 e1_o1_120=-0.18698 e1_o2_ret=-0.25233 e1_o2_exc=-0.13410 e1_o2_bars=47 e1_o2_stopped=1 e1_room=0.25233 e2_weeks=5 e2_date=2022-10-28 e2_px=62.14730 e2_o1_20=-0.00335 e2_o1_60=-0.14105 e2_o1_120=-0.04957 e2_o2_ret=-0.11532 e2_o2_exc=-0.06812 e2_o2_bars=23 e2_o2_stopped=1 e2_room=0.11532 sector=Consumer Discretionary group_rel=-0.03684
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2022-07-01 Stage4  csvclose=   55.770 ma=   65.790 | adjclose=   55.7680 adjhigh=   60.6098
+  2022-07-08 Stage4  csvclose=   59.840 ma=   65.280 | adjclose=   59.8356 adjhigh=   60.0426
+  2022-07-15 Stage4  csvclose=   58.840 ma=   64.730 | adjclose=   58.8367 adjhigh=   59.3406
+  2022-07-22 Stage4  csvclose=   63.650 ma=   64.510 | adjclose=   63.6513 adjhigh=   64.7942
+  2022-07-29 Stage4  csvclose=   68.470 ma=   64.630 | adjclose=   68.4658 adjhigh=   68.7718
+  2022-08-05 Stage4  csvclose=   66.320 ma=   64.640 | adjclose=   66.3240 adjhigh=   68.7089
+  2022-08-12 Stage1  csvclose=   70.900 ma=   64.950 | adjclose=   70.9046 adjhigh=   71.6966
+  2022-08-19 Stage2  csvclose=   70.640 ma=   65.250 | adjclose=   70.6436 adjhigh=   73.3884
+  2022-08-26 Stage2  csvclose=   65.510 ma=   65.220 | adjclose=   65.5051 adjhigh=   71.1656
+  2022-09-02 Stage3  csvclose=   61.300 ma=   64.930 | adjclose=   61.3025 adjhigh=   65.6491
+  2022-09-09 Stage3  csvclose=   63.970 ma=   64.830 | adjclose=   63.9662 adjhigh=   64.1462
+  2022-09-16 Stage3  csvclose=   61.540 ma=   64.580 | adjclose=   61.5365 adjhigh=   68.6278
+  2022-09-23 Stage4  csvclose=   56.630 ma=   64.030 | adjclose=   56.6319 adjhigh=   63.4622  <== breakdown
+  2022-09-30 Stage4  csvclose=   55.580 ma=   63.430 | adjclose=   55.5831 adjhigh=   58.8812
+  2022-10-07 Stage4  csvclose=   56.410 ma=   62.880 | adjclose=   56.4138 adjhigh=   60.7749
+  2022-10-14 Stage4  csvclose=   54.810 ma=   62.240 | adjclose=   54.8066 adjhigh=   57.4250
+Stage-3 run 2022-09-02..2022-09-16 (3 wk); top high 68.6278 (week 2022-09-16); stop = 69.3141
+breakdown week close adj 56.6319 raw 62.9300; broken support (10-wk low close) 58.8367; close BELOW support
+E1 entry 2022-09-26 adj close 55.3482 (raw 61.4100); SPY adj 346.7491; room to stop 25.23%
+   O1+20 at 2022-10-24: stock 55.5560 (+0.38%) SPY 360.6073 (+4.00%) excess(short-short) +3.62%
+   O1+60 at 2022-12-20: stock 67.5557 (+22.06%) SPY 363.8604 (+4.93%) excess(short-short) -17.12%
+   O1+120 at 2023-03-20: stock 70.6725 (+27.69%) SPY 377.9188 (+8.99%) excess(short-short) -18.70%
+   O2 exit 2022-12-01 (bar +47) STOPPED fill 69.3141 (bar adj O/H/L/C 68.2058/70.6617/67.7272/70.3005; raw C 77.8600); SPY 387.7430 (+11.82%)
+   O2 short ret -25.23%, excess vs SPY short -13.41%; lowest adj low in hold 53.0098 (-4.2% from entry)
+E2: pullback in week +5
+E2 entry 2022-10-28 adj close 62.1473 (raw 68.8300); SPY adj 370.2680; room to stop 11.53%
+   O1+20 at 2022-11-28: stock 63.4565 (+2.11%) SPY 376.8259 (+1.77%) excess(short-short) -0.34%
+   O1+60 at 2023-01-26: stock 73.7228 (+18.63%) SPY 387.0092 (+4.52%) excess(short-short) -14.10%
+   O1+120 at 2023-04-24: stock 69.5553 (+11.92%) SPY 396.0498 (+6.96%) excess(short-short) -4.96%
+   O2 exit 2022-12-01 (bar +23) STOPPED fill 69.3141 (bar adj O/H/L/C 68.2058/70.6617/67.7272/70.3005; raw C 77.8600); SPY 387.7430 (+4.72%)
+   O2 short ret -11.53%, excess vs SPY short -6.81%; lowest adj low in hold 55.6553 (-10.4% from entry)
+
+=== LGND breakdown week 2016-02-12
+committed: sym=LGND date=2016-02-12 raw_close=85.97000 top_width=2 advance=1.38479 hs=0 rs=0.01408 rs_class=pos_falling phase=s4_early yield=0.00000 bigdiv=0 stop=66.77459 e1_date=2016-02-16 e1_px=55.57080 e1_o1_20=-0.03204 e1_o1_60=-0.21264 e1_o1_120=-0.22256 e1_o2_ret=-0.20161 e1_o2_exc=-0.11044 e1_o2_bars=30 e1_o2_stopped=1 e1_room=0.20161 e2_weeks=2 e2_date=2016-02-26 e2_px=60.68620 e2_o1_20=-0.00672 e2_o1_60=-0.16906 e2_o1_120=0.01469 e2_o2_ret=-0.10033 e2_o2_exc=-0.03886 e2_o2_bars=22 e2_o2_stopped=1 e2_room=0.10033 sector=Health Care group_rel=-0.15838
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2015-11-20 Stage3  csvclose=   64.250 ma=   59.100 | adjclose=   64.2545 adjhigh=   66.6250
+  2015-11-27 Stage2  csvclose=   66.110 ma=   59.590 | adjclose=   66.1073 adjhigh=   66.4878
+  2015-12-04 Stage2  csvclose=   66.870 ma=   60.100 | adjclose=   66.8684 adjhigh=   68.5839
+  2015-12-11 Stage2  csvclose=   64.290 ma=   60.400 | adjclose=   64.2857 adjhigh=   68.6212
+  2015-12-18 Stage2  csvclose=   68.650 ma=   60.960 | adjclose=   68.6463 adjhigh=   71.1167
+  2015-12-24 Stage2  csvclose=   67.600 ma=   61.430 | adjclose=   67.5983 adjhigh=   69.5384
+  2015-12-31 Stage2  csvclose=   67.640 ma=   61.870 | adjclose=   67.6357 adjhigh=   70.4928
+  2016-01-08 Stage2  csvclose=   61.090 ma=   61.860 | adjclose=   61.0855 adjhigh=   66.9120
+  2016-01-15 Stage2  csvclose=   60.570 ma=   61.820 | adjclose=   60.5739 adjhigh=   61.8715
+  2016-01-22 Stage2  csvclose=   63.990 ma=   62.000 | adjclose=   63.9863 adjhigh=   64.7349
+  2016-01-29 Stage3  csvclose=   62.360 ma=   62.070 | adjclose=   62.3643 adjhigh=   66.1135
+  2016-02-05 Stage3  csvclose=   57.700 ma=   61.840 | adjclose=   57.7043 adjhigh=   65.1841
+  2016-02-12 Stage4  csvclose=   53.630 ma=   61.350 | adjclose=   53.6307 adjhigh=   58.4591  <== breakdown
+  2016-02-19 Stage4  csvclose=   56.040 ma=   61.050 | adjclose=   56.0449 adjhigh=   57.9351
+  2016-02-26 Stage4  csvclose=   60.690 ma=   61.060 | adjclose=   60.6862 adjhigh=   62.5951
+  2016-03-04 Stage4  csvclose=   62.350 ma=   61.190 | adjclose=   62.3518 adjhigh=   63.1628
+Stage-3 run 2016-01-29..2016-02-05 (2 wk); top high 66.1135 (week 2016-01-29); stop = 66.7746
+breakdown week close adj 53.6307 raw 85.9700; broken support (10-wk low close) 57.7043; close BELOW support
+E1 entry 2016-02-16 adj close 55.5708 (raw 89.0800); SPY adj 159.9922; room to stop 20.16%
+   O1+20 at 2016-03-15: stock 60.9794 (+9.73%) SPY 170.4375 (+6.53%) excess(short-short) -3.20%
+   O1+60 at 2016-05-11: stock 72.5951 (+30.64%) SPY 174.9854 (+9.37%) excess(short-short) -21.26%
+   O1+120 at 2016-08-05: stock 76.9183 (+38.41%) SPY 185.8448 (+16.16%) excess(short-short) -22.26%
+   O2 exit 2016-03-30 (bar +30) STOPPED fill 66.7746 (bar adj O/H/L/C 65.5022/67.0555/64.3793/65.4772; raw C 104.9600); SPY 174.5787 (+9.12%)
+   O2 short ret -20.16%, excess vs SPY short -11.04%; lowest adj low in hold 54.3419 (-2.2% from entry)
+E2: pullback in week +2
+E2 entry 2016-02-26 adj close 60.6862 (raw 97.2800); SPY adj 164.4688; room to stop 10.03%
+   O1+20 at 2016-03-28: stock 63.9551 (+5.39%) SPY 172.2229 (+4.71%) excess(short-short) -0.67%
+   O1+60 at 2016-05-23: stock 74.4230 (+22.64%) SPY 173.8923 (+5.73%) excess(short-short) -16.91%
+   O1+120 at 2016-08-17: stock 67.7417 (+11.63%) SPY 186.0066 (+13.10%) excess(short-short) +1.47%
+   O2 exit 2016-03-30 (bar +22) STOPPED fill 66.7746 (bar adj O/H/L/C 65.5022/67.0555/64.3793/65.4772; raw C 104.9600); SPY 174.5787 (+6.15%)
+   O2 short ret -10.03%, excess vs SPY short -3.89%; lowest adj low in hold 57.1678 (-5.8% from entry)
+
+=== ETR breakdown week 2007-08-10
+committed: sym=ETR date=2007-08-10 raw_close=97.99000 top_width=1 advance=0.63623 hs=0 rs=0.01106 rs_class=pos_falling phase=s3 yield=0.02970 bigdiv=0 stop=24.81676 e1_date=2007-08-13 e1_px=23.17310 e1_o1_20=-0.03344 e1_o1_60=-0.18334 e1_o1_120=-0.16588 e1_o2_ret=-0.07093 e1_o2_exc=-0.02115 e1_o2_bars=25 e1_o2_stopped=1 e1_room=0.07093 e2_weeks=1 e2_date=2007-08-17 e2_px=23.13600 e2_o1_20=-0.02936 e2_o1_60=-0.17102 e2_o1_120=-0.12972 e2_o2_ret=-0.07265 e2_o2_exc=-0.01909 e2_o2_bars=21 e2_o2_stopped=1 e2_room=0.07265 sector=Utilities group_rel=-0.01635
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2007-05-18 Stage2  csvclose=   27.210 ma=   23.790 | adjclose=   27.2100 adjhigh=   27.7161
+  2007-05-25 Stage2  csvclose=   25.520 ma=   23.980 | adjclose=   25.5167 adjhigh=   27.2652
+  2007-06-01 Stage2  csvclose=   25.830 ma=   24.180 | adjclose=   25.8296 adjhigh=   26.1287
+  2007-06-08 Stage2  csvclose=   24.570 ma=   24.290 | adjclose=   24.5711 adjhigh=   25.7973
+  2007-06-15 Stage2  csvclose=   25.850 ma=   24.460 | adjclose=   25.8457 adjhigh=   25.9538
+  2007-06-22 Stage2  csvclose=   24.200 ma=   24.520 | adjclose=   24.1984 adjhigh=   25.9515
+  2007-06-29 Stage2  csvclose=   24.700 ma=   24.600 | adjclose=   24.6976 adjhigh=   24.9576
+  2007-07-06 Stage2  csvclose=   24.670 ma=   24.670 | adjclose=   24.6746 adjhigh=   25.4223
+  2007-07-13 Stage2  csvclose=   25.360 ma=   24.780 | adjclose=   25.3648 adjhigh=   25.4154
+  2007-07-20 Stage2  csvclose=   24.560 ma=   24.830 | adjclose=   24.5619 adjhigh=   25.6294
+  2007-07-27 Stage2  csvclose=   22.510 ma=   24.740 | adjclose=   22.5097 adjhigh=   25.1508
+  2007-08-03 Stage3  csvclose=   22.680 ma=   24.650 | adjclose=   22.6754 adjhigh=   24.5711
+  2007-08-10 Stage4  csvclose=   22.710 ma=   24.570 | adjclose=   22.7073 adjhigh=   24.4824  <== breakdown
+  2007-08-17 Stage4  csvclose=   23.140 ma=   24.500 | adjclose=   23.1360 adjhigh=   24.1324
+  2007-08-24 Stage4  csvclose=   24.360 ma=   24.510 | adjclose=   24.3572 adjhigh=   24.3989
+  2007-08-31 Stage4  csvclose=   24.010 ma=   24.490 | adjclose=   24.0120 adjhigh=   24.4939
+Stage-3 run 2007-08-03..2007-08-03 (1 wk); top high 24.5711 (week 2007-08-03); stop = 24.8168
+breakdown week close adj 22.7073 raw 97.9900; broken support (10-wk low close) 22.5097; close at/above support
+E1 entry 2007-08-13 adj close 23.1731 (raw 100.0000); SPY adj 102.4070; room to stop 7.09%
+   O1+20 at 2007-09-11: stock 24.3086 (+4.90%) SPY 104.0006 (+1.56%) excess(short-short) -3.34%
+   O1+60 at 2007-11-06: stock 28.6281 (+23.54%) SPY 107.7386 (+5.21%) excess(short-short) -18.33%
+   O1+120 at 2008-02-04: stock 26.0564 (+12.44%) SPY 98.1613 (-4.15%) excess(short-short) -16.59%
+   O2 exit 2007-09-18 (bar +25) STOPPED fill 24.8168 (bar adj O/H/L/C 24.4291/25.2517/24.4291/24.7929; raw C 106.9900); SPY 107.5051 (+4.98%)
+   O2 short ret -7.09%, excess vs SPY short -2.11%; lowest adj low in hold 21.3054 (-8.1% from entry)
+E2: pullback in week +1
+E2 entry 2007-08-17 adj close 23.1360 (raw 99.8400); SPY adj 102.0403; room to stop 7.26%
+   O1+20 at 2007-09-17: stock 24.3572 (+5.28%) SPY 104.4307 (+2.34%) excess(short-short) -2.94%
+   O1+60 at 2007-11-12: stock 27.0403 (+16.88%) SPY 101.8087 (-0.23%) excess(short-short) -17.10%
+   O1+120 at 2008-02-08: stock 24.4905 (+5.85%) SPY 94.7781 (-7.12%) excess(short-short) -12.97%
+   O2 exit 2007-09-18 (bar +21) STOPPED fill 24.8168 (bar adj O/H/L/C 24.4291/25.2517/24.4291/24.7929; raw C 106.9900); SPY 107.5051 (+5.36%)
+   O2 short ret -7.26%, excess vs SPY short -1.91%; lowest adj low in hold 22.7259 (-1.8% from entry)
+
+=== TRGP breakdown week 2025-04-17
+committed: sym=TRGP date=2025-04-17 raw_close=174.57000 top_width=1 advance=1.64859 hs=0 rs=0.15409 rs_class=pos_falling phase=s4_early yield=0.01719 bigdiv=0 stop=172.38834 e1_date=2025-04-21 e1_px=159.21500 e1_o1_20=0.15137 e1_o1_60=0.20828 e1_o1_120=0.34097 e1_o2_ret=-0.08274 e1_o2_exc=-0.04082 e1_o2_bars=2 e1_o2_stopped=1 e1_room=0.08274 e2_weeks=1 e2_date=2025-04-25 e2_px=171.87170 e2_o1_20=0.14321 e2_o1_60=0.22145 e2_o1_120=0.37337 e2_o2_ret=-0.00343 e2_o2_exc=-0.00305 e2_o2_bars=1 e2_o2_stopped=1 e2_room=0.00301 sector=Energy group_rel=-0.09933
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2025-01-24 Stage2  csvclose=  201.560 ma=  173.950 | adjclose=  201.5645 adjhigh=  210.6656
+  2025-01-31 Stage2  csvclose=  190.430 ma=  175.830 | adjclose=  190.4310 adjhigh=  200.0219
+  2025-02-07 Stage2  csvclose=  194.900 ma=  177.870 | adjclose=  194.9015 adjhigh=  199.2171
+  2025-02-14 Stage2  csvclose=  198.710 ma=  180.020 | adjclose=  198.7139 adjhigh=  201.7814
+  2025-02-21 Stage2  csvclose=  193.880 ma=  181.690 | adjclose=  193.8758 adjhigh=  205.0133
+  2025-02-28 Stage2  csvclose=  195.190 ma=  183.300 | adjclose=  195.1917 adjhigh=  198.5107
+  2025-03-07 Stage2  csvclose=  176.020 ma=  183.540 | adjclose=  176.0229 adjhigh=  198.9558
+  2025-03-14 Stage2  csvclose=  184.140 ma=  184.220 | adjclose=  184.1413 adjhigh=  185.1573
+  2025-03-21 Stage2  csvclose=  191.010 ma=  185.240 | adjclose=  191.0116 adjhigh=  193.5178
+  2025-03-28 Stage2  csvclose=  191.420 ma=  186.170 | adjclose=  191.4180 adjhigh=  201.3652
+  2025-04-04 Stage2  csvclose=  155.970 ma=  184.720 | adjclose=  155.9734 adjhigh=  199.4203
+  2025-04-11 Stage3  csvclose=  158.270 ma=  183.380 | adjclose=  158.2667 adjhigh=  170.6815
+  2025-04-17 Stage4  csvclose=  168.920 ma=  182.700 | adjclose=  168.9204 adjhigh=  172.8974  <== breakdown
+  2025-04-25 Stage4  csvclose=  171.870 ma=  182.160 | adjclose=  171.8717 adjhigh=  173.4102
+  2025-05-02 Stage4  csvclose=  157.520 ma=  180.640 | adjclose=  157.5158 adjhigh=  174.0295
+  2025-05-09 Stage4  csvclose=  155.270 ma=  178.990 | adjclose=  155.2679 adjhigh=  158.8975
+Stage-3 run 2025-04-11..2025-04-11 (1 wk); top high 170.6815 (week 2025-04-11); stop = 172.3883
+breakdown week close adj 168.9204 raw 174.5700; broken support (10-wk low close) 155.9734; close at/above support
+E1 entry 2025-04-21 adj close 159.2150 (raw 164.5400); SPY adj 506.7423; room to stop 8.27%
+   O1+20 at 2025-05-19: stock 160.2015 (+0.62%) SPY 586.5876 (+15.76%) excess(short-short) +15.14%
+   O1+60 at 2025-07-17: stock 162.0018 (+1.75%) SPY 621.1574 (+22.58%) excess(short-short) +20.83%
+   O1+120 at 2025-10-10: stock 149.2017 (-6.29%) SPY 647.6543 (+27.81%) excess(short-short) +34.10%
+   O2 exit 2025-04-23 (bar +2) STOPPED fill 172.3883 (bar adj O/H/L/C 169.8686/172.5103/165.0498/166.7722; raw C 172.3500); SPY 527.9831 (+4.19%)
+   O2 short ret -8.27%, excess vs SPY short -4.08%; lowest adj low in hold 161.9341 (+1.7% from entry)
+E2: pullback in week +1
+E2 entry 2025-04-25 adj close 171.8717 (raw 177.6200); SPY adj 542.9917; room to stop 0.30%
+   O1+20 at 2025-05-23: stock 156.1437 (-9.15%) SPY 571.0662 (+5.17%) excess(short-short) +14.32%
+   O1+60 at 2025-07-23: stock 160.4837 (-6.63%) SPY 627.2597 (+15.52%) excess(short-short) +22.15%
+   O1+120 at 2025-10-16: stock 143.2203 (-16.67%) SPY 655.2117 (+20.67%) excess(short-short) +37.34%
+   O2 exit 2025-04-28 (bar +1) STOPPED fill 172.4619 (bar adj O/H/L/C 172.4619/174.0295/170.5750/173.4489; raw C 179.2500); SPY 543.1988 (+0.04%)
+   O2 short ret -0.34%, excess vs SPY short -0.31%; lowest adj low in hold 170.5750 (-0.8% from entry)
+
+=== GEN breakdown week 2025-04-04
+committed: sym=GEN date=2025-04-04 raw_close=23.78000 top_width=12 advance=0.85662 hs=0 rs=0.00988 rs_class=pos_falling phase=s4_early yield=0.02103 bigdiv=0 stop=28.28238 e1_date=2025-04-07 e1_px=23.05330 e1_o1_20=0.02312 e1_o1_60=-0.04806 e1_o1_120=0.09899 e1_o2_ret=-0.22683 e1_o2_exc=-0.10795 e1_o2_bars=23 e1_o2_stopped=1 e1_room=0.22683 e2_weeks=5 e2_date=2025-05-09 e2_px=28.10930 e2_o1_20=0.04367 e2_o1_60=0.12789 e2_o1_120=0.30157 e2_o2_ret=-0.02698 e2_o2_exc=0.00607 e2_o2_bars=1 e2_o2_stopped=1 e2_room=0.00616 sector=Information Technology group_rel=-0.10677
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2025-01-10 Stage3  csvclose=   26.040 ma=   26.990 | adjclose=   26.0383 adjhigh=   27.0643
+  2025-01-17 Stage3  csvclose=   26.640 ma=   27.010 | adjclose=   26.6385 adjhigh=   26.8224
+  2025-01-24 Stage3  csvclose=   26.560 ma=   27.030 | adjclose=   26.5610 adjhigh=   26.8611
+  2025-01-31 Stage3  csvclose=   26.050 ma=   27.010 | adjclose=   26.0480 adjhigh=   27.4515
+  2025-02-07 Stage3  csvclose=   26.740 ma=   27.020 | adjclose=   26.7449 adjhigh=   27.0256
+  2025-02-14 Stage3  csvclose=   26.950 ma=   27.050 | adjclose=   26.9523 adjhigh=   27.4902
+  2025-02-21 Stage3  csvclose=   26.300 ma=   27.030 | adjclose=   26.3008 adjhigh=   27.1468
+  2025-02-28 Stage3  csvclose=   26.570 ma=   27.020 | adjclose=   26.5731 adjhigh=   27.0107
+  2025-03-07 Stage3  csvclose=   27.430 ma=   27.070 | adjclose=   27.4287 adjhigh=   27.4968
+  2025-03-14 Stage3  csvclose=   26.280 ma=   27.030 | adjclose=   26.2814 adjhigh=   28.0024
+  2025-03-21 Stage3  csvclose=   26.430 ma=   27.000 | adjclose=   26.4272 adjhigh=   27.3023
+  2025-03-28 Stage3  csvclose=   25.700 ma=   26.910 | adjclose=   25.6980 adjhigh=   27.2245
+  2025-04-04 Stage4  csvclose=   23.120 ma=   26.660 | adjclose=   23.1214 adjhigh=   26.4369  <== breakdown
+  2025-04-11 Stage4  csvclose=   23.730 ma=   26.460 | adjclose=   23.7340 adjhigh=   24.8813
+  2025-04-17 Stage4  csvclose=   23.770 ma=   26.260 | adjclose=   23.7728 adjhigh=   24.2687
+  2025-04-25 Stage4  csvclose=   24.560 ma=   26.120 | adjclose=   24.5604 adjhigh=   24.6187
+Stage-3 run 2025-01-10..2025-03-28 (12 wk); top high 28.0024 (week 2025-03-14); stop = 28.2824
+breakdown week close adj 23.1214 raw 23.7800; broken support (10-wk low close) 25.6980; close BELOW support
+E1 entry 2025-04-07 adj close 23.0533 (raw 23.7100); SPY adj 497.3742; room to stop 22.68%
+   O1+20 at 2025-05-06: stock 25.0077 (+8.48%) SPY 551.0383 (+10.79%) excess(short-short) +2.31%
+   O1+60 at 2025-07-03: stock 29.7748 (+29.16%) SPY 618.4869 (+24.35%) excess(short-short) -4.81%
+   O1+120 at 2025-09-29: stock 28.2267 (+22.44%) SPY 658.2267 (+32.34%) excess(short-short) +9.90%
+   O2 exit 2025-05-09 (bar +23) STOPPED fill 28.2824 (bar adj O/H/L/C 27.6620/28.3135/27.6231/28.1093; raw C 28.9100); SPY 556.5014 (+11.89%)
+   O2 short ret -22.68%, excess vs SPY short -10.79%; lowest adj low in hold 22.3339 (-3.1% from entry)
+E2: pullback in week +5
+E2 entry 2025-05-09 adj close 28.1093 (raw 28.9100); SPY adj 556.5014; room to stop 0.62%
+   O1+20 at 2025-06-09: stock 28.6420 (+1.90%) SPY 591.3505 (+6.26%) excess(short-short) +4.37%
+   O1+60 at 2025-08-06: stock 28.0170 (-0.33%) SPY 625.8454 (+12.46%) excess(short-short) +12.79%
+   O1+120 at 2025-10-30: stock 25.5796 (-9.00%) SPY 674.2440 (+21.16%) excess(short-short) +30.16%
+   O2 exit 2025-05-12 (bar +1) STOPPED fill 28.8678 (bar adj O/H/L/C 28.8678/28.9747/28.0121/28.2552; raw C 29.0600); SPY 574.8923 (+3.30%)
+   O2 short ret -2.70%, excess vs SPY short +0.61%; lowest adj low in hold 28.0121 (-0.3% from entry)
+
+=== KR breakdown week 2018-12-31
+committed: sym=KR date=2018-12-31 raw_close=27.50000 top_width=2 advance=0.51352 hs=0 rs=0.08112 rs_class=pos_falling phase=s4_early yield=0.01927 bigdiv=0 stop=21.18962 e1_date=2019-01-02 e1_px=19.33010 e1_o1_20=0.04121 e1_o1_60=0.22861 e1_o1_120=0.36429 e1_o2_ret=-0.09620 e1_o2_exc=0.01980 e1_o2_bars=38 e1_o2_stopped=1 e1_room=0.09620 e2_weeks=1 e2_date=2019-01-04 e2_px=19.58500 e2_o1_20=0.06091 e2_o1_60=0.27486 e2_o1_120=0.38430 e2_o2_ret=-0.08193 e2_o2_exc=0.02429 e2_o2_bars=36 e2_o2_stopped=1 e2_room=0.08193 sector=Consumer Staples group_rel=-0.01225
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2018-10-12 Stage2  csvclose=   18.980 ma=   20.100 | adjclose=   18.9760 adjhigh=   20.7453
+  2018-10-19 Stage2  csvclose=   19.430 ma=   20.120 | adjclose=   19.4271 adjhigh=   19.6104
+  2018-10-26 Stage2  csvclose=   19.440 ma=   20.130 | adjclose=   19.4412 adjhigh=   20.2377
+  2018-11-02 Stage2  csvclose=   21.270 ma=   20.250 | adjclose=   21.2669 adjhigh=   21.5136
+  2018-11-09 Stage2  csvclose=   22.130 ma=   20.420 | adjclose=   22.1269 adjhigh=   22.3806
+  2018-11-16 Stage2  csvclose=   21.410 ma=   20.530 | adjclose=   21.4118 adjhigh=   22.5428
+  2018-11-23 Stage2  csvclose=   21.020 ma=   20.600 | adjclose=   21.0223 adjhigh=   21.7729
+  2018-11-30 Stage2  csvclose=   21.000 ma=   20.670 | adjclose=   21.0011 adjhigh=   21.6879
+  2018-12-07 Stage2  csvclose=   20.650 ma=   20.700 | adjclose=   20.6541 adjhigh=   21.2206
+  2018-12-14 Stage2  csvclose=   20.920 ma=   20.750 | adjclose=   20.9232 adjhigh=   21.5251
+  2018-12-21 Stage3  csvclose=   19.400 ma=   20.690 | adjclose=   19.4009 adjhigh=   20.9798
+  2018-12-28 Stage3  csvclose=   19.530 ma=   20.630 | adjclose=   19.5283 adjhigh=   19.7620
+  2018-12-31 Stage4  csvclose=   19.470 ma=   20.560 | adjclose=   19.4717 adjhigh=   19.6700  <== breakdown
+  2019-01-04 Stage4  csvclose=   19.590 ma=   20.500 | adjclose=   19.5850 adjhigh=   19.9744
+  2019-01-11 Stage4  csvclose=   20.130 ma=   20.470 | adjclose=   20.1302 adjhigh=   20.3497
+  2019-01-18 Stage4  csvclose=   20.840 ma=   20.490 | adjclose=   20.8382 adjhigh=   20.9232
+Stage-3 run 2018-12-21..2018-12-28 (2 wk); top high 20.9798 (week 2018-12-21); stop = 21.1896
+breakdown week close adj 19.4717 raw 27.5000; broken support (10-wk low close) 19.4009; close at/above support
+E1 entry 2019-01-02 adj close 19.3301 (raw 27.3000); SPY adj 223.8010; room to stop 9.62%
+   O1+20 at 2019-01-31: stock 20.0594 (+3.77%) SPY 241.4686 (+7.89%) excess(short-short) +4.12%
+   O1+60 at 2019-03-29: stock 17.5029 (-9.45%) SPY 253.8084 (+13.41%) excess(short-short) +22.86%
+   O1+120 at 2019-06-25: stock 15.6325 (-19.13%) SPY 262.5183 (+17.30%) excess(short-short) +36.43%
+   O2 exit 2019-02-27 (bar +38) STOPPED fill 21.1896 (bar adj O/H/L/C 20.5979/21.2098/20.5410/21.2027; raw C 29.8000); SPY 249.7611 (+11.60%)
+   O2 short ret -9.62%, excess vs SPY short +1.98%; lowest adj low in hold 19.2097 (-0.6% from entry)
+E2: pullback in week +1
+E2 entry 2019-01-04 adj close 19.5850 (raw 27.6600); SPY adj 225.7780; room to stop 8.19%
+   O1+20 at 2019-02-04: stock 19.9107 (+1.66%) SPY 243.2845 (+7.75%) excess(short-short) +6.09%
+   O1+60 at 2019-04-02: stock 16.9053 (-13.68%) SPY 256.9442 (+13.80%) excess(short-short) +27.49%
+   O1+120 at 2019-06-27: stock 15.3034 (-21.86%) SPY 263.1865 (+16.57%) excess(short-short) +38.43%
+   O2 exit 2019-02-27 (bar +36) STOPPED fill 21.1896 (bar adj O/H/L/C 20.5979/21.2098/20.5410/21.2027; raw C 29.8000); SPY 249.7611 (+10.62%)
+   O2 short ret -8.19%, excess vs SPY short +2.43%; lowest adj low in hold 19.2947 (-1.5% from entry)
+
+=== SEIC breakdown week 2008-01-25
+committed: sym=SEIC date=2008-01-25 raw_close=26.69000 top_width=1 advance=0.43190 hs=0 rs=0.00238 rs_class=pos_falling phase=s4_early yield=0.00787 bigdiv=0 stop=22.65545 e1_date=2008-01-28 e1_px=21.92030 e1_o1_20=0.10016 e1_o1_60=0.15067 e1_o1_120=0.11460 e1_o2_ret=-0.03354 e1_o2_exc=-0.03598 e1_o2_bars=2 e1_o2_stopped=1 e1_room=0.03354 e2_weeks=1 e2_date=2008-02-01 e2_px=22.36830 e2_o1_20=0.07661 e2_o1_60=0.16333 e2_o1_120=0.10484 e2_o2_ret=0.19667 e2_o2_exc=0.10484 e2_o2_bars=120 e2_o2_stopped=0 e2_room=0.01284 sector=Financials group_rel=-0.01909
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2007-11-09 Stage2  csvclose=   23.620 ma=   22.020 | adjclose=   23.6214 adjhigh=   25.1977
+  2007-11-16 Stage2  csvclose=   24.330 ma=   22.150 | adjclose=   24.3273 adjhigh=   25.1664
+  2007-11-23 Stage2  csvclose=   22.410 ma=   22.160 | adjclose=   22.4137 adjhigh=   24.3116
+  2007-11-30 Stage2  csvclose=   24.330 ma=   22.290 | adjclose=   24.3273 adjhigh=   24.6332
+  2007-12-07 Stage2  csvclose=   25.200 ma=   22.480 | adjclose=   25.1978 adjhigh=   25.4880
+  2007-12-14 Stage2  csvclose=   25.170 ma=   22.660 | adjclose=   25.1664 adjhigh=   25.8174
+  2007-12-21 Stage2  csvclose=   25.570 ma=   22.870 | adjclose=   25.5664 adjhigh=   25.7076
+  2007-12-28 Stage2  csvclose=   24.890 ma=   23.020 | adjclose=   24.8919 adjhigh=   25.9742
+  2007-12-31 Stage2  csvclose=   25.230 ma=   23.200 | adjclose=   25.2291 adjhigh=   25.4487
+  2008-01-04 Stage2  csvclose=   22.970 ma=   23.220 | adjclose=   22.9656 adjhigh=   25.5357
+  2008-01-11 Stage2  csvclose=   22.140 ma=   23.190 | adjclose=   22.1403 adjhigh=   23.4843
+  2008-01-18 Stage3  csvclose=   20.690 ma=   23.070 | adjclose=   20.6942 adjhigh=   22.4311
+  2008-01-25 Stage4  csvclose=   20.980 ma=   22.970 | adjclose=   20.9771 adjhigh=   22.1875  <== breakdown
+  2008-02-01 Stage4  csvclose=   22.370 ma=   22.970 | adjclose=   22.3683 adjhigh=   23.1699
+  2008-02-08 Stage4  csvclose=   20.620 ma=   22.850 | adjclose=   20.6235 adjhigh=   22.4547
+  2008-02-15 Stage4  csvclose=   19.900 ma=   22.700 | adjclose=   19.9004 adjhigh=   20.7963
+Stage-3 run 2008-01-18..2008-01-18 (1 wk); top high 22.4311 (week 2008-01-18); stop = 22.6554
+breakdown week close adj 20.9771 raw 26.6900; broken support (10-wk low close) 20.6942; close at/above support
+E1 entry 2008-01-28 adj close 21.9203 (raw 27.8900); SPY adj 96.3237; room to stop 3.35%
+   O1+20 at 2008-02-26: stock 20.2305 (-7.71%) SPY 98.5459 (+2.31%) excess(short-short) +10.02%
+   O1+60 at 2008-04-23: stock 19.1301 (-12.73%) SPY 98.5756 (+2.34%) excess(short-short) +15.07%
+   O1+120 at 2008-07-18: stock 18.1111 (-17.38%) SPY 90.6237 (-5.92%) excess(short-short) +11.46%
+   O2 exit 2008-01-30 (bar +2) STOPPED fill 22.6554 (bar adj O/H/L/C 22.3997/23.1699/22.1246/22.3997; raw C 28.5000); SPY 96.0887 (-0.24%)
+   O2 short ret -3.35%, excess vs SPY short -3.60%; lowest adj low in hold 21.6295 (-1.3% from entry)
+E2: pullback in week +1
+E2 entry 2008-02-01 adj close 22.3683 (raw 28.4600); SPY adj 99.4148; room to stop 1.28%
+   O1+20 at 2008-03-03: stock 19.6803 (-12.02%) SPY 95.0844 (-4.36%) excess(short-short) +7.66%
+   O1+60 at 2008-04-29: stock 18.7450 (-16.20%) SPY 99.5491 (+0.14%) excess(short-short) +16.33%
+   O1+120 at 2008-07-24: stock 17.9692 (-19.67%) SPY 90.2856 (-9.18%) excess(short-short) +10.48%
+   O2 exit 2008-07-24 (bar +120) held to +120 fill 17.9692 (bar adj O/H/L/C 18.3082/18.7340/17.8746/17.9692; raw C 22.7900); SPY 90.2856 (-9.18%)
+   O2 short ret +19.67%, excess vs SPY short +10.48%; lowest adj low in hold 16.2503 (-27.4% from entry)
+
+=== EQIX breakdown week 2025-03-14
+committed: sym=EQIX date=2025-03-14 raw_close=837.68000 top_width=1 advance=0.41572 hs=0 rs=-0.00840 rs_class=neg_falling phase=s3 yield=0.02086 bigdiv=0 stop=910.62611 e1_date=2025-03-17 e1_px=833.69850 e1_o1_20=0.03904 e1_o1_60=0.01538 e1_o1_120=0.24760 e1_o2_ret=0.09673 e1_o2_exc=0.24760 e1_o2_bars=120 e1_o2_stopped=0 e1_room=0.09227 e2_weeks=7 e2_date=2025-05-02 e2_px=851.78750 e2_o1_20=0.02360 e2_o1_60=0.20786 e2_o1_120=0.23129 e2_o2_ret=0.03921 e2_o2_exc=0.23129 e2_o2_bars=120 e2_o2_stopped=0 e2_room=0.06908 sector=Real Estate group_rel=-0.08767
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2024-12-27 Stage2  csvclose=  912.020 ma=  863.140 | adjclose=  912.0198 adjhigh=  921.2787
+  2024-12-31 Stage2  csvclose=  912.240 ma=  868.750 | adjclose=  912.2423 adjhigh=  918.3182
+  2025-01-03 Stage2  csvclose=  928.770 ma=  875.000 | adjclose=  928.7671 adjhigh=  932.5210
+  2025-01-10 Stage2  csvclose=  870.580 ma=  877.090 | adjclose=  870.5819 adjhigh=  933.3724
+  2025-01-17 Stage2  csvclose=  885.830 ma=  879.860 | adjclose=  885.8296 adjhigh=  901.8223
+  2025-01-24 Stage2  csvclose=  910.270 ma=  883.870 | adjclose=  910.2686 adjhigh=  918.7342
+  2025-01-31 Stage2  csvclose=  883.960 ma=  885.770 | adjclose=  883.9624 adjhigh=  908.9238
+  2025-02-07 Stage2  csvclose=  902.930 ma=  888.660 | adjclose=  902.9350 adjhigh=  913.3356
+  2025-02-14 Stage2  csvclose=  903.250 ma=  891.240 | adjclose=  903.2542 adjhigh=  922.4203
+  2025-02-21 Stage2  csvclose=  889.790 ma=  892.610 | adjclose=  889.7867 adjhigh=  910.2202
+  2025-02-28 Stage2  csvclose=  879.770 ma=  893.070 | adjclose=  879.7671 adjhigh=  894.5593
+  2025-03-07 Stage3  csvclose=  835.910 ma=  890.510 | adjclose=  835.9061 adjhigh=  901.6100
+  2025-03-14 Stage4  csvclose=  814.670 ma=  886.480 | adjclose=  814.6662 adjhigh=  835.6241  <== breakdown
+  2025-03-21 Stage4  csvclose=  811.660 ma=  882.220 | adjclose=  811.6611 adjhigh=  839.9908
+  2025-03-28 Stage4  csvclose=  780.940 ma=  875.960 | adjclose=  780.9389 adjhigh=  834.7781
+  2025-04-04 Stage4  csvclose=  745.160 ma=  867.400 | adjclose=  745.1597 adjhigh=  810.8539
+Stage-3 run 2025-03-07..2025-03-07 (1 wk); top high 901.6100 (week 2025-03-07); stop = 910.6261
+breakdown week close adj 814.6662 raw 837.6800; broken support (10-wk low close) 835.9061; close BELOW support
+E1 entry 2025-03-17 adj close 833.6985 (raw 857.2500); SPY adj 557.5955; room to stop 9.23%
+   O1+20 at 2025-04-14: stock 762.3345 (-8.56%) SPY 531.6317 (-4.66%) excess(short-short) +3.90%
+   O1+60 at 2025-06-11: stock 873.8261 (+4.81%) SPY 593.0072 (+6.35%) excess(short-short) +1.54%
+   O1+120 at 2025-09-08: stock 753.0530 (-9.67%) SPY 641.7195 (+15.09%) excess(short-short) +24.76%
+   O2 exit 2025-09-08 (bar +120) held to +120 fill 753.0530 (bar adj O/H/L/C 755.4336/757.0961/747.0228/753.0530; raw C 765.5100); SPY 641.7195 (+15.09%)
+   O2 short ret +9.67%, excess vs SPY short +24.76%; lowest adj low in hold 682.1400 (-18.2% from entry)
+E2: pullback in week +7
+E2 entry 2025-05-02 adj close 851.7875 (raw 875.8500); SPY adj 558.8878; room to stop 6.91%
+   O1+20 at 2025-06-02: stock 870.6874 (+2.22%) SPY 584.4773 (+4.58%) excess(short-short) +2.36%
+   O1+60 at 2025-07-30: stock 779.3156 (-8.51%) SPY 627.5070 (+12.28%) excess(short-short) +20.79%
+   O1+120 at 2025-10-23: stock 818.3921 (-3.92%) SPY 666.2404 (+19.21%) excess(short-short) +23.13%
+   O2 exit 2025-10-23 (bar +120) held to +120 fill 818.3921 (bar adj O/H/L/C 816.4935/820.3202/805.2593/818.3921; raw C 831.9300); SPY 666.2404 (+19.21%)
+   O2 short ret +3.92%, excess vs SPY short +23.13%; lowest adj low in hold 694.7195 (-18.4% from entry)
+
+=== FHN breakdown week 2023-03-24
+committed: sym=FHN date=2023-03-24 raw_close=16.76000 top_width=3 advance=0.69107 hs=0 rs=-0.26416 rs_class=neg_falling phase=s3 yield=0.03580 bigdiv=0 stop=22.10206 e1_date=2023-03-27 e1_px=15.34000 e1_o1_20=0.00507 e1_o1_60=0.44810 e1_o1_120=0.45901 e1_o2_ret=0.33199 e1_o2_exc=0.45901 e1_o2_bars=120 e1_o2_stopped=0 e1_room=0.44081 e2_weeks=1 e2_date=2023-03-31 e2_px=15.80220 e2_o1_20=0.02957 e2_o1_60=0.43448 e2_o1_120=0.41746 e2_o2_ret=0.35846 e2_o2_exc=0.41746 e2_o2_bars=120 e2_o2_stopped=0 e2_room=0.39867 sector=Financials group_rel=-0.07935
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2022-12-30 Stage2  csvclose=   21.570 ma=   20.850 | adjclose=   21.5663 adjhigh=   21.5839
+  2023-01-06 Stage2  csvclose=   21.610 ma=   20.930 | adjclose=   21.6104 adjhigh=   21.6456
+  2023-01-13 Stage2  csvclose=   21.700 ma=   21.020 | adjclose=   21.6984 adjhigh=   21.8216
+  2023-01-20 Stage2  csvclose=   21.710 ma=   21.090 | adjclose=   21.7072 adjhigh=   21.7336
+  2023-01-27 Stage2  csvclose=   21.720 ma=   21.170 | adjclose=   21.7160 adjhigh=   21.7424
+  2023-02-03 Stage2  csvclose=   21.730 ma=   21.230 | adjclose=   21.7336 adjhigh=   21.8040
+  2023-02-10 Stage2  csvclose=   21.770 ma=   21.300 | adjclose=   21.7688 adjhigh=   21.7864
+  2023-02-17 Stage2  csvclose=   21.870 ma=   21.360 | adjclose=   21.8656 adjhigh=   21.9008
+  2023-02-24 Stage2  csvclose=   21.870 ma=   21.420 | adjclose=   21.8744 adjhigh=   21.9184
+  2023-03-03 Stage3  csvclose=   18.890 ma=   21.280 | adjclose=   18.8904 adjhigh=   21.8832
+  2023-03-10 Stage3  csvclose=   17.690 ma=   21.060 | adjclose=   17.6932 adjhigh=   19.0312
+  2023-03-17 Stage3  csvclose=   13.270 ma=   20.570 | adjclose=   13.2692 adjhigh=   16.7250
+  2023-03-24 Stage4  csvclose=   14.900 ma=   20.200 | adjclose=   14.8956 adjhigh=   14.9312  <== breakdown
+  2023-03-31 Stage4  csvclose=   15.800 ma=   19.890 | adjclose=   15.8022 adjhigh=   15.9622
+  2023-04-06 Stage4  csvclose=   15.740 ma=   19.590 | adjclose=   15.7400 adjhigh=   16.0154
+  2023-04-14 Stage4  csvclose=   16.310 ma=   19.330 | adjclose=   16.3088 adjhigh=   16.6732
+Stage-3 run 2023-03-03..2023-03-17 (3 wk); top high 21.8832 (week 2023-03-03); stop = 22.1021
+breakdown week close adj 14.8956 raw 16.7600; broken support (10-wk low close) 13.2692; close at/above support
+E1 entry 2023-03-27 adj close 15.3400 (raw 17.2600); SPY adj 380.5583; room to stop 44.08%
+   O1+20 at 2023-04-25: stock 15.6333 (+1.91%) SPY 389.7630 (+2.42%) excess(short-short) +0.51%
+   O1+60 at 2023-06-22: stock 10.0773 (-34.31%) SPY 420.5269 (+10.50%) excess(short-short) +44.81%
+   O1+120 at 2023-09-18: stock 10.2472 (-33.20%) SPY 428.8939 (+12.70%) excess(short-short) +45.90%
+   O2 exit 2023-09-18 (bar +120) held to +120 fill 10.2472 (bar adj O/H/L/C 10.4023/10.4114/10.2290/10.2472; raw C 11.2300); SPY 428.8939 (+12.70%)
+   O2 short ret +33.20%, excess vs SPY short +45.90%; lowest adj low in hold 7.9899 (-47.9% from entry)
+E2: pullback in week +1
+E2 entry 2023-03-31 adj close 15.8022 (raw 17.7800); SPY adj 392.9400; room to stop 39.87%
+   O1+20 at 2023-05-01: stock 15.5711 (-1.46%) SPY 398.8140 (+1.49%) excess(short-short) +2.96%
+   O1+60 at 2023-06-28: stock 10.0412 (-36.46%) SPY 420.4113 (+6.99%) excess(short-short) +43.45%
+   O1+120 at 2023-09-22: stock 10.1377 (-35.85%) SPY 416.1227 (+5.90%) excess(short-short) +41.75%
+   O2 exit 2023-09-22 (bar +120) held to +120 fill 10.1377 (bar adj O/H/L/C 10.2016/10.2381/10.0008/10.1377; raw C 11.1100); SPY 416.1227 (+5.90%)
+   O2 short ret +35.85%, excess vs SPY short +41.75%; lowest adj low in hold 7.9899 (-49.4% from entry)
+
+=== CSCO breakdown week 2000-09-22
+committed: sym=CSCO date=2000-09-22 raw_close=60.31250 top_width=5 advance=4.56309 hs=0 rs=0.01738 rs_class=pos_falling phase=s12 yield=0.00000 bigdiv=0 stop=45.09022 e1_date=2000-09-25 e1_px=36.66880 e1_o1_20=-0.00283 e1_o1_60=0.17403 e1_o1_120=0.45428 e1_o2_ret=0.63607 e1_o2_exc=0.45428 e1_o2_bars=120 e1_o2_stopped=0 e1_room=0.22966 e2_weeks=0 e2_date= e2_px= e2_o1_20= e2_o1_60= e2_o1_120= e2_o2_ret= e2_o2_exc= e2_o2_bars= e2_o2_stopped= e2_room= sector=Information Technology group_rel=-0.16776
+weeks around the breakdown (stage csv close/ma; daily-derived adj close, adj high):
+  2000-06-30 Stage3  csvclose=   40.760 ma=   41.100 | adjclose=   40.7565 adjhigh=   41.8385
+  2000-07-07 Stage2  csvclose=   41.920 ma=   41.240 | adjclose=   41.9187 adjhigh=   42.2794
+  2000-07-14 Stage2  csvclose=   43.760 ma=   41.470 | adjclose=   43.7621 adjhigh=   44.0827
+  2000-07-21 Stage2  csvclose=   43.680 ma=   41.670 | adjclose=   43.6820 adjhigh=   44.7240
+  2000-07-28 Stage2  csvclose=   40.280 ma=   41.630 | adjclose=   40.2756 adjhigh=   44.3232
+  2000-08-04 Stage2  csvclose=   42.040 ma=   41.690 | adjclose=   42.0389 adjhigh=   42.8805
+  2000-08-11 Stage2  csvclose=   41.240 ma=   41.690 | adjclose=   41.2374 adjhigh=   44.8842
+  2000-08-18 Stage3  csvclose=   40.720 ma=   41.630 | adjclose=   40.7164 adjhigh=   41.5580
+  2000-08-25 Stage3  csvclose=   42.000 ma=   41.650 | adjclose=   41.9988 adjhigh=   43.2812
+  2000-09-01 Stage3  csvclose=   43.960 ma=   41.780 | adjclose=   43.9625 adjhigh=   44.6438
+  2000-09-08 Stage3  csvclose=   40.960 ma=   41.700 | adjclose=   40.9569 adjhigh=   43.8022
+  2000-09-15 Stage3  csvclose=   40.240 ma=   41.580 | adjclose=   40.2355 adjhigh=   40.9568
+  2000-09-22 Stage4  csvclose=   38.670 ma=   41.350 | adjclose=   38.6726 adjhigh=   40.7966  <== breakdown
+  2000-09-29 Stage4  csvclose=   35.430 ma=   40.930 | adjclose=   35.4265 adjhigh=   39.3438
+  2000-10-06 Stage4  csvclose=   36.030 ma=   40.560 | adjclose=   36.0276 adjhigh=   38.0715
+  2000-10-13 Stage4  csvclose=   35.950 ma=   40.210 | adjclose=   35.9475 adjhigh=   36.0277
+Stage-3 run 2000-08-18..2000-09-15 (5 wk); top high 44.6438 (week 2000-09-01); stop = 45.0902
+breakdown week close adj 38.6726 raw 60.3125; broken support (10-wk low close) 40.2355; close BELOW support
+E1 entry 2000-09-25 adj close 36.6688 (raw 57.1875); SPY adj 91.0561; room to stop 22.97%
+   O1+20 at 2000-10-23: stock 35.8272 (-2.30%) SPY 88.7087 (-2.58%) excess(short-short) -0.28%
+   O1+60 at 2000-12-19: stock 26.7702 (-26.99%) SPY 82.3228 (-9.59%) excess(short-short) +17.40%
+   O1+120 at 2001-03-19: stock 13.3450 (-63.61%) SPY 74.5030 (-18.18%) excess(short-short) +45.43%
+   O2 exit 2001-03-19 (bar +120) held to +120 fill 13.3450 (bar adj O/H/L/C 13.1446/13.4252/12.6637/13.3450; raw C 20.8125); SPY 74.5030 (-18.18%)
+   O2 short ret +63.61%, excess vs SPY short +45.43%; lowest adj low in hold 11.7821 (-67.9% from entry)
+E2: no pullback within 8 weeks
+
