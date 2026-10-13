@@ -25,7 +25,8 @@ below apply without being restated; a brief that repeats them is wasted context.
   `gh api -X POST repos/dayfine/trading/pulls/<N>/reviews`, or the
   GitHub MCP `pull_request_review_write` tool where `gh` is unavailable. **Post first, then verify:**
   re-read the PR's reviews, confirm the count went up, and confirm
-  `sh dev/scripts/pr_gate_status.sh <N>` reads your verdict. A verdict that exists only in your return
+  `sh dev/scripts/pr_gate_status.sh <N>` reads your verdict (without `gh`, confirm through the MCP
+  `pull_request_read` `get_reviews` call instead). A verdict that exists only in your return
   text did not happen (`feedback_qc_review_format_must_parse`).
 
 ## Step 0 — checkout (plain git, read-only, own worktree)

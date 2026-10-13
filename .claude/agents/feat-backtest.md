@@ -47,12 +47,15 @@ below apply without being restated; a brief that repeats them is wasted context.
   code from a file (`…; echo $? > rc`), never through a pipe. Never background a build and end the turn
   waiting for an event: a subagent is never woken by one (`feedback_agents_background_wait_stall`). If a
   call is moved to the background anyway, keep reading its output file until it finishes.
-- **Build your own tree, in the container.** `docker exec trading-1-dev bash -c 'cd
-  /workspaces/trading-1/<your-tree>/trading && eval $(opam env) && dune build'`, where `<your-tree>` is
-  your worktree's path relative to the repo root (it lives under `.claude/worktrees/` so the container sees
-  it). Never `cd /workspaces/trading-1/trading`: that builds the parent, not your checkout. If the sandbox
-  refuses `docker exec … bash -c`, put those two steps in a wrapper script inside your worktree, run it,
-  and delete it before you finish (`feedback_agent_sandbox_docker_wrapper`).
+- **Build your own tree.** Locally (`$TRADING_IN_CONTAINER` unset) dune runs in the container:
+  `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/<your-tree>/trading && eval $(opam env) &&
+  dune build'`, where `<your-tree>` is your worktree's path relative to the repo root (it lives under
+  `.claude/worktrees/` so the container sees it). Never `cd /workspaces/trading-1/trading`: that builds the
+  parent, not your checkout. If the sandbox refuses `docker exec … bash -c`, drop the shell:
+  `docker exec -w /workspaces/trading-1/<your-tree>/trading trading-1-dev opam exec -- dune build`, or put
+  the steps in a wrapper script inside your worktree and delete it before you finish
+  (`feedback_agent_sandbox_docker_wrapper`). On GHA (`$TRADING_IN_CONTAINER=1`) you are already inside the
+  container: run `dev/lib/run-in-env.sh dune …` with your cwd inside your own worktree.
 - **Finish protocol, in the foreground, without ending the turn in between.** Full gates
   (`dune build @fmt && dune build && dune runtest`, exit code read from a file) → commit with the trailers
   your session's attribution rules require → push the branch → open the PR (`gh pr create`, or the GitHub
@@ -60,7 +63,8 @@ below apply without being restated; a brief that repeats them is wasted context.
   **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
   name, the commit id and "PR NOT opened" so the dispatcher can open it
   (`.claude/rules/worktree-isolation.md` §Finish Protocol).
-- Never edit `dev/status/_index.md` from a feature PR; update only your track's `dev/status/<track>.md`.
+- Never edit `dev/status/_index.md` from a feature PR; update only your track's `dev/status/<track>.md`. The one
+  exception is the row for a brand-new tracked work item (`.claude/rules/feat-agent-dispatch.md` §4).
 
 ## Pre-Work Setup
 

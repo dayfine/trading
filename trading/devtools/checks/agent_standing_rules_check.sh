@@ -38,6 +38,7 @@ for a in $QC_BUILD $FEAT; do
   need "$a" "timeout: 600000"
   need "$a" "Never background a build and end the turn"
   need "$a" 'Never `cd /workspaces/trading-1/trading`'
+  need "$a" 'On GHA (`$TRADING_IN_CONTAINER=1`) you are already inside the'
 done
 for a in $QC_BUILD; do
   need "$a" 'git fetch origin pull/<N>/head && git worktree add --detach'
@@ -51,6 +52,7 @@ need qc-results "No dune, no container."
 for a in $FEAT; do
   need "$a" "Never end with an unpushed commit."
   need "$a" 'Never edit `dev/status/_index.md`'
+  need "$a" "exception is the row for a brand-new tracked work item"
 done
 
 [ "$FAILED" = 0 ] || exit 1

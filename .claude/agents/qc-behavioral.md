@@ -30,12 +30,15 @@ below apply without being restated; a brief that repeats them is wasted context.
   checked-out SHA differs from the brief's tip, the PR moved: review the new tip and say so. Never `jj`,
   never `git checkout <branch>`, never `gh pr checkout` in the parent tree. Finish with
   `git worktree remove --force <path>`.
-- **Build your own tree, in the container.** `docker exec trading-1-dev bash -c 'cd
-  /workspaces/trading-1/<your-tree>/trading && eval $(opam env) && dune build'`, where `<your-tree>` is
-  your worktree's path relative to the repo root (it lives under `.claude/worktrees/` so the container sees
-  it). Never `cd /workspaces/trading-1/trading`: that builds the parent, not your checkout. If the sandbox
-  refuses `docker exec … bash -c`, put those two steps in a wrapper script inside your worktree, run it,
-  and delete it before you finish (`feedback_agent_sandbox_docker_wrapper`).
+- **Build your own tree.** Locally (`$TRADING_IN_CONTAINER` unset) dune runs in the container:
+  `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/<your-tree>/trading && eval $(opam env) &&
+  dune build'`, where `<your-tree>` is your worktree's path relative to the repo root (it lives under
+  `.claude/worktrees/` so the container sees it). Never `cd /workspaces/trading-1/trading`: that builds the
+  parent, not your checkout. If the sandbox refuses `docker exec … bash -c`, drop the shell:
+  `docker exec -w /workspaces/trading-1/<your-tree>/trading trading-1-dev opam exec -- dune build`, or put
+  the steps in a wrapper script inside your worktree and delete it before you finish
+  (`feedback_agent_sandbox_docker_wrapper`). On GHA (`$TRADING_IN_CONTAINER=1`) you are already inside the
+  container: run `dev/lib/run-in-env.sh dune …` with your cwd inside your own worktree.
 - **Review delivery (the gate reader parses this).** Line 1 is `Reviewed SHA: <full sha>`. The first
   heading names only your own gate (`## <Gate> QC — <title>`). `## Verdict` sits on its own line, followed
   by `APPROVED` or `NEEDS_REWORK`. Post it as a COMMENT review with `commit_id` set to the reviewed SHA
@@ -43,7 +46,8 @@ below apply without being restated; a brief that repeats them is wasted context.
   `gh api -X POST repos/dayfine/trading/pulls/<N>/reviews`, or the
   GitHub MCP `pull_request_review_write` tool where `gh` is unavailable. **Post first, then verify:**
   re-read the PR's reviews, confirm the count went up, and confirm
-  `sh dev/scripts/pr_gate_status.sh <N>` reads your verdict. A verdict that exists only in your return
+  `sh dev/scripts/pr_gate_status.sh <N>` reads your verdict (without `gh`, confirm through the MCP
+  `pull_request_read` `get_reviews` call instead). A verdict that exists only in your return
   text did not happen (`feedback_qc_review_format_must_parse`).
 
 ## VCS choice (plain git, both modes)

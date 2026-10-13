@@ -36,7 +36,9 @@ reality.
 
 **The task brief itself stays short (target ≤ 0.5 KB, #2738).** It names the
 PR number and tip SHA (or the issue and branch), the scope or delta, the prior
-review's location and the iteration number. Do not paste the no-waiting rule,
+review's location and the iteration number. The three context blocks above and a
+rework's full review body (§3) are pasted on top and do not count toward that
+target. Do not paste the no-waiting rule,
 the checkout or docker incantations, the review-delivery format or the finish
 protocol: each dispatched agent's definition carries them in its "Standing
 rules" block, pinned by `trading/devtools/checks/agent_standing_rules_check.sh`.
