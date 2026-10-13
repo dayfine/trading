@@ -1,6 +1,5 @@
 open Core
 
-(* Named defaults: see [weinstein_strategy_config_defaults.mli]. *)
 include Weinstein_strategy_config_defaults
 
 type index_config = { primary : string; global : (string * string) list }
@@ -122,14 +121,16 @@ type config = {
       [@sexp.default Entry_freshness.Ma_cross]
       (** See [.mli]. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]  (** See [.mli]. *)
-  continuation_stop_at_pullback_low : bool; [@sexp.default false]  (** .mli *)
+  continuation_stop_at_pullback_low : bool; [@sexp.default false]
+      (** See [.mli]. *)
   require_structural_stop : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_exit_fill_next_open : bool; [@sexp.default true]  (** See [.mli]. *)
   sim_entry_stoplimit_fresh_bar_only : bool; [@sexp.default false]  (** .mli *)
   sim_stop_exit_fill_on_trigger_bar : bool; [@sexp.default false]  (** .mli *)
   sim_stop_fill_beats_margin_cover : bool; [@sexp.default false]  (** .mli *)
-  freeze_entry_at_first_breakout : bool; [@sexp.default false]  (** .mli *)
+  freeze_entry_at_first_breakout : bool; [@sexp.default false]
+      (** See [.mli]. *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
   entry_order_max_rest_weeks : int; [@sexp.default 52]  (** See [.mli]. *)
   short_cancel_on_non_bearish : bool; [@sexp.default false]  (** .mli *)
@@ -291,8 +292,7 @@ let default_config ~universe ~index_symbol =
     trailing_stop_ma_period = None;
   }
 
-(* F5 arming predicate, the one source for both halves (placement waiver +
-   at-fill eject), so they cannot drift apart. See [.mli]. *)
+(* F5 arming predicate shared by placement waiver + at-fill eject. See .mli. *)
 let volume_confirm_at_fill_armed (c : config) : bool =
   c.volume_confirm_at_fill && c.sim_entry_trigger_at_suggested
   && c.enable_sim_entry_stoplimit
