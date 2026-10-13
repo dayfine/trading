@@ -1,0 +1,2 @@
+decision-time large dividend in hold=1: n=1093 beat=29.5% mean=-2.73%
+decision-time large dividend in hold=0: n=44506 beat=34.3% mean=-1.24%

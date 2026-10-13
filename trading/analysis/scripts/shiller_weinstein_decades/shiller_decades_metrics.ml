@@ -25,10 +25,6 @@ let ma_window_to_months = function
         (Float.to_int (Float.round_nearest (Float.of_int n /. weeks_per_month)))
   | Months n -> Int.max 1 n
 
-(** Stan Weinstein's canonical 30-week MA, expressed in monthly bars (≈ 7).
-    Operators override via [-ma-window]. *)
-let default_ma_window = Weeks 30
-
 (** Parse the CLI [-ma-window] argument. Accepts:
     - [N] (bare integer) → [Months N] (backward-compat with the original CLI)
     - [Nd] / [Nday] / [Ndays] → [Days N]

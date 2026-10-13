@@ -856,8 +856,8 @@ let test_buyin_collides_with_margin_call _ =
   let _portfolio, transitions =
     Trading_simulation.Margin_runner.tick ~margin_config:_buyin_armed_config
       ~long_margin_rate_annual_pct:0.0 ~maintenance_long_pct:0.0
-      ~portfolio:(_two_shorts_portfolio ()) ~positions ~today_bars
-      ~date:_date_2024_01_05 ~strategy_transitions:[]
+      ~stop_beats_margin_cover:false ~portfolio:(_two_shorts_portfolio ())
+      ~positions ~today_bars ~date:_date_2024_01_05 ~strategy_transitions:[]
   in
   (* Exactly two covers: COLLIDE covered ONCE as [margin_call] (the buy-in
      duplicate dropped); BUYONLY, HTB but not breached, covered as

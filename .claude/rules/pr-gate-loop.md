@@ -79,9 +79,10 @@ When a verdict is NEEDS_REWORK, the rework dispatch must carry:
 - "Address every checked-fail item. Do not introduce new scope."
 - Commit as a **second commit** (`fix(review): address QC rework iteration N (#PR)`),
   never an amend, so the reviewer can diff what changed.
-- `timeout: 600000` on every dune Bash call, split into scoped foreground calls
-  (`feedback_agents_background_wait_stall` — the 120s default auto-backgrounds
-  the call and the agent then waits forever for an event a subagent never gets).
+- Nothing else. The no-waiting rule (`timeout: 600000`, scoped foreground dune
+  calls), the checkout, the docker cwd, the review format and the finish protocol
+  live in the agent definitions' "Standing rules" block (#2738,
+  `agent_standing_rules_check.sh`); repeating them in the brief is wasted context.
 
 ## Dispatcher-side recovery (do not re-dispatch reflexively)
 

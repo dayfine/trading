@@ -245,6 +245,23 @@
  (action
   (run sh %{dep:agent_compliance_test.sh})))
 
+; #2738: every dispatched agent definition carries its "Standing rules" block
+; (no waiting, checkout, docker cwd, review delivery, finish protocol), so
+; dispatch briefs need not repeat it. The _test drives the check on a temp copy
+; with one rule deleted and expects a named FAIL.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:agent_standing_rules_check.sh})))
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh agent_standing_rules_check.sh (universe))
+ (action
+  (run sh %{dep:agent_standing_rules_check_test.sh})))
+
 ; jj workspace boilerplate smoke test: execs the canonical Pre-Work Setup
 ; boilerplate (jj workspace add + verify + cleanup) against a tmp-dir target.
 ; Skips cleanly if jj is not on PATH (GHA runners don't have jj installed).

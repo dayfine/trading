@@ -97,6 +97,44 @@ let dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans =
         | Position.TriggerExit _ -> not (Set.mem margin_exit_ids t.position_id)
         | _ -> true)
 
+(* [stop_beats_margin_cover]: the position's strategy [StopLoss] exit whose
+   stop level the position's own bar traded through today. The stop is a
+   resting order that fills intraday on that bar (book §5.7); the maintenance
+   check runs on the close, so the stop executes first and the margin
+   transition is dropped instead of the strategy's. Side comes from the
+   position (long stop = Sell, short stop = Buy), matching the fill conversion
+   guard in {!Trigger_bar_stop_fill}. *)
+let _stop_traded_today ~stop_price_of ~bar_of ~positions
+    (t : Position.transition) =
+  let open Option.Let_syntax in
+  let result =
+    let%bind stop_price = Map.find stop_price_of t.position_id in
+    let%bind pos = Map.find positions t.position_id in
+    let%map bar = Map.find bar_of pos.Position.symbol in
+    let side =
+      match pos.Position.side with
+      | Trading_base.Types.Long -> Trading_base.Types.Sell
+      | Trading_base.Types.Short -> Trading_base.Types.Buy
+    in
+    Trigger_bar_stop_fill.bar_reaches_stop ~side ~stop_price bar
+  in
+  Option.value result ~default:false
+
+let drop_margin_exits_for_traded_stops ~strategy_transitions ~margin_trans
+    ~positions ~today_bars =
+  let stop_price_of =
+    Trigger_bar_stop_fill.stop_price_by_position strategy_transitions
+  in
+  if Map.is_empty stop_price_of then margin_trans
+  else
+    let bar_of =
+      List.fold today_bars ~init:String.Map.empty
+        ~f:(fun acc (b : Trading_engine.Types.price_bar) ->
+          Map.set acc ~key:b.symbol ~data:b)
+    in
+    List.filter margin_trans
+      ~f:(Fn.non (_stop_traded_today ~stop_price_of ~bar_of ~positions))
+
 (* A short can be flagged for cover on the same Friday by BOTH the maintenance
    check ([margin_call]) and the buy-in stress mode ([buyin_stress]). The
    [Position.t] state machine accepts [Holding -> TriggerExit] only once per
@@ -114,7 +152,8 @@ let _drop_buyins_colliding_with_covers ~short_cover_trans ~buyin_trans =
         not (Set.mem cover_ids t.position_id))
 
 let tick ~margin_config ~long_margin_rate_annual_pct ~maintenance_long_pct
-    ~portfolio ~positions ~today_bars ~date ~strategy_transitions =
+    ~stop_beats_margin_cover ~portfolio ~positions ~today_bars ~date
+    ~strategy_transitions =
   let prices = mark_prices today_bars in
   let portfolio = accrue_borrow_fee ~margin_config ~portfolio ~prices in
   let portfolio =
@@ -133,6 +172,12 @@ let tick ~margin_config ~long_margin_rate_annual_pct ~maintenance_long_pct
     _drop_buyins_colliding_with_covers ~short_cover_trans ~buyin_trans
   in
   let margin_trans = short_cover_trans @ long_reduce_trans @ buyin_trans in
+  let margin_trans =
+    if stop_beats_margin_cover then
+      drop_margin_exits_for_traded_stops ~strategy_transitions ~margin_trans
+        ~positions ~today_bars
+    else margin_trans
+  in
   let strategy_transitions =
     dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans
   in

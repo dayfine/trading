@@ -122,6 +122,25 @@ _json_actual() {
   grep -o "\"$2\":[^,}]*" "$1" 2>/dev/null | head -1 || true
 }
 
+# _flag <command...> -- prints 1 if the command succeeds, else 0 (e.g.
+# `_flag test -f "$f"`). Evaluates a non-grep conjunct as a 0/1 flag.
+_flag() { if "$@"; then echo 1; else echo 0; fi; }
+
+# _eq <a> <b> -- prints 1 if the strings are equal, else 0.
+_eq() { if [[ "$1" == "$2" ]]; then echo 1; else echo 0; fi; }
+
+# _pairs_ok <label1> <ok1> [<label2> <ok2> ...] -- returns 0 iff every flag is
+# 1. Takes the SAME label/flag array that report_conjuncts reports from, so a
+# scenario defines each conjunct exactly once (`C=(...)`) and both its
+# pass/fail decision (`if _pairs_ok "${C[@]}"`) and its failure diagnostics
+# (`report_conjuncts "${C[@]}"`) are built from it -- the two cannot drift.
+_pairs_ok() {
+  while (( "$#" >= 2 )); do
+    [[ "$2" == "1" ]] || return 1
+    shift 2
+  done
+}
+
 # _glob_count <dir> <name-pattern> [extra-find-predicate]
 #
 # Counts entries under <dir> (maxdepth 1) matching glob <name-pattern>,
@@ -580,14 +599,20 @@ out2=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_
         "${FEATURE7}" "feat/picks-phase-c-v2" "2026-07-27" 2>&1) && rc2=0 || rc2=$?
 JSON7B="${TMP_REPO}/dev/audit/2026-07-27-feat-picks-phase-c-v2-${FEATURE7}.json"
 
-if (( rc == 0 )) && (( rc2 == 0 )) \
-   && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
-   && [[ "${JSON7A}" != "${JSON7B}" ]] \
-   && grep -q '"quality_score": *4' "${JSON7A}" \
-   && grep -q '"quality_score": *5' "${JSON7B}"; then
+C7A=(
+  "rc==0 (actual=${rc})" "$(_eq "${rc}" 0)"
+  "rc2==0 (actual=${rc2})" "$(_eq "${rc2}" 0)"
+  "JSON7A exists" "$(_flag test -f "${JSON7A}")"
+  "JSON7B exists" "$(_flag test -f "${JSON7B}")"
+  "JSON7A != JSON7B (distinct paths)" "$([[ "${JSON7A}" != "${JSON7B}" ]] && echo 1 || echo 0)"
+  "JSON7A quality_score == 4 (actual: $(_json_actual "${JSON7A}" quality_score))" "$(_grep_ok '"quality_score": *4' "${JSON7A}")"
+  "JSON7B quality_score == 5 (actual: $(_json_actual "${JSON7B}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON7B}")"
+)
+if _pairs_ok "${C7A[@]}"; then
   pass "scenario 7a — two branches, same feature+date → two distinct audit files (H-AUDIT-COLLISION fix)"
 else
   fail "scenario 7a — expected two distinct files (q=4 and q=5); got rc=${rc}, rc2=${rc2}"
+  report_conjuncts "${C7A[@]}"
   echo "${out}" | sed 's/^/      /'
   echo "${out2}" | sed 's/^/      /'
   [[ -f "${JSON7A}" ]] && echo "      json A: $(cat "${JSON7A}")"
@@ -614,13 +639,19 @@ out3=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_
 
 audit_count="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-27-*-${FEATURE7}.json")"
 
-if (( rc3 == 0 )) && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
-   && [[ "${audit_count}" == "2" ]] \
-   && grep -q '"quality_score": *2' "${JSON7A}" \
-   && grep -q '"quality_score": *5' "${JSON7B}"; then
+C7B=(
+  "rc3==0 (actual=${rc3})" "$(_eq "${rc3}" 0)"
+  "JSON7A exists" "$(_flag test -f "${JSON7A}")"
+  "JSON7B exists" "$(_flag test -f "${JSON7B}")"
+  "exactly 2 audit files (actual: ${audit_count})" "$(_eq "${audit_count}" 2)"
+  "JSON7A quality_score == 2 (actual: $(_json_actual "${JSON7A}" quality_score))" "$(_grep_ok '"quality_score": *2' "${JSON7A}")"
+  "JSON7B quality_score == 5 (actual: $(_json_actual "${JSON7B}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON7B}")"
+)
+if _pairs_ok "${C7B[@]}"; then
   pass "scenario 7b — re-invoking same branch AND same reviewed sha overwrites its own record (idempotent, no duplicate)"
 else
   fail "scenario 7b — expected exactly 2 audit files for ${FEATURE7} on 2026-07-27, JSON7A rewritten to q=2, JSON7B untouched at q=5; got rc=${rc3}, audit_count=${audit_count}"
+  report_conjuncts "${C7B[@]}"
   echo "${out3}" | sed 's/^/      /'
   [[ -f "${JSON7A}" ]] && echo "      json A: $(cat "${JSON7A}")"
   [[ -f "${JSON7B}" ]] && echo "      json B: $(cat "${JSON7B}")"
@@ -1578,16 +1609,20 @@ RC_TALLY_20G="${FIX_RC_20G}"; ERR_TALLY_20G="${FIX_ERR_20G}"
 RC_SWAP_20G=0
 bash "${FIX_20G}/final_block.sh" >/dev/null 2>&1 || RC_SWAP_20G=$?
 rm -rf "${FIX_20G}"
-if [[ "${RC_SWAP_20G}" == "1" ]] \
-   && [[ "${RC_ABORT_20G}" == "7" ]] \
-   && [[ "${ERR_ABORT_20G}" == *"ABORT: record_qc_audit_test died rc=7 during scenario [# Scenario 77"* ]] \
-   && [[ "${RC_POST_20G}" == "5" ]] \
-   && [[ "${ERR_POST_20G}" != *"ABORT"* ]] \
-   && [[ "${RC_TALLY_20G}" == "7" ]] \
-   && [[ "${ERR_TALLY_20G}" == *"ABORT: record_qc_audit_test died rc=7"* ]]; then
+C20G=(
+  "final-block swap rc == 1 (actual: ${RC_SWAP_20G})" "$(_eq "${RC_SWAP_20G}" 1)"
+  "abort rc == 7 (actual: ${RC_ABORT_20G})" "$(_eq "${RC_ABORT_20G}" 7)"
+  "abort stderr names 'during scenario [# Scenario 77' (actual: '${ERR_ABORT_20G}')" "$([[ "${ERR_ABORT_20G}" == *"ABORT: record_qc_audit_test died rc=7 during scenario [# Scenario 77"* ]] && echo 1 || echo 0)"
+  "post-summary rc == 5 (actual: ${RC_POST_20G})" "$(_eq "${RC_POST_20G}" 5)"
+  "post-summary stderr has no ABORT (actual: '${ERR_POST_20G}')" "$([[ "${ERR_POST_20G}" != *"ABORT"* ]] && echo 1 || echo 0)"
+  "tallied-FAIL abort rc == 7 (actual: ${RC_TALLY_20G})" "$(_eq "${RC_TALLY_20G}" 7)"
+  "tallied-FAIL stderr has ABORT (actual: '${ERR_TALLY_20G}')" "$([[ "${ERR_TALLY_20G}" == *"ABORT: record_qc_audit_test died rc=7"* ]] && echo 1 || echo 0)"
+)
+if _pairs_ok "${C20G[@]}"; then
   pass "scenario 20g — EXIT trap names the aborting scenario via _scenario_header_at, preserves the original exit code, and stays silent after the summary starts, still aborts loudly after a tallied FAIL, and the final-block trap swap keeps rc 1 against an exit-0 _on_exit"
 else
   fail "scenario 20g — abort rc=${RC_ABORT_20G} (want 7) err='${ERR_ABORT_20G}'; post-summary rc=${RC_POST_20G} (want 5) err='${ERR_POST_20G}'; tallied-FAIL abort rc=${RC_TALLY_20G} (want 7) err='${ERR_TALLY_20G}'; final-block swap rc=${RC_SWAP_20G} (want 1)"
+  report_conjuncts "${C20G[@]}"
 fi
 # ---------------------------------------------------------------------------
 # Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
@@ -3170,26 +3205,22 @@ out40_3=$(_scenario40_call "s40c" 3011) && rc40_3=0 || rc40_3=$?
 JSON40="${TMP_REPO}/dev/audit/${DATE40}-feat-composition-no-sha-${FEATURE40}.json"
 audit_count_40="$(_glob_count "${TMP_REPO}/dev/audit" "${DATE40}-*-${FEATURE40}.json")"
 
-if (( rc40_1 == 0 )) && (( rc40_2 == 0 )) && (( rc40_3 == 0 )) \
-   && [[ -f "${JSON40}" ]] \
-   && [[ "${audit_count_40}" == "1" ]] \
-   && grep -q '"sha": *""' "${JSON40}" \
-   && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON40}" \
-   && grep -q '"consecutive_rework_count": *1,' "${JSON40}" \
-   && grep -q 'consecutive_rework_count=1' <<<"${out40_3}"; then
+C40=(
+  "rc40_1==0 (actual=${rc40_1})" "$(( rc40_1 == 0 ? 1 : 0 ))"
+  "rc40_2==0 (actual=${rc40_2})" "$(( rc40_2 == 0 ? 1 : 0 ))"
+  "rc40_3==0 (actual=${rc40_3})" "$(( rc40_3 == 0 ? 1 : 0 ))"
+  "JSON40 exists" "$([[ -f "${JSON40}" ]] && echo 1 || echo 0)"
+  "exactly 1 audit file (actual: ${audit_count_40})" "$([[ "${audit_count_40}" == "1" ]] && echo 1 || echo 0)"
+  "sha == \"\" (actual: $(_json_actual "${JSON40}" sha))" "$(_grep_ok '"sha": *""' "${JSON40}")"
+  "overall_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON40}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON40}")"
+  "consecutive_rework_count == 1 (actual: $(_json_actual "${JSON40}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *1,' "${JSON40}")"
+  "stdout of 3rd call has consecutive_rework_count=1" "$(_grep_ok 'consecutive_rework_count=1' <<<"${out40_3}")"
+)
+if _pairs_ok "${C40[@]}"; then
   pass "scenario 40 — 3 consecutive PR-mode NEEDS_REWORK calls with no Reviewed SHA line: sha stays empty AND consecutive_rework_count stays 1 (not 3) end to end, no preserved-aside file (H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED, empty-sha degrade-to-overwrite path)"
 else
   fail "scenario 40 — expected rc=0/0/0 + exactly 1 audit file + sha \"\" + overall NEEDS_REWORK + consecutive_rework_count=1; got rc=${rc40_1}/${rc40_2}/${rc40_3}, audit_count=${audit_count_40}"
-  report_conjuncts \
-    "rc40_1==0 (actual=${rc40_1})" "$(( rc40_1 == 0 ? 1 : 0 ))" \
-    "rc40_2==0 (actual=${rc40_2})" "$(( rc40_2 == 0 ? 1 : 0 ))" \
-    "rc40_3==0 (actual=${rc40_3})" "$(( rc40_3 == 0 ? 1 : 0 ))" \
-    "JSON40 exists" "$([[ -f "${JSON40}" ]] && echo 1 || echo 0)" \
-    "exactly 1 audit file (actual: ${audit_count_40})" "$([[ "${audit_count_40}" == "1" ]] && echo 1 || echo 0)" \
-    "sha == \"\" (actual: $(_json_actual "${JSON40}" sha))" "$(_grep_ok '"sha": *""' "${JSON40}")" \
-    "overall_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON40}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON40}")" \
-    "consecutive_rework_count == 1 (actual: $(_json_actual "${JSON40}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *1,' "${JSON40}")" \
-    "stdout of 3rd call has consecutive_rework_count=1" "$(_grep_ok 'consecutive_rework_count=1' <<<"${out40_3}")"
+  report_conjuncts "${C40[@]}"
   echo "${out40_1}" | sed 's/^/      /'
   echo "${out40_2}" | sed 's/^/      /'
   echo "${out40_3}" | sed 's/^/      /'
@@ -3243,14 +3274,20 @@ out41_2=$(_scenario41_call "s41b" 3013 "${DATE41B}") && rc41_2=0 || rc41_2=$?
 JSON41A="${TMP_REPO}/dev/audit/${DATE41A}-feat-composition-cross-date-${FEATURE41}.json"
 JSON41B="${TMP_REPO}/dev/audit/${DATE41B}-feat-composition-cross-date-${FEATURE41}.json"
 
-if (( rc41_1 == 0 )) && (( rc41_2 == 0 )) \
-   && [[ -f "${JSON41A}" ]] && [[ -f "${JSON41B}" ]] \
-   && grep -q '"consecutive_rework_count": *1,' "${JSON41A}" \
-   && grep -q '"consecutive_rework_count": *2,' "${JSON41B}" \
-   && grep -q 'consecutive_rework_count=2' <<<"${out41_2}"; then
+C41=(
+  "rc41_1==0 (actual=${rc41_1})" "$(_eq "${rc41_1}" 0)"
+  "rc41_2==0 (actual=${rc41_2})" "$(_eq "${rc41_2}" 0)"
+  "JSON41A exists" "$(_flag test -f "${JSON41A}")"
+  "JSON41B exists" "$(_flag test -f "${JSON41B}")"
+  "day A consecutive_rework_count == 1 (actual: $(_json_actual "${JSON41A}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *1,' "${JSON41A}")"
+  "day B consecutive_rework_count == 2 (actual: $(_json_actual "${JSON41B}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *2,' "${JSON41B}")"
+  "stdout of 2nd call has consecutive_rework_count=2" "$(_grep_ok 'consecutive_rework_count=2' <<<"${out41_2}")"
+)
+if _pairs_ok "${C41[@]}"; then
   pass "scenario 41 — 2 consecutive PR-mode NEEDS_REWORK calls on successive dates, same branch, no Reviewed SHA line: consecutive_rework_count ACCUMULATES 1 -> 2 across dates (H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED, cross-date half)"
 else
   fail "scenario 41 — expected rc=0/0 + day A consecutive_rework_count=1 + day B consecutive_rework_count=2; got rc=${rc41_1}/${rc41_2}"
+  report_conjuncts "${C41[@]}"
   echo "${out41_1}" | sed 's/^/      /'
   echo "${out41_2}" | sed 's/^/      /'
   [[ -f "${JSON41A}" ]] && echo "      json A: $(cat "${JSON41A}")"
@@ -3392,6 +3429,41 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 43b — _pairs_ok / _eq / _flag contract pin, DIRECT invocation
+# (QC rework #3289: 8 converted scenarios decide pass/fail through these
+# helpers, so a helper broken in the permissive direction passes them all
+# vacuously). Modelled on scenario 43. Calls the helpers with known data.
+#
+# Helper mutants this kills:
+#   - `_pairs_ok` no-op (`return 0` first): the middle-0, last-0 and
+#     empty-flag cases return 0.
+#   - `_pairs_ok` inverted polarity (`== "0"`): the all-1 case returns
+#     non-zero (and the 0-flag cases return 0).
+#   - `_pairs_ok` `shift 1`: flags and labels mis-pair; the all-1 case
+#     reads a label as a flag and returns non-zero.
+#   - `_pairs_ok` early exit / off-by-one loop (skips the last pair): the
+#     last-flag-0 case returns 0.
+#   - `_eq` always 1: `_eq a b` prints 1.
+#   - `_flag` always 1: `_flag false` prints 1.
+# ---------------------------------------------------------------------------
+c43b_rc_all=0; _pairs_ok "A" 1 "B" 1 "C" 1 || c43b_rc_all=$?
+c43b_rc_mid=0; _pairs_ok "A" 1 "B" 0 "C" 1 || c43b_rc_mid=$?
+c43b_rc_last=0; _pairs_ok "A" 1 "B" 1 "C" 0 || c43b_rc_last=$?
+c43b_rc_empty=0; _pairs_ok "A" 1 "B" "" "C" 1 || c43b_rc_empty=$?
+c43b_eq_same="$(_eq a a)"
+c43b_eq_diff="$(_eq a b)"
+c43b_flag_t="$(_flag true)"
+c43b_flag_f="$(_flag false)"
+
+if [[ "${c43b_rc_all}" == "0" && "${c43b_rc_mid}" != "0" && "${c43b_rc_last}" != "0" \
+      && "${c43b_rc_empty}" != "0" && "${c43b_eq_same}" == "1" && "${c43b_eq_diff}" == "0" \
+      && "${c43b_flag_t}" == "1" && "${c43b_flag_f}" == "0" ]]; then
+  pass "scenario 43b — _pairs_ok/_eq/_flag helper contracts pinned (all-1 ok; middle-0, last-0, empty fail; _eq and _flag print 1/0 correctly)"
+else
+  fail "scenario 43b — helper contract broken: _pairs_ok rc all-1=${c43b_rc_all} (want 0) middle-0=${c43b_rc_mid} last-0=${c43b_rc_last} empty=${c43b_rc_empty} (want non-zero); _eq a a='${c43b_eq_same}' (want 1) _eq a b='${c43b_eq_diff}' (want 0); _flag true='${c43b_flag_t}' (want 1) _flag false='${c43b_flag_f}' (want 0)"
+fi
+
+# ---------------------------------------------------------------------------
 # Scenario 44 — H-AUDIT-REWORK-VERDICT-STALE (#2509) regression, live
 # reproduction: file mode against a fixture reproducing the STRUCTURE of the
 # real PR #2504 review file (dev/reviews/audit-scenario22-diagnosability-2440.md
@@ -3503,23 +3575,20 @@ EOF
 out44=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE44}" "harness/audit-scenario22-diagnosability-2440" "2026-08-24" 2>&1) && rc44=0 || rc44=$?
 JSON44="${TMP_REPO}/dev/audit/2026-08-24-harness-audit-scenario22-diagnosability-2440-${FEATURE44}.json"
-if (( rc44 == 0 )) && [[ -f "${JSON44}" ]] \
-   && grep -q '"sha": *"6b979c77"' "${JSON44}" \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON44}" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON44}" \
-   && grep -q '"overall_qc": *"APPROVED"' "${JSON44}" \
-   && grep -q '"consecutive_rework_count": *0,' "${JSON44}"; then
+C44=(
+  "rc44==0 (actual=${rc44})" "$(( rc44 == 0 ? 1 : 0 ))"
+  "JSON44 exists" "$([[ -f "${JSON44}" ]] && echo 1 || echo 0)"
+  "sha == \"6b979c77\" (actual: $(_json_actual "${JSON44}" sha))" "$(_grep_ok '"sha": *"6b979c77"' "${JSON44}")"
+  "structural_qc == APPROVED (actual: $(_json_actual "${JSON44}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON44}")"
+  "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON44}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON44}")"
+  "overall_qc == APPROVED (actual: $(_json_actual "${JSON44}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON44}")"
+  "consecutive_rework_count == 0 (actual: $(_json_actual "${JSON44}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *0,' "${JSON44}")"
+)
+if _pairs_ok "${C44[@]}"; then
   pass "scenario 44 — PR #2504's real two-pass review file extracts APPROVED/APPROVED/APPROVED (sha 6b979c77, consecutive_rework_count=0), not the pre-fix NEEDS_REWORK/APPROVED/NEEDS_REWORK inversion (H-AUDIT-REWORK-VERDICT-STALE, #2509)"
 else
   fail "scenario 44 — expected rc=0 + structural/behavioral/overall all APPROVED + sha 6b979c77 + consecutive_rework_count=0; got rc=${rc44}, output:"
-  report_conjuncts \
-    "rc44==0 (actual=${rc44})" "$(( rc44 == 0 ? 1 : 0 ))" \
-    "JSON44 exists" "$([[ -f "${JSON44}" ]] && echo 1 || echo 0)" \
-    "sha == \"6b979c77\" (actual: $(_json_actual "${JSON44}" sha))" "$(_grep_ok '"sha": *"6b979c77"' "${JSON44}")" \
-    "structural_qc == APPROVED (actual: $(_json_actual "${JSON44}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON44}")" \
-    "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON44}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON44}")" \
-    "overall_qc == APPROVED (actual: $(_json_actual "${JSON44}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON44}")" \
-    "consecutive_rework_count == 0 (actual: $(_json_actual "${JSON44}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *0,' "${JSON44}")"
+  report_conjuncts "${C44[@]}"
   echo "${out44}" | sed 's/^/      /'
   [[ -f "${JSON44}" ]] && echo "      json: $(cat "${JSON44}")"
 fi
@@ -3570,23 +3639,20 @@ EOF
 out45=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE45}" "feat/dummy45" "2026-08-24" 2>&1) && rc45=0 || rc45=$?
 JSON45="${TMP_REPO}/dev/audit/2026-08-24-feat-dummy45-${FEATURE45}.json"
-if (( rc45 == 0 )) && [[ -f "${JSON45}" ]] \
-   && grep -q '"sha": *"sha2bbb45"' "${JSON45}" \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON45}" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON45}" \
-   && grep -q '"overall_qc": *"APPROVED"' "${JSON45}" \
-   && grep -q '"consecutive_rework_count": *0,' "${JSON45}"; then
+C45=(
+  "rc45==0 (actual=${rc45})" "$(( rc45 == 0 ? 1 : 0 ))"
+  "JSON45 exists" "$([[ -f "${JSON45}" ]] && echo 1 || echo 0)"
+  "sha == \"sha2bbb45\" (actual: $(_json_actual "${JSON45}" sha))" "$(_grep_ok '"sha": *"sha2bbb45"' "${JSON45}")"
+  "structural_qc == APPROVED (actual: $(_json_actual "${JSON45}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON45}")"
+  "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON45}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON45}")"
+  "overall_qc == APPROVED (actual: $(_json_actual "${JSON45}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON45}")"
+  "consecutive_rework_count == 0 (actual: $(_json_actual "${JSON45}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *0,' "${JSON45}")"
+)
+if _pairs_ok "${C45[@]}"; then
   pass "scenario 45 — a rework that fixes a STRUCTURAL finding clears structural_qc to APPROVED instead of freezing on pass 1's stale NEEDS_REWORK (H-AUDIT-REWORK-VERDICT-STALE, #2509)"
 else
   fail "scenario 45 — expected rc=0 + structural/behavioral/overall all APPROVED + consecutive_rework_count=0; got rc=${rc45}, output:"
-  report_conjuncts \
-    "rc45==0 (actual=${rc45})" "$(( rc45 == 0 ? 1 : 0 ))" \
-    "JSON45 exists" "$([[ -f "${JSON45}" ]] && echo 1 || echo 0)" \
-    "sha == \"sha2bbb45\" (actual: $(_json_actual "${JSON45}" sha))" "$(_grep_ok '"sha": *"sha2bbb45"' "${JSON45}")" \
-    "structural_qc == APPROVED (actual: $(_json_actual "${JSON45}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON45}")" \
-    "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON45}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON45}")" \
-    "overall_qc == APPROVED (actual: $(_json_actual "${JSON45}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON45}")" \
-    "consecutive_rework_count == 0 (actual: $(_json_actual "${JSON45}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *0,' "${JSON45}")"
+  report_conjuncts "${C45[@]}"
   echo "${out45}" | sed 's/^/      /'
   [[ -f "${JSON45}" ]] && echo "      json: $(cat "${JSON45}")"
 fi
@@ -3639,23 +3705,20 @@ EOF
 out46=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE46}" "feat/dummy46" "2026-08-24" 2>&1) && rc46=0 || rc46=$?
 JSON46="${TMP_REPO}/dev/audit/2026-08-24-feat-dummy46-${FEATURE46}.json"
-if (( rc46 == 0 )) && [[ -f "${JSON46}" ]] \
-   && grep -q '"sha": *"sha2ddd46"' "${JSON46}" \
-   && grep -q '"structural_qc": *"NEEDS_REWORK"' "${JSON46}" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON46}" \
-   && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON46}" \
-   && grep -q '"consecutive_rework_count": *1,' "${JSON46}"; then
+C46=(
+  "rc46==0 (actual=${rc46})" "$(( rc46 == 0 ? 1 : 0 ))"
+  "JSON46 exists" "$([[ -f "${JSON46}" ]] && echo 1 || echo 0)"
+  "sha == \"sha2ddd46\" (actual: $(_json_actual "${JSON46}" sha))" "$(_grep_ok '"sha": *"sha2ddd46"' "${JSON46}")"
+  "structural_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON46}" structural_qc))" "$(_grep_ok '"structural_qc": *"NEEDS_REWORK"' "${JSON46}")"
+  "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON46}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON46}")"
+  "overall_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON46}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON46}")"
+  "consecutive_rework_count == 1 (actual: $(_json_actual "${JSON46}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *1,' "${JSON46}")"
+)
+if _pairs_ok "${C46[@]}"; then
   pass "scenario 46 — behavioral_qc reads its OWN clean APPROVED, not inherited from a still-failing structural re-check that happens to be written last in the file (H-AUDIT-REWORK-VERDICT-STALE, #2509)"
 else
   fail "scenario 46 — expected rc=0 + structural NEEDS_REWORK + behavioral APPROVED + overall NEEDS_REWORK + consecutive_rework_count=1; got rc=${rc46}, output:"
-  report_conjuncts \
-    "rc46==0 (actual=${rc46})" "$(( rc46 == 0 ? 1 : 0 ))" \
-    "JSON46 exists" "$([[ -f "${JSON46}" ]] && echo 1 || echo 0)" \
-    "sha == \"sha2ddd46\" (actual: $(_json_actual "${JSON46}" sha))" "$(_grep_ok '"sha": *"sha2ddd46"' "${JSON46}")" \
-    "structural_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON46}" structural_qc))" "$(_grep_ok '"structural_qc": *"NEEDS_REWORK"' "${JSON46}")" \
-    "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON46}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON46}")" \
-    "overall_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON46}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON46}")" \
-    "consecutive_rework_count == 1 (actual: $(_json_actual "${JSON46}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *1,' "${JSON46}")"
+  report_conjuncts "${C46[@]}"
   echo "${out46}" | sed 's/^/      /'
   [[ -f "${JSON46}" ]] && echo "      json: $(cat "${JSON46}")"
 fi
