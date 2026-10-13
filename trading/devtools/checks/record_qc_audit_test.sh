@@ -745,13 +745,19 @@ out7e_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=7000000000000000000
 
 JSON7E="${TMP_REPO}/dev/audit/2026-07-28-feat-streaky-${FEATURE7E}.json"
 
-if (( rc7e_1 == 0 )) && (( rc7e_2 == 0 )) && (( rc7e_3 == 0 )) \
-   && [[ -f "${JSON7E}" ]] \
-   && grep -q '"consecutive_rework_count": *3' "${JSON7E}" \
-   && grep -q 'consecutive_rework_count=3' <<<"${out7e_3}"; then
+C7E=(
+  "rc7e_1==0 (actual=${rc7e_1})" "$(( rc7e_1 == 0 ? 1 : 0 ))"
+  "rc7e_2==0 (actual=${rc7e_2})" "$(( rc7e_2 == 0 ? 1 : 0 ))"
+  "rc7e_3==0 (actual=${rc7e_3})" "$(( rc7e_3 == 0 ? 1 : 0 ))"
+  "JSON7E exists" "$(_flag test -f "${JSON7E}")"
+  "consecutive_rework_count == 3 in JSON (actual: $(_json_actual "${JSON7E}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *3' "${JSON7E}")"
+  "third-call stdout reports consecutive_rework_count=3" "$(_grep_ok 'consecutive_rework_count=3' <<<"${out7e_3}")"
+)
+if _pairs_ok "${C7E[@]}"; then
   pass "scenario 7e — 3 consecutive same-day NEEDS_REWORK calls on one branch reach consecutive_rework_count=3 (was capped at 1 pre-fix, H-AUDIT-REWORK-COUNT-BLIND)"
 else
   fail "scenario 7e — expected consecutive_rework_count=3 on the third call; got rc=${rc7e_1}/${rc7e_2}/${rc7e_3}"
+  report_conjuncts "${C7E[@]}"
   echo "${out7e_1}" | sed 's/^/      /'
   echo "${out7e_2}" | sed 's/^/      /'
   echo "${out7e_3}" | sed 's/^/      /'
@@ -905,13 +911,19 @@ out8_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=3000000000000000000 
 
 JSON8="${TMP_REPO}/dev/audit/2026-07-27-feat-mmm-${FEATURE8}.json"
 
-if (( rc8_1 == 0 )) && (( rc8_2 == 0 )) && (( rc8_3 == 0 )) \
-   && [[ -f "${JSON8}" ]] \
-   && grep -q '"consecutive_rework_count": *1' "${JSON8}" \
-   && grep -q 'consecutive_rework_count=1' <<<"${out8_3}"; then
+C8=(
+  "rc8_1==0 (actual=${rc8_1})" "$(( rc8_1 == 0 ? 1 : 0 ))"
+  "rc8_2==0 (actual=${rc8_2})" "$(( rc8_2 == 0 ? 1 : 0 ))"
+  "rc8_3==0 (actual=${rc8_3})" "$(( rc8_3 == 0 ? 1 : 0 ))"
+  "JSON8 exists" "$(_flag test -f "${JSON8}")"
+  "consecutive_rework_count == 1 in JSON (actual: $(_json_actual "${JSON8}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *1' "${JSON8}")"
+  "third-call stdout reports consecutive_rework_count=1" "$(_grep_ok 'consecutive_rework_count=1' <<<"${out8_3}")"
+)
+if _pairs_ok "${C8[@]}"; then
   pass "scenario 8 — same-day records consulted in write order (recorded_at_ns), not filename order (F1 rework fix)"
 else
   fail "scenario 8 — expected consecutive_rework_count=1 for feat/mmm record (streak broken by feat/aaa=APPROVED immediately preceding in write order); got rc=${rc8_1}/${rc8_2}/${rc8_3}"
+  report_conjuncts "${C8[@]}"
   echo "${out8_1}" | sed 's/^/      /'
   echo "${out8_2}" | sed 's/^/      /'
   echo "${out8_3}" | sed 's/^/      /'
@@ -3771,14 +3783,19 @@ EOF
 out47=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE47}" "feat/dummy47" "2026-08-24" 2>&1) && rc47=0 || rc47=$?
 JSON47="${TMP_REPO}/dev/audit/2026-08-24-feat-dummy47-${FEATURE47}.json"
-if (( rc47 == 0 )) && [[ -f "${JSON47}" ]] \
-   && grep -q '"sha": *"5474a511"' "${JSON47}" \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON47}" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON47}" \
-   && grep -q '"overall_qc": *"APPROVED"' "${JSON47}"; then
+C47=(
+  "rc47==0 (actual=${rc47})" "$(( rc47 == 0 ? 1 : 0 ))"
+  "JSON47 exists" "$(_flag test -f "${JSON47}")"
+  "sha == \"5474a511\" (actual: $(_json_actual "${JSON47}" sha))" "$(_grep_ok '"sha": *"5474a511"' "${JSON47}")"
+  "structural_qc == APPROVED (actual: $(_json_actual "${JSON47}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON47}")"
+  "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON47}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON47}")"
+  "overall_qc == APPROVED (actual: $(_json_actual "${JSON47}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON47}")"
+)
+if _pairs_ok "${C47[@]}"; then
   pass "scenario 47 — combined single-verdict review (snapshot-pipeline-perf.md's shape) resolves structural/behavioral/overall all APPROVED, not a SKIPPED-structural exit-1 (H-AUDIT-COMBINED-VERDICT-FALLBACK, #2518)"
 else
   fail "scenario 47 — expected rc=0 + structural/behavioral/overall all APPROVED; got rc=${rc47}, output:"
+  report_conjuncts "${C47[@]}"
   echo "${out47}" | sed 's/^/      /'
   [[ -f "${JSON47}" ]] && echo "      json: $(cat "${JSON47}")"
 fi
@@ -3817,14 +3834,19 @@ EOF
 out48=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE48}" "feat/dummy48" "2026-08-24" 2>&1) && rc48=0 || rc48=$?
 JSON48="${TMP_REPO}/dev/audit/2026-08-24-feat-dummy48-${FEATURE48}.json"
-if (( rc48 == 0 )) && [[ -f "${JSON48}" ]] \
-   && grep -q '"sha": *"b3h48only"' "${JSON48}" \
-   && grep -q '"structural_qc": *"SKIPPED"' "${JSON48}" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON48}" \
-   && grep -q '"overall_qc": *"APPROVED"' "${JSON48}"; then
+C48=(
+  "rc48==0 (actual=${rc48})" "$(( rc48 == 0 ? 1 : 0 ))"
+  "JSON48 exists" "$(_flag test -f "${JSON48}")"
+  "sha == \"b3h48only\" (actual: $(_json_actual "${JSON48}" sha))" "$(_grep_ok '"sha": *"b3h48only"' "${JSON48}")"
+  "structural_qc == SKIPPED (actual: $(_json_actual "${JSON48}" structural_qc))" "$(_grep_ok '"structural_qc": *"SKIPPED"' "${JSON48}")"
+  "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON48}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON48}")"
+  "overall_qc == APPROVED (actual: $(_json_actual "${JSON48}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON48}")"
+)
+if _pairs_ok "${C48[@]}"; then
   pass "scenario 48 — behavioral-only split file: structural_qc stays honestly SKIPPED (not fabricated) AND overall still resolves APPROVED from behavioral alone, symmetric with the structural-only case (H-AUDIT-SPLIT-FILE-OVERALL, #2518)"
 else
   fail "scenario 48 — expected rc=0 + structural SKIPPED + behavioral APPROVED + overall APPROVED; got rc=${rc48}, output:"
+  report_conjuncts "${C48[@]}"
   echo "${out48}" | sed 's/^/      /'
   [[ -f "${JSON48}" ]] && echo "      json: $(cat "${JSON48}")"
 fi
