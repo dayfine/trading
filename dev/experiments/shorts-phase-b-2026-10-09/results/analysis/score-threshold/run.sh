@@ -29,3 +29,9 @@ for a in v0 v1; do A=$(dirname "$AUDIT")/$a-26-s0-v12-trade_audit.sexp
     END { for (p in sr) print p "," sr[p] "," rt[p] }' | sort > $D/entry-attrs-$a.csv; fi
   echo "== $a s0 filled shorts by sector/RS"; awk -F, -f $D/sector_rs.awk $D/entry-attrs-$a.csv $R/$a-26-s0-v12-trades.csv | sort
 done > $D/sector-rs-summary.txt
+# Score >= 100 vs < 100 among filled shorts, with and without the HRC 2005 data-defect trade (HRC-wein-121, v0 only).
+for a in v0 v1; do for x in "" HRC-wein-121; do echo "== $a s0 ${x:+excluding $x}"
+  awk -F, -v CUT=100 -v EXCL="$x" -f $D/split.awk $R/$a-26-s0-v12-trades.csv; done; done > $D/trades-split-100.txt
+# Pool: how many raw candidate rows were skipped for No_structural_stop (the book could not have taken them).
+if [ -f "$AUDIT" ]; then printf 'raw short alternatives %s; No_structural_stop %s\n' \
+  "$(grep -c '(side Short) (score' "$AUDIT")" "$(grep -A1 '(side Short) (score' "$AUDIT" | grep -c 'No_structural_stop')" > $D/pool-skip-reasons.txt; fi

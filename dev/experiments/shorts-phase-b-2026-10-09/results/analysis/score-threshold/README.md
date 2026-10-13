@@ -1,10 +1,22 @@
-# Score-threshold check (addendum, 2026-10-12)
+# Score-threshold check (exploratory addendum, 2026-10-12)
+
+**Exploratory and not pre-registered.** This answers a question the user asked after round 1. It does not change the
+round-1 verdict or decision 10.
 
 **Question** (user, 2026-10-12): should the short threshold be stricter? In other words, would a higher minimum
 screener score have picked better shorts?
 
-**Answer: no.** A stricter score does not separate shorts that keep falling from those that don't. On the whole
-candidate pool, every threshold is a coin flip against an SPY short, and at 120 bars the highest scores do worse.
+**Answer: not reliably.**
+- **Filled shorts.** The top-scored shorts did better, but they still lost. At score ≥ 100 there were 25 trades, a
+  32 % win rate and a −0.6 % / −1.1 % mean (v0 without the HRC defect trade / v1). Below 100 there were 170 / 142
+  trades, a 16 % win rate and a −4.8 % / −4.9 % mean.
+- **Why that is not enough.** The top-scored set is small, on one trade path, still negative, and carried by three
+  trades (DB, TAC, M).
+- **The candidate pool does not confirm it.** On the 1,491 ranked candidates, measured without stops against an SPY
+  short, every threshold is a coin flip.
+
+So there is a weak, unconfirmed signal that the top scores hurt less. There is no evidence that a stricter threshold
+makes the short book profitable.
 
 ## Method
 
@@ -12,22 +24,26 @@ candidate pool, every threshold is a coin flip against an SPY short, and at 120 
 
 **The candidate pool** (`pool.csv`, 1,491 rows):
 - Every ranked short candidate in `alternatives_considered` of v0 s0's 219 entry decisions.
-- Deduplicated on symbol and decision date, and keyed to the decision's `placement_date`.
-- This covers only the weeks in which a short was entered. The same stock in consecutive weeks appears more than
-  once, so rows are not independent.
+- Deduplicated on symbol and decision date (2,184 raw rows, no score conflicts), and keyed to the decision's
+  `placement_date`, a Friday.
+- **2,024 of the 2,184 raw rows were skipped for `No_structural_stop`** (`pool-skip-reasons.txt`). The pool is
+  therefore mostly names the book could not take.
+- It covers only the weeks in which a short was entered. The same stock in consecutive weeks appears more than once,
+  so rows are not independent.
 
 **Forward return** (`fwd.csv`):
-- Entry at the adjusted close of the first bar after the decision date. This is not the trigger fill, and no stops
-  are applied.
-- Side-signed returns at +20 / +60 / +120 bars.
+- Entry at the adjusted close of the first bar after the decision date (the Monday). This is not the trigger fill, and
+  no stops are applied.
+- Side-signed returns at +20 / +60 / +120 bars. 4 rows are truncated at +120 by the end of their data.
 
 **Excess** (`excess.csv`): the candidate's short return minus an SPY short over the same two dates.
 
-**Filled shorts** (`trades-summary.txt`): the committed v0 and v1 s0 `trades.csv`, cumulative by
-`screener_score_at_entry`.
+**Filled shorts:** the committed v0 and v1 s0 `trades.csv`. `trades-summary.txt` is cumulative by
+`screener_score_at_entry`. `trades-split-100.txt` splits them at 100, with and without HRC-wein-121.
 
 **Inputs:**
-- the v0 s0 `trade_audit.sexp`, from the sweep output (11 MB, not committed; `pool.csv` is its extract);
+- the v0 and v1 s0 `trade_audit.sexp` from the sweep output (3.2 MB each, not committed; `pool.csv` and
+  `entry-attrs-*.csv` are their extracts);
 - host `data/` bars, which are gitignored (SPY md5 `447bca148f4385bcd3b5c19a144f21bf`).
 
 ## Results
@@ -43,20 +59,22 @@ candidate pool, every threshold is a coin flip against an SPY short, and at 120 
 | 105 | 149 | 53.7 % | +0.4 % | 49.7 % | +0.5 % | 43.0 % | −3.2 % |
 | 110 | 68 | 50.0 % | +0.4 % | 48.5 % | +1.7 % | 45.6 % | −1.3 % |
 
-- **The dispersion is wide:** p10 / p90 is about −12 / +13 % at +20 bars and about −28 / +28 % at +120.
+- **Dispersion:** p10 / p90 is −12.6 / +13.0 % at +20 bars and −28.7 / +31.7 % at +120 (all candidates).
+- **The weaker +120 reading at score ≥ 105 and ≥ 110 rests on few rows.** There are 149 and 68 of them, overlapping
+  across weeks, so it is not a reliable sign that the top scores are worse.
 - **In absolute terms,** 47.9 % of all candidates were lower after 60 bars, 48.7 % at score ≥ 100 and 46.3 % at score ≥ 105.
 
-### Filled shorts (v0 s0)
+### Filled shorts (`trades-split-100.txt`, `trades-summary.txt`)
 
-| score ≥ | trades | win rate | mean | P&L |
-|---|---:|---:|---:|---:|
-| all | 196 | 18 % | −4.7 % | −$610k |
-| 90 | 136 | 19 % | −5.1 % | −$493k |
-| 100 | 26 | 31 % | −4.1 % | −$82k |
+| arm (s0) | score ≥ 100 | score < 100 |
+|---|---|---|
+| v0, all | 26 trades, win 31 %, mean −4.12 %, median −4.10 %, −$82k | 170, win 16 %, −4.78 % / −7.89 %, −$528k |
+| v0, excluding HRC-wein-121 (−92.8 % splice, §8.7 defect 2) | 25, win 32 %, −0.57 % / −3.94 %, −$29k | 170, win 16 %, −4.78 % / −7.89 %, −$528k |
+| v1 (HRC not traded) | 25, win 32 %, −1.13 % / −4.10 %, −$36k | 142, win 16 %, −4.94 % / −8.07 %, −$510k |
 
-- The score ≥ 100 row is 26 small trades.
-- It includes HRC 2005 (−92.8 %), the data-defect splice (§8.7 defect 2).
-- v1 is the same shape (`trades-summary.txt`).
+- **Size.** Top-scored shorts are a small slice of the book: 25 of 195 trades, −$29k of −$557k, v0 without HRC.
+- **Why the means are near zero.** Their means sit near zero because of DB 2015–16 (+45.2 %), TAC 2008–09 (+26.5 %) and
+  M 2015–16 (+24.4 %). Their medians stay at about −4 %.
 
 ### Sector and RS split (`sector-rs-summary.txt`; v0 / v1 s0, joined on `position_id` with the audit's entry `sector_rating` and `rs_trend`, `entry-attrs-*.csv`)
 
@@ -65,14 +83,23 @@ candidate pool, every threshold is a coin flip against an SPY short, and at 120 
 | Weak / negative and declining (the "weakest stock in the weakest sector") | 19 / 15 | −6.9 % / −8.9 % |
 | Weak / bearish crossover | 95 / 87 | −3.8 % / −3.2 % |
 | Neutral / bearish crossover | 75 / 60 | −6.9 % / −5.8 % |
+| Neutral / negative and declining | 4 / 2 | +23.9 % / +18.8 % (too few trades to read) |
+
+The remaining rows are Weak or Neutral with RS "negative improving", 1 trade each, plus one Weak row with no RS label.
 
 ## Reading
 
-- **The score does not predict.** The short score, including its weak-sector and weak-RS bonuses, does not predict which
-  Stage-4 breakdowns keep falling. A stricter threshold shrinks the book toward zero trades without improving the
-  shorts it keeps.
-- **It is the same finding from a third angle.** It matches the blind read's 3,643 skipped candidates, which were a
-  coin flip against SPY, and the 14 negative book-rule cohorts in §8.
-- **The verdict is unchanged.** It does not change the round-1 verdict or decision 10.
-- **What remains untested** is the book's short-interest ("sucker short") filter, which needs data the warehouse
-  lacks.
+- **The pool says the score does not predict.** On the broad candidate pool, the short score does not predict which
+  Stage-4 breakdowns keep falling, and that includes its weak-sector and weak-RS bonuses. This is consistent with the
+  blind read's 3,643 skipped candidates (a coin flip against SPY) and the 14 negative book-rule cohorts. Both are in
+  round 1's "Second, independent read".
+- **The filled book shows a weak tilt the pool does not confirm.** Shorts the book actually took at score ≥ 100 lost
+  less per trade and won twice as often as the rest. The rest of this section explains why that tilt is not evidence
+  for a stricter threshold.
+- **The two estimands differ.** The pool is mostly names the book could not take (`No_structural_stop`), measured
+  from Monday's close with no stops. The filled shorts carry the book's own entry and stop path.
+- **The filled tilt is weak evidence.** It is n = 25, one path (salts only re-seed the intraday fill), still negative,
+  and carried by three trades.
+- **What a test would need.** A stricter threshold would have to be pre-registered and tested as a surface. Even the
+  best-case reading (−0.6 % per trade on 25 trades over 26 years) would not make the short book worth running.
+- **What remains untested** is the book's short-interest ("sucker short") filter. It needs data the warehouse lacks.
