@@ -49,6 +49,8 @@ let _exit_for_holding ~config ~bar_reader ~skip_position_ids ~get_price
     Liquidity_metric.dollar_adv
       ~aggregation:config.Liquidity_config.adv_aggregation
       ~trim_pct:config.Liquidity_config.adv_trim_pct
+      ?split_divisor:
+        (Bar_reader.split_divisor_for bar_reader ~symbol:pos.symbol)
       ~lookback_days:config.Liquidity_config.adv_lookback_days bars
   with
   | None -> None

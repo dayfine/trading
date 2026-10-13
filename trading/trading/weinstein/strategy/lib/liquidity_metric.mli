@@ -50,6 +50,7 @@ val default_trim_pct : float
 val dollar_adv :
   ?aggregation:aggregation ->
   ?trim_pct:float ->
+  ?split_divisor:(Core.Date.t -> float) ->
   lookback_days:int ->
   Types.Daily_price.t list ->
   float option
@@ -78,4 +79,14 @@ val dollar_adv :
     must never force a spurious exit / drop). Each bar's dollar volume is
     [close_price *. Float.of_int volume]; every aggregation is over the number
     of bars actually present in the window (never a padded count). Pure: same
-    input, same output. *)
+    input, same output.
+
+    [split_divisor] (issue #3136, default absent = the pre-#3136 reading)
+    divides each bar's [close_price *. volume] by [split_divisor bar.date]. The
+    bar store's [volume] is restated for every later split while [close_price]
+    is raw, so the stored product is off by [F(t)], the product of the factors
+    of the splits after [t]: AMZN 2018-06-14 (before its 2022 20:1) reads 20x
+    its true dollar volume, C 2010-06-14 (before its 2011 1:10) 1/10. Passing
+    [F] gives raw close times raw volume, the true dollars traded that day. The
+    bar reader carries [F] when {!Liquidity_config.t.true_dollar_volume} armed
+    it ({!Bar_reader.split_divisor_for}). *)

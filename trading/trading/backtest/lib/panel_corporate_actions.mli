@@ -53,18 +53,28 @@ type t = {
       (** {!split_guard}: shared by the simulator and the strategy. *)
   ex_dividend_stops : Ex_dividend_stop.t option;
       (** {!ex_dividend_stops}: strategy side only (the stop state). *)
+  split_divisor : (symbol:string -> Date.t -> float) option;
+      (** {!split_divisor}: strategy side only (the liquidity readings). *)
 }
 (** The strategy-and-simulator corporate-action readers of one run. *)
 
+val split_divisor :
+  config:Weinstein_strategy.config ->
+  data_dir:Fpath.t ->
+  (symbol:string -> Date.t -> float) option
+(** #3136: [Some] {!True_dollar_divisor.of_data_dir} iff
+    [config.liquidity_config.true_dollar_volume]; [None] otherwise. *)
+
 val create : config:Weinstein_strategy.config -> data_dir:Fpath.t -> t
-(** Both readers, each [Some] only when its flag is on. *)
+(** All three readers, each [Some] only when its flag is on. *)
 
 val arm_bar_reader :
   t -> Weinstein_strategy.Bar_reader.t -> Weinstein_strategy.Bar_reader.t
-(** [arm_bar_reader t reader] attaches the split guard ({!guard_bar_reader}) and
+(** [arm_bar_reader t reader] attaches the split guard ({!guard_bar_reader}),
     the ex-dividend reducer
-    ({!Weinstein_strategy.Bar_reader.with_ex_dividend_stops}) present in [t];
-    [reader] itself (physically) when both are [None]. *)
+    ({!Weinstein_strategy.Bar_reader.with_ex_dividend_stops}) and the split
+    divisor ({!Weinstein_strategy.Bar_reader.with_split_divisor}) present in
+    [t]; [reader] itself (physically) when all three are [None]. *)
 
 val log : t -> unit
 (** {!log_split_guard}, then {!ex_dividend_stops_summary} when armed. *)

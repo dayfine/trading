@@ -44,6 +44,7 @@
   test_short_side_gate
   test_liquidity_metric
   test_liquidity_gate
+  test_liquidity_true_dollars
   test_liquidity_exit_runner
   test_extension_stop_runner
   test_volume_eject_runner

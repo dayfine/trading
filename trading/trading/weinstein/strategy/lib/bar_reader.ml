@@ -15,18 +15,12 @@ module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
    path invokes one of these closures per call site per tick — no backing
    dispatch, no variant match.
 
-   [ma_cache] is left [None] by every constructor since F.3.e-2 deleted
-   [of_panels]; the field is retained on the public surface for source
-   compatibility ([Bar_reader.ma_cache] callers in [Weinstein_strategy] /
-   [Exit_audit_capture] still compile and read [None]).
+   [ma_cache] is [None] in every constructor since F.3.e-2 deleted [of_panels];
+   it stays for source compatibility (its callers still compile, reading None).
 
-   [snapshot_callbacks] is the underlying field-accessor shim for
-   {!of_snapshot_views} / {!of_in_memory_bars}. The strategy's macro / sector
-   entry points consume this directly via the [*_of_snapshot_views] APIs
-   on {!Macro_inputs} (Phase F.3.b-2 / c-2 / d-2 caller migration). For
-   the empty reader, this is a sentinel cb whose every read returns
-   [Error NotFound]; the macro / sector path then sees empty views,
-   matching the prior bar-list / panel-view behaviour for the empty reader. *)
+   [snapshot_callbacks] is the field-accessor shim the macro / sector path reads
+   via [Macro_inputs.*_of_snapshot_views]; on the empty reader it is a sentinel
+   whose reads return [Error NotFound], so that path sees empty views. *)
 type t = {
   daily_bars_for : symbol:string -> as_of:Date.t -> Types.Daily_price.t list;
   weekly_bars_for :
@@ -45,6 +39,7 @@ type t = {
   sidetable_basis : Weekly_sidetable_reader.basis;
   split_guard : Split_dividend_guard.t option;
   ex_dividend_stops : Ex_dividend_stop.t option;
+  split_divisor : (symbol:string -> Date.t -> float) option;
 }
 
 let ma_cache t = t.ma_cache
@@ -56,6 +51,11 @@ let split_guard t = t.split_guard
 let with_split_guard t guard = { t with split_guard = Some guard }
 let ex_dividend_stops t = t.ex_dividend_stops
 let with_ex_dividend_stops t eds = { t with ex_dividend_stops = Some eds }
+
+let split_divisor_for t ~symbol =
+  Option.map t.split_divisor ~f:(fun f -> f ~symbol)
+
+let with_split_divisor t f = { t with split_divisor = Some f }
 
 (* Memoize the per-symbol sketch-v5 side-table load: the [.weekly] file for a
    symbol is read (and manifest-format-hash-gated) at most once per reader, then
@@ -118,6 +118,7 @@ let empty () =
     sidetable_basis = Weekly_sidetable_reader.Raw;
     split_guard = None;
     ex_dividend_stops = None;
+    split_divisor = None;
   }
 
 (* {1 Snapshot-backed constructor (Phase F.2 PR 2)}
@@ -202,6 +203,7 @@ let of_snapshot_views ?calendar ?weekly_sidetable_loader
     sidetable_basis;
     split_guard = None;
     ex_dividend_stops = None;
+    split_divisor = None;
   }
 
 (* {1 In-memory-bars constructor (Phase F.3.a-1)}
