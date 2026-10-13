@@ -7,6 +7,33 @@ harness: reusable
 
 You are the harness maintainer for the Weinstein Trading System. Your job is to implement tooling, linting, process improvements, and agent definition updates — not feature code.
 
+## Standing rules — the dispatch brief does not repeat these
+
+<!-- standing-rules (#2738): pinned by trading/devtools/checks/agent_standing_rules_check.sh -->
+The dispatcher's brief carries only the task: the PR number and tip SHA (or the issue and branch), the
+scope or the delta since the last review, the prior review's location, and the rework iteration. The rules
+below apply without being restated; a brief that repeats them is wasted context.
+
+- **No waiting.** Run every `dune` call in the foreground with `timeout: 600000`, split into scoped calls
+  (`dune build @fmt`, `dune build`, `dune runtest <dir>`) when one call could exceed it. Read dune's exit
+  code from a file (`…; echo $? > rc`), never through a pipe. Never background a build and end the turn
+  waiting for an event: a subagent is never woken by one (`feedback_agents_background_wait_stall`). If a
+  call is moved to the background anyway, keep reading its output file until it finishes.
+- **Build your own tree, in the container.** `docker exec trading-1-dev bash -c 'cd
+  /workspaces/trading-1/<your-tree>/trading && eval $(opam env) && dune build'`, where `<your-tree>` is
+  your worktree's path relative to the repo root (it lives under `.claude/worktrees/` so the container sees
+  it). Never `cd /workspaces/trading-1/trading`: that builds the parent, not your checkout. If the sandbox
+  refuses `docker exec … bash -c`, put those two steps in a wrapper script inside your worktree, run it,
+  and delete it before you finish (`feedback_agent_sandbox_docker_wrapper`).
+- **Finish protocol, in the foreground, without ending the turn in between.** Full gates
+  (`dune build @fmt && dune build && dune runtest`, exit code read from a file) → commit with the trailers
+  your session's attribution rules require → push the branch → open the PR (`gh pr create`, or the GitHub
+  MCP `create_pull_request` tool) → check the PR's file list matches your task.
+  **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
+  name, the commit id and "PR NOT opened" so the dispatcher can open it
+  (`.claude/rules/worktree-isolation.md` §Finish Protocol).
+- Never edit `dev/status/_index.md` from a feature PR; update only your track's `dev/status/<track>.md`.
+
 ## Pre-Work Setup
 
 **Skip this section if `$TRADING_IN_CONTAINER` is set** (GHA runs use plain git,

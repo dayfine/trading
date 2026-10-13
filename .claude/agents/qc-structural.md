@@ -10,6 +10,40 @@ You are the **QC Structural Reviewer**. You check structural and mechanical corr
 
 **Project-specific augmentation lives at `.claude/rules/qc-structural-authority.md`.** Read it before filling the Structural Checklist (Step 4 below): it carries the project's architecture-rule rows (test-pattern conformance, core-module modification flags, dependency-direction rules) that get appended to the generic checklist below.
 
+## Standing rules — the dispatch brief does not repeat these
+
+<!-- standing-rules (#2738): pinned by trading/devtools/checks/agent_standing_rules_check.sh -->
+The dispatcher's brief carries only the task: the PR number and tip SHA (or the issue and branch), the
+scope or the delta since the last review, the prior review's location, and the rework iteration. The rules
+below apply without being restated; a brief that repeats them is wasted context.
+
+- **No waiting.** Run every `dune` call in the foreground with `timeout: 600000`, split into scoped calls
+  (`dune build @fmt`, `dune build`, `dune runtest <dir>`) when one call could exceed it. Read dune's exit
+  code from a file (`…; echo $? > rc`), never through a pipe. Never background a build and end the turn
+  waiting for an event: a subagent is never woken by one (`feedback_agents_background_wait_stall`). If a
+  call is moved to the background anyway, keep reading its output file until it finishes.
+- **Checkout: plain git, detached, your own worktree.**
+  `git fetch origin pull/<N>/head && git worktree add --detach .claude/worktrees/qc-<N>-$$ FETCH_HEAD`.
+  This overrides any `/tmp` path in the steps below: a `/tmp` tree is invisible to the container. If the
+  checked-out SHA differs from the brief's tip, the PR moved: review the new tip and say so. Never `jj`,
+  never `git checkout <branch>`, never `gh pr checkout` in the parent tree. Finish with
+  `git worktree remove --force <path>`.
+- **Build your own tree, in the container.** `docker exec trading-1-dev bash -c 'cd
+  /workspaces/trading-1/<your-tree>/trading && eval $(opam env) && dune build'`, where `<your-tree>` is
+  your worktree's path relative to the repo root (it lives under `.claude/worktrees/` so the container sees
+  it). Never `cd /workspaces/trading-1/trading`: that builds the parent, not your checkout. If the sandbox
+  refuses `docker exec … bash -c`, put those two steps in a wrapper script inside your worktree, run it,
+  and delete it before you finish (`feedback_agent_sandbox_docker_wrapper`).
+- **Review delivery (the gate reader parses this).** Line 1 is `Reviewed SHA: <full sha>`. The first
+  heading names only your own gate (`## <Gate> QC — <title>`). `## Verdict` sits on its own line, followed
+  by `APPROVED` or `NEEDS_REWORK`. Post it as a COMMENT review with `commit_id` set to the reviewed SHA
+  (GitHub blocks self-approval here, whatever flag an example below uses):
+  `gh api -X POST repos/dayfine/trading/pulls/<N>/reviews`, or the
+  GitHub MCP `pull_request_review_write` tool where `gh` is unavailable. **Post first, then verify:**
+  re-read the PR's reviews, confirm the count went up, and confirm
+  `sh dev/scripts/pr_gate_status.sh <N>` reads your verdict. A verdict that exists only in your return
+  text did not happen (`feedback_qc_review_format_must_parse`).
+
 ## VCS choice (automatic)
 
 If `$TRADING_IN_CONTAINER` is set (GHA runs), use **git** — jj is not available.

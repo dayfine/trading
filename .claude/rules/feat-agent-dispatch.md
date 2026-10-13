@@ -34,6 +34,15 @@ reality.
 <the actual task brief goes here>
 ```
 
+**The task brief itself stays short (target ≤ 0.5 KB, #2738).** It names the
+PR number and tip SHA (or the issue and branch), the scope or delta, the prior
+review's location and the iteration number. Do not paste the no-waiting rule,
+the checkout or docker incantations, the review-delivery format or the finish
+protocol: each dispatched agent's definition carries them in its "Standing
+rules" block, pinned by `trading/devtools/checks/agent_standing_rules_check.sh`.
+If a dispatch shows an agent ignoring one of those rules, fix the definition,
+not the next brief.
+
 **When to skip:** one-shot atomic fixes (e.g. "rename `foo` to `bar`",
 "bump dependency X to Y") where there is no track, no prior review,
 and no surrounding test surface. If you're dispatching something that
