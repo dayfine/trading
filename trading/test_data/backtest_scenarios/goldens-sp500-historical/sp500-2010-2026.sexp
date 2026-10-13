@@ -213,20 +213,21 @@
 
 
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
-  ((total_return_pct ((min 330.4702) (max 447.1067)))
-   (total_trades ((min 392.7000) (max 531.3000)))
-   (win_rate ((min 31.2771) (max 42.3160)))
-   (sharpe_ratio ((min 0.3811) (max 0.5156)))
-   (max_drawdown_pct ((min 52.9769) (max 71.6746)))
-   (avg_holding_days ((min 52.5933) (max 71.1556)))
+  ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in PR #3283. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 764.9551) (max 1034.9393)))
+   (total_trades ((min 419.9000) (max 568.1000)))
+   (win_rate ((min 32.6923) (max 44.2308)))
+   (sharpe_ratio ((min 0.4273) (max 0.5781)))
+   (max_drawdown_pct ((min 66.4622) (max 89.9194)))
+   (avg_holding_days ((min 54.3122) (max 73.4813)))
    ;; OPV re-pinned ~9.88M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): the $1M-ADV entry gate drops marginal
    ;; fills and stale-exit 5d clears ghost MTM, so terminal book is lighter.
    ;; Headline metrics (return/Sharpe/DD/trades) stayed in-band — only the
    ;; terminal-MTM composition moved. Was ~18.1M floor-off pre-flip.
-   (open_positions_value ((min 1715203.3805) (max 2320569.2795)))
-   (sortino_ratio_annualized ((min 0.4514) (max 0.6108)))
-   (calmar_ratio ((min 0.1392) (max 0.1883)))
-   (ulcer_index ((min 20.1068) (max 27.2034)))
+   (open_positions_value ((min 5577084.4640) (max 7545467.2160)))
+   (sortino_ratio_annualized ((min 0.5135) (max 0.6947)))
+   (calmar_ratio ((min 0.1647) (max 0.2228)))
+   (ulcer_index ((min 25.3761) (max 34.3324)))
    ;; Floor-off does more work than the halted floor-on run; keep wall band wide.
    (wall_seconds       ((min 0.0)           (max 3600.0))))))

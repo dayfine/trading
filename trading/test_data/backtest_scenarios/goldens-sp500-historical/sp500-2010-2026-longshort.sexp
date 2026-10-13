@@ -185,19 +185,20 @@
   ;;        hold 64.38  OPV 1,884,056  sortino 0.535  calmar 0.169  ulcer 33.00
   ;; ±15% around the new actual. Correctness re-pin of a data defect: no
   ;; return claim attaches to the delta.
-  ((total_return_pct ((min 573.7523) (max 776.2531)))
-   (total_trades ((min 527.8500) (max 714.1500)))
-   (win_rate ((min 30.6602) (max 41.4815)))
-   (sharpe_ratio ((min 0.3997) (max 0.5408)))
-   (max_drawdown_pct ((min 67.2214) (max 90.9466)))
-   (avg_holding_days ((min 54.7203) (max 74.0333)))
+  ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in PR #3283. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 897.9031) (max 1214.8101)))
+   (total_trades ((min 519.3500) (max 702.6500)))
+   (win_rate ((min 30.7447) (max 41.5957)))
+   (sharpe_ratio ((min 0.4420) (max 0.5980)))
+   (max_drawdown_pct ((min 67.2834) (max 91.0305)))
+   (avg_holding_days ((min 55.3669) (max 74.9081)))
    ;; OPV re-pinned ~2.18M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): $1M-ADV entry gate + stale-exit 5d
    ;; lighten the terminal book. Headline metrics stayed in-band (ret 387.5 /
    ;; 784 / Sharpe 0.777 / DD 21.35). Was ~3.76M pre-flip.
-   (open_positions_value ((min 1601447.8805) (max 2166664.7795)))
-   (sortino_ratio_annualized ((min 0.4544) (max 0.6147)))
-   (calmar_ratio ((min 0.1436) (max 0.1943)))
-   (ulcer_index ((min 28.0478) (max 37.9470)))
+   (open_positions_value ((min 2619925.7515) (max 3544605.4285)))
+   (sortino_ratio_annualized ((min 0.5481) (max 0.7415)))
+   (calmar_ratio ((min 0.1737) (max 0.2350)))
+   (ulcer_index ((min 25.2018) (max 34.0966)))
    ;; Wall floor lowered 600→100, then floored at 0 per #2547 (a min guards nothing; the 364 run measured ~391s locally).
    (wall_seconds       ((min 0.0)           (max 2400.0))))))
