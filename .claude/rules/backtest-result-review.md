@@ -73,7 +73,7 @@ set:
 
 | signal | what it surfaces |
 |---|---|
-| **Eras vs SPY** | the strategy/SPY ratio, cut into built / held / eroded eras (±15 % legs, 4+ year runs within a 10 % band split out as held), with a chart and an era table |
+| **Eras vs SPY** | the strategy/SPY ratio (inverted SPY for a short-only book, read day by day, with short-side wording: cash in a rising market is protection, cash through a decline a miss; #3262), cut into built / held / eroded eras (±15 % legs, 4+ year runs within a 10 % band split out as held), with a chart and an era table |
 | **Regime × era** | each era split by SPY regime (UP / MIXED / DOWN, 30-week MA, lagged a week; warmed up on the SPY bars before the window, so the first 34 weeks have a regime too, #3194). The largest gap, and a second one when material, names the cause: holdings lagged in UP regimes at ≥ 40 % invested, cash through rebounds, or cash in a rising market |
 | **One-trade / salt years** | a year whose excess vs SPY is ≥ 10 pp and at least half carried by one realised trade, or whose salts end ≥ 15 pp apart |
 | **Open-position return** | the NAV move minus realised P&L (net of dividends, cash interest and commissions, or the run's `UnrealizedPnl` when reported; #3194) is ≥ 10 % of start NAV and at least half the move (or opposite in sign): the return rests on positions still open at the end, which no trade row shows (T1 5r s0: realised −$222k, NAV +$115k, BELFB open +233 %) |

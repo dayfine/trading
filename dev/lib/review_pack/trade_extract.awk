@@ -9,12 +9,12 @@
 #          stop is breached when the HIGH reaches it (the stop sits above a short)
 #   ed/xd  entry/exit date (may be a weekend -> the last bar <= date is used)
 #   ep/xp  raw fill prices; sid initial stop distance (fraction); es raw installed
-#          stop at entry (trades.csv entry_stop) -- the breach line. sid is measured
+#          stop at entry (trades.csv entry_stop) -- the breach line, on RAW bars. sid is measured
 #          from the decision price, not the fill, so entry x (1 - sid) can sit above
 #          the real stop (MELI 2015: 135.82 vs 134.88); it is the fallback when es is 0
 #
-# Every price comparison is on the ADJUSTED basis: bar prices are scaled by
-# adjusted_close/close, and the entry fill by the entry bar's factor (fe).
+# Every price comparison is on the ADJUSTED basis (bar prices scaled by adjusted_close/close, the entry
+# fill by the entry bar's factor fe) except the stop breach: raw bars against the raw stop, split-corrected.
 #
 # Writes (appending):
 #   out_tr : one tab-separated metrics line per trade (fields at END below)
@@ -26,6 +26,8 @@ BEGIN {
   FS = ","; PRE_BARS = 63; POST_BARS = 42; GRADE_BARS = 65; FWD_BARS = 40
   TOL = 0.005                      # fill-in-range tolerance (cent rounding)
   SPLIT_FAC_LO = 0.8; SPLIT_FAC_HI = 1.05   # adjustment factor / split ratio: dividends pull it under 1
+  SPLIT_JUMP = 1.25                # a day-on-day factor move this large (either way) is a split, not a dividend
+  spl = 1                          # splits since the entry bar: raw prices are divided by it (#3262)
   ncf = split("3 5 6 8 10 15", lv, " ")
   for (i = 1; i <= ncf; i++) { cf[i] = ""; lv[i] = lv[i] / 100 }
 }
@@ -93,13 +95,17 @@ function hard_stop(o, l, h, lvl,   p) {
   }
   # bars strictly after the entry day: forward pick return, stop breach, hard-stop replays
   # entry on the bar's own basis: a fill on a later split basis is scaled back first
+  # the breach line stays RAW, on the entry bar's basis (stopr), moved only by a split since (spl): the adjusted
+  # basis drifts across it on every dividend (#3262, from #3214 item 8: a short's adjusted high rose through
+  # its stop on an ex-date, CAT 64 bars early)
+  if (d > ed && pf > 0 && (f / pf >= SPLIT_JUMP || pf / f >= SPLIT_JUMP)) spl *= f / pf
   if (d > ed && fe > 0 && e == "") { esnap = 1; if (on_e && in_range(ep, el, eh, fe) == 2) esnap = SNAP; e = ep / esnap * fe
-    stopl = (es > 0) ? es / esnap * fe : e * (1 - sd * sid) }
+    stopr = (es > 0) ? es / esnap : ep / esnap * (1 - sd * sid) }
   if (d > ed && fe > 0) {
     nf++
     if (nf == FWD_BARS) f40 = sd * (a / e - 1) * 100
     # the exit bar counts: a stop filled on its trigger bar breaches the same day (lag 0)
-    if (d <= xd && breach == "" && stopl > 0 && stop_hit(l, h, stopl)) { breach = d; bidx = nf }
+    if (d <= xd && breach == "" && stopr > 0 && stop_hit($cl, $ch, stopr / spl)) { breach = d; bidx = nf }
     if (d < xd) {
       for (i = 1; i <= ncf; i++) if (cf[i] == "") cf[i] = hard_stop(o, l, h, e * (1 - sd * lv[i]))
     }
@@ -110,7 +116,7 @@ function hard_stop(o, l, h, lvl,   p) {
   # at the first bar ON or after the exit date (a Saturday exit starts Monday),
   # that bar's adjusted close is the reference (gx), and p13 is the 65th bar.
   if (d >= xd) { k++; if (k == 1) gx = a; if (k <= GRADE_BARS) { if (k == 1 || a > mxa) mxa = a; if (k == 1 || a < mna) mna = a; p13 = a } }
-  prev_c = c
+  prev_c = c; pf = f
 }
 END {
   if (ae == 0 || ax == 0) { printf "%s\tNODATA\n", pid >> out_tr; exit }
