@@ -24,3 +24,5 @@ and 2008 (−0.10 log).
 Record numbers: [[project_investor_preset_broad]]. Related: [[project_macro_suspend_investor_dilutes]],
 [[project_index_stage_veto_verdict]], [[project_shorts_liveness_dead]], [[project_ad_default_flip]],
 [[project_edge_is_the_fat_tail]].
+- Re-read 10-12 (index-hedge screen): a constant h=0.25 macro-gated SPY short costs −0.177 log on O's frozen macro vs
+  −0.154 on N — the frozen input explains only +0.02 of Phase B's −0.30 exposure-timing number.
