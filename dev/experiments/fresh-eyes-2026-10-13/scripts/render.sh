@@ -15,28 +15,42 @@ CHROME=${CHROME:-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"}
 fri=$(awk -v c="$cut" -f $S/days.awk -f $S/isfriday.awk)
 [ "$fri" = 1 ] || { echo "render.sh: cut $cut is not a Friday" >&2; exit 2; }
 mkdir -p "$out" "$WEEKLY"
-png() {  # png <svg> <png> <height>: up to 3 attempts, each killed after 60 s (headless Chrome can hang)
+# PNGs: one headless-Chrome launch per page pair (both frames stacked on one HTML page), then sips crops each frame
+# out. Chrome dominates the cost (~1.7 s a launch; SVG generation is ~0.1 s), so this halves it. The page has a
+# 1 px margin left, top and between the frames because `sips --cropOffset` mishandles an offset of 0 and a crop
+# ending on the image edge (backtest-result-review.md). Each launch is killed after 60 s and retried up to 3
+# times (headless Chrome can hang).
+pngpair() {  # pngpair <base path without -full/-5y> <frame height>
   [ -n "$NOPNG" ] && return 0
-  u="file://$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+  b=$1; hgt=$2; d=$(cd "$(dirname "$b")" && pwd); n=$(basename "$b")
+  printf '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:#fff}img{display:block;margin:1px 0 0 1px}</style></head><body><img src="%s-full.svg" width="1600" height="%s"><img src="%s-5y.svg" width="1600" height="%s"></body></html>\n' \
+    "$n" "$hgt" "$n" "$hgt" > "$d/$n.pair.html"
   for try in 1 2 3; do
-    rm -f "$2"
-    "$CHROME" --headless=new --disable-gpu --hide-scrollbars --window-size="1600,$3" \
-      --screenshot="$2" "$u" >/dev/null 2>&1 &
+    rm -f "$d/$n.pair.png"
+    "$CHROME" --headless=new --disable-gpu --hide-scrollbars --window-size="1602,$((2 * hgt + 3))" \
+      --screenshot="$d/$n.pair.png" "file://$d/$n.pair.html" >/dev/null 2>&1 &
     cpid=$!; t=0
     while kill -0 $cpid 2>/dev/null && [ $t -lt 300 ]; do sleep 0.2; t=$((t + 1)); done
     kill -0 $cpid 2>/dev/null && { kill $cpid 2>/dev/null; sleep 1; kill -9 $cpid 2>/dev/null || true; }
     wait $cpid 2>/dev/null || true
-    [ -s "$2" ] && return 0
+    [ -s "$d/$n.pair.png" ] && break
   done
-  echo "render.sh: no PNG written for $1 after 3 attempts" >&2; exit 1
+  [ -s "$d/$n.pair.png" ] || { echo "render.sh: no PNG written for $b after 3 attempts" >&2; exit 1; }
+  cp "$d/$n.pair.png" "$d/$n-full.png"; sips --cropOffset 1 1 -c "$hgt" 1600 "$d/$n-full.png" >/dev/null
+  cp "$d/$n.pair.png" "$d/$n-5y.png"; sips --cropOffset $((hgt + 2)) 1 -c "$hgt" 1600 "$d/$n-5y.png" >/dev/null
+  rm -f "$d/$n.pair.png" "$d/$n.pair.html"
+  for f in full 5y; do
+    [ "$(sips -g pixelHeight "$d/$n-$f.png" | awk '/pixelHeight/ { print $2 }')" = "$hgt" ] \
+      || { echo "render.sh: $n-$f.png is not $hgt px high" >&2; exit 1; }
+  done
 }
 if [ "$s" = MARKET ]; then
   M=$E/results/market
   for fr in full 5y; do
     awk -F, -v cut="$cut" -v frame=$fr -f $S/days.awk -f $S/chartlib.awk -f $S/market.awk \
       $M/spy-weekly.csv $M/ad-weekly.csv $M/sector-strength.csv > "$out/MARKET-$cut-$fr.svg"
-    png "$out/MARKET-$cut-$fr.svg" "$out/MARKET-$cut-$fr.png" 1260
   done
+  pngpair "$out/MARKET-$cut" 1260
   exit 0
 fi
 w=$WEEKLY/$s.csv
@@ -57,7 +71,7 @@ else sector="sector not shown"; fi
 for fr in full 5y; do
   awk -F, -v cut="$cut" -v frame=$fr -v sym="$disp" -v sector="$sector" -f $S/days.awk -f $S/chartlib.awk -f $S/chart.awk \
     "$w" > "$out/$disp-$cut-$fr.svg"
-  png "$out/$disp-$cut-$fr.svg" "$out/$disp-$cut-$fr.png" 1000
 done
+pngpair "$out/$disp-$cut" 1000
 # Last bar at or before the cut, on the chart's basis (rescaled so the close is the raw close).
 awk -F, -v cut="$cut" -v sym="$disp" -v sector="$sector" -f $S/days.awk -f $S/lastbar.awk "$w" > "$out/$disp-$cut.json"
