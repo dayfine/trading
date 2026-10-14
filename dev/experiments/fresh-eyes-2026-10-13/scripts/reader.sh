@@ -2,22 +2,25 @@
 # reader.sh <SYM> <run dir>: the forward pass for one symbol with a fresh model reader at every checkpoint (plan §4
 # layer (ii), the adaptive-look amendment; pilot 2 format).
 #
-# Each checkpoint is one headless `claude -p` call with no memory of earlier calls, from a reader folder outside the
-# repository. The rule card is the system prompt. The cut's four pages (stock full / 5y, market full / 5y) go in as
+# Each checkpoint is one headless `claude -p` call with no memory of earlier calls (a fresh context per checkpoint),
+# run in an empty working folder outside the repository. The rule card is the system prompt. The cut's four pages
+# (stock full / 5y, market full / 5y) go in as
 # ONE inline composite image (composite.sh, 2x2) in the user message (--input-format stream-json), with the last
 # week's numbers and the status as text, so a decision is normally one model turn. The reader may Grep the book for a
 # specific question (the only tool allowed); it is not told anything about our system. Its one-line JSON decision goes
 # to step.sh apply. A malformed answer is re-asked once, then applied as {"action":"none"}; a rejected decision (exit
-# 3) is re-asked at the same cut, at most twice, then applied as none.
+# 3) is re-asked at the same cut once more (attempt labels 1r1, 2r1), then a second rejection is applied as none.
 #
 # Shadow reader (agreement): when SHADOW_MODEL is set, every first-attempt prompt is also sent, in the background, to
 # that model; its answer is logged to <run dir>/shadow.csv and shadow-raw/, and never drives the stepper.
 #
 # Env: DATA, PAGES (default <run dir>/../pages, market pack in PAGES/market), WEEKLY, END (as step.sh); CARD (rule
-# card), BOOK (the book's text file), RWORK (reader folders root), MODEL (default claude-opus-5-5), MAXUSD (stop this
+# card), BOOKDIR (folder holding only book.txt, default ~/.fresh-eyes-book; BOOK_SRC fills it), RWORK (reader
+# folders root), MODEL (default claude-opus-5-5), MAXUSD (stop this
 # symbol when its driving calls pass this many dollars, default 40), SHADOW_MODEL, SHADOW_MAXUSD (no new shadow call
 # once this symbol's shadow calls pass it, default 15), CWIDTH (composite width, default 2400).
-# Writes <run dir>/calls.csv, pauses.csv (limit waits) and raw/<cut>-<n>.txt; shadow.csv and shadow-raw/ with a shadow
+# Writes <run dir>/calls.csv, pauses.csv (limit waits) and raw/<cut>-<attempt>.txt; shadow.csv and shadow-raw/ with
+# a shadow
 # model.
 # Run from the repo root. Exit 0 when the run finished, 5 when MAXUSD stopped it, 6 when the model API kept failing.
 set -e
@@ -25,12 +28,23 @@ s=$1; R=$2
 E=dev/experiments/fresh-eyes-2026-10-13; S=$E/scripts
 SP=/private/tmp/claude-501/-Users-difan-Projects-trading-1/0bdb1704-90a7-4760-bb6e-40335d5259c0/scratchpad/fresh-eyes
 CARD=${CARD:-$SP/rulecard.md}
-BOOK=${BOOK:-/Users/difan/Downloads/486827303-Stan-Weinstein-s-Secrets-For-Profiting-in-Bull-and-Bear-Mark-pdf.txt}
+# The book: a dedicated folder outside the repository holding only the book's text (the reader's --add-dir, so Grep
+# reaches nothing else). Filled once from BOOK_SRC when empty. Never committed.
+BOOKDIR=${BOOKDIR:-$HOME/.fresh-eyes-book}; BOOK=$BOOKDIR/book.txt
+BOOK_SRC=${BOOK_SRC:-/Users/difan/Downloads/486827303-Stan-Weinstein-s-Secrets-For-Profiting-in-Bull-and-Bear-Mark-pdf.txt}
 RWORK=${RWORK:-$SP/readers}; MODEL=${MODEL:-claude-opus-5-5}; MAXUSD=${MAXUSD:-40}
 SHADOW_MAXUSD=${SHADOW_MAXUSD:-15}; CWIDTH=${CWIDTH:-2400}
 PAGES=${PAGES:-$R/../pages}; export PAGES
-mkdir -p "$R/raw"; W=$RWORK/$s; mkdir -p "$W"
-case "$W" in /Users/difan/Projects/*) echo "reader.sh: reader folder must be outside the repository" >&2; exit 2 ;; esac
+# W: this symbol's work files (inputs, outputs). C / CS: the driving / shadow reader's working folders, kept empty,
+# so a reader's Grep sees neither its own earlier calls' outputs nor the other reader's answer.
+W=$RWORK/_work/$s; C=$RWORK/cwd/$s; CS=$RWORK/cwd-shadow/$s
+mkdir -p "$R/raw" "$W" "$C" "$CS" "$BOOKDIR"
+for d in "$RWORK" "$BOOKDIR"; do
+  case "$d" in /Users/difan/Projects/*) echo "reader.sh: $d must be outside the repository" >&2; exit 2 ;; esac
+done
+[ -s "$BOOK" ] || cp "$BOOK_SRC" "$BOOK"
+[ "$(ls -A "$BOOKDIR")" = book.txt ] || { echo "reader.sh: $BOOKDIR must hold only book.txt" >&2; exit 2; }
+for d in "$C" "$CS"; do [ -z "$(ls -A "$d")" ] || { echo "reader.sh: reader folder $d must be empty" >&2; exit 2; }; done
 [ -f "$R/state" ] || sh $S/step.sh "$s" "$R" init auto
 H="sym,cut,attempt,input,cache_read,cache_creation,output,cost_usd,wall_s,turns,action"
 [ -f "$R/calls.csv" ] || echo "$H" > "$R/calls.csv"
@@ -98,7 +112,7 @@ call() {
     t0=$(date +%s)
     (cd "$2" && claude -p --model "$1" --input-format stream-json --output-format stream-json --verbose \
        --no-session-persistence --restricted --strict-mcp-config --system-prompt-file "$W/system.md" \
-       --allowedTools "Grep" --add-dir "$(dirname "$BOOK")" < "$3" > "$4" 2> "$4.err") || true
+       --allowedTools "Grep" --add-dir "$BOOKDIR" < "$3" > "$4" 2> "$4.err") || true
     wl=$(( $(date +%s) - t0 ))
     ws=$(sh $S/limit.sh "$4")
     [ "$ws" = 0 ] && break
@@ -131,16 +145,18 @@ shadow() {  # shadow <cut>: the shadow model on the same first-attempt message, 
   [ -n "$SHADOW_MODEL" ] || return 0
   over "$(usd_of "$R/shadow.csv")" "$SHADOW_MAXUSD" && return 0
   sd=$W/shadow-$1; mkdir -p "$sd"; cp "$W/in.jsonl" "$sd/in.jsonl"
-  ( wl=$(call "$SHADOW_MODEL" "$sd" "$sd/in.jsonl" "$sd/out.jsonl" shadow "$1")
+  ( wl=$(call "$SHADOW_MODEL" "$CS" "$sd/in.jsonl" "$sd/out.jsonl" shadow "$1")
     # A shadow call still failing after MAXPAUSE pauses is dropped (no row): it never drives the stepper.
     [ "$(sh $S/limit.sh "$sd/out.jsonl")" = 0 ] && log_call "$sd/out.jsonl" "$R/shadow-raw/$1.txt" "$R/shadow.csv" "$1" 1 "$wl" > /dev/null
     rm -rf "$sd" ) &
 }
 
-ask() {  # ask <attempt>: one driving call; leaves the decision in $W/decision.json (empty when malformed)
+ask() {  # ask <attempt label>: one driving call; leaves the decision in $W/decision.json (empty when malformed).
+  # Labels: 1 (first ask; also sent to the shadow), 2 (malformed re-ask); after the k-th rejected decision at the
+  # cut, 1r<k> and 2r<k>, so a re-ask never overwrites an earlier raw answer.
   c=$(sed -n 's/^cut=//p' "$R/state")
   [ "$1" = 1 ] && shadow "$c"
-  wl=$(call "$MODEL" "$W" "$W/in.jsonl" "$W/out.jsonl" driving "$c")
+  wl=$(call "$MODEL" "$C" "$W/in.jsonl" "$W/out.jsonl" driving "$c")
   if [ "$(sh $S/limit.sh "$W/out.jsonl")" != 0 ]; then
     cp "$W/out.jsonl" "$R/api-failure-$c.txt" 2>/dev/null || true
     wait; echo "reader.sh: $s: still limited after ${MAXPAUSE:-24} pauses at cut $c (see $R/api-failure-$c.txt); stopping, state kept" >&2
@@ -156,9 +172,10 @@ while ! grep -q '^RUN FINISHED' "$R/pending.txt"; do
   over "$(usd_of "$R/calls.csv")" "$MAXUSD" && { wait; echo "reader.sh: $s stopped at MAXUSD" >&2; exit 5; }
   stage_inputs; rejects=0
   while :; do
-    write_prompt ""; ask 1
+    sfx=; [ $rejects = 0 ] || sfx=r$rejects
+    write_prompt ""; ask "1$sfx"
     if [ ! -s "$W/decision.json" ]; then
-      write_prompt "Your last answer was not one line of valid JSON with an action. Reply with the JSON line only."; ask 2
+      write_prompt "Your last answer was not one line of valid JSON with an action. Reply with the JSON line only."; ask "2$sfx"
     fi
     [ -s "$W/decision.json" ] && denull || echo '{"action":"none"}' > "$R/dec.json"
     set +e; sh $S/step.sh "$s" "$R" apply "$R/dec.json"; rc=$?; set -e

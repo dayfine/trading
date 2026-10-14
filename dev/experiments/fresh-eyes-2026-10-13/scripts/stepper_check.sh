@@ -2,7 +2,7 @@
 # stepper_check.sh: sim.awk on hand-made daily fixtures (flat at 10, a few days overridden). Exit 1 on any failure.
 # Cases: buy-stop fill on a gap open; a limit blocks a gap-open day; short fill; the fill day's low is not checked
 # against the stop; stop raise accepted and stop lower rejected; a long stop above the trigger rejected; the
-# 8-week rest (flagged, cancelled on none, re-issue restarts the clock); the 4-week and fill-week checkpoints;
+# 8-week rest (flagged, cancelled on none, re-issue restarts the clock, cancel / set_stop on the due order accepted); the 4-week and fill-week checkpoints;
 # exit at the next open; the end-of-run mark; the adaptive look (next_look). Run from the repo root.
 set -e
 S=dev/experiments/fresh-eyes-2026-10-13/scripts
@@ -54,6 +54,13 @@ cp "$T/state" "$T/state.due"
 run "" "action=none"; has "unconfirmed order cancelled" "ord=none"
 cp "$T/state.due" "$T/state"; run "" "action=buy_stop|trigger=20|stop=9"
 has "re-issue restarts the clock" "placed=2020-02-28"; has "re-issued order rests" "ord=buy_stop"
+# 7b. at the 8-week checkpoint the due order is still the open order: an explicit cancel is accepted (pilot 2 VOLC
+# 2007-07-13 was rejected with "cancel: no open order"); set_stop is accepted, then the 8-week rule cancels it.
+cp "$T/state.due" "$T/state"; run "" "action=cancel"
+has "cancel of a due order accepted" "LOG,2020-02-28,cancel,,,2020-03-27,"; has "cancelled by the reader" "ord=none"
+has "no auto-cancel message" "msg="
+cp "$T/state.due" "$T/state"; run "" "action=set_stop|stop=8"
+has "set_stop on a due order accepted" "ostop=8"; has "then cancelled by the 8-week rule" "msg=order not re-issued after 8 weeks: cancelled; "
 # 8. exit fills at the next day's open.
 state0 2020-01-03 long 2019-12-16 8 7; run "2020-01-06:10.4/10.6/10.2/10.5" "action=exit"
 has "exit at the next open" "TRADE,FIX,long,2019-12-16,8.000000,2020-01-06,10.400000,exit,0.300000,0.000000,0.300000"

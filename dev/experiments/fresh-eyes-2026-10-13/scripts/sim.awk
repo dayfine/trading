@@ -61,7 +61,9 @@ function validate(   a, k, t, l, s, last, x) {
     st["ord"] = a; st["trig"] = t; st["lim"] = l; st["ostop"] = s; st["placed"] = st["cut"]; st["due"] = 0
     return
   }
-  if (st["due"] == 1 && st["ord"] != "none") { st["ord"] = "none"; st["msg"] = "order not re-issued after 8 weeks: cancelled" }
+  # An order at its 8-week checkpoint is still the open order here: cancel and set_stop act on it like on any
+  # other (the 8-week auto-cancel runs after the decision, in END). Pilot 2 VOLC 2007-07-13: the auto-cancel used to
+  # run first and rejected an explicit cancel of the order the status block showed.
   if (a == "none") return
   if (a == "cancel") { if (st["ord"] == "none") reject("cancel: no open order"); st["ord"] = "none"; return }
   if (a == "exit") { if (st["pos"] == "none") reject("exit: no open position"); st["xpend"] = 1; return }
@@ -86,6 +88,8 @@ END {
   st["msg"] = ""
   validate()
   if (exit_now) exit
+  # The 8-week rule: an order still due after the decision (not re-issued, not cancelled) is cancelled now.
+  if (st["due"] == 1 && st["ord"] != "none") { st["ord"] = "none"; st["msg"] = "order not re-issued after 8 weeks: cancelled; " }
   cut = st["cut"]; ntr = 0; ev = ""
   # Adaptive look (plan amendment, user decision 2026-10-13): next_look weeks, honoured only when flat (no
   # position and no open order after this decision); otherwise the 4-week cadence.

@@ -200,29 +200,55 @@ checkpoints, 219 calls, no malformed answer, no rejected decision, 2,630 s wall.
 **The adaptive look barely cut calls.** The reader chose `next_look` 4 weeks on 135 of 219 answers, 6 on 44, 8 on
 32, 13 on 3: about 10 checkpoints a year when flat, against 13 at the fixed cadence.
 
-**Extrapolation** (26 years ≈ 270 checkpoints a symbol at IMPM's pace): about 18.5M tokens and $36 a symbol; 100
-symbols about 1.85B tokens, $3,600 at list price, about 80 h serial (20 h at four in parallel).
+**Extrapolation, an upper bound** (26 years ≈ 270 checkpoints a symbol at IMPM's pace, for every symbol): about
+18.5M tokens and $36 a symbol; 100 symbols about 1.85B tokens, $3,600 at list price, about 80 h serial (20 h at four
+in parallel). The sample's mean history is 676 weekly bars (about 13 years, `pool.txt` joined with `sample.txt`), half
+of IMPM's 1,374, so at this format the run would be about 132 checkpoints a symbol, about $1,800. Superseded by
+pilot 2's format below.
 
 ## Pilot 2 (2026-10-13): one composite image, Opus driving, Sonnet shadow
 
 **Format** (user decision 2026-10-13): the cut's four pages go in as one 2x2 composite PNG (`scripts/composite.sh`,
 2400 px wide, drawn from the SVGs in one Chrome launch) inline in the user message (`claude -p --input-format
 stream-json`), with the last week's numbers and the status as text and the rule card as the system prompt. Every
-call was one model turn (523 Opus, 491 Sonnet; no malformed answer, no rejected decision). `claude-opus-5-5` drives
-the stepper; `claude-sonnet-5-5` gets the same first-attempt message in parallel (`SHADOW_MODEL`), logged to
-`shadow.csv` / `shadow-decisions.csv`, never applied.
+call was one model turn (523 Opus, 491 Sonnet; no malformed answer). `claude-opus-5-5` drives the stepper;
+`claude-sonnet-5-5` gets the same first-attempt message in parallel (`SHADOW_MODEL`), logged to `shadow.csv` /
+`shadow-decisions.csv`, never applied.
 
-**Cost per call, clean calls:** Opus $0.0763 (33.4k tokens: 24.7k cache read, 8.2k cache write, 0.5k output); Sonnet
-$0.0395 (33.5k tokens). About 7.5 s a checkpoint including the composite render. Pilot 1's four separate image reads
-cost $0.135 and five turns a call.
+**Which build each batch ran on.** IMPM and CNDT ran in the first pilot-2 run, at `158c85478`; the VOLC, ENZY and
+TCRX reruns (after the session-limit incident below) ran at `48c24d90d`. Between the two only the limit / pause
+handling changed (`limit.sh`, `reader.sh`'s retry loop); the prompt, the composite image and the status block are
+the same.
 
-| symbol | checkpoints | Opus $ | actions (non-none) | trades | trades' excess vs SPY |
+**One rejected decision, from a stepper defect (fixed after the pilot).** VOLC 2007-07-13: the buy_stop placed
+2007-05-18 reached its 8-week checkpoint and the status block asked the reader to re-issue it or let it be cancelled.
+Opus answered `cancel`. `sim.awk` ran its 8-week auto-cancel before reading the decision, so the order was already
+gone and the cancel was rejected ("cancel: no open order"). The re-ask answered `none`, which `log.csv` applied: the
+order ended cancelled either way, so the outcome is unchanged, but the reader was shown a contradiction and the cut
+cost an extra Opus and an extra Sonnet call (both `calls.csv` and `shadow.csv` have two rows at that cut). The re-ask
+reused attempt label 1, so `raw/2007-07-13-1.txt` and `shadow-raw/2007-07-13.txt` hold only the second answers;
+`decisions.csv` lost the rejected `cancel`, which survives only in `calls.csv`. Fix: `sim.awk` now applies the
+reader's decision first (a `cancel` or `set_stop` of the due order is accepted) and runs the 8-week auto-cancel
+after it (`stepper_check.sh` case 7b); `reader.sh` labels re-asks after a rejection `1r1` / `2r1` and sends only the
+first ask of a cut to the shadow, so no raw answer is overwritten.
+
+**Cost per call, from the committed `results/pilot2/*/calls.csv` (all 523 Opus rows: IMPM and CNDT from the first
+run, VOLC, ENZY and TCRX from the reruns, the superseded calls excluded; the VOLC rejected call included):** Opus
+$0.0763 (33.3k tokens: 25.1k cache read, 7.8k cache write, 0.4k output); Sonnet, from the 491 `shadow.csv` rows,
+$0.0395 (33.5k tokens). The model wall in `calls.csv` (`wall_s`) averages 7.0 s an Opus call; pilot 2 kept no run
+log, so the composite render's time on top of it is not recorded (the estimate below takes 7.5 s a checkpoint).
+Pilot 1's four separate image reads cost $0.135 and five turns a call.
+
+| symbol | checkpoints | Opus $ | applied actions (non-none) | trades | trades' excess vs SPY |
 |---|---:|---:|---|---|---|
 | IMPM (2000–26) | 246 | 19.12 | buy_stop 2, cancel 1 | 1 long, stopped | −13.4 % |
-| VOLC (2007–11) | 99 | 7.89 | buy_stop 5, set_stop 5, cancel 1 | 4 long, all stopped | −9.7, −14.5, −11.1, −8.0 % |
+| VOLC (2007–15) | 99 | 7.89 | buy_stop 5, set_stop 5 (and 1 rejected cancel, above) | 4 long, all stopped | −9.7, −14.5, −11.1, −8.0 % |
 | ENZY (2014–18) | 40 | 2.93 | buy_stop 4 | 2 long (1 stopped, 1 open at end) | −10.1, −4.9 % |
 | CNDT (2017–26) | 96 | 7.71 | buy_stop 5, cancel 3 | 2 long, both stopped | −10.5, −4.5 % |
-| TCRX (2023–26) | 41 | 2.27 | none | none | — |
+| TCRX (2022–26) | 41 | 2.27 | none | none | — |
+
+VOLC's run covers cuts 2007-01-05 to 2014-12-19 (data to 2015-02-17); TCRX's first cut is 2022-02-04. `summary.txt`
+counts actions per call, so it shows VOLC's rejected `cancel=1`; `log.csv` has the applied ones.
 
 Nine trades, all long; the reader placed one short order in the superseded run and none in the clean runs. Five
 symbols cannot say anything about the reader's skill; the pilot measures the machinery and the cost.
@@ -243,10 +269,18 @@ The 93.5 % is mostly the 449 shared "none" answers. On the decisions that matter
 order placements Sonnet matched 5 and said none on 10; it placed 10 orders Opus did not. Most placements happen when
 the book is flat, so routing flat checkpoints to Sonnet would change the entries, not just save money.
 
-**Extrapolation to 100 symbols** (the pilot averages 104 checkpoints a symbol; the sample's mix of history lengths is
-similar, so about 10,400 calls): (a) Opus throughout, about $800 and 22 h serial (about 6 h at four in parallel);
-(b) Sonnet when flat, Opus otherwise (about 89 % of checkpoints are flat, estimated from the logs), about $450, with
-the entry-divergence caveat above.
+The VOLC 2007-07-13 pair in these counts is the two second answers (Opus `none`, Sonnet `cancel`), because the first
+answers were overwritten (above).
+
+**Extrapolation to 100 symbols, from the sample's actual history lengths.** The five pilot symbols have 2,810 weekly
+bars between them (`pool.txt`: IMPM 1,374, VOLC 454, ENZY 225, CNDT 498, TCRX 259; mean 562) and took 522
+checkpoints. The 100 sampled symbols have 67,607 bars (mean 676, about 20 % longer). At the pilot's pace that is
+522 × 67,607 / 2,810 ≈ 12,560 calls (12,680 if the 30-week warm-up before the first cut is taken out of both:
+522 × (67,607 − 3,000) / (2,810 − 150)); call it about 12,600.
+(a) Opus throughout: 12,600 × $0.0763 ≈ $960, and 12,600 × 7.5 s ≈ 26 h serial (about 6.5 h at four in parallel;
+at least 24.5 h serial on the 7.0 s model wall alone).
+(b) Sonnet when flat, Opus otherwise (about 90 % of checkpoints are flat in the five `log.csv` files): 12,600 ×
+(0.1 × $0.0763 + 0.9 × $0.0395) ≈ $540–550, with the entry-divergence caveat above.
 
 **Session-limit incident.** In the first pilot-2 run the account hit its session limit for about 20 minutes. 183
 replies ("You've hit your session limit · resets 7:50pm (America/Los_Angeles)", zero output tokens) were logged as
@@ -255,3 +289,18 @@ discarded; VOLC, ENZY and TCRX (which had run without a shadow) were rerun from 
 cap with no pause needed. `scripts/limit.sh` now classifies such replies (a session / usage / rate limit, 429 / 529,
 overloaded, no result, or zero output tokens): `reader.sh` sleeps to the stated reset + 2 min (else 15 min), logs the
 pause to `pauses.csv` and retries the same cut, never counting it as an answer (`stepper_check.sh` case 12).
+
+**Departure from the plan: a fresh context per checkpoint.** Plan §4 says "one agent context per symbol". The build
+instead makes one fresh `claude -p` call per checkpoint, with no memory of earlier calls beyond what the status block
+shows (position, resting order, recent trades). The reader therefore cannot carry a thesis, a base count or a
+remembered resistance level from one look to the next; the self-consistency step measures the consistency of
+independent readings of each chart, not of one reader following a stock. This holds for both pilots and is the
+intended design for the verdict run, unless changed before it starts.
+
+**Reader isolation for the verdict run (changed after pilot 2).** In both pilots `--add-dir` was the book's parent
+folder (`~/Downloads`), and the shadow's folder and the previous call's outputs sat inside the driving reader's
+working folder. Pilot 2 is unaffected (every call was one turn, so no tool ran). `reader.sh` now gives each reader an
+empty working folder (`$RWORK/cwd/<SYM>`, `$RWORK/cwd-shadow/<SYM>`, checked empty at start), keeps all inputs and
+outputs in `$RWORK/_work/<SYM>`, and passes `--add-dir` a dedicated folder outside the repository holding only the
+book's text (`BOOKDIR`, default `~/.fresh-eyes-book/book.txt`, never committed; `reader.sh` refuses to run if it
+holds anything else).
