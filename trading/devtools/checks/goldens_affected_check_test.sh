@@ -309,7 +309,7 @@ sed -i.bak 's/\[@sexp.default 0\]/[@sexp.default 26]/' "$REPO6/$SURFACE_MLI_REL"
 rm -f "$REPO6/$SURFACE_MLI_REL.bak"
 SHA6B="$(_commit "$REPO6" "head: flip default 0 -> 26")"
 _run "$REPO6" "$SHA6A" "$SHA6B"
-if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "no .github/workflows/golden-runs"; then
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "zero postsubmit golden specs"; then
   pass "assertion 6: no golden-runs workflow -> OK"
 else
   fail "assertion 6: expected OK/exit0, got rc=$RC output=$OUT"
@@ -930,6 +930,30 @@ fi
 rm -rf "$REPO23"
 
 echo ""
+# Tier-2/tier-4 and smoke/sweep specs must be covered without a
+# golden-runs workflow, including specs that only inherit the changed default.
+for scenario_dir in goldens-small goldens-broad smoke perf-sweep; do
+  repo="$(_make_default_change_repo no no yes "$scenario_dir")"
+  base="$(_commit "$repo" base)"
+  sed -i.bak 's/sexp.default 0/sexp.default 26/' "$repo/$SURFACE_MLI_REL"
+  head="$(_commit "$repo" flip)"
+  _run "$repo" "$base" "$head"
+  if [ "$RC" = 1 ] && echo "$OUT" | grep -q "$scenario_dir/fixture-golden.sexp"; then
+    pass "$scenario_dir: explicit override detected without postsubmit workflow"
+  else
+    fail "$scenario_dir: expected affected spec, rc=$RC output=$OUT"
+  fi
+  printf '((name fixture-golden) (config_overrides ()))\n' > "$repo/trading/test_data/backtest_scenarios/$scenario_dir/fixture-golden.sexp"
+  head="$(_commit "$repo" inherited)"
+  _run "$repo" "$base" "$head"
+  if [ "$RC" = 1 ] && echo "$OUT" | grep -q "$scenario_dir/fixture-golden.sexp"; then
+    pass "$scenario_dir: inherited default detected"
+  else
+    fail "$scenario_dir: expected inherited spec, rc=$RC output=$OUT"
+  fi
+  rm -rf "$repo"
+done
+
 echo "=== Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed ==="
 if [ "$FAIL_COUNT" -gt 0 ]; then
   exit 1

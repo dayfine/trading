@@ -149,6 +149,8 @@
 #   golden_sp500_postsubmit.sh's own default — for a workflow file with no
 #   explicit override). Every *.sexp file under each discovered subdir is
 #   grepped (whole-word) for each knob name from Steps 2 + 2.5.
+#   Also scan goldens-small, goldens-broad, smoke and perf-sweep regardless
+#   of workflow discovery: nightly/local coverage matters too (#2650).
 #
 #   Inheritance widening for VALUE CHANGES (Step 4b, issues #2558/#2570) —
 #   Step 4's name-matching answers "does any golden mention this knob",
@@ -565,10 +567,9 @@ WORKFLOWS_DIR="${REPO_ROOT}/.github/workflows"
 SUBDIRS_FILE="$(mktemp)"
 trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$LIT_BASE" "$LIT_HEAD" "$LIT_CHANGED_FIELDS" "$SUBDIRS_FILE"' EXIT
 
-WORKFLOW_MATCHED=0
+printf '%s\n' goldens-small goldens-broad smoke perf-sweep >> "$SUBDIRS_FILE"
 for wf in "$WORKFLOWS_DIR"/golden-runs-*.yml; do
   [ -f "$wf" ] || continue
-  WORKFLOW_MATCHED=1
   val="$(sed -n 's/^[[:space:]]*GOLDEN_SP500_SUBDIRS:[[:space:]]*//p' "$wf" | head -1 | tr -d '"')"
   if [ -z "$val" ]; then
     # golden_sp500_postsubmit.sh's own default when a workflow doesn't
@@ -577,11 +578,6 @@ for wf in "$WORKFLOWS_DIR"/golden-runs-*.yml; do
   fi
   printf '%s\n' $val
 done >> "$SUBDIRS_FILE"
-
-if [ "$WORKFLOW_MATCHED" -eq 0 ]; then
-  echo "OK: goldens_affected_check -- no .github/workflows/golden-runs-*.yml found; nothing to check against."
-  exit 0
-fi
 
 sort -u "$SUBDIRS_FILE" -o "$SUBDIRS_FILE"
 
@@ -702,7 +698,7 @@ echo "FAIL: goldens_affected_check -- this PR changes a config default that a PO
 echo ""
 printf '%b' "$MATCHES"
 echo ""
-echo "These goldens run only on push to main (golden-runs-*.yml), not on this PR,"
+echo "These scenarios run in postsubmit, nightly, or local suites, not necessarily on this PR,"
 echo "so CI green here gives no signal about them. Per"
 echo ".claude/rules/config-default-blast-radius.md, run each affected golden by"
 echo "hand, PAIRED (base vs this PR, one-line spec diff), and paste the paired"
