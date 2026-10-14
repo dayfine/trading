@@ -78,7 +78,7 @@ Reply with ONE line of JSON and nothing else:
 {"stage": <1-4 for the stock>, "action": "...", "trigger": <number or null>, "limit": <number or null>, "stop": <number or null>, "next_look": <weeks or null>, "reason": "<one short sentence>"}
 $1
 EOF
-  base64 < "$W/cut.png" | tr -d '\n' > "$W/cut.b64"
+  base64 < "$W/cut.png" | awk '{printf "%s", $0}' > "$W/cut.b64"
   jq -cn --rawfile b "$W/cut.b64" --rawfile t "$W/prompt.txt" \
     '{type:"user",message:{role:"user",content:[{type:"image",source:{type:"base64",media_type:"image/png",data:$b}},{type:"text",text:$t}]}}' > "$W/in.jsonl"
   rm -f "$W/cut.b64"
