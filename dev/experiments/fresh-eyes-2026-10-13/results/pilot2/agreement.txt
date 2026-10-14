@@ -1,0 +1,43 @@
+paired decisions 490 (driving without a shadow answer: 32)
+action agreement 458 / 490 = 93.5 %
+stage agreement 370 / 490 = 75.5 %
+active driving decisions (not none) 25; shadow gave the same action on 9
+shadow active where driving said none: 16
+  none -> cancel             4
+  none -> buy_stop           10
+  buy_stop -> cancel         1
+  set_stop -> none           4
+  none -> set_stop           2
+  buy_stop -> none           10
+  cancel -> cancel           3
+  set_stop -> set_stop       1
+  cancel -> none             1
+  buy_stop -> buy_stop       5
+  none -> none               449
+  active VOLC-2010-06-25: set_stop / none
+  active CNDT-2018-04-13: buy_stop / buy_stop
+  active VOLC-2011-07-01: buy_stop / none
+  active VOLC-2007-04-27: buy_stop / buy_stop
+  active CNDT-2017-09-29: cancel / cancel
+  active ENZY-2017-06-30: buy_stop / cancel
+  active VOLC-2011-01-07: set_stop / none
+  active CNDT-2018-11-02: cancel / cancel
+  active VOLC-2007-05-18: buy_stop / none
+  active CNDT-2018-02-16: cancel / cancel
+  active VOLC-2010-12-10: set_stop / set_stop
+  active ENZY-2015-05-08: buy_stop / none
+  active VOLC-2010-08-20: set_stop / none
+  active CNDT-2018-10-05: buy_stop / none
+  active ENZY-2017-03-10: buy_stop / buy_stop
+  active VOLC-2010-11-12: set_stop / none
+  active CNDT-2018-01-19: buy_stop / none
+  active IMPM-2004-07-30: cancel / none
+  active ENZY-2017-05-05: buy_stop / buy_stop
+  active IMPM-2015-10-30: buy_stop / none
+  active VOLC-2007-03-30: buy_stop / none
+  active CNDT-2017-09-01: buy_stop / none
+  active VOLC-2010-01-22: buy_stop / buy_stop
+  active IMPM-2004-07-02: buy_stop / none
+  active CNDT-2018-08-24: buy_stop / none
+level trigger: n 5, mean |diff| 1.07 %, median 1.38 %, max 2.08 %
+level stop: n 6, mean |diff| 3.01 %, median 1.01 %, max 10.12 %

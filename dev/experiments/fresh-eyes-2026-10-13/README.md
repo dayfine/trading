@@ -97,3 +97,210 @@ re-draw.
 
 `demo.sh` renders the step-1 demo set (RMD 2002-10-11 and 2008-10-10, TWTR 2015-06-26 and 2021-12-31, MP 2021-12-31
 and 2024-06-28, the market pack at 2008-10-10 and 2021-12-31) into `.sweep-output/fresh-eyes/demo/`.
+
+# Step 2: the stepper (plan §4 layer (ii))
+
+The forward pass, one symbol per run dir: at each checkpoint the reader gets the stock pages (both frames), the
+last-bar JSON, the market pages and a status block, and answers with one decision; a deterministic simulator then
+plays the daily bars to the next checkpoint. The reader never sees a bar after the cut.
+
+```sh
+E=dev/experiments/fresh-eyes-2026-10-13; R=.sweep-output/fresh-eyes/run
+DATA=data sh $E/scripts/market_pages.sh $R/pages        # shared market pack, every Friday 2000-2026, once (~25 min, 4 jobs)
+DATA=data sh $E/scripts/step.sh OMC $R/OMC init auto    # first cut; writes $R/OMC/pending.txt
+DATA=data sh $E/scripts/step.sh OMC $R/OMC apply d.json # exit 0 next cut, 3 rejected (re-ask), 4 finished
+DATA=data sh $E/scripts/step.sh OMC $R/OMC pending      # resume after a failed render
+sh $E/scripts/stepper_check.sh                          # fixtures; must print "stepper check: PASS"
+DATA=data sh $E/scripts/dry_run.sh OMC                  # whole loop with a dummy reader, timed
+```
+
+**Decision** (JSON or key=value lines; `decision.awk` normalises it): `stage`, `action` (`none`, `buy_stop`,
+`short_stop`, `cancel`, `set_stop`, `exit`), `trigger`, `limit` (optional), `stop`, `next_look` (optional), `reason`. Levels are on the
+chart's scale at the cut. `buy_stop` / `short_stop` need a trigger and the protective stop that goes live on the
+fill; they need a flat book and replace any resting order.
+
+**Validation** (a rejected decision leaves the state unchanged, `pending.txt` carries the message, exit 3): a long
+stop below the trigger, a short stop above it; a buy limit at or above the trigger, a short limit at or below it;
+`set_stop` may not lower a long stop or raise a short stop (on a resting order it moves the stop-on-fill); `cancel`
+needs an order and `exit` a position.
+
+**Prices.** The chart shows the vendor's adjusted series rescaled so the cut week's close is its raw close, i.e.
+chart = adjusted x k(t) with k(t) = raw close / adjusted close of the cut week. A level the reader gives at cut t is
+stored as level / k(t); the simulation runs on daily adjusted OHLC (raw x adjusted_close / close), so dividends and
+splits after the cut neither trigger nor move anything. The status block shows the stored levels x k at the current
+cut, so a resting order's trigger drifts slightly between cuts as dividends accrue (OMC: 107.61 at 2000-03-03,
+107.37 at 2000-03-31). Closed trades are shown as dates and returns.
+
+**Fills** (`sim.awk`). Buy-stop: the day's high >= trigger fills at max(open, trigger); with a limit, a day that
+opens above the limit does not fill. Short-stop mirrors it. A protective stop is live from the day after the fill
+(long: low <= stop fills at min(open, stop); short: high >= stop at max(open, stop)). `exit` fills at the next
+day's open. No commissions, no borrow fee beyond the dividends a short pays (the adjusted series charges them).
+
+**Checkpoints.** 4 weeks after the cut; or the Friday ending the week of a fill, a stop exit or an exit; or the
+Friday 8 weeks after an order was placed, whichever is first. At that 8-week checkpoint the order must be re-issued
+(`buy_stop` / `short_stop` again, which restarts the clock) or it is cancelled. The run ends at the symbol's last bar
+or at `END` (2026-06-26); an open position is marked to that close as `open_at_end`. The first cut (`init auto`) is
+the first Friday on or after 2000-01-07 with a 30-week MA. One position per symbol at a time, one unit of capital
+per trade.
+
+**Trade log** (`trades.csv`): side, entry and exit date and price (adjusted), how it ended (`stop`, `exit`,
+`open_at_end`), return, the SPY leg over the same days (long: SPY long; short: SPY short; SPY's adjusted open on
+the entry day to its adjusted close on the exit day, or its open when the exit fills at the open), and the excess.
+`log.csv` has one row per checkpoint; `decisions/<cut>.txt` keeps each applied decision as given.
+
+**Rendering cost.** Headless Chrome dominates (about 1.7 s a launch; the SVGs take about 0.1 s). `render.sh` puts
+both frames of a page on one HTML page, takes one screenshot and crops the two frames out with `sips` (a 1 px margin
+avoids its offset-0 and edge bugs), so a stock or market page pair costs about 2.5 s. Each launch is killed after
+60 s and retried up to 3 times. Market pages depend only on the cut, so `market_pages.sh` renders them once for every
+Friday and all symbols share them.
+
+| script | does |
+|---|---|
+| `decision.awk`, `decision.sh` | normalise one decision to key=value |
+| `sim.awk` | validate, apply and simulate to the next checkpoint |
+| `status.awk` | the status block, on the chart's scale |
+| `start.awk` | the first cut |
+| `step.sh` | init / apply / pending |
+| `market_pages.sh`, `market_one.sh` | the shared market pack for every Friday |
+| `fixture.awk`, `stepper_check.sh` | fixture checks of the fill, stop, rest and checkpoint rules |
+| `dummy_agent.awk`, `dry_run.sh` | the loop end to end with a stand-in reader (not a strategy) |
+
+**Dry run (2026-10-13, OMC, dummy reader, host, nothing else running).** 368 checkpoints from 2000-02-04 to the end,
+26 dummy trades, 1,407 s wall: 3.8 s per checkpoint, rendering the market pack inline (no pre-render). Of that, a
+stock page pair and a market page pair cost about 2.5 s each; decision + simulation + status take well under 0.1 s.
+With the market pack pre-rendered once (`market_pages.sh`, about 1,370 Fridays), a checkpoint costs about 2.5 s, so
+100 symbols at about 370 checkpoints are about 26 h of rendering, serial, before any reader time; four renders in
+parallel bring it to about 6–7 h. The reader's own time per checkpoint will dominate.
+
+**Plan amendment: adaptive look (user decision 2026-10-13, to cut model calls).** The dry run showed about 370
+checkpoints a symbol at the plan's 4-week cadence, about 37,000 model calls for 100 symbols. The decision gains an
+optional `next_look` (whole weeks, 1–13; anything else is rejected). It is honoured only when the book is flat after
+the decision (no position and no resting order); with a position or an order the 4-week cadence stands, and a fill,
+a stop exit, an exit or the 8-week rest still force a checkpoint earlier. Default 4. Pinned by `stepper_check.sh`
+case 11.
+
+## Pilot (2026-10-13): stopped by the 15M-token budget inside the first symbol
+
+`scripts/reader.sh` runs one fresh headless `claude -p` call (opus 5.5, `--restricted`, Read and Grep only, the rule
+card as the system prompt) per checkpoint from a folder outside the repository holding only the rule card, the four
+pages and the cut's numbers. A probe call confirmed the reader sees no repository instructions. `scripts/pilot.sh`
+runs the pilot symbols in turn under a total token cap; `pilot_summary.sh` and `pilot_collect.sh` summarise and copy
+the per-symbol `calls.csv`, `trades.csv`, `log.csv` and `decisions.csv` (each raw answer) into `results/pilot/`.
+The rule card the readers used is `results/rulecard.md` (the step-0 agent's own paraphrase of the book, chapter
+cites, no book text beyond short phrases).
+
+**What ran.** The cap (15M tokens) was reached on the first pilot symbol, IMPM, at the 2021-03-26 cut: 219
+checkpoints, 219 calls, no malformed answer, no rejected decision, 2,630 s wall. Actions: none 216, buy_stop 1
+(2004-07-02, cancelled 2004-07-30 when the S&P broke its MA), short_stop 1 (2016-01-22, filled 2016-01-27, stopped
+2016-02-17: return −19.9 %, excess vs an SPY short −18.1 %). The other four pilot symbols did not run.
+
+**Cost.** 68.6k tokens a call (cache read 53.9k, cache write 14.1k, output 0.6k), $0.135 a call at list price; about
+11 s a checkpoint including rendering. A call is five model turns: the four images are read one at a time.
+
+**The adaptive look barely cut calls.** The reader chose `next_look` 4 weeks on 135 of 219 answers, 6 on 44, 8 on
+32, 13 on 3: about 10 checkpoints a year when flat, against 13 at the fixed cadence.
+
+**Extrapolation, an upper bound** (26 years ≈ 270 checkpoints a symbol at IMPM's pace, for every symbol): about
+18.5M tokens and $36 a symbol; 100 symbols about 1.85B tokens, $3,600 at list price, about 80 h serial (20 h at four
+in parallel). The sample's mean history is 676 weekly bars (about 13 years, `pool.txt` joined with `sample.txt`), half
+of IMPM's 1,374, so at this format the run would be about 132 checkpoints a symbol, about $1,800. Superseded by
+pilot 2's format below.
+
+## Pilot 2 (2026-10-13): one composite image, Opus driving, Sonnet shadow
+
+**Format** (user decision 2026-10-13): the cut's four pages go in as one 2x2 composite PNG (`scripts/composite.sh`,
+2400 px wide, drawn from the SVGs in one Chrome launch) inline in the user message (`claude -p --input-format
+stream-json`), with the last week's numbers and the status as text and the rule card as the system prompt. Every
+call was one model turn (523 Opus, 491 Sonnet; no malformed answer). `claude-opus-5-5` drives the stepper;
+`claude-sonnet-5-5` gets the same first-attempt message in parallel (`SHADOW_MODEL`), logged to `shadow.csv` /
+`shadow-decisions.csv`, never applied.
+
+**Which build each batch ran on.** IMPM and CNDT ran in the first pilot-2 run, at `158c85478`; the VOLC, ENZY and
+TCRX reruns (after the session-limit incident below) ran at `48c24d90d`. Between the two only the limit / pause
+handling changed (`limit.sh`, `reader.sh`'s retry loop); the prompt, the composite image and the status block are
+the same.
+
+**One rejected decision, from a stepper defect (fixed after the pilot).** VOLC 2007-07-13: the buy_stop placed
+2007-05-18 reached its 8-week checkpoint and the status block asked the reader to re-issue it or let it be cancelled.
+Opus answered `cancel`. `sim.awk` ran its 8-week auto-cancel before reading the decision, so the order was already
+gone and the cancel was rejected ("cancel: no open order"). The re-ask answered `none`, which `log.csv` applied: the
+order ended cancelled either way, so the outcome is unchanged, but the reader was shown a contradiction and the cut
+cost an extra Opus and an extra Sonnet call (both `calls.csv` and `shadow.csv` have two rows at that cut). The re-ask
+reused attempt label 1, so `raw/2007-07-13-1.txt` and `shadow-raw/2007-07-13.txt` hold only the second answers;
+`decisions.csv` lost the rejected `cancel`, which survives only in `calls.csv`. Fix: `sim.awk` now applies the
+reader's decision first (a `cancel` or `set_stop` of the due order is accepted) and runs the 8-week auto-cancel
+after it (`stepper_check.sh` case 7b); `reader.sh` labels re-asks after a rejection `1r1` / `2r1` and sends only the
+first ask of a cut to the shadow, so no raw answer is overwritten.
+
+**Cost per call, from the committed `results/pilot2/*/calls.csv` (all 523 Opus rows: IMPM and CNDT from the first
+run, VOLC, ENZY and TCRX from the reruns, the superseded calls excluded; the VOLC rejected call included):** Opus
+$0.0763 (33.3k tokens: 25.1k cache read, 7.8k cache write, 0.4k output); Sonnet, from the 491 `shadow.csv` rows,
+$0.0395 (33.5k tokens). The model wall in `calls.csv` (`wall_s`) averages 7.0 s an Opus call; pilot 2 kept no run
+log, so the composite render's time on top of it is not recorded (the estimate below takes 7.5 s a checkpoint).
+Pilot 1's four separate image reads cost $0.135 and five turns a call.
+
+| symbol | checkpoints | Opus $ | applied actions (non-none) | trades | trades' excess vs SPY |
+|---|---:|---:|---|---|---|
+| IMPM (2000–26) | 246 | 19.12 | buy_stop 2, cancel 1 | 1 long, stopped | −13.4 % |
+| VOLC (2007–15) | 99 | 7.89 | buy_stop 5, set_stop 5 (and 1 rejected cancel, above) | 4 long, all stopped | −9.7, −14.5, −11.1, −8.0 % |
+| ENZY (2014–18) | 40 | 2.93 | buy_stop 4 | 2 long (1 stopped, 1 open at end) | −10.1, −4.9 % |
+| CNDT (2017–26) | 96 | 7.71 | buy_stop 5, cancel 3 | 2 long, both stopped | −10.5, −4.5 % |
+| TCRX (2022–26) | 41 | 2.27 | none | none | — |
+
+VOLC's run covers cuts 2007-01-05 to 2014-12-19 (data to 2015-02-17); TCRX's first cut is 2022-02-04. `summary.txt`
+counts actions per call, so it shows VOLC's rejected `cancel=1`; `log.csv` has the applied ones.
+
+Nine trades, all long; the reader placed one short order in the superseded run and none in the clean runs. Five
+symbols cannot say anything about the reader's skill; the pilot measures the machinery and the cost.
+
+**Agreement, Opus vs Sonnet on the same message** (`results/pilot2/agreement.txt`; 490 paired decisions, 32 Opus
+calls had no shadow because the first run's $15 shadow cap ran out on CNDT's tail):
+
+| | |
+|---|---|
+| same action | 458 / 490 = 93.5 % |
+| same stage | 370 / 490 = 75.5 % |
+| Opus active (not none): Sonnet gave the same action | 9 / 25 |
+| Sonnet active where Opus said none | 16 |
+| trigger, same-action pairs | n 5, median 1.4 % apart, max 2.1 % |
+| stop, same-action pairs | n 6, median 1.0 % apart, max 10.1 % |
+
+The 93.5 % is mostly the 449 shared "none" answers. On the decisions that matter the models diverge: of Opus's 16
+order placements Sonnet matched 5 and said none on 10; it placed 10 orders Opus did not. Most placements happen when
+the book is flat, so routing flat checkpoints to Sonnet would change the entries, not just save money.
+
+The VOLC 2007-07-13 pair in these counts is the two second answers (Opus `none`, Sonnet `cancel`), because the first
+answers were overwritten (above).
+
+**Extrapolation to 100 symbols, from the sample's actual history lengths.** The five pilot symbols have 2,810 weekly
+bars between them (`pool.txt`: IMPM 1,374, VOLC 454, ENZY 225, CNDT 498, TCRX 259; mean 562) and took 522
+checkpoints. The 100 sampled symbols have 67,607 bars (mean 676, about 20 % longer). At the pilot's pace that is
+522 × 67,607 / 2,810 ≈ 12,560 calls (12,680 if the 30-week warm-up before the first cut is taken out of both:
+522 × (67,607 − 3,000) / (2,810 − 150)); call it about 12,600.
+(a) Opus throughout: 12,600 × $0.0763 ≈ $960, and 12,600 × 7.5 s ≈ 26 h serial (about 6.5 h at four in parallel;
+at least 24.5 h serial on the 7.0 s model wall alone).
+(b) Sonnet when flat, Opus otherwise (about 90 % of checkpoints are flat in the five `log.csv` files): 12,600 ×
+(0.1 × $0.0763 + 0.9 × $0.0395) ≈ $540–550, with the entry-divergence caveat above.
+
+**Session-limit incident.** In the first pilot-2 run the account hit its session limit for about 20 minutes. 183
+replies ("You've hit your session limit · resets 7:50pm (America/Los_Angeles)", zero output tokens) were logged as
+malformed answers and applied as none, so VOLC from 2011-05-27 and nearly all of ENZY were invalid. Those runs are
+discarded; VOLC, ENZY and TCRX (which had run without a shadow) were rerun from scratch under a $15 Opus / $8 Sonnet
+cap with no pause needed. `scripts/limit.sh` now classifies such replies (a session / usage / rate limit, 429 / 529,
+overloaded, no result, or zero output tokens): `reader.sh` sleeps to the stated reset + 2 min (else 15 min), logs the
+pause to `pauses.csv` and retries the same cut, never counting it as an answer (`stepper_check.sh` case 12).
+
+**Departure from the plan: a fresh context per checkpoint.** Plan §4 says "one agent context per symbol". The build
+instead makes one fresh `claude -p` call per checkpoint, with no memory of earlier calls beyond what the status block
+shows (position, resting order, recent trades). The reader therefore cannot carry a thesis, a base count or a
+remembered resistance level from one look to the next; the self-consistency step measures the consistency of
+independent readings of each chart, not of one reader following a stock. This holds for both pilots and is the
+intended design for the verdict run, unless changed before it starts.
+
+**Reader isolation for the verdict run (changed after pilot 2).** In both pilots `--add-dir` was the book's parent
+folder (`~/Downloads`), and the shadow's folder and the previous call's outputs sat inside the driving reader's
+working folder. Pilot 2 is unaffected (every call was one turn, so no tool ran). `reader.sh` now gives each reader an
+empty working folder (`$RWORK/cwd/<SYM>`, `$RWORK/cwd-shadow/<SYM>`, checked empty at start), keeps all inputs and
+outputs in `$RWORK/_work/<SYM>`, and passes `--add-dir` a dedicated folder outside the repository holding only the
+book's text (`BOOKDIR`, default `~/.fresh-eyes-book/book.txt`, never committed; `reader.sh` refuses to run if it
+holds anything else).
