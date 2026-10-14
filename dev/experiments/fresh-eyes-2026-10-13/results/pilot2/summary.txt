@@ -1,0 +1,9 @@
+CNDT checkpoints=96 calls=96 tokens=3208011 (in 192, cache_read 2371872, cache_write 790688, out 45259) per_call=33416 usd=7.71 wall=719s turns_per_call=1.00 actions: buy_stop=5 cancel=3 none=88 | trades=2 long=2 short=0 sum_excess=-14.9%
+   long 2018-06-06->2018-06-27 stop ret -12.4% exc -10.5%; long 2018-08-28->2018-10-05 stop ret -4.9% exc -4.5%;
+ENZY checkpoints=40 calls=40 tokens=1334764 (in 80, cache_read 1020989, cache_write 295911, out 17784) per_call=33369 usd=2.93 wall=290s turns_per_call=1.00 actions: buy_stop=4 none=36 | trades=2 long=2 short=0 sum_excess=-15.0%
+   long 2015-05-26->2015-06-29 stop ret -12.9% exc -10.1%; long 2017-08-21->2018-01-10 open_at_end ret +9.2% exc -4.9%;
+IMPM checkpoints=246 calls=246 tokens=8190158 (in 492, cache_read 6097266, cache_write 1995583, out 96817) per_call=33293 usd=19.12 wall=1624s turns_per_call=1.00 actions: buy_stop=2 cancel=1 none=243 | trades=1 long=1 short=0 sum_excess=-13.4%
+   long 2015-11-03->2015-11-05 stop ret -13.4% exc -13.4%;
+TCRX checkpoints=41 calls=41 tokens=1365292 (in 82, cache_read 1135689, cache_write 212675, out 16846) per_call=33299 usd=2.27 wall=264s turns_per_call=1.00 actions: none=41 | trades=0 long=0 short=0 sum_excess=+0.0%
+VOLC checkpoints=99 calls=100 tokens=3342583 (in 200, cache_read 2487054, cache_write 809685, out 45644) per_call=33425 usd=7.89 wall=768s turns_per_call=1.00 actions: buy_stop=5 cancel=1 set_stop=5 none=89 | trades=4 long=4 short=0 sum_excess=-43.3%
+   long 2007-04-16->2007-04-26 stop ret -7.1% exc -9.7%; long 2007-05-09->2007-05-16 stop ret -13.9% exc -14.5%; long 2010-03-04->2011-03-15 stop ret +5.4% exc -11.1%; long 2011-07-07->2011-08-03 stop ret -14.6% exc -8.0%;

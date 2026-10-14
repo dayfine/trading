@@ -202,3 +202,56 @@ checkpoints, 219 calls, no malformed answer, no rejected decision, 2,630 s wall.
 
 **Extrapolation** (26 years ≈ 270 checkpoints a symbol at IMPM's pace): about 18.5M tokens and $36 a symbol; 100
 symbols about 1.85B tokens, $3,600 at list price, about 80 h serial (20 h at four in parallel).
+
+## Pilot 2 (2026-10-13): one composite image, Opus driving, Sonnet shadow
+
+**Format** (user decision 2026-10-13): the cut's four pages go in as one 2x2 composite PNG (`scripts/composite.sh`,
+2400 px wide, drawn from the SVGs in one Chrome launch) inline in the user message (`claude -p --input-format
+stream-json`), with the last week's numbers and the status as text and the rule card as the system prompt. Every
+call was one model turn (523 Opus, 491 Sonnet; no malformed answer, no rejected decision). `claude-opus-5-5` drives
+the stepper; `claude-sonnet-5-5` gets the same first-attempt message in parallel (`SHADOW_MODEL`), logged to
+`shadow.csv` / `shadow-decisions.csv`, never applied.
+
+**Cost per call, clean calls:** Opus $0.0763 (33.4k tokens: 24.7k cache read, 8.2k cache write, 0.5k output); Sonnet
+$0.0395 (33.5k tokens). About 7.5 s a checkpoint including the composite render. Pilot 1's four separate image reads
+cost $0.135 and five turns a call.
+
+| symbol | checkpoints | Opus $ | actions (non-none) | trades | trades' excess vs SPY |
+|---|---:|---:|---|---|---|
+| IMPM (2000–26) | 246 | 19.12 | buy_stop 2, cancel 1 | 1 long, stopped | −13.4 % |
+| VOLC (2007–11) | 99 | 7.89 | buy_stop 5, set_stop 5, cancel 1 | 4 long, all stopped | −9.7, −14.5, −11.1, −8.0 % |
+| ENZY (2014–18) | 40 | 2.93 | buy_stop 4 | 2 long (1 stopped, 1 open at end) | −10.1, −4.9 % |
+| CNDT (2017–26) | 96 | 7.71 | buy_stop 5, cancel 3 | 2 long, both stopped | −10.5, −4.5 % |
+| TCRX (2023–26) | 41 | 2.27 | none | none | — |
+
+Nine trades, all long; the reader placed one short order in the superseded run and none in the clean runs. Five
+symbols cannot say anything about the reader's skill; the pilot measures the machinery and the cost.
+
+**Agreement, Opus vs Sonnet on the same message** (`results/pilot2/agreement.txt`; 490 paired decisions, 32 Opus
+calls had no shadow because the first run's $15 shadow cap ran out on CNDT's tail):
+
+| | |
+|---|---|
+| same action | 458 / 490 = 93.5 % |
+| same stage | 370 / 490 = 75.5 % |
+| Opus active (not none): Sonnet gave the same action | 9 / 25 |
+| Sonnet active where Opus said none | 16 |
+| trigger, same-action pairs | n 5, median 1.4 % apart, max 2.1 % |
+| stop, same-action pairs | n 6, median 1.0 % apart, max 10.1 % |
+
+The 93.5 % is mostly the 449 shared "none" answers. On the decisions that matter the models diverge: of Opus's 16
+order placements Sonnet matched 5 and said none on 10; it placed 10 orders Opus did not. Most placements happen when
+the book is flat, so routing flat checkpoints to Sonnet would change the entries, not just save money.
+
+**Extrapolation to 100 symbols** (the pilot averages 104 checkpoints a symbol; the sample's mix of history lengths is
+similar, so about 10,400 calls): (a) Opus throughout, about $800 and 22 h serial (about 6 h at four in parallel);
+(b) Sonnet when flat, Opus otherwise (about 89 % of checkpoints are flat, estimated from the logs), about $450, with
+the entry-divergence caveat above.
+
+**Session-limit incident.** In the first pilot-2 run the account hit its session limit for about 20 minutes. 183
+replies ("You've hit your session limit · resets 7:50pm (America/Los_Angeles)", zero output tokens) were logged as
+malformed answers and applied as none, so VOLC from 2011-05-27 and nearly all of ENZY were invalid. Those runs are
+discarded; VOLC, ENZY and TCRX (which had run without a shadow) were rerun from scratch under a $15 Opus / $8 Sonnet
+cap with no pause needed. `scripts/limit.sh` now classifies such replies (a session / usage / rate limit, 429 / 529,
+overloaded, no result, or zero output tokens): `reader.sh` sleeps to the stated reset + 2 min (else 15 min), logs the
+pause to `pauses.csv` and retries the same cut, never counting it as an answer (`stepper_check.sh` case 12).
