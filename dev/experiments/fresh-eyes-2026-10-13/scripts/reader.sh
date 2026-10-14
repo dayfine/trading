@@ -17,8 +17,9 @@
 # card), BOOK (the book's text file), RWORK (reader folders root), MODEL (default claude-opus-5-5), MAXUSD (stop this
 # symbol when its driving calls pass this many dollars, default 40), SHADOW_MODEL, SHADOW_MAXUSD (no new shadow call
 # once this symbol's shadow calls pass it, default 15), CWIDTH (composite width, default 2400).
-# Writes <run dir>/calls.csv and raw/<cut>-<n>.txt; shadow.csv and shadow-raw/ with a shadow model.
-# Run from the repo root. Exit 0 when the run finished, 5 when MAXUSD stopped it.
+# Writes <run dir>/calls.csv, pauses.csv (limit waits) and raw/<cut>-<n>.txt; shadow.csv and shadow-raw/ with a shadow
+# model.
+# Run from the repo root. Exit 0 when the run finished, 5 when MAXUSD stopped it, 6 when the model API kept failing.
 set -e
 s=$1; R=$2
 E=dev/experiments/fresh-eyes-2026-10-13; S=$E/scripts
@@ -33,6 +34,7 @@ case "$W" in /Users/difan/Projects/*) echo "reader.sh: reader folder must be out
 [ -f "$R/state" ] || sh $S/step.sh "$s" "$R" init auto
 H="sym,cut,attempt,input,cache_read,cache_creation,output,cost_usd,wall_s,turns,action"
 [ -f "$R/calls.csv" ] || echo "$H" > "$R/calls.csv"
+[ -f "$R/pauses.csv" ] || echo "sym,cut,role,model,at_utc,wait_s,pause_n,reply" > "$R/pauses.csv"
 if [ -n "$SHADOW_MODEL" ]; then mkdir -p "$R/shadow-raw"; [ -f "$R/shadow.csv" ] || echo "$H" > "$R/shadow.csv"; fi
 { echo "You are a stock trader who follows the rule card below, written from Stan Weinstein's book. Answer in the exact format asked."; echo; cat "$CARD"; } > "$W/system.md"
 
@@ -84,14 +86,30 @@ EOF
 
 usd_of() { [ -f "$1" ] && awk -F, 'NR > 1 { t += $8 } END { printf "%.4f\n", t + 0 }' "$1" || echo 0; }
 over() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a + 0 >= b + 0) }'; }
-
-# call <model> <dir> <in.jsonl> <out.jsonl>: one headless call; prints "<wall>".
+# call <model> <dir> <in.jsonl> <out.jsonl> <role> <cut>: one headless call; prints the answering call's wall
+# seconds. A limit or overload reply (limit.sh: a session / usage / rate limit, 429 / 529, overloaded, no result, or
+# zero output tokens) is not an answer and not an attempt: the call sleeps until the stated reset + 2 min (else 15
+# min), logs the pause to <run dir>/pauses.csv and retries the same message, up to MAXPAUSE times (default 24); then
+# it returns with the failure in <out.jsonl>, and ask() stops the run with the state kept (exit 6). Pilot 2
+# (2026-10-13) recorded 183 session-limit replies as MALFORMED decisions before this.
 call() {
-  t0=$(date +%s)
-  (cd "$2" && claude -p --model "$1" --input-format stream-json --output-format stream-json --verbose \
-     --no-session-persistence --restricted --strict-mcp-config --system-prompt-file "$W/system.md" \
-     --allowedTools "Grep" --add-dir "$(dirname "$BOOK")" < "$3" > "$4" 2> "$4.err") || true
-  echo $(( $(date +%s) - t0 ))
+  np=0
+  while :; do
+    t0=$(date +%s)
+    (cd "$2" && claude -p --model "$1" --input-format stream-json --output-format stream-json --verbose \
+       --no-session-persistence --restricted --strict-mcp-config --system-prompt-file "$W/system.md" \
+       --allowedTools "Grep" --add-dir "$(dirname "$BOOK")" < "$3" > "$4" 2> "$4.err") || true
+    wl=$(( $(date +%s) - t0 ))
+    ws=$(sh $S/limit.sh "$4")
+    [ "$ws" = 0 ] && break
+    np=$((np + 1))
+    msg=$(grep '"type":"result"' "$4" | tail -1 | jq -r '.result // ""' 2>/dev/null | tr ',\n' '; ' | cut -c1-160)
+    [ -n "$msg" ] || msg=$(tr ',\n' '; ' < "$4.err" | cut -c1-160)
+    echo "$s,$6,$5,$1,$(date -u +%Y-%m-%dT%H:%M:%SZ),$ws,$np,$msg" >> "$R/pauses.csv"
+    [ "$np" -le "${MAXPAUSE:-24}" ] || break
+    sleep "$ws"
+  done
+  echo "$wl"
 }
 
 # log_call <out.jsonl> <raw file> <csv> <cut> <attempt> <wall>: the answer to <raw file>, one row to <csv>; prints
@@ -113,15 +131,21 @@ shadow() {  # shadow <cut>: the shadow model on the same first-attempt message, 
   [ -n "$SHADOW_MODEL" ] || return 0
   over "$(usd_of "$R/shadow.csv")" "$SHADOW_MAXUSD" && return 0
   sd=$W/shadow-$1; mkdir -p "$sd"; cp "$W/in.jsonl" "$sd/in.jsonl"
-  ( wl=$(call "$SHADOW_MODEL" "$sd" "$sd/in.jsonl" "$sd/out.jsonl")
-    log_call "$sd/out.jsonl" "$R/shadow-raw/$1.txt" "$R/shadow.csv" "$1" 1 "$wl" > /dev/null
+  ( wl=$(call "$SHADOW_MODEL" "$sd" "$sd/in.jsonl" "$sd/out.jsonl" shadow "$1")
+    # A shadow call still failing after MAXPAUSE pauses is dropped (no row): it never drives the stepper.
+    [ "$(sh $S/limit.sh "$sd/out.jsonl")" = 0 ] && log_call "$sd/out.jsonl" "$R/shadow-raw/$1.txt" "$R/shadow.csv" "$1" 1 "$wl" > /dev/null
     rm -rf "$sd" ) &
 }
 
 ask() {  # ask <attempt>: one driving call; leaves the decision in $W/decision.json (empty when malformed)
   c=$(sed -n 's/^cut=//p' "$R/state")
   [ "$1" = 1 ] && shadow "$c"
-  wl=$(call "$MODEL" "$W" "$W/in.jsonl" "$W/out.jsonl")
+  wl=$(call "$MODEL" "$W" "$W/in.jsonl" "$W/out.jsonl" driving "$c")
+  if [ "$(sh $S/limit.sh "$W/out.jsonl")" != 0 ]; then
+    cp "$W/out.jsonl" "$R/api-failure-$c.txt" 2>/dev/null || true
+    wait; echo "reader.sh: $s: still limited after ${MAXPAUSE:-24} pauses at cut $c (see $R/api-failure-$c.txt); stopping, state kept" >&2
+    exit 6
+  fi
   log_call "$W/out.jsonl" "$R/raw/$c-$1.txt" "$R/calls.csv" "$c" "$1" "$wl" > "$W/decision.json"
 }
 

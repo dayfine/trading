@@ -75,5 +75,22 @@ state0 2020-01-03; run "" "action=none|next_look=14"
 has "next_look 14 rejected" "REJECT,next_look must be a whole number of weeks, 1 to 13"
 state0 2020-01-03; run "" '{"action":"none","next_look":0}'
 has "next_look 0 rejected" "REJECT,next_look must be a whole number of weeks, 1 to 13"
+# 12. limit.sh: a limit / overload reply is a wait, not an answer (reader.sh retries the same cut after it).
+now=$(TZ=America/Los_Angeles date -j -f '%Y-%m-%d %H:%M:%S' '2026-10-13 19:00:00' +%s)
+lim() {  # lim <label> <result json line> <expected seconds>
+  printf '{"type":"system"}\n%s\n' "$2" > "$T/lim.jsonl"; got=$(sh $S/limit.sh "$T/lim.jsonl" "$now")
+  if [ "$got" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: got $got, want $3"; fail=1; fi
+}
+lim "session limit waits to the reset + 2 min" \
+  '{"type":"result","is_error":false,"result":"You'"'"'ve hit your session limit · resets 7:50pm (America/Los_Angeles)","usage":{"output_tokens":0}}' 3120
+lim "a reset time already past waits to the next day" \
+  '{"type":"result","is_error":false,"result":"You'"'"'ve hit your usage limit · resets 6pm (America/Los_Angeles)","usage":{"output_tokens":0}}' 82920
+lim "an error result with 529 overloaded waits 15 min" \
+  '{"type":"result","is_error":true,"result":"API Error: 529 Overloaded","usage":{"output_tokens":0}}' 900
+lim "zero output tokens waits 15 min" '{"type":"result","is_error":false,"result":"","usage":{"output_tokens":0}}' 900
+printf '{"type":"system"}\n' > "$T/lim.jsonl"
+got=$(sh $S/limit.sh "$T/lim.jsonl" "$now"); [ "$got" = 900 ] && echo "ok    no result line waits 15 min" || { echo "FAIL  no result line: got $got"; fail=1; }
+lim "a real answer with 5.29 in it is an answer" \
+  '{"type":"result","is_error":false,"result":"{\"action\":\"buy_stop\",\"trigger\":5.29,\"stop\":4.29}","usage":{"output_tokens":120}}' 0
 rm -rf "$T"
 [ $fail = 0 ] && echo "stepper check: PASS" || { echo "stepper check: FAIL"; exit 1; }
