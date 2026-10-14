@@ -115,7 +115,7 @@ DATA=data sh $E/scripts/dry_run.sh OMC                  # whole loop with a dumm
 ```
 
 **Decision** (JSON or key=value lines; `decision.awk` normalises it): `stage`, `action` (`none`, `buy_stop`,
-`short_stop`, `cancel`, `set_stop`, `exit`), `trigger`, `limit` (optional), `stop`, `reason`. Levels are on the
+`short_stop`, `cancel`, `set_stop`, `exit`), `trigger`, `limit` (optional), `stop`, `next_look` (optional), `reason`. Levels are on the
 chart's scale at the cut. `buy_stop` / `short_stop` need a trigger and the protective stop that goes live on the
 fill; they need a flat book and replace any resting order.
 
@@ -171,3 +171,10 @@ stock page pair and a market page pair cost about 2.5 s each; decision + simulat
 With the market pack pre-rendered once (`market_pages.sh`, about 1,370 Fridays), a checkpoint costs about 2.5 s, so
 100 symbols at about 370 checkpoints are about 26 h of rendering, serial, before any reader time; four renders in
 parallel bring it to about 6–7 h. The reader's own time per checkpoint will dominate.
+
+**Plan amendment: adaptive look (user decision 2026-10-13, to cut model calls).** The dry run showed about 370
+checkpoints a symbol at the plan's 4-week cadence, about 37,000 model calls for 100 symbols. The decision gains an
+optional `next_look` (whole weeks, 1–13; anything else is rejected). It is honoured only when the book is flat after
+the decision (no position and no resting order); with a position or an order the 4-week cadence stands, and a fill,
+a stop exit, an exit or the 8-week rest still force a checkpoint earlier. Default 4. Pinned by `stepper_check.sh`
+case 11.

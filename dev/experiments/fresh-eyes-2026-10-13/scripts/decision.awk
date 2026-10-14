@@ -1,11 +1,11 @@
 # Fresh-eyes stepper: normalise one agent decision to key=value lines (plan §4 layer (ii)).
 # Usage: awk -f decision.awk <decision file>
 # Accepts either a flat JSON object ({"action":"buy_stop","trigger":12.5,...}) or key=value lines. Keys kept:
-# stage, action, trigger, limit, stop, reason. Output always carries an action line (default none), so the
+# stage, action, trigger, limit, stop, next_look, reason. Output always carries an action line (default none), so the
 # simulator never reads an empty decision file.
 { buf = buf " " $0 }
 END {
-  n = split("stage action trigger limit stop reason", K, " ")
+  n = split("stage action trigger limit stop next_look reason", K, " ")
   s = buf
   if (s ~ /[{]/) {
     for (i = 1; i <= n; i++) {
@@ -20,7 +20,7 @@ END {
   } else {
     m = split(buf, L, " ")
     # key=value lines: re-read from the raw text so a reason may contain spaces.
-    t = buf; gsub(/[ \t]+([a-z]+)=/, "\n&", t); m = split(t, L, "\n")
+    t = buf; gsub(/[ \t]+([a-z_]+)=/, "\n&", t); m = split(t, L, "\n")
     for (j = 1; j <= m; j++) {
       x = L[j]; sub(/^[ \t]+/, "", x); sub(/[ \t]+$/, "", x)
       p = index(x, "="); if (p == 0) continue

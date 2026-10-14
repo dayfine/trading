@@ -13,7 +13,7 @@
 # a day opening below the limit). A protective stop is live from the day after the fill: long exits when low <=
 # stop at min(open, stop); short when high >= stop at max(open, stop). exit = the next day's open.
 #
-# Checkpoints: 4 weeks after the cut, or the Friday ending the week of a fill or a stop exit, or the Friday 8
+# Checkpoints: 4 weeks after the cut (next_look weeks, 1-13, when flat after the decision), or the Friday ending the week of a fill or a stop exit, or the Friday 8
 # weeks after an order was placed (then the order must be re-issued, or it is cancelled), whichever is first. The
 # run ends at the symbol's last bar or at `end`; an open position is marked to that close and flagged open.
 #
@@ -44,8 +44,10 @@ function trade(how, xd, xp, xo,   r, sr, s0, s1) {
   st["pos"] = "none"; st["edate"] = ""; st["epx"] = ""; st["stop"] = ""; st["xpend"] = 0
 }
 
-function validate(   a, k, t, l, s, last) {
+function validate(   a, k, t, l, s, last, x) {
   a = dc["action"]; k = kat(st["cut"])
+  x = dc["next_look"]
+  if (x != "" && (x !~ /^[0-9]+$/ || x + 0 < 1 || x + 0 > 13)) reject("next_look must be a whole number of weeks, 1 to 13")
   t = (dc["trigger"] == "") ? "" : dc["trigger"] / k; l = (dc["limit"] == "") ? "" : dc["limit"] / k
   s = (dc["stop"] == "") ? "" : dc["stop"] / k
   if (a == "buy_stop" || a == "short_stop") {
@@ -85,7 +87,11 @@ END {
   validate()
   if (exit_now) exit
   cut = st["cut"]; ntr = 0; ev = ""
-  cp = civil(days(cut) + 28)
+  # Adaptive look (plan amendment, user decision 2026-10-13): next_look weeks, honoured only when flat (no
+  # position and no open order after this decision); otherwise the 4-week cadence.
+  nl = 4
+  if (st["pos"] == "none" && st["ord"] == "none" && dc["next_look"] != "") nl = dc["next_look"] + 0
+  cp = civil(days(cut) + 7 * nl)
   if (st["ord"] != "none" && fri(plus(st["placed"], 56)) < cp) cp = fri(plus(st["placed"], 56))
   stopd = (end < dd[nd]) ? end : dd[nd]
   for (i = 1; i <= nd; i++) {

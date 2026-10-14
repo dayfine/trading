@@ -3,7 +3,7 @@
 # Cases: buy-stop fill on a gap open; a limit blocks a gap-open day; short fill; the fill day's low is not checked
 # against the stop; stop raise accepted and stop lower rejected; a long stop above the trigger rejected; the
 # 8-week rest (flagged, cancelled on none, re-issue restarts the clock); the 4-week and fill-week checkpoints;
-# exit at the next open; the end-of-run mark. Run from the repo root.
+# exit at the next open; the end-of-run mark; the adaptive look (next_look). Run from the repo root.
 set -e
 S=dev/experiments/fresh-eyes-2026-10-13/scripts
 T=${TMPDIR:-/tmp}/fe-stepcheck-$$; mkdir -p "$T"; fail=0
@@ -64,5 +64,16 @@ has "run finished" "status=done"
 # 10. a JSON decision parses the same as key=value.
 state0 2020-01-03; run "2020-01-06:12/12.5/11.8/12" '{"stage":2,"action":"buy_stop","trigger":11,"stop":9,"reason":"base, 2x vol"}'
 has "JSON decision" "epx=12"
+# 11. adaptive look: next_look 13 honoured when flat; ignored with a position or an order; out of range rejected.
+state0 2020-01-03; run "" "action=none|next_look=13"
+has "next_look 13 when flat" "cut=2020-04-03"
+state0 2020-01-03 long 2019-12-16 8 7; run "" "action=none|next_look=13"
+has "next_look ignored with a position" "cut=2020-01-31"
+state0 2020-01-03; run "" "action=buy_stop|trigger=20|stop=9|next_look=13"
+has "next_look ignored with an order" "cut=2020-01-31"
+state0 2020-01-03; run "" "action=none|next_look=14"
+has "next_look 14 rejected" "REJECT,next_look must be a whole number of weeks, 1 to 13"
+state0 2020-01-03; run "" '{"action":"none","next_look":0}'
+has "next_look 0 rejected" "REJECT,next_look must be a whole number of weeks, 1 to 13"
 rm -rf "$T"
 [ $fail = 0 ] && echo "stepper check: PASS" || { echo "stepper check: FAIL"; exit 1; }
