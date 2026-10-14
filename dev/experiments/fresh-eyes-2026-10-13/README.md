@@ -178,3 +178,27 @@ optional `next_look` (whole weeks, 1–13; anything else is rejected). It is hon
 the decision (no position and no resting order); with a position or an order the 4-week cadence stands, and a fill,
 a stop exit, an exit or the 8-week rest still force a checkpoint earlier. Default 4. Pinned by `stepper_check.sh`
 case 11.
+
+## Pilot (2026-10-13): stopped by the 15M-token budget inside the first symbol
+
+`scripts/reader.sh` runs one fresh headless `claude -p` call (opus 5.5, `--restricted`, Read and Grep only, the rule
+card as the system prompt) per checkpoint from a folder outside the repository holding only the rule card, the four
+pages and the cut's numbers. A probe call confirmed the reader sees no repository instructions. `scripts/pilot.sh`
+runs the pilot symbols in turn under a total token cap; `pilot_summary.sh` and `pilot_collect.sh` summarise and copy
+the per-symbol `calls.csv`, `trades.csv`, `log.csv` and `decisions.csv` (each raw answer) into `results/pilot/`.
+The rule card the readers used is `results/rulecard.md` (the step-0 agent's own paraphrase of the book, chapter
+cites, no book text beyond short phrases).
+
+**What ran.** The cap (15M tokens) was reached on the first pilot symbol, IMPM, at the 2021-03-26 cut: 219
+checkpoints, 219 calls, no malformed answer, no rejected decision, 2,630 s wall. Actions: none 216, buy_stop 1
+(2004-07-02, cancelled 2004-07-30 when the S&P broke its MA), short_stop 1 (2016-01-22, filled 2016-01-27, stopped
+2016-02-17: return −19.9 %, excess vs an SPY short −18.1 %). The other four pilot symbols did not run.
+
+**Cost.** 68.6k tokens a call (cache read 53.9k, cache write 14.1k, output 0.6k), $0.135 a call at list price; about
+11 s a checkpoint including rendering. A call is five model turns: the four images are read one at a time.
+
+**The adaptive look barely cut calls.** The reader chose `next_look` 4 weeks on 135 of 219 answers, 6 on 44, 8 on
+32, 13 on 3: about 10 checkpoints a year when flat, against 13 at the fixed cadence.
+
+**Extrapolation** (26 years ≈ 270 checkpoints a symbol at IMPM's pace): about 18.5M tokens and $36 a symbol; 100
+symbols about 1.85B tokens, $3,600 at list price, about 80 h serial (20 h at four in parallel).
