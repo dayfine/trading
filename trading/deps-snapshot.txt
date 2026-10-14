@@ -129,7 +129,7 @@ ppx_string_conv             v0.17.0
 ppx_tydi                    v0.17.1
 ppx_typerep_conv            v0.17.1
 ppx_variants_conv           v0.17.1
-ppxlib                      0.38.0
+ppxlib                      0.39.0
 ppxlib_jane                 v0.17.4
 protocol_version_header     v0.17.0
 re                          1.14.0
