@@ -164,3 +164,10 @@ Friday and all symbols share them.
 | `market_pages.sh`, `market_one.sh` | the shared market pack for every Friday |
 | `fixture.awk`, `stepper_check.sh` | fixture checks of the fill, stop, rest and checkpoint rules |
 | `dummy_agent.awk`, `dry_run.sh` | the loop end to end with a stand-in reader (not a strategy) |
+
+**Dry run (2026-10-13, OMC, dummy reader, host, nothing else running).** 368 checkpoints from 2000-02-04 to the end,
+26 dummy trades, 1,407 s wall: 3.8 s per checkpoint, rendering the market pack inline (no pre-render). Of that, a
+stock page pair and a market page pair cost about 2.5 s each; decision + simulation + status take well under 0.1 s.
+With the market pack pre-rendered once (`market_pages.sh`, about 1,370 Fridays), a checkpoint costs about 2.5 s, so
+100 symbols at about 370 checkpoints are about 26 h of rendering, serial, before any reader time; four renders in
+parallel bring it to about 6–7 h. The reader's own time per checkpoint will dominate.
