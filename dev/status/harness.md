@@ -1262,6 +1262,14 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     consecutive_rework_count=3`; each reverted. Also corrected the earlier
     "80 passed / 1 failed" wording to 81/1 (82 scenarios). Remaining: 5, 6
     and the lower-count scenarios.
+  - **Progress 2026-10-18 (slice 4, harness/report-conjuncts-slice4):**
+    converted 5, 6, 2, 3 (6 conjuncts each by hand count: rc, file exists,
+    structural_qc, behavioral_qc, overall_qc, quality_score) to the slice-2
+    shape. Decision logic unchanged; pass count 82 before and after.
+    Mutation evidence (quality_score literal broken to 9; suite exit 1,
+    81 passed / 1 failed, exactly one `conjunct FAILED` line naming it):
+    scenarios 2, 3, 5, 6; each reverted. Still open: scenario 1 (4),
+    7c, 9-17 and other 4-5 conjunct scenarios (the item stays open).
 - [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
   `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
   harness/scenario22-race-2440, issue #2440). This turned out to BE the
