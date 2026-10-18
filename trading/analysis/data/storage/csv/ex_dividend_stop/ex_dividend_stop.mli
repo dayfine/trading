@@ -47,7 +47,7 @@ val reduce_for_dividends :
   float
 (** [reduce_for_dividends ~dividends ~after ~through stop_level] applies
     {!reduce_stop_level} for each dividend whose [ex_date] is in
-    [(after, through)], in ex-date order. Rows without [unadjusted_amount]
+    [(after, through\]], in ex-date order. Rows without [unadjusted_amount]
     are skipped. *)
 
 type loader = string -> Corporate_actions.dividend list Status.status_or
@@ -67,7 +67,7 @@ val adjust :
   t -> symbol:string -> after:Date.t -> through:Date.t -> float -> float
 (** [adjust t ~symbol ~after ~through stop_level] is {!reduce_for_dividends}
     over [symbol]'s vendor dividends; [stop_level] unchanged when the symbol
-    has no readable file or no ex-date in [(after, through)]. Each call
+    has no readable file or no ex-date in [(after, through\]]. Each call
     reduces again, so the caller asks once per window. *)
 
 type counts = {
