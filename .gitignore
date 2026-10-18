@@ -155,10 +155,29 @@ trading/compile_commands.json
 # above (H-TRACKED-SCENARIO-DEBT). Negations must come after the ignore rules.
 # They are cited by writeups/scripts, so they stay tracked and visible.
 !dev/backtest/scenarios-2026-04-14-222425/
+dev/backtest/scenarios-2026-04-14-222425/*
+!dev/backtest/scenarios-2026-04-14-222425/*/
+dev/backtest/scenarios-2026-04-14-222425/*/*
+!dev/backtest/scenarios-2026-04-14-222425/*/actual.sexp
+!dev/backtest/scenarios-2026-04-14-222425/*/params.sexp
+!dev/backtest/scenarios-2026-04-14-222425/*/summary.sexp
+!dev/backtest/scenarios-2026-04-14-222425/*/trades.csv
 !dev/backtest/scenarios-2026-04-14-225929/
+dev/backtest/scenarios-2026-04-14-225929/*
+!dev/backtest/scenarios-2026-04-14-225929/*/
+dev/backtest/scenarios-2026-04-14-225929/*/*
+!dev/backtest/scenarios-2026-04-14-225929/*/actual.sexp
+!dev/backtest/scenarios-2026-04-14-225929/*/params.sexp
+!dev/backtest/scenarios-2026-04-14-225929/*/summary.sexp
+!dev/backtest/scenarios-2026-04-14-225929/*/trades.csv
 !dev/experiments/laggard-h-sweep-15y-2026-05-07/run.log
 !dev/experiments/rolling-5y-segmentation-ab-2026-05-11/results/run.log
-!dev/experiments/stage3-force-exit-impact-2026-05-06/run-*.log
+!dev/experiments/stage3-force-exit-impact-2026-05-06/run-15y-h2.log
+!dev/experiments/stage3-force-exit-impact-2026-05-06/run-15y-h3.log
+!dev/experiments/stage3-force-exit-impact-2026-05-06/run-15y-h4.log
+!dev/experiments/stage3-force-exit-impact-2026-05-06/run-15y.log
+!dev/experiments/stage3-force-exit-impact-2026-05-06/run-5y-h1.log
+!dev/experiments/stage3-force-exit-impact-2026-05-06/run-5y.log
 # Bayesian outputs: re-include the dirs, then re-ignore everything but the
 # few records that were committed.
 !dev/experiments/bayesian-production-sweep-2026-05-18/output-v1-parallel4/
