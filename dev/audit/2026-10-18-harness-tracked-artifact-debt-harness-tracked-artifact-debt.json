@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-18",
+  "feature": "harness-tracked-artifact-debt",
+  "branch": "harness/tracked-artifact-debt",
+  "sha": "68ae1541e1f6c5746729ceeb80b32e02af59ba14",
+  "recorded_at_ns": 1792349035401342279,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
