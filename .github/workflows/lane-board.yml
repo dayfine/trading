@@ -1,0 +1,48 @@
+# Async lane board (issue #3330, rule .claude/rules/async-lanes.md).
+#
+# Every 3 hours: read the open Codex / Jules PRs and lane issues, set one turn/* label on each, and
+# rewrite the body of the board issue. Shell + gh + jq only: no Claude, no quota. It comments on the board
+# only when an item newly turns turn/user (silent more than 48 h).
+#
+# It never posts hand-off comments (@codex / @jules): a mention from a bot token may not trigger either
+# agent. Hand-offs come from a local session via dev/scripts/lane_handoff.sh.
+#
+# Manual run: gh workflow run lane-board.yml (add -F dry_run=true to print the board without writing).
+
+name: Lane board
+
+on:
+  schedule:
+    - cron: "10 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the board and planned label edits without writing (true/false)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: lane-board
+  cancel-in-progress: false
+
+jobs:
+  board:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update board
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            sh dev/scripts/lane_board.sh --dry-run | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            sh dev/scripts/lane_board.sh
+          fi
