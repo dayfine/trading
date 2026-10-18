@@ -35,8 +35,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          APPLY: ${{ github.event.inputs.apply || 'true' }}
         run: |
-          if [ "${{ github.event.inputs.apply || 'true' }}" = "true" ]; then
+          if [ "$APPLY" = "true" ]; then
             sh dev/scripts/prune_remote_branches.sh --apply | tee -a "$GITHUB_STEP_SUMMARY"
           else
             sh dev/scripts/prune_remote_branches.sh | tee -a "$GITHUB_STEP_SUMMARY"
