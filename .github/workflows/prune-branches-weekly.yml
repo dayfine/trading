@@ -1,0 +1,44 @@
+# Weekly remote-branch prune.
+#
+# Deletes origin branches whose PR is finished: merged, or closed unmerged more than 7 days ago, and whose tip
+# has not moved since the PR's last head commit. Keeps branches that head an open PR, have no PR, or are
+# protected. Logic and the keep rules: dev/scripts/prune_remote_branches.sh. A deleted PR branch can be restored
+# from the PR page.
+#
+# Merged-PR branches are normally deleted at merge by the repo setting "Automatically delete head branches"
+# (enabled 2026-10-18); this job catches the rest (closed PRs, merges done with the setting off).
+#
+# Manual run: gh workflow run prune-branches-weekly.yml (add -F apply=false for a dry run).
+
+name: Prune remote branches (weekly)
+
+on:
+  schedule:
+    - cron: "30 8 * * 0"   # Sunday 08:30 UTC
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Delete (true) or list only (false)"
+        required: false
+        default: "true"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prune
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          APPLY: ${{ github.event.inputs.apply || 'true' }}
+        run: |
+          if [ "$APPLY" = "true" ]; then
+            sh dev/scripts/prune_remote_branches.sh --apply | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            sh dev/scripts/prune_remote_branches.sh | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
