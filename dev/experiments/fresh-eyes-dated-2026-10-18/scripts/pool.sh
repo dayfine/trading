@@ -1,10 +1,11 @@
 #!/bin/sh
-# pool.sh <date> <date dir> <groups>: step B of the reader's day (plan §3), mechanical, no model.
+# pool.sh <date> <date dir> <groups> [long|short]: step B of the reader's day (plan §3), mechanical, no model.
 # <groups>: the favoured sectors from step A, separated by '|' (names as in results/market/sector-strength.csv),
 # or "all". Needs <date dir>/ours/top.csv (ours.sh) for our screener's list.
 #   1. The PIT top-3000 members of the list in force on the date (list Y applies from Y-05-31; membership.txt of
 #      the setup map) that still trade on it (a bar within 10 days; pool_scan.awk).
-#   2. The neutral filter: close >= (1 - NEAR_HIGH) x the 52-week high (NEAR_HIGH default 0.25) and 20-day dollar
+#   2. The neutral filter: longs, close >= (1 - NEAR_HIGH) x the 52-week high; shorts, close <= (1 + NEAR_HIGH) x the
+#      52-week low (same fraction, mirrored); (NEAR_HIGH default 0.25) and 20-day dollar
 #      volume >= DV_FLOOR (default 1,000,000, the strategy's min_entry_dollar_adv).
 #   3. In a favoured group. data/sectors.csv is survivor-only, so a member with no sector row is mostly a stock
 #      that later died; leaving it out would tilt the pool toward survivors. POOL_UNKNOWN=1 (default) keeps such
@@ -17,7 +18,7 @@
 # 2026-10-13 renderers draw every page under the pseudonym. Pseudonyms are four random capitals, unique per date.
 # Run from the repo root. DATA = the daily store.
 set -e
-d=$1; DD=$2; G=$3
+d=$1; DD=$2; G=$3; SIDE=${4:-long}
 S0=dev/experiments/fresh-eyes-2026-10-13/scripts; S=dev/experiments/fresh-eyes-dated-2026-10-18/scripts
 DATA=${DATA:-/Users/difan/Projects/trading-1/data}
 MEM=${MEM:-dev/experiments/short-setup-map-2026-10-12/results/membership.txt}
@@ -33,7 +34,7 @@ awk -F, 'NR > 1 { print $3 }' "$DD/ours/top.csv" | sort -u > "$T/ours.txt"
 while read -r s; do
   f=$DATA/$(printf %s "$s" | cut -c1)/$(printf %s "$s" | rev | cut -c1)/$s/data.csv; [ -f "$f" ] && echo "$f"; done < "$T/ours.txt" >> "$T/files.txt"
 sort -u "$T/files.txt" | xargs awk -F, -v date="$d" -f $S0/days.awk -f $S/pool_scan.awk > "$T/scan.csv"
-awk -F, -v g="$G" -v nh="$NEAR_HIGH" -v floor="$DV_FLOOR" -v unk="$POOL_UNKNOWN" -v max="$POOL_MAX" -v seed="$(printf %s "$d" | tr -d -)" \
+awk -F, -v g="$G" -v nh="$NEAR_HIGH" -v floor="$DV_FLOOR" -v unk="$POOL_UNKNOWN" -v max="$POOL_MAX" -v side="$SIDE" -v seed="$(printf %s "$d" | tr -d -)" \
   -f $S/pool_pick.awk "$T/ours.txt" "$DATA/sectors.csv" "$T/scan.csv" > "$T/pool.csv"
 # The pseudonym store.
 rm -rf "$DD/store"; mkdir -p "$DD/store/S/Y"; ln -s "$DATA/S/Y/SPY" "$DD/store/S/Y/SPY"

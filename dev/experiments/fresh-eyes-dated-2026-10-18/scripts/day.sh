@@ -60,7 +60,11 @@ if [ "$side" = neither ]; then
 fi
 
 # ---- B: the pool and its contact sheets.
-[ -s "$DD/pool.csv" ] || sh $S/pool.sh "$d" "$DD" "$groups"
+[ -s "$DD/pool.csv" ] || sh $S/pool.sh "$d" "$DD" "$groups" "$side"
+if [ "$(wc -l < "$DD/pool.csv")" -le 1 ]; then
+  echo "pseudo,symbol,action,trigger,limit,stop,conviction" > "$DD/orders.csv"; : > "$DD/shortlist.txt"
+  echo "day.sh: $d empty pool, no orders"; exit 0
+fi
 sh $S/sheets.sh "$d" "$DD"
 
 # ---- C: screen the sheets.
