@@ -34,9 +34,9 @@ orchestrator run of 10-17 failed and every session was blocked until the 10-18 r
 | Codex CLI (local) | this Mac, read-only sandbox | ChatGPT plan | advisory PR review (`codex_review.sh`) | in use |
 | **Codex cloud** | chatgpt.com/codex environment | ChatGPT plan, separate from Claude | `agent/codex` issues: small, mechanical, well-specified code/doc changes that open a PR | **spike next** |
 | GitHub Copilot coding agent | GitHub Actions | Copilot plan ($10–39/mo, token credits) | issue → draft PR, best GitHub-native visibility | option |
-| Claude API key in GHA | our CI image | pay as you go, independent of the plan | QC waves and `env/cloud` work when the plan is short; Batch API (50 % off) for bulk image reads | option |
+| Claude API key in GHA | our CI image | pay as you go, independent of the plan | QC waves and `env/cloud` work when the plan is short; Batch API (50 % off) for bulk image reads | **dropped 10-18** (#3325): about 20–30× less work per dollar than the plan; the next plan tier (Max 5x → 20x) is the capacity lever |
 | Cursor cloud agents | Cursor VMs | API-rate billing after the plan credit | — | skip: no flat-rate advantage; Dockerfile builds from GitHub triggers reported flaky |
-| Jules | Google cloud | per task | — | skip for now: OCaml quality unknown |
+| Jules | Google cloud | free tier / Google AI plan | same lane as Codex (`agent/jules`), A/B against it for 2–3 weeks | **trial after Codex** (#3324, folded from #3329) |
 
 The research behind this table (sources, unverified points) is in the PR description that adds this file.
 
@@ -81,7 +81,9 @@ QC therefore spends Claude quota and sits inside the management reserve.
 ## 4. Decisions for the user
 
 1. **Codex cloud spike** (above). Recommended. Needs the user's ChatGPT/GitHub connection.
-2. **A Claude API key lane in GHA with a Console spend cap** (for example $100/month) for QC waves when the plan is
-   short. Recommended second. It is the only option that adds Claude capacity rather than another model.
+2. ~~A Claude API key lane in GHA~~ **Dropped (user, 10-18, #3325 closed).** A review costs $0.6–0.9 (structural, Haiku) or
+   $4–5 (behavioral, Opus) at API rates, against about 200 structural reviews a month; $20–40 buys a small fraction of
+   them and frees about 1–4 % of a week. Move up a plan tier instead. Extra accounts to get around limits: no (terms).
+   Async loop on GitHub: board #3330 (`turn/*` labels, 3 h refresh), hand-offs by `@codex` / `@jules` comments.
 3. **Copilot coding agent:** optional, $39/month, if the Codex spike fails on the OCaml setup.
 4. **Cursor:** not recommended for this workload.
