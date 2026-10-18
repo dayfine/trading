@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":11.88,"reason":"The pullback of about 15-17% from the 14.5 high held near the rising 30-week MA (about 13.2) and price has rallied back toward the high, so I raise the stop from 10.20 to just under the round 12 below the correction low (my chart read is about 12.2)."}

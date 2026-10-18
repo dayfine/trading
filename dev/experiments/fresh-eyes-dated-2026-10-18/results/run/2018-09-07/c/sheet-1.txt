@@ -1,0 +1,1 @@
+{"picks": [{"name": "HTLA", "score": 4}, {"name": "JHIZ", "score": 3}, {"name": "IWYC", "score": 3}, {"name": "ZIJH", "score": 3}, {"name": "GWQN", "score": 2}], "reason": "HTLA breaks out of a long base above a rising MA with a volume spike and RS turning up; JHIZ, IWYC and ZIJH are Stage 2 stocks at new highs with positive RS; GWQN is only a marginal continuation setup."}

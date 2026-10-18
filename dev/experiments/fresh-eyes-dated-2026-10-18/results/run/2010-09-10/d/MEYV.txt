@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "MEYV is in Stage 2 at all-time highs, but the S&P sits just below a flat 30-week MA, so only A+ setups qualify, and this is not one: it is ~9% above its MA with no base near the MA and no volume expansion."}

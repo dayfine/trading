@@ -1,0 +1,1 @@
+{"picks": [{"name": "DYZQ", "score": 4}, {"name": "NOBN", "score": 3}, {"name": "FFAG", "score": 3}, {"name": "MCUC", "score": 3}, {"name": "RYQI", "score": 2}], "reason": "These are Stage 2 stocks above a rising 30-week MA with positive or improving RS and breakouts to new highs, and DYZQ has the strongest RS and a virgin-territory breakout."}

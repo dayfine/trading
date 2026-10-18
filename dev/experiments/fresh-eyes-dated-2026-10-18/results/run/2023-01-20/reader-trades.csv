@@ -1,0 +1,5 @@
+pseudo,symbol,side,entry_date,exit_date,how,ret,spy_ret,excess,days,r104,max104,min104,spy104,end104,looks
+FCOJ,GLNCY,,,,expired,,,,,,,,,,0
+JARQ,WPC,,,,expired,,,,,,,,,,0
+TUGR,TDG,long,2023-01-24,2025-01-21,cap104,1.148124,0.554526,0.593598,728,1.148124,1.232942,-0.001590,0.554526,2025-01-21,13
+YCOV,IEX,,,,expired,,,,,,,,,,0

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Stage 2 breakout to new highs on strong volume and RS in a bullish market, but at 13.8 it is about 52% above its 30-week MA (9.08) and well past the roughly 10 base top, so it is too extended and any sensible stop would risk more than 15%; wait for a pullback or a new base."}

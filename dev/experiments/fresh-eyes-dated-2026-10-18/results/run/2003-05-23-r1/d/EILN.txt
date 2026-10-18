@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 17.35, "limit": 17.70, "stop": 14.88, "conviction": 2, "reason": "Early Stage 2 above a rising 30-week MA in a market that has just crossed its own MA, with positive RS; buy only on a move above the ~17.2 highs of 2002 and recent weeks into multi-year highs, but breakout volume so far is unimpressive."}

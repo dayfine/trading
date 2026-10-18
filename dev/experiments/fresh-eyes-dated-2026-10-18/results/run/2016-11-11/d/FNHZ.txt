@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 48.60, "limit": 49.60, "stop": 41.88, "conviction": 3, "reason": "Stage 2 stock above a rising 30-week MA, positive RS and a bullish market, consolidating at 43-48 under its 2006/2016 highs; a breakout above about 48.5 puts it near or in virgin territory, with the stop under the consolidation low and MA."}

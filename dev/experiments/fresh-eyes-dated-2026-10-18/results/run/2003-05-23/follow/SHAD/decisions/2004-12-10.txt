@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is above a still-rising 30-week MA and the latest pullback from the high was about 6%, short of the 8-10% correction needed to raise the stop, so it stays at 18.38."}

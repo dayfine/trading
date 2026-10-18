@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2016-04-08
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/WTPX-2016-04-08-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/WTPX-2016-04-08-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/WTPX-2016-04-08.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/market/MARKET-2016-04-08-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/market/MARKET-2016-04-08-5y.png
+cut: 2016-04-08
+position: none
+order: none
+since the last checkpoint: stopped 2016-04-06; 
+closed trades: 1
+  short 2016-03-16 -> 2016-04-06 (stop) return -17.9%

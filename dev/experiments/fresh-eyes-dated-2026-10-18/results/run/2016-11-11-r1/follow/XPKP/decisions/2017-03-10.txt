@@ -1,0 +1,1 @@
+{"action":"none","stop":42.70,"reason":"Stage 2 holds with price above a rising 30-week MA and positive RS. The Jan–Feb correction low (~43.5–44, read from the chart) sits just under the MA, so a by-the-book raise to just below it lands near 43.4, a trivial raise I skip; the stop stays at 42.70."}

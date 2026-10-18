@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 is intact: price is well above a rising 30-week MA with positive, rising RS, and this week's roughly 6.5% dip is below the 8–10% correction needed to raise the stop, so it stays at 120.47."}

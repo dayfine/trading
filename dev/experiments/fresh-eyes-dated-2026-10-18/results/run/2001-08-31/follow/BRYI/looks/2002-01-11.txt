@@ -1,0 +1,1 @@
+{"stage": 4, "action": "set_stop", "stop": 17.12, "reason": "Stage 4 below a falling 30-week MA (16.46); the oversold rally of more than 8% to about 15 failed and price is back near its prior low, so the short's stop comes down to just above the MA and the 17 round number."}

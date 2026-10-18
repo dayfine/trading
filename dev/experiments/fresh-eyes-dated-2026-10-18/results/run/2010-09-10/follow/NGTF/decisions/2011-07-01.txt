@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":34.88,"reason":"Stock is in Stage 2 above a rising 30-week MA; after a pullback of about 9% from near 40 it has rallied back toward the high, so the stop goes up from 30.88 to just under the MA (35.0), the lower of the MA and the correction low, at 34.88."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "The market is bullish and FDAO is in Stage 2 above a rising 30-week MA, but price is already well past its June breakout, about 8.5% above the MA, with no fresh base near the MA or volume surge to buy, so I'll wait for a consolidation near the MA."}

@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":11.88,"reason":"Strong Stage 2 with RS +72 and the S&P in Stage 2; a correction of roughly 10% has ended and price made new highs, so the stop goes just under the lower of that low and the rising 30-week MA (12.08), below the round 12."}

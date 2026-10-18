@@ -1,0 +1,1 @@
+{"stage": 3, "action": "set_stop", "stop": 53.88, "reason": "The MA is flattening and price has closed below it after choppy Stage 3-like swings, so the stop moves just under the February correction low (about 54), below the round number."}

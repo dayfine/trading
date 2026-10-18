@@ -1,0 +1,1 @@
+{"picks": [{"name": "LRPX", "score": 4}, {"name": "ESXC", "score": 3}, {"name": "VRSH", "score": 3}, {"name": "ZRUE", "score": 3}, {"name": "XQIN", "score": 2}], "reason": "LRPX is in a clean Stage 2 at new highs with positive RS, and the others are Stage 2 names near highs above rising MAs, though most have weak RS or are extended."}

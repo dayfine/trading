@@ -1,0 +1,1 @@
+{"picks": [{"name": "SCWA", "score": 4}, {"name": "HQBV", "score": 4}, {"name": "QXRR", "score": 4}, {"name": "AWGL", "score": 3}, {"name": "LOBO", "score": 3}], "reason": "These are former Stage 2 or Stage 3 stocks that have broken below a flattening or turning-down 30-week MA, with weak or falling RS."}

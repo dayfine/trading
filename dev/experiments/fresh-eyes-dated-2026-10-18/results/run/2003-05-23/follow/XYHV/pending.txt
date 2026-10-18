@@ -1,0 +1,10 @@
+RUN FINISHED
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/XYHV-2004-04-23-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/XYHV-2004-04-23-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/XYHV-2004-04-23.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/market/MARKET-2004-04-23-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/market/MARKET-2004-04-23-5y.png
+cut: 2004-04-23
+run: finished
+position: none
+order: none
+closed trades: 1
+  long 2003-06-05 -> 2004-04-23 (open_at_end) return +24.9%

@@ -1,0 +1,1 @@
+{"stage": 3, "action": "short_stop", "trigger": 27.85, "limit": 27.2, "stop": 30.37, "conviction": 2, "reason": "Two-year top with price below a falling 30-week MA and RS below zero and dropping, in a market below its own MA; a break of the ~28 floor starts Stage 4, but support at 24-27 from 2013 and the August 2015 low will slow the drop."}

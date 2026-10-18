@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 25.88, "reason": "Stage 2 is intact: price is above a rising 30-week MA with positive RS, and after the spring correction of about 10% the stock rallied to new highs, so the stop moves up to just under the lower of that correction low and the MA, below the round number 26."}

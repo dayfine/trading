@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is still above a rising 30-week MA (24.81 vs 23.69), and the recent pullback has not yet rallied back near the prior high, so the 20.38 stop stays put even though the slightly negative, drifting RS needs watching."}

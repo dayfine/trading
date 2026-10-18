@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2011-08-05
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/KLYG-2011-08-05-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/KLYG-2011-08-05-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/KLYG-2011-08-05.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/market/MARKET-2011-08-05-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/market/MARKET-2011-08-05-5y.png
+cut: 2011-08-05
+position: none
+order: none
+since the last checkpoint: stopped 2011-08-01; 
+closed trades: 1
+  long 2010-09-17 -> 2011-08-01 (stop) return +6.4%

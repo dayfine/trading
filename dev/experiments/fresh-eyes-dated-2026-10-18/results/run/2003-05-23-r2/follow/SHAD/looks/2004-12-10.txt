@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "The stock is still in Stage 2: it closed at 21.05, above a 30-week MA that is still rising (19.56), and its RS is positive. The rally since the mid-2004 correction has had no new 8–10% pullback, so the rules give no reason to raise the 17.88 stop."}

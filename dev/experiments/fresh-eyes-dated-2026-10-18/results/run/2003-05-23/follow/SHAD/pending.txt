@@ -1,0 +1,10 @@
+RUN FINISHED
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/SHAD-2005-05-24-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/SHAD-2005-05-24-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/SHAD-2005-05-24.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/market/MARKET-2005-05-24-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/market/MARKET-2005-05-24-5y.png
+cut: 2005-05-24
+run: finished
+position: none
+order: none
+closed trades: 1
+  long 2003-05-27 -> 2005-05-24 (open_at_end) return +120.7%

@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds: price closed above a rising 30-week MA and the S&P is still above its rising MA, but the roughly 11% pullback from the ~58 high hasn't ended and rallied back toward that high, so by the book the stop stays at 44.29 for now."}

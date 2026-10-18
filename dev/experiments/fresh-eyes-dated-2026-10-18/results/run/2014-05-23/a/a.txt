@@ -1,0 +1,1 @@
+{"phase": "Bullish: S&P in Stage 2 above a rising 30-week MA, with the A-D line confirming at new highs", "side": "long", "groups": ["Real Estate", "Energy", "Utilities"], "reason": "S&P at 190 sits above its rising 183 MA and the A-D line is making new highs with no divergence, so I look for longs in the three strongest sectors by 26-week strength."}

@@ -1,0 +1,1 @@
+{"picks": [{"name": "WYYP", "score": 4}, {"name": "HLGZ", "score": 4}, {"name": "FEXJ", "score": 4}, {"name": "UIMR", "score": 3}, {"name": "UOZH", "score": 3}], "reason": "These are Stage 2 breakouts from multi-year bases into new-high or virgin territory, with RS positive and rising and the 30-week MA rising. WYYP also shows a heavy-volume breakout week."}

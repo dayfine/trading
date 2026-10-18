@@ -1,0 +1,10 @@
+RUN FINISHED
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/HUDJ-2012-11-01-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/HUDJ-2012-11-01-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/HUDJ-2012-11-01.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/market/MARKET-2012-11-01-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/market/MARKET-2012-11-01-5y.png
+cut: 2012-11-01
+run: finished
+position: none
+order: none
+closed trades: 1
+  long 2010-11-04 -> 2012-11-01 (open_at_end) return +30.5%

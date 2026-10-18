@@ -1,0 +1,6 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+ZSKD,UTHR,short_stop,116.4,113.0,127.12,3
+WTPX,ALXN,short_stop,129.9,126.5,153.12,3
+SCWA,DNB_old,short_stop,91.9,89.5,100.12,2
+HQBV,TECH,short_stop,80.9,78.5,91.12,2
+QXRR,GM,short_stop,27.85,27.2,30.37,2

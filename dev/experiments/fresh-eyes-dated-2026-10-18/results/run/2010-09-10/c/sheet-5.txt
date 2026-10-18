@@ -1,0 +1,1 @@
+{"picks":[{"name":"PZEL","score":4},{"name":"OMKS","score":3},{"name":"FWHT","score":3},{"name":"WKVX","score":3},{"name":"FXHH","score":2}],"reason":"These are Stage 2 stocks above a rising 30-week MA with strong positive RS and little or no overhead resistance, and PZEL is breaking out to a multi-year high."}

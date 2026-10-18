@@ -1,0 +1,1 @@
+{"stage": 4, "action": "set_stop", "stop": 13.12, "reason": "Price is still in Stage 4 below a falling 30-week MA (10.38 vs 11.47) with negative RS; the June–July rally of about 12.5 failed and made new lows, so I lower the buy-stop to just above that peak, the MA and 13."}

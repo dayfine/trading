@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":15.38,"reason":"Stage 2 stock above a rising MA has rallied back to its prior high after a roughly 20% correction to about 15.8, so the stop goes just under that low and below the 15.50 half-dollar; with the S&P under a flattening MA (caution), tightening suits the rules."}

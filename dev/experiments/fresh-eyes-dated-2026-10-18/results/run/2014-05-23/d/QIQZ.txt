@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 62.15, "limit": 63.4, "stop": 56.88, "conviction": 2, "reason": "Two-year flat range near 50-60 is resolving upward into all-time highs above a turning-up MA, with RS just crossing above zero and the market in Stage 2, but breakout volume has been weak so conviction is low."}

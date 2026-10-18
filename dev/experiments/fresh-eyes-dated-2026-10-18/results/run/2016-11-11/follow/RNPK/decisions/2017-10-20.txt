@@ -1,0 +1,1 @@
+{"action":"none","stop":11.81,"reason":"The 30-week MA has flattened while price has crossed above and below it through 2017, so this looks like Stage 3; the latest correction low is about 12.2, and placing the stop below it and under the 12.00 round number gives about 11.88, too small a raise over 11.81 to bother with."}

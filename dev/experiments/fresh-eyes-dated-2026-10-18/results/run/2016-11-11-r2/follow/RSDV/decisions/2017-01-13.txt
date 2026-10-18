@@ -1,0 +1,1 @@
+{"action":"none","stop":71.88,"reason":"This is a strong Stage 2 with the price well above a rising 30-week MA and positive RS; the pullback from the high was only about 5%, short of the 8–10% correction needed to raise the stop, so it stays at 71.88."}

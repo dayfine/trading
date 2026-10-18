@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"KLYG is in Stage 2 above a rising 30-week MA (~44.5), and the pullback from ~50.7 is only ~7%, not yet the 8-10% correction, followed by a rally back toward the high, that the book requires before raising the stop, so it stays at 42.29."}

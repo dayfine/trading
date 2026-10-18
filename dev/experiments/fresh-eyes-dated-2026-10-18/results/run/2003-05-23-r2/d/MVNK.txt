@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Early Stage 2 with strong RS and a market that is bottoming, but at 13.93 it is about 30% above the base breakout near 10.5 and 50% above the 30-week MA, so it is too extended and any proper support stop would be more than 15% away."}

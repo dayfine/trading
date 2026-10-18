@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 continues with price above a rising 30-week MA and positive RS; there has been no completed 8-10% correction since entry, so the stop stays at 44.38."}

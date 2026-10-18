@@ -1,0 +1,1 @@
+{"picks": [{"name": "GVMZ", "score": 3}, {"name": "SNSB", "score": 3}, {"name": "CMGX", "score": 4}, {"name": "TTDU", "score": 4}, {"name": "JJFY", "score": 3}], "reason": "CMGX and TTDU are breaking out to new highs above a rising MA with strongly positive RS, while GVMZ, SNSB and JJFY are steady Stage 2 advances with positive RS."}

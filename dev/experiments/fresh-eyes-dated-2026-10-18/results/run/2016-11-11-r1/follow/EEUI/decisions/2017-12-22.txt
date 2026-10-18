@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 with price above a rising 30-week MA in a bullish market; the dip from about 77 to 70.15 is roughly 9% but has not yet rallied back toward the prior high, so the 63.70 stop stays where it is for now."}

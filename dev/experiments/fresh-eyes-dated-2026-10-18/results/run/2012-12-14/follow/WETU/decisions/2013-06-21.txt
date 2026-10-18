@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":59.88,"reason":"Stage 2 above a rising MA; the roughly 8% March–April correction to about 60 is over and price has rallied to new highs, so the stop goes just under the lower of that low and the MA, below the round number."}

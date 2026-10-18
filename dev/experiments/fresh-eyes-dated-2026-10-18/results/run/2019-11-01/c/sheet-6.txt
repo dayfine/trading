@@ -1,0 +1,1 @@
+{"picks": [{"name": "ZRZU", "score": 4}, {"name": "WULQ", "score": 4}, {"name": "TXPV", "score": 3}, {"name": "CJYT", "score": 3}, {"name": "YMEL", "score": 3}], "reason": "These are Stage 2 stocks above a rising 30-week MA, at or near new highs with RS flat or positive, but I can't verify breakout volume or the market and group gates from the sheet."}

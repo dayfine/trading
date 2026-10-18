@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Strong Stage 2 at all-time highs with heavy volume and RS +25, but price is about 20% above the rising MA and more than 15% past the roughly 25.5 consolidation breakout, so it is overextended; hold off until a pullback or new base near the MA."}

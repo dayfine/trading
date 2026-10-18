@@ -1,0 +1,1 @@
+{"picks": [{"name": "MQXU", "score": 3}, {"name": "ZGXR", "score": 3}, {"name": "SNKF", "score": 2}, {"name": "NLVD", "score": 2}, {"name": "ECSX", "score": 2}], "reason": "These are the names whose price is above a rising or turning 30-week MA with RS positive and improving, but few are clean first-base breakouts and several sit extended or near prior highs."}

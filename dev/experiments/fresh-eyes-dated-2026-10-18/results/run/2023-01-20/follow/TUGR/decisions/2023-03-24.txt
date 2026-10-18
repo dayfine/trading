@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 with price above a rising 30-week MA and positive RS; the roughly 10% pullback from about 770 hasn't rallied back toward that high yet, so the book says don't raise the stop."}

@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":21.88,"reason":"Stage 2 is intact with price well above a rising 30-week MA and positive RS; after the roughly 8% April pullback (low near 22.3, read off the chart) and the rally to new highs, raise the stop to just under the lower of that low and the MA (22.47), below the round 22."}

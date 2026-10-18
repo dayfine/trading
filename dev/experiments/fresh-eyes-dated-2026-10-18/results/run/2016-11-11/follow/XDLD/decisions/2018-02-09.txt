@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2: price is above a rising 30-week MA and the market is still above its own MA; the current pullback has not ended, and the 31.45 stop already sits just under the 2017 correction low, so it stays where it is."}

@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 stock in a ~19% correction, slightly below a still-rising 30-week MA. The book raises the stop only after the stock rallies back toward its prior high, which hasn't happened yet, so the stop stays at 11.51."}

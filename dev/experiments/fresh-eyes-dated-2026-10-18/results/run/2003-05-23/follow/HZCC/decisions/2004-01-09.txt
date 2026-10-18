@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":14.38,"reason":"Strong Stage 2 with a rising MA; after the roughly 20% December pullback the stock broke out to new highs on heavy volume, so the stop goes just under the lower of the correction low and the 30-week MA (~14.6), below the 14.50 half-point."}

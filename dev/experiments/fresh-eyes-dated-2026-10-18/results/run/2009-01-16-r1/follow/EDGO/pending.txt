@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2009-01-23
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r1/pages/EDGO-2009-01-23-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r1/pages/EDGO-2009-01-23-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r1/pages/EDGO-2009-01-23.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r1/pages/market/MARKET-2009-01-23-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r1/pages/market/MARKET-2009-01-23-5y.png
+cut: 2009-01-23
+position: none
+order: none
+since the last checkpoint: shorted 2009-01-20; stopped 2009-01-22; 
+closed trades: 1
+  short 2009-01-20 -> 2009-01-22 (stop) return -8.7%

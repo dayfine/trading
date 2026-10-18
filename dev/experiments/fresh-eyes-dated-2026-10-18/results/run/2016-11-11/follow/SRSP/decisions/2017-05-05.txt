@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":146.88,"reason":"Stage 2 holds with price above a steeply rising 30-week MA and the S&P bullish; after a correction of over 10% from about 170 to about 147, the stock is rallying back toward its high, so the stop goes up to just under the correction low (~147, below the MA at 150.7)."}

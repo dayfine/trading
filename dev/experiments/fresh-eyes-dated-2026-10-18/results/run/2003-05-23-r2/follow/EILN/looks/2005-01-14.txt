@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "The 30-week MA is still rising and price is sitting on it after a correction of about 12% from the ~32.5 high; the book says to raise the stop only once the correction ends and price rallies back toward the high, so the stop stays at 23.88."}

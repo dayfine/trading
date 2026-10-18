@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Stage 2 is intact: price closed at 54.08 above the rising 30-week MA of 53.24 despite a dip to 52.11. That dip is part of a correction of about 10% that has not finished, so the stop stays at 44.29 until the stock rallies back toward its prior high."}

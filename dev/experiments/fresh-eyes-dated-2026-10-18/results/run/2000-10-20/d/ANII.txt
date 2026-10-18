@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 1, "reason": "ANII is in a steep Stage 4 decline but is about 43% below its falling 30-week MA with no consolidation to short from; any sensible buy-stop above the last rally peak or the MA would be 50%+ away, far beyond the card's 30–40% pass limit, so wait for a base beneath the MA."}

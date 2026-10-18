@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":32.88,"reason":"Stage 2 above a rising 30-week MA; the pullback from about 40 looks like an 8-10% correction (read from the chart, not exact data), so I raise the stop to just under the MA (33.35) and below 33."}

@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2007-11-23
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/LFPM-2007-11-23-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/LFPM-2007-11-23-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/LFPM-2007-11-23.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/market/MARKET-2007-11-23-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/market/MARKET-2007-11-23-5y.png
+cut: 2007-11-23
+position: none
+order: none
+since the last checkpoint: stopped 2007-11-19; 
+closed trades: 1
+  long 2007-03-21 -> 2007-11-19 (stop) return +47.7%

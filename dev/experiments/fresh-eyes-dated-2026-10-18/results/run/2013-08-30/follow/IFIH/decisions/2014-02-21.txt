@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":20.88,"reason":"The stock is in Stage 2 and the market is bullish; after a roughly 10% correction it has rallied to a new high, so the stop goes up to just under the rising 30-week MA (21.33), placed below the round number 21."}

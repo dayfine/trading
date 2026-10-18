@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Strong Stage 2 above a steeply rising 30-week MA with RS well positive, and the S&P is in Stage 2, but there has been no 8-10% correction since the stop was set, so the book gives no trigger to raise the stop yet."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Stock is in late Stage 2 and about 7% above its rising 30-week MA with no consolidation base near the MA; the week off the 57.5 high came on the highest volume in 5 years and RS is only flat near zero, so there is no clean continuation entry (hold, not buy)."}

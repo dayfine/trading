@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is holding just above a still-rising 30-week MA (61.6 vs 60.7), and the pullback from the ~64 peak to 59.7 is under the 8–10% that would justify raising the stop, so the stop stays at 56.88 even though RS has slipped just below zero."}

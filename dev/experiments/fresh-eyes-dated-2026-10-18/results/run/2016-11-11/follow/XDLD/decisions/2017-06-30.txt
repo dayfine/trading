@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"The 30-week MA has flattened and is starting to roll over after the advance, and price is crossing back and forth around 36, which looks like Stage 3; the existing 32.02 stop already sits just under the May-June correction low near 32, so it is already as tight as the Stage 3 rule asks."}

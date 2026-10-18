@@ -1,0 +1,1 @@
+{"picks": [{"name": "KTCG", "score": 4}, {"name": "AGHF", "score": 4}, {"name": "KFVB", "score": 3}, {"name": "CIKW", "score": 3}, {"name": "JURY", "score": 3}], "reason": "These are Stage 2 breakouts or new highs above a rising 30-week MA with positive RS, though KFVB, CIKW and JURY have some nearby resistance or RS concerns."}

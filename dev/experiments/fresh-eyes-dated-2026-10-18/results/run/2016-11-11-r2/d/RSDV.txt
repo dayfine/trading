@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 81.0, "limit": 82.6, "stop": 71.88, "conviction": 3, "reason": "Stage 2 stock above a rising 30-week MA broke out on record volume with RS jumping to +16, and above 81 it is in virgin territory in a bullish market, though price is stretched about 17% above the MA so the stop sits under this week's low, about 11% risk."}

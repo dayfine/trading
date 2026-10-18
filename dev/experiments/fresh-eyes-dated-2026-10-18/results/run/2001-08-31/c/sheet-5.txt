@@ -1,0 +1,1 @@
+{"picks": [{"name": "IZKX", "score": 4}, {"name": "IFFZ", "score": 4}, {"name": "JCSL", "score": 3}, {"name": "ERYT", "score": 3}, {"name": "MPRN", "score": 3}], "reason": "These names show Stage 3 tops breaking below a flat or falling 30-week MA, or fresh breakdowns to new lows, with weak and falling RS. Stocks already far down in Stage 4 were skipped as overextended."}

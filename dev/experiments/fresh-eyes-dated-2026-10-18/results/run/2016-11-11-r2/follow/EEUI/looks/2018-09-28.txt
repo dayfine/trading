@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 46.88, "reason": "Stage 2 above a rising 30-week MA in a bullish market; after the mid-2018 correction of about 8% (low near 47.5) the stock made new highs, so the stop moves just under the lower of that low and the MA (47.39), below the whole dollar."}

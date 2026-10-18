@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is above a 30-week MA that is still rising, and the stop at 48.67 already sits under the 2018 correction low near 49, so raising it would be trivial and nothing calls for selling despite the slightly negative relative strength."}

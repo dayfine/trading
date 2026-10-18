@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Strong Stage 2 with good RS in a bullish market, but price is about 15% above the rising MA with no fresh base or consolidation near the MA and no volume expansion, so it is a hold rather than a buy; wait for a pullback and a new base before a continuation entry."}

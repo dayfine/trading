@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":26.88,"reason":"Stage 2 continues: price hit new highs above a rising 30-week MA after a correction of about 15% in early 2005, so the stop goes up to just under that correction low (about 27, read from the chart) and below the round number."}

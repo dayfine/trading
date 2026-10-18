@@ -1,0 +1,1 @@
+{"picks": [{"name": "FDAO", "score": 4}, {"name": "ZSGB", "score": 4}, {"name": "XLPX", "score": 3}, {"name": "EWNP", "score": 3}, {"name": "OSRL", "score": 3}], "reason": "These are Stage 2 stocks breaking to new highs above a rising MA with neutral-to-positive RS and no overhead resistance, but I can't verify breakout volume on the sheet, and XLPX and OSRL look extended."}

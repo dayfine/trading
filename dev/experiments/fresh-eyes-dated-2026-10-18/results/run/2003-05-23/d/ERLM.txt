@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "ERLM is in Stage 2, but it gapped from about 4 to 8 and now sits about 60% above its 30-week MA and far above its base breakout, so it is overextended (hold, not buy) and has no nearby support for a stop within 15%."}

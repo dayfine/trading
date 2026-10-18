@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"This is a sharp pullback of about 24% from the peak, slightly below a 30-week MA that is still rising, with RS still positive; the correction has not ended with a rally back toward the high, so the stop stays at 120.06."}

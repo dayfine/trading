@@ -1,0 +1,1 @@
+{"picks": [{"name": "JJKP", "score": 4}, {"name": "TIYQ", "score": 3}, {"name": "CKFO", "score": 3}, {"name": "MZQH", "score": 2}, {"name": "FUFI", "score": 2}], "reason": "S&P context unknown, but these show Stage 2 with price above a rising 30-week MA, positive RS and little overhead resistance, though CKFO and TIYQ look extended and MZQH has a thin-volume spike."}

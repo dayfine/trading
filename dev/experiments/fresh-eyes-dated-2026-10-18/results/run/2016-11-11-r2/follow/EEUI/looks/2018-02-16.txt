@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 69.88, "reason": "EEUI is still in Stage 2, above a rising 30-week MA, and after a 10% pullback (by chart estimate) from about 78 to about 70 it has rallied back near its high, so the stop goes up to just under the about 70 correction low, below the round number."}

@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds: price is above a rising 30-week MA after a breakout to new highs, RS is positive and the market is bullish; the stop stays at 42.88 because there has been no 8-10% correction since entry, so there is nothing to raise it on."}

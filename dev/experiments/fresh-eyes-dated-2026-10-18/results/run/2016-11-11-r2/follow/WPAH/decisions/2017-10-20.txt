@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price has come back to the top of its 49–59 range, above a 30-week MA that is turning up again, so Stage 2 is holding; the summer correction low near 49.5 is below the MA, so the book stop stays just under 49 at 48.88 and a move to about 49.38 would be too small to bother with."}

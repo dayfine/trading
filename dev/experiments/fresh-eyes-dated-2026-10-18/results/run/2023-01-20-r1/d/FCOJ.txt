@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 14.42, "limit": 14.72, "stop": 12.38, "conviction": 3, "reason": "Stage 2 continuation to a new all-time high above a rising MA with positive, rising RS and heavier recent volume, while the S&P has just crossed a flattening MA; the stop goes under the December low but entry is somewhat extended and the group is unknown."}

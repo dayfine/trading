@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "CGYH is in a healthy Stage 2 with a rising 30-week MA, positive RS and a bullish market, but it is already more than 15% above its ~82 breakout and about 15% above the MA, so this is a hold, not a buy; wait for a consolidation near the MA."}

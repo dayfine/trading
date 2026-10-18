@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "SQPP is in Stage 2 above a rising MA in a bullish market, but it is falling back from a run to new highs, RS is fading and there is no range near the MA to buy a breakout from, so I'll wait for one to form."}

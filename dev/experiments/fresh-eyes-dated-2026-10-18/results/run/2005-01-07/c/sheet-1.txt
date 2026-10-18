@@ -1,0 +1,1 @@
+{"picks": [{"name": "DGYY", "score": 3}, {"name": "LGAR", "score": 3}, {"name": "CFAD", "score": 2}, {"name": "TUYQ", "score": 3}, {"name": "ZLRK", "score": 2}], "reason": "These show Stage 2 uptrends with a rising MA and positive RS, but most are extended or lack clear volume-confirmed breakouts, so none is a textbook setup."}

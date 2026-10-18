@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Stage 2 with a rising MA and strong RS in a bullish market, but price is about 29% above the MA after a run with no base, it reversed hard at the 2017 high near 6, and a support-based stop near 5.08 would risk about 17%, so it is too extended to buy right."}

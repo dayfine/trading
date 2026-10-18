@@ -1,0 +1,1 @@
+{"picks": [{"name": "YKWJ", "score": 3}, {"name": "RLQV", "score": 3}, {"name": "CMHI", "score": 3}, {"name": "NMWY", "score": 3}, {"name": "LMOY", "score": 2}], "reason": "These are Stage 2 names with rising 30-week MAs, positive RS and prices at or near multi-year highs, but I am scoring them on chart shape alone and can't verify breakout volume or the market and group gates."}

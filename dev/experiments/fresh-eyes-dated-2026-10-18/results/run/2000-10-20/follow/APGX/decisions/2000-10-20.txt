@@ -1,0 +1,1 @@
+{"action":"short_stop","trigger":14.31,"limit":"13.95","stop":16.62,"reason":"step D order"}

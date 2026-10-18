@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "IDRM is already in Stage 4 after breaking its ~24 top support, but at 18.8 it is too far below the breakdown and a sensible stop would risk over 20%, so wait for a rally back toward the declining MA before shorting."}

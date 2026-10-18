@@ -1,0 +1,6 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+EEUI,EXPO,buy_stop,63.11,64.5,55.88,3
+RNPK,HBAN,buy_stop,12.05,12.3,10.38,3
+XPKP,BK,buy_stop,47.72,48.70,40.88,3
+RSDV,LSTR,buy_stop,81.0,82.6,71.88,3
+WPAH,PLXS,buy_stop,50.12,51.1,44.38,2

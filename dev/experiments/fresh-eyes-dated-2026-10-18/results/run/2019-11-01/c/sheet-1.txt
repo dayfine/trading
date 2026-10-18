@@ -1,0 +1,1 @@
+{"picks": [{"name": "VSRQ", "score": 4}, {"name": "MBRB", "score": 4}, {"name": "OWEP", "score": 3}, {"name": "REDM", "score": 3}, {"name": "OAHP", "score": 3}], "reason": "These are Stage 2 names, or near it, with a rising 30-week MA and RS at or above zero. Each is at or near a breakout. VSRQ and MBRB are breaking to new highs on a rising MA with positive RS."}

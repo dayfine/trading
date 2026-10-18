@@ -1,0 +1,4 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+HTLA,DCI,buy_stop,56.31,57.45,49.88,3
+ZSGB,HST,buy_stop,22.70,23.15,19.88,2
+LRPX,CVGW,buy_stop,107.70,109.90,96.88,2

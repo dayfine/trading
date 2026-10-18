@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds: the 30-week MA is still rising and price is only touching it after a pullback of about 7% from the 43 high, which is not yet a completed 8-10% correction, so the stop stays at 31.18 just under the mid-2017 correction low."}

@@ -1,0 +1,1 @@
+{"phase": "Stage 1 base turning up: SPY 396 above a now-flat 30-wk MA 389, with A-D line near highs (positive divergence)", "side": "long", "groups": ["Energy", "Materials", "Industrials"], "reason": "SPY has crossed a flattening 30-week MA after a Stage 4 decline and breadth is near its highs, so buy selectively in the sectors leading on relative strength."}

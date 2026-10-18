@@ -1,0 +1,1 @@
+{"stage": 3, "action": "none", "stop": null, "reason": "The 30-week MA has flattened after the advance and price is crossing below it with weak, negative RS, so this looks like early Stage 3; the existing 38.88 stop already sits just under the recent correction low near 39, so it stays where it is."}

@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":15.38,"reason":"SHAD is in Stage 2 at a new high above a rising 30-week MA and has rallied back to its prior peak after a 20%+ spring correction, so the stop rises to just under that correction low of about 15.5 (read off the chart, not exact)."}

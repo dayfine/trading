@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is above a rising 30-week MA with RS slightly positive, and raising the stop under the roughly 44.5 correction low would be a trivial gain over 43.70, so the stop stays as it is."}

@@ -1,0 +1,1 @@
+{"picks": [{"name": "XPKP", "score": 4}, {"name": "XDLD", "score": 4}, {"name": "HGEZ", "score": 4}, {"name": "USPE", "score": 2}], "reason": "These names are breaking out to new highs above a rising or flat 30-week MA with strong positive RS, based on how the charts read; I did not check volume closely and USPE has some overhead resistance."}

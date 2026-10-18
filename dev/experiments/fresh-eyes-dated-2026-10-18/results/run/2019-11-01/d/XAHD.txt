@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Stage 2 with a rising MA in a bullish market, but price is already about 8% above the MA, and no breakout fits the card: volume is fading, the 1.9 RS is weak and down from about +21, and the 2007 high near 73–75 is close overhead, with the stop near 59–60 about 13% risk."}

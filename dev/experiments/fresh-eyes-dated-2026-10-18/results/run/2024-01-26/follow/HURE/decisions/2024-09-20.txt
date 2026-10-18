@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":22.88,"reason":"HURE is in Stage 2 above a rising 30-week MA (28.77 vs 25.25) with strong RS, and after the roughly 14% August correction it has rallied to new highs; by my chart reading that low was about 23, so the stop goes just under it at 22.88, below the 23.00 round number."}

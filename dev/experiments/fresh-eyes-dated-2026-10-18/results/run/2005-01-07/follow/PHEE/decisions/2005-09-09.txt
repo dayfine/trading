@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":22.38,"reason":"Stage 2 is intact: price is at new highs above a rising 30-week MA with strong RS, after a correction of more than 8-10% that bottomed near 22.8 and was followed by a rally past the prior high, so the stop moves up to just under that low, which is the lower of the correction low and the MA."}

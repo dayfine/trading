@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2017-04-28
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/ISCB-2017-04-28-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/ISCB-2017-04-28-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/ISCB-2017-04-28.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/market/MARKET-2017-04-28-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/market/MARKET-2017-04-28-5y.png
+cut: 2017-04-28
+position: none
+order: none
+since the last checkpoint: stopped 2017-04-26; 
+closed trades: 1
+  long 2016-11-14 -> 2017-04-26 (stop) return -14.0%

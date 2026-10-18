@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2003-11-21
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/MGSB-2003-11-21-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/MGSB-2003-11-21-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/MGSB-2003-11-21.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/market/MARKET-2003-11-21-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/market/MARKET-2003-11-21-5y.png
+cut: 2003-11-21
+position: none
+order: none
+since the last checkpoint: stopped 2003-11-21; 
+closed trades: 1
+  long 2003-05-27 -> 2003-11-21 (stop) return -9.7%

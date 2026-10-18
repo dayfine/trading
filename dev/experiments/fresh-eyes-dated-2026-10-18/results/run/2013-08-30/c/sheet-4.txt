@@ -1,0 +1,1 @@
+{"picks":[{"name":"HAQA","score":4},{"name":"GCAE","score":4},{"name":"YLTB","score":3},{"name":"JWLP","score":3},{"name":"KMDX","score":3}],"reason":"These are Stage 2 stocks at or near multi-year highs, above a rising 30-week MA with positive relative strength and no overhead resistance."}

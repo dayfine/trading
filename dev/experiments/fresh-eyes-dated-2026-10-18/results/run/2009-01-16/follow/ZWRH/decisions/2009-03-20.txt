@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"ZWRH is in Stage 4 below a falling 30-week MA at 14.11, and the stop can only drop to above the higher of the last rally peak (about 10.3) and the MA, which is above the current 13.88, so I keep the stop."}

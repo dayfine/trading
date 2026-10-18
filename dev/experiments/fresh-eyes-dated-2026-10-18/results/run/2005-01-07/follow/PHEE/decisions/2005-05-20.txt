@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"The stock has pulled back about 24% from its ~32 high to the still-rising 30-week MA (24.7), so it is still in Stage 2; the book says not to raise the stop until the correction ends and price rallies back toward the prior high, so the stop stays at 21.91 despite last week's very heavy volume."}

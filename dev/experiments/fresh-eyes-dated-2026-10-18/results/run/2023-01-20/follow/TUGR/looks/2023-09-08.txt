@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 799.88, "reason": "Still Stage 2 above a rising 30-week MA (809) with positive RS; the summer correction of roughly 8–10% looks complete with a new high since, so raise the stop to just under the lower of the correction low and the MA, below the round 800."}

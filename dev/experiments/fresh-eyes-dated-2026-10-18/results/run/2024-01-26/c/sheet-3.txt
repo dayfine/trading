@@ -1,0 +1,1 @@
+{"picks": [{"name": "PNHF", "score": 4}, {"name": "JTLT", "score": 4}, {"name": "PGBX", "score": 3}, {"name": "DLRA", "score": 3}, {"name": "DOWR", "score": 3}], "reason": "These are Stage 2 breakouts or new highs above a rising or turning MA with positive RS (PNHF, JTLT, PGBX) or a heavy-volume breakout from a base (DLRA, DOWR), though some have nearby overhead resistance."}

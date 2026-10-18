@@ -1,0 +1,5 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+XYHV,ASL,buy_stop,7.72,7.87,6.88,4
+HZCC,SSNC1,buy_stop,10.63,10.85,9.38,3
+CWIN,NEE,buy_stop,66.12,67.45,57.88,3
+SHAD,VTR,buy_stop,11.12,11.4,9.88,3

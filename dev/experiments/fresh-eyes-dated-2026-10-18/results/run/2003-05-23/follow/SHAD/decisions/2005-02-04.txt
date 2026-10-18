@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":18.88,"reason":"The 30-week MA has flattened near 20 after a big advance, price is crossing it and RS is sliding toward zero, so this is an early Stage 3 and the stop goes up to just under the latest correction low near 19, below the round number."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 29.88, "reason": "Still Stage 2: the 30-week MA is rising and a dip just under it is tolerable, so I raise the stop under the roughly 30 low of the spring 2024 correction (my estimate from the chart) and the round 30, without selling on one heavy down week."}

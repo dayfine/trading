@@ -1,0 +1,4 @@
+cut,action,trigger,stop,next_cut,events
+2016-02-05,short_stop,129.9,153.12,2016-03-04,
+2016-03-04,none,,,2016-03-18,shorted 2016-03-16; 
+2016-03-18,none,,,2016-04-08,stopped 2016-04-06; 

@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2009-08-07
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r2/pages/TMAN-2009-08-07-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r2/pages/TMAN-2009-08-07-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r2/pages/TMAN-2009-08-07.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r2/pages/market/MARKET-2009-08-07-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2009-01-16-r2/pages/market/MARKET-2009-08-07-5y.png
+cut: 2009-08-07
+position: none
+order: none
+since the last checkpoint: stopped 2009-08-04; 
+closed trades: 1
+  short 2009-01-20 -> 2009-08-04 (stop) return +18.1%

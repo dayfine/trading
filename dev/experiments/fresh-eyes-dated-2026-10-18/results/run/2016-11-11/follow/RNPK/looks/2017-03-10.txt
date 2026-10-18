@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "RNPK is in healthy Stage 2: price is well above a steeply rising 30-week MA, RS is strongly positive and SPY is also in Stage 2, and since no 8-10% correction has completed, the stop stays at 9.82."}

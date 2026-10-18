@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds with price above a rising 30-week MA and positive RS; the stop at 25.37 already sits under the March correction low and the latest dip is under 8%, so there is no trigger to raise it."}

@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":11.28,"reason":"The MA is flattening into a Stage 1 base, price closed above it and RS turned positive, so I press the short's buy-stop to just above this week's 11.16 rally peak."}

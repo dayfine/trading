@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 58.88, "reason": "Stage 2 holds with price above a rising 30-week MA; the roughly 10% correction to about 59.5 has ended and price is back near its prior high, so the stop goes up to just under that low, below the 59 whole number."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "This is a fresh early Stage 2 breakout to new highs above a rising 30-week MA with positive RS, and there has been no 8-10% correction yet, so the initial stop at 19.88 stays."}

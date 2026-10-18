@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2017-09-08
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/SRSP-2017-09-08-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/SRSP-2017-09-08-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/SRSP-2017-09-08.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/market/MARKET-2017-09-08-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r1/pages/market/MARKET-2017-09-08-5y.png
+cut: 2017-09-08
+position: none
+order: none
+since the last checkpoint: stopped 2017-09-05; 
+closed trades: 1
+  long 2016-11-14 -> 2017-09-05 (stop) return +9.7%

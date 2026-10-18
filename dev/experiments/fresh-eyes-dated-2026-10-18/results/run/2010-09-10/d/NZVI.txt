@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "NZVI is in Stage 2, but the market is in caution (SPY near a flat MA), there is no fresh range breakout or volume surge, and heavy resistance at 19-20 (2008 and 2001 highs) sits only about 15% overhead, so it is not an A+ setup."}

@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"The 30-week MA is still rising, about 4% above where it was six weeks ago, and price at 162 is holding above it. Since the April correction low, no new 8-10% correction has finished with a rally back to the prior high, so the stop stays at 146.18, under that low."}

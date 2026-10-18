@@ -1,0 +1,1 @@
+{"picks": [{"name": "CGYH", "score": 4}, {"name": "CPLD", "score": 4}, {"name": "XIME", "score": 3}, {"name": "PALX", "score": 3}, {"name": "WVFY", "score": 2}], "reason": "These names are in Stage 2 or breaking out of a Stage 1 base. Price is above a rising or turning-up 30-week MA, and RS is positive or improving. CGYH and CPLD show new highs or a breakout with good RS."}

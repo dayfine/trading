@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"The 30-week MA has gone flat after a big advance and price is crossing it while RS fades toward zero, so this looks like Stage 3, but the existing 27.88 stop already sits just under the latest correction low near 28 and price closed above the MA, so I hold."}

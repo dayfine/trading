@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": 57.88, "reason": "This is a fresh Stage 2 breakout to new highs above a rising MA, with positive RS and a strong A-D line; the stop stays put until a correction of at least 8-10% gives a reason to raise it."}

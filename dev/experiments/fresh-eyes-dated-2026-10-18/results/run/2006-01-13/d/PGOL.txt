@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 52.75, "limit": 53.8, "stop": 46.88, "conviction": 3, "reason": "Stage 2 stock above a rising 30-week MA with positive RS in a bullish market; buy a continuation breakout above the ~52.5 December high, stop under the consolidation low near 47, though the heavy December volume spike and flattening RS hold conviction down."}

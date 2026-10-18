@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "EGGN is in late Stage 2, about 3x off its 2020 base, and the Mansfield RS has fallen from +45 to +10 with lower peaks while price made new highs, so the RS divergence and weak volume veto any continuation buy above 124."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "PZEL is in a healthy Stage 2, but at 37.4 it sits about 20% above its rising 30-week MA and about 13% past the 33 breakout, on unimpressive volume, so a buy now is late; and with SPY just below a flat MA (111 vs 112), the market gate says no new longs except A+ setups."}

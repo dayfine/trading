@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "The stock is in a strong Stage 2 well above its rising 30-week MA (19.47 vs 15.97), and the market is bullish, but there has been no 8-10% correction since entry, so the 14.88 stop stays where it is."}

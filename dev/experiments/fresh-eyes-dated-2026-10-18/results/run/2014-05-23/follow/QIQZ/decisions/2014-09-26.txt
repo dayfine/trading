@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"The stock is still in Stage 2, holding just above its rising 30-week MA during a correction of about 10% from the 67 high. The book says to raise the stop only after the correction ends and price rallies back toward that high, so the 55.97 stop stays where it is."}

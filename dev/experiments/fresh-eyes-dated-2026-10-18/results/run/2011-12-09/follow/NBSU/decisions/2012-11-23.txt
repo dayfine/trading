@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":39.88,"reason":"After a long advance the 30-week MA has flattened, price is crossing it and RS is slightly negative and falling, so this looks like Stage 3; I tighten the stop to just under the recent correction low near 40, below the round number."}

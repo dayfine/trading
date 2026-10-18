@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":30.88,"reason":"Stage 2 with a rising 30-week MA (33.6) after the roughly 8-10% Dec-Mar consolidation broke out to new highs, so I raise the stop just under that correction low (about 31) and below the round number."}

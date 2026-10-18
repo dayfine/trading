@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds with price above a rising 30-week MA after a roughly 12% pullback from 14.5, and the book says to raise the stop only after the stock rallies back toward its prior high, which it has not done."}

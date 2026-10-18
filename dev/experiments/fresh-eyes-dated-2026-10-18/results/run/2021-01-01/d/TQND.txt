@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Strong Stage 2 with a rising MA, but price is about 35% above the 30-week MA with no consolidation near it, so it is overextended (hold, not buy) and any sensible stop would be more than 15% away."}

@@ -1,0 +1,1 @@
+{"picks": [{"name": "ZJCQ", "score": 4}, {"name": "RXQT", "score": 4}, {"name": "YUKQ", "score": 3}, {"name": "TIFT", "score": 3}, {"name": "DGSF", "score": 2}], "reason": "ZJCQ and RXQT are Stage 2 breakouts to new highs above rising MAs with positive RS; YUKQ and TIFT are strong Stage 2 continuation candidates, while DGSF is a marginal rebound."}

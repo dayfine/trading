@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Stage 2 is intact: price is well above a rising 30-week MA and RS is strongly positive, and the current dip from the December high has not finished and rallied back toward that high, so by the book the 16.38 stop stays where it is for now."}

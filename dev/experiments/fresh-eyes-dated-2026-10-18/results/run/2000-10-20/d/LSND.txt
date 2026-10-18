@@ -1,0 +1,1 @@
+{"stage": 1, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Although the market is bearish, LSND is moving sideways in a 29–37 base after its decline, with a flat 30-week MA and improving RS; the early-2000 lows near 25 are nearby support, and a breakdown below them would need a stop too far away."}

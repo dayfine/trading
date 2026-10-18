@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 49.88, "reason": "Stage 2 above a rising 30-week MA in a bullish market; the November pullback of about 8% to near 50 bottomed and price has rallied back near its high, so the stop goes up to just under that correction low and below the round number."}

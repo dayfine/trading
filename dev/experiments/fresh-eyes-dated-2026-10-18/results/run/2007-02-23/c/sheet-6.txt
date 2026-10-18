@@ -1,0 +1,1 @@
+{"picks": [{"name": "VUXJ", "score": 4}, {"name": "NSZY", "score": 4}, {"name": "LNDN", "score": 3}, {"name": "IVJG", "score": 3}, {"name": "BGUB", "score": 3}], "reason": "These are Stage 2 stocks above rising MAs with positive RS and breakouts or highs. VUXJ and NSZY have the strongest volume and breakout evidence, and the others are strong but later in their advance."}

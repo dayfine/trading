@@ -1,0 +1,1 @@
+{"picks": [{"name": "MVNK", "score": 4}, {"name": "EVVU", "score": 4}, {"name": "FUMO", "score": 3}, {"name": "LWGB", "score": 3}, {"name": "HCLI", "score": 2}], "reason": "These names are breaking out above a flat or rising 30-week MA with RS positive or improving (MVNK, HCLI, LWGB, EVVU, FUMO), but several face overhead resistance or have only fair volume."}

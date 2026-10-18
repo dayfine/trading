@@ -1,0 +1,1 @@
+{"stage": 3, "action": "set_stop", "stop": 14.88, "reason": "After a big Stage 2 run and a drop of more than 20% from about 20.5, the 30-week MA is flattening near 17.8 and price is crossing it, so I tighten the stop to just under the roughly 15.3 correction low and the 15 round number."}

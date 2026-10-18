@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":30.88,"reason":"Stage 2 with price above a rising 30-week MA (35.64 vs 34.06), and after a correction of more than 10% (I read the low at about 31 off the chart) it is rallying back toward its prior high, so I raise the stop to just under the correction low and below the round number."}

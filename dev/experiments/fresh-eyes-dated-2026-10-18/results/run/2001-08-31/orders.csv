@@ -1,0 +1,4 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+XAMW,OKE,short_stop,15.74,15.27,18.12,3
+IOHV,SM,short_stop,18.4,17.9,21.12,3
+BRYI,VPI,short_stop,17.19,16.75,20.12,2

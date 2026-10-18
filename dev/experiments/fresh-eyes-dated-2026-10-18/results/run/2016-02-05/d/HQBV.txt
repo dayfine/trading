@@ -1,0 +1,1 @@
+{"stage": 4, "action": "short_stop", "trigger": 80.9, "limit": 78.5, "stop": 91.12, "conviction": 2, "reason": "Stage 4 below a declining 30-week MA with the S&P below its rolling-over MA, so a new low under 81 is a continuation short, but last week's record-volume reversal, RS near zero and the 2014 support zone at 75-88 just below keep conviction low."}

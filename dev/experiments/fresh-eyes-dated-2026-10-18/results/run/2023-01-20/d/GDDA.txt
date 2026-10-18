@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "GDDA is in Stage 2 at all-time highs with strong RS, but at 108 it is about 14% above the ~95 base breakout and 18% above its MA, breakout volume was weak, and the S&P sits only just above a flat MA, so this is no longer a buy."}

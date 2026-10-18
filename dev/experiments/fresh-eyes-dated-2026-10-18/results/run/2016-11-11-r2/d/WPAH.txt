@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 50.12, "limit": 51.1, "stop": 44.38, "conviction": 2, "reason": "Stage 2 continuation: price is breaking out of the 2016 range of about 45-48 to a multi-year high, above a rising MA with positive RS and the S&P in Stage 2, but breakout volume is only modest, so the stop sits just above $50 and needs a follow-through week to fill."}

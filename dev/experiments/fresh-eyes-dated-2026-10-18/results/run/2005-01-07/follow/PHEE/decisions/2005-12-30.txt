@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 is intact: price is above a rising 30-week MA (30.07) and RS is positive at +13. The pullback from the high near 37 is still under way and has not yet rallied back toward the prior high, so the book says not to raise the stop yet; keep it at 26.85."}

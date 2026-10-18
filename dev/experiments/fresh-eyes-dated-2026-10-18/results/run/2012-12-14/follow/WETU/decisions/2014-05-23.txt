@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"WETU is in Stage 2, closing at 86.4 above a rising 30-week MA of 81.4 with positive RS, and the recent dips look under 8%, so the stop stays at 74.88."}

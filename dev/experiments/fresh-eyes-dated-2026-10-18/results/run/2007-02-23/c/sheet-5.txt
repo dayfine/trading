@@ -1,0 +1,1 @@
+{"picks": [{"name": "GKHD", "score": 4}, {"name": "ZEPY", "score": 4}, {"name": "PDNP", "score": 3}, {"name": "NHPN", "score": 3}, {"name": "FDFA", "score": 2}], "reason": "These names show Stage 2 breakouts or new highs above a rising 30-week MA with positive RS (GKHD, ZEPY, PDNP, NHPN), and FDFA is a strong but extended new issue."}

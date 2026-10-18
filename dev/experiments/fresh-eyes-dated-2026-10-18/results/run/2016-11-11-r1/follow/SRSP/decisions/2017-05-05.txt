@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":137.88,"reason":"Stage 2 holds (price 158.93 above a rising 30-week MA at 150.71, RS +7.8); the pullback from about 172 to about 140 was over 10% and price has rallied back toward the high, so the stop goes just under the correction low (my estimate from the chart) and below the 138 round number."}

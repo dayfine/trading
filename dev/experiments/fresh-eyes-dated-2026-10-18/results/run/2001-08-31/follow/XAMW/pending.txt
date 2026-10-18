@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2001-10-12
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/XAMW-2001-10-12-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/XAMW-2001-10-12-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/XAMW-2001-10-12.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/market/MARKET-2001-10-12-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/market/MARKET-2001-10-12-5y.png
+cut: 2001-10-12
+position: none
+order: none
+since the last checkpoint: stopped 2001-10-11; 
+closed trades: 1
+  short 2001-09-17 -> 2001-10-11 (stop) return -15.1%

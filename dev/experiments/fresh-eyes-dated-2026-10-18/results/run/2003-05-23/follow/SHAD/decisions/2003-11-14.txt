@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":11.88,"reason":"Strong Stage 2 above a rising MA with positive RS; after the autumn pullback and the new high, I raise the stop to just under the 30-week MA (12.27) and below the whole number 12, though I could not confirm from the chart that the pullback reached the card's 8% trigger."}

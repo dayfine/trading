@@ -1,0 +1,121 @@
+pseudo,symbol,src,sector
+JOHD,ENZ,filter,
+ZRBK,MRX_old,filter,
+BNLE,ENTU,filter,
+HALG,DDR,filter,
+LHPR,ASTX_old1,filter,
+ZWJD,SPLS_old,filter,
+RCIU,OSI_old,filter,
+ADCJ,PH,ours,Industrials
+RJNQ,TTM,filter,
+AOBC,EPIC,filter,
+BMHJ,ROST,filter,Consumer Discretionary
+MSPY,UAPH,filter,
+ZFQZ,TNOX,filter,
+BZCT,TSS,filter,
+BLOB,LSI1,filter,
+OQLF,ARDI,filter,
+AZWB,CEG_old,filter,
+NXDP,ACV_old,filter,
+JKZW,ADZA,ours,
+DOVD,OI,filter,Materials
+ULCW,HC,ours,
+LFPM,CMI,ours,Industrials
+RDOF,RT,filter,
+UALU,ROL,ours,Industrials
+ZIVN,WGL,filter,
+FZDO,RCL,filter,Consumer Discretionary
+JCLN,STLD,filter,Materials
+RGQL,STRA,filter,Consumer Discretionary
+RSID,GLFMQ,filter,
+YXPP,LFUS,ours,Information Technology
+BEVW,FMD,filter,
+FHRE,GHL,filter,
+PNSU,SSL,filter,Materials
+MVJW,MGG,filter,
+XUJO,SWFT1,filter,
+BZAT,GRT,filter,
+SIWQ,NSM_old,filter,
+GMGI,AZPN,ours,
+QBEW,CADMQ,ours,
+IVBX,CHU,filter,
+ITSV,BVN,ours,Materials
+PBRN,SXT,filter,Materials
+WBBX,MYE,filter,Consumer Discretionary
+BCRT,ARII,filter,
+KNKQ,SUPX_old2,filter,
+ZRYQ,BMO,ours,Financials
+SDMB,BHP,ours,Materials
+ZNZI,NRF,filter,
+HRDW,HTV,filter,
+TVJQ,SK,filter,
+WLOX,SFNT,filter,
+NFRY,PCH,filter,
+SCPS,BOL,filter,
+TOJL,FLWS,filter,
+RWNQ,RVI1,filter,
+JMYR,CBT,filter,Materials
+ECOY,BKMU,filter,
+XXOU,RAD,filter,
+JCRX,AXAHY,filter,
+HJWA,TFCFA,filter,
+LLTE,BOOM,ours,Industrials
+ZCQR,TEO,filter,Communication Services
+YDII,NAPS,filter,
+QHAU,CVA,filter,
+KOSH,UAA,filter,Consumer Discretionary
+MHBW,AFX,filter,
+KTTS,PXP,filter,
+DPSO,CNL_old1,filter,
+BMTB,VTIV,filter,
+PJSO,WBA,filter,
+NBXD,RUTH,filter,
+IXYS,RIO,ours,Materials
+MRAY,WNR,filter,
+ZCVJ,ACTA,filter,
+WOBZ,B,filter,Materials
+ETOG,JNPR,filter,
+GIHV,ABAX,ours,
+RAJF,SYMM,filter,
+BGJK,CRZO,ours,
+EHDQ,GPC,filter,Consumer Discretionary
+ZEPY,NPO,ours,Industrials
+GKHD,GTIV,filter,
+ZICE,HSP,filter,
+CRKI,GAS1,filter,
+ZRER,URBN,filter,Consumer Discretionary
+RNWT,BBY,filter,Consumer Discretionary
+UGDZ,SONC,filter,
+NHPN,CPTS,filter,
+LELS,RADS,filter,
+PTVO,LKQ,filter,Consumer Discretionary
+BYSE,NAL,filter,
+PDNP,CHRW,ours,Industrials
+URGM,OMM,filter,
+FDFA,ETE,filter,
+JJZX,OCAS,filter,
+ROKC,ROSE1,filter,
+TWUJ,BORL,filter,
+PQXR,ESL,filter,
+OQVD,HOG,filter,Consumer Discretionary
+UISO,NFP,filter,
+AZBF,MANT,filter,
+CHFM,MPS,filter,
+REJI,CSL,ours,Industrials
+TUKM,LLTC,filter,
+QFWG,TU,filter,Communication Services
+VUXJ,HNZ,filter,
+LSNF,CTRN,filter,Consumer Discretionary
+BGUB,SID,ours,Materials
+GVHI,PTI,filter,
+DMVU,TBL,filter,
+QEDK,ODFL,ours,Industrials
+YOXP,MMP,filter,
+TTVP,TSCO,filter,Consumer Discretionary
+NSZY,RRA,filter,
+LNDN,MT,filter,Materials
+TYOZ,DF,filter,
+TVIX,BDY,filter,
+IDSZ,TRI_old2,filter,
+IVJG,IPCC,filter,
+JGWC,OO,filter,

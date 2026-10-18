@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":17.88,"reason":"Stage 2 holds above a rising 30-week MA (18.59); about a 10% intraday dip to 18.71 rebounded to close near the prior high, so the stop moves just under the MA and the round 18 level."}

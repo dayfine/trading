@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "TUGR has already pushed through its 2-year range top of about 660 to new highs on volume that doesn't look like 2x its 4-week average, so it fails the volume test, and with the S&P barely above a flat, declining 30-week MA (caution) only A+ setups qualify, so no order."}

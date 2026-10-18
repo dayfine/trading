@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "WPAH is in Stage 2 at a new high above its rising 30-week MA, and the 2017 correction bottomed near 49-50, so a stop under the whole number still lands at 48.88 and there is no higher level to move it to."}

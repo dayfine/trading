@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"The stock is in Stage 2 above a rising 30-week MA and has rallied back near its prior high after the spring correction of about 19%, and the 32.02 stop already sits just under that correction low (about 32.2), which is lower than the MA, so there is nothing to raise yet."}

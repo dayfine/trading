@@ -1,0 +1,1 @@
+{"picks": [{"name": "AOGL", "score": 4}, {"name": "HASN", "score": 4}, {"name": "VSBP", "score": 3}, {"name": "IOOP", "score": 3}, {"name": "CJCM", "score": 2}], "reason": "These are Stage 2 stocks above rising 30-week MAs with neutral-to-positive RS and little overhead resistance; BCWV is too extended past its MA."}

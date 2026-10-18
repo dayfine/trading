@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"HASN is still in Stage 2 above a rising 30-week MA; the stop could only rise trivially to just under the February correction low near 165, so keep it at 164.63."}

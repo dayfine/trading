@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "The market is in Stage 4 so shorts are allowed, but GJHD is late Stage 4, about 52% below its falling 30-week MA, and a trigger under 4.39 would need a buy-stop above the 5.64 high or the ~8 rally peak, 30%+ away, so I pass."}

@@ -1,0 +1,1 @@
+{"picks":[{"name":"PHEE","score":4},{"name":"PSJP","score":3},{"name":"FIKS","score":3},{"name":"TIHZ","score":3},{"name":"PAFI","score":3}],"reason":"These are Stage 2 names at or near new highs above a rising 30-week MA with RS flat to positive, and PHEE has the cleanest chart with a strong RS."}

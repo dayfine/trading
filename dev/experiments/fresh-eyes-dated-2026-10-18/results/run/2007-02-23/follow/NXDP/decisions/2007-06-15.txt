@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"NXDP is in a strong Stage 2 above its rising 30-week MA (23.0) with positive RS, and the S&P is also in Stage 2. There has been no 8–10% correction since entry that would let me raise the stop, so it stays at 21.88."}

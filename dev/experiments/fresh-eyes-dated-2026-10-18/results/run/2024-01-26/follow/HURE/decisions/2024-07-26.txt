@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"HURE is in Stage 2, above a rising 30-week MA (26.00 vs 24.18) with positive RS; the pullback from about 27.3 is only about 6%, short of the 8-10% correction the investor rule needs, so the stop stays at 21.88."}

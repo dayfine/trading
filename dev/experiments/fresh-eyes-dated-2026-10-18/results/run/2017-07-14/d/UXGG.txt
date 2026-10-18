@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Strong Stage 2 at all-time highs with positive RS and a bullish market, but price is about 12% above the rising MA, with no base or consolidation near the MA to break out of and no volume surge, so wait for a pullback and a fresh range."}

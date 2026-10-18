@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "PHEE is still in Stage 2 above a rising 30-week MA (38.3), and the current pullback from about 52 has not ended or rallied back toward the high, so the stop stays at 29.88, under the early-2006 correction low; the S&P slipping just below a flattening MA calls for caution, not a sale."}

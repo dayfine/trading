@@ -1,0 +1,1 @@
+{"stage": 4, "action": "set_stop", "stop": 14.12, "reason": "Price is in Stage 4 below a falling 30-week MA with lower highs, and it broke below its spring low after the May rally failed near 13.5, so I lower the buy-stop to just above that rally peak and the 14 round number."}

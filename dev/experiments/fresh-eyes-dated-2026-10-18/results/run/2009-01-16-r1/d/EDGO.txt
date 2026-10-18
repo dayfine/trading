@@ -1,0 +1,1 @@
+{"stage": 4, "action": "short_stop", "trigger": 8.39, "limit": 8.15, "stop": 9.12, "conviction": 2, "reason": "SPY is in Stage 4, so shorts are allowed. EDGO failed its spike rally, is below a flat 13.7 MA, and its RS has fallen back below zero; short a break of the ~8.45 low into empty space, with a trader stop about 9% higher because the rally peaks are too far away."}

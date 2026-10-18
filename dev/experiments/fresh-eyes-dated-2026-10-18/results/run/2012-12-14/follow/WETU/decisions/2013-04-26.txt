@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"WETU closed at 64.38 after breaking out of its sideways range to a new high above a 30-week MA that is still rising (61.2), so it is still Stage 2; it has had no 8–10% correction since entry, so the stop stays at 56.53."}

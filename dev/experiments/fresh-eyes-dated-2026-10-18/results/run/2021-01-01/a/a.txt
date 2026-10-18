@@ -1,0 +1,1 @@
+{"phase": "Bullish: S&P in Stage 2 at 374, above a rising 30-week MA at 338, with the A-D line at new highs confirming it", "side": "long", "groups": ["Consumer Discretionary", "Information Technology", "Materials"], "reason": "The S&P is in Stage 2 and the A-D line confirms it with no divergence, so I buy normally from the strongest groups by 26-week strength versus SPY."}

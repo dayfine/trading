@@ -1,0 +1,1 @@
+{"picks": [{"name": "EEUI", "score": 4}, {"name": "PCUL", "score": 3}, {"name": "WPAH", "score": 3}, {"name": "SMQC", "score": 3}, {"name": "XLMS", "score": 3}], "reason": "These are Stage 2 or breakout charts above a rising or turning 30-week MA, with positive RS and little overhead resistance, and EEUI and PCUL also show a volume surge."}

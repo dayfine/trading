@@ -1,0 +1,1 @@
+{"stage": 3, "action": "none", "stop": null, "reason": "The 30-week MA has gone flat near 20 and price is crossing back and forth over it with RS fading toward zero, which is a Stage 3 top; the 18.55 stop already sits just under the recent correction lows at the bottom of the range, so any raise would be trivial."}

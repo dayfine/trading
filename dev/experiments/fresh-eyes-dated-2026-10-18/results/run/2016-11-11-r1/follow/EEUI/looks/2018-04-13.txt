@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "EEUI is in a strong Stage 2: it closed at 80.9, above a rising 30-week MA at 74.7, with RS at +11.9. The stop at 70.64 already sits under the early-2018 correction low, so there is no new correction to trail the stop to, even with the S&P sitting at its 30-week MA."}

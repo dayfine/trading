@@ -1,0 +1,5 @@
+cut,action,trigger,stop,next_cut,events
+2000-10-20,short_stop,14.31,16.62,2000-11-03,shorted 2000-11-03; 
+2000-11-03,none,,,2000-12-01,
+2000-12-01,none,,,2000-12-29,
+2000-12-29,none,,,2001-01-19,stopped 2001-01-17; 

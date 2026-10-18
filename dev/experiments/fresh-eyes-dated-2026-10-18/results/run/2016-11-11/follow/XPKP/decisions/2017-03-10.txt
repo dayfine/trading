@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":43.88,"reason":"Stage 2 with a rising MA: the stock fell about 10% from its ~50 high to ~44 and is rallying back toward that high, so the stop goes just under the lower of the correction low and the 30-week MA (44.49), below the 44 round number."}

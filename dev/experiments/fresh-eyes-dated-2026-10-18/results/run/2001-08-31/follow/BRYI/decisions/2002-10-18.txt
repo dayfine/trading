@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":12.12,"reason":"Still Stage 4 below a falling 30-week MA (11.17); the stock rallied more than 8% from about 8 to about 11.5 and is heading back toward its low, so the short stop comes down to just above that rally peak and the MA, cleared past the 12 round number."}

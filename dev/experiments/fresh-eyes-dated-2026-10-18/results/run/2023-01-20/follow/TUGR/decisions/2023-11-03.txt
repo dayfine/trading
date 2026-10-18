@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds: the stock bounced from about 817 back above its rising 30-week MA (841), and the stop at 799.88 already sits under the correction low and the MA, so it stays until the stock rallies back near its prior high."}

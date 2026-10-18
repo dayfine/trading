@@ -1,0 +1,10 @@
+RUN FINISHED
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r1/pages/EILN-2005-06-30-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r1/pages/EILN-2005-06-30-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r1/pages/EILN-2005-06-30.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r1/pages/market/MARKET-2005-06-30-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r1/pages/market/MARKET-2005-06-30-5y.png
+cut: 2005-06-30
+run: finished
+position: none
+order: none
+closed trades: 1
+  long 2003-07-03 -> 2005-06-30 (open_at_end) return +134.7%

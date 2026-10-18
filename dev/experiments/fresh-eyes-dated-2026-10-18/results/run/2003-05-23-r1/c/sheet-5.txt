@@ -1,0 +1,1 @@
+{"picks": [{"name": "MVNK", "score": 3}, {"name": "LWGB", "score": 3}, {"name": "IRBD", "score": 3}, {"name": "HCLI", "score": 2}, {"name": "EVVU", "score": 3}], "reason": "These stocks are breaking up through a flat or turning 30-week MA with positive RS, but the market gate, volume and overhead resistance still need checking, so none scores above 3."}

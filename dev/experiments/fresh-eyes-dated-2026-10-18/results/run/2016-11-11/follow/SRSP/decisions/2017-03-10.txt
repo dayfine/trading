@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"SRSP is in strong Stage 2 above a steeply rising 30-week MA with positive RS. There has been no 8-10% correction followed by a rally back, which is what the investor rule needs before raising the stop, so the stop stays at 116.78."}

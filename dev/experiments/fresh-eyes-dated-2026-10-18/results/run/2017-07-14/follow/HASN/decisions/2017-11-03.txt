@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is still above a rising 30-week MA (Stage 2), and the roughly 7% pullback from the high is short of the 8–10% correction and rally back needed before raising the 158.81 stop."}

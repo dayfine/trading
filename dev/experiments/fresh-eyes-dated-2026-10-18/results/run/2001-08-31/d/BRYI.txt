@@ -1,0 +1,1 @@
+{"stage": 4, "action": "short_stop", "trigger": 17.19, "limit": 16.75, "stop": 20.12, "conviction": 2, "reason": "After the big 1999-2000 run, the stock topped and has turned down: price is below a falling 30-week MA, RS is just under zero and falling, and the S&P is in Stage 4; but support near 15.5 sits close below and the stop is about 17% away, so conviction is low."}

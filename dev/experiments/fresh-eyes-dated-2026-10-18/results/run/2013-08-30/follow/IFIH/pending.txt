@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2014-03-28
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2013-08-30/pages/IFIH-2014-03-28-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2013-08-30/pages/IFIH-2014-03-28-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2013-08-30/pages/IFIH-2014-03-28.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2013-08-30/pages/market/MARKET-2014-03-28-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2013-08-30/pages/market/MARKET-2014-03-28-5y.png
+cut: 2014-03-28
+position: none
+order: none
+since the last checkpoint: stopped 2014-03-27; 
+closed trades: 1
+  long 2013-09-06 -> 2014-03-27 (stop) return +9.8%

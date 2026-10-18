@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2018-04-06
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2017-07-14/pages/HASN-2018-04-06-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2017-07-14/pages/HASN-2018-04-06-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2017-07-14/pages/HASN-2018-04-06.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2017-07-14/pages/market/MARKET-2018-04-06-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2017-07-14/pages/market/MARKET-2018-04-06-5y.png
+cut: 2018-04-06
+position: none
+order: none
+since the last checkpoint: stopped 2018-04-02; 
+closed trades: 1
+  long 2017-09-07 -> 2018-04-02 (stop) return -8.4%

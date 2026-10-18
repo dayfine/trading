@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "MNFJ is in a strong Stage 2 with positive RS, but at 29.76 it sits about 40% above its 30-week MA (21.19), so it is overextended; the nearest real support near 22-24 would put the stop more than 15% below any entry, so I wait for a consolidation back near the MA."}

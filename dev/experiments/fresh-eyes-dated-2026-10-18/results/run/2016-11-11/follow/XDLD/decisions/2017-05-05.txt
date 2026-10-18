@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price has slipped about 3% below a 30-week MA that is still rising, with RS weakening, but support holds and there has been no rally back toward the high to justify raising the stop, so 32.34 stays."}

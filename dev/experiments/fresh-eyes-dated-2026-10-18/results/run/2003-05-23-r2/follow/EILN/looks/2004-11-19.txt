@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 23.88, "reason": "Strong Stage 2 above a rising MA; the autumn correction of about 14% to roughly 24 has ended and price made new highs, so the stop goes up to just under the lower of that low and the MA, below the round number."}

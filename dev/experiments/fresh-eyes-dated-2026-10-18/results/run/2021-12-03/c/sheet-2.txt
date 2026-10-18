@@ -1,0 +1,1 @@
+{"picks": [{"name": "DQCS", "score": 4}, {"name": "URGY", "score": 4}, {"name": "ZEGU", "score": 3}, {"name": "HQVN", "score": 3}, {"name": "INUP", "score": 3}], "reason": "These are Stage 2 stocks above a rising 30-week MA with positive and improving RS, and they are breaking out to new highs with little or no overhead resistance."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Price 64.72 is still just above a 30-week MA that is rising only slightly, and the dip from about 70 has not yet rallied back toward the high, so the 59.21 stop stays under the mid-2012 correction low; watch the falling, below-zero RS for Stage 3 signs."}

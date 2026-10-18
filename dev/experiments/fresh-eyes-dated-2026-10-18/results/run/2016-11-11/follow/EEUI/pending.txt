@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2017-01-20
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/EEUI-2017-01-20-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/EEUI-2017-01-20-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/EEUI-2017-01-20.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/market/MARKET-2017-01-20-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/market/MARKET-2017-01-20-5y.png
+cut: 2017-01-20
+position: none
+order: none
+since the last checkpoint: stopped 2017-01-19; 
+closed trades: 1
+  long 2016-11-23 -> 2017-01-19 (stop) return -9.8%

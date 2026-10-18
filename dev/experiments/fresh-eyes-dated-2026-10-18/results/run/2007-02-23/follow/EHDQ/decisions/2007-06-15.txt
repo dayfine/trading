@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is holding above a still-rising 30-week MA and there has been no 8-10% correction since entry, so the 46.19 stop stays where it is."}

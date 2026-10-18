@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":46.88,"reason":"The 30-week MA has flattened after a big advance and price closed below it with RS negative and falling, which looks like Stage 3, so I tighten the stop to just under the late-2017 support near 47."}

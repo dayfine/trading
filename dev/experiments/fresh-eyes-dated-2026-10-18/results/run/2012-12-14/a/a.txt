@@ -1,0 +1,1 @@
+{"phase": "Stage 2 bull market: S&P back above a rising 30-week MA, A-D line at new highs and confirming", "side": "long", "groups": ["Consumer Discretionary", "Industrials", "Materials"], "reason": "The November dip below the still-rising MA did not break support and the A-D line confirms, so buy normally in the three sectors leading SPY over 26 weeks."}

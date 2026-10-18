@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Strong Stage 2 stock at all-time highs with RS +23.6, but at 39.65 it is about 19% above its 30-week MA and about 40% above its 28-29 base breakout, with no consolidation near the MA to buy from, so it is overextended: hold, not buy."}

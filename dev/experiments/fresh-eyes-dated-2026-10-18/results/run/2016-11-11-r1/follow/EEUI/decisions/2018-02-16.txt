@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":70.88,"reason":"Stage 2 with the 30-week MA rising; the latest pullback of about 8–9% held near the MA at 71.25 and price is rallying back toward its high, so the stop goes just under the lower of that low and the MA, below the 71 round number."}

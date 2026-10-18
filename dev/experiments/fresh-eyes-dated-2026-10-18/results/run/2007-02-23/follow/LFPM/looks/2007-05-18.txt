@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Stage 2 above a rising 30-week MA with positive RS; the ~17% pullback from the spike high hasn't ended or rallied back toward the high, so the stop stays at 66.80 for now."}

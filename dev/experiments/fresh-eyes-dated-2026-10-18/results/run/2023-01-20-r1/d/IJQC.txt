@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "IJQC is in a strong Stage 2 at new highs, but it closed about 31% above its 30-week MA (extended), the stop under the ~58 correction low would mean over 20% risk, and SPY has only just popped above a still-declining MA, so the market gate says no new longs."}

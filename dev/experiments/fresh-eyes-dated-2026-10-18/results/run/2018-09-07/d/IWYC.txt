@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Stage 2 breakout in a bullish market, but at 65.7 the price is already more than 15% above the ~55 base top and 28% above the rising MA, with heavy 2015 resistance at 68-70 just overhead, so it is too late to buy; wait for a pullback or a new base."}

@@ -47,7 +47,7 @@ one() {  # one <image ...>: one call with prompt $P, answer to $dir/$A.txt
   W=$RWORK/_work-$role-$$; mkdir -p "$W"
   { printf '['; first=1
     for im in "$@"; do [ $first = 1 ] || printf ','; first=0
-      printf '{"type":"image","source":{"type":"base64","media_type":"image/png","data":"'; base64 < "$im" | tr -d '\n'; printf '"}}'
+      printf '{"type":"image","source":{"type":"base64","media_type":"image/png","data":"'; base64 < "$im" | awk '{ printf "%s", $0 }'; printf '"}}'
     done; printf ']'; } > "$W/imgs.json"
   jq -cn --slurpfile im "$W/imgs.json" --rawfile t "$P" \
     '{type:"user",message:{role:"user",content:($im[0] + [{type:"text",text:$t}])}}' > "$W/in.jsonl"

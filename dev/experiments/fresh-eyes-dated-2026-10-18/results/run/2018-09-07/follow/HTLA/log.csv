@@ -1,0 +1,4 @@
+cut,action,trigger,stop,next_cut,events
+2018-09-07,buy_stop,56.31,49.88,2018-09-14,bought 2018-09-10; 
+2018-09-14,none,,,2018-10-12,
+2018-10-12,none,,,2018-10-26,stopped 2018-10-25; 

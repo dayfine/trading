@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 with price at a new high (40.09) above a rising 30-week MA (34.30) and strong RS (+12.1); there has been no 8–10% correction since entry, so the stop stays at 32.62."}

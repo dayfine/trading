@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":37.88,"reason":"The stock is still in Stage 2 above a rising 30-week MA; after the mid-2012 correction of roughly 8-10% (low near 38, read from the chart) and the rally to new highs, I raise the stop to just under that low and the round number, and since RS has slipped just below zero I am watching it as a laggard."}

@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":8.88,"reason":"Strong Stage 2 above a rising MA (9.31) with RS +51; the stock has cleared its high after the autumn correction of roughly 10%, which I estimated from the chart, so the stop goes up to just under the lower of that correction low and the MA, below the 9.00 round number."}

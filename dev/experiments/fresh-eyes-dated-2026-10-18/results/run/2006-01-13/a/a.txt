@@ -1,0 +1,1 @@
+{"phase": "Bullish: S&P in Stage 2, A-D line confirming", "side": "long", "groups": ["Energy", "Materials", "Health Care"], "reason": "The S&P closed at 129, above its rising 30-week MA at 122, and the A-D line is at a new high with no divergence, so I buy normally in the three strongest sectors."}

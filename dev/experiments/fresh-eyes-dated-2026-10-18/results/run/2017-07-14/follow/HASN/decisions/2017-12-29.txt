@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":165.88,"reason":"After a big advance the 30-week MA is flattening, price is tiptoeing around it at 174 and RS is below zero and falling, so I tighten the stop to just under the recent correction low (about 166–168, read from the chart)."}

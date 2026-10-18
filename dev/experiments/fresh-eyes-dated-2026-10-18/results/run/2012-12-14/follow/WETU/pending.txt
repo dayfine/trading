@@ -1,0 +1,10 @@
+RUN FINISHED
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2012-12-14/pages/WETU-2014-12-31-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2012-12-14/pages/WETU-2014-12-31-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2012-12-14/pages/WETU-2014-12-31.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2012-12-14/pages/market/MARKET-2014-12-31-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2012-12-14/pages/market/MARKET-2014-12-31-5y.png
+cut: 2014-12-31
+run: finished
+position: none
+order: none
+closed trades: 1
+  long 2013-01-03 -> 2014-12-31 (open_at_end) return +58.2%
