@@ -58,13 +58,14 @@ Verifies: none
     Beat rate 30.4 %, t = 0.49.
   - The mean is one trade: VIAV, bought 2025-10-15 at 13.05 and still open at 47.63 (+254.8 % excess). Without it
     the mean is −0.74 %.
-- **Shorts re-derive the setup-map no-build (#3286) from a different entry.**
+- **Shorts are consistent with the setup-map no-build (#3286), from a different entry.** One unreplicated reader
+  draw: trade-level self-consistency was never measured (pilot 2 matched 9 of 25 active decisions across models).
   - The reader's 32 shorts entered at its own support breaks, a median 10 weeks after our Stage 4 began.
   - Excess: mean −1.46 %, median −5.87 %, beat 21.9 % (7 of 32). The setup map's 29.7 % lies inside this CI.
 - **Our record took none of the 24 symbols, in any salt.**
   - 13 of the 24 names did reach the record's weekly top 20. Its own trade audit skipped every one of those
-    appearances as `No_structural_stop` (84, 84 and 83 by salt), and none for cash.
-  - VIAV was skipped three weeks running in August and September 2025, seven weeks before the reader's +255 % entry.
+    appearances as `No_structural_stop`: 53 decision-list entries in each salt (`analysis/rec_cands-s{0,1,2}.csv`), none for cash.
+  - VIAV was skipped on 2025-08-22, 08-29 and 09-12, about five weeks before the reader's +255 % entry.
 - **Leads, not verdicts (§5).**
   - Our Stage-2 clock starts at the MA turn, a median of about 8 weeks before the breakout the book buys. That is the
     gap the existing `Range_top_breakout` axis was built for.
@@ -346,6 +347,10 @@ pre-breakout buys, because the screener checks the breakout separately.
 
 ### 3.6 The reader's trades: the distribution, and what carries the long mean
 
+**Caveat for every trade figure in §3.6–3.8:** one reader draw. Stage calls replicate (96 % on 112 cuts), but
+trade-level self-consistency was never measured, and in pilot 2 two models matched only 9 of 25 active decisions.
+Trade numbers are a specimen of one book reading, not an estimate of a book reader's P&L.
+
 Excess vs SPY (long) or vs an SPY short (short), at unit capital per trade (`trades.csv`; the distributions are
 *(re-derived)* from it):
 
@@ -419,9 +424,11 @@ EXPO 2006 and EZCH 2006. The other 105 average −0.34 % *(re-derived)*.
 committed; the same runs as the committed N-rb1-26 artifacts, whose `trades.csv` and `actual.sexp` are
 byte-identical):
 - **13 of the 24 names reached the weekly top 20.** The record's top-N list is 20 names, or 0 in a closed-gate week.
-  - In s0, all 84 list entries for these names were skipped as `No_structural_stop`. They cover 53 symbol-weeks over
-    52 weeks.
-  - All 84 in s1 and all 83 in s2 were skipped the same way. Cash was never the reason for these names.
+  - In each salt the weekly decision list carries 53 entries for these names (53 symbol-weeks over 52 weeks), all
+    skipped as `No_structural_stop` (`analysis/rec_cands-s{0,1,2}.csv`, from `analysis/rec_cands.sh`). Cash was never
+    the reason for these names.
+  - An earlier draft counted 84/84/83 by adding 31/31/30 repeats of the same names from entered trades'
+    `alternatives_considered`; that is a different base from the decision-list total below and is not used.
 - **That reason dominates the whole audit.** Across s0, `No_structural_stop` is 20,177 of 20,849 skip outcomes
   (96.8 %), against 486 `Insufficient_cash`.
 - **The reader often saw the same opportunity.** In 25 of the 53 symbol-weeks the reader was long the name (14) or
@@ -446,8 +453,9 @@ byte-identical):
   - 48.1 % of its 3→4 events never closed below support.
   - Restricting to true support breaks did not help (O2 beat 29.6 %).
   - Early Stage 4 is the worst market slice, because broken names rebound with the index.
-- **The reader's book-timed shorts close the remaining door, "maybe the event definition was wrong", from a second
-  direction.** The no-build stands, as does the 10-13 wide-top REJECT.
+- **The reader's book-timed shorts are consistent with the no-build from a second direction** (entries at the
+  reader's own support breaks). 32 trades from one unreplicated draw cannot close the event-definition question on
+  their own; the no-build stands on #3286 and the 10-13 wide-top screen, not on this.
 
 ## 4. How it fits what we know
 
@@ -459,14 +467,15 @@ byte-identical):
   - That surface changed the window's *width*. This study points at its *anchor*: the MA turn against the range break.
   - Those are different levers, and the second already exists as `Range_top_breakout` (keep-as-axis, not
     promotable).
-- **Confirms** the short track's closure:
+- **Consistent with** the short track's no-build records (one unreplicated reader draw, 32 trades; it adds a
+  direction, not weight):
   - `2026-10-13-short-setup-map` REJECT;
   - `2026-10-13-short-wide-top` REJECT;
   - `project_shorts_liveness_dead`.
 - **Confirms** `project_edge_is_the_fat_tail`. A book-following trader with stops shows the same shape, many small
   stop losses and a few large winners. The long mean is one trade.
 - **Confirms** `project_recovery_reentry_gap` ("No_structural_stop skips; far anchors in every year"), with a new
-  specimen. In VIAV 2025 the record surfaced the name three weeks running and skipped it. A reader using a nearer
+  specimen. In VIAV 2025 the record surfaced the name in three weeks (08-22, 08-29, 09-12) and skipped it each time. A reader using a nearer
   reaction-low stop (about 17 % risk) caught a +265 % move. One trade, so a specimen, not evidence.
 - **Consistent with** the continuation record: `2026-05-14-continuation-combined-axis` REJECT, and
   `2026-10-02-continuation-buys-trader-rerun`, which is "not promotable" per memory. The reader's mostly
@@ -491,7 +500,8 @@ byte-identical):
    - Frame it as a faithfulness question first, not a return lever.
    - The related return levers did not promote: range-top freshness (keep-axis), the early-stage2 window (REJECT),
      and true support breaks for shorts (no better).
-4. **A documentation decision.** State in `stage.mli`, or in the reference §1, that the classifier's Stage 2 and 4
+4. **A documentation decision.** (This also covers the plan §5 write-back: the stage-start definition is the one book question this run
+   raises; no book text was read, so nothing is written to the reference until that decision.) State in `stage.mli`, or in the reference §1, that the classifier's Stage 2 and 4
    begin at the MA turn, before the book's range break, and that the screener checks the breakout separately. This
    changes the docs, not behaviour.
 5. **If a reader run is ever resumed:**
