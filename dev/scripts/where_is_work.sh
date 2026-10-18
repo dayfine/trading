@@ -41,7 +41,10 @@ fi
 
 echo; echo "== Codex cloud tasks"
 if command -v codex >/dev/null 2>&1 && codex cloud list --help >/dev/null 2>&1; then
-  codex cloud list 2>/dev/null | head -20 || echo "(codex cloud list failed)"
+  # in a temp dir: the codex CLI writes error.log (with the ChatGPT account id) to its cwd
+  cx=$(mktemp -d)
+  (cd "$cx" && codex cloud list 2>/dev/null | head -20) || echo "(codex cloud list failed)"
+  rm -rf "$cx"
 else
   echo "(codex cloud not available in this CLI)"
 fi
