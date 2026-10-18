@@ -399,14 +399,19 @@ out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S2_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE2}" "feat/dummy" "2026-05-25" --pr-number 1234 2>&1) && rc=0 || rc=$?
 JSON2="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE2}.json"
-if (( rc == 0 )) && [[ -f "${JSON2}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON2}" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON2}" \
-   && grep -q '"overall_qc": *"APPROVED"' "${JSON2}" \
-   && grep -q '"quality_score": *5' "${JSON2}"; then
+C2=(
+  "rc==0 (actual=${rc})" "$(_eq "${rc}" 0)"
+  "JSON2 exists" "$(_flag test -f "${JSON2}")"
+  "JSON2 \"structural_qc\": \"APPROVED\" (actual: $(_json_actual "${JSON2}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON2}")"
+  "JSON2 \"behavioral_qc\": \"APPROVED\" (actual: $(_json_actual "${JSON2}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON2}")"
+  "JSON2 \"overall_qc\": \"APPROVED\" (actual: $(_json_actual "${JSON2}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON2}")"
+  "JSON2 \"quality_score\": 5 (actual: $(_json_actual "${JSON2}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON2}")"
+)
+if _pairs_ok "${C2[@]}"; then
   pass "scenario 2 — pr-mode both APPROVED → APPROVED overall + score 5"
 else
   fail "scenario 2 — expected APPROVED+APPROVED+5; got rc=${rc}, output:"
+  report_conjuncts "${C2[@]}"
   echo "${out}" | sed 's/^/      /'
   [[ -f "${JSON2}" ]] && echo "      json: $(cat "${JSON2}")"
 fi
@@ -445,14 +450,19 @@ out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S3_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE3}" "feat/dummy" "2026-05-25" --pr-number 1235 2>&1) && rc=0 || rc=$?
 JSON3="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE3}.json"
-if (( rc == 0 )) && [[ -f "${JSON3}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON3}" \
-   && grep -q '"behavioral_qc": *"NEEDS_REWORK"' "${JSON3}" \
-   && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON3}" \
-   && grep -q '"quality_score": *2' "${JSON3}"; then
+C3=(
+  "rc==0 (actual=${rc})" "$(_eq "${rc}" 0)"
+  "JSON3 exists" "$(_flag test -f "${JSON3}")"
+  "JSON3 \"structural_qc\": \"APPROVED\" (actual: $(_json_actual "${JSON3}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON3}")"
+  "JSON3 \"behavioral_qc\": \"NEEDS_REWORK\" (actual: $(_json_actual "${JSON3}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"NEEDS_REWORK"' "${JSON3}")"
+  "JSON3 \"overall_qc\": \"NEEDS_REWORK\" (actual: $(_json_actual "${JSON3}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON3}")"
+  "JSON3 \"quality_score\": 2 (actual: $(_json_actual "${JSON3}" quality_score))" "$(_grep_ok '"quality_score": *2' "${JSON3}")"
+)
+if _pairs_ok "${C3[@]}"; then
   pass "scenario 3 — pr-mode mixed → NEEDS_REWORK overall + score 2"
 else
   fail "scenario 3 — expected APPROVED+NEEDS_REWORK+overall NEEDS_REWORK+2; got rc=${rc}, output:"
+  report_conjuncts "${C3[@]}"
   echo "${out}" | sed 's/^/      /'
   [[ -f "${JSON3}" ]] && echo "      json: $(cat "${JSON3}")"
 fi
@@ -504,14 +514,19 @@ out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S5_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE5}" "feat/dummy" "2026-05-25" --pr-number 1236 2>&1) && rc=0 || rc=$?
 JSON5="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE5}.json"
-if (( rc == 0 )) && [[ -f "${JSON5}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON5}" \
-   && grep -q '"behavioral_qc": *"NEEDS_REWORK"' "${JSON5}" \
-   && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON5}" \
-   && grep -q '"quality_score": *3' "${JSON5}"; then
+C5=(
+  "rc==0 (actual=${rc})" "$(_eq "${rc}" 0)"
+  "JSON5 exists" "$(_flag test -f "${JSON5}")"
+  "JSON5 \"structural_qc\": \"APPROVED\" (actual: $(_json_actual "${JSON5}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON5}")"
+  "JSON5 \"behavioral_qc\": \"NEEDS_REWORK\" (actual: $(_json_actual "${JSON5}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"NEEDS_REWORK"' "${JSON5}")"
+  "JSON5 \"overall_qc\": \"NEEDS_REWORK\" (actual: $(_json_actual "${JSON5}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON5}")"
+  "JSON5 \"quality_score\": 3 (actual: $(_json_actual "${JSON5}" quality_score))" "$(_grep_ok '"quality_score": *3' "${JSON5}")"
+)
+if _pairs_ok "${C5[@]}"; then
   pass "scenario 5 — pr-mode COMMENTED state → body ## Verdict parsed (CP2 fix)"
 else
   fail "scenario 5 — expected COMMENTED body-parse APPROVED+NEEDS_REWORK+3; got rc=${rc}, output:"
+  report_conjuncts "${C5[@]}"
   echo "${out}" | sed 's/^/      /'
   [[ -f "${JSON5}" ]] && echo "      json: $(cat "${JSON5}")"
 fi
@@ -549,14 +564,19 @@ out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S6_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE6}" "feat/dummy" "2026-05-25" --pr-number 1237 2>&1) && rc=0 || rc=$?
 JSON6="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE6}.json"
-if (( rc == 0 )) && [[ -f "${JSON6}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON6}" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON6}" \
-   && grep -q '"overall_qc": *"APPROVED"' "${JSON6}" \
-   && grep -q '"quality_score": *5' "${JSON6}"; then
+C6=(
+  "rc==0 (actual=${rc})" "$(_eq "${rc}" 0)"
+  "JSON6 exists" "$(_flag test -f "${JSON6}")"
+  "JSON6 \"structural_qc\": \"APPROVED\" (actual: $(_json_actual "${JSON6}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON6}")"
+  "JSON6 \"behavioral_qc\": \"APPROVED\" (actual: $(_json_actual "${JSON6}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON6}")"
+  "JSON6 \"overall_qc\": \"APPROVED\" (actual: $(_json_actual "${JSON6}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON6}")"
+  "JSON6 \"quality_score\": 5 (actual: $(_json_actual "${JSON6}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON6}")"
+)
+if _pairs_ok "${C6[@]}"; then
   pass "scenario 6 — pr-mode empty reviews → file-mode fallback (CP1 fix)"
 else
   fail "scenario 6 — expected file-fallback APPROVED+APPROVED+5; got rc=${rc}, output:"
+  report_conjuncts "${C6[@]}"
   echo "${out}" | sed 's/^/      /'
   [[ -f "${JSON6}" ]] && echo "      json: $(cat "${JSON6}")"
 fi
