@@ -53,6 +53,18 @@ gh issue close <N> \
   --comment "Fixed by PR #<fix>; main green on <new-sha>."
 ```
 
+## Step 0b — Read the quota and size the session
+
+```bash
+sh dev/scripts/quota_status.sh      # seven-day / five-hour use, today's allowance, suggest: line
+sh dev/scripts/where_is_work.sh     # what is running where (PRs by lane, local jobs, Codex cloud)
+```
+
+Size the session from the `suggest:` line. 15 % of the week is reserved for managing (dispatch, results, QC,
+merges); project work spends only the daily allowance. Any job over ~200 model calls follows the `batch-model-run`
+skill (projection, pilot, `--guard`). Why: on 2026-10-14 one batch reader drained the week in under a day and every
+session was blocked for three days (`dev/plans/delegation-lanes-2026-10-18.md`).
+
 ## Step 1 — Read the newest priorities doc
 
 ```bash
