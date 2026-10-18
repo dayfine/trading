@@ -1,0 +1,1 @@
+FNR==1{fi++; next} fi==1{k=$1","civil(friday(days($2))); late[k]=$7; st[k]=substr($5,6,1); wk[k]=$6; next} $2=="long"{fe=civil(friday(days($3))); k=$1","fe; print $1","$3","st[k]","wk[k]","late[k]","$10}

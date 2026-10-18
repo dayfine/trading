@@ -1,0 +1,1 @@
+FNR==1{next} { s=$1; if(!(s in f) || $2<f[s]) f[s]=$2; if($2>l[s]) l[s]=$2; c[s]+=$8; n[s]++ } END { for (s in f) printf "%s,%s,%s,%d,%.4f,%.3f\n", s, f[s], l[s], n[s], c[s], (days(l[s])-days(f[s]))/365.25 }
