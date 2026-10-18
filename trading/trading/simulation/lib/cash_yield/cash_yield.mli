@@ -83,7 +83,7 @@ val net_annual_pct : t -> Date.t -> float Status.status_or
 
 val period_rate : t -> from_:Date.t -> to_:Date.t -> float Status.status_or
 (** Simple sum of the daily ACT/360 rates over the calendar days in
-    [(from_, to_]] — the cash return between two marks, used as the per-period
+    [(from_, to_)] — the cash return between two marks, used as the per-period
     risk-free rate for an excess-return Sharpe. [0.0] when [to_ <= from_]. *)
 
 val interest_base : Trading_portfolio.Portfolio.t -> float
