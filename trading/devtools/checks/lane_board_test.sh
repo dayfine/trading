@@ -155,6 +155,62 @@ run_board
 expect "$FX/board.md" 'Open PRs: 4 of 3\. \*\*Can hand out: 0\*\*' "over cap -> can hand out: 0"
 expect "$FX/board.md" 'Open PRs: 0 of 3\. \*\*Can hand out: 3\*\*' "empty JULES lane -> can hand out: 3"
 
+# ---------------- scenario 2b: replies, connector noise, header rules -----
+newfx 4
+cm() { printf '{"author":{"login":"%s"},"createdAt":"%s","body":"%s"}' "$1" "$(ago "$2")" "$3"; }
+HO='<!-- lane-handoff rework iter=1 -->'
+NOISE='To use Codex here, create an environment for this repo.'
+{
+  printf '['
+  pr 601 codex/a '[]' x; printf ','; pr 602 codex/b '[]' x; printf ','
+  pr 603 codex/c '[]' x; printf ','; pr 604 codex/d '[]' x; printf ','
+  pr 605 codex/e '[{"name":"author/codex"}]' 'Closes #704'; printf ','
+  pr 606 codex/f '[]' x; printf ','; pr 607 jules/g '[]' x; printf ','
+  pr 608 jules/h '[]' x
+  printf ']\n'
+} > "$FX/prlist.json"
+view 601 20 "[$(cm dayfine 5 "$HO"),$(cm chatgpt-codex-connector 2 'I fixed it')]"
+view 602 20 "[$(cm dayfine 5 "$HO")]"
+view 603 20 "[$(cm dayfine 5 "$HO"),$(cm 'chatgpt-codex-connector[bot]' 4 "$NOISE")]"
+view 604 20 "[$(cm dayfine 5 "$HO"),$(cm chatgpt-codex-connector 4 "$NOISE")]"
+view 605 1; view 606 2; view 607 2; view 608 100
+gates <<'G'
+601    pass     rework         none           none      -         x
+602    pass     rework         none           none      -         x
+603    pass     none           none           none      -         x
+604    pass     none           none           none      -         x
+605    pass     none           none           none      -         x
+606    FAIL     none           none           none      -         x
+607    pending  none           none           none      -         x
+608    pass     ok             ok             none      -         MERGE
+G
+cat > "$FX/issues_codex.json" <<J
+[{"number":701,"title":"replied","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 10 '<!-- lane-handoff task -->'),$(cm 'chatgpt-codex-connector[bot]' 2 'done')]},
+ {"number":702,"title":"only noise","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 10 '<!-- lane-handoff task -->'),$(cm 'chatgpt-codex-connector[bot]' 9 "$NOISE")]},
+ {"number":704,"title":"now covered","labels":[{"name":"turn/codex"}],"createdAt":"2026-01-01T00:00:00Z","comments":[]}]
+J
+cat > "$FX/issues_jules.json" <<J
+[{"number":703,"title":"silent after hand-off","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 49 '<!-- lane-handoff task -->')]}]
+J
+run_board
+B="$FX/board.md"; C="$FX/calls.log"
+expect "$B" '^\| #601 .*\| ours \|' "rework hand-off then reply, no push -> ours"
+expect "$B" '^\| #602 .*\| theirs \|' "rework hand-off, no reply -> theirs"
+expect "$B" '^\| #603 .*\| theirs \|' "connector setup reply (with [bot]) is not a move"
+expect "$B" '^\| #604 .*\| theirs \|' "connector setup reply (no [bot]) is not a move"
+expect "$B" '^\| #606 .*\| theirs \|' "CI FAIL -> theirs"
+expect "$B" '^\| #607 .*\| ours \|' "CI pending -> ours"
+expect "$B" '^\| #608 .*\| merge \|' "merge idle 100 h stays merge, never user"
+expect "$B" '^\| #701 .*\| ours \|' "issue handed out then agent replies -> ours"
+expect "$B" '^\| #702 .*\| theirs \|' "issue with only connector noise after hand-off -> theirs"
+expect "$B" '^\| #703 .*\| user \|' "issue handed out and silent 49 h -> user"
+expect "$C" 'issue comment 3330 .*#703' "silent issue raises one board comment"
+refute "$B" '^\| #704 ' "covered issue has no row"
+expect "$C" 'issue edit 704 --repo dayfine/trading --remove-label turn/codex' "covered issue loses its stale turn label"
+refute "$C" 'edit 704 .*--add-label' "covered issue gets no new turn label"
+# noise must not reset the idle clock: 603's only non-noise move is the 5 h hand-off
+expect "$B" '^\| #603 .*\| 5 \|' "noise does not reset idle"
+
 # ---------------- scenario 3: lane_handoff.sh -----------------------------
 newfx 3
 cat > "$FX/view_401.json" <<'J'

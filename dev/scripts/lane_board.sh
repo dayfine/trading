@@ -12,6 +12,7 @@
 #   - open issues labelled agent/codex | agent/jules
 #
 # Turn (first match wins), per PR:
+#   ours    the lane replied (comment/review) after OUR hand-off: we must read and answer
 #   theirs  a gate reads `rework`; or OUR hand-off comment (marker
 #           `<!-- lane-handoff`) is newer than their last push/comment; or CI
 #           is FAIL/none (they must fix or retrigger)
@@ -20,9 +21,13 @@
 #   merge   CI pass and both gates ok|skip
 #   user    the item is NOT `merge` and nothing moved for more than STALE_H hours
 # Per lane issue with no PR that mentions it:
-#   theirs  handed out (marker comment present)      ours  never handed out
+#   theirs  handed out (marker comment present), no reply since
+#   ours    never handed out, or the lane replied after the hand-off (we must read it)
 #   user    handed out and silent past STALE_H (never-handed-out issues are backlog,
 #           not stuck, so they stay `ours`)
+# The Codex connector's automatic "create an environment for this repo" reply is NOT a move
+# (every @codex mention gets it until the environment is registered, #3324). A lane issue
+# that a PR now covers loses its turn/* label.
 # "Last move" = newest of their pushes/comments and our comments/reviews. Issue
 # and PR updatedAt are NOT used: this script's own label edits would reset it.
 # Label per item: turn/claude (ours, merge), turn/codex, turn/jules, turn/user.
@@ -95,6 +100,8 @@ cat > "$T/classify.jq" <<'JQ'
 def tmax: (map(select(. != null)) | max) // 0;
 def gv: if . == null then "none" else (split("(")[0]) end;
 def okish: . == "ok" or . == "skip";
+def setup_noise:
+  (.who | test("chatgpt-codex-connector"; "i")) and (.body | test("create an environment for this repo"; "i"));
 def finish($now; $stale):
   (([.th, .ou] | max)) as $last
   | (if $last == 0 then 0 else (($now - $last) / 3600 | floor) end) as $idle
@@ -109,15 +116,18 @@ $p[0] as $prs
   | (($views | map(select(.n == $p.number)) | .[0]) // {commits: [], events: []}) as $v
   | (($gates | map(select(.n == $p.number)) | .[0]) // {ci: "none", struct: "none", behav: "none"}) as $g
   | ($g.struct | gv) as $s | ($g.behav | gv) as $b
-  | ($v.events | map(select(.who | test($p.lane; "i")))) as $te
-  | ($v.events | map(select((.who | test($p.lane; "i")) | not))) as $oe
+  | ($v.events | map(select(setup_noise | not))) as $evs
+  | ($evs | map(select(.who | test($p.lane; "i")))) as $te
+  | ($evs | map(select((.who | test($p.lane; "i")) | not))) as $oe
   | (($v.commits + ($te | map(.t))) | tmax) as $th
   | ($oe | map(.t) | tmax) as $ou
   | ($oe | map(select(.body | test("lane-handoff")) | .t) | tmax) as $ho
+  | ($te | map(.t) | tmax) as $tr
   | {kind: "pr", number: $p.number, title: $p.title, lane: $p.lane,
      labels: [$p.labels[].name], gates: "\($g.ci)/\($s)/\($b)",
      th: $th, ou: $ou, stale_ok: true,
-     base: (if $s == "rework" or $b == "rework" then "theirs"
+     base: (if $ho > 0 and $tr > $ho then "ours"
+            elif $s == "rework" or $b == "rework" then "theirs"
             elif $ho > $th then "theirs"
             elif $g.ci == "FAIL" or $g.ci == "none" then "theirs"
             elif $g.ci == "pending" then "ours"
@@ -127,8 +137,10 @@ $p[0] as $prs
 ]
 + [ $issues[] as $i
   | ([$prs[] | select(((.title // "") + " " + (.body // "")) | test("#\($i.number)([^0-9]|$)"))] | length) as $covered
-  | select($covered == 0)
-  | ($i.comments | map({t: (.createdAt | fromdateiso8601), who: (.author.login // ""), body: (.body // "")})) as $ev
+  | if $covered > 0 then
+      {kind: "issue", number: $i.number, lane: $i.lane, labels: [$i.labels[].name], covered: true}
+    else
+  ($i.comments | map({t: (.createdAt | fromdateiso8601), who: (.author.login // ""), body: (.body // "")} | select(setup_noise | not))) as $ev
   | ($ev | map(select(.who | test($i.lane; "i")) | .t) | tmax) as $th
   | ($ev | map(select((.who | test($i.lane; "i")) | not)) | map(.t)) as $ot
   | ($ev | map(select((.who | test($i.lane; "i")) | not) | select(.body | test("lane-handoff")) | .t) | tmax) as $ho
@@ -136,13 +148,16 @@ $p[0] as $prs
      labels: [$i.labels[].name], gates: "-",
      th: $th, ou: (($ot + [$i.createdAt | fromdateiso8601]) | tmax),
      stale_ok: ($ho > 0),
-     base: (if $ho > 0 then "theirs" else "ours" end)}
+     base: (if $ho > 0 and $th > $ho then "ours"
+            elif $ho > 0 then "theirs" else "ours" end)}
   | finish($now; $stale)
+    end
 ]
 JQ
 jq -n -f "$T/classify.jq" --argjson now "$NOW" --argjson stale "$STALE_H" \
   --slurpfile p "$T/prs.json" --slurpfile views "$T/views.jsonl" \
   --slurpfile gates "$T/gates.jsonl" --slurpfile issues "$T/issues.jsonl" > "$T/items.json"
+jq 'map(select(.covered | not))' "$T/items.json" > "$T/rows.json"
 
 # --- 5. board markdown -----------------------------------------------------
 {
@@ -162,21 +177,21 @@ jq -n -f "$T/classify.jq" --argjson now "$NOW" --argjson stale "$STALE_H" \
       "|---|---|---|---|---:|---|",
       ($rows | sort_by(.kind, .number)[]
         | "| #\(.number) | \(.title[0:60] | gsub("\\|"; "/")) | \(.turn) | \(.gates) | \(.idle) | \(.actor) |"),
-      ""' "$T/items.json"
+      ""' "$T/rows.json"
   echo "## Stale (turn/user)"
   echo
-  jq -r 'map(select(.turn == "user")) | if length == 0 then "none" else .[] | "- #\(.number) \(.title[0:60]) (\(.lane), idle \(.idle) h)" end' "$T/items.json"
+  jq -r 'map(select(.turn == "user")) | if length == 0 then "none" else .[] | "- #\(.number) \(.title[0:60]) (\(.lane), idle \(.idle) h)" end' "$T/rows.json"
 } > "$T/board.md"
 
 # --- 6. labels and board ----------------------------------------------------
 NEWUSER=$(jq -r '.[] | select(.turn == "user") | select(.labels | index("turn/user") | not)
-  | "- #\(.number) (\(.lane), idle \(.idle) h): \(.title[0:60])"' "$T/items.json")
+  | "- #\(.number) (\(.lane), idle \(.idle) h): \(.title[0:60])"' "$T/rows.json")
 
 if [ "$DRY" = 1 ]; then
   cat "$T/board.md"
   echo
   echo "== planned label edits"
-  jq -r '.[] | "\(.kind) #\(.number) -> turn/\(.who)"' "$T/items.json"
+  jq -r '.[] | "\(.kind) #\(.number) -> turn/\(.who)"' "$T/rows.json"
   [ -z "$NEWUSER" ] || { echo "== would comment on #$BOARD_ISSUE"; echo "$NEWUSER"; }
   exit 0
 fi
@@ -187,16 +202,19 @@ for l in claude codex jules user; do
     gh label create "turn/$l" --repo "$REPO" --color 5319e7 --description "async lane board: whose move it is" || true
 done
 
-jq -r '.[] | [.kind, .number, .who, (.labels | map(select(startswith("turn/"))) | join(","))] | @tsv' "$T/items.json" |
+jq -r '.[] | [.kind, .number, (.who // "-"), (.labels | map(select(startswith("turn/"))) | join(","))] | @tsv' "$T/items.json" |
 while IFS="	" read -r kind num who cur; do
   [ "$cur" = "turn/$who" ] && continue
+  [ "$who" = "-" ] && [ -z "$cur" ] && continue
   sub=issue; [ "$kind" = pr ] && sub=pr
   rm_args=""
   for c in $(printf '%s' "$cur" | tr ',' ' '); do
     [ "$c" = "turn/$who" ] || rm_args="$rm_args --remove-label $c"
   done
+  add_args=""
+  [ "$who" = "-" ] || add_args="--add-label turn/$who"
   # shellcheck disable=SC2086
-  gh "$sub" edit "$num" --repo "$REPO" --add-label "turn/$who" $rm_args
+  gh "$sub" edit "$num" --repo "$REPO" $add_args $rm_args
 done
 
 gh issue edit "$BOARD_ISSUE" --repo "$REPO" --body-file "$T/board.md"

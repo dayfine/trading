@@ -7,6 +7,10 @@ periodically and feedback going both ways, runs on GitHub itself. User direction
 confirmed only by the trial in #3324. Until that lands, treat the hand-off step as a request, and
 fall back to the lanes' existing start methods if a mention does nothing.
 
+Observed so far: `chatgpt-codex-connector` answers every `@codex` mention within seconds with "create an
+environment for this repo". Until #3324 registers the Codex environment, every mention gets that automatic
+reply, and no Codex hand-offs go out. The board ignores that reply (it is not a Codex move).
+
 ## The loop
 
 1. **The board shows whose turn it is.** Issue #3330 (pinned) is rewritten every 3 h by
@@ -22,9 +26,11 @@ fall back to the lanes' existing start methods if a mention does nothing.
    It posts from the user's `gh` login. A bot-token mention may not trigger either agent, so the workflow
    and the GHA orchestrator never call it. Rework is capped at iteration 2; at iteration 3 the script
    refuses and sets `turn/user` (`feat-agent-dispatch.md` section 3).
-4. **External agents answer on GitHub**: a push, or a reply comment on the PR or issue. That moves the turn
-   back to us at the next board run.
-5. **48 h of silence** from either side turns the item `turn/user`, and the board gets one comment. The user
+4. **External agents answer on GitHub**: a push, or a reply comment on the PR or issue. A push, or a reply
+   after our hand-off, moves the turn back to us at the next board run (we must read and answer the
+   reply, even when a rework gate still reads `rework`). A rework gate with no reply or push since the
+   hand-off stays `theirs`. An issue that a lane PR now mentions (`#N`) loses its `turn/*` label.
+5. **48 h of silence** from either side turns the item `turn/user` (except items ready to merge), and the board gets one comment. The user
    decides: nudge, reassign, or close. An issue never handed out stays `turn/claude`: it is backlog, not stuck.
 
 ## Caps
