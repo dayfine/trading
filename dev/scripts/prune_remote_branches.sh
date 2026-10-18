@@ -8,7 +8,7 @@
 # branch), is protected, or its tip moved after the PR's last head commit (new work landed after the PR).
 # Deleting a PR's head branch is reversible from the PR page ("Restore branch").
 #
-# Run weekly (.github/workflows/prune-branches.yml) and by hand. Needs gh with repo scope.
+# Run weekly (.github/workflows/prune-branches-weekly.yml) and by hand. Needs gh with repo scope.
 set -eu
 REPO=${REPO:-dayfine/trading}
 APPLY=0; CLOSED_DAYS=7

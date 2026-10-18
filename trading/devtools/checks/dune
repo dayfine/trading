@@ -1406,3 +1406,12 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:wait_for_test_runner.sh})))
+
+
+; prune_remote_branches test (outside dune workspace root)
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:prune_remote_branches_test.sh})))
