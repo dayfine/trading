@@ -1,0 +1,19 @@
+reader trades by side
+side   n  mean_ret  mean_excess_vs_spy  beat_spy
+short   32    -0.08 %     -1.46 %   21.9 %
+long   125     6.66 %      1.30 %   30.4 %
+
+exits
+long,stop 115
+short,stop 27
+long,open_at_end 7
+long,exit 3
+short,exit 5
+
+by our stage at entry
+key             n  mean_ret  mean_excess  beat_spy
+long,ours1       1   -12.16 %   -13.79 %    0.0 %
+long,ours2     121     6.73 %     1.40 %   30.6 %
+long,ours3       2    -9.14 %    -8.63 %    0.0 %
+long,ours4       1    48.91 %    25.06 %  100.0 %
+short,ours4     32    -0.08 %    -1.46 %   21.9 %
