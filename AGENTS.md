@@ -87,6 +87,29 @@ triage role (`.claude/skills/triage-labels.md`).
 6. **Done** = the PR is open with CI green. Merging is the dispatcher's or a
    human's; the merge's `Closes #<issue>` closes the issue. Remove your worktree.
 
+## Cloud agents (Codex cloud, Jules): rules that differ from the local ones above
+
+Cloud agents run in their own VM with no `trading-1-dev` container. Rules 1–3 above (worktree under the repo, `docker
+exec`, one dune at a time) do not apply. Use these instead (lessons from #3333 and #3334, 2026-10-18):
+
+1. **Build and test focused targets only.** Disk is about 32 GB and a full build about 13 GB. Run `dune build @fmt`,
+   then `dune build <dirs you touched>`, then `dune runtest <dirs you touched>` from `trading/` (Codex cloud: with the
+   workspace in `.codex/README.md`). CI runs the full build, the linters and the full runtest.
+2. **`dune build @fmt` must show no diff before every push.** Warnings printed by ocamlformat about doc comments in
+   other files are pre-existing on main; leave them alone. A diff fails CI.
+3. **Stay inside the brief.** Touch only the files the issue or hand-off comment names, plus their tests. Never "fix"
+   unrelated files to quiet a warning.
+4. **Put the issue link in the PR body when you open the PR.** Use `Closes #N` (every item done) or
+   `Refs #N -- remaining: <items>`, and list each item with the test or check that proves it. A bot may not be able to
+   edit the body afterwards.
+5. **Rework arrives as an `@codex` / `@jules` comment** linking a Claude QC review, with "iteration N of 2". Address
+   every failed item, add no new scope, push it as a new commit (never amend or force-push), and reply on the PR with
+   what changed. If you cannot do something (edit the PR body, reach the network), say so plainly; don't report it as
+   done.
+6. **Network:** package managers only, no GitHub token in the environment. PRs and replies go through your GitHub app.
+7. **Whose turn it is** is shown on the pinned lane board (#3330) and as `turn/*` labels. Merging is always Claude's,
+   after CI and both Claude QC gates.
+
 ## Cross-agent review (`.claude/rules/cross-agent-review.md`)
 
 - Add the label `author/codex` to every PR you open. It goes through the same
