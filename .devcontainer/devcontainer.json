@@ -1,4 +1,5 @@
 {
+  "init": true,
   "build": {
     "dockerfile": "Dockerfile",
     "target": "devcontainer"
