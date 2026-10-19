@@ -6,7 +6,8 @@
     dollars, and diffs both against the committed PIT lists. Also counts the
     entry liquidity gate decisions that flip, on week-end bars of committed
     top-N members. Writes a Markdown report and a CSV of the rejected
-    (implausible) bars. Read-only on the store and the committed lists.
+    (implausible) bars, with an optional [--out-liquidity] per-symbol entry-gate
+    flip CSV. Read-only on the store and the committed lists.
 
     {v
       dune exec analysis/data/universe/bin/dollar_volume_measurement.exe -- \
@@ -131,7 +132,7 @@ let _candidates ~bars_root ~symbol_types_path =
       Option.value (Hashtbl.find equity s) ~default:false)
 
 let _run ~bars_root ~symbol_types_path ~lists_dir ~out_report ~out_rejected
-    ~years ~sizes ~movers_k =
+    ~out_liquidity ~years ~sizes ~movers_k =
   let committed = _committed ~lists_dir ~years ~sizes in
   let member_size = List.fold sizes ~init:0 ~f:Int.max in
   let candidates = _candidates ~bars_root ~symbol_types_path in
@@ -151,7 +152,9 @@ let _run ~bars_root ~symbol_types_path ~lists_dir ~out_report ~out_rejected
       (Report.render ~liquidity_floor:_liquidity_floor ~rows
          ~movers_size:member_size ~movers_k ~scans
          ~specimens:(_specimen_rows ~bars_root scans));
-  Out_channel.write_all out_rejected ~data:(Report.rejected_csv scans)
+  Out_channel.write_all out_rejected ~data:(Report.rejected_csv scans);
+  Option.iter out_liquidity ~f:(fun path ->
+      Out_channel.write_all path ~data:(Report.liquidity_csv scans))
 
 let _int_list raw =
   String.split raw ~on:','
@@ -170,6 +173,9 @@ let command =
        flag "--out-report" (required string) ~doc:"PATH Markdown report"
      and out_rejected =
        flag "--out-rejected" (required string) ~doc:"PATH rejected-bars CSV"
+     and out_liquidity =
+       flag "--out-liquidity" (optional string)
+         ~doc:"PATH per-symbol entry-gate flip CSV"
      and start_year =
        flag "--start-year"
          (optional_with_default 1998 int)
@@ -190,6 +196,6 @@ let command =
      fun () ->
        let years = List.range start_year (end_year + 1) in
        _run ~bars_root ~symbol_types_path ~lists_dir ~out_report ~out_rejected
-         ~years ~sizes:(_int_list sizes) ~movers_k)
+         ~out_liquidity ~years ~sizes:(_int_list sizes) ~movers_k)
 
 let () = Command_unix.run command

@@ -35,6 +35,14 @@ type liquidity_year = {
   weeks : int;  (** Week-end bars checked while a governing-list member. *)
   lost : int;  (** Passes the floor on the stored basis, fails on true. *)
   gained : int;  (** Fails on the stored basis, passes on true. *)
+  stored_one_bar : int;
+      (** Passes on the stored basis, but the mean of the window's other bars
+          (the largest bar left out) is below the floor: the pass rests on one
+          bar. *)
+  true_one_bar : int;  (** The same on the true basis (#3136 O2). *)
+  gained_one_bar : int;
+      (** Fail->pass weeks whose true pass rests on one bar: the true basis
+          admitting a name the stored basis rejects, on a single print. *)
 }
 (** Entry-gate decisions per calendar year. *)
 
@@ -75,7 +83,12 @@ val liquidity_flips :
     the last bar of each week, using the trailing mean of the last
     [liquidity_lookback_bars] bars (fewer when fewer exist), on both bases. Only
     weeks whose {!governing_list_year} satisfies [is_member] count. Calendar
-    years with no counted week are omitted. *)
+    years with no counted week are omitted. It also counts, per basis, the
+    passes that rest on one bar: the window mean clears the floor but the mean
+    of the other bars, the largest left out, does not. That is the gate's [Mean]
+    aggregation admitting a name on a single print ([Liquidity_metric] documents
+    the spoof; #3136 O2 asks whether the true basis, which divides pre-split
+    bars by [F], adds to it). *)
 
 val retry_read : (unit -> 'a option) -> 'a option
 (** [retry_read f] calls [f] until it returns [Some _], at most 3 times with a
