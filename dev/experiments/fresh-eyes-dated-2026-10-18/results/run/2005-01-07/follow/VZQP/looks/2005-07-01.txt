@@ -1,0 +1,1 @@
+{"stage": 3, "action": "set_stop", "stop": 45.88, "reason": "The 30-week MA has flattened and price closed well below it on heavy volume, under the spring correction low, but it is still above the 43-45 base support, so this is Stage 3 and I tighten the stop to just under this week's 46.56 low."}

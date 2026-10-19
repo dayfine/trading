@@ -1,0 +1,1 @@
+{"stage": 4, "action": "set_stop", "stop": 15.37, "reason": "Stage 4 below a falling 30-week MA (14.46); the January rally peaked near 15 and price then broke the prior low, so I lower the buy-stop to just above the higher of that peak and the MA, over the round number."}

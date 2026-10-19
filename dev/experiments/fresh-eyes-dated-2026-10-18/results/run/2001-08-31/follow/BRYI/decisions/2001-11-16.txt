@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":19.12,"reason":"Short is working in Stage 4 below a falling 30-week MA with RS at -30; after the October rally of more than 8% failed and price broke to a new low, I lower the buy-stop to just above the higher of the rally peak and the MA, above the 19 round number, though the 19.12 level is my estimate from the chart."}

@@ -1,0 +1,10 @@
+RUN FINISHED
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20/pages/YCOV-2023-03-24-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20/pages/YCOV-2023-03-24-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20/pages/YCOV-2023-03-24.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20/pages/market/MARKET-2023-03-24-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20/pages/market/MARKET-2023-03-24-5y.png
+cut: 2023-03-24
+run: finished
+position: none
+order: none
+since the last checkpoint: order not re-issued after 8 weeks: cancelled; 
+closed trades: 0

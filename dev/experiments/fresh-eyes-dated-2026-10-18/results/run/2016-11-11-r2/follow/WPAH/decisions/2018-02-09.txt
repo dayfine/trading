@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":52.88,"reason":"The 30-week MA is still rising and the late-2017 pullback of more than 8% was followed by new highs, so I raise the stop to just under this week's 53.40 low and the round 53, since the earlier ~55 correction low has already been undercut and a slight dip below a rising MA is tolerable."}

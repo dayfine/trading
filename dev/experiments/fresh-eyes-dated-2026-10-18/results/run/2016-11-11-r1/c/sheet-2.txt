@@ -1,0 +1,1 @@
+{"picks": [{"name": "RNPK", "score": 4}, {"name": "OPUK", "score": 3}, {"name": "XRRH", "score": 3}, {"name": "DFOT", "score": 3}, {"name": "RRSQ", "score": 2}], "reason": "These names broke out on a big weekly volume spike above a flattening or rising 30-week MA, with RS improving or turning positive. RNPK is the cleanest, breaking to a new high with RS surging."}

@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":149.88,"reason":"After the big advance the 30-week MA has flattened and price has closed below it with RS turning negative, a Stage 3 top, so I raise the stop from 146.18 to 149.88, just under the recent correction lows and below the 150 round number."}

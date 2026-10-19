@@ -1,0 +1,1 @@
+{"stage": 4, "action": "short_stop", "trigger": 129.9, "limit": 126.5, "stop": 153.12, "conviction": 3, "reason": "The stock broke below its 2014-15 top range on rising volume, with the 30-week MA rolling over, RS below zero and the S&P below its own MA, so I short a break of this week's 130.51 low with the stop above this week's 152.41 high, about 18% risk."}

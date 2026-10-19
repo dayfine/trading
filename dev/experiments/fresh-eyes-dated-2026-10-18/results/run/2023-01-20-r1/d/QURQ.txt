@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Early Stage 2 with strong rising RS, but price is already about 19% above the 30-week MA, heavy 2021-22 resistance sits at 80-88, volume is unimpressive, and the S&P is only bottoming below a flat MA, so I'm passing rather than chasing."}

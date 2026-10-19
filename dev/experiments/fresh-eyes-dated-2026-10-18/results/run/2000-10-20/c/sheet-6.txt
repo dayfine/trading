@@ -1,0 +1,1 @@
+{"picks": [{"name": "APBW", "score": 4}, {"name": "ZYID", "score": 3}, {"name": "ENGO", "score": 3}, {"name": "LKXL", "score": 2}, {"name": "HLWW", "score": 2}], "reason": "APBW is a clean Stage 3 top breaking below its MA with weak RS, ZYID and ENGO are weakening below or near a flat or declining MA, and most other names are already too extended into Stage 4 to short now."}

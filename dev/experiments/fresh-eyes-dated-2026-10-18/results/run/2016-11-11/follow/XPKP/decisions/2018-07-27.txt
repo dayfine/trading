@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":49.88,"reason":"The 30-week MA has flattened and price closed below it on heavy volume with RS below zero and falling, so this looks like Stage 3; the 2018 support near 50 still holds, so I'm tightening the stop to just under that round number."}

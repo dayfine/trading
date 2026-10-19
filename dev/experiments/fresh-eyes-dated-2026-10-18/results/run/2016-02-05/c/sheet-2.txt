@@ -1,0 +1,1 @@
+{"picks":[{"name":"ZSKD","score":4},{"name":"WTPX","score":4},{"name":"DGFD","score":3},{"name":"LFGL","score":3},{"name":"BTOZ","score":3}],"reason":"These are former Stage 2 runners that have rolled into Stage 3/4, with price below a flattening or declining 30-week MA, negative and falling RS, and an S&P in Stage 4 that permits shorts."}

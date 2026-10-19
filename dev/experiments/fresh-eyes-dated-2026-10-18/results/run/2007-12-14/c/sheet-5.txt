@@ -1,0 +1,1 @@
+{"picks": [{"name": "OWYJ", "score": 4}, {"name": "BRFC", "score": 4}, {"name": "UJNW", "score": 3}, {"name": "ZJAJ", "score": 3}, {"name": "RYJF", "score": 3}], "reason": "These are Stage 2 stocks above a rising 30-week MA, with positive RS and near-high breakouts or tight consolidations, but I can't confirm breakout volume or the market and group gates from the sheet."}

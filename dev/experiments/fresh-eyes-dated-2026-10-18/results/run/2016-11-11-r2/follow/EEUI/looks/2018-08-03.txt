@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 42.88, "reason": "Strong Stage 2 above a rising 30-week MA (43.46); the roughly 8-10% pullback from the ~52 high held well above the MA and price has rallied back toward the high, so I'm raising the stop to just under the MA and below the round number."}

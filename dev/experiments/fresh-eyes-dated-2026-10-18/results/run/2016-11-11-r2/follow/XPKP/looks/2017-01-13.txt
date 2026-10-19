@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Stage 2 stock above a rising 30-week MA with positive RS in a bullish market; the pullback from about 49.5 to 47 is under 8-10%, so the stop stays at 40.88."}

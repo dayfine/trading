@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2018-10-12
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/XPKP-2018-10-12-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/XPKP-2018-10-12-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/XPKP-2018-10-12.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/market/MARKET-2018-10-12-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11/pages/market/MARKET-2018-10-12-5y.png
+cut: 2018-10-12
+position: none
+order: none
+since the last checkpoint: stopped 2018-10-11; 
+closed trades: 1
+  long 2016-11-14 -> 2018-10-11 (stop) return +8.1%

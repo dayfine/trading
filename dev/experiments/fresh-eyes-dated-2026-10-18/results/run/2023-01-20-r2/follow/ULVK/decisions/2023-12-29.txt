@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price closed at a new high above a slowly rising 30-week MA; the autumn correction low near 28.3 is below the MA, and just under 28 that gives 27.88, which is where the stop already sits."}

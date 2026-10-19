@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "The market gate allows shorts, but XPGT is already down about 70% and trades roughly 45% below its falling 30-week MA; a new-low trigger near 8.40 would need a stop above the 11.5-12 rally peaks, about 40% risk, so I pass under the 30-40% rule."}

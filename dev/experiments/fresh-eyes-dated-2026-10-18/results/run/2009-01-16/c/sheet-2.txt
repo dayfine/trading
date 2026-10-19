@@ -1,0 +1,1 @@
+{"picks": [{"name": "GJHD", "score": 3}, {"name": "INJZ", "score": 3}, {"name": "IXQB", "score": 2}, {"name": "THNL", "score": 2}, {"name": "EIVB", "score": 2}], "reason": "The S&P is in Stage 4, and these stocks sit below declining 30-week MAs, so they qualify as continuation shorts, but most have already dropped a lot and several have weak or positive RS."}

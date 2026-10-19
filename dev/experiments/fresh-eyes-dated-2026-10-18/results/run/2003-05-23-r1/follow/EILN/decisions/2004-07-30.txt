@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"EILN is in Stage 2, above a rising 30-week MA with RS above zero; the current ~7% pullback from 27.28 has not finished and the stock has not rallied back toward the high, so the stop stays at 21.38 even though the market is only in caution (S&P near a flattening MA)."}

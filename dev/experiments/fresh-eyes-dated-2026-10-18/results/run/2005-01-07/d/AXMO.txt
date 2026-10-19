@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Market and RS are fine, but AXMO is late Stage 2 at about 20% above its 30-week MA with no new base, and a buy-stop above the ~20 high would need a stop more than 15% away, so wait for a consolidation near the MA."}

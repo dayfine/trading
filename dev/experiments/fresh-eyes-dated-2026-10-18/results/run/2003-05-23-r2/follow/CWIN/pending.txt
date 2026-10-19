@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2004-05-14
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/CWIN-2004-05-14-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/CWIN-2004-05-14-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/CWIN-2004-05-14.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/market/MARKET-2004-05-14-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23-r2/pages/market/MARKET-2004-05-14-5y.png
+cut: 2004-05-14
+position: none
+order: none
+since the last checkpoint: stopped 2004-05-10; 
+closed trades: 1
+  long 2003-05-27 -> 2004-05-10 (stop) return -2.5%

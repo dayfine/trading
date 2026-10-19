@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":107.88,"reason":"LFPM is in strong Stage 2 above a rising 30-week MA (108.7) but is in a roughly 19% correction from about 145; with market breadth diverging (Caution), the stop rises to just under the MA and below the 108 round number."}

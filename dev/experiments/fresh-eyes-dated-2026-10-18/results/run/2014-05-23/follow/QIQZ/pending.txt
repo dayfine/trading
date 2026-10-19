@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2015-08-28
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/QIQZ-2015-08-28-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/QIQZ-2015-08-28-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/QIQZ-2015-08-28.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/market/MARKET-2015-08-28-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/market/MARKET-2015-08-28-5y.png
+cut: 2015-08-28
+position: none
+order: none
+since the last checkpoint: stopped 2015-08-24; 
+closed trades: 1
+  long 2014-06-02 -> 2015-08-24 (stop) return +16.7%

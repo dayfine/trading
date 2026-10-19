@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "The stock is in Stage 2 and the market is bullish, but at 26.55 it sits 20% above its 30-week MA (22.08) after a climax-volume spike to about 30; the card calls that hold, not buy, and there is no pullback-to-MA continuation setup yet."}

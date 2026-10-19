@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is still above a rising 30-week MA and the 55.72 stop stays put, because it is only raised after the current ~14% correction ends and the stock rallies back toward its prior high."}

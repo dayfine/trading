@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Strong Stage 2 with RS +26 in a bullish market, but at 65 it is about 38% above its 30-week MA and well over 15% above the ~50 breakout, so any sensible support stop is more than 15% away; wait for a consolidation near the MA."}

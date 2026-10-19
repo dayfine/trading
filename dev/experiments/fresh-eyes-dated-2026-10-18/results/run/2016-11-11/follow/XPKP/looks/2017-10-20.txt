@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "XPKP is in Stage 2, closing at 53.12 above a rising 30-week MA of 50.28. No correction of 8–10% has occurred since the last stop raise, so the 44.68 stop stays where it is."}

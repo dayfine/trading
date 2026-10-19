@@ -1,0 +1,4 @@
+salt,symbol,side,entry_date,exit_date,exit_trigger,ret,spy_ret,excess,days,r104,max104,min104,spy104,end104,position_id
+0,COLM,long,2003-05-28,2003-12-22,laggard_rotation,0.154082,0.158064,-0.003982,208,-0.071744,0.266996,-0.105843,0.290219,2005-05-25,COLM-wein-107
+1,COLM,long,2003-05-28,2003-12-22,laggard_rotation,0.154802,0.158064,-0.003262,208,-0.071164,0.267787,-0.105285,0.290219,2005-05-25,COLM-wein-107
+2,COLM,long,2003-05-28,2003-12-22,laggard_rotation,0.154322,0.158064,-0.003742,208,-0.071550,0.267259,-0.105657,0.290219,2005-05-25,COLM-wein-107

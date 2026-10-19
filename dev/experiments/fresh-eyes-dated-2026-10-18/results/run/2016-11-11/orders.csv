@@ -1,0 +1,6 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+SRSP,MTB,buy_stop,136.25,139.0,117.88,4
+EEUI,EXPO,buy_stop,63.05,64.40,56.88,3
+RNPK,HBAN,buy_stop,11.76,12.00,9.88,3
+XPKP,BK,buy_stop,47.62,48.6,42.88,3
+XDLD,SLF,buy_stop,38.3,39.05,32.88,3

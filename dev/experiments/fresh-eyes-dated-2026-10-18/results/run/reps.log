@@ -1,0 +1,10 @@
+run.sh: 2009-01-16-r1 exit 0 wall 277s calls 17
+run.sh: 2003-05-23-r1 exit 0 wall 1023s calls 62
+run.sh: 2016-11-11-r1 exit 0 wall 968s calls 52
+run.sh: 2023-01-20-r1 exit 0 wall 362s calls 17
+run.sh: compare -> /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/compare/report.txt
+run.sh: 2009-01-16-r2 exit 0 wall 378s calls 24
+run.sh: 2003-05-23-r2 exit 0 wall 1148s calls 59
+run.sh: 2016-11-11-r2 exit 0 wall 1148s calls 59
+run.sh: 2023-01-20-r2 exit 0 wall 537s calls 30
+run.sh: compare -> /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/compare/report.txt

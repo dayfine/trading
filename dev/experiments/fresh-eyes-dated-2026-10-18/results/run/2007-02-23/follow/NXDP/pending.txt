@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2007-08-10
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/NXDP-2007-08-10-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/NXDP-2007-08-10-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/NXDP-2007-08-10.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/market/MARKET-2007-08-10-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2007-02-23/pages/market/MARKET-2007-08-10-5y.png
+cut: 2007-08-10
+position: none
+order: none
+since the last checkpoint: stopped 2007-08-08; 
+closed trades: 1
+  long 2007-04-18 -> 2007-08-08 (stop) return -7.8%

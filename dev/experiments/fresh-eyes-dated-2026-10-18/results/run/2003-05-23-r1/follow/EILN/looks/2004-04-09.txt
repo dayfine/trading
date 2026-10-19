@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "EILN is in Stage 2 above a rising 30-week MA (21.9), and the current pullback of about 8% has not yet rallied back toward its high, so the stop stays at 18.38 until it does."}

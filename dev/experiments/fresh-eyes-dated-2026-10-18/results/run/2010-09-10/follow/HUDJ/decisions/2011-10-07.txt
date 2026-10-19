@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":18.38,"reason":"HUDJ is in Stage 2 with strong RS above its rising MA, but the S&P is in Stage 4, so the book says to pull stops as tight as possible; the new stop sits just under the 30-week MA (18.45) and the 18.50 half-dollar."}

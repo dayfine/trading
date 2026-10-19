@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "stop": null, "reason": "The stock is in a fresh Stage 4 breakdown well below its falling 30-week MA with negative RS, and there has been no 8% oversold rally yet, so the 24.12 buy-stop stays where it is."}

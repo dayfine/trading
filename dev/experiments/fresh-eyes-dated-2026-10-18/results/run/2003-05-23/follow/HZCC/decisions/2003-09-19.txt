@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":9.88,"reason":"Strong Stage 2 above a rising 30-week MA (10.29) with RS +37; after a pullback of roughly 8-9% to 12.69 (read from the chart) and a rally back to 13.60, the stop goes up under the MA and below the 10.00 round number."}

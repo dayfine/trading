@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2025-04-11
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2024-01-26/pages/HURE-2025-04-11-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2024-01-26/pages/HURE-2025-04-11-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2024-01-26/pages/HURE-2025-04-11.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2024-01-26/pages/market/MARKET-2025-04-11-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2024-01-26/pages/market/MARKET-2025-04-11-5y.png
+cut: 2025-04-11
+position: none
+order: none
+since the last checkpoint: stopped 2025-04-07; 
+closed trades: 1
+  long 2024-02-07 -> 2025-04-07 (stop) return +23.0%

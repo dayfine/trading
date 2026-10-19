@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":18.38,"reason":"Stage 2 holds with price above a rising 30-week MA and positive RS; the early-2004 correction of more than 10% completed and price went on to new highs, so raise the stop just under that correction low (about 18.6, read from the chart) and below the 18.50 half-number."}

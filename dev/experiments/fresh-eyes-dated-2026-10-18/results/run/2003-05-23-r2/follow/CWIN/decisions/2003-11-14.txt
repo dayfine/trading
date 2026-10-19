@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":59.38,"reason":"Price is above a rising 30-week MA. After the roughly 9% pullback from about 66 to about 59.5, the stock has rallied back toward its prior high, so the stop goes up to just under that correction low, which is lower than the MA (59.5 is read off the chart); RS is slightly negative and drifting down, so I'm watching it."}

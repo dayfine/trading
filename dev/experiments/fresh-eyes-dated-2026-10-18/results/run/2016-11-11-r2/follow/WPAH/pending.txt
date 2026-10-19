@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2018-04-27
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r2/pages/WPAH-2018-04-27-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r2/pages/WPAH-2018-04-27-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r2/pages/WPAH-2018-04-27.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r2/pages/market/MARKET-2018-04-27-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-11-11-r2/pages/market/MARKET-2018-04-27-5y.png
+cut: 2018-04-27
+position: none
+order: none
+since the last checkpoint: stopped 2018-04-26; 
+closed trades: 1
+  long 2016-11-14 -> 2018-04-26 (stop) return +7.5%

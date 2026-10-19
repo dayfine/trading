@@ -1,0 +1,1 @@
+{"picks": [{"name": "RNPK", "score": 4}, {"name": "VHUZ", "score": 3}, {"name": "DFOT", "score": 3}, {"name": "RRSQ", "score": 3}, {"name": "OPUK", "score": 2}], "reason": "These names broke out this week above a flat or rising 30-week MA with strong positive RS and a volume pickup, and RNPK is closest to a clean breakout into new highs."}

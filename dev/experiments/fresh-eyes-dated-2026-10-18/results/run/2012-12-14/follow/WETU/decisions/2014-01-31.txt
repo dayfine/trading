@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds: price is above a rising 30-week MA, RS is positive and the S&P is in Stage 2; the ~6% dip from the ~83 high is under the 8-10% needed to raise the stop, so it stays at 58.92."}

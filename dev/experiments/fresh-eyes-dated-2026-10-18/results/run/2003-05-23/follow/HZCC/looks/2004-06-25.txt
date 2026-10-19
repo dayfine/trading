@@ -1,0 +1,1 @@
+{"stage": 4, "action": "exit", "stop": null, "reason": "After the run to about 33 the stock has made lower highs and lower lows, closed at 19.8 well below a 30-week MA (23.9) that has flattened and is rolling over, and its RS has dropped below zero, so it is in or entering Stage 4 and the book says sell rather than wait for a rally."}

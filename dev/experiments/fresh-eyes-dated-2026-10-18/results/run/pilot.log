@@ -1,0 +1,4 @@
+run.sh: 2002-02-22 exit 0 wall 10s calls 1
+run.sh: 2009-01-16 exit 1 wall 55s calls 1
+run.sh: 2017-07-14 exit 0 wall 274s calls 21
+run.sh: compare -> /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/compare/report.txt

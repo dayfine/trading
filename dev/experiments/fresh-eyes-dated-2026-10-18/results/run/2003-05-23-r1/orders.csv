@@ -1,0 +1,6 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+CWIN,NEE,buy_stop,65.70,67.00,57.88,3
+SHAD,VTR,buy_stop,11.12,11.40,9.88,3
+HZCC,SSNC1,buy_stop,10.65,10.9,9.38,2
+EILN,BFAM_old,buy_stop,17.35,17.70,14.88,2
+MGSB,PGL,buy_stop,44.12,45.0,37.88,2

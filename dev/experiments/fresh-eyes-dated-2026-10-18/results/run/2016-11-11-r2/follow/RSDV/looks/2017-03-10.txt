@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 77.88, "reason": "Stage 2 above a rising MA: after a roughly 8-10% pullback from the December high (my visual estimate) the stock is back near that high, so I raise the stop to just under the lower of the correction low and the 30-week MA (about 78.3), placed below the round number."}

@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is still above a rising 30-week MA and there has been no new 8-10% correction since the stop was last set, so the stop stays at 74.53 even though RS has slipped just below zero."}

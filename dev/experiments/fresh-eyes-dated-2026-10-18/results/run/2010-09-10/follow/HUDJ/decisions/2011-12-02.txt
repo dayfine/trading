@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":18.88,"reason":"HUDJ is in a healthy Stage 2 above a rising 30-week MA with strong RS, but the S&P is in Stage 3 with a flat MA, so I'm tightening the stop to just under the 30-week MA and the 19 round number."}

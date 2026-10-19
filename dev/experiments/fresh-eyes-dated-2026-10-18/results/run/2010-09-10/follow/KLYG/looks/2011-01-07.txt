@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 43.88, "reason": "Still Stage 2 above a rising MA (45.8); after a correction of about 12% from roughly 51 to an estimated low near 44.5 (read off the chart), price is rallying back toward the high, so the stop goes up to just under the correction low (below the MA) and under the 44 round number."}

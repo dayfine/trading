@@ -1,0 +1,1 @@
+{"picks": [{"name": "XPKP", "score": 4}, {"name": "XDLD", "score": 3}, {"name": "HGEZ", "score": 3}, {"name": "USPE", "score": 2}, {"name": "THGA", "score": 2}], "reason": "These names show a Stage 2 breakout or a consolidation near a rising 30-week MA with positive RS, and I skipped the Stage 3/4 charts and those with declining MAs."}

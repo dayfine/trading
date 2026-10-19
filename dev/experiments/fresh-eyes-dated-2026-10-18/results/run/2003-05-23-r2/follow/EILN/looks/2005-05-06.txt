@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 29.88, "reason": "Stage 2 with a rising 30-week MA (32.17) and strong RS; after an 8-10% correction the stock is back near its highs, so I raise the stop to under the correction low/MA area and below the round 30 (low read from the chart, about 31)."}

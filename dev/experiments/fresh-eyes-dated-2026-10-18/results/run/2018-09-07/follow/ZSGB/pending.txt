@@ -1,0 +1,10 @@
+RUN FINISHED
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2018-09-07/pages/ZSGB-2018-11-09-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2018-09-07/pages/ZSGB-2018-11-09-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2018-09-07/pages/ZSGB-2018-11-09.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2018-09-07/pages/market/MARKET-2018-11-09-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2018-09-07/pages/market/MARKET-2018-11-09-5y.png
+cut: 2018-11-09
+run: finished
+position: none
+order: none
+since the last checkpoint: order not re-issued after 8 weeks: cancelled; 
+closed trades: 0

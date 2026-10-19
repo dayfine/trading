@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 80.12, "limit": 81.7, "stop": 68.88, "conviction": 3, "reason": "Heavy-volume Stage 1→2 breakout above a 71 base with a rising MA, RS crossing positive and a bullish market, but price is already extended and the 2015 breakdown zone (80-95) sits overhead, so enter only above this week's high with a stop under 70 (14% risk)."}

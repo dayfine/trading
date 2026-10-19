@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":18.38,"reason":"The stock is still above a rising 30-week MA and just pulled back about 9% to 18.71 before closing near its high, so the stop moves just under the lower of that low and the MA (18.59), below the 18.50 half-point."}

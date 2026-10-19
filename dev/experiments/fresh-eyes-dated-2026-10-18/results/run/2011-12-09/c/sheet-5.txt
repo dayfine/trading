@@ -1,0 +1,1 @@
+{"picks": [{"name": "OSPM", "score": 4}, {"name": "UKBS", "score": 3}, {"name": "TWCU", "score": 4}, {"name": "HEDY", "score": 3}, {"name": "NOSU", "score": 3}], "reason": "These stocks are in Stage 2 or breaking out above a rising or flattening 30-week MA with positive RS (OSPM, TWCU, UKBS, HEDY, NOSU), though the market gate and overhead resistance are unchecked."}

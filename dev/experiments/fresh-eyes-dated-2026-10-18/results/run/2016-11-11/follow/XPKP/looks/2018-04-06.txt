@@ -1,0 +1,1 @@
+{"stage": 3, "action": "set_stop", "stop": 48.88, "reason": "After a big Stage 2 run the 30-week MA (53.8) has flattened, price closed below it at 50.35 and RS is negative (-5.6) and falling, which is Stage 3, so I tighten the stop to just under this week's correction low (49.39) and the 49 round number rather than exit before major support breaks."}

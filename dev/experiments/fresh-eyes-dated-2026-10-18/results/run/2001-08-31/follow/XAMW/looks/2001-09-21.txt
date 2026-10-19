@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "stop": 18.12, "reason": "Stage 4 short below a declining 30-week MA with RS below zero; there has been no 8% oversold rally yet, so the stop stays above the prior rally peak at 18.12."}

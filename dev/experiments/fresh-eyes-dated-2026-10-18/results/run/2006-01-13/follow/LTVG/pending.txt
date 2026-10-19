@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2006-07-21
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2006-01-13/pages/LTVG-2006-07-21-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2006-01-13/pages/LTVG-2006-07-21-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2006-01-13/pages/LTVG-2006-07-21.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2006-01-13/pages/market/MARKET-2006-07-21-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2006-01-13/pages/market/MARKET-2006-07-21-5y.png
+cut: 2006-07-21
+position: none
+order: none
+since the last checkpoint: stopped 2006-07-17; 
+closed trades: 1
+  long 2006-01-17 -> 2006-07-17 (stop) return -6.0%

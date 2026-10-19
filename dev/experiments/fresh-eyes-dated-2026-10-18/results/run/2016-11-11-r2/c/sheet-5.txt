@@ -1,0 +1,1 @@
+{"picks": [{"name": "SLZM", "score": 4}, {"name": "CZGE", "score": 4}, {"name": "JZYK", "score": 3}, {"name": "AMOH", "score": 3}, {"name": "WSYC", "score": 3}], "reason": "These are Stage 2 breakouts to new highs with RS turning positive, a rising 30-week MA and a volume pickup. SLZM and CZGE look cleanest, but the market gate is unconfirmed and the breakouts are extended."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Price is pushing to new highs out of a range above a 30-week MA that is barely rising, but volume is light (no 2x surge), the RS line is below its 2013 peak while price is higher (a divergence), and the range looks Stage 3-ish, so I skip it."}

@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2006-08-18
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/PHEE-2006-08-18-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/PHEE-2006-08-18-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/PHEE-2006-08-18.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/market/MARKET-2006-08-18-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/market/MARKET-2006-08-18-5y.png
+cut: 2006-08-18
+position: none
+order: none
+since the last checkpoint: stopped 2006-08-18; 
+closed trades: 1
+  long 2005-01-27 -> 2006-08-18 (stop) return +52.3%

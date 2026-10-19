@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":17.88,"reason":"Stage 2 above a rising 30-week MA; after the roughly 13% late-2003 correction to about 18.4, price has rallied to new highs, so the stop moves up to just under that low and below the round number 18."}

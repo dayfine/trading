@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":729.88,"reason":"TUGR is in a strong Stage 2 above a rising 30-week MA (754), and after the roughly 8–10% spring correction it has rallied to new highs near 889, so the stop rises to just under that correction low and the MA, which I put near 730 by reading the chart."}

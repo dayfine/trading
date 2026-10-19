@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2002-12-20
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/BRYI-2002-12-20-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/BRYI-2002-12-20-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/BRYI-2002-12-20.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/market/MARKET-2002-12-20-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2001-08-31/pages/market/MARKET-2002-12-20-5y.png
+cut: 2002-12-20
+position: none
+order: none
+since the last checkpoint: stopped 2002-12-16; 
+closed trades: 1
+  short 2001-09-19 -> 2002-12-16 (stop) return +33.4%

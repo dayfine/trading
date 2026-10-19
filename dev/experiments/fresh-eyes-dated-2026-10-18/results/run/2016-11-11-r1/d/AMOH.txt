@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "AMOH is in Stage 2 with a rising MA, strong RS and heavy volume, but at 9.06 it sits about 31% above its 6.92 MA and well past its base breakout near 7, with no support close enough to keep the stop within 15%, so wait for a pullback or a new base."}

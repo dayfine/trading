@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":15.40,"reason":"After a big Stage 2 run, the 30-week MA has flattened, price is crossing it on heavy volume (churning), so tighten the stop to just under the spring correction low of about 15.5, which I read from the chart, below the round half-dollar."}

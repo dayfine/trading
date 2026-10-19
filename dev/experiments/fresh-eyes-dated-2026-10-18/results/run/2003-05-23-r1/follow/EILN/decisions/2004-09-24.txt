@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":21.88,"reason":"Stage 2 with a rising 30-week MA; the summer correction of over 10% bottomed near 22.5 and price is back near its highs, so raise the stop to just under that low and below the 22 round number."}

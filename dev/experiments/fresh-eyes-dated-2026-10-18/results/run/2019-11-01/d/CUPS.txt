@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "The stock is in Stage 2 and at an all-time high in a bullish market, but RS has fallen all year from +27 to about 0 (a downtrend, lower than at the prior price peaks) and breakout volume is light, so the card vetoes a buy."}

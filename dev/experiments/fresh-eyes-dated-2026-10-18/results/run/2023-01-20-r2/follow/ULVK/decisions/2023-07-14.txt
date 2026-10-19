@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":26.88,"reason":"Price is still above a slowly rising 30-week MA after a roughly 10% pullback from the ~31 high, and the rebound toward that high lets me raise the stop to just under the pullback low (about 27, my estimate from the chart) and below the round number, while the RS slipping to about zero is a warning to watch."}

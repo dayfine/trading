@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds: price is 52.65, above a rising 30-week MA at 48.6, and RS is positive at +6; the latest dip from the high is only about 3%, short of the 8-10% correction needed to raise the 43.51 stop."}

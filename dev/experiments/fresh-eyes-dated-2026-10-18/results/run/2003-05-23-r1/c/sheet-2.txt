@@ -1,0 +1,1 @@
+{"picks": [{"name": "MIIU", "score": 3}, {"name": "EILN", "score": 4}, {"name": "AYFO", "score": 3}, {"name": "MGSB", "score": 4}, {"name": "YIFB", "score": 3}], "reason": "These are Stage 2 stocks breaking to new highs above a rising 30-week MA with positive RS and rising volume (EILN and MGSB break out of multi-month ranges), while MIIU, AYFO and YIFB are weaker or extended."}

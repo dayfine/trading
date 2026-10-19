@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":74.88,"reason":"Still Stage 2 above a rising 30-week MA; after a pullback of about 8–9% from roughly 83 to roughly 75.5, the price has rallied back near the high, so the stop goes up to just under that low and under the round number."}

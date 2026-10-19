@@ -1,0 +1,4 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+AIKY,PMC,buy_stop,30.25,30.85,25.88,2
+KRRC,D,buy_stop,72.10,73.50,65.88,2
+QIQZ,EQR,buy_stop,62.15,63.4,56.88,2

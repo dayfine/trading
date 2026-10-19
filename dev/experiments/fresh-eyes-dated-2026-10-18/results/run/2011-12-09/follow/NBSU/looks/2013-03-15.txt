@@ -1,0 +1,1 @@
+{"stage": 3, "action": "set_stop", "stop": 40.88, "reason": "The 30-week MA has flattened after the big advance, price is crossing it and RS is negative and falling, so this looks like a Stage 3 top; I raise the stop to just under the latest correction low, which I read from the chart as about 41, then below the round number."}

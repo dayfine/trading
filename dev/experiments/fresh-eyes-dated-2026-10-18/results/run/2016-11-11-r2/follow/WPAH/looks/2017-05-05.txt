@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "The price has corrected about 13% from 58.5 and is just under a 30-week MA that is still rising, so the MA has not flattened into Stage 3 and the 44.38 stop below the December correction low stays until the correction ends."}

@@ -1,0 +1,1 @@
+{"picks": [{"name": "NQZO", "score": 4}, {"name": "DZIH", "score": 4}, {"name": "PROP", "score": 3}, {"name": "ELST", "score": 2}, {"name": "DGJH", "score": 2}], "reason": "The S&P is in Stage 4, and these stocks sit below declining MAs with negative RS and are breaking to or near new lows, but many are already extended."}

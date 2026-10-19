@@ -1,0 +1,1 @@
+{"stage": 3, "action": "set_stop", "stop": 14.88, "reason": "After a big Stage 2 run the stock fell about 22% to roughly 15.4 and the 30-week MA is flattening while price crosses it, so I raise the stop from 8.98 to just under that correction low and the 15 round number."}

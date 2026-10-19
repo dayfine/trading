@@ -1,0 +1,1 @@
+{"picks": [{"name": "JCLN", "score": 4}, {"name": "LFPM", "score": 4}, {"name": "ULCW", "score": 3}, {"name": "RGQL", "score": 3}, {"name": "BZAT", "score": 3}], "reason": "These are Stage 2 stocks above a rising 30-week MA with positive RS and breakouts or new highs on higher volume; JCLN and LFPM are clearest, while the others have weaker volume or some overhead resistance."}

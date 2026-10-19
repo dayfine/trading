@@ -1,0 +1,1 @@
+{"stage": 3, "action": "set_stop", "stop": 61.88, "reason": "The 30-week MA (64.41) has flattened, RS is below zero (-5.2) and price has closed just below the MA after a long advance, so this looks like Stage 3; raise the stop to 61.88, just under the early-2004 correction low (about 62, read from the chart) and below the $62 round number."}

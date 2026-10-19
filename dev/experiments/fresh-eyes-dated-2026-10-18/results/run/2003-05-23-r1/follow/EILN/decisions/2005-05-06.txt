@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":30.88,"reason":"Strong Stage 2 above a rising 30-week MA (35.23 vs 32.17), and the stock is pushing to new highs after a roughly 9% spring correction, so the stop moves up to just under the lower of the correction low (about 31.5, read from the chart) and the MA, below the 31 round number."}

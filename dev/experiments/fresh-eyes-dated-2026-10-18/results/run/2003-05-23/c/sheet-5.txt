@@ -1,0 +1,1 @@
+{"picks": [{"name": "MVNK", "score": 4}, {"name": "IZAC", "score": 3}, {"name": "FUMO", "score": 3}, {"name": "LWGB", "score": 3}, {"name": "HCLI", "score": 2}], "reason": "These are Stage 1 bases or tops breaking out above a flat-to-rising 30-week MA with strong or improving RS, and MVNK and IZAC have the strongest RS (+60) and the cleanest breakouts."}

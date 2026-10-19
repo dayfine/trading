@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "This is a fresh Stage 2 breakout to a new high on strong volume, with price above a rising 30-week MA and RS at +13.5, and with no 8-10% correction yet there is no reason to raise the 42.88 stop."}

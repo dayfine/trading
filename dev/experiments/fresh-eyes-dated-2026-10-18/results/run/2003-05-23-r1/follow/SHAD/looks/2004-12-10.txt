@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": 18.38, "reason": "SHAD is still in Stage 2 above a rising 30-week MA with RS above zero, and there has been no new 8-10% correction since the last raise, so the 18.38 stop stays."}

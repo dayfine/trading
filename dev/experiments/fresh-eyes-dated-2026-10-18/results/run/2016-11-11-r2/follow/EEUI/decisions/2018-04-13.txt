@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":70.88,"reason":"Strong Stage 2 above a rising MA at a new high after an ~9% early-2018 correction near 71-72, so raise the stop under that low and below 71; the S&P is near its MA, which also argues for tightening."}

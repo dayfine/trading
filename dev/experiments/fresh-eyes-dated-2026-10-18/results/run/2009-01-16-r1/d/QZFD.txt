@@ -1,0 +1,1 @@
+{"stage": 4, "action": "short_stop", "trigger": 10.88, "limit": 10.6, "stop": 13.12, "conviction": 2, "reason": "Late-Stage-4 continuation short: QZFD is in an 11-13 range under a falling 30-week MA (15.9) and the S&P is in Stage 4, but RS is only near zero, the group is unknown and stop risk is about 20%, so conviction is low."}

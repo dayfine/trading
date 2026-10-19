@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Strong Stage 2: price is well above a rising 30-week MA, RS is +20 and rising, and the market is bullish; the late-2014 dip to about 60 bottomed only slightly above the 59.48 stop, so raising the stop to just under that low would be trivial and I keep it."}

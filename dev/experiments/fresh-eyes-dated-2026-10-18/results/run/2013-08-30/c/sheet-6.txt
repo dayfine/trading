@@ -1,0 +1,1 @@
+{"picks": [{"name": "ODPP", "score": 3}, {"name": "ZTDZ", "score": 3}, {"name": "IAIH", "score": 3}, {"name": "GUNP", "score": 3}, {"name": "JMVJ", "score": 2}], "reason": "These are Stage 2 stocks with a rising 30-week MA, positive RS and little overhead resistance, though none shows a clean first-base breakout with a volume spike."}

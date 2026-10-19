@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is above its slowly rising 30-week MA in Stage 2 and the S&P is in Stage 2, and raising the stop under the mid-2018 correction low near 14 would add only about 0.12 above 13.76, too trivial a raise, so the stop stays at 13.76."}

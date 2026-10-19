@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":13.88,"reason":"Price is still above a slowly rising 30-week MA after a correction of more than 10% from the February high to about 14.3 and a rally back, so I raise the stop to just under that low and below 14.00."}

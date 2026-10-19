@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 with price at a new high above a rising 30-week MA, and no 8-10% correction since the stop was last set, so the 60.31 stop stays where it is."}

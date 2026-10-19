@@ -1,0 +1,5 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+TUGR,TDG,buy_stop,692.0,706.0,589.88,3
+YCOV,IEX,buy_stop,240.2,245.0,219.88,3
+FCOJ,GLNCY,buy_stop,14.45,14.75,12.38,2
+JARQ,WPC,buy_stop,86.5,88.2,76.88,2

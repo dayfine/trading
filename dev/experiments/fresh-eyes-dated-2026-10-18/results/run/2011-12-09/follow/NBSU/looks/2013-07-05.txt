@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Stage 2 holds with price at 48.8 above a rising 30-week MA of 44.6 and RS slightly positive, and the June pullback was under 8%, so the 40.34 stop stays where it is."}

@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "stop": 13.12, "reason": "Fresh Stage 4 short below a falling 30-week MA with RS at -22 in a Stage 4 market; the 13.12 buy-stop sits just above 13 and stays until an 8% rally and its peak let me lower it."}

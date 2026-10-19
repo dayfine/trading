@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "The stock is in Stage 2 in a bullish market, but at 12.54 it is about 24% above its 30-week MA, a sensible stop under the January low near 9.9 means over 15% risk, there is no clear breakout-volume surge, and old 2003-04 resistance sits at 13-15, so I pass."}

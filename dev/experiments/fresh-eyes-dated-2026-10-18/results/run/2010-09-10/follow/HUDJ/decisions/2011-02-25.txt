@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is above a rising 30-week MA and the market is bullish, and no 8-10% correction has occurred since entry, so the stop stays at 15.46; RS is below zero and slipping, so I am watching it as a possible laggard."}

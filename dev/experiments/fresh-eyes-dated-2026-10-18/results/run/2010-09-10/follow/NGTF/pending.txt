@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2011-08-12
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/NGTF-2011-08-12-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/NGTF-2011-08-12-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/NGTF-2011-08-12.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/market/MARKET-2011-08-12-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/market/MARKET-2011-08-12-5y.png
+cut: 2011-08-12
+position: none
+order: none
+since the last checkpoint: stopped 2011-08-08; 
+closed trades: 1
+  long 2010-09-20 -> 2011-08-08 (stop) return +17.2%

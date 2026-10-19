@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Fresh Stage 2 position, price above a rising 30-week MA with positive RS and no 8-10% correction since entry, so the initial stop at 46.88 stays."}

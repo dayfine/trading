@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":59.88,"reason":"Stage 2 with price above a rising 30-week MA; the spring 2012 correction of about 8% to near 60 ended and price rallied to new highs, so the stop goes up to just under that low and the round 60, while the current pullback from about 71 has not yet rallied back toward the high."}

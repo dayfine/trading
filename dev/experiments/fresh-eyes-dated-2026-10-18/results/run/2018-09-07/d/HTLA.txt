@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 56.31, "limit": 57.45, "stop": 49.88, "conviction": 3, "reason": "Stock broke out of its 2018 top range to a new all-time high on heavy volume, with RS turning positive, the MA turning up and the S&P in Stage 2; the stop goes under this week's low and $50 because the base low is over 15% away."}

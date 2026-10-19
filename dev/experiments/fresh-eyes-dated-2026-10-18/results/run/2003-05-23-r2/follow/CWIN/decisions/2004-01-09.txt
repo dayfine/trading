@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":59.88,"reason":"The MA has flattened after the advance, price has moved sideways around it (60–65) since mid-2003 and RS is negative and falling, so I tighten the stop to just under the 60 round number below the recent correction lows, which I read from the chart as about 60–61."}

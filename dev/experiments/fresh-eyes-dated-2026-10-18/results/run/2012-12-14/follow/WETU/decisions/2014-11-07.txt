@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":77.88,"reason":"Stage 2 with the 30-week MA rising and RS back above zero; the October correction of about 8–10% (low near 79 read from the chart) ended in a new high at 92.81, so the stop moves just under that low and the 78 round number."}

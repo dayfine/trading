@@ -1,0 +1,1 @@
+{"picks": [{"name": "DZIH", "score": 3}, {"name": "RQIZ", "score": 3}, {"name": "IRKW", "score": 3}, {"name": "RGEA", "score": 2}, {"name": "ERYW", "score": 2}], "reason": "Stocks that peaked in Stage 2 and are now below a falling 30-week MA with negative RS fit the short setup, but most have already dropped sharply, so only a few late-stage breakdowns score above marginal."}

@@ -1,0 +1,4 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+ZTTH,CLMT,buy_stop,32.6,33.25,27.88,3
+WETU,ITW,buy_stop,62.51,63.75,56.88,3
+KSSS,MTZ,buy_stop,24.55,25.05,21.38,2

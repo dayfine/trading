@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":21.38,"reason":"Stage 2 continues above a rising 30-week MA; after a correction of over 10% to about 21.8, the stock has rallied back toward its high, so the stop goes just under the correction low, which is below the MA."}

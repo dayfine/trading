@@ -1,0 +1,1 @@
+{"picks": [{"name": "PMMM", "score": 4}, {"name": "XAEC", "score": 3}, {"name": "UNEI", "score": 3}, {"name": "WVAG", "score": 3}, {"name": "UDEJ", "score": 2}], "reason": "These names are in Stage 2 above a rising 30-week MA with positive RS and mostly little overhead resistance, led by PMMM at new highs, while the rest are weaker or extended."}

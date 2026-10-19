@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds: price is above a rising 30-week MA with RS slightly positive, and the stop under the early-2017 correction low (about 44, read from the chart) would be a trivial raise from 43.70, so I keep it."}

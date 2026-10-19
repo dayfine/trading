@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "The market is bearish and YHEO is in Stage 4 below its falling 30-week MA with RS just under zero, but a breakdown below the 1.85 lows would need a buy-stop above the 2.6–3.0 rally highs, a 40%+ risk, and the group can't be checked, so I pass."}

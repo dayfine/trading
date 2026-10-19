@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "WAGS is in Stage 4 but has already crashed 50% in one week to far below its MA, and there's been no consolidation; the only overhead level for a stop is the $40 peak, over 100% away, which breaks the card's 30-40% short-risk limit, so I pass."}

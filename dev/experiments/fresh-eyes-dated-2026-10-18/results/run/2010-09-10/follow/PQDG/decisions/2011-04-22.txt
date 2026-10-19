@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":33.88,"reason":"Stage 2 holds: price 37.17 is above a rising 30-week MA at 34.61; after the recent pullback and rally back toward the high, I raise the stop to just under the MA and the $34 round number, though that pullback (about 7-8% by eye) is at the edge of the book's 8-10% trigger, and RS fading toward zero calls for tighter protection."}

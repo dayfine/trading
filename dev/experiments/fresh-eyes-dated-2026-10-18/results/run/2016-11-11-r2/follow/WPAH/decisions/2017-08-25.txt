@@ -1,0 +1,1 @@
+{"action":"none","stop":48.88,"reason":"Stage 3 top: the 30-week MA has rolled flat, price is choppy below it and RS is negative, but the 49 support still holds and the stop at 48.88 already sits just under it, so a break would mark Stage 4 and take me out."}

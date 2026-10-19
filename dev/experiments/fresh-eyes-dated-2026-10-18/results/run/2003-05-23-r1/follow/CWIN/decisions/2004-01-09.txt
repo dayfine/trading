@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":60.88,"reason":"After the advance the 30-week MA is flattening, price has moved sideways around it for months and RS is below zero and falling, so per the Stage 3 rule I tighten the stop to just under the latest correction low near 61, below the round number."}

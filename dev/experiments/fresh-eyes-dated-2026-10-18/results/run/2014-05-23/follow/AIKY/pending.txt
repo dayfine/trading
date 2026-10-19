@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2014-08-08
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/AIKY-2014-08-08-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/AIKY-2014-08-08-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/AIKY-2014-08-08.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/market/MARKET-2014-08-08-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2014-05-23/pages/market/MARKET-2014-08-08-5y.png
+cut: 2014-08-08
+position: none
+order: none
+since the last checkpoint: stopped 2014-08-05; 
+closed trades: 1
+  long 2014-06-06 -> 2014-08-05 (stop) return -14.4%

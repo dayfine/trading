@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "CBWJ is in a strong Stage 2 at all-time highs with RS +20, but at 155 it sits about 18% above its 30-week MA of 131 with no recent base near the MA, so it is late Stage 2 (hold, not buy) and any sound stop would be more than 15% away."}

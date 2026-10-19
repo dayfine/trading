@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"HCKA is in healthy Stage 2: it closed at 25.90, above a rising 30-week MA at 22.84, with positive RS, and the market is in Stage 2. No correction of 8-10% has finished and rallied back since entry, so the 20.38 stop stays where it is."}

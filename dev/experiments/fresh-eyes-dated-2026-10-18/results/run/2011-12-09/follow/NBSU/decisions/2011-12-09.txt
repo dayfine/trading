@@ -1,0 +1,1 @@
+{"action":"buy_stop","trigger":41.42,"limit":"42.25","stop":36.88,"reason":"step D order"}

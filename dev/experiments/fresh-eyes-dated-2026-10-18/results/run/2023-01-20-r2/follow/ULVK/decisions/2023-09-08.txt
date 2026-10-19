@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":27.88,"reason":"The 30-week MA is flattening (29.37), price is tiptoeing around it, and RS has fallen below zero, so a Stage 3 top is likely and the stop goes just under the latest correction low (about 28, read from the chart) and below that round number."}

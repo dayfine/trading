@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2011-05-13
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/PQDG-2011-05-13-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/PQDG-2011-05-13-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/PQDG-2011-05-13.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/market/MARKET-2011-05-13-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2010-09-10/pages/market/MARKET-2011-05-13-5y.png
+cut: 2011-05-13
+position: none
+order: none
+since the last checkpoint: stopped 2011-05-13; 
+closed trades: 1
+  long 2010-11-04 -> 2011-05-13 (stop) return -0.4%

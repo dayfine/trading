@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 44.88, "reason": "The stock is in Stage 2 and just broke to a new high above a rising 30-week MA (47.2); after the roughly 8-10% spring correction to about 45, the stop goes just under that correction low, which is below the MA, and under the round number 45."}

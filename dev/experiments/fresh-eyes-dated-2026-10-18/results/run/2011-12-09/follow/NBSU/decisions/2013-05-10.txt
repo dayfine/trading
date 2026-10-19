@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds: price is at new highs above a rising 30-week MA (47.78 vs 43.05), and the 2013 dips fell short of the 8–10% needed to raise the stop, so it stays at 40.88."}

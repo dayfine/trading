@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "EAIA is in a strong Stage 2 but too extended (about 20% above its 30-week MA), and last week it reversed lower on record volume; a sensible stop would be more than 15% away, and with SPY just under a flat MA this is not an A+ entry."}

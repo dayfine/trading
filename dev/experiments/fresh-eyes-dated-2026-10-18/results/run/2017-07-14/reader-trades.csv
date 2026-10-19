@@ -1,0 +1,4 @@
+pseudo,symbol,side,entry_date,exit_date,how,ret,spy_ret,excess,days,r104,max104,min104,spy104,end104,looks
+AOGL,SNV,,,,expired,,,,,,,,,,0
+HASN,AMGN,long,2017-09-07,2018-04-02,stop,-0.083706,0.056063,-0.139769,207,0.208606,0.214252,-0.075833,0.251319,2019-09-05,4
+NXAI,ILG,,,,expired,,,,,,,,,,0

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 18.38, "reason": "Still Stage 2 above a slowly rising MA, and this week's roughly 9% dip to 18.71 rebounded to near the prior high, so the stop goes up to just under the lower of that low and the MA (18.59), below the 18.50 half-number."}

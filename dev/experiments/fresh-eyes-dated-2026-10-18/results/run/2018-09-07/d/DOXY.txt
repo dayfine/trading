@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Stage 2 with a market tailwind, but price is about 13% above the ~62 breakout and 18% above the 30-week MA, and the tight range after the huge volume spike looks like a pinned special situation, so it is too late and I won't chase."}

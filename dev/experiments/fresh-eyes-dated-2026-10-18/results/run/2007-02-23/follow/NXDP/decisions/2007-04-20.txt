@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"The stock is in early Stage 2 above a rising 30-week MA with positive RS, and there has been no 8–10% correction since Wednesday's entry, so the initial stop at 21.88 stays."}

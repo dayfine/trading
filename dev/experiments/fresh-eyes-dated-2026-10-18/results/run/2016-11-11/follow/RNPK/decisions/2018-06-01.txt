@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 with price above a rising 30-week MA (14.91) and RS positive; the roughly 11% correction from about 16.3 has not yet rallied back near the prior high, so the stop stays at 12.01 until it does (next raise would be about 13.88)."}

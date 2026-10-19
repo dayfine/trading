@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "The stock is in Stage 2, above a rising 30-week MA (47.63 vs 46.81). The current pullback of about 8% from the ~52 peak has not ended or rallied back toward the high, so by the book the 40.34 stop stays where it is for now."}

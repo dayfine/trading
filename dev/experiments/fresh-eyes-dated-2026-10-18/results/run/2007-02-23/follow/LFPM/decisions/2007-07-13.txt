@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":78.88,"reason":"Strong Stage 2 with rising MA and RS at +52; after the May–June correction of more than 8% the stock rallied to new highs, so the stop goes just under the lower of the correction low (~88) and the 30-week MA (79.4), below the whole number."}

@@ -1,0 +1,10 @@
+RUN FINISHED
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20-r2/pages/ULVK-2025-01-22-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20-r2/pages/ULVK-2025-01-22-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20-r2/pages/ULVK-2025-01-22.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20-r2/pages/market/MARKET-2025-01-22-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2023-01-20-r2/pages/market/MARKET-2025-01-22-5y.png
+cut: 2025-01-22
+run: finished
+position: none
+order: none
+closed trades: 1
+  long 2023-01-25 -> 2025-01-22 (open_at_end) return +33.9%

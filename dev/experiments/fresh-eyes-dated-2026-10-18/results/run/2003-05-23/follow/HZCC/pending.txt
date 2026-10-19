@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2004-07-02
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/HZCC-2004-07-02-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/HZCC-2004-07-02-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/HZCC-2004-07-02.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/market/MARKET-2004-07-02-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2003-05-23/pages/market/MARKET-2004-07-02-5y.png
+cut: 2004-07-02
+position: none
+order: none
+since the last checkpoint: exit 2004-06-28; 
+closed trades: 1
+  long 2003-05-29 -> 2004-06-28 (exit) return +84.4%

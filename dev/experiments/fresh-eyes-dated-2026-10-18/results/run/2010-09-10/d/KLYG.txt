@@ -1,0 +1,1 @@
+{"stage": 2, "action": "buy_stop", "trigger": 47.91, "limit": 48.9, "stop": 42.88, "conviction": 2, "reason": "Stage 2 stock above a rising MA with positive, rising RS, set to break into all-time-high territory, but the market is only cautious (SPY just under a flat MA, A-D line confirming) and volume is not expanding, so the size is small and conviction low."}

@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Late Stage 4 after a fall of about 80%, and price is about 47% below a falling 30-week MA; a stop above the recent rally high (about 26) would sit roughly 35-40% above any trigger near 19, beyond the card's 30-40% pass rule."}

@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":21.38,"reason":"Still Stage 2 above a rising 30-week MA (24.16 vs 22.41) after a roughly 14% spring correction to about 21.8 and a rally back toward the high, so the investor stop moves up under the correction low and the MA."}

@@ -1,0 +1,1 @@
+{"picks": [{"name": "BZCT", "score": 4}, {"name": "AZWB", "score": 3}, {"name": "NXDP", "score": 4}, {"name": "BMHJ", "score": 3}, {"name": "DOVD", "score": 2}], "reason": "These stocks have just broken out to new highs above a rising 30-week MA with strong positive RS, and BZCT and NXDP have the cleanest breakouts with the least overhead resistance."}

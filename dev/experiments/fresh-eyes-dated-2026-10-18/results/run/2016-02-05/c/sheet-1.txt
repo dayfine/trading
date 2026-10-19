@@ -1,0 +1,1 @@
+{"picks": [{"name": "XZFS", "score": 3}, {"name": "BIUB", "score": 3}, {"name": "OWCI", "score": 3}, {"name": "MLUI", "score": 3}, {"name": "HHQQ", "score": 2}], "reason": "These are Stage 4 charts with price below a declining 30-week MA, negative RS and a recent breakdown, but several are already extended or have bounced, so none is a textbook entry."}

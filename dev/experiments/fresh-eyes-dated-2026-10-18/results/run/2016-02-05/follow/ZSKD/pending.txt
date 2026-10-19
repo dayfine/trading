@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2016-02-12
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/ZSKD-2016-02-12-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/ZSKD-2016-02-12-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/ZSKD-2016-02-12.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/market/MARKET-2016-02-12-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/market/MARKET-2016-02-12-5y.png
+cut: 2016-02-12
+position: none
+order: none
+since the last checkpoint: shorted 2016-02-08; stopped 2016-02-12; 
+closed trades: 1
+  short 2016-02-08 -> 2016-02-12 (stop) return -9.2%

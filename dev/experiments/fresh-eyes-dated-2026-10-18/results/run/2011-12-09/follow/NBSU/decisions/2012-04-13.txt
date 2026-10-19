@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Price is above a still-rising 30-week MA in Stage 2, and the early-2012 dip looks like about 7%, short of the 8–10% correction that would justify raising the stop, so it stays at 36.39 despite the RS fading toward zero."}

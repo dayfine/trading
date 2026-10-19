@@ -1,0 +1,1 @@
+{"stage": 4, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "IFFZ is in Stage 4 in a bearish market, but at 35 it is about 32% below its falling 30-week MA, and a protective stop above the 39.5 rally peak would put more than 20% at risk on a break of the low near 32, so I pass."}

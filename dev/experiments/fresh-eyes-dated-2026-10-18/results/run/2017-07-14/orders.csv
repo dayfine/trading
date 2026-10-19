@@ -1,0 +1,4 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+HASN,AMGN,buy_stop,183.5,187.0,159.88,3
+AOGL,SNV,buy_stop,45.6,46.5,40.88,2
+NXAI,ILG,buy_stop,30.12,30.72,25.88,2

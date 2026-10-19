@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2005-07-08
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/VZQP-2005-07-08-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/VZQP-2005-07-08-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/VZQP-2005-07-08.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/market/MARKET-2005-07-08-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2005-01-07/pages/market/MARKET-2005-07-08-5y.png
+cut: 2005-07-08
+position: none
+order: none
+since the last checkpoint: stopped 2005-07-07; 
+closed trades: 1
+  long 2005-01-10 -> 2005-07-07 (stop) return -10.2%

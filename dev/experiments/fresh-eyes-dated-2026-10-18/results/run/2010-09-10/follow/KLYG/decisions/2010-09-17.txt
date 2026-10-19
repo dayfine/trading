@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"The position was just entered on a Stage 2 breakout to new highs above a rising 30-week MA with positive RS, and there has been no 8-10% correction yet, so the initial 42.88 stop stays."}

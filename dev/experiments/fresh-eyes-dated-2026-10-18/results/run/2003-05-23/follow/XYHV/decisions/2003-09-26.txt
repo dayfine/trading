@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":7.38,"reason":"Stage 2 is intact, with price well above a rising 30-week MA (7.76) and strong RS, so I raise the stop to just under the MA after the summer correction and give this week's wide, heavy-volume down week room."}

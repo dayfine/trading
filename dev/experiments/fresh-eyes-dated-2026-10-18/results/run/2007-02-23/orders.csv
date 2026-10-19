@@ -1,0 +1,4 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+NXDP,ACV_old,buy_stop,23.72,24.2,21.88,3
+LFPM,CMI,buy_stop,146.70,149.60,133.88,3
+EHDQ,GPC,buy_stop,50.85,51.6,46.88,2

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 48.88, "reason": "KLYG is in Stage 2 above a rising 30-week MA with positive RS; its June pullback of about 7–8% is back near the high and the S&P sits just below its flattening MA, so I raise the stop to just under the lower of that pullback low and the 30-week MA, below the 49 round number."}

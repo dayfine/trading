@@ -1,0 +1,1 @@
+{"stage": 4, "action": "set_stop", "stop": 12.12, "reason": "The stock is still in Stage 4 below a falling 30-week MA (11.69); the rally from about 5.8 to about 10.5 has peaked and price is heading back toward the low, so the buy-stop moves down to just above the higher of that rally peak and the MA, adjusted above the round 12."}

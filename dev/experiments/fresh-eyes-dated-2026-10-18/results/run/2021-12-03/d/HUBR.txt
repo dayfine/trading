@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 1, "reason": "HUBR is about 120% above its 30-week MA after nearly doubling in one week, and its pinned 59.0-59.2 weekly range looks like a takeover; the rule card bars entries this overextended, and no sensible stop is within 15%."}

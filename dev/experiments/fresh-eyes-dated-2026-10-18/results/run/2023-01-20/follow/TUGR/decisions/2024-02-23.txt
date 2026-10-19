@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"TUGR is in a strong Stage 2: it trades at 1200, well above a rising 30-week MA (940), with RS at +20 and a bullish market; since the stop was set below the last correction low, the stock has not had another 8-10% correction, so the stop stays at 771.51."}

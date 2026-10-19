@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 is intact: price is above a rising 30-week MA and the market is still above its own rising MA; the 11% pullback hasn't rallied back toward the prior high yet, so per the book the 49.67 stop stays until it does."}

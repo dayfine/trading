@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "The market is bullish and JHIZ is in strong Stage 2, but at 42.66 it is about 18% above its ~36 breakout and 28% above the 30-week MA, so a sensible stop under the breakout would be more than 15% away; it is overextended, so wait for a pullback or a new base."}

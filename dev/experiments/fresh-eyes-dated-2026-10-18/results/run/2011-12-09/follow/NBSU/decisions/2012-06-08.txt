@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":36.88,"reason":"Price is above a slowly rising 30-week MA, and after a roughly 10% spring correction (low near 37.5, read from the chart, so approximate) it has rallied back near its prior high, so I raise the stop to just under that low and the 37 round number."}

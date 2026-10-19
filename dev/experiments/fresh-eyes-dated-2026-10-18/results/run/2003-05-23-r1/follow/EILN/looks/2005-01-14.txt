@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Stage 2 is intact: price is pulling back to a 30-week MA that is still rising, and RS is still above zero; the current pullback of about 14% hasn't finished or rallied back toward the high, so the 22.88 stop stays."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Strong Stage 2 above a rising 30-week MA (1295 vs 1158) with positive RS and the S&P bullish; there has been no new 8-10% correction since the stop was set, so the stop stays at 771.51."}

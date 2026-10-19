@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 is intact: price is above a rising 30-week MA with positive RS, and the current pullback from 16.2 is under 8% and not finished, so there is no new correction low to raise the 12.18 stop to yet."}

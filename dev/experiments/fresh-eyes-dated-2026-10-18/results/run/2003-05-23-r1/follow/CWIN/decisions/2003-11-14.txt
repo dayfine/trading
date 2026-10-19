@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":58.88,"reason":"Stage 2 holds above a rising 30-week MA (63.0); the stock has rallied back near its high after a roughly 9-10% correction to about 59.5, so the stop moves just under that low and below the round number 59, though the slightly negative, sagging RS is worth watching."}

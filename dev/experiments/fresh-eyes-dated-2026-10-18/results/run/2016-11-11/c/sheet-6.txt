@@ -1,0 +1,1 @@
+{"picks": [{"name": "RSDV", "score": 4}, {"name": "RNYG", "score": 4}, {"name": "HTFQ", "score": 3}, {"name": "YAMF", "score": 3}, {"name": "JTCG", "score": 3}], "reason": "These names are breaking out to new highs above a rising 30-week MA with RS improving and volume rising, and none looks too extended."}

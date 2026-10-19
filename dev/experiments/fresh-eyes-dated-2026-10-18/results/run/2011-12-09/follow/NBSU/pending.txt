@@ -1,0 +1,10 @@
+RUN FINISHED
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2011-12-09/pages/NBSU-2013-12-18-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2011-12-09/pages/NBSU-2013-12-18-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2011-12-09/pages/NBSU-2013-12-18.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2011-12-09/pages/market/MARKET-2013-12-18-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2011-12-09/pages/market/MARKET-2013-12-18-5y.png
+cut: 2013-12-18
+run: finished
+position: none
+order: none
+closed trades: 1
+  long 2011-12-21 -> 2013-12-18 (open_at_end) return +31.1%

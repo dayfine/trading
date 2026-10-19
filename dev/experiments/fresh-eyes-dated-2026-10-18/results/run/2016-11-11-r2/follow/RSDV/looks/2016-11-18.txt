@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "This is a fresh Stage 2 breakout to all-time highs on heavy volume, with a rising MA and strong RS, and there has been no 8-10% correction yet, so the initial 71.88 stop stays."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 44.88, "reason": "Stage 2 breakout to new highs above a rising 30-week MA (47.2) with positive RS, after an 8-10% correction from about 49.5 to an estimated chart-read low near 45, so the stop goes just under that correction low and the 45 round number."}

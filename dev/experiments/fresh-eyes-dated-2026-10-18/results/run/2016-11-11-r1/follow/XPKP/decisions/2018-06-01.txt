@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":48.88,"reason":"Still Stage 2 above a rising 30-week MA; the early-2018 correction of about 15% bottomed near 49.5 and price has rallied back near the prior high, so the stop moves up to just under that low and the round number 49."}

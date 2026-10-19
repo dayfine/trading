@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":26.88,"reason":"Strong Stage 2 with price above a rising MA and positive RS; after a roughly 8% correction the stock has rallied to new highs, so I raise the stop to just under the lower of the correction low and the 30-week MA (27.16), below the whole number."}

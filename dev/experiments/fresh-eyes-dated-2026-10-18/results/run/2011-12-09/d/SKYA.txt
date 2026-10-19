@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "SKYA is in Stage 2 and making all-time highs, but the market is in caution (SPY sits just above a flat 30-week MA), the breakout lacks clear 2x volume, price is already about 12% above the MA, and a stop under the 35 support would be over 15% away, so it is not A+."}

@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"XPKP is in Stage 2, closing at 52.65 above a rising 30-week MA (48.6) with positive RS; the latest pullback was only about 5%, short of the 8-10% the book needs before raising the stop, so it stays at 44.68."}

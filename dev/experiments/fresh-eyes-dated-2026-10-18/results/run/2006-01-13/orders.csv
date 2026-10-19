@@ -1,0 +1,3 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+PGOL,CASC1,buy_stop,52.75,53.8,46.88,3
+LTVG,NC,buy_stop,128.66,131.2,120.88,3

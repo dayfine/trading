@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":60.88,"reason":"Price has moved sideways near a 30-week MA that is flattening after a big advance, and relative strength is negative and falling, so I'm calling this an early Stage 3 top and raising the stop to just under the recent correction lows near 61, below the round number."}

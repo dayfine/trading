@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Late Stage 2, about 16% above the 30-week MA; RS is below its Oct peak while price makes a new high, volume shows no expansion, and the S&P sits on a flat MA (caution), so this is not an A+ continuation setup."}

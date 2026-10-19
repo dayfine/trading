@@ -1,0 +1,1 @@
+{"picks": [{"name": "SKLQ", "score": 4}, {"name": "APGX", "score": 4}, {"name": "IDRM", "score": 4}, {"name": "WAGS", "score": 3}, {"name": "LSND", "score": 3}], "reason": "These had Stage 3 tops with a flat or rolling MA, and they are now breaking support with weakening RS. Stocks already far below a declining MA, such as WATX, EDFH, BQSK and RERZ, are too extended to short."}

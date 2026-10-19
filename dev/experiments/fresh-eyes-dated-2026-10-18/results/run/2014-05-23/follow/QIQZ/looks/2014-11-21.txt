@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 59.88, "reason": "The stock is in Stage 2 at a new high of 70.31, above a rising 30-week MA at 64.03, after an October pullback of about 10% to roughly 60.5 at the MA, so the stop moves up to just under that correction low and the 60 round number."}

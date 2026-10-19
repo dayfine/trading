@@ -1,0 +1,1 @@
+{"picks": [{"name": "WBRT", "score": 4}, {"name": "IVWT", "score": 3}, {"name": "FXRH", "score": 3}, {"name": "CKSC", "score": 3}, {"name": "NAKW", "score": 2}], "reason": "These show Stage 2 breakouts or advances above a rising MA with positive RS and volume expansion; the others are in Stage 3 or 4, have negative RS, or are too extended."}

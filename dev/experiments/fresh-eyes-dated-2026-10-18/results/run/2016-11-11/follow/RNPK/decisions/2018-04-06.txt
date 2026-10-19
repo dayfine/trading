@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2 holds with the 30-week MA still rising (close 14.56 vs MA 14.50); the current ~12% pullback from the 16.3 high has not yet rallied back toward that high, so by the book the 12.01 stop stays where it is."}

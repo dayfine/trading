@@ -1,0 +1,1 @@
+{"picks": [{"name": "GXPR", "score": 4}, {"name": "UIAE", "score": 3}, {"name": "MHUF", "score": 3}, {"name": "EWYG", "score": 2}], "reason": "These are Stage 2 names at or breaking to new highs above a rising 30-week MA with positive and improving RS; GXPR is the cleanest breakout, UIAE is a bit extended, and MHUF and EWYG are continuation setups."}

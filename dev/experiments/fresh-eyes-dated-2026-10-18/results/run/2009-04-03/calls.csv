@@ -1,0 +1,2 @@
+role,label,model,input,cache_read,cache_creation,output,cost_usd,wall_s,turns
+A,a,claude-opus-5-5,2,25084,9269,528,0.08973679999999999,8,1

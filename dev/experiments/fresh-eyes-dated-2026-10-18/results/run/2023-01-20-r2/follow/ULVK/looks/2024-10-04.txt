@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "stop": null, "reason": "Stage 2 holds: price is above a rising 30-week MA and the market is bullish, and the current dip from about 40 has not finished or rallied back to the high, so the stop stays at 30.88, below the summer correction low."}

@@ -1,0 +1,10 @@
+DECISION NEEDED at cut 2016-03-04
+stock pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/QXRR-2016-03-04-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/QXRR-2016-03-04-5y.png
+last bar: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/QXRR-2016-03-04.json
+market pages: /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/market/MARKET-2016-03-04-full.png /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/2016-02-05/pages/market/MARKET-2016-03-04-5y.png
+cut: 2016-03-04
+position: none
+order: none
+since the last checkpoint: stopped 2016-03-03; 
+closed trades: 1
+  short 2016-02-09 -> 2016-03-03 (stop) return -9.0%

@@ -1,0 +1,1 @@
+{"action":"none","stop":"","reason":"Stage 2: price 18.74 is above a rising 30-week MA (17.89), RS just turned positive and the S&P is still in Stage 2; the recent ~7% dip is below the 8-10% correction that would justify raising the investor stop, so it stays at 15.26."}

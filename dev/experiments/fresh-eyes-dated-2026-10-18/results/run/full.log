@@ -1,0 +1,25 @@
+run.sh: 2000-10-20 exit 0 wall 311s calls 19
+run.sh: 2002-02-22 already done
+run.sh: 2001-08-31 exit 0 wall 505s calls 28
+run.sh: 2005-01-07 exit 0 wall 534s calls 32
+run.sh: 2003-05-23 exit 0 wall 907s calls 51
+run.sh: 2006-01-13 exit 0 wall 418s calls 22
+run.sh: 2007-02-23 exit 0 wall 448s calls 27
+run.sh: 2007-12-14 exit 0 wall 284s calls 17
+run.sh: 2009-04-03 exit 0 wall 10s calls 1
+run.sh: 2009-01-16 exit 0 wall 514s calls 18
+run.sh: 2011-12-09 exit 0 wall 783s calls 30
+run.sh: 2010-09-10 exit 0 wall 1236s calls 46
+run.sh: 2013-08-30 exit 0 wall 340s calls 22
+run.sh: 2012-12-14 exit 0 wall 570s calls 38
+run.sh: 2014-05-23 exit 0 wall 439s calls 28
+run.sh: 2016-02-05 exit 0 wall 361s calls 19
+run.sh: 2017-07-14 already done
+run.sh: 2018-09-07 exit 0 wall 285s calls 19
+run.sh: 2019-11-01 exit 0 wall 264s calls 17
+run.sh: 2021-01-01 exit 0 wall 272s calls 17
+run.sh: 2016-11-11 exit 0 wall 1050s calls 63
+run.sh: 2021-12-03 exit 0 wall 255s calls 17
+run.sh: 2023-01-20 exit 0 wall 489s calls 30
+run.sh: 2024-01-26 exit 0 wall 380s calls 25
+run.sh: compare -> /Users/difan/Projects/trading-1/.sweep-output/fresh-eyes-dated/run/compare/report.txt

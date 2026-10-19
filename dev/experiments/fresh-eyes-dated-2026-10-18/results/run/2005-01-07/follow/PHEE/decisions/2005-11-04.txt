@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":26.88,"reason":"Still Stage 2 above a rising MA (27.7); after the 15-20% pullback from the ~36 high, price is climbing back, so I raise the stop to just under the 30-week MA and below the whole number 27, at 26.88."}

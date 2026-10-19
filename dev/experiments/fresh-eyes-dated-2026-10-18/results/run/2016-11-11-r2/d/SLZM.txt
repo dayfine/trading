@@ -1,0 +1,1 @@
+{"stage": 2, "action": "none", "trigger": null, "limit": null, "stop": null, "conviction": 2, "reason": "Stage 2 with strong RS, but at 31 the price is about 43% above its rising 30-week MA and well past the breakout from the ~25 base, with no consolidation near the MA and old 2006-2011 resistance in the 30s-40 overhead, so wait for a new base instead of chasing."}

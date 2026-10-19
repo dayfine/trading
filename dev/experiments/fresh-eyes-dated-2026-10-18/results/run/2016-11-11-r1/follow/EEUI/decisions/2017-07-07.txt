@@ -1,0 +1,1 @@
+{"action":"set_stop","stop":55.88,"reason":"The 30-week MA has flattened after a big advance, price closed below it (58.20 vs 58.96), and RS is negative and falling, so per Stage 3 rules I tighten the stop to just under the 2017 correction low, which I estimate from the chart at about 56."}

@@ -1,0 +1,1 @@
+{"stage": 3, "action": "set_stop", "stop": 69.88, "reason": "The 30-week MA has flattened near 74.9 after a big advance and price is below it, so this looks like Stage 3; tighten the stop to just under the roughly 70 correction low and below the round number."}

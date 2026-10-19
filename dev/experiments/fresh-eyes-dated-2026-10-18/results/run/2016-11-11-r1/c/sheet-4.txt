@@ -1,0 +1,1 @@
+{"picks": [{"name": "UPZB", "score": 4}, {"name": "SRSP", "score": 4}, {"name": "VDAK", "score": 3}, {"name": "KKMY", "score": 3}, {"name": "FNHZ", "score": 3}], "reason": "These are Stage 2 stocks above rising 30-week MAs with strong RS and breakouts or new highs, led by UPZB's multi-year breakout and SRSP's heavy-volume range breakout."}

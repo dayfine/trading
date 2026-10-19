@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 43.88, "reason": "Stage 2 with price above a rising 30-week MA and RS above zero; the roughly 10% Dec–Feb correction is over and price is back near its high, so raise the stop under the lower of the correction low (about 44) and the MA (44.49), below the round number."}

@@ -1,0 +1,1 @@
+{"stage": 2, "action": "set_stop", "stop": 28.88, "reason": "Stage 2 holds: price is above a rising 30-week MA with positive RS; after the roughly 10% June correction (low read from the chart, near 29.5) the stock made a new high, so the stop goes just under that low, which is below the MA, and under the round number 29."}

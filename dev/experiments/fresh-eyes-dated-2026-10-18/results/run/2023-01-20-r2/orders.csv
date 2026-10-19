@@ -1,0 +1,4 @@
+pseudo,symbol,action,trigger,limit,stop,conviction
+ULVK,AXAHY,buy_stop,31.25,31.9,26.88,3
+FCOJ,GLNCY,buy_stop,14.42,14.70,12.38,3
+YCOV,IEX,buy_stop,242.0,247.0,217.88,2
