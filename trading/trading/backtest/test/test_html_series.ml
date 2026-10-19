@@ -54,10 +54,12 @@ let test_extra_of_present_key_returns_entry _ =
 
 let _start = _date "2018-01-01"
 
-(* Stub: [total] weekly bars from [_start], close at index [i] = [i + 1]. *)
-let _stub total ~symbol:_ ~n:_ ~as_of:_ =
-  Array.init total ~f:(fun i ->
-      (Date.add_days _start (7 * i), Float.of_int (i + 1)))
+(* Stub: [total] weekly bars from [_start] (filtered to <= as_of), close at index [i] = [i + 1]. *)
+let _stub total ~symbol:_ ~n:_ ~as_of =
+  Array.filter
+    ~f:(fun (d, _) -> Date.( <= ) d as_of)
+    (Array.init total ~f:(fun i ->
+         (Date.add_days _start (7 * i), Float.of_int (i + 1))))
 
 let _extra : Src.trade_extra =
   { qty = 1.0; stop_kind = ""; entry_stop = Some 90.0; exit_stop = Some 120.0 }
@@ -76,6 +78,10 @@ let test_series_window_indices_and_stops _ =
               (fun (s : Trade_audit_html.Html_data.trade_series) ->
                 List.hd_exn s.dates)
               (equal_to (_date "2019-06-03"));
+            field
+              (fun (s : Trade_audit_html.Html_data.trade_series) ->
+                List.last_exn s.dates)
+              (equal_to (_date "2021-03-08"));
             field
               (fun (s : Trade_audit_html.Html_data.trade_series) -> s.entry_idx)
               (equal_to 52);
