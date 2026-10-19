@@ -21,7 +21,7 @@
     the ex-date starts — i.e. it was held at the prior close, the economic
     record condition. A buy that fills on the ex-date itself gets nothing; a
     sale that fills on the ex-date still gets it. The credit for step [date]
-    covers every ex-date in [(previous credited step, date)\], so an ex-date on
+    covers every ex-date in [(previous credited step, date]], so an ex-date on
     a day without a step (a skipped weekend or holiday) is credited on the next
     step.
 
@@ -59,7 +59,7 @@ val step :
   Trading_portfolio.Portfolio.t ->
   Trading_portfolio.Portfolio.t Status.status_or
 (** Credit / charge every held position for the ex-dates in
-    [(last credited date, date)\] (never before [start_date]). [None], or a
+    [(last credited date, date]] (never before [start_date]). [None], or a
     [date] already covered, returns the portfolio unchanged. [Error] when a
     dividend file cannot be read for a reason other than [NotFound]. *)
 

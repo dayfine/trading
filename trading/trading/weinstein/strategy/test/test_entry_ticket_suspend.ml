@@ -853,7 +853,7 @@ let _sim_config =
     }
 
 (** Run the six-bar simulation under [mode] and return its steps. The
-    simulator steps every calendar day in [start_date, end_date\], so the
+    simulator steps every calendar day in [start_date, end_date), so the
     01-06/01-07 weekend appears as two bar-less steps. *)
 let _simulate ?(bars = _sim_bars) mode =
   let data_dir = Core_unix.mkdtemp "/tmp/test_entry_ticket_suspend" in
