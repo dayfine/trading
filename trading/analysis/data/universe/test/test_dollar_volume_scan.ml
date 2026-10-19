@@ -177,8 +177,20 @@ let test_render_sections _ =
          _contains "| AMZN | 2018-06-14 | 20 | 1 | 20.000 |";
          _contains "| [0.00, 0.25) | 1 |";
          _contains "| 2018 | 1 | 1 | 1 | 100.0% | 0 | n/a | 0 |";
-         _contains "| 2018 | 4 | 1 | 0 | 25.0% | 1 | 0 | 2 | 0 | 0 |";
-       ])
+         _contains
+           "## Entry liquidity gate flips ($1000000 floor, week-end bars of \
+            list members)\n\n\
+            | year | symbol-weeks | pass->fail | fail->pass | flip share | \
+            symbols pass->fail | symbols fail->pass | one-bar passes stored | \
+            one-bar passes true | fail->pass on one bar |\n\
+            |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n\
+            | 2018 | 4 | 1 | 0 | 25.0% | 1 | 0 | 2 | 0 | 0 |\n\n";
+       ]);
+  assert_that
+    (Report.liquidity_csv scans)
+    (equal_to
+       "symbol,year,weeks,pass_to_fail,fail_to_pass,one_bar_stored,one_bar_true,fail_to_pass_one_bar\n\
+        A,2018,4,1,0,2,0,0\n")
 
 (* Succeeds on the third attempt; gives up after three. *)
 let test_retry_read _ =
