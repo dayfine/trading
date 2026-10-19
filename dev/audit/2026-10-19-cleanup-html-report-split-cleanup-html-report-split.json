@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-19",
+  "feature": "cleanup-html-report-split",
+  "branch": "cleanup/html-report-split",
+  "sha": "b645071c0786eb959f224487242b4efd3cd69ff0",
+  "recorded_at_ns": 1792449312392853699,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
