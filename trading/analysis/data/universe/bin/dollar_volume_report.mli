@@ -61,3 +61,7 @@ val render :
 val rejected_csv : Dollar_volume_scan.t list -> string
 (** [rejected_csv scans] lists every rejected bar as
     [symbol,date,close,volume,true_dollar_volume]. *)
+
+val liquidity_csv : Dollar_volume_scan.t list -> string
+(** [liquidity_csv scans] lists symbol-years with a flip or a one-bar pass,
+    including week counts and the per-basis one-bar counts. *)

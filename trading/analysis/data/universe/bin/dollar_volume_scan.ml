@@ -13,7 +13,16 @@ type params = {
 }
 
 type year_score = { year : int; legacy : float option; truth : float option }
-type liquidity_year = { cal_year : int; weeks : int; lost : int; gained : int }
+
+type liquidity_year = {
+  cal_year : int;
+  weeks : int;
+  lost : int;
+  gained : int;
+  stored_one_bar : int;
+  true_one_bar : int;
+  gained_one_bar : int;
+}
 
 type t = {
   symbol : string;
@@ -54,34 +63,86 @@ let _is_week_end bars i =
   || Day_of_week.iso_8601_weekday_number (Date.day_of_week next)
      <= Day_of_week.iso_8601_weekday_number (Date.day_of_week cur)
 
-let _bump table ~cal_year ~lost ~gained =
+(* One week-end's gate reading on both bases: [pass] at the floor, and
+   [one_bar] when that pass rests on the window's largest bar. *)
+type _week = {
+  stored_pass : bool;
+  true_pass : bool;
+  stored_one : bool;
+  true_one : bool;
+}
+
+let _count b = if b then 1 else 0
+
+let _empty_year cal_year =
+  {
+    cal_year;
+    weeks = 0;
+    lost = 0;
+    gained = 0;
+    stored_one_bar = 0;
+    true_one_bar = 0;
+    gained_one_bar = 0;
+  }
+
+let _bump table ~cal_year w =
   Hashtbl.update table cal_year ~f:(fun prev ->
-      let p =
-        Option.value prev ~default:{ cal_year; weeks = 0; lost = 0; gained = 0 }
-      in
+      let p = Option.value prev ~default:(_empty_year cal_year) in
       {
         p with
         weeks = p.weeks + 1;
-        lost = (p.lost + if lost then 1 else 0);
-        gained = (p.gained + if gained then 1 else 0);
+        lost = p.lost + _count (w.stored_pass && not w.true_pass);
+        gained = p.gained + _count ((not w.stored_pass) && w.true_pass);
+        stored_one_bar = p.stored_one_bar + _count w.stored_one;
+        true_one_bar = p.true_one_bar + _count w.true_one;
+        gained_one_bar =
+          p.gained_one_bar + _count ((not w.stored_pass) && w.true_one);
       })
 
-let _dv_sums basis ~splits bars =
-  Array.map bars ~f:(DVB.bar_dollar_volume basis ~splits) |> _prefix_sums
+(* Daily dollar volumes on one basis, with their prefix sums. *)
+type _series = { dvs : float array; sums : float array }
+
+let _series basis ~splits bars =
+  let dvs = Array.map bars ~f:(DVB.bar_dollar_volume basis ~splits) in
+  { dvs; sums = _prefix_sums dvs }
+
+(* The mean of the window ending at [i] without its largest bar, over the
+   other bars; [None] for a one-bar window. *)
+let _mean_without_max s ~lookback i =
+  let lo = Int.max 0 (i + 1 - lookback) in
+  let n = i + 1 - lo in
+  if n < 2 then None
+  else
+    let top =
+      Array.fold (Array.sub s.dvs ~pos:lo ~len:n) ~init:0.0 ~f:Float.max
+    in
+    Some ((s.sums.(i + 1) -. s.sums.(lo) -. top) /. Float.of_int (n - 1))
+
+(* Pass at the floor, and whether the pass would fail without the window's
+   largest bar (the mean admitting a name on one bar, #3136 O2). *)
+let _read params s i =
+  let lookback = params.liquidity_lookback_bars in
+  let floor = params.liquidity_floor in
+  let pass = Float.(_trailing_mean s.sums ~lookback i >= floor) in
+  let one =
+    pass
+    &&
+    match _mean_without_max s ~lookback i with
+    | Some m -> Float.(m < floor)
+    | None -> false
+  in
+  (pass, one)
 
 let liquidity_flips params ~splits ~is_member bars =
-  let legacy = _dv_sums DVB.Close_times_volume ~splits bars in
-  let truth = _dv_sums DVB.True_dollars ~splits bars in
-  let lookback = params.liquidity_lookback_bars in
+  let legacy = _series DVB.Close_times_volume ~splits bars in
+  let truth = _series DVB.True_dollars ~splits bars in
   let table = Hashtbl.create (module Int) in
   Array.iteri bars ~f:(fun i (b : BR.bar) ->
       if _is_week_end bars i && is_member (governing_list_year b.date) then
-        let pass sums =
-          Float.(_trailing_mean sums ~lookback i >= params.liquidity_floor)
-        in
-        let p_legacy = pass legacy and p_true = pass truth in
-        _bump table ~cal_year:(Date.year b.date) ~lost:(p_legacy && not p_true)
-          ~gained:((not p_legacy) && p_true));
+        let stored_pass, stored_one = _read params legacy i in
+        let true_pass, true_one = _read params truth i in
+        _bump table ~cal_year:(Date.year b.date)
+          { stored_pass; true_pass; stored_one; true_one });
   Hashtbl.data table
   |> List.sort ~compare:(fun a b -> Int.compare a.cal_year b.cal_year)
 

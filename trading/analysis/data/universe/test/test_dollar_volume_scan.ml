@@ -78,7 +78,15 @@ let test_liquidity_flips_counts_member_weeks _ =
     (elements_are
        [
          equal_to
-           ({ cal_year = 2019; weeks = 2; lost = 2; gained = 0 }
+           ({
+              cal_year = 2019;
+              weeks = 2;
+              lost = 2;
+              gained = 0;
+              stored_one_bar = 0;
+              true_one_bar = 0;
+              gained_one_bar = 0;
+            }
              : Scan.liquidity_year);
        ])
 
@@ -144,7 +152,18 @@ let test_render_sections _ =
     {
       (_scan "A" (_ys 100.0 5.0)) with
       volume_jump_shares = [ 0.1 ];
-      liquidity = [ { cal_year = 2018; weeks = 4; lost = 1; gained = 0 } ];
+      liquidity =
+        [
+          {
+            cal_year = 2018;
+            weeks = 4;
+            lost = 1;
+            gained = 0;
+            stored_one_bar = 2;
+            true_one_bar = 0;
+            gained_one_bar = 0;
+          };
+        ];
     }
   in
   let scans = [ scan; _scan "B" (_ys 50.0 50.0) ] in
@@ -158,8 +177,20 @@ let test_render_sections _ =
          _contains "| AMZN | 2018-06-14 | 20 | 1 | 20.000 |";
          _contains "| [0.00, 0.25) | 1 |";
          _contains "| 2018 | 1 | 1 | 1 | 100.0% | 0 | n/a | 0 |";
-         _contains "| 2018 | 4 | 1 | 0 | 25.0% | 1 | 0 |";
-       ])
+         _contains
+           "## Entry liquidity gate flips ($1000000 floor, week-end bars of \
+            list members)\n\n\
+            | year | symbol-weeks | pass->fail | fail->pass | flip share | \
+            symbols pass->fail | symbols fail->pass | one-bar passes stored | \
+            one-bar passes true | fail->pass on one bar |\n\
+            |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n\
+            | 2018 | 4 | 1 | 0 | 25.0% | 1 | 0 | 2 | 0 | 0 |\n\n";
+       ]);
+  assert_that
+    (Report.liquidity_csv scans)
+    (equal_to
+       "symbol,year,weeks,pass_to_fail,fail_to_pass,one_bar_stored,one_bar_true,fail_to_pass_one_bar\n\
+        A,2018,4,1,0,2,0,0\n")
 
 (* Succeeds on the third attempt; gives up after three. *)
 let test_retry_read _ =
@@ -188,6 +219,124 @@ let test_rejected_csv _ =
     (equal_to
        "symbol,date,close,volume,true_dollar_volume\nX,1999-01-04,2,3,6\n")
 
+let test_liquidity_flips_one_bar_pass _ =
+  let bars =
+    Array.of_list
+      [
+        _bar "2019-06-10" 10.0 20000.0;
+        _bar "2019-06-11" 10.0 20000.0;
+        _bar "2019-06-12" 10.0 300000.0;
+      ]
+  in
+  let splits : CA.split list = [ { date = _d "2024-01-02"; factor = 2.0 } ] in
+  assert_that
+    (Scan.liquidity_flips
+       (_params ~liquidity_lookback_bars:3 ())
+       ~splits
+       ~is_member:(fun _ -> true)
+       bars)
+    (elements_are
+       [
+         equal_to
+           ({
+              cal_year = 2019;
+              weeks = 1;
+              lost = 1;
+              gained = 0;
+              stored_one_bar = 1;
+              true_one_bar = 0;
+              gained_one_bar = 0;
+            }
+             : Scan.liquidity_year);
+       ])
+
+let test_liquidity_flips_gained_on_one_bar _ =
+  let bars =
+    Array.of_list
+      [
+        _bar "2019-06-10" 10.0 2000.0;
+        _bar "2019-06-11" 10.0 2000.0;
+        _bar "2019-06-12" 10.0 30000.0;
+      ]
+  in
+  let splits : CA.split list = [ { date = _d "2024-01-02"; factor = 0.1 } ] in
+  assert_that
+    (Scan.liquidity_flips
+       (_params ~liquidity_lookback_bars:3 ())
+       ~splits
+       ~is_member:(fun _ -> true)
+       bars)
+    (elements_are
+       [
+         equal_to
+           ({
+              cal_year = 2019;
+              weeks = 1;
+              lost = 0;
+              gained = 1;
+              stored_one_bar = 0;
+              true_one_bar = 1;
+              gained_one_bar = 1;
+            }
+             : Scan.liquidity_year);
+       ])
+
+(* A one-bar pass on both bases is not a fail->pass. No split changes the
+   basis here: the same large print supports both passes. *)
+let test_liquidity_flips_one_bar_pass_on_both_bases _ =
+  let bars =
+    Array.of_list
+      [
+        _bar "2019-06-10" 10.0 20000.0;
+        _bar "2019-06-11" 10.0 20000.0;
+        _bar "2019-06-12" 10.0 300000.0;
+      ]
+  in
+  assert_that
+    (Scan.liquidity_flips
+       (_params ~liquidity_lookback_bars:3 ())
+       ~splits:[]
+       ~is_member:(fun _ -> true)
+       bars)
+    (elements_are
+       [
+         equal_to
+           ({
+              cal_year = 2019;
+              weeks = 1;
+              lost = 0;
+              gained = 0;
+              stored_one_bar = 1;
+              true_one_bar = 1;
+              gained_one_bar = 0;
+            }
+             : Scan.liquidity_year);
+       ])
+
+let test_liquidity_csv _ =
+  let year : Scan.liquidity_year =
+    {
+      cal_year = 2004;
+      weeks = 52;
+      lost = 3;
+      gained = 0;
+      stored_one_bar = 0;
+      true_one_bar = 0;
+      gained_one_bar = 0;
+    }
+  in
+  let scan =
+    {
+      (_scan "X" []) with
+      liquidity = [ year; { year with cal_year = 2005; lost = 0 } ];
+    }
+  in
+  assert_that
+    (Report.liquidity_csv [ scan ])
+    (equal_to
+       "symbol,year,weeks,pass_to_fail,fail_to_pass,one_bar_stored,one_bar_true,fail_to_pass_one_bar\n\
+        X,2004,52,3,0,0,0,0\n")
+
 let suite =
   "Dollar_volume_scan"
   >::: [
@@ -198,6 +347,13 @@ let suite =
          "test_membership_row_diffs_bases" >:: test_membership_row_diffs_bases;
          "test_render_sections" >:: test_render_sections;
          "test_retry_read" >:: test_retry_read;
+         "test_liquidity_flips_one_bar_pass"
+         >:: test_liquidity_flips_one_bar_pass;
+         "test_liquidity_flips_gained_on_one_bar"
+         >:: test_liquidity_flips_gained_on_one_bar;
+         "test_liquidity_flips_one_bar_pass_on_both_bases"
+         >:: test_liquidity_flips_one_bar_pass_on_both_bases;
+         "test_liquidity_csv" >:: test_liquidity_csv;
          "test_rejected_csv" >:: test_rejected_csv;
        ]
 

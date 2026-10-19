@@ -117,7 +117,10 @@
 
 (library
  (name dollar_volume_measurement_lib)
- (modules dollar_volume_scan dollar_volume_report)
+ (modules
+  dollar_volume_scan
+  dollar_volume_report
+  dollar_volume_liquidity_report)
  (libraries core core_unix csv.corporate_actions fpath status universe)
  (preprocess
   (pps ppx_let)))

@@ -208,36 +208,6 @@ let _rejected_summary buf scans =
         (worst s));
   _add buf "\n"
 
-let _liquidity_totals scans =
-  let table = Hashtbl.create (module Int) in
-  List.iter scans ~f:(fun (s : Scan.t) ->
-      List.iter s.liquidity ~f:(fun (l : Scan.liquidity_year) ->
-          Hashtbl.update table l.cal_year ~f:(fun prev ->
-              let w, lo, g, sl, sg =
-                Option.value prev ~default:(0, 0, 0, 0, 0)
-              in
-              ( w + l.weeks,
-                lo + l.lost,
-                g + l.gained,
-                (sl + if l.lost > 0 then 1 else 0),
-                sg + if l.gained > 0 then 1 else 0 ))));
-  Hashtbl.to_alist table
-  |> List.sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
-
-let _liquidity buf ~floor scans =
-  _add buf
-    "## Entry liquidity gate flips ($%.0f floor, week-end bars of committed \
-     top-3000 members)\n\n\
-     | year | symbol-weeks | pass->fail | fail->pass | flip share | symbols \
-     pass->fail | symbols fail->pass |\n\
-     |---|---:|---:|---:|---:|---:|---:|\n"
-    floor;
-  List.iter (_liquidity_totals scans) ~f:(fun (y, (w, lo, g, sl, sg)) ->
-      _add buf "| %d | %d | %d | %d | %s | %d | %d |\n" y w lo g
-        (_pct (lo + g) w)
-        sl sg);
-  _add buf "\n"
-
 let _rank_str = function Some r -> Int.to_string r | None -> "-"
 
 let _split_str splits =
@@ -275,7 +245,7 @@ let render ~liquidity_floor ~rows ~movers_size ~movers_k ~scans ~specimens =
   _split_diag buf scans;
   _headline buf rows;
   _rejected_summary buf scans;
-  _liquidity buf ~floor:liquidity_floor scans;
+  Dollar_volume_liquidity_report.render buf ~floor:liquidity_floor scans;
   _movers_section buf ~size:movers_size ~k:movers_k rows;
   Buffer.contents buf
 
@@ -287,3 +257,5 @@ let rejected_csv scans =
           _add buf "%s,%s,%.17g,%.17g,%.17g\n" s.symbol (Date.to_string b.date)
             b.close b.volume dv));
   Buffer.contents buf
+
+let liquidity_csv = Dollar_volume_liquidity_report.csv
