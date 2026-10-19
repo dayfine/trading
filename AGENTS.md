@@ -53,6 +53,13 @@ this way, and a concurrent Codex `dune build` corrupted the shared dune cache.
 The per-project Codex command policy lives in `.codex/rules/trading.rules`
 (PR #2786); the sandbox is a separate control and should stay on.
 
+## User communication (user directive, 2026-10-19)
+
+Make routine implementation decisions autonomously and document them in the
+PR or issue. Do not interrupt the user with clarification questions. If blocked,
+post the concrete blocker or question on the relevant GitHub issue, where it
+will be answered, and continue unaffected work.
+
 ## Issue assignment protocol (how work is handed to an agent)
 
 GitHub assignees cannot distinguish agents here (every agent runs as the same
