@@ -22,3 +22,43 @@ Helpers for `dev/scripts/review_pack.sh`. POSIX sh + awk + jq; no Python.
 The A–F grade is hindsight (it reads the 65 trading days after the exit); the
 rubric is the 2026-09-04 yearly review's
 (`dev/experiments/yearly-trade-review-2026-09-04/grade.sh`).
+
+## Missed winners (#3140, part 1)
+
+`review_pack.sh` invokes `missed_winners.sh` with the existing `--data-dir` and
+staged run. This one builder call extends the hand-off's file scope because
+published chart shards contain traded names only: they cannot find an unowned
+winner. No snapshot rebuild, container replay or new input flag is needed.
+`missed_winners.awk` scans each available symbol with 30 weeks of warm-up; the
+run window limits signals and forward returns. `missed_audit.awk` streams the
+existing audit's cascade summaries, preserving absent decisions separately from
+an explicitly empty decision list (older audits omit this field).
+
+The card covers the available bar store, which can include names outside the
+run's historical universe; it is not a PIT-universe reconstruction. Each
+qualifying week is an episode. The 26-week high uses adjusted highs; the WMA
+has linear weights 1–30; volume compares weekly totals; ADV is the trailing
+20 available daily bars' adjusted close times stored volume. The forward peak
+is a later weekly close within the window. A daily adjusted-close jump of at
+least +50% or -50% breaks a price segment; signals require 30 weeks of history
+within one segment and cannot earn a forward return across that break. This
+conservative guard can exclude real jumps as well as vendor splices.
+
+The page joins long holdings (including still-open positions) overlapping the
+signal-to-peak interval. Rode/partial/cut use the overlapping closed trade's
+reported return versus half the episode's forward return; still-open holdings
+count as partial. These are hindsight summaries, not a causal capture estimate.
+Screen decisions and macro evidence join by the UTC Monday calendar-week key,
+including weeks that cross 1 January; a Thursday episode can read its Friday
+screen without borrowing evidence from an adjacent week. Miss reasons prefer a
+recorded ticket or skip, then the signal week's Bearish
+macro, then a fully recorded zero-ticket week or absence from the recorded
+screen top-N. The latter does not identify which upstream filter rejected the
+name. Missing screening evidence stays unknown. Zero-ticket weeks below 50%
+invested require both recorded decisions and a known NAV exposure; 10 in a
+year triggers the flag. The card shows the chart run, just like its other
+per-trade panels. Faithfulness and P&L anatomy changes remain outside this PR.
+
+Validation uses a small unowned-symbol store fixture and browser-function
+checks in `review_pack_test.sh`. The full 26-year store is not present in this
+cloud workspace, so that record's counts and runtime remain for local QC.

@@ -172,6 +172,13 @@ ol.agenda li b { font-weight: 600; }
     <p class="note">Each week the macro gate turns Bullish after eight or more non-Bullish weeks is a reopen. The table shows how many entries filled in the next 13 and 26 weeks and what the strategy and SPY made over those 26 weeks. A reopen is flagged when SPY made 8 % or more and the strategy trailed it by 8 pp or more: <b>sat out</b> with two or fewer entries in 13 weeks (the 2008–09 shape: tickets or stops anchored at pre-crash levels), <b>invested and lagged</b> with six or more (a selection shortfall, not a cash one).</p>
     <div class="tablebox"><table id="reopens"></table></div>
   </div>
+  <div class="panel" id="missed-panel">
+    <h2>Missed winners by year</h2>
+    <p class="note" id="missed-note"></p>
+    <p class="note">Each episode closes above the prior 26-week high, on ≥2× the prior four weeks’ volume, above a rising 30-week weighted MA, with ≥$1M trailing 20-day ADV and a later weekly close ≥100% higher before the run ends. Prices use adjusted bars; paths crossing a ≥50% adjusted daily jump are excluded as possible splices. Ownership means a long position overlaps the signal-to-peak interval. Rode: a closed trade earns at least half the forward return; partial: a positive return below that; cut: no positive realised return; still-open positions count as partial. These are hindsight labels. Ten zero-ticket weeks below 50% invested in a year are flagged.</p>
+    <div class="tablebox"><table id="missed-years"></table></div>
+    <div class="tablebox"><table id="missed-buckets"></table></div>
+  </div>
 </section>
 
 <section class="view" id="v-periods" hidden>
@@ -470,10 +477,10 @@ const D = {};
 const load = p => fetch('data/' + p).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); });
 const chartCache = {};
 
-const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open'];
+const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open', 'missed'];
 load('manifest.json').then(man => {
   D.man = man; const ids = man.runs.map(r => r.id);
-  return Promise.all([...KINDS.flatMap(k => ids.map(id => load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json'), load('spy_warmup.json').catch(() => [])]);
+  return Promise.all([...KINDS.flatMap(k => ids.map(id => k === 'missed' ? load(`${id}_${k}.json`).catch(() => null) : load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json'), load('spy_warmup.json').catch(() => [])]);
 }).then(r => {
   const n = D.man.runs.length;
   KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
@@ -505,7 +512,7 @@ function init() {
   const opts = (note) => D.man.runs.map((r, i) => `<option value="${i}">${runLabel(i)} (${pct(D.meta[i].metrics.totalreturnpct, 0)})${note && i !== CH() ? ' · no charts' : ''}</option>`).join('');
   $('#p-salt').innerHTML = opts(false); $('#t-salt').innerHTML = opts(true); $('#t-salt').value = String(CH());
   $('#flags-title').textContent = `Per-trade flags, ${runLabel(CH())}`;
-  labelRunKind(); renderOverview(); renderPeriods(); initTrades(); renderHilo(); renderSurprises(); renderDiag(); renderAnatomy(); renderSalts(); renderAgenda();
+  labelRunKind(); renderOverview(); renderMissedWinners(); renderPeriods(); initTrades(); renderHilo(); renderSurprises(); renderDiag(); renderAnatomy(); renderSalts(); renderAgenda();
   $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
   const h = location.hash.slice(1); if (h && $('#v-' + h)) show(h);
 }
@@ -526,6 +533,50 @@ function mkChart(id, h, v) {
   new ResizeObserver(() => { if (box.clientWidth) c.applyOptions({ width: box.clientWidth }); }).observe(box);
   (resizers[v] = resizers[v] || []).push(() => { if (box.clientWidth) c.applyOptions({ width: box.clientWidth }); c.timeScale().fitContent(); });
   return c;
+}
+
+// Missed-winner episodes are hindsight; reasons use evidence from that screen.
+function missedWinners(data, trades, open, macro, nav) {
+  const at = (rows, d) => rows.filter(r => r[0] <= d).at(-1);
+  const weeks = new Map((data.audit || []).filter(r => r[0] === 'W').map(r => [isoWeek(r[1]), r]));
+  const decisions = new Map((data.audit || []).filter(r => r[0] === 'D').map(r => [isoWeek(r[1]) + '|' + r[2], r[3]]));
+  const macroWeeks = new Map(macro.map(r => [isoWeek(r[0]), r]));
+  const positions = [...trades, ...(open.rows || []).map(t => ({ ...t, xd: '9999-12-31' }))];
+  const episodes = data.episodes.map(e => {
+    const held = positions.filter(t => t.side !== 'SHORT' && t.sym === e.sym && t.ed <= e.peak && t.xd >= e.d);
+    const owned = held.length > 0, gain = Math.max(...held.map(t => t.pct || 0));
+    const capture = !owned ? '' : gain >= e.forward / 2 ? 'rode' : held.some(t => t.xd === '9999-12-31') || gain > 0 ? 'partial' : 'cut';
+    const key = isoWeek(e.d), week = weeks.get(key), decision = decisions.get(key + '|' + e.sym);
+    const invested = at(nav, week?.[1] || e.d)?.[2], trend = (macroWeeks.get(key) || at(macro, e.d))?.[1];
+    let reason = 'unknown (screen evidence absent)';
+    if (owned) reason = capture;
+    else if (decision === 'Placed') reason = 'ticket placed';
+    else if (decision?.startsWith('Skipped')) reason = 'logged skip: ' + decision.slice(8);
+    else if (trend === 'Bearish') reason = 'macro Bearish';
+    else if (week?.[3] === '1' && +week[2] === 0) reason = 'zero-ticket week (' + (invested == null ? 'exposure unknown' : invested < 25 ? '<25% invested' : invested < 50 ? '25–50% invested' : '≥50% invested') + ')';
+    else if (week?.[3] === '1') reason = 'not in recorded top-N';
+    return { ...e, owned, capture, reason };
+  });
+  const zero = [...weeks.values()].filter(w => w[3] === '1' && +w[2] === 0 && at(nav, w[1])?.[2] != null && at(nav, w[1])[2] < 50);
+  const years = [...new Set([...nav.map(r => r[0].slice(0, 4)), ...episodes.map(e => e.d.slice(0, 4))])].sort();
+  return { episodes, years: years.map(y => {
+    const es = episodes.filter(e => e.d.startsWith(y)), misses = es.filter(e => !e.owned);
+    const reasons = [...new Set(misses.map(e => e.reason))].sort().map(r => `${r}: ${misses.filter(e => e.reason === r).length}`).join('; ');
+    return { y, n: es.length, rode: es.filter(e => e.capture === 'rode').length, partial: es.filter(e => e.capture === 'partial').length, cut: es.filter(e => e.capture === 'cut').length, zero: zero.filter(w => w[1].startsWith(y)).length, reasons, top: misses.sort((a, b) => b.forward - a.forward || a.sym.localeCompare(b.sym)).slice(0, 5) };
+  }), buckets: [[100, 200], [200, 500], [500, Infinity]].map(([lo, hi]) => {
+    const es = episodes.filter(e => e.forward >= lo && e.forward < hi);
+    return { lo, hi, n: es.length, owned: es.filter(e => e.owned).length };
+  }) };
+}
+function renderMissedWinners() {
+  const data = D.missed[CH()];
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
+  const row = cells => '<tr>' + cells.map(v => '<td>' + v + '</td>').join('') + '</tr>';
+  if (!data) { $('#missed-note').textContent = 'Missed-winner inputs unavailable; rebuild this pack.'; return; }
+  const r = missedWinners(data, D.trades[CH()], D.open[CH()], D.macro, D.nav[CH()]);
+  $('#missed-note').textContent = `${data.symbols} available bar-store symbols scanned; ${r.episodes.length} qualifying weekly episodes. This covers the available store, which may include names outside the run’s historical universe. No qualifying episodes is distinct from missing inputs. Reasons describe recorded screening evidence; they do not establish a counterfactual fill.`;
+  $('#missed-years').innerHTML = tbl([['Year'], ['Episodes', 1], ['Rode / partial / cut'], ['Miss reasons'], ['Zero tickets, <50% invested', 1], ['Top five misses (forward return, hindsight)']], r.years.map(y => row([y.y, y.n, `${y.rode} / ${y.partial} / ${y.cut}`, esc(y.reasons) || '–', `${y.zero}${y.zero >= 10 ? ' ⚑' : ''}`, y.top.map(e => `${esc(e.sym)} ${e.d}: ${fmt(e.forward, 0)}%`).join('<br>') || '–'])));
+  $('#missed-buckets').innerHTML = tbl([['Forward return (hindsight)'], ['Episodes', 1], ['Owned', 1], ['Owned share', 1]], r.buckets.map(b => row([`${b.lo}–${b.hi === Infinity ? '∞' : b.hi}%`, b.n, b.owned, b.n ? fmt(100 * b.owned / b.n, 1) + '%' : '–'])));
 }
 
 /* ---------- Overview ---------- */
