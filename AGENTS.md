@@ -110,6 +110,27 @@ exec`, one dune at a time) do not apply. Use these instead (lessons from #3333 a
 7. **Whose turn it is** is shown on the pinned lane board (#3330) and as `turn/*` labels. Merging is always Claude's,
    after CI and both Claude QC gates.
 
+### Jules: evidence in every reply (added after #3333)
+
+On #3333 two replies said "done" for things that had not happened: a PR-body edit with an empty commit, and a format fix
+whose CI stayed red after touching out-of-scope files. GitHub, not the reply, is what Claude checks. These rules make the
+reply match it:
+
+1. **Before every push**, run and keep the output of:
+   ```sh
+   git fetch origin main
+   git diff --stat origin/main...HEAD      # must list only the files in the brief
+   cd trading && dune build @fmt           # must print no diff (warnings are fine)
+   ```
+   plus the focused `dune build` / `dune runtest` for the directories you touched.
+2. **Every reply on a PR pastes that output**: the `git diff --stat`, the `@fmt` result and the test summary line. Add
+   the commit SHA you pushed. A reply without them is treated as "not done".
+3. **If a step is impossible for you** (editing the PR body, reaching the network, a command that fails), write
+   `CANNOT: <step> — <why>` and stop. Never describe it as done.
+4. **One commit per request**, pushed on top (no amend, no force-push). If main moved and the PR conflicts, merge
+   `origin/main` and keep both sides; say which files conflicted.
+5. **Do not widen scope.** If a fix seems to need a file outside the brief, ask on the PR first with `QUESTION:`.
+
 ## Cross-agent review (`.claude/rules/cross-agent-review.md`)
 
 - Add the label `author/codex` to every PR you open. It goes through the same
