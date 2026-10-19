@@ -3,7 +3,7 @@
 #
 # One screen of "what is running where": every delegation lane in one place (dev/plans/delegation-lanes-2026-10-18.md).
 #   1. open PRs by lane (label author/<agent>, else branch prefix, else local) with their gate next-action
-#   2. issues handed to a lane (env/cloud, agent/codex, agent/cursor, agent/copilot) and whether a PR exists
+#   2. issues handed to a lane (env/cloud, agent/codex, agent/cursor, agent/copilot)
 #   3. long local jobs on this machine and in the container (chains, readers, backtests)
 #   4. Codex cloud tasks, when the codex CLI supports `codex cloud list`
 #   5. the last GHA orchestrator / perf runs
@@ -16,7 +16,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 echo "== open PRs by lane"
 gh pr list --repo "$REPO" --state open --limit 100 --json number,title,headRefName,labels,isDraft,updatedAt \
   --jq '.[] | (.labels | map(.name)) as $l
-        | ([$l[] | select(startswith("author/"))][0] // ( .headRefName | split("/")[0] )) as $lane
+        | ([$l[] | select(startswith("author/"))][0] // (if (.headRefName | contains("/")) then (.headRefName | split("/")[0]) else "local" end)) as $lane
         | "\($lane)\t#\(.number)\t\(.updatedAt[0:10])\t\(if .isDraft then "draft " else "" end)\(.title[0:70])"' \
   | sort | awk -F'\t' 'BEGIN { OFS = "  " } { print $1, $2, $3, $4 }'
 if [ -x "$here/pr_gate_status.sh" ] || [ -f "$here/pr_gate_status.sh" ]; then
