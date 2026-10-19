@@ -87,3 +87,43 @@ QC therefore spends Claude quota and sits inside the management reserve.
    Async loop on GitHub: board #3330 (`turn/*` labels, 3 h refresh), hand-offs by `@codex` / `@jules` comments.
 3. **Copilot coding agent:** optional, $39/month, if the Codex spike fails on the OCaml setup.
 4. **Cursor:** not recommended for this workload.
+
+## 5. Codex lanes after the cloud-environment finding (decision 2026-10-18)
+
+The Codex CLI here is on ChatGPT **Plus**, workspace **Personal**, and `codex cloud exec` reports *"no cloud
+environments are available for this workspace"*. Four `ccarenv_…` IDs were tried, and none is a Codex Cloud
+environment. `@codex` mentions on GitHub get *"create an environment for this repo"* (#3324).
+
+**Lane A: local Codex as a separately charged subagent (in use).**
+- The dispatcher runs `codex exec` in a worktree under the repo, with a written brief, under AGENTS.md's local rules.
+- It is deterministic: start, exit code and diff are visible before any PR exists.
+- The writing costs Codex's quota; the review costs ours.
+- Its plan usage can be read from the `rate_limits` line in `~/.codex/sessions/**/rollout-*.jsonl` (5 h and weekly
+  `used_percent`).
+- It shares the container, so it doesn't build beside a long backtest.
+- First task: #3263.
+
+**Lane B: a scheduled Codex task in the personal cloud (options; not enabled).**
+Codex's Scheduled feature could run a pull loop every few hours, with one unit of work per run:
+1. fix NEEDS_REWORK on `author/codex` PRs;
+2. do a real merge of main into conflicting PRs;
+3. claim the oldest `agent/codex` + `ready-for-agent` issue while fewer than 3 Codex PRs are open.
+
+A one-line run log would go to #3330. A scheduled task has nobody to click Create PR, so it needs its own GitHub
+access. The options:
+
+| option | environment access | what it can do | risk |
+|---|---|---|---|
+| **B1. write token** | package managers + `api.github.com`/`github.com`; a fine-grained PAT as a secret (`dayfine/trading` only; contents, PRs, issues read/write; no admin, workflows or secrets; 30–90 day expiry) | the full loop: push branches, open PRs, comment | Contents write can technically merge a green PR. AGENTS.md forbids it and the events would show it, but it widens what an internet-facing agent holds. Reverses the "no token" policy in `.codex/README.md` |
+| **B2. read-only token** | the same hosts, PAT read-only | reads issues and reviews and proposes diffs; the dispatcher applies them locally | Low. Every change still passes through a local step |
+| **B3. none (current)** | package managers only | nothing scheduled | None. Lane A carries Codex work |
+
+**Decision (user, 2026-10-18): B3 now.**
+- Revisit B1 once Lane A has delivered clean PRs: first-pass QC approvals, no corrective rounds.
+- B2 is the fallback if a scheduled loop is wanted before then.
+- A first enablement of B1 records here: the token's scope and expiry, who holds it, and that `.codex/README.md`'s
+  network policy changed. The pull-loop prompt was drafted on 10-18 and gets added when B1 is chosen.
+
+**Jules** (Lane C, #3324): mention-driven. First trial #3333: correct content, then 4 replies claiming work that
+hadn't landed; rebuilt by the dispatcher as #3337. Rules since then: AGENTS.md §Jules (#3336), and after 2
+corrective rounds the dispatcher finishes the task.
