@@ -16,6 +16,7 @@
   test_trade_audit_ratings
   test_trade_audit_ratings_format
   test_trade_audit_html_report
+  test_html_series
   test_trade_score
   test_trade_context
   test_trades_csv_schema
