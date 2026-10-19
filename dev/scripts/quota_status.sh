@@ -52,7 +52,7 @@ awk -v five="$five" -v seven="$seven" -v fr="$five_reset" -v sr="$seven_reset" -
     printf "five-hour: %.0f %% used, resets in %.1f h\n", 100 * five, (fr - now) / 3600
     printf "management reserve: %.0f %% of the week\n", 100 * res
     split(first, f, " ")
-    if (f[1] != "" && now - f[1] > 3600) {
+    if (f[1] != "" && now - f[1] > 86400) {
       rate = (seven - f[2]) / ((now - f[1]) / 86400)
       proj = seven + rate * days
       printf "burn: %.1f %%/day since the first reading; projected at reset: %.0f %%\n", 100 * rate, 100 * proj

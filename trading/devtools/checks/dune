@@ -1417,3 +1417,12 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:lane_board_test.sh})))
+
+; prune_remote_branches test: pins the keep/prune rules of dev/scripts/prune_remote_branches.sh
+; with a fake `gh` on PATH (#3318 item 4). Reads the script via repo_root(), so (universe).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:prune_remote_branches_test.sh})))
