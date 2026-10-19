@@ -538,19 +538,21 @@ function mkChart(id, h, v) {
 // Missed-winner episodes are hindsight; reasons use evidence from that screen.
 function missedWinners(data, trades, open, macro, nav) {
   const at = (rows, d) => rows.filter(r => r[0] <= d).at(-1);
-  const weeks = new Map((data.audit || []).filter(r => r[0] === 'W').map(r => [r[1], r]));
-  const decisions = new Map((data.audit || []).filter(r => r[0] === 'D').map(r => [r[1] + '|' + r[2], r[3]]));
+  const weeks = new Map((data.audit || []).filter(r => r[0] === 'W').map(r => [isoWeek(r[1]), r]));
+  const decisions = new Map((data.audit || []).filter(r => r[0] === 'D').map(r => [isoWeek(r[1]) + '|' + r[2], r[3]]));
+  const macroWeeks = new Map(macro.map(r => [isoWeek(r[0]), r]));
   const positions = [...trades, ...(open.rows || []).map(t => ({ ...t, xd: '9999-12-31' }))];
   const episodes = data.episodes.map(e => {
     const held = positions.filter(t => t.side !== 'SHORT' && t.sym === e.sym && t.ed <= e.peak && t.xd >= e.d);
     const owned = held.length > 0, gain = Math.max(...held.map(t => t.pct || 0));
     const capture = !owned ? '' : gain >= e.forward / 2 ? 'rode' : held.some(t => t.xd === '9999-12-31') || gain > 0 ? 'partial' : 'cut';
-    const week = weeks.get(e.d), decision = decisions.get(e.d + '|' + e.sym), invested = at(nav, e.d)?.[2];
+    const key = isoWeek(e.d), week = weeks.get(key), decision = decisions.get(key + '|' + e.sym);
+    const invested = at(nav, week?.[1] || e.d)?.[2], trend = (macroWeeks.get(key) || at(macro, e.d))?.[1];
     let reason = 'unknown (screen evidence absent)';
     if (owned) reason = capture;
     else if (decision === 'Placed') reason = 'ticket placed';
     else if (decision?.startsWith('Skipped')) reason = 'logged skip: ' + decision.slice(8);
-    else if (at(macro, e.d)?.[1] === 'Bearish') reason = 'macro Bearish';
+    else if (trend === 'Bearish') reason = 'macro Bearish';
     else if (week?.[3] === '1' && +week[2] === 0) reason = 'zero-ticket week (' + (invested == null ? 'exposure unknown' : invested < 25 ? '<25% invested' : invested < 50 ? '25–50% invested' : '≥50% invested') + ')';
     else if (week?.[3] === '1') reason = 'not in recorded top-N';
     return { ...e, owned, capture, reason };

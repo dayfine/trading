@@ -1112,12 +1112,27 @@ expect_eq "#3140 audit: long tickets/skips, zero-ticket week, old week lacks dec
 tr '\n' ' ' < "$MW/run/trade_audit.sexp" > "$MW/compact.sexp"
 expect_eq "#3140 audit: whitespace does not change evidence" "$(awk -f "$ROOT/dev/lib/review_pack/missed_audit.awk" "$MW/run/trade_audit.sexp")" \
   "$(awk -f "$ROOT/dev/lib/review_pack/missed_audit.awk" "$MW/compact.sexp")"
-for mode in lowvol illiquid splice cutoff exact; do
+for mode in lowvol illiquid splice cutoff exact breakout belowma fallingma warmup jumpup jumpdown; do
   awk -F, -v OFS=, -v mode="$mode" 'NR>1 {
     if(mode=="lowvol" && $1=="2019-08-02") $7=199999
     if(mode=="illiquid") $7=$7/100
     if(mode=="splice" && $1=="2019-08-09") $5=$6=400
     if(mode=="exact" && $5>160) $2=$3=$4=$5=$6=160
+    # Signal is row 32 (week 30). Isolate each qualifier while all others pass.
+    i=NR-2
+    if(mode=="breakout" && i==29) $3=80
+    if(mode=="belowma") {
+      c=(i==0?80:i==1?110:i==2?106:i==3?103:i<30?99.99:100+(i-30)*12)
+      $2=$3=$4=$5=$6=c
+    }
+    if(mode=="fallingma") {
+      c=(i==0?600:i==1?400:i==2?250:i==3?150:i<30?90:100+(i-30)*12)
+      $2=$3=$4=$5=$6=c
+    }
+    # A jump exactly 20 weeks before the signal: future path stays continuous.
+    if(mode=="warmup" && i<10) for(j=2;j<=6;j++) $j=$j/2
+    if(mode=="jumpup" && i==31) $2=$3=$4=$5=$6=120
+    if(mode=="jumpdown" && i>=31) $2=$3=$4=$5=$6=40*1.2^(i-31)
   } { print }' "$FIX/missed_winner.csv" > "$MW/$mode.csv"
   last=2019-12-31; [ "$mode" != cutoff ] || last=2019-09-06
   n=$(awk -v sym=WIN -v first=2019-01-01 -v last="$last" -f "$ROOT/dev/lib/review_pack/missed_winners.awk" "$MW/$mode.csv" | wc -l | tr -d ' ')
@@ -1130,7 +1145,8 @@ expect_eq "#3140 no audit: no inferred zero-ticket weeks" 0 "$(jq '.audit|length
 expect_eq "#3140 pack pipeline publishes missed inputs and renders section" 'true 1' \
   "$(jq -r 'has("episodes") and has("symbols") and has("audit")' "$S/data/r0_missed.json") $(grep -c 'id="missed-years"' "$S/index.html")"
 if command -v node >/dev/null 2>&1; then
-  { sed -n '/^function missedWinners(/,/^}/p' "$S/index.html"
+  { grep '^function isoWeek(' "$S/index.html"
+    sed -n '/^function missedWinners(/,/^}/p' "$S/index.html"
     sed -n '/^function renderMissedWinners(/,/^}/p' "$S/index.html"
     grep '^const tbl =' "$S/index.html"
     cat <<'JS'
@@ -1145,9 +1161,21 @@ assert.strictEqual(r.episodes[7].reason,'not in recorded top-N');
 assert.strictEqual(r.buckets[0].owned,3);
 assert.strictEqual(r.years[0].top.length,5);
 assert.strictEqual(missedWinners({episodes:[e('BEAR')],audit:[]},[],{},[['2019-08-02','Bearish']],nav).episodes[0].reason,'macro Bearish');
-const zero={episodes:[e('ZERO')], audit:Array.from({length:10},(_,i)=>['W',`2019-08-${String(i+2).padStart(2,'0')}`,'0','1'])};
+const zero={episodes:[e('ZERO')], audit:Array.from({length:10},(_,i)=>['W',new Date(Date.UTC(2019,7,2+7*i)).toISOString().slice(0,10),'0','1'])};
 r=missedWinners(zero,[],{},[],nav);
 assert.strictEqual(r.years[0].zero,10); assert.strictEqual(r.episodes[0].reason,'zero-ticket week (<25% invested)');
+assert.strictEqual(missedWinners(zero,[],{},[],[['2019-08-02',100000,60]]).years[0].zero,0, '60% invested is not below 50%');
+assert.strictEqual(missedWinners(zero,[],{},[],[['2019-08-02',100000,50]]).years[0].zero,0, 'exactly 50% is excluded');
+assert.strictEqual(missedWinners(zero,[],{},[],[['2019-08-02',100000,49.99]]).years[0].zero,10, 'just below 50% is counted');
+const thursday={episodes:[{...e('TICKET'),d:'2019-08-01'},{...e('SKIP'),d:'2019-08-01'}],audit:data.audit};
+assert.deepStrictEqual(missedWinners(thursday,[],{},[['2019-07-26','Bearish']],nav).episodes.map(e=>e.reason),['ticket placed','logged skip: Insufficient_cash'], 'Thursday bars join Friday decisions');
+const holiday={episodes:[{...e('HOLIDAY'),d:'2020-04-09'}],audit:[['W','2020-04-10','0','1']]};
+assert.strictEqual(missedWinners(holiday,[],{},[['2020-04-03','Bearish'],['2020-04-10','Bullish']],[['2020-04-09',100000,20]]).episodes[0].reason,'zero-ticket week (<25% invested)', 'same-week macro beats the prior week on a holiday');
+const boundary={episodes:[{...e('NEWYEAR'),d:'2019-12-31'}],audit:[['D','2020-01-03','NEWYEAR','Placed']]};
+assert.strictEqual(missedWinners(boundary,[],{},[],[]).episodes[0].reason,'ticket placed', 'week crosses calendar year');
+boundary.episodes[0].d='2020-01-06';
+assert.strictEqual(missedWinners(boundary,[],{},[],[]).episodes[0].reason,'unknown (screen evidence absent)', 'adjacent week is not joined');
+
 assert.strictEqual(missedWinners({episodes:[e('UNKNOWN')],audit:[]},[],{},[],nav).episodes[0].reason,'unknown (screen evidence absent)');
 assert.strictEqual(missedWinners({episodes:[e('SHORT')],audit:[]},[{sym:'SHORT',side:'SHORT',ed:'2019-08-02',xd:'2019-10-11',pct:100}],{},[],nav).episodes[0].owned,false);
 assert.strictEqual(missedWinners({episodes:[],audit:[]},[],{},[],nav).buckets[0].n,0);

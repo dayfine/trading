@@ -48,7 +48,10 @@ The page joins long holdings (including still-open positions) overlapping the
 signal-to-peak interval. Rode/partial/cut use the overlapping closed trade's
 reported return versus half the episode's forward return; still-open holdings
 count as partial. These are hindsight summaries, not a causal capture estimate.
-Miss reasons prefer a recorded ticket or skip, then the signal week's Bearish
+Screen decisions and macro evidence join by the UTC Monday calendar-week key,
+including weeks that cross 1 January; a Thursday episode can read its Friday
+screen without borrowing evidence from an adjacent week. Miss reasons prefer a
+recorded ticket or skip, then the signal week's Bearish
 macro, then a fully recorded zero-ticket week or absence from the recorded
 screen top-N. The latter does not identify which upstream filter rejected the
 name. Missing screening evidence stays unknown. Zero-ticket weeks below 50%
