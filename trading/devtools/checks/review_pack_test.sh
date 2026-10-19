@@ -1091,5 +1091,75 @@ expect_eq "#3262 conformance panel: stacked above the validator, not in a grid2 
 # the capture unscrolls every table box but the per-trade one (inline.html from the stub render above)
 expect_eq "#3262 render: the capture unscrolls every table box but the per-trade one" 1 \
   "$(grep -c '^<style>.tablebox:not(:has(#t-table)) { max-height: none !important; }</style>$' "$TMP/render-ok/inline.html")"
+# #3140: an unowned bar-store symbol, exact volume/return boundaries, splice guard,
+# audit evidence vs absent evidence, ownership and the rendered card.
+MW="$TMP/missed"; mkdir -p "$MW/data/W/N/WIN" "$MW/run"
+cp "$FIX/missed_winner.csv" "$MW/data/W/N/WIN/data.csv"
+printf 'date,equity\n2019-01-04,100000\n2019-10-11,100000\n' > "$MW/run/equity_curve.csv"
+cat > "$MW/run/trade_audit.sexp" <<'AUDIT'
+((audit_records ()) (cascade_summaries
+ (((date 2019-08-02) (decisions (((symbol WIN) (side Long) (outcome Placed))
+ ((symbol SKIP) (side Long) (outcome (Skipped Insufficient_cash)))
+ ((symbol SHORT) (side Short) (outcome Placed)))))
+ ((date 2019-08-09) (decisions ())) ((date 2019-08-16)))))
+AUDIT
+sh "$ROOT/dev/lib/review_pack/missed_winners.sh" "$MW/data" "$MW/run" > "$MW/result.json"
+expect_eq "#3140 scan: unowned WIN found, boundary 2x volume, 150% forward weekly close" '1 WIN 2019-08-02 150 2 2019-10-11' \
+  "$(jq -r '"\(.symbols) \(.episodes[0].sym) \(.episodes[0].d) \(.episodes[0].forward+0) \(.episodes[0].vr+0) \(.episodes[0].peak)"' "$MW/result.json")"
+expect_eq "#3140 audit: long tickets/skips, zero-ticket week, old week lacks decisions" 'D|2019-08-02|WIN|Placed;D|2019-08-02|SKIP|Skipped Insufficient_cash;W|2019-08-02|1|1;W|2019-08-09|0|1;W|2019-08-16|0|0' \
+  "$(jq -r '.audit|map(join("|"))|join(";")' "$MW/result.json")"
+# Compact and pretty audit layouts must agree.
+tr '\n' ' ' < "$MW/run/trade_audit.sexp" > "$MW/compact.sexp"
+expect_eq "#3140 audit: whitespace does not change evidence" "$(awk -f "$ROOT/dev/lib/review_pack/missed_audit.awk" "$MW/run/trade_audit.sexp")" \
+  "$(awk -f "$ROOT/dev/lib/review_pack/missed_audit.awk" "$MW/compact.sexp")"
+for mode in lowvol illiquid splice cutoff exact; do
+  awk -F, -v OFS=, -v mode="$mode" 'NR>1 {
+    if(mode=="lowvol" && $1=="2019-08-02") $7=199999
+    if(mode=="illiquid") $7=$7/100
+    if(mode=="splice" && $1=="2019-08-09") $5=$6=400
+    if(mode=="exact" && $5>160) $2=$3=$4=$5=$6=160
+  } { print }' "$FIX/missed_winner.csv" > "$MW/$mode.csv"
+  last=2019-12-31; [ "$mode" != cutoff ] || last=2019-09-06
+  n=$(awk -v sym=WIN -v first=2019-01-01 -v last="$last" -f "$ROOT/dev/lib/review_pack/missed_winners.awk" "$MW/$mode.csv" | wc -l | tr -d ' ')
+  want=0; [ "$mode" != exact ] || want=1
+  expect_eq "#3140 scan: $mode boundary" "$want" "$n"
+done
+rm "$MW/run/trade_audit.sexp"
+sh "$ROOT/dev/lib/review_pack/missed_winners.sh" "$MW/data" "$MW/run" > "$MW/noaudit.json"
+expect_eq "#3140 no audit: no inferred zero-ticket weeks" 0 "$(jq '.audit|length' "$MW/noaudit.json")"
+expect_eq "#3140 pack pipeline publishes missed inputs and renders section" 'true 1' \
+  "$(jq -r 'has("episodes") and has("symbols") and has("audit")' "$S/data/r0_missed.json") $(grep -c 'id="missed-years"' "$S/index.html")"
+if command -v node >/dev/null 2>&1; then
+  { sed -n '/^function missedWinners(/,/^}/p' "$S/index.html"
+    sed -n '/^function renderMissedWinners(/,/^}/p' "$S/index.html"
+    grep '^const tbl =' "$S/index.html"
+    cat <<'JS'
+const assert = require('assert');
+const e = (sym, forward=150) => ({sym,d:'2019-08-02',peak:'2019-10-11',forward});
+const data = {symbols:12, episodes:['RODE','PART','CUT','TICKET','SKIP','BEAR','ZERO','TOP','UNKNOWN'].map(s=>e(s)), audit:[['W','2019-08-02','1','1'],['D','2019-08-02','TICKET','Placed'],['D','2019-08-02','SKIP','Skipped Insufficient_cash']]};
+const trades = [['RODE',80],['PART',10],['CUT',-5]].map(([sym,pct])=>({sym,side:'LONG',ed:'2019-08-05',xd:'2019-10-10',pct}));
+const nav = [['2019-08-02',100000,20]];
+let r=missedWinners(data,trades,{rows:[]},[],nav);
+assert.deepStrictEqual(r.episodes.slice(0,5).map(e=>e.reason),['rode','partial','cut','ticket placed','logged skip: Insufficient_cash']);
+assert.strictEqual(r.episodes[7].reason,'not in recorded top-N');
+assert.strictEqual(r.buckets[0].owned,3);
+assert.strictEqual(r.years[0].top.length,5);
+assert.strictEqual(missedWinners({episodes:[e('BEAR')],audit:[]},[],{},[['2019-08-02','Bearish']],nav).episodes[0].reason,'macro Bearish');
+const zero={episodes:[e('ZERO')], audit:Array.from({length:10},(_,i)=>['W',`2019-08-${String(i+2).padStart(2,'0')}`,'0','1'])};
+r=missedWinners(zero,[],{},[],nav);
+assert.strictEqual(r.years[0].zero,10); assert.strictEqual(r.episodes[0].reason,'zero-ticket week (<25% invested)');
+assert.strictEqual(missedWinners({episodes:[e('UNKNOWN')],audit:[]},[],{},[],nav).episodes[0].reason,'unknown (screen evidence absent)');
+assert.strictEqual(missedWinners({episodes:[e('SHORT')],audit:[]},[{sym:'SHORT',side:'SHORT',ed:'2019-08-02',xd:'2019-10-11',pct:100}],{},[],nav).episodes[0].owned,false);
+assert.strictEqual(missedWinners({episodes:[],audit:[]},[],{},[],nav).buckets[0].n,0);
+const elements={}; const $=id=>elements[id]||(elements[id]={}); const CH=()=>0, fmt=(x,n)=>x.toFixed(n);
+const D={missed:[zero], trades:[[]], open:[{}], macro:[], nav:[nav]};
+renderMissedWinners(); assert(elements['#missed-years'].innerHTML.includes('<tr><td>2019</td>')); assert(elements['#missed-years'].innerHTML.includes('⚑')); assert(elements['#missed-buckets'].innerHTML.includes('100–200%'));
+D.missed=[null]; renderMissedWinners(); assert(elements['#missed-note'].textContent.includes('unavailable'));
+console.log('OK');
+JS
+  } > "$MW/ui.js"
+  expect_eq "#3140 browser: reasons, ownership, buckets, year summary and rendered card" OK "$(node "$MW/ui.js")"
+fi
+
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
