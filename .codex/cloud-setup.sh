@@ -2,6 +2,10 @@
 # Run from the repository root during setup, then again at task startup.
 set -eu
 repo=$(pwd -P)
+if [ ! -f "$repo/.codex/dune-workspace.cloud" ]; then
+  echo 'Run cloud setup from the repository root containing .codex/dune-workspace.cloud.' >&2
+  exit 1
+fi
 setup_dir=${TRADING_CLOUD_SETUP_DIR:-/workspace/.trading-cloud}
 image=trading-cloud-ci:2026-10-18
 source_image=ghcr.io/dayfine/trading-ci@sha256:9bd613007268f458ad935126c53b1d76368374f3032807b174908bdb3bba28e5

@@ -5,6 +5,8 @@ repository root for setup and task startup. Setup downloads the pinned CI image
 through `crane export` and imports its flattened filesystem, avoiding Docker vfs
 layer duplication. The imported image has no original image configuration;
 the script explicitly supplies its user, opam variables and working directory.
+During a cold import, budget space for both the flat tar and the imported image
+at once; the script removes the tar after import, including on failure.
 Requires Docker, curl, tar, sha256sum and an x86-64 Linux host. Keep registry
 credentials and the platform proxy configuration unchanged. Networked commands
 inside the container require the platform CA mounted read-only and the relevant
@@ -12,7 +14,10 @@ tool's trust setting (see the cloud runtime instructions).
 
 Startup reuses the container and copies `.codex/dune-workspace.cloud` to
 `/tmp/trading-cloud-workspace`. Run it from the original repository root, not a
-worktree; it refuses to reuse a container mounted from another root. Do not
+worktree; it checks for the workspace template before any Docker operation and
+refuses to reuse a container mounted from another root. Every startup removes
+the unused `5.3` switch (if present) and `/home/opam/opam-repository`, retaining
+the active `5.3.0+flambda` switch. Do not
 remove another task's container to resolve that refusal.
 
 ## Disk and validation
