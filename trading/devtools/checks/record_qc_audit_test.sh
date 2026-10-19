@@ -354,13 +354,18 @@ EOF
 out=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE1}" "feat/dummy" "2026-05-25" 2>&1) && rc=0 || rc=$?
 JSON1="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE1}.json"
-if (( rc == 0 )) && [[ -f "${JSON1}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON1}" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON1}" \
-   && grep -q '"quality_score": *4' "${JSON1}"; then
+C1=(
+  "rc==0 (actual=${rc})" "$(_eq "${rc}" 0)"
+  "JSON1 exists" "$(_flag test -f "${JSON1}")"
+  "structural_qc == APPROVED (actual: $(_json_actual "${JSON1}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON1}")"
+  "behavioral_qc == APPROVED (actual: $(_json_actual "${JSON1}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON1}")"
+  "quality_score == 4 (actual: $(_json_actual "${JSON1}" quality_score))" "$(_grep_ok '"quality_score": *4' "${JSON1}")"
+)
+if _pairs_ok "${C1[@]}"; then
   pass "scenario 1 — file-mode regression: APPROVED+APPROVED+score 4 extracted"
 else
   fail "scenario 1 — file-mode regression: expected APPROVED+APPROVED+4; got rc=${rc}, output:"
+  report_conjuncts "${C1[@]}"
   echo "${out}" | sed 's/^/      /'
   [[ -f "${JSON1}" ]] && \
     echo "      json: $(cat "${JSON1}")"
@@ -870,24 +875,28 @@ out7c_2=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/reco
 
 audit_count_7c="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-27-*${FEATURE7C}.json")"
 
-if (( rc7c_1 == 0 )) && (( rc7c_2 == 0 )) && [[ -f "${JSON7C}" ]] \
-   && [[ "${audit_count_7c}" == "2" ]] \
-   && grep -q '"quality_score": *5' "${JSON7C}"; then
-  # Confirm the FIRST record (q=4) survived under a distinct (preserved)
-  # filename rather than vanishing.
-  preserved_7c_found=false
-  for f in "${TMP_REPO}/dev/audit/2026-07-27-"*"${FEATURE7C}.json"; do
-    [[ "${f}" == "${JSON7C}" ]] && continue
-    grep -q '"quality_score": *4' "${f}" && preserved_7c_found=true
-  done
-  if $preserved_7c_found; then
-    pass "scenario 7c — empty --branch fallback: sha-based identity now preserves rather than clobbers a same-day collision (gap narrowed by H-AUDIT-REWORK-COUNT-BLIND)"
-  else
-    fail "scenario 7c — expected the first record (q=4) to survive under a distinct filename; not found"
-    ls -la "${TMP_REPO}/dev/audit/" | sed 's/^/      /'
-  fi
+# Confirm the FIRST record (q=4) survived under a distinct (preserved)
+# filename rather than vanishing.
+preserved_7c_found=0
+for f in "${TMP_REPO}/dev/audit/2026-07-27-"*"${FEATURE7C}.json"; do
+  [[ "${f}" == "${JSON7C}" ]] && continue
+  grep -q '"quality_score": *4' "${f}" && preserved_7c_found=1
+done
+
+C7C=(
+  "rc7c_1==0 (actual=${rc7c_1})" "$(_eq "${rc7c_1}" 0)"
+  "rc7c_2==0 (actual=${rc7c_2})" "$(_eq "${rc7c_2}" 0)"
+  "JSON7C exists" "$(_flag test -f "${JSON7C}")"
+  "audit file count == 2 (actual: ${audit_count_7c})" "$(_eq "${audit_count_7c}" 2)"
+  "JSON7C quality_score == 5 (actual: $(_json_actual "${JSON7C}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON7C}")"
+  "first record (q=4) preserved under a distinct filename" "${preserved_7c_found}"
+)
+if _pairs_ok "${C7C[@]}"; then
+  pass "scenario 7c — empty --branch fallback: sha-based identity now preserves rather than clobbers a same-day collision (gap narrowed by H-AUDIT-REWORK-COUNT-BLIND)"
 else
   fail "scenario 7c — expected exactly 2 files (q=4 preserved, q=5 canonical); got rc=${rc7c_1}/${rc7c_2}, audit_count=${audit_count_7c}"
+  report_conjuncts "${C7C[@]}"
+  ls -la "${TMP_REPO}/dev/audit/" | sed 's/^/      /'
   echo "${out7c_1}" | sed 's/^/      /'
   echo "${out7c_2}" | sed 's/^/      /'
   [[ -f "${JSON7C}" ]] && echo "      json: $(cat "${JSON7C}")"
@@ -989,12 +998,17 @@ out9=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=4000000000000000000 \
     --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc9=0 || rc9=$?
 JSON9="${TMP_REPO}/dev/audit/2026-07-27-harness-new-${FEATURE9}.json"
 
-if (( rc9 == 0 )) && [[ -f "${JSON9}" ]] \
-   && grep -q '"consecutive_rework_count": *2' "${JSON9}" \
-   && grep -q 'consecutive_rework_count=2' <<<"${out9}"; then
+C9=(
+  "rc9==0 (actual=${rc9})" "$(_eq "${rc9}" 0)"
+  "JSON9 exists" "$(_flag test -f "${JSON9}")"
+  "JSON9 consecutive_rework_count == 2 (actual: $(_json_actual "${JSON9}" consecutive_rework_count))" "$(_grep_ok '"consecutive_rework_count": *2' "${JSON9}")"
+  "stdout reports consecutive_rework_count=2" "$(_grep_ok 'consecutive_rework_count=2' <<<"${out9}")"
+)
+if _pairs_ok "${C9[@]}"; then
   pass "scenario 9 — legacy record with no recorded_at_ns does not abort the script (F1 rework-2 fix)"
 else
   fail "scenario 9 — expected rc=0, record written, consecutive_rework_count=2; got rc=${rc9}"
+  report_conjuncts "${C9[@]}"
   echo "${out9}" | sed 's/^/      /'
   [[ -f "${JSON9}" ]] && echo "      json: $(cat "${JSON9}")"
 fi
@@ -1016,11 +1030,17 @@ out10=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=oops \
     --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc10=0 || rc10=$?
 audit_count_after_10="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE10}.json")"
 
-if (( rc10 == 1 )) && [[ "${audit_count_before_10}" == "0" ]] && [[ "${audit_count_after_10}" == "0" ]] \
-   && grep -q 'must be a nonnegative integer' <<<"${out10}"; then
+C10=(
+  "rc10==1 (actual=${rc10})" "$(_eq "${rc10}" 1)"
+  "audit count before == 0 (actual: ${audit_count_before_10})" "$(_eq "${audit_count_before_10}" 0)"
+  "audit count after == 0 (actual: ${audit_count_after_10})" "$(_eq "${audit_count_after_10}" 0)"
+  "stdout has 'must be a nonnegative integer'" "$(_grep_ok 'must be a nonnegative integer' <<<"${out10}")"
+)
+if _pairs_ok "${C10[@]}"; then
   pass "scenario 10 — non-numeric WRITE_AUDIT_RECORDED_AT_NS rejected, no record written (N2 fix)"
 else
   fail "scenario 10 — expected rc=1, no file written, 'must be a nonnegative integer' message; got rc=${rc10}, before=${audit_count_before_10}, after=${audit_count_after_10}"
+  report_conjuncts "${C10[@]}"
   echo "${out10}" | sed 's/^/      /'
 fi
 
@@ -1053,12 +1073,17 @@ out11=$(REPO_ROOT="${TMP_REPO}" PATH="${S11_DIR}:${PATH}" \
     --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc11=0 || rc11=$?
 JSON11="${TMP_REPO}/dev/audit/2026-07-27-harness-x-${FEATURE11}.json"
 
-if (( rc11 == 0 )) && [[ -f "${JSON11}" ]] \
-   && grep -qE '"recorded_at_ns": [0-9]+,' "${JSON11}" \
-   && ! grep -q 'N,' "${JSON11}"; then
+C11=(
+  "rc11==0 (actual=${rc11})" "$(_eq "${rc11}" 0)"
+  "JSON11 exists" "$(_flag test -f "${JSON11}")"
+  "recorded_at_ns is a plain integer (actual: $(_json_actual "${JSON11}" recorded_at_ns))" "$(_grep_ok -E '"recorded_at_ns": [0-9]+,' "${JSON11}")"
+  "JSON11 has no literal 'N,'" "$(_eq "$(_grep_ok 'N,' "${JSON11}")" 0)"
+)
+if _pairs_ok "${C11[@]}"; then
   pass "scenario 11 — BSD-style date lacking %N degrades to a valid numeric timestamp, not a literal N (N3 fix)"
 else
   fail "scenario 11 — expected rc=0, recorded_at_ns to be a plain integer with no literal N; got rc=${rc11}"
+  report_conjuncts "${C11[@]}"
   echo "${out11}" | sed 's/^/      /'
   [[ -f "${JSON11}" ]] && echo "      json: $(cat "${JSON11}")"
 fi
@@ -1092,11 +1117,17 @@ out12=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record
 
 audit_count_after_12="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE12}.json")"
 
-if (( rc12 == 1 )) && [[ "${audit_count_before_12}" == "0" ]] && [[ "${audit_count_after_12}" == "0" ]] \
-   && grep -q "quality score '7' is not an integer in 1..5" <<<"${out12}"; then
+C12=(
+  "rc12==1 (actual=${rc12})" "$(_eq "${rc12}" 1)"
+  "audit count before == 0 (actual: ${audit_count_before_12})" "$(_eq "${audit_count_before_12}" 0)"
+  "audit count after == 0 (actual: ${audit_count_after_12})" "$(_eq "${audit_count_after_12}" 0)"
+  "stdout names quality score '7' not in 1..5" "$(_grep_ok "quality score '7' is not an integer in 1..5" <<<"${out12}")"
+)
+if _pairs_ok "${C12[@]}"; then
   pass "scenario 12 — out-of-range quality score (file-mode) rejected with exit 1, no record written (H-QC-SCALE)"
 else
   fail "scenario 12 — expected rc=1, no file written, message naming '7'; got rc=${rc12}, before=${audit_count_before_12}, after=${audit_count_after_12}"
+  report_conjuncts "${C12[@]}"
   echo "${out12}" | sed 's/^/      /'
 fi
 
@@ -1117,12 +1148,18 @@ out13=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
 
 audit_count_after_13="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE13}.json")"
 
-if (( rc13 == 1 )) && [[ "${audit_count_before_13}" == "0" ]] && [[ "${audit_count_after_13}" == "0" ]] \
-   && grep -q "must be an integer 1..5" <<<"${out13}" \
-   && grep -q "got: '0'" <<<"${out13}"; then
+C13=(
+  "rc13==1 (actual=${rc13})" "$(_eq "${rc13}" 1)"
+  "audit count before == 0 (actual: ${audit_count_before_13})" "$(_eq "${audit_count_before_13}" 0)"
+  "audit count after == 0 (actual: ${audit_count_after_13})" "$(_eq "${audit_count_after_13}" 0)"
+  "stdout has 'must be an integer 1..5'" "$(_grep_ok "must be an integer 1..5" <<<"${out13}")"
+  "stdout has \"got: '0'\"" "$(_grep_ok "got: '0'" <<<"${out13}")"
+)
+if _pairs_ok "${C13[@]}"; then
   pass "scenario 13 — write_audit.sh rejects out-of-range --quality-score directly, no record written (H-QC-SCALE)"
 else
   fail "scenario 13 — expected rc=1, no file written, message naming '0'; got rc=${rc13}, before=${audit_count_before_13}, after=${audit_count_after_13}"
+  report_conjuncts "${C13[@]}"
   echo "${out13}" | sed 's/^/      /'
 fi
 
