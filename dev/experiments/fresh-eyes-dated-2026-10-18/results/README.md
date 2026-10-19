@@ -1,5 +1,27 @@
 # Fresh-eyes, dated picks: the reading (24 dates, plus 2 repeats on 4 of them)
 
+**Rework 1** (qc-results on #3328 at `cc10c95ec`: NEEDS_REWORK, items R2 and R9).
+- **R2.** `ours.sh` read the record's `trades.csv` `entry_price` as a raw fill.
+  - For a hold that spans a split, the record restates it onto the exit's split basis (`round_trip_pairing.mli`). FLO 2013 (3:2 split, 2013-06-20) was therefore split twice and read +102.6 % instead of +35.1 % (salt 0).
+  - `ours.sh` now multiplies the entry back by the `splits.csv` factors in (entry, exit]. FLO is the only window entry whose hold spans a split, in any salt.
+  - `2012-12-14/ours/entries.csv` and `compare/` were regenerated, and every figure below that rests on them was re-run.
+- **What moved.**
+  - Our mean excess: +3.9 → +2.6 % (salt 0).
+  - Our per year of capital: +1.5 → −1.3 %.
+  - Reader minus ours: +0.7 pp (was −0.6); per year +1.6 pp (was −1.1).
+  - Read 3's p25: −20.0 (was −25.7). The 2012-12-14 row.
+  - Our tail figures.
+  - Our 104-week hold (median −0.9 %, geometric +0.4 %) and managed level (−0.4 %).
+- **What did not move.** Medians, sign rates, per-trade percentiles, the management value-add (a ratio of managed to held on the same entry, so the entry error cancels), and every figure in §1.1–1.2 and §3.1–3.2. The verdict is unchanged.
+- **Also.**
+  - BHC (+84 pp) joins the §1.4 two-year list; it was missing before.
+  - The 2020 coverage gap is stated next to 2008.
+  - "Per year" now names the 7-day minimum hold.
+  - §3.1's "within 13 %" is replaced by the cap arithmetic.
+  - §3.3 gives an interval for the hold comparison.
+  - The analysis scripts now read the committed `results/run`.
+- **R9.** The memory files are named in the PR body.
+
 **Pre-registration:** `dev/plans/fresh-eyes-dated-picks-2026-10-18.md`, merged at `8fd63c8ec` (#3326) and unchanged
 since.
 - §6 lists reads 1–5.
@@ -22,10 +44,19 @@ The reads are applied as written. Where one cannot be applied, the section says 
 - 32 date-runs, 928 model calls, $65.74 at list price (`results/run/*/calls.csv`). The plan's unit cost implies
   $64–102 for 32 runs. The weekly plan quota went from 8 % to 10 % over the full run.
 
+**Dates:** `results/dates.txt`, plan §2's stratified draw (`dates.sh` reproduces it).
+- No decision date falls in calendar 2008 or calendar 2020.
+- 2008: the 2007–09 bear market is covered by 2007-12-14 and 2009-01-16.
+- 2020: the crash is not covered. Blocks 20 and 21 drew 2019-11-01 and 2021-01-01.
+- So plan §2's "covers 2000-02, 2008 and 2020 by construction" holds for 2000–02 and for the 2008 bear market, but not
+  for 2020.
+- The 2020 crash shows up only inside the holds and 104-week paths of 2019-11-01 trades. Ours: KLIC and DKS were stopped
+  on 2020-02-28. The reader placed no orders that day.
+
 **Artifacts:** `results/run/<date>[-rK]/`, `results/run/compare/`, and `results/analysis/` (the analyst's
 re-derivations).
 - Our side is the record N: rb1 plus the full NYSE A-D fixture, 26 years, salts 0–2.
-  - `ours.sh` reads it from `.sweep-output/breadth-pair-N/rb1-26-s{0,1,2}-v12-{trade_audit.sexp,trades.csv}`.
+  - `ours.sh` reads it from `.sweep-output/breadth-pair-N/rb1-26-s{0,1,2}-v12-{trade_audit.sexp,trades.csv,splits.csv}`.
   - Those files are not committed. They are the same runs as the committed `breadth-fix-rb1-2026-10-11/results/N-*`.
 - The analyst's re-derivations read those audits and the host bar store `data/`. Numbers from them are marked
   *(re-derived)*.
@@ -57,9 +88,9 @@ Verifies: none
   - The agreement is made at the close look, not at the contact sheet.
   - No reader order was ever one of our entries (0 of 40 long orders).
 - **Read 2.** Reader longs (n 34) and our trades (n 51) cannot be told apart.
-  - Mean excess vs SPY: +3.3 % vs +3.9 %. Median: −6.1 % vs −3.1 %.
-  - Difference in means −0.6 pp (date-clustered 95 % CI −13.3 to +14.3).
-  - Per year of capital in the trades: +0.3 % vs +1.5 %.
+  - Mean excess vs SPY: +3.3 % vs +2.6 %. Median: −6.1 % vs −3.1 %.
+  - Difference in means +0.7 pp (date-clustered 95 % CI −11.4 to +14.8).
+  - Per year of capital in the trades: +0.3 % vs −1.3 %.
   - Both means rest on one or two trades (VTR for the reader, AVGO for ours).
   - Reader shorts: 1 of 9 beat an SPY short.
 - **Read 3.** The reader is ahead on 7 of 14 paired dates (95 % CI 23–77 %), median +0.4 pp. Every perturbation that
@@ -153,33 +184,33 @@ Split *(re-derived)*:
 | reader long | 34 | +3.3 % | −6.1 % | −19.8 | −12.2 | +10.7 | +42.8 | 11 | 279 d (127–538) | +0.3 % |
 | reader short | 9 | −6.4 % | −8.5 % | −16.5 | −11.2 | −5.8 | +4.5 | 1 | 24 d (21–75) | −28.3 % |
 | reader, pooled (`report.txt`) | 43 | +1.3 % | −8.0 % | −20.2 | −12.2 | +7.4 | +34.9 | 12 | 202 d | −1.7 % |
-| ours s0 | 51 | +3.9 % | −3.1 % | −12.9 | −9.8 | +2.3 | +17.7 | 18 | 69 d (28–145) | +1.5 % |
-| ours s1 | 49 | +4.1 % | −3.0 % | −13.7 | −9.9 | +2.2 | +18.3 | 19 | 69 d | +1.5 % |
-| ours s2 | 50 | +4.3 % | −2.7 % | −13.7 | −9.7 | +2.9 | +18.0 | 20 | 69 d | +2.4 % |
+| ours s0 | 51 | +2.6 % | −3.1 % | −12.9 | −9.8 | +2.3 | +17.7 | 18 | 69 d (28–145) | −1.3 % |
+| ours s1 | 49 | +2.6 % | −3.0 % | −13.7 | −9.9 | +2.2 | +18.3 | 19 | 69 d | −1.4 % |
+| ours s2 | 50 | +2.9 % | −2.7 % | −13.7 | −9.7 | +2.9 | +18.0 | 20 | 69 d | −0.4 % |
 
-- **Scale.** "Per year of capital" is the sum of log((1 + ret)/(1 + spy)) over the sum of years held, exponentiated.
+- **Scale.** "Per year of capital" is the sum of log((1 + ret)/(1 + spy)) over the sum of years held, exponentiated. Each hold counts as at least 7 days, the same floor `compare_dates.sh` uses for its annualised column (`stats.awk`, `boot.awk`).
   It is the excess per year earned by money inside these trades.
   - `report.txt`'s annualised column cannot be used: it annualises each trade separately, and its mean is −20.9 %
-    (reader) and −21.9 % (ours).
+    (reader) and −25.6 % (ours).
   - A 2-day −10 % trade annualises to −99.7 % (DIN, 2001-09-17), so the mean is set by the shortest holds.
 - **The difference, reader longs minus ours-s0** *(re-derived)*: bootstrapped over the 19 dates with a long trade on
   either side, 10,000 draws, seed 20261018.
-  - Mean −0.6 pp (95 % CI −13.3 to +14.3).
+  - Mean +0.7 pp (95 % CI −11.4 to +14.8).
   - Median −3.0 pp (−7.8 to +5.8).
-  - Per year −1.1 pp (−20.4 to +25.0).
-  - Salts 1 and 2 move our mean and median by at most 0.4 pp. They are the same trades with path noise, not
+  - Per year +1.6 pp (−15.5 to +25.6).
+  - Salts 1 and 2 move our mean and median by at most 0.4 pp, and our per-year figure by up to 1 pp. They are the same trades with path noise, not
     independent samples.
 - **The tail.** Both means come down to one or two trades.
-  - Without VTR (+88.1 %, 2003) the reader's long mean is +0.7 %; without its top two, −1.2 %.
-  - Without AVGO (+183.8 %, 2013) ours is +0.3 %; without its top two, −1.6 %.
-  - The top three trades are 57 % (reader) and 69 % (ours) of each side's positive excess.
-- **Power.** The design cannot see a per-trade gap smaller than about ±14 pp in the mean, or ±7 pp in the median. An
+  - Without VTR (+88.1 %, 2003) the reader's long mean is +0.7 %; without its top two (VTR, SSNC1), −1.2 %.
+  - Without AVGO (+183.8 %, 2013) ours is −1.1 %; without its top two (AVGO, BHC), −2.1 %.
+  - The top three trades are 57 % (reader) and 70 % (ours) of each side's positive excess.
+- **Power.** The design cannot see a per-trade gap smaller than about ±13 pp in the mean, or ±7 pp in the median. An
   edge of a few points per trade is well inside that.
 
 ### 1.4 Read 3: paired per date (`compare/paired.csv`)
 
 - 14 dates have trades on both sides. The reader is ahead on 7 (50 %; Clopper-Pearson 23–77 %).
-- Median difference +0.4 pp, p25 −25.7, p75 +13.3, range −37.8 to +34.5.
+- Median difference +0.4 pp, p25 −20.0, p75 +13.3, range −37.8 to +34.5.
 - Perturbations *(re-derived)*:
 
 | variant | dates | reader ahead | median diff |
@@ -190,15 +221,15 @@ Split *(re-derived)*:
 | per-date medians instead of means | 14 | 5 | −4.9 pp |
 | a side with no trade counts as SPY (excess 0); not registered | 22 | 11 | +0.4 pp |
 | each pick held 104 weeks from entry, arithmetic; not registered | 14 | 4 | −12.0 pp |
-| the same, geometric per-date means | 14 | 7 | −1.9 pp |
+| the same, geometric per-date means | 14 | 7 | −1.8 pp |
 
-- **The arithmetic 104-week row is not an effect.** It is carried by our side's two-year monsters (EW, MOV, WING, AVGO,
+- **The arithmetic 104-week row is not an effect.** It is carried by our side's two-year monsters (EW, MOV, WING, AVGO, BHC,
   XERS: +81 to +217 pp in their 104-week paths), and it disappears under the geometric mean
   (`feedback_perturb_before_believing_a_cohort_split`).
 - **By period.**
   - The reader is ahead on 4 of 5 dates in 2001–07, 2 of 8 in 2010–18, and 1 of 1 in 2024. Fisher one-sided
     P = 0.086.
-  - The 2010–18 deficit stays negative on all four big dates after removing our best trade on each (MOV, FLO, AVGO,
+  - The 2010–18 deficit stays negative on all four big dates after removing our best trade on each (MOV, BHC, AVGO,
     WING).
   - With 8 dates this cannot be called a period effect.
 
@@ -225,7 +256,7 @@ Split *(re-derived)*:
 | 2009-04-03 | neither | Neutral | 19 / 0 | 0 (0) | 0 | – | 0, – | – |
 | 2010-09-10 | long | Neutral | 18 / 1 | 4 (0) | 4 | +0.7 % | 3, −12.8 % | +13.5 pp |
 | 2011-12-09 | long | Neutral | 20 / 0 | 1 (0) | 1 | −21.0 % | 2, +7.3 % | −28.3 pp |
-| 2012-12-14 | long | Bullish | 20 / 0 | 3 (0) | 3 | −0.3 % | 4, +37.3 % | −37.5 pp |
+| 2012-12-14 | long | Bullish | 20 / 0 | 3 (0) | 3 | −0.3 % | 4, +20.4 % | −20.6 pp |
 | 2013-08-30 | long | Bullish | 20 / 3 | 2 (2) | 2 | −9.8 % | 6, +28.0 % | −37.8 pp |
 | 2014-05-23 | long | Bullish | 19 / 0 | 3 (0) | 3 | −1.4 % | 3, −4.5 % | +3.1 pp |
 | 2016-02-05 | short | Bearish | 0 / 0 | 5 (0) | 4 | −8.1 % | 0, – | – |
@@ -244,7 +275,7 @@ over salts), `compare/paired.csv`.
 ## 2. The verdict, calibrated
 
 - **No-build decision; nothing escalates.**
-  - Read 2's difference is −0.6 pp with a ±14 pp interval. Read 3 is 7 of 14. Read 4 has no events.
+  - Read 2's difference is +0.7 pp (95 % CI −11.4 to +14.8). Read 3 is 7 of 14. Read 4 has no events.
   - Under `mechanism-validation-rigor.md`, a proxy screen at this power may say "no obvious gap, not worth prioritising
     a build". It may not say that the reader and our system pick or manage equally well.
 - **What the design can claim:**
@@ -256,6 +287,7 @@ over salts), `compare/paired.csv`.
     recognition test was not built (§6, defect 5).
   - Anything about management on the same names: there are no shared trades, and the off-diagonal cells were not built.
   - Anything about shorts beyond consistency with the existing no-build (9 trades, one draw).
+  - Anything about the 2020 crash: no decision date falls in 2020 (§6, defect 12).
 - **The §3.1 mechanism does not depend on the reader's noise.** It is a property of the floor scan, reproduced on 96 %
   of the record's placed tickets.
 
@@ -323,9 +355,17 @@ buys the breakout week itself.
 - The reader shortlisted none of them (0 of 13).
 
 **Would the `Nearest` scope change this?** Mostly not *(re-derived)*.
-- It finds a floor for 220 of the 241 at-the-high skips on these lists.
-- But that floor sits a median 17.8 % below the close (p25 14.6 %). About one in five is within 13 %.
-- Most would still fail the 15 % cap. The scope is not the binding constraint; the cap against the pre-breakout low is.
+- It finds a floor for 220 of the 241 at-the-high skips on these lists, a median 17.8 % below the close (p25 14.6 %).
+- **The cap is measured from E to the installed stop, not to the floor.**
+  - The installed stop sits 4 % under the floor: `floor_stop.ml` places it at floor × (1 − 0.08 / 2), then nudges it
+    under a round number.
+  - With E at the close, a floor passes the 15 % cap only if it is within about 11.5 % of the close. That is 23 of the
+    220 (10 %).
+  - Against the bare 15 %, ignoring the 4 % offset, it is 64 (29 %).
+  - The audit does not record E for skipped names, so the true count lies somewhere in that range.
+- **A ticket also fills only within 2 % above E** (`entry_extension_max_pct 2.0`). A name already well past its
+  breakout would rest until it pulled back.
+- Most would still fail. The scope is not the binding constraint; the cap against the pre-breakout low is.
 
 ### 3.2 Our 4-week entries are mostly not decisions made on the date
 
@@ -343,8 +383,11 @@ So even apart from §3.1, the reader could not have picked most of what we trade
 
 ### 3.3 Selection, with management removed (not pre-registered)
 
-- **Filled picks held 104 weeks from entry** (`trades.csv` `r104`, `spy104`): reader longs median +0.6 % over SPY,
-  geometric mean +1.4 % (n 34). Ours: median +0.4 %, geometric +1.2 % (n 51). The same.
+- **Filled picks held 104 weeks from entry** (`trades.csv` `r104`, `spy104`; ratio form (1 + r104)/(1 + spy104) − 1).
+  - Reader longs: median +0.6 % over SPY, geometric mean +1.4 % (n 34).
+  - Ours: median −0.9 %, geometric +0.4 % (n 51).
+  - The difference is noise *(re-derived, date-clustered bootstrap, 10,000 draws, seed 20261018)*: +1.5 pp in the
+    median (95 % CI −9.7 to +16.7), +1.0 pp in the geometric mean (−13.4 to +17.5).
 - **Everything each side liked, measured from the decision date.** Each set is compared with the neutral filter names
   of the same pool: within 25 % of the 52-week high, $1M dollar volume, and in the favoured groups or with no sector
   row. A cell counts the dates where the set beat the filter names *(re-derived)*.
@@ -377,8 +420,8 @@ weeks, with the money parked in SPY after an exit *(re-derived)*.
 - **Value-add (log, managed minus held).**
   - Reader: median 0.000 (IQR −0.103 to +0.032), positive in 13 of 34.
   - Ours: median −0.057 (IQR −0.238 to +0.181), positive in 22 of 51.
-  - Geometric over each side's picks: the reader +1.4 % held vs +0.3 % managed; ours +1.2 % held vs +0.4 % managed.
-  - Both lose about a point to holding. Ours is far more active in both directions.
+  - Geometric over each side's picks: the reader +1.4 % held vs +0.3 % managed; ours +0.4 % held vs −0.4 % managed.
+  - Both lose about a point to holding (1.1 and 0.8 points). Ours is far more active in both directions.
 - **What the stock did after the exit** (vs SPY, to 104 weeks from entry):
   - After a `laggard_rotation` exit (median trade +8.0 %), the stock beat SPY in 14 of 25 (median +2.2 %; mean
     value-add −0.063).
@@ -457,7 +500,7 @@ weeks, with the money parked in SPY after an exit *(re-derived)*.
 - **Consistent with the closed selection programme:** `project_entry_selection_closed_powered`,
   `project_cascade_selection_inversion`, and the 2025 screen's "ranker pool = universe" (`project_recovery_reentry_gap`
   item 6). Our top-20 list has no forward edge over a neutral near-high pool on these dates.
-- **Confirms `project_edge_is_the_fat_tail`** for both systems: each side's mean is one or two trades.
+- **Confirms `project_edge_is_the_fat_tail`** for both systems: each side's mean is one or two trades. Without AVGO, ours turns negative.
 - **Consistent with `project_nearfloor_is_risk_not_return`** (the `Nearest` scope: REJECT-as-default, keep-as-axis).
   - On the investor preset the scope would admit few of the at-the-high names, because their pre-breakout lows are
     mostly more than 15 % away.
@@ -487,13 +530,16 @@ weeks, with the money parked in SPY after an exit *(re-derived)*.
 4. **Not suggested by this screen, but available if the faithfulness question should be settled.**
    - A pre-registered surface on the investor base that lets a fresh breakout use its pre-breakout floor
      (`support_floor_anchor_scope Nearest` exists as an axis), run through the confirmation grid.
-   - The expected effect is small: about a fifth of the at-the-high skips would come within the cap, and the reader's
-     breakout picks carried no edge here.
+   - The expected effect is small:
+     - between a tenth and three in ten of the at-the-high skips would come within the cap (§3.1);
+     - they would fill only on a pullback to within 2 % of E;
+     - the reader's breakout picks carried no edge here.
    - The trader-style alternative is a nearer reaction-low stop, as the reader used. That is a trader dial, and the
      hybrid's percentage-stop entries already lost 29–39 pp a salt (`project_investor_preset_broad`, 09-28).
 5. **If any reader study runs again:**
    - build the plan's date-axis test first (§6, defect 5);
-   - take "our picks" to be the decision week's `Placed` names, not the next 4 weeks' entries.
+   - take "our picks" to be the decision week's `Placed` names, not the next 4 weeks' entries;
+   - draw at least one date inside 2020.
 
 ## 6. Defects and caveats found
 
@@ -541,6 +587,20 @@ weeks, with the money parked in SPY after an exit *(re-derived)*.
     - The analyst's floor scan reads the host bar store, not the run's v12 warehouse.
     - It reproduces 644 of 672 placed tickets (96 %), and misses NABZY 2006 on the lists (6.7 % depth against the 8 %
       threshold).
+11. **`ours.sh` read split-restated entry prices as raw (found by qc-results, fixed in rework 1).**
+    - The record's `trades.csv` restates `entry_price` onto the exit's split basis when a split falls inside the hold
+      (`round_trip_pairing.mli`). FLO-wein-600 entered 2013-01-03 at 24.81 and reads 16.54 = 24.81 / 1.5, for the split
+      of 2013-06-20.
+    - `ours.sh` passed that to `path.awk` as a raw price, so the split was applied twice: +102.6 % instead of +35.1 %
+      (s0); +106.6 % instead of +37.7 % (s1, s2).
+    - `ours.sh` now multiplies the entry by the `splits.csv` factors in (entry, exit]. FLO is the only window entry
+      whose hold spans a split: 63, 61 and 62 entries checked per salt, including the repeat directories' copies.
+    - Any tool that reads `trades.csv` `entry_price` as the raw fill has the same trap.
+12. **Design: no decision date in calendar 2020 (or 2008).**
+    - Blocks 20 and 21 drew 2019-11-01 and 2021-01-01, so plan §2's "covers … 2020 by construction" does not hold.
+    - 2008 is covered as a bear market (2007-12-14, 2009-01-16), not as a calendar year.
+    - The 2020 crash reaches the study only through the holds of our 2019-11-01 trades (KLIC and DKS stopped on
+      2020-02-28) and their 104-week paths.
 
 ## Images looked at
 
@@ -575,7 +635,7 @@ loops in the analyst session; the scripts and their CSV outputs are committed as
 - **Read 1:** `read1.sh` and `r1rep.awk`, with tails from `hyper.awk` and `fisher.awk`.
 - **Reads 2 and 3:** `stats.awk` (the read 2 split), `boot.awk` (the clustered bootstrap), `paired.awk` (the read 3
   perturbations).
-- **§3.3 and §3.4:** `mgmt.awk` (hold vs managed), `fwd6.awk` and `hz.awk` (decision-date sets).
+- **§3.3 and §3.4:** `mgmt.awk` (hold vs managed), `boot_hold2.awk` (the hold bootstrap, added in rework 1), `fwd6.awk` and `hz.awk` (decision-date sets).
 - **Traces and checks:**
   - `cmpstop.sh`: the reader's stops vs the pre-breakout floor;
   - `later.sh`: later list appearances;

@@ -1,6 +1,6 @@
 #!/bin/sh
 DS=/Users/difan/Projects/trading-1/data
-R=/Users/difan/Projects/trading-1/.claude/worktrees/agent-ad5a719c1e2abb7df/dev/experiments/fresh-eyes-dated-2026-10-18/results/run
+R=${R:-dev/experiments/fresh-eyes-dated-2026-10-18/results/run}   # run from the repo root
 F=$(dirname $0)/fwd.awk
 echo "date,symbol,src,in_sl,in_ord,in_top0,base,r26,r52,r104,last,spy26,spy52,spy104"
 for D in $R/[12][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]; do

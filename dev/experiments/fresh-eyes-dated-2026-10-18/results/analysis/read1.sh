@@ -1,5 +1,5 @@
 #!/bin/sh
-R=/Users/difan/Projects/trading-1/.claude/worktrees/agent-ad5a719c1e2abb7df/dev/experiments/fresh-eyes-dated-2026-10-18/results/run
+R=${R:-dev/experiments/fresh-eyes-dated-2026-10-18/results/run}   # run from the repo root
 echo "dir,side,N,K,sl_n,sl_k,ord_n,ord_k,filled"
 for D in $R/[12]*; do
   b=$(basename $D); [ -f $D/pool.csv ] || { echo "$b,$(cat $D/side.txt),0,0,0,0,0,0,0"; continue; }

@@ -31,6 +31,12 @@ for k in $SALTS; do
   while read -r sym side ed xd epx xpx trig pid; do
     p=$DATA/$(printf %s "$sym" | cut -c1)/$(printf %s "$sym" | rev | cut -c1)/$sym/data.csv
     [ -f "$p" ] || { echo "ours.sh: no daily file for $sym" >&2; continue; }
+    # The record restates entry_price for a position held across a split (entry / factor; FLO-wein-600 2013:
+    # raw 24.81 reads 16.54 after the 1.5 split of 2013-06-20). Undo it so path.awk gets the raw entry
+    # (qc-results on #3328, R2). splits.csv: symbol,date,factor; splits in (entry_date, exit_date].
+    sp=$REC/$PFX$k-v12-splits.csv
+    [ -s "$sp" ] && epx=$(awk -F, -v s="$sym" -v ed="$ed" -v xd="$xd" -v e="$epx" \
+      'NR > 1 && $1 == s && $2 > ed && $2 <= xd { e *= $3 } END { printf "%.6f", e }' "$sp")
     pr=$(awk -F, -v side="$side" -v ed="$ed" -v xd="$xd" -v epx="$epx" -v xpx="$xpx" -v basis=raw -v xo=0 \
       -f $S0/days.awk -f $S/path.awk "$DATA/S/Y/SPY/data.csv" "$p")
     echo "$k,$sym,$side,$ed,$xd,$trig,$pr,$pid" >> "$O/entries.csv.tmp"

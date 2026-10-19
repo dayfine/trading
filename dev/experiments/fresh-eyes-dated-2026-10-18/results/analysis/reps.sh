@@ -1,5 +1,5 @@
 #!/bin/sh
-R=/Users/difan/Projects/trading-1/.claude/worktrees/agent-ad5a719c1e2abb7df/dev/experiments/fresh-eyes-dated-2026-10-18/results/run
+R=${R:-dev/experiments/fresh-eyes-dated-2026-10-18/results/run}   # run from the repo root
 T=$(mktemp -d)
 syms() { awk -F, 'NR>1{print $2}' "$1/pool.csv" | sort > "$2"; }
 slsyms() { awk -F, 'FNR==1{f++} f==1&&FNR>1{s[$1]=$2} f==2&&$1!=""{print s[$1]}' "$1/pool.csv" "$1/shortlist.txt" | sort > "$2"; }

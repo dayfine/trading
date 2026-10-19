@@ -1,6 +1,6 @@
 #!/bin/sh
 DS=/Users/difan/Projects/trading-1/data
-R=/Users/difan/Projects/trading-1/.claude/worktrees/agent-ad5a719c1e2abb7df/dev/experiments/fresh-eyes-dated-2026-10-18/results/run
+R=${R:-dev/experiments/fresh-eyes-dated-2026-10-18/results/run}   # run from the repo root
 echo "date sym trigger reader_stop r_dist | nearest8 n8_vs_trig | nearest7 | ma30 ma_vs_trig | reader stop vs nearest8 / ma30"
 for p in "2003-05-23 ASL" "2005-01-07 GIS" "2005-01-07 WKC" "2007-02-23 CMI" "2013-08-30 KALU" "2013-08-30 AKRX" "2016-11-11 MTB" "2016-11-11 EXPO" "2016-11-11 BK" "2016-11-11 SLF" "2017-07-14 AMGN" "2018-09-07 DCI" "2023-01-20 WPC"; do
   set -- $p; d=$1; s=$2

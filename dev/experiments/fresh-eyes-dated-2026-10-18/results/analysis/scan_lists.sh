@@ -1,7 +1,7 @@
 #!/bin/sh
 # For each of the 24 decision dates, every name on salt-0's decision list for that week: floor scan class vs record outcome.
 DS=/Users/difan/Projects/trading-1/data
-R=/Users/difan/Projects/trading-1/.claude/worktrees/agent-ad5a719c1e2abb7df/dev/experiments/fresh-eyes-dated-2026-10-18/results/run
+R=${R:-dev/experiments/fresh-eyes-dated-2026-10-18/results/run}   # run from the repo root
 echo "date,week,rank,symbol,outcome,aoff,anchor_date,anchor,counter,depth,close,class,close_vs_floor"
 for D in $R/[12][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]; do
   d=$(basename $D)
