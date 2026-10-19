@@ -1,6 +1,6 @@
 # Weekly-start sweep -- BAH SPY
 
-Run date: 2026-10-12
+Run date: 2026-10-19
 End date: 2026-09-28
 Last bar: 2026-09-28
 Window: 3 years trailing
@@ -8,7 +8,7 @@ Cells: 156 (one per Monday)
 Dropped cells: 0
 Initial: $100_000
 
-> **WARNING -- END DATE CLAMPED.** Requested end date 2026-10-12 is 14 days past the last SPY bar (2026-09-28), beyond the 7-day tolerance. Every cell is measured to 2026-09-28, not to 2026-10-12. Refresh the SPY bars to measure to the run date.
+> **WARNING -- END DATE CLAMPED.** Requested end date 2026-10-19 is 21 days past the last SPY bar (2026-09-28), beyond the 7-day tolerance. Every cell is measured to 2026-09-28, not to 2026-10-19. Refresh the SPY bars to measure to the run date.
 
 ## Summary
 
