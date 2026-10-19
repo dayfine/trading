@@ -281,6 +281,38 @@ let test_liquidity_flips_gained_on_one_bar _ =
              : Scan.liquidity_year);
        ])
 
+(* A one-bar pass on both bases is not a fail->pass. No split changes the
+   basis here: the same large print supports both passes. *)
+let test_liquidity_flips_one_bar_pass_on_both_bases _ =
+  let bars =
+    Array.of_list
+      [
+        _bar "2019-06-10" 10.0 20000.0;
+        _bar "2019-06-11" 10.0 20000.0;
+        _bar "2019-06-12" 10.0 300000.0;
+      ]
+  in
+  assert_that
+    (Scan.liquidity_flips
+       (_params ~liquidity_lookback_bars:3 ())
+       ~splits:[]
+       ~is_member:(fun _ -> true)
+       bars)
+    (elements_are
+       [
+         equal_to
+           ({
+              cal_year = 2019;
+              weeks = 1;
+              lost = 0;
+              gained = 0;
+              stored_one_bar = 1;
+              true_one_bar = 1;
+              gained_one_bar = 0;
+            }
+             : Scan.liquidity_year);
+       ])
+
 let test_liquidity_csv _ =
   let year : Scan.liquidity_year =
     {
@@ -319,6 +351,8 @@ let suite =
          >:: test_liquidity_flips_one_bar_pass;
          "test_liquidity_flips_gained_on_one_bar"
          >:: test_liquidity_flips_gained_on_one_bar;
+         "test_liquidity_flips_one_bar_pass_on_both_bases"
+         >:: test_liquidity_flips_one_bar_pass_on_both_bases;
          "test_liquidity_csv" >:: test_liquidity_csv;
          "test_rejected_csv" >:: test_rejected_csv;
        ]
