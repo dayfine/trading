@@ -48,9 +48,48 @@ let test_fixture_unicorn_alone_has_no_gap _ =
     (_window_gaps (Weinstein_strategy.Ad_bars.Unicorn.load ~data_dir))
     is_empty
 
+let _raw_date raw =
+  Date.of_string
+    (sprintf "%s-%s-%s"
+       (String.sub raw ~pos:0 ~len:4)
+       (String.sub raw ~pos:4 ~len:2)
+       (String.sub raw ~pos:6 ~len:2))
+
+let _is_non_trading date =
+  (match Date.day_of_week date with
+    | Day_of_week.Sat | Day_of_week.Sun -> true
+    | _ -> false)
+  || Weinstein_strategy.Exchange_calendar.is_closed date
+
+(* Every "<file> <date>" row on or after [start] that falls on a weekend or a
+   scheduled NYSE holiday. *)
+let _non_trading_rows ~data_dir ~start file =
+  In_channel.read_lines
+    (Filename.concat (Filename.concat data_dir "breadth") file)
+  |> List.filter_map ~f:(fun line ->
+      let date = _raw_date (List.hd_exn (String.split line ~on:',')) in
+      if Date.( >= ) date start && _is_non_trading date then
+        Some (sprintf "%s %s" file (Date.to_string date))
+      else None)
+
+(* Exchange_calendar's holiday rules cover 2000 onwards. Pre-2000 rows
+   deliberately remain unchecked; midweek exceptional closures (2007-01-02,
+   2018-12-05) are outside the calendar and were removed by hand (README.md).
+   Read both raw CSVs so unpaired rows and zero-count placeholders cannot
+   disappear through the Unicorn loader. *)
+let test_fixture_calendar _ =
+  let start = Date.of_string "2000-01-01" in
+  let data_dir = _fixture_data_dir () in
+  assert_that
+    (List.concat_map
+       [ "nyse_advn.csv"; "nyse_decln.csv" ]
+       ~f:(_non_trading_rows ~data_dir ~start))
+    is_empty
+
 let suite =
   "ad_bars_fixture"
   >::: [
+         "fixture: NYSE calendar from 2000 onwards" >:: test_fixture_calendar;
          "fixture: composed breadth has no gap over 1998-2020"
          >:: test_fixture_composed_has_no_gap;
          "fixture: Unicorn breadth alone has no gap over 1998-2020"
