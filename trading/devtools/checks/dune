@@ -1407,10 +1407,21 @@
  (action
   (run sh %{dep:wait_for_test_runner.sh})))
 
-; prune_remote_branches test (outside dune workspace root)
+; prune_remote_branches test
 
 (rule
  (alias runtest)
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:prune_remote_branches_test.sh})))
+
+; Async lane board (.claude/rules/async-lanes.md): pins the turn rules of
+; dev/scripts/lane_board.sh and the iteration cap of dev/scripts/lane_handoff.sh
+; with a fake `gh` on PATH. The scripts live outside the dune workspace root
+; and are read via repo_root() at RUN TIME, so (universe) is required.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:lane_board_test.sh})))
