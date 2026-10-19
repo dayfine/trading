@@ -1268,8 +1268,20 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     shape. Decision logic unchanged; pass count 82 before and after.
     Mutation evidence (quality_score literal broken to 9; suite exit 1,
     81 passed / 1 failed, exactly one `conjunct FAILED` line naming it):
-    scenarios 2, 3, 5, 6; each reverted. Still open: scenario 1 (4),
+    scenarios 2, 3, 5, 6; each reverted. Still open: scenario 1 (5, see slice 5),
     7c, 9-17 and other 4-5 conjunct scenarios (the item stays open).
+  - **Progress 2026-10-19 (slice 5, harness/report-conjuncts-slice5):**
+    converted 1 (5 conjuncts, hand-counted: rc, file exists, structural_qc,
+    behavioral_qc, quality_score; the "(4)" wording in slice 4 above was
+    wrong), 7c (6: rc x2, file exists, file count, canonical q=5, preserved
+    q=4 record), 9 (4), 10 (4), 11 (4), 12 (4), 13 (5) to the slice-2 shape.
+    Decision logic unchanged; pass count 82 before and after. Mutation
+    evidence (one expected literal broken; suite exit 1, exactly one
+    `conjunct FAILED` line naming it; each reverted): 1 `quality_score ==
+    4`; 7c `audit file count == 2`; 9 `consecutive_rework_count=2`; 10
+    `must be a nonnegative integer`; 11 `recorded_at_ns is a plain integer`;
+    12 `quality score '7'`; 13 `got: '0'`. Still open: scenarios 14-18c and
+    other 4-5 conjunct scenarios (the item stays open).
 - [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
   `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
   harness/scenario22-race-2440, issue #2440). This turned out to BE the
