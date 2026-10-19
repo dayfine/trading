@@ -60,6 +60,10 @@ sh dev/scripts/quota_status.sh      # seven-day / five-hour use, today's allowan
 sh dev/scripts/where_is_work.sh     # what is running where (PRs by lane, local jobs, Codex cloud)
 ```
 
+Then read the async lane board (`gh issue view 3330`, rule `async-lanes.md`) and process every `turn/claude`
+item: QC waves, merges, and hand-offs to Codex/Jules via `sh dev/scripts/lane_handoff.sh` (local session
+only). Items on `turn/user` are raised with the user, batched, outside quiet hours.
+
 Size the session from the `suggest:` line. 15 % of the week is reserved for managing (dispatch, results, QC,
 merges); project work spends only the daily allowance. Any job over ~200 model calls follows the `batch-model-run`
 skill (projection, pilot, `--guard`). Why: on 2026-10-14 one batch reader drained the week in under a day and every

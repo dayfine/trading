@@ -607,6 +607,14 @@ spawning the dependent feat-agent. Use the same blueprint as a feature (prefligh
 Blocking refactors take a feature slot in the current run. If all slots are
 consumed by blocking refactors, no feat-agents run today — this is correct.
 
+### 2a2: Async lanes (Codex / Jules)
+
+Read the lane board: `gh issue view 3330` (rule `.claude/rules/async-lanes.md`). Process the `turn/claude`
+items: dispatch the QC waves and merges (`pr-gate-loop.md`), and hand out lane issues up to each lane's
+"Can hand out: N". Do NOT post `@codex` / `@jules` hand-offs from here: a bot-token mention may not trigger
+either agent, so list the hand-offs still owed in the daily summary for the next local session
+(`dev/scripts/lane_handoff.sh`). Leave `turn/user` items alone and mention them in the summary.
+
 ### 2b: Non-blocking followup accumulation (scheduled)
 
 Use deep-scan Check 5's actionable per-file counts: open `- [ ]` items
