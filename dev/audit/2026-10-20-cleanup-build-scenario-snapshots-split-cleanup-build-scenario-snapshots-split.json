@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-20",
+  "feature": "cleanup-build-scenario-snapshots-split",
+  "branch": "cleanup/build-scenario-snapshots-split",
+  "sha": "db181ceede74a15cb0118e1825d46837cbe63e75",
+  "recorded_at_ns": 1792507774674834357,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
