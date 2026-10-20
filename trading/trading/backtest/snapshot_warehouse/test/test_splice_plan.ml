@@ -33,10 +33,10 @@ let _with_temp_dir f =
 
 let _write_csv ~data_dir ~symbol bars =
   match Csv.Csv_storage.create ~data_dir:(Fpath.v data_dir) symbol with
-  | Error e -> assert_failure ("csv create: " ^ Status.show e)
+  | Error e -> failwith ("csv create: " ^ Status.show e)
   | Ok storage -> (
       match Csv.Csv_storage.save storage ~override:true bars with
-      | Error e -> assert_failure ("csv save: " ^ Status.show e)
+      | Error e -> failwith ("csv save: " ^ Status.show e)
       | Ok () -> ())
 
 let _setup data_dir =
