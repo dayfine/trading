@@ -1,4 +1,4 @@
-((run_date 2026-10-12) (end_date 2026-09-28) (symbol SPY)
+((run_date 2026-10-19) (end_date 2026-09-28) (symbol SPY)
  (initial_cash 100000) (years_back 3)
  (cells
   (((start_date 2023-10-02) (final_value 179865.41873946492)
@@ -475,5 +475,5 @@
    (median_cagr 0.17502684771887045) (mean_cagr 0.18008462320642923)
    (stddev_cagr 0.063500869170521321) (n_cells 156)))
  (coverage
-  ((requested_end_date 2026-10-12) (last_bar_date 2026-09-28)
+  ((requested_end_date 2026-10-19) (last_bar_date 2026-09-28)
    (tolerance_days 7) (clamped true))))
