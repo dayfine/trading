@@ -61,6 +61,47 @@ let test_exit_reason_empty_file _ =
     (Hashtbl.length (T.exit_reason_lookup ~scenario_dir:dir))
     (equal_to 0)
 
+let test_exit_reason_empty_trigger_kept _ =
+  let dir =
+    write_scenario
+      ~csv:
+        "symbol,entry_date,exit_date,exit_trigger\n\
+         AAPL,2020-01-02,2020-03-02,\n\
+         MSFT,2020-01-03,2020-04-01,stop_loss\n"
+  in
+  let tbl = T.exit_reason_lookup ~scenario_dir:dir in
+  assert_that
+    (Hashtbl.length tbl, Hashtbl.find tbl (key "AAPL" "2020-01-02" "2020-03-02"))
+    (equal_to ((2, Some "") : int * string option))
+
+let test_exit_reason_duplicate_key_last_wins _ =
+  let dir =
+    write_scenario
+      ~csv:
+        "symbol,entry_date,exit_date,exit_trigger\n\
+         AAPL,2020-01-02,2020-03-02,a\n\
+         AAPL,2020-01-02,2020-03-02,c\n\
+         AAPL,2020-01-02,2020-03-02,b\n"
+  in
+  let tbl = T.exit_reason_lookup ~scenario_dir:dir in
+  (* The last row is neither the first, the max nor the min. *)
+  assert_that
+    (Hashtbl.find tbl (key "AAPL" "2020-01-02" "2020-03-02"))
+    (equal_to (Some "b" : string option))
+
+let test_exit_reason_leading_blank_line _ =
+  let dir =
+    write_scenario
+      ~csv:
+        "\n\
+         symbol,entry_date,exit_date,exit_trigger\n\
+         AAPL,2020-01-02,2020-03-02,stop_loss\n"
+  in
+  let tbl = T.exit_reason_lookup ~scenario_dir:dir in
+  assert_that
+    (Hashtbl.find tbl (key "AAPL" "2020-01-02" "2020-03-02"))
+    (equal_to (Some "stop_loss" : string option))
+
 let index =
   T.build_mfe_index
     [
@@ -94,6 +135,19 @@ let test_find_tolerance_edges _ =
 let test_find_unknown_symbol _ =
   assert_that (find "ZZZ" "2020-01-10") (equal_to (None : float option))
 
+let test_find_tie_prefers_later_listed _ =
+  (* Both entries are 2 days from 2020-01-12. Asserting both listing orders
+     separates "later listed wins" from date- and MFE-based tie-breaks. *)
+  let tie entries =
+    T.find_mfe
+      (T.build_mfe_index entries)
+      ~symbol:"AAPL" ~entry_date:(d "2020-01-12")
+  in
+  assert_that
+    ( tie [ ("AAPL", d "2020-01-14", 0.50); ("AAPL", d "2020-01-10", 0.30) ],
+      tie [ ("AAPL", d "2020-01-10", 0.30); ("AAPL", d "2020-01-14", 0.50) ] )
+    (equal_to ((Some 0.30, Some 0.50) : float option * float option))
+
 let test_tolerance_value _ = assert_that T.join_tolerance_days (equal_to 7)
 
 let suite =
@@ -104,9 +158,17 @@ let suite =
          >:: test_exit_reason_skips_incomplete_rows;
          "exit_reason missing column" >:: test_exit_reason_missing_column;
          "exit_reason empty file" >:: test_exit_reason_empty_file;
+         "exit_reason empty trigger kept"
+         >:: test_exit_reason_empty_trigger_kept;
+         "exit_reason duplicate key last wins"
+         >:: test_exit_reason_duplicate_key_last_wins;
+         "exit_reason leading blank line"
+         >:: test_exit_reason_leading_blank_line;
          "find_mfe exact and nearest" >:: test_find_exact_and_nearest;
          "find_mfe tolerance edges" >:: test_find_tolerance_edges;
          "find_mfe unknown symbol" >:: test_find_unknown_symbol;
+         "find_mfe tie prefers later listed"
+         >:: test_find_tie_prefers_later_listed;
          "join tolerance value" >:: test_tolerance_value;
        ]
 
