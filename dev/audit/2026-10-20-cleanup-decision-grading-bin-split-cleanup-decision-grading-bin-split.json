@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-20",
+  "feature": "cleanup-decision-grading-bin-split",
+  "branch": "cleanup/decision-grading-bin-split",
+  "sha": "780ccf7635ad90fc436aa805ecc07fbbdcfba1f9",
+  "recorded_at_ns": 1792513392731154828,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
