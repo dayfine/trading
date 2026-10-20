@@ -878,8 +878,10 @@ audit_count_7c="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-27-*${FEATURE7C}.
 # Confirm the FIRST record (q=4) survived under a distinct (preserved)
 # filename rather than vanishing.
 preserved_7c_found=0
+preserved_7c_scores=""
 for f in "${TMP_REPO}/dev/audit/2026-07-27-"*"${FEATURE7C}.json"; do
   [[ "${f}" == "${JSON7C}" ]] && continue
+  preserved_7c_scores+=" $(basename "${f}"):$(_json_actual "${f}" quality_score)"
   grep -q '"quality_score": *4' "${f}" && preserved_7c_found=1
 done
 
@@ -889,7 +891,7 @@ C7C=(
   "JSON7C exists" "$(_flag test -f "${JSON7C}")"
   "audit file count == 2 (actual: ${audit_count_7c})" "$(_eq "${audit_count_7c}" 2)"
   "JSON7C quality_score == 5 (actual: $(_json_actual "${JSON7C}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON7C}")"
-  "first record (q=4) preserved under a distinct filename" "${preserved_7c_found}"
+  "first record (q=4) preserved under a distinct filename (non-canonical records found:${preserved_7c_scores:- none})" "${preserved_7c_found}"
 )
 if _pairs_ok "${C7C[@]}"; then
   pass "scenario 7c — empty --branch fallback: sha-based identity now preserves rather than clobbers a same-day collision (gap narrowed by H-AUDIT-REWORK-COUNT-BLIND)"
@@ -1198,12 +1200,18 @@ out14=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="/nonexistent/gh-binary-t
 
 audit_count_after_14="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE14}.json")"
 
-if (( rc14 == 1 )) && [[ "${audit_count_before_14}" == "0" ]] && [[ "${audit_count_after_14}" == "0" ]] \
-   && grep -q "not available on PATH" <<<"${out14}" \
-   && grep -q "dev/reviews/${FEATURE14}.md" <<<"${out14}"; then
+C14=(
+  "rc14==1 (actual=${rc14})" "$(_eq "${rc14}" 1)"
+  "audit count before == 0 (actual: ${audit_count_before_14})" "$(_eq "${audit_count_before_14}" 0)"
+  "audit count after == 0 (actual: ${audit_count_after_14})" "$(_eq "${audit_count_after_14}" 0)"
+  "stdout has 'not available on PATH'" "$(_grep_ok "not available on PATH" <<<"${out14}")"
+  "stdout names dev/reviews/${FEATURE14}.md" "$(_grep_ok "dev/reviews/${FEATURE14}.md" <<<"${out14}")"
+)
+if _pairs_ok "${C14[@]}"; then
   pass "scenario 14 — missing gh binary with --pr-number refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK)"
 else
   fail "scenario 14 — expected rc=1, no file written, message naming missing gh + review path; got rc=${rc14}, before=${audit_count_before_14}, after=${audit_count_after_14}"
+  report_conjuncts "${C14[@]}"
   echo "${out14}" | sed 's/^/      /'
 fi
 
@@ -1236,11 +1244,17 @@ out15=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record
 
 audit_count_after_15="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE15}.json")"
 
-if (( rc15 == 1 )) && [[ "${audit_count_before_15}" == "0" ]] && [[ "${audit_count_after_15}" == "0" ]] \
-   && grep -q "quality score '0' is not an integer in 1..5" <<<"${out15}"; then
+C15=(
+  "rc15==1 (actual=${rc15})" "$(_eq "${rc15}" 1)"
+  "audit count before == 0 (actual: ${audit_count_before_15})" "$(_eq "${audit_count_before_15}" 0)"
+  "audit count after == 0 (actual: ${audit_count_after_15})" "$(_eq "${audit_count_after_15}" 0)"
+  "stdout names quality score '0' not in 1..5" "$(_grep_ok "quality score '0' is not an integer in 1..5" <<<"${out15}")"
+)
+if _pairs_ok "${C15[@]}"; then
   pass "scenario 15 — zero quality score (file-mode) rejected with exit 1, no record written (H-QC-SCALE lower bound)"
 else
   fail "scenario 15 — expected rc=1, no file written, message naming '0'; got rc=${rc15}, before=${audit_count_before_15}, after=${audit_count_after_15}"
+  report_conjuncts "${C15[@]}"
   echo "${out15}" | sed 's/^/      /'
 fi
 
@@ -1275,11 +1289,17 @@ out16=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record
 
 audit_count_after_16="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE16}.json")"
 
-if (( rc16 == 1 )) && [[ "${audit_count_before_16}" == "0" ]] && [[ "${audit_count_after_16}" == "0" ]] \
-   && grep -q "quality score '10' is not an integer in 1..5" <<<"${out16}"; then
+C16=(
+  "rc16==1 (actual=${rc16})" "$(_eq "${rc16}" 1)"
+  "audit count before == 0 (actual: ${audit_count_before_16})" "$(_eq "${audit_count_before_16}" 0)"
+  "audit count after == 0 (actual: ${audit_count_after_16})" "$(_eq "${audit_count_after_16}" 0)"
+  "stdout names quality score '10' not in 1..5" "$(_grep_ok "quality score '10' is not an integer in 1..5" <<<"${out16}")"
+)
+if _pairs_ok "${C16[@]}"; then
   pass "scenario 16 — double-digit quality score '10' (file-mode) rejected, pins multi-digit capture + end-anchored range check"
 else
   fail "scenario 16 — expected rc=1, no file written, message naming '10'; got rc=${rc16}, before=${audit_count_before_16}, after=${audit_count_after_16}"
+  report_conjuncts "${C16[@]}"
   echo "${out16}" | sed 's/^/      /'
 fi
 
@@ -1302,12 +1322,18 @@ out17=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
 
 audit_count_after_17="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE17}.json")"
 
-if (( rc17 == 1 )) && [[ "${audit_count_before_17}" == "0" ]] && [[ "${audit_count_after_17}" == "0" ]] \
-   && grep -q "must be an integer 1..5" <<<"${out17}" \
-   && grep -q "got: '6'" <<<"${out17}"; then
+C17=(
+  "rc17==1 (actual=${rc17})" "$(_eq "${rc17}" 1)"
+  "audit count before == 0 (actual: ${audit_count_before_17})" "$(_eq "${audit_count_before_17}" 0)"
+  "audit count after == 0 (actual: ${audit_count_after_17})" "$(_eq "${audit_count_after_17}" 0)"
+  "stdout has 'must be an integer 1..5'" "$(_grep_ok "must be an integer 1..5" <<<"${out17}")"
+  "stdout has \"got: '6'\"" "$(_grep_ok "got: '6'" <<<"${out17}")"
+)
+if _pairs_ok "${C17[@]}"; then
   pass "scenario 17 — write_audit.sh rejects --quality-score 6 directly, no record written (H-QC-SCALE upper bound)"
 else
   fail "scenario 17 — expected rc=1, no file written, message naming '6'; got rc=${rc17}, before=${audit_count_before_17}, after=${audit_count_after_17}"
+  report_conjuncts "${C17[@]}"
   echo "${out17}" | sed 's/^/      /'
 fi
 
@@ -1329,12 +1355,18 @@ out18=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
 
 audit_count_after_18="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE18}.json")"
 
-if (( rc18 == 1 )) && [[ "${audit_count_before_18}" == "0" ]] && [[ "${audit_count_after_18}" == "0" ]] \
-   && grep -q "must be an integer 1..5" <<<"${out18}" \
-   && grep -q "got: '3.5'" <<<"${out18}"; then
+C18=(
+  "rc18==1 (actual=${rc18})" "$(_eq "${rc18}" 1)"
+  "audit count before == 0 (actual: ${audit_count_before_18})" "$(_eq "${audit_count_before_18}" 0)"
+  "audit count after == 0 (actual: ${audit_count_after_18})" "$(_eq "${audit_count_after_18}" 0)"
+  "stdout has 'must be an integer 1..5'" "$(_grep_ok "must be an integer 1..5" <<<"${out18}")"
+  "stdout has \"got: '3.5'\"" "$(_grep_ok "got: '3.5'" <<<"${out18}")"
+)
+if _pairs_ok "${C18[@]}"; then
   pass "scenario 18 — write_audit.sh rejects --quality-score 3.5 directly, no record written (H-QC-SCALE non-integer)"
 else
   fail "scenario 18 — expected rc=1, no file written, message naming '3.5'; got rc=${rc18}, before=${audit_count_before_18}, after=${audit_count_after_18}"
+  report_conjuncts "${C18[@]}"
   echo "${out18}" | sed 's/^/      /'
 fi
 
@@ -1356,12 +1388,17 @@ out18b=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
 
 JSON18B="${TMP_REPO}/dev/audit/2026-07-27-harness-z-${FEATURE18B}.json"
 
-if (( rc18b == 0 )) && [[ -f "${JSON18B}" ]] \
-   && grep -q '"harness_gap": *"LINTER_CANDIDATE: golden scenario would have caught this"' "${JSON18B}" \
-   && ! grep -q "harness-gap is only meaningful" <<<"${out18b}"; then
+C18B=(
+  "rc18b==0 (actual=${rc18b})" "$(_eq "${rc18b}" 0)"
+  "JSON18B exists" "$(_flag test -f "${JSON18B}")"
+  "JSON18B harness_gap text survives (actual: $(_json_actual "${JSON18B}" harness_gap))" "$(_grep_ok '"harness_gap": *"LINTER_CANDIDATE: golden scenario would have caught this"' "${JSON18B}")"
+  "stdout has no 'harness-gap is only meaningful' WARNING" "$(_eq "$(_grep_ok "harness-gap is only meaningful" <<<"${out18b}")" 0)"
+)
+if _pairs_ok "${C18B[@]}"; then
   pass "scenario 18b — --harness-gap survives an APPROVED verdict, no longer discarded (H-AUDIT-HARNESS-GAP-DROPPED-ON-APPROVED fix)"
 else
   fail "scenario 18b — expected the harness_gap text to survive in the record with no WARNING; got rc=${rc18b}"
+  report_conjuncts "${C18B[@]}"
   echo "${out18b}" | sed 's/^/      /'
   [[ -f "${JSON18B}" ]] && echo "      json: $(cat "${JSON18B}")"
 fi
@@ -1379,11 +1416,16 @@ out18c=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
 
 JSON18C="${TMP_REPO}/dev/audit/2026-07-27-harness-z2-${FEATURE18C}.json"
 
-if (( rc18c == 0 )) && [[ -f "${JSON18C}" ]] \
-   && grep -q '"harness_gap": *"MISSING_TEST_PATTERN: no golden for this stop transition"' "${JSON18C}"; then
+C18C=(
+  "rc18c==0 (actual=${rc18c})" "$(_eq "${rc18c}" 0)"
+  "JSON18C exists" "$(_flag test -f "${JSON18C}")"
+  "JSON18C harness_gap text survives (actual: $(_json_actual "${JSON18C}" harness_gap))" "$(_grep_ok '"harness_gap": *"MISSING_TEST_PATTERN: no golden for this stop transition"' "${JSON18C}")"
+)
+if _pairs_ok "${C18C[@]}"; then
   pass "scenario 18c — --harness-gap on NEEDS_REWORK unaffected by the fix (control)"
 else
   fail "scenario 18c — expected the harness_gap text to survive on a NEEDS_REWORK record; got rc=${rc18c}"
+  report_conjuncts "${C18C[@]}"
   echo "${out18c}" | sed 's/^/      /'
   [[ -f "${JSON18C}" ]] && echo "      json: $(cat "${JSON18C}")"
 fi
