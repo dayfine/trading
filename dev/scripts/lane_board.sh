@@ -14,20 +14,23 @@
 # Turn (first match wins), per PR:
 #   ours    the lane replied (comment/review) after OUR hand-off: we must read and answer
 #   theirs  a gate reads `rework`; or OUR hand-off comment (marker
-#           `<!-- lane-handoff`) is newer than their last push/comment; or CI
+#           `<!-- lane-handoff` or a word-bounded @lane mention by a non-lane
+#           author) is newer than their last push/comment; or CI
 #           is FAIL/none (they must fix or retrigger)
 #   ours    CI pending, or CI green with a QC gate missing/stale/unclear
 #           (the gate state comes from dev/scripts/pr_gate_status.sh)
 #   merge   CI pass and both gates ok|skip
 #   user    the item is NOT `merge` and nothing moved for more than STALE_H hours
 # Per lane issue with no PR that mentions it:
-#   theirs  handed out (marker comment present), no reply since
-#   ours    never handed out, or the lane replied after the hand-off (we must read it)
+#   theirs  handed out (marker or non-lane @lane mention), no move since
+#   ours    never handed out, or the lane replied/pushed after the hand-off
 #   user    handed out and silent past STALE_H (never-handed-out issues are backlog,
 #           not stuck, so they stay `ours`)
 # The Codex connector's automatic "create an environment for this repo" reply is NOT a move
 # (every @codex mention gets it until the environment is registered, #3324). A lane issue
 # that a PR now covers loses its turn/* label.
+# A lane branch with no open PR counts as an issue move when its name or head
+# commit message mentions #N (head commit date; matching lane only).
 # "Last move" = newest of their pushes/comments and our comments/reviews. Issue
 # and PR updatedAt are NOT used: this script's own label edits would reset it.
 # Label per item: turn/claude (ours, merge), turn/codex, turn/jules, turn/user.
@@ -95,6 +98,23 @@ for lane in codex jules; do
     >> "$T/issues.jsonl"
 done
 
+# Branch heads without an open PR: one branch listing and one commit read per
+# lane branch. Use commit dates, never branch/issue updatedAt (label churn).
+: > "$T/pushes.jsonl"
+gh api --paginate --slurp "repos/$REPO/branches?per_page=100" > "$T/branches.json"
+jq -r --slurpfile prs "$T/prs.json" '
+  add[] | . as $b
+  | select(.name | test("^(codex|jules)/"))
+  | select(any($prs[0][]; .headRefName == $b.name) | not)
+  | [.name, .commit.sha] | @tsv' "$T/branches.json" > "$T/branches.tsv"
+while IFS="	" read -r branch sha; do
+  gh api "repos/$REPO/commits/$sha" > "$T/commit.json"
+  jq -c --arg branch "$branch" '
+    {lane: ($branch | split("/")[0]),
+     ref: ($branch + " " + .commit.message),
+     t: (.commit.committer.date | fromdateiso8601)}' "$T/commit.json" >> "$T/pushes.jsonl"
+done < "$T/branches.tsv"
+
 # --- 4. classify -----------------------------------------------------------
 cat > "$T/classify.jq" <<'JQ'
 def tmax: (map(select(. != null)) | max) // 0;
@@ -102,6 +122,8 @@ def gv: if . == null then "none" else (split("(")[0]) end;
 def okish: . == "ok" or . == "skip";
 def setup_noise:
   (.who | test("chatgpt-codex-connector"; "i")) and (.body | test("create an environment for this repo"; "i"));
+def handoff($lane):
+  (.body | test("lane-handoff")) or (.body | test("@" + $lane + "\\b"; "i"));
 def finish($now; $stale):
   (([.th, .ou] | max)) as $last
   | (if $last == 0 then 0 else (($now - $last) / 3600 | floor) end) as $idle
@@ -121,7 +143,7 @@ $p[0] as $prs
   | ($evs | map(select((.who | test($p.lane; "i")) | not))) as $oe
   | (($v.commits + ($te | map(.t))) | tmax) as $th
   | ($oe | map(.t) | tmax) as $ou
-  | ($oe | map(select(.body | test("lane-handoff")) | .t) | tmax) as $ho
+  | ($oe | map(select(handoff($p.lane)) | .t) | tmax) as $ho
   | ($te | map(.t) | tmax) as $tr
   | {kind: "pr", number: $p.number, title: $p.title, lane: $p.lane,
      labels: [$p.labels[].name], gates: "\($g.ci)/\($s)/\($b)",
@@ -141,9 +163,11 @@ $p[0] as $prs
       {kind: "issue", number: $i.number, lane: $i.lane, labels: [$i.labels[].name], covered: true}
     else
   ($i.comments | map({t: (.createdAt | fromdateiso8601), who: (.author.login // ""), body: (.body // "")} | select(setup_noise | not))) as $ev
-  | ($ev | map(select(.who | test($i.lane; "i")) | .t) | tmax) as $th
+  | ((($ev | map(select(.who | test($i.lane; "i")) | .t))
+      + [$pushes[] | select(.lane == $i.lane)
+          | select(.ref | test("#\($i.number)([^0-9]|$)")) | .t]) | tmax) as $th
   | ($ev | map(select((.who | test($i.lane; "i")) | not)) | map(.t)) as $ot
-  | ($ev | map(select((.who | test($i.lane; "i")) | not) | select(.body | test("lane-handoff")) | .t) | tmax) as $ho
+  | ($ev | map(select((.who | test($i.lane; "i")) | not) | select(handoff($i.lane)) | .t) | tmax) as $ho
   | {kind: "issue", number: $i.number, title: $i.title, lane: $i.lane,
      labels: [$i.labels[].name], gates: "-",
      th: $th, ou: (($ot + [$i.createdAt | fromdateiso8601]) | tmax),
@@ -156,7 +180,8 @@ $p[0] as $prs
 JQ
 jq -n -f "$T/classify.jq" --argjson now "$NOW" --argjson stale "$STALE_H" \
   --slurpfile p "$T/prs.json" --slurpfile views "$T/views.jsonl" \
-  --slurpfile gates "$T/gates.jsonl" --slurpfile issues "$T/issues.jsonl" > "$T/items.json"
+  --slurpfile gates "$T/gates.jsonl" --slurpfile issues "$T/issues.jsonl" \
+  --slurpfile pushes "$T/pushes.jsonl" > "$T/items.json"
 jq 'map(select(.covered | not))' "$T/items.json" > "$T/rows.json"
 
 # --- 5. board markdown -----------------------------------------------------

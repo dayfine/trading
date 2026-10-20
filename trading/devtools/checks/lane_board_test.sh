@@ -38,7 +38,13 @@ case "$1 $2" in
   "issue list") case "$*" in *agent/codex*) cat "$FX/issues_codex.json" ;; *) cat "$FX/issues_jules.json" ;; esac ;;
   "issue view") cat "$FX/issueview_$3.json" ;;
   "label list") cat "$FX/labels.json" ;;
-  "api "*) echo "https://github.com/x/pull/1#pullrequestreview-9" ;;
+  "api "*)
+    echo "$*" >> "$FX/reads.log"
+    case "$*" in
+      *'/branches?'*) cat "$FX/branches.json" ;;
+      *'/commits/'*) cat "$FX/commit_${2##*/}.json" ;;
+      *) echo "https://github.com/x/pull/1#pullrequestreview-9" ;;
+    esac ;;
   *)
     echo "$*" | tr '\n' ' ' >> "$FX/calls.log"; echo >> "$FX/calls.log"
     prev=""
@@ -61,6 +67,7 @@ pr() { # pr <n> <branch> <labels-json> <body>
 }
 newfx() {
   FX="$W/fx$1"; mkdir -p "$FX"; export FX
+  echo '[[]]' > "$FX/branches.json"
   echo '[]' > "$FX/labels.json"; echo '[]' > "$FX/issues_codex.json"; echo '[]' > "$FX/issues_jules.json"
 }
 run_board() {
@@ -210,6 +217,52 @@ expect "$C" 'issue edit 704 --repo dayfine/trading --remove-label turn/codex' "c
 refute "$C" 'edit 704 .*--add-label' "covered issue gets no new turn label"
 # noise must not reset the idle clock: 603's only non-noise move is the 5 h hand-off
 expect "$B" '^\| #603 .*\| 5 \|' "noise does not reset idle"
+
+# ---------------- scenario 2c: hand-written hand-offs and branch heads -----
+newfx 5
+printf '[%s,%s]\n' "$(pr 801 jules/open '[]' x)" "$(pr 802 codex/open '[]' x)" > "$FX/prlist.json"
+view 801 20 "[$(cm dayfine 2 '@jules please fix this')]"
+view 802 20 "[$(cm dayfine 2 '@codex please fix this'),$(cm 'chatgpt-codex-connector[bot]' 1 "$NOISE")]"
+gates <<'G'
+801 pass none none none - x
+802 pass none none none - x
+G
+cat > "$FX/issues_jules.json" <<J
+[{"number":901,"title":"manual hand-off","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 2 '@jules, please take this')]},
+ {"number":902,"title":"stale manual hand-off","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 49 '@Jules please take this')]},
+ {"number":903,"title":"branch message move","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 10 '@jules please take this')]},
+ {"number":904,"title":"word boundary","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 49 '@jules_extra is another handle')]},
+ {"number":905,"title":"branch name move","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 10 '@jules please take this')]},
+ {"number":906,"title":"open PR branch ignored","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 10 '@jules please take this')]},
+ {"number":907,"title":"own mention not hand-off","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm jules-bot 49 '@jules working on it')]},
+ {"number":908,"title":"wrong lane push","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 10 '@jules please take this')]}]
+J
+cat > "$FX/issues_codex.json" <<J
+[{"number":909,"title":"setup noise","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 49 '@codex please take this'),$(cm 'chatgpt-codex-connector[bot]' 1 "$NOISE")]},
+ {"number":910,"title":"codex branch move","labels":[],"createdAt":"2026-01-01T00:00:00Z","comments":[$(cm dayfine 10 '@codex please take this')]}]
+J
+cat > "$FX/branches.json" <<'J'
+[[{"name":"jules/wip","commit":{"sha":"a"}},
+  {"name":"jules/#905-work","commit":{"sha":"b"}},
+  {"name":"jules/open","commit":{"sha":"ignored"}},
+  {"name":"feat/other","commit":{"sha":"ignored2"}}],
+ [{"name":"codex/wip","commit":{"sha":"c"}}]]
+J
+printf '{"commit":{"committer":{"date":"%s"},"message":"Implement #903 and #9080"}}\n' "$(ago 1)" > "$FX/commit_a.json"
+printf '{"commit":{"committer":{"date":"%s"},"message":"work"}}\n' "$(ago 1)" > "$FX/commit_b.json"
+printf '{"commit":{"committer":{"date":"%s"},"message":"Implement #908 and #910"}}\n' "$(ago 1)" > "$FX/commit_c.json"
+run_board
+B="$FX/board.md"; C="$FX/calls.log"
+for n in 801 802 901 906 908; do expect "$B" "^\| #$n .*\| theirs \|" "manual hand-off $n -> theirs"; done
+for n in 902 909; do expect "$B" "^\| #$n .*\| user \|" "silent manual hand-off $n -> user (noise excluded)"; done
+for n in 903 905 910; do expect "$B" "^\| #$n .*\| ours \|.*\| 1 \|" "branch head $n -> ours and resets idle"; done
+for n in 904 907; do expect "$B" "^\| #$n .*\| ours \|" "non-hand-off $n remains ours"; done
+expect "$C" 'issue edit 901 .*--add-label turn/jules' "manual hand-off sets turn/jules"
+expect "$C" 'issue edit 902 .*--add-label turn/user' "stale manual hand-off sets turn/user"
+expect "$C" 'issue edit 903 .*--add-label turn/claude' "branch push sets turn/claude"
+[ "$(grep -c '/branches?' "$FX/reads.log")" = 1 ] || fail "one branch listing"
+[ "$(grep -c '/commits/' "$FX/reads.log")" = 3 ] || fail "one commit read per eligible lane branch"
+refute "$FX/reads.log" 'ignored' "open-PR and non-lane branches not read"
 
 # ---------------- scenario 3: lane_handoff.sh -----------------------------
 newfx 3
