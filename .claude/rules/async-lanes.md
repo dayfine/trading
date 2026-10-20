@@ -30,8 +30,26 @@ reply, and no Codex hand-offs go out. The board ignores that reply (it is not a 
    after our hand-off, moves the turn back to us at the next board run (we must read and answer the
    reply, even when a rework gate still reads `rework`). A rework gate with no reply or push since the
    hand-off stays `theirs`. An issue that a lane PR now mentions (`#N`) loses its `turn/*` label.
+A hand-off is either a `<!-- lane-handoff` marker or a word-bounded `@codex` / `@jules` mention
+   in a comment/review by someone outside that lane. Connector setup replies remain excluded.
+   For an issue with no covering PR, a `codex/*` or `jules/*` branch with no open lane PR is also a
+   lane move when its name or head commit message mentions `#N`. The board uses the head's committer
+   date and matches only that issue's lane; it lists branches once (paginated) and reads each
+   eligible head once.
 5. **48 h of silence** from either side turns the item `turn/user` (except items ready to merge), and the board gets one comment. The user
    decides: nudge, reassign, or close. An issue never handed out stays `turn/claude`: it is backlog, not stuck.
+
+## Turn table
+
+| Item | Condition | Turn |
+|---|---|---|
+| PR | Lane reply after our hand-off | `turn/claude` (read and answer) |
+| PR | Rework gate, newer hand-off than lane move, or CI fail/missing | Lane's turn |
+| PR | CI pending, or green with a missing/stale QC gate | `turn/claude` |
+| PR | CI pass and both QC gates ok/skip | `turn/claude` (merge) |
+| Issue without covering PR | Handed off, no lane reply or matching branch head since | Lane's turn |
+| Issue without covering PR | Never handed off, or lane reply/branch head after hand-off | `turn/claude` |
+| Handed-off issue / non-merge PR | No move for more than 48 h | `turn/user` |
 
 ## Caps
 
@@ -47,4 +65,6 @@ A `do-not-merge` label still holds.
 
 `trading/devtools/checks/lane_board_test.sh` pins the turn rules with a fake `gh`: rework is theirs, green CI
 with no QC is ours, all gates ok is merge, 49 h of silence is user, a non-lane PR is ignored, over cap shows
-`can hand out: 0`, and `lane_handoff.sh` iteration 3 refuses.
+`can hand out: 0`, and `lane_handoff.sh` iteration 3 refuses. It also pins manual mentions,
+word boundaries, non-lane authors, setup-noise exclusion, matching branch names/messages, lane and
+issue-number boundaries, pagination and the exclusion of branches with open PRs.
