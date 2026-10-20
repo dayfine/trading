@@ -258,10 +258,11 @@ ol.agenda li b { font-weight: 600; }
     <div class="tablebox"><table id="d-picks"></table></div>
   </div>
   <div class="panel">
-    <h2>P&amp;L anatomy by entry year</h2>
-    <p class="note">Per entry year: average position weight at entry (entry value ÷ NAV that day), win rate, average win and loss (side-signed %), payoff (avg win ÷ avg loss), expectancy per trade (p × win − (1 − p) × loss) and the sum of each trade's P&amp;L as a share of NAV at its entry. The line below reads the whole run's shape: how concentrated the result is, how fat each tail is, and hindsight outcome counts.</p>
+    <div class="row" style="justify-content:space-between"><h2>P&amp;L anatomy by run and entry year</h2><label>Run <select id="a-run" aria-label="P&amp;L anatomy run"></select></label></div>
+    <p class="note">Closed trades, grouped by entry year and for the whole selected run. Weight is entry notional ÷ NAV on or before entry; Σ P&amp;L / NAV sums each trade’s P&amp;L ÷ its entry NAV. Win rate uses positive dollar P&amp;L; average loss is a positive magnitude over negative trades. Expectancy is the mean signed trade return, including breakevens. Missing input or an undefined ratio reads <b>n/a</b>.</p>
     <div class="tablebox"><table id="d-anat"></table></div>
-    <p class="note" id="d-anat-shape" style="margin-top:8px"></p>
+    <p class="note" style="margin-top:8px">Top-k share uses the largest signed dollar profits ÷ net realised P&amp;L and can exceed 100%. Hill α uses positive profits and absolute losses separately, with k = floor(10% × sample size), compared with the next-largest value; fewer than 10 observations or a tied tail reads n/a. <b>Hindsight, 13-week path (65 trading bars starting on or after exit):</b> whipsaw = losing trade then ≥15% in its favour; good stop = losing stop then ≤−5% continuation; rotation regret = laggard exit then ≥15% in its favour. Counts need all relevant trades’ 65-bar continuations; a truncated or missing path reads n/a. Whipsaw and regret can overlap.</p>
+    <div class="tablebox"><table id="d-anat-shape"></table></div>
   </div>
   <div class="grid2">
     <div class="panel">
@@ -477,10 +478,10 @@ const D = {};
 const load = p => fetch('data/' + p).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); });
 const chartCache = {};
 
-const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open', 'missed'];
+const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open', 'missed', 'anatomy'];
 load('manifest.json').then(man => {
   D.man = man; const ids = man.runs.map(r => r.id);
-  return Promise.all([...KINDS.flatMap(k => ids.map(id => k === 'missed' ? load(`${id}_${k}.json`).catch(() => null) : load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json'), load('spy_warmup.json').catch(() => [])]);
+  return Promise.all([...KINDS.flatMap(k => ids.map(id => ['missed', 'anatomy'].includes(k) ? load(`${id}_${k}.json`).catch(() => null) : load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json'), load('spy_warmup.json').catch(() => [])]);
 }).then(r => {
   const n = D.man.runs.length;
   KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
@@ -511,6 +512,7 @@ function init() {
   $('#packstamp').textContent = packStamp(D.man);
   const opts = (note) => D.man.runs.map((r, i) => `<option value="${i}">${runLabel(i)} (${pct(D.meta[i].metrics.totalreturnpct, 0)})${note && i !== CH() ? ' · no charts' : ''}</option>`).join('');
   $('#p-salt').innerHTML = opts(false); $('#t-salt').innerHTML = opts(true); $('#t-salt').value = String(CH());
+  $('#a-run').innerHTML = opts(false); $('#a-run').value = String(CH()); $('#a-run').addEventListener('change', renderAnatomy);
   $('#flags-title').textContent = `Per-trade flags, ${runLabel(CH())}`;
   labelRunKind(); renderOverview(); renderMissedWinners(); renderPeriods(); initTrades(); renderHilo(); renderSurprises(); renderDiag(); renderAnatomy(); renderSalts(); renderAgenda();
   $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
@@ -1217,48 +1219,23 @@ function renderDiag() {
 }
 
 /* ---------- P&L anatomy (#3140 part 3) ---------- */
-// Hill tail index of the k largest values of xs (all > 0): k / sum ln(x_i / x_(k+1)). Larger = thinner
-// tail. null with fewer than k + 1 values or k < 2. Pure, for review_pack_test.sh.
-function hillAlpha(xs, k) {
-  const s = xs.filter(x => x > 0).sort((a, b) => b - a);
-  if (k < 2 || s.length <= k) return null;
-  let sum = 0; for (let i = 0; i < k; i++) sum += Math.log(s[i] / s[k]);
-  return sum > 0 ? k / sum : null;
-}
-// One cohort's anatomy: trades ts (pct = side-signed P&L %, pnl $, qty, ep), navAt(date) -> NAV on or
-// before the date. Weight = entry value / NAV at entry; Σ NAV-relative = Σ pnl / NAV at entry, in %.
-// Expectancy = p × avg win − (1 − p) × avg loss, in % per trade. Pure, for review_pack_test.sh.
-function anatomyRow(ts, navAt) {
-  const w = ts.filter(t => t.pnl > 0), l = ts.filter(t => t.pnl <= 0), avg = a => a.length ? a.reduce((q, x) => q + x, 0) / a.length : null;
-  const p = ts.length ? w.length / ts.length : null, aw = avg(w.map(t => t.pct)), al = avg(l.map(t => -t.pct));
-  const nav = t => navAt(t.ed) || null;
-  return { n: ts.length, weight: avg(ts.filter(nav).map(t => 100 * t.qty * t.ep / nav(t))), p: p == null ? null : 100 * p, aw, al,
-    payoff: aw != null && al ? aw / al : null, exp: p == null ? null : p * (aw || 0) - (1 - p) * (al || 0),
-    navpct: ts.filter(nav).reduce((q, t) => q + 100 * t.pnl / nav(t), 0) };
-}
-// Run-level shape: the share of net P&L the top `top` trades carry, Hill alphas of winners' and losers'
-// $ P&L (k = min(20, n / 4)), and hindsight outcome counts: whipsaw (grade D/F), good stop (a losing stop
-// exit after which the stock kept moving against the trade: post-13-week ≤ −5 %), rotation regret (a
-// laggard-rotation exit after which the stock ran ≥ 15 % the trade's way). Pure, for review_pack_test.sh.
-function anatomyShape(ts, top = 20) {
-  const net = ts.reduce((q, t) => q + t.pnl, 0), byPnl = [...ts].sort((a, b) => b.pnl - a.pnl);
-  const topSum = byPnl.slice(0, top).reduce((q, t) => q + t.pnl, 0);
-  const wins = ts.filter(t => t.pnl > 0).map(t => t.pnl), losses = ts.filter(t => t.pnl < 0).map(t => -t.pnl);
-  const k = n => Math.min(20, Math.floor(n / 4));
-  return { topShare: net ? 100 * topSum / net : null, alphaW: hillAlpha(wins, k(wins.length)), alphaL: hillAlpha(losses, k(losses.length)),
-    whipsaw: ts.filter(t => /^[DF]/.test(t.g || '')).length,
-    goodStop: ts.filter(t => t.trig === 'stop_loss' && t.pnl <= 0 && t.p13 != null && t.p13 <= -5).length,
-    regret: ts.filter(t => t.trig === 'laggard_rotation' && t.pmax != null && t.pmax >= 15).length };
+// Precomputed per-run/year anatomy; missing values stay n/a, including zero denominators.
+function anatomyTables(data) {
+  const missing = '<tbody><tr><td colspan="9">n/a: P&amp;L anatomy inputs unavailable; rebuild this pack.</td></tr></tbody>';
+  if (!data?.available || !data.rows) return { metrics: missing, shape: missing };
+  const num = (v, digits = 2) => v == null ? 'n/a' : fmt(v, digits);
+  const cells = xs => '<tr>' + xs.map(x => `<td class="num">${x}</td>`).join('') + '</tr>';
+  return {
+    metrics: tbl([['Entry year'], ['N', 1], ['Avg weight %', 1], ['Win rate %', 1], ['Avg win %', 1], ['Avg loss %', 1], ['Payoff', 1], ['Expectancy %', 1], ['Σ P&L / NAV %', 1]],
+      data.rows.map(r => cells([r.year, num(r.n, 0), num(r.weight), num(r.win_rate), num(r.avg_win), num(r.avg_loss), num(r.payoff), num(r.expectancy), num(r.nav_pct)]))),
+    shape: tbl([['Entry year'], ['Top 5 / net %', 1], ['Top 10 / net %', 1], ['Top 20 / net %', 1], ['Hill α wins / losses'], ['Whipsaws', 1], ['Good stops', 1], ['Rotation regrets', 1], ['65-bar continuations', 1]],
+      data.rows.map(r => cells([r.year, num(r.top5), num(r.top10), num(r.top20), `${num(r.alphaW)} / ${num(r.alphaL)}`, num(r.whipsaw, 0), num(r.good_stop, 0), num(r.rotation_regret, 0), `${num(r.continuations, 0)} / ${num(r.n, 0)}`])))
+  };
 }
 function renderAnatomy() {
-  const t = D.trades[CH()], nav = D.nav[CH()];
-  const navAt = d => { let lo = 0, hi = nav.length - 1, r = null; while (lo <= hi) { const m = (lo + hi) >> 1; if (nav[m][0] <= d) { r = nav[m][1]; lo = m + 1; } else hi = m - 1; } return r; };
-  const yrs = [...new Set(t.map(x => x.yr))].sort(), row = (lab, ts) => { const r = anatomyRow(ts, navAt);
-    return `<tr><td><b>${lab}</b></td>${tdn(r.n)}${tdn(r.weight, 1)}${tdn(r.p)}${tdp(r.aw)}${tdp(r.al == null ? null : -r.al)}${tdn(r.payoff, 2)}${tdp(r.exp)}${tdp(r.navpct)}</tr>`; };
-  $('#d-anat').innerHTML = tbl([['Entry year'], ['Trades', 1], ['Avg weight %', 1], ['Win rate', 1], ['Avg win', 1], ['Avg loss', 1], ['Payoff', 1], ['Expectancy', 1], ['Σ P&L / NAV', 1]],
-    [...yrs.map(y => row(y, t.filter(x => x.yr === y))), row('All', t)]);
-  const s = anatomyShape(t);
-  $('#d-anat-shape').innerHTML = `The top 20 trades carry <b>${s.topShare == null ? '–' : fmt(s.topShare, 0) + '%'}</b> of net realised P&amp;L. Tail index (Hill, $ P&amp;L): winners α ${fmt(s.alphaW, 1)}, losers α ${fmt(s.alphaL, 1)} (lower = fatter tail). Hindsight, 13 weeks after the exit: <b>${s.whipsaw}</b> whipsaws (grade D/F) : <b>${s.goodStop}</b> good stops (the loss kept going) : <b>${s.regret}</b> rotation regrets (sold for a laggard, then ran ≥ 15%).`;
+  const run = +$('#a-run').value, tables = anatomyTables(D.anatomy[run]);
+  $('#d-anat').innerHTML = tables.metrics;
+  $('#d-anat-shape').innerHTML = tables.shape;
 }
 
 /* ---------- Salts ---------- */

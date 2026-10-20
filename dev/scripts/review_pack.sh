@@ -184,6 +184,7 @@ host_run() { # $1 label, $2 index
   nav_json "$d" > "$s/$1_nav.json"
   open_json "$d" > "$s/$1_open.json"
   sh "$LIB/missed_winners.sh" "$DATA" "$d" > "$s/$1_missed.json"
+  sh "$LIB/pnl_anatomy.sh" "$d" > "$s/$1_anatomy.json"
   # the detector: more than $1 and 1 % apart -> a warning line, and the page's findings say so
   jq -r 'def abs: if . < 0 then -. else . end;
     .check | select(.actual != null) | ((.pack - .actual) | abs) as $e
