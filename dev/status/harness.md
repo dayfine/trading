@@ -1282,6 +1282,18 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     `must be a nonnegative integer`; 11 `recorded_at_ns is a plain integer`;
     12 `quality score '7'`; 13 `got: '0'`. Still open: scenarios 14-18c and
     other 4-5 conjunct scenarios (the item stays open).
+  - **Progress 2026-10-20 (slice 6, harness/report-conjuncts-slice6):**
+    converted 14 (5 conjuncts: rc, count before, count after, 2 stdout
+    greps), 15 (4), 16 (4), 17 (5), 18 (5), 18b (4: rc, file exists,
+    harness_gap text, no WARNING), 18c (3) to the slice-2 shape. Decision
+    logic unchanged; pass count 82 before and after. Mutation evidence (one
+    expected literal broken; suite exit 1, exactly one `conjunct FAILED`
+    line naming it; each reverted): 14 `not available on PATH`; 15 `quality
+    score '0'`; 16 `quality score '10'`; 17 `got: '6'`; 18 `got: '3.5'`;
+    18b `rc18b==0`; 18c harness_gap text. Also fixed the slice-5 7c nit: the
+    preserved-record conjunct label now lists the non-canonical records and
+    their quality scores. Still open: scenarios 19-20g and other multi-conjunct
+    scenarios (the item stays open).
 - [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
   `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
   harness/scenario22-race-2440, issue #2440). This turned out to BE the
