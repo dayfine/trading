@@ -107,12 +107,19 @@ let test_reuse_is_reported_not_acted_on _ =
       let survivors, cuts =
         _plan ~data_dir:dir ~output_dir:out [ "SPL"; "CLN" ]
       in
+      let rows name =
+        List.drop (In_channel.read_lines (Filename.concat out name)) 1
+      in
       assert_that
         ( survivors,
           Map.length cuts,
-          Stdlib.Sys.file_exists (Filename.concat out "splices.csv"),
-          Stdlib.Sys.file_exists (Filename.concat out "splice_actions.csv") )
-        (equal_to ([ "SPL"; "CLN" ], 0, true, true)))
+          rows "splices.csv",
+          rows "splice_actions.csv" )
+        (equal_to
+           ( [ "SPL"; "CLN" ],
+             0,
+             [ "SPL,2020-04-10,10.0000,40.0000,4.000,10000,10000" ],
+             [ "SPL,reuse,1,2020-04-09,100,300,kept" ] )))
 
 let test_drop_exception_removes_symbol _ =
   _with_temp_dir (fun dir ->
