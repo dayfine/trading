@@ -36,6 +36,7 @@
 open Core
 module TAR = Trade_audit_report
 module DG = Decision_grading
+module Trade_lookups = DG.Trade_lookups
 module Bar_reader = Weinstein_strategy.Bar_reader
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
@@ -58,12 +59,6 @@ let _pct_scale = 100.0
 (* Daily_panels LRU cache budget for the post-exit bar reads. The lens fetches a
    handful of weeks per closed trade, so a modest cap suffices. *)
 let _cache_mb = 512
-
-(* Max calendar-day gap when joining a trades.csv round-trip to its audit record
-   for MFE: the audit entry_date is the Friday decision date, the round-trip's is
-   the next-trading-day fill. Kept in sync with
-   [Trade_audit_ratings._join_tolerance_days]. *)
-let _join_tolerance_days = 7
 
 let _usage () =
   eprintf
@@ -148,60 +143,10 @@ let _bar_reader_of_snapshot ~snapshot_dir =
   in
   Bar_reader.of_snapshot_views (Snapshot_callbacks.of_daily_panels panels)
 
-(** Ground-truth exit-reason lookup read straight from [trades.csv]'s
-    [exit_trigger] column, keyed by [(symbol, entry_date, exit_date)].
-
-    {!Trade_audit_report}'s [per_trade_row.exit_trigger] is derived from the
-    {b audit record}'s exit trigger and is blank whenever the audit's
-    [exit_decision] is absent — which it is for [laggard_rotation] /
-    [stage3_force_exit] exits in pre-#1506 runs. The CSV column carries the real
-    label for every trade, so the lens (whose whole point is separating these
-    reasons) reads it directly. *)
-let _exit_reason_lookup ~scenario_dir =
-  let tbl = Hashtbl.Poly.create () in
-  let path = Filename.concat scenario_dir "trades.csv" in
-  let rows =
-    In_channel.read_lines path
-    |> List.filter ~f:(fun l -> not (String.is_empty l))
-    |> List.map ~f:(fun l -> String.split l ~on:',')
-  in
-  (match rows with
-  | header :: data ->
-      let idx name =
-        List.findi header ~f:(fun _ h -> String.equal h name)
-        |> Option.map ~f:fst
-      in
-      let col_symbol = idx "symbol" in
-      let col_entry = idx "entry_date" in
-      let col_exit = idx "exit_date" in
-      let col_trigger = idx "exit_trigger" in
-      let get row i = Option.bind i ~f:(fun i -> List.nth row i) in
-      List.iter data ~f:(fun row ->
-          match
-            ( get row col_symbol,
-              get row col_entry,
-              get row col_exit,
-              get row col_trigger )
-          with
-          | Some sym, Some ed, Some xd, Some trig ->
-              Hashtbl.set tbl
-                ~key:(sym, Date.of_string ed, Date.of_string xd)
-                ~data:trig
-          | _ -> ())
-  | [] -> ());
-  tbl
-
-(** Per-symbol MFE lookup built straight from [trade_audit.sexp]'s
-    [exit_decision.max_favorable_excursion_pct] (the in-trade peak as a fraction
-    of entry price).
-
-    Why not the report's ratings? The audit's [entry_date] is the Friday
-    decision date; the round-trip's [entry_date] in [trades.csv] is the actual
-    fill (next trading day), so the two differ by ~1 day. An exact
-    [(symbol, entry_date)] join therefore misses, so we replicate
-    {!Trade_audit_report.Trade_audit_ratings}'s nearest-within-tolerance join:
-    index audit MFEs by symbol, then at lookup time pick the audit record whose
-    [entry_date] is nearest the round-trip's, within [_join_tolerance_days]. *)
+(** Per-symbol MFE index built from [trade_audit.sexp]'s
+    [exit_decision.max_favorable_excursion_pct] (in-trade peak as a fraction of
+    entry price). Joined to round-trips by {!Trade_lookups.find_mfe}, since the
+    audit's Friday decision date differs from the fill date in [trades.csv]. *)
 let _mfe_index ~scenario_dir =
   let path = Filename.concat scenario_dir "trade_audit.sexp" in
   let records =
@@ -211,25 +156,10 @@ let _mfe_index ~scenario_dir =
       try (Backtest.Trade_audit.audit_blob_of_sexp sexp).audit_records
       with _ -> Backtest.Trade_audit.audit_records_of_sexp sexp
   in
-  let tbl = Hashtbl.create (module String) in
-  List.iter records ~f:(fun (r : Backtest.Trade_audit.audit_record) ->
-      Option.iter r.exit_ ~f:(fun (e : Backtest.Trade_audit.exit_decision) ->
-          Hashtbl.add_multi tbl ~key:r.entry.symbol
-            ~data:(r.entry.entry_date, e.max_favorable_excursion_pct)));
-  tbl
-
-(** MFE for a round-trip: the audit record for [symbol] whose entry date is
-    nearest [entry_date], within [_join_tolerance_days]. [None] when the symbol
-    has no audit MFE within tolerance. *)
-let _find_mfe mfe_index ~symbol ~entry_date =
-  match Hashtbl.find mfe_index symbol with
-  | None -> None
-  | Some candidates ->
-      List.filter_map candidates ~f:(fun (d, mfe) ->
-          let gap = Int.abs (Date.diff d entry_date) in
-          if gap <= _join_tolerance_days then Some (gap, mfe) else None)
-      |> List.min_elt ~compare:(fun (g1, _) (g2, _) -> Int.compare g1 g2)
-      |> Option.map ~f:snd
+  List.filter_map records ~f:(fun (r : Backtest.Trade_audit.audit_record) ->
+      Option.map r.exit_ ~f:(fun (e : Backtest.Trade_audit.exit_decision) ->
+          (r.entry.symbol, r.entry.entry_date, e.max_favorable_excursion_pct)))
+  |> Trade_lookups.build_mfe_index
 
 (** The {!DG.Post_exit.horizon_result} at [grade_horizon], or [None] when that
     horizon was not computed. *)
@@ -257,8 +187,8 @@ let _grade_row ~bar_reader ~mfe_index ~exit_reason_lookup ~horizons
   let realized_pnl_pct = row.pnl_percent /. _pct_scale in
   let entry_capture_ratio =
     Option.bind
-      (_find_mfe mfe_index ~symbol:row.symbol ~entry_date:row.entry_date)
-      ~f:(fun mfe ->
+      (Trade_lookups.find_mfe mfe_index ~symbol:row.symbol
+         ~entry_date:row.entry_date) ~f:(fun mfe ->
         DG.Grade.entry_capture_ratio ~realized_pnl_pct ~max_favorable_pct:mfe)
   in
   let exit_reason =
@@ -317,7 +247,7 @@ let () =
   let report = TAR.load ~scenario_dir () in
   let bar_reader = _bar_reader_of_snapshot ~snapshot_dir in
   let mfe_index = _mfe_index ~scenario_dir in
-  let exit_reason_lookup = _exit_reason_lookup ~scenario_dir in
+  let exit_reason_lookup = Trade_lookups.exit_reason_lookup ~scenario_dir in
   eprintf "decision_grading: grading %d round-trips from %s\n%!"
     (List.length report.rows) scenario_dir;
   let graded =
