@@ -12,7 +12,9 @@ val exit_reason_lookup :
   scenario_dir:string -> (string * Date.t * Date.t, string) Hashtbl.t
 (** Exit-reason lookup read from [<scenario_dir>/trades.csv]'s [exit_trigger]
     column, keyed by [(symbol, entry_date, exit_date)]. Columns are located by
-    header name; rows missing any of the four columns are skipped. *)
+    header name; rows missing any of the four columns are skipped. Blank lines
+    are ignored; an empty [exit_trigger] cell is kept as [""]; when a key
+    repeats, the last row wins. *)
 
 type mfe_index
 (** Audit MFEs indexed by symbol. *)
@@ -24,4 +26,5 @@ val build_mfe_index : (string * Date.t * float) list -> mfe_index
 val find_mfe : mfe_index -> symbol:string -> entry_date:Date.t -> float option
 (** MFE of the audit record for [symbol] whose entry date is nearest
     [entry_date], within {!join_tolerance_days} (inclusive). [None] when the
-    symbol has no record within tolerance. *)
+    symbol has no record within tolerance. On equal gaps the entry listed later
+    in {!build_mfe_index}'s input wins. *)
