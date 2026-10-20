@@ -2880,7 +2880,7 @@ out31a=$(_run_record_qc_audit_31 "${BOGUS_MISSING31}" "missing") && rc31a=0 || r
 walkup_count31a="$(_glob_count "${WALKUP6_ROOT}/dev/audit" '*.json' '-type f')"
 C31A=(
   "(( rc31a != 0 )) (actual: rc31a=${rc31a})" "$(( rc31a != 0 ))"
-  "grep -qF 'FAIL: REPO_ROOT is set to 'BOGUS_MISSING31' but is not a directory' <<<'out31a' (actual: BOGUS_MISSING31=${BOGUS_MISSING31})" "$(_grep_ok  "FAIL: REPO_ROOT is set to '${BOGUS_MISSING31}' but is not a directory" <<<"${out31a}")"
+  "grep -qF 'FAIL: REPO_ROOT is set to 'BOGUS_MISSING31' but is not a directory' <<<'out31a' (actual: BOGUS_MISSING31=${BOGUS_MISSING31})" "$(_grep_ok -F "FAIL: REPO_ROOT is set to '${BOGUS_MISSING31}' but is not a directory" <<<"${out31a}")"
   "[[ 'walkup_count31a' == '0' ]] (actual: walkup_count31a=${walkup_count31a})" "$([[ "${walkup_count31a}" == "0" ]] && echo 1 || echo 0)"
 )
 if _pairs_ok "${C31A[@]}"; then
@@ -2896,7 +2896,7 @@ out31b=$(_run_record_qc_audit_31 "${BOGUS_FILE31}" "file") && rc31b=0 || rc31b=$
 walkup_count31b="$(_glob_count "${WALKUP6_ROOT}/dev/audit" '*.json' '-type f')"
 C31B=(
   "(( rc31b != 0 )) (actual: rc31b=${rc31b})" "$(( rc31b != 0 ))"
-  "grep -qF 'FAIL: REPO_ROOT is set to 'BOGUS_FILE31' but is not a directory' <<<'out31b' (actual: BOGUS_FILE31=${BOGUS_FILE31})" "$(_grep_ok  "FAIL: REPO_ROOT is set to '${BOGUS_FILE31}' but is not a directory" <<<"${out31b}")"
+  "grep -qF 'FAIL: REPO_ROOT is set to 'BOGUS_FILE31' but is not a directory' <<<'out31b' (actual: BOGUS_FILE31=${BOGUS_FILE31})" "$(_grep_ok -F "FAIL: REPO_ROOT is set to '${BOGUS_FILE31}' but is not a directory" <<<"${out31b}")"
   "[[ 'walkup_count31b' == '0' ]] (actual: walkup_count31b=${walkup_count31b})" "$([[ "${walkup_count31b}" == "0" ]] && echo 1 || echo 0)"
 )
 if _pairs_ok "${C31B[@]}"; then
