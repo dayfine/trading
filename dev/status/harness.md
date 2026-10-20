@@ -1294,6 +1294,26 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     preserved-record conjunct label now lists the non-canonical records and
     their quality scores. Still open: scenarios 19-20g and other multi-conjunct
     scenarios (the item stays open).
+  - **Progress 2026-10-20 (slice 7, harness/report-conjuncts-slice7):**
+    converted every remaining top-level multi-conjunct (>=3) `if` in
+    `record_qc_audit_test.sh` to the slice-2 shape (`C<N>=(label flag ...)`,
+    `if _pairs_ok`, `report_conjuncts` in the `else`). Hand-counted conjuncts:
+    19 (7), 20 (4), 20b (4), 20c (4), 20d (3), 20e (3), 20f (5), 23 (3), 24
+    (5 outer + 5 for its inner source-order check), 25b (4), 26a (3), 26b
+    (3), 27 (4), 27b (3), 28 (5), 28b (4), 7d (7), 7f (5), 30a/30b/30c (3
+    each), 31a/31b (3 each), 32 (6), 33 (5), 34 (6), 35 (4), 36 (5), 37 (6),
+    38 (6), 39 (4), 43b (8). 20g was done in slice 2. Decision logic
+    unchanged; pass count 82 before and after. 30a-43b were converted with a
+    one-off throwaway transformer, then each array was mutation-proved (the
+    middle conjunct's expected literal broken; suite exit 1, exactly one
+    `conjunct FAILED` line naming it; each reverted). Scenarios 21, 22, 43,
+    50-55 already reported per-conjunct via 0/1 flag variables before this
+    slice. **Remaining multi-conjunct spots (so the item stays open):** the
+    per-value loop bodies of 25a and 26a (rc, record present, `OK: wrote`
+    line per spelling: `offenders` names the spelling but not which of the
+    three failed) and 7d's inner `preserved_found` loop (3 greps on one
+    file, fail message is a bare "not found"). Two-conjunct scenarios (4,
+    29a/b/c, 31c, 42, 49, 25a outer check) were left as is.
 - [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
   `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
   harness/scenario22-race-2440, issue #2440). This turned out to BE the

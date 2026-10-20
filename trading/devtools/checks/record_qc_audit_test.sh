@@ -711,11 +711,16 @@ out4=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_
 
 audit_count_7d="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-27-*-${FEATURE7}.json")"
 
-if (( rc4 == 0 )) && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
-   && [[ "${audit_count_7d}" == "3" ]] \
-   && grep -q '"quality_score": *5' "${JSON7A}" \
-   && grep -q '"sha": *"run1sha-v2"' "${JSON7A}" \
-   && grep -q '"quality_score": *5' "${JSON7B}"; then
+C7D=(
+  "rc4==0 (actual=${rc4})" "$(_eq "${rc4}" 0)"
+  "JSON7A exists" "$(_flag test -f "${JSON7A}")"
+  "JSON7B exists" "$(_flag test -f "${JSON7B}")"
+  "audit_count_7d == 3 (actual=${audit_count_7d})" "$(_eq "${audit_count_7d}" 3)"
+  "JSON7A quality_score == 5 (actual: $(_json_actual "${JSON7A}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON7A}")"
+  "JSON7A sha == run1sha-v2 (actual: $(_json_actual "${JSON7A}" sha))" "$(_grep_ok '"sha": *"run1sha-v2"' "${JSON7A}")"
+  "JSON7B quality_score == 5 (actual: $(_json_actual "${JSON7B}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON7B}")"
+)
+if _pairs_ok "${C7D[@]}"; then
   # The preserved (superseded) NEEDS_REWORK record must exist somewhere
   # under the ${FEATURE7} glob, distinct from JSON7A/JSON7B, and still show
   # the rework's own verdict/sha/score -- not silently vanished.
@@ -736,6 +741,7 @@ if (( rc4 == 0 )) && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
   fi
 else
   fail "scenario 7d — expected 3 audit files for ${FEATURE7} on 2026-07-27 (JSON7A now q=5/run1sha-v2, JSON7B untouched q=5, plus a preserved record); got rc=${rc4}, audit_count=${audit_count_7d}"
+  report_conjuncts "${C7D[@]}"
   echo "${out4}" | sed 's/^/      /'
   [[ -f "${JSON7A}" ]] && echo "      json A: $(cat "${JSON7A}")"
   [[ -f "${JSON7B}" ]] && echo "      json B: $(cat "${JSON7B}")"
@@ -812,12 +818,18 @@ out7f_2=$(REPO_ROOT="${TMP_REPO}" \
 JSON7F="${TMP_REPO}/dev/audit/2026-07-29-feat-no-sha-${FEATURE7F}.json"
 audit_count_7f="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-29-*-${FEATURE7F}.json")"
 
-if (( rc7f_1 == 0 )) && (( rc7f_2 == 0 )) && [[ -f "${JSON7F}" ]] \
-   && [[ "${audit_count_7f}" == "1" ]] \
-   && grep -q '"quality_score": *4' "${JSON7F}"; then
+C7F=(
+  "(( rc7f_1 == 0 )) (actual: rc7f_1=${rc7f_1})" "$(( rc7f_1 == 0 ))"
+  "(( rc7f_2 == 0 )) (actual: rc7f_2=${rc7f_2})" "$(( rc7f_2 == 0 ))"
+  "[[ -f 'JSON7F' ]]" "$([[ -f "${JSON7F}" ]] && echo 1 || echo 0)"
+  "[[ 'audit_count_7f' == '1' ]] (actual: audit_count_7f=${audit_count_7f})" "$([[ "${audit_count_7f}" == "1" ]] && echo 1 || echo 0)"
+  "grep -q ''quality_score': *4' 'JSON7F'" "$(_grep_ok '"quality_score": *4' "${JSON7F}")"
+)
+if _pairs_ok "${C7F[@]}"; then
   pass "scenario 7f — direct callers omitting --sha still overwrite in place, no preserved-aside file (backward compatible)"
 else
   fail "scenario 7f — expected exactly 1 file with q=4 (second call wins, no --sha means no preserve); got rc=${rc7f_1}/${rc7f_2}, audit_count=${audit_count_7f}"
+  report_conjuncts "${C7F[@]}"
   echo "${out7f_1}" | sed 's/^/      /'
   echo "${out7f_2}" | sed 's/^/      /'
   [[ -f "${JSON7F}" ]] && echo "      json: $(cat "${JSON7F}")"
@@ -1500,16 +1512,20 @@ else
   TMP_FILE_19_DIR="$(dirname "${TMP_FILE_19}")"
   TMP_FILE_19_BASENAME="$(basename "${TMP_FILE_19}")"
 
-  if (( rc19_2 != 0 )) \
-     && [[ "${CONTENT_AFTER}" == "${CONTENT_A}" ]] \
-     && [[ "${stray_tmp_count}" == "0" ]] \
-     && grep -q "simulating interruption before rename" <<<"${out19_2}" \
-     && [[ -n "${TMP_FILE_19}" ]] \
-     && [[ "${TMP_FILE_19_DIR}" == "${TMP_REPO}/dev/audit" ]] \
-     && [[ "${TMP_FILE_19_BASENAME}" != *.json ]]; then
+  C19=(
+    "rc19_2 != 0 (actual=${rc19_2})" "$(_flag test "${rc19_2}" -ne 0)"
+    "target byte-identical to content A after interrupted write" "$(_eq "${CONTENT_AFTER}" "${CONTENT_A}")"
+    "stray_tmp_count == 0 (actual=${stray_tmp_count})" "$(_eq "${stray_tmp_count}" 0)"
+    "output has 'simulating interruption before rename'" "$(_grep_ok "simulating interruption before rename" <<<"${out19_2}")"
+    "TMP_FILE_19 non-empty (actual='${TMP_FILE_19}')" "$(_flag test -n "${TMP_FILE_19}")"
+    "temp staged in dev/audit (actual dir='${TMP_FILE_19_DIR}')" "$(_eq "${TMP_FILE_19_DIR}" "${TMP_REPO}/dev/audit")"
+    "temp basename not *.json (actual='${TMP_FILE_19_BASENAME}')" "$([[ "${TMP_FILE_19_BASENAME}" != *.json ]] && echo 1 || echo 0)"
+  )
+  if _pairs_ok "${C19[@]}"; then
     pass "scenario 19 — interrupted write leaves pre-existing target byte-identical, temp file cleaned up, staged in same dir with non-.json suffix (H-AUDIT-ATOMIC-WRITE)"
   else
     fail "scenario 19 — expected rc2!=0, target unchanged (content A), no stray temp file, temp staged in ${TMP_REPO}/dev/audit with non-.json suffix; got rc2=${rc19_2}, stray_tmp_count=${stray_tmp_count}, TMP_FILE_19=${TMP_FILE_19} (dir=${TMP_FILE_19_DIR}, basename=${TMP_FILE_19_BASENAME})"
+    report_conjuncts "${C19[@]}"
     echo "${out19_2}" | sed 's/^/      /'
     echo "      content A: ${CONTENT_A}"
     echo "      content after: ${CONTENT_AFTER}"
@@ -1531,12 +1547,17 @@ out20=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
 JSON20="${TMP_REPO}/dev/audit/2026-07-29-harness-atomic-${FEATURE20}.json"
 stray_tmp_count_20="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE20}.json.??????")"
 
-if (( rc20 == 0 )) && [[ -f "${JSON20}" ]] \
-   && grep -q '"quality_score": *5' "${JSON20}" \
-   && [[ "${stray_tmp_count_20}" == "0" ]]; then
+C20=(
+  "rc20==0 (actual=${rc20})" "$(_eq "${rc20}" 0)"
+  "JSON20 exists" "$(_flag test -f "${JSON20}")"
+  "JSON20 quality_score == 5 (actual: $(_json_actual "${JSON20}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON20}")"
+  "stray_tmp_count_20 == 0 (actual=${stray_tmp_count_20})" "$(_eq "${stray_tmp_count_20}" 0)"
+)
+if _pairs_ok "${C20[@]}"; then
   pass "scenario 20 — uninterrupted write still produces exactly the target record, no leftover temp file"
 else
   fail "scenario 20 — expected rc=0, record at ${JSON20} with score 5, no stray temp file; got rc=${rc20}, stray_tmp_count=${stray_tmp_count_20}"
+  report_conjuncts "${C20[@]}"
   echo "${out20}" | sed 's/^/      /'
   [[ -f "${JSON20}" ]] && echo "      json: $(cat "${JSON20}")"
 fi
@@ -1572,12 +1593,17 @@ else
   out20c_2=$(_write20c 5) && rc20c_2=0 || rc20c_2=$?
   INODE20C_AFTER="$(_inode "${JSON20C}")"
   rm -f "${JSON20C}.pin"
-  if (( rc20c_2 == 0 )) && [[ -n "${INODE20C_BEFORE}" ]] \
-     && [[ "${INODE20C_BEFORE}" != "${INODE20C_AFTER}" ]] \
-     && grep -q '"quality_score": *5' "${JSON20C}"; then
+  C20C=(
+    "rc20c_2==0 (actual=${rc20c_2})" "$(_eq "${rc20c_2}" 0)"
+    "inode before non-empty (actual='${INODE20C_BEFORE}')" "$(_flag test -n "${INODE20C_BEFORE}")"
+    "inode changed (before=${INODE20C_BEFORE} after=${INODE20C_AFTER})" "$([[ "${INODE20C_BEFORE}" != "${INODE20C_AFTER}" ]] && echo 1 || echo 0)"
+    "JSON20C quality_score == 5 (actual: $(_json_actual "${JSON20C}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON20C}")"
+  )
+  if _pairs_ok "${C20C[@]}"; then
     pass "scenario 20c — republish replaces the target's directory entry (new inode): publish is an atomic rename, not an in-place overwrite (H-AUDIT-ATOMICITY-PARTIAL-PIN)"
   else
     fail "scenario 20c — expected rc=0, new content, and inode change (rename); got rc=${rc20c_2}, inode before=${INODE20C_BEFORE} after=${INODE20C_AFTER}"
+    report_conjuncts "${C20C[@]}"
     echo "${out20c_2}" | sed 's/^/      /'
   fi
 fi
@@ -1624,10 +1650,16 @@ _rm_count_20d() {
 CODE_ONLY_20D="$(sed -E 's/^[[:space:]]*#.*$//' "${WRITE_AUDIT}" 2>/dev/null)" || true
 read -r MV_LINE_20D RM_OUT_COUNT_20D <<<"$(_rm_count_20d "${CODE_ONLY_20D}")"
 [[ "${MV_LINE_20D}" == "none" ]] && MV_LINE_20D=""
-if [[ -n "${CODE_ONLY_20D}" ]] && [[ -n "${MV_LINE_20D}" ]] && (( RM_OUT_COUNT_20D == 0 )); then
+C20D=(
+  "code-only text non-empty" "$(_flag test -n "${CODE_ONLY_20D}")"
+  "publish mv line present (actual='${MV_LINE_20D}')" "$(_flag test -n "${MV_LINE_20D}")"
+  "rm/unlink count before mv == 0 (actual=${RM_OUT_COUNT_20D})" "$(_eq "${RM_OUT_COUNT_20D}" 0)"
+)
+if _pairs_ok "${C20D[@]}"; then
   pass "scenario 20d — no rm/unlink of \$OUTPUT_FILE precedes the publish mv (no window where the record is absent; H-AUDIT-RM-THEN-MV-UNPINNED)"
 else
   fail "scenario 20d — expected publish mv line present and zero rm/unlink targeting \$OUTPUT_FILE / \$OUTPUT_BASENAME / a local alias at or before it; got mv_line=${MV_LINE_20D}, rm_count=${RM_OUT_COUNT_20D}"
+  report_conjuncts "${C20D[@]}"
 fi
 # ---------------------------------------------------------------------------
 # Scenario 20e — H-AUDIT-20D-ONELINE-FN-ALIAS: fixture-pins the 20d detector
@@ -1648,10 +1680,16 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"'
 read -r _ CNT_ONELINE_20E <<<"$(_rm_count_20d "${FIX_ONELINE_20E}")"
 read -r _ CNT_MULTI_20E <<<"$(_rm_count_20d "${FIX_MULTI_20E}")"
 read -r _ CNT_CLEAN_20E <<<"$(_rm_count_20d "${FIX_CLEAN_20E}")"
-if (( CNT_ONELINE_20E >= 1 )) && (( CNT_MULTI_20E >= 1 )) && (( CNT_CLEAN_20E == 0 )); then
+C20E=(
+  "one-line alias flagged, count >= 1 (actual=${CNT_ONELINE_20E})" "$(_flag test "${CNT_ONELINE_20E}" -ge 1)"
+  "multi-line alias flagged, count >= 1 (actual=${CNT_MULTI_20E})" "$(_flag test "${CNT_MULTI_20E}" -ge 1)"
+  "clean fixture count == 0 (actual=${CNT_CLEAN_20E})" "$(_eq "${CNT_CLEAN_20E}" 0)"
+)
+if _pairs_ok "${C20E[@]}"; then
   pass "scenario 20e — 20d detector flags one-line and multi-line function-local aliases of \$OUTPUT_FILE and passes a clean fixture (H-AUDIT-20D-ONELINE-FN-ALIAS)"
 else
   fail "scenario 20e — expected counts oneline>=1, multiline>=1, clean==0; got ${CNT_ONELINE_20E}/${CNT_MULTI_20E}/${CNT_CLEAN_20E}"
+  report_conjuncts "${C20E[@]}"
 fi
 # ---------------------------------------------------------------------------
 # Scenario 20f — ABORT-header lookup pin: _scenario_header_at must return the
@@ -1664,13 +1702,18 @@ PROSE_LINE_20F="$(grep -n '^# scenario 27 pinned' "${SELF_20F}" | head -1 | cut 
 H_OWN_20F="$(_scenario_header_at "${SELF_20F}" "${H30_LINE_20F:-1}")"
 H_PROSE_20F="$(_scenario_header_at "${SELF_20F}" "${PROSE_LINE_20F:-1}")"
 H_AFTER_20F="$(_scenario_header_at "${SELF_20F}" "$(( ${PROSE_LINE_20F:-1} + 1 ))")"
-if [[ -n "${H30_LINE_20F}" && -n "${PROSE_LINE_20F}" ]] \
-   && [[ "${H_OWN_20F}" == "# Scenario 30 "* ]] \
-   && [[ "${H_PROSE_20F}" == "# Scenario 30 "* ]] \
-   && [[ "${H_AFTER_20F}" == "# Scenario 30 "* ]]; then
+C20F=(
+  "scenario 30 header line found (actual='${H30_LINE_20F}')" "$(_flag test -n "${H30_LINE_20F}")"
+  "scenario 27 prose line found (actual='${PROSE_LINE_20F}')" "$(_flag test -n "${PROSE_LINE_20F}")"
+  "header at own line is '# Scenario 30 ' (actual='${H_OWN_20F}')" "$([[ "${H_OWN_20F}" == "# Scenario 30 "* ]] && echo 1 || echo 0)"
+  "header at prose line is '# Scenario 30 ' (actual='${H_PROSE_20F}')" "$([[ "${H_PROSE_20F}" == "# Scenario 30 "* ]] && echo 1 || echo 0)"
+  "header after prose line is '# Scenario 30 ' (actual='${H_AFTER_20F}')" "$([[ "${H_AFTER_20F}" == "# Scenario 30 "* ]] && echo 1 || echo 0)"
+)
+if _pairs_ok "${C20F[@]}"; then
   pass "scenario 20f — _scenario_header_at returns a capitalised real header on and after lowercase-prose lines (ABORT scenario naming)"
 else
   fail "scenario 20f — expected real '# Scenario' headers; got own='${H_OWN_20F}' prose='${H_PROSE_20F}' after='${H_AFTER_20F}' (h30=${H30_LINE_20F:-none} prose_line=${PROSE_LINE_20F:-none})"
+  report_conjuncts "${C20F[@]}"
 fi
 # ---------------------------------------------------------------------------
 # Scenario 20g — ABORT-trap behavioural pin: extract the real trap block
@@ -1786,13 +1829,17 @@ else
   CONTENT_AFTER_20B="$(cat "${JSON20B}" 2>/dev/null || echo "MISSING")"
   audit_count_20b="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE20B}.json")"
 
-  if (( rc20b_2 != 0 )) \
-     && [[ "${CONTENT_AFTER_20B}" == "${CONTENT_A_20B}" ]] \
-     && [[ "${audit_count_20b}" == "1" ]] \
-     && grep -q "nonexistent-dir-for-write-audit-test" <<<"${out20b_2}"; then
+  C20B=(
+    "rc20b_2 != 0 (actual=${rc20b_2})" "$(_flag test "${rc20b_2}" -ne 0)"
+    "target byte-identical to content A" "$(_eq "${CONTENT_AFTER_20B}" "${CONTENT_A_20B}")"
+    "audit_count_20b == 1 (actual=${audit_count_20b})" "$(_eq "${audit_count_20b}" 1)"
+    "output names the injected nonexistent dir" "$(_grep_ok "nonexistent-dir-for-write-audit-test" <<<"${out20b_2}")"
+  )
+  if _pairs_ok "${C20B[@]}"; then
     pass "scenario 20b — forced cp -p preservation-copy failure leaves the pre-existing target byte-identical and creates no second record (H-AUDIT-REWORK-COUNT-BLIND, cp -p failure-safety)"
   else
     fail "scenario 20b — expected rc2!=0, target unchanged (content A), exactly 1 record for ${FEATURE20B}, cp error naming the injected path; got rc2=${rc20b_2}, audit_count=${audit_count_20b}"
+    report_conjuncts "${C20B[@]}"
     echo "${out20b_2}" | sed 's/^/      /'
     echo "      content A: ${CONTENT_A_20B}"
     echo "      content after: ${CONTENT_AFTER_20B}"
@@ -1975,10 +2022,16 @@ out23=$(REPO_ROOT="${TMP_REPO}" bash -c 'umask 077 && exec "$0" "$@"' "${WRITE_A
 JSON23="${TMP_REPO}/dev/audit/2026-08-04-harness-audit-mode-${FEATURE23}.json"
 mode23="$(_file_mode_octal "${JSON23}" 2>/dev/null || echo 'UNKNOWN')"
 
-if (( rc23 == 0 )) && [[ -f "${JSON23}" ]] && [[ "${mode23}" == "644" ]]; then
+C23=(
+  "rc23==0 (actual=${rc23})" "$(_eq "${rc23}" 0)"
+  "JSON23 exists" "$(_flag test -f "${JSON23}")"
+  "mode23 == 644 (actual=${mode23})" "$(_eq "${mode23}" 644)"
+)
+if _pairs_ok "${C23[@]}"; then
   pass "scenario 23 — audit record written mode 0644 (not 0600) even under a restrictive ambient umask (H-AUDIT-MODE-0600)"
 else
   fail "scenario 23 — expected rc=0, record at ${JSON23} mode 644; got rc=${rc23}, mode=${mode23}"
+  report_conjuncts "${C23[@]}"
   echo "${out23}" | sed 's/^/      /'
 fi
 
@@ -2071,22 +2124,32 @@ MV_LINE_24="$(printf '%s\n' "${CODE_ONLY_24}" | grep -n 'mv -f "\$TMP_FILE" "\$O
 OUTPUT_CHMOD_COUNT_24="$(printf '%s\n' "${CODE_ONLY_24}" | grep -c 'chmod [0-9]* "\$OUTPUT_FILE"' || true)"
 [ -z "${OUTPUT_CHMOD_COUNT_24}" ] && OUTPUT_CHMOD_COUNT_24=0
 
+# The "<" comparison is only meaningful when both line numbers are non-empty;
+# an empty one makes `test` error (stderr suppressed) -> flag 0, as the former
+# short-circuiting `&&` chain did.
+C24S=(
+  "code-only text non-empty" "$(_flag test -n "${CODE_ONLY_24}")"
+  "chmod-TMP_FILE line found (actual='${CHMOD_TMP_LINE_24}')" "$(_flag test -n "${CHMOD_TMP_LINE_24}")"
+  "publish mv line found (actual='${MV_LINE_24}')" "$(_flag test -n "${MV_LINE_24}")"
+  "chmod-TMP_FILE line < mv line (${CHMOD_TMP_LINE_24} vs ${MV_LINE_24})" "$(_flag test "${CHMOD_TMP_LINE_24}" -lt "${MV_LINE_24}" 2>/dev/null)"
+  "chmod-OUTPUT_FILE count == 0 (actual=${OUTPUT_CHMOD_COUNT_24})" "$(_eq "${OUTPUT_CHMOD_COUNT_24}" 0)"
+)
 source_order_ok=0
-if [[ -n "${CODE_ONLY_24}" ]] \
-   && [[ -n "${CHMOD_TMP_LINE_24}" ]] && [[ -n "${MV_LINE_24}" ]] \
-   && (( CHMOD_TMP_LINE_24 < MV_LINE_24 )) \
-   && (( OUTPUT_CHMOD_COUNT_24 == 0 )); then
-  source_order_ok=1
-fi
+_pairs_ok "${C24S[@]}" && source_order_ok=1
 
-if (( rc24 != 0 )) \
-   && [[ -f "${JSON24}" ]] \
-   && [[ "${mode24}" == "644" ]] \
-   && grep -q "simulating interruption right after rename" <<<"${out24}" \
-   && (( source_order_ok == 1 )); then
+C24=(
+  "rc24 != 0 (actual=${rc24})" "$(_flag test "${rc24}" -ne 0)"
+  "JSON24 exists" "$(_flag test -f "${JSON24}")"
+  "mode24 == 644 (actual=${mode24})" "$(_eq "${mode24}" 644)"
+  "output has 'simulating interruption right after rename'" "$(_grep_ok "simulating interruption right after rename" <<<"${out24}")"
+  "source-order check passed" "$(_eq "${source_order_ok}" 1)"
+)
+if _pairs_ok "${C24[@]}"; then
   pass "scenario 24 — \$OUTPUT_FILE already mode 0644 at the instant of first visibility right after the rename, AND source-order check confirms chmod 644 \"\$TMP_FILE\" precedes mv with no chmod ever targeting \$OUTPUT_FILE (H-AUDIT-MODE-ORDER-UNPINNED)"
 else
   fail "scenario 24 — expected rc!=0, record at ${JSON24} already mode 644 right after rename, 'simulating interruption right after rename' in output, chmod-TMP_FILE line < mv line with zero chmod-OUTPUT_FILE occurrences; got rc=${rc24}, mode=${mode24}, chmod_tmp_line=${CHMOD_TMP_LINE_24}, mv_line=${MV_LINE_24}, output_chmod_count=${OUTPUT_CHMOD_COUNT_24}"
+  report_conjuncts "${C24[@]}"
+  report_conjuncts "${C24S[@]}"
   echo "${out24}" | sed 's/^/      /'
 fi
 
@@ -2248,13 +2311,17 @@ CONTENT_25_AFTER="$(cat "${JSON25}" 2>/dev/null || echo MISSING)"
 # The `!= MISSING` guard keeps the byte-identical comparison from passing
 # vacuously: with no prior record on disk, MISSING == MISSING would satisfy
 # "unchanged" without ever exercising the property.
-if (( rc25_one != 0 )) \
-   && grep -q "simulating interruption before rename" <<<"${out25_one}" \
-   && [[ "${CONTENT_25_BEFORE}" != "MISSING" ]] \
-   && [[ "${CONTENT_25_AFTER}" == "${CONTENT_25_BEFORE}" ]]; then
+C25B=(
+  "rc25_one != 0 (actual=${rc25_one})" "$(_flag test "${rc25_one}" -ne 0)"
+  "output has 'simulating interruption before rename'" "$(_grep_ok "simulating interruption before rename" <<<"${out25_one}")"
+  "prior record present (not MISSING)" "$([[ "${CONTENT_25_BEFORE}" != "MISSING" ]] && echo 1 || echo 0)"
+  "prior record unchanged by the fired hook" "$(_eq "${CONTENT_25_AFTER}" "${CONTENT_25_BEFORE}")"
+)
+if _pairs_ok "${C25B[@]}"; then
   pass "scenario 25b — WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME=1 still fires: aborts before publishing, prior record untouched (hook not fixed into permanently dead)"
 else
   fail "scenario 25b — expected rc!=0 + 'simulating interruption before rename' + a real prior record left unchanged; got rc=${rc25_one}, prior_record_present=$([[ "${CONTENT_25_BEFORE}" != "MISSING" ]] && echo yes || echo no), content_changed=$([[ "${CONTENT_25_AFTER}" == "${CONTENT_25_BEFORE}" ]] && echo no || echo yes)"
+  report_conjuncts "${C25B[@]}"
   echo "${out25_one}" | sed 's/^/      /'
 fi
 
@@ -2282,22 +2349,31 @@ for hookval26 in "${HOOK_DISABLE_VALUES[@]}"; do
   fi
 done
 
-if [[ -z "${offenders26}" ]] && (( seen26 == HOOK_DISABLE_EXPECTED_COUNT )) \
-   && [[ -f "${JSON26}" ]]; then
+C26A=(
+  "[[ -z 'offenders26' ]] (actual: offenders26=${offenders26})" "$([[ -z "${offenders26}" ]] && echo 1 || echo 0)"
+  "(( seen26 == HOOK_DISABLE_EXPECTED_COUNT )) (actual: seen26=${seen26} HOOK_DISABLE_EXPECTED_COUNT=${HOOK_DISABLE_EXPECTED_COUNT})" "$(( seen26 == HOOK_DISABLE_EXPECTED_COUNT ))"
+  "[[ -f 'JSON26' ]]" "$([[ -f "${JSON26}" ]] && echo 1 || echo 0)"
+)
+if _pairs_ok "${C26A[@]}"; then
   pass "scenario 26a — all ${seen26} documented 'off' spellings ($(_disable_values_repr)) leave WRITE_AUDIT_TEST_ABORT_AFTER_RENAME disabled: rc=0 with the 'OK:' line, no spurious failure reported for an already-published record (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
   fail "scenario 26a — expected ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings, exercised ${seen26} ($(_disable_values_repr)); each exercised value must show rc=0 + 'OK: wrote'; record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no); offending values:${offenders26:-none}"
+  report_conjuncts "${C26A[@]}"
 fi
 
 # (b) fire direction — `1` must still abort right after the rename.
 out26_one=$(_run_write_audit_26 1) && rc26_one=0 || rc26_one=$?
 
-if (( rc26_one != 0 )) \
-   && grep -q "simulating interruption right after rename" <<<"${out26_one}" \
-   && ! grep -q "^OK: wrote" <<<"${out26_one}"; then
+C26B=(
+  "rc26_one != 0 (actual=${rc26_one})" "$(_flag test "${rc26_one}" -ne 0)"
+  "output has 'simulating interruption right after rename'" "$(_grep_ok "simulating interruption right after rename" <<<"${out26_one}")"
+  "output has no 'OK: wrote' line" "$(grep -q "^OK: wrote" <<<"${out26_one}" && echo 0 || echo 1)"
+)
+if _pairs_ok "${C26B[@]}"; then
   pass "scenario 26b — WRITE_AUDIT_TEST_ABORT_AFTER_RENAME=1 still fires: aborts right after the rename with no 'OK:' line (hook not fixed into permanently dead; scenario 24 depends on this)"
 else
   fail "scenario 26b — expected rc!=0 + 'simulating interruption right after rename' + no 'OK: wrote'; got rc=${rc26_one}"
+  report_conjuncts "${C26B[@]}"
   echo "${out26_one}" | sed 's/^/      /'
 fi
 
@@ -2341,11 +2417,17 @@ out27=$(REPO_ROOT="${TARGET_ROOT}" \
 target_count27="$(_glob_count "${TARGET_ROOT}/dev/audit" '*.json' '-type f')"
 walkup_count27="$(_glob_count "${WALKUP_ROOT}/dev/audit" '*.json' '-type f')"
 
-if (( rc27 == 0 )) && grep -q "^OK: wrote" <<<"${out27}" \
-   && [[ "${target_count27}" == "1" ]] && [[ "${walkup_count27}" == "0" ]]; then
+C27=(
+  "rc27==0 (actual=${rc27})" "$(_eq "${rc27}" 0)"
+  "output has 'OK: wrote'" "$(_grep_ok "^OK: wrote" <<<"${out27}")"
+  "target_count27 == 1 (actual=${target_count27})" "$(_eq "${target_count27}" 1)"
+  "walkup_count27 == 0 (actual=${walkup_count27})" "$(_eq "${walkup_count27}" 0)"
+)
+if _pairs_ok "${C27[@]}"; then
   pass "scenario 27 — REPO_ROOT override wins over a SUCCESSFUL walk-up to a different root: record lands under \$REPO_ROOT/dev/audit only, never the walked-up root (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE)"
 else
   fail "scenario 27 — expected rc=0 + 'OK: wrote' + exactly 1 record under TARGET_ROOT and 0 under WALKUP_ROOT; got rc=${rc27}, target_count=${target_count27}, walkup_count=${walkup_count27}"
+  report_conjuncts "${C27[@]}"
   echo "${out27}" | sed 's/^/      /'
 fi
 # ---------------------------------------------------------------------------
@@ -2402,10 +2484,16 @@ rm -rf "${SCRATCH27B}"
 walkup_count27b_after="$(_glob_count "${WALKUP_ROOT}/dev/audit" '*.json' '-type f')"
 walkup_count27b_delta=$(( walkup_count27b_after - walkup_count27b_before ))
 
-if (( rc27b == 0 )) && grep -q "^OK: wrote" <<<"${out27b}" && (( walkup_count27b_delta == 1 )); then
+C27B=(
+  "rc27b==0 (actual=${rc27b})" "$(_eq "${rc27b}" 0)"
+  "output has 'OK: wrote'" "$(_grep_ok "^OK: wrote" <<<"${out27b}")"
+  "walkup_count27b_delta == 1 (actual=${walkup_count27b_delta})" "$(_eq "${walkup_count27b_delta}" 1)"
+)
+if _pairs_ok "${C27B[@]}"; then
   pass "scenario 27b — REPO_ROOT unset: the walk-up still locates the root and publishes the record (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE, pins the fallback branch production actually uses); asserts a DELTA of exactly 1 new record over a pre-call snapshot, immune to a future scenario writing into WALKUP_ROOT before this point (H-AUDIT-27B-CUMULATIVE-COUNT); invoked from a scratch cwd with no .git/.claude above it, so a \$PWD-based walk-up regression cannot resolve to and leak into the live dev/audit/ (H-AUDIT-27B-LEAKS-UNDER-PWD-REGRESSION)"
 else
   fail "scenario 27b — expected rc=0 + 'OK: wrote' + exactly 1 NEW record under WALKUP_ROOT (before=${walkup_count27b_before}, after=${walkup_count27b_after}, delta=${walkup_count27b_delta}); got rc=${rc27b}"
+  report_conjuncts "${C27B[@]}"
   echo "${out27b}" | sed 's/^/      /'
 fi
 
@@ -2487,11 +2575,18 @@ target_count28="$(_glob_count "${TARGET2_ROOT}/dev/audit" '*.json' '-type f')"
 walkup_count28="$(_glob_count "${WALKUP2_ROOT}/dev/audit" '*.json' '-type f')"
 JSON28="${TARGET2_ROOT}/dev/audit/2026-08-08-harness-repo-root-sibling-${FEATURE28}.json"
 
-if (( rc28 == 0 )) && [[ "${target_count28}" == "1" ]] && [[ "${walkup_count28}" == "0" ]] \
-   && [[ -f "${JSON28}" ]] && grep -q '"quality_score": *5' "${JSON28}"; then
+C28=(
+  "rc28==0 (actual=${rc28})" "$(_eq "${rc28}" 0)"
+  "target_count28 == 1 (actual=${target_count28})" "$(_eq "${target_count28}" 1)"
+  "walkup_count28 == 0 (actual=${walkup_count28})" "$(_eq "${walkup_count28}" 0)"
+  "JSON28 exists" "$(_flag test -f "${JSON28}")"
+  "JSON28 quality_score == 5 (actual: $(_json_actual "${JSON28}" quality_score))" "$(_grep_ok '"quality_score": *5' "${JSON28}")"
+)
+if _pairs_ok "${C28[@]}"; then
   pass "scenario 28 — REPO_ROOT override wins end-to-end through the write_audit.sh child process: record (quality_score 5, from TARGET2_ROOT's review file) lands under \$REPO_ROOT/dev/audit only, never the walked-up root (H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING)"
 else
   fail "scenario 28 — expected rc=0 + exactly 1 record under TARGET2_ROOT (quality_score 5) and 0 under WALKUP2_ROOT; got rc=${rc28}, target_count=${target_count28}, walkup_count=${walkup_count28}"
+  report_conjuncts "${C28[@]}"
   echo "${out28}" | sed 's/^/      /'
   [[ -f "${JSON28}" ]] && echo "      json: $(cat "${JSON28}")"
 fi
@@ -2543,11 +2638,17 @@ out28b=$(env -u REPO_ROOT \
 walkup_count28b="$(_glob_count "${WALKUP3_ROOT}/dev/audit" '*.json' '-type f')"
 JSON28B="${WALKUP3_ROOT}/dev/audit/2026-08-08-harness-repo-root-sibling-${FEATURE28B}.json"
 
-if (( rc28b == 0 )) && [[ "${walkup_count28b}" == "1" ]] \
-   && [[ -f "${JSON28B}" ]] && grep -q '"quality_score": *3' "${JSON28B}"; then
+C28B=(
+  "rc28b==0 (actual=${rc28b})" "$(_eq "${rc28b}" 0)"
+  "walkup_count28b == 1 (actual=${walkup_count28b})" "$(_eq "${walkup_count28b}" 1)"
+  "JSON28B exists" "$(_flag test -f "${JSON28B}")"
+  "JSON28B quality_score == 3 (actual: $(_json_actual "${JSON28B}" quality_score))" "$(_grep_ok '"quality_score": *3' "${JSON28B}")"
+)
+if _pairs_ok "${C28B[@]}"; then
   pass "scenario 28b — REPO_ROOT unset: the walk-up still locates the root and publishes the record end-to-end through write_audit.sh (H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING, own fixture, absolute count not cumulative)"
 else
   fail "scenario 28b — expected rc=0 + exactly 1 record under WALKUP3_ROOT (quality_score 3); got rc=${rc28b}, walkup_count=${walkup_count28b}"
+  report_conjuncts "${C28B[@]}"
   echo "${out28b}" | sed 's/^/      /'
   [[ -f "${JSON28B}" ]] && echo "      json: $(cat "${JSON28B}")"
 fi
@@ -2675,24 +2776,32 @@ _run_write_audit_30() {  # $1 = REPO_ROOT value, $2 = feature suffix (for a dist
 # (a) nonexistent path
 out30a=$(_run_write_audit_30 "${BOGUS_MISSING30}" "missing") && rc30a=0 || rc30a=$?
 walkup_count30a="$(_glob_count "${WALKUP5_ROOT}/dev/audit" '*.json' '-type f')"
-if (( rc30a != 0 )) \
-   && [[ "${out30a}" == "FAIL: REPO_ROOT is set to '${BOGUS_MISSING30}' but is not a directory" ]] \
-   && [[ "${walkup_count30a}" == "0" ]]; then
+C30A=(
+  "(( rc30a != 0 )) (actual: rc30a=${rc30a})" "$(( rc30a != 0 ))"
+  "[[ 'out30a' == 'FAIL: REPO_ROOT is set to 'BOGUS_MISSING30' but is not a directory' ]] (actual: BOGUS_MISSING30=${BOGUS_MISSING30})" "$([[ "${out30a}" == "FAIL: REPO_ROOT is set to '${BOGUS_MISSING30}' but is not a directory" ]] && echo 1 || echo 0)"
+  "[[ 'walkup_count30a' == '0' ]] (actual: walkup_count30a=${walkup_count30a})" "$([[ "${walkup_count30a}" == "0" ]] && echo 1 || echo 0)"
+)
+if _pairs_ok "${C30A[@]}"; then
   pass "scenario 30a — write_audit.sh: REPO_ROOT set to a nonexistent path is a hard error, zero records written under the walked-up root either (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH)"
 else
   fail "scenario 30a — expected rc!=0 + exact FAIL message + 0 records under WALKUP5_ROOT; got rc=${rc30a}, walkup_count=${walkup_count30a}"
+  report_conjuncts "${C30A[@]}"
   echo "${out30a}" | sed 's/^/      /'
 fi
 
 # (b) regular file, not a directory
 out30b=$(_run_write_audit_30 "${BOGUS_FILE30}" "file") && rc30b=0 || rc30b=$?
 walkup_count30b="$(_glob_count "${WALKUP5_ROOT}/dev/audit" '*.json' '-type f')"
-if (( rc30b != 0 )) \
-   && [[ "${out30b}" == "FAIL: REPO_ROOT is set to '${BOGUS_FILE30}' but is not a directory" ]] \
-   && [[ "${walkup_count30b}" == "0" ]]; then
+C30B=(
+  "(( rc30b != 0 )) (actual: rc30b=${rc30b})" "$(( rc30b != 0 ))"
+  "[[ 'out30b' == 'FAIL: REPO_ROOT is set to 'BOGUS_FILE30' but is not a directory' ]] (actual: BOGUS_FILE30=${BOGUS_FILE30})" "$([[ "${out30b}" == "FAIL: REPO_ROOT is set to '${BOGUS_FILE30}' but is not a directory" ]] && echo 1 || echo 0)"
+  "[[ 'walkup_count30b' == '0' ]] (actual: walkup_count30b=${walkup_count30b})" "$([[ "${walkup_count30b}" == "0" ]] && echo 1 || echo 0)"
+)
+if _pairs_ok "${C30B[@]}"; then
   pass "scenario 30b — write_audit.sh: REPO_ROOT set to a regular file (not a directory) is a hard error, zero records written under the walked-up root either"
 else
   fail "scenario 30b — expected rc!=0 + exact FAIL message + 0 records under WALKUP5_ROOT (cumulative with 30a); got rc=${rc30b}, walkup_count=${walkup_count30b}"
+  report_conjuncts "${C30B[@]}"
   echo "${out30b}" | sed 's/^/      /'
 fi
 
@@ -2700,10 +2809,16 @@ fi
 # walk-up succeeds and the record is published under WALKUP5_ROOT.
 out30c=$(_run_write_audit_30 "" "empty") && rc30c=0 || rc30c=$?
 walkup_count30c="$(_glob_count "${WALKUP5_ROOT}/dev/audit" '*.json' '-type f')"
-if (( rc30c == 0 )) && grep -q "^OK: wrote" <<<"${out30c}" && [[ "${walkup_count30c}" == "1" ]]; then
+C30C=(
+  "(( rc30c == 0 )) (actual: rc30c=${rc30c})" "$(( rc30c == 0 ))"
+  "grep -q '^OK: wrote' <<<'out30c'" "$(_grep_ok "^OK: wrote" <<<"${out30c}")"
+  "[[ 'walkup_count30c' == '1' ]] (actual: walkup_count30c=${walkup_count30c})" "$([[ "${walkup_count30c}" == "1" ]] && echo 1 || echo 0)"
+)
+if _pairs_ok "${C30C[@]}"; then
   pass "scenario 30c — write_audit.sh: REPO_ROOT='' (empty string) is treated as unset: the walk-up still succeeds and publishes the record (deliberate, not a regression of 30a/30b)"
 else
   fail "scenario 30c — expected rc=0 + 'OK: wrote' + exactly 1 record under WALKUP5_ROOT (30a/30b wrote none); got rc=${rc30c}, walkup_count=${walkup_count30c}"
+  report_conjuncts "${C30C[@]}"
   echo "${out30c}" | sed 's/^/      /'
 fi
 
@@ -2763,24 +2878,32 @@ _run_record_qc_audit_31() {  # $1 = REPO_ROOT value, $2 = feature suffix
 # (a) nonexistent path
 out31a=$(_run_record_qc_audit_31 "${BOGUS_MISSING31}" "missing") && rc31a=0 || rc31a=$?
 walkup_count31a="$(_glob_count "${WALKUP6_ROOT}/dev/audit" '*.json' '-type f')"
-if (( rc31a != 0 )) \
-   && grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_MISSING31}' but is not a directory" <<<"${out31a}" \
-   && [[ "${walkup_count31a}" == "0" ]]; then
+C31A=(
+  "(( rc31a != 0 )) (actual: rc31a=${rc31a})" "$(( rc31a != 0 ))"
+  "grep -qF 'FAIL: REPO_ROOT is set to 'BOGUS_MISSING31' but is not a directory' <<<'out31a' (actual: BOGUS_MISSING31=${BOGUS_MISSING31})" "$(_grep_ok -F "FAIL: REPO_ROOT is set to '${BOGUS_MISSING31}' but is not a directory" <<<"${out31a}")"
+  "[[ 'walkup_count31a' == '0' ]] (actual: walkup_count31a=${walkup_count31a})" "$([[ "${walkup_count31a}" == "0" ]] && echo 1 || echo 0)"
+)
+if _pairs_ok "${C31A[@]}"; then
   pass "scenario 31a — record_qc_audit.sh: REPO_ROOT set to a nonexistent path is a hard error, zero records written under the walked-up root end-to-end through the write_audit.sh child (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH)"
 else
   fail "scenario 31a — expected rc!=0 + FAIL message naming '${BOGUS_MISSING31}' + 0 records under WALKUP6_ROOT; got rc=${rc31a}, walkup_count=${walkup_count31a}"
+  report_conjuncts "${C31A[@]}"
   echo "${out31a}" | sed 's/^/      /'
 fi
 
 # (b) regular file, not a directory
 out31b=$(_run_record_qc_audit_31 "${BOGUS_FILE31}" "file") && rc31b=0 || rc31b=$?
 walkup_count31b="$(_glob_count "${WALKUP6_ROOT}/dev/audit" '*.json' '-type f')"
-if (( rc31b != 0 )) \
-   && grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_FILE31}' but is not a directory" <<<"${out31b}" \
-   && [[ "${walkup_count31b}" == "0" ]]; then
+C31B=(
+  "(( rc31b != 0 )) (actual: rc31b=${rc31b})" "$(( rc31b != 0 ))"
+  "grep -qF 'FAIL: REPO_ROOT is set to 'BOGUS_FILE31' but is not a directory' <<<'out31b' (actual: BOGUS_FILE31=${BOGUS_FILE31})" "$(_grep_ok -F "FAIL: REPO_ROOT is set to '${BOGUS_FILE31}' but is not a directory" <<<"${out31b}")"
+  "[[ 'walkup_count31b' == '0' ]] (actual: walkup_count31b=${walkup_count31b})" "$([[ "${walkup_count31b}" == "0" ]] && echo 1 || echo 0)"
+)
+if _pairs_ok "${C31B[@]}"; then
   pass "scenario 31b — record_qc_audit.sh: REPO_ROOT set to a regular file (not a directory) is a hard error, zero records written under the walked-up root end-to-end (cumulative with 31a)"
 else
   fail "scenario 31b — expected rc!=0 + FAIL message naming '${BOGUS_FILE31}' + 0 records under WALKUP6_ROOT; got rc=${rc31b}, walkup_count=${walkup_count31b}"
+  report_conjuncts "${C31B[@]}"
   echo "${out31b}" | sed 's/^/      /'
 fi
 
@@ -2846,13 +2969,19 @@ out32=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S32_DIR}/gh" \
 
 audit_count_after_32="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE32}.json")"
 
-if (( rc32 == 1 )) && [[ "${audit_count_before_32}" == "0" ]] && [[ "${audit_count_after_32}" == "0" ]] \
-   && grep -q "failed (exit 1)" <<<"${out32}" \
-   && grep -q "rate limit exceeded" <<<"${out32}" \
-   && grep -q "dev/reviews/${FEATURE32}.md" <<<"${out32}"; then
+C32=(
+  "(( rc32 == 1 )) (actual: rc32=${rc32})" "$(( rc32 == 1 ))"
+  "[[ 'audit_count_before_32' == '0' ]] (actual: audit_count_before_32=${audit_count_before_32})" "$([[ "${audit_count_before_32}" == "0" ]] && echo 1 || echo 0)"
+  "[[ 'audit_count_after_32' == '0' ]] (actual: audit_count_after_32=${audit_count_after_32})" "$([[ "${audit_count_after_32}" == "0" ]] && echo 1 || echo 0)"
+  "grep -q 'failed (exit 1)' <<<'out32'" "$(_grep_ok "failed (exit 1)" <<<"${out32}")"
+  "grep -q 'rate limit exceeded' <<<'out32'" "$(_grep_ok "rate limit exceeded" <<<"${out32}")"
+  "grep -q 'dev/reviews/FEATURE32.md' <<<'out32' (actual: FEATURE32=${FEATURE32})" "$(_grep_ok "dev/reviews/${FEATURE32}.md" <<<"${out32}")"
+)
+if _pairs_ok "${C32[@]}"; then
   pass "scenario 32 — gh nonzero exit + stderr (rate-limited) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
 else
   fail "scenario 32 — expected rc=1, no file written, message naming exit code + stderr + review path; got rc=${rc32}, before=${audit_count_before_32}, after=${audit_count_after_32}"
+  report_conjuncts "${C32[@]}"
   echo "${out32}" | sed 's/^/      /'
 fi
 
@@ -2891,12 +3020,18 @@ out33=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S33_DIR}/gh" \
 
 audit_count_after_33="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE33}.json")"
 
-if (( rc33 == 1 )) && [[ "${audit_count_before_33}" == "0" ]] && [[ "${audit_count_after_33}" == "0" ]] \
-   && grep -q "failed (exit 1)" <<<"${out33}" \
-   && grep -q "dev/reviews/${FEATURE33}.md" <<<"${out33}"; then
+C33=(
+  "(( rc33 == 1 )) (actual: rc33=${rc33})" "$(( rc33 == 1 ))"
+  "[[ 'audit_count_before_33' == '0' ]] (actual: audit_count_before_33=${audit_count_before_33})" "$([[ "${audit_count_before_33}" == "0" ]] && echo 1 || echo 0)"
+  "[[ 'audit_count_after_33' == '0' ]] (actual: audit_count_after_33=${audit_count_after_33})" "$([[ "${audit_count_after_33}" == "0" ]] && echo 1 || echo 0)"
+  "grep -q 'failed (exit 1)' <<<'out33'" "$(_grep_ok "failed (exit 1)" <<<"${out33}")"
+  "grep -q 'dev/reviews/FEATURE33.md' <<<'out33' (actual: FEATURE33=${FEATURE33})" "$(_grep_ok "dev/reviews/${FEATURE33}.md" <<<"${out33}")"
+)
+if _pairs_ok "${C33[@]}"; then
   pass "scenario 33 — gh nonzero exit, silent (no stderr) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
 else
   fail "scenario 33 — expected rc=1, no file written, message naming exit code + review path; got rc=${rc33}, before=${audit_count_before_33}, after=${audit_count_after_33}"
+  report_conjuncts "${C33[@]}"
   echo "${out33}" | sed 's/^/      /'
 fi
 
@@ -2939,13 +3074,19 @@ out34=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S34_DIR}/gh" \
 
 audit_count_after_34="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE34}.json")"
 
-if (( rc34 == 1 )) && [[ "${audit_count_before_34}" == "0" ]] && [[ "${audit_count_after_34}" == "0" ]] \
-   && grep -q "returned no reviews and wrote to stderr (exit 0)" <<<"${out34}" \
-   && grep -q "deprecated API version" <<<"${out34}" \
-   && grep -q "dev/reviews/${FEATURE34}.md" <<<"${out34}"; then
+C34=(
+  "(( rc34 == 1 )) (actual: rc34=${rc34})" "$(( rc34 == 1 ))"
+  "[[ 'audit_count_before_34' == '0' ]] (actual: audit_count_before_34=${audit_count_before_34})" "$([[ "${audit_count_before_34}" == "0" ]] && echo 1 || echo 0)"
+  "[[ 'audit_count_after_34' == '0' ]] (actual: audit_count_after_34=${audit_count_after_34})" "$([[ "${audit_count_after_34}" == "0" ]] && echo 1 || echo 0)"
+  "grep -q 'returned no reviews and wrote to stderr (exit 0)' <<<'out34'" "$(_grep_ok "returned no reviews and wrote to stderr (exit 0)" <<<"${out34}")"
+  "grep -q 'deprecated API version' <<<'out34'" "$(_grep_ok "deprecated API version" <<<"${out34}")"
+  "grep -q 'dev/reviews/FEATURE34.md' <<<'out34' (actual: FEATURE34=${FEATURE34})" "$(_grep_ok "dev/reviews/${FEATURE34}.md" <<<"${out34}")"
+)
+if _pairs_ok "${C34[@]}"; then
   pass "scenario 34 — gh exit 0 + stderr warning (empty stdout) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
 else
   fail "scenario 34 — expected rc=1, no file written, message naming exit code + stderr + review path; got rc=${rc34}, before=${audit_count_before_34}, after=${audit_count_after_34}"
+  report_conjuncts "${C34[@]}"
   echo "${out34}" | sed 's/^/      /'
 fi
 
@@ -2983,12 +3124,17 @@ out35=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S35_DIR}/gh" \
   bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
   "${FEATURE35}" "feat/dummy" "2026-05-25" --pr-number 3004 2>&1) && rc35=0 || rc35=$?
 JSON35="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE35}.json"
-if (( rc35 == 0 )) && [[ -f "${JSON35}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON35}" \
-   && grep -q '"quality_score": *3' "${JSON35}"; then
+C35=(
+  "(( rc35 == 0 )) (actual: rc35=${rc35})" "$(( rc35 == 0 ))"
+  "[[ -f 'JSON35' ]]" "$([[ -f "${JSON35}" ]] && echo 1 || echo 0)"
+  "grep -q ''structural_qc': *'APPROVED'' 'JSON35'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON35}")"
+  "grep -q ''quality_score': *3' 'JSON35'" "$(_grep_ok '"quality_score": *3' "${JSON35}")"
+)
+if _pairs_ok "${C35[@]}"; then
   pass "scenario 35 — gh exit 0, empty stdout, no stderr: genuine zero-review PR still falls back to file mode unchanged (H-AUDIT-GH-FALLBACK-RESIDUAL regression pin)"
 else
   fail "scenario 35 — expected file-fallback rc=0 + APPROVED + score 3; got rc=${rc35}, output:"
+  report_conjuncts "${C35[@]}"
   echo "${out35}" | sed 's/^/      /'
   [[ -f "${JSON35}" ]] && echo "      json: $(cat "${JSON35}")"
 fi
@@ -3027,13 +3173,18 @@ out36=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S36_DIR}/gh" \
   bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
   "${FEATURE36}" "feat/dummy" "2026-05-25" --pr-number 3005 2>&1) && rc36=0 || rc36=$?
 JSON36="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE36}.json"
-if (( rc36 == 0 )) && [[ -f "${JSON36}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON36}" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON36}" \
-   && grep -q '"quality_score": *4' "${JSON36}"; then
+C36=(
+  "(( rc36 == 0 )) (actual: rc36=${rc36})" "$(( rc36 == 0 ))"
+  "[[ -f 'JSON36' ]]" "$([[ -f "${JSON36}" ]] && echo 1 || echo 0)"
+  "grep -q ''structural_qc': *'APPROVED'' 'JSON36'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON36}")"
+  "grep -q ''behavioral_qc': *'APPROVED'' 'JSON36'" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON36}")"
+  "grep -q ''quality_score': *4' 'JSON36'" "$(_grep_ok '"quality_score": *4' "${JSON36}")"
+)
+if _pairs_ok "${C36[@]}"; then
   pass "scenario 36 — gh exit 0, non-empty stdout: happy path unchanged, record written from PR reviews (H-AUDIT-GH-FALLBACK-RESIDUAL)"
 else
   fail "scenario 36 — expected rc=0 + APPROVED+APPROVED+score 4; got rc=${rc36}, output:"
+  report_conjuncts "${C36[@]}"
   echo "${out36}" | sed 's/^/      /'
   [[ -f "${JSON36}" ]] && echo "      json: $(cat "${JSON36}")"
 fi
@@ -3104,14 +3255,19 @@ out37=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S37_DIR}/gh" \
   bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
   "${FEATURE37}" "feat/dummy" "2026-05-25" --pr-number 3006 2>&1) && rc37=0 || rc37=$?
 JSON37="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE37}.json"
-if (( rc37 == 0 )) && [[ -f "${JSON37}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON37}" \
-   && grep -q '"behavioral_qc": *"NEEDS_REWORK"' "${JSON37}" \
-   && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON37}" \
-   && grep -q '"quality_score": *2' "${JSON37}"; then
+C37=(
+  "(( rc37 == 0 )) (actual: rc37=${rc37})" "$(( rc37 == 0 ))"
+  "[[ -f 'JSON37' ]]" "$([[ -f "${JSON37}" ]] && echo 1 || echo 0)"
+  "grep -q ''structural_qc': *'APPROVED'' 'JSON37'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON37}")"
+  "grep -q ''behavioral_qc': *'NEEDS_REWORK'' 'JSON37'" "$(_grep_ok '"behavioral_qc": *"NEEDS_REWORK"' "${JSON37}")"
+  "grep -q ''overall_qc': *'NEEDS_REWORK'' 'JSON37'" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON37}")"
+  "grep -q ''quality_score': *2' 'JSON37'" "$(_grep_ok '"quality_score": *2' "${JSON37}")"
+)
+if _pairs_ok "${C37[@]}"; then
   pass "scenario 37 — gh exit 0, non-empty stdout + stderr warning: real PR payload recorded, not refused, not the wrong file-mode fallback (H-AUDIT-GH-STDERR-GATE-TOO-BROAD)"
 else
   fail "scenario 37 — expected rc=0 + APPROVED/NEEDS_REWORK/NEEDS_REWORK/score 2 from the real payload (not the wrong file fixture, not a refusal); got rc=${rc37}, output:"
+  report_conjuncts "${C37[@]}"
   echo "${out37}" | sed 's/^/      /'
   [[ -f "${JSON37}" ]] && echo "      json: $(cat "${JSON37}")"
 fi
@@ -3166,14 +3322,19 @@ out38=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S38_DIR}/gh" \
   bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
   "${FEATURE38}" "feat/dummy" "2026-05-25" --pr-number 3007 2>&1) && rc38=0 || rc38=$?
 JSON38="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE38}.json"
-if (( rc38 == 0 )) && [[ -f "${JSON38}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON38}" \
-   && grep -q '"behavioral_qc": *"SKIPPED"' "${JSON38}" \
-   && grep -q '"overall_qc": *"APPROVED"' "${JSON38}" \
-   && grep -q '"quality_score": *null' "${JSON38}"; then
+C38=(
+  "(( rc38 == 0 )) (actual: rc38=${rc38})" "$(( rc38 == 0 ))"
+  "[[ -f 'JSON38' ]]" "$([[ -f "${JSON38}" ]] && echo 1 || echo 0)"
+  "grep -q ''structural_qc': *'APPROVED'' 'JSON38'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON38}")"
+  "grep -q ''behavioral_qc': *'SKIPPED'' 'JSON38'" "$(_grep_ok '"behavioral_qc": *"SKIPPED"' "${JSON38}")"
+  "grep -q ''overall_qc': *'APPROVED'' 'JSON38'" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON38}")"
+  "grep -q ''quality_score': *null' 'JSON38'" "$(_grep_ok '"quality_score": *null' "${JSON38}")"
+)
+if _pairs_ok "${C38[@]}"; then
   pass "scenario 38 — PR mode, structural-only review: unresolved behavioral_qc/quality_score fall to SKIPPED/null, not leaked from an unrelated dev/reviews/ file (CP4 rework)"
 else
   fail "scenario 38 — expected rc=0 + APPROVED/SKIPPED/APPROVED/null (not leaked from the wrong file fixture); got rc=${rc38}, output:"
+  report_conjuncts "${C38[@]}"
   echo "${out38}" | sed 's/^/      /'
   [[ -f "${JSON38}" ]] && echo "      json: $(cat "${JSON38}")"
 fi
@@ -3223,12 +3384,17 @@ out39=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S39_DIR}/gh" \
   bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
   "${FEATURE39}" "feat/dummy" "2026-05-25" --pr-number 3008 2>&1) && rc39=0 || rc39=$?
 JSON39="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE39}.json"
-if (( rc39 == 0 )) && [[ -f "${JSON39}" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${JSON39}" \
-   && grep -q '"sha": *""' "${JSON39}"; then
+C39=(
+  "(( rc39 == 0 )) (actual: rc39=${rc39})" "$(( rc39 == 0 ))"
+  "[[ -f 'JSON39' ]]" "$([[ -f "${JSON39}" ]] && echo 1 || echo 0)"
+  "grep -q ''structural_qc': *'APPROVED'' 'JSON39'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON39}")"
+  "grep -q ''sha': *''' 'JSON39'" "$(_grep_ok '"sha": *""' "${JSON39}")"
+)
+if _pairs_ok "${C39[@]}"; then
   pass "scenario 39 — PR mode, structural-only review with no Reviewed SHA line: sha stays empty, not leaked from an unrelated dev/reviews/ file (H-AUDIT-SHA-FILE-LEAK)"
 else
   fail "scenario 39 — expected rc=0 + structural_qc APPROVED + sha \"\" (not leaked from the wrong file fixture); got rc=${rc39}, output:"
+  report_conjuncts "${C39[@]}"
   echo "${out39}" | sed 's/^/      /'
   [[ -f "${JSON39}" ]] && echo "      json: $(cat "${JSON39}")"
 fi
@@ -3566,12 +3732,21 @@ c43b_eq_diff="$(_eq a b)"
 c43b_flag_t="$(_flag true)"
 c43b_flag_f="$(_flag false)"
 
-if [[ "${c43b_rc_all}" == "0" && "${c43b_rc_mid}" != "0" && "${c43b_rc_last}" != "0" \
-      && "${c43b_rc_empty}" != "0" && "${c43b_eq_same}" == "1" && "${c43b_eq_diff}" == "0" \
-      && "${c43b_flag_t}" == "1" && "${c43b_flag_f}" == "0" ]]; then
+C43B=(
+  "[[ 'c43b_rc_all' == '0' ]] (actual: c43b_rc_all=${c43b_rc_all})" "$([[ "${c43b_rc_all}" == "0" ]] && echo 1 || echo 0)"
+  "[[ 'c43b_rc_mid' != '0' ]] (actual: c43b_rc_mid=${c43b_rc_mid})" "$([[ "${c43b_rc_mid}" != "0" ]] && echo 1 || echo 0)"
+  "[[ 'c43b_rc_last' != '0' ]] (actual: c43b_rc_last=${c43b_rc_last})" "$([[ "${c43b_rc_last}" != "0" ]] && echo 1 || echo 0)"
+  "[[ 'c43b_rc_empty' != '0' ]] (actual: c43b_rc_empty=${c43b_rc_empty})" "$([[ "${c43b_rc_empty}" != "0" ]] && echo 1 || echo 0)"
+  "[[ 'c43b_eq_same' == '1' ]] (actual: c43b_eq_same=${c43b_eq_same})" "$([[ "${c43b_eq_same}" == "1" ]] && echo 1 || echo 0)"
+  "[[ 'c43b_eq_diff' == '0' ]] (actual: c43b_eq_diff=${c43b_eq_diff})" "$([[ "${c43b_eq_diff}" == "0" ]] && echo 1 || echo 0)"
+  "[[ 'c43b_flag_t' == '1' ]] (actual: c43b_flag_t=${c43b_flag_t})" "$([[ "${c43b_flag_t}" == "1" ]] && echo 1 || echo 0)"
+  "[[ 'c43b_flag_f' == '0' ]] (actual: c43b_flag_f=${c43b_flag_f})" "$([[ "${c43b_flag_f}" == "0" ]] && echo 1 || echo 0)"
+)
+if _pairs_ok "${C43B[@]}"; then
   pass "scenario 43b — _pairs_ok/_eq/_flag helper contracts pinned (all-1 ok; middle-0, last-0, empty fail; _eq and _flag print 1/0 correctly)"
 else
   fail "scenario 43b — helper contract broken: _pairs_ok rc all-1=${c43b_rc_all} (want 0) middle-0=${c43b_rc_mid} last-0=${c43b_rc_last} empty=${c43b_rc_empty} (want non-zero); _eq a a='${c43b_eq_same}' (want 1) _eq a b='${c43b_eq_diff}' (want 0); _flag true='${c43b_flag_t}' (want 1) _flag false='${c43b_flag_f}' (want 0)"
+  report_conjuncts "${C43B[@]}"
 fi
 
 # ---------------------------------------------------------------------------
