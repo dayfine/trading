@@ -1,0 +1,8 @@
+{
+  "check": 7,
+  "examples": [
+    {"name": "Neutral allowed", "expected": "pass", "trade": {"id": "7-0", "sym": "C70", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "mE": "Neutral", "aMacro": "Bearish"}},
+    {"name": "Fill week matters", "expected": "fail", "trade": {"id": "7-1", "sym": "C71", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "mE": "Bearish", "aMacro": "Bullish"}},
+    {"name": "Decision macro cannot substitute", "expected": "n/a", "trade": {"id": "7-2", "sym": "C72", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "aMacro": "Bullish"}}
+  ]
+}

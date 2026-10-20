@@ -1,0 +1,8 @@
+{
+  "check": 11,
+  "examples": [
+    {"name": "Threshold inclusive", "expected": "pass", "trade": {"id": "11-0", "sym": "C110", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "isd": 0.15}},
+    {"name": "Wider", "expected": "fail", "trade": {"id": "11-1", "sym": "C111", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "isd": 0.1501}},
+    {"name": "Decision proxy cannot substitute", "expected": "n/a", "trade": {"id": "11-2", "sym": "C112", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "sid": 0.04}}
+  ]
+}

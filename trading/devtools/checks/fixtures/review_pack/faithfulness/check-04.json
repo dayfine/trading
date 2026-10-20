@@ -1,0 +1,8 @@
+{
+  "check": 4,
+  "examples": [
+    {"name": "Threshold inclusive", "expected": "pass", "trade": {"id": "4-0", "sym": "C40", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "fvr": 2}},
+    {"name": "Quiet pullback cannot be ruled out", "expected": "n/a", "trade": {"id": "4-1", "sym": "C41", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "fvr": 0.25}},
+    {"name": "Missing ratio", "expected": "n/a", "trade": {"id": "4-2", "sym": "C42", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01"}}
+  ]
+}

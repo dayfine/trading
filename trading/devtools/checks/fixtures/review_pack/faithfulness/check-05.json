@@ -1,0 +1,8 @@
+{
+  "check": 5,
+  "examples": [
+    {"name": "Positive", "expected": "pass", "trade": {"id": "5-0", "sym": "C50", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "rs": "Pos_rising"}},
+    {"name": "Negative", "expected": "fail", "trade": {"id": "5-1", "sym": "C51", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "rs": "Neg_improving"}},
+    {"name": "Missing RS", "expected": "n/a", "trade": {"id": "5-2", "sym": "C52", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01"}}
+  ]
+}

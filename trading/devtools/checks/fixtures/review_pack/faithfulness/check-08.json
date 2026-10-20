@@ -1,0 +1,8 @@
+{
+  "check": 8,
+  "examples": [
+    {"name": "High composite score proves no sector decision", "expected": "n/a", "trade": {"id": "8-0", "sym": "C80", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "score": 120, "aScore": 120}},
+    {"name": "Low score proves no sector failure", "expected": "n/a", "trade": {"id": "8-1", "sym": "C81", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "aScore": 0}},
+    {"name": "Missing sector", "expected": "n/a", "trade": {"id": "8-2", "sym": "C82", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01"}}
+  ]
+}

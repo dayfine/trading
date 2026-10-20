@@ -1,0 +1,8 @@
+{
+  "check": 6,
+  "examples": [
+    {"name": "Cascade A+ is not overhead grade", "expected": "n/a", "trade": {"id": "6-0", "sym": "C60", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "aGrade": "A+"}},
+    {"name": "Cascade C is not overhead grade", "expected": "n/a", "trade": {"id": "6-1", "sym": "C61", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "aGrade": "C"}},
+    {"name": "Missing grade", "expected": "n/a", "trade": {"id": "6-2", "sym": "C62", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01"}}
+  ]
+}

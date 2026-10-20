@@ -1,0 +1,8 @@
+{
+  "check": 2,
+  "examples": [
+    {"name": "SDA specimen has no age", "expected": "n/a", "trade": {"id": "2-0", "sym": "SDA", "side": "LONG", "ed": "2023-07-12", "xd": "2020-02-01"}},
+    {"name": "Old entry date does not prove history", "expected": "n/a", "trade": {"id": "2-1", "sym": "C21", "side": "LONG", "ed": "2000-01-01", "xd": "2020-02-01"}},
+    {"name": "Missing history", "expected": "n/a", "trade": {"id": "2-2", "sym": "C22", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01"}}
+  ]
+}

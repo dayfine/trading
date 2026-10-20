@@ -1,0 +1,8 @@
+{
+  "check": 1,
+  "examples": [
+    {"name": "Stage2 needs slope", "expected": "n/a", "trade": {"id": "1-0", "sym": "C10", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "rsE": "Stage2"}},
+    {"name": "Wrong replay stage", "expected": "fail", "trade": {"id": "1-1", "sym": "C11", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "rsE": "Stage4"}},
+    {"name": "No replay", "expected": "n/a", "trade": {"id": "1-2", "sym": "C12", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01"}}
+  ]
+}

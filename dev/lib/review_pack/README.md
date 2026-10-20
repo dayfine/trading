@@ -17,6 +17,7 @@ Helpers for `dev/scripts/review_pack.sh`. POSIX sh + awk + jq; no Python.
 | `stages.sh` | trading-1-dev | `stage_chart.exe` per trade (weekly stage replay), over the bar store the host passes (#3262) |
 | `croot.sh` | host | the container path of this checkout: the bind mount plus its path below the mount source, so a worktree builds and runs its own tree (#3262) |
 | `pack_sha.sh` | host | `pack_sha REPO`: the pack code's commit, `-dirty` when `dev/lib/review_pack` or `review_pack.sh` differ from it, for the page header (#3262) |
+| `faithfulness.{sh,jq}` | host | existing assembled trades JSON → weighted, coverage-aware long-trade checks and detectors in `<run>_faithfulness.json` |
 | `index.html` | browser | the page; reads `data/manifest.json` and the per-run files |
 
 The A–F grade is hindsight (it reads the 65 trading days after the exit); the
@@ -100,3 +101,55 @@ The small `fixtures/review_pack/pnl_anatomy/` run and arithmetic comments in
 `review_pack_test.sh` independently pin the year, whole-run and second-salt
 values, concentration, tail indices, hindsight boundaries and missing-input
 behaviour. Faithfulness is outside this slice.
+
+
+## Faithfulness (#3140, item 2 slice 1; partial evidence)
+
+`faithfulness.sh` reads only the existing `<run>_trades.json`; no new inputs,
+container step or join changes. The 13-rule table at the top of
+`faithfulness.jq` holds weights, book sections and evidence notes. Checks
+1/3/7/11/13 weigh 2, the rest 1 (total 18). Known passes / known weight gives
+the score: A ≥90%, B ≥80%, C ≥70%, D ≥60%, F below 60%; no known weight gives
+`n/a`. Every row shows scored weight out of 18, all statuses and failed checks.
+The grade describes observed evidence, not overall faithfulness. It is separate
+from the hindsight performance grade. This is the requested long-trade rubric;
+short/unknown-side rows are entirely `n/a` rather than penalising valid shorts.
+
+The tab shows counts per run, ranked failed checks and sortable trade rows
+(worst score first, unknown scores last). Missing files render `n/a`, preserving
+old packs. Screen volume uses `vr`; fill volume uses `fvr`. RS reads the audit's
+positive/negative labels (a bullish crossover is positive). Macro reads `mE`,
+the fill's last preceding screen, not decision-time `aMacro`. Stop provenance
+reads `sfk`, and installed width reads `isd`, never the screening proxy `sid`.
+Any Stage-4 replay week fails check 13; zero needs a nonempty replay hold.
+Reported `stop_loss` passes check 12; listed forced/other exits fail it, while
+laggard rotation needs unavailable exit-time weakness evidence.
+
+**Input-contract blocker, reported on #3140:** assembled data omits MA slopes,
+pre-entry history length, pullback/peak-volume context, actual overhead grade,
+sector decision, designed order type/limit and exit-time weakness. Therefore:
+
+- Checks 2/6/8 are always `n/a`. `aGrade` is the cascade grade, not resistance.
+- Check 1 can fail on a non-Stage-2 replay, but Stage 2 alone cannot prove a
+  rising MA (the classifier can retain the prior stage under mixed signals).
+- Check 4 passes at fill volume ≥2; lower volume is `n/a` because it might be a
+  quiet pullback. The tab shows <1, 1–<2, ≥2 ratio bins and unknown coverage;
+  the overview flags measured ratios under 2 as an observation, not a failure.
+- Check 9 can fail below the trigger or on an audited unfaithful fill. A
+  positive `fvt` plus `faithful=false` proves "filled from above" (above the
+  limit); a positive faithful fill is unknown because Market orders also
+  report faithful=true. `fvt` must exist, since the legacy join maps absent
+  execution faithfulness to false. A rounded zero fill-vs-trigger cannot rule
+  out a small upper-limit breach. The join itself stays unchanged.
+- "Sold a healthy Stage-2 stock" needs exit MA slope. Stop exits and non-Stage-2
+  replays rule it out; remaining cases stay unknown. No healthy sale is claimed.
+- "SPAC / under 52 weeks" needs history, not ticker identity. The SDA entry
+  on 2023-07-12 is a committed specimen that correctly remains unknown.
+
+These unavailable pass/fail paths cannot be tested truthfully without extending
+the input contract. Each check has a fixture pinning its observable statuses
+and missing-data behaviour; the detector fixture pins distribution, above-limit
+proof, false exclusions and the SDA unknown. The PR remains partial. Career
+scorecard and container-built R1–R8 stay in slice 2. The 52-week and 15% cutoffs
+are pack policies from #3140; citations identify the related book principle,
+not numeric rules attributed to the book.
