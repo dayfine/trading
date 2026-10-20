@@ -1197,7 +1197,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   by #2440 (scenarios 21/22, above); the remaining ~48 are filed as a
   tracked follow-up item immediately below rather than bulk-edited here.
 
-- [ ] **Follow-up: apply `report_conjuncts()` to the remaining multi-conjunct
+- [x] **Follow-up: apply `report_conjuncts()` to the remaining multi-conjunct
   assertions in `record_qc_audit_test.sh`** (filed 2026-08-24, from the
   survey above). `report_conjuncts()` now exists in the file (added by
   the #2440 diagnosability fix) and is proven correct by mutation testing
@@ -1314,6 +1314,18 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     three failed) and 7d's inner `preserved_found` loop (3 greps on one
     file, fail message is a bare "not found"). Two-conjunct scenarios (4,
     29a/b/c, 31c, 42, 49, 25a outer check) were left as is.
+  - **Progress 2026-10-20 (slice 8, harness/report-conjuncts-slice8) -- ITEM CLOSED:**
+    converted the last three spots to the `C<N>=(label flag ...)` +
+    `_pairs_ok` + `report_conjuncts` shape: 25a (per spelling: rc, record
+    present, `OK: wrote` line, plus the seen-count), 26a (per spelling: rc,
+    `OK: wrote`; the existing seen-count and record-present stay), and 7d's
+    inner `preserved_found` loop (sha, quality_score, overall_qc per
+    candidate file). Fixed slice-7 label nits: 30a/30b/35-39/7f labels now
+    carry the observed value and no doubled quotes. Pass count 82 before and
+    after. Each conversion mutation-proved (one literal broken per spelling,
+    exactly one `conjunct FAILED` line naming spelling and conjunct).
+    Nothing with >=3 conjuncts remains; two-conjunct scenarios (4, 29a/b/c,
+    31c, 42, 49) are out of scope.
 - [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
   `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
   harness/scenario22-race-2440, issue #2440). This turned out to BE the
