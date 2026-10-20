@@ -36,3 +36,22 @@
  (libraries core ounit2 matchers types splice_detector)
  (preprocess
   (pps ppx_jane)))
+
+(test
+ (name test_splice_plan)
+ (modules test_splice_plan)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  ounit2
+  matchers
+  status
+  types
+  fpath
+  csv
+  weinstein.snapshot_pipeline
+  splice_detector
+  splice_plan)
+ (preprocess
+  (pps ppx_jane)))

@@ -48,6 +48,21 @@
   weinstein.snapshot_pipeline
   scenario_snapshot_plan
   splice_detector
+  splice_plan
   twin_pass)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
+ (name splice_plan)
+ (modules splice_plan)
+ (libraries
+  core
+  fpath
+  csv
+  types
+  scripts.bar_window
+  weinstein.snapshot_pipeline
+  splice_detector)
  (preprocess
   (pps ppx_jane)))

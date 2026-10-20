@@ -61,7 +61,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] file_length: trading/backtest/stops_differential/stops_surface_trace.ml — 413 lines, hard limit 500 (source: #2876) — DONE 2026-10-14: split into trace_common/trace_initial_hit/trace_floor/trace_update siblings (main 35 lines, max 126); exception removed; golden diff unchanged. PR
 - [x] file_length: trading/backtest/tuner/bin/bayesian_runner_runner.ml — 354 -> 273 lines; output writers moved to bayesian_runner_writers.ml; exception removed (cleanup/bayes-runner-split)
 - [x] file_length: trading/backtest/trade_audit_html/html_report.ml — 354 → 188 lines; derived chart series extracted to html_series.ml(i); exception removed (source: #2876)
-- [ ] file_length: trading/backtest/snapshot_warehouse/build_scenario_snapshots.ml — 340 lines, hard limit 500 (source: #2876)
+- [x] file_length: trading/backtest/snapshot_warehouse/build_scenario_snapshots.ml — 340 -> 258 lines; splice wiring extracted to splice_plan.ml(i); exception removed (2026-10-20)
 - [ ] file_length: trading/backtest/decision_grading/bin/decision_grading_bin.ml — 338 lines, hard limit 500 (source: #2876)
 - [x] file_length: analysis/scripts/trade_autopsy/bin/autopsy_runner.ml — 310→210 lines; extracted Markdown-rendering helpers to a sibling `Autopsy_report` module (with `.mli`) in the same `bin/` dir; removed the now-obsolete linter_exceptions.conf entry. PR TBD, branch cleanup/autopsy-runner-file-length (source: #2876)
 - [ ] file_length: analysis/scripts/rebuild_weekly_sidetables/sidetable_migrator.ml — 301 lines, hard limit 500 (source: #2876)
