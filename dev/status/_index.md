@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-20 (orchestrator run 39424708263 — see `dev/daily/2026-10-20.md`). Queue at start: 3 (all weekly ops automation PRs).
+Last updated: 2026-10-20 (orchestrator run 2 — see `dev/daily/2026-10-20-run2.md`; run 1 39424708263). Queue at start: 3 (all weekly ops automation PRs).
 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-20: report_conjuncts slices 6+7 #3358 #3360; next: loop bodies 25a/26a/7d, then close item |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-20: report_conjuncts item CLOSED (#3364, slice 8); next: open T3 items (T3-C / T3-H) or new findings |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-20: #3359 + #3361 file_length splits MERGED; next: file_length sidetable_migrator.ml (301) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-20: #3359 #3361 splits + #3363 trade_lookups test_gap; next: decision_grading_bin.exe has no runner test |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
