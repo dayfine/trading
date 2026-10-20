@@ -110,7 +110,8 @@ do_start() {
         docker start "$CONTAINER_NAME"
     else
         log_info "Creating and starting container '$CONTAINER_NAME'..."
-        docker run -d \
+        # Reap orphaned children: zombies stalled builds and backtests on 2026-10-18/19.
+        docker run -d --init \
             --name "$CONTAINER_NAME" \
             --memory 12g \
             -v "$PROJECT_ROOT:$WORKDIR" \
