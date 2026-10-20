@@ -711,28 +711,6 @@ console.log($1)"; }
 else
   echo "SKIP: review_pack #3203 rework page cases need node"
 fi
-# #3140 part 3, P&L anatomy: pure functions extracted from the page and pinned with node.
-if command -v node >/dev/null 2>&1; then
-  AFNS="$(sed -n -e '/^function hillAlpha(/,/^}/p' -e '/^function anatomyRow(/,/^}/p' -e '/^function anatomyShape(/,/^}/p' "$S/index.html")"
-  an() { node -e "$AFNS
-const tr = (pct, pnl, extra) => Object.assign({ ed: '2020-01-02', qty: 100, ep: 100, pct, pnl }, extra || {});
-console.log($1)"; }
-  expect_eq "hillAlpha: k=2 over 8, 4, 2 = 2 / (ln(8/2) + ln(4/2))" "0.962" "$(an 'hillAlpha([8, 4, 2], 2).toFixed(3)')"
-  expect_eq "hillAlpha: too few values -> null" null "$(an 'hillAlpha([8, 4], 2)')"
-  expect_eq "hillAlpha: k < 2 -> null even with enough values" null "$(an 'hillAlpha([8, 4], 1)')"
-  expect_eq "anatomyRow: 2 wins (+20, +10 %), 2 losses (-5, -5 %) at a 100k NAV, 10k each" \
-    '{"n":4,"weight":10,"p":50,"aw":15,"al":5,"payoff":3,"exp":5,"navpct":2}' \
-    "$(an 'JSON.stringify(anatomyRow([tr(20, 2000), tr(10, 1000), tr(-5, -500), tr(-5, -500)], () => 100000))')"
-  # decoys, each failing exactly one conjunct: a winning stop exit and a losing rotation exit that kept
-  # falling (not good stops), a stop exit that ran (not a regret), a rotation exit that ran 14.99 % (under 15)
-  expect_eq "anatomyShape: top-1 share, hindsight counts (each decoy misses one condition)" '{"topShare":200,"whipsaw":1,"goodStop":1,"regret":1}' \
-    "$(an 'JSON.stringify((({ topShare, whipsaw, goodStop, regret }) => ({ topShare, whipsaw, goodStop, regret }))(anatomyShape([tr(20, 2000, { trig: "laggard_rotation", pmax: 15 }), tr(-5, -500, { trig: "stop_loss", g: "D", p13: 10 }), tr(-5, -500, { trig: "stop_loss", g: "B", p13: -8 }),
-      tr(5, 500, { trig: "stop_loss", g: "B", p13: -8 }), tr(-5, -500, { trig: "laggard_rotation", g: "B", p13: -8 }), tr(-5, -500, { trig: "stop_loss", g: "B", pmax: 20 }), tr(5, 500, { trig: "laggard_rotation", g: "B", pmax: 14.99 })], 1)))')"
-  expect_eq "anatomyShape: Hill alpha over k = min(20, n / 4) (12 wins of 1k..12k -> k 3, 3 / (ln 12/9 + ln 11/9 + ln 10/9) = 5.05); no losses -> null" "5.05 null" \
-    "$(an '((s) => [s.alphaW.toFixed(2), String(s.alphaL)].join(" "))(anatomyShape(Array.from({ length: 12 }, (_, i) => tr(1, 1000 * (i + 1)))))')"
-else
-  echo "SKIP: review_pack anatomy cases need node"
-fi
 expect_eq "wiring: the P&L anatomy card is rendered on load" 1 "$(grep -c 'renderDiag(); renderAnatomy(); renderSalts();' "$S/index.html")"
 # #3194 short-book follow-ups.
 # 1. Regime warm-up: spy_warmup.json carries the REGIME_WARMUP_ROWS SPY bars before the window, so the
@@ -1187,6 +1165,103 @@ console.log('OK');
 JS
   } > "$MW/ui.js"
   expect_eq "#3140 browser: reasons, ownership, buckets, year summary and rendered card" OK "$(node "$MW/ui.js")"
+fi
+
+# #3140 P&L anatomy: independent arithmetic for 10 wins (512..1), 10 losses
+# (-256..-0.5) in 2019 and +100/-50 in 2020, each a $1,000 entry. NAV is
+# 10k/20k: weights 10%/5%; 2019 net=1023-511.5=511.5, 2020 net=50.
+PA="$TMP/pnl-anatomy"; mkdir -p "$PA"
+cp -R "$FIX/pnl_anatomy" "$PA/s0"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/s0" > "$PA/s0.json"
+pq() { jq -r "$1" "$PA/s0.json"; }
+expect_eq "#3140 anatomy: sorted years and All" '2019,2020,All' "$(pq '.rows|map(.year)|join(",")')"
+expect_eq "#3140 anatomy: 2019 N, weight, wins, win/loss, payoff, expectancy, relative/net P&L" '[20,10,50,10.23,5.115,2,2.5575,5.115,511.5]' \
+  "$(pq '.rows[0]|[.n,.weight,.win_rate,.avg_win,.avg_loss,.payoff,.expectancy,.nav_pct,.pnl]|tojson')"
+expect_eq "#3140 anatomy: 2020 cohort" '[2,5,50,10,5,2,2.5,0.25,50]' \
+  "$(pq '.rows[1]|[.n,.weight,.win_rate,.avg_win,.avg_loss,.payoff,.expectancy,.nav_pct,.pnl]|tojson')"
+# Across years: weights (20*10+2*5)/22; win/loss means 1123/110 and 561.5/110;
+# expectancy (112.3-56.15)/22; relative P&L 5.115+.25.
+expect_eq "#3140 anatomy: All arithmetic, not an average of year averages" true \
+  "$(pq 'def near($x): (. - $x | if .<0 then -. else . end)<1e-8;
+  .rows[2] | .n==22 and .win_rate==50 and .payoff==2 and .pnl==561.5 and .nav_pct==5.365 and
+  (.weight|near(210/22)) and (.avg_win|near(1123/110)) and (.avg_loss|near(561.5/110)) and (.expectancy|near(56.15/22))')"
+# 2019 top5=512+256+128+64+32=992, top10=1023, top20=net.
+# All top5=1060; top10=1122 (all positive profits except $1); top20=945.5
+# (net plus the two excluded losses, $256+$128). Shares can exceed 100%.
+expect_eq "#3140 anatomy: top 5/10/20 concentration, by year and All" true \
+  "$(pq 'def near($x): (. - $x | if .<0 then -. else . end)<1e-8;
+  (.rows[0].top5|near(100*992/511.5)) and .rows[0].top10==200 and .rows[0].top20==100 and
+  (.rows[1]|.top5==100 and .top10==100 and .top20==100) and
+  (.rows[2].top5|near(100*1060/561.5)) and (.rows[2].top10|near(100*1122/561.5)) and (.rows[2].top20|near(100*945.5/561.5))')"
+# Top 10%: k=1 for 10 or 11 observations; largest/next-largest=2 on both tails.
+expect_eq "#3140 anatomy: Hill alpha = 1/ln(2), small cohorts n/a" true \
+  "$(pq 'def near($x): (. - $x | if .<0 then -. else . end)<1e-8;
+  (.rows[0].alphaW|near(1/(2|log))) and (.rows[0].alphaL|near(1/(2|log))) and
+  .rows[1].alphaW==null and .rows[1].alphaL==null and (.rows[2].alphaW|near(1/(2|log))) and (.rows[2].alphaL|near(1/(2|log)))')"
+expect_eq "#3140 anatomy: hindsight counts and complete paths, by year and All" '[[2,1,2,20],[0,1,1,2],[2,2,3,22]]' \
+  "$(pq '[.rows[]|[.whipsaw,.good_stop,.rotation_regret,.continuations]]|tojson')"
+# A second salt with doubled NAV has exactly half the weights/relative P&L.
+cp -R "$PA/s0" "$PA/s1"
+awk -F, -v OFS=, 'NR>1{$2=$2*2} {print}' "$PA/s0/equity_curve.csv" > "$PA/s1/equity_curve.csv"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/s1" > "$PA/s1.json"
+expect_eq "#3140 anatomy: independent salt NAV changes weights, not trade returns" true \
+  "$(jq -r --slurpfile a "$PA/s0.json" '[range(0;3) as $i | (.rows[$i].weight*2-$a[0].rows[$i].weight|fabs)<1e-8 and (.rows[$i].nav_pct*2-$a[0].rows[$i].nav_pct|fabs)<1e-8 and .rows[$i].avg_win==$a[0].rows[$i].avg_win]|all' "$PA/s1.json")"
+# Missing paths must not masquerade as clean zero counts.
+cp -R "$PA/s0" "$PA/missing"; rm "$PA/missing/x_trades.tsv"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/missing" > "$PA/missing.json"
+expect_eq "#3140 anatomy: absent continuation data -> n/a counts" true \
+  "$(jq -r '.rows|all(.whipsaw==null and .good_stop==null and .rotation_regret==null and .continuations==0)' "$PA/missing.json")"
+awk -F'\t' -v OFS='\t' '$1=="L2"{$17=64} {print}' "$PA/s0/x_trades.tsv" > "$PA/missing/x_trades.tsv"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/missing" > "$PA/short.json"
+expect_eq "#3140 anatomy: 64 bars is incomplete; unrelated regret data remains known" '[null,null,2,19]' \
+  "$(jq -c '.rows[0]|[.whipsaw,.good_stop,.rotation_regret,.continuations]' "$PA/short.json")"
+rm "$PA/missing/equity_curve.csv"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/missing" > "$PA/nonav.json"
+expect_eq "#3140 anatomy: missing NAV -> n/a weights and relative P&L, known N retained" true \
+  "$(jq -r '.rows|all(.weight==null and .nav_pct==null and .n>0)' "$PA/nonav.json")"
+rm "$PA/missing/trades.csv"
+expect_eq "#3140 anatomy: missing trades -> unavailable" '{"available":false,"rows":null}' \
+  "$(sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/missing")"
+# Exact entry-date NAV beats the earlier row; a later row cannot leak backwards.
+printf 'date,equity\n2019-01-04,5000\n2019-01-07,10000\n2019-01-08,90000\n2020-01-06,20000\n' > "$PA/s1/equity_curve.csv"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/s1" > "$PA/exact-nav.json"
+expect_eq "#3140 anatomy: NAV join on or before entry, never future NAV" '[10,5]' "$(jq -c '[.rows[0:2][].weight]' "$PA/exact-nav.json")"
+# Zero net makes concentration undefined; a breakeven counts in N and expectancy,
+# but not in average win/loss. A missing percentage is not an implied 0% return.
+mkdir -p "$PA/edge"
+{ head -1 "$PA/s0/trades.csv"
+  awk -F, -v OFS=, 'NR==2{$9=100;$10=10;print} NR==12{$9=-100;$10=-10;print}' "$PA/s0/trades.csv"; } > "$PA/edge/trades.csv"
+cp "$PA/s0/equity_curve.csv" "$PA/edge/"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/edge" > "$PA/zero.json"
+expect_eq "#3140 anatomy: zero net -> n/a concentration; zero expectancy is known" '[0,null,null,null,0]' "$(jq -c '.rows[-1]|[.pnl,.top5,.top10,.top20,.expectancy]' "$PA/zero.json")"
+awk -F, -v OFS=, 'NR==3{$9=0;$10=0} {print}' "$PA/edge/trades.csv" > "$PA/edge/new.csv"; mv "$PA/edge/new.csv" "$PA/edge/trades.csv"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/edge" > "$PA/flat.json"
+expect_eq "#3140 anatomy: breakeven is not a loss sample" '[2,50,10,null,null,5]' "$(jq -c '.rows[-1]|[.n,.win_rate,.avg_win,.avg_loss,.payoff,.expectancy]' "$PA/flat.json")"
+awk -F, -v OFS=, 'NR==2{$10=""} {print}' "$PA/edge/trades.csv" > "$PA/edge/new.csv"; mv "$PA/edge/new.csv" "$PA/edge/trades.csv"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/edge" > "$PA/nopct.json"
+expect_eq "#3140 anatomy: missing return -> n/a, not a zero return" '[null,null,null]' "$(jq -c '.rows[-1]|[.avg_win,.avg_loss,.expectancy]' "$PA/nopct.json")"
+# Ten equal positive profits have a zero log sum: a tail estimate is undefined.
+{ head -1 "$PA/s0/trades.csv"
+  awk -F, -v OFS=, 'NR>1 && NR<=11{$9=100;$10=10;print}' "$PA/s0/trades.csv"; } > "$PA/edge/trades.csv"
+sh "$ROOT/dev/lib/review_pack/pnl_anatomy.sh" "$PA/edge" > "$PA/ties.json"
+expect_eq "#3140 anatomy: tied winner tail n/a, all-win rate and return known" '[10,100,10,null,null]' "$(jq -c '.rows[-1]|[.n,.win_rate,.expectancy,.alphaW,.alphaL]' "$PA/ties.json")"
+expect_eq "#3140 anatomy: pipeline emits every run" true "$(jq -s 'length==2 and all(.available)' "$S/data/r0_anatomy.json" "$S/data/r1_anatomy.json")"
+if command -v node >/dev/null 2>&1; then
+  { grep '^const tbl =' "$S/index.html"
+    sed -n -e '/^function anatomyTables(/,/^}/p' -e '/^function renderAnatomy(/,/^}/p' "$S/index.html"
+    cat <<'JS'
+const assert=require('assert'), fs=require('fs'), fmt=(v,n)=>v.toFixed(n);
+const a=JSON.parse(fs.readFileSync(process.argv[2])), b=JSON.parse(fs.readFileSync(process.argv[3]));
+const t=anatomyTables(a); assert(t.metrics.includes('10.23')); assert(t.shape.includes('193.94')); assert(t.shape.includes('1.44 / 1.44')); assert(t.shape.includes('n/a'));
+assert(!t.metrics.includes('null') && !t.shape.includes('NaN'));
+assert(anatomyTables(null).metrics.includes('n/a')); assert(anatomyTables({available:false}).shape.includes('n/a'));
+const nodes={'#a-run':{value:'1'},'#d-anat':{},'#d-anat-shape':{}}, $=id=>nodes[id], D={anatomy:[a,b]};
+renderAnatomy(); assert.strictEqual(nodes['#d-anat'].innerHTML,anatomyTables(b).metrics); assert(nodes['#d-anat'].innerHTML.includes('4.77'));
+nodes['#a-run'].value='0'; renderAnatomy(); assert.strictEqual(nodes['#d-anat'].innerHTML,t.metrics);
+console.log('OK');
+JS
+  } > "$PA/ui.js"
+  expect_eq "#3140 anatomy: rendered values/n-a and selecting another salt" OK "$(node "$PA/ui.js" "$PA/s0.json" "$PA/s1.json")"
 fi
 
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"

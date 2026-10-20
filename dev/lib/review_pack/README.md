@@ -62,3 +62,41 @@ per-trade panels. Faithfulness and P&L anatomy changes remain outside this PR.
 Validation uses a small unowned-symbol store fixture and browser-function
 checks in `review_pack_test.sh`. The full 26-year store is not present in this
 cloud workspace, so that record's counts and runtime remain for local QC.
+
+## P&L anatomy (#3140, item 3)
+
+`pnl_anatomy.sh` reads each staged run's `trades.csv`, `equity_curve.csv` and
+the pack's existing `x_trades.tsv` continuation extraction. It publishes
+`<run>_anatomy.json`; the Diagnostics card selects any run and shows each entry
+year plus All. The earlier chart-run-only browser calculations are replaced by
+this shared host calculation.
+
+N counts closed trades. A winner has positive dollar P&L, a loss has negative
+dollar P&L, and a breakeven contributes to N and expectancy but not to the win
+or loss samples. Returns are the CSV's side-signed percentages; average loss
+is shown as a positive magnitude. Expectancy is the mean signed return,
+equivalent to win probability × average win minus loss probability × average
+loss. Entry weight is entry notional / the last NAV on or before entry; relative
+P&L is the sum of each trade's P&L / that entry NAV. Missing required values
+make the affected metric null, rendered `n/a`, rather than dropping trades.
+
+Top-5/10/20 share ranks signed dollar P&L and divides each top-k sum by net
+realised P&L (undefined at zero net; above 100% and negative shares are valid).
+Hill alpha uses winners and absolute losses separately: k=floor(n/10),
+alpha=k/sum(log(x_i/x_(k+1))) over descending positive values. Fewer than ten
+observations or a zero log sum gives `n/a`.
+
+Hindsight counts use the existing 65-bar extraction window starting at the
+first bar on or after exit (its closing price is the reference). Each relevant
+trade needs that full window. Whipsaw is a losing trade followed by at least +15% in its favour;
+good stop is a losing stop followed by at most -5% at bar 65; rotation regret
+is a laggard exit followed by at least +15% in its favour. The existing
+extraction already signs these returns for shorts. Whipsaw and regret can
+overlap. If any relevant path is missing or truncated, that category is
+`n/a`; the card also shows how many full continuations exist. No raw-data
+rescan or new container replay is introduced.
+
+The small `fixtures/review_pack/pnl_anatomy/` run and arithmetic comments in
+`review_pack_test.sh` independently pin the year, whole-run and second-salt
+values, concentration, tail indices, hindsight boundaries and missing-input
+behaviour. Faithfulness is outside this slice.
