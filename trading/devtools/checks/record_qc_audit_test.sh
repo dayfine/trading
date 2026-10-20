@@ -725,18 +725,26 @@ if _pairs_ok "${C7D[@]}"; then
   # under the ${FEATURE7} glob, distinct from JSON7A/JSON7B, and still show
   # the rework's own verdict/sha/score -- not silently vanished.
   preserved_found=false
+  C7DP=()
   for f in "${TMP_REPO}/dev/audit/2026-07-27-"*"-${FEATURE7}.json"; do
     [[ "${f}" == "${JSON7A}" ]] && continue
     [[ "${f}" == "${JSON7B}" ]] && continue
-    if grep -q '"sha": *"run1sha"' "${f}" && grep -q '"quality_score": *2' "${f}" \
-       && grep -q '"overall_qc": *"NEEDS_REWORK"' "${f}"; then
+    C7DF=(
+      "preserved $(basename "${f}") sha == run1sha (actual: $(_json_actual "${f}" sha))" "$(_grep_ok '"sha": *"run1sha"' "${f}")"
+      "preserved $(basename "${f}") quality_score == 2 (actual: $(_json_actual "${f}" quality_score))" "$(_grep_ok '"quality_score": *2' "${f}")"
+      "preserved $(basename "${f}") overall_qc == NEEDS_REWORK (actual: $(_json_actual "${f}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${f}")"
+    )
+    C7DP+=("${C7DF[@]}")
+    if _pairs_ok "${C7DF[@]}"; then
       preserved_found=true
     fi
   done
+  (( ${#C7DP[@]} > 0 )) || C7DP=("a preserved record exists besides JSON7A/JSON7B" 0)
   if $preserved_found; then
     pass "scenario 7d — same branch, DIFFERENT reviewed sha (rework) preserves the prior NEEDS_REWORK record instead of clobbering it (H-AUDIT-REWORK-COUNT-BLIND fix)"
   else
     fail "scenario 7d — expected the pre-rework NEEDS_REWORK record (sha run1sha, q=2) to survive under a distinct filename; not found"
+    report_conjuncts "${C7DP[@]}"
     ls -la "${TMP_REPO}/dev/audit/" | sed 's/^/      /'
   fi
 else
@@ -821,9 +829,9 @@ audit_count_7f="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-29-*-${FEATURE7F}
 C7F=(
   "(( rc7f_1 == 0 )) (actual: rc7f_1=${rc7f_1})" "$(( rc7f_1 == 0 ))"
   "(( rc7f_2 == 0 )) (actual: rc7f_2=${rc7f_2})" "$(( rc7f_2 == 0 ))"
-  "[[ -f 'JSON7F' ]]" "$([[ -f "${JSON7F}" ]] && echo 1 || echo 0)"
+  "JSON7F exists" "$([[ -f "${JSON7F}" ]] && echo 1 || echo 0)"
   "[[ 'audit_count_7f' == '1' ]] (actual: audit_count_7f=${audit_count_7f})" "$([[ "${audit_count_7f}" == "1" ]] && echo 1 || echo 0)"
-  "grep -q ''quality_score': *4' 'JSON7F'" "$(_grep_ok '"quality_score": *4' "${JSON7F}")"
+  "JSON7F quality_score == 4 (actual: $(_json_actual "${JSON7F}" quality_score))" "$(_grep_ok '"quality_score": *4' "${JSON7F}")"
 )
 if _pairs_ok "${C7F[@]}"; then
   pass "scenario 7f — direct callers omitting --sha still overwrite in place, no preserved-aside file (backward compatible)"
@@ -2273,24 +2281,26 @@ _run_write_audit_25() {  # $1 = value for the BEFORE_RENAME hook, $2 = notes
 # (a) disable direction — every documented "off" spelling must run to
 # completion. Each iteration clears the target first, so "record published"
 # is proven per-value rather than inherited from an earlier iteration.
-offenders25=""
+C25A=()
 seen25=0
 for hookval25 in "${HOOK_DISABLE_VALUES[@]}"; do
   seen25=$(( seen25 + 1 ))
   rm -f "${JSON25}"
   out25=$(_run_write_audit_25 "${hookval25}" "gate off via [${hookval25}]") \
     && rc25=0 || rc25=$?
-  present25=$([[ -f "${JSON25}" ]] && echo yes || echo no)
-  if (( rc25 != 0 )) || [[ "${present25}" != "yes" ]] \
-     || ! grep -q "^OK: wrote" <<<"${out25}"; then
-    offenders25="${offenders25} [${hookval25}](rc=${rc25},record=${present25})"
-  fi
+  C25A+=(
+    "[${hookval25}] rc25 == 0 (actual: rc25=${rc25})" "$(_eq "${rc25}" 0)"
+    "[${hookval25}] record present (JSON25)" "$(_flag test -f "${JSON25}")"
+    "[${hookval25}] output has 'OK: wrote'" "$(_grep_ok "^OK: wrote" <<<"${out25}")"
+  )
 done
+C25A+=("seen25 == HOOK_DISABLE_EXPECTED_COUNT (actual: seen25=${seen25} expected=${HOOK_DISABLE_EXPECTED_COUNT})" "$(_eq "${seen25}" "${HOOK_DISABLE_EXPECTED_COUNT}")")
 
-if [[ -z "${offenders25}" ]] && (( seen25 == HOOK_DISABLE_EXPECTED_COUNT )); then
+if _pairs_ok "${C25A[@]}"; then
   pass "scenario 25a — all ${seen25} documented 'off' spellings ($(_disable_values_repr)) leave WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME disabled: write completes, record published (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
-  fail "scenario 25a — expected ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings, exercised ${seen25} ($(_disable_values_repr)); each exercised value must show rc=0 + record + 'OK: wrote'; offending values:${offenders25:-none}"
+  fail "scenario 25a — expected ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings, exercised ${seen25} ($(_disable_values_repr)); each exercised value must show rc=0 + record + 'OK: wrote'; got seen=${seen25}"
+  report_conjuncts "${C25A[@]}"
 fi
 
 # (b) fire direction — `1` must still abort before publishing, leaving the
@@ -2339,25 +2349,26 @@ _run_write_audit_26() {  # $1 = value for the AFTER_RENAME hook
 # not the hook fires (this hook aborts after the `mv`), so rc and the "OK:"
 # line -- NOT the file's existence -- are what separate inert from fired
 # here.
-offenders26=""
+C26L=()
 seen26=0
 for hookval26 in "${HOOK_DISABLE_VALUES[@]}"; do
   seen26=$(( seen26 + 1 ))
   out26=$(_run_write_audit_26 "${hookval26}") && rc26=0 || rc26=$?
-  if (( rc26 != 0 )) || ! grep -q "^OK: wrote" <<<"${out26}"; then
-    offenders26="${offenders26} [${hookval26}](rc=${rc26})"
-  fi
+  C26L+=(
+    "[${hookval26}] rc26 == 0 (actual: rc26=${rc26})" "$(_eq "${rc26}" 0)"
+    "[${hookval26}] output has 'OK: wrote'" "$(_grep_ok "^OK: wrote" <<<"${out26}")"
+  )
 done
 
 C26A=(
-  "[[ -z 'offenders26' ]] (actual: offenders26=${offenders26})" "$([[ -z "${offenders26}" ]] && echo 1 || echo 0)"
+  "${C26L[@]}"
   "(( seen26 == HOOK_DISABLE_EXPECTED_COUNT )) (actual: seen26=${seen26} HOOK_DISABLE_EXPECTED_COUNT=${HOOK_DISABLE_EXPECTED_COUNT})" "$(( seen26 == HOOK_DISABLE_EXPECTED_COUNT ))"
-  "[[ -f 'JSON26' ]]" "$([[ -f "${JSON26}" ]] && echo 1 || echo 0)"
+  "JSON26 exists" "$(_flag test -f "${JSON26}")"
 )
 if _pairs_ok "${C26A[@]}"; then
   pass "scenario 26a — all ${seen26} documented 'off' spellings ($(_disable_values_repr)) leave WRITE_AUDIT_TEST_ABORT_AFTER_RENAME disabled: rc=0 with the 'OK:' line, no spurious failure reported for an already-published record (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
-  fail "scenario 26a — expected ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings, exercised ${seen26} ($(_disable_values_repr)); each exercised value must show rc=0 + 'OK: wrote'; record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no); offending values:${offenders26:-none}"
+  fail "scenario 26a — expected ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings, exercised ${seen26} ($(_disable_values_repr)); each exercised value must show rc=0 + 'OK: wrote'; record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no)"
   report_conjuncts "${C26A[@]}"
 fi
 
@@ -2778,7 +2789,7 @@ out30a=$(_run_write_audit_30 "${BOGUS_MISSING30}" "missing") && rc30a=0 || rc30a
 walkup_count30a="$(_glob_count "${WALKUP5_ROOT}/dev/audit" '*.json' '-type f')"
 C30A=(
   "(( rc30a != 0 )) (actual: rc30a=${rc30a})" "$(( rc30a != 0 ))"
-  "[[ 'out30a' == 'FAIL: REPO_ROOT is set to 'BOGUS_MISSING30' but is not a directory' ]] (actual: BOGUS_MISSING30=${BOGUS_MISSING30})" "$([[ "${out30a}" == "FAIL: REPO_ROOT is set to '${BOGUS_MISSING30}' but is not a directory" ]] && echo 1 || echo 0)"
+  "out30a == FAIL: REPO_ROOT is set to ${BOGUS_MISSING30} but is not a directory (actual: out30a=${out30a})" "$([[ "${out30a}" == "FAIL: REPO_ROOT is set to '${BOGUS_MISSING30}' but is not a directory" ]] && echo 1 || echo 0)"
   "[[ 'walkup_count30a' == '0' ]] (actual: walkup_count30a=${walkup_count30a})" "$([[ "${walkup_count30a}" == "0" ]] && echo 1 || echo 0)"
 )
 if _pairs_ok "${C30A[@]}"; then
@@ -2794,7 +2805,7 @@ out30b=$(_run_write_audit_30 "${BOGUS_FILE30}" "file") && rc30b=0 || rc30b=$?
 walkup_count30b="$(_glob_count "${WALKUP5_ROOT}/dev/audit" '*.json' '-type f')"
 C30B=(
   "(( rc30b != 0 )) (actual: rc30b=${rc30b})" "$(( rc30b != 0 ))"
-  "[[ 'out30b' == 'FAIL: REPO_ROOT is set to 'BOGUS_FILE30' but is not a directory' ]] (actual: BOGUS_FILE30=${BOGUS_FILE30})" "$([[ "${out30b}" == "FAIL: REPO_ROOT is set to '${BOGUS_FILE30}' but is not a directory" ]] && echo 1 || echo 0)"
+  "out30b == FAIL: REPO_ROOT is set to ${BOGUS_FILE30} but is not a directory (actual: out30b=${out30b})" "$([[ "${out30b}" == "FAIL: REPO_ROOT is set to '${BOGUS_FILE30}' but is not a directory" ]] && echo 1 || echo 0)"
   "[[ 'walkup_count30b' == '0' ]] (actual: walkup_count30b=${walkup_count30b})" "$([[ "${walkup_count30b}" == "0" ]] && echo 1 || echo 0)"
 )
 if _pairs_ok "${C30B[@]}"; then
@@ -3126,9 +3137,9 @@ out35=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S35_DIR}/gh" \
 JSON35="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE35}.json"
 C35=(
   "(( rc35 == 0 )) (actual: rc35=${rc35})" "$(( rc35 == 0 ))"
-  "[[ -f 'JSON35' ]]" "$([[ -f "${JSON35}" ]] && echo 1 || echo 0)"
-  "grep -q ''structural_qc': *'APPROVED'' 'JSON35'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON35}")"
-  "grep -q ''quality_score': *3' 'JSON35'" "$(_grep_ok '"quality_score": *3' "${JSON35}")"
+  "JSON35 exists" "$([[ -f "${JSON35}" ]] && echo 1 || echo 0)"
+  "JSON35 structural_qc == APPROVED (actual: $(_json_actual "${JSON35}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON35}")"
+  "JSON35 quality_score == 3 (actual: $(_json_actual "${JSON35}" quality_score))" "$(_grep_ok '"quality_score": *3' "${JSON35}")"
 )
 if _pairs_ok "${C35[@]}"; then
   pass "scenario 35 — gh exit 0, empty stdout, no stderr: genuine zero-review PR still falls back to file mode unchanged (H-AUDIT-GH-FALLBACK-RESIDUAL regression pin)"
@@ -3175,10 +3186,10 @@ out36=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S36_DIR}/gh" \
 JSON36="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE36}.json"
 C36=(
   "(( rc36 == 0 )) (actual: rc36=${rc36})" "$(( rc36 == 0 ))"
-  "[[ -f 'JSON36' ]]" "$([[ -f "${JSON36}" ]] && echo 1 || echo 0)"
-  "grep -q ''structural_qc': *'APPROVED'' 'JSON36'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON36}")"
-  "grep -q ''behavioral_qc': *'APPROVED'' 'JSON36'" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON36}")"
-  "grep -q ''quality_score': *4' 'JSON36'" "$(_grep_ok '"quality_score": *4' "${JSON36}")"
+  "JSON36 exists" "$([[ -f "${JSON36}" ]] && echo 1 || echo 0)"
+  "JSON36 structural_qc == APPROVED (actual: $(_json_actual "${JSON36}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON36}")"
+  "JSON36 behavioral_qc == APPROVED (actual: $(_json_actual "${JSON36}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"APPROVED"' "${JSON36}")"
+  "JSON36 quality_score == 4 (actual: $(_json_actual "${JSON36}" quality_score))" "$(_grep_ok '"quality_score": *4' "${JSON36}")"
 )
 if _pairs_ok "${C36[@]}"; then
   pass "scenario 36 — gh exit 0, non-empty stdout: happy path unchanged, record written from PR reviews (H-AUDIT-GH-FALLBACK-RESIDUAL)"
@@ -3257,11 +3268,11 @@ out37=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S37_DIR}/gh" \
 JSON37="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE37}.json"
 C37=(
   "(( rc37 == 0 )) (actual: rc37=${rc37})" "$(( rc37 == 0 ))"
-  "[[ -f 'JSON37' ]]" "$([[ -f "${JSON37}" ]] && echo 1 || echo 0)"
-  "grep -q ''structural_qc': *'APPROVED'' 'JSON37'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON37}")"
-  "grep -q ''behavioral_qc': *'NEEDS_REWORK'' 'JSON37'" "$(_grep_ok '"behavioral_qc": *"NEEDS_REWORK"' "${JSON37}")"
-  "grep -q ''overall_qc': *'NEEDS_REWORK'' 'JSON37'" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON37}")"
-  "grep -q ''quality_score': *2' 'JSON37'" "$(_grep_ok '"quality_score": *2' "${JSON37}")"
+  "JSON37 exists" "$([[ -f "${JSON37}" ]] && echo 1 || echo 0)"
+  "JSON37 structural_qc == APPROVED (actual: $(_json_actual "${JSON37}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON37}")"
+  "JSON37 behavioral_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON37}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"NEEDS_REWORK"' "${JSON37}")"
+  "JSON37 overall_qc == NEEDS_REWORK (actual: $(_json_actual "${JSON37}" overall_qc))" "$(_grep_ok '"overall_qc": *"NEEDS_REWORK"' "${JSON37}")"
+  "JSON37 quality_score == 2 (actual: $(_json_actual "${JSON37}" quality_score))" "$(_grep_ok '"quality_score": *2' "${JSON37}")"
 )
 if _pairs_ok "${C37[@]}"; then
   pass "scenario 37 — gh exit 0, non-empty stdout + stderr warning: real PR payload recorded, not refused, not the wrong file-mode fallback (H-AUDIT-GH-STDERR-GATE-TOO-BROAD)"
@@ -3324,11 +3335,11 @@ out38=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S38_DIR}/gh" \
 JSON38="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE38}.json"
 C38=(
   "(( rc38 == 0 )) (actual: rc38=${rc38})" "$(( rc38 == 0 ))"
-  "[[ -f 'JSON38' ]]" "$([[ -f "${JSON38}" ]] && echo 1 || echo 0)"
-  "grep -q ''structural_qc': *'APPROVED'' 'JSON38'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON38}")"
-  "grep -q ''behavioral_qc': *'SKIPPED'' 'JSON38'" "$(_grep_ok '"behavioral_qc": *"SKIPPED"' "${JSON38}")"
-  "grep -q ''overall_qc': *'APPROVED'' 'JSON38'" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON38}")"
-  "grep -q ''quality_score': *null' 'JSON38'" "$(_grep_ok '"quality_score": *null' "${JSON38}")"
+  "JSON38 exists" "$([[ -f "${JSON38}" ]] && echo 1 || echo 0)"
+  "JSON38 structural_qc == APPROVED (actual: $(_json_actual "${JSON38}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON38}")"
+  "JSON38 behavioral_qc == SKIPPED (actual: $(_json_actual "${JSON38}" behavioral_qc))" "$(_grep_ok '"behavioral_qc": *"SKIPPED"' "${JSON38}")"
+  "JSON38 overall_qc == APPROVED (actual: $(_json_actual "${JSON38}" overall_qc))" "$(_grep_ok '"overall_qc": *"APPROVED"' "${JSON38}")"
+  "JSON38 quality_score == null (actual: $(_json_actual "${JSON38}" quality_score))" "$(_grep_ok '"quality_score": *null' "${JSON38}")"
 )
 if _pairs_ok "${C38[@]}"; then
   pass "scenario 38 — PR mode, structural-only review: unresolved behavioral_qc/quality_score fall to SKIPPED/null, not leaked from an unrelated dev/reviews/ file (CP4 rework)"
@@ -3386,9 +3397,9 @@ out39=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S39_DIR}/gh" \
 JSON39="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE39}.json"
 C39=(
   "(( rc39 == 0 )) (actual: rc39=${rc39})" "$(( rc39 == 0 ))"
-  "[[ -f 'JSON39' ]]" "$([[ -f "${JSON39}" ]] && echo 1 || echo 0)"
-  "grep -q ''structural_qc': *'APPROVED'' 'JSON39'" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON39}")"
-  "grep -q ''sha': *''' 'JSON39'" "$(_grep_ok '"sha": *""' "${JSON39}")"
+  "JSON39 exists" "$([[ -f "${JSON39}" ]] && echo 1 || echo 0)"
+  "JSON39 structural_qc == APPROVED (actual: $(_json_actual "${JSON39}" structural_qc))" "$(_grep_ok '"structural_qc": *"APPROVED"' "${JSON39}")"
+  "JSON39 sha == empty (actual: $(_json_actual "${JSON39}" sha))" "$(_grep_ok '"sha": *""' "${JSON39}")"
 )
 if _pairs_ok "${C39[@]}"; then
   pass "scenario 39 — PR mode, structural-only review with no Reviewed SHA line: sha stays empty, not leaked from an unrelated dev/reviews/ file (H-AUDIT-SHA-FILE-LEAK)"
