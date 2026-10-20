@@ -79,13 +79,15 @@ let test_exit_reason_duplicate_key_last_wins _ =
     write_scenario
       ~csv:
         "symbol,entry_date,exit_date,exit_trigger\n\
-         AAPL,2020-01-02,2020-03-02,second\n\
-         AAPL,2020-01-02,2020-03-02,first\n"
+         AAPL,2020-01-02,2020-03-02,a\n\
+         AAPL,2020-01-02,2020-03-02,c\n\
+         AAPL,2020-01-02,2020-03-02,b\n"
   in
   let tbl = T.exit_reason_lookup ~scenario_dir:dir in
+  (* The last row is neither the first, the max nor the min. *)
   assert_that
     (Hashtbl.find tbl (key "AAPL" "2020-01-02" "2020-03-02"))
-    (equal_to (Some "first" : string option))
+    (equal_to (Some "b" : string option))
 
 let test_exit_reason_leading_blank_line _ =
   let dir =
@@ -134,15 +136,17 @@ let test_find_unknown_symbol _ =
   assert_that (find "ZZZ" "2020-01-10") (equal_to (None : float option))
 
 let test_find_tie_prefers_later_listed _ =
-  (* Both are 2 days from 2020-01-12. The later-listed entry is the earlier-dated
-     and smaller-MFE one, so only "later listed wins" yields 0.30. *)
-  let tied =
-    T.build_mfe_index
-      [ ("AAPL", d "2020-01-14", 0.50); ("AAPL", d "2020-01-10", 0.30) ]
+  (* Both entries are 2 days from 2020-01-12. Asserting both listing orders
+     separates "later listed wins" from date- and MFE-based tie-breaks. *)
+  let tie entries =
+    T.find_mfe
+      (T.build_mfe_index entries)
+      ~symbol:"AAPL" ~entry_date:(d "2020-01-12")
   in
   assert_that
-    (T.find_mfe tied ~symbol:"AAPL" ~entry_date:(d "2020-01-12"))
-    (equal_to (Some 0.30 : float option))
+    ( tie [ ("AAPL", d "2020-01-14", 0.50); ("AAPL", d "2020-01-10", 0.30) ],
+      tie [ ("AAPL", d "2020-01-10", 0.30); ("AAPL", d "2020-01-14", 0.50) ] )
+    (equal_to ((Some 0.30, Some 0.50) : float option * float option))
 
 let test_tolerance_value _ = assert_that T.join_tolerance_days (equal_to 7)
 
