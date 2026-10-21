@@ -37,6 +37,7 @@
   test_short_borrow_gate
   test_declining_ma_gate
   test_deteriorating_blocks_longs
+  test_neutral_blocks_screener_thread
   test_index_stage_veto
   test_short_ticket_policy
   test_entry_recency_gate
