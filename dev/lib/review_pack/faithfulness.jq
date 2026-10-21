@@ -13,7 +13,7 @@ def rules: [
   {id:9, name:"Fill at/above trigger and within limit", weight:1, section:"4.7", evidence:"Negative fvt or audited unfaithful fill disproves it; Market fills also report faithful=true, so cannot prove it."},
   {id:10, name:"Structural stop, no fallback", weight:1, section:"5.1", evidence:"sfk: Support_floor versus Buffer_fallback."},
   {id:11, name:"Installed stop within 15% of fill", weight:2, section:"5.1", evidence:"isd: installed distance, never screening sid. 15% is the pack policy."},
-  {id:12, name:"Stop hit, or badly lagging rotation", weight:1, section:"5.6", evidence:"Reported stop_loss passes; exit-time weakness for laggard_rotation is not joined. See also §5.7."},
+  {id:12, name:"Stop hit, Stage-3 exit, or badly lagging rotation", weight:1, section:"5.6", evidence:"stop_loss (§5.7) and stage3_force_exit (§1 Stage 3) pass; involuntary exits fail. Other exits and laggard weakness are n/a."},
   {id:13, name:"No Stage-4 hold", weight:2, section:"1", evidence:"s4w and holdW from weekly stage replay; any observed Stage-4 week fails."}
 ];
 def num: type == "number";
@@ -38,9 +38,9 @@ def check($i):
   elif $i == 10 then if .sfk == "Support_floor" then true elif .sfk == "Buffer_fallback" then false else null end
   elif $i == 11 then if (.isd | num) then .isd >= 0 and .isd <= 0.15 else null end
   elif $i == 12 then
-    if .trig == "stop_loss" then true
+    if .trig == "stop_loss" or .trig == "stage3_force_exit" then true
     elif .trig == "laggard_rotation" or (.trig // "") == "" then null
-    elif (.trig as $trig | ["force_liquidation","margin_call","delisted","liquidity_exit","extension_stop","stage3_force_exit","stale_force_exit"] | index($trig)) != null then false
+    elif (.trig as $trig | ["force_liquidation","margin_call","delisted"] | index($trig)) != null then false
     else null end
   elif $i == 13 then
     if (.s4w | num) and .s4w > 0 then false

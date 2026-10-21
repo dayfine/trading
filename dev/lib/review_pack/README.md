@@ -122,8 +122,10 @@ positive/negative labels (a bullish crossover is positive). Macro reads `mE`,
 the fill's last preceding screen, not decision-time `aMacro`. Stop provenance
 reads `sfk`, and installed width reads `isd`, never the screening proxy `sid`.
 Any Stage-4 replay week fails check 13; zero needs a nonempty replay hold.
-Reported `stop_loss` passes check 12; listed forced/other exits fail it, while
-laggard rotation needs unavailable exit-time weakness evidence.
+Reported `stop_loss` (§5.7) and `stage3_force_exit` (§1 Stage 3) pass check 12.
+Involuntary `force_liquidation`, `margin_call` and `delisted` exits fail it.
+`extension_stop`, `liquidity_exit` and `stale_force_exit` remain `n/a` without
+a book rationale; laggard rotation needs unavailable exit-time weakness evidence.
 
 **Input-contract blocker, reported on #3140:** assembled data omits MA slopes,
 pre-entry history length, pullback/peak-volume context, actual overhead grade,
