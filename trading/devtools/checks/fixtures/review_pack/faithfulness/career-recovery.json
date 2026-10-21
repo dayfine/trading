@@ -1,0 +1,8 @@
+{
+  "id": "recovery",
+  "calculation": "100 * mean(3/6, 0/6) = 25",
+  "input": {"episodes": [{"d": "2020-01-03", "e13": 3}, {"d": "2021-01-01", "e13": 0}]},
+  "expectedScore": 25,
+  "becauseParts": ["13-week entries 2020-01-03: 3; 2021-01-01: 0", "reference 6 per episode"],
+  "missing": {"episodes": [{"d": "2020-01-03", "e13": null}]}
+}

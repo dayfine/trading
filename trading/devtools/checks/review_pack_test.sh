@@ -1328,5 +1328,52 @@ JS
   expect_eq "#3140 faithfulness: overview wires detector signals" 1 "$(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'out.push(...faithfulnessSignals')"
 fi
 
+# #3140 career scorecard: eight independently calculated dimensions, plus
+# shorts-off. These are published-data fixtures, with no simulator inputs.
+if command -v node >/dev/null 2>&1; then
+  cat > "$FF/career-case.js" <<'JS'
+const assert=require('assert'), fs=require('fs'), c=require(process.argv[2]), f=JSON.parse(fs.readFileSync(process.argv[3]));
+const result=c.score(f.input), row=result.rows.find(r=>r.id===f.id);
+assert.strictEqual(result.rows.length,8); assert.strictEqual('overall' in result,false);
+if(f.expectedScore===null) assert.strictEqual(row.score,null);
+else {assert(Math.abs(row.score-f.expectedScore)<1e-9,`${f.id}: ${row.score} != ${f.expectedScore}`); assert(row.score>=0&&row.score<=100);}
+for(const part of f.becauseParts) assert(row.because.includes(part),row.because+' missing '+part);
+assert(row.section); assert(row.policy);
+if(f.missing){const na=c.score(f.missing).rows.find(r=>r.id===f.id); assert.strictEqual(na.score,null); assert(na.because.includes('n/a'));}
+assert.strictEqual(result.scored,result.rows.filter(r=>r.score!==null).length);
+console.log('OK');
+JS
+  for fixture in "$FIX"/faithfulness/career-*.json; do
+    expect_eq "#3140 career $(basename "$fixture"): hand arithmetic, because, n/a" OK "$(node "$FF/career-case.js" "$ROOT/dev/lib/review_pack/career_scorecard.js" "$fixture")"
+  done
+  {
+    echo "const assert=require('assert'), c=require(process.argv[2]);"
+    grep '^const tbl =\|^const faithEsc =' "$S/index.html"
+    sed -n -e '/^function careerInput(/,/^}/p' -e '/^function renderCareerScorecard(/,/^}/p' -e '/^function initCareerScorecard(/,/^}/p' "$S/index.html"
+    cat <<'JS'
+const nav=[['2019-12-31',100],['2020-01-02',90],['2020-01-03',99],['2021-01-04',89.1]], spy=[['2019-12-31',100],['2020-01-02',80],['2020-01-03',88],['2021-01-04',88]];
+const reg=new Map([['2020-01-02','DOWN'],['2020-01-03','DOWN'],['2021-01-04','DOWN']]);
+const down=c.downPeriods(nav,spy,reg); assert.strictEqual(down.length,2); assert(Math.abs(down[0].ret+1)<1e-9); assert(Math.abs(down[0].spy+12)<1e-9); assert(Math.abs(down[1].ret+10)<1e-9); assert.strictEqual(down[1].spy,0);
+assert.strictEqual(c.downPeriods([],[],reg),null); assert.strictEqual(c.downPeriods(nav,spy.slice(1),reg),null);
+assert.strictEqual(c.score({}).scored,0); assert.strictEqual(c.score({episodes:[]}).rows[6].score,null);
+assert.strictEqual(c.score({episodes:[{d:'x',e13:9}]}).rows[6].score,100);
+assert.strictEqual(c.score({meta:{short_leg:{fills:0,pnl:0}}}).rows[7].score,0);
+assert.strictEqual(c.score({meta:{short_leg:{fills:2,pnl:0}}}).rows[7].score,50);
+assert.strictEqual(c.score({meta:{short_leg:{fills:2,pnl:-10}}}).rows[7].score,0);
+const nodes={'#f-run':{value:'0',listeners:{},addEventListener(k,f){this.listeners[k]=f;}},'#career-coverage':{},'#career-table':{}}, $=id=>nodes[id], runLabel=i=>['s0','s1'][i], fmt=v=>v.toFixed(1);
+const CareerScorecard=c, D={nav:[nav,nav],trades:[[],[{side:'SHORT'}]],meta:[{basis:'price',short_leg:{fills:2,pnl:500}},{basis:'tr',short_leg:null}],faithfulness:[null,null],anatomy:[null,null],spyPrice:spy,spyTR:spy.map(([d,v])=>[d,v*2]),spyWarmup:[],macro:[]};
+let basisReads=[],dirs=[]; const basisView=b=>({series:b==='price'?'spyPrice':'spyTR'}), isShort=t=>t.side==='SHORT';
+const spyOnNavDates=(n,series)=>{basisReads.push(series);return series;}, spyRegimeByDay=()=>reg, withWarmup=(w,s,b)=>s;
+const reopenEpisodes=(m,n,s,t,dir)=>{dirs.push(dir);return [];};
+initCareerScorecard(); assert(nodes['#career-coverage'].textContent.includes('1 of 8')); assert(nodes['#career-table'].innerHTML.includes('100.0')); assert(nodes['#career-table'].innerHTML.includes('n/a')); assert.strictEqual((nodes['#career-table'].innerHTML.match(/<tr>/g)||[]).length,9);
+nodes['#f-run'].value='1'; nodes['#f-run'].listeners.change(); assert(nodes['#career-coverage'].textContent.includes('s1: 0 of 8')); assert.strictEqual(basisReads[0],D.spyPrice); assert.strictEqual(basisReads[1],D.spyTR); assert.deepStrictEqual(dirs,[1,-1]);
+assert(!nodes['#career-table'].innerHTML.includes('NaN')); assert(!nodes['#career-table'].innerHTML.includes('undefined'));
+console.log('OK');
+JS
+  } > "$FF/career-ui.js"
+  expect_eq "#3140 career: DOWN yearly compounding, guards, coverage and selected-run wiring" OK "$(node "$FF/career-ui.js" "$ROOT/dev/lib/review_pack/career_scorecard.js")"
+  expect_eq "#3140 career: helper is inlined for portable rendered packs" '1 1' "$(grep -c '^const CareerScorecard =' "$S/index.html") $(grep -c 'initCareerScorecard();' "$S/index.html")"
+fi
+
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

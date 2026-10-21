@@ -1,0 +1,6 @@
+{
+  "id": "shorts",
+  "input": {"meta": {"short_leg": null}},
+  "expectedScore": null,
+  "becauseParts": ["shorts disabled"]
+}
