@@ -12,6 +12,10 @@
 # Fixtures: same-line heading, next line, blank-then-next, bold, NEEDS_REWORK
 # next-line, a prose-only mention (must NOT parse), no verdict at all, and
 # precedence (overall_qc: beats a conflicting ## Verdict section).
+# Also: two headings (last wins), a later heading with no verdict (resets to
+# none), backtick-wrapped token, a non-verdict first line followed by a later
+# token line (must NOT parse), a "## Verdicts summary" heading (ignored), and a
+# trailing empty "## Verdict" heading (reset: none, not the earlier verdict).
 set -e
 
 . "$(dirname "$0")/_check_lib.sh"
@@ -43,6 +47,12 @@ printf '# Review\n\n## Verdict (re-review)\n\nNEEDS_REWORK\n' > "$R/suffix.md"
 printf '# Review\n\n## Verdict\n\nThe change is fine; I would say APPROVED later.\n' > "$R/prose.md"
 printf '# Agreement table\n\n| PR | verdict |\n| 1 | APPROVED |\n' > "$R/noverdict.md"
 printf 'overall_qc: NEEDS_REWORK\n\n## Verdict\n\nAPPROVED\n' > "$R/precedence.md"
+printf '# Review\n\n## Verdict\n\nNEEDS_REWORK\n\n## Verdict\n\nAPPROVED\n' > "$R/twoheadings.md"
+printf '# Review\n\n## Verdict\n\nAPPROVED\n\n## Verdict rationale\n\nprose only\n' > "$R/laterempty.md"
+printf '# Review\n\n## Verdict\n\n`APPROVED`\n' > "$R/backtick.md"
+printf '# Review\n\n## Verdict\n\nAPPROVED\n\n## Verdict\n' > "$R/trailinghead.md"
+printf '# Review\n\n## Verdict\n\nSee the findings below.\n\nAPPROVED\n' > "$R/scanpast.md"
+printf '# Review\n\n## Verdicts summary\n\nAPPROVED\n' > "$R/plural.md"
 
 REPO_ROOT="$FAKE_ROOT" sh "$CHECK_06" "$DETAIL_FILE" "$FINDINGS_FILE"
 
@@ -65,9 +75,15 @@ expect_verdict precedence NEEDS_REWORK
 expect_verdict suffix NEEDS_REWORK
 expect_none prose
 expect_none noverdict
+expect_verdict twoheadings APPROVED
+expect_none laterempty
+expect_verdict backtick APPROVED
+expect_none scanpast
+expect_none plural
+expect_none trailinghead
 
 if [ "$FAIL_COUNT" -gt 0 ]; then
   echo "deep_scan_verdict_parse_check: ${FAIL_COUNT} failure(s)" >&2
   exit 1
 fi
-echo "OK: deep_scan_verdict_parse_check (9 fixtures)"
+echo "OK: deep_scan_verdict_parse_check (15 fixtures)"

@@ -6,6 +6,9 @@
 # of the first non-blank line at or after the heading (text on the heading
 # line itself counts), with markdown bold/backtick markers stripped. Only that
 # one line is inspected, so a later prose mention never counts.
+# A later "## Verdict" heading with no parseable verdict resets the result to
+# none (fails safe: "could not extract", never a stale earlier verdict). The
+# heading must end the word: "## Verdicts summary" is not a verdict heading.
 extract_heading_verdict() {
   awk '
     function tok(s) {
@@ -14,7 +17,7 @@ extract_heading_verdict() {
       if (s ~ /^NEEDS_REWORK([^A-Za-z_]|$)/) return "NEEDS_REWORK"
       return ""
     }
-    /^##[ \t]+Verdict/ {
+    /^##[ \t]+Verdict([ \t(]|\r?$)/ {
       armed = 1; res = ""
       rest = $0; sub(/^##[ \t]+Verdict/, "", rest)
       t = tok(rest); if (t != "") { res = t; armed = 0 }
