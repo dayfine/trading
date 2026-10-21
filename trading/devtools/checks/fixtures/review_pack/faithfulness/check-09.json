@@ -1,0 +1,8 @@
+{
+  "check": 9,
+  "examples": [
+    {"name": "Faithful Market is no limit proof", "expected": "n/a", "trade": {"id": "9-0", "sym": "C90", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "fvt": 0, "faithful": true}},
+    {"name": "Below trigger", "expected": "fail", "trade": {"id": "9-1", "sym": "C91", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "fvt": -0.1, "faithful": true}},
+    {"name": "False without execution is unknown", "expected": "n/a", "trade": {"id": "9-2", "sym": "C92", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "faithful": false}}
+  ]
+}

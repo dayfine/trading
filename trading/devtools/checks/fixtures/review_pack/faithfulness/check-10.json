@@ -1,0 +1,8 @@
+{
+  "check": 10,
+  "examples": [
+    {"name": "Structural", "expected": "pass", "trade": {"id": "10-0", "sym": "C100", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "sfk": "Support_floor"}},
+    {"name": "Fallback", "expected": "fail", "trade": {"id": "10-1", "sym": "C101", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "sfk": "Buffer_fallback"}},
+    {"name": "Unknown stop source", "expected": "n/a", "trade": {"id": "10-2", "sym": "C102", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01"}}
+  ]
+}

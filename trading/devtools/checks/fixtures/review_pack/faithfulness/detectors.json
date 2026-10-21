@@ -1,0 +1,7 @@
+[
+  {"id": "ABOVE", "sym": "ABOVE", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "fvt": 3, "faithful": false, "fvr": 0.5, "rsX": "Stage2", "trig": "laggard_rotation"},
+  {"id": "MARKET", "sym": "MARKET", "side": "LONG", "fvt": 5, "faithful": true, "fvr": 1.5, "rsX": "Stage3", "trig": "laggard_rotation"},
+  {"id": "BELOW", "sym": "BELOW", "side": "LONG", "fvt": -0.1, "faithful": false, "fvr": 2, "rsX": "Stage2", "trig": "stop_loss"},
+  {"id": "SDA", "sym": "SDA", "side": "LONG", "ed": "2023-07-12", "xd": "2023-08-01", "rsX": "Stage2"},
+  {"id": "SHORT", "sym": "SHORT", "side": "SHORT", "rsE": "Stage4", "s4w": 10, "holdW": 10, "fvr": 0.1, "fvt": 3, "faithful": false}
+]

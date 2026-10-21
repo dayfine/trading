@@ -43,6 +43,7 @@ nav.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 nav.tabs button { font: 500 13px var(--f-body); color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; cursor: pointer; white-space: nowrap; }
 nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
 nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, tr:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#f-trades th button { font: inherit; color: inherit; border: 0; background: transparent; padding: 0; cursor: pointer; text-align: inherit; }
 section.view { display: grid; gap: 20px; padding-top: 20px; }
 h2 { font: 600 17px/1.3 var(--f-head); margin: 0; letter-spacing: .01em; }
 h3 { font: 600 14px/1.3 var(--f-head); margin: 0; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
@@ -126,6 +127,7 @@ ol.agenda li b { font-weight: 600; }
       <button role="tab" data-v="hilo">Highlights &amp; lowlights</button>
       <button role="tab" data-v="surprises">Surprises</button>
       <button role="tab" data-v="diag">Diagnostics</button>
+      <button role="tab" data-v="faithfulness">Faithfulness</button>
       <button role="tab" data-v="salts">Salts</button>
       <button role="tab" data-v="agenda">Review agenda</button>
     </nav>
@@ -280,6 +282,26 @@ ol.agenda li b { font-weight: 600; }
     <h2>Can D/F trades be avoided at entry?</h2>
     <p class="note">The grade is hindsight: it uses the trade’s own result and the 65 trading days after the exit. The question is whether anything known on entry day predicts it. Each row is a cohort by an entry-time field; a useful filter needs a D/F rate well off the overall rate on a cohort with real net P&amp;L at stake.</p>
     <div class="grid2" id="d-df"></div>
+  </div>
+</section>
+
+<section class="view" id="v-faithfulness" hidden>
+  <div class="panel">
+    <h2>Faithfulness grades by run</h2>
+    <p class="note">Long-trade rubric, separate from the hindsight performance grade. A ≥ 90%, B ≥ 80%, C ≥ 70%, D ≥ 60%, F below 60%. Missing evidence drops out of the denominator; a high grade with low coverage does not certify a faithful trade. Shorts and unknown sides are n/a under this long-trade rubric.</p>
+    <div class="tablebox"><table id="f-grades"></table></div>
+  </div>
+  <div class="panel">
+    <div class="row"><h2>Evidence and detectors</h2><label>Run <select id="f-run"></select></label></div>
+    <div id="f-detectors"></div>
+    <h3>Failing checks, ranked by count</h3>
+    <p class="note">Counts are failures / trades with evidence. n/a is never a clean zero. The rule table shows weights, sources and book citations; history and risk cutoffs are pack policy.</p>
+    <div class="tablebox"><table id="f-checks"></table></div>
+  </div>
+  <div class="panel">
+    <h2>Per-trade faithfulness</h2>
+    <p class="note">Worst known score first; click a column to sort. Unknown scores follow scored rows. Each row includes all 13 pass / fail / n/a checks.</p>
+    <div class="tablebox"><table id="f-trades"></table></div>
   </div>
 </section>
 
@@ -478,10 +500,10 @@ const D = {};
 const load = p => fetch('data/' + p).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); });
 const chartCache = {};
 
-const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open', 'missed', 'anatomy'];
+const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open', 'missed', 'anatomy', 'faithfulness'];
 load('manifest.json').then(man => {
   D.man = man; const ids = man.runs.map(r => r.id);
-  return Promise.all([...KINDS.flatMap(k => ids.map(id => ['missed', 'anatomy'].includes(k) ? load(`${id}_${k}.json`).catch(() => null) : load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json'), load('spy_warmup.json').catch(() => [])]);
+  return Promise.all([...KINDS.flatMap(k => ids.map(id => ['missed', 'anatomy', 'faithfulness'].includes(k) ? load(`${id}_${k}.json`).catch(() => null) : load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json'), load('spy_warmup.json').catch(() => [])]);
 }).then(r => {
   const n = D.man.runs.length;
   KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
@@ -513,6 +535,7 @@ function init() {
   const opts = (note) => D.man.runs.map((r, i) => `<option value="${i}">${runLabel(i)} (${pct(D.meta[i].metrics.totalreturnpct, 0)})${note && i !== CH() ? ' · no charts' : ''}</option>`).join('');
   $('#p-salt').innerHTML = opts(false); $('#t-salt').innerHTML = opts(true); $('#t-salt').value = String(CH());
   $('#a-run').innerHTML = opts(false); $('#a-run').value = String(CH()); $('#a-run').addEventListener('change', renderAnatomy);
+  initFaithfulness(opts(false));
   $('#flags-title').textContent = `Per-trade flags, ${runLabel(CH())}`;
   labelRunKind(); renderOverview(); renderMissedWinners(); renderPeriods(); initTrades(); renderHilo(); renderSurprises(); renderDiag(); renderAnatomy(); renderSalts(); renderAgenda();
   $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
@@ -872,6 +895,7 @@ function renderSignals(nav, spy) {
   // margin calls clustered on low-priced shorts (see marginChurn)
   const mc = marginChurnLine(marginChurn(tr), v16Count(D.meta[CH()].validator), D.trades.map((ts, i) => [runLabel(i), marginChurn(ts).low]));
   if (mc) out.push(mc);
+  out.push(...faithfulnessSignals(D.faithfulness?.[CH()]));
   // gate reopen episodes: the flat-through-the-recovery shape (2008-09) and its opposite (invested, lagged)
   const eps = reopenEpisodes(D.macro, nav, spy, tr, dir), ep = e => `${e.d.slice(0, 7)} (${e.e13} ${e.e13 === 1 ? 'entry' : 'entries'} in 13 wk, ${pct(e.ret, 1)} vs ${BL} ${pct(e.spy, 1)})`;
   const groups = [['sat out', 'Sat out the recovery'], ['invested and lagged', 'Invested and lagged'], ['lagged', 'Lagged']].map(([k, label]) => [label, eps.filter(e => e.flag === k)]).filter(([, l]) => l.length);
@@ -1236,6 +1260,65 @@ function renderAnatomy() {
   const run = +$('#a-run').value, tables = anatomyTables(D.anatomy[run]);
   $('#d-anat').innerHTML = tables.metrics;
   $('#d-anat-shape').innerHTML = tables.shape;
+}
+
+/* ---------- Faithfulness ---------- */
+const faithEsc = s => String(s ?? 'n/a').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+function faithfulnessDetectors(data) {
+  if (!data?.available) return null;
+  const rows = data.rows, volume = rows.map(t => t.fvr).filter(v => v != null);
+  const counts = key => ({ hits: rows.filter(t => t.detectors[key] === true).length, known: rows.filter(t => t.detectors[key] != null).length, total: rows.length });
+  return { volume: { known: volume.length, total: rows.length, bins: [volume.filter(v => v < 1).length, volume.filter(v => v >= 1 && v < 2).length, volume.filter(v => v >= 2).length] },
+    healthy: counts('healthy'), above: counts('above'), history: counts('history') };
+}
+function faithfulnessSignals(data) {
+  const d = faithfulnessDetectors(data); if (!d) return [];
+  const out = [], v = d.volume;
+  if (v.known && v.bins[0] + v.bins[1]) out.push(`<b>Fill-week volume:</b> ${v.bins[0] + v.bins[1]} of ${v.known} measured long fills were under 2× (${v.total - v.known} n/a). Quiet-pullback evidence is unavailable; low volume alone is not a failed check.`);
+  if (d.above.hits) out.push(`<b>Filled from above:</b> ${d.above.hits} long fills exceeded their designed limit (unfaithful audit fill with positive fill-vs-trigger). ${d.above.known} of ${d.above.total} trades have decisive evidence.`);
+  // Keep all detectors on the same path: unobservable detectors never produce a clean zero signal.
+  if (d.healthy.hits) out.push(`<b>Sold a healthy Stage-2 stock:</b> ${d.healthy.hits} trades.`);
+  if (d.history.hits) out.push(`<b>SPAC / under 52 weeks of history:</b> ${d.history.hits} trades.`);
+  return out;
+}
+function faithfulnessTables(data, sort = { k: 'score', dir: 1 }) {
+  if (!data?.available) return { checks:'<tbody><tr><td>n/a — faithfulness data unavailable</td></tr></tbody>', trades:'<tbody><tr><td>n/a</td></tr></tbody>', detectors:'<p>n/a — faithfulness data unavailable</p>' };
+  const esc = faithEsc, d = faithfulnessDetectors(data), count = c => `${c.known ? c.hits : 'n/a'} / ${c.known} measured (${c.total - c.known} n/a)`;
+  const cells = values => `<tr>${values.map(v => `<td>${v}</td>`).join('')}</tr>`;
+  const checks = tbl([['Check'], ['Weight'], ['Failures / measured'], ['Book reference / evidence']], [...data.failures].sort((a,b) => b.count - a.count || a.id - b.id).map(r => cells([
+    `${r.id}. ${esc(r.name)}`, r.weight, r.known ? `${r.count} / ${r.known}` : 'n/a', `<a href="https://github.com/dayfine/trading/blob/main/docs/design/weinstein-book-reference.md">§${r.section}</a> · ${esc(r.evidence)}`])));
+  const rows = [...data.rows].sort((a,b) => {
+    const value = t => sort.k === 'failed' ? t.failed.length : t[sort.k === 'grade' ? 'score' : sort.k];
+    const av = value(a), bv = value(b);
+    if (av == null || bv == null) return av == null ? (bv == null ? 0 : 1) : -1;
+    return (av > bv ? 1 : av < bv ? -1 : 0) * sort.dir || String(a.id).localeCompare(String(b.id));
+  });
+  const cols = [['Symbol','sym'], ['Entry','ed'], ['Exit','xd'], ['Grade','grade'], ['Score %','score'], ['Scored weight','possible'], ['Failed checks','failed'], ['All checks','checks']];
+  const trades = `<thead><tr>${cols.map(([name,k]) => `<th><button type="button" data-fsort="${k}"${k === sort.k ? ' aria-pressed="true"' : ''}>${name}${k === sort.k ? (sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr></thead><tbody>${rows.map(t => cells([
+    esc(t.sym), esc(t.ed), esc(t.xd), esc(t.grade), t.score == null ? 'n/a' : fmt(t.score, 1), `${t.possible} / ${data.total_weight}`, t.failed.map(id => esc(data.rules.find(r => r.id === id).name)).join('; ') || 'none observed',
+    t.checks.map(c => `${c.id}: ${c.status}`).join(' · ')] )).join('')}</tbody>`;
+  const v = d.volume;
+  const detectors = `<p><b>Fill-week volume ratio:</b> ${v.known ? `&lt;1×: ${v.bins[0]} · 1–&lt;2×: ${v.bins[1]} · ≥2×: ${v.bins[2]}` : 'n/a'} · ${v.known} measured, ${v.total - v.known} n/a. Completed fill week, per-bar ratio versus prior four weeks.</p>
+    <p><b>Filled from above:</b> ${count(d.above)}. Positive fill-vs-trigger plus an unfaithful audit fill proves an upper-limit breach; faithful Market orders cannot prove a limit.</p>
+    <p><b>Sold a healthy Stage-2 stock:</b> n/a — exit MA slope is not joined. ${d.healthy.known} of ${d.healthy.total} trades ruled out by stop exit or non-Stage-2 replay; the rest are n/a.</p>
+    <p><b>SPAC / under 52 weeks of history:</b> n/a — history length is not joined. Ticker identity does not establish listing age or SPAC status.</p>`;
+  return { checks, trades, detectors };
+}
+let fSort = { k:'score', dir:1 };
+function renderFaithfulness() {
+  $('#f-grades').innerHTML = tbl([['Run'], ['A'], ['B'], ['C'], ['D'], ['F'], ['n/a']], D.man.runs.map((r,i) => `<tr><td>${faithEsc(runLabel(i))}</td>${['A','B','C','D','F','n/a'].map(g => `<td>${D.faithfulness?.[i]?.available ? D.faithfulness[i].grades[g] : 'n/a'}</td>`).join('')}</tr>`));
+  const tables = faithfulnessTables(D.faithfulness?.[+$('#f-run').value], fSort);
+  $('#f-checks').innerHTML = tables.checks; $('#f-trades').innerHTML = tables.trades; $('#f-detectors').innerHTML = tables.detectors;
+}
+function initFaithfulness(options) {
+  $('#f-run').innerHTML = options; $('#f-run').value = String(CH());
+  $('#f-run').addEventListener('change', renderFaithfulness);
+  $('#f-trades').addEventListener('click', e => {
+    const b = e.target.closest('[data-fsort]'); if (!b) return;
+    const k = b.dataset.fsort; if (k === 'checks') return;
+    fSort = { k, dir:fSort.k === k ? -fSort.dir : (k === 'failed' ? -1 : 1) }; renderFaithfulness();
+  });
+  renderFaithfulness();
 }
 
 /* ---------- Salts ---------- */

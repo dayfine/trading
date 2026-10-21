@@ -1,0 +1,8 @@
+{
+  "check": 3,
+  "examples": [
+    {"name": "Threshold inclusive", "expected": "pass", "trade": {"id": "3-0", "sym": "C30", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "vr": 2}},
+    {"name": "Below threshold", "expected": "fail", "trade": {"id": "3-1", "sym": "C31", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "vr": 1.99}},
+    {"name": "Missing ratio", "expected": "n/a", "trade": {"id": "3-2", "sym": "C32", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "vr": null}}
+  ]
+}

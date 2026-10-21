@@ -1,0 +1,8 @@
+{
+  "check": 13,
+  "examples": [
+    {"name": "No Stage4 weeks", "expected": "pass", "trade": {"id": "13-0", "sym": "C130", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "s4w": 0, "holdW": 1}},
+    {"name": "One Stage4 week", "expected": "fail", "trade": {"id": "13-1", "sym": "C131", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "s4w": 1, "holdW": 1}},
+    {"name": "No replay coverage", "expected": "n/a", "trade": {"id": "13-2", "sym": "C132", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "s4w": 0, "holdW": 0}}
+  ]
+}

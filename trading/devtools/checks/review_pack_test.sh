@@ -1264,5 +1264,69 @@ JS
   expect_eq "#3140 anatomy: rendered values/n-a and selecting another salt" OK "$(node "$PA/ui.js" "$PA/s0.json" "$PA/s1.json")"
 fi
 
+# #3140 faithfulness: fixtures use only fields emitted by assemble.awk.
+# Unobservable pass/fail paths stay n/a; see README and the issue blocker.
+FF="$TMP/faithfulness"; mkdir -p "$FF"
+FH="$ROOT/dev/lib/review_pack/faithfulness.sh"
+for fixture in "$FIX"/faithfulness/check-*.json; do
+  check=$(jq -r .check "$fixture")
+  jq '[.examples[].trade]' "$fixture" > "$FF/input.json"
+  sh "$FH" "$FF/input.json" > "$FF/output.json"
+  expected=$(jq -r '[.examples[].expected] | join(" ")' "$fixture")
+  actual=$(jq -r --argjson id "$check" '[.rows[].checks[] | select(.id == $id) | .status] | join(" ")' "$FF/output.json")
+  expect_eq "#3140 faithfulness check $check: known evidence and n/a" "$expected" "$actual"
+done
+sh "$FH" "$FIX/faithfulness/detectors.json" > "$FF/detectors.json"
+sh "$FH" "$T" > "$FF/direct.json"
+expect_eq "#3140 faithfulness: builder consumes its assembled trades" true "$(jq -s '.[0] == .[1]' "$FF/direct.json" "$S/data/r0_faithfulness.json")"
+expect_eq "#3140 faithfulness: every built salt publishes data" "true true" "$(jq -s -r 'map(.available) | @tsv' "$S/data/r0_faithfulness.json" "$S/data/r1_faithfulness.json" | tr '\t' ' ')"
+expect_eq "#3140 faithfulness: missing input stays unavailable" false "$(sh "$FH" "$FF/missing.json" | jq .available)"
+sed '/^\[\.\[\] | row\]/,$d' "$ROOT/dev/lib/review_pack/faithfulness.jq" > "$FF/grade.jq"
+printf '%s\n' '[null,0,59.99,60,69.99,70,79.99,80,89.99,90,100] | map(grade(.))' >> "$FF/grade.jq"
+expect_eq "#3140 faithfulness: inclusive grade boundaries" 'n/a F F D D C C B B A A' "$(jq -nr -f "$FF/grade.jq" | jq -r 'join(" ")')"
+# vr (2), RS (1), macro (2), stop source (1), risk (2), stop exit (1), hold (2):
+# 11 known weight, 2 failed screen weight -> 9/11 = 81.818... -> B; 7 unknown.
+echo '[{"id":"weighted","sym":"weighted","side":"LONG","vr":1.99,"rs":"Bullish_xover","mE":"Neutral","sfk":"Support_floor","isd":0.15,"trig":"stop_loss","s4w":0,"holdW":1},{}]' > "$FF/weighted-input.json"
+sh "$FH" "$FF/weighted-input.json" > "$FF/weighted.json"
+expect_eq "#3140 faithfulness: weights, missing denominator and all-unknown grade" '18 9 11 B n/a' "$(jq -r '[.total_weight,.rows[0].earned,.rows[0].possible,.rows[0].grade,.rows[1].grade] | join(" ")' "$FF/weighted.json")"
+expect_eq "#3140 faithfulness: score uses weighted evidence" true "$(jq '.rows[0].score > 81.818 and .rows[0].score < 81.819' "$FF/weighted.json")"
+expect_eq "#3140 faithfulness: short rubric has no scored weight" '0 n/a' "$(jq -r '.rows[] | select(.id == "SHORT") | "\(.possible) \(.grade)"' "$FF/detectors.json")"
+expect_eq "#3140 faithfulness: above-limit proof excludes Market and missing execution" 'true n/a false n/a' "$(jq -r '[.rows[:4][].detectors.above | if . == null then "n/a" else tostring end] | join(" ")' "$FF/detectors.json")"
+# fvt is rounded to percentage hundredths in the audit markdown: zero does not
+# rule out a small positive breach. No designed limit may be inferred from it.
+echo '[{"side":"LONG","fvt":0,"faithful":false},{"side":"LONG","fvt":0,"faithful":true}]' > "$FF/rounded.json"
+expect_eq "#3140 faithfulness: rounded zero cannot rule out an upper-limit breach" 'null null' "$(sh "$FH" "$FF/rounded.json" | jq -r '[.rows[].detectors.above | tostring] | join(" ")')"
+expect_eq "#3140 faithfulness: healthy sale cannot be proved without slope" 'n/a false false n/a' "$(jq -r '[.rows[:4][].detectors.healthy | if . == null then "n/a" else tostring end] | join(" ")' "$FF/detectors.json")"
+expect_eq "#3140 faithfulness: SDA date is not proof of short history" 'SDA 2023-07-12 n/a' "$(jq -r '.rows[] | select(.id == "SDA") | "\(.sym) \(.ed) \(.checks[] | select(.id == 2) | .status)"' "$FF/detectors.json")"
+if command -v node >/dev/null 2>&1; then
+  {
+    echo "const assert=require('assert'), fs=require('fs');"
+    grep '^const tbl =\|^const faithEsc =\|^let fSort =' "$S/index.html"
+    sed -n -e '/^function faithfulnessDetectors(/,/^}/p' -e '/^function faithfulnessSignals(/,/^}/p' -e '/^function faithfulnessTables(/,/^}/p' -e '/^function renderFaithfulness(/,/^}/p' -e '/^function initFaithfulness(/,/^}/p' "$S/index.html"
+    cat <<'JS'
+const fmt=(v,d=1)=>Number(v).toFixed(d), a=JSON.parse(fs.readFileSync(process.argv[2])), b=JSON.parse(fs.readFileSync(process.argv[3]));
+const d=faithfulnessDetectors(a); assert.deepStrictEqual(d.volume,{known:3,total:5,bins:[1,1,1]});
+assert.deepStrictEqual(d.above,{hits:1,known:2,total:5}); assert.strictEqual(d.healthy.hits,0); assert.strictEqual(d.history.known,0);
+const sig=faithfulnessSignals(a).join(' '); assert(sig.includes('2 of 3')); assert(sig.includes('Filled from above')); assert(!sig.includes('Sold a healthy')); assert(!sig.includes('SPAC'));
+assert.deepStrictEqual(faithfulnessSignals(null),[]); assert(faithfulnessTables(null).checks.includes('n/a'));
+const t=faithfulnessTables(a); assert(t.detectors.includes('&lt;1×: 1')); assert(t.trades.includes('SDA')); assert(t.trades.includes('2023-07-12')); assert(t.detectors.includes('n/a — history'));
+assert(t.checks.indexOf('9. Fill at/above') < t.checks.indexOf('1. Stage')); assert(t.checks.includes('§4.7')); assert(t.checks.includes('n/a')); assert(t.trades.indexOf('ABOVE')<t.trades.indexOf('BELOW'));
+assert(t.trades.includes('9: fail')); assert(t.trades.includes('18')); assert(!t.trades.includes('undefined')); assert(!t.trades.includes('NaN'));
+assert(faithfulnessTables(a,{k:'sym',dir:-1}).trades.indexOf('SHORT') < faithfulnessTables(a,{k:'sym',dir:-1}).trades.indexOf('ABOVE'));
+const bad=structuredClone(a); bad.rows[0].sym='<script>bad</script>'; assert(faithfulnessTables(bad).trades.includes('&lt;script&gt;'));
+const nodes=Object.fromEntries(['#f-run','#f-grades','#f-checks','#f-trades','#f-detectors'].map(id=>[id,{value:'0',listeners:{},addEventListener(k,f){this.listeners[k]=f;}}]));
+const $=id=>nodes[id], CH=()=>0, runLabel=i=>['s0','s1'][i], D={man:{runs:[{},{}]},faithfulness:[a,b]};
+initFaithfulness('<option>runs</option>'); assert(nodes['#f-grades'].innerHTML.includes('s1')); assert(nodes['#f-trades'].innerHTML.includes('ABOVE'));
+nodes['#f-run'].value='1'; nodes['#f-run'].listeners.change(); assert(nodes['#f-trades'].innerHTML.includes('weighted')); assert(!nodes['#f-trades'].innerHTML.includes('ABOVE'));
+nodes['#f-run'].value='0'; renderFaithfulness(); nodes['#f-trades'].listeners.click({target:{closest(){return {dataset:{fsort:'sym'}};}}});
+assert.strictEqual(fSort.k,'sym'); nodes['#f-trades'].listeners.click({target:{closest(){return {dataset:{fsort:'sym'}};}}}); assert.strictEqual(fSort.dir,-1);
+D.faithfulness[1]=null; renderFaithfulness(); assert(nodes['#f-grades'].innerHTML.includes('n/a'));
+console.log('OK');
+JS
+  } > "$FF/ui.js"
+  expect_eq "#3140 faithfulness: distribution, signals, coverage, rendering, salt selection and sorting" OK "$(node "$FF/ui.js" "$FF/detectors.json" "$FF/weighted.json")"
+  expect_eq "#3140 faithfulness: overview wires detector signals" 1 "$(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'out.push(...faithfulnessSignals')"
+fi
+
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

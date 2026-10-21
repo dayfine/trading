@@ -1,0 +1,14 @@
+{
+  "check": 12,
+  "examples": [
+    {"name": "Reported stop hit", "expected": "pass", "trade": {"id": "12-0", "sym": "C120", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "trig": "stop_loss"}},
+    {"name": "Forced sale", "expected": "fail", "trade": {"id": "12-1", "sym": "C121", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "trig": "force_liquidation"}},
+    {"name": "Entry RS is no exit weakness proof", "expected": "n/a", "trade": {"id": "12-2", "sym": "C122", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "trig": "laggard_rotation", "rs": "Neg_declining"}},
+    {"name": "stage3_force_exit", "expected": "pass", "trade": {"id": "12-3", "sym": "C123", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "trig": "stage3_force_exit"}},
+    {"name": "extension_stop", "expected": "n/a", "trade": {"id": "12-4", "sym": "C124", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "trig": "extension_stop"}},
+    {"name": "liquidity_exit", "expected": "n/a", "trade": {"id": "12-5", "sym": "C125", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "trig": "liquidity_exit"}},
+    {"name": "stale_force_exit", "expected": "n/a", "trade": {"id": "12-6", "sym": "C126", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "trig": "stale_force_exit"}},
+    {"name": "margin_call", "expected": "fail", "trade": {"id": "12-7", "sym": "C127", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "trig": "margin_call"}},
+    {"name": "delisted", "expected": "fail", "trade": {"id": "12-8", "sym": "C128", "side": "LONG", "ed": "2020-01-01", "xd": "2020-02-01", "trig": "delisted"}}
+  ]
+}
