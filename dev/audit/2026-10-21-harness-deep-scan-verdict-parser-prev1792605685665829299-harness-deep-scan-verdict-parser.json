@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-21",
+  "feature": "harness-deep-scan-verdict-parser",
+  "branch": "harness/deep-scan-verdict-parser",
+  "sha": "0058af02b2b3760a41bb45406707a3d90358cd7b",
+  "recorded_at_ns": 1792605685665829299,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
