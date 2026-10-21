@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-21",
+  "feature": "cleanup-require-breakout-volume-pin",
+  "branch": "cleanup/require-breakout-volume-pin",
+  "sha": "10189b06c5fc20c53dca87383614ab8ffbe4a760",
+  "recorded_at_ns": 1792609194165555434,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
