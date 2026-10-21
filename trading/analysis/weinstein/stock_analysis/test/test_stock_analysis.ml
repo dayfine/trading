@@ -461,6 +461,24 @@ let test_analyze_threads_require_breakout_volume _ =
     (gate cfg, gate { cfg with require_breakout_volume = false })
     (equal_to (true, false))
 
+(* EFFECTIVENESS-PIN: require_breakout_volume -- [analyze]'s own copy of
+   [config.require_breakout_volume] onto the analysis ([stock_analysis.ml]
+   record construction). On a uniform-volume (Weak) breakout shape every other
+   gate passes, so flipping the field alone flips [is_breakout_candidate]; a
+   dropped or defaulted thread leaves both arms equal and fails this test. *)
+let test_analyze_require_breakout_volume_changes_candidacy _ =
+  let bars = rising_bars ~n:35 50.0 100.0 in
+  let bench = rising_bars ~n:35 80.0 110.0 in
+  let candidate config =
+    is_breakout_candidate
+      (analyze ~config ~ticker:"X" ~bars ~benchmark_bars:bench
+         ~prior_stage:(Some (Stage1 { weeks_in_base = 12 }))
+         ~as_of_date:as_of)
+  in
+  assert_that
+    (candidate cfg, candidate { cfg with require_breakout_volume = false })
+    (equal_to (false, true))
+
 (* ------------------------------------------------------------------ *)
 (* Breakdown candidate                                                  *)
 (* ------------------------------------------------------------------ *)
@@ -1155,6 +1173,8 @@ let suite =
          >:: test_volume_waiver_does_not_widen_other_gates;
          "analyze threads require_breakout_volume"
          >:: test_analyze_threads_require_breakout_volume;
+         "analyze require_breakout_volume changes candidacy"
+         >:: test_analyze_require_breakout_volume_changes_candidacy;
          "breakout rejection names each gate" >:: test_rejection_names_each_gate;
          "breakout rejection agrees with the boolean"
          >:: test_rejection_agrees_with_the_boolean;

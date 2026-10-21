@@ -137,6 +137,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 - [x] adapter_exception_expired: trading/devtools/checks/adapter_effectiveness_exceptions.conf — neutral_blocks_longs/shorts review_at 2026-10-01 passed; add thread pin via _run_screener (source: 2026-10-19-deep.md) — DONE: test_neutral_blocks_screener_thread.ml pins both fields; both exception lines removed (PR pending)
 - [ ] adapter_exception_expired: trading/devtools/checks/adapter_effectiveness_exceptions.conf — 6 more entries past review_at: stop_width_mode, stop_width_size_down_max_pct, match_fraction, ret_epsilon, require_breakout_volume, insufficient_score; one pin (or re-justification) per thread, separate PRs (source: 2026-10-19-deep.md)
+  - require_breakout_volume: DONE (cleanup/require-breakout-volume-pin) -- test_analyze_require_breakout_volume_changes_candidacy pins the stock_analysis.ml inner thread; exception line removed. 5 remain: stop_width_mode, stop_width_size_down_max_pct, match_fraction, ret_epsilon, insufficient_score.
 
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
