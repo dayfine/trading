@@ -1426,3 +1426,19 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:prune_remote_branches_test.sh})))
+
+; Deep scan check 6 verdict-extraction regression test (deep scan 2026-10-19
+; Warning 13): invokes check_06_qc_calibration.sh on a synthetic
+; dev/reviews/ covering same-line, next-line, blank-then-next, bold,
+; NEEDS_REWORK, prose-only, no-verdict and overall_qc-precedence cases.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  deep_scan/_lib.sh
+  deep_scan/_verdict.sh
+  deep_scan/check_06_qc_calibration.sh
+  (universe))
+ (action
+  (run sh %{dep:deep_scan_verdict_parse_check.sh})))

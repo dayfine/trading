@@ -24,6 +24,7 @@ REPORT_FILE="${1:?Usage: check_06_qc_calibration.sh <report_file> [findings_file
 FINDINGS_FILE="${2:-}"
 
 . "$(dirname "$0")/_lib.sh"
+. "$(dirname "$0")/_verdict.sh"
 
 # ────────────────────────────────────────────────────────────────
 # Check 6: QC calibration audit
@@ -86,12 +87,10 @@ for review_file in "${REPO_ROOT}"/dev/reviews/*.md; do
     fi
   fi
 
-  # Fallback: look for standalone verdict lines after "## Verdict"
+  # Fallback: verdict on the heading line or the next non-blank line after
+  # "## Verdict" (bare or bold); see deep_scan/_verdict.sh.
   if [ -z "$verdict" ]; then
-    verdict_line="$(grep -A1 '^## Verdict' "$review_file" 2>/dev/null | tail -1 | tr -d '[:space:]' || true)"
-    case "$verdict_line" in
-      APPROVED|NEEDS_REWORK) verdict="$verdict_line" ;;
-    esac
+    verdict="$(extract_heading_verdict "$review_file")"
   fi
 
   if [ -z "$verdict" ]; then
