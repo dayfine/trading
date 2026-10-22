@@ -1,0 +1,8 @@
+{
+  "id": "portfolio",
+  "calculation": "100 * min(1, 10/12.5) = 80; top-k shares >100% are disclosed without a penalty",
+  "input": {"anatomy": {"available": true, "rows": [{"year": "All", "weight": 12.5, "top5": 120, "top10": 150, "top20": 200}]}},
+  "expectedScore": 80,
+  "becauseParts": ["average weight 12.5% (reference 10%)", "top-5/10/20 shares 120%/150%/200%", "no concentration penalty"],
+  "missing": {"anatomy": {"available": true, "rows": [{"year": "All", "weight": 12.5, "top5": 120, "top10": null, "top20": 200}]}}
+}

@@ -17,6 +17,7 @@ Helpers for `dev/scripts/review_pack.sh`. POSIX sh + awk + jq; no Python.
 | `stages.sh` | trading-1-dev | `stage_chart.exe` per trade (weekly stage replay), over the bar store the host passes (#3262) |
 | `croot.sh` | host | the container path of this checkout: the bind mount plus its path below the mount source, so a worktree builds and runs its own tree (#3262) |
 | `pack_sha.sh` | host | `pack_sha REPO`: the pack code's commit, `-dirty` when `dev/lib/review_pack` or `review_pack.sh` differ from it, for the page header (#3262) |
+| `career_scorecard.js` | browser | eight run-level diagnostic dimensions from published pack evidence; inlined into the built page so file-based renders need no extra asset |
 | `faithfulness.{sh,jq}` | host | existing assembled trades JSON → weighted, coverage-aware long-trade checks and detectors in `<run>_faithfulness.json` |
 | `index.html` | browser | the page; reads `data/manifest.json` and the per-run files |
 
@@ -155,3 +156,52 @@ proof, false exclusions and the SDA unknown. The PR remains partial. Career
 scorecard and container-built R1–R8 stay in slice 2. The 52-week and 15% cutoffs
 are pack policies from #3140; citations identify the related book principle,
 not numeric rules attributed to the book.
+
+
+## Career scorecard (#3140, item 2 slice 2)
+
+The Faithfulness tab adds eight rows for the selected run, with score / 100,
+a one-line because, book sections and the scoring policy. It shows how many
+of eight dimensions have evidence. There is deliberately no overall grade.
+`career_scorecard.js` is a pure browser helper, inlined by the existing builder
+into `index.html`; the portable render still needs only the page and its data.
+It reads published faithfulness, trades, meta and anatomy, plus the page's
+existing regime and gate-reopen calculations. No new flag, join or replay.
+
+The formulas below are diagnostic report conventions, not quantitative rules
+attributed to Weinstein or a strategy verdict. Citations identify the related
+book principles. Each component must have observations before its dimension
+can score; unavailable components make the dimension `n/a`. Pass rates pool
+only known pass/fail statuses and show their measured denominator. Detector
+rates likewise use only observed true/false values. They do not assert that
+unmeasured trades passed. Selection can therefore score on partial evidence,
+just as slice 1 can; the missing checks are not silently counted as passes.
+
+| Dimension | Score and evidence | Book sections |
+|---|---|---|
+| Bear defense | Mean of check-7 pass rate and fraction of DOWN calendar years with strategy return ≥ SPY. Each year's strategy/SPY DOWN-day returns print in the because. | §2.1 |
+| Selection | Pooled pass rate for checks 1, 5, 6, 8. | §4.1–4.4, §3.1 |
+| Volume | Pooled pass rate for checks 3, 4. | §4.2 |
+| Stop / risk | Mean of checks 10/11 pass rate and fraction of observed fills not above the limit. Above-limit hits and measured fills print. | §5.1, §4.7 |
+| Riding winners | Mean of check-12 pass rate and 100 × payoff/(1+payoff). Anatomy supplies the All-row payoff. The slice-1 healthy-sale detector can never read true, so it is not scored and the because says so; it re-enters the mean when that detector can fire. | §5.2, §5.6 |
+| Portfolio construction | 100 × min(1, 10 / average entry weight %). The 10% reference is a reporting policy, not a book allocation rule. All top-5/10/20 P&L shares print as context; there is no concentration penalty for a fat-tail strategy, including shares >100% or negative net-P&L shares. | §5.1 |
+| Recovery playbook | Mean of 100 × min(13-week entries / 6, 1) per complete gate-reopen episode. Six is the page's existing "many entries" reference. Each episode's date and count print; no complete episode means n/a. | §2.1, §4.1 |
+| Shorts | n/a when meta has no enabled short leg. With reported fills and P&L: 100 for fills with positive P&L, 50 for flat P&L, 0 for losses or a reported zero-fill leg. Counts and dollars print. | §6.1 |
+
+DOWN returns compound the same daily strategy/SPY ratios as the existing era
+regime table, grouped by calendar year. Regimes remain lagged weekly MA/slope
+readings, warmed up on existing SPY bars. Every run uses its own price/total-
+return SPY basis (mixed uses total return, as the page does), not the chart
+run's basis. Having no DOWN period yields `n/a`, not a perfect defense score. Recovery
+uses existing `reopenEpisodes`, including its complete 26-week outcome window
+and side-aware gate for a short-only book; the score uses its 13-week entry
+counts. These scores measure observed activity and outcomes, not whether more
+exposure would have been desirable in every case.
+
+The career-*.json fixtures independently pin each dimension's arithmetic,
+source numbers in the because, a missing component and shorts off. The tests
+also pin year-boundary compounding, score bounds, flat/loss/zero-fill shorts,
+recovery saturation, selected-run basis and direction, eight-row rendering,
+coverage and the helper's inclusion in the built page. Slice 1 checks and
+weights remain unchanged. Its unavailable evidence paths and the local
+container-built 26-year R1–R8 report remain outside this slice.

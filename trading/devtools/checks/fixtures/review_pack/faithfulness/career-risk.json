@@ -1,0 +1,8 @@
+{
+  "id": "risk",
+  "calculation": "mean(3/4 pass, 1/2 clean fills) * 100 = 62.5",
+  "input": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 10, "status": "pass"}, {"id": 11, "status": "fail"}], "detectors": {"above": true}}, {"checks": [{"id": 10, "status": "pass"}, {"id": 11, "status": "pass"}, {"id": 3, "status": "fail"}, {"id": 12, "status": "fail"}], "detectors": {"above": false}}]}},
+  "expectedScore": 62.5,
+  "becauseParts": ["checks 10/11 3/4 observed pass", "filled from above 1/2 observed"],
+  "missing": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 10, "status": "pass"}, {"id": 11, "status": "pass"}], "detectors": {"above": null}}]}}
+}

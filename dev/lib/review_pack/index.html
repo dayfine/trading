@@ -299,6 +299,12 @@ ol.agenda li b { font-weight: 600; }
     <div class="tablebox"><table id="f-checks"></table></div>
   </div>
   <div class="panel">
+    <h2>Career scorecard</h2>
+    <p class="note" id="career-coverage"></p>
+    <p class="note">Diagnostic scores for the selected run above, using observed evidence. Missing components make a dimension n/a; check and detector rates show their measured coverage. These policies are report conventions, not book-prescribed cutoffs. There is no overall grade.</p>
+    <div class="tablebox"><table id="career-table"></table></div>
+  </div>
+  <div class="panel">
     <h2>Per-trade faithfulness</h2>
     <p class="note">Worst known score first; click a column to sort. Unknown scores follow scored rows. Each row includes all 13 pass / fail / n/a checks.</p>
     <div class="tablebox"><table id="f-trades"></table></div>
@@ -337,6 +343,7 @@ ol.agenda li b { font-weight: 600; }
 </main>
 
 <script>
+/* career-scorecard helper */
 (() => {
 const $ = s => document.querySelector(s);
 const el = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (html) e.innerHTML = html; return e; };
@@ -509,7 +516,8 @@ load('manifest.json').then(man => {
   KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
   D.spyTR = r[KINDS.length * n]; D.macro = r[KINDS.length * n + 1]; D.spyPrice = r[KINDS.length * n + 2];
   D.spy = D[basisView(D.meta[D.man.charts_run || 0].basis).series];
-  D.spyRegime = withWarmup(r[KINDS.length * n + 3], D.spy, D.meta[D.man.charts_run || 0].basis);
+  D.spyWarmup = r[KINDS.length * n + 3];
+  D.spyRegime = withWarmup(D.spyWarmup, D.spy, D.meta[D.man.charts_run || 0].basis);
   D.trades.forEach(ts => ts.forEach(t => { t.flags = FLAGS.filter(f => f.test(t)).map(f => f.id); t.yr = t.ed.slice(0, 4); t.tr = tradeTR(t); }));
   init();
 }).catch(e => { $('main').innerHTML = `<div class="empty">Could not load the data files (${e.message}).</div>`; });
@@ -535,7 +543,7 @@ function init() {
   const opts = (note) => D.man.runs.map((r, i) => `<option value="${i}">${runLabel(i)} (${pct(D.meta[i].metrics.totalreturnpct, 0)})${note && i !== CH() ? ' · no charts' : ''}</option>`).join('');
   $('#p-salt').innerHTML = opts(false); $('#t-salt').innerHTML = opts(true); $('#t-salt').value = String(CH());
   $('#a-run').innerHTML = opts(false); $('#a-run').value = String(CH()); $('#a-run').addEventListener('change', renderAnatomy);
-  initFaithfulness(opts(false));
+  initFaithfulness(opts(false)); initCareerScorecard();
   $('#flags-title').textContent = `Per-trade flags, ${runLabel(CH())}`;
   labelRunKind(); renderOverview(); renderMissedWinners(); renderPeriods(); initTrades(); renderHilo(); renderSurprises(); renderDiag(); renderAnatomy(); renderSalts(); renderAgenda();
   $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
@@ -1319,6 +1327,25 @@ function initFaithfulness(options) {
     fSort = { k, dir:fSort.k === k ? -fSort.dir : (k === 'failed' ? -1 : 1) }; renderFaithfulness();
   });
   renderFaithfulness();
+}
+
+/* ---------- Run-level career scorecard ---------- */
+function careerInput(run) {
+  const nav=D.nav[run], trades=D.trades[run], meta=D.meta[run], series=D[basisView(meta.basis).series];
+  const shortBook=trades.length>0 && trades.every(isShort), dir=shortBook ? -1 : 1;
+  const spy=nav.length && series?.length ? spyOnNavDates(nav,series) : [];
+  const regime=spyRegimeByDay(withWarmup(D.spyWarmup,series || [],meta.basis));
+  return {faithfulness:D.faithfulness?.[run],anatomy:D.anatomy?.[run],meta,
+    downPeriods:CareerScorecard.downPeriods(nav,spy,regime),
+    episodes:nav.length && spy.length ? reopenEpisodes(D.macro,nav,spy,trades,dir) : null};
+}
+function renderCareerScorecard() {
+  const run=+$('#f-run').value, result=CareerScorecard.score(careerInput(run));
+  $('#career-coverage').textContent=`${runLabel(run)}: ${result.scored} of 8 dimensions scored. No overall grade.`;
+  $('#career-table').innerHTML=tbl([['Dimension'],['Score / 100',1],['Because'],['Book / scoring policy']],result.rows.map(r => `<tr><td>${faithEsc(r.name)}</td><td>${r.score == null ? 'n/a' : fmt(r.score,1)}</td><td>${faithEsc(r.because)}</td><td><a href="https://github.com/dayfine/trading/blob/main/docs/design/weinstein-book-reference.md">§${faithEsc(r.section)}</a> · ${faithEsc(r.policy)}</td></tr>`));
+}
+function initCareerScorecard() {
+  $('#f-run').addEventListener('change',renderCareerScorecard); renderCareerScorecard();
 }
 
 /* ---------- Salts ---------- */

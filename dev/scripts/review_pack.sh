@@ -218,7 +218,8 @@ site_common() {
     --arg pack_sha "$(pack_sha "$REPO")" --arg snap "$snap_used" \
     '{title: $title, subtitle: $subtitle, charts_run: $charts, runs: $runs, run_kind: $kind, pack_sha: $pack_sha, snapshot_dir: $snap}' > "$s/manifest.json"
   # the page <title> carries --title (HTML-escaped); the template default is a placeholder
-  TITLE="$TITLE" awk 'BEGIN { t = ENVIRON["TITLE"]; gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t) }
+  TITLE="$TITLE" awk -v career="$LIB/career_scorecard.js" 'BEGIN { t = ENVIRON["TITLE"]; gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t) }
+    /^\/\* career-scorecard helper \*\/$/ { while ((getline line < career) > 0) print line; close(career); next }
     /^<title>.*<\/title>$/ { print "<title>" t "</title>"; next } { print }' "$LIB/index.html" > "$OUT/site/index.html"
 }
 check_json() {

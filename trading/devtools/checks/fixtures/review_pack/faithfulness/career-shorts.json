@@ -1,0 +1,8 @@
+{
+  "id": "shorts",
+  "calculation": "2 short fills with +$500 P&L meet the positive participation policy = 100",
+  "input": {"meta": {"short_leg": {"fills": 2, "pnl": 500}}},
+  "expectedScore": 100,
+  "becauseParts": ["short fills 2; short P&L $500"],
+  "missing": {"meta": {"short_leg": {"fills": null, "pnl": 500}}}
+}

@@ -1,0 +1,8 @@
+{
+  "id": "selection",
+  "calculation": "3 passes / 4 observed statuses = 75; n/a excluded",
+  "input": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 1, "status": "pass"}, {"id": 5, "status": "fail"}, {"id": 6, "status": "n/a"}, {"id": 8, "status": "pass"}], "detectors": {}}, {"checks": [{"id": 5, "status": "pass"}, {"id": 2, "status": "fail"}, {"id": 7, "status": "fail"}], "detectors": {}}]}},
+  "expectedScore": 75,
+  "becauseParts": ["checks 1/5/6/8 3/4 observed pass"],
+  "missing": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 1, "status": "n/a"}, {"id": 5, "status": "n/a"}, {"id": 6, "status": "n/a"}, {"id": 8, "status": "n/a"}], "detectors": {}}]}}
+}

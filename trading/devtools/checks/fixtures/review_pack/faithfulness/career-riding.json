@@ -1,0 +1,8 @@
+{
+  "id": "riding",
+  "calculation": "mean(100*2/3 exit passes, 100*3/(1+3) payoff) = 425/6; healthy-sale detector cannot read true, so it is not scored",
+  "input": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 12, "status": "pass"}], "detectors": {"healthy": false}}, {"checks": [{"id": 12, "status": "fail"}], "detectors": {"healthy": true}}, {"checks": [{"id": 12, "status": "pass"}, {"id": 7, "status": "fail"}], "detectors": {"healthy": null}}]}, "anatomy": {"available": true, "rows": [{"year": "All", "payoff": 3}]}},
+  "expectedScore": 70.83333333333333,
+  "becauseParts": ["checks 12 2/3 observed pass", "healthy-sale evidence unavailable", "payoff 3"],
+  "missing": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 12, "status": "pass"}], "detectors": {"healthy": false}}]}, "anatomy": {"available": true, "rows": [{"year": "All", "payoff": null}]}}
+}
