@@ -429,6 +429,8 @@ vcv-M3138 and vcv-M3174 were VALID, and the control was rejected the same way.
   (see Launch).
 
 - 2026-10-22: results read committed (Results section). qc-results R9 rework: memories `project_sim_price_only_accounting` (ADMA-style cancellations are path luck, superseding the 10-07 "not path luck" line) and `project_funding_grid_monster_lottery` (chain V re-derives the funding lottery) updated; RV3 bullet 16 read from its criteria.
+- 2026-10-22: qc-results iteration 2: RV3 row 16 corrected to the pack rule's output (2022 GLNG, 2024 ADMA; 2020 is not flagged).
+
 ## Results (2026-10-22)
 
 All eight cells finished, and each wrote `actual.sexp` with `crashed false`. The artifacts are at `0a574dad9` under
@@ -1107,7 +1109,7 @@ ex-date NAV reconciles to the cent scale.
 | 13 | Average invested 58 % of NAV, 5.5 positions | **Descriptive only.** No conclusion here rests on it; the regime split by era is bullets 2–6 |
 | 14 | 0 Saturday fills; V13 20 violations (9 skipped) | **Confirm.** V13 holds delisting exits with no exit bar (PPDI, PLMD, NLC, MRUS), split-basis rows (NEOG, MMSI) and OKE (D9), the same classes as N |
 | 15 | Salt spread 1,223 / 1,166 / 1,216 % | **Confirm.** That is 0.044 log, all from 2013–14: trade lists are identical until MBI 2013-05-06, and yearly spread is ≤ 1 pt except 2013 (3.7) and 2014 (2.1) |
-| 16 | "Years that rest on one trade or on the salt" (collapsed) | **Refine (read from the criteria; the list is filled client-side and the render keeps it collapsed).** Salt clause: no year has salts ≥ 15 pp apart (largest spread 3.7 pp, 2013, Salts tab). One-trade clause: the years whose excess is carried by one realised trade are the ones bullets 1 and 4 already name (2020 rests on APPS, open at year end and realised in 2021 for +$2.36M, the largest of 2020-entry net $4.48M; 2024 rests on ADMA, +$3.08M of $3.62M realised in 2024, yearly table). Nothing new beyond those |
+| 16 | "Years that rest on one trade or on the salt" (collapsed) | **Confirm, read from the pack's own rule** (`dev/lib/review_pack/index.html` `oneTradeYear`, top trade by exit year) over the published M pack's `data/s0_years.json` + `s0_trades.json`: it lists **2022 (GLNG, +$897k, 8.9 % of start NAV vs a +13.9 pp excess)** and **2024 (ADMA)**. GLNG is held identically in all four arms, so bullet 1's "built 2022" rests on it. No salt year (largest spread 3.7 pp, 2013). 2020 is not on the list: its top exit is DXCM; that APPS carries 2020 is this README's entry-year reading (bullets 1 and 4), not a pack finding |
 
 **The other packs, where they differ from M:**
 - **M3138.**
