@@ -32,11 +32,11 @@ while [ $# -gt 0 ]; do
 done
 command -v jq >/dev/null 2>&1 || { echo "codex_quota: jq not installed" >&2; exit 4; }
 
-# newest rollout file that carries a rate_limits object; prints "<mtime> <path>" or nothing
+# newest rollout file with a numeric used_percent (a rate_limits record with numbers); prints "<mtime> <path>" or nothing
 newest() {
   [ -d "$CODEX_HOME/sessions" ] || return 0
   find "$CODEX_HOME/sessions" -name 'rollout-*.jsonl' -type f 2>/dev/null | while IFS= read -r f; do
-    grep -q '"rate_limits"' "$f" 2>/dev/null || continue
+    grep -q '"used_percent":[0-9]' "$f" 2>/dev/null || continue
     m=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")
     echo "$m $f"
   done | sort -n | tail -1
@@ -56,9 +56,10 @@ fi
 [ -n "$pick" ] || { echo "codex_quota: no rollout with rate_limits under $CODEX_HOME/sessions" >&2; exit 4; }
 file=${pick#* }
 
-# the last rate_limits object in the file, wherever it is nested
+# the last rate_limits record with a numeric five-hour used_percent. Codex also writes records for other limit ids
+# (limit_id "premium") whose primary/secondary are null; those are skipped (#3378 follow-up).
 read -r five weekly five_reset weekly_reset <<EOF
-$(grep '"rate_limits"' "$file" | tail -1 | jq -r '[.. | objects | select(has("rate_limits")) | .rate_limits][-1]
+$(grep '"used_percent":[0-9]' "$file" | tail -1 | jq -r '[.. | objects | select(has("rate_limits")) | .rate_limits | select(.primary.used_percent != null)][-1]
   | "\(.primary.used_percent // "na") \(.secondary.used_percent // "na") \(.primary.resets_at // "na") \(.secondary.resets_at // "na")"')
 EOF
 [ "$five" != na ] && [ "$weekly" != na ] || { echo "codex_quota: rate_limits without used_percent in $file" >&2; exit 4; }
