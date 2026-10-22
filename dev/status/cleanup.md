@@ -136,8 +136,9 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
   **Not dispatched 2026-09-22** — every agent slot this run went to QC on an eight-PR queue that had zero reviews on it, and `dispatch_disk_guard.sh` mechanically caps this runner at 2 concurrent agents. Capacity, not a judgement that the work is unreal. (source: 2026-09-21-deep.md, appended by orchestrator run 35728381545)
 
 - [x] adapter_exception_expired: trading/devtools/checks/adapter_effectiveness_exceptions.conf — neutral_blocks_longs/shorts review_at 2026-10-01 passed; add thread pin via _run_screener (source: 2026-10-19-deep.md) — DONE: test_neutral_blocks_screener_thread.ml pins both fields; both exception lines removed (PR pending)
-- [ ] adapter_exception_expired: trading/devtools/checks/adapter_effectiveness_exceptions.conf — 6 more entries past review_at: stop_width_mode, stop_width_size_down_max_pct, match_fraction, ret_epsilon, require_breakout_volume, insufficient_score; one pin (or re-justification) per thread, separate PRs (source: 2026-10-19-deep.md)
+- [ ] adapter_exception_expired: trading/devtools/checks/adapter_effectiveness_exceptions.conf — 3 entries left past review_at: match_fraction, ret_epsilon, insufficient_score; one pin (or re-justification) per thread, separate PRs (source: 2026-10-19-deep.md)
   - require_breakout_volume: DONE (cleanup/require-breakout-volume-pin) -- test_analyze_require_breakout_volume_changes_candidacy pins the stock_analysis.ml inner thread; exception line removed. 5 remain: stop_width_mode, stop_width_size_down_max_pct, match_fraction, ret_epsilon, insufficient_score.
+  - stop_width_mode + stop_width_size_down_max_pct: DONE (cleanup/stop-width-mode-thread-pin) -- EFFECTIVENESS-PIN comments on test_walk_emits_the_narrow_stops_first (existing tests already red under mutation); both exception lines removed. 3 remain: match_fraction, ret_epsilon, insufficient_score.
 
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
