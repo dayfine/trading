@@ -482,7 +482,12 @@ let test_highest_match_fraction_wins _ =
 
 (* The premise of the test above: the loser genuinely qualifies on its own, at
    the lower score. Without this, the ranking test could pass because
-   [ALPHACO] was never a candidate at all. *)
+   [ALPHACO] was never a candidate at all.
+
+   EFFECTIVENESS-PIN: match_fraction -- goes red if [config.match_fraction] is
+   not threaded into the [Twin_detector] config in [_returns_score]: the 0.8
+   score only qualifies under the configured 0.5 threshold, not the 0.95
+   default. *)
 let test_weaker_successor_qualifies_on_its_own _ =
   let report =
     _detect ~config:_ranked [ _ranked_predecessor; _weaker_successor ]
