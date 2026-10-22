@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-22 (orchestrator run — see `dev/daily/2026-10-22.md`). Queue at start: 1 (#3369 codex lane).
-10-22: merged #3385, #3386. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
+Last updated: 2026-10-22 (orchestrator run 2 — see `dev/daily/2026-10-22-run2.md`). Queue at start: 0.
+10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -130,9 +130,9 @@ immune (#2605).
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-22: #3385 verdict-parser nits merged; next: open T3 items (T3-C / T3-H) or new findings |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 10-22: #3385 + #3389 verdict-parser fixtures merged; next: open T3 items (T3-C / T3-H) or new findings |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-22: #3386 stop_width pins; next: 3 expired adapter exceptions (match_fraction, ret_epsilon, insufficient_score) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-22: #3386 + #3390 adapter pins; next: 2 expired adapter exceptions (ret_epsilon, insufficient_score) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
