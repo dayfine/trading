@@ -4,6 +4,8 @@
 
 ## Recent activity (2026-05-09..22, since last refresh)
 
+- **Deep-scan check 6 verdict parser nits (follow-up to #3370, 2026-10-22):** `deep_scan/_verdict.sh` now accepts `## Verdict: APPROVED` (colon after the heading word); the existing `[^A-Za-z_]` boundary already rejects `APPROVEDX`, now pinned by a fixture. `deep_scan_verdict_parse_check.sh` has 17 fixtures (added `colon`, `glued`); each was mutation-checked RED. Only caller besides the test: `check_06_qc_calibration.sh`. Verify: `dune runtest trading/devtools/checks`.
+
 ### CI hardening (PRs #1117, #1121, #1130, #1131, #1138)
 
 - **#1117 — `no_python_check.sh` race-proof prune** (MERGED 2026-05-16):
