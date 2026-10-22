@@ -138,6 +138,19 @@ reply match it:
    `origin/main` and keep both sides; say which files conflicted.
 5. **Do not widen scope.** If a fix seems to need a file outside the brief, ask on the PR first with `QUESTION:`.
 
+## Usage budget (Codex: shared plan limits)
+
+Codex cloud and Codex CLI draw on one account limit: a 5-hour window and a weekly window. A task cannot read that
+limit from inside its sandbox, so keep each task cheap by construction. The dispatcher paces how many tasks go out
+(`dev/scripts/codex_quota.sh`, which holds new hand-offs above 70 % of the 5-hour window).
+
+1. **One issue per task.** Stop when the issue's `## Done when` items are met; open the PR and end the task.
+2. **Focused builds only.** `dune build @fmt`, `dune build`, and `dune runtest <the directories you touched>`. At most
+   one full `dune runtest` per task, right before the push. CI runs everything else.
+3. **No backtests, sweeps or scenario runs**, and no bulk reads of `data/` or `trading/test_data/`.
+4. **Read narrowly.** Open the files the brief names and their direct callers; do not survey the repository.
+5. **A rework commit addresses only the listed review items.** No refactors on the side.
+
 ## Cross-agent review (`.claude/rules/cross-agent-review.md`)
 
 - Add the label `author/codex` to every PR you open. It goes through the same

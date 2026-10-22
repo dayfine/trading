@@ -55,6 +55,12 @@ A hand-off is either a `<!-- lane-handoff` marker or a word-bounded `@codex` / `
 
 At most 3 open PRs per external lane. The board prints `Can hand out: N` per lane; hand out only up to N.
 
+**Codex usage pacing (user, 2026-10-21: spend about 70 % of each 5-hour window).** Before handing Codex a new task
+(a brief, an issue to relay, or a rework), run `sh dev/scripts/codex_quota.sh --guard 70 --weekly-guard 85`. Exit 3
+means hold the hand-off until the window resets (the script prints when) and say so in the next status line. The
+reading comes from the local Codex CLI's session logs; cloud tasks share the same account limit. Codex itself keeps
+each task cheap per `AGENTS.md` "Usage budget".
+
 ## What does not change
 
 All three Claude gates (CI, qc-structural, qc-behavioral at the current tip) apply to every external-lane PR
