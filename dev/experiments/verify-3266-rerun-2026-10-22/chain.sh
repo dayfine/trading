@@ -17,17 +17,21 @@
 #   2. Warehouse rebuild phase (`wh`) kept: /tmp/snap_top3000_pit_v12wk, same START / END / tail-exceptions as chain V,
 #      built at the pinned tree (post-#3283), 4 chunks, one job at a time. The container was recreated 2026-10-22 and
 #      /tmp/snap_top3000_pit_v12pit (the v12 manifest chain V took its symbol set from) is gone, so the symbol set is
-#      derived from the run tree's own lists instead: union of top-3000-1999 and top-3000-20*.sexp, minus MEL (no CSV;
-#      the v12 convention), plus GSPC.INDX. That is the v12 set minus its non-list extras; the cell reads only list
-#      members (universe_schedule) and the benchmark, so extras are never loaded. The old-vs-new warehouse comparison
-#      (fix detector) is dropped with the old warehouse; the rebuild guarantee is now structural: the NEED commits
-#      (incl. #3283 3f51d4afd) must be ancestors of the run tree, and the build runs from that tree's binary.
+#      derived from the run tree: union of top-3000-1999 and top-3000-20*.sexp, minus MEL (no CSV; the v12 convention),
+#      plus GSPC.INDX, plus the 14 symbols the runner always loads outside list membership (the 11 SPDR sector ETFs and
+#      GDAXI.INDX, N225.INDX, ISF.LSE), parsed at launch from the run tree's
+#      trading/trading/weinstein/strategy/lib/macro_inputs.ml (`spdr_sector_etfs`, `default_global_indices`), never hardcoded.
+#      Launch aborts unless the set is exactly EXPECT_WH=9236, N's manifest count. The cache line's n_symbols_absent
+#      must then be N's 1 (MEL): after the preflight it must not exceed 1 (a short window touches fewer symbols), and
+#      after the cell it must equal 1, else the cell is VOID (logged, no RESULT line). The old-vs-new warehouse
+#      comparison (fix detector) is dropped with the old warehouse; the rebuild guarantee is now structural: the NEED
+#      commits (incl. #3283 3f51d4afd) must be ancestors of the run tree, and the build runs from that tree's binary.
 #   3. #3391 guard at launch: the run tree must contain 3d437597c, and no list may hold a confirmed twin pair
 #      (twin-drops.txt rows are re-checked, and CMD/CMN must not co-occur in any list).
 #   4. Chain V defect D2 fixed: the cash_rejection count normalises whitespace first (the audit sexp is pretty-printed,
 #      so `(cash_rejection` is often at a line end and a per-line grep for `(cash_rejection ` undercounted).
 #      Chain V defect D3 fixed: a cell with no actual.sexp (guard-killed by `timeout`, OOM, crash) logs
-#      `GUARD-KILLED/FAILED ... exit=N` and `RESULT ... <no result>`; the validator and validator_diff do not run, so
+#      `GUARD-KILLED/FAILED ... exit=N` and writes no RESULT line (the run-end `NO RESULT` line flags the read as void); the validator and validator_diff do not run, so
 #      no V6 line or `exit=0` can be printed for a cell that produced nothing.
 #
 # Cell guard: CELL_TIMEOUT=60000 s, sized from the MEASURED arm, not the null. Chain V's M-pre3339 s0 took 11,709 s
@@ -46,7 +50,9 @@ ART=/tmp/sweeps/verify-3266-rerun                       # container side; host $
 WTREL=${WTREL:-.claude/worktrees/sweep-v3266}          # the pinned run tree, repo-relative (container-visible)
 WT=/workspaces/trading-1/$WTREL; ROOT=$WT/trading; FIX=$ROOT/test_data/backtest_scenarios
 WH=${WH:-/tmp/snap_top3000_pit_v12wk}                # v12 symbol set, rebuilt at the pinned tree (post-#3283)
-EXPECT_UNION=${EXPECT_UNION:-9222}                       # distinct symbols in the run tree lists today; asserted at launch
+EXPECT_WH=${EXPECT_WH:-9236}                            # warehouse set = union - MEL + GSPC.INDX + 14 runner extras = N's manifest count
+EXPECT_ABSENT=1                                          # N's cache line: n_symbols_absent=1 (MEL, no CSV)
+EXPECT_UNION=${EXPECT_UNION:-9222}                     # distinct symbols in the run tree lists today; asserted at launch
 WH_START=1998-01-01; WH_END=2026-10-07               # the v12 build's START and END (build_pit_warehouse_v12.sh, launched 10-07 PT)
 CELL_TIMEOUT=${CELL_TIMEOUT:-60000}                     # >= 1.5 x 39,142 s (slowest same-spec cell, #3381); chain V M-pre3339 s0: 11,709 s
 MMAP_HANDLES=${SNAPSHOT_MAX_MMAP_HANDLES:-12000}     # #2839/#2882: >= manifest size, so the LRU never cycles
@@ -106,7 +112,16 @@ cmd_launch() {
     | sed 's/(symbol //; s/)$//' | LC_ALL=C sort -u > "$STAGE/lists-union.txt"
   [ "$(wc -l < "$STAGE/lists-union.txt" | tr -d ' ')" = "$EXPECT_UNION" ] \
     || die "lists hold $(wc -l < "$STAGE/lists-union.txt" | tr -d ' ') distinct symbols, expected $EXPECT_UNION (set EXPECT_UNION if main moved on purpose)"
-  { grep -v -x -F MEL "$STAGE/lists-union.txt"; echo GSPC.INDX; } | LC_ALL=C sort -u > "$STAGE/wh-syms.txt"
+  # The runner always adds 14 symbols outside list membership (runner.ml _runner_base_config / _all_runner_symbols):
+  # parse them from the run tree's macro_inputs.ml, do not hardcode.
+  MI=$WTREL/trading/trading/weinstein/strategy/lib/macro_inputs.ml
+  { sed -n '/^let spdr_sector_etfs/,/^  \]$/p' "$MI"; sed -n '/^let default_global_indices/,/\]$/p' "$MI"; } \
+    | grep -o '("[A-Z0-9.]*",' | sed 's/("//; s/",$//' | LC_ALL=C sort -u > "$STAGE/runner-extras.txt"
+  [ "$(wc -l < "$STAGE/runner-extras.txt" | tr -d ' ')" = 14 ] \
+    || die "parsed $(wc -l < "$STAGE/runner-extras.txt" | tr -d ' ') runner extras from $MI, expected 14 (11 SPDR + 3 indices)"
+  { grep -v -x -F MEL "$STAGE/lists-union.txt"; echo GSPC.INDX; cat "$STAGE/runner-extras.txt"; } | LC_ALL=C sort -u > "$STAGE/wh-syms.txt"
+  [ "$(wc -l < "$STAGE/wh-syms.txt" | tr -d ' ')" = "$EXPECT_WH" ] \
+    || die "warehouse set holds $(wc -l < "$STAGE/wh-syms.txt" | tr -d ' ') symbols, expected $EXPECT_WH (N's manifest count)"
   echo "warehouse symbol set: $(wc -l < "$STAGE/wh-syms.txt" | tr -d ' ') ($STAGE/wh-syms.txt)" | tee -a "$STAGE/launch.log"
   # #3391 guard: the dedupe is in the run tree and no confirmed twin pair co-occurs in a list (the V6 specimen of chain V).
   TD=$WTREL/trading/test_data/backtest_scenarios/pit-v12/twin-drops.txt
@@ -200,10 +215,18 @@ run_cell() { # $1 spec name, $2 salt, $3 pairs (label=validator[,...] or -), $4 
     log "GUARD-KILLED/FAILED $tag: no actual.sexp; last log line '${ex}' (exit=124 = CELL_TIMEOUT ${CELL_TIMEOUT}s, exit=137 = OOM); validator and V6 gate NOT run (wall $(( $(date +%s) - start ))s)"
     return 0
   fi
+  # Void the read unless the cache saw exactly N's absent set (MEL only): a missing runner extra or list member would
+  # make this cell a different experiment from N.
+  cache=$(dx sh -c "grep -h 'snapshot cache' $STAGE_C/$tag.log | tail -1")
+  absent=$(echo "$cache" | sed -n 's/.*n_symbols_absent=\([0-9]*\).*/\1/p')
+  if [ "$absent" != "$EXPECT_ABSENT" ]; then
+    log "VOID $tag: n_symbols_absent=${absent:-<no cache line>}, expected $EXPECT_ABSENT (MEL); warehouse differs from N's, no RESULT written; $cache"
+    return 0
+  fi
   # one arm's actual.sexp only (sweep-hygiene.md metric-glob rule)
   m=$(dx sh -c "grep -hoE 'total_return_pct [0-9.eE+-]+|total_trades [0-9]+|sharpe_ratio [0-9.eE+-]+|max_drawdown_pct [0-9.eE+-]+|calmar_ratio [0-9.eE+-]+' ${out}/${name}/actual.sexp 2>/dev/null | tr '\n' ' '")
   dx sh -c "for f in actual.sexp trades.csv splits.csv params.sexp summary.sexp trade_audit.sexp open_positions.csv force_liquidations.sexp equity_curve.csv macro_trend.sexp; do cp ${out}/${name}/\$f $ART/${tag}-\$f 2>/dev/null; done; cp $STAGE_C/$tag.log $ART/${tag}.log; cp $STAGE_C/$tag.rss $ART/${tag}.rss 2>/dev/null" || true
-  cache=$(dx sh -c "grep -h 'snapshot cache' $STAGE_C/$tag.log | tail -1"); rss=$(dx sh -c "tail -1 $STAGE_C/$tag.rss 2>/dev/null")
+  rss=$(dx sh -c "tail -1 $STAGE_C/$tag.rss 2>/dev/null")
   guards=$(dx sh -c "grep -hE 'Panel_runner: (split_dividend_guard|ex_dividend_stop_adjust)' $STAGE_C/$tag.log | tr '\n' ' '")
   # D2 (chain V): the audit is pretty-printed, so normalise whitespace before counting (same pattern as audit_rows).
   rej=$(dx sh -c "tr -s '\n\t ' '   ' < $ART/${tag}-trade_audit.sexp 2>/dev/null | grep -o '(cash_rejection ((required' | wc -l" | tr -d ' ')
@@ -268,6 +291,10 @@ cmd_run() {
     run "TRADING_DATA_DIR=$td SNAPSHOT_CACHE_MB=1024 SNAPSHOT_MAX_MMAP_HANDLES=$MMAP_HANDLES timeout 3600 ./_build/default/trading/backtest/scenarios/scenario_runner.exe --dir $pd --fixtures-root $FIX --snapshot-dir $WH --no-emit-all-eligible --parallel 1 > $pd.log 2>&1"
     pout=$(dx sh -c "grep 'Output root' $pd.log | tail -1 | sed 's/.*: //'")
     dx test -s "${pout}/${name}/actual.sexp" || die "preflight $name wrote no actual.sexp (see $pd.log)"
+    pabs=$(dx sh -c "grep -h 'snapshot cache' $pd.log | tail -1" | sed -n 's/.*n_symbols_absent=\([0-9]*\).*/\1/p')
+    # a ~3-month window touches fewer symbols than the full cell, so only an excess over N's 1 fails here; the cell
+    # itself is held to exactly 1.
+    [ -n "$pabs" ] && [ "$pabs" -le "$EXPECT_ABSENT" ] || die "preflight $name: n_symbols_absent=${pabs:-<no cache line>}, expected <= $EXPECT_ABSENT: the warehouse lacks list members or runner extras (see $pd.log)"
     log "PREFLIGHT_OK $name ($(( $(date +%s) - t0 ))s)"
   done
   for tok in $(cells); do
@@ -275,7 +302,7 @@ cmd_run() {
     run_cell "$name" "$salt" "$pairs" "$data"
   done
   log "CELLS DONE"
-  grep -q "RESULT v3266-Mpre3339-s0 " "$LOG_HOST" || log "NO RESULT: the cell wrote no actual.sexp (see GUARD-KILLED/FAILED above); the #3266 read is void, relaunch after tracing"
+  grep -q "RESULT v3266-Mpre3339-s0 " "$LOG_HOST" || log "NO RESULT: the cell wrote no actual.sexp (GUARD-KILLED/FAILED above) or was VOIDed on n_symbols_absent; the #3266 read is void, relaunch after tracing"
   phase_packs
   cmd_collect "$STAGE/results"
   log "VERIFY-3266-RERUN DONE. Next: perf_long_cells.sh update $LOG_HOST; collect into the results PR; read per README."

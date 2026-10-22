@@ -21,8 +21,11 @@ One 26y cell, **M-pre3339 s0**, on current `origin/main` (which holds #3283, #33
   not by #3339. `chain.sh` checks that #3339 changes no shipped code and that nothing after it touches the A-D CSVs.
 - **Warehouse:** `/tmp/snap_top3000_pit_v12wk`, rebuilt by `chain.sh` at the pinned tree (the container was recreated on
   2026-10-22 and chain V's warehouses are gone). The symbol set is the union of the run tree's yearly lists (minus MEL,
-  plus `GSPC.INDX`), since the v12 manifest it was taken from is gone; see the `chain.sh` header for what that does and
-  does not equal.
+  plus `GSPC.INDX`) plus the 14 symbols the runner always loads outside list membership (the 11 SPDR sector ETFs and
+  GDAXI.INDX, N225.INDX, ISF.LSE), parsed at launch from the run tree's `macro_inputs.ml`, since the v12 manifest it was
+  taken from is gone. How it is guaranteed to match N's: launch aborts unless the set is exactly 9,236 symbols (N's
+  manifest count), and the cache line's `n_symbols_absent` must be N's 1 (MEL) after the preflight (at most 1) and after
+  the cell (exactly 1), else the cell is VOID and no RESULT is written.
 - **Guards:** cell guard 60,000 s (1.5 x the slowest same-spec cell, 39,142 s, #3381; chain V's own M-pre3339 s0 took
   11,709 s); host disk >= 20 GB; pinned worktree, clean-tree and HEAD checks; the #3391 twin guard at launch.
 - **Defects of chain V fixed in this copy:** D2 (the `cash_rejections` count in `GUARDS`) and D3 (a guard-killed cell
@@ -40,7 +43,9 @@ One 26y cell, **M-pre3339 s0**, on current `origin/main` (which holds #3283, #33
 > 1. **Delta.** M-pre3339 s0 − N s0 [...] on: total return, in log `ln(1+R)` and in %; CAGR, max DD, Sharpe, Calmar, trades.
 >    N reads 849.28 / 835.99 / 878.27 %, i.e. 2.2505 / 2.2364 / 2.2806 log; its own salt range is 0.044 log.
 > 2. **Where the fix acts.** From `macro_trend.sexp`, count the weekly readings whose `trend` or `breadth_state` differs
->    between **M-pre3339 s0 and N s0**, by year, split into weeks within ±2 weeks of 1 January and all other weeks. [...]
+>    between **M-pre3339 s0 and N s0**, by year, split into weeks within ±2 weeks of 1 January and all other weeks.
+>    - The fix changes bucketing only at year-crossing weeks. A difference far from a year-end comes through the
+>      30-week and A-D windows those weeks feed, and is traced on one example.
 > 3. **Entries gained and lost** (M-pre3339 s0 vs N s0 [...]), joined on `symbol|entry_date` from `trades.csv`
 >    (`position_id` is not a cross-arm key), with each set's P&L and the three largest contributors traced. Each set is
 >    also split **by entry year**, so a delta concentrated in one era is visible.
@@ -79,7 +84,9 @@ good or bad (a correctness fix has no accept or reject), and it makes M-pre3339 
 N's own salt range of 0.044 log, and a difference inside that range is reported as inside it. On satisfied, #3266 closes
 quoting the delta; the PR carrying the results says `Verifies #3266: rerun the record on N's spec, delta reported — <path>`.
 
-**Residual confound: the universe now differs from N's by CMN only.** N ran on the lists before #3391. The two arms share
+**Residual confound: the universe now differs from N's by CMN only.** This is guaranteed, not assumed: the warehouse set
+is 9,236 symbols, N's manifest count, including the 14 runner extras, and `n_symbols_absent` must equal N's 1 (MEL) or the
+cell is voided (see Warehouse above). N ran on the lists before #3391. The two arms share
 every list except the five from which #3391 removed CMN (2005, 2009, 2013, 2014, 2015; CMD is untouched, and 2016 still
 holds CMN alone). N never selected CMN or CMD in any salt (chain V §1.1), so removing CMN cannot delete an N trade, and the
 V6 gate removes the only instrument-set defect that was known. The residual is that CMN could still have been a screened
@@ -96,7 +103,7 @@ claim that the confound is zero:
 
 Item 4 (data drift) uses `wh/syms.txt` and `corp-actions-changed.txt`, which `chain.sh` stages. The old
 `csv-mtime-changed.txt` of chain V is not available, because it compared against the deleted v12 warehouse; the drift list is
-therefore `corp-actions-changed.txt` plus any traded symbol whose CSV is newer than 2026-10-08, computed at read time from
+therefore `corp-actions-changed.txt` plus any traded symbol whose CSV is newer than 2026-10-07 17:44 PT (the v12 build start), computed at read time from
 `data/`.
 
 ## Review pack
