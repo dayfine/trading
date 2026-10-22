@@ -1452,7 +1452,6 @@
  (action
   (run sh %{dep:deep_scan_verdict_parse_check.sh})))
 
-
 ; #3266: every per-list rename-twin drop in pit-v12/twin-drops.txt still holds in the pit-v12 lists. Reads the
 ; lists via repo_root() at RUN TIME, so (universe) is required (H-CHECK-CACHE-BLIND).
 
