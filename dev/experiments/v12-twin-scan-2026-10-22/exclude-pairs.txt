@@ -1,0 +1,6 @@
+# Confirmed-by-run pairs that are NOT one instrument held twice; window-drops.sh never drops these.
+# Share classes of one issuer (trading/test_data/share_classes.sexp, handled by the #3015 one-class-per-issuer flag):
+GOOG GOOGL
+LGF-A LGF-B
+# Spin-off, not a share-class or rename pair (#2782, noted in share_classes.sexp):
+IAC MTCH

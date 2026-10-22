@@ -5931,8 +5931,6 @@
     (synthetic false) (avg_dollar_volume 878513.87926829257))
    ((symbol LFCR) (weight 0.00033333333333333332) (sector "Health Care")
     (synthetic false) (avg_dollar_volume 876995.512195122))
-   ((symbol CMN) (weight 0.00033333333333333332) (sector "")
-    (synthetic false) (avg_dollar_volume 873839.73539295373))
    ((symbol SPEX) (weight 0.00033333333333333332) (sector "")
     (synthetic false) (avg_dollar_volume 873100.95600499993))
    ((symbol KERX) (weight 0.00033333333333333332) (sector "")
