@@ -1,0 +1,75 @@
+[10-19 02:40:37] chain V run tree .claude/worktrees/sweep-vcv HEAD=7e7c65628 (expect 7e7c65628) prereg=7e7c65628 lists md5 deca56c7c7b38e7df5fd0abeaa7ccc53
+[10-19 02:40:37] cell guard CELL_TIMEOUT=36000s (slowest measured cell of this spec 11,881 s); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-19 02:40:38] host free 45G
+[10-19 02:40:39] ABORT: another build/backtest is running in trading-1-dev
+[10-19 03:11:31] chain V run tree .claude/worktrees/sweep-vcv HEAD=7e7c65628 (expect 7e7c65628) prereg=7e7c65628 lists md5 deca56c7c7b38e7df5fd0abeaa7ccc53
+[10-19 03:11:31] cell guard CELL_TIMEOUT=36000s (slowest measured cell of this spec 11,881 s); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-19 03:11:31] host free 61G
+[10-19 03:11:32] BUILD
+[10-19 03:17:11] BUILD_DONE
+[10-19 03:17:12] WH BUILD chunk 1 (2310 symbols) -> /tmp/snap_top3000_pit_v12wk
+[10-19 04:01:28] WH chunk 1 done: peak_rss_kb=69184 (wall 2656s)
+[10-19 04:01:28] WH BUILD chunk 2 (2309 symbols) -> /tmp/snap_top3000_pit_v12wk
+[10-19 04:34:53] WH chunk 2 done: peak_rss_kb=78812 (wall 2005s)
+[10-19 04:34:53] WH BUILD chunk 3 (2309 symbols) -> /tmp/snap_top3000_pit_v12wk
+[10-19 05:13:33] WH chunk 3 done: peak_rss_kb=85588 (wall 2320s)
+[10-19 05:13:33] WH BUILD chunk 4 (2308 symbols) -> /tmp/snap_top3000_pit_v12wk
+[10-19 05:53:06] WH chunk 4 done: peak_rss_kb=100212 (wall 2373s)
+[10-19 05:53:20] WH verify: entries=9236 csv_mtime changed since v12=0 (/tmp/vcv-run/wh/csv-mtime-changed.txt); stable symbols=9236, of which payload differs=8345 .weekly differs=8841 either=8851 (95.8 %)
+[10-19 05:53:24] TD_PRE /tmp/vcv-td-pre3339: A-D md5 1b91614926e369f4dfaeedcad0896d6f (run tree a829a2d715fcbf5b327a799fade5c9d7); 39 entries
+[10-19 05:53:24] PREFLIGHT vcv-M (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-19 06:18:34] PREFLIGHT_OK vcv-M (1510s)
+[10-19 06:18:34] PREFLIGHT vcv-Mpre3339 (TRADING_DATA_DIR=/tmp/vcv-td-pre3339)
+[10-19 06:42:37] PREFLIGHT_OK vcv-Mpre3339 (1443s)
+[10-19 06:42:37] PREFLIGHT vcv-M3138 (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-19 07:06:42] PREFLIGHT_OK vcv-M3138 (1445s)
+[10-19 07:06:42] PREFLIGHT vcv-M3174 (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-19 07:25:26] PREFLIGHT_OK vcv-M3174 (1124s)
+[10-19 07:25:26] host free 57G
+[10-19 07:25:26] RUN vcv-M-s0 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-19 12:12:31] GUARDS vcv-M-s0 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=4
+[10-19 12:12:32] RESULT vcv-M-s0 => total_return_pct 1222.887170176969 total_trades 575 sharpe_ratio 0.58787039303749988 max_drawdown_pct 27.667606642308257 calmar_ratio 0.37012841649606421  V6 INVARIANT 1 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsN(N-rb1-26-s0-v12-validator.sexp.sexp):exit=1 peak_rss_kb=5780708 Panel_runner: snapshot cache hits=148647762 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2483166552 maxrss_bytes=5903585280 (wall 17226s)
+[10-19 12:12:32] host free 57G
+[10-19 12:12:32] RUN vcv-Mpre3339-s0 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/tmp/vcv-td-pre3339)
+[10-19 15:27:41] GUARDS vcv-Mpre3339-s0 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=4
+[10-19 15:27:41] RESULT vcv-Mpre3339-s0 => total_return_pct 1222.2856132863142 total_trades 574 sharpe_ratio 0.58683827312978931 max_drawdown_pct 27.667164088992163 calmar_ratio 0.37006590563185404  V6 INVARIANT 1 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsN(N-rb1-26-s0-v12-validator.sexp.sexp):exit=1 vsM(vcv-M-s0-validator.sexp.sexp):exit=0 peak_rss_kb=5783124 Panel_runner: snapshot cache hits=148645132 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2472505336 maxrss_bytes=5897576448 (wall 11709s)
+[10-19 15:27:41] host free 55G
+[10-19 15:27:41] RUN vcv-M3174-s0 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-19 20:00:56] GUARDS vcv-M3174-s0 => Panel_runner: split_dividend_guard rejected=4 no_files=0 Panel_runner: ex_dividend_stop_adjust reduced=306 skipped_no_amount=0 no_files=0  cash_rejections=3
+[10-19 20:00:56] RESULT vcv-M3174-s0 => total_return_pct 1160.9794457622711 total_trades 576 sharpe_ratio 0.576485498134374 max_drawdown_pct 27.875348588170919 calmar_ratio 0.36021937904407691  V6 INVARIANT 1 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsM(vcv-M-s0-validator.sexp.sexp):exit=0 peak_rss_kb=5803168 Panel_runner: snapshot cache hits=148863808 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2503560776 maxrss_bytes=5925277696 (wall 16395s)
+[10-19 20:00:56] host free 64G
+[10-19 20:00:56] RUN vcv-M3138-s0 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-20 04:56:50] GUARDS vcv-M3138-s0 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=1
+[10-20 04:56:50] RESULT vcv-M3138-s0 => total_return_pct 1137.309052243932 total_trades 579 sharpe_ratio 0.58693962870138927 max_drawdown_pct 24.917022138303533 calmar_ratio 0.39982826907017022  V6 INVARIANT 1 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsM(vcv-M-s0-validator.sexp.sexp):exit=0 peak_rss_kb=5742416 Panel_runner: snapshot cache hits=148657316 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2496707712 maxrss_bytes=5880233984 (wall 32154s)
+[10-20 04:56:50] host free 76G
+[10-20 04:56:50] RUN vcv-M-s1 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-20 11:58:09] GUARDS vcv-M-s1 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=3
+[10-20 11:58:10] RESULT vcv-M-s1 => total_return_pct 1166.3955554334079 total_trades 576 sharpe_ratio 0.57703705410880257 max_drawdown_pct 27.613828884119584 calmar_ratio 0.36427584787426848  V6 INVARIANT 1 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsN(N-rb1-26-s1-v12-validator.sexp.sexp):exit=1 peak_rss_kb=5808768 Panel_runner: snapshot cache hits=148647781 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2499231688 maxrss_bytes=5923860480 (wall 25280s)
+[10-20 11:58:10] host free 59G
+[10-20 11:58:10] RUN vcv-M3138-s1 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-20 21:58:32] GUARDS vcv-M3138-s1 => <none> cash_rejections=0
+[10-20 21:58:32] GUARD-KILLED vcv-M3138-s1 => <no result> V6 INVARIANT 1 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsM(vcv-M-s1-validator.sexp.sexp):exit=0 peak_rss_kb=48504 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) (wall 36022s)
+[10-20 21:58:32] host free 46G
+[10-20 21:58:32] RUN vcv-M-s2 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-21 04:41:38] DETACHED vcv-M-s2: timeout wrapper killed (guard 36000 s would cut a ~46,500 s cell); waiting for the runner
+[10-21 04:42:19] DETACHED vcv-M-s2: timeout wrapper killed (guard 36000 s would cut a ~46,500 s cell); waiting for the runner
+[10-21 08:50:54] GUARDS vcv-M-s2 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=4
+[10-21 08:50:54] RESULT vcv-M-s2 => total_return_pct 1216.2677232302449 total_trades 575 sharpe_ratio 0.58635142284277253 max_drawdown_pct 27.51299218517461 calmar_ratio 0.371449532314323  V6 INVARIANT 1 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsN(N-rb1-26-s2-v12-validator.sexp.sexp):exit=1 peak_rss_kb=n/a(detached) Panel_runner: snapshot cache hits=148647766 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2484315520 maxrss_bytes=5896351744 (wall 39142s)
+[10-21 08:50:54] REARM vcv-M3138-s1 (guard-killed at 36,022 s); running the M3138 s1/s2 cells with CELL_TIMEOUT=72000
+[10-21 08:50:54] host free 34G
+[10-21 08:50:54] RUN vcv-M3138-s1 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-21 17:00:00] GUARDS vcv-M3138-s1 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=3
+[10-21 17:00:00] RESULT vcv-M3138-s1 => total_return_pct 1133.1073726379529 total_trades 582 sharpe_ratio 0.58519354484987429 max_drawdown_pct 24.723953872413318 calmar_ratio 0.40237928024340747  V6 INVARIANT 1 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsM(vcv-M-s1-validator.sexp.sexp):exit=0 peak_rss_kb=5792284 Panel_runner: snapshot cache hits=148658656 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2491523424 maxrss_bytes=5915365376 (wall 29346s)
+[10-21 17:00:00] host free 37G
+[10-21 17:00:00] RUN vcv-M3138-s2 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data)
+[10-22 01:58:28] GUARDS vcv-M3138-s2 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=2
+[10-22 01:58:28] RESULT vcv-M3138-s2 => total_return_pct 1156.5224038970587 total_trades 580 sharpe_ratio 0.59014495684722268 max_drawdown_pct 24.492908499532067 calmar_ratio 0.40936457422744704  V6 INVARIANT 1 violations (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-vcv/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsM(vcv-M-s2-validator.sexp.sexp):exit=0 peak_rss_kb=5805496 Panel_runner: snapshot cache hits=148655875 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2499889184 maxrss_bytes=5919068160 (wall 32308s)
+[10-22 01:58:28] CELLS DONE
+[10-22 01:58:28] PACK M: s0=/Users/difan/Projects/trading-1/.sweep-output/verify-chain-v/vcv-M-s0- s1=/Users/difan/Projects/trading-1/.sweep-output/verify-chain-v/vcv-M-s1- s2=/Users/difan/Projects/trading-1/.sweep-output/verify-chain-v/vcv-M-s2-
+[10-22 02:07:06] PACK M -> /Users/difan/Projects/trading-1/.sweep-output/review-vcv-M (site/ + render/top.png, part-N.png)
+[10-22 02:07:06] PACK Mpre3339: s0=/Users/difan/Projects/trading-1/.sweep-output/verify-chain-v/vcv-Mpre3339-s0-
+[10-22 02:15:17] PACK Mpre3339 -> /Users/difan/Projects/trading-1/.sweep-output/review-vcv-Mpre3339 (site/ + render/top.png, part-N.png)
+[10-22 02:15:17] PACK M3138: s0=/Users/difan/Projects/trading-1/.sweep-output/verify-chain-v/vcv-M3138-s0- s1=/Users/difan/Projects/trading-1/.sweep-output/verify-chain-v/vcv-M3138-s1- s2=/Users/difan/Projects/trading-1/.sweep-output/verify-chain-v/vcv-M3138-s2-
+[10-22 02:23:01] PACK M3138 -> /Users/difan/Projects/trading-1/.sweep-output/review-vcv-M3138 (site/ + render/top.png, part-N.png)
+[10-22 02:23:01] PACK M3174: s0=/Users/difan/Projects/trading-1/.sweep-output/verify-chain-v/vcv-M3174-s0-
+[10-22 02:29:19] PACK M3174 -> /Users/difan/Projects/trading-1/.sweep-output/review-vcv-M3174 (site/ + render/top.png, part-N.png)
