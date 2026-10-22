@@ -16,7 +16,7 @@
 # none), backtick-wrapped token, a non-verdict first line followed by a later
 # token line (must NOT parse), a "## Verdicts summary" heading (ignored), and a
 # trailing empty "## Verdict" heading (reset: none, not the earlier verdict),
-# a "## Verdict: APPROVED" heading-line verdict, and "APPROVEDX" (not a verdict).
+# a "## Verdict: APPROVED" heading-line verdict, and "APPROVEDX" / "NEEDS_REWORKX" (not verdicts).
 set -e
 
 . "$(dirname "$0")/_check_lib.sh"
@@ -56,6 +56,8 @@ printf '# Review\n\n## Verdict\n\nSee the findings below.\n\nAPPROVED\n' > "$R/s
 printf '# Review\n\n## Verdicts summary\n\nAPPROVED\n' > "$R/plural.md"
 printf '# Review\n\n## Verdict: APPROVED\n\nbody\n' > "$R/colon.md"
 printf '# Review\n\n## Verdict\n\nAPPROVEDX\n' > "$R/glued.md"
+printf '# Review\n\n## Verdict\n\nNEEDS_REWORKX\n' > "$R/gluedrework.md"
+printf '# Review\n\n## Verdict: NEEDS_REWORKX\n\nbody\n' > "$R/gluedrework_colon.md"
 
 REPO_ROOT="$FAKE_ROOT" sh "$CHECK_06" "$DETAIL_FILE" "$FINDINGS_FILE"
 
@@ -86,9 +88,11 @@ expect_none plural
 expect_none trailinghead
 expect_verdict colon APPROVED
 expect_none glued
+expect_none gluedrework
+expect_none gluedrework_colon
 
 if [ "$FAIL_COUNT" -gt 0 ]; then
   echo "deep_scan_verdict_parse_check: ${FAIL_COUNT} failure(s)" >&2
   exit 1
 fi
-echo "OK: deep_scan_verdict_parse_check (17 fixtures)"
+echo "OK: deep_scan_verdict_parse_check (19 fixtures)"
