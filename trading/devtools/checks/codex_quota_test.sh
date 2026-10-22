@@ -2,7 +2,8 @@
 # Offline test for dev/scripts/codex_quota.sh (Codex hand-off pacing, AGENTS.md "Usage budget"). Fixture rollout logs
 # in a temp $CODEX_HOME stand in for ~/.codex/sessions; --no-probe keeps the real codex CLI out of it. Pins:
 # the newest rollout wins; primary = five-hour and secondary = weekly; --guard / --weekly-guard exit 3 at or above
-# the threshold and 0 below it; no rollout, or rate_limits without used_percent, exits 4; each reading is logged.
+# the threshold and 0 below it; no rollout, or rate_limits without used_percent, exits 4; a trailing null-window
+# record for another limit id is skipped; each reading is logged.
 set -eu
 . "$(dirname "$0")/_check_lib.sh"
 ROOT=$(repo_root)
@@ -54,6 +55,14 @@ expect "$W/out" 'no rollout with rate_limits' "no-rollout message"
 H2="$W/home2"; mkdir -p "$H2/sessions/x"
 echo '{"payload":{"rate_limits":{"primary":null,"secondary":null}}}' > "$H2/sessions/x/rollout-a.jsonl"
 run "$H2"; rc_is "$RC" 4 "rate_limits without used_percent"
+# 5b. a trailing record for another limit id with null windows (limit_id "premium", seen 2026-10-21) is skipped:
+#     the last numeric "codex" record in the newest file is read, not exit 4
+H3="$W/home3"; mkdir -p "$H3/sessions/y"
+{ line 33 91; echo '{"payload":{"rate_limits":{"limit_id":"premium","primary":null,"secondary":null}}}'; } \
+  > "$H3/sessions/y/rollout-b.jsonl"
+run "$H3"; rc_is "$RC" 0 "trailing premium record with null windows"
+expect "$W/out" '^codex five-hour: 33 % used' "five-hour from the codex record, not the premium one"
+expect "$W/out" '^codex weekly: 91 % used' "weekly from the codex record"
 # 6. a stale reading with --no-probe is still read (no CLI call), and its age is printed
 run "$H" --max-age 0; rc_is "$RC" 0 "stale reading, no probe"
 expect "$W/out" '^reading age: [0-9]+ s' "reading age line"
