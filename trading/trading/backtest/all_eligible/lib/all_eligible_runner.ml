@@ -1,11 +1,3 @@
-(* @large-module: pipeline orchestrator covers CLI parsing (~80 LOC), out-dir
-   + config resolution, snapshot construction, Friday calendar, per-symbol
-   weekly analysis, scan + score over the panel, forward-walk outlooks,
-   universe resolution, plus the public CSV + Markdown renderers consumed by
-   tests and the per-cell emission in [Grade_sweep]. The grade-sweep + cell
-   emission lives in [Grade_sweep]; the public renderers stay here so the
-   runner module remains the single API surface for external consumers. *)
-
 (** All-eligible runner — see [all_eligible_runner.mli] for the API contract. *)
 
 open Core
@@ -25,11 +17,7 @@ let _warmup_days = Backtest.Runner.warmup_days_for Weinstein
 let _bar_lookback_weeks = 90
 let _snapshot_cache_mb = Backtest.Snapshot_world.default_cache_mb ()
 
-(* ---------------------------------------------------------------- *)
-(* CLI args                                                           *)
-(* ---------------------------------------------------------------- *)
-
-type cli_args = {
+type cli_args = All_eligible_cli.cli_args = {
   scenario_path : string;
   out_dir : string option;
   entry_dollars : float option;
@@ -40,119 +28,9 @@ type cli_args = {
   warehouse_dir : string option;
 }
 
-let _usage () =
-  String.concat ~sep:"\n"
-    [
-      "Usage: all_eligible_runner --scenario <path> [options]";
-      "  --scenario <path>            Path to scenario sexp (required).";
-      "  --out-dir <path>             Output dir (default: \
-       dev/all_eligible/<name>/<UTC>/).";
-      "  --entry-dollars <float>      Override entry-dollar sizing.";
-      "  --return-buckets <csv>       Override return-bucket boundaries (e.g. \
-       -0.5,0.0,0.5).";
-      "  --min-grade <F|D|C|B|A|A+>   Cascade grade floor (default: C).";
-      "  --grade-sweep                Run F/D/C/B/A as a sweep; emit one \
-       subdir per grade plus a top-level cross-grade summary.";
-      "  --snapshot-dir <warehouse>   Read bars from a pre-built snapshot \
-       warehouse (its manifest.sexp) instead of building from CSV data/. Use \
-       for broad universes (e.g. top-3000) the CSV store doesn't hold.";
-      "  --config-overrides <sexp>    Extra config overrides (sexp list, \
-       passthrough).";
-    ]
-
-let _fail_usage msg = failwith (msg ^ "\n" ^ _usage ())
-
-let _parse_buckets s : float list =
-  String.split s ~on:',' |> List.map ~f:String.strip
-  |> List.filter ~f:(fun cell -> not (String.is_empty cell))
-  |> List.map ~f:Float.of_string
-
-let _parse_grade s : Weinstein_types.grade =
-  match String.uppercase (String.strip s) with
-  | "A+" | "APLUS" -> A_plus
-  | "A" -> A
-  | "B" -> B
-  | "C" -> C
-  | "D" -> D
-  | "F" -> F
-  | other ->
-      _fail_usage
-        (Printf.sprintf "--min-grade expects one of {F,D,C,B,A,A+}, got %s"
-           other)
-
-let _parse_overrides s : Sexp.t list =
-  match Sexp.of_string s with
-  | List items -> items
-  | Atom _ ->
-      _fail_usage
-        "--config-overrides expects a sexp list, e.g. '((entry_dollars \
-         5000.0))'"
-
-let parse_argv argv =
-  let init =
-    {
-      scenario_path = "";
-      out_dir = None;
-      entry_dollars = None;
-      return_buckets = None;
-      min_grade = None;
-      grade_sweep = false;
-      config_overrides = [];
-      warehouse_dir = None;
-    }
-  in
-  let rec loop acc = function
-    | [] -> acc
-    | "--scenario" :: v :: rest -> loop { acc with scenario_path = v } rest
-    | "--out-dir" :: v :: rest -> loop { acc with out_dir = Some v } rest
-    | "--entry-dollars" :: v :: rest ->
-        loop { acc with entry_dollars = Some (Float.of_string v) } rest
-    | "--return-buckets" :: v :: rest ->
-        loop { acc with return_buckets = Some (_parse_buckets v) } rest
-    | "--min-grade" :: v :: rest ->
-        loop { acc with min_grade = Some (_parse_grade v) } rest
-    | "--grade-sweep" :: rest -> loop { acc with grade_sweep = true } rest
-    | "--snapshot-dir" :: v :: rest ->
-        loop { acc with warehouse_dir = Some v } rest
-    | "--config-overrides" :: v :: rest ->
-        loop { acc with config_overrides = _parse_overrides v } rest
-    | flag :: _ -> _fail_usage (Printf.sprintf "Unknown flag: %s" flag)
-  in
-  let args = Array.to_list argv |> List.tl |> Option.value ~default:[] in
-  let parsed = loop init args in
-  if String.is_empty parsed.scenario_path then
-    _fail_usage "Missing required flag: --scenario"
-  else parsed
-
-(* ---------------------------------------------------------------- *)
-(* Out-dir / config resolution                                        *)
-(* ---------------------------------------------------------------- *)
-
-(** Render [now] as a filesystem-safe UTC ISO timestamp, e.g.
-    [2026-05-06T20-13-44Z]. Replaces colons (illegal on some filesystems) with
-    hyphens. *)
-let _utc_timestamp () : string =
-  let now = Time_ns.now () in
-  let s = Time_ns.to_string_iso8601_basic now ~zone:Time_float.Zone.utc in
-  String.tr s ~target:':' ~replacement:'-'
-
-let resolve_out_dir ~scenario_name (args : cli_args) : string =
-  match args.out_dir with
-  | Some d -> d
-  | None ->
-      let ts = _utc_timestamp () in
-      Filename.concat (Filename.concat "dev/all_eligible" scenario_name) ts
-
-let resolve_config (args : cli_args) : All_eligible.config =
-  let base = All_eligible.default_config in
-  let entry_dollars =
-    Option.value args.entry_dollars ~default:base.entry_dollars
-  in
-  let return_buckets =
-    Option.value args.return_buckets ~default:base.return_buckets
-  in
-  let min_grade = Option.value args.min_grade ~default:base.min_grade in
-  { entry_dollars; return_buckets; min_grade }
+let parse_argv = All_eligible_cli.parse_argv
+let resolve_out_dir = All_eligible_cli.resolve_out_dir
+let resolve_config = All_eligible_cli.resolve_config
 
 (* ---------------------------------------------------------------- *)
 (* Friday calendar                                                    *)
@@ -318,101 +196,8 @@ let _resolve_universe ~fixtures_root (scenario : Scenario_lib.Scenario.t) :
       let universe = Hashtbl.keys tbl |> List.sort ~compare:String.compare in
       (universe, tbl)
 
-(* ---------------------------------------------------------------- *)
-(* Output emission                                                    *)
-(* ---------------------------------------------------------------- *)
-
-let _csv_header =
-  "signal_date,symbol,side,entry_price,exit_date,exit_reason,return_pct,hold_days,entry_dollars,shares,pnl_dollars,cascade_score,passes_macro,rs_value,rs_trend,volume_ratio,weeks_advancing,stage2_late,resistance_quality"
-
-let _side_to_string : Trading_base.Types.position_side -> string = function
-  | Long -> "LONG"
-  | Short -> "SHORT"
-
-let _exit_reason_to_string : OT.exit_trigger -> string = function
-  | Stage3_transition -> "Stage3_transition"
-  | Stop_hit -> "Stop_hit"
-  | End_of_run -> "End_of_run"
-
-(** Render an optional feature column: the value when present, the empty string
-    when [None] — so a missing decision-time feature reads as a blank cell
-    rather than a sentinel that downstream parsers must special-case. *)
-let _opt_to_string ~f = function Some v -> f v | None -> ""
-
-let _rs_trend_to_string (t : Weinstein_types.rs_trend) : string =
-  Sexp.to_string (Weinstein_types.sexp_of_rs_trend t)
-
-let _resistance_quality_to_string (q : Weinstein_types.overhead_quality) :
-    string =
-  Sexp.to_string (Weinstein_types.sexp_of_overhead_quality q)
-
-let _trade_to_csv_row (t : All_eligible.trade_record) : string =
-  Printf.sprintf
-    "%s,%s,%s,%.4f,%s,%s,%.6f,%d,%.2f,%.6f,%.4f,%d,%b,%s,%s,%s,%s,%s,%s"
-    (Date.to_string t.signal_date)
-    t.symbol (_side_to_string t.side) t.entry_price
-    (Date.to_string t.exit_date)
-    (_exit_reason_to_string t.exit_reason)
-    t.return_pct t.hold_days t.entry_dollars t.shares t.pnl_dollars
-    t.cascade_score t.passes_macro
-    (_opt_to_string ~f:(Printf.sprintf "%.6f") t.rs_value)
-    (_opt_to_string ~f:_rs_trend_to_string t.rs_trend)
-    (_opt_to_string ~f:(Printf.sprintf "%.6f") t.volume_ratio)
-    (_opt_to_string ~f:Int.to_string t.weeks_advancing)
-    (_opt_to_string ~f:Bool.to_string t.stage2_late)
-    (_opt_to_string ~f:_resistance_quality_to_string t.resistance_quality)
-
-let write_trades_csv ~path (result : All_eligible.result) : unit =
-  let lines = _csv_header :: List.map result.trades ~f:_trade_to_csv_row in
-  Out_channel.write_lines path lines
-
-(** Render one row of the bucket histogram. Uses [neg_infinity] / [infinity]
-    sentinels for the open ends. *)
-let _bucket_row (low, high, count) : string =
-  let fmt_low =
-    if Float.is_negative low && Float.is_inf low then "-inf"
-    else Printf.sprintf "%.2f" low
-  in
-  let fmt_high =
-    if Float.is_inf high then "+inf" else Printf.sprintf "%.2f" high
-  in
-  Printf.sprintf "| %s | %s | %d |" fmt_low fmt_high count
-
-let format_summary_md ~scenario_name ~start_date ~end_date
-    ~(result : All_eligible.result) : string =
-  let agg = result.aggregate in
-  let bucket_lines =
-    "| Low | High | Count |" :: "|---|---|---|"
-    :: List.map agg.return_buckets ~f:_bucket_row
-  in
-  let stats_lines =
-    [
-      "| Metric | Value |";
-      "|---|---|";
-      Printf.sprintf "| trade_count | %d |" agg.trade_count;
-      Printf.sprintf "| winners | %d |" agg.winners;
-      Printf.sprintf "| losers | %d |" agg.losers;
-      Printf.sprintf "| win_rate_pct | %.4f |" agg.win_rate_pct;
-      Printf.sprintf "| mean_return_pct | %.6f |" agg.mean_return_pct;
-      Printf.sprintf "| median_return_pct | %.6f |" agg.median_return_pct;
-      Printf.sprintf "| total_pnl_dollars | %.2f |" agg.total_pnl_dollars;
-    ]
-  in
-  let header_lines =
-    [
-      Printf.sprintf "# All-eligible diagnostic — %s" scenario_name;
-      "";
-      Printf.sprintf "Period: %s to %s"
-        (Date.to_string start_date)
-        (Date.to_string end_date);
-      "";
-      "## Aggregate";
-      "";
-    ]
-  in
-  let bucket_header = [ ""; "## Return-bucket histogram"; "" ] in
-  String.concat ~sep:"\n"
-    (header_lines @ stats_lines @ bucket_header @ bucket_lines @ [ "" ])
+let write_trades_csv = All_eligible_output.write_trades_csv
+let format_summary_md = All_eligible_output.format_summary_md
 
 (* ---------------------------------------------------------------- *)
 (* Pipeline                                                            *)
