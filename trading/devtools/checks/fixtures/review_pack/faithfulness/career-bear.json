@@ -1,7 +1,7 @@
 {
   "id": "bear",
   "calculation": "mean(100*1/3 check-7 pass, 100*2/3 DOWN years at least SPY) = 50",
-  "input": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 7, "status": "pass"}], "detectors": {}}, {"checks": [{"id": 7, "status": "fail"}], "detectors": {}}, {"checks": [{"id": 7, "status": "fail"}], "detectors": {}}]}, "downPeriods": [{"period": "2019", "ret": -5, "spy": -10}, {"period": "2020", "ret": -20, "spy": -15}, {"period": "2021", "ret": 0, "spy": -8}]},
+  "input": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 7, "status": "pass"}], "detectors": {}}, {"checks": [{"id": 7, "status": "fail"}], "detectors": {}}, {"checks": [{"id": 7, "status": "fail"}, {"id": 1, "status": "fail"}, {"id": 10, "status": "fail"}], "detectors": {}}]}, "downPeriods": [{"period": "2019", "ret": -5, "spy": -10}, {"period": "2020", "ret": -20, "spy": -15}, {"period": "2021", "ret": 0, "spy": -8}]},
   "expectedScore": 50,
   "becauseParts": ["checks 7 1/3 observed pass", "DOWN 2/3 years", "2019: -5% vs -10%", "2020: -20% vs -15%", "2021: 0% vs -8%"],
   "missing": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 7, "status": "pass"}], "detectors": {}}]}, "downPeriods": null}

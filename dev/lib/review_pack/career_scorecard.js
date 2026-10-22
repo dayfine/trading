@@ -9,7 +9,7 @@ const CareerScorecard = (() => {
     ['selection', 'Selection', '4.1–4.4, 3.1', 'Pooled observed pass rate of checks 1, 5, 6, 8.'],
     ['volume', 'Volume', '4.2', 'Pooled observed pass rate of checks 3, 4.'],
     ['risk', 'Stop / risk', '5.1, 4.7', 'Mean of checks 10/11 pass rate and observed fills not above limit.'],
-    ['riding', 'Riding winners', '5.2, 5.6', 'Mean of check-12 pass rate, observed exits not healthy sales, and payoff/(1+payoff).'],
+    ['riding', 'Riding winners', '5.2, 5.6', 'Mean of check-12 pass rate and payoff/(1+payoff); healthy-sale evidence is unavailable and not scored.'],
     ['portfolio', 'Portfolio construction', '5.1', '100 × min(1, 10 / average weight %); top-k shares are descriptive, with no concentration penalty.'],
     ['recovery', 'Recovery playbook', '2.1, 4.1', 'Mean of min(entries in 13 weeks / 6, 1) across complete gate-reopen episodes.'],
     ['shorts', 'Shorts', '6.1', 'Shorts enabled: 100 for fills with positive P&L, 50 for flat P&L, 0 for losses or zero fills.']
@@ -30,7 +30,7 @@ const CareerScorecard = (() => {
   function score(input = {}) {
     const f=input.faithfulness, all=input.anatomy?.available ? input.anatomy.rows?.find(r => r.year === 'All') : null;
     const c7=checks(f,[7]), selection=checks(f,[1,5,6,8]), volume=checks(f,[3,4]), risk=checks(f,[10,11]), exit=checks(f,[12]);
-    const above=detector(f,'above'), healthy=detector(f,'healthy');
+    const above=detector(f,'above');
     const down=Array.isArray(input.downPeriods) ? input.downPeriods : [];
     const downKnown=down.length && down.every(p => num(p.ret) && num(p.spy));
     const beaten=downKnown ? down.filter(p => p.ret >= p.spy).length : 0;
@@ -44,7 +44,7 @@ const CareerScorecard = (() => {
       bear: [mean([c7.score, downKnown ? 100*beaten/down.length : null]), `${c7.why}; DOWN ${beaten}/${down.length} years ≥ SPY (${down.filter(p => num(p.ret) && num(p.spy)).map(p => `${p.period}: ${fmt(p.ret)}% vs ${fmt(p.spy)}%`).join('; ') || 'n/a'})`],
       selection: [selection.score, selection.why], volume: [volume.score, volume.why],
       risk: [mean([risk.score,above.score]), `${risk.why}; filled from above ${above.hits}/${above.n} observed`],
-      riding: [mean([exit.score,healthy.score,payoff]), `${exit.why}; healthy sales ${healthy.hits}/${healthy.n} observed; payoff ${num(all?.payoff) ? fmt(all.payoff) : 'n/a'}`],
+      riding: [mean([exit.score,payoff]), `${exit.why}; healthy-sale evidence unavailable (detector cannot read true), not scored; payoff ${num(all?.payoff) ? fmt(all.payoff) : 'n/a'}`],
       portfolio: [portfolio ? 100*Math.min(1,POLICY.weightPct/all.weight) : null, `average weight ${num(all?.weight) ? fmt(all.weight) : 'n/a'}% (reference ${POLICY.weightPct}%); top-5/10/20 shares ${['top5','top10','top20'].map(k => num(all?.[k]) ? fmt(all[k])+'%' : 'n/a').join('/')} (no concentration penalty)`],
       recovery: [epsKnown ? 100*eps.reduce((s,e) => s+Math.min(e.e13/POLICY.reopenEntries,1),0)/eps.length : null, `13-week entries ${eps.map(e => `${e.d}: ${num(e.e13) ? e.e13 : 'n/a'}`).join('; ') || 'n/a'}; reference ${POLICY.reopenEntries} per episode`],
       shorts: [shorts ? (short.fills > 0 ? (short.pnl > 0 ? 100 : short.pnl === 0 ? 50 : 0) : 0) : null, short ? `short fills ${num(short.fills) ? short.fills : 'n/a'}; short P&L $${num(short.pnl) ? fmt(short.pnl) : 'n/a'}` : 'shorts disabled or parameters unavailable']

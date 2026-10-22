@@ -183,7 +183,7 @@ just as slice 1 can; the missing checks are not silently counted as passes.
 | Selection | Pooled pass rate for checks 1, 5, 6, 8. | §4.1–4.4, §3.1 |
 | Volume | Pooled pass rate for checks 3, 4. | §4.2 |
 | Stop / risk | Mean of checks 10/11 pass rate and fraction of observed fills not above the limit. Above-limit hits and measured fills print. | §5.1, §4.7 |
-| Riding winners | Mean of check-12 pass rate, fraction of observed exits not healthy sales, and 100 × payoff/(1+payoff). Anatomy supplies the All-row payoff. | §5.2, §5.6 |
+| Riding winners | Mean of check-12 pass rate and 100 × payoff/(1+payoff). Anatomy supplies the All-row payoff. The slice-1 healthy-sale detector can never read true, so it is not scored and the because says so; it re-enters the mean when that detector can fire. | §5.2, §5.6 |
 | Portfolio construction | 100 × min(1, 10 / average entry weight %). The 10% reference is a reporting policy, not a book allocation rule. All top-5/10/20 P&L shares print as context; there is no concentration penalty for a fat-tail strategy, including shares >100% or negative net-P&L shares. | §5.1 |
 | Recovery playbook | Mean of 100 × min(13-week entries / 6, 1) per complete gate-reopen episode. Six is the page's existing "many entries" reference. Each episode's date and count print; no complete episode means n/a. | §2.1, §4.1 |
 | Shorts | n/a when meta has no enabled short leg. With reported fills and P&L: 100 for fills with positive P&L, 50 for flat P&L, 0 for losses or a reported zero-fill leg. Counts and dollars print. | §6.1 |

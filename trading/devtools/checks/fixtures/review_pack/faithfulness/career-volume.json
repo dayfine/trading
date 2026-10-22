@@ -1,7 +1,7 @@
 {
   "id": "volume",
   "calculation": "2 passes / 3 observed statuses = 200/3",
-  "input": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 3, "status": "pass"}, {"id": 4, "status": "pass"}], "detectors": {}}, {"checks": [{"id": 3, "status": "fail"}, {"id": 4, "status": "n/a"}], "detectors": {}}]}},
+  "input": {"faithfulness": {"available": true, "rows": [{"checks": [{"id": 3, "status": "pass"}, {"id": 4, "status": "pass"}], "detectors": {}}, {"checks": [{"id": 3, "status": "fail"}, {"id": 4, "status": "n/a"}, {"id": 5, "status": "fail"}, {"id": 1, "status": "fail"}], "detectors": {}}]}},
   "expectedScore": 66.66666666666667,
   "becauseParts": ["checks 3/4 2/3 observed pass"],
   "missing": {"faithfulness": {"available": false, "rows": null}}
