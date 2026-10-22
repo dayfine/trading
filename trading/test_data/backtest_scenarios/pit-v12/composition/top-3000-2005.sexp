@@ -5022,8 +5022,6 @@
     (synthetic false) (avg_dollar_volume 2375292.3571428573))
    ((symbol RBAK) (weight 0.00033333333333333332) (sector "")
     (synthetic false) (avg_dollar_volume 2373740.1292857141))
-   ((symbol CMN) (weight 0.00033333333333333332) (sector "")
-    (synthetic false) (avg_dollar_volume 2372690.0677248677))
    ((symbol HOPE) (weight 0.00033333333333333332) (sector Financials)
     (synthetic false) (avg_dollar_volume 2371611.6904761903))
    ((symbol TGA) (weight 0.00033333333333333332) (sector "")

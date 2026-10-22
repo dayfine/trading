@@ -5961,8 +5961,6 @@
     (synthetic false) (avg_dollar_volume 1744761.6363636365))
    ((symbol MVO) (weight 0.00033333333333333332) (sector Energy)
     (synthetic false) (avg_dollar_volume 1730628.7954545454))
-   ((symbol CMN) (weight 0.00033333333333333332) (sector "")
-    (synthetic false) (avg_dollar_volume 1730064.3557575755))
    ((symbol CYTK) (weight 0.00033333333333333332) (sector "Health Care")
     (synthetic false) (avg_dollar_volume 1727808.6750000005))
    ((symbol SXI) (weight 0.00033333333333333332) (sector Industrials)

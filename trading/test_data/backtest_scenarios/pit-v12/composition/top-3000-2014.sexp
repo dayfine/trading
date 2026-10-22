@@ -5554,8 +5554,6 @@
    ((symbol UEIC) (weight 0.00033333333333333332)
     (sector "Information Technology") (synthetic false)
     (avg_dollar_volume 3805441.1264285706))
-   ((symbol CMN) (weight 0.00033333333333333332) (sector "")
-    (synthetic false) (avg_dollar_volume 3803786.753095238))
    ((symbol CMD) (weight 0.00033333333333333332) (sector "")
     (synthetic false) (avg_dollar_volume 3800283.79952381))
    ((symbol FOR) (weight 0.00033333333333333332) (sector "Real Estate")

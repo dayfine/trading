@@ -5219,8 +5219,6 @@
     (synthetic false) (avg_dollar_volume 5145378.1144088237))
    ((symbol HMIN) (weight 0.00033333333333333332) (sector "")
     (synthetic false) (avg_dollar_volume 5125774.2056097565))
-   ((symbol CMN) (weight 0.00033333333333333332) (sector "")
-    (synthetic false) (avg_dollar_volume 5119998.4626829261))
    ((symbol CMD) (weight 0.00033333333333333332) (sector "")
     (synthetic false) (avg_dollar_volume 5114093.1287804851))
    ((symbol NWN) (weight 0.00033333333333333332) (sector Utilities)

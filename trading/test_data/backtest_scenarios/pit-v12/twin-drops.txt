@@ -1,0 +1,8 @@
+# Per-list rename-twin drops (#3266): LIST DROPPED SURVIVOR. Checked by trading/devtools/checks/pit_twin_cooccur_check.sh.
+# Produced by dev/experiments/v12-twin-scan-2026-10-22/ (window-drops.sh). Applied scope: CMN/CMD only (user-approved
+# minimal scope 2026-10-22); the full proposal (790 rows) is results/drops.txt, tracked separately.
+top-3000-2005 CMN CMD
+top-3000-2009 CMN CMD
+top-3000-2013 CMN CMD
+top-3000-2014 CMN CMD
+top-3000-2015 CMN CMD
