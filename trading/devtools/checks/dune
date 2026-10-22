@@ -1418,6 +1418,15 @@
  (action
   (run sh %{dep:lane_board_test.sh})))
 
+; codex_quota test: pins dev/scripts/codex_quota.sh (Codex hand-off pacing, AGENTS.md "Usage budget") against fixture
+; rollout logs in a temp CODEX_HOME, with --no-probe. Reads the script via repo_root(), so (universe).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:codex_quota_test.sh})))
+
 ; prune_remote_branches test: pins the keep/prune rules of dev/scripts/prune_remote_branches.sh
 ; with a fake `gh` on PATH (#3318 item 4). Reads the script via repo_root(), so (universe).
 
