@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-22",
+  "feature": "harness-verdict-parser-nits",
+  "branch": "harness/verdict-parser-nits",
+  "sha": "3f15661203667102b8e9b0caf169ef3179ad1f2b",
+  "recorded_at_ns": 1792678385092041912,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
