@@ -1460,3 +1460,23 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:pit_twin_cooccur_check.sh})))
+
+; .gitignore directory-negation check: every `!<dir>/` under dev/backtest/ or
+; dev/experiments/ needs a later `<dir>/*` re-ignore (qc-behavioral on #3321).
+; Reads the real repo-root .gitignore via repo_root() (outside the dune
+; sandbox mirror), so (universe) is required -- same as no_python_check.sh.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:gitignore_negation_check.sh})))
+
+; Fixture self-test: RED on the #3321 first-draft shape, GREEN on the narrowed
+; shape and on the real .gitignore (also needs (universe) for the latter).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh gitignore_negation_check.sh (universe))
+ (action
+  (run sh %{dep:gitignore_negation_check_test.sh})))
