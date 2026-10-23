@@ -1375,5 +1375,87 @@ JS
   expect_eq "#3140 career: helper is inlined for portable rendered packs" '1 1' "$(grep -c '^const CareerScorecard =' "$S/index.html") $(grep -c 'initCareerScorecard();' "$S/index.html")"
 fi
 
+# #3394 / chain V D4, D5, D6, D10: real pipeline fixtures, then the page's actual renderers.
+if command -v node >/dev/null 2>&1; then
+  CV="$TMP/chain-v"; mkdir -p "$CV/on" "$CV/old"
+  cp "$FIX"/run/* "$CV/on/"
+  # Special-dividend price loss becomes a gain (AD-shaped), leaving BBB as the true worst trade.
+  awk 'BEGIN { FS=OFS="," } $1=="AAA" { $9=-584000; $24=630600 } $1=="BBB" { $9=-50000 } { print }' "$FIX/run/trades.csv" > "$CV/on/trades.csv"
+  sed 's/((enable_short_side false))/((enable_short_side false)) ((entry_ticket_macro_suspend On_bearish_macro))/' "$FIX/run/params.sexp" > "$CV/on/params.sexp"
+  cat > "$CV/on/validator.sexp.md" <<'EOF'
+V6 INVARIANT 2 violations (share-class map: fixture)
+    CMD 2009-11-09 twin positions: CMD/CMN
+    <TWIN> 2010-01-04 twin positions: TWIN/TWIN.B
+EOF
+  cp "$CV/on/"* "$CV/old/"
+  rm "$CV/old/validator.sexp.md"
+  # An older artifact has no per-trade dividend column, even if the run has an aggregate total.
+  awk 'BEGIN { FS=OFS="," } { NF--; print }' "$CV/on/trades.csv" > "$CV/old/trades.csv"
+  sed 's/On_bearish_macro/Off/' "$CV/on/params.sexp" > "$CV/old/params.sexp"
+  sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$CV/pack" s0="$FIX/run/" s1="$CV/on/" s2="$CV/old/" > "$CV/log" 2> "$CV/err"
+  {
+    echo "const assert = require('assert'), fs = require('fs');"
+    sed -n -e '/^const fmt = /p' -e '/^const pct = /p' -e '/^const usdk = /p' -e '/^const sgn = /p' -e '/^const gradeTag = /p' -e '/^const faithEsc = /p' \
+      -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' \
+      -e '/^const FLAG_WATCH_SHARE_PCT/p' -e '/^const FLAG_SEV_RANK/p' \
+      -e '/^function openHits(/,/^}/p' -e '/^function flagSeverity(/,/^}/p' -e '/^function flagPlan(/,/^}/p' \
+      -e '/^function tradeTR(/p' -e '/^function list(/,/^}/p' -e '/^function hiloBasis(/,/^}/p' \
+      -e '/^function hiloYears(/,/^}/p' -e '/^function renderHilo(/,/^}/p' -e '/^function v6Signals(/,/^}/p' "$S/index.html"
+    cat <<'JS'
+const root = process.argv[2], read = name => JSON.parse(fs.readFileSync(root + '/' + name));
+const metas = [0,1,2].map(i => read('s' + i + '_meta.json'));
+const trades = read('s1_trades.json'), old = read('s2_trades.json');
+trades.concat(old).forEach(t => { t.yr = t.ed.slice(0,4); });
+const node = {innerHTML:'', addEventListener(){}}, $ = () => node, CH = () => 0, D = {trades:[trades]};
+const panel = title => node.innerHTML.split('<div class="panel"><h2>' + title + '</h2>')[1].split('</table>')[0];
+renderHilo();
+const losers = panel('Biggest losers ($)'), year = panel('Best and worst trade by entry year');
+assert(losers.indexOf('BBB-wein-2') < losers.indexOf('AAA-wein-1'));
+assert(losers.includes('P&L including dividends')); assert(losers.includes('$47k'));
+assert(/Worst<\/th>/.test(year)); assert(year.includes('class="num pos">$47k'));
+assert(year.includes('data-open="BBB-wein-2">BBB'));
+const y = hiloYears(trades, hiloBasis(trades).value)[0];
+assert.strictEqual(y.b.sym,'AAA'); assert.strictEqual(y.w.sym,'BBB');
+D.trades = [old]; renderHilo();
+for (const title of ['Biggest losers ($)','Best and worst trade by entry year'])
+  assert(panel(title).includes('price-only P&L (dividends not included)'));
+assert(panel('Biggest losers ($)').indexOf('AAA-wein-1') < panel('Biggest losers ($)').indexOf('BBB-wein-2'));
+assert(hiloBasis([{pnl:1,div:0},{pnl:2,div:null}]).label.includes('price-only'));
+console.log('D4 OK');
+const signals = v6Signals(metas,['s0','s1','s2']);
+assert.strictEqual(signals.length,1); assert(signals[0].includes('s1: 2 violations'));
+assert(signals[0].includes('CMD/CMN')); assert(signals[0].includes('&lt;TWIN&gt;'));
+assert.deepStrictEqual(v6Signals([metas[0],metas[2]],['s0','s2']),[]);
+assert.deepStrictEqual(v6Signals([{validator:[{id:'V6',status:'PASS'}]}],['s0']),[]);
+assert.deepStrictEqual(v6Signals([{validator:[{id:'V6',status:'0 violations'}]}],['s0']),[]);
+console.log('D5 OK');
+const f = FLAGS.find(f => f.id === 'macrobear');
+const hit = [{flags:['macrobear'],pnl:1,mE:'Bearish'}, ...Array.from({length:99},()=>({flags:[],pnl:0,mE:'Bullish'}))];
+const card = meta => flagPlan([f],hit,[],100000,meta).cards[0];
+assert.strictEqual(card(metas[1]).f.zero,true); assert.strictEqual(card(metas[1]).sev,'watch');
+for (const meta of [metas[0],metas[2],{}]) {
+  assert.strictEqual(card(meta).f.zero,false); assert.strictEqual(card(meta).sev,'info');
+  assert(!card(meta).why.includes('config implies'));
+}
+assert.strictEqual(card({overrides:'((entry_ticket_macro_suspend On_index_stage4))'}).f.zero,true);
+assert.strictEqual(card({overrides:'((entry_ticket_macro_suspend Unknown))'}).f.zero,false);
+console.log('D6 OK');
+D.trades = [[{...trades[0],sym:'AEM',id:'single',yr:'2008',pnl:17000,div:0}]]; renderHilo();
+const single = panel('Best and worst trade by entry year');
+assert(single.includes('<b>2008</b>')); assert.strictEqual((single.match(/data-open="single"/g)||[]).length,1);
+assert(single.includes('<td>—</td><td class="num">—</td>'));
+assert(!single.includes('class="num neg"')); assert(!single.includes('undefined')); assert(!single.includes('NaN'));
+console.log('D10 OK');
+JS
+  } > "$CV/render.js"
+  node "$CV/render.js" "$CV/pack/site/data" > "$CV/results"
+  for item in D4 D5 D6 D10; do
+    expect_eq "#3394 $item: fixture-backed page rendering" "$item OK" "$(grep "^$item " "$CV/results")"
+  done
+  expect_eq "#3394 D5: missing validator is quiet in the pipeline" "" "$(grep -v '^\[review_pack ' "$CV/err")"
+  expect_eq "#3394 D5: all-run V6 signal is wired into the lead bullets" 1 "$(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'out.push(.*v6Signals(D.meta,')"
+  expect_eq "#3394 D6: diagnostic severity receives the selected run params" 1 "$(grep -c 'flagPlan(FLAGS, t, open, D.nav\[CH()\]\[0\]\[1\], D.meta\[CH()\])' "$S/index.html")"
+fi
+
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]

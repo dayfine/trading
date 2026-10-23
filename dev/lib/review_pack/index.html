@@ -408,7 +408,7 @@ const FLAGS = [
     why: 'Exit not chosen by the strategy’s rules. A margin call buys a short back when its loss passes the margin limit.' },
   { id: 'macro', cat: 'book', needs: 'mE', open: true, label: 'Macro not with the side at entry', test: t => t.mE && t.mE !== withMacro(t),
     why: 'Book Ch. 3/8: weight buying to a bullish market and shorting to a bearish one. A long entered when the macro was not Bullish, a short when it was not Bearish. The run allows Neutral-market buys (audit R8).' },
-  { id: 'macrobear', cat: 'book', needs: 'mE', open: true, zero: true, label: 'Filled against the macro (screen before the fill)', test: t => t.mE === againstMacro(t),
+  { id: 'macrobear', cat: 'book', needs: 'mE', open: true, zeroWhen: meta => /\(entry_ticket_macro_suspend\s+On_(?:bearish_macro|index_stage4)\)/.test(meta.overrides || ''), label: 'Filled against the macro (screen before the fill)', test: t => t.mE === againstMacro(t),
     why: 'A long filled when the last macro screen before the fill read Bearish, or a short when it read Bullish (V23’s rule: a Friday fill has not seen that day’s screen). The gate (spine rule 6) blocks the ticket’s placement, not its fill: with entry_ticket_macro_suspend Off (the default) a ticket placed in a with-macro week keeps resting and can fill after the screen turns. Compare V23 for longs.' },
   { id: 'lowvol', cat: 'book', needs: 'fvr', label: 'Long fill-week volume under 2× average', test: t => !isShort(t) && t.fvr != null && t.fvr < 2,
     why: 'Book Ch. 4: a breakout needs volume at least twice the recent average (spine rule 3). Read on the week the order FILLED (its volume vs the 4 weeks before), not the screen week trades.csv records. Shorts are left out: a breakdown does not need volume (reference Ch. 2, Stage 4 detail).' },
@@ -450,9 +450,10 @@ function flagSeverity(f, c, nav0) {
 // The cards to draw, sorted by severity then |net $|, and the labels of the checks hidden because they
 // found nothing. A check whose input no trade carries (macro needs the audit report) is an n/a card,
 // never hidden: a missing input must not read as a clean 0.
-function flagPlan(flags, t, open, nav0) {
+function flagPlan(flags, t, open, nav0, meta = {}) {
   const cards = [], clear = [];
-  for (const f of flags) {
+  for (const flag of flags) {
+    const f = { ...flag, zero: flag.zeroWhen ? flag.zeroWhen(meta) : flag.zero };
     const ts = t.filter(x => x.flags.includes(f.id)), no = openHits(f, open);
     const c = { f, n: ts.length + no, closed: ts.length, no, total: t.length, net: ts.reduce((a, x) => a + x.pnl, 0) };
     if (f.needs && !t.some(x => x[f.needs] != null && x[f.needs] !== '')) cards.push({ ...c, sev: 'na', why: 'no input for this check' });
@@ -821,6 +822,16 @@ function v16Count(validator) {
   const m = /(\d+) violations?/.exec(v.status || '');
   return m ? +m[1] : 0;
 }
+// Surface every affected salt/arm, including runs other than the charted one. Missing V6 is unknown.
+function v6Signals(metas, labels) {
+  return metas.flatMap((meta, i) => {
+    const v = (meta.validator || []).find(x => x.id === 'V6');
+    const m = v && /(\d+) violations?/.exec(v.status || '');
+    if (!m || +m[1] === 0) return [];
+    const specimens = (v.specimens || []).map(faithEsc).join('; ') || 'specimens unavailable';
+    return [`<b>V6 twin positions — ${faithEsc(labels[i])}: ${+m[1]} ${+m[1] === 1 ? 'violation' : 'violations'}.</b> ${specimens}`];
+  });
+}
 // The margin-churn bullet, or '' when it does not fire. v16 = v16Count(..); runs = [[label, low count]]
 // for every run when there is more than one. Pure, for the test.
 function marginChurnLine(c, v16, runs) {
@@ -881,6 +892,7 @@ function renderSignals(nav, spy) {
   $('#eras').innerHTML = tbl(head, rows.map(r => `<tr>${[`<b>${r.label}</b>`, r.y0 === r.y1 ? r.y0 : `${r.y0}–${r.y1}`, `${fmt(r.r0, 2)} → ${fmt(r.r1, 2)}`, cell(r.cells.UP), cell(r.cells.MIXED), cell(r.cells.DOWN), r.key || '–'].map((v, i) => `<td${head[i][1] ? ' class="num"' : ''}>${v}</td>`).join('')}</tr>`));
   const span = r => r.y0 === r.y1 ? r.y0 : `${r.y0}–${r.y1}`;
   const out = [`<b>Eras vs ${BL}${shortBook ? ' (short-only book)' : ''}:</b> ${rows.map(r => `${r.label} ${span(r)} (${fmt(r.r0, 2)}→${fmt(r.r1, 2)}×)`).join('; ')}. The ratio ends at ${fmt(pts[pts.length - 1][1], 2)}× ${BL}${Math.max(...pts.map(p => p[1])) > 1 && pts[pts.length - 1][1] < 1 ? `, after peaking at ${fmt(Math.max(...pts.map(p => p[1])), 2)}×: a whole-window "trails ${BL}" depends on the end date` : ''}.`];
+  out.push(...v6Signals(D.meta, D.meta.map((_, i) => runLabel(i))));
   for (const r of rows.filter(r => r.label === 'eroded' && r.key)) { const x = r.cells[r.key]; const x2 = r.key2 && r.cells[r.key2];
     out.push(`<b>Eroded ${span(r)} (${fmt(r.r0, 2)}→${fmt(r.r1, 2)}×):</b> mostly ${regimeText(r.key, x.s, x.m, x.expo, dir)}${x2 ? `; also ${regimeText(r.key2, x2.s, x2.m, x2.expo, dir)}` : ''}.`); }
   // years one trade or the salt decided (yearRestsBullet): kept out of the lead list (#3214), shown in a
@@ -1161,21 +1173,35 @@ function drawTradeChart(t, c) {
 }
 
 /* ---------- Highlights & lowlights ---------- */
-function list(title, note, rows, val) {
-  return `<div class="panel"><h2>${title}</h2>${note ? `<p class="note">${note}</p>` : ''}<div class="tablebox" style="max-height:none"><table><thead><tr><th>Symbol</th><th>Entry → exit</th><th class="num">P&L %</th><th class="num">P&L $</th><th>Grade</th><th class="num">${val[0]}</th></tr></thead><tbody>${rows.map(t => `<tr class="click" data-open="${t.id}"><td><b>${t.sym}</b></td><td>${t.ed} → ${t.xd}</td><td class="num ${sgn(t.pct)}">${pct(t.pct)}</td><td class="num ${sgn(t.pnl)}">${usdk(t.pnl)}</td><td>${gradeTag(t.g)}</td><td class="num">${val[1](t)}</td></tr>`).join('')}</tbody></table></div></div>`;
+function list(title, note, rows, val, basis = { value: t => t.pnl, label: 'P&L $' }) {
+  return `<div class="panel"><h2>${title}</h2>${note ? `<p class="note">${note}</p>` : ''}<div class="tablebox" style="max-height:none"><table><thead><tr><th>Symbol</th><th>Entry → exit</th><th class="num">Price P&L %</th><th class="num">${basis.label}</th><th>Grade</th><th class="num">${val[0]}</th></tr></thead><tbody>${rows.map(t => `<tr class="click" data-open="${t.id}"><td><b>${t.sym}</b></td><td>${t.ed} → ${t.xd}</td><td class="num ${sgn(t.pct)}">${pct(t.pct)}</td><td class="num ${sgn(basis.value(t))}">${usdk(basis.value(t))}</td><td>${gradeTag(t.g)}</td><td class="num">${val[1](t)}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+// Only use dividend-inclusive ranks when every trade has the per-trade amount. A run total cannot
+// supply missing rows (older trades.csv); label the entire comparison consistently in that case.
+function hiloBasis(trades) {
+  return trades.length && trades.every(t => t.div != null)
+    ? { value: tradeTR, label: 'P&L including dividends' }
+    : { value: t => t.pnl, label: 'price-only P&L (dividends not included)' };
+}
+function hiloYears(trades, value) {
+  return [...new Set(trades.map(t => t.yr))].sort().map(y => {
+    const ts = trades.filter(t => t.yr === y);
+    const b = ts.reduce((a, t) => value(t) > value(a) ? t : a);
+    const w = ts.length > 1 ? ts.reduce((a, t) => value(t) < value(a) ? t : a) : null;
+    return { y, b, w, n: ts.length, net: ts.reduce((a, t) => a + value(t), 0) };
+  });
 }
 function renderHilo() {
   const t = D.trades[CH()]; const by = (k, d = -1) => [...t].sort((a, b) => (a[k] - b[k]) * d);
-  const days = ['Days', x => x.days];
-  const years = [...new Set(t.map(x => x.yr))].sort();
-  const yb = years.map(y => { const ts = t.filter(x => x.yr === y); const b = ts.reduce((a, x) => x.pnl > a.pnl ? x : a), w = ts.reduce((a, x) => x.pnl < a.pnl ? x : a); return { y, b, w, n: ts.length, net: ts.reduce((a, x) => a + x.pnl, 0) }; });
+  const days = ['Days', x => x.days], basis = hiloBasis(t), value = basis.value;
+  const yb = hiloYears(t, value);
   $('#hilo').innerHTML =
     list('Biggest winners ($)', 'The fat tail that carries the run.', by('pnl').slice(0, 12), days) +
-    list('Biggest losers ($)', 'Check whether each loss was sized by a structural stop or the 4% fallback.', by('pnl', 1).slice(0, 12), days) +
+    list('Biggest losers ($)', `${basis.label}. Check whether each loss was sized by a structural stop or the 4% fallback.`, [...t].sort((a, b) => value(a) - value(b)).slice(0, 12), days, basis) +
     list('Best exits (grade A, largest %)', 'Winners where the stock did not go much higher after the exit.', t.filter(x => (x.g || '')[0] === 'A').sort((a, b) => b.pct - a.pct).slice(0, 12), ['13 wk after', x => pct(x.pmax, 0)]) +
     list('Costliest whipsaws', 'Stopped out at a loss, then the stock moved the trade’s way (up for a long, down for a short). Sorted by that move within 13 weeks of the exit.', t.filter(x => /^[DF]/.test(x.g || '')).sort((a, b) => b.pmax - a.pmax).slice(0, 12), ['13 wk after', x => pct(x.pmax, 0)]) +
     list('Largest give-backs', 'Open gain at its peak versus the gain at exit.', t.filter(x => x.mfe != null).sort((a, b) => (b.mfe - b.pct) - (a.mfe - a.pct)).slice(0, 12), ['Peak open', x => pct(x.mfe, 0)]) +
-    `<div class="panel"><h2>Best and worst trade by entry year</h2><div class="tablebox"><table><thead><tr><th>Year</th><th class="num">Trades</th><th class="num">Net</th><th>Best</th><th class="num">$</th><th>Worst</th><th class="num">$</th></tr></thead><tbody>${yb.map(r => `<tr><td><b>${r.y}</b></td><td class="num">${r.n}</td><td class="num ${sgn(r.net)}">${usdk(r.net)}</td><td class="click" data-open="${r.b.id}">${r.b.sym}</td><td class="num pos">${usdk(r.b.pnl)}</td><td class="click" data-open="${r.w.id}">${r.w.sym}</td><td class="num neg">${usdk(r.w.pnl)}</td></tr>`).join('')}</tbody></table></div></div>`;
+    `<div class="panel"><h2>Best and worst trade by entry year</h2><p class="note">${basis.label}</p><div class="tablebox"><table><thead><tr><th>Year</th><th class="num">Trades</th><th class="num">Net</th><th>Best</th><th class="num">$</th><th>Worst</th><th class="num">$</th></tr></thead><tbody>${yb.map(r => `<tr><td><b>${r.y}</b></td><td class="num">${r.n}</td><td class="num ${sgn(r.net)}">${usdk(r.net)}</td><td class="click" data-open="${r.b.id}">${r.b.sym}</td><td class="num ${sgn(value(r.b))}">${usdk(value(r.b))}</td>${r.w ? `<td class="click" data-open="${r.w.id}">${r.w.sym}</td><td class="num ${sgn(value(r.w))}">${usdk(value(r.w))}</td>` : '<td>—</td><td class="num">—</td>'}</tr>`).join('')}</tbody></table></div></div>`;
   $('#hilo').addEventListener('click', e => { const r = e.target.closest('[data-open]'); if (r) openTrade(r.dataset.open, CH()); });
 }
 
@@ -1194,7 +1220,7 @@ function validatorList(vs) {
 }
 function renderSurprises() {
   const t = D.trades[CH()], open = D.open[CH()].rows;
-  const plan = flagPlan(FLAGS, t, open, D.nav[CH()][0][1]);
+  const plan = flagPlan(FLAGS, t, open, D.nav[CH()][0][1], D.meta[CH()]);
   $('#flagcards').innerHTML = plan.cards.map(flagCardHtml).join('');
   $('#flagclear').innerHTML = flagClearLine(plan.clear);
   $('#flag-rule').innerHTML = flagRuleNote();
