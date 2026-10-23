@@ -50,6 +50,38 @@ cat > "$tmp/red5" <<'X2'
 foo/
 X2
 expect "negation followed by unrelated line" 1 "$tmp/red5" 'experiments/e/'
+cat > "$tmp/red6" <<'X2'
+dev/backtest/*
+!/dev/backtest/A/
+!/dev/experiments/B/
+/dev/experiments/B/*
+foo/
+X2
+expect "anchored negation, not last line, no re-ignore" 1 "$tmp/red6" 'backtest/A/'
+cat > "$tmp/red7" <<'X2'
+!/dev/backtest/A/
+/dev/backtest/A/actual.sexp
+foo/
+X2
+expect "anchored negation, anchored near-miss" 1 "$tmp/red7" 'backtest/A/'
+cat > "$tmp/red8" <<'X2'
+!dev/experiments/B/
+/dev/experiments/B/out/*
+foo/
+X2
+expect "bare negation, anchored near-miss" 1 "$tmp/red8" 'experiments/B/'
+
+cat > "$tmp/green2" <<'X2'
+!/dev/backtest/A/
+/dev/backtest/A/*
+!/dev/experiments/B/
+dev/experiments/B/*
+!dev/backtest/C/
+/dev/backtest/C/*
+!/dev/backtest/A/keep.sexp
+X2
+expect "anchored negations re-ignored (either form)" 0 "$tmp/green2"
+
 cat > "$tmp/green" <<'X'
 !dev/backtest/scenarios-X/
 dev/backtest/scenarios-X/*
