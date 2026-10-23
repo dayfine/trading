@@ -507,6 +507,21 @@ let test_weaker_successor_qualifies_on_its_own _ =
            ];
        ])
 
+(* The same weaker successor under a [ret_epsilon] wide enough to absorb the 5%
+   nick: all 10 overlap return pairs match, so the score rises from 0.8 to 1.0.
+
+   EFFECTIVENESS-PIN: ret_epsilon -- goes red if [config.ret_epsilon] is not
+   threaded into the [Twin_detector] config in [_returns_score]: the stock 1e-3
+   would leave the score at 0.8. *)
+let test_wider_ret_epsilon_absorbs_nick _ =
+  let config = { _ranked with ret_epsilon = 0.2 } in
+  let report = _detect ~config [ _ranked_predecessor; _weaker_successor ] in
+  assert_that report.renames
+    (elements_are
+       [
+         field (fun (r : Detector.rename) -> r.match_fraction) (float_equal 1.0);
+       ])
+
 (* ------------------------------------------------------------------ *)
 (* [as_of] truncation                                                  *)
 (* ------------------------------------------------------------------ *)
@@ -606,6 +621,8 @@ let suite =
          "highest match fraction wins" >:: test_highest_match_fraction_wins;
          "weaker successor qualifies on its own"
          >:: test_weaker_successor_qualifies_on_its_own;
+         "wider ret_epsilon absorbs nick"
+         >:: test_wider_ret_epsilon_absorbs_nick;
          "bars after as_of are ignored" >:: test_bars_after_as_of_are_ignored;
          "as_of result matches pre-truncated input"
          >:: test_as_of_matches_pre_truncated_input;
