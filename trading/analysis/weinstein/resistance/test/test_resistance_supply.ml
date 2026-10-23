@@ -186,6 +186,31 @@ let test_nan_sketch_degrades_to_insufficient _ =
   in
   assert_that result.quality (equal_to Weinstein_types.Insufficient_history)
 
+(* A non-default [insufficient_score] changes the score of both degradation
+   paths (short history, non-finite cell) and leaves a sufficient-history
+   sketch untouched.
+
+   EFFECTIVENESS-PIN: insufficient_score -- goes red if [_insufficient] ignores
+   [config.insufficient_score] (the stock 0.5 would be returned instead of
+   0.9), or if the value leaks into the scored path (virgin would stop at 0). *)
+let test_non_default_insufficient_score_threads_through _ =
+  let config =
+    { _config with min_history_bars = 240; insufficient_score = 0.9 }
+  in
+  let score sketch =
+    (Resistance_supply.analyze ~config ~sketch ~breakout_price:100.0).score
+  in
+  assert_that
+    ( score { _virgin_sketch with bars_seen = 100.0 },
+      score { _virgin_sketch with max_high_520w = Float.nan },
+      score _virgin_sketch )
+    (all_of
+       [
+         field (fun (short, _, _) -> short) (float_equal 0.9);
+         field (fun (_, nan, _) -> nan) (float_equal 0.9);
+         field (fun (_, _, enough) -> enough) (float_equal 0.0);
+       ])
+
 (* ------------------------------------------------------------------ *)
 (* Parity vs the v1 mapper on the virgin verdict, through the real     *)
 (* sketch builder: same weekly window, same raw-high basis.            *)
@@ -468,6 +493,8 @@ let suite =
          "insufficient history" >:: test_insufficient_history;
          "NaN sketch degrades to insufficient"
          >:: test_nan_sketch_degrades_to_insufficient;
+         "non-default insufficient_score threads through"
+         >:: test_non_default_insufficient_score_threads_through;
          "virgin parity with v1" >:: test_virgin_parity_with_v1;
          "is_virgin predicate" >:: test_is_virgin_predicate;
          "is_virgin agrees with analyze" >:: test_is_virgin_agrees_with_analyze;
