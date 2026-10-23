@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-23",
+  "feature": "harness-gitignore-negation-check",
+  "branch": "harness/gitignore-negation-check",
+  "sha": "d799b114b9e4c53fc78311daac407d6997f1f6d4",
+  "recorded_at_ns": 1792767745619526968,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
