@@ -334,3 +334,4 @@ date,experiment,tag,universe,years,cap,head,wall_s,s_per_year
 2026-10-21T08:50:54,verify-chain-v-2026-10-19,vcv-M-s2,pit-schedule-3000,26.49,12000,7e7c65628,39142,1478
 2026-10-21T17:00:00,verify-chain-v-2026-10-19,vcv-M3138-s1,pit-schedule-3000,26.49,12000,7e7c65628,29346,1108
 2026-10-22T01:58:28,verify-chain-v-2026-10-19,vcv-M3138-s2,pit-schedule-3000,26.49,12000,7e7c65628,32308,1220
+2026-10-23T00:14:05,v3266-run,v3266-Mpre3339-s0,pit-schedule-3000,26.49,12000,af6109ca8,27309,1031
