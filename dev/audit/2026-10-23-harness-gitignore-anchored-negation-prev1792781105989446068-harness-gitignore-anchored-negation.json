@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-23",
+  "feature": "harness-gitignore-anchored-negation",
+  "branch": "harness/gitignore-anchored-negation",
+  "sha": "aa1d54d8b692d51ad9fbe58a90cb1ba45a9b85c4",
+  "recorded_at_ns": 1792781105989446068,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
