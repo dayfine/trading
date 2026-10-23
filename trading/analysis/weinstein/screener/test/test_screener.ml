@@ -2054,6 +2054,119 @@ let test_ranking_omitted_field_defaults_alphabetical _ =
   assert_that no_ranking.candidate_ranking (equal_to Alphabetical)
 
 (* ------------------------------------------------------------------ *)
+(* Seeded tiebreak (issue #3404, path-stability plan Step 1)            *)
+(* ------------------------------------------------------------------ *)
+
+let _seeded_tie_tickers = [ "AAA"; "BBB"; "CCC"; "DDD"; "EEE"; "FFF"; "GGG" ]
+
+let _seeded_tie_group () =
+  List.map _seeded_tie_tickers ~f:(fun ticker -> ranking_candidate ~ticker ())
+
+(** Ticker order of [candidates] under [ranking] (default [Seeded]) at [seed] /
+    [date]. *)
+let _seeded_sort ?(ranking = Seeded) ~seed ~date candidates =
+  List.sort candidates
+    ~compare:(compare_for_ranking ~tiebreak_seed:seed ~as_of:date ranking)
+  |> List.map ~f:(fun (c : scored_candidate) -> c.ticker)
+
+(* Same seed and date → the same order, whatever the input order (a pure
+   function of the tie group, not of the caller's list). *)
+let test_seeded_same_seed_same_order _ =
+  let group = _seeded_tie_group () in
+  assert_that
+    (_seeded_sort ~seed:7 ~date:as_of (List.rev group))
+    (equal_to (_seeded_sort ~seed:7 ~date:as_of group))
+
+(* A different seed re-draws the order of a tie group, and so does a different
+   screen date (the date term stops one name always winning its ties). Each draw
+   is a permutation of the group, never a drop. *)
+let test_seeded_seed_and_date_redraw_order _ =
+  let group = _seeded_tie_group () in
+  let base = _seeded_sort ~seed:0 ~date:as_of group in
+  let other_seed = _seeded_sort ~seed:1 ~date:as_of group in
+  let other_date = _seeded_sort ~seed:0 ~date:(Date.add_days as_of 7) group in
+  let sorted l = List.sort l ~compare:String.compare in
+  assert_that
+    ( List.equal String.equal base other_seed,
+      List.equal String.equal base other_date,
+      sorted other_seed,
+      sorted other_date )
+    (equal_to (false, false, _seeded_tie_tickers, _seeded_tie_tickers))
+
+(* Score stays the primary key: with no ties the order is score descending at
+   every seed — the seed only reorders inside an equal-score group. *)
+let test_seeded_keeps_score_order_without_ties _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"ZZZ" ~score:60 ();
+      ranking_candidate ~ticker:"AAA" ~score:90 ();
+      ranking_candidate ~ticker:"MMM" ~score:75 ();
+    ]
+  in
+  assert_that
+    (List.map [ 0; 1; 2; 3; 4; 5 ] ~f:(fun seed ->
+         _seeded_sort ~seed ~date:as_of candidates))
+    (each (equal_to [ "AAA"; "MMM"; "ZZZ" ]))
+
+(* [Alphabetical] ignores [tiebreak_seed] and [as_of]: ticker order at any seed
+   — the default path is bit-identical to before #3404. *)
+let test_seeded_alphabetical_ignores_seed _ =
+  let group = List.rev (_seeded_tie_group ()) in
+  assert_that
+    (List.map [ 0; 3; 42 ] ~f:(fun seed ->
+         _seeded_sort ~ranking:Alphabetical ~seed ~date:as_of group))
+    (each (equal_to _seeded_tie_tickers))
+
+(* Cascade wiring: [screen_with_cooldown] sorts by [config.tiebreak_seed] and its
+   own [~as_of]. With the cap inside a 7-name tie group, the admitted names are
+   the comparator's first three at that seed and date, and two seeds admit
+   different sets. *)
+let test_seeded_cascade_reads_config_seed _ =
+  let admitted seed =
+    let config =
+      {
+        cfg with
+        candidate_ranking = Seeded;
+        tiebreak_seed = seed;
+        max_buy_candidates = 3;
+      }
+    in
+    (screen_with_cooldown ~config ~macro_trend:Bullish
+       ~sector_map:(empty_sector_map ())
+       ~stocks:(_breakout_stocks _seeded_tie_tickers)
+       ~held_tickers:[] ~as_of ~last_stop_out_dates:[] ())
+      .buy_candidates
+    |> List.map ~f:(fun (c : scored_candidate) -> c.ticker)
+  in
+  let expected seed =
+    List.take (_seeded_sort ~seed ~date:as_of (_seeded_tie_group ())) 3
+  in
+  assert_that
+    (admitted 0, admitted 1, List.equal String.equal (admitted 0) (admitted 1))
+    (equal_to (expected 0, expected 1, false))
+
+(* Both fields round-trip through the config sexp, and an omitted
+   [tiebreak_seed] deserialises to 0 (the [@sexp.default]). *)
+let test_seeded_fields_round_trip _ =
+  let default_str = Sexp.to_string (sexp_of_config default_config) in
+  let seeded =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first default_str
+            ~pattern:"(candidate_ranking Alphabetical)(tiebreak_seed 0)"
+            ~with_:"(candidate_ranking Seeded)(tiebreak_seed 4)"))
+  in
+  let omitted =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first default_str ~pattern:"(tiebreak_seed 0)"
+            ~with_:""))
+  in
+  assert_that
+    (seeded.candidate_ranking, seeded.tiebreak_seed, omitted.tiebreak_seed)
+    (equal_to (Seeded, 4, 0))
+
+(* ------------------------------------------------------------------ *)
 (* early_stage2_max_weeks: early-Stage2 window knob                     *)
 (* ------------------------------------------------------------------ *)
 
@@ -3793,6 +3906,16 @@ let suite =
          >:: test_ranking_field_serializes_and_round_trips;
          "test_ranking_omitted_field_defaults_alphabetical"
          >:: test_ranking_omitted_field_defaults_alphabetical;
+         "test_seeded_same_seed_same_order" >:: test_seeded_same_seed_same_order;
+         "test_seeded_seed_and_date_redraw_order"
+         >:: test_seeded_seed_and_date_redraw_order;
+         "test_seeded_keeps_score_order_without_ties"
+         >:: test_seeded_keeps_score_order_without_ties;
+         "test_seeded_alphabetical_ignores_seed"
+         >:: test_seeded_alphabetical_ignores_seed;
+         "test_seeded_cascade_reads_config_seed"
+         >:: test_seeded_cascade_reads_config_seed;
+         "test_seeded_fields_round_trip" >:: test_seeded_fields_round_trip;
          "test_score_long_window_controls_early_stage2_signal"
          >:: test_score_long_window_controls_early_stage2_signal;
          "test_long_score_components_decompose_the_score"

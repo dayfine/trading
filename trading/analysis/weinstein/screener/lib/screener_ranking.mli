@@ -40,7 +40,17 @@
     band, no sort beats unbiased sampling (project_edge_is_the_fat_tail).
     [Hash_order] is a deterministic cross-platform FNV-1a order (a reproducible
     proxy for a random shuffle); all three fall back to [ticker] for
-    reproducibility. *)
+    reproducibility.
+
+    {b Seeded} (issue #3404, [dev/plans/path-stability-fixes-2026-10-23.md]
+    §"Step 1") — a {e seeded draw} among ties, for the path-stability
+    experiment. Equal-score candidates are ordered by a pure 32-bit FNV-1a hash
+    of [(tiebreak_seed, as_of date, ticker)], then by [ticker] as the final
+    total-order key. Unlike [Hash_order] the order changes with the seed (so
+    salts are independent draws) and with the screen date (so the same name does
+    not always win, or always lose, its ties). Pure: no global RNG; the same
+    seed, date and tie group always give the same order. Default-off: the
+    screener default stays [Alphabetical]. *)
 type candidate_ranking =
   | Alphabetical
   | Quality
@@ -48,6 +58,7 @@ type candidate_ranking =
   | Reverse_alphabetical
   | Symbol_length
   | Hash_order
+  | Seeded
 [@@deriving sexp, eq]
 
 type rankable = {
@@ -61,7 +72,17 @@ type rankable = {
     adapts its [scored_candidate] to this so the comparator does not depend on
     the full record. *)
 
-val compare_rankable : candidate_ranking -> rankable -> rankable -> int
-(** [compare_rankable ranking a b] is the total order the cascade sorts and caps
-    by: primary key [score] descending, then the [ranking] tiebreak among equal
-    scores (see {!candidate_ranking}). Pure. *)
+val compare_rankable :
+  ?tiebreak_seed:int ->
+  ?as_of:Core.Date.t ->
+  candidate_ranking ->
+  rankable ->
+  rankable ->
+  int
+(** [compare_rankable ?tiebreak_seed ?as_of ranking a b] is the total order the
+    cascade sorts and caps by: primary key [score] descending, then the
+    [ranking] tiebreak among equal scores (see {!candidate_ranking}). Pure.
+
+    [tiebreak_seed] (default [0]) and [as_of] (the screen date; default absent,
+    hashed as an empty date) are read only by [Seeded]; every other mode ignores
+    them, so existing callers are unchanged. *)
