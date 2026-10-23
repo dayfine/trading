@@ -35,6 +35,21 @@ dev/backtest/s/*
 X
 expect "re-ignore before negation does not count" 1 "$tmp/red3"
 
+
+cat > "$tmp/red4" <<'X2'
+!dev/backtest/X/
+!dev/backtest/X/actual.sexp
+dev/backtest/X/actual.sexp
+dev/backtest/Y/*
+foo/
+X2
+expect "negation followed by near-miss and other-dir lines" 1 "$tmp/red4" 'backtest/X/'
+
+cat > "$tmp/red5" <<'X2'
+!dev/experiments/e/
+foo/
+X2
+expect "negation followed by unrelated line" 1 "$tmp/red5" 'experiments/e/'
 cat > "$tmp/green" <<'X'
 !dev/backtest/scenarios-X/
 dev/backtest/scenarios-X/*
