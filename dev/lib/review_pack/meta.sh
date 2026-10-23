@@ -59,7 +59,7 @@ printf '},"n_round_trips":%s,"final_value":%s' "$(grep -oE 'n_round_trips [0-9]+
 printf ',"code_version":"%s"' "$(grep -oE 'code_version [0-9a-f]+' "$D/params.sexp" | cut -d' ' -f2)"
 printf ',"overrides":"%s"' "$(sed -n '/overrides/,$p' "$D/params.sexp" | tr -s ' \n' ' ' | esc)"
 printf ',"validator":['
-awk 'function flush() { if (id != "") { printf "%s{\"id\":\"%s\",\"sev\":\"%s\",\"status\":\"%s\",\"specimens\":[%s]}", (n++?",":""), id, sev, st, sp } }
+[ -s "$D/validator.sexp.md" ] && awk 'function flush() { if (id != "") { printf "%s{\"id\":\"%s\",\"sev\":\"%s\",\"status\":\"%s\",\"specimens\":[%s]}", (n++?",":""), id, sev, st, sp } }
   /^V[0-9]+ / { flush(); id=$1; sev=$2; $1=""; $2=""; st=substr($0,3); sp=""; ns=0; next }
   /^    / && id != "" { s=$0; sub(/^ +/,"",s); gsub(/\\/,"\\\\",s); gsub(/"/,"\\\"",s); sp = sp (ns++?",":"") "\"" s "\""; next }
   END { flush() }' "$D/validator.sexp.md"
