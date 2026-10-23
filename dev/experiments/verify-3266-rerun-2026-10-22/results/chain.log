@@ -1,0 +1,36 @@
+[10-22 12:27:18] verify-3266-rerun run tree .claude/worktrees/sweep-v3266 HEAD=af6109ca8 (expect af6109ca8) prereg=af6109ca8 lists md5 51fba79e26a6273845c37c13f6aae070
+[10-22 12:27:18] cell guard CELL_TIMEOUT=60000s (chain V M-pre3339 s0 11,709 s; slowest same-spec cell 39,142 s, #3381); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-22 12:27:19] host free 27G
+[10-22 12:27:19] BUILD
+[10-22 12:31:14] BUILD_DONE
+[10-22 12:31:14] WH BUILD chunk 1 (2310 symbols) -> /tmp/snap_top3000_pit_v12wk
+[10-22 12:57:42] WH chunk 1 done: peak_rss_kb=71848 (wall 1588s)
+[10-22 12:57:43] WH BUILD chunk 2 (2309 symbols) -> /tmp/snap_top3000_pit_v12wk
+[10-22 13:26:54] WH chunk 2 done: peak_rss_kb=78872 (wall 1751s)
+[10-22 13:26:54] WH BUILD chunk 3 (2309 symbols) -> /tmp/snap_top3000_pit_v12wk
+[10-22 13:58:44] WH chunk 3 done: peak_rss_kb=86864 (wall 1910s)
+[10-22 13:58:45] WH BUILD chunk 4 (2308 symbols) -> /tmp/snap_top3000_pit_v12wk
+[10-22 14:33:10] WH chunk 4 done: peak_rss_kb=101300 (wall 2065s)
+[10-22 14:33:11] WH verify: entries=9236 snaps=9236 weekly=9236
+[10-22 14:33:13] TD_PRE /tmp/v3266-td-pre3339: A-D md5 1b91614926e369f4dfaeedcad0896d6f (run tree a829a2d715fcbf5b327a799fade5c9d7); 39 entries
+[10-22 14:33:14] PREFLIGHT v3266-Mpre3339 (TRADING_DATA_DIR=/tmp/v3266-td-pre3339)
+[10-22 14:42:21] PREFLIGHT_OK v3266-Mpre3339 (547s)
+[10-22 14:42:21] host free 15G
+[10-22 14:42:21] ABORT: host disk < 20G before v3266-Mpre3339-s0
+[10-22 16:08:04] verify-3266-rerun run tree .claude/worktrees/sweep-v3266 HEAD=af6109ca8 (expect af6109ca8) prereg=af6109ca8 lists md5 51fba79e26a6273845c37c13f6aae070
+[10-22 16:08:04] cell guard CELL_TIMEOUT=60000s (chain V M-pre3339 s0 11,709 s; slowest same-spec cell 39,142 s, #3381); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-22 16:08:04] host free 23G
+[10-22 16:08:05] BUILD
+[10-22 16:08:58] BUILD_DONE
+[10-22 16:08:59] WH /tmp/snap_top3000_pit_v12wk already rebuilt (marker present); skipped
+[10-22 16:09:06] TD_PRE /tmp/v3266-td-pre3339: A-D md5 1b91614926e369f4dfaeedcad0896d6f (run tree a829a2d715fcbf5b327a799fade5c9d7); 39 entries
+[10-22 16:09:08] PREFLIGHT v3266-Mpre3339 (TRADING_DATA_DIR=/tmp/v3266-td-pre3339)
+[10-22 16:38:56] PREFLIGHT_OK v3266-Mpre3339 (1788s)
+[10-22 16:38:56] host free 24G
+[10-22 16:38:56] RUN v3266-Mpre3339-s0 on /tmp/snap_top3000_pit_v12wk (TRADING_DATA_DIR=/tmp/v3266-td-pre3339)
+[10-23 00:14:05] GUARDS v3266-Mpre3339-s0 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=43
+[10-23 00:14:05] RESULT v3266-Mpre3339-s0 => total_return_pct 1521.6389596891929 total_trades 566 sharpe_ratio 0.63271499581133639 max_drawdown_pct 27.667715632350593 calmar_ratio 0.40088012458630229  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-v3266/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsN(N-rb1-26-s0-v12-validator.sexp.sexp):exit=0 peak_rss_kb=5771256 Panel_runner: snapshot cache hits=148638632 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2466994736 maxrss_bytes=5894119424 (wall 27309s)
+[10-23 00:14:05] CELLS DONE
+[10-23 00:14:05] PACK Mpre3339: s0=/Users/difan/Projects/trading-1/.sweep-output/verify-3266-rerun/v3266-Mpre3339-s0-
+[10-23 00:30:49] PACK Mpre3339 -> /Users/difan/Projects/trading-1/.sweep-output/review-v3266-Mpre3339 (site/ + render/top.png, part-N.png)
+[10-23 00:30:50] VERIFY-3266-RERUN DONE. Next: perf_long_cells.sh update /tmp/v3266-run/chain.log; collect into the results PR; read per README.
