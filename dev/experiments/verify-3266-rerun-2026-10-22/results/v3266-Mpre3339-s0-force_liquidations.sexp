@@ -1,0 +1,13 @@
+((events
+  (((symbol CCME) (position_id CCME-wein-462) (date 2011-02-03) (side Long)
+    (entry_price 14.89) (current_price 11.09) (quantity 14054)
+    (cost_basis 209264.06) (unrealized_pnl -53405.200000000012)
+    (unrealized_pnl_pct -0.25520483546004036) (reason Per_position))
+   ((symbol SDA) (position_id SDA-wein-1172) (date 2023-07-13) (side Long)
+    (entry_price 11.56) (current_price 8.18) (quantity 105998)
+    (cost_basis 1225336.8800000001) (unrealized_pnl -358273.24000000011)
+    (unrealized_pnl_pct -0.29238754325259519) (reason Per_position))
+   ((symbol SIRI) (position_id SIRI-wein-1177) (date 2023-07-25) (side Long)
+    (entry_price 6.88) (current_price 5.13) (quantity 199473)
+    (cost_basis 1372374.24) (unrealized_pnl -349077.75)
+    (unrealized_pnl_pct -0.25436046511627908) (reason Per_position)))))

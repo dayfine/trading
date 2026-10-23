@@ -1,0 +1,5 @@
+active_through: 2203 marked, 107 survivors (of 2310 symbols)
+wrote 2310 entries to /tmp/snap_top3000_pit_v12wk/manifest.sexp in 1579.16s
+series_tail: 70 findings (20 truncated, 9 stray_dropped, 41 kept, 0 kept_by_exception, 0 cut_prefix, 0 cut_refused_short_tail)
+verify: 2310/2310 files OK (failed=0)
+exit=0
