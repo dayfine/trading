@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-23",
+  "feature": "cleanup-insufficient-score-pin",
+  "branch": "cleanup/insufficient-score-pin",
+  "sha": "4921017fa13f0a31fd4c76b735d0350d3ef1b907",
+  "recorded_at_ns": 1792781105958411061,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
