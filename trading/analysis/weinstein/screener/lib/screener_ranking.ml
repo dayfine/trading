@@ -8,6 +8,7 @@ type candidate_ranking =
   | Reverse_alphabetical
   | Symbol_length
   | Hash_order
+  | Seeded
 [@@deriving sexp, eq]
 
 type rankable = { score : int; ticker : string; analysis : Stock_analysis.t }
@@ -122,12 +123,27 @@ let _hash_order_cmp a b =
   | 0 -> String.compare a.ticker b.ticker
   | c -> c
 
+(** The seed-and-date prefix of a [Seeded] hash key (issue #3404). The date is
+    hashed as ISO [YYYY-MM-DD]; a screen with no date hashes it as empty. *)
+let _seed_key ~tiebreak_seed ~as_of =
+  let date = Option.value_map as_of ~default:"" ~f:Date.to_string in
+  sprintf "%d|%s|" tiebreak_seed date
+
+(** [Seeded] tiebreak: FNV-1a of [seed|date|ticker] ascending, then [ticker] as
+    the final total-order key (also the hash-collision fallback). Changing the
+    seed or the date re-draws the order of a tie group; nothing else does. *)
+let _seeded_cmp ~seed_key a b =
+  let key r = _ticker_hash (seed_key ^ r.ticker) in
+  match Int.compare (key a) (key b) with
+  | 0 -> String.compare a.ticker b.ticker
+  | c -> c
+
 (** Tiebreak comparator among equal-score candidates, parameterised by the
     ranking mode. [Alphabetical] is bit-identical to the historical ticker-only
     tiebreak; [Quality] leads with RS magnitude; [Quality_earliness] leads with
     earliness; the rest are uninformative {!_reverse_alphabetical_cmp} /
     {!_symbol_length_cmp} / {!_hash_order_cmp} controls. *)
-let _tiebreak ranking a b =
+let _tiebreak ~seed_key ranking a b =
   match ranking with
   | Alphabetical -> String.compare a.ticker b.ticker
   | Quality -> _lex _quality_keys a b
@@ -135,7 +151,9 @@ let _tiebreak ranking a b =
   | Reverse_alphabetical -> _reverse_alphabetical_cmp a b
   | Symbol_length -> _symbol_length_cmp a b
   | Hash_order -> _hash_order_cmp a b
+  | Seeded -> _seeded_cmp ~seed_key a b
 
-let compare_rankable ranking a b =
+let compare_rankable ?(tiebreak_seed = 0) ?as_of ranking a b =
   let by_score = Int.compare b.score a.score in
-  if by_score <> 0 then by_score else _tiebreak ranking a b
+  if by_score <> 0 then by_score
+  else _tiebreak ~seed_key:(_seed_key ~tiebreak_seed ~as_of) ranking a b

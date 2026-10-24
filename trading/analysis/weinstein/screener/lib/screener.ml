@@ -42,6 +42,7 @@ type config = {
   candidate_params : candidate_params;
   min_grade : grade;
   candidate_ranking : candidate_ranking; [@sexp.default Alphabetical]
+  tiebreak_seed : int; [@sexp.default 0]
   min_score_override : int option; [@sexp.default None]
   max_score_override : int option; [@sexp.default None]
   volume_ratio_exclude_range : volume_ratio_band option; [@sexp.default None]
@@ -67,6 +68,7 @@ let default_config =
     candidate_params = default_candidate_params;
     min_grade = C;
     candidate_ranking = Alphabetical;
+    tiebreak_seed = 0;
     min_score_override = None;
     max_score_override = None;
     volume_ratio_exclude_range = None;
@@ -260,29 +262,27 @@ let _rankable_of_candidate (c : scored_candidate) : Screener_ranking.rankable =
     tiebreak among equal scores (see {!Screener_ranking.candidate_ranking}).
     Adapts each candidate to {!Screener_ranking.rankable} and delegates. Exposed
     so the ordering contract is unit-testable in isolation of the cascade. *)
-let compare_for_ranking ranking a b =
-  Screener_ranking.compare_rankable ranking (_rankable_of_candidate a)
-    (_rankable_of_candidate b)
+let compare_for_ranking ?tiebreak_seed ?as_of ranking a b =
+  Screener_ranking.compare_rankable ?tiebreak_seed ?as_of ranking
+    (_rankable_of_candidate a) (_rankable_of_candidate b)
 
-let _top_n ~ranking n lst =
+let _top_n ~compare n lst =
   (* Secondary sort breaks score ties deterministically. Without it,
      [List.sort]'s stability depends on the input ordering — which in turn
      depends on Hashtbl iteration order, and that diverges between macOS and
      Linux. A G15-step-3 panel-golden CI failure surfaced this: local
      regenerated more round_trips than GHA produced, with the diff being a
      tied-score candidate that landed on either side of a cash-budget boundary
-     depending on its position in the sorted list. The [Alphabetical] mode
-     (default) preserves the original ticker-only tiebreak bit-for-bit; the
-     [Quality] mode breaks ties by RS magnitude / earliness / volume, falling
-     back to ticker so the order stays fully deterministic. *)
-  List.sort lst ~compare:(compare_for_ranking ranking) |> fun l ->
+     depending on its position in the sorted list. [compare] carries the
+     ranking tiebreak; see {!Screener_ranking.candidate_ranking}. *)
+  List.sort lst ~compare |> fun l ->
   List.sub l ~pos:0 ~len:(min n (List.length l))
 
-(** Apply [candidate_fn] to each pair, drop [None]s, sort by score (tiebroken
-    per [ranking]), and cap at [max_n]. Shared by the long and short evaluation
-    paths. *)
-let _filter_and_cap ~ranking ~candidate_fn ~max_n candidates =
-  List.filter_map candidates ~f:candidate_fn |> _top_n ~ranking max_n
+(** Apply [candidate_fn] to each pair, drop [None]s, sort by [compare] (score,
+    then the ranking tiebreak), and cap at [max_n]. Shared by the long and short
+    evaluation paths. *)
+let _filter_and_cap ~compare ~candidate_fn ~max_n candidates =
+  List.filter_map candidates ~f:candidate_fn |> _top_n ~compare max_n
 
 (** The long side's whole admission answer for one screen call: the
     breadth-resolution macro gate {!longs_admitted_by_breadth} {b and} the
@@ -306,7 +306,7 @@ let _longs_admitted ~config ~macro_trend ~breadth_state ~index_stage =
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
     ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
-    ~max_buy_candidates ~longs_admitted ~ranking ~candidates :
+    ~max_buy_candidates ~longs_admitted ~compare ~candidates :
     scored_candidate list =
   if not longs_admitted then []
   else
@@ -316,7 +316,7 @@ let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
         ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
         ~min_rs_normalized
     in
-    _filter_and_cap ~ranking ~candidate_fn ~max_n:max_buy_candidates candidates
+    _filter_and_cap ~compare ~candidate_fn ~max_n:max_buy_candidates candidates
 
 (** Filter, score, grade, sort, and cap short candidates.
 
@@ -333,7 +333,7 @@ let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
 let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
     ~max_short_candidates ~neutral_blocks_shorts ~enable_slow_grind_short_gate
-    ~ranking ~decline_is_slow_grind ~candidates ~macro_trend :
+    ~compare ~decline_is_slow_grind ~candidates ~macro_trend :
     scored_candidate list =
   let macro_admits =
     shorts_admitted_by_macro ~neutral_blocks_shorts macro_trend
@@ -348,7 +348,7 @@ let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
         ~min_score_override ~max_score_override ~volume_ratio_exclude_range
         ~min_price
     in
-    _filter_and_cap ~ranking ~candidate_fn ~max_n:max_short_candidates
+    _filter_and_cap ~compare ~candidate_fn ~max_n:max_short_candidates
       candidates
 
 (* ------------------------------------------------------------------ *)
@@ -394,7 +394,11 @@ let _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member =
     [(buy_candidates, short_candidates)]; decoupled from [_screen] so the latter
     stays within the 50-line linter cap. *)
 let _evaluate_candidates ~config ~decline_is_slow_grind ~longs_admitted
-    ~candidates ~macro_trend =
+    ~candidates ~macro_trend ~as_of =
+  let compare =
+    compare_for_ranking ~tiebreak_seed:config.tiebreak_seed ?as_of
+      config.candidate_ranking
+  in
   let buy_candidates =
     _evaluate_longs ~weights:config.weights ~thresholds:config.grade_thresholds
       ~params:config.candidate_params ~min_grade:config.min_grade
@@ -405,8 +409,8 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~longs_admitted
       ~failed_breakout_tolerance_pct:config.failed_breakout_tolerance_pct
       ~early_stage2_max_weeks:config.early_stage2_max_weeks
       ~min_rs_normalized:config.min_rs_normalized
-      ~max_buy_candidates:config.max_buy_candidates ~longs_admitted
-      ~ranking:config.candidate_ranking ~candidates
+      ~max_buy_candidates:config.max_buy_candidates ~longs_admitted ~compare
+      ~candidates
   in
   let short_candidates =
     _evaluate_shorts ~weights:config.weights ~thresholds:config.grade_thresholds
@@ -417,15 +421,14 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~longs_admitted
       ~min_price:config.min_price
       ~max_short_candidates:config.max_short_candidates
       ~neutral_blocks_shorts:config.neutral_blocks_shorts
-      ~enable_slow_grind_short_gate:config.enable_slow_grind_short_gate
-      ~ranking:config.candidate_ranking ~decline_is_slow_grind ~candidates
-      ~macro_trend
+      ~enable_slow_grind_short_gate:config.enable_slow_grind_short_gate ~compare
+      ~decline_is_slow_grind ~candidates ~macro_trend
   in
   (buy_candidates, short_candidates)
 
 let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
     ~breadth_state ~index_stage ~sector_map ~stocks ~held_tickers ~cooldown_set
-    ~is_member : result =
+    ~is_member ~as_of : result =
   let held_set = String.Set.of_list held_tickers in
   let buys_active =
     _longs_admitted ~config ~macro_trend ~breadth_state ~index_stage
@@ -441,7 +444,7 @@ let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
   let candidates_after_held = List.length candidates in
   let buy_candidates, short_candidates =
     _evaluate_candidates ~config ~decline_is_slow_grind
-      ~longs_admitted:buys_active ~candidates ~macro_trend
+      ~longs_admitted:buys_active ~candidates ~macro_trend ~as_of
   in
   {
     buy_candidates;
@@ -474,7 +477,9 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   _screen ~on_candidates:None ~config ~decline_is_slow_grind:true ~macro_trend
     ~breadth_state:(breadth_state_or_projection ~macro_trend None)
     ~index_stage:None ~sector_map ~stocks ~held_tickers
-    ~cooldown_set:String.Set.empty ~is_member:(fun _ -> true)
+    ~cooldown_set:String.Set.empty
+    ~is_member:(fun _ -> true)
+    ~as_of:None
 
 let screen_with_cooldown ?membership_at ?(decline_is_slow_grind = true)
     ?on_candidates ?breadth_state ?index_stage ~config ~macro_trend ~sector_map
@@ -489,3 +494,4 @@ let screen_with_cooldown ?membership_at ?(decline_is_slow_grind = true)
   _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
     ~breadth_state:(breadth_state_or_projection ~macro_trend breadth_state)
     ~index_stage ~sector_map ~stocks ~held_tickers ~cooldown_set ~is_member
+    ~as_of:(Some as_of)

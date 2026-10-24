@@ -146,6 +146,15 @@ type config = {
           [Overlay_validator.apply_overrides] and is a [Variant_matrix] [Key]
           axis. Not wired into any default config until it earns an ACCEPT in
           the experiment ledger (Phase 2 WF-CV). *)
+  tiebreak_seed : int; [@sexp.default 0]
+      (** Seed for the [Seeded] tiebreak (issue #3404,
+          [dev/plans/path-stability-fixes-2026-10-23.md] §"Step 1"). Read only
+          when [candidate_ranking = Seeded]: ties are then ordered by a pure
+          hash of [(tiebreak_seed, screen date, ticker)], then by ticker. Inert
+          under every other ranking mode, so the default [0] changes nothing.
+          Reachable per salt via
+          [((screening_config ((candidate_ranking Seeded) (tiebreak_seed N))))]
+          through [Overlay_validator.apply_overrides]. *)
   min_score_override : int option; [@sexp.default None]
       (** Optional numeric score floor that, when [Some n], replaces the
           {!min_grade} filter with a strict [score >= n] gate on the cascade
@@ -602,14 +611,24 @@ type result = {
 (** Screener output. *)
 
 val compare_for_ranking :
-  candidate_ranking -> scored_candidate -> scored_candidate -> int
-(** [compare_for_ranking ranking a b] is the total order the cascade uses to
-    sort and cap candidates: primary key [score] descending, then the [ranking]
-    tiebreak among equal scores. [Alphabetical] tiebreaks by [ticker]
-    (historical behaviour); [Quality] tiebreaks by RS magnitude (descending),
-    then [weeks_advancing] (ascending = earlier), then volume ratio
-    (descending), then [ticker] (ascending). Exposed so the ordering contract is
-    unit-testable in isolation of the cascade pipeline. Pure. *)
+  ?tiebreak_seed:int ->
+  ?as_of:Core.Date.t ->
+  candidate_ranking ->
+  scored_candidate ->
+  scored_candidate ->
+  int
+(** [compare_for_ranking ?tiebreak_seed ?as_of ranking a b] is the total order
+    the cascade uses to sort and cap candidates: primary key [score] descending,
+    then the [ranking] tiebreak among equal scores. [Alphabetical] tiebreaks by
+    [ticker] (historical behaviour); [Quality] tiebreaks by RS magnitude
+    (descending), then [weeks_advancing] (ascending = earlier), then volume
+    ratio (descending), then [ticker] (ascending); [Seeded] tiebreaks by a hash
+    of [(tiebreak_seed, as_of, ticker)], then [ticker] (issue #3404).
+    [tiebreak_seed] (default [0]) and [as_of] are read only by [Seeded]. The
+    cascade passes [config.tiebreak_seed] and, in {!screen_with_cooldown}, its
+    [~as_of]; {!screen} has no date and hashes it as empty. Exposed so the
+    ordering contract is unit-testable in isolation of the cascade pipeline.
+    Pure. *)
 
 val screen :
   config:config ->
