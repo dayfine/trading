@@ -1382,6 +1382,25 @@ let test_armed_rename_detect_drops_predecessor_and_warns _ =
               ]);
        ])
 
+(* Pins the [rename_detect_match_fraction] thread into [Rename_gate]: every
+   other armed test uses 0.95, which equals the detector default, so a generator
+   that ignored the config value and used the default would pass them all. The
+   fixture's ZOMB/ZOMBN returns match on every pair (fraction 1.0), so a
+   threshold of 1.01 is unreachable: the SAME fixture that drops ZOMB at 0.95
+   must now keep it and emit no warning. *)
+let test_rename_detect_match_fraction_is_threaded_from_config _ =
+  let snap =
+    Generator.generate
+      (_rename_inputs ~rename_detect_min_overlap_days:5
+         ~rename_detect_match_fraction:1.01)
+  in
+  assert_that snap
+    (all_of
+       [
+         field _long_symbols (elements_are [ equal_to "AAPL"; equal_to "ZOMB" ]);
+         field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
+       ])
+
 (* ORDER: rename detection must run BEFORE the sparse-tail gate. The zombie tail
    that identifies a superseded ticker is exactly what the sparse-tail gate
    removes, so running second would erase the evidence.
@@ -1871,6 +1890,8 @@ let suite =
          >:: test_disabled_rename_detect_is_bit_identical;
          "armed rename detection drops the predecessor and warns"
          >:: test_armed_rename_detect_drops_predecessor_and_warns;
+         "rename_detect_match_fraction is threaded from config"
+         >:: test_rename_detect_match_fraction_is_threaded_from_config;
          "rename detection runs before the sparse-tail gate"
          >:: test_rename_detect_runs_before_the_sparse_tail_gate;
          "armed rename detection on a clean universe is a no-op"
