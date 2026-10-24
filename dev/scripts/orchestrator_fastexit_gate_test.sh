@@ -1492,6 +1492,20 @@ result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS"
 check "open PR run below tracked count -> tracked count wins (-run3)" \
   "dev/daily/2027-03-02-run3.md" "$result"
 
+# Scenario 66b: the maximum sits in the MIDDLE of the list, so both first-wins
+# and last-wins loops fail (GitHub lists open PRs newest first).
+_prs_json "$_PRS" ops/daily-2027-03-08-run2 ops/daily-2027-03-08-run4 ops/daily-2027-03-08
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-08)
+check "several open heads -> highest run wins (-run5)" \
+  "dev/daily/2027-03-08-run5.md" "$result"
+
+# Scenario 66c: malformed heads on a date with 0 tracked summaries, so any
+# false hit (e.g. bare-prefix match counted as run 1) changes the answer.
+_prs_json "$_PRS" ops/daily-2027-03-060 ops/daily-2027-03-06-summary ops/daily-2027-03-06-run5x ops/daily-2027-03-06-run
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-06)
+check "malformed heads with 0 tracked -> un-suffixed path" \
+  "dev/daily/2027-03-06.md" "$result"
+
 # Scenarios 67-69: the LIVE curl path (no injection file), via a fake `curl`
 # first on PATH. The fake prints $FAKE_CURL_BODY and exits $FAKE_CURL_RC, and
 # records the URL it was called with in $FAKE_CURL_LOG.
