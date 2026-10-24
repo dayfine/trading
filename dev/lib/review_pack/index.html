@@ -508,10 +508,10 @@ const D = {};
 const load = p => fetch('data/' + p).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); });
 const chartCache = {};
 
-const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open', 'missed', 'anatomy', 'faithfulness'];
+const KINDS = ['meta', 'trades', 'years', 'quarters', 'nav', 'open', 'missed', 'anatomy', 'faithfulness', 'peaks'];
 load('manifest.json').then(man => {
   D.man = man; const ids = man.runs.map(r => r.id);
-  return Promise.all([...KINDS.flatMap(k => ids.map(id => ['missed', 'anatomy', 'faithfulness'].includes(k) ? load(`${id}_${k}.json`).catch(() => null) : load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json'), load('spy_warmup.json').catch(() => [])]);
+  return Promise.all([...KINDS.flatMap(k => ids.map(id => ['missed', 'anatomy', 'faithfulness', 'peaks'].includes(k) ? load(`${id}_${k}.json`).catch(() => null) : load(`${id}_${k}.json`))), load('spy.json'), load('macro.json'), load('spy_price.json'), load('spy_warmup.json').catch(() => [])]);
 }).then(r => {
   const n = D.man.runs.length;
   KINDS.forEach((k, i) => D[k] = r.slice(i * n, (i + 1) * n));
@@ -860,6 +860,19 @@ function givebackLine(g) {
   if (!g || !g.fires) return '';
   return `<b>Gave back open gains after the NAV peak:</b> NAV peaked at ${usdk(g.peak)} on ${g.d} with about ${usdk(g.openAtPeak)} unrealised in the ${g.held} positions then held (NAV above start, less P&amp;L realised by then), and ended at ${usdk(g.end)}: ${usdk(g.giveback)} below the peak. The closed trades among those positions realised ${usdk(g.heldPnl)} in all. The window's return is read at a low point of a held book, not at what it earned.`;
 }
+// A sibling to the final-peak detector: each high-water episode ends at the next strict new high
+// (or window end). Per-position gains are price-only, not a NAV-minus-realised cash-flow remainder.
+const PEAK_GAIN_NAV_PCT = 15;
+function peakGivebackSignals(peaks) {
+  if (peaks == null) return ['<b>Concentrated gains at NAV peaks: n/a</b> — peak/position price inputs are unavailable.'];
+  return peaks.flatMap(p => {
+    const hits = p.positions.filter(t => t.gain != null && 100 * t.gain >= PEAK_GAIN_NAV_PCT * p.peak);
+    const missing = p.positions.filter(t => t.gain == null).length, lines = [];
+    if (hits.length) lines.push(`<b>Concentrated open gain before a drawdown:</b> NAV peaked on ${p.d}, then fell ${fmt(p.drawdown, 1)}% through ${p.trough} before a new high or the window end. ${hits.map(t => `${faithEsc(t.sym)} held ${usd(t.gain)} of open gain (${fmt(100 * t.gain / p.peak, 1)}% of peak NAV)`).join('; ')}.`);
+    if (missing) lines.push(`<b>Concentrated gains at NAV peak ${p.d}: n/a</b> for ${missing} position price/inventory ${missing === 1 ? 'input' : 'inputs'}; unavailable prices or an ambiguous corporate-action basis cannot establish their open gain.`);
+    return lines;
+  });
+}
 // Renders the ratio chart + era table; returns { lead: finding bullets, rests: one-trade / salt-year bullets } (HTML strings).
 function renderSignals(nav, spy) {
   const ys = D.years[CH()], reg = spyRegimeByDay(), tr = D.trades[CH()];
@@ -912,6 +925,7 @@ function renderSignals(nav, spy) {
   // open gains held at the NAV peak and given back by the end (see navPeakGiveback)
   const gb = givebackLine(navPeakGiveback(nav, tr, openRows));
   if (gb) out.push(gb);
+  out.push(...peakGivebackSignals(D.peaks?.[CH()]));
   // margin calls clustered on low-priced shorts (see marginChurn)
   const mc = marginChurnLine(marginChurn(tr), v16Count(D.meta[CH()].validator), D.trades.map((ts, i) => [runLabel(i), marginChurn(ts).low]));
   if (mc) out.push(mc);
