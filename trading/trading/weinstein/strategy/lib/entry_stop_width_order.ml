@@ -68,11 +68,10 @@ let prefer_narrow_stops ?initial_stop_buffer ~config ~bar_reader ~current_date
   let initial_stop_buffer =
     Option.value initial_stop_buffer ~default:config.initial_stop_buffer
   in
+  (* [demotes] reads only [mode]; the sanity ceiling applies in the per-candidate
+     gate ([entry_walk.ml]), so the default ceiling is passed here. *)
   let policy : Stop_width_mode.policy =
-    {
-      mode = config.stop_width_mode;
-      size_down_max_pct = config.stop_width_size_down_max_pct;
-    }
+    { Stop_width_mode.default_policy with mode = config.stop_width_mode }
   in
   if not (Stop_width_mode.demotes ~policy) then candidates
   else
