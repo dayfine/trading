@@ -579,11 +579,11 @@ _open_pr_max_run() {
     _opm_json=$(cat "$ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE" 2>/dev/null) \
       || { echo 0; return 0; }
   elif command -v curl >/dev/null 2>&1 && [ -n "${GH_TOKEN:-}" ] \
-    && [ -n "${GITHUB_REPOSITORY:-}" ]; then
+    && [ -n "${GITHUB_REPOSITORY:-$REPO}" ]; then
     _opm_json=$(curl -sS -f \
       -H "Authorization: Bearer $GH_TOKEN" \
       -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+      "https://api.github.com/repos/${GITHUB_REPOSITORY:-$REPO}/pulls?state=open&per_page=100" \
       2>/dev/null) || { echo 0; return 0; }
   else
     echo 0

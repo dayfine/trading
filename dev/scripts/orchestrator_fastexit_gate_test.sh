@@ -1492,6 +1492,50 @@ result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS"
 check "open PR run below tracked count -> tracked count wins (-run3)" \
   "dev/daily/2027-03-02-run3.md" "$result"
 
+# Scenarios 67-69: the LIVE curl path (no injection file), via a fake `curl`
+# first on PATH. The fake prints $FAKE_CURL_BODY and exits $FAKE_CURL_RC, and
+# records the URL it was called with in $FAKE_CURL_LOG.
+_FAKEBIN="$TMP_REPO/fakebin"
+mkdir -p "$_FAKEBIN"
+cat > "$_FAKEBIN/curl" <<'FAKE'
+#!/bin/sh
+for _a in "$@"; do _last="$_a"; done
+printf '%s\n' "$_last" > "$FAKE_CURL_LOG"
+[ "${FAKE_CURL_RC:-0}" -eq 0 ] && printf '%s' "$FAKE_CURL_BODY"
+exit "${FAKE_CURL_RC:-0}"
+FAKE
+chmod +x "$_FAKEBIN/curl"
+_FAKE_LOG="$TMP_REPO/fake-curl.log"
+_live() { # <date> <env-cmd...> : run current_summary_path via the live curl branch
+  _lv_date=$1; shift
+  (cd "$TMP_REPO" && env -u ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE \
+    PATH="$_FAKEBIN:$PATH" GH_TOKEN=tok FAKE_CURL_LOG="$_FAKE_LOG" \
+    FAKE_CURL_RC="${FAKE_CURL_RC:-0}" FAKE_CURL_BODY="${FAKE_CURL_BODY:-[]}" \
+    "$@" "$GATE" current_summary_path "$_lv_date")
+}
+
+# Scenario 67: live curl returns an open -run3 PR (and a lower one) -> run4,
+# against ORCHESTRATOR_FASTEXIT_GATE_REPO when GITHUB_REPOSITORY is unset.
+_prs_json "$_PRS" ops/daily-2027-03-05-run2 ops/daily-2027-03-05-run3 feat/x
+result=$(FAKE_CURL_BODY=$(cat "$_PRS") _live 2027-03-05 env -u GITHUB_REPOSITORY ORCHESTRATOR_FASTEXIT_GATE_REPO=o/r)
+check "live curl path: highest open run (-run3) -> -run4" \
+  "dev/daily/2027-03-05-run4.md" "$result"
+check "live curl path: falls back to \$REPO when GITHUB_REPOSITORY unset" \
+  "https://api.github.com/repos/o/r/pulls?state=open&per_page=100" "$(cat "$_FAKE_LOG")"
+
+# Scenario 68: live curl fails (HTTP error -> non-zero exit) -> tracked-only.
+result=$(FAKE_CURL_RC=22 _live 2027-03-05 env)
+check "live curl failure falls back to tracked-only (run 1)" \
+  "dev/daily/2027-03-05.md" "$result"
+
+# Scenario 69: no GH_TOKEN and no injection -> tracked-only, curl never called.
+rm -f "$_FAKE_LOG"
+result=$(cd "$TMP_REPO" && env -u ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE -u GH_TOKEN \
+  PATH="$_FAKEBIN:$PATH" FAKE_CURL_LOG="$_FAKE_LOG" "$GATE" current_summary_path 2027-03-05)
+check "no GH_TOKEN -> tracked-only, no network call" \
+  "dev/daily/2027-03-05.md" "$result"
+check "no GH_TOKEN -> curl not invoked" "absent" "$([ -e "$_FAKE_LOG" ] && echo present || echo absent)"
+
 # =========================================================================
 # `hours_since_prior_summary` replaces Step 0.5's escape-hatch `ls -t
 # dev/daily/*.md | head -1` + raw mtime arithmetic (advisory 2 of the CP4
