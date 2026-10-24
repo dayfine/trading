@@ -182,6 +182,7 @@ host_run() { # $1 label, $2 index
   awk -f "$LIB/assemble.awk" "$d/trades.csv" "$d/x_trades.tsv" "$d/x_audit.tsv" "$d/x_macro.tsv" "$d/x_stage.tsv" "$d/x_sfk.tsv" > "$s/$1_trades.json"
   cp "$d/x_pY.json" "$s/$1_years.json"; cp "$d/x_pQ.json" "$s/$1_quarters.json"
   nav_json "$d" > "$s/$1_nav.json"
+  sh "$LIB/peak_gains.sh" "$DATA" "$d" > "$s/$1_peaks.json"
   open_json "$d" > "$s/$1_open.json"
   sh "$LIB/missed_winners.sh" "$DATA" "$d" > "$s/$1_missed.json"
   sh "$LIB/pnl_anatomy.sh" "$d" > "$s/$1_anatomy.json"

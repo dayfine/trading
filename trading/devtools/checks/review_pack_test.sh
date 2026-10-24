@@ -1457,5 +1457,95 @@ JS
   expect_eq "#3394 D6: diagnostic severity receives the selected run params" 1 "$(grep -c 'flagPlan(FLAGS, t, open, D.nav\[CH()\]\[0\]\[1\], D.meta\[CH()\])' "$S/index.html")"
 fi
 
+# #3409: an intermediate high carried by one open gain, then recovered to a new final high.
+# Run the real host join, not a precomputed gain passed directly into the predicate.
+if command -v node >/dev/null 2>&1; then
+  PK="$TMP/peaks"; mkdir -p "$PK/data/A/A/AAA" "$PK/flag" "$PK/shallow" "$PK/spread"
+  cat > "$PK/data/A/A/AAA/data.csv" <<'EOF'
+date,open,high,low,close,adjusted_close
+2020-01-02,100,101,99,100,100
+2020-01-03,200,201,199,200,200
+2020-01-06,130,131,129,130,130
+2020-01-07,220,221,219,220,220
+2020-01-08,150,151,149,150,150
+2020-01-09,250,251,249,250,250
+EOF
+  cat > "$PK/flag/equity_curve.csv" <<'EOF'
+date,portfolio_value
+2020-01-02,1000
+2020-01-03,1200
+2020-01-06,900
+2020-01-07,1300
+2020-01-08,1000
+2020-01-09,1400
+EOF
+  cat > "$PK/flag/trades.csv" <<'EOF'
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity
+AAA,LONG,2020-01-02,2020-01-09,7,100,250,2
+EOF
+  printf 'symbol,side,entry_date,entry_price,quantity\n' > "$PK/flag/open_positions.csv"
+  cp "$PK/flag/"* "$PK/shallow/"; cp "$PK/flag/"* "$PK/spread/"
+  # Both dips are only 10% in the negative control.
+  sed 's/2020-01-06,900/2020-01-06,1080/; s/2020-01-08,1000/2020-01-08,1170/' "$PK/flag/equity_curve.csv" > "$PK/shallow/equity_curve.csv"
+  # Same aggregate gain split over ten names: no one name carries 15% of NAV.
+  head -1 "$PK/flag/trades.csv" > "$PK/spread/trades.csv"
+  for n in 0 1 2 3 4 5 6 7 8 9; do
+    sym="A$n"; mkdir -p "$PK/data/A/$n/$sym"; cp "$PK/data/A/A/AAA/data.csv" "$PK/data/A/$n/$sym/data.csv"
+    printf '%s,LONG,2020-01-02,2020-01-09,7,100,250,0.2\n' "$sym" >> "$PK/spread/trades.csv"
+  done
+  for case in flag shallow spread; do sh "$ROOT/dev/lib/review_pack/peak_gains.sh" "$PK/data" "$PK/$case" > "$PK/$case.json"; done
+  {
+    echo "const assert = require('assert'), fs = require('fs');"
+    sed -n -e '/^const fmt = /p' -e '/^const usd = /p' -e '/^const usdk = /p' -e '/^const faithEsc = /p' -e '/^const PEAK_GAIN_NAV_PCT/p' \
+      -e '/^function peakGivebackSignals(/,/^}/p' -e '/^const GIVEBACK_OPEN_PCT/p' -e '/^function navPeakGiveback(/,/^}/p' "$S/index.html"
+    cat <<'JS'
+const read = n => JSON.parse(fs.readFileSync(process.argv[2]+'/'+n+'.json'));
+const yes=read('flag'), noDD=read('shallow'), spread=read('spread');
+assert.deepStrictEqual(yes.map(p=>p.d),['2020-01-03','2020-01-07']);
+assert.strictEqual(yes[0].drawdown,25); assert.strictEqual(yes[0].positions[0].gain,200);
+const lines=peakGivebackSignals(yes); assert.strictEqual(lines.length,2);
+assert(lines[0].includes('2020-01-03')); assert(lines[0].includes('25.0%'));
+assert(lines[0].includes('AAA')); assert(lines[0].includes('16.7% of peak NAV'));
+assert.strictEqual(navPeakGiveback([['a',1000],['b',1200],['c',900],['d',1400]],[],[]),null);
+console.log('must flag OK');
+assert.deepStrictEqual(noDD,[]); assert.deepStrictEqual(peakGivebackSignals(noDD),[]); console.log('shallow OK');
+assert.strictEqual(spread.length,2); assert.strictEqual(spread[0].positions.length,10);
+assert.deepStrictEqual(peakGivebackSignals(spread),[]); console.log('spread OK');
+const edge={...yes[0],drawdown:15,positions:[{sym:'EDGE',gain:180}]};
+assert.strictEqual(peakGivebackSignals([edge]).length,1);
+assert.deepStrictEqual(peakGivebackSignals([{...edge,positions:[{sym:'EDGE',gain:179.99}]}]),[]);
+assert(peakGivebackSignals(null)[0].includes('n/a'));
+assert(peakGivebackSignals([{...edge,positions:[{sym:'MISSING',gain:null}]}])[0].includes('n/a'));
+assert(peakGivebackSignals([{...edge,positions:[{sym:'<EDGE>',gain:180}]}])[0].includes('&lt;EDGE&gt;'));
+console.log('boundaries and n/a OK');
+JS
+  } > "$PK/check.js"
+  node "$PK/check.js" "$PK" > "$PK/result"
+  expect_eq "#3409: intermediate peaks with concentrated open gain must flag" 'must flag OK' "$(grep '^must flag' "$PK/result")"
+  expect_eq "#3409: 10 percent drawdowns must not flag" 'shallow OK' "$(grep '^shallow' "$PK/result")"
+  expect_eq "#3409: gains spread across ten names must not flag" 'spread OK' "$(grep '^spread' "$PK/result")"
+  expect_eq "#3409: gain boundary, missing inputs and escaped symbols" 'boundaries and n/a OK' "$(grep '^boundaries' "$PK/result")"
+  # A final open row participates too; missing bars and ambiguous split bases remain null, not zero.
+  cp -R "$PK/flag" "$PK/open"
+  head -1 "$PK/flag/trades.csv" > "$PK/open/trades.csv"
+  printf 'symbol,side,entry_date,entry_price,quantity\nAAA,LONG,2020-01-02,100,2\n' > "$PK/open/open_positions.csv"
+  sh "$ROOT/dev/lib/review_pack/peak_gains.sh" "$PK/data" "$PK/open" > "$PK/open.json"
+  expect_eq "#3409: position still open at end has a measured peak gain" 200 "$(jq '.[0].positions[0].gain+0' "$PK/open.json")"
+  sh "$ROOT/dev/lib/review_pack/peak_gains.sh" "$PK/absent" "$PK/flag" > "$PK/missing.json"
+  expect_eq "#3409: missing price input is null" null "$(jq '.[0].positions[0].gain' "$PK/missing.json")"
+  awk -F, 'BEGIN { OFS="," } NR>2 { $6=$5/2 } { print }' "$PK/data/A/A/AAA/data.csv" > "$PK/split.csv"
+  expect_eq "#3409: ambiguous split basis is null" null "$(awk -v ed=2020-01-02 -v end=2020-01-09 -v peak_date=2020-01-03 -v ep=100 -v qty=2 -v side=LONG -f "$ROOT/dev/lib/review_pack/peak_gain.awk" "$PK/split.csv")"
+  cp -R "$PK/flag" "$PK/edge"
+  sed 's/2020-01-06,900/2020-01-06,1020/; s/2020-01-08,1000/2020-01-08,1105/' "$PK/flag/equity_curve.csv" > "$PK/edge/equity_curve.csv"
+  sh "$ROOT/dev/lib/review_pack/peak_gains.sh" "$PK/data" "$PK/edge" > "$PK/edge.json"
+  expect_eq "#3409: drawdowns exactly 15 percent are included" 2 "$(jq length "$PK/edge.json")"
+  sed 's/1020/1020.01/; s/1105/1105.01/' "$PK/edge/equity_curve.csv" > "$PK/edge/under.csv"
+  mv "$PK/edge/under.csv" "$PK/edge/equity_curve.csv"
+  sh "$ROOT/dev/lib/review_pack/peak_gains.sh" "$PK/data" "$PK/edge" > "$PK/under.json"
+  expect_eq "#3409: drawdowns just below 15 percent are excluded" 0 "$(jq length "$PK/under.json")"
+  expect_eq "#3409: absent NAV inputs are unavailable" null "$(sh "$ROOT/dev/lib/review_pack/peak_gains.sh" "$PK/data" "$PK/no-run")"
+  expect_eq "#3409: new signal is wired into the lead list" 1 "$(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'out.push(.*peakGivebackSignals(D.peaks')"
+fi
+
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
