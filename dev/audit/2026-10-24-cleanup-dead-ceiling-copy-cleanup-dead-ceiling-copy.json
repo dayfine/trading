@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-24",
+  "feature": "cleanup-dead-ceiling-copy",
+  "branch": "cleanup/dead-ceiling-copy",
+  "sha": "db2a055f15a1a246900eacce16cdb03b982062c4",
+  "recorded_at_ns": 1792863837224364441,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

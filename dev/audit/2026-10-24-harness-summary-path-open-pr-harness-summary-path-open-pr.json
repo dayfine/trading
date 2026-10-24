@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-24",
+  "feature": "harness-summary-path-open-pr",
+  "branch": "harness/summary-path-open-pr",
+  "sha": "3de1689de00069d28ffca150a789f7d857f697eb",
+  "recorded_at_ns": 1792863837305979496,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 2,
+  "notes": ""
+}
