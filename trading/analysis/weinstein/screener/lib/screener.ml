@@ -266,12 +266,6 @@ let compare_for_ranking ?tiebreak_seed ?as_of ranking a b =
   Screener_ranking.compare_rankable ?tiebreak_seed ?as_of ranking
     (_rankable_of_candidate a) (_rankable_of_candidate b)
 
-(** The cascade's sort comparator for one screen: [config]'s ranking mode and
-    [tiebreak_seed], at the screen date [as_of] (read only by [Seeded]). *)
-let _ranking_compare ~config ~as_of =
-  compare_for_ranking ~tiebreak_seed:config.tiebreak_seed ?as_of
-    config.candidate_ranking
-
 let _top_n ~compare n lst =
   (* Secondary sort breaks score ties deterministically. Without it,
      [List.sort]'s stability depends on the input ordering — which in turn
@@ -279,10 +273,8 @@ let _top_n ~compare n lst =
      Linux. A G15-step-3 panel-golden CI failure surfaced this: local
      regenerated more round_trips than GHA produced, with the diff being a
      tied-score candidate that landed on either side of a cash-budget boundary
-     depending on its position in the sorted list. The [Alphabetical] mode
-     (default) preserves the original ticker-only tiebreak bit-for-bit; the
-     [Quality] mode breaks ties by RS magnitude / earliness / volume, falling
-     back to ticker so the order stays fully deterministic. *)
+     depending on its position in the sorted list. [compare] carries the
+     ranking tiebreak; see {!Screener_ranking.candidate_ranking}. *)
   List.sort lst ~compare |> fun l ->
   List.sub l ~pos:0 ~len:(min n (List.length l))
 
@@ -403,7 +395,10 @@ let _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member =
     stays within the 50-line linter cap. *)
 let _evaluate_candidates ~config ~decline_is_slow_grind ~longs_admitted
     ~candidates ~macro_trend ~as_of =
-  let compare = _ranking_compare ~config ~as_of in
+  let compare =
+    compare_for_ranking ~tiebreak_seed:config.tiebreak_seed ?as_of
+      config.candidate_ranking
+  in
   let buy_candidates =
     _evaluate_longs ~weights:config.weights ~thresholds:config.grade_thresholds
       ~params:config.candidate_params ~min_grade:config.min_grade
