@@ -1,8 +1,7 @@
 # floor-nearest-2026-10-25: Nearest support floor under `require_structural_stop`, pre-registered
 
-Status: **PRE-REGISTERED, NOT RUN.** This directory holds the chain, the one p0 spec and the read rule below, written
-before any SN cell ran. The null it is read against (path-stability arm S, 6 cells) finished on 2026-10-24 and its
-numbers are quoted here; SN's are not known to the author.
+Status: **RUN 2026-10-25; NOT LIVE as screened (§Results, #3423).** Pre-registered in #3418 (97b6daa99, plus the §Log
+06:57 PT amendment) before any SN cell ran; the null is path-stability arm S (#3419). All 6 SN cells ran clean (V6 exit 0).
 
 ## Why this arm
 
@@ -126,7 +125,7 @@ Those include the window's tail names: APPS, MMYT and GLNG at the decision, and 
 Paths. `results/` is this directory's results, the SN cells collected by the amended `chain.sh` (source `/tmp/fn-res2`).
 `null/` is `../path-stability-2026-10-23/results/`, the S cells. These are byte-identical to `/tmp/ps-run/results`: 42 of
 42 per-cell files were compared. `read/` is `results/read/`, written by `read/fn-analysis.sh`. That script regenerates
-every derived table below from `results/` and `null/`, plus the raw trade audits, which are not committed
+every derived table below except `read/screen-floor-breakdown.txt` (a static extract of the screen session's uncommitted output) from `results/` and `null/`, plus the raw trade audits, which are not committed
 (`.sweep-output/{floor-nearest,path-stability}/ps-*-trade_audit.sexp`). `read/decisions/*.csv` holds the per-cell
 top-N decisions reduced from those audits; `read/tickets/*.txt` holds each placed ticket with its outcome and P&L.
 
@@ -255,7 +254,7 @@ against 18 % of the trades both arms took. Their mean size at fill is 8.6 % of N
   - SN did not place 67 that S placed. 58 of them hit `Insufficient_cash`, 5 were not in SN's list that week, and 4 had
     another outcome.
 - **Across the six pairs.** About 217–235 converted decisions per cell divide into 87–100 placed (39–46 %), 99–127
-  `Insufficient_cash` (46–54 %) and 15–16 `Sized_to_zero`. 39–58 of S's placements per cell, 23–31 % of those SN also
+  `Insufficient_cash` (46–54 %) and 15–16 `Sized_to_zero`. 39–58 of S's placements per cell, 24–32 % of those SN also
   decided, become `Insufficient_cash` in SN.
 - **When the displacement happens.**
   - 10–18 per cell come after a converted SN placement earlier in the same week's list.
@@ -332,7 +331,7 @@ Three mechanisms, in order of size:
   - KD stopped out 10-13 at −15.3 % and ANET 10-26 at −6.9 %. The cash came back one to three weeks after the only week
     MMYT carried a structural stop.
 - **APPS, p3.**
-  - Converted NVDA (04-03), CABO (05-01), ATRC (05-08) and ASND (05-22) filled SN's book to 10 names.
+  - Converted NVDA (04-03), CABO (05-01) and ASND (05-22), with LACO (entered 05-27), filled SN's book to 10 names; ATRC's 05-08 ticket was refused at the fill (`entry_fill_rejected_by_portfolio`).
   - On 2020-06-12 APPS was `Insufficient_cash`; S, holding 7 names, placed it.
   - On 06-19 Nearest admitted APPS again. Where S decided APPS that week (p0), it was `No_structural_stop`: a fresh
     high.
@@ -389,7 +388,7 @@ picks for a slot. On this window they mostly do not, and they take the slot.
 - **The 08-16 tightening channel is nearly absent with the gate on.** On trades both arms took, 83–90 of 89–97 per pair
   have the same initial stop. Nearest tightens 4–6 per pair, and loosens 2 in p1 (`read/paired.txt`). The arm's
   signature is the opposite of 08-16's "fewer trades, longer holds, lower DD":
-  - 25–45 % more trades (`actual.sexp`: 180–194 against 132–150);
+  - 1.25–1.43 × as many trades (`actual.sexp`: 180–194 against 132–150);
   - shorter holds (64–70 days against 71–81);
   - the same win rate (29–34 %);
   - drawdown mixed across pairs.
@@ -555,7 +554,7 @@ the pack cannot see today.
 
 ### Ledger (one line)
 
-2026-10-25 floor-nearest — NOT LIVE as screened (ledger `Inconclusive`, no return read): SN (Nearest under `require_structural_stop`, top-3000 pit-v12 2019–24, K=6) cut NSS to 0.950 × S against a ≤ 0.75 × bar mis-set versus the screen's own 6.7 % conversion (Placed 238 > 190); why: Nearest turns "no floor" into "floor > 15 %", and its ~5 % conversions re-draw cash in a cash-bound book (39–58 S tickets displaced per cell, incl. APPS/MMYT/GLNG, ADMA/MSTR at the fill; converts −2.3 % ex IONQ against shared +4.6 %); descriptive Δ median ln(1+R) −0.41, 6/6 seeds negative; the dial stays a default-off keep-axis and is not escalated.
+2026-10-25 floor-nearest — NOT LIVE as screened (no return read; ledger entry to follow in a docs PR): SN (Nearest under `require_structural_stop`, top-3000 pit-v12 2019–24, K=6) cut NSS to 0.950 × S against a ≤ 0.75 × bar mis-set versus the screen's own 6.7 % conversion (Placed 238 > 190); why: Nearest turns "no floor" into "floor > 15 %", and its ~5 % conversions re-draw cash in a cash-bound book (39–58 S tickets displaced per cell, incl. APPS/MMYT/GLNG, ADMA/MSTR at the fill; converts −2.3 % ex IONQ against shared +4.6 %); descriptive Δ median ln(1+R) −0.41, 6/6 seeds negative; the dial stays a default-off keep-axis and is not escalated.
 
 `Verifies: none`. The #3420 [after-merge] item concerns the path-stability cells, not this run.
 
