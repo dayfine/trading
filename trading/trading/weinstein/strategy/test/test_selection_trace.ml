@@ -75,11 +75,17 @@ let _tie_score () =
 (* Ranking + truncation                                                 *)
 (* ------------------------------------------------------------------ *)
 
-(** Equal-score candidates come out in ascending ticker order under the default
+(** The ticker-order tiebreak mode. The screener default is [Seeded] since
+    #3404; the tie-group tests below pin [Alphabetical] explicitly, because the
+    tiebreak-reversal mutation they detect lives in that mode's comparator. *)
+let _alpha_cfg =
+  { _cfg with Screener.candidate_ranking = Screener.Alphabetical }
+
+(** Equal-score candidates come out in ascending ticker order under the
     [Alphabetical] tiebreak — regardless of the order they were fed in, which
     the fixture deliberately scrambles. Fails if the tiebreak is reordered. *)
 let test_equal_scores_rank_alphabetically _ =
-  let buys = (_screen _cfg).buy_candidates in
+  let buys = (_screen _alpha_cfg).buy_candidates in
   let tied =
     List.filter (_tickers buys) ~f:(fun t ->
         List.mem Selection_trace.tie_group t ~equal:String.equal)
@@ -92,7 +98,9 @@ let test_equal_scores_rank_alphabetically _ =
     under a top-N off-by-one and under a tiebreak reversal. *)
 let test_cap_inside_tie_group_keeps_alphabetically_first _ =
   let keep = 3 in
-  let buys = (_screen { _cfg with max_buy_candidates = keep }).buy_candidates in
+  let buys =
+    (_screen { _alpha_cfg with max_buy_candidates = keep }).buy_candidates
+  in
   assert_that (_tickers buys)
     (equal_to (List.take Selection_trace.tie_group keep))
 

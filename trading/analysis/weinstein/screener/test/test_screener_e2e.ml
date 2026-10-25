@@ -307,18 +307,21 @@ let test_ch11_spotcheck_2022_bear _ =
   in
   assert_that result.Screener.macro_trend (equal_to Bearish);
   assert_that result.Screener.buy_candidates is_empty;
-  (* Score-tied candidates (both score 45): screener sorts by score DESC
-     then by ticker ASC, so JPM precedes MSFT. The deterministic
-     secondary-sort prevents Hashtbl-iteration-order divergence between
-     macOS and Linux (G15 step 3 CI surfacing). *)
+  (* Score-tied candidates (both score 45): screener sorts by score DESC,
+     then by the default [Seeded] tiebreak (seed 0, #3404), a pure hash of
+     (seed, date, ticker) — [screen] passes no date — which puts MSFT before
+     JPM here. Under the
+     pre-#3404 [Alphabetical] default JPM came first. The order is still
+     deterministic, so Hashtbl-iteration order cannot leak in between macOS
+     and Linux (G15 step 3 CI surfacing). *)
   assert_that result.Screener.short_candidates
     (elements_are
        [
-         _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:45
-           ~entry_low:112.0 ~entry_high:117.0 ~stop_low:121.0 ~stop_high:126.0
-           ~risk_low:0.075 ~risk_high:0.085;
          _candidate_matcher ~side:`Short ~ticker:"MSFT" ~score:45
            ~entry_low:243.0 ~entry_high:248.0 ~stop_low:262.0 ~stop_high:267.0
+           ~risk_low:0.075 ~risk_high:0.085;
+         _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:45
+           ~entry_low:112.0 ~entry_high:117.0 ~stop_low:121.0 ~stop_high:126.0
            ~risk_low:0.075 ~risk_high:0.085;
        ])
 

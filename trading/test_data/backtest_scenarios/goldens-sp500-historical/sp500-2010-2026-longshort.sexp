@@ -186,6 +186,7 @@
   ;; ±15% around the new actual. Correctness re-pin of a data defect: no
   ;; return claim attaches to the delta.
   ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in PR #3283. Correctness re-pin: no return claim attaches to the delta.
+  ;; RE-PINNED 2026-10-25 for the Seeded candidate_ranking default (#3425; ties broken by a seeded hash, not by symbol name). +-15% (total_return_pct: at least +-5pp) around the Seeded actual, failing metrics only; Alphabetical->Seeded: OPV in band on main (exact value not in the main artifact)->6,164,458 (GHA 40232163695 vs main 40198082542). Tie-order path change: no return claim.
   ((total_return_pct ((min 897.9031) (max 1214.8101)))
    (total_trades ((min 519.3500) (max 702.6500)))
    (win_rate ((min 30.7447) (max 41.5957)))
@@ -196,7 +197,7 @@
    ;; 2026-07-10-realism-defaults-flip): $1M-ADV entry gate + stale-exit 5d
    ;; lighten the terminal book. Headline metrics stayed in-band (ret 387.5 /
    ;; 784 / Sharpe 0.777 / DD 21.35). Was ~3.76M pre-flip.
-   (open_positions_value ((min 2619925.7515) (max 3544605.4285)))
+   (open_positions_value ((min 5239789.1810) (max 7089126.5390)))
    (sortino_ratio_annualized ((min 0.5481) (max 0.7415)))
    (calmar_ratio ((min 0.1737) (max 0.2350)))
    (ulcer_index ((min 25.2018) (max 34.0966)))

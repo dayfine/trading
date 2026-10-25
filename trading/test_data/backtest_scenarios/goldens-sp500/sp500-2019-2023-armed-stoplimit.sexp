@@ -192,11 +192,12 @@
 
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in the PR. Correctness re-pin: no return claim attaches to the delta.
-  ((total_return_pct ((min 58.6120) (max 79.2986)))
+  ;; RE-PINNED 2026-10-25 for the Seeded candidate_ranking default (#3425; ties broken by a seeded hash, not by symbol name). +-15% (total_return_pct: at least +-5pp) around the Seeded actual, failing metrics only; Alphabetical->Seeded: ret 68.96->56.60, OPV 1,655,616->1,344,551 (GHA 40232165563 vs main 40229425989). Tie-order path change: no return claim.
+  ((total_return_pct ((min 48.1068) (max 65.0857)))
    (total_trades ((min 149.6000) (max 202.4000)))
    (win_rate ((min 26.5625) (max 35.9375)))
    (sharpe_ratio ((min 0.6358) (max 0.8602)))
    (max_drawdown_pct ((min 19.9869) (max 27.0410)))
    (avg_holding_days ((min 50.3722) (max 68.1506)))
-   (open_positions_value ((min 1407273.9910) (max 1903958.9290)))
+   (open_positions_value ((min 1142868.5115) (max 1546233.8685)))
    (wall_seconds         ((min 0.0)         (max 1500.0))))))

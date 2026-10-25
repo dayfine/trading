@@ -49,8 +49,10 @@
     total-order key. Unlike [Hash_order] the order changes with the seed (so
     salts are independent draws) and with the screen date (so the same name does
     not always win, or always lose, its ties). Pure: no global RNG; the same
-    seed, date and tie group always give the same order. Default-off: the
-    screener default stays [Alphabetical]. *)
+    seed, date and tie group always give the same order. The screener default
+    since issue #3404 (approved 2026-10-25, see
+    [dev/experiments/path-stability-2026-10-23/README.md]); [Alphabetical] stays
+    a selectable mode. *)
 type candidate_ranking =
   | Alphabetical
   | Quality
