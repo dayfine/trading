@@ -1,0 +1,12 @@
+SN p0: 32 edge cases; Insufficient_cash 1; No_structural_stop 26; Placed 5; split-basis: none
+SN p1: 26 edge cases; absent 1; No_structural_stop 22; Placed 3; split-basis: SNX 2020-11-09 (0.7628)
+SN p2: 25 edge cases; Insufficient_cash 2; absent 3; No_structural_stop 17; Placed 3; split-basis: none
+SN p3: 28 edge cases; Insufficient_cash 1; absent 3; No_structural_stop 21; Placed 3; split-basis: NEE 2020-10-21 (2.4577)
+SN p4: 23 edge cases; absent 1; Insufficient_cash 1; No_structural_stop 20; Placed 1; split-basis: none
+SN p5: 29 edge cases; Insufficient_cash 2; No_structural_stop 23; Placed 4; split-basis: NEE 2020-10-21 (2.4577)
+S  p0: 8 edge cases, 0 split-basis
+S  p1: 3 edge cases, 1 split-basis
+S  p2: 5 edge cases, 0 split-basis
+S  p3: 4 edge cases, 0 split-basis
+S  p4: 3 edge cases, 0 split-basis
+S  p5: 5 edge cases, 0 split-basis

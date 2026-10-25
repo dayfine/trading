@@ -1,0 +1,38 @@
+filled or open tickets pooled over p0-p5 (the cells share most trades: see the overlap line)
+converted skips (SN; S skipped NSS)      n=447 mean  -1.44% p10 -13.93 p25 -11.95 median  -4.25 p75  +2.54 p90 +10.38 win 32.7% >+50%  1.6% >+100% 0.4% P&L -316k
+converted ex IONQ                        n=445 mean  -2.25% p10 -13.93 p25 -11.95 median  -4.26 p75  +2.54 p90  +9.62 win 32.4% >+50%  1.1% >+100% 0.0% P&L -940k
+converted ex IONQ, NVDA                  n=441 mean  -3.17% p10 -13.93 p25 -11.95 median  -4.46 p75  +2.46 p90  +9.62 win 31.7% >+50%  0.2% >+100% 0.0% P&L -1231k
+displaced (S placed; SN Insufficient_cash) n=218 mean +10.43% p10 -12.11 p25  -9.68 median  -3.31 p75  +5.02 p90 +21.37 win 36.7% >+50%  4.6% >+100% 2.8% P&L +3010k
+displaced ex MMYT                        n=215 mean  +7.75% p10 -12.11 p25  -9.69 median  -3.31 p75  +4.37 p90 +21.29 win 35.8% >+50%  3.3% >+100% 1.4% P&L +1439k
+displaced ex MMYT, APPS                  n=212 mean  +0.42% p10 -12.11 p25  -9.78 median  -3.31 p75  +4.37 p90 +19.70 win 34.9% >+50%  1.9% >+100% 0.0% P&L +269k
+shared, S side                           n=605 mean  +8.29% p10 -12.67 p25 -10.38 median  -5.06 p75  +3.98 p90 +28.78 win 31.6% >+50%  6.8% >+100% 3.6% P&L +7063k
+shared, SN side                          n=587 mean  +7.67% p10 -12.67 p25 -10.38 median  -5.03 p75  +3.98 p90 +28.78 win 32.0% >+50%  6.6% >+100% 3.4% P&L +5121k
+shared S side ex ADMA, APPS              n=599 mean  +4.62% p10 -12.67 p25 -10.38 median  -5.15 p75  +3.28 p90 +24.67 win 30.9% >+50%  5.8% >+100% 2.7% P&L +3939k
+S cash -> SN placed (SN side)            n= 85 mean  +0.97% p10 -12.22 p25  -8.16 median  -5.05 p75  +2.30 p90 +20.36 win 34.1% >+50%  2.4% >+100% 0.0% P&L +83k
+
+converted tickets by number of cells holding the same decision: 1:66 2:33 3:15 4:13 5:10 6:28 (distinct 165)
+
+by decision year, pooled P&L $k: converted (SN) | displaced (S P&L, lost) | shared SN - S
+2019 | -55 | -23 | +13
+2020 | +8 | +1629 | -650
+2021 | -723 | -479 | +210
+2022 | -292 | +60 | -31
+2023 | -286 | +1654 | -1285
+2024 | +1031 | +170 | -198
+
+p0 only, by decision year, $k: converted (SN) | S cash -> SN placed (SN) | displaced (S P&L) | shared SN | shared S
+2019 | -19 | -21 | -8 | +73 | +61
+2020 | +107 | -6 | +122 | +245 | +240
+2021 | -139 | -51 | -10 | -93 | -107
+2022 | -70 | +0 | +134 | -72 | -86
+2023 | -40 | +0 | +23 | +321 | +408
+2024 | +320 | +20 | +22 | +76 | +82
+
+initial stop distance bands and size at fill (filled or open)
+SN  No_structural_stop   n=436 stop>=14%: 33% | 10-14%: 52% | 5-10%: 13% | <5%: 2% | mean size 8.6% of NAV
+SN  Placed               n=570 stop>=14%: 18% | 10-14%: 44% | 5-10%: 22% | <5%: 16% | mean size 9.8% of NAV
+S   Insufficient_cash    n=203 stop>=14%: 10% | 10-14%: 39% | 5-10%: 34% | <5%: 17% | mean size 10.8% of NAV
+
+exit mix of realised trades (SN side)
+No_structural_stop: n=436 mean days 51 | delisted 0% (mean +65.3%) stop_loss 51% (mean -9.8%) laggard_rotation 49% (mean +5.0%)
+Placed: n=570 mean days 77 | stop_loss 55% (mean -8.7%) delisted 1% (mean +35.8%) laggard_rotation 44% (mean +24.4%)

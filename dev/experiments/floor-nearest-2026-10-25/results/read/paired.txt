@@ -1,0 +1,73 @@
+pair lnR_S lnR_SN diff first_NAV_difference SN/S NAV at year end 2019..2024
+p0 0.6733 0.6260 -0.0473 2019-06-03 0.931 1.005 0.943 0.766 0.760 0.954
+p1 1.1766 0.8897 -0.2869 2019-06-03 0.919 0.875 0.777 0.706 0.683 0.751
+p2 0.9447 0.7668 -0.1779 2019-06-03 0.937 0.946 0.861 0.958 0.981 0.837
+p3 0.8372 0.4988 -0.3385 2019-06-03 0.993 0.765 0.769 0.755 0.705 0.713
+p4 1.1179 0.6220 -0.4958 2019-04-15 0.907 0.710 0.731 0.692 0.698 0.609
+p5 1.2031 0.5592 -0.6439 2019-06-03 0.931 0.645 0.643 0.617 0.601 0.525
+paired mean -0.3317 sd 0.2149 se 0.0877 (n=6, all signs: see column 4)
+
+yearly return per cell 2019..2024
+ps-S-p0     +9.8%  +18.3%  +14.1%   -5.1%  +13.3%  +23.1%
+ps-SN-p0    +2.2%  +27.9%   +7.0%  -23.0%  +12.5%  +54.4%
+ps-S-p1    +11.1%  +47.7%  +26.1%   -6.1%   +8.1%  +54.4%
+ps-SN-p1    +2.1%  +40.6%  +11.9%  -14.6%   +4.5%  +69.7%
+ps-S-p2    +10.8%  +46.9%  +19.8%  -17.0%   +8.1%  +46.9%
+ps-SN-p2    +3.9%  +48.3%   +9.1%   -7.7%  +10.7%  +25.4%
+ps-S-p3     +7.9%  +48.3%  +14.0%   -7.9%   +7.9%  +27.3%
+ps-SN-p3    +7.2%  +14.2%  +14.6%   -9.5%   +0.7%  +28.8%
+ps-S-p4    +10.3%  +52.0%  +17.0%   -7.1%   +9.0%  +54.0%
+ps-SN-p4    -0.0%  +18.9%  +20.6%  -12.1%  +10.0%  +34.3%
+ps-S-p5     +4.8%  +72.7%  +17.1%   -8.2%   +8.3%  +58.0%
+ps-SN-p5    -2.4%  +19.7%  +16.7%  -12.0%   +5.5%  +38.2%
+
+tail per cell (README step 4): trades, trades with pnl_percent > 100, top trade by TR P&L (pnl_dollars + dividends), its share of realised TR P&L, end unrealised (actual.sexp)
+ps-S-p0   trades 150 | >+100% 2 | top BBWI 2020-08-05 158k | top share 45% of realised 354k | unrealised 532k
+ps-SN-p0  trades 188 | >+100% 2 | top BBWI 2020-08-05 150k | top share 184% of realised 81k | unrealised 734k
+ps-S-p1   trades 134 | >+100% 4 | top ADMA 2023-12-19 622k | top share 43% of realised 1449k | unrealised 697k
+ps-SN-p1  trades 192 | >+100% 4 | top ADMA 2023-12-19 445k | top share 52% of realised 860k | unrealised 512k
+ps-S-p2   trades 136 | >+100% 4 | top ADMA 2023-12-19 518k | top share 54% of realised 955k | unrealised 527k
+ps-SN-p2  trades 180 | >+100% 3 | top APPS 2020-06-15 357k | top share 71% of realised 500k | unrealised 590k
+ps-S-p3   trades 139 | >+100% 3 | top APPS 2020-06-15 389k | top share 62% of realised 625k | unrealised 591k
+ps-SN-p3  trades 194 | >+100% 2 | top BBWI 2020-08-05 147k | top share 121% of realised 121k | unrealised 465k
+ps-S-p4   trades 133 | >+100% 4 | top ADMA 2023-12-19 583k | top share 45% of realised 1287k | unrealised 681k
+ps-SN-p4  trades 185 | >+100% 3 | top ADMA 2023-12-19 411k | top share 60% of realised 686k | unrealised 121k
+ps-S-p5   trades 132 | >+100% 5 | top ADMA 2023-12-19 624k | top share 43% of realised 1457k | unrealised 766k
+ps-SN-p5  trades 189 | >+100% 3 | top ADMA 2023-12-19 392k | top share 67% of realised 580k | unrealised 108k
+
+README cohort join (trades.csv, symbol|entry_date): both (S P&L, SN P&L) | S-only | SN-only
+p0 both 95 (S 258k, SN 267k) | S-only 55 +96k | SN-only 93 -186k
+p1 both 97 (S 1412k, SN 1181k) | S-only 37 +37k | SN-only 95 -322k
+p2 both 91 (S 521k, SN 549k) | S-only 45 +434k | SN-only 89 -49k
+p3 both 94 (S 116k, SN 153k) | S-only 45 +509k | SN-only 100 -32k
+p4 both 91 (S 1074k, SN 855k) | S-only 42 +213k | SN-only 94 -169k
+p5 both 89 (S 846k, SN 638k) | S-only 43 +611k | SN-only 100 -57k
+
+initial stop on trades both arms took (trades.csv entry_stop, joined on symbol|entry_date; 0.005 tolerance)
+p0 shared 95: same stop 90, SN tighter 5, SN looser 0
+p1 shared 97: same stop 90, SN tighter 5, SN looser 2
+p2 shared 91: same stop 85, SN tighter 6, SN looser 0
+p3 shared 94: same stop 90, SN tighter 4, SN looser 0
+p4 shared 91: same stop 86, SN tighter 5, SN looser 0
+p5 shared 89: same stop 83, SN tighter 6, SN looser 0
+
+p0, trades exited in 2022: realised TR P&L by class (the other arm's outcome on the same decision)
+S p0 2022 exits, class absent: n=1 P&L -18k
+S p0 2022 exits, class Insufficient_cash: n=3 P&L +169k
+S p0 2022 exits, class Placed: n=18 P&L -52k
+SN p0 2022 exits, class No_structural_stop: n=13 P&L -91k
+SN p0 2022 exits, class Placed: n=16 P&L -53k
+
+max drawdown peak -> trough per cell
+ps-S-p0   17.1% 2020-02-20 -> 2020-03-25
+ps-SN-p0  32.3% 2021-05-07 -> 2023-10-27
+ps-S-p1   20.3% 2021-04-09 -> 2023-10-27
+ps-SN-p1  32.9% 2021-04-12 -> 2023-10-27
+ps-S-p2   32.3% 2021-04-12 -> 2023-10-27
+ps-SN-p2  29.3% 2021-04-12 -> 2023-10-27
+ps-S-p3   22.9% 2021-04-12 -> 2023-10-27
+ps-SN-p3  25.4% 2021-06-01 -> 2023-10-27
+ps-S-p4   23.7% 2021-04-12 -> 2023-10-27
+ps-SN-p4  22.3% 2019-09-23 -> 2020-03-23
+ps-S-p5   38.0% 2021-02-09 -> 2023-10-27
+ps-SN-p5  27.7% 2021-06-01 -> 2023-10-26

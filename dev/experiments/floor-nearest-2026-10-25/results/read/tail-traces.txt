@@ -1,0 +1,92 @@
+== APPS
+S   p0: 2020-06-12:Insufficient_cash 2020-06-19:No_structural_stop 2020-06-26:No_structural_stop 2021-10-08:No_structural_stop 
+SN  p0: 2020-06-12:Insufficient_cash 2020-06-19:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-19 APPS-wein-276 entry_ticket_ttl_expired - P&L +0k
+S   p1: 2020-06-12:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-12 APPS-wein-162 filled 2020-06-15 P&L +390k
+SN  p1: 2020-06-12:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-12 APPS-wein-259 filled 2020-06-15 P&L +340k
+S   p2: 2020-06-12:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-12 APPS-wein-168 filled 2020-06-15 P&L +387k
+SN  p2: 2020-06-12:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-12 APPS-wein-273 filled 2020-06-15 P&L +357k
+S   p3: 2020-06-12:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-12 APPS-wein-163 filled 2020-06-15 P&L +389k
+SN  p3: 2020-06-12:Insufficient_cash 2020-06-19:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-19 APPS-wein-262 entry_ticket_ttl_expired - P&L +0k
+S   p4: 2020-06-12:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-12 APPS-wein-158 filled 2020-06-15 P&L +395k
+SN  p4: 2020-06-12:Insufficient_cash 2020-06-19:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-19 APPS-wein-263 entry_ticket_ttl_expired - P&L +0k
+S   p5: 2020-06-12:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-12 APPS-wein-166 filled 2020-06-15 P&L +387k
+SN  p5: 2020-06-12:Insufficient_cash 2020-06-19:Placed 2021-10-08:No_structural_stop  | ticket 2020-06-19 APPS-wein-265 entry_ticket_ttl_expired - P&L +0k
+== GLNG
+S   p0: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-297 filled 2022-02-07 P&L +134k
+SN  p0: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Insufficient_cash 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop 
+S   p1: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-290 filled 2022-02-07 P&L +183k
+SN  p1: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-467 filled 2022-02-07 P&L +136k
+S   p2: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop 
+SN  p2: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-479 filled 2022-02-07 P&L +144k
+S   p3: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-291 filled 2022-02-07 P&L +159k
+SN  p3: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-482 filled 2022-02-07 P&L +121k
+S   p4: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-280 filled 2022-02-07 P&L +173k
+SN  p4: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-463 filled 2022-02-07 P&L +123k
+S   p5: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-299 filled 2022-02-07 P&L +187k
+SN  p5: 2022-01-14:No_structural_stop 2022-01-28:No_structural_stop 2022-02-04:Placed 2023-09-29:No_structural_stop 2024-04-05:No_structural_stop 2024-04-12:No_structural_stop 2024-04-19:No_structural_stop 2024-04-26:No_structural_stop  | ticket 2022-02-04 GLNG-wein-489 filled 2022-02-07 P&L +119k
+== ADMA
+S   p0: 2023-08-11:No_structural_stop 
+SN  p0: 2023-08-11:No_structural_stop 
+S   p1: 2023-08-18:Placed  | ticket 2023-08-18 ADMA-wein-323 filled 2023-12-19 P&L +622k
+SN  p1: 2023-08-18:Placed  | ticket 2023-08-18 ADMA-wein-512 filled 2023-12-19 P&L +445k
+S   p2: 2023-08-18:Placed  | ticket 2023-08-18 ADMA-wein-320 filled 2023-12-19 P&L +518k
+SN  p2: 2023-08-18:Placed  | ticket 2023-08-18 ADMA-wein-525 entry_fill_rejected_by_portfolio - P&L +0k
+S   p3: 
+SN  p3: 
+S   p4: 2023-08-18:Placed  | ticket 2023-08-18 ADMA-wein-313 filled 2023-12-19 P&L +583k
+SN  p4: 2023-08-18:Placed  | ticket 2023-08-18 ADMA-wein-507 filled 2023-12-19 P&L +411k
+S   p5: 2023-08-11:No_structural_stop 2023-08-18:Placed  | ticket 2023-08-18 ADMA-wein-331 filled 2023-12-19 P&L +624k
+SN  p5: 2023-08-11:No_structural_stop 2023-08-18:Placed  | ticket 2023-08-18 ADMA-wein-531 filled 2023-12-19 P&L +392k
+== MMYT
+S   p0: 2019-03-08:No_structural_stop 2023-08-04:No_structural_stop 2023-10-06:Placed  | ticket 2023-10-06 MMYT-wein-335 open 2023-10-26 P&L +390k
+SN  p0: 2019-03-08:No_structural_stop 2023-08-04:No_structural_stop 2023-10-06:Placed  | ticket 2023-10-06 MMYT-wein-541 open 2023-10-26 P&L +296k
+S   p1: 2023-08-04:No_structural_stop 2023-09-08:No_structural_stop 2023-10-06:Placed  | ticket 2023-10-06 MMYT-wein-328 open 2023-10-26 P&L +534k
+SN  p1: 2023-08-04:No_structural_stop 2023-09-08:No_structural_stop 2023-10-06:Insufficient_cash 
+S   p2: 2023-08-04:No_structural_stop 2023-10-06:Placed  | ticket 2023-10-06 MMYT-wein-323 open 2023-10-26 P&L +448k
+SN  p2: 2023-08-04:No_structural_stop 2023-10-06:Placed  | ticket 2023-10-06 MMYT-wein-536 open 2023-10-26 P&L +432k
+S   p3: 2019-03-08:No_structural_stop 2023-08-04:No_structural_stop 2023-10-06:Placed  | ticket 2023-10-06 MMYT-wein-325 open 2023-10-26 P&L +463k
+SN  p3: 2019-03-08:No_structural_stop 2023-08-04:No_structural_stop 2023-10-06:Placed  | ticket 2023-10-06 MMYT-wein-535 open 2023-10-26 P&L +351k
+S   p4: 2023-08-04:No_structural_stop 2023-09-08:No_structural_stop 2023-10-06:Placed  | ticket 2023-10-06 MMYT-wein-317 open 2023-10-26 P&L +501k
+SN  p4: 2023-08-04:No_structural_stop 2023-09-08:No_structural_stop 2023-10-06:Insufficient_cash 
+S   p5: 2019-03-08:No_structural_stop 2023-08-04:No_structural_stop 2023-09-08:No_structural_stop 2023-10-06:Placed  | ticket 2023-10-06 MMYT-wein-334 open 2023-10-26 P&L +536k
+SN  p5: 2019-03-08:No_structural_stop 2023-08-04:No_structural_stop 2023-09-08:No_structural_stop 2023-10-06:Insufficient_cash 
+== MSTR
+S   p0: 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2021-08-13:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash 
+SN  p0: 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2021-08-13:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash 
+S   p1: 2019-03-08:Placed 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2020-10-09:No_structural_stop 2021-08-13:No_structural_stop 2023-02-03:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash  | ticket 2019-03-08 MSTR-wein-88 filled 2019-04-15 P&L -8k
+SN  p1: 2019-03-08:Placed 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2020-10-09:No_structural_stop 2021-08-13:No_structural_stop 2023-02-03:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash  | ticket 2019-03-08 MSTR-wein-123 filled 2019-04-15 P&L -8k
+S   p2: 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2020-10-02:No_structural_stop 2020-10-09:No_structural_stop 2021-08-13:No_structural_stop 2023-02-03:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash 
+SN  p2: 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2020-10-02:No_structural_stop 2020-10-09:No_structural_stop 2021-08-13:No_structural_stop 2023-02-03:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash 
+S   p3: 2019-03-08:Placed 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2020-10-09:No_structural_stop 2021-08-13:No_structural_stop 2023-02-03:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash  | ticket 2019-03-08 MSTR-wein-89 filled 2019-04-15 P&L -8k
+SN  p3: 2019-03-08:Placed 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2020-10-09:No_structural_stop 2021-08-13:No_structural_stop 2023-02-03:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash  | ticket 2019-03-08 MSTR-wein-125 filled 2019-04-15 P&L -8k
+S   p4: 2019-03-15:No_structural_stop 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2020-10-02:No_structural_stop 2020-10-09:No_structural_stop 2021-08-13:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash 
+SN  p4: 2019-03-15:Placed 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-25:No_structural_stop 2020-10-02:No_structural_stop 2020-10-09:No_structural_stop 2021-08-13:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash  | ticket 2019-03-15 MSTR-wein-125 filled 2019-04-15 P&L -8k
+S   p5: 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-18:Placed 2021-08-13:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash 2023-12-01:Insufficient_cash  | ticket 2020-09-18 MSTR-wein-179 filled 2020-10-12 P&L +428k
+SN  p5: 2019-09-13:No_structural_stop 2020-08-21:No_structural_stop 2020-09-18:Placed 2021-08-13:No_structural_stop 2023-03-31:No_structural_stop 2023-11-10:No_structural_stop 2023-11-17:Insufficient_cash 2023-12-01:Insufficient_cash  | ticket 2020-09-18 MSTR-wein-281 entry_fill_rejected_by_portfolio - P&L +0k
+== IONQ
+S   p0: 2023-03-31:No_structural_stop 2024-10-25:No_structural_stop 
+SN  p0: 2023-03-31:No_structural_stop 2024-10-25:Placed  | ticket 2024-10-25 IONQ-wein-708 open 2024-10-29 P&L +269k
+S   p1: 2023-03-31:No_structural_stop 2024-10-25:No_structural_stop 
+SN  p1: 2023-03-31:No_structural_stop 2024-10-25:Placed  | ticket 2024-10-25 IONQ-wein-678 open 2024-10-29 P&L +355k
+S   p2: 2023-03-31:No_structural_stop 2024-10-25:No_structural_stop 
+SN  p2: 2023-03-31:No_structural_stop 2024-10-25:Insufficient_cash 
+S   p3: 2023-03-31:No_structural_stop 2024-10-25:No_structural_stop 
+SN  p3: 2023-03-31:No_structural_stop 2024-10-25:Insufficient_cash 
+S   p4: 2023-03-31:No_structural_stop 2024-10-25:No_structural_stop 
+SN  p4: 2023-03-31:No_structural_stop 2024-10-25:Insufficient_cash 
+S   p5: 2023-03-31:No_structural_stop 2024-10-25:No_structural_stop 
+SN  p5: 2023-03-31:No_structural_stop 2024-10-25:Insufficient_cash 
+
+== books on the decision day (positions held; entry date, notional at entry)
+S   p3 2020-06-12: SHEN(2020-04-08,89k) MOH(2020-04-28,150k) KR(2020-03-30,93k) GILD(2020-03-02,119k) GC(2020-04-06,71k) DXCM(2019-07-22,66k) CLX(2020-03-16,99k) 
+SN  p3 2020-06-12: SHEN(2020-04-08,84k) NVDA(2020-04-06,76k) LACO(2020-05-27,72k) KR(2020-03-30,86k) GILD(2020-03-02,108k) GC(2020-04-06,64k) DXCM(2019-07-22,68k) CLX(2020-03-16,90k) CABO(2020-05-04,63k) ASND(2020-05-26,74k) 
+S   p5 2020-06-12: SHEN(2020-04-08,88k) MOH(2020-04-28,149k) KR(2020-03-30,92k) GILD(2020-03-02,119k) GC(2020-04-06,69k) DXCM(2019-07-22,66k) CLX(2020-03-16,98k) 
+SN  p5 2020-06-12: SHEN(2020-04-08,75k) NVDA(2020-04-06,68k) KR(2020-03-30,77k) GILD(2020-03-16,108k) GC(2020-04-06,58k) DXCM(2019-07-22,68k) CLX(2020-03-16,83k) ATRC(2020-05-11,64k) 
+S   p0 2022-02-04: VGR(2021-12-06,204k) TGNA(2022-02-04,107k) ON(2021-08-27,110k) MUFG(2022-01-11,137k) MIME(2021-06-25,100k) MAA(2021-02-23,76k) CNX(2022-01-12,118k) 
+SN  p0 2022-02-04: WTRG(2021-12-21,88k) VGR(2021-12-06,188k) TRNO(2022-01-24,99k) TGNA(2022-02-04,99k) ON(2021-08-27,106k) MUFG(2022-01-11,127k) MIME(2021-06-25,100k) CWK(2021-12-13,98k) CNX(2022-01-12,109k) 
+S   p1 2023-10-06: X(2023-09-19,194k) R(2023-09-01,166k) PKG(2023-08-21,263k) KEX(2023-06-06,174k) HPE(2023-07-11,173k) 
+SN  p1 2023-10-06: X(2023-09-19,140k) R(2023-09-01,119k) PKG(2023-08-21,188k) KEX(2023-06-06,122k) KD(2023-09-11,90k) HPE(2023-07-11,123k) ANET(2023-09-18,190k) 
+S   p4 2023-10-06: X(2023-09-19,181k) R(2023-09-01,155k) PKG(2023-08-21,246k) KEX(2023-06-06,165k) 
+SN  p4 2023-10-06: X(2023-09-19,128k) R(2023-09-01,109k) PKG(2023-08-21,173k) LPG(2023-09-15,94k) KEX(2023-06-06,113k) KD(2023-09-11,83k) ANET(2023-09-18,175k) 
+S   p5 2023-10-06: X(2023-09-19,195k) R(2023-09-01,166k) PKG(2023-08-21,263k) KEX(2023-06-06,174k) HPE(2023-07-11,174k) 
+SN  p5 2023-10-06: X(2023-09-19,124k) R(2023-09-01,104k) PKG(2023-08-21,165k) KEX(2023-06-06,106k) KD(2023-09-11,80k) HPE(2023-07-11,108k) ANET(2023-09-18,168k) 
