@@ -1,7 +1,7 @@
 # path-stability-2026-10-23: #3404 Step 2, pre-registered
 
-Status: **RUN 2026-10-23/24; read below (§Results).** Originally: PRE-REGISTERED, NOT RUN. This directory holds the chain, the four p0 specs and this read rule. Nothing has
-run. The chain is launched by the dispatcher when the container is free (no agents, no other backtest), after #3406
+Status: **RUN 2026-10-23/24; read below (§Results).** The text down to §Results is the pre-registration as committed at
+`a8ba322fc` (then: "PRE-REGISTERED, NOT RUN"). The chain is launched by the dispatcher when the container is free (no agents, no other backtest), after #3406
 (Step 1, `Seeded` tiebreak) merges: `launch` aborts otherwise.
 
 The read rule is `dev/plans/path-stability-fixes-2026-10-23.md` at commit `b5ce359b7` (#3407, the amended plan), §"Step 2",
@@ -165,7 +165,7 @@ Scale: SPY total return on the window is +158.4 % (ln 0.949, 17.1 %/yr). S's med
   chains measure noise with seeded perturbations in place of path salts.
 - **Seeded as the default.** Recommended for user approval as a correctness fix (the rule's R3 exception). The A→Z
   bias is measurable (`results/read/letter-mix.txt`): A-tickers are 17.4 % of A-p0's 138 trades vs 10.0–14.3 % in the
-  six S cells and 9.5 % of the list union; A–F tickers 43.5 % vs 34.6–37.9 %.
+  six S cells and 9.5 % of the 1999–2025 list union (10.4 % on the 2018–24 lists in force; reproduced by qc-results from the lists, not in a committed extract); A–F tickers 43.5 % vs 34.6–37.9 %.
 - **SR.** Ratio **0.99** > 0.85: **does not stabilise.** (Do-no-harm would have passed: median 0.976 vs 1.031.)
 - **SC.** Ratio **0.57** ≤ 0.6, but its median 0.626 is **0.406 below** S's, more than spread(S) = 0.211: do-no-harm
   **fails**, **does not stabilise.** No DD cost (median max DD 20.4 % vs 23.3 %); median Calmar 0.52 vs 0.67.
@@ -221,7 +221,7 @@ three it catches.
 **3.3 Why SR does not stabilise.** The resize acts only on at-fill refusals (9–14 per S cell, 72 in all; after SR 6–10,
 1 at least half funded). It touches neither gate 1 nor gate 2 (128–156 placement-time `Insufficient_cash` skips per S
 cell). Each saved ticket commits cash a later candidate needs: at seed 3, SR fills DKS (2019-11-07) and LACO
-(2020-05-27), then cannot place APPS (2020-06-12): +$21.9k saved, −$389k displaced. Seed 5 repeats it (−$387k).
+(2020-05-27), then cannot place APPS (2020-06-12): +$22.4k saved (total return; $21.9k price-only), −$389k displaced. Seed 5 repeats it (−$387k).
 
 **3.4 Why SC cuts return.** Same seeds, same gate-1 results, smaller stake (trades joined on symbol and entry date):
 
@@ -264,7 +264,7 @@ cell). Each saved ticket commits cash a later candidate needs: at seed 3, SR fil
 - `project_monster_funnel_top_of_funnel`, `project_top_n_capacity_verdict`: extended; the cap binds every week and
   91 % of its slots go to names that are then unplaceable. ADMA is the boundary specimen in both.
 - `project_screener_alphabetical_tiebreak`: **contradicted** — on top-3000 the bias over-selects A-tickers and boundary
-  ties decide the window's two largest winners.
+  ties decide two of its three tail trades (ADMA, GLNG).
 - `project_edge_is_the_fat_tail`: confirmed.
 
 ### 5. What it implies next (options; the choice is the user's)
@@ -294,7 +294,7 @@ cell). Each saved ticket commits cash a later candidate needs: at seed 3, SR fil
 
 ### Review-pack look
 
-`.sweep-output/review-ps-{A,S,SR,SC}-p0/`, 60 images (`top.png`, `part-1…14.png` each), pack SHA `3db869d32`.
+`.sweep-output/review-ps-{A,S,SR,SC}-p0/`, 61 images (`top.png`, `part-1…14.png` each, plus SC `part-15.png`), pack SHA `3db869d32`.
 
 - Every chart spans 2019-01-02 → 2024-12-30. KPI strips match `actual.sexp` (A +168 % / −27.4 % / 0.79 / 138 trades;
   S +96 % / −17.1 % / 0.63 / 150; SR +86 % / −17.1 % / 0.58 / 153; SC +71 % / −16.3 % / 0.54 / 192). No mojibake, NaN
@@ -309,3 +309,19 @@ cell). Each saved ticket commits cash a later candidate needs: at seed 3, SR fil
   positions** — **confirmed** (MMYT in all 24 cells, CVNA). **Ten trades made $1.73M** (A) — **confirmed**, three carry
   it. **Entries cancelled at the fill for cash** — **refined** by defect 3. **Gate reopens** — none flagged.
 - Limit: the packs are single-run and cannot show the seed spread; a pack with an arm's p0–p5 as runs would.
+
+**Published packs (RV1):** [A](https://claude.ai/artifact/FiprVgeUujbVRmN8rjj6r9) ·
+[S](https://claude.ai/artifact/Vm8SLjNXLGQ8y2nqMVdSZX) · [SR](https://claude.ai/artifact/CYr3dRhjUDJRNPbgLQTden) ·
+[SC](https://claude.ai/artifact/THzJ9tVfVexzAtWGk9ThSz) (private to the owner until shared).
+
+### Record
+
+- **User decision, 2026-10-25:** Seeded tie order (seed 0) approved as the default, the rule's correctness exception
+  (#3404 comment). The flip PR and a K-seed record re-baseline follow.
+- **G2b (`entry_fill_size_to_available`):** not a stabiliser at min fraction 0.5. It stays a default-off axis
+  (REJECT-as-stabiliser, keep-as-axis; not retirement-eligible).
+- **§5.1 note:** "K ≥ 5 seeds" leaves open whether the list deletions are kept; this design cannot separate deletion
+  noise from seed noise (seeds act first), so the next chain should state its choice.
+- `results/lists.md5` is committed as `results/lists-md5.txt` (same content; the extension kept the PR in the
+  results-only lane). `chain.sh` still writes `lists.md5` and is left as pre-registered.
+- Memory: `project_path_stability_seeded_noise`. Defects §6 items 1–3 are filed as #3420.
