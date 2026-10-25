@@ -1,0 +1,48 @@
+[10-25 06:48:57] floor-nearest run tree .claude/worktrees/sweep-ps HEAD=3db869d32 (expect 3db869d32) prereg=97b6daa99 lists md5 51fba79e26a6273845c37c13f6aae070
+[10-25 06:48:57] cell guard CELL_TIMEOUT=14400s (1.5 x 6 y x 1,505 s/yr, the slowest same-spec cell #3381; #3266 rerun 1,031 s/yr); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-25 06:48:57] host free 40G
+[10-25 06:48:57] BUILD
+[10-25 06:49:06] BUILD_DONE
+[10-25 06:49:06] WH /tmp/snap_top3000_pit_v12wk reused: 9236 symbols, equal to the run tree's derived set
+[10-25 06:49:07] FIXPS /tmp/fn-fix: 33 entries
+[10-25 06:49:08] PREFLIGHT ps-SN-p0
+[10-25 06:57:07] PREFLIGHT_OK ps-SN-p0 (479s)
+[10-25 06:57:07] host free 43G
+[10-25 06:57:07] RUN ps-SN-p0-s0 on /tmp/snap_top3000_pit_v12wk (fixtures /workspaces/trading-1/.claude/worktrees/sweep-ps/trading/test_data/backtest_scenarios)
+[10-25 07:46:59] GUARDS ps-SN-p0-s0 => Panel_runner: split_dividend_guard rejected=0 no_files=0  cash_rejections=26
+[10-25 07:46:59] RESULT ps-SN-p0-s0 => total_return_pct 87.00741711949631 total_trades 188 sharpe_ratio 0.54494819071849143 max_drawdown_pct 32.267048526245887 calmar_ratio 0.34080981715244035  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-ps/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff: vsA0(ps-A-p0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=4788676 Panel_runner: snapshot cache hits=37887745 misses=12146 miss_absent=2910 evictions=0 n_symbols=9237 misses_per_symbol=1.31 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1952864640 maxrss_bytes=4896260096 (wall 2992s)
+[10-25 07:46:59] PERTURB names = the null's (/tmp/ps-run/results/perturb-names.txt)
+[10-25 07:46:59] PERTURB p1: delete SHEN (A-p0 total-return P&L -23.95 over 1 trades; in 8 of 27 scheduled lists)
+[10-25 07:46:59] PERTURB p2: delete ODFL (A-p0 total-return P&L 102.09 over 1 trades; in 23 of 27 scheduled lists)
+[10-25 07:46:59] PERTURB p3: delete SLAB (A-p0 total-return P&L -236.96 over 1 trades; in 26 of 27 scheduled lists)
+[10-25 07:46:59] PERTURB p4: delete DECK (A-p0 total-return P&L 327.11 over 1 trades; in 22 of 27 scheduled lists)
+[10-25 07:46:59] PERTURB p5: delete DIOD (A-p0 total-return P&L 337.81 over 1 trades; in 24 of 27 scheduled lists)
+[10-25 07:47:01] PERTURB p1: SHEN cut from 8 lists; lists md5 73e36440d187e9c4e5eed7b85f48be0f; specs ps-{A,S,SR,SC}-p1 generated
+[10-25 07:47:04] PERTURB p2: ODFL cut from 23 lists; lists md5 26acaf5f4db5a2967f42b5e1399afbc2; specs ps-{A,S,SR,SC}-p2 generated
+[10-25 07:47:09] PERTURB p3: SLAB cut from 26 lists; lists md5 40c0337ade7cb13a318b1d1ba4d9b7af; specs ps-{A,S,SR,SC}-p3 generated
+[10-25 07:47:15] PERTURB p4: DECK cut from 22 lists; lists md5 b6e299882055874dfcf8a034694d7c21; specs ps-{A,S,SR,SC}-p4 generated
+[10-25 07:47:21] PERTURB p5: DIOD cut from 24 lists; lists md5 7c4df148f2c8be4db953cfe0fc4d7b75; specs ps-{A,S,SR,SC}-p5 generated
+[10-25 07:47:21] host free 40G
+[10-25 07:47:22] RUN ps-SN-p1-s0 on /tmp/snap_top3000_pit_v12wk (fixtures /tmp/fn-fix)
+[10-25 08:38:44] GUARDS ps-SN-p1-s0 => Panel_runner: split_dividend_guard rejected=0 no_files=0  cash_rejections=23
+[10-25 08:38:44] RESULT ps-SN-p1-s0 => total_return_pct 143.43645033449414 total_trades 192 sharpe_ratio 0.68837667549007664 max_drawdown_pct 32.928519578527727 calmar_ratio 0.48545583031878531  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-ps/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff: vsSN0(ps-SN-p0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=4782512 Panel_runner: snapshot cache hits=37880191 misses=12145 miss_absent=2910 evictions=0 n_symbols=9236 misses_per_symbol=1.31 n_symbols_touched=9235 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9235 max_bytes=128386680 max_mmap_open=9235 avg_entries=4618.0 avg_bytes=64864284 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1951631400 maxrss_bytes=4894801920 (wall 3082s)
+[10-25 08:38:44] host free 39G
+[10-25 08:38:44] RUN ps-SN-p2-s0 on /tmp/snap_top3000_pit_v12wk (fixtures /tmp/fn-fix)
+[10-25 09:19:16] GUARDS ps-SN-p2-s0 => Panel_runner: split_dividend_guard rejected=0 no_files=0  cash_rejections=31
+[10-25 09:19:16] RESULT ps-SN-p2-s0 => total_return_pct 115.29192810522252 total_trades 180 sharpe_ratio 0.59437501253306069 max_drawdown_pct 29.281937183878014 calmar_ratio 0.4656095401730716  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-ps/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff: vsSN0(ps-SN-p0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=4781884 Panel_runner: snapshot cache hits=37890758 misses=12145 miss_absent=2910 evictions=0 n_symbols=9236 misses_per_symbol=1.31 n_symbols_touched=9235 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9235 max_bytes=128384908 max_mmap_open=9235 avg_entries=4618.0 avg_bytes=64861686 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1943494256 maxrss_bytes=4891230208 (wall 2432s)
+[10-25 09:19:16] host free 37G
+[10-25 09:19:16] RUN ps-SN-p3-s0 on /tmp/snap_top3000_pit_v12wk (fixtures /tmp/fn-fix)
+[10-25 09:58:37] GUARDS ps-SN-p3-s0 => Panel_runner: split_dividend_guard rejected=0 no_files=0  cash_rejections=15
+[10-25 09:58:37] RESULT ps-SN-p3-s0 => total_return_pct 64.668823007178062 total_trades 194 sharpe_ratio 0.409917658659067 max_drawdown_pct 25.39521021723294 calmar_ratio 0.34131702599515856  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-ps/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff: vsSN0(ps-SN-p0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=4786856 Panel_runner: snapshot cache hits=37879267 misses=12145 miss_absent=2910 evictions=0 n_symbols=9236 misses_per_symbol=1.31 n_symbols_touched=9235 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9235 max_bytes=128387152 max_mmap_open=9235 avg_entries=4618.0 avg_bytes=64864495 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1954347496 maxrss_bytes=4900212736 (wall 2361s)
+[10-25 09:58:38] host free 38G
+[10-25 09:58:38] RUN ps-SN-p4-s0 on /tmp/snap_top3000_pit_v12wk (fixtures /tmp/fn-fix)
+[10-25 10:42:03] GUARDS ps-SN-p4-s0 => Panel_runner: split_dividend_guard rejected=0 no_files=0  cash_rejections=27
+[10-25 10:42:03] RESULT ps-SN-p4-s0 => total_return_pct 86.271379325598943 total_trades 185 sharpe_ratio 0.520100520007678 max_drawdown_pct 22.340036693643643 calmar_ratio 0.48898661428182782  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-ps/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff: vsSN0(ps-SN-p0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=4779628 Panel_runner: snapshot cache hits=37890832 misses=12145 miss_absent=2910 evictions=0 n_symbols=9236 misses_per_symbol=1.31 n_symbols_touched=9235 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9235 max_bytes=128384908 max_mmap_open=9235 avg_entries=4618.0 avg_bytes=64855500 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1945650768 maxrss_bytes=4893184000 (wall 2605s)
+[10-25 10:42:03] host free 38G
+[10-25 10:42:03] RUN ps-SN-p5-s0 on /tmp/snap_top3000_pit_v12wk (fixtures /tmp/fn-fix)
+[10-25 11:45:00] GUARDS ps-SN-p5-s0 => Panel_runner: split_dividend_guard rejected=0 no_files=0  cash_rejections=23
+[10-25 11:45:00] RESULT ps-SN-p5-s0 => total_return_pct 74.928037961466288 total_trades 189 sharpe_ratio 0.45820076182304975 max_drawdown_pct 27.742034802653237 calmar_ratio 0.3521089564431169  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-ps/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION PASS  v6diff: vsSN0(ps-SN-p0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=4792120 Panel_runner: snapshot cache hits=37876861 misses=12145 miss_absent=2910 evictions=0 n_symbols=9236 misses_per_symbol=1.31 n_symbols_touched=9235 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9235 max_bytes=128384908 max_mmap_open=9235 avg_entries=4618.0 avg_bytes=64855609 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1954214512 maxrss_bytes=4901781504 (wall 3777s)
+[10-25 11:45:00] CELLS DONE: 6 RESULT, 0 EXCLUDED, 0 failed/void (of 6)
+[10-25 11:45:00] PACK SN: p0=/Users/difan/Projects/trading-1/.sweep-output/floor-nearest/ps-SN-p0-s0-
+[10-25 11:53:12] PACK SN -> /Users/difan/Projects/trading-1/.sweep-output/review-ps-SN-p0 (site/ + render/top.png, part-N.png)
+[10-25 11:53:16] FLOOR-NEAREST DONE. Next: perf_long_cells.sh update /tmp/fn-run/chain.log; results-analyst read per README; results PR.

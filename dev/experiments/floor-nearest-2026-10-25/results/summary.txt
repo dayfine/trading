@@ -1,0 +1,34 @@
+floor-nearest summary: SN from /tmp/fn-res2, S (null) from /tmp/ps-run/results
+
+liveness (README; SN p0 vs the null's S p0 = decision outcomes No_structural_stop 5078, Placed 190, path-stability ps-S-p0-s0 trade_audit):
+  SN p0: No_structural_stop 4822 (0.950 x S), Placed 238 (1.253 x S)
+  -> NOT LIVE as screened: no return read (README)
+
+cell                 status     total_return_pct  ln(1+R)    sharpe   max_dd_pct  calmar
+ps-S-p0              included   96.070785445799046  0.6733     0.63204332941336716  17.076462149233674  0.69546749232781258
+ps-S-p1              included   224.31970747004976  1.1766     0.96220727350166491  20.263010284308315  1.0692837173090157
+ps-S-p2              included   157.20558017326928  0.9447     0.77244037883523864  32.2710840857384  0.52846254485605171
+ps-S-p3              included   130.99445513718712  0.8372     0.70999862281315573  22.923493043294798  0.65327704518230068
+ps-S-p4              included   205.83683452130796  1.1179     0.90407193410347564  23.657839179909963  0.86578383558951666
+ps-S-p5              included   233.0391376127713  1.2031     0.90286720245367569  38.0213460389428  0.58404551528317461
+ps-SN-p0             included   87.00741711949631  0.6260     0.54494819071849143  32.267048526245887  0.34080981715244035
+ps-SN-p1             included   143.43645033449414  0.8897     0.68837667549007664  32.928519578527727  0.48545583031878531
+ps-SN-p2             included   115.29192810522252  0.7668     0.59437501253306069  29.281937183878014  0.4656095401730716
+ps-SN-p3             included   64.668823007178062  0.4988     0.409917658659067  25.39521021723294  0.34131702599515856
+ps-SN-p4             included   86.271379325598943  0.6220     0.520100520007678  22.340036693643643  0.48898661428182782
+ps-SN-p5             included   74.928037961466288  0.5592     0.45820076182304975  27.742034802653237  0.3521089564431169
+
+arm  n  spread_sd  range      median_ln  median_sharpe  median_maxdd  median_calmar
+S    6  0.2108     0.5298     1.0313     0.8377         23.2907       0.6744
+SN   6  0.1435     0.3909     0.6240     0.5325         28.5120       0.4089
+
+delta median ln(1+R) = -0.4073 (bar = spread(S) = 0.2108); SN beats S in 3 of 36 cross pairs; spread(SN)/spread(S) = 0.6805
+median max DD SN - S = +5.22 pp (DD-cost bar 21.08 pp); median Calmar SN 0.4089 vs S 0.6744
+decision-rule arithmetic (mechanical; README; applies only if liveness reads LIVE): NO-BUILD decision for this lever at this window (keep the axis)
+
+divergence onset (first date an SN pk NAV differs from SN p0; descriptive):
+  ps-SN-p1-s0: 2019-02-26
+  ps-SN-p2-s0: 2019-05-09
+  ps-SN-p3-s0: 2019-02-28
+  ps-SN-p4-s0: 2019-02-26
+  ps-SN-p5-s0: 2019-02-28

@@ -1,0 +1,9 @@
+# Source: the 2026-10-25 host-only floor screen's per-decision output (session scratchpad floor_out.txt, made by floor_screen.awk over the record N arm s0 26y trade_audit; uncommitted). Columns: date sym outcome variant admitted dist filled ret26 mfe26 stopped.
+# Per-decision admission of top-N No_structural_stop skips (decisions with >= 160 bars of history):
+N90: skips 20165 | admitted 2771 (13.7%) | no qualifying floor 986 (4.9%) | floor > 15% away 16402 (81.3%) | other 6
+W90: skips 20165 | admitted 1415 (7.0%) | no qualifying floor 13531 (67.1%) | floor > 15% away 5214 (25.9%) | other 5
+N90 admits, W90 does not (the Nearest increment): 1356 of 20165 skips (6.7%); W90 admits, N90 does not: 0
+# Cohort counts behind the memory's 1,148 / 138 (admitted AND filled within 5 bars, one per symbol per 182 days; cohorts.txt):
+No_structural_stop N90 1148 | No_structural_stop W90 517 | Placed W90 138
+# 2019-2024 decisions only (cohorts.txt; N90-only = N90 cohort rows not in the W90 skip cohort): mean 26-week return and share > +50%
+N90-only skips n=285 mean +6.01% >+50% 8.4% | W90 placed n=33 mean +1.87% >+50% 6.1%

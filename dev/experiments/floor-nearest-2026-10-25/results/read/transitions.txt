@@ -1,0 +1,23 @@
+pair | S NSS also decided in SN | ->Placed | ->Insufficient_cash | ->Sized_to_zero | ->other | stayed NSS | S Placed also decided in SN | ->Insufficient_cash (displaced) | S Insufficient_cash -> SN Placed
+p0 | 5018 | 91 | 127 | 16 | 1 | 4783 | 185 | 58 | 17
+p1 | 5022 | 99 | 104 | 16 | 1 | 4802 | 166 | 39 | 15
+p2 | 5041 | 95 | 121 | 16 | 3 | 4806 | 168 | 49 | 17
+p3 | 5021 | 87 | 119 | 15 | 3 | 4797 | 176 | 56 | 19
+p4 | 5032 | 100 | 99 | 16 | 2 | 4815 | 164 | 44 | 20
+p5 | 5014 | 100 | 110 | 16 | 2 | 4786 | 167 | 49 | 21
+
+displaced S tickets (S Placed, SN Insufficient_cash): did SN place an S-unplaced name EARLIER in the same week's list?
+p0 displaced 58: same week after a converted SN placement 10, after another SN-only placement 1, carry-over (no extra SN placement earlier that week) 47
+p1 displaced 39: same week after a converted SN placement 12, after another SN-only placement 1, carry-over (no extra SN placement earlier that week) 26
+p2 displaced 49: same week after a converted SN placement 16, after another SN-only placement 1, carry-over (no extra SN placement earlier that week) 32
+p3 displaced 56: same week after a converted SN placement 13, after another SN-only placement 4, carry-over (no extra SN placement earlier that week) 39
+p4 displaced 44: same week after a converted SN placement 17, after another SN-only placement 7, carry-over (no extra SN placement earlier that week) 20
+p5 displaced 49: same week after a converted SN placement 18, after another SN-only placement 2, carry-over (no extra SN placement earlier that week) 29
+
+first decisions that differ (S vs SN), p0 and p4:
+p0 2019-05-17 CHDN S:No_structural_stop SN:Placed
+p0 2019-06-07 QIWI S:No_structural_stop SN:Placed
+p0 2019-06-07 BF-B S:No_structural_stop SN:Placed
+p4 2019-03-15 MSTR S:No_structural_stop SN:Placed
+p4 2019-04-05 BOOM S:No_structural_stop SN:Sized_to_zero
+p4 2019-05-17 CHDN S:No_structural_stop SN:Placed

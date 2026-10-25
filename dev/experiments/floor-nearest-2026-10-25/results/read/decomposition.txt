@@ -1,0 +1,17 @@
+columns: arm cell class(other arm's outcome on the same decision) decision symbol position_id status fill pnl ret% stopdist notional/NAV exit days  (tickets/ps-*-tickets.txt)
+
+pair | dNAV | dTickets | shared: SN-S | converted (S skipped NSS) | S cash -> SN placed | other SN-only | displaced: S placed, SN cash (minus S P&L) | other S-only (minus) | dInterest | residual  ($k)
+p0 | -91 | -71 | -48 | +159 | -59 | +165 | -284 | -3 | -20 | +1
+p1 | -809 | -774 | -300 | +149 | +0 | -57 | -612 | +45 | -31 | -4
+p2 | -419 | -392 | -571 | -180 | +25 | +271 | +48 | +14 | -30 | +3
+p3 | -663 | -630 | -24 | -136 | +54 | -2 | -513 | -8 | -34 | +1
+p4 | -1196 | -1160 | -263 | -157 | -12 | -7 | -748 | +27 | -35 | -0
+p5 | -1581 | -1534 | -736 | -152 | +75 | +101 | -900 | +79 | -46 | -1
+
+shared decisions (placed in both arms): filled in both (SN P&L - S P&L) | filled in S only | filled in SN only  ($k)
+p0 | 97 -109 | 12 +69 | 3 -8
+p1 | 97 -299 | 6 +22 | 4 -23
+p2 | 92 -6 | 6 -570 ADMA(filled,518k)->SN entry_fill_rejected_by_portfolio | 4 +5
+p3 | 95 -98 | 6 -33 | 6 +106
+p4 | 91 -285 | 5 +14 | 4 +8
+p5 | 90 -292 | 8 -418 MSTR(filled,427k)->SN entry_fill_rejected_by_portfolio | 4 -27

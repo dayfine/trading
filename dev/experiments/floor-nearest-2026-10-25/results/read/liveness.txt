@@ -1,0 +1,16 @@
+cell No_structural_stop Placed Insufficient_cash Sized_to_zero Share_class_held total
+ps-S-p0 5078 190 131 59 2 5460
+ps-S-p1 5073 171 156 57 0 5457
+ps-S-p2 5101 171 128 54 2 5456
+ps-S-p3 5088 180 129 59 2 5458
+ps-S-p4 5099 169 135 57 2 5462
+ps-S-p5 5082 175 141 60 1 5459
+ps-SN-p0 4822 238 316 76 5 5457
+ps-SN-p1 4849 247 281 75 3 5455
+ps-SN-p2 4847 240 292 74 4 5457
+ps-SN-p3 4837 236 304 75 5 5457
+ps-SN-p4 4866 249 265 77 4 5461
+ps-SN-p5 4837 243 295 77 5 5457
+
+SN p0 vs the pre-registered S p0 counts (5078 / 190): bar No_structural_stop <= 3808 AND Placed > 190
+SN p0 No_structural_stop 4822 (0.950 x), Placed 238 (1.253 x)
