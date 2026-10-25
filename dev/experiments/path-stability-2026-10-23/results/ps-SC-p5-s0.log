@@ -1,0 +1,55 @@
+[snapshot-mode] loaded manifest at /tmp/snap_top3000_pit_v12wk/manifest.sexp (schema_hash=060588c0224b7d7e73f367fbd1801084, 9236 entries)
+Loading 1 scenarios from /tmp/ps-work/ps-SC-p5-s0 (parallel=1)
+Fixtures root: /tmp/ps-fix
+Bar data source: snapshot mode (/tmp/snap_top3000_pit_v12wk)
+Progress emission: every 26 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-ps/trading/dev/backtest/scenarios-2026-10-25-014926
+
+>>> Running ps-SC-p5: path-stability SC p5 (deletes DIOD): S + max_position_pct_long 0.07 (capacity) (2019-01-01 to 2024-12-31)
+Using scenario-provided sector map (9221 symbols)...
+Universe: 9221 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 9236
+Running backtest (2019-01-01 to 2024-12-31, warmup from 2018-01-02)...
+Panel_runner: simulator window 2018-01-02..2024-12-31 (warmup 364 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 1826 days) for strategy
+WARN: portfolio rejected fill for LACO (side=Types.Buy qty=2644.0000 price=27.1504): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 71811.966796664419, Available: 34088.384492020254, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MCK (side=Types.Buy qty=454.0000 price=156.7300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 71159.959999999992, Available: 34088.431836998716, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for HPQ (side=Types.Buy qty=3393.0000 price=21.9400): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 74476.349999999991, Available: 20874.211003832257, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CVM (side=Types.Buy qty=7136.0000 price=18.4518): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 131743.4048, Available: 39578.689527006383, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for QFIN (side=Types.Buy qty=6264.0000 price=20.5569): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 128831.09918169254, Available: 33624.122602424912, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MBC (side=Types.Buy qty=8603.0000 price=19.2000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 165263.63, Available: 114038.15261288047, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for TIGR (side=Types.Buy qty=29277.0000 price=5.6406): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 165432.6162, Available: 62152.698200709259, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=37885299 misses=12145 miss_absent=2910 evictions=0 n_symbols=9236 misses_per_symbol=1.31 n_symbols_touched=9235 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9235 max_bytes=128384908 max_mmap_open=9235 avg_entries=4618.0 avg_bytes=64855609 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1951071344 maxrss_bytes=4896382976
+Panel_runner: split_dividend_guard rejected=0 no_files=0
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-ps
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+ps-SC-p5                       139.8%     180    30.6%    36.2%   PASS
+
+1/1 scenarios passed.
+exit=0

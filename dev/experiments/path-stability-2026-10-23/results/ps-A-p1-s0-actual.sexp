@@ -1,0 +1,8 @@
+((total_return_pct 165.78340871404234) (total_trades 138)
+ (win_rate 30.434782608695656) (sharpe_ratio 0.78785229043883853)
+ (max_drawdown_pct 27.425186414808948) (avg_holding_days 71.224637681159422)
+ (open_positions_value 1739400.9699999997)
+ (unrealized_pnl 516551.64649057831)
+ (sortino_ratio_annualized 1.362027406148195)
+ (calmar_ratio 0.64524528576137208) (ulcer_index 13.521242521419806)
+ (force_liquidations_count 2) (crashed false) (crash_message ""))
