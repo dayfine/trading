@@ -132,27 +132,34 @@ type config = {
       (** Minimum grade to include in output. Default: C. Used unless
           [min_score_override] is [Some _] — in that case the numeric override
           takes precedence and the grade ladder is bypassed. *)
-  candidate_ranking : candidate_ranking; [@sexp.default Alphabetical]
-      (** Tiebreak ordering among equal-score candidates. Default:
-          [Alphabetical] — bit-identical to the historical ticker-only tiebreak,
-          so the default config (and every golden) is unchanged. [Quality]
-          breaks ties by RS magnitude / earliness / volume instead (see
-          {!candidate_ranking}).
+  candidate_ranking : candidate_ranking; [@sexp.default Seeded]
+      (** Tiebreak ordering among equal-score candidates. Default: [Seeded]
+          (with {!tiebreak_seed} [0]) since issue #3404 — a seeded draw among
+          ties, keyed on [(tiebreak_seed, screen date, ticker)]. The
+          path-stability experiment
+          ([dev/experiments/path-stability-2026-10-23/README.md] §Results)
+          measured seeded tie-order noise at 12.6x the alphabetical yardstick
+          and an A-ticker over-selection under [Alphabetical]; the user approved
+          [Seeded] as the default on 2026-10-25 as a correctness fix (ledger
+          [2026-10-24-path-stability]).
 
-          Default-off ranking axis (issue #1782): reachable from the
-          scenario/strategy override path via
-          [((screening_config ((candidate_ranking Quality))))] — see
-          [Weinstein_strategy.config.screening_config] — so it routes through
+          [Alphabetical] (the historical ticker-only tiebreak, the default
+          before #3404) stays selectable via
+          [((screening_config ((candidate_ranking Alphabetical))))]. [Quality]
+          breaks ties by RS magnitude / earliness / volume instead (see
+          {!candidate_ranking}); it remains a default-off ranking axis (issue
+          #1782). Every mode is reachable through
+          [Weinstein_strategy.config.screening_config], so it routes through
           [Overlay_validator.apply_overrides] and is a [Variant_matrix] [Key]
-          axis. Not wired into any default config until it earns an ACCEPT in
-          the experiment ledger (Phase 2 WF-CV). *)
+          axis. *)
   tiebreak_seed : int; [@sexp.default 0]
       (** Seed for the [Seeded] tiebreak (issue #3404,
           [dev/plans/path-stability-fixes-2026-10-23.md] §"Step 1"). Read only
-          when [candidate_ranking = Seeded]: ties are then ordered by a pure
-          hash of [(tiebreak_seed, screen date, ticker)], then by ticker. Inert
-          under every other ranking mode, so the default [0] changes nothing.
-          Reachable per salt via
+          when [candidate_ranking = Seeded] (the default): ties are then ordered
+          by a pure hash of [(tiebreak_seed, screen date, ticker)], then by
+          ticker. Inert under every other ranking mode. A different seed is a
+          different draw of the tie order, so noise is measured over several
+          seeds (K >= 5) rather than one. Reachable per salt via
           [((screening_config ((candidate_ranking Seeded) (tiebreak_seed N))))]
           through [Overlay_validator.apply_overrides]. *)
   min_score_override : int option; [@sexp.default None]

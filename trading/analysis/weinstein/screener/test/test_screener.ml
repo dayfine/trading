@@ -1952,7 +1952,7 @@ let test_ranking_earliness_round_trips _ =
       (Sexp.of_string
          (String.substr_replace_first
             (Sexp.to_string (sexp_of_config default_config))
-            ~pattern:"(candidate_ranking Alphabetical)"
+            ~pattern:"(candidate_ranking Seeded)"
             ~with_:"(candidate_ranking Quality_earliness)"))
   in
   assert_that earliness_cfg.candidate_ranking (equal_to Quality_earliness)
@@ -2001,25 +2001,27 @@ let test_ranking_hash_order_is_deterministic_permutation _ =
     (sort_tickers Hash_order candidates)
     (elements_are [ equal_to "ZZ"; equal_to "AAA"; equal_to "M" ])
 
-(* All control modes round-trip through the config sexp (real [Overlay_validator]
-   axis values). *)
+(* [Alphabetical] (the pre-#3404 default) and all control modes round-trip
+   through the config sexp (real [Overlay_validator] axis values). *)
 let test_ranking_control_modes_round_trip _ =
   let cfg_with mode =
     config_of_sexp
       (Sexp.of_string
          (String.substr_replace_first
             (Sexp.to_string (sexp_of_config default_config))
-            ~pattern:"(candidate_ranking Alphabetical)"
+            ~pattern:"(candidate_ranking Seeded)"
             ~with_:("(candidate_ranking " ^ mode ^ ")")))
   in
   assert_that
     [
+      (cfg_with "Alphabetical").candidate_ranking;
       (cfg_with "Reverse_alphabetical").candidate_ranking;
       (cfg_with "Symbol_length").candidate_ranking;
       (cfg_with "Hash_order").candidate_ranking;
     ]
     (elements_are
        [
+         equal_to Alphabetical;
          equal_to Reverse_alphabetical;
          equal_to Symbol_length;
          equal_to Hash_order;
@@ -2028,14 +2030,14 @@ let test_ranking_control_modes_round_trip _ =
 (* Axis-ability (experiment-flag-discipline R2): the field is present in the
    serialized config (so [Overlay_validator] resolves the
    [screening_config.candidate_ranking] override path) and a [Quality] overlay
-   round-trips. An omitted field deserialises to the [Alphabetical] default. *)
+   round-trips. An omitted field deserialises to the [Seeded] default (issue #3404). *)
 let test_ranking_field_serializes_and_round_trips _ =
   let default_str = Sexp.to_string (sexp_of_config default_config) in
   let quality_cfg =
     config_of_sexp
       (Sexp.of_string
          (String.substr_replace_first default_str
-            ~pattern:"(candidate_ranking Alphabetical)"
+            ~pattern:"(candidate_ranking Seeded)"
             ~with_:"(candidate_ranking Quality)"))
   in
   assert_that
@@ -2043,15 +2045,15 @@ let test_ranking_field_serializes_and_round_trips _ =
       quality_cfg.candidate_ranking )
     (equal_to (true, Quality))
 
-let test_ranking_omitted_field_defaults_alphabetical _ =
+let test_ranking_omitted_field_defaults_seeded _ =
   let no_ranking =
     config_of_sexp
       (Sexp.of_string
          (String.substr_replace_first
             (Sexp.to_string (sexp_of_config default_config))
-            ~pattern:"(candidate_ranking Alphabetical)" ~with_:""))
+            ~pattern:"(candidate_ranking Seeded)" ~with_:""))
   in
-  assert_that no_ranking.candidate_ranking (equal_to Alphabetical)
+  assert_that no_ranking.candidate_ranking (equal_to Seeded)
 
 (* ------------------------------------------------------------------ *)
 (* Seeded tiebreak (issue #3404, path-stability plan Step 1)            *)
@@ -2153,7 +2155,7 @@ let test_seeded_fields_round_trip _ =
     config_of_sexp
       (Sexp.of_string
          (String.substr_replace_first default_str
-            ~pattern:"(candidate_ranking Alphabetical)(tiebreak_seed 0)"
+            ~pattern:"(candidate_ranking Seeded)(tiebreak_seed 0)"
             ~with_:"(candidate_ranking Seeded)(tiebreak_seed 4)"))
   in
   let omitted =
@@ -3904,8 +3906,8 @@ let suite =
          >:: test_ranking_control_modes_round_trip;
          "test_ranking_field_serializes_and_round_trips"
          >:: test_ranking_field_serializes_and_round_trips;
-         "test_ranking_omitted_field_defaults_alphabetical"
-         >:: test_ranking_omitted_field_defaults_alphabetical;
+         "test_ranking_omitted_field_defaults_seeded"
+         >:: test_ranking_omitted_field_defaults_seeded;
          "test_seeded_same_seed_same_order" >:: test_seeded_same_seed_same_order;
          "test_seeded_seed_and_date_redraw_order"
          >:: test_seeded_seed_and_date_redraw_order;

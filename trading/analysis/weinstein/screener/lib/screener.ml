@@ -41,7 +41,7 @@ type config = {
   grade_thresholds : grade_thresholds;
   candidate_params : candidate_params;
   min_grade : grade;
-  candidate_ranking : candidate_ranking; [@sexp.default Alphabetical]
+  candidate_ranking : candidate_ranking; [@sexp.default Seeded]
   tiebreak_seed : int; [@sexp.default 0]
   min_score_override : int option; [@sexp.default None]
   max_score_override : int option; [@sexp.default None]
@@ -67,7 +67,7 @@ let default_config =
     grade_thresholds = default_grade_thresholds;
     candidate_params = default_candidate_params;
     min_grade = C;
-    candidate_ranking = Alphabetical;
+    candidate_ranking = Seeded;
     tiebreak_seed = 0;
     min_score_override = None;
     max_score_override = None;

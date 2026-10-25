@@ -90,10 +90,11 @@
   ;; ±15% around the new actual (total_return_pct: at least ±5pp). Correctness
   ;; re-pin of a data defect: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in the PR. Correctness re-pin: no return claim attaches to the delta.
-  ((total_return_pct ((min 57.3752) (max 77.6252)))
-   (total_trades ((min 175.9500) (max 238.0500)))
-   (win_rate ((min 29.9758) (max 40.5556)))
-   (sharpe_ratio ((min 0.5762) (max 0.7796)))
-   (max_drawdown_pct ((min 18.7180) (max 25.3244)))
-   (avg_holding_days ((min 58.0012) (max 78.4722)))
-   (open_positions_value ((min 1233142.4045) (max 1668369.1355))))))
+  ;; RE-PINNED 2026-10-25 for the #3404 tie-order default flip (candidate_ranking Alphabetical -> Seeded, tiebreak_seed 0). +-15% around the new actual (total_return_pct: at least +-5pp). Old arm (Alphabetical override, same build): 67.50% / 207 trades / DD 22.02; new: 84.65% / 206 / DD 20.15. One seed is one draw of the tie order (dev/experiments/path-stability-2026-10-23/): no return claim attaches to the delta.
+  ((total_return_pct ((min 71.9567) (max 97.3532)))
+   (total_trades ((min 175.1000) (max 236.9000)))
+   (win_rate ((min 31.3592) (max 42.4272)))
+   (sharpe_ratio ((min 0.6672) (max 0.9027)))
+   (max_drawdown_pct ((min 17.1312) (max 23.1775)))
+   (avg_holding_days ((min 59.6939) (max 80.7624)))
+   (open_positions_value ((min 1555798.7495) (max 2104904.1905))))))

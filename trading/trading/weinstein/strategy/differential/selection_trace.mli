@@ -162,8 +162,9 @@ val strong_sector_short : string
 val tie_group : string list
 (** The five tickers built from a verbatim-identical price/volume series, so
     their scores are exactly equal and only the ticker distinguishes them. In
-    ascending alphabetical order — i.e. the order the default [Alphabetical]
-    tiebreak must emit them in, whatever order they were fed. *)
+    ascending alphabetical order — i.e. the order the [Alphabetical] tiebreak
+    (the default before #3404 made it [Seeded]) must emit them in, whatever
+    order they were fed. *)
 
 val case_count : int
 (** Number of distinct (universe x config) selection cases the trace exercises.
