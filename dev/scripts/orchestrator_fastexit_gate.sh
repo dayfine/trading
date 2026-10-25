@@ -556,6 +556,59 @@ _verify_full_mode_dispatch_artifacts() {
 
 # --- dev/status/ drift (Condition 2, mirrored from lead-orchestrator.md) ----
 
+# _open_pr_max_run <date>
+# Highest run number among OPEN PRs whose head branch is `ops/daily-<date>`
+# (run 1) or `ops/daily-<date>-runK` (run K); prints 0 when none, and ALSO 0
+# on every failure (no jq, no token, API/parse error) so the caller degrades
+# to tracked-only counting. Prints only the number. Never fails.
+#
+# H-SUMMARY-PATH-OPEN-PR (2026-10-24): a same-day daily-summary PR still
+# OPEN is invisible to `git ls-tree HEAD`, so the next run computed the SAME
+# filename as that unmerged PR (observed 2026-10-23: run 2 got 2026-10-23.md
+# while #3400 for that path was unmerged).
+#
+# Test injection: ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE=<file> makes
+# this read the open-PR list from that file instead of the network (an
+# unreadable file counts as an API failure). Single page (per_page=100), the
+# same limitation as open_pr_count.
+_open_pr_max_run() {
+  _opm_date="$1"
+  _opm_json=""
+  command -v jq >/dev/null 2>&1 || { echo 0; return 0; }
+  if [ -n "${ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE:-}" ]; then
+    _opm_json=$(cat "$ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE" 2>/dev/null) \
+      || { echo 0; return 0; }
+  elif command -v curl >/dev/null 2>&1 && [ -n "${GH_TOKEN:-}" ] \
+    && [ -n "${GITHUB_REPOSITORY:-$REPO}" ]; then
+    _opm_json=$(curl -sS -f \
+      -H "Authorization: Bearer $GH_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${GITHUB_REPOSITORY:-$REPO}/pulls?state=open&per_page=100" \
+      2>/dev/null) || { echo 0; return 0; }
+  else
+    echo 0
+    return 0
+  fi
+  _opm_heads=$(printf '%s' "$_opm_json" | jq -r '.[].head.ref' 2>/dev/null) \
+    || { echo 0; return 0; }
+  _opm_max=0
+  for _opm_h in $_opm_heads; do
+    case "$_opm_h" in
+      "ops/daily-${_opm_date}") _opm_k=1 ;;
+      "ops/daily-${_opm_date}-run"*)
+        _opm_k="${_opm_h#"ops/daily-${_opm_date}-run"}"
+        case "$_opm_k" in
+          ''|*[!0-9]*) continue ;;
+        esac
+        ;;
+      *) continue ;;
+    esac
+    [ "$_opm_k" -gt "$_opm_max" ] && _opm_max="$_opm_k"
+  done
+  echo "$_opm_max"
+  return 0
+}
+
 # _current_summary_path <date>
 # The dev/daily/<date>[-runN].md path THIS run's own summary is (or will be)
 # written to, for a given <date> (a YYYY-MM-DD string; callers pass
@@ -605,6 +658,12 @@ _current_summary_path() {
     | grep -v -- '-plan\.md$' \
     | grep -v -- '-summary\.md$' \
     | wc -l | tr -d ' ')
+  # Open (unmerged) same-day summary PRs also own their run numbers
+  # (H-SUMMARY-PATH-OPEN-PR): N = max(tracked count, highest open run) + 1.
+  _open_max=$(_open_pr_max_run "$_date")
+  if [ "$_open_max" -gt "$_run_count" ]; then
+    _run_count="$_open_max"
+  fi
   _n=$((_run_count + 1))
   if [ "$_n" -eq 1 ]; then
     printf 'dev/daily/%s.md' "$_date"

@@ -119,6 +119,14 @@ ORCHESTRATOR_FASTEXIT_GATE_LIB=1
 . "$GATE"
 unset ORCHESTRATOR_FASTEXIT_GATE_LIB
 
+# Offline default for the open-PR lookup behind `current_summary_path`
+# (H-SUMMARY-PATH-OPEN-PR): an empty open-PR list, so no scenario ever hits
+# the network even when GH_TOKEN/GITHUB_REPOSITORY are set on the runner.
+_OPEN_PRS_EMPTY=$(mktemp)
+printf '[]' > "$_OPEN_PRS_EMPTY"
+ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_OPEN_PRS_EMPTY"
+export ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE
+
 fails=0
 total=0
 
@@ -1415,6 +1423,143 @@ MD
 result=$(cd "$TMP_REPO" && "$GATE" current_summary_path 2027-01-09)
 check "current_summary_path is NOT defeated by an intent-to-add (git add -N) same-day file (harness item T3-ITA)" \
   "dev/daily/2027-01-09.md" "$result"
+
+# =========================================================================
+# H-SUMMARY-PATH-OPEN-PR: an OPEN (unmerged) same-day `ops/daily-<date>[-runK]`
+# PR owns its run number, so N = max(tracked count, highest open run) + 1.
+# The open-PR list is injected via ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE.
+# Dates 2027-03-* are later than every fixture above.
+# =========================================================================
+_prs_json() { # <outfile> <head-ref>...
+  _pj_out=$1; shift
+  _pj_body=""
+  for _pj_h in "$@"; do
+    _pj_body="${_pj_body}{\"number\":1,\"head\":{\"ref\":\"${_pj_h}\"}},"
+  done
+  printf '[%s]' "${_pj_body%,}" > "$_pj_out"
+}
+_commit_daily() { # <date> : commit dev/daily/<date>[...]
+  (
+    cd "$TMP_REPO"
+    for _cd_f in "$@"; do
+      printf '# Status\n' > "dev/daily/$_cd_f"
+      git add "dev/daily/$_cd_f"
+    done
+    git commit -q -m "ops: daily $*"
+  )
+}
+_PRS="$TMP_REPO/open-prs.json"
+
+# Scenario 61: open run1 PR + 0 tracked -> run2.
+_reset_repo_no_drift
+_prs_json "$_PRS" ops/daily-2027-03-01
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-01)
+check "open ops/daily-<date> PR (run 1) with 0 tracked -> -run2" \
+  "dev/daily/2027-03-01-run2.md" "$result"
+
+# Scenario 62: open run3 PR + 2 tracked -> run4.
+_commit_daily 2027-03-02.md 2027-03-02-run2.md
+_prs_json "$_PRS" ops/daily-2027-03-02-run3
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-02)
+check "open -run3 PR with 2 tracked -> -run4" \
+  "dev/daily/2027-03-02-run4.md" "$result"
+
+# Scenario 63: tracked only (merged), no open PR -> unchanged (tracked + 1).
+_commit_daily 2027-03-03.md
+_prs_json "$_PRS"
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-03)
+check "tracked only, no open PR -> unchanged (-run2)" \
+  "dev/daily/2027-03-03-run2.md" "$result"
+
+# Scenario 64: API failure (unreadable file / malformed JSON) -> unchanged.
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$TMP_REPO/does-not-exist.json" "$GATE" current_summary_path 2027-03-03)
+check "unreadable open-PR source falls back to tracked-only" \
+  "dev/daily/2027-03-03-run2.md" "$result"
+printf 'not json' > "$_PRS"
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-03)
+check "malformed open-PR JSON falls back to tracked-only" \
+  "dev/daily/2027-03-03-run2.md" "$result"
+
+# Scenario 65: other-date PRs, unrelated heads and non-numeric suffixes ignored.
+_prs_json "$_PRS" ops/daily-2027-03-04 ops/daily-2027-03-03-run5x ops/daily-2027-03-03-summary feat/foo ops/daily-2027-03-030
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-03)
+check "other-date / malformed-suffix PR heads are ignored" \
+  "dev/daily/2027-03-03-run2.md" "$result"
+
+# Scenario 66: open PR number lower than tracked count -> tracked wins.
+_prs_json "$_PRS" ops/daily-2027-03-02-run2
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-02)
+check "open PR run below tracked count -> tracked count wins (-run3)" \
+  "dev/daily/2027-03-02-run3.md" "$result"
+
+# Scenario 66b: the maximum sits in the MIDDLE of the list, so both first-wins
+# and last-wins loops fail (GitHub lists open PRs newest first).
+_prs_json "$_PRS" ops/daily-2027-03-08-run2 ops/daily-2027-03-08-run4 ops/daily-2027-03-08
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-08)
+check "several open heads -> highest run wins (-run5)" \
+  "dev/daily/2027-03-08-run5.md" "$result"
+
+# Scenario 66c: malformed heads on a date with 0 tracked summaries, so any
+# false hit (e.g. bare-prefix match counted as run 1) changes the answer.
+_prs_json "$_PRS" ops/daily-2027-03-060 ops/daily-2027-03-06-summary ops/daily-2027-03-06-run5x ops/daily-2027-03-06-run
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-06)
+check "malformed heads with 0 tracked -> un-suffixed path" \
+  "dev/daily/2027-03-06.md" "$result"
+
+# Scenario 66d: other-date heads (run-1 and run-K shapes) and the file/parse
+# fallbacks on 0-tracked dates, so any false hit changes the answer.
+_prs_json "$_PRS" ops/daily-2027-03-08-run4 ops/daily-2027-03-10
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-09)
+check "other-date heads with 0 tracked -> un-suffixed path" "dev/daily/2027-03-09.md" "$result"
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$TMP_REPO/does-not-exist.json" "$GATE" current_summary_path 2027-03-07)
+check "unreadable open-PR source with 0 tracked -> un-suffixed path" "dev/daily/2027-03-07.md" "$result"
+printf 'not json' > "$_PRS"
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-07)
+check "malformed open-PR JSON with 0 tracked -> un-suffixed path" "dev/daily/2027-03-07.md" "$result"
+
+# Scenarios 67-69: the LIVE curl path (no injection file), via a fake `curl`
+# first on PATH. The fake prints $FAKE_CURL_BODY and exits $FAKE_CURL_RC, and
+# records the URL it was called with in $FAKE_CURL_LOG.
+_FAKEBIN="$TMP_REPO/fakebin"
+mkdir -p "$_FAKEBIN"
+cat > "$_FAKEBIN/curl" <<'FAKE'
+#!/bin/sh
+for _a in "$@"; do _last="$_a"; done
+printf '%s\n' "$_last" > "$FAKE_CURL_LOG"
+[ "${FAKE_CURL_RC:-0}" -eq 0 ] && printf '%s' "$FAKE_CURL_BODY"
+exit "${FAKE_CURL_RC:-0}"
+FAKE
+chmod +x "$_FAKEBIN/curl"
+_FAKE_LOG="$TMP_REPO/fake-curl.log"
+_live() { # <date> <env-cmd...> : run current_summary_path via the live curl branch
+  _lv_date=$1; shift
+  (cd "$TMP_REPO" && env -u ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE \
+    PATH="$_FAKEBIN:$PATH" GH_TOKEN=tok FAKE_CURL_LOG="$_FAKE_LOG" \
+    FAKE_CURL_RC="${FAKE_CURL_RC:-0}" FAKE_CURL_BODY="${FAKE_CURL_BODY:-[]}" \
+    "$@" "$GATE" current_summary_path "$_lv_date")
+}
+
+# Scenario 67: live curl returns an open -run3 PR (and a lower one) -> run4,
+# against ORCHESTRATOR_FASTEXIT_GATE_REPO when GITHUB_REPOSITORY is unset.
+_prs_json "$_PRS" ops/daily-2027-03-05-run2 ops/daily-2027-03-05-run3 feat/x
+result=$(FAKE_CURL_BODY=$(cat "$_PRS") _live 2027-03-05 env -u GITHUB_REPOSITORY ORCHESTRATOR_FASTEXIT_GATE_REPO=o/r)
+check "live curl path: highest open run (-run3) -> -run4" \
+  "dev/daily/2027-03-05-run4.md" "$result"
+check "live curl path: falls back to \$REPO when GITHUB_REPOSITORY unset" \
+  "https://api.github.com/repos/o/r/pulls?state=open&per_page=100" "$(cat "$_FAKE_LOG")"
+
+# Scenario 68: live curl fails (HTTP error -> non-zero exit) -> tracked-only.
+result=$(FAKE_CURL_RC=22 _live 2027-03-05 env)
+check "live curl failure falls back to tracked-only (run 1)" \
+  "dev/daily/2027-03-05.md" "$result"
+
+# Scenario 69: no GH_TOKEN and no injection -> tracked-only, curl never called.
+rm -f "$_FAKE_LOG"
+result=$(cd "$TMP_REPO" && env -u ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE -u GH_TOKEN \
+  PATH="$_FAKEBIN:$PATH" FAKE_CURL_LOG="$_FAKE_LOG" "$GATE" current_summary_path 2027-03-05)
+check "no GH_TOKEN -> tracked-only, no network call" \
+  "dev/daily/2027-03-05.md" "$result"
+check "no GH_TOKEN -> curl not invoked" "absent" "$([ -e "$_FAKE_LOG" ] && echo present || echo absent)"
 
 # =========================================================================
 # `hours_since_prior_summary` replaces Step 0.5's escape-hatch `ls -t
