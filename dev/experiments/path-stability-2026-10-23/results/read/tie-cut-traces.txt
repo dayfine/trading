@@ -1,0 +1,107 @@
+## decision 2020-06-12 (admitted top-N in screen order; x = Skipped No_structural_stop)
+A-p0   [stocks=3194 after_held=1982 grade=225 top_n=20 entered=2 ] ATHM x,AVGO x,CCS x,DCUE x,DECK Placed,SAH x,ESTC x,MCHP x,PENN x,YETI x,APPS Placed,CIVI x,CNNE x,MKSI x,RH x,XWEL x,BURL x,DTEGY x,
+A-p1   [stocks=3193 after_held=1981 grade=225 top_n=20 entered=2 ] ATHM x,AVGO x,CCS x,DCUE x,DECK Placed,SAH x,ESTC x,MCHP x,PENN x,YETI x,APPS Placed,CIVI x,CNNE x,MKSI x,RH x,XWEL x,BURL x,DTEGY x,
+A-p2   [stocks=3194 after_held=1982 grade=225 top_n=20 entered=2 ] ATHM x,AVGO x,CCS x,DCUE x,DECK Placed,SAH x,ESTC x,MCHP x,PENN x,YETI x,APPS Placed,CIVI x,CNNE x,MKSI x,RH x,XWEL x,BURL x,DTEGY x,
+A-p3   [stocks=3194 after_held=1983 grade=225 top_n=20 entered=2 ] ATHM x,AVGO x,CCS x,DCUE x,DECK Placed,SAH x,ESTC x,MCHP x,PENN x,YETI x,APPS Placed,CIVI x,CNNE x,MKSI x,RH x,XWEL x,BURL x,DTEGY x,
+A-p4   [stocks=3193 after_held=1981 grade=224 top_n=20 entered=1 ] ATHM x,AVGO x,CCS x,DCUE x,SAH x,ESTC x,MCHP x,PENN x,YETI x,APPS Placed,CIVI x,CNNE x,MKSI x,RH x,XWEL x,BURL x,DTEGY x,EXPGY x,
+A-p5   [stocks=3193 after_held=1981 grade=225 top_n=20 entered=2 ] ATHM x,AVGO x,CCS x,DCUE x,DECK Placed,SAH x,ESTC x,MCHP x,PENN x,YETI x,APPS Placed,CIVI x,CNNE x,MKSI x,RH x,XWEL x,BURL x,DTEGY x,
+S-p0   [stocks=3194 after_held=1978 grade=224 top_n=20 entered=0 ] ATHM x,AVGO x,CCS x,DCUE x,SAH x,DECK (Insufficient_cash,ESTC x,YETI x,MCHP x,PENN x,APPS (Insufficient_cash,CNNE x,XWEL x,MKSI x,RH x,CIVI x,INSM x,EXPGY x,
+S-p1   [stocks=3193 after_held=1981 grade=225 top_n=20 entered=2 ] ATHM x,CCS x,DECK Placed,DCUE x,SAH x,AVGO x,PENN x,YETI x,MCHP x,ESTC x,APPS Placed,MKSI x,RH x,CIVI x,XWEL x,CNNE x,BURL x,VRNS x,
+S-p2   [stocks=3194 after_held=1982 grade=225 top_n=20 entered=2 ] ATHM x,AVGO x,CCS x,DCUE x,DECK Placed,SAH x,PENN x,ESTC x,YETI x,MCHP x,APPS Placed,MKSI x,CIVI x,XWEL x,RH x,CNNE x,DTEGY x,INSM x,
+S-p3   [stocks=3194 after_held=1982 grade=225 top_n=20 entered=2 ] ATHM x,AVGO x,CCS x,DCUE x,SAH x,DECK Placed,YETI x,MCHP x,PENN x,ESTC x,APPS Placed,RH x,XWEL x,MKSI x,CNNE x,CIVI x,DTEGY x,VRNS x,
+S-p4   [stocks=3193 after_held=1980 grade=223 top_n=20 entered=1 ] ATHM x,CCS x,DCUE x,AVGO x,SAH x,PENN x,ESTC x,MCHP x,YETI x,APPS Placed,CIVI x,MKSI x,CNNE x,XWEL x,RH x,EXPGY x,BURL x,HOME x,
+S-p5   [stocks=3193 after_held=1981 grade=225 top_n=20 entered=2 ] ATHM x,DECK Placed,CCS x,SAH x,DCUE x,AVGO x,MCHP x,YETI x,ESTC x,PENN x,APPS Placed,CIVI x,XWEL x,RH x,CNNE x,MKSI x,HOME x,DTEGY x,
+SR-p0  [stocks=3194 after_held=1980 grade=225 top_n=20 entered=1 ] ATHM x,AVGO x,CCS x,DCUE x,SAH x,DECK Placed,ESTC x,YETI x,MCHP x,PENN x,APPS (Insufficient_cash,CNNE x,XWEL x,MKSI x,RH x,CIVI x,INSM x,EXPGY x,
+SR-p1  [stocks=3193 after_held=1982 grade=225 top_n=20 entered=2 ] ATHM x,CCS x,DECK Placed,DCUE x,SAH x,AVGO x,PENN x,YETI x,MCHP x,ESTC x,APPS Placed,MKSI x,RH x,CIVI x,XWEL x,CNNE x,BURL x,VRNS x,
+SR-p2  [stocks=3194 after_held=1982 grade=225 top_n=20 entered=2 ] ATHM x,AVGO x,CCS x,DCUE x,DECK Placed,SAH x,PENN x,ESTC x,YETI x,MCHP x,APPS Placed,MKSI x,CIVI x,XWEL x,RH x,CNNE x,DTEGY x,INSM x,
+SR-p3  [stocks=3194 after_held=1981 grade=224 top_n=20 entered=1 ] ATHM x,AVGO x,CCS x,DCUE x,SAH x,DECK Placed,YETI x,MCHP x,PENN x,ESTC x,APPS (Insufficient_cash,RH x,XWEL x,MKSI x,CNNE x,CIVI x,DTEGY x,VRNS x,
+SR-p4  [stocks=3193 after_held=1980 grade=223 top_n=20 entered=1 ] ATHM x,CCS x,DCUE x,AVGO x,SAH x,PENN x,ESTC x,MCHP x,YETI x,APPS Placed,CIVI x,MKSI x,CNNE x,XWEL x,RH x,EXPGY x,BURL x,HOME x,
+SR-p5  [stocks=3193 after_held=1980 grade=224 top_n=20 entered=1 ] ATHM x,DECK Placed,CCS x,SAH x,DCUE x,AVGO x,MCHP x,YETI x,ESTC x,PENN x,APPS (Insufficient_cash,CIVI x,XWEL x,RH x,CNNE x,MKSI x,HOME x,DTEGY x,
+SC-p0  [stocks=3194 after_held=1975 grade=223 top_n=20 entered=0 ] ATHM x,AVGO x,CCS x,DCUE x,SAH x,DECK (Insufficient_cash,ESTC x,YETI x,MCHP x,PENN x,APPS (Insufficient_cash,CNNE x,XWEL x,MKSI x,RH x,CIVI x,INSM x,EXPGY x,
+SC-p1  [stocks=3193 after_held=1975 grade=224 top_n=20 entered=0 ] ATHM x,CCS x,DECK (Insufficient_cash,DCUE x,SAH x,AVGO x,PENN x,YETI x,MCHP x,ESTC x,APPS (Insufficient_cash,MKSI x,RH x,CIVI x,XWEL x,CNNE x,BURL x,VRNS x,
+SC-p2  [stocks=3194 after_held=1978 grade=224 top_n=20 entered=0 ] ATHM x,AVGO x,CCS x,DCUE x,DECK (Insufficient_cash,SAH x,PENN x,ESTC x,YETI x,MCHP x,APPS (Insufficient_cash,MKSI x,CIVI x,XWEL x,RH x,CNNE x,DTEGY x,INSM x,
+SC-p3  [stocks=3194 after_held=1977 grade=224 top_n=20 entered=2 ] ATHM x,AVGO x,CCS x,DCUE x,SAH x,DECK Placed,YETI x,MCHP x,PENN x,ESTC x,APPS Placed,RH x,XWEL x,MKSI x,CNNE x,CIVI x,DTEGY x,VRNS x,
+SC-p4  [stocks=3193 after_held=1975 grade=222 top_n=20 entered=0 ] ATHM x,CCS x,DCUE x,AVGO x,SAH x,PENN x,ESTC x,MCHP x,YETI x,APPS (Insufficient_cash,CIVI x,MKSI x,CNNE x,XWEL x,RH x,EXPGY x,BURL x,HOME x,
+SC-p5  [stocks=3193 after_held=1977 grade=224 top_n=20 entered=2 ] ATHM x,DECK Placed,CCS x,SAH x,DCUE x,AVGO x,MCHP x,YETI x,ESTC x,PENN x,APPS Placed,CIVI x,XWEL x,RH x,CNNE x,MKSI x,HOME x,DTEGY x,
+
+## decision 2022-02-04 (admitted top-N in screen order; x = Skipped No_structural_stop)
+A-p0   [stocks=3406 after_held=2024 grade=277 top_n=20 entered=1 ] EC x,UTL x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,AGO x,BAESY x,BCRX x,CNA x,GLNG Placed,MA x,MFC x,MMP x,PAGP x,PM x,SF x,
+A-p1   [stocks=3405 after_held=2023 grade=277 top_n=20 entered=1 ] EC x,UTL x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,AGO x,BAESY x,BCRX x,CNA x,GLNG Placed,MA x,MFC x,MMP x,PAGP x,PM x,SF x,
+A-p2   [stocks=3406 after_held=2024 grade=277 top_n=20 entered=1 ] EC x,UTL x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,AGO x,BAESY x,BCRX x,CNA x,GLNG Placed,MA x,MFC x,MMP x,PAGP x,PM x,SF x,
+A-p3   [stocks=3406 after_held=2025 grade=277 top_n=20 entered=1 ] EC x,UTL x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,AGO x,BAESY x,BCRX x,CNA x,GLNG Placed,MA x,MFC x,MMP x,PAGP x,PM x,SF x,
+A-p4   [stocks=3405 after_held=2024 grade=277 top_n=20 entered=1 ] EC x,UTL x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,AGO x,BAESY x,BCRX x,CNA x,GLNG Placed,MA x,MFC x,MMP x,PAGP x,PM x,SF x,
+A-p5   [stocks=3405 after_held=2023 grade=277 top_n=20 entered=1 ] EC x,UTL x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,AGO x,BAESY x,BCRX x,CNA x,GLNG Placed,MA x,MFC x,MMP x,PAGP x,PM x,SF x,
+S-p0   [stocks=3406 after_held=2025 grade=276 top_n=20 entered=1 ] UTL x,EC x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,GLNG Placed,CNA x,AGO x,PM x,SMFG x,MFC x,SF x,BAESY x,MA x,MMP x,BCRX x,
+S-p1   [stocks=3405 after_held=2024 grade=276 top_n=20 entered=1 ] UTL x,EC x,ET x,MGI x,TEF x,WTI x,THG x,CIB x,CNO x,MMP x,BCRX x,PM x,GLNG Placed,MA x,MFC x,TBBK x,PAGP x,SF x,AGO x,TRP x,
+S-p2   [stocks=3406 after_held=2027 grade=277 top_n=20 entered=0 ] EC x,UTL x,MGI x,TEF x,ET x,WTI x,CNO x,THG x,CIB x,PAGP x,TBBK x,SMFG x,MFC x,TRP x,BCRX x,MA x,MMP x,AGO x,BAESY x,PM x,
+S-p3   [stocks=3406 after_held=2026 grade=278 top_n=20 entered=1 ] UTL x,EC x,TEF x,ET x,MGI x,WTI x,THG x,CNO x,CIB x,TBBK x,MFC x,MMP x,BAESY x,CNA x,SF x,PM x,GLNG Placed,PAGP x,BCRX x,MA x,
+S-p4   [stocks=3405 after_held=2025 grade=277 top_n=20 entered=1 ] EC x,UTL x,TEF x,MGI x,ET x,WTI x,CIB x,CNO x,THG x,SF x,BAESY x,TBBK x,AGO x,BCRX x,GLNG Placed,MFC x,MA x,MMP x,CNA x,PM x,
+S-p5   [stocks=3405 after_held=2024 grade=276 top_n=20 entered=1 ] UTL x,EC x,TEF x,ET x,MGI x,WTI x,CIB x,THG x,CNO x,PM x,MA x,SMFG x,TBBK x,GLNG Placed,MFC x,TRP x,PAGP x,AGO x,BAESY x,BCRX x,
+SR-p0  [stocks=3406 after_held=2026 grade=277 top_n=20 entered=1 ] UTL x,EC x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,GLNG Placed,CNA x,AGO x,PM x,SMFG x,MFC x,SF x,BAESY x,MA x,MMP x,BCRX x,
+SR-p1  [stocks=3405 after_held=2024 grade=276 top_n=20 entered=1 ] UTL x,EC x,ET x,MGI x,TEF x,WTI x,THG x,CIB x,CNO x,MMP x,BCRX x,PM x,GLNG Placed,MA x,MFC x,TBBK x,PAGP x,SF x,AGO x,TRP x,
+SR-p2  [stocks=3406 after_held=2027 grade=278 top_n=20 entered=0 ] EC x,UTL x,MGI x,TEF x,ET x,WTI x,CNO x,THG x,CIB x,PAGP x,TBBK x,SMFG x,MFC x,TRP x,BCRX x,MA x,MMP x,AGO x,BAESY x,PM x,
+SR-p3  [stocks=3406 after_held=2026 grade=279 top_n=20 entered=1 ] UTL x,EC x,TEF x,ET x,MGI x,WTI x,THG x,CNO x,CIB x,TBBK x,MFC x,MMP x,BAESY x,CNA x,SF x,PM x,GLNG Placed,PAGP x,BCRX x,MA x,
+SR-p4  [stocks=3405 after_held=2025 grade=277 top_n=20 entered=1 ] EC x,UTL x,TEF x,MGI x,ET x,WTI x,CIB x,CNO x,THG x,SF x,BAESY x,TBBK x,AGO x,BCRX x,GLNG Placed,MFC x,MA x,MMP x,CNA x,PM x,
+SR-p5  [stocks=3405 after_held=2024 grade=277 top_n=20 entered=1 ] UTL x,EC x,TEF x,ET x,MGI x,WTI x,CIB x,THG x,CNO x,PM x,MA x,SMFG x,TBBK x,GLNG Placed,MFC x,TRP x,PAGP x,AGO x,BAESY x,BCRX x,
+SC-p0  [stocks=3406 after_held=2021 grade=276 top_n=20 entered=1 ] UTL x,EC x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,GLNG Placed,CNA x,AGO x,PM x,SMFG x,MFC x,SF x,BAESY x,MA x,MMP x,BCRX x,
+SC-p1  [stocks=3405 after_held=2020 grade=276 top_n=20 entered=1 ] UTL x,EC x,ET x,MGI x,TEF x,WTI x,THG x,CIB x,CNO x,MMP x,BCRX x,PM x,GLNG Placed,MA x,MFC x,TBBK x,PAGP x,SF x,AGO x,TRP x,
+SC-p2  [stocks=3406 after_held=2021 grade=275 top_n=20 entered=0 ] EC x,UTL x,MGI x,TEF x,ET x,WTI x,CNO x,THG x,CIB x,PAGP x,TBBK x,SMFG x,MFC x,TRP x,BCRX x,MA x,MMP x,AGO x,BAESY x,PM x,
+SC-p3  [stocks=3406 after_held=2022 grade=277 top_n=20 entered=1 ] UTL x,EC x,TEF x,ET x,MGI x,WTI x,THG x,CNO x,CIB x,TBBK x,MFC x,MMP x,BAESY x,CNA x,SF x,PM x,GLNG Placed,PAGP x,BCRX x,MA x,
+SC-p4  [stocks=3405 after_held=2019 grade=275 top_n=20 entered=1 ] EC x,UTL x,TEF x,MGI x,ET x,WTI x,CIB x,CNO x,THG x,SF x,BAESY x,TBBK x,AGO x,BCRX x,GLNG Placed,MFC x,MA x,MMP x,CNA x,PM x,
+SC-p5  [stocks=3405 after_held=2019 grade=274 top_n=20 entered=1 ] UTL x,EC x,TEF x,ET x,MGI x,WTI x,CIB x,THG x,CNO x,PM x,MA x,SMFG x,TBBK x,GLNG Placed,MFC x,TRP x,PAGP x,AGO x,BAESY x,BCRX x,
+
+## decision 2023-08-18 (admitted top-N in screen order; x = Skipped No_structural_stop)
+A-p0   [stocks=2750 after_held=1763 grade=261 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,CORT x,INSW x,PRGO x,R Placed,SCHL x,TEN x,TXT x,DTCB x,ADMA Placed,AMGN x,CRGY x,DINO x,HDSN x,IMO x,MTDR x,PKG Placed,ROST x,
+A-p1   [stocks=2750 after_held=1763 grade=261 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,CORT x,INSW x,PRGO x,R Placed,SCHL x,TEN x,TXT x,DTCB x,ADMA Placed,AMGN x,CRGY x,DINO x,HDSN x,IMO x,MTDR x,PKG Placed,ROST x,
+A-p2   [stocks=2749 after_held=1762 grade=260 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,CORT x,INSW x,PRGO x,R Placed,SCHL x,TEN x,TXT x,DTCB x,ADMA Placed,AMGN x,CRGY x,DINO x,HDSN x,IMO x,MTDR x,PKG Placed,ROST x,
+A-p3   [stocks=2750 after_held=1763 grade=261 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,CORT x,INSW x,PRGO x,R Placed,SCHL x,TEN x,TXT x,DTCB x,ADMA Placed,AMGN x,CRGY x,DINO x,HDSN x,IMO x,MTDR x,PKG Placed,ROST x,
+A-p4   [stocks=2749 after_held=1762 grade=260 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,CORT x,INSW x,PRGO x,R Placed,SCHL x,TEN x,TXT x,DTCB x,ADMA Placed,AMGN x,CRGY x,DINO x,HDSN x,IMO x,MTDR x,PKG Placed,ROST x,
+A-p5   [stocks=2750 after_held=1763 grade=261 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,CORT x,INSW x,PRGO x,R Placed,SCHL x,TEN x,TXT x,DTCB x,ADMA Placed,AMGN x,CRGY x,DINO x,HDSN x,IMO x,MTDR x,PKG Placed,ROST x,
+S-p0   [stocks=2750 after_held=1763 grade=261 top_n=20 entered=2 ] DHT x,IMAX x,SCHL x,CORT x,INSW x,PRGO x,R Placed,TEN x,CDW x,TXT x,DTCB x,TFSL x,MTDR x,CRGY x,PKG Placed,ROST x,TEVA x,DINO x,HDSN x,SUN x,
+S-p1   [stocks=2750 after_held=1764 grade=261 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,CORT x,R Placed,TEN x,SCHL x,PRGO x,INSW x,TXT x,DTCB x,DINO x,TEVA x,ROST x,AMGN x,ADMA Placed,IMO x,SUN x,MTDR x,PKG Placed,
+S-p2   [stocks=2749 after_held=1762 grade=260 top_n=20 entered=2 ] DHT x,IMAX x,R Placed,CORT x,PRGO x,CDW x,TEN x,SCHL x,INSW x,TXT x,DTCB x,IMO x,DINO x,CRGY x,TFSL x,ROST x,AMGN x,TEVA x,ADMA Placed,SUN x,
+S-p3   [stocks=2750 after_held=1763 grade=261 top_n=20 entered=2 ] DHT x,IMAX x,SCHL x,CDW x,INSW x,TEN x,CORT x,R Placed,PRGO x,TXT x,DTCB x,IMO x,AMGN x,MTDR x,PKG Placed,TFSL x,CRGY x,HDSN x,TEVA x,DINO x,
+S-p4   [stocks=2749 after_held=1765 grade=262 top_n=20 entered=3 ] DHT x,IMAX x,INSW x,CORT x,R Placed,TEN x,PRGO x,CDW x,SCHL x,TXT x,DTCB x,TFSL x,IMO x,TEVA x,PKG Placed,HDSN x,ROST x,CRGY x,AMGN x,ADMA Placed,
+S-p5   [stocks=2750 after_held=1764 grade=262 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,INSW x,SCHL x,PRGO x,CORT x,R Placed,TEN x,TXT x,DTCB x,SUN x,PKG Placed,TFSL x,DINO x,IMO x,ROST x,TEVA x,MTDR x,ADMA Placed,
+SR-p0  [stocks=2750 after_held=1763 grade=261 top_n=20 entered=2 ] DHT x,IMAX x,SCHL x,CORT x,INSW x,PRGO x,R Placed,TEN x,CDW x,TXT x,DTCB x,TFSL x,MTDR x,CRGY x,PKG Placed,ROST x,TEVA x,DINO x,HDSN x,SUN x,
+SR-p1  [stocks=2750 after_held=1764 grade=261 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,CORT x,R Placed,TEN x,SCHL x,PRGO x,INSW x,TXT x,DTCB x,DINO x,TEVA x,ROST x,AMGN x,ADMA Placed,IMO x,SUN x,MTDR x,PKG Placed,
+SR-p2  [stocks=2749 after_held=1762 grade=260 top_n=20 entered=2 ] DHT x,IMAX x,R Placed,CORT x,PRGO x,CDW x,TEN x,SCHL x,INSW x,TXT x,DTCB x,IMO x,DINO x,CRGY x,TFSL x,ROST x,AMGN x,TEVA x,ADMA Placed,SUN x,
+SR-p3  [stocks=2750 after_held=1763 grade=261 top_n=20 entered=2 ] DHT x,IMAX x,SCHL x,CDW x,INSW x,TEN x,CORT x,R Placed,PRGO x,TXT x,DTCB x,IMO x,AMGN x,MTDR x,PKG Placed,TFSL x,CRGY x,HDSN x,TEVA x,DINO x,
+SR-p4  [stocks=2749 after_held=1765 grade=262 top_n=20 entered=3 ] DHT x,IMAX x,INSW x,CORT x,R Placed,TEN x,PRGO x,CDW x,SCHL x,TXT x,DTCB x,TFSL x,IMO x,TEVA x,PKG Placed,HDSN x,ROST x,CRGY x,AMGN x,ADMA Placed,
+SR-p5  [stocks=2750 after_held=1764 grade=262 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,INSW x,SCHL x,PRGO x,CORT x,R Placed,TEN x,TXT x,DTCB x,SUN x,PKG Placed,TFSL x,DINO x,IMO x,ROST x,TEVA x,MTDR x,ADMA Placed,
+SC-p0  [stocks=2750 after_held=1763 grade=261 top_n=20 entered=2 ] DHT x,IMAX x,SCHL x,CORT x,INSW x,PRGO x,R Placed,TEN x,CDW x,TXT x,DTCB x,TFSL x,MTDR x,CRGY x,PKG Placed,ROST x,TEVA x,DINO x,HDSN x,SUN x,
+SC-p1  [stocks=2750 after_held=1764 grade=261 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,CORT x,R Placed,TEN x,SCHL x,PRGO x,INSW x,TXT x,DTCB x,DINO x,TEVA x,ROST x,AMGN x,ADMA Placed,IMO x,SUN x,MTDR x,PKG Placed,
+SC-p2  [stocks=2749 after_held=1762 grade=260 top_n=20 entered=2 ] DHT x,IMAX x,R Placed,CORT x,PRGO x,CDW x,TEN x,SCHL x,INSW x,TXT x,DTCB x,IMO x,DINO x,CRGY x,TFSL x,ROST x,AMGN x,TEVA x,ADMA Placed,SUN x,
+SC-p3  [stocks=2750 after_held=1763 grade=261 top_n=20 entered=2 ] DHT x,IMAX x,SCHL x,CDW x,INSW x,TEN x,CORT x,R Placed,PRGO x,TXT x,DTCB x,IMO x,AMGN x,MTDR x,PKG Placed,TFSL x,CRGY x,HDSN x,TEVA x,DINO x,
+SC-p4  [stocks=2749 after_held=1765 grade=262 top_n=20 entered=3 ] DHT x,IMAX x,INSW x,CORT x,R Placed,TEN x,PRGO x,CDW x,SCHL x,TXT x,DTCB x,TFSL x,IMO x,TEVA x,PKG Placed,HDSN x,ROST x,CRGY x,AMGN x,ADMA Placed,
+SC-p5  [stocks=2750 after_held=1764 grade=262 top_n=20 entered=3 ] DHT x,IMAX x,CDW x,INSW x,SCHL x,PRGO x,CORT x,R Placed,TEN x,TXT x,DTCB x,SUN x,PKG Placed,TFSL x,DINO x,IMO x,ROST x,TEVA x,MTDR x,ADMA Placed,
+
+## scores of the names ADMA's A-p0 entry record lists as alternatives (decision 2023-08-18; ADMA itself scores 95)
+cascade_score 95,DHT 110,IMAX 106,CDW 105,CORT 105,INSW 105,PRGO 105,SCHL 105,TEN 105,TXT 101,DTCB 97,AMGN 95,CRGY 95,DINO 95,HDSN 95,IMO 95,MTDR 95,ROST 95,
+
+## admitted-slot outcomes over all weeks (graded > admitted = cap binds)
+cell   weeks binds  slots  no_ss placed ins_cash  other  ge19x
+A-p0     277   277   5540   5069    180    147     62    167
+A-p1     277   277   5540   5070    181    145     62    167
+A-p2     277   277   5540   5069    180    146     63    169
+A-p3     277   277   5540   5069    180    146     62    167
+A-p4     277   277   5540   5071    182    143     62    167
+A-p5     277   277   5540   5070    180    146     62    167
+S-p0     277   277   5540   5078    190    131     61    168
+S-p1     277   277   5540   5073    171    156     57    172
+S-p2     277   277   5540   5101    171    128     56    172
+S-p3     277   277   5540   5088    180    129     61    171
+S-p4     277   277   5540   5099    169    135     59    174
+S-p5     277   277   5540   5082    175    141     61    174
+SR-p0    277   277   5540   5078    188    133     61    168
+SR-p1    277   277   5540   5078    179    141     59    173
+SR-p2    277   277   5540   5096    168    137     55    170
+SR-p3    277   277   5540   5081    178    138     61    171
+SR-p4    277   277   5540   5099    170    135     58    174
+SR-p5    277   277   5540   5081    172    145     61    173
+SC-p0    277   277   5540   5086    232     79     63    169
+SC-p1    277   277   5540   5083    217     99     58    172
+SC-p2    277   277   5540   5111    224     65     56    174
+SC-p3    277   277   5540   5094    224     79     61    173
+SC-p4    277   277   5540   5111    222     69     60    177
+SC-p5    277   277   5540   5091    224     81     62    176

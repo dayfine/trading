@@ -1,0 +1,43 @@
+[snapshot-mode] loaded manifest at /tmp/snap_top3000_pit_v12wk/manifest.sexp (schema_hash=060588c0224b7d7e73f367fbd1801084, 9236 entries)
+Loading 1 scenarios from /tmp/ps-work/ps-SC-p2-s0 (parallel=1)
+Fixtures root: /tmp/ps-fix
+Bar data source: snapshot mode (/tmp/snap_top3000_pit_v12wk)
+Progress emission: every 26 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-ps/trading/dev/backtest/scenarios-2026-10-24-231112
+
+>>> Running ps-SC-p2: path-stability SC p2 (deletes ODFL): S + max_position_pct_long 0.07 (capacity) (2019-01-01 to 2024-12-31)
+Using scenario-provided sector map (9221 symbols)...
+Universe: 9221 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 9236
+Running backtest (2019-01-01 to 2024-12-31, warmup from 2018-01-02)...
+Panel_runner: simulator window 2018-01-02..2024-12-31 (warmup 364 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 1826 days) for strategy
+WARN: portfolio rejected fill for MCK (side=Types.Buy qty=452.0000 price=156.7300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 70846.48, Available: 30001.7232673527, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for EVOP (side=Types.Buy qty=3467.0000 price=30.1829): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 104678.756170981, Available: 35025.662947643985, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for VISN (side=Types.Buy qty=32826.0000 price=3.9372): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 129570.78719999999, Available: 127892.837302062, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for UPWK (side=Types.Buy qty=8169.0000 price=16.4435): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 134408.60023890462, Available: 132701.48573338959, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=37889808 misses=12145 miss_absent=2910 evictions=0 n_symbols=9236 misses_per_symbol=1.31 n_symbols_touched=9235 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9235 max_bytes=128384908 max_mmap_open=9235 avg_entries=4618.0 avg_bytes=64861686 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1943500912 maxrss_bytes=4890935296
+Panel_runner: split_dividend_guard rejected=0 no_files=0
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-ps
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+ps-SC-p2                        78.4%     187    32.1%    21.9%   PASS
+
+1/1 scenarios passed.
+exit=0

@@ -1,6 +1,6 @@
 # path-stability-2026-10-23: #3404 Step 2, pre-registered
 
-Status: **PRE-REGISTERED, NOT RUN.** This directory holds the chain, the four p0 specs and this read rule. Nothing has
+Status: **RUN 2026-10-23/24; read below (§Results).** Originally: PRE-REGISTERED, NOT RUN. This directory holds the chain, the four p0 specs and this read rule. Nothing has
 run. The chain is launched by the dispatcher when the container is free (no agents, no other backtest), after #3406
 (Step 1, `Seeded` tiebreak) merges: `launch` aborts otherwise.
 
@@ -137,4 +137,175 @@ Per arm, over its K = 6 cells:
 
 ## Results
 
-_Placeholder: filled by the results PR (results-analyst read, `summary.txt`, review-pack look, `Verifies` line)._
+Read by results-analyst; numbers spot-checked by the dispatcher against the committed artifacts. Raw `trade_audit.sexp`
+files are reduced by `collect` (`*-audit_entries.csv`, `*-cash_rejections.csv`); the extracts that read the raw audits
+and the packs are in `results/read/` with the scripts that regenerate them (`ps-analysis.sh`, `regime.awk`).
+
+**Run.** Pre-registration `a8ba322fc`, rule = plan at `b5ce359b7`, run tree HEAD `3db869d32`, 2026-10-23 20:55 →
+10-24 19:49 PT. All 24 cells RESULT, 0 excluded, 0 void (`results/chain.log`). Every cell reads `n_symbols_absent=1`.
+All 23 `validator_diff -check V6` gates exit 0 and V6 = 0 in all 24 reports, so every pair below is V6-clean. Cell
+wall 2,360–4,794 s, 21.8 h in all (plan estimate 41 h). Deleted names (`results/perturb-names.txt`): p1 SHEN, p2 ODFL,
+p3 SLAB, p4 DECK, p5 DIOD.
+
+### 1. The rule, as written
+
+ln(1+R) per cell (`results/summary.txt`):
+
+| arm | p0 | p1 | p2 | p3 | p4 | p5 | spread (SD) | range | median | med. Sharpe | med. maxDD % | med. Calmar |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| A | 0.985 | 0.978 | 0.940 | 0.983 | 0.970 | 0.975 | 0.0167 | 0.046 | 0.9764 | 0.787 | 27.44 | 0.643 |
+| S | 0.673 | 1.177 | 0.945 | 0.837 | 1.118 | 1.203 | 0.2108 | 0.530 | 1.0313 | 0.838 | 23.29 | 0.674 |
+| SR | 0.619 | 0.967 | 0.984 | 0.620 | 1.082 | 1.031 | 0.2088 | 0.463 | 0.9755 | 0.797 | 25.36 | 0.634 |
+| SC | 0.535 | 0.688 | 0.579 | 0.650 | 0.601 | 0.875 | 0.1205 | 0.340 | 0.6256 | 0.600 | 20.36 | 0.521 |
+
+Scale: SPY total return on the window is +158.4 % (ln 0.949, 17.1 %/yr). S's median is 18.8 %/yr, its seeds span
+11.9–22.2 %/yr; A's six cells span 17.0–17.8 %/yr; SC's median is 11.0 %/yr.
+
+- **Yardstick.** spread(S)/spread(A) = **12.6** ≥ 1.5: the alphabetical yardstick understates path noise. From now on,
+  chains measure noise with seeded perturbations in place of path salts.
+- **Seeded as the default.** Recommended for user approval as a correctness fix (the rule's R3 exception). The A→Z
+  bias is measurable (`results/read/letter-mix.txt`): A-tickers are 17.4 % of A-p0's 138 trades vs 10.0–14.3 % in the
+  six S cells and 9.5 % of the list union; A–F tickers 43.5 % vs 34.6–37.9 %.
+- **SR.** Ratio **0.99** > 0.85: **does not stabilise.** (Do-no-harm would have passed: median 0.976 vs 1.031.)
+- **SC.** Ratio **0.57** ≤ 0.6, but its median 0.626 is **0.406 below** S's, more than spread(S) = 0.211: do-no-harm
+  **fails**, **does not stabilise.** No DD cost (median max DD 20.4 % vs 23.3 %); median Calmar 0.52 vs 0.67.
+- **Promotion.** No arm stabilises; nothing to promote; the SRC follow-up does not trigger.
+- **Small n.** 90 % intervals on the SD ratios (F(5,5)): S/A 5.6–28; SR/S 0.44–2.2; SC/S 0.25–1.28.
+
+Divergence onsets: in A, each pk diverges on A-p0's entry date for its deleted name (2019-07 → 2024-02). In the
+seeded arms, p1/p4 diverge 2019-02-26, p3/p5 2019-02-28, p2 2019-05-09, identical in S, SR and SC.
+
+### 2. Verdict, calibrated
+
+- **Yardstick: robust.** Every leave-one-out ratio stays in 9.2–39.3. Within S the seed is confounded with the list
+  deletion, but every seeded onset precedes the first deleted name's first entry (2019-07-24), so the seed is the
+  first-order term.
+- **Seeded default.** A rule recommendation, not a return claim: A-p0 (0.985) sits inside S's six draws (0.673–1.203).
+  Alphabetical order freezes one draw; it does not shift the level.
+- **SR.** Resizing at min fraction 0.5 does not reduce seeded spread on this window. Its paired level gap (−0.108 log,
+  5 of 6 seeds) is two displacement events (§3.3), not a return verdict.
+- **SC.** Its return cut is robust in this design (6 of 6 seeds, mean −0.338 log, about −7.8 pp/yr at the medians). Its
+  spread pass is not: 3 of 6 leave-one-out drops land in the inconclusive band, and it is proportional to its level.
+- **Cannot say:** anything outside 2019–2024 or top-3000 PIT v12, or the seeded spread at 26 y (unmeasured).
+
+### 3. Why
+
+**3.1 The window's return is three trades plus one open position.** In A-p0, ADMA ($526k), APPS ($397k) and GLNG
+($153k) carry $1.08M of total-return P&L; the other 135 trades net +$3k. End unrealised P&L is $521k, mostly MMYT,
+open since 2023-10-26 in all 24 cells (`results/read/tail-decomposition.txt`). A cell's level is set by which of the
+three it catches.
+
+**3.2 Two gates decide which tails a cell catches** (`results/read/tie-cut-traces.txt`):
+
+| seed | S | SR | SC | ADMA top-20, 2023-08-18 | GLNG top-20, 2022-02-04 | APPS 2020-06-12 (S / SR / SC) |
+|---|---|---|---|---|---|---|
+| 0 | 0.673 | 0.619 | 0.535 | **cut** | in | no cash / no cash / no cash |
+| 1 | 1.177 | 0.967 | 0.688 | in | in | placed / placed / no cash |
+| 2 | 0.945 | 0.984 | 0.579 | in | **cut** | placed / placed / no cash |
+| 3 | 0.837 | 0.620 | 0.650 | **cut** | in | placed / no cash / placed |
+| 4 | 1.118 | 1.082 | 0.601 | in | in | placed / placed / no cash |
+| 5 | 1.203 | 1.031 | 0.875 | in | in | placed / no cash / placed |
+| A, all six | 0.940–0.985 | | | in ×6 | in ×6 | placed ×6 |
+
+- **Gate 1: the top-20 cut lands inside a tie group.** `max_buy_candidates` = 20 binds in all 277 decision weeks of
+  every cell, and 91–92 % of admitted slots are then skipped as `No_structural_stop`. ADMA, 2023-08-18: 11 names score
+  97–110; the last 9 slots go to a score-95 tie group of at least 12. Seeds 0 and 3 cut ADMA; only R, ADMA and PKG of the
+  20 have a structural stop. GLNG, 2022-02-04, is the only placeable name of its 20, and seed 2 cuts it. The cuts are
+  identical in S, SR and SC at each seed.
+- **Gate 2: cash at placement.** APPS is top-20 in all 24 cells and placed in 16; in the other 8 the entry walk skips
+  it as `Insufficient_cash`, a state built by the cell's earlier draws.
+- **Alphabetical is frozen, not stable.** It settles every boundary the same way, so all six A cells catch all three
+  tails; a deleted minor name moves the path only from its own entry date (worst: ODFL, −0.046 log in ten months). A
+  seed re-draws every boundary, so each seed is a different draw of the same tail lottery.
+
+**3.3 Why SR does not stabilise.** The resize acts only on at-fill refusals (9–14 per S cell, 72 in all; after SR 6–10,
+1 at least half funded). It touches neither gate 1 nor gate 2 (128–156 placement-time `Insufficient_cash` skips per S
+cell). Each saved ticket commits cash a later candidate needs: at seed 3, SR fills DKS (2019-11-07) and LACO
+(2020-05-27), then cannot place APPS (2020-06-12): +$21.9k saved, −$389k displaced. Seed 5 repeats it (−$387k).
+
+**3.4 Why SC cuts return.** Same seeds, same gate-1 results, smaller stake (trades joined on symbol and entry date):
+
+| seed | shared trades | S on shared | SC on shared | SC/S quantity | S-only | SC-only (n) | Δ end unrealised |
+|---|---|---|---|---|---|---|---|
+| 0 | 140 | $356k | $217k | 0.73 | −$3k | +$52k (52) | −$176k |
+| 1 | 125 | $1,061k | $586k | 0.61 | +$389k | +$33k (54) | −$411k |
+| 2 | 127 | $660k | $377k | 0.63 | +$295k | +$93k (60) | −$300k |
+| 3 | 135 | $563k | $460k | 0.70 | +$62k | −$1k (50) | −$235k |
+| 4 | 127 | $812k | $447k | 0.59 | +$474k | +$21k (56) | −$407k |
+| 5 | 131 | $1,417k | $937k | 0.68 | +$40k | −$12k (49) | −$399k |
+
+- The tails pay about half (ADMA $267–350k vs $518–624k; MMYT held at about half size). APPS is lost in three more
+  seeds. The names do not double: SC averages 6.7 positions vs 5.3 at p0, and its 49–60 extra trades net about zero.
+- Exposure by SPY regime and period, p0 cells (`results/read/regime-split.txt`):
+
+| p0 cell | 2019–21 UP (SPY +49.4 %) | 2019–21 DOWN (SPY +47.5 %) | 2022–24 UP (SPY +27.2 %) | 2022–24 DOWN (SPY +10.4 %) | invested |
+|---|---|---|---|---|---|
+| A | +72.6 % @ 60 % | +10.4 % @ 46 % | +45.9 % @ 71 % | +4.9 % @ 37 % | 58 % |
+| S | +49.3 % @ 66 % | +10.9 % @ 44 % | +20.5 % @ 68 % | +3.0 % @ 34 % | 59 % |
+| SR | +45.6 % @ 66 % | +11.1 % @ 44 % | +18.2 % @ 69 % | +3.0 % @ 34 % | 60 % |
+| SC | +46.9 % @ 61 % | +11.9 % @ 38 % | +14.0 % @ 62 % | +0.6 % @ 24 % | 53 % |
+
+  SC is less invested in every regime and both periods; its shortfall sits in 2022–24 UP days, more than the exposure
+  gap explains (the half-size open book does the rest). A-p0 vs S-p0 is UP-day holdings (APPS, ADMA), not cash.
+- SC's lower spread is the same draw at smaller stakes: its seeds rank like S's (correlation 0.69), spread/median 0.19
+  vs 0.20, paired SC − S mean −0.338 log, 6 of 6 negative.
+
+**3.5 Perturbation checks.** Leave one out: S/A 9.2–39.3; SR/S 0.83–1.15; SC/S 0.29–0.74.
+
+### 4. How it fits what we know
+
+- `project_26y_path_noise_floor`: confirmed and refined. One cell is one draw; the 6-year seeded SD alone is 0.21; the
+  26-year seeded spread is unmeasured.
+- Ledger `2026-06-30-tiebreak-noise-floor`: confirmed (tie order is a large selection variance that grows with
+  breadth). Its forward directive, capacity as the variance reducer, is refined: at a 7 % cap the tails halve.
+- `project_record_gap_is_concentration`, capacity-concentration BROAD: confirmed; P&L tracks quantity on shared trades.
+- `project_funding_grid_monster_lottery`, chain V (#3383): re-derived; saved tickets are median-sized, displacement is
+  monster-sized.
+- `project_monster_funnel_top_of_funnel`, `project_top_n_capacity_verdict`: extended; the cap binds every week and
+  91 % of its slots go to names that are then unplaceable. ADMA is the boundary specimen in both.
+- `project_screener_alphabetical_tiebreak`: **contradicted** — on top-3000 the bias over-selects A-tickers and boundary
+  ties decide the window's two largest winners.
+- `project_edge_is_the_fat_tail`: confirmed.
+
+### 5. What it implies next (options; the choice is the user's)
+
+1. **Measure noise as the rule now says:** K ≥ 5 seeds per arm, paired by seed (arms share each seed's draws:
+   correlation 0.87 SR, 0.69 SC; paired SD 0.11–0.15 vs 0.21 unpaired). At K = 6 a 6-year lever read resolves about
+   ±0.09–0.13 log at 2 SE.
+2. **Seeded default** (correctness; user approval), then re-baseline the record as K seeds. On this window 3 of 6 seeds
+   beat SPY. `config-default-blast-radius` applies.
+3. **Act on gate 1:** a top-N cap counted in placeable names (no such dial exists), or the existing
+   `support_floor_anchor_scope Nearest` dial (pre-registered as `../floor-nearest-2026-10-25/`, #3418, running).
+4. **Accept the noise** as intrinsic to a ~5-slot book on a fat-tailed edge, and measure it (option 1).
+5. **Before the next 26-year verdict,** run a 26-year seeded null on the record config.
+
+### 6. Defects found
+
+1. **V12 and `stop_fill_distance_pct` mix split bases** (left over from #3127/#3256). `results/ps-SC-p0-s0-validator.sexp.sexp`:
+   NVDA 2021-05-24 installed_stop 567.69 vs fill 154.55 (4:1 split 2021-07-20); SNX in the p1 cells (factor 2.0,
+   2020-12-01). P&L unaffected; false V12 FAIL rows.
+2. **V13 counts delisting exits as fills on a day with no bar** (`_v13_leg`, no waiver). S-p0: MIME-wein-200 (exit
+   2022-05-20, last bar 05-19), LACO-wein-168 (exit 2020-10-09, last bar 10-08). Reporting only.
+3. **Cash-rejection `available` is gross cash** (`cancel_handler.ml:272`, `current_cash`), while the G2b clamp budgets
+   cash plus paper losses minus commission. `results/ps-SR-p1-s0-cash_rejections.csv` ADNT-wein-122 shows 0.79 funded
+   yet was refused under a 0.5 minimum. Funding-fraction counts overstate spendable cash.
+4. Known, #3215: BBWI held across the 2021-08-03 VSCO spin-off in all 24 cells; uncredited.
+5. To check (#3239 class): SNX's 2020-12-01 split factor 2.0 falls on the Concentrix spin-off date.
+
+### Review-pack look
+
+`.sweep-output/review-ps-{A,S,SR,SC}-p0/`, 60 images (`top.png`, `part-1…14.png` each), pack SHA `3db869d32`.
+
+- Every chart spans 2019-01-02 → 2024-12-30. KPI strips match `actual.sexp` (A +168 % / −27.4 % / 0.79 / 138 trades;
+  S +96 % / −17.1 % / 0.63 / 150; SR +86 % / −17.1 % / 0.58 / 153; SC +71 % / −16.3 % / 0.54 / 192). No mojibake, NaN
+  or empty panels.
+- Config-implied zeros are zero: 0 fallback stops, 0 stop exits on a later open, 0 Saturday fills. "Filled against the
+  macro" (A 2, S 1) are Bullish-week tickets filled after the screen turned, allowed with `entry_ticket_macro_suspend`
+  off.
+- Odd rows traced: SC's V12 NVDA row (defect 1); V13 counts vs the pack's 0 (defect 2); S-p0's flat NAV in late
+  2022–2023 is two zero-exposure stretches earning T-bill interest, not a marking stall.
+- Signals (RV3): **Eras vs SPY** (A 1.04×, S 0.76×, SR 0.72×, SC 0.66×; seeded packs blame 2019–21 cash through the
+  rebound) — **refined**: that is seed 0's draw; A-p0 leads on UP days because it holds APPS. **Return rests on open
+  positions** — **confirmed** (MMYT in all 24 cells, CVNA). **Ten trades made $1.73M** (A) — **confirmed**, three carry
+  it. **Entries cancelled at the fill for cash** — **refined** by defect 3. **Gate reopens** — none flagged.
+- Limit: the packs are single-run and cannot show the seed spread; a pack with an arm's p0–p5 as runs would.
