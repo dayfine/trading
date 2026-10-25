@@ -1506,6 +1506,17 @@ result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS"
 check "malformed heads with 0 tracked -> un-suffixed path" \
   "dev/daily/2027-03-06.md" "$result"
 
+# Scenario 66d: other-date heads (run-1 and run-K shapes) and the file/parse
+# fallbacks on 0-tracked dates, so any false hit changes the answer.
+_prs_json "$_PRS" ops/daily-2027-03-08-run4 ops/daily-2027-03-10
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-09)
+check "other-date heads with 0 tracked -> un-suffixed path" "dev/daily/2027-03-09.md" "$result"
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$TMP_REPO/does-not-exist.json" "$GATE" current_summary_path 2027-03-07)
+check "unreadable open-PR source with 0 tracked -> un-suffixed path" "dev/daily/2027-03-07.md" "$result"
+printf 'not json' > "$_PRS"
+result=$(cd "$TMP_REPO" && ORCHESTRATOR_FASTEXIT_GATE_OPEN_PRS_JSON_FILE="$_PRS" "$GATE" current_summary_path 2027-03-07)
+check "malformed open-PR JSON with 0 tracked -> un-suffixed path" "dev/daily/2027-03-07.md" "$result"
+
 # Scenarios 67-69: the LIVE curl path (no injection file), via a fake `curl`
 # first on PATH. The fake prints $FAKE_CURL_BODY and exits $FAKE_CURL_RC, and
 # records the URL it was called with in $FAKE_CURL_LOG.
