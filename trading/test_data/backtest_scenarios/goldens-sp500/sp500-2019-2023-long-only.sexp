@@ -148,14 +148,15 @@
 
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in the PR. Correctness re-pin: no return claim attaches to the delta.
-  ((total_return_pct ((min 10.3264) (max 20.3264)))
+  ;; RE-PINNED 2026-10-25 for the Seeded candidate_ranking default (#3425; ties broken by a seeded hash, not by symbol name). +-15% (total_return_pct: at least +-5pp) around the Seeded actual, failing metrics only; Alphabetical->Seeded: ret 15.33->31.25, sharpe 0.249->0.358, OPV 1,151,446->925,413, sortino 0.219->0.378, calmar 0.099->0.186 (GHA 40232165563 vs main 40229425989). Tie-order path change: no return claim.
+  ((total_return_pct ((min 26.2529) (max 36.2529)))
    (total_trades ((min 128.3500) (max 173.6500)))
    (win_rate ((min 27.5828) (max 37.3179)))
-   (sharpe_ratio ((min 0.2115) (max 0.2862)))
+   (sharpe_ratio ((min 0.3044) (max 0.4118)))
    (max_drawdown_pct ((min 24.9115) (max 33.7037)))
    (avg_holding_days ((min 49.4238) (max 66.8675)))
-   (open_positions_value ((min 978729.1393) (max 1324162.9531)))
-   (sortino_ratio_annualized ((min 0.1858) (max 0.2514)))
-   (calmar_ratio ((min 0.0841) (max 0.1138)))
+   (open_positions_value ((min 786600.6505) (max 1064224.4095)))
+   (sortino_ratio_annualized ((min 0.3216) (max 0.4351)))
+   (calmar_ratio ((min 0.1579) (max 0.2136)))
    (ulcer_index ((min 11.5632) (max 15.6443)))
    (wall_seconds       ((min 0.0)          (max 1500.0))))))

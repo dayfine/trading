@@ -214,6 +214,7 @@
 
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in PR #3283. Correctness re-pin: no return claim attaches to the delta.
+  ;; RE-PINNED 2026-10-25 for the Seeded candidate_ranking default (#3425; ties broken by a seeded hash, not by symbol name). +-15% (total_return_pct: at least +-5pp) around the Seeded actual, failing metrics only; Alphabetical->Seeded: OPV 6,561,276->4,432,184 (GHA 40232163695 vs main 40198082542). Tie-order path change: no return claim.
   ((total_return_pct ((min 764.9551) (max 1034.9393)))
    (total_trades ((min 419.9000) (max 568.1000)))
    (win_rate ((min 32.6923) (max 44.2308)))
@@ -225,7 +226,7 @@
    ;; fills and stale-exit 5d clears ghost MTM, so terminal book is lighter.
    ;; Headline metrics (return/Sharpe/DD/trades) stayed in-band — only the
    ;; terminal-MTM composition moved. Was ~18.1M floor-off pre-flip.
-   (open_positions_value ((min 5577084.4640) (max 7545467.2160)))
+   (open_positions_value ((min 3767356.6975) (max 5097012.0025)))
    (sortino_ratio_annualized ((min 0.5135) (max 0.6947)))
    (calmar_ratio ((min 0.1647) (max 0.2228)))
    (ulcer_index ((min 25.3761) (max 34.3324)))
