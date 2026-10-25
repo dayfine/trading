@@ -35,7 +35,7 @@ REPO=${REPO:-/Users/difan/Projects/trading-1}
 EXP=dev/experiments/floor-nearest-2026-10-25
 STAGE=${STAGE:-/tmp/fn-run}                            # host, outside every VCS tree (sweep-hygiene.md: inputs too)
 H=$REPO/.sweep-output                                # host side of the container's /tmp/sweeps bind-mount
-ART=/tmp/sweeps/floor-nearest                          # container side; host $H/path-stability
+ART=/tmp/sweeps/floor-nearest                          # container side; host $H/floor-nearest
 HART=$H/floor-nearest
 WTREL=${WTREL:-.claude/worktrees/sweep-ps}             # the pinned run tree, repo-relative (container-visible)
 WT=/workspaces/trading-1/$WTREL; ROOT=$WT/trading; FIX=$ROOT/test_data/backtest_scenarios
@@ -386,9 +386,9 @@ cmd_collect() { # $1 destination results dir (host)
       echo $(( $(wc -l < "$dest/$b-cash_rejections.csv") - 1 )) > "$dest/$b-cash_rejections.txt"
       awk -F, -v c="$b" 'NR > 1 { n[substr($3, 1, 4)]++ } END { for (y in n) print c "," y "," n[y] }' \
         "$dest/$b-cash_rejections.csv" | LC_ALL=C sort >> "$dest/cash_rejections_by_year.csv"
-      # liveness (README): decision outcomes in the audit, one count per outcome tag
-      tr -s '\n\t ' '   ' < "$f" | grep -oE 'No_structural_stop|Placed|Insufficient_cash|Sized_to_zero' | LC_ALL=C sort | uniq -c \
-        | awk '{ print $2 "," $1 }' > "$dest/$b-audit_outcomes.csv"
+      # liveness (README): top-N decision outcomes only, never the re-listings in alternatives_considered
+      tr -s '\n\t ' '   ' < "$f" | grep -oE '\(outcome (Placed|\(Skipped [A-Za-z_]+)' \
+        | sed 's/^(outcome (Skipped //; s/^(outcome //' | LC_ALL=C sort | uniq -c | awk '{ print $2 "," $1 }' > "$dest/$b-audit_outcomes.csv"
       continue ;; esac
     cp "$f" "$dest/"
   done
@@ -432,12 +432,12 @@ cmd_summary() {
   { _rows S "$NULL_DIR" "$nlg" && _rows SN "$dir" "$lg"; } > "$rows" || { rm -f "$rows"; return 1; }
   echo "floor-nearest summary: SN from $dir, S (null) from $NULL_DIR"
   echo
-  echo "liveness (README; SN p0 vs the null's S p0 = No_structural_stop 8302, Placed 190, path-stability ps-S-p0-s0 trade_audit):"
+  echo "liveness (README; SN p0 vs the null's S p0 = decision outcomes No_structural_stop 5078, Placed 190, path-stability ps-S-p0-s0 trade_audit):"
   oc=$dir/ps-SN-p0-s0-audit_outcomes.csv
   if [ -s "$oc" ]; then
     awk -F, '{ c[$1] = $2 } END { nss = c["No_structural_stop"] + 0; pl = c["Placed"] + 0
-      printf "  SN p0: No_structural_stop %d (%.3f x S), Placed %d (%.3f x S)\n", nss, nss / 8302, pl, pl / 190
-      if (nss <= 0.75 * 8302 && pl > 190) print "  -> LIVE (No_structural_stop <= 0.75 x S and Placed > S)"
+      printf "  SN p0: No_structural_stop %d (%.3f x S), Placed %d (%.3f x S)\n", nss, nss / 5078, pl, pl / 190
+      if (nss <= 0.75 * 5078 && pl > 190) print "  -> LIVE (No_structural_stop <= 0.75 x S and Placed > S)"
       else print "  -> NOT LIVE as screened: no return read (README)" }' "$oc"
   else echo "  n/a: $oc missing"; fi
   echo

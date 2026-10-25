@@ -7,7 +7,7 @@ numbers are quoted here; SN's are not known to the author.
 ## Why this arm
 
 The record N arm skips about 20,000 decisions over 26 y as `No_structural_stop` (every year, 87–97 % of top-N
-decisions). On the path-stability S p0 cell it is 8,302 skips against 190 placed tickets. A host-only screen of the
+decisions). On the path-stability S p0 cell it is 5,078 skipped decisions against 190 placed tickets. A host-only screen of the
 26y record skips (2026-10-25, memory `project_floor_and_refresh_screens`) found:
 
 - 67 % of skips have no 8 % pullback after the 90-bar high, because the high is at or near the end of the window: the
@@ -40,7 +40,7 @@ prior against it.
   the null, never re-chosen.
 - **Validity.** SN p0 is gated on `validator_diff -check V6` against the null's A-p0, and each SN pk against SN p0, as in
   the null's chain. An excluded cell is dropped and named.
-- **Cost.** 6 cells at about 3,000–3,600 s each (the null's S/SC cells), about 6–7 h, alone in the container.
+- **Cost.** 6 cells; the null's S cells took 2,360–2,863 s and its SC cells 3,013–3,606 s, so about 4–6 h, alone in the container.
 
 ## Metrics and decision rule (written before any SN run)
 
@@ -48,8 +48,10 @@ Per arm over its included cells: spread = sample SD of ln(1 + R); median ln(1 + 
 Null values (path-stability `summary.txt`, 2026-10-24): spread(S) = **0.2108**, median ln(1 + R) = **1.0313**, median
 max DD 23.29 %, median Calmar 0.674.
 
-1. **Liveness first.** From SN p0's trade audit: `No_structural_stop` ≤ 0.75 × 8,302 **and** `Placed` > 190 (S p0's
-   counts). If either fails, the mechanism did not do what the screen predicted. The run is recorded as "not live as
+1. **Liveness first.** From SN p0's trade audit, counting top-N decision outcomes only (`(outcome ...)` in
+   `cascade_summaries`, not the re-listings in each placed entry's `alternatives_considered`): skipped
+   `No_structural_stop` ≤ 0.75 × 5,078 = 3,808 **and** `Placed` > 190 (S p0's counts). If SN p0 is excluded or failed,
+   liveness is n/a and nothing is read. If either condition fails, the mechanism did not do what the screen predicted. The run is recorded as "not live as
    screened", with no return read, and the next step is to find out why.
 2. **Return.** Δ = median ln(1 + R)(SN) − median ln(1 + R)(S), with the bar b = spread(S) = 0.2108.
    - Δ ≥ +b → **PROMISING**: escalate to a new pre-registration covering 26 y plus a pre-2009 cell
@@ -57,10 +59,13 @@ max DD 23.29 %, median Calmar 0.674.
    - Δ ≤ −b → **NO-BUILD decision** for this lever at this window. The dial stays default-off as an axis.
    - otherwise → **INCONCLUSIVE**: no escalation on return.
 3. **Do-no-harm on PROMISING.** If median max DD(SN) − median max DD(S) > 100 × b pp, the result reads "PROMISING
-   with a DD cost": a user decision, not an automatic escalation. Calmar is reported beside it.
+   with a DD cost": a user decision, not an automatic escalation. Calmar is reported beside it. At this window the
+   DD bar is loose (21 pp), so the median max DD and Calmar are also reported on their own.
 4. **Reported, not decision-bearing:** spread(SN)/spread(S); how many of the 36 SN × S cross pairs SN wins; the
    divergence onset of each SN pk; the review-pack signals of SN p0; the tail (trades above +100 % total return per
-   cell and the top trade's share of P&L), read from the committed `trades.csv`.
+   cell and the top trade's share of P&L), read from the committed `trades.csv`. Also a cohort read of SN p0 vs S p0
+   joined on `symbol|entry_date`: trades in both, SN only (the converted skips) and S only, with count and P&L each.
+5. **Cell floor:** `summary` applies the rule only with ≥ 4 included cells in each arm; otherwise it reports n/a.
 
 **Power, said up front.** With n = 6 per arm and spread 0.21, the standard error of a difference in medians is about
 0.15, so the bar b = 0.21 is about 1.4 SE. Only a large effect can register. An INCONCLUSIVE result does not show that
@@ -108,3 +113,12 @@ entrants have a lower median 12-month forward return (−0.5 % vs +6.1 %) but ho
 ## Results
 
 _Placeholder: filled by the results PR (results-analyst read, `summary.txt`, review-pack look, `Verifies` line)._
+
+## Log
+
+- 2026-10-25 06:57 PT, before any SN artifact was read (the chain was in the SN-p0 preflight): qc-results (#3418)
+  found that liveness counted every `No_structural_stop` token in the audit (8,302 on S p0). That figure includes the
+  week's skips re-listed in each placed entry's `alternatives_considered`, which grow with Placed and pull against
+  the second condition. Amended to decision outcomes only (S p0: 5,078 / 190). The bar ratio 0.75 is unchanged. The
+  running chain was staged from 97b6daa99, so its own `summary.txt` uses the old count: `collect` and `summary` are
+  re-run from this commit's `chain.sh` after the chain ends, and that output is the one read.
