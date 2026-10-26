@@ -1,6 +1,6 @@
 # Status: cleanup
 
-## Last updated: 2026-10-12
+## Last updated: 2026-10-26
 
 ## Status
 IN_PROGRESS
@@ -142,6 +142,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
   - require_breakout_volume: DONE (cleanup/require-breakout-volume-pin) -- test_analyze_require_breakout_volume_changes_candidacy pins the stock_analysis.ml inner thread; exception line removed. 5 remain: stop_width_mode, stop_width_size_down_max_pct, match_fraction, ret_epsilon, insufficient_score.
   - stop_width_mode + stop_width_size_down_max_pct: DONE (cleanup/stop-width-mode-thread-pin) -- EFFECTIVENESS-PIN comments on test_walk_emits_the_narrow_stops_first (existing tests already red under mutation); both exception lines removed. 3 remain: match_fraction, ret_epsilon, insufficient_score.
 
+- [x] test_gap: trading/backtest/decision_grading/bin/decision_grading_bin.ml — no test ran the bin (source: 2026-10-20-run2 summary follow-up). DONE 2026-10-26: `test_decision_grading_bin.ml` builds a synthetic snapshot warehouse + scenario dir (trades.csv, trade_audit.sexp, summary.sexp), runs the real exe and pins the full markdown; 7 bin mutants proven red (pnl scale, side wiring, grade-horizon pick, MFE entry-date join, empty-reason label, exit-reason key, exit_price). Surprise: the bin takes `side` from the audit entry (default Long), not trades.csv `side`, so a short with no audit record is graded as a long (TAR render, `trade_audit_report.ml:105`). Branch cleanup/decision-grading-runner-test.
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
 ## Completed
