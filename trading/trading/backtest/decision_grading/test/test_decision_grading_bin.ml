@@ -55,21 +55,21 @@ let _bars ~after =
         active_through = None;
       })
 
+(* Unwrap a setup Result, failing the test with [what] and the status. *)
+let _ok_exn ~what = function
+  | Ok v -> v
+  | Error err -> assert_failure (what ^ ": " ^ Status.show err)
+
 let _write_warehouse ~snapshot_dir symbols =
   let schema = Snapshot_schema.default in
   let entries =
     List.map symbols ~f:(fun (symbol, after) ->
         let rows =
-          match
-            Pipeline.build_for_symbol ~symbol ~bars:(_bars ~after) ~schema ()
-          with
-          | Ok r -> r
-          | Error err -> assert_failure (Status.show err)
+          _ok_exn ~what:"build_for_symbol"
+            (Pipeline.build_for_symbol ~symbol ~bars:(_bars ~after) ~schema ())
         in
         let path = Filename.concat snapshot_dir (symbol ^ ".snap") in
-        (match Snapshot_format.write ~path rows with
-        | Ok () -> ()
-        | Error err -> assert_failure (Status.show err));
+        _ok_exn ~what:"Snapshot_format.write" (Snapshot_format.write ~path rows);
         let stat = Core_unix.stat path in
         ({
            symbol;
@@ -81,13 +81,10 @@ let _write_warehouse ~snapshot_dir symbols =
          }
           : Snapshot_manifest.file_metadata))
   in
-  match
-    Snapshot_manifest.write
-      ~path:(Filename.concat snapshot_dir "manifest.sexp")
-      (Snapshot_manifest.create ~schema ~entries)
-  with
-  | Ok () -> ()
-  | Error err -> assert_failure (Status.show err)
+  _ok_exn ~what:"Snapshot_manifest.write"
+    (Snapshot_manifest.write
+       ~path:(Filename.concat snapshot_dir "manifest.sexp")
+       (Snapshot_manifest.create ~schema ~entries))
 
 let _trades_csv =
   "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger\n\
