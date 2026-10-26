@@ -299,6 +299,13 @@ pin_md5() {
   else cp "$1" "$2"; log "install: wrote $(basename "$2") ($(n_of "$2") lists): commit it"; fi
 }
 
+# $1 post.stamp, $2 twin-scan.sh, $3 bar-store path. stdout: the twin-scan cache key: the post lists, the scanner's bytes
+# (its thresholds are constants in the file) and its effective settings. A cache from another scanner or MIN_SHARED is
+# rescanned. The bar store's contents are not bound (start from a fresh WORK after any data change).
+scan_stamp() {
+  echo "post=$(cat "$1") scanner=$(cksum < "$2" | awk '{ print $1 "-" $2 }') MIN_SHARED=${MIN_SHARED:-8} DATA=$3"
+}
+
 # $1 dir of dated lists, $2 twin-drops-monthly.txt. stdout: the twinscan completion stamp, the cksums of the lists'
 # bytes and of the drop evidence. Written to $WORK/twinscan.done only after report_unhandled passes.
 twinscan_stamp() {
@@ -407,11 +414,12 @@ phase_twinscan() {
   [ -s "$WORK/post.stamp" ] || die "run the post phase first"
   cat "$WORK"/final/*.sexp | cksum | cmp -s - "$WORK/post.stamp" || die "$WORK/final changed since post (monthly drops already applied?): rerun post first"
   S=$WORK/twin-scan
-  if [ -s "$S/cooccur.txt" ] && cmp -s "$S/stamp" "$WORK/post.stamp"; then log "twinscan: reusing $S (same post lists)"
+  if [ -s "$S/cooccur.txt" ] && scan_stamp "$WORK/post.stamp" "$TWINX/twin-scan.sh" "$DATA_H" | cmp -s - "$S/stamp"; then
+    log "twinscan: reusing $S (same post lists, scanner and settings)"
   else
     rm -rf "$S"; mkdir -p "$S"; t0=$(date +%s)
     DATA=$DATA_H LISTS=$WORK/final sh "$TWINX/twin-scan.sh" "$S" 2>> "$WORK/build.log" || die "twin-scan.sh failed"
-    cp "$WORK/post.stamp" "$S/stamp"; log "twinscan: $(n_of "$S/twins.txt") confirmed pairs (wall $(( $(date +%s) - t0 ))s)"
+    scan_stamp "$WORK/post.stamp" "$TWINX/twin-scan.sh" "$DATA_H" > "$S/stamp"; log "twinscan: $(n_of "$S/twins.txt") confirmed pairs (wall $(( $(date +%s) - t0 ))s)"
   fi
   [ ! -s "$S/missing-csv.txt" ] || log "twinscan: $(n_of "$S/missing-csv.txt") list symbols have no CSV (e.g. $(head -3 "$S/missing-csv.txt" | tr '\n' ' '))"
   syms_of "$V12"/composition/top-*.sexp | LC_ALL=C sort -u > "$WORK/yearly-union.txt"
