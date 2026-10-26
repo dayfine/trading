@@ -108,6 +108,14 @@ entrants have a lower median 12-month forward return (−0.5 % vs +6.1 %) but ho
 - **Perturbations:** the same five names, cut from every monthly list; same seeds.
 - **Rule:** the same as SN's (liveness, then Δ against spread(S), do-no-harm, the same caveats). Liveness for SM: at
   least one SM p0 trade in a symbol outside the yearly list in force on its entry date.
+- **Amendment 2026-10-25 (after the SN read, before any SM list, warehouse or run exists):**
+  - **Displacement read.** SN showed this book is cash-bound: every admitted ticket displaces one. For each SM cell vs
+    its paired S cell, report (a) *entrants*: SM placements in symbols outside the yearly list in force; (b)
+    *displaced*: S placements absent from the SM cell; (c) the realised ln(1+R) of each set, as n, mean, median,
+    p10/p90 and the share above +100 %. This is descriptive. It explains the Δ and does not change the rule above.
+  - **Twin drops on monthly lists.** Year Y's pit-v12 twin drops apply to every monthly list dated in
+    [Y-05-31, Y+1-05-31). Symbols that appear only in monthly lists also go through the twin detector, and its drops
+    are committed with their evidence (prerequisite 3).
 
 ## Results
 
