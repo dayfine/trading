@@ -1397,6 +1397,18 @@
  (action
   (run sh %{dep:build_pit_warehouse_v12_guard_smoke.sh})))
 
+; Arm SM prerequisite 3: dry harness for the list-side rules of dev/scripts/build_monthly_universe_warehouse.sh
+; (yearly twin-drops re-keyed to monthly windows, monthly-only twin drops, both-legs-yearly co-occurrence drops,
+; chained-survivor guard, schedule, warehouse set) and its abort guards (md5 pin, May 31 identity, unhandled
+; twin cells, drop checks, verify set checks, list and warehouse resume). Same (universe) pattern as above: the script is read via
+; repo_root() at run time.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:build_monthly_universe_guard_smoke.sh})))
+
 ; wait_for test (issue #2738 Ask 2): dev/scripts/wait_for.sh is the
 ; dispatcher's background wait helper (.claude/rules/dispatcher-cadence.md).
 ; Same shim + (universe) pattern as dispatch_disk_guard_test_runner.sh above.

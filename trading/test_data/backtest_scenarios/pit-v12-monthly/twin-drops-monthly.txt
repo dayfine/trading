@@ -1,0 +1,5 @@
+# NOT YET PRODUCED. Monthly rename-twin drops for arm SM: LIST DROPPED SURVIVOR <twin-scan.sh evidence>.
+# Written by `dev/scripts/build_monthly_universe_warehouse.sh twinscan` on the full 1999-05-31..2025-12-31 build;
+# commit the regenerated file together with composition.md5 and composition-raw.md5 (the lists and the schedule are
+# gitignored and rebuilt by that script). Until then this file holds no rows, and an empty file here does NOT mean
+# the scan found no twins.

@@ -6,6 +6,29 @@
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-10-25 — monthly top-3000 lists + warehouse build script (arm SM
+  prerequisite 3; PR open).** `dev/scripts/build_monthly_universe_warehouse.sh`
+  (resumable phases preflight / lists / post / twinscan / install / warehouse /
+  verify) builds the month-end lists 1999-05-31 → 2025-12-31 on the pit-v12
+  inputs, applies pit-v12's alias maps and twin drops (a confirmed pair's
+  dropped leg leaves every monthly list holding both legs, whatever the
+  window), drops monthly-only and ungoverned both-legs-yearly twin pairs with
+  the scan's evidence (`pit-v12-monthly/twin-drops-monthly.txt`, a marked
+  placeholder until the full run), checks every May 31 list against pit-v12
+  byte for byte, writes the dated `universe_schedule`, and builds a chunked
+  warehouse with the chain's set-equality check. The lists (~130 MB) are
+  gitignored; the committed `composition{,-raw}.md5` pin them and install
+  aborts on a mismatch. Pinned by
+  `trading/devtools/checks/build_monthly_universe_guard_smoke.sh` (dry
+  harness of the list-side helpers and of every abort guard: `pin_md5`,
+  `check_may31` with its 27-list count, `report_unhandled`, `check_drops_hold`,
+  the verify set checks including `.weekly`, smoke-then-full list resume, and
+  the warehouse build stamp) and `test_build_composition_universes_runner`
+  (new `summary_lines`, non-leap February, first-differing-line report). List
+  markers are bound to their bounds and inputs, the raw lists must be exactly
+  the requested month ends, and chunk markers and `$OUT` are reused only under
+  the same build stamp (set, chunk size, window, exceptions, run tree). Not
+  run here: the full build (~6–7 h container-exclusive).
 - [x] **2026-10-25 — month-end anchors on the composition list builder (arm
   SM prerequisites 1 + 2, `dev/experiments/floor-nearest-2026-10-25/README.md`
   §"Arm SM"; PR open).** `build_composition_universes_runner --month-ends
