@@ -29,8 +29,11 @@
 #              every monthly list holding both legs while the yearly list in force holds at most one (dispatcher
 #              decision 2026-10-25; cells the yearly list also holds together are the pit-v12 state and stay). Rows +
 #              the detector's evidence -> $DEST/twin-drops-monthly.txt (commit it). Afterwards no such cell may remain:
-#              $DEST/twin-cooccur-unhandled.txt must hold no rows, or the phase aborts.
-#   install    final lists -> $DEST/composition, composition{,-raw}.md5, twin-drops.txt (the re-keyed yearly rows),
+#              $DEST/twin-cooccur-unhandled.txt must hold no rows, or the phase aborts. Only then is
+#              $WORK/twinscan.done written (cksums of the final lists and twin-drops-monthly.txt); the phase removes it
+#              first, so an aborted twinscan leaves none.
+#   install    requires $WORK/twinscan.done to match the current final lists and drops (a missing or stale stamp
+#              aborts), then: final lists -> $DEST/composition, composition{,-raw}.md5, twin-drops.txt (the re-keyed yearly rows),
 #              universe-schedule.sexp (one `(DATE "pit-v12-monthly/composition/top-3000-DATE.sexp")` per list).
 #              The lists (~130 MB) and the schedule are gitignored and rebuilt by this script; only composition.md5,
 #              composition-raw.md5 and twin-drops-monthly.txt are committed. Once the md5 files are committed, install
@@ -41,6 +44,10 @@
 #              exceptions, run tree commit), which $OUT also carries; any other reuse aborts.
 #   verify     manifest == warehouse set derived from $DEST's lists (the chain's set-equality check), every entry has a
 #              .snap and a .weekly, no orphan .snap or .weekly, manifest <= handle cap.
+#
+# Resume caches (list .done markers, post.stamp, the twin-scan dir, twinscan.done, chunk markers, $OUT's stamp) bind the
+# bounds, builder flags, metadata inputs (inventory, symbol types, sectors), list bytes and warehouse window. They do
+# NOT cover the CSV bar contents: after any change to the bar store, start from a fresh WORK and OUT.
 #
 # Measured 2026-10-25 (smoke, FROM=2009-04-01 TO=2009-06-30): lists 145 s for 3 (48 s per list; 2025-10..12: 41 s);
 # twin scan 83 s over a 2,959-name union (pit-v12's 9,279-name scan: 14 min); warehouse 0.87 s per name in 80-name
@@ -98,7 +105,7 @@ n_of() { wc -l < "$1" | tr -d ' '; }
 # $1 yearly drops file ("top-N-Y D S", '#' comments), $2 dir of top-3000-YYYY-MM-DD.sexp lists, $3 skipped-rows
 # file. stdout: "top-3000-YYYY-MM-DD D S" for every monthly list holding both legs of a pair (D, S) named by any row,
 # whatever its window: both legs of a confirmed pair can co-occur in a monthly list whose governing yearly list holds
-# only one leg (CMN and CMD in top-3000-2009-04-30, the 2008 window; dispatcher decision 2026-10-25). Ascending by
+# at most one leg (CMN and CMD in top-3000-2009-04-30, the 2008 window, whose list holds neither; dispatcher decision 2026-10-25). Ascending by
 # list, then pair. A list dated in a top-3000-Y row's window [Y-05-31, Y+1-05-31) that holds D without S is written to
 # $3 (dropping D there would delete the instrument, not a second copy).
 map_yearly_drops() {
@@ -141,7 +148,7 @@ derive_monthly_drops() {
 # dir of monthly lists. stdout: the rows whose monthly list holds both legs while the yearly list in force (the latest
 # May 31 on or before LIST's date) holds at most one. A cell whose yearly list in force also holds both legs is the
 # pit-v12 state (the unapplied 790-row proposal, #3391) and is left alone, so every May 31 list keeps its yearly bytes.
-# Specimen: CMN and CMD are both in top-3000-2009-04-30, whose yearly list in force (2008) holds one leg.
+# Specimen: CMN and CMD are both in top-3000-2009-04-30, whose yearly list in force (2008) holds neither leg.
 ungoverned_cooccur() {
   while read -r l d s ev; do
     [ -n "$l" ] || continue
@@ -284,16 +291,38 @@ pin_md5() {
   else cp "$1" "$2"; log "install: wrote $(basename "$2") ($(n_of "$2") lists): commit it"; fi
 }
 
+# $1 dir of dated lists, $2 twin-drops-monthly.txt. stdout: the twinscan completion stamp, the cksums of the lists'
+# bytes and of the drop evidence. Written to $WORK/twinscan.done only after report_unhandled passes.
+twinscan_stamp() {
+  echo "lists=$(cat "$1"/top-3000-*.sexp | cksum | awk '{ print $1 "-" $2 }') drops=$(cksum < "$2" | awk '{ print $1 "-" $2 }')"
+}
+
+# $1 dir of dated lists, $2 twin-drops-monthly.txt, $3 recorded completion stamp. Install's precondition: aborts unless
+# a twinscan completed (every check passed) on exactly these lists and drops. A twinscan that aborted part way writes
+# no stamp (the phase removes it first), and a list or drop file changed since leaves a stale one.
+check_twinscan_done() {
+  [ -s "$3" ] || die "no twinscan completion stamp $3: run the twinscan phase first (an aborted twinscan leaves none)"
+  twinscan_stamp "$1" "$2" | cmp -s - "$3" || die "$1 or $2 changed since the twinscan completed ($3 is stale): rerun post and twinscan"
+}
+
 # $1 warehouse set, $2 CHUNK_SIZE, $3 WH_START, $4 WH_END, $5 tail-exceptions file, $6 run tree commit. stdout: the
 # one-line provenance of a warehouse build. Chunk markers and an existing $OUT are reused only under the same line:
-# build_snapshots -incremental skips a symbol whose CSV is unchanged, so a changed window or input would otherwise
-# keep the old snapshots silently.
+# build_snapshots -incremental skips a symbol whose CSV is unchanged, so a changed set, chunking, window, exception
+# list or run tree would otherwise keep the old snapshots silently. The stamp does NOT cover the CSV bar contents:
+# after any change to the bar store, start from a fresh WORK and OUT.
 wh_stamp() {
   echo "syms=$(cksum < "$1" | awk '{ print $1 "-" $2 }') k=$2 start=$3 end=$4 exc=$(cksum < "$5" | awk '{ print $1 "-" $2 }') tree=$6"
 }
 
 # $1 recorded stamp (may be absent: a fresh build), $2 new stamp. Exit 0 when reuse is compatible.
 stamp_compatible() { [ ! -f "$1" ] || cmp -s "$1" "$2"; }
+
+# $1 $OUT (for messages), $2 the stamp copied out of an existing $OUT (absent or empty: it had none), $3 new stamp.
+# An existing $OUT is reused only when it carries the same stamp; one without a stamp, or with another, aborts.
+check_out_stamp() {
+  [ -s "$2" ] || die "$1 exists without a build stamp: move it or set OUT"
+  cmp -s "$2" "$3" || die "$1 was built for another window or input set ($2 vs $3): remove it and the chunk markers"
+}
 
 [ -z "${SM_LIB_ONLY:-}" ] || { return 0 2>/dev/null || exit 0; }   # dry-harness hook
 
@@ -366,6 +395,7 @@ phase_post() {
 }
 
 phase_twinscan() {
+  rm -f "$WORK/twinscan.done"   # an abort below must leave install refusing
   [ -s "$WORK/post.stamp" ] || die "run the post phase first"
   cat "$WORK"/final/*.sexp | cksum | cmp -s - "$WORK/post.stamp" || die "$WORK/final changed since post (monthly drops already applied?): rerun post first"
   S=$WORK/twin-scan
@@ -387,6 +417,7 @@ phase_twinscan() {
   write_monthly_drops_file
   if [ -s "$WORK/drops-monthly.txt" ]; then sh "$TWINX/apply-drops.sh" "$WORK/drops-monthly.txt" "$WORK/final" >> "$WORK/post.log" || die "apply-drops (monthly rows)"; fi
   report_unhandled "$WORK/cooccur-other.txt" "$V12/composition" "$WORK/final" "$DEST/twin-cooccur-unhandled.txt"
+  twinscan_stamp "$WORK/final" "$DEST/twin-drops-monthly.txt" > "$WORK/twinscan.done"   # only now: every check passed
   log "twinscan: monthly-only symbols $(n_of "$WORK/monthly-only.txt") of union $(n_of "$WORK/monthly-union.txt"); $(awk '{ print $2, $3 }' "$WORK/drops-monthly.txt" | sort -u | wc -l | tr -d ' ') pairs -> $(n_of "$WORK/drops-monthly.txt") list rows dropped ($(n_of "$WORK/drops-monthly-only.txt") monthly-only, $(n_of "$WORK/drops-cooccur.txt") both-legs-yearly) -> $DEST/twin-drops-monthly.txt"
 }
 
@@ -404,7 +435,7 @@ write_monthly_drops_file() {
 }
 
 phase_install() {
-  [ -f "$WORK/drops-monthly.txt" ] && [ "$WORK/drops-monthly.txt" -nt "$WORK/post.stamp" ] || die "run the twinscan phase first"
+  check_twinscan_done "$WORK/final" "$DEST/twin-drops-monthly.txt" "$WORK/twinscan.done"
   mkdir -p "$DEST/composition"; rm -f "$DEST"/composition/top-3000-*.sexp
   cp "$WORK"/final/top-3000-*.sexp "$DEST/composition/"
   { echo "# Yearly pit-v12 twin-drops re-keyed to the monthly lists (build_monthly_universe_warehouse.sh post): LIST DROPPED SURVIVOR"
@@ -444,8 +475,8 @@ wh_resume_guard() {
   stamp_compatible "$W/build.stamp" "$W/build.stamp.new" \
     || die "the chunk markers in $W were written for another build ($W/build.stamp vs $W/build.stamp.new): remove $OUT and $W/chunk-* $W/build.stamp"
   if dx test -e "$OUT"; then
-    dx cat "$OUT/.sm-build.stamp" > "$W/out.stamp" 2>/dev/null || die "$OUT exists without a build stamp: move it or set OUT"
-    cmp -s "$W/out.stamp" "$W/build.stamp.new" || die "$OUT was built for another window or input set ($W/out.stamp vs $W/build.stamp.new): remove it and $W/chunk-*"
+    dx cat "$OUT/.sm-build.stamp" > "$W/out.stamp" 2>/dev/null || rm -f "$W/out.stamp"
+    check_out_stamp "$OUT" "$W/out.stamp" "$W/build.stamp.new"
   else
     rm -f "$W"/chunk-*.done; dx mkdir -p "$OUT"; docker cp "$W/build.stamp.new" "$CONTAINER:$OUT/.sm-build.stamp" || die "stamp $OUT"
   fi

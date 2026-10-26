@@ -19,7 +19,9 @@
 #   i. set_equal (verify): equal passes; an extra name, or a manifest name with no .weekly, fails.
 #   j. check_drops_hold: a dropped leg still listed, or a missing survivor, aborts.
 #   k. lists resume: a smoke run's marker never stands in for a full run; the list set must be the exact month ends.
-#   l. warehouse stamp: a changed WH_START, WH_END or exceptions file rejects the old markers and output.
+#   l. warehouse stamp: a changed WH_START, WH_END or exceptions file rejects the old markers and output; an existing
+#      $OUT without its stamp, or with another, aborts (check_out_stamp).
+#   m. check_twinscan_done: install refuses a missing or stale twinscan completion stamp, accepts a matching one.
 #
 # Run: sh trading/devtools/checks/build_monthly_universe_guard_smoke.sh
 set -eu
@@ -58,7 +60,7 @@ grep -v -e 2009-04-30 -e 2012-01-31 "$SB/mapped.txt" > "$SB/mapped-in-window.txt
 check "a: a row lands on its [Y-05-31, Y+1-05-31) lists holding both legs" "$SB/want-in-window.txt" "$SB/mapped-in-window.txt"
 printf 'top-3000-2009-04-30 CMN CMD\ntop-3000-2012-01-31 CMN CMD\n' > "$SB/want-gap.txt"
 grep -e 2009-04-30 -e 2012-01-31 "$SB/mapped.txt" > "$SB/mapped-gap.txt" || true
-check "a: the pair also drops where the yearly list in force holds one leg (CMN/CMD in 2009-04-30, the 2008 window) or no row's window applies (2012)" "$SB/want-gap.txt" "$SB/mapped-gap.txt"
+check "a: the pair also drops where the yearly list in force holds at most one leg (CMN/CMD in 2009-04-30, the 2008 window) or no row's window applies (2012)" "$SB/want-gap.txt" "$SB/mapped-gap.txt"
 echo 'top-3000-2010-05-31 CMN CMD survivor-absent' > "$SB/want-skipped.txt"
 check "a: an in-window list holding D without its survivor is kept and reported; a list holding only S is untouched" "$SB/want-skipped.txt" "$SB/skipped.txt"
 
@@ -194,6 +196,23 @@ wh_stamp "$L2/syms.txt" 2500 2000-01-01 2026-10-07 "$L2/exc.sexp" abc > "$L2/sta
 expect_abort "l: a changed WH_START rejects them" stamp_compatible "$L2/old.stamp" "$L2/start.stamp"
 echo '(exceptions (X))' > "$L2/exc.sexp"; wh_stamp "$L2/syms.txt" 2500 1998-01-01 2026-10-07 "$L2/exc.sexp" abc > "$L2/exc.stamp"
 expect_abort "l: changed tail exceptions reject them" stamp_compatible "$L2/old.stamp" "$L2/exc.stamp"
+# $OUT side: an existing $OUT is reused only under its own copy of the same stamp
+expect_abort "l: an existing \$OUT without a build stamp aborts" check_out_stamp OUT "$L2/absent.stamp" "$L2/same.stamp"
+: > "$L2/empty.stamp"
+expect_abort "l: an existing \$OUT with an empty build stamp aborts" check_out_stamp OUT "$L2/empty.stamp" "$L2/same.stamp"
+expect_abort "l: an existing \$OUT with another build stamp aborts" check_out_stamp OUT "$L2/end.stamp" "$L2/same.stamp"
+expect_pass "l: an existing \$OUT with the same build stamp is reused" check_out_stamp OUT "$L2/old.stamp" "$L2/same.stamp"
+
+# --- m. install requires a completed twinscan on the current lists and drops ------------------------------------------
+T=$SB/twindone; mkdir -p "$T/final"; list "$T/final/top-3000-2009-06-30.sexp" CMN A
+printf '# header\ntop-3000-2009-06-30 CMD CMN\n' > "$T/drops.txt"
+expect_abort "m: install aborts with no twinscan completion stamp (an aborted twinscan writes none)" check_twinscan_done "$T/final" "$T/drops.txt" "$T/twinscan.done"
+twinscan_stamp "$T/final" "$T/drops.txt" > "$T/twinscan.done"
+expect_pass "m: install accepts a stamp matching the current lists and drops" check_twinscan_done "$T/final" "$T/drops.txt" "$T/twinscan.done"
+list "$T/final/top-3000-2009-06-30.sexp" CMN CMD A
+expect_abort "m: install aborts on a stale stamp (the lists changed since the twinscan)" check_twinscan_done "$T/final" "$T/drops.txt" "$T/twinscan.done"
+list "$T/final/top-3000-2009-06-30.sexp" CMN A; echo 'top-3000-2009-06-30 X Y' >> "$T/drops.txt"
+expect_abort "m: install aborts on a stale stamp (the drop evidence changed since the twinscan)" check_twinscan_done "$T/final" "$T/drops.txt" "$T/twinscan.done"
 
 echo "build_monthly_universe_guard_smoke: $passes passed, $fails failed"
 [ "$fails" = 0 ]
