@@ -102,8 +102,15 @@ let _row_of_trade audit_idx (trade : Trading_simulation.Metrics.trade_metrics) :
   let execution =
     Option.bind audit ~f:(fun (r : TA.audit_record) -> r.execution)
   in
+  (* Without an audit record, fall back to the trade's own entry-leg side
+     (Buy = long round-trip, Sell = short) rather than assuming Long. *)
   let side =
-    Option.value_map entry ~default:Trading_base.Types.Long ~f:(fun e -> e.side)
+    Option.value_map entry
+      ~default:
+        (match trade.side with
+        | Trading_base.Types.Buy -> Trading_base.Types.Long
+        | Trading_base.Types.Sell -> Trading_base.Types.Short)
+      ~f:(fun e -> e.side)
   in
   (* Enriched exit wins; otherwise fall back to the reason-only
      [external_exit] captured for exits generated outside the strategy's
