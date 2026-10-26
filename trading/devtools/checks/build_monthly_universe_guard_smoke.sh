@@ -9,7 +9,7 @@
 #      list, carrying the scan's evidence; mode `other` returns the complementary (both-legs-yearly) pairs.
 #   b2. ungoverned_cooccur: a both-legs-yearly pair drops where the yearly list in force holds at most one leg, never
 #      where it holds both.
-#   c. chained_survivors: a survivor that is also dropped in the same list fails; in another list it passes.
+#   c. resolve_chains: a survivor dropped in the same list resolves to the last leg (tagged via=); a cycle fails.
 #   d. write_schedule: one dated entry per monthly list, ascending; yearly-named files are ignored.
 #   e. warehouse_set: list union - MEL + GSPC.INDX + runner extras, sorted unique.
 # and the abort guards, each case in a subshell (die exits):
@@ -86,11 +86,15 @@ ungoverned_cooccur "$SB/other-rows.txt" "$Y" "$M" > "$SB/ungoverned.txt"
 printf 'top-3000-2009-04-30 A B ev=1\ntop-3000-2007-08-31 A B\n' > "$SB/want-ungoverned.txt"
 check "b2: drops where the yearly list in force holds one leg or none exists; never where it holds both (May 31 keeps its bytes)" "$SB/want-ungoverned.txt" "$SB/ungoverned.txt"
 
-# --- c. chained survivors ---------------------------------------------------------------------------------------------
-printf 'L1 X Y\nL1 Y Z\n' > "$SB/chain.txt"
-if chained_survivors "$SB/chain.txt" > /dev/null; then bad "c: a survivor dropped in the same list must fail"; else ok "c: a survivor dropped in the same list fails"; fi
-printf 'L1 X Y\nL2 Y Z\n' > "$SB/nochain.txt"
-if chained_survivors "$SB/nochain.txt" > /dev/null; then ok "c: the same symbols in different lists pass"; else bad "c: different lists must pass"; fi
+# --- c. chain resolution ----------------------------------------------------------------------------------------------
+printf 'L1 X Y ev=1\nL1 Y Z ev=2\nL2 X Y ev=3\n' > "$SB/chain.txt"
+resolve_chains "$SB/chain.txt" > "$SB/chain-out.txt" 2> /dev/null || bad "c: a chain without a cycle must pass"
+printf 'L1 X Z ev=1 via=Y\nL1 Y Z ev=2\nL2 X Y ev=3\n' > "$SB/want-chain.txt"
+check "c: a survivor dropped in the same list resolves to the chain's last leg; another list's row is left alone" "$SB/want-chain.txt" "$SB/chain-out.txt"
+printf 'L1 X Y\nL1 Y X\n' > "$SB/cycle.txt"
+if resolve_chains "$SB/cycle.txt" > /dev/null 2>&1; then bad "c: a cycle must fail"; else ok "c: a cycle fails"; fi
+printf 'L1 X Y\nL1 Y Z\nL1 Z Y\n' > "$SB/cycle2.txt"
+if resolve_chains "$SB/cycle2.txt" > /dev/null 2>&1; then bad "c: a cycle off the start must fail"; else ok "c: a cycle off the start fails"; fi
 
 # --- d. schedule ------------------------------------------------------------------------------------------------------
 S=$SB/sched; mkdir -p "$S"

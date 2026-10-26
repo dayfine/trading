@@ -4,3 +4,10 @@ GOOG GOOGL
 LGF-A LGF-B
 # Spin-off, not a share-class or rename pair (#2782, noted in share_classes.sexp):
 IAC MTCH
+# Distinct preferred series of one issuer (Merrill Lynch / BofA, each its own security; all four held in top-3000-2020):
+BML-P-G BML-P-H
+BML-P-G BML-P-J
+BML-P-G BML-P-L
+BML-P-H BML-P-J
+BML-P-H BML-P-L
+BML-P-J BML-P-L
