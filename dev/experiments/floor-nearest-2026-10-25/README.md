@@ -127,6 +127,16 @@ entrants have a lower median 12-month forward return (−0.5 % vs +6.1 %) but ho
     rebuilds the lists and the schedule from the committed inputs, aborting unless they match the md5 files byte
     for byte.
 
+### How to run SM
+
+```sh
+PREREG=<commit holding chain-sm.sh> sh dev/experiments/floor-nearest-2026-10-25/chain-sm.sh stage-lists  # optional host-only dry run
+PREREG=<commit holding chain-sm.sh> sh dev/experiments/floor-nearest-2026-10-25/chain-sm.sh launch       # reuses .claude/worktrees/sweep-ps @ 3db869d32
+tail -f /tmp/fsm-run/chain.log
+sh dev/experiments/floor-nearest-2026-10-25/chain-sm.sh summary /tmp/fsm-run/results   # S rows from NULL_DIR (default /tmp/ps-run/results)
+sh dev/scripts/perf_long_cells.sh update /tmp/fsm-run/chain.log
+```
+
 ## Results
 
 
@@ -584,3 +594,10 @@ the pack cannot see today.
   the second condition. Amended to decision outcomes only (S p0: 5,078 / 190). The bar ratio 0.75 is unchanged. The
   running chain was staged from 97b6daa99, so its own `summary.txt` uses the old count: `collect` and `summary` are
   re-run from this commit's `chain.sh` after the chain ends, and that output is the one read.
+- 2026-10-26, before any SM list was staged by a chain or any SM cell ran: `chain-sm.sh` and `specs/ps-SM-p0.sexp`
+  written (ps-S-p0 with its 27 yearly entries replaced by the 320 month-end lists; `universe_path` points at the first
+  monthly list, which `scenario_runner` ignores under a schedule). The rule text above is unchanged. One property of
+  the liveness test, recorded before the run: it reads `trades.csv` `entry_date`, the fill, so a ticket decided before
+  a May 31 roll and filled after it in a name the new yearly list drops passes it. On the null's own S cells this
+  happens once each in p1 and p4 (TRTX, decided 2021-05-28, filled 2021-08-17) and never in p0. `summary` prints this
+  base rate beside SM p0's count, and re-tests each passing trade at its decision date, as description.
