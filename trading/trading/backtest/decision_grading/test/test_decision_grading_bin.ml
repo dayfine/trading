@@ -135,7 +135,7 @@ let _write_scenario dir =
     ~data:_trade_audit;
   Out_channel.write_all (Filename.concat dir "summary.sexp") ~data:_summary
 
-let _run_report () =
+let _run_report ~grade_horizon =
   let root = Filename_unix.temp_dir "dg_bin" "" in
   let scenario_dir = Filename.concat root "scn" in
   let snapshot_dir = Filename.concat root "snap" in
@@ -153,12 +153,16 @@ let _run_report () =
   let cmd =
     sprintf
       "%s --scenario-dir %s --snapshot-dir %s --horizons 4,13 --grade-horizon \
-       13 --out %s 2>%s"
-      _exe scenario_dir snapshot_dir out log
+       %d --out %s 2>%s"
+      _exe scenario_dir snapshot_dir grade_horizon out log
   in
   let rc = Stdlib.Sys.command cmd in
   (* On failure the report is absent: surface stderr instead. *)
-  (rc, In_channel.read_all (if Sys_unix.file_exists_exn out then out else log))
+  let text =
+    In_channel.read_all (if Sys_unix.file_exists_exn out then out else log)
+  in
+  ignore (Stdlib.Sys.command (sprintf "rm -rf %s" (Filename.quote root)));
+  (rc, text)
 
 let _expected =
   {|# Decision-grading report — scn
@@ -185,8 +189,44 @@ Net value-add = realized − counterfactual-if-held (positive = the exits helped
 |}
 
 let test_report _ =
-  let rc, markdown = _run_report () in
+  let rc, markdown = _run_report ~grade_horizon:13 in
   assert_that (rc, markdown) (equal_to (0, _expected))
 
-let suite = "decision_grading_bin" >::: [ "report" >:: test_report ]
+let _expected_4w =
+  {|# Decision-grading report — scn
+
+Period: 2020-01-01 .. 2020-12-31 | round-trips graded: 3 | grade horizon: 4w
+
+Net value-add = realized − counterfactual-if-held (positive = the exits helped). % premature = gave up a winner; % good exit = dodged a drop.
+
+### Exit value vs hold-counterfactual
+
+| exit_reason | n | mean realized | mean post-exit cont. | % premature | % good exit | mean net value-add | mean capture |
+|---|---|---|---|---|---|---|---|
+| laggard_rotation | 1 | -10.0% | -5.8% | 0% | 0% | +5.8% | n/a |
+| stop_loss | 1 | +20.0% | +11.5% | 100% | 0% | -11.5% | 0.50 |
+| unlabeled | 1 | +0.0% | +11.5% | 100% | 0% | -11.5% | n/a |
+
+### Disaster-avoidance vs upside-foregone (the insurance decomposition)
+
+| exit_reason | n | mean disaster dodged | mean upside foregone | cont p10 | cont p90 | disaster-dodge rate |
+|---|---|---|---|---|---|---|
+| laggard_rotation | 1 | -5.8% | +0.0% | -5.8% | -5.8% | 0% |
+| stop_loss | 1 | +0.0% | +11.5% | +11.5% | +11.5% | 0% |
+| unlabeled | 1 | +0.0% | +11.5% | +11.5% | +11.5% | 0% |
+|}
+
+(* Same fixture graded at 4w: AAA is still up at 4 weeks, so its verdict flips;
+   pins that [--grade-horizon] reaches [Grade.grade_exit]'s config. *)
+let test_report_grade_horizon_4 _ =
+  let rc, markdown = _run_report ~grade_horizon:4 in
+  assert_that (rc, markdown) (equal_to (0, _expected_4w))
+
+let suite =
+  "decision_grading_bin"
+  >::: [
+         "report" >:: test_report;
+         "report grade horizon 4" >:: test_report_grade_horizon_4;
+       ]
+
 let () = run_test_tt_main suite
