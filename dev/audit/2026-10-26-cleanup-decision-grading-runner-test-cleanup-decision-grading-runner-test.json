@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-26",
+  "feature": "cleanup-decision-grading-runner-test",
+  "branch": "cleanup/decision-grading-runner-test",
+  "sha": "3ccbfa2773f28c9fcf6917f53e22ff8d0cf557d0",
+  "recorded_at_ns": 1793032158956923427,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
