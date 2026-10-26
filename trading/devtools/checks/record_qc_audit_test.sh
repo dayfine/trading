@@ -739,7 +739,8 @@ if _pairs_ok "${C7D[@]}"; then
       preserved_found=true
     fi
   done
-  (( ${#C7DP[@]} > 0 )) || C7DP=("a preserved record exists besides JSON7A/JSON7B" 0)
+  # No empty-C7DP fallback: without nullglob an unmatched glob iterates once over
+  # the literal pattern, so C7DP always holds >= 3 conjuncts (shown as <file missing>).
   if $preserved_found; then
     pass "scenario 7d — same branch, DIFFERENT reviewed sha (rework) preserves the prior NEEDS_REWORK record instead of clobbering it (H-AUDIT-REWORK-COUNT-BLIND fix)"
   else
@@ -2299,7 +2300,7 @@ C25A+=("seen25 == HOOK_DISABLE_EXPECTED_COUNT (actual: seen25=${seen25} expected
 if _pairs_ok "${C25A[@]}"; then
   pass "scenario 25a — all ${seen25} documented 'off' spellings ($(_disable_values_repr)) leave WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME disabled: write completes, record published (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
-  fail "scenario 25a — expected ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings, exercised ${seen25} ($(_disable_values_repr)); each exercised value must show rc=0 + record + 'OK: wrote'; got seen=${seen25}"
+  fail "scenario 25a — expected ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings, exercised ${seen25} ($(_disable_values_repr)); each exercised value must show rc=0 + record + 'OK: wrote'"
   report_conjuncts "${C25A[@]}"
 fi
 

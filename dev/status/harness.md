@@ -4,6 +4,7 @@
 
 ## Recent activity (2026-05-09..22, since last refresh)
 
+- [x] **#3364 review nits (2026-10-26):** `record_qc_audit_test.sh` scenario 7d drops the unreachable empty-`C7DP` fallback conjunct (an unmatched glob iterates once over the literal pattern, so `C7DP` always holds the three `<file missing>` conjuncts); scenario 25a fail message states `seen25` once. Pass count unchanged (82). Verify: `sh trading/devtools/checks/record_qc_audit_test.sh`.
 - **Deep-scan check 6 verdict parser nits (follow-up to #3370, 2026-10-22):** `deep_scan/_verdict.sh` now accepts `## Verdict: APPROVED` (colon after the heading word); the existing `[^A-Za-z_]` boundary already rejects `APPROVEDX`, now pinned by a fixture. `deep_scan_verdict_parse_check.sh` has 17 fixtures (added `colon`, `glued`); each was mutation-checked RED. Only caller besides the test: `check_06_qc_calibration.sh`. Verify: `dune runtest trading/devtools/checks`.
 
 ### CI hardening (PRs #1117, #1121, #1130, #1131, #1138)
