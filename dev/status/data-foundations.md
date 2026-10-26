@@ -1,20 +1,19 @@
 # Status: data-foundations
 
-## Last updated: 2026-10-25
+## Last updated: 2026-10-26
 
 ## Status
 IN_PROGRESS
 
 ## Completed
 - [x] **2026-10-25 — monthly top-3000 lists + warehouse build script (arm SM
-  prerequisite 3; PR open).** `dev/scripts/build_monthly_universe_warehouse.sh`
+  prerequisite 3; PRs #3429, #3430, full build 2026-10-26).** `dev/scripts/build_monthly_universe_warehouse.sh`
   (resumable phases preflight / lists / post / twinscan / install / warehouse /
   verify) builds the month-end lists 1999-05-31 → 2025-12-31 on the pit-v12
   inputs, applies pit-v12's alias maps and twin drops (a confirmed pair's
   dropped leg leaves every monthly list holding both legs, whatever the
   window), drops monthly-only and ungoverned both-legs-yearly twin pairs with
-  the scan's evidence (`pit-v12-monthly/twin-drops-monthly.txt`, a marked
-  placeholder until the full run), checks every May 31 list against pit-v12
+  the scan's evidence (`pit-v12-monthly/twin-drops-monthly.txt`), checks every May 31 list against pit-v12
   byte for byte, writes the dated `universe_schedule`, and builds a chunked
   warehouse with the chain's set-equality check. The lists (~130 MB) are
   gitignored; the committed `composition{,-raw}.md5` pin them and install
@@ -27,11 +26,17 @@ IN_PROGRESS
   (new `summary_lines`, non-leap February, first-differing-line report). List
   markers are bound to their bounds and inputs, the raw lists must be exactly
   the requested month ends, and chunk markers and `$OUT` are reused only under
-  the same build stamp (set, chunk size, window, exceptions, run tree). Not
-  run here: the full build (~6–7 h container-exclusive).
+  the same build stamp (set, chunk size, window, exceptions, run tree). Full build 2026-10-26 at 888f25017:
+  320 lists, all 27 May 31 lists byte-identical to pit-v12; 107 twin pairs -> 1,003
+  list rows dropped (7 re-pointed through a rename chain by PR #3430,
+  `via=`; the BML-P preferred series excluded), no ungoverned co-occurrence;
+  warehouse VERIFY OK, 10,125 symbols, 3.6 GB (chains: `EXPECT_WH=10125`,
+  `EXPECT_ABSENT=1`). Wall: lists ~4 h (35–46 s per list), twin scan 8 min,
+  warehouse 5 chunks 1h40m. The md5 files and the drop evidence are committed;
+  the twin-scan cache is keyed on the scanner bytes and `MIN_SHARED`.
 - [x] **2026-10-25 — month-end anchors on the composition list builder (arm
   SM prerequisites 1 + 2, `dev/experiments/floor-nearest-2026-10-25/README.md`
-  §"Arm SM"; PR open).** `build_composition_universes_runner --month-ends
+  §"Arm SM"; #3427).** `build_composition_universes_runner --month-ends
   FROM,TO` (default off) builds at every calendar month end in the range and
   writes `top-N-YYYY-MM-DD.sexp`; the default yearly May 31 path and its
   file names are unchanged (`Build_composition_universes_runner_lib.schedule`).

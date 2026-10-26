@@ -22,6 +22,8 @@
 #   l. warehouse stamp: a changed WH_START, WH_END or exceptions file rejects the old markers and output; an existing
 #      $OUT without its stamp, or with another, aborts (check_out_stamp).
 #   m. check_twinscan_done: install refuses a missing or stale twinscan completion stamp, accepts a matching one.
+#   n. scan_stamp: the twin-scan cache key changes with the post lists, the scanner bytes or MIN_SHARED; phase_twinscan uses it.
+#   o. phase_twinscan ordering: twinscan.done is removed first and written only after report_unhandled.
 #
 # Run: sh trading/devtools/checks/build_monthly_universe_guard_smoke.sh
 set -eu
@@ -91,6 +93,10 @@ printf 'L1 X Y ev=1\nL1 Y Z ev=2\nL2 X Y ev=3\n' > "$SB/chain.txt"
 resolve_chains "$SB/chain.txt" > "$SB/chain-out.txt" 2> /dev/null || bad "c: a chain without a cycle must pass"
 printf 'L1 X Z ev=1 via=Y\nL1 Y Z ev=2\nL2 X Y ev=3\n' > "$SB/want-chain.txt"
 check "c: a survivor dropped in the same list resolves to the chain's last leg; another list's row is left alone" "$SB/want-chain.txt" "$SB/chain-out.txt"
+printf 'L1 W X ev=1\nL1 X Y ev=2\nL1 Y Z ev=3\n' > "$SB/chain2.txt"
+resolve_chains "$SB/chain2.txt" > "$SB/chain2-out.txt" 2> /dev/null || bad "c: a two-link chain must pass"
+printf 'L1 W Z ev=1 via=X\nL1 X Z ev=2 via=Y\nL1 Y Z ev=3\n' > "$SB/want-chain2.txt"
+check "c: a two-link chain resolves every row to its last leg" "$SB/want-chain2.txt" "$SB/chain2-out.txt"
 printf 'L1 X Y\nL1 Y X\n' > "$SB/cycle.txt"
 if resolve_chains "$SB/cycle.txt" > /dev/null 2>&1; then bad "c: a cycle must fail"; else ok "c: a cycle fails"; fi
 printf 'L1 X Y\nL1 Y Z\nL1 Z Y\n' > "$SB/cycle2.txt"
@@ -217,6 +223,32 @@ list "$T/final/top-3000-2009-06-30.sexp" CMN CMD A
 expect_abort "m: install aborts on a stale stamp (the lists changed since the twinscan)" check_twinscan_done "$T/final" "$T/drops.txt" "$T/twinscan.done"
 list "$T/final/top-3000-2009-06-30.sexp" CMN A; echo 'top-3000-2009-06-30 X Y' >> "$T/drops.txt"
 expect_abort "m: install aborts on a stale stamp (the drop evidence changed since the twinscan)" check_twinscan_done "$T/final" "$T/drops.txt" "$T/twinscan.done"
+
+
+# --- n. the twin-scan cache is keyed on the post lists, the scanner's bytes and its settings --------------------------
+N=$SB/scan; mkdir -p "$N"; echo '123 456' > "$N/post.stamp"; echo 'scan v1' > "$N/twin-scan.sh"
+scan_stamp "$N/post.stamp" "$N/twin-scan.sh" /data > "$N/old.stamp"
+scan_stamp "$N/post.stamp" "$N/twin-scan.sh" /data > "$N/same.stamp"
+check "n: the same lists, scanner and settings give the same key (the cache is reused)" "$N/old.stamp" "$N/same.stamp"
+echo 'scan v2' > "$N/twin-scan.sh"; scan_stamp "$N/post.stamp" "$N/twin-scan.sh" /data > "$N/scanner.stamp"
+if cmp -s "$N/old.stamp" "$N/scanner.stamp"; then bad "n: a changed scanner must change the key"; else ok "n: a changed scanner changes the key (the scan reruns)"; fi
+echo 'scan v1' > "$N/twin-scan.sh"; MIN_SHARED=4 scan_stamp "$N/post.stamp" "$N/twin-scan.sh" /data > "$N/minshared.stamp"
+if cmp -s "$N/old.stamp" "$N/minshared.stamp"; then bad "n: a changed MIN_SHARED must change the key"; else ok "n: a changed MIN_SHARED changes the key"; fi
+echo '123 457' > "$N/post.stamp"; scan_stamp "$N/post.stamp" "$N/twin-scan.sh" /data > "$N/post2.stamp"
+if cmp -s "$N/old.stamp" "$N/post2.stamp"; then bad "n: changed post lists must change the key"; else ok "n: changed post lists change the key"; fi
+# phase_twinscan: the reuse test and the stamp write both go through scan_stamp
+awk '/^phase_twinscan\(\)/ { on = 1 } on { print } on && /^}/ { exit }' "$SCRIPT" > "$N/phase.sh"
+if [ "$(grep -c 'scan_stamp "\$WORK/post.stamp" "\$TWINX/twin-scan.sh" "\$DATA_H"' "$N/phase.sh")" = 2 ]; then ok "n: phase_twinscan reuses and records the cache through scan_stamp"
+else bad "n: phase_twinscan must reuse and record the cache through scan_stamp"; fi
+
+# --- o. phase_twinscan ordering: the completion stamp is removed first and written only after every check ------------
+first=$(sed -n '2,$p' "$N/phase.sh" | grep -v '^[[:space:]]*$' | head -1)
+case $first in *'rm -f "$WORK/twinscan.done"'*) ok "o: phase_twinscan removes twinscan.done as its first statement" ;;
+  *) bad "o: phase_twinscan must remove twinscan.done first (got: $first)" ;; esac
+ln_unh=$(grep -n '^[[:space:]]*report_unhandled' "$N/phase.sh" | head -1 | cut -d: -f1)
+ln_done=$(grep -n 'twinscan_stamp .*> "\$WORK/twinscan.done"' "$N/phase.sh" | head -1 | cut -d: -f1)
+if [ -n "$ln_unh" ] && [ -n "$ln_done" ] && [ "$ln_done" -gt "$ln_unh" ]; then ok "o: twinscan.done is written after report_unhandled"
+else bad "o: twinscan.done must be written after report_unhandled (lines ${ln_unh:-none} / ${ln_done:-none})"; fi
 
 echo "build_monthly_universe_guard_smoke: $passes passed, $fails failed"
 [ "$fails" = 0 ]
