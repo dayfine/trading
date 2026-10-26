@@ -60,7 +60,7 @@ WTREL=${WTREL:-.claude/worktrees/sweep-ps}             # the pinned run tree, re
 WT=/workspaces/trading-1/$WTREL; ROOT=$WT/trading; FIX=$ROOT/test_data/backtest_scenarios
 FIXPS=/tmp/fsm-fix                                     # container: fixtures root for every cell (symlinks + lists)
 WH=${WH:-/tmp/snap_top3000_pit_v12monthly}             # built by dev/scripts/build_monthly_universe_warehouse.sh
-WH_MARK=.sm-build.stamp                                # its completion stamp
+WH_MARK=.sm-build.stamp                                # its build stamp (written when the warehouse phase starts; completeness = the manifest check)
 EXPECT_WH=${EXPECT_WH:-10125}                          # manifest symbol count: union - MEL + GSPC.INDX + 14 extras
 EXPECT_ABSENT=${EXPECT_ABSENT:-1}                      # cache line n_symbols_absent (MEL, no CSV)
 EXPECT_UNION=${EXPECT_UNION:-10111}                    # distinct symbols across the 320 monthly lists
