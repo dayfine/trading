@@ -17,7 +17,13 @@
         --out-dir trading/test_data/goldens-custom-universe/composition/ \
         --start-year 1998 --end-year 2026 \
         --top-n 500,1000,3000
-    v} *)
+    v}
+
+    [--month-ends FROM,TO] (default off) builds at every calendar month end in
+    [[FROM, TO]] instead, writing [{out_dir}/top-{top_n}-{YYYY-MM-DD}.sexp]; its
+    May 31 lists equal the yearly ones byte for byte
+    ([dev/scripts/pit_v12_month_end_repro_check.sh] checks that against the
+    committed pit-v12 lists). *)
 
 open! Core
 
@@ -41,22 +47,31 @@ let _parse_top_n_list raw : int list =
       _exit_with_error (Printf.sprintf "invalid --top-n %S" bad)
   | _ -> List.map parsed ~f:(function Ok n -> n | Error _ -> assert false)
 
-let _print_summary (result : Build_composition_universes_runner_lib.result) =
+module Lib = Build_composition_universes_runner_lib
+
+(* Yearly keeps the pre-schedule "year=YYYY" skip label byte for byte. *)
+let _skip_label ~(schedule : Lib.schedule) date =
+  match schedule with
+  | Yearly _ -> Printf.sprintf "year=%d" (Date.year date)
+  | Month_ends _ -> Printf.sprintf "date=%s" (Date.to_string date)
+
+let _print_summary ~schedule (result : Lib.result) =
   Stdlib.Printf.printf
     "build_composition_universes_runner: written=%d skipped=%d\n" result.written
     result.skipped;
   if result.skipped > 0 then
-    List.iter (List.rev result.skip_reasons) ~f:(fun (year, top_n, reason) ->
-        Stdlib.Printf.printf "  skip year=%d top_n=%d: %s\n" year top_n reason)
+    List.iter (List.rev result.skip_reasons) ~f:(fun (date, top_n, reason) ->
+        Stdlib.Printf.printf "  skip %s top_n=%d: %s\n"
+          (_skip_label ~schedule date)
+          top_n reason)
 
 let _run ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
-    ~inventory_path ~out_dir ~start_year ~end_year ~top_ns =
+    ~inventory_path ~out_dir ~schedule ~top_ns =
   let result =
-    Build_composition_universes_runner_lib.run ~dollar_volume ~bars_root
-      ~symbol_types_path ~sectors_csv_path ~inventory_path ~out_dir ~start_year
-      ~end_year ~top_ns
+    Lib.run ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
+      ~inventory_path ~out_dir ~schedule ~top_ns
   in
-  _print_summary result
+  _print_summary ~schedule result
 
 let _default_out_dir = "trading/test_data/goldens-custom-universe/composition/"
 let _default_top_n_raw = "500,1000,3000"
@@ -112,18 +127,26 @@ let command =
            " rank on true dollars traded (split-only basis, implausible bars \
             dropped; issue #3136). Requires an --out-dir other than the \
             default."
+     and month_ends =
+       flag "--month-ends" (optional string)
+         ~doc:
+           "FROM,TO build at every calendar month end d with FROM <= d <= TO \
+            (YYYY-MM-DD each), files top-N-YYYY-MM-DD.sexp; --start-year / \
+            --end-year are then ignored. Default off: May 31 of each year."
      in
      fun () ->
        let top_ns = _parse_top_n_list top_n_raw in
-       let dollar_volume =
-         match
-           Build_composition_universes_runner_lib.dollar_volume_of_flag
-             ~true_dollars ~out_dir
-         with
+       let ok_or_exit = function
          | Ok c -> c
          | Error msg -> _exit_with_error msg
        in
+       let dollar_volume =
+         ok_or_exit (Lib.dollar_volume_of_flag ~true_dollars ~out_dir)
+       in
+       let schedule =
+         ok_or_exit (Lib.schedule_of_flags ~start_year ~end_year ~month_ends)
+       in
        _run ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
-         ~inventory_path ~out_dir ~start_year ~end_year ~top_ns)
+         ~inventory_path ~out_dir ~schedule ~top_ns)
 
 let () = Command_unix.run command
