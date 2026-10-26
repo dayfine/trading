@@ -1,11 +1,25 @@
 # Status: data-foundations
 
-## Last updated: 2026-10-11
+## Last updated: 2026-10-25
 
 ## Status
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-10-25 — month-end anchors on the composition list builder (arm
+  SM prerequisites 1 + 2, `dev/experiments/floor-nearest-2026-10-25/README.md`
+  §"Arm SM"; PR open).** `build_composition_universes_runner --month-ends
+  FROM,TO` (default off) builds at every calendar month end in the range and
+  writes `top-N-YYYY-MM-DD.sexp`; the default yearly May 31 path and its
+  file names are unchanged (`Build_composition_universes_runner_lib.schedule`).
+  Pinned by `test_build_composition_universes_runner.ml` (month-end
+  enumeration incl. leap Feb, file names, flag parsing, and the month-end
+  May 31 file byte-equal to the yearly one). Reproduction check
+  `dev/scripts/pit_v12_month_end_repro_check.sh` (in the container) rebuilds
+  each May 31 through `--month-ends`, applies pit-v12's alias maps and
+  twin-drops, and `cmp`s against `pit-v12/composition/`. Not done here:
+  prerequisite 3 (warehouse over the monthly union), and how the per-list
+  #3391 twin-drops map onto monthly lists.
 - [x] **2026-10-11 — NYSE A-D breadth fixture gap 2000-2016 (#3238, PR
   open).** `trading/test_data/breadth/nyse_{advn,decln}.csv` replaced with the
   full Unicorn archive (1965-03-01 → 2020-02-14, 13,872 rows; every prior
