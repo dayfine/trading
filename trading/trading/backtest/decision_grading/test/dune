@@ -1,5 +1,6 @@
 (tests
  (names
+  test_decision_grading_bin
   test_post_exit
   test_grade
   test_aggregate
@@ -8,10 +9,19 @@
  (libraries
   ounit2
   core
+  core_unix
+  core_unix.sys_unix
+  status
+  weinstein.snapshot_pipeline
+  trading.data_panel.snapshot
   core_unix.filename_unix
   matchers
   decision_grading
   types
   trading.base)
  (preprocess
-  (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))
+  (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv))
+ (deps
+  ; test_decision_grading_bin.ml runs the real exe as a subprocess; without
+  ; this dune may skip building it.
+  ../bin/decision_grading_bin.exe))
