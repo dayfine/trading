@@ -12,6 +12,14 @@
 #   c. chained_survivors: a survivor that is also dropped in the same list fails; in another list it passes.
 #   d. write_schedule: one dated entry per monthly list, ascending; yearly-named files are ignored.
 #   e. warehouse_set: list union - MEL + GSPC.INDX + runner extras, sorted unique.
+# and the abort guards, each case in a subshell (die exits):
+#   f. pin_md5: match passes; mismatch aborts and leaves the pin; REPIN=1 re-pins; a missing pin is written.
+#   g. check_may31: identical passes; raw md5, final bytes or May 31 count off aborts; month_ends counts.
+#   h. report_unhandled: a surviving ungoverned cell aborts; none passes.
+#   i. set_equal (verify): equal passes; an extra name, or a manifest name with no .weekly, fails.
+#   j. check_drops_hold: a dropped leg still listed, or a missing survivor, aborts.
+#   k. lists resume: a smoke run's marker never stands in for a full run; the list set must be the exact month ends.
+#   l. warehouse stamp: a changed WH_START, WH_END or exceptions file rejects the old markers and output.
 #
 # Run: sh trading/devtools/checks/build_monthly_universe_guard_smoke.sh
 set -eu
@@ -96,6 +104,96 @@ printf 'XLK\nSPY\n' > "$SB/extras.txt"
 warehouse_set "$E" "$SB/extras.txt" > "$SB/set.txt"
 printf 'AAA\nBBB\nCCC\nGSPC.INDX\nSPY\nXLK\n' > "$SB/want-set.txt"
 check "e: union - MEL + GSPC.INDX + extras, sorted unique" "$SB/want-set.txt" "$SB/set.txt"
+
+# --- guards: each case runs in a subshell, because die exits ---------------------------------------------------------
+expect_pass() { d=$1; shift; if ( "$@" ) > "$SB/guard.out" 2>&1; then ok "$d"; else bad "$d"; cat "$SB/guard.out"; fi; }
+expect_abort() { d=$1; shift; if ( "$@" ) > "$SB/guard.out" 2>&1; then bad "$d"; cat "$SB/guard.out"; else ok "$d"; fi; }
+
+# --- f. pin_md5 -------------------------------------------------------------------------------------------------------
+P=$SB/pin; mkdir -p "$P"
+echo 'aaa  top-3000-2009-05-31.sexp' > "$P/new.md5"; cp "$P/new.md5" "$P/pinned.md5"
+expect_pass "f: pin_md5 passes when the rebuild matches the pinned md5s" pin_md5 "$P/new.md5" "$P/pinned.md5"
+echo 'bbb  top-3000-2009-05-31.sexp' > "$P/other.md5"
+expect_abort "f: pin_md5 aborts on a rebuild that differs" pin_md5 "$P/other.md5" "$P/pinned.md5"
+check "f: the aborted pin leaves the pinned file unchanged" "$P/new.md5" "$P/pinned.md5"
+repin() { REPIN=1; pin_md5 "$@"; }   # REPIN stays inside expect_pass's subshell
+expect_pass "f: REPIN=1 re-pins a differing rebuild" repin "$P/other.md5" "$P/pinned.md5"
+check "f: REPIN=1 overwrites the pinned file" "$P/other.md5" "$P/pinned.md5"
+expect_pass "f: a missing pin file is written" pin_md5 "$P/new.md5" "$P/first.md5"
+check "f: the written pin file is the rebuild's" "$P/new.md5" "$P/first.md5"
+
+# --- g. check_may31 ---------------------------------------------------------------------------------------------------
+R=$SB/m31/raw; F=$SB/m31/final; V=$SB/m31/v12; mkdir -p "$R" "$F" "$V/composition"
+list "$R/top-3000-2009-05-31.sexp" A B MEL; list "$F/top-3000-2009-05-31.sexp" A B; list "$F/top-3000-2009-06-30.sexp" A
+cp "$F/top-3000-2009-05-31.sexp" "$V/composition/top-3000-2009.sexp"
+echo "$(md5_file "$R/top-3000-2009-05-31.sexp")  top-3000-2009.sexp" > "$V/composition-raw.md5"
+expect_pass "g: check_may31 passes on byte-identical raw and final May 31 lists (non-May lists ignored)" check_may31 "$R" "$F" "$V" 1
+expect_abort "g: check_may31 aborts when the May 31 count differs from the range's" check_may31 "$R" "$F" "$V" 2
+cp "$R/top-3000-2009-05-31.sexp" "$SB/m31/raw-keep.sexp"; list "$R/top-3000-2009-05-31.sexp" A B MEL Z
+expect_abort "g: check_may31 aborts on a raw md5 mismatch" check_may31 "$R" "$F" "$V" 1
+cp "$SB/m31/raw-keep.sexp" "$R/top-3000-2009-05-31.sexp"; list "$F/top-3000-2009-05-31.sexp" A
+expect_abort "g: check_may31 aborts on a final-bytes mismatch" check_may31 "$R" "$F" "$V" 1
+month_ends 1999-05-31 2025-12-31 | wc -l | tr -d ' ' > "$SB/n-ends.txt"; may31_count 1999-05-31 2025-12-31 >> "$SB/n-ends.txt"
+month_ends 2100-01-31 2100-03-30 >> "$SB/n-ends.txt"
+printf '320\n27\n2100-01-31\n2100-02-28\n' > "$SB/want-n-ends.txt"
+check "g: the default range holds 320 month ends and 27 May 31s; 2100 is not a leap year" "$SB/want-n-ends.txt" "$SB/n-ends.txt"
+
+# --- h. report_unhandled ----------------------------------------------------------------------------------------------
+expect_abort "h: report_unhandled aborts when an ungoverned twin cell survives" report_unhandled "$SB/other-rows.txt" "$Y" "$M" "$SB/unhandled.txt"
+grep -v '^#' "$SB/unhandled.txt" > "$SB/unhandled-rows.txt" || true
+check "h: the report names the surviving cells" "$SB/want-ungoverned.txt" "$SB/unhandled-rows.txt"
+: > "$SB/no-rows.txt"
+expect_pass "h: report_unhandled passes when no cell survives" report_unhandled "$SB/no-rows.txt" "$Y" "$M" "$SB/unhandled-none.txt"
+
+# --- i. set_equal: the verify comparisons (manifest vs list set, .snap and .weekly vs manifest) ------------------------
+printf 'A\nB\nC\n' > "$SB/want-set3.txt"
+printf 'A\nB\nC\n' > "$SB/got-eq.txt"; expect_pass "i: equal sets pass" set_equal "$SB/want-set3.txt" "$SB/got-eq.txt" "$SB/sd.txt"
+printf 'A\nB\nC\nD\n' > "$SB/got-extra.txt"; expect_abort "i: an extra name fails" set_equal "$SB/want-set3.txt" "$SB/got-extra.txt" "$SB/sd.txt"
+printf 'A\nC\n' > "$SB/weekly.txt"; expect_abort "i: a manifest name with no .weekly side-table fails" set_equal "$SB/want-set3.txt" "$SB/weekly.txt" "$SB/wd.txt"
+echo B > "$SB/want-wd.txt"
+check "i: the diff names the symbol missing its .weekly" "$SB/want-wd.txt" "$SB/wd.txt"
+
+# --- j. check_drops_hold ----------------------------------------------------------------------------------------------
+H=$SB/hold; mkdir -p "$H"; list "$H/top-3000-2009-06-30.sexp" CMN A
+printf '# header\ntop-3000-2009-06-30 CMD CMN\n' > "$H/drops.txt"
+expect_pass "j: check_drops_hold passes when the dropped leg is gone and the survivor present" check_drops_hold "$H" "$H/drops.txt"
+printf 'top-3000-2009-06-30 A CMN\n' > "$H/back.txt"
+expect_abort "j: check_drops_hold aborts when a dropped leg is still in its list" check_drops_hold "$H" "$H/drops.txt" "$H/back.txt"
+printf 'top-3000-2009-06-30 CMD XYZ\n' > "$H/nosurv.txt"
+expect_abort "j: check_drops_hold aborts when the survivor is missing" check_drops_hold "$H" "$H/nosurv.txt"
+
+# --- k. list resume: a smoke run's markers never stand in for a full run ----------------------------------------------
+K=$SB/resume; mkdir -p "$K"
+for d in 2009-04-30 2009-05-31 2009-06-30; do list "$K/top-3000-$d.sexp" A; done
+write_list_marker "$K" 2009 2009-04-01 2009-06-30 prov1
+lists_plan 2009-04-01 2009-06-30 "$K" prov1 > "$SB/plan-smoke.txt"
+check "k: a rerun of the smoke range reuses its marker" /dev/null "$SB/plan-smoke.txt"
+expect_pass "k: the smoke range's lists are exactly its month ends" check_list_set "$K" 2009-04-01 2009-06-30
+lists_plan 2008-12-31 2009-12-31 "$K" prov1 > "$SB/plan-full.txt"
+printf '2008 2008-12-31 2008-12-31\n2009 2009-01-01 2009-12-31\n' > "$SB/want-plan-full.txt"
+check "k: a full run after the smoke rebuilds 2009 (marker for other bounds) and builds 2008" "$SB/want-plan-full.txt" "$SB/plan-full.txt"
+expect_abort "k: the smoke's partial 2009 fails the full range's list-set check" check_list_set "$K" 2008-12-31 2009-12-31
+for d in $(month_ends 2008-12-31 2009-12-31); do list "$K/top-3000-$d.sexp" A; done
+write_list_marker "$K" 2008 2008-12-31 2008-12-31 prov1; write_list_marker "$K" 2009 2009-01-01 2009-12-31 prov1
+lists_plan 2008-12-31 2009-12-31 "$K" prov1 > "$SB/plan-done.txt"
+check "k: once the full run has written its markers nothing is rebuilt" /dev/null "$SB/plan-done.txt"
+expect_pass "k: the full range's lists are exactly its month ends" check_list_set "$K" 2008-12-31 2009-12-31
+lists_plan 2008-12-31 2009-12-31 "$K" prov2 > "$SB/plan-prov.txt"
+check "k: changed inputs rebuild every year" "$SB/want-plan-full.txt" "$SB/plan-prov.txt"
+expect_abort "k: lists left over from a wider range fail a narrower range's check" check_list_set "$K" 2009-04-01 2009-06-30
+
+# --- l. warehouse resume stamp ----------------------------------------------------------------------------------------
+L2=$SB/stamp; mkdir -p "$L2"; printf 'A\nGSPC.INDX\n' > "$L2/syms.txt"; echo '(exceptions ())' > "$L2/exc.sexp"
+wh_stamp "$L2/syms.txt" 2500 1998-01-01 2026-10-07 "$L2/exc.sexp" abc > "$L2/old.stamp"
+wh_stamp "$L2/syms.txt" 2500 1998-01-01 2026-10-07 "$L2/exc.sexp" abc > "$L2/same.stamp"
+expect_pass "l: the same build reuses its markers" stamp_compatible "$L2/old.stamp" "$L2/same.stamp"
+expect_pass "l: no recorded stamp is a fresh build" stamp_compatible "$L2/absent.stamp" "$L2/same.stamp"
+wh_stamp "$L2/syms.txt" 2500 1998-01-01 2026-12-31 "$L2/exc.sexp" abc > "$L2/end.stamp"
+expect_abort "l: a changed WH_END rejects the old markers and output" stamp_compatible "$L2/old.stamp" "$L2/end.stamp"
+wh_stamp "$L2/syms.txt" 2500 2000-01-01 2026-10-07 "$L2/exc.sexp" abc > "$L2/start.stamp"
+expect_abort "l: a changed WH_START rejects them" stamp_compatible "$L2/old.stamp" "$L2/start.stamp"
+echo '(exceptions (X))' > "$L2/exc.sexp"; wh_stamp "$L2/syms.txt" 2500 1998-01-01 2026-10-07 "$L2/exc.sexp" abc > "$L2/exc.stamp"
+expect_abort "l: changed tail exceptions reject them" stamp_compatible "$L2/old.stamp" "$L2/exc.stamp"
 
 echo "build_monthly_universe_guard_smoke: $passes passed, $fails failed"
 [ "$fails" = 0 ]

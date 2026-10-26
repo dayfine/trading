@@ -122,7 +122,7 @@ entrants have a lower median 12-month forward return (−0.5 % vs +6.1 %) but ho
     monthly list that holds both legs of a confirmed pair, whatever the window; cells where the yearly list in force
     also holds both legs are pit-v12's own state and stay, so each May 31 list still equals its yearly list.
     `twin-cooccur-unhandled.txt` must come out empty.
-  - **Lists not committed.** The 319 monthly lists (~130 MB) are not committed. `composition.md5`,
+  - **Lists not committed.** The 320 monthly lists (~130 MB) are not committed. `composition.md5`,
     `composition-raw.md5` and `twin-drops-monthly.txt` are, and `dev/scripts/build_monthly_universe_warehouse.sh`
     rebuilds the lists and the schedule from the committed inputs, aborting unless they match the md5 files byte
     for byte.

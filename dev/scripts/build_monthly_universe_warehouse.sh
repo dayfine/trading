@@ -12,13 +12,16 @@
 #   preflight  guards: pinned tree clean + built, #2724 present, container free, disk, inputs, SGP_old1 store edit
 #   lists      builder --month-ends Y-01-01,Y-12-31 --top-n 3000 --true-dollar-volume, one job per calendar year, on the
 #              pit-v12 inputs (pit-v12/inventory.sexp, $DATA/symbol_types.sexp, $DATA/sectors.csv) -> $WORK/raw.
-#              A year with a .done marker is skipped.
+#              A year is skipped only when its .done marker names the same bounds and inputs (run tree commit,
+#              builder flags, the three input files' md5s); afterwards $WORK/raw must hold exactly the month ends
+#              FROM..TO, so a smoke run's partial year is rebuilt by a full run, never reused.
 #   post       pit-v12 post-processing on a copy of raw, in its commit order (as pit_v12_month_end_repro_check.sh):
 #              1-2. alias-lists.pl with v11's alias2.resolved, alias3.txt, then v12's alias-v12-new.txt
 #              3.   pit-v12/twin-drops.txt, re-keyed: each confirmed pair (D, S) it names loses D from EVERY monthly
 #                   list that holds both legs, whatever the window (D absent: nothing to drop; S absent from a list in
 #                   a row's [Y-05-31, Y+1-05-31) window: kept, logged)
-#              then every May 31 list must equal pit-v12/composition/top-3000-Y.sexp byte for byte (raw and final).
+#              then every May 31 list must equal pit-v12/composition/top-3000-Y.sexp byte for byte (raw and final),
+#              and there must be one per May 31 in FROM..TO (27 for the defaults).
 #   twinscan   v12-twin-scan-2026-10-22/twin-scan.sh (host, CSV store, whole union, no chunks) over the post lists.
 #              A confirmed pair with a leg that is in NO yearly pit-v12 list (top-1000 or top-3000, any year) and not in
 #              exclude-pairs.txt loses its DROPPED leg (the detector's later-last-bar rule) from every monthly list that
@@ -34,13 +37,15 @@
 #              aborts unless the rebuild matches them byte for byte (REPIN=1 re-pins).
 #   warehouse  build_snapshots -incremental over the warehouse set in chunks of CHUNK_SIZE, one job at a time, no twin
 #              dedupe (twins are handled in the lists, as for the _v12wk warehouse the floor-nearest chain reads).
+#              Markers and $OUT are reused only under the same build stamp (set, CHUNK_SIZE, WH_START, WH_END, tail
+#              exceptions, run tree commit), which $OUT also carries; any other reuse aborts.
 #   verify     manifest == warehouse set derived from $DEST's lists (the chain's set-equality check), every entry has a
-#              .snap, no orphan .snap, .weekly side-tables present, manifest <= handle cap.
+#              .snap and a .weekly, no orphan .snap or .weekly, manifest <= handle cap.
 #
 # Measured 2026-10-25 (smoke, FROM=2009-04-01 TO=2009-06-30): lists 145 s for 3 (48 s per list; 2025-10..12: 41 s);
 # twin scan 83 s over a 2,959-name union (pit-v12's 9,279-name scan: 14 min); warehouse 0.87 s per name in 80-name
 # chunks (the _v12wk rebuild: ~0.5 s per name in ~2,300-name chunks). Full-run estimate, container-exclusive:
-# lists 319 x ~45 s = ~4 h, twin scan ~20 min (host), warehouse ~11-12k names = ~1.6-2.9 h; ~6-7 h in all.
+# lists 320 x ~45 s = ~4 h, twin scan ~20 min (host), warehouse ~11-12k names = ~1.6-2.9 h; ~6-7 h in all.
 #
 # Env: RUN_TREE (required), CONTAINER (trading-1-dev), HOST_ROOT (/Users/difan/Projects/trading-1), FROM (1999-05-31),
 #      TO (2025-12-31), WORK (/tmp/sm-monthly-work, host), CWORK (/tmp/sm-monthly, container), OUT
@@ -170,6 +175,126 @@ warehouse_set() {
   { syms_of "$1"/top-3000-*.sexp | grep -v -x -F MEL; echo GSPC.INDX; cat "$2"; } | LC_ALL=C sort -u
 }
 
+# ------------------------------------------------------------------------------------------------ guard helpers
+# (also sourced by the dry harness; they read only their args, plus WORK through log/die and REPIN in pin_md5)
+
+md5_file() { md5 -q "$1" 2>/dev/null || md5sum "$1" 2>/dev/null | cut -c1-32; }
+
+# $1 FROM, $2 TO (YYYY-MM-DD). stdout: every calendar month end d with FROM <= d <= TO, ascending (the builder's
+# --month-ends semantics, build_composition_universes_runner_lib.mli month_ends).
+month_ends() {
+  lo=$(echo "$1" | tr -d -); hi=$(echo "$2" | tr -d -); yy=${1%%-*}
+  while [ "$yy" -le "${2%%-*}" ]; do
+    for mm in 01 02 03 04 05 06 07 08 09 10 11 12; do
+      case $mm in 04|06|09|11) dd=30 ;; 02) dd=28
+        if [ $((yy % 4)) = 0 ] && { [ $((yy % 100)) != 0 ] || [ $((yy % 400)) = 0 ]; }; then dd=29; fi ;; *) dd=31 ;; esac
+      [ "$yy$mm$dd" -ge "$lo" ] && [ "$yy$mm$dd" -le "$hi" ] && echo "$yy-$mm-$dd"
+    done
+    yy=$((yy + 1))
+  done
+  return 0
+}
+
+# $1 FROM, $2 TO. stdout: how many May 31 lists the range holds (27 for the default 1999-05-31 .. 2025-12-31).
+may31_count() { month_ends "$1" "$2" | grep -c -e '-05-31$' || :; }
+
+# $1 raw dir, $2 year, $3 lo, $4 hi, $5 input provenance: the year's .done marker. A marker is honoured only for the
+# same bounds and inputs, so a smoke run's partial year is rebuilt by a later full run (lists_plan).
+write_list_marker() { echo "$3 $4 $5" > "$1/.done-$2"; }
+
+# $1 FROM, $2 TO, $3 raw dir, $4 input provenance. stdout: "YEAR LO HI" for every calendar year the lists phase must
+# (re)build: no marker, or a marker for other bounds or other inputs.
+lists_plan() {
+  py=${1%%-*}
+  while [ "$py" -le "${2%%-*}" ]; do
+    plo="$py-01-01"; phi="$py-12-31"; [ "$py" = "${1%%-*}" ] && plo=$1; [ "$py" = "${2%%-*}" ] && phi=$2
+    [ -f "$3/.done-$py" ] && [ "$(cat "$3/.done-$py")" = "$plo $phi $4" ] || echo "$py $plo $phi"
+    py=$((py + 1))
+  done
+}
+
+# $1 sorted wanted set, $2 sorted actual set, $3 diff file. Exit 0 when equal; otherwise writes `comm -3` (col 1 =
+# missing from $2, col 2 = extra in $2) to $3 and exits 1.
+set_equal() {
+  cmp -s "$1" "$2" && return 0
+  LC_ALL=C comm -3 "$1" "$2" > "$3"; return 1
+}
+
+# $1 lists dir, $2 FROM, $3 TO. Aborts unless the dir's dated lists are exactly the month ends FROM..TO (nothing
+# missing from a partial resume, nothing left over from another range).
+check_list_set() {
+  month_ends "$2" "$3" | sed 's/.*/top-3000-&.sexp/' > "$WORK/lists-want.txt"
+  ls "$1" | grep -e '^top-3000-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\.sexp$' | LC_ALL=C sort > "$WORK/lists-got.txt" || :
+  set_equal "$WORK/lists-want.txt" "$WORK/lists-got.txt" "$WORK/lists-diff.txt" \
+    || die "$1 holds $(n_of "$WORK/lists-got.txt") lists, not the $(n_of "$WORK/lists-want.txt") month ends $2..$3 ($WORK/lists-diff.txt: col 1 = missing, col 2 = extra)"
+}
+
+# $1 raw dir, $2 final dir, $3 pit-v12 dir, $4 expected count. Every May 31 list equals pit-v12's yearly list: raw
+# against composition-raw.md5, final against composition/; and there are exactly $4 of them.
+check_may31() {
+  mn=0
+  for f in "$2"/top-3000-[0-9][0-9][0-9][0-9]-05-31.sexp; do
+    [ -f "$f" ] || continue
+    my=$(basename "$f" | cut -c10-13); b=top-3000-$my.sexp
+    want=$(awk -v b="$b" '$2 == b { print $1 }' "$3/composition-raw.md5")
+    got=$(md5_file "$1/top-3000-$my-05-31.sexp")
+    [ -n "$want" ] && [ "$want" = "$got" ] || die "raw $my-05-31 md5 $got != pit-v12 composition-raw.md5 $want (builder or store moved)"
+    cmp -s "$f" "$3/composition/$b" || die "final $my-05-31 differs from pit-v12/composition/$b (post-processing moved)"
+    mn=$((mn + 1))
+  done
+  [ "$mn" = "$4" ] || die "May 31 check: $mn lists in $2, expected $4"
+  log "May 31 check: $mn lists byte-identical to pit-v12 (raw md5 and final)"
+}
+
+# $1 rows (derive_monthly_drops ... other), $2 yearly dir, $3 monthly dir, $4 report file. Post-apply check: no
+# confirmed, non-excluded pair with both legs yearly-listed still co-occurs in a monthly list whose yearly list in
+# force holds at most one leg. By construction (the yearly pairs drop in every window, the rest through
+# ungoverned_cooccur) the report comes out empty; a row means a drop rule missed a cell, and this aborts.
+report_unhandled() {
+  { echo "# Expected EMPTY: confirmed twin pairs, both legs in some yearly pit-v12 list, still co-occurring in a monthly"
+    echo "# list after every drop rule while the yearly list in force holds at most one leg: LIST LEG_A LEG_B <evidence>."
+    ungoverned_cooccur "$1" "$2" "$3"; } > "$4"
+  nu=$(grep -c -v '^#' "$4" || :)
+  [ "$nu" = 0 ] || die "$nu ungoverned twin cells survive the drops: $4"
+  log "twinscan: no ungoverned twin co-occurrence left ($4 holds no rows)"
+}
+
+# $1 lists dir, $2... twin-drop files ("LIST D S ..."). Aborts unless every file holds on the lists: no DROPPED leg
+# is back in its list and every survivor is present.
+check_drops_hold() {
+  hd=$1; shift
+  for f in "$@"; do
+    grep -v '^#' "$f" | while read -r l d s _; do
+      [ -n "$l" ] || continue
+      ! grep -q -F "(symbol $d)" "$hd/$l.sexp" || { echo "$l holds $d again"; exit 1; }
+      grep -q -F "(symbol $s)" "$hd/$l.sexp" || { echo "$l lacks survivor $s"; exit 1; }
+    done || die "twin-drop check failed on $f"
+  done
+}
+
+md5_of_dir() { (cd "$1" && { md5sum top-3000-*.sexp 2>/dev/null || md5 -r top-3000-*.sexp | awk '{ print $1 "  " $2 }'; }); }
+
+# $1 freshly computed manifest, $2 committed manifest. The lists are NOT committed (~130 MB, gitignored): the committed
+# md5 files are the record, and every rebuild from the committed inputs must reproduce them byte for byte. A missing
+# $2 (first build) or REPIN=1 writes it.
+pin_md5() {
+  if [ -f "$2" ] && [ -z "${REPIN:-}" ]; then
+    cmp -s "$1" "$2" || die "rebuilt lists differ from the committed $(basename "$2") (diff $1 $2; REPIN=1 re-pins)"
+    log "install: $(n_of "$2") lists match the committed $(basename "$2") byte for byte"
+  else cp "$1" "$2"; log "install: wrote $(basename "$2") ($(n_of "$2") lists): commit it"; fi
+}
+
+# $1 warehouse set, $2 CHUNK_SIZE, $3 WH_START, $4 WH_END, $5 tail-exceptions file, $6 run tree commit. stdout: the
+# one-line provenance of a warehouse build. Chunk markers and an existing $OUT are reused only under the same line:
+# build_snapshots -incremental skips a symbol whose CSV is unchanged, so a changed window or input would otherwise
+# keep the old snapshots silently.
+wh_stamp() {
+  echo "syms=$(cksum < "$1" | awk '{ print $1 "-" $2 }') k=$2 start=$3 end=$4 exc=$(cksum < "$5" | awk '{ print $1 "-" $2 }') tree=$6"
+}
+
+# $1 recorded stamp (may be absent: a fresh build), $2 new stamp. Exit 0 when reuse is compatible.
+stamp_compatible() { [ ! -f "$1" ] || cmp -s "$1" "$2"; }
+
 [ -z "${SM_LIB_ONLY:-}" ] || { return 0 2>/dev/null || exit 0; }   # dry-harness hook
 
 # ----------------------------------------------------------------------------------------------------------- phases
@@ -201,11 +326,17 @@ phase_preflight() {
   log "preflight OK: FROM=$FROM TO=$TO WORK=$WORK OUT=$OUT DEST=$DEST"
 }
 
+# What the lists depend on besides the bounds: the builder's commit and flags, and its three input files.
+list_prov() {
+  echo "tree=$(git -C "$HOST_TREE" rev-parse HEAD) top-n=3000 tdv inv=$(md5_file "$V12/inventory.sexp") types=$(md5_file "$DATA_H/symbol_types.sexp") sectors=$(md5_file "$DATA_H/sectors.csv")"
+}
+
 phase_lists() {
-  mkdir -p "$WORK/raw"; y=${FROM%%-*}; last=${TO%%-*}
-  while [ "$y" -le "$last" ]; do
-    lo="$y-01-01"; hi="$y-12-31"; [ "$y" = "${FROM%%-*}" ] && lo=$FROM; [ "$y" = "$last" ] && hi=$TO
-    if [ -f "$WORK/raw/.done-$y" ]; then log "lists $y: done (marker)"; y=$((y + 1)); continue; fi
+  mkdir -p "$WORK/raw"; prov=$(list_prov)
+  lists_plan "$FROM" "$TO" "$WORK/raw" "$prov" > "$WORK/lists-plan.txt"
+  log "lists: $(n_of "$WORK/lists-plan.txt") years to build (the rest have a marker for the same bounds and inputs)"
+  while read -r y lo hi <&3; do   # fd 3: nothing in the loop body can eat the plan
+    rm -f "$WORK/raw/.done-$y" "$WORK/raw/top-3000-$y-"*.sexp
     d=$CWORK/dated-$y; dx rm -rf "$d"; dx mkdir -p "$d"; t0=$(date +%s)
     dx "$LIST_EXE" --bars-root "$DATA_C" --symbol-types "$DATA_C/symbol_types.sexp" --sectors-csv "$DATA_C/sectors.csv" \
       --inventory "$RUN_TREE/trading/test_data/backtest_scenarios/pit-v12/inventory.sexp" --out-dir "$d" \
@@ -213,30 +344,15 @@ phase_lists() {
     grep -q 'skipped=0$' "$WORK/lists-$y.log" || die "builder skipped anchors in $y (see $WORK/lists-$y.log)"
     n=$(sed -n 's/.*written=\([0-9]*\) .*/\1/p' "$WORK/lists-$y.log"); [ "${n:-0}" -gt 0 ] || die "builder wrote no list for $y"
     docker cp "$CONTAINER:$d/." "$WORK/raw/" || die "docker cp $d"; dx rm -rf "$d"
-    w=$(( $(date +%s) - t0 )); touch "$WORK/raw/.done-$y"
+    w=$(( $(date +%s) - t0 )); write_list_marker "$WORK/raw" "$y" "$lo" "$hi" "$prov"
     log "lists $y: $n lists $lo..$hi (wall ${w}s, $((w / n))s per list)"
-    y=$((y + 1))
-  done
-  log "lists: $(ls "$WORK"/raw/top-3000-*.sexp | wc -l | tr -d ' ') raw lists in $WORK/raw"
-}
-
-# Every May 31 list equals pit-v12's yearly list: raw against composition-raw.md5, final against composition/.
-check_may31() {
-  n=0
-  for f in "$WORK"/final/top-3000-[0-9][0-9][0-9][0-9]-05-31.sexp; do
-    [ -f "$f" ] || continue
-    y=$(basename "$f" | cut -c10-13); b=top-3000-$y.sexp
-    want=$(awk -v b="$b" '$2 == b { print $1 }' "$V12/composition-raw.md5")
-    got=$(md5 -q "$WORK/raw/top-3000-$y-05-31.sexp" 2>/dev/null || md5sum "$WORK/raw/top-3000-$y-05-31.sexp" | cut -c1-32)
-    [ "$want" = "$got" ] || die "raw $y-05-31 md5 $got != pit-v12 composition-raw.md5 $want (builder or store moved)"
-    cmp -s "$f" "$V12/composition/$b" || die "final $y-05-31 differs from pit-v12/composition/$b (post-processing moved)"
-    n=$((n + 1))
-  done
-  log "May 31 check: $n lists byte-identical to pit-v12 (raw md5 and final)"
+  done 3< "$WORK/lists-plan.txt"
+  check_list_set "$WORK/raw" "$FROM" "$TO"
+  log "lists: $(ls "$WORK"/raw/top-3000-*.sexp | wc -l | tr -d ' ') raw lists in $WORK/raw, exactly the month ends $FROM..$TO"
 }
 
 phase_post() {
-  ls "$WORK"/raw/top-3000-*.sexp >/dev/null 2>&1 || die "no raw lists: run the lists phase"
+  check_list_set "$WORK/raw" "$FROM" "$TO"
   rm -rf "$WORK/final"; mkdir -p "$WORK/final"; cp "$WORK"/raw/top-3000-*.sexp "$WORK/final/"
   : > "$WORK/post.log"
   for m in $ALIAS_MAPS; do perl "$ALIAS_PL" "$m" "$WORK"/final/*.sexp >> "$WORK/post.log" || die "alias-lists.pl $m"; done
@@ -245,7 +361,7 @@ phase_post() {
     sh "$TWINX/apply-drops.sh" "$WORK/drops-yearly-mapped.txt" "$WORK/final" >> "$WORK/post.log" || die "apply-drops (yearly rows)"
   fi
   log "post: aliases applied; yearly twin-drops -> $(n_of "$WORK/drops-yearly-mapped.txt") monthly rows applied, $(n_of "$WORK/drops-yearly-skipped.txt") kept (survivor absent)"
-  check_may31
+  check_may31 "$WORK/raw" "$WORK/final" "$V12" "$(may31_count "$FROM" "$TO")"
   cat "$WORK"/final/*.sexp | cksum > "$WORK/post.stamp"
 }
 
@@ -270,7 +386,7 @@ phase_twinscan() {
   chained_survivors "$WORK/drops-monthly.txt" > "$WORK/drops-chained.txt" || die "chained twins (a survivor is also dropped in the same list): $WORK/drops-chained.txt; resolve by hand"
   write_monthly_drops_file
   if [ -s "$WORK/drops-monthly.txt" ]; then sh "$TWINX/apply-drops.sh" "$WORK/drops-monthly.txt" "$WORK/final" >> "$WORK/post.log" || die "apply-drops (monthly rows)"; fi
-  report_unhandled "$S"
+  report_unhandled "$WORK/cooccur-other.txt" "$V12/composition" "$WORK/final" "$DEST/twin-cooccur-unhandled.txt"
   log "twinscan: monthly-only symbols $(n_of "$WORK/monthly-only.txt") of union $(n_of "$WORK/monthly-union.txt"); $(awk '{ print $2, $3 }' "$WORK/drops-monthly.txt" | sort -u | wc -l | tr -d ' ') pairs -> $(n_of "$WORK/drops-monthly.txt") list rows dropped ($(n_of "$WORK/drops-monthly-only.txt") monthly-only, $(n_of "$WORK/drops-cooccur.txt") both-legs-yearly) -> $DEST/twin-drops-monthly.txt"
 }
 
@@ -287,48 +403,13 @@ write_monthly_drops_file() {
   } > "$DEST/twin-drops-monthly.txt"
 }
 
-# Post-apply check: no confirmed, non-excluded pair with both legs yearly-listed still co-occurs in a monthly list whose
-# yearly list in force holds at most one leg. By construction (the yearly pairs drop in every window, the rest through
-# ungoverned_cooccur) the file comes out empty; a row means a drop rule missed a cell, and the phase aborts.
-report_unhandled() {
-  ungoverned_cooccur "$WORK/cooccur-other.txt" "$V12/composition" "$WORK/final" > "$WORK/cooccur-unhandled.txt"
-  { echo "# Expected EMPTY: confirmed twin pairs, both legs in some yearly pit-v12 list, still co-occurring in a monthly"
-    echo "# list after every drop rule while the yearly list in force holds at most one leg: LIST LEG_A LEG_B <evidence>."
-    cat "$WORK/cooccur-unhandled.txt"; } > "$DEST/twin-cooccur-unhandled.txt"
-  [ ! -s "$WORK/cooccur-unhandled.txt" ] || die "$(n_of "$WORK/cooccur-unhandled.txt") ungoverned twin cells survive the drops: $DEST/twin-cooccur-unhandled.txt"
-  log "twinscan: no ungoverned twin co-occurrence left ($DEST/twin-cooccur-unhandled.txt holds no rows)"
-}
-
-# Both twin-drop files hold on the final lists: no DROPPED leg is back in its list and every survivor is present.
-check_drops_hold() {
-  for f in "$DEST/twin-drops.txt" "$DEST/twin-drops-monthly.txt"; do
-    grep -v '^#' "$f" | while read -r l d s _; do
-      [ -n "$l" ] || continue
-      ! grep -q -F "(symbol $d)" "$1/$l.sexp" || { echo "$l holds $d again"; exit 1; }
-      grep -q -F "(symbol $s)" "$1/$l.sexp" || { echo "$l lacks survivor $s"; exit 1; }
-    done || die "twin-drop check failed on $f"
-  done
-}
-
-md5_of_dir() { (cd "$1" && { md5sum top-3000-*.sexp 2>/dev/null || md5 -r top-3000-*.sexp | awk '{ print $1 "  " $2 }'; }); }
-
-# $1 freshly computed manifest, $2 committed manifest. The lists are NOT committed (~130 MB, gitignored): the committed
-# md5 files are the record, and every rebuild from the committed inputs must reproduce them byte for byte. A missing
-# $2 (first build) or REPIN=1 writes it.
-pin_md5() {
-  if [ -f "$2" ] && [ -z "${REPIN:-}" ]; then
-    cmp -s "$1" "$2" || die "rebuilt lists differ from the committed $(basename "$2") (diff $1 $2; REPIN=1 re-pins)"
-    log "install: $(n_of "$2") lists match the committed $(basename "$2") byte for byte"
-  else cp "$1" "$2"; log "install: wrote $(basename "$2") ($(n_of "$2") lists): commit it"; fi
-}
-
 phase_install() {
   [ -f "$WORK/drops-monthly.txt" ] && [ "$WORK/drops-monthly.txt" -nt "$WORK/post.stamp" ] || die "run the twinscan phase first"
   mkdir -p "$DEST/composition"; rm -f "$DEST"/composition/top-3000-*.sexp
   cp "$WORK"/final/top-3000-*.sexp "$DEST/composition/"
   { echo "# Yearly pit-v12 twin-drops re-keyed to the monthly lists (build_monthly_universe_warehouse.sh post): LIST DROPPED SURVIVOR"
     cat "$WORK/drops-yearly-mapped.txt"; } > "$DEST/twin-drops.txt"
-  check_drops_hold "$DEST/composition"
+  check_drops_hold "$DEST/composition" "$DEST/twin-drops.txt" "$DEST/twin-drops-monthly.txt"
   md5_of_dir "$DEST/composition" > "$WORK/composition.md5"; pin_md5 "$WORK/composition.md5" "$DEST/composition.md5"
   md5_of_dir "$WORK/raw" > "$WORK/composition-raw.md5"; pin_md5 "$WORK/composition-raw.md5" "$DEST/composition-raw.md5"
   write_schedule "$DEST/composition" > "$DEST/universe-schedule.sexp"
@@ -355,12 +436,25 @@ wh_syms() {
   else cp "$WORK/wh/syms-full.txt" "$WORK/wh/syms.txt"; fi
 }
 
+# Chunk markers and $OUT are reused only for the build they were made by (wh_stamp: set, CHUNK_SIZE, WH_START, WH_END,
+# tail exceptions, run tree). $OUT carries its own copy of the stamp, so deleting the markers cannot make an old $OUT
+# look fresh to build_snapshots -incremental. An $OUT without a stamp, or with another, aborts.
+wh_resume_guard() {
+  wh_stamp "$W/syms.txt" "$CHUNK_SIZE" "$WH_START" "$WH_END" "$EXC" "$(git -C "$HOST_TREE" rev-parse HEAD)" > "$W/build.stamp.new"
+  stamp_compatible "$W/build.stamp" "$W/build.stamp.new" \
+    || die "the chunk markers in $W were written for another build ($W/build.stamp vs $W/build.stamp.new): remove $OUT and $W/chunk-* $W/build.stamp"
+  if dx test -e "$OUT"; then
+    dx cat "$OUT/.sm-build.stamp" > "$W/out.stamp" 2>/dev/null || die "$OUT exists without a build stamp: move it or set OUT"
+    cmp -s "$W/out.stamp" "$W/build.stamp.new" || die "$OUT was built for another window or input set ($W/out.stamp vs $W/build.stamp.new): remove it and $W/chunk-*"
+  else
+    rm -f "$W"/chunk-*.done; dx mkdir -p "$OUT"; docker cp "$W/build.stamp.new" "$CONTAINER:$OUT/.sm-build.stamp" || die "stamp $OUT"
+  fi
+  mv "$W/build.stamp.new" "$W/build.stamp"
+}
+
 phase_warehouse() {
   wh_syms; W=$WORK/wh
-  # chunk markers are only valid for the set they were built from
-  echo "$(cksum < "$W/syms.txt") k=$CHUNK_SIZE" > "$W/syms.stamp.new"
-  if [ -f "$W/syms.stamp" ]; then cmp -s "$W/syms.stamp" "$W/syms.stamp.new" || die "warehouse set or CHUNK_SIZE changed since the chunk markers in $W were written: remove $OUT and $W/chunk-*"
-  else mv "$W/syms.stamp.new" "$W/syms.stamp"; fi
+  wh_resume_guard
   rm -f "$W"/chunk-*.txt
   grep -v -x GSPC.INDX "$W/syms.txt" > "$W/syms-nobench.txt"
   awk -v d="$W" -v k="$CHUNK_SIZE" '{ print > (d "/chunk-" (int((NR - 1) / k) + 1) ".txt") }' "$W/syms-nobench.txt"
@@ -382,14 +476,15 @@ phase_warehouse() {
 phase_verify() {
   wh_syms; W=$WORK/wh
   manifest_syms > "$W/manifest.txt"
-  cmp -s "$W/syms.txt" "$W/manifest.txt" || {
-    LC_ALL=C comm -3 "$W/syms.txt" "$W/manifest.txt" > "$W/set-diff.txt"
-    die "manifest set differs from the lists' warehouse set ($(n_of "$W/set-diff.txt") names, $W/set-diff.txt: col 1 = missing, col 2 = extra)"
-  }
-  dx sh -c "ls $OUT/*.snap | sed 's#.*/##; s#\\.snap\$##' | LC_ALL=C sort -u" > "$W/snaps.txt"
-  cmp -s "$W/manifest.txt" "$W/snaps.txt" || die "manifest entries and .snap files differ (#2724 clobber or orphans; $W/snaps.txt)"
-  n_wk=$(dx sh -c "ls $OUT/*.weekly 2>/dev/null | wc -l" | tr -d ' '); [ "$n_wk" -gt 0 ] || die "no .weekly side-table in $OUT"
-  m=$(n_of "$W/manifest.txt"); [ "$m" -le "$HANDLE_CAP" ] || log "WARNING: manifest $m > handle cap $HANDLE_CAP: chains on $OUT must export SNAPSHOT_MAX_MMAP_HANDLES >= $m"
+  set_equal "$W/syms.txt" "$W/manifest.txt" "$W/set-diff.txt" \
+    || die "manifest set differs from the lists' warehouse set ($(n_of "$W/set-diff.txt") names, $W/set-diff.txt: col 1 = missing, col 2 = extra)"
+  dx sh -c "ls $OUT | sed -n 's/\\.snap\$//p' | LC_ALL=C sort -u" > "$W/snaps.txt"
+  set_equal "$W/manifest.txt" "$W/snaps.txt" "$W/snap-diff.txt" \
+    || die "manifest entries and .snap files differ (#2724 clobber or orphans; $W/snap-diff.txt: col 1 = no .snap, col 2 = orphan)"
+  dx sh -c "ls $OUT | sed -n 's/\\.weekly\$//p' | LC_ALL=C sort -u" > "$W/weekly.txt"
+  set_equal "$W/manifest.txt" "$W/weekly.txt" "$W/weekly-diff.txt" \
+    || die "manifest entries and .weekly side-tables differ ($W/weekly-diff.txt: col 1 = no .weekly, col 2 = orphan)"
+  n_wk=$(n_of "$W/weekly.txt"); m=$(n_of "$W/manifest.txt"); [ "$m" -le "$HANDLE_CAP" ] || log "WARNING: manifest $m > handle cap $HANDLE_CAP: chains on $OUT must export SNAPSHOT_MAX_MMAP_HANDLES >= $m"
   log "VERIFY OK: manifest $m == lists' warehouse set (union - MEL + GSPC.INDX + 14 extras); snaps $m; weekly $n_wk; size $(dx du -sh "$OUT" | awk '{ print $1 }'). Chains: EXPECT_WH=$m, EXPECT_ABSENT=1 (MEL)"
 }
 

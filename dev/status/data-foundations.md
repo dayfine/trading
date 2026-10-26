@@ -20,8 +20,14 @@ IN_PROGRESS
   gitignored; the committed `composition{,-raw}.md5` pin them and install
   aborts on a mismatch. Pinned by
   `trading/devtools/checks/build_monthly_universe_guard_smoke.sh` (dry
-  harness of the list-side helpers) and `test_build_composition_universes_runner`
-  (new `summary_lines`, non-leap February, first-differing-line report). Not
+  harness of the list-side helpers and of every abort guard: `pin_md5`,
+  `check_may31` with its 27-list count, `report_unhandled`, `check_drops_hold`,
+  the verify set checks including `.weekly`, smoke-then-full list resume, and
+  the warehouse build stamp) and `test_build_composition_universes_runner`
+  (new `summary_lines`, non-leap February, first-differing-line report). List
+  markers are bound to their bounds and inputs, the raw lists must be exactly
+  the requested month ends, and chunk markers and `$OUT` are reused only under
+  the same build stamp (set, chunk size, window, exceptions, run tree). Not
   run here: the full build (~6–7 h container-exclusive).
 - [x] **2026-10-25 — month-end anchors on the composition list builder (arm
   SM prerequisites 1 + 2, `dev/experiments/floor-nearest-2026-10-25/README.md`

@@ -1399,7 +1399,8 @@
 
 ; Arm SM prerequisite 3: dry harness for the list-side rules of dev/scripts/build_monthly_universe_warehouse.sh
 ; (yearly twin-drops re-keyed to monthly windows, monthly-only twin drops, both-legs-yearly co-occurrence drops,
-; chained-survivor guard, schedule, warehouse set). Same (universe) pattern as above: the script is read via
+; chained-survivor guard, schedule, warehouse set) and its abort guards (md5 pin, May 31 identity, unhandled
+; twin cells, drop checks, verify set checks, list and warehouse resume). Same (universe) pattern as above: the script is read via
 ; repo_root() at run time.
 
 (rule
