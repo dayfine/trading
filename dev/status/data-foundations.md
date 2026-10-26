@@ -7,7 +7,7 @@ IN_PROGRESS
 
 ## Completed
 - [x] **2026-10-25 — monthly top-3000 lists + warehouse build script (arm SM
-  prerequisite 3; #3429, #3430, full build 2026-10-26).** `dev/scripts/build_monthly_universe_warehouse.sh`
+  prerequisite 3; PRs #3429, #3430, full build 2026-10-26).** `dev/scripts/build_monthly_universe_warehouse.sh`
   (resumable phases preflight / lists / post / twinscan / install / warehouse /
   verify) builds the month-end lists 1999-05-31 → 2025-12-31 on the pit-v12
   inputs, applies pit-v12's alias maps and twin drops (a confirmed pair's
@@ -28,7 +28,7 @@ IN_PROGRESS
   the requested month ends, and chunk markers and `$OUT` are reused only under
   the same build stamp (set, chunk size, window, exceptions, run tree). Full build 2026-10-26 at 888f25017:
   320 lists, all 27 May 31 lists byte-identical to pit-v12; 107 twin pairs -> 1,003
-  list rows dropped (7 re-pointed through a rename chain by #3430,
+  list rows dropped (7 re-pointed through a rename chain by PR #3430,
   `via=`; the BML-P preferred series excluded), no ungoverned co-occurrence;
   warehouse VERIFY OK, 10,125 symbols, 3.6 GB (chains: `EXPECT_WH=10125`,
   `EXPECT_ABSENT=1`). Wall: lists ~4 h (35–46 s per list), twin scan 8 min,
