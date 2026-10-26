@@ -111,7 +111,8 @@ entrants have a lower median 12-month forward return (−0.5 % vs +6.1 %) but ho
 - **Amendment 2026-10-25 (after the SN read, before any SM list, warehouse or run exists):**
   - **Displacement read.** SN showed this book is cash-bound: every admitted ticket displaces one. For each SM cell vs
     its paired S cell, report (a) *entrants*: SM placements in symbols outside the yearly list in force; (b)
-    *displaced*: S placements absent from the SM cell; (c) the realised ln(1+R) of each set, as n, mean, median,
+    *displaced*: S placements absent from the SM cell, counted at the decision (S Placed where SM reads Insufficient_cash, as for SN) and,
+    separately, by the symbol + entry-date join, which mixes in path effects; (c) the realised ln(1+R) of each set, as n, mean, median,
     p10/p90 and the share above +100 %. This is descriptive. It explains the Δ and does not change the rule above.
   - **Twin drops on monthly lists.** Year Y's pit-v12 twin drops apply to every monthly list dated in
     [Y-05-31, Y+1-05-31). Symbols that appear only in monthly lists also go through the twin detector, and its drops
@@ -562,7 +563,7 @@ the pack cannot see today.
 
 ### Ledger (one line)
 
-2026-10-25 floor-nearest — NOT LIVE as screened (no return read; ledger entry to follow in a docs PR): SN (Nearest under `require_structural_stop`, top-3000 pit-v12 2019–24, K=6) cut NSS to 0.950 × S against a ≤ 0.75 × bar mis-set versus the screen's own 6.7 % conversion (Placed 238 > 190); why: Nearest turns "no floor" into "floor > 15 %", and its ~5 % conversions re-draw cash in a cash-bound book (39–58 S tickets displaced per cell, incl. APPS/MMYT/GLNG, ADMA/MSTR at the fill; converts −2.3 % ex IONQ against shared +4.6 %); descriptive Δ median ln(1+R) −0.41, 6/6 seeds negative; the dial stays a default-off keep-axis and is not escalated.
+2026-10-25 floor-nearest — NOT LIVE as screened (no return read; ledger entry `_ledger/2026-10-25-floor-nearest.sexp`, #3428): SN (Nearest under `require_structural_stop`, top-3000 pit-v12 2019–24, K=6) cut NSS to 0.950 × S against a ≤ 0.75 × bar mis-set versus the screen's own 6.7 % conversion (Placed 238 > 190); why: Nearest turns "no floor" into "floor > 15 %", and its ~5 % conversions re-draw cash in a cash-bound book (39–58 S tickets displaced per cell, incl. APPS/MMYT/GLNG, ADMA/MSTR at the fill; converts −2.3 % ex IONQ against shared +4.6 %); descriptive Δ median ln(1+R) −0.41, 6/6 seeds negative; the dial stays a default-off keep-axis and is not escalated.
 
 `Verifies: none`. The #3420 [after-merge] item concerns the path-stability cells, not this run.
 
