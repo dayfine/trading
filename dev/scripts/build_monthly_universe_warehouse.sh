@@ -160,10 +160,18 @@ ungoverned_cooccur() {
   return 0
 }
 
-# $1 rows ("LIST D S ..."). Fails (exit 1, offending rows on stdout) when a row's survivor is a dropped leg of another
-# row in the same list: applying both would delete the instrument from that list.
-chained_survivors() {
-  awk 'NR == FNR { dropped[$1 " " $2] = 1; next } ($1 " " $3) in dropped { print; bad = 1 } END { exit bad }' "$1" "$1"
+# $1 rows ("LIST D S <evidence>"). stdout: the rows with each survivor resolved through the list's chain of drops to
+# the last leg nobody drops, tagged "via=<scan survivor>" when it moved. Every row comes from a pair whose legs are
+# both listed, so the chain's last leg is listed too and applying every row keeps one copy of the instrument.
+# Specimen: top-3000-2005-06-30 drops LB1 (survivor LB_old1) and LB_old1 (survivor BBWI); LB1's row now names BBWI.
+# Fails (exit 1, the cycle's rows on stderr) when a chain returns to its start: applying it would drop every leg.
+resolve_chains() {
+  awk 'NR == FNR { surv[$1 " " $2] = $3; next }
+    { s = $3; n = 0
+      while (($1 " " s) in surv) { s = surv[$1 " " s]; if (++n > 64 || s == $2) { print > "/dev/stderr"; bad = 1; next } }
+      if (s != $3) { v = $3; $3 = s; $0 = $0 " via=" v }
+      print }
+    END { exit bad }' "$1" "$1"
 }
 
 # $1 dir of dated lists. stdout: the universe_schedule block, one entry per list, ascending by date.
@@ -412,8 +420,8 @@ phase_twinscan() {
   derive_monthly_drops "$S/twins.txt" "$S/cooccur.txt" "$WORK/monthly-only.txt" "$TWINX/exclude-pairs.txt" > "$WORK/drops-monthly-only.txt"
   derive_monthly_drops "$S/twins.txt" "$S/cooccur.txt" "$WORK/monthly-only.txt" "$TWINX/exclude-pairs.txt" other > "$WORK/cooccur-other.txt"
   ungoverned_cooccur "$WORK/cooccur-other.txt" "$V12/composition" "$WORK/final" > "$WORK/drops-cooccur.txt"
-  LC_ALL=C sort "$WORK/drops-monthly-only.txt" "$WORK/drops-cooccur.txt" > "$WORK/drops-monthly.txt"
-  chained_survivors "$WORK/drops-monthly.txt" > "$WORK/drops-chained.txt" || die "chained twins (a survivor is also dropped in the same list): $WORK/drops-chained.txt; resolve by hand"
+  LC_ALL=C sort "$WORK/drops-monthly-only.txt" "$WORK/drops-cooccur.txt" > "$WORK/drops-scan.txt"
+  resolve_chains "$WORK/drops-scan.txt" > "$WORK/drops-monthly.txt" 2> "$WORK/drops-cycle.txt" || die "twin-drop cycle (applying it drops every leg): $WORK/drops-cycle.txt; add the pair to exclude-pairs.txt"
   write_monthly_drops_file
   if [ -s "$WORK/drops-monthly.txt" ]; then sh "$TWINX/apply-drops.sh" "$WORK/drops-monthly.txt" "$WORK/final" >> "$WORK/post.log" || die "apply-drops (monthly rows)"; fi
   report_unhandled "$WORK/cooccur-other.txt" "$V12/composition" "$WORK/final" "$DEST/twin-cooccur-unhandled.txt"
