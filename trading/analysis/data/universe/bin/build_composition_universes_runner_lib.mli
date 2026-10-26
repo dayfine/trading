@@ -69,6 +69,13 @@ val run :
     pre-#3136 (same order, products and fold); a rebuild on today's store and
     candidate set will not reproduce the committed lists. *)
 
+val summary_lines : schedule:schedule -> result -> string list
+(** [summary_lines ~schedule result] is the runner's stdout, one string per
+    line: [build_composition_universes_runner: written=W skipped=S], then one
+    [  skip LABEL top_n=N: REASON] per skipped pair in chronological order.
+    [LABEL] is [year=YYYY] under {!Yearly} (the pre-schedule text, byte for
+    byte) and [date=YYYY-MM-DD] under {!Month_ends}. *)
+
 val is_committed_dir : string -> bool
 (** [is_committed_dir path] is true when [path], after resolving symlinks (when
     it exists) and collapsing [.] / [..] / trailing [/], ends in the components

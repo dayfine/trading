@@ -106,6 +106,25 @@ let run ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
       List.fold top_ns ~init:acc ~f:(fun acc top_n ->
           _step inputs ~out_dir ~schedule ~top_n ~date acc))
 
+(* Yearly keeps the pre-schedule "year=YYYY" skip label byte for byte. *)
+let _skip_label ~schedule date =
+  match schedule with
+  | Yearly _ -> Printf.sprintf "year=%d" (Date.year date)
+  | Month_ends _ -> Printf.sprintf "date=%s" (Date.to_string date)
+
+let summary_lines ~schedule result =
+  let header =
+    Printf.sprintf "build_composition_universes_runner: written=%d skipped=%d"
+      result.written result.skipped
+  in
+  let skips =
+    List.rev_map result.skip_reasons ~f:(fun (date, top_n, reason) ->
+        Printf.sprintf "  skip %s top_n=%d: %s"
+          (_skip_label ~schedule date)
+          top_n reason)
+  in
+  header :: skips
+
 let _committed_components = [ "goldens-custom-universe"; "composition" ]
 
 (* Resolve symlinks when the path exists; otherwise fall back to the lexical

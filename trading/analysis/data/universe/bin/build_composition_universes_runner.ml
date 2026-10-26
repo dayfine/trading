@@ -49,21 +49,9 @@ let _parse_top_n_list raw : int list =
 
 module Lib = Build_composition_universes_runner_lib
 
-(* Yearly keeps the pre-schedule "year=YYYY" skip label byte for byte. *)
-let _skip_label ~(schedule : Lib.schedule) date =
-  match schedule with
-  | Yearly _ -> Printf.sprintf "year=%d" (Date.year date)
-  | Month_ends _ -> Printf.sprintf "date=%s" (Date.to_string date)
-
 let _print_summary ~schedule (result : Lib.result) =
-  Stdlib.Printf.printf
-    "build_composition_universes_runner: written=%d skipped=%d\n" result.written
-    result.skipped;
-  if result.skipped > 0 then
-    List.iter (List.rev result.skip_reasons) ~f:(fun (date, top_n, reason) ->
-        Stdlib.Printf.printf "  skip %s top_n=%d: %s\n"
-          (_skip_label ~schedule date)
-          top_n reason)
+  List.iter (Lib.summary_lines ~schedule result) ~f:(fun line ->
+      Stdlib.Printf.printf "%s\n" line)
 
 let _run ~dollar_volume ~bars_root ~symbol_types_path ~sectors_csv_path
     ~inventory_path ~out_dir ~schedule ~top_ns =

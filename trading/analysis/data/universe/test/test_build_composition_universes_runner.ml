@@ -273,6 +273,18 @@ let test_month_ends_spans_year_and_leap_february _ =
          equal_to (_d "2020-03-31");
        ])
 
+(* Non-leap Februaries end on the 28th: an ordinary year (2019) and a century
+   year that is not a multiple of 400 (2100); 2000 is a multiple of 400. *)
+let test_month_ends_non_leap_february _ =
+  assert_that
+    ( Runner.month_ends ~first:(_d "2019-01-15") ~last:(_d "2019-03-31"),
+      Runner.month_ends ~first:(_d "2100-02-01") ~last:(_d "2100-02-28"),
+      Runner.month_ends ~first:(_d "2000-02-01") ~last:(_d "2000-02-29") )
+    (equal_to
+       ( [ _d "2019-01-31"; _d "2019-02-28"; _d "2019-03-31" ],
+         [ _d "2100-02-28" ],
+         [ _d "2000-02-29" ] ))
+
 let test_month_ends_excludes_partial_last_month _ =
   assert_that
     ( Runner.month_ends ~first:(_d "2020-04-30") ~last:(_d "2020-06-29"),
@@ -375,6 +387,23 @@ let test_month_ends_writes_one_dated_file_per_anchor _ =
     (is_ok_and_holds
        (field (fun s -> s.Universe.Snapshot.date) (equal_to (_d "2020-04-30"))))
 
+let _first_line_diff ~expected ~actual =
+  if String.equal expected actual then None
+  else
+    let e = Array.of_list (String.split expected ~on:'\n') in
+    let a = Array.of_list (String.split actual ~on:'\n') in
+    let line arr i = if i < Array.length arr then arr.(i) else "<eof>" in
+    let rec go i =
+      if String.equal (line e i) (line a i) then go (i + 1)
+      else Some (i + 1, line e i, line a i)
+    in
+    go 0
+
+let _describe_diff = function
+  | None -> "byte-identical"
+  | Some (n, e, a) ->
+      Printf.sprintf "first difference at line %d: yearly %S, monthly %S" n e a
+
 (* Prerequisite 2's code path: the month-end path's May 31 file is the yearly
    path's file byte for byte, so the monthly lists differ from the yearly ones
    only by date. *)
@@ -389,29 +418,65 @@ let test_month_end_may_31_is_byte_identical_to_yearly _ =
       ~out_dir:monthly_dir fixture
   in
   let read dir name = In_channel.read_all (Filename.concat dir name) in
-  let pairs =
+  let diffs =
     List.map [ 3; 5 ] ~f:(fun n ->
-        ( read yearly_dir (Printf.sprintf "top-%d-2020.sexp" n),
-          read monthly_dir (Printf.sprintf "top-%d-2020-05-31.sexp" n) ))
+        let y = read yearly_dir (Printf.sprintf "top-%d-2020.sexp" n) in
+        ( String.length y,
+          _first_line_diff ~expected:y
+            ~actual:
+              (read monthly_dir (Printf.sprintf "top-%d-2020-05-31.sexp" n)) ))
   in
   _cleanup_dir root;
   assert_that (yearly.Runner.written, monthly.Runner.written) (equal_to (2, 4));
-  assert_that pairs
+  assert_that diffs
     (elements_are
-       (List.init 2 ~f:(fun _ ->
+       (List.map diffs ~f:(fun (_, diff) ->
             all_of
               [
-                field (fun (y, _) -> String.length y) (gt (module Int_ord) 0);
-                field (fun (y, m) -> String.equal y m) (equal_to true);
+                field fst (gt (module Int_ord) 0);
+                field snd (equal_to ~msg:(_describe_diff diff) None);
               ])))
+
+let test_summary_lines_skip_labels _ =
+  let result : Runner.result =
+    {
+      written = 1;
+      skipped = 2;
+      skip_reasons =
+        [ (_d "2021-05-31", 10, "late"); (_d "2020-05-31", 10, "early") ];
+    }
+  in
+  let monthly =
+    Runner.Month_ends { first = _d "2020-05-31"; last = _d "2021-05-31" }
+  in
+  assert_that
+    ( Runner.summary_lines ~schedule:_yearly_2020 result,
+      Runner.summary_lines ~schedule:monthly result,
+      Runner.summary_lines ~schedule:monthly
+        { written = 3; skipped = 0; skip_reasons = [] } )
+    (equal_to
+       ( [
+           "build_composition_universes_runner: written=1 skipped=2";
+           "  skip year=2020 top_n=10: early";
+           "  skip year=2021 top_n=10: late";
+         ],
+         [
+           "build_composition_universes_runner: written=1 skipped=2";
+           "  skip date=2020-05-31 top_n=10: early";
+           "  skip date=2021-05-31 top_n=10: late";
+         ],
+         [ "build_composition_universes_runner: written=3 skipped=0" ] ))
 
 let suite =
   "Build_composition_universes_runner"
   >::: [
          "test_month_ends_spans_year_and_leap_february"
          >:: test_month_ends_spans_year_and_leap_february;
+         "test_month_ends_non_leap_february"
+         >:: test_month_ends_non_leap_february;
          "test_month_ends_excludes_partial_last_month"
          >:: test_month_ends_excludes_partial_last_month;
+         "test_summary_lines_skip_labels" >:: test_summary_lines_skip_labels;
          "test_yearly_anchor_dates_are_may_31"
          >:: test_yearly_anchor_dates_are_may_31;
          "test_snapshot_file_names" >:: test_snapshot_file_names;

@@ -116,7 +116,16 @@ entrants have a lower median 12-month forward return (−0.5 % vs +6.1 %) but ho
     p10/p90 and the share above +100 %. This is descriptive. It explains the Δ and does not change the rule above.
   - **Twin drops on monthly lists.** Year Y's pit-v12 twin drops apply to every monthly list dated in
     [Y-05-31, Y+1-05-31). Symbols that appear only in monthly lists also go through the twin detector, and its drops
-    are committed with their evidence (prerequisite 3).
+    are committed with their evidence (prerequisite 3). *Revised 2026-10-25 by the dispatcher, before any SM list
+    exists:* both legs of a confirmed pit-v12 pair can co-occur in a monthly list whose yearly list in force holds
+    only one leg (CMN and CMD in `top-3000-2009-04-30`, the 2008 window). The dropped leg therefore leaves **every**
+    monthly list that holds both legs of a confirmed pair, whatever the window; cells where the yearly list in force
+    also holds both legs are pit-v12's own state and stay, so each May 31 list still equals its yearly list.
+    `twin-cooccur-unhandled.txt` must come out empty.
+  - **Lists not committed.** The 319 monthly lists (~130 MB) are not committed. `composition.md5`,
+    `composition-raw.md5` and `twin-drops-monthly.txt` are, and `dev/scripts/build_monthly_universe_warehouse.sh`
+    rebuilds the lists and the schedule from the committed inputs, aborting unless they match the md5 files byte
+    for byte.
 
 ## Results
 

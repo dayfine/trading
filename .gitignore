@@ -79,6 +79,15 @@ trading/dev/backtest/
 trading/test_data/**/data.csv
 trading/test_data/**/data.metadata.sexp
 
+# Arm SM monthly top-3000 lists (319 lists, ~130 MB) and their schedule: rebuilt
+# byte-identically by dev/scripts/build_monthly_universe_warehouse.sh, which checks
+# them against the committed composition.md5 / composition-raw.md5. Only the md5
+# files and twin-drops-monthly.txt in pit-v12-monthly/ are committed.
+trading/test_data/backtest_scenarios/pit-v12-monthly/composition/
+trading/test_data/backtest_scenarios/pit-v12-monthly/universe-schedule.sexp
+trading/test_data/backtest_scenarios/pit-v12-monthly/twin-drops.txt
+trading/test_data/backtest_scenarios/pit-v12-monthly/twin-cooccur-unhandled.txt
+
 .claude/worktrees/
 
 # grid_search.exe per-cell shard files (parallel runner intermediates,
