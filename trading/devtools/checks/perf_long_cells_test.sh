@@ -52,6 +52,20 @@ expect_eq "row shape for n0-s0" "2026-01-01T01:00:00,demo-2026-01-01,n0-s0-v11,p
   "$(printf '%s\n' "$rows" | grep ',n0-s0-v11,')"
 expect_eq "missing spec keeps ?" "?,?" "$(printf '%s\n' "$rows" | grep ',missing-spec-s0,' | cut -d, -f4,5)"
 
+# A chain's last-quarter preflight spec carries the cell's name too and sorts first
+# (floor-nearest arm SM: preflight-ps-SM-p0.sexp read 0.25 y for a 6 y cell): skip it.
+mkdir -p "$TMP/pf/dev/experiments"
+cp -R "${FIX}/dev/experiments/demo-2026-01-01" "$TMP/pf/dev/experiments/"
+printf '((name "n0")\n (period ((start_date 2028-10-01) (end_date 2029-01-01))))\n' \
+  > "$TMP/pf/dev/experiments/demo-2026-01-01/preflight-n0.sexp"
+expect_eq "a preflight spec of the same name is not the cell's spec" "pit-schedule-3000,10.00" \
+  "$(sh "$SCRIPT" collect "$TMP/pf/dev/experiments/demo-2026-01-01/chain.log" | grep ',n0-s0-v11,' | cut -d, -f4,5)"
+# grep -r visits files in directory order, so the case above can pass by luck; with the
+# preflight as the only spec of that name, it must never be read
+rm -rf "$TMP/pf/dev/experiments/demo-2026-01-01/specs"
+expect_eq "a preflight spec alone resolves to ?" "?,?" \
+  "$(sh "$SCRIPT" collect "$TMP/pf/dev/experiments/demo-2026-01-01/chain.log" | grep ',n0-s0-v11,' | cut -d, -f4,5)"
+
 rows2=$(sh "$SCRIPT" collect "$LOG2")
 expect_eq "a chain that logs no cap ran at the pre-#2882 default 256" 256 "$(printf '%s\n' "$rows2" | grep ',n0-s0-v11,' | cut -d, -f6)"
 expect_eq "golden <family>--<name>-new resolves under the golden spec root" "broad,5.00" \

@@ -33,7 +33,8 @@ END {
   for (j = 1; j <= nk; j++) {
     k = ks[j]
     # NAV dates before SPY's first bar (a holiday first row, 2019-01-01) start at SPY's first bar, not 0
-    if (s_spy[k] == 0) s_spy[k] = first_spy
+    # a period that ends before SPY's first bar has no SPY move at all: it stays 0, not -100 %
+    if (s_spy[k] == 0 && e_spy[k] > 0) s_spy[k] = first_spy
     r = (s_nav[k] > 0) ? (e_nav[k] / s_nav[k] - 1) * 100 : 0
     sr = (s_spy[k] > 0) ? (e_spy[k] / s_spy[k] - 1) * 100 : 0
     printf "%s{\"p\":\"%s\",\"from\":\"%s\",\"to\":\"%s\",\"nav0\":%.0f,\"nav1\":%.0f,\"ret\":%.2f,\"spy\":%.2f,\"mdd\":%.2f,\"dd_peak\":%.2f,\"expo\":%.1f,\"pos\":%.1f,\"opened\":%d,\"closed\":%d,\"wins\":%d,\"pnl\":%.0f,\"wk\":%d,\"bull\":%d,\"neut\":%d,\"bear\":%d}", \

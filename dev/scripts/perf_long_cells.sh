@@ -48,7 +48,8 @@ exp_dir() {
 
 # "<universe>,<years>" for a spec name, "?,?" when not found.
 spec_shape() { # $1 search dir, $2 spec name
-  f=$(grep -rlE "^\(\(name \"$2\"\)" "$1" --include='*.sexp' 2>/dev/null | head -1 || true)
+  # a chain's preflight-<spec>.sexp (a last-quarter smoke) carries the same name: never the cell's window
+  f=$(grep -rlE "^\(\(name \"$2\"\)" "$1" --include='*.sexp' --exclude='preflight-*' 2>/dev/null | head -1 || true)
   [ -n "$f" ] || { echo "?,?"; return; }
   awk '
     /start_date/ { match($0, /start_date [0-9-]+/); s = substr($0, RSTART + 11, 10) }
