@@ -290,6 +290,15 @@ expect_eq "second run r1 emitted" 6 "$(jq length "$S/data/r1_trades.json")"
 expect_eq "year table: one row" 2020 "$(jq -r '.[0].p' "$S/data/r0_years.json")"
 expect_eq "quarter table: two rows" "2020Q1 2020Q2" "$(jq -r 'map(.p)|join(" ")' "$S/data/r0_quarters.json")"
 expect_eq "validator check parsed" V13 "$(jq -r '.validator[1].id' "$S/data/r0_meta.json")"
+# An equity curve whose first row is a market holiday before SPY's first bar (2019-01-01, floor-nearest
+# arm SM): the first period's SPY start is SPY's first bar, never 0 -- a 0 start printed SPY 2019 as
+# 0.0 % and the eras ratio as 1.22x where the KPI strip read 0.93x.
+mkdir -p "$TMP/hs"
+printf 'date,open,high,low,close,adjusted_close,volume\n2019-01-02,1,1,1,100,100,1\n2019-12-31,1,1,1,130,130,1\n2020-12-31,1,1,1,143,143,1\n' > "$TMP/hs/spy.csv"
+printf 'date,portfolio_value\n2019-01-01,100\n2019-01-02,100\n2019-12-31,110\n2020-12-31,121\n' > "$TMP/hs/eq.csv"
+: > "$TMP/hs/empty"
+expect_eq "holiday start: first year's SPY reads from SPY's first bar" "2019:30 2020:10" \
+  "$(awk -v gran=Y -f "$ROOT/dev/lib/review_pack/periods.awk" "$TMP/hs/spy.csv" "$TMP/hs/eq.csv" "$TMP/hs/empty" "$TMP/hs/empty" "$TMP/hs/empty" | jq -r 'map("\(.p):\(.spy|round)")|join(" ")')"
 
 
 # Open positions at the window end (#3125). A copy of the fixture run gains
