@@ -883,7 +883,7 @@ The seven tail names are every trade above +100 % in either arm (APPS, ADMA, BBW
   - A $146 shortfall cost BBWI (+$162k), like FDX's $68.58 in the memory.
   - Cell level tracks tail capture: ADMA, APPS, BBWI, GLNG, MMYT, DXCM, MSTR.
 - **`project_top_n_capacity_verdict` (ledger `2026-09-22-top-of-funnel-capacity.sexp`): confirmed again.** Widening the funnel of a capital-bound book re-draws the slots. Three funnel-widening reads now behave the same way: top-N 40, Nearest, and the monthly refresh.
-- **`project_monster_funnel_top_of_funnel`: confirmed from the entrant side.** 80 % of entrant monsters die at the top-20, and those that pass mostly die at `No_structural_stop`.
+- **`project_monster_funnel_top_of_funnel`: confirmed from the entrant side.** On SM p0, 48 of 60 entrant monsters (80 %) never reach the top-20 (45 of 60, 75 %, across all six cells), and those that pass mostly die at `No_structural_stop`.
 - **`project_edge_is_the_fat_tail`: refined.** That memory lists "universe breadth (more shots at a monster)" as tail-preserving. That holds only if the shots reach a slot. List breadth adds volume-spike names that the top-20 cut and the stop gate filter out before cash.
 - **`project_record_gap_is_concentration`: confirmed.** The same tail trades, at the same weight on a smaller NAV, cost −$0.62M pooled.
 - **`project_2025_anatomy`: consistent.** Supply is not what limits the tail; the funnel is. 2025 itself is untested here.
@@ -936,7 +936,7 @@ None of these changes the SM − S comparison.
   - The summary failed safely: the chain's own summary could not compute that column instead of guessing. But the defaults should be committed paths.
 - **Guard log names no specimen.** `Panel_runner: split_dividend_guard rejected=1` (every `sm/ps-SM-p*-s0.log`) names no symbol or date, so the rejected event cannot be identified from the artifacts. Proposal: print the symbol, date and factor of each rejection.
 - **Known classes, with entrant specimens.**
-  - **CGEN, filled from above** (SM p2 `CGEN-wein-354`, SM p3 `CGEN-wein-359`).
+  - **CGEN, filled from above** (SM p2 `CGEN-wein-359`, SM p3 `CGEN-wein-354`).
     - Decided 2024-01-26 at a close of 2.21, with `suggested_entry` 1.50 (32 % under the close) and stop 1.488.
     - Filled 2024-07-05 at 1.53 after 23 weeks, on a falling bar: open 1.61, low 1.50.
     - Exited three days later as a `liquidity_exit`. This is the SN read's SDA class.
