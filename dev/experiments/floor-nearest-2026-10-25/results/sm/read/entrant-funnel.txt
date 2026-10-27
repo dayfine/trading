@@ -1,0 +1,42 @@
+member-months of the monthly lists dated 2018-12-31..2024-11-30: 12-month forward return (adjusted close)
+members : rows 187872, with R12 180852, >+100% 9285 (5.13%), >+300% 1021 (0.56%), >+300% without a >=50% day 705
+entrants: rows 18035, with R12 17159, >+100% 1329 (7.75%), >+300% 229 (1.33%), >+300% without a >=50% day 123
+entrant share: of rows 8.8%, of >+100% rows 12.5%, of >+300% rows 18.3%, of >+300% rows without a >=50% day 14.9%
+members  R12: p10 -0.454 p25 -0.202 median +0.044 p75 +0.322 p90 +0.684
+entrants R12: p10 -0.742 p25 -0.475 median -0.112 p75 +0.253 p90 +0.814
+
+distinct names with a >+300 % R12 month (no >=50 % day): first such month; did the arm's p0 top-N decide them within 12 months?
+entrants: 60 names; reached SM p0 top-N within 12 months: 12; placed: 1
+  FSLY 2019-07-31 R12 +345%: No_structural_stop
+  JMIA 2019-11-30 R12 +414%: No_structural_stop
+  PRPL 2020-03-31 R12 +457%: No_structural_stop No_structural_stop
+  GNMK 2020-03-31 R12 +480%: No_structural_stop No_structural_stop No_structural_stop
+  FLGT 2020-03-31 R12 +798%: No_structural_stop
+  SI_old1 2020-11-30 R12 +475%: No_structural_stop
+  AEHR 2022-07-31 R12 +357%: No_structural_stop
+  VERA 2023-01-31 R12 +329%: No_structural_stop
+  BMA 2023-10-31 R12 +379%: Placed
+  FNMA 2024-01-31 R12 +336%: No_structural_stop
+  HSAI 2024-02-29 R12 +385%: Sized_to_zero
+  KC 2024-10-31 R12 +358%: No_structural_stop
+  entrant names, trading days of history before their first >+300 % month:
+  < 260: 21 | 260-519: 1 | >= 520: 38
+members: 227 names; reached S p0 top-N within 12 months: 67; placed: 3
+
+entrant >+300 % names: top-N decisions in any SM cell within 12 months of the first such month, by outcome
+  FSLY 2019-07-31: 6 cells; No_structural_stop 12
+  JMIA 2019-11-30: 6 cells; No_structural_stop 6
+  NET 2019-12-31: 2 cells; No_structural_stop 2
+  FLGT 2020-03-31: 6 cells; No_structural_stop 6
+  GNMK 2020-03-31: 6 cells; No_structural_stop 18
+  PRPL 2020-03-31: 6 cells; No_structural_stop 11
+  CLDX 2020-07-31: 3 cells; Insufficient_cash 2 No_structural_stop 2
+  SI_old1 2020-11-30: 6 cells; No_structural_stop 6
+  AEHR 2022-07-31: 6 cells; No_structural_stop 9
+  VERA 2023-01-31: 6 cells; No_structural_stop 6
+  CAVA 2023-09-30: 1 cells; Sized_to_zero 1
+  BMA 2023-10-31: 3 cells; Insufficient_cash 1 Placed 2
+  FNMA 2024-01-31: 6 cells; No_structural_stop 6
+  HSAI 2024-02-29: 6 cells; Sized_to_zero 10
+  KC 2024-10-31: 1 cells; No_structural_stop 1
+  60 names; reached any SM cell top-N: 15

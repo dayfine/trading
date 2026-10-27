@@ -1,0 +1,66 @@
+tail per cell: trades, pnl_percent > 100, top trade by TR P&L, its share of realised TR P&L, end unrealised (actual.sexp)
+S p0   trades 150 | >+100% 2 | top BBWI 2020-08-05 158k | top share 45% of realised 354k | unrealised 532k
+SM p0  trades 150 | >+100% 3 | top APPS 2020-06-15 378k | top share 51% of realised 738k | unrealised 586k
+S p1   trades 134 | >+100% 4 | top ADMA 2023-12-19 622k | top share 43% of realised 1449k | unrealised 697k
+SM p1  trades 147 | >+100% 3 | top ADMA 2023-12-19 419k | top share 63% of realised 670k | unrealised 486k
+S p2   trades 136 | >+100% 4 | top ADMA 2023-12-19 518k | top share 54% of realised 955k | unrealised 527k
+SM p2  trades 153 | >+100% 2 | top BBWI 2020-08-05 146k | top share 74% of realised 198k | unrealised 454k
+S p3   trades 139 | >+100% 3 | top APPS 2020-06-15 389k | top share 62% of realised 625k | unrealised 591k
+SM p3  trades 151 | >+100% 3 | top APPS 2020-06-15 371k | top share 81% of realised 457k | unrealised 549k
+S p4   trades 133 | >+100% 4 | top ADMA 2023-12-19 583k | top share 45% of realised 1287k | unrealised 681k
+SM p4  trades 148 | >+100% 4 | top ADMA 2023-12-19 497k | top share 52% of realised 954k | unrealised 522k
+S p5   trades 132 | >+100% 5 | top ADMA 2023-12-19 624k | top share 43% of realised 1457k | unrealised 766k
+SM p5  trades 149 | >+100% 4 | top ADMA 2023-12-19 467k | top share 55% of realised 850k | unrealised 574k
+
+cohort join on symbol|entry_date (trades.csv): both (S, SM P&L) | S-only | SM-only
+p0 both 113 (S +487k, SM +472k) | S-only 37 -134k | SM-only 37 +266k
+p1 both 107 (S +1049k, SM +885k) | S-only 27 +400k | SM-only 40 -216k
+p2 both 102 (S +57k, SM +154k) | S-only 34 +898k | SM-only 51 +44k
+p3 both 100 (S +576k, SM +551k) | S-only 39 +49k | SM-only 51 -94k
+p4 both 101 (S +1142k, SM +1070k) | S-only 32 +144k | SM-only 47 -116k
+p5 both 117 (S +1166k, SM +991k) | S-only 15 +291k | SM-only 32 -141k
+
+paired by seed: ln(1+R) S, SM, difference (actual.sexp)
+p0 0.6733 0.8776 +0.2043
+p1 1.1766 0.7993 -0.3773
+p2 0.9447 0.5388 -0.4059
+p3 0.8372 0.7351 -0.1022
+p4 1.1179 0.9367 -0.1812
+p5 1.2031 0.9175 -0.2856
+mean -0.1913 sd 0.2254 (n=6)
+
+max drawdown peak -> trough per cell (equity_curve.csv)
+S p0   17.1% 2020-02-20 -> 2020-03-25
+SM p0  24.3% 2021-04-13 -> 2023-10-27
+S p1   20.3% 2021-04-09 -> 2023-10-27
+SM p1  35.2% 2021-02-09 -> 2023-10-27
+S p2   32.3% 2021-04-12 -> 2023-10-27
+SM p2  25.6% 2021-06-01 -> 2023-10-27
+S p3   22.9% 2021-04-12 -> 2023-10-27
+SM p3  29.8% 2021-04-12 -> 2023-10-27
+S p4   23.7% 2021-04-12 -> 2023-10-27
+SM p4  27.8% 2021-04-12 -> 2023-10-27
+S p5   38.0% 2021-02-09 -> 2023-10-27
+SM p5  36.3% 2021-02-09 -> 2023-10-27
+
+tail names caught per arm and cell (TR P&L, $k)
+S   p0: APPS - ADMA - BBWI +158k MSTR - GLNG +134k MMYT +390k DXCM +114k
+SM  p0: APPS +378k ADMA - BBWI +156k MSTR -8k GLNG +160k MMYT +448k DXCM +116k
+S   p1: APPS +390k ADMA +622k BBWI +162k MSTR -8k GLNG +183k MMYT +534k DXCM +116k
+SM  p1: APPS +383k ADMA +419k BBWI - MSTR -8k GLNG +130k MMYT +360k DXCM +118k
+S   p2: APPS +387k ADMA +518k BBWI +159k MSTR - GLNG - MMYT +448k DXCM +115k
+SM  p2: APPS - ADMA - BBWI +146k MSTR - GLNG +119k MMYT +341k DXCM +118k
+S   p3: APPS +389k ADMA - BBWI +160k MSTR -8k GLNG +159k MMYT +463k DXCM +115k
+SM  p3: APPS +371k ADMA - BBWI +151k MSTR -8k GLNG +152k MMYT +421k DXCM +117k
+S   p4: APPS +395k ADMA +583k BBWI +162k MSTR - GLNG +173k MMYT +501k DXCM +116k
+SM  p4: APPS +384k ADMA +497k BBWI +158k MSTR - GLNG +154k MMYT +427k DXCM +119k
+S   p5: APPS +387k ADMA +624k BBWI +159k MSTR +428k GLNG +187k MMYT +536k DXCM +115k
+SM  p5: APPS - ADMA +467k BBWI +149k MSTR +360k GLNG +149k MMYT +401k DXCM +117k
+
+S Placed -> SM Insufficient_cash: SM placements earlier in the same week's list
+p0 displaced 24: after an entrant placement that week 5, after another SM-only placement 1, carry-over 18
+p1 displaced 8: after an entrant placement that week 0, after another SM-only placement 0, carry-over 8
+p2 displaced 21: after an entrant placement that week 5, after another SM-only placement 3, carry-over 13
+p3 displaced 27: after an entrant placement that week 3, after another SM-only placement 3, carry-over 21
+p4 displaced 23: after an entrant placement that week 0, after another SM-only placement 4, carry-over 19
+p5 displaced 11: after an entrant placement that week 2, after another SM-only placement 0, carry-over 9

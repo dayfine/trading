@@ -1,0 +1,35 @@
+yearly return per cell 2019..2024
+S p0     +9.8%  +18.3%  +14.1%   -5.1%  +13.3%  +23.1%
+SM p0    +6.8%  +51.0%  +20.3%  -15.2%   +9.8%  +33.1%
+S p1    +11.1%  +47.7%  +26.1%   -6.1%   +8.1%  +54.4%
+SM p1    +7.8%  +43.9%   +4.7%  -17.7%   +5.9%  +57.0%
+S p2    +10.8%  +46.9%  +19.8%  -17.0%   +8.1%  +46.9%
+SM p2    +7.1%  +12.0%  +23.2%  -16.0%   +5.7%  +30.6%
+S p3     +7.9%  +48.3%  +14.0%   -7.9%   +7.9%  +27.3%
+SM p3    +7.5%  +44.5%  +22.6%  -19.3%   +7.1%  +26.7%
+S p4    +10.3%  +52.0%  +17.0%   -7.1%   +9.0%  +54.0%
+SM p4   +10.2%  +47.4%  +16.8%  -16.9%   +6.3%  +52.2%
+S p5     +4.8%  +72.7%  +17.1%   -8.2%   +8.3%  +58.0%
+SM p5    +5.2%  +32.6%  +29.0%  -17.6%   +6.2%  +58.8%
+
+year-end NAV ratio SM/S 2019..2024
+p0 0.973 1.241 1.309 1.170 1.135 1.227
+p1 0.970 0.946 0.785 0.688 0.674 0.686
+p2 0.966 0.737 0.758 0.767 0.750 0.666
+p3 0.996 0.970 1.043 0.915 0.907 0.903
+p4 1.000 0.969 0.968 0.866 0.844 0.834
+p5 1.004 0.771 0.849 0.763 0.748 0.752
+
+2022: qty x (end - start) per position held in 2022 (start = 2021-12-31 close or the fill; end = exit or 2022-12-30 close), by class ($k)
+S   p0 dNAV   -76k  MTM   -99k (TRT +0k) | Insufficient_cash -77k cut -29k Placed -3k leaver +10k
+SM  p0 dNAV  -294k  MTM  -321k (TRT -173k) | Insufficient_cash -46k entrant -227k cut -32k Placed -16k
+S   p1 dNAV  -126k  MTM  -154k (TRT +0k) | Insufficient_cash -45k cut -21k Placed -101k leaver +13k
+SM  p1 dNAV  -287k  MTM  -305k (TRT -144k) | Insufficient_cash -23k entrant -199k Placed -82k
+S   p2 dNAV  -331k  MTM  -360k (TRT +0k) | Insufficient_cash -103k cut -35k Placed -236k leaver +13k
+SM  p2 dNAV  -236k  MTM  -253k (TRT -132k) | Insufficient_cash -22k entrant -183k cut +119k Placed -167k
+S   p3 dNAV  -145k  MTM  -170k (TRT +0k) | Insufficient_cash -40k Placed -107k leaver -23k
+SM  p3 dNAV  -367k  MTM  -389k (TRT -168k) | Insufficient_cash -33k entrant -233k cut -16k Placed -106k
+S   p4 dNAV  -139k  MTM  -164k (TRT +0k) | Insufficient_cash -92k cut -12k Placed -74k leaver +13k
+SM  p4 dNAV  -320k  MTM  -340k (TRT -170k) | Insufficient_cash -25k entrant -232k cut -16k Placed -67k
+S   p5 dNAV  -175k  MTM  -206k (TRT +0k) | Insufficient_cash -24k cut -30k Placed -127k leaver -26k
+SM  p5 dNAV  -316k  MTM  -338k (TRT -161k) | Insufficient_cash -29k entrant -213k Placed -97k

@@ -1,0 +1,81 @@
+floor-refresh SM summary: SM from /tmp/fsm-run/results, S (null) from /tmp/ps-run/results, yearly lists from /Users/difan/Projects/trading-1/.claude/worktrees/sweep-ps/trading/test_data/backtest_scenarios/pit-v12/composition
+
+liveness (README §Arm SM: >= 1 SM p0 trade in a symbol outside the yearly pit-v12 list in force on its entry date):
+  null S p0 (base rate, descriptive): 0 of 150 closed trades outside the yearly list in force by entry_date (0 also by decision date)
+  null S p1 (base rate, descriptive): 1 of 134 closed trades outside the yearly list in force by entry_date (0 also by decision date): TRTX@2021-08-17(decided 2021-05-28)
+  null S p2 (base rate, descriptive): 0 of 136 closed trades outside the yearly list in force by entry_date (0 also by decision date)
+  null S p3 (base rate, descriptive): 0 of 139 closed trades outside the yearly list in force by entry_date (0 also by decision date)
+  null S p4 (base rate, descriptive): 1 of 133 closed trades outside the yearly list in force by entry_date (0 also by decision date): TRTX@2021-08-17(decided 2021-05-28)
+  null S p5 (base rate, descriptive): 0 of 132 closed trades outside the yearly list in force by entry_date (0 also by decision date)
+  SM p0: 19 of 150 closed trades outside the yearly list in force by entry_date (19 also by decision date): XRN@2021-08-04(decided 2021-07-23) WWR@2020-10-26(decided 2020-10-23) VRDN@2022-09-06(decided 2022-09-02) TRT@2021-12-06(decided 2021-12-03) TBBK@2021-05-17(decided 2021-05-14) STEL@2022-11-21(decided 2022-11-18) SCYX@2023-04-19(decided 2023-04-14) OWL@2021-08-02(decided 2021-07-16) MLAB@2021-10-11(decided 2021-10-08) LYTS@2023-09-28(decided 2023-09-08) LUNR@2023-03-23(decided 2023-03-10) IOTS@2020-04-27(decided 2020-03-13) ...
+  -> LIVE
+
+cell                 status     total_return_pct  ln(1+R)    sharpe   max_dd_pct  calmar
+ps-S-p0              included   96.070785445799046  0.6733     0.63204332941336716  17.076462149233674  0.69546749232781258
+ps-S-p1              included   224.31970747004976  1.1766     0.96220727350166491  20.263010284308315  1.0692837173090157
+ps-S-p2              included   157.20558017326928  0.9447     0.77244037883523864  32.2710840857384  0.52846254485605171
+ps-S-p3              included   130.99445513718712  0.8372     0.70999862281315573  22.923493043294798  0.65327704518230068
+ps-S-p4              included   205.83683452130796  1.1179     0.90407193410347564  23.657839179909963  0.86578383558951666
+ps-S-p5              included   233.0391376127713  1.2031     0.90286720245367569  38.0213460389428  0.58404551528317461
+ps-SM-p0             included   140.50726567376856  0.8776     0.71976730356313334  24.266058051336696  0.64916718688344432
+ps-SM-p1             included   122.39186521457597  0.7993     0.65033645294797726  35.2429928749037  0.40437688314086573
+ps-SM-p2             included   71.398794199599763  0.5388     0.47094136990437663  25.646685309071003  0.36640365970040883
+ps-SM-p3             included   108.56348015756376  0.7351     0.5973924308339158  29.764158631741889  0.43795119035168512
+ps-SM-p4             included   155.14432540051016  0.9367     0.74353260710643887  27.810939184099766  0.60761636057352275
+ps-SM-p5             included   150.29264378355614  0.9175     0.7198729787593543  36.329683908257756  0.45485800700539819
+
+arm  n  spread_sd  range      median_ln  median_sharpe  median_maxdd  median_calmar
+S    6  0.2108     0.5298     1.0313     0.8377         23.2907       0.6744
+SM   6  0.1489     0.3978     0.8384     0.6851         28.7875       0.4464
+
+delta median ln(1+R) = -0.1929 (bar = spread(S) = 0.2108; README: 0.2108); SM beats S in 8 of 36 cross pairs; spread(SM)/spread(S) = 0.7065
+median max DD SM - S = +5.50 pp (DD-cost bar 21.08 pp); median Calmar SM 0.4464 vs S 0.6744
+decision (liveness LIVE; README rule, mechanical): INCONCLUSIVE: no escalation on return
+
+divergence onset (first date an SM pk NAV differs from SM p0; descriptive):
+  ps-SM-p1-s0: 2019-02-26
+  ps-SM-p2-s0: 2019-04-15
+  ps-SM-p3-s0: 2019-05-09
+  ps-SM-p4-s0: 2019-02-26
+  ps-SM-p5-s0: 2019-04-15
+
+displacement read (README amendment 2026-10-25; descriptive). ln(1+R) of CLOSED trades, R = (pnl_dollars + dividends) / (entry_price x qty).
+  S decisions from /Users/difan/Projects/trading-1/.claude/worktrees/res-sm/dev/experiments/floor-nearest-2026-10-25/results/read/decisions (the SN read's reduction of the S audits); SM decisions from /tmp/fsm-run/results/*-decisions.csv.
+  pair p0 (SM pk vs S pk, same seed and deletion):
+    (a) entrants: Placed decisions 26 of 191; open at the end 0; closed trades n=19 mean=-0.0131 median=-0.0851 p10=-0.1366 p90=+0.1651 share>+100%=0.0%
+    (b) displaced at the decision (S Placed, SM Insufficient_cash): 24 decisions; their closed S trades n=14 mean=-0.0444 median=-0.0738 p10=-0.1096 p90=+0.0702 share>+100%=0.0%
+    (b) S-only by the symbol + entry_date join: n=37 mean=-0.0283 median=-0.0482 p10=-0.1430 p90=+0.1124 share>+100%=0.0%
+        SM-only by the same join (for reference): n=37 mean=+0.0207 median=-0.0550 p10=-0.1369 p90=+0.1335 share>+100%=2.7%
+  pair p1 (SM pk vs S pk, same seed and deletion):
+    (a) entrants: Placed decisions 22 of 191; open at the end 0; closed trades n=17 mean=-0.0552 median=-0.0717 p10=-0.1527 p90=+0.0694 share>+100%=0.0%
+    (b) displaced at the decision (S Placed, SM Insufficient_cash): 8 decisions; their closed S trades n=6 mean=+0.0524 median=-0.0617 p10=-0.0964 p90=+0.3154 share>+100%=0.0%
+    (b) S-only by the symbol + entry_date join: n=27 mean=+0.0800 median=-0.0336 p10=-0.1134 p90=+0.3628 share>+100%=3.7%
+        SM-only by the same join (for reference): n=40 mean=-0.0354 median=-0.0508 p10=-0.1317 p90=+0.0868 share>+100%=0.0%
+  pair p2 (SM pk vs S pk, same seed and deletion):
+    (a) entrants: Placed decisions 26 of 196; open at the end 0; closed trades n=21 mean=-0.0115 median=-0.0717 p10=-0.1363 p90=+0.1617 share>+100%=0.0%
+    (b) displaced at the decision (S Placed, SM Insufficient_cash): 21 decisions; their closed S trades n=17 mean=+0.0972 median=-0.0370 p10=-0.1018 p90=+0.2268 share>+100%=5.9%
+    (b) S-only by the symbol + entry_date join: n=34 mean=+0.0892 median=-0.0322 p10=-0.1117 p90=+0.2199 share>+100%=5.9%
+        SM-only by the same join (for reference): n=51 mean=-0.0047 median=-0.0502 p10=-0.1311 p90=+0.1617 share>+100%=0.0%
+  pair p3 (SM pk vs S pk, same seed and deletion):
+    (a) entrants: Placed decisions 25 of 190; open at the end 0; closed trades n=21 mean=-0.0549 median=-0.0717 p10=-0.1363 p90=+0.0585 share>+100%=0.0%
+    (b) displaced at the decision (S Placed, SM Insufficient_cash): 27 decisions; their closed S trades n=17 mean=+0.0180 median=-0.0381 p10=-0.1062 p90=+0.1873 share>+100%=0.0%
+    (b) S-only by the symbol + entry_date join: n=39 mean=-0.0012 median=-0.0381 p10=-0.1124 p90=+0.1842 share>+100%=0.0%
+        SM-only by the same join (for reference): n=51 mean=-0.0214 median=-0.0298 p10=-0.1609 p90=+0.1146 share>+100%=0.0%
+  pair p4 (SM pk vs S pk, same seed and deletion):
+    (a) entrants: Placed decisions 25 of 187; open at the end 0; closed trades n=19 mean=-0.0527 median=-0.0872 p10=-0.1335 p90=+0.0791 share>+100%=0.0%
+    (b) displaced at the decision (S Placed, SM Insufficient_cash): 23 decisions; their closed S trades n=14 mean=-0.0099 median=-0.0543 p10=-0.0894 p90=+0.1271 share>+100%=0.0%
+    (b) S-only by the symbol + entry_date join: n=32 mean=+0.0164 median=-0.0392 p10=-0.1143 p90=+0.1923 share>+100%=0.0%
+        SM-only by the same join (for reference): n=47 mean=-0.0232 median=-0.0502 p10=-0.1318 p90=+0.1141 share>+100%=0.0%
+  pair p5 (SM pk vs S pk, same seed and deletion):
+    (a) entrants: Placed decisions 23 of 193; open at the end 0; closed trades n=17 mean=-0.0533 median=-0.0851 p10=-0.1527 p90=+0.0998 share>+100%=0.0%
+    (b) displaced at the decision (S Placed, SM Insufficient_cash): 11 decisions; their closed S trades n=5 mean=+0.3003 median=-0.0927 p10=-0.1113 p90=+1.0934 share>+100%=20.0%
+    (b) S-only by the symbol + entry_date join: n=15 mean=+0.0735 median=-0.0814 p10=-0.1377 p90=+0.1151 share>+100%=6.7%
+        SM-only by the same join (for reference): n=32 mean=-0.0318 median=-0.0603 p10=-0.1613 p90=+0.1336 share>+100%=0.0%
+  pooled over the pairs:
+    entrants, closed:            n=114 mean=-0.0394 median=-0.0784 p10=-0.1363 p90=+0.1390 share>+100%=0.0%
+    displaced at the decision:   n=73 mean=+0.0413 median=-0.0550 p10=-0.1112 p90=+0.1929 share>+100%=2.7%
+    S-only by the join:          n=184 mean=+0.0311 median=-0.0381 p10=-0.1167 p90=+0.1951 share>+100%=2.2%
+    SM-only by the join:         n=258 mean=-0.0159 median=-0.0502 p10=-0.1363 p90=+0.1146 share>+100%=0.4%
+  Left to the analyst (not mechanical here): open positions' marks (unrealised P&L of entrants and of displaced
+  tickets still open at the end), the NAV-gap decomposition by decision class, which displaced tickets never filled,
+  entrants refused for cash, the tail-name ledger, and separating path effects from the join.

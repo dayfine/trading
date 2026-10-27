@@ -1,0 +1,47 @@
+first common date the paired NAVs differ (equity_curve.csv)
+p0 2019-02-28 S 1009348.93 SM 1004402.34
+p1 2019-06-06 S 993013.78 SM 989844.76
+p2 2019-02-28 S 1009348.93 SM 1004402.34
+p3 2019-06-06 S 984000.45 SM 980859.88
+p4 2019-06-06 S 999922.44 SM 996727.96
+p5 2019-06-06 S 992236.61 SM 989069.08
+
+equity-curve rows and dates present in one arm only
+p0 rows S 1561 SM 1563; SM-only dates: 2019-01-01 2020-01-01
+p1 rows S 1561 SM 1563; SM-only dates: 2019-01-01 2020-01-01
+p2 rows S 1561 SM 1563; SM-only dates: 2019-01-01 2020-01-01
+p3 rows S 1561 SM 1563; SM-only dates: 2019-01-01 2020-01-01
+p4 rows S 1561 SM 1563; SM-only dates: 2019-01-01 2020-01-01
+p5 rows S 1561 SM 1563; SM-only dates: 2019-01-01 2020-01-01
+SM p0 2019-01-01,1000063.89
+SM p0 2019-01-02,1000126.95
+SM p0 2019-12-31,1067679.82
+SM p0 2020-01-01,1067682.55
+SM p0 2020-01-02,1063534.06
+S  p0 2019-01-02,1000126.95
+S  p0 2019-12-31,1097849.51
+S  p0 2020-01-02,1094871.54
+USAS bars on those dates (data/): 2019-01-01,0.0001,0.0001,0.0001,0.0001,0.0002,0, 2020-01-01,0.0001,0.0001,0.0001,0.0001,0.0003,0, 
+USAS in yearly lists 2017-2024: 0; in monthly lists dated 2018-05..2024-12: 2020-08-31 2020-09-30 
+
+trades with the same symbol, entry and exit date in both arms: price, pnl%, stop and dividend-per-share mismatches
+p0 shared 111: price 0, pnl% 0, entry_stop 0, dividend/share 0
+p1 shared 107: price 0, pnl% 0, entry_stop 0, dividend/share 0
+p2 shared 101: price 0, pnl% 0, entry_stop 0, dividend/share 0
+p3 shared 100: price 0, pnl% 0, entry_stop 0, dividend/share 0
+p4 shared 101: price 0, pnl% 0, entry_stop 0, dividend/share 0
+p5 shared 117: price 0, pnl% 0, entry_stop 0, dividend/share 0
+
+macro_trend.sexp identical per pair
+p0 identical
+p1 identical
+p2 identical
+p3 identical
+p4 identical
+p5 identical
+
+params.sexp differences, p0
+5c5
+< (universe_size 9222)
+---
+> (universe_size 10111)

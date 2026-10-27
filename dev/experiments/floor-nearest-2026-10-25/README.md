@@ -1,6 +1,6 @@
 # floor-nearest-2026-10-25: Nearest support floor under `require_structural_stop`, pre-registered
 
-Status: **RUN 2026-10-25; NOT LIVE as screened (§Results, #3423).** Pre-registered in #3418 (97b6daa99, plus the §Log
+Status: **SN RUN 2026-10-25, NOT LIVE as screened (§Results, #3423); SM RUN 2026-10-26, INCONCLUSIVE (§Results, arm SM).** Pre-registered in #3418 (97b6daa99, plus the §Log
 06:57 PT amendment) before any SN cell ran; the null is path-stability arm S (#3419). All 6 SN cells ran clean (V6 exit 0).
 
 ## Why this arm
@@ -586,6 +586,418 @@ the pack cannot see today.
 
 `Verifies: none`. The #3420 [after-merge] item concerns the path-stability cells, not this run.
 
+## Results, arm SM (monthly universe refresh)
+
+**INCONCLUSIVE.** This is the rule as pre-registered at d97f94937: SN's rule, SM's own liveness test and the 2026-10-25 displacement amendment.
+- **Liveness passes.** 19 of 150 SM p0 closed trades are in names outside the yearly list in force, and all 19 are outside it at the decision too.
+- **Return.** Δ median ln(1+R) is −0.193 against a bar of ±0.211, so there is no escalation on return.
+- **The lean.** It is negative and traced, but it does not reach the bar.
+
+**Paths.**
+- `sm/` is `results/sm/`: the six SM cells as `chain-sm.sh collect` wrote them, from `/tmp/fsm-run/results`. 120 files were compared. All are identical except `chain.log`, whose committed copy adds the final DONE line.
+- `null/` is `../path-stability-2026-10-23/results/`. It is byte-identical to the `/tmp/ps-run/results` the chain read (42 of 42 S files compared).
+- `read/decisions/` holds the S top-N decisions from the SN read.
+- `sm/read/` holds the extracts below, written by `sm/read/sm-analysis.sh`. Its inputs are:
+  - the directories above;
+  - the committed yearly lists;
+  - the 320 staged monthly lists. They are not committed, and each matches `trading/test_data/backtest_scenarios/pit-v12-monthly/composition.md5`;
+  - `data/`, for the 2024-12-30 marks and month-end closes;
+  - the two p0 review packs.
+- The per-decision annotation `annot.txt` (4.1 MB) is not committed; `sm-analysis.sh` regenerates it. The raw trade audits are not committed either (`.sweep-output/floor-refresh-sm/`).
+
+**`sm/summary.txt` is a re-run.**
+- The chain's default `S_DEC_DIR` (`chain-sm.sh` line 91) resolves to the parent working copy. That copy sat on a base older than the SN read and had no `results/read/decisions/`. So the chain's own summary could not compute "displaced at the decision".
+- The summary was re-run with `S_DEC_DIR` pinned to this tree. The committed `sm/summary.txt` is that re-run.
+- `chain-sm.sh summary results/sm`, run with `NULL_DIR`, `S_DEC_DIR` and `YEARLY_DIR` on committed paths, reproduces it line for line. Only the three paths in its header change.
+
+### The rule, as written (arm SM)
+
+**Validity.**
+- All six cells ran on the null's build `3db869d32` (`sm/chain.log`, line 1). They used the 320 monthly lists at md5 `d0c7f724…` and the null's five deletion names (`sm/perturb-names.txt` and the PERTURB lines).
+- `validator_diff -check V6` exits 0 for SM p0 against the null's A-p0 (`sm/ps-SM-p0-s0.v6diff-A0.log`). It also exits 0 for each SM pk against SM p0 (`sm/ps-SM-p{1..5}-s0.v6diff-SM0.log`).
+- The chain log reads 6 RESULT, 0 EXCLUDED and 0 failed/void.
+
+**Step 1, liveness (decision-bearing): LIVE.** The test is "at least one SM p0 trade in a symbol outside the yearly list in force on its entry date" (`sm/summary.txt`).
+
+| cell | closed trades outside the yearly list, by fill date | of those, also by decision date |
+|---|---:|---:|
+| S p0, p2, p3, p5 | 0 | 0 |
+| S p1, p4 | 1 (TRTX, decided 2021-05-28, filled 2021-08-17) | 0 |
+| **SM p0** | **19 of 150** | **19** |
+
+- **Both dates.** The 10-26 Log entry asked for both. The fill-date test is the pre-registered one. Re-testing at the decision removes the null's roll-only TRTX passes and keeps all 19 SM passes.
+- **Closed trades only.** Open positions change nothing. None of SM p0's 7 open positions is outside the yearly list, and no entrant is open at the end in any cell (`sm/summary.txt`: "open at the end 0" in all six pairs; `sm/read/tickets.txt`).
+- **Fill date against decision date.** Classified at the decision, SM p0 placed 26 entrant tickets, and 21 filled. Two of them fell inside the next yearly list by their fill date, which is why the fill-date count is 19:
+  - GSHD, decided 2019-05-24 and filled 06-06;
+  - USAC, decided 2023-10-13 and filled 2024-08-02.
+
+**Step 2, return: INCONCLUSIVE** (`sm/summary.txt`).
+
+| arm | n | spread SD ln(1+R) | median ln(1+R) | median Sharpe | median max DD | median Calmar |
+|---|---:|---:|---:|---:|---:|---:|
+| S | 6 | 0.2108 | 1.0313 | 0.8377 | 23.29 % | 0.6744 |
+| SM | 6 | 0.1489 | 0.8384 | 0.6851 | 28.79 % | 0.4464 |
+
+- **Δ = −0.1929.** The bar is b = 0.2108, so −b < Δ < +b. The result is INCONCLUSIVE, with no escalation on return.
+- **Per year.** The median cell compounds at 18.8 %/yr in S and 15.0 %/yr in SM. SPY total return over the window is +158.4 %, about 17.1 %/yr (`sm/read/regime-split.txt`).
+- **Per cell.** ln(1+R) for p0–p5 is 0.878 / 0.799 / 0.539 / 0.735 / 0.937 / 0.918 in SM and 0.673 / 1.177 / 0.945 / 0.837 / 1.118 / 1.203 in S.
+
+**Step 3, do-no-harm: n/a.** It applies only on PROMISING. Reported on their own, as the rule asks: median max DD is +5.50 pp higher in SM (the DD bar is 21.08 pp), and median Calmar is 0.446 against 0.674.
+
+**Step 5, cell floor:** 6 included cells in each arm.
+
+**Step 4, reported and not decision-bearing.**
+- **Spread.** spread(SM)/spread(S) = 0.71. With K = 6 per arm, this cannot be told from 1.
+- **Cross pairs.** SM beats S in 8 of 36.
+- **Divergence onsets.**
+  - SM pk leaves SM p0 on 2019-02-26, 04-15, 05-09, 02-26 and 04-15 (`sm/summary.txt`).
+  - SM pk leaves S pk (same seed, same deletion) on 2019-02-28 in p0 and p2, and on 2019-06-06 in the other four (`sm/read/same-data.txt`).
+  - The first placements that differ are:
+    - SPSC 2019-02-15 in p0 and p2. S placed it, and two entrants pushed it out of SM's top-20 (§Why 6 below).
+    - 2019-05-24 in the other four pairs. SM placed the entrant GSHD in all four; S placed the leaver JBSS in p1 and p3 (`sm/read/transitions.txt`).
+  - Pairing by seed therefore holds only for the first two to five months.
+- **Paired by seed (not the pre-registered read).** SM − S is +0.204, −0.377, −0.406, −0.102, −0.181 and −0.286. The mean is −0.191 and the SD 0.225 (`sm/read/step4.txt`).
+- **The tail** (`trades.csv`, `pnl_percent` > 100).
+  - Trades above +100 %: 3/3/2/3/4/4 per SM cell, against 2/4/4/3/4/5 per S cell.
+  - The top trade's share of realised total-return P&L is 51–81 % in SM and 43–62 % in S.
+  - End unrealised P&L is $586k on SM p0 and $532k on S p0 (`actual.sexp`).
+- **Cohort read, SM p0 against S p0, joined on `symbol|entry_date`** (`sm/read/step4.txt`):
+
+  | cohort | trades | P&L in S | P&L in SM |
+  |---|---:|---:|---:|
+  | in both | 113 | +$487k | +$472k |
+  | SM only | 37 | | +$266k |
+  | S only | 37 | −$134k | |
+
+  p0 is the one pair SM wins. In p1, p3, p4 and p5 the SM-only cohort is −$94k to −$216k (+$44k in p2). In p1–p5 the S-only cohort is +$49k to +$898k.
+
+**Displacement read (the amendment; descriptive).** Closed trades, ln(1+R) with R = (pnl + dividends) / (entry price × quantity), pooled over the six pairs (`sm/summary.txt`):
+
+| set | n | mean | median | p10 | p90 | > +100 % |
+|---|---:|---:|---:|---:|---:|---:|
+| (a) entrants | 114 | −0.039 | −0.078 | −0.136 | +0.139 | 0.0 % |
+| (b) displaced at the decision (S Placed, SM `Insufficient_cash`) | 73 | +0.041 | −0.055 | −0.111 | +0.193 | 2.7 % |
+| (b) S-only by the symbol + entry-date join | 184 | +0.031 | −0.038 | −0.117 | +0.195 | 2.2 % |
+| SM-only by the same join (reference) | 258 | −0.016 | −0.050 | −0.136 | +0.115 | 0.4 % |
+
+Per pair (`sm/summary.txt`):
+
+| pair | entrant placements / SM placed | entrant closed trades | displaced at the decision (their closed S trades) | S-only by join |
+|---|---:|---:|---:|---:|
+| p0 | 26 / 191 | 19 | 24 (14) | 37 |
+| p1 | 22 / 191 | 17 | 8 (6) | 27 |
+| p2 | 26 / 196 | 21 | 21 (17) | 34 |
+| p3 | 25 / 190 | 21 | 27 (17) | 39 |
+| p4 | 25 / 187 | 19 | 23 (14) | 32 |
+| p5 | 23 / 193 | 17 | 11 (5) | 15 |
+
+The summary leaves five parts to the analyst (`sm/read/tickets.txt`, `sm/read/cohorts.txt`):
+- **Open marks.** No entrant is open at the end. Nine displaced S tickets are, CVNA, BBW, TCOM and VCYT among them. With their 2024-12-30 marks, the displaced set is n = 82, median −0.039, p90 +0.289.
+- **Displaced tickets that never filled.** 32 of the 114 displaced decisions never filled in S either: 14 were still resting at the end, 10 expired and 8 were refused at the fill. Their displacement cost nothing.
+- **Entrants refused for cash.** 40 entrant decisions read `Insufficient_cash` (5–10 per cell), and 13 entrant tickets were refused at the fill.
+- **The displaced tail.** The two > +100 % displaced trades are one name, APPS 2020-06-12, in p2 and p5.
+- **Path effects.** The decision-class decomposition (§Why 2 below) separates path effects from the join.
+
+### Same data, different warehouse
+
+SM ran on `/tmp/snap_top3000_pit_v12monthly`: 10,125 symbols, with `n_symbols_absent=1` (MEL). S ran on `/tmp/snap_top3000_pit_v12wk`, with 9,236. Below is what the change could move, and what it did (`sm/read/same-data.txt` unless noted).
+
+- **Shared names read the same bars.** On 637 trades both arms hold with the same symbol, entry date and exit date (100–117 per pair), these all agree exactly:
+  - entry price and exit price;
+  - `pnl_percent` and `entry_stop`;
+  - dividends per share.
+- **Shared decisions read the same stops.** Both arms made 29,696 decisions on the same Friday and symbol. On these, the stop gate and the sizer never disagree. The only flips are (`sm/read/transitions.txt`):
+  - cash: 140 `Insufficient_cash` → `Placed` and 114 the other way;
+  - share class: 5.
+- **The NAVs agree to the cent** on every common date until 2019-02-28 (p0, p2) or 2019-06-06 (p1, p3–p5).
+- **The macro inputs are identical.** `macro_trend.sexp` is byte-identical in all six pairs. `params.sexp` differs only in `universe_size`: 9,222 against 10,111.
+- **The calendar gains two empty steps.**
+  - Every SM equity curve has rows for 2019-01-01 and 2020-01-01 that S lacks: 1,563 rows against 1,561, and `n_steps` 1,563 against 1,561.
+  - They come from USAS, a name in no yearly list. Its `data/` file has $0.0001, volume-0 rows on those holidays.
+  - The 2019-01-01 row reads $1,000,063.89, which is one day of cash interest. S books the same two days at its first step: the 2019-01-02 NAV is $1,000,126.95 in both arms.
+  - So the rows move no dollars. They can touch only daily-return statistics (Sharpe, volatility), through two extra near-zero returns among 1,562.
+  - USAS was never decided or traded. The rows are a calendar effect of the warehouse, not a mechanism effect. They did break the first pack render (§Review-pack look, arm SM).
+- **One guarded event on an SM-only name.** `split_dividend_guard rejected=1` appears in every SM cell and in no S cell (chain log, GUARDS lines). The split detector misread a dividend on a name S never reads, and the guard rejected it, which is the protective path (#3173). The log does not name the symbol (§Defects found, arm SM).
+
+The warehouse change adds two empty steps and one guarded event on an SM-only name. Nothing on a shared name moved. The SM − S difference is the universe, and the cash paths it sets off.
+
+### Was the SM liveness test consistent with the screen?
+
+Yes, and it is a weak test by design: the SN read noted that "≥ 1 trade outside the yearly list" is easy to pass.
+- The arm places 22–26 entrant tickets per cell, against the null's base rate of 0–1 roll-only passes.
+- Entrants are 7.2 % of SM's top-20 decisions (379–398 per cell).
+- They are 8.8 % of member-months in this window (`sm/read/entrant-funnel.txt`). The screen's 13 % is a 26-year figure.
+- So entrants reach the top-20 at slightly below their share of the list. The arm did what the screen predicted at the decision level.
+
+### The SM verdict, calibrated
+
+- **What this run establishes.** At 2019–2024 on top-3000 PIT, a monthly list refresh is live. It does not raise the median return.
+  - The descriptive lean is negative: Δ = −0.193, with S above SM in 28 of 36 cross pairs and 5 of 6 seed pairs.
+  - Δ is 0.92 b and about −1.3 SE, at the pre-registered SE of 0.15. By rule it is INCONCLUSIVE.
+- **What it cannot claim.**
+  - It is not a NO-BUILD decision, and it does not show that the refresh hurts: Δ did not reach −b.
+  - About 70 % of the pooled NAV gap is seven tail names: where each found cash, and at what size (§Why 2 below). That is the path noise of `project_26y_path_noise_floor`, even though every dollar of it is traced.
+  - It says nothing about 2025 or AXTI, whose entrant month (2025-09) is outside the window. It says nothing before 2009, and nothing about a book with slack cash.
+- **What the why supports.** The entrants the refresh adds realise worse than what they displace, and the refresh adds no tail trade to the book. Together these make a positive effect at this window unlikely. But they rest on about 30 distinct entrant tickets, and on a funnel trace rather than on P&L.
+
+### Why (arm SM)
+
+**1. What the refresh changes in the decision flow** (per cell; `sm/read/transitions.txt`).
+- **Entrants come in.** About 7 % of SM's top-20 decisions are entrants: names in the month-end list but not in the yearly list in force.
+- **Leavers go out.** About 4.5 % of S's decisions (241–250 per cell) are leavers: names the yearly list still holds but the current month-end list has dropped.
+- **The top-20 cut re-draws.** The Seeded tie order hashes each name separately (`screener_ranking.mli`). So an entrant inserts into the order and pushes the bottom names out, and a leaver frees a slot.
+  - 245–278 S decisions per cell are cut from SM's top-20.
+  - 128–147 SM decisions are on names that S's top-20 did not reach.
+- **Placements.**
+  - S's 169–190 placements per cell go, in SM, to: 128–155 the same, 8–27 `Insufficient_cash`, 6–9 leavers, 3–16 cut and 0–2 held.
+  - SM's 187–196 placements come from: the same 128–155, 22–26 entrants, 14–32 tickets S could not fund, and 1–6 cut gains.
+- **Entrants convert more often.** 6.6 % of entrant decisions place (26 of 395 on p0), against 3.5 % of all decisions (191 of 5,486). They are also `Sized_to_zero` more often: 18–20 per cell, out of SM's 62–71.
+- **Cash at the fill is tighter.** SM refuses 11–17 tickets per cell for cash at the fill, against 9–14 in S; pooled, 89 against 72 (`cash_rejections.txt`).
+
+**2. Where the NAV gap comes from** (`sm/read/decomposition.txt`; $k; the residual is within $8k per pair).
+
+| pair | ΔNAV | seven tail names, SM − S | entrants (SM) | other tickets, SM − S | Δ interest | ln(NAV_SM/NAV_S) |
+|---|---:|---:|---:|---:|---:|---:|
+| p0 | +444 | +454 | +15 | −31 | +10 | +0.204 |
+| p1 | −1,019 | −596 | −109 | −286 | −27 | −0.377 |
+| p2 | −858 | −903 | +6 | +67 | −26 | −0.406 |
+| p3 | −224 | −72 | −140 | +3 | −7 | −0.102 |
+| p4 | −507 | −191 | −116 | −185 | −13 | −0.181 |
+| p5 | −827 | −792 | −90 | +83 | −27 | −0.286 |
+| sum | −2,991 | −2,100 | −434 | −349 | −90 | |
+
+The seven tail names are every trade above +100 % in either arm (APPS, ADMA, BBWI, MMYT, DXCM, MSTR), plus GLNG (+70 %). The gap splits into three parts, in order of size.
+
+- **The tail lottery: −$2.10M pooled, 70 %.** It turns on which arm's cash catches each tail name (`sm/read/tail-ledger.txt`, `sm/read/step4.txt`).
+  - APPS 2020-06-12 (+526 %): S funded it in 5 cells and SM in 4. SM gained it in p0 and lost it in p2 and p5, worth $378–387k each time.
+  - ADMA 2023-08-18 (+300 %): S had it in 4 cells and SM in 3. SM p2 was refused at the fill after 17 weeks of rest: $131,637 required against $91,928 available (`sm/ps-SM-p2-s0-cash_rejections.csv`). S p2 made +$518k.
+  - BBWI 2020-07-31 (+138 %): S had it in 6 cells and SM in 5. SM p1 was refused at the fill for $146: $114,950 required against $114,804 available (`sm/ps-SM-p1-s0-cash_rejections.csv`). `available` is gross cash, per #3420. S p1 made +$162k.
+  - MMYT and DXCM reach both arms in all six cells. GLNG reaches SM in all six and S in five (S p2 lacks it).
+  - The rest of this term is size. The same tail trades are a fixed share of NAV in both arms: ADMA 10.0 %, MMYT 14.4–14.7 %. So they are smaller in dollars wherever SM's NAV is already lower. That is −$0.62M pooled on tickets both arms filled.
+  - In p3 and p4, both arms caught the same tail names, and SM still trails by 0.10 and 0.18. That residue is the entrants' own losses plus the size effect. In the other four pairs, one or two tail names decide the sign.
+- **The entrants' own trades: −$434k pooled, 15 %.** They lose $90k–$140k in four cells. They are about zero in p0 and p2, where BMA found cash (+$127k and +$92k).
+  - Scaled, that is about −$12k a year per cell, about −0.8 % a year of SM's $1.45M average NAV.
+- **Everything else: −$349k, plus −$90k of interest.** These classes are small:
+  - leavers made +$8k for S over 45 placements;
+  - cut names made +$29k for S and +$49k for SM.
+- **Displacement is mostly carry-over.** 0–5 of the 8–27 cash-displaced S tickets per pair came after an entrant placement in the same week's list. Most came after earlier weeks' positions had already taken the cash (`sm/read/step4.txt`).
+
+**3. Entrants are worse than what they displace** (`sm/read/cohorts.txt`; filled or open tickets, ln(1+R), pooled).
+
+| set | n | mean | median | p10 | p90 | > +50 % | > +100 % |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| entrants | 123 | −0.032 | −0.072 | −0.136 | +0.115 | 1.6 % | 0.0 % |
+| entrants ex BMA | 121 | −0.044 | −0.072 | −0.136 | +0.115 | 0.0 % | 0.0 % |
+| displaced at the decision (S side, incl. 9 open) | 82 | +0.052 | −0.039 | −0.111 | +0.289 | 3.7 % | 2.4 % |
+| displaced ex APPS | 80 | +0.008 | −0.043 | −0.111 | +0.201 | 1.2 % | 0.0 % |
+| shared, S side, ex ADMA, APPS, MMYT | 670 | +0.010 | −0.049 | −0.132 | +0.223 | 5.5 % | 1.9 % |
+
+- **Median and p90.** The median gap is 2–3 pp of trade return, inside overlapping interquartile ranges. The p90 gap is larger: +0.115 for entrants, against +0.20 to +0.29 for what they displaced and +0.22 for the body of the book.
+- **Perturbed.** The sign survives each of these:
+  - dropping the top name on each side (BMA; APPS);
+  - testing entrants by fill date instead of decision date (median −0.078, `sm/summary.txt`);
+  - dropping the open marks (displaced median −0.055).
+
+  The dollar size does not survive: without APPS, the displaced cohort's P&L falls from +$963k to +$189k.
+- **The cohort is small.** The six cells place only 35 distinct entrant tickets. 18 are placed in all six cells, and 30 filled somewhere. At the book's tail rate, 30 tickets would hold well under one trade above +100 % even if entrants matched the book. So "no entrant tail trade" proves nothing by itself, and §5 answers the tail question instead.
+
+**4. Why entrants realise worse: they are volume spikes.** A name enters a monthly dollar-volume list because its recent dollar volume jumped. The breakout screen rewards the same spike.
+- **Breakout volume.** `entry_volume_ratio` (`trades.csv`) for entrants has a median of 4.6×, p75 12.0× and p90 33.9×. For SM's other trades it is 2.5×, 3.1× and 4.3× (`sm/read/cohorts.txt`).
+- **Exits.**
+  - Entrants exit at the stop more often: 65 % of trades, against 56 % for shared trades.
+  - They are held 45 days against 75.
+  - Their laggard-rotation exits make +12.8 %, against +25.5 %.
+  - Size at fill is the same: 10.5 % of NAV against 9.9 %.
+- **Forward returns.** Entrants' 12-month forward returns are wider on both sides (`sm/read/entrant-funnel.txt`):
+  - median −11.2 % against +4.4 % for members;
+  - p10 −74 % against −45 %;
+  - p90 +81 % against +68 %.
+
+  The stop takes the left side. §5 shows how rarely the right side arrives.
+
+**5. Why the entrant tail does not reach the book** (`sm/read/entrant-funnel.txt`). The screen's premise holds in this window: entrants are 8.8 % of member-months but 18.3 % of > +300 % 12-month rows (14.9 % without a ≥ 50 % one-day move). The funnel stops them.
+- **The population.** 60 distinct names had a > +300 % 12-month move starting in a month when they were entrants, with no ≥ 50 % day.
+- **Most never reach a top-20.** 45 never reached any SM cell's top-20 in the following 12 months. 21 of the 60 had under a year of trading history at the time. Examples are 2019 listings such as ZM (first bar 2019-04-18), NET, CRWD and PTON.
+- **Those that do are skipped.** 15 reached a top-20 in at least one cell:
+  - 11 read only `No_structural_stop`: FSLY, JMIA, NET, PRPL, GNMK, FLGT, SI_old1, AEHR, VERA, FNMA and KC;
+  - CLDX read `No_structural_stop` or `Insufficient_cash`;
+  - CAVA and HSAI read `Sized_to_zero`;
+  - BMA was placed (§6).
+- **Members meet the same funnel.** 67 of 227 member names with such a move reached S p0's top-20 (30 %), and 3 were placed. For entrants on SM p0 the figures are 12 of 60 (20 %) and 1 placed.
+- **The gates.** The refresh widens the list. What reaches cash is decided by the top-20 cut and the structural-stop gate.
+
+**6. Events traced end to end** (positions from `trades.csv`, decisions from the regenerated `annot.txt`, bars from `data/`).
+- **The first divergence: SPSC, p0 and p2.**
+  - On 2019-02-15, GFF and ICAGY sit 3rd and 10th in SM's top-20. Both are in the 2019-01-31 monthly list and not in the 2018 yearly list.
+  - S's last two names that day, FNOX and SPSC, are not in SM's list. S placed SPSC, which filled on 2019-02-28.
+  - 2019-02-28 is the first date the paired NAVs differ. The SPSC trade itself made −$1.5k, but it moved the cash path.
+- **APPS 2020-06-12: p0 gains it, p2 and p5 lose it.**
+  - On SM p0, MOH (decided 2020-04-24) had been refused at the fill. SM p0 held 8 names, S p0 held 10 (MOH $152k and ASND among them), and only SM p0 could fund DECK and APPS that Friday. SM p0 made +$378k.
+  - On SM p2 and p5, the cash sat in LACO and AKAM. These are ordinary names that S had refused for cash or at the fill. S funded APPS, for +$387k in each cell.
+  - None of the names that held the cash was an entrant. A candidate-set change re-draws whose cash is free.
+- **TRT, the entrant round trip, in all six cells.**
+  - TRT was decided 2021-12-03. It is in the 2021-11-30 monthly list and in no yearly list for 2020–21. Its breakout volume was 247.9×.
+  - It filled 2021-12-06 at 7.62 with a stop at 6.88, 8.8 % below. It closed 2021-12-31 at 13.43, +76 %.
+  - The stop was never raised: there was no correction to trail.
+  - It stopped out 2022-01-19 at 6.87, −9.9 %, for −$15k to −$20k per cell.
+  - It added +$117k to +$153k to SM's 2021 year-end mark and took back −$132k to −$173k in January 2022 (`sm/read/years.txt`, `sm/read/y2022-positions.txt`).
+  - This is most of SM's 2022 shortfall. In five pairs SM's 2022 is 8–12 pp worse than S's (−15 % to −19 % against −5 % to −8 %). The entrants' 2022 marks, −$183k to −$233k per cell, cover the whole gap, and TRT is most of those marks. Over its life the trade lost only $15k–$20k.
+- **BMA, the one entrant monster that reached cash.**
+  - BMA was in the monthly lists from 2023-09-30 and not in the 2023 yearly list. It was decided 2023-12-15.
+  - It filled in p0 and p2 on 12-18 at 28.21 and had 5 stop raises. It was rotated out as a laggard on 2024-07-15 at 54.00: +91.4 % on price, +$127k total return on p0.
+  - BMA closed 2024 at 96.76, +243 % over the fill.
+  - It was refused for cash in p5. It was not in the top-20 in p1, p3 or p4.
+
+**7. Exposure is read against market condition** (p0 pair; pack NAV with invested %, SPY regime on the 30-week MA and its slope, lagged one week; `sm/read/regime-split.txt`).
+
+| period | regime | days | invested S / SM | return S / SM | SPY |
+|---|---|---:|---:|---:|---:|
+| 2019 | DOWN | 31 | 0.0 % / 0.0 % | +0.3 % / +0.3 % | +10.9 % |
+| 2019 | all | 251 | 44.0 % / 39.4 % | +9.8 % / +6.8 % | +31.1 % |
+| 2020 | UP | 175 | 74.5 % / 75.9 % | +20.5 % / +49.7 % | +5.9 % |
+| 2020 | all | 253 | 72.5 % / 72.0 % | +18.3 % / +51.0 % | +18.3 % |
+| 2021 | UP (all days) | 252 | 67.4 % / 76.8 % | +14.1 % / +20.3 % | +28.7 % |
+| 2022 | UP | 14 | 88.2 % / 76.0 % | −7.9 % / −15.9 % | −7.8 % |
+| 2022 | all | 251 | 45.0 % / 46.0 % | −5.1 % / −15.2 % | −18.2 % |
+| 2023 | all | 250 | 41.7 % / 43.6 % | +13.3 % / +9.8 % | +26.2 % |
+| 2024 | UP (all days) | 251 | 84.5 % / 86.1 % | +23.1 % / +33.1 % | +25.3 % |
+| 2019–2021 | all | 756 | 61.4 % / 62.8 % | +48.2 % / +93.9 % | +99.7 % |
+| 2022–2024 | all | 752 | 57.1 % / 58.6 % | +32.3 % / +24.0 % | +29.4 % |
+| 2019–2024 | all | 1,508 | 59.2 % / 60.7 % | +96.0 % / +140.5 % | +158.4 % |
+
+- **Exposure is never the difference.** It is within 1.5 pp over each three-year period. By year it is within 5 pp, except 2021 (76.8 % against 67.4 %).
+- **Where SM p0 gains and loses.** Its lead is 2020's UP days (APPS) and 2024. It loses the first 14 trading days of 2022, which are UP days: TRT's collapse.
+- **Coverage.** This is the pair SM wins. Only the p0 packs exist, so the pk cells have no exposure series.
+
+### How SM fits what we know
+
+- **`project_floor_and_refresh_screens`: confirmed in direction, refined in size and consequence.**
+  - In this window, entrants are 8.8 % of member-months, not 13 %, and hold 18.3 % of > +300 % rows, not 29 %. Their median forward return is worse and their tail is fatter, as the screen said.
+  - The memory said that if SM was built, a displacement count should be pre-registered. That was done, and it reads as a cash re-draw.
+  - The new part: the entrant tail exists in the list but not in the book. 45 of 60 never reach a top-20, and 1 is placed.
+- **floor-nearest SN (ledger `2026-10-25-floor-nearest.sexp`): the same shape at half the size.**
+  - Entrants do not beat what they displace: median −0.072 against −0.039, and ex top name −0.044 against +0.008. SN's converts showed the same pattern (−2.3 % against +4.6 %).
+  - SM adds 22–26 placements per cell, against SN's 87–100. Its cash-displaced count is 8–27, against 39–58. Its Δ is −0.19, against −0.41.
+- **`project_26y_path_noise_floor` and `project_path_stability_seeded_noise`: confirmed.**
+  - A candidate-set change moved the end NAV by 0.10–0.41 log per pair.
+  - A $146 shortfall cost BBWI (+$162k), like FDX's $68.58 in the memory.
+  - Cell level tracks tail capture: ADMA, APPS, BBWI, GLNG, MMYT, DXCM, MSTR.
+- **`project_top_n_capacity_verdict` (ledger `2026-09-22-top-of-funnel-capacity.sexp`): confirmed again.** Widening the funnel of a capital-bound book re-draws the slots. Three funnel-widening reads now behave the same way: top-N 40, Nearest, and the monthly refresh.
+- **`project_monster_funnel_top_of_funnel`: confirmed from the entrant side.** On SM p0, 48 of 60 entrant monsters (80 %) never reach the top-20 (45 of 60, 75 %, across all six cells), and those that pass mostly die at `No_structural_stop`.
+- **`project_edge_is_the_fat_tail`: refined.** That memory lists "universe breadth (more shots at a monster)" as tail-preserving. That holds only if the shots reach a slot. List breadth adds volume-spike names that the top-20 cut and the stop gate filter out before cash.
+- **`project_record_gap_is_concentration`: confirmed.** The same tail trades, at the same weight on a smaller NAV, cost −$0.62M pooled.
+- **`project_2025_anatomy`: consistent.** Supply is not what limits the tail; the funnel is. 2025 itself is untested here.
+- **`project_entry_selection_closed_powered`: consistent.** The top-20 cut lands inside a tie group, so which names make it is a seeded draw, and entrants enter that draw by hash.
+- **`project_pit_universe_migration`, decision D1 (the May-31 anchor):** the anchor is not shown to bias the record at this window.
+- **Applied: `feedback_perturb_before_believing_a_cohort_split`** (§Why 3 above).
+- **No contradiction.** The SN read guessed that SM's "one possible advantage is a fatter entrant tail". There is a fatter tail in the list and none in the book.
+
+### What SM implies next
+
+These are options. The choice is the user's.
+
+1. **Stop here for SM (the honest default).**
+   - Record INCONCLUSIVE, with no escalation on return, by rule.
+   - The yearly May-31 lists stay the record's universe.
+   - Nothing in strategy code needs to be retired. The monthly lists and warehouse stay an available input.
+   - The why gives no route to a positive effect at this window.
+2. **A realism by-product.** Monthly lists move the median by −0.19 log, inside one null SD, and no tail name is lost to list membership itself. So the backtest's May-31 freeze is not shown to flatter or penalise the record at this window. That is one window.
+3. **The tail question behind SN and SM is not a universe question.** It is how to catch fresh names like IONQ and AXTI.
+   - The binding gates are the top-20 cut (a score tie group, in seeded order) and the §5.1 structural-stop gate, which is faithful.
+   - The record says ranking has no skill.
+   - The prior for a fourth funnel-widening lever is low.
+4. **If 2025 matters.** AXTI's entrant month (2025-09) is outside this window. A 2025–26 SM cell would trace one name; it would not give a verdict. Low priority.
+5. **Process, for the next universe or funnel arm.**
+   - Pre-register the leaver and cut classes beside "displaced at the decision". The cash class held only 8–27 of the 20–49 S placements per cell that SM did not make.
+   - Chain summaries should default to committed input paths and print the paths they read.
+
+### Defects found (arm SM)
+
+None of these changes the SM − S comparison.
+
+- **Data: zero-volume sub-cent bars that become simulator steps.**
+  - `data/U/S/USAS/data.csv` has rows at $0.0001 with volume 0 on US holidays. 2019-01-01 and 2020-01-01 are two of them.
+  - USAS is in five monthly lists (2020-08-31, 2020-09-30 and 2025-10-31 to 12-31) and in no yearly list. Its rows add the two extra steps to every SM equity curve.
+  - The class is wider: 163 of the 10,125 warehouse symbols have volume-0 bars at ≤ $0.001 in 2018–2024. None was traded in either arm.
+  - Proposal: drop such rows at warehouse build, or keep zero-volume bars out of the simulator calendar.
+- **Pack: SPY anchored on a holiday first row (fixed, #3445).** The first render (`.sweep-output/review-ps-SM-p0`, pack 3db869d32) had three errors:
+  - SPY 2019 read 0.00 % (`p0_years.json`);
+  - the eras read "built 2019–2020 (1.00→1.36×) … ends at 1.22×";
+  - years beating SPY read 4/6.
+
+  These contradict the KPI strip: +141 % against SPY's +158 % is 0.93×. The cause is the 2019-01-01 NAV row, which falls before SPY's first bar. It is fixed in #3445 and pinned in `review_pack_test.sh`.
+- **Pack: the commit label is wrong in jj workspaces.**
+  - The re-render's `manifest.json` says `"pack_sha": "6436d9a6f"`. That is the parent repository's HEAD, not the workspace (`.claude/worktrees/fix-rp`) that carries #3445.
+  - `dev/lib/review_pack/pack_sha.sh` runs `git -C REPO rev-parse HEAD`, which resolves to the parent repository from a jj workspace. Its dirty check reads the parent's paths too.
+  - So #3262's guard cannot flag a pack built from a jj workspace.
+- **Chain: the summary defaults point outside the commit.**
+  - `chain-sm.sh` line 91 defaults `S_DEC_DIR` to `$REPO/$EXP/results/read/decisions`, in the parent working copy, which here lacked the directory.
+  - `NULL_DIR` defaults to `/tmp/ps-run/results`. The committed summary header names the `/tmp` paths.
+  - The summary failed safely: the chain's own summary could not compute that column instead of guessing. But the defaults should be committed paths.
+- **Guard log names no specimen.** `Panel_runner: split_dividend_guard rejected=1` (every `sm/ps-SM-p*-s0.log`) names no symbol or date, so the rejected event cannot be identified from the artifacts. Proposal: print the symbol, date and factor of each rejection.
+- **Known classes, with entrant specimens.**
+  - **CGEN, filled from above** (SM p2 `CGEN-wein-359`, SM p3 `CGEN-wein-354`).
+    - Decided 2024-01-26 at a close of 2.21, with `suggested_entry` 1.50 (32 % under the close) and stop 1.488.
+    - Filled 2024-07-05 at 1.53 after 23 weeks, on a falling bar: open 1.61, low 1.50.
+    - Exited three days later as a `liquidity_exit`. This is the SN read's SDA class.
+  - **USAC, a rested ticket.** Decided 2023-10-13, filled 2024-08-02 after 42 weeks (#3075 class).
+- **Unchanged from the SN read, present here too.**
+  - Phantom force-liquidation records: SDA 2023-07-13 and SIRI 2023-07-25 (`force_liquidations_count 2` in `sm/ps-SM-p0-s0-actual.sexp`).
+  - SDA filled from above.
+  - V13 delisting rows: MIME and LACO.
+  - V12 edge drift: SM 9/5/8/6/9/7, against S 8/4/5/4/3/5.
+
+### Review-pack look, arm SM
+
+Published pack (SM p0): https://claude.ai/artifact/WgGuP4vAuYAEC5WBE3XNtT. The S p0 null pack is https://claude.ai/artifact/Vm8SLjNXLGQ8y2nqMVdSZX (#3419).
+
+The pack read here is the #3445 re-render (`render/top.png` and `part-1..14.png`). The first render's `top.png` and S p0's `top.png` were also read. What was checked:
+
+- **Window.** 2019-01-01 → 2024-12-30, and every chart spans it.
+- **KPIs against `sm/ps-SM-p0-s0-actual.sexp` and `summary.sexp`.** All match:
+  - +141 %, CAGR 15.8 %, max DD −24.3 % (2021-04-13 → 2023-10-27);
+  - Sharpe 0.72, Calmar 0.65;
+  - 150 trades, win rate 32.7 %, average hold 73 d, 7 open, profit factor 1.57.
+- **Yearly table against `equity_curve.csv`.** It matches:
+  - SM: +6.8 / +51.0 / +20.3 / −15.2 / +9.8 / +33.1 %;
+  - SPY: +31.1 / +18.3 / +28.7 / −18.2 / +26.2 / +25.3 %;
+  - average invested 61 % against the regime split's 60.7 %.
+- **Config-implied zeros.**
+  - Fallback stops: 0 of 150, as `require_structural_stop` implies.
+  - Stop exits sold at a later open: 0, as `sim_stop_exit_fill_on_trigger_bar` implies.
+  - "Stop breached before the exit day", "Initial stop wider than 15 %", "Fill outside the day's high–low" and "Fill on a non-trading day": all clear.
+  - Placements in a Bearish week: 0. The 26 Bearish weeks have no decisions in any SM cell (`macro_trend.sexp`, the regenerated `annot.txt`).
+  - The one fill after a Bearish screen, ISEE 2022-09-30 (V23), is a resting ticket, which `entry_ticket_macro_suspend` off allows.
+- **Text.** No mojibake, `NaN` or empty panels. Wide tables are cut at the panel edge, and `part-14` overlaps `part-13`. Both are cosmetic, as in SN.
+- **Found on the first render:** the SPY 2019 and eras defect (§Defects found, arm SM), now fixed. The re-render reads 0.93× and 3 of 6 years.
+- **Odd rows, traced.**
+  - TRT's give-back, +73 % peak open gain to −9.9 % (§Why 6 above).
+  - CGEN, a fill from above.
+  - SIRI −$28k, the phantom force-liquidation record.
+  - V13: MIME and LACO, delisting exits.
+
+**What the pack's signals said (RV3).**
+- **Eras vs SPY: eroded 2019 to 0.81×, built 2020 to 1.04×, eroded 2021–24 to 0.93×.** Confirmed. S p0 eroded 2019–21 to 0.74× and held 0.76× through 2022–24. SM p0's whole lead is 2020: APPS. The year-end SM/S ratio goes 0.973 → 1.241 in 2020 (`sm/read/years.txt`).
+- **"Eroded 2019: mostly in cash through rebounds" (DOWN days +0.3 % against SPY +10.9 % at 0 % invested).** Confirmed, and not an SM effect. S p0 reads the same, and the macro gate held both books out.
+- **"Eroded 2021–2024: holdings lagged in UP days" (+40.5 % against +63.8 % at 72 % invested).** Confirmed and refined. Exposure matches S within 1.5 pp per period. The extra lag is 2022: TRT's give-back and five 2022 entrant stop-outs.
+- **"Concentrated open gain before a drawdown":** APPS held $617,808 of open gain at the 2021-04-13 peak (30.9 % of peak NAV), and the NAV then fell 24.3 % to 2023-10-27. Confirmed. In 11 of the 12 cells across both arms, the max drawdown ends on 2023-10-27 (`sm/read/step4.txt`). The drawdown is the window's shape, and APPS sizes it on SM p0.
+- **"Concentrated gains at NAV peak: n/a for 1 position."** That position is BBWI, on the 2021 spin-off basis (#3215 class). It is the same in S.
+- **"Fill-week volume: 143 of 150 under 2×".** S p0 reads 144 of 150, so it is not an SM effect. It measures the fill week; the entrants' outlier is their breakout-week volume (§Why 4 above).
+- **Gate reopens: 3, none flagged.** The macro series is byte-identical to S's.
+- **"Entries cancelled at the fill for cash": 16, against 9 on S p0.** Confirmed, and central to the why (BBWI p1, ADMA p2); pooled, 89 against 72.
+- **"Worst three-year stretch 2021–2023, +12.1 % against SPY +32.9 %".** Confirmed. 2022 carries TRT's give-back.
+- **"Ten trades made $1.27M of the $679k realised total".** Confirmed. BMA (+$116k price P&L) is the only entrant among them.
+- **0 fallback stops; 20 of 81 stop exits more than 0.5 % beyond the stop; 0 at a later open; 40 D/F losers moved the trade's way (−$509k).** Confirmed. The rate is S p0's: 39 trades for −$427k, per the SN read's §Review-pack look.
+- **Average invested 61 %, 0 fills on a day with no bar, V13 = 2.** Confirmed.
+- **A pattern the pack did not flag.** One position's year-end open gain carried a year boundary: TRT added about +9 pp to SM p0's 2021 and took about −9 pp from 2022. The year table cannot show this.
+  - Proposed detector: flag a year whose return moves by at least 5 pp on one position's year-end open gain that the next year gives back.
+
+### Ledger, arm SM (one line)
+
+2026-10-26 floor-nearest arm SM: INCONCLUSIVE (rule applied, LIVE; ledger entry `_ledger/2026-10-26-floor-refresh-sm.sexp`). Design: monthly top-3000 universe refresh against path-stability S (top-3000 PIT, 2019–24, K=6, build 3db869d32). Result: Δ median ln(1+R) −0.193 against a bar of 0.211; SM wins 8 of 36 cross pairs; median max DD +5.5 pp; Calmar 0.45 against 0.67. Liveness: 19 of 150 SM p0 trades are outside the yearly list, against a null base rate of 0–1 (roll-only). Why: 70 % of the NAV gap is which arm's cash caught APPS, ADMA or BBWI (BBWI refused for $146). 15 % is the entrants' own trades (−$434k pooled): volume-spike names (median breakout volume 4.6× against 2.5×) that realise worse than what they displace (median −0.072 against −0.039), with 0 of 123 above +100 %. The entrant tail stops at the funnel: 45 of 60 > +300 % entrant names never reach a top-20, and 1 (BMA) is placed. No escalation; the yearly May-31 lists stay.
+
+`Verifies: none`. No issue item is satisfied by this run.
+
 ## Log
 
 - 2026-10-25 06:57 PT, before any SN artifact was read (the chain was in the SN-p0 preflight): qc-results (#3418)
@@ -601,3 +1013,7 @@ the pack cannot see today.
   a May 31 roll and filled after it in a name the new yearly list drops passes it. On the null's own S cells this
   happens once each in p1 and p4 (TRTX, decided 2021-05-28, filled 2021-08-17) and never in p0. `summary` prints this
   base rate beside SM p0's count, and re-tests each passing trade at its decision date, as description.
+- 2026-10-26, after the SM chain ended (16:48 PT): `chain-sm.sh summary` re-run with `S_DEC_DIR` pinned to the committed
+  `results/read/decisions` (the chain's default resolved to a parent working copy without it). The rule text is unchanged;
+  the read is §Results, arm SM, written by a results-analyst pass from the committed artifacts. The first SM pack render
+  carried a pack defect (SPY 2019 = 0 % on a holiday first NAV row), fixed in #3445 before the pack was read.
