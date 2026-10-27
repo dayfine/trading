@@ -299,6 +299,11 @@ printf 'date,portfolio_value\n2019-01-01,100\n2019-01-02,100\n2019-12-31,110\n20
 : > "$TMP/hs/empty"
 expect_eq "holiday start: first year's SPY reads from SPY's first bar" "2019:30 2020:10" \
   "$(awk -v gran=Y -f "$ROOT/dev/lib/review_pack/periods.awk" "$TMP/hs/spy.csv" "$TMP/hs/eq.csv" "$TMP/hs/empty" "$TMP/hs/empty" "$TMP/hs/empty" | jq -r 'map("\(.p):\(.spy|round)")|join(" ")')"
+# a whole period before SPY's first bar has no SPY move: 0, never -100 % (#3445 QC note)
+printf 'date,open,high,low,close,adjusted_close,volume\n2019-04-01,1,1,1,100,100,1\n2019-06-28,1,1,1,110,110,1\n' > "$TMP/hs/spy-q2.csv"
+printf 'date,portfolio_value\n2019-01-02,100\n2019-03-29,101\n2019-04-01,101\n2019-06-28,102\n' > "$TMP/hs/eq-q.csv"
+expect_eq "period wholly before SPY's first bar: SPY 0, the next one from SPY's first bar" "2019Q1:0 2019Q2:10" \
+  "$(awk -v gran=Q -f "$ROOT/dev/lib/review_pack/periods.awk" "$TMP/hs/spy-q2.csv" "$TMP/hs/eq-q.csv" "$TMP/hs/empty" "$TMP/hs/empty" "$TMP/hs/empty" | jq -r 'map("\(.p):\(.spy|round)")|join(" ")')"
 
 
 # Open positions at the window end (#3125). A copy of the fixture run gains
