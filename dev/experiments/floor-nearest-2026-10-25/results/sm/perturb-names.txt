@@ -1,0 +1,9 @@
+# path-stability perturbation names, chosen by rule from ps-A-p0-s0 trades.csv after it finished (plan §Perturbations):
+# the five traded symbols with the smallest |total-return P&L| = |sum over the symbol's trades of pnl_dollars + dividends_received|,
+# ties by ticker (C locale); symbols held at the window end (open_positions.csv) excluded. pk deletes the k-th from every scheduled list.
+# k symbol tr_pnl n_trades lists_holding
+p1 SHEN -23.95 1 8
+p2 ODFL 102.09 1 23
+p3 SLAB -236.96 1 26
+p4 DECK 327.11 1 22
+p5 DIOD 337.81 1 24

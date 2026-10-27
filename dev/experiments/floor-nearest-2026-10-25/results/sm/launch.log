@@ -1,0 +1,4 @@
+lists OK: 320 files from /Users/difan/Projects/trading-1/.claude/worktrees/sweep-sm/trading/test_data/backtest_scenarios/pit-v12-monthly/composition match composition.md5 at d97f94937; lists md5 d0c7f7242e87d281ddb2b707c8263091
+twin guard OK: 1003 twin-drops-monthly rows hold; no list holds both legs of the 1 pit-v12 pairs
+union 10111 symbols; derived warehouse set 10125
+staged 11880 dividends.csv
