@@ -61,6 +61,32 @@ _test_dirs_for_feature() {
   esac
 }
 
+# Sanitized audit branches (one per line, "/" -> "-"): a review named after a
+# branch slug (e.g. feat/screener-failed-breakout) has its audit record filed
+# under the FEATURE name (screener), so the filename glob alone misses it.
+AUDIT_BRANCHES="$(mktemp)"
+for audit_file in "${REPO_ROOT}"/dev/audit/*.json; do
+  [ -f "$audit_file" ] || continue
+  grep -o '"branch": *"[^"]*"' "$audit_file" 2>/dev/null | head -1 \
+    | sed 's/.*: *"//;s/"$//;s#/#-#g' >> "$AUDIT_BRANCHES" || true
+done
+
+# _has_audit_record <slug>: true if dev/audit has a record for the review
+# slug, by filename suffix or by the record's branch field, also after
+# stripping a -structural/-behavioral(-v2|-rework) review-kind suffix.
+_has_audit_record() {
+  _slug="$1"
+  _base="$(printf '%s' "$_slug" | sed 's/-\(behavioral\|structural\)\(-v2\|-rework\)\{0,1\}$//')"
+  for _s in "$_slug" "$_base"; do
+    for _f in "${REPO_ROOT}"/dev/audit/*-"$_s".json; do
+      [ -f "$_f" ] && return 0
+    done
+    grep -qE -- "(^|-)${_s}\$" "$AUDIT_BRANCHES" 2>/dev/null && return 0
+  done
+  return 1
+}
+NO_TEST_MAP_COUNT=0
+
 for review_file in "${REPO_ROOT}"/dev/reviews/*.md; do
   [ -f "$review_file" ] || continue
   feature="$(basename "$review_file" .md)"
@@ -100,14 +126,7 @@ for review_file in "${REPO_ROOT}"/dev/reviews/*.md; do
   fi
 
   # Check for audit trail record
-  has_audit=false
-  for audit_file in "${REPO_ROOT}"/dev/audit/*-"${feature}".json; do
-    if [ -f "$audit_file" ]; then
-      has_audit=true
-      break
-    fi
-  done
-  if ! $has_audit; then
+  if ! _has_audit_record "$feature"; then
     QC_CAL_COUNT=$((QC_CAL_COUNT + 1))
     add_info "QC calibration: \`${feature}\` has review (verdict: ${verdict}) but no audit trail in \`dev/audit/\`"
   fi
@@ -116,8 +135,7 @@ for review_file in "${REPO_ROOT}"/dev/reviews/*.md; do
   if $DUNE_AVAILABLE; then
     test_dirs="$(_test_dirs_for_feature "$feature")"
     if [ -z "$test_dirs" ]; then
-      QC_CAL_COUNT=$((QC_CAL_COUNT + 1))
-      add_info "QC calibration: no test directory mapping for feature \`${feature}\`"
+      NO_TEST_MAP_COUNT=$((NO_TEST_MAP_COUNT + 1))
       continue
     fi
 
@@ -145,6 +163,15 @@ for review_file in "${REPO_ROOT}"/dev/reviews/*.md; do
     fi
   fi
 done
+
+rm -f "$AUDIT_BRANCHES"
+
+# Features without a hardcoded test-dir mapping are heuristic noise, not
+# per-feature findings: report one aggregated line with the count.
+if [ "$NO_TEST_MAP_COUNT" -gt 0 ]; then
+  QC_CAL_COUNT=$((QC_CAL_COUNT + 1))
+  add_info "QC calibration: ${NO_TEST_MAP_COUNT} reviewed feature(s) have no test directory mapping (verdict-vs-test-health cross-check skipped; heuristic)"
+fi
 
 # ────────────────────────────────────────────────────────────────
 # Rework-streak escalation scan (H-REWORK-STREAK-ESCALATION-UNTESTED)

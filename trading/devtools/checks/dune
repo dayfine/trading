@@ -1492,3 +1492,19 @@
  (deps _check_lib.sh gitignore_negation_check.sh (universe))
  (action
   (run sh %{dep:gitignore_negation_check_test.sh})))
+
+; Deep scan check 6 noise fixes (Warning 6, 2026-10-26): audit matching via the
+; record's branch field / review-kind suffix strip, and aggregation of the
+; "no test directory mapping" lines. Invokes check_06 on a fixture via the
+; REPO_ROOT override; same dep shape as deep_scan_rework_streak_check.sh.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  deep_scan/_lib.sh
+  deep_scan/_verdict.sh
+  deep_scan/check_06_qc_calibration.sh
+  (universe))
+ (action
+  (run sh %{dep:deep_scan_check06_noise_check.sh})))
