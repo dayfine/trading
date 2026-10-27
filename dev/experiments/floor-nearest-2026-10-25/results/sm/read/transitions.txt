@@ -1,0 +1,87 @@
+sanity: S decisions outside the yearly list in force / SM decisions outside the monthly list in force (both must be 0)
+0 0
+
+top-N decisions by outcome per cell (fill-time cash refusals from cash_rejections.txt)
+S p0   NSS 5078 Placed 190 Insufficient_cash 131 Sized_to_zero 59 Share_class_held 2 total 5460 | fill-time cash refusals 9
+SM p0  NSS 5081 Placed 191 Insufficient_cash 141 Sized_to_zero 71 Share_class_held 2 total 5486 | fill-time cash refusals 16
+S p1   NSS 5073 Placed 171 Insufficient_cash 156 Sized_to_zero 57 Share_class_held 0 total 5457 | fill-time cash refusals 12
+SM p1  NSS 5096 Placed 191 Insufficient_cash 135 Sized_to_zero 67 Share_class_held 1 total 5490 | fill-time cash refusals 14
+S p2   NSS 5101 Placed 171 Insufficient_cash 128 Sized_to_zero 54 Share_class_held 2 total 5456 | fill-time cash refusals 14
+SM p2  NSS 5109 Placed 196 Insufficient_cash 120 Sized_to_zero 62 Share_class_held 2 total 5489 | fill-time cash refusals 17
+S p3   NSS 5088 Placed 180 Insufficient_cash 129 Sized_to_zero 59 Share_class_held 2 total 5458 | fill-time cash refusals 14
+SM p3  NSS 5105 Placed 190 Insufficient_cash 126 Sized_to_zero 69 Share_class_held 1 total 5491 | fill-time cash refusals 11
+S p4   NSS 5099 Placed 169 Insufficient_cash 135 Sized_to_zero 57 Share_class_held 2 total 5462 | fill-time cash refusals 9
+SM p4  NSS 5096 Placed 187 Insufficient_cash 136 Sized_to_zero 67 Share_class_held 1 total 5487 | fill-time cash refusals 14
+S p5   NSS 5082 Placed 175 Insufficient_cash 141 Sized_to_zero 60 Share_class_held 1 total 5459 | fill-time cash refusals 14
+SM p5  NSS 5097 Placed 193 Insufficient_cash 129 Sized_to_zero 66 Share_class_held 1 total 5486 | fill-time cash refusals 17
+
+placements -> the other arm's outcome on the same decision (absent split by membership)
+S Placed:
+  p0 total 190: Insufficient_cash 24 held 1 cut 16 Placed 141 leaver 8
+  p1 total 171: Insufficient_cash 8 held 1 cut 11 Placed 143 leaver 8
+  p2 total 171: Insufficient_cash 21 held 1 cut 13 Placed 130 leaver 6
+  p3 total 180: Insufficient_cash 27 held 2 cut 11 Placed 131 leaver 9
+  p4 total 169: Insufficient_cash 23 held 1 cut 9 Placed 128 leaver 8
+  p5 total 175: Insufficient_cash 11 held 0 cut 3 Placed 155 leaver 6
+SM Placed:
+  p0 total 191: Insufficient_cash 18 Share_class_held 0 held 1 entrant 26 cut 5 Placed 141
+  p1 total 191: Insufficient_cash 22 Share_class_held 0 held 1 entrant 22 cut 3 Placed 143
+  p2 total 196: Insufficient_cash 32 Share_class_held 0 held 3 entrant 26 cut 5 Placed 130
+  p3 total 190: Insufficient_cash 29 Share_class_held 1 held 0 entrant 25 cut 4 Placed 131
+  p4 total 187: Insufficient_cash 25 Share_class_held 1 held 2 entrant 25 cut 6 Placed 128
+  p5 total 193: Insufficient_cash 14 Share_class_held 0 held 0 entrant 23 cut 1 Placed 155
+
+decisions absent from the other arm's top-N, per pair
+p0 | S:cut 278 | SM:held 12 | SM:cut 147 | S:held 5 | S:leaver 245 | SM:entrant 395
+p1 | S:cut 252 | SM:held 6 | SM:cut 130 | S:held 1 | S:leaver 241 | SM:entrant 391
+p2 | S:cut 255 | SM:held 12 | SM:cut 134 | S:held 6 | S:leaver 250 | SM:entrant 398
+p3 | S:cut 245 | SM:held 10 | SM:cut 143 | S:held 12 | S:leaver 242 | SM:entrant 379
+p4 | S:cut 257 | SM:held 8 | SM:cut 128 | S:held 7 | S:leaver 245 | SM:entrant 398
+p5 | S:cut 270 | SM:held 5 | SM:cut 139 | S:held 2 | S:leaver 243 | SM:entrant 398
+
+SM decisions on entrant names, and S decisions on leaver names, by outcome
+p0 SM entrant 395 of 5486 (7.2%): Placed 26 Insufficient_cash 6 Sized_to_zero 18 NSS 345
+p0 S leaver 245 of 5460 (4.5%): Placed 8 Insufficient_cash 4 Sized_to_zero 7 NSS 226
+p1 SM entrant 391 of 5490 (7.1%): Placed 22 Insufficient_cash 6 Sized_to_zero 20 NSS 343
+p1 S leaver 241 of 5457 (4.4%): Placed 8 Insufficient_cash 9 Sized_to_zero 6 NSS 218
+p2 SM entrant 398 of 5489 (7.3%): Placed 26 Insufficient_cash 7 Sized_to_zero 18 NSS 347
+p2 S leaver 250 of 5456 (4.6%): Placed 6 Insufficient_cash 6 Sized_to_zero 6 NSS 232
+p3 SM entrant 379 of 5491 (6.9%): Placed 25 Insufficient_cash 5 Sized_to_zero 19 NSS 330
+p3 S leaver 242 of 5458 (4.4%): Placed 9 Insufficient_cash 5 Sized_to_zero 7 NSS 221
+p4 SM entrant 398 of 5487 (7.3%): Placed 25 Insufficient_cash 10 Sized_to_zero 18 NSS 345
+p4 S leaver 245 of 5462 (4.5%): Placed 8 Insufficient_cash 5 Sized_to_zero 6 NSS 226
+p5 SM entrant 398 of 5486 (7.3%): Placed 23 Insufficient_cash 6 Sized_to_zero 19 NSS 350
+p5 S leaver 243 of 5459 (4.5%): Placed 6 Insufficient_cash 7 Sized_to_zero 7 NSS 223
+
+outcome flips on decisions both arms made (pooled)
+ 29696 total
+ 27749 No_structural_stop -> No_structural_stop
+   828 Placed -> Placed
+   574 Insufficient_cash -> Insufficient_cash
+   281 Sized_to_zero -> Sized_to_zero
+   140 Insufficient_cash -> Placed
+   114 Placed -> Insufficient_cash
+     5 Share_class_held -> Share_class_held
+     2 Share_class_held -> Placed
+     2 Share_class_held -> Insufficient_cash
+     1 Insufficient_cash -> Share_class_held
+
+first placement differences per pair
+p0 2019-02-15 S SPSC Placed other:cut
+p0 2019-03-08 SM MSTR Placed other:cut
+p0 2019-03-29 S BOOM Placed other:cut
+p1 2019-05-24 S JBSS Placed other:leaver
+p1 2019-05-24 SM GSHD Placed other:entrant
+p1 2019-08-16 SM ADAM Placed other:cut
+p2 2019-02-15 S SPSC Placed other:cut
+p2 2019-05-24 S JBSS Placed other:leaver
+p2 2019-05-24 SM GSHD Placed other:entrant
+p3 2019-05-24 S JBSS Placed other:leaver
+p3 2019-05-24 SM GSHD Placed other:entrant
+p3 2019-08-02 SM MPWR Placed other:cut
+p4 2019-05-24 SM GSHD Placed other:entrant
+p4 2019-09-06 S KEYS Placed other:cut
+p4 2019-12-06 S CRMT Insufficient_cash other:Placed
+p5 2019-05-24 SM GSHD Placed other:entrant
+p5 2019-08-16 SM ADAM Placed other:cut
+p5 2019-11-15 S ZWS Insufficient_cash other:Placed

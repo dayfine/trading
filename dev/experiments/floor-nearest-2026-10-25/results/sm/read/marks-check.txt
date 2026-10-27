@@ -1,0 +1,24 @@
+S p0 marks 532482 vs actual.sexp unrealized_pnl 532469
+S p0 coverage: filled 150 of 150 trades, open 7 of 7
+SM p0 marks 586418 vs actual.sexp unrealized_pnl 586462
+SM p0 coverage: filled 150 of 150 trades, open 7 of 7
+S p1 marks 696907 vs actual.sexp unrealized_pnl 696939
+S p1 coverage: filled 134 of 134 trades, open 7 of 7
+SM p1 marks 485509 vs actual.sexp unrealized_pnl 485547
+SM p1 coverage: filled 147 of 147 trades, open 7 of 7
+S p2 marks 527132 vs actual.sexp unrealized_pnl 527153
+S p2 coverage: filled 136 of 136 trades, open 4 of 4
+SM p2 marks 454406 vs actual.sexp unrealized_pnl 454448
+SM p2 coverage: filled 153 of 153 trades, open 7 of 7
+S p3 marks 590698 vs actual.sexp unrealized_pnl 590762
+S p3 coverage: filled 139 of 139 trades, open 5 of 5
+SM p3 marks 549406 vs actual.sexp unrealized_pnl 549478
+SM p3 coverage: filled 151 of 151 trades, open 7 of 7
+S p4 marks 680497 vs actual.sexp unrealized_pnl 680549
+S p4 coverage: filled 133 of 133 trades, open 5 of 5
+SM p4 marks 521519 vs actual.sexp unrealized_pnl 521555
+SM p4 coverage: filled 148 of 148 trades, open 3 of 3
+S p5 marks 766005 vs actual.sexp unrealized_pnl 766065
+S p5 coverage: filled 132 of 132 trades, open 5 of 5
+SM p5 marks 573985 vs actual.sexp unrealized_pnl 574031
+SM p5 coverage: filled 149 of 149 trades, open 5 of 5

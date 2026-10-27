@@ -1,0 +1,36 @@
+pair | dNAV | shared SM-S | entrants | SM cut/held | S cash->SM placed | SM other | displaced at decision (-S) | leavers (-S) | S cut/held (-S) | S other (-S) | dInterest | residual ($k)
+p0 | +444 | +25 | +15 | -52 | +422 | +0 | -57 | +1 | +84 | +0 | +10 | -4
+p1 | -1019 | -597 | -109 | -2 | -101 | +0 | -73 | -2 | -107 | +0 | -27 | -1
+p2 | -858 | -536 | +6 | +130 | -43 | +0 | -339 | -45 | -3 | +0 | -26 | -3
+p3 | -224 | +21 | -140 | -28 | +21 | +0 | -107 | +10 | +15 | +0 | -7 | -8
+p4 | -507 | -292 | -116 | +1 | +4 | +0 | -52 | +12 | -47 | +0 | -13 | -3
+p5 | -827 | -360 | -90 | +0 | -59 | +0 | -335 | +16 | +30 | +0 | -27 | -2
+
+pair | dNAV | seven tail names (APPS ADMA BBWI MMYT DXCM MSTR GLNG) SM-S | entrants | other tickets SM-S | dInterest | residual | ln(NAV_SM/NAV_S) ($k)
+p0 | +444 | +454 | +15 | -31 | +10 | -4 | +0.204
+p1 | -1019 | -596 | -109 | -286 | -27 | -1 | -0.377
+p2 | -858 | -903 | +6 | +67 | -26 | -3 | -0.406
+p3 | -224 | -72 | -140 | +3 | -7 | -8 | -0.102
+p4 | -507 | -191 | -116 | -185 | -13 | -3 | -0.181
+p5 | -827 | -792 | -90 | +83 | -27 | -2 | -0.286
+
+decisions placed in both arms: both filled (n, SM-S) | filled in S only (n, -S P&L, big ones) | filled in SM only (n, SM P&L) ($k)
+p0 | 111 +49 | 7 -4 | 3 -20
+p1 | 113 -386 | 4 -228 BBWI(2020-07-31,162k)->SM entry_fill_rejected_by_portfolio | 6 +18
+p2 | 105 -45 | 3 -495 ADMA(2023-08-18,518k)->SM entry_fill_rejected_by_portfolio | 5 +4
+p3 | 102 -76 | 4 -25 | 7 +122
+p4 | 104 -163 | 4 -125 ADNT(2020-02-21,87k)->SM entry_fill_rejected_by_portfolio | 5 -5
+p5 | 122 -366 | 4 -2 | 4 +8
+
+cash detail of fill-time refusals of tail and swing tickets (results/sm cash_rejections.csv)
+p0 ADNT-wein-129,ADNT,2020-02-21,37,153382.0196,17085.990711511626,0.1114
+p0 MOH-wein-156,MOH,2020-04-24,0,148000.18639999998,93178.656857067457,0.6296
+p1 ADNT-wein-123,ADNT,2020-02-21,37,160257.95200000002,85192.14364408559,0.5316
+p1 BBWI-wein-166,BBWI,2020-07-31,0,114950.47702714198,114804.30526201231,0.9987
+p1 MOH-wein-148,MOH,2020-04-24,0,147185.20739999998,97103.649978406771,0.6597
+p2 ADMA-wein-336,ADMA,2023-08-18,17,131637.12,91927.894116214942,0.6983
+p2 MOH-wein-152,MOH,2020-04-24,0,144577.27459999998,85264.221864248786,0.5897
+p3 MOH-wein-148,MOH,2020-04-24,0,146859.2158,89925.079450074583,0.6123
+p4 ADNT-wein-121,ADNT,2020-02-21,37,158335.9394,47160.550084187671,0.2979
+p4 MOH-wein-146,MOH,2020-04-24,0,150608.1192,93660.2117625078,0.6219
+p5 MOH-wein-150,MOH,2020-04-24,0,147837.1906,93115.241285304524,0.6298
