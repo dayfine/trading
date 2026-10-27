@@ -70,17 +70,13 @@ let _snap_path ~warehouse_dir ~(entry : Snapshot_manifest.file_metadata) =
   else Filename.concat warehouse_dir entry.path
 
 let _read_snap_bars ~path : Types.Daily_price.t list Status.status_or =
-  match Snapshot_columnar.with_reader ~path ~f:Snapshot_columnar.read_all with
-  | Error e -> Error e
-  | Ok rows -> Ok (List.map rows ~f:_bar_of_row)
+  Snapshot_columnar.with_reader ~path ~f:Snapshot_columnar.read_all
+  |> Result.map ~f:(List.map ~f:_bar_of_row)
 
 let _csv_bars ~data_dir ~symbol : Types.Daily_price.t list option =
-  match Csv.Csv_storage.create ~data_dir symbol with
-  | Error _ -> None
-  | Ok storage -> (
-      match Csv.Csv_storage.get storage () with
-      | Error _ -> None
-      | Ok bars -> Some bars)
+  Csv.Csv_storage.create ~data_dir symbol
+  |> Result.bind ~f:(fun storage -> Csv.Csv_storage.get storage ())
+  |> Result.ok
 
 (* Snap/CSV [adjusted_close] ratio on one overlap date; [None] when the CSV
    has no bar that date or either side is non-finite / non-positive. *)
@@ -294,8 +290,7 @@ let _migrate_source ~warehouse_dir ~csv_data_dir ~output_dir ~sketch_deep_days
 let migrate ~warehouse_dir ~csv_data_dir ~output_dir
     ?(sketch_deep_days = default_sketch_deep_days) () =
   let manifest_path = Filename.concat warehouse_dir "manifest.sexp" in
-  match Snapshot_manifest.read ~path:manifest_path with
-  | Error e -> Error e
-  | Ok source ->
-      _migrate_source ~warehouse_dir ~csv_data_dir ~output_dir ~sketch_deep_days
-        source
+  let migrate_source =
+    _migrate_source ~warehouse_dir ~csv_data_dir ~output_dir ~sketch_deep_days
+  in
+  Snapshot_manifest.read ~path:manifest_path |> Result.bind ~f:migrate_source
