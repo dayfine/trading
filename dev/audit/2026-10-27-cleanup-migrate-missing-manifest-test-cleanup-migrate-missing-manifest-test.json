@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-27",
+  "feature": "cleanup-migrate-missing-manifest-test",
+  "branch": "cleanup/migrate-missing-manifest-test",
+  "sha": "ed83dd405b520423f7d8c10856ee468e7d74884a",
+  "recorded_at_ns": 1793127966095496091,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
