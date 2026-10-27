@@ -32,7 +32,7 @@ chmod +x "${FAKE_ROOT}/bin/dune"
 
 R="${FAKE_ROOT}/dev/reviews"
 A="${FAKE_ROOT}/dev/audit"
-for s in byfile viabranch base-structural base-behavioral-v2 genuine genuine-structural screener; do
+for s in byfile viabranch base-structural base-behavioral-v2 base-structural-rework base-foo ase genuine genuine-structural screener; do
   printf '# Review\n\n## Verdict\n\nAPPROVED\n' > "$R/$s.md"
 done
 audit() { printf '{\n  "feature": "%s",\n  "branch": "%s"\n}\n' "$2" "$3" > "$A/$1.json"; }
@@ -57,14 +57,19 @@ expect_matched byfile
 expect_matched viabranch
 expect_matched base-structural
 expect_matched base-behavioral-v2
+expect_matched base-structural-rework
+# A non-review-kind suffix must NOT be stripped, and the branch match is
+# hyphen-anchored (ase is a tail of fix-base with no boundary).
+expect_reported base-foo
+expect_reported ase
 
 
 if grep -q 'no test directory mapping for feature' "$FINDINGS_FILE"; then
   fail "per-feature 'no test directory mapping' lines must be aggregated"
 fi
-# 7 reviews, 1 mapped (screener) -> 6 unmapped
-grep -q '6 reviewed feature(s) have no test directory mapping' "$FINDINGS_FILE" \
-  || fail "expected one aggregated line with count 6; findings:
+# 10 reviews, 1 mapped (screener) -> 9 unmapped
+grep -q '9 reviewed feature(s) have no test directory mapping' "$FINDINGS_FILE" \
+  || fail "expected one aggregated line with count 9; findings:
 $(sed 's/^/      /' "$FINDINGS_FILE")"
 [ "$(grep -c 'have no test directory mapping' "$FINDINGS_FILE")" = 1 ] \
   || fail "expected exactly one aggregated mapping line"
