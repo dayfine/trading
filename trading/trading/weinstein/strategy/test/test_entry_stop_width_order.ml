@@ -359,7 +359,7 @@ let _entered_tickers ?sector_cap ~mode ~cash () =
     test in this file still passes.
 
     EFFECTIVENESS-PIN: stop_width_mode -- goes red if [config.stop_width_mode]
-    is dropped at EITHER copy site: [entry_stop_width_order.ml]
+    is dropped at EITHER read site: [entry_stop_width_order.ml]
     ([Demote_over_max] no longer reorders) or [entry_walk.ml]'s [~stop_width]
     policy ([Size_down] stops admitting the wide pair, [Drop_over_max] stops
     dropping it).
@@ -368,9 +368,9 @@ let _entered_tickers ?sector_cap ~mode ~cash () =
     [config.stop_width_size_down_max_pct] is dropped from the [entry_walk.ml]
     [~stop_width] policy (the ceiling falls back to [max_stop_distance_pct], so
     the 0.90-ceiling wide pair is dropped under [Size_down] and
-    [Demote_over_max]). The [entry_stop_width_order.ml] copy of the ceiling is
-    never read by [Stop_width_mode.demotes], so it has no observable effect to
-    pin.
+    [Demote_over_max]). [entry_stop_width_order.ml] no longer carries a ceiling:
+    it passes the default ceiling, and [Stop_width_mode.demotes] reads only
+    [mode], so there is no second ceiling site to pin.
 
     Cash is ample here on purpose: this case is about {i priority}, and the case
     where priority becomes a different admitted set is
