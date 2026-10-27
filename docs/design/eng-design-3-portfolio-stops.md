@@ -17,6 +17,8 @@
 - **Weinstein Strategy** — new: `trading/weinstein/strategy/` — implements `STRATEGY` interface; IS the portfolio manager for both live and simulation
 - **Trading State** — new: `trading/weinstein/trading_state/` — persistence for live runs
 - **Order Generator** — new: `trading/weinstein/order_gen/` — formats `Position.transition list` → broker orders for the live runner
+- **Live Orders** — new: `trading/weinstein/live_orders/` (lib `weinstein_trading.live_orders`, depends on `trading.strategy`, `order_gen`, `stops`) — the live tick's order path. `run_tick` snapshots the strategy's `stop_states` ref before and after one tick, then `orders_for_tick` calls `Weinstein_order_gen.from_transitions` with `~stop_sync` built from the two snapshots and the post-transition positions. A fresh fill thus gets a broker `Stop` at its installed level, and a tightening or split rescale (which emits no transition) still reaches the broker. Input: a `tick` (`transitions`, `positions_after`); output: `suggested_order list`
+- **Split Corpus** — new (test support): `trading/weinstein/split_corpus/` (lib `weinstein_trading.split_corpus`, depends on `core`, `csv`, `status`, `types`) — loader for real split price windows kept as fixtures under `trading/test_data/split_corpus/<SYMBOL>-<ex-date>/` (`bars.csv` with raw `close` and back-adjusted `adjusted_close`, plus `meta.sexp` with split ratios and expected adjustment factors). Used by `split_corpus/test/` to assert every price-basis consumer (stops, resistance, MA) uses one consistent basis across a split. API: `find_root`, `entry_names`, `load`, `load_all`, `adjustment_factor`
 
 ## 3.2 Requirements
 
