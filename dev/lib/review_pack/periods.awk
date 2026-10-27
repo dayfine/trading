@@ -16,7 +16,7 @@ END {
   # SPY: carry last known adj close onto every NAV date
   peak_all = 0; nk = 0; last_spy = 0
   for (i = 1; i <= nd; i++) {
-    d = nds[i]; v = nav[d] + 0; if (d in spy) last_spy = spy[d] + 0
+    d = nds[i]; v = nav[d] + 0; if (d in spy) { last_spy = spy[d] + 0; if (!first_spy) first_spy = last_spy }
     k = key(d)
     if (!(k in seen)) { seen[k] = 1; nk++; ks[nk] = k
       s_nav[k] = (i > 1) ? prev_v : v; s_spy[k] = (i > 1) ? prev_spy : last_spy
@@ -32,6 +32,8 @@ END {
   printf "["
   for (j = 1; j <= nk; j++) {
     k = ks[j]
+    # NAV dates before SPY's first bar (a holiday first row, 2019-01-01) start at SPY's first bar, not 0
+    if (s_spy[k] == 0) s_spy[k] = first_spy
     r = (s_nav[k] > 0) ? (e_nav[k] / s_nav[k] - 1) * 100 : 0
     sr = (s_spy[k] > 0) ? (e_spy[k] / s_spy[k] - 1) * 100 : 0
     printf "%s{\"p\":\"%s\",\"from\":\"%s\",\"to\":\"%s\",\"nav0\":%.0f,\"nav1\":%.0f,\"ret\":%.2f,\"spy\":%.2f,\"mdd\":%.2f,\"dd_peak\":%.2f,\"expo\":%.1f,\"pos\":%.1f,\"opened\":%d,\"closed\":%d,\"wins\":%d,\"pnl\":%.0f,\"wk\":%d,\"bull\":%d,\"neut\":%d,\"bear\":%d}", \
