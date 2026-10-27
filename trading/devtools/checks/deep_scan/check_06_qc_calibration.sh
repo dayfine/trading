@@ -65,11 +65,25 @@ _test_dirs_for_feature() {
 # branch slug (e.g. feat/screener-failed-breakout) has its audit record filed
 # under the FEATURE name (screener), so the filename glob alone misses it.
 AUDIT_BRANCHES="$(mktemp)"
+_streak_raw=""
+trap 'rm -f "$AUDIT_BRANCHES" "$_streak_raw"' EXIT
 for audit_file in "${REPO_ROOT}"/dev/audit/*.json; do
   [ -f "$audit_file" ] || continue
   grep -o '"branch": *"[^"]*"' "$audit_file" 2>/dev/null | head -1 \
     | sed 's/.*: *"//;s/"$//;s#/#-#g' >> "$AUDIT_BRANCHES" || true
 done
+
+# _branch_matches <slug>: true if a recorded branch equals the slug or ends
+# with "-<slug>". Literal (non-regex) compare, so slug metacharacters such as
+# "." cannot match other characters. Slug goes via ENVIRON (no -v escapes).
+_branch_matches() {
+  SLUG="$1" awk '
+    BEGIN { s = ENVIRON["SLUG"]; n = length(s) }
+    $0 == s { found = 1; exit }
+    length($0) > n && substr($0, length($0) - n) == "-" s { found = 1; exit }
+    END { exit !found }
+  ' "$AUDIT_BRANCHES" 2>/dev/null
+}
 
 # _has_audit_record <slug>: true if dev/audit has a record for the review
 # slug, by filename suffix or by the record's branch field, also after
@@ -81,7 +95,7 @@ _has_audit_record() {
     for _f in "${REPO_ROOT}"/dev/audit/*-"$_s".json; do
       [ -f "$_f" ] && return 0
     done
-    grep -qE -- "(^|-)${_s}\$" "$AUDIT_BRANCHES" 2>/dev/null && return 0
+    _branch_matches "$_s" && return 0
   done
   return 1
 }
@@ -163,8 +177,6 @@ for review_file in "${REPO_ROOT}"/dev/reviews/*.md; do
     fi
   fi
 done
-
-rm -f "$AUDIT_BRANCHES"
 
 # Features without a hardcoded test-dir mapping are heuristic noise, not
 # per-feature findings: report one aggregated line with the count.
