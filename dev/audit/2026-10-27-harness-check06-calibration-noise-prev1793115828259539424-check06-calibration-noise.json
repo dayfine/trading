@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-27",
+  "feature": "check06-calibration-noise",
+  "branch": "harness/check06-calibration-noise",
+  "sha": "446f1adee42b4cff5b86ffefab9a7b907516aed5",
+  "recorded_at_ns": 1793115828259539424,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}

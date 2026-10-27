@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-27",
+  "feature": "trade-audit-short-side-fallback",
+  "branch": "fix/trade-audit-short-side-fallback",
+  "sha": "be8a863bd8d4fbe3588d71da17300fe9e443ad04",
+  "recorded_at_ns": 1793108448362148463,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
