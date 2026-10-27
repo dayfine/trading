@@ -22,8 +22,9 @@ This is a re-baseline, not a lever test: no accept or reject.
 - **Cells.** k = 0, 1, 2, 3, 4. Window 2000-01-01 → 2026-06-26, top-3000 PIT v12 schedule (27 yearly lists, broad,
   U1 passes), path salt 0 everywhere. Tags `rk-k<k>-s0`. k0 is what the default config produces.
 - **Build.** A pinned worktree at origin/main when launched (must contain #3425 and the template's fixes, #3391
-  dedupe included). #3388 (the full rename-twin dedupe) is still open and is not applied: the universe is the same
-  27 lists as the old record (`results/lists-md5.txt`).
+  dedupe included). The 27 lists are main's (md5 `51fba79e…`, the same as `../path-stability-2026-10-23/`); they
+  differ from the old record's (`deca56c7…`) by #3391's CMN/CMD twin drop, one more reason item 3 below is
+  descriptive only. #3388 (the full rename-twin dedupe) is still open and is not applied.
 - **Warehouse.** `/tmp/snap_top3000_pit_v12wk` (the #3266 rerun's build, 9,236 symbols), reused and checked against
   the run tree's lists.
 - **Order.** Preflight k0 and k1 on the last half-year (a non-zero seed must reach `params.sexp`), then k0 .. k4,
