@@ -356,6 +356,19 @@ let test_partial_clone_aborts_without_manifest _ =
     (Stdlib.Sys.file_exists (Filename.concat output_dir "manifest.sexp"))
     (equal_to false)
 
+let test_missing_source_manifest_is_error _ =
+  let tmp = _tmp_dir () in
+  let output_dir = Filename.concat tmp "out" in
+  let result =
+    Sidetable_migrator.migrate
+      ~warehouse_dir:(Filename.concat tmp "no_such_warehouse")
+      ~csv_data_dir:tmp ~output_dir ()
+  in
+  assert_that result is_error;
+  assert_that
+    (Stdlib.Sys.file_exists (Filename.concat output_dir "manifest.sexp"))
+    (equal_to false)
+
 let suite =
   "sidetable_migrator"
   >::: [
@@ -371,6 +384,8 @@ let suite =
          "fallback: unstable basis" >:: test_fallback_unstable_basis;
          "partial clone aborts without manifest"
          >:: test_partial_clone_aborts_without_manifest;
+         "missing source manifest is Error"
+         >:: test_missing_source_manifest_is_error;
        ]
 
 let () = run_test_tt_main suite
