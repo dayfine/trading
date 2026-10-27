@@ -315,6 +315,8 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
 ## Completed
 
+- [x] Design-doc drift (deep scan 2026-10-26 Warnings 1-2): `docs/design/eng-design-3-portfolio-stops.md` §3.1 now lists `weinstein/live_orders/` and `weinstein/split_corpus/`. Verify: `sh trading/devtools/checks/deep_scan/check_02_design_doc_drift.sh /tmp/r` reports no eng-design-3 drift.
+
 ### 7th gnu_time_rss copy + shape-based structural guard (issue #2576, 2026-08-27)
 
 - [x] qc-behavioral reviewing #2572 (the rework of #2559) found a 7th,
