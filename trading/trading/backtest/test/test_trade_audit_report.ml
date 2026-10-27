@@ -305,6 +305,26 @@ let test_row_has_none_audit_fields_when_unmatched _ =
            ];
        ])
 
+let test_row_side_falls_back_to_trade_side_when_unmatched _ =
+  let short =
+    make_trade ~symbol:"NOAUDIT" ~side:Trading_base.Types.Sell
+      ~entry_date:(_date "2024-06-01") ()
+  in
+  let long =
+    make_trade ~symbol:"NOAUDITL" ~entry_date:(_date "2024-07-01") ()
+  in
+  let report = TAR.render ~trade_audit:[] ~trades:[ short; long ] () in
+  assert_that report.rows
+    (elements_are
+       [
+         field
+           (fun (r : TAR.per_trade_row) -> r.side)
+           (equal_to Trading_base.Types.Short);
+         field
+           (fun (r : TAR.per_trade_row) -> r.side)
+           (equal_to Trading_base.Types.Long);
+       ])
+
 (* --- Execution-faithfulness columns + summary (#2210 follow-on) --------- *)
 
 let test_row_has_execution_fields_when_present _ =
@@ -1499,6 +1519,8 @@ let suite =
          >:: test_row_has_audit_fields_when_matched;
          "row has none audit fields when unmatched"
          >:: test_row_has_none_audit_fields_when_unmatched;
+         "row side falls back to trade side when unmatched"
+         >:: test_row_side_falls_back_to_trade_side_when_unmatched;
          "row has execution fields when present"
          >:: test_row_has_execution_fields_when_present;
          "row execution fields none when absent"
