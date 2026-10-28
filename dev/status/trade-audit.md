@@ -218,7 +218,7 @@ NO
       `grep -rn '{!Weinstein_trading\.' --include=*.ml --include=*.mli .`
       returns nothing.
 
-- [ ] **Census the `CancelEntry` construction sites in a linter (R5, residual
+- [x] **Census the `CancelEntry` construction sites in a linter (R5, residual
       gap left open by R2).** R2's test derives its reachable set by driving the
       two producer modules that exist today, so it catches a renamed token, a
       deleted arm, an audit path that stops persisting a reason, and (very
@@ -239,6 +239,11 @@ NO
       test files — 2 each in `test_position.ml`, `test_cancel_handler.ml`,
       `test_trade_audit.ml`; 1 each in `test_entry_ticket_ttl.ml`,
       `test_gtc_entry_persistence.ml`.
+      Done: `trading/devtools/checks/cancelentry_census_check.sh` (fixture test
+      `cancelentry_census_check_test.sh`, wired into runtest) pins the production
+      construction set at 6 sites (the 2 above plus `entry_ticket_suspend`,
+      `short_ticket_policy`, `split_ticket_cancel`, `delisted_ticket_cancel`,
+      added since the baseline). Verify: `sh trading/devtools/checks/cancelentry_census_check.sh`.
 
 ## Report-path `position_id` join (2026-08-14, follow-up to PR #2317)
 
