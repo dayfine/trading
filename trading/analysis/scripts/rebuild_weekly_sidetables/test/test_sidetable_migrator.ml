@@ -316,6 +316,35 @@ let test_fallback_no_csv _ =
     (equal_to
        (Weekly_sidetable_builder.of_bars ~deep_bars:[] ~bars:(_window_bars ())))
 
+(* [Csv_storage.create] itself fails when the CSV data dir cannot hold the
+   symbol's shard directory (here: the "dir" is a regular file). The .mli
+   documents only the no-CSV fallback; pin that this unreadable-store case
+   behaves identically to an absent CSV (Fallback_no_csv, snap-only rebuild)
+   rather than aborting the migration. *)
+let test_unreadable_csv_store_falls_back _ =
+  let warehouse_dir = _tmp_dir () in
+  let output_dir = Filename.concat (_tmp_dir ()) "clone" in
+  let csv_file = Filename.concat (_tmp_dir ()) "not_a_dir" in
+  Out_channel.write_all csv_file ~data:"x";
+  _write_warehouse ~warehouse_dir ();
+  let summary =
+    Sidetable_migrator.migrate ~warehouse_dir ~csv_data_dir:csv_file ~output_dir
+      ~sketch_deep_days:_sketch_deep_days ()
+  in
+  let expected_report : Sidetable_migrator.symbol_report =
+    {
+      symbol = _symbol;
+      outcome = Sidetable_migrator.Fallback_no_csv;
+      date_parity = false;
+    }
+  in
+  assert_that summary
+    (is_ok_and_holds (_reports_matcher [ equal_to expected_report ]));
+  assert_that
+    (_read_weekly ~dir:output_dir)
+    (equal_to
+       (Weekly_sidetable_builder.of_bars ~deep_bars:[] ~bars:(_window_bars ())))
+
 (* A historical revision (one overlap date's adjusted moved by its own factor)
    is NOT a global rebase — no constant re-pin exists, so the migrator refuses
    the deep prefix rather than guessing. *)
@@ -382,6 +411,8 @@ let suite =
          "rounded rebase still stable" >:: test_rounded_rebase_still_stable;
          "fallback: no csv" >:: test_fallback_no_csv;
          "fallback: unstable basis" >:: test_fallback_unstable_basis;
+         "fallback: unreadable csv store"
+         >:: test_unreadable_csv_store_falls_back;
          "partial clone aborts without manifest"
          >:: test_partial_clone_aborts_without_manifest;
          "missing source manifest is Error"
