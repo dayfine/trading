@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-28",
+  "feature": "cleanup-csv-bars-error-pin",
+  "branch": "cleanup/csv-bars-error-pin",
+  "sha": "43631a6a5eeb79b97759e8106ca39788178fa7e1",
+  "recorded_at_ns": 1793210008749389772,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
