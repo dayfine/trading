@@ -2704,6 +2704,50 @@ fi
 rm -rf "${WALKUP3_ROOT}"
 
 # ---------------------------------------------------------------------------
+# Scenario 28c (H-AUDIT-WALKUP-SENTINEL-NARROWING-UNPINNED, second copy):
+# 28b's fixture carries only `.claude`, so narrowing record_qc_audit.sh's OWN
+# walk-up sentinel test to `.claude` only (probe K2) survived. This sibling
+# uses a fixture with ONLY a `.git` directory. Own fixture, absolute count.
+# ---------------------------------------------------------------------------
+FEATURE28C="repo-root-gitonly-walkup"
+WALKUP4_ROOT="$(mktemp -d -t record_qc_audit_walkup4.XXXXXX)"
+mkdir -p "${WALKUP4_ROOT}/.git" "${WALKUP4_ROOT}/trading/devtools/checks" \
+         "${WALKUP4_ROOT}/dev/audit" "${WALKUP4_ROOT}/dev/reviews"
+cp "${SCRIPT}" "${WALKUP4_ROOT}/trading/devtools/checks/"
+cp "${SCRIPT_DIR}/write_audit.sh" "${WALKUP4_ROOT}/trading/devtools/checks/"
+chmod +x "${WALKUP4_ROOT}/trading/devtools/checks/"*.sh
+
+cat > "${WALKUP4_ROOT}/dev/reviews/${FEATURE28C}.md" <<'EOT'
+Reviewed SHA: walkup4sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+3 — git-only walk-up path
+EOT
+
+out28c=$(env -u REPO_ROOT \
+  bash "${WALKUP4_ROOT}/trading/devtools/checks/record_qc_audit.sh" \
+    "${FEATURE28C}" "harness/repo-root-gitonly" "2026-08-08" 2>&1) && rc28c=0 || rc28c=$?
+
+walkup_count28c="$(_glob_count "${WALKUP4_ROOT}/dev/audit" '*.json' '-type f')"
+C28C=(
+  "rc28c==0 (actual=${rc28c})" "$(_eq "${rc28c}" 0)"
+  "walkup_count28c == 1 (actual=${walkup_count28c})" "$(_eq "${walkup_count28c}" 1)"
+)
+if _pairs_ok "${C28C[@]}"; then
+  pass "scenario 28c — REPO_ROOT unset, fixture has only a .git sentinel: record_qc_audit.sh's own walk-up still locates the root (pins the .git arm; kills probe K2 on this copy)"
+else
+  fail "scenario 28c — expected rc=0 + exactly 1 record under a .git-only fixture; got rc=${rc28c}, count=${walkup_count28c}"
+  report_conjuncts "${C28C[@]}"
+  echo "${out28c}" | sed 's/^/      /'
+fi
+
+rm -rf "${WALKUP4_ROOT}"
+
+# ---------------------------------------------------------------------------
 # Scenario 29 (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH): the shared
 # _check_lib.sh:repo_root() helper -- sourced by most OTHER check scripts,
 # not just the audit pair -- must treat a REPO_ROOT that is SET but fails
