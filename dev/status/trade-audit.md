@@ -1,6 +1,6 @@
 # Status: trade-audit
 
-## Last updated: 2026-10-03
+## Last updated: 2026-10-28
 
 ## Status
 READY_FOR_REVIEW
@@ -91,7 +91,11 @@ NO
 
 ## Open work
 
-- [ ] **`ticket-funding-cohort-2026-08-18/README.md:310` says the gross figures
+- [x] **Done 2026-10-28 (orchestrator, docs PR):** `:310` now reads "indicate the
+      scale of the effect; they neither bound nor predict it". The paragraph's
+      other "bound" uses (`:290`, `:304`) refer to the TTL clock bounds, not a
+      magnitude bound, and were left as written.
+      **`ticket-funding-cohort-2026-08-18/README.md:310` says the gross figures
       "bound" the effect — they do not.** Two-word fix, filed rather than
       reworked because it is pre-existing, errs toward *under*-claiming, and
       both affected documents give identical practical guidance. Found
@@ -108,7 +112,11 @@ NO
       that line as a bound in a sizing argument.
       `harness_gap: NONE`. (source: 2026-08-18 qc-behavioral R1 on PR #2371)
 
-- [ ] **`ticket-funding-cohort-2026-08-18/README.md` disagrees with itself on
+- [x] **Already resolved (verified 2026-10-28):** `:207-209` now says "total
+      realized +2,314,952 (the bucket rows below sum to +2,314,953 — a \$1
+      artifact of per-bucket rounding, not a missing trade)", so the two figures
+      are reconciled in place. No edit needed.
+      **`ticket-funding-cohort-2026-08-18/README.md` disagrees with itself on
       the keyed total: `:207` says **+2,314,952**, `:249` says **+2,314,953**.**
       The buckets sum to **2,314,953**, and #2368 (`a994b7bc`) states 2,314,953
       in all three places it arises, so `:207` is the typo. One digit, but it is
@@ -119,7 +127,16 @@ NO
       is the point about cross-PR review being worth more than either individual
       pass. `harness_gap: NONE`. (source: 2026-08-18 qc-behavioral on PR #2368)
 
-- [ ] **Retire `dev/agent-memory/project_rest_time_pnl_is_cell_specific.md`.**
+- [x] **Retired in place (verified 2026-10-28).** The memory was rewritten at
+      source on 2026-08-18 (`modified: 2026-08-18T19:58`): its description now
+      opens "SUPERSEDED", and its body opens "⚠ SUPERSEDED 2026-08-18 … do not
+      cite its numbers", so a session that loads it no longer reads the retracted
+      framing as current. It was not added to `export-memory.sh`'s `STALE` list
+      because deleting the file would orphan three in-tree citations
+      (`ttl-retest-2026-08-16/README.md:29,97` and
+      `ticket-funding-cohort-2026-08-18/README.md:231`). A local session may still
+      choose to delete it; that is reversible either way.
+      **Retire `dev/agent-memory/project_rest_time_pnl_is_cell_specific.md`.**
       This is a **recorded in-tree obligation, not a suggestion**:
       `dev/experiments/ttl-retest-2026-08-16/README.md:100` states that whichever
       of #2368/#2371 lands second retires it. #2371 merged as `6c3485c4` and
@@ -135,7 +152,10 @@ NO
       2 of 2, and widening scope at the cap is how a PR fails to land at all.
       `harness_gap: NONE`. (source: 2026-08-18 qc-behavioral residual 3 on PR #2368)
 
-- [ ] **`exit-trigger-recompute-2026-08-18.md:118–120` contradicts itself two
+- [x] **Done 2026-10-28 (orchestrator, docs PR):** the caution now scopes itself
+      to "no tabulated share column above", and says that figures stated against
+      the run's +2,314,952 name that denominator.
+      **`exit-trigger-recompute-2026-08-18.md:118–120` contradicts itself two
       sentences apart** — says "no row here should be read as a share of the run
       total", then reads one (32% of +2,314,952). Both figures are correct and
       both denominators are named, so nothing is wrong numerically; the caution

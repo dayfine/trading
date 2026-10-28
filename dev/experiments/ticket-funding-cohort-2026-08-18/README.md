@@ -307,7 +307,7 @@ P&L.
 
 **Calibration.** Gross ≠ net: cancelling a resting ticket frees its capital,
 which the walk redeploys into some other candidate, and that replacement's P&L is
-unmeasured. These figures bound the effect, they do not predict it. It is also
+unmeasured. These figures indicate the scale of the effect; they neither bound nor predict it. It is also
 one salt on one base. The honest conclusion is *"the clock axis is worth running
 and #2368's deferral rested on a number this run does not reproduce"* — not
 *"#2368's number was wrong"*, which F2 does not establish, and not *"a 26-week clock
