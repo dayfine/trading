@@ -32,7 +32,7 @@ chmod +x "${FAKE_ROOT}/bin/dune"
 
 R="${FAKE_ROOT}/dev/reviews"
 A="${FAKE_ROOT}/dev/audit"
-for s in byfile viabranch base-structural base-behavioral-v2 base-structural-rework base-foo ase genuine genuine-structural screener a.b; do
+for s in byfile viabranch base-structural base-behavioral-v2 base-structural-rework base-foo ase genuine genuine-structural screener a.b exact-slug; do
   printf '# Review\n\n## Verdict\n\nAPPROVED\n' > "$R/$s.md"
 done
 audit() { printf '{\n  "feature": "%s",\n  "branch": "%s"\n}\n' "$2" "$3" > "$A/$1.json"; }
@@ -40,6 +40,7 @@ audit 2026-01-01-b-byfile unrelated other/branch
 audit 2026-01-02-tuning tuning feat/viabranch
 audit 2026-01-03-base base fix/base
 audit 2026-01-04-metachar metachar feat/axb
+audit 2026-01-05-eq eq exact/slug
 
 PATH="${FAKE_ROOT}/bin:$PATH" REPO_ROOT="$FAKE_ROOT" sh "$CHECK_06" "$DETAIL_FILE" "$FINDINGS_FILE"
 
@@ -56,6 +57,8 @@ expect_reported genuine
 expect_reported genuine-structural
 expect_matched byfile
 expect_matched viabranch
+# Exact-equality arm: branch exact/slug normalizes to exact-slug (no prefix).
+expect_matched exact-slug
 expect_matched base-structural
 expect_matched base-behavioral-v2
 expect_matched base-structural-rework
@@ -70,9 +73,9 @@ expect_reported a.b
 if grep -q 'no test directory mapping for feature' "$FINDINGS_FILE"; then
   fail "per-feature 'no test directory mapping' lines must be aggregated"
 fi
-# 11 reviews, 1 mapped (screener) -> 10 unmapped
-grep -q '10 reviewed feature(s) have no test directory mapping' "$FINDINGS_FILE" \
-  || fail "expected one aggregated line with count 10; findings:
+# 12 reviews, 1 mapped (screener) -> 11 unmapped
+grep -q '11 reviewed feature(s) have no test directory mapping' "$FINDINGS_FILE" \
+  || fail "expected one aggregated line with count 11; findings:
 $(sed 's/^/      /' "$FINDINGS_FILE")"
 [ "$(grep -c 'have no test directory mapping' "$FINDINGS_FILE")" = 1 ] \
   || fail "expected exactly one aggregated mapping line"
