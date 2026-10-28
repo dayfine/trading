@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-28",
+  "feature": "harness",
+  "branch": "harness/walkup-git-sentinel",
+  "sha": "4c6d395614e558cfcde327296dcf0ef2406088eb",
+  "recorded_at_ns": 1793217540646138995,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
