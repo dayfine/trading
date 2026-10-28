@@ -13,6 +13,9 @@
 # single `|` (not the `[|` of an array literal), `with` or `function`, or the `}` is followed by `->` or `when`.
 # Anything else counts, including an arm RHS (`| A -> CancelEntry { .. }`, even
 # before another arm) and `CancelEntry { .. } |> f`.
+# Other pattern shapes (array/paren/tuple/let) are counted and fail loud.
+# Limitation: comment stripping is not string-aware; a string literal holding
+# `(*` opens a phantom comment and hides later constructions in that file.
 # Site identity is "path:count" (count of constructions in that file).
 #
 # Adding a producer on purpose: add its "path:count" line to KNOWN here and

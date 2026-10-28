@@ -54,4 +54,16 @@ expect "array-literal construction" 1 "$tmp/arr" 'NEW.*a/lib/third.ml:1'
 mk "$tmp/arr2"
 printf 'let f r =\n  [|\n    CancelEntry { reason = r }\n  |]\n' > "$tmp/arr2/trading/trading/a/lib/third.ml"
 expect "array-literal, [| at end of previous line" 1 "$tmp/arr2" 'NEW.*a/lib/third.ml:1'
+mk "$tmp/tuple"
+printf 'let f = function\n  | A, CancelEntry { reason } -> reason\n' > "$tmp/tuple/trading/trading/a/lib/third.ml"
+expect "tuple LHS ignored via ->" 0 "$tmp/tuple"
+mk "$tmp/guard"
+printf 'let f = function\n  | A, CancelEntry { reason } when x -> reason\n' > "$tmp/guard/trading/trading/a/lib/third.ml"
+expect "guarded LHS ignored via when" 0 "$tmp/guard"
+mk "$tmp/pathor"
+printf 'let f = function\n  | Position.CancelEntry { reason } | Other _ -> reason\n' > "$tmp/pathor/trading/trading/a/lib/third.ml"
+expect "module-path LHS before or-pattern ignored" 0 "$tmp/pathor"
+mk "$tmp/withor"
+printf 'let f x = match x with CancelEntry { reason } | B -> reason\n' > "$tmp/withor/trading/trading/a/lib/third.ml"
+expect "with-prefixed LHS before or-pattern ignored" 0 "$tmp/withor"
 exit $fail
