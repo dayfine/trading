@@ -30,4 +30,13 @@ echo 'let t = { kind = Position.CancelEntry { reason = r } }' > "$tmp/add/tradin
 expect "third production site" 1 "$tmp/add" 'NEW.*a/lib/third.ml:1'
 mk "$tmp/gone"; rm "$tmp/gone/trading/trading/a/lib/known.ml"
 expect "removed site" 1 "$tmp/gone" 'MISSING.*a/lib/known.ml:1'
+mk "$tmp/multi"
+printf 'let t =\n  { kind =\n      Position.CancelEntry\n        { reason = r } }\n' > "$tmp/multi/trading/trading/a/lib/third.ml"
+expect "multi-line construction" 1 "$tmp/multi" 'NEW.*a/lib/third.ml:1'
+mk "$tmp/rhs"
+echo '  | A -> Position.CancelEntry { reason = r }' > "$tmp/rhs/trading/trading/a/lib/third.ml"
+expect "arm-RHS construction" 1 "$tmp/rhs" 'NEW.*a/lib/third.ml:1'
+mk "$tmp/lhs"
+printf 'let f = function\n  | Position.CancelEntry\n      { reason } -> reason\n  | CancelEntry { reason } | Other { reason } -> reason\n(* CancelEntry { reason = c } *)\n' > "$tmp/lhs/trading/trading/a/lib/third.ml"
+expect "arm-LHS pattern and comment ignored" 0 "$tmp/lhs"
 exit $fail
