@@ -202,7 +202,7 @@ type t = {
       (** The [CancelEntry] transition's own reason token, persisted verbatim.
           Always [Some] exactly when {!ticket_age_weeks_at_cancel} is, and read
           together with it: the age says {i how long} the ticket rested, this
-          says {i what killed it}. Four tokens exist —
+          says {i what killed it}. Seven tokens exist —
           {!Trading_simulation.Cancel_handler.portfolio_rejection_reason}
           ([entry_fill_rejected_by_portfolio]),
           {!Weinstein_strategy.Entry_ticket_ttl}'s [entry_ticket_ttl_expired] /
@@ -215,16 +215,20 @@ type t = {
           default-off #3075 flag is armed,
           {!Weinstein_strategy.Split_ticket_cancel.cancel_reason}
           ([entry_ticket_split_while_resting]) is a strategy {b decision}: the
-          symbol split while the ticket rested.
+          symbol split while the ticket rested. Likewise, when the default-off
+          #3218 flag is armed,
+          {!Weinstein_strategy.Short_ticket_policy.cancel_reason}
+          ([entry_ticket_short_macro_not_bearish]) cancels a resting short whose
+          bearish-market premise lapsed.
 
-          The distinction is load-bearing, not cosmetic, and the first four
-          tokens fall in {b three} categories. The two TTL tokens are
-          {b decisions} the strategy took. The rejection token is an
-          {b accident of capital timing} — a ticket that triggered, filled at
-          the engine, and was then refused because the book could not fund it
-          (dev/notes/ticket-death-on-cash-2026-08-16.md). [delisted] is a
-          {b data-driven death} — the symbol's series ended, so no policy and no
-          amount of cash could have kept the ticket alive; it fires on every
+          The distinction is load-bearing, not cosmetic, and the tokens fall in
+          {b four} categories. The two TTL tokens (and the split and
+          short-policy ones) are {b decisions} the strategy took. The rejection
+          token is an {b accident of capital timing} — a ticket that triggered,
+          filled at the engine, and was then refused because the book could not
+          fund it (dev/notes/ticket-death-on-cash-2026-08-16.md). [delisted] is
+          a {b data-driven death} — the symbol's series ended, so no policy and
+          no amount of cash could have kept the ticket alive; it fires on every
           marker-carrying warehouse (#2691 onward) and belongs in its own
           bucket. Averaging a cancel-age column across these populations mixes a
           policy with a failure with a fact about the data.

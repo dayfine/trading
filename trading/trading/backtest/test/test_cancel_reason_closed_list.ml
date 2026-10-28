@@ -5,57 +5,59 @@
     [Trade_audit.record_transitions], [Ticket_lifecycle.cancel_reason],
     [Cancel_handler.portfolio_rejection_reason] and
     [Delisted_ticket_cancel.cancel_reason] — each assert a {e closed} list:
-    exactly four reason tokens can ever land in
-    [Ticket_lifecycle.cancel_reason], in {b three} categories. Two are strategy
-    {e decisions} built by [Weinstein_strategy.Entry_ticket_ttl]; the third is
-    the simulator's capital-timing {e accident},
-    [Cancel_handler.portfolio_rejection_reason]; the fourth is a
-    {e data-driven death}, [Delisted_ticket_cancel.cancel_reason] ([delisted],
-    #2696), emitted when a resting ticket's symbol has stopped existing. The
-    distinction is load-bearing: a cancel-age column averaged without splitting
-    on the token mixes a policy with a failure with a fact about the data
+    exactly the seven reason tokens listed below can ever land in
+    [Ticket_lifecycle.cancel_reason], from six producers, in {b four}
+    categories. Strategy {e decisions}: the two
+    [Weinstein_strategy.Entry_ticket_ttl] tokens, [Split_ticket_cancel] and
+    [Short_ticket_policy]; the simulator's capital-timing {e accident},
+    [Cancel_handler.portfolio_rejection_reason]; a {e data-driven death},
+    [Delisted_ticket_cancel.cancel_reason] ([delisted], #2696), emitted when a
+    resting ticket's symbol has stopped existing; and a {e withdrawal},
+    [Entry_ticket_suspend] (below). The distinction is load-bearing: a
+    cancel-age column averaged without splitting on the token mixes a policy
+    with a failure with a fact about the data
     ([dev/notes/ticket-death-on-cash-2026-08-16.md],
     [dev/plans/delisting-data-fix-2026-09-06.md]).
 
-    {b A fifth token, a fourth category (#2976).}
+    {b The fifth token, the fourth category (#2976).}
     [Weinstein_strategy.Entry_ticket_suspend] (default-off
     [entry_ticket_macro_suspend]) emits [entry_ticket_macro_suspended] — a
     {e withdrawal}, not a death: the setup is re-issued once the macro gate
-    admits. It is driven below as Producer 4, across every mode, so the list is
-    five tokens in four categories. This is the blind spot the next paragraph
-    predicts, closed at the moment the producer landed.
+    admits. It is driven below as Producer 4, across every mode. This is the
+    blind spot the next paragraph predicts, closed at the moment the producer
+    landed.
 
-    {b A sixth token (#3075).} [Weinstein_strategy.Split_ticket_cancel]
+    {b The sixth token (#3075).} [Weinstein_strategy.Split_ticket_cancel]
     (default-off [cancel_resting_entry_on_split]) emits
     [entry_ticket_split_while_resting] — a strategy {e decision}, alongside the
     two TTL tokens: the ticket was written on a chart the split replaced. It is
-    driven below as Producer 5, so the list is six tokens.
+    driven below as Producer 5.
 
-    {b A seventh token (#3218).} [Weinstein_strategy.Short_ticket_policy]
+    {b The seventh token (#3218).} [Weinstein_strategy.Short_ticket_policy]
     (default-off [short_cancel_on_non_bearish]) emits
     [entry_ticket_short_macro_not_bearish] — a strategy {e decision}: a resting
-    short whose bearish-market premise lapsed. Producer 6, so seven tokens.
+    short whose bearish-market premise lapsed. Producer 6.
 
-    {b Why a hand-written list of four literals would pin nothing.} Comparing
-    four string constants against four string constants passes forever. So the
-    {e reachable} side of the equality below is never written down — it is
-    {b derived} by driving the three production producers over an input grid,
-    pushing every [CancelEntry] they emit through
-    [Trade_audit.record_transitions], and reading back what the audit persisted.
-    Only the {e documented} side is written down. Rename a token, delete a
-    producer arm, or stop the audit persisting one, and the two sets diverge.
+    {b Why a hand-written list of literals would pin nothing.} Comparing string
+    constants against string constants passes forever. So the {e reachable} side
+    of the equality below is never written down — it is {b derived} by driving
+    the six production producers over an input grid, pushing every [CancelEntry]
+    they emit through [Trade_audit.record_transitions], and reading back what
+    the audit persisted. Only the {e documented} side is written down. Rename a
+    token, delete a producer arm, or stop the audit persisting one, and the two
+    sets diverge.
 
-    {b What this does NOT catch — stated plainly.} The grid drives the three
-    producer modules that exist today. A {e fifth} producer added in some fourth
-    module would not be reached, and this test would stay green while the
-    docstrings went stale. That is not hypothetical: it is exactly what happened
-    to the previous revision of this test, which drove two producers and stayed
-    green while #2709 added [Delisted_ticket_cancel] as a third — the blind spot
-    this docstring predicted, realised. Closing it requires a source-level
-    census of [CancelEntry] construction sites, which is a linter's job, not a
-    unit test's — filed as R5 on [dev/status/trade-audit.md], and #2709 is the
-    evidence that follow-up is worth doing. Within the three modules driven here
-    the grid is genuinely a sweep (every armed/disarmed combination of both
+    {b What this does NOT catch -- stated plainly.} The grid drives the six
+    producer modules that exist today. A {e seventh} producer added in some
+    other module would not be reached, and this test would stay green while the
+    docstrings went stale. That is not hypothetical: it happened to the first
+    revision of this test, which drove two producers and stayed green while
+    #2709 added [Delisted_ticket_cancel] as a third. The gap is closed by a
+    source-level census of [CancelEntry] construction sites,
+    [trading/devtools/checks/cancelentry_census_check.sh] (R5, dune runtest),
+    which fails when a production construction site appears or disappears
+    without its entry in the census list. Within the modules driven here the
+    grid is genuinely a sweep (every armed/disarmed combination of both
     [Entry_ticket_ttl] gates, and every marker position relative to the step
     date, across three position states and three ages), so a new arm added to
     any producer is very likely to be reached. *)
@@ -74,7 +76,7 @@ module Suspend_mode = Weinstein_strategy.Entry_ticket_suspend_mode
 module Split_ticket_cancel = Weinstein_strategy.Split_ticket_cancel
 module Short_ticket_policy = Weinstein_strategy.Short_ticket_policy
 
-(* The documented side of the equality: the closed list exactly as the four
+(* The documented side of the equality: the closed list exactly as the
    docstrings name it. [Cancel_handler]'s and [Delisted_ticket_cancel]'s tokens
    are referenced symbolically because they are exported; the two
    [Entry_ticket_ttl] tokens are private to that module, so they appear here as
@@ -496,11 +498,12 @@ let test_reachable_reasons_equal_the_documented_closed_list _ =
           )))
     (equal_to (Set.to_list _documented_cancel_reasons))
 
-(** The partition the docstrings assert, pinned separately: four tokens in three
-    categories — two strategy {e decisions}, one simulator {e accident} of
-    capital timing, one {e data-driven death}. Set equality alone would still
-    pass if a token migrated between the modules, which would silently
-    invalidate the split every cancel-reason analysis groups on. *)
+(** The partition the docstrings assert, pinned separately: seven tokens from
+    six producers in four categories (strategy {e decisions}, a simulator
+    {e accident} of capital timing, a {e data-driven death}, a {e withdrawal}).
+    Set equality alone would still pass if a token migrated between the modules,
+    which would silently invalidate the split every cancel-reason analysis
+    groups on. *)
 let test_each_producer_contributes_its_documented_tokens _ =
   assert_that
     ( Set.to_list (_reachable_from _ttl_transitions),
