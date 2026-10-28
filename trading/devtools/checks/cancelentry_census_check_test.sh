@@ -48,4 +48,10 @@ expect "piped construction" 1 "$tmp/pipe" 'NEW.*a/lib/third.ml:1'
 mk "$tmp/orpat"
 printf 'let f = function\n  | Other _ | Position.CancelEntry { reason } -> reason\n  | B -> x\n' > "$tmp/orpat/trading/trading/a/lib/third.ml"
 expect "or-pattern LHS ignored" 0 "$tmp/orpat"
+mk "$tmp/arr"
+printf 'let f r = [| CancelEntry { reason = r } |]\n' > "$tmp/arr/trading/trading/a/lib/third.ml"
+expect "array-literal construction" 1 "$tmp/arr" 'NEW.*a/lib/third.ml:1'
+mk "$tmp/arr2"
+printf 'let f r =\n  [|\n    CancelEntry { reason = r }\n  |]\n' > "$tmp/arr2/trading/trading/a/lib/third.ml"
+expect "array-literal, [| at end of previous line" 1 "$tmp/arr2" 'NEW.*a/lib/third.ml:1'
 exit $fail

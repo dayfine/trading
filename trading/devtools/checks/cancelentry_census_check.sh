@@ -10,7 +10,7 @@
 # `.mli`, test dirs / test_*.ml, and comments. The `{` may sit on a later line
 # (ocamlformat does that). A pattern is not a construction: an occurrence in a
 # match-arm LHS is skipped, i.e. the token before it (past a module path) is a
-# single `|`, `with` or `function`, or the `}` is followed by `->` or `when`.
+# single `|` (not the `[|` of an array literal), `with` or `function`, or the `}` is followed by `->` or `when`.
 # Anything else counts, including an arm RHS (`| A -> CancelEntry { .. }`, even
 # before another arm) and `CancelEntry { .. } |> f`.
 # Site identity is "path:count" (count of constructions in that file).
@@ -58,7 +58,7 @@ END {
     sub(/^[ \t\n]+/, "", after)
     sub(/([A-Z][A-Za-z0-9_']*\.)+$/, "", before)
     sub(/[ \t\n]+$/, "", before)
-    if (before ~ /(^|[^|])\|$/ || before ~ /(^|[^A-Za-z0-9_])(with|function)$/) continue
+    if (before ~ /(^|[^|[])\|$/ || before ~ /(^|[^A-Za-z0-9_])(with|function)$/) continue
     if (after ~ /^(->|when[^A-Za-z0-9_])/) continue
     c++
   }
