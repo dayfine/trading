@@ -2509,6 +2509,42 @@ else
   echo "${out27b}" | sed 's/^/      /'
 fi
 
+# ---------------------------------------------------------------------------
+# Scenario 27c (H-AUDIT-WALKUP-SENTINEL-NARROWING-UNPINNED): the WALKUP_ROOT
+# fixture above carries only a `.claude` sentinel, so narrowing the walk-up's
+# sentinel test to `.claude` only (probe K2) survived. This sibling uses a
+# fixture with ONLY a `.git` directory, so the `.git` arm of the sentinel
+# test is load-bearing. Own fixture, absolute count (nothing else writes
+# here). Same scratch-cwd guard as 27b.
+# ---------------------------------------------------------------------------
+GITONLY_ROOT="$(mktemp -d -t write_audit_gitonly.XXXXXX)"
+mkdir -p "${GITONLY_ROOT}/.git" "${GITONLY_ROOT}/trading/devtools/checks" \
+         "${GITONLY_ROOT}/dev/audit"
+cp "${SCRIPT_DIR}/write_audit.sh" "${GITONLY_ROOT}/trading/devtools/checks/"
+chmod +x "${GITONLY_ROOT}/trading/devtools/checks/write_audit.sh"
+
+SCRATCH27C="$(mktemp -d -t write_audit_27c_scratch.XXXXXX)"
+out27c=$(cd "${SCRATCH27C}" && env -u REPO_ROOT \
+  bash "${GITONLY_ROOT}/trading/devtools/checks/write_audit.sh" \
+    --date 2026-08-06 --feature "repo-root-gitonly" --branch "harness/repo-root" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc27c=0 || rc27c=$?
+rm -rf "${SCRATCH27C}"
+
+gitonly_count27c="$(_glob_count "${GITONLY_ROOT}/dev/audit" '*.json' '-type f')"
+C27C=(
+  "rc27c==0 (actual=${rc27c})" "$(_eq "${rc27c}" 0)"
+  "output has 'OK: wrote'" "$(_grep_ok "^OK: wrote" <<<"${out27c}")"
+  "gitonly_count27c == 1 (actual=${gitonly_count27c})" "$(_eq "${gitonly_count27c}" 1)"
+)
+if _pairs_ok "${C27C[@]}"; then
+  pass "scenario 27c — REPO_ROOT unset, fixture has only a .git sentinel: write_audit.sh's walk-up still locates the root (pins the .git arm; kills probe K2)"
+else
+  fail "scenario 27c — expected rc=0 + exactly 1 record under a .git-only fixture; got rc=${rc27c}, count=${gitonly_count27c}"
+  report_conjuncts "${C27C[@]}"
+  echo "${out27c}" | sed 's/^/      /'
+fi
+rm -rf "${GITONLY_ROOT}"
+
 rm -rf "${WALKUP_ROOT}" "${TARGET_ROOT}"
 
 # ---------------------------------------------------------------------------
