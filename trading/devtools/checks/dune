@@ -1508,3 +1508,22 @@
   (universe))
  (action
   (run sh %{dep:deep_scan_check06_noise_check.sh})))
+
+; CancelEntry construction-site census (R5, trade-audit.md): fails when the set
+; of production `CancelEntry { ... }` sites differs from the known set. Scans
+; the real tree at RUN TIME, hence (universe).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:cancelentry_census_check.sh})))
+
+; Fixture self-test: RED on an added site and on a removed one, GREEN on the
+; real tree.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh cancelentry_census_check.sh (universe))
+ (action
+  (run sh %{dep:cancelentry_census_check_test.sh})))
