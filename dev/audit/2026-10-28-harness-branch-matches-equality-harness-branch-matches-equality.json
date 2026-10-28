@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-28",
+  "feature": "harness-branch-matches-equality",
+  "branch": "harness/branch-matches-equality",
+  "sha": "d795f9f2bdefdc1049781b56d3115ebf665925fd",
+  "recorded_at_ns": 1793210008817305147,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

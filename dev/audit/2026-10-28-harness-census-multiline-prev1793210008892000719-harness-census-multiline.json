@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-28",
+  "feature": "harness-census-multiline",
+  "branch": "harness/census-multiline",
+  "sha": "0630410c4d9a6e5ffe9a10d45f6020f2e37d6e7b",
+  "recorded_at_ns": 1793210008892000719,
+  "structural_qc": "NEEDS_REWORK",
+  "behavioral_qc": "SKIPPED",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": null,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 2,
+  "notes": ""
+}
