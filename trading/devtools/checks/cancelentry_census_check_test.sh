@@ -39,4 +39,13 @@ expect "arm-RHS construction" 1 "$tmp/rhs" 'NEW.*a/lib/third.ml:1'
 mk "$tmp/lhs"
 printf 'let f = function\n  | Position.CancelEntry\n      { reason } -> reason\n  | CancelEntry { reason } | Other { reason } -> reason\n(* CancelEntry { reason = c } *)\n' > "$tmp/lhs/trading/trading/a/lib/third.ml"
 expect "arm-LHS pattern and comment ignored" 0 "$tmp/lhs"
+mk "$tmp/rhs2"
+printf 'let f = function\n  | A -> Position.CancelEntry { reason = r }\n  | B -> x\n' > "$tmp/rhs2/trading/trading/a/lib/third.ml"
+expect "arm-RHS followed by another arm" 1 "$tmp/rhs2" 'NEW.*a/lib/third.ml:1'
+mk "$tmp/pipe"
+printf 'let f r = CancelEntry { reason = r } |> Option.some\n' > "$tmp/pipe/trading/trading/a/lib/third.ml"
+expect "piped construction" 1 "$tmp/pipe" 'NEW.*a/lib/third.ml:1'
+mk "$tmp/orpat"
+printf 'let f = function\n  | Other _ | Position.CancelEntry { reason } -> reason\n  | B -> x\n' > "$tmp/orpat/trading/trading/a/lib/third.ml"
+expect "or-pattern LHS ignored" 0 "$tmp/orpat"
 exit $fail

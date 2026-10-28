@@ -8,9 +8,11 @@
 #
 # Counted: constructions of `CancelEntry {` under trading/trading, excluding
 # `.mli`, test dirs / test_*.ml, and comments. The `{` may sit on a later line
-# (ocamlformat does that). A pattern is not a construction: an occurrence whose
-# closing `}` is followed by `->`, `|`, `when` or `as` (a match-arm LHS) is
-# skipped; an arm RHS (`| A -> CancelEntry { .. }`) counts.
+# (ocamlformat does that). A pattern is not a construction: an occurrence in a
+# match-arm LHS is skipped, i.e. the token before it (past a module path) is a
+# single `|`, `with` or `function`, or the `}` is followed by `->` or `when`.
+# Anything else counts, including an arm RHS (`| A -> CancelEntry { .. }`, even
+# before another arm) and `CancelEntry { .. } |> f`.
 # Site identity is "path:count" (count of constructions in that file).
 #
 # Adding a producer on purpose: add its "path:count" line to KNOWN here and
@@ -33,7 +35,7 @@ tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 printf '%s\n' "$KNOWN" | sed '/^$/d' | sort > "$tmp/known"
 
 # Strip OCaml comments (nested), then count `CancelEntry` + optional whitespace
-# + `{` whose closing `}` is not followed by a pattern terminator.
+# + `{` that is not in a match-arm LHS (see header).
 cat > "$tmp/count.awk" <<'AWK'
 { s = s $0 "\n" }
 END {
@@ -47,13 +49,17 @@ END {
   }
   c = 0
   while (match(out, /CancelEntry[ \t\n]*\{/)) {
+    before = substr(out, 1, RSTART - 1)
     rest = substr(out, RSTART + RLENGTH)
     out = rest
     close_at = index(rest, "}")
     if (close_at == 0) { c++; continue }
     after = substr(rest, close_at + 1)
     sub(/^[ \t\n]+/, "", after)
-    if (after ~ /^(->|\||when[^A-Za-z0-9_]|as[^A-Za-z0-9_])/) continue
+    sub(/([A-Z][A-Za-z0-9_']*\.)+$/, "", before)
+    sub(/[ \t\n]+$/, "", before)
+    if (before ~ /(^|[^|])\|$/ || before ~ /(^|[^A-Za-z0-9_])(with|function)$/) continue
+    if (after ~ /^(->|when[^A-Za-z0-9_])/) continue
     c++
   }
   print c
