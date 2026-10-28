@@ -116,8 +116,9 @@ or a value not listed); which, is not determined here, and the artifacts are no
 longer on disk to check. The shares and per-trade figures above are therefore
 over the 1,141 grouped trades, not over the run. The residual is 0.5% of trades
 and 4.3% of realized P&L — small enough not to move F1 (a sign test on the two
-largest groups) but large enough that no row here should be read as a share of
-the run total.
+largest groups) but large enough that no tabulated share column above should be
+read as a share of the run total. Figures stated explicitly against the run's
++2,314,952 (as below) name that denominator and are run shares.
 
 F1 holds on a different code tree and a different build: laggard positive, stops
 negative. The two `extension_stop` exits carrying +749,388 between them is the
