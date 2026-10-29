@@ -975,6 +975,20 @@ check "VERIFIES e2e (gh): code PR never gets the hint" no "$(
 )"
 GATE_FILES=$_SAVED_FILES; GATE_REVIEWS_JSON=$_SAVED_REVIEWS; GATE_BODY=""
 export GATE_FILES GATE_REVIEWS_JSON GATE_BODY
+
+# #3421 (gh backend): `gh pr view --json files` is capped at 100, so a list of
+# 100 or more cannot be proven complete and fails closed to the three-gate lane.
+_SAVED_FILES=$GATE_FILES
+GATE_FILES=$( { i=0; while [ "$i" -lt 100 ]; do printf 'dev/notes/n%d.md\n' "$i"; i=$((i+1)); done; } )
+export GATE_FILES
+row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+check "#3421 e2e (gh): a 100-file (possibly truncated) list fails closed to three gates" ok "$(printf '%s' "$row" | awk '{print $3}')"
+GATE_FILES=$( { i=0; while [ "$i" -lt 99 ]; do printf 'dev/notes/n%d.md\n' "$i"; i=$((i+1)); done; } )
+export GATE_FILES
+row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
+check "#3421 e2e (gh): a 99-file doc list is complete and stays docs-only" skip "$(printf '%s' "$row" | awk '{print $3}')"
+GATE_FILES=$_SAVED_FILES
+export GATE_FILES
 rm -rf "$GH_E2E_STUB_DIR"
 
 # 34. Defect 2's NICE-TO-HAVE, END TO END (curl backend): with `gh` absent
@@ -1002,7 +1016,9 @@ case "$url" in
       invalid) printf 'not-json'; exit 0 ;;
       empty) exit 0 ;;
     esac
-    printf '%s\n' "$GATE_FILES" | jq -R -s 'split("\n") | map(select(length > 0) | {filename: .})'
+    _page=$(printf '%s' "$url" | sed -n 's/.*[?&]page=\([0-9][0-9]*\).*/\1/p')
+    printf '%s\n' "$GATE_FILES" | jq -R -s --argjson p "${_page:-1}" \
+      'split("\n") | map(select(length > 0) | {filename: .}) | .[($p - 1) * 100 : $p * 100]'
     ;;
   */issues/*/comments*)
     printf '%s\n' "${GATE_COMMENTS_JSON:-[]}"
@@ -1087,6 +1103,27 @@ for GATE_META_CASE in http invalid empty; do
   )"
 done
 unset GATE_META_CASE
+
+# #3421: the lane is decided from the COMPLETE file list. 149 doc files plus a
+# code file at position 150 (second REST page): must stay three-gate (STRUCT
+# is a real gate, not skip). RED under the old single-page read.
+_SAVED_FILES=$GATE_FILES
+GATE_FILES=$( { i=0; while [ "$i" -lt 149 ]; do printf 'dev/notes/n%d.md\n' "$i"; i=$((i+1)); done; printf 'trading/foo/late.ml\n'; } )
+export GATE_FILES
+row=$(_e2e_probe "$CURL_E2E_STUB_DIR" dummy-token 501 | tail -1)
+check "#3421 e2e (curl): code file past position 100 keeps the three-gate lane" ok "$(printf '%s' "$row" | awk '{print $3}')"
+# 150 pure doc files across two pages are still docs-only (pagination did not break the fast lane).
+GATE_FILES=$( { i=0; while [ "$i" -lt 150 ]; do printf 'dev/notes/n%d.md\n' "$i"; i=$((i+1)); done; } )
+export GATE_FILES
+row=$(_e2e_probe "$CURL_E2E_STUB_DIR" dummy-token 501 | tail -1)
+check "#3421 e2e (curl): 150 doc files over two pages stay docs-only" skip "$(printf '%s' "$row" | awk '{print $3}')"
+# Exactly 100 doc files: the full page forces a second read, which is empty.
+GATE_FILES=$( { i=0; while [ "$i" -lt 100 ]; do printf 'dev/notes/n%d.md\n' "$i"; i=$((i+1)); done; } )
+export GATE_FILES
+row=$(_e2e_probe "$CURL_E2E_STUB_DIR" dummy-token 501 | tail -1)
+check "#3421 e2e (curl): exactly 100 doc files stay docs-only" skip "$(printf '%s' "$row" | awk '{print $3}')"
+GATE_FILES=$_SAVED_FILES
+export GATE_FILES
 SAVED_TIP=$GATE_TIP
 GATE_TIP=''
 e2e_rc=0
@@ -1140,7 +1177,9 @@ case "$url" in
     jq -n --arg n "$GATE_PR_NUMBER" '[{number: ($n | tonumber)}]'
     ;;
   */pulls/*/files*)
-    printf '%s\n' "$GATE_FILES" | jq -R -s 'split("\n") | map(select(length > 0) | {filename: .})'
+    _page=$(printf '%s' "$url" | sed -n 's/.*[?&]page=\([0-9][0-9]*\).*/\1/p')
+    printf '%s\n' "$GATE_FILES" | jq -R -s --argjson p "${_page:-1}" \
+      'split("\n") | map(select(length > 0) | {filename: .}) | .[($p - 1) * 100 : $p * 100]'
     ;;
   */pulls/*/reviews*)
     printf '%s\n' "$GATE_REVIEWS_JSON"
@@ -2143,7 +2182,9 @@ case "$url" in
     jq -n --arg n "$GATE_PR_NUMBER" '[{number: ($n | tonumber)}]'
     ;;
   */pulls/*/files*)
-    printf '%s\n' "$GATE_FILES" | jq -R -s 'split("\n") | map(select(length > 0) | {filename: .})'
+    _page=$(printf '%s' "$url" | sed -n 's/.*[?&]page=\([0-9][0-9]*\).*/\1/p')
+    printf '%s\n' "$GATE_FILES" | jq -R -s --argjson p "${_page:-1}" \
+      'split("\n") | map(select(length > 0) | {filename: .}) | .[($p - 1) * 100 : $p * 100]'
     ;;
   */issues/*/comments*)
     printf '%s\n' "${GATE_COMMENTS_JSON:-[]}"
