@@ -1,0 +1,46 @@
+Loading 1 scenarios from /tmp/t4seedg/goldens-sp500-historical--top3000-2000-2026-catstop-new (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/dev/backtest/scenarios-2026-10-29-230855
+
+>>> Running top3000-2000-2026-catstop-deep: BROAD deep long-only + catastrophic_stop_pct=0.10 base for the capacity/concentration WF-CV (top-3000-2000 PIT). (2000-01-01 to 2026-04-30)
+Using scenario-provided sector map (3000 symbols)...
+Universe: 3000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 3015
+Running backtest (2000-01-01 to 2026-04-30, warmup from 1999-01-02)...
+Panel_runner: simulator window 1999-01-02..2026-04-30 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (3015 symbols, /tmp/panel_runner_csv_snapshot_1fc836)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 7129 days) for strategy
+WARN: portfolio rejected fill for JBHT (side=Types.Buy qty=2362.0000 price=30.1410): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 71216.662, Available: 71016.302107692027, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for DGX (side=Types.Buy qty=2650.0000 price=58.7193): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 155632.74460489929, Available: 155532.45819522176, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for ROP (side=Types.Buy qty=1354.0000 price=135.4373): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 183395.67212026287, Available: 182970.48203924854, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for JPM (side=Types.Buy qty=2956.0000 price=64.0318): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 189307.41936834334, Available: 188523.4424344202, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for AKAM (side=Types.Buy qty=4825.0000 price=114.7004): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 553477.52660477418, Available: 541278.49280232925, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=35695477 misses=3015 miss_absent=0 evictions=0 n_symbols=3015 misses_per_symbol=1.00 n_symbols_touched=3015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=3015 max_bytes=285899400 max_mmap_open=0 avg_entries=1508.0 avg_bytes=146465893 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=1166951288 maxrss_bytes=1202499584
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4seed
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+top3000-2000-2026-catstop-deep   344.6%     621    38.3%    29.5%   PASS
+
+1/1 scenarios passed.
+exit=0

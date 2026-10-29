@@ -1,0 +1,54 @@
+Loading 1 scenarios from /tmp/t4seedg/goldens-sp500-historical--sp500-2010-2026-longshort-new (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/dev/backtest/scenarios-2026-10-29-202441
+
+>>> Running sp500-2010-2026-longshort-historical: 16y sp500 historical long-short backtest — survivorship-aware universe (510 symbols), enable_short_side=true. Twin of sp500-2010-2026.sexp (long-only). Phase A of dev/notes/plan-short-integration-2026-05-12.md. (2010-01-01 to 2026-04-30)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2010-01-01 to 2026-04-30, warmup from 2009-01-02)...
+Panel_runner: simulator window 2009-01-02..2026-04-30 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_703474)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 4520 days) for strategy
+WARN: portfolio rejected fill for ZION (side=Types.Buy qty=3333.0000 price=31.2558): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 104175.5433483907, Available: 102958.93852206157, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CL (side=Types.Buy qty=3050.0000 price=65.7929): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 200668.28399999999, Available: 196444.83909253756, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for ETN (side=Types.Buy qty=2559.0000 price=77.6320): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 198660.34531718638, Available: 196842.58896851225, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for DVA (side=Types.Buy qty=2634.0000 price=70.2551): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 185051.95974, Available: 182879.24469189782, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for IVZ (side=Types.Buy qty=21665.0000 price=10.7454): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 232798.44105, Available: 221996.50130493456, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for A (side=Types.Buy qty=12190.0000 price=129.8549): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1582931.17005, Available: 1482857.1083327029, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for WYNN (side=Types.Buy qty=8068.0000 price=94.5801): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 763072.23511588876, Available: 751424.4401117157, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=6240391 misses=525 miss_absent=0 evictions=0 n_symbols=525 misses_per_symbol=1.00 n_symbols_touched=525 n_symbols_absent=0 loads_per_touched=1.00 max_entries=525 max_bytes=223771968 max_mmap_open=0 avg_entries=263.0 avg_bytes=117265809 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=917080920 maxrss_bytes=951066624
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4seed
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+sp500-2010-2026-longshort-historical  1033.7%     584    36.1%    78.6%   PASS
+
+1/1 scenarios passed.
+exit=0

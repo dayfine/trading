@@ -1,0 +1,39 @@
+Loading 1 scenarios from /tmp/t4seedg/goldens-broad--tier4-broad-10y-new (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/dev/backtest/scenarios-2026-10-29-175632
+
+>>> Running tier4-broad-10y: Tier-4 release-gate SCALE — full broad universe × 10y (snapshot-mode only) (2014-01-02 to 2023-12-29)
+Using scenario-provided sector map (3000 symbols)...
+Universe: 3000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 3015
+Running backtest (2014-01-02 to 2023-12-29, warmup from 2013-01-03)...
+Panel_runner: simulator window 2013-01-03..2023-12-29 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (3015 symbols, /tmp/panel_runner_csv_snapshot_8bb41a)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 256 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 2867 days) for strategy
+WARN: portfolio rejected fill for CPRI (side=Types.Buy qty=6521.0000 price=56.7625): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 370213.3624342457, Available: 366613.06688194483, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for WAT (side=Types.Buy qty=2046.0000 price=231.6200): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 473914.98000000004, Available: 471980.80073296913, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for COTY (side=Types.Buy qty=20809.0000 price=7.0278): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 146449.5802, Available: 144462.15016714335, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=16212872 misses=3015 miss_absent=0 evictions=0 n_symbols=3015 misses_per_symbol=1.00 n_symbols_touched=3015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=3015 max_bytes=258285072 max_mmap_open=0 avg_entries=1508.0 avg_bytes=132831945 cap_mb=4096 cap_mmap_handles=256 top_heap_bytes=1046685912 maxrss_bytes=1080778752
+Panel_runner: split_dividend_guard rejected=0 no_files=2
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4seed
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+tier4-broad-10y                164.7%     115    24.3%    32.8%   PASS
+
+1/1 scenarios passed.
+exit=0

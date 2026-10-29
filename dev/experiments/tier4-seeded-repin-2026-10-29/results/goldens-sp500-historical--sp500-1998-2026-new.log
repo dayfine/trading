@@ -1,0 +1,50 @@
+Loading 1 scenarios from /tmp/t4seedg/goldens-sp500-historical--sp500-1998-2026-new (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/dev/backtest/scenarios-2026-10-29-224418
+
+>>> Running sp500-1998-2026-historical: 28y top-3000 historical scaffolding scenario — base for the 1998-2026 28-fold walk-forward fixture (M4 T4.1). Universe pointer is a T4.1 placeholder; T4.2 plumbs per-fold rotation. (1998-01-01 to 2026-04-30)
+Using scenario-provided sector map (3000 symbols)...
+Universe: 3000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 3015
+Running backtest (1998-01-01 to 2026-04-30, warmup from 1997-01-02)...
+Panel_runner: simulator window 1997-01-02..2026-04-30 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (3015 symbols, /tmp/panel_runner_csv_snapshot_50c9f4)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 7651 days) for strategy
+WARN: portfolio rejected fill for GILD (side=Types.Buy qty=1677.0000 price=46.6304): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 78199.239900352375, Available: 77983.991454087183, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for C (side=Types.Buy qty=32337.0000 price=4.6535): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 150481.05732719996, Available: 143204.21563575917, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for KR (side=Types.Buy qty=10632.0000 price=26.7130): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 284012.33940288966, Available: 283312.07423108339, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for IAC (side=Types.Buy qty=2203.0000 price=278.9893): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 614613.48286485, Available: 602760.8472480647, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for JCI (side=Types.Buy qty=10019.0000 price=66.4932): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 666195.67137, Available: 663148.97588698613, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for ODFL (side=Types.Buy qty=611.0000 price=445.6227): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 272275.46969999996, Available: 268539.94356405665, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=37705308 misses=3015 miss_absent=0 evictions=0 n_symbols=3015 misses_per_symbol=1.00 n_symbols_touched=3015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=3015 max_bytes=272049816 max_mmap_open=0 avg_entries=1508.0 avg_bytes=139301816 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=1105592744 maxrss_bytes=1140051968
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4seed
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+sp500-1998-2026-historical     145.6%     526    41.1%    45.8%   PASS
+
+1/1 scenarios passed.
+exit=0
