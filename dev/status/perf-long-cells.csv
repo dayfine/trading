@@ -371,3 +371,8 @@ date,experiment,tag,universe,years,cap,head,wall_s,s_per_year
 2026-10-26T14:47:22,fsm-run,ps-SM-p3-s0,pit-schedule-3000,6.00,12000,3db869d32,3032,505
 2026-10-26T15:42:19,fsm-run,ps-SM-p4-s0,pit-schedule-3000,6.00,12000,3db869d32,3297,550
 2026-10-26T16:41:33,fsm-run,ps-SM-p5-s0,pit-schedule-3000,6.00,12000,3db869d32,3554,592
+2026-10-27T16:06:05,rk-run,rk-k0-s0,pit-schedule-3000,26.49,12000,fc78391dd,12605,476
+2026-10-27T19:31:41,rk-run,rk-k1-s0,pit-schedule-3000,26.49,12000,fc78391dd,12336,466
+2026-10-28T01:57:43,rk-run,rk-k2-s0,pit-schedule-3000,26.49,12000,fc78391dd,23162,874
+2026-10-28T06:51:40,rk-run,rk-k3-s0,pit-schedule-3000,26.49,12000,fc78391dd,17637,666
+2026-10-28T10:22:14,rk-run,rk-k4-s0,pit-schedule-3000,26.49,12000,fc78391dd,12633,477
