@@ -433,6 +433,60 @@ expect_eq "run kind: null-s0 / map-s0 read as arms" arm "$(jq -r .run_kind "$SW/
 rc=0
 sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/forced" --run-kind salt a="$SW/run/" b="$SW/run/" >"$SW/forced.log" 2>&1 || rc=$?
 expect_eq "run kind: --run-kind salt overrides auto" salt "$(jq -r .run_kind "$SW/forced/site/data/manifest.json")"
+# #3384 defect 5: a seed set (k0 k1 ...) is one config under different tie-order seeds, its own kind
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/seeds" k0="$SW/run/" k1="$SW/run/" >"$SW/seeds.log" 2>&1 || rc=$?
+expect_eq "run kind: k0 / k1 read as seeds" seed "$(jq -r .run_kind "$SW/seeds/site/data/manifest.json")"
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/seedsforced" --run-kind seed a="$SW/run/" b="$SW/run/" >"$SW/seedsforced.log" 2>&1 || rc=$?
+expect_eq "run kind: --run-kind seed overrides auto" seed "$(jq -r .run_kind "$SW/seedsforced/site/data/manifest.json")"
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/kmix" k0="$SW/run/" base="$SW/run/" >"$SW/kmix.log" 2>&1 || rc=$?
+expect_eq "run kind: k0 beside a non-k label is arms, not seeds" arm "$(jq -r .run_kind "$SW/kmix/site/data/manifest.json")"
+expect_eq "run kind: the page words seeds as one config with tie-order path noise" yes "$(grep -q 'seeds of one config: differences are tie-order path noise' "$SW/seeds/site/index.html" && echo yes || echo no)"
+# #3384 defect 3: some runs with a stage replay and some without -> every run is graded without checks 1 and 13
+mkdir -p "$SW/halfstage/runs/k0/stage"
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/halfstage" k0="$SW/run/" k1="$SW/run/" >"$SW/halfstage.log" 2>&1 || rc=$?
+expect_eq "faithfulness: a replay for one run of two drops checks 1 and 13 for both" "[1,13] [1,13]" "$(jq -c '.excluded' "$SW/halfstage/site/data/k0_faithfulness.json" "$SW/halfstage/site/data/k1_faithfulness.json" | tr '\n' ' ' | sed 's/ $//')"
+expect_eq "faithfulness: the dropped checks read n/a on every trade of the run that had the replay" "n/a" "$(jq -r '[.rows[].checks[] | select(.id == 1 or .id == 13) | .status] | unique | join(",")' "$SW/halfstage/site/data/k0_faithfulness.json")"
+expect_eq "faithfulness: no replay for any run drops nothing" "[] []" "$(jq -c '.excluded' "$SW/seeds/site/data/k0_faithfulness.json" "$SW/seeds/site/data/k1_faithfulness.json" | tr '\n' ' ' | sed 's/ $//')"
+mkdir -p "$SW/fullstage/runs/k0/stage" "$SW/fullstage/runs/k1/stage"
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/fullstage" k0="$SW/run/" k1="$SW/run/" >"$SW/fullstage.log" 2>&1 || rc=$?
+expect_eq "faithfulness: a replay for every run drops nothing" "[] []" "$(jq -c '.excluded' "$SW/fullstage/site/data/k0_faithfulness.json" "$SW/fullstage/site/data/k1_faithfulness.json" | tr '\n' ' ' | sed 's/ $//')"
+# #3468 rework: the drop guard, run directly on a trade whose evidence decides checks 1 and 13
+printf '%s\n' '[{"id":1,"sym":"ZZZ","ed":"2020-01-03","xd":"2020-06-05","side":"LONG","rsE":"Stage1","s4w":2,"holdW":10}]' > "$SW/drop_trade.json"
+FJ='.rows[0] | [(.checks | map(select(.id == 1 or .id == 13) | .status) | join(",")), (.possible|tostring), .grade] | join(" ")'
+expect_eq "faithfulness: no DROP_IDS, checks 1 and 13 both fail on decisive evidence" "fail,fail 4 F" "$(sh "$ROOT/dev/lib/review_pack/faithfulness.sh" "$SW/drop_trade.json" | jq -r "$FJ")"
+expect_eq "faithfulness: DROP_IDS 1,13 reads both n/a and removes them from possible and the grade" "n/a,n/a 0 n/a" "$(sh "$ROOT/dev/lib/review_pack/faithfulness.sh" "$SW/drop_trade.json" 1,13 | jq -r "$FJ")"
+if command -v node >/dev/null 2>&1; then
+  { sed -n -e '/^const RK = /p' -e '/^const RKC = /p' -e '/^function labelRunKind(/,/^}/p' "$SW/seeds/site/index.html"
+    cat <<'JS'
+const assert = require('assert');
+const mk = kind => {
+  const nodes = {};
+  const get = sel => nodes[sel] || (nodes[sel] = { textContent: '', setAttribute(k, v) { this[k] = v; },
+    closest() { return { querySelector: () => get('#years-h2') }; } });
+  global.$ = get; global.D = { man: { run_kind: kind } };
+  labelRunKind();
+  return nodes;
+};
+let n = mk('seed');
+assert.strictEqual(RK(), 'seed');
+assert.strictEqual(n['[data-v="salts"]'].textContent, 'Seeds');
+assert(n['#v-salts p.note'].textContent.includes('seeds of one config: differences are tie-order path noise'));
+assert.strictEqual(n['#v-salts h2'].textContent, 'Every seed, side by side');
+assert.strictEqual(n['#years-h2'].textContent, 'Yearly return by seed');
+n = mk('arm');
+assert.strictEqual(RK(), 'arm');
+assert.strictEqual(n['[data-v="salts"]'].textContent, 'Arms');
+assert(n['#v-salts p.note'].textContent.includes('These runs are arms'));
+assert(!n['#v-salts p.note'].textContent.includes('tie-order'));
+n = mk('salt');
+assert.strictEqual(RK(), 'salt');
+assert.strictEqual(n['#v-salts p.note'], undefined);
+console.log('OK');
+JS
+  } > "$SW/rk.js"
+  expect_eq "run kind: the seed branch of labelRunKind words the tab, note and headings; arm keeps the arm note" OK "$(node "$SW/rk.js" 2>&1 | tail -3)"
+fi
 if command -v node >/dev/null 2>&1; then
   SFNS="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' -e '/^const REOPEN_CLOSED_WEEKS/p' -e '/^function reopenFlag(/,/^}/p' -e '/^function reopenEpisodes(/,/^}/p' "$SW/pack/site/index.html")"
   fl() { node -e "$SFNS
@@ -1137,7 +1191,7 @@ expect_eq "#3140 no audit: no inferred zero-ticket weeks" 0 "$(jq '.audit|length
 expect_eq "#3140 pack pipeline publishes missed inputs and renders section" 'true 1' \
   "$(jq -r 'has("episodes") and has("symbols") and has("audit")' "$S/data/r0_missed.json") $(grep -c 'id="missed-years"' "$S/index.html")"
 if command -v node >/dev/null 2>&1; then
-  { grep '^function isoWeek(' "$S/index.html"
+  { grep '^function isoWeek(\|^function dayAfter(\|^const MISSED_HORIZON_DAYS' "$S/index.html"
     sed -n '/^function missedWinners(/,/^}/p' "$S/index.html"
     sed -n '/^function renderMissedWinners(/,/^}/p' "$S/index.html"
     grep '^const tbl =' "$S/index.html"
@@ -1145,13 +1199,24 @@ if command -v node >/dev/null 2>&1; then
 const assert = require('assert');
 const e = (sym, forward=150) => ({sym,d:'2019-08-02',peak:'2019-10-11',forward});
 const data = {symbols:12, episodes:['RODE','PART','CUT','TICKET','SKIP','BEAR','ZERO','TOP','UNKNOWN'].map(s=>e(s)), audit:[['W','2019-08-02','1','1'],['D','2019-08-02','TICKET','Placed'],['D','2019-08-02','SKIP','Skipped Insufficient_cash']]};
-const trades = [['RODE',80],['PART',10],['CUT',-5]].map(([sym,pct])=>({sym,side:'LONG',ed:'2019-08-05',xd:'2019-10-10',pct}));
+const trades = [['RODE',80],['PART',10],['CUT',-5]].map(([sym,pct])=>({sym,side:'LONG',ed:'2019-08-05',xd:'2019-10-10',pct,mfe:100}));
 const nav = [['2019-08-02',100000,20]];
 let r=missedWinners(data,trades,{rows:[]},[],nav);
 assert.deepStrictEqual(r.episodes.slice(0,5).map(e=>e.reason),['rode','partial','cut','ticket placed','logged skip: Insufficient_cash']);
 assert.strictEqual(r.episodes[7].reason,'not in recorded top-N');
 assert.strictEqual(r.buckets[0].owned,3);
 assert.strictEqual(r.years[0].top.length,5);
+// #3384 defect 4: ownership is bounded to 52 weeks after the signal, and capture compares a trade with the
+// stock's own move inside its holding window (mfe), not with the forward return to a peak years away.
+const far = (ed, pct, mfe, forward=400) => missedWinners({episodes:[{sym:'FAR',d:'2019-08-02',peak:'2022-01-07',forward}],audit:[]},[{sym:'FAR',side:'LONG',ed,xd:ed.slice(0,4)+'-12-20',pct,mfe}],{rows:[]},[],nav).episodes[0];
+assert.strictEqual(far('2020-07-31',30,40).owned,true,'entry on day 364 (the last day) is inside the horizon');
+assert.strictEqual(far('2020-07-30',30,40).owned,true,'entry on day 363 is inside the horizon');
+assert.strictEqual(far('2020-08-01',30,40).owned,false,'entry after day 364 is a later move, not this signal (the MMYT shape)');
+assert.strictEqual(far('2020-07-30',30,40).capture,'rode','30 of a 40 holding-window move rode, though the forward 400 would call it partial');
+assert.strictEqual(far('2020-07-30',30,100).capture,'partial','30 of a 100 holding-window move is partial');
+assert.strictEqual(far('2020-07-30',-3,10).capture,'cut');
+assert.strictEqual(far('2020-07-30',30,undefined).capture,'partial','no holding-window move: not claimed as rode');
+assert.strictEqual(far('2020-07-30',50,100).capture,'rode','exactly half rode');
 assert.strictEqual(missedWinners({episodes:[e('BEAR')],audit:[]},[],{},[['2019-08-02','Bearish']],nav).episodes[0].reason,'macro Bearish');
 const zero={episodes:[e('ZERO')], audit:Array.from({length:10},(_,i)=>['W',new Date(Date.UTC(2019,7,2+7*i)).toISOString().slice(0,10),'0','1'])};
 r=missedWinners(zero,[],{},[],nav);
@@ -1316,7 +1381,7 @@ if command -v node >/dev/null 2>&1; then
   {
     echo "const assert=require('assert'), fs=require('fs');"
     grep '^const tbl =\|^const faithEsc =\|^let fSort =' "$S/index.html"
-    sed -n -e '/^function faithfulnessDetectors(/,/^}/p' -e '/^function faithfulnessSignals(/,/^}/p' -e '/^function faithfulnessTables(/,/^}/p' -e '/^function renderFaithfulness(/,/^}/p' -e '/^function initFaithfulness(/,/^}/p' "$S/index.html"
+    sed -n -e '/^function faithfulnessDetectors(/,/^}/p' -e '/^function faithfulnessSignals(/,/^}/p' -e '/^function faithfulnessTables(/,/^}/p' -e '/^function faithfulnessExcludedNote(/,/^}/p' -e '/^function renderFaithfulness(/,/^}/p' -e '/^function initFaithfulness(/,/^}/p' "$S/index.html"
     cat <<'JS'
 const fmt=(v,d=1)=>Number(v).toFixed(d), a=JSON.parse(fs.readFileSync(process.argv[2])), b=JSON.parse(fs.readFileSync(process.argv[3]));
 const d=faithfulnessDetectors(a); assert.deepStrictEqual(d.volume,{known:3,total:5,bins:[1,1,1]});
@@ -1328,13 +1393,17 @@ assert(t.checks.indexOf('9. Fill at/above') < t.checks.indexOf('1. Stage')); ass
 assert(t.trades.includes('9: fail')); assert(t.trades.includes('18')); assert(!t.trades.includes('undefined')); assert(!t.trades.includes('NaN'));
 assert(faithfulnessTables(a,{k:'sym',dir:-1}).trades.indexOf('SHORT') < faithfulnessTables(a,{k:'sym',dir:-1}).trades.indexOf('ABOVE'));
 const bad=structuredClone(a); bad.rows[0].sym='<script>bad</script>'; assert(faithfulnessTables(bad).trades.includes('&lt;script&gt;'));
-const nodes=Object.fromEntries(['#f-run','#f-grades','#f-checks','#f-trades','#f-detectors'].map(id=>[id,{value:'0',listeners:{},addEventListener(k,f){this.listeners[k]=f;}}]));
+const nodes=Object.fromEntries(['#f-run','#f-grades','#f-checks','#f-trades','#f-detectors','#f-excluded'].map(id=>[id,{value:'0',listeners:{},addEventListener(k,f){this.listeners[k]=f;}}]));
 const $=id=>nodes[id], CH=()=>0, runLabel=i=>['s0','s1'][i], D={man:{runs:[{},{}]},faithfulness:[a,b]};
 initFaithfulness('<option>runs</option>'); assert(nodes['#f-grades'].innerHTML.includes('s1')); assert(nodes['#f-trades'].innerHTML.includes('ABOVE'));
 nodes['#f-run'].value='1'; nodes['#f-run'].listeners.change(); assert(nodes['#f-trades'].innerHTML.includes('weighted')); assert(!nodes['#f-trades'].innerHTML.includes('ABOVE'));
 nodes['#f-run'].value='0'; renderFaithfulness(); nodes['#f-trades'].listeners.click({target:{closest(){return {dataset:{fsort:'sym'}};}}});
 assert.strictEqual(fSort.k,'sym'); nodes['#f-trades'].listeners.click({target:{closest(){return {dataset:{fsort:'sym'}};}}}); assert.strictEqual(fSort.dir,-1);
 D.faithfulness[1]=null; renderFaithfulness(); assert(nodes['#f-grades'].innerHTML.includes('n/a'));
+assert.strictEqual(nodes['#f-excluded'].hidden,true); assert.strictEqual(faithfulnessExcludedNote([a,b]),'');
+const ex={...a,excluded:[1,13]}; const note=faithfulnessExcludedNote([ex,{...b,excluded:[1,13]}]);
+assert(note.includes('Checks 1 (Stage 2') && note.includes('13 (No Stage-4 hold)') && note.includes('checks all runs have'));
+D.faithfulness=[ex,null]; renderFaithfulness(); assert.strictEqual(nodes['#f-excluded'].hidden,false); assert(nodes['#f-excluded'].textContent.includes('stage replay ran for some runs only'));
 console.log('OK');
 JS
   } > "$FF/ui.js"
@@ -1559,6 +1628,39 @@ JS
   expect_eq "#3409: drawdowns just below 15 percent are excluded" 0 "$(jq length "$PK/under.json")"
   expect_eq "#3409: absent NAV inputs are unavailable" null "$(sh "$ROOT/dev/lib/review_pack/peak_gains.sh" "$PK/data" "$PK/no-run")"
   expect_eq "#3409: new signal is wired into the lead list" 1 "$(sed -n '/^function renderSignals(/,/^}/p' "$S/index.html" | grep -c 'out.push(.*peakGivebackSignals(D.peaks')"
+fi
+
+# #3384 defect 4 + detector: trades held by some runs but not all. The record-kseed specimen: TWX1 is held by
+# every seed and sorts first by position; ADMA 2023-12-19 is held by k1, k2, k4 only and is the biggest.
+if command -v node >/dev/null 2>&1; then
+  OV="$TMP/overlap"; mkdir -p "$OV"
+  { sed -n '/^function partialTrades(/,/^}/p' "$S/index.html"
+    cat <<'JS'
+const assert = require('assert');
+const t = (sym, ed, qty, ep, pnl = 0) => ({ sym, ed, qty, ep, pnl });
+const nav = [['2000-01-03', 1000000], ['2023-12-15', 4000000]];
+const common = t('TWX1', '2000-01-28', 100, 50);
+const runs = [
+  [common, t('AAA', '2001-02-01', 10, 10)],                                   // k0: lacks ADMA, has AAA
+  [common, t('ADMA', '2023-12-19', 40000, 25, 900000), t('AAA', '2001-02-01', 10, 10)],
+  [common, t('ADMA', '2023-12-19', 40000, 25, 700000), t('AAA', '2001-02-01', 10, 10)],
+  [common, t('ADMA', '2023-12-19', 40000, 25, 800000), t('ZZZ', '2005-05-05', 100, 10)], // k3: no AAA
+];
+const labels = ['k0', 'k1', 'k2', 'k3'], p = partialTrades(runs, runs.map(() => nav), labels);
+assert.strictEqual(p.first.sym, 'AAA', 'first partial entry is by date, not the first position where sorted lists differ');
+assert.deepStrictEqual([p.first.holders, p.first.missing], [['k0', 'k1', 'k2'], ['k3']]);
+assert.strictEqual(p.count, 3);
+assert.deepStrictEqual(p.big.map(x => x.sym), ['ADMA', 'ZZZ', 'AAA'], 'ranked by entry weight');
+assert.deepStrictEqual([p.big[0].holders, p.big[0].missing], [['k1', 'k2', 'k3'], ['k0']]);
+assert.strictEqual(Math.round(p.big[0].weight * 100) / 100, 25, '40000 x 25 over a 4M NAV');
+assert.strictEqual(partialTrades([[common], [common]], [nav, nav], ['a', 'b']).first, null, 'identical runs: nothing partial');
+assert.strictEqual(partialTrades(runs, runs.map(() => []), labels).big[0].weight, null, 'no NAV row: weight unknown, still listed');
+assert.strictEqual(partialTrades(runs, runs.map(() => nav), labels, 1).big.length, 1);
+console.log('OK');
+JS
+  } > "$OV/check.js"
+  expect_eq "#3384 trade overlap: first entry not in every run, biggest partial trades with holders" OK "$(node "$OV/check.js")"
+  expect_eq "#3384 trade overlap: the page renders the detector table" yes "$(grep -q 'Largest trades held by some' "$S/index.html" && grep -q 'partialTrades(D.trades, D.nav' "$S/index.html" && echo yes || echo no)"
 fi
 
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"

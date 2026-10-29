@@ -205,3 +205,19 @@ recovery saturation, selected-run basis and direction, eight-row rendering,
 coverage and the helper's inclusion in the built page. Slice 1 checks and
 weights remain unchanged. Its unavailable evidence paths and the local
 container-built 26-year R1–R8 report remain outside this slice.
+
+## Seed sets, partial trades, replay coverage and capture (#3384, record-kseed defects 3-5, 9b)
+
+- **Run kinds.** `--run-kind salt | seed | arm | auto`. A seed set is one config under different screener
+  tie-order seeds; `auto` reads labels `k<N>` as seeds (before the salt rule). The page says "seeds of one
+  config: differences are tie-order path noise".
+- **Trade overlap.** The first difference is the earliest entry (date, then symbol) not held by every run, not the
+  first position where two sorted lists differ. A table lists the largest trades held by some runs but not all,
+  by entry weight (entry value over the entry-date NAV), with the runs that hold and lack each.
+- **Faithfulness coverage.** The stage replay (about 1.3 s per trade) runs for the charts run only. When some
+  runs have a replay and others do not, `faithfulness.sh` is called with `1,13` and every run is graded without
+  checks 1 and 13 (`excluded` in `<run>_faithfulness.json`; the tab says so). Replaying every run would cost
+  one replay per run; grading on the shared checks keeps the grades comparable for free.
+- **Missed-winner capture.** Ownership is a long trade overlapping the signal to the earlier of the peak and 52
+  weeks after it. Rode compares the best overlapping trade with the stock's best move inside that trade's own
+  holding window (its MFE), not with the forward return to a peak that can be years out. Hindsight labels.

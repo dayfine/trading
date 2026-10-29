@@ -177,7 +177,7 @@ ol.agenda li b { font-weight: 600; }
   <div class="panel" id="missed-panel">
     <h2>Missed winners by year</h2>
     <p class="note" id="missed-note"></p>
-    <p class="note">Each episode closes above the prior 26-week high, on ≥2× the prior four weeks’ volume, above a rising 30-week weighted MA, with ≥$1M trailing 20-day ADV and a later weekly close ≥100% higher before the run ends. Prices use adjusted bars; paths crossing a ≥50% adjusted daily jump are excluded as possible splices. Ownership means a long position overlaps the signal-to-peak interval. Rode: a closed trade earns at least half the forward return; partial: a positive return below that; cut: no positive realised return; still-open positions count as partial. These are hindsight labels. Ten zero-ticket weeks below 50% invested in a year are flagged.</p>
+    <p class="note">Each episode closes above the prior 26-week high, on ≥2× the prior four weeks’ volume, above a rising 30-week weighted MA, with ≥$1M trailing 20-day ADV and a later weekly close ≥100% higher before the run ends. Prices use adjusted bars; paths crossing a ≥50% adjusted daily jump are excluded as possible splices. Ownership means a long position overlaps the interval from the signal to the earlier of the peak and 52 weeks after it. Rode: the best overlapping closed trade earns at least half of the stock’s best move inside that trade’s own holding window (its MFE); partial: a positive return below that; cut: no positive realised return; still-open positions count as partial. The forward return and the peak can lie years later and are not what a trade is compared with. These are hindsight labels. Ten zero-ticket weeks below 50% invested in a year are flagged.</p>
     <div class="tablebox"><table id="missed-years"></table></div>
     <div class="tablebox"><table id="missed-buckets"></table></div>
   </div>
@@ -289,6 +289,7 @@ ol.agenda li b { font-weight: 600; }
   <div class="panel">
     <h2>Faithfulness grades by run</h2>
     <p class="note">Long-trade rubric, separate from the hindsight performance grade. A ≥ 90%, B ≥ 80%, C ≥ 70%, D ≥ 60%, F below 60%. Missing evidence drops out of the denominator; a high grade with low coverage does not certify a faithful trade. Shorts and unknown sides are n/a under this long-trade rubric.</p>
+    <p class="note" id="f-excluded" hidden></p>
     <div class="tablebox"><table id="f-grades"></table></div>
   </div>
   <div class="panel">
@@ -524,14 +525,18 @@ load('manifest.json').then(man => {
 }).catch(e => { $('main').innerHTML = `<div class="empty">Could not load the data files (${e.message}).</div>`; });
 
 // salts = one config under different path seeds; arms = different configs (manifest run_kind, #3149)
-const RK = () => D.man && D.man.run_kind === 'arm' ? 'arm' : 'salt';
+// seeds = one config under different screener tie-order seeds (differences are tie-order path noise)
+const RK = () => D.man && ['arm', 'seed'].includes(D.man.run_kind) ? D.man.run_kind : 'salt';
 const RKC = () => RK()[0].toUpperCase() + RK().slice(1);
 function labelRunKind() {
   if (RK() === 'salt') return;
-  $('[data-v="salts"]').textContent = 'Arms'; $('label[for="p-salt"]').textContent = 'Arm'; $('#t-salt').setAttribute('aria-label', 'Arm');
-  $('#v-salts h2').textContent = 'Every arm, side by side';
-  $('#v-salts p.note').textContent = 'These runs are arms: different configs, not salts of one. Their differences are the levers’ effect plus path noise, not path noise alone.';
-  $('#s-years').closest('.panel').querySelector('h2').textContent = 'Yearly return by arm';
+  const k = RK(), K = RKC();
+  $('[data-v="salts"]').textContent = K + 's'; $('label[for="p-salt"]').textContent = K; $('#t-salt').setAttribute('aria-label', K);
+  $('#v-salts h2').textContent = `Every ${k}, side by side`;
+  $('#v-salts p.note').textContent = k === 'seed'
+    ? 'These runs are seeds of one config: differences are tie-order path noise. The levers, the macro trace and the candidate lists are the same.'
+    : 'These runs are arms: different configs, not salts of one. Their differences are the levers’ effect plus path noise, not path noise alone.';
+  $('#s-years').closest('.panel').querySelector('h2').textContent = `Yearly return by ${k}`;
 }
 // the header stamp (#3262): which pack code built the page, and which snapshot dir the audit read
 const packStamp = m => `pack ${m.pack_sha || 'unknown'} · snapshot ${m.snapshot_dir || 'none (--no-container)'}`;
@@ -570,6 +575,8 @@ function mkChart(id, h, v) {
 }
 
 // Missed-winner episodes are hindsight; reasons use evidence from that screen.
+const MISSED_HORIZON_DAYS = 364;
+function dayAfter(d, n) { return new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10); }
 function missedWinners(data, trades, open, macro, nav) {
   const at = (rows, d) => rows.filter(r => r[0] <= d).at(-1);
   const weeks = new Map((data.audit || []).filter(r => r[0] === 'W').map(r => [isoWeek(r[1]), r]));
@@ -577,9 +584,13 @@ function missedWinners(data, trades, open, macro, nav) {
   const macroWeeks = new Map(macro.map(r => [isoWeek(r[0]), r]));
   const positions = [...trades, ...(open.rows || []).map(t => ({ ...t, xd: '9999-12-31' }))];
   const episodes = data.episodes.map(e => {
-    const held = positions.filter(t => t.side !== 'SHORT' && t.sym === e.sym && t.ed <= e.peak && t.xd >= e.d);
-    const owned = held.length > 0, gain = Math.max(...held.map(t => t.pct || 0));
-    const capture = !owned ? '' : gain >= e.forward / 2 ? 'rode' : held.some(t => t.xd === '9999-12-31') || gain > 0 ? 'partial' : 'cut';
+    // ownership is bounded: a long trade overlapping [signal, min(peak, signal + MISSED_HORIZON_DAYS)], so a
+    // later trade does not count as owning a signal years earlier. Capture compares the trade's gain with the
+    // stock's own best move inside that trade's holding window (its mfe), not with the move to the peak.
+    const end = e.peak < dayAfter(e.d, MISSED_HORIZON_DAYS) ? e.peak : dayAfter(e.d, MISSED_HORIZON_DAYS);
+    const held = positions.filter(t => t.side !== 'SHORT' && t.sym === e.sym && t.ed <= end && t.xd >= e.d);
+    const owned = held.length > 0, best = owned ? held.reduce((a, t) => (t.pct || 0) > (a.pct || 0) ? t : a) : null, gain = owned ? best.pct || 0 : 0;
+    const capture = !owned ? '' : gain > 0 && best.mfe != null && gain >= best.mfe / 2 ? 'rode' : held.some(t => t.xd === '9999-12-31') || gain > 0 ? 'partial' : 'cut';
     const key = isoWeek(e.d), week = weeks.get(key), decision = decisions.get(key + '|' + e.sym);
     const invested = at(nav, week?.[1] || e.d)?.[2], trend = (macroWeeks.get(key) || at(macro, e.d))?.[1];
     let reason = 'unknown (screen evidence absent)';
@@ -716,7 +727,7 @@ function oneTradeYear(ex, topPct) {
 }
 // The "<year> rests on one trade / the salt" bullet, or '' when neither holds: the year's excess vs SPY is
 // decided by its top realised trade (oneTradeYear), or the salts end the year >= 15 pp apart. kind is
-// RK() ('salt' | 'arm'). Pure, for the test.
+// RK() ('salt' | 'arm' | 'seed'). Pure, for the test.
 function yearRestsBullet(y, top, salts, kind) {
   const spread = salts.length > 1 ? Math.max(...salts) - Math.min(...salts) : 0;
   const ex = y.ret - y.spy, topPct = top ? 100 * top.pnl / y.nav0 : 0, one = top && oneTradeYear(ex, topPct);
@@ -1003,7 +1014,7 @@ function renderOverview() {
     `<b>${gap.length} of ${stops.length} stop exits filled more than 0.5% beyond the stop; ${late.length} sold at an open after the day the stop traded.</b> ${df.length} losers (grade D/F) then moved ≥ 15% the trade’s way within 13 weeks; they lost ${usdk(df.reduce((a, x) => a + x.pnl, 0))}.`,
     `<b>Average invested: ${fmt(expoAvg, 0)}% of NAV,</b> about ${fmt(ys.reduce((a, y) => a + y.pos, 0) / ys.length, 1)} positions on average.`,
     noBarFillLine(wk.length, (inv.validator.find(v => v.id === 'V13') || {}).status),
-    rets.length > 1 && (RK() === 'salt' ? `<b>Salt spread: the same rules returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} salts.` : `<b>The ${rets.length} arms returned ${rets.map(r => pct(r, 0)).join(', ')}</b> (different configs, not salts of one).`),
+    rets.length > 1 && (RK() === 'seed' ? `<b>Seed spread: one config returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} seeds (tie-order path noise).` : RK() === 'salt' ? `<b>Salt spread: the same rules returned ${rets.map(r => pct(r, 0)).join(', ')}</b> across ${rets.length} salts.` : `<b>The ${rets.length} arms returned ${rets.map(r => pct(r, 0)).join(', ')}</b> (different configs, not salts of one).`),
   ].filter(Boolean);
   // the signals lead: era bullets come before the run-level counts; one-trade and salt years sit in a collapsed note (#3214)
   const sig = renderSignals(nav, spy);
@@ -1353,7 +1364,14 @@ function faithfulnessTables(data, sort = { k: 'score', dir: 1 }) {
   return { checks, trades, detectors };
 }
 let fSort = { k:'score', dir:1 };
+// Checks dropped from every run so the grades compare the same evidence (the stage replay ran for some runs only).
+function faithfulnessExcludedNote(all) {
+  const ids = [...new Set((all || []).flatMap(f => f?.excluded || []))].sort((a, b) => a - b); if (!ids.length) return '';
+  const rules = (all.find(f => f?.rules) || {}).rules || [];
+  return `Checks ${ids.map(id => `${id}${rules.find(r => r.id === id) ? ' (' + faithEsc(rules.find(r => r.id === id).name) + ')' : ''}`).join(' and ')} are n/a for every run here: the weekly stage replay ran for some runs only, so each run is graded on the checks all runs have.`;
+}
 function renderFaithfulness() {
+  const note = faithfulnessExcludedNote(D.faithfulness); $('#f-excluded').textContent = note; $('#f-excluded').hidden = !note;
   $('#f-grades').innerHTML = tbl([['Run'], ['A'], ['B'], ['C'], ['D'], ['F'], ['n/a']], D.man.runs.map((r,i) => `<tr><td>${faithEsc(runLabel(i))}</td>${['A','B','C','D','F','n/a'].map(g => `<td>${D.faithfulness?.[i]?.available ? D.faithfulness[i].grades[g] : 'n/a'}</td>`).join('')}</tr>`));
   const tables = faithfulnessTables(D.faithfulness?.[+$('#f-run').value], fSort);
   $('#f-checks').innerHTML = tables.checks; $('#f-trades').innerHTML = tables.trades; $('#f-detectors').innerHTML = tables.detectors;
@@ -1389,6 +1407,24 @@ function initCareerScorecard() {
 }
 
 /* ---------- Salts ---------- */
+// Trades held by some runs but not all. A trade is keyed by symbol + entry date. first = the earliest such
+// entry (by date, then symbol), not the first position where two sorted lists differ, which can name a trade
+// every run holds. big = the largest of them by entry weight (entry value over the NAV on the entry date,
+// read from the first run that holds it), each with the runs that hold it and the runs that do not.
+function partialTrades(trades, navs, labels, top = 5) {
+  const key = t => t.sym + '|' + t.ed, n = trades.length, held = new Map();
+  trades.forEach((ts, i) => ts.forEach(t => { const h = held.get(key(t)) || { t, runs: [] }; h.runs.push(i); held.set(key(t), h); }));
+  const navAt = (i, d) => { let v = null; for (const r of navs[i] || []) { if (r[0] > d) break; v = r[1]; } return v; };
+  const some = [...held.values()].filter(h => h.runs.length < n).map(h => {
+    const nav = navAt(h.runs[0], h.t.ed);
+    return { sym: h.t.sym, ed: h.t.ed, pnl: h.t.pnl, weight: nav ? 100 * Math.abs(h.t.qty * h.t.ep) / nav : null,
+      holders: h.runs.map(i => labels[i]), missing: labels.filter((_, i) => !h.runs.includes(i)) };
+  });
+  const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  const first = [...some].sort((a, b) => cmp(a.ed, b.ed) || cmp(a.sym, b.sym))[0] || null;
+  const big = [...some].sort((a, b) => (b.weight ?? -1) - (a.weight ?? -1) || cmp(a.ed, b.ed) || cmp(a.sym, b.sym)).slice(0, top);
+  return { first, big, count: some.length };
+}
 const SALT_COLORS = ['--accent', '--s1', '--s4', '--s3', '--s2', '--neut'];
 function renderSalts() {
   const n = D.trades.length, col = i => css(SALT_COLORS[i % SALT_COLORS.length]);
@@ -1404,12 +1440,16 @@ function renderSalts() {
   const allK = new Set(D.trades.flat().map(key)); let nAll = 0, nSome = 0, nOne = 0; const pAll = D.trades.map(() => 0);
   allK.forEach(k => { const inS = sets.map(s => s.has(k)); const cnt = inS.filter(Boolean).length; if (cnt === n) { nAll++; sets.forEach((s, i) => pAll[i] += s.get(k).pnl); } else if (cnt > 1) nSome++; else nOne++; });
   const tot = D.trades.map(ts => ts.reduce((a, t) => a + t.pnl, 0));
-  const seqs = D.trades.map(ts => [...ts].sort((a, b) => a.ed < b.ed ? -1 : a.ed > b.ed ? 1 : a.sym < b.sym ? -1 : 1).map(key));
-  let div = null; for (let j = 0; j < Math.min(...seqs.map(s => s.length)); j++) if (seqs.some(s => s[j] !== seqs[0][j])) { div = seqs.map(s => s[j]); break; }
+  const part = partialTrades(D.trades, D.nav, D.man.runs.map((r, i) => runLabel(i)));
+  const runsText = (a, b) => `held by ${a.join(', ')}; not by ${b.join(', ')}`;
+  const bigRows = part.big.map(p => `<tr><td><b>${faithEsc(p.sym)}</b> ${p.ed}</td><td class="num">${p.weight == null ? '–' : fmt(p.weight, 1) + '%'}</td>${tdu(p.pnl)}<td>${faithEsc(p.holders.join(', '))}</td><td>${faithEsc(p.missing.join(', '))}</td></tr>`).join('');
   const uniqTop = D.trades.map((ts, i) => ts.filter(t => sets.every((s, o) => o === i || !s.has(key(t)))).sort((a, b) => b.pnl - a.pnl).slice(0, 3));
-  $('#s-overlap').innerHTML = `<p class="note">A trade counts as shared when the same symbol was entered on the same date. ${div ? `The trade lists first differ at ${div.map(k => k.replace('|', ' ')).join(' / ')}; everything before that is identical.` : ''}</p>
+  $('#s-overlap').innerHTML = `<p class="note">A trade counts as shared when the same symbol was entered on the same date. ${part.first ? `The first entry not held by every ${RK()} is ${faithEsc(part.first.sym)} ${part.first.ed} (${faithEsc(runsText(part.first.holders, part.first.missing))}); every earlier entry is held by all.` : `Every ${RK()} holds the same trades.`}</p>
     <div class="kpis"><div class="kpi"><span class="k">In every ${RK()}</span><span class="v">${nAll}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In some</span><span class="v">${nSome}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In one ${RK()} only</span><span class="v">${nOne}</span><span class="n">trades</span></div></div>
-    <table><thead><tr><th>${RKC()}</th><th class="num">Trades</th><th class="num">Realised total</th><th class="num">From shared trades</th><th class="num">From the rest</th><th>Biggest trades only this ${RK()} took</th></tr></thead><tbody>${D.trades.map((ts, i) => `<tr><td><b>${runLabel(i)}</b></td><td class="num">${ts.length}</td>${tdu(tot[i])}${tdu(pAll[i])}${tdu(tot[i] - pAll[i])}<td>${uniqTop[i].map(t => `${t.sym} ${usdk(t.pnl)}`).join(', ')}</td></tr>`).join('')}</tbody></table>`;
+    <table><thead><tr><th>${RKC()}</th><th class="num">Trades</th><th class="num">Realised total</th><th class="num">From shared trades</th><th class="num">From the rest</th><th>Biggest trades only this ${RK()} took</th></tr></thead><tbody>${D.trades.map((ts, i) => `<tr><td><b>${runLabel(i)}</b></td><td class="num">${ts.length}</td>${tdu(tot[i])}${tdu(pAll[i])}${tdu(tot[i] - pAll[i])}<td>${uniqTop[i].map(t => `${t.sym} ${usdk(t.pnl)}`).join(', ')}</td></tr>`).join('')}</tbody></table>
+    <h3>Largest trades held by some ${RK()}s but not all</h3>
+    <p class="note">Ranked by entry weight: entry value over the NAV on the entry date. ${part.count} trades are held by some but not all.</p>
+    ${part.big.length ? `<table><thead><tr><th>Trade</th><th class="num">Entry weight</th><th class="num">Realised</th><th>Held by</th><th>Not held by</th></tr></thead><tbody>${bigRows}</tbody></table>` : '<p class="note">None.</p>'}`;
 }
 
 /* ---------- Agenda ---------- */
@@ -1424,7 +1464,7 @@ function renderAgenda() {
     ['Open the biggest losers and whipsaws', 'hilo', 'Was the stop structural or the 4% fallback? Did the stock recover right after?'],
     ['Go through the execution flags', 'surprises', 'Weekend-dated fills, fills outside the day’s range, stops sold a day late. Decide which are simulator defects and which are real market behaviour.'],
     ['Go through the book flags', 'surprises', 'Neutral-macro entries, low breakout volume, fallback stops, Stage 4 holds. Decide which deviations are deliberate dials and which are bugs.'],
-    rets.length > 1 && [`Compare the ${RK()}s`, 'salts', `${RK() === 'salt' ? 'The same rules produce' : 'The arms produce'} ${fmt(Math.min(...rets), 0)}–${fmt(Math.max(...rets), 0)}%. Which trades account for the gap?`],
+    rets.length > 1 && [`Compare the ${RK()}s`, 'salts', `${RK() === 'arm' ? 'The arms produce' : 'The same config produces'} ${fmt(Math.min(...rets), 0)}–${fmt(Math.max(...rets), 0)}%. Which trades account for the gap?`],
   ].filter(Boolean);
   $('#agenda').innerHTML = items.map(([a, v, b]) => `<li><b><a href="#${v}" data-go="${v}">${a}</a></b><br><span class="mut">${b}</span></li>`).join('');
   $('#agenda').addEventListener('click', e => { const a = e.target.closest('[data-go]'); if (a) { e.preventDefault(); show(a.dataset.go); } });
