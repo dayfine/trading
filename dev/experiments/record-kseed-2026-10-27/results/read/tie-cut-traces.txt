@@ -1,0 +1,122 @@
+## decision 2000-01-07 (admitted top-N in screen order; x = Skipped No_structural_stop)
+k0 [macro_trend Neutral long_grade_admitted 537 long_top_n_admitted 20 entered 0 ] EMN x,OMX x,WLL1 x,GON x,M x,ECIL x,DEX2 x,GNTX x,CHH x,LIN x,SWRX x,TLSP x,SNKTY x,HC x,BRSL x,SLG x,BHP x,
+k1 [macro_trend Neutral long_grade_admitted 537 long_top_n_admitted 20 entered 0 ] EMN x,ECIL x,WLL1 x,M x,OMX x,GON x,DEX2 x,GNTX x,CHH x,LIN x,GADZ x,SWRX x,GMGC x,TLSP x,REMC_old x,BEC x,BRSL x,BHP x,
+k2 [macro_trend Neutral long_grade_admitted 537 long_top_n_admitted 20 entered 1 ] EMN x,GON x,WLL1 x,M x,ECIL x,OMX x,DEX2 x,GNTX x,LIN x,CHH x,SNKTY x,DXC Placed,IGEN_old x,IFCI1 x,IMPX_old x,BEC x,TLSP x,
+k3 [macro_trend Neutral long_grade_admitted 537 long_top_n_admitted 20 entered 1 ] EMN x,OMX x,WLL1 x,ECIL x,M x,GON x,DEX2 x,GNTX x,LIN x,CHH x,RCMT x,REMC_old x,SWRX x,IMPX_old x,HC x,GMGC x,FR Placed,NSTM x,
+k4 [macro_trend Neutral long_grade_admitted 537 long_top_n_admitted 20 entered 0 ] EMN x,ECIL x,OMX x,M x,WLL1 x,GON x,DEX2 x,GNTX x,CHH x,LIN x,GMGC x,REMC_old x,IMPX_old x,SNKTY x,NSTM x,
+
+## decision 2010-02-05 (admitted top-N in screen order; x = Skipped No_structural_stop)
+k0 [macro_trend Bullish long_grade_admitted 400 long_top_n_admitted 20 entered 1 ] DHI x,SHW x,DLX Placed,CRL x,NDN x,ICGN x,ETD x,MTH x,CPE x,MMS x,GWW x,NVO x,CMG Insufficient_cash,NVS Insufficient_cash,CVSA x,OTEX x,ILMN x,CCOI x,HBAN x,
+k1 [macro_trend Bullish long_grade_admitted 400 long_top_n_admitted 20 entered 3 ] DHI x,DLX Placed,SHW x,CRL x,MTH x,ICGN x,ETD x,NDN x,CPE x,GWW x,OTEX x,CMG Placed,NVS Placed,NVO x,CVSA x,MMS x,ILMN x,HTHIY x,CCMP x,
+k2 [macro_trend Bullish long_grade_admitted 402 long_top_n_admitted 20 entered 1 ] DHI x,SHW x,DLX Placed,CRL x,ICGN x,MTH x,NDN x,ETD x,CPE x,CVSA x,OTEX x,MMS x,NVO x,GWW x,NVS Insufficient_cash,CMG Insufficient_cash,ILMN x,CCMP x,INDB x,
+k3 [macro_trend Bullish long_grade_admitted 400 long_top_n_admitted 20 entered 2 ] DHI x,SHW x,DLX Placed,CRL x,NDN x,ETD x,ICGN x,MTH x,CPE x,NVS Placed,GWW x,NVO x,MMS x,OTEX x,CVSA x,CMG Insufficient_cash,ILMN x,CCOI x,FL x,
+k4 [macro_trend Bullish long_grade_admitted 401 long_top_n_admitted 20 entered 3 ] DHI x,DLX Placed,SHW x,CRL x,ETD x,NDN x,ICGN x,MTH x,CPE x,OTEX x,GWW x,CMG Placed,NVO x,NVS Placed,MMS x,CVSA x,ILMN x,HBAN x,FL x,
+
+## decision 2020-06-12 (admitted top-N in screen order; x = Skipped No_structural_stop)
+k0 [macro_trend Bullish long_grade_admitted 225 long_top_n_admitted 20 entered 2 ] ATHM x,AVGO x,CCS x,DCUE x,SAH x,DECK Placed,ESTC x,YETI x,MCHP x,PENN x,APPS Placed,CNNE x,XWEL x,MKSI x,RH x,CIVI x,INSM x,EXPGY x,
+k1 [macro_trend Bullish long_grade_admitted 225 long_top_n_admitted 20 entered 2 ] ATHM x,CCS x,DECK Placed,DCUE x,SAH x,AVGO x,PENN x,YETI x,MCHP x,ESTC x,APPS Placed,MKSI x,RH x,CIVI x,XWEL x,CNNE x,BURL x,VRNS x,
+k2 [macro_trend Bullish long_grade_admitted 225 long_top_n_admitted 20 entered 2 ] ATHM x,AVGO x,CCS x,DCUE x,DECK Placed,SAH x,PENN x,ESTC x,YETI x,MCHP x,APPS Placed,MKSI x,CIVI x,XWEL x,RH x,CNNE x,DTEGY x,INSM x,
+k3 [macro_trend Bullish long_grade_admitted 225 long_top_n_admitted 20 entered 2 ] ATHM x,AVGO x,CCS x,DCUE x,SAH x,DECK Placed,YETI x,MCHP x,PENN x,ESTC x,APPS Placed,RH x,XWEL x,MKSI x,CNNE x,CIVI x,DTEGY x,VRNS x,
+k4 [macro_trend Bullish long_grade_admitted 224 long_top_n_admitted 20 entered 2 ] ATHM x,DECK Placed,CCS x,DCUE x,AVGO x,SAH x,PENN x,ESTC x,MCHP x,YETI x,APPS Placed,CIVI x,MKSI x,CNNE x,XWEL x,RH x,EXPGY x,BURL x,
+
+## decision 2022-02-04 (admitted top-N in screen order; x = Skipped No_structural_stop)
+k0 [macro_trend Bullish long_grade_admitted 276 long_top_n_admitted 20 entered 1 ] UTL x,EC x,ET x,MGI x,TEF x,WTI x,CIB x,CNO x,THG x,GLNG Placed,CNA x,AGO x,PM x,SMFG x,MFC x,SF x,BAESY x,MA x,MMP x,BCRX x,
+k1 [macro_trend Bullish long_grade_admitted 277 long_top_n_admitted 20 entered 1 ] UTL x,EC x,ET x,MGI x,TEF x,WTI x,THG x,CIB x,CNO x,MMP x,BCRX x,PM x,GLNG Placed,MA x,MFC x,TBBK x,PAGP x,SF x,AGO x,TRP x,
+k2 [macro_trend Bullish long_grade_admitted 277 long_top_n_admitted 20 entered 0 ] EC x,UTL x,MGI x,TEF x,ET x,WTI x,CNO x,THG x,CIB x,PAGP x,TBBK x,SMFG x,MFC x,TRP x,BCRX x,MA x,MMP x,AGO x,BAESY x,PM x,
+k3 [macro_trend Bullish long_grade_admitted 278 long_top_n_admitted 20 entered 1 ] UTL x,EC x,TEF x,ET x,MGI x,WTI x,THG x,CNO x,CIB x,TBBK x,MFC x,MMP x,BAESY x,CNA x,SF x,PM x,GLNG Placed,PAGP x,BCRX x,MA x,
+k4 [macro_trend Bullish long_grade_admitted 277 long_top_n_admitted 20 entered 1 ] EC x,UTL x,TEF x,MGI x,ET x,WTI x,CIB x,CNO x,THG x,SF x,BAESY x,TBBK x,AGO x,BCRX x,GLNG Placed,MFC x,MA x,MMP x,CNA x,PM x,
+
+## decision 2023-08-18 (admitted top-N in screen order; x = Skipped No_structural_stop)
+k0 [macro_trend Bullish long_grade_admitted 261 long_top_n_admitted 20 entered 2 ] DHT x,IMAX x,SCHL x,CORT x,INSW x,PRGO x,R Placed,TEN x,CDW x,TXT x,DTCB x,TFSL x,MTDR x,CRGY x,PKG Placed,ROST x,TEVA x,DINO x,HDSN x,SUN x,
+k1 [macro_trend Bullish long_grade_admitted 261 long_top_n_admitted 20 entered 3 ] DHT x,IMAX x,CDW x,CORT x,R Placed,TEN x,SCHL x,PRGO x,INSW x,TXT x,DTCB x,DINO x,TEVA x,ROST x,AMGN x,ADMA Placed,IMO x,SUN x,MTDR x,PKG Placed,
+k2 [macro_trend Bullish long_grade_admitted 261 long_top_n_admitted 20 entered 2 ] DHT x,IMAX x,R Placed,CORT x,PRGO x,CDW x,TEN x,SCHL x,INSW x,TXT x,DTCB x,IMO x,DINO x,CRGY x,TFSL x,ROST x,AMGN x,TEVA x,ADMA Placed,SUN x,
+k3 [macro_trend Bullish long_grade_admitted 261 long_top_n_admitted 20 entered 2 ] DHT x,IMAX x,SCHL x,CDW x,INSW x,TEN x,CORT x,R Placed,PRGO x,TXT x,DTCB x,IMO x,AMGN x,MTDR x,PKG Placed,TFSL x,CRGY x,HDSN x,TEVA x,DINO x,
+k4 [macro_trend Bullish long_grade_admitted 263 long_top_n_admitted 20 entered 3 ] DHT x,IMAX x,INSW x,CORT x,R Placed,TEN x,PRGO x,CDW x,SCHL x,TXT x,DTCB x,TFSL x,IMO x,TEVA x,PKG Placed,HDSN x,ROST x,CRGY x,AMGN x,ADMA Placed,
+
+## decision 2024-07-05 (admitted top-N in screen order; x = Skipped No_structural_stop)
+k0 [macro_trend Bullish long_grade_admitted 154 long_top_n_admitted 20 entered 1 ] PANW x,BTDR x,LUCK x,CRDO x,ALNY x,APLD x,BTBT x,OLED x,OLLI x,MOMO x,FUN x,AAPL x,ORCL x,HUT x,MC x,ESTC x,INSM x,CCL x,CVNA Placed,AVGO Sized_to_zero,
+k1 [macro_trend Bullish long_grade_admitted 154 long_top_n_admitted 20 entered 0 ] PANW x,BTDR x,LUCK x,CRDO x,ALNY x,APLD x,BTBT x,ORCL x,AAPL x,FUN x,OLED x,MOMO x,OLLI x,HUT x,MC x,INSM x,ESTC x,CCL x,MOD x,CRTO x,
+k2 [macro_trend Bullish long_grade_admitted 154 long_top_n_admitted 20 entered 0 ] BTDR x,PANW x,LUCK x,ALNY x,CRDO x,BTBT x,APLD x,OLED x,FUN x,AAPL x,ORCL x,MOMO x,OLLI x,HUT x,ESTC x,INSM x,MC x,CCL x,TYL x,CAVA Sized_to_zero,
+k3 [macro_trend Bullish long_grade_admitted 154 long_top_n_admitted 20 entered 0 ] BTDR x,PANW x,LUCK x,CRDO x,ALNY x,BTBT x,APLD x,OLLI x,AAPL x,FUN x,OLED x,MOMO x,ORCL x,HUT x,ESTC x,MC x,INSM x,CCL x,ARGX x,ALTR x,
+k4 [macro_trend Bullish long_grade_admitted 154 long_top_n_admitted 20 entered 0 ] PANW x,BTDR x,LUCK x,ALNY x,CRDO x,APLD x,BTBT x,AAPL x,OLLI x,OLED x,ORCL x,MOMO x,FUN x,HUT x,ESTC x,INSM x,MC x,CCL x,INST x,MNDY x,
+
+## scores of ADMA's alternatives, k1's ADMA entry record (decision 2023-08-18; ADMA scores 95)
+cascade_score 95,DHT 110,IMAX 106,CDW 105,CORT 105,TEN 105,SCHL 105,PRGO 105,INSW 105,TXT 101,DTCB 97,DINO 95,TEVA 95,ROST 95,AMGN 95,IMO 95,SUN 95,MTDR 95,
+
+## ADMA: screen outcomes per seed (date outcome)
+k0: 2023-08-11 Skipped No_structural_stop; 2025-04-04 Skipped No_structural_stop; 
+k1: 2023-08-18 Placed; 2025-04-04 Skipped No_structural_stop; 
+k2: 2023-08-18 Placed; 2025-04-04 Skipped No_structural_stop; 
+k3: 2025-04-04 Skipped No_structural_stop; 
+k4: 2023-08-18 Placed; 2025-04-04 Skipped No_structural_stop; 
+
+## GLNG: screen outcomes per seed (date outcome)
+k0: 2006-01-06 Skipped No_structural_stop; 2006-01-13 Skipped No_structural_stop; 2014-03-21 Skipped No_structural_stop; 2014-03-28 Skipped No_structural_stop; 2014-04-04 Skipped No_structural_stop; 2014-04-11 Skipped Insufficient_cash; 2015-05-22 Skipped No_structural_stop; 2016-09-16 Skipped No_structural_stop; 2017-12-15 Skipped No_structural_stop; 2022-01-14 Skipped No_structural_stop; 2022-01-28 
+
+k1: 2006-01-06 Skipped No_structural_stop; 2006-01-13 Skipped No_structural_stop; 2014-03-21 Skipped No_structural_stop; 2014-03-28 Skipped No_structural_stop; 2014-04-11 Skipped Insufficient_cash; 2015-05-22 Skipped No_structural_stop; 2016-09-16 Skipped No_structural_stop; 2017-12-15 Skipped No_structural_stop; 2022-01-14 Skipped No_structural_stop; 2022-01-28 Skipped No_structural_stop; 2022-02-04 
+
+k2: 2006-01-06 Skipped No_structural_stop; 2006-01-13 Skipped No_structural_stop; 2014-03-21 Skipped No_structural_stop; 2014-03-28 Skipped No_structural_stop; 2014-04-04 Skipped No_structural_stop; 2015-05-22 Skipped No_structural_stop; 2016-09-16 Skipped No_structural_stop; 2017-12-15 Skipped No_structural_stop; 2022-01-14 Skipped No_structural_stop; 2022-01-28 Skipped No_structural_stop; 2023-09-29
+
+k3: 2006-01-06 Skipped No_structural_stop; 2006-01-13 Skipped No_structural_stop; 2014-03-21 Skipped No_structural_stop; 2014-03-28 Skipped No_structural_stop; 2014-04-11 Skipped Insufficient_cash; 2015-05-22 Skipped No_structural_stop; 2016-09-16 Skipped No_structural_stop; 2017-12-15 Skipped No_structural_stop; 2022-01-14 Skipped No_structural_stop; 2022-01-28 Skipped No_structural_stop; 2022-02-04 
+
+k4: 2006-01-06 Skipped No_structural_stop; 2006-01-13 Skipped No_structural_stop; 2014-03-21 Skipped No_structural_stop; 2014-03-28 Skipped No_structural_stop; 2014-04-11 Skipped Insufficient_cash; 2015-05-22 Skipped No_structural_stop; 2016-09-16 Skipped No_structural_stop; 2017-12-15 Skipped No_structural_stop; 2022-01-14 Skipped No_structural_stop; 2022-01-28 Skipped No_structural_stop; 2022-02-04 
+
+
+## CVNA: screen outcomes per seed (date outcome)
+k0: 2019-03-22 Skipped No_structural_stop; 2020-05-08 Skipped No_structural_stop; 2021-06-25 Skipped No_structural_stop; 2023-06-09 Skipped No_structural_stop; 2024-07-05 Placed; 2025-12-19 Skipped Sized_to_zero; 2025-12-26 Placed; 
+k1: 2019-03-22 Skipped No_structural_stop; 2020-05-08 Skipped No_structural_stop; 2021-06-25 Skipped No_structural_stop; 2023-06-09 Skipped No_structural_stop; 2025-12-19 Skipped Sized_to_zero; 2025-12-26 Skipped Insufficient_cash; 
+k2: 2020-05-08 Skipped No_structural_stop; 2021-06-25 Skipped No_structural_stop; 2023-06-09 Skipped No_structural_stop; 2025-12-19 Skipped Sized_to_zero; 2025-12-26 Placed; 
+k3: 2020-05-08 Skipped No_structural_stop; 2021-06-25 Skipped No_structural_stop; 2023-06-09 Skipped No_structural_stop; 2025-01-24 Skipped No_structural_stop; 2025-12-19 Skipped Sized_to_zero; 2025-12-26 Placed; 
+k4: 2019-03-22 Skipped No_structural_stop; 2020-05-08 Skipped No_structural_stop; 2020-10-16 Placed; 2021-06-25 Skipped No_structural_stop; 2023-06-09 Skipped No_structural_stop; 2025-12-19 Skipped Sized_to_zero; 2025-12-26 Placed; 
+
+## CMG: screen outcomes per seed (date outcome)
+k0: 2010-01-15 Skipped No_structural_stop; 2010-01-22 Skipped No_structural_stop; 2010-01-29 Skipped No_structural_stop; 2010-02-05 Skipped Insufficient_cash; 2010-06-04 Skipped No_structural_stop; 2010-06-11 Skipped Sized_to_zero; 2013-05-03 Skipped No_structural_stop; 2013-09-06 Skipped No_structural_stop; 2015-08-07 Skipped No_structural_stop; 2015-08-14 Skipped No_structural_stop; 2017-04-07 Skipp
+
+k1: 2010-01-15 Skipped No_structural_stop; 2010-01-22 Skipped No_structural_stop; 2010-01-29 Skipped No_structural_stop; 2010-02-05 Placed; 2013-04-19 Skipped No_structural_stop; 2013-04-26 Skipped No_structural_stop; 2013-05-03 Skipped No_structural_stop; 2013-05-10 Skipped No_structural_stop; 2015-08-07 Skipped No_structural_stop; 2015-08-14 Skipped No_structural_stop; 2017-04-07 Skipped No_structur
+
+k2: 2010-01-15 Skipped No_structural_stop; 2010-01-22 Skipped No_structural_stop; 2010-01-29 Skipped No_structural_stop; 2010-02-05 Skipped Insufficient_cash; 2010-06-04 Skipped No_structural_stop; 2010-06-11 Skipped Sized_to_zero; 2013-04-19 Skipped No_structural_stop; 2013-04-26 Skipped No_structural_stop; 2013-05-10 Skipped No_structural_stop; 2015-08-07 Skipped No_structural_stop; 2015-08-14 Skipp
+
+k3: 2010-01-15 Skipped No_structural_stop; 2010-01-22 Skipped No_structural_stop; 2010-01-29 Skipped No_structural_stop; 2010-02-05 Skipped Insufficient_cash; 2010-06-04 Skipped No_structural_stop; 2010-06-11 Skipped Sized_to_zero; 2013-04-26 Skipped No_structural_stop; 2013-05-10 Skipped No_structural_stop; 2015-08-07 Skipped No_structural_stop; 2015-08-14 Skipped No_structural_stop; 2017-04-07 Skipp
+
+k4: 2010-01-15 Skipped No_structural_stop; 2010-01-22 Skipped No_structural_stop; 2010-01-29 Skipped No_structural_stop; 2010-02-05 Placed; 2013-04-26 Skipped No_structural_stop; 2013-05-10 Skipped No_structural_stop; 2015-08-07 Skipped No_structural_stop; 2015-08-14 Skipped No_structural_stop; 2017-04-07 Skipped No_structural_stop; 2017-04-21 Skipped No_structural_stop; 2017-04-28 Skipped No_structur
+
+
+## CRM: screen outcomes per seed (date outcome)
+k0: 2006-09-08 Skipped No_structural_stop; 2007-06-08 Skipped No_structural_stop; 2007-06-15 Skipped No_structural_stop; 2007-09-28 Skipped No_structural_stop; 2012-02-24 Skipped No_structural_stop; 2012-03-02 Skipped No_structural_stop; 2012-03-09 Skipped No_structural_stop; 2012-03-16 Skipped No_structural_stop; 2013-08-30 Skipped No_structural_stop; 2015-03-06 Placed; 
+k1: 2006-09-08 Skipped No_structural_stop; 2007-06-08 Skipped No_structural_stop; 2007-09-28 Skipped No_structural_stop; 2012-02-24 Skipped No_structural_stop; 2012-03-02 Skipped No_structural_stop; 2012-03-09 Skipped No_structural_stop; 2012-03-16 Skipped No_structural_stop; 2012-03-30 Skipped No_structural_stop; 2013-08-30 Skipped No_structural_stop; 2013-09-20 Skipped No_structural_stop; 
+k2: 2006-09-08 Skipped No_structural_stop; 2007-06-08 Skipped No_structural_stop; 2007-09-28 Skipped No_structural_stop; 2009-11-27 Placed; 2012-02-24 Skipped No_structural_stop; 2012-03-02 Skipped No_structural_stop; 2012-03-09 Skipped No_structural_stop; 2012-03-16 Skipped No_structural_stop; 2013-08-30 Skipped No_structural_stop; 2015-02-27 Skipped No_structural_stop; 2015-03-20 Placed; 
+k3: 2006-09-08 Skipped No_structural_stop; 2007-06-01 Skipped No_structural_stop; 2007-06-08 Skipped No_structural_stop; 2007-09-28 Skipped No_structural_stop; 2009-11-27 Skipped Insufficient_cash; 2012-02-24 Skipped No_structural_stop; 2012-03-02 Skipped No_structural_stop; 2012-03-09 Skipped No_structural_stop; 2012-03-16 Skipped No_structural_stop; 2013-08-30 Skipped No_structural_stop; 2015-02-27 
+
+k4: 2006-09-08 Skipped No_structural_stop; 2007-06-01 Skipped No_structural_stop; 2007-06-08 Skipped No_structural_stop; 2007-06-15 Skipped No_structural_stop; 2007-09-28 Skipped No_structural_stop; 2012-02-24 Skipped No_structural_stop; 2012-03-02 Skipped No_structural_stop; 2012-03-09 Skipped No_structural_stop; 2012-03-16 Skipped No_structural_stop; 2013-08-30 Skipped No_structural_stop; 2013-09-20
+
+
+## LAD: screen outcomes per seed (date outcome)
+k0: 2010-09-03 Skipped No_structural_stop; 2011-11-04 Skipped No_structural_stop; 2012-08-10 Skipped Insufficient_cash; 2016-12-09 Skipped No_structural_stop; 2021-08-13 Skipped No_structural_stop; 
+k1: 2010-09-03 Skipped No_structural_stop; 2011-11-04 Skipped No_structural_stop; 2012-08-10 Placed; 2016-12-09 Skipped No_structural_stop; 2021-08-13 Skipped No_structural_stop; 
+k2: 2010-09-03 Skipped No_structural_stop; 2011-11-04 Skipped No_structural_stop; 2016-12-09 Skipped No_structural_stop; 2021-08-13 Skipped No_structural_stop; 
+k3: 2010-09-03 Skipped No_structural_stop; 2011-11-04 Skipped No_structural_stop; 2016-12-09 Skipped No_structural_stop; 2020-10-16 Placed; 2021-08-13 Skipped No_structural_stop; 
+k4: 2010-09-03 Skipped No_structural_stop; 2011-11-04 Skipped No_structural_stop; 2016-12-09 Skipped No_structural_stop; 2021-08-13 Skipped No_structural_stop; 
+
+## APPS: screen outcomes per seed (date outcome)
+k0: 2020-06-12 Placed; 2021-10-08 Skipped No_structural_stop; 2026-05-29 Skipped No_structural_stop; 2026-06-05 Placed; 
+k1: 2020-06-12 Placed; 2021-10-08 Skipped No_structural_stop; 2026-05-29 Skipped No_structural_stop; 2026-06-05 Placed; 
+k2: 2020-06-12 Placed; 2021-10-08 Skipped No_structural_stop; 2026-05-29 Skipped No_structural_stop; 2026-06-05 Placed; 
+k3: 2020-06-12 Placed; 2021-10-08 Skipped No_structural_stop; 2026-05-29 Skipped No_structural_stop; 2026-06-05 Placed; 
+k4: 2020-06-12 Placed; 2021-10-08 Skipped No_structural_stop; 2026-05-29 Skipped No_structural_stop; 2026-06-05 Placed; 
+
+## first NAV divergence, every pair (equity_curve.csv)
+k0 vs k1: 2000-01-25
+k0 vs k2: 2000-02-28
+k0 vs k3: 2000-01-11
+k0 vs k4: 2000-01-25
+k1 vs k2: 2000-01-25
+k1 vs k3: 2000-01-11
+k1 vs k4: 2000-01-25
+k2 vs k3: 2000-01-11
+k2 vs k4: 2000-01-25
+k3 vs k4: 2000-01-11
+M vs k0: 2000-01-11
+M vs k1: 2000-01-11
+M vs k2: 2000-01-11
+M vs k3: 2000-01-25
+M vs k4: 2000-01-11
