@@ -3,7 +3,7 @@
 ## Last updated: 2026-10-28
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
 ### 2026-07-27 — `trades.csv` phantom SHORT / duplicate rows (issue #2059)
 

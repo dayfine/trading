@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-29",
+  "feature": "harness-gate-status-pagination",
+  "branch": "harness/gate-status-pagination",
+  "sha": "678a17e1283ef792de144ac848aff706a75f0976",
+  "recorded_at_ns": 1793289020088238015,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 3,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
