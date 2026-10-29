@@ -1122,6 +1122,12 @@ GATE_FILES=$( { i=0; while [ "$i" -lt 100 ]; do printf 'dev/notes/n%d.md\n' "$i"
 export GATE_FILES
 row=$(_e2e_probe "$CURL_E2E_STUB_DIR" dummy-token 501 | tail -1)
 check "#3421 e2e (curl): exactly 100 doc files stay docs-only" skip "$(printf '%s' "$row" | awk '{print $3}')"
+# 3000 doc files = 30 full pages: the cap cannot prove completeness, so it
+# fails closed to the three-gate lane (sentinel), not docs-only.
+GATE_FILES=$( { i=0; while [ "$i" -lt 3000 ]; do printf 'dev/notes/n%d.md\n' "$i"; i=$((i+1)); done; } )
+export GATE_FILES
+row=$(_e2e_probe "$CURL_E2E_STUB_DIR" dummy-token 501 | tail -1)
+check "#3421 e2e (curl): 3000 doc files hit the page cap and fail closed to three gates" ok "$(printf '%s' "$row" | awk '{print $3}')"
 GATE_FILES=$_SAVED_FILES
 export GATE_FILES
 SAVED_TIP=$GATE_TIP
