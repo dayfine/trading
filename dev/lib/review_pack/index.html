@@ -727,7 +727,7 @@ function oneTradeYear(ex, topPct) {
 }
 // The "<year> rests on one trade / the salt" bullet, or '' when neither holds: the year's excess vs SPY is
 // decided by its top realised trade (oneTradeYear), or the salts end the year >= 15 pp apart. kind is
-// RK() ('salt' | 'arm'). Pure, for the test.
+// RK() ('salt' | 'arm' | 'seed'). Pure, for the test.
 function yearRestsBullet(y, top, salts, kind) {
   const spread = salts.length > 1 ? Math.max(...salts) - Math.min(...salts) : 0;
   const ex = y.ret - y.spy, topPct = top ? 100 * top.pnl / y.nav0 : 0, one = top && oneTradeYear(ex, topPct);

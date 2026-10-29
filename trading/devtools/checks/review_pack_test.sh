@@ -451,6 +451,42 @@ expect_eq "faithfulness: no replay for any run drops nothing" "[] []" "$(jq -c '
 mkdir -p "$SW/fullstage/runs/k0/stage" "$SW/fullstage/runs/k1/stage"
 sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$SW/fullstage" k0="$SW/run/" k1="$SW/run/" >"$SW/fullstage.log" 2>&1 || rc=$?
 expect_eq "faithfulness: a replay for every run drops nothing" "[] []" "$(jq -c '.excluded' "$SW/fullstage/site/data/k0_faithfulness.json" "$SW/fullstage/site/data/k1_faithfulness.json" | tr '\n' ' ' | sed 's/ $//')"
+# #3468 rework: the drop guard, run directly on a trade whose evidence decides checks 1 and 13
+printf '%s\n' '[{"id":1,"sym":"ZZZ","ed":"2020-01-03","xd":"2020-06-05","side":"LONG","rsE":"Stage1","s4w":2,"holdW":10}]' > "$SW/drop_trade.json"
+FJ='.rows[0] | [(.checks | map(select(.id == 1 or .id == 13) | .status) | join(",")), (.possible|tostring), .grade] | join(" ")'
+expect_eq "faithfulness: no DROP_IDS, checks 1 and 13 both fail on decisive evidence" "fail,fail 4 F" "$(sh "$ROOT/dev/lib/review_pack/faithfulness.sh" "$SW/drop_trade.json" | jq -r "$FJ")"
+expect_eq "faithfulness: DROP_IDS 1,13 reads both n/a and removes them from possible and the grade" "n/a,n/a 0 n/a" "$(sh "$ROOT/dev/lib/review_pack/faithfulness.sh" "$SW/drop_trade.json" 1,13 | jq -r "$FJ")"
+if command -v node >/dev/null 2>&1; then
+  { sed -n -e '/^const RK = /p' -e '/^const RKC = /p' -e '/^function labelRunKind(/,/^}/p' "$SW/seeds/site/index.html"
+    cat <<'JS'
+const assert = require('assert');
+const mk = kind => {
+  const nodes = {};
+  const get = sel => nodes[sel] || (nodes[sel] = { textContent: '', setAttribute(k, v) { this[k] = v; },
+    closest() { return { querySelector: () => get('#years-h2') }; } });
+  global.$ = get; global.D = { man: { run_kind: kind } };
+  labelRunKind();
+  return nodes;
+};
+let n = mk('seed');
+assert.strictEqual(RK(), 'seed');
+assert.strictEqual(n['[data-v="salts"]'].textContent, 'Seeds');
+assert(n['#v-salts p.note'].textContent.includes('seeds of one config: differences are tie-order path noise'));
+assert.strictEqual(n['#v-salts h2'].textContent, 'Every seed, side by side');
+assert.strictEqual(n['#years-h2'].textContent, 'Yearly return by seed');
+n = mk('arm');
+assert.strictEqual(RK(), 'arm');
+assert.strictEqual(n['[data-v="salts"]'].textContent, 'Arms');
+assert(n['#v-salts p.note'].textContent.includes('These runs are arms'));
+assert(!n['#v-salts p.note'].textContent.includes('tie-order'));
+n = mk('salt');
+assert.strictEqual(RK(), 'salt');
+assert.strictEqual(n['#v-salts p.note'], undefined);
+console.log('OK');
+JS
+  } > "$SW/rk.js"
+  expect_eq "run kind: the seed branch of labelRunKind words the tab, note and headings; arm keeps the arm note" OK "$(node "$SW/rk.js" 2>&1 | tail -3)"
+fi
 if command -v node >/dev/null 2>&1; then
   SFNS="$(sed -n -e '/^\/\/ Side-aware trade helpers/,/^const ownStage/p' -e '/^const FLAGS = \[/,/^\];/p' -e '/^const REOPEN_CLOSED_WEEKS/p' -e '/^function reopenFlag(/,/^}/p' -e '/^function reopenEpisodes(/,/^}/p' "$SW/pack/site/index.html")"
   fl() { node -e "$SFNS
@@ -1173,7 +1209,8 @@ assert.strictEqual(r.years[0].top.length,5);
 // #3384 defect 4: ownership is bounded to 52 weeks after the signal, and capture compares a trade with the
 // stock's own move inside its holding window (mfe), not with the forward return to a peak years away.
 const far = (ed, pct, mfe, forward=400) => missedWinners({episodes:[{sym:'FAR',d:'2019-08-02',peak:'2022-01-07',forward}],audit:[]},[{sym:'FAR',side:'LONG',ed,xd:ed.slice(0,4)+'-12-20',pct,mfe}],{rows:[]},[],nav).episodes[0];
-assert.strictEqual(far('2020-07-30',30,40).owned,true,'entry on day 364 is inside the horizon');
+assert.strictEqual(far('2020-07-31',30,40).owned,true,'entry on day 364 (the last day) is inside the horizon');
+assert.strictEqual(far('2020-07-30',30,40).owned,true,'entry on day 363 is inside the horizon');
 assert.strictEqual(far('2020-08-01',30,40).owned,false,'entry after day 364 is a later move, not this signal (the MMYT shape)');
 assert.strictEqual(far('2020-07-30',30,40).capture,'rode','30 of a 40 holding-window move rode, though the forward 400 would call it partial');
 assert.strictEqual(far('2020-07-30',30,100).capture,'partial','30 of a 100 holding-window move is partial');
