@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-29",
+  "feature": "harness-wait-for-no-gh",
+  "branch": "harness/wait-for-no-gh",
+  "sha": "f3ed7ce753cb60d80affce7c36af60cd10a229b9",
+  "recorded_at_ns": 1793300953857021716,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 3,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
