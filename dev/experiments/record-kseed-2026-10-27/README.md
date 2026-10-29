@@ -221,7 +221,8 @@ See "Review-pack look" below; the appendix answers each signal bullet.
   - k3 admits FR, which is placed and fills 2000-01-11: the first NAV divergence.
   - k2 admits DXC, which fills 2000-02-28.
   - The other three seeds admit neither.
-- **The second screen, 2000-01-14** (`read/tie-cut-traces.txt`):
+- **The second screen, 2000-01-14** (from the raw `rk-k<k>-s0-trade_audit.sexp`, not committed; `read/tie-cut-traces.txt`
+  has no block for this date):
   - k0 places TWX1, FR and DIS;
   - k1 places TWX1 and VION;
   - k2 places TWX1 and DIS;
@@ -240,7 +241,7 @@ See "Review-pack look" below; the appendix answers each signal bullet.
 **The common core** (`read/overlap.txt`, `read/tail-weights.txt`):
 
 - 274 trades are in every seed, 404 in two to four seeds, and 257 in one.
-- Four trades are in all five seeds; their weights are each trade's P&L as a share of entry NAV:
+- The four largest of the 274 trades in all five seeds, by weight (each trade's P&L as a share of entry NAV):
 
   | trade | weight |
   |---|---:|
@@ -386,7 +387,6 @@ rows reproduce the pack's era table.
 4. **What Seeded changed: it removed the A→Z bias** (`read/letter-mix.txt`).
    - A-tickers are 9.7–11.1 % of seed trades, and A–F tickers 36.3–39.9 %.
    - Under Alphabetical (M, N s0–s2) they are 13.7–15.4 % and 46.4–47.0 %.
-   - In the list union they are 9.5 % and 36.6 %.
    - Under Alphabetical, ADMA wins its 2023-08-18 tie every time: M and all three N salts hold it. Under Seeded it is
      a 3-in-5 draw.
    - The level did not move. M is mid-band, as A-p0 was mid-band at 6y (#3419 §2).
@@ -442,7 +442,8 @@ rows reproduce the pack's era table.
     - The 2025-05-30 reopen is "invested and lagged" in every seed: 13–17 entries, and −1.6 % to +0.1 % against
       +16.6 %.
   - **Bear defence in 2000–08.**
-- **Contradictions:** none in the results. There is one in the pre-registration's text (defect 1).
+- **Contradictions:** none in the results. The chain's list comment and its unchecked md5 are wrong (defect 1); the
+  merged §Design is right.
 
 ### 5. What it implies next (options; the choice is the user's)
 
@@ -474,7 +475,7 @@ rows reproduce the pack's era table.
 
 | # | kind | defect | specimen |
 |---|---|---|---|
-| 1 | pre-registration text | §Design says "the universe is the same 27 lists as the old record (`results/lists-md5.txt`)". It is not. The run's lists (md5 `51fba79e…`) are #3391's, the same as the #3266 rerun's; N's are md5 `deca56c7…`, and the two differ by CMN in five lists. `chain.sh` computes the md5 but compares it with nothing. So item 3's reference also spans a list change, which #3266 labels. The band is unaffected, since all seeds share the lists | `git diff 524bc2df0 fc78391dd -- trading/test_data/backtest_scenarios/pit-v12/composition/top-3000-{2005,2009,2013,2014,2015}.sexp`: one `(symbol CMN)` row each; pre-registered `chain.sh` lines 93–97 |
+| 1 | chain comment / check | `chain.sh` line 93's comment says "Same scheduled lists as the old record", and the md5 it writes is compared with nothing. The run's lists (md5 `51fba79e…`) are #3391's, the same as the #3266 rerun's; N's are md5 `deca56c7…`, and the two differ by CMN in five lists. §Design states this correctly: the pre-registration commit `57eedc3e8` had the wrong sentence, and #3456's second commit (`534561c53`) fixed it before merge, 16 s after the chain launched. So item 3's reference also spans a list change, which #3266 labels. The band is unaffected, since all seeds share the lists | `git diff 524bc2df0 fc78391dd -- trading/test_data/backtest_scenarios/pit-v12/composition/top-3000-{2005,2009,2013,2014,2015}.sexp`: one `(symbol CMN)` row each; `chain.sh` lines 93–97 |
 | 2 | chain | The chain's PACK step failed because its `--out` was outside the run tree, which container steps require. So the chain built no pack; it was rebuilt by hand at `.claude/worktrees/sweep-rk/.review-record-kseed/`. The README's line "the pack goes to `.sweep-output/review-record-kseed-build/`" is wrong | `chain.log` "PACK build failed"; `/tmp/rk-run/pack.log` line 1; `chain.sh` line 169 (`out=$H/review-record-kseed-build`) |
 | 3 | review pack | The stage replay runs only for the charts run (k0), so checks 1 and 13 are measured for k0 and n/a for k1–k4. The "Faithfulness grades by run" table therefore compares different evidence sets. Regraded without checks 1 and 13, k0 reads A 427 / B 20 / C 107 / D 2 / F 10, the same shape as k1–k4 (A 414–432, B 13–18, C 94–114, D 2–3, F 8–9). The mechanism: a trade with one check-3 failure drops from B to C once check 13's pass leaves the denominator. This is coverage, not the seed | `dev/scripts/review_pack.sh` line 119; `site/data/k*_faithfulness.json` `.failures[0,12].known`: k0 35 / 537, k1–k4 0 / 0; `read/pack-checks.txt` |
 | 4 | review pack | "Missed winners" capture is uninformative. "Rode" is 13 of 2,009 owned episodes in k0 (11–19 across seeds), and those 13 are just the run's monsters. The forward return runs to a later peak a median 8 years out (p25 3, p75 14; median +295 %). Ownership is any long trade that overlaps the signal-to-peak interval: MMYT's 2017-01-27 signal counts as "rode" by a 2023 trade. The label compares a ~93-day trade with a multi-year move | `dev/lib/review_pack/index.html` lines 580–582; `read/pack-checks.txt` |
@@ -589,7 +590,7 @@ screens traced above list all 20.
 ### Record
 
 - **Memory.**
-  - The record becomes the K-seed band: median 2.7819, SD 0.2254, range 2.5593–3.1436; k0 reads 2.6482.
+  - `project_record_kseed_band` (new): the record becomes the K-seed band: median 2.7819, SD 0.2254, range 2.5593–3.1436; k0 reads 2.6482.
   - `project_path_stability_seeded_noise`: the 26y SD is now measured, and the gate-1 draws recur at the same seeds.
   - `project_26y_path_noise_floor`: the single-cell floor is 0.45 log at 2 SD.
 - **Ledger.** A baseline entry for this band supersedes `2026-10-12-breadth-fix-rb1-record-baseline` as the record.
