@@ -20,10 +20,12 @@
 #   --snapshot-dir W   snapshot warehouse for trade_audit_report (container path,
 #                      default /tmp/snap_top3000_pit_v11pit); missing -> audit skipped
 #   --data-dir D       CSV bar store (default <repo>/data)
-#   --run-kind K       salt | arm | auto (default auto): salts are one config under
-#                      different path seeds, arms are different configs; the page
-#                      words its comparison accordingly. auto = salt when every label
-#                      is <base>s<N> with one shared base (s0 s1, null-s0 null-s1), else arm
+#   --run-kind K       salt | seed | arm | auto (default auto): salts are one config under
+#                      different path seeds, seeds are one config under different screener
+#                      tie-order seeds, arms are different configs; the page words its
+#                      comparison accordingly. auto = seed when every label is k<N>, else
+#                      salt when every label is <base>s<N> with one shared base (s0 s1,
+#                      null-s0 null-s1), else arm
 #   --no-container     skip the three docker steps (audit report, stage replay,
 #                      their build): the site still builds, without conformance
 #                      rows, audit fields or weekly stage overlays
@@ -61,7 +63,7 @@ while [ $# -gt 0 ]; do
     --data-dir) DATA=$2; shift 2 ;;
     --run-kind) RUN_KIND=$2; shift 2 ;;
     --no-container) DOCKER=0; shift ;;
-    -h|--help) sed -n '2,41p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,43p' "$0"; exit 0 ;;
     *=*) RUNS="$RUNS $1"; shift ;;
     *) echo "review_pack: unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -73,8 +75,9 @@ SPY_CSV="$DATA/S/Y/SPY/data.csv"
 
 log() { printf '[review_pack %s] %s\n' "$(date +%H:%M:%S)" "$*" >&2; }
 labels() { for r in $RUNS; do printf '%s\n' "${r%%=*}"; done; }
-run_kind() { # salt | arm: auto = salt when every label is <base>s<N> with one shared base (#3149)
-  case "$RUN_KIND" in salt|arm) echo "$RUN_KIND"; return ;; esac
+run_kind() { # salt | seed | arm: auto = seed when every label is k<N>; salt when every label is <base>s<N> with one shared base (#3149)
+  case "$RUN_KIND" in salt|seed|arm) echo "$RUN_KIND"; return ;; esac
+  [ "$(labels | grep -cvE '^k[0-9]+$')" = 0 ] && { echo seed; return; }
   [ "$(labels | grep -cvE '(^|[^A-Za-z0-9])s[0-9]+$')" = 0 ] && [ "$(labels | sed -E 's/s[0-9]+$//' | sort -u | wc -l | tr -d ' ')" = 1 ] && echo salt || echo arm
 }
 charts_label() { labels | sed -n "$((CHARTS + 1))p"; }
@@ -186,7 +189,7 @@ host_run() { # $1 label, $2 index
   open_json "$d" > "$s/$1_open.json"
   sh "$LIB/missed_winners.sh" "$DATA" "$d" > "$s/$1_missed.json"
   sh "$LIB/pnl_anatomy.sh" "$d" > "$s/$1_anatomy.json"
-  sh "$LIB/faithfulness.sh" "$s/$1_trades.json" > "$s/$1_faithfulness.json"
+  sh "$LIB/faithfulness.sh" "$s/$1_trades.json" "$FAITH_DROP" > "$s/$1_faithfulness.json"
   # the detector: more than $1 and 1 % apart -> a warning line, and the page's findings say so
   jq -r 'def abs: if . < 0 then -. else . end;
     .check | select(.actual != null) | ((.pack - .actual) | abs) as $e
@@ -234,6 +237,12 @@ for r in $RUNS; do stage_run "${r%%=*}" "${r#*=}"; done
 spy_covers_runs
 [ "$DOCKER" = 1 ] && docker_steps
 mkdir -p "$OUT/site/data"
+# The stage replay (~1.3 s per trade) runs for the charts run only, so checks 1 and 13 are measured for that
+# run alone. When some runs have a replay and others do not, every run is graded without them, so the grades
+# compare the same evidence; the faithfulness tab says which checks were dropped.
+FAITH_DROP=""; with_stage=0; for l in $(labels); do [ -d "$OUT/runs/$l/stage" ] && with_stage=$((with_stage + 1)); done
+[ "$with_stage" -gt 0 ] && [ "$with_stage" -lt "$(labels | wc -l | tr -d ' ')" ] && FAITH_DROP="1,13"
+[ -z "$FAITH_DROP" ] || log "faithfulness: only $with_stage of $(labels | wc -l | tr -d ' ') runs have a stage replay; grading every run without checks 1 and 13"
 i=0; for l in $(labels); do host_run "$l" "$i"; i=$((i + 1)); done
 site_common
 check_json

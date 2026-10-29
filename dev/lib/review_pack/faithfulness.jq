@@ -17,6 +17,8 @@ def rules: [
   {id:13, name:"No Stage-4 hold", weight:2, section:"1", evidence:"s4w and holdW from weekly stage replay; any observed Stage-4 week fails."}
 ];
 def num: type == "number";
+# check ids read as n/a for every trade (--argjson drop [..]); none by default
+def dropped: $ARGS.named.drop // [];
 def status($x): if $x == null then "n/a" elif $x then "pass" else "fail" end;
 # Conventional percentage bands, inclusive at 90/80/70/60; no E band.
 def grade($score):
@@ -25,6 +27,7 @@ def grade($score):
   elif $score >= 60 then "D" else "F" end;
 def known_stage: . == "Stage1" or . == "Stage2" or . == "Stage3" or . == "Stage4";
 def check($i):
+  if (dropped | index($i)) != null then null else
   if .side != "LONG" then null
   elif $i == 1 then if (.rsE | known_stage) and .rsE != "Stage2" then false else null end
   elif $i == 3 then if (.vr | num) and .vr >= 0 then .vr >= 2 else null end
@@ -45,7 +48,7 @@ def check($i):
   elif $i == 13 then
     if (.s4w | num) and .s4w > 0 then false
     elif (.s4w | num) and .s4w == 0 and (.holdW | num) and .holdW > 0 then true else null end
-  else null end;
+  else null end end;
 def row:
   . as $t
   | [rules[] as $r | $r + {status: ($t | check($r.id) | status(.))}] as $checks
@@ -63,7 +66,7 @@ def row:
                elif .fvt < 0 then false else null end),
        history: null}};
 [.[] | row] as $rows
-| {available:true, rules:rules, total_weight:(rules | map(.weight) | add), rows:$rows,
+| {available:true, excluded:dropped, rules:rules, total_weight:(rules | map(.weight) | add), rows:$rows,
    grades: (["A","B","C","D","F","n/a"] | map(. as $g | {key:$g,value:([$rows[] | select(.grade == $g)] | length)}) | from_entries),
    failures: [rules[] as $r | $r + {
      count: ([$rows[].checks[] | select(.id == $r.id and .status == "fail")] | length),
