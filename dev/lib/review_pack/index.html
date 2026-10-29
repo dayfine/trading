@@ -1409,20 +1409,25 @@ function initCareerScorecard() {
 /* ---------- Salts ---------- */
 // Trades held by some runs but not all. A trade is keyed by symbol + entry date. first = the earliest such
 // entry (by date, then symbol), not the first position where two sorted lists differ, which can name a trade
-// every run holds. big = the largest of them by entry weight (entry value over the NAV on the entry date,
-// read from the first run that holds it), each with the runs that hold it and the runs that do not.
+// every run holds. big = the largest of them by impact: realised total-return P&L (price P&L plus dividends
+// where the row carries them) over the NAV on the entry date, by absolute value so big losers show too. Entry
+// weight (entry value over the same NAV) is shown beside it; every position is sized near the same weight, so
+// weight alone ranks noise. NAV is read from the first run that holds the trade; each row lists the runs that
+// hold it and the runs that do not.
 function partialTrades(trades, navs, labels, top = 5) {
   const key = t => t.sym + '|' + t.ed, n = trades.length, held = new Map();
   trades.forEach((ts, i) => ts.forEach(t => { const h = held.get(key(t)) || { t, runs: [] }; h.runs.push(i); held.set(key(t), h); }));
   const navAt = (i, d) => { let v = null; for (const r of navs[i] || []) { if (r[0] > d) break; v = r[1]; } return v; };
   const some = [...held.values()].filter(h => h.runs.length < n).map(h => {
     const nav = navAt(h.runs[0], h.t.ed);
-    return { sym: h.t.sym, ed: h.t.ed, pnl: h.t.pnl, weight: nav ? 100 * Math.abs(h.t.qty * h.t.ep) / nav : null,
+    const pnl = h.t.pnl + (h.t.div || 0);
+    return { sym: h.t.sym, ed: h.t.ed, pnl, weight: nav ? 100 * Math.abs(h.t.qty * h.t.ep) / nav : null,
+      impact: nav ? 100 * pnl / nav : null,
       holders: h.runs.map(i => labels[i]), missing: labels.filter((_, i) => !h.runs.includes(i)) };
   });
   const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   const first = [...some].sort((a, b) => cmp(a.ed, b.ed) || cmp(a.sym, b.sym))[0] || null;
-  const big = [...some].sort((a, b) => (b.weight ?? -1) - (a.weight ?? -1) || cmp(a.ed, b.ed) || cmp(a.sym, b.sym)).slice(0, top);
+  const big = [...some].sort((a, b) => (b.impact == null ? -1 : Math.abs(b.impact)) - (a.impact == null ? -1 : Math.abs(a.impact)) || cmp(a.ed, b.ed) || cmp(a.sym, b.sym)).slice(0, top);
   return { first, big, count: some.length };
 }
 const SALT_COLORS = ['--accent', '--s1', '--s4', '--s3', '--s2', '--neut'];
@@ -1442,14 +1447,14 @@ function renderSalts() {
   const tot = D.trades.map(ts => ts.reduce((a, t) => a + t.pnl, 0));
   const part = partialTrades(D.trades, D.nav, D.man.runs.map((r, i) => runLabel(i)));
   const runsText = (a, b) => `held by ${a.join(', ')}; not by ${b.join(', ')}`;
-  const bigRows = part.big.map(p => `<tr><td><b>${faithEsc(p.sym)}</b> ${p.ed}</td><td class="num">${p.weight == null ? '–' : fmt(p.weight, 1) + '%'}</td>${tdu(p.pnl)}<td>${faithEsc(p.holders.join(', '))}</td><td>${faithEsc(p.missing.join(', '))}</td></tr>`).join('');
+  const bigRows = part.big.map(p => `<tr><td><b>${faithEsc(p.sym)}</b> ${p.ed}</td><td class="num">${p.impact == null ? '–' : fmt(p.impact, 1) + '%'}</td><td class="num">${p.weight == null ? '–' : fmt(p.weight, 1) + '%'}</td>${tdu(p.pnl)}<td>${faithEsc(p.holders.join(', '))}</td><td>${faithEsc(p.missing.join(', '))}</td></tr>`).join('');
   const uniqTop = D.trades.map((ts, i) => ts.filter(t => sets.every((s, o) => o === i || !s.has(key(t)))).sort((a, b) => b.pnl - a.pnl).slice(0, 3));
   $('#s-overlap').innerHTML = `<p class="note">A trade counts as shared when the same symbol was entered on the same date. ${part.first ? `The first entry not held by every ${RK()} is ${faithEsc(part.first.sym)} ${part.first.ed} (${faithEsc(runsText(part.first.holders, part.first.missing))}); every earlier entry is held by all.` : `Every ${RK()} holds the same trades.`}</p>
     <div class="kpis"><div class="kpi"><span class="k">In every ${RK()}</span><span class="v">${nAll}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In some</span><span class="v">${nSome}</span><span class="n">trades</span></div><div class="kpi"><span class="k">In one ${RK()} only</span><span class="v">${nOne}</span><span class="n">trades</span></div></div>
     <table><thead><tr><th>${RKC()}</th><th class="num">Trades</th><th class="num">Realised total</th><th class="num">From shared trades</th><th class="num">From the rest</th><th>Biggest trades only this ${RK()} took</th></tr></thead><tbody>${D.trades.map((ts, i) => `<tr><td><b>${runLabel(i)}</b></td><td class="num">${ts.length}</td>${tdu(tot[i])}${tdu(pAll[i])}${tdu(tot[i] - pAll[i])}<td>${uniqTop[i].map(t => `${t.sym} ${usdk(t.pnl)}`).join(', ')}</td></tr>`).join('')}</tbody></table>
     <h3>Largest trades held by some ${RK()}s but not all</h3>
-    <p class="note">Ranked by entry weight: entry value over the NAV on the entry date. ${part.count} trades are held by some but not all.</p>
-    ${part.big.length ? `<table><thead><tr><th>Trade</th><th class="num">Entry weight</th><th class="num">Realised</th><th>Held by</th><th>Not held by</th></tr></thead><tbody>${bigRows}</tbody></table>` : '<p class="note">None.</p>'}`;
+    <p class="note">Ranked by impact: realised P&L (dividends included where the trade row carries them) over the NAV on the entry date, by absolute value so large losers show too. Entry weight is entry value over the same NAV. ${part.count} trades are held by some but not all.</p>
+    ${part.big.length ? `<table><thead><tr><th>Trade</th><th class="num">Impact</th><th class="num">Entry weight</th><th class="num">Realised</th><th>Held by</th><th>Not held by</th></tr></thead><tbody>${bigRows}</tbody></table>` : '<p class="note">None.</p>'}`;
 }
 
 /* ---------- Agenda ---------- */
