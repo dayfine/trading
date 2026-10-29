@@ -1655,6 +1655,12 @@ assert.deepStrictEqual(p.big.map(x => x.sym), ['ADMA', 'LOSS', 'DECOY', 'AAA', '
 assert.strictEqual(Math.round(p.big[1].impact * 100) / 100, -20, 'a big loser held by some runs ranks by absolute impact');
 assert.strictEqual(partialTrades([[t('D', '2023-12-19', 10, 10, 100, ), common], [common]], [nav, nav], ['a', 'b']).big[0].pnl, 100);
 assert.strictEqual(partialTrades([[Object.assign(t('D', '2023-12-19', 10, 10, 100), { div: 50 }), common], [common]], [nav, nav], ['a', 'b']).big[0].pnl, 150, 'dividends count toward realised P&L');
+const lead = t('LEAD', '2001-01-01', 10, 10, 120000), overtaker = Object.assign(t('OVER', '2001-01-01', 10, 10, 100000), { div: 50000 });
+const flip = partialTrades([[lead, overtaker, common], [common]], [nav, nav], ['a', 'b']).big;
+assert.deepStrictEqual(flip.map(x => x.sym), ['OVER', 'LEAD'], 'impact ranks by P&L plus dividends: OVER (150k) overtakes LEAD (120k) only when dividends count');
+assert.strictEqual(Math.round(flip[0].impact * 1000) / 1000, 15, 'impact on a dividend row is (pnl + div) over NAV: 150000 / 1000000');
+const noNav = t('NONAV', '1999-01-01', 10, 10, 900000), small = t('SMALL', '2001-01-01', 10, 10, 1000);
+assert.deepStrictEqual(partialTrades([[noNav, small, common], [common]], [nav, nav], ['a', 'b']).big.map(x => x.sym), ['SMALL', 'NONAV'], 'a trade with no NAV ranks below one with a known impact');
 assert.deepStrictEqual([p.big[0].holders, p.big[0].missing], [['k1', 'k2', 'k3'], ['k0']]);
 assert.strictEqual(Math.round(p.big[0].weight * 100) / 100, 25, '40000 x 25 over a 4M NAV');
 assert.strictEqual(partialTrades([[common], [common]], [nav, nav], ['a', 'b']).first, null, 'identical runs: nothing partial');
