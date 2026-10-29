@@ -19,7 +19,8 @@
 #   --max-seconds N   same, in seconds (overrides --max-minutes)
 #   --interval S      seconds between checks (default 30)
 #
-# Exit: 0 the condition holds; 2 timed out; 1 usage error. Every fired or
+# Exit: 0 the condition holds; 2 timed out; 1 usage error; 3 no GitHub backend
+# (checks/reviews only, checked at startup). Every fired or
 # timed-out exit prints one line with the UTC wall-clock time and the elapsed
 # seconds, so a resumed session can tell "fired late" from "never fired".
 #
@@ -31,12 +32,22 @@
 # The PR conditions use `gh api` (REST), not `gh pr checks` / `gh pr view`,
 # which go through GraphQL and are refused in Claude cloud sessions.
 #
-# Seams (tests): WAIT_FOR_GH (default gh), WAIT_FOR_PS (default
+# Backend for checks/reviews: `gh` when it is on PATH; otherwise curl against
+# https://api.github.com with $GH_TOKEN, parsed with jq (the GHA orchestrator
+# container has no gh). If neither is usable (no gh and no GH_TOKEN, or no curl
+# or jq), checks/reviews exit 3 immediately with a message on stderr -- they
+# never wait silently on a backend that cannot answer (2026-10-29: two
+# 540 s timeouts on checks that had long since completed).
+#
+# Seams (tests): WAIT_FOR_GH (default gh), WAIT_FOR_CURL (default curl), WAIT_FOR_PS (default
 # 'ps -eo stat=,args='), WAIT_FOR_REPO (default dayfine/trading).
 
 set -u
 
 GH="${WAIT_FOR_GH:-gh}"
+CURL="${WAIT_FOR_CURL:-curl}"
+EXIT_NO_BACKEND=3
+backend=""
 PS_CMD="${WAIT_FOR_PS:-ps -eo stat=,args=}"
 REPO="${WAIT_FOR_REPO:-dayfine/trading}"
 SECONDS_PER_MINUTE=60
@@ -66,14 +77,40 @@ _cond_log() {
   [ -f "$1" ] && grep -Eq -- "$2" "$1"
 }
 
+# _api <rest-path> <jq-filter>: print the filtered REST response using the
+# selected backend; non-zero when the call or the parse fails.
+_api() {
+  if [ "$backend" = gh ]; then
+    $GH api "$1" --jq "$2" 2>/dev/null
+  else
+    body=$($CURL -fsSL -H "Authorization: Bearer ${GH_TOKEN:-}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/$1" 2>/dev/null) || return 1
+    printf "%s" "$body" | jq -r "$2" 2>/dev/null
+  fi
+}
+
+# Pick the backend for checks/reviews, or exit 3.
+_select_backend() {
+  if command -v "$GH" >/dev/null 2>&1; then
+    backend=gh
+  elif [ -n "${GH_TOKEN:-}" ] && command -v "$CURL" >/dev/null 2>&1 &&
+    command -v jq >/dev/null 2>&1; then
+    backend=curl
+  else
+    echo "wait_for: no GitHub backend for '$kind': need gh on PATH, or GH_TOKEN with curl and jq" >&2
+    exit "$EXIT_NO_BACKEND"
+  fi
+}
+
 # Check runs on the PR head (REST, so it also works where GraphQL is blocked);
 # fires when there is at least one and every one has completed. Detail names
 # the failed count so the caller knows which way it went.
 _cond_checks() {
-  sha=$($GH api "repos/$REPO/pulls/$1" --jq .head.sha 2>/dev/null) || return 1
+  sha=$(_api "repos/$REPO/pulls/$1" .head.sha) || return 1
   [ -n "$sha" ] || return 1
-  runs=$($GH api "repos/$REPO/commits/$sha/check-runs?per_page=100" \
-    --jq '.check_runs[] | "\(.status) \(.conclusion)"' 2>/dev/null) || return 1
+  runs=$(_api "repos/$REPO/commits/$sha/check-runs?per_page=100" \
+    '.check_runs[] | "\(.status) \(.conclusion)"') || return 1
   [ -n "$runs" ] || return 1
   if printf '%s\n' "$runs" | grep -qv '^completed '; then return 1; fi
   fails=$(printf '%s\n' "$runs" |
@@ -84,8 +121,7 @@ _cond_checks() {
 }
 
 _cond_reviews() {
-  n=$($GH api "repos/$REPO/pulls/$1/reviews?per_page=100" --jq length \
-    2>/dev/null) || return 1
+  n=$(_api "repos/$REPO/pulls/$1/reviews?per_page=100" length) || return 1
   _is_uint "$n" && [ "$n" -ge "$2" ]
 }
 
@@ -132,6 +168,7 @@ case "$kind" in
   proc) [ $# -eq 1 ] || _usage; detail="no live process matches '$1'" ;;
   *) _usage ;;
 esac
+case "$kind" in checks | reviews) _select_backend ;; esac
 
 while :; do
   if "_cond_$kind" "$@"; then
