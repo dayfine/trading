@@ -90,7 +90,7 @@ cmd_launch() {
   [ "$(wc -l < "$STAGE/runner-extras.txt" | tr -d ' ')" = 14 ] || die "expected 14 runner extras in $MI"
   { grep -v -x -F MEL "$STAGE/lists-union.txt"; echo GSPC.INDX; cat "$STAGE/runner-extras.txt"; } | LC_ALL=C sort -u > "$STAGE/wh-syms.txt"
   [ "$(wc -l < "$STAGE/wh-syms.txt" | tr -d ' ')" = "$EXPECT_WH" ] || die "derived warehouse set != $EXPECT_WH"
-  # Same scheduled lists as the old record: md5 of the 27 lists in schedule order.
+  # md5 of the 27 scheduled lists, recorded for provenance (not compared: these are #3391's lists, not the old record's).
   grep -o '"pit-v12/composition/top-3000-[0-9]*\.sexp"' "$STAGE/specs/rk-k0.sexp" | tr -d '"' | LC_ALL=C sort -u > "$STAGE/sched-lists.txt"
   [ "$(wc -l < "$STAGE/sched-lists.txt" | tr -d ' ')" = 27 ] || die "expected 27 scheduled lists"
   echo "lists md5 $(while read -r p; do cat "$WTREL/trading/test_data/backtest_scenarios/$p"; done < "$STAGE/sched-lists.txt" | md5 -q)" > "$STAGE/lists-md5.txt"

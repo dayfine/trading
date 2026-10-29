@@ -1,0 +1,33 @@
+[10-27 12:18:52] record-kseed run tree .claude/worktrees/sweep-rk HEAD=fc78391dd (expect fc78391dd) prereg=57eedc3e8 lists md5 51fba79e26a6273845c37c13f6aae070
+[10-27 12:18:52] cell guard CELL_TIMEOUT=60000s (1.5 x 39,142 s, vcv-M-s2); SNAPSHOT_MAX_MMAP_HANDLES=12000
+[10-27 12:18:53] host free 62G
+[10-27 12:18:53] BUILD
+[10-27 12:20:32] BUILD_DONE
+[10-27 12:20:32] WH /tmp/snap_top3000_pit_v12wk reused: 9236 symbols, equal to the run tree's derived set
+[10-27 12:20:32] PREFLIGHT rk-k0
+[10-27 12:29:25] PREFLIGHT_OK rk-k0 (533s)
+[10-27 12:29:25] PREFLIGHT rk-k1
+[10-27 12:35:59] PREFLIGHT_OK rk-k1 (394s)
+[10-27 12:35:59] host free 64G
+[10-27 12:36:00] RUN rk-k0-s0 on /tmp/snap_top3000_pit_v12wk
+[10-27 16:06:05] GUARDS rk-k0-s0 => Panel_runner: split_dividend_guard rejected=3 no_files=0  cash_rejections=43
+[10-27 16:06:05] RESULT rk-k0-s0 => total_return_pct 1312.7881612948102 total_trades 566 sharpe_ratio 0.60588204030579318 max_drawdown_pct 26.227255994619149 calmar_ratio 0.40090340057005941  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-rk/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: none peak_rss_kb=5789396 Panel_runner: snapshot cache hits=148642221 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2487962232 maxrss_bytes=5911773184 (wall 12605s)
+[10-27 16:06:05] host free 61G
+[10-27 16:06:05] RUN rk-k1-s0 on /tmp/snap_top3000_pit_v12wk
+[10-27 19:31:41] GUARDS rk-k1-s0 => Panel_runner: split_dividend_guard rejected=2 no_files=0  cash_rejections=51
+[10-27 19:31:41] RESULT rk-k1-s0 => total_return_pct 2218.8186060854741 total_trades 555 sharpe_ratio 0.72579095804517446 max_drawdown_pct 24.159467674532632 calmar_ratio 0.52160720965037621  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-rk/trading/test_data/share_classes.sexp) V16 EXPECTATION 2 violations V17 EXPECTATION PASS  v6diff: vsk0(rk-k0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=5783660 Panel_runner: snapshot cache hits=148619981 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2481082536 maxrss_bytes=5906632704 (wall 12336s)
+[10-27 19:31:41] host free 59G
+[10-27 19:31:41] RUN rk-k2-s0 on /tmp/snap_top3000_pit_v12wk
+[10-28 01:57:43] GUARDS rk-k2-s0 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=50
+[10-28 01:57:43] RESULT rk-k2-s0 => total_return_pct 1515.02772600391 total_trades 552 sharpe_ratio 0.631675353160662 max_drawdown_pct 32.075605496055189 calmar_ratio 0.3452562106443619  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-rk/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsk0(rk-k0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=5811476 Panel_runner: snapshot cache hits=148613563 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2509055720 maxrss_bytes=5935128576 (wall 23162s)
+[10-28 01:57:43] host free 45G
+[10-28 01:57:43] RUN rk-k3-s0 on /tmp/snap_top3000_pit_v12wk
+[10-28 06:51:40] GUARDS rk-k3-s0 => Panel_runner: split_dividend_guard rejected=4 no_files=0  cash_rejections=43
+[10-28 06:51:40] RESULT rk-k3-s0 => total_return_pct 1192.6885047296505 total_trades 564 sharpe_ratio 0.60151234272544485 max_drawdown_pct 23.874121093498545 calmar_ratio 0.42491547367662097  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-rk/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsk0(rk-k0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=5777904 Panel_runner: snapshot cache hits=148647767 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2476271888 maxrss_bytes=5900623872 (wall 17637s)
+[10-28 06:51:40] host free 33G
+[10-28 06:51:41] RUN rk-k4-s0 on /tmp/snap_top3000_pit_v12wk
+[10-28 10:22:14] GUARDS rk-k4-s0 => Panel_runner: split_dividend_guard rejected=3 no_files=0  cash_rejections=41
+[10-28 10:22:14] RESULT rk-k4-s0 => total_return_pct 1648.6561693564245 total_trades 552 sharpe_ratio 0.65305321059651722 max_drawdown_pct 26.105612040059317 calmar_ratio 0.43700250305029475  V6 INVARIANT PASS (share-class map: /workspaces/trading-1/.claude/worktrees/sweep-rk/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION PASS  v6diff: vsk0(rk-k0-s0-validator.sexp.sexp):exit=0 peak_rss_kb=5801860 Panel_runner: snapshot cache hits=148614022 misses=20659 miss_absent=11423 evictions=0 n_symbols=9237 misses_per_symbol=2.24 n_symbols_touched=9236 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9236 max_bytes=128414088 max_mmap_open=9236 avg_entries=4618.5 avg_bytes=64873859 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2499976192 maxrss_bytes=5925531648 (wall 12633s)
+[10-28 10:22:14] CELLS DONE: 5 RESULT, 0 EXCLUDED, 0 failed/void (of 5)
+[10-28 10:22:14] PACK: k0=/Users/difan/Projects/trading-1/.sweep-output/record-kseed/rk-k0-s0- k1=/Users/difan/Projects/trading-1/.sweep-output/record-kseed/rk-k1-s0- k2=/Users/difan/Projects/trading-1/.sweep-output/record-kseed/rk-k2-s0- k3=/Users/difan/Projects/trading-1/.sweep-output/record-kseed/rk-k3-s0- k4=/Users/difan/Projects/trading-1/.sweep-output/record-kseed/rk-k4-s0-
+[10-28 10:22:14] PACK build failed (see /tmp/rk-run/pack.log)

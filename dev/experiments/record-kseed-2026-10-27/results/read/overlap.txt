@@ -1,0 +1,73 @@
+keys in 5 seeds: 274
+keys in 4 seeds: 114
+keys in 3 seeds: 126
+keys in 2 seeds: 164
+keys in 1 seeds: 257
+
+per seed: shared-by-all-5 / in 2-4 seeds / this seed only (n, total-return $, price-only $)
+k0 | all5 n=274 TR=6536384 price=6189406 | some n=240 TR=2448698 price=1796401 | only n=52 TR=1800991 price=1582439 | not-in-all-5 price=3378841
+k1 | all5 n=274 TR=6714116 price=6290358 | some n=224 TR=9803754 price=9100039 | only n=57 TR=1805815 price=1680611 | not-in-all-5 price=10780651
+k2 | all5 n=274 TR=6041660 price=5683279 | some n=228 TR=5167360 price=4262399 | only n=50 TR=998228 price=904183 | not-in-all-5 price=5166582
+k3 | all5 n=274 TR=6537423 price=6196618 | some n=238 TR=2431957 price=1797810 | only n=52 TR=721233 price=655997 | not-in-all-5 price=2453807
+k4 | all5 n=274 TR=6099269 price=5735785 | some n=232 TR=7294597 price=6530961 | only n=46 TR=130992 price=-82621 | not-in-all-5 price=6448340
+
+trades by seed set, any seed's total-return P&L > $300k (k$ per seed; - = not taken)
+2003-09-15 ADSK seeds=01234 k0=547 k1=506 k2=511 k3=546 k4=517
+2010-02-05 CRM seeds=2 k0=- k1=- k2=509 k3=- k4=-
+2010-02-08 CMG seeds=14 k0=- k1=397 k2=- k3=- k4=399
+2010-08-16 FOSL seeds=0124 k0=338 k1=316 k2=375 k3=- k4=333
+2010-11-15 MERC seeds=3 k0=- k1=- k2=- k3=440 k4=-
+2012-08-13 LAD seeds=1 k0=- k1=567 k2=- k3=- k4=-
+2012-12-17 LGND seeds=0 k0=531 k1=- k2=- k3=- k4=-
+2013-09-10 AVGO seeds=0134 k0=670 k1=726 k2=- k3=639 k4=678
+2014-10-21 GPN seeds=01234 k0=437 k1=459 k2=418 k3=403 k4=425
+2015-01-06 IPHI seeds=4 k0=- k1=- k2=- k3=- k4=340
+2016-07-07 AGX seeds=01234 k0=333 k1=359 k2=309 k3=324 k4=336
+2016-10-26 ROL seeds=01234 k0=297 k1=321 k2=276 k3=289 k4=300
+2016-10-31 PEGA seeds=01234 k0=696 k1=749 k2=651 k3=682 k4=700
+2017-03-28 CHDN seeds=1 k0=- k1=385 k2=- k3=- k4=-
+2017-05-30 NJDCY seeds=134 k0=- k1=338 k2=- k3=301 k4=310
+2017-08-07 TREX seeds=1 k0=- k1=356 k2=- k3=- k4=-
+2017-08-08 WING seeds=0123 k0=356 k1=376 k2=314 k3=335 k4=-
+2017-12-04 SAGE seeds=2 k0=- k1=- k2=556 k3=- k4=-
+2019-07-22 DXCM seeds=01234 k0=805 k1=939 k2=775 k3=797 k4=825
+2019-10-14 SGEN seeds=12 k0=- k1=459 k2=380 k3=- k4=-
+2020-06-15 APPS seeds=01234 k0=2655 k1=3255 k2=2664 k3=2632 k4=2697
+2020-08-04 AN seeds=01234 k0=689 k1=844 k2=682 k3=675 k4=693
+2020-08-05 BBWI seeds=01234 k0=1103 k1=1351 k2=1091 k3=1080 k4=1110
+2020-09-04 SSTK seeds=01234 k0=584 k1=718 k2=580 k3=574 k4=590
+2020-09-28 WSM seeds=12 k0=- k1=713 k2=579 k3=- k4=-
+2020-11-09 ADNT seeds=24 k0=- k1=- k2=604 k3=- k4=613
+2020-11-16 FCNCA seeds=234 k0=- k1=- k2=453 k3=445 k4=459
+2020-11-24 HPQ seeds=014 k0=275 k1=339 k2=- k3=- k4=282
+2021-01-19 CCJ seeds=1 k0=- k1=563 k2=- k3=- k4=-
+2021-02-23 MAA seeds=13 k0=- k1=325 k2=- k3=260 k4=-
+2021-06-25 MIME seeds=01 k0=381 k1=468 k2=- k3=- k4=-
+2021-07-27 VICR seeds=01234 k0=370 k1=505 k2=401 k3=364 k4=397
+2021-08-27 ON seeds=01234 k0=222 k1=301 k2=242 k3=218 k4=239
+2022-02-07 GLNG seeds=0134 k0=1124 k1=1523 k2=- k3=1076 k4=1165
+2023-09-15 LPG seeds=0 k0=312 k1=- k2=- k3=- k4=-
+2023-09-19 X seeds=01234 k0=293 k1=404 k2=278 k3=285 k4=304
+2023-10-09 SUN seeds=0134 k0=328 k1=450 k2=- k3=317 k4=341
+2023-10-26 MMYT seeds=01234 k0=2476 k1=3395 k2=2357 k3=2392 k4=2572
+2023-12-19 ADMA seeds=124 k0=- k1=5182 k2=3575 k3=- k4=3922
+2024-04-22 AGI seeds=3 k0=- k1=- k2=- k3=372 k4=-
+2024-04-23 ATI seeds=034 k0=384 k1=- k2=- k3=364 k4=409
+2024-07-08 CVNA seeds=0 k0=1100 k1=- k2=- k3=- k4=-
+2024-08-12 VCYT seeds=14 k0=- k1=415 k2=- k3=- k4=316
+2025-04-14 SPNT seeds=01234 k0=312 k1=514 k2=353 k3=288 k4=388
+2025-05-01 STN seeds=01234 k0=268 k1=439 k2=306 k3=246 k4=332
+2025-07-18 MRUS seeds=01234 k0=510 k1=848 k2=578 k3=474 k4=642
+2025-09-05 ATMU seeds=0134 k0=185 k1=307 k2=- k3=171 k4=229
+
+shared-trade matrix (symbol|entry_date), seeds vs M (v3266, Alphabetical, fixed code) vs N s0-s2
+        k0    k1    k2    k3    k4     M    N0    N1    N2
+  k0   566   390   405   407   406   412   377   382   378
+  k1   390   555   390   402   386   395   371   370   368
+  k2   405   390   552   394   393   403   381   382   384
+  k3   407   402   394   564   393   407   377   381   379
+  k4   406   386   393   393   552   398   382   385   381
+   M   412   395   403   407   398   566   471   464   473
+  N0   377   371   381   377   382   471   570   559   562
+  N1   382   370   382   381   385   464   559   575   553
+  N2   378   368   384   379   381   473   562   553   568

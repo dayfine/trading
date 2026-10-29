@@ -1,0 +1,15 @@
+## ADMA entry record, k1 (decision 2023-08-18)
+(cascade_score 95) (suggested_entry 4.32) (close_at_decision 4.1) (installed_stop 3.9263999999999997) (stop_floor_kind Support_floor) (risk_pct 0.079999999999999918) (initial_position_value 1715584.32) (placement_date 2023-08-18) (ticket_age_weeks_at_fill 17) 
+
+## SGNT-wein-703, k0: installed stop (unrounded) and the bars around the exit
+(installed_stop 23.759999999999998)
+date,open,high,low,close,adjusted_close,volume
+2014-08-01,25.56,25.678,24.02,24.27,24.27,321098
+2014-08-04,24.22,24.364,23.76,23.98,23.98,262440
+2014-08-05,23.93,24.67,23.735,24.55,24.55,185936
+2014-08-06,24.42,25.04,24.42,24.8,24.8,144382
+
+## IHG 2012-06-19 entry bar and its later consolidation
+date,open,high,low,close,adjusted_close,volume,active_through
+2012-06-19,23.82,24.2201,23.8,24.11,17.5324,610402,
+2012-10-09,0.93333333333333335

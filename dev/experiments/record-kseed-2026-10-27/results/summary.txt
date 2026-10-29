@@ -1,0 +1,24 @@
+record-kseed summary: seeds from /tmp/rk-run/results; old record N (Alphabetical, salts 0-2) from /Users/difan/Projects/trading-1/dev/experiments/breadth-fix-rb1-2026-10-11/results
+
+cell     status     total_return_pct  ln(1+R)   sharpe   max_dd_pct  calmar   trades
+new  k0  included   1312.7881612948102  2.6482    0.60588204030579318  26.227255994619149  0.40090340057005941  566
+new  k1  included   2218.8186060854741  3.1436    0.72579095804517446  24.159467674532632  0.52160720965037621  555
+new  k2  included   1515.02772600391  2.7819    0.631675353160662  32.075605496055189  0.3452562106443619  552
+new  k3  included   1192.6885047296505  2.5593    0.60151234272544485  23.874121093498545  0.42491547367662097  564
+new  k4  included   1648.6561693564245  2.8614    0.65305321059651722  26.105612040059317  0.43700250305029475  552
+old  s0  reference  849.28471802734794  2.2505    0.52619961747211075  22.519479027939532  0.39378153424860968  570
+old  s1  reference  835.98652087284813  2.2364    0.52215909262678983  22.193349859198747  0.39695567906507234  575
+old  s2  reference  878.269961499003  2.2806    0.53422141323157679  22.187817831793144  0.40524336178655  568
+
+set  n  median_ln  sd_ln    min_ln   max_ln   median_sharpe  median_maxdd  median_calmar
+new  5  2.7819     0.2254   2.5593   3.1436   0.6317         26.1056       0.4249
+old  3  2.2505     0.0226   2.2364   2.2806   0.5262         22.1933       0.3970
+
+record: replaced by the K-seed set (n = 5); headline median ln(1+R) 2.7819, range [2.5593, 3.1436]
+old record N median ln(1+R) 2.2505 lies outside the new seed range (descriptive; salts vs seeds, not paired)
+
+divergence onset (first date a seed's NAV differs from k0's; descriptive):
+  k1: 2000-01-25
+  k2: 2000-02-28
+  k3: 2000-01-11
+  k4: 2000-01-25

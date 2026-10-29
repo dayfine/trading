@@ -1,0 +1,30 @@
+k0 grades {"A":416,"B":122,"C":6,"D":20,"F":2,"n/a":0}; check1 known 35; check13 known 537
+k1 grades {"A":420,"B":18,"C":106,"D":2,"F":9,"n/a":0}; check1 known 0; check13 known 0
+k2 grades {"A":414,"B":13,"C":114,"D":3,"F":8,"n/a":0}; check1 known 0; check13 known 0
+k3 grades {"A":432,"B":13,"C":108,"D":3,"F":8,"n/a":0}; check1 known 0; check13 known 0
+k4 grades {"A":430,"B":17,"C":94,"D":3,"F":8,"n/a":0}; check1 known 0; check13 known 0
+k0 regraded without checks 1 and 13: A 427 B 20 C 107 D 2 F 10 n/a 0
+
+k0 missed-winner capture: cut=1079 partial=917 rode=13 unowned=18456
+k1 missed-winner capture: cut=1050 partial=962 rode=19 unowned=18434
+k2 missed-winner capture: cut=1127 partial=930 rode=16 unowned=18392
+k3 missed-winner capture: cut=1125 partial=957 rode=11 unowned=18372
+k4 missed-winner capture: cut=1047 partial=892 rode=18 unowned=18508
+signal-to-peak years: p25 3 median 8 p75 14
+forward return %: p25 166 median 295 p75 644
+
+reopen 2009-05-01 k0 entries 13w=0 26w=2 strategy 26w -0.6%
+reopen 2009-05-01 k1 entries 13w=0 26w=2 strategy 26w +0.1%
+reopen 2009-05-01 k2 entries 13w=0 26w=1 strategy 26w -0.7%
+reopen 2009-05-01 k3 entries 13w=0 26w=4 strategy 26w -2.3%
+reopen 2009-05-01 k4 entries 13w=0 26w=3 strategy 26w -2.8%
+reopen 2010-08-06 k0 entries 13w=8 26w=13 strategy 26w +6.6%
+reopen 2010-08-06 k1 entries 13w=9 26w=13 strategy 26w +24.0%
+reopen 2010-08-06 k2 entries 13w=7 26w=12 strategy 26w +14.3%
+reopen 2010-08-06 k3 entries 13w=8 26w=16 strategy 26w +7.6%
+reopen 2010-08-06 k4 entries 13w=6 26w=12 strategy 26w +16.5%
+reopen 2025-05-30 k0 entries 13w=13 26w=19 strategy 26w +0.1%
+reopen 2025-05-30 k1 entries 13w=13 26w=19 strategy 26w -1.2%
+reopen 2025-05-30 k2 entries 13w=17 26w=21 strategy 26w -0.6%
+reopen 2025-05-30 k3 entries 13w=15 26w=20 strategy 26w -0.9%
+reopen 2025-05-30 k4 entries 13w=14 26w=20 strategy 26w -1.6%
