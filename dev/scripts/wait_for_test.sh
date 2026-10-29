@@ -95,6 +95,93 @@ if [ "$got" -ne 0 ] || ! printf '%s' "$out" | grep -q -- "fired"; then
   failures=$((failures + 1))
 fi
 
+# curl backend (no gh on PATH, as in the GHA orchestrator container): a stub
+# curl prints raw REST JSON for the URL (its last argument); jq shapes it.
+cat >"$TMP/curl" <<'EOF'
+#!/bin/sh
+for a; do url=$a; done
+# Reject unless the call is authenticated and aimed at api.github.com.
+case " $* " in *" Authorization: Bearer tok "*) ;; *) exit 22 ;; esac
+case "$url" in https://api.github.com/*) ;; *) exit 22 ;; esac
+case "$url" in
+  */pulls/42) echo '{"head":{"sha":"abc123"}}' ;;
+  */commits/abc123/check-runs*) cat "$STUB_DIR/checks.json" ;;
+  */pulls/42/reviews*) cat "$STUB_DIR/reviews.json" ;;
+  *) exit 22 ;;
+esac
+EOF
+chmod +x "$TMP/curl"
+_run_curl() {
+  name=$1 want=$2 needle=$3
+  shift 3
+  out=$(STUB_DIR="$TMP" WAIT_FOR_GH="$TMP/no-such-gh" WAIT_FOR_CURL="$TMP/curl" \
+    GH_TOKEN=tok sh "$WAIT_FOR" "$@" 2>&1)
+  got=$?
+  if [ "$got" -ne "$want" ] || ! printf '%s' "$out" | grep -q -- "$needle"; then
+    echo "FAIL: wait_for_test -- $name: want exit $want + '$needle', got $got"
+    echo "  output: $out"
+    failures=$((failures + 1))
+  fi
+}
+echo '{"check_runs":[{"status":"completed","conclusion":"success"},{"status":"in_progress","conclusion":null}]}' >"$TMP/checks.json"
+_run_curl "curl: checks wait while one runs" 2 timeout $T checks 42
+echo '{"check_runs":[{"status":"completed","conclusion":"success"},{"status":"completed","conclusion":"failure"}]}' >"$TMP/checks.json"
+_run_curl "curl: checks fire when all completed" 0 "at abc123 (fail=1)" $T checks 42
+echo '[{"id":1},{"id":2}]' >"$TMP/reviews.json"
+_run_curl "curl: reviews at the count fire" 0 fired $T reviews 42 2
+_run_curl "curl: reviews below the count wait" 2 timeout $T reviews 42 3
+
+# No usable backend: exit 3 at once (well under the 1s limit), never a silent wait.
+for kind_args in "checks 42" "reviews 42 1"; do
+  s=$(date +%s)
+  out=$(env -u GH_TOKEN WAIT_FOR_GH="$TMP/no-such-gh" WAIT_FOR_CURL="$TMP/curl" \
+    sh "$WAIT_FOR" --max-seconds 30 --interval 5 $kind_args 2>&1)
+  got=$?
+  if [ "$got" -ne 3 ] || [ $(($(date +%s) - s)) -gt 3 ] ||
+    ! printf '%s' "$out" | grep -q "no GitHub backend"; then
+    echo "FAIL: wait_for_test -- no backend ($kind_args): want fast exit 3, got $got"
+    echo "  output: $out"
+    failures=$((failures + 1))
+  fi
+done
+# GH_TOKEN set but curl missing is also unusable.
+out=$(WAIT_FOR_GH="$TMP/no-such-gh" WAIT_FOR_CURL="$TMP/no-such-curl" GH_TOKEN=tok \
+  sh "$WAIT_FOR" --max-seconds 30 $T checks 42 2>&1)
+[ $? -eq 3 ] || { echo "FAIL: wait_for_test -- missing curl: want exit 3"; failures=$((failures + 1)); }
+# GH_TOKEN and curl present but jq unavailable: unusable. PATH is restricted to
+# a dir of shims for the basic tools, deliberately without jq or gh.
+mkdir "$TMP/nojq"
+for tool in sh date sleep grep awk cat env dirname mktemp rm sed tr head ps; do
+  p=$(command -v "$tool") && ln -s "$p" "$TMP/nojq/$tool"
+done
+s=$(date +%s)
+out=$(PATH="$TMP/nojq" WAIT_FOR_GH="$TMP/no-such-gh" WAIT_FOR_CURL="$TMP/curl" GH_TOKEN=tok \
+  "$TMP/nojq/sh" "$WAIT_FOR" --max-seconds 30 --interval 5 checks 42 2>&1)
+got=$?
+if [ "$got" -ne 3 ] || [ $(($(date +%s) - s)) -gt 3 ] ||
+  ! printf '%s' "$out" | grep -q "no GitHub backend"; then
+  echo "FAIL: wait_for_test -- missing jq: want fast exit 3, got $got"
+  echo "  output: $out"
+  failures=$((failures + 1))
+fi
+
+# log and proc never need a backend: run them in the NO-backend configuration.
+_run_nobackend() {
+  name=$1 want=$2 needle=$3
+  shift 3
+  out=$(env -u GH_TOKEN WAIT_FOR_GH="$TMP/no-such-gh" WAIT_FOR_CURL="$TMP/no-such-curl" \
+    WAIT_FOR_PS="cat $TMP/ps" sh "$WAIT_FOR" "$@" 2>&1)
+  got=$?
+  if [ "$got" -ne "$want" ] || ! printf '%s' "$out" | grep -q -- "$needle"; then
+    echo "FAIL: wait_for_test -- $name: want exit $want + '$needle', got $got"
+    echo "  output: $out"
+    failures=$((failures + 1))
+  fi
+}
+_run_nobackend "log needs no backend" 0 fired $T log "$TMP/chain.log" '^RESULT s0-'
+printf 'Ss bash\n' >"$TMP/ps"
+_run_nobackend "proc needs no backend" 0 fired $T proc 'dune'
+
 # usage
 _run "unknown condition is a usage error" 1 "usage" $T bogus
 _run "non-numeric PR is a usage error" 1 "usage" $T checks abc
