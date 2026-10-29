@@ -100,6 +100,9 @@ fi
 cat >"$TMP/curl" <<'EOF'
 #!/bin/sh
 for a; do url=$a; done
+# Reject unless the call is authenticated and aimed at api.github.com.
+case " $* " in *" Authorization: Bearer tok "*) ;; *) exit 22 ;; esac
+case "$url" in https://api.github.com/*) ;; *) exit 22 ;; esac
 case "$url" in
   */pulls/42) echo '{"head":{"sha":"abc123"}}' ;;
   */commits/abc123/check-runs*) cat "$STUB_DIR/checks.json" ;;
@@ -145,8 +148,39 @@ done
 out=$(WAIT_FOR_GH="$TMP/no-such-gh" WAIT_FOR_CURL="$TMP/no-such-curl" GH_TOKEN=tok \
   sh "$WAIT_FOR" --max-seconds 30 $T checks 42 2>&1)
 [ $? -eq 3 ] || { echo "FAIL: wait_for_test -- missing curl: want exit 3"; failures=$((failures + 1)); }
-# log and proc never need a backend.
-_run_curl "log needs no backend" 0 fired $T log "$TMP/chain.log" '^RESULT s0-'
+# GH_TOKEN and curl present but jq unavailable: unusable. PATH is restricted to
+# a dir of shims for the basic tools, deliberately without jq or gh.
+mkdir "$TMP/nojq"
+for tool in sh date sleep grep awk cat env dirname mktemp rm sed tr head ps; do
+  p=$(command -v "$tool") && ln -s "$p" "$TMP/nojq/$tool"
+done
+s=$(date +%s)
+out=$(PATH="$TMP/nojq" WAIT_FOR_GH="$TMP/no-such-gh" WAIT_FOR_CURL="$TMP/curl" GH_TOKEN=tok \
+  "$TMP/nojq/sh" "$WAIT_FOR" --max-seconds 30 --interval 5 checks 42 2>&1)
+got=$?
+if [ "$got" -ne 3 ] || [ $(($(date +%s) - s)) -gt 3 ] ||
+  ! printf '%s' "$out" | grep -q "no GitHub backend"; then
+  echo "FAIL: wait_for_test -- missing jq: want fast exit 3, got $got"
+  echo "  output: $out"
+  failures=$((failures + 1))
+fi
+
+# log and proc never need a backend: run them in the NO-backend configuration.
+_run_nobackend() {
+  name=$1 want=$2 needle=$3
+  shift 3
+  out=$(env -u GH_TOKEN WAIT_FOR_GH="$TMP/no-such-gh" WAIT_FOR_CURL="$TMP/no-such-curl" \
+    WAIT_FOR_PS="cat $TMP/ps" sh "$WAIT_FOR" "$@" 2>&1)
+  got=$?
+  if [ "$got" -ne "$want" ] || ! printf '%s' "$out" | grep -q -- "$needle"; then
+    echo "FAIL: wait_for_test -- $name: want exit $want + '$needle', got $got"
+    echo "  output: $out"
+    failures=$((failures + 1))
+  fi
+}
+_run_nobackend "log needs no backend" 0 fired $T log "$TMP/chain.log" '^RESULT s0-'
+printf 'Ss bash\n' >"$TMP/ps"
+_run_nobackend "proc needs no backend" 0 fired $T proc 'dune'
 
 # usage
 _run "unknown condition is a usage error" 1 "usage" $T bogus
