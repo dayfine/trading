@@ -683,7 +683,13 @@ _pr_meta_gh() {
   # MERGEABLE / CONFLICTING / UNKNOWN -- read straight through with no
   # reshaping needed, unlike the curl backend below which has to normalise
   # REST's separate boolean + mergeable_state fields into the same three.
-  gh pr view "$1" --repo "$REPO" --json headRefOid,files,reviews,labels,mergeable,body
+  # `gh pr view --json files` returns at most 100 files (#3421). With 100 or
+  # more the list cannot be proven complete: append the sentinel path so the
+  # lane logic falls to the three-gate lane. (An unreadable payload yields
+  # empty output, which the caller's shape check reports as a meta error.)
+  gh pr view "$1" --repo "$REPO" --json headRefOid,files,reviews,labels,mergeable,body \
+    | jq -c --arg s "$_FILES_INCOMPLETE_SENTINEL" --argjson max "$_FILES_PAGE_SIZE" \
+        'if (.files | length) >= $max then .files += [{path: $s}] else . end'
 }
 _pr_checks_gh() {
   gh pr checks "$1" --repo "$REPO" 2>/dev/null | awk '{print $2}' | sort -u | tr '\n' ' '
@@ -696,8 +702,8 @@ _pr_checks_gh() {
 # so every consumer below (`_gate`, `_is_docs_only`, the do-not-merge label
 # check) is backend-agnostic and unchanged.
 #
-# No pagination beyond a single `per_page=100` page on any of the three
-# endpoints -- matches the `gh pr list --limit 50` scope this replaces, and
+# The file list is paginated to completion (#3421). No other endpoint is: the other two
+# use one `per_page=100` page -- matches the `gh pr list --limit 50` scope, and
 # PRs in this repo do not carry 100+ files/reviews/check-runs. A repo that
 # grew past that would need real pagination; not a gap worth solving here.
 _curl_gh() {
@@ -706,13 +712,39 @@ _curl_gh() {
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/$1"
 }
+# The file list decides the docs-only / results-only lanes, so it must be
+# COMPLETE (#3421): a non-allowlisted file past position 100 would otherwise
+# land the PR in a lighter lane. Both backends fail closed when completeness
+# cannot be proven, by appending a sentinel path that no allowlist matches.
+_FILES_INCOMPLETE_SENTINEL="UNVERIFIED-FILE-LIST-INCOMPLETE"
+_FILES_PAGE_SIZE=100
+_FILES_MAX_PAGES=30
+# Reads pulls/N/files pages until a short page; echoes one JSON array.
+_curl_all_files() {
+  _cf_n=$1; _cf_page=1; _cf_all='[]'
+  while :; do
+    _cf_pg=$(_curl_gh "repos/$REPO/pulls/$_cf_n/files?per_page=$_FILES_PAGE_SIZE&page=$_cf_page") || return 1
+    [ -n "$_cf_pg" ] || return 1
+    _cf_len=$(printf '%s' "$_cf_pg" | jq -e 'if type == "array" then length else error("not an array") end') || return 1
+    _cf_all=$(printf '%s\n%s\n' "$_cf_all" "$_cf_pg" | jq -sc 'add') || return 1
+    if [ "$_cf_len" -lt "$_FILES_PAGE_SIZE" ]; then
+      printf '%s' "$_cf_all"; return 0
+    fi
+    if [ "$_cf_page" -ge "$_FILES_MAX_PAGES" ]; then
+      # Full page at the cap: cannot prove completeness -> fail closed.
+      printf '%s\n' "$_cf_all" | jq -c --arg s "$_FILES_INCOMPLETE_SENTINEL" '. + [{filename: $s}]'
+      return 0
+    fi
+    _cf_page=$((_cf_page + 1))
+  done
+}
 _list_open_prs_curl() {
   _curl_gh "repos/$REPO/pulls?state=open&per_page=100" | jq -r '.[].number'
 }
 _pr_meta_curl() {
   _n=$1
   _pr=$(_curl_gh "repos/$REPO/pulls/$_n") || return 1
-  _files=$(_curl_gh "repos/$REPO/pulls/$_n/files?per_page=100") || return 1
+  _files=$(_curl_all_files "$_n") || return 1
   _reviews=$(_curl_gh "repos/$REPO/pulls/$_n/reviews?per_page=100") || return 1
   # Shell builtin printf streams payloads, avoiding Linux's per-argument cap.
   printf '%s\n' "$_pr" "$_files" "$_reviews" | jq -se '
