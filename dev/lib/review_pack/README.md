@@ -213,7 +213,8 @@ container-built 26-year R1–R8 report remain outside this slice.
   config: differences are tie-order path noise".
 - **Trade overlap.** The first difference is the earliest entry (date, then symbol) not held by every run, not the
   first position where two sorted lists differ. A table lists the largest trades held by some runs but not all,
-  by entry weight (entry value over the entry-date NAV), with the runs that hold and lack each.
+  by impact (realised total-return P&L over the entry-date NAV, absolute value), with entry weight and realised
+  $ beside it and the runs that hold and lack each.
 - **Faithfulness coverage.** The stage replay (about 1.3 s per trade) runs for the charts run only. When some
   runs have a replay and others do not, `faithfulness.sh` is called with `1,13` and every run is graded without
   checks 1 and 13 (`excluded` in `<run>_faithfulness.json`; the tab says so). Replaying every run would cost
