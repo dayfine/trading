@@ -12,6 +12,18 @@ perf-tier fix described in the 2026-09-21 weekly-review entry below.
 
 ## Weekly review (`.claude/rules/perf-review-weekly.md`, ~2 h/week — user 2026-09-20)
 
+- **2026-10-29 (tier-4 Seeded re-pin chain, `dev/experiments/tier4-seeded-repin-2026-10-29/`)**:
+  30 cells added to `perf-long-cells.csv`. `perf_long_cells.sh check` flags two
+  10y shapes as SLOWER: `top-3000-2014|10y|cap256` 68 s/yr vs a median of 36
+  (+89 %) and `top-1000-2014|10y|cap256` 72 vs 32 (+125 %), each against 3
+  earlier cells. The same cell also varied within this chain
+  (`sp500-2010-2026` 3,263 s new arm vs 2,115 s old arm, both at cap 12,000)
+  while another session ran heavy builds on the host, so host load is the
+  first suspect; not yet confirmed. The first segment's 15y sp500 cell
+  thrashed at the default cap 256 and was relaunched at 12,000
+  (`chain.log` RESTART line). Re-check both 10y shapes on a quiet host in
+  the next weekly read before filing.
+
 - **2026-10-05 (issue-fix audit, first run; #3019 `[after-merge]`)**: ran
   `dev/scripts/issue_fix_audit.sh` against the live repo: 36 open issues, the
   newest 500 merged PRs. (The cloud session's `gh` is api-only, so it ran

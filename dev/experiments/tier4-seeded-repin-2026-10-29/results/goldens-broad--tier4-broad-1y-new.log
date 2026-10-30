@@ -1,0 +1,31 @@
+Loading 1 scenarios from /tmp/t4seedg/goldens-broad--tier4-broad-1y-new (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/dev/backtest/scenarios-2026-10-29-164754
+
+>>> Running tier4-broad-1y: Tier-4 release-gate SCALE — full broad universe × 1y mechanic validation (snapshot-mode only) (2022-01-03 to 2022-12-30)
+Using scenario-provided sector map (3000 symbols)...
+Universe: 3000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 3015
+Running backtest (2022-01-03 to 2022-12-30, warmup from 2021-01-04)...
+Panel_runner: simulator window 2021-01-04..2022-12-30 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (3015 symbols, /tmp/panel_runner_csv_snapshot_5111bc)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 256 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 520 days) for strategy
+WARN: portfolio rejected fill for MKC (side=Types.Buy qty=2603.0000 price=96.2800): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 250642.87, Available: 248724.13401536411, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=2911370 misses=3015 miss_absent=0 evictions=0 n_symbols=3015 misses_per_symbol=1.00 n_symbols_touched=3015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=3015 max_bytes=53191176 max_mmap_open=0 avg_entries=1508.0 avg_bytes=26679966 cap_mb=4096 cap_mmap_handles=256 top_heap_bytes=272135896 maxrss_bytes=301772800
+Panel_runner: split_dividend_guard rejected=0 no_files=0
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4seed
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+tier4-broad-1y                 -15.6%      21     4.8%    20.5%   PASS
+
+1/1 scenarios passed.
+exit=0

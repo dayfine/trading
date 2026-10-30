@@ -1,0 +1,50 @@
+Loading 1 scenarios from /tmp/t4seedg/goldens-sp500-historical--sp500-2000-2026-catstop-armon-new (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/dev/backtest/scenarios-2026-10-29-215823
+
+>>> Running sp500-2000-2026-catstop-armon-deep: Deep long-only + cat_stop 0.10 + arm_on_rate=true base for the fast_v_min_rate_pct surface. (2000-01-01 to 2026-04-30)
+Using scenario-provided sector map (515 symbols)...
+Universe: 515 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 530
+Running backtest (2000-01-01 to 2026-04-30, warmup from 1999-01-02)...
+Panel_runner: simulator window 1999-01-02..2026-04-30 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (530 symbols, /tmp/panel_runner_csv_snapshot_6d06ba)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 7129 days) for strategy
+WARN: portfolio rejected fill for EL (side=Types.Buy qty=845.0000 price=117.4600): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 99262.15, Available: 98868.806271960348, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for JPM (side=Types.Buy qty=2204.0000 price=62.1078): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 136907.63120000003, Available: 136423.1059191252, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for WTW (side=Types.Buy qty=2197.0000 price=166.1274): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 365003.88802453765, Available: 348817.041400464, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for AMAT (side=Types.Buy qty=5004.0000 price=73.9400): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 370045.8, Available: 368361.39334977593, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CF (side=Types.Buy qty=6930.0000 price=61.0697): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 423282.2822418877, Available: 422024.93084536958, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for A (side=Types.Buy qty=3138.0000 price=129.7900): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 407312.39999999997, Available: 392503.930503581, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=8120845 misses=530 miss_absent=0 evictions=0 n_symbols=530 misses_per_symbol=1.00 n_symbols_touched=530 n_symbols_absent=0 loads_per_touched=1.00 max_entries=530 max_bytes=214047592 max_mmap_open=0 avg_entries=265.5 avg_bytes=111357890 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=881632392 maxrss_bytes=915746816
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4seed
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+sp500-2000-2026-catstop-armon-deep   214.6%     616    38.8%    27.4%   PASS
+
+1/1 scenarios passed.
+exit=0

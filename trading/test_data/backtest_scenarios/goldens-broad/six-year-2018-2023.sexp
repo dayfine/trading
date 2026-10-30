@@ -70,9 +70,10 @@
   ;; decade-2014-2023 OVERLAP yet moved opposite directions (funding-path
   ;; chaos). Covid twin BIT-IDENTICAL.
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + dissection in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips; tier 4 is a local release gate with no CI consumer. Correctness re-pin: no return claim attaches to the delta.
-  ((total_return_pct ((min -25.2915) (max -15.2915)))
-   (total_trades ((min 187.8500) (max 254.1500)))
-   (win_rate ((min 21.5385) (max 29.1403)))
-   (sharpe_ratio ((min -0.1401) (max -0.1036)))
-   (max_drawdown_pct ((min 33.5521) (max 45.3940)))
-   (avg_holding_days ((min 43.7385) (max 59.1756))))))
+  ;; RE-PINNED 2026-10-29 for the Seeded tiebreak default (#3425), ±15% around the new-arm actual (dev/experiments/tier4-seeded-repin-2026-10-29/). The prior pin was already stale: the Alphabetical arm fails it too. Single seed-0 draw; the cross-arm move is path noise (#3419), see the README.
+  ((total_return_pct ((min 321.7004) (max 435.2417)))
+   (total_trades ((min 150.4500) (max 203.5500)))
+   (win_rate ((min 24.4915) (max 33.1356)))
+   (sharpe_ratio ((min 0.5527) (max 0.7478)))
+   (max_drawdown_pct ((min 65.5769) (max 88.7217)))
+   (avg_holding_days ((min 53.0554) (max 71.7808))))))

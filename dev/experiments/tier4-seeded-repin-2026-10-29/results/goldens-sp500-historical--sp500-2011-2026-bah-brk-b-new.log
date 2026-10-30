@@ -1,0 +1,28 @@
+Loading 1 scenarios from /tmp/t4seedg/goldens-sp500-historical--sp500-2011-2026-bah-brk-b-new (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/dev/backtest/scenarios-2026-10-29-164747
+
+>>> Running sp500-2011-2026-bah-brk-b: Buy-and-Hold BRK-B 2011-2026 — 15y post-split active-value reference baseline. Start date 2011-01-03 chosen to avoid the 2010-01-21 50-for-1 BRK-B split. (2011-01-03 to 2026-04-30)
+Using scenario-provided sector map (1 symbols)...
+Universe: 1 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 16
+Running backtest (2011-01-03 to 2026-04-30, warmup from 2011-01-03)...
+Panel_runner: simulator window 2011-01-03..2026-04-30 (warmup 0 days, strategy Bah_benchmark(BRK-B))
+Panel_runner: in-process snapshot built (16 symbols, /tmp/panel_runner_csv_snapshot_604fbe)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 256 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 3999 days) for strategy
+Panel_runner: snapshot cache hits=102466 misses=16 miss_absent=0 evictions=0 n_symbols=16 misses_per_symbol=1.00 n_symbols_touched=16 n_symbols_absent=0 loads_per_touched=1.00 max_entries=16 max_bytes=2040056 max_mmap_open=0 avg_entries=8.5 avg_bytes=1565714 cap_mb=4096 cap_mmap_handles=256 top_heap_bytes=19730184 maxrss_bytes=49508352
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4seed
+WARN: fold-health: zero in-window round-trips across 3853 steps (positions likely opened during warmup and never round-tripped in-window)
+WARN: fold-health: terminal NAV moved 486.29% from the starting stake with zero in-window round-trips (likely warmup-window P&L leaked into the measurement window)
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+sp500-2011-2026-bah-brk-b      486.3%       0     nan%    29.5%   PASS
+
+1/1 scenarios passed.
+exit=0

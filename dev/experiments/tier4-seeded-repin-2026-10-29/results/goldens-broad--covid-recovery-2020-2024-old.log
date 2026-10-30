@@ -1,0 +1,47 @@
+Loading 1 scenarios from /tmp/t4seedg/goldens-broad--covid-recovery-2020-2024-old (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/dev/backtest/scenarios-2026-10-29-170801
+
+>>> Running covid-recovery-2020-2024: COVID crash and recovery through 2024 (PIT top-1000-2020) (2020-01-02 to 2024-12-31)
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2020-01-02 to 2024-12-31, warmup from 2019-01-03)...
+Panel_runner: simulator window 2019-01-03..2024-12-31 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (1015 symbols, /tmp/panel_runner_csv_snapshot_0f5f10)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 256 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 1564 days) for strategy
+WARN: portfolio rejected fill for AIV (side=Types.Buy qty=27689.0000 price=8.3965): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 232766.4068649181, Available: 232420.75629349845, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for DECK (side=Types.Buy qty=731.0000 price=318.5525): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 232869.22105387409, Available: 232526.72211941928, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for EPAM (side=Types.Buy qty=341.0000 price=418.8700): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 142838.08000000002, Available: 141457.89476654981, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MRVL (side=Types.Buy qty=1314.0000 price=62.3424): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 81931.0536, Available: 81293.1443887791, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for IQ (side=Types.Buy qty=22219.0000 price=5.3652): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 119431.5688, Available: 116397.80137272572, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=3909452 misses=1015 miss_absent=0 evictions=0 n_symbols=1015 misses_per_symbol=1.00 n_symbols_touched=1015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=1015 max_bytes=149834888 max_mmap_open=0 avg_entries=508.0 avg_bytes=76148457 cap_mb=4096 cap_mmap_handles=256 top_heap_bytes=615827080 maxrss_bytes=649887744
+Panel_runner: split_dividend_guard rejected=0 no_files=1
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4seed
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+covid-recovery-2020-2024        -2.8%     180    30.0%    39.4%   FAIL (total_return_pct low (-2.76 < 37.50); total_trades high (180.00 > 170.20); sharpe_ratio low (-0.05 < 0.40); max_drawdown_pct high (39.40 > 36.85))
+
+0/1 scenarios passed.
+exit=1

@@ -1,0 +1,58 @@
+Loading 1 scenarios from /tmp/t4seedg/goldens-sp500-historical--sp500-2000-2026-longshort-new (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4seed/trading/dev/backtest/scenarios-2026-10-29-221852
+
+>>> Running sp500-2000-2026-longshort-deep: Deep long-short base (sp500-as-of-2000 PIT, 2000-2026, enable_short_side=true) for the neutral_blocks_shorts WF-CV. Same overlay as sp500-2010-2026-longshort. (2000-01-01 to 2026-04-30)
+Using scenario-provided sector map (515 symbols)...
+Universe: 515 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 530
+Running backtest (2000-01-01 to 2026-04-30, warmup from 1999-01-02)...
+Panel_runner: simulator window 1999-01-02..2026-04-30 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (530 symbols, /tmp/panel_runner_csv_snapshot_594e71)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 7129 days) for strategy
+WARN: portfolio rejected fill for LHX (side=Types.Buy qty=3893.0000 price=46.5533): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 181231.86064499998, Available: 180872.02558261043, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MDT (side=Types.Buy qty=2039.0000 price=59.0695): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 120442.75128, Available: 119946.01619243706, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for LEN (side=Types.Buy qty=4726.0000 price=52.6907): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 249016.40451121482, Available: 244289.69504872, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MCHP (side=Types.Buy qty=3748.0000 price=95.9381): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 359576.1678348, Available: 358399.61649691651, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for AMGN (side=Types.Buy qty=1434.0000 price=233.1165): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 334289.061, Available: 324938.80314591812, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for IVZ (side=Types.Buy qty=20658.0000 price=10.7454): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 221977.85345999998, Available: 214926.8875226464, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CF (side=Types.Buy qty=7358.0000 price=61.1002): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 449575.48685389286, Available: 447837.35457770817, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for EA (side=Types.Buy qty=1643.0000 price=139.9800): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 229987.066065, Available: 226834.43133134081, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=8160629 misses=530 miss_absent=0 evictions=0 n_symbols=530 misses_per_symbol=1.00 n_symbols_touched=530 n_symbols_absent=0 loads_per_touched=1.00 max_entries=530 max_bytes=214047592 max_mmap_open=0 avg_entries=265.5 avg_bytes=111357890 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=880590072 maxrss_bytes=914935808
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4seed
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+sp500-2000-2026-longshort-deep   259.5%     628    38.7%    25.4%   PASS
+
+1/1 scenarios passed.
+exit=0
