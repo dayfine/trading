@@ -29,7 +29,13 @@ let _orders =
     _make "o5" Buy Market (Rejected "no cash") None;
   ]
 
+(* [Time_ns_unix.sexp_of_t] reads the local zone, so these tests cannot run
+   where /etc/localtime is absent (the CI image). They run in dev containers. *)
+let _skip_without_local_zone () =
+  skip_if (not (Stdlib.Sys.file_exists "/etc/localtime")) "no /etc/localtime"
+
 let test_order_roundtrip _ =
+  _skip_without_local_zone ();
   assert_that
     (List.map (fun o -> o |> sexp_of_order |> order_of_sexp) _orders)
     (equal_to (_orders : order list))
