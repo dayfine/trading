@@ -1,11 +1,22 @@
 # Status: data-foundations
 
-## Last updated: 2026-10-26
+## Last updated: 2026-10-29
 
 ## Status
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-10-29 — full pit-v12 rename-twin dedupe (#3388).**
+  `dev/experiments/twin-dedupe-26y-2026-10-29/apply-full-dedupe.sh` applies the
+  v12 twin scan's full proposal: `drops.txt` filtered against
+  `exclude-pairs.txt` (the 6 BML-P rows out, 784 rows), survivor chains
+  resolved per list (67 rows re-pointed, `via=`), 779 new rows = 713 entries
+  removed from 54 lists, `pit-v12/twin-drops.txt` rewritten with all 784 rows,
+  `pit-v12/composition.md5` regenerated (27 scheduled lists `51fba79e…` →
+  `369b988f…`, union 9,222 → 9,185). Verify:
+  `sh trading/devtools/checks/pit_twin_cooccur_check.sh` (784 drops hold); a
+  second run of the script applies nothing. The paired 26y read (dd vs cur,
+  seeds 0–2) is pre-registered in that directory's README and `chain.sh`.
 - [x] **2026-10-25 — monthly top-3000 lists + warehouse build script (arm SM
   prerequisite 3; PRs #3429, #3430, full build 2026-10-26).** `dev/scripts/build_monthly_universe_warehouse.sh`
   (resumable phases preflight / lists / post / twinscan / install / warehouse /
@@ -1752,6 +1763,13 @@ Adds `weinstein.snapshot_pipeline` library
 aggregates. Manifest schema-hash drives incremental rebuild.
 
 ## Next Steps
+
+**Follow-up (#3388):** `build_monthly_universe_warehouse.sh` `post` re-keys
+`pit-v12/twin-drops.txt` to every monthly list whatever the window; with the
+784-row file its `check_may31` no longer reproduces the yearly lists. Restate
+the re-key per window before the next monthly build. The paired 26y read
+(`dev/experiments/twin-dedupe-26y-2026-10-29/chain.sh launch`) runs after
+merge.
 
 Synth-v1 (#755) + Synth-v2 (#775) + Synth-v3 (#1028) all MERGED.
 EODHD multi-market expansion MERGED (#772). M5.3 Phase F retirement

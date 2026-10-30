@@ -1752,8 +1752,6 @@
     (avg_dollar_volume 61661998.097560972))
    ((symbol FTCHQ) (weight 0.001) (sector "") (synthetic false)
     (avg_dollar_volume 61644942.3085366))
-   ((symbol FTCHF) (weight 0.001) (sector "") (synthetic false)
-    (avg_dollar_volume 61601169.487804875))
    ((symbol LEGN) (weight 0.001) (sector "Health Care") (synthetic false)
     (avg_dollar_volume 61463359.585365854))
    ((symbol WEN) (weight 0.001) (sector "Consumer Discretionary")

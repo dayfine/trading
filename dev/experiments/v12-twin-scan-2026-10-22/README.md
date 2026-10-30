@@ -83,3 +83,8 @@ and 2015). That is the user-approved minimal fix for #3266: the twin that failed
 proposal (`results/drops.txt`, 790 entries in 54 lists) changes the universe far more than one twin, and every 26y
 number would move with it; it is filed as its own issue, to be measured as a universe change before it is applied.
 `pit-v12/twin-drops.txt` therefore holds 5 rows today.
+
+**Superseded 2026-10-29 (#3388).** The full proposal is now applied by
+`../twin-dedupe-26y-2026-10-29/apply-full-dedupe.sh`: `drops.txt` less the 6 BML-P rows (excluded after this scan
+ran), survivor chains resolved per list, 784 rows in `pit-v12/twin-drops.txt`. The paired 26y read that sizes the
+change is pre-registered there.
