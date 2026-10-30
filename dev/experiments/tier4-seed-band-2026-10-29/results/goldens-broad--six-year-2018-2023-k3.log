@@ -1,0 +1,47 @@
+Loading 1 scenarios from /tmp/t4band/goldens-broad--six-year-2018-2023-k3 (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/dev/backtest/scenarios-2026-10-30-040049
+
+>>> Running six-year-2018-2023: 6-year run covering COVID crash and recovery (PIT top-1000-2018) (2018-01-02 to 2023-12-29)
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2018-01-02 to 2023-12-29, warmup from 2017-01-03)...
+Panel_runner: simulator window 2017-01-03..2023-12-29 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (1015 symbols, /tmp/panel_runner_csv_snapshot_9b82df)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 1824 days) for strategy
+WARN: portfolio rejected fill for WMB (side=Types.Buy qty=7702.0000 price=32.6000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 251162.22, Available: 248914.5574604088, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for OKTA (side=Types.Buy qty=1716.0000 price=128.3400): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 220248.6, Available: 211199.77116076575, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for RL (side=Types.Buy qty=843.0000 price=103.9400): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 87629.849999999991, Available: 86026.6463346447, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for IFF (side=Types.Buy qty=1908.0000 price=113.0100): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 215642.16, Available: 214578.6166066977, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CNQ (side=Types.Buy qty=3305.0000 price=61.2500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 202464.3, Available: 202415.02133152905, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=4460863 misses=1015 miss_absent=0 evictions=0 n_symbols=1015 misses_per_symbol=1.00 n_symbols_touched=1015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=1015 max_bytes=163378040 max_mmap_open=0 avg_entries=508.0 avg_bytes=84077906 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=667013792 maxrss_bytes=701411328
+Panel_runner: split_dividend_guard rejected=0 no_files=2
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4band
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+six-year-2018-2023              21.6%     198    30.8%    38.9%   FAIL (total_return_pct high (21.58 > -15.29); win_rate high (30.81 > 29.14); sharpe_ratio high (0.17 > -0.10))
+
+0/1 scenarios passed.
+exit=1

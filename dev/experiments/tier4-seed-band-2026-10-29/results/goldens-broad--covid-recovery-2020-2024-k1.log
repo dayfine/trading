@@ -1,0 +1,39 @@
+Loading 1 scenarios from /tmp/t4band/goldens-broad--covid-recovery-2020-2024-k1 (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/dev/backtest/scenarios-2026-10-30-030948
+
+>>> Running covid-recovery-2020-2024: COVID crash and recovery through 2024 (PIT top-1000-2020) (2020-01-02 to 2024-12-31)
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2020-01-02 to 2024-12-31, warmup from 2019-01-03)...
+Panel_runner: simulator window 2019-01-03..2024-12-31 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (1015 symbols, /tmp/panel_runner_csv_snapshot_776f84)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 1564 days) for strategy
+WARN: portfolio rejected fill for GM (side=Types.Buy qty=8305.0000 price=41.3500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 343494.8, Available: 341762.56300423661, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for EQT (side=Types.Buy qty=21495.0000 price=39.7086): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 853751.30699999991, Available: 844931.656441975, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for BBY (side=Types.Buy qty=9400.0000 price=92.2080): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 866849.20000000007, Available: 856039.0482114281, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=3904635 misses=1015 miss_absent=0 evictions=0 n_symbols=1015 misses_per_symbol=1.00 n_symbols_touched=1015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=1015 max_bytes=149834888 max_mmap_open=0 avg_entries=508.0 avg_bytes=76148457 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=610803864 maxrss_bytes=644972544
+Panel_runner: split_dividend_guard rejected=0 no_files=0
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4band
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+covid-recovery-2020-2024       227.0%     168    29.2%    76.0%   FAIL (total_return_pct high (226.96 > 50.74); win_rate low (29.17 < 29.29); sharpe_ratio high (0.62 > 0.54); max_drawdown_pct high (75.98 > 36.85))
+
+0/1 scenarios passed.
+exit=1

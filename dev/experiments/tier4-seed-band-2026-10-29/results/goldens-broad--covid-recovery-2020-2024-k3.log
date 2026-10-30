@@ -1,0 +1,43 @@
+Loading 1 scenarios from /tmp/t4band/goldens-broad--covid-recovery-2020-2024-k3 (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/dev/backtest/scenarios-2026-10-30-033120
+
+>>> Running covid-recovery-2020-2024: COVID crash and recovery through 2024 (PIT top-1000-2020) (2020-01-02 to 2024-12-31)
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2020-01-02 to 2024-12-31, warmup from 2019-01-03)...
+Panel_runner: simulator window 2019-01-03..2024-12-31 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (1015 symbols, /tmp/panel_runner_csv_snapshot_a49b5b)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 1564 days) for strategy
+WARN: portfolio rejected fill for NOK (side=Types.Buy qty=23399.0000 price=4.4166): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 103578.0134, Available: 97422.77626365333, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for ROKU (side=Types.Buy qty=9194.0000 price=60.1400): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 553019.1, Available: 538384.54612101649, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CIEN (side=Types.Buy qty=10879.0000 price=50.4288): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 548723.7052, Available: 538854.6119470105, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CBOE (side=Types.Buy qty=7443.0000 price=204.1700): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1519711.7399999998, Available: 1509388.3584321104, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=3911638 misses=1015 miss_absent=0 evictions=0 n_symbols=1015 misses_per_symbol=1.00 n_symbols_touched=1015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=1015 max_bytes=149834888 max_mmap_open=0 avg_entries=508.0 avg_bytes=76148457 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=615220904 maxrss_bytes=648728576
+Panel_runner: split_dividend_guard rejected=0 no_files=0
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4band
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+covid-recovery-2020-2024       532.9%     141    29.8%    74.2%   FAIL (total_return_pct high (532.86 > 50.74); sharpe_ratio high (0.79 > 0.54); max_drawdown_pct high (74.23 > 36.85))
+
+0/1 scenarios passed.
+exit=1

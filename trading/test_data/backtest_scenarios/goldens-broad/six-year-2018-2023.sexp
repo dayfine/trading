@@ -71,9 +71,10 @@
   ;; chaos). Covid twin BIT-IDENTICAL.
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + dissection in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips; tier 4 is a local release gate with no CI consumer. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-29 for the Seeded tiebreak default (#3425), ±15% around the new-arm actual (dev/experiments/tier4-seeded-repin-2026-10-29/). The prior pin was already stale: the Alphabetical arm fails it too. Single seed-0 draw; the cross-arm move is path noise (#3419), see the README.
-  ((total_return_pct ((min 321.7004) (max 435.2417)))
-   (total_trades ((min 150.4500) (max 203.5500)))
-   (win_rate ((min 24.4915) (max 33.1356)))
-   (sharpe_ratio ((min 0.5527) (max 0.7478)))
-   (max_drawdown_pct ((min 65.5769) (max 88.7217)))
-   (avg_holding_days ((min 53.0554) (max 71.7808))))))
+  ;; SEED-BAND RE-PIN 2026-10-29 (#3404 follow-up): each metric is the min..max over tiebreak seeds 0-4, widened 15% each side (total_return_pct: at least 5pp); seeds and per-seed actuals in dev/experiments/tier4-seed-band-2026-10-29/. Seed-to-seed spread is path noise (#3419), so a single-seed ±15% pin fails on any path-perturbing change; this band fails only on moves outside that noise.
+  ((total_return_pct ((min 16.5775) (max 435.2417)))
+   (total_trades ((min 139.4000) (max 233.4500)))
+   (win_rate ((min 24.4915) (max 36.4634)))
+   (sharpe_ratio ((min 0.1436) (max 0.7478)))
+   (max_drawdown_pct ((min 33.0573) (max 88.7217)))
+   (avg_holding_days ((min 47.3338) (max 77.1201))))))

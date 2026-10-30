@@ -1,0 +1,51 @@
+Loading 1 scenarios from /tmp/t4band/goldens-broad--decade-2014-2023-k4 (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/dev/backtest/scenarios-2026-10-30-052138
+
+>>> Running decade-2014-2023: 10-year decade run spanning multiple regimes (PIT top-1000-2014) (2014-01-02 to 2023-12-29)
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2014-01-02 to 2023-12-29, warmup from 2013-01-03)...
+Panel_runner: simulator window 2013-01-03..2023-12-29 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (1015 symbols, /tmp/panel_runner_csv_snapshot_e44a5e)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 2867 days) for strategy
+WARN: portfolio rejected fill for ROP (side=Types.Buy qty=482.0000 price=141.6768): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 68293.019291242483, Available: 68185.848343514517, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for SWKS (side=Types.Buy qty=3475.0000 price=77.1500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 268131., Available: 265466.61056073243, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for SYK (side=Types.Buy qty=652.0000 price=120.6600): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 78676.84, Available: 78663.554234894371, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for BHP (side=Types.Buy qty=2813.0000 price=43.1579): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 121431.3027, Available: 120338.08280416683, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for GE (side=Types.Buy qty=58852.0000 price=7.7826): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 458610.09520000004, Available: 455197.65031024185, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for A (side=Types.Buy qty=9027.0000 price=129.7900): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1171704.5999999999, Available: 1149098.5357597664, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=6719673 misses=1015 miss_absent=0 evictions=0 n_symbols=1015 misses_per_symbol=1.00 n_symbols_touched=1015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=1015 max_bytes=216054776 max_mmap_open=0 avg_entries=508.0 avg_bytes=111082324 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=889229128 maxrss_bytes=923713536
+Panel_runner: split_dividend_guard rejected=0 no_files=5
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4band
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+decade-2014-2023               737.1%     275    36.4%    76.9%   FAIL (total_return_pct high (737.05 > 125.11); sharpe_ratio high (0.60 > 0.55); max_drawdown_pct high (76.93 > 40.60))
+
+0/1 scenarios passed.
+exit=1
