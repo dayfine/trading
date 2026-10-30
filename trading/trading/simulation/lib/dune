@@ -47,6 +47,8 @@
   capital_relative_drawdown_computer
   portfolio_valuation
   stale_hold
+  simulator_checkpoint
+  step_inputs
   stale_exit_runner
   forced_exit
   forced_exit_step

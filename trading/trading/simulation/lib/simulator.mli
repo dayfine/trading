@@ -427,3 +427,28 @@ val universe_symbols : t -> string list
     that gating is observable on the created value rather than only re-derivable
     through {!prune_symbols_by_active_through} — the default-[false] no-prune
     contract is what keeps baselines bit-equal, so it needs to be assertable. *)
+
+(** {1 Checkpoint} *)
+
+module Checkpoint : sig
+  type snapshot = Simulator_checkpoint.t [@@deriving sexp]
+  (** Every simulator-owned item of the state inventory
+      ([dev/notes/resumable-backtest-state-inventory.md]) as plain sexp-able
+      data. Strategy state and recorders are not included; they checkpoint
+      separately (#3477 PRs 4-5). *)
+
+  val capture : t -> snapshot
+  (** Read the simulator's current date, portfolio, positions, accumulated steps
+      and fill-routing links, plus the dependency-owned state: the order
+      manager's orders, the engine's bars, the retry ledger, interest and
+      dividend accruals and the stale-hold log. Pure with respect to [t]. *)
+
+  val restore : t -> snapshot -> t Status.status_or
+  (** [restore fresh s] writes [s] into the dependencies of [fresh] in place and
+      returns the simulator positioned where [s] was captured. [fresh] must come
+      from {!create} with the same [config] and an unused [deps] (empty order
+      manager, same cash-yield and dividend arming). Stepping the result to the
+      end yields the same [run_result] as stepping the captured simulator.
+      [Error] when the arming of interest or dividends differs, or an order is
+      refused. *)
+end

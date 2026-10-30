@@ -794,3 +794,24 @@
   trading.orders
   trading.portfolio
   matchers))
+
+(test
+ (name test_simulator_checkpoint)
+ (modules test_simulator_checkpoint)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  status
+  csv.corporate_actions
+  trading.simulation
+  trading.simulation.dividends
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.orders
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))

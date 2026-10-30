@@ -3,4 +3,4 @@
  (name trading_simulation_dividends)
  (libraries core fpath status trading.portfolio csv.corporate_actions)
  (preprocess
-  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

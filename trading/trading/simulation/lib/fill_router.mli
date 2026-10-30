@@ -56,6 +56,20 @@ val record : links -> (string * string) list -> unit
 (** Install one generation pass's [(order_id, position_id)] pairs, in place:
     replaces the in-flight set, appends to the archive. *)
 
+type snapshot = {
+  in_flight : (string * string) list;
+  archive : (string * string) list;
+}
+[@@deriving sexp]
+(** Both link sets as [(order_id, position_id)] pairs sorted by order id, for a
+    checkpoint (#3477). *)
+
+val snapshot : links -> snapshot
+(** Capture both lifetimes. *)
+
+val restore : links -> snapshot -> unit
+(** Overwrite [links] in place with the snapshot. *)
+
 val archived : links -> string Core.String.Map.t
 (** Immutable snapshot of the archive — [order_id -> position_id] for every
     order generated so far, in any pass. *)
