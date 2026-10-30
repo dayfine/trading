@@ -401,16 +401,19 @@ let _breadth_series_of_bars = function
   | [] -> None
   | bars -> Some (Breadth_series_cache.of_daily_bars bars)
 
+(* Fail loudly on an inconsistent dawn-leverage config (margin must be armed;
+   the dawn requirement must be a fractional (0,1] requirement), and on the
+   one-share-class rule running unarmed (flag on, no map; #3015). Both are
+   no-ops for a default config. *)
+let _validate_config config =
+  Leverage_dawn.validate config;
+  Share_class_gate.validate config
+
 let make_with_state ?(ad_bars = []) ?(breadth_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
     ?(audit_recorder = Audit_recorder.noop) ?fold_start_date
     ?universe_membership_at ~state config =
-  (* Fail loudly on an inconsistent dawn-leverage config (margin must be armed;
-     the dawn requirement must be a fractional (0,1] requirement). No-op when
-     [dawn_leverage_enabled = false]. *)
-  Leverage_dawn.validate config;
-  (* #3015: the one-share-class rule must not run unarmed (flag on, no map). *)
-  Share_class_gate.validate config;
+  _validate_config config;
   let bar_reader =
     match bar_reader with Some r -> r | None -> Bar_reader.empty ()
   in
