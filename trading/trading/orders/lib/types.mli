@@ -2,7 +2,7 @@
 
 open Trading_base.Types
 
-type order_id = string [@@deriving show, eq]
+type order_id = string [@@deriving show, eq, sexp]
 (** Unique identifier for an order *)
 
 (** Time in force specifies how long an order remains active:
@@ -10,7 +10,7 @@ type order_id = string [@@deriving show, eq]
     - GTC: Good Till Cancelled, remains active until explicitly cancelled
     - IOC: Immediate Or Cancel, execute immediately or cancel
     - FOK: Fill Or Kill, must be filled completely immediately or cancelled *)
-type time_in_force = Day | GTC | IOC | FOK [@@deriving show, eq]
+type time_in_force = Day | GTC | IOC | FOK [@@deriving show, eq, sexp]
 
 (** Order status represents the current state of an order:
     - Pending: Order has been submitted but not yet executed
@@ -24,7 +24,7 @@ type order_status =
   | Filled
   | Cancelled
   | Rejected of string
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type order = {
   id : order_id;  (** Unique order identifier *)
@@ -39,7 +39,7 @@ type order = {
   created_at : Time_ns_unix.t;  (** Time when order was created *)
   updated_at : Time_ns_unix.t;  (** Time when order was last updated *)
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 (** Core order record containing all order information *)
 
 val update_status : order -> order_status -> order

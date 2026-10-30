@@ -1,7 +1,7 @@
 open Trading_base.Types
 
-type order_id = string [@@deriving show, eq]
-type time_in_force = Day | GTC | IOC | FOK [@@deriving show, eq]
+type order_id = string [@@deriving show, eq, sexp]
+type time_in_force = Day | GTC | IOC | FOK [@@deriving show, eq, sexp]
 
 type order_status =
   | Pending
@@ -9,7 +9,7 @@ type order_status =
   | Filled
   | Cancelled
   | Rejected of string
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type order = {
   id : order_id;
@@ -24,7 +24,7 @@ type order = {
   created_at : Time_ns_unix.t;
   updated_at : Time_ns_unix.t;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 let update_status order new_status =
   { order with status = new_status; updated_at = Time_ns_unix.now () }

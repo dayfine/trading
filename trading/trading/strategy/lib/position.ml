@@ -10,14 +10,14 @@ type entry_reasoning =
   | PricePattern of string
   | Rebalancing
   | ManualDecision of { description : string }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type risk_params = {
   stop_loss_price : float option;
   take_profit_price : float option;
   max_hold_days : int option;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type exit_reason =
   | TakeProfit of {
@@ -35,7 +35,7 @@ type exit_reason =
   | Underperforming of { days_held : int; current_return : float }
   | PortfolioRebalancing
   | StrategySignal of { label : string; detail : string option }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type position_state =
   | Entering of {
@@ -69,10 +69,10 @@ type position_state =
       exit_date : Date.t;
       days_held : int;
     }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type position_side = Trading_base.Types.position_side = Long | Short
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type t = {
   id : string;
@@ -84,7 +84,7 @@ type t = {
   last_updated : Date.t;
   portfolio_lot_ids : string list;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 (** {1 Transitions} *)
 

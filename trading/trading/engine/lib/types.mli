@@ -17,7 +17,7 @@ type price_bar = {
   low_price : price;
   close_price : price;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 (** Price bar for a symbol with OHLC data *)
 
 (** {1 Intraday Price Path Types} *)
