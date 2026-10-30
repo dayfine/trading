@@ -30,3 +30,8 @@
 (test
  (name test_buffer_pool)
  (libraries ounit2 trading.engine matchers))
+
+(test
+ (name test_price_bar_sexp)
+ (modules test_price_bar_sexp)
+ (libraries ounit2 trading.engine trading.base matchers))

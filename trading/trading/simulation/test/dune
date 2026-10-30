@@ -781,3 +781,16 @@
   types
   matchers
   simulation_test_helpers))
+
+(test
+ (name test_step_result_sexp)
+ (modules test_step_result_sexp)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  trading.simulation.types
+  trading.base
+  trading.orders
+  trading.portfolio
+  matchers))
