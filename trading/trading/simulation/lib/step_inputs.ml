@@ -1,18 +1,21 @@
 open Core
 
+(* Daily_price -> engine price_bar. *)
+let _to_price_bar symbol (p : Types.Daily_price.t) :
+    Trading_engine.Types.price_bar =
+  {
+    symbol;
+    open_price = p.open_price;
+    high_price = p.high_price;
+    low_price = p.low_price;
+    close_price = p.close_price;
+  }
+
 let today_bars ~adapter ~symbols ~date =
-  let get_bar symbol =
-    Trading_simulation_data.Market_data_adapter.get_price adapter ~symbol ~date
-    |> Option.map ~f:(fun (p : Types.Daily_price.t) ->
-        {
-          Trading_engine.Types.symbol;
-          open_price = p.open_price;
-          high_price = p.high_price;
-          low_price = p.low_price;
-          close_price = p.close_price;
-        })
-  in
-  List.filter_map symbols ~f:get_bar
+  List.filter_map symbols ~f:(fun symbol ->
+      Trading_simulation_data.Market_data_adapter.get_price adapter ~symbol
+        ~date
+      |> Option.map ~f:(_to_price_bar symbol))
 
 let strategy_transitions ~strategy ~adapter ~cadence ~date ~portfolio ~positions
     =
