@@ -10,6 +10,7 @@
 #   - a RESULT line becomes one row: date, experiment dir, tag, universe
 #     (pit-schedule-3000), years (10.00), cap (12000), HEAD, wall, s/yr;
 #   - a <no result> (guard-killed) cell is dropped, never timed;
+#   - a -k<N> seed tag resolves to its spec like a -s<N> salt tag;
 #   - a cell whose spec is missing keeps "?" and never enters a comparison;
 #   - update dedupes on (date, tag): a second update adds no rows;
 #   - check exits 1 when the newest cell of a shape is > 20 % slower per
@@ -70,10 +71,12 @@ rows2=$(sh "$SCRIPT" collect "$LOG2")
 expect_eq "a chain that logs no cap ran at the pre-#2882 default 256" 256 "$(printf '%s\n' "$rows2" | grep ',n0-s0-v11,' | cut -d, -f6)"
 expect_eq "golden <family>--<name>-new resolves under the golden spec root" "broad,5.00" \
   "$(printf '%s\n' "$rows2" | grep ',goldens-small--g1-new,' | cut -d, -f4,5)"
+expect_eq "a -k<N> seed tag resolves like the bare spec name" "broad,5.00" \
+  "$(printf '%s\n' "$rows2" | grep ',goldens-small--g1-k3,' | cut -d, -f4,5)"
 
 sh "$SCRIPT" update "$LOG" "$LOG2" >/dev/null
 sh "$SCRIPT" update "$LOG" "$LOG2" >/dev/null
-expect_eq "update dedupes on (timestamp, tag)" 11 "$(wc -l < "$PERF_LONG_LEDGER" | tr -d ' ')"
+expect_eq "update dedupes on (timestamp, tag)" 12 "$(wc -l < "$PERF_LONG_LEDGER" | tr -d ' ')"
 expect_eq "ledger is in time order" "$(tail -n +2 "$PERF_LONG_LEDGER" | cut -d, -f1 | sort | tr '\n' ' ')" \
   "$(tail -n +2 "$PERF_LONG_LEDGER" | cut -d, -f1 | tr '\n' ' ')"
 

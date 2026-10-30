@@ -5,3 +5,4 @@
 [01-02 03:00:00] RESULT nospec-a-s0 => total_return_pct 1.0  (wall 400s)
 [01-02 04:00:00] RESULT nospec-b-s0 => total_return_pct 1.0  (wall 450s)
 [01-02 05:00:00] RESULT goldens-small--g1-new => total_return_pct 3.0  (wall 300s)
+[01-02 06:00:00] RESULT goldens-small--g1-k3 => total_return_pct 3.0  (wall 310s)

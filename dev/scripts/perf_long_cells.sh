@@ -17,7 +17,7 @@
 #   [MM-DD HH:MM:SS] RESULT <tag> => <metrics> ... (wall <N>s)
 # plus optional header lines "HEAD=<sha>" and "SNAPSHOT_MAX_MMAP_HANDLES=<n>"
 # (a chain that never logs the cap ran at the pre-#2882 default, 256).
-# The cell's spec is found by name (<tag> minus "-s<salt>[-suffix]") under the
+# The cell's spec is found by name (<tag> minus "-s<salt>[-suffix]" or a "-k<N>" seed tag) under the
 # chain log's experiment directory, or under PERF_LONG_SPECS if set; window
 # and universe come from it. A cell whose spec cannot be found keeps "?" for
 # both and never enters a comparison.
@@ -79,12 +79,16 @@ collect_one() { # $1 chain log
       match($0, /\(wall [0-9]+s\)/); w = substr($0, RSTART + 6, RLENGTH - 8)
       printf "%s\t%s\t%s\t%s\t%s\n", md "T" hms, tag, (cap == "" ? 256 : cap), (head == "" ? "?" : head), w
     }' "$1" | while IFS="$(printf '\t')" read -r md tag cap head w; do
-    name=$(printf '%s\n' "$tag" | sed -E 's/-s[0-9]+(-.*)?$//')
+    name=$(printf '%s\n' "$tag" | sed -E 's/-s[0-9]+(-.*)?$//; s/-k[0-9]+$//')
     shape=$(spec_shape "$search" "$name")
     if [ "$shape" = "?,?" ]; then
       # golden cells are tagged <family>--<golden>-new|old; their specs are fixtures
       gname=$(printf '%s\n' "$name" | sed -E 's/^.*--//; s/-(new|old)$//')
-      shape=$(spec_shape "${PERF_LONG_GOLDEN_SPECS:-$REPO/trading/test_data/backtest_scenarios}" "$gname")
+      groot=${PERF_LONG_GOLDEN_SPECS:-$REPO/trading/test_data/backtest_scenarios}
+      # the same golden name exists in several families; prefer the tag's own family dir
+      fam=${name%%--*}
+      [ -d "$groot/$fam" ] && groot=$groot/$fam
+      shape=$(spec_shape "$groot" "$gname")
     fi
     years=${shape#*,}
     spy=$(awk -v w="$w" -v y="$years" 'BEGIN { if (y + 0 > 0) printf "%.0f", w / y; else print "?" }')
