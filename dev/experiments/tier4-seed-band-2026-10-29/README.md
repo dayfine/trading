@@ -6,7 +6,10 @@ prepended to the golden's `config_overrides`, otherwise the golden spec on main)
 seed-to-seed path noise (#3419) instead of one draw.
 
 Run: pinned worktree at `7615dde7d`, `SNAPSHOT_MAX_MMAP_HANDLES=12000`, one cell at a time, `chain.sh` /
-`chain.log`. 16 cells, all finished, none crashed. Seed 0 is the new arm in
+`chain.log`. 16 cells, all finished, none crashed. The seed specs carry the golden's pre-#3474 expected block, so the
+PASS/FAIL tags in `chain.log` are judged against that superseded band; the run inputs are identical and no number is
+affected. The first launch aborted on the memory guard at 4096 MiB free; `chain.sh` was then lowered to 3072 (these cells
+peak under 1 GB) and relaunched. Seed 0 is the new arm in
 `../tier4-seeded-repin-2026-10-29/results/` (same build).
 
 ## Per-seed values (seed 0, 1, 2, 3, 4)
@@ -40,7 +43,13 @@ least 5 pp each side. Seed 0 (the default) sits inside every band by constructio
   nothing about the strategy; the band is a regression tripwire for gross breakage (a crash, zero trades, a
   sign flip, an order-of-magnitude move), not a performance read. Same lesson as the 26y K=5 record band
   (#3467): quote broad cells as a seed band, never one draw.
-- **Trade count is the tight metric** (spread ≤ ~25 %), so it is the most sensitive part of these pins.
+- **The tightest metric differs by cell** (max/min over seeds): win rate on covid-recovery (1.12) and six-year (1.10),
+  avg holding days on bull-crash (1.08), trade count on decade (1.06). Those are the most sensitive parts of these pins;
+  return, Sharpe and max drawdown spread several-fold and pin little.
+- **Coverage is limited.** With 5 draws, min..max is expected to hold only about 2/3 of a new draw, and a path-perturbing
+  code change behaves like a new draw. The ±15 % widening helps little on metrics that spread several-fold. Across 24
+  bounds a benign path change can fail one, so on a FAIL first check whether the result is plausible as another seed
+  (rerun a seed or two) before reading it as a regression.
 - **Max drawdown is bimodal on two cells:** covid-recovery 31 % (k0, k2) vs 74–77 % (k1, k3, k4), and
   decade splits the same way (59–61 % vs 77 %); six-year spreads 39–77 %. On covid the high-DD seeds are also the high-return ones. Not
   dissected here; worth a look when these windows next carry a verdict.
