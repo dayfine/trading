@@ -44,18 +44,21 @@ let _sync_active manager order =
   if is_active order then Hashtbl.replace manager.active_orders order.id order
   else Hashtbl.remove manager.active_orders order.id
 
-let submit_orders manager orders =
-  List.map
-    (fun order ->
-      if Hashtbl.mem manager.orders order.id then
-        error_invalid_argument ("Order with ID " ^ order.id ^ " already exists")
-      else (
-        Hashtbl.add manager.orders order.id order;
-        Hashtbl.replace manager.seq order.id manager.next_seq;
-        manager.next_seq <- manager.next_seq + 1;
-        _sync_active manager order;
-        Result.Ok ()))
-    orders
+(* Record a brand-new order and stamp its insertion sequence number. *)
+let _register manager order =
+  Hashtbl.add manager.orders order.id order;
+  Hashtbl.replace manager.seq order.id manager.next_seq;
+  manager.next_seq <- manager.next_seq + 1;
+  _sync_active manager order
+
+let _submit_one manager order =
+  if Hashtbl.mem manager.orders order.id then
+    error_invalid_argument ("Order with ID " ^ order.id ^ " already exists")
+  else (
+    _register manager order;
+    Result.Ok ())
+
+let submit_orders manager orders = List.map (_submit_one manager) orders
 
 let _cancel_order manager order_id order =
   if not (is_active order) then
