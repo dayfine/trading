@@ -9,3 +9,8 @@
 (test
  (name test_types)
  (libraries ounit2 trading.orders trading.base))
+
+(test
+ (name test_types_sexp)
+ (modules test_types_sexp)
+ (libraries ounit2 trading.orders trading.base matchers))

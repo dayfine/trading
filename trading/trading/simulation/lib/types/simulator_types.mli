@@ -64,7 +64,7 @@ type step_result = {
           further bars) as non-trading and silently truncated the equity curve.
       *)
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 (** Result of a single simulation step *)
 
 (** {1 Run Result} *)

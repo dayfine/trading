@@ -65,3 +65,8 @@
  (name test_portfolio_view)
  (modules test_portfolio_view)
  (libraries ounit2 core trading.strategy types matchers))
+
+(test
+ (name test_position_sexp)
+ (modules test_position_sexp)
+ (libraries ounit2 core trading.strategy trading.base matchers))

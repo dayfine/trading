@@ -7,7 +7,7 @@ type price_bar = {
   low_price : price;
   close_price : price;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type path_point = { price : price } [@@deriving show, eq]
 type intraday_path = path_point list [@@deriving show, eq]
