@@ -1,3 +1,4 @@
+open Sexplib0.Sexp_conv
 open Trading_base.Types
 
 type price_bar = {

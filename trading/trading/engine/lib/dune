@@ -1,7 +1,7 @@
 (library
  (public_name trading.engine)
  (name trading_engine)
- (libraries trading.base trading.orders status)
+ (libraries sexplib0 trading.base trading.orders status)
  (modules
   types
   engine
