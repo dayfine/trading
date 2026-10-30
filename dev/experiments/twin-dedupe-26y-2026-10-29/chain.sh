@@ -266,8 +266,10 @@ cmd_collect() { # $1 destination results dir (host); trade_audit.sexp is too lar
 }
 
 # ---------------------------------------------------------------------------------------------------------- summary
-# README §"What is read", mechanically. A pair counts when both cells have a RESULT line and an actual.sexp and the dd
-# cell has no GATE-FAIL line. d = ln(1 + R_dd) - ln(1 + R_cur), R = total_return_pct / 100; SD is the sample SD (n-1).
+# README §"What is read", mechanically. A pair counts only when (1) both cells have a RESULT line and an actual.sexp,
+# (2) the dd cell has no GATE-FAIL line, and (3) the two params.sexp files are equal once (universe_size N) is masked
+# (same-build rule; a missing params.sexp also fails it). Any other pair is "pair out" and enters no number. Fewer than
+# 2 pairs: "no read", nothing else. d = ln(1 + R_dd) - ln(1 + R_cur), R = total_return_pct / 100; SD is the sample SD (n-1).
 _metrics() { # $1 actual.sexp -> "R sharpe maxdd calmar trades"
   nt=$(grep -o 'total_return_pct' "$1" | wc -l | tr -d ' ')
   [ "$nt" = 1 ] || { echo "TRIPWIRE: $1 holds $nt total_return_pct tokens" >&2; return 1; }
@@ -275,6 +277,11 @@ _metrics() { # $1 actual.sexp -> "R sharpe maxdd calmar trades"
     n = split("total_return_pct sharpe_ratio max_drawdown_pct calmar_ratio total_trades", k, " ")
     for (i = 1; i <= n; i++) { v = "nan"; if (match($0, "\\(" k[i] " [-0-9.eE+]+\\)")) { v = substr($0, RSTART + length(k[i]) + 2, RLENGTH - length(k[i]) - 3) } printf "%s ", v }
   }'
+}
+_params_equal() { # $1 dir, $2 seed -> 0 when both params.sexp exist and match with (universe_size N) masked
+  _pc=$1/td-cur-k$2-s0-params.sexp; _pd=$1/td-dd-k$2-s0-params.sexp  # not a/b: cmd_summary loops on $a
+  [ -s "$_pc" ] && [ -s "$_pd" ] || return 1
+  [ "$(sed 's/(universe_size [0-9]*)//' "$_pc" | md5 -q)" = "$(sed 's/(universe_size [0-9]*)//' "$_pd" | md5 -q)" ]
 }
 _status() { # $1 tag, $2 dir, $3 chain log
   if ! grep -q " RESULT $1 " "$3"; then echo no_result
@@ -298,8 +305,8 @@ _paired() { # $1 rows file ("k arm status R sharpe maxdd calmar trades")
         n++; x[n] = d; s += d; dd[n] = ld; if (d > 0) pos++; else if (d < 0) neg++
         printf "k%d    %.4f       %.4f      %+.4f\n", k, lc, ld, d }
       print ""
-      if (n == 0) { print "paired read: no pair included"; exit }
-      mu = s / n; sd = "n/a"; if (n >= 2) { ss = 0; for (i = 1; i <= n; i++) ss += (x[i] - mu) ^ 2; sd = sprintf("%.4f", sqrt(ss / (n - 1))) }
+      if (n < 2) { printf "paired read: no read (%d pair(s) included; the pre-registration needs at least 2)\n", n; exit }
+      mu = s / n; ss = 0; for (i = 1; i <= n; i++) ss += (x[i] - mu) ^ 2; sd = sprintf("%.4f", sqrt(ss / (n - 1)))
       printf "paired: n = %d, mean d %+.4f, SD %s, sign %d+ / %d- / %d zero\n", n, mu, sd, pos, neg, n - pos - neg
       printf "movement class (|mean d| / band SD = %.2f): %s\n", (mu < 0 ? -mu : mu) / bs, cls(mu / bs)
       m = med(dd, n); z = (m - bm) / bs
@@ -333,6 +340,7 @@ cmd_summary() {
   for k in $KS; do
     for a in cur dd; do
       tag=td-$a-k$k-s0; st=$(_status "$tag" "$dir" "$lg")
+      [ "$st" = ok ] && ! _params_equal "$dir" "$k" && st=params_mismatch
       vals="nan nan nan nan nan"; [ -s "$dir/$tag-actual.sexp" ] && { vals=$(_metrics "$dir/$tag-actual.sexp") || { rm -f "$rows"; return 1; }; }
       vd=-; [ "$a" = dd ] && [ -f "$dir/$tag.v6diff-cur.log" ] && vd=$(tail -1 "$dir/$tag.v6diff-cur.log")
       echo "$k $a $st $vals" >> "$rows"
