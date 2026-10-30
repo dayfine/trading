@@ -1,0 +1,31 @@
+Loading 1 scenarios from /tmp/t4band/goldens-broad--bull-crash-2015-2020-k2 (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/dev/backtest/scenarios-2026-10-30-025126
+
+>>> Running bull-crash-2015-2020: Strong bull market through the 2020 crash (PIT top-1000-2015) (2015-01-02 to 2020-12-31)
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2015-01-02 to 2020-12-31, warmup from 2014-01-03)...
+Panel_runner: simulator window 2014-01-03..2020-12-31 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (1015 symbols, /tmp/panel_runner_csv_snapshot_62aedd)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 1825 days) for strategy
+WARN: portfolio rejected fill for LH (side=Types.Buy qty=783.0000 price=109.6092): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 85831.8664413672, Available: 84850.5673147646, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=4314233 misses=1015 miss_absent=0 evictions=0 n_symbols=1015 misses_per_symbol=1.00 n_symbols_touched=1015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=1015 max_bytes=144345824 max_mmap_open=0 avg_entries=508.0 avg_bytes=73963197 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=599659712 maxrss_bytes=633737216
+Panel_runner: split_dividend_guard rejected=0 no_files=4
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4band
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+bull-crash-2015-2020           160.1%     159    39.6%    19.0%   FAIL (total_return_pct high (160.09 > 65.43); sharpe_ratio high (0.96 > 0.60); max_drawdown_pct low (19.00 < 29.80); avg_holding_days high (70.65 > 67.75))
+
+0/1 scenarios passed.
+exit=1

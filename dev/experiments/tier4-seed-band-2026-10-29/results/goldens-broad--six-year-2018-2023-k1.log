@@ -1,0 +1,31 @@
+Loading 1 scenarios from /tmp/t4band/goldens-broad--six-year-2018-2023-k1 (parallel=1)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /workspaces/trading-1/.claude/worktrees/sweep-t4band/trading/dev/backtest/scenarios-2026-10-30-034253
+
+>>> Running six-year-2018-2023: 6-year run covering COVID crash and recovery (PIT top-1000-2018) (2018-01-02 to 2023-12-29)
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2018-01-02 to 2023-12-29, warmup from 2017-01-03)...
+Panel_runner: simulator window 2017-01-03..2023-12-29 (warmup 364 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (1015 symbols, /tmp/panel_runner_csv_snapshot_e3086c)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 1824 days) for strategy
+WARN: portfolio rejected fill for GME (side=Types.Buy qty=15060.0000 price=9.5798): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 144423.01797914784, Available: 142734.98427719064, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=4455976 misses=1015 miss_absent=0 evictions=0 n_symbols=1015 misses_per_symbol=1.00 n_symbols_touched=1015 n_symbols_absent=0 loads_per_touched=1.00 max_entries=1015 max_bytes=163378040 max_mmap_open=0 avg_entries=508.0 avg_bytes=84077906 cap_mb=4096 cap_mmap_handles=12000 top_heap_bytes=664008416 maxrss_bytes=698187776
+Panel_runner: split_dividend_guard rejected=0 no_files=3
+fatal: not a git repository: /Users/difan/Projects/trading-1/.git/worktrees/sweep-t4band
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+six-year-2018-2023              77.9%     203    29.1%    56.0%   FAIL (total_return_pct high (77.95 > -15.29); sharpe_ratio high (0.39 > -0.10); max_drawdown_pct high (56.04 > 45.39))
+
+0/1 scenarios passed.
+exit=1
