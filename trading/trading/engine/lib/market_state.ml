@@ -35,6 +35,16 @@ let update t ~path_config bars =
   Hashtbl.clear t.generated;
   List.iter bars ~f:(fun bar -> Hashtbl.set t.bars ~key:bar.symbol ~data:bar)
 
+let bars t =
+  Hashtbl.data t.bars
+  |> List.sort ~compare:(fun (a : price_bar) b ->
+      String.compare a.symbol b.symbol)
+
+let restore_bars t bars =
+  Hashtbl.clear t.bars;
+  Hashtbl.clear t.generated;
+  List.iter bars ~f:(fun bar -> Hashtbl.set t.bars ~key:bar.symbol ~data:bar)
+
 (* Look up (or lazily create / grow) the scratch for [symbol] sized for the
    current [path_config]. [find_or_add] allocates only on a miss. *)
 let _scratch_for t ~symbol =

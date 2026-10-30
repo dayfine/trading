@@ -192,6 +192,13 @@ module Log : sig
   val create : unit -> t
   val record : t -> event -> unit
 
+  val snapshot : t -> event list
+  (** The recorded events newest-first, as stored: the checkpoint form (#3477).
+  *)
+
+  val restore : t -> event list -> unit
+  (** Overwrite the log in place with a {!snapshot}. *)
+
   val events : t -> event list
   (** All events in chronological order, broken ties by symbol. *)
 

@@ -88,6 +88,18 @@ val process_orders :
     | Error err -> (* handle error *)
     ]} *)
 
+type snapshot = { bars : price_bar list; stop_limit_blocked : int }
+[@@deriving sexp]
+(** The engine's run-carried state: the last bar per symbol (sorted by symbol)
+    and the {!stop_limit_blocked_count} tally. Everything else is a cache that
+    refills lazily; intraday paths are a pure function of the bar (#3477). *)
+
+val snapshot : t -> snapshot
+(** Capture the run-carried state. *)
+
+val restore : t -> snapshot -> unit
+(** Overwrite [t]'s run-carried state with the snapshot, in place. *)
+
 val stop_limit_blocked_count : t -> int
 (** Diagnostic tally: StopLimit orders whose stop {b triggered} on a bar but
     whose limit was never reachable, so no fill happened.

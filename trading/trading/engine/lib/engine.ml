@@ -22,6 +22,19 @@ let create config =
 
 let stop_limit_blocked_count engine = !(engine.stop_limit_blocked_count)
 
+type snapshot = { bars : price_bar list; stop_limit_blocked : int }
+[@@deriving sexp]
+
+let snapshot engine =
+  {
+    bars = Market_state.bars engine.market_state;
+    stop_limit_blocked = !(engine.stop_limit_blocked_count);
+  }
+
+let restore engine { bars; stop_limit_blocked } =
+  Market_state.restore_bars engine.market_state bars;
+  engine.stop_limit_blocked_count := stop_limit_blocked
+
 (* Store today's bars; intraday [Price_path] generation is deferred to
    [Market_state.path_for] at order-processing time, so paths are materialized
    only for the few symbols an order references rather than the whole universe.
