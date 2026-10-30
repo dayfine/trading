@@ -12,7 +12,7 @@
 # renames top-N-Y-05-31.sexp to top-N-Y.sexp, then applies pit-v12's post-processing in its commit order:
 #   1. alias-lists.pl with v11's alias2.resolved, then alias3.txt                           (#3182)
 #   2. alias-lists.pl with the v12 warehouse build's alias-v12-new.txt                      (#3198)
-#   3. apply-drops.sh with pit-v12/twin-drops.txt (CMN/CMD)                                 (#3391)
+#   3. apply-drops.sh with pit-v12/twin-drops.txt (CMN/CMD, then the full dedupe)    (#3391, #3388)
 # and cmp's every list against pit-v12/composition/. The builder output (before step 1) is also md5'd against
 # pit-v12/composition-raw.md5, so a mismatch says whether the builder/store or the post-processing moved.
 # Exit 0 iff every FINAL list matches. ~1.4 min per list (pit-v12's 56 lists took ~80 min, one job).
