@@ -16,10 +16,16 @@ type order_filter =
    load instead of cumulative submissions. Without this index, hot-loop
    scenarios (e.g. Cell E h=2 on 15y, 4000+ submitted orders) pay an
    O(N) cumulative scan every simulator step — the dominant remaining
-   per-day perf cost after PRs #1014 + #1015. *)
+   per-day perf cost after PRs #1014 + #1015.
+
+   [seq] stamps each order with a monotonic insertion number at first submit
+   (never changed by update / cancel). [list_orders] sorts by it so callers
+   see insertion order rather than [Hashtbl] bucket order (#3477). *)
 type order_manager = {
   orders : (order_id, order) Hashtbl.t;
   active_orders : (order_id, order) Hashtbl.t;
+  seq : (order_id, int) Hashtbl.t;
+  mutable next_seq : int;
 }
 
 let _initial_size = 100
@@ -28,6 +34,8 @@ let create () =
   {
     orders = Hashtbl.create _initial_size;
     active_orders = Hashtbl.create _initial_size;
+    seq = Hashtbl.create _initial_size;
+    next_seq = 0;
   }
 
 (* Sync [active_orders] with the current status of [order]: insert/refresh
@@ -43,6 +51,8 @@ let submit_orders manager orders =
         error_invalid_argument ("Order with ID " ^ order.id ^ " already exists")
       else (
         Hashtbl.add manager.orders order.id order;
+        Hashtbl.replace manager.seq order.id manager.next_seq;
+        manager.next_seq <- manager.next_seq + 1;
         _sync_active manager order;
         Result.Ok ()))
     orders
@@ -78,10 +88,12 @@ let matches_filter order = function
 (* [ActiveOnly] walks [active_orders] (bounded by current pending count);
    every other branch walks the full audit table. *)
 let list_orders ?filter manager =
+  let seq_of order = Hashtbl.find manager.seq order.id in
   let collect tbl predicate =
     Hashtbl.fold
       (fun _ order acc -> if predicate order then order :: acc else acc)
       tbl []
+    |> List.sort (fun a b -> Int.compare (seq_of a) (seq_of b))
   in
   match filter with
   | None -> collect manager.orders (fun _ -> true)
