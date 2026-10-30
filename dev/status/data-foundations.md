@@ -1,11 +1,22 @@
 # Status: data-foundations
 
-## Last updated: 2026-10-29
+## Last updated: 2026-10-30
 
 ## Status
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-10-30 — monthly builder applies twin drops per window (#3388 follow-up).**
+  `build_monthly_universe_warehouse.sh` `map_yearly_drops` now applies a
+  `pit-v12/twin-drops.txt` `top-3000-Y` row only to the monthly lists dated in
+  [Y-05-31, Y+1-05-31), from its original pair (`via=` leg), chain-resolved per
+  monthly list; top-1000 rows are not read; a survivor cycle aborts `post`.
+  Checked on the host against the real file: the 28 pre-#3475 yearly lists,
+  taken as May 31 monthly lists, reproduce `pit-v12/composition/` byte for byte
+  and the mapped rows equal the yearly `top-3000` rows. Verify:
+  `sh trading/devtools/checks/build_monthly_twin_window_check.sh` (fixture
+  `fixtures/monthly_twin_window/`: May 31 equality, MEE kept after its twin
+  window, mid-window chain) and `build_monthly_universe_guard_smoke.sh`.
 - [x] **2026-10-29 — full pit-v12 rename-twin dedupe (#3388).**
   `dev/experiments/twin-dedupe-26y-2026-10-29/apply-full-dedupe.sh` applies the
   v12 twin scan's full proposal: `drops.txt` filtered against
@@ -1764,10 +1775,8 @@ aggregates. Manifest schema-hash drives incremental rebuild.
 
 ## Next Steps
 
-**Follow-up (#3388):** `build_monthly_universe_warehouse.sh` `post` re-keys
-`pit-v12/twin-drops.txt` to every monthly list whatever the window; with the
-784-row file its `check_may31` no longer reproduces the yearly lists. Restate
-the re-key per window before the next monthly build. The paired 26y read
+**Follow-up (#3388):** the monthly re-key is per window (2026-10-30); the
+next monthly build re-pins `pit-v12-monthly/composition.md5` (`REPIN=1`). The paired 26y read
 (`dev/experiments/twin-dedupe-26y-2026-10-29/chain.sh launch`) runs after
 merge.
 

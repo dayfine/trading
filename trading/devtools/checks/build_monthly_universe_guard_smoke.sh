@@ -2,9 +2,10 @@
 # build_monthly_universe_guard_smoke.sh -- dry harness for the list-side rules of
 # dev/scripts/build_monthly_universe_warehouse.sh (arm SM prerequisite 3). The build itself takes hours in the
 # container, so the script's pure helpers are sourced (SM_LIB_ONLY=1) and run on fixture lists:
-#   a. map_yearly_drops: a pair named by a yearly row drops D from every monthly list holding D and S, whatever the
-#      window (CMN/CMD in top-3000-2009-04-30, the 2008 window); an in-window list holding D without S is kept and
-#      reported.
+#   a. map_yearly_drops: a top-3000-Y row drops D only from the monthly lists of its window [Y-05-31, Y+1-05-31)
+#      holding D and S; a list outside every row's window (CMN/CMD in top-3000-2009-04-30, the 2008 window) is left to
+#      the twinscan phase (b2); an in-window list holding D without S is kept and reported. The per-window and chain
+#      cases on a #3475-shaped fixture are build_monthly_twin_window_check.sh.
 #   b. derive_monthly_drops: only pairs with a monthly-only leg drop, excluded pairs never, one row per co-occurring
 #      list, carrying the scan's evidence; mode `other` returns the complementary (both-legs-yearly) pairs.
 #   b2. ungoverned_cooccur: a both-legs-yearly pair drops where the yearly list in force holds at most one leg, never
@@ -60,9 +61,9 @@ map_yearly_drops "$SB/drops.txt" "$L" "$SB/skipped.txt" > "$SB/mapped.txt"
 printf 'top-3000-2009-05-31 CMN CMD\ntop-3000-2010-06-30 CMN CMD\n' > "$SB/want-in-window.txt"
 grep -v -e 2009-04-30 -e 2012-01-31 "$SB/mapped.txt" > "$SB/mapped-in-window.txt" || true
 check "a: a row lands on its [Y-05-31, Y+1-05-31) lists holding both legs" "$SB/want-in-window.txt" "$SB/mapped-in-window.txt"
-printf 'top-3000-2009-04-30 CMN CMD\ntop-3000-2012-01-31 CMN CMD\n' > "$SB/want-gap.txt"
+: > "$SB/want-gap.txt"
 grep -e 2009-04-30 -e 2012-01-31 "$SB/mapped.txt" > "$SB/mapped-gap.txt" || true
-check "a: the pair also drops where the yearly list in force holds at most one leg (CMN/CMD in 2009-04-30, the 2008 window) or no row's window applies (2012)" "$SB/want-gap.txt" "$SB/mapped-gap.txt"
+check "a: no row outside its window: CMN/CMD in 2009-04-30 (the 2008 window) and 2012 (no row) are the twinscan phase's cells" "$SB/want-gap.txt" "$SB/mapped-gap.txt"
 echo 'top-3000-2010-05-31 CMN CMD survivor-absent' > "$SB/want-skipped.txt"
 check "a: an in-window list holding D without its survivor is kept and reported; a list holding only S is untouched" "$SB/want-skipped.txt" "$SB/skipped.txt"
 

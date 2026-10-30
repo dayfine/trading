@@ -1409,6 +1409,20 @@
  (action
   (run sh %{dep:build_monthly_universe_guard_smoke.sh})))
 
+; Fixture-driven regression for the monthly builder's per-window re-key of the
+; per-list pit-v12/twin-drops.txt (#3475, #3388): May 31 lists equal the yearly
+; lists after the drops, a pair that is a twin in an early window is retained
+; later, chains resolve per monthly list. Fixture read via repo_root() at run time.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (source_tree fixtures/monthly_twin_window)
+  (universe))
+ (action
+  (run sh %{dep:build_monthly_twin_window_check.sh})))
+
 ; wait_for test (issue #2738 Ask 2): dev/scripts/wait_for.sh is the
 ; dispatcher's background wait helper (.claude/rules/dispatcher-cadence.md).
 ; Same shim + (universe) pattern as dispatch_disk_guard_test_runner.sh above.

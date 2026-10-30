@@ -17,9 +17,10 @@
 #              FROM..TO, so a smoke run's partial year is rebuilt by a full run, never reused.
 #   post       pit-v12 post-processing on a copy of raw, in its commit order (as pit_v12_month_end_repro_check.sh):
 #              1-2. alias-lists.pl with v11's alias2.resolved, alias3.txt, then v12's alias-v12-new.txt
-#              3.   pit-v12/twin-drops.txt, re-keyed: each confirmed pair (D, S) it names loses D from EVERY monthly
-#                   list that holds both legs, whatever the window (D absent: nothing to drop; S absent from a list in
-#                   a row's [Y-05-31, Y+1-05-31) window: kept, logged)
+#              3.   pit-v12/twin-drops.txt (per list since #3475), re-keyed by window: a top-3000-Y row (D, S) applies
+#                   only to the monthly lists dated in [Y-05-31, Y+1-05-31) holding both legs, chain-resolved per list
+#                   (map_yearly_drops; D absent: nothing to drop; no survivor of D present: kept, logged). Cells
+#                   outside every row's window are the twinscan phase's.
 #              then every May 31 list must equal pit-v12/composition/top-3000-Y.sexp byte for byte (raw and final),
 #              and there must be one per May 31 in FROM..TO (27 for the defaults).
 #   twinscan   v12-twin-scan-2026-10-22/twin-scan.sh (host, CSV store, whole union, no chunks) over the post lists.
@@ -102,31 +103,44 @@ n_of() { wc -l < "$1" | tr -d ' '; }
 # ------------------------------------------------------------------------------------------- pure list-side helpers
 # (sourced by trading/devtools/checks/build_monthly_universe_guard_smoke.sh; no docker, no globals but their args)
 
-# $1 yearly drops file ("top-N-Y D S", '#' comments), $2 dir of top-3000-YYYY-MM-DD.sexp lists, $3 skipped-rows
-# file. stdout: "top-3000-YYYY-MM-DD D S" for every monthly list holding both legs of a pair (D, S) named by any row,
-# whatever its window: both legs of a confirmed pair can co-occur in a monthly list whose governing yearly list holds
-# at most one leg (CMN and CMD in top-3000-2009-04-30, the 2008 window, whose list holds neither; dispatcher decision 2026-10-25). Ascending by
-# list, then pair. A list dated in a top-3000-Y row's window [Y-05-31, Y+1-05-31) that holds D without S is written to
-# $3 (dropping D there would delete the instrument, not a second copy).
+# $1 dated list name (top-3000-YYYY-MM-DD). stdout: the year Y of the yearly list in force, the latest May 31 on or
+# before the date (top-3000-2009-04-30 -> 2008, top-3000-2009-05-31 -> 2009).
+window_year() {
+  dt=${1#top-3000-}; wy=${dt%%-*}
+  [ "$(echo "$dt" | cut -c6-7,9-10)" -lt 531 ] && wy=$((wy - 1))
+  echo "$wy"
+}
+
+# $1 yearly drops file ("LIST D S [via=S0]", '#' comments; pit-v12/twin-drops.txt), $2 dir of
+# top-3000-YYYY-MM-DD.sexp lists, $3 skipped-rows file. stdout: "top-3000-YYYY-MM-DD D S [via=S0]", ascending.
+# A top-3000-Y row is a decision for its window only: it applies to the monthly lists dated in [Y-05-31, Y+1-05-31)
+# and nowhere else (#3475 made twin-drops.txt per list: MEE/FLR are twins in 1998-1999 and distinct in 2001, where
+# the yearly list keeps both). top-1000 rows are not read: the monthly lists are top-3000, and every top-1000 pair has
+# its year's top-3000 row. Each row is taken as its ORIGINAL pair (D, S0), S0 = the via= leg when present, and kept
+# where the monthly list holds both D and S0; the kept rows are then chain-resolved per list (resolve_chains), as
+# apply-full-dedupe.sh resolved the yearly rows. On a May 31 list (raw bytes = the yearly raw) that keeps exactly the
+# yearly list's rows, so the final May 31 list equals the yearly one byte for byte (check_may31). Mid-window, a
+# survivor that is absent or itself dropped resolves through the chain the list actually holds. A list holding D
+# while no row of D in the window has its survivor present is written to $3 ("LIST D S0 survivor-absent"; dropping D
+# there would delete the instrument, not a second copy). Cells outside every row's window are the twinscan phase's
+# (ungoverned_cooccur). Fails (exit 1) on a survivor cycle.
 map_yearly_drops() {
-  : > "$3"
-  grep -v '^#' "$1" | awk 'NF >= 3 { print $2, $3 }' | LC_ALL=C sort -u | while read -r d s; do
-    for f in "$2"/top-3000-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].sexp; do
-      [ -f "$f" ] || continue
-      grep -q -F "(symbol $d)" "$f" && grep -q -F "(symbol $s)" "$f" && echo "$(basename "$f" .sexp) $d $s"
-    done
-  done | LC_ALL=C sort
-  grep -v '^#' "$1" | while read -r l d s _; do
-    case "$l" in top-3000-[0-9][0-9][0-9][0-9]) ;; *) continue ;; esac
-    y=${l#top-3000-}; lo="${y}0531"; hi="$((y + 1))0531"
-    for f in "$2"/top-3000-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].sexp; do
-      [ -f "$f" ] || continue
-      b=$(basename "$f" .sexp); n=$(echo "${b#top-3000-}" | tr -d -)
-      { [ "$n" -lt "$lo" ] || [ "$n" -ge "$hi" ]; } && continue
-      grep -q -F "(symbol $d)" "$f" && ! grep -q -F "(symbol $s)" "$f" && echo "$b $d $s survivor-absent" >> "$3"
-    done
-  done
-  return 0
+  : > "$3"; mp=$3.pairs; : > "$mp"
+  grep -v '^#' "$1" | awk '$1 ~ /^top-3000-[0-9][0-9][0-9][0-9]$/ && NF >= 3' > "$3.rows"
+  for f in "$2"/top-3000-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].sexp; do
+    [ -f "$f" ] || continue
+    b=$(basename "$f" .sexp)
+    awk -v l="$b" -v yl="top-3000-$(window_year "$b")" -v skip="$3" '
+      FILENAME == ARGV[1] { while (match($0, /\(symbol [^)]*\)/)) { has[substr($0, RSTART + 8, RLENGTH - 9)] = 1; $0 = substr($0, RSTART + RLENGTH) } next }
+      $1 != yl { next }
+      { s0 = $3; if ($4 ~ /^via=/) s0 = substr($4, 5)
+        if (!($2 in has)) next
+        if (s0 in has) { print l, $2, s0; dropped[$2] = 1 } else if (!($2 in miss)) miss[$2] = s0 }
+      END { for (d in miss) if (!(d in dropped)) print l, d, miss[d], "survivor-absent" >> skip }' "$f" "$3.rows"
+  done | LC_ALL=C sort -u > "$mp"
+  rc=0; resolve_chains "$mp" > "$mp.res" || rc=1; LC_ALL=C sort "$mp.res"; rm -f "$mp.res"
+  LC_ALL=C sort -o "$3" "$3"; rm -f "$mp" "$3.rows"
+  return "$rc"
 }
 
 # $1 twins.txt ("D S <evidence...>"), $2 cooccur.txt ("D S: list..."), $3 sorted monthly-only symbols, $4 exclude
@@ -400,7 +414,8 @@ phase_post() {
   rm -rf "$WORK/final"; mkdir -p "$WORK/final"; cp "$WORK"/raw/top-3000-*.sexp "$WORK/final/"
   : > "$WORK/post.log"
   for m in $ALIAS_MAPS; do perl "$ALIAS_PL" "$m" "$WORK"/final/*.sexp >> "$WORK/post.log" || die "alias-lists.pl $m"; done
-  map_yearly_drops "$V12/twin-drops.txt" "$WORK/final" "$WORK/drops-yearly-skipped.txt" > "$WORK/drops-yearly-mapped.txt"
+  map_yearly_drops "$V12/twin-drops.txt" "$WORK/final" "$WORK/drops-yearly-skipped.txt" > "$WORK/drops-yearly-mapped.txt" \
+    || die "yearly twin-drops: survivor cycle in a monthly list ($WORK/drops-yearly-mapped.txt)"
   if [ -s "$WORK/drops-yearly-mapped.txt" ]; then
     sh "$TWINX/apply-drops.sh" "$WORK/drops-yearly-mapped.txt" "$WORK/final" >> "$WORK/post.log" || die "apply-drops (yearly rows)"
   fi

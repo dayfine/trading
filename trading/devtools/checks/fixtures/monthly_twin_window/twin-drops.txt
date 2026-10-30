@@ -1,0 +1,10 @@
+# Fixture in pit-v12/twin-drops.txt's shape (#3475): LIST DROPPED SURVIVOR [via=ORIGINAL_SURVIVOR].
+# MEE/FLR are twins in the 1999 window only (the real file: 1998-1999); in 2000 and 2001 the yearly lists keep both.
+# BAC-WS-B twins BAC and BAC-WS-A, and BAC-WS-A leaves for BAC: the via= row is the resolved chain.
+top-1000-1999 MEE FLR
+top-1000-2000 BAC-WS-A BAC
+top-3000-1999 BAC-WS-A BAC
+top-3000-1999 BAC-WS-B BAC
+top-3000-1999 BAC-WS-B BAC via=BAC-WS-A
+top-3000-1999 MEE FLR
+top-3000-2000 BAC-WS-A BAC
