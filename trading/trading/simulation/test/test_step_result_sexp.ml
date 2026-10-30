@@ -56,13 +56,7 @@ let _step =
     had_market_bars = true;
   }
 
-(* [Time_ns_unix.sexp_of_t] reads the local zone, so these tests cannot run
-   where /etc/localtime is absent (the CI image). They run in dev containers. *)
-let _skip_without_local_zone () =
-  skip_if (not (Stdlib.Sys.file_exists "/etc/localtime")) "no /etc/localtime"
-
 let test_roundtrip _ =
-  _skip_without_local_zone ();
   assert_that
     (List.map
        [

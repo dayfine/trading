@@ -27,15 +27,13 @@ let _orders =
     _make "o3" Buy (Stop 50.000000000001) Filled (Some 50.1);
     _make "o4" Sell (StopLimit (49.5, 49.25)) Cancelled None;
     _make "o5" Buy Market (Rejected "no cash") None;
+    _make "o6" Sell
+      (Limit (Stdlib.Float.min_float /. 1e10))
+      Pending
+      (Some (Stdlib.Float.min_float /. 1e10));
   ]
 
-(* [Time_ns_unix.sexp_of_t] reads the local zone, so these tests cannot run
-   where /etc/localtime is absent (the CI image). They run in dev containers. *)
-let _skip_without_local_zone () =
-  skip_if (not (Stdlib.Sys.file_exists "/etc/localtime")) "no /etc/localtime"
-
 let test_order_roundtrip _ =
-  _skip_without_local_zone ();
   assert_that
     (List.map (fun o -> o |> sexp_of_order |> order_of_sexp) _orders)
     (equal_to (_orders : order list))

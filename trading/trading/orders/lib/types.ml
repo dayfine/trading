@@ -22,8 +22,8 @@ type order = {
   status : order_status;
   filled_quantity : quantity;
   avg_fill_price : price option;
-  created_at : Time_ns_unix.t;
-  updated_at : Time_ns_unix.t;
+  created_at : Utc_time.t;
+  updated_at : Utc_time.t;
 }
 [@@deriving show, eq, sexp]
 

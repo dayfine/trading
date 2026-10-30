@@ -36,8 +36,8 @@ type order = {
   status : order_status;  (** Current order status *)
   filled_quantity : quantity;  (** Amount already filled *)
   avg_fill_price : price option;  (** Average price of fills, if any *)
-  created_at : Time_ns_unix.t;  (** Time when order was created *)
-  updated_at : Time_ns_unix.t;  (** Time when order was last updated *)
+  created_at : Utc_time.t;  (** Time when order was created *)
+  updated_at : Utc_time.t;  (** Time when order was last updated *)
 }
 [@@deriving show, eq, sexp]
 (** Core order record containing all order information *)
