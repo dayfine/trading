@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-30",
+  "feature": "orders-fill-insertion-order",
+  "branch": "orders/fill-insertion-order-3477",
+  "sha": "c65897fdffc24334e492a0be8b996ae81bf8e10c",
+  "recorded_at_ns": 1793373508226212893,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

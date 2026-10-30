@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-30",
+  "feature": "checkpoint-sexp-roundtrip",
+  "branch": "checkpoint/sexp-roundtrip-3477-pr2",
+  "sha": "7e4bdfd2bf650717b030132e03954a350ad82c14",
+  "recorded_at_ns": 1793373508261389063,
+  "structural_qc": "NEEDS_REWORK",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
