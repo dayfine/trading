@@ -110,6 +110,15 @@ type candidate_decision =
     pre-PR-2 code: same sizing inputs, same stop computation, same side-effects
     on [stop_states]. *)
 
+val position_counter : unit -> int
+(** The process-global counter behind {!gen_position_id}: the number of ids
+    minted so far. Read when checkpointing strategy state (#3477). *)
+
+val set_position_counter : int -> unit
+(** Overwrite the counter so the next id is [n + 1]. Restores a checkpoint; the
+    counter is process-global, so a restore also affects any other strategy
+    instance in the process. *)
+
 val gen_position_id : string -> string
 (** Generate a fresh position id of the form [<ticker>-wein-<n>] with [n] a
     monotonically-increasing global counter. Same shape the strategy used

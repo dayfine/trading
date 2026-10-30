@@ -9,7 +9,7 @@ let _days_per_week = 7
 
 (* The ticket's FIRST placement, carried across every suspend / re-issue cycle:
    its date keeps the TTL clock counting, its id is the audit join key (#2989). *)
-type origin = { origin_date : Date.t; origin_id : string }
+type origin = { origin_date : Date.t; origin_id : string } [@@deriving sexp]
 
 (* Everything needed to re-emit the withdrawn order unchanged. *)
 type ticket = {
@@ -21,6 +21,7 @@ type ticket = {
   origin : origin;
   stop_state : Weinstein_stops.stop_state option;
 }
+[@@deriving sexp]
 
 type t = {
   stashed : ticket Hashtbl.M(String).t;  (** by symbol *)
@@ -31,6 +32,30 @@ let create () =
   {
     stashed = Hashtbl.create (module String);
     origins = Hashtbl.create (module String);
+  }
+
+(* Checkpoint form: symbol- / id-sorted alists, so the sexp does not depend on
+   hash-bucket order (#3477). *)
+type snapshot = {
+  stashed_tickets : (string * ticket) list;
+  reissued_origins : (string * origin) list;
+}
+[@@deriving sexp]
+
+let _sorted_alist tbl =
+  Hashtbl.to_alist tbl
+  |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+
+let capture t =
+  {
+    stashed_tickets = _sorted_alist t.stashed;
+    reissued_origins = _sorted_alist t.origins;
+  }
+
+let restore snap =
+  {
+    stashed = Hashtbl.of_alist_exn (module String) snap.stashed_tickets;
+    origins = Hashtbl.of_alist_exn (module String) snap.reissued_origins;
   }
 
 let suspends ~(config : Weinstein_strategy_config.config)

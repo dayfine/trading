@@ -86,6 +86,18 @@ type t
 val create : unit -> t
 (** A fresh, empty store. *)
 
+type snapshot [@@deriving sexp]
+(** The store's contents for checkpointing (#3477): the stashed tickets and the
+    re-issue origins, each as a key-sorted association list so the sexp does not
+    depend on hash order. *)
+
+val capture : t -> snapshot
+(** [capture store] copies the contents out; [store] is untouched. *)
+
+val restore : snapshot -> t
+(** [restore snap] is a fresh store holding exactly the captured contents, so
+    [capture (restore s) = s]. *)
+
 val cancel_reason : string
 (** ["entry_ticket_macro_suspended"] — the [CancelEntry] reason of a suspension.
     A {e withdrawal}, not a ticket death: the same setup comes back as a new

@@ -10,6 +10,7 @@
   test_cascade_trace
   test_entry_audit_capture
   test_entry_freeze
+  test_strategy_state_resume
   test_entry_stop_width_order
   test_stop_buffer_by_state
   test_stop_width_by_macro_state

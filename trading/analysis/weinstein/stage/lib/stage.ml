@@ -51,6 +51,7 @@ type result = {
   transition : (stage * stage) option;
   above_ma_count : int;
 }
+[@@deriving sexp]
 
 (* ------------------------------------------------------------------ *)
 (* Private stage helpers                                               *)

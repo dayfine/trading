@@ -95,6 +95,7 @@ type result = {
   above_ma_count : int;
       (** Number of the last [confirm_weeks] bars where close > MA. *)
 }
+[@@deriving sexp]
 (** Result of a single stage classification call. *)
 
 val classify :

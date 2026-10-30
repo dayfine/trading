@@ -84,3 +84,14 @@ val release : t -> symbol:string -> unit
     {!Entry_ticket_ttl.run} therefore releases explicitly, which is what makes
     "cancel releases the pin; the symbol may re-qualify later with a fresh [E]"
     actually true. *)
+
+type snapshot [@@deriving sexp]
+(** The pin table as a symbol-sorted association list, for checkpointing
+    (#3477). Sorted so the sexp is deterministic whatever the hash order. *)
+
+val capture : t -> snapshot
+(** [capture pending] copies the pins out; [pending] is untouched. *)
+
+val restore : snapshot -> t
+(** [restore snap] is a fresh table holding exactly the captured pins, so
+    [capture (restore s) = s]. *)
