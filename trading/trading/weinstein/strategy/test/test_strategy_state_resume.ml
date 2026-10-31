@@ -134,25 +134,43 @@ let _resting_ticket =
           }))
   |> _ok_or_fail "ticket setup"
 
+(* The pins are pinned by the snapshot round trip, not by onward behaviour: in
+   this fixture neither symbol is a screener candidate, and the re-issued
+   ticket carries its own entry level, so no onward output reads a pin. A
+   restore that drops the table fails the round-trip test (probed). *)
 let _pinned_e =
   Entry_freeze.snapshot_of_sexp
-    (Sexp.of_string "((ZZZ ((entry 1000) (anchor Breakout))))")
+    (Sexp.of_string
+       "((AAA ((entry 12345) (anchor Breakout))) (ZZZ ((entry 1000) (anchor \
+        Breakout))))")
   |> Entry_freeze.restore
+
+let _initial_stop =
+  Weinstein_stops.Initial { stop_level = 90.0; reference_level = 95.0 }
+
+(* Give every remaining state field a non-default value, so that a [restore]
+   that drops any one of them changes the snapshot (QC rework, #3477). *)
+let _populate_tables (state : Weinstein_strategy_state.t) =
+  Hashtbl.set state.last_stop_out_dates ~key:"OUT" ~data:_arm_date;
+  Hashtbl.set state.stage3_streaks ~key:"HELD" ~data:3;
+  Hashtbl.set state.laggard_streaks ~key:"HELD" ~data:2;
+  Hashtbl.set state.prior_stage_ma_values ~key:"HELD" ~data:98.5;
+  Hashtbl.set state.sector_prior_stages ~key:"Tech"
+    ~data:(Weinstein_types.Stage3 { weeks_topping = 1 })
 
 (* Arm freeze and suspend on [state]: pin a no-chase E, then suspend the
    resting ticket under a bearish screen, which stashes it. Returns the armed
    state ([pending_entry_e] is replaced, so the record is rebuilt). *)
 let _arm (state : Weinstein_strategy_state.t) =
   let state = { state with pending_entry_e = _pinned_e } in
-  let stop_states =
-    ref
-      (String.Map.singleton _stashed_symbol
-         (Weinstein_stops.Initial { stop_level = 90.0; reference_level = 95.0 }))
-  in
+  state.stop_states :=
+    String.Map.of_alist_exn
+      [ (_stashed_symbol, _initial_stop); ("HELD", _initial_stop) ];
+  _populate_tables state;
   let _transitions, _held =
     Entry_ticket_suspend.run ~store:state.suspended_tickets
       ~pending_entry_e:state.pending_entry_e ~config:_lib_config
-      ~macro_result:_bearish_macro ~stop_states
+      ~macro_result:_bearish_macro ~stop_states:state.stop_states
       ~current_close:(fun _ -> Some 100.0)
       ~portfolio:
         {
@@ -213,6 +231,11 @@ let test_armed_snapshot_holds_freeze_and_suspend _ =
        [
          field (String.is_substring ~substring:"ZZZ-1") (equal_to true);
          field (String.is_substring ~substring:"(entry 1000)") (equal_to true);
+         field (String.is_substring ~substring:"(entry 12345)") (equal_to true);
+         field (String.is_substring ~substring:"OUT") (equal_to true);
+         field (String.is_substring ~substring:"HELD") (equal_to true);
+         field (String.is_substring ~substring:"98.5") (equal_to true);
+         field (String.is_substring ~substring:"Tech") (equal_to true);
        ])
 
 let test_capture_restore_round_trips _ =
