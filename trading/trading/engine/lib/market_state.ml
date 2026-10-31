@@ -40,7 +40,10 @@ let bars t =
   |> List.sort ~compare:(fun (a : price_bar) b ->
       String.compare a.symbol b.symbol)
 
-let restore_bars t bars =
+let path_config t = t.path_config
+
+let restore t ~path_config bars =
+  t.path_config <- path_config;
   Hashtbl.clear t.bars;
   Hashtbl.clear t.generated;
   List.iter bars ~f:(fun bar -> Hashtbl.set t.bars ~key:bar.symbol ~data:bar)

@@ -22,6 +22,7 @@ open Types
     - ReverseJ: Back-loaded activity (building toward close)
     - Uniform: Equal probability throughout the day *)
 type distribution_profile = UShaped | JShaped | ReverseJ | Uniform
+[@@deriving sexp]
 
 type path_config = {
   profile : distribution_profile;
@@ -38,6 +39,7 @@ type path_config = {
           (3-5) give heavier tails and more extreme moves. Higher values (>30)
           approach Gaussian behavior. *)
 }
+[@@deriving sexp]
 (** Configuration for path generation.
 
     If not specified, reasonable defaults are used:
