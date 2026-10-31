@@ -1,0 +1,28 @@
+twin-dedupe summary: cells from /tmp/td-run/results; record band median 2.7819 SD 0.2254 (record-kseed); rk-k<k> from /Users/difan/Projects/trading-1/.claude/worktrees/sweep-td/dev/experiments/record-kseed-2026-10-27/results
+
+cell        status       total_return_pct  sharpe   max_dd_pct  calmar   trades   v6diff_vs_cur
+td-cur-k0-s0 ok           1312.7881612948102  0.60588204030579318 26.227255994619149 0.40090340057005941 566      -
+td-dd-k0-s0 ok           1257.3161037285336  0.59545645718000728 27.216163138493361 0.38019941063350227 567      exit=0
+td-cur-k1-s0 ok           2218.8186060854741  0.72579095804517446 24.159467674532632 0.52160720965037621 555      -
+td-dd-k1-s0 ok           2270.9529357695355  0.72947317957910651 24.159420045563422 0.5255228614377826 556      exit=0
+td-cur-k2-s0 ok           1515.02772600391  0.631675353160662 32.075605496055189 0.3452562106443619 552      -
+td-dd-k2-s0 ok           1438.722922729761  0.62426081064221639 32.07576841965485 0.33893167712853089 555      exit=0
+
+seed  ln(1+R_cur)  ln(1+R_dd)  d = dd - cur
+k0    2.6482       2.6081      -0.0401
+k1    3.1436       3.1659      +0.0222
+k2    2.7819       2.7335      -0.0484
+
+paired: n = 3, mean d -0.0221, SD 0.0386, sign 1+ / 2- / 0 zero
+movement class (|mean d| / band SD = 0.10): <= 1 band SD
+dd median ln(1+R) 2.7335 vs record band median 2.7819: -0.21 band SD (<= 1 band SD)
+
+cur reproduces rk-k<k> (actual.sexp byte-for-byte; a difference means the run tree moved since record-kseed):
+  k0: yes
+  k1: yes
+  k2: yes
+
+same build: dd vs cur params.sexp per seed, (universe_size N) masked (expected equal; sizes cur 9222, dd 9185):
+  k0: equal (cur (universe_size 9222), dd (universe_size 9185))
+  k1: equal (cur (universe_size 9222), dd (universe_size 9185))
+  k2: equal (cur (universe_size 9222), dd (universe_size 9185))
