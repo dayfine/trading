@@ -71,8 +71,27 @@ type totals = {
           [None]. *)
   missing_files : int;  (** Distinct held symbols that had no [dividends.csv]. *)
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 (** Running totals of one run. *)
 
 val totals : t -> totals
 (** Totals credited so far. *)
+
+type snapshot = {
+  cached_symbols : string list;
+  credited_through : Date.t;
+  totals : totals;
+}
+[@@deriving sexp]
+(** Run-carried state for a checkpoint (#3477): the symbols already loaded
+    (sorted), the last credited date and the running totals. The cached dividend
+    lists are re-read from the loader on {!restore}, not stored. *)
+
+val snapshot : t -> snapshot
+(** Capture the run-carried state. *)
+
+val restore : t -> snapshot -> unit Status.status_or
+(** Overwrite [t] in place with the snapshot, re-reading each cached symbol's
+    dividends through the loader without counting a missing file again (the
+    snapshot's [totals] already did). [Error] when a file cannot be read for a
+    reason other than [NotFound]. *)

@@ -25,7 +25,7 @@ type step_result = {
   benchmark_return : float option;
   had_market_bars : bool;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 (** {1 Run Result} *)
 

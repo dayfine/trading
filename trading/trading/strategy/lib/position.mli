@@ -135,7 +135,7 @@ open Core
 type position_side = Trading_base.Types.position_side =
   | Long  (** Buy to enter, sell to exit *)
   | Short  (** Sell to enter, buy to exit *)
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 (** {1 Position States} *)
 
@@ -145,14 +145,14 @@ type entry_reasoning =
   | PricePattern of string
   | Rebalancing
   | ManualDecision of { description : string }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type risk_params = {
   stop_loss_price : float option;
   take_profit_price : float option;
   max_hold_days : int option;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 (** Risk parameters for position management *)
 
 (** Exit reason - why we're closing this position *)
@@ -185,7 +185,7 @@ type exit_reason =
             string the strategy uses to encode salient context (e.g.
             ["weeks_in_stage3=3"]). Consumers that only label the exit
             (trades.csv writer, audit report) ignore [detail]. *)
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 (** Position state variants - only state-specific data *)
 type position_state =
@@ -227,7 +227,7 @@ type position_state =
       exit_date : Date.t;  (** Exit date *)
       days_held : int;  (** Days between entry and exit *)
     }  (** State: Position fully closed *)
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type t = {
   id : string;  (** Unique position identifier *)
@@ -245,7 +245,7 @@ type t = {
           position is created. Populated when entry fills execute and portfolio
           lots are created. *)
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 (** Position with normalized data - common fields at top level, state-specific
     data in variants *)
 

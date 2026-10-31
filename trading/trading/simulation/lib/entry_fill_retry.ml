@@ -7,6 +7,16 @@ type t = { max_retries : int; used : int String.Table.t }
 
 let create ~max_retries = { max_retries; used = String.Table.create () }
 
+type snapshot = (string * int) list [@@deriving sexp]
+
+let snapshot t =
+  Hashtbl.to_alist t.used
+  |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+
+let restore t entries =
+  Hashtbl.clear t.used;
+  List.iter entries ~f:(fun (key, data) -> Hashtbl.set t.used ~key ~data)
+
 let retries_used t ~position_id =
   Hashtbl.find t.used position_id |> Option.value ~default:0
 

@@ -184,68 +184,11 @@ let _submit_orders t orders =
 
 let _is_complete t = Date.( >= ) t.current_date t.config.end_date
 
-(** Convert Daily_price to engine price_bar *)
-let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
-    Trading_engine.Types.price_bar =
-  {
-    Trading_engine.Types.symbol;
-    open_price = daily_price.open_price;
-    high_price = daily_price.high_price;
-    low_price = daily_price.low_price;
-    close_price = daily_price.close_price;
-  }
-
-(** Get all price bars for today using market data adapter *)
-let _get_today_bars t =
-  let get_bar symbol =
-    Trading_simulation_data.Market_data_adapter.get_price
-      t.deps.market_data_adapter ~symbol ~date:t.current_date
-    |> Option.map ~f:(_to_price_bar symbol)
-  in
-  List.filter_map t.deps.symbols ~f:get_bar
-
 (** Extract fills, re-stamped with the simulated [date] (G1;
     {!Fill_date_stamp}). *)
 let _extract_trades ~date reports =
   List.concat_map reports ~f:(fun report -> report.Trading_engine.Types.trades)
   |> List.map ~f:(Fill_date_stamp.restamp ~date)
-
-(** Create get_price function for strategy *)
-let _make_get_price t : Trading_strategy.Strategy_interface.get_price_fn =
- fun symbol ->
-  Trading_simulation_data.Market_data_adapter.get_price
-    t.deps.market_data_adapter ~symbol ~date:t.current_date
-
-(** Create get_indicator function for strategy *)
-let _make_get_indicator t : Trading_strategy.Strategy_interface.get_indicator_fn
-    =
- fun symbol indicator_name period cadence ->
-  Trading_simulation_data.Market_data_adapter.get_indicator
-    t.deps.market_data_adapter ~symbol ~indicator_name ~period ~cadence
-    ~date:t.current_date
-
-(** True if the strategy should be called today given the configured cadence. *)
-let _should_call_strategy t =
-  Trading_simulation_data.Time_series.is_period_end
-    ~cadence:t.config.strategy_cadence t.current_date
-
-(** Call strategy and get transitions, or skip and return [] on non-cadence
-    days. *)
-let _call_strategy t =
-  if not (_should_call_strategy t) then Ok []
-  else
-    let (module S) = t.deps.strategy in
-    let get_price = _make_get_price t in
-    let get_indicator = _make_get_indicator t in
-    let open Result.Let_syntax in
-    let portfolio : Trading_strategy.Portfolio_view.t =
-      {
-        cash = t.portfolio.Trading_portfolio.Portfolio.current_cash;
-        positions = t.positions;
-      }
-    in
-    let%bind output = S.on_market_close ~get_price ~get_indicator ~portfolio in
-    Ok output.transitions
 
 let _is_holding_state = function
   | Trading_strategy.Position.Holding _ -> true
@@ -300,7 +243,10 @@ let _prepare_market_state t =
       ~adapter:t.deps.market_data_adapter ~date:t.current_date
       ~portfolio:t.portfolio ~positions:t.positions ()
   in
-  let today_bars = _get_today_bars t in
+  let today_bars =
+    Step_inputs.today_bars ~adapter:t.deps.market_data_adapter
+      ~symbols:t.deps.symbols ~date:t.current_date
+  in
   if not (List.is_empty today_bars) then
     List.iter
       (Stale_hold.detect_stale ~adapter:t.deps.market_data_adapter
@@ -442,7 +388,9 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
   (* Surface the already-realised delisted / stale force-exits in this step. *)
   let trades = forced_exit_trades @ fill_trades in
   let%bind strategy_transitions =
-    _call_strategy { t with portfolio; positions }
+    Step_inputs.strategy_transitions ~strategy:t.deps.strategy
+      ~adapter:t.deps.market_data_adapter ~cadence:t.config.strategy_cadence
+      ~date:t.current_date ~portfolio ~positions
   in
   let portfolio, transitions =
     Margin_runner.tick ~margin_config:t.deps.margin_config
@@ -497,3 +445,53 @@ let run t =
     | Ok (Stepped (t', _)) -> loop t'
   in
   loop t
+
+(** {1 Checkpoint} *)
+
+module Checkpoint = struct
+  type snapshot = Simulator_checkpoint.t [@@deriving sexp]
+
+  let _deps_args (d : dependencies) =
+    (d.order_manager, d.engine, d.entry_fill_retry, d.cash_credits)
+
+  let capture t : snapshot =
+    let order_manager, engine, entry_fill_retry, cash_credits =
+      _deps_args t.deps
+    in
+    {
+      current_date = t.current_date;
+      portfolio = t.portfolio;
+      positions = t.positions;
+      steps = List.rev t.step_history;
+      last_known_prices =
+        Hashtbl.to_alist t.last_known_prices
+        |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b);
+      valuation_failure_count = !(t.valuation_failure_count);
+      order_links = Fill_router.snapshot t.order_links;
+      deps =
+        Simulator_checkpoint.capture_deps ~order_manager ~engine
+          ~entry_fill_retry ~cash_credits ~stale_hold_log:t.deps.stale_hold_log;
+    }
+
+  let restore t (s : snapshot) =
+    let open Result.Let_syntax in
+    let order_manager, engine, entry_fill_retry, cash_credits =
+      _deps_args t.deps
+    in
+    let%map () =
+      Simulator_checkpoint.restore_deps ~order_manager ~engine ~entry_fill_retry
+        ~cash_credits ~stale_hold_log:t.deps.stale_hold_log s.deps
+    in
+    Hashtbl.clear t.last_known_prices;
+    List.iter s.last_known_prices ~f:(fun (key, data) ->
+        Hashtbl.set t.last_known_prices ~key ~data);
+    t.valuation_failure_count := s.valuation_failure_count;
+    Fill_router.restore t.order_links s.order_links;
+    {
+      t with
+      current_date = s.current_date;
+      portfolio = s.portfolio;
+      positions = s.positions;
+      step_history = List.rev s.steps;
+    }
+end

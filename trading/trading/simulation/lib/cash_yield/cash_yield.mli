@@ -116,6 +116,9 @@ module Accrual : sig
       credit to the running total. [None] (or a date before [start_date])
       returns the portfolio unchanged. *)
 
+  val restore_total : t -> float -> unit
+  (** Overwrite the running total with a checkpointed {!total} (#3477). *)
+
   val total : t -> float
   (** Interest credited so far, in dollars. *)
 end

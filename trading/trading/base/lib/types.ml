@@ -30,6 +30,18 @@ type position = { symbol : symbol; quantity : quantity; price : price }
 
 type trade_id = string [@@deriving show, eq, sexp]
 
+(* Zone-independent timestamp: same type as [Time_ns_unix.t], but sexp goes
+   through [Time_ns.Alternate_sexp] (UTC), so it needs no tzdata/local zone. *)
+module Utc_time = struct
+  type t = Time_ns_unix.t
+
+  let pp = Time_ns_unix.pp
+  let show t = Stdlib.Format.asprintf "%a" pp t
+  let equal = Time_ns_unix.equal
+  let sexp_of_t = Time_ns.Alternate_sexp.sexp_of_t
+  let t_of_sexp = Time_ns.Alternate_sexp.t_of_sexp
+end
+
 type trade = {
   id : trade_id;
   order_id : string;
@@ -38,6 +50,6 @@ type trade = {
   quantity : quantity;
   price : price;
   commission : float;
-  timestamp : Time_ns_unix.t;
+  timestamp : Utc_time.t;
 }
 [@@deriving show, eq, sexp]

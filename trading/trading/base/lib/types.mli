@@ -26,6 +26,12 @@ type order_type =
 
 type trade_id = string [@@deriving show, eq, sexp]
 
+module Utc_time : sig
+  type t = Time_ns_unix.t [@@deriving show, eq, sexp]
+  (** A [Time_ns_unix.t] whose sexp is the UTC alternate form, independent of
+      the host's local zone (checkpoint-safe). *)
+end
+
 type trade = {
   id : trade_id;
   order_id : string;
@@ -34,6 +40,6 @@ type trade = {
   quantity : quantity;
   price : price;
   commission : float;
-  timestamp : Time_ns_unix.t;
+  timestamp : Utc_time.t;
 }
 [@@deriving show, eq, sexp]

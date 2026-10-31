@@ -35,6 +35,20 @@ val update :
     [path_config] for later lazy path generation. Clears the per-tick path memo
     so the next {!path_for} for any symbol regenerates from the new bar. *)
 
+val bars : t -> Types.price_bar list
+(** The most-recent bar of every symbol seen so far, sorted by symbol. Orders on
+    a symbol with no bar today fill against its entry here, so a checkpoint must
+    carry them (#3477). *)
+
+val path_config : t -> Price_path.path_config
+(** The [path_config] of the latest {!update} (the default before any). It
+    decides which path a bar generates, so a checkpoint must carry it. *)
+
+val restore :
+  t -> path_config:Price_path.path_config -> Types.price_bar list -> unit
+(** Replace the stored bars and the path config, and drop the per-tick path
+    memo. The scratch pool is a cache and is left to refill lazily. *)
+
 val path_for :
   t -> symbol:Trading_base.Types.symbol -> Types.intraday_path option
 (** Intraday path for [symbol], generated from its most-recent stored bar and
