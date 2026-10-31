@@ -120,6 +120,7 @@ type result = {
   rationale : string list;
       (** Human-readable explanation of the composite signal. *)
 }
+[@@deriving sexp]
 (** Result of macro analysis. *)
 
 type breadth_bar = Macro_types.breadth_bar = {

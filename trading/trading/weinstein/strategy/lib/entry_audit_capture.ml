@@ -56,6 +56,9 @@ let gen_position_id symbol =
   Int.incr _position_counter;
   Printf.sprintf "%s-wein-%d" symbol !_position_counter
 
+let position_counter () = !_position_counter
+let set_position_counter n = _position_counter := n
+
 let _sizing_side_of_cand_side (side : Trading_base.Types.position_side) =
   match side with Long -> `Long | Short -> `Short
 

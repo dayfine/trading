@@ -4,6 +4,7 @@
    death-loop fix in _maybe_reset_halt + _run_macro_and_entries *)
 open Core
 open Trading_strategy
+module Weinstein_strategy_state = Weinstein_strategy_state
 module Bar_reader = Bar_reader
 module Spy_only_weinstein_strategy = Spy_only_weinstein_strategy
 module Sector_rotation_weinstein_strategy = Sector_rotation_weinstein_strategy
@@ -400,33 +401,40 @@ let _breadth_series_of_bars = function
   | [] -> None
   | bars -> Some (Breadth_series_cache.of_daily_bars bars)
 
-let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
-    ?(breadth_bars = []) ?(ticker_sectors = Hashtbl.create (module String))
-    ?bar_reader ?(audit_recorder = Audit_recorder.noop) ?fold_start_date
-    ?universe_membership_at config =
-  (* Fail loudly on an inconsistent dawn-leverage config (margin must be armed;
-     the dawn requirement must be a fractional (0,1] requirement). No-op when
-     [dawn_leverage_enabled = false]. *)
+(* Fail loudly on an inconsistent dawn-leverage config (margin must be armed;
+   the dawn requirement must be a fractional (0,1] requirement), and on the
+   one-share-class rule running unarmed (flag on, no map; #3015). Both are
+   no-ops for a default config. *)
+let _validate_config config =
   Leverage_dawn.validate config;
-  (* #3015: the one-share-class rule must not run unarmed (flag on, no map). *)
-  Share_class_gate.validate config;
+  Share_class_gate.validate config
+
+let make_with_state ?(ad_bars = []) ?(breadth_bars = [])
+    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
+    ?(audit_recorder = Audit_recorder.noop) ?fold_start_date
+    ?universe_membership_at ~state config =
+  _validate_config config;
   let bar_reader =
     match bar_reader with Some r -> r | None -> Bar_reader.empty ()
   in
-  let ( stop_states,
-        last_stop_out_dates,
-        prior_macro,
-        peak_tracker,
-        prior_macro_result,
-        prior_decline_character,
-        prior_stages,
-        prior_stage_ma_values,
-        sector_prior_stages,
-        stage3_streaks,
-        laggard_streaks,
-        weekly_ad_bars ) =
-    Weinstein_strategy_state.init ~initial_stop_states ~ad_bars
+  let {
+    Weinstein_strategy_state.stop_states;
+    last_stop_out_dates;
+    prior_macro;
+    peak_tracker;
+    prior_macro_result;
+    prior_decline_character;
+    prior_stages;
+    prior_stage_ma_values;
+    sector_prior_stages;
+    stage3_streaks;
+    laggard_streaks;
+    pending_entry_e;
+    suspended_tickets;
+  } =
+    state
   in
+  let weekly_ad_bars = Ad_bars_aggregation.daily_to_weekly ad_bars in
   (* Precompute the A-D cumulative + momentum series ONCE; the weekly A-D bars
      are fixed for the whole run, so per-tick macro work reads from this cache
      in O(log n) instead of re-folding the full list every Friday. *)
@@ -436,8 +444,6 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
       weekly_ad_bars
   in
   let breadth_series = _breadth_series_of_bars breadth_bars in
-  let pending_entry_e = _make_closure_tables () in
-  let suspended_tickets = Entry_ticket_suspend.create () in
   let module M = struct
     let name = name
 
@@ -450,6 +456,14 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
         ~stage3_streaks ~laggard_streaks ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
+
+let make ?(initial_stop_states = String.Map.empty) ?ad_bars ?breadth_bars
+    ?ticker_sectors ?bar_reader ?audit_recorder ?fold_start_date
+    ?universe_membership_at config =
+  make_with_state ?ad_bars ?breadth_bars ?ticker_sectors ?bar_reader
+    ?audit_recorder ?fold_start_date ?universe_membership_at
+    ~state:(Weinstein_strategy_state.init ~initial_stop_states)
+    config
 
 module Internal_for_test = struct
   (* Tests pass the weekly A-D bar list directly; build the per-run cache from

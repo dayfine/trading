@@ -152,6 +152,11 @@ module Peak_tracker : sig
 
   val reset : t -> unit
   (** Flip [halt_state] back to [Active]. Idempotent. Peak is preserved. *)
+
+  val restore : t -> peak:float -> halt_state:halt_state -> unit
+  (** Overwrite both the tracked peak and the halt state. Used only to restore a
+      checkpointed tracker (#3477); normal flow uses {!observe} / {!mark_halted}
+      / {!reset}. *)
 end
 
 (** {1 Check} *)

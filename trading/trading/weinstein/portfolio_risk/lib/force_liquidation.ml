@@ -145,6 +145,10 @@ module Peak_tracker = struct
 
   let mark_halted t = t.halt <- Halted
   let reset t = t.halt <- Active
+
+  let restore t ~peak ~halt_state =
+    t.peak <- peak;
+    t.halt <- halt_state
 end
 
 (* ---- Position_input ---- *)

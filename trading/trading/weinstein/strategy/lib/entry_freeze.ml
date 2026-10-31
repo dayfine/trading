@@ -4,9 +4,18 @@ open Core
    arm is pinned with the level so the audit names the arm the resting ticket
    was actually priced at, not the current week's arm. *)
 type pin = { entry : float; anchor : Screener.entry_anchor_kind }
+[@@deriving sexp]
+
 type t = pin Hashtbl.M(String).t
+type snapshot = (string * pin) list [@@deriving sexp]
 
 let create () : t = Hashtbl.create (module String)
+
+let capture (t : t) : snapshot =
+  Hashtbl.to_alist t
+  |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+
+let restore (snap : snapshot) : t = Hashtbl.of_alist_exn (module String) snap
 
 (* Drop any pinned symbol that is neither a candidate this week nor currently
    held: the setup has ended (candidate dropped out, or the position round-tripped

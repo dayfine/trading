@@ -33,6 +33,10 @@ open Core
 
 (** {1 Sub-modules} *)
 
+module Weinstein_strategy_state = Weinstein_strategy_state
+(** Per-run mutable state record with sexp capture / restore (#3477); the
+    argument of {!make_with_state}. *)
+
 module Ad_bars = Ad_bars
 (** NYSE advance/decline breadth data loader. See {!Ad_bars}. *)
 
@@ -1530,6 +1534,29 @@ val make :
     ({!Leverage_dawn.validate}), or [max_one_share_class_per_issuer = true] with
     an empty [share_class_groups] ({!Share_class_gate.validate}, #3015). *)
 
+val make_with_state :
+  ?ad_bars:Macro.ad_bar list ->
+  ?breadth_bars:Macro.breadth_bar list ->
+  ?ticker_sectors:(string, string) Hashtbl.t ->
+  ?bar_reader:Bar_reader.t ->
+  ?audit_recorder:Audit_recorder.t ->
+  ?fold_start_date:Date.t ->
+  ?universe_membership_at:(string -> Date.t -> bool) ->
+  state:Weinstein_strategy_state.t ->
+  config ->
+  (module Trading_strategy.Strategy_interface.STRATEGY)
+(** {!make} over an explicit, caller-supplied per-run state instead of a fresh
+    one (#3477, resumable backtests). [make] is [make_with_state] over
+    {!Weinstein_strategy_state.init}, so the two behave identically from an
+    empty state.
+
+    To resume mid-run, {!Weinstein_strategy_state.capture} the state of a
+    running strategy (keep the [t] you passed in), save the sexp, and later pass
+    {!Weinstein_strategy_state.restore} of it here. The returned strategy
+    mutates [state] in place. The other arguments are run inputs, not state:
+    pass the same values the original run used. Restoring also sets the
+    process-global position-id counter. *)
+
 (** {1 Internal — testing only}
 
     Direct seams into the strategy's [_on_market_close] used by behavioural
@@ -1537,6 +1564,7 @@ val make :
     [Peak_tracker] in a known [Halted] state and assert that the next Friday
     tick resets the halt to [Active] when macro flips off Bearish (PR #695,
     review item B1). Not for production use. *)
+
 module Internal_for_test : sig
   val on_market_close :
     fold_start_date:Date.t option ->

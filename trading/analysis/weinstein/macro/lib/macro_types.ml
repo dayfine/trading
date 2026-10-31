@@ -60,6 +60,7 @@ type result = {
   regime_changed : bool;
   rationale : string list;
 }
+[@@deriving sexp]
 
 type callbacks = {
   index_stage : Stage.callbacks;
