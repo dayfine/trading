@@ -348,3 +348,8 @@
          (unit ("trading/analysis/technical/indicators/time_period/test/test_week_bucketing.ml"
                 "test_week_53_crossing_new_year_is_one_bucket"))))
  (status fixed))
+
+((issue 3388)
+ (finding "pit-v12 lists held 127 co-occurring rename twins; both legs of one instrument took top-20 slots (34 weeks per seed); full dedupe moved the 26y record 0.10 band SD; V6 guards held doubles only, a ranking-level twin detector is not built")
+ (guard ((validator V6)))
+ (status fixed))
