@@ -202,16 +202,17 @@
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in the PR. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-25 for the Seeded candidate_ranking default (#3425; ties broken by a seeded hash, not by symbol name). +-15% (total_return_pct: at least +-5pp) around the Seeded actual, failing metrics only; Alphabetical->Seeded: ret 142.5->60.11, maxDD 57.9->27.46, OPV in band->1,262,217, sortino in band->0.76, ulcer in band->12.91 (GHA 40232161522 vs main 40229425967; values from the run logs, 1-2 dp). This composition golden is the known GME lottery: the -82pp move is tie-order path noise (the #3419 path-stability finding), not a return claim.
-  ((total_return_pct ((min 51.0935) (max 69.1265)))
-   (total_trades ((min 157.2500) (max 212.7500)))
-   (win_rate ((min 25.2703) (max 34.1892)))
-   (sharpe_ratio ((min 0.4937) (max 0.6679)))
-   (max_drawdown_pct ((min 23.3410) (max 31.5790)))
-   (avg_holding_days ((min 52.3784) (max 70.8649)))
-   (open_positions_value ((min 1072884.5435) (max 1451549.6765)))
-   (sortino_ratio_annualized ((min 0.6460) (max 0.8740)))
-   (calmar_ratio ((min 0.2851) (max 0.3857)))
-   (ulcer_index ((min 10.9735) (max 14.8465)))
+  ;; RE-PINNED 2026-10-31 for the same-day fill insertion order (#3483, #3477). +-15% around the new actual (total_return_pct: at least +-5pp). Base 1323351cc -> PR c65897fdf: ret 60.1->51.76, trades 186->196, DD 27.5->31.73. A same-day order change is one draw of the path (dev/experiments/path-stability-2026-10-23/): no return claim attaches to the delta.
+  ((total_return_pct ((min 43.9936) (max 59.5207)))
+   (total_trades ((min 166.6000) (max 225.4000)))
+   (win_rate ((min 22.1173) (max 29.9235)))
+   (sharpe_ratio ((min 0.4668) (max 0.6316)))
+   (max_drawdown_pct ((min 26.9684) (max 36.4866)))
+   (avg_holding_days ((min 51.2472) (max 69.3344)))
+   (open_positions_value ((min 1103053.2195) (max 1492366.1205)))
+   (sortino_ratio_annualized ((min 0.5862) (max 0.7931)))
+   (calmar_ratio ((min 0.2336) (max 0.3161)))
+   (ulcer_index ((min 12.9549) (max 17.5272)))
    ;; wall_seconds guards only the MAX (catastrophic slowdown). The old
    ;; min 100.0 was the 2026-08-25 "GHA flake" (#2547 root cause, read
    ;; from the first #2549-uploaded per-cell artifact): fast warm-cache
