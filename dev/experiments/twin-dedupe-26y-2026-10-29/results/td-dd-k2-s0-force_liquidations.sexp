@@ -1,0 +1,13 @@
+((events
+  (((symbol WCRX) (position_id WCRX-wein-445) (date 2010-09-09) (side Long)
+    (entry_price 29.39) (current_price 21.63) (quantity 13475)
+    (cost_basis 396030.25) (unrealized_pnl -104566.00000000001)
+    (unrealized_pnl_pct -0.26403538618577749) (reason Per_position))
+   ((symbol SDA) (position_id SDA-wein-1135) (date 2023-07-13) (side Long)
+    (entry_price 11.56) (current_price 8.18) (quantity 99103)
+    (cost_basis 1145630.68) (unrealized_pnl -334968.14000000007)
+    (unrealized_pnl_pct -0.29238754325259525) (reason Per_position))
+   ((symbol SIRI) (position_id SIRI-wein-1140) (date 2023-07-25) (side Long)
+    (entry_price 6.88) (current_price 5.13) (quantity 186703)
+    (cost_basis 1284516.64) (unrealized_pnl -326730.25)
+    (unrealized_pnl_pct -0.25436046511627908) (reason Per_position)))))
