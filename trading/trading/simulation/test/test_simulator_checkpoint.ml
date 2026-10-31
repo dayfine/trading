@@ -368,6 +368,33 @@ let test_restore_deps_then_capture_is_the_identity _ =
        (equal_to
           (Simulator_checkpoint.sexp_of_deps_state _populated_deps_state)))
 
+(* The simulator-owned price fallback and valuation tally never matter in a
+   fixture with a bar for every symbol every day, so pin their restore with
+   hand-set values: restore into a fresh simulator and capture again. *)
+let test_restore_then_capture_keeps_prices_and_valuation_tally _ =
+  let again =
+    _with_data "sim_checkpoint_prices" (fun data_dir ->
+        let snap =
+          Simulator.Checkpoint.capture
+            (_step_until (_fresh_sim data_dir) "2024-01-05")
+        in
+        let edited =
+          {
+            snap with
+            last_known_prices = [ ("AAPL", 101.25); ("ZZZ", 7.5) ];
+            valuation_failure_count = 3;
+          }
+        in
+        Result.map
+          (Simulator.Checkpoint.restore (_fresh_sim data_dir) edited)
+          ~f:(fun restored ->
+            let c = Simulator.Checkpoint.capture restored in
+            (c.last_known_prices, c.valuation_failure_count)))
+  in
+  assert_that again
+    (is_ok_and_holds
+       (pair (equal_to [ ("AAPL", 101.25); ("ZZZ", 7.5) ]) (equal_to 3)))
+
 let suite =
   "simulator_checkpoint"
   >::: [
@@ -383,6 +410,8 @@ let suite =
          >:: test_capture_holds_the_resting_orders_and_dividend_state;
          "restore_deps then capture_deps is the identity"
          >:: test_restore_deps_then_capture_is_the_identity;
+         "restore keeps last-known prices and the valuation tally"
+         >:: test_restore_then_capture_keeps_prices_and_valuation_tally;
          "restore refuses a different dividend arming"
          >:: test_restore_refuses_a_different_dividend_arming;
        ]
