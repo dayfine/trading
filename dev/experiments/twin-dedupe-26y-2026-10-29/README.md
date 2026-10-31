@@ -127,6 +127,10 @@ d = ln(1+R_dd) − ln(1+R_cur). Sources: `results/td-*-s0-actual.sexp`, `results
 
 Mean d −0.0221, SD 0.0386, SE 0.0223, t = −0.99 (2 df), 95 % interval [−0.118, +0.074]. In money the end NAV moves −3.9 %, +2.2 % and −4.7 %. Max drawdown changes only in k0, where dd's deepest drawdown is 2018-06 → 2020-03 and contains the WIFI loss below.
 
+**dd against the band (pre-registered item 3, descriptive).** The dd median ln(1+R) is 2.7335 (k2), −0.21 band SD from the record band median 2.7819, so ≤ 1 band SD. The cur median of the same three seeds is 2.7819 (also k2), so the dd median sits exactly k2's d below the band.
+
+**Calmar** (cur / dd): k0 0.401 / 0.380, k1 0.522 / 0.526, k2 0.345 / 0.339 (`results/summary.txt`).
+
 **cur reproduces the record.** Each `results/td-cur-k*-s0-actual.sexp` and `trades.csv` is byte-identical to `../record-kseed-2026-10-27/results/rk-k*-s0-*`.
 
 ### Verdict
@@ -151,9 +155,9 @@ Cross-arm trades are matched on `(symbol, entry_date)`, unique within every arm;
 
 **3. The tail is untouched.** The top-8 winners by % (APPS, ADMA, ADSK, AVGO, DXCM, MMYT, BBWI and others) are common to both arms in every pair. That is why 494 removals moved each seed by at most 0.048, while #3266's single CMN removal moved a seed by 0.204: its cascade cancelled ASR and pre-empted CRM. **The size of a universe change's effect is set by whether its cascade reaches a tail trade, not by how many names it removes.**
 
-**4. WIFI, the one step shared by every seed.** On 2018-08-24 one instrument held two of cur's top-20 slots (COHR #2, IIVI #3–4, both `No_structural_stop`). In dd, WIFI enters at #20 and is placed. The ticket rests 10 weeks, then fills from above at the limit on 2018-11-02 (open 29.86, low 24.31, filled 29.05) and gaps out the next session at 24.88: −14.35 %, about −0.022 log in every seed. Without WIFI the per-seed d are −0.018, +0.044, −0.026 (mean +0.0001). So "the mean is WIFI" is a decomposition, not a significance claim.
+**4. WIFI, the one step shared by every seed.** On 2018-08-24 one instrument held two of cur's top-20 slots (COHR #2, IIVI #3–4, both `No_structural_stop`). In dd, WIFI enters at #20 and is placed. The ticket rests 10 weeks, then fills from above at the limit on 2018-11-02 (open 29.86, low 24.31, filled 29.05) and gaps out the next session at 24.88: −14.35 %, −0.0221 / −0.0222 / −0.0223 log by seed (the 2018-11-02 to 2018-11-05 window; `why/ratio-steps-k*.txt` prints the single 2018-11-02 day, −0.0221 / −0.0221 / −0.0222). Without WIFI the per-seed d are −0.018, +0.044, −0.026 (mean +0.0001). So "the mean is WIFI" is a decomposition, not a significance claim.
 
-**5. Exposure is not a channel.** Whole-window invested % by SPY regime (DOWN / MIXED / UP) differs between paired arms by at most 0.8 pp, and by 3.5 pp in the largest era × regime cell (`why/regime-split-pairs.txt`). The return cells that differ are exactly where the steps fall. The 2009–11, 2012–15 and 2023–26 cells are identical in every pair.
+**5. Exposure is not a channel.** Whole-window invested % by SPY regime (DOWN / MIXED / UP) differs between paired arms by at most 0.8 pp, and by 3.5 pp in the largest era × regime cell (`why/regime-split-pairs.txt`). The return cells that differ are exactly where the steps fall. The 2009–11, 2012–15 and 2023–26 cells are identical in k0 and k1; in k2 the 2009–11 cells differ by at most 0.2 pp.
 
 **6. Validator counts between paired arms.** V6 is 0 / 0 everywhere. V7 (21/21, 20/19, 15/16), V12 (34/35, 24/24, 29/31) and V13 (24/24, 22/22, 21/21) differ by at most 2 and follow the arm-only trades. They are per-trade checks with known validator classes present in both arms (Defects, below), so they do not bear on the verdict.
 
@@ -209,7 +213,7 @@ Cross-arm trades are matched on `(symbol, entry_date)`, unique within every arm;
    - The "n/a for 1 position" bullets do not name the position.
    - There is no paired mode.
    - The "above" detector reads null on QCOM-wein-1127 (#3424 item 2).
-2. **Simulator, stop-trigger float tolerance.** SGNT-wein-703, 2014-08-04, in all six runs: one exit a day late, about $500.
+2. **Simulator, stop-trigger float tolerance.** SGNT-wein-703, 2014-08-04, in all six runs: one exit a day late, about $500. Added to #3424 as a specimen.
 3. **Simulator (#3424 item 1).** Phantom force-liquidations SDA 2023-07-13 and SIRI 2023-07-25 in all runs; WCRX 2010-09-09 in k1 and k2.
 4. **Validator (#3420).**
    - V13 split-basis entry rows: NEOG 2017-09-05 and OKE 2013-09-18.
