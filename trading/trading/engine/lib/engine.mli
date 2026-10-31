@@ -88,11 +88,16 @@ val process_orders :
     | Error err -> (* handle error *)
     ]} *)
 
-type snapshot = { bars : price_bar list; stop_limit_blocked : int }
+type snapshot = {
+  bars : price_bar list;
+  path_config : Price_path.path_config;
+  stop_limit_blocked : int;
+}
 [@@deriving sexp]
-(** The engine's run-carried state: the last bar per symbol (sorted by symbol)
-    and the {!stop_limit_blocked_count} tally. Everything else is a cache that
-    refills lazily; intraday paths are a pure function of the bar (#3477). *)
+(** The engine's run-carried state: the last bar per symbol (sorted by symbol),
+    the active path config and the {!stop_limit_blocked_count} tally. Everything
+    else is a cache that refills lazily: an intraday path is a pure function of
+    the bar and the path config (#3477). *)
 
 val snapshot : t -> snapshot
 (** Capture the run-carried state. *)

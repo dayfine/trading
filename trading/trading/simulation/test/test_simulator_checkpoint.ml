@@ -21,6 +21,7 @@ open Core
 open Matchers
 open Test_helpers
 module Simulator = Trading_simulation.Simulator
+module Simulator_checkpoint = Trading_simulation.Simulator_checkpoint
 module Dividend_crediting = Trading_simulation_dividends.Dividend_crediting
 module Metric_types = Trading_simulation_types.Metric_types
 module Position = Trading_strategy.Position
@@ -280,6 +281,93 @@ let test_restore_refuses_a_different_dividend_arming _ =
   in
   assert_that result is_error
 
+(* Every dependency-owned field set to a non-neutral value: interest total,
+   consumed retries, a stale event, a non-default path config with a restored
+   historical bar, and a dividend cache holding a symbol with no file (MSFT)
+   that the snapshot's tally already counted once. *)
+let _populated_deps_state : Simulator_checkpoint.deps_state =
+  {
+    orders = [];
+    engine =
+      {
+        bars =
+          [
+            {
+              symbol = "AAPL";
+              open_price = 100.0;
+              high_price = 101.0;
+              low_price = 99.0;
+              close_price = 100.5;
+            };
+          ];
+        path_config =
+          { Trading_engine.Price_path.default_config with seed = Some 3 };
+        stop_limit_blocked = 4;
+      };
+    entry_fill_retry = [ ("AAPL-1", 2) ];
+    cash_yield_total = Some 12.5;
+    dividends =
+      Some
+        {
+          cached_symbols = [ "AAPL"; "MSFT" ];
+          credited_through = _date "2024-01-04";
+          totals =
+            {
+              long_income = 3.0;
+              short_paid = 0.0;
+              skipped_no_amount = 1;
+              missing_files = 1;
+            };
+        };
+    stale_hold_log =
+      [
+        {
+          symbol = "AAPL";
+          date = _date "2024-01-04";
+          last_bar_date = _date "2024-01-02";
+          last_close = 100.0;
+          days_since_last_bar = 2;
+          quantity = 10.0;
+          cost_basis = 1000.0;
+        };
+      ];
+  }
+
+let test_restore_deps_then_capture_is_the_identity _ =
+  let order_manager = Trading_orders.Manager.create () in
+  let engine =
+    Trading_engine.Engine.create
+      { Trading_engine.Types.commission = _commission; slippage_bps = 0 }
+  in
+  let entry_fill_retry =
+    Trading_simulation.Entry_fill_retry.create ~max_retries:2
+  in
+  let cash_credits : Trading_simulation.Cash_credits.t =
+    {
+      cash_yield =
+        Some
+          (Trading_simulation_cash_yield.Cash_yield.Accrual.create
+             (Trading_simulation_cash_yield.Cash_yield.constant ~rate_pct:4.0
+                ~fee_bp:0.0)
+             ~start_date:_config.start_date);
+      dividends = Some (_crediting ());
+    }
+  in
+  let stale_hold_log = Trading_simulation.Stale_hold.Log.create () in
+  let restored =
+    Result.map
+      (Simulator_checkpoint.restore_deps ~order_manager ~engine
+         ~entry_fill_retry ~cash_credits ~stale_hold_log _populated_deps_state)
+      ~f:(fun () ->
+        Simulator_checkpoint.capture_deps ~order_manager ~engine
+          ~entry_fill_retry ~cash_credits ~stale_hold_log
+        |> Simulator_checkpoint.sexp_of_deps_state)
+  in
+  assert_that restored
+    (is_ok_and_holds
+       (equal_to
+          (Simulator_checkpoint.sexp_of_deps_state _populated_deps_state)))
+
 let suite =
   "simulator_checkpoint"
   >::: [
@@ -293,6 +381,8 @@ let suite =
          >:: test_fixture_fills_stop_pays_dividends_and_leaves_a_resting_order;
          "capture holds the resting orders and dividend state"
          >:: test_capture_holds_the_resting_orders_and_dividend_state;
+         "restore_deps then capture_deps is the identity"
+         >:: test_restore_deps_then_capture_is_the_identity;
          "restore refuses a different dividend arming"
          >:: test_restore_refuses_a_different_dividend_arming;
        ]
