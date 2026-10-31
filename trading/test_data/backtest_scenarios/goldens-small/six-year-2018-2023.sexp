@@ -75,10 +75,11 @@
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + notes in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips and the tier-2 nightly runs continue-on-error. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in the PR. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-25 for the #3404 tie-order default flip (candidate_ranking Alphabetical -> Seeded, tiebreak_seed 0). +-15% around the new actual (total_return_pct: at least +-5pp). Old arm (Alphabetical override, same build): -17.27% / 245 trades / DD 35.77; new: 21.78% / 243 / DD 27.02. One seed is one draw of the tie order (dev/experiments/path-stability-2026-10-23/): no return claim attaches to the delta.
-  ((total_return_pct ((min 16.7815) (max 26.7815)))
-   (total_trades ((min 206.5500) (max 279.4500)))
-   (win_rate ((min 20.9877) (max 28.3951)))
-   (sharpe_ratio ((min 0.2473) (max 0.3346)))
-   (max_drawdown_pct ((min 22.9642) (max 31.0692)))
-   (avg_holding_days ((min 46.0434) (max 62.2940)))
-   (open_positions_value ((min 821021.3665) (max 1110793.6135))))))
+  ;; RE-PINNED 2026-10-31 for the same-day fill insertion order (#3483, #3477). +-15% around the new actual (total_return_pct: at least +-5pp). Base 1323351cc -> PR c65897fdf: ret 21.78->14.52, trades 243->249, DD 27.02->30.89. A same-day order change is one draw of the path (dev/experiments/path-stability-2026-10-23/): no return claim attaches to the delta.
+  ((total_return_pct ((min 9.5174) (max 19.5174)))
+   (total_trades ((min 211.6500) (max 286.3500)))
+   (win_rate ((min 20.1406) (max 27.2490)))
+   (sharpe_ratio ((min 0.1911) (max 0.2585)))
+   (max_drawdown_pct ((min 26.2531) (max 35.5189)))
+   (avg_holding_days ((min 45.4221) (max 61.4534)))
+   (open_positions_value ((min 772251.8090) (max 1044811.2710))))))

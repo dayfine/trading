@@ -215,20 +215,21 @@
   ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in PR #3283. Correctness re-pin: no return claim attaches to the delta.
   ;; RE-PINNED 2026-10-25 for the Seeded candidate_ranking default (#3425; ties broken by a seeded hash, not by symbol name). +-15% (total_return_pct: at least +-5pp) around the Seeded actual, failing metrics only; Alphabetical->Seeded: OPV 6,561,276->4,432,184 (GHA 40232163695 vs main 40198082542). Tie-order path change: no return claim.
-  ((total_return_pct ((min 764.9551) (max 1034.9393)))
-   (total_trades ((min 419.9000) (max 568.1000)))
-   (win_rate ((min 32.6923) (max 44.2308)))
-   (sharpe_ratio ((min 0.4273) (max 0.5781)))
-   (max_drawdown_pct ((min 66.4622) (max 89.9194)))
-   (avg_holding_days ((min 54.3122) (max 73.4813)))
+  ;; RE-PINNED 2026-10-31 for the same-day fill insertion order (#3483, #3477). +-15% around the new actual (total_return_pct: at least +-5pp). Base 1323351cc -> PR c65897fdf: ret 978.73->1344.33, trades 472->476, DD 78.18->77.67. A same-day order change is one draw of the path (dev/experiments/path-stability-2026-10-23/): no return claim attaches to the delta.
+  ((total_return_pct ((min 1142.6829) (max 1545.9827)))
+   (total_trades ((min 404.6000) (max 547.4000)))
+   (win_rate ((min 34.2857) (max 46.3866)))
+   (sharpe_ratio ((min 0.4687) (max 0.6341)))
+   (max_drawdown_pct ((min 66.0222) (max 89.3242)))
+   (avg_holding_days ((min 56.0393) (max 75.8179)))
    ;; OPV re-pinned ~9.88M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): the $1M-ADV entry gate drops marginal
    ;; fills and stale-exit 5d clears ghost MTM, so terminal book is lighter.
    ;; Headline metrics (return/Sharpe/DD/trades) stayed in-band — only the
    ;; terminal-MTM composition moved. Was ~18.1M floor-off pre-flip.
-   (open_positions_value ((min 3767356.6975) (max 5097012.0025)))
-   (sortino_ratio_annualized ((min 0.5135) (max 0.6947)))
-   (calmar_ratio ((min 0.1647) (max 0.2228)))
-   (ulcer_index ((min 25.3761) (max 34.3324)))
+   (open_positions_value ((min 5933056.9160) (max 8027077.0040)))
+   (sortino_ratio_annualized ((min 0.6035) (max 0.8165)))
+   (calmar_ratio ((min 0.1945) (max 0.2631)))
+   (ulcer_index ((min 24.5213) (max 33.1758)))
    ;; Floor-off does more work than the halted floor-on run; keep wall band wide.
    (wall_seconds       ((min 0.0)           (max 3600.0))))))
