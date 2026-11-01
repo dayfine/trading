@@ -105,15 +105,15 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
      is unchanged; the value is a crashed or OOM-killed scenario keeping the
      trades it had already closed. *)
   let result =
-    Backtest.Result_writer.with_trades_stream ~output_dir:scenario_dir
-      ~every_n_fridays:progress_every ~start_date:s.period.start_date
-      ~f:(fun ~on_step_setup ->
+    Backtest.Result_writer.with_optional_trades_stream ~output_dir:scenario_dir
+      ~every_n_fridays:(Some progress_every) ~start_date:s.period.start_date
+      ~f:(fun ?on_step_setup () ->
         Backtest.Runner.run_backtest ~start_date:s.period.start_date
           ~end_date:s.period.end_date ~overrides:s.config_overrides
           ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter
           ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ?bar_data_source
           ?candidate_log:(Backtest.Candidate_log.create_if emit_candidates)
-          ?universe_membership_at ~on_step_setup ())
+          ?universe_membership_at ?on_step_setup ())
   in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   (* Post-step: per-week candidate list (#2490). Runs after the canonical

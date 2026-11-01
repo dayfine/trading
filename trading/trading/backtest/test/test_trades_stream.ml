@@ -380,6 +380,42 @@ let test_stream_is_closed_when_body_raises _ =
         (List.map (_data_rows dir) ~f:_row_key)
         (elements_are [ equal_to "AAPL|2024-01-05|2024-01-12" ]))
 
+(** {!Backtest.Result_writer.with_optional_trades_stream} is the one wiring both
+    [backtest_runner.exe] and [scenario_runner.exe] use. [None] hands [f] no
+    hook and creates no [trades.csv]; [Some n] hands it a hook that streams
+    closed round-trips into [trades.csv] before any {!Result_writer.write}. *)
+let _drive_optional ~dir ~every_n_fridays =
+  let hook_given = ref false in
+  Backtest.Result_writer.with_optional_trades_stream ~output_dir:dir
+    ~every_n_fridays ~start_date:_mon1 ~f:(fun ?on_step_setup () ->
+      Option.iter on_step_setup ~f:(fun setup ->
+          hook_given := true;
+          let record =
+            setup
+              ~stop_log:(Backtest.Stop_log.create ())
+              ~trade_audit:(Backtest.Trade_audit.create ())
+              ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+          in
+          List.iter
+            (_round_trip_steps ~symbol:"AAPL" ~entry:_fri1 ~exit_:_fri2
+               ~price:100.0) ~f:(fun (s : Sim_types.step_result) ->
+              record ~date:s.date ~step:s)));
+  !hook_given
+
+let test_optional_stream_none_installs_no_hook _ =
+  _with_temp_dir (fun dir ->
+      assert_that
+        ( _drive_optional ~dir ~every_n_fridays:None,
+          Stdlib.Sys.file_exists (Filename.concat dir "trades.csv") )
+        (equal_to (false, false)))
+
+let test_optional_stream_some_installs_hook_and_streams _ =
+  _with_temp_dir (fun dir ->
+      let hook_given = _drive_optional ~dir ~every_n_fridays:(Some 1) in
+      assert_that
+        (hook_given, List.map (_data_rows dir) ~f:_row_key)
+        (equal_to (true, [ "AAPL|2024-01-05|2024-01-12" ])))
+
 (* ------------------------------------------------------------------ *)
 (* End-to-end: Runner.run_backtest ~stream_trades_dir                   *)
 (* ------------------------------------------------------------------ *)
@@ -464,6 +500,10 @@ let suite =
          >:: test_header_only_file_and_idempotent_close;
          "with_trades_stream closes the stream when its body raises"
          >:: test_stream_is_closed_when_body_raises;
+         "optional stream: None installs no hook"
+         >:: test_optional_stream_none_installs_no_hook;
+         "optional stream: Some installs the hook and streams"
+         >:: test_optional_stream_some_installs_hook_and_streams;
          "runner streams trades.csv before Result_writer runs"
          >:: test_runner_streams_trades_csv_before_result_writer;
        ]

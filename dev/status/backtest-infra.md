@@ -520,8 +520,9 @@ paired 26y A/B (implementation check vs the +0.24 / +0.13 log estimates) remains
   `scenario_runner` is wired. The binary already parses `--progress-every`;
   wrapping its `run_backtest` call in `Result_writer.with_trades_stream` is
   ~5 lines and would cover ad-hoc long runs launched outside the catalog.
-- [ ] **Follow-up: the `scenario_runner` call site itself is not pinned by a
-  test.** The `Result_writer → Runner → Panel_runner → Panel_step_loop` chain is
+- [x] **Follow-up (done, #3497): both `with_trades_stream` call sites now share `Result_writer.with_optional_trades_stream`, pinned in `test_trades_stream.ml` (None -> no hook/no file; Some -> hook + streamed rows). Residual: that each binary still *calls* the helper is unpinned (needs the binary driven); dropping the Some branch or the helper fails a test.**
+  (Original note:) the `scenario_runner` call site itself was not pinned by a
+  test. The `Result_writer → Runner → Panel_runner → Panel_step_loop` chain is
   (`test_trades_stream.ml`), but nothing fails if the `with_trades_stream`
   wrapper is deleted from `scenario_runner.ml` — that would need the scenario
   binary driven under test.

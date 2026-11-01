@@ -59,3 +59,16 @@ val with_trades_stream :
     the run completed — the completion sentinel is unchanged ([actual.sexp]
     under the scenario runner, [summary.sexp] under [backtest_runner.exe]). And
     streamed rows carry no [position_id]; see {!Trades_stream} for why. *)
+
+val with_optional_trades_stream :
+  output_dir:string ->
+  every_n_fridays:int option ->
+  start_date:Core.Date.t ->
+  f:(?on_step_setup:Panel_runner.step_hook_setup -> unit -> 'a) ->
+  'a
+(** [with_optional_trades_stream ~output_dir ~every_n_fridays ~start_date ~f] is
+    the single wiring both [backtest_runner.exe] and [scenario_runner.exe] use.
+    [None] calls [f] with no hook (no streaming, no [trades.csv] until
+    {!write}); [Some n] behaves as {!with_trades_stream} with cadence [n],
+    handing [f] the hook. Pass the hook straight to {!Runner.run_backtest}'s
+    [?on_step_setup]. *)
