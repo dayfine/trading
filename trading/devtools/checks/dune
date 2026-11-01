@@ -1551,3 +1551,12 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:data_manifest_test.sh})))
+
+; #3476: pin dev/scripts/r2_bars.sh (bar store to/from a private R2 bucket),
+; run offline through R2_LOCAL_STORE over an invented two-symbol fixture.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:r2_bars_test.sh})))
