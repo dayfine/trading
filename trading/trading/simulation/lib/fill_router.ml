@@ -139,3 +139,24 @@ let _apply_one_trade ~date ~order_links positions trade =
 let update_positions_from_trades ?order_links ~date ~positions ~trades () =
   List.fold_result trades ~init:positions
     ~f:(_apply_one_trade ~date ~order_links)
+
+type snapshot = {
+  in_flight : (string * string) list;
+  archive : (string * string) list;
+}
+[@@deriving sexp]
+
+let _sorted_alist tbl =
+  Hashtbl.to_alist tbl
+  |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+
+let snapshot (t : links) =
+  { in_flight = _sorted_alist t.in_flight; archive = _sorted_alist t.archive }
+
+let restore (t : links) (s : snapshot) =
+  let load tbl pairs =
+    Hashtbl.clear tbl;
+    List.iter pairs ~f:(fun (key, data) -> Hashtbl.set tbl ~key ~data)
+  in
+  load t.in_flight s.in_flight;
+  load t.archive s.archive

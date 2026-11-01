@@ -144,4 +144,5 @@ module Accrual = struct
         portfolio
 
   let total acc = acc.total
+  let restore_total acc total = acc.total <- total
 end

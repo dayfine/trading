@@ -11,7 +11,7 @@ type totals = {
   skipped_no_amount : int;
   missing_files : int;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type t = {
   load : loader;
@@ -108,3 +108,36 @@ let step t ~date portfolio =
   | None -> Ok portfolio
   | Some t when Date.( <= ) date t.credited_through -> Ok portfolio
   | Some t -> _credit t ~date portfolio
+
+type snapshot = {
+  cached_symbols : string list;
+  credited_through : Date.t;
+  totals : totals;
+}
+[@@deriving sexp]
+
+let snapshot (t : t) =
+  {
+    cached_symbols = List.sort (Hashtbl.keys t.cache) ~compare:String.compare;
+    credited_through = t.credited_through;
+    totals = t.totals;
+  }
+
+(* Reload without [_dividends_for]'s missing-file tally: the checkpointed
+   [totals] already counted every miss once. *)
+let _reload t symbol =
+  match t.load symbol with
+  | Ok divs -> Ok divs
+  | Error { Status.code = NotFound; _ } -> Ok []
+  | Error e -> Error e
+
+let restore (t : t) (s : snapshot) =
+  Hashtbl.clear t.cache;
+  let%map () =
+    List.fold s.cached_symbols ~init:(Ok ()) ~f:(fun acc symbol ->
+        let%bind () = acc in
+        let%map divs = _reload t symbol in
+        Hashtbl.set t.cache ~key:symbol ~data:divs)
+  in
+  t.credited_through <- s.credited_through;
+  t.totals <- s.totals

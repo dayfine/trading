@@ -162,6 +162,29 @@ let test_valid_salt_parses _ =
          Market_state.parse_salt (Some s)))
     (equal_to [ 0; 7; 42; -3 ])
 
+(* A checkpoint (#3477) restores bars and path config into a fresh state, with
+   no further [update]: the next path must be the one the source would draw. *)
+let test_restore_carries_bars_and_path_config _ =
+  let path_config =
+    { Price_path.default_config with seed = Some 7; total_points = 60 }
+  in
+  let source = Market_state.create () in
+  Market_state.update source ~path_config [ a_bar ];
+  let restored = Market_state.create () in
+  Market_state.restore restored
+    ~path_config:(Market_state.path_config source)
+    (Market_state.bars source);
+  let path_of t =
+    Option.map (Market_state.path_for t ~symbol:"AAPL") ~f:prices
+  in
+  assert_that
+    ( path_of restored,
+      path_of
+        (let t = Market_state.create () in
+         Market_state.update t ~path_config:Price_path.default_config [ a_bar ];
+         t) )
+    (pair (equal_to (path_of source)) (not_ (equal_to (path_of source))))
+
 let suite =
   "market_state"
   >::: [
@@ -174,6 +197,8 @@ let suite =
          "repeated calls within a tick are memoized"
          >:: test_repeated_calls_within_tick_memoized;
          "unknown symbol has no path" >:: test_unknown_symbol_is_none;
+         "restore carries bars and path config"
+         >:: test_restore_carries_bars_and_path_config;
          "salt 0 is bit-identical to unsalted"
          >:: test_salt_zero_matches_unsalted;
          "a non-zero salt changes the seed"

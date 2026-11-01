@@ -49,6 +49,16 @@ val create : max_retries:int -> t
     threaded from [Weinstein_strategy_config.entry_fill_reject_retries]) makes
     every operation below a no-op. *)
 
+type snapshot = (string * int) list [@@deriving sexp]
+(** The ledger as [(position_id, retries spent)] sorted by id; the budget is
+    config and is not carried (#3477). *)
+
+val snapshot : t -> snapshot
+(** Capture the ledger. *)
+
+val restore : t -> snapshot -> unit
+(** Overwrite the ledger in place with the snapshot. *)
+
 val retries_used : t -> position_id:string -> int
 (** [retries_used t ~position_id] is how many retries the ticket held by
     [position_id] has already consumed; [0] for a ticket that has never been

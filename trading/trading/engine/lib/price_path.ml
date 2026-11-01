@@ -6,6 +6,7 @@ open Trading_base.Types
 open Types
 
 type distribution_profile = UShaped | JShaped | ReverseJ | Uniform
+[@@deriving sexp]
 
 type path_config = {
   profile : distribution_profile;
@@ -18,6 +19,7 @@ type path_config = {
           - Higher values (>30): Approaches Gaussian distribution
           - Default: 4.0 for moderately fat tails *)
 }
+[@@deriving sexp]
 
 let default_config =
   {

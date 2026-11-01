@@ -204,6 +204,8 @@ module Log = struct
     | 0 -> String.compare a.symbol b.symbol
     | n -> n
 
+  let snapshot t = t.rev_events
+  let restore t rev_events = t.rev_events <- rev_events
   let events t = List.rev t.rev_events |> List.sort ~compare:_compare_event
   let count t = List.length t.rev_events
 
