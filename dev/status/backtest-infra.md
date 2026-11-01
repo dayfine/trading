@@ -516,7 +516,7 @@ paired 26y A/B (implementation check vs the +0.24 / +0.13 log estimates) remains
     `trading/trading/backtest/test/test_trades_stream.ml`, incl. the
     Runner→Panel_step_loop wiring pin and the byte-identity check).
 - [x] **Fixed (#3437): `Trade_audit_report` row `side` fell back to `Long` with no audit record.** Now derived from `trade.side` (Buy->Long, Sell->Short); pinned by `row side falls back to trade side when unmatched` in `test_trade_audit_report.ml`.
-- [ ] **Follow-up: `backtest_runner.exe` does not stream.** Only
+- [x] **Follow-up (done, #3495): `backtest_runner.exe` now streams `trades.csv` when `--progress-every` is set.** Only
   `scenario_runner` is wired. The binary already parses `--progress-every`;
   wrapping its `run_backtest` call in `Result_writer.with_trades_stream` is
   ~5 lines and would cover ad-hoc long runs launched outside the catalog.
