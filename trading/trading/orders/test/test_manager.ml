@@ -387,6 +387,55 @@ let test_update_order_timestamp _ =
     (is_ok_and_holds
        (field (fun r -> r.updated_at) (equal_to filled_order.updated_at)))
 
+(* Insertion-order contract (#3477): ids chosen so lexical / hash order differs
+   from submission order. *)
+let _ordered_ids = [ "z9"; "a1"; "m5"; "b2"; "y8"; "c3" ]
+
+let _submit_ordered manager =
+  let orders =
+    List.map _ordered_ids ~f:(fun id ->
+        let o =
+          make_order ~symbol:"AAPL" ~side:Buy ~order_type:Market ~quantity:1.0
+            ~time_in_force:Day
+        in
+        { o with id })
+  in
+  let _ = submit_orders manager orders in
+  orders
+
+let _ids orders = List.map orders ~f:(fun o -> o.id)
+
+let test_list_orders_insertion_order _ =
+  let manager = create () in
+  let _ = _submit_ordered manager in
+  assert_that
+    (_ids (list_orders manager))
+    (elements_are (List.map _ordered_ids ~f:equal_to));
+  assert_that
+    (_ids (list_orders ~filter:ActiveOnly manager))
+    (elements_are (List.map _ordered_ids ~f:equal_to))
+
+let test_insertion_order_survives_update_and_cancel _ =
+  let manager = create () in
+  let orders = _submit_ordered manager in
+  let _ = cancel_orders manager [ "a1" ] in
+  let first = List.hd_exn orders in
+  let _ = update_order manager (update_status first Filled) in
+  let _ =
+    update_order manager
+      {
+        (List.nth_exn orders 2) with
+        filled_quantity = 0.5;
+        status = PartiallyFilled 0.5;
+      }
+  in
+  assert_that
+    (_ids (list_orders manager))
+    (elements_are (List.map _ordered_ids ~f:equal_to));
+  assert_that
+    (_ids (list_orders ~filter:ActiveOnly manager))
+    (elements_are (List.map [ "m5"; "b2"; "y8"; "c3" ] ~f:equal_to))
+
 let suite =
   "Order Manager"
   >::: [
@@ -408,6 +457,9 @@ let suite =
          "update_order_preserves_changes"
          >:: test_update_order_preserves_changes;
          "update_order_timestamp" >:: test_update_order_timestamp;
+         "list_orders_insertion_order" >:: test_list_orders_insertion_order;
+         "insertion_order_survives_update_and_cancel"
+         >:: test_insertion_order_survives_update_and_cancel;
        ]
 
 let () = run_test_tt_main suite

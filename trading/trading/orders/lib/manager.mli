@@ -32,7 +32,11 @@ type order_filter =
 [@@deriving show, eq]
 
 val list_orders : ?filter:order_filter -> order_manager -> order list
-(** List all orders, optionally filtered *)
+(** List all orders, optionally filtered. Orders are returned in submission
+    (insertion) order for every filter: each order is stamped with a monotonic
+    sequence number when first submitted, and neither [update_order] nor
+    [cancel_orders] changes it. The engine fills active orders in this order, so
+    it must not depend on hash layout. *)
 
 val update_order : order_manager -> order -> status
 (** Update an existing order in the manager. Replaces the order with the same
