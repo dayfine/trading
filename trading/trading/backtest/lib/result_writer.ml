@@ -208,3 +208,11 @@ let with_trades_stream ~output_dir ~every_n_fridays ~start_date ~f =
   Exn.protect
     ~f:(fun () -> f ~on_step_setup)
     ~finally:(fun () -> Option.iter !opened ~f:Trades_stream.close)
+
+let with_optional_trades_stream ~output_dir ~every_n_fridays ~start_date
+    ~(f : ?on_step_setup:Panel_runner.step_hook_setup -> unit -> 'a) =
+  match every_n_fridays with
+  | None -> f ?on_step_setup:None ()
+  | Some n ->
+      with_trades_stream ~output_dir ~every_n_fridays:n ~start_date
+        ~f:(fun ~on_step_setup -> f ~on_step_setup ())
