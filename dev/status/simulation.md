@@ -1,6 +1,25 @@
 # Status: simulation
 
-## Last updated: 2026-09-02
+## Last updated: 2026-11-01
+
+### 2026-11-01 — #3477 resumable backtests: PRs 0–4 merged (LOCAL, do not dispatch)
+
+Booked by the GHA orchestrator reconcile (track pacer 2026-11-01 P4/P7: the
+programme had no track row). Verified against GitHub on 2026-11-01:
+
+- PR 1 — state inventory note `dev/notes/resumable-backtest-state-inventory.md`: **MERGED #3479** `841ff2f8` 2026-10-30.
+- PR 2 — sexp round-trip for position / order / step_result / price_bar / split types: **MERGED #3482** `6e35c2d6` 2026-10-30.
+- PR 0 — `orders/lib/manager.ml` fills active orders in insertion order (A1 core-module change; six golden bands re-pinned after a `do-not-merge` hold): **MERGED #3483** `0ffe2dcf` 2026-11-01.
+- PR 4 — Weinstein strategy state lifted into a capturable record: **MERGED #3486** `12983396` 2026-10-31.
+- PR 3 — simulator checkpoint capture/restore (`simulator_checkpoint.ml`): **MERGED #3485** `21461890` 2026-11-01.
+
+Remaining (issue #3477 `## Done when`): PRs 5–6 per the inventory note, then
+`scenario_runner --checkpoint-every N / --resume <ckpt>` with a byte-identity
+test on a small golden ([merge]), and byte identity on one goldens-broad cell
+([after-merge]). Owner: the local/cloud session driving #3477 — in flight
+locally, the orchestrator does not dispatch it. Carried non-blocking nits from
+#3483: stale fill-order comments in `orders/lib/create_order.ml` and
+`simulation/lib/order_generator.ml`; `list_orders` sorts on every ActiveOnly call.
 
 ### 2026-08-18 — F2 clock default promoted 0 → 26 (PR #2384) — **REVERTED 2026-08-19 by #2397**
 
