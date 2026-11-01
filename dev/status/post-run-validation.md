@@ -2,7 +2,9 @@
 
 ## Status
 
-READY_FOR_REVIEW
+IN_PROGRESS
+
+<!-- 2026-11-01 orchestrator reconcile: #2875 MERGED 2026-09-20, so READY_FOR_REVIEW was stale; IN_PROGRESS until Series_level is armed on a rebuild. -->
 
 <!-- 2026-09-20: PR #2875 (wire Series_level into Build_runner behind
      -detect-series-level, report-only + default-off) is open and green, so the

@@ -1,9 +1,9 @@
 # Status: tax-lens
 
-## Last updated: 2026-07-24
+## Last updated: 2026-11-01
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
 ## Interface stable
 YES

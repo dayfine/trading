@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-01",
+  "feature": "backtest-infra",
+  "branch": "feat/backtest-runner-stream",
+  "sha": "c149585d2540df165e3ddd7a72e53bfc186772bd",
+  "recorded_at_ns": 1793545788777085910,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-10-31 (orchestrator run 1 — see `dev/daily/2026-10-31.md`). Queue at start: 3; #3490 merged; #3483 held, #3485 stacked on it.
-10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
+Last updated: 2026-11-01 (orchestrator run 1 — see `dev/daily/2026-11-01.md`). Queue at start: 1; merged #3494 (docs) and #3495 (dispatched this run).
+11-01: merged #3483, #3485, #3494, #3495. 10-31: merged #3490, #3493. 10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -105,12 +105,12 @@ immune (#2605).
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | 09-28: cloud #3000 #3004 #3005 #3006 #3007 MERGED; #2984 open (order_gen ~stop_sync live wiring). PIT LOCAL; next #2839 |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2984 live stop-sync MERGED #3121 (10-04); PIT LOCAL; next #2839 |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1/v2 MERGED; twin-detector direct-match + hub guard MERGED #2862 (default-off); alias sidecar is armed-pass only (#2870); next: arm the guards on a PIT rebuild |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | `Series_level` WIRED to `Build_runner` behind `-detect-series-level`, report-only default-off, MERGED #2875 (1 rework); next: arm on next rebuild + read sidecar |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
-| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | cache occupancy telemetry MERGED `c62ec6df` (#2888); perf tiers now pass `--no-emit-all-eligible` (#2894); next: #2899 flag-pin check, broad-5y + PIT-smoke tier cells (#2896) |
+| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | #2899 flag-pin + #2896 PIT-smoke cell shipped (09-22); 10-29 weekly review: re-check two SLOWER 10y cap256 shapes on a quiet host |
 | [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | t3k factor-lens matrix SHIPPED LOCAL (#1639 2000-26 H1 r=-0.744; #1642 2011-26 confirm); next: regime-gated deploy proxy validation (LOCAL/data-gated) |
 | [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay (#1683) + scenario wiring (#1689) + floor_weight searchable axis (#1697, R2 complete) all MERGED default-off; no remaining follow-ups |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
@@ -136,8 +136,8 @@ immune (#2605).
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | veto arm DONE — REJECT-as-default/keep-as-axis (#2884); next: top-of-funnel screen (LOCAL) |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | Clock 0→52 MERGED #2587; A-null LANDED #2631 (`deb45a7e`) — return effect sign-inconsistent, maxDD the robust property; next: none queued |
+| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | Seeded default MERGED #3425; K-seed record band #3467; 5 stale state tokens fixed 11-01; next: top-of-funnel screen (LOCAL) |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | #3477 resumable backtests PRs 0–4 MERGED (#3479 #3482 #3483 #3485 #3486); next: PRs 5–6 + `--resume` byte-identity test (LOCAL) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | MERGED | feat-backtest | — | Closed 2026-10-04: Gaps A-F shipped; ledger in active use (70 entries); no code successor |
