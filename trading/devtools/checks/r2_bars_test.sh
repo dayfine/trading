@@ -10,7 +10,10 @@
 #   - a corrupted archive fails the sha256 check (exit 2) and unpacks nothing;
 #   - pull refuses a non-empty destination;
 #   - pull --manifest exits 0 on a matching manifest and 1 on a changed one;
-#   - credentials missing from env and env file are an error naming the var.
+#   - credentials missing from env and env file are an error naming the var;
+#   - the env file is parsed, never run, and the environment wins over it;
+#   - a failed bucket listing exits 2 instead of reading as empty;
+#   - R2_MAX_BYTES makes push refuse an oversized archive and store nothing.
 #
 # Run:
 #   sh trading/devtools/checks/r2_bars_test.sh
@@ -85,6 +88,39 @@ expect_eq "missing credential is an error" yes "$(
   env -u R2_LOCAL_STORE -u R2_ACCESS_KEY_ID R2_ENV="$TMP/none.env" \
     sh "$SCRIPT" ls >"$TMP/out" 2>&1 || rc=$?
   [ "$rc" = 2 ] && grep -q R2_ACCESS_KEY_ID "$TMP/out" && echo yes || echo no)"
+
+expect_eq "size limit refuses a large archive" 2 \
+  "$(rc_of env R2_MAX_BYTES=10 sh "$SCRIPT" push --data-dir "$TMP/src" --name data-20200301)"
+expect_eq "size limit stores nothing" no \
+  "$([ -e "$R2_LOCAL_STORE/bars/data-20200301.tar.gz" ] && echo yes || echo no)"
+
+# Env-file credentials: these run without R2_LOCAL_STORE, so the real loader
+# reads the file. Endpoints point at a closed localhost port; nothing leaves
+# the machine.
+cat >"$TMP/three.env" <<EOF
+export R2_ACCESS_KEY_ID="id-from-file"
+R2_SECRET_ACCESS_KEY='\$(touch $TMP/PWNED)'
+R2_ENDPOINT=http://127.0.0.1:19
+EOF
+no_store() {
+  env -u R2_LOCAL_STORE -u R2_ACCESS_KEY_ID -u R2_SECRET_ACCESS_KEY \
+    -u R2_ENDPOINT -u R2_BUCKET "$@"
+}
+expect_eq "env file missing a var names it" yes "$(
+  rc=0
+  no_store R2_ENV="$TMP/three.env" sh "$SCRIPT" ls >"$TMP/out" 2>&1 || rc=$?
+  [ "$rc" = 2 ] && grep -q 'R2_BUCKET is not set' "$TMP/out" && echo yes || echo no)"
+expect_eq "env file values are never run" no "$([ -e "$TMP/PWNED" ] && echo yes || echo no)"
+
+printf 'R2_BUCKET=b\n' >>"$TMP/three.env"
+expect_eq "environment wins over the env file" yes "$(
+  rc=0
+  no_store R2_ENV="$TMP/three.env" R2_ENDPOINT=http://127.0.0.1:9 \
+    sh "$SCRIPT" ls >"$TMP/out" 2>&1 || rc=$?
+  [ "$rc" = 2 ] && grep -q "port 9 " "$TMP/out" && ! grep -q 'port 19' "$TMP/out" \
+    && echo yes || echo no)"
+expect_eq "failed listing is an error, not empty" yes "$(
+  grep -q 'cannot list the bucket' "$TMP/out" && echo yes || echo no)"
 
 printf 'r2_bars_test: %d passed, %d failed\n' "$PASS" "$FAILED"
 [ "$FAILED" -eq 0 ]

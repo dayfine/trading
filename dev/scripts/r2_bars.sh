@@ -17,7 +17,8 @@
 #   its sha256, and uploads both as bars/<NAME>.tar.gz and
 #   bars/<NAME>.tar.gz.sha256. NAME defaults to data-<UTC date>. Refuses to
 #   overwrite an existing object unless --force. One PUT carries the archive,
-#   so it must be under R2's 5 GiB single-upload limit (checked).
+#   so it must be under R2's 5 GiB single-upload limit (checked; R2_MAX_BYTES
+#   overrides the limit).
 # pull: downloads bars/<NAME>.tar.gz (NAME defaults to the newest by key),
 #   checks its sha256, and unpacks into DEST, which must be empty or absent.
 #   With --manifest FILE, rebuilds a manifest of DEST at FILE's cutoff and
@@ -39,8 +40,9 @@ set -eu
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PREFIX=bars
-# R2's single PUT limit is 5 GiB; stay a little under it.
-MAX_BYTES=5300000000
+# R2's single PUT limit is 5 GiB; stay a little under it. R2_MAX_BYTES
+# overrides it (the test sets a tiny limit to reach the check).
+MAX_BYTES=${R2_MAX_BYTES:-5300000000}
 
 _die() {
   printf 'r2_bars: %s\n' "$*" >&2
@@ -123,7 +125,7 @@ _get() {
 }
 
 # Prints "<key> <bytes>" for every archive, sorted by key.
-_list() {
+_list_unsorted() {
   if [ -n "${R2_LOCAL_STORE:-}" ]; then
     [ -d "$R2_LOCAL_STORE/$PREFIX" ] || return 0
     for f in "$R2_LOCAL_STORE/$PREFIX"/*.tar.gz; do
@@ -131,11 +133,20 @@ _list() {
       printf '%s/%s %s\n' "$PREFIX" "$(basename "$f")" "$(wc -c <"$f" | tr -d ' ')"
     done
   else
-    _curl -f "$(_url '')?list-type=2&prefix=$PREFIX/" \
+    # Fetch first so a failed request is an error, not an empty listing.
+    # One request returns up to 1,000 keys; there is no paging.
+    xml=$(_curl -f "$(_url '')?list-type=2&prefix=$PREFIX/") || _die "cannot list the bucket"
+    printf '%s\n' "$xml" \
       | tr '<' '\n' \
       | sed -n -e 's/^Key>\(.*\)$/K \1/p' -e 's/^Size>\(.*\)$/S \1/p' \
       | awk '$1=="K"{k=$2} $1=="S" && k ~ /\.tar\.gz$/ {print k, $2}'
-  fi | LC_ALL=C sort
+  fi
+}
+
+# A failed listing exits 2 here; it never reads as an empty bucket.
+_list() {
+  listing=$(_list_unsorted) || exit 2
+  [ -z "$listing" ] || printf '%s\n' "$listing" | LC_ALL=C sort
 }
 
 _push() {
@@ -192,7 +203,8 @@ _pull() {
   if [ -n "$name" ]; then
     key="$PREFIX/$name.tar.gz"
   else
-    key=$(_list | tail -1 | cut -d' ' -f1)
+    listing=$(_list) || exit 2
+    key=$(printf '%s\n' "$listing" | tail -1 | cut -d' ' -f1)
     [ -n "$key" ] || _die "no archives in the bucket"
   fi
   work=$(mktemp -d "${TMPDIR:-/tmp}/r2_bars.XXXXXX")
