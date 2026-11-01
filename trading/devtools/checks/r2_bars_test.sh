@@ -99,8 +99,8 @@ expect_eq "size limit stores nothing" no \
 # the machine.
 cat >"$TMP/three.env" <<EOF
 export R2_ACCESS_KEY_ID="id-from-file"
-R2_SECRET_ACCESS_KEY='\$(touch $TMP/PWNED)'
-R2_ENDPOINT=http://127.0.0.1:19
+R2_SECRET_ACCESS_KEY="\$(touch $TMP/PWNED)"
+R2_ENDPOINT="http://127.0.0.1:19"
 EOF
 no_store() {
   env -u R2_LOCAL_STORE -u R2_ACCESS_KEY_ID -u R2_SECRET_ACCESS_KEY \
@@ -121,6 +121,12 @@ expect_eq "environment wins over the env file" yes "$(
     && echo yes || echo no)"
 expect_eq "failed listing is an error, not empty" yes "$(
   grep -q 'cannot list the bucket' "$TMP/out" && echo yes || echo no)"
+expect_eq "quotes around env-file values are dropped" yes "$(
+  rc=0
+  no_store R2_ENV="$TMP/three.env" sh "$SCRIPT" ls >"$TMP/out" 2>&1 || rc=$?
+  [ "$rc" = 2 ] && grep -q "port 19 " "$TMP/out" && echo yes || echo no)"
+expect_eq "env file still never run after a full load" no \
+  "$([ -e "$TMP/PWNED" ] && echo yes || echo no)"
 
 printf 'r2_bars_test: %d passed, %d failed\n' "$PASS" "$FAILED"
 [ "$FAILED" -eq 0 ]
