@@ -49,10 +49,20 @@ let run_and_write ~start_date ~end_date ~overrides ~output_dir
   in
   let progress_emitter = _make_progress_emitter ~progress_every ~output_dir in
   Backtest.Gc_trace.record ?trace:gc_trace ~phase:"start" ();
-  let result =
+  let run ?on_step_setup () =
     Backtest.Runner.run_backtest ~start_date ~end_date ~overrides
       ?sector_map_override ?trace ?gc_trace ?bar_data_source ?progress_emitter
-      ?slippage_bps ()
+      ?slippage_bps ?on_step_setup ()
+  in
+  (* Stream closed round-trips into trades.csv on the --progress-every cadence
+     (#2502), mirroring scenario_runner. Result_writer.write below rewrites the
+     file, so a completed run is byte-identical; unset => no streaming. *)
+  let result =
+    match progress_every with
+    | None -> run ()
+    | Some n ->
+        Backtest.Result_writer.with_trades_stream ~output_dir ~every_n_fridays:n
+          ~start_date ~f:(fun ~on_step_setup -> run ~on_step_setup ())
   in
   eprintf "Writing output to %s/\n%!" output_dir;
   Backtest.Result_writer.write ~output_dir result;
