@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-11-01 (orchestrator run 1 — see `dev/daily/2026-11-01.md`). Queue at start: 1; merged #3494 (docs) and #3495 (dispatched this run).
-11-01: merged #3483, #3485, #3494, #3495. 10-31: merged #3490, #3493. 10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
+Last updated: 2026-11-01 (orchestrator run 2 — see `dev/daily/2026-11-01-run2.md`). Queue at start: 0; merged #3497 (dispatched this run).
+11-01: merged #3483, #3485, #3494, #3495, #3497. 10-31: merged #3490, #3493. 10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -105,7 +105,7 @@ immune (#2605).
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2984 live stop-sync MERGED #3121 (10-04); PIT LOCAL; next #2839 |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2984 live stop-sync MERGED #3121 (10-04); trades-stream wiring pinned #3497; PIT LOCAL; next #2839 |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1/v2 MERGED; twin-detector direct-match + hub guard MERGED #2862 (default-off); alias sidecar is armed-pass only (#2870); next: arm the guards on a PIT rebuild |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | `Series_level` WIRED to `Build_runner` behind `-detect-series-level`, report-only default-off, MERGED #2875 (1 rework); next: arm on next rebuild + read sidecar |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
