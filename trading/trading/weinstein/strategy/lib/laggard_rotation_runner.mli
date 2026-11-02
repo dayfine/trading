@@ -62,14 +62,18 @@
 open Core
 open Trading_strategy
 
-val window_return : n:int -> Types.Daily_price.t list -> float option
+val window_return :
+  ?adjusted:bool -> n:int -> Types.Daily_price.t list -> float option
 (** [window_return ~n bars] = the simple return over the most recent rolling
     window of [n] weekly bars: [close[last] / close[first] - 1.0], computed from
     a chronological [bars] list with [List.length bars >= n + 1]. Returns [None]
     when the list is shorter than [n + 1] bars or its oldest close is
     non-positive (degenerate snapshot). Exposed so the macro-bearish trim's RS
     ranking ({!Macro_bearish_trim_runner}) reuses the identical window-return
-    primitive, keeping the laggard and trim RS notions consistent. *)
+    primitive, keeping the laggard and trim RS notions consistent.
+
+    [~adjusted:true] (default [false]) reads [adjusted_close] instead of
+    [close_price], so a split inside the window is not a loss (#3426). *)
 
 val update :
   config:Laggard_rotation.config ->
@@ -124,6 +128,13 @@ val update :
       that the position state machine does not currently support.
     - Short positions and non-Holding states are skipped without emitting, and
       their entry in [laggard_streaks] is left untouched.
+
+    {2 Flags (#3426, both default off)}
+
+    - [config.adjusted_returns]: window returns use [adjusted_close].
+    - [config.clear_streak_on_close]: the streak table is keyed by position id,
+      and entries whose position is gone or [Closed] are pruned right after the
+      screening-day check (before the empty-positions check).
 
     {2 Mutates}
 

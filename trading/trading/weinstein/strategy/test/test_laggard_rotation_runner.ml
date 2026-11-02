@@ -21,8 +21,12 @@ let make_bar date ~close ?low ?high () =
     active_through = None;
   }
 
-let cfg_k4 = { Laggard_rotation.hysteresis_weeks = 4; rs_window_weeks = 13 }
-let cfg_k1 = { Laggard_rotation.hysteresis_weeks = 1; rs_window_weeks = 13 }
+let cfg_k4 =
+  { Laggard_rotation.default_config with Laggard_rotation.hysteresis_weeks = 4 }
+
+let cfg_k1 =
+  { Laggard_rotation.default_config with Laggard_rotation.hysteresis_weeks = 1 }
+
 let _friday = Date.of_string "2024-04-05" (* Friday *)
 let _monday = Date.of_string "2024-04-08" (* Monday *)
 

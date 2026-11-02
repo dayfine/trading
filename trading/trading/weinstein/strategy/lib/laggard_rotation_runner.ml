@@ -11,12 +11,17 @@ let _simple_return ~oldest ~latest : float option =
     (oldest) and the close at index n (latest). Returns [None] if the list is
     shorter than [n + 1] or the oldest close is non-positive (avoids
     divide-by-zero on degenerate snapshots). *)
-let _window_return ~(n : int) (bars : Types.Daily_price.t list) : float option =
+let _window_return ?(adjusted = false) ~(n : int)
+    (bars : Types.Daily_price.t list) : float option =
   if List.length bars < n + 1 then None
   else
     let arr = Array.of_list bars in
-    _simple_return ~oldest:arr.(0).close_price
-      ~latest:arr.(Array.length arr - 1).close_price
+    let price (b : Types.Daily_price.t) =
+      if adjusted then b.adjusted_close else b.close_price
+    in
+    _simple_return
+      ~oldest:(price arr.(0))
+      ~latest:(price arr.(Array.length arr - 1))
 
 (* Public alias so {!Macro_bearish_trim_runner}'s caller can compute the same
    window return for its RS ranking, keeping the two RS notions consistent. *)
@@ -56,6 +61,25 @@ let _emit_exit_transition ~pos ~current_date ~get_price ~skip_position_ids
     Option.map (get_price pos.symbol) ~f:(fun bar ->
         _make_exit_transition ~pos ~current_date ~bar ~rs_13w_neg_weeks)
 
+(** Streak-table key: the position id when [clear_streak_on_close] is set (so a
+    re-entry of the same symbol is a fresh key), else the symbol. *)
+let _streak_key ~(config : Laggard_rotation.config) (pos : Position.t) =
+  if config.clear_streak_on_close then pos.id else pos.symbol
+
+(** Drop streak entries whose position is no longer open. Only used when
+    [clear_streak_on_close] is set. *)
+let _prune_streaks ~(config : Laggard_rotation.config) ~positions
+    ~laggard_streaks =
+  if config.clear_streak_on_close then begin
+    let open_ids =
+      Map.fold positions ~init:String.Set.empty ~f:(fun ~key:_ ~data:pos acc ->
+          match Position.get_state pos with
+          | Position.Closed _ -> acc
+          | _ -> Set.add acc pos.Position.id)
+    in
+    Hashtbl.filter_keys_inplace laggard_streaks ~f:(Set.mem open_ids)
+  end
+
 (** Run the detector on a long Holding position whose history covered the RS
     window. Returns [Some transition] only on [Laggard_exit] that survives the
     skip-list and [get_price] gates. *)
@@ -64,7 +88,8 @@ let _observe_and_emit ~config ~laggard_streaks ~benchmark_13w_return
     (pos : Position.t) =
   let decision =
     Laggard_rotation.observe_position ~config ~state:laggard_streaks
-      ~symbol:pos.symbol ~position_13w_return ~benchmark_13w_return
+      ~symbol:(_streak_key ~config pos) ~position_13w_return
+      ~benchmark_13w_return
   in
   match decision with
   | Laggard_rotation.Hold -> None
@@ -78,11 +103,12 @@ let _observe_and_emit ~config ~laggard_streaks ~benchmark_13w_return
 let _laggard_exit_for_holding ~config ~laggard_streaks ~benchmark_13w_return
     ~skip_position_ids ~bar_reader ~get_price ~current_date (pos : Position.t) =
   let n = config.Laggard_rotation.rs_window_weeks in
+  let adjusted = config.Laggard_rotation.adjusted_returns in
   let pos_bars =
     Bar_reader.weekly_bars_for bar_reader ~symbol:pos.symbol ~n:(n + 1)
       ~as_of:current_date
   in
-  match _window_return ~n pos_bars with
+  match _window_return ~adjusted ~n pos_bars with
   | None -> None
   | Some position_13w_return ->
       _observe_and_emit ~config ~laggard_streaks ~benchmark_13w_return
@@ -116,22 +142,39 @@ let _collect_laggard_exits ~config ~positions ~laggard_streaks
       _fold_position ~config ~laggard_streaks ~benchmark_13w_return
         ~skip_position_ids ~bar_reader ~get_price ~current_date acc pos)
 
+(** Benchmark return then per-position pass; split out of {!update} so the prune
+    step sits between the screening-day and empty-map checks. *)
+let _update_with_benchmark ~config ~benchmark_symbol ~positions ~bar_reader
+    ~get_price ~laggard_streaks ~skip_position_ids ~current_date =
+  let n = config.Laggard_rotation.rs_window_weeks in
+  let adjusted = config.Laggard_rotation.adjusted_returns in
+  let benchmark_bars =
+    Bar_reader.weekly_bars_for bar_reader ~symbol:benchmark_symbol ~n:(n + 1)
+      ~as_of:current_date
+  in
+  match _window_return ~adjusted ~n benchmark_bars with
+  | None ->
+      (* Missing benchmark history is a data gap, not a stage-recovery
+         signal — leave the streak table untouched and emit nothing. *)
+      []
+  | Some benchmark_13w_return ->
+      _collect_laggard_exits ~config ~positions ~laggard_streaks
+        ~benchmark_13w_return ~skip_position_ids ~bar_reader ~get_price
+        ~current_date
+
+(** Screening-day body: prune closed-position streaks, then bail on an empty map
+    before reading any bars. *)
+let _update_on_screening_day ~config ~benchmark_symbol ~positions ~bar_reader
+    ~get_price ~laggard_streaks ~skip_position_ids ~current_date =
+  _prune_streaks ~config ~positions ~laggard_streaks;
+  if Map.is_empty positions then []
+  else
+    _update_with_benchmark ~config ~benchmark_symbol ~positions ~bar_reader
+      ~get_price ~laggard_streaks ~skip_position_ids ~current_date
+
 let update ~config ~benchmark_symbol ~is_screening_day ~positions ~bar_reader
     ~get_price ~laggard_streaks ~skip_position_ids ~current_date =
   if not is_screening_day then []
-  else if Map.is_empty positions then []
   else
-    let n = config.Laggard_rotation.rs_window_weeks in
-    let benchmark_bars =
-      Bar_reader.weekly_bars_for bar_reader ~symbol:benchmark_symbol ~n:(n + 1)
-        ~as_of:current_date
-    in
-    match _window_return ~n benchmark_bars with
-    | None ->
-        (* Missing benchmark history is a data gap, not a stage-recovery
-           signal — leave the streak table untouched and emit nothing. *)
-        []
-    | Some benchmark_13w_return ->
-        _collect_laggard_exits ~config ~positions ~laggard_streaks
-          ~benchmark_13w_return ~skip_position_ids ~bar_reader ~get_price
-          ~current_date
+    _update_on_screening_day ~config ~benchmark_symbol ~positions ~bar_reader
+      ~get_price ~laggard_streaks ~skip_position_ids ~current_date
