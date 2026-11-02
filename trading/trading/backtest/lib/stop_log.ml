@@ -31,6 +31,7 @@ type _pos_record = {
       (* Whether {!record_stop_decision} has fired for this position yet: the
          first one is the fill-time seed of the stop machine. *)
 }
+[@@deriving sexp]
 
 type t = {
   positions : (string, _pos_record) Hashtbl.t;
@@ -249,3 +250,25 @@ let get_stop_infos t : stop_info list =
   Hashtbl.fold t.positions ~init:[] ~f:(fun ~key:position_id ~data:record acc ->
       _record_to_info ~position_id record :: acc)
   |> List.sort ~compare:(fun a b -> String.compare a.position_id b.position_id)
+
+(* Checkpoint ------------------------------------------------------------- *)
+
+type snapshot = { date : Date.t option; records : (string * _pos_record) list }
+[@@deriving sexp]
+
+(* [_pos_record] is mutable: copy it so a snapshot shares nothing live. *)
+let _copy_record r = { r with pos_seen_decision = r.pos_seen_decision }
+
+let capture t : snapshot =
+  let records =
+    Hashtbl.to_alist t.positions
+    |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+    |> List.map ~f:(fun (id, r) -> (id, _copy_record r))
+  in
+  { date = t.current_date; records }
+
+let restore (s : snapshot) =
+  let positions = Hashtbl.create (module String) in
+  List.iter s.records ~f:(fun (id, r) ->
+      Hashtbl.set positions ~key:id ~data:(_copy_record r));
+  { positions; current_date = s.date }

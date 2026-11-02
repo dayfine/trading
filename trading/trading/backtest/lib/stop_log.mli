@@ -328,3 +328,18 @@ val get_stop_infos : t -> stop_info list
 (** Return stop info for all positions that have been observed, sorted by
     [position_id]. Positions still in Holding state will have
     [exit_trigger = None]. *)
+
+(** {1 Checkpoint} *)
+
+type snapshot [@@deriving sexp]
+(** The collector's full state as plain data: the current date and every
+    per-position record, sorted by [position_id]. Shares nothing with the live
+    collector. *)
+
+val capture : t -> snapshot
+(** Copy of the collector's state. Later {!record_transitions} calls do not
+    change it. *)
+
+val restore : snapshot -> t
+(** A fresh collector holding the snapshot's state. Feeding it the remaining
+    transitions yields the same {!get_stop_infos} as the original. *)

@@ -132,6 +132,7 @@ type _bucket = {
   mutable bucket_cash_rejection : Ticket_lifecycle.cash_rejection option;
   mutable bucket_stop_decisions : Weinstein_stops.Stop_decision.t list;
 }
+[@@deriving sexp]
 (** Per-position bucket: every [record_*] lands here; folded at drain. *)
 
 type t = {
@@ -281,3 +282,28 @@ let audit_records_of_sexp (sexp : Sexp.t) : audit_record list =
 
 let sexp_of_audit_blob : audit_blob -> Sexp.t = [%sexp_of: audit_blob]
 let audit_blob_of_sexp : Sexp.t -> audit_blob = [%of_sexp: audit_blob]
+
+(* Checkpoint ------------------------------------------------------------- *)
+
+type snapshot = { buckets : _bucket list; queue : cascade_summary list }
+[@@deriving sexp]
+
+(* Buckets are mutable: copy each so a snapshot shares nothing live. *)
+let _copy_bucket b = { b with bucket_stop_decisions = b.bucket_stop_decisions }
+
+let capture t : snapshot =
+  let buckets =
+    Hashtbl.data t.records
+    |> List.sort ~compare:(fun a b ->
+        String.compare a.bucket_entry.position_id b.bucket_entry.position_id)
+    |> List.map ~f:_copy_bucket
+  in
+  { buckets; queue = Queue.to_list t.cascade_summaries }
+
+let restore (s : snapshot) =
+  let t = create () in
+  List.iter s.buckets ~f:(fun b ->
+      Hashtbl.set t.records ~key:b.bucket_entry.position_id
+        ~data:(_copy_bucket b));
+  List.iter s.queue ~f:(Queue.enqueue t.cascade_summaries);
+  t
