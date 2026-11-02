@@ -21,16 +21,18 @@ let _negative_unrealized_pnl (portfolio : Trading_portfolio.Portfolio.t) =
   List.fold portfolio.unrealized_pnl_per_position ~init:0.0
     ~f:(fun acc (_symbol, pnl) -> acc +. Float.min 0.0 pnl)
 
+let spendable_cash (portfolio : Trading_portfolio.Portfolio.t) =
+  portfolio.current_cash +. _negative_unrealized_pnl portfolio
+
+let buy_budget ~portfolio ~(trade : Trading_base.Types.trade) =
+  spendable_cash portfolio -. trade.commission
+
 let affordable_quantity ~(portfolio : Trading_portfolio.Portfolio.t)
     ~(trade : Trading_base.Types.trade) =
   match trade.side with
   | Sell -> 0.0
   | Buy ->
-      let budget =
-        portfolio.current_cash
-        +. _negative_unrealized_pnl portfolio
-        -. trade.commission
-      in
+      let budget = buy_budget ~portfolio ~trade in
       if Float.(trade.price <= 0.0) || Float.(budget <= 0.0) then 0.0
       else Float.round_down (budget /. trade.price)
 

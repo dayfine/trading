@@ -12,7 +12,7 @@
     and [trade_audit.sexp] persists.
 
     {b The amounts.} [required] is the refused fill's cost,
-    [quantity *. price +. commission]. [available] is the portfolio's
+    [quantity *. price +. commission]. [available] is the portfolio's gross
     [current_cash] at the moment the trade was refused: earlier fills of the
     same step are already booked, later ones are not. That is the [Required] /
     [Available] pair the cash-floor error reports. For a short entry, [required]
@@ -35,12 +35,20 @@ type t = {
   symbol : string;
   date : Date.t;  (** The step on which the fill was refused. *)
   required : float;  (** The refused fill's cost, commission included. *)
-  available : float;  (** Cash at the moment of the refusal. *)
+  available : float;
+      (** {b Gross} cash at the moment of the refusal ([current_cash]). *)
+  budgeted : float;
+      (** What the portfolio's cash floor let this fill spend:
+          [current_cash + negative_unrealized_pnl]
+          ({!Entry_fill_resize.spendable_cash}), the ceiling on a fill's cost
+          (shares plus commission) that the refusing check and the G2b clamp
+          both apply. Below [available] whenever the book carries paper losses
+          (#3420). *)
 }
 [@@deriving show, eq]
 
 val funded_fraction : t -> float
-(** [available /. required], or [0.0] when [required <= 0.0]: how close the
+(** [budgeted /. required], or [0.0] when [required <= 0.0]: how close the
     ticket came to being fundable (ADMA: 0.957). Above 1 when the cash floor's
     unrealized-loss drag, not the price, refused the fill. *)
 
@@ -52,11 +60,16 @@ val pending : date:Date.t -> emit:(t -> unit) option -> pending
 (** A fresh step table. With [emit = None] every operation below is a no-op, so
     the default simulator does no extra work. *)
 
-val note : pending -> Trading_base.Types.trade -> available_cash:float -> unit
+val note :
+  pending ->
+  Trading_base.Types.trade ->
+  available_cash:float ->
+  budgeted_cash:float ->
+  unit
 (** [note p trade ~available_cash] records that [trade] was refused when the
-    portfolio held [available_cash]. The first refusal of a symbol in a step
-    wins. Shaped to be {!Cancel_handler.apply_trades_best_effort}'s [on_reject]
-    hook. *)
+    portfolio held [available_cash] gross and could spend [budgeted_cash]. The
+    first refusal of a symbol in a step wins. Shaped to be
+    {!Cancel_handler.apply_trades_best_effort}'s [on_reject] hook. *)
 
 val emit :
   pending ->

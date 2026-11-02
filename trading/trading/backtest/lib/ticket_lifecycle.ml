@@ -41,7 +41,12 @@ type entry_anchor =
 type reissue = { original_position_id : string; reissue_date : Date.t }
 [@@deriving sexp]
 
-type cash_rejection = { required : float; available : float } [@@deriving sexp]
+type cash_rejection = {
+  required : float;
+  available : float;
+  budgeted : float; [@sexp.default 0.0]
+}
+[@@deriving sexp]
 
 type t = {
   placement_date : Date.t;
@@ -70,7 +75,7 @@ let age_weeks_from lifecycle ~resolved =
 (* Extracted for the same reason [_stamp_fill_age] is: a record update this wide
    inside the [Option.map] closure trips the nesting linter. *)
 let cash_rejection_of (r : Trading_simulation.Entry_cash_rejection.t) =
-  { required = r.required; available = r.available }
+  { required = r.required; available = r.available; budgeted = r.budgeted }
 
 let _merge_resolutions ~fill_volume ~cancel_age_weeks ~cancel_reason
     ~cash_rejection l =

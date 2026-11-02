@@ -428,6 +428,45 @@ let test_v12_respects_config_gate _ =
   in
   assert_that (result ~id:"V12" inputs) (violations_and_pass 0 true)
 
+(* #3420 NVDA-wein-240: stop installed at 567.6864 on E = 618 (0.0814 wide),
+   filled at 154.5500 on the restated post-split basis (4:1 split two months
+   later). Measured against the fill the row read 2.6732 and failed; measured
+   from E, as the gate does, it passes. *)
+let test_v12_split_straddling_position_passes _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [ trade ~symbol:"NVDA" ~entry_date:"2021-05-24" ~entry_price:154.55 () ];
+      audit =
+        audit_of
+          [ ("NVDA", ctx ~installed_stop:567.6864 ~suggested_entry:618.0 ()) ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 0 true)
+
+(* #3420 KD 2023-09-11: the gate admitted 14.99 % from E; the stop-limit filled
+   0.1 % above E, which read 15.08 % from the fill. E-basis keeps it a pass,
+   while a stop genuinely wider than the gate from E still fails. *)
+let test_v12_measures_from_e_not_fill _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"KD" ~entry_date:"2023-09-11" ~entry_price:17.32 ();
+          trade ~symbol:"WIDE" ~entry_date:"2023-09-11" ~entry_price:100.0 ();
+        ];
+      audit =
+        audit_of
+          [
+            ("KD", ctx ~installed_stop:14.7227 ~suggested_entry:17.319 ());
+            ("WIDE", ctx ~installed_stop:80.0 ~suggested_entry:100.0 ());
+          ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 1 false)
+
 (* ---- V13: fill dates and prices must lie on a real bar ----------------- *)
 
 let ohlc ~date ~o ~h ~l ~c : Vt.daily_bar =
@@ -595,6 +634,76 @@ let test_v13_rebased_store_still_flags_saturday_exit _ =
     }
   in
   assert_that (result ~id:"V13" inputs) (violations_skipped_pass 1 0 false)
+
+(* #3420 MIME-wein-200 / LACO-wein-168: a delisted symbol's last bar is
+   Thu 2022-05-19 and its exit is dated Fri 2022-05-20, a day with no bar. The
+   delisting exit is waived. The same shape under any other exit trigger, and a
+   delisting dated two sessions out, are still flagged. *)
+let _delisting_inputs ~exit_trigger ~exit_date =
+  {
+    (Vt.empty_inputs ()) with
+    trades =
+      [
+        trade ~symbol:"MIME" ~entry_date:"2022-05-16" ~entry_price:100.0
+          ~exit_date ~exit_price:101.0 ~exit_trigger ();
+      ];
+    bars =
+      bars_of
+        [
+          ( "MIME",
+            ohlc_bars
+              [
+                ohlc ~date:"2022-05-16" ~o:99.0 ~h:102.0 ~l:98.0 ~c:100.0;
+                ohlc ~date:"2022-05-19" ~o:100.0 ~h:102.0 ~l:100.0 ~c:101.0;
+              ] );
+        ];
+  }
+
+let test_v13_waives_delisting_exit_one_session_after_last_bar _ =
+  assert_that
+    (result ~id:"V13"
+       (_delisting_inputs ~exit_trigger:"delisted" ~exit_date:"2022-05-20"))
+    (violations_and_pass 0 true)
+
+let test_v13_still_flags_other_no_bar_fills _ =
+  assert_that
+    ( result ~id:"V13"
+        (_delisting_inputs ~exit_trigger:"stop_loss" ~exit_date:"2022-05-20"),
+      result ~id:"V13"
+        (_delisting_inputs ~exit_trigger:"delisted" ~exit_date:"2022-05-24") )
+    (all_of
+       [
+         field fst (violations_and_pass 1 false);
+         field snd (violations_and_pass 1 false);
+       ])
+
+(* #3420 KD 2023-09-11: filled at 17.32 against a bar high of 17.319 (cent
+   rounding). Inside half a cent is clean; 2 cents out is still a violation. *)
+let test_v13_tolerates_cent_rounded_fill _ =
+  let inputs price =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"KD" ~entry_date:"2023-09-11" ~entry_price:price
+            ~exit_date:"2023-09-11" ~exit_price:price ();
+        ];
+      bars =
+        bars_of
+          [
+            ( "KD",
+              ohlc_bars
+                [ ohlc ~date:"2023-09-11" ~o:17.0 ~h:17.319 ~l:16.9 ~c:17.2 ] );
+          ];
+    }
+  in
+  assert_that
+    (result ~id:"V13" (inputs 17.32), result ~id:"V13" (inputs 17.34))
+    (all_of
+       [
+         field fst (violations_and_pass 0 true);
+         field snd (violations_and_pass 1 false);
+       ])
 
 (* ---- V14: stop-out judged against the entry bar ------------------------ *)
 
@@ -1230,6 +1339,15 @@ let suite =
          "v11_stop_bounds" >:: test_v11;
          "v12_gate_consistency" >:: test_v12;
          "v12_skips_unevaluable" >:: test_v12_skips_unevaluable;
+         "v12_split_straddling_position_passes"
+         >:: test_v12_split_straddling_position_passes;
+         "v12_measures_from_e_not_fill" >:: test_v12_measures_from_e_not_fill;
+         "v13_waives_delisting_exit_one_session_after_last_bar"
+         >:: test_v13_waives_delisting_exit_one_session_after_last_bar;
+         "v13_still_flags_other_no_bar_fills"
+         >:: test_v13_still_flags_other_no_bar_fills;
+         "v13_tolerates_cent_rounded_fill"
+         >:: test_v13_tolerates_cent_rounded_fill;
          "v12_respects_config_gate" >:: test_v12_respects_config_gate;
          "v13_clean" >:: test_v13_clean;
          "v13_flags_saturday_exit" >:: test_v13_flags_saturday_exit;

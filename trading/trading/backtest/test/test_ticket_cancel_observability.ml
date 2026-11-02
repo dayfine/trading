@@ -234,7 +234,11 @@ let test_portfolio_rejected_fill_records_a_cancel _ =
               (fun (l : TL.t) -> l.cash_rejection)
               (is_some_and
                  (equal_to
-                    ({ required = 100_000.0; available = 5_000.0 }
+                    ({
+                       required = 100_000.0;
+                       available = 5_000.0;
+                       budgeted = 5_000.0;
+                     }
                       : TL.cash_rejection)));
           ]))
 
@@ -260,7 +264,13 @@ let test_cash_rejection_sexp_round_trip _ =
   let with_rejection =
     {
       _placement_lifecycle with
-      cash_rejection = Some { required = 446_712.52; available = 427_489.55 };
+      cash_rejection =
+        Some
+          {
+            required = 446_712.52;
+            available = 427_489.55;
+            budgeted = 420_000.0;
+          };
     }
   in
   assert_that
@@ -272,7 +282,11 @@ let test_cash_rejection_sexp_round_trip _ =
           (fun (l : TL.t) -> l.cash_rejection)
           (is_some_and
              (equal_to
-                ({ required = 446_712.52; available = 427_489.55 }
+                ({
+                   required = 446_712.52;
+                   available = 427_489.55;
+                   budgeted = 420_000.0;
+                 }
                   : TL.cash_rejection))))
        (equal_to false))
 

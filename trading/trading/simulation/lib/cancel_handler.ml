@@ -269,10 +269,12 @@ let _bucket_trade ~hook ~on_reject ~initial_long_margin_req
   | portfolio, `Rejected (t, err) ->
       _warn_rejected_trade t err;
       on_reject t
-        ~available_cash:portfolio.Trading_portfolio.Portfolio.current_cash;
+        ~available_cash:portfolio.Trading_portfolio.Portfolio.current_cash
+        ~budgeted_cash:(Entry_fill_resize.spendable_cash portfolio);
       (portfolio, accepted, t :: rejected)
 
-let _ignore_reject (_ : Trading_base.Types.trade) ~available_cash:(_ : float) =
+let _ignore_reject (_ : Trading_base.Types.trade) ~available_cash:(_ : float)
+    ~budgeted_cash:(_ : float) =
   ()
 
 let apply_trades_best_effort ?on_trade_fill ?(on_reject = _ignore_reject)

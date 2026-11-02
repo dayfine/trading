@@ -19,7 +19,9 @@ val check_v8 : inputs -> Validator_step.finding
 
 val check_v12 : inputs -> Validator_step.finding
 (** V12 (INV): every filled entry's installed stop sits within
-    [config.gate_max_stop_distance_pct] of its fill price — i.e. the
+    [config.gate_max_stop_distance_pct] of the screener's [E] (the gate's own
+    basis; the fill is on a restated split basis and may land up to 2 % above
+    [E], #3420; legacy audits with no [E] fall back to the fill) — i.e. the
     [Stop_too_wide] gate that should have rejected a wider stop actually fired.
     Skips rows with no audit join or no captured [installed_stop]. *)
 

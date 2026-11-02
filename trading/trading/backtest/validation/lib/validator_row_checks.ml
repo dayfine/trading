@@ -64,18 +64,31 @@ let check_v11 inputs = fold_steps inputs.trades ~f:(_v11_step inputs.config)
    cell's [stop_width_size_down_max_pct] or V12 reports a wall of false
    failures. Under the default [Drop_over_max] the invariant holds exactly as
    stated above. *)
+(* #3420: the distance is measured from [E] (the screener's [suggested_entry]),
+   as the gate does. [installed_stop] and [E] are both decision-time prices, so
+   they share one split basis; the fill sits on the restated basis of
+   [trades.csv], so measuring against it read NVDA 2021-05-24 (4:1 split two
+   months later) as 2.67 wide against a true 0.081. It also keeps the 2 % band
+   a stop-limit fill may land above [E] from failing a ticket the gate
+   admitted (KD 14.99 % -> 15.08 %). A legacy audit with no [E] falls back to
+   the fill. *)
+let _v12_base ~(row : trade_row) ~(ctx : entry_context) =
+  if Float.( > ) ctx.suggested_entry 0.0 then ctx.suggested_entry
+  else row.entry_price
+
 let _v12_dist ~(row : trade_row) ~(ctx : entry_context) =
-  Float.abs (ctx.installed_stop -. row.entry_price) /. row.entry_price
+  let base = _v12_base ~row ~ctx in
+  Float.abs (ctx.installed_stop -. base) /. base
 
 let _v12_detail (c : check_config) ~dist ~(ctx : entry_context)
     ~(row : trade_row) =
-  sprintf "installed_stop=%.4f vs fill=%.4f -> dist=%.4f > gate=%.4f"
-    ctx.installed_stop row.entry_price dist c.gate_max_stop_distance_pct
+  sprintf "installed_stop=%.4f vs E=%.4f -> dist=%.4f > gate=%.4f"
+    ctx.installed_stop (_v12_base ~row ~ctx) dist c.gate_max_stop_distance_pct
 
 (* Un-evaluable rows: legacy audits with no captured [installed_stop] ([0.0]
    default) or a non-positive fill. *)
 let _v12_unevaluable ~(row : trade_row) ~(ctx : entry_context) =
-  Float.( <= ) ctx.installed_stop 0.0 || Float.( <= ) row.entry_price 0.0
+  Float.( <= ) ctx.installed_stop 0.0 || Float.( <= ) (_v12_base ~row ~ctx) 0.0
 
 let _v12_pred (c : check_config) (row : trade_row) (ctx : entry_context) =
   (* The unevaluable guard is checked first, so the divide-by-zero [dist] of a

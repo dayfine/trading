@@ -156,9 +156,27 @@ let _stop_initial_distance_pct (entry : Trade_audit.entry_decision) =
    strategy's [Stop_too_wide] gate bounds (measured vs [effective_entry] at
    decision time) and the basis the V12 validator checks. [fill] is the round
    trip's realized entry price. *)
-let _stop_fill_distance_pct ~fill (entry : Trade_audit.entry_decision) =
-  if Float.( <= ) fill 0.0 || Float.( <= ) entry.installed_stop 0.0 then None
-  else Some (Float.abs (entry.installed_stop -. fill) /. fill)
+(* #3420: [fill] is on the restated (exit-side) split basis, but the audit's
+   [installed_stop] is the decision-time level, so a split between decision and
+   fill (NVDA: stop 567.69 pre-split, fill 154.55 post-split, read 2.67 instead
+   of 0.081) or a ticket that rested across one (AAON: 83.21 vs a live 55.48)
+   mixed bases. The stop log's [entry_stop] is already restated onto the fill
+   basis (#3127/#3256) and replaced by the machine's level at the fill (#3075),
+   so it is preferred; the audit level is the fallback when no stop-log record
+   joined. *)
+let _stop_for_fill_basis ~(stop_info : Stop_log.stop_info option)
+    (entry : Trade_audit.entry_decision) =
+  match
+    Option.bind stop_info ~f:(fun (i : Stop_log.stop_info) -> i.entry_stop)
+  with
+  | Some s -> s
+  | None -> entry.installed_stop
+
+let _stop_fill_distance_pct ~fill ~stop_info
+    (entry : Trade_audit.entry_decision) =
+  let stop = _stop_for_fill_basis ~stop_info entry in
+  if Float.( <= ) fill 0.0 || Float.( <= ) stop 0.0 then None
+  else Some (Float.abs (stop -. fill) /. fill)
 
 let _days_to_first_stop_trigger ~(entry_date : Date.t) ~(exit_date : Date.t)
     ~(trigger : Stop_log.exit_trigger option) =
@@ -227,7 +245,8 @@ let of_precomputed (pre : precomputed)
     Option.bind entry ~f:_stop_initial_distance_pct
   in
   let stop_fill_distance_pct =
-    Option.bind entry ~f:(_stop_fill_distance_pct ~fill:trade.entry_price)
+    Option.bind entry
+      ~f:(_stop_fill_distance_pct ~fill:trade.entry_price ~stop_info)
   in
   let screener_score_at_entry =
     Option.map entry ~f:(fun e -> e.cascade_score)

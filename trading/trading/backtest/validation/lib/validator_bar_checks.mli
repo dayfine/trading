@@ -32,7 +32,13 @@ val check_v10 : inputs -> Validator_step.finding
 val check_v13 : inputs -> Validator_step.finding
 (** V13 (INV): every trade's [entry_date] and [exit_date] have a bar for that
     symbol, and [entry_price] / [exit_price] lie inside their bar's
-    [[low, high]] widened by [config.fill_price_epsilon_pct].
+    [[low, high]] widened by [config.fill_price_epsilon_pct] and half a cent
+    (fills are cent-rounded; KD 17.32 vs a high of 17.319, #3420).
+
+    {b Delisting exit.} An exit with [exit_trigger = "delisted"] dated after the
+    symbol's last bar, by at most one session (MIME-wein-200, LACO-wein-168), is
+    clean: the symbol has no bar that day by construction. Any other no-bar fill
+    is still flagged.
 
     Both sides are checked; the first failing leg (entry before exit) supplies
     the specimen. A missing-bar specimen names the nearest earlier bar date so

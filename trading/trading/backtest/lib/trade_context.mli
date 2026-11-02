@@ -16,10 +16,12 @@
       {b E-basis, not fill-basis}: in arms whose fill diverges from [E] this
       overstates stop depth vs cost (the 2026-08-07 confound; findings §4
       RESOLVED) — for gate-basis analysis use [stop_fill_distance_pct].
-    - [stop_fill_distance_pct] — [|installed_stop - fill| / fill], the same
-      quantity the strategy's [Stop_too_wide] gate bounds and the V12 validator
-      checks; [fill] is the round trip's realized entry price. [None] when the
-      audit is missing or fill/stop is non-positive.
+    - [stop_fill_distance_pct] — [|stop - fill| / fill], where [stop] is the
+      stop log's [entry_stop] (restated onto the fill's split basis, #3420) or,
+      with no stop-log record, the audit's [installed_stop]; the same quantity
+      the strategy's [Stop_too_wide] gate bounds and the V12 validator checks;
+      [fill] is the round trip's realized entry price. [None] when the audit is
+      missing or fill/stop is non-positive.
     - [stop_trigger_kind] — uses the round-trip exit fill price, not the
       strategy's trigger-bar observation; string label from
       {!Stop_log.classify_stop_trigger_kind}: [gap_down] / [intraday] /

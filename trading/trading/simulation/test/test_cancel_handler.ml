@@ -441,7 +441,7 @@ let test_on_reject_sees_cash_at_the_refusal _ =
   let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:6_000.0 () in
   let _, accepted, rejected =
     Cancel_handler.apply_trades_best_effort
-      ~on_reject:(fun t ~available_cash ->
+      ~on_reject:(fun t ~available_cash ~budgeted_cash:_ ->
         seen := !seen @ [ (t.Trading_base.Types.symbol, available_cash) ])
       portfolio
       [ _make_trade ~symbol:"MSFT" (); _make_trade ~symbol:"AAPL" () ]
@@ -450,9 +450,48 @@ let test_on_reject_sees_cash_at_the_refusal _ =
     (List.length accepted, List.length rejected, !seen)
     (equal_to (1, 1, [ ("AAPL", 999.0) ]))
 
+(* #3420 item 3: the budget [on_reject] reports is the one the portfolio's own
+   cash floor applies (cash + paper losses - commission), not gross cash. The
+   ADNT specimen shape: a book holding 6,000 with 1,000 of paper losses refuses
+   a Buy costing 4,999.01 although gross cash would cover it. The reported
+   budget (4,999) is pinned against [Portfolio.apply_single_trade] itself: a
+   fill priced one cent under the budget is accepted, one cent over is refused. *)
+let _marked_portfolio () =
+  let p = Trading_portfolio.Portfolio.create ~initial_cash:6_000.0 () in
+  { p with unrealized_pnl_per_position = [ ("HELD", -1_000.0) ] }
+
+let _one_share ~price : Trading_base.Types.trade =
+  {
+    (_make_trade ~symbol:"ADNT" ()) with
+    quantity = 1.0;
+    price;
+    commission = 1.0;
+  }
+
+let _accepts portfolio trade =
+  Result.is_ok (Trading_portfolio.Portfolio.apply_single_trade portfolio trade)
+
+let test_on_reject_reports_the_budget_the_floor_applies _ =
+  let portfolio = _marked_portfolio () in
+  let seen = ref [] in
+  let refused = _one_share ~price:4_999.01 in
+  let _ =
+    Cancel_handler.apply_trades_best_effort
+      ~on_reject:(fun _ ~available_cash ~budgeted_cash ->
+        seen := !seen @ [ (available_cash, budgeted_cash) ])
+      portfolio [ refused ]
+  in
+  assert_that
+    ( !seen,
+      _accepts portfolio (_one_share ~price:4_998.99),
+      _accepts portfolio refused )
+    (equal_to ([ (6_000.0, 5_000.0) ], true, false))
+
 let suite =
   "Cancel_handler"
   >::: [
+         "on_reject reports the budget the floor applies"
+         >:: test_on_reject_reports_the_budget_the_floor_applies;
          "on_reject sees cash at the refusal"
          >:: test_on_reject_sees_cash_at_the_refusal;
          "transitions_for_rejected_trades emits one transition per matched \
