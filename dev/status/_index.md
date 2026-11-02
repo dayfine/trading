@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-11-02 (orchestrator run 1 — see `dev/daily/2026-11-02.md`). Queue at start: 4; merged #3507, #3510, #3508; #3500 drafted at rework cap.
-11-02: merged #3499, #3501, #3502, #3503, #3504, #3507, #3508, #3510. 11-01: merged #3483, #3485, #3494, #3495, #3497. 10-31: merged #3490, #3493. 10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
+Last updated: 2026-11-02 (orchestrator run 2 — see `dev/daily/2026-11-02-run2.md`). Queue at start: 0; #3500 merged by hand; opened #3512 (#3505), all gates green, held for human (core module).
+11-02: merged #3499, #3500, #3501, #3502, #3503, #3504, #3507, #3508, #3510. 11-01: merged #3483, #3485, #3494, #3495, #3497. 10-31: merged #3490, #3493. 10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -107,7 +107,7 @@ immune (#2605).
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2984 live stop-sync MERGED #3121 (10-04); trades-stream wiring pinned #3497; PIT LOCAL; next #2839 |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1/v2 MERGED; twin-detector direct-match + hub guard MERGED #2862 (default-off); alias sidecar is armed-pass only (#2870); next: arm the guards on a PIT rebuild |
-| [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | #3500 (draft) | #3500 (#3420 V12/V13) at rework cap: add a load_audit test of `_gate_stop_distance_pct`, re-QC (human decides) |
+| [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | #3500 merged (#3420 V12/V13); remaining: #3420 [after-merge] verify items |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | #2899 flag-pin + #2896 PIT-smoke cell shipped (09-22); 10-29 weekly review: re-check two SLOWER 10y cap256 shapes on a quiet host |
@@ -137,7 +137,7 @@ immune (#2605).
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | Seeded default MERGED #3425; K-seed record band #3467; 5 stale state tokens fixed 11-01; next: top-of-funnel screen (LOCAL) |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | #3477 resumable backtests PRs 0–4 MERGED (#3479 #3482 #3483 #3485 #3486); next: PRs 5–6 + `--resume` byte-identity test (LOCAL) |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #3512 | #3512 (#3505 stop epsilon) gates green, human merge (engine change); #3477 PRs 6–7 (LOCAL) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | MERGED | feat-backtest | — | Closed 2026-10-04: Gaps A-F shipped; ledger in active use (70 entries); no code successor |
