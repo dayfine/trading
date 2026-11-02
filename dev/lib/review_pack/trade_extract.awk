@@ -89,7 +89,7 @@ function hard_stop(o, l, h, lvl,   p) {
   f = a / c; o = $co * f; h = $ch * f; l = $cl * f
   day = sprintf("%s\t%s\t%.4f\t%.4f\t%.4f\t%.4f", pid, d, o, h, l, a)
   # last bar on/before entry & exit
-  if (d <= ed) { ewk = week_of(d); fe = f; ae = a; pre_c = prev_c; ebar = d; el = $cl + 0; eh = $ch + 0
+  if (d <= ed) { ewk = week_of(d); fe = f; ae = a; pre_c = prev_c; ebar = d; el = $cl + 0; eh = $ch + 0; eo = $co + 0
                  ring[nr % PRE_BARS] = day; nr++ }
   if (d <= xd) { fx = f; ax = a; xbar = d; xl = $cl + 0; xh = $ch + 0 }
   if (d == ed) on_e = 1
@@ -142,6 +142,10 @@ END {
   ein = on_e ? in_range(ep, el, eh, fe) : 0
   xin = on_x ? in_range(xp, xl, xh, fx) : 0; xsnap = (xin == 2) ? SNAP : 1
   if (esnap == "") esnap = 1
+  # fill vs the entry bar's own raw open (#3424): a buy-stop that triggers inside the bar fills at or above the
+  # open, so a fill well below it was filled from above; null without an open or when the entry date has no bar
+  # of its own (on_e 0: a Saturday-dated fill compares against another bar's open)
+  fbo = (on_e && eo > 0 && ep > 0) ? sprintf("%.4f", ep / esnap / eo - 1) : "null"
   gapup = (pre_c > 0) ? sd * (ep / esnap / pre_c - 1) * 100 : 0
   # bars from the first initial-stop breach to the exit bar (0: the exit day; -1: never breached)
   blag = (breach == "") ? -1 : xidx - bidx
@@ -158,8 +162,9 @@ END {
   xpast = (xd > lastd || (!on_x && nxt > year_on(xbar))) ? 1 : 0
   # pid fe fx mfe mae post_max post_min post13 grade on_e on_x in_e in_x entry_vs_prevclose ebar xbar post_bars
   #   fwd40 breach_lag hardstop_cf entry_adj exit_adj isd fill_week_vol_ratio exit_past_last_bar
+  #   fill_vs_bar_open (field 26, entry fill / the entry bar's raw open - 1)
   #   (entry/exit_adj: fills on the chart's adjusted basis)
-  printf "%s\t%.6f\t%.6f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%s\t%d\t%d\t%d\t%d\t%.2f\t%s\t%s\t%d\t%s\t%d\t%s\t%.4f\t%.4f\t%s\t%s\t%d\n", \
+  printf "%s\t%.6f\t%.6f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%s\t%d\t%d\t%d\t%d\t%.2f\t%s\t%s\t%d\t%s\t%d\t%s\t%.4f\t%.4f\t%s\t%s\t%d\t%s\n", \
     pid, fe, fx, mfe * 100, mae * 100, ma, mn, a13, g, on_e, on_x, ein, xin, gapup, ebar, xbar, k, \
-    (f40 == "" ? "null" : sprintf("%.2f", f40)), blag, cfs, ep / esnap * fe, xp / xsnap * fx, isd, fvr, xpast >> out_tr
+    (f40 == "" ? "null" : sprintf("%.2f", f40)), blag, cfs, ep / esnap * fe, xp / xsnap * fx, isd, fvr, xpast, fbo >> out_tr
 }

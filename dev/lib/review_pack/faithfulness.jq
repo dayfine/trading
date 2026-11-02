@@ -17,6 +17,8 @@ def rules: [
   {id:13, name:"No Stage-4 hold", weight:2, section:"1", evidence:"s4w and holdW from weekly stage replay; any observed Stage-4 week fails."}
 ];
 def num: type == "number";
+# an entry fill more than 0.5 % under its own bar's open was filled from above (#3424)
+def from_above_tol: 0.005;
 # check ids read as n/a for every trade (--argjson drop [..]); none by default
 def dropped: $ARGS.named.drop // [];
 def status($x): if $x == null then "n/a" elif $x then "pass" else "fail" end;
@@ -61,9 +63,13 @@ def row:
      detectors: {
        healthy: (if .side != "LONG" then null elif .trig == "stop_loss" then false
                  elif (.rsX | known_stage) and .rsX != "Stage2" then false else null end),
-       above: (if .side != "LONG" or (.fvt | num | not) then null
+       above: (if .side != "LONG" then null
+               elif (.fbo | num) and .fbo < -from_above_tol then true
+               elif (.fvt | num | not) then null
                elif .faithful == false and .fvt > 0 then true
-               elif .fvt < 0 then false else null end),
+               elif .fvt < 0 then false
+               elif (.fbo | num) and .fbo >= 0 and .faithful == true then false
+               else null end),
        history: null}};
 [.[] | row] as $rows
 | {available:true, excluded:dropped, rules:rules, total_weight:(rules | map(.weight) | add), rows:$rows,

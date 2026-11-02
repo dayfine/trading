@@ -383,6 +383,34 @@ console.log($1)"; }
 else
   echo "SKIP: review_pack open-position page cases need node"
 fi
+# #3424 fill-vs-bar-open: field 26 `fbo` = entry fill / the entry bar's raw open - 1. SDA 2023-07-12 (the committed
+# specimen): the bar opens 14.15 and the long fills at 11.79 (-16.68 %), far under the open a triggering buy-stop
+# cannot fill below -> "filled from above" with no trade audit at all. SDB fills inside 0.5 % of its open.
+FBO="$TMP/fbo"; mkdir -p "$FBO/run" "$FBO/data/S/A/SDA" "$FBO/data/S/B/SDB" "$FBO/data/S/C/SDC"; cp "$FIX"/run/* "$FBO/run/"
+mkdir -p "$FBO/data/S/Y"; cp -R "$FIX/data/S/Y/SPY" "$FBO/data/S/Y/"
+printf '%s\n' 'date,open,high,low,close,adjusted_close,volume,active_through' \
+  '2023-07-11,21.00,22.00,20.50,21.97,21.97,1000000,' \
+  '2023-07-12,14.15,14.50,11.55,11.90,11.90,1000000,' \
+  '2023-07-13,11.90,11.95,10.30,10.44,10.44,1000000,' > "$FBO/data/S/A/SDA/data.csv"
+printf '%s\n' 'date,open,high,low,close,adjusted_close,volume,active_through' \
+  '2023-07-11,20.00,21.00,19.50,20.50,20.50,1000000,' \
+  '2023-07-12,20.00,21.50,19.90,21.00,21.00,1000000,' \
+  '2023-07-13,21.00,21.20,20.50,20.80,20.80,1000000,' > "$FBO/data/S/B/SDB/data.csv"
+printf '%s\n' 'date,open,high,low,close,adjusted_close,volume,active_through' \
+  '2023-07-13,14.15,14.50,11.55,11.90,11.90,1000000,' \
+  '2023-07-14,14.15,14.50,11.55,11.90,11.90,1000000,' \
+  '2023-07-17,11.90,12.00,11.50,11.80,11.80,1000000,' > "$FBO/data/S/C/SDC/data.csv"
+{ head -1 "$FIX/run/trades.csv"
+  echo "SDC,LONG,2023-07-15,2023-07-17,2,11.79,11.80,1000,10.00,0.08,10.50,10.50,laggard_rotation,Stage2,2.5000,0.1000,non_stop_exit,,100,SDC-wein-1,,,0"
+  echo "SDA,LONG,2023-07-12,2023-07-13,1,11.79,10.44,1000,-1350.00,-11.45,10.50,10.50,stop_loss,Stage2,2.5000,0.1000,intraday,1,100,SDA-wein-1,,,0"
+  echo "SDB,LONG,2023-07-12,2023-07-13,1,20.05,20.80,1000,750.00,3.74,19.00,19.00,laggard_rotation,Stage2,2.5000,0.0500,non_stop_exit,,100,SDB-wein-1,,,0"; } > "$FBO/run/trades.csv"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FBO/data" --out "$FBO/pack" r0="$FBO/run/" >"$FBO/log" 2>&1 || rc=$?
+expect_eq "#3424 fbo: builds, exit 0" 0 "$rc"
+FBOT="$FBO/pack/site/data/r0_trades.json"
+expect_eq "#3424 fbo: field 26 is fill / bar open - 1 (SDA -0.1668, SDB +0.0025)" "-0.1668 0.0025" "$(jq -r '[.[]|select(.sym=="SDA" or .sym=="SDB")|.fbo]|map(tostring)|join(" ")' "$FBOT")"
+expect_eq "#3424 fbo: a Saturday-dated entry (no bar of its own; the prior bar opens at 14.15) reads null, not another bar's open" "null 0" "$(jq -r '.[]|select(.sym=="SDC")|"\(.fbo) \(.onE)"' "$FBOT")"
+expect_eq "#3424 fbo: SDA reads filled from above, SDB (inside the 0.5 % tolerance, no audit) stays unknown" "true null" "$(jq -r '[.rows[]|select(.sym=="SDA" or .sym=="SDB")|.detectors.above]|map(tostring)|join(" ")' "$FBO/pack/site/data/r0_faithfulness.json")"
 # Short trades read side-aware (#3149). A run of three SHORT rows over the long fixtures' bars:
 #   AAA short 100 -> covered 110 (stop_loss): the HIGH first reaches the 105 entry_stop on the exit bar
 #       (lag 0; the long reading had the low under 105 on day 1); filled 4.8 % above the stop (gapstop);
@@ -1370,11 +1398,12 @@ sh "$FH" "$FF/weighted-input.json" > "$FF/weighted.json"
 expect_eq "#3140 faithfulness: weights, missing denominator and all-unknown grade" '18 9 11 B n/a' "$(jq -r '[.total_weight,.rows[0].earned,.rows[0].possible,.rows[0].grade,.rows[1].grade] | join(" ")' "$FF/weighted.json")"
 expect_eq "#3140 faithfulness: score uses weighted evidence" true "$(jq '.rows[0].score > 81.818 and .rows[0].score < 81.819' "$FF/weighted.json")"
 expect_eq "#3140 faithfulness: short rubric has no scored weight" '0 n/a' "$(jq -r '.rows[] | select(.id == "SHORT") | "\(.possible) \(.grade)"' "$FF/detectors.json")"
-expect_eq "#3140 faithfulness: above-limit proof excludes Market and missing execution" 'true n/a false n/a' "$(jq -r '[.rows[:4][].detectors.above | if . == null then "n/a" else tostring end] | join(" ")' "$FF/detectors.json")"
+expect_eq "#3140 faithfulness: above-limit proof excludes Market and missing execution; a fill far under its bar's open (SDA, fbo) proves it alone" 'true n/a false true' "$(jq -r '[.rows[:4][].detectors.above | if . == null then "n/a" else tostring end] | join(" ")' "$FF/detectors.json")"
 # fvt is rounded to percentage hundredths in the audit markdown: zero does not
 # rule out a small positive breach. No designed limit may be inferred from it.
 echo '[{"side":"LONG","fvt":0,"faithful":false},{"side":"LONG","fvt":0,"faithful":true}]' > "$FF/rounded.json"
 expect_eq "#3140 faithfulness: rounded zero cannot rule out an upper-limit breach" 'null null' "$(sh "$FH" "$FF/rounded.json" | jq -r '[.rows[].detectors.above | tostring] | join(" ")')"
+expect_eq "#3424 faithfulness: a faithful fill at/above the open is false, 0-0.5% under it stays unknown" 'false n/a' "$(jq -r '[.rows[5:7][].detectors.above | if . == null then "n/a" else tostring end] | join(" ")' "$FF/detectors.json")"
 expect_eq "#3140 faithfulness: healthy sale cannot be proved without slope" 'n/a false false n/a' "$(jq -r '[.rows[:4][].detectors.healthy | if . == null then "n/a" else tostring end] | join(" ")' "$FF/detectors.json")"
 expect_eq "#3140 faithfulness: SDA date is not proof of short history" 'SDA 2023-07-12 n/a' "$(jq -r '.rows[] | select(.id == "SDA") | "\(.sym) \(.ed) \(.checks[] | select(.id == 2) | .status)"' "$FF/detectors.json")"
 if command -v node >/dev/null 2>&1; then
@@ -1384,8 +1413,8 @@ if command -v node >/dev/null 2>&1; then
     sed -n -e '/^function faithfulnessDetectors(/,/^}/p' -e '/^function faithfulnessSignals(/,/^}/p' -e '/^function faithfulnessTables(/,/^}/p' -e '/^function faithfulnessExcludedNote(/,/^}/p' -e '/^function renderFaithfulness(/,/^}/p' -e '/^function initFaithfulness(/,/^}/p' "$S/index.html"
     cat <<'JS'
 const fmt=(v,d=1)=>Number(v).toFixed(d), a=JSON.parse(fs.readFileSync(process.argv[2])), b=JSON.parse(fs.readFileSync(process.argv[3]));
-const d=faithfulnessDetectors(a); assert.deepStrictEqual(d.volume,{known:3,total:5,bins:[1,1,1]});
-assert.deepStrictEqual(d.above,{hits:1,known:2,total:5}); assert.strictEqual(d.healthy.hits,0); assert.strictEqual(d.history.known,0);
+const d=faithfulnessDetectors(a); assert.deepStrictEqual(d.volume,{known:3,total:7,bins:[1,1,1]});
+assert.deepStrictEqual(d.above,{hits:2,known:4,total:7}); assert.strictEqual(d.healthy.hits,0); assert.strictEqual(d.history.known,0);
 const sig=faithfulnessSignals(a).join(' '); assert(sig.includes('2 of 3')); assert(sig.includes('Filled from above')); assert(!sig.includes('Sold a healthy')); assert(!sig.includes('SPAC'));
 assert.deepStrictEqual(faithfulnessSignals(null),[]); assert(faithfulnessTables(null).checks.includes('n/a'));
 const t=faithfulnessTables(a); assert(t.detectors.includes('&lt;1×: 1')); assert(t.trades.includes('SDA')); assert(t.trades.includes('2023-07-12')); assert(t.detectors.includes('n/a — history'));
