@@ -526,8 +526,7 @@ let test_no_force_liq_record_for_stop_closed_position _ =
   state.stop_states :=
     Map.set !(state.stop_states) ~key:symbol
       ~data:
-        (Weinstein_stops.Initial
-           { stop_level = 6.31; reference_level = 6.5 });
+        (Weinstein_stops.Initial { stop_level = 6.31; reference_level = 6.5 });
   let config =
     Weinstein_strategy.default_config ~universe:[] ~index_symbol:_index_symbol
   in
@@ -562,8 +561,8 @@ let test_no_force_liq_record_for_stop_closed_position _ =
                      (matching ~msg:"Expected StopLoss TriggerExit"
                         (function
                           | Trading_strategy.Position.TriggerExit
-                              { exit_reason = StopLoss _; exit_price } ->
-                              Some exit_price
+                              { exit_reason = StopLoss { stop_price; _ }; _ } ->
+                              Some stop_price
                           | _ -> None)
                         (float_equal 6.31));
                  ];
