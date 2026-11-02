@@ -143,8 +143,8 @@ let _stop_info_for ~position_id ~symbol (pre : precomputed) :
 (* E-basis distance: measured against the screener's [suggested_entry], NOT the
    fill. In arms whose fill diverges from E (market-at-close vs a chased E) this
    overstates stop depth vs cost — see the 2026-08-07 confound resolution
-   (fill-model findings §4 RESOLVED). Kept for backwards-compat; gate-basis
-   analysis should read [stop_fill_distance_pct]. *)
+   (fill-model findings §4 RESOLVED). The nearest column to the
+   gate's own basis, and the one V12 mirrors. *)
 let _stop_initial_distance_pct (entry : Trade_audit.entry_decision) =
   if Float.( <= ) entry.suggested_entry 0.0 then None
   else
@@ -152,10 +152,6 @@ let _stop_initial_distance_pct (entry : Trade_audit.entry_decision) =
       (Float.abs (entry.suggested_entry -. entry.installed_stop)
       /. entry.suggested_entry)
 
-(* Fill-basis distance: |installed_stop - fill| / fill, the exact quantity the
-   strategy's [Stop_too_wide] gate bounds (measured vs [effective_entry] at
-   decision time) and the basis the V12 validator checks. [fill] is the round
-   trip's realized entry price. *)
 (* #3420: [fill] is on the restated (exit-side) split basis, but the audit's
    [installed_stop] is the decision-time level, so a split between decision and
    fill (NVDA: stop 567.69 pre-split, fill 154.55 post-split, read 2.67 instead

@@ -267,6 +267,22 @@ let test_funded_fraction _ =
         } )
     (pair (float_equal ~epsilon:1e-4 0.95697) (float_equal 0.0))
 
+(* #3420 ADNT-wein-122 shape: 0.789 of the cost in gross cash, but only 0.45
+   once the book's paper losses are counted. [funded_fraction] reads the
+   budgeted figure, so it must report 0.45, not 0.789. *)
+let test_funded_fraction_reads_budgeted_not_gross _ =
+  assert_that
+    (R.funded_fraction
+       {
+         position_id = "p";
+         symbol = "ADNT";
+         date = _date "2024-01-03";
+         required = 10_000.0;
+         available = 7_891.0;
+         budgeted = 4_500.0;
+       })
+    (float_equal ~epsilon:1e-9 0.45)
+
 let suite =
   "entry_cash_rejection"
   >::: [
@@ -275,6 +291,8 @@ let suite =
          "funded ticket not recorded" >:: test_funded_ticket_not_recorded;
          "pending maps cancels to notes" >:: test_pending_maps_cancels_to_notes;
          "funded fraction" >:: test_funded_fraction;
+         "funded fraction reads budgeted not gross"
+         >:: test_funded_fraction_reads_budgeted_not_gross;
        ]
 
 let () = run_test_tt_main suite

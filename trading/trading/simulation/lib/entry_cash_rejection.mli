@@ -19,8 +19,10 @@
     is the same notional cost, while the portfolio refuses a short on its
     collateral rule, so read short rows as "the size of the ticket", not the
     size of the shortfall. The floor also charges the book's unrealized-loss
-    drag, so a long can be refused with [available >= required] (see
-    {!funded_fraction}).
+    drag, so a long can be refused with [available >= required]; [budgeted] is
+    net of that drag, so {!funded_fraction} (which reads [budgeted]) shows such
+    a long as under-funded. [budgeted] is the cash-account floor's figure: under
+    [initial_long_margin_req < 1.0] a margin-funded shortfall is not reflected.
 
     {b What is recorded.} Only refusals that end in a [CancelEntry]. A refusal
     the retry re-offers or the resize refills is not a cancellation and is not
@@ -49,8 +51,11 @@ type t = {
 
 val funded_fraction : t -> float
 (** [budgeted /. required], or [0.0] when [required <= 0.0]: how close the
-    ticket came to being fundable (ADMA: 0.957). Above 1 when the cash floor's
-    unrealized-loss drag, not the price, refused the fill. *)
+    ticket came to being fundable once the cash floor's paper-loss drag is
+    counted (ADMA with no drag: 0.957; ADNT-wein-122: gross 0.789 funded, under
+    0.5 budgeted). Below 1 for a long the floor refused. It can exceed 1 only
+    when something other than cash refused the fill, such as a short refused on
+    its collateral rule. *)
 
 type pending
 (** One step's refusals noted so far, by symbol, plus where to send the records.

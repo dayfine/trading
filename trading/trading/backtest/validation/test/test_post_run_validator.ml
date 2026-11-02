@@ -445,23 +445,76 @@ let test_v12_split_straddling_position_passes _ =
   in
   assert_that (result ~id:"V12" inputs) (violations_and_pass 0 true)
 
-(* #3420 KD 2023-09-11: the gate admitted 14.99 % from E; the stop-limit filled
-   0.1 % above E, which read 15.08 % from the fill. E-basis keeps it a pass,
-   while a stop genuinely wider than the gate from E still fails. *)
+(* #3420 KD 2023-09-11 shape: the gate admitted 14.996 % from E; a stop-limit
+   fill 1.9 % above E (17.65) reads 16.6 % from the fill. From E it passes, while
+   a stop genuinely wider than the gate from E (and with no nearer base) fails. *)
 let test_v12_measures_from_e_not_fill _ =
   let inputs =
     {
       (Vt.empty_inputs ()) with
       trades =
         [
-          trade ~symbol:"KD" ~entry_date:"2023-09-11" ~entry_price:17.32 ();
+          trade ~symbol:"KD" ~entry_date:"2023-09-11" ~entry_price:17.65 ();
           trade ~symbol:"WIDE" ~entry_date:"2023-09-11" ~entry_price:100.0 ();
         ];
       audit =
         audit_of
           [
-            ("KD", ctx ~installed_stop:14.7227 ~suggested_entry:17.319 ());
+            ("KD", ctx ~installed_stop:14.72 ~suggested_entry:17.319 ());
             ("WIDE", ctx ~installed_stop:80.0 ~suggested_entry:100.0 ());
+          ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 1 false)
+
+(* A close-anchored run (the default config): the gate measured from the
+   decision close 100, not from E = 102. A stop at 85.5 is 14.5 % from the close
+   (admitted) but 16.2 % from E; it must not fail. A stop at 80 is wider than the
+   gate from both bases and fails. *)
+let test_v12_close_anchored_run_not_failed_from_e _ =
+  let with_close c =
+    {
+      c with
+      Vt.decision_bar =
+        { Vt.no_decision_bar with close_at_decision = Some 100.0 };
+    }
+  in
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"ADMIT" ~entry_date:"2023-09-11" ~entry_price:102.0 ();
+          trade ~symbol:"WIDE" ~entry_date:"2023-09-11" ~entry_price:102.0 ();
+        ];
+      audit =
+        audit_of
+          [
+            ( "ADMIT",
+              with_close (ctx ~installed_stop:85.5 ~suggested_entry:102.0 ()) );
+            ( "WIDE",
+              with_close (ctx ~installed_stop:80.0 ~suggested_entry:102.0 ()) );
+          ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 1 false)
+
+(* Legacy audit with no E and no decision close: V12 falls back to the fill. A
+   stop at 50 against a fill of 100 fails; a stop at 90 passes. *)
+let test_v12_legacy_audit_falls_back_to_fill _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"WIDE" ~entry_date:"2020-01-03" ~entry_price:100.0 ();
+          trade ~symbol:"OK" ~entry_date:"2020-02-07" ~entry_price:100.0 ();
+        ];
+      audit =
+        audit_of
+          [
+            ("WIDE", ctx ~installed_stop:50.0 ~suggested_entry:0.0 ());
+            ("OK", ctx ~installed_stop:90.0 ~suggested_entry:0.0 ());
           ];
     }
   in
@@ -1342,6 +1395,10 @@ let suite =
          "v12_split_straddling_position_passes"
          >:: test_v12_split_straddling_position_passes;
          "v12_measures_from_e_not_fill" >:: test_v12_measures_from_e_not_fill;
+         "v12_close_anchored_run_not_failed_from_e"
+         >:: test_v12_close_anchored_run_not_failed_from_e;
+         "v12_legacy_audit_falls_back_to_fill"
+         >:: test_v12_legacy_audit_falls_back_to_fill;
          "v13_waives_delisting_exit_one_session_after_last_bar"
          >:: test_v13_waives_delisting_exit_one_session_after_last_bar;
          "v13_still_flags_other_no_bar_fills"
