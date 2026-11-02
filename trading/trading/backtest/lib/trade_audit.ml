@@ -283,27 +283,18 @@ let audit_records_of_sexp (sexp : Sexp.t) : audit_record list =
 let sexp_of_audit_blob : audit_blob -> Sexp.t = [%sexp_of: audit_blob]
 let audit_blob_of_sexp : Sexp.t -> audit_blob = [%of_sexp: audit_blob]
 
-(* Checkpoint ------------------------------------------------------------- *)
+(* (buckets sorted by position id, cascade summaries in insertion order) *)
+type snapshot = (string * _bucket) list * cascade_summary list [@@deriving sexp]
 
-type snapshot = { buckets : _bucket list; queue : cascade_summary list }
-[@@deriving sexp]
-
-(* Buckets are mutable: copy each so a snapshot shares nothing live. *)
-let _copy_bucket b = { b with bucket_stop_decisions = b.bucket_stop_decisions }
+(* Buckets are mutable: copy so a snapshot shares nothing live. *)
+let _copy b = { b with bucket_stop_decisions = b.bucket_stop_decisions }
 
 let capture t : snapshot =
-  let buckets =
-    Hashtbl.data t.records
-    |> List.sort ~compare:(fun a b ->
-        String.compare a.bucket_entry.position_id b.bucket_entry.position_id)
-    |> List.map ~f:_copy_bucket
-  in
-  { buckets; queue = Queue.to_list t.cascade_summaries }
+  let by_key (a, _) (b, _) = String.compare a b in
+  let buckets = Hashtbl.to_alist t.records |> List.sort ~compare:by_key in
+  (List.Assoc.map buckets ~f:_copy, Queue.to_list t.cascade_summaries)
 
-let restore (s : snapshot) =
-  let t = create () in
-  List.iter s.buckets ~f:(fun b ->
-      Hashtbl.set t.records ~key:b.bucket_entry.position_id
-        ~data:(_copy_bucket b));
-  List.iter s.queue ~f:(Queue.enqueue t.cascade_summaries);
-  t
+let restore ((buckets, queue) : snapshot) =
+  let records = Hashtbl.of_alist_exn (module String) buckets in
+  Hashtbl.map_inplace records ~f:_copy;
+  { records; cascade_summaries = Queue.of_list queue }

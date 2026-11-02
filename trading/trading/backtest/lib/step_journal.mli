@@ -1,10 +1,10 @@
 (** Append-only journal of simulator steps, one sexp per line.
 
     A resumable backtest keeps its [step_result]s outside the checkpoint, so a
-    checkpoint stays small. The contract: {b append the steps before writing
-    the checkpoint that counts them}. A crash between the two leaves extra
-    lines past the checkpoint's step count, which {!read} ignores and
-    {!truncate} drops. (#3477 PR 5.) *)
+    checkpoint stays small. The contract:
+    {b append the steps before writing the checkpoint that counts them}. A crash
+    between the two leaves extra lines past the checkpoint's step count, which
+    {!read} ignores and {!truncate} drops. (#3477 PR 5.) *)
 
 type step_result = Trading_simulation_types.Simulator_types.step_result
 
