@@ -108,7 +108,11 @@ val apply_to_positions :
 
 val apply_trades_best_effort :
   ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
-  ?on_reject:(Trading_base.Types.trade -> available_cash:float -> unit) ->
+  ?on_reject:
+    (Trading_base.Types.trade ->
+    available_cash:float ->
+    budgeted_cash:float ->
+    unit) ->
   ?initial_long_margin_req:float ->
   Trading_portfolio.Portfolio.t ->
   Trading_base.Types.trade list ->

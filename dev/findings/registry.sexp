@@ -354,6 +354,39 @@
  (guard ((validator V6)))
  (status fixed))
 
+((issue 3420) (ref "V12 and stop_fill_distance_pct mixed split bases (NVDA-wein-240, AAON-wein-307)")
+ (finding "V12 compared a decision-time stop with a restated post-split fill, and stop_fill_distance_pct did the same; V12 now reads the gate's own decision-time distance from the audit, the column uses the split-restated stop-log level")
+ (guard ((unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
+                "v12_split_straddling_position_passes"))
+         (unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
+                "v12_measures_from_e_not_fill"))
+         (unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
+                "v12_reads_the_gates_own_distance"))
+         (unit ("trading/trading/backtest/validation/test/test_validator_stop_macro_checks.ml"
+                "load_audit projects gate stop distance"))
+         (unit ("trading/trading/backtest/test/test_trade_context.ml"
+                "fill distance uses split-restated stop (#3420)"))
+         (unit ("trading/trading/backtest/test/test_trade_context.ml"
+                "fill distance uses machine stop at fill (#3420)"))))
+ (status fixed))
+
+((issue 3420) (ref "V13 counted delisting exits as no-bar fills; cent-rounded fills flagged")
+ (finding "V13 had no waiver for a delisted exit dated one session after the last bar (MIME-wein-200, LACO-wein-168) and no cent-rounding tolerance")
+ (guard ((unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
+                "v13_waives_delisting_exit_one_session_after_last_bar"))
+         (unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
+                "v13_still_flags_other_no_bar_fills"))
+         (unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
+                "v13_tolerates_cent_rounded_fill"))))
+ (status fixed))
+
+((issue 3420) (ref "cash rejection available was gross cash (ADNT-wein-122)")
+ (finding "the cash-rejection record carried current_cash while the refusing check budgets cash plus paper losses; it now also records budgeted")
+ (guard ((unit ("trading/trading/simulation/test/test_cancel_handler.ml"
+                "on_reject reports the budget the floor applies"))))
+ (status fixed))
+
+
 ((issue 3424)
  (finding "force-liquidation recorded a phantom event for a position already closed by its stop the same bar (SIRI 2023-07-25: stop 6.31, close 5.13); the review pack's Filled-from-above detector read null for fills far under the bar's open (SDA 2023-07-12)")
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_force_liquidation_runner.ml"

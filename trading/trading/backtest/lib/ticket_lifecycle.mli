@@ -163,7 +163,10 @@ type cash_rejection = {
       (** The refused fill's cost, [quantity * price + commission]. For a short,
           the ticket's notional (a short is refused on collateral). *)
   available : float;
-      (** The portfolio's cash at the moment the fill was refused. *)
+      (** The portfolio's {b gross} cash at the moment the fill was refused. *)
+  budgeted : float; [@sexp.default 0.0]
+      (** The ceiling on the fill's cost the cash floor applied: cash plus paper
+          losses (#3420). [0.0] on audits written before the field existed. *)
 }
 [@@deriving sexp]
 (** What the book could not fund when a triggered entry was refused at the fill
@@ -172,8 +175,8 @@ type cash_rejection = {
 
 val cash_rejection_of :
   Trading_simulation.Entry_cash_rejection.t -> cash_rejection
-(** The on-disk projection of a simulator record: its [required] and
-    [available]; the position id and date are the row's own. *)
+(** The on-disk projection of a simulator record: its [required], [available]
+    and [budgeted]; the position id and date are the row's own. *)
 
 type t = {
   placement_date : Date.t;

@@ -19,9 +19,17 @@ val check_v8 : inputs -> Validator_step.finding
 
 val check_v12 : inputs -> Validator_step.finding
 (** V12 (INV): every filled entry's installed stop sits within
-    [config.gate_max_stop_distance_pct] of its fill price — i.e. the
-    [Stop_too_wide] gate that should have rejected a wider stop actually fired.
-    Skips rows with no audit join or no captured [installed_stop]. *)
+    [config.gate_max_stop_distance_pct], measured from the gate's own quantity:
+    the audit's [initial_risk_dollars / initial_position_value], which equals
+    the [Stop_too_wide] gate's [stop_distance_pct] on both E-anchored and
+    close-anchored runs (shares cancel; decision-time, so split-safe; #3420).
+    Fallback, only for audits lacking those fields: the stop is measured from
+    the screener's [E] and the decision-bar close, and V12 fails only when it is
+    wider than the gate from {b every} available base (never flags a stop the
+    gate admitted, but can pass one it rejected); a legacy audit with neither
+    base falls back to the fill. I.e. the [Stop_too_wide] gate that should have
+    rejected a wider stop actually fired. Skips rows with no audit join or no
+    captured [installed_stop]. *)
 
 val check_v11 : inputs -> Validator_step.finding
 (** V11 (EXP): [stop_initial_distance_pct] within the configured bounds. *)

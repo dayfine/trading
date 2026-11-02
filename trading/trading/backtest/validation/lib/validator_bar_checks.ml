@@ -137,10 +137,16 @@ let _v13_range_detail ~leg ~price (bar : daily_bar) =
   sprintf "%s_price=%.4f outside %s bar [%.4f, %.4f]" leg price
     (Date.to_string bar.date) bar.low bar.high
 
+(* Fills are rounded to the cent, so a fill can sit up to half a cent outside a
+   bar whose high/low carry more decimals (KD 2023-09-11 filled at 17.32 against
+   a high of 17.319; AXIA 2021-05-24 at 9.96 against a low of 9.9638, #3420).
+   The slack is absolute, on top of the relative [fill_price_epsilon_pct]. *)
+let _cent_rounding_slack = 0.005
+
 let _v13_in_range (c : check_config) ~price (bar : daily_bar) =
   let eps = c.fill_price_epsilon_pct in
-  Float.( >= ) price (bar.low *. (1.0 -. eps))
-  && Float.( <= ) price (bar.high *. (1.0 +. eps))
+  Float.( >= ) price ((bar.low *. (1.0 -. eps)) -. _cent_rounding_slack)
+  && Float.( <= ) price ((bar.high *. (1.0 +. eps)) +. _cent_rounding_slack)
 
 (* Per-leg outcome. [Leg_waived] is un-evaluable rather than clean: the price
    leg is only meaningful when the stored bar shares the run's price basis, and
@@ -149,8 +155,25 @@ let _v13_in_range (c : check_config) ~price (bar : daily_bar) =
    never suppresses a missing-bar violation. *)
 type _leg_outcome = Leg_clean | Leg_waived | Leg_violation of string
 
-let _v13_leg (c : check_config) (b : bars) ~leg ~date ~price =
+(* A delisted symbol's forced exit is dated the session after its last bar, a
+   day on which it has no bar by construction (MIME-wein-200: last bar
+   2022-05-19, exit 2022-05-20; LACO-wein-168: 2020-10-08 -> 2020-10-09, #3420).
+   That one leg is clean. Any other exit trigger, or a delisting dated further
+   out, still reads as a fill on a day with no bar. *)
+let _v13_is_delisting_session (b : bars) ~leg ~date ~(row : trade_row) =
+  String.equal leg "exit"
+  && String.equal row.exit_trigger "delisted"
+  &&
+  match nearest_daily_date b date with
+  | Some last ->
+      Date.( > ) date last
+      && Date.( <= ) date (Date.add_weekdays_rounding_backward last 1)
+      && Option.is_none (daily_on b date)
+  | None -> false
+
+let _v13_leg (c : check_config) (b : bars) ~row ~leg ~date ~price =
   match daily_on b date with
+  | None when _v13_is_delisting_session b ~leg ~date ~row -> Leg_clean
   | None -> Leg_violation (_v13_missing_detail b ~leg ~date)
   | Some bar when not (price_basis_ok ~bar_price:bar.close ~fill_price:price) ->
       Leg_waived
@@ -166,8 +189,8 @@ let _v13_any_waived legs =
 (* Entry leg first, so it supplies the specimen when both legs fail. *)
 let _v13_legs (c : check_config) (b : bars) (row : trade_row) =
   [
-    _v13_leg c b ~leg:"entry" ~date:row.entry_date ~price:row.entry_price;
-    _v13_leg c b ~leg:"exit" ~date:row.exit_date ~price:row.exit_price;
+    _v13_leg c b ~row ~leg:"entry" ~date:row.entry_date ~price:row.entry_price;
+    _v13_leg c b ~row ~leg:"exit" ~date:row.exit_date ~price:row.exit_price;
   ]
 
 let _v13_verdict (c : check_config) (b : bars) (row : trade_row) =

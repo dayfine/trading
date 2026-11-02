@@ -52,9 +52,9 @@ let check_v11 inputs = fold_steps inputs.trades ~f:(_v11_step inputs.config)
    ([entry_audit_capture.ml]). So a filled trade wider than the gate is an
    invariant break: either the gate did not fire, or the captured
    [installed_stop] disagrees with the gated stop. The distance is measured
-   exactly as the gate measures it — against the FILL price
-   ([trade_row.entry_price] = the strategy's [effective_entry]), not the
-   screener's [suggested_entry].
+   exactly as the gate measures it (the audit gate distance), not against the
+   FILL price ([trade_row.entry_price], which can differ from the gate's
+   [effective_entry]) and not the screener's [suggested_entry].
 
    F3 exception (2026-08-10): under [config.stop_width_mode = Size_down] the
    strategy ADMITS a wider-than-gate structural stop and shrinks the share count
@@ -64,27 +64,72 @@ let check_v11 inputs = fold_steps inputs.trades ~f:(_v11_step inputs.config)
    cell's [stop_width_size_down_max_pct] or V12 reports a wall of false
    failures. Under the default [Drop_over_max] the invariant holds exactly as
    stated above. *)
-let _v12_dist ~(row : trade_row) ~(ctx : entry_context) =
-  Float.abs (ctx.installed_stop -. row.entry_price) /. row.entry_price
+(* Fallback bases, for audits that carry no gate distance (#3420); the
+   primary basis is the audit gate distance (_v12_pred). The gate
+   measures from its [effective_entry], which is [E] when the run
+   armed [sim_entry_trigger_at_suggested] and the decision-bar close otherwise
+   (the default). The audit does not say which, so the stop is measured from
+   each decision-time base the gate could have used, and V12 fails only when it
+   is wider than the gate from {b all} of them: then the gate cannot have
+   admitted it, whichever it used. [installed_stop], [E] and the decision close
+   share one split basis, so a split between decision and fill no longer
+   matters (NVDA 2021-05-24: 2.67 against the restated fill, 0.081 from [E]),
+   and neither does the up-to-2 % band a stop-limit fill lands above [E] (KD
+   2023-09-11). A legacy audit with neither base falls back to the fill. *)
+let _v12_bases ~(row : trade_row) ~(ctx : entry_context) =
+  let positive = List.filter ~f:(fun b -> Float.( > ) b 0.0) in
+  match
+    positive
+      (ctx.suggested_entry :: Option.to_list ctx.decision_bar.close_at_decision)
+  with
+  | [] -> positive [ row.entry_price ]
+  | bases -> bases
 
-let _v12_detail (c : check_config) ~dist ~(ctx : entry_context)
-    ~(row : trade_row) =
-  sprintf "installed_stop=%.4f vs fill=%.4f -> dist=%.4f > gate=%.4f"
-    ctx.installed_stop row.entry_price dist c.gate_max_stop_distance_pct
+let _v12_dist_from ~(ctx : entry_context) base =
+  Float.abs (ctx.installed_stop -. base) /. base
+
+(* The base with the smallest distance: the most favourable reading of the
+   gate's own measure. [None] when there is no usable base. *)
+let _v12_closest ~(row : trade_row) ~(ctx : entry_context) =
+  _v12_bases ~row ~ctx
+  |> List.map ~f:(fun b -> (_v12_dist_from ~ctx b, b))
+  |> List.min_elt ~compare:(fun (a, _) (b, _) -> Float.compare a b)
+
+let _v12_detail (c : check_config) ~dist ~base ~(ctx : entry_context) =
+  sprintf
+    "installed_stop=%.4f vs closest gate base=%.4f (E=%.4f) -> dist=%.4f > \
+     gate=%.4f"
+    ctx.installed_stop base ctx.suggested_entry dist
+    c.gate_max_stop_distance_pct
 
 (* Un-evaluable rows: legacy audits with no captured [installed_stop] ([0.0]
-   default) or a non-positive fill. *)
-let _v12_unevaluable ~(row : trade_row) ~(ctx : entry_context) =
-  Float.( <= ) ctx.installed_stop 0.0 || Float.( <= ) row.entry_price 0.0
+   default) or no positive base at all. *)
+let _v12_unevaluable ~(ctx : entry_context) =
+  Float.( <= ) ctx.installed_stop 0.0
+
+let _v12_gate_detail (c : check_config) ~dist ~(ctx : entry_context) =
+  sprintf
+    "installed_stop=%.4f -> the gate's own stop distance=%.4f > gate=%.4f \
+     (E=%.4f)"
+    ctx.installed_stop dist c.gate_max_stop_distance_pct ctx.suggested_entry
+
+(* Fallback when the audit carries no gate distance: the closest decision-time
+   base, which can only under-report (never flag a stop the gate admitted). *)
+let _v12_fallback_pred (c : check_config) (row : trade_row)
+    (ctx : entry_context) =
+  match _v12_closest ~row ~ctx with
+  | None -> Skip
+  | Some (dist, base) when Float.( > ) dist c.gate_max_stop_distance_pct ->
+      Fail (spec row (_v12_detail c ~dist ~base ~ctx))
+  | Some _ -> Pass
 
 let _v12_pred (c : check_config) (row : trade_row) (ctx : entry_context) =
-  (* The unevaluable guard is checked first, so the divide-by-zero [dist] of a
-     non-positive fill (inf/nan) never reaches a verdict. *)
-  match _v12_dist ~row ~ctx with
-  | _ when _v12_unevaluable ~row ~ctx -> Skip
-  | dist when Float.( > ) dist c.gate_max_stop_distance_pct ->
-      Fail (spec row (_v12_detail c ~dist ~ctx ~row))
-  | _ -> Pass
+  match ctx.gate_stop_distance_pct with
+  | _ when _v12_unevaluable ~ctx -> Skip
+  | Some dist when Float.( > ) dist c.gate_max_stop_distance_pct ->
+      Fail (spec row (_v12_gate_detail c ~dist ~ctx))
+  | Some _ -> Pass
+  | None -> _v12_fallback_pred c row ctx
 
 let check_v12 inputs =
   fold_steps inputs.trades

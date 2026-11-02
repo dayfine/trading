@@ -38,6 +38,7 @@ let ctx ?(close_at_decision = None) ?(adjusted_close_at_decision = None)
     installed_stop = 90.0;
     screener_proxy_stop = None;
     suggested_entry = 100.0;
+    gate_stop_distance_pct = None;
     decision_bar = { close_at_decision; adjusted_close_at_decision; ma_value };
   }
 

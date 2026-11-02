@@ -7,16 +7,18 @@ type t = {
   date : Date.t;
   required : float;
   available : float;
+  budgeted : float;
 }
 [@@deriving show, eq]
 
 let funded_fraction t =
-  if Float.(t.required <= 0.0) then 0.0 else t.available /. t.required
+  if Float.(t.required <= 0.0) then 0.0 else t.budgeted /. t.required
 
 type pending = {
   date : Date.t;
   emit : (t -> unit) option;
-  noted : (float * float) String.Table.t; (* symbol -> (required, available) *)
+  noted : (float * float * float) String.Table.t;
+      (* symbol -> (required, available, budgeted) *)
 }
 
 let pending ~date ~emit = { date; emit; noted = String.Table.create () }
@@ -24,25 +26,30 @@ let pending ~date ~emit = { date; emit; noted = String.Table.create () }
 let _cost (trade : Trading_base.Types.trade) =
   (trade.quantity *. trade.price) +. trade.commission
 
-let note p (trade : Trading_base.Types.trade) ~available_cash =
+let note p (trade : Trading_base.Types.trade) ~available_cash ~budgeted_cash =
   if Option.is_some p.emit then
     ignore
-      (Hashtbl.add p.noted ~key:trade.symbol ~data:(_cost trade, available_cash)
+      (Hashtbl.add p.noted ~key:trade.symbol
+         ~data:(_cost trade, available_cash, budgeted_cash)
         : [ `Ok | `Duplicate ])
+
+let _make p ~(tr : Position.transition) ~symbol (required, available, budgeted)
+    =
+  {
+    position_id = tr.position_id;
+    symbol;
+    date = p.date;
+    required;
+    available;
+    budgeted;
+  }
 
 let _record p ~positions (tr : Position.transition) =
   match tr.kind with
   | CancelEntry _ ->
       let%bind.Option (pos : Position.t) = Map.find positions tr.position_id in
-      let symbol = pos.symbol in
-      let%map.Option required, available = Hashtbl.find p.noted symbol in
-      {
-        position_id = tr.position_id;
-        symbol;
-        date = p.date;
-        required;
-        available;
-      }
+      Hashtbl.find p.noted pos.symbol
+      |> Option.map ~f:(_make p ~tr ~symbol:pos.symbol)
   | _ -> None
 
 let emit p ~positions ~cancels =

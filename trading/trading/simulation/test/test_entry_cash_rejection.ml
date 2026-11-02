@@ -119,6 +119,7 @@ let test_cancelled_ticket_recorded _ =
               date = _date "2024-01-03";
               required = 10_800.0;
               available = 10_400.0;
+              budgeted = 10_400.0;
             }
              : R.t);
        ])
@@ -136,6 +137,7 @@ let test_retried_refusal_not_recorded _ =
              field (fun (r : R.t) -> r.date) (equal_to (_date "2024-01-04"));
              field (fun (r : R.t) -> r.required) (float_equal 20_000.0);
              field (fun (r : R.t) -> r.available) (float_equal 10_400.0);
+             field (fun (r : R.t) -> r.budgeted) (float_equal 10_400.0);
            ];
        ])
 
@@ -197,10 +199,10 @@ let test_pending_maps_cancels_to_notes _ =
   in
   R.note p
     (_trade ~symbol:"ADMA" ~quantity:10.0 ~price:44.0 ~commission:1.0 ())
-    ~available_cash:427.0;
+    ~available_cash:427.0 ~budgeted_cash:427.0;
   R.note p
     (_trade ~symbol:"ADMA" ~quantity:1.0 ~price:1.0 ())
-    ~available_cash:9.0;
+    ~available_cash:9.0 ~budgeted_cash:9.0;
   let positions =
     String.Map.of_alist_exn
       [
@@ -237,6 +239,7 @@ let test_pending_maps_cancels_to_notes _ =
               date = _date "2024-01-03";
               required = 441.0;
               available = 427.0;
+              budgeted = 427.0;
             }
              : R.t);
        ])
@@ -251,6 +254,7 @@ let test_funded_fraction _ =
           date = _date "2024-01-03";
           required = 446_712.52;
           available = 427_489.55;
+          budgeted = 427_489.55;
         },
       R.funded_fraction
         {
@@ -259,8 +263,25 @@ let test_funded_fraction _ =
           date = _date "2024-01-03";
           required = 0.0;
           available = 5.0;
+          budgeted = 5.0;
         } )
     (pair (float_equal ~epsilon:1e-4 0.95697) (float_equal 0.0))
+
+(* #3420 ADNT-wein-122 shape: 0.789 of the cost in gross cash, but only 0.45
+   once the book's paper losses are counted. [funded_fraction] reads the
+   budgeted figure, so it must report 0.45, not 0.789. *)
+let test_funded_fraction_reads_budgeted_not_gross _ =
+  assert_that
+    (R.funded_fraction
+       {
+         position_id = "p";
+         symbol = "ADNT";
+         date = _date "2024-01-03";
+         required = 10_000.0;
+         available = 7_891.0;
+         budgeted = 4_500.0;
+       })
+    (float_equal ~epsilon:1e-9 0.45)
 
 let suite =
   "entry_cash_rejection"
@@ -270,6 +291,8 @@ let suite =
          "funded ticket not recorded" >:: test_funded_ticket_not_recorded;
          "pending maps cancels to notes" >:: test_pending_maps_cancels_to_notes;
          "funded fraction" >:: test_funded_fraction;
+         "funded fraction reads budgeted not gross"
+         >:: test_funded_fraction_reads_budgeted_not_gross;
        ]
 
 let () = run_test_tt_main suite

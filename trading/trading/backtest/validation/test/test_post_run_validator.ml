@@ -29,7 +29,8 @@ let trade ?(side = "LONG") ?(exit_trigger = "") ?(stop_trigger_kind = "")
 let ctx ?(stage = Weinstein_types.Stage2 { weeks_advancing = 3; late = false })
     ?(macro_trend = Weinstein_types.Bullish)
     ?(ma_direction = Weinstein_types.Rising) ?(resistance_quality = None)
-    ?(installed_stop = 90.0) ?(suggested_entry = 100.0) () : Vt.entry_context =
+    ?(installed_stop = 90.0) ?(suggested_entry = 100.0)
+    ?(gate_stop_distance_pct = None) () : Vt.entry_context =
   {
     stage;
     macro_trend;
@@ -38,6 +39,7 @@ let ctx ?(stage = Weinstein_types.Stage2 { weeks_advancing = 3; late = false })
     installed_stop;
     screener_proxy_stop = None;
     suggested_entry;
+    gate_stop_distance_pct;
     decision_bar = Vt.no_decision_bar;
   }
 
@@ -428,6 +430,135 @@ let test_v12_respects_config_gate _ =
   in
   assert_that (result ~id:"V12" inputs) (violations_and_pass 0 true)
 
+(* #3420 NVDA-wein-240: stop installed at 567.6864 on E = 618 (0.0814 wide),
+   filled at 154.5500 on the restated post-split basis (4:1 split two months
+   later). Measured against the fill the row read 2.6732 and failed; measured
+   from E, as the gate does, it passes. *)
+let test_v12_split_straddling_position_passes _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [ trade ~symbol:"NVDA" ~entry_date:"2021-05-24" ~entry_price:154.55 () ];
+      audit =
+        audit_of
+          [ ("NVDA", ctx ~installed_stop:567.6864 ~suggested_entry:618.0 ()) ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 0 true)
+
+(* #3420 KD 2023-09-11 shape: the gate admitted 14.95 % from E; a stop-limit
+   fill 1.9 % above E (17.65) reads 16.5 % from the fill. From E it passes, while
+   a stop genuinely wider than the gate from E (and with no nearer base) fails. *)
+let test_v12_measures_from_e_not_fill _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"KD" ~entry_date:"2023-09-11" ~entry_price:17.65 ();
+          trade ~symbol:"WIDE" ~entry_date:"2023-09-11" ~entry_price:100.0 ();
+        ];
+      audit =
+        audit_of
+          [
+            ("KD", ctx ~installed_stop:14.73 ~suggested_entry:17.319 ());
+            ("WIDE", ctx ~installed_stop:80.0 ~suggested_entry:100.0 ());
+          ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 1 false)
+
+(* A close-anchored run (the default config): the gate measured from the
+   decision close 100, not from E = 102. A stop at 85.5 is 14.5 % from the close
+   (admitted) but 16.2 % from E; it must not fail. A stop at 80 is wider than the
+   gate from both bases and fails. *)
+let test_v12_close_anchored_run_not_failed_from_e _ =
+  let with_close c =
+    {
+      c with
+      Vt.decision_bar =
+        { Vt.no_decision_bar with close_at_decision = Some 100.0 };
+    }
+  in
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"ADMIT" ~entry_date:"2023-09-11" ~entry_price:102.0 ();
+          trade ~symbol:"WIDE" ~entry_date:"2023-09-11" ~entry_price:102.0 ();
+        ];
+      audit =
+        audit_of
+          [
+            ( "ADMIT",
+              with_close (ctx ~installed_stop:85.5 ~suggested_entry:102.0 ()) );
+            ( "WIDE",
+              with_close (ctx ~installed_stop:80.0 ~suggested_entry:102.0 ()) );
+          ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 1 false)
+
+(* An E-anchored run (the gate measured from E = 100) whose decision close sat
+   below E at 97. A stop at 83 is 17.0 % from the gate's base, so the gate must
+   have rejected it, yet 14.4 % from the close. The audit's own gate distance
+   (risk dollars / position value = 0.17) makes V12 fail it; the row with a gate
+   distance of 0.14 passes. *)
+let test_v12_reads_the_gates_own_distance _ =
+  let with_close c =
+    {
+      c with
+      Vt.decision_bar =
+        { Vt.no_decision_bar with close_at_decision = Some 97.0 };
+    }
+  in
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"REJECT" ~entry_date:"2023-09-11" ~entry_price:100.0 ();
+          trade ~symbol:"ADMIT" ~entry_date:"2023-09-11" ~entry_price:100.0 ();
+        ];
+      audit =
+        audit_of
+          [
+            ( "REJECT",
+              with_close
+                (ctx ~installed_stop:83.0 ~suggested_entry:100.0
+                   ~gate_stop_distance_pct:(Some 0.17) ()) );
+            ( "ADMIT",
+              with_close
+                (ctx ~installed_stop:86.0 ~suggested_entry:100.0
+                   ~gate_stop_distance_pct:(Some 0.14) ()) );
+          ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 1 false)
+
+(* Legacy audit with no E and no decision close: V12 falls back to the fill. A
+   stop at 50 against a fill of 100 fails; a stop at 90 passes. *)
+let test_v12_legacy_audit_falls_back_to_fill _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"WIDE" ~entry_date:"2020-01-03" ~entry_price:100.0 ();
+          trade ~symbol:"OK" ~entry_date:"2020-02-07" ~entry_price:100.0 ();
+        ];
+      audit =
+        audit_of
+          [
+            ("WIDE", ctx ~installed_stop:50.0 ~suggested_entry:0.0 ());
+            ("OK", ctx ~installed_stop:90.0 ~suggested_entry:0.0 ());
+          ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 1 false)
+
 (* ---- V13: fill dates and prices must lie on a real bar ----------------- *)
 
 let ohlc ~date ~o ~h ~l ~c : Vt.daily_bar =
@@ -595,6 +726,76 @@ let test_v13_rebased_store_still_flags_saturday_exit _ =
     }
   in
   assert_that (result ~id:"V13" inputs) (violations_skipped_pass 1 0 false)
+
+(* #3420 MIME-wein-200 / LACO-wein-168: a delisted symbol's last bar is
+   Thu 2022-05-19 and its exit is dated Fri 2022-05-20, a day with no bar. The
+   delisting exit is waived. The same shape under any other exit trigger, and a
+   delisting dated two sessions out, are still flagged. *)
+let _delisting_inputs ~exit_trigger ~exit_date =
+  {
+    (Vt.empty_inputs ()) with
+    trades =
+      [
+        trade ~symbol:"MIME" ~entry_date:"2022-05-16" ~entry_price:100.0
+          ~exit_date ~exit_price:101.0 ~exit_trigger ();
+      ];
+    bars =
+      bars_of
+        [
+          ( "MIME",
+            ohlc_bars
+              [
+                ohlc ~date:"2022-05-16" ~o:99.0 ~h:102.0 ~l:98.0 ~c:100.0;
+                ohlc ~date:"2022-05-19" ~o:100.0 ~h:102.0 ~l:100.0 ~c:101.0;
+              ] );
+        ];
+  }
+
+let test_v13_waives_delisting_exit_one_session_after_last_bar _ =
+  assert_that
+    (result ~id:"V13"
+       (_delisting_inputs ~exit_trigger:"delisted" ~exit_date:"2022-05-20"))
+    (violations_and_pass 0 true)
+
+let test_v13_still_flags_other_no_bar_fills _ =
+  assert_that
+    ( result ~id:"V13"
+        (_delisting_inputs ~exit_trigger:"stop_loss" ~exit_date:"2022-05-20"),
+      result ~id:"V13"
+        (_delisting_inputs ~exit_trigger:"delisted" ~exit_date:"2022-05-24") )
+    (all_of
+       [
+         field fst (violations_and_pass 1 false);
+         field snd (violations_and_pass 1 false);
+       ])
+
+(* #3420 KD 2023-09-11: filled at 17.32 against a bar high of 17.319 (cent
+   rounding). Inside half a cent is clean; 2 cents out is still a violation. *)
+let test_v13_tolerates_cent_rounded_fill _ =
+  let inputs price =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"KD" ~entry_date:"2023-09-11" ~entry_price:price
+            ~exit_date:"2023-09-11" ~exit_price:price ();
+        ];
+      bars =
+        bars_of
+          [
+            ( "KD",
+              ohlc_bars
+                [ ohlc ~date:"2023-09-11" ~o:17.0 ~h:17.319 ~l:16.9 ~c:17.2 ] );
+          ];
+    }
+  in
+  assert_that
+    (result ~id:"V13" (inputs 17.32), result ~id:"V13" (inputs 17.34))
+    (all_of
+       [
+         field fst (violations_and_pass 0 true);
+         field snd (violations_and_pass 1 false);
+       ])
 
 (* ---- V14: stop-out judged against the entry bar ------------------------ *)
 
@@ -1230,6 +1431,21 @@ let suite =
          "v11_stop_bounds" >:: test_v11;
          "v12_gate_consistency" >:: test_v12;
          "v12_skips_unevaluable" >:: test_v12_skips_unevaluable;
+         "v12_split_straddling_position_passes"
+         >:: test_v12_split_straddling_position_passes;
+         "v12_measures_from_e_not_fill" >:: test_v12_measures_from_e_not_fill;
+         "v12_close_anchored_run_not_failed_from_e"
+         >:: test_v12_close_anchored_run_not_failed_from_e;
+         "v12_reads_the_gates_own_distance"
+         >:: test_v12_reads_the_gates_own_distance;
+         "v12_legacy_audit_falls_back_to_fill"
+         >:: test_v12_legacy_audit_falls_back_to_fill;
+         "v13_waives_delisting_exit_one_session_after_last_bar"
+         >:: test_v13_waives_delisting_exit_one_session_after_last_bar;
+         "v13_still_flags_other_no_bar_fills"
+         >:: test_v13_still_flags_other_no_bar_fills;
+         "v13_tolerates_cent_rounded_fill"
+         >:: test_v13_tolerates_cent_rounded_fill;
          "v12_respects_config_gate" >:: test_v12_respects_config_gate;
          "v13_clean" >:: test_v13_clean;
          "v13_flags_saturday_exit" >:: test_v13_flags_saturday_exit;

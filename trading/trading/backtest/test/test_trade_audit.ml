@@ -866,6 +866,7 @@ let test_record_cash_rejection_without_entry_is_dropped _ =
       date = _date "2024-05-01";
       required = 1_000.0;
       available = 400.0;
+      budgeted = 400.0;
     };
   assert_that (TA.get_audit_records t)
     (elements_are

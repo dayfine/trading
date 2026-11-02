@@ -42,6 +42,7 @@ let ctx ~installed_stop ~screener_proxy_stop : Vt.entry_context =
     installed_stop;
     screener_proxy_stop;
     suggested_entry = 100.0;
+    gate_stop_distance_pct = None;
     decision_bar = Vt.no_decision_bar;
   }
 
@@ -566,6 +567,46 @@ let test_load_audit_reads_proxy_and_screens _ =
                  ]));
        ])
 
+(* ---- load_audit: V12's gate distance projected from the audit ---------- *)
+
+(* The audit record with the decision-time notional and risk replaced, and the
+   symbol swapped so two records coexist in one file. *)
+let sized_record ~symbol ~value ~risk =
+  current_record
+  |> String.substr_replace_all ~pattern:"AAPL" ~with_:symbol
+  |> String.substr_replace_all ~pattern:"(initial_position_value 130291.89)"
+       ~with_:(sprintf "(initial_position_value %s)" value)
+  |> String.substr_replace_all
+       ~pattern:"(initial_risk_dollars 29437.563599999987)"
+       ~with_:(sprintf "(initial_risk_dollars %s)" risk)
+
+let gate_distance_of (a : Va.loaded_audit) symbol =
+  Option.bind
+    (a.lookup (trade ~symbol ~entry_date:"2019-06-21" ()))
+    ~f:(fun (c : Vt.entry_context) -> c.gate_stop_distance_pct)
+
+(* V12's basis is [initial_risk_dollars /. initial_position_value] (E 100,
+   close 97, stop 83: 1700 / 10000 = 0.17); a non-positive risk is a legacy
+   audit and yields [None] so V12 falls back to the closest-base rule (#3420). *)
+let test_load_audit_projects_gate_stop_distance _ =
+  let contents =
+    blob
+      ~record:
+        (sized_record ~symbol:"AAPL" ~value:"10000" ~risk:"1700"
+        ^ sized_record ~symbol:"MSFT" ~value:"10000" ~risk:"0")
+      ~summaries:[]
+  in
+  assert_that
+    (with_temp_file contents ~f:Va.load_audit)
+    (matching ~msg:"Expected Ok" Result.ok
+       (all_of
+          [
+            field
+              (fun a -> gate_distance_of a "AAPL")
+              (is_some_and (float_equal 0.17));
+            field (fun a -> gate_distance_of a "MSFT") is_none;
+          ]))
+
 (* ---- end to end: Validator_report.run over a run directory ------------- *)
 
 (* A 21-cell trades.csv row: symbol, side, entry/exit dates, prices, qty; the
@@ -660,6 +701,8 @@ let suite =
          "load_macro_suspend file modes" >:: test_load_macro_suspend_file_modes;
          "load_audit reads proxy and screens"
          >:: test_load_audit_reads_proxy_and_screens;
+         "load_audit projects gate stop distance"
+         >:: test_load_audit_projects_gate_stop_distance;
          "report run wires params and screens"
          >:: test_report_run_wires_params_and_screens;
        ]

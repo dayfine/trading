@@ -323,6 +323,58 @@ let test_fill_basis_diverges_from_e_basis _ =
            (is_some_and (float_equal ~epsilon:1e-6 0.15));
        ])
 
+(* #3420 item 1: the fill is on the restated post-split basis while the audit's
+   [installed_stop] is the decision-time level. NVDA-wein-240: stop installed at
+   567.6864 on E 618, filled at 154.55 (restated; the 4:1 split is two months
+   later). The stop log's [entry_stop] is rescaled to 141.9216, so the distance
+   reads 0.0817 (true), not 2.6732. *)
+let test_fill_distance_uses_split_restated_stop _ =
+  let trade = make_trade ~symbol:"NVDA" ~entry_price:154.55 () in
+  let ctx =
+    TC.of_audit_and_stop_log
+      ~audit:
+        [
+          make_record
+            (make_entry ~symbol:"NVDA" ~suggested_entry:618.0
+               ~installed_stop:567.6864 ());
+        ]
+      ~stop_infos:
+        [
+          make_stop_info ~position_id:"AAPL-wein-1" ~symbol:"NVDA"
+            ~entry_stop:(Some 141.9216) ();
+        ]
+      ~trade
+  in
+  assert_that ctx
+    (field
+       (fun (c : TC.t) -> c.stop_fill_distance_pct)
+       (is_some_and (float_equal ~epsilon:1e-4 0.0817)))
+
+(* AAON-wein-307 shape: decided 2023-03-17 at installed stop 83.21, filled 47
+   weeks later at 83.43, with the machine's live stop at 55.475. The distance is
+   0.335, not the 0.0026 the decision-time level reads. *)
+let test_fill_distance_uses_machine_stop_at_fill _ =
+  let trade = make_trade ~symbol:"AAON" ~entry_price:83.43 () in
+  let ctx =
+    TC.of_audit_and_stop_log
+      ~audit:
+        [
+          make_record
+            (make_entry ~symbol:"AAON" ~suggested_entry:83.6
+               ~installed_stop:83.21 ());
+        ]
+      ~stop_infos:
+        [
+          make_stop_info ~position_id:"AAPL-wein-1" ~symbol:"AAON"
+            ~entry_stop:(Some 55.475) ();
+        ]
+      ~trade
+  in
+  assert_that ctx
+    (field
+       (fun (c : TC.t) -> c.stop_fill_distance_pct)
+       (is_some_and (float_equal ~epsilon:1e-3 0.335)))
+
 (* Late Stage2 propagates to entry_stage label. *)
 let test_late_stage2_label _ =
   let trade = make_trade () in
@@ -712,6 +764,10 @@ let test_csv_row_fields_renders_none_as_empty _ =
 let suite =
   "Trade_context"
   >::: [
+         "fill distance uses split-restated stop (#3420)"
+         >:: test_fill_distance_uses_split_restated_stop;
+         "fill distance uses machine stop at fill (#3420)"
+         >:: test_fill_distance_uses_machine_stop_at_fill;
          "stage_label distinguishes Stage2_late"
          >:: test_stage_label_distinguishes_late_stage2;
          "long stop classification uses fill"
