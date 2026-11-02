@@ -13,6 +13,17 @@
             "timeout": 900
           }
         ]
+      },
+      {
+        "matcher": "startup|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/dev/scripts/session_brief.sh\" brief",
+            "timeout": 60,
+            "statusMessage": "Loading session brief"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -21,6 +32,17 @@
           {
             "type": "command",
             "command": "bash dev/scripts/cleanup_merged_worktrees.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/dev/scripts/session_brief.sh\" precompact",
+            "timeout": 10
           }
         ]
       }
