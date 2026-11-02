@@ -19,6 +19,7 @@
   cross_validation)
  (libraries
   core
+  csv
   csv.corporate_actions
   fpath
   eodhd

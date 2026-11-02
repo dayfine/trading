@@ -7,20 +7,8 @@ type bar = {
   volume : float;
 }
 
-(* Sharding rule matches [Csv_storage.symbol_data_dir]: first letter /
-   last letter / <symbol>. Single-character symbols collapse to
-   [<L>/<L>/<L>]. *)
-let _shard_letters symbol =
-  let l1 = String.prefix symbol 1 in
-  let l2 =
-    if String.length symbol >= 2 then
-      String.sub symbol ~pos:(String.length symbol - 1) ~len:1
-    else l1
-  in
-  (l1, l2)
-
 let bars_path ~bars_root symbol =
-  let l1, l2 = _shard_letters symbol in
+  let l1, l2 = Csv.Symbol_shard.letters symbol in
   Filename.concat
     (Filename.concat (Filename.concat bars_root l1) l2)
     (Filename.concat symbol "data.csv")

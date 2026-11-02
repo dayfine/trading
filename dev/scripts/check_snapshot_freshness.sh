@@ -129,9 +129,9 @@ stale_list=""
 while IFS=$'\t' read -r sym recorded_mtime; do
   [ -z "$sym" ] && continue
 
-  l1=$(printf '%s' "$sym" | cut -c1)
+  l1=$(printf "%s" "$sym" | cut -c1 | tr "[:lower:]" "[:upper:]")
   sym_len=${#sym}
-  l2=$(printf '%s' "$sym" | cut -c"${sym_len}")
+  l2=$(printf "%s" "$sym" | cut -c"${sym_len}" | tr "[:lower:]" "[:upper:]")
   csv_path="$csv_data_dir/$l1/$l2/$sym/data.csv"
 
   # If CSV is gone, treat as not-stale (cannot verify; rebuild won't help).

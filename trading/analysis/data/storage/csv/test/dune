@@ -14,3 +14,7 @@
  (libraries ounit2 csv)
  (deps
   (file ./data/test_data.csv)))
+
+(test
+ (name test_symbol_shard)
+ (libraries ounit2 csv fpath matchers))

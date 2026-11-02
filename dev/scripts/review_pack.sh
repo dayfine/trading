@@ -136,7 +136,7 @@ extract_run() { # $1 run dir, $2 1 = also write daily chart bars
   done
   extract_open "$d"
 }
-sym_csv() { printf '%s/%s/%s/%s/data.csv' "$DATA" "$(printf %s "$1" | cut -c1)" "$(printf %s "$1" | rev | cut -c1)" "$1"; }
+sym_csv() { printf '%s/%s/%s/%s/data.csv' "$DATA" "$(printf %s "$1" | cut -c1 | tr "[:lower:]" "[:upper:]")" "$(printf %s "$1" | rev | cut -c1 | tr "[:lower:]" "[:upper:]")" "$1"; }
 extract_open() { # $1 run dir: positions still held at the window end join the exposure series (#3125)
   d=$1; : > "$d/x_open.tsv"; [ -s "$d/open_positions.csv" ] || return 0
   last=$(tail -1 "$d/equity_curve.csv" | cut -d, -f1)

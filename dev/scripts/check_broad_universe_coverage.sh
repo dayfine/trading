@@ -85,9 +85,9 @@ missing_list=""
 # dashes (BF-A, BRK-B) since EODHD returns dash-form for dual-class shares.
 while IFS= read -r sym; do
   [ -z "$sym" ] && continue
-  l1=$(printf '%s' "$sym" | cut -c1)
+  l1=$(printf "%s" "$sym" | cut -c1 | tr "[:lower:]" "[:upper:]")
   sym_len=${#sym}
-  l2=$(printf '%s' "$sym" | cut -c"${sym_len}")
+  l2=$(printf "%s" "$sym" | cut -c"${sym_len}" | tr "[:lower:]" "[:upper:]")
 
   csv_path="$data_dir/$l1/$l2/$sym/data.csv"
 
