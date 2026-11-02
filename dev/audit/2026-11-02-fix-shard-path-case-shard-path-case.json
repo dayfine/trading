@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-02",
+  "feature": "shard-path-case",
+  "branch": "fix/shard-path-case",
+  "sha": "9506669790efb86ef1fe06f5a86dd59a956c52d6",
+  "recorded_at_ns": 1793646478286505055,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
