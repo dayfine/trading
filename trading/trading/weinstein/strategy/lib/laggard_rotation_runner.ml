@@ -162,13 +162,19 @@ let _update_with_benchmark ~config ~benchmark_symbol ~positions ~bar_reader
         ~benchmark_13w_return ~skip_position_ids ~bar_reader ~get_price
         ~current_date
 
+(** Screening-day body: prune closed-position streaks, then bail on an empty map
+    before reading any bars. *)
+let _update_on_screening_day ~config ~benchmark_symbol ~positions ~bar_reader
+    ~get_price ~laggard_streaks ~skip_position_ids ~current_date =
+  _prune_streaks ~config ~positions ~laggard_streaks;
+  if Map.is_empty positions then []
+  else
+    _update_with_benchmark ~config ~benchmark_symbol ~positions ~bar_reader
+      ~get_price ~laggard_streaks ~skip_position_ids ~current_date
+
 let update ~config ~benchmark_symbol ~is_screening_day ~positions ~bar_reader
     ~get_price ~laggard_streaks ~skip_position_ids ~current_date =
   if not is_screening_day then []
-  else begin
-    _prune_streaks ~config ~positions ~laggard_streaks;
-    if Map.is_empty positions then []
-    else
-      _update_with_benchmark ~config ~benchmark_symbol ~positions ~bar_reader
-        ~get_price ~laggard_streaks ~skip_position_ids ~current_date
-  end
+  else
+    _update_on_screening_day ~config ~benchmark_symbol ~positions ~bar_reader
+      ~get_price ~laggard_streaks ~skip_position_ids ~current_date
