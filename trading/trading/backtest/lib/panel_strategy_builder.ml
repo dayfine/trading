@@ -63,12 +63,25 @@ let _reject_schedule_on_scenario_universe ~use_scenario_universe
          under the Weinstein strategy."
   | true, None | false, _ -> ()
 
-let build ~ad_bars ~breadth_bars ~ticker_sectors ~config ~strategy_choice
-    ~bar_reader ~audit_recorder ?fold_start_date ?universe_membership_at () =
-  match (strategy_choice : Strategy_choice.t) with
-  | Weinstein ->
+let _build_weinstein ~ad_bars ~breadth_bars ~ticker_sectors ~config ~bar_reader
+    ~audit_recorder ?fold_start_date ?universe_membership_at ?state () =
+  match state with
+  | None ->
       Weinstein_strategy.make ~ad_bars ~breadth_bars ~ticker_sectors ~bar_reader
         ~audit_recorder ?fold_start_date ?universe_membership_at config
+  | Some state ->
+      Weinstein_strategy.make_with_state ~ad_bars ~breadth_bars ~ticker_sectors
+        ~bar_reader ~audit_recorder ?fold_start_date ?universe_membership_at
+        ~state config
+
+let build ~ad_bars ~breadth_bars ~ticker_sectors ~config ~strategy_choice
+    ~bar_reader ~audit_recorder ?fold_start_date ?universe_membership_at ?state
+    () =
+  match (strategy_choice : Strategy_choice.t) with
+  | Weinstein ->
+      _build_weinstein ~ad_bars ~breadth_bars ~ticker_sectors ~config
+        ~bar_reader ~audit_recorder ?fold_start_date ?universe_membership_at
+        ?state ()
   | Bah_benchmark { symbol } ->
       Trading_strategy.Bah_benchmark_strategy.make { symbol }
   | Spy_only_weinstein { symbol; ma_period_weeks; enable_stage4_short } ->

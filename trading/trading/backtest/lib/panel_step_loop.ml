@@ -59,6 +59,26 @@ let record_step_into_progress ~progress_acc ~date
         ~fills_added:(List.length step_result.trades)
         ~portfolio_value:step_result.portfolio_value
 
+(* The per-step snapshot-cache occupancy sample for the [--gc-trace] CSV. A pure
+   read of [daily_panels] ([resident] is O(1) and mutates nothing). *)
+let cache_sampler_of_panels ~daily_panels () : Gc_trace.cache_sample =
+  let r = Snapshot_runtime.Daily_panels.resident daily_panels in
+  { cache_entries = r.entries; cache_bytes = r.bytes; mmap_open = r.mmap_open }
+
+(* The run-window line every backtest prints first. *)
+let log_window ~warmup_start ~end_date ~warmup_days strategy_choice =
+  eprintf
+    "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
+    (Date.to_string warmup_start)
+    (Date.to_string end_date) warmup_days
+    (Strategy_choice.name strategy_choice)
+
+(* Call the checkpoint hook after a Friday step. *)
+let _fire_on_friday on_friday ~date sim =
+  match (on_friday, Date.day_of_week date) with
+  | Some f, Day_of_week.Fri -> f ~date sim
+  | _ -> ()
+
 (** Step-loop replacement for [Simulator.run] that snapshots [Gc.stat] before
     and after each [Simulator.step] call. [pending_date] is tracked locally in
     lockstep with the simulator's internal [current_date] so the [_before]
@@ -69,7 +89,7 @@ let record_step_into_progress ~progress_acc ~date
     passed, is invoked with the same completed step — the artefact-streaming
     hook (#2502). *)
 let run_simulator_with_gc_trace ?gc_trace ?cache_sampler ?progress_acc ?on_step
-    ~stop_log sim =
+    ?on_friday ~stop_log sim =
   let start_date = (Simulator.get_config sim).start_date in
   let rec loop sim ~pending_date =
     Stop_log.set_current_date stop_log pending_date;
@@ -78,6 +98,7 @@ let run_simulator_with_gc_trace ?gc_trace ?cache_sampler ?progress_acc ?on_step
     | `Continue (sim', step_result) ->
         record_step_into_progress ~progress_acc ~date:pending_date ~step_result;
         Option.iter on_step ~f:(fun f -> f ~date:pending_date ~step:step_result);
+        _fire_on_friday on_friday ~date:pending_date sim';
         loop sim' ~pending_date:(Date.add_days pending_date 1)
   in
   loop sim ~pending_date:start_date

@@ -17,6 +17,7 @@ val build :
   audit_recorder:Weinstein_strategy.Audit_recorder.t ->
   ?fold_start_date:Date.t ->
   ?universe_membership_at:(string -> Date.t -> bool) ->
+  ?state:Weinstein_strategy.Weinstein_strategy_state.t ->
   unit ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** [build ~ad_bars ~ticker_sectors ~config ~strategy_choice ~bar_reader
@@ -64,4 +65,10 @@ val build :
     are single-symbol, and [Sector_rotation_weinstein] with
     [use_scenario_universe = false] trades its own SPDR sector-ETF default list
     — so a schedule is inapplicable there (the same reason they already ignore
-    [universe_path]) and is ignored without raising. *)
+    [universe_path]) and is ignored without raising.
+
+    @param state
+      Weinstein branch only: an explicit per-run state, forwarded to
+      {!Weinstein_strategy.make_with_state} so the caller keeps a handle it can
+      capture for a checkpoint (#3477). [None] (the default) is
+      {!Weinstein_strategy.make} exactly. *)
