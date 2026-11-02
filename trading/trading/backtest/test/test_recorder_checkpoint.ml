@@ -192,6 +192,7 @@ let _audit_head t =
   TA.record_entry t (_entry "AAA-wein-1" "AAA");
   TA.record_entry t (_entry "BBB-wein-2" "BBB");
   TA.record_cascade_summary t (_summary "2024-01-05" 2);
+  TA.record_cascade_summary t (_summary "2024-01-05" 1);
   TA.record_stop_decision t
     (_decision "2024-01-12" "AAA-wein-1" ~before:138.0 ~after:140.0)
 
@@ -230,7 +231,7 @@ let test_trade_audit _ =
          field
            (fun (b : TA.audit_blob) ->
              List.map b.cascade_summaries ~f:(fun s -> s.entered))
-           (equal_to [ 2; 0 ]);
+           (equal_to [ 2; 1; 0 ]);
        ])
 
 (* Force_liquidation_log -------------------------------------------------- *)
@@ -256,7 +257,8 @@ let test_force_liquidation_log _ =
       ~sexp_of:FL.sexp_of_snapshot ~of_sexp:FL.snapshot_of_sexp
       ~head:(fun l ->
         FL.record l (_fl_event "2024-01-10" 60.0);
-        FL.record l (_fl_event "2024-01-11" 50.0))
+        FL.record l (_fl_event "2024-01-11" 50.0);
+        FL.record l (_fl_event "2024-01-11" 45.0))
       ~tail:(fun l -> FL.record l (_fl_event "2024-01-11" 40.0))
       ~observe:(fun l ->
         [%sexp_of: Portfolio_risk.Force_liquidation.event list] (FL.events l))
@@ -264,7 +266,7 @@ let test_force_liquidation_log _ =
   assert_that obs (_same_as_live obs);
   assert_that (FL.events live)
     (elements_are
-       (List.map [ 60.0; 50.0; 40.0 ] ~f:(fun p ->
+       (List.map [ 60.0; 50.0; 45.0; 40.0 ] ~f:(fun p ->
             field
               (fun (e : Portfolio_risk.Force_liquidation.event) ->
                 e.current_price)

@@ -83,14 +83,18 @@ let test_errors _ =
         SJ.read ~path ~n_steps:2)
   in
   assert_that
-    (SJ.read ~path:missing ~n_steps:1, short, corrupt)
+    ( SJ.read ~path:missing ~n_steps:1,
+      SJ.truncate ~path:missing ~n_steps:1,
+      short,
+      corrupt )
     (all_of
        [
-         field (fun (m, _, _) -> m) is_error;
-         field (fun (_, (r, _), _) -> r) is_error;
-         field (fun (_, (_, t), _) -> t) is_error;
+         field (fun (m, _, _, _) -> m) is_error;
+         field (fun (_, tm, _, _) -> tm) is_error;
+         field (fun (_, _, (r, _), _) -> r) is_error;
+         field (fun (_, _, (_, t), _) -> t) is_error;
          field
-           (fun (_, _, c) ->
+           (fun (_, _, _, c) ->
              match c with
              | Error (e : Status.t) ->
                  String.is_substring e.message ~substring:"line 2"
