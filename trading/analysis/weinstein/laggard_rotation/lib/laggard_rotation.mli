@@ -61,11 +61,23 @@ type config = {
       (** Rolling window (in weeks) over which the position's return is compared
           to the benchmark's return. Default 13 — Weinstein-canonical
           intermediate-term horizon. *)
+  adjusted_returns : bool; [@sexp.default false]
+      (** Default [false]. When [true] the runner computes the position and
+          benchmark window returns from [adjusted_close] instead of the raw
+          [close_price], so a split inside the window is not read as a loss
+          (#3426). Raw closes across a forward split read as a 50–75 % drop. *)
+  clear_streak_on_close : bool; [@sexp.default false]
+      (** Default [false]. When [true] the runner keys the streak table by
+          position id instead of symbol and prunes entries whose position is
+          gone or closed, so a symbol re-entered after a laggard exit starts
+          from a zero streak rather than firing on its first lagging Friday
+          (#3426). *)
 }
 [@@deriving sexp]
 
 val default_config : config
-(** Defaults: [{ hysteresis_weeks = 4; rs_window_weeks = 13 }]. *)
+(** Defaults: [{ hysteresis_weeks = 4; rs_window_weeks = 13;
+    adjusted_returns = false; clear_streak_on_close = false }]. *)
 
 (** Decision emitted by {!observe}. *)
 type decision =

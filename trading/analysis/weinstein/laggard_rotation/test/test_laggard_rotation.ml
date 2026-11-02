@@ -5,9 +5,9 @@ open Laggard_rotation
 
 (* --- helpers --- *)
 
-let cfg_k4 = { hysteresis_weeks = 4; rs_window_weeks = 13 }
-let cfg_k1 = { hysteresis_weeks = 1; rs_window_weeks = 13 }
-let cfg_k6 = { hysteresis_weeks = 6; rs_window_weeks = 13 }
+let cfg_k4 = { default_config with hysteresis_weeks = 4 }
+let cfg_k1 = { default_config with hysteresis_weeks = 1 }
+let cfg_k6 = { default_config with hysteresis_weeks = 6 }
 
 (* --- pure observe --- *)
 
@@ -92,14 +92,14 @@ let test_observe_k6_requires_six_weeks _ =
 let test_observe_k0_treated_as_k1 _ =
   (* Defensive: hysteresis_weeks <= 0 is treated as 1, so a single
      negative-RS read fires immediately. *)
-  let config = { hysteresis_weeks = 0; rs_window_weeks = 13 } in
+  let config = { default_config with hysteresis_weeks = 0 } in
   assert_that
     (observe ~config ~prior_consecutive_neg_rs:0 ~position_13w_return:(-0.01)
        ~benchmark_13w_return:0.01)
     (equal_to ((1, Laggard_exit { rs_13w_neg_weeks = 1 }) : int * decision))
 
 let test_observe_negative_k_treated_as_k1 _ =
-  let config = { hysteresis_weeks = -3; rs_window_weeks = 13 } in
+  let config = { default_config with hysteresis_weeks = -3 } in
   assert_that
     (observe ~config ~prior_consecutive_neg_rs:0 ~position_13w_return:(-0.05)
        ~benchmark_13w_return:0.05)
@@ -229,6 +229,21 @@ let test_default_config_window_is_thirteen _ =
 
 (* --- runner --- *)
 
+let test_default_flags_off _ =
+  assert_that default_config
+    (all_of
+       [
+         field (fun c -> c.adjusted_returns) (equal_to false);
+         field (fun c -> c.clear_streak_on_close) (equal_to false);
+       ])
+
+let test_legacy_sexp_flags_off _ =
+  assert_that
+    (config_of_sexp
+       (Sexp.of_string "((hysteresis_weeks 2) (rs_window_weeks 13))"))
+    (equal_to
+       ({ default_config with hysteresis_weeks = 2 } : config))
+
 let suite =
   "laggard_rotation"
   >::: [
@@ -270,6 +285,8 @@ let suite =
          >:: test_default_config_hysteresis_is_four;
          "default_config: window is 13"
          >:: test_default_config_window_is_thirteen;
+         "default_config: #3426 flags are off" >:: test_default_flags_off;
+         "legacy sexp parses with #3426 flags off" >:: test_legacy_sexp_flags_off;
        ]
 
 let () = run_test_tt_main suite

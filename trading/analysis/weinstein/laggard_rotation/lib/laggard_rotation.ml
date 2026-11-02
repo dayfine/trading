@@ -1,6 +1,11 @@
 open Core
 
-type config = { hysteresis_weeks : int; rs_window_weeks : int }
+type config = {
+  hysteresis_weeks : int;
+  rs_window_weeks : int;
+  adjusted_returns : bool; [@sexp.default false]
+  clear_streak_on_close : bool; [@sexp.default false]
+}
 [@@deriving sexp]
 
 let _default_hysteresis_weeks = 4
@@ -10,6 +15,8 @@ let default_config =
   {
     hysteresis_weeks = _default_hysteresis_weeks;
     rs_window_weeks = _default_rs_window_weeks;
+    adjusted_returns = false;
+    clear_streak_on_close = false;
   }
 
 type decision = Hold | Laggard_exit of { rs_13w_neg_weeks : int }

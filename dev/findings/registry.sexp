@@ -353,3 +353,9 @@
  (finding "pit-v12 lists held 127 co-occurring rename twins; both legs of one instrument took top-20 slots (34 weeks per seed); full dedupe moved the 26y record 0.10 band SD; V6 guards held doubles only, a ranking-level twin detector is not built")
  (guard ((validator V6)))
  (status fixed))
+
+((issue 3426)
+ (finding "laggard rotation read raw closes across a split (forward split = false 50-75% loss exit) and keyed its streak by symbol with no clear on close (re-entry fired on first lagging Friday)")
+ (guard ((unit ("trading/trading/weinstein/strategy/test/test_laggard_split_streak.ml" "adjusted_returns: 2:1 split inside the window does not read as a loss"))
+         (unit ("trading/trading/weinstein/strategy/test/test_laggard_split_streak.ml" "clear_streak_on_close: re-entry does not fire on first lagging Friday"))))
+ (status fixed-behind-flag))
