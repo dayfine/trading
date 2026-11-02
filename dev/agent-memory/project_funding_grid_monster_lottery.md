@@ -48,3 +48,5 @@ tickets — check opportunity level, symbol+year, before claiming a loss).
 
 Record: `dev/notes/funding-grid-writeup-2026-08-22.md`, artifacts
 `dev/experiments/funding-grid-2026-08-22/` (PR #2473).
+
+**2026-10-22 re-derivation (chain V, PR #3383):** #3138's at-fill resize lever on the current record spec reproduces this exactly — 3 salts, mean −0.047 log, 0/3 positive, sign set by one reshuffle (LACO/APPS 2020, ADNT later). Funding levers stay closed; reopening needs a new mechanism argument, not a new knob on the same cash-rejection event (README §5.2). See [[project_sim_price_only_accounting]].

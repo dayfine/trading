@@ -30,3 +30,5 @@ caught only the 3 pairs that were HELD simultaneously; the true count was **233 
 budget ~3.5 h for a 4-chunk union. Better: a `-twin-only` mode in `build_snapshots` (closes-only load) —
 not built. Related: [[delisting-guards-2672]], [[splice-reuse-cut-is-terminal-events]],
 [[pit-universe-migration]].
+
+**Ranking-level effect (2026-10-31, #3489):** on the pre-dedupe lists no twin was ever held twice (V6 = 0), but 34 weeks per seed had both legs of one instrument in the top-20, and the two legs carry different scores (IIVI 110 vs COHR 120). V6 cannot see this; a ranking-level twin detector would. Removing all 98 twin symbols moved the 26y record 0.10 band SD.

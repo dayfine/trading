@@ -1,0 +1,1100 @@
+{
+  "run_id": "local-2026-11-02",
+  "timestamp": "2026-11-02T15:08:24Z",
+  "commit_sha": "3d86df8b42bf45212f10d116df3dc158fb87b91e",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 7368,
+    "output_tokens": 1200842,
+    "cache_read_input_tokens": 426697595,
+    "cache_creation_input_tokens": 17951618,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-11-02",
+    "source": "local-transcripts",
+    "generated_at": "2026-11-02T15:08:24Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-11-02",
+      "until": "2026-11-02"
+    },
+    "totals": {
+      "dispatches": 35,
+      "sessions": 2,
+      "resumes": 78,
+      "api_calls": 2466,
+      "input_tokens": 7368,
+      "output_tokens": 1200842,
+      "cache_read_input_tokens": 426697595,
+      "cache_creation_input_tokens": 17951618,
+      "subagent_tokens": 364176220,
+      "main_tokens": 81681203,
+      "by_model": {
+        "claude-haiku-4-5-20251001": {
+          "api_calls": 364,
+          "input_tokens": 2982,
+          "output_tokens": 807,
+          "cache_read_input_tokens": 38572176,
+          "cache_creation_input_tokens": 2356808
+        },
+        "claude-opus-5-5": {
+          "api_calls": 2102,
+          "input_tokens": 4386,
+          "output_tokens": 1200035,
+          "cache_read_input_tokens": 388125419,
+          "cache_creation_input_tokens": 15594810
+        }
+      }
+    },
+    "context_histogram": {
+      "calls": 305,
+      "p50": 277649,
+      "p90": 406277,
+      "max": 519721,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 184,
+      "share_above_threshold_pct": 60.3,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "50-100k",
+          "calls": 25,
+          "share_pct": 8.1
+        },
+        {
+          "label": "100-150k",
+          "calls": 45,
+          "share_pct": 14.7
+        },
+        {
+          "label": "150-200k",
+          "calls": 28,
+          "share_pct": 9.1
+        },
+        {
+          "label": "200-300k",
+          "calls": 87,
+          "share_pct": 28.5
+        },
+        {
+          "label": "300-500k",
+          "calls": 103,
+          "share_pct": 33.7
+        },
+        {
+          "label": "500k+",
+          "calls": 17,
+          "share_pct": 5.5
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a096f9d3383631b17",
+        "agent_type": "general-purpose",
+        "description": "Map-plan BDSP 01.05–01.10",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 5733,
+        "resumes": 9,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 206,
+            "input_tokens": 434,
+            "output_tokens": 151235,
+            "cache_read_input_tokens": 62863289,
+            "cache_creation_input_tokens": 1672885
+          }
+        },
+        "api_calls": 206,
+        "input_tokens": 434,
+        "output_tokens": 151235,
+        "cache_read_input_tokens": 62863289,
+        "cache_creation_input_tokens": 1672885
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "abd1cbde5e5be8203",
+        "agent_type": "general-purpose",
+        "description": "Simulator stages B-D for BDSP",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 2455,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 147,
+            "input_tokens": 300,
+            "output_tokens": 151546,
+            "cache_read_input_tokens": 39339427,
+            "cache_creation_input_tokens": 379582
+          }
+        },
+        "api_calls": 147,
+        "input_tokens": 300,
+        "output_tokens": 151546,
+        "cache_read_input_tokens": 39339427,
+        "cache_creation_input_tokens": 379582
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "af600485788107a07",
+        "agent_type": "general-purpose",
+        "description": "Plan 00.05b/c Jubilife walks",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 3560,
+        "resumes": 3,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 110,
+            "input_tokens": 232,
+            "output_tokens": 68512,
+            "cache_read_input_tokens": 19886822,
+            "cache_creation_input_tokens": 736554
+          }
+        },
+        "api_calls": 110,
+        "input_tokens": 232,
+        "output_tokens": 68512,
+        "cache_read_input_tokens": 19886822,
+        "cache_creation_input_tokens": 736554
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "adb990a7ffa15fb1f",
+        "agent_type": "feat-backtest",
+        "description": "Fix phantom force-liq #3424",
+        "ref": "#3424",
+        "date": "2026-11-02",
+        "wall_seconds": 4923,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 87,
+            "input_tokens": 174,
+            "output_tokens": 1389,
+            "cache_read_input_tokens": 15594381,
+            "cache_creation_input_tokens": 1730170
+          }
+        },
+        "api_calls": 87,
+        "input_tokens": 174,
+        "output_tokens": 1389,
+        "cache_read_input_tokens": 15594381,
+        "cache_creation_input_tokens": 1730170
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a1f66cdea5963ee6b",
+        "agent_type": "general-purpose",
+        "description": "FRLG onto shared MapData",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 1310,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 101,
+            "input_tokens": 204,
+            "output_tokens": 62133,
+            "cache_read_input_tokens": 15076224,
+            "cache_creation_input_tokens": 190331
+          }
+        },
+        "api_calls": 101,
+        "input_tokens": 204,
+        "output_tokens": 62133,
+        "cache_read_input_tokens": 15076224,
+        "cache_creation_input_tokens": 190331
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a7f3aff0a5af4fec0",
+        "agent_type": "general-purpose",
+        "description": "BDSP table conversion, staged",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 1379,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 86,
+            "input_tokens": 180,
+            "output_tokens": 72172,
+            "cache_read_input_tokens": 14071441,
+            "cache_creation_input_tokens": 216754
+          }
+        },
+        "api_calls": 86,
+        "input_tokens": 180,
+        "output_tokens": 72172,
+        "cache_read_input_tokens": 14071441,
+        "cache_creation_input_tokens": 216754
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ad1444024d44b1138",
+        "agent_type": "general-purpose",
+        "description": "Prep FRLG stack for upstream",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 2254,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 100,
+            "input_tokens": 208,
+            "output_tokens": 63854,
+            "cache_read_input_tokens": 13863284,
+            "cache_creation_input_tokens": 368184
+          }
+        },
+        "api_calls": 100,
+        "input_tokens": 208,
+        "output_tokens": 63854,
+        "cache_read_input_tokens": 13863284,
+        "cache_creation_input_tokens": 368184
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "abc36843b02d1e3f1",
+        "agent_type": "general-purpose",
+        "description": "BDSP 00.01-00.05 event timeline",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 1072,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 77,
+            "input_tokens": 154,
+            "output_tokens": 99150,
+            "cache_read_input_tokens": 12938333,
+            "cache_creation_input_tokens": 308500
+          }
+        },
+        "api_calls": 77,
+        "input_tokens": 154,
+        "output_tokens": 99150,
+        "cache_read_input_tokens": 12938333,
+        "cache_creation_input_tokens": 308500
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a59ed2fbec37f9c6f",
+        "agent_type": "feat-backtest",
+        "description": "Checkpoint PR 5: recorders + journal",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 4911,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 71,
+            "input_tokens": 142,
+            "output_tokens": 1130,
+            "cache_read_input_tokens": 11238361,
+            "cache_creation_input_tokens": 1916827
+          }
+        },
+        "api_calls": 71,
+        "input_tokens": 142,
+        "output_tokens": 1130,
+        "cache_read_input_tokens": 11238361,
+        "cache_creation_input_tokens": 1916827
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ae3cb428fe7cfb377",
+        "agent_type": "general-purpose",
+        "description": "Build test stages 0 and A",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 1122,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/166",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 83,
+            "input_tokens": 166,
+            "output_tokens": 103274,
+            "cache_read_input_tokens": 12568062,
+            "cache_creation_input_tokens": 240405
+          }
+        },
+        "api_calls": 83,
+        "input_tokens": 166,
+        "output_tokens": 103274,
+        "cache_read_input_tokens": 12568062,
+        "cache_creation_input_tokens": 240405
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a6c3d2dfe031248df",
+        "agent_type": "general-purpose",
+        "description": "Headless test binary",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 1131,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 103,
+            "input_tokens": 208,
+            "output_tokens": 47456,
+            "cache_read_input_tokens": 11479862,
+            "cache_creation_input_tokens": 141690
+          }
+        },
+        "api_calls": 103,
+        "input_tokens": 208,
+        "output_tokens": 47456,
+        "cache_read_input_tokens": 11479862,
+        "cache_creation_input_tokens": 141690
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a96e1c7be4c9c21df",
+        "agent_type": "feat-weinstein",
+        "description": "Fix laggard rotation defects #3426",
+        "ref": "#3426",
+        "date": "2026-11-02",
+        "wall_seconds": 4923,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 61,
+            "input_tokens": 122,
+            "output_tokens": 1283,
+            "cache_read_input_tokens": 9397137,
+            "cache_creation_input_tokens": 1576548
+          }
+        },
+        "api_calls": 61,
+        "input_tokens": 122,
+        "output_tokens": 1283,
+        "cache_read_input_tokens": 9397137,
+        "cache_creation_input_tokens": 1576548
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a73a8a3f0f22804d3",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3500",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 5340,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 51,
+            "input_tokens": 102,
+            "output_tokens": 1985,
+            "cache_read_input_tokens": 7350463,
+            "cache_creation_input_tokens": 1714747
+          }
+        },
+        "api_calls": 51,
+        "input_tokens": 102,
+        "output_tokens": 1985,
+        "cache_read_input_tokens": 7350463,
+        "cache_creation_input_tokens": 1714747
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a8dc82be02ee212be",
+        "agent_type": "general-purpose",
+        "description": "Route 203 map vs console diff",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 777,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 66,
+            "input_tokens": 134,
+            "output_tokens": 63494,
+            "cache_read_input_tokens": 8448812,
+            "cache_creation_input_tokens": 190893
+          }
+        },
+        "api_calls": 66,
+        "input_tokens": 134,
+        "output_tokens": 63494,
+        "cache_read_input_tokens": 8448812,
+        "cache_creation_input_tokens": 190893
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a9b32b4980015762b",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3504",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 2714,
+        "resumes": 8,
+        "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 71,
+            "input_tokens": 588,
+            "output_tokens": 116,
+            "cache_read_input_tokens": 8250658,
+            "cache_creation_input_tokens": 328813
+          }
+        },
+        "api_calls": 71,
+        "input_tokens": 588,
+        "output_tokens": 116,
+        "cache_read_input_tokens": 8250658,
+        "cache_creation_input_tokens": 328813
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "ad6d1db2d8352212b",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3503",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 2847,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 51,
+            "input_tokens": 102,
+            "output_tokens": 1147,
+            "cache_read_input_tokens": 7666049,
+            "cache_creation_input_tokens": 742990
+          }
+        },
+        "api_calls": 51,
+        "input_tokens": 102,
+        "output_tokens": 1147,
+        "cache_read_input_tokens": 7666049,
+        "cache_creation_input_tokens": 742990
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a2a113ecd18c28952",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3500 iter1",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 1116,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 48,
+            "input_tokens": 96,
+            "output_tokens": 1765,
+            "cache_read_input_tokens": 7893972,
+            "cache_creation_input_tokens": 385102
+          }
+        },
+        "api_calls": 48,
+        "input_tokens": 96,
+        "output_tokens": 1765,
+        "cache_read_input_tokens": 7893972,
+        "cache_creation_input_tokens": 385102
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a48aacf2e1db85270",
+        "agent_type": "general-purpose",
+        "description": "Split BDSP detector change to own PR",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 1551,
+        "resumes": 5,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 85,
+            "input_tokens": 182,
+            "output_tokens": 35751,
+            "cache_read_input_tokens": 7337349,
+            "cache_creation_input_tokens": 161051
+          }
+        },
+        "api_calls": 85,
+        "input_tokens": 182,
+        "output_tokens": 35751,
+        "cache_read_input_tokens": 7337349,
+        "cache_creation_input_tokens": 161051
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "ac44858335c75079d",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3503",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 2618,
+        "resumes": 3,
+        "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 62,
+            "input_tokens": 502,
+            "output_tokens": 123,
+            "cache_read_input_tokens": 6541957,
+            "cache_creation_input_tokens": 339002
+          }
+        },
+        "api_calls": 62,
+        "input_tokens": 502,
+        "output_tokens": 123,
+        "cache_read_input_tokens": 6541957,
+        "cache_creation_input_tokens": 339002
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a31792e1f2ca28f49",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3502",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 2166,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 38,
+            "input_tokens": 76,
+            "output_tokens": 1181,
+            "cache_read_input_tokens": 5316357,
+            "cache_creation_input_tokens": 620773
+          }
+        },
+        "api_calls": 38,
+        "input_tokens": 76,
+        "output_tokens": 1181,
+        "cache_read_input_tokens": 5316357,
+        "cache_creation_input_tokens": 620773
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "ab1a5a59aac65fe0a",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3504",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 1308,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 36,
+            "input_tokens": 72,
+            "output_tokens": 354,
+            "cache_read_input_tokens": 5241085,
+            "cache_creation_input_tokens": 428084
+          }
+        },
+        "api_calls": 36,
+        "input_tokens": 72,
+        "output_tokens": 354,
+        "cache_read_input_tokens": 5241085,
+        "cache_creation_input_tokens": 428084
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ab7dae10ed5056373",
+        "agent_type": "general-purpose",
+        "description": "Extend shared MapData in #114",
+        "ref": "#114",
+        "date": "2026-11-02",
+        "wall_seconds": 1266,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 47,
+            "input_tokens": 104,
+            "output_tokens": 53408,
+            "cache_read_input_tokens": 5164075,
+            "cache_creation_input_tokens": 282885
+          }
+        },
+        "api_calls": 47,
+        "input_tokens": 104,
+        "output_tokens": 53408,
+        "cache_read_input_tokens": 5164075,
+        "cache_creation_input_tokens": 282885
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a32f6ff6118838e13",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3500",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 2086,
+        "resumes": 3,
+        "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 44,
+            "input_tokens": 360,
+            "output_tokens": 85,
+            "cache_read_input_tokens": 4672423,
+            "cache_creation_input_tokens": 236440
+          }
+        },
+        "api_calls": 44,
+        "input_tokens": 360,
+        "output_tokens": 85,
+        "cache_read_input_tokens": 4672423,
+        "cache_creation_input_tokens": 236440
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a1b1c6c728557a07a",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3502",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 2449,
+        "resumes": 4,
+        "outcome": "done",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 42,
+            "input_tokens": 346,
+            "output_tokens": 81,
+            "cache_read_input_tokens": 4395594,
+            "cache_creation_input_tokens": 461065
+          }
+        },
+        "api_calls": 42,
+        "input_tokens": 346,
+        "output_tokens": 81,
+        "cache_read_input_tokens": 4395594,
+        "cache_creation_input_tokens": 461065
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "af0c0bcb43c462d2a",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3503 iter1",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 2455,
+        "resumes": 5,
+        "outcome": "done",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 41,
+            "input_tokens": 334,
+            "output_tokens": 79,
+            "cache_read_input_tokens": 4125116,
+            "cache_creation_input_tokens": 388297
+          }
+        },
+        "api_calls": 41,
+        "input_tokens": 334,
+        "output_tokens": 79,
+        "cache_read_input_tokens": 4125116,
+        "cache_creation_input_tokens": 388297
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a0b78416396d3fa63",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3504 iter1",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 1469,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 42,
+            "input_tokens": 338,
+            "output_tokens": 203,
+            "cache_read_input_tokens": 4241094,
+            "cache_creation_input_tokens": 266508
+          }
+        },
+        "api_calls": 42,
+        "input_tokens": 338,
+        "output_tokens": 203,
+        "cache_read_input_tokens": 4241094,
+        "cache_creation_input_tokens": 266508
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a3b8436138a6d7c3b",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3503 iter1",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 705,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 25,
+            "input_tokens": 50,
+            "output_tokens": 258,
+            "cache_read_input_tokens": 3825065,
+            "cache_creation_input_tokens": 154039
+          }
+        },
+        "api_calls": 25,
+        "input_tokens": 50,
+        "output_tokens": 258,
+        "cache_read_input_tokens": 3825065,
+        "cache_creation_input_tokens": 154039
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a465b83f426caea4d",
+        "agent_type": "general-purpose",
+        "description": "Rework FRLG sizing doc",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 786,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 43,
+            "input_tokens": 88,
+            "output_tokens": 53078,
+            "cache_read_input_tokens": 3741445,
+            "cache_creation_input_tokens": 149683
+          }
+        },
+        "api_calls": 43,
+        "input_tokens": 88,
+        "output_tokens": 53078,
+        "cache_read_input_tokens": 3741445,
+        "cache_creation_input_tokens": 149683
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a8ed8951efbb0841c",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3500 iter1",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 642,
+        "resumes": 4,
+        "outcome": "stalled",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 31,
+            "input_tokens": 256,
+            "output_tokens": 58,
+            "cache_read_input_tokens": 3131770,
+            "cache_creation_input_tokens": 237082
+          }
+        },
+        "api_calls": 31,
+        "input_tokens": 256,
+        "output_tokens": 58,
+        "cache_read_input_tokens": 3131770,
+        "cache_creation_input_tokens": 237082
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a44867dfbb1847bd2",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3501",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 239,
+        "resumes": 4,
+        "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 31,
+            "input_tokens": 258,
+            "output_tokens": 62,
+            "cache_read_input_tokens": 3213564,
+            "cache_creation_input_tokens": 99601
+          }
+        },
+        "api_calls": 31,
+        "input_tokens": 258,
+        "output_tokens": 62,
+        "cache_read_input_tokens": 3213564,
+        "cache_creation_input_tokens": 99601
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "ad9c6a50535b70478",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3504 iter1",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 190,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 18,
+            "input_tokens": 36,
+            "output_tokens": 511,
+            "cache_read_input_tokens": 2511755,
+            "cache_creation_input_tokens": 134458
+          }
+        },
+        "api_calls": 18,
+        "input_tokens": 36,
+        "output_tokens": 511,
+        "cache_read_input_tokens": 2511755,
+        "cache_creation_input_tokens": 134458
+      },
+      {
+        "kind": "dispatch",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "agent_id": "a3f2f97dd68cdfb5e",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3501",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 121,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 16,
+            "input_tokens": 32,
+            "output_tokens": 202,
+            "cache_read_input_tokens": 2081986,
+            "cache_creation_input_tokens": 120797
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 32,
+        "output_tokens": 202,
+        "cache_read_input_tokens": 2081986,
+        "cache_creation_input_tokens": 120797
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "abe395a3d16cf0790",
+        "agent_type": "general-purpose",
+        "description": "Migrate FRLG maps to shared MapData",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 221,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 23,
+            "input_tokens": 52,
+            "output_tokens": 21391,
+            "cache_read_input_tokens": 1738682,
+            "cache_creation_input_tokens": 99171
+          }
+        },
+        "api_calls": 23,
+        "input_tokens": 52,
+        "output_tokens": 21391,
+        "cache_read_input_tokens": 1738682,
+        "cache_creation_input_tokens": 99171
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a296c28e02d85d1dd",
+        "agent_type": "Plan",
+        "description": "Plan staged sim/test work",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 143,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 9,
+            "input_tokens": 18,
+            "output_tokens": 13417,
+            "cache_read_input_tokens": 400979,
+            "cache_creation_input_tokens": 68464
+          }
+        },
+        "api_calls": 9,
+        "input_tokens": 18,
+        "output_tokens": 13417,
+        "cache_read_input_tokens": 400979,
+        "cache_creation_input_tokens": 68464
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "a033c42f483b1a07e",
+        "agent_type": "general-purpose",
+        "description": "Merge autostory-v4 into seg01",
+        "ref": "",
+        "date": "2026-11-02",
+        "wall_seconds": 46,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 9,
+            "input_tokens": 18,
+            "output_tokens": 3409,
+            "cache_read_input_tokens": 350570,
+            "cache_creation_input_tokens": 48442
+          }
+        },
+        "api_calls": 9,
+        "input_tokens": 18,
+        "output_tokens": 3409,
+        "cache_read_input_tokens": 350570,
+        "cache_creation_input_tokens": 48442
+      }
+    ],
+    "sessions": [
+      {
+        "kind": "session",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "date": "2026-11-02",
+        "wall_seconds": 355,
+        "dispatches_launched": 0,
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 56,
+            "input_tokens": 110,
+            "output_tokens": 24027,
+            "cache_read_input_tokens": 5386175,
+            "cache_creation_input_tokens": 96787
+          }
+        },
+        "api_calls": 56,
+        "input_tokens": 110,
+        "output_tokens": 24027,
+        "cache_read_input_tokens": 5386175,
+        "cache_creation_input_tokens": 96787
+      },
+      {
+        "kind": "session",
+        "session": "384a969e-ff88-4e5f-95a6-759e2e1686c1",
+        "date": "2026-11-02",
+        "wall_seconds": 34497,
+        "dispatches_launched": 19,
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 249,
+            "input_tokens": 590,
+            "output_tokens": 101523,
+            "cache_read_input_tokens": 75353977,
+            "cache_creation_input_tokens": 718014
+          }
+        },
+        "api_calls": 249,
+        "input_tokens": 590,
+        "output_tokens": 101523,
+        "cache_read_input_tokens": 75353977,
+        "cache_creation_input_tokens": 718014
+      }
+    ]
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}
