@@ -1570,3 +1570,13 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:cleanup_merged_lock_test.sh})))
+
+; session_brief.sh (SessionStart brief + PreCompact handoff guard): picks the newest
+; handoff by the date in its file name (not mtime), flags a stale one, and warns before a
+; compaction when no handoff is dated today. Offline fixtures; no gh.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:session_brief_test.sh})))

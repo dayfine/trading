@@ -72,8 +72,13 @@ session was blocked for three days (`dev/plans/delegation-lanes-2026-10-18.md`).
 ## Step 1 — Read the newest priorities doc
 
 ```bash
-ls -1t dev/notes/next-session-priorities-*.md | head -1
+ls dev/notes/next-session-priorities-*.md | sort | tail -1   # by the date in the name, not mtime
 ```
+
+The `SessionStart` hook (`dev/scripts/session_brief.sh brief`, on `startup` and `clear`)
+already prints this doc, its age, main CI and the PR gate table into context. Read the
+output rather than re-running the lookup. A `PreCompact` hook warns when no handoff is
+dated today; write one before compacting if the plan changed.
 
 `Read` that file. It carries the current P0/P1/defer framing, the
 specific in-flight work items, the rationale, and the sequencing. The
