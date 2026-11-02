@@ -31,11 +31,12 @@ type trade_row = {
           the column; the audit join falls back to [(symbol, entry_date)] for
           those. *)
   stop_fill_distance_pct : float option;
-      (** [stop_fill_distance_pct] column: [|installed_stop - fill| / fill] —
-          the fill-basis stop distance the [Stop_too_wide] gate bounds. V14
-          reconstructs the installed stop from it, preferring it over the
-          E-basis [stop_initial_distance_pct]. [None] when the cell is empty
-          (legacy runs whose [trades.csv] predates the column). *)
+      (** [stop_fill_distance_pct] column: [|stop - fill| / fill] — the stop-log
+          stop (restated onto the fill's split basis) against the fill; not the
+          quantity the [Stop_too_wide] gate bounds (#3420). V14 reconstructs the
+          installed stop from it, preferring it over the E-basis
+          [stop_initial_distance_pct]. [None] when the cell is empty (legacy
+          runs whose [trades.csv] predates the column). *)
 }
 (** A parsed [trades.csv] round-trip row (only the fields the checks read). *)
 
@@ -92,6 +93,13 @@ type entry_context = {
       (** The screener's graded breakout level [E]
           ([Trade_audit.entry_decision.suggested_entry]); carried for V12's
           specimen detail and the faithfulness harness. *)
+  gate_stop_distance_pct : float option; [@sexp.option]
+      (** V12: the [Stop_too_wide] gate's own [stop_distance_pct], recovered as
+          [initial_risk_dollars /. initial_position_value] from the audit (both
+          are computed off the gate's [effective_entry], so the shares cancel;
+          decision-time, so split-safe). [None] on audits where either is
+          non-positive; V12 then falls back to the closest decision-time base.
+      *)
   decision_bar : decision_bar_read; [@sexp.default no_decision_bar]
       (** V20's decision-bar reads. *)
 }

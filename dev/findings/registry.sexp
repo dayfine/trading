@@ -355,11 +355,13 @@
  (status fixed))
 
 ((issue 3420) (ref "V12 and stop_fill_distance_pct mixed split bases (NVDA-wein-240, AAON-wein-307)")
- (finding "V12 compared a decision-time stop with a restated post-split fill, and stop_fill_distance_pct did the same; V12 now measures from E, the column uses the split-restated stop-log level")
+ (finding "V12 compared a decision-time stop with a restated post-split fill, and stop_fill_distance_pct did the same; V12 now reads the gate's own decision-time distance from the audit, the column uses the split-restated stop-log level")
  (guard ((unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
                 "v12_split_straddling_position_passes"))
          (unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
                 "v12_measures_from_e_not_fill"))
+         (unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
+                "v12_reads_the_gates_own_distance"))
          (unit ("trading/trading/backtest/test/test_trade_context.ml"
                 "fill distance uses split-restated stop (#3420)"))
          (unit ("trading/trading/backtest/test/test_trade_context.ml"

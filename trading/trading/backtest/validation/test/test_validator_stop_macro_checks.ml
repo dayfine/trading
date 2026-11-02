@@ -42,6 +42,7 @@ let ctx ~installed_stop ~screener_proxy_stop : Vt.entry_context =
     installed_stop;
     screener_proxy_stop;
     suggested_entry = 100.0;
+    gate_stop_distance_pct = None;
     decision_bar = Vt.no_decision_bar;
   }
 

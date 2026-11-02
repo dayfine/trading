@@ -95,6 +95,7 @@ type entry_context = {
   installed_stop : float; [@sexp.default 0.0]
   screener_proxy_stop : float option; [@sexp.option]
   suggested_entry : float; [@sexp.default 0.0]
+  gate_stop_distance_pct : float option; [@sexp.option]
   decision_bar : decision_bar_read; [@sexp.default no_decision_bar]
 }
 [@@deriving sexp]

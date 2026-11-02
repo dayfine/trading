@@ -15,9 +15,7 @@
       distance from the {b screener's} entry [E] to the initial stop. 0.08 = 8%.
       {b E-basis, not fill-basis}: in arms whose fill diverges from [E] this
       overstates stop depth vs cost (the 2026-08-07 confound; findings §4
-      RESOLVED). This is the column V12 now reads: V12 measures from [E] (or the
-      decision close) because those share the installed stop's decision-time
-      split basis.
+      RESOLVED). V12 uses the gate's own distance, not this column.
     - [stop_fill_distance_pct] — [|stop - fill| / fill], where [stop] is the
       stop log's [entry_stop] (restated onto the fill's split basis, #3420) or,
       with no stop-log record, the audit's [installed_stop]. It is the live

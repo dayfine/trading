@@ -29,7 +29,8 @@ let trade ?(side = "LONG") ?(exit_trigger = "") ?(stop_trigger_kind = "")
 let ctx ?(stage = Weinstein_types.Stage2 { weeks_advancing = 3; late = false })
     ?(macro_trend = Weinstein_types.Bullish)
     ?(ma_direction = Weinstein_types.Rising) ?(resistance_quality = None)
-    ?(installed_stop = 90.0) ?(suggested_entry = 100.0) () : Vt.entry_context =
+    ?(installed_stop = 90.0) ?(suggested_entry = 100.0)
+    ?(gate_stop_distance_pct = None) () : Vt.entry_context =
   {
     stage;
     macro_trend;
@@ -38,6 +39,7 @@ let ctx ?(stage = Weinstein_types.Stage2 { weeks_advancing = 3; late = false })
     installed_stop;
     screener_proxy_stop = None;
     suggested_entry;
+    gate_stop_distance_pct;
     decision_bar = Vt.no_decision_bar;
   }
 
@@ -494,6 +496,43 @@ let test_v12_close_anchored_run_not_failed_from_e _ =
               with_close (ctx ~installed_stop:85.5 ~suggested_entry:102.0 ()) );
             ( "WIDE",
               with_close (ctx ~installed_stop:80.0 ~suggested_entry:102.0 ()) );
+          ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 1 false)
+
+(* An E-anchored run (the gate measured from E = 100) whose decision close sat
+   below E at 97. A stop at 83 is 17.0 % from the gate's base, so the gate must
+   have rejected it, yet 14.4 % from the close. The audit's own gate distance
+   (risk dollars / position value = 0.17) makes V12 fail it; the row with a gate
+   distance of 0.14 passes. *)
+let test_v12_reads_the_gates_own_distance _ =
+  let with_close c =
+    {
+      c with
+      Vt.decision_bar =
+        { Vt.no_decision_bar with close_at_decision = Some 97.0 };
+    }
+  in
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"REJECT" ~entry_date:"2023-09-11" ~entry_price:100.0 ();
+          trade ~symbol:"ADMIT" ~entry_date:"2023-09-11" ~entry_price:100.0 ();
+        ];
+      audit =
+        audit_of
+          [
+            ( "REJECT",
+              with_close
+                (ctx ~installed_stop:83.0 ~suggested_entry:100.0
+                   ~gate_stop_distance_pct:(Some 0.17) ()) );
+            ( "ADMIT",
+              with_close
+                (ctx ~installed_stop:86.0 ~suggested_entry:100.0
+                   ~gate_stop_distance_pct:(Some 0.14) ()) );
           ];
     }
   in
@@ -1397,6 +1436,8 @@ let suite =
          "v12_measures_from_e_not_fill" >:: test_v12_measures_from_e_not_fill;
          "v12_close_anchored_run_not_failed_from_e"
          >:: test_v12_close_anchored_run_not_failed_from_e;
+         "v12_reads_the_gates_own_distance"
+         >:: test_v12_reads_the_gates_own_distance;
          "v12_legacy_audit_falls_back_to_fill"
          >:: test_v12_legacy_audit_falls_back_to_fill;
          "v13_waives_delisting_exit_one_session_after_last_bar"

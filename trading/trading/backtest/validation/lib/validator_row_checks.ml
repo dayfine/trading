@@ -64,7 +64,8 @@ let check_v11 inputs = fold_steps inputs.trades ~f:(_v11_step inputs.config)
    cell's [stop_width_size_down_max_pct] or V12 reports a wall of false
    failures. Under the default [Drop_over_max] the invariant holds exactly as
    stated above. *)
-(* #3420: the gate measures from its [effective_entry], which is [E] when the run
+(* Fallback bases, for audits that carry no gate distance (#3420). The gate
+   measures from its [effective_entry], which is [E] when the run
    armed [sim_entry_trigger_at_suggested] and the decision-bar close otherwise
    (the default). The audit does not say which, so the stop is measured from
    each decision-time base the gate could have used, and V12 fails only when it
@@ -105,13 +106,29 @@ let _v12_detail (c : check_config) ~dist ~base ~(ctx : entry_context) =
 let _v12_unevaluable ~(ctx : entry_context) =
   Float.( <= ) ctx.installed_stop 0.0
 
-let _v12_pred (c : check_config) (row : trade_row) (ctx : entry_context) =
+let _v12_gate_detail (c : check_config) ~dist ~(ctx : entry_context) =
+  sprintf
+    "installed_stop=%.4f -> the gate's own stop distance=%.4f > gate=%.4f \
+     (E=%.4f)"
+    ctx.installed_stop dist c.gate_max_stop_distance_pct ctx.suggested_entry
+
+(* Fallback when the audit carries no gate distance: the closest decision-time
+   base, which can only under-report (never flag a stop the gate admitted). *)
+let _v12_fallback_pred (c : check_config) (row : trade_row)
+    (ctx : entry_context) =
   match _v12_closest ~row ~ctx with
-  | _ when _v12_unevaluable ~ctx -> Skip
   | None -> Skip
   | Some (dist, base) when Float.( > ) dist c.gate_max_stop_distance_pct ->
       Fail (spec row (_v12_detail c ~dist ~base ~ctx))
   | Some _ -> Pass
+
+let _v12_pred (c : check_config) (row : trade_row) (ctx : entry_context) =
+  match ctx.gate_stop_distance_pct with
+  | _ when _v12_unevaluable ~ctx -> Skip
+  | Some dist when Float.( > ) dist c.gate_max_stop_distance_pct ->
+      Fail (spec row (_v12_gate_detail c ~dist ~ctx))
+  | Some _ -> Pass
+  | None -> _v12_fallback_pred c row ctx
 
 let check_v12 inputs =
   fold_steps inputs.trades

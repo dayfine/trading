@@ -89,6 +89,19 @@ let parse_open_positions_csv path =
   In_channel.read_lines path |> _drop_header
   |> List.filter_map ~f:_parse_open_line
 
+(* The gate's own [stop_distance_pct], recovered from the audit: the entry
+   emitter writes [initial_risk_dollars = shares * |effective_entry - stop|] and
+   [initial_position_value = shares * effective_entry] off the same
+   [effective_entry] the [Stop_too_wide] gate measured from, so the shares cancel
+   and the ratio is the gate's distance exactly. Both are decision-time, hence
+   split-safe (#3420). [None] when either is non-positive (legacy audits). *)
+let _gate_stop_distance_pct (e : Backtest.Trade_audit.entry_decision) =
+  if
+    Float.( > ) e.initial_position_value 0.0
+    && Float.( > ) e.initial_risk_dollars 0.0
+  then Some (e.initial_risk_dollars /. e.initial_position_value)
+  else None
+
 let _entry_context_of (e : Backtest.Trade_audit.entry_decision) =
   {
     stage = e.stage;
@@ -98,6 +111,7 @@ let _entry_context_of (e : Backtest.Trade_audit.entry_decision) =
     installed_stop = e.installed_stop;
     screener_proxy_stop = Some e.screener_proxy_stop;
     suggested_entry = e.suggested_entry;
+    gate_stop_distance_pct = _gate_stop_distance_pct e;
     decision_bar =
       {
         close_at_decision = e.close_at_decision;
