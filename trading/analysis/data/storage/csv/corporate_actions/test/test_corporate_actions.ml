@@ -82,7 +82,7 @@ let test_paths_follow_symbol_dir _ =
   assert_that
     ( Fpath.to_string (CA.dividends_path ~data_dir "AAPL"),
       Fpath.to_string (CA.splits_path ~data_dir "APC_old") )
-    (equal_to ("/data/A/L/AAPL/dividends.csv", "/data/A/d/APC_old/splits.csv"))
+    (equal_to ("/data/A/L/AAPL/dividends.csv", "/data/A/D/APC_old/splits.csv"))
 
 let test_empty_writes_header_only _ =
   let data_dir = _fresh_dir () in
