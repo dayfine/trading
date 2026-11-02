@@ -241,8 +241,7 @@ let test_legacy_sexp_flags_off _ =
   assert_that
     (config_of_sexp
        (Sexp.of_string "((hysteresis_weeks 2) (rs_window_weeks 13))"))
-    (equal_to
-       ({ default_config with hysteresis_weeks = 2 } : config))
+    (equal_to ({ default_config with hysteresis_weeks = 2 } : config))
 
 let suite =
   "laggard_rotation"
@@ -286,7 +285,8 @@ let suite =
          "default_config: window is 13"
          >:: test_default_config_window_is_thirteen;
          "default_config: #3426 flags are off" >:: test_default_flags_off;
-         "legacy sexp parses with #3426 flags off" >:: test_legacy_sexp_flags_off;
+         "legacy sexp parses with #3426 flags off"
+         >:: test_legacy_sexp_flags_off;
        ]
 
 let () = run_test_tt_main suite

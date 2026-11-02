@@ -76,8 +76,9 @@ type config = {
 [@@deriving sexp]
 
 val default_config : config
-(** Defaults: [{ hysteresis_weeks = 4; rs_window_weeks = 13;
-    adjusted_returns = false; clear_streak_on_close = false }]. *)
+(** Defaults:
+    [{ hysteresis_weeks = 4; rs_window_weeks = 13; adjusted_returns = false;
+     clear_streak_on_close = false }]. *)
 
 (** Decision emitted by {!observe}. *)
 type decision =

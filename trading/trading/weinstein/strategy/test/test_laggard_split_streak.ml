@@ -123,7 +123,9 @@ let _k4 = { Laggard_rotation.default_config with hysteresis_weeks = 4 }
 let _bench = _bars ~from_c:100.0 ~to_c:110.0 ()
 
 let test_split_window_return _ =
-  let bars = _bars ~split_after:_split_after_week ~from_c:200.0 ~to_c:265.0 () in
+  let bars =
+    _bars ~split_after:_split_after_week ~from_c:200.0 ~to_c:265.0 ()
+  in
   assert_that
     ( Laggard_rotation_runner.window_return ~adjusted:true ~n:13 bars,
       Laggard_rotation_runner.window_return ~n:13 bars )
@@ -134,7 +136,9 @@ let test_split_window_return _ =
        ])
 
 let _split_run ~config ~key =
-  let positions = String.Map.singleton "SPL" (_holding ~id:"SPL" ~symbol:"SPL") in
+  let positions =
+    String.Map.singleton "SPL" (_holding ~id:"SPL" ~symbol:"SPL")
+  in
   let streaks = _streaks_of [ (key, 3) ] in
   let spl = _bars ~split_after:_split_after_week ~from_c:200.0 ~to_c:265.0 () in
   let exits =
@@ -144,8 +148,11 @@ let _split_run ~config ~key =
   (exits, Hashtbl.find streaks key)
 
 let test_split_flag_on _ =
-  let config = { _k4 with adjusted_returns = true; clear_streak_on_close = true } in
-  assert_that (_split_run ~config ~key:"SPL")
+  let config =
+    { _k4 with adjusted_returns = true; clear_streak_on_close = true }
+  in
+  assert_that
+    (_split_run ~config ~key:"SPL")
     (all_of
        [
          field (fun (e, _) -> e) is_empty;
@@ -153,7 +160,8 @@ let test_split_flag_on _ =
        ])
 
 let test_split_flag_off _ =
-  assert_that (_split_run ~config:_k4 ~key:"SPL")
+  assert_that
+    (_split_run ~config:_k4 ~key:"SPL")
     (field (fun (e, _) -> e) (size_is 1))
 
 let _reentry_run ~config ~seed_key ~positions =
