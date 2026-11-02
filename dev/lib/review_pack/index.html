@@ -1334,7 +1334,7 @@ function faithfulnessSignals(data) {
   const d = faithfulnessDetectors(data); if (!d) return [];
   const out = [], v = d.volume;
   if (v.known && v.bins[0] + v.bins[1]) out.push(`<b>Fill-week volume:</b> ${v.bins[0] + v.bins[1]} of ${v.known} measured long fills were under 2× (${v.total - v.known} n/a). Quiet-pullback evidence is unavailable; low volume alone is not a failed check.`);
-  if (d.above.hits) out.push(`<b>Filled from above:</b> ${d.above.hits} long fills exceeded their designed limit (unfaithful audit fill with positive fill-vs-trigger). ${d.above.known} of ${d.above.total} trades have decisive evidence.`);
+  if (d.above.hits) out.push(`<b>Filled from above:</b> ${d.above.hits} long fills were filled from above (an unfaithful audit fill with positive fill-vs-trigger, or a fill more than 0.5% under its own bar’s open). ${d.above.known} of ${d.above.total} trades have decisive evidence.`);
   // Keep all detectors on the same path: unobservable detectors never produce a clean zero signal.
   if (d.healthy.hits) out.push(`<b>Sold a healthy Stage-2 stock:</b> ${d.healthy.hits} trades.`);
   if (d.history.hits) out.push(`<b>SPAC / under 52 weeks of history:</b> ${d.history.hits} trades.`);
@@ -1358,7 +1358,7 @@ function faithfulnessTables(data, sort = { k: 'score', dir: 1 }) {
     t.checks.map(c => `${c.id}: ${c.status}`).join(' · ')] )).join('')}</tbody>`;
   const v = d.volume;
   const detectors = `<p><b>Fill-week volume ratio:</b> ${v.known ? `&lt;1×: ${v.bins[0]} · 1–&lt;2×: ${v.bins[1]} · ≥2×: ${v.bins[2]}` : 'n/a'} · ${v.known} measured, ${v.total - v.known} n/a. Completed fill week, per-bar ratio versus prior four weeks.</p>
-    <p><b>Filled from above:</b> ${count(d.above)}. Positive fill-vs-trigger plus an unfaithful audit fill proves an upper-limit breach; faithful Market orders cannot prove a limit.</p>
+    <p><b>Filled from above:</b> ${count(d.above)}. A fill more than 0.5% under its own bar’s open proves it (a triggered buy-stop fills at or above the open), as does positive fill-vs-trigger plus an unfaithful audit fill; faithful Market orders cannot prove a limit.</p>
     <p><b>Sold a healthy Stage-2 stock:</b> n/a — exit MA slope is not joined. ${d.healthy.known} of ${d.healthy.total} trades ruled out by stop exit or non-Stage-2 replay; the rest are n/a.</p>
     <p><b>SPAC / under 52 weeks of history:</b> n/a — history length is not joined. Ticker identity does not establish listing age or SPAC status.</p>`;
   return { checks, trades, detectors };

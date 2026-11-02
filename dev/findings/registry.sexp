@@ -353,3 +353,11 @@
  (finding "pit-v12 lists held 127 co-occurring rename twins; both legs of one instrument took top-20 slots (34 weeks per seed); full dedupe moved the 26y record 0.10 band SD; V6 guards held doubles only, a ranking-level twin detector is not built")
  (guard ((validator V6)))
  (status fixed))
+
+((issue 3424)
+ (finding "force-liquidation recorded a phantom event for a position already closed by its stop the same bar (SIRI 2023-07-25: stop 6.31, close 5.13); the review pack's Filled-from-above detector read null for fills far under the bar's open (SDA 2023-07-12)")
+ (guard ((unit ("trading/trading/weinstein/strategy/test/test_force_liquidation_runner.ml"
+                "#3424 — skip_position_ids suppresses record and exit"))
+         (unit ("trading/trading/weinstein/strategy/test/test_force_liquidation_strategy.ml"
+                "#3424 — no force-liq record for a stop-closed position (SIRI)"))))
+ (status fixed))
