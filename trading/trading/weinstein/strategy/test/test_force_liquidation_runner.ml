@@ -151,7 +151,7 @@ let test_per_position_trigger_emits_exit _ =
   let transitions =
     Force_liquidation_runner.update ~config:FL.default_config ~positions
       ~get_price ~cash:1_000_000.0 ~current_date:(_date "2024-04-29")
-      ~peak_tracker ~audit_recorder:recorder
+      ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   assert_that transitions
     (elements_are
@@ -194,7 +194,7 @@ let test_exit_label_matches_emitted_label _ =
   let transitions =
     Force_liquidation_runner.update ~config:FL.default_config ~positions
       ~get_price ~cash:1_000_000.0 ~current_date:(_date "2024-04-29")
-      ~peak_tracker ~audit_recorder:recorder
+      ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   assert_that
     (List.map transitions ~f:_strategy_signal_of)
@@ -217,7 +217,7 @@ let test_per_position_trigger_no_fire_under_threshold _ =
   let transitions =
     Force_liquidation_runner.update ~config:FL.default_config ~positions
       ~get_price ~cash:1_000_000.0 ~current_date:(_date "2024-04-29")
-      ~peak_tracker ~audit_recorder:recorder
+      ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   assert_that transitions is_empty;
   assert_that !captured is_empty
@@ -253,7 +253,7 @@ let test_portfolio_floor_trigger_closes_all _ =
   let _ =
     Force_liquidation_runner.update ~config:floor_config ~positions
       ~get_price:get_price_par ~cash:980_000.0
-      ~current_date:(_date "2024-01-02") ~peak_tracker ~audit_recorder:recorder
+      ~current_date:(_date "2024-01-02") ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   (* Second tick: catastrophic drop. AAPL 100→20, TSLA 200→40.
      Position values: 100*20 + 50*40 = 4000; cash unchanged at 980_000.
@@ -271,7 +271,7 @@ let test_portfolio_floor_trigger_closes_all _ =
   let transitions =
     Force_liquidation_runner.update ~config:floor_config ~positions
       ~get_price:get_price_crash ~cash:200_000.0
-      ~current_date:(_date "2024-04-29") ~peak_tracker ~audit_recorder:recorder
+      ~current_date:(_date "2024-04-29") ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   (* Both positions close under Portfolio_floor reason. Both carry the SAME
      ["force_liquidation"] label as a per-position breaker exit — the branch
@@ -300,7 +300,7 @@ let test_no_positions_no_events _ =
       ~positions:String.Map.empty
       ~get_price:(fun _ -> None)
       ~cash:1_000_000.0 ~current_date:(_date "2024-04-29") ~peak_tracker
-      ~audit_recorder:recorder
+      ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   assert_that transitions is_empty;
   assert_that !captured is_empty
@@ -320,7 +320,7 @@ let test_short_position_loss_fires _ =
   let transitions =
     Force_liquidation_runner.update ~config:FL.default_config ~positions
       ~get_price ~cash:1_000_000.0 ~current_date:(_date "2024-04-29")
-      ~peak_tracker ~audit_recorder:recorder
+      ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   assert_that transitions (size_is 1);
   assert_that !captured
@@ -357,7 +357,7 @@ let test_non_holding_position_does_not_fire _ =
   let transitions =
     Force_liquidation_runner.update ~config:FL.default_config ~positions
       ~get_price ~cash:1_000_000.0 ~current_date:(_date "2024-04-29")
-      ~peak_tracker ~audit_recorder:recorder
+      ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   assert_that transitions is_empty;
   assert_that !captured is_empty
@@ -378,7 +378,7 @@ let test_missing_price_does_not_fire _ =
     Force_liquidation_runner.update ~config:FL.default_config ~positions
       ~get_price:(fun _ -> None)
       ~cash:1_000_000.0 ~current_date:(_date "2024-04-29") ~peak_tracker
-      ~audit_recorder:recorder
+      ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   assert_that transitions is_empty;
   assert_that !captured is_empty
@@ -415,7 +415,7 @@ let test_short_holding_does_not_inflate_peak _ =
   let _ =
     Force_liquidation_runner.update ~config:FL.default_config ~positions
       ~get_price ~cash:1_100_000.0 ~current_date:(_date "2024-01-02")
-      ~peak_tracker ~audit_recorder:recorder
+      ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   (* Post-fix: peak = $1M (true value). Pre-fix: peak = $1.2M (inflated). *)
   assert_that (FL.Peak_tracker.peak peak_tracker) (float_equal 1_000_000.0)
@@ -480,7 +480,7 @@ let test_two_profitable_shorts_no_portfolio_floor _ =
   let _ =
     Force_liquidation_runner.update ~config:floor_config ~positions
       ~get_price:get_price_par ~cash:1_200_000.0
-      ~current_date:(_date "2024-01-02") ~peak_tracker ~audit_recorder:recorder
+      ~current_date:(_date "2024-01-02") ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   (* Post-fix peak: $1M. Pre-fix: $1.4M. *)
   assert_that (FL.Peak_tracker.peak peak_tracker) (float_equal 1_000_000.0);
@@ -503,7 +503,7 @@ let test_two_profitable_shorts_no_portfolio_floor _ =
   let _ =
     Force_liquidation_runner.update ~config:floor_config ~positions
       ~get_price:get_price_profit ~cash:1_200_000.0
-      ~current_date:(_date "2024-04-29") ~peak_tracker ~audit_recorder:recorder
+      ~current_date:(_date "2024-04-29") ~peak_tracker ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   (* No Portfolio_floor events captured — these shorts are profiting. *)
   let portfolio_floor_events =
@@ -631,7 +631,7 @@ let test_inconsistent_positions_cash_phantom_spikes_peak _ =
   let _ =
     Force_liquidation_runner.update ~config:FL.default_config
       ~positions:positions_full ~get_price ~cash:pre_tick_cash
-      ~current_date:date ~peak_tracker:peak_fixed ~audit_recorder:recorder
+      ~current_date:date ~peak_tracker:peak_fixed ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   assert_that (FL.Peak_tracker.peak peak_fixed) (float_equal true_pv);
   (* Buggy path: positions filtered as if S1 already removed, cash NOT yet
@@ -641,11 +641,38 @@ let test_inconsistent_positions_cash_phantom_spikes_peak _ =
   let _ =
     Force_liquidation_runner.update ~config:FL.default_config
       ~positions:positions_buggy ~get_price ~cash:pre_tick_cash
-      ~current_date:date ~peak_tracker:peak_buggy ~audit_recorder:recorder
+      ~current_date:date ~peak_tracker:peak_buggy ~audit_recorder:recorder ~skip_position_ids:String.Set.empty
   in
   assert_that
     (FL.Peak_tracker.peak peak_buggy)
     (float_equal (true_pv +. s1_mtm_magnitude))
+
+(** #3424: a position closed this tick by another channel (a stop) is skipped
+    before the audit record is written, not merely filtered afterwards. *)
+let test_skip_position_ids_suppresses_record_and_exit _ =
+  let make symbol =
+    _make_holding ~symbol ~side:Trading_base.Types.Long
+      ~entry_date:(_date "2024-01-02") ~quantity:100.0 ~entry_price:100.0
+  in
+  let positions =
+    String.Map.of_alist_exn [ ("AAPL", make "AAPL"); ("TSLA", make "TSLA") ]
+  in
+  let bar = _make_bar ~date:(_date "2024-04-29") ~close:40.0 in
+  let get_price _ = Some bar in
+  let peak_tracker = FL.Peak_tracker.create () in
+  let recorder, captured = _capturing_recorder () in
+  let transitions =
+    Force_liquidation_runner.update ~config:FL.default_config ~positions
+      ~get_price ~cash:10_000.0 ~current_date:(_date "2024-04-29")
+      ~peak_tracker ~audit_recorder:recorder
+      ~skip_position_ids:(String.Set.singleton "AAPL-1")
+  in
+  assert_that
+    (List.map transitions ~f:(fun (t : Position.transition) -> t.position_id))
+    (elements_are [ equal_to "TSLA-1" ]);
+  assert_that
+    (List.map !captured ~f:(fun (e : FL.event) -> e.position_id))
+    (elements_are [ equal_to "TSLA-1" ])
 
 let suite =
   "force_liquidation_runner"
@@ -669,6 +696,8 @@ let suite =
          >:: test_short_holding_does_not_inflate_peak;
          "G9 — two profitable shorts do not trigger portfolio_floor"
          >:: test_two_profitable_shorts_no_portfolio_floor;
+         "#3424 — skip_position_ids suppresses record and exit"
+         >:: test_skip_position_ids_suppresses_record_and_exit;
          "G12 — inconsistent (positions, cash) phantom-spikes peak"
          >:: test_inconsistent_positions_cash_phantom_spikes_peak;
        ]

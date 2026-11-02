@@ -88,7 +88,7 @@ let _transition_of_event (e : FL.event) : Position.transition =
   }
 
 let update ~config ~positions ~get_price ~cash ~current_date ~peak_tracker
-    ~audit_recorder =
+    ~audit_recorder ~skip_position_ids =
   let inputs =
     Map.fold positions ~init:[] ~f:(fun ~key:_ ~data:pos acc ->
         match _position_input_of_holding ~get_price pos with
@@ -99,6 +99,10 @@ let update ~config ~positions ~get_price ~cash ~current_date ~peak_tracker
   let events =
     FL.check ~config ~date:current_date ~positions:inputs ~portfolio_value
       ~peak_tracker
+  in
+  let events =
+    List.filter events ~f:(fun (e : FL.event) ->
+        not (Set.mem skip_position_ids e.position_id))
   in
   List.iter events ~f:audit_recorder.Audit_recorder.record_force_liquidation;
   List.map events ~f:_transition_of_event

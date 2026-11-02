@@ -103,7 +103,8 @@ let _get_price_of_state state ~current_date symbol =
   | [] -> None
   | bars -> List.last bars
 
-let _drive_tick state ~config ~current_date ~portfolio =
+let _drive_tick ?(audit_recorder = Audit_recorder.noop) state ~config
+    ~current_date ~portfolio =
   Internal_for_test.on_market_close ~fold_start_date:None ~config ~ad_bars:[]
     ~stop_states:state.stop_states
     ~last_stop_out_dates:state.last_stop_out_dates
@@ -114,7 +115,7 @@ let _drive_tick state ~config ~current_date ~portfolio =
     ~prior_stage_ma_values:state.prior_stage_ma_values
     ~sector_prior_stages:state.sector_prior_stages
     ~ticker_sectors:state.ticker_sectors ~stage3_streaks:state.stage3_streaks
-    ~laggard_streaks:state.laggard_streaks ~audit_recorder:Audit_recorder.noop
+    ~laggard_streaks:state.laggard_streaks ~audit_recorder
     ~get_price:(_get_price_of_state state ~current_date)
     ~get_indicator:(fun _ _ _ _ -> None)
     ~portfolio
@@ -491,6 +492,84 @@ let test_adjust_dedup_against_force_liq_exit _ =
                  (equal_to 0);
              ])))
 
+(** #3424: SIRI 2023-07-25 closed at its 6.31 stop, but the breaker also saw the
+    bar's 5.13 close (a 35.9% loss) and recorded a force-liquidation for a
+    position that never exits that way. The stop-exited id must be skipped
+    before the record is written. *)
+let test_no_force_liq_record_for_stop_closed_position _ =
+  let symbol = "SIRI" in
+  let position_id = "SIRI-1" in
+  let current_date = Date.of_string "2023-07-25" in
+  let pos =
+    _make_holding_long ~symbol ~position_id
+      ~entry_date:(Date.of_string "2023-01-03")
+      ~quantity:1000.0 ~entry_price:8.0
+  in
+  let siri_bar =
+    {
+      Types.Daily_price.date = current_date;
+      open_price = 5.96;
+      high_price = 6.00;
+      low_price = 5.10;
+      close_price = 5.13;
+      adjusted_close = 5.13;
+      volume = 1_000_000;
+      active_through = None;
+    }
+  in
+  let index_bar = _make_daily_bar ~date:current_date ~price:100.0 in
+  let bar_reader =
+    Bar_reader.of_in_memory_bars
+      [ (symbol, [ siri_bar ]); (_index_symbol, [ index_bar ]) ]
+  in
+  let state = _fresh_state ~bar_reader in
+  state.stop_states :=
+    Map.set !(state.stop_states) ~key:symbol
+      ~data:
+        (Weinstein_stops.Initial
+           { stop_level = 6.31; reference_level = 6.5 });
+  let config =
+    Weinstein_strategy.default_config ~universe:[] ~index_symbol:_index_symbol
+  in
+  let portfolio : Trading_strategy.Portfolio_view.t =
+    { cash = 100_000.0; positions = String.Map.singleton symbol pos }
+  in
+  let captured = ref [] in
+  let audit_recorder =
+    {
+      Audit_recorder.noop with
+      record_force_liquidation = (fun e -> captured := e :: !captured);
+    }
+  in
+  let result =
+    _drive_tick ~audit_recorder state ~config ~current_date ~portfolio
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (o : Trading_strategy.Strategy_interface.output) ->
+            o.transitions)
+          (elements_are
+             [
+               all_of
+                 [
+                   field
+                     (fun (t : Trading_strategy.Position.transition) ->
+                       t.position_id)
+                     (equal_to position_id);
+                   field
+                     (fun (t : Trading_strategy.Position.transition) -> t.kind)
+                     (matching ~msg:"Expected StopLoss TriggerExit"
+                        (function
+                          | Trading_strategy.Position.TriggerExit
+                              { exit_reason = StopLoss _; exit_price } ->
+                              Some exit_price
+                          | _ -> None)
+                        (float_equal 6.31));
+                 ];
+             ])));
+  assert_that !captured is_empty
+
 (* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
@@ -516,6 +595,8 @@ let suite =
          >:: test_no_primary_index_bar_short_circuits;
          "PR #911 dedup — adjust transitions stripped when force-liq exits"
          >:: test_adjust_dedup_against_force_liq_exit;
+         "#3424 — no force-liq record for a stop-closed position (SIRI)"
+         >:: test_no_force_liq_record_for_stop_closed_position;
        ]
 
 let () = run_test_tt_main suite

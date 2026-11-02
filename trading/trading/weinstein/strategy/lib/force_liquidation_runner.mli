@@ -44,6 +44,7 @@ val update :
   current_date:Date.t ->
   peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->
   audit_recorder:Audit_recorder.t ->
+  skip_position_ids:String.Set.t ->
   Position.transition list
 (** Run the force-liquidation policy and return TriggerExit transitions.
 
@@ -65,6 +66,14 @@ val update :
     [Portfolio_floor] events on still-profitable shorts. Per-position
     double-exit avoidance now happens at the strategy layer (filter the returned
     transitions), not by passing a filtered position map here.
+
+    [skip_position_ids] (#3424): positions already closed this tick by another
+    exit channel (the stop-exit ids). Their events are dropped BEFORE the audit
+    record is written and before transitions are built, so no phantom
+    [force_liquidations.sexp] row exists for a position that never exits via the
+    breaker. Specimen: SIRI 2023-07-25 closed at its 6.31 stop, yet the breaker
+    saw the bar's 5.13 close and recorded a force-liquidation. The
+    [peak_tracker] still observes ALL positions (see G12 above).
 
     Side effects:
     - [peak_tracker] observe + halt-state update via
