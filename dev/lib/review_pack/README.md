@@ -138,6 +138,11 @@ sector decision, designed order type/limit and exit-time weakness. Therefore:
 - Check 4 passes at fill volume ≥2; lower volume is `n/a` because it might be a
   quiet pullback. The tab shows <1, 1–<2, ≥2 ratio bins and unknown coverage;
   the overview flags measured ratios under 2 as an observation, not a failure.
+- "Filled from above" (#3424) is proved first by `fbo`, the entry fill over the
+  entry bar's raw open minus 1 (trade_extract field 26): a buy-stop that
+  triggers inside the bar fills at or above the open, so `fbo` under -0.5%
+  (`from_above_tol`) needs no audit. Otherwise the audit rule below applies;
+  a faithful fill at or above the open (`fbo >= 0`) reads false; a faithful fill 0-0.5% under it stays unknown, since it can still be a from-above fill inside the tolerance. `fbo` is null when the entry date has no bar of its own.
 - Check 9 can fail below the trigger or on an audited unfaithful fill. A
   positive `fvt` plus `faithful=false` proves "filled from above" (above the
   limit); a positive faithful fill is unknown because Market orders also

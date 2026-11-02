@@ -150,20 +150,19 @@ let _run_extension_special_exit ~config ~record_force_exit ~positions
   emit_audit extension_ts;
   extension_ts @ force_exit_ts
 
-(* Build the base force-liquidation channel: run the force-liq runner, then drop
-   positions already exiting via a stop this tick. Returns the trimmed channel
-   plus the stop-exited id set used to seed the running skip set. *)
+(* Build the base force-liquidation channel: run the force-liq runner, skipping
+   positions already exiting via a stop this tick (#3424: skipped before the
+   audit record is written). Returns the channel plus the stop-exited id set
+   used to seed the running skip set. *)
 let _build_force_exit_channel ~config ~positions ~get_price ~cash ~peak_tracker
     ~audit_recorder ~exit_transitions ~current_date =
-  let raw_force_exit_ts =
-    Force_liquidation_runner.update
-      ~config:config.portfolio_config.force_liquidation ~positions ~get_price
-      ~cash ~current_date ~peak_tracker ~audit_recorder
-  in
   let stop_exited_ids =
     Transition_assembly.trigger_exit_ids_of exit_transitions
   in
-  ( Transition_assembly.filter_out_exited_ids stop_exited_ids raw_force_exit_ts,
+  ( Force_liquidation_runner.update
+      ~config:config.portfolio_config.force_liquidation ~positions ~get_price
+      ~cash ~current_date ~peak_tracker ~audit_recorder
+      ~skip_position_ids:stop_exited_ids,
     stop_exited_ids )
 
 (* The ONE F5 arming gate, feeding both the eject and its audit twin. The

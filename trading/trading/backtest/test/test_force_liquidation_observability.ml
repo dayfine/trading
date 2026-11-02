@@ -131,6 +131,7 @@ let _stop_log_after_breaker ~positions ~get_price =
       ~cash:1_000_000.0 ~current_date:_exit_date
       ~peak_tracker:(FL.Peak_tracker.create ())
       ~audit_recorder:Weinstein_strategy.Audit_recorder.noop
+      ~skip_position_ids:Core.String.Set.empty
   in
   Stop_log.record_transitions stop_log transitions;
   stop_log
