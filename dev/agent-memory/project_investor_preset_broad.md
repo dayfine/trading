@@ -49,3 +49,7 @@ trades 570 / 575 / 568. N − O = −0.003 / +0.019 / +0.073 log = noise. Pre-20
 Early bears worse (2000–02 +9 vs +15 %, 2007–09 −10 vs −5 %), 2010–16 better (+0.09 to +0.11 log). Tail: PEGA/GPN/JNS
 in, CHDN/GTIV/INVX out. Pair every 26y arm against N s0–s2 (artifacts
 `dev/experiments/breadth-fix-rb1-2026-10-11/results/N-*`). See [[project_breadth_fix_ad_frozen]].
+
+**Update 2026-10-23 (#3266 rerun, PR #3397): N stays the record.** M-pre3339 s0 (fixed week bucketing #3283, CMN-deduped
+lists #3391) = 1,521.64 % vs N s0 849.28 % = +0.5355 log, V6 clean vs N. Path lottery: ADSK 2003 + 2012–14 swaps + APPS
+2020 give +0.648; rest −0.113; UP-day holdings, not exposure. Not an improvement from the fix. See [[project_26y_path_noise_floor]].

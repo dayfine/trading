@@ -1,6 +1,6 @@
 ---
 name: project_shorts_liveness_dead
-description: "Shorts liveness 10-03 (PR #3110): investor + faithful shorts on 5d = 0 fills; slow-grind gate closed 117/138 Bearish weeks; 174 admitted → 2 tickets, both above market, never filled"
+description: Shorts track — Phase B failed, index hedge, setup map and wide top all no-build (10-13); events = random member; track open-idle for short interest
 metadata:
   node_type: memory
   type: project
@@ -46,3 +46,39 @@ threshold. "Weakest stock in weakest sector" (Weak sector + RS negative-declinin
 No_structural_stop), breakdown-only entry (no half-on-pullback), macro-composite market timing (book: index early
 Stage 4), no H&S detection, mirrored score that doesn't rank. Next: pre-registered short SETUP MAP over all Stage 3→4
 breakdowns (dev/plans/short-setup-map-2026-10-12.md, PR #3274, held do-not-merge until the user confirms).
+
+**2026-10-13: setup map NO-BUILD (#3286).** The book's short setup was mapped over 45,599 Stage 3→4 breakdowns (PIT
+top-3000, 2000–25):
+- P1 (breakdown entry): median −3.76 %, beat 29.7 %.
+- P2 (pullback entry): median −1.91 %, beat 31.4 %.
+- The bar is a beat rate ≥ 55 %. Two blind analyst reads agree.
+
+**Why:**
+- With no stop, breakdowns are a coin flip against an SPY short (+60 bars: beat 51.4 %).
+- Every checklist item, given the others, selects worse shorts. SPY early Stage 4 is the worst slice, because broken
+  names rebound with the index.
+- The tight stop (the classifier's Stage 3 lasts 1–2 weeks) turns the coin flip into a loss. No stop width rescues it.
+
+**Dividends:** don't exclude payers (beat 34.2 % for both). A known ≥ 3 % dividend in the hold is slightly worse (beat
+29.5 %, n 1,093).
+
+**Recommendation:** close single-name shorts. The decision is the user's, pending. Untested levers: short interest
+(data-blocked) and a price-defined wide top (expected to fail). The existing short flags stay default-off axes until
+the user decides.
+
+**Wide-top screen, 2026-10-13 (#3294, user option (b)): CLOSE (no-build).**
+- 24,790 price-defined wide tops (late-Stage-2 52-week high, then a base break under a falling 30w MA), stop above
+  the episode high. O1 +60 beat 51.3 % (bar 55 %), median +0.50 %; $17 floor 50.8 %.
+- **Why:** the far stop (median room 38 %) makes it the no-stop hold. Against a calendar-matched random top-3000
+  member, events land at 49.1 % (the setup map's breakdowns too): a broken top carries no information about the next
+  1–6 months relative to SPY. The 2013–25 "beat" of 56 % is the cap-weight/size base rate (random member 57.0 %;
+  43–66 % by year). The book's timing window is adverse: early SPY Stage 4 events 45.4 % vs the null.
+- **Forward:** more price-shape short screens are not worth prioritizing. Short interest is the one book lever left;
+  data-gated (free FINRA exchange-listed only from 2021-06; our EODHD plan gets "Forbidden" on fundamentals, probed
+  2026-10-13). Reopen standard: pre-register any short idea against the calendar-matched null, not an SPY short alone.
+- **User decision 2026-10-13:** track stays open but idle (option c = pursue short interest); short flags stay
+  default-off axes; nothing retires.
+- **Cross-check for the long book (untested):** random members lagged SPY most in 2019/2023/2024, the long book's lag
+  years — part of "holdings lagged in UP regimes" may be universe vs cap-weighted SPY. Equal-weight benchmark idea.
+
+**User decision 2026-10-18 11:00: keep the track OPEN-IDLE** (not REJECT-do-not-revive), against the analysts' close recommendation. The short-only flags are therefore NOT Rule-4 retirement candidates. Next work, if any, is a first look at FINRA short-interest data once it is acquired; nothing is scheduled before then.
