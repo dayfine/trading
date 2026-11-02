@@ -1,9 +1,19 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-10-06
+## Last updated: 2026-11-02
 
 ## Status
 IN_PROGRESS
+
+## 2026-11-02 — laggard rotation: split-adjusted returns + streak clear, default-off (#3426, branch `feat/laggard-split-streak`)
+
+Two defects in `Laggard_rotation_runner`, each behind a new default-off
+`Laggard_rotation.config` flag (default path bit-identical, no golden moves):
+`adjusted_returns` (window returns read `adjusted_close`, so a split is not a
+loss) and `clear_streak_on_close` (streak keyed by position id, entries of
+gone/closed positions pruned). Tests: `test_laggard_split_streak.ml`.
+
+Next: a paired off/on surface on the record preset before promoting either flag.
 
 ## 2026-10-06 — shorts Phase B v0 fixes, three default-off flags (branch `feat/shorts-phase-b-fixes`)
 
