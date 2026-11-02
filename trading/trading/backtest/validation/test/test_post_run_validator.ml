@@ -445,8 +445,8 @@ let test_v12_split_straddling_position_passes _ =
   in
   assert_that (result ~id:"V12" inputs) (violations_and_pass 0 true)
 
-(* #3420 KD 2023-09-11 shape: the gate admitted 14.996 % from E; a stop-limit
-   fill 1.9 % above E (17.65) reads 16.6 % from the fill. From E it passes, while
+(* #3420 KD 2023-09-11 shape: the gate admitted 14.95 % from E; a stop-limit
+   fill 1.9 % above E (17.65) reads 16.5 % from the fill. From E it passes, while
    a stop genuinely wider than the gate from E (and with no nearer base) fails. *)
 let test_v12_measures_from_e_not_fill _ =
   let inputs =
@@ -460,7 +460,7 @@ let test_v12_measures_from_e_not_fill _ =
       audit =
         audit_of
           [
-            ("KD", ctx ~installed_stop:14.72 ~suggested_entry:17.319 ());
+            ("KD", ctx ~installed_stop:14.73 ~suggested_entry:17.319 ());
             ("WIDE", ctx ~installed_stop:80.0 ~suggested_entry:100.0 ());
           ];
     }
