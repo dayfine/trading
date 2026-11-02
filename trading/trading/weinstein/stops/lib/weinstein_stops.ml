@@ -37,8 +37,8 @@ let check_stop_hit ?(on_close = false) ~state ~side ~bar () =
   let stop_level = get_stop_level state in
   let price = _trigger_price ~on_close ~side ~bar in
   match side with
-  | Long -> Float.( <= ) price stop_level
-  | Short -> Float.( >= ) price stop_level
+  | Long -> Trading_base.Stop_trigger.sell_stop_reached ~price ~stop:stop_level
+  | Short -> Trading_base.Stop_trigger.buy_stop_reached ~price ~stop:stop_level
 
 (* ---- Initial stop computation ---- *)
 

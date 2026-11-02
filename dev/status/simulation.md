@@ -1,6 +1,16 @@
 # Status: simulation
 
-## Last updated: 2026-11-01
+## Last updated: 2026-11-02
+
+### 2026-11-02 — #3505 stop trigger absorbs float noise (fix/stop-epsilon-3505)
+
+A stop stored as `23.759999999999998` missed a bar whose low printed `23.76`
+(SGNT-wein-703 fired a day late). Every stop-trigger compare — `Weinstein_stops.check_stop_hit`,
+`Catastrophic_stop.check_hit`, `Trigger_bar_stop_fill.bar_reaches_stop`, engine
+`Fill_rules` stop activation and `Price_path.might_fill` — now goes through the new
+`Trading_base.Stop_trigger` (absolute tolerance 1e-6, far below a tick). A1: touches
+`engine/lib` and `base/lib`. `stops_surface_trace.expected` re-pinned (12 ±1e-12 probe lines
+flip false -> true, as intended).
 
 ### 2026-11-01 — #3477 resumable backtests: PRs 0–4 merged (LOCAL, do not dispatch)
 

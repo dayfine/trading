@@ -61,13 +61,12 @@ let would_fill_limit ~(path : intraday_path) ~side ~limit_price :
 
 let _meets_stop ~side ~stop_price price =
   match side with
-  | Buy -> Float.(price >= stop_price)
-  | Sell -> Float.(price <= stop_price)
+  | Buy -> Trading_base.Stop_trigger.buy_stop_reached ~price ~stop:stop_price
+  | Sell -> Trading_base.Stop_trigger.sell_stop_reached ~price ~stop:stop_price
 
 let _crosses_stop ~side ~stop_price ~prev_price ~curr_price =
-  match side with
-  | Buy -> Float.(prev_price < stop_price && curr_price >= stop_price)
-  | Sell -> Float.(prev_price > stop_price && curr_price <= stop_price)
+  (not (_meets_stop ~side ~stop_price prev_price))
+  && _meets_stop ~side ~stop_price curr_price
 
 let rec _search_stop_with_path ~(crosses : float -> float -> bool)
     ~(meets : float -> bool) ~(prev_point : path_point) = function
