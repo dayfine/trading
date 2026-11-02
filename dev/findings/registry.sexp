@@ -362,6 +362,8 @@
                 "v12_measures_from_e_not_fill"))
          (unit ("trading/trading/backtest/validation/test/test_post_run_validator.ml"
                 "v12_reads_the_gates_own_distance"))
+         (unit ("trading/trading/backtest/validation/test/test_validator_stop_macro_checks.ml"
+                "load_audit projects gate stop distance"))
          (unit ("trading/trading/backtest/test/test_trade_context.ml"
                 "fill distance uses split-restated stop (#3420)"))
          (unit ("trading/trading/backtest/test/test_trade_context.ml"

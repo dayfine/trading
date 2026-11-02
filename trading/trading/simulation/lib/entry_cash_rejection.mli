@@ -71,9 +71,9 @@ val note :
   available_cash:float ->
   budgeted_cash:float ->
   unit
-(** [note p trade ~available_cash] records that [trade] was refused when the
-    portfolio held [available_cash] gross and could spend [budgeted_cash]. The
-    first refusal of a symbol in a step wins. Shaped to be
+(** [note p trade ~available_cash ~budgeted_cash] records that [trade] was
+    refused when the portfolio held [available_cash] gross and could spend
+    [budgeted_cash]. The first refusal of a symbol in a step wins. Shaped to be
     {!Cancel_handler.apply_trades_best_effort}'s [on_reject] hook. *)
 
 val emit :

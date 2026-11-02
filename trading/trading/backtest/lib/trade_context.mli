@@ -23,7 +23,7 @@
       can exceed the gate's bound (AAON-wein-307: 0.335 after a 47-week rest,
       against a gate-basis 0.005); it is {b not} the quantity the
       [Stop_too_wide] gate bounds. [fill] is the round trip's realized entry
-      price [None] when the audit is missing or fill/stop is non-positive.
+      price. [None] when the audit is missing or fill/stop is non-positive.
     - [stop_trigger_kind] — uses the round-trip exit fill price, not the
       strategy's trigger-bar observation; string label from
       {!Stop_log.classify_stop_trigger_kind}: [gap_down] / [intraday] /

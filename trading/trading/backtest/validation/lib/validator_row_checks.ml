@@ -52,9 +52,9 @@ let check_v11 inputs = fold_steps inputs.trades ~f:(_v11_step inputs.config)
    ([entry_audit_capture.ml]). So a filled trade wider than the gate is an
    invariant break: either the gate did not fire, or the captured
    [installed_stop] disagrees with the gated stop. The distance is measured
-   exactly as the gate measures it (the audit gate distance); not against the FILL price
-   ([trade_row.entry_price] = the strategy's [effective_entry]), not the
-   screener's [suggested_entry].
+   exactly as the gate measures it (the audit gate distance), not against the
+   FILL price ([trade_row.entry_price], which can differ from the gate's
+   [effective_entry]) and not the screener's [suggested_entry].
 
    F3 exception (2026-08-10): under [config.stop_width_mode = Size_down] the
    strategy ADMITS a wider-than-gate structural stop and shrinks the share count
