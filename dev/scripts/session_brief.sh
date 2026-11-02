@@ -28,8 +28,12 @@ MAX_LINES=${SESSION_BRIEF_MAX_LINES:-150}
 STALE_DAYS=3
 
 # Newest handoff doc by the date in its name; empty when there is none.
+# Compared with the .md suffix stripped, so a suffixed doc beats the plain one of the same
+# date (<D>-eod.md > <D>.md); ties among suffixes are lexical.
 _newest_doc() {
-  ls "$NOTES_DIR"/next-session-priorities-*.md 2>/dev/null | sort | tail -1
+  newest=$(ls "$NOTES_DIR"/next-session-priorities-*.md 2>/dev/null | sed "s/\.md$//" | sort | tail -1)
+  [ -n "$newest" ] && printf "%s.md\n" "$newest"
+  return 0
 }
 
 # YYYY-MM-DD from a doc path.

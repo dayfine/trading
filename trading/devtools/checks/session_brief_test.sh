@@ -61,6 +61,13 @@ out=$(run precompact 2026-11-02 "$TMP/notes")
 out=$(run precompact 2026-11-03 "$TMP/notes")
 expect "precompact warns without today's doc" "$out" '"systemMessage": "No handoff dated 2026-11-03 (newest: 2026-11-02)'
 
+mkdir -p "$TMP/eod"
+printf "MORNING-BODY\n" > "$TMP/eod/next-session-priorities-2026-08-24.md"
+printf "EOD-BODY\n" > "$TMP/eod/next-session-priorities-2026-08-24-eod.md"
+out=$(run brief 2026-08-24 "$TMP/eod")
+expect "suffixed -eod doc beats plain same-date doc" "$out" "EOD-BODY"
+expect_not "superseded plain doc not printed" "$out" "MORNING-BODY"
+
 out=$(run brief 2026-11-02 "$TMP/empty")
 expect "brief with no docs" "$out" "No next-session-priorities doc found"
 out=$(run precompact 2026-11-02 "$TMP/empty")

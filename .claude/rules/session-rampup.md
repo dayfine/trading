@@ -72,7 +72,7 @@ session was blocked for three days (`dev/plans/delegation-lanes-2026-10-18.md`).
 ## Step 1 — Read the newest priorities doc
 
 ```bash
-ls dev/notes/next-session-priorities-*.md | sort | tail -1   # by the date in the name, not mtime
+ls dev/notes/next-session-priorities-*.md | sed "s/\.md$//" | sort | tail -1 | sed "s/$/.md/"   # by name, not mtime; suffixed (-eod) beats plain same-date
 ```
 
 The `SessionStart` hook (`dev/scripts/session_brief.sh brief`, on `startup` and `clear`)
