@@ -19,11 +19,8 @@ type reconcile_entry = {
 type reconcile_result = Reconciled of reconcile_entry | Unchanged
 
 let shard_manifest_path ~data_dir symbol =
-  let first_char = String.get symbol 0 in
-  let last_char = String.get symbol (String.length symbol - 1) in
-  Fpath.(
-    data_dir / String.make 1 first_char / String.make 1 last_char
-    / "manifest.sexp")
+  let l1, l2 = Symbol_shard.letters symbol in
+  Fpath.(data_dir / l1 / l2 / "manifest.sexp")
 
 let _log_warning fmt = Printf.eprintf (fmt ^^ "\n%!")
 

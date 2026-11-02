@@ -1,13 +1,13 @@
 ---
 name: project_sim_price_only_accounting
-description: "10-05→10-07: sim WAS price-only; #3156+#3160 add default-off cash_yield + dividend_crediting; 26y A/B (#3178): interest +0.232 log (on estimate), dividends +0.21–0.23 (specials; #3173 double count), TR CAGR 9.1–9.8 % vs SPY TR 8.2 %"
+description: "10-05→10-22: sim WAS price-only; #3156+#3160 add default-off cash_yield + dividend_crediting; 26y A/B (#3178): interest +0.232 log (on estimate), dividends +0.21–0.23 (specials; #3173 double count), TR CAGR 9.1–9.8 % vs SPY TR 8.2 %"
 metadata:
   type: project
 ---
 
 26y investor deep-dive (results-analyst, 2026-10-05): the simulator accrues nothing on positive cash (only margin debit + short borrow, `margin_runner.ml:116-121`; Sharpe rf = 0) and credits no dividends (raw-close marks). At ~49 % average cash, T-bill interest ≈ +0.24 log (×1.27) and dividends ≈ +0.13 log (×1.14) over 2000–26 → s0/s2 ≈ 9.3 % CAGR on a total-return basis vs SPY ~8.1–8.2 % (s1 ≈ 7.8 %). SPY benchmark rows (#3130) are price-only too (SPY TR +706 % vs sim BAH +401 %).
 
-s1's gap to s0 (~$1.6M) is ONE at-fill cash cancellation (ADMA, 96 % funded, log only) — 34–35 such per salt (#3138), not path luck.
+s1's gap to s0 (~$1.6M) is ONE at-fill cash cancellation (ADMA, 96 % funded, log only) — 34–35 such per salt (#3138). ~~not path luck~~ **Superseded 10-22 (chain V): it IS path luck — see the update below.**
 
 **Why:** the merged "investor trails SPY / idle cash costs" readings ([[project_investor_preset_broad]]) compared a zero-interest price-only sim with SPY total return.
 
@@ -20,3 +20,5 @@ s1's gap to s0 (~$1.6M) is ONE at-fill cash cancellation (ADMA, 96 % funded, log
 - Crediting reconstructs to < $1. The guard rejected 2–3 events per path (WING, DHLGY ticket, TDG); BCH not tested.
 - Consequence: a default-flip PR for `dividend_crediting` + `split_dividend_guard`.
 - New gap: spin-offs are not credited (BBWI→VSCO, ~0.06 log, #3215). #3174 (ex-div stops) is still default-off.
+
+**Update 2026-10-22 (chain V, PR #3383, verify-chain-v-2026-10-19): the ADMA-style at-fill cancellations ARE path luck, not a lever.** #3138's resize-to-available flag (`entry_fill_size_to_available`) was a 3-salt REFUTE: mean −0.047 log, 0/3 positive. Resizing turns ~18–19 cash-rejected entries per salt into ordinary trades (median ≈ $0; ex-ADNT −$2k…−$9k); the sign is one 2020 chain (M cancels LACO → funds APPS +$2.36M; the arm buys a smaller LACO, misses APPS, later funds ADNT). So the "not path luck" line above is superseded: the cancellation decides WHICH monster gets funded ([[project_funding_grid_monster_lottery]]). #3173 re-confirmed (TDG/WING credited once, 3/3 M cells); #3174 ex-div stop adjust: live (reduced=306) but direct effect −$14.5k / 26y — keep default-off, decide on realism. Record still N: every M−N pair fails V6 on a CMD/CMN twin in the v12 2009 list (#3266 open).

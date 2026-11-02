@@ -31,7 +31,7 @@ while IFS="$tab" read -r date nav trough drawdown; do
     # A closed trip is no longer held on its exit day. A final open row has end=last.
     [ "$end" \< "$date" ] && continue
     if [ "$end" = "$date" ] && [ "$is_open" != 1 ]; then continue; fi
-    file="$DATA/$(printf %s "$sym" | cut -c1)/$(printf %s "$sym" | rev | cut -c1)/$sym/data.csv"
+    file="$DATA/$(printf %s "$sym" | cut -c1 | tr "[:lower:]" "[:upper:]")/$(printf %s "$sym" | rev | cut -c1 | tr "[:lower:]" "[:upper:]")/$sym/data.csv"
     gain=null
     if [ -s "$file" ]; then
       gain=$(awk -v ed="$ed" -v end="$end" -v peak_date="$date" -v ep="$ep" -v qty="$qty" -v side="$side" -f "$LIB/peak_gain.awk" "$file")

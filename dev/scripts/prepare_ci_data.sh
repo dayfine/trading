@@ -105,6 +105,8 @@ SKIPPED_EMPTY=0
 for sym in $SYMBOLS; do
   first="${sym%${sym#?}}"  # first char: ${sym:0:1} in bash; posix: remove all but first
   last="${sym#"${sym%?}"}" # last char:  ${sym: -1}  in bash; posix: remove all but last
+  first=$(printf %s "$first" | tr "[:lower:]" "[:upper:]") # shard dirs are uppercase (#3506)
+  last=$(printf %s "$last" | tr "[:lower:]" "[:upper:]")
 
   src_dir="${DATA_DIR}/${first}/${last}/${sym}"
   src_csv="${src_dir}/data.csv"
