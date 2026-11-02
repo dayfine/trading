@@ -20,11 +20,14 @@
 # How it works:
 #   For each .claude/worktrees/agent-*/ directory:
 #     1. Determine the branch name from jj bookmarks (preferred) or git HEAD.
-#     2. If the branch is still present on origin → keep (PR not yet merged).
-#     3. If the branch is gone from origin and the worktree is older than
+#     2. If the worktree is locked (Claude Code locks active agent worktrees)
+#        → keep. Its worktree-agent-<id> branch is never pushed, so the
+#        origin check alone cannot tell a live agent from a merged one.
+#     3. If the branch is still present on origin → keep (PR not yet merged).
+#     4. If the branch is gone from origin and the worktree is older than
 #        --stale-hours → remove (either: PR merged + branch deleted, or:
 #        long-abandoned failed-push).
-#     4. If no branch can be determined → skip with a warning (can't decide).
+#     5. If no branch can be determined → skip with a warning (can't decide).
 #
 # This is safe to run mid-session: live branches are always preserved, and
 # the 1-hour default protects in-flight agents whose first push has not yet
@@ -147,6 +150,19 @@ for wt in "${WORKTREES_DIR}"/agent-*; do
   if [ -z "${branch}" ]; then
     log "skip: ${wt} — could not determine branch"
     skipped=$(( skipped + 1 ))
+    continue
+  fi
+
+  # -- 1b. Locked worktree? ---------------------------------------------
+  # Claude Code locks every active agent worktree (`git worktree add --lock`).
+  # Its branch, worktree-agent-<id>, is never pushed, so the origin check
+  # below always reads it as "deleted on origin" and the age gate alone
+  # reaped live agents mid-build (three on 2026-11-02, two on 2026-08-10).
+  # The lock file lives in the worktree's admin dir, so no path matching.
+  wt_git_dir=$(git -C "${wt}" rev-parse --absolute-git-dir 2>/dev/null || true)
+  if [ -n "${wt_git_dir}" ] && [ -f "${wt_git_dir}/locked" ]; then
+    log "keep: ${wt} (locked worktree, active agent)"
+    kept=$(( kept + 1 ))
     continue
   fi
 
