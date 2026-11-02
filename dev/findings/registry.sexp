@@ -359,5 +359,7 @@
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_force_liquidation_runner.ml"
                 "#3424 — skip_position_ids suppresses record and exit"))
          (unit ("trading/trading/weinstein/strategy/test/test_force_liquidation_strategy.ml"
-                "#3424 — no force-liq record for a stop-closed position (SIRI)"))))
+                "#3424 — no force-liq record for a stop-closed position (SIRI)"))
+         (unit ("trading/devtools/checks/review_pack_test.sh"
+                "#3424 fbo: SDA reads filled from above, SDB (inside the 0.5 % tolerance, no audit) stays unknown"))))
  (status fixed))

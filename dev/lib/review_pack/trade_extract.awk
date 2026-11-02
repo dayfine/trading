@@ -143,8 +143,9 @@ END {
   xin = on_x ? in_range(xp, xl, xh, fx) : 0; xsnap = (xin == 2) ? SNAP : 1
   if (esnap == "") esnap = 1
   # fill vs the entry bar's own raw open (#3424): a buy-stop that triggers inside the bar fills at or above the
-  # open, so a fill well below it was filled from above; null without an open
-  fbo = (eo > 0 && ep > 0) ? sprintf("%.4f", ep / esnap / eo - 1) : "null"
+  # open, so a fill well below it was filled from above; null without an open or when the entry date has no bar
+  # of its own (on_e 0: a Saturday-dated fill compares against another bar's open)
+  fbo = (on_e && eo > 0 && ep > 0) ? sprintf("%.4f", ep / esnap / eo - 1) : "null"
   gapup = (pre_c > 0) ? sd * (ep / esnap / pre_c - 1) * 100 : 0
   # bars from the first initial-stop breach to the exit bar (0: the exit day; -1: never breached)
   blag = (breach == "") ? -1 : xidx - bidx

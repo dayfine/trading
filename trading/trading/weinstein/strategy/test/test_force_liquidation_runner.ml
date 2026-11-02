@@ -678,7 +678,9 @@ let test_skip_position_ids_suppresses_record_and_exit _ =
     (elements_are [ equal_to "TSLA-1" ]);
   assert_that
     (List.map !captured ~f:(fun (e : FL.event) -> e.position_id))
-    (elements_are [ equal_to "TSLA-1" ])
+    (elements_are [ equal_to "TSLA-1" ]);
+  (* the peak tracker still observes the skipped position: 10,000 + 2 * 100 * 40 *)
+  assert_that (FL.Peak_tracker.peak peak_tracker) (float_equal 18_000.0)
 
 let suite =
   "force_liquidation_runner"

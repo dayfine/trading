@@ -68,7 +68,7 @@ def row:
                elif (.fvt | num | not) then null
                elif .faithful == false and .fvt > 0 then true
                elif .fvt < 0 then false
-               elif (.fbo | num) and .faithful == true then false
+               elif (.fbo | num) and .fbo >= 0 and .faithful == true then false
                else null end),
        history: null}};
 [.[] | row] as $rows
