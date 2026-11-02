@@ -19,14 +19,15 @@ val check_v8 : inputs -> Validator_step.finding
 
 val check_v12 : inputs -> Validator_step.finding
 (** V12 (INV): every filled entry's installed stop sits within
-    [config.gate_max_stop_distance_pct] of at least one base the gate could have
-    measured from: the screener's [E] (the gate's [effective_entry] on runs that
-    arm [sim_entry_trigger_at_suggested]) or the decision-bar close (its
-    [effective_entry] by default). V12 fails only when the stop is wider than
-    the gate from {b every} available base, so neither mode raises a false row.
-    The fill is not used: it sits on the split-restated basis of [trades.csv]
-    and may land up to 2 % above [E] (#3420); only a legacy audit with neither
-    base falls back to it. I.e. the [Stop_too_wide] gate that should have
+    [config.gate_max_stop_distance_pct], measured from the gate's own quantity:
+    the audit's [initial_risk_dollars / initial_position_value], which equals
+    the [Stop_too_wide] gate's [stop_distance_pct] on both E-anchored and
+    close-anchored runs (shares cancel; decision-time, so split-safe; #3420).
+    Fallback, only for audits lacking those fields: the stop is measured from
+    the screener's [E] and the decision-bar close, and V12 fails only when it is
+    wider than the gate from {b every} available base (never flags a stop the
+    gate admitted, but can pass one it rejected); a legacy audit with neither
+    base falls back to the fill. I.e. the [Stop_too_wide] gate that should have
     rejected a wider stop actually fired. Skips rows with no audit join or no
     captured [installed_stop]. *)
 

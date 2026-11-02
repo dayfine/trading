@@ -52,7 +52,7 @@ let check_v11 inputs = fold_steps inputs.trades ~f:(_v11_step inputs.config)
    ([entry_audit_capture.ml]). So a filled trade wider than the gate is an
    invariant break: either the gate did not fire, or the captured
    [installed_stop] disagrees with the gated stop. The distance is measured
-   exactly as the gate measures it — against the FILL price
+   exactly as the gate measures it (the audit gate distance); not against the FILL price
    ([trade_row.entry_price] = the strategy's [effective_entry]), not the
    screener's [suggested_entry].
 
@@ -64,7 +64,8 @@ let check_v11 inputs = fold_steps inputs.trades ~f:(_v11_step inputs.config)
    cell's [stop_width_size_down_max_pct] or V12 reports a wall of false
    failures. Under the default [Drop_over_max] the invariant holds exactly as
    stated above. *)
-(* Fallback bases, for audits that carry no gate distance (#3420). The gate
+(* Fallback bases, for audits that carry no gate distance (#3420); the
+   primary basis is the audit gate distance (_v12_pred). The gate
    measures from its [effective_entry], which is [E] when the run
    armed [sim_entry_trigger_at_suggested] and the decision-bar close otherwise
    (the default). The audit does not say which, so the stop is measured from
