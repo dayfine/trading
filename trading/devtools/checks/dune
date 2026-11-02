@@ -1560,3 +1560,13 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:r2_bars_test.sh})))
+
+; cleanup_merged_worktrees.sh must keep locked (active agent) worktrees: their
+; worktree-agent-<id> branch is never pushed, so the origin check alone reaped
+; live agents mid-build (2026-11-02). Uses a tmp git repo; no docker needed.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:cleanup_merged_lock_test.sh})))

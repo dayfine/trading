@@ -57,6 +57,7 @@
   test_late_stage2_tighten_ratchet
   test_macro_bearish_trim_runner
   test_laggard_rotation_runner
+  test_laggard_split_streak
   test_stops_runner
   test_stop_move_capture
   test_stop_decision_capture

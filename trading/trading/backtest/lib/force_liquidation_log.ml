@@ -30,3 +30,10 @@ let load_sexp path =
   let sexp = Sexp.load_sexp path in
   let blob = artefact_of_sexp sexp in
   blob.events
+
+type snapshot = Force_liquidation.event list [@@deriving sexp]
+
+(* Newest first, as stored: [events] sorts stably over recording order, so ties
+   on [(date, position_id)] depend on it. *)
+let capture t : snapshot = t.rev_events
+let restore (s : snapshot) = { rev_events = s }

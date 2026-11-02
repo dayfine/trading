@@ -57,3 +57,15 @@ val save_sexp : path:string -> t -> unit
 val load_sexp : string -> Force_liquidation.event list
 (** Inverse of {!save_sexp}. Raises if the file does not exist or fails to
     parse. *)
+
+(** {1 Checkpoint} *)
+
+type snapshot [@@deriving sexp]
+(** The recorded events, newest first, as stored: ties on [(date, position_id)]
+    break by recording order, so the order is part of the state. *)
+
+val capture : t -> snapshot
+(** Copy of the collector's state. *)
+
+val restore : snapshot -> t
+(** A fresh collector holding the snapshot's events. *)

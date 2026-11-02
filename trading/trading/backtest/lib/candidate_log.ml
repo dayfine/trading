@@ -169,3 +169,8 @@ let emit ~enabled ~scenario_dir (t : t) =
       eprintf "candidates: failed to write %s: %s\n%!"
         (_candidates_path ~scenario_dir)
         (Exn.to_string e)
+
+type snapshot = week list [@@deriving sexp]
+
+let capture c : snapshot = Queue.to_list c.weeks
+let restore (s : snapshot) = { weeks = Queue.of_list s }

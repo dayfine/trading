@@ -725,3 +725,17 @@ val sexp_of_audit_blob : audit_blob -> Sexp.t
 val audit_blob_of_sexp : Sexp.t -> audit_blob
 (** Parse a combined audit-records + cascade-summaries snapshot from sexp.
     Inverse of {!sexp_of_audit_blob}. *)
+
+(** {1 Checkpoint} *)
+
+type snapshot [@@deriving sexp]
+(** The collector's full state as plain data: every per-position bucket sorted
+    by [position_id], and the cascade summaries in insertion order. Shares
+    nothing with the live collector. *)
+
+val capture : t -> snapshot
+(** Copy of the collector's state. Later [record_*] calls do not change it. *)
+
+val restore : snapshot -> t
+(** A fresh collector holding the snapshot's state. Feeding it the remaining
+    events yields the same {!get_audit_blob} as the original. *)

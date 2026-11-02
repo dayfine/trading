@@ -383,3 +383,9 @@
  (guard ((unit ("trading/trading/simulation/test/test_cancel_handler.ml"
                 "on_reject reports the budget the floor applies"))))
  (status fixed))
+
+((issue 3426)
+ (finding "laggard rotation read raw closes across a split (forward split = false 50-75% loss exit) and keyed its streak by symbol with no clear on close (re-entry fired on first lagging Friday)")
+ (guard ((unit ("trading/trading/weinstein/strategy/test/test_laggard_split_streak.ml" "adjusted_returns: 2:1 split inside the window does not read as a loss"))
+         (unit ("trading/trading/weinstein/strategy/test/test_laggard_split_streak.ml" "clear_streak_on_close: re-entry does not fire on first lagging Friday"))))
+ (status fixed-behind-flag))

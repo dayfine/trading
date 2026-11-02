@@ -141,6 +141,15 @@ else" — plus an owner. Option (b) has one genuinely live item behind it: Next
 step 1 below (pinning per-cell tier budgets), actionable for months. Leaving
 the track as-is is the option that has been taken by default six weeks running.
 
+### Recent activity (2026-11-02) — resumable backtest, recorder checkpoints (#3477 PR 5)
+
+`Stop_log`, `Trade_audit`, `Force_liquidation_log` and `Candidate_log` each
+gain `snapshot` (sexp-able), `capture` and `restore`; hash tables are captured
+sorted by key and mutable records are copied. New `Step_journal`
+(`steps.sexpl`: `append`, `read ~n_steps`, `truncate ~n_steps`) holds the
+simulator steps outside the checkpoint. Tests: `test_recorder_checkpoint`,
+`test_step_journal`. No CLI flag and no checkpoint directory yet (PR 6, PR 7).
+
 ### Recent activity (2026-06-16) — Snapshot_columnar reader: ONE mmap per file (Rosetta VMA fix)
 
 Branch `feat/snapshot-single-mmap`. Fixes the Rosetta VMA-exhaustion crash in

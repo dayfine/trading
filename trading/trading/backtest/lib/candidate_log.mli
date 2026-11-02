@@ -210,3 +210,14 @@ val emit : enabled:bool -> scenario_dir:string -> t -> unit
     never abort the parent backtest, whose [actual.sexp] / [summary.sexp] are
     already on disk by the time this runs. Same contract as
     [Backtest_all_eligible.Scenario_post_step.emit]. *)
+
+(** {1 Checkpoint} *)
+
+type snapshot [@@deriving sexp]
+(** The recorded weeks in record order. *)
+
+val capture : collector -> snapshot
+(** Copy of the collector's weeks. *)
+
+val restore : snapshot -> collector
+(** A fresh collector holding the snapshot's weeks, in the same order. *)
