@@ -390,6 +390,17 @@ let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
 
 (** {1 Early Exit Optimization} *)
 
+(* Whether [bar] trades through a [side] stop at [stop_price], within
+   {!Trading_base.Stop_trigger.tolerance} (#3505). *)
+let _stop_might_fill (bar : price_bar) (side : side) stop_price =
+  match side with
+  | Buy ->
+      Trading_base.Stop_trigger.buy_stop_reached ~price:bar.high_price
+        ~stop:stop_price
+  | Sell ->
+      Trading_base.Stop_trigger.sell_stop_reached ~price:bar.low_price
+        ~stop:stop_price
+
 let rec might_fill (bar : price_bar) (side : side) (order_type : order_type) :
     bool =
   match order_type with
@@ -402,14 +413,9 @@ let rec might_fill (bar : price_bar) (side : side) (order_type : order_type) :
       | Sell ->
           (* Sell limit fills if price reaches or goes above limit *)
           Float.(bar.high_price >= limit_price))
-  | Stop stop_price -> (
-      match side with
-      | Buy ->
-          (* Buy stop triggers if price reaches or goes above stop *)
-          Float.(bar.high_price >= stop_price)
-      | Sell ->
-          (* Sell stop triggers if price reaches or goes below stop *)
-          Float.(bar.low_price <= stop_price))
+  | Stop stop_price ->
+      (* Buy stop triggers at or above the stop; sell stop at or below it *)
+      _stop_might_fill bar side stop_price
   | StopLimit (stop_price, limit_price) ->
       (* Stop must trigger AND limit must be reachable *)
       might_fill bar side (Stop stop_price)

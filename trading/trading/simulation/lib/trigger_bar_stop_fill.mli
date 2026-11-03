@@ -104,6 +104,7 @@ val bar_reaches_stop :
   bool
 (** [bar_reaches_stop ~side ~stop_price bar] is whether [bar] trades through
     [stop_price] on the side the exit order takes: low [<=] stop for a [Sell]
-    (closing a long), high [>=] stop for a [Buy] (covering a short). The
-    conversion guard of {!select}, shared with
-    {!Margin_runner.drop_margin_exits_for_traded_stops}. *)
+    (closing a long), high [>=] stop for a [Buy] (covering a short), both within
+    {!Trading_base.Stop_trigger.tolerance} (#3505). The conversion guard of
+    {!select}, shared with {!Margin_runner.drop_margin_exits_for_traded_stops}.
+*)

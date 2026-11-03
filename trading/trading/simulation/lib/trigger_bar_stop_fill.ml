@@ -14,8 +14,12 @@ let stop_price_by_position transitions =
 (* Whether [bar] trades through [stop_price] on the side [side] exits at. *)
 let bar_reaches_stop ~side ~stop_price (bar : Trading_engine.Types.price_bar) =
   match (side : Trading_base.Types.side) with
-  | Sell -> Float.( <= ) bar.low_price stop_price
-  | Buy -> Float.( >= ) bar.high_price stop_price
+  | Sell ->
+      Trading_base.Stop_trigger.sell_stop_reached ~price:bar.low_price
+        ~stop:stop_price
+  | Buy ->
+      Trading_base.Stop_trigger.buy_stop_reached ~price:bar.high_price
+        ~stop:stop_price
 
 (* The [Stop] re-typing of [order], when it is a Market exit for a stop-loss
    position whose fresh bar reaches the stop; [None] otherwise. *)

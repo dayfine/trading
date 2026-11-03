@@ -16,5 +16,9 @@ let check_hit ~armed ~pct ~trailing_high ~bar ~side =
   else
     let level = trigger_level ~pct ~trailing_high ~side in
     match side with
-    | Long -> Float.( <= ) bar.Types.Daily_price.low_price level
-    | Short -> Float.( >= ) bar.Types.Daily_price.high_price level
+    | Long ->
+        Trading_base.Stop_trigger.sell_stop_reached
+          ~price:bar.Types.Daily_price.low_price ~stop:level
+    | Short ->
+        Trading_base.Stop_trigger.buy_stop_reached
+          ~price:bar.Types.Daily_price.high_price ~stop:level
