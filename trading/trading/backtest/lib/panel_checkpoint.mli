@@ -5,7 +5,8 @@ open Core
 
 type window = Date.t * Date.t * int * float
 (** [(start_date, end_date, warmup_days, initial_cash)]: with the strategy
-    config, what identifies a run. *)
+    config, what identifies a run. Commission, slippage and the cost model are
+    not part of the identity, so a resume does not notice them changing. *)
 
 type resumed = Backtest_checkpoint.header * Backtest_checkpoint.state
 (** A loaded, validated checkpoint. *)

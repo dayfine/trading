@@ -136,9 +136,10 @@ val run :
     any other [strategy_choice] raises [Failure]. [None] (the default) builds
     the strategy without an explicit state and takes no hook: bit-identical to
     before. With [request.resume] the run first loads the checkpoint in
-    [request.scenario_dir] (refusing on any identity mismatch), restores the
-    recorders, strategy state and simulator from it, and steps on from the
-    checkpoint's date; it fails if [candidate_log] is also given.
+    [request.scenario_dir] (refusing when the strategy config, window, cash,
+    build, snapshot content or seed salt differ; costs are not checked),
+    restores the recorders, strategy state and simulator from it, and steps on
+    from the checkpoint's date; it fails if [candidate_log] is also given.
 
     [strategy_choice], when passed, selects which strategy module the simulator
     runs (#882). Defaults to {!Strategy_choice.Weinstein} —

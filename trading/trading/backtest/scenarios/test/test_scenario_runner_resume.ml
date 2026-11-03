@@ -165,6 +165,70 @@ let test_resume_without_checkpoint_is_refused _ =
            (equal_to true);
        ])
 
+(* [--resume] accepts the scenario directory or its [checkpoint/] subdirectory,
+   with or without a trailing slash, and resolves the output root they sit in. *)
+let test_plan_accepts_scenario_or_checkpoint_dir _ =
+  let dir = _stage_armed_scenario () in
+  let path = Filename.concat dir (_scenario_name ^ ".sexp") in
+  let scenario = Scenario_lib.Scenario.load path in
+  let plan resume =
+    let scenarios, root =
+      Scenario_lib.Checkpoint_cli.plan ~resume:(Some resume)
+        [ (path, scenario) ]
+    in
+    (List.map scenarios ~f:(fun (_, s) -> s.Scenario_lib.Scenario.name), root)
+  in
+  let expected = ([ _scenario_name ], "/runs/root") in
+  let results =
+    List.map
+      [
+        "/runs/root/" ^ _scenario_name;
+        "/runs/root/" ^ _scenario_name ^ "/checkpoint";
+        "/runs/root/" ^ _scenario_name ^ "/checkpoint/";
+      ]
+      ~f:plan
+  in
+  _rm_rf dir;
+  assert_that results
+    (elements_are [ equal_to expected; equal_to expected; equal_to expected ])
+
+(* A resume naming a scenario that is not under [--dir] exits 1. *)
+let test_resume_of_unknown_scenario_is_refused _ =
+  let dir = _stage_armed_scenario () in
+  let code, text = _run ~dir "--resume /tmp/some-root/no-such-scenario" in
+  _rm_rf dir;
+  assert_that (code, text)
+    (all_of
+       [
+         field (fun (c, _) -> c) (equal_to 1);
+         field
+           (fun (_, t) ->
+             String.is_substring t
+               ~substring:"expected exactly one scenario named no-such-scenario")
+           (equal_to true);
+       ])
+
+(* [--resume] with [--emit-candidates] is refused, not silently run. *)
+let test_resume_with_emit_candidates_is_refused _ =
+  let dir = _stage_armed_scenario () in
+  let empty = Stdlib.Filename.temp_dir "resume_cand_" "" in
+  Core_unix.mkdir_p (Filename.concat empty _scenario_name);
+  let code, text =
+    _run ~dir
+      (sprintf "--emit-candidates --resume %s"
+         (Filename.quote (Filename.concat empty _scenario_name)))
+  in
+  List.iter [ dir; empty ] ~f:_rm_rf;
+  assert_that (code, text)
+    (all_of
+       [
+         field (fun (c, _) -> Int.(c <> 0)) (equal_to true);
+         field
+           (fun (_, t) ->
+             String.is_substring t ~substring:"does not support candidate")
+           (equal_to true);
+       ])
+
 let suite =
   "Scenario_runner_resume"
   >::: [
@@ -172,6 +236,12 @@ let suite =
          >:: test_pause_and_resume_is_byte_identical;
          "resume with no checkpoint is refused"
          >:: test_resume_without_checkpoint_is_refused;
+         "plan accepts the scenario or its checkpoint dir"
+         >:: test_plan_accepts_scenario_or_checkpoint_dir;
+         "resume of an unknown scenario is refused"
+         >:: test_resume_of_unknown_scenario_is_refused;
+         "resume with emit-candidates is refused"
+         >:: test_resume_with_emit_candidates_is_refused;
        ]
 
 (* Same fallback as the sibling subprocess tests: the local dev container does

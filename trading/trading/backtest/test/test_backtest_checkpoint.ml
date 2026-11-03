@@ -438,6 +438,44 @@ let test_load_refuses_unparseable_component _ =
             (_refusal dir ~expect:_identity)
             (_mentions "simulator.sexp")))
 
+(* A component that parses as a sexp but has the wrong structure is refused,
+   naming the file ([Checkpoint_files.read_as]). *)
+let test_load_refuses_wrong_shape_component _ =
+  _with_sim (fun sim ->
+      _with_dir (fun dir ->
+          _write_exn dir (_state sim);
+          Out_channel.write_all
+            (_checkpoint_file dir "strategy.sexp")
+            ~data:"(foo bar)";
+          assert_that
+            (_refusal dir ~expect:_identity)
+            (_mentions "strategy.sexp")))
+
+(* Resuming with a candidate collector is refused before any file is read. *)
+let test_resume_with_candidate_capture_is_refused _ =
+  let module M = Snapshot_pipeline.Snapshot_manifest in
+  let request =
+    {
+      BC.scenario_dir = "/nonexistent";
+      every_n_fridays = 1;
+      resume = true;
+      halt_after_checkpoints = None;
+    }
+  in
+  let candidate_log = Backtest.Candidate_log.create_if true in
+  assert_raises
+    (Failure "Panel_runner: --resume does not support candidate capture")
+    (fun () ->
+      Backtest.Panel_checkpoint.load_resume ~checkpoint:(Some request)
+        ~config:
+          (Weinstein_strategy.default_config ~universe:[]
+             ~index_symbol:"GSPC.INDX")
+        ~window:(_date "2024-01-02", _date "2024-06-28", 364, 100_000.0)
+        ~manifest:
+          (M.create ~schema:Data_panel_snapshot.Snapshot_schema.default
+             ~entries:[])
+        ~candidate_log)
+
 let test_failed_write_warns_and_continues _ =
   _with_sim (fun sim ->
       _with_dir (fun dir ->
@@ -522,6 +560,10 @@ let suite =
          >:: test_load_refuses_missing_component;
          "load refuses an unparseable component"
          >:: test_load_refuses_unparseable_component;
+         "load refuses a wrong-shape component"
+         >:: test_load_refuses_wrong_shape_component;
+         "resume with candidate capture is refused"
+         >:: test_resume_with_candidate_capture_is_refused;
          "failed write warns and continues"
          >:: test_failed_write_warns_and_continues;
          "manifest identity ignores paths and mtimes"

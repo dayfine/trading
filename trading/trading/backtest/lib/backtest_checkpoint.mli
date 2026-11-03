@@ -83,8 +83,9 @@ val load :
 type request = {
   scenario_dir : string;
   every_n_fridays : int;
-      (** Checkpoint on every N-th Friday; [Int.max_value] never writes (a
-          resume-only run). *)
+      (** Checkpoint on every N-th Friday, counted from the start of this run (a
+          resumed run counts from its resume point); [Int.max_value] never
+          writes (a resume-only run). *)
   resume : bool;
       (** Continue from the checkpoint already in [scenario_dir] instead of
           starting from the window's first day (#3477 PR 7). *)
