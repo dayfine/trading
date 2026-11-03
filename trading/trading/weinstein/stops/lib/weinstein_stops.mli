@@ -317,7 +317,9 @@ val check_stop_hit :
 (** [true] if the bar's trigger price crossed the stop level.
 
     Default ([on_close = false]) uses the intra-bar extreme — Long: triggered by
-    [low_price ≤ stop_level]; Short: [high_price ≥ stop_level].
+    [low_price ≤ stop_level]; Short: [high_price ≥ stop_level]. Both compares go
+    through {!Trading_base.Stop_trigger}, so a price equal to the stop up to
+    float noise triggers it (#3505).
 
     With [on_close = true] the trigger uses the bar's [close_price] instead
     (Long: [close ≤ stop_level]; Short: [close ≥ stop_level]) — Weinstein's

@@ -12,6 +12,21 @@ perf-tier fix described in the 2026-09-21 weekly-review entry below.
 
 ## Weekly review (`.claude/rules/perf-review-weekly.md`, ~2 h/week — user 2026-09-20)
 
+- **2026-11-02 (weekly read)**: perf-weekly 11-02 (run 41483315296) vs 10-26
+  (40332412818): all 12 cells PASS, peak RSS within 1 % on every cell, wall
+  +29 to +41 % on every non-trivial cell (`sp500-2010-2026` 304 → 405 s,
+  `weinstein-2019-top-500` 84 → 118 s). The move is uniform across cells and
+  the nightly `bull-crash-2015-2020` cell swings 71 to 121 s over 10-26..11-02
+  with no monotone trend (71 s on 11-02 itself), so runner speed variance is
+  the first suspect, not code; no ticket. The workflows do not log the runner
+  CPU model, which is what would settle it. `perf_long_cells.sh check`: no new
+  cells since 10-29; the two 10y cap-256 SLOWER shapes are still unrechecked
+  on a quiet host. Issue audit: 17 open; 4 stale `verify/pending` (#3206,
+  #3183, #3145, #3109) commented, all waiting on backtest capacity (cloud
+  default) or the parked shorts track. Usage: backfill wrote `local-2026-10-27.json`;
+  10-28..10-31 failed (`token_usage_report.sh` exit 4: a live transcript in
+  another project grew mid-read), so no usage row this week; retry when no
+  other session is writing.
 - **2026-10-29 (tier-4 Seeded re-pin chain, `dev/experiments/tier4-seeded-repin-2026-10-29/`)**:
   30 cells added to `perf-long-cells.csv`. `perf_long_cells.sh check` flags two
   10y shapes as SLOWER: `top-3000-2014|10y|cap256` 68 s/yr vs a median of 36

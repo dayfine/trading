@@ -98,6 +98,7 @@ three shell-only PRs). Same day as the perf read, same "write it down" rule.
 | `dev/budget/local-<date>.json` | local session: Claude main + every dispatch, Codex runs | `sh dev/scripts/budget_local_record.sh` at session end (`session-rampup.md` §Maintenance); backfill missed days with `--date` |
 | `dev/budget/<date>-<run>.json` | GHA orchestrator runs, `total_cost_usd` | the orchestrator's cost step |
 | `dev/reviews/codex-agreement.md` | Codex verdict vs Claude gates + `codex tok in/out` | `codex_agreement_row.sh <PR> --append` at merge |
+| cloud session runs (`RemoteTrigger` routines) | per run: model, turns, wall time (`result:` lines of the run log); no token counts | dispatcher, at the weekly read: `RemoteTrigger list`, then `list_runs` per routine fired that week and `get_run_log` per run. No script: the API is reachable only through the in-session tool |
 
 **The table (one row per week, in `dev/status/cost-tracking.md` §Usage review):**
 
@@ -110,12 +111,13 @@ three shell-only PRs). Same day as the perf read, same "write it down" rule.
 | Codex cost per finding | `codex-agreement.md`: `codex tok in/out` ÷ codex-only items | (d): compare with the Claude gates' tokens per finding |
 | GHA $ per run | `<date>-<run>.json` totals | trend only |
 | tokens per model | `.claude.totals.by_model` (per model: `api_calls`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`; each row's own `model`/`models` fields carry the same split per dispatch/session) | (e): once work is routed by model/effort (verdict-bearing analysis → top model at max effort, structural QC → haiku), spend should shift toward the cheaper model on bulk QC lanes — a `by_model` split that still reads top-heavy on the expensive model after routing lands is a signal the routing isn't actually being followed |
+| cloud runs (count, turns, wall h, by model) | the cloud-run rows above, set against the week's seven-day quota move (`quota_status.sh`) | trend only; a single run above ~150 turns or ~3 h of model time gets a look at its log that week (a looping or runaway session) |
 
 Two consecutive weeks of rows → the first optimisation decision, recorded in
 the same section with the numbers that drove it. What the sources do **not**
 cover (say it rather than infer it): dollars for local sessions (transcripts
-carry no price), transcripts from any other machine, and Codex runs made
-outside `codex_review.sh`.
+carry no price), transcripts from any other machine (cloud sessions: turns and wall time only, no
+tokens), and Codex runs made outside `codex_review.sh`.
 
 ## What QC can check
 

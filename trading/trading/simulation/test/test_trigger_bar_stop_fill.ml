@@ -266,6 +266,47 @@ let test_execute_leaves_other_pending_orders_alone _ =
                  (equal_to (Pending : Trading_orders.Types.order_status))));
        ])
 
+(* #3505, SGNT-wein-703: the stop is stored with float noise, and the 2014-08-04
+   low prints exactly at it to the cent. *)
+let _sgnt_stop = 23.759999999999998
+let _sgnt_low = 23.76
+
+(* A low equal to the stop to the cent reaches it; a low one tick (or more)
+   above does not. Short side mirrored on the high. *)
+let test_sgnt_low_equal_to_stop_within_tick_reaches_it _ =
+  let reaches side ~low ~high =
+    Stop_fill.bar_reaches_stop ~side ~stop_price:_sgnt_stop
+      (_bar ~open_price:24.0 ~high ~low ())
+  in
+  assert_that
+    [
+      reaches Sell ~low:_sgnt_low ~high:24.5;
+      reaches Sell ~low:23.77 ~high:24.5;
+      reaches Sell ~low:23.80 ~high:24.5;
+      reaches Buy ~low:23.0 ~high:_sgnt_low;
+      reaches Buy ~low:23.0 ~high:23.75;
+    ]
+    (equal_to [ true; false; false; true; false ])
+
+(* End to end through the engine: the converted Stop fills on the SGNT bar
+   instead of reverting to a next-day Market order. *)
+let test_sgnt_stop_fills_on_the_bar_whose_low_equals_it _ =
+  let engine, order_manager =
+    _engine_and_manager [ _bar ~open_price:24.0 ~high:24.5 ~low:_sgnt_low () ]
+  in
+  let stop_order =
+    { (_market_order ~id:"O1" ~side:Sell ()) with order_type = Stop _sgnt_stop }
+  in
+  assert_that
+    (Stop_fill.execute ~engine ~order_manager ~date:_date [ stop_order ])
+    (is_ok_and_holds
+       (elements_are
+          [
+            field
+              (fun (t : Trading_base.Types.trade) -> t.price)
+              (float_equal ~epsilon:0.005 _sgnt_low);
+          ]))
+
 (* #3206: the flag takes effect only with same-bar stop fills in force. *)
 let test_beats_margin_enabled_truth_table _ =
   let combos =
@@ -308,6 +349,10 @@ let suite =
          "execute reverts an unfilled order to Market"
          >:: test_execute_reverts_an_unfilled_order_to_market;
          "execute of no orders is a no-op" >:: test_execute_empty_is_a_no_op;
+         "SGNT stop 23.759999999999998 is reached by low 23.76 not 23.77"
+         >:: test_sgnt_low_equal_to_stop_within_tick_reaches_it;
+         "SGNT stop fills on the bar whose low equals it"
+         >:: test_sgnt_stop_fills_on_the_bar_whose_low_equals_it;
        ]
 
 let () = run_test_tt_main suite

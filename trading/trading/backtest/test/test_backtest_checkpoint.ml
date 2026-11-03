@@ -62,8 +62,16 @@ let _fresh_sim data_dir =
   in
   create_exn ~config:_config ~deps
 
+(* OUnit runs cases in parallel processes and [with_test_data] recreates its
+   directory by name, so each call gets a name no other case shares. *)
+let _sim_counter = ref 0
+
 let _with_sim f =
-  with_test_data "backtest_checkpoint"
+  Int.incr _sim_counter;
+  with_test_data
+    (sprintf "backtest_checkpoint_%d_%d"
+       (Pid.to_int (Core_unix.getpid ()))
+       !_sim_counter)
     [ ("AAPL", _bars) ]
     ~f:(fun d -> f (_fresh_sim d))
 
@@ -104,6 +112,7 @@ let _texts (s : BC.state) =
     Backtest.Stop_log.sexp_of_snapshot s.stop_log;
     Backtest.Trade_audit.sexp_of_snapshot s.trade_audit;
     Backtest.Force_liquidation_log.sexp_of_snapshot s.force_liquidation_log;
+    Option.sexp_of_t Backtest.Candidate_log.sexp_of_snapshot s.candidate_log;
   ]
   |> List.map ~f:Sexp.to_string
 
@@ -235,7 +244,10 @@ let _hook_dates sim =
   let dates = ref [] in
   let _ =
     Backtest.Panel_step_loop.run_simulator_with_gc_trace
-      ~on_friday:(fun ~date _ -> dates := date :: !dates)
+      ~on_friday:(fun ~date hooked_sim ->
+        let next = (Sim.Checkpoint.capture hooked_sim).current_date in
+        assert_that next (equal_to (Date.add_days date 1));
+        dates := date :: !dates)
       ~stop_log:(Backtest.Stop_log.create ())
       sim
   in
@@ -279,6 +291,182 @@ let test_friday_hook_writes_every_nth_friday _ =
               Sys_unix.file_exists_exn (Filename.concat dir BC.dir_name) )
             (equal_to (false, true))))
 
+let _checkpoint_file dir name =
+  Filename.concat (Filename.concat dir BC.dir_name) name
+
+let test_candidates_round_trip _ =
+  _with_sim (fun sim ->
+      _with_dir (fun dir ->
+          let state =
+            {
+              (_state sim) with
+              candidate_log = Some Backtest.Candidate_log.(capture (create ()));
+            }
+          in
+          _write_exn dir state;
+          assert_that
+            ( _load dir ~expect:_identity,
+              Sys_unix.file_exists_exn (_checkpoint_file dir "candidates.sexp")
+            )
+            (all_of
+               [
+                 field fst
+                   (is_ok_and_holds
+                      (field
+                         (fun (_, (s : BC.state)) ->
+                           (Option.is_some s.candidate_log, _texts s))
+                         (equal_to (true, _texts state))));
+                 field snd (equal_to true);
+               ])))
+
+let test_no_candidates_loads_as_none _ =
+  _with_sim (fun sim ->
+      _with_dir (fun dir ->
+          _write_exn dir (_state sim);
+          assert_that
+            ( _load dir ~expect:_identity,
+              Sys_unix.file_exists_exn (_checkpoint_file dir "candidates.sexp")
+            )
+            (all_of
+               [
+                 field fst
+                   (is_ok_and_holds
+                      (field
+                         (fun (_, (s : BC.state)) ->
+                           Option.is_none s.candidate_log)
+                         (equal_to true)));
+                 field snd (equal_to false);
+               ])))
+
+let _run_key = Sexp.of_string "(cfg 2024)"
+let _manifest = Sexp.of_string "(manifest 1)"
+
+let _identity_with ~run_key =
+  BC.identity_of ~run_key ~manifest:_manifest ~seed_salt:None
+
+let test_identity_of_digests_inputs _ =
+  let base = _identity_with ~run_key:_run_key in
+  assert_that
+    ( String.equal base.config_digest
+        (_identity_with ~run_key:_run_key).config_digest,
+      String.equal base.config_digest
+        (_identity_with ~run_key:(Sexp.of_string "(cfg 2025)")).config_digest,
+      base.build_sha )
+    (equal_to (true, false, Backtest.Build_info.git_sha))
+
+let _setup ~request ~weinstein =
+  BC.setup ~resumed:None ~request ~weinstein ~run_key:_run_key
+    ~manifest:_manifest
+    ~stop_log:(Backtest.Stop_log.create ())
+    ~trade_audit:(Backtest.Trade_audit.create ())
+    ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+    ~candidate_log:None
+
+let test_setup_without_request_arms_nothing _ =
+  let state, hook = _setup ~request:None ~weinstein:true in
+  assert_that
+    (Option.is_none state, Option.is_none hook)
+    (equal_to (true, true))
+
+let test_setup_with_request_arms_both _ =
+  let request =
+    Some
+      {
+        BC.scenario_dir = "unused";
+        every_n_fridays = 1;
+        resume = false;
+        halt_after_checkpoints = None;
+      }
+  in
+  let state, hook = _setup ~request ~weinstein:true in
+  assert_that
+    (Option.is_some state, Option.is_some hook)
+    (equal_to (true, true))
+
+let test_setup_refuses_other_strategies _ =
+  let request =
+    Some
+      {
+        BC.scenario_dir = "unused";
+        every_n_fridays = 1;
+        resume = false;
+        halt_after_checkpoints = None;
+      }
+  in
+  assert_that
+    (Result.is_error
+       (Result.try_with (fun () -> _setup ~request ~weinstein:false)))
+    (equal_to true)
+
+let test_setup_refuses_non_positive_cadence _ =
+  let outcome n =
+    Result.try_with (fun () ->
+        _setup
+          ~request:
+            (Some
+               {
+                 BC.scenario_dir = "unused";
+                 every_n_fridays = n;
+                 resume = false;
+                 halt_after_checkpoints = None;
+               })
+          ~weinstein:true)
+    |> Result.error
+    |> Option.map ~f:Exn.to_string
+  in
+  assert_that
+    [ outcome 0; outcome (-1) ]
+    (elements_are [ _mentions "every_n_fridays"; _mentions "every_n_fridays" ])
+
+let test_load_refuses_missing_component _ =
+  _with_sim (fun sim ->
+      _with_dir (fun dir ->
+          _write_exn dir (_state sim);
+          Core_unix.unlink (_checkpoint_file dir "strategy.sexp");
+          assert_that
+            (_refusal dir ~expect:_identity)
+            (_mentions "strategy.sexp")))
+
+let test_load_refuses_unparseable_component _ =
+  _with_sim (fun sim ->
+      _with_dir (fun dir ->
+          _write_exn dir (_state sim);
+          Out_channel.write_all
+            (_checkpoint_file dir "simulator.sexp")
+            ~data:"((unbalanced";
+          assert_that
+            (_refusal dir ~expect:_identity)
+            (_mentions "simulator.sexp")))
+
+let test_failed_write_warns_and_continues _ =
+  _with_sim (fun sim ->
+      _with_dir (fun dir ->
+          let blocker = Filename.concat dir "blocker" in
+          Out_channel.write_all blocker ~data:"a regular file";
+          let scenario_dir = Filename.concat blocker "scenario" in
+          let hook =
+            BC.friday_hook
+              ~request:
+                {
+                  scenario_dir;
+                  every_n_fridays = 1;
+                  resume = false;
+                  halt_after_checkpoints = None;
+                }
+              ~identity:_identity
+              ~strategy_state:
+                (Strategy_state.init ~initial_stop_states:String.Map.empty)
+              ~stop_log:(Backtest.Stop_log.create ())
+              ~trade_audit:(Backtest.Trade_audit.create ())
+              ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+              ~candidate_log:None
+          in
+          hook ~date:(_date "2024-01-05") sim;
+          assert_that
+            (Sys_unix.file_exists_exn
+               (Filename.concat scenario_dir BC.dir_name))
+            (equal_to false)))
+
 (* The identity of a snapshot must not depend on where a CSV-mode run built it
    or on source-file mtimes, but must follow the content. *)
 let test_manifest_sexp_ignores_paths_and_mtimes _ =
@@ -320,6 +508,22 @@ let suite =
          "hook fires only on Fridays" >:: test_hook_fires_only_on_fridays;
          "friday hook writes every nth Friday"
          >:: test_friday_hook_writes_every_nth_friday;
+         "candidates round-trip" >:: test_candidates_round_trip;
+         "no candidates loads as none" >:: test_no_candidates_loads_as_none;
+         "identity_of digests its inputs" >:: test_identity_of_digests_inputs;
+         "setup without request arms nothing"
+         >:: test_setup_without_request_arms_nothing;
+         "setup with request arms both" >:: test_setup_with_request_arms_both;
+         "setup refuses a non-positive cadence"
+         >:: test_setup_refuses_non_positive_cadence;
+         "setup refuses other strategies"
+         >:: test_setup_refuses_other_strategies;
+         "load refuses a missing component"
+         >:: test_load_refuses_missing_component;
+         "load refuses an unparseable component"
+         >:: test_load_refuses_unparseable_component;
+         "failed write warns and continues"
+         >:: test_failed_write_warns_and_continues;
          "manifest identity ignores paths and mtimes"
          >:: test_manifest_sexp_ignores_paths_and_mtimes;
        ]
