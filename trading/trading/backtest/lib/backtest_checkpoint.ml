@@ -48,38 +48,7 @@ let _final ~scenario_dir = Filename.concat scenario_dir dir_name
 let _tmp ~scenario_dir = _final ~scenario_dir ^ ".tmp"
 let _old ~scenario_dir = _final ~scenario_dir ^ ".old"
 
-(* Remove a flat directory of files; absent is fine. *)
-let _remove_dir dir =
-  if Sys_unix.file_exists_exn dir then (
-    Array.iter (Sys_unix.readdir dir) ~f:(fun f ->
-        Core_unix.unlink (Filename.concat dir f));
-    Core_unix.rmdir dir)
-
 (* ---- Component files ---- *)
-
-let _write_sexp ~dir name sexp =
-  Out_channel.write_all (Filename.concat dir name)
-    ~data:(Sexp.to_string_hum sexp ^ "\n")
-
-let _read_sexp ~dir name =
-  let path = Filename.concat dir name in
-  if not (Sys_unix.file_exists_exn path) then
-    Status.error_not_found (sprintf "checkpoint file missing: %s" path)
-  else
-    try Ok (Sexp.load_sexp path)
-    with e ->
-      Status.error_invalid_argument
-        (sprintf "checkpoint file %s does not parse: %s" path (Exn.to_string e))
-
-(* Parse a component, naming the file when the sexp has the wrong shape. *)
-let _read_as ~dir name of_sexp =
-  let open Result.Let_syntax in
-  let%bind sexp = _read_sexp ~dir name in
-  try Ok (of_sexp sexp)
-  with e ->
-    Status.error_invalid_argument
-      (sprintf "checkpoint file %s/%s is malformed: %s" dir name
-         (Exn.to_string e))
 
 (* Write every component into [dir]. The journal goes first and the header last,
    so a header on disk implies the rest was written. *)
@@ -87,15 +56,19 @@ let _write_components ~dir ~identity (s : state) =
   let steps = s.simulator.steps in
   Step_journal.append ~path:(Filename.concat dir Step_journal.file_name) steps;
   let simulator = { s.simulator with steps = [] } in
-  _write_sexp ~dir "simulator.sexp" (Sim.Checkpoint.sexp_of_snapshot simulator);
-  _write_sexp ~dir "strategy.sexp" (Strategy_state.sexp_of_snapshot s.strategy);
-  _write_sexp ~dir "stop_log.sexp" (Stop_log.sexp_of_snapshot s.stop_log);
-  _write_sexp ~dir "trade_audit.sexp"
+  Checkpoint_files.write_sexp ~dir "simulator.sexp"
+    (Sim.Checkpoint.sexp_of_snapshot simulator);
+  Checkpoint_files.write_sexp ~dir "strategy.sexp"
+    (Strategy_state.sexp_of_snapshot s.strategy);
+  Checkpoint_files.write_sexp ~dir "stop_log.sexp"
+    (Stop_log.sexp_of_snapshot s.stop_log);
+  Checkpoint_files.write_sexp ~dir "trade_audit.sexp"
     (Trade_audit.sexp_of_snapshot s.trade_audit);
-  _write_sexp ~dir "force_liquidation_log.sexp"
+  Checkpoint_files.write_sexp ~dir "force_liquidation_log.sexp"
     (Force_liquidation_log.sexp_of_snapshot s.force_liquidation_log);
   Option.iter s.candidate_log ~f:(fun c ->
-      _write_sexp ~dir "candidates.sexp" (Candidate_log.sexp_of_snapshot c));
+      Checkpoint_files.write_sexp ~dir "candidates.sexp"
+        (Candidate_log.sexp_of_snapshot c));
   let header =
     {
       version;
@@ -104,7 +77,7 @@ let _write_components ~dir ~identity (s : state) =
       identity;
     }
   in
-  _write_sexp ~dir "header.sexp" (sexp_of_header header)
+  Checkpoint_files.write_sexp ~dir "header.sexp" (sexp_of_header header)
 
 (* Swap [tmp] in as the checkpoint. The previous one is parked under [.old]
    until the new one is in place, so no step leaves [checkpoint/] half-written. *)
@@ -112,20 +85,20 @@ let _commit ~scenario_dir =
   let final = _final ~scenario_dir and old = _old ~scenario_dir in
   if Sys_unix.file_exists_exn final then Core_unix.rename ~src:final ~dst:old;
   Core_unix.rename ~src:(_tmp ~scenario_dir) ~dst:final;
-  _remove_dir old
+  Checkpoint_files.remove_dir old
 
 let write ?(before_commit = fun () -> ()) ~scenario_dir ~identity state =
   let tmp = _tmp ~scenario_dir in
   try
-    _remove_dir tmp;
-    _remove_dir (_old ~scenario_dir);
+    Checkpoint_files.remove_dir tmp;
+    Checkpoint_files.remove_dir (_old ~scenario_dir);
     Core_unix.mkdir_p tmp;
     _write_components ~dir:tmp ~identity state;
     before_commit ();
     _commit ~scenario_dir;
     Ok ()
   with e ->
-    (try _remove_dir tmp with _ -> ());
+    (try Checkpoint_files.remove_dir tmp with _ -> ());
     Status.error_internal
       (sprintf "checkpoint write failed in %s: %s" scenario_dir
          (Exn.to_string e))
@@ -166,14 +139,16 @@ let _validate_header (h : header) ~(expect : identity) =
 let _read_candidates ~dir =
   if Sys_unix.file_exists_exn (Filename.concat dir "candidates.sexp") then
     Result.map
-      (_read_as ~dir "candidates.sexp" Candidate_log.snapshot_of_sexp)
+      (Checkpoint_files.read_as ~dir "candidates.sexp"
+         Candidate_log.snapshot_of_sexp)
       ~f:Option.some
   else Ok None
 
 let _read_state ~dir ~(header : header) =
   let open Result.Let_syntax in
   let%bind simulator =
-    _read_as ~dir "simulator.sexp" Sim.Checkpoint.snapshot_of_sexp
+    Checkpoint_files.read_as ~dir "simulator.sexp"
+      Sim.Checkpoint.snapshot_of_sexp
   in
   let%bind steps =
     Step_journal.read
@@ -181,14 +156,18 @@ let _read_state ~dir ~(header : header) =
       ~n_steps:header.n_steps
   in
   let%bind strategy =
-    _read_as ~dir "strategy.sexp" Strategy_state.snapshot_of_sexp
+    Checkpoint_files.read_as ~dir "strategy.sexp"
+      Strategy_state.snapshot_of_sexp
   in
-  let%bind stop_log = _read_as ~dir "stop_log.sexp" Stop_log.snapshot_of_sexp in
+  let%bind stop_log =
+    Checkpoint_files.read_as ~dir "stop_log.sexp" Stop_log.snapshot_of_sexp
+  in
   let%bind trade_audit =
-    _read_as ~dir "trade_audit.sexp" Trade_audit.snapshot_of_sexp
+    Checkpoint_files.read_as ~dir "trade_audit.sexp"
+      Trade_audit.snapshot_of_sexp
   in
   let%bind force_liquidation_log =
-    _read_as ~dir "force_liquidation_log.sexp"
+    Checkpoint_files.read_as ~dir "force_liquidation_log.sexp"
       Force_liquidation_log.snapshot_of_sexp
   in
   let%map candidate_log = _read_candidates ~dir in
@@ -207,7 +186,9 @@ let load ~scenario_dir ~expect =
   if not (Sys_unix.file_exists_exn dir) then
     Status.error_not_found (sprintf "no checkpoint at %s" dir)
   else
-    let%bind header = _read_as ~dir "header.sexp" header_of_sexp in
+    let%bind header =
+      Checkpoint_files.read_as ~dir "header.sexp" header_of_sexp
+    in
     let%bind () = _validate_header header ~expect in
     let%map state = _read_state ~dir ~header in
     (header, state)
