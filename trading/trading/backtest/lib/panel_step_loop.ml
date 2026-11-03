@@ -89,8 +89,10 @@ let _fire_on_friday on_friday ~date sim =
     passed, is invoked with the same completed step — the artefact-streaming
     hook (#2502). *)
 let run_simulator_with_gc_trace ?gc_trace ?cache_sampler ?progress_acc ?on_step
-    ?on_friday ~stop_log sim =
-  let start_date = (Simulator.get_config sim).start_date in
+    ?on_friday ?resume_date ~stop_log sim =
+  let start_date =
+    Option.value resume_date ~default:(Simulator.get_config sim).start_date
+  in
   let rec loop sim ~pending_date =
     Stop_log.set_current_date stop_log pending_date;
     match step_loop_iter ?gc_trace ?cache_sampler ~date:pending_date sim with

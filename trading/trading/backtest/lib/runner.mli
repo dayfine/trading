@@ -200,6 +200,7 @@ val run_backtest :
   ?candidate_log:Candidate_log.collector ->
   ?on_step_setup:Panel_runner.step_hook_setup ->
   ?universe_membership_at:(string -> Date.t -> bool) ->
+  ?checkpoint:Backtest_checkpoint.request ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -314,10 +315,12 @@ val run_backtest :
     through the simulator step loop. See {!Backtest_progress.emitter}. Used by
     [backtest_runner.exe]'s [--progress-every] flag to emit a tail-able
     [progress.sexp] mid-run; tests install a recording emitter to pin emission
-    cadence. Resumability is intentionally NOT in this PR — the checkpoint is
-    read-only progress information; restartability of the simulator state is a
-    follow-up (deferred per the data-pipeline-automation plan, §"Open question
-    4").
+    cadence. That checkpoint is read-only progress information; resumable state
+    is [checkpoint] below.
+
+    [checkpoint], when passed, is threaded to {!Panel_runner.run}: write a
+    resumable checkpoint every [every_n_fridays] Fridays and/or resume from the
+    one in [scenario_dir] (#3477 PR 7). [None] (the default) is bit-identical.
 
     [on_step_setup], when passed, is threaded to {!Panel_runner.run} as its
     per-step observer — the mid-run artefact-streaming seam (#2502). Build it

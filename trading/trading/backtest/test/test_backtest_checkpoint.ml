@@ -253,7 +253,13 @@ let test_friday_hook_writes_every_nth_friday _ =
           let state = _state sim in
           let hook =
             BC.friday_hook
-              ~request:{ scenario_dir = dir; every_n_fridays = 2 }
+              ~request:
+                {
+                  scenario_dir = dir;
+                  every_n_fridays = 2;
+                  resume = false;
+                  halt_after_checkpoints = None;
+                }
               ~identity:_identity
               ~strategy_state:
                 (Strategy_state.init ~initial_stop_states:String.Map.empty)
@@ -273,6 +279,31 @@ let test_friday_hook_writes_every_nth_friday _ =
               Sys_unix.file_exists_exn (Filename.concat dir BC.dir_name) )
             (equal_to (false, true))))
 
+(* The identity of a snapshot must not depend on where a CSV-mode run built it
+   or on source-file mtimes, but must follow the content. *)
+let test_manifest_sexp_ignores_paths_and_mtimes _ =
+  let module M = Snapshot_pipeline.Snapshot_manifest in
+  let schema = Data_panel_snapshot.Snapshot_schema.default in
+  let entry ?(path = "/tmp/a/AAPL.snap") ?(mtime = 1.0) ?(md5 = "abc") () =
+    {
+      M.symbol = "AAPL";
+      path;
+      byte_size = 10;
+      payload_md5 = md5;
+      csv_mtime = mtime;
+      active_through = None;
+    }
+  in
+  let sexp e =
+    Backtest.Panel_checkpoint.manifest_sexp (M.create ~schema ~entries:[ e ])
+  in
+  assert_that
+    ( Sexp.equal
+        (sexp (entry ()))
+        (sexp (entry ~path:"/tmp/b/AAPL.snap" ~mtime:2.0 ())),
+      Sexp.equal (sexp (entry ())) (sexp (entry ~md5:"def" ())) )
+    (equal_to (true, false))
+
 let suite =
   "backtest_checkpoint"
   >::: [
@@ -289,6 +320,8 @@ let suite =
          "hook fires only on Fridays" >:: test_hook_fires_only_on_fridays;
          "friday hook writes every nth Friday"
          >:: test_friday_hook_writes_every_nth_friday;
+         "manifest identity ignores paths and mtimes"
+         >:: test_manifest_sexp_ignores_paths_and_mtimes;
        ]
 
 let () = run_test_tt_main suite

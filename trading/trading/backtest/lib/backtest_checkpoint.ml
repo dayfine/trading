@@ -214,7 +214,12 @@ let load ~scenario_dir ~expect =
 
 (* ---- Friday hook ---- *)
 
-type request = { scenario_dir : string; every_n_fridays : int }
+type request = {
+  scenario_dir : string;
+  every_n_fridays : int;
+  resume : bool;
+  halt_after_checkpoints : int option;
+}
 
 let _capture ~strategy_state ~stop_log ~trade_audit ~force_liquidation_log
     ~candidate_log sim =
@@ -229,35 +234,61 @@ let _capture ~strategy_state ~stop_log ~trade_audit ~force_liquidation_log
 
 let _write_or_warn ~scenario_dir ~identity ~date state =
   match write ~scenario_dir ~identity state with
-  | Ok () -> ()
+  | Ok () -> true
   | Error e ->
       eprintf "WARNING: checkpoint at %s not written: %s\n"
-        (Date.to_string date) (Status.show e)
+        (Date.to_string date) (Status.show e);
+      false
+
+let _halt_exit_code = 75
+
+(* Test-only pause: leave the process once [halt_after_checkpoints] checkpoints
+   are on disk. *)
+let _halt_if_due ~request ~written =
+  match request.halt_after_checkpoints with
+  | Some k when written >= k ->
+      eprintf "Backtest_checkpoint: halting after %d checkpoint(s)\n%!" written;
+      Stdlib.exit _halt_exit_code
+  | _ -> ()
 
 let friday_hook ~request ~identity ~strategy_state ~stop_log ~trade_audit
     ~force_liquidation_log ~candidate_log =
-  let fridays = ref 0 in
+  let fridays = ref 0 and written = ref 0 in
   fun ~date sim ->
     Int.incr fridays;
     if !fridays % request.every_n_fridays = 0 then
-      _capture ~strategy_state ~stop_log ~trade_audit ~force_liquidation_log
-        ~candidate_log sim
-      |> _write_or_warn ~scenario_dir:request.scenario_dir ~identity ~date
+      let state =
+        _capture ~strategy_state ~stop_log ~trade_audit ~force_liquidation_log
+          ~candidate_log sim
+      in
+      if _write_or_warn ~scenario_dir:request.scenario_dir ~identity ~date state
+      then (
+        Int.incr written;
+        _halt_if_due ~request ~written:!written)
 
-let _setup_armed ~request ~run_key ~manifest ~stop_log ~trade_audit
-    ~force_liquidation_log ~candidate_log =
-  let state = Strategy_state.init ~initial_stop_states:String.Map.empty in
-  let identity =
-    identity_of ~run_key ~manifest
-      ~seed_salt:(Sys.getenv "TRADING_PATH_SEED_SALT")
+let _expected_identity ~run_key ~manifest =
+  identity_of ~run_key ~manifest
+    ~seed_salt:(Sys.getenv "TRADING_PATH_SEED_SALT")
+
+let load_for_resume ~request ~run_key ~manifest =
+  load ~scenario_dir:request.scenario_dir
+    ~expect:(_expected_identity ~run_key ~manifest)
+
+let _setup_armed ~resumed ~request ~run_key ~manifest ~stop_log ~trade_audit
+    ~force_liquidation_log ~candidate_log () =
+  let state =
+    match (resumed : state option) with
+    | Some s -> Strategy_state.restore s.strategy
+    | None -> Strategy_state.init ~initial_stop_states:String.Map.empty
   in
+  let identity = _expected_identity ~run_key ~manifest in
   let hook =
     friday_hook ~request ~identity ~strategy_state:state ~stop_log ~trade_audit
       ~force_liquidation_log ~candidate_log
   in
   (Some state, Some hook)
 
-let setup ~request ~weinstein ~run_key ~manifest ~stop_log ~trade_audit
+let setup ~resumed ~request ~weinstein ~run_key ~manifest ~stop_log ~trade_audit
     ~force_liquidation_log ~candidate_log =
   match request with
   | None -> (None, None)
@@ -265,5 +296,5 @@ let setup ~request ~weinstein ~run_key ~manifest ~stop_log ~trade_audit
       failwith
         "Backtest_checkpoint: checkpointing supports the Weinstein strategy"
   | Some request ->
-      _setup_armed ~request ~run_key ~manifest ~stop_log ~trade_audit
-        ~force_liquidation_log ~candidate_log
+      _setup_armed ~resumed ~request ~run_key ~manifest ~stop_log ~trade_audit
+        ~force_liquidation_log ~candidate_log ()

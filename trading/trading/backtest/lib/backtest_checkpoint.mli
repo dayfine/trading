@@ -80,9 +80,28 @@ val load :
 
 (** {1 Friday hook} *)
 
-type request = { scenario_dir : string; every_n_fridays : int }
+type request = {
+  scenario_dir : string;
+  every_n_fridays : int;
+      (** Checkpoint on every N-th Friday; [Int.max_value] never writes (a
+          resume-only run). *)
+  resume : bool;
+      (** Continue from the checkpoint already in [scenario_dir] instead of
+          starting from the window's first day (#3477 PR 7). *)
+  halt_after_checkpoints : int option;
+      (** Test-only: [Stdlib.exit 75] once this many checkpoints have been
+          written, simulating a killed run. [None] in production. *)
+}
 (** Ask a run to checkpoint into [scenario_dir] on every [every_n_fridays]-th
-    Friday. *)
+    Friday, and optionally to resume from the checkpoint found there. *)
+
+val load_for_resume :
+  request:request ->
+  run_key:Sexp.t ->
+  manifest:Sexp.t ->
+  (header * state) Status.status_or
+(** {!load} the checkpoint in [request.scenario_dir], validated against the
+    identity {!setup} would write for this [run_key] and [manifest]. *)
 
 val friday_hook :
   request:request ->
@@ -101,6 +120,7 @@ val friday_hook :
     stderr and the run continues. *)
 
 val setup :
+  resumed:state option ->
   request:request option ->
   weinstein:bool ->
   run_key:Sexp.t ->
@@ -111,7 +131,8 @@ val setup :
   candidate_log:Candidate_log.collector option ->
   Weinstein_strategy.Weinstein_strategy_state.t option
   * (date:Date.t -> Trading_simulation.Simulator.t -> unit) option
-(** What a run needs to checkpoint: the fresh strategy state it must build its
+(** What a run needs to checkpoint: the strategy state (fresh, or restored from
+    [Some] [resumed], the state {!load_for_resume} returned) it must build its
     strategy over (via {!Weinstein_strategy.make_with_state}) and the
     {!friday_hook} sharing it, with an identity digested from [run_key],
     [manifest] and the build. [(None, None)] without a [request], which is the

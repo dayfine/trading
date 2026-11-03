@@ -1,0 +1,42 @@
+(** See [checkpoint_cli.mli]. *)
+
+open Core
+
+let request ~scenario_dir
+    ({ every_n_fridays; resume; halt_after_checkpoints } :
+      Cli_args.checkpoint_flags) =
+  if Option.is_none every_n_fridays && Option.is_none resume then None
+  else
+    Some
+      {
+        Backtest.Backtest_checkpoint.scenario_dir;
+        every_n_fridays = Option.value every_n_fridays ~default:Int.max_value;
+        resume = Option.is_some resume;
+        halt_after_checkpoints;
+      }
+
+let _scenario_dir_of path =
+  let path = String.rstrip path ~drop:(Char.equal '/') in
+  if String.equal (Filename.basename path) Backtest.Backtest_checkpoint.dir_name
+  then Filename.dirname path
+  else path
+
+let plan ~resume scenarios =
+  match resume with
+  | None ->
+      ( scenarios,
+        Output_root.make_timestamped_root ~repo_root:(Cli_args.repo_root ()) )
+  | Some path -> (
+      let dir = _scenario_dir_of path in
+      let name = Filename.basename dir in
+      match
+        List.filter scenarios ~f:(fun (_, s) ->
+            String.equal s.Scenario.name name)
+      with
+      | [ one ] -> ([ one ], Filename.dirname dir)
+      | _ ->
+          eprintf
+            "--resume %s: expected exactly one scenario named %s in the \
+             scenario directory\n"
+            path name;
+          Stdlib.exit 1)
