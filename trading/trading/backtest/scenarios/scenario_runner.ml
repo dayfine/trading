@@ -5,6 +5,7 @@
     [--goldens-small | --goldens-broad | --goldens | --smoke | --dir <path>]
     [--parallel N] [--fixtures-root <path>] [--snapshot-dir <path>]
     [--progress-every N] [--no-emit-all-eligible] [--emit-candidates]
+    [--checkpoint-every N] [--resume <scenario-dir>]
 
     [--goldens-small] — small-universe goldens (~300 symbols; local-friendly).
     [--goldens-broad] — broad-universe goldens (full sector-map; nightly/GHA).
@@ -65,6 +66,7 @@ module Scenario_progress = Scenario_lib.Scenario_progress
 module Bar_source_resolver = Scenario_lib.Bar_source_resolver
 open Scenario_lib.Scenario_checks
 module Cli_args = Scenario_lib.Cli_args
+module Checkpoint_cli = Scenario_lib.Checkpoint_cli
 module Output_root = Scenario_lib.Output_root
 
 (* Run one scenario inside a child process *)
@@ -85,8 +87,8 @@ let _emit_fold_health ~scenario_dir ~(result : Backtest.Runner.result) =
   Backtest.Fold_health_runner.emit ~output_dir:scenario_dir result
 
 let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
-    ~emit_all_eligible ~emit_candidates ~bar_data_source ~scenario_path
-    (s : Scenario.t) =
+    ~emit_all_eligible ~emit_candidates ~bar_data_source ~checkpoint
+    ~scenario_path (s : Scenario.t) =
   eprintf "\n>>> Running %s: %s (%s to %s)\n%!" s.name s.description
     (Date.to_string s.period.start_date)
     (Date.to_string s.period.end_date);
@@ -113,7 +115,9 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
           ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter
           ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ?bar_data_source
           ?candidate_log:(Backtest.Candidate_log.create_if emit_candidates)
-          ?universe_membership_at ?on_step_setup ())
+          ?universe_membership_at ?on_step_setup
+          ?checkpoint:(Checkpoint_cli.request ~scenario_dir checkpoint)
+          ())
   in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   (* Post-step: per-week candidate list (#2490). Runs after the canonical
@@ -177,13 +181,14 @@ let _write_crashed_actual ~output_root (s : Scenario.t) ~msg =
     (sexp_of_actual (crashed_actual ~msg))
 
 let _fork_scenario ~output_root ~fixtures_root ~progress_every
-    ~emit_all_eligible ~emit_candidates ~bar_data_source ~scenario_path
-    (s : Scenario.t) =
+    ~emit_all_eligible ~emit_candidates ~bar_data_source ~checkpoint
+    ~scenario_path (s : Scenario.t) =
   match Core_unix.fork () with
   | `In_the_child -> (
       try
         _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
-          ~emit_all_eligible ~emit_candidates ~bar_data_source ~scenario_path s;
+          ~emit_all_eligible ~emit_candidates ~bar_data_source ~checkpoint
+          ~scenario_path s;
         Stdlib.exit 0
       with e ->
         let msg = Exn.to_string e in
@@ -208,7 +213,7 @@ let _await_one running =
 
 let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
     ~progress_every ~emit_all_eligible ~emit_candidates ~bar_data_source
-    (scenarios : (string * Scenario.t) list) =
+    ~checkpoint (scenarios : (string * Scenario.t) list) =
   let running = Queue.create () in
   let statuses = Hashtbl.create (module String) in
   let reap () =
@@ -221,7 +226,8 @@ let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
       if Queue.length running >= parallel then reap ();
       let pid =
         _fork_scenario ~output_root ~fixtures_root ~progress_every
-          ~emit_all_eligible ~emit_candidates ~bar_data_source ~scenario_path s
+          ~emit_all_eligible ~emit_candidates ~bar_data_source ~checkpoint
+          ~scenario_path s
       in
       Queue.enqueue running (s, pid));
   while not (Queue.is_empty running) do
@@ -242,6 +248,7 @@ let () =
     progress_every;
     emit_all_eligible;
     emit_candidates;
+    checkpoint;
   } =
     Cli_args.parse_args ()
   in
@@ -272,14 +279,14 @@ let () =
   let scenarios_with_paths =
     List.map files ~f:(fun file -> (file, Scenario.load file))
   in
-  let output_root =
-    Output_root.make_timestamped_root ~repo_root:(Cli_args.repo_root ())
+  let scenarios_with_paths, output_root =
+    Checkpoint_cli.plan ~resume:checkpoint.resume scenarios_with_paths
   in
   eprintf "Output root: %s\n%!" output_root;
   let results =
     _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
       ~progress_every ~emit_all_eligible ~emit_candidates ~bar_data_source
-      scenarios_with_paths
+      ~checkpoint scenarios_with_paths
   in
   print_header ();
   let pass_flags =

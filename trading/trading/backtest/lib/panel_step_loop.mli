@@ -66,6 +66,7 @@ val run_simulator_with_gc_trace :
     step:Trading_simulation_types.Simulator_types.step_result ->
     unit) ->
   ?on_friday:(date:Date.t -> Simulator.t -> unit) ->
+  ?resume_date:Date.t ->
   stop_log:Stop_log.t ->
   Simulator.t ->
   Trading_simulation_types.Simulator_types.run_result
@@ -85,4 +86,8 @@ val run_simulator_with_gc_trace :
     (after [on_step]), with that date and the simulator positioned at the next
     day. It is the checkpoint seam (#3477): [Panel_runner] builds the closure
     from {!Backtest_checkpoint.friday_hook}. It may read the simulator but must
-    not change the run; omitting it is bit-identical to the loop without it. *)
+    not change the run; omitting it is bit-identical to the loop without it.
+
+    [resume_date], when provided, is the first date to step: the date of a
+    simulator restored from a checkpoint (#3477 PR 7), whose own config still
+    holds the window start. Omitting it steps from the config's start date. *)

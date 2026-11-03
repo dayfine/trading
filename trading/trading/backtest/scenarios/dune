@@ -12,7 +12,8 @@
   output_root
   scenario_checks
   scenario_universe
-  cli_args)
+  cli_args
+  checkpoint_cli)
  (libraries
   core
   core_unix

@@ -13,7 +13,8 @@
   test_scenario_progress
   test_bar_source_resolver
   test_ladder_v4_overlays
-  test_output_root)
+  test_output_root
+  test_scenario_runner_resume)
  (modules
   test_scenario
   test_universe_file
@@ -28,7 +29,8 @@
   test_scenario_progress
   test_bar_source_resolver
   test_ladder_v4_overlays
-  test_output_root)
+  test_output_root
+  test_scenario_runner_resume)
  (libraries
   ounit2
   core

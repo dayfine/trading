@@ -265,7 +265,13 @@ let test_friday_hook_writes_every_nth_friday _ =
           let state = _state sim in
           let hook =
             BC.friday_hook
-              ~request:{ scenario_dir = dir; every_n_fridays = 2 }
+              ~request:
+                {
+                  scenario_dir = dir;
+                  every_n_fridays = 2;
+                  resume = false;
+                  halt_after_checkpoints = None;
+                }
               ~identity:_identity
               ~strategy_state:
                 (Strategy_state.init ~initial_stop_states:String.Map.empty)
@@ -349,7 +355,8 @@ let test_identity_of_digests_inputs _ =
     (equal_to (true, false, Backtest.Build_info.git_sha))
 
 let _setup ~request ~weinstein =
-  BC.setup ~request ~weinstein ~run_key:_run_key ~manifest:_manifest
+  BC.setup ~resumed:None ~request ~weinstein ~run_key:_run_key
+    ~manifest:_manifest
     ~stop_log:(Backtest.Stop_log.create ())
     ~trade_audit:(Backtest.Trade_audit.create ())
     ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
@@ -362,14 +369,30 @@ let test_setup_without_request_arms_nothing _ =
     (equal_to (true, true))
 
 let test_setup_with_request_arms_both _ =
-  let request = Some { BC.scenario_dir = "unused"; every_n_fridays = 1 } in
+  let request =
+    Some
+      {
+        BC.scenario_dir = "unused";
+        every_n_fridays = 1;
+        resume = false;
+        halt_after_checkpoints = None;
+      }
+  in
   let state, hook = _setup ~request ~weinstein:true in
   assert_that
     (Option.is_some state, Option.is_some hook)
     (equal_to (true, true))
 
 let test_setup_refuses_other_strategies _ =
-  let request = Some { BC.scenario_dir = "unused"; every_n_fridays = 1 } in
+  let request =
+    Some
+      {
+        BC.scenario_dir = "unused";
+        every_n_fridays = 1;
+        resume = false;
+        halt_after_checkpoints = None;
+      }
+  in
   assert_that
     (Result.is_error
        (Result.try_with (fun () -> _setup ~request ~weinstein:false)))
@@ -379,7 +402,14 @@ let test_setup_refuses_non_positive_cadence _ =
   let outcome n =
     Result.try_with (fun () ->
         _setup
-          ~request:(Some { BC.scenario_dir = "unused"; every_n_fridays = n })
+          ~request:
+            (Some
+               {
+                 BC.scenario_dir = "unused";
+                 every_n_fridays = n;
+                 resume = false;
+                 halt_after_checkpoints = None;
+               })
           ~weinstein:true)
     |> Result.error
     |> Option.map ~f:Exn.to_string
@@ -408,6 +438,44 @@ let test_load_refuses_unparseable_component _ =
             (_refusal dir ~expect:_identity)
             (_mentions "simulator.sexp")))
 
+(* A component that parses as a sexp but has the wrong structure is refused,
+   naming the file ([Checkpoint_files.read_as]). *)
+let test_load_refuses_wrong_shape_component _ =
+  _with_sim (fun sim ->
+      _with_dir (fun dir ->
+          _write_exn dir (_state sim);
+          Out_channel.write_all
+            (_checkpoint_file dir "strategy.sexp")
+            ~data:"(foo bar)";
+          assert_that
+            (_refusal dir ~expect:_identity)
+            (_mentions "strategy.sexp")))
+
+(* Resuming with a candidate collector is refused before any file is read. *)
+let test_resume_with_candidate_capture_is_refused _ =
+  let module M = Snapshot_pipeline.Snapshot_manifest in
+  let request =
+    {
+      BC.scenario_dir = "/nonexistent";
+      every_n_fridays = 1;
+      resume = true;
+      halt_after_checkpoints = None;
+    }
+  in
+  let candidate_log = Backtest.Candidate_log.create_if true in
+  assert_raises
+    (Failure "Panel_runner: --resume does not support candidate capture")
+    (fun () ->
+      Backtest.Panel_checkpoint.load_resume ~checkpoint:(Some request)
+        ~config:
+          (Weinstein_strategy.default_config ~universe:[]
+             ~index_symbol:"GSPC.INDX")
+        ~window:(_date "2024-01-02", _date "2024-06-28", 364, 100_000.0)
+        ~manifest:
+          (M.create ~schema:Data_panel_snapshot.Snapshot_schema.default
+             ~entries:[])
+        ~candidate_log)
+
 let test_failed_write_warns_and_continues _ =
   _with_sim (fun sim ->
       _with_dir (fun dir ->
@@ -416,7 +484,13 @@ let test_failed_write_warns_and_continues _ =
           let scenario_dir = Filename.concat blocker "scenario" in
           let hook =
             BC.friday_hook
-              ~request:{ scenario_dir; every_n_fridays = 1 }
+              ~request:
+                {
+                  scenario_dir;
+                  every_n_fridays = 1;
+                  resume = false;
+                  halt_after_checkpoints = None;
+                }
               ~identity:_identity
               ~strategy_state:
                 (Strategy_state.init ~initial_stop_states:String.Map.empty)
@@ -430,6 +504,31 @@ let test_failed_write_warns_and_continues _ =
             (Sys_unix.file_exists_exn
                (Filename.concat scenario_dir BC.dir_name))
             (equal_to false)))
+
+(* The identity of a snapshot must not depend on where a CSV-mode run built it
+   or on source-file mtimes, but must follow the content. *)
+let test_manifest_sexp_ignores_paths_and_mtimes _ =
+  let module M = Snapshot_pipeline.Snapshot_manifest in
+  let schema = Data_panel_snapshot.Snapshot_schema.default in
+  let entry ?(path = "/tmp/a/AAPL.snap") ?(mtime = 1.0) ?(md5 = "abc") () =
+    {
+      M.symbol = "AAPL";
+      path;
+      byte_size = 10;
+      payload_md5 = md5;
+      csv_mtime = mtime;
+      active_through = None;
+    }
+  in
+  let sexp e =
+    Backtest.Panel_checkpoint.manifest_sexp (M.create ~schema ~entries:[ e ])
+  in
+  assert_that
+    ( Sexp.equal
+        (sexp (entry ()))
+        (sexp (entry ~path:"/tmp/b/AAPL.snap" ~mtime:2.0 ())),
+      Sexp.equal (sexp (entry ())) (sexp (entry ~md5:"def" ())) )
+    (equal_to (true, false))
 
 let suite =
   "backtest_checkpoint"
@@ -461,8 +560,14 @@ let suite =
          >:: test_load_refuses_missing_component;
          "load refuses an unparseable component"
          >:: test_load_refuses_unparseable_component;
+         "load refuses a wrong-shape component"
+         >:: test_load_refuses_wrong_shape_component;
+         "resume with candidate capture is refused"
+         >:: test_resume_with_candidate_capture_is_refused;
          "failed write warns and continues"
          >:: test_failed_write_warns_and_continues;
+         "manifest identity ignores paths and mtimes"
+         >:: test_manifest_sexp_ignores_paths_and_mtimes;
        ]
 
 let () = run_test_tt_main suite

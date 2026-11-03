@@ -285,13 +285,13 @@ let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
 let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
     ?strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
     ?progress_emitter ?slippage_bps ?cost_model ?candidate_log
-    ?universe_membership_at () =
+    ?universe_membership_at ?checkpoint () =
   Panel_runner.run
     ~input:(_panel_input_of_deps deps)
     ~start_date ~end_date ~warmup_days ~initial_cash ~commission
     ?strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
     ?progress_emitter ?slippage_bps ?cost_model ?candidate_log ?on_step_setup
-    ?universe_membership_at ()
+    ?universe_membership_at ?checkpoint ()
 
 let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
     ~final_value ~round_trips ~sim_result ~stale_holds : Summary.t =
@@ -455,7 +455,7 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
-    ?candidate_log ?on_step_setup ?universe_membership_at () =
+    ?candidate_log ?on_step_setup ?universe_membership_at ?checkpoint () =
   let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
   let warmup_days = warmup_days_for strategy_choice in
   let warmup_start = Date.add_days start_date (-warmup_days) in
@@ -469,7 +469,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
       ~strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
       ?progress_emitter ?slippage_bps ?cost_model ?candidate_log
-      ?universe_membership_at ()
+      ?universe_membership_at ?checkpoint ()
   in
   Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
   _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result ~stop_log

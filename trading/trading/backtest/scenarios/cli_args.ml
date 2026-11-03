@@ -14,6 +14,16 @@ let _goldens_broad_dir () =
 
 let _smoke_dir () = repo_root () ^ "trading/test_data/backtest_scenarios/smoke"
 
+type checkpoint_flags = {
+  every_n_fridays : int option;  (** [--checkpoint-every N]. *)
+  resume : string option;
+      (** [--resume <dir>]: continue the one scenario whose artefact directory
+          (or its [checkpoint/] subdirectory) is [dir]. *)
+  halt_after_checkpoints : int option;
+      (** [--halt-after-checkpoint K], test-only: exit 75 after K checkpoints.
+      *)
+}
+
 type t = {
   dir : string;
   parallel : int;
@@ -48,6 +58,8 @@ type t = {
          writes [<scenario_dir>/candidates.sexp] (#2490). Default [false]: this
          one opts IN, because unlike the all-eligible diagnostic it costs
          strategy-side work on every screened Friday. *)
+  checkpoint : checkpoint_flags;
+      (* Resumable-backtest flags (#3477); all unset by default. *)
 }
 
 let _default_parallel = 4
@@ -57,7 +69,7 @@ let _usage () =
     "Usage: scenario_runner [--goldens-small | --goldens-broad | --goldens | \
      --smoke | --dir <path>] [--parallel N] [--fixtures-root <path>] \
      [--snapshot-dir <path>] [--progress-every N] [--no-emit-all-eligible] \
-     [--emit-candidates]\n";
+     [--emit-candidates] [--checkpoint-every N] [--resume <scenario-dir>]\n";
   Stdlib.exit 1
 
 let _parse_progress_every n_str =
@@ -65,6 +77,13 @@ let _parse_progress_every n_str =
   | Some n when n >= 1 -> n
   | _ ->
       eprintf "--progress-every requires a positive integer argument\n";
+      Stdlib.exit 1
+
+let _parse_positive flag n_str =
+  match Int.of_string_opt n_str with
+  | Some n when n >= 1 -> n
+  | _ ->
+      eprintf "%s requires a positive integer argument\n" flag;
       Stdlib.exit 1
 
 (* Mutable accumulator for the parse. Using a record (rather than threading 7
@@ -78,6 +97,9 @@ type _parse_acc = {
   mutable progress_every : int option;
   mutable emit_all_eligible : bool;
   mutable emit_candidates : bool;
+  mutable checkpoint_every : int option;
+  mutable resume : string option;
+  mutable halt_after_checkpoint : int option;
 }
 
 let _finalize_acc (acc : _parse_acc) : t =
@@ -91,6 +113,12 @@ let _finalize_acc (acc : _parse_acc) : t =
         ~default:Scenario_progress.default_every_n_fridays;
     emit_all_eligible = acc.emit_all_eligible;
     emit_candidates = acc.emit_candidates;
+    checkpoint =
+      {
+        every_n_fridays = acc.checkpoint_every;
+        resume = acc.resume;
+        halt_after_checkpoints = acc.halt_after_checkpoint;
+      };
   }
 
 let _parse_flag args =
@@ -103,6 +131,9 @@ let _parse_flag args =
       progress_every = None;
       emit_all_eligible = true;
       emit_candidates = false;
+      checkpoint_every = None;
+      resume = None;
+      halt_after_checkpoint = None;
     }
   in
   let rec loop args =
@@ -140,6 +171,16 @@ let _parse_flag args =
         loop rest
     | "--emit-candidates" :: rest ->
         acc.emit_candidates <- true;
+        loop rest
+    | "--checkpoint-every" :: n :: rest ->
+        acc.checkpoint_every <- Some (_parse_positive "--checkpoint-every" n);
+        loop rest
+    | "--halt-after-checkpoint" :: n :: rest ->
+        acc.halt_after_checkpoint <-
+          Some (_parse_positive "--halt-after-checkpoint" n);
+        loop rest
+    | "--resume" :: path :: rest ->
+        acc.resume <- Some path;
         loop rest
     | _ -> _usage ()
   in

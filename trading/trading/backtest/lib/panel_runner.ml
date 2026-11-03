@@ -336,10 +336,19 @@ let _bind_step_hook ~(r : _recorders) setup =
       f ~stop_log:r.stop_log ~trade_audit:r.trade_audit
         ~force_liquidation_log:r.force_liquidation_log)
 
-let _create_recorders ?candidate_log () : _recorders =
-  let stop_log = Stop_log.create () in
-  let trade_audit = Trade_audit.create () in
-  let force_liquidation_log = Force_liquidation_log.create () in
+let _create_recorders ?candidate_log
+    ?(restored : Backtest_checkpoint.state option) () : _recorders =
+  let stop_log, trade_audit, force_liquidation_log =
+    match restored with
+    | None ->
+        ( Stop_log.create (),
+          Trade_audit.create (),
+          Force_liquidation_log.create () )
+    | Some s ->
+        ( Stop_log.restore s.stop_log,
+          Trade_audit.restore s.trade_audit,
+          Force_liquidation_log.restore s.force_liquidation_log )
+  in
   let stale_hold_log = Trading_simulation.Stale_hold.Log.create () in
   let audit_recorder =
     Trade_audit_recorder.of_collector ?candidate_log ~stop_log ~trade_audit
@@ -399,10 +408,10 @@ let _build_sim input ~r ~(ca : Panel_corporate_actions.t) ~start_date
     ~prune_universe_by_active_through ~strategy ~market_data_adapter ()
 
 (* The Fill-phase step loop inside its trace span, with the caller's step hook
-   bound to this run's recorders. Extracted so [run] stays under the
-   function-length cap. *)
+   bound to this run's recorders (extracted to keep [run] short). *)
 let _run_steps ~r ~trace ~gc_trace ~cache_sampler ~progress_emitter
-    ~warmup_start ~end_date ~on_step_setup ~on_friday ~n_all_symbols sim =
+    ~warmup_start ~end_date ~on_step_setup ~on_friday ?resume_date
+    ~n_all_symbols sim =
   let progress_acc =
     Loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date
   in
@@ -410,26 +419,28 @@ let _run_steps ~r ~trace ~gc_trace ~cache_sampler ~progress_emitter
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
         Loop.run_simulator_with_gc_trace ?gc_trace ~cache_sampler ?progress_acc
           ?on_step:(_bind_step_hook ~r on_step_setup)
-          ?on_friday ~stop_log:r.stop_log sim)
+          ?on_friday ?resume_date ~stop_log:r.stop_log sim)
   in
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   result
 
-(* Checkpointing (#3477): the strategy-state handle and the Friday hook, both
-   [None] without a request. *)
-let _checkpoint_hooks ~checkpoint ~strategy_choice ~(input : input) ~window
-    ~manifest ~(r : _recorders) ~candidate_log =
-  let start_date, end_date, warmup_days, initial_cash = window in
-  Backtest_checkpoint.setup ~request:checkpoint
-    ~weinstein:(Strategy_choice.equal strategy_choice Strategy_choice.Weinstein)
-    ~run_key:
-      (Sexp.List
-         (Weinstein_strategy.sexp_of_config input.config
-          :: List.map ~f:Date.sexp_of_t [ start_date; end_date ]
-         @ [ sexp_of_int warmup_days; sexp_of_float initial_cash ]))
-    ~manifest:(Snapshot_pipeline.Snapshot_manifest.sexp_of_t manifest)
-    ~stop_log:r.stop_log ~trade_audit:r.trade_audit
-    ~force_liquidation_log:r.force_liquidation_log ~candidate_log
+(* Checkpoint wiring (#3477): the checkpoint being resumed, the recorders
+   (restored from it, or fresh), and the strategy state and Friday hook. *)
+let _checkpointing (input : input) ~checkpoint ~strategy_choice ~window
+    ~manifest ~candidate_log =
+  let config = input.config in
+  let resumed =
+    Panel_checkpoint.load_resume ~checkpoint ~config ~window ~manifest
+      ~candidate_log
+  in
+  let restored = Option.map resumed ~f:snd in
+  let r = _create_recorders ?candidate_log ?restored () in
+  let strategy_state, on_friday =
+    Panel_checkpoint.hooks ~resumed:restored ~checkpoint ~strategy_choice
+      ~config ~window ~manifest ~stop_log:r.stop_log ~trade_audit:r.trade_audit
+      ~force_liquidation_log:r.force_liquidation_log ~candidate_log
+  in
+  (resumed, r, strategy_state, on_friday)
 
 (* #3173 / #3174: one set of corporate-action readers per run, shared by the
    strategy and the simulator; each [None] unless its flag is on. *)
@@ -447,15 +458,13 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   let warmup_start = Date.add_days start_date (-warmup_days) in
   Loop.log_window ~warmup_start ~end_date ~warmup_days strategy_choice;
-  let r = _create_recorders ?candidate_log () in
   let ca = _corporate_actions input in
   let n_all_symbols = List.length input.all_symbols in
   let snapshot_dir, manifest =
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source
   in
-  let strategy_state, on_friday =
-    _checkpoint_hooks ~checkpoint ~strategy_choice ~input ~manifest ~r
-      ~candidate_log
+  let resumed, r, strategy_state, on_friday =
+    _checkpointing input ~checkpoint ~strategy_choice ~manifest ~candidate_log
       ~window:(start_date, end_date, warmup_days, initial_cash)
   in
   let ( strategy,
@@ -471,11 +480,13 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     _build_sim input ~r ~ca ~start_date ~warmup_start ~end_date ~initial_cash
       ~commission ?slippage_bps ?cost_model ~active_through_for
       ~prune_universe_by_active_through ~strategy ~market_data_adapter ()
+    |> Fn.flip Panel_checkpoint.restore_sim resumed
   in
   let sim_result =
     _run_steps ~r ~trace ~gc_trace
       ~cache_sampler:(Loop.cache_sampler_of_panels ~daily_panels)
       ~progress_emitter ~warmup_start ~end_date ~on_step_setup ~on_friday
+      ?resume_date:(Panel_checkpoint.resume_date resumed)
       ~n_all_symbols sim
   in
   let final_close_prices = final_close_prices_thunk () in

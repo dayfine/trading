@@ -1,5 +1,15 @@
 (** Command-line parsing for [scenario_runner]. *)
 
+type checkpoint_flags = {
+  every_n_fridays : int option;  (** [--checkpoint-every N]. *)
+  resume : string option;
+      (** [--resume <dir>]: continue the one scenario whose artefact directory
+          (or its [checkpoint/] subdirectory) is [dir]. *)
+  halt_after_checkpoints : int option;
+      (** [--halt-after-checkpoint K], test-only: exit 75 after K checkpoints.
+      *)
+}
+
 type t = {
   dir : string;
   parallel : int;
@@ -9,6 +19,7 @@ type t = {
   progress_every : int;  (** Friday-cycle cadence for [progress.sexp]. *)
   emit_all_eligible : bool;  (** [false] under [--no-emit-all-eligible]. *)
   emit_candidates : bool;  (** [true] under [--emit-candidates]. *)
+  checkpoint : checkpoint_flags;  (** Resumable-backtest flags (#3477). *)
 }
 
 val repo_root : unit -> string
