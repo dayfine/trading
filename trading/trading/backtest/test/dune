@@ -10,6 +10,7 @@
   test_trade_audit_recorder
   test_candidate_log
   test_recorder_checkpoint
+  test_backtest_checkpoint
   test_step_journal
   test_split_safe_metric
   test_trade_audit_capture

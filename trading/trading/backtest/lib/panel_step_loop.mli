@@ -7,6 +7,19 @@ open Trading_simulation
 val step_phase : date:Date.t -> boundary:string -> string
 (** Phase label string for one step boundary: [step_<YYYY-MM-DD>_<boundary>]. *)
 
+val cache_sampler_of_panels :
+  daily_panels:Snapshot_runtime.Daily_panels.t -> unit -> Gc_trace.cache_sample
+(** The snapshot-cache residency sample for the [--gc-trace] CSV: a pure read of
+    [daily_panels], only forced when tracing is on. *)
+
+val log_window :
+  warmup_start:Date.t ->
+  end_date:Date.t ->
+  warmup_days:int ->
+  Strategy_choice.t ->
+  unit
+(** Print the run-window line every backtest starts with, to stderr. *)
+
 val step_failed : Status.t -> 'a
 (** Raise a [Failure] describing a simulation step error. *)
 
@@ -52,6 +65,7 @@ val run_simulator_with_gc_trace :
     (date:Date.t ->
     step:Trading_simulation_types.Simulator_types.step_result ->
     unit) ->
+  ?on_friday:(date:Date.t -> Simulator.t -> unit) ->
   stop_log:Stop_log.t ->
   Simulator.t ->
   Trading_simulation_types.Simulator_types.run_result
@@ -65,4 +79,10 @@ val run_simulator_with_gc_trace :
     right after the progress hook. It is the mid-run artefact-streaming seam
     (#2502) — [Runner] uses it to feed {!Trades_stream}. Observability only: the
     callback must not mutate simulator state, and omitting it is bit-identical
-    to the pre-#2502 loop. *)
+    to the pre-#2502 loop.
+
+    [on_friday], when provided, is called after each step whose date is a Friday
+    (after [on_step]), with that date and the simulator positioned at the next
+    day. It is the checkpoint seam (#3477): [Panel_runner] builds the closure
+    from {!Backtest_checkpoint.friday_hook}. It may read the simulator but must
+    not change the run; omitting it is bit-identical to the loop without it. *)

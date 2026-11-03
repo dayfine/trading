@@ -14,6 +14,7 @@ module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Cost_model = Backtest_cost_model.Cost_model
+module Loop = Panel_step_loop
 
 type input = {
   data_dir_fpath : Fpath.t;
@@ -161,26 +162,6 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
       "Backtest.Panel_runner: failed to create simulator: " ^ Status.show e)
   |> Result.ok_or_failwith
 
-(* Read one symbol's close on [date]. Returns [None] when the symbol is not
-   present in the snapshot, the read errors, or the close is NaN. *)
-let _read_close ~daily_panels ~close_col ~date symbol =
-  match Daily_panels.read_today daily_panels ~symbol ~date with
-  | Error _ -> None
-  | Ok snap ->
-      let v = snap.values.(close_col) in
-      if Float.is_nan v then None else Some (symbol, v)
-
-(** Close prices on [end_date] for every universe symbol, read from the snapshot
-    via [Daily_panels.read_today]. Missing / NaN entries are dropped; the runner
-    filters to held symbols when populating [Runner.result.final_prices]. *)
-let _final_close_prices ~daily_panels ~symbols ~end_date =
-  let schema = Daily_panels.schema daily_panels in
-  match Snapshot_schema.index_of schema Snapshot_schema.Close with
-  | None -> []
-  | Some close_col ->
-      List.filter_map symbols
-        ~f:(_read_close ~daily_panels ~close_col ~date:end_date)
-
 (* Resolve the [(snapshot_dir, manifest)] pair the runner reads through for
    the strategy's bar reads (via [_build_snapshot_bar_reader]), the
    simulator's per-tick price reads, and final-close lookups. CSV mode
@@ -309,7 +290,7 @@ let fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date =
    bar-fetch prune (the returned [active_through_for]); [None] is bit-equal. *)
 let _setup_hybrid (input : input) ~ca ~strategy_choice ~snapshot_dir ~manifest
     ~shared_panels ~warmup_start ~end_date ~audit_recorder ?fold_start_date
-    ?universe_membership_at () =
+    ?universe_membership_at ?strategy_state () =
   let daily_panels = _resolve_panels ~shared_panels ~snapshot_dir ~manifest in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let bar_reader =
@@ -320,11 +301,11 @@ let _setup_hybrid (input : input) ~ca ~strategy_choice ~snapshot_dir ~manifest
     Panel_strategy_builder.build ~ad_bars:input.ad_bars
       ~breadth_bars:input.breadth_bars ~ticker_sectors:input.ticker_sectors
       ~config:input.config ~strategy_choice ~bar_reader ~audit_recorder
-      ?fold_start_date ?universe_membership_at ()
+      ?fold_start_date ?universe_membership_at ?state:strategy_state ()
   in
   let adapter = _build_market_data_adapter ~daily_panels in
   let final_close_prices () =
-    _final_close_prices ~daily_panels ~symbols:input.all_symbols ~end_date
+    Panel_close_prices.final ~daily_panels ~symbols:input.all_symbols ~end_date
   in
   let active_through_for = _active_through_for_of_panels ~daily_panels in
   (strategy, adapter, final_close_prices, daily_panels, active_through_for)
@@ -420,29 +401,35 @@ let _build_sim input ~r ~(ca : Panel_corporate_actions.t) ~start_date
 (* The Fill-phase step loop inside its trace span, with the caller's step hook
    bound to this run's recorders. Extracted so [run] stays under the
    function-length cap. *)
-let _run_steps ~r ~trace ~gc_trace ~cache_sampler ~progress_acc ~on_step_setup
-    ~n_all_symbols sim =
-  Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
-      Panel_step_loop.run_simulator_with_gc_trace ?gc_trace ~cache_sampler
-        ?progress_acc
-        ?on_step:(_bind_step_hook ~r on_step_setup)
-        ~stop_log:r.stop_log sim)
+let _run_steps ~r ~trace ~gc_trace ~cache_sampler ~progress_emitter
+    ~warmup_start ~end_date ~on_step_setup ~on_friday ~n_all_symbols sim =
+  let progress_acc =
+    Loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date
+  in
+  let result =
+    Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
+        Loop.run_simulator_with_gc_trace ?gc_trace ~cache_sampler ?progress_acc
+          ?on_step:(_bind_step_hook ~r on_step_setup)
+          ?on_friday ~stop_log:r.stop_log sim)
+  in
+  Option.iter progress_acc ~f:Backtest_progress.emit_final;
+  result
 
-(* The per-step snapshot-cache occupancy sample for the [--gc-trace] CSV. A
-   pure read of [daily_panels] ([Daily_panels.resident] is O(1) and mutates
-   nothing), and only ever forced when [--gc-trace] is on — see
-   [Gc_trace.record]. *)
-let _cache_sampler_of_panels ~daily_panels () : Gc_trace.cache_sample =
-  let r = Daily_panels.resident daily_panels in
-  { cache_entries = r.entries; cache_bytes = r.bytes; mmap_open = r.mmap_open }
-
-(* The run-window line every backtest prints first. *)
-let _log_window ~warmup_start ~end_date ~warmup_days strategy_choice =
-  eprintf
-    "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
-    (Date.to_string warmup_start)
-    (Date.to_string end_date) warmup_days
-    (Strategy_choice.name strategy_choice)
+(* Checkpointing (#3477): the strategy-state handle and the Friday hook, both
+   [None] without a request. *)
+let _checkpoint_hooks ~checkpoint ~strategy_choice ~(input : input) ~window
+    ~manifest ~(r : _recorders) ~candidate_log =
+  let start_date, end_date, warmup_days, initial_cash = window in
+  Backtest_checkpoint.setup ~request:checkpoint
+    ~weinstein:(Strategy_choice.equal strategy_choice Strategy_choice.Weinstein)
+    ~run_key:
+      (Sexp.List
+         (Weinstein_strategy.sexp_of_config input.config
+          :: List.map ~f:Date.sexp_of_t [ start_date; end_date ]
+         @ [ sexp_of_int warmup_days; sexp_of_float initial_cash ]))
+    ~manifest:(Snapshot_pipeline.Snapshot_manifest.sexp_of_t manifest)
+    ~stop_log:r.stop_log ~trade_audit:r.trade_audit
+    ~force_liquidation_log:r.force_liquidation_log ~candidate_log
 
 (* #3173 / #3174: one set of corporate-action readers per run, shared by the
    strategy and the simulator; each [None] unless its flag is on. *)
@@ -454,17 +441,22 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
     ?(prune_universe_by_active_through = false) ?candidate_log ?on_step_setup
-    ?universe_membership_at () =
+    ?universe_membership_at ?checkpoint () =
   let fold_start_date =
     fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date
   in
   let warmup_start = Date.add_days start_date (-warmup_days) in
-  _log_window ~warmup_start ~end_date ~warmup_days strategy_choice;
+  Loop.log_window ~warmup_start ~end_date ~warmup_days strategy_choice;
   let r = _create_recorders ?candidate_log () in
   let ca = _corporate_actions input in
   let n_all_symbols = List.length input.all_symbols in
   let snapshot_dir, manifest =
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source
+  in
+  let strategy_state, on_friday =
+    _checkpoint_hooks ~checkpoint ~strategy_choice ~input ~manifest ~r
+      ~candidate_log
+      ~window:(start_date, end_date, warmup_days, initial_cash)
   in
   let ( strategy,
         market_data_adapter,
@@ -473,25 +465,22 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
         active_through_for ) =
     _setup_hybrid input ~ca ~strategy_choice ~snapshot_dir ~manifest
       ~shared_panels ~warmup_start ~end_date ~audit_recorder:r.audit_recorder
-      ?fold_start_date ?universe_membership_at ()
+      ?fold_start_date ?universe_membership_at ?strategy_state ()
   in
   let sim =
     _build_sim input ~r ~ca ~start_date ~warmup_start ~end_date ~initial_cash
       ~commission ?slippage_bps ?cost_model ~active_through_for
       ~prune_universe_by_active_through ~strategy ~market_data_adapter ()
   in
-  let progress_acc =
-    Panel_step_loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date
-  in
   let sim_result =
     _run_steps ~r ~trace ~gc_trace
-      ~cache_sampler:(_cache_sampler_of_panels ~daily_panels)
-      ~progress_acc ~on_step_setup ~n_all_symbols sim
+      ~cache_sampler:(Loop.cache_sampler_of_panels ~daily_panels)
+      ~progress_emitter ~warmup_start ~end_date ~on_step_setup ~on_friday
+      ~n_all_symbols sim
   in
-  Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
-  _finish_panels ~daily_panels ~n_all_symbols ~shared_panels;
   Panel_corporate_actions.log ca;
+  _finish_panels ~daily_panels ~n_all_symbols ~shared_panels;
   ( sim_result,
     r.stop_log,
     r.trade_audit,

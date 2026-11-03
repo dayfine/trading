@@ -78,6 +78,7 @@ val run :
   ?candidate_log:Candidate_log.collector ->
   ?on_step_setup:step_hook_setup ->
   ?universe_membership_at:(string -> Date.t -> bool) ->
+  ?checkpoint:Backtest_checkpoint.request ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t
@@ -128,6 +129,13 @@ val run :
     emission unconditionally so a [progress.sexp] always reflects the run's end
     state. When [None], the runner takes no extra work — same zero-overhead
     contract as the other optional plumbing.
+
+    [checkpoint], when passed, makes the run write a resumable checkpoint
+    ({!Backtest_checkpoint}) into [request.scenario_dir] on every
+    [request.every_n_fridays]-th Friday (#3477 PR 6). Weinstein strategy only;
+    any other [strategy_choice] raises [Failure]. [None] (the default) builds
+    the strategy without an explicit state and takes no hook: bit-identical to
+    before.
 
     [strategy_choice], when passed, selects which strategy module the simulator
     runs (#882). Defaults to {!Strategy_choice.Weinstein} —
