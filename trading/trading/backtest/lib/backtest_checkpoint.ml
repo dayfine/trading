@@ -236,6 +236,10 @@ let _write_or_warn ~scenario_dir ~identity ~date state =
 
 let friday_hook ~request ~identity ~strategy_state ~stop_log ~trade_audit
     ~force_liquidation_log ~candidate_log =
+  if request.every_n_fridays <= 0 then
+    failwith
+      (sprintf "Backtest_checkpoint: every_n_fridays must be positive, got %d"
+         request.every_n_fridays);
   let fridays = ref 0 in
   fun ~date sim ->
     Int.incr fridays;

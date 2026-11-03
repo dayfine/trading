@@ -62,8 +62,16 @@ let _fresh_sim data_dir =
   in
   create_exn ~config:_config ~deps
 
+(* OUnit runs cases in parallel processes and [with_test_data] recreates its
+   directory by name, so each call gets a name no other case shares. *)
+let _sim_counter = ref 0
+
 let _with_sim f =
-  with_test_data "backtest_checkpoint"
+  Int.incr _sim_counter;
+  with_test_data
+    (sprintf "backtest_checkpoint_%d_%d"
+       (Pid.to_int (Core_unix.getpid ()))
+       !_sim_counter)
     [ ("AAPL", _bars) ]
     ~f:(fun d -> f (_fresh_sim d))
 
@@ -367,6 +375,19 @@ let test_setup_refuses_other_strategies _ =
        (Result.try_with (fun () -> _setup ~request ~weinstein:false)))
     (equal_to true)
 
+let test_setup_refuses_non_positive_cadence _ =
+  let outcome n =
+    Result.try_with (fun () ->
+        _setup
+          ~request:(Some { BC.scenario_dir = "unused"; every_n_fridays = n })
+          ~weinstein:true)
+    |> Result.error
+    |> Option.map ~f:Exn.to_string
+  in
+  assert_that
+    [ outcome 0; outcome (-1) ]
+    (elements_are [ _mentions "every_n_fridays"; _mentions "every_n_fridays" ])
+
 let test_load_refuses_missing_component _ =
   _with_sim (fun sim ->
       _with_dir (fun dir ->
@@ -432,6 +453,8 @@ let suite =
          "setup without request arms nothing"
          >:: test_setup_without_request_arms_nothing;
          "setup with request arms both" >:: test_setup_with_request_arms_both;
+         "setup refuses a non-positive cadence"
+         >:: test_setup_refuses_non_positive_cadence;
          "setup refuses other strategies"
          >:: test_setup_refuses_other_strategies;
          "load refuses a missing component"

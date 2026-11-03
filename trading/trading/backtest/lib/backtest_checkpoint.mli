@@ -98,7 +98,8 @@ val friday_hook :
 (** The [?on_friday] closure for {!Panel_step_loop.run_simulator_with_gc_trace}
     once applied up to [~candidate_log]: counts the Fridays it is called on and
     {!write}s on every [every_n_fridays]-th. A failed write is reported on
-    stderr and the run continues. *)
+    stderr and the run continues. Raises [Failure] when
+    [request.every_n_fridays] is not positive. *)
 
 val setup :
   request:request option ->
@@ -115,5 +116,6 @@ val setup :
     strategy over (via {!Weinstein_strategy.make_with_state}) and the
     {!friday_hook} sharing it, with an identity digested from [run_key],
     [manifest] and the build. [(None, None)] without a [request], which is the
-    unchanged default. Raises [Failure] when [weinstein] is false: v1 supports
-    the Weinstein strategy only. *)
+    unchanged default. Raises [Failure] when [weinstein] is false (v1 supports
+    the Weinstein strategy only) or [request.every_n_fridays] is not positive.
+*)
