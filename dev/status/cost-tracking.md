@@ -103,10 +103,11 @@ Weekly token-spend read, same slot as the perf review
 (`.claude/rules/perf-review-weekly.md` §Usage review, issue #2922). One row
 per week; inputs are `dev/budget/local-<date>.json`
 (`dev/scripts/budget_local_record.sh`), the orchestrator `<date>-<run>.json`
-records, and `dev/reviews/codex-agreement.md`.
+records, `dev/reviews/codex-agreement.md`, and the week's cloud session runs
+(model, turns, wall time from each `RemoteTrigger` run log).
 
-| week | tok/merged PR | tok/QC verdict | resume share | main calls >250k | codex tok/finding | GHA $ | decision |
-|---|---|---|---|---|---|---|---|
+| week | tok/merged PR | tok/QC verdict | resume share | main calls >250k | codex tok/finding | cloud runs (n / turns / wall h) | GHA $ | decision |
+|---|---|---|---|---|---|---|---|---|
 
 ## Next Steps
 
