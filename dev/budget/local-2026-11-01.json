@@ -1,0 +1,1495 @@
+{
+  "run_id": "local-2026-11-01",
+  "timestamp": "2026-11-02T15:22:40Z",
+  "commit_sha": "b865d5c403ec1c039abfb272072a6a7a8352c2d3",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 45163,
+    "output_tokens": 5127519,
+    "cache_read_input_tokens": 1606150191,
+    "cache_creation_input_tokens": 57652049,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-11-01",
+    "source": "local-transcripts",
+    "generated_at": "2026-11-02T15:22:40Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-11-01",
+      "until": "2026-11-01"
+    },
+    "totals": {
+      "dispatches": 50,
+      "sessions": 0,
+      "resumes": 297,
+      "api_calls": 5322,
+      "input_tokens": 45163,
+      "output_tokens": 5127519,
+      "cache_read_input_tokens": 1606150191,
+      "cache_creation_input_tokens": 57652049,
+      "subagent_tokens": 1668974922,
+      "main_tokens": 0,
+      "by_model": {
+        "claude-fable-5-1": {
+          "api_calls": 1178,
+          "input_tokens": 35273,
+          "output_tokens": 1811423,
+          "cache_read_input_tokens": 195771236,
+          "cache_creation_input_tokens": 7463722
+        },
+        "claude-haiku-4-5-20251001": {
+          "api_calls": 162,
+          "input_tokens": 1330,
+          "output_tokens": 296,
+          "cache_read_input_tokens": 16848358,
+          "cache_creation_input_tokens": 1227717
+        },
+        "claude-haiku-5-5": {
+          "api_calls": 3,
+          "input_tokens": 6,
+          "output_tokens": 1728,
+          "cache_read_input_tokens": 9140,
+          "cache_creation_input_tokens": 6209
+        },
+        "claude-opus-5-5": {
+          "api_calls": 3979,
+          "input_tokens": 8554,
+          "output_tokens": 3314072,
+          "cache_read_input_tokens": 1393521457,
+          "cache_creation_input_tokens": 48954401
+        }
+      }
+    },
+    "context_histogram": {
+      "calls": 0,
+      "p50": 0,
+      "p90": 0,
+      "max": 0,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 0,
+      "share_above_threshold_pct": 0,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "50-100k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "100-150k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "150-200k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "200-300k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "300-500k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "aa02c54af244fd9da",
+        "agent_type": "general-purpose",
+        "description": "Rewrite BDSP #128 as story table",
+        "ref": "#128",
+        "date": "2026-11-01",
+        "wall_seconds": 9033,
+        "resumes": 7,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 576,
+            "input_tokens": 1230,
+            "output_tokens": 550125,
+            "cache_read_input_tokens": 260667085,
+            "cache_creation_input_tokens": 1341453
+          }
+        },
+        "api_calls": 576,
+        "input_tokens": 1230,
+        "output_tokens": 550125,
+        "cache_read_input_tokens": 260667085,
+        "cache_creation_input_tokens": 1341453
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ac43d7f439245f7ea",
+        "agent_type": "general-purpose",
+        "description": "Route plan-vs-actual drawings",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 19423,
+        "resumes": 20,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 478,
+            "input_tokens": 1014,
+            "output_tokens": 389134,
+            "cache_read_input_tokens": 210988002,
+            "cache_creation_input_tokens": 6345763
+          }
+        },
+        "api_calls": 478,
+        "input_tokens": 1014,
+        "output_tokens": 389134,
+        "cache_read_input_tokens": 210988002,
+        "cache_creation_input_tokens": 6345763
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "aeb7b5291af2c6156",
+        "agent_type": "general-purpose",
+        "description": "BDSP MVP v3: story events + JSON maps",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 32714,
+        "resumes": 28,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 424,
+            "input_tokens": 922,
+            "output_tokens": 363689,
+            "cache_read_input_tokens": 181971795,
+            "cache_creation_input_tokens": 8675442
+          }
+        },
+        "api_calls": 424,
+        "input_tokens": 922,
+        "output_tokens": 363689,
+        "cache_read_input_tokens": 181971795,
+        "cache_creation_input_tokens": 8675442
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "aae3247a28c6c30e8",
+        "agent_type": "general-purpose",
+        "description": "Write FRLG AutoStory MVP program",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 40329,
+        "resumes": 45,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 346,
+            "input_tokens": 792,
+            "output_tokens": 361442,
+            "cache_read_input_tokens": 140108259,
+            "cache_creation_input_tokens": 12508690
+          }
+        },
+        "api_calls": 346,
+        "input_tokens": 792,
+        "output_tokens": 361442,
+        "cache_read_input_tokens": 140108259,
+        "cache_creation_input_tokens": 12508690
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a0daa052d0a1b0632",
+        "agent_type": "general-purpose",
+        "description": "Shared declarative story steps (separate branch)",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 15433,
+        "resumes": 6,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 348,
+            "input_tokens": 720,
+            "output_tokens": 300573,
+            "cache_read_input_tokens": 140734055,
+            "cache_creation_input_tokens": 1612722
+          }
+        },
+        "api_calls": 348,
+        "input_tokens": 720,
+        "output_tokens": 300573,
+        "cache_read_input_tokens": 140734055,
+        "cache_creation_input_tokens": 1612722
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "afcaa2f7ac7edb5ac",
+        "agent_type": "general-purpose",
+        "description": "BDSP maps-v4, #127, #129 on MapData",
+        "ref": "#127",
+        "date": "2026-11-01",
+        "wall_seconds": 8721,
+        "resumes": 12,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 289,
+            "input_tokens": 604,
+            "output_tokens": 295005,
+            "cache_read_input_tokens": 118722647,
+            "cache_creation_input_tokens": 3373862
+          }
+        },
+        "api_calls": 289,
+        "input_tokens": 604,
+        "output_tokens": 295005,
+        "cache_read_input_tokens": 118722647,
+        "cache_creation_input_tokens": 3373862
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "abe1119f7bcfaae4a",
+        "agent_type": "general-purpose",
+        "description": "Fix FRLG walker tile drift after wild battle",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 36818,
+        "resumes": 18,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 314,
+            "input_tokens": 676,
+            "output_tokens": 309007,
+            "cache_read_input_tokens": 91432071,
+            "cache_creation_input_tokens": 4979328
+          }
+        },
+        "api_calls": 314,
+        "input_tokens": 676,
+        "output_tokens": 309007,
+        "cache_read_input_tokens": 91432071,
+        "cache_creation_input_tokens": 4979328
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a87321851e5a97556",
+        "agent_type": "general-purpose",
+        "description": "BDSP AutoStory v4 without #1717",
+        "ref": "#1717",
+        "date": "2026-11-01",
+        "wall_seconds": 4549,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 224,
+            "input_tokens": 462,
+            "output_tokens": 126408,
+            "cache_read_input_tokens": 66174576,
+            "cache_creation_input_tokens": 407330
+          }
+        },
+        "api_calls": 224,
+        "input_tokens": 462,
+        "output_tokens": 126408,
+        "cache_read_input_tokens": 66174576,
+        "cache_creation_input_tokens": 407330
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a8c7292aae456ef34",
+        "agent_type": "general-purpose",
+        "description": "Design doc for #116 run records",
+        "ref": "#116",
+        "date": "2026-11-01",
+        "wall_seconds": 11407,
+        "resumes": 11,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 231,
+            "input_tokens": 492,
+            "output_tokens": 159968,
+            "cache_read_input_tokens": 48458782,
+            "cache_creation_input_tokens": 1213596
+          }
+        },
+        "api_calls": 231,
+        "input_tokens": 492,
+        "output_tokens": 159968,
+        "cache_read_input_tokens": 48458782,
+        "cache_creation_input_tokens": 1213596
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a17098e948575379e",
+        "agent_type": "general-purpose",
+        "description": "Build base/bdsp-1717 and prepare bdsp/mvp",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 5306,
+        "resumes": 6,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 189,
+            "input_tokens": 5906,
+            "output_tokens": 185592,
+            "cache_read_input_tokens": 46780354,
+            "cache_creation_input_tokens": 551521
+          },
+          "claude-opus-5-5": {
+            "api_calls": 4,
+            "input_tokens": 10,
+            "output_tokens": 1919,
+            "cache_read_input_tokens": 1016966,
+            "cache_creation_input_tokens": 340211
+          }
+        },
+        "api_calls": 193,
+        "input_tokens": 5916,
+        "output_tokens": 187511,
+        "cache_read_input_tokens": 47797320,
+        "cache_creation_input_tokens": 891732
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a0a02b18939b3736f",
+        "agent_type": "general-purpose",
+        "description": "BDSP v4 phase 2: table rewrite",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 12555,
+        "resumes": 42,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 167,
+            "input_tokens": 418,
+            "output_tokens": 122299,
+            "cache_read_input_tokens": 34738414,
+            "cache_creation_input_tokens": 3185426
+          }
+        },
+        "api_calls": 167,
+        "input_tokens": 418,
+        "output_tokens": 122299,
+        "cache_read_input_tokens": 34738414,
+        "cache_creation_input_tokens": 3185426
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a538fb9ca4d640f8f",
+        "agent_type": "general-purpose",
+        "description": "Ship FRLG+BDSP maps: Packages + fixtures",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 3645,
+        "resumes": 8,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 178,
+            "input_tokens": 384,
+            "output_tokens": 113242,
+            "cache_read_input_tokens": 33912387,
+            "cache_creation_input_tokens": 792371
+          }
+        },
+        "api_calls": 178,
+        "input_tokens": 384,
+        "output_tokens": 113242,
+        "cache_read_input_tokens": 33912387,
+        "cache_creation_input_tokens": 792371
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ae33a9e641b098709",
+        "agent_type": "general-purpose",
+        "description": "Lab channel: unify LabControl and CFR (#107)",
+        "ref": "#107",
+        "date": "2026-11-01",
+        "wall_seconds": 5254,
+        "resumes": 7,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/107",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 101,
+            "input_tokens": 2734,
+            "output_tokens": 192094,
+            "cache_read_input_tokens": 24115482,
+            "cache_creation_input_tokens": 1459158
+          }
+        },
+        "api_calls": 101,
+        "input_tokens": 2734,
+        "output_tokens": 192094,
+        "cache_read_input_tokens": 24115482,
+        "cache_creation_input_tokens": 1459158
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a2f0c0281730039d2",
+        "agent_type": "general-purpose",
+        "description": "00.01-00.03 as planned walks + Gym grid",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 2576,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/112",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 91,
+            "input_tokens": 2882,
+            "output_tokens": 140664,
+            "cache_read_input_tokens": 18476088,
+            "cache_creation_input_tokens": 467066
+          }
+        },
+        "api_calls": 91,
+        "input_tokens": 2882,
+        "output_tokens": 140664,
+        "cache_read_input_tokens": 18476088,
+        "cache_creation_input_tokens": 467066
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ausersdifanprojectsarduin-a2b802266b2ad800",
+        "agent_type": "fork",
+        "description": "(/Users/difan/Projects/Arduino-Source-agents/poke…",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 327,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 36,
+            "input_tokens": 74,
+            "output_tokens": 28432,
+            "cache_read_input_tokens": 16514728,
+            "cache_creation_input_tokens": 1654590
+          }
+        },
+        "api_calls": 36,
+        "input_tokens": 74,
+        "output_tokens": 28432,
+        "cache_read_input_tokens": 16514728,
+        "cache_creation_input_tokens": 1654590
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a31852d38a1863b09",
+        "agent_type": "general-purpose",
+        "description": "Re-derive 4 BDSP grids from pokediamond",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 3319,
+        "resumes": 3,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 62,
+            "input_tokens": 1868,
+            "output_tokens": 177383,
+            "cache_read_input_tokens": 17108695,
+            "cache_creation_input_tokens": 708437
+          }
+        },
+        "api_calls": 62,
+        "input_tokens": 1868,
+        "output_tokens": 177383,
+        "cache_read_input_tokens": 17108695,
+        "cache_creation_input_tokens": 708437
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "abd39b8611e933edb",
+        "agent_type": "general-purpose",
+        "description": "Rework #116 into Lab run records",
+        "ref": "#116",
+        "date": "2026-11-01",
+        "wall_seconds": 3807,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 67,
+            "input_tokens": 2098,
+            "output_tokens": 153771,
+            "cache_read_input_tokens": 12691578,
+            "cache_creation_input_tokens": 303559
+          },
+          "claude-opus-5-5": {
+            "api_calls": 10,
+            "input_tokens": 20,
+            "output_tokens": 5407,
+            "cache_read_input_tokens": 2383010,
+            "cache_creation_input_tokens": 269248
+          }
+        },
+        "api_calls": 77,
+        "input_tokens": 2118,
+        "output_tokens": 159178,
+        "cache_read_input_tokens": 15074588,
+        "cache_creation_input_tokens": 572807
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "af9a16a3625cf8be2",
+        "agent_type": "general-purpose",
+        "description": "Build lab/main, lab/bdsp, lab/frlg",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 4869,
+        "resumes": 6,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/115",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 92,
+            "input_tokens": 2774,
+            "output_tokens": 70082,
+            "cache_read_input_tokens": 11585730,
+            "cache_creation_input_tokens": 834358
+          }
+        },
+        "api_calls": 92,
+        "input_tokens": 2774,
+        "output_tokens": 70082,
+        "cache_read_input_tokens": 11585730,
+        "cache_creation_input_tokens": 834358
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a81b219ba23ef254a",
+        "agent_type": "general-purpose",
+        "description": "PokemonNavigation: decomp map generator",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 2351,
+        "resumes": 2,
+        "outcome": "stalled",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 62,
+            "input_tokens": 1954,
+            "output_tokens": 143821,
+            "cache_read_input_tokens": 9234408,
+            "cache_creation_input_tokens": 456228
+          }
+        },
+        "api_calls": 62,
+        "input_tokens": 1954,
+        "output_tokens": 143821,
+        "cache_read_input_tokens": 9234408,
+        "cache_creation_input_tokens": 456228
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ahow-would-you-fc49f0d0fb7b7198",
+        "agent_type": "fork",
+        "description": "how would you design a \"MCP\" or agent integration…",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 801,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 18,
+            "input_tokens": 42,
+            "output_tokens": 18287,
+            "cache_read_input_tokens": 8203087,
+            "cache_creation_input_tokens": 43798
+          }
+        },
+        "api_calls": 18,
+        "input_tokens": 42,
+        "output_tokens": 18287,
+        "cache_read_input_tokens": 8203087,
+        "cache_creation_input_tokens": 43798
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a00e37857d470723f",
+        "agent_type": "general-purpose",
+        "description": "Decomp vs our grids: route impact",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 1922,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 45,
+            "input_tokens": 1352,
+            "output_tokens": 89675,
+            "cache_read_input_tokens": 6912307,
+            "cache_creation_input_tokens": 265331
+          }
+        },
+        "api_calls": 45,
+        "input_tokens": 1352,
+        "output_tokens": 89675,
+        "cache_read_input_tokens": 6912307,
+        "cache_creation_input_tokens": 265331
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a601fc14612841b82",
+        "agent_type": "general-purpose",
+        "description": "Restack shared nav files into #114",
+        "ref": "#114",
+        "date": "2026-11-01",
+        "wall_seconds": 1591,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 65,
+            "input_tokens": 134,
+            "output_tokens": 43241,
+            "cache_read_input_tokens": 6939996,
+            "cache_creation_input_tokens": 277740
+          }
+        },
+        "api_calls": 65,
+        "input_tokens": 134,
+        "output_tokens": 43241,
+        "cache_read_input_tokens": 6939996,
+        "cache_creation_input_tokens": 277740
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a2e255ae492d9209a",
+        "agent_type": "general-purpose",
+        "description": "Continue PokemonNavigation decomp generator",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 1759,
+        "resumes": 2,
+        "outcome": "https://github.com/dayfine/PokemonNavigation/pull/29",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 31,
+            "input_tokens": 934,
+            "output_tokens": 110847,
+            "cache_read_input_tokens": 6556504,
+            "cache_creation_input_tokens": 294536
+          }
+        },
+        "api_calls": 31,
+        "input_tokens": 934,
+        "output_tokens": 110847,
+        "cache_read_input_tokens": 6556504,
+        "cache_creation_input_tokens": 294536
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "abe4802f370d7c1fa",
+        "agent_type": "general-purpose",
+        "description": "Survey worktrees, propose tree layout",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 1615,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 60,
+            "input_tokens": 122,
+            "output_tokens": 56783,
+            "cache_read_input_tokens": 6628820,
+            "cache_creation_input_tokens": 260975
+          }
+        },
+        "api_calls": 60,
+        "input_tokens": 122,
+        "output_tokens": 56783,
+        "cache_read_input_tokens": 6628820,
+        "cache_creation_input_tokens": 260975
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ac306b250c352eeb4",
+        "agent_type": "general-purpose",
+        "description": "Make StoryEvents pose game-agnostic",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 4846,
+        "resumes": 11,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 50,
+            "input_tokens": 1371,
+            "output_tokens": 84647,
+            "cache_read_input_tokens": 4837752,
+            "cache_creation_input_tokens": 339523
+          },
+          "claude-opus-5-5": {
+            "api_calls": 9,
+            "input_tokens": 26,
+            "output_tokens": 2657,
+            "cache_read_input_tokens": 1175153,
+            "cache_creation_input_tokens": 344000
+          }
+        },
+        "api_calls": 59,
+        "input_tokens": 1397,
+        "output_tokens": 87304,
+        "cache_read_input_tokens": 6012905,
+        "cache_creation_input_tokens": 683523
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "af6c44df8afdd8e38",
+        "agent_type": "general-purpose",
+        "description": "Re-scope #83: decomp decoder in devtools/maps",
+        "ref": "#83",
+        "date": "2026-11-01",
+        "wall_seconds": 1606,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 55,
+            "input_tokens": 1702,
+            "output_tokens": 79415,
+            "cache_read_input_tokens": 6354166,
+            "cache_creation_input_tokens": 166989
+          }
+        },
+        "api_calls": 55,
+        "input_tokens": 1702,
+        "output_tokens": 79415,
+        "cache_read_input_tokens": 6354166,
+        "cache_creation_input_tokens": 166989
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ae550b46c2a3c6752",
+        "agent_type": "general-purpose",
+        "description": "Fix #15: 00.04 plan exceeds search cap",
+        "ref": "#15",
+        "date": "2026-11-01",
+        "wall_seconds": 1442,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/110",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 44,
+            "input_tokens": 1318,
+            "output_tokens": 82093,
+            "cache_read_input_tokens": 5774366,
+            "cache_creation_input_tokens": 212329
+          }
+        },
+        "api_calls": 44,
+        "input_tokens": 1318,
+        "output_tokens": 82093,
+        "cache_read_input_tokens": 5774366,
+        "cache_creation_input_tokens": 212329
+      },
+      {
+        "kind": "dispatch",
+        "session": "065e3ac2-f069-4230-a0ea-bd630f4c1697",
+        "agent_id": "a33b1d215be73506a",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral #3485 at rebased tip",
+        "ref": "#3485",
+        "date": "2026-11-01",
+        "wall_seconds": 842,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 39,
+            "input_tokens": 78,
+            "output_tokens": 733,
+            "cache_read_input_tokens": 5624601,
+            "cache_creation_input_tokens": 326063
+          }
+        },
+        "api_calls": 39,
+        "input_tokens": 78,
+        "output_tokens": 733,
+        "cache_read_input_tokens": 5624601,
+        "cache_creation_input_tokens": 326063
+      },
+      {
+        "kind": "dispatch",
+        "session": "065e3ac2-f069-4230-a0ea-bd630f4c1697",
+        "agent_id": "a831b82e634c734c0",
+        "agent_type": "qc-structural",
+        "description": "qc-structural #3499",
+        "ref": "#3499",
+        "date": "2026-11-01",
+        "wall_seconds": 2183,
+        "resumes": 8,
+        "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 50,
+            "input_tokens": 418,
+            "output_tokens": 92,
+            "cache_read_input_tokens": 5229516,
+            "cache_creation_input_tokens": 380120
+          }
+        },
+        "api_calls": 50,
+        "input_tokens": 418,
+        "output_tokens": 92,
+        "cache_read_input_tokens": 5229516,
+        "cache_creation_input_tokens": 380120
+      },
+      {
+        "kind": "dispatch",
+        "session": "065e3ac2-f069-4230-a0ea-bd630f4c1697",
+        "agent_id": "a3f36e28acb3f35a9",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral #3499 rework tip",
+        "ref": "#3499",
+        "date": "2026-11-01",
+        "wall_seconds": 320,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 36,
+            "input_tokens": 72,
+            "output_tokens": 412,
+            "cache_read_input_tokens": 5373928,
+            "cache_creation_input_tokens": 172810
+          }
+        },
+        "api_calls": 36,
+        "input_tokens": 72,
+        "output_tokens": 412,
+        "cache_read_input_tokens": 5373928,
+        "cache_creation_input_tokens": 172810
+      },
+      {
+        "kind": "dispatch",
+        "session": "065e3ac2-f069-4230-a0ea-bd630f4c1697",
+        "agent_id": "a1220c62c30f375bc",
+        "agent_type": "qc-structural",
+        "description": "qc-structural #3485 at rebased tip",
+        "ref": "#3485",
+        "date": "2026-11-01",
+        "wall_seconds": 1651,
+        "resumes": 2,
+        "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 45,
+            "input_tokens": 366,
+            "output_tokens": 90,
+            "cache_read_input_tokens": 4748675,
+            "cache_creation_input_tokens": 375251
+          }
+        },
+        "api_calls": 45,
+        "input_tokens": 366,
+        "output_tokens": 90,
+        "cache_read_input_tokens": 4748675,
+        "cache_creation_input_tokens": 375251
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "abcc038d7454dc698",
+        "agent_type": "general-purpose",
+        "description": "Restructure #66 into shared core + homes",
+        "ref": "#66",
+        "date": "2026-11-01",
+        "wall_seconds": 1329,
+        "resumes": 9,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 49,
+            "input_tokens": 1284,
+            "output_tokens": 38890,
+            "cache_read_input_tokens": 4921215,
+            "cache_creation_input_tokens": 125625
+          }
+        },
+        "api_calls": 49,
+        "input_tokens": 1284,
+        "output_tokens": 38890,
+        "cache_read_input_tokens": 4921215,
+        "cache_creation_input_tokens": 125625
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ac9b82521ac90d6cd",
+        "agent_type": "general-purpose",
+        "description": "Merge base into #111 (conflicts)",
+        "ref": "#111",
+        "date": "2026-11-01",
+        "wall_seconds": 2947,
+        "resumes": 3,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 44,
+            "input_tokens": 1322,
+            "output_tokens": 43435,
+            "cache_read_input_tokens": 4054299,
+            "cache_creation_input_tokens": 347726
+          }
+        },
+        "api_calls": 44,
+        "input_tokens": 1322,
+        "output_tokens": 43435,
+        "cache_read_input_tokens": 4054299,
+        "cache_creation_input_tokens": 347726
+      },
+      {
+        "kind": "dispatch",
+        "session": "065e3ac2-f069-4230-a0ea-bd630f4c1697",
+        "agent_id": "ade941ac19776f583",
+        "agent_type": "qc-structural",
+        "description": "qc-structural #3499 rework tip",
+        "ref": "#3499",
+        "date": "2026-11-01",
+        "wall_seconds": 2128,
+        "resumes": 3,
+        "outcome": "APPROVED",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 40,
+            "input_tokens": 326,
+            "output_tokens": 73,
+            "cache_read_input_tokens": 4093994,
+            "cache_creation_input_tokens": 242590
+          }
+        },
+        "api_calls": 40,
+        "input_tokens": 326,
+        "output_tokens": 73,
+        "cache_read_input_tokens": 4093994,
+        "cache_creation_input_tokens": 242590
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a38ec3d8e2354ad0e",
+        "agent_type": "general-purpose",
+        "description": "CFR: BDSP detectors, taps, load-save",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 966,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 44,
+            "input_tokens": 1350,
+            "output_tokens": 37618,
+            "cache_read_input_tokens": 4071155,
+            "cache_creation_input_tokens": 124614
+          }
+        },
+        "api_calls": 44,
+        "input_tokens": 1350,
+        "output_tokens": 37618,
+        "cache_read_input_tokens": 4071155,
+        "cache_creation_input_tokens": 124614
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a73d07c2b90ce78be",
+        "agent_type": "general-purpose",
+        "description": "Fork PR hygiene: close, label, merge designs",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 1039,
+        "resumes": 3,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/86",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 38,
+            "input_tokens": 84,
+            "output_tokens": 25242,
+            "cache_read_input_tokens": 3402534,
+            "cache_creation_input_tokens": 234887
+          }
+        },
+        "api_calls": 38,
+        "input_tokens": 84,
+        "output_tokens": 25242,
+        "cache_read_input_tokens": 3402534,
+        "cache_creation_input_tokens": 234887
+      },
+      {
+        "kind": "dispatch",
+        "session": "065e3ac2-f069-4230-a0ea-bd630f4c1697",
+        "agent_id": "ab289f77d0d315b7c",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral #3499 iter-2 tip",
+        "ref": "#3499",
+        "date": "2026-11-01",
+        "wall_seconds": 168,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 20,
+            "input_tokens": 40,
+            "output_tokens": 1426,
+            "cache_read_input_tokens": 3232742,
+            "cache_creation_input_tokens": 238707
+          }
+        },
+        "api_calls": 20,
+        "input_tokens": 40,
+        "output_tokens": 1426,
+        "cache_read_input_tokens": 3232742,
+        "cache_creation_input_tokens": 238707
+      },
+      {
+        "kind": "dispatch",
+        "session": "065e3ac2-f069-4230-a0ea-bd630f4c1697",
+        "agent_id": "ac7ff115edb305b18",
+        "agent_type": "qc-structural",
+        "description": "qc-structural #3499 iter-2 tip",
+        "ref": "#3499",
+        "date": "2026-11-01",
+        "wall_seconds": 778,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-haiku-4-5-20251001",
+        "models": {
+          "claude-haiku-4-5-20251001": {
+            "api_calls": 27,
+            "input_tokens": 220,
+            "output_tokens": 41,
+            "cache_read_input_tokens": 2776173,
+            "cache_creation_input_tokens": 229756
+          }
+        },
+        "api_calls": 27,
+        "input_tokens": 220,
+        "output_tokens": 41,
+        "cache_read_input_tokens": 2776173,
+        "cache_creation_input_tokens": 229756
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a33d6f2307e9f7209",
+        "agent_type": "general-purpose",
+        "description": "Build nav/shared collector PR",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 2009,
+        "resumes": 3,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/114",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 40,
+            "input_tokens": 1164,
+            "output_tokens": 23654,
+            "cache_read_input_tokens": 2546284,
+            "cache_creation_input_tokens": 144760
+          }
+        },
+        "api_calls": 40,
+        "input_tokens": 1164,
+        "output_tokens": 23654,
+        "cache_read_input_tokens": 2546284,
+        "cache_creation_input_tokens": 144760
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "aaea9f10d205d79c6",
+        "agent_type": "general-purpose",
+        "description": "Build frlg/mvp collector PR",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 3115,
+        "resumes": 3,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/117",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 30,
+            "input_tokens": 842,
+            "output_tokens": 29134,
+            "cache_read_input_tokens": 2050739,
+            "cache_creation_input_tokens": 263966
+          }
+        },
+        "api_calls": 30,
+        "input_tokens": 842,
+        "output_tokens": 29134,
+        "cache_read_input_tokens": 2050739,
+        "cache_creation_input_tokens": 263966
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "aadda0d5db8fceb2a",
+        "agent_type": "general-purpose",
+        "description": "Adopt agent-harness patterns",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 241,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 29,
+            "input_tokens": 58,
+            "output_tokens": 23068,
+            "cache_read_input_tokens": 2197299,
+            "cache_creation_input_tokens": 102386
+          }
+        },
+        "api_calls": 29,
+        "input_tokens": 58,
+        "output_tokens": 23068,
+        "cache_read_input_tokens": 2197299,
+        "cache_creation_input_tokens": 102386
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a63e1bdb3b7707e32",
+        "agent_type": "general-purpose",
+        "description": "Decode missing BDSP town grids from decomp",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 1202,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 20,
+            "input_tokens": 610,
+            "output_tokens": 77154,
+            "cache_read_input_tokens": 2024069,
+            "cache_creation_input_tokens": 158620
+          }
+        },
+        "api_calls": 20,
+        "input_tokens": 610,
+        "output_tokens": 77154,
+        "cache_read_input_tokens": 2024069,
+        "cache_creation_input_tokens": 158620
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a2deea02fffcb0d92",
+        "agent_type": "general-purpose",
+        "description": "#107: lab scripts + agnostic skill",
+        "ref": "#107",
+        "date": "2026-11-01",
+        "wall_seconds": 526,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 27,
+            "input_tokens": 834,
+            "output_tokens": 28740,
+            "cache_read_input_tokens": 1830454,
+            "cache_creation_input_tokens": 75855
+          }
+        },
+        "api_calls": 27,
+        "input_tokens": 834,
+        "output_tokens": 28740,
+        "cache_read_input_tokens": 1830454,
+        "cache_creation_input_tokens": 75855
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a9d112092a5e2c483",
+        "agent_type": "general-purpose",
+        "description": "Continue CFR BDSP commands PR",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 840,
+        "resumes": 2,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/102",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 26,
+            "input_tokens": 744,
+            "output_tokens": 16327,
+            "cache_read_input_tokens": 1692870,
+            "cache_creation_input_tokens": 134678
+          }
+        },
+        "api_calls": 26,
+        "input_tokens": 744,
+        "output_tokens": 16327,
+        "cache_read_input_tokens": 1692870,
+        "cache_creation_input_tokens": 134678
+      },
+      {
+        "kind": "dispatch",
+        "session": "065e3ac2-f069-4230-a0ea-bd630f4c1697",
+        "agent_id": "ad2dfd46daf44ab59",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral #3499",
+        "ref": "#3499",
+        "date": "2026-11-01",
+        "wall_seconds": 183,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 12,
+            "input_tokens": 24,
+            "output_tokens": 140,
+            "cache_read_input_tokens": 1566222,
+            "cache_creation_input_tokens": 150958
+          }
+        },
+        "api_calls": 12,
+        "input_tokens": 24,
+        "output_tokens": 140,
+        "cache_read_input_tokens": 1566222,
+        "cache_creation_input_tokens": 150958
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "aupdate-for-httpsgithubco-646963c69a0ff104",
+        "agent_type": "fork",
+        "description": "update for https://github.com/PokemonAutomation/A…",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 66,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 7,
+            "input_tokens": 196,
+            "output_tokens": 4490,
+            "cache_read_input_tokens": 1081371,
+            "cache_creation_input_tokens": 18383
+          }
+        },
+        "api_calls": 7,
+        "input_tokens": 196,
+        "output_tokens": 4490,
+        "cache_read_input_tokens": 1081371,
+        "cache_creation_input_tokens": 18383
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "ashould-we-keep-47fe86fa6a4c5871",
+        "agent_type": "fork",
+        "description": "should we keep #99 in the lab-console branch?",
+        "ref": "#99",
+        "date": "2026-11-01",
+        "wall_seconds": 39,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 2,
+            "input_tokens": 34,
+            "output_tokens": 1897,
+            "cache_read_input_tokens": 1071350,
+            "cache_creation_input_tokens": 10460
+          }
+        },
+        "api_calls": 2,
+        "input_tokens": 34,
+        "output_tokens": 1897,
+        "cache_read_input_tokens": 1071350,
+        "cache_creation_input_tokens": 10460
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a0e22ae49676a1be9",
+        "agent_type": "general-purpose",
+        "description": "FRLG speedrun route research to Brock",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 192,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 19,
+            "input_tokens": 38,
+            "output_tokens": 11692,
+            "cache_read_input_tokens": 1002485,
+            "cache_creation_input_tokens": 50248
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 38,
+        "output_tokens": 11692,
+        "cache_read_input_tokens": 1002485,
+        "cache_creation_input_tokens": 50248
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "aef1fbdbb92e40da5",
+        "agent_type": "general-purpose",
+        "description": "Make lab/frlg-mvp branch",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 122,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 9,
+            "input_tokens": 18,
+            "output_tokens": 3741,
+            "cache_read_input_tokens": 351813,
+            "cache_creation_input_tokens": 51797
+          }
+        },
+        "api_calls": 9,
+        "input_tokens": 18,
+        "output_tokens": 3741,
+        "cache_read_input_tokens": 351813,
+        "cache_creation_input_tokens": 51797
+      },
+      {
+        "kind": "dispatch",
+        "session": "140a8691-16b9-4a7a-bc62-1f7473634161",
+        "agent_id": "a15b88957fe0d914a",
+        "agent_type": "web-fetch",
+        "description": "Check BDSP early story scene spots",
+        "ref": "",
+        "date": "2026-11-01",
+        "wall_seconds": 8,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-haiku-5-5",
+        "models": {
+          "claude-haiku-5-5": {
+            "api_calls": 3,
+            "input_tokens": 6,
+            "output_tokens": 1728,
+            "cache_read_input_tokens": 9140,
+            "cache_creation_input_tokens": 6209
+          }
+        },
+        "api_calls": 3,
+        "input_tokens": 6,
+        "output_tokens": 1728,
+        "cache_read_input_tokens": 9140,
+        "cache_creation_input_tokens": 6209
+      }
+    ],
+    "sessions": []
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}
