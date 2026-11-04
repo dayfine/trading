@@ -26,15 +26,20 @@ open OUnit2
 open Core
 open Matchers
 
+(** [(entry, guarded decision dates checked)]. Pinning the count keeps each
+    per-entry case from passing vacuously. NVDA-2021-07-20 checks none: its
+    ex-date is a Tuesday, so its split week mixes bases and every post-split
+    date is out of scope (registry row "split-week weekly bar mixes bases"). The
+    [0] is pinned so a guard change that brings those dates in is noticed. *)
 let _entries =
   [
-    "AAPL-2014-06-09";
-    "AAPL-2020-08-31";
-    "C-1996-05-28";
-    "GE-2021-08-02";
-    "NVDA-2021-07-20";
-    "NVDA-2024-06-10";
-    "TSLA-2020-08-31";
+    ("AAPL-2014-06-09", 13);
+    ("AAPL-2020-08-31", 13);
+    ("C-1996-05-28", 26);
+    ("GE-2021-08-02", 13);
+    ("NVDA-2021-07-20", 0);
+    ("NVDA-2024-06-10", 13);
+    ("TSLA-2020-08-31", 13);
   ]
 
 let _sa_config = Stock_analysis.default_config
@@ -144,10 +149,14 @@ let _off_basis_dates reads =
 (* Tests                                                                *)
 (* ------------------------------------------------------------------ *)
 
-let _test_scan_level_on_decision_basis name _ =
+let _test_scan_level_on_decision_basis (name, n_decisions) _ =
   assert_that
-    (_off_basis_dates (_scan_reads (_load name)))
-    (equal_to ([] : Date.t list))
+    (_scan_reads (_load name))
+    (all_of
+       [
+         field List.length (equal_to n_decisions);
+         field _off_basis_dates (equal_to ([] : Date.t list));
+       ])
 
 (** Guards the test above against vacuity: the corpus holds guarded post-split
     decision dates for both split directions (a forward split and GE's 1:8
@@ -160,8 +169,8 @@ let test_scan_covers_forward_and_reverse_splits _ =
        [ field fst (gt (module Int_ord) 0); field snd (gt (module Int_ord) 0) ])
 
 let _per_entry label test =
-  List.map _entries ~f:(fun name ->
-      Printf.sprintf "%s/%s" label name >:: test name)
+  List.map _entries ~f:(fun ((name, _) as entry) ->
+      Printf.sprintf "%s/%s" label name >:: test entry)
 
 let suite =
   "split_corpus_scan"
