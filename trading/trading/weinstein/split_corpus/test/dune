@@ -2,16 +2,24 @@
  (names
   test_split_corpus
   test_split_corpus_stage_stops
-  test_split_corpus_entry_audit)
+  test_split_corpus_entry_audit
+  test_split_corpus_scan
+  test_split_corpus_entry_ticket
+  test_split_corpus_stop_fill)
  (libraries
   core
   types
   trading.base
   trading.strategy
+  trading.orders
+  trading.engine
+  trading.simulation
   indicators.time_period
   weinstein.types
   weinstein.stage
   weinstein.stock_analysis
+  weinstein.resistance
+  weinstein.support
   weinstein.screener
   weinstein.macro
   weinstein_trading.stops
