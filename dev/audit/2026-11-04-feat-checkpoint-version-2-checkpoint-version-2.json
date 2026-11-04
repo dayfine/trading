@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-04",
+  "feature": "checkpoint-version-2",
+  "branch": "feat/checkpoint-version-2",
+  "sha": "3a7c8ba1dc5fdef628aedd52fa9584cb16c30400",
+  "recorded_at_ns": 1793825967869655071,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
