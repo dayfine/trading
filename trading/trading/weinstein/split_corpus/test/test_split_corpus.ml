@@ -12,7 +12,13 @@
     - each meta factor matches the bars' own [adjusted_close /. close] on either
       side of the ex-date, and the meta is internally consistent
       ([factor_after /. factor_before = ratio]);
-    - the meta's [shape] and [symbol] agree with its splits and its name. *)
+    - the meta's [shape] and [symbol] agree with its splits and its name;
+    - the basis-restatement oracle the scan column relies on
+      ({!Split_corpus.pending_ratio}, {!Split_corpus.restate_bar}) gives the
+      hand-computed answer: the ratio before an ex-date and [1.0] on and after
+      it, the product of C-1996's two ratios, GE's 1:8 restated UP, the identity
+      with no split between the dates, and [adjusted_close] / [volume]
+      untouched. *)
 
 open OUnit2
 open Core
@@ -124,6 +130,103 @@ let _test_meta_shape_and_symbol_agree name _ =
          field _shape_agrees (equal_to true);
        ])
 
+(* ------------------------------------------------------------------ *)
+(* Basis restatement: the scan column's oracle                          *)
+(* ------------------------------------------------------------------ *)
+
+let _d = Date.of_string
+
+(* C-1996-05-28's two ratios as the meta writes them. *)
+let _c_first = 1.5
+let _c_second = 1.3333333333
+
+(** [(date, expected pending_ratio)] per entry: the split ratio before the
+    ex-date, [1.0] on and after it, and the product of both ratios before C's
+    first split. *)
+let _pending_cases =
+  [
+    ( "AAPL-2014-06-09",
+      [ ("2014-06-06", 7.0); ("2014-06-09", 1.0); ("2014-07-01", 1.0) ] );
+    ( "GE-2021-08-02",
+      [ ("2021-07-30", 0.125); ("2021-08-02", 1.0); ("2021-09-01", 1.0) ] );
+    ( "C-1996-05-28",
+      [
+        ("1996-05-24", _c_first *. _c_second);
+        ("1996-05-28", _c_second);
+        ("1996-06-03", _c_second);
+        ("1996-11-22", _c_second);
+        ("1996-11-25", 1.0);
+        ("1996-12-02", 1.0);
+      ] );
+  ]
+
+let _test_pending_ratio (name, cases) _ =
+  let meta = (_load name).meta in
+  assert_that
+    (List.map cases ~f:(fun (date, _) ->
+         Split_corpus.pending_ratio meta (_d date)))
+    (elements_are
+       (List.map cases ~f:(fun (_, r) -> float_equal ~epsilon:_ratio_tol r)))
+
+(** [(label, entry, bar date, as_of, k)]: [restate_bar] must multiply the bar's
+    raw o/h/l/c by [k]. *)
+let _restate_cases =
+  [
+    ( "forward_7to1_divides",
+      "AAPL-2014-06-09",
+      "2014-06-06",
+      "2014-06-09",
+      1.0 /. 7.0 );
+    (* 1:8 reverse: the restated pre-split price goes UP eightfold
+       (12.95 -> 103.60). *)
+    ("reverse_1to8_multiplies", "GE-2021-08-02", "2021-07-30", "2021-08-02", 8.0);
+    ( "two_splits_divides_by_product",
+      "C-1996-05-28",
+      "1996-05-24",
+      "1996-12-02",
+      1.0 /. (_c_first *. _c_second) );
+    ( "between_two_splits_divides_by_first",
+      "C-1996-05-28",
+      "1996-05-24",
+      "1996-06-03",
+      1.0 /. _c_first );
+    ( "post_split_bar_into_pre_split_basis",
+      "AAPL-2014-06-09",
+      "2014-06-09",
+      "2014-06-06",
+      7.0 );
+    ( "no_split_between_after",
+      "AAPL-2014-06-09",
+      "2014-06-09",
+      "2014-07-01",
+      1.0 );
+    ("no_split_between_before", "GE-2021-08-02", "2021-07-29", "2021-07-30", 1.0);
+    ( "no_split_between_same_date",
+      "C-1996-05-28",
+      "1996-06-03",
+      "1996-06-03",
+      1.0 );
+  ]
+
+let _test_restate_bar (_, name, bar_date, as_of, k) _ =
+  let entry : Split_corpus.entry = _load name in
+  let bar = _bar_on entry.bars (_d bar_date) in
+  let scaled get = field get (float_equal ~epsilon:_ratio_tol (get bar *. k)) in
+  assert_that
+    (Split_corpus.restate_bar entry.meta ~as_of:(_d as_of) bar)
+    (all_of
+       [
+         field (fun (b : Types.Daily_price.t) -> b.date) (equal_to bar.date);
+         scaled (fun (b : Types.Daily_price.t) -> b.open_price);
+         scaled (fun (b : Types.Daily_price.t) -> b.high_price);
+         scaled (fun (b : Types.Daily_price.t) -> b.low_price);
+         scaled (fun (b : Types.Daily_price.t) -> b.close_price);
+         field
+           (fun (b : Types.Daily_price.t) -> b.adjusted_close)
+           (float_equal bar.adjusted_close);
+         field (fun (b : Types.Daily_price.t) -> b.volume) (equal_to bar.volume);
+       ])
+
 let _per_entry label test =
   List.map _expected_entries ~f:(fun name ->
       Printf.sprintf "%s/%s" label name >:: test name)
@@ -139,5 +242,9 @@ let suite =
        @ _per_entry "meta_factors_match_bars" _test_meta_factors_match_bars
        @ _per_entry "meta_shape_and_symbol_agree"
            _test_meta_shape_and_symbol_agree
+       @ List.map _pending_cases ~f:(fun ((name, _) as case) ->
+           "pending_ratio/" ^ name >:: _test_pending_ratio case)
+       @ List.map _restate_cases ~f:(fun ((label, _, _, _, _) as case) ->
+           "restate_bar/" ^ label >:: _test_restate_bar case)
 
 let () = run_test_tt_main suite

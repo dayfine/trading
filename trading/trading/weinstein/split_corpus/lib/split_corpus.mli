@@ -85,3 +85,22 @@ val load : root:string -> string -> entry
 
 val load_all : root:string -> entry list
 (** Every entry under [root], in {!entry_names} order. *)
+
+(** {1 Basis restatement}
+
+    The suite's oracle: a corpus bar restated into another bar's basis is what
+    the same tape would have printed had no split separated the two dates. A
+    consumer that reads one consistent basis gives the same relative answer on
+    the loaded tape and on the restated one. *)
+
+val pending_ratio : meta -> Date.t -> float
+(** Product of the ratios of [meta]'s splits whose [ex_date] is after the date:
+    dividing a raw price printed on that date by it restates the price into the
+    window's final basis. [1.0] on and after the last ex-date. *)
+
+val restate_bar :
+  meta -> as_of:Date.t -> Types.Daily_price.t -> Types.Daily_price.t
+(** [restate_bar meta ~as_of bar] restates [bar]'s RAW open / high / low / close
+    into the basis of the bar printed on [as_of] (multiplies them by
+    [pending_ratio meta as_of /. pending_ratio meta bar.date]). [adjusted_close]
+    and [volume] are untouched: the adjusted series is already continuous. *)

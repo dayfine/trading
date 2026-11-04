@@ -65,3 +65,17 @@ let load ~root name =
   { name; meta = _load_meta dir; bars = _load_bars dir }
 
 let load_all ~root = List.map (entry_names ~root) ~f:(load ~root)
+
+let pending_ratio (meta : meta) date =
+  List.fold meta.splits ~init:1.0 ~f:(fun acc (s : split) ->
+      if Date.( > ) s.ex_date date then acc *. s.ratio else acc)
+
+let restate_bar meta ~as_of (bar : Types.Daily_price.t) : Types.Daily_price.t =
+  let k = pending_ratio meta as_of /. pending_ratio meta bar.date in
+  {
+    bar with
+    open_price = bar.open_price *. k;
+    high_price = bar.high_price *. k;
+    low_price = bar.low_price *. k;
+    close_price = bar.close_price *. k;
+  }
