@@ -16,7 +16,6 @@ let request ~scenario_dir
       }
 
 let _scenario_dir_of path =
-  let path = String.rstrip path ~drop:(Char.equal '/') in
   if String.equal (Filename.basename path) Backtest.Backtest_checkpoint.dir_name
   then Filename.dirname path
   else path

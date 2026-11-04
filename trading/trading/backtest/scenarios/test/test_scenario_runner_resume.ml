@@ -23,6 +23,7 @@ let _armed_overrides =
 (* Friday counts include the 52-week warmup, so the 4th checkpoint (Friday 68)
    lands in September of the 2019-06-01..2019-12-31 window. *)
 let _window_start = Date.of_string "2019-06-01"
+let _window_end = Date.of_string "2019-12-31"
 let _checkpoint_every = 17
 let _halt_after = 4
 let _compared_files = [ "actual.sexp"; "trades.csv"; "equity_curve.csv" ]
@@ -140,11 +141,40 @@ let test_pause_and_resume_is_byte_identical _ =
        [
          field
            (fun (d, _, _) ->
-             Option.exists d ~f:(fun d -> Date.(d >= _window_start)))
+             Option.exists d ~f:(fun d ->
+                 Date.(d >= _window_start && d < _window_end)))
            (equal_to true);
          field (fun (_, r, _) -> r) (equal_to paused_root);
          field (fun (_, _, c) -> c) (equal_to full_contents);
        ])
+
+(* A resumed run counts its checkpoint cadence from the resume point: pausing
+   again after one checkpoint at every-5 lands 5 Fridays (35 days) later. *)
+let test_resumed_run_counts_fridays_from_resume_point _ =
+  let dir = _stage_armed_scenario () in
+  let paused =
+    _run ~dir
+      (sprintf "--checkpoint-every %d --halt-after-checkpoint %d"
+         _checkpoint_every _halt_after)
+  in
+  let root = _root_exn paused in
+  let first = _checkpoint_date root in
+  (* Must not divide _checkpoint_every * _halt_after (68), or an absolute
+     Friday counter would also checkpoint on schedule and the test could not
+     tell it from resume-relative counting. *)
+  let resumed_every = 5 in
+  ignore
+    (_run ~dir
+       (sprintf "--resume %s --checkpoint-every %d --halt-after-checkpoint 1"
+          (Filename.quote (Filename.concat root _scenario_name))
+          resumed_every)
+      : int * string);
+  let second = _checkpoint_date root in
+  List.iter [ dir; root ] ~f:_rm_rf;
+  assert_that (first, second)
+    (field
+       (fun (a, b) -> Option.map2 a b ~f:(fun a b -> Date.diff b a))
+       (equal_to (Some (7 * resumed_every))))
 
 let test_resume_without_checkpoint_is_refused _ =
   let dir = _stage_armed_scenario () in
@@ -185,12 +215,13 @@ let test_plan_accepts_scenario_or_checkpoint_dir _ =
         "/runs/root/" ^ _scenario_name;
         "/runs/root/" ^ _scenario_name ^ "/checkpoint";
         "/runs/root/" ^ _scenario_name ^ "/checkpoint/";
+        "/runs/root/" ^ _scenario_name ^ "/";
       ]
       ~f:plan
   in
   _rm_rf dir;
   assert_that results
-    (elements_are [ equal_to expected; equal_to expected; equal_to expected ])
+    (elements_are (List.init 4 ~f:(fun _ -> equal_to expected)))
 
 (* A resume naming a scenario that is not under [--dir] exits 1. *)
 let test_resume_of_unknown_scenario_is_refused _ =
@@ -234,6 +265,8 @@ let suite =
   >::: [
          "pause at a mid-window Friday then resume is byte-identical"
          >:: test_pause_and_resume_is_byte_identical;
+         "a resumed run counts Fridays from the resume point"
+         >:: test_resumed_run_counts_fridays_from_resume_point;
          "resume with no checkpoint is refused"
          >:: test_resume_without_checkpoint_is_refused;
          "plan accepts the scenario or its checkpoint dir"

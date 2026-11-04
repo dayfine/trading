@@ -5,8 +5,21 @@ open Core
 
 type window = Date.t * Date.t * int * float
 (** [(start_date, end_date, warmup_days, initial_cash)]: with the strategy
-    config, what identifies a run. Commission, slippage and the cost model are
-    not part of the identity, so a resume does not notice them changing. *)
+    config and {!costs}, what identifies a run. *)
+
+type costs = {
+  commission : Trading_engine.Types.commission_config;
+  slippage_bps : int option;
+  cost_model : Backtest_cost_model.Cost_model.t option;
+}
+(** The run's cost settings as the caller passed them (before the cost-model
+    overlay). Part of the run's identity: a resume with different costs is
+    refused. *)
+
+val run_key :
+  config:Weinstein_strategy.config -> window:window -> costs:costs -> Sexp.t
+(** What a resume must reproduce, digested into the checkpoint identity: the
+    strategy config, the window and the costs. *)
 
 type resumed = Backtest_checkpoint.header * Backtest_checkpoint.state
 (** A loaded, validated checkpoint. *)
@@ -23,6 +36,7 @@ val load_resume :
   checkpoint:Backtest_checkpoint.request option ->
   config:Weinstein_strategy.config ->
   window:window ->
+  costs:costs ->
   manifest:Snapshot_pipeline.Snapshot_manifest.t ->
   candidate_log:Candidate_log.collector option ->
   resumed option
@@ -47,6 +61,7 @@ val hooks :
   strategy_choice:Strategy_choice.t ->
   config:Weinstein_strategy.config ->
   window:window ->
+  costs:costs ->
   manifest:Snapshot_pipeline.Snapshot_manifest.t ->
   stop_log:Stop_log.t ->
   trade_audit:Trade_audit.t ->
