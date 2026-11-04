@@ -261,8 +261,7 @@ let test_entry_anchor_column_reads_the_lifecycle_tag _ =
   let lifecycle entry_anchor : TL.t =
     {
       placement_date = _date "2024-01-12";
-      ticket_age_weeks_at_cancel = None;
-      cancel_reason = None;
+      cancel = None;
       ticket_age_weeks_at_fill = None;
       fill_volume = None;
       freshness_basis = TL.Ma_cross;

@@ -178,34 +178,18 @@ val cash_rejection_of :
 (** The on-disk projection of a simulator record: its [required], [available]
     and [budgeted]; the position id and date are the row's own. *)
 
-type t = {
-  placement_date : Date.t;
-      (** The tick on which the resting entry ticket was written — i.e. when the
-          strategy emitted its [CreateEntering].
-
-          Equal to [Trade_audit.entry_decision.entry_date] on every row this
-          build writes, and recorded separately on purpose: [entry_date] is the
-          row's join key and its name reads like a {i fill} date (indeed
-          {!Trade_context} still falls back to matching it against fill dates
-          when a round-trip carries no position id). Naming the placement
-          instant explicitly gives the two age fields below a documented anchor
-          that a later change to [entry_date]'s meaning cannot silently
-          invalidate. *)
-  ticket_age_weeks_at_cancel : int option; [@sexp.option]
+type cancellation = {
+  age_weeks : int;
       (** Whole weeks the ticket rested before it was {b cancelled} — set by
           {!Trade_audit.record_transitions} from the [CancelEntry] transition's
-          date minus {!placement_date}. {b Unbounded}, and the column F2's TTL
-          analysis should read: a TTL cancel is by construction the multi-week
-          case ([entry_order_ttl_weeks] is also in weeks, so the units line up
-          without conversion).
-
-          [None] when the ticket did not resolve by cancellation — it filled, or
-          it was still resting at end-of-run. *)
-  cancel_reason : string option; [@sexp.option]
+          date minus the record's [placement_date]. {b Unbounded}, and the
+          column F2's TTL analysis should read: a TTL cancel is by construction
+          the multi-week case ([entry_order_ttl_weeks] is also in weeks, so the
+          units line up without conversion). *)
+  reason : string;
       (** The [CancelEntry] transition's own reason token, persisted verbatim.
-          Always [Some] exactly when {!ticket_age_weeks_at_cancel} is, and read
-          together with it: the age says {i how long} the ticket rested, this
-          says {i what killed it}. Seven tokens exist —
+          Read together with {!age_weeks}: the age says {i how long} the ticket
+          rested, this says {i what killed it}. Seven tokens exist —
           {!Trading_simulation.Cancel_handler.portfolio_rejection_reason}
           ([entry_fill_rejected_by_portfolio]),
           {!Weinstein_strategy.Entry_ticket_ttl}'s [entry_ticket_ttl_expired] /
@@ -238,6 +222,37 @@ type t = {
 
           The closed list is pinned by
           [trading/trading/backtest/test/test_cancel_reason_closed_list.ml]. *)
+}
+[@@deriving sexp]
+(** A resting ticket's cancellation (PR-5): one value, so the age and the reason
+    cannot be set apart. *)
+
+type t = {
+  placement_date : Date.t;
+      (** The tick on which the resting entry ticket was written — i.e. when the
+          strategy emitted its [CreateEntering].
+
+          Equal to [Trade_audit.entry_decision.entry_date] on every row this
+          build writes, and recorded separately on purpose: [entry_date] is the
+          row's join key and its name reads like a {i fill} date (indeed
+          {!Trade_context} still falls back to matching it against fill dates
+          when a round-trip carries no position id). Naming the placement
+          instant explicitly gives the two age fields below a documented anchor
+          that a later change to [entry_date]'s meaning cannot silently
+          invalidate. *)
+  cancel : cancellation option;
+      (** How the ticket was {b cancelled}: its resting age and the reason
+          token, as one value — a cancel is exactly one observation with two
+          fields, so a row carries both or neither by construction (R1 of
+          #2357). [None] when the ticket did not resolve by cancellation — it
+          filled, or it was still resting at end-of-run. Read through
+          {!ticket_age_weeks_at_cancel} / {!cancel_reason}.
+
+          {b On disk} the field is written as the two flat fields
+          [(ticket_age_weeks_at_cancel N) (cancel_reason TOKEN)] at this
+          position, the shape every [trade_audit.sexp] reader greps for; the
+          sexp converters below translate, and reject a row carrying only one of
+          the pair. *)
   ticket_age_weeks_at_fill : int option; [@sexp.option]
       (** Whole weeks the ticket rested before it {b filled} — set by
           {!Execution_faithfulness.enrich} from the matched round-trip's
@@ -303,6 +318,14 @@ type t = {
     the placement-time fields populated and the two resolution fields [None];
     the resolutions are merged in later by {!resolve} / {!with_fill_age}. *)
 
+val ticket_age_weeks_at_cancel : t -> int option
+(** The cancelled ticket's resting age in whole weeks ({!cancellation.age_weeks}
+    of [cancel]); [None] exactly when {!cancel_reason} is. *)
+
+val cancel_reason : t -> string option
+(** The cancel's reason token ({!cancellation.reason} of [cancel]); [None]
+    exactly when {!ticket_age_weeks_at_cancel} is. *)
+
 val age_weeks : placed:Date.t -> resolved:Date.t -> int
 (** Whole weeks between placement and resolution. Clamped at [0]: a resolution
     dated before its own placement is not a negative age. *)
@@ -315,19 +338,18 @@ val age_weeks_from : t option -> resolved:Date.t -> int option
 val resolve :
   t option ->
   fill_volume:fill_volume_check option ->
-  cancel_age_weeks:int option ->
-  cancel_reason:string option ->
+  cancel:cancellation option ->
   cash_rejection:cash_rejection option ->
   t option
 (** Fold the collector-side observations (the F5 fill-week check and the cancel
     age + reason, and the #3138 at-fill cash rejection) into a placement-time
     record. [None] in ⇒ [None] out: a [trade_audit.sexp] row written before PR-5
-    has no lifecycle to merge into and is never given one. All four labelled
+    has no lifecycle to merge into and is never given one. All three labelled
     arguments are [None] on a row whose ticket simply filled under an unarmed F5
-    config — the no-observation case, not a zero. [cancel_age_weeks] and
-    [cancel_reason] always travel together: a row carries both or neither,
-    because a cancel is exactly one observation with two fields. Never touches
-    {!ticket_age_weeks_at_fill}, which only the enrichment pass can know. *)
+    config — the no-observation case, not a zero. The cancel age and reason
+    travel together in one {!cancellation}: a row carries both or neither. Never
+    touches {!ticket_age_weeks_at_fill}, which only the enrichment pass can
+    know. *)
 
 val with_fill_age : t option -> resolved:Date.t -> t option
 (** Stamp only {!ticket_age_weeks_at_fill}, from [resolved] against the record's
