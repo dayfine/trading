@@ -622,15 +622,14 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     (harvest-rotate, the last emitter, was retired); the case is kept because
     the simulator and order generator still handle the transition.
 
-    [CancelEntry] transitions set the bucket's
-    [ticket_lifecycle.ticket_age_weeks_at_cancel] from the transition date minus
-    the entry's [placement_date], {b and} its [cancel_reason] from the
-    transition's own reason token. That is the only place a never-filled
-    ticket's resolution is observable at all, since it produces no round-trip
-    for the fill-side enrichment to join. The fill-side column
-    ([ticket_age_weeks_at_fill]) is left [None]: the two resolutions are
-    mutually exclusive. Dropped when no entry was recorded for the id, same as
-    the exit path.
+    [CancelEntry] transitions set the bucket's [ticket_lifecycle.cancel] — one
+    {!Ticket_lifecycle.cancellation} carrying the age (transition date minus the
+    entry's [placement_date]) {b and} the transition's own reason token. That is
+    the only place a never-filled ticket's resolution is observable at all,
+    since it produces no round-trip for the fill-side enrichment to join. The
+    fill-side column ([ticket_age_weeks_at_fill]) is left [None]: the two
+    resolutions are mutually exclusive. Dropped when no entry was recorded for
+    the id, same as the exit path.
 
     {b Four kinds of cancel arrive here, not one, in three categories.} Two are
     strategy {e decisions} — {!Weinstein_strategy.Entry_ticket_ttl}'s

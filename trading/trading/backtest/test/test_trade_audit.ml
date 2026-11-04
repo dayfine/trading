@@ -350,16 +350,16 @@ let _triple : TL.triple_confirmation =
   }
 
 let _lifecycle ?(placement_date = _date "2024-03-01")
-    ?(ticket_age_weeks_at_cancel = Some 3)
-    ?(cancel_reason = Some "entry_ticket_ttl_expired")
-    ?(ticket_age_weeks_at_fill = None) ?(fill_volume = None)
-    ?(freshness_basis = TL.Range_top_breakout)
+    ?(cancel =
+      Some
+        ({ age_weeks = 3; reason = "entry_ticket_ttl_expired" }
+          : TL.cancellation)) ?(ticket_age_weeks_at_fill = None)
+    ?(fill_volume = None) ?(freshness_basis = TL.Range_top_breakout)
     ?(entry_anchor = Some TL.Continuation) ?(sized_down_wide_stop = true)
     ?(triple_confirmation = _triple) ?(reissued_from = None) () : TL.t =
   {
     placement_date;
-    ticket_age_weeks_at_cancel;
-    cancel_reason;
+    cancel;
     ticket_age_weeks_at_fill;
     fill_volume;
     freshness_basis;
@@ -427,8 +427,7 @@ let test_entry_decision_sexp_tolerates_missing_ticket_lifecycle _ =
     age or a fabricated verdict. *)
 let test_ticket_lifecycle_sexp_omits_unresolved_fill_fields _ =
   let unresolved =
-    _lifecycle ~ticket_age_weeks_at_cancel:None ~cancel_reason:None
-      ~ticket_age_weeks_at_fill:None ~fill_volume:None ()
+    _lifecycle ~cancel:None ~ticket_age_weeks_at_fill:None ~fill_volume:None ()
   in
   let sexp = TL.sexp_of_t unresolved in
   let field_names =
@@ -573,9 +572,7 @@ let _lifecycle_of (r : TA.audit_record) = r.entry.ticket_lifecycle
 let test_record_fill_volume_merges_into_the_entry_row _ =
   let t = TA.create () in
   TA.record_entry t
-    (make_entry
-       ~ticket_lifecycle:(Some (_lifecycle ~ticket_age_weeks_at_cancel:None ()))
-       ());
+    (make_entry ~ticket_lifecycle:(Some (_lifecycle ~cancel:None ())) ());
   TA.record_fill_volume t ~position_id:"AAPL-wein-1"
     (_check TL.No_verdict TL.Held);
   assert_that (TA.get_audit_records t)
@@ -609,9 +606,7 @@ let test_cancel_entry_records_the_resting_age_in_weeks _ =
   TA.record_entry t
     (make_entry
        ~ticket_lifecycle:
-         (Some
-            (_lifecycle ~placement_date:(_date "2024-03-01")
-               ~ticket_age_weeks_at_cancel:None ~cancel_reason:None ()))
+         (Some (_lifecycle ~placement_date:(_date "2024-03-01") ~cancel:None ()))
        ());
   TA.record_transitions t
     [
@@ -628,11 +623,9 @@ let test_cancel_entry_records_the_resting_age_in_weeks _ =
            (is_some_and
               (all_of
                  [
-                   field
-                     (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel)
+                   field TL.ticket_age_weeks_at_cancel
                      (is_some_and (equal_to 3));
-                   field
-                     (fun (l : TL.t) -> l.cancel_reason)
+                   field TL.cancel_reason
                      (is_some_and (equal_to "entry_ticket_ttl_expired"));
                    field (fun (l : TL.t) -> l.ticket_age_weeks_at_fill) is_none;
                  ]));
@@ -651,8 +644,7 @@ let test_cancel_reason_distinguishes_rejection_from_ttl _ =
       (make_entry ~position_id
          ~ticket_lifecycle:
            (Some
-              (_lifecycle ~placement_date:(_date "2024-03-01")
-                 ~ticket_age_weeks_at_cancel:None ~cancel_reason:None ()))
+              (_lifecycle ~placement_date:(_date "2024-03-01") ~cancel:None ()))
          ());
     TA.record_transitions t
       [
@@ -663,8 +655,7 @@ let test_cancel_reason_distinguishes_rejection_from_ttl _ =
         };
       ];
     List.filter_map (TA.get_audit_records t) ~f:(fun (r : TA.audit_record) ->
-        Option.bind r.entry.ticket_lifecycle ~f:(fun (l : TL.t) ->
-            l.cancel_reason))
+        Option.bind r.entry.ticket_lifecycle ~f:TL.cancel_reason)
   in
   assert_that
     ( record_cancel ~position_id:"AAPL-wein-1"
@@ -706,9 +697,7 @@ let _placement_row () =
           ~reason:TA.Top_n_cutoff ();
       ]
     ~ticket_lifecycle:
-      (Some
-         (_lifecycle ~placement_date:_placed ~ticket_age_weeks_at_cancel:None
-            ~cancel_reason:None ()))
+      (Some (_lifecycle ~placement_date:_placed ~cancel:None ()))
     ()
 
 (** Suspend, re-issue and fill: the original placement is withdrawn with the
@@ -748,7 +737,7 @@ let test_record_reissue_links_the_filled_copy_to_its_placement _ =
              field
                (fun (r : TA.audit_record) ->
                  Option.map r.entry.ticket_lifecycle ~f:(fun l ->
-                     (l.cancel_reason, l.reissued_from)))
+                     (TL.cancel_reason l, l.reissued_from)))
                (is_some_and
                   (equal_to (Some "entry_ticket_macro_suspended", None)));
              field (fun (r : TA.audit_record) -> r.exit_) is_none;
@@ -767,8 +756,7 @@ let test_record_reissue_links_the_filled_copy_to_its_placement _ =
                         placement-time lifecycle field. *)
                      ticket_lifecycle =
                        Some
-                         (_lifecycle ~placement_date:_placed
-                            ~ticket_age_weeks_at_cancel:None ~cancel_reason:None
+                         (_lifecycle ~placement_date:_placed ~cancel:None
                             ~reissued_from:(Some _reissue_link) ());
                    }
                     : TA.entry_decision));

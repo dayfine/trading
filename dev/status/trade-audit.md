@@ -1,6 +1,6 @@
 # Status: trade-audit
 
-## Last updated: 2026-10-28
+## Last updated: 2026-11-04
 
 ## Status
 IN_PROGRESS
@@ -184,17 +184,19 @@ NO
       re-traded symbol is still date-joined and may be misattributed, even
       though the per-trade table above it is exact.
 
-- [ ] **Enforce the "always together" invariant on the cancel pair (R1, from
-      qc-behavioral on PR #2357).** `ticket_lifecycle.mli:153` asserts
-      `cancel_reason` is "Always `Some` exactly when `ticket_age_weeks_at_cancel`
-      is", and `:229` repeats it ("always travel together"), but they are two
-      independent `int option` / `string option` fields — nothing in the type
-      forbids one being `Some` with the other `None`. The invariant holds today
-      only because `Trade_audit._record_cancel`
-      (`trading/trading/backtest/lib/trade_audit.ml:231-235`) is the single
-      writer and sets both. A second writer would silently break a documented
-      guarantee. Fix shape: make the pair one `option` of a record (or a private
-      constructor), so the type carries the invariant instead of a docstring.
+- [x] **Enforce the "always together" invariant on the cancel pair (R1, from
+      qc-behavioral on PR #2357).** Done (2026-11-04) — `Ticket_lifecycle.t`
+      now holds one `cancel : cancellation option` (`{ age_weeks; reason }`)
+      instead of two independent options, so a row carries both or neither by
+      construction; `Trade_audit`'s bucket and `Ticket_lifecycle.resolve` take
+      the same single value. Reads go through the views
+      `Ticket_lifecycle.ticket_age_weeks_at_cancel` / `cancel_reason`. The
+      on-disk sexp is unchanged: custom converters write the pair as the two
+      flat fields at the old position (the awk readers under
+      `dev/experiments/*` grep that shape) and reject a half-pair on read.
+      Pinned by `trading/trading/backtest/test/test_ticket_lifecycle_cancel.ml`
+      (exact bytes, round-trip, half-pair refusal). Verify:
+      `dune runtest trading/backtest/test`.
 
 - [x] **Pin the cancel-reason closed list with an exhaustiveness test (R2, from
       qc-behavioral on PR #2357).** Done — `trading/trading/backtest/test/

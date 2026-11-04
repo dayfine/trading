@@ -54,15 +54,14 @@ let _triple_confirmation_of_event
   }
 
 (** The placement-time half of the lifecycle record. The resolution half
-    ([fill_volume], [ticket_age_weeks_at_cancel], [ticket_age_weeks_at_fill]) is
-    unknowable at placement and is merged in later — by
-    {!Trade_audit.record_fill_volume} / {!Trade_audit.record_transitions} at
-    drain time and by {!Execution_faithfulness.enrich} at the runner. *)
+    ([fill_volume], [cancel], [ticket_age_weeks_at_fill]) is unknowable at
+    placement and is merged in later — by {!Trade_audit.record_fill_volume} /
+    {!Trade_audit.record_transitions} at drain time and by
+    {!Execution_faithfulness.enrich} at the runner. *)
 let _ticket_lifecycle_of_event (e : AR.entry_event) : Ticket_lifecycle.t =
   {
     placement_date = e.current_date;
-    ticket_age_weeks_at_cancel = None;
-    cancel_reason = None;
+    cancel = None;
     ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = _freshness_basis_of_event e.freshness_basis;

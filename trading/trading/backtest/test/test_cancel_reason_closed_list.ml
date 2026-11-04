@@ -168,8 +168,7 @@ let _triple : TL.triple_confirmation =
 let _lifecycle : TL.t =
   {
     placement_date = _placement_date;
-    ticket_age_weeks_at_cancel = None;
-    cancel_reason = None;
+    cancel = None;
     ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = TL.Range_top_breakout;
@@ -231,8 +230,7 @@ let _reasons_through_trade_audit (trans : Position.transition) =
   TA.record_entry t { _base_entry with position_id = trans.position_id };
   TA.record_transitions t [ trans ];
   List.filter_map (TA.get_audit_records t) ~f:(fun (r : TA.audit_record) ->
-      Option.bind r.entry.ticket_lifecycle ~f:(fun (l : TL.t) ->
-          l.cancel_reason))
+      Option.bind r.entry.ticket_lifecycle ~f:TL.cancel_reason)
 
 let _reachable_from transitions =
   List.concat_map transitions ~f:_reasons_through_trade_audit

@@ -380,7 +380,7 @@ let test_entry_projection_carries_placement_time_lifecycle _ =
                      }
                       : TL.triple_confirmation));
                field (fun (l : TL.t) -> l.fill_volume) is_none;
-               field (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel) is_none;
+               field TL.ticket_age_weeks_at_cancel is_none;
                field (fun (l : TL.t) -> l.ticket_age_weeks_at_fill) is_none;
              ])))
 

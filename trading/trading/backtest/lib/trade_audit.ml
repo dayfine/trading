@@ -127,8 +127,7 @@ type _bucket = {
   mutable bucket_exit : exit_decision option;
   mutable bucket_external_exit : external_exit_decision option;
   mutable bucket_fill_volume : Ticket_lifecycle.fill_volume_check option;
-  mutable bucket_cancel_age_weeks : int option;
-  mutable bucket_cancel_reason : string option;
+  mutable bucket_cancel : Ticket_lifecycle.cancellation option;
   mutable bucket_cash_rejection : Ticket_lifecycle.cash_rejection option;
   mutable bucket_stop_decisions : Weinstein_stops.Stop_decision.t list;
 }
@@ -153,8 +152,7 @@ let _fresh_bucket (entry : entry_decision) =
     bucket_exit = None;
     bucket_external_exit = None;
     bucket_fill_volume = None;
-    bucket_cancel_age_weeks = None;
-    bucket_cancel_reason = None;
+    bucket_cancel = None;
     bucket_cash_rejection = None;
     bucket_stop_decisions = [];
   }
@@ -216,12 +214,16 @@ let _fill_in_external_exit (bucket : _bucket)
     bucket.bucket_external_exit <- Some ext
 
 (* PR-5: a cancelled ticket's resting age, anchored on [placement_date], paired
-   with the transition's reason token — see [Ticket_lifecycle.cancel_reason]. *)
+   with the transition's reason token — see [Ticket_lifecycle.cancellation].
+   [None] when the entry has no lifecycle (a pre-PR-5 row), which
+   [Ticket_lifecycle.resolve] would drop anyway. *)
 let _record_cancel ~cancel_date ~reason (bucket : _bucket) =
-  bucket.bucket_cancel_age_weeks <-
+  let age =
     Ticket_lifecycle.age_weeks_from bucket.bucket_entry.ticket_lifecycle
-      ~resolved:cancel_date;
-  bucket.bucket_cancel_reason <- Some reason
+      ~resolved:cancel_date
+  in
+  bucket.bucket_cancel <-
+    Option.map age ~f:(fun age_weeks -> { Ticket_lifecycle.age_weeks; reason })
 
 let _process_transition t (trans : Trading_strategy.Position.transition) =
   let apply f = _with_bucket t ~position_id:trans.position_id ~f in
@@ -240,9 +242,7 @@ let _entry_with_lifecycle (bucket : _bucket) : entry_decision =
     bucket.bucket_entry with
     ticket_lifecycle =
       Ticket_lifecycle.resolve bucket.bucket_entry.ticket_lifecycle
-        ~fill_volume:bucket.bucket_fill_volume
-        ~cancel_age_weeks:bucket.bucket_cancel_age_weeks
-        ~cancel_reason:bucket.bucket_cancel_reason
+        ~fill_volume:bucket.bucket_fill_volume ~cancel:bucket.bucket_cancel
         ~cash_rejection:bucket.bucket_cash_rejection;
   }
 

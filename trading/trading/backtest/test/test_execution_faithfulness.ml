@@ -346,11 +346,10 @@ let test_degenerate_trigger_falls_back_to_suggested_entry _ =
 
 (* PR-5 ticket age at fill --------------------------------------------- *)
 
-let _lifecycle ?(ticket_age_weeks_at_cancel = None) ~placement_date () : TL.t =
+let _lifecycle ?(cancel = None) ~placement_date () : TL.t =
   {
     placement_date;
-    ticket_age_weeks_at_cancel;
-    cancel_reason = None;
+    cancel;
     ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = TL.Ma_cross;
@@ -375,15 +374,13 @@ let _age_of_first records =
   Option.bind (_lifecycle_of_first records) ~f:(fun (l : TL.t) ->
       l.ticket_age_weeks_at_fill)
 
-let _enrich_one ?ticket_age_weeks_at_cancel ?position_id ~placement ~fill () =
+let _enrich_one ?cancel ?position_id ~placement ~fill () =
   let audit =
     [
       make_record
         (make_entry ~entry_date:(_date placement)
            ~ticket_lifecycle:
-             (Some
-                (_lifecycle ?ticket_age_weeks_at_cancel
-                   ~placement_date:(_date placement) ()))
+             (Some (_lifecycle ?cancel ~placement_date:(_date placement) ()))
            ());
     ]
   in
@@ -422,17 +419,17 @@ let test_enrich_stamps_multi_week_age_via_position_id _ =
 let test_enrich_writes_only_the_fill_age_column _ =
   assert_that
     (_lifecycle_of_first
-       (_enrich_one ~ticket_age_weeks_at_cancel:(Some 9) ~placement:"2024-01-12"
-          ~fill:"2024-01-15" ()))
+       (_enrich_one
+          ~cancel:
+            (Some { TL.age_weeks = 9; reason = "entry_ticket_ttl_expired" })
+          ~placement:"2024-01-12" ~fill:"2024-01-15" ()))
     (is_some_and
        (all_of
           [
             field
               (fun (l : TL.t) -> l.ticket_age_weeks_at_fill)
               (is_some_and (equal_to 0));
-            field
-              (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel)
-              (is_some_and (equal_to 9));
+            field TL.ticket_age_weeks_at_cancel (is_some_and (equal_to 9));
           ]))
 
 (** A [trade_audit.sexp] written before PR-5 has no [ticket_lifecycle]; the

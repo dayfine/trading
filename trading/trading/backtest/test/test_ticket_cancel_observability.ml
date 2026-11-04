@@ -115,8 +115,7 @@ let _one_shot_strategy ~quantity : (module Strategy_interface.STRATEGY) =
 let _placement_lifecycle : TL.t =
   {
     placement_date = _entry_date;
-    ticket_age_weeks_at_cancel = None;
-    cancel_reason = None;
+    cancel = None;
     ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = TL.Ma_cross;
@@ -223,11 +222,8 @@ let test_portfolio_rejected_fill_records_a_cancel _ =
     (is_some_and
        (all_of
           [
-            field
-              (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel)
-              (is_some_and (equal_to 0));
-            field
-              (fun (l : TL.t) -> l.cancel_reason)
+            field TL.ticket_age_weeks_at_cancel (is_some_and (equal_to 0));
+            field TL.cancel_reason
               (is_some_and (equal_to Cancel_handler.portfolio_rejection_reason));
             field (fun (l : TL.t) -> l.ticket_age_weeks_at_fill) is_none;
             field
@@ -253,8 +249,8 @@ let test_affordable_fill_records_no_cancel _ =
     (is_some_and
        (all_of
           [
-            field (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel) is_none;
-            field (fun (l : TL.t) -> l.cancel_reason) is_none;
+            field TL.ticket_age_weeks_at_cancel is_none;
+            field TL.cancel_reason is_none;
             field (fun (l : TL.t) -> l.cash_rejection) is_none;
           ]))
 
