@@ -426,19 +426,19 @@ let _run_steps ~r ~trace ~gc_trace ~cache_sampler ~progress_emitter
 
 (* Checkpoint wiring (#3477): the checkpoint being resumed, the recorders
    (restored from it, or fresh), and the strategy state and Friday hook. *)
-let _checkpointing (input : input) ~checkpoint ~strategy_choice ~window
+let _checkpointing (input : input) ~checkpoint ~strategy_choice ~window ~costs
     ~manifest ~candidate_log =
-  let config = input.config in
   let resumed =
-    Panel_checkpoint.load_resume ~checkpoint ~config ~window ~manifest
-      ~candidate_log
+    Panel_checkpoint.load_resume ~checkpoint ~config:input.config ~window ~costs
+      ~manifest ~candidate_log
   in
   let restored = Option.map resumed ~f:snd in
   let r = _create_recorders ?candidate_log ?restored () in
   let strategy_state, on_friday =
     Panel_checkpoint.hooks ~resumed:restored ~checkpoint ~strategy_choice
-      ~config ~window ~manifest ~stop_log:r.stop_log ~trade_audit:r.trade_audit
-      ~force_liquidation_log:r.force_liquidation_log ~candidate_log
+      ~config:input.config ~window ~costs ~manifest ~stop_log:r.stop_log
+      ~trade_audit:r.trade_audit ~force_liquidation_log:r.force_liquidation_log
+      ~candidate_log
   in
   (resumed, r, strategy_state, on_friday)
 
@@ -453,9 +453,6 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
     ?(prune_universe_by_active_through = false) ?candidate_log ?on_step_setup
     ?universe_membership_at ?checkpoint () =
-  let fold_start_date =
-    fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date
-  in
   let warmup_start = Date.add_days start_date (-warmup_days) in
   Loop.log_window ~warmup_start ~end_date ~warmup_days strategy_choice;
   let ca = _corporate_actions input in
@@ -466,6 +463,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   let resumed, r, strategy_state, on_friday =
     _checkpointing input ~checkpoint ~strategy_choice ~manifest ~candidate_log
       ~window:(start_date, end_date, warmup_days, initial_cash)
+      ~costs:{ Panel_checkpoint.commission; slippage_bps; cost_model }
   in
   let ( strategy,
         market_data_adapter,
@@ -474,7 +472,9 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
         active_through_for ) =
     _setup_hybrid input ~ca ~strategy_choice ~snapshot_dir ~manifest
       ~shared_panels ~warmup_start ~end_date ~audit_recorder:r.audit_recorder
-      ?fold_start_date ?universe_membership_at ?strategy_state ()
+      ?fold_start_date:
+        (fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date)
+      ?universe_membership_at ?strategy_state ()
   in
   let sim =
     _build_sim input ~r ~ca ~start_date ~warmup_start ~end_date ~initial_cash

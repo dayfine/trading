@@ -471,6 +471,12 @@ let test_resume_with_candidate_capture_is_refused _ =
           (Weinstein_strategy.default_config ~universe:[]
              ~index_symbol:"GSPC.INDX")
         ~window:(_date "2024-01-02", _date "2024-06-28", 364, 100_000.0)
+        ~costs:
+          {
+            commission = { per_share = 0.01; minimum = 1.0 };
+            slippage_bps = None;
+            cost_model = None;
+          }
         ~manifest:
           (M.create ~schema:Data_panel_snapshot.Snapshot_schema.default
              ~entries:[])
@@ -530,6 +536,69 @@ let test_manifest_sexp_ignores_paths_and_mtimes _ =
       Sexp.equal (sexp (entry ())) (sexp (entry ~md5:"def" ())) )
     (equal_to (true, false))
 
+let _config =
+  Weinstein_strategy.default_config ~universe:[] ~index_symbol:"GSPC.INDX"
+
+let _window = (_date "2024-01-02", _date "2024-06-28", 364, 100_000.0)
+
+let _base_costs : Backtest.Panel_checkpoint.costs =
+  {
+    commission = { per_share = 0.01; minimum = 1.0 };
+    slippage_bps = None;
+    cost_model = None;
+  }
+
+let _identity_for costs =
+  BC.identity_of
+    ~run_key:
+      (Backtest.Panel_checkpoint.run_key ~config:_config ~window:_window ~costs)
+    ~manifest:(Sexp.Atom "m") ~seed_salt:None
+
+(* A checkpoint written under one set of cost settings is refused by a resume
+   under any other: commission, slippage, and the cost model. *)
+let test_changed_costs_refuse_resume _ =
+  _with_sim (fun sim ->
+      _with_dir (fun dir ->
+          ok_or_fail_status
+            (BC.write ~scenario_dir:dir
+               ~identity:(_identity_for _base_costs)
+               (_state sim));
+          let cases =
+            [
+              {
+                _base_costs with
+                commission = { per_share = 0.02; minimum = 1.0 };
+              };
+              {
+                _base_costs with
+                commission = { per_share = 0.01; minimum = 2.0 };
+              };
+              { _base_costs with slippage_bps = Some 5 };
+              {
+                _base_costs with
+                cost_model = Some Backtest_cost_model.Cost_model.retail_default;
+              };
+            ]
+          in
+          let refused costs = _refusal dir ~expect:(_identity_for costs) in
+          assert_that
+            ( List.map cases ~f:(fun c -> Option.is_some (refused c)),
+              refused _base_costs )
+            (equal_to ([ true; true; true; true ], None))))
+
+(* A journal with fewer lines than the header counts is refused, not loaded
+   short. *)
+let test_short_step_journal_refuses _ =
+  _with_sim (fun sim ->
+      _with_dir (fun dir ->
+          _write_exn dir (_state sim);
+          let path = _checkpoint_file dir Backtest.Step_journal.file_name in
+          let kept = List.take (In_channel.read_lines path) 2 in
+          Out_channel.write_lines path kept;
+          assert_that
+            (_refusal dir ~expect:_identity)
+            (_mentions "has 2 lines, expected 3")))
+
 let suite =
   "backtest_checkpoint"
   >::: [
@@ -568,6 +637,8 @@ let suite =
          >:: test_failed_write_warns_and_continues;
          "manifest identity ignores paths and mtimes"
          >:: test_manifest_sexp_ignores_paths_and_mtimes;
+         "changed costs refuse a resume" >:: test_changed_costs_refuse_resume;
+         "short step journal refuses" >:: test_short_step_journal_refuses;
        ]
 
 let () = run_test_tt_main suite
