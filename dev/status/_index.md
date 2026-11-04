@@ -4,8 +4,8 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-11-02 (orchestrator run 2 — see `dev/daily/2026-11-02-run2.md`). Queue at start: 0; #3500 merged by hand; opened #3512 (#3505), all gates green, held for human (core module).
-11-02: merged #3499, #3500, #3501, #3502, #3503, #3504, #3507, #3508, #3510. 11-01: merged #3483, #3485, #3494, #3495, #3497. 10-31: merged #3490, #3493. 10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
+Last updated: 2026-11-04 (orchestrator run 1 — see `dev/daily/2026-11-04.md`). Queue at start: 0; auto-merged #3526 (trade-audit R1) and #3527 (#2973 split-corpus columns, 2 reworks).
+11-04: merged #3524, #3526, #3527. 11-03: merged #3512, #3513, #3517, #3521. 11-02: merged #3499, #3500, #3501, #3502, #3503, #3504, #3507, #3508, #3510. 11-01: merged #3483, #3485, #3494, #3495, #3497. 10-31: merged #3490, #3493. 10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
 
 **Capability correction, measured this run:** the orchestrator token **CAN merge** a PR that modifies
 `.github/workflows/**` — #2903 changed `prune-candidates-weekly.yml` and `PUT /merge` returned
@@ -117,7 +117,7 @@ immune (#2605).
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
-| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | 10-28: #3460, #3459, #3462 census merged; next: cancel-pair invariant (R1), ratings `position_id` join |
+| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | 11-04: R1 cancel-pair invariant merged (#3526); next: ratings `position_id` join |
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
@@ -137,7 +137,7 @@ immune (#2605).
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | Seeded default MERGED #3425; K-seed record band #3467; 5 stale state tokens fixed 11-01; next: top-of-funnel screen (LOCAL) |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #3512 | #3512 (#3505 stop epsilon) gates green, human merge (engine change); #3477 PRs 6–7 (LOCAL) |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | #3512 (#3505) and #3477 PRs 6–7 merged; next: 26y kill+resume cloud run (LOCAL) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | MERGED | feat-backtest | — | Closed 2026-10-04: Gaps A-F shipped; ledger in active use (70 entries); no code successor |
