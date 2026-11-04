@@ -149,7 +149,7 @@ let test_pause_and_resume_is_byte_identical _ =
        ])
 
 (* A resumed run counts its checkpoint cadence from the resume point: pausing
-   again after one checkpoint at every-4 lands 4 Fridays (28 days) later. *)
+   again after one checkpoint at every-5 lands 5 Fridays (35 days) later. *)
 let test_resumed_run_counts_fridays_from_resume_point _ =
   let dir = _stage_armed_scenario () in
   let paused =
@@ -159,7 +159,10 @@ let test_resumed_run_counts_fridays_from_resume_point _ =
   in
   let root = _root_exn paused in
   let first = _checkpoint_date root in
-  let resumed_every = 4 in
+  (* Must not divide _checkpoint_every * _halt_after (68), or an absolute
+     Friday counter would also checkpoint on schedule and the test could not
+     tell it from resume-relative counting. *)
+  let resumed_every = 5 in
   ignore
     (_run ~dir
        (sprintf "--resume %s --checkpoint-every %d --halt-after-checkpoint 1"
