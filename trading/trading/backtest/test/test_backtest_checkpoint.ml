@@ -168,7 +168,7 @@ let test_each_identity_field_refuses _ =
           List.iter cases ~f:(fun (field_name, expect) ->
               assert_that (_refusal dir ~expect) (_mentions field_name))))
 
-let test_other_version_refuses _ =
+let _refuses_version version =
   _with_sim (fun sim ->
       _with_dir (fun dir ->
           _write_exn dir (_state sim);
@@ -180,7 +180,7 @@ let test_other_version_refuses _ =
               (Sexp.to_string
                  (BC.sexp_of_header
                     {
-                      version = BC.version + 1;
+                      version;
                       date = _date "2024-01-05";
                       n_steps = 3;
                       identity = _identity;
@@ -188,6 +188,11 @@ let test_other_version_refuses _ =
           assert_that
             (_refusal dir ~expect:_identity)
             (_mentions "checkpoint version")))
+
+(* Version 1 predates the single-value cancel in the trade-audit bucket. *)
+let test_other_version_refuses _ =
+  _refuses_version (BC.version + 1);
+  _refuses_version 1
 
 let test_missing_checkpoint_refuses _ =
   _with_dir (fun dir ->

@@ -4,7 +4,7 @@ open Core
 module Sim = Trading_simulation.Simulator
 module Strategy_state = Weinstein_strategy.Weinstein_strategy_state
 
-let version = 1
+let version = 2
 let dir_name = "checkpoint"
 
 type identity = {

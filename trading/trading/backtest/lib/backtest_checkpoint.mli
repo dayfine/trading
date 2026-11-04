@@ -19,7 +19,9 @@
 open Core
 
 val version : int
-(** Checkpoint format version. Bump it when any component's sexp changes. *)
+(** Checkpoint format version. Bump it when any component's sexp changes. v2:
+    the trade-audit bucket stores one [bucket_cancel] value in place of
+    [bucket_cancel_age_weeks] and [bucket_cancel_reason] (#3526). *)
 
 val dir_name : string
 (** ["checkpoint"]. *)
