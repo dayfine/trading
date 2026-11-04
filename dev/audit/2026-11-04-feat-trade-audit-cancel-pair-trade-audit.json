@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-04",
+  "feature": "trade-audit",
+  "branch": "feat/trade-audit-cancel-pair",
+  "sha": "bbc70c50bb049809af63f6642c80696a127b3a6a",
+  "recorded_at_ns": 1793814738884438514,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
