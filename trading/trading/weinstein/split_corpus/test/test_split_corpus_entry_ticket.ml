@@ -90,16 +90,21 @@ let _create_entering ~symbol ~date entry_price :
         };
   }
 
+(** Setup-only unwrap: fails the test with the status message on [Error]. *)
+let _ok_exn result =
+  Result.map_error result ~f:Status.show |> Result.ok_or_failwith
+
 (** [(trigger, limit)] of the simulator's entry ticket for [E]. *)
 let _ticket ~symbol ~date e =
-  match
+  let orders, _ =
     Trading_simulation.Order_generator.transitions_to_orders ~current_date:date
       ~positions:String.Map.empty ~entry_extension_max_pct:_cap_pct
       [ _create_entering ~symbol ~date e ]
-  with
-  | Ok ([ { order_type = StopLimit (trigger, limit); _ } ], _) ->
-      (trigger, limit)
-  | _ -> assert_failure "expected one StopLimit entry ticket"
+    |> _ok_exn
+  in
+  match orders with
+  | [ { order_type = StopLimit (trigger, limit); _ } ] -> (trigger, limit)
+  | _ -> failwith "expected one StopLimit entry ticket"
 
 (** One weekly decision [i] read on the corpus vintage and on the later-split
     vintage:
@@ -150,12 +155,9 @@ let _vintage_violations decisions =
 let _cancels (entry : Split_corpus.entry) ~bar_reader ~current_date =
   let symbol = entry.meta.symbol in
   let pos =
-    match
-      Trading_strategy.Position.create_entering
-        (_create_entering ~symbol ~date:current_date 1.0)
-    with
-    | Ok p -> p
-    | Error err -> assert_failure (Status.show err)
+    Trading_strategy.Position.create_entering
+      (_create_entering ~symbol ~date:current_date 1.0)
+    |> _ok_exn
   in
   List.length
     (Split_ticket_cancel.cancellations
