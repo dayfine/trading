@@ -413,7 +413,7 @@
  (reason "found by the split corpus scan column (test_split_corpus_scan.ml asserts only the guarded dates); the fix (check the boundary over offsets 1..base_end_offset_weeks, or restate) is a strategy change left to a follow-up on #2973")
  (status open))
 ((issue 2973) (ref "split corpus scan column: split-week weekly bar mixes bases")
- (finding "split-week weekly bar mixes bases when the ex-date is not the week's first trading day: its high is the pre-split raw high but its split factor is read from the post-split close, so the G14 scan keeps it (NVDA 2021-07-20 Tue: breakout 761.68 vs close 219.00 for the rest of the 52-week window)")
+ (finding "split-week weekly bar mixes bases when the ex-date is not the week's first trading day: its high is the pre-split raw high but its split factor is read from the post-split close, so the G14 scan keeps it (NVDA 2021-07-20 Tue: breakout 761.68 vs close 219.00 for the rest of the 52-week window). Worst case is a Friday ex-date (ISRG 2017-10-06, 3:1): the split day is the screening day, so the decision-week bar itself has high 1094.55 against close 361.47 and every post-split decision is out of the guarded scope")
  (guard none)
  (reason "found by the split corpus scan column (test_split_corpus_scan.ml excludes mid-week ex-dates); fix belongs in the weekly roll-up or the scan, left to a follow-up on #2973")
  (status open))

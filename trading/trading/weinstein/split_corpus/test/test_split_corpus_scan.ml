@@ -27,8 +27,9 @@ open Core
 open Matchers
 
 (** [(entry, guarded decision dates checked)]. Pinning the count keeps each
-    per-entry case from passing vacuously. NVDA-2021-07-20 checks none: its
-    ex-date is a Tuesday, so its split week mixes bases and every post-split
+    per-entry case from passing vacuously. NVDA-2021-07-20 and ISRG-2017-10-06
+    check none: their ex-dates are a Tuesday and a Friday (the split day is the
+    screening day itself), so each split week mixes bases and every post-split
     date is out of scope (registry row "split-week weekly bar mixes bases"). The
     [0] is pinned so a guard change that brings those dates in is noticed. *)
 let _entries =
@@ -37,6 +38,8 @@ let _entries =
     ("AAPL-2020-08-31", 13);
     ("C-1996-05-28", 26);
     ("GE-2021-08-02", 13);
+    ("INFY-2014-12-08", 20);
+    ("ISRG-2017-10-06", 0);
     ("NVDA-2021-07-20", 0);
     ("NVDA-2024-06-10", 13);
     ("TSLA-2020-08-31", 13);
