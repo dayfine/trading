@@ -205,11 +205,17 @@ let _fork_scenario ~output_root ~fixtures_root ~progress_every
         Stdlib.exit 1)
   | `In_the_parent pid -> pid
 
-type _child_status = Succeeded | Crashed
+type _child_status = Succeeded | Crashed | Halted
 
+(* A child that exited [halt_exit_code] stopped on purpose at a checkpoint. *)
 let _await_one running =
   let _, pid = Queue.dequeue_exn running in
-  match Core_unix.waitpid pid with Ok () -> Succeeded | Error _ -> Crashed
+  match Core_unix.waitpid pid with
+  | Ok () -> Succeeded
+  | Error (`Exit_non_zero code)
+    when code = Backtest.Backtest_checkpoint.halt_exit_code ->
+      Halted
+  | Error _ -> Crashed
 
 let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
     ~progress_every ~emit_all_eligible ~emit_candidates ~bar_data_source
@@ -238,6 +244,16 @@ let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
         Hashtbl.find statuses s.Scenario.name |> Option.value ~default:Crashed
       in
       (s, status))
+
+(* 0 when everything passed; [halt_exit_code] when every non-passing scenario
+   halted (a wrapper may resume); 1 when any scenario failed or crashed. *)
+let _exit_code ~pass_flags ~halted_flags =
+  let non_passing = List.zip_exn pass_flags halted_flags in
+  let non_passing = List.filter non_passing ~f:(fun (pass, _) -> not pass) in
+  if List.is_empty non_passing then 0
+  else if List.for_all non_passing ~f:snd then
+    Backtest.Backtest_checkpoint.halt_exit_code
+  else 1
 
 let () =
   let {
@@ -289,11 +305,17 @@ let () =
       ~checkpoint scenarios_with_paths
   in
   print_header ();
-  let pass_flags =
-    List.map results ~f:(fun (s, _) -> process_result ~output_root s)
+  let pass_flags, halted_flags =
+    List.map results ~f:(fun (s, status) ->
+        match status with
+        | Halted ->
+            Checkpoint_cli.print_halted_row ~output_root
+              ~checkpoints:checkpoint.halt_after_checkpoints s;
+            (false, true)
+        | Succeeded | Crashed -> (process_result ~output_root s, false))
+    |> List.unzip
   in
-  let all_pass = List.for_all pass_flags ~f:Fn.id in
   let n_pass = List.count pass_flags ~f:Fn.id in
   let n_total = List.length pass_flags in
   printf "\n%d/%d scenarios passed.\n" n_pass n_total;
-  if not all_pass then Stdlib.exit 1
+  Stdlib.exit (_exit_code ~pass_flags ~halted_flags)

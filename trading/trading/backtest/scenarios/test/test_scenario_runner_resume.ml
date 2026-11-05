@@ -26,6 +26,7 @@ let _window_start = Date.of_string "2019-06-01"
 let _window_end = Date.of_string "2019-12-31"
 let _checkpoint_every = 17
 let _halt_after = 4
+let _halt_exit_code = Backtest.Backtest_checkpoint.halt_exit_code
 let _compared_files = [ "actual.sexp"; "trades.csv"; "equity_curve.csv" ]
 
 let _scenario_runner_exe =
@@ -126,6 +127,8 @@ let test_pause_and_resume_is_byte_identical _ =
          (Filename.quote (Filename.concat paused_root _scenario_name)))
   in
   let resumed_root = _root_exn resumed in
+  let paused_code, paused_text = paused in
+  let resumed_code, _ = resumed in
   let contents root = List.map _compared_files ~f:(_read root) in
   let full_contents = contents full_root
   and resumed_contents = contents resumed_root in
@@ -145,6 +148,16 @@ let test_pause_and_resume_is_byte_identical _ =
                  Date.(d >= _window_start && d < _window_end)))
            (equal_to true);
          field (fun (_, r, _) -> r) (equal_to paused_root);
+         field (fun _ -> paused_code) (equal_to _halt_exit_code);
+         field
+           (fun _ ->
+             String.is_substring paused_text
+               ~substring:"HALTED at checkpoint 4 (")
+           (equal_to true);
+         field
+           (fun _ -> String.is_substring paused_text ~substring:"FAIL")
+           (equal_to false);
+         field (fun _ -> resumed_code) (equal_to 0);
          field (fun (_, _, c) -> c) (equal_to full_contents);
        ])
 
