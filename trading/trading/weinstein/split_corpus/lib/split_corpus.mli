@@ -10,11 +10,12 @@
     Layout, under [trading/test_data/split_corpus/]: one directory per entry,
     named [<SYMBOL>-<first ex-date>], holding
 
-    - [bars.csv] — roughly 60 weeks of daily bars around the split(s), the bar
-      store's own 7 columns ([date,open,high,low,close,adjusted_close,volume]).
-      [close] is RAW (as printed that day); [adjusted_close] is back-adjusted
-      for every later split and dividend in the data vintage, so it is
-      continuous across the ex-date while [close] jumps by the split ratio.
+    - [bars.csv] — about 61 to 78 weeks (300 to 380 rows; 63 to 79 weekly bars),
+      by entry, of daily bars around the split(s), the bar store's own 7 columns
+      ([date,open,high,low,close,adjusted_close,volume]). [close] is RAW (as
+      printed that day); [adjusted_close] is back-adjusted for every later split
+      and dividend in the data vintage, so it is continuous across the ex-date
+      while [close] jumps by the split ratio.
     - [meta.sexp] — a {!meta}: the splits inside the window, each with its ratio
       and the expected raw-to-adjusted factor either side of the ex-date.
 
