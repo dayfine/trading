@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-05",
+  "feature": "split-corpus-windows",
+  "branch": "feat/split-corpus-windows",
+  "sha": "cb42c28d1adb5e7c9309c9fbe3b64c1695c5cace",
+  "recorded_at_ns": 1793897037143424193,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
