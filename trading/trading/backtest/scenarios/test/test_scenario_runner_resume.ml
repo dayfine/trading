@@ -150,9 +150,12 @@ let test_pause_and_resume_is_byte_identical _ =
          field (fun (_, r, _) -> r) (equal_to paused_root);
          field (fun _ -> paused_code) (equal_to _halt_exit_code);
          field
-           (fun _ ->
-             String.is_substring paused_text
-               ~substring:"HALTED at checkpoint 4 (")
+           (fun (d, _, _) ->
+             Option.exists d ~f:(fun d ->
+                 String.is_substring paused_text
+                   ~substring:
+                     (sprintf "HALTED at checkpoint %d (%s)" _halt_after
+                        (Date.to_string d))))
            (equal_to true);
          field
            (fun _ -> String.is_substring paused_text ~substring:"FAIL")
