@@ -190,6 +190,7 @@ expect_eq "pull-dir --jobs 4 exits 0" 0 \
   "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/bigd1" --name big1 --jobs 4)"
 expect_eq "parallel round trip restores the tree" "" "$(diff -r "$TMP/big" "$TMP/bigd1" || echo differs)"
 expect_eq "--jobs 0 is refused" 2 "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/big" --name bigj --jobs 0)"
+expect_eq "--jobs 00 is refused" 2 "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/big" --name bigj --jobs 00)"
 
 # A failing transfer: non-zero, names the file, no SHA256SUMS.
 expect_eq "failing transfer exits non-zero" 2 \
@@ -214,6 +215,8 @@ expect_eq "resumed upload pulls and verifies" 0 "$(rc_of sh "$SCRIPT" pull-dir -
 expect_eq "resumed upload restores the tree" "" "$(diff -r "$TMP/big" "$TMP/bigd3" || echo differs)"
 expect_eq "complete upload is still refused without --resume" 2 \
   "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/big" --name bigr)"
+expect_eq "resume over a complete upload exits 0" 0 \
+  "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/big" --name bigr --resume --jobs 4)"
 
 printf 'r2_bars_test: %d passed, %d failed\n' "$PASS" "$FAILED"
 [ "$FAILED" -eq 0 ]

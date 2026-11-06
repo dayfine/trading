@@ -299,7 +299,11 @@ _wh_args() { # sets dir, name, force, resume, jobs from --dir/--dest, --name, ..
   done
   [ -n "$dir" ] && [ -n "$name" ] || _usage
   case $name in */*|.*) _die "bad warehouse name: $name" ;; esac
-  case $jobs in ''|*[!0-9]*|0) _die "--jobs must be a positive integer: $jobs" ;; esac
+  case $jobs in ''|*[!0-9]*) _die "--jobs must be a positive integer: $jobs" ;; esac
+  jobs_val=$jobs
+  while [ "${jobs_val#0}" != "$jobs_val" ]; do jobs_val=${jobs_val#0}; done
+  [ -n "$jobs_val" ] || _die "--jobs must be a positive integer: $jobs"
+  jobs=$jobs_val
 }
 
 # _size KEY : prints the object's byte size, or nothing if it does not exist.
