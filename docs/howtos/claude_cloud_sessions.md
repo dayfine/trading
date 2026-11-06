@@ -72,7 +72,7 @@ Sessions take 2-4 minutes to start.
 Building the v12 PIT warehouse inside a session takes about 5.5 h and yields a
 different construction (9,181 symbols) from the local 9,236-symbol one. Pull the
 local warehouse instead. It lives in the private R2 bucket under
-`warehouse/<name>/` (not `bars/`), one object per `.snap` file plus a
+`warehouse/<name>/` (not `bars/`), one object per file (`.snap`, `.weekly`, `manifest.sexp`) plus a
 `SHA256SUMS` manifest. The credentials are the same as for the bars
 (`dev/scripts/r2_bars.sh` header).
 

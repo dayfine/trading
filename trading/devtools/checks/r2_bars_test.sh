@@ -16,9 +16,10 @@
 #   - R2_MAX_BYTES makes push refuse an oversized archive and store nothing;
 #   - push-dir/pull-dir round-trip a warehouse directory under warehouse/,
 #     not bars/ (issue #3535);
-#   - pull-dir refuses a corrupted, a missing and an extra file (exit 1, names
-#     the file, destination left absent); push-dir refuses overwrite and an
-#     oversized file; verify-dir flags an extra file in an existing copy.
+#   - pull-dir refuses a corrupted and a missing file (exit 1, names the
+#     file, destination left absent); push-dir refuses overwrite and a file over
+#     the limit (the limit is per file, not total); verify-dir flags an extra
+#     file in an existing copy.
 #
 # Run:
 #   sh trading/devtools/checks/r2_bars_test.sh
@@ -147,6 +148,10 @@ expect_eq "push-dir refuses to overwrite" 2 \
   "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/wh" --name wh1)"
 expect_eq "push-dir size limit refuses" 2 \
   "$(rc_of env R2_MAX_BYTES=3 sh "$SCRIPT" push-dir --dir "$TMP/wh" --name whbig)"
+# Limit 11 sits between the largest file (10 bytes) and the total (22): only a
+# per-file check lets this through.
+expect_eq "push-dir limit is per file, not total" 0 \
+  "$(rc_of env R2_MAX_BYTES=11 sh "$SCRIPT" push-dir --dir "$TMP/wh" --name whmid)"
 expect_eq "pull-dir exits 0" 0 "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/whd1" --name wh1)"
 expect_eq "pull-dir restores the tree" "" "$(diff -r "$TMP/wh" "$TMP/whd1" || echo differs)"
 expect_eq "pull-dir refuses a non-empty destination" 2 \
