@@ -221,7 +221,7 @@ let _write_or_warn ~scenario_dir ~identity ~date state =
         (Date.to_string date) (Status.show e);
       false
 
-let _halt_exit_code = 75
+let halt_exit_code = 75
 
 (* Test-only pause: leave the process once [halt_after_checkpoints] checkpoints
    are on disk. *)
@@ -229,7 +229,7 @@ let _halt_if_due ~request ~written =
   match request.halt_after_checkpoints with
   | Some k when written >= k ->
       eprintf "Backtest_checkpoint: halting after %d checkpoint(s)\n%!" written;
-      Stdlib.exit _halt_exit_code
+      Stdlib.exit halt_exit_code
   | _ -> ()
 
 let friday_hook ~request ~identity ~strategy_state ~stop_log ~trade_audit

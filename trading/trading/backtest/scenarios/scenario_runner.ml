@@ -71,21 +71,6 @@ module Output_root = Scenario_lib.Output_root
 
 (* Run one scenario inside a child process *)
 
-(** Run the {!Backtest.Fold_health} degenerate-fold guard over a completed run
-    and surface any findings loudly: each finding is printed to stderr with a
-    [WARN: fold-health] prefix and the full list is written to
-    [<scenario_dir>/fold_health.sexp]. A healthy run writes the empty list (so
-    the artefact's presence is uniform across runs) and prints nothing. The
-    equity-curve series is the per-step [portfolio_value] over the in-window
-    steps — the same series {!Backtest.Result_writer} writes to
-    [equity_curve.csv]. Purely diagnostic: no metric or return value changes. *)
-let _emit_fold_health ~scenario_dir ~(result : Backtest.Runner.result) =
-  (* Delegates to the shared runner-path emission (#1557) so the scenario
-     catalog and the [backtest_runner] binary surface the same finding union
-     ([Fold_health.check] invariants ∪ the #1553 divergence guard) identically.
-     Behaviour-identical to the prior inline form. *)
-  Backtest.Fold_health_runner.emit ~output_dir:scenario_dir result
-
 let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
     ~emit_all_eligible ~emit_candidates ~bar_data_source ~checkpoint
     ~scenario_path (s : Scenario.t) =
@@ -131,7 +116,7 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
      round-trips + flat equity + an unexplained terminal move — the A2 warmup-
      leak class) loudly to stderr and as [fold_health.sexp]. Purely a reporting
      post-step; it changes no metric and never aborts the run. *)
-  _emit_fold_health ~scenario_dir ~result;
+  Backtest.Fold_health_runner.emit ~output_dir:scenario_dir result;
   (* Post-step: emit the all-eligible diagnostic alongside actual.sexp /
      summary.sexp so every scenario surfaces raw-signal alpha without manual
      [all_eligible_runner.exe] invocation. Failures inside the runner are
@@ -205,11 +190,17 @@ let _fork_scenario ~output_root ~fixtures_root ~progress_every
         Stdlib.exit 1)
   | `In_the_parent pid -> pid
 
-type _child_status = Succeeded | Crashed
+type _child_status = Succeeded | Crashed | Halted
 
+(* A child that exited [halt_exit_code] stopped on purpose at a checkpoint. *)
 let _await_one running =
   let _, pid = Queue.dequeue_exn running in
-  match Core_unix.waitpid pid with Ok () -> Succeeded | Error _ -> Crashed
+  match Core_unix.waitpid pid with
+  | Ok () -> Succeeded
+  | Error (`Exit_non_zero code)
+    when code = Backtest.Backtest_checkpoint.halt_exit_code ->
+      Halted
+  | Error _ -> Crashed
 
 let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
     ~progress_every ~emit_all_eligible ~emit_candidates ~bar_data_source
@@ -289,11 +280,17 @@ let () =
       ~checkpoint scenarios_with_paths
   in
   print_header ();
-  let pass_flags =
-    List.map results ~f:(fun (s, _) -> process_result ~output_root s)
+  let pass_flags, halted_flags =
+    List.map results ~f:(fun (s, status) ->
+        match status with
+        | Halted ->
+            Checkpoint_cli.print_halted_row ~output_root
+              ~checkpoints:checkpoint.halt_after_checkpoints s;
+            (false, true)
+        | Succeeded | Crashed -> (process_result ~output_root s, false))
+    |> List.unzip
   in
-  let all_pass = List.for_all pass_flags ~f:Fn.id in
   let n_pass = List.count pass_flags ~f:Fn.id in
   let n_total = List.length pass_flags in
   printf "\n%d/%d scenarios passed.\n" n_pass n_total;
-  if not all_pass then Stdlib.exit 1
+  Stdlib.exit (Checkpoint_cli.exit_code ~pass_flags ~halted_flags)

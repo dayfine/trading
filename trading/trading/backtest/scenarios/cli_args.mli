@@ -6,8 +6,11 @@ type checkpoint_flags = {
       (** [--resume <dir>]: continue the one scenario whose artefact directory
           (or its [checkpoint/] subdirectory) is [dir]. *)
   halt_after_checkpoints : int option;
-      (** [--halt-after-checkpoint K], test-only: exit 75 after K checkpoints.
-      *)
+      (** [--halt-after-checkpoint K], test-only: the worker exits
+          {!Backtest.Backtest_checkpoint.halt_exit_code} (75) after K
+          checkpoints. The parent reports that scenario as HALTED, not FAIL, and
+          [scenario_runner] exits 75 when every non-passing scenario halted; a
+          crash still exits 1. *)
 }
 
 type t = {

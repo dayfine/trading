@@ -39,3 +39,34 @@ let plan ~resume scenarios =
              scenario directory\n"
             path name;
           Stdlib.exit 1)
+
+let _header_date ~output_root (s : Scenario.t) =
+  let path =
+    String.concat ~sep:"/"
+      [
+        Output_root.scenario_dir ~output_root s;
+        Backtest.Backtest_checkpoint.dir_name;
+        "header.sexp";
+      ]
+  in
+  try
+    Some
+      (Backtest.Backtest_checkpoint.header_of_sexp (Sexp.load_sexp path)).date
+  with _ -> None
+
+let print_halted_row ~output_root ~checkpoints (s : Scenario.t) =
+  let n = Option.value_map checkpoints ~default:"?" ~f:Int.to_string in
+  let date =
+    Option.value_map
+      (_header_date ~output_root s)
+      ~default:"?" ~f:Date.to_string
+  in
+  printf "%-28s HALTED at checkpoint %s (%s)\n" s.name n date
+
+let exit_code ~pass_flags ~halted_flags =
+  let non_passing = List.zip_exn pass_flags halted_flags in
+  let non_passing = List.filter non_passing ~f:(fun (pass, _) -> not pass) in
+  if List.is_empty non_passing then 0
+  else if List.for_all non_passing ~f:snd then
+    Backtest.Backtest_checkpoint.halt_exit_code
+  else 1

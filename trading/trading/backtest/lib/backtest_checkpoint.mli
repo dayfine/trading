@@ -26,6 +26,13 @@ val version : int
 val dir_name : string
 (** ["checkpoint"]. *)
 
+val halt_exit_code : int
+(** [75] (EX_TEMPFAIL): the exit status of a run that stopped on purpose at a
+    checkpoint because [halt_after_checkpoints] was reached. A wrapper may
+    restart on it with [--resume]; any other non-zero exit is a crash.
+    [scenario_runner] reports such a child as HALTED rather than FAIL and exits
+    with this code itself when every non-passing scenario halted. *)
+
 type identity = {
   config_digest : string;
       (** Digest of the run's strategy config, dates, cash and strategy. *)
@@ -92,8 +99,9 @@ type request = {
       (** Continue from the checkpoint already in [scenario_dir] instead of
           starting from the window's first day (#3477 PR 7). *)
   halt_after_checkpoints : int option;
-      (** Test-only: [Stdlib.exit 75] once this many checkpoints have been
-          written, simulating a killed run. [None] in production. *)
+      (** Test-only: [Stdlib.exit halt_exit_code] (75) once this many
+          checkpoints have been written, simulating a killed run. [None] in
+          production. *)
 }
 (** Ask a run to checkpoint into [scenario_dir] on every [every_n_fridays]-th
     Friday, and optionally to resume from the checkpoint found there. *)
