@@ -70,7 +70,7 @@ Sessions take 2-4 minutes to start.
 ## Pulling the snapshot warehouse (#3535)
 
 Building the v12 PIT warehouse inside a session takes about 5.5 h and yields a
-different construction (9,181 symbols) from the local 9,236-symbol one. Pull the
+different construction (9,181 symbols) from the local 9,236-symbol one (`v12wk`). Pull the
 local warehouse instead. It lives in the private R2 bucket under
 `warehouse/<name>/` (not `bars/`), one object per file (`.snap`, `.weekly`, `manifest.sexp`) plus a
 `SHA256SUMS` manifest. The credentials are the same as for the bars
@@ -83,21 +83,21 @@ the checkout survives. Use `.sweep-output/` (gitignored); check with
 
 ```sh
 # local, once: uploads ~3.6 GB; never in a cloud session
-sh dev/scripts/r2_bars.sh push-dir --dir /tmp/snap_top3000_pit_v12monthly --name v12monthly
+sh dev/scripts/r2_bars.sh push-dir --dir /tmp/snap_top3000_pit_v12wk --name v12wk-9236
 # cloud session: downloads, verifies every file, then moves into place
-sh dev/scripts/r2_bars.sh pull-dir --dest "$PWD/.sweep-output/warehouse/snap_top3000_pit_v12monthly" --name v12monthly
+sh dev/scripts/r2_bars.sh pull-dir --dest "$PWD/.sweep-output/warehouse/snap_top3000_pit_v12wk" --name v12wk-9236
 # after a restart, re-check without downloading again
-sh dev/scripts/r2_bars.sh verify-dir --dir "$PWD/.sweep-output/warehouse/snap_top3000_pit_v12monthly" --name v12monthly
+sh dev/scripts/r2_bars.sh verify-dir --dir "$PWD/.sweep-output/warehouse/snap_top3000_pit_v12wk" --name v12wk-9236
 ```
 
-Both transfer 16 files at a time (`--jobs N` to change) and print a line every 1,000 files. A killed `push-dir` is rerun with `--resume`, which skips objects already uploaded at the same size.
+Both transfer 16 files at a time (`--jobs N` to change) and print a line every 1,000 files. A killed `push-dir` is rerun with `--resume`, which skips objects already uploaded at the same size. `--resume` compares sizes only, so a rebuilt source needs `--force`; `pull-dir` and `verify-dir` check every object against `SHA256SUMS` and catch any stale one.
 
 `pull-dir` exits 1 and names each file that is corrupted, missing or extra, and
 leaves the destination absent; a warehouse that did not verify must not be run.
 The destination must be empty or absent.
 
 Point runs at it by passing that directory wherever a local run uses
-`/tmp/snap_top3000_pit_v12monthly` (the snapshot directory argument of the spec or
+`/tmp/snap_top3000_pit_v12wk` (the snapshot directory argument of the spec or
 chain script). The container needs the path under the mount: run docker with
 `-v $PWD:/w` as below and give the in-container path `/w/.sweep-output/warehouse/...`.
 
