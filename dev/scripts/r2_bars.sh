@@ -25,6 +25,22 @@
 #   compares roots; a mismatch exits 1 and lists the symbols.
 # ls: lists the archives in the bucket with their sizes.
 #
+# Snapshot warehouse (issue #3535), a directory of .snap files plus
+# manifest.sexp, under its own prefix warehouse/<NAME>/ (never bars/):
+#   r2_bars.sh push-dir --dir DIR --name NAME [--force]
+#   r2_bars.sh pull-dir --dest DIR --name NAME
+#   r2_bars.sh verify-dir --dir DIR --name NAME
+# push-dir uploads every file as its own object (each under the 5 GiB
+# single-PUT limit) and then warehouse/<NAME>/SHA256SUMS, a sorted
+# "<sha256>  <relative path>" line per file. The manifest goes last, so its
+# presence means the upload completed. Refuses to overwrite unless --force.
+# pull-dir downloads the files the manifest lists into a staging directory,
+# checks each hash, and checks the file set equals the manifest's; only then
+# does it move the result to DEST (empty or absent). A mismatching, missing
+# or extra file exits 1 naming each file, and DEST is left untouched.
+# verify-dir runs the same check on an existing DIR (for example after a
+# session restart) without downloading the data.
+#
 # Credentials: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT
 # (https://<account-id>.r2.cloudflarestorage.com) and R2_BUCKET. Any that are
 # unset are read from $R2_ENV, default ~/.config/trading/r2.env (KEY=value
@@ -54,6 +70,9 @@ _usage() {
 usage: r2_bars.sh push --data-dir DIR [--name NAME] [--force]
        r2_bars.sh pull --dest DIR [--name NAME] [--manifest FILE]
        r2_bars.sh ls
+       r2_bars.sh push-dir --dir DIR --name NAME [--force]
+       r2_bars.sh pull-dir --dest DIR --name NAME
+       r2_bars.sh verify-dir --dir DIR --name NAME
 EOF
   exit 2
 }
@@ -225,12 +244,132 @@ _pull() {
   fi
 }
 
+# ---- snapshot warehouse directories (issue #3535) ----
+
+WH_PREFIX=warehouse
+
+# _wh_manifest DIR OUT : sorted "<sha256>  <relative path>" for every file.
+_wh_manifest() {
+  : >"$2"
+  (cd "$1" && find . -type f | sed 's|^\./||' | LC_ALL=C sort) >"$2.paths"
+  while IFS= read -r rel; do
+    printf '%s  %s\n' "$(_sha256 "$1/$rel")" "$rel" >>"$2"
+  done <"$2.paths"
+  rm -f "$2.paths"
+}
+
+# _wh_check DIR MANIFEST : prints one line per bad file (differs / missing /
+# extra) and returns 1 if any; compares the hashes and the file set.
+_wh_check() {
+  _wh_manifest "$1" "$1.check.$$" 2>/dev/null || return 1
+  bad=$(awk -F'  ' 'NR==FNR {want[$2]=$1; next}
+        {got[$2]=$1}
+        END {
+          for (p in want) {
+            if (!(p in got)) print "missing: " p
+            else if (got[p] != want[p]) print "differs: " p
+          }
+          for (p in got) if (!(p in want)) print "extra: " p
+        }' "$2" "$1.check.$$" | LC_ALL=C sort)
+  rm -f "$1.check.$$"
+  [ -z "$bad" ] && return 0
+  printf '%s\n' "$bad" >&2
+  return 1
+}
+
+_wh_args() { # sets dir, name from --dir/--dest, --name, --force
+  dir='' name='' force=0
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --dir|--dest) [ $# -ge 2 ] || _usage; dir=$2; shift 2 ;;
+      --name) [ $# -ge 2 ] || _usage; name=$2; shift 2 ;;
+      --force) force=1; shift ;;
+      *) _usage ;;
+    esac
+  done
+  [ -n "$dir" ] && [ -n "$name" ] || _usage
+  case $name in */*|.*) _die "bad warehouse name: $name" ;; esac
+}
+
+_push_dir() {
+  _wh_args "$@"
+  [ -d "$dir" ] || _die "no such directory: $dir"
+  _load_credentials
+  base="$WH_PREFIX/$name"
+  if [ "$force" = 0 ] && _exists "$base/SHA256SUMS"; then
+    _die "$base already exists (use --force to replace it)"
+  fi
+  work=$(mktemp -d "${TMPDIR:-/tmp}/r2_bars.XXXXXX")
+  trap 'rm -rf "$work"' EXIT
+  printf 'r2_bars: hashing %s\n' "$dir" >&2
+  _wh_manifest "$dir" "$work/SHA256SUMS"
+  [ -s "$work/SHA256SUMS" ] || _die "no files under $dir"
+  # Every file is one PUT, so each must be under the single-upload limit.
+  while IFS= read -r rel; do
+    bytes=$(wc -c <"$dir/$rel" | tr -d ' ')
+    [ "$bytes" -lt "$MAX_BYTES" ] || _die "$rel is $bytes bytes, over the single-upload limit"
+  done <<EOF
+$(sed 's/^[^ ]*  //' "$work/SHA256SUMS")
+EOF
+  count=$(wc -l <"$work/SHA256SUMS" | tr -d ' ')
+  printf 'r2_bars: uploading %s files to %s\n' "$count" "$base" >&2
+  while IFS= read -r rel; do
+    _put "$dir/$rel" "$base/$rel"
+  done <<EOF
+$(sed 's/^[^ ]*  //' "$work/SHA256SUMS")
+EOF
+  _put "$work/SHA256SUMS" "$base/SHA256SUMS"
+  printf '%s %s files\n' "$base" "$count"
+}
+
+_pull_dir() {
+  _wh_args "$@"
+  dest=$dir
+  if [ -d "$dest" ] && [ -n "$(ls -A "$dest")" ]; then
+    _die "destination is not empty: $dest"
+  fi
+  _load_credentials
+  base="$WH_PREFIX/$name"
+  stage="$dest.partial.$$"
+  trap 'rm -rf "$stage" "$stage.sums"' EXIT
+  mkdir -p "$stage"
+  _get "$base/SHA256SUMS" "$stage.sums" || _die "cannot fetch $base/SHA256SUMS"
+  fail=0
+  while IFS= read -r rel; do
+    mkdir -p "$stage/$(dirname "$rel")"
+    if ! _get "$base/$rel" "$stage/$rel" 2>/dev/null; then
+      printf 'missing: %s\n' "$rel" >&2; fail=1
+    fi
+  done <<EOF
+$(sed 's/^[^ ]*  //' "$stage.sums")
+EOF
+  _wh_check "$stage" "$stage.sums" || fail=1
+  [ "$fail" = 0 ] || { printf 'r2_bars: %s failed verification; %s untouched\n' "$base" "$dest" >&2; exit 1; }
+  [ ! -d "$dest" ] || rmdir "$dest"
+  mv "$stage" "$dest"
+  printf '%s verified -> %s\n' "$base" "$dest"
+}
+
+_verify_dir() {
+  _wh_args "$@"
+  [ -d "$dir" ] || _die "no such directory: $dir"
+  _load_credentials
+  work=$(mktemp -d "${TMPDIR:-/tmp}/r2_bars.XXXXXX")
+  trap 'rm -rf "$work"' EXIT
+  _get "$WH_PREFIX/$name/SHA256SUMS" "$work/sums" || _die "cannot fetch $WH_PREFIX/$name/SHA256SUMS"
+  _wh_check "$dir" "$work/sums" || { printf 'r2_bars: %s does not match %s\n' "$dir" "$name" >&2; exit 1; }
+  printf '%s matches %s\n' "$dir" "$name"
+}
+
 [ $# -ge 1 ] || _usage
 cmd=$1
 shift
 case $cmd in
   push) _push "$@" ;;
   pull) _pull "$@" ;;
+  push-dir) _push_dir "$@" ;;
+  pull-dir) _pull_dir "$@" ;;
+  verify-dir) _verify_dir "$@" ;;
   ls) _load_credentials; _list ;;
   *) _usage ;;
 esac

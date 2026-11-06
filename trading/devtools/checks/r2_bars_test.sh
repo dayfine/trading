@@ -13,7 +13,12 @@
 #   - credentials missing from env and env file are an error naming the var;
 #   - the env file is parsed, never run, and the environment wins over it;
 #   - a failed bucket listing exits 2 instead of reading as empty;
-#   - R2_MAX_BYTES makes push refuse an oversized archive and store nothing.
+#   - R2_MAX_BYTES makes push refuse an oversized archive and store nothing;
+#   - push-dir/pull-dir round-trip a warehouse directory under warehouse/,
+#     not bars/ (issue #3535);
+#   - pull-dir refuses a corrupted, a missing and an extra file (exit 1, names
+#     the file, destination left absent); push-dir refuses overwrite and an
+#     oversized file; verify-dir flags an extra file in an existing copy.
 #
 # Run:
 #   sh trading/devtools/checks/r2_bars_test.sh
@@ -127,6 +132,38 @@ expect_eq "quotes around env-file values are dropped" yes "$(
   [ "$rc" = 2 ] && grep -q "port 19 " "$TMP/out" && echo yes || echo no)"
 expect_eq "env file still never run after a full load" no \
   "$([ -e "$TMP/PWNED" ] && echo yes || echo no)"
+
+# Snapshot warehouse directory (issue #3535): per-file objects under
+# warehouse/<name>/ plus SHA256SUMS. Invented fixture, not market data.
+mkdir -p "$TMP/wh"
+printf 'snap-a' >"$TMP/wh/AAA.snap"
+printf 'snap-z' >"$TMP/wh/ZED.snap"
+printf '(manifest)' >"$TMP/wh/manifest.sexp"
+expect_eq "push-dir exits 0" 0 "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/wh" --name wh1)"
+expect_eq "push-dir stores under warehouse/, not bars/" yes \
+  "$([ -f "$R2_LOCAL_STORE/warehouse/wh1/AAA.snap" ] && [ -f "$R2_LOCAL_STORE/warehouse/wh1/SHA256SUMS" ] \
+     && [ ! -e "$R2_LOCAL_STORE/bars/wh1" ] && echo yes || echo no)"
+expect_eq "push-dir refuses to overwrite" 2 \
+  "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/wh" --name wh1)"
+expect_eq "push-dir size limit refuses" 2 \
+  "$(rc_of env R2_MAX_BYTES=3 sh "$SCRIPT" push-dir --dir "$TMP/wh" --name whbig)"
+expect_eq "pull-dir exits 0" 0 "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/whd1" --name wh1)"
+expect_eq "pull-dir restores the tree" "" "$(diff -r "$TMP/wh" "$TMP/whd1" || echo differs)"
+expect_eq "pull-dir refuses a non-empty destination" 2 \
+  "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/whd1" --name wh1)"
+expect_eq "verify-dir passes a good copy" 0 "$(rc_of sh "$SCRIPT" verify-dir --dir "$TMP/whd1" --name wh1)"
+printf 'x' >"$TMP/whd1/EXTRA.snap"
+expect_eq "verify-dir flags an extra file" 1 "$(rc_of sh "$SCRIPT" verify-dir --dir "$TMP/whd1" --name wh1)"
+expect_eq "extra file is named" yes "$(grep -q 'extra: EXTRA.snap' "$TMP/out" && echo yes || echo no)"
+
+printf 'bad' >"$R2_LOCAL_STORE/warehouse/wh1/ZED.snap"
+expect_eq "pull-dir refuses a corrupted file" 1 "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/whd2" --name wh1)"
+expect_eq "corrupted file is named" yes "$(grep -q 'differs: ZED.snap' "$TMP/out" && echo yes || echo no)"
+expect_eq "corrupted pull leaves no destination" no "$([ -e "$TMP/whd2" ] && echo yes || echo no)"
+rm "$R2_LOCAL_STORE/warehouse/wh1/AAA.snap"
+expect_eq "pull-dir refuses a missing file" 1 "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/whd3" --name wh1)"
+expect_eq "missing file is named" yes "$(grep -q 'missing: AAA.snap' "$TMP/out" && echo yes || echo no)"
+expect_eq "missing-file pull leaves no destination" no "$([ -e "$TMP/whd3" ] && echo yes || echo no)"
 
 printf 'r2_bars_test: %d passed, %d failed\n' "$PASS" "$FAILED"
 [ "$FAILED" -eq 0 ]

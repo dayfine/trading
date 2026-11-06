@@ -67,6 +67,38 @@ Use the `RemoteTrigger` tool (`action: create`), a run time a minute or two ahea
 Follow it with `list_runs` / `get_run_log` on the trigger to read the result.
 Sessions take 2-4 minutes to start.
 
+## Pulling the snapshot warehouse (#3535)
+
+Building the v12 PIT warehouse inside a session takes about 5.5 h and yields a
+different construction (9,181 symbols) from the local 9,236-symbol one. Pull the
+local warehouse instead. It lives in the private R2 bucket under
+`warehouse/<name>/` (not `bars/`), one object per `.snap` file plus a
+`SHA256SUMS` manifest. The credentials are the same as for the bars
+(`dev/scripts/r2_bars.sh` header).
+
+Put it **inside the bind-mounted checkout**, not `/tmp`: a session-worker restart
+wipes `/tmp` (about 53 min were lost to this on the 26y kill + resume run), while
+the checkout survives. Use `.sweep-output/` (gitignored); check with
+`git status` that the pulled files do not show up, and never commit them.
+
+```sh
+# local, once: uploads ~3.6 GB; never in a cloud session
+sh dev/scripts/r2_bars.sh push-dir --dir /tmp/snap_top3000_pit_v12monthly --name v12monthly
+# cloud session: downloads, verifies every file, then moves into place
+sh dev/scripts/r2_bars.sh pull-dir --dest "$PWD/.sweep-output/warehouse/snap_top3000_pit_v12monthly" --name v12monthly
+# after a restart, re-check without downloading again
+sh dev/scripts/r2_bars.sh verify-dir --dir "$PWD/.sweep-output/warehouse/snap_top3000_pit_v12monthly" --name v12monthly
+```
+
+`pull-dir` exits 1 and names each file that is corrupted, missing or extra, and
+leaves the destination absent; a warehouse that did not verify must not be run.
+The destination must be empty or absent.
+
+Point runs at it by passing that directory wherever a local run uses
+`/tmp/snap_top3000_pit_v12monthly` (the snapshot directory argument of the spec or
+chain script). The container needs the path under the mount: run docker with
+`-v $PWD:/w` as below and give the in-container path `/w/.sweep-output/warehouse/...`.
+
 ## Building and testing inside a session
 
 ```sh
