@@ -27,13 +27,18 @@
 #
 # Snapshot warehouse (issue #3535), a directory of .snap files plus
 # manifest.sexp, under its own prefix warehouse/<NAME>/ (never bars/):
-#   r2_bars.sh push-dir --dir DIR --name NAME [--force]
-#   r2_bars.sh pull-dir --dest DIR --name NAME
+#   r2_bars.sh push-dir --dir DIR --name NAME [--force|--resume] [--jobs N]
+#   r2_bars.sh pull-dir --dest DIR --name NAME [--jobs N]
 #   r2_bars.sh verify-dir --dir DIR --name NAME
 # push-dir uploads every file as its own object (each under the 5 GiB
 # single-PUT limit) and then warehouse/<NAME>/SHA256SUMS, a sorted
 # "<sha256>  <relative path>" line per file. The manifest goes last, so its
 # presence means the upload completed. Refuses to overwrite unless --force.
+# Files move --jobs N at a time (default 16, push-dir and pull-dir) with a
+# progress line per 1,000 files; any failed file exits non-zero naming it, and
+# SHA256SUMS is uploaded only after every file succeeded. --resume skips a file
+# whose object already exists with the same byte size, so a killed push can be
+# rerun (it also lifts the overwrite refusal).
 # pull-dir downloads the files the manifest lists into a staging directory,
 # checks each hash, and checks the file set equals the manifest's; only then
 # does it move the result to DEST (empty or absent). A mismatching, missing
@@ -55,6 +60,7 @@
 set -eu
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+SELF=$SCRIPT_DIR/$(basename "$0")
 PREFIX=bars
 # R2's single PUT limit is 5 GiB; stay a little under it. R2_MAX_BYTES
 # overrides it (the test sets a tiny limit to reach the check).
@@ -70,8 +76,8 @@ _usage() {
 usage: r2_bars.sh push --data-dir DIR [--name NAME] [--force]
        r2_bars.sh pull --dest DIR [--name NAME] [--manifest FILE]
        r2_bars.sh ls
-       r2_bars.sh push-dir --dir DIR --name NAME [--force]
-       r2_bars.sh pull-dir --dest DIR --name NAME
+       r2_bars.sh push-dir --dir DIR --name NAME [--force|--resume] [--jobs N]
+       r2_bars.sh pull-dir --dest DIR --name NAME [--jobs N]
        r2_bars.sh verify-dir --dir DIR --name NAME
 EOF
   exit 2
@@ -106,6 +112,8 @@ _load_credentials() {
   R2_ENDPOINT=${R2_ENDPOINT%/}
   curl --help all 2>/dev/null | grep -q -- '--aws-sigv4' \
     || _die "curl lacks --aws-sigv4 (need curl >= 7.75)"
+  # Parallel workers (re-invocations of this script) inherit the credentials.
+  export R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT R2_BUCKET
 }
 
 # _curl ARGS... : signed request; the key pair goes to curl on stdin.
@@ -277,18 +285,73 @@ _wh_check() {
   return 1
 }
 
-_wh_args() { # sets dir, name from --dir/--dest, --name, --force
-  dir='' name='' force=0
+_wh_args() { # sets dir, name, force, resume, jobs from --dir/--dest, --name, ...
+  dir='' name='' force=0 resume=0 jobs=16
   while [ $# -gt 0 ]; do
     case $1 in
       --dir|--dest) [ $# -ge 2 ] || _usage; dir=$2; shift 2 ;;
       --name) [ $# -ge 2 ] || _usage; name=$2; shift 2 ;;
+      --jobs) [ $# -ge 2 ] || _usage; jobs=$2; shift 2 ;;
       --force) force=1; shift ;;
+      --resume) resume=1; shift ;;
       *) _usage ;;
     esac
   done
   [ -n "$dir" ] && [ -n "$name" ] || _usage
   case $name in */*|.*) _die "bad warehouse name: $name" ;; esac
+  case $jobs in ''|*[!0-9]*|0) _die "--jobs must be a positive integer: $jobs" ;; esac
+}
+
+# _size KEY : prints the object's byte size, or nothing if it does not exist.
+_size() {
+  if [ -n "${R2_LOCAL_STORE:-}" ]; then
+    [ -f "$R2_LOCAL_STORE/$1" ] && wc -c <"$R2_LOCAL_STORE/$1" | tr -d ' '
+    return 0
+  fi
+  hdr=$(_curl -I -D - -o /dev/null -w 'CODE %{http_code}\n' "$(_url "$1")" | tr -d '\r') || return 0
+  printf '%s\n' "$hdr" | grep -q '^CODE 200$' || return 0
+  printf '%s\n' "$hdr" | awk 'tolower($1)=="content-length:" {print $2}' | tail -1
+}
+
+# Workers, run once per file by xargs (re-invocations of this script, so the
+# credentials come from the exported environment, never the command line).
+#   _put1 DIR BASE RESUME REL   /   _get1 STAGE BASE REL
+# A failed file prints "failed: REL" (or "missing: REL") and exits 1.
+_put1() {
+  if [ "$3" = 1 ]; then
+    have=$(_size "$2/$4")
+    want=$(wc -c <"$1/$4" | tr -d ' ')
+    [ "$have" = "$want" ] && return 0
+  fi
+  if [ -n "${R2_LOCAL_FAIL_ON:-}" ]; then # test hook, local store only
+    case $4 in *"$R2_LOCAL_FAIL_ON"*) printf 'failed: %s\n' "$4" >&2; return 1 ;; esac
+  fi
+  _put "$1/$4" "$2/$4" 2>/dev/null || { printf 'failed: %s\n' "$4" >&2; return 1; }
+}
+
+_get1() {
+  mkdir -p "$(dirname "$1/$3")"
+  _get "$2/$3" "$1/$3" 2>/dev/null || { printf 'missing: %s\n' "$3" >&2; return 1; }
+}
+
+# _par_run LIST JOBS VERB LABEL ARGS... : runs `$SELF VERB ARGS... REL` for
+# every line of LIST, JOBS at a time, in chunks of 1,000 so a progress line
+# can be printed. Returns 1 if any file failed (after finishing its chunk).
+_par_run() {
+  list=$1 jobs=$2 verb=$3 label=$4
+  shift 4
+  total=$(wc -l <"$list" | tr -d ' ')
+  rm -rf "$list.chunks"; mkdir -p "$list.chunks"
+  split -l 1000 "$list" "$list.chunks/c."
+  done_n=0 bad=0
+  for chunk in "$list.chunks"/c.*; do
+    tr '\n' '\0' <"$chunk" | xargs -0 -P "$jobs" -I{} sh "$SELF" "$verb" "$@" {} || bad=1
+    done_n=$((done_n + $(wc -l <"$chunk" | tr -d ' ')))
+    printf 'r2_bars: %s %s/%s files\n' "$label" "$done_n" "$total" >&2
+    [ "$bad" = 0 ] || break
+  done
+  rm -rf "$list.chunks"
+  return "$bad"
 }
 
 _push_dir() {
@@ -296,34 +359,32 @@ _push_dir() {
   [ -d "$dir" ] || _die "no such directory: $dir"
   _load_credentials
   base="$WH_PREFIX/$name"
-  if [ "$force" = 0 ] && _exists "$base/SHA256SUMS"; then
-    _die "$base already exists (use --force to replace it)"
+  if [ "$force" = 0 ] && [ "$resume" = 0 ] && _exists "$base/SHA256SUMS"; then
+    _die "$base already exists (use --force to replace it, or --resume)"
   fi
   work=$(mktemp -d "${TMPDIR:-/tmp}/r2_bars.XXXXXX")
   trap 'rm -rf "$work"' EXIT
   printf 'r2_bars: hashing %s\n' "$dir" >&2
   _wh_manifest "$dir" "$work/SHA256SUMS"
   [ -s "$work/SHA256SUMS" ] || _die "no files under $dir"
+  sed 's/^[^ ]*  //' "$work/SHA256SUMS" >"$work/paths"
   # Every file is one PUT, so each must be under the single-upload limit.
   while IFS= read -r rel; do
     bytes=$(wc -c <"$dir/$rel" | tr -d ' ')
     [ "$bytes" -lt "$MAX_BYTES" ] || _die "$rel is $bytes bytes, over the single-upload limit"
-  done <<EOF
-$(sed 's/^[^ ]*  //' "$work/SHA256SUMS")
-EOF
-  count=$(wc -l <"$work/SHA256SUMS" | tr -d ' ')
-  printf 'r2_bars: uploading %s files to %s\n' "$count" "$base" >&2
-  while IFS= read -r rel; do
-    _put "$dir/$rel" "$base/$rel"
-  done <<EOF
-$(sed 's/^[^ ]*  //' "$work/SHA256SUMS")
-EOF
+  done <"$work/paths"
+  count=$(wc -l <"$work/paths" | tr -d ' ')
+  printf 'r2_bars: uploading %s files to %s (%s at a time)\n' "$count" "$base" "$jobs" >&2
+  _par_run "$work/paths" "$jobs" _put1 uploaded "$dir" "$base" "$resume" \
+    || _die "upload failed (see 'failed:' lines above); SHA256SUMS not uploaded"
+  # The manifest goes last: its presence means every file is up.
   _put "$work/SHA256SUMS" "$base/SHA256SUMS"
   printf '%s %s files\n' "$base" "$count"
 }
 
 _pull_dir() {
   _wh_args "$@"
+  [ "$resume" = 0 ] || _usage
   dest=$dir
   if [ -d "$dest" ] && [ -n "$(ls -A "$dest")" ]; then
     _die "destination is not empty: $dest"
@@ -331,18 +392,14 @@ _pull_dir() {
   _load_credentials
   base="$WH_PREFIX/$name"
   stage="$dest.partial.$$"
-  trap 'rm -rf "$stage" "$stage.sums"' EXIT
+  trap 'rm -rf "$stage" "$stage.sums" "$stage.paths"' EXIT
   mkdir -p "$stage"
   _get "$base/SHA256SUMS" "$stage.sums" || _die "cannot fetch $base/SHA256SUMS"
+  sed 's/^[^ ]*  //' "$stage.sums" >"$stage.paths"
+  printf 'r2_bars: downloading %s files (%s at a time)\n' \
+    "$(wc -l <"$stage.paths" | tr -d ' ')" "$jobs" >&2
   fail=0
-  while IFS= read -r rel; do
-    mkdir -p "$stage/$(dirname "$rel")"
-    if ! _get "$base/$rel" "$stage/$rel" 2>/dev/null; then
-      printf 'missing: %s\n' "$rel" >&2; fail=1
-    fi
-  done <<EOF
-$(sed 's/^[^ ]*  //' "$stage.sums")
-EOF
+  _par_run "$stage.paths" "$jobs" _get1 downloaded "$stage" "$base" || fail=1
   _wh_check "$stage" "$stage.sums" || fail=1
   [ "$fail" = 0 ] || { printf 'r2_bars: %s failed verification; %s untouched\n' "$base" "$dest" >&2; exit 1; }
   [ ! -d "$dest" ] || rmdir "$dest"
@@ -370,6 +427,8 @@ case $cmd in
   push-dir) _push_dir "$@" ;;
   pull-dir) _pull_dir "$@" ;;
   verify-dir) _verify_dir "$@" ;;
+  _put1) _put1 "$@" ;; # internal: parallel workers
+  _get1) _get1 "$@" ;;
   ls) _load_credentials; _list ;;
   *) _usage ;;
 esac

@@ -90,6 +90,8 @@ sh dev/scripts/r2_bars.sh pull-dir --dest "$PWD/.sweep-output/warehouse/snap_top
 sh dev/scripts/r2_bars.sh verify-dir --dir "$PWD/.sweep-output/warehouse/snap_top3000_pit_v12monthly" --name v12monthly
 ```
 
+Both transfer 16 files at a time (`--jobs N` to change) and print a line every 1,000 files. A killed `push-dir` is rerun with `--resume`, which skips objects already uploaded at the same size.
+
 `pull-dir` exits 1 and names each file that is corrupted, missing or extra, and
 leaves the destination absent; a warehouse that did not verify must not be run.
 The destination must be empty or absent.
