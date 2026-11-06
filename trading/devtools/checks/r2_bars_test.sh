@@ -19,7 +19,11 @@
 #   - pull-dir refuses a corrupted and a missing file (exit 1, names the
 #     file, destination left absent); push-dir refuses overwrite and a file over
 #     the limit (the limit is per file, not total); verify-dir flags an extra
-#     file in an existing copy.
+#     file in an existing copy;
+#   - --jobs N round-trips in parallel with progress lines; a failing transfer
+#     exits non-zero, names the file and uploads no SHA256SUMS; push-dir
+#     --resume completes an interrupted upload (skips same-size objects,
+#     re-sends a wrong-size one) and pull-dir then verifies.
 #
 # Run:
 #   sh trading/devtools/checks/r2_bars_test.sh
@@ -169,6 +173,47 @@ rm "$R2_LOCAL_STORE/warehouse/wh1/AAA.snap"
 expect_eq "pull-dir refuses a missing file" 1 "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/whd3" --name wh1)"
 expect_eq "missing file is named" yes "$(grep -q 'missing: AAA.snap' "$TMP/out" && echo yes || echo no)"
 expect_eq "missing-file pull leaves no destination" no "$([ -e "$TMP/whd3" ] && echo yes || echo no)"
+
+# Parallel transfer and resume (this change). 12 files in a nested layout.
+mkdir -p "$TMP/big/sub"
+i=1
+while [ "$i" -le 12 ]; do
+  printf 'file-%s' "$i" >"$TMP/big/F$i.snap"
+  i=$((i + 1))
+done
+printf 'nested' >"$TMP/big/sub/N.snap"
+expect_eq "push-dir --jobs 4 exits 0" 0 \
+  "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/big" --name big1 --jobs 4)"
+expect_eq "push-dir prints a progress line" yes \
+  "$(grep -q 'uploaded 13/13 files' "$TMP/out" && echo yes || echo no)"
+expect_eq "pull-dir --jobs 4 exits 0" 0 \
+  "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/bigd1" --name big1 --jobs 4)"
+expect_eq "parallel round trip restores the tree" "" "$(diff -r "$TMP/big" "$TMP/bigd1" || echo differs)"
+expect_eq "--jobs 0 is refused" 2 "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/big" --name bigj --jobs 0)"
+
+# A failing transfer: non-zero, names the file, no SHA256SUMS.
+expect_eq "failing transfer exits non-zero" 2 \
+  "$(rc_of env R2_LOCAL_FAIL_ON=F7.snap sh "$SCRIPT" push-dir --dir "$TMP/big" --name bigf --jobs 4)"
+expect_eq "failing transfer names the file" yes "$(grep -q 'failed: F7.snap' "$TMP/out" && echo yes || echo no)"
+expect_eq "failing transfer leaves no SHA256SUMS" no \
+  "$([ -e "$R2_LOCAL_STORE/warehouse/bigf/SHA256SUMS" ] && echo yes || echo no)"
+expect_eq "pull of the unfinished upload fails" 2 "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/bigd2" --name bigf)"
+
+# Interrupted push: some objects pre-seeded (one with the wrong size), no
+# SHA256SUMS. --resume uploads only what is missing or wrong, then pull verifies.
+mkdir -p "$R2_LOCAL_STORE/warehouse/bigr"
+cp "$TMP/big/F1.snap" "$TMP/big/F2.snap" "$R2_LOCAL_STORE/warehouse/bigr/"
+printf 'short' >"$R2_LOCAL_STORE/warehouse/bigr/F3.snap"
+touch -t 200001010000 "$R2_LOCAL_STORE/warehouse/bigr/F1.snap"
+expect_eq "resume push exits 0" 0 \
+  "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/big" --name bigr --resume --jobs 4)"
+expect_eq "resume keeps an intact object untouched" yes \
+  "$([ "$(find "$R2_LOCAL_STORE/warehouse/bigr/F1.snap" -newer "$TMP/big/F1.snap" | wc -l | tr -d ' ')" = 0 ] && echo yes || echo no)"
+expect_eq "resume fixes a wrong-size object" "file-3" "$(cat "$R2_LOCAL_STORE/warehouse/bigr/F3.snap")"
+expect_eq "resumed upload pulls and verifies" 0 "$(rc_of sh "$SCRIPT" pull-dir --dest "$TMP/bigd3" --name bigr)"
+expect_eq "resumed upload restores the tree" "" "$(diff -r "$TMP/big" "$TMP/bigd3" || echo differs)"
+expect_eq "complete upload is still refused without --resume" 2 \
+  "$(rc_of sh "$SCRIPT" push-dir --dir "$TMP/big" --name bigr)"
 
 printf 'r2_bars_test: %d passed, %d failed\n' "$PASS" "$FAILED"
 [ "$FAILED" -eq 0 ]
