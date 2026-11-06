@@ -273,6 +273,22 @@ let test_resume_with_emit_candidates_is_refused _ =
            (equal_to true);
        ])
 
+(* The process exit code: 0 all passed; halt code only when every non-passing
+   scenario halted; 1 as soon as one failed, halted or not. *)
+let test_exit_code_classifies_halts _ =
+  let code pass halted =
+    Scenario_lib.Checkpoint_cli.exit_code ~pass_flags:pass ~halted_flags:halted
+  in
+  assert_that
+    [
+      code [ true; true ] [ false; false ];
+      code [ true; false ] [ false; true ];
+      code [ false; false ] [ true; true ];
+      code [ false; false ] [ true; false ];
+      code [ true; false ] [ false; false ];
+    ]
+    (equal_to [ 0; _halt_exit_code; _halt_exit_code; 1; 1 ])
+
 let suite =
   "Scenario_runner_resume"
   >::: [
@@ -288,6 +304,8 @@ let suite =
          >:: test_resume_of_unknown_scenario_is_refused;
          "resume with emit-candidates is refused"
          >:: test_resume_with_emit_candidates_is_refused;
+         "exit code is the halt code only when every non-pass halted"
+         >:: test_exit_code_classifies_halts;
        ]
 
 (* Same fallback as the sibling subprocess tests: the local dev container does

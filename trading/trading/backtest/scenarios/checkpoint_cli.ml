@@ -62,3 +62,11 @@ let print_halted_row ~output_root ~checkpoints (s : Scenario.t) =
       ~default:"?" ~f:Date.to_string
   in
   printf "%-28s HALTED at checkpoint %s (%s)\n" s.name n date
+
+let exit_code ~pass_flags ~halted_flags =
+  let non_passing = List.zip_exn pass_flags halted_flags in
+  let non_passing = List.filter non_passing ~f:(fun (pass, _) -> not pass) in
+  if List.is_empty non_passing then 0
+  else if List.for_all non_passing ~f:snd then
+    Backtest.Backtest_checkpoint.halt_exit_code
+  else 1

@@ -25,3 +25,10 @@ val print_halted_row :
     [HALTED at checkpoint <n> (<date>)], with [n] from [checkpoints] (the
     [--halt-after-checkpoint] value) and the date read from the checkpoint
     header; ["?"] for whichever is unavailable. Not a failure row. *)
+
+val exit_code : pass_flags:bool list -> halted_flags:bool list -> int
+(** The runner's process exit code from per-scenario [pass_flags] and
+    [halted_flags] (same length, same order): 0 when every scenario passed;
+    {!Backtest.Backtest_checkpoint.halt_exit_code} when every non-passing
+    scenario halted at a checkpoint (a wrapper may resume); 1 when any scenario
+    failed or crashed. *)
