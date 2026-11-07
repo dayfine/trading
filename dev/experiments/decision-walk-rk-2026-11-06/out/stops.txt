@@ -1,0 +1,186 @@
+== S0. integrity
+14 stop moves outside the state machine (split rescales): ADSK(0.500) AVD(0.500) DECK(0.333) EME(0.500) ENB(0.500) FLO(0.667) GD(0.500) GPN(0.500) HCSG(0.667) IHG(1.071) MMSI(0.800) NEOG(0.750) OKE(0.875) TRMB(0.667)
+trades.csv n_stop_raises minus raises counted in the audit = 0: 566 trades
+0 rows where the stop moved down inside the state machine
+
+== S1. how often: rows by reason and state; positions that ever logged each reason
+4107	No_correction_yet | Trailing>Trailing
+3676	Correction_not_recovered | Trailing>Trailing
+550	Cycle_stalled | Trailing>Trailing
+545	Seeded_trailing | Initial>Trailing
+386	Tightened_hold | Tightened>Tightened
+335	Raised | Trailing>Trailing
+224	Stop_hit | Trailing>Trailing
+61	Entered_tightening | Trailing>Tightened
+59	Anchor_not_fresh | Trailing>Trailing
+49	Stop_hit | Tightened>Tightened
+45	Tightened_ratchet | Tightened>Tightened
+19	Entered_tightening | Initial>Tightened
+18	Stop_hit | Initial>Initial
+545 / 571 positions	Seeded_trailing
+505 / 571 positions	No_correction_yet
+418 / 571 positions	Correction_not_recovered
+281 / 571 positions	Stop_hit
+222 / 571 positions	Cycle_stalled
+139 / 571 positions	Raised
+80 / 571 positions	Entered_tightening
+53 / 571 positions	Tightened_hold
+45 / 571 positions	Tightened_ratchet
+14 / 571 positions	Anchor_not_fresh
+-- stop increases per position (Raised + Tightened_ratchet + Entered_tightening rows that moved the stop up)
+0: 365 positions
+1: 88 positions
+2: 64 positions
+3: 26 positions
+4: 9 positions
+5: 8 positions
+6: 4 positions
+7: 4 positions
+8: 1 positions
+11: 1 positions
+14: 1 positions
+-- ever raised, by holding length (closed trades)
+a) <=20d | 140 trades | raised  16 (11%) | raised:    -212k mean   -3.8% | never:   -8817k mean   -7.6%
+b) 21-64d | 145 trades | raised  31 (21%) | raised:    -958k mean   -6.3% | never:   -5794k mean   -8.4%
+c) 65-129d | 128 trades | raised  57 (45%) | raised:    +516k mean   +1.2% | never:    -436k mean   +0.5%
+d) 130-259d | 122 trades | raised  78 (64%) | raised:   +7093k mean  +15.1% | never:   +3604k mean  +18.5%
+e) 260d+ |  31 trades | raised  21 (68%) | raised:  +12022k mean +106.4% | never:   +2551k mean  +80.6%
+-- by exit trigger x ever raised
+delisted | never           |   1 |      -0k | mean   -0.1% | mean days 1
+delisted | raised          |   5 |    +993k | mean  +24.0% | mean days 142
+laggard_rotation | never   | 177 |   +5826k | mean   +9.0% | mean days 108
+laggard_rotation | raised  | 102 |  +14921k | mean  +27.5% | mean days 174
+stale_force_exit | raised  |   1 |     +47k | mean  +17.0% | mean days 113
+stop_loss | never          | 185 |  -14719k | mean  -10.0% | mean days 23
+stop_loss | raised         |  95 |   +2500k | mean   +2.9% | mean days 112
+
+== S2. by how much: Raised rows (first cycle = anchored on the entry-seeded extreme)
+group                             n     mean      p10      p25   median      p75      p90       max      >5     >10
+first cycle|new stop below that close     89   +15.31   +11.25   +12.25   +14.89   +17.53   +20.16     +27.9  100.0%   94.4%
+first cycle|raise, % of the old stop     89    +4.96    +0.74    +1.96    +4.29    +7.68    +8.98     +30.1   40.4%    6.7%
+later cycle|new stop below that close    246   +23.35   +13.30   +16.25   +20.09   +26.89   +35.22     +62.4  100.0%   98.4%
+later cycle|raise, % of the old stop    246    +7.46    +2.36    +3.88    +5.99    +8.89   +12.63    +112.3   61.0%   18.7%
+group                             n     mean      p10      p25   median      p75      p90       max     >30     >90
+days from fill to the first stop increase    203   +65.98    +2.00   +14.00   +43.00   +76.00  +154.00    +699.0   61.1%   20.2%
+
+== S3. which rule: completed cycles (Raised + Cycle_stalled) by the term that binds the candidate and the basis gap
+   candidate = 0.99 x min(correction extreme, MA); MA on adjusted closes, correction extreme on raw bars (#2982); gap = close/adjusted >= 1.05
+Cycle_stalled | corr-low | gap>=5% rows    1 positions   1 | a same-basis candidate would raise: 0 rows (mean +0.0% on the stop)
+Cycle_stalled | corr-low | no-gap  rows    4 positions   3 | a same-basis candidate would raise: 0 rows (mean +0.0% on the stop)
+Cycle_stalled | MA | gap>=5%       rows  461 positions 162 | a same-basis candidate would raise: 390 rows (mean +22.3% on the stop)
+Cycle_stalled | MA | no-gap        rows   84 positions  58 | a same-basis candidate would raise: 16 rows (mean +1.8% on the stop)
+Raised | corr-low | gap>=5%        rows    2 positions   2
+Raised | corr-low | no-gap         rows   67 positions  48
+Raised | MA | gap>=5%              rows   67 positions  33
+Raised | MA | no-gap               rows  199 positions  88
+-- ever raised, by the basis factor at entry
+factor a) <1.05: 244 positions, 112 ever raised (46%)
+factor b) 1.05-1.5: 165 positions, 60 ever raised (36%)
+factor c) >=1.5: 162 positions, 34 ever raised (21%)
+-- ever raised by factor at entry, within era (fill year)
+2000-08 | a) <1.05: 43 positions, 27 ever raised (63%)
+2000-08 | b) 1.05-1.5: 23 positions, 8 ever raised (35%)
+2000-08 | c) >=1.5: 67 positions, 17 ever raised (25%)
+2009-19 | a) <1.05: 94 positions, 43 ever raised (46%)
+2009-19 | b) 1.05-1.5: 90 positions, 36 ever raised (40%)
+2009-19 | c) >=1.5: 81 positions, 14 ever raised (17%)
+2020-26 | a) <1.05: 107 positions, 42 ever raised (39%)
+2020-26 | b) 1.05-1.5: 52 positions, 16 ever raised (31%)
+2020-26 | c) >=1.5: 14 positions, 3 ever raised (21%)
+
+== S4. stops that never rose: closed trades held >= 65 days, by why
+a) no completed cycle (no 8% correction + recovery)  |  17 |    -651k | mean   -3.2% | mean MFE   +3.8% | mean days 79
+b) a cycle stalled only because of the basis gap     |  91 |   +6659k | mean  +19.1% | mean MFE  +34.5% | mean days 165
+c) stale anchor >= 13 weeks                          |   1 |     +78k | mean  +18.4% | mean MFE  +45.7% | mean days 133
+d) cycles stalled: MA below the stop on one basis    |  16 |    -367k | mean   -2.7% | mean MFE  +12.7% | mean days 88
+281 closed trades held >= 65 days; raised at least once: 156
+trailing hold rows 7842; with a stale anchor (no bar back at the last reset close) 545
+-- stale anchor: longest stretch per position after a reset with no bar back at the reset close (weeks)
+a) <4w: 17 positions (trend extreme > 25% above the anchor: 0)
+b) 4-13w: 8 positions (trend extreme > 25% above the anchor: 1)
+c) 13-26w: 5 positions (trend extreme > 25% above the anchor: 4)
+d) 26w+: 7 positions (trend extreme > 25% above the anchor: 7)
+  APPS stale 2020-08-07..2021-05-14 (40 wk), trend extreme +583% above the anchor | exit 2021-05-17 laggard_rotation +526% +2655k
+  CVNA stale 2024-09-20..2025-02-28 (23 wk), trend extreme +76% above the anchor | exit 2025-03-03 laggard_rotation +80% +1100k
+  DEL stale 2005-12-30..2006-06-23 (25 wk), trend extreme +24% above the anchor | exit 2006-07-10 laggard_rotation +18% +28k
+  EOG stale 2000-08-18..2001-03-30 (32 wk), trend extreme +62% above the anchor | exit 2001-04-02 laggard_rotation +63% +44k
+  FOSL stale 2010-09-03..2011-08-19 (50 wk), trend extreme +175% above the anchor | exit 2011-10-03 laggard_rotation +83% +338k
+  GEF stale 2006-10-20..2007-03-23 (22 wk), trend extreme +44% above the anchor | exit 2007-03-26 laggard_rotation +58% +99k
+  GILD stale 2005-11-04..2006-05-05 (26 wk), trend extreme +33% above the anchor | exit 2006-05-08 laggard_rotation +42% +67k
+  HCI stale 2013-05-03..2013-08-23 (16 wk), trend extreme +34% above the anchor | exit 2013-08-26 laggard_rotation +18% +78k
+  LGND stale 2013-05-31..2014-05-23 (51 wk), trend extreme +183% above the anchor | exit 2014-05-27 laggard_rotation +233% +531k
+  LPG stale 2023-11-03..2024-02-02 (13 wk), trend extreme +38% above the anchor | exit 2024-02-12 laggard_rotation +29% +249k
+  NOAH stale 2017-10-06..2018-07-06 (39 wk), trend extreme +106% above the anchor | exit 2018-07-16 laggard_rotation +58% +285k
+  VYX stale 2003-12-26..2004-08-06 (32 wk), trend extreme +42% above the anchor | exit 2004-08-16 laggard_rotation +34% +35k
+
+== S5. exits after a raise vs never raised (stop exits)
+c) last raise 11-60d before            |  42 |     -13k | mean   +0.1% | 13w after: mean  +1.9%, higher 24, > +10% 15
+b) last raise <=10d before the exit    |  44 |   +2531k | mean   +6.4% | 13w after: mean  +8.9%, higher 34, > +10% 20
+d) last raise >60d before              |   9 |     -18k | mean   -0.6% | 13w after: mean +12.7%, higher 8, > +10% 4
+a) never raised (initial stop)         | 185 |  -14719k | mean  -10.0% | 13w after: mean  +6.2%, higher 98, > +10% 63
+-- by the rule that made the last stop move
+Raised | >10d                  |  42 |    +245k | mean   +1.5% | 13w after: mean  +3.9%, higher 26
+Entered_tightening | <=10d     |  24 |   +1971k | mean   +3.5% | 13w after: mean +10.7%, higher 18
+Tightened_ratchet | <=10d      |  14 |    +514k | mean  +14.0% | 13w after: mean  +4.1%, higher 11
+Raised | <=10d                 |   6 |     +46k | mean   +0.1% | 13w after: mean +13.2%, higher 5
+Tightened_ratchet | >10d       |   9 |    -276k | mean   -7.4% | 13w after: mean  +3.3%, higher 6
+-- positions that entered the Tightened state (Stage 3/4 or a flat / falling MA in Stage 2)
+from Trailing: 61 | +3527k | mean +9.5% | stop exits 38 | stop jump at tightening +13.0% | 13w after exit +5.9%
+from Initial: 19 | +232k | mean +1.8% | stop exits 11 | stop jump at tightening +8.8% | 13w after exit +2.6%
+
+== S6. winners' give-back: (1 + realised)/(1 + MFE) - 1, trades with MFE >= +30 % (last columns: share giving back less than 30 % / 20 %)
+group                             n     mean      p10      p25   median      p75      p90       max    >-30    >-20
+ALL                             102   -17.52   -31.29   -23.73   -17.24   -10.21    -5.16      +0.1   87.3%   62.7%
+delisted | raised                 2    -5.38    -5.59    -5.59    -5.59    -5.59    -5.59      -5.2  100.0%  100.0%
+laggard_rotation | never         32   -14.21   -24.75   -19.40   -14.05    -8.10    -6.01      +0.1   96.9%   78.1%
+laggard_rotation | raised        39   -15.18   -31.29   -20.71   -13.50    -7.79    -2.87      -0.9   87.2%   71.8%
+stale anchor >= 13w              12   -22.31   -34.72   -31.11   -22.66   -14.59   -13.52      -9.8   75.0%   50.0%
+stop_loss | never                 4   -35.78   -37.31   -37.31   -36.66   -36.00   -36.00     -33.2    0.0%    0.0%
+stop_loss | raised               25   -23.46   -30.37   -25.61   -23.04   -19.33   -17.88     -10.2   88.0%   36.0%
+-- largest dollar give-backs: quantity x (peak price - exit price)
+  +1682k  APPS 2020-06-15->2021-05-17 laggard_rotation: MFE +858%, realised +526%, pnl +2655k
+  +1453k  BBWI 2020-08-05->2021-08-16 laggard_rotation: MFE +320%, realised +138%, pnl +1098k
+  +1368k  SATL 2026-04-01->2026-06-24 stop_loss: MFE +88%, realised -12%, pnl -165k
+  +1080k  MMYT 2023-10-26->2025-02-25 stop_loss: MFE +222%, realised +155%, pnl +2476k
+  +723k  CVNA 2024-07-08->2025-03-03 laggard_rotation: MFE +133%, realised +80%, pnl +1100k
+  +651k  BBW 2025-06-09->2025-11-04 stop_loss: MFE +57%, realised +7%, pnl +87k
+  +621k  AGYS 2024-06-10->2024-10-30 stop_loss: MFE +36%, realised +4%, pnl +87k
+  +542k  GLNG 2022-02-07->2022-11-28 laggard_rotation: MFE +104%, realised +70%, pnl +1124k
+  +514k  BBW 2024-09-18->2025-03-14 stop_loss: MFE +51%, realised +5%, pnl +58k
+  +511k  VICR 2021-07-27->2021-12-06 stop_loss: MFE +51%, realised +21%, pnl +370k
+
+== S7. first-order replay of stop_ma_same_basis (#2982) on this run (lib/replay_basis.awk; no portfolio feedback)
+# split-rescaled positions excluded: 14
+196 closed positions where a same-basis candidate beats the stop at least once
+earlier exit: 54 positions, delta -2198k (better 29, worse 25)
+same exit day: 498 positions, delta +139k (better 9, worse 0)
+total first-order delta -2059k
+earlier exits of trades that actually made > +50%: 7, delta -2339k; the other 47, delta +141k
+group                             n     mean      p10      p25   median      p75      p90       max      >0     >10
+earlier exit: delta per trade, % of the actual exit     54    -3.89   -19.86    -5.43    +0.35    +4.21    +9.24     +19.0   53.7%    7.4%
+-- the seven largest losses and the three largest gains (earlier exits)
+  DXCM fill 2019-07-22, actual 2020-08-17 laggard_rotation +173.2% | replay exit 2019-09-10 -10.5% | -854k (max factor 4.00)
+  GLNG fill 2022-02-07, actual 2022-11-28 laggard_rotation +70.1% | replay exit 2022-07-06 +40.3% | -478k (max factor 1.11)
+  AVGO fill 2013-09-10, actual 2015-08-20 stop_loss +199.8% | replay exit 2014-10-10 +80.4% | -388k (max factor 13.37)
+  NOAH fill 2017-07-05, actual 2018-07-16 laggard_rotation +57.7% | replay exit 2017-09-08 -9.9% | -334k (max factor 1.43)
+  R fill 2023-09-01, actual 2024-01-22 laggard_rotation +10.2% | replay exit 2023-10-27 -10.7% | -209k (max factor 1.06)
+  BWA fill 2010-02-03, actual 2011-05-23 laggard_rotation +86.5% | replay exit 2010-05-20 -5.9% | -208k (max factor 2.73)
+  SSTK fill 2020-09-04, actual 2021-02-08 laggard_rotation +50.1% | replay exit 2021-02-01 +34.0% | -187k (max factor 1.22)
+  BBWI fill 2020-08-05, actual 2021-08-16 laggard_rotation +137.9% | replay exit 2021-08-03 +151.7% | +110k (max factor 1.83)
+  ZWS fill 2019-11-25, actual 2020-03-09 laggard_rotation -16.0% | replay exit 2020-02-27 -0.0% | +91k (max factor 2.12)
+  SMCI fill 2021-11-29, actual 2022-02-07 stop_loss -7.8% | replay exit 2022-01-24 -3.9% | +63k (max factor 10.00)
+
+== S8. first-order replay of a peak-following anchor (correction_must_follow_peak) inside each stale stretch (lib/replay_anchor.awk)
+-- anchor fix alone (the run's mixed-basis MA)
+37 stale stretches; earlier exits 1 (better 0, worse 1); first-order delta -266k
+  APPS (stale from 2020-08-07): actual exit 2021-05-17 at 57.86 | replay exit 2021-05-11 at 53.20 | -255k (cycles 11, raises 10)
+-- anchor fix + same-basis MA
+37 stale stretches; earlier exits 8 (better 3, worse 5); first-order delta -633k
+  APPS (stale from 2020-08-07): actual exit 2021-05-17 at 57.86 | replay exit 2021-05-11 at 53.20 | -255k (cycles 11, raises 10)
+  BBWI (stale from 2021-01-08): actual exit 2021-08-16 at 60.97 | replay exit 2021-08-03 at 64.50 | +110k (cycles 5, raises 5)
+  GEF (stale from 2006-10-20): actual exit 2007-03-26 at 110.88 | replay exit 2007-03-16 at 102.61 | -20k (cycles 1, raises 1)
+  GFF (stale from 2010-03-05): actual exit 2010-06-01 at 12.20 | replay exit 2010-05-06 at 12.34 | +3k (cycles 1, raises 1)
+  GILD (stale from 2005-11-04): actual exit 2006-05-08 at 56.25 | replay exit 2006-05-02 at 55.25 | -4k (cycles 2, raises 2)
+  GLNG (stale from 2022-03-04): actual exit 2022-11-28 at 24.94 | replay exit 2022-07-06 at 20.56 | -478k (cycles 3, raises 3)
+  LGND (stale from 2013-05-31): actual exit 2014-05-27 at 66.73 | replay exit 2014-04-14 at 60.15 | -75k (cycles 5, raises 5)
+  STX (stale from 2012-02-03): actual exit 2012-06-04 at 21.87 | replay exit 2012-05-30 at 24.40 | +32k (cycles 2, raises 2)
