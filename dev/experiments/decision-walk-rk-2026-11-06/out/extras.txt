@@ -1,0 +1,236 @@
+== X1. per year: NAV return (equity curve), SPY total return (pack spy.json), fills, stop exits, quick-fails, P&L by exit year
+year | NAV | SPY TR | fills | stop exits | quick-fails | stop P&L | rotation P&L | best realised (by exit year)
+2000 |  +20.8% |   -8.8% |  18 |  10 |   0 |    -81k |    +61k | PENN +30%
+2001 |   -2.0% |  -11.8% |   2 |   4 |   1 |    +29k |   +104k | EOG +63%
+2002 |   +0.3% |  -21.6% |   1 |   1 |   0 |    -14k |     +0k |  +0%
+2003 |  +26.9% |  +28.2% |  17 |   3 |   1 |    -37k |    +50k | AUOTY +23%
+2004 |  +42.0% |  +10.7% |  18 |   3 |   1 |    -52k |   +223k | BGO +103%
+2005 |   -1.8% |   +4.8% |  25 |  14 |   5 |   -179k |   +703k | ADSK +292%
+2006 |  +25.9% |  +15.8% |  24 |   5 |   2 |    -57k |   +288k | EME +89%
+2007 |  +10.5% |   +5.1% |  28 |  12 |   5 |   -125k |   +520k | HURN +131%
+2008 |   -9.4% |  -36.8% |   0 |   7 |   0 |   -167k |    +58k | EXC +15%
+2009 |   +9.3% |  +26.4% |  12 |   2 |   0 |    -44k |    +28k | GGG +7%
+2010 |  +11.2% |  +15.1% |  23 |  16 |   3 |   -240k |   +309k | DECK +53%
+2011 |   -6.6% |   +1.9% |  32 |  18 |   7 |   -363k |   +596k | BWA +87%
+2012 |  +17.3% |  +16.0% |  27 |  12 |   4 |   -117k |   +252k | ONXX +50%
+2013 |  +31.2% |  +32.3% |  28 |   9 |   4 |   -337k |   +662k | FLO +34%
+2014 |  +26.8% |  +13.5% |  23 |   9 |   2 |   -405k |  +1206k | LGND +233%
+2015 |   +4.8% |   +1.2% |  15 |  12 |   4 |   +502k |  +1031k | AVGO +200%
+2016 |  +10.0% |  +12.0% |  15 |   1 |   0 |    -55k |    +40k | LLL_old +10%
+2017 |  +17.9% |  +21.7% |  27 |   8 |   2 |   -569k |  +1731k | PEGA +78%
+2018 |  -10.9% |   -4.6% |  30 |  20 |   9 |  -1314k |   +922k | NOAH +58%
+2019 |   +4.5% |  +31.2% |  33 |  11 |   2 |   -669k |   +320k | GLPG +41%
+2020 |  +49.8% |  +18.3% |  33 |  19 |   7 |  -1253k |  +1260k | DXCM +173%
+2021 |  +13.1% |  +28.7% |  24 |  12 |   7 |   -862k |  +5195k | APPS +526%
+2022 |   -6.2% |  -18.2% |  13 |  17 |   6 |  -1603k |  +1503k | GLNG +70%
+2023 |  +12.2% |  +26.2% |  24 |  11 |   5 |  -1224k |   -151k | ARCO +3%
+2024 |  +21.5% |  +24.9% |  29 |  10 |   3 |  -1151k |  +1960k | LPG +29%
+2025 |   -8.9% |  +17.7% |  31 |  18 |   6 |    +28k |  +1619k | MMYT +155%
+2026 |   -3.7% |   +8.3% |  14 |  16 |   7 |  -1860k |   +256k | ATMU +15%
+
+== X2. book exposure vs the spec's max_long_exposure_pct 0.70 / min_cash_pct 0.30 (pack NAV series, % of NAV in positions)
+days 6659: >70% 3041 (45.7%), >85% 1618 (24.3%), >95% 420 (6.3%); max 101.0% on 2024-10-18
+-- top-N outcomes by the book's exposure on the screen date
+101	Insufficient_cash | c) 70-85%
+17	Insufficient_cash | b) 50-70%
+181	Placed | a) <50%
+183	Placed | b) 50-70%
+207	Placed | c) 70-85%
+25	Sized_to_zero | a) <50%
+36	Sized_to_zero | b) 50-70%
+366	Insufficient_cash | d) 85%+
+5	Insufficient_cash | a) <50%
+50	Sized_to_zero | c) 70-85%
+66	Sized_to_zero | d) 85%+
+99	Placed | d) 85%+
+filled tickets placed while the book was > 70% invested: 250 (at or under 70%: 316)
+NAV 2025-01-02,16151720.33
+  WABC qty 19187 close 51.55 value 989090
+  UPWK qty 106371 close 16.41 value 1745548
+  SKYT qty 99211 close 13.47 value 1336372
+  MMYT qty 42518 close 116.23 value 4941867
+  KMPR qty 21403 close 65.43 value 1400398
+  GOOGL qty 10888 close 189.43 value 2062514
+  CVNA qty 10523 close 199.56 value 2099970
+  BBW qty 34255 close 44.08 value 1509960
+
+== X3. entry geometry specimens: initial stop < 2 % of E (E below the decision close)
+  AAON decision 2023-03-17: E 83.42, close 89.33 (E/close 0.93), installed stop 83.21 (0.2% under E) | 2024-02-15 -> 2024-05-03 stop_loss -5.18%
+  AMSY decision 2000-03-17: E 36.43, close 41.19 (E/close 0.88), installed stop 35.88 (1.5% under E) | 2000-04-03 -> 2000-04-17 stop_loss -4.63%
+  APPF decision 2024-02-16: E 212.47, close 233.46 (E/close 0.91), installed stop 212.16 (0.1% under E) | 2024-04-15 -> 2024-04-18 stop_loss -2.12%
+  APPF decision 2025-08-08: E 274.36, close 283.36 (E/close 0.97), installed stop 271.43 (1.1% under E) | 2025-08-11 -> 2025-08-12 stop_loss -4.02%
+  BRC decision 2018-09-21: E 41.10, close 44.15 (E/close 0.93), installed stop 40.88 (0.5% under E) | 2018-10-09 -> 2018-10-10 stop_loss -2.52%
+  CRON decision 2018-09-21: E 11.96, close 12.51 (E/close 0.96), installed stop 11.79 (1.4% under E) | 2018-09-24 -> 2018-09-25 stop_loss -2.24%
+  DCI decision 2009-12-04: E 40.02, close 42.75 (E/close 0.94), installed stop 39.91 (0.3% under E) | 2010-01-21 -> 2010-01-25 stop_loss -2.35%
+  DECK decision 2009-10-30: E 86.78, close 89.67 (E/close 0.97), installed stop 85.24 (1.8% under E) | 2009-11-02 -> 2010-07-19 laggard_rotation 52.55%
+  EXTR decision 2021-11-26: E 12.35, close 13.00 (E/close 0.95), installed stop 12.19 (1.3% under E) | 2022-01-21 -> 2022-01-24 stop_loss -3.99%
+  FLNA decision 2020-10-09: E 11.00, close 11.92 (E/close 0.92), installed stop 10.88 (1.1% under E) | 2020-10-12 -> 2020-10-13 stop_loss -3.65%
+  GGG decision 2009-10-30: E 26.55, close 27.54 (E/close 0.96), installed stop 26.17 (1.4% under E) | 2009-11-02 -> 2009-12-21 laggard_rotation 6.57%
+  GME decision 2020-09-04: E 6.95, close 7.65 (E/close 0.91), installed stop 6.88 (1.0% under E) | 2020-09-10 -> 2020-09-11 stop_loss -9.93%
+  GNTX decision 2009-10-30: E 15.41, close 16.01 (E/close 0.96), installed stop 15.24 (1.1% under E) | 2009-11-03 -> 2010-06-29 stop_loss 14.01%
+  ISPH decision 2003-09-12: E 16.43, close 17.72 (E/close 0.93), installed stop 16.31 (0.7% under E) | 2003-09-25 -> 2003-09-26 stop_loss -3.27%
+  LMAT decision 2026-02-27: E 101.47, close 108.18 (E/close 0.94), installed stop 101.38 (0.1% under E) | 2026-03-03 -> 2026-05-12 stop_loss -2.08%
+  NTRA decision 2020-05-15: E 42.01, close 45.23 (E/close 0.93), installed stop 41.43 (1.4% under E) | 2020-05-26 -> 2020-06-04 stop_loss -3.31%
+  TDS decision 2023-09-08: E 17.42, close 18.18 (E/close 0.96), installed stop 17.16 (1.5% under E) | 2023-09-11 -> 2023-09-12 stop_loss -3.99%
+  UPWK decision 2025-09-26: E 18.23, close 19.15 (E/close 0.95), installed stop 17.88 (1.9% under E) | 2025-09-30 -> 2025-10-01 stop_loss -4.12%
+-- resting tickets that crossed a split before filling
+  AAON placed 2023-03-17, filled 2024-02-15, split 2023-08-17 x1.5
+
+== X4. specimen traces (stop decisions: date state stop_before>stop_after candidate cycles trend/correction extremes MA reason | close low factor)
+-- APPS-wein-1018
+  trade: APPS,LONG,2020-06-15,2021-05-17,336,9.25,57.86,54614,2654870.22,525.62,7.88,8.63,laggard_rotation,0.1405,1
+  decision 2020-06-12: E 9.17, installed 7.8816000000000006, close 9.38, adj close 9.38, MA 6.2097204301075273, weeks advancing 1, ticket age 0
+  2020-06-15 Init>Trai 7.88>7.88 cand= cc 0>0 trend 9.885 corr 8.75 ma 6.43 Seeded_trailing | close 9.885 low 8.75 f 1.0000
+  2020-06-16 Trai>Trai 7.88>7.88 cand=6.3968051612903229 cc 0>1 trend 9.885 corr 8.75 ma 6.46 Cycle_stalled | close 10.42 low 10.01 f 1.0000
+  2020-06-19 Trai>Trai 7.88>7.88 cand= cc 1>1 trend 10.42 corr 9.91 ma 6.46 No_correction_yet | close 10.38 low 10.17 f 1.0000
+  2020-06-22 Trai>Trai 7.88>7.88 cand= cc 1>1 trend 10.42 corr 9.91 ma 6.75 No_correction_yet | close 11.04 low 10.3101 f 1.0000
+  2020-06-23 Trai>Trai 7.88>7.88 cand=6.6934432258064511 cc 1>2 trend 11.04 corr 9.91 ma 6.76 Cycle_stalled | close 11.27 low 10.85 f 1.0000
+  2020-06-25 Trai>Trai 7.88>7.88 cand= cc 2>2 trend 11.27 corr 10.57 ma 6.79 No_correction_yet | close 11.75 low 10.755 f 1.0000
+  2020-06-26 Trai>Trai 7.88>7.88 cand=6.7279335483870959 cc 2>3 trend 11.75 corr 10.57 ma 6.80 Cycle_stalled | close 11.81 low 11.46 f 1.0000
+  2020-07-01 Trai>Trai 7.88>7.88 cand=6.875 cc 3>4 trend 12.57 corr 11.4 ma 7.18 Cycle_stalled | close 12.675 low 12.415 f 1.0000
+  2020-07-10 Trai>Trai 7.88>7.88 cand= cc 4>4 trend 13.43 corr 12.16 ma 7.61 Correction_not_recovered | close 13.22 low 12.7 f 1.0000
+  2020-07-17 Trai>Trai 7.88>7.88 cand= cc 4>4 trend 13.43 corr 11.76 ma 7.98 Correction_not_recovered | close 12.775 low 12.48 f 1.0000
+  2020-07-24 Trai>Trai 7.88>7.88 cand= cc 4>4 trend 13.43 corr 11.76 ma 8.30 Correction_not_recovered | close 12.19 low 11.79 f 1.0000
+  2020-07-31 Trai>Trai 7.88>8.63 cand=8.6348012903225815 cc 4>5 trend 13.43 corr 11.76 ma 8.72 Raised | close 13.88 low 13.22 f 1.0000
+  2020-08-07 Trai>Trai 8.63>8.63 cand= cc 5>5 trend 21.27 corr 13.88 ma 9.69 Anchor_not_fresh | close 22.585 low 21.655 f 1.0000
+  2020-09-18 Trai>Trai 8.63>8.63 cand= cc 5>5 trend 32.35 corr 13.88 ma 16.11 Anchor_not_fresh | close 32.79 low 31.05 f 1.0000
+  2020-11-06 Trai>Trai 8.63>8.63 cand= cc 5>5 trend 41.86 corr 13.88 ma 25.18 Anchor_not_fresh | close 42.3 low 40.31 f 1.0000
+  2020-12-18 Trai>Trai 8.63>8.63 cand= cc 5>5 trend 53.47 corr 13.88 ma 33.61 Anchor_not_fresh | close 57.44 low 52.66 f 1.0000
+  2021-01-22 Trai>Trai 8.63>8.63 cand= cc 5>5 trend 64.37 corr 13.88 ma 42.77 Anchor_not_fresh | close 67.93 low 60.31 f 1.0000
+  2021-02-05 Trai>Trai 8.63>8.63 cand= cc 5>5 trend 77.19 corr 13.88 ma 47.57 Anchor_not_fresh | close 88.08 low 76.6855 f 1.0000
+-- DXCM-wein-953
+  trade: DXCM,LONG,2019-07-22,2020-08-17,392,157.00,428.97,2960,805031.20,173.23,133.66,133.66,laggard_rotation,0.1483,0
+  decision 2019-07-05: E 156.94, installed 133.6608, close 146.99, adj close 36.7475, MA 33.097123655913983, weeks advancing 1, ticket age 2
+  2019-07-22 Init>Trai 133.66>133.66 cand= cc 0>0 trend 155.11 corr 152.53 ma 34.04 Seeded_trailing | close 155.11 low 152.53 f 4.0000
+  2019-07-26 Trai>Trai 133.66>133.66 cand= cc 0>0 trend 155.11 corr 150.2 ma 34.01 No_correction_yet | close 153.77 low 151.22 f 4.0000
+  2019-08-02 Trai>Trai 133.66>133.66 cand= cc 0>0 trend 156.87 corr 140.5 ma 34.16 Correction_not_recovered | close 144.21 low 141.76 f 4.0000
+  2019-08-09 Trai>Trai 133.66>133.66 cand= cc 0>0 trend 156.87 corr 139.53 ma 34.47 Correction_not_recovered | close 155.44 low 153.04 f 4.0000
+  2019-08-12 Trai>Trai 133.66>133.66 cand= cc 0>0 trend 156.87 corr 139.53 ma 34.71 Correction_not_recovered | close 151.93 low 150.63 f 4.0000
+  2019-08-13 Trai>Trai 133.66>133.66 cand=34.449205645161292 cc 0>1 trend 156.87 corr 139.53 ma 34.80 Cycle_stalled | close 157.3 low 150.69 f 4.0000
+  2019-08-16 Trai>Trai 133.66>133.66 cand= cc 1>1 trend 158.53 corr 151.24 ma 34.90 No_correction_yet | close 163.68 low 158.54 f 4.0000
+  2019-08-20 Trai>Trai 133.66>133.66 cand= cc 1>1 trend 163.68 corr 151.24 ma 35.40 No_correction_yet | close 168.28 low 162.47 f 4.0000
+  2019-08-21 Trai>Trai 133.66>133.66 cand=35.125045645161293 cc 1>2 trend 168.28 corr 151.24 ma 35.48 Cycle_stalled | close 173.19 low 168.61 f 4.0000
+  2019-11-07 Trai>Trai 133.66>133.66 cand=38.400263709677418 cc 2>3 trend 175.19 corr 138.28 ma 38.79 Cycle_stalled | close 194.7 low 183.15 f 4.0000
+  2019-11-19 Trai>Trai 133.66>133.66 cand=40.375 cc 3>4 trend 213.78 corr 193.5 ma 40.92 Cycle_stalled | close 217.58 low 212.51 f 4.0000
+  2020-01-07 Trai>Trai 133.66>133.66 cand=46.888172419354838 cc 4>5 trend 229.18 corr 199.52 ma 47.36 Cycle_stalled | close 231.45 low 225.01 f 4.0000
+  2020-02-10 Trai>Trai 133.66>133.66 cand=51.375 cc 5>6 trend 243.7 corr 224.01 ma 52.07 Cycle_stalled | close 246.92 low 240.07 f 4.0000
+  2020-02-18 Trai>Trai 133.66>133.66 cand=53.802513387096781 cc 6>7 trend 283.91 corr 242.27 ma 54.35 Cycle_stalled | close 296. low 281.38 f 4.0000
+  2020-04-16 Trai>Trai 133.66>133.66 cand=60.875 cc 7>8 trend 302.51 corr 182.07 ma 61.62 Cycle_stalled | close 306.27 low 295. f 4.0000
+  2020-04-27 Trai>Trai 133.66>133.66 cand=64.6474843548387 cc 8>9 trend 332.44 corr 303.33 ma 65.30 Cycle_stalled | close 335.05 low 330. f 4.0000
+  2020-05-04 Trai>Trai 133.66>133.66 cand=66.375 cc 9>10 trend 345.47 corr 312.15 ma 67.26 Cycle_stalled | close 352.51 low 339.43 f 4.0000
+  2020-05-08 Trai>Trai 133.66>133.66 cand=67.434989032258059 cc 10>11 trend 404.36 corr 351.09 ma 68.12 Cycle_stalled | close 405.5 low 398.22 f 4.0000
+  2020-07-06 Trai>Trai 133.66>133.66 cand=84.821757580645169 cc 11>12 trend 421.36 corr 336.02 ma 85.68 Cycle_stalled | close 423.18 low 408.81 f 4.0000
+  2020-08-03 Trai>Trai 133.66>133.66 cand=92.3752606451613 cc 12>13 trend 440.5 corr 381.12 ma 93.31 Cycle_stalled | close 443.67 low 432.39 f 4.0000
+-- CVNA-wein-1247
+  trade: CVNA,LONG,2024-07-08,2025-03-03,238,129.99,234.50,10523,1099758.73,80.40,116.17,116.17,laggard_rotation,0.1039,0
+  decision 2024-07-05: E 129.64, installed 116.1696, close 128.05, adj close 25.61, MA 19.083264516129031, weeks advancing 59, ticket age 0
+  2024-07-08 Init>Trai 116.17>116.17 cand= cc 0>0 trend 122.32 corr 120.05 ma 19.61 Seeded_trailing | close 122.32 low 120.05 f 5.0000
+  2024-07-11 Trai>Trai 116.17>116.17 cand= cc 0>0 trend 130.97 corr 120.05 ma 19.71 Correction_not_recovered | close 129.93 low 127.7 f 5.0000
+  2024-07-12 Trai>Trai 116.17>116.17 cand=19.375 cc 0>1 trend 130.97 corr 120.05 ma 19.79 Cycle_stalled | close 136.24 low 130.32 f 5.0000
+  2024-07-19 Trai>Trai 116.17>116.17 cand= cc 1>1 trend 145.03 corr 128.21 ma 20.39 Correction_not_recovered | close 130.06 low 128.79 f 5.0000
+  2024-07-26 Trai>Trai 116.17>116.17 cand= cc 1>1 trend 145.03 corr 122.14 ma 20.99 Correction_not_recovered | close 132.85 low 127.5 f 5.0000
+  2024-08-01 Trai>Trai 116.17>116.17 cand=21.375 cc 1>2 trend 145.03 corr 122.14 ma 21.73 Cycle_stalled | close 146.52 low 138.7768 f 5.0000
+  2024-08-15 Trai>Trai 116.17>116.17 cand=22.66858141935484 cc 2>3 trend 146.52 corr 118.5 ma 22.90 Cycle_stalled | close 151.56 low 142.63 f 5.0000
+  2024-08-16 Trai>Trai 116.17>116.17 cand= cc 3>3 trend 151.56 corr 148.69 ma 22.95 No_correction_yet | close 155.93 low 148.69 f 5.0000
+  2024-08-23 Trai>Trai 116.17>116.17 cand= cc 3>3 trend 156.77 corr 148.69 ma 23.74 No_correction_yet | close 159.78 low 151.52 f 5.0000
+  2024-09-18 Trai>Trai 116.17>116.17 cand=25.375 cc 3>4 trend 159.78 corr 124.39 ma 25.76 Cycle_stalled | close 161.63 low 157.265 f 5.0000
+  2024-09-20 Trai>Trai 116.17>116.17 cand= cc 4>4 trend 170.74 corr 161.63 ma 25.92 No_correction_yet | close 173.85 low 167.8 f 5.0000
+  2024-10-04 Trai>Trai 116.17>116.17 cand= cc 4>4 trend 176.95 corr 161.63 ma 27.42 Anchor_not_fresh | close 180.17 low 176.61 f 5.0000
+  2024-10-11 Trai>Trai 116.17>116.17 cand= cc 4>4 trend 191.57 corr 161.63 ma 28.33 Anchor_not_fresh | close 192.25 low 188.75 f 5.0000
+  2024-10-25 Trai>Trai 116.17>116.17 cand= cc 4>4 trend 200.22 corr 161.63 ma 30.13 Anchor_not_fresh | close 202.53 low 197.57 f 5.0000
+  2024-11-22 Trai>Trai 116.17>116.17 cand= cc 4>4 trend 250.06 corr 161.63 ma 35.43 Anchor_not_fresh | close 259.36 low 249.02 f 5.0000
+  2025-02-07 Trai>Trai 116.17>116.17 cand= cc 4>4 trend 263.17 corr 161.63 ma 43.58 Anchor_not_fresh | close 264.07 low 259.5828 f 5.0000
+  2025-02-14 Trai>Trai 116.17>116.17 cand= cc 4>4 trend 272.4 corr 161.63 ma 44.72 Anchor_not_fresh | close 285.33 low 272.98 f 5.0000
+-- SATL-wein-1390
+  trade: SATL,LONG,2026-04-01,2026-06-24,84,6.07,5.34,225172,-164581.21,-12.04,5.34,5.38,stop_loss,0.1044,1
+  decision 2026-03-27: E 5.96, installed 5.3375999999999992, close 5.93, adj close 5.93, MA 3.1580322580645155, weeks advancing 9, ticket age 0
+  2026-04-01 Init>Trai 5.34>5.34 cand= cc 0>0 trend 5.71 corr 5.44 ma 3.33 Seeded_trailing | close 5.71 low 5.44 f 1.0000
+  2026-04-02 Trai>Trai 5.34>5.34 cand= cc 0>0 trend 5.71 corr 5.44 ma 3.40 No_correction_yet | close 6.77 low 5.52 f 1.0000
+  2026-04-06 Trai>Trai 5.34>5.34 cand=3.375 cc 0>1 trend 6.77 corr 5.44 ma 3.66 Cycle_stalled | close 7.05 low 6.43 f 1.0000
+  2026-04-10 Trai>Trai 5.34>5.34 cand= cc 1>1 trend 7.2 corr 6.65 ma 3.68 No_correction_yet | close 7.33 low 7.01 f 1.0000
+  2026-04-13 Trai>Trai 5.34>5.34 cand=3.9175151612903218 cc 1>2 trend 7.33 corr 6.65 ma 3.96 Cycle_stalled | close 7.55 low 7. f 1.0000
+  2026-04-17 Trai>Trai 5.34>5.34 cand= cc 2>2 trend 7.55 corr 6.49 ma 3.92 Correction_not_recovered | close 6.93 low 6.86 f 1.0000
+  2026-04-24 Trai>Trai 5.34>5.34 cand= cc 2>2 trend 7.55 corr 6.02 ma 4.10 Correction_not_recovered | close 6.17 low 6.02 f 1.0000
+  2026-05-01 Trai>Trai 5.34>5.34 cand= cc 2>2 trend 7.55 corr 5.77 ma 4.35 Correction_not_recovered | close 7.18 low 6.56 f 1.0000
+  2026-05-08 Trai>Trai 5.34>5.34 cand=4.375 cc 2>3 trend 7.55 corr 5.77 ma 4.61 Cycle_stalled | close 7.57 low 6.9 f 1.0000
+  2026-05-15 Trai>Trai 5.34>5.34 cand=4.9540451612903214 cc 3>4 trend 8.7 corr 7.06 ma 5.00 Cycle_stalled | close 9.84 low 8.3 f 1.0000
+  2026-05-22 Trai>Trai 5.34>5.38 cand=5.3823319354838723 cc 4>5 trend 9.84 corr 8.76 ma 5.44 Raised | close 10.61 low 9.77 f 1.0000
+  2026-06-24 Trai>Trai 5.38>5.38 cand= cc 5>5 trend 10.74 corr 5.39 ma 6.17 Stop_hit | close 5.04 low 4.975 f 1.0000
+-- GME-wein-1025
+  trade: GME,LONG,2020-09-10,2020-09-11,1,6.95,6.26,163739,-112979.91,-9.93,6.88,6.88,stop_loss,0.0096,0
+  decision 2020-09-04: E 6.95, installed 6.8831999999999995, close 7.65, adj close 1.9125, MA 1.1656612903225807, weeks advancing 1, ticket age 0
+  2020-09-10 Init>Init 6.88>6.88 cand= cc 0>0 trend  corr  ma 1.19 Stop_hit | close 6.23 low 6.19 f 4.0000
+  2020-09-11 Init>Init 6.88>6.88 cand= cc 0>0 trend  corr  ma 1.19 Stop_hit | close 6.09 low 5.87 f 4.0000
+-- FOSL-wein-449
+  trade: FOSL,LONG,2010-08-16,2011-10-03,413,43.82,80.12,9312,337981.03,82.82,40.85,48.38,laggard_rotation,0.0640,2
+  decision 2010-08-13: E 43.64, installed 40.848384, close 43.7, adj close 43.7, MA 38.73086021505376, weeks advancing 2, ticket age 0
+  2010-08-16 Init>Trai 40.85>40.85 cand= cc 0>0 trend 43.83 corr 42.51 ma 39.11 Seeded_trailing | close 43.83 low 42.51 f 1.0000
+  2010-08-20 Trai>Trai 40.85>40.85 cand= cc 0>0 trend 45 corr 42.51 ma 39.13 No_correction_yet | close 44.15 low 43.51 f 1.0000
+  2010-08-27 Trai>Trai 40.85>40.85 cand= cc 0>0 trend 45 corr 42.51 ma 39.64 No_correction_yet | close 46.01 low 44.72 f 1.0000
+  2010-08-31 Trai>Trai 40.85>40.85 cand= cc 0>0 trend 47.95 corr 42.51 ma 40.21 Correction_not_recovered | close 47.49 low 47.32 f 1.0000
+  2010-09-01 Trai>Trai 40.85>40.85 cand=39.8874406451613 cc 0>1 trend 47.95 corr 42.51 ma 40.29 Cycle_stalled | close 48.8 low 47.55 f 1.0000
+  2010-09-03 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 49.91 corr 48.8 ma 40.38 No_correction_yet | close 50.2 low 48.93 f 1.0000
+  2010-10-01 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 54.59 corr 48.8 ma 43.47 Correction_not_recovered | close 53.07 low 52.53 f 1.0000
+  2010-10-08 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 54.68 corr 48.8 ma 44.32 Correction_not_recovered | close 54.54 low 54.3 f 1.0000
+  2010-10-22 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 55.63 corr 48.8 ma 46.01 Anchor_not_fresh | close 56.58 low 55.764 f 1.0000
+  2010-11-05 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 61.25 corr 48.8 ma 48.23 Anchor_not_fresh | close 62.22 low 61.11 f 1.0000
+  2010-12-10 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 73.33 corr 48.8 ma 55.90 Anchor_not_fresh | close 73.42 low 72.56 f 1.0000
+  2011-02-04 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 74.15 corr 48.8 ma 65.19 Anchor_not_fresh | close 76.56 low 73.72 f 1.0000
+  2011-02-11 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 80.45 corr 48.8 ma 66.75 Anchor_not_fresh | close 82.79 low 79.29 f 1.0000
+  2011-03-25 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 85.52 corr 48.8 ma 73.71 Anchor_not_fresh | close 88.53 low 85.97 f 1.0000
+  2011-04-21 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 95.95 corr 48.8 ma 79.99 Anchor_not_fresh | close 96.71 low 95.58 f 1.0000
+  2011-07-01 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 117.73 corr 48.8 ma 96.03 Anchor_not_fresh | close 121.96 low 117.51 f 1.0000
+  2011-07-08 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 124.01 corr 48.8 ma 98.38 Anchor_not_fresh | close 124.65 low 121.29 f 1.0000
+  2011-07-15 Trai>Trai 40.85>40.85 cand= cc 1>1 trend 128.58 corr 48.8 ma 100.90 Anchor_not_fresh | close 128.9 low 127. f 1.0000
+  2011-08-22 Trai>Tigh 40.85>48.31 cand= cc 1>1 trend 134.29 corr 48.8 ma 103.23 Entered_tightening | close 74.28 low 72.9729 f 1.0000
+  2011-08-23 Tigh>Tigh 48.31>48.38 cand= cc 0>0 trend  corr 48.8 ma 104.02 Tightened_ratchet | close 86.52 low 74.027 f 1.0000
+  2011-08-26 Tigh>Tigh 48.38>48.38 cand= cc 0>0 trend  corr 48.8 ma 104.58 Tightened_hold | close 95.31 low 87.65 f 1.0000
+  2011-09-02 Tigh>Tigh 48.38>48.38 cand= cc 0>0 trend  corr 48.8 ma 104.27 Tightened_hold | close 93.76 low 91. f 1.0000
+  2011-09-09 Tigh>Tigh 48.38>48.38 cand= cc 0>0 trend  corr 48.8 ma 103.93 Tightened_hold | close 94. low 92.25 f 1.0000
+  2011-09-16 Tigh>Tigh 48.38>48.38 cand= cc 0>0 trend  corr 48.8 ma 104.11 Tightened_hold | close 102.5 low 99.63 f 1.0000
+  2011-09-23 Tigh>Tigh 48.38>48.38 cand= cc 0>0 trend  corr 48.8 ma 103.71 Tightened_hold | close 94.19 low 90.38 f 1.0000
+  2011-09-30 Tigh>Tigh 48.38>48.38 cand= cc 0>0 trend  corr 48.8 ma 102.43 Tightened_hold | close 81.06 low 80.97 f 1.0000
+-- SDA-wein-1168
+  trade: SDA,LONG,2023-07-12,2023-07-13,1,11.79,10.44,109457,-147593.98,-11.44,10.49,10.49,stop_loss,0.0923,0
+  decision 2023-06-16: E 11.56, installed 10.492799999999999, close 21.97, adj close 21.97, MA 11.787894623655912, placement 2023-06-16, ticket age 3, fill 11.7912
+-- AAON-wein-1156
+  trade: AAON,LONG,2024-02-15,2024-05-03,78,83.43,79.11,19812,-85583.60,-5.18,55.48,79.18,stop_loss,0.0025,2
+  decision 2023-03-17: E 83.42, installed 83.212895999999986, close 89.33, adj close 58.7344, MA 50.794512473118282, placement 2023-03-17, ticket age 47, fill 83.4319274596036
+-- screen 2020-06-12 (APPS placed): top-N decisions and 26-week forward returns
+  week: 2020-06-12	Bullish	Recovering	1982	235	225	20	2	2	17	0	0	0
+  ATHM No_structural_stop +19%
+  AVGO No_structural_stop +44%
+  CCS No_structural_stop +48%
+  DCUE No_structural_stop -0%
+  SAH No_structural_stop +41%
+  DECK Placed +53%
+  ESTC No_structural_stop +72%
+  YETI No_structural_stop +106%
+  MCHP No_structural_stop +40%
+  PENN No_structural_stop +199%
+  APPS Placed +420%
+  CNNE No_structural_stop +17%
+  XWEL No_structural_stop -74%
+  MKSI No_structural_stop +45%
+  RH No_structural_stop +86%
+  LEN-B No_structural_stop +33%
+  CIVI No_structural_stop +14%
+  INSM No_structural_stop +34%
+  EXPGY No_structural_stop +10%
+
+== X5. Bullish screen weeks by the book's exposure band, by era (next-week returns, compounded; SPY total return)
+2000-08 | expo <40% |  20 wk | SPY    +4% | NAV    +4% | placed/wk 0.50 | NSS share of top-N 97%
+2000-08 | expo 40-60% |  19 wk | SPY    +8% | NAV   +24% | placed/wk 1.00 | NSS share of top-N 95%
+2000-08 | expo 60%+ | 175 wk | SPY   +16% | NAV   +73% | placed/wk 0.50 | NSS share of top-N 94%
+2009-15 | expo <40% |  28 wk | SPY   +27% | NAV    +7% | placed/wk 0.57 | NSS share of top-N 96%
+2009-15 | expo 40-60% |  48 wk | SPY   +44% | NAV   +54% | placed/wk 0.65 | NSS share of top-N 96%
+2009-15 | expo 60%+ | 202 wk | SPY    +1% | NAV   +39% | placed/wk 0.55 | NSS share of top-N 93%
+2016-19 | expo <40% |  42 wk | SPY    -5% | NAV    -3% | placed/wk 0.71 | NSS share of top-N 96%
+2016-19 | expo 40-60% |  32 wk | SPY   +23% | NAV   +10% | placed/wk 0.91 | NSS share of top-N 94%
+2016-19 | expo 60%+ | 104 wk | SPY   +34% | NAV   +13% | placed/wk 0.56 | NSS share of top-N 93%
+2020-22 | expo <40% |  19 wk | SPY    -3% | NAV    +3% | placed/wk 0.84 | NSS share of top-N 95%
+2020-22 | expo 40-60% |  24 wk | SPY   -11% | NAV    +4% | placed/wk 0.88 | NSS share of top-N 95%
+2020-22 | expo 60%+ |  59 wk | SPY   +26% | NAV   +43% | placed/wk 0.51 | NSS share of top-N 91%
+2023-26 | expo <40% |  24 wk | SPY   +10% | NAV    -2% | placed/wk 0.58 | NSS share of top-N 97%
+2023-26 | expo 40-60% |  29 wk | SPY    +7% | NAV   -11% | placed/wk 1.03 | NSS share of top-N 93%
+2023-26 | expo 60%+ | 104 wk | SPY   +41% | NAV   +22% | placed/wk 0.62 | NSS share of top-N 90%

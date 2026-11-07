@@ -1,0 +1,109 @@
+2023-01-06 Bullish grade=321 top=20 placed=0 nss=20 cash=0 | spy+2.7 nav+0.1 expo0.0 pos0
+2023-01-13 Bullish grade=373 top=20 placed=0 nss=20 cash=0 | spy-0.7 nav+0.1 expo0.0 pos0
+2023-01-20 Bullish grade=397 top=20 placed=0 nss=20 cash=0 | spy+2.5 nav+0.1 expo0.0 pos0
+2023-01-27 Bullish grade=519 top=20 placed=0 nss=20 cash=0 | spy+1.6 nav+0.2 expo0.0 pos0
+2023-02-03 Bullish grade=713 top=20 placed=0 nss=20 cash=0 | spy-1.0 nav-0.1 expo7.1 pos1
+   FILLED: UFPI(24w) 
+2023-02-10 Bullish grade=514 top=20 placed=0 nss=20 cash=0 | spy-0.2 nav-0.5 expo6.9 pos1
+2023-02-17 Bullish grade=582 top=20 placed=0 nss=20 cash=0 | spy-2.7 nav-0.3 expo6.3 pos1
+2023-02-24 Bullish grade=418 top=20 placed=0 nss=20 cash=0 | spy+2.0 nav+0.1 expo0.0 pos0
+   EXITED: UFPI:stop-15%/-123k→+0 
+2023-03-03 Bullish grade=375 top=20 placed=0 nss=20 cash=0 | spy-4.5 nav+0.1 expo0.0 pos0
+2023-03-10 Neutral grade=252 top=20 placed=1 nss=19 cash=0 | spy+1.4 nav+0.1 expo0.0 pos0
+   placed: KEX 
+2023-03-17 Bullish grade=150 top=20 placed=1 nss=19 cash=0 | spy+1.5 nav+0.1 expo0.0 pos0
+   placed: AAON 
+2023-03-24 Bullish grade=147 top=20 placed=3 nss=17 cash=0 | spy+3.4 nav+0.3 expo0.0 pos0
+   placed: FWONK GE· HURN 
+2023-03-31 Bullish grade=171 top=20 placed=1 nss=18 cash=0 | spy+0.8 nav+0.3 expo17.9 pos2
+   placed: OMC 
+   FILLED: FWONK(0w) HURN(0w) 
+2023-04-14 Bullish grade=245 top=20 placed=0 nss=19 cash=0 | spy-0.1 nav-0.0 expo25.3 pos3
+   FILLED: OMC(0w) 
+2023-04-21 Bullish grade=316 top=20 placed=0 nss=20 cash=0 | spy+0.9 nav-0.3 expo25.2 pos3
+2023-04-28 Bullish grade=281 top=20 placed=1 nss=19 cash=0 | spy-0.8 nav-0.6 expo24.9 pos3
+   placed: TECK 
+2023-05-05 Bullish grade=290 top=20 placed=1 nss=19 cash=0 | spy-0.3 nav+0.2 expo17.5 pos2
+   placed: WCN· 
+   EXITED: HURN:stop-7%/-57k→+33 
+2023-05-12 Bullish grade=160 top=20 placed=0 nss=20 cash=0 | spy+1.7 nav+0.2 expo17.6 pos2
+2023-05-19 Bullish grade=114 top=20 placed=0 nss=18 cash=0 | spy+0.3 nav-0.5 expo17.6 pos2
+2023-05-26 Bullish grade=107 top=20 placed=2 nss=17 cash=0 | spy+1.9 nav-0.2 expo17.2 pos2
+   placed: AMX ARCO 
+2023-06-02 Bullish grade=134 top=20 placed=1 nss=19 cash=0 | spy+0.5 nav+0.1 expo19.9 pos2
+   placed: NSSC 
+   FILLED: AMX(0w) 
+   EXITED: OMC:lagg-5%/-43k→-10 
+2023-06-09 Bullish grade=174 top=20 placed=1 nss=18 cash=0 | spy+2.6 nav-0.6 expo28.5 pos3
+   placed: MRVL 
+   FILLED: KEX(12w) ARCO(1w) 
+   EXITED: FWONK:lagg-2%/-19k→-5 
+2023-06-16 Bullish grade=267 top=20 placed=1 nss=19 cash=0 | spy-1.4 nav+0.2 expo26.5 pos3
+   placed: SDA 
+   FILLED: NSSC(1w) 
+   EXITED: AMX:lagg-2%/-18k→-17 
+2023-06-23 Bullish grade=230 top=20 placed=1 nss=18 cash=0 | spy+2.3 nav+1.3 expo41.1 pos4
+   placed: KAI 
+   FILLED: MRVL(1w) 
+2023-06-30 Bullish grade=282 top=20 placed=1 nss=19 cash=0 | spy-1.1 nav-0.4 expo44.2 pos4
+   placed: HPE 
+   FILLED: KAI(1w) 
+   EXITED: NSSC:lagg-10%/-103k→-38 
+2023-07-07 Bullish grade=220 top=20 placed=0 nss=19 cash=0 | spy+2.4 nav-0.5 expo43.9 pos4
+2023-07-14 Bullish grade=266 top=20 placed=0 nss=20 cash=0 | spy+0.6 nav+0.6 expo53.8 pos5
+   FILLED: HPE(1w) SDA(3w) 
+   EXITED: SDA:stop-11%/-148k→+17 
+2023-07-21 Bullish grade=311 top=20 placed=1 nss=19 cash=0 | spy+1.0 nav+0.0 expo54.0 pos5
+   placed: SIRI 
+2023-07-28 Bullish grade=307 top=20 placed=0 nss=19 cash=0 | spy-2.2 nav-1.6 expo55.8 pos5
+   FILLED: SIRI(0w) 
+   EXITED: SIRI:stop-14%/-202k→-13 
+2023-08-04 Bullish grade=424 top=20 placed=1 nss=18 cash=0 | spy-0.3 nav-0.7 expo46.1 pos4
+   placed: PJT 
+   EXITED: KAI:stop-10%/-118k→+13 
+2023-08-11 Bullish grade=377 top=20 placed=2 nss=18 cash=0 | spy-2.1 nav-1.7 expo45.6 pos4
+   placed: CENTA MNKD· 
+2023-08-18 Bullish grade=261 top=20 placed=2 nss=18 cash=0 | spy+0.8 nav-0.7 expo44.6 pos4
+   placed: PKG R 
+2023-08-25 Bullish grade=214 top=20 placed=0 nss=20 cash=0 | spy+2.5 nav+1.2 expo44.6 pos4
+   FILLED: PKG(0w) 
+   EXITED: MRVL:stop-9%/-152k→+5 
+2023-09-01 Bullish grade=172 top=20 placed=1 nss=19 cash=0 | spy-1.3 nav-1.3 expo54.1 pos5
+   placed: X 
+   FILLED: R(2w) 
+2023-09-08 Bullish grade=137 top=20 placed=2 nss=18 cash=0 | spy-0.1 nav+0.8 expo53.4 pos5
+   placed: LPG TDS 
+2023-09-15 Bullish grade=220 top=20 placed=0 nss=20 cash=0 | spy-2.9 nav-0.3 expo62.0 pos6
+   FILLED: TDS(0w) LPG(1w) 
+   EXITED: TDS:stop-4%/-64k→+3 
+2023-09-22 Bullish grade=184 top=20 placed=0 nss=20 cash=0 | spy-0.7 nav+0.0 expo86.9 pos8
+   FILLED: X(2w) CENTA(6w) 
+2023-09-29 Bullish grade=177 top=20 placed=0 nss=20 cash=0 | spy+0.5 nav-1.0 expo73.3 pos7
+   EXITED: CENTA:stop-7%/-119k→+11 
+2023-10-06 Neutral grade=99 top=20 placed=2 nss=17 cash=0 | spy+0.5 nav+0.8 expo62.1 pos6
+   placed: MMYT SUN 
+   EXITED: ARCO:lagg+3%/+34k→+30 
+2023-10-13 Neutral grade=88 top=20 placed=1 nss=19 cash=0 | spy-2.4 nav-1.7 expo74.0 pos7
+   placed: E 
+   FILLED: SUN(0w) 
+2023-10-20 Neutral grade=78 top=20 placed=0 nss=20 cash=0 | spy-2.5 nav-0.4 expo74.7 pos7
+   FILLED: E(0w) 
+   EXITED: HPE:stop-12%/-125k→+4 
+2023-10-27 Neutral grade=74 top=20 placed=0 nss=20 cash=0 | spy+5.8 nav+5.9 expo79.6 pos7
+   FILLED: MMYT(2w) 
+   EXITED: KEX:stop+1%/+9k→+4 
+2023-11-03 Bullish grade=130 top=20 placed=1 nss=17 cash=2 | spy+1.4 nav-0.0 expo89.9 pos8
+   placed: OKE 
+   FILLED: PJT(13w) 
+2023-11-10 Bullish grade=85 top=20 placed=1 nss=17 cash=2 | spy+2.3 nav+2.3 expo89.9 pos8
+   placed: AGYS 
+2023-11-17 Bullish grade=165 top=20 placed=0 nss=18 cash=1 | spy+1.0 nav+1.2 expo100.2 pos9
+   FILLED: AGYS(0w) 
+2023-11-24 Bullish grade=271 top=20 placed=0 nss=20 cash=0 | spy+0.8 nav+2.3 expo100.2 pos9
+2023-12-01 Bullish grade=357 top=20 placed=0 nss=20 cash=0 | spy+0.2 nav-1.1 expo100.3 pos9
+2023-12-08 Bullish grade=521 top=20 placed=0 nss=19 cash=1 | spy+2.4 nav+3.9 expo100.2 pos9
+2023-12-15 Bullish grade=702 top=20 placed=0 nss=20 cash=0 | spy+0.9 nav+4.3 expo91.8 pos8
+   EXITED: AGYS:stop-11%/-127k→-4 
+2023-12-22 Bullish grade=780 top=20 placed=0 nss=20 cash=0 | spy+0.4 nav-0.2 expo84.0 pos7
+   EXITED: E:lagg-0%/-2k→-4 
+2023-12-29 Bullish grade=678 top=20 placed=0 nss=19 cash=0 | spy-1.6 nav-0.9 expo84.0 pos7

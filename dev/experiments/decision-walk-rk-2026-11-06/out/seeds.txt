@@ -1,0 +1,10 @@
+k0: 552 closed positions replayed | basis fix -2059k = -21.5% of realised +9568k; earlier exits 54, of which > +50% winners 7 (-2339k) | compounded at the run's own NAV growth: ln(1+R) -0.414 | anchor fix alone -266k
+   largest cuts: AVGO 2013 -388k; BWA 2010 -208k; DXCM 2019 -854k; GLNG 2022 -478k; NOAH 2017 -334k; R 2023 -209k; SSTK 2020 -187k; 
+k1: 541 closed positions replayed | basis fix -2667k = -15.6% of realised +17071k; earlier exits 54, of which > +50% winners 9 (-2600k) | compounded at the run's own NAV growth: ln(1+R) -0.535 | anchor fix alone -326k
+   largest cuts: AVGO 2013 -421k; BWA 2010 -187k; DXCM 2019 -996k; GLNG 2022 -648k; R 2023 -289k; SSTK 2020 -229k; 
+k2: 541 closed positions replayed | basis fix -1764k = -16.3% of realised +10850k; earlier exits 50, of which > +50% winners 6 (-1501k) | compounded at the run's own NAV growth: ln(1+R) -0.411 | anchor fix alone -263k
+   largest cuts: BWA 2010 -208k; DXCM 2019 -822k; NOAH 2017 -293k; R 2023 -199k; SSTK 2020 -185k; 
+k3: 553 closed positions replayed | basis fix -1766k = -20.4% of realised +8650k; earlier exits 52, of which > +50% winners 7 (-2043k) | compounded at the run's own NAV growth: ln(1+R) -0.374 | anchor fix alone -241k
+   largest cuts: AVGO 2013 -370k; BWA 2010 -200k; DXCM 2019 -846k; GLNG 2022 -458k; R 2023 -203k; SSTK 2020 -184k; 
+k4: 541 closed positions replayed | basis fix -2477k = -20.3% of realised +12184k; earlier exits 48, of which > +50% winners 8 (-2452k) | compounded at the run's own NAV growth: ln(1+R) -0.514 | anchor fix alone -257k
+   largest cuts: AVGO 2013 -393k; BWA 2010 -189k; DXCM 2019 -875k; GLNG 2022 -496k; NOAH 2017 -322k; R 2023 -218k; SSTK 2020 -189k; 
