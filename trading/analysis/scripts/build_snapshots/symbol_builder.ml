@@ -60,10 +60,15 @@ let _file_path ~output_dir ~symbol =
 let _weekly_path ~output_dir ~symbol =
   Filename.concat output_dir (symbol ^ ".weekly")
 
-let _entry_is_current ~csv_mtime (e : Snapshot_manifest.file_metadata) =
-  Float.( <= ) csv_mtime e.csv_mtime && Stdlib.Sys.file_exists e.path
+(* The file is looked for in [output_dir] (by basename), not at the manifest's
+   recorded path, so an incremental run over a warehouse copied from where it
+   was built still recognises its up-to-date files (#3535). *)
+let _entry_is_current ~output_dir ~csv_mtime
+    (e : Snapshot_manifest.file_metadata) =
+  Float.( <= ) csv_mtime e.csv_mtime
+  && Stdlib.Sys.file_exists (Snapshot_manifest.resolve_path ~dir:output_dir e)
 
-let _should_skip ~existing ~symbol ~csv_mtime ~schema =
+let _should_skip ~output_dir ~existing ~symbol ~csv_mtime ~schema =
   match existing with
   | None -> false
   | Some (m : Snapshot_manifest.t) ->
@@ -71,7 +76,7 @@ let _should_skip ~existing ~symbol ~csv_mtime ~schema =
       && Option.value_map
            (Snapshot_manifest.find m ~symbol)
            ~default:false
-           ~f:(_entry_is_current ~csv_mtime)
+           ~f:(_entry_is_current ~output_dir ~csv_mtime)
 
 let _file_metadata ~symbol ~path ~csv_mtime ~active_through =
   let bytes = In_channel.read_all path in
@@ -251,7 +256,7 @@ let process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
       Printf.eprintf "skip %s: no CSV\n%!" symbol;
       None
   | Some csv_mtime ->
-      if _should_skip ~existing ~symbol ~csv_mtime ~schema then
+      if _should_skip ~output_dir ~existing ~symbol ~csv_mtime ~schema then
         _maybe_reuse ~existing ~symbol
       else
         _try_build_and_checkpoint ~data_dir ~start_date ~end_date

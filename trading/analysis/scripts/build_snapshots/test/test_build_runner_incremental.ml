@@ -20,7 +20,9 @@
     - a carried entry whose [.snap] file is gone is dropped, so the closing
       verify still passes (carry guard B);
     - a pre-run manifest written under another schema is refused whole (carry
-      guard A). *)
+      guard A);
+    - a warehouse moved after its build tops up in place, its files found in the
+      directory the run is given (#3535). *)
 
 open Core
 open OUnit2
@@ -217,6 +219,34 @@ let test_cross_schema_manifest_is_not_carried _ =
        (elements_are [ equal_to _new_symbol ])
        (contains_substring "entries are NOT carried forward"))
 
+(* Build the two-symbol warehouse in [dir/snap], move it to [dir/moved] (its
+   manifest still records [dir/snap/...] paths, as a warehouse pulled from R2
+   does), then top it up in place. *)
+let _relocated_topup_in_dir second_run dir =
+  let data_dir = Filename.concat dir "csv" in
+  let built_dir = Filename.concat dir "snap" in
+  let output_dir = Filename.concat dir "moved" in
+  Core_unix.mkdir_p data_dir;
+  _write_all_csvs ~data_dir;
+  _build ~incremental:false ~data_dir ~output_dir:built_dir _initial_symbols;
+  Stdlib.Sys.rename built_dir output_dir;
+  let log =
+    _second_build_captured ~incremental:true ~data_dir ~output_dir second_run
+  in
+  (_manifest_symbols ~output_dir, log)
+
+(** #3535: an incremental top-up of a warehouse that was moved after its build
+    finds the existing [.snap] files in the directory it runs over, not at the
+    manifest's recorded build paths. Following the recorded paths, carry guard B
+    saw every existing file as gone and dropped [AAA] and [BBB], leaving an
+    index of [NEW] alone. *)
+let test_relocated_warehouse_topup_keeps_existing_symbols _ =
+  assert_that
+    (_with_temp_dir (_relocated_topup_in_dir [ _new_symbol ]))
+    (pair
+       (elements_are [ equal_to "AAA"; equal_to "BBB"; equal_to _new_symbol ])
+       (contains_substring "verify: 3/3 files OK (failed=0)"))
+
 let () =
   run_test_tt_main
     ("build_runner_incremental"
@@ -231,4 +261,6 @@ let () =
            >:: test_carried_entry_without_a_snap_file_is_dropped;
            "a cross-schema manifest is not carried forward"
            >:: test_cross_schema_manifest_is_not_carried;
+           "a relocated warehouse top-up keeps the existing symbols"
+           >:: test_relocated_warehouse_topup_keeps_existing_symbols;
          ])

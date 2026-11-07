@@ -173,6 +173,31 @@ let test_verify_detects_corrupted_file _ =
             field (fun (r : Snapshot_verifier.t) -> r.failed) (equal_to 1);
           ]))
 
+(* A warehouse moved after its build verifies in place: every entry resolves
+   against the manifest's new directory, not the recorded build path (#3535).
+   The checked path in each result is the moved one. *)
+let test_verify_passes_relocated_directory _ =
+  let dir, _ = _build_one_symbol_dir ~symbols:[ "AAPL"; "MSFT" ] () in
+  let moved = dir ^ "_moved" in
+  Stdlib.Sys.rename dir moved;
+  assert_that
+    (Snapshot_verifier.verify_directory
+       ~manifest_path:(Filename.concat moved "manifest.sexp"))
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun (r : Snapshot_verifier.t) -> r.passed) (equal_to 2);
+            field (fun (r : Snapshot_verifier.t) -> r.failed) (equal_to 0);
+            field
+              (fun (r : Snapshot_verifier.t) ->
+                List.map r.results ~f:(fun f -> f.path))
+              (equal_to
+                 [
+                   Filename.concat moved "AAPL.snap";
+                   Filename.concat moved "MSFT.snap";
+                 ]);
+          ]))
+
 let test_verify_returns_error_when_manifest_missing _ =
   assert_that
     (Snapshot_verifier.verify_directory
@@ -186,6 +211,8 @@ let suite =
          "verify passes v1 directory" >:: test_verify_passes_v1_directory;
          "verify detects v2 schema skew" >:: test_verify_detects_v2_schema_skew;
          "verify detects corrupted file" >:: test_verify_detects_corrupted_file;
+         "verify passes relocated directory"
+         >:: test_verify_passes_relocated_directory;
          "verify returns error when manifest missing"
          >:: test_verify_returns_error_when_manifest_missing;
        ]
