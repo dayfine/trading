@@ -1580,3 +1580,13 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:session_brief_test.sh})))
+
+; Split corpus (#2973) review_pack column: trade_extract.awk over every corpus
+; window with a trade held across the ex-date. Reads dev/lib/review_pack/ and
+; trading/test_data/split_corpus via repo_root() at RUN TIME, so (universe).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:split_corpus_trade_extract_check.sh})))
