@@ -24,8 +24,12 @@
 type file_metadata = {
   symbol : string;  (** Universe ticker, e.g. ["AAPL"]. *)
   path : string;
-      (** Path to the snapshot file. Absolute or relative to the manifest
-          location depending on how the writer was invoked. *)
+      (** Path to the snapshot file as the writer recorded it: [build_snapshots]
+          records [<output-dir>/<SYMBOL>.snap] with [<output-dir>] as given on
+          its command line (usually absolute), the side-table migrator a bare
+          [<SYMBOL>.snap]. Informational only: readers locate the file with
+          {!resolve_path}, never by opening this path directly, so a warehouse
+          copied to another directory still reads correctly (#3535). *)
   byte_size : int;  (** File size in bytes at write time. *)
   payload_md5 : string;
       (** Hex md5 of the file's payload section (mirrors the file's own
@@ -101,6 +105,22 @@ val find : t -> symbol:string -> file_metadata option
 (** [find t ~symbol] returns the entry for [symbol], or [None] if absent. O(N)
     in the entry count — Phase B universes (≤ 10K) scan in microseconds; if
     Phase C demands faster lookup it can build a hashtable on top. *)
+
+val resolve_path : dir:string -> file_metadata -> string
+(** [resolve_path ~dir entry] is where [entry]'s snapshot file lives in a
+    warehouse opened from directory [dir]: [dir] joined with the basename of
+    [entry.path]. Pure; does not touch disk.
+
+    Every writer puts a warehouse's files flat in the manifest's own directory,
+    so the basename is the only part of the recorded path that survives a copy.
+    The recorded directory is ignored on purpose: a manifest built at
+    [/tmp/snap_x] and pulled to [.sweep-output/warehouse/snap_x] records
+    [/tmp/snap_x/A.snap], and following it would read a stale or missing file
+    (#3535). For a warehouse opened at the path it was built at, this returns
+    the recorded file (the same path, modulo a trailing slash on [dir]). A
+    relative recorded path is resolved the same way, by basename, since
+    [build_snapshots] records a relative [<output-dir>] relative to its own
+    working directory, not to the manifest. *)
 
 val upsert_entry : t -> file_metadata -> t
 (** [upsert_entry t entry] returns a manifest with [entry] added (if no entry

@@ -100,6 +100,10 @@ Point runs at it by passing that directory wherever a local run uses
 `/tmp/snap_top3000_pit_v12wk` (the snapshot directory argument of the spec or
 chain script). The container needs the path under the mount: run docker with
 `-v $PWD:/w` as below and give the in-container path `/w/.sweep-output/warehouse/...`.
+No symlink to the build path is needed: `manifest.sexp` still records the paths the
+warehouse was built at (`/tmp/snap_top3000_pit_v12wk/A.snap`), but every reader resolves
+each file by name inside the directory it was given (`Snapshot_manifest.resolve_path`,
+#3535).
 
 ## Building and testing inside a session
 
