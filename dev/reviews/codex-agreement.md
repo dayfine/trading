@@ -13,3 +13,4 @@ false rework (`.claude/rules/cross-agent-review.md`).
 | 2026-10-26 | #3430 | 2c1ae3b41 | ok | ok | ok | yes | 0 | 0 | 270843/2085 |  |
 | 2026-10-26 | #3435 | ee49b0b94 | ok | ok | ok@87ada4e6 (tip delta: 2 status lines) | yes | 0 | 0 | n/a |  |
 | 2026-10-26 | #3445 | df3607fe7 | ok | ok | ok | yes | 0 | 0 | 256460/1147 |  |
+| 2026-10-29 | #3474 | 6e86aa127 | ok | ok | ok | yes | 0 | 0 | 286620/2524 |  |
