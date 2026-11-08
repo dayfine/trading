@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-08",
+  "feature": "split-corpus",
+  "branch": "feat/split-corpus-stops-runner",
+  "sha": "f4918bce710961266d9b8430f466390b613bd06d",
+  "recorded_at_ns": 1794164162576763347,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
