@@ -70,34 +70,35 @@ let _load name : Split_corpus.entry =
   | Some root -> Split_corpus.load ~root name
   | None -> assert_failure "trading/test_data/split_corpus not found above cwd"
 
+(* Test-setup unwrap: a failed position transition aborts the test with the
+   status message. *)
+let _setup_exn result =
+  Result.map_error result ~f:(fun err ->
+      "position setup failed: " ^ Status.show err)
+  |> Result.ok_or_failwith
+
 let _holding_position ~symbol (bar : Types.Daily_price.t) =
   let open Trading_strategy.Position in
   let step p kind =
-    match
-      apply_transition p { position_id = symbol; date = bar.date; kind }
-    with
-    | Ok p -> p
-    | Error _ -> assert_failure "position setup failed"
+    _setup_exn
+      (apply_transition p { position_id = symbol; date = bar.date; kind })
   in
   let created =
-    match
-      create_entering
-        {
-          position_id = symbol;
-          date = bar.date;
-          kind =
-            CreateEntering
-              {
-                symbol;
-                side = _long;
-                target_quantity = 10.0;
-                entry_price = bar.close_price;
-                reasoning = ManualDecision { description = "split corpus" };
-              };
-        }
-    with
-    | Ok p -> p
-    | Error _ -> assert_failure "position setup failed"
+    _setup_exn
+      (create_entering
+         {
+           position_id = symbol;
+           date = bar.date;
+           kind =
+             CreateEntering
+               {
+                 symbol;
+                 side = _long;
+                 target_quantity = 10.0;
+                 entry_price = bar.close_price;
+                 reasoning = ManualDecision { description = "split corpus" };
+               };
+         })
   in
   let filled =
     step created
