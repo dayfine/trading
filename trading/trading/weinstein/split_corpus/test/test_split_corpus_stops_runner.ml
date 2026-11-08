@@ -128,6 +128,11 @@ type hold = {
   entry_distance : float;
       (** Stop distance on the entry bar (the last pre-split bar): the entry
           close against the initial stop. *)
+  entry_restated_stop : float;
+      (** The initial stop on the entry bar, restated in the window's final
+          basis — the first point of the restated-stop sequence, so the
+          entry-to-ex-date step (the only one the split rescale can lower) is
+          checked. *)
   days : day list;
       (** From the bar after entry — the ex-date — to the exit bar (inclusive)
           or the window's end. *)
@@ -196,6 +201,9 @@ let _hold_across (entry : Split_corpus.entry) (s : Split_corpus.split) =
     entry_distance =
       _distance ~close:entry_bar.close_price
         ~stop:(Weinstein_stops.get_stop_level initial);
+    entry_restated_stop =
+      Weinstein_stops.get_stop_level initial
+      /. Split_corpus.pending_ratio entry.meta entry_bar.date;
     days;
   }
 
@@ -214,7 +222,9 @@ let _ex_date_step h =
   | _ -> None
 
 let _restated_drops h =
-  let stops = List.map h.days ~f:(fun d -> d.restated_stop) in
+  let stops =
+    h.entry_restated_stop :: List.map h.days ~f:(fun d -> d.restated_stop)
+  in
   match stops with
   | [] -> 0
   | _ :: rest ->
