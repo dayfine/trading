@@ -5,7 +5,8 @@
   test_split_corpus_entry_audit
   test_split_corpus_scan
   test_split_corpus_entry_ticket
-  test_split_corpus_stop_fill)
+  test_split_corpus_stop_fill
+  test_split_corpus_stops_runner)
  (libraries
   core
   types
