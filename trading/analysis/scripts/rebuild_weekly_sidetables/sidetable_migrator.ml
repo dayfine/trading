@@ -59,15 +59,11 @@ let _bar_of_row (row : Snap.t) : Types.Daily_price.t =
     ~adjusted_close:(_get row Snapshot_schema.Adjusted_close)
     ()
 
-(* Prefer the conventional [<warehouse_dir>/<symbol>.snap] location; fall back
-   to the manifest entry's recorded path (absolute, or relative to the
-   warehouse dir). Keeps the migrator working on a warehouse that was moved
-   after its manifest recorded absolute paths. *)
-let _snap_path ~warehouse_dir ~(entry : Snapshot_manifest.file_metadata) =
-  let conventional = Filename.concat warehouse_dir (entry.symbol ^ ".snap") in
-  if Stdlib.Sys.file_exists conventional then conventional
-  else if Filename.is_absolute entry.path then entry.path
-  else Filename.concat warehouse_dir entry.path
+(* The entry's [.snap] in [warehouse_dir], by the shared resolver: the
+   manifest's recorded directory is ignored, so a moved warehouse migrates in
+   place (#3535). *)
+let _snap_path ~warehouse_dir ~entry =
+  Snapshot_manifest.resolve_path ~dir:warehouse_dir entry
 
 let _read_snap_bars ~path : Types.Daily_price.t list Status.status_or =
   Snapshot_columnar.with_reader ~path ~f:Snapshot_columnar.read_all

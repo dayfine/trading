@@ -22,7 +22,9 @@
 
 type file_result = {
   symbol : string;  (** Symbol from the manifest entry under verification. *)
-  path : string;  (** Filesystem path that was checked. *)
+  path : string;
+      (** Filesystem path that was checked: the entry resolved against the
+          manifest's directory ({!Snapshot_manifest.resolve_path}). *)
   status : (int, Status.t) Result.t;
       (** [Ok n] when the file round-trips and produced [n] rows. [Error err]
           when the format-detecting read failed (md5, schema, parse). *)
@@ -39,10 +41,11 @@ type t = {
 
 val verify_directory : manifest_path:string -> t Status.status_or
 (** [verify_directory ~manifest_path] reads the manifest at [manifest_path],
-    iterates every entry, and round-trips each file via
-    {!Snapshot_io.read_with_expected_schema} (format-detecting v1/v2) using the
-    manifest's schema as the expected schema. Returns a {!t} summarizing the
-    sweep.
+    iterates every entry, and round-trips each file (resolved against the
+    manifest's own directory by {!Snapshot_manifest.resolve_path}, so a copied
+    warehouse verifies in place) via {!Snapshot_io.read_with_expected_schema}
+    (format-detecting v1/v2) using the manifest's schema as the expected schema.
+    Returns a {!t} summarizing the sweep.
 
     Returns [Error] only when the manifest itself cannot be loaded; per-file
     failures are reported in the [results] list (and counted in [failed]) so a

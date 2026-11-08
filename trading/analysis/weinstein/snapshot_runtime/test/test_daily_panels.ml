@@ -938,6 +938,64 @@ let test_mixed_v1_and_v2_both_read _ =
   check_symbol "OLD";
   check_symbol "NEW"
 
+(* --- relocated warehouse (#3535) ------------------------------------- *)
+
+(* Build a v2 warehouse of [symbols] in one temp directory, then move the whole
+   directory elsewhere. The manifest entries keep the build directory's
+   absolute paths, exactly as a warehouse pulled from R2 does. Returns the new
+   directory and the manifest. *)
+let _relocated_v2_warehouse ~symbols ~n_days =
+  let build_dir = _make_tmp_dir () in
+  let entries =
+    List.map symbols ~f:(fun symbol ->
+        _v2_write_symbol ~dir:build_dir ~symbol (_v2_series ~symbol ~n:n_days))
+  in
+  let moved_dir = build_dir ^ "_moved" in
+  Stdlib.Sys.rename build_dir moved_dir;
+  let manifest =
+    Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
+  in
+  (moved_dir, manifest)
+
+let _create_or_fail ~snapshot_dir ~manifest =
+  match Daily_panels.create ~snapshot_dir ~manifest ~max_cache_mb:1 with
+  | Ok t -> t
+  | Error err -> assert_failure ("Daily_panels.create: " ^ Status.show err)
+
+let test_relocated_warehouse_reads_from_opened_dir _ =
+  let dir, manifest = _relocated_v2_warehouse ~symbols:[ "AAPL" ] ~n_days:5 in
+  let t = _create_or_fail ~snapshot_dir:dir ~manifest in
+  let date = Date.add_days _default_start 2 in
+  assert_that
+    (Daily_panels.read_today t ~symbol:"AAPL" ~date)
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun (r : Snapshot.t) -> r.symbol) (equal_to "AAPL");
+            field (fun (r : Snapshot.t) -> r.date) (equal_to date);
+            field (fun (r : Snapshot.t) -> r.values.(0)) (float_equal 102.0);
+            field (fun (r : Snapshot.t) -> r.values.(1)) (float_equal 202.0);
+          ]))
+
+(* A file absent from the opened directory is an [Internal] error that names
+   the path looked at, never a silent not-found that would read as "no data". *)
+let test_relocated_warehouse_missing_file_errors_clearly _ =
+  let dir, manifest = _relocated_v2_warehouse ~symbols:[ "AAPL" ] ~n_days:5 in
+  let missing = Filename.concat dir "AAPL.snap" in
+  Stdlib.Sys.remove missing;
+  let t = _create_or_fail ~snapshot_dir:dir ~manifest in
+  assert_that
+    (Daily_panels.read_today t ~symbol:"AAPL" ~date:_default_start)
+    (matching ~msg:"Expected Error"
+       (function Error (e : Status.t) -> Some e | Ok _ -> None)
+       (all_of
+          [
+            field (fun (e : Status.t) -> e.code) (equal_to Status.Internal);
+            field
+              (fun (e : Status.t) -> e.message)
+              (contains_substring ("not found at " ^ missing));
+          ]))
+
 let suite =
   "Daily_panels tests"
   >::: [
@@ -1000,6 +1058,10 @@ let suite =
          "resident and caps report live state"
          >:: test_resident_and_caps_report_live_state;
          "mixed v1 and v2 both read" >:: test_mixed_v1_and_v2_both_read;
+         "relocated warehouse reads from opened dir"
+         >:: test_relocated_warehouse_reads_from_opened_dir;
+         "relocated warehouse missing file errors clearly"
+         >:: test_relocated_warehouse_missing_file_errors_clearly;
        ]
 
 let () = run_test_tt_main suite

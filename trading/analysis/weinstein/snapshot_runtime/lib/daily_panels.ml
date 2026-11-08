@@ -86,9 +86,17 @@ type t = {
 
 (* --- Path resolution -------------------------------------------------- *)
 
-let _resolve_path ~snapshot_dir (entry : Snapshot_manifest.file_metadata) =
-  if Filename.is_absolute entry.path then entry.path
-  else Filename.concat snapshot_dir entry.path
+(* Files resolve against [snapshot_dir], never the manifest's recorded build
+   path, so a relocated warehouse reads correctly (#3535). A load failure on a
+   file that is not there is reported as such, naming both paths, rather than
+   as whatever the decoder makes of a missing file. The existence check runs
+   only on the failure path, so a successful load pays no extra syscall. *)
+let _missing_file_error ~path (entry : Snapshot_manifest.file_metadata) =
+  Status.error_internal
+    (Printf.sprintf
+       "Daily_panels: snapshot file for %s not found at %s (manifest recorded \
+        %s; files are resolved by basename against the snapshot directory)"
+       entry.symbol path entry.path)
 
 (* --- LRU helpers ------------------------------------------------------ *)
 
@@ -163,8 +171,11 @@ let _insert_into_cache t ~symbol ~backing =
   entry
 
 let _load_symbol_file t (entry : Snapshot_manifest.file_metadata) =
-  let path = _resolve_path ~snapshot_dir:t.snapshot_dir entry in
-  Backing.load ~path ~expected:t.expected_schema
+  let path = Snapshot_manifest.resolve_path ~dir:t.snapshot_dir entry in
+  match Backing.load ~path ~expected:t.expected_schema with
+  | Error _ when not (Stdlib.Sys.file_exists path) ->
+      _missing_file_error ~path entry
+  | result -> result
 
 let _load_and_insert t ~symbol =
   t.misses <- t.misses + 1;

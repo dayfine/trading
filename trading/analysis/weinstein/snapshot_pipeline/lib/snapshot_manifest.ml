@@ -59,6 +59,9 @@ let read ~path =
 let find t ~symbol =
   List.find t.entries ~f:(fun e -> String.equal e.symbol symbol)
 
+let resolve_path ~dir (entry : file_metadata) =
+  Filename.concat dir (Filename.basename entry.path)
+
 let upsert_entry t entry =
   let replaced = ref false in
   let entries =

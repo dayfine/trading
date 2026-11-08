@@ -243,6 +243,34 @@ let test_set_weekly_hash_round_trips _ =
           (fun (m : Snapshot_manifest.t) -> m.weekly_sidetable_format_hash)
           (is_some_and (equal_to "abc123"))))
 
+(* --- resolve_path (#3535) --- *)
+
+(* A warehouse built at one directory and opened at another resolves every
+   entry in the directory it was opened from, whatever the recorded path
+   says: an absolute build path, a bare filename, or a path relative to the
+   builder's working directory. *)
+let test_resolve_path_ignores_recorded_directory _ =
+  let entry path = { (_sample_entry ~symbol:"AAPL") with path } in
+  assert_that
+    (List.map
+       [ "/tmp/snap_top3000_pit_v12wk/AAPL.snap"; "AAPL.snap"; "out/AAPL.snap" ]
+       ~f:(fun p ->
+         Snapshot_manifest.resolve_path ~dir:"/w/warehouse/snap" (entry p)))
+    (elements_are
+       [
+         equal_to "/w/warehouse/snap/AAPL.snap";
+         equal_to "/w/warehouse/snap/AAPL.snap";
+         equal_to "/w/warehouse/snap/AAPL.snap";
+       ])
+
+(* Opened at the directory it was built in, the resolver returns exactly the
+   recorded path: the original-location read is unchanged. *)
+let test_resolve_path_at_build_dir_is_recorded_path _ =
+  let entry = _sample_entry ~symbol:"MSFT" in
+  assert_that
+    (Snapshot_manifest.resolve_path ~dir:"/snapshots" entry)
+    (equal_to entry.path)
+
 let suite =
   "Snapshot_manifest tests"
   >::: [
@@ -268,6 +296,10 @@ let suite =
          "create leaves weekly hash none"
          >:: test_create_leaves_weekly_hash_none;
          "set weekly hash round trips" >:: test_set_weekly_hash_round_trips;
+         "resolve_path ignores recorded directory"
+         >:: test_resolve_path_ignores_recorded_directory;
+         "resolve_path at build dir is recorded path"
+         >:: test_resolve_path_at_build_dir_is_recorded_path;
        ]
 
 let () = run_test_tt_main suite

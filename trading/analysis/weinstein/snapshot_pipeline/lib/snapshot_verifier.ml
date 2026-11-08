@@ -9,14 +9,15 @@ type file_result = {
 
 type t = { total : int; passed : int; failed : int; results : file_result list }
 
-let _verify_one ~(entry : Snapshot_manifest.file_metadata)
+let _verify_one ~dir ~(entry : Snapshot_manifest.file_metadata)
     ~(expected : Data_panel_snapshot.Snapshot_schema.t) : file_result =
+  let path = Snapshot_manifest.resolve_path ~dir entry in
   let status =
-    match Snapshot_io.read_with_expected_schema ~path:entry.path ~expected with
+    match Snapshot_io.read_with_expected_schema ~path ~expected with
     | Ok rows -> Ok (List.length rows)
     | Error err -> Error err
   in
-  { symbol = entry.symbol; path = entry.path; status }
+  { symbol = entry.symbol; path; status }
 
 let _summarize results =
   let passed = List.count results ~f:(fun r -> Result.is_ok r.status) in
@@ -26,8 +27,9 @@ let _summarize results =
 let verify_directory ~manifest_path =
   let open Result.Let_syntax in
   let%bind manifest = Snapshot_manifest.read ~path:manifest_path in
+  let dir = Filename.dirname manifest_path in
   let results =
     List.map manifest.entries ~f:(fun entry ->
-        _verify_one ~entry ~expected:manifest.schema)
+        _verify_one ~dir ~entry ~expected:manifest.schema)
   in
   Ok (_summarize results)

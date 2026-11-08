@@ -214,6 +214,15 @@ let _write_level_report ~level_config ~output_dir builts =
   Level_pass.write_report level_config ~output_dir
     (List.filter_map builts ~f:(fun (b : Symbol_builder.built) -> b.level))
 
+(* This run's entries plus the untouched pre-run ones carried forward (#2669),
+   logging the carry when it is non-empty. *)
+let _with_carried ~existing ~schema ~excluded ~output_dir entries =
+  let carried =
+    Carry.carried_entries ~existing ~schema ~excluded ~output_dir entries
+  in
+  Carry.log_carry_forward carried;
+  carried @ entries
+
 let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
     ?(splice_cuts = Map.empty (module String))
     ?(twin_config = Twin_detector.Config.default)
@@ -249,9 +258,9 @@ let build ?(survivor_tolerance_days = default_survivor_tolerance_days)
            ~symbols_total ~started_at ~hygiene)
   in
   let entries = _finalize_entries ~survivor_tolerance_days builts in
-  let carried = Carry.carried_entries ~existing ~schema ~excluded entries in
-  Carry.log_carry_forward carried;
-  let final_entries = carried @ entries in
+  let final_entries =
+    _with_carried ~existing ~schema ~excluded ~output_dir entries
+  in
   _log_marker_split final_entries;
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
   (* Only the MANIFEST and its marker-split log get the merged set.

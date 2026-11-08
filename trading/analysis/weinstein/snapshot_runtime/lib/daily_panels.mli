@@ -128,9 +128,13 @@ val create :
     {!read_history}).
 
     [snapshot_dir] is the directory containing the per-symbol [<SYMBOL>.snap]
-    files. Manifest entries' [path] fields may be absolute or relative; when
-    relative they are resolved against [snapshot_dir]. The directory is not
-    scanned eagerly — files are opened lazily on first access for a symbol.
+    files. Each entry's file is resolved against [snapshot_dir] by basename
+    ([Snapshot_pipeline.Snapshot_manifest.resolve_path]); the directory recorded
+    in the entry's [path] is ignored, so a warehouse copied to another directory
+    reads correctly (#3535). A file missing from [snapshot_dir] surfaces on
+    first access as [Error Internal] naming the resolved path and the recorded
+    one. The directory is not scanned eagerly — files are opened lazily on first
+    access for a symbol.
 
     [max_cache_mb] is the LRU byte cap in megabytes (1 MB = 1,048,576 bytes).
     Must be positive. The smallest sensible value is enough to hold one symbol's

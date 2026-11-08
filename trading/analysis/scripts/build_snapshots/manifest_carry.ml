@@ -51,7 +51,7 @@ let _carry_candidates ~existing ~schema =
    duplicate the pass exists to remove, and on an incremental rebuild that is
    exactly the shape that hides it: the pass reports the drop, the manifest
    keeps indexing it, and the backtest still holds both legs. *)
-let carried_entries ~existing ~schema ~excluded entries =
+let carried_entries ~existing ~schema ~excluded ~output_dir entries =
   let produced =
     List.map entries ~f:(fun (e : Snapshot_manifest.file_metadata) -> e.symbol)
     |> Set.of_list (module String)
@@ -59,7 +59,9 @@ let carried_entries ~existing ~schema ~excluded entries =
   let skip symbol = Set.mem produced symbol || Set.mem excluded symbol in
   _carry_candidates ~existing ~schema
   |> List.filter ~f:(fun (e : Snapshot_manifest.file_metadata) ->
-      (not (skip e.symbol)) && Stdlib.Sys.file_exists e.path)
+      (not (skip e.symbol))
+      && Stdlib.Sys.file_exists
+           (Snapshot_manifest.resolve_path ~dir:output_dir e))
 
 (* A non-empty carry set means this run's universe was not a superset of the
    warehouse. That is legitimate (a top-up is exactly that shape), so it is a
