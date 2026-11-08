@@ -1,0 +1,114 @@
+2021-01-08 Bullish grade=873 top=20 placed=2 nss=15 cash=2 | spy-1.5 nav+0.2 expo84.0 pos6
+   placed: MIME QLYS 
+2021-01-15 Bullish grade=781 top=20 placed=1 nss=17 cash=0 | spy+1.9 nav+7.8 expo83.9 pos6
+   placed: RYTM· 
+2021-01-22 Bullish grade=758 top=20 placed=0 nss=16 cash=1 | spy-3.3 nav-8.5 expo90.9 pos7
+   FILLED: QLYS(1w) 
+2021-01-29 Bullish grade=556 top=20 placed=1 nss=13 cash=4 | spy+4.8 nav+19.1 expo90.5 pos7
+   placed: WGO 
+2021-02-05 Bullish grade=787 top=20 placed=0 nss=16 cash=2 | spy+1.3 nav-1.6 expo91.2 pos7
+2021-02-12 Bullish grade=717 top=20 placed=1 nss=15 cash=1 | spy-0.7 nav-1.2 expo79.4 pos6
+   placed: THO 
+   FILLED: WGO(1w) 
+   EXITED: SSTK:lagg+50%/+580k→+17 QLYS:stop-15%/-114k→-5 
+2021-02-19 Bullish grade=676 top=20 placed=0 nss=17 cash=2 | spy-2.5 nav-1.6 expo90.3 pos7
+   FILLED: THO(0w) 
+2021-02-26 Bullish grade=525 top=20 placed=1 nss=17 cash=0 | spy+0.9 nav-2.7 expo69.3 pos5
+   placed: WIX 
+   EXITED: FSLR:stop+7%/+96k→-13 THO:stop-11%/-147k→+2 
+2021-03-05 Bullish grade=476 top=20 placed=1 nss=19 cash=0 | spy+2.7 nav+9.9 expo70.0 pos5
+   placed: WD 
+   FILLED: WIX(0w) 
+   EXITED: WIX:stop-10%/-159k→-14 
+2021-03-12 Bullish grade=581 top=20 placed=1 nss=18 cash=0 | spy-0.8 nav-3.1 expo85.1 pos6
+   placed: VIRT 
+   FILLED: WD(0w) 
+2021-03-19 Bullish grade=508 top=20 placed=0 nss=17 cash=2 | spy+1.7 nav-1.3 expo92.6 pos7
+   FILLED: VIRT(0w) 
+2021-03-26 Bullish grade=424 top=20 placed=0 nss=13 cash=5 | spy+3.9 nav+6.7 expo92.7 pos7
+2021-04-09 Bullish grade=484 top=20 placed=0 nss=18 cash=1 | spy+1.4 nav-2.8 expo92.8 pos7
+2021-04-16 Bullish grade=543 top=20 placed=0 nss=19 cash=1 | spy-0.1 nav-0.1 expo92.9 pos7
+2021-04-23 Bullish grade=520 top=20 placed=0 nss=17 cash=1 | spy+0.1 nav+0.3 expo93.0 pos7
+2021-04-30 Bullish grade=449 top=20 placed=0 nss=19 cash=1 | spy+1.2 nav-4.0 expo93.0 pos7
+2021-05-07 Bullish grade=545 top=20 placed=0 nss=17 cash=3 | spy-1.3 nav-3.9 expo93.0 pos7
+2021-05-14 Bullish grade=397 top=20 placed=0 nss=16 cash=3 | spy-0.4 nav-3.7 expo85.0 pos6
+   EXITED: VIRT:lagg-5%/-53k→-8 
+2021-05-21 Bullish grade=340 top=20 placed=1 nss=19 cash=0 | spy+1.2 nav+1.2 expo59.9 pos5
+   placed: KREF 
+   EXITED: APPS:lagg+526%/+2655k→-13 
+2021-05-28 Bullish grade=388 top=20 placed=1 nss=18 cash=0 | spy+0.6 nav-1.3 expo39.3 pos3
+   placed: ASH 
+   EXITED: WGO:lagg-5%/-41k→+5 WD:lagg+3%/+49k→-0 
+2021-06-04 Bullish grade=438 top=20 placed=1 nss=19 cash=0 | spy+0.4 nav+0.4 expo46.5 pos4
+   placed: REXR· 
+   FILLED: ASH(0w) 
+2021-06-11 Bullish grade=441 top=20 placed=1 nss=19 cash=0 | spy-1.9 nav-2.4 expo39.0 pos3
+   placed: BIIB 
+   EXITED: HPQ:lagg+40%/+263k→-5 
+2021-06-18 Bullish grade=476 top=20 placed=1 nss=19 cash=0 | spy+2.8 nav+2.8 expo29.3 pos2
+   placed: FRHC 
+   EXITED: ASH:lagg-1%/-11k→+0 
+2021-06-25 Bullish grade=562 top=20 placed=1 nss=19 cash=0 | spy+1.7 nav+0.0 expo48.7 pos4
+   placed: TXG 
+   FILLED: FRHC(0w) BIIB(1w) MIME(24w) 
+   EXITED: BIIB:stop-6%/-107k→-16 
+2021-07-02 Bullish grade=503 top=20 placed=0 nss=20 cash=0 | spy+0.4 nav-0.4 expo43.9 pos4
+   FILLED: TXG(0w) 
+   EXITED: AN:lagg+77%/+689k→+31 
+2021-07-09 Bullish grade=455 top=20 placed=1 nss=19 cash=0 | spy-1.0 nav-1.3 expo36.2 pos3
+   placed: SHOP 
+   EXITED: TXG:stop-12%/-122k→-18 
+2021-07-16 Bullish grade=382 top=20 placed=2 nss=18 cash=0 | spy+2.0 nav+1.6 expo49.0 pos4
+   placed: IEX WB· 
+   FILLED: SHOP(0w) 
+2021-07-23 Bullish grade=370 top=20 placed=2 nss=18 cash=0 | spy-0.3 nav+1.3 expo37.4 pos3
+   placed: MSEX VICR 
+   EXITED: SHOP:stop-8%/-121k→-0 
+2021-07-30 Bullish grade=444 top=20 placed=0 nss=20 cash=0 | spy+0.9 nav-3.3 expo52.1 pos4
+   FILLED: VICR(0w) 
+2021-08-06 Bullish grade=443 top=20 placed=0 nss=20 cash=0 | spy+0.8 nav-0.5 expo60.6 pos4
+2021-08-13 Bullish grade=396 top=20 placed=0 nss=19 cash=0 | spy-0.6 nav-0.3 expo60.2 pos4
+2021-08-20 Bullish grade=297 top=20 placed=1 nss=19 cash=0 | spy+1.6 nav+2.2 expo33.8 pos3
+   placed: ON 
+   EXITED: BBWI:lagg+138%/+1098k→+21 
+2021-08-27 Bullish grade=364 top=20 placed=0 nss=20 cash=0 | spy+0.6 nav+0.8 expo43.0 pos4
+   FILLED: ON(1w) 
+2021-09-03 Bullish grade=405 top=20 placed=0 nss=20 cash=0 | spy-1.7 nav-0.9 expo43.5 pos4
+2021-09-10 Bullish grade=323 top=20 placed=0 nss=20 cash=0 | spy-0.6 nav+1.1 expo43.0 pos4
+2021-09-17 Bullish grade=417 top=20 placed=0 nss=19 cash=0 | spy+0.6 nav+0.6 expo43.6 pos4
+2021-09-24 Bullish grade=344 top=20 placed=0 nss=20 cash=0 | spy-2.2 nav-0.6 expo34.5 pos3
+   EXITED: FRHC:lagg-3%/-35k→+9 
+2021-10-01 Bullish grade=318 top=20 placed=1 nss=18 cash=0 | spy+0.8 nav-0.3 expo34.1 pos3
+   placed: SWN 
+2021-10-08 Bullish grade=296 top=20 placed=3 nss=15 cash=0 | spy+1.8 nav+1.3 expo33.9 pos3
+   placed: MUFG NXST TGNA 
+2021-10-15 Bullish grade=316 top=20 placed=1 nss=19 cash=0 | spy+1.6 nav+0.3 expo34.8 pos3
+   placed: FRO 
+2021-10-22 Bullish grade=366 top=20 placed=0 nss=20 cash=0 | spy+1.4 nav+1.7 expo44.2 pos4
+   FILLED: FRO(0w) 
+2021-10-29 Bullish grade=349 top=20 placed=1 nss=18 cash=0 | spy+2.0 nav+2.7 expo45.1 pos4
+   placed: CNX 
+2021-11-05 Bullish grade=530 top=20 placed=0 nss=20 cash=0 | spy-0.3 nav+0.6 expo53.9 pos5
+   FILLED: NXST(3w) 
+2021-11-12 Bullish grade=429 top=20 placed=0 nss=20 cash=0 | spy+0.3 nav+0.5 expo46.4 pos4
+   EXITED: FRO:stop-11%/-126k→-8 
+2021-11-19 Bullish grade=412 top=20 placed=3 nss=17 cash=0 | spy-2.1 nav-4.4 expo53.1 pos5
+   placed: UA WOLF_old2 YETI· 
+   FILLED: IEX(17w) 
+2021-11-26 Bullish grade=333 top=20 placed=2 nss=14 cash=3 | spy-1.2 nav-1.6 expo72.3 pos7
+   placed: EXTR SMCI 
+   FILLED: WOLF_old2(0w) UA(0w) 
+2021-12-03 Bullish grade=255 top=20 placed=2 nss=17 cash=1 | spy+3.8 nav+0.1 expo66.1 pos6
+   placed: QCOM VGR 
+   FILLED: SMCI(0w) 
+   EXITED: UA:stop-12%/-156k→-26 WOLF_old2:stop-12%/-155k→-24 
+2021-12-10 Bullish grade=248 top=20 placed=1 nss=19 cash=0 | spy-2.0 nav-1.1 expo63.4 pos6
+   placed: CPRI 
+   FILLED: VGR(0w) 
+   EXITED: VICR:stop+21%/+370k→-35 
+2021-12-17 Bullish grade=241 top=20 placed=2 nss=17 cash=1 | spy+3.3 nav+4.1 expo65.7 pos6
+   placed: LRCX SIMO· 
+   FILLED: CPRI(0w) 
+   EXITED: NXST:stop-13%/-121k→+31 
+2021-12-31 Bullish grade=376 top=20 placed=0 nss=17 cash=2 | spy-1.9 nav-2.3 expo93.9 pos8
+   FILLED: KREF(30w) LRCX(0w) 

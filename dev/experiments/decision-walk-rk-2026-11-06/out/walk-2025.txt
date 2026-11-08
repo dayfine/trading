@@ -1,0 +1,121 @@
+2025-01-03 Bullish grade=209 top=20 placed=0 nss=17 cash=0 | spy-1.9 nav-5.5 expo100.6 pos8
+   FILLED: SKYT(0w) 
+2025-01-10 Bullish grade=153 top=20 placed=1 nss=19 cash=0 | spy+2.9 nav+3.9 expo87.1 pos6
+   placed: JPM 
+   EXITED: WABC:stop-14%/-152k→-12 SKYT:stop-15%/-195k→-45 
+2025-01-17 Bullish grade=220 top=20 placed=0 nss=18 cash=2 | spy+1.7 nav+2.1 expo96.0 pos7
+   FILLED: JPM(0w) 
+2025-01-24 Bullish grade=299 top=20 placed=0 nss=19 cash=1 | spy-1.0 nav+0.7 expo96.1 pos7
+2025-01-31 Bullish grade=276 top=20 placed=0 nss=20 cash=0 | spy-0.2 nav-0.2 expo96.2 pos7
+2025-02-07 Bullish grade=496 top=20 placed=1 nss=17 cash=2 | spy+1.5 nav-1.2 expo86.6 pos6
+   placed: WRLD 
+   EXITED: UPWK:stop-10%/-170k→+3 
+2025-02-14 Bullish grade=415 top=20 placed=0 nss=19 cash=1 | spy-1.6 nav-7.4 expo94.4 pos7
+   FILLED: WRLD(0w) 
+2025-02-21 Bullish grade=268 top=20 placed=0 nss=19 cash=1 | spy-1.0 nav+0.5 expo80.6 pos6
+   EXITED: GOOGL:stop-8%/-174k→-6 
+2025-02-28 Bullish grade=335 top=20 placed=0 nss=20 cash=0 | spy-3.1 nav-1.2 expo43.9 pos4
+   EXITED: KMPR:lagg-3%/-39k→-2 MMYT:stop+155%/+2476k→+9 
+2025-03-07 Bullish grade=278 top=20 placed=1 nss=19 cash=0 | spy-2.3 nav-1.7 expo18.0 pos2
+   placed: ASND 
+   EXITED: WRLD:stop-13%/-165k→+20 CVNA:lagg+80%/+1100k→+55 
+2025-03-14 Neutral grade=215 top=20 placed=1 nss=19 cash=0 | spy+0.5 nav+0.5 expo0.0 pos0
+   placed: NOMD 
+   EXITED: JPM:stop-9%/-122k→+18 BBW:stop+5%/+58k→+46 
+2025-03-21 Neutral grade=216 top=20 placed=3 nss=17 cash=0 | spy-1.5 nav-0.5 expo8.4 pos1
+   placed: EGP STN VZ 
+   FILLED: ASND(1w) 
+2025-03-28 Neutral grade=162 top=20 placed=0 nss=20 cash=0 | spy-9.1 nav-1.0 expo7.9 pos1
+2025-04-04 Neutral grade=116 top=20 placed=2 nss=17 cash=0 | spy+5.7 nav-0.0 expo14.4 pos2
+   placed: PTGX SPNT 
+   FILLED: VZ(1w) 
+2025-04-11 Bearish grade=0 top=0 placed=0 nss=0 cash=0 | spy+3.1 nav-0.2 expo7.3 pos1
+   EXITED: ASND:stop-13%/-168k→+26 
+2025-04-25 Neutral grade=77 top=20 placed=0 nss=19 cash=0 | spy+2.9 nav+1.6 expo19.5 pos2
+   FILLED: SPNT(1w) 
+2025-05-02 Neutral grade=120 top=20 placed=0 nss=19 cash=0 | spy-0.4 nav+0.6 expo28.1 pos3
+   FILLED: STN(5w) 
+2025-05-09 Neutral grade=152 top=20 placed=0 nss=20 cash=0 | spy+5.3 nav+0.4 expo39.4 pos4
+   FILLED: NOMD(7w) 
+2025-05-16 Neutral grade=198 top=20 placed=0 nss=20 cash=0 | spy-2.5 nav-0.0 expo29.7 pos3
+   EXITED: NOMD:stop-9%/-151k→-18 
+2025-05-23 Neutral grade=265 top=20 placed=1 nss=19 cash=0 | spy+1.8 nav+0.5 expo29.6 pos3
+   placed: BJRI 
+2025-05-30 Bullish grade=318 top=20 placed=1 nss=19 cash=0 | spy+1.7 nav+1.3 expo29.9 pos3
+   placed: ATAT 
+2025-06-06 Bullish grade=299 top=20 placed=3 nss=17 cash=0 | spy-0.4 nav-3.4 expo50.7 pos5
+   placed: BBW MRUS TNXP 
+   FILLED: PTGX(8w) BJRI(2w) 
+2025-06-13 Bullish grade=279 top=20 placed=0 nss=19 cash=0 | spy-0.2 nav+0.9 expo61.6 pos6
+   FILLED: BBW(0w) TNXP(0w) 
+   EXITED: TNXP:stop-25%/-537k→-20 
+2025-06-20 Bullish grade=233 top=20 placed=1 nss=19 cash=0 | spy+3.5 nav+1.0 expo54.8 pos5
+   placed: BOX· 
+   EXITED: VZ:lagg-6%/-64k→+6 
+2025-06-27 Bullish grade=305 top=20 placed=0 nss=20 cash=0 | spy+1.4 nav-2.6 expo48.0 pos4
+   EXITED: PTGX:lagg+8%/+80k→+22 
+2025-07-11 Bullish grade=357 top=20 placed=0 nss=20 cash=0 | spy+0.6 nav+0.5 expo54.3 pos5
+   FILLED: ATAT(4w) 
+2025-07-18 Bullish grade=432 top=20 placed=4 nss=16 cash=0 | spy+1.5 nav+0.4 expo49.6 pos5
+   placed: HWC IIIV PTC TCBI 
+   FILLED: MRUS(6w) 
+   EXITED: BJRI:stop-9%/-193k→-20 
+2025-07-25 Bullish grade=471 top=20 placed=0 nss=19 cash=0 | spy-2.4 nav-1.5 expo42.4 pos5
+   FILLED: PTC(1w) 
+   EXITED: SPNT:lagg+18%/+312k→-8 
+2025-08-01 Bullish grade=358 top=20 placed=1 nss=19 cash=0 | spy+2.5 nav+0.7 expo49.8 pos6
+   placed: KN 
+   FILLED: HWC(1w) 
+2025-08-08 Bullish grade=332 top=20 placed=2 nss=18 cash=0 | spy+1.0 nav-0.4 expo58.2 pos7
+   placed: APPF CVLT 
+   FILLED: IIIV(3w) 
+2025-08-15 Bullish grade=253 top=20 placed=1 nss=19 cash=0 | spy+0.3 nav+1.9 expo69.3 pos8
+   placed: NYT 
+   FILLED: APPF(0w) CVLT(0w) KN(1w) 
+   EXITED: HWC:lagg-7%/-84k→+2 APPF:stop-4%/-82k→-8 
+2025-08-22 Bullish grade=424 top=20 placed=1 nss=19 cash=0 | spy-0.0 nav+1.1 expo83.9 pos9
+   placed: ATMU 
+   FILLED: NYT(0w) 
+2025-08-29 Bullish grade=515 top=20 placed=0 nss=19 cash=0 | spy+0.3 nav+0.7 expo66.6 pos7
+   EXITED: STN:lagg+24%/+266k→-13 CVLT:lagg-7%/-86k→-32 
+2025-09-05 Bullish grade=590 top=20 placed=1 nss=19 cash=0 | spy+1.6 nav+2.1 expo61.2 pos7
+   placed: UTHR· 
+   FILLED: ATMU(2w) 
+   EXITED: NYT:lagg-0%/-8k→+9 
+2025-09-12 Bullish grade=511 top=20 placed=0 nss=20 cash=0 | spy+1.2 nav+0.4 expo62.0 pos7
+2025-09-19 Bullish grade=467 top=20 placed=0 nss=20 cash=0 | spy-0.3 nav-0.2 expo62.1 pos7
+2025-09-26 Bullish grade=355 top=20 placed=2 nss=18 cash=0 | spy+1.1 nav+2.0 expo68.9 pos8
+   placed: INOD UPWK 
+2025-10-03 Bullish grade=343 top=20 placed=0 nss=20 cash=0 | spy-2.4 nav-2.6 expo76.9 pos9
+   FILLED: INOD(0w) UPWK(0w) 
+   EXITED: UPWK:stop-4%/-89k→+12 
+2025-10-10 Bullish grade=215 top=20 placed=0 nss=20 cash=0 | spy+1.7 nav+0.1 expo76.3 pos9
+2025-10-17 Bullish grade=215 top=20 placed=1 nss=19 cash=0 | spy+1.9 nav+0.7 expo68.5 pos8
+   placed: IBM 
+   EXITED: ATAT:lagg+6%/+63k→+7 
+2025-10-24 Bullish grade=258 top=20 placed=0 nss=19 cash=0 | spy+0.7 nav-0.8 expo69.8 pos8
+   FILLED: IBM(1w) 
+   EXITED: PTC:lagg+0%/+3k→-20 
+2025-10-31 Bullish grade=204 top=20 placed=1 nss=19 cash=0 | spy-1.6 nav-2.0 expo69.6 pos8
+   placed: PUMP 
+2025-11-07 Bullish grade=254 top=20 placed=0 nss=20 cash=0 | spy+0.1 nav-1.4 expo53.3 pos6
+   EXITED: BBW:stop+7%/+87k→+9 INOD:stop-15%/-173k→-22 
+2025-11-14 Bullish grade=160 top=20 placed=1 nss=19 cash=0 | spy-1.9 nav-0.2 expo46.2 pos5
+   placed: AUPH· 
+   FILLED: PUMP(1w) 
+   EXITED: PUMP:stop-14%/-167k→+16 IIIV:stop-4%/-55k→-23 
+2025-11-21 Bullish grade=111 top=20 placed=1 nss=19 cash=0 | spy+3.7 nav+1.8 expo46.1 pos5
+   placed: BKV 
+2025-11-28 Bullish grade=191 top=20 placed=0 nss=20 cash=0 | spy+0.3 nav+0.8 expo55.2 pos6
+   FILLED: BKV(1w) 
+2025-12-05 Bullish grade=163 top=20 placed=1 nss=19 cash=0 | spy-0.6 nav+0.3 expo53.8 pos6
+   placed: ALIZY 
+   FILLED: TCBI(19w) 
+   EXITED: KN:lagg+6%/+76k→+15 
+2025-12-12 Bullish grade=299 top=20 placed=2 nss=16 cash=0 | spy+0.1 nav-0.2 expo61.1 pos7
+   placed: MAR SOLV 
+   FILLED: ALIZY(0w) 
+2025-12-19 Bullish grade=297 top=20 placed=0 nss=19 cash=0 | spy+1.4 nav+0.5 expo69.1 pos8
+   FILLED: MAR(0w) 
+2025-12-26 Bullish grade=326 top=20 placed=2 nss=17 cash=1 | spy-1.0 nav-2.5 expo69.2 pos8
+   placed: AAOI CVNA 
