@@ -103,7 +103,39 @@ chain script). The container needs the path under the mount: run docker with
 No symlink to the build path is needed: `manifest.sexp` still records the paths the
 warehouse was built at (`/tmp/snap_top3000_pit_v12wk/A.snap`), but every reader resolves
 each file by name inside the directory it was given (`Snapshot_manifest.resolve_path`,
-#3535).
+#3535). A build older than #3547 (such as the record's `fc78391dd`) still opens the recorded paths
+and reads no bars (`n_symbols_touched=0`, then `Window_filter: no trading day`); for those, add
+`-v $PWD/.sweep-output/warehouse/snap_top3000_pit_v12wk:/tmp/snap_top3000_pit_v12wk:ro`.
+
+Locally, run `r2_bars.sh` on the host: from inside `trading-1-dev` R2 answers 403 even with the
+same credentials (seen 2026-11-08, cause not traced); copy the warehouse out with `docker cp`
+first.
+
+### Dividends and splits come separately
+
+The warehouse holds bars only. The simulator credits dividends and reads splits from
+`$TRADING_DATA_DIR/<A>/<B>/<SYM>/dividends.csv` and `splits.csv`, which local chain scripts copy
+from the gitignored `data/` into the run tree's `trading/test_data/` (for example
+`record-kseed-2026-10-27/chain.sh`, the `rsync … dividends.csv … splits.csv` line). A cloud run
+without them credits no dividends and silently diverges: the first rk-k0 cloud run lost FR's
+$1,767.00 dividend on 2000-06-28 and ended at 1251.35 % against the record's 1312.79 % (#3535).
+
+They are in R2 as one tarball, `warehouse/corpact-2026-10-27/corpact.tar.gz` (23,760 files,
+2 MB; `files.txt` lists them):
+
+```sh
+# local, once per refresh of data/: pack and upload (bump the name's date)
+D=.sweep-output/warehouse/corpact; mkdir -p $D
+(cd data && find . \( -name dividends.csv -o -name splits.csv \) | LC_ALL=C sort > ../$D/files.txt \
+  && tar -czf ../$D/corpact.tar.gz -T ../$D/files.txt)
+sh dev/scripts/r2_bars.sh push-dir --dir "$PWD/$D" --name corpact-2026-10-27
+# cloud session: pull, then unpack into the run tree's test_data before the run
+sh dev/scripts/r2_bars.sh pull-dir --dest "$PWD/.sweep-output/warehouse/corpact" --name corpact-2026-10-27
+tar -xzf .sweep-output/warehouse/corpact/corpact.tar.gz -C <run-tree>/trading/test_data
+```
+
+Check `find <run-tree>/trading/test_data -name dividends.csv | wc -l` against the local chain's
+`staged N dividends.csv` line (11,880 for corpact-2026-10-27).
 
 ## Building and testing inside a session
 
