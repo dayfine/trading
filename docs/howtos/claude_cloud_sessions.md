@@ -126,9 +126,10 @@ They are in R2 as one tarball, `warehouse/corpact-2026-10-27/corpact.tar.gz` (23
 ```sh
 # local, once per refresh of data/: pack and upload (bump the name's date)
 D=.sweep-output/warehouse/corpact; mkdir -p $D
-(cd data && find . \( -name dividends.csv -o -name splits.csv \) | LC_ALL=C sort > ../$D/files.txt \
-  && tar -czf ../$D/corpact.tar.gz -T ../$D/files.txt)
-sh dev/scripts/r2_bars.sh push-dir --dir "$PWD/$D" --name corpact-2026-10-27
+(cd data && find . \( -name dividends.csv -o -name splits.csv \) | LC_ALL=C sort > ../$D/src.txt \
+  && tar -czf ../$D/corpact.tar.gz -s ",^\./\([^/]*\)/D/\([^/]*_old\)/,./\1/d/\2/," -T ../$D/src.txt) \
+  && tar -tzf $D/corpact.tar.gz > $D/files.txt
+sh dev/scripts/r2_bars.sh push-dir --dir "$PWD/$D" --name corpact-2026-10-27 --force
 # cloud session: pull, then unpack into the run tree's test_data before the run
 sh dev/scripts/r2_bars.sh pull-dir --dest "$PWD/.sweep-output/warehouse/corpact" --name corpact-2026-10-27
 tar -xzf .sweep-output/warehouse/corpact/corpact.tar.gz -C <run-tree>/trading/test_data
@@ -136,6 +137,13 @@ tar -xzf .sweep-output/warehouse/corpact/corpact.tar.gz -C <run-tree>/trading/te
 
 Check `find <run-tree>/trading/test_data -name dividends.csv | wc -l` against the local chain's
 `staged N dividends.csv` line (11,880 for corpact-2026-10-27).
+
+The `-s` rewrite matters. `Csv_storage.symbol_data_dir` shards by the symbol's first and last
+character, case-sensitively, so `LZ_old` lives in `L/d/LZ_old`. On the Mac's case-insensitive disk
+`data/L/d` and `data/L/D` are one directory and `find` prints it as `L/D`; on Linux the run then
+finds none of the 235 `*_old` symbols' files and credits no dividend for them. The second rk-k0 cloud
+run lost LZ_old's $846.56 on 2004-08-06 this way (`dividendmissingfilecount` 8, #3535). The set
+was re-uploaded with the rewrite on 2026-11-09.
 
 ## Building and testing inside a session
 
