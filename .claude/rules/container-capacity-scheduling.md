@@ -1,6 +1,8 @@
 # Container capacity scheduling — keeping the pipe full without killing the runs
 
-`trading-1-dev` is a **fixed, shared 7.75 GB / ~8-core resource**. Every kind of
+`trading-1-dev` is a **fixed, shared 5 GB / 6-CPU resource** (7.75 GB / 10 CPUs until 2026-11-08, when
+backtests moved to cloud sessions by default, `docs/howtos/claude_cloud_sessions.md`; a 26y or other
+long run goes to the cloud, and runs locally only after raising the VM back). Every kind of
 work in this repo draws on it differently, and the failure mode is silent: an
 OOM-killed backtest child writes no exception, no `Killed` line, no stack — the
 scenario just reports `FAIL (scenario crashed or did not write actual.sexp)` and
@@ -26,7 +28,7 @@ mutually exclusive; dispatcher-side work is free and should fill every gap.**
 ## GHA runner — memory-bound, not the local Cap 3
 
 The table above is calibrated to `trading-1-dev`, the **local** devcontainer
-(7.75 GB / ~8 cores). The **GHA runner** is a different, tighter resource:
+(5 GB / 6 CPUs). The **GHA runner** is a different, tighter resource:
 **15 GB total** (`free -g`), and it is **memory-bound, not core-bound** — the
 "Cap 3" agent ceiling above does not transfer to it as-is.
 
