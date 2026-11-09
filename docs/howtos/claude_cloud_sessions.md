@@ -5,6 +5,11 @@ local session launches work in it. Cloud sessions are a second worker beside the
 local `trading-1-dev` container, which fits one backtest at a time and nothing
 beside it (`.claude/rules/container-capacity-scheduling.md`).
 
+**Backtests run here by default** (since 2026-11-09, when the 26y record cell `rk-k0` reproduced
+byte-identically from the R2 warehouse, #3535): chains, seeds and grids launch as cloud sessions with
+the warehouse and corporate actions pulled from R2 as below. The local container is for QC builds,
+interactive debugging and the Weinstein book, and is the fallback when a run needs data not yet in R2.
+
 ## The environment
 
 One environment, **Default** (`env_011CV2KYxeXLs26U85qQo3rV`), configured in the
@@ -126,10 +131,9 @@ They are in R2 as one tarball, `warehouse/corpact-2026-10-27/corpact.tar.gz` (23
 ```sh
 # local, once per refresh of data/: pack and upload (bump the name's date)
 D=.sweep-output/warehouse/corpact; mkdir -p $D
-(cd data && find . \( -name dividends.csv -o -name splits.csv \) | LC_ALL=C sort > ../$D/src.txt \
-  && tar -czf ../$D/corpact.tar.gz -s ",^\./\([^/]*\)/D/\([^/]*_old\)/,./\1/d/\2/," -T ../$D/src.txt) \
-  && tar -tzf $D/corpact.tar.gz > $D/files.txt
-sh dev/scripts/r2_bars.sh push-dir --dir "$PWD/$D" --name corpact-2026-10-27 --force
+(cd data && find . \( -name dividends.csv -o -name splits.csv \) | LC_ALL=C sort > ../$D/files.txt \
+  && tar -czf ../$D/corpact.tar.gz -T ../$D/files.txt)
+sh dev/scripts/r2_bars.sh push-dir --dir "$PWD/$D" --name corpact-2026-10-27
 # cloud session: pull, then unpack into the run tree's test_data before the run
 sh dev/scripts/r2_bars.sh pull-dir --dest "$PWD/.sweep-output/warehouse/corpact" --name corpact-2026-10-27
 tar -xzf .sweep-output/warehouse/corpact/corpact.tar.gz -C <run-tree>/trading/test_data
@@ -138,12 +142,19 @@ tar -xzf .sweep-output/warehouse/corpact/corpact.tar.gz -C <run-tree>/trading/te
 Check `find <run-tree>/trading/test_data -name dividends.csv | wc -l` against the local chain's
 `staged N dividends.csv` line (11,880 for corpact-2026-10-27).
 
-The `-s` rewrite matters. `Csv_storage.symbol_data_dir` shards by the symbol's first and last
-character, case-sensitively, so `LZ_old` lives in `L/d/LZ_old`. On the Mac's case-insensitive disk
-`data/L/d` and `data/L/D` are one directory and `find` prints it as `L/D`; on Linux the run then
-finds none of the 235 `*_old` symbols' files and credits no dividend for them. The second rk-k0 cloud
-run lost LZ_old's $846.56 on 2004-08-06 this way (`dividendmissingfilecount` 8, #3535). The set
-was re-uploaded with the rewrite on 2026-11-09.
+**A build from before #3510 (2026-11-02) needs one more step.** Shard folders use the symbol's first
+and last character, upper-cased since #3510 (`LZ_old` in `L/D/LZ_old`, as packed). Older builds, such
+as the record SHA `fc78391dd`, use the raw last character and look in `L/d/LZ_old`; on Linux they find
+none of the 235 `*_old` symbols' files and credit no dividend for them, with no error
+(`dividendmissingfilecount` 8 and a 1311.40 % vs 1312.79 % rk-k0 run, #3535). For such a build, after
+unpacking:
+
+```sh
+(cd <run-tree>/trading/test_data && for p in */D/*_old; do
+  mkdir -p "${p%%/*}/d" && mv "$p" "${p%%/*}/d/"; done)
+```
+
+With that step the rk-k0 cloud run matched the record byte-identically (2026-11-09).
 
 ## Building and testing inside a session
 
