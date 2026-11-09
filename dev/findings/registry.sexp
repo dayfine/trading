@@ -434,6 +434,6 @@
  (status open))
 ((issue 2973) (ref "split corpus volume column: ranker volume check drops GMCR's 3:1")
  (finding "Dollar_volume_basis.applied_splits drops GMCR's 2010-05-18 3:1 as stored volume not restated (10-bar median volume jump share ~0.66 >= volume_raw_min_share 0.5), so both true-dollar consumers (the PIT ranker's True_dollars and the armed Liquidity_metric via True_dollar_divisor, same rule) read GMCR's pre-split bars as raw close x stored volume: 3x the no-split tape if the store volume is restated as the corpus assumes. The window cannot settle which side is wrong: mean jump share 0.21 / 0.35 / 0.45 / 0.70 over 20 / 40 / 60 / 100 bars, a genuine 2010 volume rise or a raw-volume delisted file")
- (guard none)
- (reason "found by the split corpus volume column (test_split_corpus_volume.ml excludes GMCR-2010-05-18 from the dollar-volume columns); resolving it needs GMCR's full store file (local) to tell raw from restated volume, then either a corpus note or a sturdier volume check; follow-up on #2973")
+ (guard ((unit ("trading/trading/weinstein/split_corpus/test/test_split_corpus_volume.ml"
+                "ranker_drops_gmcr_2010_split_pending_finding"))))
  (status open))
