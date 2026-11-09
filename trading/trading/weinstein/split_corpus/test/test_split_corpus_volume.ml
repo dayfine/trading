@@ -14,8 +14,9 @@
     ex-date on the store tape and not on the no-split tape. Three consumers:
 
     - {b Breakout volume ratio} ([Volume.analyze_breakout] over weekly bars, the
-      screener's confirmation, and [Volume.classify_breakout], the at-fill eject
-      runner's): same ratio and same verdict at every week.
+      screener's confirmation, and [Volume.confirms_breakout], the verdict the
+      at-fill eject runner reads through its named form
+      [Volume.classify_breakout]): same ratio and same verdict at every week.
     - {b Strategy dollar-ADV} ([Liquidity_metric.dollar_adv], the entry gate,
       the held-position exit and the short-borrow gate), armed with the split
       divisor as [Liquidity_config.true_dollar_volume] arms it ([F] over the
@@ -279,6 +280,27 @@ let test_mixed_dollar_adv_steps_every_split _ =
          List.map entry.meta.splits ~f:(_mixed_adv_step_share entry)))
     (each (ge (module Float_ord) _min_step_share))
 
+(** Tripwire for {!_volume_basis_unresolved}: the ranker's volume check
+    currently drops GMCR's 2010-05-18 3:1 (the vendor record carries it, the
+    applied list is empty). If the check changes and applies the split, this
+    fails, flagging the exclusion as stale rather than letting it mask a
+    now-resolvable entry. *)
+let test_ranker_drops_gmcr_2010_split_pending_finding _ =
+  let entry = _load "GMCR-2010-05-18" in
+  assert_that
+    (_vendor_splits entry.meta, _applied_splits entry)
+    (all_of
+       [
+         field fst
+           (elements_are
+              [
+                equal_to
+                  ({ date = Date.of_string "2010-05-18"; factor = 3.0 }
+                    : Corporate_actions.split);
+              ]);
+         field snd (elements_are []);
+       ])
+
 let _per_entry ?(entries = _entries) label test =
   List.map entries ~f:(fun name ->
       Printf.sprintf "%s/%s" label name >:: test name)
@@ -301,6 +323,8 @@ let suite =
            "raw_volume_steps_every_split" >:: test_raw_volume_steps_every_split;
            "mixed_dollar_adv_steps_every_split"
            >:: test_mixed_dollar_adv_steps_every_split;
+           "ranker_drops_gmcr_2010_split_pending_finding"
+           >:: test_ranker_drops_gmcr_2010_split_pending_finding;
          ]
 
 let () = run_test_tt_main suite
