@@ -6,7 +6,8 @@
   test_split_corpus_scan
   test_split_corpus_entry_ticket
   test_split_corpus_stop_fill
-  test_split_corpus_stops_runner)
+  test_split_corpus_stops_runner
+  test_split_corpus_volume)
  (libraries
   core
   types
@@ -23,6 +24,9 @@
   weinstein.support
   weinstein.screener
   weinstein.macro
+  weinstein.volume
+  universe
+  csv.corporate_actions
   weinstein_trading.stops
   weinstein_trading.portfolio_risk
   weinstein_trading.strategy
