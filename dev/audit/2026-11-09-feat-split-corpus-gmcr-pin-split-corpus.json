@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-09",
+  "feature": "split-corpus",
+  "branch": "feat/split-corpus-gmcr-pin",
+  "sha": "3c33cdf97c8fa4f051b9e3c58bc3879d1b0e4265",
+  "recorded_at_ns": 1794267950468627984,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
