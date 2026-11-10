@@ -1,0 +1,165 @@
+;; chain-w-2026-11-10: goldens-sp500/sp500-2019-2023-long-only.sexp plus ONE override line, split_raw_confirm_min_share (0.5) (issues #3109/#3104).
+;; Flip arm of a config-default-blast-radius.md paired golden run; the base arm is the golden file itself at the run SHA.
+;; Staging scenario, NOT a golden: its perf-tier lines are dropped so no tier discovers it. chain.sh launch checks the diff.
+;; variant of [sp500-2019-2023]. Same period (2019-2023) and universe; only
+;; difference is [enable_short_side = false]. Weekly cadence, ≤2 h budget.
+;;
+;; Long-only counterpart to [sp500-2019-2023.sexp]. Tracking both lets us
+;; isolate whether strategy issues are short-side-specific or general:
+;;
+;;   * If long-only PASSes pins but the with-shorts variant FAILs → issue is
+;;     in short-side machinery (e.g., G15 short-side risk control).
+;;   * If both FAIL similarly → issue is in shared strategy components
+;;     (e.g., G14 screener resistance calc / Position.t entry_price).
+;;
+;; Pinned ranges intentionally TIGHT — they target the "fully fixed" state,
+;; not current behavior. Both variants currently FAIL these pins. The
+;; long-only FAIL surfaces G14 explicitly (~6 spurious Per_position
+;; force-liqs from the screener / Position.t price-space mismatch — see
+;; dev/notes/g14-deep-dive-2026-05-01.md).
+;;
+;; Pinned values mirror [sp500-2019-2023.sexp] expected ranges: same 5-year
+;; period, same universe, and the long-only side is a strict subset of the
+;; with-shorts strategy. The "ideal" long-only profile should be ≈ the
+;; with-shorts baseline modulo the short-side contribution, which has
+;; historically been small (PR #711 measured 4 short trades / 32 total).
+;; If long-only diverges meaningfully from this target post-fix, re-pin
+;; once empirical data justifies it.
+;;
+;; Current measured baseline 2026-05-01 (post-G12+G13, pre-G14/G15):
+;;   total_return_pct  65.03   total_trades 136   win_rate 37.50
+;;   sharpe_ratio       0.62   max_drawdown 31.78  avg_holding_days 69.51
+;;   open_positions_value 1,481,963  force_liquidations 6 (all Per_position, G14)
+;;
+;; (Pre-rename the [unrealized_pnl] field above carried mtm-value semantics —
+;; the same quantity now exposed as [Metric_types.OpenPositionsValue]. The
+;; corrected [UnrealizedPnl] metric (open positions value minus cost basis)
+;; was first emitted in PR feat/metrics-unrealized-pnl-rename; on the
+;; long-only baseline measured 2026-04-30 it was +$421,922.)
+;;
+;; The 31.8% MaxDD vs the pin's 3..9% target reflects the strategy's
+;; drawdown profile WITHOUT the (spurious) Portfolio_floor brake. Whether
+;; that gap is closed by fixing G14 alone, or whether it requires a real
+;; risk control (G15-style for longs), is part of what these pins surface.
+((name "cw-g-sp500-2019-2023-long-only-rc")
+ (description "S&P 500 over 2019-2023 — long-only — Cell E config")
+ (period ((start_date 2019-01-02) (end_date 2023-12-29)))
+ (universe_path "universes/sp500.sexp")
+ (universe_size 503)
+ ;; Cell E rollout 2026-05-11: applies the new standard strategy config
+ ;; (max_position_pct_long=0.30, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+ ;; stage3 force-exit h=1, laggard rotation h=2). Replaces prior 0.30/0.90/0.10
+ ;; default-sized baseline (79.74% / 74 trades / 30.8% DD).
+ ;; Measured 2026-05-12 (Cell E, post-#1052 force-liq fix + #1053 metric schema):
+ ;;   total_return_pct   66.54  total_trades 248   win_rate 39.11
+ ;;   sharpe_ratio       0.68   max_drawdown 24.09 avg_holding_days  41.95
+ ;;   open_positions_value 1,401,130
+ ;;   sortino_ratio_annualized 0.95   calmar_ratio 0.45   ulcer_index 8.61
+ ;; MaxDD cut 6.7pp (31 → 24), trade count 3.4x. Tolerances ±15%.
+ (config_overrides
+  (((cash_yield No_yield)) ;; #3137: price-only pin, keeps this regression golden byte-identical
+   ((dividend_crediting false) (split_dividend_guard false))
+   ((split_raw_confirm_min_share (0.5))) ;; #3137/#3173: no-dividend pin, keeps the metric set byte-identical
+   ((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.30))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Deviations from the live weekly-picks config
+ ;; (dev/weekly-picks/live-config-overrides.sexp), enforced by the
+ ;; golden_live_drift linter (#2403). Data-only: Scenario.t is
+ ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
+ (deviates_from_live
+  ((cash_yield "price-only regression pin (#3137); the code default (and live config) arm the 3-month T-bill series")
+   (dividend_crediting "no-dividend regression pin (#3137); the code default (and live config) credit cash dividends")
+   (split_dividend_guard "no-guard regression pin (#3173); the code default (and live config) reject dividend-shaped splits")
+   (enable_short_side "long-only cell: arms the short leg off; the code default (and therefore live) is on")
+   (portfolio_config "record-convention concentration arming (exposure 0.70 / min_cash 0.30, plus position 0.14 where armed); live runs the code defaults")
+   (enable_stage3_force_exit "record-convention Stage-3 force-exit arming; live leaves it default-off")
+   (stage3_force_exit_config "hysteresis_weeks 1 belongs to the arming above; the code default is 2")
+   (enable_laggard_rotation "record-convention laggard-rotation arming; live leaves it default-off")
+   (laggard_rotation_config "hysteresis_weeks 2 belongs to the arming above; the code default is 4")
+   (extension_stop_config "live arms the extension-stop insurance (trigger 2.0 / trail 0.25, ledger 2026-07-14-extension-stop-insurance-accept); this cell pins the pre-insurance basis")
+   (reject_declining_ma_long_entry "live arms the declining-MA long-entry rejection (#1775); this cell pins the pre-arming basis")
+   (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
+   (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
+   (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
+   (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
+   (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
+   (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
+   (rename_detect_match_fraction "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")))
+ ;; Cost-model overlay (PR #1260 wiring). See goldens-small/bull-crash-2015-2020.sexp
+ ;; for the full rationale. [retail_default] with per_trade=0 is byte-equal
+ ;; to [None] under current wiring; spread / per_share activate once
+ ;; [Cost_model.to_engine_costs] is wired into [Panel_runner].
+ (cost_model
+  ((per_trade_commission 0.0)
+   (per_share_commission 0.0)
+   (bid_ask_spread_bps 5.0)
+   (market_impact_bps_per_pct_adv 0.0)))
+ (expected
+  ;; Re-pinned 2026-08-24 for the book-faithful stops basis (PR #2530:
+  ;; initial_stop_buffer 1.0 + reset_anchor_on_stalled_cycle default-on;
+  ;; user-directed #2486; ledger 2026-08-24-stops-basis-book-faithful).
+  ;; ±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
+  ;; Re-pinned 2026-06-25 for the concentration=0.30 promotion (max_position_pct_long
+  ;; 0.14 -> 0.30, the production default; broad top-3000 WF-CV ACCEPT, ledger
+  ;; 2026-06-25-capacity-concentration-broad). Measured against test_data (the
+  ;; golden-runs-sp500-15y store), ±15% around 0.30 actuals:
+  ;;   ret 41.13  trades 207  win 37.2  sharpe 0.47  maxDD 38.96  hold 45.86
+  ;;   sortino 0.58  calmar 0.18  ulcer 15.46
+  ;; vs prior 0.14 pin (ret 26 / maxDD 31): 0.30 = the honest production risk profile
+  ;; (higher return AND higher DD); the 0.14 override understated it.
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
+  ;;   ret 16.38  trades 203  win 38.42  sharpe 0.26  maxDD 41.69  hold 43.14
+  ;;   OPV 870,207  sortino 0.25  calmar 0.074  ulcer 16.31
+  ;; Return 41→16% while the with-shorts twin held ~46%: on this window the
+  ;; RS-honest early-2019 cohort rides COVID unhedged (DD ~42%) — the known
+  ;; high-dispersion signature of concentration 0.30, now on the honest RS basis.
+  ;; Verified INERT under the 2026-07-11 REALISM-DEFAULTS flip (user mandate;
+  ;; min_entry_dollar_adv 0.0→1e6 + stale_exit_after_days None→Some 5; ledger
+  ;; 2026-07-10-realism-defaults-flip): re-measured = BIT-IDENTICAL to the 364 pin
+  ;; (16.38% / 203 / 38.42 / 0.26 / 41.69 / 43.14 / OPV 870,207 / force_liqs 2).
+  ;; SP500 universe is liquid → entry gate + stale-exit no-op. Bands unchanged.
+  ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
+  ;; 52->56 makes the trend classifier + its FOUR consumers live for the
+  ;; first time; the 4 deeper bars also reach volume/breakout detection).
+  ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
+  ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
+  ;; record, NO return-improvement claim attaches to these deltas -- the
+  ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
+
+  ;; RE-PINNED 2026-08-26 for the fill-model default flip (PR #2569:
+
+  ;; enable_sim_entry_stoplimit + entry_extension_max_pct 2.0 as the
+
+  ;; default pair -- USER-directed fidelity decision, #2405 precondition;
+
+  ;; entries now rest as StopLimit tickets like live). +-15% around the
+
+  ;; paired-sweep actuals at PR tip aa4a513e2 (local pinned worktree,
+
+  ;; committed store). NO return claim: the swings are entry-timing
+
+  ;; reshuffles on regression pins, not evidence about the fill model.
+
+
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
+  ;; RE-PINNED 2026-10-13 for the #3266 ISO week-year bucketing fix (a week crossing 1 January is one weekly bar). +-15% around the new actual (total_return_pct: at least +-5pp); paired main-vs-branch table in the PR. Correctness re-pin: no return claim attaches to the delta.
+  ;; RE-PINNED 2026-10-25 for the Seeded candidate_ranking default (#3425; ties broken by a seeded hash, not by symbol name). +-15% (total_return_pct: at least +-5pp) around the Seeded actual, failing metrics only; Alphabetical->Seeded: ret 15.33->31.25, sharpe 0.249->0.358, OPV 1,151,446->925,413, sortino 0.219->0.378, calmar 0.099->0.186 (GHA 40232165563 vs main 40229425989). Tie-order path change: no return claim.
+  ;; RE-PINNED 2026-10-31 for the same-day fill insertion order (#3483, #3477). +-15% around the new actual (total_return_pct: at least +-5pp). Base 1323351cc -> PR c65897fdf: ret 31.25->26.75, trades 153->155, DD 30.16->32.56. A same-day order change is one draw of the path (dev/experiments/path-stability-2026-10-23/): no return claim attaches to the delta.
+  ((total_return_pct ((min 21.7540) (max 31.7540)))
+   (total_trades ((min 131.7500) (max 178.2500)))
+   (win_rate ((min 26.3226) (max 35.6129)))
+   (sharpe_ratio ((min 0.2778) (max 0.3759)))
+   (max_drawdown_pct ((min 27.6759) (max 37.4438)))
+   (avg_holding_days ((min 49.3494) (max 66.7668)))
+   (open_positions_value ((min 759730.7055) (max 1027870.9545)))
+   (sortino_ratio_annualized ((min 0.2822) (max 0.3819)))
+   (calmar_ratio ((min 0.1271) (max 0.1719)))
+   (ulcer_index ((min 12.2696) (max 16.6001)))
+   (wall_seconds       ((min 0.0)          (max 1500.0))))))
