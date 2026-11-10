@@ -250,7 +250,8 @@ let _record_stop_decision ~trade_audit ~stop_log
   Trade_audit.record_stop_decision trade_audit d;
   Option.iter stop_log ~f:(fun log ->
       Stop_log.record_stop_decision log ~position_id:d.position_id
-        ~stop_before:d.stop_before ~stop_after:d.stop_after)
+        ~stop_before:d.stop_before ~stop_after:d.stop_after
+        ~tighten_trigger:d.tighten_trigger)
 
 (* #2989: copy the original placement row forward under the re-issued id, and
    book its installed stop there too (the re-issue re-installs the same plan). *)

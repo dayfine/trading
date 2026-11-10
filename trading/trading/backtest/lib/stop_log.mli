@@ -210,6 +210,15 @@ type stop_info = {
           happens to occur after a split still counts, because it is compared
           against the (already rescaled) previous level, not against a pre-split
           one. *)
+  tighten_trigger : Weinstein_stops.Tighten_trigger.t option; [@sexp.option]
+      (** Why the stop state machine tightened this position's stop (Stage 3/4,
+          a flat or falling 30-week MA in Stage 2, or the short-side mirror),
+          taken from the latest {!record_stop_decision} that carried one. [None]
+          when the stop never tightened, or when no stop decision was recorded.
+          A position leaves [Tightened] only by exiting, so this is the one
+          trigger behind every tightened move. Reporting only: no [trades.csv]
+          column reads it. [@sexp.option] keeps snapshots written before this
+          field existed readable. *)
 }
 [@@deriving show, eq, sexp]
 (** Stop information for a single round-trip trade. Keyed by position_id so it
@@ -281,7 +290,12 @@ val record_stop_move : t -> position_id:string -> level:float -> unit
     {!stop_info.n_stop_raises} when strictly so. *)
 
 val record_stop_decision :
-  t -> position_id:string -> stop_before:float -> stop_after:float -> unit
+  t ->
+  position_id:string ->
+  stop_before:float ->
+  stop_after:float ->
+  tighten_trigger:Weinstein_stops.Tighten_trigger.t option ->
+  unit
 (** Observe one advance of the position's stop state machine: the level it held
     going into the step ([stop_before]) and the level it left ([stop_after]).
     The backtest wires this to [Audit_recorder.t.record_stop_decision] (issue
@@ -307,7 +321,12 @@ val record_stop_decision :
     split for a short (stop moved {e down}), reads as a raise {e here}: this
     function sees levels, not the split factor, so it cannot tell the two apart.
     When the backtest wires {!record_stop_split}, the rescale arrives first and
-    this function sees no gap at all. *)
+    this function sees no gap at all.
+
+    [tighten_trigger] is the decision's
+    [Weinstein_stops.Stop_decision.t.tighten_trigger]; a [Some] replaces
+    {!stop_info.tighten_trigger}, a [None] leaves it as it was. It never affects
+    any stop level or count. *)
 
 val record_stop_split : t -> position_id:string -> factor:float -> unit
 (** Observe a split rescale of [position_id]'s stop (issue #3127). The backtest

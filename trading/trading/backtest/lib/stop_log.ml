@@ -13,6 +13,7 @@ type stop_info = {
   exit_trigger : exit_trigger option;
   max_stop : float option;
   n_stop_raises : int;
+  tighten_trigger : Weinstein_stops.Tighten_trigger.t option; [@sexp.option]
 }
 [@@deriving show, eq, sexp]
 
@@ -30,6 +31,9 @@ type _pos_record = {
   mutable pos_seen_decision : bool;
       (* Whether {!record_stop_decision} has fired for this position yet: the
          first one is the fill-time seed of the stop machine. *)
+  mutable pos_tighten_trigger : Weinstein_stops.Tighten_trigger.t option;
+      [@sexp.option]
+      (* The latest trigger a stop decision reported (reporting only). *)
 }
 [@@deriving sexp]
 
@@ -58,6 +62,7 @@ let _fresh_record ~symbol =
     pos_max_stop = None;
     pos_n_stop_raises = 0;
     pos_seen_decision = false;
+    pos_tighten_trigger = None;
   }
 
 let _ensure_record t ~position_id ~symbol =
@@ -227,11 +232,14 @@ let record_stop_split t ~position_id ~factor =
       r.pos_current_stop <- rescale r.pos_current_stop;
       r.pos_max_stop <- rescale r.pos_max_stop)
 
-let record_stop_decision t ~position_id ~stop_before ~stop_after =
+let record_stop_decision t ~position_id ~stop_before ~stop_after
+    ~tighten_trigger =
   let record = _ensure_record t ~position_id ~symbol:"" in
   if record.pos_seen_decision then _resync_to_machine record ~level:stop_before
   else _reseed_at_fill record ~level:stop_before;
   record.pos_seen_decision <- true;
+  Option.iter tighten_trigger ~f:(fun trigger ->
+      record.pos_tighten_trigger <- Some trigger);
   _install_stop record ~level:stop_after ~is_raise_candidate:true
 
 let _record_to_info ~position_id record : stop_info =
@@ -244,6 +252,7 @@ let _record_to_info ~position_id record : stop_info =
     exit_trigger = record.pos_exit_trigger;
     max_stop = record.pos_max_stop;
     n_stop_raises = record.pos_n_stop_raises;
+    tighten_trigger = record.pos_tighten_trigger;
   }
 
 let get_stop_infos t : stop_info list =

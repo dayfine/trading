@@ -321,6 +321,7 @@ let test_sexp_round_trip _ =
       last_correction_extreme = None;
       ma_value = 95.0;
       reason = D.Raised;
+      tighten_trigger = None;
     }
   in
   assert_that (D.t_of_sexp (D.sexp_of_t d)) (equal_to d)

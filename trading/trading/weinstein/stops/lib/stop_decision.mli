@@ -133,6 +133,15 @@ type t = {
           it has one. *)
   ma_value : float;  (** [step.ma_value]. *)
   reason : reason;
+  tighten_trigger : Tighten_trigger.t option; [@sexp.option]
+      (** Why the stop is tightened, on every step whose state is [Tightened]
+          before or after it: the [Entered_tightening] that installed it, each
+          [Tightened_ratchet] / [Tightened_hold] after, and a [Stop_hit] from
+          [Tightened]. [None] on every other step, and when the [Tightened]
+          state carries a reason string the state machine never writes
+          ({!Tighten_trigger.of_reason}). Reporting only. [@sexp.option] omits
+          it when [None] and reads an absent field as [None], so stop decisions
+          written before this field existed still parse. *)
 }
 [@@deriving eq, sexp]
 (** One stop decision for one held position. *)

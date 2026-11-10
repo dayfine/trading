@@ -10,6 +10,7 @@ module Vol_scaled_stop = Vol_scaled_stop
 module Catastrophic_stop = Catastrophic_stop
 module Extension_stop = Extension_stop
 module Stop_decision = Stop_decision
+module Tighten_trigger = Tighten_trigger
 
 (* ---- Stop level extraction ---- *)
 
@@ -88,35 +89,37 @@ let _is_recovery = Stop_geometry.is_recovery
 
 (* ---- Tightening trigger checks ---- *)
 
-(* Long: tighten when stock enters topping/declining territory or MA deteriorates.
-   Returns (should_tighten, reason). *)
-let _should_tighten_long ~config ~ma_direction ~stage : bool * string =
+(* Long: tighten when stock enters topping/declining territory or MA
+   deteriorates. [None] = no tightening. *)
+let _should_tighten_long ~config ~ma_direction ~stage : Tighten_trigger.t option
+    =
   match stage with
-  | Stage3 _ | Stage4 _ -> (true, "Stage 3/4 detected")
-  | Stage1 _ -> (false, "")
-  | Stage2 _ ->
-      if config.tighten_on_flat_ma then
+  | Stage3 _ | Stage4 _ -> Some Tighten_trigger.Stage3_or_4
+  | Stage1 _ -> None
+  | Stage2 _ -> (
+      if not config.tighten_on_flat_ma then None
+      else
         match ma_direction with
-        | Flat -> (true, "30-week MA flattening")
-        | Declining -> (true, "30-week MA falling in Stage 2")
-        | Rising -> (false, "")
-      else (false, "")
+        | Flat -> Some Tighten_trigger.Ma_flat_in_stage2
+        | Declining -> Some Tighten_trigger.Ma_falling_in_stage2
+        | Rising -> None)
 
 (* Short: tighten when stock shows bullish recovery (Stage 1/2) or MA turns up.
-   Returns (should_tighten, reason). *)
-let _should_tighten_short ~config ~ma_direction ~stage : bool * string =
+   [None] = no tightening. *)
+let _should_tighten_short ~config ~ma_direction ~stage :
+    Tighten_trigger.t option =
   match stage with
-  | Stage1 _ | Stage2 _ -> (true, "Stage 1/2 detected")
-  | Stage3 _ -> (false, "")
-  | Stage4 _ ->
-      if config.tighten_on_flat_ma then
+  | Stage1 _ | Stage2 _ -> Some Tighten_trigger.Stage1_or_2
+  | Stage3 _ -> None
+  | Stage4 _ -> (
+      if not config.tighten_on_flat_ma then None
+      else
         match ma_direction with
-        | Rising -> (true, "30-week MA rising in Stage 4")
-        | Flat -> (true, "30-week MA flattening in Stage 4")
-        | Declining -> (false, "")
-      else (false, "")
+        | Rising -> Some Tighten_trigger.Ma_rising_in_stage4
+        | Flat -> Some Tighten_trigger.Ma_flat_in_stage4
+        | Declining -> None)
 
-let _should_tighten ~config ~side ~ma_direction ~stage : bool * string =
+let _should_tighten ~config ~side ~ma_direction ~stage =
   match side with
   | Long -> _should_tighten_long ~config ~ma_direction ~stage
   | Short -> _should_tighten_short ~config ~ma_direction ~stage
@@ -170,12 +173,10 @@ let _to_trailing ~config ~side ~ma_value ~stop_level ~bar =
    or [None] if no tightening is warranted. *)
 let _check_tighten ~config ~side ~stop_level ~correction_extreme ~ma_direction
     ~stage =
-  let should_tighten, reason =
-    _should_tighten ~config ~side ~ma_direction ~stage
-  in
-  if should_tighten then
-    Some (_to_tightened ~config ~side ~stop_level ~correction_extreme ~reason)
-  else None
+  _should_tighten ~config ~side ~ma_direction ~stage
+  |> Option.map ~f:(fun trigger ->
+      _to_tightened ~config ~side ~stop_level ~correction_extreme
+        ~reason:(Tighten_trigger.to_reason trigger))
 
 (* Handles the stop-hit and tightening checks shared by Initial and Trailing states.
    Returns [Some (new_state, event)] if the stop was hit or tightening triggered,

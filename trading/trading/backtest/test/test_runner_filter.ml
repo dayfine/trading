@@ -447,6 +447,7 @@ let _stop_info ?entry_date ~position_id ~symbol () : Backtest.Stop_log.stop_info
     exit_trigger = None;
     max_stop = Some 100.0;
     n_stop_raises = 0;
+    tighten_trigger = None;
   }
 
 let test_filter_stop_infos_drops_warmup_entries _ =

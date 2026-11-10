@@ -47,6 +47,11 @@ module Extension_stop = Extension_stop
     ({!Extension_stop_runner}) feeds it the holding-window series. See the
     module doc for the contract. *)
 
+module Tighten_trigger = Tighten_trigger
+(** The typed trigger behind a [Tightened] state (Stage 3/4, MA flat or falling
+    in Stage 2; the short mirror). Its {!Tighten_trigger.to_reason} strings are
+    the reason strings {!update} records. *)
+
 module Stop_decision = Stop_decision
 (** Observability record for one {!update} call: stop before -> after, state,
     correction bookkeeping, the MA read, and a reason tag naming the decision

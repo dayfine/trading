@@ -107,6 +107,7 @@ let make_stop_info ~position_id ~symbol
     exit_trigger;
     max_stop;
     n_stop_raises;
+    tighten_trigger = None;
   }
 
 (* stage_label --------------------------------------------------------- *)
