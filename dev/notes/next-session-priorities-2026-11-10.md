@@ -1,6 +1,6 @@
 # Next-session priorities — 2026-11-10 (supersedes 2026-11-08)
 
-Session 2026-11-08 → 11-10 (one continuous session), handoff written 09:45 PT 11-10. Open issues: **14**. Main CI green.
+Session 2026-11-08 → 11-10 (one continuous session), handoff written 09:45 PT 11-10. Open issues: **9** (14 at the start of 11-10; #3381 closed, #3145 and #3206 closed with the parked shorts track, #3487 folded into #3384, #3215 into #3239). Main CI green.
 No open PRs.
 
 ## 0. Ground rules (changed)
@@ -28,7 +28,12 @@ No open PRs.
 
 ## 2. In flight
 
-None.
+| what | where | next |
+|---|---|---|
+| chain-w pre-registration (#3136, #3109, #3183) | cloud routine `trig_014rRpBE1DdTBCerq5azqZeQ` | review the PR, then launch the cells in the cloud |
+| Stop_decision `Tightened` trigger (walkthrough D3) | cloud routine `trig_01JNcKJ4bTahDNtG5MDwpFPg` | QC structural, behavioral, merge; then screen the 38 near-tightening stop exits |
+| pack detectors: stop < 2 % of E, E ≥ 10 % under close, frozen trail | cloud routine `trig_01F2SG3iu9zcHTeVhF9Das5K` | QC, merge |
+| #3570 walkthrough decisions (docs) | PR | CI, merge |
 
 ## 3. Queue
 
@@ -43,6 +48,8 @@ None.
    (#3513, #3562). Refresh `trading/test_data/S/Y/SPY` past 09-28 (ops-data) before the next Monday run.
 5. #2973 split corpus: owned by another session.
 
-## 4. Decisions waiting
+## 4. Decisions taken 11-10 (user)
 
-None.
+- Trail: keep the de-facto rule; the v12wk + corpact-2026-10-27 vintage is part of the record identity (#3570).
+- Build the tightening reason and the three pack detectors (in flight above).
+- Backlog practice: every finding names its closing run; each weekly read closes or folds at least as many issues as it opens; small defects go into umbrellas #3384 and #3239.
