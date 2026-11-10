@@ -11,7 +11,7 @@
   record vs our 10.6 at the same 70% exposure — dilution, not selection.
 - Prior evidence (`project_capacity_concentration_surface`, 2026-06-25, sp500-PIT WF-CV, single path): concentration is a
   real, tail-amplifying lever with a return-for-drawdown trade-off; the 0.25 cell was a knife-edge above both neighbours and
-  read as path-dependent overfit; `max_long_exposure_pct` alone was inert because the cash floor binds. Neither was measured on
+  read as path-dependent overfit; `max_long_exposure_pct` alone was inert (it caps one position, not the book; the cash floor has no reader, corrected 2026-11-10). Neither was measured on
   the broad record with salts.
 
 ## Arms (specs/, run by chain-conc.sh; null = the committed `stop-width-by-state-2026-09-08/results/a0-breadth-on-null-s{0,1,2}-v10`)
@@ -65,9 +65,10 @@ retires the value on this base; the knob stays an axis (it already is one).
 - 22:12 PT: **c2-deploy85, salt 0** (wall 10,503 s; `results/c2-deploy85-s0-v10-*`) — **bit-identical to the null**:
   `trades.csv` identical row for row (all 710 trades, every column but `position_id`), every `actual.sexp` metric identical
   (382.74 / 710 / 0.445 / 37.60 / Calmar 0.163 / unrealised $777k), while `params.sexp` confirms the overrides took
-  (`max_long_exposure_pct` 0.85, `min_cash_pct` 0.15). The book never reaches the 70% exposure ceiling or the 30% cash
-  floor at `max_position_pct_long 0.14` (max nine concurrent names, positions sized below the cap by the risk-based sizer),
-  so neither knob binds. This reproduces the 06-25 finding (`project_capacity_concentration_surface`: exposure inert) on
+  (`max_long_exposure_pct` 0.85, `min_cash_pct` 0.15). Neither knob binds, but not for the reason first written here (corrected 2026-11-10,
+  `../decision-walk-rk-2026-11-06/` §4): `min_cash_pct` has no reader in the simulation path, and
+  `max_long_exposure_pct` only caps a single position, where `max_position_pct_long 0.14` is always smaller. There is
+  no aggregate ceiling; on the record the book exceeds 70 % invested on almost half of all days. This reproduces the 06-25 finding (`project_capacity_concentration_surface`: exposure inert) on
   the broad record and extends it to the cash floor. **Lane G2 stopped by the dispatcher after this cell**: salts 1–2 of
   an inert arm would reproduce the nulls digit for digit and cost ~5.8 h of container. **c2 = INERT; the "deploy more"
   lever does not exist at this per-position size** — deployment in a recovery is bound by per-position sizing and slot
