@@ -600,3 +600,17 @@ screens traced above list all 20.
 
 - 2026-10-27: pre-registered.
 - 2026-10-28: ran (5 of 5 included); read by results-analyst; pack rebuilt by hand (defect 2) and published.
+
+## Inert overrides (labelled 2026-11-10)
+
+Every `rk-k*.sexp` carries `((portfolio_config ((max_long_exposure_pct 0.70))))` and
+`((portfolio_config ((min_cash_pct 0.30))))`, inherited from rb1-26. Neither shapes the record:
+
+- `min_cash_pct` has no reader in the simulation path (`project_envelope_knobs_dead`).
+- `max_long_exposure_pct` is read only in `Portfolio_risk._max_shares_by_caps`, as a cap on one position's notional,
+  where `max_position_pct_long` 0.14 is always the smaller. It is not an aggregate ceiling: the book runs above 70 %
+  on almost half of all days and reaches about 100 % (2025-01-02: $16.09M of $16.15M NAV invested,
+  `../decision-walk-rk-2026-11-06/` D7).
+
+They stay in the specs so the files remain byte-identical to what ran. New specs built from this record should drop
+them.

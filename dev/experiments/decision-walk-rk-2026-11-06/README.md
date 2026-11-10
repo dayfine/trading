@@ -502,3 +502,20 @@ are D3 (decompose the tightening exits once the reason is recorded) and the repr
 ## Files
 
 Committed: this README, `walk-rk.sh` + `lib/` (host-only, ~3 min), and the text outputs under `out/` (`tables.txt`, `stops.txt`, `extras.txt`, `seeds.txt`, `walk-YEAR.txt`). Not committed: `out/records.txt` (8 MB audit dump) and the `.tsv` intermediates (some carry bar prices); `walk-rk.sh` regenerates them. Paths above under `.sweep-output/walk-rk-k0/` are the local run; `out/` here is a copy of the same files.
+
+## 7. Decisions (user, 2026-11-10)
+
+The user took the recommended option on each §5 item.
+
+1. **Trailing stop: (a), keep the de-facto rule.** The record's exit rule stays the initial structural stop, laggard
+   rotation and tightening, with the trail's adjusted-MA basis as it is. The adjusted-price vintage is part of the
+   record's identity: the record runs on the `v12wk` warehouse (9,236 symbols, R2 set `v12wk-9236`, built for the
+   #3266 rerun) with corporate actions `corpact-2026-10-27`. A bar or corporate-action refresh that adds later splits
+   can move old trades (the CVNA specimen), so a refresh is a re-baseline, never a silent swap. `stop_ma_same_basis`
+   stays a default-off axis; (b) is not run. `correction_must_follow_peak` is not run on its own.
+2. **Record the tightening reason:** build it (`Stop_decision.t` gains the `Tightened` trigger). The screen of the
+   38 near-tightening stop exits waits for that build.
+3. **Pack detectors:** build the three in §5 item 3.
+4. **Spec hygiene:** the two inert overrides are labelled, not dropped, so the committed specs stay byte-identical to
+   what ran: see `../record-kseed-2026-10-27/README.md` §"Inert overrides". The concentration-deploy README sentence is
+   corrected in place.
