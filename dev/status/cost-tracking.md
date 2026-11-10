@@ -108,6 +108,7 @@ records, `dev/reviews/codex-agreement.md`, and the week's cloud session runs
 
 | week | tok/merged PR | tok/QC verdict | resume share | main calls >250k | codex tok/finding | cloud runs (n / turns / wall h) | GHA $ | decision |
 |---|---|---|---|---|---|---|---|---|
+| 2026-11-02..09 (partial) | n/a | n/a | n/a | 11-05: 0 % of 31 calls; 11-06: 18 % of 510 | 0 codex rows this week | 20 / not read / not read | $123.50 over 15 runs | none: two days of local records (11-05, 11-06; 11-03/04/07/08/09 missing, `budget_local_record.sh` exit 4 while this session was writing, then the 30-min background limit). Cloud: 20 sessions, mostly parity runs (#3506, #3535) and #3477 PRs; turns and model time need each run log, not read. Retry the backfill at session end with no other session live. |
 
 ## Next Steps
 
