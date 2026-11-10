@@ -55,12 +55,6 @@ val plain_range : bound_spec -> float * float
     [margin = (upper - threshold) * sentinel_margin_fraction] — the expanded
     lower bound gives the GP one normalised slot's worth of "off" mass. *)
 
-val sentinel_margin_fraction : float
-(** Fraction of the active [(threshold, upper)] span allocated below [threshold]
-    as the "off" slot in {!plain_range}. Pinned at [0.25]: a candidate's draw in
-    [\[threshold - 0.25 * (upper - threshold), threshold)] decodes as [None].
-    Exposed so tests can assert exact bounds. *)
-
 val decode_sentinel_sample : bound_spec -> float -> float option
 (** [decode_sentinel_sample spec sampled] interprets a BO-sampled value against
     a [bound_spec].

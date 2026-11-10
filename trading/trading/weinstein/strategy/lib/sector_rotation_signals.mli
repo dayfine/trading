@@ -20,12 +20,6 @@ val is_stage2_advance : Stage.result -> bool
     predicate {!Spy_only_signals.is_entry_signal} encodes; re-exported here so
     the strategy's eligibility filter reads in selection terms. *)
 
-val rank_top_k : candidates:candidate list -> k:int -> String.Set.t
-(** [rank_top_k ~candidates ~k] returns the symbols of the top [k] candidates by
-    [normalized_rs] descending, tie-broken by symbol name ascending so the
-    selection is deterministic. Returns at most [k] symbols (fewer when
-    [candidates] is shorter). A non-positive [k] yields the empty set. *)
-
 val rank_top_k_capped :
   candidates:candidate list ->
   k:int ->

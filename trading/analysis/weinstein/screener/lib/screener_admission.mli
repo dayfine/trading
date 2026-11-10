@@ -89,17 +89,6 @@ val passes_failed_breakout :
     invalidated. Defined as [Option.is_none (failed_breakout_reason ...)] so the
     gate and the reported reason can never drift. *)
 
-val count_long_failed_breakouts :
-  tolerance_pct:float ->
-  early_stage2_max_weeks:int ->
-  candidates:(Stock_analysis.t * sector_context) list ->
-  int
-(** How many long candidates the failed-breakout gate dropped: those that pass
-    {!Stock_analysis.is_breakout_candidate} but fail {!passes_failed_breakout}.
-    Feeds {!Screener_cascade_diagnostics.t.long_failed_breakout_dropped} so the
-    drop is visible in the cascade report. Always [0] when the gate is disabled
-    ([tolerance_pct <= 0.0]). *)
-
 val rs_blocks_short : Rs.result option -> bool
 (** Hard gate per Weinstein Ch. 11: never short a stock with strong relative
     strength, even if it breaks down. Returns [true] for candidates whose RS

@@ -12,22 +12,7 @@
     over an existing [stop_state]. The strategy threads a
     [stop_state String.Map.t ref] across ticks. *)
 
-open Core
 open Trading_strategy
-
-val seed_initial :
-  stops_config:Weinstein_stops.config ->
-  bar_reader:Bar_reader.t ->
-  fallback_buffer:float ->
-  symbol:string ->
-  entry_price:float ->
-  as_of:Date.t ->
-  Weinstein_stops.stop_state
-(** [seed_initial ~stops_config ~bar_reader ~fallback_buffer ~symbol
-     ~entry_price ~as_of] computes the initial trailing-stop state for a long
-    entry, anchored on the support-floor lookup over the symbol's daily bars at
-    [as_of]. Falls back to [entry_price *. fallback_buffer] when no qualifying
-    correction is found. *)
 
 val seed_or_keep :
   stops_config:Weinstein_stops.config ->

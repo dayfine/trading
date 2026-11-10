@@ -44,10 +44,6 @@ type source =
 val default_fee_bp : float
 (** [10.0] bp/yr — an SGOV/BIL-class T-bill fund expense ratio. *)
 
-val default_series_path : string
-(** ["macro/tbill_3m_dtb3.csv"] — the committed FRED [DTB3] 3-month T-bill
-    series (1954-01-04 onward), relative to the data directory. *)
-
 val default_source : source
 (** [Series default_series_path] — the strategy-config default since the #3137
     default-on flip (accounting realism, approved by the paired 26y

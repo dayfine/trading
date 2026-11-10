@@ -55,10 +55,6 @@ val internal_error : string -> t
 val not_found_error : string -> t
 (** [not_found_error message] creates a status with NotFound code *)
 
-val permission_denied_error : string -> t
-(** [permission_denied_error message] creates a status with Permission_denied
-    code *)
-
 val combine : t list -> t
 (** [combine statuses] combines a list of statuses into a single status.
     - If all statuses are Ok, returns Ok
@@ -82,7 +78,3 @@ val error_internal : string -> 'a status_or
 val error_not_found : string -> 'a status_or
 (** [error_not_found msg] returns [Error (not_found_error msg)]. Use for not
     found errors in result-returning functions. *)
-
-val error_permission_denied : string -> 'a status_or
-(** [error_permission_denied msg] returns [Error (permission_denied_error msg)].
-    Use for permission denied errors in result-returning functions. *)

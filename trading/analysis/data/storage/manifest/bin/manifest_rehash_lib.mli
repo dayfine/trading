@@ -14,9 +14,6 @@ type counters = {
 
     The pair shape is [(csv_path, error_message)]. *)
 
-val empty_counters : unit -> counters
-(** Fresh counters initialized to zero. *)
-
 val run :
   data_dir_str:string ->
   source:string ->
@@ -37,16 +34,3 @@ val run :
     string is used verbatim.
 
     Prints a summary to stdout via {!print_summary}. *)
-
-val print_summary : counters -> unit
-(** Print the counters in the form
-
-    {[
-      Manifest rehash summary
-        walked              = N
-        manifests present   = N
-        rehashed            = N
-        failures            = N
-    ]}
-
-    plus a [first failures:] block when [failures] is non-empty. *)

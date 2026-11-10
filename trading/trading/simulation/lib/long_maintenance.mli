@@ -89,12 +89,6 @@ open Core
 module Portfolio = Trading_portfolio.Portfolio
 module Position = Trading_strategy.Position
 
-val restore_buffer_pct : float
-(** The small restore buffer: the reduce target ratio is
-    [maintenance_long_pct *. (1.0 +. restore_buffer_pct)], leaving headroom
-    above the bare requirement so ordinary mark noise on the next weekly check
-    does not immediately re-trigger a reduce. [0.02] (2%). *)
-
 type long_holding = {
   position_id : string;
   symbol : string;

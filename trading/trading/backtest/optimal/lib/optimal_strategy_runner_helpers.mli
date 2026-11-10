@@ -15,24 +15,9 @@ val bar_lookback_weeks : int
     memoisation. Large enough to cover the 30-week MA plus breakout-base
     lookback in [Stock_analysis.default_config]. *)
 
-val friday_on_or_before : Date.t -> Date.t
-(** [friday_on_or_before d] returns the most recent Friday on or before [d]. *)
-
 val fridays_in_range : start:Date.t -> end_:Date.t -> Date.t list
 (** [fridays_in_range ~start ~end_] returns all Fridays in [[start, end_]],
     inclusive. The list is ascending and drives the per-week scan loop. *)
-
-val analyze_symbol_on_friday :
-  snapshot_callbacks:Snapshot_runtime.Snapshot_callbacks.t ->
-  friday:Date.t ->
-  stock_config:Stock_analysis.config ->
-  bar_lookback:int ->
-  string ->
-  Stock_analysis.t option
-(** [analyze_symbol_on_friday ~snapshot_callbacks ~friday ~stock_config
-     ~bar_lookback symbol] runs [Stock_analysis.analyze] for [symbol] on
-    [friday]. Returns [None] when there are not enough weekly bars (e.g. early
-    in the run or a newly-listed symbol). *)
 
 val build_sector_context_map :
   (string, string) Hashtbl.t -> (string, Screener.sector_context) Hashtbl.t

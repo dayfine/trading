@@ -109,11 +109,6 @@ val summary_stats_to_metrics :
   summary_stats -> Trading_simulation_types.Metric_types.metric_set
 (** Convert summary_stats to metric_set *)
 
-val compute_profit_factor : trade_metrics list -> float
-(** Compute profit factor: gross profit divided by gross loss across the given
-    round-trips. Returns [Float.infinity] when there are profitable trades but
-    no losses, and [0.0] when there are no trades or no profits. *)
-
 val compute_round_trip_metric_set :
   trade_metrics list -> Trading_simulation_types.Metric_types.metric_set
 (** Build the round-trip-derived metric set ([TotalPnl], [AvgHoldingDays],

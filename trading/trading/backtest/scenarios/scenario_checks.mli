@@ -31,19 +31,8 @@ val crashed_actual : msg:string -> actual
 (** Sentinel [actual] for a crashed run: out-of-range numerics so range checks
     fail explicitly, with [crashed = true] and [crash_message = msg]. *)
 
-val read_wall_seconds : scenario_dir:string -> float
-(** Read [wall_seconds.txt] from [scenario_dir]; [NaN] when missing. *)
-
-val run_checks :
-  ?wall_seconds:float -> actual -> Scenario.expected -> check list
-(** Compare [actual] against the scenario's expected ranges. *)
-
 val print_header : unit -> unit
 (** Print the results-table header. *)
-
-val format_row : Scenario.t -> actual -> check list -> bool
-(** Print one result row; returns [true] iff all checks passed and the run did
-    not crash. *)
 
 val process_result : output_root:string -> Scenario.t -> bool
 (** Parent side: read back the child's [actual.sexp], run the checks and print

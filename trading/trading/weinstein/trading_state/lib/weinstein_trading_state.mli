@@ -69,10 +69,6 @@ val get_stop_state : t -> ticker:string -> Weinstein_stops.stop_state option
 (** [get_stop_state state ~ticker] retrieves the current stop state for
     [ticker], or [None] if not tracked. *)
 
-val remove_stop_state : t -> ticker:string -> t
-(** [remove_stop_state state ~ticker] removes the stop state entry for [ticker].
-    Use when a position is closed. *)
-
 val set_prior_stage : t -> ticker:string -> Weinstein_types.stage -> t
 (** [set_prior_stage state ~ticker stage] records the most recent stage
     classification for [ticker]. *)

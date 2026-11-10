@@ -40,16 +40,8 @@ type coverage = {
 val all_features : feature list
 (** Canonical order used when [--features] is omitted. *)
 
-val feature_name : feature -> string
-(** Lowercase identifier, matching the CSV column name. *)
-
 val feature_of_string : string -> feature option
 (** Parse a [--features] token (case-insensitive) to a feature. *)
-
-val feature_kind : feature -> kind
-(** Modelling kind; [Categorical] carries its full category set in canonical
-    order. The dropped reference is the first of these that is observed in the
-    data (see {!build}). *)
 
 val build :
   features:feature list ->
@@ -58,10 +50,6 @@ val build :
 (** [build ~features ~rows] computes coverage over all [rows], complete-case
     filters, and assembles the standardised one-hot design matrix. [Error] when
     no complete-case rows remain. *)
-
-val era_bounds : (string * int * int) list
-(** The fixed era split as [(label, min_year, max_year)] inclusive: 2000-2008 /
-    2009-2017 / 2018-2026. *)
 
 val eras : Csv_rows.row list -> (string * Csv_rows.row list) list
 (** [eras rows] partitions [rows] by [signal_date] year into {!era_bounds}

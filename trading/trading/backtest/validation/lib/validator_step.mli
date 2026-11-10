@@ -41,11 +41,6 @@ val audit_step :
 (** Dispatch a trade with an audit record to [pred]; a row with no audit record
     is {!Skip}. *)
 
-val bars_context : inputs -> trade_row -> (bars * int) option
-(** The entry-week index for a trade with basis-consistent bars. [None] when
-    bars are missing, the entry week can't be located, or the entry-week close
-    disagrees with the fill price (post-run split rebasing). *)
-
 val wbars_step :
   inputs -> pred:(trade_row -> bars -> int -> step) -> trade_row -> step
 (** Dispatch a trade with a valid {!bars_context} to [pred]; otherwise {!Skip}.

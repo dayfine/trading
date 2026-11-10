@@ -18,16 +18,6 @@
 
 open Core
 
-val grade_dir_name : Weinstein_types.grade -> string
-(** [grade_dir_name g] returns a filesystem-safe directory leaf for [g] — e.g.
-    ["grade-A_plus"] for [A_plus] (the [+] is escaped to [_plus] so the
-    directory name is portable across shells / filesystems). *)
-
-val sweep_grades : Weinstein_types.grade list
-(** The sweep ladder, ordered lowest-quality floor → highest-quality floor:
-    [[F; D; C; B; A; A_plus]]. The ordering is what the cross-grade summary
-    table reads down — trade counts decrease monotonically along it. *)
-
 type cell_inputs = {
   base_config : All_eligible.config;
       (** Template config (entry-dollars / return-buckets) used for every cell.
@@ -52,23 +42,6 @@ type cell_inputs = {
     into a record so the call sites don't have to repeat seven labelled
     arguments. *)
 
-val build_cell :
-  base_config:All_eligible.config ->
-  scored:Backtest_optimal.Optimal_types.scored_candidate list ->
-  min_grade:Weinstein_types.grade ->
-  All_eligible.config * All_eligible.result
-(** [build_cell ~base_config ~scored ~min_grade] applies the grade-floor + dedup
-    \+ grade pipeline for one cell:
-
-    1. {!All_eligible.filter_by_min_grade} drops scored candidates whose
-    [cascade_grade] is below [min_grade]. 2.
-    {!All_eligible.dedup_first_admission} collapses consecutive-Friday
-    re-firings on the surviving set. 3. {!All_eligible.grade} projects each
-    survivor into a fixed-dollar trade record and aggregates.
-
-    Returns the resolved per-cell config (with [min_grade] overwritten) plus the
-    cell's {!All_eligible.result}. Pure function. *)
-
 val emit_single_cell : inputs:cell_inputs -> unit
 (** [emit_single_cell ~inputs] runs {!build_cell} once for
     [inputs.base_config.min_grade] and writes the three per-cell artefacts to
@@ -78,13 +51,3 @@ val emit_grade_sweep : inputs:cell_inputs -> unit
 (** [emit_grade_sweep ~inputs] iterates [sweep_grades], runs {!build_cell} for
     each, writes per-cell artefacts to [inputs.out_dir/grade-<G>/], and writes a
     top-level [inputs.out_dir/summary.md] with the cross-grade table. *)
-
-val format_sweep_summary_md :
-  scenario_name:string ->
-  start_date:Date.t ->
-  end_date:Date.t ->
-  cells:(Weinstein_types.grade * All_eligible.result) list ->
-  string
-(** [format_sweep_summary_md ~scenario_name ~start_date ~end_date ~cells]
-    renders the cross-grade Markdown summary. Pure function; exposed for direct
-    unit-testing of the table layout. *)

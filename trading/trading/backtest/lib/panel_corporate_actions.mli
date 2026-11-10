@@ -33,9 +33,6 @@ val split_guard_summary : Split_dividend_guard.t -> string
 (** One stderr line with the run's guard counts:
     ["Panel_runner: split_dividend_guard rejected=<n> no_files=<m>"]. *)
 
-val log_split_guard : Split_dividend_guard.t option -> unit
-(** Prints {!split_guard_summary} to stderr when armed; nothing otherwise. *)
-
 val ex_dividend_stops :
   config:Weinstein_strategy.config ->
   data_dir:Fpath.t ->

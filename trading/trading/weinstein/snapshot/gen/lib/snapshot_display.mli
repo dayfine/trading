@@ -5,11 +5,6 @@
 
 open Weinstein_snapshot
 
-val overhead_quality_label : Weinstein_types.overhead_quality -> string
-(** Bare constructor label (e.g. ["Heavy_resistance"]) — the derived
-    [show_overhead_quality] printer module-qualifies the constructor, which the
-    display strings must not carry. *)
-
 val resistance_grade : Stock_analysis.t -> string option
 (** Resistance grade for display (score/display split, §D5): the v2
     sketch-derived grade with its continuous score (e.g.
@@ -17,9 +12,6 @@ val resistance_grade : Stock_analysis.t -> string option
     v1 binary grade. [analysis.supply] is [None] whenever [overhead_supply] is
     disarmed, so the disarmed v2 output stays byte-identical to the v1 grade
     string (both route through {!overhead_quality_label}). *)
-
-val regime_label : Weinstein_types.market_trend -> string
-(** Bare regime label (["Bullish"] / ["Bearish"] / ["Neutral"]). *)
 
 val macro_context : Macro.result -> Weekly_snapshot.macro_context
 

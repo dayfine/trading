@@ -53,9 +53,3 @@ val load : data_dir:string -> Macro_types.breadth_bar list
     k weeks back" — true.
 
     Missing file, unreadable file, or a file with no usable rows: [[]]. *)
-
-val min_universe_count : int
-(** Minimum [n] for a row to be kept by {!load}. Constituent counts in the
-    committed series run ~1,900-2,900 on real sessions and 1-2 on holidays, so
-    any cut in between is equivalent; this one is stated as a named constant
-    rather than inlined so the contract above is checkable. *)

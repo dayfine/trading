@@ -428,50 +428,6 @@ let stage_callbacks_of_snapshot_views ?ma_cache ~(config : Stage.config)
   let weekly = Snapshot_bar_views.weekly_view_for cb ~symbol ~n ~as_of in
   stage_callbacks_of_weekly_view ?ma_cache ~symbol ~config ~weekly ()
 
-let rs_callbacks_of_snapshot_views ~(cb : Snapshot_callbacks.t) ~stock_symbol
-    ~benchmark_symbol ~n ~as_of : Rs.callbacks =
-  let stock =
-    Snapshot_bar_views.weekly_view_for cb ~symbol:stock_symbol ~n ~as_of
-  in
-  let benchmark =
-    Snapshot_bar_views.weekly_view_for cb ~symbol:benchmark_symbol ~n ~as_of
-  in
-  rs_callbacks_of_weekly_views ~stock ~benchmark
-
-let volume_callbacks_of_snapshot_views ~(cb : Snapshot_callbacks.t) ~symbol ~n
-    ~as_of : Volume.callbacks =
-  let weekly = Snapshot_bar_views.weekly_view_for cb ~symbol ~n ~as_of in
-  volume_callbacks_of_weekly_view ~weekly
-
-let resistance_callbacks_of_snapshot_views ~(cb : Snapshot_callbacks.t) ~symbol
-    ~n ~as_of : Resistance.callbacks =
-  let weekly = Snapshot_bar_views.weekly_view_for cb ~symbol ~n ~as_of in
-  resistance_callbacks_of_weekly_view ~weekly
-
-let stock_analysis_callbacks_of_snapshot_views ?ma_cache
-    ~(config : Stock_analysis.config) ~(cb : Snapshot_callbacks.t) ~stock_symbol
-    ~benchmark_symbol ~n ~as_of () : Stock_analysis.callbacks =
-  let stock =
-    Snapshot_bar_views.weekly_view_for cb ~symbol:stock_symbol ~n ~as_of
-  in
-  let benchmark =
-    Snapshot_bar_views.weekly_view_for cb ~symbol:benchmark_symbol ~n ~as_of
-  in
-  stock_analysis_callbacks_of_weekly_views ?ma_cache ~stock_symbol
-    ~snapshot_cb:cb ~config ~stock ~benchmark ()
-
-let sector_callbacks_of_snapshot_views ?ma_cache ~(config : Sector.config)
-    ~(cb : Snapshot_callbacks.t) ~sector_symbol ~benchmark_symbol ~n ~as_of () :
-    Sector.callbacks =
-  let sector =
-    Snapshot_bar_views.weekly_view_for cb ~symbol:sector_symbol ~n ~as_of
-  in
-  let benchmark =
-    Snapshot_bar_views.weekly_view_for cb ~symbol:benchmark_symbol ~n ~as_of
-  in
-  sector_callbacks_of_weekly_views ?ma_cache ~sector_symbol ~config ~sector
-    ~benchmark ()
-
 let macro_callbacks_of_snapshot_views ?ma_cache ~(config : Macro.config)
     ~(cb : Snapshot_callbacks.t) ~index_symbol
     ~(globals : (string * string) list) ~(ad_bars : Macro.ad_bar list) ~n ~as_of

@@ -30,12 +30,6 @@ val metric_arg_of_string : string -> metric_arg
 
     @raise Failure on unrecognised metric. *)
 
-val metric_arg_to_lib :
-  metric_arg ->
-  [ `Sharpe | `Total_return_pct | `Calmar | `CAGR | `Max_drawdown_pct ]
-(** Adapter: maps {!metric_arg} to the polymorphic-variant input shape that
-    {!Tuner.Proxy_calibration_lib.matched_pairs} expects. *)
-
 val metric_label : metric_arg -> string
 (** Map a [metric_arg] to its {!Walk_forward.Walk_forward_types.fold_actual}
     field name. Used in markdown rendering for traceability. *)

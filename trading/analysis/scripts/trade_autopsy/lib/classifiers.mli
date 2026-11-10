@@ -7,12 +7,6 @@ module Walk_step = Per_symbol_stage_strategy_lib.Walk_step
 
 type weekly_bar = Types.Daily_price.t
 
-val weeks_between :
-  bars:weekly_bar list -> from_date:Date.t -> to_date:Date.t -> int option
-(** [weeks_between ~bars ~from_date ~to_date] returns the index distance between
-    the bars matching [from_date] and [to_date]. [None] if either date is not in
-    [bars]. *)
-
 val weeks_held : weekly_bars:weekly_bar list -> trade:Walk_step.trade -> int
 (** [weeks_held ~weekly_bars ~trade] returns the number of weekly bars between
     the trade's entry and exit dates. Returns 0 if either date is not in

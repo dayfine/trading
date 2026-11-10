@@ -64,8 +64,6 @@ let load ~root name =
   let dir = Filename.concat root name in
   { name; meta = _load_meta dir; bars = _load_bars dir }
 
-let load_all ~root = List.map (entry_names ~root) ~f:(load ~root)
-
 let pending_ratio (meta : meta) date =
   List.fold meta.splits ~init:1.0 ~f:(fun acc (s : split) ->
       if Date.( > ) s.ex_date date then acc *. s.ratio else acc)

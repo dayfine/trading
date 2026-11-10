@@ -102,7 +102,3 @@ val render_report : spec_report list -> string
 (** Human-readable multi-line summary: one line per finding, prefixed by the
     spec path, plus a trailing counts line. Empty findings render as a single OK
     line. *)
-
-val failure_count : spec_report list -> int
-(** Total findings across all reports. Zero means every golden's drift is fully
-    and accurately declared. *)

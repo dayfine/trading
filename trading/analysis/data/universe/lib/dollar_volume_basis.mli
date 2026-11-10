@@ -81,23 +81,8 @@ type config = {
 }
 [@@deriving sexp, eq, show]
 
-val default_max_bar_dollar_volume : float
-(** [2e11]. *)
-
 val default_split_confirm_log_tolerance : float
 (** [0.2] (the jump within about 22 % of the factor). *)
-
-val default_split_search_bars : int
-(** [2]. *)
-
-val default_volume_check_bars : int
-(** [10]. *)
-
-val default_volume_raw_min_log_factor : float
-(** [log 3]. *)
-
-val default_volume_raw_min_share : float
-(** [0.5]: nearer a full jump than none. *)
 
 val legacy_config : config
 (** {!Close_times_volume} with the default knobs: the behaviour every existing

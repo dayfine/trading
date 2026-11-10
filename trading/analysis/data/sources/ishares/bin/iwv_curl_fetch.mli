@@ -29,12 +29,6 @@ val curl_max_time_seconds : int
 (** Per-request curl timeout. iShares responses are typically well under 5 s;
     this gives generous headroom for transient slowness. *)
 
-val curl_retryable_exit_codes : int list
-(** Curl exit codes that classify as transient network errors (suitable for
-    retry). 6=resolve, 7=connect, 28=op timeout, 35=ssl-handshake,
-    52=empty-reply, 56=recv. All other non-zero curl exits surface as fatal.
-    From the [curl(1)] man page. *)
-
 val curl_args : body_tempfile:string -> Uri.t -> string list
 (** [curl_args ~body_tempfile uri] returns the argv list (excluding the leading
     ["curl"] program path) for a single GET. The output body is streamed to

@@ -155,9 +155,6 @@ type staleness_report = { excluded_count : int; sample : string list }
     A non-zero count is the signal that a partial / lagging data refresh shrank
     the universe — the silent-shrink this report exists to surface. *)
 
-val staleness_sample_size : int
-(** Maximum number of tickers carried in {!staleness_report.sample}. *)
-
 val build : date:Date.t -> config:config -> Snapshot.t Status.status_or
 (** [build ~date ~config] runs the pipeline in the module docstring and returns
     the equal-weighted snapshot of every eligible symbol at [date].

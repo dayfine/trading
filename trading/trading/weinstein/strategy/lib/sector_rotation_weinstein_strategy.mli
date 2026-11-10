@@ -123,31 +123,12 @@ type config = {
 val name : string
 (** Human-readable strategy name, [SectorRotationWeinstein]. *)
 
-val default_symbols : string list
-(** The 11 SPDR sector ETFs:
-    [XLK; XLF; XLI; XLV; XLE; XLP; XLY; XLU; XLB; XLRE; XLC]. *)
-
 val default_benchmark_symbol : string
 (** [SPY] — the RS-ranking benchmark, never traded. *)
-
-val default_k : int
-(** [1] — hold a single strongest Stage-2 sector by default. *)
 
 val default_fallback_stop_buffer : float
 (** [0.92] — an 8% loose initial stop, matching Weinstein's 8% correction rule
     (book §5.1) when no structural support floor is available. *)
-
-val default_enable_macro_gate : bool
-(** [false] — the macro gate is off by default, keeping the strategy
-    bit-identical to the ungated selection-only testbed. *)
-
-val default_sector_cap : int option
-(** [None] — no per-sector concentration cap by default, keeping selection
-    bit-identical to the uncapped top-[k]. *)
-
-val default_sector_of : string -> string option
-(** [fun _ -> None] — no symbol→sector mapping by default, so every symbol is
-    its own singleton sector and {!default_sector_cap} stays a no-op. *)
 
 val default_config : config
 (** [default_config] uses {!default_symbols}, {!default_benchmark_symbol},

@@ -60,12 +60,6 @@ let set_stop_state state ~ticker stop_state =
 let get_stop_state state ~ticker =
   List.Assoc.find state.stop_states ticker ~equal:String.equal
 
-let remove_stop_state state ~ticker =
-  let stops =
-    List.filter state.stop_states ~f:(fun (t, _) -> not String.(t = ticker))
-  in
-  { state with stop_states = stops }
-
 let set_prior_stage state ~ticker stage =
   let stages =
     List.filter state.prior_stages ~f:(fun (t, _) -> not String.(t = ticker))

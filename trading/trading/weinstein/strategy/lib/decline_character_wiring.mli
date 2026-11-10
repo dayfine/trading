@@ -11,21 +11,6 @@
     [weinstein.macro]), so the stops lib and stops runner stay macro-agnostic
     (A2): they receive a plain [~armed:bool], not a {!Decline_character.t}. *)
 
-val classifier_config :
-  fast_v_arm_on_rate_alone:bool ->
-  fast_v_min_rate_pct:float ->
-  Decline_character.config
-(** [classifier_config ~fast_v_arm_on_rate_alone ~fast_v_min_rate_pct] is
-    [Decline_character.default_config] with [fast_v_ignores_ma_filter] set from
-    the strategy-level [fast_v_arm_on_rate_alone] flag and [fast_v_min_rate_pct]
-    set from the strategy-level field of the same name — a single source of the
-    classifier config so both classify sites (the stop-arming {!update_ref} and
-    the slow-grind-gate screen-time classify) stay consistent. With
-    [fast_v_arm_on_rate_alone = false] and
-    [fast_v_min_rate_pct = Decline_character.default_config.fast_v_min_rate_pct]
-    (0.08) it reproduces [default_config] exactly (bit-identical to the pre-flag
-    behaviour). *)
-
 val classify :
   config:Decline_character.config ->
   macro:Macro.result ->

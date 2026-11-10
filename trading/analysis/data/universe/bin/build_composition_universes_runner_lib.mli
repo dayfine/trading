@@ -76,11 +76,6 @@ val summary_lines : schedule:schedule -> result -> string list
     [LABEL] is [year=YYYY] under {!Yearly} (the pre-schedule text, byte for
     byte) and [date=YYYY-MM-DD] under {!Month_ends}. *)
 
-val is_committed_dir : string -> bool
-(** [is_committed_dir path] is true when [path], after resolving symlinks (when
-    it exists) and collapsing [.] / [..] / trailing [/], ends in the components
-    [goldens-custom-universe/composition] — the committed PIT lists. *)
-
 val dollar_volume_of_flag :
   true_dollars:bool ->
   out_dir:string ->

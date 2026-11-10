@@ -39,17 +39,6 @@ type t =
   | Non_usd_listing  (** Member of the non-USD symbol set. *)
 [@@deriving sexp, eq, show]
 
-val curated_non_usd : string list
-(** Seed non-USD symbols: HSBA, SBER, CELSIA, CTRA_old (issue #3183 specimens).
-    Uppercase except the [_old] suffix; matching upper-cases both sides.
-
-    The set is keyed on the symbol alone, so it only holds tickers that read as
-    non-USD in {b every} vintage they appear in (checked against the pit-v12
-    lists). A ticker reused across eras is excluded: [LDG] is Longs Drug Stores
-    (US, 1998-2008) before it is the foreign-currency series (2016-2020), so
-    adding it globally would drop a US stock from 11 vintages. Callers who want
-    such a ticker for one vintage add it through [extra_non_usd]. *)
-
 val classify : ?extra_non_usd:string list -> string -> t option
 (** [classify ?extra_non_usd symbol] returns the class of [symbol] or [None] for
     an ordinary symbol. Case-insensitive. Precedence when several apply:

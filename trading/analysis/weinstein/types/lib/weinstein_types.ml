@@ -65,21 +65,6 @@ type gics_sector =
   | Communication_services
 [@@deriving show, eq, ord, sexp]
 
-let all_gics_sectors =
-  [
-    Information_technology;
-    Financials;
-    Health_care;
-    Energy;
-    Industrials;
-    Consumer_staples;
-    Consumer_discretionary;
-    Utilities;
-    Materials;
-    Real_estate;
-    Communication_services;
-  ]
-
 let gics_sector_to_string = function
   | Information_technology -> "Information Technology"
   | Financials -> "Financials"

@@ -201,16 +201,14 @@ val classify_with_callbacks :
     bottleneck, add:
 
     {[
-    val classify_step :
-      config:config -> prev_result:result -> new_bar:Daily_price.t -> result
-    ]}
-
+    
     [classify_step] would maintain an incremental MA state (e.g. a sliding
     window of the last [ma_period] closes) and update the MA value with the
     single new bar in O(1), reusing the rest of [classify]'s logic. The existing
     [classify] stays as the "cold-start" entry point.
 
-    {3 State machine functor for [_classify_new_stage]}
+    {3 State machine functor for [_classify_new_stage
+    ]}
 
     [_classify_new_stage] encodes the valid transitions between Stage 1–4. A
     well-defined state machine functor would make the states, guards, and

@@ -98,10 +98,6 @@ val default_fallback_stop_buffer : float
 (** [0.92] — an 8% loose initial stop, matching Weinstein's 8% correction rule
     (book §5.1) when no structural support floor is available. *)
 
-val default_enable_stage4_short : bool
-(** [false] — the Stage-4 short leg is off by default, keeping the strategy
-    long/flat and bit-identical to its pre-short-leg behaviour. *)
-
 val default_config : config
 (** [default_config] uses {!default_symbol}, {!Stage.default_config},
     {!Weinstein_stops.default_config}, {!default_fallback_stop_buffer}, and
