@@ -12,6 +12,17 @@ perf-tier fix described in the 2026-09-21 weekly-review entry below.
 
 ## Weekly review (`.claude/rules/perf-review-weekly.md`, ~2 h/week — user 2026-09-20)
 
+- **2026-11-09 (weekly read)**: perf-weekly 11-09 (run 42659531787) vs 11-02
+  (41483315296): all 12 cells PASS, wall +0 to +3 % (`sp500-2010-2026` 405 → 418 s),
+  peak RSS within 1 % on every cell; nightly 11-09 (42625959166) all PASS. Last
+  week's +29-41 % jump did not continue, consistent with runner variance; no ticket.
+  `perf_long_cells.sh check`: no new local cells; the `top-1000-2014|10y|cap256`
+  SLOWER row is unchanged. #3381: the same 26y cell (`rk-k0`, fc78391dd, cap 12000) ran
+  in cloud sessions at 6,527 / 6,782 / 6,870 s (~255 s/yr) vs 12,605 s locally alone and
+  23,162 s overnight, identical cache lines: host, not code; commented. Local container
+  shrunk to 5 GB / 6 CPUs (#3558); long cells now run in the cloud. Issue audit: 14 open;
+  5 stale `verify/pending`: #3136, #3109, #3183 re-owned to `env/cloud` (unblocked by the
+  cloud default), #3206 and #3145 commented (parked shorts track). #3535 closed.
 - **2026-11-02 (weekly read)**: perf-weekly 11-02 (run 41483315296) vs 10-26
   (40332412818): all 12 cells PASS, peak RSS within 1 % on every cell, wall
   +29 to +41 % on every non-trivial cell (`sp500-2010-2026` 304 → 405 s,

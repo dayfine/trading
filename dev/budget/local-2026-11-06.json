@@ -1,0 +1,623 @@
+{
+  "run_id": "local-2026-11-06",
+  "timestamp": "2026-11-10T00:40:20Z",
+  "commit_sha": "3565dfed9487432b97182bb9e5798f8a2c6c3a77",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 1098,
+    "output_tokens": 115479,
+    "cache_read_input_tokens": 78609974,
+    "cache_creation_input_tokens": 3598054,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-11-06",
+    "source": "local-transcripts",
+    "generated_at": "2026-11-10T00:40:20Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-11-06",
+      "until": "2026-11-06"
+    },
+    "totals": {
+      "dispatches": 16,
+      "sessions": 3,
+      "resumes": 16,
+      "api_calls": 510,
+      "input_tokens": 1098,
+      "output_tokens": 115479,
+      "cache_read_input_tokens": 78609974,
+      "cache_creation_input_tokens": 3598054,
+      "subagent_tokens": 35282332,
+      "main_tokens": 47042273,
+      "by_model": {
+        "<synthetic>": {
+          "api_calls": 2,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        },
+        "claude-opus-5-5": {
+          "api_calls": 397,
+          "input_tokens": 876,
+          "output_tokens": 113897,
+          "cache_read_input_tokens": 64833588,
+          "cache_creation_input_tokens": 2040901
+        },
+        "claude-sonnet-5-5": {
+          "api_calls": 111,
+          "input_tokens": 222,
+          "output_tokens": 1582,
+          "cache_read_input_tokens": 13776386,
+          "cache_creation_input_tokens": 1557153
+        }
+      }
+    },
+    "context_histogram": {
+      "calls": 271,
+      "p50": 166578,
+      "p90": 276202,
+      "max": 347035,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 49,
+      "share_above_threshold_pct": 18,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 5,
+          "share_pct": 1.8
+        },
+        {
+          "label": "50-100k",
+          "calls": 39,
+          "share_pct": 14.3
+        },
+        {
+          "label": "100-150k",
+          "calls": 65,
+          "share_pct": 23.9
+        },
+        {
+          "label": "150-200k",
+          "calls": 89,
+          "share_pct": 32.8
+        },
+        {
+          "label": "200-300k",
+          "calls": 50,
+          "share_pct": 18.4
+        },
+        {
+          "label": "300-500k",
+          "calls": 23,
+          "share_pct": 8.4
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "a54c3ae403d5e4467",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR #3543",
+        "ref": "#3543",
+        "date": "2026-11-06",
+        "wall_seconds": 258,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 31,
+            "input_tokens": 62,
+            "output_tokens": 1324,
+            "cache_read_input_tokens": 4998170,
+            "cache_creation_input_tokens": 238215
+          }
+        },
+        "api_calls": 31,
+        "input_tokens": 62,
+        "output_tokens": 1324,
+        "cache_read_input_tokens": 4998170,
+        "cache_creation_input_tokens": 238215
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "a8266e7f25c3bca67",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR #3542",
+        "ref": "#3542",
+        "date": "2026-11-06",
+        "wall_seconds": 241,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 23,
+            "input_tokens": 46,
+            "output_tokens": 1533,
+            "cache_read_input_tokens": 3271123,
+            "cache_creation_input_tokens": 161728
+          }
+        },
+        "api_calls": 23,
+        "input_tokens": 46,
+        "output_tokens": 1533,
+        "cache_read_input_tokens": 3271123,
+        "cache_creation_input_tokens": 161728
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "aa35c4602da447d2f",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR #3539",
+        "ref": "#3539",
+        "date": "2026-11-06",
+        "wall_seconds": 176,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 21,
+            "input_tokens": 42,
+            "output_tokens": 199,
+            "cache_read_input_tokens": 2962168,
+            "cache_creation_input_tokens": 161539
+          }
+        },
+        "api_calls": 21,
+        "input_tokens": 42,
+        "output_tokens": 199,
+        "cache_read_input_tokens": 2962168,
+        "cache_creation_input_tokens": 161539
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "aae623f30bec7f9a4",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR #3540",
+        "ref": "#3540",
+        "date": "2026-11-06",
+        "wall_seconds": 129,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 16,
+            "input_tokens": 32,
+            "output_tokens": 1018,
+            "cache_read_input_tokens": 2686704,
+            "cache_creation_input_tokens": 233952
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 32,
+        "output_tokens": 1018,
+        "cache_read_input_tokens": 2686704,
+        "cache_creation_input_tokens": 233952
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "a0e5f9b965bc886bc",
+        "agent_type": "harness-maintainer",
+        "description": "r2_bars parallel push/pull + resume",
+        "ref": "",
+        "date": "2026-11-06",
+        "wall_seconds": 157,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 19,
+            "input_tokens": 38,
+            "output_tokens": 254,
+            "cache_read_input_tokens": 2685359,
+            "cache_creation_input_tokens": 159079
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 38,
+        "output_tokens": 254,
+        "cache_read_input_tokens": 2685359,
+        "cache_creation_input_tokens": 159079
+      },
+      {
+        "kind": "dispatch",
+        "session": "e7e15b8e-1d8e-4d3c-85c4-7d686b19a55a",
+        "agent_id": "a21d572fab0031704",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3536",
+        "ref": "",
+        "date": "2026-11-06",
+        "wall_seconds": 386,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 19,
+            "input_tokens": 38,
+            "output_tokens": 1147,
+            "cache_read_input_tokens": 2561256,
+            "cache_creation_input_tokens": 152122
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 38,
+        "output_tokens": 1147,
+        "cache_read_input_tokens": 2561256,
+        "cache_creation_input_tokens": 152122
+      },
+      {
+        "kind": "dispatch",
+        "session": "e7e15b8e-1d8e-4d3c-85c4-7d686b19a55a",
+        "agent_id": "a867d172e9714ae60",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3536 re-run",
+        "ref": "",
+        "date": "2026-11-06",
+        "wall_seconds": 471,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 18,
+            "input_tokens": 36,
+            "output_tokens": 289,
+            "cache_read_input_tokens": 2367723,
+            "cache_creation_input_tokens": 146523
+          }
+        },
+        "api_calls": 18,
+        "input_tokens": 36,
+        "output_tokens": 289,
+        "cache_read_input_tokens": 2367723,
+        "cache_creation_input_tokens": 146523
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "a2de589310f53181f",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR #3539",
+        "ref": "#3539",
+        "date": "2026-11-06",
+        "wall_seconds": 107,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 16,
+            "input_tokens": 32,
+            "output_tokens": 170,
+            "cache_read_input_tokens": 2059476,
+            "cache_creation_input_tokens": 144573
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 32,
+        "output_tokens": 170,
+        "cache_read_input_tokens": 2059476,
+        "cache_creation_input_tokens": 144573
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "aef745a98dda75492",
+        "agent_type": "harness-maintainer",
+        "description": "#3535 warehouse push/pull via R2",
+        "ref": "#3535",
+        "date": "2026-11-06",
+        "wall_seconds": 162,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 13,
+            "input_tokens": 26,
+            "output_tokens": 196,
+            "cache_read_input_tokens": 1717219,
+            "cache_creation_input_tokens": 152497
+          }
+        },
+        "api_calls": 13,
+        "input_tokens": 26,
+        "output_tokens": 196,
+        "cache_read_input_tokens": 1717219,
+        "cache_creation_input_tokens": 152497
+      },
+      {
+        "kind": "dispatch",
+        "session": "e7e15b8e-1d8e-4d3c-85c4-7d686b19a55a",
+        "agent_id": "a4fa7289604213264",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3536",
+        "ref": "",
+        "date": "2026-11-06",
+        "wall_seconds": 1163,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 13,
+            "input_tokens": 26,
+            "output_tokens": 191,
+            "cache_read_input_tokens": 1500028,
+            "cache_creation_input_tokens": 283929
+          }
+        },
+        "api_calls": 13,
+        "input_tokens": 26,
+        "output_tokens": 191,
+        "cache_read_input_tokens": 1500028,
+        "cache_creation_input_tokens": 283929
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "abc880b55f836f3a9",
+        "agent_type": "harness-maintainer",
+        "description": "r2 follow-ups: doc name, jobs 00, resume test",
+        "ref": "",
+        "date": "2026-11-06",
+        "wall_seconds": 66,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 12,
+            "input_tokens": 24,
+            "output_tokens": 184,
+            "cache_read_input_tokens": 1466061,
+            "cache_creation_input_tokens": 137397
+          }
+        },
+        "api_calls": 12,
+        "input_tokens": 24,
+        "output_tokens": 184,
+        "cache_read_input_tokens": 1466061,
+        "cache_creation_input_tokens": 137397
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "a7ade7e5f7b4d5175",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR #3542",
+        "ref": "#3542",
+        "date": "2026-11-06",
+        "wall_seconds": 72,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 11,
+            "input_tokens": 22,
+            "output_tokens": 101,
+            "cache_read_input_tokens": 1348017,
+            "cache_creation_input_tokens": 141672
+          }
+        },
+        "api_calls": 11,
+        "input_tokens": 22,
+        "output_tokens": 101,
+        "cache_read_input_tokens": 1348017,
+        "cache_creation_input_tokens": 141672
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "a3c042891fd0eb564",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR #3540",
+        "ref": "#3540",
+        "date": "2026-11-06",
+        "wall_seconds": 84,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 10,
+            "input_tokens": 20,
+            "output_tokens": 174,
+            "cache_read_input_tokens": 1184172,
+            "cache_creation_input_tokens": 135823
+          }
+        },
+        "api_calls": 10,
+        "input_tokens": 20,
+        "output_tokens": 174,
+        "cache_read_input_tokens": 1184172,
+        "cache_creation_input_tokens": 135823
+      },
+      {
+        "kind": "dispatch",
+        "session": "e7e15b8e-1d8e-4d3c-85c4-7d686b19a55a",
+        "agent_id": "ae635e39c265cb87c",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3536 re-run",
+        "ref": "",
+        "date": "2026-11-06",
+        "wall_seconds": 59,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 7,
+            "input_tokens": 14,
+            "output_tokens": 132,
+            "cache_read_input_tokens": 778939,
+            "cache_creation_input_tokens": 132782
+          }
+        },
+        "api_calls": 7,
+        "input_tokens": 14,
+        "output_tokens": 132,
+        "cache_read_input_tokens": 778939,
+        "cache_creation_input_tokens": 132782
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "a282dc8d9454a2e59",
+        "agent_type": "harness-maintainer",
+        "description": "#3539 QC nits cleanup",
+        "ref": "#3539",
+        "date": "2026-11-06",
+        "wall_seconds": 50,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 6,
+            "input_tokens": 12,
+            "output_tokens": 121,
+            "cache_read_input_tokens": 645939,
+            "cache_creation_input_tokens": 135006
+          }
+        },
+        "api_calls": 6,
+        "input_tokens": 12,
+        "output_tokens": 121,
+        "cache_read_input_tokens": 645939,
+        "cache_creation_input_tokens": 135006
+      },
+      {
+        "kind": "dispatch",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "agent_id": "a87e328b5e930b1d5",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR #3543",
+        "ref": "#3543",
+        "date": "2026-11-06",
+        "wall_seconds": 39,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 4,
+            "input_tokens": 8,
+            "output_tokens": 59,
+            "cache_read_input_tokens": 391176,
+            "cache_creation_input_tokens": 134395
+          }
+        },
+        "api_calls": 4,
+        "input_tokens": 8,
+        "output_tokens": 59,
+        "cache_read_input_tokens": 391176,
+        "cache_creation_input_tokens": 134395
+      }
+    ],
+    "sessions": [
+      {
+        "kind": "session",
+        "session": "f3267f54-42df-4810-86c1-c1364bce8356",
+        "date": "2026-11-06",
+        "wall_seconds": 4493,
+        "dispatches_launched": 0,
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 78,
+            "input_tokens": 170,
+            "output_tokens": 25861,
+            "cache_read_input_tokens": 7163962,
+            "cache_creation_input_tokens": 94996
+          }
+        },
+        "api_calls": 78,
+        "input_tokens": 170,
+        "output_tokens": 25861,
+        "cache_read_input_tokens": 7163962,
+        "cache_creation_input_tokens": 94996
+      },
+      {
+        "kind": "session",
+        "session": "e7e15b8e-1d8e-4d3c-85c4-7d686b19a55a",
+        "date": "2026-11-06",
+        "wall_seconds": 9468,
+        "dispatches_launched": 4,
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 58,
+            "input_tokens": 128,
+            "output_tokens": 23127,
+            "cache_read_input_tokens": 9913188,
+            "cache_creation_input_tokens": 178237
+          }
+        },
+        "api_calls": 58,
+        "input_tokens": 128,
+        "output_tokens": 23127,
+        "cache_read_input_tokens": 9913188,
+        "cache_creation_input_tokens": 178237
+      },
+      {
+        "kind": "session",
+        "session": "f2ca18af-09a8-4d24-8488-d98ac47316e9",
+        "date": "2026-11-06",
+        "wall_seconds": 165390,
+        "dispatches_launched": 17,
+        "model": "claude-opus-5-5",
+        "models": {
+          "<synthetic>": {
+            "api_calls": 2,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0
+          },
+          "claude-opus-5-5": {
+            "api_calls": 133,
+            "input_tokens": 322,
+            "output_tokens": 59399,
+            "cache_read_input_tokens": 28909294,
+            "cache_creation_input_tokens": 673589
+          }
+        },
+        "api_calls": 135,
+        "input_tokens": 322,
+        "output_tokens": 59399,
+        "cache_read_input_tokens": 28909294,
+        "cache_creation_input_tokens": 673589
+      }
+    ]
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}
