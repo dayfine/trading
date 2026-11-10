@@ -1,11 +1,12 @@
 # Join every per-trade source into one JSON array (stdout).
-# usage: awk -f assemble.awk trades.csv x_trades.tsv x_audit.tsv x_macro.tsv x_stage.tsv x_sfk.tsv
+# usage: awk -f assemble.awk trades.csv x_trades.tsv x_audit.tsv x_macro.tsv x_stage.tsv x_sfk.tsv x_geo.tsv
 #   x_audit.tsv : sym<TAB>entry_date<TAB>rs<TAB>macro<TAB>grade<TAB>score<TAB>fill_vs_trig<TAB>faithful
 #   x_stage.tsv : pid<TAB>stage_at_entry<TAB>stage_at_exit<TAB>s3_weeks<TAB>s4_weeks<TAB>hold_weeks<TAB>s2_weeks
 #   x_sfk.tsv   : pid<TAB>stop_floor_kind (trade_audit.sexp)
+#   x_geo.tsv   : pid<TAB>suggested_entry<TAB>close_at_decision<TAB>adjusted_close_at_decision (entry_geom.awk)
 function q(s) { gsub(/"/, "", s); return "\"" s "\"" }
 function n(s) { return (s == "" ? "null" : s + 0) }
-# files told apart by ARGV, not an FNR==1 counter: x_audit.tsv / x_stage.tsv / x_sfk.tsv are
+# files told apart by ARGV, not an FNR==1 counter: x_audit.tsv / x_stage.tsv / x_sfk.tsv / x_geo.tsv are
 # empty without the container steps, which a counter would skip, shifting the rest
 FILENAME == ARGV[1] { if (FNR == 1) { n_h = split($0, hd, ","); for (i = 1; i <= n_h; i++) if (hd[i] == "dividends_received") dcol = i; next }; nt++; row[nt] = $0; next }
 FILENAME == ARGV[2] { split($0, a, "\t"); x[a[1]] = $0; next }
@@ -13,6 +14,7 @@ FILENAME == ARGV[3] { split($0, a, "\t"); au[a[1] "|" a[2]] = $0; next }
 FILENAME == ARGV[4] { split($0, a, "\t"); nm++; md[nm] = a[1]; mtr[nm] = a[2]; mbr[nm] = a[3]; next }
 FILENAME == ARGV[5] { split($0, a, "\t"); st[a[1]] = $0; next }
 FILENAME == ARGV[6] { split($0, a, "\t"); sfk[a[1]] = a[2]; next }
+FILENAME == ARGV[7] { split($0, a, "\t"); geo[a[1]] = $0; next }
 # the last screen strictly before d (#3262): a screen runs at its day's close, so a fill on a screen
 # day (a Friday) has not seen it yet. V23's rule (validator_audit_checks.ml _last_screen_before).
 function macro_at(d,   i, r) { r = 0; for (i = 1; i <= nm && md[i] < d; i++) r = i; return r }
@@ -26,6 +28,7 @@ END {
       (t > 1 ? ",\n" : ""), q(pid), q(c[1]), q(c[3]), q(c[4]), n(c[5]), n(c[6]), n(c[7]), n(c[8]), n(c[9]), n(c[10]), n(c[12]), q(c[13]), q(c[14]), n(c[15]), n(c[16]), q(c[17]), n(c[18]), n(c[19]), n(c[21]), n(c[22]), n(c[23]), n(dcol ? c[dcol] : "")
     printf ",\"side\":%s,\"es\":%s,\"mE\":%s,\"bE\":%s,\"mX\":%s,\"bearW\":%d,\"macroW\":%d", q(c[2]), n(c[11]), q(ie ? mtr[ie] : ""), q(ie ? mbr[ie] : ""), q(ix ? mtr[ix] : ""), bw, hw
     if (pid in sfk) printf ",\"sfk\":%s", q(sfk[pid])
+    if (pid in geo) { split(geo[pid], g, "\t"); printf ",\"aE\":%s,\"aC\":%s,\"aA\":%s", n(g[2]), n(g[3]), n(g[4]) }
     if (pid in x) { split(x[pid], e, "\t")
       if (e[2] ~ /^NO/) printf ",\"nodata\":true"
       else printf ",\"fe\":%s,\"fx\":%s,\"mfe\":%s,\"mae\":%s,\"pmax\":%s,\"pmin\":%s,\"p13\":%s,\"g\":%s,\"onE\":%s,\"onX\":%s,\"inE\":%s,\"inX\":%s,\"gap\":%s,\"ebar\":%s,\"xbar\":%s,\"postN\":%s,\"f40\":%s,\"blag\":%s,\"cf\":[%s],\"eadj\":%s,\"xadj\":%s,\"isd\":%s,\"fvr\":%s,\"xpast\":%s,\"fbo\":%s", \

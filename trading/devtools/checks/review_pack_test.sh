@@ -72,6 +72,9 @@
 #     2:1 split mid-hold); a short-only book's eras read against SPY inverted, with short-side wording;
 #     dividends from the run when trades.csv has no dividends_received column; the plurals; a Friday
 #     exit; pack_sha's -dirty; conformance stacked above the validator; the capture unscrolls tables.
+#   - #3546 entry geometry (decision walk D4/D5/D1): entry_geom.awk joins E and the decision closes from
+#     trade_audit.sexp; tight stop, deep E and vintage-frozen trail each fire on a specimen-shaped row, stay
+#     silent on clean ones and read n/a without their inputs.
 #
 # Run:
 #   sh trading/devtools/checks/review_pack_test.sh
@@ -1701,6 +1704,95 @@ JS
   expect_eq "#3384 trade overlap: first entry not in every run, biggest partial trades with holders" OK "$(node "$OV/check.js")"
   expect_eq "#3384 trade overlap: the page renders the detector table" yes "$(grep -q 'Largest trades held by some' "$S/index.html" && grep -q 'partialTrades(D.trades, D.nav' "$S/index.html" && echo yes || echo no)"
 fi
+
+# Entry-geometry signals (#3546 §5 item 3, decision walk D4/D5/D1): entry_geom.awk reads E, the decision close and
+# its adjusted close out of trade_audit.sexp; entryGeometry / entryGeometryLines count three classes per run.
+# Specimen-shaped rows (symbols without bars in the store: the join must not need them):
+#   GME  E 6.95, stop 6.88 (sid 0.0101)            -> tight (< 2 % of E)
+#   SDA  E 5.00 vs close 9.43 (E / close 0.53)     -> deep (>= 10 % under the close)
+#   DXCM 357 days, 0 raises, raw / adjusted 141 / 35.25 = 4.00 -> frozen
+# Clean rows: CLN sid 0.06, E / close 0.98, factor 1.0099 < 1.05 over 100 days unraised (boundary under 1.05);
+#   CVN factor 5.00 but raised twice; NEW 60 days, factor 4, unraised (under the 65-day hold); OLD has no
+#   adjusted close (an audit from before the field) -> frozen unknown for it, not a hit.
+GW="$TMP/geo"; mkdir -p "$GW/run" "$GW/clean"; cp "$FIX"/run/* "$GW/run/"
+GH='symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises'
+GCLEAN='CLN,LONG,2020-01-10,2020-04-19,100,50.00,55.00,100,500.00,10.00,47.00,47.00,laggard_rotation,Stage2,2.0,0.0600,non_stop_exit,,100,CLN-wein-4,,47.00,0
+CVN,LONG,2020-01-10,2020-05-09,120,50.00,60.00,100,1000.00,20.00,46.00,52.00,stop_loss,Stage2,2.0,0.0800,intraday,,100,CVN-wein-5,,52.00,2
+NEW,LONG,2020-01-10,2020-03-10,60,50.00,45.00,100,-500.00,-10.00,46.00,46.00,stop_loss,Stage2,2.0,0.0800,intraday,,100,NEW-wein-6,,46.00,0
+OLD,LONG,2020-01-10,2020-05-09,120,50.00,52.00,100,200.00,4.00,46.00,46.00,laggard_rotation,Stage2,2.0,0.0800,non_stop_exit,,100,OLD-wein-7,,46.00,0'
+printf '%s\n%s\n%s\n%s\n%s\n' "$GH" \
+  'GME,LONG,2020-09-10,2020-09-14,4,7.17,6.65,10000,-5200.00,-7.25,6.88,6.88,stop_loss,Stage2,2.0,0.0101,gap_down,4,100,GME-wein-1025,0.04,6.88,0' \
+  'SDA,LONG,2023-07-12,2023-07-13,1,5.00,4.60,8000,-3200.00,-8.00,4.60,4.60,stop_loss,Stage2,2.0,0.0800,intraday,1,100,SDA-wein-1168,,4.60,0' \
+  'DXCM,LONG,2019-08-09,2020-07-31,357,140.00,420.00,500,140000.00,200.00,133.66,133.66,laggard_rotation,Stage2,2.0,0.0500,non_stop_exit,,100,DXCM-wein-953,,133.66,0' \
+  "$GCLEAN" > "$GW/run/trades.csv"
+printf '%s\n%s\n' "$GH" "$GCLEAN" > "$GW/clean/trades.csv"
+cat > "$GW/run/trade_audit.sexp" <<'SEXP'
+((audit_records
+  (((entry
+     ((symbol GME) (entry_date 2020-09-04) (position_id GME-wein-1025) (side Long)
+      (suggested_entry 6.95) (close_at_decision 7.65) (adjusted_close_at_decision 7.65)
+      (installed_stop 6.88) (stop_floor_kind Support_floor)
+      (alternatives_considered (((symbol XYZ) (side Long) (score 50)))))))
+   ((entry
+     ((symbol SDA) (entry_date 2023-06-30) (position_id SDA-wein-1168) (side Long) (suggested_entry 5.00)
+      (close_at_decision 9.43)
+      (adjusted_close_at_decision 9.43) (installed_stop 4.60) (stop_floor_kind Support_floor))))
+   ((entry
+     ((symbol DXCM) (entry_date 2019-08-02) (position_id DXCM-wein-953) (side Long) (suggested_entry 140)
+      (close_at_decision 141) (adjusted_close_at_decision 35.25) (stop_floor_kind Support_floor)))
+    (exit ((symbol DXCM) (exit_date 2020-07-31) (position_id DXCM-wein-953))))
+   ((entry ((symbol CLN) (position_id CLN-wein-4) (suggested_entry 50) (close_at_decision 51) (adjusted_close_at_decision 50.5))))
+   ((entry ((symbol CVN) (position_id CVN-wein-5) (suggested_entry 50) (close_at_decision 51) (adjusted_close_at_decision 10.2))))
+   ((entry ((symbol NEW) (position_id NEW-wein-6) (suggested_entry 50) (close_at_decision 51) (adjusted_close_at_decision 12.75))))
+   ((entry ((symbol OLD) (position_id OLD-wein-7) (suggested_entry 50) (close_at_decision 51)))))))
+SEXP
+cp "$GW/run/trade_audit.sexp" "$GW/clean/"; for f in params.sexp summary.sexp equity_curve.csv macro_trend.sexp validator.sexp.md; do cp "$FIX/run/$f" "$GW/clean/"; done
+expect_eq "#3546 entry_geom.awk: E, decision close, adjusted close per entry; an absent field stays empty" \
+  "GME-wein-1025|6.95|7.65|7.65 SDA-wein-1168|5.00|9.43|9.43 DXCM-wein-953|140|141|35.25 CLN-wein-4|50|51|50.5 CVN-wein-5|50|51|10.2 NEW-wein-6|50|51|12.75 OLD-wein-7|50|51|" \
+  "$(awk -f "$ROOT/dev/lib/review_pack/entry_geom.awk" "$GW/run/trade_audit.sexp" | tr '\t' '|' | tr '\n' ' ' | sed 's/ $//')"
+expect_eq "#3546 entry_geom.awk: line wrapping does not change the rows" \
+  "$(awk -f "$ROOT/dev/lib/review_pack/entry_geom.awk" "$GW/run/trade_audit.sexp")" "$(tr '\n' ' ' < "$GW/run/trade_audit.sexp" | awk -f "$ROOT/dev/lib/review_pack/entry_geom.awk")"
+rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$GW/pack" g0="$GW/run/" g1="$GW/clean/" >"$GW/log" 2>&1 || rc=$?
+expect_eq "#3546 geometry fixture: builds, exit 0" 0 "$rc"
+GT="$GW/pack/site/data/g0_trades.json"
+expect_eq "#3546 assemble: aE / aC / aA reach the trade JSON (SDA), null when the audit lacks the field (OLD)" "5 9.43 9.43 | 50 51 null" \
+  "$(jq -r '(.[]|select(.sym=="SDA")|"\(.aE) \(.aC) \(.aA)"), "|", (.[]|select(.sym=="OLD")|"\(.aE) \(.aC) \(.aA)")' "$GT" | tr '\n' ' ' | sed 's/ $//')"
+rm "$GW/run/trade_audit.sexp"; rc=0
+sh "$SCRIPT" --no-container --data-dir "$FIX/data" --out "$GW/noaud" g0="$GW/run/" >"$GW/noaud.log" 2>&1 || rc=$?
+expect_eq "#3546 no trade_audit.sexp: builds, and no trade carries aE" "0 0" "$rc $(jq '[.[]|select(has("aE"))]|length' "$GW/noaud/site/data/g0_trades.json")"
+if command -v node >/dev/null 2>&1; then
+  GEF="$(sed -n -e '/^const fmt = /p' -e '/^const usdk = /p' -e '/^const isShort = /p' -e '/^const faithEsc = /p' -e '/^const ENTRY_TIGHT_STOP_PCT/p' \
+    -e '/^const ENTRY_GEOM_CHECKS = /,/^];/p' -e '/^function entryGeometry(/,/^}/p' -e '/^function entryGeometryLines(/,/^}/p' "$S/index.html")"
+  ge() { node -e "$GEF
+const fs = require('fs'), rd = f => JSON.parse(fs.readFileSync(f, 'utf8'));
+const G = rd('$GT'), C = rd('$GW/pack/site/data/g1_trades.json'), N = rd('$GW/noaud/site/data/g0_trades.json');
+const brief = g => g.map(r => r.key + ' ' + (r.na ? 'n/a' : r.n + ' ' + r.pnl + ' ' + r.top.map(t => t.id).join(',') + ' u' + r.unknown)).join(' | ');
+console.log($1)"; }
+  expect_eq "#3546 entryGeometry: GME tight, SDA deep, DXCM frozen; OLD unknown for frozen; CLN / CVN / NEW clean" \
+    "tight 1 -5200 GME-wein-1025 u0 | deep 1 -3200 SDA-wein-1168 u0 | frozen 1 140000 DXCM-wein-953 u1" "$(ge 'brief(entryGeometry(G))')"
+  expect_eq "#3546 entryGeometry: the clean rows count 0, not n/a" "tight 0 0  u0 | deep 0 0  u0 | frozen 0 0  u1" "$(ge 'brief(entryGeometry(C))')"
+  expect_eq "#3546 entryGeometry: without the audit, deep and frozen read n/a; tight keeps trades.csv's distance" \
+    "tight 1 -5200 GME-wein-1025 u0 | deep n/a | frozen n/a" "$(ge 'brief(entryGeometry(N))')"
+  expect_eq "#3546 entryGeometry: no stop_initial_distance_pct -> tight n/a" "n/a" "$(ge "brief(entryGeometry(G.map(t => ({ ...t, sid: null })))).split(' | ')[0].split(' ')[1]")"
+  expect_eq "#3546 entryGeometry: short rows are not counted" "tight 0 0  u0" "$(ge "brief(entryGeometry(G.filter(t => t.sym === 'GME').map(t => ({ ...t, side: 'SHORT', sid: 0.01 })).concat(C))).split(' | ')[0]")"
+  expect_eq "#3546 entryGeometryLines: one bullet per firing class, with each run's count, P&L and specimens" yes \
+    "$(ge "entryGeometryLines([['g0', entryGeometry(G)], ['g1', entryGeometry(C)]]).join('\n')" | awk '
+      /^<b>Initial stop under 2 % below E:<\/b> g0 1 trade, −\$5k \(GME-wein-1025: E 6.95, stop 6.88, 1.0 %, −\$5k\); g1 0 trades, \$0k\. / { a++ }
+      /^<b>E 10 % or more below the decision close:<\/b> g0 1 trade, −\$3k \(SDA-wein-1168: E 5.00 vs close 9.43, E \/ close 0.53, −\$3k\)/ { b++ }
+      /^<b>Trail never raised, basis factor 1.05 or more:<\/b> g0 1 trade, \$140k \(DXCM-wein-953: 357 days, raw \/ adjusted 4.00, \$140k\), 1 without the input; g1 0 trades/ { c++ }
+      END { print (a == 1 && b == 1 && c == 1 && NR == 3) ? "yes" : "no: " NR " lines" }')"
+  expect_eq "#3546 entryGeometryLines: silent when every run reads a clean 0" "" "$(ge "entryGeometryLines([['g1', entryGeometry(C)]]).join('|')")"
+  expect_eq "#3546 entryGeometryLines: a missing input reads n/a, never 0" \
+    "<b>E 10 % or more below the decision close: n/a</b> for g0: needs suggested_entry and close_at_decision in trade_audit.sexp.|<b>Trail never raised, basis factor 1.05 or more: n/a</b> for g0: needs close_at_decision and adjusted_close_at_decision in trade_audit.sexp, n_stop_raises in trades.csv." \
+    "$(ge "entryGeometryLines([['g0', entryGeometry(N.filter(t => t.sym !== 'GME'))]]).join('|')")"
+  expect_eq "#3546 entryGeometryLines: a run without the input shows n/a beside a firing run" yes \
+    "$(ge "entryGeometryLines([['g0', entryGeometry(G)], ['g2', entryGeometry(N)]])[1]" | grep -q 'g0 1 trade.*; g2 n/a\. ' && echo yes || echo no)"
+else
+  echo "SKIP: review_pack #3546 entry-geometry cases need node"
+fi
+expect_eq "#3546 wiring: What stands out runs entryGeometryLines over every run" 1 \
+  "$(grep -c 'out.push(...entryGeometryLines(D.trades.map((ts, i) => \[runLabel(i), entryGeometry(ts)\])));' "$S/index.html")"
 
 printf '%s: %d passed, %d failed\n' "review_pack_test" "$PASS" "$FAILED"
 [ "$FAILED" = 0 ]
