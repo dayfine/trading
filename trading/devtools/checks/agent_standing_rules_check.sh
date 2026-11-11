@@ -42,6 +42,7 @@ for a in $QC_BUILD $FEAT; do
 done
 for a in $QC_BUILD; do
   need "$a" 'git fetch origin pull/<N>/head && git worktree add --detach'
+  need "$a" "CI is the build of record."
 done
 for a in $QC_ALL; do
   need "$a" 'Line 1 is `Reviewed SHA: <full sha>`'
