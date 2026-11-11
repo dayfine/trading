@@ -162,13 +162,20 @@ unread. V3 (liquidity) is expected to differ in the #3136 pair and is not gated:
 - **T3 attribution (the implementation check):** `firstdiff.txt` joins the two `trades.csv` on `symbol|entry_date`
   (the file is sorted by symbol, not date, so a positional diff would not give the first divergence), orders the
   base-only, arm-only and changed rows by entry date with no truncation, and adds the `equity_curve.csv` first
-  differing date. The first divergence is the earliest-dated such row. On that first date at least one differing
-  event must be on a symbol whose divisor is not 1 on that date, i.e. its `splits.csv` in `td-full` lists a split after
-  that date that the raw close confirms. Every differing entry before the paths separate on cash is listed with its
-  symbol, date, side (blocked → admitted, the 10-19 measurement's dominant 1.9 % class, or admitted → blocked, the
-  0.6 % class) and divisor. A first date on which every differing event is on a divisor-1 symbol **fails** T3:
-  something other than the gate moved. Same-date knock-on trades on divisor-1 symbols (a freed or consumed slot or
-  cash) are listed as displacement, not counted as a T3 failure.
+  differing date. Rows are compared with `position_id` (column 20) blanked. A row that differs only in its id has kind
+  `id-shift`: ids come from a process-global counter bumped at decision time, so one gate flip shifts the id of every
+  later-decided trade; an `id-shift` row marks that an earlier decision changed and is never a divergence.
+  **T3 is read in decision order, not fill order.** `position_id` increases with decision time, and ids before the
+  first changed decision are identical in both runs, so they are a common decision clock. Take every `arm-only`,
+  `base-only` and `changed-*` row (not `id-shift`) with its id (the arm's for `arm-only`/`changed-arm`, the base's for
+  `base-only`/`changed-base`). Let **F** be the smallest id among those rows that sit on a symbol whose divisor is not 1
+  at that row's entry date, i.e. its `splits.csv` in `td-full` lists a split after that date that the raw close
+  confirms. T3 passes if F exists and **no differing row has an id below F**. Every differing row with an id at or
+  above F on a divisor-1 symbol is knock-on (a freed or consumed slot, cash, or a ticket that rests or never fills)
+  and is listed as displacement, not counted as a T3 failure, whatever its fill date. A differing row with an id below
+  F **fails** T3: something other than the gate moved first. No `trade_audit.sexp` extract is needed (the audit is
+  not collected). Every differing entry is listed with its symbol, date, id, side (blocked → admitted, the 10-19
+  measurement's dominant 1.9 % class, or admitted → blocked, the 0.6 % class) and divisor.
 - **T4 level (reported, no verdict):** total return, end-NAV log ratio, MaxDD, trades, Sharpe, Calmar. A level delta
   below 0.45 log that T3 does not trace to gate decisions is path noise.
 - **The decision this pair can record** (the `[after-merge]` item): the pit-v12 lists already rank on true dollars
@@ -265,9 +272,12 @@ on a broad universe; the sp500 cells are regression pins.
 2. Review pack for the 26y cells (`backtest-result-review.md`): `dev/scripts/review_pack.sh --no-container` on W0 /
    Wtd / Wrc, rendered and looked at before the writeup; the look is recorded.
 3. `sh dev/scripts/perf_long_cells.sh update <chain.log>`.
-4. The results PR carries `Verifies #3136: …`, `Verifies #3183: …` and, if the prerequisite ran and the maintainer accepts the 6-pair subset (acceptance recorded in the PR), `Verifies #3109: …`
-   lines, each naming its artifact (`issue-hygiene.md` B). Without that acceptance, or with the prerequisite not run,
-   the PR carries `Refs #3109 -- remaining: paired runs of the 26 unrun goldens` instead (the flip stays `AFFECTS-ALL`).
+4. The results PR carries `Verifies #3136: …`, `Verifies #3183: …` and, if the prerequisite ran and the maintainer
+   accepts the 6-pair subset (acceptance recorded in the PR), `Verifies #3109: …` lines, each naming its artifact
+   (`issue-hygiene.md` B). Without that acceptance the PR carries
+   `Refs #3109 -- remaining: paired runs of the 26 unrun goldens` instead. With the prerequisite not run it carries
+   `Refs #3109 -- remaining: the W0 / Wrc pair, the 5 goldens-sp500 pairs and paired runs of the 26 unrun goldens`.
+   In both cases the flip stays `AFFECTS-ALL`.
 
 ## Launching (cloud session brief)
 

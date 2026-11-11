@@ -199,13 +199,21 @@ run_cell() {
 }
 
 # Keyed trades.csv diff of a pair: join on symbol|entry_date, ordered by entry date, no truncation. trades.csv is
-# sorted by symbol, so a positional diff would name the wrong "first divergence".
+# sorted by symbol, so a positional diff would name the wrong "first divergence". Rows are compared with column 20
+# (position_id) blanked: ids come from a process-global counter bumped at decision time, so one gate flip shifts the
+# id of every later-decided trade. A row that differs ONLY in its id is kind `id-shift` (it marks that an earlier
+# decision changed; never a divergence). Real differences keep the full row, id included, so the README T3 read can
+# order them by id (= decision order) rather than by fill date.
 trades_keyed_diff() { # $1 base trades.csv, $2 arm trades.csv
   awk -F, -v OFS='\t' '
+    function blank(s,   f, n, i, o) { n = split(s, f, ","); f[20] = ""; o = f[1]; for (i = 2; i <= n; i++) o = o "," f[i]; return o }
     NR == FNR { if (FNR > 1) a[$1 "|" $3] = $0; next }
     FNR > 1 { k = $1 "|" $3
       if (!(k in a)) print $3, $1, "arm-only", $0
-      else { seen[k] = 1; if (a[k] != $0) { print $3, $1, "changed-base", a[k]; print $3, $1, "changed-arm", $0 } } }
+      else { seen[k] = 1
+        if (a[k] != $0) {
+          if (blank(a[k]) == blank($0)) print $3, $1, "id-shift", a[k] " -> " $0
+          else { print $3, $1, "changed-base", a[k]; print $3, $1, "changed-arm", $0 } } } }
     END { for (k in a) if (!(k in seen)) { split(k, p, "|"); print p[2], p[1], "base-only", a[k] } }' "$1" "$2" |
     sort -s -t "$(printf '\t')" -k1,1 -k2,2
 }
