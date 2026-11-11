@@ -159,12 +159,16 @@ unread. V3 (liquidity) is expected to differ in the #3136 pair and is not gated:
 - **T2 liveness:** `trades.csv` differs. If identical, the read says "no realised entry or exit changed on this path";
   the stage guard has already shown that the divisor's input files exist, and #3301's AMZN-2018 / C-2010 tests pin
   the plumbing, so an identical pair is reported as a finding (the record path is insensitive), not as a failure.
-- **T3 attribution (the implementation check):** the first differing `trades.csv` row and `equity_curve.csv` date
-  (`firstdiff.txt`). The first differing entry or exit must be on a symbol whose divisor is not 1 on that date, i.e.
-  its `splits.csv` in `td-full` lists a split after that date that the raw close confirms. Every differing entry before
-  the paths separate on cash is listed with its symbol, date, side (blocked → admitted, the 10-19 measurement's
-  dominant 1.9 % class, or admitted → blocked, the 0.6 % class) and divisor. A first divergence on a symbol with
-  divisor 1 **fails** T3: something other than the gate moved.
+- **T3 attribution (the implementation check):** `firstdiff.txt` joins the two `trades.csv` on `symbol|entry_date`
+  (the file is sorted by symbol, not date, so a positional diff would not give the first divergence), orders the
+  base-only, arm-only and changed rows by entry date with no truncation, and adds the `equity_curve.csv` first
+  differing date. The first divergence is the earliest-dated such row. On that first date at least one differing
+  event must be on a symbol whose divisor is not 1 on that date, i.e. its `splits.csv` in `td-full` lists a split after
+  that date that the raw close confirms. Every differing entry before the paths separate on cash is listed with its
+  symbol, date, side (blocked → admitted, the 10-19 measurement's dominant 1.9 % class, or admitted → blocked, the
+  0.6 % class) and divisor. A first date on which every differing event is on a divisor-1 symbol **fails** T3:
+  something other than the gate moved. Same-date knock-on trades on divisor-1 symbols (a freed or consumed slot or
+  cash) are listed as displacement, not counted as a T3 failure.
 - **T4 level (reported, no verdict):** total return, end-NAV log ratio, MaxDD, trades, Sharpe, Calmar. A level delta
   below 0.45 log that T3 does not trace to gate decisions is path noise.
 - **The decision this pair can record** (the `[after-merge]` item): the pit-v12 lists already rank on true dollars
@@ -172,7 +176,10 @@ unread. V3 (liquidity) is expected to differ in the #3136 pair and is not gated:
   liquidity gate, computed at read time from bars. If T1 and T3 pass, Wtd ran on the unchanged `v12wk-9236`
   warehouse and its divergence is wholly the gate's, so **no list or warehouse rebuild is needed for the gate basis**;
   that is recorded on #3136 and the issue's last item is met. If T1 or T3 fails, no decision is recorded and the
-  failing specimen becomes the next step.
+  failing specimen becomes the next step. **If the pair is identical** (T3 has no first divergence), **no decision is
+  recorded**: the run has no liveness counter for the divisor, so an insensitive path cannot be told from an inert
+  knob. The next step is to trace first: take a W0 candidate-week from the 10-19 flip list, check its divisor and gate
+  outcome by hand, and record the decision only if that shows the gate was live.
 - **What it cannot decide:**
   - whether to flip the `true_dollar_volume` default. That is a separate config-default PR with its own paired goldens
     (`config-default-blast-radius.md`; the knob's docstring says so) and, as a look-ahead correction, the
@@ -258,8 +265,9 @@ on a broad universe; the sp500 cells are regression pins.
 2. Review pack for the 26y cells (`backtest-result-review.md`): `dev/scripts/review_pack.sh --no-container` on W0 /
    Wtd / Wrc, rendered and looked at before the writeup; the look is recorded.
 3. `sh dev/scripts/perf_long_cells.sh update <chain.log>`.
-4. The results PR carries `Verifies #3136: …`, `Verifies #3183: …` and, if the prerequisite ran, `Verifies #3109: …`
-   lines, each naming its artifact (`issue-hygiene.md` B).
+4. The results PR carries `Verifies #3136: …`, `Verifies #3183: …` and, if the prerequisite ran and the maintainer accepts the 6-pair subset (acceptance recorded in the PR), `Verifies #3109: …`
+   lines, each naming its artifact (`issue-hygiene.md` B). Without that acceptance, or with the prerequisite not run,
+   the PR carries `Refs #3109 -- remaining: paired runs of the 26 unrun goldens` instead (the flip stays `AFFECTS-ALL`).
 
 ## Launching (cloud session brief)
 

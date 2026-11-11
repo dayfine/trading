@@ -198,11 +198,25 @@ run_cell() {
   log "RESULT $tag => ${m:-<no result>} ${q:-<no validator>} v6diff:${v6:- none} $(tail -1 "$ART/$tag.rss" 2>/dev/null) $(tail -1 "$ART/$tag.log") ${guards} (wall ${wall}s)"
 }
 
-# First differing trades.csv row and equity_curve.csv date of a pair (the README's trace reads start here).
+# Keyed trades.csv diff of a pair: join on symbol|entry_date, ordered by entry date, no truncation. trades.csv is
+# sorted by symbol, so a positional diff would name the wrong "first divergence".
+trades_keyed_diff() { # $1 base trades.csv, $2 arm trades.csv
+  awk -F, -v OFS='\t' '
+    NR == FNR { if (FNR > 1) a[$1 "|" $3] = $0; next }
+    FNR > 1 { k = $1 "|" $3
+      if (!(k in a)) print $3, $1, "arm-only", $0
+      else { seen[k] = 1; if (a[k] != $0) { print $3, $1, "changed-base", a[k]; print $3, $1, "changed-arm", $0 } } }
+    END { for (k in a) if (!(k in seen)) { split(k, p, "|"); print p[2], p[1], "base-only", a[k] } }' "$1" "$2" |
+    sort -s -t "$(printf '\t')" -k1,1 -k2,2
+}
+
+# Keyed trades.csv diff, splits.csv diff and equity_curve.csv first differing date of a pair (the README's trace
+# reads start here). The first divergence is the earliest-dated line of the trades block.
 firstdiff() { # $1 base tag, $2 arm tag
   { echo "== $2 vs $1"
     cmp -s "$ART/$1-trades.csv" "$ART/$2-trades.csv" && echo "trades.csv identical" || {
-      diff "$ART/$1-trades.csv" "$ART/$2-trades.csv" | head -8; }
+      echo "trades.csv keyed diff (date, symbol, kind, row), earliest first:"
+      trades_keyed_diff "$ART/$1-trades.csv" "$ART/$2-trades.csv"; }
     cmp -s "$ART/$1-splits.csv" "$ART/$2-splits.csv" && echo "splits.csv identical" || diff "$ART/$1-splits.csv" "$ART/$2-splits.csv"
     awk -F, 'NR == FNR { a[FNR] = $0; next } a[FNR] != $0 { print "equity_curve first differing row: " $1; exit }' \
       "$ART/$1-equity_curve.csv" "$ART/$2-equity_curve.csv"; } >> "$ART/firstdiff.txt" 2>&1
