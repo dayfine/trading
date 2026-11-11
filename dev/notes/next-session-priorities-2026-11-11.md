@@ -19,7 +19,7 @@ Ground rules from 2026-11-10 §0 still hold (backtests in the cloud, local conta
 
 | PR | state |
 |---|---|
-| #3578 | follow-up to #3577 (CI pending → reviewer stops; cancelled/timed_out = no run). CI, then both QC gates |
+| #3578 | follow-up to #3577 (CI pending → reviewer stops; cancelled/timed_out = no run). All gates green; merges once main CI is green |
 | #3571 | chain-w pre-registration: **draft, rework cap reached**, see §4 |
 
 ## 3. Queue
@@ -33,6 +33,11 @@ Ground rules from 2026-11-10 §0 still hold (backtests in the cloud, local conta
 5. Local budget backfill 11-03 … 11-11 (`budget_local_record.sh --date D`, no other session live).
 6. Linter candidate from #3574 QC: for each `val` removed from an `.mli`, grep surviving docs for links to it
    (`odoc_dangling_ref_check.sh` only matches `Module._private`; the repo never runs `dune build @doc`).
+
+7. **#3578 QC gaps (one small PR):** word the CI rule as "status ≠ completed → stop" and "conclusion ∉ {success,
+   failure} → no completed run" (covers waiting/requested/neutral/stale/startup_failure); drop "each QC agent
+   pays its own full build" in `qc-structural-authority.md`; align `skipped` with `pr_gate_status.sh`; pin the
+   no-run sentence in `agent_standing_rules_check.sh` and its `_test.sh`.
 
 **Docker 4 GB check: answered, keep 5 GB.** Peak during a 3-reviewer cold-build wave was 3.23 GiB
 (00:32 PT 11-11). With #3577 reviewers no longer cold-build, so the peak should drop; re-measure after a few
