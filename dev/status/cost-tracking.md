@@ -1,6 +1,6 @@
 # Status: cost-tracking
 
-## Last updated: 2026-09-24
+## Last updated: 2026-11-11
 
 ## Status
 MERGED
@@ -10,6 +10,16 @@ since #483 + the new-day bug fix #495/#499. Verified on the most recent
 10 runs 2026-05-05..2026-05-11 — every JSON carries a non-null
 `totals.total_cost_usd` figure. Per-subagent breakdown remains a known
 gap, captured under §Follow-up below.)
+
+**Billing basis changed 2026-11-11.** The `ANTHROPIC_API_KEY` repo secret was
+set on 2026-11-11 (#3576), so the three scheduled Claude workflows
+(orchestrator, health-deep-weekly, track-pacer-weekly) now bill API credit
+instead of the Max plan. From that date `total_cost_usd` in
+`dev/budget/<date>-<run>.json` is real API dollars; earlier records are the
+action's list-price estimate of plan usage. The key belongs to the `trading-gha` Console workspace, capped at $60/month
+(set 2026-11-11). At the cap the API refuses calls and the workflows fail;
+they do not fall back to the OAuth token while the secret is set. Delete the secret to fall back to
+`CLAUDE_CODE_OAUTH_TOKEN`.
 
 ## Interface stable
 NO
