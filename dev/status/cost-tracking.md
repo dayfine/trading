@@ -16,8 +16,9 @@ set on 2026-11-11 (#3576), so the three scheduled Claude workflows
 (orchestrator, health-deep-weekly, track-pacer-weekly) now bill API credit
 instead of the Max plan. From that date `total_cost_usd` in
 `dev/budget/<date>-<run>.json` is real API dollars; earlier records are the
-action's list-price estimate of plan usage. The spend cap lives on the
-Console workspace, not in this repo. Delete the secret to fall back to
+action's list-price estimate of plan usage. The key belongs to the `trading-gha` Console workspace, capped at $60/month
+(set 2026-11-11). At the cap the API refuses calls and the workflows fail;
+they do not fall back to the OAuth token while the secret is set. Delete the secret to fall back to
 `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ## Interface stable
