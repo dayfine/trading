@@ -49,7 +49,8 @@ below apply without being restated; a brief that repeats them is wasted context.
   the dispatcher re-dispatches once it completes. Treat `cancelled`, `timed_out`, `skipped` or no
   `build-and-test` check at all as no completed run: build the whole tree locally and say so in the review.
   Also build locally when a finding depends on output CI does not show. A `failure` conclusion fails the
-  matching gate; read `gh run view <run-id> --log-failed`. Why: a cold local build costs ~25 min and ~1 GB of container memory
+  matching gate; read `gh run view <run-id> --log-failed`.
+  Why: a cold local build costs ~25 min and ~1 GB of container memory
   per reviewer and re-checks what CI already checked (2026-11-11: #3574 and #3573 reviewers killed
   25- and 50-minute local builds and fell back on CI).
 - **Review delivery (the gate reader parses this).** Line 1 is `Reviewed SHA: <full sha>`. The first
