@@ -39,6 +39,17 @@ below apply without being restated; a brief that repeats them is wasted context.
   the steps in a wrapper script inside your worktree and delete it before you finish
   (`feedback_agent_sandbox_docker_wrapper`). On GHA (`$TRADING_IN_CONTAINER=1`) you are already inside the
   container: run `dev/lib/run-in-env.sh dune …` with your cwd inside your own worktree.
+- **CI is the build of record.** Before any local `dune` call, read the `build-and-test` check at the
+  reviewed SHA: `gh api repos/dayfine/trading/commits/<sha>/check-runs --jq '.check_runs[] |
+  select(.name=="build-and-test") | "\(.status) \(.conclusion) \(.html_url)"'`. That job runs `dune build`,
+  `dune build @fmt` and `dune runtest`. On `completed success`, do not run a full `dune build` or
+  `dune runtest` locally: record the build, format and test gates as PASS and cite the run URL. Run local
+  dune only scoped to what the review needs (one test directory to check a claim, a mutation probe). Build
+  the whole tree locally only when CI has no completed run at that SHA (say so in the review) or a finding
+  depends on output CI does not show. A `failure` conclusion fails the matching gate; read
+  `gh run view <run-id> --log-failed`. Why: a cold local build costs ~25 min and ~1 GB of container memory
+  per reviewer and re-checks what CI already checked (2026-11-11: #3574 and #3573 reviewers killed
+  25- and 50-minute local builds and fell back on CI).
 - **Review delivery (the gate reader parses this).** Line 1 is `Reviewed SHA: <full sha>`. The first
   heading names only your own gate (`## <Gate> QC — <title>`). `## Verdict` sits on its own line, followed
   by `APPROVED` or `NEEDS_REWORK`. Post it as a COMMENT review with `commit_id` set to the reviewed SHA

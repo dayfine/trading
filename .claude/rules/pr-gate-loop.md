@@ -38,6 +38,16 @@ Two rules that are easy to get wrong and cost a re-run each time:
 - **Behavioral does not run until structural APPROVES.** Dispatching both at once
   wastes the behavioral agent when structural finds a blocker.
 
+## Who waits on CI
+
+The dispatcher, never the agent. Wait with `sh dev/scripts/wait_for.sh checks <N>` in the
+background (`dispatcher-cadence.md`) and dispatch QC once it reports `fail=0`; a rework agent
+pushes, reports the tip and stops. QC agents treat the green `build-and-test` run at the
+reviewed SHA as the build of record and do not rebuild the tree (standing rule in both QC
+agent definitions; local dune is scoped to what the review needs). Observed 2026-11-11: the #3574 and
+#3573 reviewers killed 25- and 50-minute local builds that CI had already passed; the #3572
+reviewer, which skipped it, reached the same confidence faster.
+
 ## Read the state, don't remember it
 
 ```sh
