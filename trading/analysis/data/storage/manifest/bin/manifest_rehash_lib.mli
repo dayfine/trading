@@ -14,9 +14,6 @@ type counters = {
 
     The pair shape is [(csv_path, error_message)]. *)
 
-val empty_counters : unit -> counters
-(** Fresh counters initialized to zero. *)
-
 val run :
   data_dir_str:string ->
   source:string ->

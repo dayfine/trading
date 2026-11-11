@@ -35,11 +35,6 @@ val macro_cancellations :
     filled shorts, long tickets and non-[Entering] positions are skipped. The
     caller decides whether the macro read warrants calling this. *)
 
-val partition_by_side :
-  Position.t String.Map.t -> Position.t String.Map.t * Position.t String.Map.t
-(** [(longs, shorts)] — splits a position map by side so each half can run
-    {!Entry_ticket_ttl} with its own rest limit. *)
-
 val armed : Weinstein_strategy_config.config -> bool
 (** [true] when any resting-ticket cancel is armed: the re-screen, a positive
     long clock, or either #3218 short lever. [false] means {!run} is a no-op, so

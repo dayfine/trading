@@ -1,6 +1,6 @@
 (executables
- (names generate_synth generate_synth_v2 generate_synth_v3)
- (modules generate_synth generate_synth_v2 generate_synth_v3)
+ (names generate_synth generate_synth_v3)
+ (modules generate_synth generate_synth_v3)
  (libraries
   core
   core_unix

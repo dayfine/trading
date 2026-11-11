@@ -7,18 +7,9 @@
 
 open Trading_strategy
 
-val is_exit_signal : Stage.result -> bool
-(** A long "exit to flat" signal: the symbol has rolled from a topping Stage 3
-    into a declining Stage 4, or is already in Stage 4. Stage 1/2 and a bare
-    Stage 3 (still topping, not yet broken) do not exit. *)
-
 val is_entry_signal : Stage.result -> bool
 (** A long entry signal: the symbol is in Stage 2 (advancing) {e and} the MA is
     rising — never a flat-MA basing tape. *)
-
-val is_cover_signal : Stage.result -> bool
-(** A short-cover signal: the symbol has LEFT Stage 4 — based (Stage 1) or
-    resumed advancing (Stage 2). The mirror of {!is_exit_signal} for a short. *)
 
 val stage_exit_label_for_side :
   side:Position.position_side -> Stage.result -> string option

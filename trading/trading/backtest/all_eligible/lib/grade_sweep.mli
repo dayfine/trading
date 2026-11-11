@@ -18,11 +18,6 @@
 
 open Core
 
-val grade_dir_name : Weinstein_types.grade -> string
-(** [grade_dir_name g] returns a filesystem-safe directory leaf for [g] — e.g.
-    ["grade-A_plus"] for [A_plus] (the [+] is escaped to [_plus] so the
-    directory name is portable across shells / filesystems). *)
-
 val sweep_grades : Weinstein_types.grade list
 (** The sweep ladder, ordered lowest-quality floor → highest-quality floor:
     [[F; D; C; B; A; A_plus]]. The ordering is what the cross-grade summary
@@ -78,13 +73,3 @@ val emit_grade_sweep : inputs:cell_inputs -> unit
 (** [emit_grade_sweep ~inputs] iterates [sweep_grades], runs {!build_cell} for
     each, writes per-cell artefacts to [inputs.out_dir/grade-<G>/], and writes a
     top-level [inputs.out_dir/summary.md] with the cross-grade table. *)
-
-val format_sweep_summary_md :
-  scenario_name:string ->
-  start_date:Date.t ->
-  end_date:Date.t ->
-  cells:(Weinstein_types.grade * All_eligible.result) list ->
-  string
-(** [format_sweep_summary_md ~scenario_name ~start_date ~end_date ~cells]
-    renders the cross-grade Markdown summary. Pure function; exposed for direct
-    unit-testing of the table layout. *)

@@ -15,9 +15,6 @@ let _default_min_window_bars = 30
    last bar is on / after [date] (exactly the pre-tolerance behaviour). *)
 let _default_max_staleness_trading_days = 0
 
-(* Re-exported from {!Staleness} so the public surface stays unchanged. *)
-let staleness_sample_size = S.sample_size
-
 (* Live-universe spec gate values (the spec, not the no-op record default). *)
 let _spec_min_price = 5.0
 let _spec_min_avg_dollar_volume = 1_000_000.0

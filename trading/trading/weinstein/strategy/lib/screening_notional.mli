@@ -24,16 +24,6 @@ val initial_long_notional : Position.t Map.M(String).t -> float
     must not trigger the cap. Entry-denominated also stays symmetric with the
     short cap and avoids threading a [get_price] mark into the walk. *)
 
-val initial_sector_exposures :
-  positions:Position.t Map.M(String).t ->
-  sector_lookup:(string -> string option) ->
-  (string, float) Hashtbl.t
-(** Build the per-sector exposure accumulator seeded with existing [Holding]
-    positions' entry-price-denominated absolute notional. [sector_lookup]
-    resolves each held symbol to its sector — same source the entry walk uses
-    for new candidates; symbols it can't resolve bucket under the empty string
-    (which the cap exempts). *)
-
 type entry_walk_state = {
   remaining_cash : float ref;
   short_notional_acc : float ref;

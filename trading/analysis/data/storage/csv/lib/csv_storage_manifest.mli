@@ -77,14 +77,6 @@ type reconcile_result =
           or the prior sha256 matched the new on-disk hash (refetch produced
           identical content). No diff entry written. *)
 
-val reconcile_log_path :
-  data_dir:Fpath.t -> reconcile_at:Time_ns.t -> string -> Fpath.t
-(** [reconcile_log_path ~data_dir ~reconcile_at symbol] returns the file path
-    where a reconcile entry for [symbol] captured at [reconcile_at] is written:
-    [data_dir / "_reconcile_log" / "YYYY-MM-DD" / "<symbol>.sexp"]. The date
-    shard uses UTC so log entries are stable across hosts. Pure path
-    computation. *)
-
 val reconcile_on_save :
   data_dir:Fpath.t ->
   symbol:string ->

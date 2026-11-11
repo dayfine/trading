@@ -28,12 +28,6 @@ type trade = {
 [@@deriving show, eq]
 (** Per-trade record exposed for the result type. *)
 
-val adjusted_prices : bid_ask_bps:float -> close:float -> float * float
-(** [adjusted_prices ~bid_ask_bps ~close] is [(buy_px, sell_px)] where buy fills
-    pay [close * (1 + bps/10000)] and sell fills receive
-    [close * (1 - bps/10000)]. The symmetric half-spread cost charged on every
-    fill. *)
-
 val mtm_equity : cash:float -> position:position -> close:float -> float
 (** [mtm_equity ~cash ~position ~close] is the mark-to-market equity given the
     cash balance, current position, and current period's close price.

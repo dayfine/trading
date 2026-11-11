@@ -40,16 +40,8 @@ type coverage = {
 val all_features : feature list
 (** Canonical order used when [--features] is omitted. *)
 
-val feature_name : feature -> string
-(** Lowercase identifier, matching the CSV column name. *)
-
 val feature_of_string : string -> feature option
 (** Parse a [--features] token (case-insensitive) to a feature. *)
-
-val feature_kind : feature -> kind
-(** Modelling kind; [Categorical] carries its full category set in canonical
-    order. The dropped reference is the first of these that is observed in the
-    data (see {!build}). *)
 
 val build :
   features:feature list ->

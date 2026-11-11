@@ -66,18 +66,6 @@ val top_symbol_divergences :
 
 (** {1 Rendering} *)
 
-val render_profile :
-  label:string ->
-  whipsaw_days:int ->
-  hold_ge:int ->
-  stop_gt:float ->
-  year_stat list ->
-  stop_summary ->
-  string
-
-val render_divergence :
-  a_label:string -> b_label:string -> year_div list -> sym_div list -> string
-
 val run :
   ?b_path:string ->
   ?a_label:string ->

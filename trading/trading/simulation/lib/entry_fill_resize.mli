@@ -58,16 +58,6 @@ val spendable_cash : Trading_portfolio.Portfolio.t -> float
     most a Buy fill can cost (shares plus commission) before the portfolio's
     cash floor refuses it. A cash-rejection record reports it as [budgeted]. *)
 
-val buy_budget :
-  portfolio:Trading_portfolio.Portfolio.t ->
-  trade:Trading_base.Types.trade ->
-  float
-(** [buy_budget ~portfolio ~trade] is the cash the portfolio's cash floor lets a
-    Buy spend on shares: [current_cash + negative_unrealized_pnl - commission].
-    A fill costing [quantity *. price] is accepted exactly when that cost does
-    not exceed this figure. It is the figure {!affordable_quantity} divides by
-    the price: {!spendable_cash} less the fill's commission. *)
-
 val affordable_quantity :
   portfolio:Trading_portfolio.Portfolio.t ->
   trade:Trading_base.Types.trade ->

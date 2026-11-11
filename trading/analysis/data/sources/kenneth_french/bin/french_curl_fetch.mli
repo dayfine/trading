@@ -31,11 +31,6 @@ val curl_max_time_seconds : int
 (** Per-request curl timeout. The 5-Industry daily ZIP is ~520 KB; this gives
     generous headroom even on slow links. *)
 
-val user_agent : string
-(** Browser-style User-Agent used in the [-A] header. The Dartmouth/Tuck server
-    returned 200 with [Mozilla/5.0] during the 2026-05-16 probe; we pin a
-    similar value defensively against future IIS WAF changes. *)
-
 val fetch : Uri.t -> dest_path:string -> unit Or_error.t Deferred.t
 (** [fetch uri ~dest_path] performs a one-shot HTTP GET via system [curl] and
     writes the (binary-safe) response body to [dest_path] on HTTP 200. Returns

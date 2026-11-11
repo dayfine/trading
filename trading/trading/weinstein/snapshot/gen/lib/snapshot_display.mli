@@ -18,9 +18,6 @@ val resistance_grade : Stock_analysis.t -> string option
     disarmed, so the disarmed v2 output stays byte-identical to the v1 grade
     string (both route through {!overhead_quality_label}). *)
 
-val regime_label : Weinstein_types.market_trend -> string
-(** Bare regime label (["Bullish"] / ["Bearish"] / ["Neutral"]). *)
-
 val macro_context : Macro.result -> Weekly_snapshot.macro_context
 
 val candidate_of_scored :

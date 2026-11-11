@@ -32,7 +32,6 @@ let invalid_argument_error message = { code = Invalid_argument; message }
 
 let internal_error message = { code = Internal; message }
 let not_found_error message = { code = NotFound; message }
-let permission_denied_error message = { code = Permission_denied; message }
 
 let _combine_messages first rest =
   match rest with
@@ -60,4 +59,3 @@ let ok () = Result.Ok ()
 let error_invalid_argument msg = Error (invalid_argument_error msg)
 let error_internal msg = Error (internal_error msg)
 let error_not_found msg = Error (not_found_error msg)
-let error_permission_denied msg = Error (permission_denied_error msg)
