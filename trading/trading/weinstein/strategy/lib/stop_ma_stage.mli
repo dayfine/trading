@@ -5,6 +5,16 @@
     the optional trailing-stop MA ([trailing_stop_ma_period], issue #3038) can
     be added without growing the runner. *)
 
+val default_stage_and_ma_for_side :
+  Trading_base.Types.position_side ->
+  Weinstein_types.stage * Weinstein_types.ma_direction
+(** Position-favourable stage + MA direction default for warmup periods (fewer
+    than [stage_config.ma_period] weekly bars). The return drives
+    {!Weinstein_stops.update} into its no-tighten branch: Stage 2 + Rising for a
+    long, Stage 4 + Declining for a short. Hardcoding [Stage2 + Flat] for shorts
+    tightened on every warmup tick (the G1 pathology, see
+    [dev/notes/short-side-gaps-2026-04-29.md]). *)
+
 val trailing_ma_value :
   ?ma_cache:Weekly_ma_cache.t ->
   stage_config:Stage.config ->

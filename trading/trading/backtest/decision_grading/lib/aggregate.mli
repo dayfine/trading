@@ -112,6 +112,11 @@ type group_stats = {
 [@@deriving show, eq, sexp]
 (** Aggregate statistics for one exit-reason group. *)
 
+val default_disaster_threshold_pct : float
+(** [-0.20] — the default cutoff for {!group_stats.disaster_dodge_rate}: a
+    post-exit drop of 20% or more (as a fraction of exit price) counts as a
+    disaster dodged. *)
+
 val aggregate_by_exit_reason :
   ?disaster_threshold_pct:float -> graded_trade list -> group_stats list
 (** [aggregate_by_exit_reason ?disaster_threshold_pct trades] partitions

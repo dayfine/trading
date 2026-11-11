@@ -38,6 +38,22 @@ type config = {
       (** Master seed. The HMM uses [seed]; the GARCH layer uses [seed + 1]. *)
 }
 
+val default_garch_per_regime : (Regime_hmm.regime * Garch.params) list
+(** Hand-set per-regime GARCH parameters. Documented in the module-level
+    comment. Roughly:
+    - Bull: omega=1e-6, alpha=0.05, beta=0.93 — annualised vol ~12%
+    - Bear: omega=1e-5, alpha=0.10, beta=0.85 — annualised vol ~25%
+    - Crisis: omega=5e-5, alpha=0.20, beta=0.75 — annualised vol ~60%
+
+    Calibration TODO: re-fit per regime from real history. *)
+
+val default_drift_per_regime : (Regime_hmm.regime * float) list
+(** Hand-set per-regime per-day log-return drifts:
+    - Bull: +0.0005/day (~13% annualised)
+    - Bear: -0.0003/day (~-7.5% annualised)
+    - Crisis: -0.002/day (~-50% annualised over a sustained crisis; mitigated by
+      short mean duration). *)
+
 val default_config :
   start_date:Core.Date.t ->
   start_price:float ->

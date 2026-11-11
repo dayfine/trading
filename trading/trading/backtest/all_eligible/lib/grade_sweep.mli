@@ -18,6 +18,11 @@
 
 open Core
 
+val sweep_grades : Weinstein_types.grade list
+(** The sweep ladder, ordered lowest-quality floor → highest-quality floor:
+    [[F; D; C; B; A; A_plus]]. The ordering is what the cross-grade summary
+    table reads down — trade counts decrease monotonically along it. *)
+
 type cell_inputs = {
   base_config : All_eligible.config;
       (** Template config (entry-dollars / return-buckets) used for every cell.
@@ -41,6 +46,23 @@ type cell_inputs = {
 (** Inputs threaded through {!emit_single_cell} and {!emit_grade_sweep}. Bundled
     into a record so the call sites don't have to repeat seven labelled
     arguments. *)
+
+val build_cell :
+  base_config:All_eligible.config ->
+  scored:Backtest_optimal.Optimal_types.scored_candidate list ->
+  min_grade:Weinstein_types.grade ->
+  All_eligible.config * All_eligible.result
+(** [build_cell ~base_config ~scored ~min_grade] applies the grade-floor + dedup
+    \+ grade pipeline for one cell:
+
+    1. {!All_eligible.filter_by_min_grade} drops scored candidates whose
+    [cascade_grade] is below [min_grade]. 2.
+    {!All_eligible.dedup_first_admission} collapses consecutive-Friday
+    re-firings on the surviving set. 3. {!All_eligible.grade} projects each
+    survivor into a fixed-dollar trade record and aggregates.
+
+    Returns the resolved per-cell config (with [min_grade] overwritten) plus the
+    cell's {!All_eligible.result}. Pure function. *)
 
 val emit_single_cell : inputs:cell_inputs -> unit
 (** [emit_single_cell ~inputs] runs {!build_cell} once for

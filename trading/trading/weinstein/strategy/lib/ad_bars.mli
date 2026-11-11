@@ -73,6 +73,11 @@ end
     once held one 1965 row and then 2017+, so every 26y run had no breadth for
     2000-2016. These helpers make such holes visible. *)
 
+val default_max_interior_gap_days : int
+(** Widest Unicorn hole, in calendar days between consecutive bars, that {!load}
+    leaves unfilled (7). The longest legitimate NYSE closure in the archive
+    (2001-09-10 to 2001-09-17) is exactly 7 days. *)
+
 val gaps :
   Macro.ad_bar list -> max_gap_days:int -> (Core.Date.t * Core.Date.t) list
 (** [gaps bars ~max_gap_days] returns every pair [(a, b)] of consecutive bar

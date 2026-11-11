@@ -31,6 +31,16 @@ type t = {
       (** Row-stochastic matrix governing per-step regime transitions. *)
 }
 
+val default_transitions : transition_matrix
+(** Hand-set defaults documented in the module-level comment. Chosen so:
+    - Mean Bull duration ≈ 1 / (1 - 0.97) ≈ 33 steps (interpreted as months when
+      paired with monthly drivers; the HMM itself is unitless).
+    - Mean Bear duration ≈ 1 / (1 - 0.93) ≈ 15 steps.
+    - Mean Crisis duration ≈ 1 / (1 - 0.65) ≈ ~3 steps; Crisis is rarely entered
+      (Bull→Crisis 0.005, Bear→Crisis 0.02).
+
+    Calibration TODO: re-derive from a Baum-Welch fit on 30y SPY history. *)
+
 val default : t
 (** Bull initial regime + [default_transitions]. Convenience constructor for
     callers that want the canonical hand-set HMM. *)

@@ -5,6 +5,12 @@
 open Core
 open Trading_strategy
 
+val initial_short_notional : Position.t Map.M(String).t -> float
+(** Sum entry-price-denominated short notional across all open [Holding] shorts.
+    Seeds the per-Friday short-notional accumulator before the entry walk begins
+    (entry-price-denominated so the cap measures committed-at-entry exposure).
+*)
+
 val initial_long_notional : Position.t Map.M(String).t -> float
 (** Sum entry-price-denominated long notional across all open [Holding] longs.
     Mirror of {!initial_short_notional}; seeds the per-Friday long-notional

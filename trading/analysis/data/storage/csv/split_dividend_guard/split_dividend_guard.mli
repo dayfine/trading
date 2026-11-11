@@ -61,6 +61,18 @@ val implied_factor : prev_close:float -> amount:float -> float option
     [amount] makes the split detector see. [None] unless
     [0 < amount < prev_close]. *)
 
+val is_dividend_not_split :
+  ?config:config ->
+  date:Date.t ->
+  prev_close:float ->
+  factor:float ->
+  dividends:Corporate_actions.dividend list ->
+  splits:Corporate_actions.split list ->
+  unit ->
+  bool
+(** The pure rule from the module doc: [true] means the detected split of
+    [factor] on [date] is the dividend and must not be applied. *)
+
 type loader = string -> Corporate_actions.dividend list Status.status_or
 (** Reads one symbol's dividends; [NotFound] means "no file". *)
 

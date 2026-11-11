@@ -51,6 +51,10 @@ val build :
     filters, and assembles the standardised one-hot design matrix. [Error] when
     no complete-case rows remain. *)
 
+val era_bounds : (string * int * int) list
+(** The fixed era split as [(label, min_year, max_year)] inclusive: 2000-2008 /
+    2009-2017 / 2018-2026. *)
+
 val eras : Csv_rows.row list -> (string * Csv_rows.row list) list
 (** [eras rows] partitions [rows] by [signal_date] year into {!era_bounds}
     (empty eras are retained so the caller can report them). *)

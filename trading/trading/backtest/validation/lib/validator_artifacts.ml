@@ -207,6 +207,9 @@ let load_audit path =
     | exception exn ->
         Error ("trade_audit.sexp unreadable: " ^ Exn.to_string exn)
 
+let load_audit_lookup path =
+  match load_audit path with Ok a -> a.lookup | Error _ -> fun _ -> None
+
 (* Two dates share an ISO trading week iff (week_number, ISO week-year) match;
    the calendar year would split a week that crosses 1 January (#3266). *)
 let _same_week d1 d2 =

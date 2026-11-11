@@ -5,6 +5,11 @@
 
 open Weinstein_snapshot
 
+val overhead_quality_label : Weinstein_types.overhead_quality -> string
+(** Bare constructor label (e.g. ["Heavy_resistance"]) — the derived
+    [show_overhead_quality] printer module-qualifies the constructor, which the
+    display strings must not carry. *)
+
 val resistance_grade : Stock_analysis.t -> string option
 (** Resistance grade for display (score/display split, §D5): the v2
     sketch-derived grade with its continuous score (e.g.

@@ -53,6 +53,12 @@ val load_audit : string -> (loaded_audit, string) result
       empty lookup and no screens — a dead join, which V19 flags on every keyed
       row. *)
 
+val load_audit_lookup : string -> trade_row -> entry_context option
+(** [load_audit_lookup path] parses [trade_audit.sexp] and returns a lookup from
+    a {!trade_row} to its {!entry_context} via {!build_audit_lookup}
+    (position_id when the row has one, else [(symbol, entry_date)]). Returns an
+    always-[None] lookup when the file cannot be read. *)
+
 val bars_of_daily : Types.Daily_price.t list -> bars
 (** [bars_of_daily daily] projects an ascending run of stored daily bars onto
     the {!Validator_types.bars} the checks read. Exposed — rather than left

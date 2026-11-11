@@ -49,6 +49,13 @@ val detect_for_held_positions :
     bar (weekends/holidays) or no prior bar (first appearance) yield no event.
     Order follows [portfolio.positions] (sorted by symbol). *)
 
+val apply_events :
+  Trading_portfolio.Portfolio.t ->
+  Trading_portfolio.Split_event.t list ->
+  Trading_portfolio.Portfolio.t
+(** Apply each detected split event to [portfolio] in order. Pure: returns the
+    updated portfolio with all events folded in. *)
+
 val apply_to_position :
   float -> Trading_strategy.Position.t -> Trading_strategy.Position.t
 (** Apply a split [factor] to a strategy-side {!Trading_strategy.Position.t}'s

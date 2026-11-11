@@ -44,6 +44,10 @@ val render : t -> string
 (** [render chip] is the [<span class="chip …">…</span>] element, with [text]
     escaped via {!Html_page.escape}. *)
 
+val render_all : t list -> string
+(** [render_all chips] concatenates {!render} over [chips], with no separator —
+    spacing is the stylesheet's job. [[]] renders as the empty string. *)
+
 val group : ?cls:string -> t list -> string
 (** [group ?cls chips] wraps {!render_all} in a [<span>] container so a run of
     chips lays out as one unit. [cls] defaults to ["chips"]. *)

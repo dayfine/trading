@@ -84,6 +84,9 @@ val load : root:string -> string -> entry
     [bars.csv] / [meta.sexp]: a corpus defect must fail the suite, never be
     skipped. *)
 
+val load_all : root:string -> entry list
+(** Every entry under [root], in {!entry_names} order. *)
+
 (** {1 Basis restatement}
 
     The suite's oracle: a corpus bar restated into another bar's basis is what

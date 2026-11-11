@@ -24,6 +24,10 @@
     [dev/plans/experiment-platform-2026-05-29.md]; shared with the Bayesian
     optimizer's best-of-N correction. *)
 
+val euler_mascheroni : float
+(** The Euler-Mascheroni constant gamma (approximately [0.5772156649]), used by
+    {!expected_max_sharpe}. *)
+
 val skewness : float list -> float
 (** [skewness xs] is the population skewness gamma3 of [xs] (the third
     standardised moment, divisor [n] not [n - 1]). Raises [Invalid_argument] if

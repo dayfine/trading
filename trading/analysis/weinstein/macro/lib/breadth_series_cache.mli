@@ -33,6 +33,10 @@
 
 type t
 
+val trading_days_per_week : int
+(** Rows per [week_offset] step. 5 — the series carries one row per trading
+    session with holidays already dropped. *)
+
 val of_daily_bars : Macro_types.breadth_bar list -> t
 (** [of_daily_bars bars] indexes [bars] (ascending by date, as
     {!Breadth_bars.load} returns). An empty list yields an empty cache whose

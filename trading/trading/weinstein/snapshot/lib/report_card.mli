@@ -68,6 +68,17 @@ type t = {
           than an empty one). *)
 }
 
+val tradingview_href : string -> string
+(** [tradingview_href symbol] is the TradingView chart URL for [symbol].
+
+    A plain external link — not an asset — so the page stays self-contained: it
+    still inlines every stylesheet and every chart, references no external
+    resource, and needs no JavaScript to read.
+
+    The symbol is escaped for attribute context, so a malformed ticker yields a
+    dead link rather than an attribute breakout. The scheme and host are fixed
+    here, never taken from snapshot data. *)
+
 val render : t -> string
 (** [render card] is the complete [<div class="cand …">…</div>] element.
 

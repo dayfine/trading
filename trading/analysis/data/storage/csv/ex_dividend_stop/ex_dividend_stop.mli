@@ -29,6 +29,10 @@
 
 open Core
 
+val min_adjusted_amount : float
+(** [0.01]: FINRA 5330's de-minimis threshold. A dividend below one cent does
+    not move the order. *)
+
 val reduce_stop_level : stop_level:float -> amount:float -> float
 (** [reduce_stop_level ~stop_level ~amount] is the sell-stop level after one
     cash dividend of [amount] per share: [stop_level -. amount] rounded down to
