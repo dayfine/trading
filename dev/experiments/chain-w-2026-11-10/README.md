@@ -173,9 +173,27 @@ unread. V3 (liquidity) is expected to differ in the #3136 pair and is not gated:
   confirms. T3 passes if F exists and **no differing row has an id below F**. Every differing row with an id at or
   above F on a divisor-1 symbol is knock-on (a freed or consumed slot, cash, or a ticket that rests or never fills)
   and is listed as displacement, not counted as a T3 failure, whatever its fill date. A differing row with an id below
-  F **fails** T3: something other than the gate moved first. No `trade_audit.sexp` extract is needed (the audit is
-  not collected). Every differing entry is listed with its symbol, date, id, side (blocked → admitted, the 10-19
-  measurement's dominant 1.9 % class, or admitted → blocked, the 0.6 % class) and divisor.
+  F is **traced before T3 is scored FAIL** (below); only an untraced one fails T3: something other than the gate moved
+  first. Every differing entry is listed with its symbol, date, id, side and divisor. Three side classes: blocked →
+  admitted (the 10-19 measurement's dominant 1.9 % class), admitted → blocked (the 0.6 % class), and **hold exit
+  changed** (the liquidity exit reads the same divisor, `liquidity_exit_runner.ml:52-53`; `min_hold_dollar_adv` is
+  500,000 in W0).
+  - **Known limitation: F sees only decisions that leave a `trades.csv` row.** A first changed decision that leaves
+    no row is invisible to F: a placed ticket that never fills, or a fill the portfolio refuses at fill time for cash
+    (`portfolio rejected fill … Insufficient cash`). Its same-tick knock-on (a lower-ranked rival skipped as
+    `Insufficient_cash` in one run and placed in the other, or a later fill refused in one run only) then lands
+    below F. Measured on rk-k0 (QC review of this PR, iteration 2): 99 of 665 placed tickets never filled, 20–28 of
+    those had a lower-ranked `Insufficient_cash` rival in the same tick, and `rk-k0-s0.log` has 43 fill refusals.
+    About 3–4 % of correct runs would read as a false FAIL on rows alone. The same gap covers a split inside the
+    20-day ADV window that falls before the row's entry (fill) date, which reads divisor 1 at that date; this is rare.
+  - **Trace before FAIL.** `chain.sh` extracts each W cell's entry decisions from its `trade_audit.sexp` while it is
+    still in the output dir (`<tag>-entries.tsv`: `position_id`, symbol, decision `entry_date`, placed or skipped,
+    side, skip reason; collected, unlike the audit). Before T3 is scored FAIL, each differing row below F is traced
+    through the two runs' extracts and cell logs (`portfolio rejected fill`). If the row is a same-tick or fill-time
+    knock-on of a divisor ≠ 1 decision (a placed decision on a divisor ≠ 1 symbol that is in one extract only, filled
+    or not, and whose cash skipped or refused the row's entry in one run), that decision is recorded as the first
+    changed decision, F moves to its id, and T3 is read from there. Otherwise no decision is recorded and T3 fails.
+    This mirrors the identical-pair branch below.
 - **T4 level (reported, no verdict):** total return, end-NAV log ratio, MaxDD, trades, Sharpe, Calmar. A level delta
   below 0.45 log that T3 does not trace to gate decisions is path noise.
 - **The decision this pair can record** (the `[after-merge]` item): the pit-v12 lists already rank on true dollars
@@ -183,9 +201,9 @@ unread. V3 (liquidity) is expected to differ in the #3136 pair and is not gated:
   liquidity gate, computed at read time from bars. If T1 and T3 pass, Wtd ran on the unchanged `v12wk-9236`
   warehouse and its divergence is wholly the gate's, so **no list or warehouse rebuild is needed for the gate basis**;
   that is recorded on #3136 and the issue's last item is met. If T1 or T3 fails, no decision is recorded and the
-  failing specimen becomes the next step. **If the pair is identical** (T3 has no first divergence), **no decision is
-  recorded**: the run has no liveness counter for the divisor, so an insensitive path cannot be told from an inert
-  knob. The next step is to trace first: take a W0 candidate-week from the 10-19 flip list, check its divisor and gate
+  failing specimen becomes the next step. **If the pair is identical or `id-shift` only** (T3 has no F), **no
+  decision is recorded**: the run has no liveness counter for the divisor, so an insensitive path cannot be told from
+  an inert knob. The next step is to trace first: take a W0 candidate-week from the 10-19 flip list, check its divisor and gate
   outcome by hand, and record the decision only if that shows the gate was live.
 - **What it cannot decide:**
   - whether to flip the `true_dollar_volume` default. That is a separate config-default PR with its own paired goldens
@@ -268,7 +286,8 @@ on a broad universe; the sp500 cells are regression pins.
 ## After the chain
 
 1. `sh chain.sh collect <repo>/dev/experiments/chain-w-2026-11-10/results` (the chain also collects into
-   `.sweep-output/chain-w/results`). `trade_audit.sexp` is left out (large; not needed by these reads).
+   `.sweep-output/chain-w/results`). `trade_audit.sexp` is left out (large); T3's trace reads
+   the `<tag>-entries.tsv` extract instead.
 2. Review pack for the 26y cells (`backtest-result-review.md`): `dev/scripts/review_pack.sh --no-container` on W0 /
    Wtd / Wrc, rendered and looked at before the writeup; the look is recorded.
 3. `sh dev/scripts/perf_long_cells.sh update <chain.log>`.

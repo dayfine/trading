@@ -230,6 +230,43 @@ firstdiff() { # $1 base tag, $2 arm tag
       "$ART/$1-equity_curve.csv" "$ART/$2-equity_curve.csv"; } >> "$ART/firstdiff.txt" 2>&1
 }
 
+# Entry decisions of one W cell, from its trade_audit.sexp (README T3 trace-before-FAIL). trades.csv shows only fills;
+# this extract also shows a placed ticket that never filled and the candidates skipped at the same decision date.
+# One row per placed entry (position_id, symbol, decision entry_date, side) and one per distinct skipped alternative
+# (date, symbol, reason_skipped; position_id "-": no id is drawn for a skip). Sorted by decision date, placed first.
+# A week with no placed entry lists no alternatives in the audit, so its skips are not here. Tested on the local
+# rk-k0 audit (.sweep-output/walk-rk-k0/pack/runs/k0/trade_audit.sexp): 670 placed, 8,481 skipped rows (11,879
+# alternatives before de-duplication; 214 Insufficient_cash, 8,164 No_structural_stop, 101 Sized_to_zero, 2
+# Share_class_held).
+entries_extract() { # $1 trade_audit.sexp -> stdout TSV
+  printf 'position_id\tsymbol\tdecision_date\tkind\tside\tskip_reason\n'
+  tr -s '\n\t ' '   ' < "$1" | awk '{ gsub(/\(\(entry \(/, "\n&"); print }' | awk '
+    /^\(\(entry \(/ {
+      sym = ""; d = ""; id = ""; side = ""
+      if (match($0, /\(symbol [^ )]+\)/)) sym = substr($0, RSTART + 8, RLENGTH - 9)
+      if (match($0, /\(entry_date [0-9-]+\)/)) d = substr($0, RSTART + 12, RLENGTH - 13)
+      if (match($0, /\(position_id [^ )]+\)/)) id = substr($0, RSTART + 13, RLENGTH - 14)
+      if (match($0, /\(side [A-Za-z]+\)/)) side = substr($0, RSTART + 6, RLENGTH - 7)
+      print id "\t" sym "\t" d "\tplaced\t" side "\t-"
+      s = $0; i = index(s, "(alternatives_considered"); if (i == 0) next; s = substr(s, i)
+      while (match(s, /\(symbol [^ )]+\) \(side [A-Za-z]+\) \(score [^ )]+\) \(grade [A-Za-z_]+\) \(reason_skipped [A-Za-z_]+\)/)) {
+        r = substr(s, RSTART, RLENGTH); s = substr(s, RSTART + RLENGTH)
+        split(r, t, /[() ]+/)
+        k = d "|" t[3] "|" t[11]
+        if (!(k in seen)) { seen[k] = 1; print "-\t" t[3] "\t" d "\tskipped\t" t[5] "\t" t[11] } } }' |
+    LC_ALL=C sort -t "$(printf '\t')" -k3,3 -k4,4 -k1,1
+}
+
+# Entries extract of every W cell that ran, while its trade_audit.sexp is still in $ART (collect leaves the audit out).
+entries_reads() {
+  for tag in cw-W0-s0 cw-Wtd-s0 cw-Wrc-s0; do
+    [ -s "$ART/$tag-trade_audit.sexp" ] || continue
+    entries_extract "$ART/$tag-trade_audit.sexp" > "$ART/$tag-entries.tsv" &&
+      log "ENTRIES $tag: $(awk -F'\t' '$4 == "placed"' "$ART/$tag-entries.tsv" | wc -l | tr -d ' ') placed, $(awk -F'\t' '$4 == "skipped"' "$ART/$tag-entries.tsv" | wc -l | tr -d ' ') skipped -> $tag-entries.tsv" ||
+      log "ENTRIES $tag: extract FAILED"
+  done
+}
+
 cells() {
   R=$REPO/$REC/results; S=$REPO/$EXP/specs; G=$REPO/trading/test_data/backtest_scenarios/goldens-sp500
   run_cell cw-W0-s0 "$S/cw-W0.sexp" w "R=$R/rk-k0-s0-validator.sexp.sexp"
@@ -246,13 +283,14 @@ cells() {
   for f in actual.sexp trades.csv equity_curve.csv; do
     cmp -s "$R/rk-k0-s0-$f" "$ART/cw-W0-s0-$f" && log "PARITY W0 vs rk-k0 $f identical" || log "PARITY W0 vs rk-k0 $f DIFFERS"; done
   firstdiff cw-W0-s0 cw-Wtd-s0
+  entries_reads
   if rc_enabled; then firstdiff cw-W0-s0 cw-Wrc-s0; for g in $GOLDENS; do firstdiff "g-$g" "g-$g-rc"; done; fi
 }
 
 collect() {
   dest=${1:?usage: chain.sh collect DEST}; mkdir -p "$dest"
   for f in "$ART"/*; do [ -f "$f" ] || continue
-    case "$f" in *-trade_audit.sexp) continue ;; esac              # large; the read uses trades.csv + splits.csv
+    case "$f" in *-trade_audit.sexp) continue ;; esac   # large; T3 reads <tag>-entries.tsv, extracted by entries_reads
     cp "$f" "$dest/"; done
   [ -d "$ART/3183" ] && { mkdir -p "$dest/3183"; cp "$ART/3183/membership.csv" "$ART/3183/dropped.csv" "$dest/3183/"; cp "$ART"/3183/on/*.report.txt "$dest/3183/" 2>/dev/null; }
   cp "$LOG" "$dest/chain.log"; cp "$WORK/td-ca-extra.txt" "$dest/" 2>/dev/null
