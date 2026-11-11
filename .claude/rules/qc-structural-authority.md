@@ -14,7 +14,8 @@ architecture and conventions.
 ## Project context
 
 - Codebase: OCaml + Dune (see `.claude/rules/no-python.md`, `.claude/rules/ocaml-patterns.md`).
-- Build gates the agent runs (`dune build @fmt`, `dune build`, `dune runtest`)
+- Build gates (`dune build @fmt`, `dune build`, `dune runtest`), read from CI's
+  `build-and-test` at the reviewed SHA (agent standing rule "CI is the build of record"),
   cover most checks via dune-wired linters: `fn_length_linter`,
   `linter_magic_numbers.sh`, `linter_mli_coverage.sh`, `nesting_linter`.
 - Test framework of record: OUnit2 + the in-repo Matchers library
