@@ -24,7 +24,9 @@
 #
 #   secret_names:
 #     - BOT_GITHUB_TOKEN          (fine-grained PAT for repo writes)
-#     - CLAUDE_CODE_OAUTH_TOKEN   (claude-code-action auth)
+#     - CLAUDE_CODE_OAUTH_TOKEN   (claude-code-action auth, plan quota)
+#     - ANTHROPIC_API_KEY_ORCHESTRATOR (optional; when set, bills API credit
+#       instead of the plan. No plan ceiling then: cap spend in the Console)
 #     - GITHUB_TOKEN              (auto-provided by GHA; used for ghcr login)
 #
 #   cron_slots:              every 3h at :17 — 8 slots/day
@@ -208,7 +210,11 @@ jobs:
         id: run-orchestrator
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # API-key billing when ANTHROPIC_API_KEY_ORCHESTRATOR is set (one key per workflow,
+          # so Console usage splits by job);
+          # otherwise the plan's OAuth token. Only one of the two is ever non-empty.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY_ORCHESTRATOR }}
+          claude_code_oauth_token: ${{ secrets.ANTHROPIC_API_KEY_ORCHESTRATOR == '' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
           # show_full_output omitted (default false). Tool-call traces are
           # dumped to the GHA log at ~2-3 MB per run and duplicate content
