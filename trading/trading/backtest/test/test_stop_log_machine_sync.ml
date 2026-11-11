@@ -39,6 +39,8 @@ let _update_stop level =
 type step =
   | Trans of Position.transition
   | Decision of float * float
+  | Tightened of float * float * Weinstein_stops.Tighten_trigger.t
+      (** A decision on a tightened stop, carrying its trigger. *)
   | Split of float
       (** The strategy rescaled the stop for a split by this factor (#3127). *)
 
@@ -52,7 +54,10 @@ let _run ~installed steps : Stop_log.stop_info =
     | Trans t -> Stop_log.record_transitions log [ t ]
     | Decision (stop_before, stop_after) ->
         Stop_log.record_stop_decision log ~position_id:_pid ~stop_before
-          ~stop_after
+          ~stop_after ~tighten_trigger:None
+    | Tightened (stop_before, stop_after, trigger) ->
+        Stop_log.record_stop_decision log ~position_id:_pid ~stop_before
+          ~stop_after ~tighten_trigger:(Some trigger)
     | Split factor -> Stop_log.record_stop_split log ~position_id:_pid ~factor);
   match Stop_log.get_stop_infos log with
   | [ info ] -> info
@@ -331,6 +336,41 @@ let test_split_for_unknown_position_is_ignored _ =
            ];
        ])
 
+(* The tightening trigger rides on the stop info, and a later decision that
+   carries none (a hold row from a never-tightened prefix, or a test feed)
+   does not erase it. Levels and raise counts are those of the plain-decision
+   drive: the trigger is reporting only. *)
+let test_tighten_trigger_is_kept _ =
+  assert_that
+    (_run ~installed:80.0
+       [
+         Trans _create_entering;
+         Trans _entry_complete_no_stop;
+         Decision (80.0, 80.0);
+         Tightened (80.0, 90.0, Weinstein_stops.Tighten_trigger.Stage3_or_4);
+         Decision (90.0, 90.0);
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Stop_log.stop_info) -> i.tighten_trigger)
+           (is_some_and (equal_to Weinstein_stops.Tighten_trigger.Stage3_or_4));
+         field
+           (fun (i : Stop_log.stop_info) -> i.exit_stop)
+           (is_some_and (float_equal 90.0));
+         field (fun (i : Stop_log.stop_info) -> i.n_stop_raises) (equal_to 1);
+       ])
+
+let test_never_tightened_has_no_trigger _ =
+  assert_that
+    (_run ~installed:80.0
+       [
+         Trans _create_entering;
+         Trans _entry_complete_no_stop;
+         Decision (80.0, 85.0);
+       ])
+    (field (fun (i : Stop_log.stop_info) -> i.tighten_trigger) is_none)
+
 let suite =
   "Stop_log machine sync"
   >::: [
@@ -357,6 +397,9 @@ let suite =
          >:: test_avd_row_stop_columns_on_price_basis;
          "split for an unknown position is ignored (#3127)"
          >:: test_split_for_unknown_position_is_ignored;
+         "tighten trigger is kept" >:: test_tighten_trigger_is_kept;
+         "never tightened has no trigger"
+         >:: test_never_tightened_has_no_trigger;
        ]
 
 let () = run_test_tt_main suite

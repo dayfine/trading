@@ -224,6 +224,7 @@ let _force_liq_stop_info ~symbol ~detail : Backtest.Stop_log.stop_info =
            });
     max_stop = Some 95.0;
     n_stop_raises = 0;
+    tighten_trigger = None;
   }
 
 (** Render one round-trip whose stop record carries [stop_info] and return its
@@ -343,6 +344,7 @@ let test_end_of_period_renders_label _ =
           exit_trigger = Some Backtest.Stop_log.End_of_period;
           max_stop = Some 95.0;
           n_stop_raises = 0;
+          tighten_trigger = None;
         }
       in
       let result =
@@ -696,6 +698,7 @@ let test_trades_csv_populates_context_from_audit_and_stop_log _ =
              { stop_price = 92.0; actual_price = 91.99 });
       max_stop = Some 92.0;
       n_stop_raises = 0;
+      tighten_trigger = None;
     }
   in
   let result : Backtest.Runner.result =
@@ -773,6 +776,7 @@ let test_trades_csv_context_falls_back_to_empty_when_no_audit _ =
              { stop_price = 92.0; actual_price = 91.99 });
       max_stop = Some 92.0;
       n_stop_raises = 0;
+      tighten_trigger = None;
     }
   in
   let result =
@@ -850,6 +854,7 @@ let test_retraded_symbol_keys_triggers_by_position_id _ =
              { stop_price = 92.0; actual_price = 91.99 });
       max_stop = Some 92.0;
       n_stop_raises = 0;
+      tighten_trigger = None;
     }
   in
   let stop2 : Backtest.Stop_log.stop_info =
@@ -862,6 +867,7 @@ let test_retraded_symbol_keys_triggers_by_position_id _ =
       exit_trigger = Some Backtest.Stop_log.End_of_period;
       max_stop = Some 92.0;
       n_stop_raises = 0;
+      tighten_trigger = None;
     }
   in
   let result : Backtest.Runner.result =

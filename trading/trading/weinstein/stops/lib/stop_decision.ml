@@ -46,6 +46,7 @@ type t = {
   last_correction_extreme : float option;
   ma_value : float;
   reason : reason;
+  tighten_trigger : Tighten_trigger.t option; [@sexp.option]
 }
 [@@deriving eq, sexp]
 
@@ -178,6 +179,15 @@ let _candidate ~config ~side ~reason ~correction_extreme ~ma_value =
       Some (_cycle_candidate ~config ~side ~correction_extreme ~ma_value)
   | _ -> None
 
+(* The trigger recorded on a [Tightened] state after the step, else before it
+   (a stop hit returns its input state, so either side would do there). *)
+let _tighten_trigger (step : step) =
+  match (step.after, step.before) with
+  | Stop_types.Tightened { reason; _ }, _
+  | _, Stop_types.Tightened { reason; _ } ->
+      Tighten_trigger.of_reason reason
+  | _ -> None
+
 let make ~config ~side ~position_id (step : step) : t =
   let last_trend_extreme, last_correction_extreme = _extremes ~side step in
   let reason = classify ~config ~side step in
@@ -197,6 +207,7 @@ let make ~config ~side ~position_id (step : step) : t =
     last_correction_extreme;
     ma_value = step.ma_value;
     reason;
+    tighten_trigger = _tighten_trigger step;
   }
 
 let is_hold = function

@@ -186,6 +186,7 @@ let _decision date position_id ~before ~after : Weinstein_stops.Stop_decision.t
     last_correction_extreme = None;
     ma_value = 120.0;
     reason = Raised;
+    tighten_trigger = None;
   }
 
 let _audit_head t =

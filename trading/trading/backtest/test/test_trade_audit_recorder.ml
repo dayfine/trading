@@ -610,6 +610,7 @@ let test_stop_decision_reaches_stop_log_and_audit_row _ =
       last_correction_extreme = Some 104.0;
       ma_value = 100.0;
       reason = SD.No_correction_yet;
+      tighten_trigger = None;
     };
   assert_that
     (Backtest.Stop_log.get_stop_infos stop_log)

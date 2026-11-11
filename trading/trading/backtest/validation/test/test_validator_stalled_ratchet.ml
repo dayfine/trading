@@ -43,6 +43,7 @@ let row ?(cb = 1) ?stop_after ?candidate ?(ma = 0.0) ?corr ~date ~reason stop :
     last_correction_extreme = corr;
     ma_value = ma;
     reason;
+    tighten_trigger = None;
   }
 
 let history ?(symbol = "TKT") ?(entry_date = "2020-01-03") decisions :

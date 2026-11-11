@@ -1244,6 +1244,7 @@ let _stop_decision ?(position_id = "AAPL-wein-1") ~date ~reason () : SD.t =
     last_correction_extreme = Some 104.0;
     ma_value = 100.0;
     reason;
+    tighten_trigger = None;
   }
 
 (** Decisions land on their entry's row in recording (= date) order. *)
