@@ -17,7 +17,7 @@
 # SECRETS REQUIRED
 # ----------------------------------------------------------------------------
 #   CLAUDE_CODE_OAUTH_TOKEN — generated via `claude setup-token`.
-#   ANTHROPIC_API_KEY_HEALTH — optional; when set, bills API credit instead of the plan.
+#   ANTHROPIC_API_KEY — optional; when set, bills API credit instead of the plan.
 #   BOT_GITHUB_TOKEN        — fine-grained PAT; Contents R+W, Pull requests R+W.
 #   Both are already configured in the repo (shared with orchestrator.yml).
 # ----------------------------------------------------------------------------
@@ -78,11 +78,11 @@ jobs:
       - name: Run health-scanner (deep mode)
         uses: anthropics/claude-code-action@v1
         with:
-          # API-key billing when ANTHROPIC_API_KEY_HEALTH is set (one key per workflow,
-          # so Console usage splits by job);
+          # API-key billing when ANTHROPIC_API_KEY is set (shared by the
+          # scheduled workflows in this repo);
           # otherwise the plan's OAuth token. Only one of the two is ever non-empty.
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY_HEALTH }}
-          claude_code_oauth_token: ${{ secrets.ANTHROPIC_API_KEY_HEALTH == '' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.ANTHROPIC_API_KEY == '' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
           prompt: |
             Run the deep scan. Today is ${{ steps.today.outputs.date }}.
