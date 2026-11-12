@@ -1,0 +1,29 @@
+[symbol_class_exclusion] dropped 17, kept 2738
+    - HSBA: symbol class excluded (Symbol_class.Non_usd_listing)
+    - LHC-UN: symbol class excluded (Symbol_class.Unit)
+    - CTRA_old: symbol class excluded (Symbol_class.Non_usd_listing)
+    - SBER: symbol class excluded (Symbol_class.Non_usd_listing)
+    - CELSIA: symbol class excluded (Symbol_class.Non_usd_listing)
+    - BAC-WS-A: symbol class excluded (Symbol_class.Warrant)
+    - WFC-WS: symbol class excluded (Symbol_class.Warrant)
+    - GM-WS-B: symbol class excluded (Symbol_class.Warrant)
+    - AIG-WS: symbol class excluded (Symbol_class.Warrant)
+    - COF-WS: symbol class excluded (Symbol_class.Warrant)
+    - RCF-UN: symbol class excluded (Symbol_class.Unit)
+    - CND-UN: symbol class excluded (Symbol_class.Unit)
+    - BAC-WS-B: symbol class excluded (Symbol_class.Warrant)
+    - STI-WS-A: symbol class excluded (Symbol_class.Warrant)
+    - CMA-WS: symbol class excluded (Symbol_class.Warrant)
+    - STI-WS-B: symbol class excluded (Symbol_class.Warrant)
+    - C-WS-A: symbol class excluded (Symbol_class.Warrant)
+[dual_class_dedup] dropped 6, kept 2732
+    - GOOG: dual-class duplicate of GOOGL
+    - PBR-A: dual-class duplicate of PBR
+    - BRK-A: dual-class duplicate of BRK-B
+    - LGF-A: dual-class duplicate of LGF-B
+    - NWS: dual-class duplicate of NWSA
+    - HEI-A: dual-class duplicate of HEI
+[reit_policy] dropped 0, kept 2732
+[adr_liquidity_floor] dropped 0, kept 2732
+[preferred_exclusion] dropped 0, kept 2732
+TOTAL: kept 2732, dropped 23

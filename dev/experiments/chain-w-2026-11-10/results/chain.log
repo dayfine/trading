@@ -1,0 +1,36 @@
+[11-12 08:22:02Z] chain-w run; CELL_TIMEOUT=21600s GOLDEN_TIMEOUT=3600s
+[11-12 08:22:08Z] PREREQ_MISSING: split_raw_confirm_min_share is not a config field at HEAD; the #3109 cells are skipped (README §Prerequisite)
+[11-12 08:22:08Z] HEAD=b54e44ea9 image=ghcr.io/dayfine/trading-ci:latest sha256:3865e48e8a61
+[11-12 08:22:08Z] disk free 22G
+[11-12 08:22:08Z] PULL warehouse v12wk-9236
+[11-12 08:22:18Z] chain-w run; CELL_TIMEOUT=21600s GOLDEN_TIMEOUT=3600s
+[11-12 08:22:19Z] PREREQ_MISSING: split_raw_confirm_min_share is not a config field at HEAD; the #3109 cells are skipped (README §Prerequisite)
+[11-12 08:22:19Z] HEAD=b54e44ea9 image=ghcr.io/dayfine/trading-ci:latest sha256:3865e48e8a61
+[11-12 08:22:19Z] disk free 22G
+[11-12 08:22:19Z] PULL warehouse v12wk-9236
+[11-12 08:33:26Z] PULL corpact corpact-2026-10-27
+[11-12 08:33:28Z] PULL bars data-20261102
+[11-12 08:34:17Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-12 08:34:18Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv, 11888 data.csv
+[11-12 08:34:18Z] BUILD
+[11-12 08:35:36Z] BUILD_DONE
+[11-12 08:35:36Z] SPEC CHECKS OK (W0 = rk-k0; each arm = its base + one override)
+[11-12 08:35:36Z] PREFLIGHT cw-W0
+[11-12 08:40:12Z] PREFLIGHT_OK cw-W0 (276s)
+[11-12 08:40:12Z] PREFLIGHT cw-Wtd
+[11-12 08:44:55Z] PREFLIGHT_OK cw-Wtd (283s)
+[11-12 08:44:55Z] 3183 policy runs: 56 pit-v12 lists x {off, on}
+[11-12 08:45:17Z] 3183 DONE: 56 lists -> /home/user/trading/.sweep-output/chain-w/art/3183/membership.csv
+[11-12 08:45:17Z] disk free 16G
+[11-12 08:45:17Z] RUN cw-W0-s0 (cw-W0, TRADING_DATA_DIR=/w/.sweep-output/chain-w/td-full)
+[11-12 10:39:57Z] RESULT cw-W0-s0 => total_return_pct 1472.7554563229353 total_trades 576 sharpe_ratio 0.63378419510324935 max_drawdown_pct 27.21768913331405 calmar_ratio 0.40279380963353373  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 1 violations (31 skipped)  v6diff: vsR:exit=0 peak_rss_kb=5776168 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=3 no_files=0 Panel_runner: snapshot cache hits=148059516 misses=20622 miss_absent=11423 evictions=0 n_symbols=9200 misses_per_symbol=2.24 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2549673456 maxrss_bytes=5899329536  (wall 6875s)
+[11-12 10:39:58Z] disk free 16G
+[11-12 10:39:58Z] RUN cw-Wtd-s0 (cw-Wtd, TRADING_DATA_DIR=/w/.sweep-output/chain-w/td-full)
+[11-12 12:35:56Z] RESULT cw-Wtd-s0 => total_return_pct 1388.0843602122645 total_trades 575 sharpe_ratio 0.61725383497505326 max_drawdown_pct 27.217350169434823 calmar_ratio 0.39428855169471921  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 1 violations (28 skipped)  v6diff: vsW0:exit=0 peak_rss_kb=5748188 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=3 no_files=0 Panel_runner: snapshot cache hits=148053213 misses=20622 miss_absent=11423 evictions=0 n_symbols=9200 misses_per_symbol=2.24 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2506193800 maxrss_bytes=5884903424  (wall 6952s)
+[11-12 12:35:56Z] SKIP #3109 cells: PREREQ_MISSING (split_raw_confirm_min_share)
+[11-12 12:35:57Z] CELLS DONE
+[11-12 12:35:57Z] PARITY W0 vs rk-k0 actual.sexp DIFFERS
+[11-12 12:35:57Z] PARITY W0 vs rk-k0 trades.csv DIFFERS
+[11-12 12:35:57Z] PARITY W0 vs rk-k0 equity_curve.csv DIFFERS
+[11-12 12:35:57Z] ENTRIES cw-W0-s0: 683 placed, 8588 skipped -> cw-W0-s0-entries.tsv
+[11-12 12:35:57Z] ENTRIES cw-Wtd-s0: 679 placed, 8676 skipped -> cw-Wtd-s0-entries.tsv

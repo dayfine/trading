@@ -1,0 +1,20 @@
+[symbol_class_exclusion] dropped 6, kept 2783
+    - SBER: symbol class excluded (Symbol_class.Non_usd_listing)
+    - RCF-UN: symbol class excluded (Symbol_class.Unit)
+    - DNMR-WS: symbol class excluded (Symbol_class.Warrant)
+    - CVE-WS: symbol class excluded (Symbol_class.Warrant)
+    - SEDA-UN: symbol class excluded (Symbol_class.Unit)
+    - ACIC-WS: symbol class excluded (Symbol_class.Warrant)
+[dual_class_dedup] dropped 8, kept 2775
+    - GOOG: dual-class duplicate of GOOGL
+    - BRK-A: dual-class duplicate of BRK-B
+    - PBR-A: dual-class duplicate of PBR
+    - UA: dual-class duplicate of UAA
+    - FOX: dual-class duplicate of FOXA
+    - HEI-A: dual-class duplicate of HEI
+    - NWS: dual-class duplicate of NWSA
+    - LGF-B: dual-class duplicate of LGF-A
+[reit_policy] dropped 0, kept 2775
+[adr_liquidity_floor] dropped 0, kept 2775
+[preferred_exclusion] dropped 0, kept 2775
+TOTAL: kept 2775, dropped 14

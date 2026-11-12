@@ -1,0 +1,19 @@
+[symbol_class_exclusion] dropped 5, kept 2787
+    - CTRA_old: symbol class excluded (Symbol_class.Non_usd_listing)
+    - SBER: symbol class excluded (Symbol_class.Non_usd_listing)
+    - LHC-UN: symbol class excluded (Symbol_class.Unit)
+    - CELSIA: symbol class excluded (Symbol_class.Non_usd_listing)
+    - RCF-UN: symbol class excluded (Symbol_class.Unit)
+[dual_class_dedup] dropped 8, kept 2779
+    - GOOG: dual-class duplicate of GOOGL
+    - PBR-A: dual-class duplicate of PBR
+    - BRK-A: dual-class duplicate of BRK-B
+    - FOX: dual-class duplicate of FOXA
+    - UA: dual-class duplicate of UAA
+    - HEI-A: dual-class duplicate of HEI
+    - LGF-B: dual-class duplicate of LGF-A
+    - NWS: dual-class duplicate of NWSA
+[reit_policy] dropped 0, kept 2779
+[adr_liquidity_floor] dropped 0, kept 2779
+[preferred_exclusion] dropped 0, kept 2779
+TOTAL: kept 2779, dropped 13
