@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-11-11 (orchestrator run 1 — see `dev/daily/2026-11-11.md`). Queue: 1 PR (#3571, draft, at rework cap, awaiting user); no dispatchable track work; no row changes.
+Last updated: 2026-11-12 (orchestrator run 1 — see `dev/daily/2026-11-12.md`). Queue: 1 PR (#3584, chain-w artifacts from a cloud session, reading pending); #3571 merged 11-11; no dispatchable track work; no row changes.
 11-11: merged #3572, #3573, #3574, #3576, #3577, #3578, #3579 (local).
 11-06: merged #3536 (local). 11-05: merged #3530, #3532. 11-04: merged #3524, #3526, #3527, #3529. 11-03: merged #3512, #3513, #3517, #3521. 11-02: merged #3499, #3500, #3501, #3502, #3503, #3504, #3507, #3508, #3510. 11-01: merged #3483, #3485, #3494, #3495, #3497. 10-31: merged #3490, #3493. 10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
 
