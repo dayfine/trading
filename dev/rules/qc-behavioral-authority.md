@@ -44,6 +44,15 @@ below do not apply):
 - The PR body's "Test plan" / "Test coverage" / "What it does" sections —
   the author's explicit claims.
 
+## Situational rule checks (read the rule when the PR matches)
+
+These rules load on demand, so read them by path when they apply, and add their rows to the checklist:
+
+- **Adds, flips or removes a strategy mechanism or flag:** `dev/rules/experiment-flag-discipline.md`
+  §"What QC can check" (R1–R5; R3 needs the ledger ACCEPT cited).
+- **Changes a strategy-config default:** `dev/rules/config-default-blast-radius.md`
+  §"What QC can check" (B1–B3: the paired table or zero-match statement in the PR body).
+
 ## Domain checklist (append to qc-behavioral's generic Contract Pinning Checklist)
 
 For Weinstein-feature PRs, append these rows below the CP1–CP4 rows. For

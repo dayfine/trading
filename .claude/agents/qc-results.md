@@ -42,7 +42,7 @@ Never `jj`, never `gh pr checkout` (`feedback_agent_gh_pr_checkout_moved_parent_
 
 ## Step 1 — locate the record
 
-For the experiment directory in the diff, read in this order: `README.md` (pre-registration, §Log, §Verdict), `specs/*.sexp`, `results/` (per-arm `actual.sexp`, `trades.csv`, `validator.sexp.sexp`, chain `.log`/`.rss`), the chain script, any read script (`paired.sh`, `*.awk`), and the ledger entry under `dev/experiments/_ledger/` if the PR adds one. Read `dev/rules/mechanism-validation-rigor.md`, `dev/rules/sweep-hygiene.md` (metric-glob tripwire), `universe-discipline.md`, `dev/rules/experiment-flag-discipline.md` and `dev/rules/perf-review-weekly.md` §3 — the checklist below cites them.
+For the experiment directory in the diff, read in this order: `README.md` (pre-registration, §Log, §Verdict), `specs/*.sexp`, `results/` (per-arm `actual.sexp`, `trades.csv`, `validator.sexp.sexp`, chain `.log`/`.rss`), the chain script, any read script (`paired.sh`, `*.awk`), and the ledger entry under `dev/experiments/_ledger/` if the PR adds one. Read `dev/rules/mechanism-validation-rigor.md`, `dev/rules/sweep-hygiene.md` (metric-glob tripwire), `.claude/rules/universe-discipline.md`, `dev/rules/experiment-flag-discipline.md`, `dev/rules/backtest-result-review.md` (RV1–RV3) and `dev/rules/perf-review-weekly.md` §3 — the checklist below cites them.
 
 ## Step 2 — the checklist
 

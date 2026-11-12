@@ -21,6 +21,17 @@ architecture and conventions.
 - Test framework of record: OUnit2 + the in-repo Matchers library
   (`base/matchers/`). Test conventions are in `.claude/rules/test-patterns.md`.
 
+## Situational rule checks (read the rule when the PR matches)
+
+These rules load on demand, so read them by path when they apply:
+
+- **Adds, flips or removes a strategy mechanism or flag:** `dev/rules/experiment-flag-discipline.md`
+  §"What QC can check" (R1–R5).
+- **Changes a strategy-config default** (a `[@sexp.default]`, a `let default*` field, or
+  `live-config-overrides.sexp`): `dev/rules/config-default-blast-radius.md` §"What QC can check" (B1–B3).
+
+Report each applicable row in the checklist below; a FAIL there blocks like any other row.
+
 ## Architecture rules to verify (append to the generic structural checklist)
 
 After completing the generic checklist (H1–H3, P1–P5), append these rows:

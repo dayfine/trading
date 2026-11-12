@@ -202,7 +202,7 @@
 #   gating knob(s) in `[bracket]` form. A knob whose coupling to another
 #   knob is undocumented, or documented in prose without the bracket
 #   convention, is still a false negative here — the mechanical signal
-#   is only as good as the docstring. `.claude/rules/
+#   is only as good as the docstring. `dev/rules/
 #   config-default-blast-radius.md`'s manual step is the backstop for
 #   exactly that residual: it asks the PR author to read the knob's own
 #   docstring and reason about gating relationships, not just grep for

@@ -245,14 +245,14 @@ when its trigger applies.** Agents that need one read it by path.
 |---|---|
 | launching a run over ~1 h, a sweep, or a chain | `sweep-hygiene.md`, `container-capacity-scheduling.md` |
 | dispatching agents, or deciding QC vs a backtest | `container-capacity-scheduling.md`, `feat-agent-dispatch.md`, `worktree-isolation.md` |
-| reading results of a 26y or verdict-bearing run | `backtest-result-review.md`, `mechanism-validation-rigor.md` |
+| reading results of a 26y or verdict-bearing run, or reviewing as qc-results | `backtest-result-review.md`, `mechanism-validation-rigor.md` |
 | a promote / reject / build / no-build call on a mechanism | `mechanism-validation-rigor.md`, `promotion-confirmation.md`, `experiment-flag-discipline.md` |
 | adding, flipping or removing a strategy-config default | `experiment-flag-discipline.md`, `config-default-blast-radius.md` |
 | weekly perf / usage / issue review | `perf-review-weekly.md`, `issue-hygiene.md` |
 | filing, closing or triaging issues | `issue-hygiene.md` |
 | handing work to GHA, Codex or Jules; the lane board | `gha-local-coordination.md`, `async-lanes.md`, `cross-agent-review.md` |
 | a Weinstein faithfulness question | `book-as-authority.md` |
-| reviewing as qc-structural / qc-behavioral | `qc-structural-authority.md`, `qc-behavioral-authority.md` |
+| reviewing as qc-structural / qc-behavioral | `qc-structural-authority.md`, `qc-behavioral-authority.md` (they route to `experiment-flag-discipline.md` and `config-default-blast-radius.md` when a PR touches a mechanism or a config default) |
 
 ## Agent skills
 
