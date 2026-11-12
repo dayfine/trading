@@ -107,7 +107,7 @@ Standard boilerplate for every feat-* / harness-maintainer / ops-data agent:
 # === Pre-work: create isolated jj workspace ===
 # Claude Code's isolation:"worktree" creates a git-worktree, NOT a jj-workspace.
 # Without this step, concurrent agents race the shared op_heads / default WorkspaceName.
-# See .claude/rules/worktree-isolation.md §"jj workspace isolation".
+# See dev/rules/worktree-isolation.md §"jj workspace isolation".
 #
 # CRITICAL: the workspace MUST live under the repo (.claude/worktrees/) so it is
 # visible inside the Docker container via the bind-mount. A /tmp path is

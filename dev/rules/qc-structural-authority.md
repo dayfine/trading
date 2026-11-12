@@ -50,7 +50,7 @@ QC agents dispatched on this repo MUST be invoked with both of:
    2026-05-14: two non-isolated QC agents rebased the parent `@` onto
    `experiments/continuation-tuning` and reverted `dev/status/screener.md`
    to pre-fix content on disk. Same rule as `feat-*` per
-   `.claude/rules/worktree-isolation.md`.
+   `dev/rules/worktree-isolation.md`.
 
 2. **Run `dune` inside docker, against the agent's OWN checkout — never the
    parent tree.** The dispatch prompt must explicitly instruct the agent to
@@ -68,7 +68,7 @@ QC agents dispatched on this repo MUST be invoked with both of:
    **`cd /workspaces/trading-1/trading` (the parent tree) is WRONG for a QC
    agent** — it builds whatever the dispatcher happens to have checked out,
    not the PR under review, and it contends for the parent's dune lock.
-   `.claude/rules/worktree-isolation.md` §"jj workspace isolation" is the
+   `dev/rules/worktree-isolation.md` §"jj workspace isolation" is the
    authority on this cwd rule: the same "cd to the parent builds the parent,
    not your edits" hazard that section documents for feat-agents applies
    identically to QC agents. See issue #2386.
