@@ -1,0 +1,828 @@
+{
+  "run_id": "local-2026-11-04",
+  "timestamp": "2026-11-12T08:54:59Z",
+  "commit_sha": "b54e44ea9d1f379ea8f35d367fa5aeb329a19695",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 11576,
+    "output_tokens": 990029,
+    "cache_read_input_tokens": 233780595,
+    "cache_creation_input_tokens": 9185375,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-11-04",
+    "source": "local-transcripts",
+    "generated_at": "2026-11-12T08:54:59Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-11-04",
+      "until": "2026-11-04"
+    },
+    "totals": {
+      "dispatches": 22,
+      "sessions": 6,
+      "resumes": 12,
+      "api_calls": 1579,
+      "input_tokens": 11576,
+      "output_tokens": 990029,
+      "cache_read_input_tokens": 233780595,
+      "cache_creation_input_tokens": 9185375,
+      "subagent_tokens": 180314270,
+      "main_tokens": 63653305,
+      "by_model": {
+        "claude-fable-5-1": {
+          "api_calls": 321,
+          "input_tokens": 9006,
+          "output_tokens": 217751,
+          "cache_read_input_tokens": 41876423,
+          "cache_creation_input_tokens": 589687
+        },
+        "claude-opus-5-5": {
+          "api_calls": 1147,
+          "input_tokens": 2348,
+          "output_tokens": 770374,
+          "cache_read_input_tokens": 178442401,
+          "cache_creation_input_tokens": 4912347
+        },
+        "claude-sonnet-5-5": {
+          "api_calls": 111,
+          "input_tokens": 222,
+          "output_tokens": 1904,
+          "cache_read_input_tokens": 13461771,
+          "cache_creation_input_tokens": 3683341
+        }
+      }
+    },
+    "context_histogram": {
+      "calls": 441,
+      "p50": 147532,
+      "p90": 205511,
+      "max": 239840,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 0,
+      "share_above_threshold_pct": 0,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 4,
+          "share_pct": 0.9
+        },
+        {
+          "label": "50-100k",
+          "calls": 105,
+          "share_pct": 23.8
+        },
+        {
+          "label": "100-150k",
+          "calls": 122,
+          "share_pct": 27.6
+        },
+        {
+          "label": "150-200k",
+          "calls": 143,
+          "share_pct": 32.4
+        },
+        {
+          "label": "200-300k",
+          "calls": 67,
+          "share_pct": 15.1
+        },
+        {
+          "label": "300-500k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "ab2aaf946e25da661",
+        "agent_type": "autostory-code",
+        "description": "FRLG 00.23 Cut + Lt. Surge",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 2705,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 187,
+            "input_tokens": 374,
+            "output_tokens": 200992,
+            "cache_read_input_tokens": 49758380,
+            "cache_creation_input_tokens": 420963
+          }
+        },
+        "api_calls": 187,
+        "input_tokens": 374,
+        "output_tokens": 200992,
+        "cache_read_input_tokens": 49758380,
+        "cache_creation_input_tokens": 420963
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "ad40f545843ae0e78",
+        "agent_type": "autostory-code",
+        "description": "FRLG battle loop bugs + simple tactics",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 2379,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 137,
+            "input_tokens": 276,
+            "output_tokens": 111237,
+            "cache_read_input_tokens": 26501076,
+            "cache_creation_input_tokens": 275821
+          }
+        },
+        "api_calls": 137,
+        "input_tokens": 276,
+        "output_tokens": 111237,
+        "cache_read_input_tokens": 26501076,
+        "cache_creation_input_tokens": 275821
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "aff1771a9bd0d217e",
+        "agent_type": "autostory-code",
+        "description": "Code FRLG 00.26 Bike Voucher+Bicycle",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 934,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/224",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 85,
+            "input_tokens": 170,
+            "output_tokens": 58879,
+            "cache_read_input_tokens": 12201441,
+            "cache_creation_input_tokens": 198525
+          }
+        },
+        "api_calls": 85,
+        "input_tokens": 170,
+        "output_tokens": 58879,
+        "cache_read_input_tokens": 12201441,
+        "cache_creation_input_tokens": 198525
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "ae64e22987b9c8e5f",
+        "agent_type": "autostory-code",
+        "description": "Code FRLG 00.27 Route 9→Route 10",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 887,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 77,
+            "input_tokens": 156,
+            "output_tokens": 74096,
+            "cache_read_input_tokens": 10886850,
+            "cache_creation_input_tokens": 224334
+          }
+        },
+        "api_calls": 77,
+        "input_tokens": 156,
+        "output_tokens": 74096,
+        "cache_read_input_tokens": 10886850,
+        "cache_creation_input_tokens": 224334
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "ab3b4073b751551b9",
+        "agent_type": "autostory-code",
+        "description": "Fix 00.24 Center warp miss",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 832,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 87,
+            "input_tokens": 176,
+            "output_tokens": 49761,
+            "cache_read_input_tokens": 10848662,
+            "cache_creation_input_tokens": 194546
+          }
+        },
+        "api_calls": 87,
+        "input_tokens": 176,
+        "output_tokens": 49761,
+        "cache_read_input_tokens": 10848662,
+        "cache_creation_input_tokens": 194546
+      },
+      {
+        "kind": "dispatch",
+        "session": "e1bd1e1b-b347-4f62-a7e9-e4bcd5f74dd1",
+        "agent_id": "a9fc4a0eb5447782c",
+        "agent_type": "feat-backtest",
+        "description": "Checkpoint follow-up PR (#3477 notes)",
+        "ref": "#3477",
+        "date": "2026-11-04",
+        "wall_seconds": 8345,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 64,
+            "input_tokens": 128,
+            "output_tokens": 816,
+            "cache_read_input_tokens": 8529719,
+            "cache_creation_input_tokens": 2322106
+          }
+        },
+        "api_calls": 64,
+        "input_tokens": 128,
+        "output_tokens": 816,
+        "cache_read_input_tokens": 8529719,
+        "cache_creation_input_tokens": 2322106
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "ad37d98f10e8a69dd",
+        "agent_type": "autostory-code",
+        "description": "Fix TEACH free-slot Machine set",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 727,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 73,
+            "input_tokens": 146,
+            "output_tokens": 50918,
+            "cache_read_input_tokens": 8801986,
+            "cache_creation_input_tokens": 176590
+          }
+        },
+        "api_calls": 73,
+        "input_tokens": 146,
+        "output_tokens": 50918,
+        "cache_read_input_tokens": 8801986,
+        "cache_creation_input_tokens": 176590
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "a99f56f05d95f6e5f",
+        "agent_type": "autostory-code",
+        "description": "Diagnose Surge loss (Raichu)",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 928,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 63,
+            "input_tokens": 128,
+            "output_tokens": 49507,
+            "cache_read_input_tokens": 7425304,
+            "cache_creation_input_tokens": 171195
+          }
+        },
+        "api_calls": 63,
+        "input_tokens": 128,
+        "output_tokens": 49507,
+        "cache_read_input_tokens": 7425304,
+        "cache_creation_input_tokens": 171195
+      },
+      {
+        "kind": "dispatch",
+        "session": "e1bd1e1b-b347-4f62-a7e9-e4bcd5f74dd1",
+        "agent_id": "ac5a998137087c278",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral #3524",
+        "ref": "#3524",
+        "date": "2026-11-04",
+        "wall_seconds": 3225,
+        "resumes": 2,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 42,
+            "input_tokens": 86,
+            "output_tokens": 2206,
+            "cache_read_input_tokens": 5620696,
+            "cache_creation_input_tokens": 958944
+          }
+        },
+        "api_calls": 42,
+        "input_tokens": 86,
+        "output_tokens": 2206,
+        "cache_read_input_tokens": 5620696,
+        "cache_creation_input_tokens": 958944
+      },
+      {
+        "kind": "dispatch",
+        "session": "e1bd1e1b-b347-4f62-a7e9-e4bcd5f74dd1",
+        "agent_id": "a622f86e23eb6363a",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral #3524 iter 1",
+        "ref": "#3524",
+        "date": "2026-11-04",
+        "wall_seconds": 1827,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 40,
+            "input_tokens": 80,
+            "output_tokens": 1056,
+            "cache_read_input_tokens": 5535867,
+            "cache_creation_input_tokens": 458734
+          }
+        },
+        "api_calls": 40,
+        "input_tokens": 80,
+        "output_tokens": 1056,
+        "cache_read_input_tokens": 5535867,
+        "cache_creation_input_tokens": 458734
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "a11ddd38bfe2782e2",
+        "agent_type": "autostory-code",
+        "description": "Fix 00.25 nurse walk + grey loop",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 596,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 59,
+            "input_tokens": 122,
+            "output_tokens": 33440,
+            "cache_read_input_tokens": 5392268,
+            "cache_creation_input_tokens": 118988
+          }
+        },
+        "api_calls": 59,
+        "input_tokens": 122,
+        "output_tokens": 33440,
+        "cache_read_input_tokens": 5392268,
+        "cache_creation_input_tokens": 118988
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "a0831c2e4350eda16",
+        "agent_type": "autostory-code",
+        "description": "TEACH: press A after learned",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 342,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 41,
+            "input_tokens": 82,
+            "output_tokens": 21760,
+            "cache_read_input_tokens": 3968452,
+            "cache_creation_input_tokens": 131185
+          }
+        },
+        "api_calls": 41,
+        "input_tokens": 82,
+        "output_tokens": 21760,
+        "cache_read_input_tokens": 3968452,
+        "cache_creation_input_tokens": 131185
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "a299900cff4e44bfd",
+        "agent_type": "autostory-code",
+        "description": "Fix summary moves read (Oddish)",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 403,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 51,
+            "input_tokens": 102,
+            "output_tokens": 22368,
+            "cache_read_input_tokens": 3849501,
+            "cache_creation_input_tokens": 79490
+          }
+        },
+        "api_calls": 51,
+        "input_tokens": 102,
+        "output_tokens": 22368,
+        "cache_read_input_tokens": 3849501,
+        "cache_creation_input_tokens": 79490
+      },
+      {
+        "kind": "dispatch",
+        "session": "95eaf9c2-d5ac-41ad-80d4-68ec3fc679be",
+        "agent_id": "a1cce877a4a9009dc",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral on PR #3525",
+        "ref": "#3525",
+        "date": "2026-11-04",
+        "wall_seconds": 128,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 16,
+            "input_tokens": 32,
+            "output_tokens": 167,
+            "cache_read_input_tokens": 2191468,
+            "cache_creation_input_tokens": 157709
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 32,
+        "output_tokens": 167,
+        "cache_read_input_tokens": 2191468,
+        "cache_creation_input_tokens": 157709
+      },
+      {
+        "kind": "dispatch",
+        "session": "e1bd1e1b-b347-4f62-a7e9-e4bcd5f74dd1",
+        "agent_id": "a17a776579d5e8094",
+        "agent_type": "qc-structural",
+        "description": "qc-structural #3524 iter 1",
+        "ref": "#3524",
+        "date": "2026-11-04",
+        "wall_seconds": 1521,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 14,
+            "input_tokens": 28,
+            "output_tokens": 231,
+            "cache_read_input_tokens": 1487783,
+            "cache_creation_input_tokens": 413784
+          }
+        },
+        "api_calls": 14,
+        "input_tokens": 28,
+        "output_tokens": 231,
+        "cache_read_input_tokens": 1487783,
+        "cache_creation_input_tokens": 413784
+      },
+      {
+        "kind": "dispatch",
+        "session": "e1bd1e1b-b347-4f62-a7e9-e4bcd5f74dd1",
+        "agent_id": "a4215d51e0be8c2fd",
+        "agent_type": "qc-structural",
+        "description": "qc-structural #3524",
+        "ref": "#3524",
+        "date": "2026-11-04",
+        "wall_seconds": 2484,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 14,
+            "input_tokens": 28,
+            "output_tokens": 389,
+            "cache_read_input_tokens": 1209878,
+            "cache_creation_input_tokens": 676696
+          }
+        },
+        "api_calls": 14,
+        "input_tokens": 28,
+        "output_tokens": 389,
+        "cache_read_input_tokens": 1209878,
+        "cache_creation_input_tokens": 676696
+      },
+      {
+        "kind": "dispatch",
+        "session": "03a5453a-3d58-4a9e-b2c1-585ec25ff7e4",
+        "agent_id": "ae64e22987b9c8e5f",
+        "agent_type": "autostory-code",
+        "description": "Code FRLG 00.27 Route 9→Route 10",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 187,
+        "resumes": 0,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 8,
+            "input_tokens": 16,
+            "output_tokens": 6995,
+            "cache_read_input_tokens": 1836172,
+            "cache_creation_input_tokens": 13054
+          }
+        },
+        "api_calls": 8,
+        "input_tokens": 16,
+        "output_tokens": 6995,
+        "cache_read_input_tokens": 1836172,
+        "cache_creation_input_tokens": 13054
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "a39a24e6f8608d9ea",
+        "agent_type": "run-records",
+        "description": "Add code-health allow tag",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 245,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 25,
+            "input_tokens": 50,
+            "output_tokens": 20319,
+            "cache_read_input_tokens": 1689253,
+            "cache_creation_input_tokens": 86339
+          }
+        },
+        "api_calls": 25,
+        "input_tokens": 50,
+        "output_tokens": 20319,
+        "cache_read_input_tokens": 1689253,
+        "cache_creation_input_tokens": 86339
+      },
+      {
+        "kind": "dispatch",
+        "session": "e1bd1e1b-b347-4f62-a7e9-e4bcd5f74dd1",
+        "agent_id": "aa240aa7b0d7915bd",
+        "agent_type": "feat-backtest",
+        "description": "Rework #3524 iteration 1",
+        "ref": "#3524",
+        "date": "2026-11-04",
+        "wall_seconds": 429,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 10,
+            "input_tokens": 20,
+            "output_tokens": 328,
+            "cache_read_input_tokens": 1173298,
+            "cache_creation_input_tokens": 134371
+          }
+        },
+        "api_calls": 10,
+        "input_tokens": 20,
+        "output_tokens": 328,
+        "cache_read_input_tokens": 1173298,
+        "cache_creation_input_tokens": 134371
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "af5024a53d54bf8e2",
+        "agent_type": "autostory-code",
+        "description": "Sim Surge+Erika move options",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 198,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 18,
+            "input_tokens": 36,
+            "output_tokens": 11150,
+            "cache_read_input_tokens": 1126440,
+            "cache_creation_input_tokens": 82452
+          }
+        },
+        "api_calls": 18,
+        "input_tokens": 36,
+        "output_tokens": 11150,
+        "cache_read_input_tokens": 1126440,
+        "cache_creation_input_tokens": 82452
+      },
+      {
+        "kind": "dispatch",
+        "session": "95eaf9c2-d5ac-41ad-80d4-68ec3fc679be",
+        "agent_id": "afaec35f12af4907b",
+        "agent_type": "qc-structural",
+        "description": "qc-structural on PR #3525",
+        "ref": "#3525",
+        "date": "2026-11-04",
+        "wall_seconds": 56,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 9,
+            "input_tokens": 18,
+            "output_tokens": 140,
+            "cache_read_input_tokens": 1061093,
+            "cache_creation_input_tokens": 136384
+          }
+        },
+        "api_calls": 9,
+        "input_tokens": 18,
+        "output_tokens": 140,
+        "cache_read_input_tokens": 1061093,
+        "cache_creation_input_tokens": 136384
+      },
+      {
+        "kind": "dispatch",
+        "session": "4776c4c1-483a-44ef-80a5-02f04e43807e",
+        "agent_id": "a93be61f4f9102ef5",
+        "agent_type": "Plan",
+        "description": "Plan FRLG checkpoints after Surge",
+        "ref": "",
+        "date": "2026-11-04",
+        "wall_seconds": 242,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 18,
+            "input_tokens": 36,
+            "output_tokens": 19484,
+            "cache_read_input_tokens": 960082,
+            "cache_creation_input_tokens": 87862
+          }
+        },
+        "api_calls": 18,
+        "input_tokens": 36,
+        "output_tokens": 19484,
+        "cache_read_input_tokens": 960082,
+        "cache_creation_input_tokens": 87862
+      }
+    ],
+    "sessions": [
+      {
+        "kind": "session",
+        "session": "03a5453a-3d58-4a9e-b2c1-585ec25ff7e4",
+        "date": "2026-11-04",
+        "wall_seconds": 188,
+        "dispatches_launched": 0,
+        "model": "unknown",
+        "models": {},
+        "api_calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0
+      },
+      {
+        "kind": "session",
+        "session": "01123b6a-b317-4630-a6be-4b5630e255af",
+        "date": "2026-11-04",
+        "wall_seconds": 1150,
+        "dispatches_launched": 0,
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 27,
+            "input_tokens": 746,
+            "output_tokens": 17252,
+            "cache_read_input_tokens": 1850937,
+            "cache_creation_input_tokens": 64484
+          }
+        },
+        "api_calls": 27,
+        "input_tokens": 746,
+        "output_tokens": 17252,
+        "cache_read_input_tokens": 1850937,
+        "cache_creation_input_tokens": 64484
+      },
+      {
+        "kind": "session",
+        "session": "2b8074bf-2387-4263-ae87-39d043c257ed",
+        "date": "2026-11-04",
+        "wall_seconds": 21313,
+        "dispatches_launched": 0,
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 294,
+            "input_tokens": 8260,
+            "output_tokens": 200499,
+            "cache_read_input_tokens": 40025486,
+            "cache_creation_input_tokens": 525203
+          }
+        },
+        "api_calls": 294,
+        "input_tokens": 8260,
+        "output_tokens": 200499,
+        "cache_read_input_tokens": 40025486,
+        "cache_creation_input_tokens": 525203
+      },
+      {
+        "kind": "session",
+        "session": "77a3697d-0043-4dac-859d-00d75fcdd8ca",
+        "date": "2026-11-04",
+        "wall_seconds": 0,
+        "dispatches_launched": 0,
+        "model": "unknown",
+        "models": {},
+        "api_calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0
+      },
+      {
+        "kind": "session",
+        "session": "698b072a-0f7b-4776-a4a3-6f3812687036",
+        "date": "2026-11-04",
+        "wall_seconds": 1122,
+        "dispatches_launched": 0,
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 21,
+            "input_tokens": 42,
+            "output_tokens": 7410,
+            "cache_read_input_tokens": 2939680,
+            "cache_creation_input_tokens": 127638
+          }
+        },
+        "api_calls": 21,
+        "input_tokens": 42,
+        "output_tokens": 7410,
+        "cache_read_input_tokens": 2939680,
+        "cache_creation_input_tokens": 127638
+      },
+      {
+        "kind": "session",
+        "session": "95eaf9c2-d5ac-41ad-80d4-68ec3fc679be",
+        "date": "2026-11-04",
+        "wall_seconds": 68205,
+        "dispatches_launched": 2,
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 99,
+            "input_tokens": 238,
+            "output_tokens": 28629,
+            "cache_read_input_tokens": 16908823,
+            "cache_creation_input_tokens": 947978
+          }
+        },
+        "api_calls": 99,
+        "input_tokens": 238,
+        "output_tokens": 28629,
+        "cache_read_input_tokens": 16908823,
+        "cache_creation_input_tokens": 947978
+      }
+    ]
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}
