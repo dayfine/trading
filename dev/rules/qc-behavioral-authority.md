@@ -139,7 +139,7 @@ no domain logic to leak into core modules.
 ## Operational requirements for QC agents in this repo
 
 Same invariants as qc-structural — see
-`.claude/rules/qc-structural-authority.md` §"Operational requirements
+`dev/rules/qc-structural-authority.md` §"Operational requirements
 for QC agents in this repo":
 
 1. Dispatch with **`isolation: "worktree"`, checked out with plain `git`**
@@ -153,7 +153,7 @@ for QC agents in this repo":
    `cd /workspaces/trading-1/trading` (the parent tree). Native invocations
    produce ENVFAIL on the ocamlformat / opam skew between host and
    container; parent-tree invocations build the wrong PR entirely. See
-   `.claude/rules/qc-structural-authority.md` item 2 for the exact
+   `dev/rules/qc-structural-authority.md` item 2 for the exact
    incantation and `.claude/rules/worktree-isolation.md` §"jj workspace
    isolation" for the authority on dune cwd (issue #2386).
 

@@ -50,7 +50,7 @@ Pass the PR number, the repository path and the review role to every
 invocation. Scope comes from `gh pr view <N> --json
 files,title,body,headRefName,headRefOid`, never from commit ancestry —
 concurrent agents leave unrelated commits in the graph, and the A3 rule in
-`.claude/rules/qc-structural-authority.md` is measured against the PR's file
+`dev/rules/qc-structural-authority.md` is measured against the PR's file
 list for exactly that reason. The `--base` diff Codex computes is *context*
 for the reviewer, not the scope.
 
@@ -58,7 +58,7 @@ for the reviewer, not the scope.
 
 Every dune gate the roles run (`dune build @fmt`, `dune build`, `dune
 runtest`) must execute **inside `trading-1-dev`, against the reviewer's own
-checkout** (`.claude/rules/qc-structural-authority.md` §"Operational
+checkout** (`dev/rules/qc-structural-authority.md` §"Operational
 requirements", `.claude/rules/worktree-isolation.md`). The container
 bind-mounts the repo at `/workspaces/trading-1`, so the worktree has to live
 under the repo — a `/tmp` path is invisible to `docker exec`, and a native
@@ -160,7 +160,7 @@ Common prompt body (both variants):
 ```
 Review PR #${PR_NUMBER} (head ${HEAD_SHA}) as qc-structural.
 Protocol: .claude/agents/qc-structural.md plus the project rows in
-.claude/rules/qc-structural-authority.md (P6, A1, A2, A3); also apply
+dev/rules/qc-structural-authority.md (P6, A1, A2, A3); also apply
 .claude/rules/experiment-flag-discipline.md R1-R3,
 .claude/rules/config-default-blast-radius.md B1-B3 and
 .claude/rules/test-patterns.md where the diff touches strategy config or tests.
@@ -219,7 +219,7 @@ already cleared the first gate; do NOT restate that fact or name that gate in
 your report. Protocol: .claude/agents/qc-behavioral.md (CP1-CP4: every
 non-trivial claim in .mli docstrings, the PR body's test plan and the linked
 issue must be pinned by a named test that exists in the diff) plus the domain
-rows and authority list in .claude/rules/qc-behavioral-authority.md (S/L/C/T
+rows and authority list in dev/rules/qc-behavioral-authority.md (S/L/C/T
 rows for Weinstein-domain PRs; all NA with one note for infra/harness PRs).
 For a faithfulness question the reference leaves open, the book is a local
 file — follow .claude/rules/book-as-authority.md. Shell scope: scoped

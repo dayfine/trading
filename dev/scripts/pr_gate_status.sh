@@ -157,7 +157,7 @@
 #
 #   The mechanism behind the OTHER four is structural, not coincidental:
 #   qc-behavioral's own CP2 row
-#   (`.claude/rules/qc-behavioral-authority.md`) routinely produces PR-body-only
+#   (`dev/rules/qc-behavioral-authority.md`) routinely produces PR-body-only
 #   findings ("your PR body advertises a test that does not exist"). Curing a
 #   body-only finding cannot move the tip, because nothing in the tree changed
 #   -- so the standard, CORRECT resolution of a CP2 finding always lands as

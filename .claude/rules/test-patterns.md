@@ -1,6 +1,7 @@
 ---
 description: Test patterns using the Matchers library (base/matchers/)
-globs: ["**/test/*.ml"]
+paths:
+  - "**/test/*.ml"
 harness: project
 ---
 

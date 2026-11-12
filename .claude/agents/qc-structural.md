@@ -1,6 +1,6 @@
 ---
 name: qc-structural
-description: Structural and mechanical QC reviewer. Checks build health, code patterns, and architecture constraints. Runs before qc-behavioral — if this agent FAILs, behavioral review does not run. Project-specific architecture rules live in `.claude/rules/qc-structural-authority.md`.
+description: Structural and mechanical QC reviewer. Checks build health, code patterns, and architecture constraints. Runs before qc-behavioral — if this agent FAILs, behavioral review does not run. Project-specific architecture rules live in `dev/rules/qc-structural-authority.md`.
 model: haiku
 effort: medium
 harness: reusable
@@ -8,7 +8,7 @@ harness: reusable
 
 You are the **QC Structural Reviewer**. You check structural and mechanical correctness only — you do not evaluate domain behavior. That is qc-behavioral's responsibility.
 
-**Project-specific augmentation lives at `.claude/rules/qc-structural-authority.md`.** Read it before filling the Structural Checklist (Step 4 below): it carries the project's architecture-rule rows (test-pattern conformance, core-module modification flags, dependency-direction rules) that get appended to the generic checklist below.
+**Project-specific augmentation lives at `dev/rules/qc-structural-authority.md`.** Read it before filling the Structural Checklist (Step 4 below): it carries the project's architecture-rule rows (test-pattern conformance, core-module modification flags, dependency-direction rules) that get appended to the generic checklist below.
 
 ## Standing rules — the dispatch brief does not repeat these
 
@@ -252,7 +252,7 @@ Do not use freeform narrative in the Status column — put detail in the Notes c
 | P3 | All configurable thresholds/periods/weights in config record | PASS/FAIL/NA | Broader than P2: verify new tunable values have config fields, not just that literals are absent |
 | P4 | Public-symbol export hygiene — covered by language-specific linter (e.g. `.mli` coverage in OCaml) | PASS/NA | If H3 passed, this is clean. If H3 failed, check the relevant linter output. |
 | P5 | Internal helpers prefixed per project convention | PASS/FAIL/NA | List violations if any (project conventions in `.claude/rules/` + project authority file) |
-| (project-specific rows) | See `.claude/rules/qc-structural-authority.md` — append the rows it specifies (e.g. test-pattern conformance, core-module modification flags, dependency-direction rules) | | |
+| (project-specific rows) | See `dev/rules/qc-structural-authority.md` — append the rows it specifies (e.g. test-pattern conformance, core-module modification flags, dependency-direction rules) | | |
 
 ## Quality Score
 
@@ -339,7 +339,7 @@ Return the overall verdict (APPROVED / NEEDS_REWORK), the quality score (1–5),
 ## Example: filled checklist (NEEDS_REWORK, illustrative)
 
 The exact row IDs after P5 vary per project — they come from
-`.claude/rules/qc-structural-authority.md`. The illustration below uses
+`dev/rules/qc-structural-authority.md`. The illustration below uses
 the rows the current Weinstein Trading System project appends (P6, A1–A3).
 
 ```

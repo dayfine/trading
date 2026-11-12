@@ -18,7 +18,7 @@ This repo is **single-context**: one domain (Weinstein-style stage-analysis trad
 
 Skills that read domain docs (`improve-codebase-architecture`, `diagnose`, `tdd`, `qc-behavioral`) should:
 
-1. **For Weinstein domain logic** — primary authority is `docs/design/weinstein-book-reference.md`. Trace every claim about stage classification, stop-loss rules, screener cascade, sector analysis to a section of that doc. The qc-behavioral agent already uses this contract; see `.claude/rules/qc-behavioral-authority.md` for the row-by-row checklist.
+1. **For Weinstein domain logic** — primary authority is `docs/design/weinstein-book-reference.md`. Trace every claim about stage classification, stop-loss rules, screener cascade, sector analysis to a section of that doc. The qc-behavioral agent already uses this contract; see `dev/rules/qc-behavioral-authority.md` for the row-by-row checklist.
 2. **For system architecture + component boundaries** — read `docs/design/weinstein-trading-system-v2.md` + `docs/design/codebase-assessment.md`.
 3. **For per-subsystem behavior** — read the matching `eng-design-N-*.md` (1=data, 2=screener, 3=stops, 4=simulation).
 4. **For "what changed and why"** — there are no formal ADRs yet. The closest equivalents are: `dev/plans/<feature>.md` (forward-looking plans), `dev/notes/<topic>.md` (post-hoc reasoning), and `dev/status/<track>.md` (current state per track). Treat plans as design intent, notes as decision narratives, status files as the live state.

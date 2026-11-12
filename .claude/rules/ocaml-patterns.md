@@ -1,6 +1,8 @@
 ---
 description: OCaml code patterns and idioms for this codebase
-globs: ["**/*.ml", "**/*.mli"]
+paths:
+  - "**/*.ml"
+  - "**/*.mli"
 harness: project
 ---
 

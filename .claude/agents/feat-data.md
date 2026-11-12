@@ -220,7 +220,7 @@ status to READY_FOR_REVIEW.
 
 ## Architecture constraint
 
-- **A2 boundary** (per `.claude/rules/qc-structural-authority.md`): all
+- **A2 boundary** (per `dev/rules/qc-structural-authority.md`): all
   feature code lives under `trading/analysis/data/`. **No imports from
   `analysis/data/` into `trading/trading/`** — the consumer side
   (`feat-backtest`, `feat-weinstein`) imports from `analysis/data/`,
