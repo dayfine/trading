@@ -38,6 +38,6 @@ no access to the first, is worth its cost (the `blind-judge` skill). Flag any di
 ## Measuring it
 
 Token rows carry `agent_type`, and the model too once the usage report records it.
-`perf-review-weekly.md` §Usage review reads tokens per model and per QC verdict. If direction-class
+`dev/rules/perf-review-weekly.md` §Usage review reads tokens per model and per QC verdict. If direction-class
 analysts cost more than they change, or if structural QC at `medium` starts missing what CI then catches,
 change the table here and record the numbers that drove the change.

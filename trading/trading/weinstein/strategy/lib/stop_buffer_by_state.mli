@@ -33,7 +33,7 @@
     are all unchanged). [docs/design/weinstein-book-reference.md] therefore
     needs no amendment for this module.
 
-    {1 R1 / R2 ([.claude/rules/experiment-flag-discipline.md])}
+    {1 R1 / R2 ([dev/rules/experiment-flag-discipline.md])}
 
     {b R1.} {!default} leaves every slot at {!unset}, and {!buffer_for} then
     returns its [~fallback] for every state — so with the default config the

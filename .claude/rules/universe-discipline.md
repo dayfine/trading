@@ -45,7 +45,7 @@ sensitive behaviour. The rule exists because that memory did not stop it.
 
 ## Consequence for the confirmation grid
 
-`promotion-confirmation.md` §"The grid" previously offered *"SP500-510 vs
+`dev/rules/promotion-confirmation.md` §"The grid" previously offered *"SP500-510 vs
 top-3000"* as an example of universe diversity. **That is superseded.** Grid
 universe diversity must be **broad-vs-broad** — a different PIT snapshot, a
 different breadth tier (top-1000 vs top-3000), or a different composition
@@ -75,9 +75,9 @@ numbers appear in the writeup's conclusions.
 
 ## Related
 
-- `promotion-confirmation.md` — the grid; its universe-diversity axis is
+- `dev/rules/promotion-confirmation.md` — the grid; its universe-diversity axis is
   constrained by this file.
-- `mechanism-validation-rigor.md` — a screen on the wrong universe fails check 1
+- `dev/rules/mechanism-validation-rigor.md` — a screen on the wrong universe fails check 1
   (estimand) before any of the other six.
 - `memory/project_cell_e_2020_stall_regime` — broad universe is the lever.
 - `memory/project_broad_universe_semantics`,

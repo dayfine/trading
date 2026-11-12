@@ -66,10 +66,10 @@ For any PR that adds or changes strategy logic:
   PR that, e.g., buys outside Stage 2, drops volume confirmation, or removes the
   macro gate is a FAIL regardless of backtest numbers.
 - **W2 — adaptation is a dial, and config-expressed.** Any adaptation is one of
-  the listed dials, lands as a config field (per `experiment-flag-discipline.md`),
+  the listed dials, lands as a config field (per `dev/rules/experiment-flag-discipline.md`),
   and cites Weinstein authority (book reference section) for why it is faithful.
   If the reference does not cover the case, **read the book** — it is available
-  locally; see `.claude/rules/book-as-authority.md` for the path, the OCR
+  locally; see `dev/rules/book-as-authority.md` for the path, the OCR
   caveat, and the requirement to write the resolved answer back into the
   reference.
   A mechanism that is *not* a documented dial or a faithful adaptation of one is

@@ -1,7 +1,7 @@
 #!/bin/sh
 # review_pack_render.sh -- render a review pack (dev/scripts/review_pack.sh) to
 # PNG screenshots so the pack can be LOOKED AT, not just read
-# (.claude/rules/backtest-result-review.md).
+# (dev/rules/backtest-result-review.md).
 #
 # usage:
 #   sh dev/scripts/review_pack_render.sh --site DIR [--out DIR] [--width W]

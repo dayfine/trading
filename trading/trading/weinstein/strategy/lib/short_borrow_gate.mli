@@ -1,7 +1,7 @@
 (** The [short_borrow_availability] short-entry gate (margin M3a).
 
     A faithful Weinstein short-side eligibility "dial" (default-off axis per
-    [.claude/rules/experiment-flag-discipline.md]) modelling
+    [dev/rules/experiment-flag-discipline.md]) modelling
     {b borrow availability}: a short can only be opened if shares are locatable
     to borrow. We have no locate feed, so borrow supply is proxied by
     {b trailing dollar-ADV} — a thinly-traded name has little float circulating

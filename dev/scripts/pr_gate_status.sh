@@ -23,7 +23,7 @@
 #   sh dev/scripts/pr_gate_status.sh            # all open PRs
 #   sh dev/scripts/pr_gate_status.sh 2265 2280  # just these
 #
-# CODEX COLUMN (.claude/rules/cross-agent-review.md)
+# CODEX COLUMN (dev/rules/cross-agent-review.md)
 #   A fourth, ADVISORY column reads reviews whose FIRST heading starts with
 #   "Codex" (e.g. "## Codex review -- <title>"), posted by dev/scripts/
 #   codex_review.sh. It is never a merge gate on its own: the three gates
@@ -40,7 +40,7 @@
 # BACKEND SELECTION (#2432 defect 2)
 #   This script needs to read PR lists/metadata/check-runs from GitHub. Local
 #   interactive sessions have `gh` on PATH and a browser login; the GHA
-#   orchestrator container (`.claude/rules/gha-local-coordination.md`) --
+#   orchestrator container (`dev/rules/gha-local-coordination.md`) --
 #   the environment the cron actually runs this script in -- has neither, only
 #   `curl` + `$GH_TOKEN`. The OLD code called `gh pr list`/`gh pr view`/
 #   `gh pr checks` unconditionally. Verified directly (dash AND bash, `gh`
@@ -78,7 +78,7 @@
 # OUTPUT: one row per PR --
 #   PR  CI  STRUCT  BEHAV  CODEX  VERIFIES  NEXT-ACTION
 # where STRUCT/BEHAV are ok | rework | unclear | stale(<sha>) | unreadable(<sha>) | none.
-# VERIFIES (#3275, .claude/rules/issue-hygiene.md B) is read only on a
+# VERIFIES (#3275, dev/rules/issue-hygiene.md B) is read only on a
 # results-only PR: ok (a "Verifies #N: <item>" body line) | none ("Verifies:
 # none") | missing (neither; the action keeps its MERGE but gains a
 # "[+ Verifies line missing]" hint, qc-results owns the FAIL). Every other PR
@@ -848,7 +848,7 @@ _qc_comment_warning() {
 }
 
 # _verifies_state BODY -> ok | none | missing, the VERIFIES column of a
-# results-only PR (.claude/rules/issue-hygiene.md B, #3275). "ok": at least one
+# results-only PR (dev/rules/issue-hygiene.md B, #3275). "ok": at least one
 # "Verifies #N: <item>" line; "none": an explicit "Verifies: none"; "missing":
 # neither. A line may carry a list marker ("- ") and leading spaces; the match
 # is case-sensitive, and a claim line wins over a stray "Verifies: none".

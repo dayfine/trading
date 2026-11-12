@@ -34,9 +34,9 @@ below apply without being restated; a brief that repeats them is wasted context.
   MCP `create_pull_request` tool) → check the PR's file list matches your task.
   **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
   name, the commit id and "PR NOT opened" so the dispatcher can open it
-  (`.claude/rules/worktree-isolation.md` §Finish Protocol).
+  (`dev/rules/worktree-isolation.md` §Finish Protocol).
 - Never edit `dev/status/_index.md` from a feature PR; update only your track's `dev/status/<track>.md`. The one
-  exception is the row for a brand-new tracked work item (`.claude/rules/feat-agent-dispatch.md` §4).
+  exception is the row for a brand-new tracked work item (`dev/rules/feat-agent-dispatch.md` §4).
 
 ## Pre-Work Setup
 
@@ -60,7 +60,7 @@ jj workspace forget "$AGENT_ID"
 rm -rf "$AGENT_WS"
 ```
 
-See `.claude/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
+See `dev/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
 
 ## At the start of every session
 
@@ -114,7 +114,7 @@ Otherwise (local runs), use **jj** with a per-session workspace. The orchestrato
 
 ## Workspace integrity
 
-Before commit and before push, follow `.claude/rules/worktree-isolation.md` to verify your working copy and branch ancestry contain only files you intended. Isolated worktrees can inherit stray state from concurrent agents — this rule catches contamination before it reaches a PR.
+Before commit and before push, follow `dev/rules/worktree-isolation.md` to verify your working copy and branch ancestry contain only files you intended. Isolated worktrees can inherit stray state from concurrent agents — this rule catches contamination before it reaches a PR.
 
 ## Allowed Tools
 

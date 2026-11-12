@@ -918,7 +918,7 @@ GATE_REVIEWS_JSON=$SAVED_GATE_REVIEWS
 GATE_COMMENTS_JSON='[]'
 
 
-# VERIFIES column (#3275, .claude/rules/issue-hygiene.md B). Unit: the body
+# VERIFIES column (#3275, dev/rules/issue-hygiene.md B). Unit: the body
 # parser's three states and its edges.
 check "VERIFIES unit: Verifies #N: line -> ok" ok "$(_verifies_state 'intro
 Verifies #3275: [after-merge] sweep green -- dev/experiments/x/results/s0.sexp')"
@@ -1888,7 +1888,7 @@ check "colon-style verdict: the gate it actually names reads its real ok verdict
 check "colon-style verdict: an unrelated, never-reviewed gate reads none, not a false unreadable" \
   none "$(_gate "$(reviews "$COLON_STYLE_VERDICT")" structural "$TIP")"
 
-# Cross-agent review (.claude/rules/cross-agent-review.md): the advisory CODEX
+# Cross-agent review (dev/rules/cross-agent-review.md): the advisory CODEX
 # column reads reviews whose first heading starts with "Codex". Pins the two
 # directions of isolation -- a Codex review never satisfies a Claude gate, and
 # a Claude gate review never satisfies the CODEX column -- plus the ok / rework

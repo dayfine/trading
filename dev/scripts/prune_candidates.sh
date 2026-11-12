@@ -652,7 +652,7 @@ checker2() {
 # config.mli (declared directly, or as a nested dotted reference like
 # [stops_config.catastrophic_stop_pct] whose own default is itself a no-op)
 # that has a ledger REJECT, report eligibility per
-# .claude/rules/experiment-flag-discipline.md Rule 4: eligible only if the
+# dev/rules/experiment-flag-discipline.md Rule 4: eligible only if the
 # flag is referenced by NO committed *.sexp file outside dev/experiments/
 # (a mention inside dev/experiments/ is that flag's own experiment record,
 # not a live reference) and by no non-default assignment in trading/**/*.ml

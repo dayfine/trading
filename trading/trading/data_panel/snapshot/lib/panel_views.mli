@@ -12,8 +12,8 @@
     Putting the records in this neutral hub avoids the otherwise-required
     [analysis/weinstein/] → [trading/trading/data_panel/] dune dep that would
     cross the A2 architecture boundary (see
-    [.claude/rules/qc-structural-authority.md] §A2). The pre-F.3.e-1 arrangement
-    had {!Snapshot_runtime.Snapshot_bar_views} as the canonical home; that
+    [dev/rules/qc-structural-authority.md] §A2). The pre-F.3.e-1 arrangement had
+    {!Snapshot_runtime.Snapshot_bar_views} as the canonical home; that
     introduced an [analysis/] → [trading/] import. F.3.e-3 (which deleted the
     [Data_panel.Bar_panels] panel-backed reader) leaves only the snapshot
     consumer alive — the records still live here so the type definition stays in

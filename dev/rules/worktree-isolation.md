@@ -182,7 +182,7 @@ as its last actions, without ending the turn in between:**
    and fix) **and** `gh pr view <N> --json files` must show them.
 4. **On any push/PR failure:** retry once; if it still fails, report the
    **bookmark name + commit id + "PR NOT opened"** explicitly so the dispatcher
-   can open it (the dispatcher's recovery path, `feat-agent-dispatch.md` §2).
+   can open it (the dispatcher's recovery path, `dev/rules/feat-agent-dispatch.md` §2).
 
 Never end a turn with an un-pushed commit. The PR being open on origin is the
 only durable proof of done — a green local build that was never pushed is lost

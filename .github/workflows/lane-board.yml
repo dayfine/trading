@@ -1,4 +1,4 @@
-# Async lane board (issue #3330, rule .claude/rules/async-lanes.md).
+# Async lane board (issue #3330, rule dev/rules/async-lanes.md).
 #
 # Every 3 hours: read the open Codex / Jules PRs and lane issues, set one turn/* label on each, and
 # rewrite the body of the board issue. Shell + gh + jq only: no Claude, no quota. It comments on the board

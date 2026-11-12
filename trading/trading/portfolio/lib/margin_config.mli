@@ -43,7 +43,7 @@ type t = {
           [dev/notes/long-short-margin-mechanics-2026-06-12.md] §3 for the
           economics. Searchable via the nested overlay key
           [margin_config.short_borrow_rate_tiers]
-          ([.claude/rules/experiment-flag-discipline.md] R2). *)
+          ([dev/rules/experiment-flag-discipline.md] R2). *)
   short_maintenance_tiers : Short_margin_tiers.tier list; [@sexp.default []]
       (** Price-tiered {b maintenance equity ratio} table (margin M3a), default
           [[]] (empty). When empty, every short uses the flat
@@ -54,7 +54,7 @@ type t = {
           {!Short_margin_tiers.tier_value} and
           [dev/notes/long-short-margin-mechanics-2026-06-12.md] §1. Searchable
           via the nested overlay key [margin_config.short_maintenance_tiers]
-          ([.claude/rules/experiment-flag-discipline.md] R2). *)
+          ([dev/rules/experiment-flag-discipline.md] R2). *)
   short_buyin_stress_mode : bool; [@sexp.default false]
       (** Deterministic buy-in {b stress-path} mode (margin M3b), default
           [false] (R1 no-op). When [true], every held short that is
@@ -73,7 +73,7 @@ type t = {
           Gated by this flag alone, independent of {!enabled} (a stress cell can
           exercise buy-ins without full Reg-T margin accounting). Searchable via
           the nested overlay key [margin_config.short_buyin_stress_mode]
-          ([.claude/rules/experiment-flag-discipline.md] R2). *)
+          ([dev/rules/experiment-flag-discipline.md] R2). *)
   short_buyin_htb_price_below : float; [@sexp.default 0.0]
       (** HTB price threshold for {!short_buyin_stress_mode} (margin M3b),
           default [0.0] (R1 no-op — no positive mark is strictly below [0.0], so

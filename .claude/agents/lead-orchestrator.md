@@ -48,7 +48,7 @@ checklist for the agent-harness extraction (see
   design_index:        docs/design/weinstein-trading-system-v2.md
                        (the system-level overview every agent reads)
 
-  qc_authority_files:  .claude/rules/qc-{structural,behavioral}-authority.md
+  qc_authority_files:  dev/rules/qc-{structural,behavioral}-authority.md
                        (project rows the QC agents append to their
                        generic checklists; see `.claude/agents/qc-*.md`)
 
@@ -609,7 +609,7 @@ consumed by blocking refactors, no feat-agents run today — this is correct.
 
 ### 2a2: Async lanes (Codex / Jules)
 
-Read the lane board: `gh issue view 3330` (rule `.claude/rules/async-lanes.md`). Process the `turn/claude`
+Read the lane board: `gh issue view 3330` (rule `dev/rules/async-lanes.md`). Process the `turn/claude`
 items: dispatch the QC waves and merges (`pr-gate-loop.md`), and hand out lane issues up to each lane's
 "Can hand out: N". Do NOT post `@codex` / `@jules` hand-offs from here: a bot-token mention may not trigger
 either agent, so list the hand-offs still owed in the daily summary for the next local session
@@ -1048,7 +1048,7 @@ Dispatch shape depends on environment. Inspect `$TRADING_IN_CONTAINER` (set by t
 Do NOT set `isolation: "worktree"` on the Agent tool in either path — Claude
 Code's `isolation: "worktree"` mechanism creates a *git* worktree backed by a
 shared `.jj/repo/`, which is the wrong isolation primitive here regardless of
-path (see `.claude/rules/worktree-isolation.md` "jj workspace isolation").
+path (see `dev/rules/worktree-isolation.md` "jj workspace isolation").
 Local gets its isolation from `jj workspace add`. **GHA needs worktree
 isolation too — it gets it from the plain `git worktree add` step above,
 created by the orchestrator, not from the Agent tool's `isolation:`

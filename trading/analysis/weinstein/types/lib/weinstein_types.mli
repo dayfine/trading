@@ -71,11 +71,10 @@ type rs_trend =
           {b Emitted only when armed.} {!Rs.config.enable_positive_declining}
           defaults to [false], under which {!Rs} folds this cohort back into
           {!Positive_flat} — so no existing run can observe this constructor
-          until a spec arms the flag
-          ([.claude/rules/experiment-flag-discipline.md] R1). Placed after
-          {!Positive_flat} rather than at the end purely for reading order; the
-          sexp encoding is by constructor name, so position carries no
-          back-compat weight. *)
+          until a spec arms the flag ([dev/rules/experiment-flag-discipline.md]
+          R1). Placed after {!Positive_flat} rather than at the end purely for
+          reading order; the sexp encoding is by constructor name, so position
+          carries no back-compat weight. *)
   | Negative_improving
       (** RS still negative but improving — watch, not yet a buy. *)
   | Negative_declining  (** RS negative and falling — avoid or short. *)

@@ -1160,7 +1160,7 @@
    %{exe:../../trading/backtest/validation/bin/validator_diff.exe}
    (run sh %{dep:validator_diff_exit_codes_smoke.sh}))))
 
-; codex_review test (2026-09-13, .claude/rules/cross-agent-review.md): pins the
+; codex_review test (2026-09-13, dev/rules/cross-agent-review.md): pins the
 ; report validator of dev/scripts/codex_review.sh -- the check that keeps an
 ; advisory Codex review from ever being posted under a Claude gate heading --
 ; and the CODEX_REVIEW=off fallback. Same shim + (universe) pattern as
@@ -1373,7 +1373,7 @@
   (run sh %{dep:issue_fix_audit_test.sh})))
 
 ; Pin the issue-hygiene sections of dev/scripts/issue_fix_audit.sh (#3275,
-; .claude/rules/issue-hygiene.md) over canned gh JSON + a fixed clock: the
+; dev/rules/issue-hygiene.md) over canned gh JSON + a fixed clock: the
 ; open-count/cap header, (c) untriaged, (d) stale verify (timeline label date,
 ; updatedAt fallback), (e) idle, (f) owner/user latest comment.
 
@@ -1433,7 +1433,7 @@
  (action
   (run sh %{dep:wait_for_test_runner.sh})))
 
-; Async lane board (.claude/rules/async-lanes.md): pins the turn rules of
+; Async lane board (dev/rules/async-lanes.md): pins the turn rules of
 ; dev/scripts/lane_board.sh and the iteration cap of dev/scripts/lane_handoff.sh
 ; with a fake `gh` on PATH. The scripts live outside the dune workspace root
 ; and are read via repo_root() at RUN TIME, so (universe) is required.

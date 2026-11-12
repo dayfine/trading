@@ -60,7 +60,7 @@ sh dev/scripts/quota_status.sh      # seven-day / five-hour use, today's allowan
 sh dev/scripts/where_is_work.sh     # what is running where (PRs by lane, local jobs, Codex cloud)
 ```
 
-Then read the async lane board (`gh issue view 3330`, rule `async-lanes.md`) and process every `turn/claude`
+Then read the async lane board (`gh issue view 3330`, rule `dev/rules/async-lanes.md`) and process every `turn/claude`
 item: QC waves, merges, and hand-offs to Codex/Jules via `sh dev/scripts/lane_handoff.sh` (local session
 only). Items on `turn/user` are raised with the user, batched, outside quiet hours.
 
@@ -181,7 +181,7 @@ script's `STALE` list. Docs-only change → admin-merge.
 
 At session end, alongside the memory export, write the day's local spend
 record (issue #2922) so the weekly §Usage review
-(`perf-review-weekly.md`) reads committed files instead of re-deriving them:
+(`dev/rules/perf-review-weekly.md`) reads committed files instead of re-deriving them:
 
 ```bash
 sh dev/scripts/budget_local_record.sh            # today (UTC) -> dev/budget/local-<date>.json

@@ -63,9 +63,9 @@ below apply without being restated; a brief that repeats them is wasted context.
   MCP `create_pull_request` tool) → check the PR's file list matches your task.
   **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
   name, the commit id and "PR NOT opened" so the dispatcher can open it
-  (`.claude/rules/worktree-isolation.md` §Finish Protocol).
+  (`dev/rules/worktree-isolation.md` §Finish Protocol).
 - Never edit `dev/status/_index.md` from a feature PR; update only your track's `dev/status/<track>.md`. The one
-  exception is the row for a brand-new tracked work item (`.claude/rules/feat-agent-dispatch.md` §4).
+  exception is the row for a brand-new tracked work item (`dev/rules/feat-agent-dispatch.md` §4).
 
 ## Pre-Work Setup
 
@@ -89,7 +89,7 @@ jj workspace forget "$AGENT_ID"
 rm -rf "$AGENT_WS"
 ```
 
-See `.claude/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
+See `dev/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
 
 ## At the start of every session
 
@@ -213,7 +213,7 @@ status to READY_FOR_REVIEW.
 - [ ] **Pinned data fixtures are committed** — any HTML / CSV / sexp the test depends on lives under `test/data/` and is referenced by relative path. Do not depend on network fetches in tests.
 - [ ] **Cached data is gitignored** — `dev/data/<vendor>/` (anything fetched at runtime) is in `.gitignore`; small samples for tests live under `test/data/` and are checked in.
 - [ ] `dune build && dune runtest` passes with zero warnings on a clean checkout of the branch — run in the **foreground**, check the **exit code** (not `grep FAIL:`; not `… | tail; echo $?` which captures tail not dune)
-- [ ] **Finish Protocol** followed (`.claude/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
+- [ ] **Finish Protocol** followed (`dev/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
 - [ ] `dune build @fmt` passes (formatter in check mode)
 - [ ] `dev/status/data-foundations.md` updated: tick off the item, add a Completed entry with what was built, where it lives, and how to verify
 - [ ] PR body is non-empty — after `jst submit`, write the PR description (what/why/test plan) via `gh pr edit <N> --body-file <path>`. `jst submit` does not populate the body.

@@ -24,7 +24,7 @@
       [Stage.result]'s [weeks_advancing], counted from the MA cross, and
       {!range_top_freshness} returns [None] so {!Stock_analysis} keeps its
       pre-feature admission arm verbatim (R1 of
-      [.claude/rules/experiment-flag-discipline.md]).
+      [dev/rules/experiment-flag-discipline.md]).
     - [Range_top_breakout] {b (armed)} — freshness is measured from the breakout
       above the ticket anchor (the top of the {i current} trading range). The
       MA-cross age is not consulted at all; the admit test is

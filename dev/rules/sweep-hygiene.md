@@ -118,7 +118,7 @@ Chain-preamble invariants (in addition to the flock + disk guard):
 - Abort if the run tree is dirty: `[ -z "$(git status --porcelain)" ]`.
 - The worktree lives under `.claude/worktrees/` (repo-local) so the
   container sees it; `/tmp` paths are host-only per
-  `worktree-isolation.md`.
+  `dev/rules/worktree-isolation.md`.
 
 With a pinned worktree, parent-workspace jj/git activity during the
 sweep is no longer fatal — but the "no concurrent jj ops" rule below

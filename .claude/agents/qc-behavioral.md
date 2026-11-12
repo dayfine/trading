@@ -105,7 +105,7 @@ Never run `jj`, push, merge, or edit/build in the parent checkout. See
 `dev/rules/qc-behavioral-authority.md` §"Operational requirements for QC
 agents in this repo" for the Docker/worktree contract. This permission scope
 belongs to the behavioral QC role; Codex advisory reviews remain read-only
-with no Dune under `.claude/rules/cross-agent-review.md`.
+with no Dune under `dev/rules/cross-agent-review.md`.
 
 ## Prerequisite
 

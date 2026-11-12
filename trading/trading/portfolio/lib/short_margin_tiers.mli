@@ -18,8 +18,8 @@
 
     The thresholds themselves are {b not} baked into this module: it only
     provides the lookup mechanism. Concrete tier values live in default-disarmed
-    example configs / tests, per [.claude/rules/experiment-flag-discipline.md]
-    R1 (default-off) — the code ships an empty table.
+    example configs / tests, per [dev/rules/experiment-flag-discipline.md] R1
+    (default-off) — the code ships an empty table.
 
     Pure. *)
 

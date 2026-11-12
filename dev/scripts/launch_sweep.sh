@@ -6,7 +6,7 @@
 # `docker exec -d` and prints the PID + a monitor command line.
 #
 # Why a wrapper exists: 2026-05-23/24/25 lost ~16h of sweep wall-time to
-# repeated violations of `.claude/rules/sweep-hygiene.md` preconditions
+# repeated violations of `dev/rules/sweep-hygiene.md` preconditions
 # (sweep output in a repo path, host-disk fill, Docker.raw runaway). The
 # discipline doc is not enough on its own; this script is the enforcement
 # layer. PR-A of `dev/plans/sweep-and-qc-architecture-2026-05-26.md`.
@@ -46,7 +46,7 @@
 #   LAUNCH_SWEEP_WORKTREE_STALE_HRS  (default: 24)
 #
 # References:
-#   - .claude/rules/sweep-hygiene.md
+#   - dev/rules/sweep-hygiene.md
 #   - dev/plans/sweep-and-qc-architecture-2026-05-26.md (PR-A)
 
 set -euo pipefail
@@ -266,7 +266,7 @@ run_check no_stale_worktrees   check_no_stale_worktrees
 if (( ${#FAILURES[@]} > 0 )); then
   echo "" >&2
   echo "[launch_sweep] REFUSING TO LAUNCH — ${#FAILURES[@]} precondition(s) failed: ${FAILURES[*]}" >&2
-  echo "[launch_sweep] see .claude/rules/sweep-hygiene.md for recovery guidance" >&2
+  echo "[launch_sweep] see dev/rules/sweep-hygiene.md for recovery guidance" >&2
   exit 2
 fi
 

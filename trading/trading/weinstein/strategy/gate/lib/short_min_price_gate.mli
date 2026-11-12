@@ -1,7 +1,7 @@
 (** The [short_min_price] short-entry gate.
 
     A faithful Weinstein eligibility "dial" (default-off axis per
-    [.claude/rules/experiment-flag-discipline.md]) that encodes the researched
+    [dev/rules/experiment-flag-discipline.md]) that encodes the researched
     sub-$17 economic-margin floor on shorts
     ([dev/notes/long-short-margin-mechanics-2026-06-12.md]). The spine is
     untouched — this only narrows which short candidates are eligible. *)

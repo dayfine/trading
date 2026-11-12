@@ -28,7 +28,7 @@ type process_high_water = { top_heap_bytes : int; maxrss_bytes : int }
       count toward RSS but are evictable. Read it as a per-run trend number, not
       as headroom against the container limit; for headroom use
       [docker stats MemUsage] (see
-      [.claude/rules/container-capacity-scheduling.md]). *)
+      [dev/rules/container-capacity-scheduling.md]). *)
 
 val read_process_high_water : unit -> process_high_water
 (** [read_process_high_water ()] samples the current process high-water marks.

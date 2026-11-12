@@ -1,6 +1,6 @@
 #!/bin/sh
 # Offline test for dev/scripts/lane_board.sh and dev/scripts/lane_handoff.sh
-# (async lane board, .claude/rules/async-lanes.md). A fake `gh` on PATH serves
+# (async lane board, dev/rules/async-lanes.md). A fake `gh` on PATH serves
 # fixtures and logs every mutation; a stub gate script replaces
 # pr_gate_status.sh. Pins the turn rules:
 #   rework -> theirs; green + no QC -> ours; all ok -> merge; 49 h silent ->

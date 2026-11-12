@@ -43,7 +43,7 @@ Express the fix as **axes**, not a point. Prefer toggling/combining *existing*
 flags (`enable_short_side`, `enable_stage3_force_exit`,
 `enable_laggard_rotation`, `enable_continuation_buys`, `enable_pi_filter`,
 `stage_method`). If the fix needs a **new** mechanism, land it behind a
-**default-off flag first** per `.claude/rules/experiment-flag-discipline.md` —
+**default-off flag first** per `dev/rules/experiment-flag-discipline.md` —
 it becomes an axis the day it merges; do NOT wire it into the default config
 until it earns an ACCEPT here.
 
@@ -60,7 +60,7 @@ each candidate variant's effective-config hash and look it up:
 Author a WF spec with an `axes` block (`Walk_forward.Variant_matrix` expands it;
 unknown axis keys raise at expansion time). Mirror an existing fixture under
 `trading/test_data/walk_forward/`. Then run, observing
-`.claude/rules/sweep-hygiene.md` (output to `/tmp/sweeps/<name>`, `df -h`
+`dev/rules/sweep-hygiene.md` (output to `/tmp/sweeps/<name>`, `df -h`
 checks, no concurrent jj ops, no concurrent agent dispatches):
 
 ```bash
@@ -97,7 +97,7 @@ An ACCEPT from one surface is **necessary but not sufficient** to flip a
 default. The single-window DSR winner is frequently overfit to that window —
 the 2026-05-30 early-admission ma=10 won 15y at DSR 1.0 but did **not**
 generalise to an independent 2019-2023 window. Before any promotion, run the
-**confirmation grid** in `.claude/rules/promotion-confirmation.md`: re-run the
+**confirmation grid** in `dev/rules/promotion-confirmation.md`: re-run the
 candidate surface across ≥3 independent (period × universe) contexts and promote
 only a value that is robust **across the grid**, not the single-window winner.
 If no value is robust, keep the mechanism's ACCEPT but leave the default off.
@@ -116,5 +116,5 @@ institutional memory.
 - Don't act on a single-window backtest win. Surface + folds + DSR, always.
 - Don't wire a new mechanism into the default config before an ACCEPT verdict.
 - Don't re-run a config-hash the ledger already rejected on the same base/window.
-- Don't launch a multi-hour sweep without the `sweep-hygiene.md` pre-flight.
+- Don't launch a multi-hour sweep without the `dev/rules/sweep-hygiene.md` pre-flight.
 - Don't trust the autopsy's recommended value — it's a labeller; the surface decides.

@@ -37,8 +37,8 @@
 
     {!empty} blocks nothing, so a universe build wired with {!empty} is
     bit-identical to one with no blocklist at all — per
-    [.claude/rules/experiment-flag-discipline.md] R1, the filter is inert until
-    a caller supplies a non-empty {!t}. Arming the live universe with {!curated}
+    [dev/rules/experiment-flag-discipline.md] R1, the filter is inert until a
+    caller supplies a non-empty {!t}. Arming the live universe with {!curated}
     is a separate decision, not this module's default. *)
 
 (** The kind of non-equity instrument a blocklisted symbol is. Kept distinct

@@ -2,7 +2,7 @@
 
 How the simulator models real broker margin, short-side capital requirements,
 and tradeability — and how each control maps to actual broker/regulatory rules.
-All controls are **default-off no-ops** (`.claude/rules/experiment-flag-discipline.md`):
+All controls are **default-off no-ops** (`dev/rules/experiment-flag-discipline.md`):
 with defaults, the simulator is bit-identical to a frictionless long-only engine.
 Research basis: `dev/notes/long-short-margin-mechanics-2026-06-12.md` (Reg-T,
 FINRA 4210, Schwab/IBKR).

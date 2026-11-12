@@ -184,8 +184,7 @@ let () =
        Fix by making every declaration agree on the same default (do not just \
        add a linter_exceptions.conf entry). If this is a pre-existing \
        divergence too risky to fix in this change (a behaviour-changing \
-       default flip -- see .claude/rules/experiment-flag-discipline.md R1), \
-       add a\n\
+       default flip -- see dev/rules/experiment-flag-discipline.md R1), add a\n\
       \  sexp_default_drift <type>.<field> <reason>  # review_at: <trigger>\n\
        line to devtools/checks/linter_exceptions.conf instead, with a real \
        tracked follow-up.\n";

@@ -51,7 +51,7 @@ type config = {
             line on the Mansfield chart, it must have clearly topped out and
             started trending lower" — a literal description of this state.
 
-          Default-off per [.claude/rules/experiment-flag-discipline.md] R1;
+          Default-off per [dev/rules/experiment-flag-discipline.md] R1;
           searchable as a {!Weinstein_strategy_config} axis (R2). No default
           flip without a ledger ACCEPT plus a confirmation grid (R3). *)
 }

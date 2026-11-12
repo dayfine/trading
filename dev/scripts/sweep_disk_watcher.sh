@@ -38,7 +38,7 @@
 #   DISK_WATCHER_MAX_ITERATIONS      (default: unlimited; tests pin to 1-3)
 #
 # References:
-#   - .claude/rules/sweep-hygiene.md
+#   - dev/rules/sweep-hygiene.md
 #   - dev/plans/sweep-and-qc-architecture-2026-05-26.md (PR-C)
 
 set -euo pipefail

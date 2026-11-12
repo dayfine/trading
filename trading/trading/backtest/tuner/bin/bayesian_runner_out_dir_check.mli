@@ -7,7 +7,7 @@
     module enforces it at the binary's own arg-parse time so a direct
     [dune exec ... bayesian_runner.exe --out-dir <bad>] also fails fast.
 
-    Authority: [.claude/rules/sweep-hygiene.md] +
+    Authority: [dev/rules/sweep-hygiene.md] +
     [dev/plans/sweep-and-qc-architecture-2026-05-26.md]. *)
 
 val validate :

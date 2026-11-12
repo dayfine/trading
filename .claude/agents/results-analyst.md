@@ -24,8 +24,8 @@ A markdown draft for the experiment README's result section, in this order:
 
 1. **Each rule, in order, as written.** The numbers, and the file each comes from. A number that cannot
    be traced to a file is not quoted.
-2. **The verdict, calibrated** (`mechanism-validation-rigor.md` §Verdict calibration;
-   `promotion-confirmation.md` for anything near promotion). Say what this design can and cannot claim.
+2. **The verdict, calibrated** (`dev/rules/mechanism-validation-rigor.md` §Verdict calibration;
+   `dev/rules/promotion-confirmation.md` for anything near promotion). Say what this design can and cannot claim.
 3. **Why.** Decompose the result into mechanisms: timing, picks, the fat-tail tax, cost and turnover,
    gate interaction, a data defect. Trace at least three individual trades or events end to end.
    Perturb before you believe a split (`feedback_perturb_before_believing_a_cohort_split`).
@@ -39,8 +39,8 @@ A markdown draft for the experiment README's result section, in this order:
 ## Rules
 
 - `universe-discipline.md`: no conclusion rests on an sp500 cell.
-- `backtest-result-review.md` RV2: every exposure figure comes with the regime split, by period.
-- `mechanism-validation-rigor.md` check 8: the paired read is gated on `validator_diff -check V6`.
+- `dev/rules/backtest-result-review.md` RV2: every exposure figure comes with the regime split, by period.
+- `dev/rules/mechanism-validation-rigor.md` check 8: the paired read is gated on `validator_diff -check V6`.
 - Distributions, not point estimates. Scale returns economically.
 - Do not edit files in the repo. Write your draft to the path the dispatcher names, or return it inline.
 - Run long Bash calls in the foreground with `timeout: 600000`. Never background one and wait.

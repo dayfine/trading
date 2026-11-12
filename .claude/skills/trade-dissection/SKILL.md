@@ -14,7 +14,7 @@ where +7,321% vs +310% resolved to a single mechanism: E anchored to a stale
 year-old high (`dev/notes/fill-model-ladder-v2-2026-08-08.md`).
 
 It pairs with `screen-rigor` (report distributions, name the estimand) and
-`.claude/rules/mechanism-validation-rigor.md` (the *why* is the deliverable, not
+`dev/rules/mechanism-validation-rigor.md` (the *why* is the deliverable, not
 the verdict). The dissection **is** how you produce a transferable *why*.
 
 ## When it fires
@@ -91,7 +91,7 @@ join raw bars to see close-vs-E.
    level / stop / structural tax), connect it to known findings
    (`project_edge_is_the_fat_tail`, the fill-model inversion), and state what it
    rules in/out for the next lever. A verdict without a transferable why is a draft
-   (`mechanism-validation-rigor.md`).
+   (`dev/rules/mechanism-validation-rigor.md`).
 
 ## Caveats that bite (learned 2026-08-07/08)
 

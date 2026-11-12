@@ -20,7 +20,7 @@
 # an unpredictable multi-minute tail to whichever PR happens to trip it.
 # A fast, deterministic FAIL-and-list turns the silent gap into a blocking
 # signal without that cost: it points the author at
-# .claude/rules/config-default-blast-radius.md, whose step 2 is the actual
+# dev/rules/config-default-blast-radius.md, whose step 2 is the actual
 # paired run this job doesn't perform.
 #
 # The overwhelmingly common case is zero cost: no config-default surface
@@ -31,7 +31,7 @@
 # legitimately trips this check (the config default IS supposed to
 # change) cannot ever turn this job green on its own, because the job is
 # a pure function of the diff -- doing the manual paired run required by
-# .claude/rules/config-default-blast-radius.md and pasting the table in
+# dev/rules/config-default-blast-radius.md and pasting the table in
 # the PR body doesn't change what the diff contains. The `paired-run-done`
 # label is the resolution: a human applies it AFTER eyeballing the pasted
 # paired table, and this job downgrades its FAIL to a pass-with-notice.

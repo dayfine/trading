@@ -111,12 +111,12 @@ The `goldens-affected` job is a pure function of the diff: for a PR that
 being changed), doing everything this rule asks — the paired run, the
 pasted table — does not change what's in the diff, so the job would FAIL
 forever with no way to go green. That is an unsatisfiable condition for a
-conformant author, and `pr-merge-gates.md` treats any `FAIL:` line as
+conformant author, and `.claude/rules/pr-merge-gates.md` treats any `FAIL:` line as
 non-negotiable, so a real config-default PR would be permanently
 unmergeable without this path.
 
 The resolution is a label, not prose in the PR body — automation reads
-labels and failing checks, not TODO comments (`pr-merge-gates.md` Rule 0's
+labels and failing checks, not TODO comments (`.claude/rules/pr-merge-gates.md` Rule 0's
 "do-not-merge" lesson applies in reverse here: what must let a PR merge
 also has to be expressed in automation vocabulary):
 

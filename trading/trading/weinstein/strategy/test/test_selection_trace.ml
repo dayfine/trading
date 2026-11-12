@@ -37,7 +37,7 @@
 
     The two observational-equivalence tests pin the property the instrumentation
     PRs actually claim: capture on produces the same selection as capture off.
-    That is [.claude/rules/experiment-flag-discipline.md] R1 (default-off is the
+    That is [dev/rules/experiment-flag-discipline.md] R1 (default-off is the
     prior behaviour) made mechanical for this surface. *)
 
 open OUnit2

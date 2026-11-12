@@ -12,7 +12,7 @@ module H = Snapshot_bar_views_helpers
    [analysis/] dep. The manifest re-export ([type =] with the record body)
    keeps the field-access syntax ([v.Snapshot_bar_views.n]) working at every
    call site. The neutral hub satisfies the A2 architecture boundary, see
-   [.claude/rules/qc-structural-authority.md] §A2. *)
+   [dev/rules/qc-structural-authority.md] §A2. *)
 type weekly_view = Panel_views.weekly_view = {
   closes : float array;
   raw_closes : float array;

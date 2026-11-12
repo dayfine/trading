@@ -37,10 +37,10 @@ with a target of 10–20 open issues.
   satisfies, or `Verifies: none`.
   - qc-results checks that the evidence meets the item, as a row in its checklist.
   - If it does, the dispatcher closes #N right after the merge, quoting the evidence.
-- **`Closes #N` stays as written in `pr-merge-gates.md`:** every [merge] item is met, and no [after-merge] item
+- **`Closes #N` stays as written in `.claude/rules/pr-merge-gates.md`:** every [merge] item is met, and no [after-merge] item
   remains.
 
-## C. The weekly pass (same slot as `perf-review-weekly.md`)
+## C. The weekly pass (same slot as `dev/rules/perf-review-weekly.md`)
 
 Run `sh dev/scripts/issue_fix_audit.sh`. Every issue it lists leaves the week closed, re-owned or commented.
 
@@ -50,7 +50,7 @@ Run `sh dev/scripts/issue_fix_audit.sh`. Every issue it lists leaves the week cl
 - **stale verify:** `verify/pending` for more than 14 days;
 - **idle:** no update for more than 30 days;
 - **a waiting `owner/user` question:** raise it with the user once, batched, outside quiet hours
-  (`decision-quiet-hours.md`).
+  (`.claude/rules/decision-quiet-hours.md`).
 
 Record the open count and what closed in `dev/status/backtest-perf.md` §Weekly review.
 
@@ -69,6 +69,6 @@ Record the open count and what closed in `dev/status/backtest-perf.md` §Weekly 
 
 ## Related
 
-- `pr-merge-gates.md` §Issue links (#3019)
-- `findings-registry.md`: closing a finding issue updates its registry row.
-- `perf-review-weekly.md`: the weekly slot.
+- `.claude/rules/pr-merge-gates.md` §Issue links (#3019)
+- `.claude/rules/findings-registry.md`: closing a finding issue updates its registry row.
+- `dev/rules/perf-review-weekly.md`: the weekly slot.

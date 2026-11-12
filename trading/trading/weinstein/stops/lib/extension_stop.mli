@@ -66,7 +66,7 @@ type config = {
 val default_config : config
 (** The no-op default ([trigger_ratio = 0.0], [trail_pct = 0.0]) — the mechanism
     is disabled, so merging it changes no backtest result
-    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+    ([dev/rules/experiment-flag-discipline.md] R1). *)
 
 val is_enabled : config -> bool
 (** [true] iff both [trigger_ratio > 0.0] and [trail_pct > 0.0]. When [false]

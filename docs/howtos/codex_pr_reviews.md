@@ -1,6 +1,6 @@
 # Invoking Codex for PR reviews from another CLI
 
-> **Status (2026-09-13, `.claude/rules/cross-agent-review.md`, PR #2798):** the
+> **Status (2026-09-13, `dev/rules/cross-agent-review.md`, PR #2798):** the
 > default integration is **advisory**. `sh dev/scripts/codex_review.sh <PR>` runs
 > Codex read-only against the PR head, validates the report, and posts it under
 > `## Codex review — <title>`, which the `CODEX` column of
@@ -59,7 +59,7 @@ for the reviewer, not the scope.
 Every dune gate the roles run (`dune build @fmt`, `dune build`, `dune
 runtest`) must execute **inside `trading-1-dev`, against the reviewer's own
 checkout** (`dev/rules/qc-structural-authority.md` §"Operational
-requirements", `.claude/rules/worktree-isolation.md`). The container
+requirements", `dev/rules/worktree-isolation.md`). The container
 bind-mounts the repo at `/workspaces/trading-1`, so the worktree has to live
 under the repo — a `/tmp` path is invisible to `docker exec`, and a native
 host `dune` run reports ENVFAIL from the ocamlformat / opam skew, not from
@@ -99,7 +99,7 @@ corrupt each other (observed 2026-09-13: a Codex build alongside a dispatcher
 build produced a spurious "module alias is missing" failure that a clean
 rebuild cured). Capacity: at most 3 concurrent reviewers, **one** dune
 build/runtest in flight, and never while a multi-hour backtest holds the
-container (`.claude/rules/container-capacity-scheduling.md`).
+container (`dev/rules/container-capacity-scheduling.md`).
 
 ### Sandbox decision — pick A or B, and use that section's invocation
 
@@ -161,8 +161,8 @@ Common prompt body (both variants):
 Review PR #${PR_NUMBER} (head ${HEAD_SHA}) as qc-structural.
 Protocol: .claude/agents/qc-structural.md plus the project rows in
 dev/rules/qc-structural-authority.md (P6, A1, A2, A3); also apply
-.claude/rules/experiment-flag-discipline.md R1-R3,
-.claude/rules/config-default-blast-radius.md B1-B3 and
+dev/rules/experiment-flag-discipline.md R1-R3,
+dev/rules/config-default-blast-radius.md B1-B3 and
 .claude/rules/test-patterns.md where the diff touches strategy config or tests.
 Scope = 'gh pr view ${PR_NUMBER} --json files,title,body,headRefName,headRefOid';
 the --base diff is context only.
@@ -222,7 +222,7 @@ issue must be pinned by a named test that exists in the diff) plus the domain
 rows and authority list in dev/rules/qc-behavioral-authority.md (S/L/C/T
 rows for Weinstein-domain PRs; all NA with one note for infra/harness PRs).
 For a faithfulness question the reference leaves open, the book is a local
-file — follow .claude/rules/book-as-authority.md. Shell scope: scoped
+file — follow dev/rules/book-as-authority.md. Shell scope: scoped
 'dune runtest <dir>' only, inside the container against this checkout:
 docker exec trading-1-dev bash -c 'cd ${CWT}/trading && eval \$(opam env) && export TRADING_DATA_DIR=\$PWD/test_data && dune runtest <dir>'
 plus at least two mutation probes that sever the mechanism, each reverted

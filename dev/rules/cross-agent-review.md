@@ -8,7 +8,7 @@ column) so the gate loop enforces it, not the chat.
 
 1. **Every PR merges on the three gates, whoever wrote it:** CI green +
    qc-structural APPROVED + qc-behavioral APPROVED at the current tip
-   (`pr-merge-gates.md`). Both QC verdicts are **Claude Code** reviews
+   (`.claude/rules/pr-merge-gates.md`). Both QC verdicts are **Claude Code** reviews
    (dispatched subagents or the local session). A Codex review is never a
    substitute for either.
 2. **Codex reviews are advisory.** They post under the heading
@@ -81,7 +81,7 @@ The dispatcher may call `codex_review.sh` on **every** PR that reaches
   (`PR SHA in= cached= out= reasoning= wall=`, or `tokens=na events=N` when no
   turn completed — a quota hit, for one). The A/B row carries it as
   `codex tok in/out`, so cost per finding is comparable across reviewers
-  (`perf-review-weekly.md` §Usage review).
+  (`dev/rules/perf-review-weekly.md` §Usage review).
 
 `docs/howtos/codex_pr_reviews.md` (#2785) describes the **promotion path** —
 Codex playing the qc-structural / qc-behavioral roles under the gate headings.
@@ -92,7 +92,7 @@ its own rule change here.
 ## Container discipline (unchanged)
 
 Claude QC reviewers build in their own worktree and take a dune slot
-(`container-capacity-scheduling.md`: cap 3 agents, one dune in flight,
+(`dev/rules/container-capacity-scheduling.md`: cap 3 agents, one dune in flight,
 none beside a multi-hour backtest). The advisory Codex review does not build.
 If a future Codex role does, it takes the same slot rules as a Claude reviewer.
 

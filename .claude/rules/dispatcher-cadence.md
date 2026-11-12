@@ -50,6 +50,6 @@ costs 2.3× one at 150k.
 
 ## Related
 
-- `container-capacity-scheduling.md`: what may run while you wait.
+- `dev/rules/container-capacity-scheduling.md`: what may run while you wait.
 - `session-rampup.md` Step 3: when to compact.
 - `pr-gate-loop.md`: the gate loop this cadence drives.

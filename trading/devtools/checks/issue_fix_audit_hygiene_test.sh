@@ -1,7 +1,7 @@
 #!/bin/sh
 # issue_fix_audit_hygiene_test.sh -- fixture-driven test for the issue-hygiene
 # sections of dev/scripts/issue_fix_audit.sh (issue #3275,
-# .claude/rules/issue-hygiene.md). No network: ISSUE_FIX_AUDIT_FIXTURE_DIR
+# dev/rules/issue-hygiene.md). No network: ISSUE_FIX_AUDIT_FIXTURE_DIR
 # feeds canned gh JSON and ISSUE_FIX_AUDIT_NOW fixes the clock at 2026-10-13.
 #
 # Pins, on fixtures/issue_fix_audit_hygiene (9 open issues):

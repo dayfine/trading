@@ -13,8 +13,8 @@
     {b a cell whose invariant counts differ from its comparator's is not a
        paired read.} The two arms hold different instrument sets, so their P&L
     delta measures the data defect as much as it measures the mechanism, and its
-    size scales with the lever. See
-    [.claude/rules/mechanism-validation-rigor.md] check 8.
+    size scales with the lever. See [dev/rules/mechanism-validation-rigor.md]
+    check 8.
 
     Everything here is pure over already-parsed {!Validator_types.report}
     values; [bin/validator_diff.ml] is the thin CLI that loads the sexps and

@@ -68,8 +68,8 @@
     The scenario/backtest driver ({!Backtest.Runner}) and anything requiring a
     bar warehouse. This is a synthetic in-process instrument; it cannot speak to
     data-layer or fill-model behaviour. A trace match is evidence about the
-    selection surface only — see [.claude/rules/mechanism-validation-rigor.md]
-    on calibrating a proxy's verdict to what it actually measures.
+    selection surface only — see [dev/rules/mechanism-validation-rigor.md] on
+    calibrating a proxy's verdict to what it actually measures.
 
     Four further limits, stated rather than papered over:
 

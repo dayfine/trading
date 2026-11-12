@@ -213,7 +213,7 @@ let test_six_year_full_lifecycle _ =
      NOT ATTRIBUTED to the RS term. The 4-bar-deeper view moves every standard
      weekly consumer at once — volume and breakout/resistance zones as well as
      RS — and the two were not varied independently, so no mechanism is claimed
-     for the delta ([.claude/rules/mechanism-validation-rigor.md]). A plausible
+     for the delta ([dev/rules/mechanism-validation-rigor.md]). A plausible
      reading is that a now-differentiating ranking lets two more entries clear
      the top-N, but this fixture cannot distinguish that from the widening
      alone.

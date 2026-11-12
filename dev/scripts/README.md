@@ -41,7 +41,7 @@ bash dev/scripts/velocity_report.sh --since 2026-03-24 --out dev/notes/velocity-
 
 | Script | Purpose |
 |---|---|
-| `sweep_stale_worktrees.sh` | Remove stale `agent-*` jj workspaces to reclaim disk space. See `.claude/rules/worktree-isolation.md §Cleanup`. |
+| `sweep_stale_worktrees.sh` | Remove stale `agent-*` jj workspaces to reclaim disk space. See `dev/rules/worktree-isolation.md §Cleanup`. |
 | `cleanup_merged_worktrees.sh` | Remove worktrees whose branches are gone from origin (post-merge cleanup). |
 | `build_sp500_universe.sh` | Build the S&P 500 ticker universe for backtesting. |
 | `build_broad_snapshot_incremental.sh` | Incrementally build a broad-universe snapshot. |

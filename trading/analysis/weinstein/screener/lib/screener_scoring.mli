@@ -45,7 +45,7 @@ type scoring_weights = {
           Stage1→2 breakouts under-perform early-Stage2 entries on win-rate yet
           are scored +30 vs +15 — this field is the axis that lets an experiment
           flatten or invert that premium. Default-off per
-          [.claude/rules/experiment-flag-discipline.md]. *)
+          [dev/rules/experiment-flag-discipline.md]. *)
   w_strong_volume : int;
       (** Weight for Strong volume confirmation. Default: 20. *)
   w_adequate_volume : int;
@@ -79,9 +79,9 @@ type scoring_weights = {
           [@sexp.default None] keeps the field present in the serialized form
           (axis resolves) while parsing a missing field to [None] (older config
           sexps round-trip). Default-off per
-          [.claude/rules/experiment-flag-discipline.md]; the strategy arms it
-          via [Weinstein_strategy_config.overhead_supply] (the upstream config
-          that makes [Stock_analysis.t.supply] non-[None]). *)
+          [dev/rules/experiment-flag-discipline.md]; the strategy arms it via
+          [Weinstein_strategy_config.overhead_supply] (the upstream config that
+          makes [Stock_analysis.t.supply] non-[None]). *)
   w_virgin_support : int option; [@sexp.default None]
       (** Short-side weight for {b Virgin_territory support below} a breakdown —
           no prior buyers waiting below to cushion the fall, the most explosive
@@ -122,7 +122,7 @@ type scoring_weights = {
           the field in the serialized config, so
           [screening_config.weights.w_continuation] resolves as a
           [Variant_matrix] axis. Default-off per
-          [.claude/rules/experiment-flag-discipline.md]. *)
+          [dev/rules/experiment-flag-discipline.md]. *)
 }
 [@@deriving sexp]
 (** Scoring weights for each positive signal. All are configurable.

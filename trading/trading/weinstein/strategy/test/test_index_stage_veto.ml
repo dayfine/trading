@@ -316,8 +316,8 @@ let _fresh_entry_symbols ~index_stage_veto_blocks_longs index_stage =
 (* R1 / R2 — flag discipline                                            *)
 (* ------------------------------------------------------------------ *)
 
-(** R1 ([.claude/rules/experiment-flag-discipline.md]): the shipped default is
-    the no-op, so merging the mechanism moves no golden. Asserted on the real
+(** R1 ([dev/rules/experiment-flag-discipline.md]): the shipped default is the
+    no-op, so merging the mechanism moves no golden. Asserted on the real
     [default_config] rather than a literal, which is what a default flip would
     have to change. *)
 let test_the_shipped_default_is_off _ =

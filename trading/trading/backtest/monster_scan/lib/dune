@@ -1,5 +1,5 @@
 ; A2 note: the `weinstein.*` deps below are the established backtest exception
-; surface (.claude/rules/qc-structural-authority.md A2 allow-lists analysis/
+; surface (dev/rules/qc-structural-authority.md A2 allow-lists analysis/
 ; imports into trading/trading/ under trading/trading/backtest/**). This library
 ; reads the snapshot warehouse and reuses the PRODUCTION stage classifier rather
 ; than reimplementing one; it defines no strategy behaviour of its own.

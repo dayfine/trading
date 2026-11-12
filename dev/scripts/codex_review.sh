@@ -3,7 +3,7 @@
 # review whose first heading is "## Codex review -- <title>", which is what the
 # CODEX column of dev/scripts/pr_gate_status.sh reads.
 #
-# WHY THIS EXISTS (.claude/rules/cross-agent-review.md)
+# WHY THIS EXISTS (dev/rules/cross-agent-review.md)
 #   A second reviewer with a different failure profile is useful, but the merge
 #   decision stays on CI + qc-structural + qc-behavioral (Claude). This script
 #   keeps Codex in the advisory seat: it never posts under a gate heading, it

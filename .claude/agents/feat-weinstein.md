@@ -44,9 +44,9 @@ below apply without being restated; a brief that repeats them is wasted context.
   MCP `create_pull_request` tool) → check the PR's file list matches your task.
   **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
   name, the commit id and "PR NOT opened" so the dispatcher can open it
-  (`.claude/rules/worktree-isolation.md` §Finish Protocol).
+  (`dev/rules/worktree-isolation.md` §Finish Protocol).
 - Never edit `dev/status/_index.md` from a feature PR; update only your track's `dev/status/<track>.md`. The one
-  exception is the row for a brand-new tracked work item (`.claude/rules/feat-agent-dispatch.md` §4).
+  exception is the row for a brand-new tracked work item (`dev/rules/feat-agent-dispatch.md` §4).
 
 ## Pre-Work Setup
 
@@ -70,7 +70,7 @@ jj workspace forget "$AGENT_ID"
 rm -rf "$AGENT_WS"
 ```
 
-See `.claude/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
+See `dev/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
 
 ## At the start of every session
 
@@ -123,7 +123,7 @@ Do **not** modify the state machine itself (Initial → FirstCorrection → Trai
 - [ ] `Stops.compute_initial_stop` accepts the output; behaviour under `None` is identical to today's fixed-buffer code path
 - [ ] Smoke test: run `Weinstein_strategy` on cached 2018-2023 data and confirm at least one Stage-2 entry places its initial stop based on a support-floor value (not the fixed-buffer proxy)
 - [ ] `dune build && dune runtest` passes, `dune build @fmt` passes — run in the **foreground**, check the **exit code** (not `grep FAIL:`; not `… | tail; echo $?` which captures tail)
-- [ ] **Finish Protocol** followed (`.claude/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
+- [ ] **Finish Protocol** followed (`dev/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
 - [ ] PR diff respects `## PR sizing` rules from `feat-agent-template.md` (≤500 LOC, one new module per PR)
 - [ ] No changes to screener, portfolio_risk, order_gen, or trading_state
 

@@ -127,7 +127,7 @@ type config = {
           Default [false] reproduces the prior intra-bar GTC-stop behaviour
           bit-for-bit (longs trigger on [low ≤ stop], shorts on [high ≥ stop]),
           so every existing golden replays unchanged. Default-off experiment
-          axis per [.claude/rules/experiment-flag-discipline.md]; design
+          axis per [dev/rules/experiment-flag-discipline.md]; design
           [dev/plans/weekly-close-stop-2026-06-19.md]. *)
   vol_scaled_stop_atr_mult : float; [@sexp.default 0.0]
       (** Volatility-scaled minimum installed-stop distance (default-off). When
@@ -158,7 +158,7 @@ type config = {
             minimum-distance floor widens. Default [0.0] is an exact no-op
             ([Float.max base 0.0 = base]) so every existing golden replays
             unchanged. Default-off experiment axis per
-            [.claude/rules/experiment-flag-discipline.md] /
+            [dev/rules/experiment-flag-discipline.md] /
             [.claude/rules/weinstein-faithful-core.md]; promoted only on a
             ledger ACCEPT. *)
   vol_scaled_stop_atr_period : int; [@sexp.default 14]
@@ -193,8 +193,8 @@ type config = {
           when the macro tape is a fast-V crash. Default [0.0] is an exact no-op
           (the trigger is gated on [pct > 0.0]) so every existing golden replays
           unchanged. Default-off experiment axis per
-          [.claude/rules/experiment-flag-discipline.md]; promoted only on a
-          ledger ACCEPT. *)
+          [dev/rules/experiment-flag-discipline.md]; promoted only on a ledger
+          ACCEPT. *)
   support_floor_anchor_mode : Support_floor.anchor_mode;
       [@sexp.default Support_floor.Wick]
       (** Which price field the support-floor primitive anchors the correction
@@ -219,8 +219,8 @@ type config = {
           reading; see [.claude/rules/weinstein-faithful-core.md]. Default
           [Wick] is an exact no-op so every existing golden replays unchanged.
           Default-off experiment axis per
-          [.claude/rules/experiment-flag-discipline.md]; promoted only on a
-          ledger ACCEPT. *)
+          [dev/rules/experiment-flag-discipline.md]; promoted only on a ledger
+          ACCEPT. *)
   support_floor_anchor_scope : Support_floor.anchor_scope;
       [@sexp.default Support_floor.Window_extreme]
       (** WHICH prior counter-move the support-floor primitive anchors on
@@ -250,8 +250,8 @@ type config = {
           [.claude/rules/weinstein-faithful-core.md]. Default [Window_extreme]
           is an exact no-op so every existing golden replays unchanged.
           Default-off experiment axis per
-          [.claude/rules/experiment-flag-discipline.md]; promoted only on a
-          ledger ACCEPT. *)
+          [dev/rules/experiment-flag-discipline.md]; promoted only on a ledger
+          ACCEPT. *)
   split_safe_floors : bool; [@sexp.default false]
       (** When [true], every support-floor path rescales the scanned window onto
           its split/dividend-adjusted basis (per-bar factor
@@ -301,8 +301,8 @@ type config = {
           change — spine item 5 ("stop below the base") is unchanged; only the
           scale on which "the base" is read is corrected (W1/W2,
           [.claude/rules/weinstein-faithful-core.md]). Default-off experiment
-          axis per [.claude/rules/experiment-flag-discipline.md]; promoted only
-          on a ledger ACCEPT. *)
+          axis per [dev/rules/experiment-flag-discipline.md]; promoted only on a
+          ledger ACCEPT. *)
   reset_anchor_on_stalled_cycle : bool; [@sexp.default true]
       (** When [true] {b (the default since 2026-08-24)}, a correction cycle
           that completes but whose derived stop candidate does {b not} improve
@@ -360,7 +360,7 @@ type config = {
           [false -> true] by user decision on 2026-08-24 without a ledger
           ACCEPT, as a book-faithfulness correction; recorded in
           [dev/experiments/_ledger/2026-08-24-stops-basis-book-faithful.sexp]
-          per [.claude/rules/experiment-flag-discipline.md] R3. *)
+          per [dev/rules/experiment-flag-discipline.md] R3. *)
   stop_skip_entry_bar : bool; [@sexp.default true]
       (** When [true], a position's stop is never allowed to produce an {b exit}
           on the bar whose date equals the position's own [entry_date]. The
@@ -404,7 +404,7 @@ type config = {
           golden was re-pinned PAIRED (flag off vs on at one build) in the
           promotion PR. Set [false] to reproduce a pre-2026-09-03 baseline
           bit-for-bit. Remains an experiment axis per
-          [.claude/rules/experiment-flag-discipline.md] R2. *)
+          [dev/rules/experiment-flag-discipline.md] R2. *)
   stop_ma_same_basis : bool; [@sexp.default false]
       (** When [true], the 30-week MA handed to the stop machine is restated
           onto the {b raw} price basis of the as-of bar before it is compared
@@ -436,7 +436,7 @@ type config = {
           compares the correction low with the MA on one chart; feeding both on
           one price basis is data hygiene, not a new mechanism
           ([.claude/rules/weinstein-faithful-core.md] W1/W2). Default-off
-          experiment axis per [.claude/rules/experiment-flag-discipline.md]; the
+          experiment axis per [dev/rules/experiment-flag-discipline.md]; the
           #2974 replay shows the fixed ratchet is not an obvious win (it may
           give back tail), so promotion needs a paired, V6-gated broad run. *)
   correction_must_follow_peak : bool; [@sexp.default false]
@@ -470,7 +470,7 @@ type config = {
           peak" — the correction is a decline {e from} the peak, so this is a
           faithfulness correction of the cycle detector, not a new mechanism
           (W1/W2). Default-off experiment axis per
-          [.claude/rules/experiment-flag-discipline.md]. *)
+          [dev/rules/experiment-flag-discipline.md]. *)
   tightened_can_ratchet : bool; [@sexp.default false]
       (** When [true], a [Tightened] stop is raised under each successive
           {b confirmed reaction low} of the topping zone (mirror: lowered above
@@ -499,7 +499,7 @@ type config = {
           above" the MA, a raise to a later low that is only trivially higher is
           optional, and a correction low is raised to only after the stock
           "rallies well off the low ... back close to prior peak". Default-off
-          experiment axis per [.claude/rules/experiment-flag-discipline.md]. *)
+          experiment axis per [dev/rules/experiment-flag-discipline.md]. *)
   tightened_min_reaction_pct : float; [@sexp.default 0.08]
       (** Minimum pullback from the swing peak for a topping-zone reaction low
           to count under [tightened_can_ratchet] (default 0.08). Inert with the
@@ -527,7 +527,7 @@ type config = {
           faithful short trail uses [tightened_can_ratchet = true]; see
           [docs/design/weinstein-book-reference.md] §6.3. This flag remains a
           default-off experiment axis per
-          [.claude/rules/experiment-flag-discipline.md]. *)
+          [dev/rules/experiment-flag-discipline.md]. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

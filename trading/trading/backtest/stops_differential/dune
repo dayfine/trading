@@ -23,7 +23,7 @@
 ;
 ; Lives under trading/trading/backtest/ rather than beside the stops library
 ; because the trace links `weinstein.types` (analysis/weinstein/), and
-; `.claude/rules/qc-structural-authority.md` A2 allow-lists analysis/ imports
+; `dev/rules/qc-structural-authority.md` A2 allow-lists analysis/ imports
 ; into trading/trading/ only under trading/trading/backtest/**. It is a
 ; regression pin over the stops surface, so it belongs with the other goldens.
 

@@ -18,9 +18,9 @@
     ([barbell_overlay_runner]) is a CLI shim over {!run}, which is unit-testable
     on a tiny fixture universe without a CLI.
 
-    Default-off per [.claude/rules/experiment-flag-discipline.md]: {!run} is
-    only invoked when a caller opts in; the {!Barbell.Barbell_config.t} it
-    threads through still defaults to the pure-engine no-op. *)
+    Default-off per [dev/rules/experiment-flag-discipline.md]: {!run} is only
+    invoked when a caller opts in; the {!Barbell.Barbell_config.t} it threads
+    through still defaults to the pure-engine no-op. *)
 
 open Core
 

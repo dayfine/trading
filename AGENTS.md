@@ -34,7 +34,7 @@ this way, and a concurrent Codex `dune build` corrupted the shared dune cache.
    cache is shared across worktrees; check `docker exec trading-1-dev sh -c
    'ps -eo args | grep [d]une'` first. Never build while a multi-hour backtest
    holds the container (`docker exec trading-1-dev sh -c 'ps -eo args | grep
-   [s]cenario_runner'`) — see `.claude/rules/container-capacity-scheduling.md`.
+   [s]cenario_runner'`) — see `dev/rules/container-capacity-scheduling.md`.
 4. **Docs-only PRs need no build.** If your diff is only `*.md` /
    `dev/notes|plans|reviews|status`, skip dune entirely; CI is the gate.
 5. **Branch, commit, PR conventions** are in `CLAUDE.md` (branch names,
@@ -151,7 +151,7 @@ limit from inside its sandbox, so keep each task cheap by construction. The disp
 4. **Read narrowly.** Open the files the brief names and their direct callers; do not survey the repository.
 5. **A rework commit addresses only the listed review items.** No refactors on the side.
 
-## Cross-agent review (`.claude/rules/cross-agent-review.md`)
+## Cross-agent review (`dev/rules/cross-agent-review.md`)
 
 - Add the label `author/codex` to every PR you open. It goes through the same
   gate loop as any PR: CI + qc-structural + qc-behavioral, both **Claude Code**
