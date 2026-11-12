@@ -39,9 +39,9 @@ below apply without being restated; a brief that repeats them is wasted context.
   MCP `create_pull_request` tool) → check the PR's file list matches your task.
   **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
   name, the commit id and "PR NOT opened" so the dispatcher can open it
-  (`.claude/rules/worktree-isolation.md` §Finish Protocol).
+  (`dev/rules/worktree-isolation.md` §Finish Protocol).
 - Never edit `dev/status/_index.md` from a feature PR; update only your track's `dev/status/<track>.md`. The one
-  exception is the row for a brand-new tracked work item (`.claude/rules/feat-agent-dispatch.md` §4).
+  exception is the row for a brand-new tracked work item (`dev/rules/feat-agent-dispatch.md` §4).
 
 ## Required sections (every feat-agent must have all of these)
 
@@ -50,7 +50,7 @@ below apply without being restated; a brief that repeats them is wasted context.
 Every feat-agent (and harness-maintainer / ops-data) must include this block
 verbatim near the top. It creates an isolated jj workspace so concurrent agents
 don't race the shared `op_heads` / default `WorkspaceName`.
-See `.claude/rules/worktree-isolation.md` §"jj workspace isolation" for the
+See `dev/rules/worktree-isolation.md` §"jj workspace isolation" for the
 root-cause explanation.
 
 ```markdown
@@ -211,8 +211,8 @@ status to READY_FOR_REVIEW.
 - [ ] No function exceeds 50 lines
 - [ ] PR diff respects `## PR sizing` rules (≤500 LOC, one new module per PR; status / plan / fixtures don't count)
 - [ ] All configurable parameters routed through config record — no magic numbers
-- [ ] `dune build && dune runtest` passes with zero warnings **on a clean checkout of the branch** — not just on your local worktree. Run in the **foreground** and check the **exit code** (not `grep FAIL:` — OUnit/linter failures may not print that literal; and `… | tail; echo $?` captures `tail`'s exit, not dune's). If you are running in `isolation: "worktree"` (the orchestrator default), your working copy is usually but not always a clean checkout — follow `.claude/rules/worktree-isolation.md` to verify (`jj diff --stat` pre-commit, branch ancestry check pre-push, PR file list post-push). If you are NOT in a worktree (rare, legacy runs), re-verify by checking that every module your branch references is either in your commits or already on `main@origin` — do not rely on files sitting in the shared working copy that you did not explicitly commit.
-- [ ] **Finish Protocol** followed (`.claude/rules/worktree-isolation.md` §"Finish Protocol") — REQUIRED for every feat-agent: verify in foreground → `jj describe` → `jj bookmark set feat/<name> -r @` → `jj git push -b feat/<name>` → `gh pr create`, atomically as the last actions with no turn-end in between; then confirm `jj diff -r @ --stat` is non-empty AND `gh pr view <N> --json files` lists your files; on any push/PR failure, retry once then report **bookmark + commit id + "PR NOT opened"**. **Never end a turn with an un-pushed commit** — a green local build that was never pushed is lost work (2026-06-07: 3 agent commits lost this way).
+- [ ] `dune build && dune runtest` passes with zero warnings **on a clean checkout of the branch** — not just on your local worktree. Run in the **foreground** and check the **exit code** (not `grep FAIL:` — OUnit/linter failures may not print that literal; and `… | tail; echo $?` captures `tail`'s exit, not dune's). If you are running in `isolation: "worktree"` (the orchestrator default), your working copy is usually but not always a clean checkout — follow `dev/rules/worktree-isolation.md` to verify (`jj diff --stat` pre-commit, branch ancestry check pre-push, PR file list post-push). If you are NOT in a worktree (rare, legacy runs), re-verify by checking that every module your branch references is either in your commits or already on `main@origin` — do not rely on files sitting in the shared working copy that you did not explicitly commit.
+- [ ] **Finish Protocol** followed (`dev/rules/worktree-isolation.md` §"Finish Protocol") — REQUIRED for every feat-agent: verify in foreground → `jj describe` → `jj bookmark set feat/<name> -r @` → `jj git push -b feat/<name>` → `gh pr create`, atomically as the last actions with no turn-end in between; then confirm `jj diff -r @ --stat` is non-empty AND `gh pr view <N> --json files` lists your files; on any push/PR failure, retry once then report **bookmark + commit id + "PR NOT opened"**. **Never end a turn with an un-pushed commit** — a green local build that was never pushed is lost work (2026-06-07: 3 agent commits lost this way).
 - [ ] `dune build @fmt` passes (formatter in check mode; equivalent: `dune fmt` produces no diff)
 - [ ] `Interface stable: YES` is set in `dev/status/<feature>.md` once `.mli` is finalized
 - [ ] **PR description is non-empty.** `jst submit` does NOT populate the PR body from commit messages — the body field stays empty unless you write it explicitly. After `jst submit`, run `gh pr edit <N> --body-file <path>` (or `curl PATCH /pulls/<N> -d '{"body":"..."}'`) to set the body. The description should mirror the extended commit message: what changed, why, test plan. Bodies matter for reviewers scanning `gh pr list` and for future archaeology. Empty-body PRs were an observed gap — see run-5 on 2026-04-19.

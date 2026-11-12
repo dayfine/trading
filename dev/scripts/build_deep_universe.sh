@@ -4,7 +4,7 @@
 # WHY THIS EXISTS
 #   The 27-year deep backtest (dot-com bust + GFC) is the load-bearing
 #   macro-regime cell of every promotion-confirmation grid
-#   (.claude/rules/promotion-confirmation.md). Its bar data is huge and
+#   (dev/rules/promotion-confirmation.md). Its bar data is huge and
 #   deliberately NOT committed (survivorship-biased deep bars would bloat the
 #   repo). This script rebuilds that data from the ONE committed seed — the
 #   point-in-time 2000 S&P 500 snapshot — so the deep capability is a

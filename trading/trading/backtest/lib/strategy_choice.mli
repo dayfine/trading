@@ -60,7 +60,7 @@ type t =
           [true] the strategy goes short in Stage 4 instead of sitting flat — a
           faithful Weinstein adaptation (he shorts Stage-4 declines), gated as a
           default-off testbed dial per
-          [.claude/rules/experiment-flag-discipline.md]. See
+          [dev/rules/experiment-flag-discipline.md]. See
           {!Weinstein_strategy.Spy_only_weinstein_strategy.config} for the short
           mechanics. *)
   | Sector_rotation_weinstein of {
@@ -94,7 +94,7 @@ type t =
           are blocked and held sectors are forced flat (Weinstein spine item 6,
           omitted from the bare testbed to isolate selection). Default-off keeps
           every pre-existing sector scenario bit-identical; it is a searchable
-          dial per [.claude/rules/experiment-flag-discipline.md].
+          dial per [dev/rules/experiment-flag-discipline.md].
 
           [use_scenario_universe] ([@sexp.default false]) selects the tradable
           universe. When [false] (default) the strategy trades the hardcoded 11
@@ -115,7 +115,7 @@ type t =
           never capped). [None] (default) = uncapped top-[k], bit-identical. A
           diversification constraint only — the spine ordering is untouched; a
           searchable default-off dial per
-          [.claude/rules/experiment-flag-discipline.md] and faithful per
+          [dev/rules/experiment-flag-discipline.md] and faithful per
           [.claude/rules/weinstein-faithful-core.md].
 
           The strategy spine (Stage-2-only entry, Stage 3/4 exit, stop below
@@ -139,8 +139,8 @@ type t =
           cost is accepted and measured (lens screen vs total-return SPY, a
           separate step). Every breaker threshold routes through the strategy's
           own default {!Index_circuit_breaker.config}, default-off relative to a
-          promoted default per [.claude/rules/experiment-flag-discipline.md].
-          See {!Weinstein_strategy.Breaker_spy_strategy.config}. *)
+          promoted default per [dev/rules/experiment-flag-discipline.md]. See
+          {!Weinstein_strategy.Breaker_spy_strategy.config}. *)
 [@@deriving sexp, eq, show]
 
 val default : t

@@ -8,7 +8,7 @@
     This is a READ-ONLY, IN-SAMPLE screen. Its output feeds a screen-rigor
     calibrated verdict (no-build decision vs escalate-to-WF-CV); it must NOT be
     read as causal or deployable alpha. See
-    [.claude/rules/mechanism-validation-rigor.md]. *)
+    [dev/rules/mechanism-validation-rigor.md]. *)
 
 type era_fit = {
   label : string;  (** Era label from {!Feature_matrix.era_bounds}. *)

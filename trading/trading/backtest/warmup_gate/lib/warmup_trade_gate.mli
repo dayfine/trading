@@ -1,9 +1,9 @@
 (** The warmup-trading gate.
 
     A default-off backtest mechanism (per
-    [.claude/rules/experiment-flag-discipline.md]) that suppresses all new
-    position entries before the measurement [start_date]. The simulator runs
-    from [start_date - warmup_days] so the Weinstein strategy trades during the
+    [dev/rules/experiment-flag-discipline.md]) that suppresses all new position
+    entries before the measurement [start_date]. The simulator runs from
+    [start_date - warmup_days] so the Weinstein strategy trades during the
     warmup window; PR #1549's A2 root-cause showed this leaks a warmup-built
     portfolio into every measurement window (the 2009-06-26 fold's warmup
     spanned the GFC bottom → portfolio depleted to ~35% before measurement

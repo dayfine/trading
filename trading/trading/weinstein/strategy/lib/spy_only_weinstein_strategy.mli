@@ -70,8 +70,8 @@ type config = {
           in Stage 4 instead of sitting flat — a faithful Weinstein adaptation
           (he shorts Stage-4 declines; book §Short-Selling Rules). It is a
           {e testbed dial} only: default-off per
-          [.claude/rules/experiment-flag-discipline.md] R1, and not promoted to
-          the default config (R3) without a ledger ACCEPT.
+          [dev/rules/experiment-flag-discipline.md] R1, and not promoted to the
+          default config (R3) without a ledger ACCEPT.
 
           Short mechanics (mirror of the long side):
           - {b Entry.} On a weekly close, when flat and SPY's stage read is a

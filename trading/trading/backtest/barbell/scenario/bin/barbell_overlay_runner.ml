@@ -15,7 +15,7 @@
     {!Backtest.Runner.run_backtest} unchanged (Option A of
     [dev/plans/barbell-deployable-overlay-2026-06-21.md]).
 
-    Default-off per [.claude/rules/experiment-flag-discipline.md]: with
+    Default-off per [dev/rules/experiment-flag-discipline.md]: with
     [--floor-weight 0.0] (the default) the blended NAV is the pure-engine curve,
     so invoking the overlay changes nothing until a weight is chosen. The
     documented promotion target is a light floor [~0.30-0.40]

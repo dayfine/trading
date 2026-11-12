@@ -18,7 +18,7 @@
     {!Build_from_individuals} pipeline keeps, so a universe rebuilt through the
     policy with the default config is bit-identical to one built without it.
     Every flag must be flipped explicitly to change a result — the data-layer
-    analog of [.claude/rules/experiment-flag-discipline.md]. *)
+    analog of [dev/rules/experiment-flag-discipline.md]. *)
 
 type candidate = {
   symbol : string;

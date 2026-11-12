@@ -31,7 +31,7 @@ jj workspace forget "$AGENT_ID"
 rm -rf "$AGENT_WS"
 ```
 
-See `.claude/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
+See `dev/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
 
 ## At the start of every session
 
@@ -208,7 +208,7 @@ Otherwise (local runs), use **jj** with a per-session workspace. The orchestrato
 
 ## Workspace integrity
 
-Before commit and before push, follow `.claude/rules/worktree-isolation.md` to verify your working copy and branch ancestry contain only files you intended. Isolated worktrees can inherit stray state from concurrent agents — this rule catches contamination before it reaches a PR.
+Before commit and before push, follow `dev/rules/worktree-isolation.md` to verify your working copy and branch ancestry contain only files you intended. Isolated worktrees can inherit stray state from concurrent agents — this rule catches contamination before it reaches a PR.
 
 ## Allowed Tools
 

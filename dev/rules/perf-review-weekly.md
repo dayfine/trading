@@ -64,7 +64,7 @@ the handle cap (`SNAPSHOT_MAX_MMAP_HANDLES`, #2839) are the per-run signals.
    verdicts but never time is a gap — add the cell before the next verdict
    run, not after it dies.
 3. **Local long cells carry their own numbers.** Every chain script logs the
-   cache line and GNU-time peak RSS per cell (`sweep-hygiene.md` preamble),
+   cache line and GNU-time peak RSS per cell (`dev/rules/sweep-hygiene.md` preamble),
    and the cell guard is set from the **measured arm**, not the null:
    guard ≥ 1.5 × the slowest observed cell of that arm. **The ledger is
    `dev/status/perf-long-cells.csv`**: after every chain, run
@@ -95,7 +95,7 @@ three shell-only PRs). Same day as the perf read, same "write it down" rule.
 
 | source | what | how it gets there |
 |---|---|---|
-| `dev/budget/local-<date>.json` | local session: Claude main + every dispatch, Codex runs | `sh dev/scripts/budget_local_record.sh` at session end (`session-rampup.md` §Maintenance); backfill missed days with `--date` |
+| `dev/budget/local-<date>.json` | local session: Claude main + every dispatch, Codex runs | `sh dev/scripts/budget_local_record.sh` at session end (`.claude/rules/session-rampup.md` §Maintenance); backfill missed days with `--date` |
 | `dev/budget/<date>-<run>.json` | GHA orchestrator runs, `total_cost_usd` | the orchestrator's cost step |
 | `dev/reviews/codex-agreement.md` | Codex verdict vs Claude gates + `codex tok in/out` | `codex_agreement_row.sh <PR> --append` at merge |
 | cloud session runs (`RemoteTrigger` routines) | per run: model, turns, wall time (`result:` lines of the run log); no token counts | dispatcher, at the weekly read: `RemoteTrigger list`, then `list_runs` per routine fired that week and `get_run_log` per run. No script: the API is reachable only through the in-session tool |
@@ -107,7 +107,7 @@ three shell-only PRs). Same day as the perf read, same "write it down" rule.
 | tokens per merged PR (Claude, all dispatches on that `ref`) | `.claude.rows[]` grouped by `ref` | trend only |
 | tokens per QC verdict, split structural / behavioral / results | rows with `agent_type` `qc-*` | (b): tokens per QC verdict on PRs with no OCaml in the diff vs PRs with OCaml — if the no-OCaml reviews cost within ~40 % of the OCaml ones, the rebuild dominates → add a "CI-authoritative build; do not rebuild" path to QC briefs (the rows do not split tool output; this is the proxy) |
 | resume overhead | rows with `resumes > 0`, share of subagent tokens | (a): ≥ 20 % → prioritise the event-wait helper (#2738) |
-| main-session calls above the compact threshold (default 250k, `session-rampup.md` Step 3) | `.claude.context_histogram.share_above_threshold_pct` | (c): > 50 % of calls → the `/compact` rule is not being followed; fix the habit before any preamble cut |
+| main-session calls above the compact threshold (default 250k, `.claude/rules/session-rampup.md` Step 3) | `.claude.context_histogram.share_above_threshold_pct` | (c): > 50 % of calls → the `/compact` rule is not being followed; fix the habit before any preamble cut |
 | Codex cost per finding | `codex-agreement.md`: `codex tok in/out` ÷ codex-only items | (d): compare with the Claude gates' tokens per finding |
 | GHA $ per run | `<date>-<run>.json` totals | trend only |
 | tokens per model | `.claude.totals.by_model` (per model: `api_calls`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`; each row's own `model`/`models` fields carry the same split per dispatch/session) | (e): once work is routed by model/effort (verdict-bearing analysis → top model at max effort, structural QC → haiku), spend should shift toward the cheaper model on bulk QC lanes — a `by_model` split that still reads top-heavy on the expensive model after routing lands is a signal the routing isn't actually being followed |
@@ -126,7 +126,7 @@ tokens), and Codex runs made outside `codex_review.sh`.
   already covers the shape).
 - A chain script's `CELL_TIMEOUT` cites the measurement it was sized from.
 
-Related: `container-capacity-scheduling.md` (measure with `docker stats`, not
+Related: `dev/rules/container-capacity-scheduling.md` (measure with `docker stats`, not
 RSS, for container headroom — peak RSS is still the right per-cell trend
-number), `sweep-hygiene.md`, `memory/feedback_weekly_perf_review_budget`,
+number), `dev/rules/sweep-hygiene.md`, `memory/feedback_weekly_perf_review_budget`,
 `memory/project_snapshot_cache_handle_cap_thrash`.

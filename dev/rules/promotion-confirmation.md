@@ -2,7 +2,7 @@
 
 A ledger **ACCEPT** from a single walk-forward surface is **necessary but not
 sufficient** to flip a mechanism's global default. Before promotion
-(`experiment-flag-discipline.md` R3), the candidate must clear a **confirmation
+(`dev/rules/experiment-flag-discipline.md` R3), the candidate must clear a **confirmation
 grid**: the same surface re-run across several independent
 (period × universe) contexts, with the promotable *value* required to be robust
 **across the grid** — not just the DSR winner on the one window that produced
@@ -117,7 +117,7 @@ until the grid pins a value. Full record:
 
 ## Relationship to the other rules
 
-- `experiment-flag-discipline.md` — R3 ("no default-on without an ACCEPT") is the
+- `dev/rules/experiment-flag-discipline.md` — R3 ("no default-on without an ACCEPT") is the
   *gate*; this rule is the *evidence standard* that gate demands before a default
   flips. An ACCEPT lets a mechanism be promoted **eligible**; the grid decides
   **which value, if any** actually flips.

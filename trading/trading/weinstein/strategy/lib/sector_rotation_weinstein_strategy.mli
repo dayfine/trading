@@ -93,7 +93,7 @@ type config = {
           {!Sector_rotation_transitions.holding_exits}). This is the faithful
           "bearish tape blocks buys / get out" rule (weinstein-book-reference.md
           §Macro Analysis) the bare testbed omits. A {e default-off dial} per
-          [.claude/rules/experiment-flag-discipline.md] R1/R2: a config field,
+          [dev/rules/experiment-flag-discipline.md] R1/R2: a config field,
           searchable as an axis, not wired on until a ledger ACCEPT (R3). *)
   sector_cap : int option;
       (** Optional per-GICS-sector concentration cap on the weekly rotation.
@@ -109,7 +109,7 @@ type config = {
           spine is untouched (Stage-2-only entry per spine item 2, Stage 3/4
           exit per item 4, RS-for-selection ordering per item 7). See
           [.claude/rules/weinstein-faithful-core.md]. A {e default-off dial} per
-          [.claude/rules/experiment-flag-discipline.md] R1/R2: a config field,
+          [dev/rules/experiment-flag-discipline.md] R1/R2: a config field,
           searchable as an axis, not wired on until a ledger ACCEPT (R3). *)
   sector_of : string -> string option;
       (** Symbol -> GICS-sector lookup used by {!sector_cap}. Default

@@ -19,13 +19,13 @@ reply, and no Codex hand-offs go out. The board ignores that reply (it is not a 
    or `turn/user`. The turn rules are in the script header; `merge` shows as `turn/claude`.
 2. **Claude's turns get processed** (`turn/claude`: a QC wave, a merge, a hand-off to post, an issue to hand
    out):
-   - at session start, `session-rampup.md` Step 0b;
+   - at session start, `.claude/rules/session-rampup.md` Step 0b;
    - in each orchestrator cron slot, `lead-orchestrator.md` Step 2a2, which runs the QC waves and merges
      and hands out up to the cap. It posts no hand-offs (see 3).
 3. **Hand-offs come from a local session**, with `sh dev/scripts/lane_handoff.sh <PR|issue> rework|task`.
    It posts from the user's `gh` login. A bot-token mention may not trigger either agent, so the workflow
    and the GHA orchestrator never call it. Rework is capped at iteration 2; at iteration 3 the script
-   refuses and sets `turn/user` (`feat-agent-dispatch.md` section 3).
+   refuses and sets `turn/user` (`dev/rules/feat-agent-dispatch.md` section 3).
 4. **External agents answer on GitHub**: a push, or a reply comment on the PR or issue. A push, or a reply
    after our hand-off, moves the turn back to us at the next board run (we must read and answer the
    reply, even when a rework gate still reads `rework`). A rework gate with no reply or push since the
@@ -64,7 +64,7 @@ each task cheap per `AGENTS.md` "Usage budget".
 ## What does not change
 
 All three Claude gates (CI, qc-structural, qc-behavioral at the current tip) apply to every external-lane PR
-(`pr-merge-gates.md`, `cross-agent-review.md`). The board decides who moves next; it never approves or merges.
+(`.claude/rules/pr-merge-gates.md`, `dev/rules/cross-agent-review.md`). The board decides who moves next; it never approves or merges.
 A `do-not-merge` label still holds.
 
 ## Tests

@@ -1,7 +1,7 @@
 # Mechanism-validation rigor — the bar a "validate-before-build" screen must clear
 
 A cheap read-only screen run *before* building a strategy mechanism is good
-discipline (`experiment-flag-discipline.md`, the cascade-reweight save). But a
+discipline (`dev/rules/experiment-flag-discipline.md`, the cascade-reweight save). But a
 screen is only worth running if it is *honest about what it can and cannot
 conclude*. This rule exists because the 2026-06-10 harvest-rotate screen reported
 **"REJECTED, both preconditions fail decisively"** off point-estimate medians,
@@ -47,7 +47,7 @@ forward-return studies, selection-edge checks, "is there alpha in X" screens.
 5. **Surface, not boolean.** A mechanism has knobs (fraction `k`, threshold,
    pick-rank, horizon). Test a **range** and show the response shape, not one
    point. A single-point probe cannot reject a mechanism — it can only fail to
-   find an obvious free lunch at that point. (Per `experiment-flag-discipline.md`
+   find an obvious free lunch at that point. (Per `dev/rules/experiment-flag-discipline.md`
    R2 the mechanism is an axis; the screen should sweep it too.)
 
 6. **Paired / event-level, not just pooled.** When the decision is "at moment t,
@@ -96,7 +96,7 @@ conclude:
 - ✅ **"No obvious free lunch at the tested point; not worth prioritizing a build"**
   — a *decision*, which may lean on standing priors
   (`feedback_strategy_mechanic_changes_too_explorative`,
-  `weinstein-faithful-core.md`).
+  `.claude/rules/weinstein-faithful-core.md`).
 - ✅ **"Promising signal — escalate to the real test"** (mechanism as a default-off
   surface under WF-CV + the confirmation grid).
 
@@ -105,7 +105,7 @@ It may **not** conclude:
 - ❌ **"Decisively rejected"** / **"the mechanism does not work."** Only the real
   test rejects: the mechanism implemented behind a default-off flag and backtested
   as a surface under walk-forward CV (`experiment-gap-closing` skill,
-  `promotion-confirmation.md`). A proxy screen rejects *prioritization*, not the
+  `dev/rules/promotion-confirmation.md`). A proxy screen rejects *prioritization*, not the
   mechanism.
 
 Write the verdict as **"no-build *decision*"** (citing the prior) when the screen
@@ -154,11 +154,11 @@ is extracted and persisted. A verdict without a transferable why is a draft.
 
 ## Relationship to the other rules
 
-- `experiment-flag-discipline.md` — the mechanism is default-off + an axis; this
+- `dev/rules/experiment-flag-discipline.md` — the mechanism is default-off + an axis; this
   rule says the *pre-build screen* of that axis must be rigorous before it informs
   a decision.
-- `experiment-gap-closing` skill / `promotion-confirmation.md` — the **real** test
+- `experiment-gap-closing` skill / `dev/rules/promotion-confirmation.md` — the **real** test
   (surface → WF-CV → DSR/Pareto → confirmation grid). This rule governs the cheap
   screen that decides whether to *enter* that pipeline.
-- `weinstein-faithful-core.md` — a legitimate standing prior a weak screen may lean
+- `.claude/rules/weinstein-faithful-core.md` — a legitimate standing prior a weak screen may lean
   on; but lean on it *explicitly* as a prior, don't dress it up as a data verdict.

@@ -3,7 +3,7 @@
 How the cloud environment is set up, how to rebuild it from nothing, and how a
 local session launches work in it. Cloud sessions are a second worker beside the
 local `trading-1-dev` container, which fits one backtest at a time and nothing
-beside it (`.claude/rules/container-capacity-scheduling.md`).
+beside it (`dev/rules/container-capacity-scheduling.md`).
 
 **Backtests run here by default** (since 2026-11-09, when the 26y record cell `rk-k0` reproduced
 byte-identically from the R2 warehouse, #3535): chains, seeds and grids launch as cloud sessions with
@@ -27,7 +27,7 @@ owner, `dockerd`, and the image `ghcr.io/dayfine/trading-ci:latest`.
 
 What it does not get: `data/` (2.1 GB of bars), the snapshot warehouse
 (`/tmp/snap_top3000_pit_v*`), `.sweep-output/` artifacts, and the Weinstein book,
-which never leaves the local machine (`.claude/rules/book-as-authority.md`).
+which never leaves the local machine (`dev/rules/book-as-authority.md`).
 
 ### Rebuilding it from nothing
 

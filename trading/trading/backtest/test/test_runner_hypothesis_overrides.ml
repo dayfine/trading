@@ -581,8 +581,8 @@ let test_unknown_key_error_reports_overlay_index _ =
 
 (** [extension_stop_config] defaults to the no-op ([trigger_ratio = 0.0] /
     [trail_pct = 0.0]) — the mechanism is disabled, so every existing
-    golden/baseline decodes unchanged
-    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+    golden/baseline decodes unchanged ([dev/rules/experiment-flag-discipline.md]
+    R1). *)
 let test_default_extension_stop_config_is_no_op _ =
   let cfg = _default_config () in
   assert_that cfg.extension_stop_config
@@ -636,7 +636,7 @@ let test_extension_stop_config_axis_resolves_via_overlay_validator _ =
     [Insufficient_history] floor is disabled, so the built
     [Stock_analysis.config] is byte-identical to
     {!Stock_analysis.default_config} and every existing golden/baseline replays
-    unchanged ([.claude/rules/experiment-flag-discipline.md] R1). *)
+    unchanged ([dev/rules/experiment-flag-discipline.md] R1). *)
 let test_default_resistance_min_history_bars_is_zero _ =
   let cfg = _default_config () in
   assert_that cfg.resistance_min_history_bars (equal_to 0)
@@ -671,7 +671,7 @@ let test_resistance_min_history_bars_axis_resolves_via_overlay_validator _ =
 
 (** [entry_freshness_basis] defaults to [Ma_cross] — the Stage-2 admission clock
     still counts from the MA cross, so every existing golden/baseline replays
-    unchanged ([.claude/rules/experiment-flag-discipline.md] R1). *)
+    unchanged ([dev/rules/experiment-flag-discipline.md] R1). *)
 let test_default_entry_freshness_basis_is_ma_cross _ =
   let cfg = _default_config () in
   assert_that cfg.entry_freshness_basis (equal_to Entry_freshness.Ma_cross)
@@ -717,8 +717,8 @@ let test_strategy_config_parses_with_entry_freshness_basis_absent _ =
 
 (** [volume_confirm_at_fill] defaults to [false] — volume stays a screen-time
     admission gate and no at-fill eject path is reachable, so every existing
-    golden/baseline replays unchanged
-    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+    golden/baseline replays unchanged ([dev/rules/experiment-flag-discipline.md]
+    R1). *)
 let test_default_volume_confirm_at_fill_is_false _ =
   let cfg = _default_config () in
   assert_that cfg.volume_confirm_at_fill (equal_to false)
@@ -763,7 +763,7 @@ let test_strategy_config_parses_with_volume_confirm_at_fill_absent _ =
 
 (** [0.0] (the default) is the no-op: the failed-breakout re-validation gate is
     disabled, so screener output is bit-identical to pre-feature behaviour
-    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+    ([dev/rules/experiment-flag-discipline.md] R1). *)
 let test_default_screening_failed_breakout_tolerance_is_zero _ =
   let cfg = _default_config () in
   assert_that cfg.screening_config.failed_breakout_tolerance_pct
@@ -1192,9 +1192,9 @@ let test_strategy_config_parses_without_resize_fields _ =
 (** R1: the RS [Positive_declining] state ships off, which is the behaviour the
     classifier had before it existed — [Rs] folds the cohort back into
     [Positive_flat], so no consumer sees the new constructor and every golden
-    replays unchanged ([.claude/rules/experiment-flag-discipline.md] R1). No
-    ledger verdict exists for this mechanism, so any other default would be a
-    promotion with no evidence behind it (R3). *)
+    replays unchanged ([dev/rules/experiment-flag-discipline.md] R1). No ledger
+    verdict exists for this mechanism, so any other default would be a promotion
+    with no evidence behind it (R3). *)
 let test_default_enable_rs_positive_declining_is_false _ =
   assert_that (_default_config ()).enable_rs_positive_declining (equal_to false)
 
@@ -1262,7 +1262,7 @@ let test_strategy_config_parses_without_rs_declining_field _ =
 (** The map ships with every slot at [Stop_buffer_by_state.unset], so the entry
     walk resolves [config.initial_stop_buffer] for every macro state and every
     existing golden/baseline replays unchanged
-    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+    ([dev/rules/experiment-flag-discipline.md] R1). *)
 let test_default_initial_stop_buffer_by_macro_state_is_empty _ =
   let cfg = _default_config () in
   assert_that cfg.initial_stop_buffer_by_macro_state
@@ -1325,7 +1325,7 @@ module Suspend_mode = Weinstein_strategy.Entry_ticket_suspend_mode
 
 (** [entry_ticket_macro_suspend] defaults to [Off] — resting tickets stay live
     whatever the tape, so every existing golden replays unchanged
-    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+    ([dev/rules/experiment-flag-discipline.md] R1). *)
 let test_default_entry_ticket_macro_suspend_is_off _ =
   assert_that (_default_config ()).entry_ticket_macro_suspend
     (equal_to Suspend_mode.Off)

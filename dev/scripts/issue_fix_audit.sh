@@ -1,7 +1,7 @@
 #!/bin/sh
 # issue_fix_audit.sh -- weekly report of issues whose fix status needs a human
 # decision (issue #3019) and of issue-hygiene drift (issue #3275,
-# .claude/rules/issue-hygiene.md). Reports only; it closes and edits nothing.
+# dev/rules/issue-hygiene.md). Reports only; it closes and edits nothing.
 #
 # usage: sh dev/scripts/issue_fix_audit.sh
 #

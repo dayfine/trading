@@ -10,7 +10,7 @@
     validated daily-return blend this overlay reproduces).
 
     Every field is a no-op at its default per
-    [.claude/rules/experiment-flag-discipline.md]: with [enable] [false] and
+    [dev/rules/experiment-flag-discipline.md]: with [enable] [false] and
     [floor_weight] [0.0] a barbell run is byte-identical to a pure-engine run.
     The record is [sexp]-derivable so each field is expressible as a
     {!Backtest.Variant_matrix}-style axis (R2) — nothing here is a hardcoded

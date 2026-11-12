@@ -21,9 +21,9 @@ let validate ~out_dir ?(env_lookup = Sys.getenv) () =
     Status.error_invalid_argument
       (sprintf
          "Refusing --out-dir %S — sweep output must start with %S per \
-          .claude/rules/sweep-hygiene.md (otherwise it inflates the \
-          container's writable layer + Docker.raw on macOS hosts). Override at \
-          your own risk: set %s=1."
+          dev/rules/sweep-hygiene.md (otherwise it inflates the container's \
+          writable layer + Docker.raw on macOS hosts). Override at your own \
+          risk: set %s=1."
          out_dir _allowed_prefix _override_env)
 
 let validate_or_exit ~out_dir =

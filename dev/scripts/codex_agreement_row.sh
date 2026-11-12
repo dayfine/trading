@@ -2,7 +2,7 @@
 # codex_agreement_row.sh -- one A/B row per PR: did the advisory Codex review
 # agree with the two Claude gates at the same tip? (issue #2905)
 #
-# WHY: .claude/rules/cross-agent-review.md keeps Codex advisory until its
+# WHY: dev/rules/cross-agent-review.md keeps Codex advisory until its
 # verdicts have agreed with the Claude gates "across enough PRs to trust it".
 # Nothing recorded that agreement, so the promotion question could never be
 # answered. This script derives the row from the review bodies with the SAME
@@ -102,7 +102,7 @@ ensure_header() {
       'verdict with the combined Claude verdict (rework if either gate said so). Read the' \
       'table monthly: the promotion path in `docs/howtos/codex_pr_reviews.md` becomes a' \
       'discussable option only after >= 20 rows with agree >= 90 % and no Codex-only' \
-      'false rework (`.claude/rules/cross-agent-review.md`).' '' \
+      'false rework (`dev/rules/cross-agent-review.md`).' '' \
       '| date | PR | tip | struct | behav | codex | agree | codex-only items | claude-only items | codex tok in/out | note |' \
       '|---|---|---|---|---|---|---|---|---|---|---|' > "$1"
   fi

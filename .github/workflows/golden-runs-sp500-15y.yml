@@ -104,7 +104,7 @@ jobs:
       # fix, so the raw peak_rss files are gone and the true figure is
       # unverifiable now; a "1" + a ~745MB-scale value would put it around
       # ~1.7-2.4 GB, not 12.4 GB. See #2553, #2559,
-      # .claude/rules/container-capacity-scheduling.md
+      # dev/rules/container-capacity-scheduling.md
       # "Pre-#2553 kill-report RSS figures are suspect on failing cells".
       # Retightened 14400 -> 7200 (2026-08-31, #2615 qc-behavioral): the
       # 4h/cell value was sized for the all_eligible-era 90-102 min cells

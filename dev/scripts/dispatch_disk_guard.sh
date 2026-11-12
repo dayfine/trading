@@ -8,7 +8,7 @@
 #   16 GB / 16 GB / 16 GB = 48 GB). Combined with image layers and `_build`
 #   growth, that run reached 100% disk and the harness's own task-output
 #   filesystem returned ENOSPC, killing a tool call mid-orchestration.
-#   `.claude/rules/container-capacity-scheduling.md`'s "cap 3 agents" is
+#   `dev/rules/container-capacity-scheduling.md`'s "cap 3 agents" is
 #   stated in terms of memory and cores; it has an undocumented DISK
 #   dimension that this script makes mechanical instead of held-by-hand --
 #   the orchestrator capped itself at 2 agents instead of 3 on 09-14 and

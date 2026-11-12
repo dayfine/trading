@@ -123,7 +123,7 @@ happens to be running.
 ## When this fires
 
 - A PR adapts a dial and must cite Weinstein authority
-  (`weinstein-faithful-core.md` W2).
+  (`.claude/rules/weinstein-faithful-core.md` W2).
 - qc-behavioral fills an S / L / C row and the reference does not clearly cover
   the case.
 - Someone claims a mechanism is or is not faithful and the record disagrees, or
@@ -136,7 +136,7 @@ happens to be running.
 
 It does not make faithfulness checkable by a linter, and it does not license
 citing the book to justify a mechanism the book does not discuss. The spine in
-`weinstein-faithful-core.md` still governs what may be adapted at all; this rule
+`.claude/rules/weinstein-faithful-core.md` still governs what may be adapted at all; this rule
 only governs **how to find out what the book actually says**.
 
 Related: `.claude/rules/weinstein-faithful-core.md`,

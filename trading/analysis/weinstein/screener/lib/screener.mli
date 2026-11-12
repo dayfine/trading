@@ -410,7 +410,7 @@ type config = {
           [@sexp.default 4] keeps the field present in the serialized form while
           parsing a missing field back to [4] (older config sexps round-trip).
           Not wired into any non-default config until it earns an ACCEPT in the
-          experiment ledger ([.claude/rules/experiment-flag-discipline.md]). *)
+          experiment ledger ([dev/rules/experiment-flag-discipline.md]). *)
   min_rs_normalized : float; [@sexp.default 0.0]
       (** W1 long-side relative-strength admission floor — book §4.4 rule 2,
           {i "negative RS in negative territory → NEVER buy, no matter how good

@@ -2,7 +2,7 @@
 # lane_handoff.sh <PR|issue> <rework|task> [--iter N] [--dry-run]
 #
 # Posts the hand-off comment that addresses an external agent: `@codex` for the
-# Codex lane, `@jules` for the Jules lane. Rule: .claude/rules/async-lanes.md.
+# Codex lane, `@jules` for the Jules lane. Rule: dev/rules/async-lanes.md.
 #
 # RUN THIS FROM A LOCAL SESSION ONLY, with the user's own `gh` login. A comment
 # posted with a bot token (the workflow's GITHUB_TOKEN) may not trigger Codex or

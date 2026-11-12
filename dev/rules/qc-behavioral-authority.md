@@ -28,7 +28,7 @@ For Weinstein domain features (stage classifiers, screener, stops, simulation):
   `BOOK-CHECK-NEEDED: <question>` in the review and mark the row
   `PLAUSIBLE-pending-book` instead of PASS/FAIL, for a later local session to
   resolve. Path, OCR caveat, and the full environment-aware protocol:
-  `.claude/rules/book-as-authority.md`. A reference is a summary and cannot
+  `dev/rules/book-as-authority.md`. A reference is a summary and cannot
   settle a dispute about its own scope.
 - `docs/design/eng-design-2-screener-analysis.md` — screener / analysis spec
 - `docs/design/eng-design-3-portfolio-stops.md` — portfolio / stops spec
@@ -44,6 +44,15 @@ below do not apply):
 - The PR body's "Test plan" / "Test coverage" / "What it does" sections —
   the author's explicit claims.
 
+## Situational rule checks (read the rule when the PR matches)
+
+These rules load on demand, so read them by path when they apply, and add their rows to the checklist:
+
+- **Adds, flips or removes a strategy mechanism or flag:** `dev/rules/experiment-flag-discipline.md`
+  §"What QC can check" (R1–R5; R3 needs the ledger ACCEPT cited).
+- **Changes a strategy-config default:** `dev/rules/config-default-blast-radius.md`
+  §"What QC can check" (B1–B3: the paired table or zero-match statement in the PR body).
+
 ## Domain checklist (append to qc-behavioral's generic Contract Pinning Checklist)
 
 For Weinstein-feature PRs, append these rows below the CP1–CP4 rows. For
@@ -51,7 +60,7 @@ non-Weinstein PRs (infra / refactor / harness), skip the entire block except F1 
 mark every other row NA with one explanatory note.
 
 **Status values for S/L/C rows in a GHA/remote session** (book unreachable,
-per `.claude/rules/book-as-authority.md` "Environment-aware protocol"): PASS
+per `dev/rules/book-as-authority.md` "Environment-aware protocol"): PASS
 and FAIL still apply whenever tier 1 (`weinstein-book-reference.md`) actually
 settles the question. Use `PLAUSIBLE-pending-book` only for the case tier 1
 leaves genuinely open, alongside a `BOOK-CHECK-NEEDED: <question>` line in the
@@ -154,7 +163,7 @@ for QC agents in this repo":
    produce ENVFAIL on the ocamlformat / opam skew between host and
    container; parent-tree invocations build the wrong PR entirely. See
    `dev/rules/qc-structural-authority.md` item 2 for the exact
-   incantation and `.claude/rules/worktree-isolation.md` §"jj workspace
+   incantation and `dev/rules/worktree-isolation.md` §"jj workspace
    isolation" for the authority on dune cwd (issue #2386).
 
 ## What the generic agent doesn't know about

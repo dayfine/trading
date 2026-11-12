@@ -35,7 +35,7 @@ task that created it).
 
 ## What this is NOT
 
-Per `.claude/rules/mechanism-validation-rigor.md` — this produces a **screen**,
+Per `dev/rules/mechanism-validation-rigor.md` — this produces a **screen**,
 not a verdict. It can conclude "our gate excludes setups a book-faithful reader
 would take — worth investigating" or "no systematic divergence found in this
 cohort." It can NEVER conclude "our code is right/wrong," promote or reject a
@@ -249,7 +249,7 @@ is not a usable data point.
    Report per-category counts. On `agree-place` cases, additionally report
    level agreement: `|judge.trigger_level - our_E| / our_E` and the same for
    the stop, distribution not point estimate (mean/median/p10/p90) per
-   `mechanism-validation-rigor.md` check 2.
+   `dev/rules/mechanism-validation-rigor.md` check 2.
 
 ## Cohort selection (mandatory: disputed cases + controls)
 
@@ -287,7 +287,7 @@ Aim for a cohort where disputed cases are a minority (e.g. 5 disputed + 10+
 controls) so the agreement-rate denominator isn't dominated by the very
 cases under question.
 
-## Verdict calibration (mandatory — read `.claude/rules/mechanism-validation-rigor.md` first)
+## Verdict calibration (mandatory — read `dev/rules/mechanism-validation-rigor.md` first)
 
 Permitted conclusions:
 - "N of M disputed cases got a judge over-exclusion flag (we-declined,
@@ -318,6 +318,6 @@ A short writeup (`dev/notes/blind-judge-<topic>-YYYY-MM-DD.md`) reporting:
 judge self-consistency (the number that gates everything else), the 4-way
 comparison table, level-agreement distribution on agree-place cases, and
 which specific disputed cases (if any) warrant a trade-dissection follow-up.
-Per `mechanism-validation-rigor.md`'s "real deliverable is the why" — if
+Per `dev/rules/mechanism-validation-rigor.md`'s "real deliverable is the why" — if
 divergence is found, name which disputed cases and take them to
 `trade-dissection` next, don't stop at the aggregate count.

@@ -27,11 +27,11 @@
     [barbell_floor_sweep_runner] wires the thunk to a real
     {!Barbell_blend.blend} over two legs run once.
 
-    Default-off per [.claude/rules/experiment-flag-discipline.md]: enumerating
+    Default-off per [dev/rules/experiment-flag-discipline.md]: enumerating
     weights flips no default; the axis is only realised when a session opts into
     running the sweep, and [floor_weight = 0.0] remains a valid (no-op = pure
     engine) cell. Promoting any weight to the default is a separate,
-    ledger-gated decision (R3 / [.claude/rules/promotion-confirmation.md]). *)
+    ledger-gated decision (R3 / [dev/rules/promotion-confirmation.md]). *)
 
 type axis = {
   floor_weights : float list;

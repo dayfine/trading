@@ -11,7 +11,7 @@ pushed the container to 5.6/7.75 GB and killed a 26y run **1h53m in**, with the
 only evidence being a `<no result>` in the chain log.
 
 This file is the scheduling discipline. It is the throughput counterpart to
-`sweep-hygiene.md` (which says what not to do during a sweep) — this one says
+`dev/rules/sweep-hygiene.md` (which says what not to do during a sweep) — this one says
 what to *run* when, so the session neither idles nor thrashes.
 
 ## The three work classes
@@ -71,7 +71,7 @@ Why this ordering, even though a backtest looks like the more productive use:
   backtest.
 - Backtests are **relaunch-resumable** — the spec is committed and the run is
   reproducible. A PR sitting unreviewed is pure dead time, and it accumulates:
-  `pr-gate-loop.md` opens with a session that found **eight** unreviewed PRs.
+  `.claude/rules/pr-gate-loop.md` opens with a session that found **eight** unreviewed PRs.
 
 **Pre-flight, before launching anything long:**
 
@@ -117,7 +117,7 @@ session on a 1.5-hour confounded run.
    A 26y run needs ≥4 GB headroom. If mem is above ~3.5 GB used, something else
    is live — find it before launching.
 6. **Long runs go in a pinned worktree, detached, with a file log**
-   (`sweep-hygiene.md`), so a dispatcher-side mistake cannot kill them and a
+   (`dev/rules/sweep-hygiene.md`), so a dispatcher-side mistake cannot kill them and a
    session boundary cannot orphan them.
 
 ### ⚠ Measure with `docker stats`, not per-process RSS

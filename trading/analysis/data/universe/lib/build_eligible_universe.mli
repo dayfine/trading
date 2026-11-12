@@ -55,10 +55,9 @@
 
     {!default_config}'s gates are all no-ops ([min_price = 0.0],
     [min_avg_dollar_volume = 0.0], [reit_policy = Include],
-    [exclude_preferred = false]) — per
-    [.claude/rules/experiment-flag-discipline.md] R2, every gate is an explicit
-    config field defaulting to the pre-gate behaviour. {!spec_config} is the
-    live-universe spec: [min_price = 5.0],
+    [exclude_preferred = false]) — per [dev/rules/experiment-flag-discipline.md]
+    R2, every gate is an explicit config field defaulting to the pre-gate
+    behaviour. {!spec_config} is the live-universe spec: [min_price = 5.0],
     [min_avg_dollar_volume = 1_000_000.0], [reit_policy = Exclude],
     [exclude_preferred = true]. *)
 
@@ -104,9 +103,9 @@ type config = {
           before the composition policy runs. No-op default
           {!Asset_type_blocklist.empty} (both {!default_config} and
           {!spec_config}) keeps the build bit-identical to the pre-blocklist
-          behaviour — per [.claude/rules/experiment-flag-discipline.md] R1,
-          arming the live universe with {!Asset_type_blocklist.curated} is a
-          separate decision. *)
+          behaviour — per [dev/rules/experiment-flag-discipline.md] R1, arming
+          the live universe with {!Asset_type_blocklist.curated} is a separate
+          decision. *)
   bars_root : string;
       (** Root of cached bars ([<L1>/<L2>/<symbol>/data.csv]). *)
   symbol_types_path : string;  (** Path to [symbol_types.sexp]. *)

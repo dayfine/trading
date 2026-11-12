@@ -21,7 +21,7 @@
     1. {b The flag→cutoff mapping} ({!Panel_runner.fold_start_date_of_opt_in}):
     [false] (the default) → [None] (no pruning → bit-equal baselines); [true] →
     [Some start_date]. This is the load-bearing default-off invariant
-    ([.claude/rules/experiment-flag-discipline.md] R1): an un-opted-in caller
+    ([dev/rules/experiment-flag-discipline.md] R1): an un-opted-in caller
     behaves identically to pre-Win-#4.
 
     2. {b The acceptance criterion} — "with the opt-in ENABLED, fewer symbols

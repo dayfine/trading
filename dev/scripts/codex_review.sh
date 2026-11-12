@@ -3,7 +3,7 @@
 # review whose first heading is "## Codex review -- <title>", which is what the
 # CODEX column of dev/scripts/pr_gate_status.sh reads.
 #
-# WHY THIS EXISTS (.claude/rules/cross-agent-review.md)
+# WHY THIS EXISTS (dev/rules/cross-agent-review.md)
 #   A second reviewer with a different failure profile is useful, but the merge
 #   decision stays on CI + qc-structural + qc-behavioral (Claude). This script
 #   keeps Codex in the advisory seat: it never posts under a gate heading, it
@@ -218,10 +218,10 @@ You are in a detached checkout of exactly $_sha. Read ONLY that checkout: the ch
 'git diff origin/main...HEAD' and the file list is 'git diff --name-only origin/main...HEAD'
 (do not use 'gh pr diff' or 'gh pr view' -- the live PR may have moved past this revision).
 Look for: correctness defects, missing or weak tests for claims the diff makes, contract drift
-between .mli docstrings / commit messages and the code, and violations of the repo rules under
-.claude/rules/ (test-patterns.md, experiment-flag-discipline.md, config-default-blast-radius.md,
-universe-discipline.md where relevant). Do NOT run dune, do not modify files, do not commit,
-push or post to GitHub.
+between .mli docstrings / commit messages and the code, and violations of the repo rules
+(.claude/rules/test-patterns.md, dev/rules/experiment-flag-discipline.md,
+dev/rules/config-default-blast-radius.md, .claude/rules/universe-discipline.md where relevant).
+Do NOT run dune, do not modify files, do not commit, push or post to GitHub.
 Report format (machine-parsed; follow exactly):
   line 1: Reviewed SHA: $_sha
   first heading: ## Codex review — $_title

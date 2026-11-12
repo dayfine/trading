@@ -62,9 +62,9 @@ below apply without being restated; a brief that repeats them is wasted context.
   MCP `create_pull_request` tool) → check the PR's file list matches your task.
   **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
   name, the commit id and "PR NOT opened" so the dispatcher can open it
-  (`.claude/rules/worktree-isolation.md` §Finish Protocol).
+  (`dev/rules/worktree-isolation.md` §Finish Protocol).
 - Never edit `dev/status/_index.md` from a feature PR; update only your track's `dev/status/<track>.md`. The one
-  exception is the row for a brand-new tracked work item (`.claude/rules/feat-agent-dispatch.md` §4).
+  exception is the row for a brand-new tracked work item (`dev/rules/feat-agent-dispatch.md` §4).
 
 ## Pre-Work Setup
 
@@ -88,7 +88,7 @@ jj workspace forget "$AGENT_ID"
 rm -rf "$AGENT_WS"
 ```
 
-See `.claude/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
+See `dev/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
 
 ## At the start of every session
 
@@ -220,7 +220,7 @@ status to READY_FOR_REVIEW.
 - [ ] If experiment: scenario files parse via `Scenario.load` (run `dune build`)
 - [ ] If experiment: `dev/experiments/<name>/report.md` includes a comparative table + falsifiable conclusion
 - [ ] `dune build && dune runtest` passes with zero warnings — run in the **foreground**, check the **exit code** (not `grep FAIL:`; not `… | tail; echo $?` which captures tail not dune)
-- [ ] **Finish Protocol** followed (`.claude/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
+- [ ] **Finish Protocol** followed (`dev/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
 - [ ] `dune build @fmt` passes (formatter in check mode; equivalent: `dune fmt` produces no diff)
 - [ ] The relevant status file (`backtest-infra.md` or `backtest-scale.md`) updated: tick off the item under the relevant subsection, add a Completed entry with what was built, where it lives, and how to verify
 - [ ] Trading-behaviour-impact items also link back to `## Potential experiments` if they originated there

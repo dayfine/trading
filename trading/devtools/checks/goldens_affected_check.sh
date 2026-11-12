@@ -22,7 +22,7 @@
 #   invisible to every golden in the suite and the check is free. If one
 #   does, this is exactly the blast-DEPTH gap #2384 fell into, and the
 #   check FAILs with a pointer to the manual paired-run requirement in
-#   `.claude/rules/config-default-blast-radius.md` — that rule's step (b)
+#   `dev/rules/config-default-blast-radius.md` — that rule's step (b)
 #   is what actually re-derives the missing signal; this script's job is
 #   only to say WHEN that step is required, not to run it.
 #
@@ -193,7 +193,7 @@
 #   an "OK (acknowledged)" pass-with-notice instead. goldens-affected.yml
 #   sets that var from the PR's `paired-run-done` label, which a human
 #   applies after eyeballing the pasted paired-run table
-#   (`.claude/rules/config-default-blast-radius.md`) -- this script never
+#   (`dev/rules/config-default-blast-radius.md`) -- this script never
 #   verifies the table itself, only that the label is present.
 #
 # KNOWN LIMITATION
@@ -202,7 +202,7 @@
 #   gating knob(s) in `[bracket]` form. A knob whose coupling to another
 #   knob is undocumented, or documented in prose without the bracket
 #   convention, is still a false negative here — the mechanical signal
-#   is only as good as the docstring. `.claude/rules/
+#   is only as good as the docstring. `dev/rules/
 #   config-default-blast-radius.md`'s manual step is the backstop for
 #   exactly that residual: it asks the PR author to read the knob's own
 #   docstring and reason about gating relationships, not just grep for
@@ -676,7 +676,7 @@ fi
 # --- Acknowledgment path (B3): a PR that legitimately trips this check has
 # no way to make the diff-derived FAIL above go away on its own -- see
 # goldens-affected.yml's "ACKNOWLEDGMENT PATH" comment and
-# .claude/rules/config-default-blast-radius.md. A human applies the
+# dev/rules/config-default-blast-radius.md. A human applies the
 # 'paired-run-done' label AFTER eyeballing the pasted paired-run table;
 # the workflow then sets this env var. This downgrades the verdict to a
 # pass-with-notice -- it does NOT verify the table's contents, only that
@@ -687,7 +687,7 @@ if [ "${GOLDENS_AFFECTED_ACK:-}" = "1" ]; then
   printf '%b' "$MATCHES"
   echo ""
   echo "The paired golden run table required by"
-  echo ".claude/rules/config-default-blast-radius.md must already be pasted in"
+  echo "dev/rules/config-default-blast-radius.md must already be pasted in"
   echo "the PR body -- this downgrade only records that a maintainer applied the"
   echo "'paired-run-done' label after eyeballing that table; it does not verify"
   echo "the table's contents."
@@ -700,7 +700,7 @@ printf '%b' "$MATCHES"
 echo ""
 echo "These scenarios run in postsubmit, nightly, or local suites, not necessarily on this PR,"
 echo "so CI green here gives no signal about them. Per"
-echo ".claude/rules/config-default-blast-radius.md, run each affected golden by"
+echo "dev/rules/config-default-blast-radius.md, run each affected golden by"
 echo "hand, PAIRED (base vs this PR, one-line spec diff), and paste the paired"
 echo "table in the PR body before merging. See issue #2393 / PR #2384"
 echo "(-38.42pp merged on green CI) for why this is a hard requirement, not"

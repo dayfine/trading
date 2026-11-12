@@ -15,7 +15,7 @@
     expansion + per-cell blend). No core-module edits — each sleeve reuses
     {!Backtest.Runner.run_backtest} unchanged.
 
-    Default-off per [.claude/rules/experiment-flag-discipline.md]: enumerating
+    Default-off per [dev/rules/experiment-flag-discipline.md]: enumerating
     weights flips no default; [0.0] is a valid (pure-engine no-op) cell. The
     documented promotion target is a light floor [~0.30-0.40]
     ([dev/backtest/barbell-grid-2026-06-20/FINDINGS.md]), but promoting any

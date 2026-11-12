@@ -23,7 +23,7 @@
 # LOCAL-ONLY: the warehouse lives in the trading-1-dev container at
 # /tmp/snap_top3000_pit_v11pit (tens of GB) and is never built on GHA.
 # Intended to be run by hand as part of the weekly perf review
-# (.claude/rules/perf-review-weekly.md), logging its table into
+# (dev/rules/perf-review-weekly.md), logging its table into
 # dev/status/backtest-perf.md "## Weekly review" -- not wired into any
 # GHA workflow.
 #

@@ -21,6 +21,17 @@ architecture and conventions.
 - Test framework of record: OUnit2 + the in-repo Matchers library
   (`base/matchers/`). Test conventions are in `.claude/rules/test-patterns.md`.
 
+## Situational rule checks (read the rule when the PR matches)
+
+These rules load on demand, so read them by path when they apply:
+
+- **Adds, flips or removes a strategy mechanism or flag:** `dev/rules/experiment-flag-discipline.md`
+  §"What QC can check" (R1–R5).
+- **Changes a strategy-config default** (a `[@sexp.default]`, a `let default*` field, or
+  `live-config-overrides.sexp`): `dev/rules/config-default-blast-radius.md` §"What QC can check" (B1–B3).
+
+Report each applicable row in the checklist below; a FAIL there blocks like any other row.
+
 ## Architecture rules to verify (append to the generic structural checklist)
 
 After completing the generic checklist (H1–H3, P1–P5), append these rows:
@@ -50,7 +61,7 @@ QC agents dispatched on this repo MUST be invoked with both of:
    2026-05-14: two non-isolated QC agents rebased the parent `@` onto
    `experiments/continuation-tuning` and reverted `dev/status/screener.md`
    to pre-fix content on disk. Same rule as `feat-*` per
-   `.claude/rules/worktree-isolation.md`.
+   `dev/rules/worktree-isolation.md`.
 
 2. **Run `dune` inside docker, against the agent's OWN checkout — never the
    parent tree.** The dispatch prompt must explicitly instruct the agent to
@@ -68,7 +79,7 @@ QC agents dispatched on this repo MUST be invoked with both of:
    **`cd /workspaces/trading-1/trading` (the parent tree) is WRONG for a QC
    agent** — it builds whatever the dispatcher happens to have checked out,
    not the PR under review, and it contends for the parent's dune lock.
-   `.claude/rules/worktree-isolation.md` §"jj workspace isolation" is the
+   `dev/rules/worktree-isolation.md` §"jj workspace isolation" is the
    authority on this cwd rule: the same "cd to the parent builds the parent,
    not your edits" hazard that section documents for feat-agents applies
    identically to QC agents. See issue #2386.

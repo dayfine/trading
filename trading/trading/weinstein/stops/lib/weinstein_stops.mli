@@ -246,7 +246,7 @@ val floor_is_structural :
     over [((stops_config ((split_safe_floors true))))] can be substantially
     inert with no signal other than "on == off" in aggregate. An ACCEPT computed
     over a partly-inert surface is uninterpretable
-    ([.claude/rules/mechanism-validation-rigor.md]); this tag lets a run report
+    ([dev/rules/mechanism-validation-rigor.md]); this tag lets a run report
     {e what fraction} of its decisions were inert before the mechanism is
     promoted. *)
 type split_safe_basis =

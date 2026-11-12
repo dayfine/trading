@@ -13,7 +13,7 @@
 #   nothing asserts that severing changes behaviour. The failure mode
 #   is a SILENT NULL: an armed axis sweep then measures the baseline,
 #   and the experiment ledger records a REJECT for a mechanism that
-#   never ran. Per .claude/rules/experiment-flag-discipline.md Rule 4,
+#   never ran. Per dev/rules/experiment-flag-discipline.md Rule 4,
 #   a terminal REJECT can get the "rejected" mechanism's code deleted --
 #   so this defect class can delete working code on false evidence.
 #

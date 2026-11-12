@@ -46,9 +46,9 @@ type forward_stat = {
 [@@deriving sexp]
 (** Central-tendency summary of forward returns for one group of candidates.
     Both mean and median are reported so the reader sees the distribution shape,
-    not just a point estimate (per
-    [.claude/rules/mechanism-validation-rigor.md]). [None]-valued forward
-    returns contribute to neither [n] nor the statistics. *)
+    not just a point estimate (per [dev/rules/mechanism-validation-rigor.md]).
+    [None]-valued forward returns contribute to neither [n] nor the statistics.
+*)
 
 val forward_stat : Counterfactual.candidate_forward list -> forward_stat
 (** [forward_stat cs] pools the [forward_return_pct] over [cs], dropping

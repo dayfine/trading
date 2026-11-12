@@ -6,7 +6,7 @@ overnight runs; lifted here so I do the same inline without booting
 the orchestrator).
 
 These supplement, not replace:
-- `.claude/rules/worktree-isolation.md` — jj workspace isolation contract.
+- `dev/rules/worktree-isolation.md` — jj workspace isolation contract.
 - `.claude/rules/pr-merge-gates.md` — the 3-gate merge rule.
 - `dev/rules/qc-structural-authority.md` — review surface and FLAG protocol.
 

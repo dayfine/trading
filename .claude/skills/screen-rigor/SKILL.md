@@ -8,7 +8,7 @@ description: Walk a read-only "validate-before-build" screen through the 8 rigor
 A read-only screen run *before* building a mechanism is good discipline. But a
 screen reports on a **proxy**, so it can only support a narrow class of claims.
 This skill is the procedure; the spec it enforces is
-`.claude/rules/mechanism-validation-rigor.md`. It exists because the 2026-06-10
+`dev/rules/mechanism-validation-rigor.md`. It exists because the 2026-06-10
 harvest-rotate screen wrote **"REJECTED, both fail decisively"** off point-estimate
 medians when the distributions said **"coin-flip, no edge, mild tail-risk"** — same
 data, wrong verdict shape. (`dev/experiments/harvest-rotate-validation-2026-06-10/`.)
@@ -64,7 +64,7 @@ Bound it: which direction does the proxy bias?
    `-check V6`: dropping it audits every Invariant, and the per-trade ones
    (V7 virgin-territory bars, V12 stop distance, V13 bar/price bounds) move
    benignly with the trade list any lever changes by design. See
-   `.claude/rules/mechanism-validation-rigor.md` check 8.
+   `dev/rules/mechanism-validation-rigor.md` check 8.
 
 ### Step 3 — Calibrate the verdict to what a proxy can claim
 
@@ -75,7 +75,7 @@ A screen MAY conclude one of:
   State the prior explicitly; don't dress it up as a data verdict.
 - **"Promising signal → escalate to the real test"** → hand off to
   `experiment-gap-closing` (mechanism as a default-off surface, WF-CV, DSR/Pareto,
-  confirmation grid per `promotion-confirmation.md`).
+  confirmation grid per `dev/rules/promotion-confirmation.md`).
 
 A screen may NOT conclude **"decisively rejected / the mechanism doesn't work."**
 Only the real WF-CV test rejects. Write *"no-build decision (citing the prior)"*,
@@ -114,9 +114,9 @@ on.
 
 ## Relationship to the other tools
 
-- `.claude/rules/mechanism-validation-rigor.md` — the spec (auto-loaded every
+- `dev/rules/mechanism-validation-rigor.md` — the spec (auto-loaded every
   session); this skill is the procedure that applies it.
 - `experiment-gap-closing` skill — the **real** test the screen decides whether to
   enter.
-- `promotion-confirmation.md` / `experiment-flag-discipline.md` — the gates *after*
+- `dev/rules/promotion-confirmation.md` / `dev/rules/experiment-flag-discipline.md` — the gates *after*
   the real test earns an ACCEPT.

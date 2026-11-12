@@ -235,6 +235,25 @@ forward "M5.2a-d still PLANNED" while M5.2a-d had already shipped via
 - Use WebSearch to identify similar issues and solutions
 - Check dune-package files for actual module structure when modules seem missing
 
+## On-demand rules (`dev/rules/`)
+
+`.claude/rules/` loads into every session. Rules that only matter in one
+situation live in `dev/rules/` instead: **read the matching file before acting
+when its trigger applies.** Agents that need one read it by path.
+
+| when | read |
+|---|---|
+| launching a run over ~1 h, a sweep, or a chain | `sweep-hygiene.md`, `container-capacity-scheduling.md` |
+| dispatching agents, or deciding QC vs a backtest | `container-capacity-scheduling.md`, `feat-agent-dispatch.md`, `worktree-isolation.md` |
+| reading results of a 26y or verdict-bearing run, or reviewing as qc-results | `backtest-result-review.md`, `mechanism-validation-rigor.md` |
+| a promote / reject / build / no-build call on a mechanism | `mechanism-validation-rigor.md`, `promotion-confirmation.md`, `experiment-flag-discipline.md` |
+| adding, flipping or removing a strategy-config default | `experiment-flag-discipline.md`, `config-default-blast-radius.md` |
+| weekly perf / usage / issue review | `perf-review-weekly.md`, `issue-hygiene.md` |
+| filing, closing or triaging issues | `issue-hygiene.md` |
+| handing work to GHA, Codex or Jules; the lane board | `gha-local-coordination.md`, `async-lanes.md`, `cross-agent-review.md` |
+| a Weinstein faithfulness question | `book-as-authority.md` |
+| reviewing as qc-structural / qc-behavioral | `qc-structural-authority.md`, `qc-behavioral-authority.md` (they route to `experiment-flag-discipline.md` and `config-default-blast-radius.md` when a PR touches a mechanism or a config default) |
+
 ## Agent skills
 
 Project-wide config consumed by the global Matt-Pocock engineering skills (`to-issues`, `triage`, `to-prd`, `qa`, `improve-codebase-architecture`, `diagnose`, `tdd`). Located under `.claude/skills/` per Claude Code's skills convention.

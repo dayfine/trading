@@ -154,7 +154,7 @@ let test_only_stage4_is_vetoed_through_the_cascade _ =
     (elements_are
        [ equal_to [ "AAPL" ]; equal_to [ "AAPL" ]; equal_to [ "AAPL" ] ])
 
-(** R1 ([.claude/rules/experiment-flag-discipline.md]): the flag off is the
+(** R1 ([dev/rules/experiment-flag-discipline.md]): the flag off is the
     historical cascade bit-equally, and so is the flag on with no [?index_stage]
     supplied. Pinned as three identical buy lists against the pre-veto call
     shape ({!Screener.screen}, which cannot pass an index stage at all). *)

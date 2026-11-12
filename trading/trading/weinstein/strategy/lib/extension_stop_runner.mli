@@ -28,7 +28,7 @@
     No-op when [not (Extension_stop.is_enabled config)] (the default
     [trigger_ratio = 0.0] / [trail_pct = 0.0]): returns [[]] so every existing
     golden/baseline replays bit-identically
-    ([.claude/rules/experiment-flag-discipline.md] R1).
+    ([dev/rules/experiment-flag-discipline.md] R1).
 
     {1 Cadence & side}
 

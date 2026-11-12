@@ -2,7 +2,7 @@
     overlay.
 
     A faithful Weinstein eligibility "dial" (default-off axis per
-    [.claude/rules/experiment-flag-discipline.md]) that drops entry candidates —
+    [dev/rules/experiment-flag-discipline.md]) that drops entry candidates —
     long AND short — whose trailing dollar-ADV is too low to trade into safely.
     The spine is untouched ([.claude/rules/weinstein-faithful-core.md] W1): this
     only narrows which candidates are eligible, exactly as

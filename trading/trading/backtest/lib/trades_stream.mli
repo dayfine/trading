@@ -12,7 +12,7 @@
 
     Every scenario artefact is written in one shot at scenario end; mid-run the
     output directory holds only [progress.sexp]. A crash or OOM — which
-    [.claude/rules/container-capacity-scheduling.md] documents as a silent,
+    [dev/rules/container-capacity-scheduling.md] documents as a silent,
     recurring failure on multi-hour runs — therefore loses the whole trade
     record of the arm. Streaming turns that into a partial-but-well-formed
     [trades.csv] holding every round-trip closed before the kill, and lets an
