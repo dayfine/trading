@@ -154,8 +154,8 @@ rm -rf "$AGENT_WS"
 but with a different fix: they don't write jj history, so they check out the
 PR with plain `git` inside their own dispatched worktree — never `jj edit`,
 which (like the cd-to-parent bug above) reaches the parent workspace instead
-of the agent's own checkout. `.claude/rules/qc-structural-authority.md` and
-`.claude/rules/qc-behavioral-authority.md` §"Operational requirements for QC
+of the agent's own checkout. `dev/rules/qc-structural-authority.md` and
+`dev/rules/qc-behavioral-authority.md` §"Operational requirements for QC
 agents in this repo" defer to this section as the authority on both the dune
 `cwd` rule and the git-not-jj checkout rule (issue #2386).
 

@@ -8,7 +8,7 @@ the orchestrator).
 These supplement, not replace:
 - `.claude/rules/worktree-isolation.md` — jj workspace isolation contract.
 - `.claude/rules/pr-merge-gates.md` — the 3-gate merge rule.
-- `.claude/rules/qc-structural-authority.md` — review surface and FLAG protocol.
+- `dev/rules/qc-structural-authority.md` — review surface and FLAG protocol.
 
 ## 1. Pre-flight context injection
 

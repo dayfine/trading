@@ -140,5 +140,5 @@ citing the book to justify a mechanism the book does not discuss. The spine in
 only governs **how to find out what the book actually says**.
 
 Related: `.claude/rules/weinstein-faithful-core.md`,
-`.claude/rules/qc-behavioral-authority.md`,
+`dev/rules/qc-behavioral-authority.md`,
 `docs/design/weinstein-book-reference.md`, issue #2457 (GHA-unreachable path).

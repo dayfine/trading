@@ -42,7 +42,7 @@ A PR is mergeable only when **all three** are green:
    GitHub PR review comment (query: `gh pr view <N> --json reviews`).
 3. **qc-behavioral** — APPROVED verdict at the current PR tip, posted as a
    GitHub PR review comment. NA only for the cases listed in
-   `.claude/rules/qc-behavioral-authority.md` §"When to skip this file
+   `dev/rules/qc-behavioral-authority.md` §"When to skip this file
    entirely" (pure infra / refactor / harness PRs that touch no domain
    logic — still requires the generic CP1–CP4 review plus row F1; only the
    S*/L*/C*/T* domain rows are skipped).
@@ -133,7 +133,7 @@ results verdict APPROVED at the current tip; `do-not-merge` outranks it.
 - **QC structural catches what CI doesn't.** Architecture constraints
   (A1–A3), test patterns (P6), pattern-match exhaustivity, naming
   hygiene — these are not in any linter; they're in `.claude/agents/
-  qc-structural.md` + `.claude/rules/qc-structural-authority.md`.
+  qc-structural.md` + `dev/rules/qc-structural-authority.md`.
 - **QC behavioral catches contract drift.** The .mli docstring,
   feature plan, and PR body each name claims; qc-behavioral pins each
   claim against a test. Without it, "the test suite is green" is a
