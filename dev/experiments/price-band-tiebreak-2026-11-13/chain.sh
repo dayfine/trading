@@ -2,21 +2,24 @@
 # price-band-tiebreak-2026-11-13: one tie seed's pair (arm S, then arm P) in a Claude cloud session. Five sessions,
 # one per seed, run side by side. Pre-registration and read rule: README.md beside this file. NOT run by its author.
 #
-# Runs on the session host (POSIX sh) from the session's checkout at origin/main. Every OCaml step runs in
-# ghcr.io/dayfine/trading-ci:latest with the checkout mounted at /w. Everything is written under
-# .sweep-output/price-band/ (gitignored, inside the mount, so a session-worker restart that wipes /tmp loses nothing).
+# Runs on the session host (POSIX sh) from the session's checkout at PB_SHA, the one main SHA all five sessions use
+# (named in the launch brief). Every OCaml step runs in ghcr.io/dayfine/trading-ci:latest with the checkout mounted at
+# /w. Everything is written under .sweep-output/price-band/ (gitignored, inside the mount, so a session-worker restart
+# that wipes /tmp loses nothing); TMPDIR points there too.
 #
-# Subcommands:
+# Subcommands (PB_SHA must be set for run and stage):
 #   sh chain.sh run K          lock -> guards -> stage (R2 pulls, data dir) -> build -> spec checks -> preflight of
 #                              both arms -> pb-S-kK -> pb-P-kK (V6 vs S) -> pair reads -> collect into results/kK
 #   sh chain.sh stage          only the R2 pulls and the data dir (resumable; each step leaves a .done marker)
 #   sh chain.sh collect K DEST copy seed K's artifacts and reads into DEST
-# Re-running `run K` skips every cell whose RESULT line is already in chain.log (resume after a session restart).
+# Re-running `run K` skips every cell whose RESULT line is already in chain.log (resume after a session restart). The
+# lock is an flock on a file descriptor, so a killed run leaves no stale lock behind.
 #
 # Derived from ../chain-w-2026-11-10/chain.sh: the same guards, stage (warehouse v12wk-9236, corpact-2026-10-27,
 # bars data-20261102 for the validator's data dir), build, run_cell, keyed trades diff and entries extract. Changes:
 #   1. One seed per invocation (K), two 26y cells (S, P) and no goldens or #3183 runs.
-#   2. Guards require Price_band_seeded in the screener (#3587) instead of chain-w's commit list.
+#   2. Guards pin HEAD to PB_SHA (an ancestor of origin/main, and the HEAD= of any earlier run in this chain.log)
+#      instead of HEAD = origin/main, and require Price_band_seeded with edges [8; 14; 33] (#3587).
 #   3. Spec checks: pb-S-kK = rk-kK except the header; pb-P-kK = pb-S-kK plus the one candidate_ranking override.
 #
 # Cell guard: CELL_TIMEOUT=21600 s = 3x the slowest cloud cell of this spec (rk-k0, 6,870 s, PR #3569). The session
@@ -44,7 +47,8 @@ OVR='((screening_config((candidate_rankingPrice_band_seeded))))'   # arm P's one
 # Commits the run tree must contain: #3510 (upper-case shards), #3547 (relocatable warehouse).
 NEED="20824663d 8ee1ed797"
 
-mkdir -p "$OUT" "$ART" "$WORK"
+mkdir -p "$OUT" "$ART" "$WORK" "$OUT/tmp"
+export TMPDIR=$OUT/tmp                                # r2_bars.sh stages downloads in $TMPDIR; keep them off /tmp
 log() { echo "[$(date -u '+%m-%d %H:%M:%S')Z] $*" | tee -a "$LOG"; }
 die() { log "ABORT: $*"; exit 1; }
 cpath() { echo "$1" | sed "s#^$REPO#/w#"; }           # host path -> container path
@@ -57,13 +61,18 @@ guards() {
   cd "$REPO" || exit 1
   [ "$(git rev-parse --is-shallow-repository)" = true ] && git fetch -q --unshallow origin main
   git fetch -q origin main
+  [ -n "${PB_SHA:-}" ] || die "PB_SHA unset (the launch brief names the one SHA all five sessions run)"
+  pb=$(git rev-parse --verify -q "$PB_SHA^{commit}") || die "PB_SHA $PB_SHA is not a commit here"
+  head=$(git rev-parse HEAD)
+  [ "$head" = "$pb" ] || die "HEAD $(git rev-parse --short HEAD) is not PB_SHA $PB_SHA (git checkout $PB_SHA first)"
+  git merge-base --is-ancestor "$pb" origin/main || die "PB_SHA $PB_SHA is not on origin/main"
+  prev=$(sed -n 's/.*\] HEAD=\([0-9a-f]*\) .*/\1/p' "$LOG" | head -1)
+  [ -z "$prev" ] || [ "$prev" = "$(git rev-parse --short=9 HEAD)" ] || die "HEAD differs from this chain.log's earlier HEAD=$prev"
   for c in $NEED; do git merge-base --is-ancestor "$c" HEAD || die "HEAD lacks $c"; done
   grep -q 'Price_band_seeded' trading/analysis/weinstein/screener/lib/screener_ranking.mli \
     || die "HEAD has no Price_band_seeded candidate_ranking (#3587 not merged?)"
-  if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
-    [ "${ALLOW_NON_MAIN:-}" = 1 ] || die "HEAD $(git rev-parse --short HEAD) is not origin/main"
-    log "WARNING: HEAD $(git rev-parse --short HEAD) is not origin/main (ALLOW_NON_MAIN=1)"
-  fi
+  grep -q 'let default_price_band_edges = \[ 8.0; 14.0; 33.0 \]' trading/analysis/weinstein/screener/lib/screener_ranking.ml \
+    || die "default_price_band_edges at HEAD is not [ 8.0; 14.0; 33.0 ] (README §Mechanism)"
   [ -z "$(git status --porcelain --untracked-files=no)" ] || die "checkout dirty"
   [ -f "$EXP/README.md" ] || die "$EXP not in the checkout (pre-registration not merged?)"
   log "HEAD=$(git rev-parse --short=9 HEAD) image=$IMG $(docker image inspect -f '{{.Id}}' "$IMG" 2>/dev/null | cut -c1-19)"
@@ -241,9 +250,9 @@ collect() { # $1 seed, $2 dest
 
 cmd_run() { # $1 seed
   seed_ok "${1:-}" || { echo "usage: sh $0 run K   (K in 0..4)" >&2; exit 2; }
-  LOCK=$OUT/chain.lock; mkdir "$LOCK" 2>/dev/null || { echo "ABORT: lock $LOCK held"; exit 1; }
-  trap 'rmdir "$LOCK" 2>/dev/null' EXIT
-  log "price-band run k$1; CELL_TIMEOUT=${CELL_TIMEOUT}s"
+  # The kernel drops an flock when its process dies, so a killed run cannot leave a stale lock for the resume.
+  exec 9>"$OUT/chain.lock"; flock -n 9 || die "another chain.sh run holds $OUT/chain.lock"
+  log "price-band run k$1; PB_SHA=${PB_SHA:-unset} CELL_TIMEOUT=${CELL_TIMEOUT}s"
   guards; disk_ok || die "disk < ${DISK_MIN_GB}G"
   stage; build; spec_checks "$1"; preflight "$1"; cells "$1"
   collect "$1" "$OUT/results/k$1"

@@ -6,6 +6,7 @@
 #   1. windows.tsv  every pit-v12 top-3000 list Y as (symbol, Y-05-31, Y+1-05-30)
 #   2. events.tsv   every book-style weekly breakout of a member in its window (lib/mscan.awk; 20,195 rows on 11-13)
 #   3. ytrait-capped.txt  quintile cut-offs from the 2000-2012 events, the pass rule in both halves (lib/ytrait.awk)
+#   3b. price-bands.txt  the same events split by the tiebreak's fixed bands $8 / $14 / $33 (lib/bands.awk)
 #   4. funnel-by-price.txt  the 08-23 monster funnel split by raw price at the monster's start
 set -u
 WORK=${1:?usage: screen.sh WORK}; mkdir -p "$WORK"
@@ -35,6 +36,7 @@ for c in 6 7 8 9 10 11 12 13 14 15 17; do
   CUTS="$CUTS$c:$cs;"
 done
 awk -F'\t' -v OFS='\t' -v CAP=1.90 -v CUTS="$CUTS" -f "$L/ytrait.awk" "$WORK/events.tsv" > "$WORK/ytrait-capped.txt"
+awk -F'\t' -v CAP=1.90 -f "$L/bands.awk" "$WORK/events.tsv" > "$WORK/price-bands.txt"
 
 # Funnel: raw close on or before each monster's start date, then the stage share per price band.
 awk -F'\t' '{ print $1 "\t" $2 "\t" $5 }' "$FUN" | sort -k1,1 > "$WORK/funnel.tsv"
@@ -48,4 +50,4 @@ done > "$WORK/funnel_price.tsv"
 awk -F'\t' '$4 != "" { p = $4 + 0; b = (p < 8) ? "1 <$8" : (p < 14) ? "2 $8-14" : (p < 33) ? "3 $14-33" : "4 >$33"; n[b]++; st[b, $3]++; S[$3] = 1 }
   END { for (b in n) { printf "%-8s n=%4d", b, n[b]; for (s in S) printf " | %s %4.1f%%", s, 100 * st[b, s] / n[b]; print "" } }' \
   "$WORK/funnel_price.tsv" | sort > "$WORK/funnel-by-price.txt"
-echo "wrote $WORK/ytrait-capped.txt $WORK/funnel-by-price.txt"
+echo "wrote $WORK/ytrait-capped.txt $WORK/price-bands.txt $WORK/funnel-by-price.txt"

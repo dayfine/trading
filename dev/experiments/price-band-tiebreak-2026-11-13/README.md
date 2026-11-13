@@ -7,16 +7,23 @@ written.
 
 The 2026-11-13 population screen (`screen/`, pre-registration `screen/PREREG.md`) covered every book-style weekly
 breakout of a PIT top-3000 member from 2000 to 2025: 20,195 events. A breakout is a close above the 26-week high on
-≥ 2× the prior 4 weeks' volume, above a rising 30-week WMA, at a raw price ≥ $5. The screen found one decision-time
-trait that raises the share of trades that double within a year without lowering the win rate
-(`screen/results/ytrait-capped.txt`):
+≥ 2× the prior 4 weeks' volume, above a rising 30-week WMA, at a raw price ≥ $5. Of 12 decision-time traits, two
+cells passed the pre-registered rule (monster-rate lift ≥ 1.5 and a mean ride above the population's, in both halves;
+`screen/results/ytrait-capped.txt`):
 
-- **Low share price.** Breakouts at $5–8 doubled 21 % / 20 % of the time (2000–12 / 2013–25), against 4–6 % above
-  $33, at the same 39 % win rate.
-- **Fatter right tail.** The capped mean ride was +8.1 % / +8.6 %, against +1.7 % / +3.1 % for all breakouts.
+- **Price Q1 (≤ $14.12).** It passed with a monster rate of 15.9 % / 13.6 % (2000–12 / 2013–25) against 8.0 % / 7.3 %.
+- **ath_gap Q1 (≥ 63 % below the all-time high).** It passed narrowly: 13.2 % / 14.0 %, with a capped mean ride of
+  +3.9 % / +3.4 % against +1.7 % / +3.1 %. It overlaps with low price and is not tested here.
+
+Split by the tiebreak's fixed bands (`screen/results/price-bands.txt`), price is monotone, and the win rate does not
+move:
+
+- **Doubling.** Breakouts at $5–8 doubled 21.1 % / 19.5 % of the time, against 4.9 % / 5.6 % above $33.
+- **Win rate.** Every band wins 38–41 % of the time (all breakouts: 38.1 % / 40.6 %).
+- **Fatter right tail.** The $5–8 capped mean ride was +8.1 % / +8.6 %, against +1.7 % / +3.1 % for all breakouts.
 
 The strategy under-samples these names. 11.3 % of the record's trades enter at ≤ $14 (k0–k4 pooled, 2,789 trades),
-against 17 % of breakouts. The 08-23 monster funnel, split by price (`screen/results/funnel-by-price.txt`), says
+against 16.2 % of breakouts (3,277 of 20,195 below $14). The 08-23 monster funnel, split by price (`screen/results/funnel-by-price.txt`), says
 where they are lost:
 
 | raw price at the monster's start | dropped at breakout | dropped at the top-N cut | admitted |
@@ -90,6 +97,9 @@ difference under 0.2 log is one draw (`dev/agent-memory/project_26y_path_noise_f
 - **Capacity:** for P's entries at ≤ $14, position value ÷ the 20-day mean dollar volume at the fill (p50 / p90 / max).
 - **Cash displacement:** S's tickets that P skipped for `Insufficient_cash` (`pb-P-kK-s0-entries.tsv`), and what
   they made in S.
+- **Anchors:** entries per arm by `entry_anchor` (`trades.csv`). An `Ma_fallback` anchor prices off the adjusted MA,
+  so its band can carry later splits (#3587 behavioral review). All 2,789 of the record's entries anchored on
+  `breakout`.
 
 ## Not claimed
 
@@ -108,9 +118,13 @@ A single 26y K = 5 read cannot promote. Even an ESCALATE only opens the walk-for
 
 ## Launching (one cloud session per seed, K = 0..4, side by side)
 
+The dispatcher picks one SHA on `origin/main` that contains #3587 and this pre-registration, and puts it in all five
+briefs as `<PB_SHA>`. `chain.sh` refuses to run at any other HEAD, and refuses to resume at a HEAD different from the
+one its `chain.log` already records.
+
 ```
-Repo checkout at origin/main. Do not edit tracked files. Run:
-  sh dev/experiments/price-band-tiebreak-2026-11-13/chain.sh run K
+Repo checkout of dayfine/trading. Run: git fetch origin main && git checkout <PB_SHA>. Do not edit tracked files. Run:
+  PB_SHA=<PB_SHA> sh dev/experiments/price-band-tiebreak-2026-11-13/chain.sh run K
 in the background with its output going to .sweep-output/price-band/run.out, and re-run the same command after any
 restart (it resumes). Never print R2 or EODHD credentials. When "PRICE-BAND kK DONE" appears in
 .sweep-output/price-band/chain.log, copy .sweep-output/price-band/results/kK into
@@ -119,5 +133,10 @@ that branch. Do not open a PR, merge, label or push to main. If the chain logs A
 stop.
 ```
 
-The dispatcher gathers the five branches into one results PR and has `results-analyst` read it, then `qc-results`
-reviews it (`dev/rules/model-routing.md`).
+After the runs:
+1. The dispatcher gathers the five branches into one results PR.
+2. It builds one review pack of the ten cells with `dev/scripts/review_pack.sh` and renders it with
+   `review_pack_render.sh`, as `../record-kseed-2026-10-27/chain.sh` `phase_pack` does
+   (`dev/rules/backtest-result-review.md` RV1). This runs on the host, from the R2 warehouse.
+3. `results-analyst` reads the PR and the pack.
+4. `qc-results` reviews the PR (`dev/rules/model-routing.md`).
