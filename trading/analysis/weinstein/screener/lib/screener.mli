@@ -162,6 +162,19 @@ type config = {
           seeds (K >= 5) rather than one. Reachable per salt via
           [((screening_config ((candidate_ranking Seeded) (tiebreak_seed N))))]
           through [Overlay_validator.apply_overrides]. *)
+  ranking_price_band_edges : float list;
+      [@sexp.default default_price_band_edges]
+      (** Price-band edges for the [Price_band_seeded] tiebreak: a tied
+          candidate's band is the number of edges at or below its raw ticket
+          price ([suggested_entry]), and the cheaper band sorts first (see
+          {!candidate_ranking}). Default: {!default_price_band_edges}
+          ([[8.0; 14.0; 33.0]]). Read only when
+          [candidate_ranking = Price_band_seeded]; inert under every other mode,
+          so the default config's behaviour does not depend on it. Reachable as
+          [((screening_config ((candidate_ranking Price_band_seeded)
+           (ranking_price_band_edges (5 10 20)))))] through
+          [Overlay_validator.apply_overrides], so both the mode and the edges
+          are [Variant_matrix] [Key] axes. *)
   min_score_override : int option; [@sexp.default None]
       (** Optional numeric score floor that, when [Some n], replaces the
           {!min_grade} filter with a strict [score >= n] gate on the cascade
@@ -620,19 +633,24 @@ type result = {
 val compare_for_ranking :
   ?tiebreak_seed:int ->
   ?as_of:Core.Date.t ->
+  ?price_band_edges:float list ->
   candidate_ranking ->
   scored_candidate ->
   scored_candidate ->
   int
-(** [compare_for_ranking ?tiebreak_seed ?as_of ranking a b] is the total order
-    the cascade uses to sort and cap candidates: primary key [score] descending,
-    then the [ranking] tiebreak among equal scores. [Alphabetical] tiebreaks by
-    [ticker] (historical behaviour); [Quality] tiebreaks by RS magnitude
-    (descending), then [weeks_advancing] (ascending = earlier), then volume
-    ratio (descending), then [ticker] (ascending); [Seeded] tiebreaks by a hash
-    of [(tiebreak_seed, as_of, ticker)], then [ticker] (issue #3404).
-    [tiebreak_seed] (default [0]) and [as_of] are read only by [Seeded]. The
-    cascade passes [config.tiebreak_seed] and, in {!screen_with_cooldown}, its
+(** [compare_for_ranking ?tiebreak_seed ?as_of ?price_band_edges ranking a b] is
+    the total order the cascade uses to sort and cap candidates: primary key
+    [score] descending, then the [ranking] tiebreak among equal scores.
+    [Alphabetical] tiebreaks by [ticker] (historical behaviour); [Quality]
+    tiebreaks by RS magnitude (descending), then [weeks_advancing] (ascending =
+    earlier), then volume ratio (descending), then [ticker] (ascending);
+    [Seeded] tiebreaks by a hash of [(tiebreak_seed, as_of, ticker)], then
+    [ticker] (issue #3404); [Price_band_seeded] tiebreaks by the price band of
+    [suggested_entry] (ascending), then as [Seeded]. [tiebreak_seed] (default
+    [0]) and [as_of] are read only by [Seeded] and [Price_band_seeded];
+    [price_band_edges] (default {!default_price_band_edges}) only by
+    [Price_band_seeded]. The cascade passes [config.tiebreak_seed],
+    [config.ranking_price_band_edges] and, in {!screen_with_cooldown}, its
     [~as_of]; {!screen} has no date and hashes it as empty. Exposed so the
     ordering contract is unit-testable in isolation of the cascade pipeline.
     Pure. *)

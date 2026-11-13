@@ -43,6 +43,8 @@ type config = {
   min_grade : grade;
   candidate_ranking : candidate_ranking; [@sexp.default Seeded]
   tiebreak_seed : int; [@sexp.default 0]
+  ranking_price_band_edges : float list;
+      [@sexp.default default_price_band_edges]
   min_score_override : int option; [@sexp.default None]
   max_score_override : int option; [@sexp.default None]
   volume_ratio_exclude_range : volume_ratio_band option; [@sexp.default None]
@@ -69,6 +71,7 @@ let default_config =
     min_grade = C;
     candidate_ranking = Seeded;
     tiebreak_seed = 0;
+    ranking_price_band_edges = default_price_band_edges;
     min_score_override = None;
     max_score_override = None;
     volume_ratio_exclude_range = None;
@@ -254,35 +257,22 @@ let _short_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
 (* ------------------------------------------------------------------ *)
 
 (** Project a {!scored_candidate} onto the {!Screener_ranking.rankable} the
-    comparator needs (score / ticker / analysis). *)
+    comparator needs (score / ticker / ticket price / analysis). *)
 let _rankable_of_candidate (c : scored_candidate) : Screener_ranking.rankable =
-  { score = c.score; ticker = c.ticker; analysis = c.analysis }
+  {
+    score = c.score;
+    ticker = c.ticker;
+    price = c.suggested_entry;
+    analysis = c.analysis;
+  }
 
 (** Full ranking comparator: primary [score] descending, then the [ranking]
     tiebreak among equal scores (see {!Screener_ranking.candidate_ranking}).
     Adapts each candidate to {!Screener_ranking.rankable} and delegates. Exposed
     so the ordering contract is unit-testable in isolation of the cascade. *)
-let compare_for_ranking ?tiebreak_seed ?as_of ranking a b =
-  Screener_ranking.compare_rankable ?tiebreak_seed ?as_of ranking
-    (_rankable_of_candidate a) (_rankable_of_candidate b)
-
-let _top_n ~compare n lst =
-  (* Secondary sort breaks score ties deterministically. Without it,
-     [List.sort]'s stability depends on the input ordering — which in turn
-     depends on Hashtbl iteration order, and that diverges between macOS and
-     Linux. A G15-step-3 panel-golden CI failure surfaced this: local
-     regenerated more round_trips than GHA produced, with the diff being a
-     tied-score candidate that landed on either side of a cash-budget boundary
-     depending on its position in the sorted list. [compare] carries the
-     ranking tiebreak; see {!Screener_ranking.candidate_ranking}. *)
-  List.sort lst ~compare |> fun l ->
-  List.sub l ~pos:0 ~len:(min n (List.length l))
-
-(** Apply [candidate_fn] to each pair, drop [None]s, sort by [compare] (score,
-    then the ranking tiebreak), and cap at [max_n]. Shared by the long and short
-    evaluation paths. *)
-let _filter_and_cap ~compare ~candidate_fn ~max_n candidates =
-  List.filter_map candidates ~f:candidate_fn |> _top_n ~compare max_n
+let compare_for_ranking ?tiebreak_seed ?as_of ?price_band_edges ranking a b =
+  Screener_ranking.compare_rankable ?tiebreak_seed ?as_of ?price_band_edges
+    ranking (_rankable_of_candidate a) (_rankable_of_candidate b)
 
 (** The long side's whole admission answer for one screen call: the
     breadth-resolution macro gate {!longs_admitted_by_breadth} {b and} the
@@ -316,7 +306,7 @@ let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
         ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
         ~min_rs_normalized
     in
-    _filter_and_cap ~compare ~candidate_fn ~max_n:max_buy_candidates candidates
+    filter_and_cap ~compare ~candidate_fn ~max_n:max_buy_candidates candidates
 
 (** Filter, score, grade, sort, and cap short candidates.
 
@@ -348,8 +338,7 @@ let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
         ~min_score_override ~max_score_override ~volume_ratio_exclude_range
         ~min_price
     in
-    _filter_and_cap ~compare ~candidate_fn ~max_n:max_short_candidates
-      candidates
+    filter_and_cap ~compare ~candidate_fn ~max_n:max_short_candidates candidates
 
 (* ------------------------------------------------------------------ *)
 (* Main screener                                                        *)
@@ -397,7 +386,7 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~longs_admitted
     ~candidates ~macro_trend ~as_of =
   let compare =
     compare_for_ranking ~tiebreak_seed:config.tiebreak_seed ?as_of
-      config.candidate_ranking
+      ~price_band_edges:config.ranking_price_band_edges config.candidate_ranking
   in
   let buy_candidates =
     _evaluate_longs ~weights:config.weights ~thresholds:config.grade_thresholds

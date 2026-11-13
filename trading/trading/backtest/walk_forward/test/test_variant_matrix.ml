@@ -783,6 +783,42 @@ let test_reset_anchor_on_stalled_cycle_nested_axis_expands _ =
               ]);
        ])
 
+(* The [Price_band_seeded] tiebreak and its band edges are [Key] axes under
+   [screening_config]: the mode is a nullary variant atom and the edges a float
+   list value, and every cell validates against the default config at expansion
+   time. *)
+let test_price_band_ranking_axes_expand _ =
+  let ranking_axis =
+    VM.Key
+      {
+        path = [ "screening_config"; "candidate_ranking" ];
+        values = Sexp.[ Atom "Seeded"; Atom "Price_band_seeded" ];
+      }
+  in
+  let edges_axis =
+    VM.Key
+      {
+        path = [ "screening_config"; "ranking_price_band_edges" ];
+        values = List.map [ "(8 14 33)"; "(5 10 20)" ] ~f:Sexp.of_string;
+      }
+  in
+  let t =
+    { VM.axes = [ ranking_axis; edges_axis ]; expansion = VM.Cartesian }
+  in
+  assert_that
+    (List.map (VM.expand t) ~f:(fun (v : WFR.variant) -> v.label))
+    (elements_are
+       [
+         equal_to "candidate_ranking=Seeded__ranking_price_band_edges=(8 14 33)";
+         equal_to "candidate_ranking=Seeded__ranking_price_band_edges=(5 10 20)";
+         equal_to
+           "candidate_ranking=Price_band_seeded__ranking_price_band_edges=(8 \
+            14 33)";
+         equal_to
+           "candidate_ranking=Price_band_seeded__ranking_price_band_edges=(5 \
+            10 20)";
+       ])
+
 (* ---------- Sampled determinism + fallback ---------- *)
 
 let test_sampled_determinism _ =
@@ -958,6 +994,8 @@ let suite =
          >:: test_split_safe_floors_nested_axis_expands;
          "reset_anchor_on_stalled_cycle_nested_axis_expands"
          >:: test_reset_anchor_on_stalled_cycle_nested_axis_expands;
+         "price-band ranking mode + edges axes expand + validate"
+         >:: test_price_band_ranking_axes_expand;
          "sampled determinism (same seed -> same labels)"
          >:: test_sampled_determinism;
          "sampled different seed -> different subset"

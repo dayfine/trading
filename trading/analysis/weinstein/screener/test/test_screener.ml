@@ -1808,10 +1808,12 @@ let ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio :
     as_of_date = as_of;
   }
 
-(** Build a long {!scored_candidate} with a fixed score and the controllable
-    [Quality]-tiebreak keys. *)
+(** Build a long {!scored_candidate} with a fixed score, the controllable
+    [Quality]-tiebreak keys and the ticket price [entry] read by
+    [Price_band_seeded]. *)
 let ranking_candidate ~ticker ?(score = 75) ?(rs_norm = 1.0)
-    ?(weeks_advancing = 5) ?(volume_ratio = 2.5) () : scored_candidate =
+    ?(weeks_advancing = 5) ?(volume_ratio = 2.5) ?(entry = 100.0) () :
+    scored_candidate =
   {
     ticker;
     analysis = ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio;
@@ -1819,7 +1821,7 @@ let ranking_candidate ~ticker ?(score = 75) ?(rs_norm = 1.0)
     side = Long;
     grade = A;
     score;
-    suggested_entry = 100.0;
+    suggested_entry = entry;
     suggested_stop = 92.0;
     risk_pct = 0.08;
     swing_target = None;
@@ -2167,6 +2169,166 @@ let test_seeded_fields_round_trip _ =
   assert_that
     (seeded.candidate_ranking, seeded.tiebreak_seed, omitted.tiebreak_seed)
     (equal_to (Seeded, 4, 0))
+
+(* ------------------------------------------------------------------ *)
+(* Price_band_seeded: cheaper band first, the Seeded draw inside a band *)
+(* ------------------------------------------------------------------ *)
+
+(** Equal-score candidates built from [(ticker, entry)] pairs. *)
+let _priced_group priced =
+  List.map priced ~f:(fun (ticker, entry) ->
+      ranking_candidate ~ticker ~entry ())
+
+(** Ticker order of [candidates] under [Price_band_seeded] at [seed] / [date]
+    with the default band edges. *)
+let _band_sort ~seed ~date candidates =
+  List.sort candidates
+    ~compare:
+      (compare_for_ranking ~tiebreak_seed:seed ~as_of:date Price_band_seeded)
+  |> List.map ~f:(fun (c : scored_candidate) -> c.ticker)
+
+(* A price's band is the number of edges at or below it: a price on an edge is
+   in the band above, the edge order does not matter, and no edges is one
+   band. *)
+let test_price_band_counts_edges_at_or_below _ =
+  let prices = [ 5.0; 8.0; 10.0; 14.0; 20.0; 33.0; 50.0 ] in
+  let bands edges = List.map prices ~f:(price_band ~edges) in
+  assert_that
+    (bands default_price_band_edges, bands [ 33.0; 8.0; 14.0 ], bands [])
+    (equal_to
+       ( [ 0; 1; 1; 2; 2; 3; 3 ],
+         [ 0; 1; 1; 2; 2; 3; 3 ],
+         [ 0; 0; 0; 0; 0; 0; 0 ] ))
+
+(* Ties are ordered by band, cheapest first, at every seed: one name per band,
+   given most expensive first. *)
+let test_price_band_ties_ordered_by_band _ =
+  let group =
+    _priced_group [ ("AAA", 50.0); ("BBB", 20.0); ("CCC", 10.0); ("DDD", 5.0) ]
+  in
+  assert_that
+    (List.map [ 0; 1; 2; 3; 4 ] ~f:(fun seed ->
+         _band_sort ~seed ~date:as_of group))
+    (each (equal_to [ "DDD"; "CCC"; "BBB"; "AAA" ]))
+
+(* Inside a band the order is the [Seeded] draw: a tie group split across two
+   bands sorts as the Seeded order of the cheap names, then the Seeded order of
+   the dear ones, at every seed. *)
+let test_price_band_keeps_seeded_order_within_band _ =
+  let cheap = [ "AAA"; "CCC"; "EEE"; "GGG" ] in
+  let dear = [ "BBB"; "DDD"; "FFF" ] in
+  let at entry tickers = List.map tickers ~f:(fun t -> (t, entry)) in
+  let group = _priced_group (at 6.0 cheap @ at 40.0 dear) in
+  let seeded seed tickers =
+    _seeded_sort ~seed ~date:as_of (_priced_group (at 100.0 tickers))
+  in
+  let seeds = [ 0; 1; 2; 3; 4 ] in
+  assert_that
+    (List.map seeds ~f:(fun seed -> _band_sort ~seed ~date:as_of group))
+    (equal_to
+       (List.map seeds ~f:(fun seed -> seeded seed cheap @ seeded seed dear)))
+
+(* With every tied name in one band the mode is exactly [Seeded], at any seed and
+   date, although the prices differ inside the band. *)
+let test_price_band_one_band_is_seeded _ =
+  let group =
+    _priced_group
+      (List.mapi _seeded_tie_tickers ~f:(fun i t -> (t, 15.0 +. Float.of_int i)))
+  in
+  let draws = [ (0, as_of); (1, as_of); (7, Date.add_days as_of 7) ] in
+  assert_that
+    (List.map draws ~f:(fun (seed, date) -> _band_sort ~seed ~date group))
+    (equal_to
+       (List.map draws ~f:(fun (seed, date) -> _seeded_sort ~seed ~date group)))
+
+(* Score stays primary: a cheap name with a lower score never passes a dear name
+   with a higher one. *)
+let test_price_band_keeps_score_order _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"CHEAP" ~score:60 ~entry:5.0 ();
+      ranking_candidate ~ticker:"DEAR" ~score:90 ~entry:50.0 ();
+    ]
+  in
+  assert_that
+    (List.map [ 0; 1; 2 ] ~f:(fun seed ->
+         _band_sort ~seed ~date:as_of candidates))
+    (each (equal_to [ "DEAR"; "CHEAP" ]))
+
+(** [default_config] with the fields named in [drop] removed and the [add]
+    fields (sexp text) appended, parsed back through [config_of_sexp]. *)
+let _config_with_fields ~drop ~add =
+  let is_dropped = function
+    | Sexp.List (Sexp.Atom name :: _) -> List.mem drop name ~equal:String.equal
+    | _ -> false
+  in
+  match sexp_of_config default_config with
+  | Sexp.List fields ->
+      config_of_sexp
+        (Sexp.List
+           (List.filter fields ~f:(Fn.non is_dropped)
+           @ List.map add ~f:Sexp.of_string))
+  | atom -> config_of_sexp atom
+
+(* The mode and the edges parse from the config sexp (so both are overlay and
+   [Variant_matrix] axes), and the edges default to [8; 14; 33] in
+   [default_config] and when the field is omitted. *)
+let test_price_band_fields_parse_and_default _ =
+  let custom =
+    _config_with_fields
+      ~drop:[ "candidate_ranking"; "ranking_price_band_edges" ]
+      ~add:
+        [
+          "(candidate_ranking Price_band_seeded)";
+          "(ranking_price_band_edges (5 10 20))";
+        ]
+  in
+  let omitted =
+    _config_with_fields ~drop:[ "ranking_price_band_edges" ] ~add:[]
+  in
+  assert_that
+    ( default_config.ranking_price_band_edges,
+      omitted.ranking_price_band_edges,
+      custom.candidate_ranking,
+      custom.ranking_price_band_edges )
+    (equal_to
+       ( [ 8.0; 14.0; 33.0 ],
+         [ 8.0; 14.0; 33.0 ],
+         Price_band_seeded,
+         [ 5.0; 10.0; 20.0 ] ))
+
+(* Cascade wiring: [screen_with_cooldown] bands by the ticket price and reads
+   [config.ranking_price_band_edges]. Seven tied breakouts are all dear except
+   the one [Seeded] ranks last. With a cap of one, the default edges admit that
+   cheap name; with no edges every price shares a band and the [Seeded] winner
+   is admitted instead. *)
+let test_price_band_cascade_reads_config_edges _ =
+  let seeded = _seeded_sort ~seed:0 ~date:as_of (_seeded_tie_group ()) in
+  let cheap = List.last_exn seeded in
+  let stocks =
+    List.map (_breakout_stocks _seeded_tie_tickers)
+      ~f:(fun (a : Stock_analysis.t) ->
+        let price = if String.equal a.ticker cheap then 5.0 else 50.0 in
+        { a with breakout_price = Some price; local_range_top = None })
+  in
+  let admitted edges =
+    let config =
+      {
+        cfg with
+        candidate_ranking = Price_band_seeded;
+        ranking_price_band_edges = edges;
+        max_buy_candidates = 1;
+      }
+    in
+    (screen_with_cooldown ~config ~macro_trend:Bullish
+       ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
+       ~last_stop_out_dates:[] ())
+      .buy_candidates
+    |> List.map ~f:(fun (c : scored_candidate) -> c.ticker)
+  in
+  assert_that
+    (admitted default_price_band_edges, admitted [])
+    (equal_to ([ cheap ], [ List.hd_exn seeded ]))
 
 (* ------------------------------------------------------------------ *)
 (* early_stage2_max_weeks: early-Stage2 window knob                     *)
@@ -3918,6 +4080,20 @@ let suite =
          "test_seeded_cascade_reads_config_seed"
          >:: test_seeded_cascade_reads_config_seed;
          "test_seeded_fields_round_trip" >:: test_seeded_fields_round_trip;
+         "test_price_band_counts_edges_at_or_below"
+         >:: test_price_band_counts_edges_at_or_below;
+         "test_price_band_ties_ordered_by_band"
+         >:: test_price_band_ties_ordered_by_band;
+         "test_price_band_keeps_seeded_order_within_band"
+         >:: test_price_band_keeps_seeded_order_within_band;
+         "test_price_band_one_band_is_seeded"
+         >:: test_price_band_one_band_is_seeded;
+         "test_price_band_keeps_score_order"
+         >:: test_price_band_keeps_score_order;
+         "test_price_band_fields_parse_and_default"
+         >:: test_price_band_fields_parse_and_default;
+         "test_price_band_cascade_reads_config_edges"
+         >:: test_price_band_cascade_reads_config_edges;
          "test_score_long_window_controls_early_stage2_signal"
          >:: test_score_long_window_controls_early_stage2_signal;
          "test_long_score_components_decompose_the_score"
