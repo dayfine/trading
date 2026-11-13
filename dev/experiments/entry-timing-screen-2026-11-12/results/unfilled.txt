@@ -1,0 +1,6 @@
+== never-filled tickets under the stale-E cap (proxy: installed stop, 26-week hold)
+k0 unfilled tickets 104, stale E 28, would fill under the cap 18, proxy NAV-%   -0.9, stopped out 6
+k1 unfilled tickets 115, stale E 34, would fill under the cap 24, proxy NAV-%   -0.8, stopped out 12
+k2 unfilled tickets 112, stale E 29, would fill under the cap 18, proxy NAV-%   +5.7, stopped out 8
+k3 unfilled tickets 112, stale E 29, would fill under the cap 18, proxy NAV-%   +0.2, stopped out 10
+k4 unfilled tickets 105, stale E 30, would fill under the cap 17, proxy NAV-%   +5.1, stopped out 6

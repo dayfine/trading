@@ -1,0 +1,10 @@
+== event outcomes (kind status: count)  F filled, N no fill, D 15 % gate drop, U no breakout in 26 weeks
+null F: 552
+skip D: 11059
+skip F: 1264
+skip N: 458
+skip U: 1068
+
+== filled trades, NAV-% on the 26-week proxy: null = the run's own entries, skip = converted skips
+null  n= 552 sum  +245.1 mean +0.444 median -0.697 p90 +3.09 p99 +8.73 max +32.32 | >= +2 NAV-%: 16.7 per 100 | >= +5: 4.7 per 100 | losers 59%
+skip  n=1264 sum  +517.3 mean +0.409 median +0.364 p90 +2.03 p99 +4.15 max +24.53 | >= +2 NAV-%: 10.8 per 100 | >= +5: 0.8 per 100 | losers 40%

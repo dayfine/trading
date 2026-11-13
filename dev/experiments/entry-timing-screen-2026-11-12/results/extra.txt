@@ -1,0 +1,72 @@
+== H1 band skip: drop trades with lo < screen extension <= hi. NAV-% change k0..k4 | trades skipped in k0 | >= +100 % trades lost (all seeds)
+0.25-0.40 |   -8.1   -9.8   -3.7   +4.0   +2.0 | n_k0  39 | monsters 0
+0.25-0.45 |   -3.0   -4.8   +0.7   +8.0   +5.2 | n_k0  44 | monsters 0
+0.25-0.50 |   +1.5   +0.3   +5.2  +11.5   +8.7 | n_k0  51 | monsters 0
+0.25-0.60 |  -47.4  -48.6  -43.7  -37.4  -40.3 | n_k0  57 | monsters 10
+0.25-9    |  -32.3  -35.7  -28.3  -24.5  -25.0 | n_k0  68 | monsters 10
+0.30-0.40 |   -2.3   +9.8   +6.0  +10.7   +4.4 | n_k0  18 | monsters 0
+0.30-0.45 |   +2.8  +14.8  +10.4  +14.7   +7.5 | n_k0  23 | monsters 0
+0.30-0.50 |   +7.3  +19.9  +14.9  +18.2  +11.1 | n_k0  30 | monsters 0
+0.30-0.60 |  -41.6  -29.0  -34.0  -30.7  -37.9 | n_k0  36 | monsters 10
+0.30-9    |  -26.5  -16.1  -18.6  -17.8  -22.6 | n_k0  47 | monsters 10
+0.35-0.40 |   +3.3   +2.7   +5.4   +4.6   +5.3 | n_k0   3 | monsters 0
+0.35-0.45 |   +8.4   +7.7   +9.8   +8.6   +8.4 | n_k0   8 | monsters 0
+0.35-0.50 |  +12.9  +12.8  +14.3  +12.2  +11.9 | n_k0  15 | monsters 0
+0.35-0.60 |  -36.0  -36.1  -34.6  -36.7  -37.0 | n_k0  21 | monsters 10
+0.35-9    |  -20.9  -23.2  -19.2  -23.8  -21.7 | n_k0  32 | monsters 10
+
+== H2' cap a stale E at the 4-week high x 1.005 (only when the code's E is above it), vs the null
+k0 n=105 delta  +11.6 NAV-%  better  86 worse   7  filled earlier 62
+k1 n= 96 delta   +7.3 NAV-%  better  78 worse   7  filled earlier 56
+k2 n=103 delta   +6.8 NAV-%  better  85 worse   9  filled earlier 66
+k3 n=106 delta  +12.0 NAV-%  better  90 worse   7  filled earlier 71
+k4 n= 90 delta   +9.7 NAV-%  better  80 worse   4  filled earlier 53
+k0 90% bootstrap CI of the sum [+2.2, +22.1]
+k0 trades worse than -0.5 NAV-%: 5
+
+== trades >= +100 % (all seeds)
+k1 ADMA-wein-1160 screen 2023-08-18 ext  +7.7%  trade +300.0%  NAV-% +33.2
+k2 ADMA-wein-1138 screen 2023-08-18 ext  +7.7%  trade +300.0%  NAV-% +33.2
+k4 ADMA-wein-1156 screen 2023-08-18 ext  +7.7%  trade +300.0%  NAV-% +33.2
+k0 ADSK-wein-120  screen 2003-09-12 ext +10.5%  trade +291.7%  NAV-% +41.7
+k1 ADSK-wein-119  screen 2003-09-12 ext +10.5%  trade +291.7%  NAV-% +41.7
+k2 ADSK-wein-117  screen 2003-09-12 ext +10.5%  trade +291.7%  NAV-% +41.7
+k3 ADSK-wein-120  screen 2003-09-12 ext +10.5%  trade +291.7%  NAV-% +41.7
+k4 ADSK-wein-123  screen 2003-09-12 ext +10.5%  trade +291.7%  NAV-% +41.7
+k0 APPS-wein-1018 screen 2020-06-12 ext +51.1%  trade +525.6%  NAV-% +37.7
+k1 APPS-wein-999  screen 2020-06-12 ext +51.1%  trade +525.6%  NAV-% +37.7
+k2 APPS-wein-986  screen 2020-06-12 ext +51.1%  trade +525.6%  NAV-% +37.7
+k3 APPS-wein-1012 screen 2020-06-12 ext +51.1%  trade +525.6%  NAV-% +37.7
+k4 APPS-wein-1001 screen 2020-06-12 ext +51.1%  trade +525.6%  NAV-% +37.7
+k0 AVGO-wein-637  screen 2013-08-30 ext  +5.9%  trade +199.8%  NAV-% +15.6
+k1 AVGO-wein-631  screen 2013-08-30 ext  +5.9%  trade +199.8%  NAV-% +15.6
+k3 AVGO-wein-639  screen 2013-08-30 ext  +5.9%  trade +199.8%  NAV-% +15.6
+k4 AVGO-wein-644  screen 2013-08-30 ext  +5.9%  trade +199.8%  NAV-% +15.6
+k0 BBWI-wein-1021 screen 2020-07-31 ext +50.8%  trade +137.9%  NAV-% +14.3
+k1 BBWI-wein-1002 screen 2020-07-31 ext +50.8%  trade +137.9%  NAV-% +14.3
+k2 BBWI-wein-989  screen 2020-07-31 ext +50.8%  trade +137.9%  NAV-% +14.3
+k3 BBWI-wein-1016 screen 2020-07-31 ext +50.8%  trade +137.9%  NAV-% +14.3
+k4 BBWI-wein-1004 screen 2020-07-31 ext +50.8%  trade +137.9%  NAV-% +14.0
+k0 BGO-wein-112   screen 2003-07-11 ext +17.0%  trade +103.2%  NAV-%  +7.1
+k1 BGO-wein-112   screen 2003-07-11 ext +17.0%  trade +103.2%  NAV-%  +7.1
+k2 BGO-wein-109   screen 2003-07-11 ext +17.0%  trade +103.2%  NAV-%  +7.1
+k3 BGO-wein-112   screen 2003-07-11 ext +17.0%  trade +103.2%  NAV-%  +7.1
+k4 BGO-wein-115   screen 2003-07-11 ext +17.0%  trade +103.2%  NAV-%  +7.1
+k1 CMG-wein-390   screen 2010-02-05 ext  +5.6%  trade +150.2%  NAV-% +16.1
+k4 CMG-wein-396   screen 2010-02-05 ext  +5.6%  trade +150.2%  NAV-% +16.1
+k2 CRM-wein-366   screen 2009-11-27 ext +15.2%  trade +126.0%  NAV-% +18.0
+k0 DXCM-wein-953  screen 2019-07-05 ext +11.0%  trade +173.2%  NAV-% +11.7
+k1 DXCM-wein-932  screen 2019-07-05 ext +11.0%  trade +173.2%  NAV-% +11.7
+k2 DXCM-wein-922  screen 2019-07-05 ext +11.0%  trade +173.2%  NAV-% +11.7
+k3 DXCM-wein-945  screen 2019-07-05 ext +11.0%  trade +173.2%  NAV-% +11.7
+k4 DXCM-wein-937  screen 2019-07-05 ext +11.0%  trade +173.2%  NAV-% +11.7
+k0 HURN-wein-239  screen 2006-03-10 ext  +9.5%  trade +131.5%  NAV-% +10.2
+k4 HURN-wein-240  screen 2006-03-10 ext  +9.5%  trade +131.5%  NAV-% +10.2
+k1 LAD-wein-574   screen 2012-08-10 ext +13.6%  trade +116.7%  NAV-% +16.7
+k0 LGND-wein-595  screen 2012-12-14 ext +13.9%  trade +232.8%  NAV-% +15.7
+k3 MERC-wein-469  screen 2010-11-12 ext +22.1%  trade +111.4%  NAV-% +15.9
+k0 MMYT-wein-1184 screen 2023-10-06 ext +21.2%  trade +154.8%  NAV-% +22.1
+k1 MMYT-wein-1165 screen 2023-10-06 ext +21.2%  trade +154.8%  NAV-% +22.1
+k2 MMYT-wein-1141 screen 2023-10-06 ext +21.2%  trade +154.8%  NAV-% +22.1
+k3 MMYT-wein-1174 screen 2023-10-06 ext +21.2%  trade +154.8%  NAV-% +22.1
+k4 MMYT-wein-1160 screen 2023-10-06 ext +21.2%  trade +154.8%  NAV-% +22.1
