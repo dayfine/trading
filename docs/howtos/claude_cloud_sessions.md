@@ -175,6 +175,14 @@ toolchain and falls back to a read-only review (seen 2026-10-08).
   The review heading and verdict format come from `.claude/agents/qc-*.md`.
 - **Feature PR.** Name the issue, the branch, the scope, and "open the PR; do not
   merge". The authoring session also answers review comments posted on its PR.
+- **Backtest chain longer than 2 h.** Give the exact launch command:
+  `setsid nohup sh <chain.sh> run … >> <out>/run.out 2>&1 < /dev/null &`. "Start it in the background" is not
+  enough. Two of five price-band sessions (2026-11-13) used the harness's background Bash task instead, which is
+  killed at 2 h, and had to be relaunched. The brief should also say:
+  - wait with a Monitor until-loop on the chain log, plus a 30-minute `send_later` heartbeat that re-arms both;
+  - never `docker kill` every container: the session's own `trading-1-dev` dev container is not a chain cell.
+- **Correcting a running session.** `SendMessage` cannot reach a cloud session. Create a `RemoteTrigger` with
+  `persist_session: true` and `persistent_session_id: session_<id>`; its prompt arrives as the session's next turn.
 - Every brief: never merge, label or push to `main`; never write an at-sign before
   a username. Cloud sessions end their turn when idle, so a brief that must wait
   on CI should poll it with a Monitor until-loop.
