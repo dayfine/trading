@@ -1,0 +1,8 @@
+00-12 athQ1   pxQ1   n= 1193 (54.6% of 00-12 athQ1) monster  16.6% ride  +6.2%
+00-12 athQ1   pxQ2-5 n=  992 (45.4% of 00-12 athQ1) monster   9.2% ride  +1.0%
+00-12 athQ2-5 pxQ1   n=  992 (11.3% of 00-12 athQ2-5) monster  15.0% ride  +4.8%
+00-12 athQ2-5 pxQ2-5 n= 7750 (88.7% of 00-12 athQ2-5) monster   5.6% ride  +0.7%
+13-25 athQ1   pxQ1   n=  642 (40.7% of 13-25 athQ1) monster  17.1% ride  +5.2%
+13-25 athQ1   pxQ2-5 n=  935 (59.3% of 13-25 athQ1) monster  11.9% ride  +2.1%
+13-25 athQ2-5 pxQ1   n=  516 (6.7% of 13-25 athQ2-5) monster   9.3% ride  +3.2%
+13-25 athQ2-5 pxQ2-5 n= 7175 (93.3% of 13-25 athQ2-5) monster   5.7% ride  +3.1%

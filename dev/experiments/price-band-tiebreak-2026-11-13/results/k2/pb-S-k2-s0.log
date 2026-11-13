@@ -1,0 +1,254 @@
+[snapshot-mode] loaded manifest at /w/.sweep-output/price-band/warehouse/snap_top3000_pit_v12wk/manifest.sexp (schema_hash=060588c0224b7d7e73f367fbd1801084, 9236 entries)
+Loading 1 scenarios from /w/.sweep-output/price-band/work/cell-pb-S-k2-s0 (parallel=1)
+Fixtures root: /w/trading/test_data/backtest_scenarios
+Bar data source: snapshot mode (/w/.sweep-output/price-band/warehouse/snap_top3000_pit_v12wk)
+Progress emission: every 26 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Per-week candidate emission: disabled
+Output root: /w/.sweep-output/price-band/dev/backtest/scenarios-2026-11-13-135031
+
+>>> Running pb-S-k2: price-band arm S = record N, Seeded tie order seed 2, 26y, pit-v12, interest + dividends (2000-01-01 to 2026-06-26)
+Using scenario-provided sector map (9185 symbols)...
+Universe: 9185 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 9200
+Running backtest (2000-01-01 to 2026-06-26, warmup from 1999-01-02)...
+Panel_runner: simulator window 1999-01-02..2026-06-26 (warmup 364 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES)
+Panel_runner: snapshot bar reader wired (calendar 7170 days) for strategy
+WARN: portfolio rejected fill for BRC (side=Types.Buy qty=5143.0000 price=37.3932): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 192364.6576, Available: 70702.61729066298, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for PRMB (side=Types.Buy qty=5809.0000 price=31.1610): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 181072.339, Available: 176833.59765366808, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MECA (side=Types.Buy qty=991.0000 price=142.1264): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 140857.2125834387, Available: 71641.730585049459, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for BAK (side=Types.Buy qty=14537.0000 price=15.9000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 231283.67, Available: 58485.013175860993, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for NPO (side=Types.Buy qty=4945.0000 price=40.2949): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 199307.97132561554, Available: 32711.050712378339, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for DOV (side=Types.Buy qty=3617.0000 price=52.1899): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 188806.88585257213, Available: 59235.577497109007, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for FTEK (side=Types.Buy qty=8319.0000 price=30.0000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 249653.19, Available: 59286.193078166383, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CLC (side=Types.Buy qty=11678.0000 price=36.2100): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 422977.16000000003, Available: 360039.14555625478, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for LMT (side=Types.Buy qty=2983.0000 price=104.0446): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 310394.79301550344, Available: 262573.185323066, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for EXPD (side=Types.Buy qty=8223.0000 price=49.4304): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 406548.47155548603, Available: 224910.11450182748, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for WDFC (side=Types.Buy qty=7409.0000 price=38.0521): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 282001.85921117658, Available: 225225.56751399953, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for EPD (side=Types.Buy qty=9283.0000 price=29.5422): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 274332.91946310352, Available: 98023.447181722324, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for COHR (side=Types.Buy qty=14100.0000 price=28.6722): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 404419.02, Available: 290609.01295942039, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for WY (side=Types.Buy qty=23824.0000 price=16.7076): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 398280.1024, Available: 290609.01295942039, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for PAYX (side=Types.Buy qty=12642.0000 price=29.4576): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 372529.3992, Available: 290609.01295942039, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for DLX (side=Types.Buy qty=15014.0000 price=18.2508): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 274167.3273401669, Available: 165534.91186899523, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for WOR (side=Types.Buy qty=14838.0000 price=26.7720): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 397391.42544875731, Available: 166868.84656758321, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for JJSF (side=Types.Buy qty=4746.0000 price=45.0071): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 213651.25999766809, Available: 163143.35805414882, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for SVVS (side=Types.Buy qty=11922.0000 price=18.6341): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 222275.3927765892, Available: 163145.21608479015, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for QSFT (side=Types.Buy qty=23650.0000 price=19.2882): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 456402.43, Available: 452434.04401467519, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for HCSG (side=Types.Buy qty=12385.0000 price=23.4724): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 290829.10004768817, Available: 214433.51713525102, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for HAE (side=Types.Buy qty=3474.0000 price=65.1504): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 226367.26802369175, Available: 127864.63813654316, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for TGI (side=Types.Buy qty=3143.0000 price=97.8422): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 307549.57858006557, Available: 31778.020818106648, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for FRFHF (side=Types.Buy qty=643.0000 price=419.3420): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 269643.33889578114, Available: 103977.11733639927, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for FLO (side=Types.Buy qty=10285.0000 price=24.8064): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 255236.674, Available: 56807.002739190648, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for DHC (side=Types.Buy qty=13720.0000 price=23.3038): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 319865.336, Available: 56807.002739190648, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MDU (side=Types.Buy qty=10380.0000 price=23.3392): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 242364.56956070042, Available: 122222.71473919071, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for EXAS (side=Types.Buy qty=45188.0000 price=12.6072): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 570146.0336, Available: 375312.82774975733, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for TDG (side=Types.Buy qty=1796.0000 price=156.7919): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 281616.14142736304, Available: 18572.112163317855, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for IHG (side=Types.Buy qty=11152.0000 price=31.1800): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 347830.88, Available: 18572.112163317855, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for RNR (side=Types.Buy qty=3635.0000 price=98.1173): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 356692.57222856994, Available: 334765.20141035767, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for HWC (side=Types.Buy qty=19014.0000 price=42.1362): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 801367.8468, Available: 190936.56243719836, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for EGP (side=Types.Buy qty=4909.0000 price=76.4171): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 375180.75164012832, Available: 194206.93423362146, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for IQV (side=Types.Buy qty=6198.0000 price=81.9007): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 507682.36439466407, Available: 212442.05245563912, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for TTS (side=Types.Buy qty=25304.0000 price=21.6000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 546819.44000000006, Available: 405075.45007525233, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for ADTN (side=Types.Buy qty=18677.0000 price=23.9701): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 447875.88504935271, Available: 414506.42532824981, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for IDTI (side=Types.Buy qty=18468.0000 price=27.2300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 503068.32, Available: 414571.02344021312, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for UHAL (side=Types.Buy qty=1059.0000 price=396.5864): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 419995.55298800359, Available: 376203.6520742962, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for VOYA (side=Types.Buy qty=9256.0000 price=43.5100): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 402821.12, Available: 60765.246227823271, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for AUB (side=Types.Buy qty=12725.0000 price=39.2267): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 499287.11629892583, Available: 60152.471600672485, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CAL (side=Types.Buy qty=18645.0000 price=34.5779): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 644890.60453246115, Available: 580634.08752505644, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for AMRN (side=Types.Buy qty=19237.0000 price=23.6668): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 455471.49648896459, Available: 262941.30337386357, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for LACO (side=Types.Buy qty=16989.0000 price=27.1504): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 461427.19512425555, Available: 85769.512596171015, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MCK (side=Types.Buy qty=2895.0000 price=156.7300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 453762.3, Available: 85769.631720494071, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for HPQ (side=Types.Buy qty=27194.0000 price=21.9400): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 596908.29999999993, Available: 163131.65480591741, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for HNI (side=Types.Buy qty=21875.0000 price=42.0809): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 920737.90128544427, Available: 538985.61515277647, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for EVOP (side=Types.Buy qty=34340.0000 price=30.1829): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1036823.9073872187, Available: 254206.30769677286, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for ENVA (side=Types.Buy qty=24161.0000 price=41.3288): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 998787.6997891427, Available: 882667.58786301152, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for TNK (side=Types.Buy qty=27688.0000 price=49.2558): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1364071.4704, Available: 457793.34377073497, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for WCN (side=Types.Buy qty=4493.0000 price=149.0052): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 669525.241427357, Available: 461385.09319228487, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for HUYA (side=Types.Buy qty=221282.0000 price=4.3350): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 961470.28999999992, Available: 137003.46158705684, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for BBW (side=Types.Buy qty=31085.0000 price=30.6783): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 953946.54140928073, Available: 579039.60895696213, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for HPQ (side=Types.Buy qty=52128.0000 price=34.7514): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1812042.2592000002, Available: 666604.14608317532, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MNKD (side=Types.Buy qty=119494.0000 price=5.7700): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 690675.32, Available: 668029.87801478885, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MBC (side=Types.Buy qty=70181.0000 price=19.2000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1348177.01, Available: 1100859.1319648416, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for UPWK (side=Types.Buy qty=111004.0000 price=16.4435): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1826403.7533259112, Available: 1700330.2767893795, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+WARN: portfolio rejected fill for LBTYA (side=Types.Buy qty=162302.0000 price=12.3930): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 2013031.7060000002, Available: 1995121.8255038778, Unrealized loss drag: 0."
+  }. An entry is cancelled outright; an exit is reverted to Holding for retry (see Cancel_handler).
+Panel_runner: split_dividend_guard rejected=4 no_files=0
+Panel_runner: snapshot cache hits=148028372 misses=20622 miss_absent=11423 evictions=0 n_symbols=9200 misses_per_symbol=2.24 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2499255232 maxrss_bytes=5869993984
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+pb-S-k2                       1335.0%     562    39.3%    32.1%   PASS
+
+1/1 scenarios passed.
+exit=0

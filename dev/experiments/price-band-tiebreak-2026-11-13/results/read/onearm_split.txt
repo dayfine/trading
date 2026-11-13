@@ -1,0 +1,19 @@
+per seed: shared P|S, P-only n/sum, S-only n/sum, net, net after trimming the top 1/2/3 of each side
+k0 shared 286.7|287.8  P-only 120/+91.9  S-only 144/+21.2  net +70.7  trim 1:+49.8 2:+41.6 3:+39.9
+k1 shared 269.2|270.0  P-only 136/+83.8  S-only 152/+57.6  net +26.3  trim 1:+27.4 2:+19.6 3:+16.4
+k2 shared 253.1|254.1  P-only 112/+99.8  S-only 144/+53.5  net +46.3  trim 1:+49.0 2:+41.8 3:+37.1
+k3 shared 267.0|265.5  P-only 128/+67.4  S-only 137/+25.8  net +41.6  trim 1:+22.7 2:+16.0 3:+12.0
+k4 shared 275.6|277.1  P-only 122/+69.0  S-only 127/+46.5  net +22.5  trim 1:+22.8 2:+20.4 3:+16.4
+
+pooled one-arm net by band (P-only minus S-only nav_pct sums)
+band 0: P-only 39/+146.7  S-only 28/-7.6  net +154.3
+band 1: P-only 92/+7.2  S-only 43/-8.9  net +16.1
+band 2: P-only 286/+180.1  S-only 173/+114.9  net +65.2
+band 3: P-only 201/+77.9  S-only 460/+106.1  net -28.2
+
+pooled one-arm net by entry era
+2000-09: P-only 157/+89.7  S-only 173/+71.3  net +18.5
+2010-12: P-only 145/+191.1  S-only 172/+44.0  net +147.0
+2013-17: P-only 103/+89.3  S-only 153/+55.0  net +34.3
+2018-23: P-only 142/+43.8  S-only 119/+27.1  net +16.7
+2024-26: P-only 71/-2.0  S-only 87/+7.0  net -9.0

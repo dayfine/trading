@@ -252,6 +252,9 @@ cmd_run() { # $1 seed
   seed_ok "${1:-}" || { echo "usage: sh $0 run K   (K in 0..4)" >&2; exit 2; }
   # The kernel drops an flock when its process dies, so a killed run cannot leave a stale lock for the resume.
   exec 9>"$OUT/chain.lock"; flock -n 9 || die "another chain.sh run holds $OUT/chain.lock"
+  # A restart mid-pull leaves the bars tar.gz in $TMPDIR and pull-dir its $WH.partial.<pid>; both are safe to drop
+  # under the lock (added after the 11-13 runs, per the #3588 qc-results note).
+  rm -rf "$OUT/tmp"/r2_bars.* "$WH".partial.*
   log "price-band run k$1; PB_SHA=${PB_SHA:-unset} CELL_TIMEOUT=${CELL_TIMEOUT}s"
   guards; disk_ok || die "disk < ${DISK_MIN_GB}G"
   stage; build; spec_checks "$1"; preflight "$1"; cells "$1"

@@ -1,0 +1,5 @@
+k0  S-not-P 566, of which held/pending in P 16 (2.8%) | P-not-S 531, of which held/pending in S 33 (6.2%)
+k1  S-not-P 603, of which held/pending in P 24 (4.0%) | P-not-S 581, of which held/pending in S 13 (2.2%)
+k2  S-not-P 613, of which held/pending in P 17 (2.8%) | P-not-S 594, of which held/pending in S 26 (4.4%)
+k3  S-not-P 593, of which held/pending in P 26 (4.4%) | P-not-S 567, of which held/pending in S 30 (5.3%)
+k4  S-not-P 573, of which held/pending in P 24 (4.2%) | P-not-S 546, of which held/pending in S 16 (2.9%)
