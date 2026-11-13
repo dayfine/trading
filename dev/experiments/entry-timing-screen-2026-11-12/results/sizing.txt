@@ -1,0 +1,17 @@
+== H2' (cap a stale E) split per seed, NAV-%: delta = price channel + size channel
+k0 n=105 delta  +11.6 = price  +3.9 + size  +7.7  (size share 66 %)
+k1 n= 96 delta   +7.3 = price  +4.4 + size  +3.0  (size share 40 %)
+k2 n=103 delta   +6.8 = price  +2.7 + size  +4.1  (size share 60 %)
+k3 n=106 delta  +12.0 = price  +6.5 + size  +5.5  (size share 46 %)
+k4 n= 90 delta   +9.7 = price  +6.1 + size  +3.6  (size share 37 %)
+share count of the capped ticket vs the null, all seeds' filled stale rows (n=500): mean +13.8 %, median +10.3 %, p90 +28.0 %
+rebuild check, max relative error: null_pnl 2e-05 on 500 rows, h2n4_pnl 1e-05 on 500 rows (6-digit CSV rounding)
+
+== F1 N=13 M=4 at the run's position size: NAV-% at risk per trade = value_over_nav x n13m4_stop_dist
+k0 trades with a book stop 524: mean 2.40 %, >= 5 % on 22, max 10.6 % | gate-dropped 443: mean 2.63 %
+k1 trades with a book stop 513: mean 2.41 %, >= 5 % on 22, max 10.6 % | gate-dropped 421: mean 2.67 %
+k2 trades with a book stop 514: mean 2.43 %, >= 5 % on 24, max 10.6 % | gate-dropped 423: mean 2.69 %
+k3 trades with a book stop 525: mean 2.40 %, >= 5 % on 21, max 10.6 % | gate-dropped 427: mean 2.68 %
+k4 trades with a book stop 514: mean 2.43 %, >= 5 % on 20, max 10.6 % | gate-dropped 425: mean 2.70 %
+k0 quantiles, trades with a book stop: median 2.14 %, p75 2.90 %, p90 3.97 %
+k0 quantiles, gate-dropped: median 2.32 %, p75 3.07 %

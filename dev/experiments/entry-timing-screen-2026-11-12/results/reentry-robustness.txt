@@ -1,0 +1,24 @@
+== k0, 13-week window: top 10 re-entries by NAV-%
+  +138.94	GME    stopped 2020-09-11  re-bought 2020-09-14  trade +2684.5%  stop 19% below
+    +7.80	AAOI   stopped 2026-01-05  re-bought 2026-01-28  trade  +209.4%  stop 27% below
+    +6.98	NTRA   stopped 2020-06-04  re-bought 2020-06-19  trade  +135.5%  stop 19% below
+    +3.52	INOD   stopped 2024-06-18  re-bought 2024-07-08  trade   +98.2%  stop 28% below
+    +2.48	B      stopped 2007-08-16  re-bought 2007-09-06  trade   +52.5%  stop 21% below
+    +2.35	EAT    stopped 2020-09-21  re-bought 2020-10-09  trade   +45.3%  stop 19% below
+    +2.18	HSIC   stopped 2012-11-28  re-bought 2012-12-17  trade   +15.8%  stop 7% below
+    +2.07	FHN    stopped 2014-12-01  re-bought 2014-12-05  trade   +18.8%  stop 9% below
+    +1.98	QSFT   stopped 2010-07-01  re-bought 2010-07-30  trade   +33.3%  stop 17% below
+    +1.93	VRTX   stopped 2014-08-07  re-bought 2014-09-05  trade   +29.5%  stop 15% below
+
+== per seed (13-week window): total | minus top 3 | minus top 10 | fills 2000-2012 | fills 2013-2026
+k0  +163.9 |   +10.2 |    -6.3 |   +13.8 |  +150.1
+k1  +158.0 |    +4.3 |   -13.1 |    +2.1 |  +155.9
+k2  +164.6 |   +10.9 |    -9.3 |    +6.3 |  +158.3
+k3  +175.2 |   +17.1 |    -4.0 |   +12.1 |  +163.1
+k4  +150.6 |    +1.1 |   -17.0 |    +2.4 |  +148.2
+
+== by shakeout depth (stop distance), 5 seeds pooled, 13-week window
+a <=15%   fills  146  NAV-%   -12.4  per fill -0.08  win 37.0%  +50% trades 1
+b 15-25%  fills  321  NAV-%  +770.5  per fill +2.40  win 51.4%  +50% trades 21
+c 25-40%  fills  148  NAV-%   +53.2  per fill +0.36  win 61.5%  +50% trades 17
+d >40%    fills   19  NAV-%    +1.0  per fill +0.05  win 68.4%  +50% trades 1

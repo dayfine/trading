@@ -1,0 +1,4 @@
+trades with bars 2756 (no store bars: 33)
+run fill inside the store's raw bar: 2695 (97.8%)
+replay MA extension within 1pp of the audit's: 2756 of 2756
+null control: same fill day 2558 (92.8%), of which price within 0.5% 2321; replay fills earlier 169, later 22, never 7

@@ -1,0 +1,29 @@
+k0 stop exits 279 (initial-stop exits 184)
+k1 stop exits 273 (initial-stop exits 188)
+k2 stop exits 273 (initial-stop exits 189)
+k3 stop exits 283 (initial-stop exits 191)
+k4 stop exits 279 (initial-stop exits 191)
+
+== re-entry window 8 weeks
+k0 fills  26 (+0 the run re-bought anyway, 69 blocked by the 15% rule)  NAV-%   -5.3  per fill -0.20  median trade -12.1%  win 34.6%  +50% fills 0
+k1 fills  23 (+0 the run re-bought anyway, 71 blocked by the 15% rule)  NAV-%   -5.5  per fill -0.24  median trade -10.8%  win 34.8%  +50% fills 0
+k2 fills  29 (+0 the run re-bought anyway, 75 blocked by the 15% rule)  NAV-%   -6.7  per fill -0.23  median trade -10.8%  win 31.0%  +50% fills 0
+k3 fills  33 (+0 the run re-bought anyway, 70 blocked by the 15% rule)  NAV-%  +12.2  per fill +0.37  median trade  -4.1%  win 42.4%  +50% fills 1
+k4 fills  23 (+0 the run re-bought anyway, 74 blocked by the 15% rule)  NAV-%   -7.7  per fill -0.34  median trade -12.1%  win 30.4%  +50% fills 0
+k0 fills in weeks where cash was already short (an Insufficient_cash skip that week): 5 of 26
+
+== re-entry window 13 weeks
+k0 fills  28 (+0 the run re-bought anyway, 95 blocked by the 15% rule)  NAV-%   -5.1  per fill -0.18  median trade -12.1%  win 35.7%  +50% fills 0
+k1 fills  26 (+0 the run re-bought anyway, 98 blocked by the 15% rule)  NAV-%   -5.0  per fill -0.19  median trade -10.8%  win 38.5%  +50% fills 0
+k2 fills  32 (+0 the run re-bought anyway, 97 blocked by the 15% rule)  NAV-%   -6.2  per fill -0.19  median trade -10.8%  win 34.4%  +50% fills 0
+k3 fills  36 (+0 the run re-bought anyway, 99 blocked by the 15% rule)  NAV-%  +12.7  per fill +0.35  median trade  -4.1%  win 44.4%  +50% fills 1
+k4 fills  24 (+0 the run re-bought anyway, 99 blocked by the 15% rule)  NAV-%   -8.7  per fill -0.36  median trade -12.2%  win 29.2%  +50% fills 0
+k0 fills in weeks where cash was already short (an Insufficient_cash skip that week): 5 of 28
+
+== re-entry window 26 weeks
+k0 fills  29 (+0 the run re-bought anyway, 140 blocked by the 15% rule)  NAV-%   -4.7  per fill -0.16  median trade -11.3%  win 37.9%  +50% fills 0
+k1 fills  27 (+0 the run re-bought anyway, 144 blocked by the 15% rule)  NAV-%   -4.6  per fill -0.17  median trade  -7.8%  win 40.7%  +50% fills 0
+k2 fills  34 (+0 the run re-bought anyway, 138 blocked by the 15% rule)  NAV-%   -4.3  per fill -0.13  median trade -10.3%  win 38.2%  +50% fills 0
+k3 fills  37 (+0 the run re-bought anyway, 146 blocked by the 15% rule)  NAV-%  +13.1  per fill +0.35  median trade  -3.6%  win 45.9%  +50% fills 1
+k4 fills  26 (+0 the run re-bought anyway, 144 blocked by the 15% rule)  NAV-%   -6.8  per fill -0.26  median trade -12.1%  win 34.6%  +50% fills 0
+k0 fills in weeks where cash was already short (an Insufficient_cash skip that week): 5 of 29
