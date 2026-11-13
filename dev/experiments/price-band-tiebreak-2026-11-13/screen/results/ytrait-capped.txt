@@ -1,0 +1,93 @@
+2000-2012 n=10927 monster 8.01% mean ride +1.7% | 2013-2025 n=9268 monster 7.29% mean ride +3.1%
+
+base_weeks cut-offs 
+  cut-offs (2000-12): 1 6 29 46
+  Q1 | 00-12 n= 2582 mon  7.05% lift 0.88 ride   +2.2% win 38.1% 2x  1.7% | 13-25 n= 2421 mon  5.91% lift 0.81 ride   +2.7% win 40.9% 2x  1.2%
+  Q2 | 00-12 n= 1903 mon  7.41% lift 0.93 ride   +2.3% win 39.2% 2x  1.8% | 13-25 n= 1616 mon  6.62% lift 0.91 ride   +3.5% win 42.2% 2x  1.2%
+  Q3 | 00-12 n= 2167 mon  8.26% lift 1.03 ride   +2.2% win 39.4% 2x  1.7% | 13-25 n= 1945 mon  7.61% lift 1.04 ride   +3.5% win 40.3% 2x  1.7%
+  Q4 | 00-12 n= 2239 mon  8.08% lift 1.01 ride   +0.8% win 37.3% 2x  1.4% | 13-25 n= 1782 mon  7.97% lift 1.09 ride   +3.2% win 38.1% 2x  2.3%
+  Q5 | 00-12 n= 2036 mon  9.43% lift 1.18 ride   +1.1% win 36.3% 2x  2.2% | 13-25 n= 1504 mon  9.04% lift 1.24 ride   +2.9% win 41.9% 2x  2.0%
+
+depth cut-offs 
+  cut-offs (2000-12): 0.3197 0.4075 0.5042 0.6458
+  Q1 | 00-12 n= 2185 mon  1.92% lift 0.24 ride   +2.9% win 44.1% 2x  0.8% | 13-25 n= 2521 mon  1.51% lift 0.21 ride   +2.5% win 43.4% 2x  0.3%
+  Q2 | 00-12 n= 2187 mon  4.39% lift 0.55 ride   +2.8% win 39.6% 2x  1.0% | 13-25 n= 2116 mon  3.45% lift 0.47 ride   +2.9% win 40.5% 2x  0.8%
+  Q3 | 00-12 n= 2184 mon  7.69% lift 0.96 ride   +2.6% win 37.5% 2x  2.0% | 13-25 n= 1825 mon  8.05% lift 1.10 ride   +3.2% win 38.5% 2x  1.6%
+  Q4 | 00-12 n= 2185 mon 10.71% lift 1.34 ride   +1.4% win 35.8% 2x  1.5% | 13-25 n= 1616 mon 11.14% lift 1.53 ride   +3.3% win 38.7% 2x  2.4%
+  Q5 | 00-12 n= 2186 mon 15.32% lift 1.91 ride   -1.1% win 33.3% 2x  3.5% | 13-25 n= 1190 mon 20.00% lift 2.74 ride   +4.5% win 40.8% 2x  5.2%
+
+ath_gap cut-offs 
+  cut-offs (2000-12): -0.6349 -0.3335 -0.086 0.025
+  Q1 | 00-12 n= 2185 mon 13.23% lift 1.65 ride   +3.9% win 38.4% 2x  2.9% | 13-25 n= 1577 mon 14.01% lift 1.92 ride   +3.4% win 39.5% 2x  3.0%  <== PASSES
+  Q2 | 00-12 n= 2185 mon  7.60% lift 0.95 ride   +1.0% win 36.6% 2x  1.6% | 13-25 n= 1558 mon  7.70% lift 1.06 ride   +2.2% win 39.7% 2x  2.0%
+  Q3 | 00-12 n= 2187 mon  5.44% lift 0.68 ride   +0.7% win 37.1% 2x  1.2% | 13-25 n= 1870 mon  5.56% lift 0.76 ride   +2.9% win 39.1% 2x  1.2%
+  Q4 | 00-12 n= 2185 mon  5.22% lift 0.65 ride   +2.2% win 40.2% 2x  1.2% | 13-25 n= 2037 mon  4.03% lift 0.55 ride   +3.5% win 42.7% 2x  1.0%
+  Q5 | 00-12 n= 2185 mon  8.56% lift 1.07 ride   +0.9% win 37.9% 2x  1.9% | 13-25 n= 2226 mon  6.69% lift 0.92 ride   +3.5% win 41.4% 2x  1.4%
+
+age cut-offs 
+  cut-offs (2000-12): 183 322 525 887
+  Q1 | 00-12 n= 2213 mon 12.38% lift 1.55 ride   +0.2% win 36.0% 2x  2.3% | 13-25 n= 1208 mon 14.65% lift 2.01 ride   +6.3% win 41.9% 2x  3.6%
+  Q2 | 00-12 n= 2178 mon 10.24% lift 1.28 ride   +3.4% win 38.8% 2x  2.7% | 13-25 n=  943 mon  9.33% lift 1.28 ride   +1.0% win 37.1% 2x  1.6%
+  Q3 | 00-12 n= 2168 mon  6.60% lift 0.82 ride   +1.3% win 38.8% 2x  1.4% | 13-25 n= 1118 mon  8.41% lift 1.15 ride   +4.3% win 40.6% 2x  2.7%
+  Q4 | 00-12 n= 2182 mon  6.87% lift 0.86 ride   +2.1% win 36.3% 2x  1.7% | 13-25 n= 1685 mon  6.47% lift 0.89 ride   +2.7% win 42.0% 2x  1.1%
+  Q5 | 00-12 n= 2186 mon  3.89% lift 0.49 ride   +1.7% win 40.4% 2x  0.7% | 13-25 n= 4314 mon  4.82% lift 0.66 ride   +2.6% win 40.5% 2x  1.1%
+
+price cut-offs 
+  cut-offs (2000-12): 14.12 22.56 32.75 49.13
+  Q1 | 00-12 n= 2185 mon 15.88% lift 1.98 ride   +5.6% win 39.0% 2x  3.7% | 13-25 n= 1158 mon 13.64% lift 1.87 ride   +4.3% win 39.9% 2x  3.8%  <== PASSES
+  Q2 | 00-12 n= 2186 mon  8.46% lift 1.06 ride   +2.3% win 39.2% 2x  1.6% | 13-25 n= 1247 mon  9.22% lift 1.26 ride   +4.5% win 39.1% 2x  2.6%
+  Q3 | 00-12 n= 2187 mon  5.76% lift 0.72 ride   +0.9% win 36.9% 2x  1.3% | 13-25 n= 1210 mon  6.86% lift 0.94 ride   +2.9% win 40.5% 2x  1.7%
+  Q4 | 00-12 n= 2183 mon  4.54% lift 0.57 ride   +0.6% win 37.6% 2x  1.1% | 13-25 n= 1531 mon  5.81% lift 0.80 ride   +3.3% win 42.5% 2x  1.3%
+  Q5 | 00-12 n= 2186 mon  5.40% lift 0.67 ride   -0.6% win 37.6% 2x  1.1% | 13-25 n= 4122 mon  5.60% lift 0.77 ride   +2.4% win 40.6% 2x  0.9%
+
+dollar_vol cut-offs 
+  cut-offs (2000-12): 2.931e+06 7.061e+06 1.671e+07 4.836e+07
+  Q1 | 00-12 n= 2185 mon 10.43% lift 1.30 ride   +3.5% win 38.2% 2x  2.5% | 13-25 n=  391 mon  7.67% lift 1.05 ride   +1.5% win 39.9% 2x  1.8%
+  Q2 | 00-12 n= 2185 mon  8.28% lift 1.03 ride   +0.7% win 36.6% 2x  1.5% | 13-25 n= 1039 mon  6.83% lift 0.94 ride   +3.1% win 40.1% 2x  1.6%
+  Q3 | 00-12 n= 2186 mon  7.78% lift 0.97 ride   +1.5% win 37.2% 2x  1.7% | 13-25 n= 1898 mon  6.43% lift 0.88 ride   +3.8% win 40.3% 2x  2.2%
+  Q4 | 00-12 n= 2185 mon  6.27% lift 0.78 ride   +0.8% win 38.2% 2x  1.3% | 13-25 n= 2291 mon  7.94% lift 1.09 ride   +2.5% win 39.8% 2x  1.4%
+  Q5 | 00-12 n= 2186 mon  7.27% lift 0.91 ride   +2.2% win 40.2% 2x  1.8% | 13-25 n= 3649 mon  7.43% lift 1.02 ride   +3.4% win 41.5% 2x  1.5%
+
+vol26 cut-offs 
+  cut-offs (2000-12): 0.0345 0.0469 0.0607 0.0836
+  Q1 | 00-12 n= 2191 mon  1.69% lift 0.21 ride   +2.7% win 42.7% 2x  0.5% | 13-25 n= 2403 mon  1.33% lift 0.18 ride   +2.7% win 42.7% 2x  0.2%
+  Q2 | 00-12 n= 2189 mon  4.66% lift 0.58 ride   +3.7% win 39.6% 2x  1.9% | 13-25 n= 2129 mon  3.29% lift 0.45 ride   +3.2% win 41.9% 2x  0.8%
+  Q3 | 00-12 n= 2184 mon  7.69% lift 0.96 ride   +2.9% win 38.6% 2x  1.5% | 13-25 n= 1842 mon  6.51% lift 0.89 ride   +3.2% win 39.0% 2x  1.5%
+  Q4 | 00-12 n= 2178 mon 10.19% lift 1.27 ride   +2.2% win 36.8% 2x  2.1% | 13-25 n= 1502 mon 10.19% lift 1.40 ride   +2.4% win 39.2% 2x  1.9%
+  Q5 | 00-12 n= 2185 mon 15.84% lift 1.98 ride   -2.8% win 32.6% 2x  2.8% | 13-25 n= 1392 mon 21.62% lift 2.96 ride   +4.3% win 38.6% 2x  5.5%
+
+volx cut-offs 
+  cut-offs (2000-12): 2.16 2.4 2.76 3.56
+  Q1 | 00-12 n= 2195 mon  6.70% lift 0.84 ride   +3.0% win 40.3% 2x  1.5% | 13-25 n= 1982 mon  6.00% lift 0.82 ride   +3.2% win 41.9% 2x  1.2%
+  Q2 | 00-12 n= 2227 mon  6.87% lift 0.86 ride   +2.6% win 38.8% 2x  1.8% | 13-25 n= 1967 mon  6.41% lift 0.88 ride   +3.1% win 40.8% 2x  1.3%
+  Q3 | 00-12 n= 2149 mon  7.45% lift 0.93 ride   +1.2% win 36.5% 2x  1.6% | 13-25 n= 1731 mon  6.87% lift 0.94 ride   +3.9% win 41.7% 2x  1.6%
+  Q4 | 00-12 n= 2180 mon  8.81% lift 1.10 ride   +1.5% win 38.3% 2x  1.8% | 13-25 n= 1862 mon  6.82% lift 0.94 ride   +2.7% win 39.5% 2x  1.3%
+  Q5 | 00-12 n= 2176 mon 10.25% lift 1.28 ride   +0.4% win 36.3% 2x  2.2% | 13-25 n= 1726 mon 10.72% lift 1.47 ride   +2.8% win 39.0% 2x  3.1%
+
+ret26 cut-offs 
+  cut-offs (2000-12): 0.1639 0.2637 0.3887 0.6329
+  Q1 | 00-12 n= 2189 mon  4.02% lift 0.50 ride   +2.3% win 41.3% 2x  1.0% | 13-25 n= 1971 mon  2.94% lift 0.40 ride   +1.7% win 39.9% 2x  0.7%
+  Q2 | 00-12 n= 2182 mon  5.96% lift 0.74 ride   +3.5% win 39.2% 2x  1.6% | 13-25 n= 2128 mon  4.79% lift 0.66 ride   +3.4% win 41.4% 2x  1.1%
+  Q3 | 00-12 n= 2185 mon  5.63% lift 0.70 ride   +1.3% win 36.9% 2x  1.5% | 13-25 n= 1942 mon  5.97% lift 0.82 ride   +2.7% win 40.6% 2x  1.2%
+  Q4 | 00-12 n= 2186 mon  9.38% lift 1.17 ride   +2.0% win 38.2% 2x  1.7% | 13-25 n= 1785 mon  8.57% lift 1.18 ride   +4.1% win 40.8% 2x  1.8%
+  Q5 | 00-12 n= 2185 mon 15.06% lift 1.88 ride   -0.5% win 34.6% 2x  3.0% | 13-25 n= 1442 mon 17.13% lift 2.35 ride   +4.1% win 40.2% 2x  4.1%
+
+ext cut-offs 
+  cut-offs (2000-12): 0.1262 0.177 0.2381 0.3397
+  Q1 | 00-12 n= 2186 mon  2.15% lift 0.27 ride   +3.0% win 42.2% 2x  0.6% | 13-25 n= 2219 mon  1.40% lift 0.19 ride   +2.6% win 41.4% 2x  0.4%
+  Q2 | 00-12 n= 2187 mon  4.21% lift 0.53 ride   +2.4% win 39.7% 2x  1.0% | 13-25 n= 2023 mon  3.21% lift 0.44 ride   +3.0% win 42.1% 2x  0.4%
+  Q3 | 00-12 n= 2184 mon  7.51% lift 0.94 ride   +2.8% win 37.7% 2x  2.0% | 13-25 n= 1823 mon  5.54% lift 0.76 ride   +3.0% win 39.8% 2x  1.4%
+  Q4 | 00-12 n= 2185 mon  9.93% lift 1.24 ride   +2.1% win 37.1% 2x  2.2% | 13-25 n= 1632 mon 10.60% lift 1.45 ride   +4.3% win 41.5% 2x  2.1%
+  Q5 | 00-12 n= 2185 mon 16.25% lift 2.03 ride   -1.7% win 33.6% 2x  3.0% | 13-25 n= 1571 mon 19.48% lift 2.67 ride   +2.9% win 37.6% 2x  4.8%
+
+regime (Q1 = S&P not in an uptrend, Q2 = uptrend)
+  Q1 | 00-12 n= 3201 mon  8.09% lift 1.01 ride   -1.8% win 32.3% 2x  2.0% | 13-25 n=  849 mon  6.12% lift 0.84 ride   +1.4% win 38.6% 2x  1.5%
+  Q2 | 00-12 n= 7726 mon  7.97% lift 1.00 ride   +3.2% win 40.4% 2x  1.7% | 13-25 n= 8419 mon  7.41% lift 1.02 ride   +3.3% win 40.8% 2x  1.7%
+
+eff104 cut-offs 
+  cut-offs (2000-12): 0.04618 0.09519 0.1502 0.2209
+  Q1 | 00-12 n= 2015 mon  7.00% lift 0.87 ride   +0.8% win 35.1% 2x  1.9% | 13-25 n= 1662 mon  6.08% lift 0.83 ride   +1.7% win 38.9% 2x  1.3%
+  Q2 | 00-12 n= 2015 mon  7.30% lift 0.91 ride   +1.5% win 37.1% 2x  1.4% | 13-25 n= 1654 mon  7.86% lift 1.08 ride   +3.5% win 41.7% 2x  1.6%
+  Q3 | 00-12 n= 2016 mon  7.49% lift 0.94 ride   +1.9% win 39.5% 2x  1.6% | 13-25 n= 1697 mon  6.84% lift 0.94 ride   +3.7% win 40.2% 2x  1.8%
+  Q4 | 00-12 n= 2015 mon  6.65% lift 0.83 ride   +2.4% win 39.3% 2x  1.4% | 13-25 n= 1803 mon  5.44% lift 0.75 ride   +3.2% win 42.5% 2x  1.3%
+  Q5 | 00-12 n= 2016 mon  9.52% lift 1.19 ride   +3.4% win 40.3% 2x  2.5% | 13-25 n= 1912 mon  7.53% lift 1.03 ride   +2.2% win 39.4% 2x  1.5%

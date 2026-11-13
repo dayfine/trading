@@ -1,0 +1,7 @@
+# Monster funnel by raw price at the monster's start date (screen.sh step 4).
+# Input: ../../instrumented-record-2026-08-23/results/monster-ep100-outcomes.tsv (v1; the v2 file has numeric dates).
+# Price = raw close on or before the start date; 1,686 of the file's monsters have a data.csv.
+1 <$8    n= 702 | Dropped_at_breakout 50.6% | Dropped_at_grade  0.9% | NOT_SURFACED  8.0% | Dropped_at_top_n 36.9% | Admitted  3.7%
+2 $8-14  n= 248 | Dropped_at_breakout 52.4% | Dropped_at_grade  0.8% | NOT_SURFACED  6.5% | Dropped_at_top_n 37.1% | Admitted  3.2%
+3 $14-33 n= 385 | Dropped_at_breakout 43.4% | Dropped_at_grade  0.3% | NOT_SURFACED 12.2% | Dropped_at_top_n 40.5% | Admitted  3.6%
+4 >$33   n= 351 | Dropped_at_breakout 33.6% | Dropped_at_grade  0.0% | NOT_SURFACED 11.4% | Dropped_at_top_n 49.9% | Admitted  5.1%
