@@ -1,0 +1,16 @@
+[symbol_class_exclusion] dropped 0, kept 2953
+[dual_class_dedup] dropped 10, kept 2943
+    - GOOG: dual-class duplicate of GOOGL
+    - BRK-A: dual-class duplicate of BRK-B
+    - PBR-A: dual-class duplicate of PBR
+    - FOX: dual-class duplicate of FOXA
+    - HEI-A: dual-class duplicate of HEI
+    - UA: dual-class duplicate of UAA
+    - NWS: dual-class duplicate of NWSA
+    - LEN-B: dual-class duplicate of LEN
+    - UHAL: dual-class duplicate of UHAL-B
+    - CWEN-A: dual-class duplicate of CWEN
+[reit_policy] dropped 0, kept 2943
+[adr_liquidity_floor] dropped 0, kept 2943
+[preferred_exclusion] dropped 0, kept 2943
+TOTAL: kept 2943, dropped 10

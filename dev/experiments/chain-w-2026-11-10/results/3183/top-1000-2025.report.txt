@@ -1,0 +1,8 @@
+[symbol_class_exclusion] dropped 0, kept 995
+[dual_class_dedup] dropped 2, kept 993
+    - GOOG: dual-class duplicate of GOOGL
+    - BRK-A: dual-class duplicate of BRK-B
+[reit_policy] dropped 0, kept 993
+[adr_liquidity_floor] dropped 0, kept 993
+[preferred_exclusion] dropped 0, kept 993
+TOTAL: kept 993, dropped 2

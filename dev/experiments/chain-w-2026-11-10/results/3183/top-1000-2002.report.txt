@@ -1,0 +1,15 @@
+[symbol_class_exclusion] dropped 7, kept 944
+    - HSBA: symbol class excluded (Symbol_class.Non_usd_listing)
+    - CELSIA: symbol class excluded (Symbol_class.Non_usd_listing)
+    - WFC-WS: symbol class excluded (Symbol_class.Warrant)
+    - SBER: symbol class excluded (Symbol_class.Non_usd_listing)
+    - CTRA_old: symbol class excluded (Symbol_class.Non_usd_listing)
+    - CMA-WS: symbol class excluded (Symbol_class.Warrant)
+    - RCF-UN: symbol class excluded (Symbol_class.Unit)
+[dual_class_dedup] dropped 2, kept 942
+    - BRK-A: dual-class duplicate of BRK-B
+    - PBR-A: dual-class duplicate of PBR
+[reit_policy] dropped 0, kept 942
+[adr_liquidity_floor] dropped 0, kept 942
+[preferred_exclusion] dropped 0, kept 942
+TOTAL: kept 942, dropped 9

@@ -1,0 +1,16 @@
+[symbol_class_exclusion] dropped 7, kept 908
+    - HSBA: symbol class excluded (Symbol_class.Non_usd_listing)
+    - SBER: symbol class excluded (Symbol_class.Non_usd_listing)
+    - CTRA_old: symbol class excluded (Symbol_class.Non_usd_listing)
+    - CELSIA: symbol class excluded (Symbol_class.Non_usd_listing)
+    - WFC-WS: symbol class excluded (Symbol_class.Warrant)
+    - CMA-WS: symbol class excluded (Symbol_class.Warrant)
+    - RCF-UN: symbol class excluded (Symbol_class.Unit)
+[dual_class_dedup] dropped 3, kept 905
+    - GOOGL: dual-class duplicate of GOOG
+    - PBR-A: dual-class duplicate of PBR
+    - BRK-A: dual-class duplicate of BRK-B
+[reit_policy] dropped 0, kept 905
+[adr_liquidity_floor] dropped 0, kept 905
+[preferred_exclusion] dropped 0, kept 905
+TOTAL: kept 905, dropped 10
