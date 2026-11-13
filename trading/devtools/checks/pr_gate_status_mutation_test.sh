@@ -277,7 +277,7 @@ run_mutation r1 killed \
   '(r) _is_results_only accepts any path, not just dev/experiments/ (a code PR would get the one-gate lane)'
 
 run_mutation r2 killed \
-  's/^      \*\.md|\*\.sexp|\*\.csv|\*\.sh|\*\.awk|\*\.log|\*\.rss|\*\.txt|\*\.json) ;;$/      *) ;;/' \
+  's/^      \*\.md|\*\.sexp|\*\.csv|\*\.tsv|\*\.sh|\*\.awk|\*\.log|\*\.rss|\*\.txt|\*\.json) ;;$/      *) ;;/' \
   '(r) _is_results_only accepts any extension under dev/experiments/ (a dune file or .png would get the one-gate lane)'
 
 run_mutation r3 killed \
