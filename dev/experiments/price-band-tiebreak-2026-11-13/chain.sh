@@ -1,6 +1,3 @@
-  # A restart mid-pull leaves the bars tar.gz in $TMPDIR and pull-dir its $WH.partial.<pid>; safe to drop under the lock
-  # (added after the 11-13 runs, #3588 qc-results note).
-  rm -rf "$OUT/tmp"/r2_bars.* "$WH".partial.*
 #!/bin/sh
 # price-band-tiebreak-2026-11-13: one tie seed's pair (arm S, then arm P) in a Claude cloud session. Five sessions,
 # one per seed, run side by side. Pre-registration and read rule: README.md beside this file. NOT run by its author.

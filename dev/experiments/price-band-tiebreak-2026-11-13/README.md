@@ -179,6 +179,9 @@ drawdown is 5.64 pp worse than S's, against a 3 pp limit.
   carry `HEAD=1034b458e` and image `sha256:3865e48e8a61`.
 - **Derived tables.** `results/read/`, written by the scripts named in each section. They read only `results/`,
   except where a section says it reads the bar store. Those scripts print bands and ratios only, never a bar.
+  The per-row files some sections cite (`read/positions.tsv`, `read/channels.tsv`, `read/list_bands.tsv`,
+  `read/basis_check.tsv`) are regenerated, not committed: they need the local `data/`, and two of them would let a reader
+  recover raw closes. Their committed summaries reproduce byte for byte from a regeneration (#3595 qc-results).
 - **Capacity and the per-arm table.** `results/read/capacity.sh` writes `cap-{P,S}.txt`, and `results/read/metrics.sh`
   writes `metrics.txt`. Both read the per-arm artifacts; `capacity.sh` also reads the bar store and prints ratios only.
 
@@ -249,7 +252,8 @@ The bar is 1.3 × 11.58 % = 15.05 %, and it fails. The result is **NOT LIVE**.
 - **S.** ln 2.7554, about 11.0 %/yr over 26.5 years. Sharpe 0.634, max DD 25.56 %.
 - **P.** ln 3.0844, about 12.3 %/yr. Sharpe 0.699, max DD 31.20 %.
 - **Spread.** The seed SD of ln(1+R) is 0.127 for S and 0.147 for P. The record's band SD was 0.225.
-- **Paired Δ.** Mean +0.337, SD 0.167. A t4 interval at 90 % is +0.18 to +0.50. It covers tie-order noise only.
+- **Paired Δ.** Mean +0.337, SD 0.167. A t4 interval at 90 % would be +0.18 to +0.50, but it treats the five P
+  cells as independent. P's cross-band order is the same in every seed, so the interval is too narrow (§Why 5).
 - **The ≤ $8 share** is 3.94 % for S and 4.46 % for P, pooled (1.13×).
 
 **The five largest one-arm-only NAV contributors** (`read/positions.tsv`, `read/positions.sh`):
@@ -317,8 +321,8 @@ is not where the gap comes from (§Why 3).
   - It is a statement about a mis-specified proxy, not about the mechanism.
   - It is not a NO-BUILD decision either. `Price_band_seeded` stays a default-off axis, as it was.
 - **What the description can and cannot support.**
-  - **Supports.** In this window, P's 26-year outcome sits above S's by more than tie-order noise: five S re-draws
-    never reach any P re-draw.
+  - **Supports.** In this window, P's 26-year outcome sits above S's by more than tie-order noise, at about 2–2.4 SD
+    (one-sided p ≈ 0.01–0.02 under a shared-draw bound, §Why 5). Five S re-draws never reach any P re-draw.
   - **Does not support.** It cannot say the band order is better in expectation. Its five seeds replicate one set of
     systematic swaps rather than testing it (§Why 5).
   - **Effective sample.** The deciding events are a handful of distinct names, about 70 % of the gap entered in
@@ -578,13 +582,19 @@ Any change to tie order re-draws the tails, as a seed change does (`memory/proje
   differences are |0.022| to |0.298| (median 0.149). Three of the five P−S gaps exceed the largest S−S gap. All 25 P
   vs S comparisons, same seed or not, favour P (minimum +0.050).
 
-**Exact permutation probability.** Suppose the band order were just another tie draw: the ten values exchangeable
-draws from one distribution. Each of the C(10,5) = 252 ways to label five values P is then equally likely. Exactly one
-puts all five P above all five S, so p = **1/252 = 0.004**, one-sided. The paired sign test, 5 of 5 positive, gives
-1/32 = 0.031. The pairs are separable (the largest S value, 2.878, is below the smallest P value, 2.929), so all-above
-under the sign-flip null is also 1/32. With n = 5, 1/252 and 1/32 are the most extreme values each test can return.
+**Permutation and sign tests: floors, not values.** If the ten values were exchangeable draws, each of the
+C(10,5) = 252 labellings would be equally likely. Exactly one puts all five P above all five S, so p would be 1/252 =
+0.004, one-sided. The paired sign test, 5 of 5 positive, would give 1/32 = 0.031. Both treat the five P cells as
+independent draws. They are not: P's cross-band order is the same in every seed, so a "just another fixed tie order"
+null gives the five P cells one shared draw (below). The 1/252, the 1/32 and the t4 interval are therefore floors on
+the p-value, not its value.
 
-**What that supports.** In this window, universe and build, P's outcome differs from S's by more than tie-order noise.
+**A shared-draw bound.** Treat S's whole seed variance (SD 0.127) as the component the five P cells share, plus
+per-seed noise. The gap in means (+0.337) is then about 2.2–2.4 SD: 2.2 with P's own seed spread (0.147) added as
+independent noise, 2.4 without it. One-sided p is about 0.01–0.02.
+
+**What that supports.** In this window, universe and build, P's outcome differs from S's by more than tie-order noise, at
+the strength of the shared-draw bound (about 2–2.4 SD), not at 1/252.
 
 **What it cannot support.**
 
@@ -603,19 +613,20 @@ under the sign-flip null is also 1/32. With n = 5, 1/252 and 1/32 are the most e
 
 #### 6. Drawdown, concentration, cash, capacity
 
-- **Concentration: no.** Mean position weight at entry is 0.098 of NAV in both arms, and 0.097–0.105 in every band.
+- **Concentration: no.** Mean position weight at entry is 0.098 of NAV in both arms, and 0.097–0.106 in every band.
   Mean initial stop distance by band is equal to within 0.002. P runs 3 % fewer entries (2,756 against 2,842) and ends
   with 4–5 open positions, as S does.
 - **Drawdown: yes, modestly.**
   - **Ulcer index.** Higher in P in 5 of 5 seeds, by 0.48 to 1.61 (P 10.20–12.18, S 9.72–11.39; `actual.sexp`).
-  - **Max DD.** Deeper in P in 4 of 5 seeds: +4.79, +0.64, +0.01, +5.64 and +1.28 pp for k0–k4.
+  - **Max DD.** Deeper in P in 5 of 5 seeds by sign, 4 of 5 by more than 0.1 pp: +4.79, +0.64, +0.01, +5.64 and
+    +1.28 pp for k0–k4.
   - **Where the gaps come from** (`read/curves.txt`). The two large ones, k0 and k3, are the 2018–2020 episode: P
     falls from its own Jan-2018 peak, S from mid-2018. P gave back part of its 2017 run-up (the k0 gap fell from +0.488
     at end-2017 to +0.444 at end-2018).
   - **The open episode.** The 2024-11 → 2026-06 drawdown is deeper in P in 4 of 5 seeds (P 21.3–26.0 %, S
     19.6–22.4 %; k3 is the exception, 22.1 % against 22.4 %).
 - **Risk-adjusted.**
-  - **Sharpe** is higher in P in 5 of 5 seeds (+0.027 to +0.110), and so is Sortino.
+  - **Sharpe** is higher in P in 5 of 5 seeds (+0.028 to +0.110), and so is Sortino.
   - **Calmar** is higher in 3 of 5, equal in k4 and lower in k3.
   - **The gain** is bought with the volatility of the names it buys, not with position size.
 - **Cash displacement** runs both ways and nets about +4 points of entry NAV per seed (table above). The README's
@@ -628,7 +639,7 @@ under the sign-flip null is also 1/32. With n = 5, 1/252 and 1/32 are the most e
 
 ### The pre-registration's §Why, corrected (#3588 qc-results notes)
 
-- **The ath_gap overlap, now measured** (`read/athgap_overlap.txt`, from `read/athgap_overlap.sh` over the screen's
+- **The ath_gap overlap, now measured** (`screen/results/athgap_overlap.txt`, from `screen/athgap_overlap.sh` over the screen's
   `events.tsv`; aggregates only).
   - **Overlap.** 54.6 % (2000–12) and 40.7 % (2013–25) of ath_gap Q1 events are also price Q1.
   - **Monster rate.** ath_gap Q1 lifts the monster rate inside both price strata. Price Q1: 16.6 % against 15.0 %,
@@ -716,7 +727,7 @@ the next decision on evidence rather than on this read.
 1. **The liveness proxy was mis-specified (pre-registration design).** It measured the ≤ $14 share of entries, which
    sits downstream of the cash and structural-stop gates and covers only the cheap side. The 1.3× multiplier had no
    per-decision basis. Specimen: README lines 74–76; the cut-off sweep in §Why 2; the list-swap table in §Why 1.
-2. **`trades.csv` `entry_price` is restated for splits during the hold.** It is not the decision-time price
+2. **`trades.csv` `entry_price` is restated for splits during the hold.** Tracked in #3384. It is not the decision-time price
    (`read/basis_check.tsv`, from `read/basis_check.sh`, which reads the bar store and prints ratios only). Of 1,050
    distinct positions across the ten cells, 1,032 match the raw close on the entry date. The other 18 all held through
    a split, and each ratio equals the product of the in-hold splits:
@@ -728,12 +739,13 @@ the next decision on evidence rather than on this read.
    | ADSK | 2003-09-15 | 0.501 | 2:1 on 2004-12-21 |
    | DUK | 2012-06-01 | 2.985 | 1:3 reverse on 2012-07-03 |
 
-   - **Bands.** Five positions change band: DECK, EME, ENB and AVD should be at $33 or more; DUK should be $14–33.
+   - **Bands.** Six positions change band: DECK, EME, ENB and AVD should be at $33 or more; DUK and ADSK should be
+     $14–33.
    - **The ≤ $14 count.** ADSK is the only one affected, and it is shared by all ten cells (1.219 → 1.220).
    - **The mechanism is not affected.** It prices the raw `suggested_entry` at the decision. This is an analysis
      trap, not a simulator bug.
    - **Fix.** Document it in the `trades.csv` column notes, or add a raw `decision_price` column.
-3. **`entries.tsv` cannot see the cut on Fridays with no placement, and drops the score.** The alternatives hang off a
+3. **`entries.tsv` cannot see the cut on Fridays with no placement, and drops the score.** Tracked in #3384. The alternatives hang off a
    placed entry (`chain.sh` `entries_extract`). 327 of P's 705 one-arm tickets (46 %) and 385 of S's 793 are
    therefore channel-unresolved. `trade_audit.sexp` (with scores) was not collected. A future tiebreak arm should run
    with `--emit-candidates` on at least one cell.
@@ -754,7 +766,20 @@ the next decision on evidence rather than on this read.
 
 The pack covers all ten cells, with charts on P-k0. It was built with `review_pack.sh --run-kind arm --charts-run 0
 --no-container` at b54e44ea9 and rendered with `review_pack_render.sh` (27 slices). It was looked at by the dispatcher
-(RV1–RV3). The pack is not committed (46 MB site, per-trade charts from the bar store).
+(RV1–RV3).
+
+The pack is **not published or committed, by design**. Its site (46 MB) embeds per-trade daily price series read from
+the local EODHD bar store, and those may not be shared, published or committed (EODHD terms). The pack figures quoted
+below (KPI strip, concentrated-gain peaks, era read, stop signal) can be rebuilt from the committed per-arm artifacts
+plus a local `data/` with:
+
+```
+R=dev/experiments/price-band-tiebreak-2026-11-13/results
+sh dev/scripts/review_pack.sh --out <dir> --title "Price-band tiebreak, K=5 paired (2000-2026, pit-v12)" \
+  --run-kind arm --charts-run 0 --no-container --data-dir data \
+  P-k0=$R/k0/pb-P-k0-s0- S-k0=$R/k0/pb-S-k0-s0- ...   # all ten, P-kK and S-kK for K = 0..4
+sh dev/scripts/review_pack_render.sh --site <dir>/site
+```
 
 - **KPI strip (P-k0).** +2,662 %, CAGR 13.4 %, max DD −32.0 %, Sharpe 0.74, 552 trades, 5 open at the end. These match
   `actual.sexp`. The arms list reads +2,662 / +1,473 / +2,094 / +1,678 / +2,085 / +1,335 / +1,770 / +1,220 / +1,906 /
@@ -772,7 +797,8 @@ The pack covers all ten cells, with charts on P-k0. It was built with `review_pa
   5 of 5 seeds.
 - **Initial stop under 2 % below E: not P-specific.** The signal fires on 13–21 trades in every cell, S and P alike
   (P-k0 19 trades, −$1.10M; S-k0 18, −$535k). The names (GME, APPF, AAON, TCOM, UPWK) recur in both arms. This is the
-  known decision-walk D4 item, not a band-order effect.
+  known decision-walk D4 item, not a band-order effect. P does lose more dollars on it in all five seeds (P −$0.72M to
+  −$1.10M; S −$0.47M to −$0.63M, and S-k2 +$42k), partly because P's NAV is larger.
 - **Audit-dependent cards read n/a**, as `--no-container` implies: E ≥ 10 % below the decision close, trail never
   raised, fallback stops. The missed-winners table reads "unknown (screen evidence absent)" for the same reason.
 - **Validator.** V13 counts 39 violations (4 skipped) on P-k0. That is a per-trade check that moves with the trade list
