@@ -272,6 +272,8 @@ A stock gets A+ rating if ALL THREE present:
 
 "When you find one of these special big-winner patterns, invest much more heavily in it because the probabilities are great that you have a grand-slam home run on your hands."
 
+**Low prices disguise big winners (Ch. 5, resolved 2026-11-13).** Several of the chapter's big winners broke out at low prices: Blocker Energy at about $1 ("although the low price disguises it, there was one heck of an advance before the breakout"), Keystone Consolidated from under $5, Anthony Industries at about $10. The sentence just before "invest much more heavily" is about price level: on the arithmetic Mansfield scale, "when a low-priced stock advances sharply, the low-priced action looks miniscule even though the percentages are large." The book gives no price rule. What it records is that the chapter's tail cases are often cheap and that their percentage moves are easy to under-read. The default-off `Price_band_seeded` screener tie-break (`Screener_ranking`) cites this passage. It adjusts the tie-break dial and changes no spine item.
+
 ### 4.6 Continuation Buys (Ch. 3, ~lines 2214–2238)
 
 A second category of buy signal that occurs within an established Stage 2 uptrend — distinct from the initial breakout.

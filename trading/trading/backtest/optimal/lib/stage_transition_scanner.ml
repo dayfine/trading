@@ -44,6 +44,7 @@ let _permissive_screener_config (config : config) : Screener.config =
     min_grade = F;
     candidate_ranking = Screener.Alphabetical;
     tiebreak_seed = 0;
+    ranking_price_band_edges = Screener.default_price_band_edges;
     min_score_override = None;
     max_score_override = None;
     volume_ratio_exclude_range = None;

@@ -9,9 +9,20 @@ type candidate_ranking =
   | Symbol_length
   | Hash_order
   | Seeded
+  | Price_band_seeded
 [@@deriving sexp, eq]
 
-type rankable = { score : int; ticker : string; analysis : Stock_analysis.t }
+type rankable = {
+  score : int;
+  ticker : string;
+  price : float;
+  analysis : Stock_analysis.t;
+}
+
+let default_price_band_edges = [ 8.0; 14.0; 33.0 ]
+
+let price_band ~edges price =
+  List.count edges ~f:(fun edge -> Float.(edge <= price))
 
 (** Continuous relative-strength magnitude for the [Quality] tiebreak.
 
@@ -138,12 +149,21 @@ let _seeded_cmp ~seed_key a b =
   | 0 -> String.compare a.ticker b.ticker
   | c -> c
 
+(** [Price_band_seeded] tiebreak: {!price_band} ascending (the cheaper band
+    first), then {!_seeded_cmp} inside a band. Within one band it is exactly
+    [Seeded]. *)
+let _price_band_seeded_cmp ~seed_key ~edges a b =
+  match Int.compare (price_band ~edges a.price) (price_band ~edges b.price) with
+  | 0 -> _seeded_cmp ~seed_key a b
+  | c -> c
+
 (** Tiebreak comparator among equal-score candidates, parameterised by the
     ranking mode. [Alphabetical] is bit-identical to the historical ticker-only
     tiebreak; [Quality] leads with RS magnitude; [Quality_earliness] leads with
-    earliness; the rest are uninformative {!_reverse_alphabetical_cmp} /
-    {!_symbol_length_cmp} / {!_hash_order_cmp} controls. *)
-let _tiebreak ~seed_key ranking a b =
+    earliness; [Seeded] is the seeded draw and [Price_band_seeded] the same draw
+    inside price bands; the rest are uninformative {!_reverse_alphabetical_cmp}
+    / {!_symbol_length_cmp} / {!_hash_order_cmp} controls. *)
+let _tiebreak ~seed_key ~price_band_edges ranking a b =
   match ranking with
   | Alphabetical -> String.compare a.ticker b.ticker
   | Quality -> _lex _quality_keys a b
@@ -152,8 +172,29 @@ let _tiebreak ~seed_key ranking a b =
   | Symbol_length -> _symbol_length_cmp a b
   | Hash_order -> _hash_order_cmp a b
   | Seeded -> _seeded_cmp ~seed_key a b
+  | Price_band_seeded ->
+      _price_band_seeded_cmp ~seed_key ~edges:price_band_edges a b
 
-let compare_rankable ?(tiebreak_seed = 0) ?as_of ranking a b =
+let compare_rankable ?(tiebreak_seed = 0) ?as_of
+    ?(price_band_edges = default_price_band_edges) ranking a b =
   let by_score = Int.compare b.score a.score in
   if by_score <> 0 then by_score
-  else _tiebreak ~seed_key:(_seed_key ~tiebreak_seed ~as_of) ranking a b
+  else
+    _tiebreak
+      ~seed_key:(_seed_key ~tiebreak_seed ~as_of)
+      ~price_band_edges ranking a b
+
+let _top_n ~compare n lst =
+  (* Secondary sort breaks score ties deterministically. Without it,
+     [List.sort]'s stability depends on the input ordering — which in turn
+     depends on Hashtbl iteration order, and that diverges between macOS and
+     Linux. A G15-step-3 panel-golden CI failure surfaced this: local
+     regenerated more round_trips than GHA produced, with the diff being a
+     tied-score candidate that landed on either side of a cash-budget boundary
+     depending on its position in the sorted list. [compare] carries the
+     ranking tiebreak; see {!candidate_ranking}. *)
+  List.sort lst ~compare |> fun l ->
+  List.sub l ~pos:0 ~len:(min n (List.length l))
+
+let filter_and_cap ~compare ~candidate_fn ~max_n candidates =
+  List.filter_map candidates ~f:candidate_fn |> _top_n ~compare max_n
