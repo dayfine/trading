@@ -1,0 +1,27 @@
+[11-13 13:30:21Z] price-band run k3; PB_SHA=1034b458e5160cc955a873a2f3267b2cee63232b CELL_TIMEOUT=21600s
+[11-13 13:30:28Z] HEAD=1034b458e image=ghcr.io/dayfine/trading-ci:latest sha256:3865e48e8a61
+[11-13 13:30:28Z] disk free 22G
+[11-13 13:30:28Z] PULL warehouse v12wk-9236
+[11-13 13:39:33Z] PULL corpact corpact-2026-10-27
+[11-13 13:39:34Z] PULL bars data-20261102
+[11-13 13:40:21Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-13 13:40:21Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv, 11888 data.csv
+[11-13 13:40:21Z] BUILD
+[11-13 13:41:03Z] BUILD_DONE
+[11-13 13:41:03Z] SPEC CHECKS OK (pb-S-k3 = rk-k3; pb-P-k3 = pb-S-k3 + candidate_ranking Price_band_seeded)
+[11-13 13:41:03Z] PREFLIGHT pb-S-k3
+[11-13 13:46:18Z] PREFLIGHT_OK pb-S-k3 (315s, Price_band_seeded in params: no)
+[11-13 13:46:18Z] PREFLIGHT pb-P-k3
+[11-13 13:51:25Z] PREFLIGHT_OK pb-P-k3 (307s, Price_band_seeded in params: yes)
+[11-13 13:51:25Z] disk free 16G
+[11-13 13:51:25Z] RUN pb-S-k3-s0 (pb-S-k3)
+[11-13 16:05:31Z] RESULT pb-S-k3-s0 => total_return_pct 1220.14585307154 total_trades 562 sharpe_ratio 0.60427530859043788 max_drawdown_pct 25.558343357764624 calmar_ratio 0.40033631012961962  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 1 violations (30 skipped)  v6diff: none peak_rss_kb=5739084 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=4 no_files=0 Panel_runner: snapshot cache hits=148052163 misses=20622 miss_absent=11423 evictions=0 n_symbols=9200 misses_per_symbol=2.24 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2477236912 maxrss_bytes=5861412864  (wall 8039s)
+[11-13 16:05:32Z] disk free 16G
+[11-13 16:05:32Z] RUN pb-P-k3-s0 (pb-P-k3)
+[11-13 18:15:23Z] RESULT pb-P-k3-s0 => total_return_pct 1770.2542751444189 total_trades 553 sharpe_ratio 0.65667243990705271 max_drawdown_pct 31.2017791838383 calmar_ratio 0.37470245126219165  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 1 violations (28 skipped)  v6diff: vsS:exit=0 peak_rss_kb=5737952 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=4 no_files=0 Panel_runner: snapshot cache hits=148024497 misses=20622 miss_absent=11423 evictions=0 n_symbols=9200 misses_per_symbol=2.24 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2510236728 maxrss_bytes=5875662848  (wall 7784s)
+[11-13 18:15:23Z] CELLS DONE k3
+[11-13 18:15:23Z] PARITY pb-S-k3-s0 vs rk-k3 actual.sexp differs
+[11-13 18:15:23Z] PARITY pb-S-k3-s0 vs rk-k3 trades.csv differs
+[11-13 18:15:23Z] PARITY pb-S-k3-s0 vs rk-k3 equity_curve.csv differs
+[11-13 18:15:23Z] ENTRIES pb-S-k3-s0: 676 placed, 8699 skipped
+[11-13 18:15:23Z] ENTRIES pb-P-k3-s0: 662 placed, 8434 skipped
