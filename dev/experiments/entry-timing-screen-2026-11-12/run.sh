@@ -6,7 +6,7 @@
 #   RUNDIR  holds rk-k{0..4}-s0-{trade_audit.sexp,trades.csv,equity_curve.csv} of record-kseed-2026-10-27
 #           (the audit is not committed; locally it is .sweep-output/record-kseed/)
 #   WORK    scratch directory for intermediates
-# Needs the CSV bar store at ./data. Rewrites results/ next to this script. ~2 minutes.
+# Needs the CSV bar store at ./data. Rewrites results/ next to this script. About 14 minutes in all.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd); L=$HERE/lib; RES=$HERE/results
 WALK=$HERE/../decision-walk-rk-2026-11-06/lib
@@ -105,3 +105,9 @@ awk -F'\t' -f "$L/rsum.awk" "$W/cashweeks.txt" "$W/reentry.tsv" > "$RES/reentry.
 awk -F'\t' -f "$L/rsum.awk" "$W/cashweeks.txt" "$W/reentry-nogate.tsv" > "$RES/reentry-nogate.txt"
 awk -F'\t' -f "$L/rrobust.awk" "$W/reentry-nogate.tsv" > "$RES/reentry-robustness.txt"
 echo "wrote follow-ups to $RES"
+
+# 5. sizing reads over the result CSVs (QC rework 1 of #3594; no bars): H2' split into its price and size channels,
+#    and F1's NAV at risk per trade at the run's position size.
+awk -F, -f "$L/sizing.awk" "$RES/replay-k0.csv" "$RES/replay-k1.csv" "$RES/replay-k2.csv" "$RES/replay-k3.csv" \
+  "$RES/replay-k4.csv" "$RES/floor.csv" > "$RES/sizing.txt"
+echo "wrote sizing.txt to $RES"

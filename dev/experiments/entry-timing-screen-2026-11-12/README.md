@@ -36,8 +36,10 @@ moving average matches the strategy's on every trade.
 - **Idea.** DIS was 21 % above its 30-week average when it was picked. Skip trades like that.
 - **Test.** Delete every trade above a cutoff (10 %, 15 %, 20 % … 50 % above the average, measured at the pick and
   at the fill) and add up what disappears.
-- **Result: worse at every cutoff, in all five runs.** At 20 % it removes about 100 trades per run. Together they
-  made +48 to +60, and they include 3–4 of the 8–10 trades per run that doubled.
+- **Result: worse at every cutoff measured at the pick, in all five runs.** At 20 % it removes about 100 trades per
+  run. Together they made +48 to +60, and they include 3–4 of the 8–10 trades per run that doubled.
+- **At the fill** it is worse from 10 % to 40 % in all five runs, and +0.6 to +1.7 at 50 %, where it skips only
+  14–15 trades per run (`summary.txt` H1′). That one corner sits next to −28 to −38 at 40 %.
 - **What went right.** The instinct about losers is correct. The further a stock had run, the more often the trade
   lost: win rate falls from 46 % to 12.5 %, and the median trade from −1.6 % to −11.4 %.
 - **What went wrong.** The few extended trades that win, win enormously. APPS made +526 % and BBWI +138 %; they
@@ -57,18 +59,29 @@ moving average matches the strategy's on every trade.
   old high, so the strategy's E sat *below* the recent high and the order filled on a dip or right away.
   Requiring a fresh new high meant paying more, and about a third of those orders never filled at all, which
   lost good trades.
+- **Already tested for real.** The flag was backtested on 10-03
+  (`dev/experiments/entry-anchor-recovery-2026-10-02/results-2026-10-03.md`): on the investor preset, every value
+  (4, 13 and 26 weeks) diluted in 3/3 salts in both 5-year windows. This screen reaches the same answer from the
+  per-trade side.
 
 ### H2′: only fix the stale price
 
 - **Idea.** Lower E only when it is stuck *above* the recent range, as with DIS (about 1 trade in 5): E′ = min(E,
   4-week high × 1.005). Otherwise leave it alone.
 - **Result: better in all five runs (+6.8 to +12.0, 2–5 % of realised P&L).** 78–90 trades per run better, 4–9
-  worse, mostly by buying the same stock a little cheaper or a little earlier.
-- **What went right.** It changes the price paid but not which stocks get bought, so the big winners are
-  untouched.
+  worse, mostly by buying the same stock a little cheaper or a little earlier, and in a larger size.
+- **Two channels: the price paid and the position size.** The replay sizes each ticket at 1 % NAV risk off its own
+  trigger, as the code does. A lower E with the same stop shortens the risk per share, so the capped ticket buys
+  more shares (median +10 %, p90 +28 %). Stopped losers still lose about 1 % of NAV; winners are larger. Of the
+  gain, the price paid is +2.7 to +6.5 per run and the larger position +3.0 to +7.7, so the size channel is
+  37–66 % of it (`sizing.txt`).
+- **What went right.** It changes the price paid and the position size, not which stocks get bought, so the big
+  winners are untouched. The price channel alone is positive in all five runs.
 - **What's uncertain.**
   - The replay can't see knock-on effects. Cash spent earlier might block another purchase, and a cheaper fill can
     change later rotation decisions.
+  - The size channel needs cash. The replay funds the larger positions freely; the real book is bound by the 70 %
+    exposure cap, the 30 % cash floor and rotation, so part of that half may not survive.
   - Orders that never filled at the old high would now fill: 17–24 per run. I estimated them separately with a
     proxy hold, and they came out about break-even (−0.9 to +5.7).
 - **DIS itself is not saved.** Its 4-week top was 36.75, so E′ is 36.93 instead of 37.12: the same fill day and
@@ -89,7 +102,7 @@ moving average matches the strategy's on every trade.
 
 The strategy's profit comes from a handful of huge winners, and they often look "too extended" when bought. Any
 rule that avoids extended stocks, or waits for a dip, also avoids those winners. The only fix that survived changes
-the price paid without changing which stocks get bought.
+the price paid and the position size, not which stocks get bought.
 
 This is the 07-12 entry-shape finding seen from a new angle (`memory/project_entry_shape_gates_no_build`: the big
 losers and the monsters are the same kind of ticket). It is also the trigger half of
@@ -107,6 +120,8 @@ screen narrows that to: only when the stale E is above the current range.
 | H1 band 30–60 % | −41.6 | −29.0 | −34.0 | −30.7 | −37.9 | `extra.txt` band |
 | H2 anchor N=4 vs null | −74.0 | −114.0 | −112.7 | −73.4 | −98.9 | `summary.txt` H2 (k0 90 % CI [−137.5, −19.0]) |
 | H2′ cap stale E vs null | +11.6 | +7.3 | +6.8 | +12.0 | +9.7 | `extra.txt` H2′ (k0 90 % CI [+2.2, +22.1]) |
+| of which the price paid | +3.9 | +4.4 | +2.7 | +6.5 | +6.1 | `sizing.txt` |
+| of which the larger position | +7.7 | +3.0 | +4.1 | +5.5 | +3.6 | `sizing.txt` |
 | H2′ never-filled tickets (proxy) | −0.9 | −0.8 | +5.7 | +0.2 | +5.1 | `unfilled.txt` |
 | H3 X=20 % m=8 %: real → pullback | 53.3 → 31.6 | 50.1 → 30.3 | 53.7 → 41.6 | 60.4 → 34.3 | 47.9 → 36.0 | `summary.txt` H3 |
 
@@ -139,6 +154,12 @@ The H3 row covers flagged trades only: the real P&L, then the pullback rule's (z
 - Sizing for every modelled P&L follows the code: value = min(1 % NAV / stop distance at the trigger, 14 % NAV).
   The model matches DIS's real P&L (−$10,371 vs −$10,382).
 
+**H2′ split (`lib/sizing.awk`, over `replay-k*.csv` only).** Price channel = `h2n4_pnl` × shares(null) /
+shares(E′): the capped fill and exit at the null's share count. Size channel = the rest. The shares come from the row
+itself: E = `E_over_fill`, E′ = `rt4_over_fill` × 1.005, and the stop from `value_over_nav` (stop distance =
+0.01 / `value_over_nav` below the 14 % cap). The rebuilt stop reproduces `null_pnl` and `h2n4_pnl` from their R
+columns on all 500 stale rows (largest relative error 2e-5, CSV rounding).
+
 **Never-filled tickets (`lib/unfilled.awk`).** For tickets the code placed but never filled, with E above the
 4-week high: does the capped E′ fill within 52 weeks? If so, they are held with the installed stop for up to 26
 weeks. This is a proxy, since the code's result there is 0.
@@ -159,6 +180,7 @@ weeks. This is a proxy, since the code's result there is 0.
      X = 20 %: the skipped cohort's own mean is about the average trade's, and the lost tail remains.
    - H3 is scored only on flagged trades whose E-ticket eventually filled. That is a stronger subset than all
      extended screens, so the bias favours H3, and H3 still loses.
+   - For H2′ the gap includes its size channel (37–66 % of the gain): the replay funds the larger positions freely.
 2. **Distributions.** `why.txt` gives n, mean and p10/p25/median/p75/p90 per extension bucket, per-trade H2
    deltas by E position, and the H3 filled-vs-control distribution.
    - H1's buckets differ in the tail, not the middle. The median trade worsens monotonically with extension, while
@@ -176,8 +198,9 @@ weeks. This is a proxy, since the code's result there is 0.
    The sample is the trades the code took. Tickets it never filled are covered for H2′ (`unfilled.txt`); names it
    never screened are not covered.
 5. **Surface.** H1: X ∈ {10, 15, 20, 25, 30, 40, 50 %} at the screen and at the fill, plus 15 band cells. H2: N ∈
-   {2, 4, 8, 13}. H3: X × m ∈ {7 values} × {3 %, 8 %}. Signs are stable across each surface, except H1's band cells
-   (see the trap above).
+   {2, 4, 8, 13}. H3: X × m ∈ {7 values} × {3 %, 8 %}. Signs are stable across each surface, except two H1
+   corners: the band cells (see the trap above), and the fill-based cut at X = 50 %, which is +0.6 to +1.7 in 5/5
+   seeds on 14–15 trades, next to −28 to −38 at 40 %. Neither changes the H1 verdict.
 6. **Paired, event-level.** H2/H2′ are paired with the null per trade (better/worse counts in `extra.txt`); H3 is
    paired with its control. DIS, APPS and BBWI are traced (`extra.txt` lists every ≥ +100 % trade with its
    extension).
@@ -194,8 +217,16 @@ weeks. This is a proxy, since the code's result there is 0.
   `memory/project_edge_is_the_fat_tail` and `memory/project_entry_shape_gates_no_build`. This is not "the mechanism
   cannot work". The mechanism of failure is structural: all three change **which** names fill, and the names they
   drop carry the right tail.
+  - H1 and H3 are new rules, and nothing is built for them.
+  - H2 is the existing flag `entry_anchor_local_range_weeks` (default off). Classification: REJECT-as-default /
+    keep-as-axis, as the flag inventory (`dev/notes/mechanism-flag-inventory-2026-08-09.md`) lists it. A screen
+    cannot earn do-not-revive, so this verdict does not make the flag retirement-eligible. The screen re-derives
+    the flag's real test of 10-03 (`dev/experiments/entry-anchor-recovery-2026-10-02/results-2026-10-03.md`), where
+    every value diluted in 3/3 salts in both windows.
 - **H2′: escalate.** Build a default-off flag that caps E at the current range top only when E is above it, then
   run a K = 5 paired 26y comparison on the record config.
+  - The paired test must report the split between the price and the size channel: per-arm position value and
+    exposure, or a price-only sizing variant that keeps the null's share count.
   - Faithfulness: book §4.7 anchors the buy-stop at the top of the *current* trading range. This is an entry-level
     dial (W2), and the spine is intact.
   - Nothing here promotes it.
@@ -207,6 +238,8 @@ weeks. This is a proxy, since the code's result there is 0.
   the RS benchmark (charts only).
 - `lib/validate.awk`, `lib/summarize.awk`, `lib/why.awk`, `lib/extra.awk`: the result tables.
 - `lib/unfilled_specs.awk`, `lib/unfilled.awk`: never-filled tickets under the cap.
+- `lib/sizing.awk` (`run.sh` step 5, over the result CSVs only): H2′ split into its price and size channels, and
+  F1's NAV at risk per trade. Output `results/sizing.txt`.
 - `results/replay-k{0..4}.csv`: one row per trade per seed, with every counterfactual. `results/unfilled.csv`: never-filled
   tickets. The text files are the tables quoted above.
 
@@ -243,7 +276,8 @@ the other way: k0's `No_structural_stop` skips that the book's stop would turn i
 **Result: it removes the big winners.**
 
 - **The book's floor is more than 15 % below the code's E on most trades.** In k0 at N=13, M=4 that is 443 of 545
-  (81 %). The gate drops them, including 6 of k0's 8 doubling trades:
+  (81 %). The gate drops them, including 6 of the 8 doubling trades in k0's replayed set (k0's ninth, ADSK 2003,
+  fails the basis check and is not replayed):
 
   | trade | result | book stop below E |
   |---|---:|---:|
@@ -261,7 +295,9 @@ the other way: k0's `No_structural_stop` skips that the book's stop would turn i
   - The gain rests on STRP 2017 (a Verizon/AT&T bidding war, +24.1 NAV-% in k0) and GME 2020 (the squeeze, +13.0).
   - Deeper stops turned small losses into large ones: FMI 2015 −1.1 → −7.4, PYX 2018 −1.9 → −6.7, SIRI 2023
     −1.7 → −6.0, and CVNA Dec 2025.
-  - It also implies 5–7 % of NAV at risk per trade, which the book's 15 % rule exists to prevent.
+  - It also puts about 2.4 % of NAV at risk per trade on average, against the record's 1 %, and 5 % or more on 22
+    of k0's 524 trades with a book stop (`sizing.txt`: `value_over_nav` in `replay-k0.csv` × `n13m4_stop_dist` in
+    `floor.csv`). The FMI, PYX and SIRI losses are that tail, which the book's 15 % rule exists to prevent.
 - **Converted skips (k0):** 1,264 fills on a 26-week proxy hold. The proxy is calibrated on the run's own entries:
   +245 NAV-% against +260 realised.
 
@@ -274,8 +310,8 @@ the other way: k0's `No_structural_stop` skips that the book's stop would turn i
 
 **Why.** A book-literal floor plus the 15 % rule only admits stocks still near their base. The record's money comes
 from stocks bought after they have run, where the only stop within 15 % is a dip inside the run. The post-breakout
-floor is what lets the code buy extended leaders at all. Fixing it is equivalent to H1 (skip extended entries),
-which lost.
+floor is what lets the code buy extended leaders at all. Fixing it points the same way as H1 (skip extended
+entries), which lost, but cuts much deeper: the gate drops 81 % of k0's trades, against about 18 % for H1 at 20 %.
 
 **Verdict: no-build** at the tested surface. The book-floor trades have a better median and fewer losers. That is
 worth remembering if the goal ever becomes steadier returns rather than maximum return, but that is a different
@@ -297,9 +333,10 @@ distance all point the same way for losers and for monsters. AUC(+50 %) / AUC(lo
 | MA slope | 0.60 | 0.55 |
 | book-floor distance | 0.62 | 0.55 |
 
-The hottest quintile has the worst win rate (28–30 %) and the worst median (about −7 %), but the most +50 % trades,
-with flat-to-higher NAV-% per trade. The calmest quintile wins most often (46–48 %) and has 4–6 +50 % trades. The
-other features show nothing consistent.
+The hottest quintile has the worst win rate (28–35 %) and the worst median (−5 to −8 %), but 10–13 +50 % trades,
+about the most (book-floor distance's Q4 has 14). Its NAV-% per trade beats the calmest quintile's for extension, RS and MA slope, but not
+for book-floor distance (+0.27 against +0.48). The calmest quintile wins most often (46–48 %) and has 4–6 +50 %
+trades. The other features show nothing consistent.
 
 There are only 13 trades of +100 % in 26 years (40 of +50 %), too few to validate any multivariate model.
 
@@ -342,8 +379,8 @@ the same kind of ticket.
 | entry features | measure heat (risk), not quality |
 | R1 | finds no edge outside one squeeze |
 
-Only H2′, which changes the price paid without changing which names fill, survives. The DIS/TWX1/SFAM losses are
-the premium the strategy pays to own APPS and MMYT.
+Only H2′, which changes the price paid and the position size, not which names fill, survives. The DIS/TWX1/SFAM
+losses are the premium the strategy pays to own APPS and MMYT.
 
 ### Follow-up files
 
@@ -353,6 +390,7 @@ the premium the strategy pays to own APPS and MMYT.
   - `lib/conv_events.awk`, `lib/conv.awk`, `lib/csum.awk`: k0 conversions.
   - `lib/features.awk`, `lib/quint.awk`: the feature scan.
   - `lib/reentry.awk`, `lib/rsum.awk`, `lib/rrobust.awk`: R1.
+  - `lib/sizing.awk` (step 5): F1's NAV at risk per trade, in `sizing.txt`.
 - Results:
   - `floor-cells.txt`, `floor-samesize.txt`, `floor-conversions.txt`, `features.txt`, `reentry.txt`,
     `reentry-nogate.txt`, `reentry-robustness.txt`.
