@@ -1,0 +1,27 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
+== Measurement 1: how often the band order binds (README §Measurements) ==
+screened dates 99 | longs macro-blocked 0 | longs open 99 (2000-12 0, 2013-26 99)
+cap binds (pool > 20): 24 = 24.2 % of open dates (2000-12 n/a, 2013-26 24.2 %)
+  of which the cut falls inside a score tie: 20 (83.3 % of binding); the tie spans >1 band: 12 (50.0 %)
+top-20 set changes: 10 = 10.1 % of open dates, 41.7 % of binding dates (L1)
+  by half: 2000-12 n/a of binding, 2013-26 41.7 % of binding
+top-20 order changes (set or sequence): 47 = 47.5 % of open dates
+funded prefix changes (S ranks 1..last placed vs P's first as many): 5 of 34 dates with a placement (14.7 %)
+names swapped at the cut: 13 each way; per changed date mean 1.30 | changed dates by swaps 1 9, 2 0, 3 0, 4 1, 5 0, 6+ 0
+swaps at the cut by band: <$8  $8-14  $14-33  >=$33
+  swapped out          0     0     0    13
+  swapped in           0     0    13     0
+== Measurement 2: the funded tickets the order re-draws on this path, and what they are worth (README §Measurements) ==
+S's top-20 names by band (open dates): admitted / walked (post-cut gates passed) / placed / fundable = Q
+  <$8          2 /      2 (100.0 %) /     0 (0.0 %) /     0  Q = 0.0000
+  $8-14       28 /     27 (96.4 %) /     0 (0.0 %) /     1  Q = 0.0357
+  $14-33     133 /    128 (96.2 %) /     2 (1.5 %) /     4  Q = 0.0301
+  >=$33      970 /    963 (99.3 %) /    51 (5.3 %) /    61  Q = 0.0629
+model check: the funding model run on S's own order reproduces S's placed set on 82 of 83 open dates with a pool (98.8 %); S's walk ran out of cash on 6 of them
+fill ratio = entries 43 / placed tickets 53 = 0.811
+  <$8     expected tickets re-drawn in    0.00 out    0.00   r = 0.0804
+  $8-14   expected tickets re-drawn in    0.00 out    0.00   r = 0.0461
+  $14-33  expected tickets re-drawn in    0.39 out    0.00   r = 0.0097
+  >=$33   expected tickets re-drawn in    1.00 out    2.00   r = 0.0089
+re-drawn tickets: in 1.4, out 2.0 (0.73 a year over 1.9 screened years); by channel: cut dates in 0.4 / out 1.0, order-only dates in 1.0 / out 1.0
+E_net = fill x sum over bands of (in - out) x r = -0.004 expected net >= +100 % trades over the window (L2)

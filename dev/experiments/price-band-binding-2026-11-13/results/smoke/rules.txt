@@ -1,0 +1,5 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
+Rule 1 inputs: L1 0.4167 (bar 0.25) | L2 E_net -0.004 (bars 0.75 / 1.5) | T ratio 99.000 (bars 1.0 / 1.5), in>out 2000-12 0, 2013-26 1, monsters 2 (min 20), ride diff +0.1197
+Rule 1 (tiebreak), mechanical: CLOSE-AXIS (the order does not bind enough to move the tail)
+Rule 2 inputs: exact-week hits none | window hits none | cheap monsters with a cascade row 0 (min 30)
+Rule 2 (sub-gate), mechanical: NOTHING

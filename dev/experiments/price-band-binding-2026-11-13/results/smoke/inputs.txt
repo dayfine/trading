@@ -1,0 +1,7 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
+# inputs of this read
+SEED=0 CAP=20 EVENTS=surfaced STORE_END=2026-05-01
+candidates.sexp md5 10c80f70508e444c275aaf828bcdbc04 bytes 13004988
+trade_audit.sexp md5 1d6c6f26672a6d44b2fb633c6559e661
+trades.csv md5 dcb8e99dfe7b9ee23bce2e5674876dd1
+screened dates 99, Long rows 36521, pool rows 1329, walk rows 1120, entries 43, screen events 1827

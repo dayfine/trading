@@ -1,0 +1,55 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
+== Measurement 4: the population screen's breakouts in this run's cascade (README §Measurements) ==
+events in the screened weeks: 210; by band (all / monster): <$8 0/0, $8-14 0/0, $14-33 21/3, >=$33 189/16
+
+-- exact-week view: share of the band's events (monster | all) --
+class                  | <$8               | $8-14             | $14-33            | >=$33            
+ADMITTED               |    n/a     n/a    |    n/a     n/a    |  33.3%   14.3%    |  31.2%   12.2%   
+TOP_N                  |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+GRADE                  |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+SECTOR                 |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Price_floor        |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Stage_setup        |    n/a     n/a    |    n/a     n/a    |  66.7%   71.4%    |  50.0%   68.3%   
+BRK_Breakout_volume    |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.5%   
+BRK_Rs_declining       |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Failed_breakout    |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Volume_band        |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+NOT_SURFACED           |    n/a     n/a    |    n/a     n/a    |   0.0%   14.3%    |  18.8%   19.0%   
+MACRO_BLOCKED          |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+NO_SCREEN              |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+
+-- exact view: breakout sub-gates among events with a cascade row (monster share, all share, lift = M/A) --
+sub-gate               | < $14 (cheap)                  | $14-33                         | >= $33                        
+BRK_Price_floor        | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Stage_setup        | M   0.0 % A   0.0 % lift 0.00 | M  66.7 % A  83.3 % lift 0.80 | M  61.5 % A  84.3 % lift 0.73
+BRK_Breakout_volume    | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.7 % lift 0.00
+BRK_Rs_declining       | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Failed_breakout    | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Volume_band        | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+events with a cascade row: cheap monster 0, cheap all 0; $14-33 3 / 18; >= $33 13 / 153
+
+-- best of weeks 0..+4 view: share of the band's events (monster | all) --
+class                  | <$8               | $8-14             | $14-33            | >=$33            
+ADMITTED               |    n/a     n/a    |    n/a     n/a    |  33.3%   23.8%    |  37.5%   14.3%   
+TOP_N                  |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+GRADE                  |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+SECTOR                 |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Price_floor        |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Stage_setup        |    n/a     n/a    |    n/a     n/a    |  66.7%   71.4%    |  56.2%   73.0%   
+BRK_Breakout_volume    |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.5%   
+BRK_Rs_declining       |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Failed_breakout    |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Volume_band        |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+NOT_SURFACED           |    n/a     n/a    |    n/a     n/a    |   0.0%    4.8%    |   6.2%   12.2%   
+MACRO_BLOCKED          |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+NO_SCREEN              |    n/a     n/a    |    n/a     n/a    |   0.0%    0.0%    |   0.0%    0.0%   
+
+-- window view: breakout sub-gates among events with a cascade row (monster share, all share, lift = M/A) --
+sub-gate               | < $14 (cheap)                  | $14-33                         | >= $33                        
+BRK_Price_floor        | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Stage_setup        | M   0.0 % A   0.0 % lift 0.00 | M  66.7 % A  75.0 % lift 0.89 | M  60.0 % A  83.1 % lift 0.72
+BRK_Breakout_volume    | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.6 % lift 0.00
+BRK_Rs_declining       | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Failed_breakout    | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Volume_band        | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+events with a cascade row: cheap monster 0, cheap all 0; $14-33 3 / 20; >= $33 15 / 166
