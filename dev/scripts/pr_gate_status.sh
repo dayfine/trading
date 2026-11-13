@@ -213,8 +213,8 @@ _is_docs_only() {
 
 # A PR is results-only (ONE gate, qc-results, per pr-merge-gates.md
 # "Results-only PRs") when every path is under dev/experiments/ (the ledger
-# included) and every file is an experiment artifact: sexp / csv / sh / awk /
-# log / rss / txt / json, or md. Tested AFTER _is_docs_only, so an
+# included) and every file is an experiment artifact: sexp / csv / tsv /
+# sh / awk / log / rss / txt / json, or md. Tested AFTER _is_docs_only, so an
 # experiment README-only change still classifies as docs-only. Any path
 # outside dev/experiments/, or any other extension (an .ml, a dune file, a
 # golden under trading/test_data/), takes the full three gates -- the lane
@@ -231,7 +231,7 @@ _is_results_only() {
       *) return 1 ;;
     esac
     case "$f" in
-      *.md|*.sexp|*.csv|*.sh|*.awk|*.log|*.rss|*.txt|*.json) ;;
+      *.md|*.sexp|*.csv|*.tsv|*.sh|*.awk|*.log|*.rss|*.txt|*.json) ;;
       *) return 1 ;;
     esac
   done

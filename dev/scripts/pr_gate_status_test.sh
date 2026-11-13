@@ -2042,6 +2042,8 @@ check "curl comment backend reads issue endpoint" \
 # --- results-only lane (pr-merge-gates.md "Results-only PRs") ---------------
 check "results-only: experiment artifacts under dev/experiments" yes "$(
   _is_results_only "dev/experiments/x-2026-09-21/README.md dev/experiments/x-2026-09-21/specs/a.sexp dev/experiments/x-2026-09-21/results/s0-trades.csv dev/experiments/x-2026-09-21/chain.sh dev/experiments/x-2026-09-21/funnel.awk dev/experiments/_ledger/2026-09-21-x.sexp" && echo yes || echo no)"
+check "results-only: a tab-separated extract (entries.tsv) is an experiment artifact" yes "$(
+  _is_results_only "dev/experiments/x/results/k0/a-s0-entries.tsv dev/experiments/x/results/k0/a-s0-trades.csv" && echo yes || echo no)"
 check "results-only: a code file outside dev/experiments takes three gates" no "$(
   _is_results_only "dev/experiments/x/README.md trading/trading/weinstein/screener/lib/screener.ml" && echo yes || echo no)"
 check "results-only: a golden fixture is not an experiment artifact" no "$(

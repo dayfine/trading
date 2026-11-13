@@ -93,7 +93,7 @@ malformed sexp in fixtures, magic numbers in code examples, etc.).
 
 A PR is **results-only** if every path is under `dev/experiments/` (the
 `_ledger/` included) **and** every file is an experiment artifact or record:
-`*.sexp`, `*.csv`, `*.log`, `*.rss`, `*.txt`, `*.json`, `*.md`, `*.sh`,
+`*.sexp`, `*.csv`, `*.tsv`, `*.log`, `*.rss`, `*.txt`, `*.json`, `*.md`, `*.sh`,
 `*.awk`. `pr_gate_status.sh` tests docs-only first, so an experiment
 README-only change stays docs-only; a results-only PR shows `STRUCT=skip`
 and its NEXT-ACTION reads `dispatch qc-results` / `MERGE (results-only)`.
