@@ -1,0 +1,42 @@
+OK   G check failed
+     COMBINED: G INVALID (the G check failed; C's outcome ESCALATE stands alone, G reads are information only, no channel is named)
+OK   G NOT LIVE
+     COMBINED: G INVALID (G vs S is NOT LIVE; C's outcome ESCALATE stands alone, G reads are information only, no channel is named)
+OK   fewer than 4 G seeds
+     COMBINED: G INVALID (fewer than 4 valid G seeds (3); C's outcome ESCALATE stands alone, G reads are information only, no channel is named)
+OK   both pass, admissions add
+     COMBINED: BOTH PASS (candidate: the cap as built (C); the lever alone clears the bar, and C vs G says the admissions add to it; A without its 3 largest keys <= 0 in 2 of 5 valid seeds (reported for C's candidacy: it changes neither the row nor the candidate))
+OK   both pass, unresolved
+     COMBINED: BOTH PASS (candidate: the cap as built (C); the lever alone clears the bar, and C vs G is unresolved, so it does not show the admissions taking it back; A without its 3 largest keys <= 0 in 2 of 5 valid seeds (reported for C's candidacy: it changes neither the row nor the candidate))
+OK   both pass, admissions cost
+     COMBINED: BOTH PASS (candidate: the cap with the uncapped gate (G); C vs G says the admissions cost; A without its 3 largest keys <= 0 in 2 of 5 valid seeds (reported for C's candidacy: it changes neither the row nor the candidate))
+OK   both pass, A count printed
+     COMBINED: BOTH PASS (candidate: the cap as built (C); the lever alone clears the bar, and C vs G says the admissions add to it; A without its 3 largest keys <= 0 in 4 of 5 valid seeds (reported for C's candidacy: it changes neither the row nor the candidate))
+OK   lever, C fails drawdown, admissions add
+     COMBINED: LEVER, NOT ADMISSIONS (G passes and C (INCONCLUSIVE, median clears the bar but maxDD gap 4.20 pp above the 3.0 pp bar) does not; C vs G: admissions add; candidate: the cap with the uncapped gate (G); C's own outcome stands for the flag as built; C's admissions added at least the bar over G, but C failed its own bar, so the gain does not make C a candidate)
+OK   lever, C fails trim3, admissions add
+     COMBINED: LEVER, NOT ADMISSIONS (G passes and C (INCONCLUSIVE, median clears the bar but trim3 > 0 in only 3 of 5 seeds) does not; C vs G: admissions add; candidate: the cap with the uncapped gate (G); C's own outcome stands for the flag as built; C's admissions added at least the bar over G, but C failed its own bar, so the gain does not make C a candidate)
+OK   lever, C fails sign count, admissions add
+     COMBINED: LEVER, NOT ADMISSIONS (G passes and C (INCONCLUSIVE, median clears the bar but delta > 0 in only 3 of 5 seeds) does not; C vs G: admissions add; candidate: the cap with the uncapped gate (G); C's own outcome stands for the flag as built; C's admissions added at least the bar over G, but C failed its own bar, so the gain does not make C a candidate)
+OK   lever, add: the gain does not make C a candidate
+     COMBINED: LEVER, NOT ADMISSIONS (G passes and C (INCONCLUSIVE, median clears the bar but maxDD gap 4.20 pp above the 3.0 pp bar) does not; C vs G: admissions add; candidate: the cap with the uncapped gate (G); C's own outcome stands for the flag as built; C's admissions added at least the bar over G, but C failed its own bar, so the gain does not make C a candidate)
+OK   lever, admissions cost
+     COMBINED: LEVER, NOT ADMISSIONS (G passes and C (KEEP-AXIS) does not; C vs G: admissions cost; candidate: the cap with the uncapped gate (G); C's own outcome stands for the flag as built; the admissions cost the lever's gain)
+OK   lever, unresolved
+     COMBINED: LEVER, NOT ADMISSIONS (G passes and C (KEEP-AXIS) does not; C vs G: unresolved; candidate: the cap with the uncapped gate (G); C's own outcome stands for the flag as built; the admissions neither clearly add nor cost: they bury the lever's gain in noise, or C fails for another reason)
+OK   admissions, G fails trim3, admissions cost
+     COMBINED: ADMISSIONS (C passes and G (INCONCLUSIVE, median clears the bar but trim3 > 0 in only 3 of 5 seeds) does not; C vs G: admissions cost; C's ESCALATE stands under its rule, but the lever, not the admissions, carries the gain: G beat C by at least the bar and failed its own bar, so no candidate is named and the call between C and G goes to the user with both outcomes; A without its 3 largest keys <= 0 in 1 of 5 valid seeds)
+OK   admissions cost names G's failed bar
+     COMBINED: ADMISSIONS (C passes and G (INCONCLUSIVE, median clears the bar but trim3 > 0 in only 3 of 5 seeds) does not; C vs G: admissions cost; C's ESCALATE stands under its rule, but the lever, not the admissions, carries the gain: G beat C by at least the bar and failed its own bar, so no candidate is named and the call between C and G goes to the user with both outcomes; A without its 3 largest keys <= 0 in 1 of 5 valid seeds)
+OK   admissions, admissions add
+     COMBINED: ADMISSIONS (C passes and G (KEEP-AXIS) does not; C vs G: admissions add; C's ESCALATE stands under its rule, and the gain rides on the admissions, read as a stop-gate change against the stop-width history; A without its 3 largest keys <= 0 in 1 of 5 valid seeds)
+OK   admissions, unresolved
+     COMBINED: ADMISSIONS (C passes and G (KEEP-AXIS) does not; C vs G: unresolved; C's ESCALATE stands under its rule, but this run cannot say the screen's lever carries it, read as a stop-gate change against the stop-width history; A without its 3 largest keys <= 0 in 1 of 5 valid seeds)
+OK   admissions, three-largest-keys flag
+     COMBINED: ADMISSIONS (C passes and G (INCONCLUSIVE, median clears the bar but trim3 > 0 in only 3 of 5 seeds) does not; C vs G: unresolved; C's ESCALATE stands under its rule, but this run cannot say the screen's lever carries it, read as a stop-gate change against the stop-width history; A without its 3 largest keys <= 0 in 3 of 5 valid seeds: FLAG to the user with the ESCALATE, before any promotion work)
+OK   admissions, no flag below 3
+     COMBINED: ADMISSIONS (C passes and G (INCONCLUSIVE, median clears the bar but trim3 > 0 in only 3 of 5 seeds) does not; C vs G: unresolved; C's ESCALATE stands under its rule, but this run cannot say the screen's lever carries it, read as a stop-gate change against the stop-width history; A without its 3 largest keys <= 0 in 2 of 5 valid seeds)
+OK   neither passes
+     COMBINED: NEITHER PASSES (C: KEEP-AXIS, G: KEEP-AXIS; each arm's own outcome applies to its configuration)
+OK   provisional (unmarked open-leg keys)
+     COMBINED: BOTH PASS (candidate: the cap as built (C); the lever alone clears the bar, and C vs G says the admissions add to it; A without its 3 largest keys <= 0 in 0 of 5 valid seeds (reported for C's candidacy: it changes neither the row nor the candidate))  PROVISIONAL: an open-leg key has no mark

@@ -1,0 +1,14 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises,entry_anchor,dividends_received
+TWX1,LONG,2000-01-28,2000-02-22,25,80.60,74.71,1775,-10452.27,-7.31,74.76,74.76,stop_loss,Stage2,8.2380,0.0539,intraday,25,108,TWX1-wein-83,0.0725,74.76,0,breakout,0.00
+TRW1,LONG,2000-03-27,2000-05-25,59,58.34,49.78,1178,-10088.97,-14.68,49.80,49.80,stop_loss,Stage2,3.2442,0.1446,intraday,59,95,TRW1-wein-90,0.1464,49.80,0,breakout,0.00
+STT,LONG,2000-04-10,2000-04-14,4,95.82,88.20,1359,-10356.87,-7.95,88.38,88.38,stop_loss,Stage2,2.3244,0.0768,intraday,4,105,STT-wein-94,0.0776,88.38,0,breakout,0.00
+SFAM,LONG,2000-02-07,2000-03-30,52,21.00,18.25,3869,-10639.75,-13.10,18.36,18.36,stop_loss,Stage2,3.8163,0.1249,gap_down,52,95,SFAM-wein-87,0.1257,18.36,0,breakout,0.00
+PENN,LONG,2000-04-17,2000-09-05,141,10.62,13.81,13002,41428.27,29.99,10.20,10.20,laggard_rotation,Stage2,2.1100,0.0213,non_stop_exit,,105,PENN-wein-96,0.0400,10.20,0,breakout,0.00
+MOND_old,LONG,2000-09-11,2000-10-10,29,42.50,37.66,2361,-11438.03,-11.40,37.68,37.68,stop_loss,Stage2,2.0431,0.1126,intraday,29,95,MOND_old-wein-102,0.1134,37.68,0,breakout,0.00
+FR,LONG,2000-04-25,2000-08-14,111,28.41,31.00,2850,7378.91,9.11,24.88,24.88,laggard_rotation,Stage2,3.1007,0.1238,non_stop_exit,,95,FR-wein-84,0.1245,24.88,0,breakout,0.00
+ELGX,LONG,2000-09-05,2000-09-27,22,13.07,11.52,7450,-11548.84,-11.86,11.34,11.63,stop_loss,Stage2,4.7023,0.1148,gap_down,22,85,ELGX-wein-101,0.1321,11.63,1,breakout,0.00
+DIS,LONG,2000-01-25,2000-02-25,31,37.23,31.91,1949,-10382.16,-14.31,31.98,31.98,stop_loss,Stage2,2.1988,0.1385,intraday,31,95,DIS-wein-85,0.1411,31.98,0,breakout,0.00
+BSC_old,LONG,2000-07-24,2000-11-13,112,48.78,55.00,1931,12017.77,12.76,42.36,47.88,laggard_rotation,Stage2,1.6203,0.1142,non_stop_exit,,100,BSC_old-wein-99,0.1315,47.88,2,breakout,0.00
+BKI_old,LONG,2000-03-30,2000-09-21,175,18.01,21.60,3991,14310.59,19.91,15.42,21.63,stop_loss,Stage2,2.7220,0.1414,intraday,175,95,BKI_old-wein-88,0.1439,21.63,4,breakout,0.00
+ATLC,LONG,2000-09-18,2000-10-13,25,45.10,41.31,3617,-13727.67,-8.41,41.40,41.40,stop_loss,Stage2,2.7462,0.0638,intraday,25,95,ATLC-wein-103,0.0821,41.40,0,breakout,0.00
+AMSY,LONG,2000-04-03,2000-04-17,14,37.16,35.44,3864,-6648.40,-4.63,35.88,35.88,stop_loss,Stage2,2.4270,0.0151,gap_down,14,95,AMSY-wein-89,0.0344,35.88,0,breakout,0.00
