@@ -20,6 +20,11 @@
  (libraries stock_analysis weinstein_types core ounit2 matchers))
 
 (test
+ (name test_stale_entry_cap)
+ (modules test_stale_entry_cap)
+ (libraries stock_analysis core ounit2 matchers))
+
+(test
  (name test_stock_analysis_e2e)
  (modules test_stock_analysis_e2e)
  (libraries

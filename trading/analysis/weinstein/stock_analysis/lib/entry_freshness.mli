@@ -84,12 +84,15 @@ val range_top_freshness :
     fresh from, and the armed basis admits nothing (never falls back to the
     MA-cross window — the two clocks are alternatives, not a disjunction).
 
-    {b The anchor must be the ticket anchor.} Callers pass
-    [Stock_analysis.t.local_range_top], the same level the screener anchors
+    {b The anchor must be the ticket anchor.} Callers pass the replace anchor
+    over [entry_anchor_local_range_weeks], the same level the screener anchors
     [suggested_entry] at, so the freshness test and the resting order can never
     drift apart (plan §6, last bullet). With
     [entry_anchor_local_range_weeks = 0] there is no anchor and the armed basis
-    is inert.
+    is inert. The one exception is the stale-entry cap
+    ([entry_cap_local_range_weeks], {!Stale_entry_cap}). It may lower the ticket
+    below this anchor, and it is deliberately not passed here, so arming it
+    never moves admission.
 
     {b Not the continuation / pullback buy.} There is deliberately no "already
     broke out N weeks ago" disjunct: that shape is the book's second-chance

@@ -35,3 +35,17 @@ val scan_min_low :
     with the same stop conditions. [get_low] is consumed via the Resistance
     callback bundle, which labels its index [~bar_offset]; both conventions mean
     "offset back from the newest bar". *)
+
+val scan_recent_max_high :
+  get_high:(week_offset:int -> float option) ->
+  get_split_factor:(week_offset:int -> float option) ->
+  weeks:int ->
+  float option
+(** {!scan_max_high} over the most recent [weeks] bars — offsets
+    [0 .. weeks - 1], the current bar included: the "current trading range" the
+    book anchors the buy-stop above (weinstein-book-reference.md §4.7). [None]
+    when [weeks <= 0] (the knob that sets it is off) or no bar in the window has
+    a defined high. Same split-boundary truncation as {!scan_max_high}, so a
+    shorter window's result never exceeds a longer one's. Backs both the replace
+    anchor ([entry_anchor_local_range_weeks]) and the stale-entry cap
+    ([entry_cap_local_range_weeks], {!Stale_entry_cap}). *)

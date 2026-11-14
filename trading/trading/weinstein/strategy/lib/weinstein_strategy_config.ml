@@ -116,6 +116,7 @@ type config = {
   sim_entry_trigger_at_suggested : bool; [@sexp.default false]
       (** See [.mli]. *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
+  entry_cap_local_range_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
   entry_freshness_basis : Entry_freshness.basis;
       [@sexp.default Entry_freshness.Ma_cross]
       (** See [.mli]. *)
@@ -162,12 +163,11 @@ type config = {
 }
 [@@deriving sexp]
 
-(* Top-level so [default_config] stays a flat literal (nesting linter). *)
+(* Top-level: keeps [default_config] a flat literal. *)
 let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
-(* Promoted-bundle screening config (2026-07-23): standard defaults with the
-   continuous overhead-supply weight armed. Pairs with [overhead_supply = Some
-   Resistance_supply.default_config] in [default_config]; both must be armed. *)
+(* Promoted-bundle (2026-07-23) screener defaults with the overhead-supply
+   weight armed; pairs with [overhead_supply] in [default_config]. *)
 let _default_screening_config =
   {
     Screener.default_config with
@@ -178,8 +178,7 @@ let _default_screening_config =
       };
   }
 
-(* Flat record literal, one line per field (no logic); OCaml has no partial
-   record literals. @large-function: flat default-config record literal *)
+(* @large-function: flat default-config record literal, one line per field *)
 let default_config ~universe ~index_symbol =
   {
     universe;
@@ -258,6 +257,7 @@ let default_config ~universe ~index_symbol =
     enable_sim_entry_stoplimit = true;
     sim_entry_trigger_at_suggested = false;
     entry_anchor_local_range_weeks = 0;
+    entry_cap_local_range_weeks = 0;
     entry_freshness_basis = Entry_freshness.Ma_cross;
     stop_anchor_at_entry_base = false;
     continuation_stop_at_pullback_low = false;

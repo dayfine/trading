@@ -519,7 +519,10 @@ type scored_candidate = {
             It outranks [local_range_top] because it is the pattern's own
             breakout level, whereas [local_range_top] includes the current
             (breakout) bar and so sits above the close.
-          + {b local range}: [analysis.local_range_top] when [Some].
+          + {b local range}: [analysis.local_range_top] when [Some]. That is the
+            replace anchor, or the stale-entry cap's level when the cap bound
+            ({!Stale_entry_cap}, which lowers a graded top sitting above the
+            current trading range).
           + {b default}: [breakout_price] (or the MA-based fallback).
 
           A {b short} candidate (#3131) anchors at [analysis.breakdown_price]

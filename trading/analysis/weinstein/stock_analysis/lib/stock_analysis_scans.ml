@@ -98,3 +98,9 @@ let scan_min_low ~get_low ~get_split_factor ~base_end_offset ~base_lookback :
         | Some l -> loop (off + 1) (_min_opt best l)
     in
     loop base_end_offset None
+
+(** {!scan_max_high} over the most recent [weeks] bars (offsets
+    [0 .. weeks - 1]); [None] when [weeks <= 0] (empty range). *)
+let scan_recent_max_high ~get_high ~get_split_factor ~weeks : float option =
+  scan_max_high ~get_high ~get_split_factor ~base_end_offset:0
+    ~base_lookback:weeks

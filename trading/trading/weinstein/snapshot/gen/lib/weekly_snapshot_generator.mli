@@ -125,6 +125,17 @@ type inputs = {
 }
 (** Everything {!generate} needs to assemble one snapshot. *)
 
+val stock_analysis_config : Weinstein_strategy.config -> Stock_analysis.config
+(** [stock_analysis_config config] is the per-stock analysis config {!generate}
+    screens with: {!Stock_analysis.default_config} with the strategy config's
+    ticket-level knobs threaded in. Those are [overhead_supply], the replace
+    anchor [entry_anchor_local_range_weeks], the stale-entry cap
+    [entry_cap_local_range_weeks] ({!Stale_entry_cap}) and the F1
+    [entry_freshness_basis]. Each defaults to the no-op, so the weekly report
+    stays bit-identical when unarmed. It is the weekly-report counterpart of the
+    simulator's [Weinstein_strategy.stock_analysis_config_for] for these knobs.
+    Exposed so the threading is testable. *)
+
 val generate : inputs -> Weekly_snapshot.t
 (** [generate inputs] runs the cascade and returns the assembled snapshot.
 
