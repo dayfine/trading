@@ -1,6 +1,9 @@
 # Price-band tiebreak confirmation (2026-11-13): pre-registration
 
-**Status: pre-registered, no runs.** Written before any result of either cell. The rule below is applied as written.
+**Status: run 2026-11-14.** NO-BUILD: C1 INCONCLUSIVE (return short, drawdown +3.83 pp, concentration 1 of 5), C2
+FAIL (median Δ ln(1+R) −0.280, 1 of 5 seeds positive). `Price_band_seeded` stays a default-off axis, and no further
+confirmation cells run on it without a new mechanism argument (§Results). The rule below was applied as written to the
+20 cloud cells this directory launched.
 The user approved this experiment on 2026-11-13.
 
 ## Why
@@ -452,3 +455,609 @@ After the runs:
    (RV1). It is looked at and not committed (EODHD terms).
 4. `results-analyst` reads the PR and the pack, applies the combined decision, and writes the why.
 5. `qc-results` reviews the PR (`dev/rules/model-routing.md`).
+
+## Results
+
+**NO-BUILD.** C1 reads **INCONCLUSIVE** and C2 reads **FAIL**. By §The combined decision, a FAIL in either cell is
+NO-BUILD. `Price_band_seeded` stays a default-off axis and no default changes. No further confirmation cells run on
+it without a new mechanism argument.
+
+- **The order binds in both cells.** It changes the post-cut list on 62.3 % (C1) and 58.3 % (C2) of Friday-pairs. The
+  ≥ $33 signature is 82.2 and 74.5 pp. Liveness is not why the cells fall short.
+- **C2 fails its return bar.** On the top-1000 schedule over the full window, P ends below S in 4 of 5 seeds. The
+  median Δ ln(1+R) is −0.280.
+- **C1 misses every bar after liveness.**
+  - Return: the median Δ on 2013–2026 top-3000 is +0.139, against δ = 0.20, with 3 of 5 seeds positive.
+  - Drawdown: the arm-median drawdown is 3.83 pp deeper.
+  - Concentration: the gap survives the trim in 1 seed of 5.
+- **Attribution, as the rule fixes it.** The 26-year gap belongs to what C2 removed: top-3000 breadth. §Why shows
+  what that means in trades:
+  - the gap lived in a few cheap names below the top 1,000 by dollar volume, most of them entered in 2010–12;
+  - C1 is #3595's own 2013–2026 half, replayed.
+
+**Paths.**
+- **Per-arm artifacts.** `results/k{0..4}/pbc{1,2}-{S,P}-kK-s0-*`, and each seed's chain log `results/kK/chain-kK.log`.
+- **The reads.** `results/read/{decide,report,capacity,cash}-{1,2}.txt`, from `read/*.sh`, run on the host as step 2
+  prescribes. A fresh regeneration of the list-band and position tables reproduces all eight files byte for byte.
+- **Figures marked †.** They come from `results/read/analyst_checks.sh`, whose output is
+  `results/read/analyst_checks.txt`; section letters are in brackets.
+  - It reads the committed artifacts of this directory and of #3595, and the committed pit-v12 lists.
+  - It reads the local bar store through `read/positions.sh` and `read/list_bands.sh`.
+  - It prints counts, NAV shares, bands, ranks, dates and relative moves, never a close.
+
+### Validity and provenance (§0)
+
+- **One build, one image, one data stage.**
+  - All five chain logs carry `HEAD=04ca2ff0b` and image `sha256:3865e48e8a61`. The sessions launched at 03:41–03:42Z
+    on 2026-11-14.
+  - Each pulled warehouse `v12wk-9236`, corporate actions `corpact-2026-10-27` and bars `data-20261102`, and removed no
+    corporate-action file.
+  - Each logged `STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv, 11888 data.csv`.
+- **Specs and preflight.** All five sessions logged `SPEC CHECKS OK`. All 20 specs logged `PREFLIGHT_OK`:
+  - the override is in P's `params.sexp` only;
+  - `n_symbols=9200` (C1) or `3492` (C2), with `absent=1`;
+  - the macro trend and breadth state equal `pb-S-k0`'s on 12 of 12 Fridays.
+- **Restarts.** Two containers restarted. Each restart re-ran the launch command and logged the same `HEAD=` and
+  image. It re-staged and rebuilt, passed the spec checks, and skipped the preflight and every cell with a `RESULT`
+  line. It then re-ran the one cell it had lost.
+  - **k1 restarted once,** at 06:59:31Z, while pbc2-P-k1 ran; C1 and pbc2-S-k1 had finished. pbc2-P-k1 re-ran from
+    07:02:31 to 08:05:45Z.
+  - **k4 restarted twice.** At 04:57:21Z it lost pbc1-S-k4, which re-ran 04:59:55–06:07:04Z. At 06:56:53Z it lost
+    pbc1-P-k4, which re-ran 07:00:14–08:09:14Z.
+  - Each of the 20 cell logs holds one result and one snapshot-cache line.
+- **Cells.**
+  - Walls were 2,904–4,104 s (C1) and 2,930–4,264 s (C2). The guard was 14,400 s; the projections were 3,770–4,250 s
+    and 3,940–4,430 s.
+  - Peak RSS was about 5.3 GB (C1) and 2.8 GB (C2).
+- **V6.** `validator_diff -check V6` of P-kK against S-kK exits 0 ("agree") for all ten pairs
+  (`pbcC-P-kK-s0.v6diff-S.log`). Every cache line reads `n_symbols_absent=1`. All five seeds of both cells enter the
+  read.
+- **The rest of the validator.**
+  - The audit join is 100 % in all 20 cells, and V12, V19 and V20 pass.
+  - V7, V13 and V17 read the validator's data dir, whose committed short bar files shadow the store (§Defects 2).
+  - V16 flags one fallback exit in both arms of C2 k0, k1, k2 and k4: MAY 2005-03-02, `stale_force_exit`.
+  - None of these differs between the arms of a pair.
+
+### The rule, as written
+
+`decide.sh` was not taken on trust:
+- Δk, the medians, m_S and the drawdown medians were re-derived from `actual.sexp`.
+- B was re-derived from `entries.tsv` alone.
+- G and both trims were re-derived from freshly regenerated tables, with separate code.
+
+All agree to the printed digit.
+
+| clause | bar | C1: 2013–2026, top-3000 | C2: 2000–2026, top-1000 |
+|---|---|---|---|
+| valid seeds | ≥ 4 | 5 | 5 |
+| Friday-pairs | ≥ 100 | 1,250 | 2,279 |
+| B, lists changed | ≥ 33 % | 62.3 % (58.5–64.5 by seed) | 58.3 % (55.8–59.9) |
+| G, ≥ $33 gap | ≥ 40 pp | 82.2 pp (87.9 − 5.6 %) | 74.5 pp (92.6 − 18.1 %) |
+| **liveness** | | **LIVE** | **LIVE** |
+| Δk, k0..k4 | | +0.171, −0.044, +0.208, +0.139, −0.166 | −0.424, +0.199, −0.049, −0.280, −0.293 |
+| median Δk against δ = max(0.20, m_S) | ≥ δ | +0.139 against 0.200 (m_S 0.170) | −0.280 against 0.324 (m_S 0.324) |
+| seeds with Δk > 0 | ≥ 4 | 3 | 1 |
+| **return** | | **short** | **FAIL** |
+| max DD, arm medians | ≤ +3.0 pp | P 29.77 − S 25.94 = **+3.83** | P 28.17 − S 26.66 = +1.51 |
+| trim-3 net > 0, by seed | ≥ 4 | **1** (−7.0, −5.8, +23.0, −5.2, −16.6) | **2** (−15.6, +19.2, +4.8, −33.3, −34.6) |
+| **cell outcome** | | **INCONCLUSIVE** | **FAIL** |
+
+Source: `results/read/decide-{1,2}.txt`. The paired drawdown medians, +1.28 pp (C1) and +2.62 pp (C2), are printed
+and not read.
+
+- **C1: which bars failed, and by how much.**
+  - **Return is short, not a fail.** The median Δk, +0.139, is 0.061 under δ; m_S, 0.170, is under the 0.20 floor.
+    Three seeds are positive, one short of 4. A fail needs a median ≤ 0, or 2 seeds or fewer.
+  - **Drawdown is 0.83 pp over.** The arm medians differ by +3.83 pp, against the 3.0 pp bar.
+  - **Concentration is three seeds short.** The trimmed net is positive in 1 seed of 5, against the 4 required.
+- **C2: the return fails on both counts.** The median Δk is −0.280 (≤ 0), and only 1 seed is positive (≤ 2). Its δ is
+  the cell's own m_S, 0.324. The drawdown is inside the bar (+1.51 pp). The concentration also misses (2 of 5). FAIL
+  decides.
+- **Combined.** C2 FAIL gives **NO-BUILD**, whatever C1 reads.
+- **#3597.** Its Rule 1 returned CLOSE-AXIS (#3602). This read is not ESCALATE, so the clash clause of §How this read
+  combines with #3597 does not fire. Both reads keep the axis default-off.
+
+### Reported regardless of the verdict
+
+**Per seed and arm.** Source: `results/read/report-{1,2}.txt` §A. "Closed" counts positions; C2 S-k0 has 652 trade
+rows because CERN-wein-739 is booked twice (§Defects 1). "≥ +100 %" counts closed positions.
+
+| cell | seed | arm | R | ln(1+R) | Δk | max DD | Sharpe | Ulcer | closed | open | ≥ +100 % |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| C1 | k0 | S | +278.6 % | 1.3313 | | 25.94 | 0.585 | 10.60 | 340 | 5 | 5 |
+| C1 | k0 | P | +349.4 % | 1.5027 | +0.171 | 29.77 | 0.635 | 12.64 | 334 | 5 | 6 |
+| C1 | k1 | S | +337.0 % | 1.4747 | | 26.30 | 0.640 | 11.62 | 331 | 5 | 6 |
+| C1 | k1 | P | +318.0 % | 1.4303 | −0.044 | 25.19 | 0.612 | 11.65 | 330 | 5 | 6 |
+| C1 | k2 | S | +258.8 % | 1.2775 | | 32.07 | 0.560 | 13.56 | 340 | 6 | 6 |
+| C1 | k2 | P | +341.7 % | 1.4854 | +0.208 | 31.48 | 0.647 | 13.98 | 325 | 5 | 6 |
+| C1 | k3 | S | +258.6 % | 1.2771 | | 25.68 | 0.566 | 11.12 | 330 | 5 | 5 |
+| C1 | k3 | P | +312.0 % | 1.4160 | +0.139 | 31.20 | 0.600 | 13.89 | 333 | 5 | 6 |
+| C1 | k4 | S | +362.0 % | 1.5304 | | 25.10 | 0.657 | 11.12 | 328 | 5 | 6 |
+| C1 | k4 | P | +291.2 % | 1.3640 | −0.166 | 26.39 | 0.580 | 12.29 | 341 | 4 | 6 |
+| C2 | k0 | S | +1,544.2 % | 2.7999 | | 25.41 | 0.659 | 11.01 | 651 | 7 | 11 |
+| C2 | k0 | P | +975.6 % | 2.3755 | −0.424 | 28.17 | 0.562 | 11.86 | 644 | 7 | 8 |
+| C2 | k1 | S | +759.3 % | 2.1510 | | 30.50 | 0.514 | 12.47 | 664 | 7 | 8 |
+| C2 | k1 | P | +948.3 % | 2.3498 | +0.199 | 33.12 | 0.558 | 12.62 | 649 | 6 | 8 |
+| C2 | k2 | S | +1,448.0 % | 2.7395 | | 26.66 | 0.654 | 10.81 | 648 | 6 | 10 |
+| C2 | k2 | P | +1,373.5 % | 2.6902 | −0.049 | 27.85 | 0.627 | 10.74 | 644 | 7 | 9 |
+| C2 | k3 | S | +978.6 % | 2.3782 | | 30.54 | 0.586 | 11.54 | 640 | 6 | 8 |
+| C2 | k3 | P | +714.9 % | 2.0979 | −0.280 | 25.78 | 0.500 | 10.61 | 652 | 5 | 7 |
+| C2 | k4 | S | +1,087.4 % | 2.4744 | | 25.79 | 0.604 | 10.71 | 636 | 5 | 9 |
+| C2 | k4 | P | +785.6 % | 2.1811 | −0.293 | 33.97 | 0.513 | 13.37 | 655 | 6 | 10 |
+
+- **Scale.** The paired median is +0.139 log over 13.5 years in C1, about +1.0 % a year. In C2 it is −0.280 over
+  26.5 years, about −1.1 % a year. #3595's was +0.348 over 26.5 years, about +1.3 % a year.
+- **Spread† [A].**
+  - In C1, S's seed SD of ln(1+R) is 0.117 and P's is 0.056. P is above S in 17 of the 25 cross-seed pairs.
+  - In C2, S's SD is 0.267 and P's 0.228. P is above S in 6 of 25.
+  - In #3595, P was above S in 25 of 25.
+- **Risk-adjusted.**
+  - In C1, P's Sharpe is higher in 3 of 5 seeds and its Ulcer index higher in 5 of 5. P's max drawdown is deeper in
+    3 of 5.
+  - In C2, P's Sharpe is higher in 1 of 5 seeds and its Ulcer index higher in 3 of 5. P's max drawdown is deeper in
+    4 of 5.
+
+**Entries by band, pooled over seeds.** Source: `report-{1,2}.txt` §A, split-restatement corrected.
+
+| cell | arm | entries | < $8 | $8–14 | $14–33 | ≥ $33 | closed ≥ +100 % |
+|---|---|---:|---:|---:|---:|---:|---:|
+| C1 | S | 1,695 | 4.3 % | 7.7 % | 20.3 % | 67.7 % | 28 |
+| C1 | P | 1,687 | 4.7 % | 8.8 % | 25.5 % | 60.9 % | 30 |
+| C2 | S | 3,270 | 1.0 % | 3.0 % | 13.0 % | 83.0 % | 46 |
+| C2 | P | 3,275 | 1.2 % | 3.5 % | 18.3 % | 77.0 % | 42 |
+
+**One-arm net by band.** It is P-only minus S-only, in points of entry NAV, pooled; counts are P-only / S-only
+positions. Source: §B. #3595's corrected column is from this README's §Reported regardless.
+
+| band | C1 | C2 | #3595 (26 y, top-3000) |
+|---|---:|---:|---:|
+| < $8 | +64.8 (19 / 12) | −10.1 (13 / 5) | +154.3 |
+| $8–14 | −14.1 (39 / 21) | −27.2 (32 / 16) | +16.1 |
+| $14–33 | +28.6 (135 / 48) | +105.6 (242 / 69) | +106.5 |
+| ≥ $33 | −43.9 (124 / 244) | −177.6 (369 / 561) | −69.5 |
+| total | +35.4 | −109.4 | +207.5 |
+
+C1's < $8 row is ADMA: +28.6 in each of k0 and k3.
+
+**One-arm net by entry era.** Source: §B, and `read/repro-3595.txt` for #3595.
+
+| era | C1 | C2 | #3595 |
+|---|---:|---:|---:|
+| 2000–09 | | −81.1 | +18.5 |
+| 2010–12 | | +28.5 | +147.0 |
+| 2013–17 | +11.7 | −93.1 | +34.3 |
+| 2018–23 | +32.7, of which ADMA +57.2 | +26.5 | +16.7 |
+| 2024–26 | −9.0 | +9.9 | −9.0 |
+
+C1's 2024–26 row is #3595's to the digit (P-only 71 / −2.0, S-only 87 / +7.0); §Why 2 explains why.
+
+**Liveness by seed.** Source: `decide-{1,2}.txt`.
+- **C1.** B is 58.5–64.5 % and G 78.4–85.0 pp. P's tickets that S did not place that Friday are 13.9–20.6 % (pooled
+  18.5 %).
+- **C2.** B is 55.8–59.9 %, G 72.6–78.1 pp, and the re-drawn share 17.2–22.7 % (pooled 20.0 %).
+- **#3595.** The re-drawn share was 21.5 %.
+
+**The 2013–2026 increment.** Source: `report-{1,2}.txt` §C.
+- **For C1 it is the whole cell:** +0.171, −0.044, +0.208, +0.139, −0.166.
+- **For C2 it is −0.337, +0.010, +0.008, −0.029 and −0.041** (median −0.029). The full-window Δk beside it is −0.424,
+  +0.199, −0.049, −0.280 and −0.293. By end-2012, C2's gap already stood at −0.088, +0.189, −0.057, −0.252 and −0.253.
+
+**The largest one-arm contributors.** The five largest per seed and side, with split-restated prices marked, are in
+`report-{1,2}.txt` §D. The three largest, as % of entry NAV:
+
+| cell | seed | Δk | net → trim 3 | P-only | S-only |
+|---|---|---:|---:|---|---|
+| C1 | k0 | +0.171 | +22.5 → −7.0 | ADMA 2023-12-19 $4.35 +300 % 28.6; SAGE 2017-12-04 8.0; ADNT 2020-11-09 6.6 | CVNA 2024-07-08 7.7; MIME 2021-06-25 3.1; ATI 2024-04-23 2.9 |
+| C1 | k1 | −0.044 | −6.2 → −5.8 | IPHI 2015-01-06 6.4; SGEN 2019-10-14 5.6; CDNS 2020-05-06 5.5 | WSM 2020-09-28 6.9; SKX 2014-03-10 5.7; CHDN 2017-03-28 5.4 |
+| C1 | k2 | +0.208 | +19.3 → +23.0 | AMED 2014-10-02 5.4; HPQ 2020-11-24 2.8; LPG 2023-09-15 2.8 | WSM 6.9; FCNCA 2020-11-16 4.7; WDFC 2013-07-22 3.0 |
+| C1 | k3 | +0.139 | +18.1 → −5.2 | ADMA 28.6; SAGE 8.0; IPHI 6.4 | GLNG 2022-02-07 9.7; AMED 5.3; FCNCA 4.8 |
+| C1 | k4 | −0.166 | −18.3 → −16.6 | SGEN 5.6; GTIV 2014-06-09 4.4; LPG 2.7 | IPHI 6.4; FCNCA 4.8; TWLO 2026-04-30 3.2 |
+| C2 | k0 | −0.424 | −55.9 → −15.6 | NIO 2020-09-24 $16.85 +119 % 13.1; BWA 2010-02-03 6.9; HRB 2012-10-22 6.6 | TSLA 2013-04-09 $41.00 +230 % 32.7; SWKS 2014-05-20 17.8; ANET 2016-11-14 16.3 |
+| C2 | k1 | +0.199 | +17.5 → +19.2 | NIO 13.1; X 2005-12-19 4.8; HLF 2010-08-30 3.8 | AVGO 2013-09-10 $39.39 +200 % 15.3; ESLRQ 2005-10-19 4.8; ORCL 2024-08-05 3.3 |
+| C2 | k2 | −0.049 | −3.0 → +4.8 | NIO 13.1; HRB 6.5; EOG 2000-05-01 4.4 | AVGO 15.9; SK 2010-06-01 8.3; SBUX 2011-08-08 7.8 |
+| C2 | k3 | −0.280 | −37.3 → −33.3 | BWA 6.9; MAA 2021-03-15 5.9; SQM 2022-04-25 4.8 | TIBX 2010-07-12 $12.74 +112 % 10.2; HRB 6.6; ESLRQ 4.8 |
+| C2 | k4 | −0.293 | −30.7 → −34.6 | IREN 2025-07-15 $16.32 +175 % 17.5; NIO 13.1; SK 8.3 | AVGO 15.8; TIBX 10.1; NVO 2010-01-26 9.1 |
+
+**Capacity.** Source: `capacity-{1,2}.txt`. For entries at or below $14: position value ÷ the 20-day mean dollar
+volume.
+
+| cell | arm | n | p50 | p90 | max | ≥ 0.25 | from 2023-07-01: n / p50 / p90 / max |
+|---|---|---:|---:|---:|---|---:|---|
+| C1 | P | 229 | 0.007 | 0.041 | 0.181 (TRTX 2021-08-17 k4) | 0 | 70 / 0.019 / 0.052 / 0.084 |
+| C1 | S | 204 | 0.006 | 0.043 | 0.197 (TRTX 2021-08-17 k4) | 0 | 65 / 0.017 / 0.056 / 0.087 |
+| C2 | P | 155 | 0.006 | 0.019 | 0.068 (ELGX 2011-06-23 k4) | 0 | 30 / 0.009 / 0.047 / 0.064 |
+| C2 | S | 131 | 0.007 | 0.026 | 0.088 (SIRI 2023-07-24 k0) | 0 | 31 / 0.009 / 0.059 / 0.088 |
+
+- The late subset's ≥ 0.25 count is not printed by `capacity.sh`. It is 0, because every late maximum is under 0.25.
+- These ratios are far below #3595's (P: p50 0.038, p90 0.194, maximum 0.949, 18 entries at ≥ 0.25).
+- Neither cell tests capacity at #3595's late-run NAV:
+  - C1 starts at $1M in 2013. On 2023-07-03 its P book is 4.5–6.2× smaller than #3595's at the same seed† [K].
+  - C2's cheap names are top-1000 names, and so more liquid.
+
+**Cash displacement, both ways.** Source: `cash-{1,2}.txt`. The net is P's tickets that S skipped for cash, minus S's
+tickets that P skipped for cash, in points of entry NAV, by seed:
+- C1: −14.0, +9.7, +4.6, −3.4, +2.6.
+- C2: −24.1, +11.2, −19.7, −11.3, +4.9.
+
+This counts skips at the decision only. A fill the portfolio rejects for cash is not in it, and such rejections are
+routine in both arms: 15–30 per C1 cell and 60–79 per C2 cell† [J]. AVGO 2013 in C2 is one (§Why 6).
+
+### The verdict, calibrated
+
+- **What this run establishes.**
+  - The band order binds outside the 26-year top-3000 cell, at about the same rate and with the same fingerprint:
+    both in the post-2012 window and on the top-1000 tier.
+  - On the top-1000 tier over 2000–2026 it does not reproduce #3595's gap. The paired median is −0.280, and S ends above
+    P in 19 of the 25 cross-seed pairs† [A].
+  - On top-3000 without the 2010–12 entries, it reproduces only #3595's own 2013–2026 increment (§Why 2).
+  - So the 26-year gap is not a general property of the order. By the rule this is NO-BUILD: the axis stays
+    default-off, and no further confirmation cells run on it without a new mechanism argument.
+- **What it does not establish.**
+  - **That the order hurts on the top-1000 tier.** C2's median gap lies inside its own reshuffle null (m_S 0.324).
+    The mean paired gap, −0.170, is about 0.6 of S's seed SD (0.267)† [A]. The FAIL says the confirmation did not
+    happen, not that the order loses in expectation.
+  - **That C1 is fresh evidence on 2013–2026.** Same-seed C1 paths re-synchronise with #3595's (§Why 2). Eight of the
+    ten arm-seeds hold #3595's positions from 2019 on, and all ten from 2023. C1's own information is mostly its
+    2013–2018 re-path.
+  - **That the mechanism does not work** (`dev/rules/mechanism-validation-rigor.md` §Verdict calibration).
+    - These are two K = 5 seed reads, not a walk-forward surface.
+    - The order's expected effect is below what either cell can resolve. #3597 measured it at about one doubler per
+      26 years at top-3000.
+    - The read rejects prioritising the axis further, not the mechanism.
+  - **Anything out of sample.** Both windows lie inside the history on which the screen chose the trait (§Not
+    claimed).
+- **How strong the NO-BUILD is.** The deciding cell is one breadth tier on one history. That is enough for NO-BUILD,
+  because the rule asks the gap to transfer and it does not. It is not enough to call the order harmful.
+
+### Why
+
+#### 1. The order binds everywhere; what it binds on changes with breadth
+
+- **Liveness held, with margin.** B is 62.3 % and 58.3 %, against the 33 % bar and near #3595's 66.8 %. G is 82.2 and
+  74.5 pp, against 40. The README expected the narrower universe to bind less by construction; it binds almost as
+  often. B includes path effects; #3597's path-free L1 was 0.690, on S-k0 at 26 years.
+- **The band proxy holds.** The decision-date band equals the fill band on 97.9 % (C1) and 98.1 % (C2) of filled
+  tickets† [G].
+- **On the top-1000 tier the cheap end thins out** [G]†. The table shows the band mix of all slots in S's lists, and
+  of the names P lists that S does not:
+
+  | band | C1 S lists | C2 S lists | C1 names P adds | C2 names P adds |
+  |---|---:|---:|---:|---:|
+  | < $8 | 5.5 % | 1.2 % | 15.4 % | 3.5 % |
+  | $8–14 | 7.4 % | 2.8 % | 26.9 % | 10.7 % |
+  | $14–33 | 25.4 % | 15.7 % | 52.1 % | 67.7 % |
+  | ≥ $33 | 61.7 % | 80.3 % | 5.6 % | 18.1 % |
+
+  - The names P adds are under $14 42 % of the time in C1, and 40 % in #3595 (§Why 1 there). In C2 they are under $14
+    14 % of the time. On the top-1000 tier the order mostly swaps $14–33 names for ≥ $33 ones.
+  - **The off-signature swaps are path.** Of the 470 names priced ≥ $33 that P lists in C2 and S does not, S held 146
+    that Friday† [G]. A held name leaves its own arm's pool. In a universe that is 80 % ≥ $33, swaps driven by the path
+    are mostly ≥ $33 names, so 18 % of P's additions are ≥ $33 here, against 6 % in C1.
+- **Why the mix matters.** #3597's funded re-draw put +1.10 of its 0.953 expected doublers in the bands under $14. The
+  exchange of $14–33 names for ≥ $33 ones netted −0.14, because at the strategy's rates those bands convert alike. A
+  tier on which a seventh of the promoted names are cheap leaves the order little expected tail to buy.
+
+#### 2. C1 is #3595's 2013–2026 half, replayed
+
+- **The same paths.** C1 starts all-cash on 2013-01-01, but its paths lock onto the 26-year cells' at the same seed and
+  arm† [C1].
+  - Its positions (symbol and entry date, open ones included) equal #3595's from 2015 (P-k1); from 2016 (P-k3, S-k4,
+    P-k4); from 2019 (S-k0, P-k0, S-k2, S-k3); from 2022 (P-k2); and from 2023 (S-k1).
+  - The year-on-year change in ln(NAV_P / NAV_S) is the same to three decimals in every seed from 2023, and in four
+    seeds from 2022† [C2].
+- **Why they lock.**
+  - The lists, the bars, the cascade score and P's cross-band order are functions of the date. So is S's seeded draw,
+    which hashes `seed|date|ticker` (`screener_ranking.ml` `_seed_key`, `_seeded_cmp`).
+  - Sizes are fractions of NAV.
+  - Once the positions each run carried in have closed and the cash fractions match, the two runs make the same
+    decisions.
+- **So C1 measured #3595's own increment.**
+  - C1's Δk per seed is +0.171, −0.044, +0.208, +0.139, −0.166. #3595's 2013–2026 increment is +0.290, −0.061, +0.190,
+    +0.151, −0.155 (`read/repro-3595.txt` §C). The signs agree in 5 of 5 seeds, and the medians are +0.139 against
+    +0.151.
+  - §Decision rule 2 ("Expectation, written now") predicted this outcome.
+- **What carries C1's lean.**
+  - **ADMA, a tie-cut lottery, in k0 and k3.** It is the only one-arm doubler in C1 (+300 %, 28.6 % of entry NAV each)†
+    [D], in the same two seeds as in #3595. P holds it in five seeds and S in three† [N]. Without it, C1's pooled
+    one-arm net falls from +35.4 to about −21.8, about −4.4 a seed.
+  - **SAGE, a cash lottery, in the same two seeds.** It entered 2017-12-04, is priced ≥ $33, and made +55.8 % (8.0 %
+    of entry NAV).
+    - P-k0 and P-k3 placed it on 2017-12-01. S skipped it for `Insufficient_cash` in k1–k4, and P did in k1, k2 and
+      k4. S-k0 recorded no list that Friday† [L].
+    - A ≥ $33 name in both arms, so not a band swap.
+  - **k2 is the only seed whose gap survives the trim (+23.0).** It is built of many small differences in the
+    re-pathed years: its year-end gap rose +0.134 in 2014 and +0.063 in 2017 (`report-1.txt` §C).
+    - The largest piece is AMED, P-only here but S-only in k1 and k3.
+    - #3595's k2 gained about as much over 2013–2017 on a different path: +0.234 against C1's +0.239† [C2].
+- **The drawdown miss is #3595's episode.**
+  - P-k0 and P-k3 peak on 2018-01-26 and trough on 2020-03-25. Their S arms peak in mid-June 2018† [B].
+  - #3595's P-k0 and P-k3 have the same dates, and P-k3 the same depth, 31.20 %.
+  - Into that peak, P held SAGE and NOAH (2017-07-05, +57.7 %), the only one-arm positions it carried across it† [M].
+  - The miss is k0's +3.83 pp; k3's gap is +5.52 pp.
+
+#### 3. C2: the cut swaps net to about zero, and the draw went to S
+
+- **By channel.** This splits the gap by what the other arm did with each placed ticket, using `cash.sh`'s classes:
+  P's tickets minus S's tickets, in points of entry NAV† [H].
+
+  | the other arm … | C1 | C2 |
+  |---|---:|---:|
+  | listed the name not at all (the cut, or held) | +46.4 | +1.0 |
+  | skipped it for cash at the decision | −0.4 | −39.0 |
+  | placed it too (the fills can still differ) | +11.7 | −37.5 |
+  | recorded no list that Friday | −23.3 | −32.0 |
+  | found no structural stop | −1.8 | |
+  | total, P minus S over all positions | +32.6 | −107.6 |
+
+  - In C1, the cut channel is ADMA: +27.8 in k0 and +30.3 in k3.
+  - In C2, where the other arm's list is visible, the order's own swaps net +1.0. The loss sits in the cash channels
+    (−76.5) and the unresolved one (−32.0).
+- **The systematic swaps are P's; the large one-off draws are S's** [E]†. Position keys are grouped by how many P seeds
+  hold them minus how many S seeds:
+  - **P in at least 3 more seeds:** 62 keys, net +98.6. NIO 2020-09-24 leads (+52.5; $14–33; P in 4 seeds, S in
+    none), then BWA 2010-02-03 (+20.7) and BBWI 2010-02-16 (+13.1).
+  - **S in at least 3 more seeds:** 29 keys, net −74.4. AVGO 2013-09-10 leads (−48.1).
+  - **One or two seeds apart:** 600 keys, net −135.8. This is where S's ≥ $33 monsters sit: TSLA 2013-04-09 (−32.7),
+    NVO 2010-01-26 (−18.2), CVH 2003-05-05 (−18.1), SWKS 2014-05-20 (−17.9), ANET 2016-11-14 (−16.3) and RH 2020-10-30
+    (−14.2). TIBX 2010-07-12 (−20.3) is a cheap name S caught on its own path.
+- **Tail access.** Closed one-arm positions at ≥ +100 %, P minus S, by seed† [D]:
+
+  | | k0 | k1 | k2 | k3 | k4 |
+  |---|---:|---:|---:|---:|---:|
+  | #3595 (26 y, top-3000) | +2 | +3 | +2 | +2 | +2 |
+  | C1 (2013–26, top-3000) | +1 | 0 | 0 | +1 | 0 |
+  | C2 (26 y, top-1000) | −3 | 0 | −1 | −1 | +1 |
+
+  - In C2, P's one-arm doublers are NIO (four seeds), and IREN and SK (k4).
+  - S's are TSLA, SWKS, ANET and CERN (k0), AVGO (k1, k2, k4), SK (k2) and TIBX (k3, k4).
+  - CERN's +138 % is a phantom (§Defects 1). Without it, k0 reads −2.
+- **The distributions.** One-arm positions' P&L %, with open positions marked† [I]:
+
+  | | n | mean | p10 | median | p90 | win | ≥ +50 % | ≥ +100 % |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|
+  | C1 P-only | 317 | +2.9 | −13.1 | −3.8 | +23.7 | 38.8 % | 2.8 % | 0.6 % |
+  | C1 S-only | 325 | +1.8 | −12.8 | −2.8 | +19.7 | 41.5 % | 2.5 % | 0.0 % |
+  | C2 P-only | 656 | +1.9 | −11.8 | −2.6 | +18.6 | 39.8 % | 2.0 % | 0.9 % |
+  | C2 S-only | 651 | +4.0 | −11.3 | −2.3 | +18.7 | 39.9 % | 3.5 % | 1.5 % |
+  | #3595 P-only | 618 | +6.1 | −12.9 | −3.8 | +33.1 | 39.6 % | 6.5 % | 2.3 % |
+  | #3595 S-only | 704 | +2.5 | −12.2 | −2.7 | +19.7 | 43.0 % | 2.7 % | 0.4 % |
+
+  P's one-arm book never wins more often than S's. Only on 26-year top-3000 did it buy the fatter right tail that
+  pays for that. In C2 the right tail is S's.
+- **Per seed, C2.**
+  - k0: three ≥ $33 monsters in S. The CERN phantom also flatters S here.
+  - k1: NIO, against AVGO lost to cash at the fill.
+  - k2: NIO, against AVGO lost to cash at the decision.
+  - k3: a broad loss built in 2004–06 and 2011 (`report-2.txt` §C).
+  - k4: AVGO lost to cash at the fill.
+
+#### 4. Where #3595's gap lived: below the top 1,000
+
+- **By dollar-volume rank.** Each of #3595's positions is ranked in the top-3000 list in force at its entry† [F].
+  - Names ranked below 1,000 carry +197.3 of its +204.5 pooled points (P minus S over all positions). Names in the top
+    1,000 net +7.2.
+  - By seed, outside the top 1,000: +65.5, +19.2, +47.1, +29.8 and +35.7. Inside: +4.2, +6.2, −1.8, +13.3 and −14.7.
+- **Perturbed** (`feedback_perturb_before_believing_a_cohort_split`).
+  - At every cut from 500 to 2,000 the part outside is positive in all five seeds; at 1,500, k1's is barely so,
+    +0.2.
+  - The part inside stays between −35.4 and +73.8, pooled.
+  - Within the lower 2,000 the profile is not smooth. Ranks 1,501–2,000 net −50.6, and ranks 2,001–2,500 net +142.0.
+    That is a few names, not a gradient.
+- **The deciding names** [F2, N]†.
+  - On their decision dates, MERC, WAL, DINO, REGN and ADMA were in the top-3000 list in force and not in the
+    top-1000 list. None of them is held in any C2 cell.
+  - ATML was in both lists. C2 holds it in both arms of all five seeds.
+
+#### 5. Breadth, the 2010–12 cluster, or a shared draw?
+
+All three, because they describe the same few events.
+
+- **Breadth.** The names that made the gap sat below the top 1,000. C2 removed them, and on what was left the order
+  lost (median −0.280).
+- **The 2010–12 cluster.** Five of them entered in 2010–12. C1 removed those entries and kept the breadth. It returned
+  #3595's own 2013–2026 increment (+0.139 against +0.151).
+- **A shared draw.**
+  - Each seed replicates the same swaps. P's cross-band order is the same at every seed.
+  - S's draw at a given date is the same in every window.
+  - That is why C1 caught ADMA and SAGE in exactly #3595's seeds.
+- **Against #3597's expectation.**
+  - #3597 found that the order re-draws about 84 funded tickets in 26 years. That is worth about one net doubler
+    (E_net 0.953, about 0.10–0.18 log).
+  - #3595's seeds realised +2 to +3 doublers each (§3).
+  - C1's 13.5 years hold about half of that expectation, since the re-draws split about evenly between the halves
+    (#3597 §What it implies next). C1 realised +0.4 a seed, all of it ADMA.
+  - C2's promoted names are cheap a third as often, so its expectation is smaller still. It realised −0.8 a seed
+    (−0.6 without CERN).
+  - In no cell is the expected effect within reach of a K = 5 read (δ is 0.20 and 0.32).
+  - What #3595's five seeds saw was one draw of a few cheap names, replicated five times.
+
+#### 6. Four decisions, end to end
+
+- **ADMA, 2023-08-18 (C1; the cut)** [L]†.
+  - S-k0's and S-k3's 20-name lists hold PKG and R placed; ADMA is not in them.
+  - P's lists in k0 and k3 hold ADMA placed. To make room, they drop SUN (k0) and DINO (k3), both ≥ $33.
+  - In k1, S's own seeded draw admits ADMA.
+  - The ticket filled 2023-12-19 at $4.35 and exited 2024-12-23 at +300 %, 28.6 % of entry NAV.
+  - The year-end gap rose +0.204 (k0) and +0.181 (k3) in 2024, in C1 exactly as in #3595† [C2].
+- **NIO, 2020-09-18 (C2; the cut)** [L]†.
+  - S-k0's list has KKR placed and no NIO. P-k0's list has NIO placed.
+  - P drops KKR, DKNG, DOW and PENN (all ≥ $33) and VICI ($14–33).
+  - P adds NIO and AMH ($14–33), HBAN and PBR-A ($8–14), and PINS (≥ $33).
+  - NIO filled 2020-09-24 at $16.85 and exited 2021-03-08 at +119.4 %, 13.1 % of entry NAV.
+  - P held it in k0, k1, k2 and k4; S held it in no seed† [N]. This is the order working as designed.
+- **AVGO, 2013-08-30 (C2; cash at the fill)** [L]†.
+  - Both arms placed AVGO in k1 and k4, and the buy stop triggered in both on 2013-09-10.
+  - S filled: 6,211 shares in k1 and 9,083 in k4.
+  - P's fill was rejected. In k1, $288,394 was required and $37,735 available, after P had filled NVS that day and a
+    larger HLF on 09-03 (9,085 shares against S's 7,647). In k4, $289,497 was required and $213,713 available, after
+    P filled HLF on 09-03 (`pbc2-P-kK-s0.log`; `trades.csv`).
+  - AVGO made +199.8 %, about 15–16 % of entry NAV.
+  - In #3595 the same ticket fell the other way: P held it in k1 and k2, where S had skipped it for cash. The name is
+    ≥ $33 in both arms; the cash path decides.
+- **TSLA, 2013-04-05 (C2; unresolved)** [L]†.
+  - S-k0 placed it from a 20-name list with 17 names at ≥ $33. It filled 2013-04-09 at $41.00 and exited 2013-11-18
+    at +229.9 %, 32.7 % of entry NAV. That is the largest one-arm position in either cell.
+  - P-k0 recorded no list that Friday, so the artifacts cannot say whether its order cut TSLA or its cash was short.
+  - On the same Friday at k2, P's order did cut two ≥ $33 names, GIS and TM, for CNP and POM_old ($14–33). It kept
+    TSLA, which both k2 arms then held.
+  - Tickets placed a week later, on 2013-04-12, in seven C2 cells never filled. The committed artifacts do not say
+    why (no `trade_audit.sexp`).
+
+### How it fits what we know
+
+- **Confirms #3597** (`project_trait_y_low_price`; ledger `2026-11-14-price-band-binding`). The order binds routinely
+  and buys about one doubler per 26 years in expectation, so a traced gap is still a draw. The confirmation cells show
+  that the draw does not recur outside its breadth and era.
+- **Confirms #3595's era decomposition.** About 70 % of the gap came from 2010–12 entries. Without them, what is left
+  is the 2013–2026 increment #3595 already reported.
+- **Confirms the gate-1 / gate-2 law** (`project_record_kseed_band`, `project_path_stability_seeded_noise`). ADMA (the
+  tie cut), and SAGE and AVGO (cash), decide which tails a seed catches.
+- **Refines `project_26y_path_noise_floor`.** That memory records a universe change re-drawing the path "as a few
+  local steps that re-synchronise" (#3489). A start-date change does the same: a nested window on the parent's seeds
+  converges on the parent's path within 2–6 years. A nested cell is a re-measurement, not a replicate.
+- **Settles the contradiction #3595 flagged** with the tiebreak ledger rows (`2026-06-29-candidate-ranking-tiebreak-
+  grid`, `2026-06-30-tiebreak-noise-floor`).
+  - The noise-floor row found that the best arbitrary tiebreak flips by breadth cell: Symbol_length was best on
+    top-500 and collapsed on top-1000.
+  - The informative price order now does the same. It was above every S seed on 26-year top-3000, and is below S in
+    4 of 5 seeds on top-1000.
+- **Rhymes with the top-N grid** (`project_top_n_grid_lane_2026_09_22`). Cap 40 tightened on two top-3000 cells and
+  was dominated on the top-1000 cell. Two slot-level levers have now looked good on top-3000 and failed on top-1000.
+- **Consistent with `project_cell_e_2020_stall_regime`** ("broad universe is the lever"). What the order harvested
+  lived in the broad tail.
+- **Contradicts nothing on record.** One expectation in this README missed: C2 binds about as often as C1 (58.3 %
+  against 62.3 %), not markedly less.
+
+### What it implies next
+
+These are options; the choice is the user's.
+
+- **Stop on this axis (the rule's outcome).** Both reads now agree: #3597 is CLOSE-AXIS and this read is NO-BUILD.
+  The NO-BUILD clause rules out further confirmation cells without a new mechanism argument, and the why supplies none:
+  the order's expected tail is about one doubler per 26 years on top-3000, and less on top-1000.
+- **The low-price trait.**
+  - #3597 placed its leak at `Stage_setup` (breadth, with no lift), the top-N slot and post-cut fundability. This read
+    closes the slot route on both tiers tested.
+  - The remaining link is why cheap top-20 names fail the structural-stop walk. That is a read-only count on a
+    `trade_audit.sexp`, and it points at a risk dial already studied.
+  - "Nothing further" is the honest default.
+- **A design rule for period cells.**
+  - A sub-window cell on its parent's seeds is independent of the parent only until it re-synchronises, here 2–6
+    years.
+  - `dev/rules/promotion-confirmation.md` already asks for disjoint windows; this run shows why a nested window cannot
+    substitute for one.
+  - It bears on the open stale-E cap escalation and on any grid built from the K = 5 record seeds. It is worth a
+    line in that rule if the user wants one.
+- **Levers that act at the top-N cut.** For them a top-1000 cell is the hard test, since their top-3000 gains sit in
+  the lower 2,000 names. Run that cell early.
+- **Defects to file** (§Defects 1): a CERN-shaped specimen for #3109, and a test for an exit order filled on a
+  split's effective date.
+- **Ruled out by this read:**
+  - a sweep of the band edges;
+  - more seeds on these windows;
+  - a pre-2000 cell on this lever without a new argument;
+  - promoting `Price_band_seeded` on #3595's evidence.
+
+### Defects found
+
+1. **A phantom split doubles a held position: C2 S-k0, CERN 2013-07-01. This is a #3109 specimen.**
+   - **The specimen** [O]†.
+     - CERN-wein-739 entered 2013-01-30. It appears in `pbc2-S-k0-s0-trades.csv` as two closed rows of 5,843 shares at
+       $21.15.
+     - One row exits 2013-07-01 at $48.50 (+$159,821, +129.3 %). The other exits 2013-07-22 at $50.42 (+$171,039,
+       +138.4 %).
+     - `pbc2-S-k0-s0-splits.csv` applies a CERN factor of 2.0 on 2013-07-01.
+   - **The cause.**
+     - In the bar store, CERN's `close` is already on the post-split basis before 2013-07-01. It moves +1.5 % that day,
+       a gap share of −0.01, while `adjusted_close` steps ×2.
+     - `Split_detector.detect_split` reads the step as a 2:1 split, and `Split_handler` doubles the held quantity
+       (`split_handler.ml`). The price does not halve.
+     - This is #3109's class: "held positions rescaled on non-split days". The #3105 `raw_confirm_min_share` check,
+       which is default-off, would reject the event.
+   - **The effect.**
+     - S-k0's NAV rose +$415,497 (+9.88 %) on 2013-07-01. P-k0's rose +0.68 % and S-k1's +0.42% [O].
+     - The phantom is about $283k: the extra 5,843 shares at the row's $48.50 exit price. It overstates S-k0's
+       ln(1+R) by about 0.06.
+     - Corrected, C2's Δk for k0 is about −0.36 rather than −0.42, and δ about 0.29 rather than 0.32. The outcome does
+       not move: the median stays −0.280, with 1 seed of 5 positive.
+     - CERN's +138 % is not a real doubler (§Why 3).
+   - **Scope.** Of the 192 splits applied to held positions in this run's 20 cells, this is the only one without a
+     raw gap. #3595's cells carry one small case, IHG 2012-10-09 (factor 0.933), in both arms of k0 and k2 and in P-k3
+     [O]†.
+   - **A simulator-side question.**
+     - The 2013-07-01 exit sold 5,843 shares, the pre-split count, and left the rescaled remainder open until 07-22.
+       That is why one position became two rows.
+     - Had the split been real, an exit queued before it would have left half the position open.
+     - One specimen cannot show whether this is general. `split_handler.ml` rescales the `Exiting` state's
+       `target_quantity`, so the pending order is the place to look. A unit test pinning an exit filled on a split's
+       effective date would settle it.
+   - **The read side.** `read/positions.sh` keys positions on symbol and entry date, so it keeps only the second CERN
+     row (+$171,039 of the +$330,860 the two rows book).
+2. **The validator's data dir shadows the store (chain-w D1, carried over).**
+   - V17's specimens are committed short bar files read in place of the full store [O2]†:
+     - PBR 2026-02-09 and NVS 2025-12-03, in all ten C2 cells (their `trading/test_data` files end 2025-05-16);
+     - QCOM 2026-05-18, in all ten C1 cells and C2 S-k2 (its file ends 2026-04-10);
+     - SNA 2026-04-23, in C2 S-k3.
+   - The store runs to 2026-08-17 for all four names.
+   - The same files drive most of C2's V13 (99–109 per cell, mostly "no bar on entry_date … nearest earlier bar:
+     none") and its V7 (60–68).
+   - This is not a simulator defect. V6 is unaffected, and the counts match within each pair. The fix is chain-w
+     §5 item 5.
+3. **Design: a nested window re-synchronises with its parent.**
+   - §Not claimed says C1 "re-runs 2013–26 from cash and removes only the 2010–12 entries". In fact it reproduces
+     #3595's positions from 2015–2023, depending on arm and seed (§Why 2), so most of its 13.5 years re-measure
+     #3595's paths.
+   - The rule could still be applied as written; the cell simply carried less independent evidence than the design
+     assumed.
+4. **The two-sided cash read misses the fill-time gate.**
+   - `read/cash.sh` classifies a ticket by the other arm's decision-time skip. A fill rejected for cash leaves both
+     arms in `both-placed`.
+   - So AVGO 2013 in C2 k1 and k4 (−15.3 and −15.8 points; §D) shows no cash effect.
+   - Rejections at the fill are routine [J]†. A future cash read should join the rejected fills in the cell logs.
+5. **Carried over, unchanged (#3384).**
+   - `entries.tsv` records no list on a Friday without a placement. C2's unresolved channel is −32.0, and TSLA (k0) is
+     its largest item.
+   - `trades.csv` restates `entry_price` across in-hold splits: `report-2.txt` §D marks TRN, CNC, PH, CLF, DVN, CVH and
+     AVGO 2023. `read/positions.sh` corrects the bands.
+6. **Checked, no defect.**
+   - `decide.sh` is re-derived above.
+   - Trimming the three largest contributions by absolute size instead of by value gives the same trimmed nets in all
+     ten seeds† [P].
+
+### Review-pack look
+
+Two packs, one per cell, each over its ten arms with charts on P-k0. They were built with `review_pack.sh --run-kind arm
+--charts-run 0 --no-container` (pack b54e44ea9, run 04ca2ff0b) and rendered with `review_pack_render.sh` (C1 21 slices,
+C2 31). The dispatcher looked at them (RV1–RV3). They are not committed (per-trade charts from the bar store). One pack per
+cell rather than one over all 20, because the two cells differ in window and universe and one overlay would mix them.
+
+- **KPI strips (P-k0) match the per-arm table.**
+  - C1: +349 %, maximum drawdown −29.8 %, Sharpe 0.63, 334 trades.
+  - C2: +976 %, −28.2 %, 0.56, 644 trades.
+  - Both arms lists match `decide-{1,2}.txt` arm by arm: C1 +349 / +279 / +318 / +337 / +342 / +259 / +312 / +259 / +291 /
+    +362 %, and C2 +976 / +1,544 / +948 / +759 / +1,373 / +1,448 / +715 / +979 / +786 / +1,087 %.
+- **Windows.** C1 runs 2013-01-02 → 2026-06-25 over 9,185 symbols, and C2 2000-01-03 → 2026-06-25 over 3,477.
+- **C1 re-synchronisation (§Why 2), confirmed.**
+  - P-k0's concentration signals are #3595's P-k0 figures. The 2021-04-13 peak falls 25.7 % to 2023-10-27, with APPS at
+    30.4 % of peak NAV. The 2024-11-28 peak falls 23.8 %, with MMYT at 15.0 % and ADMA at 23.3 %.
+  - The 2018-01-26 peak reads n/a for one position's open gain.
+  - The arms table puts ADMA 2023-12-19 first: impact 28.6 %, held by P-k0..4 and S-k1, S-k2, S-k4, not by S-k0 or S-k3.
+    SAGE 2017-12-04 is third (8.0 %, P-k0 and P-k3 only). Both match §Why 2 and [N].
+- **C2 signals, confirmed or refined.**
+  - The 2021-02-16 peak falls 28.2 % to 2023-10-26, with NIO at 16.5 % of peak NAV. NIO is the order's swap (§Why 6).
+  - The 2025-11-05 peak falls 20.3 %, with IREN at 28.0 %. That is not a swap: both arms of k0–k3 hold IREN, and only k4
+    holds it in P alone, as §Why 3 has it.
+- **Not flagged: C2 S-k0's 2013-07-01 step (§Defects 1).** The pack charts P-k0 only. S-k0's NAV series shows the +9.9 %
+  day (4,205,296 → 4,620,793), and no signal names it. This is a detector candidate for the pack (RV3): a one-day NAV
+  move that the held positions' price moves do not explain.
+- **Era bullets.**
+  - C1 ends at 0.71× SPY over 2013–2026 (SPY +533 %). It eroded in 2018–19, 2021 and 2025–26, with holdings lagging while
+    the market rose, not an exposure effect.
+  - C2 ends at 1.33× SPY. It built 2000–08 and 2010–15 and eroded 2016–19 and 2021–26.
+  - Neither cell's eras turn on a price-band swap. The eroding legs are the record config's own.
+- **Execution flags (P-k0's summary) carry no band signal.**
+  - The initial-stop-under-2 % list repeats the same handful of tickets across arms and seeds: GME, APPF and AAON in C1,
+    and CRM, SBUX and DECK in C2.
+  - On P-k0, 59 (C1) and 106 (C2) long fills were filled from above. 44 of 175 (C1) and 60 of 271 (C2) stop exits filled
+    more than 0.5 % past the stop.
+  - None of these is a band swap. The entry-geometry diagnostics (D1, D4, D5) were not compared across arms here.

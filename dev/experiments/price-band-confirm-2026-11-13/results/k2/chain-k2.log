@@ -1,0 +1,38 @@
+[11-14 03:41:40Z] price-band-confirm run k2; PB_SHA=04ca2ff0bba02e9221c2ba884c13719ccfca459a CELL_TIMEOUT=14400s
+[11-14 03:41:45Z] HEAD=04ca2ff0b image=ghcr.io/dayfine/trading-ci:latest sha256:3865e48e8a61
+[11-14 03:41:45Z] disk free 22G
+[11-14 03:41:45Z] disk free 22G
+[11-14 03:41:45Z] PULL warehouse v12wk-9236
+[11-14 03:47:15Z] PULL corpact corpact-2026-10-27
+[11-14 03:47:16Z] PULL bars data-20261102
+[11-14 03:48:03Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-14 03:48:03Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv, 11888 data.csv
+[11-14 03:48:03Z] BUILD
+[11-14 03:49:05Z] BUILD_DONE
+[11-14 03:49:05Z] SPEC CHECKS OK (pbc1-S-k2 = rk-k2 + start 2013-01-01; pbc2-S-k2 = rk-k2 on top-1000 lists; P = S + Price_band_seeded)
+[11-14 03:49:05Z] PREFLIGHT pbc1-S-k2 (to 2013-03-29)
+[11-14 03:53:59Z] PREFLIGHT_OK pbc1-S-k2 (294s, Price_band_seeded in params: no, n_symbols=9200 absent=1, macro = 26y on 12/12 Fridays)
+[11-14 03:53:59Z] PREFLIGHT pbc1-P-k2 (to 2013-03-29)
+[11-14 03:58:50Z] PREFLIGHT_OK pbc1-P-k2 (291s, Price_band_seeded in params: yes, n_symbols=9200 absent=1, macro = 26y on 12/12 Fridays)
+[11-14 03:58:50Z] PREFLIGHT pbc2-S-k2 (to 2000-03-31)
+[11-14 04:00:43Z] PREFLIGHT_OK pbc2-S-k2 (113s, Price_band_seeded in params: no, n_symbols=3492 absent=1, macro = 26y on 12/12 Fridays)
+[11-14 04:00:43Z] PREFLIGHT pbc2-P-k2 (to 2000-03-31)
+[11-14 04:02:33Z] PREFLIGHT_OK pbc2-P-k2 (110s, Price_band_seeded in params: yes, n_symbols=3492 absent=1, macro = 26y on 12/12 Fridays)
+[11-14 04:02:33Z] disk free 16G
+[11-14 04:02:33Z] RUN pbc1-S-k2-s0 (pbc1-S-k2)
+[11-14 05:05:25Z] RESULT pbc1-S-k2-s0 => total_return_pct 258.7565868566133 total_trades 340 sharpe_ratio 0.56017365005219022 max_drawdown_pct 32.072411621557649 calmar_ratio 0.30990738308247451  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION 1 violations  v6diff: none peak_rss_kb=5279832 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=3 no_files=0 Panel_runner: snapshot cache hits=77928216 misses=15218 miss_absent=6019 evictions=0 n_symbols=9200 misses_per_symbol=1.65 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2205382256 maxrss_bytes=5390016512  (wall 3768s)
+[11-14 05:05:25Z] disk free 16G
+[11-14 05:05:25Z] RUN pbc1-P-k2-s0 (pbc1-P-k2)
+[11-14 06:08:36Z] RESULT pbc1-P-k2-s0 => total_return_pct 341.65952444093608 total_trades 325 sharpe_ratio 0.64731225437006068 max_drawdown_pct 31.47555110044059 calmar_ratio 0.37006530313982805  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION PASS V17 EXPECTATION 1 violations  v6diff: vsS:exit=0 peak_rss_kb=5267136 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=2 no_files=0 Panel_runner: snapshot cache hits=77920232 misses=15218 miss_absent=6019 evictions=0 n_symbols=9200 misses_per_symbol=1.65 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2188891232 maxrss_bytes=5384409088  (wall 3787s)
+[11-14 06:08:37Z] ENTRIES pbc1-S-k2-s0: 420 placed, 5209 skipped
+[11-14 06:08:37Z] ENTRIES pbc1-P-k2-s0: 389 placed, 4963 skipped
+[11-14 06:08:37Z] CELL C1 DONE k2
+[11-14 06:08:37Z] disk free 16G
+[11-14 06:08:37Z] RUN pbc2-S-k2-s0 (pbc2-S-k2)
+[11-14 07:11:34Z] RESULT pbc2-S-k2-s0 => total_return_pct 1447.9624640810346 total_trades 648 sharpe_ratio 0.65351556471031913 max_drawdown_pct 26.660066269861272 calmar_ratio 0.4087221693243776  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 3 violations (95 skipped)  v6diff: none peak_rss_kb=2753548 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=2 no_files=0 Panel_runner: snapshot cache hits=60048982 misses=14914 miss_absent=11423 evictions=0 n_symbols=3492 misses_per_symbol=4.27 n_symbols_touched=3491 n_symbols_absent=1 loads_per_touched=1.00 max_entries=3491 max_bytes=58535756 max_mmap_open=3491 avg_entries=1746.0 avg_bytes=29452409 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1269872648 maxrss_bytes=2812436480  (wall 3772s)
+[11-14 07:11:34Z] disk free 16G
+[11-14 07:11:34Z] RUN pbc2-P-k2-s0 (pbc2-P-k2)
+[11-14 08:15:36Z] RESULT pbc2-P-k2-s0 => total_return_pct 1373.4552936941182 total_trades 644 sharpe_ratio 0.62657516518187606 max_drawdown_pct 27.848552493351981 calmar_ratio 0.38386876369115069  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 2 violations (91 skipped)  v6diff: vsS:exit=0 peak_rss_kb=2760580 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=1 no_files=0 Panel_runner: snapshot cache hits=60052043 misses=14914 miss_absent=11423 evictions=0 n_symbols=3492 misses_per_symbol=4.27 n_symbols_touched=3491 n_symbols_absent=1 loads_per_touched=1.00 max_entries=3491 max_bytes=58535756 max_mmap_open=3491 avg_entries=1746.0 avg_bytes=29452409 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=1270006440 maxrss_bytes=2816782336  (wall 3836s)
+[11-14 08:15:36Z] ENTRIES pbc2-S-k2-s0: 789 placed, 9715 skipped
+[11-14 08:15:36Z] ENTRIES pbc2-P-k2-s0: 779 placed, 9540 skipped
+[11-14 08:15:36Z] CELL C2 DONE k2
