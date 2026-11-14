@@ -1,0 +1,35 @@
+[11-14 13:54:12Z] stale-e-cap-k5 run k4; SC_SHA=aab0602627c407036451b93aa9b9d58f4f89de92 CELL_TIMEOUT=16200s
+[11-14 13:54:17Z] HEAD=aab060262 image=ghcr.io/dayfine/trading-ci:latest sha256:3865e48e8a61 mem=15G
+[11-14 13:54:17Z] disk free 22G
+[11-14 13:54:17Z] disk free 22G
+[11-14 13:54:17Z] PULL warehouse v12wk-9236
+[11-14 14:00:48Z] PULL corpact corpact-2026-10-27
+[11-14 14:00:50Z] PULL bars data-20261102
+[11-14 14:01:38Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-14 14:01:38Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv, 11888 data.csv
+[11-14 14:01:38Z] BUILD
+[11-14 14:02:39Z] BUILD_DONE
+[11-14 14:02:39Z] SPEC CHECKS OK (sec-S-k4 = rk-k4 = pb-S-k4; sec-C-k4 = sec-S-k4 + entry_cap_local_range_weeks 4; sec-G-k4 = sec-C-k4 + entry_cap_stop_gate_on_uncapped true, no replace anchor or freeze; trigger at E, StopLimit 2 %)
+[11-14 14:02:39Z] PREFLIGHT sec-S-k4 (to 2000-03-31)
+[11-14 14:06:23Z] PREFLIGHT_OK sec-S-k4 (224s, entry_cap_local_range_weeks=0, gate flag off, n_symbols=9200 absent=1, capped tickets 0 of 7)
+[11-14 14:06:23Z] PREFLIGHT sec-C-k4 (to 2000-03-31)
+[11-14 14:10:32Z] PREFLIGHT_OK sec-C-k4 (249s, entry_cap_local_range_weeks=4, gate flag off, n_symbols=9200 absent=1, capped tickets 7 of 14, capped on an S gate key 3)
+[11-14 14:10:32Z] PREFLIGHT sec-G-k4 (to 2000-03-31)
+[11-14 14:14:32Z] PREFLIGHT_OK sec-G-k4 (240s, entry_cap_local_range_weeks=4, gate flag true, n_symbols=9200 absent=1, capped tickets 1 of 7, capped on an S gate key 0)
+[11-14 14:14:32Z] disk free 16G
+[11-14 14:14:32Z] RUN sec-S-k4-s0 (sec-S-k4)
+[11-14 16:13:47Z] RESULT sec-S-k4-s0 => total_return_pct 1639.5074156607905 total_trades 548 sharpe_ratio 0.65056657766622994 max_drawdown_pct 25.10502676696462 calmar_ratio 0.4535407647368544  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 1 violations (33 skipped)  v6diff: none peak_rss_kb=5734684 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=2 no_files=0 Panel_runner: snapshot cache hits=148026331 misses=20622 miss_absent=11423 evictions=0 n_symbols=9200 misses_per_symbol=2.24 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2486035376 maxrss_bytes=5848727552  (wall 7149s)
+[11-14 16:13:47Z] PARITY sec-S-k4-s0 vs pb-S-k4-s0 actual.sexp identical
+[11-14 16:13:47Z] PARITY sec-S-k4-s0 vs pb-S-k4-s0 equity_curve.csv identical
+[11-14 16:13:47Z] TRIPWIRE MATCH sec-S-k4-s0 trades.csv md5 995be28e6ef1c1829f7db0c8ecd79a41 (549 lines)
+[11-14 16:13:47Z] EXTRACT sec-S-k4-s0: 658 placed, 8352 skipped; capped tickets 0 of 658
+[11-14 16:13:47Z] disk free 16G
+[11-14 16:13:47Z] RUN sec-C-k4-s0 (sec-C-k4)
+[11-14 18:22:15Z] RESULT sec-C-k4-s0 => total_return_pct 585.42323208194955 total_trades 850 sharpe_ratio 0.39586831187250732 max_drawdown_pct 45.158625424059039 calmar_ratio 0.16690440398041517  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 2 violations (47 skipped)  v6diff: vsS:exit=0 peak_rss_kb=5837292 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=3 no_files=0 Panel_runner: snapshot cache hits=148551149 misses=20622 miss_absent=11423 evictions=0 n_symbols=9200 misses_per_symbol=2.24 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2555919072 maxrss_bytes=5926117376  (wall 7698s)
+[11-14 18:22:16Z] EXTRACT sec-C-k4-s0: 1142 placed, 11483 skipped; capped tickets 730 of 1142
+[11-14 18:22:16Z] disk free 16G
+[11-14 18:22:16Z] RUN sec-G-k4-s0 (sec-G-k4)
+[11-14 20:20:27Z] RESULT sec-G-k4-s0 => total_return_pct 1721.1154053582572 total_trades 544 sharpe_ratio 0.66325014133246951 max_drawdown_pct 24.516432395484618 calmar_ratio 0.47230156298316067  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 1 violations (31 skipped)  v6diff: vsS:exit=0 peak_rss_kb=5722720 exit=0 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB), max mmap handles = 12000 (env SNAPSHOT_MAX_MMAP_HANDLES) Panel_runner: split_dividend_guard rejected=2 no_files=0 Panel_runner: snapshot cache hits=148058193 misses=20622 miss_absent=11423 evictions=0 n_symbols=9200 misses_per_symbol=2.24 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00 max_entries=9199 max_bytes=127980460 max_mmap_open=9199 avg_entries=4600.0 avg_bytes=64663475 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=2467334024 maxrss_bytes=5851009024  (wall 7084s)
+[11-14 20:20:27Z] EXTRACT sec-G-k4-s0: 647 placed, 8230 skipped; capped tickets 113 of 647
+[11-14 20:20:27Z] GCHECK k4: capped tickets on a key sec-S-k4 skipped at the stop gate: G 0 (must be 0), C 274
+[11-14 20:20:27Z] CELLS DONE k4
