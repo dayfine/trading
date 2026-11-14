@@ -17,7 +17,8 @@
 #   [MM-DD HH:MM:SS] RESULT <tag> => <metrics> ... (wall <N>s)
 # plus optional header lines "HEAD=<sha>" and "SNAPSHOT_MAX_MMAP_HANDLES=<n>"
 # (a chain that never logs the cap ran at the pre-#2882 default, 256).
-# A cloud chain stamps UTC as [MM-DD HH:MM:SSZ]; the Z is accepted and the time kept as logged.
+# A cloud chain stamps UTC as [MM-DD HH:MM:SSZ]; the Z is accepted and the time kept as logged. A cell
+# that prints its own cache stats ("cap_mmap_handles=<n>" on the RESULT line) uses that cap over the header's.
 # The cell's spec is found by name (<tag> minus "-s<salt>[-suffix]", then minus a "-k<N>" seed tag) under the
 # chain log's experiment directory, or under PERF_LONG_SPECS if set; window
 # and universe come from it. A cell whose spec cannot be found keeps "?" for

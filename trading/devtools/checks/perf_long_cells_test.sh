@@ -13,7 +13,8 @@
 #   - a -k<N> seed tag resolves to its spec like a -s<N> salt tag;
 #   - a cloud chain's [MM-DD HH:MM:SSZ] stamp gives the same rows as the local one;
 #   - a cloud cell's cap comes from its own cap_mmap_handles=N, and a spec named
-#     per seed (pb-S-k1) is found before the -k<N> is stripped;
+#     per seed (pb-S-k1) is found before the -k<N> is stripped, and both win
+#     when they disagree with a header cap or a bare spec;
 #   - a cell whose spec is missing keeps "?" and never enters a comparison;
 #   - update dedupes on (date, tag): a second update adds no rows;
 #   - check exits 1 when the newest cell of a shape is > 20 % slower per
@@ -86,6 +87,13 @@ printf '%s\n' "[01-03 00:00:00Z] chain HEAD=fff0001" \
   "[01-03 01:00:00Z] RESULT cz-k1-s0 => total_return_pct 1.0 cap_mb=1024 cap_mmap_handles=12000 maxrss_bytes=1  (wall 2000s)" > "$C/chain.log"
 expect_eq "cloud cell: per-seed spec and its own cap" "2026-01-03T01:00:00,cloud-2026-01-03,cz-k1-s0,pit-schedule-3000,10.00,12000,fff0001,2000,200" \
   "$(sh "$SCRIPT" collect "$C/chain.log")"
+# Both precedences, pinned where they disagree: a bare "cz" spec (a 5-year window) beside
+# cz-k1 must lose to it, and a header cap of 256 must lose to the cell's own 12000.
+printf '((name "cz")\n (period ((start_date 2000-01-01) (end_date 2005-01-01))))\n' > "$C/specs/cz.sexp"
+printf '%s\n' "[01-03 00:00:00Z] chain HEAD=fff0001 SNAPSHOT_MAX_MMAP_HANDLES=256" \
+  "[01-03 01:00:00Z] RESULT cz-k1-s0 => total_return_pct 1.0 cap_mmap_handles=12000  (wall 2000s)" > "$C/chain.log"
+expect_eq "per-seed spec beats the bare one; the cell's cap beats the header's" "pit-schedule-3000,10.00,12000" \
+  "$(sh "$SCRIPT" collect "$C/chain.log" | cut -d, -f4-6)"
 
 rows2=$(sh "$SCRIPT" collect "$LOG2")
 expect_eq "a chain that logs no cap ran at the pre-#2882 default 256" 256 "$(printf '%s\n' "$rows2" | grep ',n0-s0-v11,' | cut -d, -f6)"

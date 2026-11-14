@@ -422,6 +422,12 @@ date,experiment,tag,universe,years,cap,head,wall_s,s_per_year
 2026-10-29T22:13:16,tier4-seed-band-2026-10-29,goldens-broad--decade-2014-2023-k2,top-1000-2014,9.99,12000,7615dde7d,532,53
 2026-10-29T22:21:36,tier4-seed-band-2026-10-29,goldens-broad--decade-2014-2023-k3,top-1000-2014,9.99,12000,7615dde7d,499,50
 2026-10-29T22:29:22,tier4-seed-band-2026-10-29,goldens-broad--decade-2014-2023-k4,top-1000-2014,9.99,12000,7615dde7d,464,46
+2026-10-30T05:16:48,twin-dedupe-26y-2026-10-29,td-cur-k0-s0,pit-schedule-3000,26.49,12000,65b6edae8,11729,443
+2026-10-30T08:09:30,twin-dedupe-26y-2026-10-29,td-dd-k0-s0,pit-schedule-3000,26.49,12000,65b6edae8,10362,391
+2026-10-30T11:12:06,twin-dedupe-26y-2026-10-29,td-cur-k1-s0,pit-schedule-3000,26.49,12000,65b6edae8,10956,414
+2026-10-30T14:42:17,twin-dedupe-26y-2026-10-29,td-dd-k1-s0,pit-schedule-3000,26.49,12000,65b6edae8,12611,476
+2026-10-30T18:03:43,twin-dedupe-26y-2026-10-29,td-cur-k2-s0,pit-schedule-3000,26.49,12000,65b6edae8,12086,456
+2026-10-30T22:17:56,twin-dedupe-26y-2026-10-29,td-dd-k2-s0,pit-schedule-3000,26.49,12000,65b6edae8,15253,576
 2026-11-12T10:39:57,chain-w-2026-11-10,cw-W0-s0,pit-schedule-3000,26.49,12000,b54e44ea9,6875,260
 2026-11-12T12:35:56,chain-w-2026-11-10,cw-Wtd-s0,pit-schedule-3000,26.49,12000,b54e44ea9,6952,262
 2026-11-13T15:56:33,price-band-tiebreak-2026-11-13,pb-S-k1-s0,pit-schedule-3000,26.49,12000,1034b458e,7375,278
