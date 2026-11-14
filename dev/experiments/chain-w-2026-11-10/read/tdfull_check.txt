@@ -1,0 +1,629 @@
+committed short data.csv files: 650; symbols whose F at 1999-01-04 differs (short | full):
+  AAP	1 | 3
+  AAPL	28 | 112
+  ABT	2.0842 | 2.22766
+  ADBE	1 | 8
+  ADI	1 | 2
+  ADM	1 | 1.15763
+  ADP	1.139 | 1.26093
+  ADSK	1 | 4
+  AES	1 | 2
+  AFL	2 | 4
+  AIG	1 | 1.875
+  AJG	1 | 4
+  ALB	1 | 2
+  AMAT	1 | 4
+  AMD	1 | 2
+  AME	2.25 | 6.75
+  AMGN	1 | 4
+  AMZN	20 | 120
+  AON	1 | 1.5
+  APA	1 | 2.31
+  APH	8 | 64
+  ARE	1 | 100
+  ASML	1 | 3
+  AXON	1 | 12
+  AXP	1 | 3.4274
+  BAC	1 | 2
+  BALL	4 | 16
+  BAX	1.841 | 3.682
+  BBD	1.5972 | 14.3748
+  BBWI	1.237 | 2.474
+  BBY	1 | 4.5
+  BF-B	3.75 | 9.375
+  BHC	1 | 4
+  BHP	1 | 2.0651
+  BIIB	1 | 6
+  BKNG	25 | 4.16667
+  BMY	1 | 2.10133
+  BN	2.8751 | 14.5552
+  BP	1 | 2
+  BRO	2 | 16
+  BSX	1 | 2
+  C	0.1 | 0.2
+  CAH	1 | 1.5
+  CAT	1 | 2
+  CBRE	1 | 3
+  CHD	4 | 12
+  CHKP	1 | 6
+  CHRW	1 | 4
+  CI	1 | 3
+  CIEN	1 | 0.285714
+  CINF	1 | 1.1025
+  CL	2 | 4
+  CLF	1 | 8
+  CLX	1 | 2
+  CMCSA	2.134 | 6
+  CMI	1 | 4
+  CNC	4 | 12
+  CNP	1 | 1.18624
+  CNQ	4.084 | 16.336
+  COF	1 | 3
+  COHR	2 | 8
+  COO	1 | 2
+  COP	1 | 2
+  COR	2 | 8
+  COST	1 | 2
+  CP	5 | 10
+  CPRT	16 | 96
+  CRWD	1 | 4
+  CSCO	1 | 4
+  CSX	9.00002 | 18
+  CTAS	4 | 6
+  CTRA	4 | 12
+  CTSH	2 | 16
+  CVNA	1 | 5
+  CVS	1 | 2
+  CVX	1 | 2
+  D	1 | 2
+  DD	1.67923 | 0.4725
+  DE	1 | 2
+  DGX	1 | 4
+  DHI	1 | 3.6297
+  DHR	2.97566 | 5.95133
+  DINO	2 | 16
+  DIS	1 | 1.01368
+  DLTR	3 | 4.5
+  DOC	1.098 | 2.196
+  DRI	1.11869 | 1.67804
+  DUK	0.333333 | 0.666667
+  DVA	2 | 3
+  DVN	1 | 2
+  EA	1 | 4
+  EBAY	2.376 | 57.024
+  ECL	1 | 2
+  EL	2 | 4
+  ELV	1 | 2
+  EME	1 | 4
+  EMR	1 | 2
+  ENB	2 | 8
+  EOG	2 | 4
+  EPD	2 | 4
+  EQIX	1 | 0.03125
+  EQR	1 | 2
+  EQT	1.837 | 7.348
+  ETN	2 | 4
+  EXC	1.402 | 2.804
+  EXPD	1 | 8
+  F	1 | 1.74818
+  FAST	8 | 32
+  FDS	1 | 4.5
+  FDX	1 | 2.482
+  FE	1 | 0.333333
+  FFIV	1 | 2
+  FICO	1 | 3.375
+  FISV	4 | 9
+  FITB	1 | 1.5
+  FTI	2.688 | 5.376
+  GAP	1 | 1.5
+  GD	1 | 2
+  GE	0.208662 | 0.625986
+  GEN	1 | 8
+  GILD	2 | 32
+  GIS	2 | 4
+  GLW	1 | 3
+  GME	4 | 8
+  GPN	2 | 4
+  GRMN	1 | 2
+  HAL	1 | 2
+  HAS	1 | 1.5
+  HBAN	1 | 1.21
+  HD	1 | 1.5
+  HPQ	2.202 | 4.404
+  HRL	4 | 8
+  HSIC	2.55 | 5.1
+  HSY	1 | 2
+  IAC	5.59541 | 10.0717
+  IBM	1.046 | 2.092
+  IDXX	2 | 4
+  IEX	1 | 2.25
+  ILMN	1.028 | 2.056
+  INCY	1 | 2
+  INFY	8 | 64
+  INTC	1 | 4
+  INTU	1 | 6
+  IRM	1.082 | 3.65175
+  ISRG	9.00002 | 4.50001
+  ITUB	2.66393 | 34.2981
+  ITW	1 | 2
+  IVZ	1 | 2.5
+  J	1.20897 | 4.83588
+  JBHT	1 | 4
+  JBL	1 | 4
+  JCI	0.955 | 0.4775
+  JKHY	1 | 4
+  JNJ	1 | 2
+  JPM	1 | 1.5
+  KIM	1 | 3
+  KLAC	1 | 20
+  KMX	1 | 2
+  KR	2 | 4
+  KSS	1 | 2
+  L	1 | 6
+  LEN	1.033 | 2.066
+  LH	1 | 0.4
+  LHX	1.05843 | 2.11685
+  LIN	1 | 2
+  LNG	1 | 0.5
+  LOW	1 | 4
+  LRCX	10 | 30
+  LUMN	1 | 1.5
+  LUV	1 | 2.25
+  M	1 | 2
+  MAR	1.07271 | 2.14543
+  MCD	1 | 2
+  MCHP	2 | 6.75
+  MCO	1 | 2
+  MDT	1 | 2
+  MGM	1 | 4
+  MKC	2 | 4
+  MMM	1.196 | 2.392
+  MNST	12 | 192
+  MRK	1.048 | 2.096
+  MRSH	1 | 2
+  MRVL	1 | 4
+  MS	1 | 2
+  MSFT	1 | 4
+  MSI	0.247372 | 0.829179
+  MSTR	10 | 20
+  MTB	1 | 10
+  MTCH	1 | 1.8
+  MU	1 | 2
+  NDSN	2 | 4
+  NEE	4 | 8
+  NFLX	70 | 140
+  NKE	4 | 8
+  NOC	1.10681 | 2.21361
+  NOK	1 | 8
+  NOV	1.109 | 2.218
+  NRG	1 | 2
+  NTAP	1 | 4
+  NTES	5 | 20
+  NTRS	1 | 2
+  NUE	1 | 4
+  NVDA	40 | 480
+  NVO	10 | 50
+  NVS	1.116 | 2.232
+  O	1.032 | 2.064
+  ODFL	6.75 | 22.7812
+  OKE	2.2844 | 4.5688
+  OMC	1 | 2
+  ORCL	1 | 6
+  ORLY	15 | 60
+  OXY	1 | 2
+  PAYX	1 | 2.25
+  PBR	1 | 4
+  PBR-A	1 | 4
+  PCAR	1.5 | 7.59375
+  PEG	1 | 2
+  PFE	1.054 | 3.162
+  PG	1 | 2
+  PGR	1 | 12
+  PH	1 | 1.5
+  PHM	1 | 4
+  PNR	1.489 | 2.978
+  POOL	1 | 5.0625
+  PPL	1.07365 | 2.14731
+  PSKY	1 | 0.5
+  PTC	1 | 0.4
+  PWR	1 | 1.5
+  QCOM	1 | 16
+  RF	1 | 1.2346
+  RIG	1 | 0.699599
+  RJF	1.5 | 3.375
+  RMD	2 | 8
+  ROL	5.0625 | 17.0859
+  ROP	1 | 2
+  ROST	4 | 16
+  RSG	1 | 1.5
+  RTX	1.589 | 6.356
+  RVTY	1 | 2
+  RYAAY	2.5 | 20
+  SBUX	2 | 16
+  SCHW	1 | 3
+  SJM	1 | 0.945
+  SLB	1 | 2
+  SNPS	1 | 2
+  SO	1 | 1.63693
+  SONY	5 | 10
+  SPGI	1 | 4
+  STLD	1 | 4
+  STT	1 | 2
+  STZ	1 | 8
+  SWKS	1 | 3
+  SYK	1 | 4
+  SYY	1 | 2
+  TAP	1 | 2
+  TCOM	4 | 16
+  TECH	4 | 8
+  TER	1 | 2
+  TEVA	1 | 8
+  TGT	1 | 2
+  TJX	4 | 8
+  TPL	9 | 45
+  TPR	1 | 8
+  TRMB	2 | 6
+  TROW	1 | 2
+  TSCO	20 | 80
+  TSM	1.005 | 3.27969
+  TT	1.61383 | 3.22766
+  TTWO	1 | 1.5
+  TXN	1 | 4
+  TXT	1 | 2
+  UHS	2 | 4
+  UNH	1 | 8
+  UNP	2 | 4
+  URBN	1 | 8
+  USB	1 | 3
+  VALE	1 | 12
+  VLO	1.094 | 4.376
+  VMC	1 | 3
+  VRSN	1 | 4
+  VRTX	1 | 2
+  VTR	1 | 0.8757
+  VTRS	1 | 2.25
+  VZ	1.06622 | 1.11195
+  WAT	1 | 4
+  WFC	1 | 2
+  WMB	1.22669 | 1.33627
+  WMT	3 | 6
+  WRB	3.375 | 17.0859
+  WSM	2 | 4
+  WST	2 | 4
+  XLB	1 | 2
+  XLE	1 | 2
+  XLF	1 | 1.231
+  XLK	1 | 2
+  XLU	1 | 2
+  XLY	1 | 2
+  XOM	1 | 2
+  YUM	1.391 | 5.564
+  ZBRA	1 | 2.25
+count: 300
+entry decisions on those symbols where F differs at the decision date (arm, symbol, date, kind, gate s|t_asrun|t_full):
+  W0	AAPL	2004-01-30	skipped	F 28|56	gate 111
+  W0	ADP	2006-03-17	placed	F 1.139|1.26093	gate 111
+  W0	ADSK	2003-09-12	placed	F 1|2	gate 111
+  W0	AJG	2000-04-07	skipped	F 1|2	gate 111
+  W0	AME	2006-03-10	skipped	F 2.25|3.375	gate 111
+  W0	BALL	2004-02-20	skipped	F 4|8	gate 111
+  W0	BBWI	2000-04-07	skipped	F 1.237|2.474	gate 111
+  W0	BBWI	2000-04-14	skipped	F 1.237|2.474	gate 111
+  W0	BN	2013-04-19	placed	F 2.78325|4.17488	gate 111
+  W0	BN	2016-10-14	skipped	F 1.8555|2.78325	gate 111
+  W0	CAT	2004-10-15	skipped	F 1|2	gate 111
+  W0	CLF	2001-06-08	skipped	F 1|8	gate 110	FLIPS ON FULL HISTORY
+  W0	CLF	2001-06-15	skipped	F 1|8	gate 110	FLIPS ON FULL HISTORY
+  W0	CLF	2003-08-08	skipped	F 1|8	gate 111
+  W0	CLF	2003-09-12	skipped	F 1|8	gate 111
+  W0	CMCSA	2004-01-16	skipped	F 2.134|3	gate 111
+  W0	CMCSA	2006-05-12	skipped	F 2.134|3	gate 111
+  W0	CMI	2007-02-23	skipped	F 1|4	gate 111
+  W0	COR	2005-04-29	skipped	F 2|4	gate 111
+  W0	CRWD	2025-10-31	skipped	F 1|4	gate 111
+  W0	CRWD	2026-05-15	skipped	F 1|4	gate 111
+  W0	CRWD	2026-05-22	skipped	F 1|4	gate 111
+  W0	CRWD	2026-05-29	skipped	F 1|4	gate 111
+  W0	CSX	2003-11-21	skipped	F 9.00002|18	gate 111
+  W0	CTRA	2000-04-14	skipped	F 4|12	gate 111
+  W0	CTRA	2003-12-12	skipped	F 4|12	gate 111
+  W0	CTSH	2003-06-27	skipped	F 2|8	gate 111
+  W0	CVNA	2019-03-22	skipped	F 1|5	gate 111
+  W0	CVNA	2021-06-25	skipped	F 1|5	gate 111
+  W0	CVNA	2023-06-09	skipped	F 1|5	gate 111
+  W0	CVNA	2024-07-05	placed	F 1|5	gate 111
+  W0	CVNA	2025-12-26	placed	F 1|5	gate 111
+  W0	DHR	2001-06-08	skipped	F 2.97566|5.95133	gate 111
+  W0	DHR	2001-06-15	skipped	F 2.97566|5.95133	gate 111
+  W0	DINO	2004-03-12	skipped	F 2|8	gate 111
+  W0	DINO	2004-03-19	skipped	F 2|8	gate 111
+  W0	DINO	2004-03-26	skipped	F 2|8	gate 111
+  W0	DIS	2000-01-14	placed	F 1|1.01368	gate 111
+  W0	DUK	2000-04-28	skipped	F 0.333333|0.666667	gate 111
+  W0	EME	2004-06-18	skipped	F 1|4	gate 111
+  W0	EME	2004-12-17	placed	F 1|4	gate 111
+  W0	ENB	2004-03-26	placed	F 2|4	gate 110	FLIPS ON FULL HISTORY
+  W0	EOG	2000-04-14	placed	F 2|4	gate 111
+  W0	EOG	2004-05-28	skipped	F 2|4	gate 111
+  W0	EXPD	2006-06-23	skipped	F 1|2	gate 111
+  W0	FAST	2000-04-14	skipped	F 8|32	gate 111
+  W0	FAST	2000-04-28	skipped	F 8|32	gate 111
+  W0	FDS	2004-06-04	skipped	F 1|1.5	gate 111
+  W0	FDX	2000-08-11	skipped	F 1|1.241	gate 111
+  W0	FDX	2012-11-02	skipped	F 1|1.241	gate 111
+  W0	FDX	2013-08-09	skipped	F 1|1.241	gate 111
+  W0	FDX	2016-10-14	skipped	F 1|1.241	gate 111
+  W0	FDX	2025-09-26	skipped	F 1|1.241	gate 111
+  W0	FFIV	2006-11-03	skipped	F 1|2	gate 111
+  W0	FFIV	2007-06-01	skipped	F 1|2	gate 111
+  W0	FTI	2006-12-22	skipped	F 2.688|5.376	gate 111
+  W0	FTI	2007-02-23	skipped	F 2.688|5.376	gate 111
+  W0	FTI	2007-03-09	skipped	F 2.688|5.376	gate 111
+  W0	GD	2005-02-18	skipped	F 1|2	gate 111
+  W0	GD	2006-02-10	placed	F 1|2	gate 111
+  W0	GEN	2003-08-01	skipped	F 1|4	gate 111
+  W0	GEN	2003-08-15	skipped	F 1|4	gate 111
+  W0	GILD	2004-06-04	skipped	F 2|8	gate 111
+  W0	GILD	2005-04-29	placed	F 2|4	gate 111
+  W0	GME	2003-09-12	skipped	F 4|8	gate 111
+  W0	GME	2004-01-30	skipped	F 4|8	gate 111
+  W0	GRMN	2005-08-05	skipped	F 1|2	gate 111
+  W0	HAL	2004-10-15	skipped	F 1|2	gate 111
+  W0	IAC	2000-08-25	skipped	F 5.59541|5.03587	gate 111
+  W0	IEX	2006-02-03	skipped	F 1|1.5	gate 111
+  W0	IEX	2006-02-10	skipped	F 1|1.5	gate 111
+  W0	INTU	2000-09-01	skipped	F 1|2	gate 111
+  W0	ITUB	2021-06-11	skipped	F 1.3343|1.37433	gate 111
+  W0	ITUB	2021-06-18	skipped	F 1.3343|1.37433	gate 111
+  W0	ITUB	2025-03-14	skipped	F 1.1|1.133	gate 111
+  W0	ITW	2006-03-10	skipped	F 1|2	gate 111
+  W0	J	2007-01-26	skipped	F 1.20897|2.41794	gate 111
+  W0	JBHT	2000-04-28	skipped	F 1|4	gate 111
+  W0	KLAC	2014-07-18	skipped	F 1|10	gate 111
+  W0	KLAC	2015-11-06	skipped	F 1|10	gate 111
+  W0	KLAC	2016-10-28	skipped	F 1|10	gate 111
+  W0	KLAC	2018-08-24	skipped	F 1|10	gate 111
+  W0	KLAC	2025-05-23	skipped	F 1|10	gate 111
+  W0	KLAC	2025-05-30	skipped	F 1|10	gate 111
+  W0	KMX	2006-02-03	skipped	F 1|2	gate 111
+  W0	L	2004-01-16	skipped	F 1|3	gate 111
+  W0	LH	2001-06-08	skipped	F 1|4	gate 111
+  W0	MAR	2004-10-15	skipped	F 1.07271|2.14543	gate 111
+  W0	MGM	2000-04-28	placed	F 1|2	gate 111
+  W0	MGM	2003-08-15	skipped	F 1|2	gate 111
+  W0	MGM	2004-10-29	skipped	F 1|2	gate 111
+  W0	MMM	2003-08-08	skipped	F 1.196|2.392	gate 111
+  W0	MMM	2003-08-15	skipped	F 1.196|2.392	gate 111
+  W0	MNST	2012-06-08	skipped	F 6|12	gate 111
+  W0	MNST	2014-09-05	skipped	F 6|12	gate 111
+  W0	MTCH	2000-08-25	skipped	F 1|0.9	gate 111
+  W0	MU	2000-03-17	skipped	F 1|2	gate 111
+  W0	MU	2000-03-24	skipped	F 1|2	gate 111
+  W0	MU	2000-03-31	skipped	F 1|2	gate 111
+  W0	NKE	2006-10-13	skipped	F 4|8	gate 111
+  W0	NOC	2000-04-28	skipped	F 1.10681|2.21361	gate 111
+  W0	NOV	2007-03-02	skipped	F 1.109|2.218	gate 111
+  W0	NRG	2005-06-17	skipped	F 1|2	gate 111
+  W0	NRG	2006-06-09	skipped	F 1|2	gate 111
+  W0	NRG	2006-06-16	placed	F 1|2	gate 111
+  W0	NTES	2004-03-12	skipped	F 5|20	gate 111
+  W0	NTES	2006-02-10	skipped	F 5|20	gate 111
+  W0	NVO	2004-02-20	skipped	F 10|20	gate 111
+  W0	ODFL	2005-10-14	skipped	F 6.75|10.125	gate 111
+  W0	OMC	2006-05-05	skipped	F 1|2	gate 111
+  W0	OXY	2000-09-08	skipped	F 1|2	gate 111
+  W0	PBR-A	2004-08-20	skipped	F 1|4	gate 111
+  W0	PH	2003-08-01	skipped	F 1|1.5	gate 111
+  W0	PH	2003-08-08	skipped	F 1|1.5	gate 111
+  W0	PH	2007-02-23	skipped	F 1|1.5	gate 111
+  W0	PH	2007-03-02	skipped	F 1|1.5	gate 111
+  W0	PHM	2000-04-14	skipped	F 1|4	gate 111
+  W0	PNR	2003-11-14	skipped	F 1.489|2.978	gate 111
+  W0	PNR	2003-11-21	skipped	F 1.489|2.978	gate 111
+  W0	RMD	2004-02-06	skipped	F 2|4	gate 111
+  W0	ROL	2003-11-14	skipped	F 5.0625|11.3906	gate 111
+  W0	ROL	2003-11-21	skipped	F 5.0625|11.3906	gate 111
+  W0	ROL	2005-04-01	skipped	F 5.0625|7.59375	gate 111
+  W0	ROL	2007-02-23	skipped	F 5.0625|7.59375	gate 111
+  W0	ROL	2007-03-09	placed	F 5.0625|7.59375	gate 111
+  W0	ROL	2007-07-27	skipped	F 5.0625|7.59375	gate 111
+  W0	ROL	2007-08-10	skipped	F 5.0625|7.59375	gate 111
+  W0	RSG	2003-11-14	skipped	F 1|1.5	gate 111
+  W0	RSG	2003-11-21	skipped	F 1|1.5	gate 111
+  W0	RYAAY	2003-10-24	skipped	F 2.5|5	gate 111
+  W0	STLD	2000-01-14	skipped	F 1|4	gate 111
+  W0	STLD	2003-07-18	skipped	F 1|4	gate 111
+  W0	STLD	2003-08-08	skipped	F 1|4	gate 111
+  W0	STT	2000-04-07	placed	F 1|2	gate 111
+  W0	TAP	2004-02-20	skipped	F 1|2	gate 111
+  W0	TAP	2006-09-01	skipped	F 1|2	gate 111
+  W0	TEVA	2001-06-15	skipped	F 1|4	gate 111
+  W0	TEVA	2004-02-06	skipped	F 1|2	gate 111
+  W0	TRMB	2003-11-21	placed	F 2|6	gate 111
+  W0	TRMB	2006-02-03	skipped	F 2|4	gate 111
+  W0	TRMB	2006-12-08	skipped	F 2|4	gate 111
+  W0	TROW	2000-04-07	skipped	F 1|2	gate 111
+  W0	TSM	2007-06-22	skipped	F 1.005|1.01007	gate 111
+  W0	TSM	2007-06-29	skipped	F 1.005|1.01007	gate 111
+  W0	TSM	2007-07-06	skipped	F 1.005|1.01007	gate 111
+  W0	TT	2004-10-15	skipped	F 1.61383|3.22766	gate 111
+  W0	TXT	2003-07-18	skipped	F 1|2	gate 111
+  W0	TXT	2003-08-08	skipped	F 1|2	gate 111
+  W0	TXT	2007-05-11	skipped	F 1|2	gate 111
+  W0	UNP	2005-01-07	skipped	F 2|4	gate 111
+  W0	UNP	2005-04-01	skipped	F 2|4	gate 111
+  W0	UNP	2007-01-19	skipped	F 2|4	gate 111
+  W0	VRTX	2000-01-14	skipped	F 1|2	gate 111
+  W0	VTR	2004-08-13	skipped	F 1|0.8757	gate 111
+  W0	VZ	2004-08-20	skipped	F 1.06622|1.11195	gate 111
+  W0	WFC	2004-06-04	skipped	F 1|2	gate 111
+  W0	WRB	2000-08-11	placed	F 3.375|17.0859	gate 111
+  W0	WRB	2004-01-16	skipped	F 3.375|7.59375	gate 111
+  W0	WRB	2004-01-30	skipped	F 3.375|7.59375	gate 111
+  W0	WRB	2004-02-06	skipped	F 3.375|7.59375	gate 111
+  W0	YUM	2004-03-05	skipped	F 1.391|2.782	gate 111
+  W0	YUM	2006-05-12	skipped	F 1.391|2.782	gate 111
+  W0	YUM	2006-05-26	skipped	F 1.391|2.782	gate 111
+  Wtd	AAPL	2004-01-30	skipped	F 28|56	gate 111
+  Wtd	ADSK	2003-09-12	placed	F 1|2	gate 111
+  Wtd	AJG	2000-04-07	skipped	F 1|2	gate 111
+  Wtd	AME	2006-03-10	skipped	F 2.25|3.375	gate 111
+  Wtd	BALL	2004-02-20	skipped	F 4|8	gate 111
+  Wtd	BBWI	2000-04-07	skipped	F 1.237|2.474	gate 111
+  Wtd	BBWI	2000-04-14	skipped	F 1.237|2.474	gate 111
+  Wtd	BN	2013-04-19	placed	F 2.78325|4.17488	gate 111
+  Wtd	BN	2016-10-14	skipped	F 1.8555|2.78325	gate 111
+  Wtd	CAT	2004-10-15	skipped	F 1|2	gate 111
+  Wtd	CLF	2001-06-08	skipped	F 1|8	gate 110	FLIPS ON FULL HISTORY
+  Wtd	CLF	2001-06-15	skipped	F 1|8	gate 110	FLIPS ON FULL HISTORY
+  Wtd	CLF	2003-08-08	skipped	F 1|8	gate 111
+  Wtd	CLF	2003-09-12	skipped	F 1|8	gate 111
+  Wtd	CMCSA	2004-01-16	skipped	F 2.134|3	gate 111
+  Wtd	CMCSA	2006-05-12	skipped	F 2.134|3	gate 111
+  Wtd	CMCSA	2006-05-19	skipped	F 2.134|3	gate 111
+  Wtd	CMI	2007-02-23	skipped	F 1|4	gate 111
+  Wtd	COR	2005-04-29	skipped	F 2|4	gate 111
+  Wtd	CRWD	2025-10-31	skipped	F 1|4	gate 111
+  Wtd	CRWD	2026-05-15	skipped	F 1|4	gate 111
+  Wtd	CRWD	2026-05-22	skipped	F 1|4	gate 111
+  Wtd	CRWD	2026-05-29	skipped	F 1|4	gate 111
+  Wtd	CSX	2003-11-21	skipped	F 9.00002|18	gate 111
+  Wtd	CTRA	2000-04-14	skipped	F 4|12	gate 111
+  Wtd	CTRA	2003-12-12	skipped	F 4|12	gate 111
+  Wtd	CTSH	2003-06-27	skipped	F 2|8	gate 111
+  Wtd	CVNA	2019-03-22	skipped	F 1|5	gate 111
+  Wtd	CVNA	2021-06-25	skipped	F 1|5	gate 111
+  Wtd	CVNA	2023-06-09	skipped	F 1|5	gate 111
+  Wtd	CVNA	2024-07-05	placed	F 1|5	gate 111
+  Wtd	CVNA	2025-12-26	placed	F 1|5	gate 111
+  Wtd	DHR	2001-06-08	skipped	F 2.97566|5.95133	gate 111
+  Wtd	DHR	2001-06-15	skipped	F 2.97566|5.95133	gate 111
+  Wtd	DINO	2004-03-12	skipped	F 2|8	gate 111
+  Wtd	DINO	2004-03-19	skipped	F 2|8	gate 111
+  Wtd	DINO	2004-03-26	skipped	F 2|8	gate 111
+  Wtd	DIS	2000-01-14	placed	F 1|1.01368	gate 111
+  Wtd	DUK	2000-04-28	skipped	F 0.333333|0.666667	gate 111
+  Wtd	EME	2004-06-18	skipped	F 1|4	gate 111
+  Wtd	EME	2004-12-17	placed	F 1|4	gate 111
+  Wtd	ENB	2004-03-26	placed	F 2|4	gate 110	FLIPS ON FULL HISTORY
+  Wtd	EOG	2000-04-14	placed	F 2|4	gate 111
+  Wtd	EOG	2004-05-28	skipped	F 2|4	gate 111
+  Wtd	EXPD	2006-06-23	skipped	F 1|2	gate 111
+  Wtd	FAST	2000-04-14	skipped	F 8|32	gate 111
+  Wtd	FAST	2000-04-28	skipped	F 8|32	gate 111
+  Wtd	FDS	2004-06-04	skipped	F 1|1.5	gate 111
+  Wtd	FDX	2000-08-11	skipped	F 1|1.241	gate 111
+  Wtd	FDX	2012-11-02	skipped	F 1|1.241	gate 111
+  Wtd	FDX	2013-08-09	skipped	F 1|1.241	gate 111
+  Wtd	FDX	2016-10-14	skipped	F 1|1.241	gate 111
+  Wtd	FDX	2025-09-26	skipped	F 1|1.241	gate 111
+  Wtd	FFIV	2006-11-03	skipped	F 1|2	gate 111
+  Wtd	FFIV	2007-05-18	skipped	F 1|2	gate 111
+  Wtd	FTI	2006-12-22	skipped	F 2.688|5.376	gate 111
+  Wtd	FTI	2007-02-23	skipped	F 2.688|5.376	gate 111
+  Wtd	FTI	2007-03-09	skipped	F 2.688|5.376	gate 111
+  Wtd	GD	2005-02-18	skipped	F 1|2	gate 111
+  Wtd	GD	2006-02-10	placed	F 1|2	gate 111
+  Wtd	GEN	2003-08-01	skipped	F 1|4	gate 111
+  Wtd	GEN	2003-08-15	skipped	F 1|4	gate 111
+  Wtd	GILD	2004-06-04	skipped	F 2|8	gate 111
+  Wtd	GILD	2005-04-29	placed	F 2|4	gate 111
+  Wtd	GME	2003-09-12	skipped	F 4|8	gate 111
+  Wtd	GME	2004-01-30	skipped	F 4|8	gate 111
+  Wtd	GRMN	2005-08-05	skipped	F 1|2	gate 111
+  Wtd	HAL	2004-10-15	skipped	F 1|2	gate 111
+  Wtd	IAC	2000-08-25	skipped	F 5.59541|5.03587	gate 111
+  Wtd	IEX	2006-02-03	skipped	F 1|1.5	gate 111
+  Wtd	IEX	2006-02-10	skipped	F 1|1.5	gate 111
+  Wtd	INTU	2000-09-01	skipped	F 1|2	gate 111
+  Wtd	ITUB	2021-06-11	skipped	F 1.3343|1.37433	gate 111
+  Wtd	ITUB	2021-06-18	skipped	F 1.3343|1.37433	gate 111
+  Wtd	ITUB	2025-03-14	skipped	F 1.1|1.133	gate 111
+  Wtd	ITW	2006-03-10	skipped	F 1|2	gate 111
+  Wtd	J	2007-02-02	skipped	F 1.20897|2.41794	gate 111
+  Wtd	JBHT	2000-04-28	skipped	F 1|4	gate 111
+  Wtd	KLAC	2014-07-18	skipped	F 1|10	gate 111
+  Wtd	KLAC	2015-11-06	skipped	F 1|10	gate 111
+  Wtd	KLAC	2016-10-28	skipped	F 1|10	gate 111
+  Wtd	KLAC	2018-08-24	skipped	F 1|10	gate 111
+  Wtd	KLAC	2025-05-23	skipped	F 1|10	gate 111
+  Wtd	KLAC	2025-05-30	skipped	F 1|10	gate 111
+  Wtd	KMX	2006-02-03	skipped	F 1|2	gate 111
+  Wtd	L	2004-01-16	skipped	F 1|3	gate 111
+  Wtd	LH	2001-06-08	skipped	F 1|4	gate 111
+  Wtd	MAR	2004-10-15	skipped	F 1.07271|2.14543	gate 111
+  Wtd	MGM	2000-04-28	placed	F 1|2	gate 111
+  Wtd	MGM	2003-08-15	skipped	F 1|2	gate 111
+  Wtd	MGM	2004-10-29	skipped	F 1|2	gate 111
+  Wtd	MMM	2003-08-08	skipped	F 1.196|2.392	gate 111
+  Wtd	MMM	2003-08-15	skipped	F 1.196|2.392	gate 111
+  Wtd	MNST	2012-06-08	skipped	F 6|12	gate 111
+  Wtd	MNST	2014-09-05	skipped	F 6|12	gate 111
+  Wtd	MTCH	2000-08-25	skipped	F 1|0.9	gate 111
+  Wtd	MU	2000-03-17	skipped	F 1|2	gate 111
+  Wtd	MU	2000-03-24	skipped	F 1|2	gate 111
+  Wtd	MU	2000-03-31	skipped	F 1|2	gate 111
+  Wtd	NKE	2006-10-13	skipped	F 4|8	gate 111
+  Wtd	NOC	2000-04-28	skipped	F 1.10681|2.21361	gate 111
+  Wtd	NOV	2007-03-02	skipped	F 1.109|2.218	gate 111
+  Wtd	NRG	2005-06-17	skipped	F 1|2	gate 111
+  Wtd	NRG	2006-06-09	skipped	F 1|2	gate 111
+  Wtd	NRG	2006-06-16	placed	F 1|2	gate 111
+  Wtd	NTES	2004-03-12	skipped	F 5|20	gate 111
+  Wtd	NTES	2006-02-10	skipped	F 5|20	gate 111
+  Wtd	NVO	2004-02-20	skipped	F 10|20	gate 111
+  Wtd	ODFL	2005-10-14	skipped	F 6.75|10.125	gate 111
+  Wtd	OMC	2006-05-05	skipped	F 1|2	gate 111
+  Wtd	OXY	2000-09-08	skipped	F 1|2	gate 111
+  Wtd	PBR-A	2004-08-20	skipped	F 1|4	gate 111
+  Wtd	PH	2003-08-01	skipped	F 1|1.5	gate 111
+  Wtd	PH	2003-08-08	skipped	F 1|1.5	gate 111
+  Wtd	PH	2007-02-23	skipped	F 1|1.5	gate 111
+  Wtd	PH	2007-03-02	skipped	F 1|1.5	gate 111
+  Wtd	PHM	2000-04-14	skipped	F 1|4	gate 111
+  Wtd	PNR	2003-11-14	skipped	F 1.489|2.978	gate 111
+  Wtd	PNR	2003-11-21	skipped	F 1.489|2.978	gate 111
+  Wtd	RMD	2004-02-06	skipped	F 2|4	gate 111
+  Wtd	ROL	2003-11-14	skipped	F 5.0625|11.3906	gate 111
+  Wtd	ROL	2003-11-21	skipped	F 5.0625|11.3906	gate 111
+  Wtd	ROL	2005-04-01	skipped	F 5.0625|7.59375	gate 111
+  Wtd	ROL	2007-02-23	skipped	F 5.0625|7.59375	gate 111
+  Wtd	ROL	2007-03-09	skipped	F 5.0625|7.59375	gate 111
+  Wtd	ROL	2007-07-27	skipped	F 5.0625|7.59375	gate 111
+  Wtd	ROL	2007-08-10	skipped	F 5.0625|7.59375	gate 111
+  Wtd	RSG	2003-11-14	skipped	F 1|1.5	gate 111
+  Wtd	RSG	2003-11-21	skipped	F 1|1.5	gate 111
+  Wtd	RYAAY	2003-10-24	skipped	F 2.5|5	gate 111
+  Wtd	STLD	2000-01-14	skipped	F 1|4	gate 111
+  Wtd	STLD	2003-07-18	skipped	F 1|4	gate 111
+  Wtd	STLD	2003-08-08	skipped	F 1|4	gate 111
+  Wtd	STT	2000-04-07	placed	F 1|2	gate 111
+  Wtd	TAP	2004-02-20	skipped	F 1|2	gate 111
+  Wtd	TAP	2006-09-01	skipped	F 1|2	gate 111
+  Wtd	TEVA	2001-06-15	skipped	F 1|4	gate 111
+  Wtd	TEVA	2004-02-06	skipped	F 1|2	gate 111
+  Wtd	TRMB	2003-11-21	placed	F 2|6	gate 111
+  Wtd	TRMB	2006-02-03	skipped	F 2|4	gate 111
+  Wtd	TRMB	2006-12-08	skipped	F 2|4	gate 111
+  Wtd	TROW	2000-04-07	skipped	F 1|2	gate 111
+  Wtd	TSM	2007-06-29	skipped	F 1.005|1.01007	gate 111
+  Wtd	TSM	2007-07-06	skipped	F 1.005|1.01007	gate 111
+  Wtd	TT	2004-10-15	skipped	F 1.61383|3.22766	gate 111
+  Wtd	TXT	2003-07-18	skipped	F 1|2	gate 111
+  Wtd	TXT	2003-08-08	skipped	F 1|2	gate 111
+  Wtd	UNP	2005-01-07	skipped	F 2|4	gate 111
+  Wtd	UNP	2005-04-01	skipped	F 2|4	gate 111
+  Wtd	VRTX	2000-01-14	skipped	F 1|2	gate 111
+  Wtd	VTR	2004-08-13	skipped	F 1|0.8757	gate 111
+  Wtd	VTR	2007-10-05	skipped	F 1|0.8757	gate 111
+  Wtd	VZ	2004-08-20	skipped	F 1.06622|1.11195	gate 111
+  Wtd	WFC	2004-06-04	skipped	F 1|2	gate 111
+  Wtd	WFC	2006-03-03	skipped	F 1|2	gate 111
+  Wtd	WRB	2000-08-11	placed	F 3.375|17.0859	gate 111
+  Wtd	WRB	2004-01-16	skipped	F 3.375|7.59375	gate 111
+  Wtd	WRB	2004-01-30	skipped	F 3.375|7.59375	gate 111
+  Wtd	WRB	2004-02-06	skipped	F 3.375|7.59375	gate 111
+  Wtd	YUM	2004-03-05	skipped	F 1.391|2.782	gate 111
+  Wtd	YUM	2006-05-12	skipped	F 1.391|2.782	gate 111
+  Wtd	YUM	2006-05-19	skipped	F 1.391|2.782	gate 111
+  Wtd	YUM	2006-05-26	skipped	F 1.391|2.782	gate 111
