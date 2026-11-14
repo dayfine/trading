@@ -838,6 +838,97 @@ let test_local_range_top_truncates_at_split_boundary _ =
     (is_some_and (lt (module Float_ord) 100.0))
 
 (* ------------------------------------------------------------------ *)
+(* Stale-entry cap (entry_cap_local_range_weeks, H2′ #3594)             *)
+(* ------------------------------------------------------------------ *)
+
+(** A stale graded top: flat [100] bars (highs [102]) with one [200] spike (high
+    [204]) [spike_offset] weeks back. With the default 52/8 base window the
+    graded [breakout_price] is [204] whenever the spike is at offsets [8..51];
+    the current 4-week range tops out at [102]. The default spike sits at offset
+    40 — outside the 30-week stage MA (MA stays [100], flat), so only the anchor
+    level differs between arms. *)
+let _stale_top_bars ?(spike_offset = 40) () =
+  _local_range_bars ~n:60 ~flat_price:100.0 ~spike_offset ~spike_price:200.0
+
+let _analyze_capped ?(replace = 0) ?(basis = Entry_freshness.Ma_cross) ~cap bars
+    =
+  analyze
+    ~config:
+      {
+        cfg with
+        entry_anchor_local_range_weeks = replace;
+        entry_cap_local_range_weeks = cap;
+        entry_freshness_basis = basis;
+      }
+    ~ticker:"X" ~bars ~benchmark_bars:[] ~prior_stage:None ~as_of_date:as_of
+
+(** E above T: the graded top ([204]) sits above the 4-week range top ([102]),
+    so the ticket anchor is capped to [102]. The graded [breakout_price] —
+    admission and grading's basis — is untouched. *)
+let test_cap_lowers_stale_graded_top _ =
+  assert_that
+    (_analyze_capped ~cap:4 (_stale_top_bars ()))
+    (all_of
+       [
+         field (fun r -> r.local_range_top) (is_some_and (float_equal 102.0));
+         field (fun r -> r.breakout_price) (is_some_and (float_equal 204.0));
+       ])
+
+(** E below T: a spike 2 weeks back is inside the 4-week range ([T = 204]) and
+    outside the base window, so the graded top ([102]) sits below [T]. The cap
+    does not bind: no ticket anchor, the screener keeps the graded top. *)
+let test_cap_leaves_graded_top_below_range _ =
+  assert_that
+    (_analyze_capped ~cap:4 (_stale_top_bars ~spike_offset:2 ()))
+    (all_of
+       [
+         field (fun r -> r.local_range_top) is_none;
+         field (fun r -> r.breakout_price) (is_some_and (float_equal 102.0));
+       ])
+
+(** Flag off ([cap = 0]) on the fixture where the cap would bind: the analysis
+    is the default one — no ticket anchor, same graded top, same freshness. *)
+let test_cap_off_is_default_on_binding_fixture _ =
+  let bars = _stale_top_bars () in
+  let default =
+    analyze ~config:cfg ~ticker:"X" ~bars ~benchmark_bars:[] ~prior_stage:None
+      ~as_of_date:as_of
+  in
+  assert_that
+    (_analyze_capped ~cap:0 bars)
+    (all_of
+       [
+         field (fun r -> r.local_range_top) is_none;
+         field (fun r -> r.breakout_price) (equal_to default.breakout_price);
+         field
+           (fun r -> r.range_top_freshness)
+           (equal_to default.range_top_freshness);
+       ])
+
+(** Both armed: the cap lowers the replace anchor too. A 45-week replace window
+    catches the spike ([204]); the 4-week cap brings the ticket to [102]. *)
+let test_cap_composes_with_replace_anchor _ =
+  assert_that
+    (_analyze_capped ~replace:45 ~cap:4 (_stale_top_bars ())).local_range_top
+    (is_some_and (float_equal 102.0))
+
+(** Admission never sees the cap. Under [Range_top_breakout] the F1 clock is
+    live iff the close ([100]) is within 5% below its anchor (and the flat MA,
+    [100], sits under it). Anchored at the 4-week top [102] it would be live
+    (control arm, replace 4); the armed arm's clock reads the uncapped 45-week
+    replace anchor [204] and stays not-live, exactly as with the cap off. *)
+let test_cap_never_moves_freshness_clock _ =
+  let bars = _stale_top_bars () in
+  let arm ~replace ~cap =
+    (_analyze_capped ~replace ~cap ~basis:Range_top_breakout bars)
+      .range_top_freshness
+  in
+  assert_that
+    [ arm ~replace:4 ~cap:0; arm ~replace:45 ~cap:0; arm ~replace:45 ~cap:4 ]
+    (elements_are
+       [ equal_to (Some true); equal_to (Some false); equal_to (Some false) ])
+
+(* ------------------------------------------------------------------ *)
 (* Continuation buys — Interpretation B of issue #889                   *)
 (*                                                                      *)
 (* The continuation arm of [is_breakout_candidate] only fires when      *)
@@ -1144,6 +1235,16 @@ let suite =
          >:: test_local_range_top_includes_spike_in_window;
          "local-range top truncates at split boundary"
          >:: test_local_range_top_truncates_at_split_boundary;
+         "stale-entry cap lowers a graded top above the range"
+         >:: test_cap_lowers_stale_graded_top;
+         "stale-entry cap leaves a graded top below the range"
+         >:: test_cap_leaves_graded_top_below_range;
+         "stale-entry cap off is the default analysis"
+         >:: test_cap_off_is_default_on_binding_fixture;
+         "stale-entry cap composes with the replace anchor"
+         >:: test_cap_composes_with_replace_anchor;
+         "stale-entry cap never moves the freshness clock"
+         >:: test_cap_never_moves_freshness_clock;
          "continuation default off keeps existing rejection"
          >:: test_continuation_default_off_keeps_existing_rejection;
          "continuation enabled admits mature stage2"

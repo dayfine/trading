@@ -101,6 +101,24 @@ let test_threads_entry_anchor_local_range_weeks _ =
   let built = Weinstein_strategy.stock_analysis_config_for ~config in
   assert_that built.entry_anchor_local_range_weeks (equal_to 26)
 
+(** The seam threads [entry_cap_local_range_weeks] (the stale-entry cap, H2′
+    #3594) verbatim into the built per-screen [Stock_analysis.config]. Default
+    [0] is pinned by [test_default_builds_stock_analysis_default_config]
+    ([Stock_analysis.default_config] has the cap at [0] too).
+
+    EFFECTIVENESS-PIN: entry_cap_local_range_weeks -- arms the field away from
+    its [0] default; severing the copy in [_stock_analysis_config_for] would
+    leave [built.entry_cap_local_range_weeks = 0] and fail the assertion. *)
+let test_threads_entry_cap_local_range_weeks _ =
+  let config =
+    {
+      (_default_config ()) with
+      Weinstein_strategy.entry_cap_local_range_weeks = 4;
+    }
+  in
+  let built = Weinstein_strategy.stock_analysis_config_for ~config in
+  assert_that built.entry_cap_local_range_weeks (equal_to 4)
+
 (** The seam threads [entry_freshness_basis] (F1, the admission-clock basis —
     {!Entry_freshness.basis}) verbatim into the built per-screen
     [Stock_analysis.config]. Found uncovered by the 2026-08-28 census
@@ -203,6 +221,8 @@ let suite =
          >:: test_override_mirrors_into_support_via_shared_record;
          "threads entry_anchor_local_range_weeks into built config"
          >:: test_threads_entry_anchor_local_range_weeks;
+         "threads entry_cap_local_range_weeks into built config"
+         >:: test_threads_entry_cap_local_range_weeks;
          "threads entry_freshness_basis into built config"
          >:: test_threads_entry_freshness_basis;
        ]

@@ -125,23 +125,21 @@ let _analyze_ticker ~(inputs : inputs)
       (Stock_analysis.analyze_with_callbacks ~config:analysis_config ~ticker
          ~callbacks ~prior_stage ~as_of_date:inputs.as_of)
 
-(* Per-stock analysis for the screened universe. Threads the strategy config's
-   ticket-level knobs ([overhead_supply], [entry_anchor_local_range_weeks],
-   [entry_freshness_basis]) into the per-stock analysis config; each defaults to
-   the no-op, so the live path stays bit-identical when unarmed.
+let stock_analysis_config (config : Weinstein_strategy.config) =
+  {
+    Stock_analysis.default_config with
+    overhead_supply = config.overhead_supply;
+    entry_anchor_local_range_weeks = config.entry_anchor_local_range_weeks;
+    entry_cap_local_range_weeks = config.entry_cap_local_range_weeks;
+    entry_freshness_basis = config.entry_freshness_basis;
+  }
+
+(* Per-stock analysis for the screened universe, on [stock_analysis_config].
    [eligible_tickers] is pre-filtered by the sparse-tail gate
    ([_eligible_tickers]); this fn no longer walks [inputs.ticker_sectors]. *)
 let _analyze_universe ~(inputs : inputs) ~index_bars ~eligible_tickers :
     Stock_analysis.t list =
-  let analysis_config =
-    {
-      Stock_analysis.default_config with
-      overhead_supply = inputs.config.overhead_supply;
-      entry_anchor_local_range_weeks =
-        inputs.config.entry_anchor_local_range_weeks;
-      entry_freshness_basis = inputs.config.entry_freshness_basis;
-    }
-  in
+  let analysis_config = stock_analysis_config inputs.config in
   List.filter_map eligible_tickers ~f:(fun ticker ->
       _analyze_ticker ~inputs ~analysis_config ~index_bars ticker)
 

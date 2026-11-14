@@ -36,6 +36,7 @@
   test_true_dollar_divisor
   test_panel_income_arming
   test_trailing_stop_ma_overlays
+  test_entry_cap_overlays
   test_panel_loader_parity
   test_snapshot_mode_parity
   test_backtest_runner_args

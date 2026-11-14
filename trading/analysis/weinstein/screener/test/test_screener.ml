@@ -2955,6 +2955,67 @@ let test_entry_anchor_local_top_when_armed _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* entry_cap_local_range_weeks: stale-entry cap (H2′, #3594)           *)
+(* ------------------------------------------------------------------ *)
+
+(** A graded top of [100.0] carrying the ticket level {!Stock_analysis} stores
+    when the cap is armed over a current range topping at [range_top] (replace
+    anchor off): {!Stale_entry_cap.ticket_anchor}. *)
+let capped_analysis ~range_top =
+  anchor_analysis ~ticker:"AAA" ~breakout_price:(Some 100.0)
+    ~local_range_top:
+      (Stale_entry_cap.ticket_anchor ~range_top:None ~cap_top:(Some range_top)
+         ~breakout_price:(Some 100.0))
+
+(** E above T: the graded top [100] sits above the current range [90], so the
+    ticket rests at [90 *. 1.005 = 90.45] (the screener's own
+    [entry_buffer_pct]); the stop and risk follow it; the audit arm is
+    [Local_range_top]. Grade / score / side equal the uncapped candidate's —
+    admission and grading never see the cap. *)
+let test_stale_cap_lowers_entry_stop_and_risk _ =
+  let c_off =
+    List.hd_exn
+      (_screen_buys
+         (anchor_analysis ~ticker:"AAA" ~breakout_price:(Some 100.0)
+            ~local_range_top:None))
+  in
+  assert_that
+    (_screen_buys (capped_analysis ~range_top:90.0))
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (c : scored_candidate) -> c.suggested_entry)
+               (float_equal 90.45);
+             field (fun c -> c.suggested_stop) (float_equal (90.45 *. 0.92));
+             field (fun c -> c.risk_pct) (float_equal 0.08);
+             field entry_anchor_kind (equal_to Local_range_top);
+             field (fun c -> c.grade) (equal_to c_off.grade);
+             field (fun c -> c.score) (equal_to c_off.score);
+             field (fun c -> c.side) (equal_to c_off.side);
+           ];
+       ])
+
+(** E at or below T: a current range topping at [100] (equal) or [110] (above)
+    leaves the ticket exactly as with the cap off — graded top [100 *. 1.005],
+    arm [Breakout]. *)
+let test_stale_cap_leaves_entry_at_or_below_range _ =
+  let unchanged =
+    all_of
+      [
+        field
+          (fun (c : scored_candidate) -> c.suggested_entry)
+          (float_equal 100.5);
+        field entry_anchor_kind (equal_to Breakout);
+      ]
+  in
+  assert_that
+    (List.concat_map [ 100.0; 110.0 ] ~f:(fun range_top ->
+         _screen_buys (capped_analysis ~range_top)))
+    (elements_are [ unchanged; unchanged ])
+
+(* ------------------------------------------------------------------ *)
 (* #3056: continuation-buy entry anchor (consolidation_high)           *)
 (* ------------------------------------------------------------------ *)
 
@@ -4142,6 +4203,10 @@ let suite =
          >:: test_entry_anchor_graded_top_when_off;
          "entry anchor: local top when armed, admission/grading unchanged"
          >:: test_entry_anchor_local_top_when_armed;
+         "stale-entry cap: lowers entry, stop and risk above the range"
+         >:: test_stale_cap_lowers_entry_stop_and_risk;
+         "stale-entry cap: entry unchanged at or below the range"
+         >:: test_stale_cap_leaves_entry_at_or_below_range;
          "continuation anchor: entry at consolidation_high when hit"
          >:: test_continuation_anchor_at_consolidation_high;
          "continuation anchor: flag off keeps graded top, no mature admit"

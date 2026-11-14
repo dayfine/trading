@@ -1212,6 +1212,51 @@ type config = {
           [((flag entry_anchor_local_range_weeks) (values (13 26 52)))];
           default-off until a ledger ACCEPT. Note:
           [dev/notes/honest-ladder-2026-08-05.md]. *)
+  entry_cap_local_range_weeks : int; [@sexp.default 0]
+      (** Stale-entry cap ("H2′", #3594): lower a long buy-stop trigger [E] that
+          sits {i above} the top of the current trading range, and leave every
+          other [E] alone. When [> 0], [T] is the split-safe maximum high over
+          the most recent [entry_cap_local_range_weeks] weekly bars, and the
+          screener's ticket anchor becomes [min(anchor, T)]. The screener's
+          usual breakout buffer ([Screener.candidate_params.entry_buffer_pct],
+          default 0.5%) is then applied, so the capped ticket is
+          [T * (1 + entry_buffer_pct)] rounded to the cent. An anchor at or
+          below [T] is unchanged. Example value: [4] (the screen's 4-week high).
+
+          {b A cap, not a replace.} The replace anchor
+          ({i entry_anchor_local_range_weeks}, the screen's H2) moves [E] to the
+          range top unconditionally. That raised the price paid in most trades
+          and dropped the orders that never reached it, and it diluted in the
+          2026-10-03 backtest. The cap only lowers a stale [E], so it never
+          raises a price and never drops a name. Screen:
+          [dev/experiments/entry-timing-screen-2026-11-12/README.md] §"H2′".
+
+          {b Ticket-level only.} Threaded into
+          [Stock_analysis.config.entry_cap_local_range_weeks] on the simulator
+          screening path ([_stock_analysis_config_for]) and the weekly-report
+          path ([Weekly_snapshot_generator.stock_analysis_config]). The capped
+          level rides [Stock_analysis.t.local_range_top], so the entry and the
+          derived stop / risk follow it exactly as they follow the replace
+          anchor, and the audit's entry-anchor arm reads [local_range_top] when
+          the cap bound. Admission, [resistance_quality] grading, cascade
+          scoring, the F1 freshness clock (it reads the uncapped replace anchor)
+          and stage classification are all unchanged. It applies to the graded
+          breakout top and to the replace anchor; with both armed, the ticket is
+          the replace anchor over the shorter window. It never touches the MA
+          fallback, whose adjusted-MA level would be a basis mix against the raw
+          [T] (issue #2973), the continuation arm, or shorts. See
+          [Stale_entry_cap].
+
+          {b Faithfulness (W1/W2).} [docs/design/weinstein-book-reference.md]
+          §4.7 anchors the buy-stop at the top of the {i current} trading range
+          ("write down the price that each would need to break out"), and §4.1
+          requires the breakout above resistance. This is an entry-level dial
+          with the spine intact.
+
+          {b Default [0] = off, bit-identical to every existing baseline and
+             golden} (R1). R2: axis-expressible as
+          [((flag entry_cap_local_range_weeks) (values (0 4)))]. R3: stays [0]
+          until a ledger ACCEPT (the K = 5 paired 26y run). *)
   entry_freshness_basis : Entry_freshness.basis;
       [@sexp.default Entry_freshness.Ma_cross]
       (** F1 — which event starts the Stage-2 admission clock.

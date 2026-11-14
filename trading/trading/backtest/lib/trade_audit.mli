@@ -261,7 +261,10 @@ type entry_decision = {
           most recent [entry_anchor_local_range_weeks] bars. [None] when the
           knob is at its default 0 (feature off) or no defined high existed in
           the window — so the column also records whether the local-anchor
-          mechanism was armed for this entry. *)
+          mechanism was armed for this entry. Under the stale-entry cap
+          ([entry_cap_local_range_weeks], [Stale_entry_cap]) it is the capped
+          ticket level: present exactly when the cap bound, if the replace
+          anchor is off. *)
   screener_proxy_stop : float;
       (** The screener's fixed-percentage {e proxy} stop,
           [Screener.scored_candidate.suggested_stop]:

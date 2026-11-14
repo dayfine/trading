@@ -1002,6 +1002,13 @@ type config = {
           (admission / grading / stage classification unchanged); default [0] =
           off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.entry_anchor_local_range_weeks]. *)
+  entry_cap_local_range_weeks : int; [@sexp.default 0]
+      (** Stale-entry cap (H2′, #3594): when [> 0], a long ticket anchored
+          {i above} the split-safe max high over the last
+          [entry_cap_local_range_weeks] bars is lowered to it; any other anchor
+          is unchanged. A cap, not a replace. Strictly ticket-level; default [0]
+          = off, bit-identical baselines (R1). See
+          [Weinstein_strategy_config.entry_cap_local_range_weeks]. *)
   entry_freshness_basis : Entry_freshness.basis;
       [@sexp.default Entry_freshness.Ma_cross]
       (** F1 — which event starts the Stage-2 admission clock. [Ma_cross]

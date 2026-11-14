@@ -5,7 +5,8 @@
     + the continuation detector's [consolidation_high] — pattern-specific, book
       §4.6 "breaks out anew above the top of its resistance zone"; the old base
       top in [breakout_price] sits below a continuation name's close;
-    + [analysis.local_range_top] (the generic local-range knob);
+    + [analysis.local_range_top]: the generic local-range knob, or the level of
+      the stale-entry cap when it bound ([Stale_entry_cap]);
     + [analysis.breakout_price], else the MA-based fallback above the MA.
 
     Shorts (#3131):

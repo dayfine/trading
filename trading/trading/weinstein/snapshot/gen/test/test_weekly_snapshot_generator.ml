@@ -1830,6 +1830,38 @@ let test_eligible_beyond_cap_positive_when_cap_bites _ =
            (gt (module Int_ord) 0);
        ])
 
+(* Weekly-report seam for the ticket-level entry knobs: the generator screens
+   with [Generator.stock_analysis_config], which must thread the stale-entry cap
+   (H2′, #3594) and the replace anchor from the strategy config, exactly as the
+   simulator's [Weinstein_strategy.stock_analysis_config_for] does. *)
+let _report_config () =
+  Weinstein_strategy.default_config ~universe:[ "AAPL" ]
+    ~index_symbol:_index_symbol
+
+(* R1: at the strategy default both knobs are off, so the report is
+   bit-identical to the pre-cap generator. *)
+let test_report_entry_anchors_default_off _ =
+  let built = Generator.stock_analysis_config (_report_config ()) in
+  assert_that
+    (built.entry_cap_local_range_weeks, built.entry_anchor_local_range_weeks)
+    (pair (equal_to 0) (equal_to 0))
+
+(* EFFECTIVENESS-PIN: entry_cap_local_range_weeks -- weekly-report path: arms
+   the cap (and the replace anchor) away from [0]; a severed copy in
+   [stock_analysis_config] would leave the built value at [0]. *)
+let test_report_threads_entry_anchors _ =
+  let config =
+    {
+      (_report_config ()) with
+      Weinstein_strategy.entry_cap_local_range_weeks = 4;
+      entry_anchor_local_range_weeks = 26;
+    }
+  in
+  let built = Generator.stock_analysis_config config in
+  assert_that
+    (built.entry_cap_local_range_weeks, built.entry_anchor_local_range_weeks)
+    (pair (equal_to 4) (equal_to 26))
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
@@ -1918,6 +1950,10 @@ let suite =
          "snapshot round-trips through writer/reader" >:: test_round_trips;
          "empty universe yields no candidates"
          >:: test_empty_universe_no_candidates;
+         "report entry anchors default off"
+         >:: test_report_entry_anchors_default_off;
+         "report threads the stale-entry cap and replace anchor"
+         >:: test_report_threads_entry_anchors;
        ]
 
 let () = run_test_tt_main suite

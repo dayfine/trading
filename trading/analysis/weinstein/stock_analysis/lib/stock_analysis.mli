@@ -80,6 +80,31 @@ type config = {
           [Stock_analysis_scans.scan_max_high] walk). The [@sexp.default 0]
           attribute is inert here (this config does not derive sexp) but marks
           the field as an additive, default-off option. *)
+  entry_cap_local_range_weeks : int; [@sexp.default 0]
+      (** Stale-entry cap (H2′, #3594; {!Stale_entry_cap}). When [> 0], a long
+          ticket whose anchor sits {i above} the top of the current trading
+          range is lowered to it: [T] is the split-safe maximum high over the
+          most recent [entry_cap_local_range_weeks] bars, and the ticket anchor
+          becomes [min(anchor, T)]. An anchor at or below [T] is unchanged.
+          Unlike [entry_anchor_local_range_weeks], which replaces the anchor
+          unconditionally, this only ever lowers it. The capped level is carried
+          in {!t.local_range_top}, so the screener's entry / stop / risk follow
+          it through the existing [Local_range_top] arm. The screener's own
+          buffer ([Screener.candidate_params.entry_buffer_pct]) is then applied
+          on top.
+
+          {b Ticket-level only}, like the replace anchor: {!t.breakout_price}
+          (admission, grading), the F1 freshness clock (reads the {i uncapped}
+          replace anchor) and stage classification are unchanged. Applies to the
+          graded breakout top and to the replace anchor (both armed = the
+          replace anchor over the shorter window). It never applies to the MA
+          fallback, the continuation arm or shorts; see {!Stale_entry_cap} for
+          why.
+
+          {b Default [0] = off}: {!t.local_range_top} is exactly what
+          [entry_anchor_local_range_weeks] alone produces (bit-identical). The
+          [@sexp.default 0] attribute is inert here (this config does not derive
+          sexp) but marks the field as an additive, default-off option. *)
   entry_freshness_basis : Entry_freshness.basis;
       [@sexp.default Entry_freshness.Ma_cross]
       (** F1 (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §2 M1 / §3
@@ -147,11 +172,22 @@ type t = {
           over the most recent [config.entry_anchor_local_range_weeks] bars
           (offsets [0 .. weeks - 1], the "current trading range"). [None] when
           [config.entry_anchor_local_range_weeks = 0] (default — feature off) OR
-          when no defined high exists in the window. Read {i only} by the
-          screener to anchor {!Screener.suggested_entry} (and, through it, the
-          derived stop / risk ticket fields); it never feeds admission, grading,
-          or stage classification, so [breakout_price] remains the sole basis
-          for those. Off by default = bit-identical to prior behaviour. *)
+          when no defined high exists in the window.
+
+          Under the stale-entry cap ([config.entry_cap_local_range_weeks > 0],
+          {!Stale_entry_cap.ticket_anchor}) it is the {i capped} ticket level:
+          [min] of the above and the cap's range top [T] when the replace anchor
+          is armed. Otherwise it is [Some T] exactly when [breakout_price]
+          exceeds [T], and [None] when the graded top already sits at or below
+          the current range. So it can differ from the level
+          {!range_top_freshness} was measured against, which is always the
+          uncapped replace anchor.
+
+          Read {i only} by the screener to anchor {!Screener.suggested_entry}
+          (and, through it, the derived stop / risk ticket fields); it never
+          feeds admission, grading, or stage classification, so [breakout_price]
+          remains the sole basis for those. Off by default = bit-identical to
+          prior behaviour. *)
   prior_stage : Weinstein_types.stage option;
       (** Stage from the previous week, passed forward for transition tracking.
       *)
@@ -183,8 +219,10 @@ type t = {
   range_top_freshness : bool option;
       (** F1 — the armed admission clock's verdict, computed by
           {!Entry_freshness.range_top_freshness} from
-          [config.entry_freshness_basis], the stage MA direction / value,
-          {!local_range_top}, and {!current_close}.
+          [config.entry_freshness_basis], the stage MA direction / value, the
+          replace anchor over [config.entry_anchor_local_range_weeks] (equal to
+          {!local_range_top} unless the stale-entry cap is armed; the clock
+          never reads the cap), and {!current_close}.
 
           [None] under the default [Ma_cross] basis — "this basis has no
           opinion", which {!is_breakout_candidate} reads as "run the pre-F1
