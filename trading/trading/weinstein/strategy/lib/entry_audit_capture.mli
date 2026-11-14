@@ -242,8 +242,12 @@ val make_entry_transition :
     would install at [e], computed by the same helper. The trigger, the
     installed stop (a re-anchored one included, placed below [effective_entry]),
     the sizing and the [No_structural_stop] detail still follow
-    [effective_entry]. The strategy passes {!Entry_cap_stop_gate.gate_entry}:
-    the trigger the ticket would have had with the stale-entry cap off. *)
+    [effective_entry]. In the candidate trace of [Pass], [Stop_too_wide] and
+    [Sized_zero], the entry and the stop are the placed ones while the
+    [stop_distance_pct] is the gate's, measured from [e], so recomputing it from
+    the same line gives a different number (audit only). The strategy passes
+    {!Entry_cap_stop_gate.gate_entry}: the trigger the ticket would have had
+    with the stale-entry cap off. *)
 
 val check_cash_and_deduct :
   leverage_enabled:bool ->

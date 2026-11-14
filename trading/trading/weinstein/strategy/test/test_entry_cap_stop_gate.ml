@@ -149,9 +149,10 @@ let _walk ~config cand =
   (entries, stop)
 
 (* One ticket, direct, so the result names the gate that fired. *)
-let _attempt ?gate_entry ~require_structural_stop cand =
+let _attempt ?(stop_anchor_at_entry_base = true) ?gate_entry
+    ~require_structural_stop cand =
   Entry_audit_capture.make_entry_transition ~trigger_at_suggested:true
-    ~stop_anchor_at_entry_base:true ~require_structural_stop ?gate_entry
+    ~stop_anchor_at_entry_base ~require_structural_stop ?gate_entry
     ~portfolio_risk_config:_base_config.portfolio_config
     ~stops_config:_base_config.stops_config ~initial_stop_buffer:1.0
     ~stop_states:(ref String.Map.empty) ~bar_reader:(_reader ())
@@ -163,6 +164,10 @@ let _no_structural_stop_kind = function
 
 let _entry_ok = function
   | Entry_audit_capture.Entry_ok (_, meta) -> Some meta
+  | _ -> None
+
+let _stop_too_wide = function
+  | Entry_audit_capture.Stop_too_wide -> Some ()
   | _ -> None
 
 let test_gate_entry_is_uncapped_trigger _ =
@@ -177,11 +182,15 @@ let test_gate_entry_none_unless_applies _ =
   let no_trigger =
     { (_config ~gate:true ()) with sim_entry_trigger_at_suggested = false }
   in
+  let no_stoplimit =
+    { (_config ~gate:true ()) with enable_sim_entry_stoplimit = false }
+  in
   assert_that
     [
       gate ~config:(_config ~gate:false ()) (_wide ());
       gate ~config:(_config ~cap_weeks:0 ~gate:true ()) (_wide ());
       gate ~config:no_trigger (_wide ());
+      gate ~config:no_stoplimit (_wide ());
       gate (_wide ~capped:false ());
       gate
         (_candidate ~side:Trading_base.Types.Short ~breakout:114.43
@@ -211,6 +220,31 @@ let test_flag_on_skips_as_cap_off _ =
     (matching _no_structural_stop_kind
        (equal_to
           (Audit_recorder.Buffer_fallback : Audit_recorder.stop_floor_kind)))
+
+(** The plain [max_stop_distance_pct] gate reads [E] too: with the re-anchor and
+    [require_structural_stop] off, the floor stop is ~21 % below [E] and ~13 %
+    below [E′]. Flag off admits [_wide] at [E′] = 105; flag on drops it as
+    [Stop_too_wide], the cap-off ticket's outcome. *)
+let test_flag_on_width_gate_reads_uncapped_trigger _ =
+  let config gate =
+    {
+      (_config ~gate ()) with
+      stop_anchor_at_entry_base = false;
+      require_structural_stop = false;
+    }
+  in
+  let attempt ?gate_entry () =
+    _attempt ~stop_anchor_at_entry_base:false ?gate_entry
+      ~require_structural_stop:false (_wide ())
+  in
+  assert_that
+    (fst (_walk ~config:(config false) (_wide ())))
+    (elements_are [ pair (float_equal 105.0) __ ]);
+  assert_that (fst (_walk ~config:(config true) (_wide ()))) is_empty;
+  assert_that (attempt ()) (matching _entry_ok __);
+  assert_that
+    (attempt ~gate_entry:115.0 ())
+    (matching _stop_too_wide (equal_to ()))
 
 (** (c) Flag on, floor within 15 % of [E]: placed at [E′] = 98 with the cap-off
     ticket's floor stop, sized from [E′] minus that stop. *)
@@ -321,6 +355,8 @@ let suite =
          "flag off: the cap admits" >:: test_flag_off_cap_admits;
          "flag on: skipped as with the cap off"
          >:: test_flag_on_skips_as_cap_off;
+         "flag on: width gate reads the uncapped trigger"
+         >:: test_flag_on_width_gate_reads_uncapped_trigger;
          "flag on: placed at the capped trigger"
          >:: test_flag_on_places_at_capped_trigger;
          "flag on, cap off: no-op" >:: test_flag_on_cap_off_is_noop;
