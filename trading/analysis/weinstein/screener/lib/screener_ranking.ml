@@ -140,11 +140,19 @@ let _seed_key ~tiebreak_seed ~as_of =
   let date = Option.value_map as_of ~default:"" ~f:Date.to_string in
   sprintf "%d|%s|" tiebreak_seed date
 
+(* One ticker's [Seeded] hash under an already-built [seed_key]. Shared by the
+   comparator and {!seeded_tiebreak_key}, so the key a report prints is the key
+   the cascade sorted by. *)
+let _seeded_hash ~seed_key ticker = _ticker_hash (seed_key ^ ticker)
+
+let seeded_tiebreak_key ?(tiebreak_seed = 0) ?as_of ticker =
+  _seeded_hash ~seed_key:(_seed_key ~tiebreak_seed ~as_of) ticker
+
 (** [Seeded] tiebreak: FNV-1a of [seed|date|ticker] ascending, then [ticker] as
     the final total-order key (also the hash-collision fallback). Changing the
     seed or the date re-draws the order of a tie group; nothing else does. *)
 let _seeded_cmp ~seed_key a b =
-  let key r = _ticker_hash (seed_key ^ r.ticker) in
+  let key r = _seeded_hash ~seed_key r.ticker in
   match Int.compare (key a) (key b) with
   | 0 -> String.compare a.ticker b.ticker
   | c -> c

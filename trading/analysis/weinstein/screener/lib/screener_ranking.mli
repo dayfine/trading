@@ -131,6 +131,14 @@ val compare_rankable :
     [Price_band_seeded]. Every other mode ignores them, so existing callers are
     unchanged. *)
 
+val seeded_tiebreak_key :
+  ?tiebreak_seed:int -> ?as_of:Core.Date.t -> string -> int
+(** [seeded_tiebreak_key ?tiebreak_seed ?as_of ticker] is the key the [Seeded]
+    (and, inside a price band, [Price_band_seeded]) tiebreak sorts equal-score
+    candidates by, ascending, with [ticker] breaking a hash collision. Same
+    defaults as {!compare_rankable}, and computed by the same hash, so a report
+    can print the key the cascade actually sorted by. Pure. *)
+
 val filter_and_cap :
   compare:('a -> 'a -> int) ->
   candidate_fn:('b -> 'a option) ->
