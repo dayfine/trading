@@ -1,5 +1,5 @@
 # SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
 Rule 1 inputs: L1 0.4167 (bar 0.25) | L2 E_net -0.004 (bars 0.75 / 1.5) | T ratio 99.000 (bars 1.0 / 1.5), in>out 2000-12 0, 2013-26 1, monsters 2 (min 20), ride diff +0.1197
-Rule 1 (tiebreak), mechanical: CLOSE-AXIS (the expected direct tail effect on this path is below the noise floor; keep as a default-off axis)
+Rule 1 (tiebreak), mechanical: CLOSE-AXIS (L2 < 0.75: the expected direct tail effect is under about 0.1 log, half the about-0.2-log 26-year noise floor; keep as a default-off axis)
 Rule 2 inputs: hits (all three bars) exact none, window none | lift >= 1.25 at any share: exact none, window none | cheap monsters with a cascade row: exact 0, window 0 (min 30 each)
 Rule 2 (sub-gate), mechanical: UNDERPOWERED (fewer than 30 cheap monsters with a cascade row in a view): no conclusion

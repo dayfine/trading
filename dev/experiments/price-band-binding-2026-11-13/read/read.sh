@@ -102,10 +102,15 @@ say "7/7 the pre-registered rules, applied mechanically (README §Decision rules
 cat "$WORK/agates.txt" "$WORK/bgates.txt" "$WORK/tgates.txt" "$WORK/fgates.txt" | tr '\n' ' ' | awk '{
   for (i = 1; i < NF; i += 2) v[$i] = ($(i + 1) ~ /^[-+0-9.]+$/) ? $(i + 1) + 0 : $(i + 1)
   L1 = v["L1"]; L2 = v["L2"]; tr = v["T_ratio"]; tm = v["T_monsters"]; td = v["T_ride_diff"]
-  bfail = (L1 < 0.25 || L2 < 0.75); bpass = (L1 >= 0.25 && L2 >= 1.5)
+  # Rule 1, in README order; each branch prints its own reason.
+  bpass = (L1 >= 0.25 && L2 >= 1.5)
   tfail = (tm >= 20 && (tr < 1.0 || td <= 0)); tpass = (tm >= 20 && tr >= 1.5 && v["T_h1_in_gt_out"] && v["T_h2_in_gt_out"] && td > 0)
   printf "Rule 1 inputs: L1 %.4f (bar 0.25) | L2 E_net %.3f (bars 0.75 / 1.5) | T ratio %.3f (bars 1.0 / 1.5), in>out 2000-12 %d, 2013-26 %d, monsters %d (min 20), ride diff %+.4f\n", L1, L2, tr, v["T_h1_in_gt_out"], v["T_h2_in_gt_out"], tm, td
-  r1 = bfail ? "CLOSE-AXIS (the expected direct tail effect on this path is below the noise floor; keep as a default-off axis)" : tfail ? "CLOSE-AXIS (it binds, but swaps in no fatter tail; keep as a default-off axis)" : (bpass && tpass) ? "FRESH-PREREGISTRATION" : "PARK"
+  if (L2 < 0.75) r1 = "CLOSE-AXIS (L2 < 0.75: the expected direct tail effect is under about 0.1 log, half the about-0.2-log 26-year noise floor; keep as a default-off axis)"
+  else if (L1 < 0.25) r1 = "PARK (L1 < 0.25: the order rarely changes the top 20 on binding dates, so the #3595 binds-often correction does not hold; but L2 >= 0.75, its cash-order re-draws still carry an expected tail at or above the bar, so no grounds to close)"
+  else if (tfail) r1 = "CLOSE-AXIS (T: the order binds, but among tied names it swaps in no fatter tail; keep as a default-off axis)"
+  else if (bpass && tpass) r1 = "FRESH-PREREGISTRATION (L1 >= 0.25, L2 >= 1.5 and T passes)"
+  else r1 = "PARK (binding and tail are not decisive: L2 between 0.75 and 1.5, or T short of its bars)"
   if (v["AG"] < 0.90) r1 = sprintf("NOT APPLIED (the band proxy agrees with the ticket band on %.1f %% of placed tickets, below 90 %%)", 100 * v["AG"])
   printf "Rule 1 (tiebreak), mechanical: %s\n", r1
   # Rule 2, in README order: UNDERPOWERED, DIAL-STUDY (both views), one view only, lift below the share bar, NOTHING.

@@ -116,7 +116,8 @@ emits no Long rows.
      the re-draw buys. Here fill = entries ÷ placed tickets in this cell, and r(b) is S's ≥ +100 % trades per entry in
      band b, pooled over #3595's five S cells: 9/112, 10/217, 8/828 and 15/1,685 (§Why 2 there).
    - **What L2 compares.** P's modelled funding against S's actual placements, not against the same model run on S's
-     order. The model's error on cash dates therefore enters L2, and the model check above bounds it.
+     order. The model's error on cash dates therefore enters L2. The model check above indicates how large that
+     error is, but it does not bound it.
    - The read splits the re-draw into dates where the cut changed and dates where only the order changed (the cash
      order).
 3. **The swap tail** (`results/read/swap_tail.txt`).
@@ -151,28 +152,40 @@ emits no Long rows.
 
 ### Rule 1: the tiebreak axis
 
-Checked in this order:
+Checked in this order. Each branch has its own reason, and `rules.txt` prints it.
 
-1. **CLOSE-AXIS** if L1 < 0.25 or L2 < 0.75. The order's expected direct tail effect on this path is then below the
-   26-year noise floor (about 0.1 log). #3595's gap would rest on the realised outcomes of a few systematic swaps
-   (MERC, DINO and the rest of #3595 §Why 5), not on an effect the order buys in expectation. This reading says
-   nothing about what a seed change produces. #3595 §Why 5 measured that separately: same-seed P−S has a median of
-   +0.348 against 0.149 for cross-seed S−S.
-2. **CLOSE-AXIS** if T has at least 20 monsters on the two sides together and either its ratio is below 1.0 or the
-   swapped-in names' mean ride is not above the swapped-out names'. The order binds, but on the strategy's own ties it
-   swaps in no fatter tail.
+1. **CLOSE-AXIS** if L2 < 0.75.
+   - **Reason.** The expected direct tail effect is under about 0.1 log, half the about 0.2 log 26-year noise floor.
+     No K = 5 run could separate it from seed noise.
+   - **What it means for #3595.** Its gap would rest on the realised outcomes of a few systematic swaps (MERC, DINO and
+     the rest of #3595 §Why 5), not on an effect the order buys in expectation.
+   - **What it does not say.** Nothing about what a seed change produces. #3595 §Why 5 measured that separately:
+     same-seed P−S has a median of +0.348, against 0.149 for cross-seed S−S.
+2. **PARK** if L1 < 0.25 (with L2 ≥ 0.75).
+   - **Reason.** The order rarely changes the top 20 on binding dates, so #3595's "binds often" correction does not
+     hold. But its cash-order re-draws still carry an expected tail at or above the bar, so that is not grounds to
+     close.
+   - **Why T is not read on this branch.** T measures only the cut swaps, which a low L1 makes rare.
+3. **CLOSE-AXIS** if T has at least 20 monsters on the two sides together, and either its ratio is below 1.0 or the
+   swapped-in names' mean ride is not above the swapped-out names'.
+   - **Reason.** The order binds, but among tied names it swaps in no fatter tail.
+4. **FRESH PRE-REGISTRATION** if L1 ≥ 0.25, L2 ≥ 1.5 and T passes. T passes with at least 20 monsters, a ratio
+   ≥ 1.5, in above out in both halves, and a higher mean ride.
+   - **What it carries.** The four parts #3595 §What it implies next lists: liveness, a fixed drawdown reading, a
+     name-concentration check, and broad-vs-broad confirmation cells.
+   - **Its liveness bar.** It is set from this rate: one P cell with `--emit-candidates` must show the top 20 changing
+     on at least 0.5 × L1 of its binding dates.
+5. **PARK** otherwise.
+   - **Reason.** Binding and tail are not decisive: L2 is between 0.75 and 1.5, or T falls short of its bars.
 
-   **What CLOSE-AXIS does to the flag** (`dev/rules/experiment-flag-discipline.md` Rule 4). Either CLOSE-AXIS keeps
-   `Price_band_seeded` as a default-off axis, which is the REJECT-as-default-but-legitimate-axis class. It is not
-   do-not-revive, so it is not retirement-eligible. The reason is that this is a one-window proxy read: it rejects
-   prioritising the axis, not the mechanism (`dev/rules/mechanism-validation-rigor.md` §Verdict calibration). No new
-   pre-registration follows.
-3. **FRESH PRE-REGISTRATION** if L1 ≥ 0.25, L2 ≥ 1.5 and T passes: at least 20 monsters, ratio ≥ 1.5, in above out in
-   both halves, and a higher mean ride. It carries the four parts #3595 §What it implies next lists (liveness, a fixed
-   drawdown reading, a name-concentration check, broad-vs-broad confirmation cells). Its liveness bar is set from this
-   rate: one P cell with `--emit-candidates` must show the top 20 changing on at least 0.5 × L1 of its binding dates.
-4. **PARK** otherwise. The axis stays default-off (keep-as-axis under Rule 4), no new cells are spent now, and the
-   measured rates go into the ledger. Reopen it only with history the screen did not see (a pre-2000 window).
+**What each outcome does to the flag** (`dev/rules/experiment-flag-discipline.md` Rule 4).
+
+- **CLOSE-AXIS.** Either branch keeps `Price_band_seeded` as a default-off axis, the
+  REJECT-as-default-but-legitimate-axis class. It is not do-not-revive, so it is not retirement-eligible. The reason is
+  that this is a one-window proxy read: it rejects prioritising the axis, not the mechanism
+  (`dev/rules/mechanism-validation-rigor.md` §Verdict calibration). No new pre-registration follows.
+- **PARK.** Keep-as-axis as well: the axis stays default-off, no new cells are spent now, and the measured rates go into
+  the ledger. Reopen it only with history the screen did not see (a pre-2000 window).
 
 The rule is **not applied** if the band proxy agrees with the ticket band on fewer than 90 % of placed tickets.
 
@@ -233,16 +246,20 @@ Why these bars:
 
 - **20 % share: materiality.** The 08-23 funnel lost 50.6 % of < $8 monsters and 52.4 % of $8–14 monsters at the
   breakout phase (`../price-band-tiebreak-2026-11-13/screen/results/funnel-by-price.txt`).
-  - A gate that is first to drop a fifth of cheap monsters carries roughly 40 % of that phase loss. That is enough for
-    a study of one dial to matter.
+  - A gate that is first to drop a fifth of cheap monsters carries about 36 % of that phase loss, on one base (all
+    monster events). About 92–93.5 % of cheap monsters have a cascade row (NOT_SURFACED was 8.0 % and 6.5 %), so 20 %
+    of them is 18.4–18.7 % of all of them, against the 50.6–52.4 % loss. That is enough for a study of one dial to
+    matter.
   - Below 20 %, no single dial's study could recover much of the loss.
 - **Lift 1.25, below T's 1.5.** There are two reasons.
   - **What the bar opens.** DIAL-STUDY opens only a cheap read-only screen, which carries its own pre-registration.
     T ≥ 1.5 gates a fresh 26-year pre-registration and its confirmation cells.
   - **The lift has a ceiling.** If a gate is first to drop a fraction A of all cheap breakouts with a row, its lift can
     be at most 1/A. A 1.5 bar therefore excludes, by construction rather than by evidence, any gate that drops more than
-    two thirds of them. On the smoke, `Stage_setup` dropped 83–84 % of the breakouts with a row (`results/smoke/funnel.txt`,
-    $14–33 and ≥ $33; the smoke has no cheap events). That is a ceiling of about 1.2, so even 1.25 may be out of reach
+    two thirds of them.
+  - **The smoke's dominant gate.** In the exact view, `Stage_setup` dropped 83.3 % and 84.3 % of the breakouts with a
+    row ($14–33 and ≥ $33; `results/smoke/funnel.txt`, and the smoke has no cheap events). That is a ceiling of about
+    1.2. In the window view it dropped 75.0 % and 83.1 %, a ceiling of 1.33 and 1.20. So even 1.25 may be out of reach
     for the dominant gate. That is accepted: a gate that drops nearly everything cannot be selecting against monsters by
     much.
 - **30 cheap monsters per view.** Below that, a 20 % share is six names. That is the same small-n defect as T's
@@ -272,11 +289,14 @@ to `results-analyst`.
 - **The swap tail is the screen's ex-post outcome.** It is a weekly-close doubling, not a stop-managed trade, and it
   applies to names that were listed, not filled.
 - **The funnel uses the screen's breakout predicate, not the strategy's.**
-  - **Each drop is attributed to the first failing gate.** `breakout_gate` names the first gate that failed, in
-    evaluation order (`trading/trading/backtest/lib/candidate_log.mli`, the #2533 first-failing-gate contract;
-    `Stage_setup`, then `Breakout_volume`, then `Rs_declining` inside the breakout predicate). So a gate's share is the
-    share it was *first* to drop. A name `Stage_setup` dropped may fail later gates too, so a share is not what
-    loosening that gate would admit.
+  - **Each drop is attributed to the first failing gate.** `breakout_gate` names the first gate that failed, in the
+    evaluation order the #2533 contract pins.
+    - The authority is `trading/analysis/weinstein/screener/lib/screener_admission.mli` (the `breakout_gate` docstring),
+      which `candidate_log.mli` cites.
+    - On the long side the order is `Price_floor` → `Stage_setup` → `Breakout_volume` → `Rs_declining` →
+      `Failed_breakout` → `Volume_band`.
+    - So a gate's share is the share it was *first* to drop. A name `Stage_setup` dropped may fail later gates too, so
+      a share is not what loosening that gate would admit.
   - `NOT_SURFACED` lumps several causes together.
   - The screen's events need 52 forward weeks, which tilts them toward survivors. Measurement 3's primary convention
     does not.
@@ -333,7 +353,14 @@ in `results/smoke/` carries that banner.
 - **Binding on the smoke window.** The cap bound on 24 of 99 open dates (24.2 %). The top 20 changed on 10 of those 24
   (41.7 %), which is 10.1 % of open dates. The ordered top 20 changed on 47.5 % of open dates. Thirteen names swapped
   each way, all ≥ $33 out and $14–33 in. The funding model reproduced S's placed set on 82 of 83 dates with a pool.
-- **Rules.** The rule code runs end to end. Rule 2 reads UNDERPOWERED because sp500 has no cheap events.
+- **Rules.** The rule code runs end to end. Rule 1 reads CLOSE-AXIS on the L2 branch. Rule 2 reads UNDERPOWERED
+  because sp500 has no cheap events.
+  - **How `rules.txt` was produced.** At QC rework iteration 2, only `read.sh`'s step-7 rule block changed. So
+    `rules.txt` was regenerated by running that block on the gate values this run printed in its "inputs" lines,
+    which are unchanged. Every other smoke file is from the run itself.
+  - **The ladder test.** The step-7 block was also run on synthetic inputs, one per Rule 1 branch. Each landed where
+    the README's order puts it: L1 0.20 with L2 2.0 gives PARK, and L1 0.50 with L2 0.50 gives CLOSE-AXIS on the L2
+    branch.
 
 ## Files
 

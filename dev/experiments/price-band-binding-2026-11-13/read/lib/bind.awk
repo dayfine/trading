@@ -101,7 +101,7 @@ function one_date(d,   n, i, k, r, b, half, binding, ties, nb, changed, ordch, s
 # when S cut it. When S's walk ran out of cash (any Insufficient_cash), both orders fund only as many tickets as S
 # placed, in their own order; otherwise every fundable top-N name is funded. Expected values, not draws. The re-draw
 # compares P's MODELLED funding (eP) with S's ACTUAL placements, so the model's error on cash dates enters L2; the
-# model check (the same model on S's own order, eS) bounds it.
+# model check (the same model on S's own order, eS) indicates its size; it does not bound it.
 function fundable(i) { if (inS[i]) return (wout[i] == "Placed" || wout[i] == "Insufficient_cash") ? 1 : 0; return Q[BD[i]] }
 function walk_order(o, cash, m, e,   r, cum, x, p) {
   cum = 0

@@ -5,7 +5,7 @@
 #   date  idx  symbol  outcome            (outcome = Placed or the skip reason)
 #   Read from cascade_summaries only: each summary opens with its date, and its decisions field holds
 #   ((symbol X) (side Long) (outcome Placed)) or (outcome (Skipped Reason)) rows.
-# ENTRIES (file): one row per audit record's entry decision (filled positions):
+# ENTRIES (file): one row per audit record's entry decision (placed tickets, more than the fills):
 #   symbol  entry_date  side  suggested_entry  close_at_decision      ("NA" when close_at_decision is absent)
 {
   sub(/^[ \t]+/, ""); sub(/[ \t]+$/, "")
