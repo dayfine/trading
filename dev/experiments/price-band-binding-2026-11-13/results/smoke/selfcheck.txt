@@ -1,0 +1,9 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
+# price-band-binding self-check (read/read.sh step 3; README §Self-check). SEED=0 CAP=20
+band proxy (decision-date raw close from the bar store) vs the ticket band (suggested_entry): 53 of 53 placed tickets (trade_audit entry records) agree (100.0 %); 0 without a bar
+bar lookup vs trade_audit close_at_decision band: 53 of 53 agree (100.0 %)
+SC1 (the Seeded re-rank reproduces the Admitted set): PASS on all 99 longs-open dates
+SC2 (the walk order is the Seeded order): PASS on all 82 dates with a walk record
+SC power: the cut fell inside a score tie on 20 dates; the Alphabetical control misses the Admitted set on 18 dates
+pool rows with no price (band NA, ranked in the top band): 0
+SELF-CHECK PASSED

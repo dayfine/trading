@@ -1,0 +1,23 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
+== Measurement 3: the swap tail (README §Measurements; screen definitions, deduped per symbol per 26 weeks) ==
+deduped rows: in 12 (F 12, D 0, T 0, X 0) | out 13 (F 13, D 0, T 0, X 0)
+primary convention FD (cov F or D):
+  swapped in             n=   12  monster    2 =  16.7 %  win  50.0 %  mean ride   +8.3 %  p10 -17.2% p25 -10.1% p50 -2.2% p75 +2.8% p90 +75.0%
+  swapped out            n=   13  monster    0 =   0.0 %  win  30.8 %  mean ride   -3.7 %  p10 -14.8% p25 -13.3% p50 -4.8% p75 +0.9% p90 +10.5%
+  in, 2000-12            n=0
+  out, 2000-12           n=0
+  in, 2013-26            n=   12  monster    2 =  16.7 %  win  50.0 %  mean ride   +8.3 %  p10 -17.2% p25 -10.1% p50 -2.2% p75 +2.8% p90 +75.0%
+  out, 2013-26           n=   13  monster    0 =   0.0 %  win  30.8 %  mean ride   -3.7 %  p10 -14.8% p25 -13.3% p50 -4.8% p75 +0.9% p90 +10.5%
+  in, <$8                n=0
+  out, <$8               n=0
+  in, $8-14              n=0
+  out, $8-14             n=0
+  in, $14-33             n=   12  monster    2 =  16.7 %  win  50.0 %  mean ride   +8.3 %  p10 -17.2% p25 -10.1% p50 -2.2% p75 +2.8% p90 +75.0%
+  out, $14-33            n=0
+  in, >=$33              n=0
+  out, >=$33             n=   13  monster    0 =   0.0 %  win  30.8 %  mean ride   -3.7 %  p10 -14.8% p25 -13.3% p50 -4.8% p75 +0.9% p90 +10.5%
+screen convention F (52 forward weeks only):
+  swapped in             n=   12  monster    2 =  16.7 %  win  50.0 %  mean ride   +8.3 %  p10 -17.2% p25 -10.1% p50 -2.2% p75 +2.8% p90 +75.0%
+  swapped out            n=   13  monster    0 =   0.0 %  win  30.8 %  mean ride   -3.7 %  p10 -14.8% p25 -13.3% p50 -4.8% p75 +0.9% p90 +10.5%
+monster-rate ratio in/out: FD 99.00 (F 99.00); monsters on both sides 2
+paired per changed date (in minus out, mean capped ride): n=10  in > out on 60.0 %  mean +1.8 pp  p10 -15.8 pp  median +0.1 pp  p90 +7.3 pp
