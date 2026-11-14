@@ -795,7 +795,8 @@ about the cap's effect on returns, and none enters the read.
 - `results/smoke/split.txt` is `read/split.sh` run on them. It was regenerated twice: with arm G (below), and for the
   rework of #3608 under §What the read prints. Its sums now leave out the open-leg keys (8 of the S:C pair's 39 keys),
   so they differ from the first version's, whose per-key lines carried marked open positions.
-  `results/smoke/smoke.txt` (last section) records the change and the check that no printed byte depends on a mark.
+  `results/smoke/smoke.txt` (last section) records the change and the check that no printed sum or key line depends on a
+  mark (the bars' pass/fail flags do read the marks, one bit each).
 
 | arm | wall | placed tickets | capped | closed | open at the end |
 |---|---:|---:|---:|---:|---:|

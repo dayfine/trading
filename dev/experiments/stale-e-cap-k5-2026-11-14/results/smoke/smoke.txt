@@ -179,8 +179,8 @@ The first stub run found a defect, fixed before this commit: cells() kept the G 
 #   sh read/combine_check.sh > results/smoke/combine_check.txt
 
 The defect. The first split.txt printed per-key lines and sums that included open positions marked from the bar store.
-Each such line was a marked read of one raw close: a line "EOG|2000-04-14 PS -8.72" with the committed 2,733 shares at
-25.52 and the committed NAV on that Friday gives the close of EOG's last curve date to the cent (the QC review did it).
+Each such line was a marked read of one raw close: an open key's NAV-% value, with its committed share count, entry
+price and the committed NAV, gives that name's last-curve-date close to the cent (the QC review showed it for one key).
 The same held for WRB, TOL and WLP1 keys, for the PS/PC sums, for the totals and for "A gate", all of which had open
 keys in them.
 
