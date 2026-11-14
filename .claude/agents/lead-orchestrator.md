@@ -850,8 +850,10 @@ Skip a track if its status file shows MERGED with no Blocking Refactors or Follo
 For each feature that will run today, assemble the pre-flight context package **before** spawning the feat-agent. This is a deterministic step: run these shell commands and collect the output.
 
 ```bash
-# 1. Current test failures for this feature's test directory
-dev/lib/run-in-env.sh dune runtest <feature-test-dir> 2>&1 || true
+# 1. Current test failures for this feature's test directory, from main's latest CI run
+#    (build agents do not run tests locally, #3619; neither does this step)
+run_id=$(gh run list --branch main --workflow CI --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run view "$run_id" --log-failed 2>/dev/null | grep -F '<feature-test-dir>' || echo "All passing on main"
 
 # 2. Last QC review findings (if any)
 # Read: dev/reviews/<feature>.md (if it exists)
