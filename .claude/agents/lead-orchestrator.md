@@ -1074,7 +1074,7 @@ You are implementing the <FEATURE> track for the Weinstein Trading System.
 ## Pre-flight context (read this before starting any work)
 
 ### Current test failures in your test directory
-<paste dune runtest output for this feature's test dir, or "All passing" if clean>
+<paste the failing tests from main's latest CI run for this feature's test dir, or "All passing on main (CI green at <sha>)">
 
 ### Last QC review findings
 <paste relevant sections from dev/reviews/<feature>.md, or "No prior review" if first run>
@@ -1114,7 +1114,7 @@ Your branch: feat/<feature>
 Work using TDD (CLAUDE.md workflow):
   1. .mli interface + skeleton → dune build passes
   2. Write tests
-  3. Implement → dune build && dune runtest passes
+  3. Implement → dune build passes (CI runs the tests)
   4. dune fmt
   5. Commit and push (see commit discipline below)
 
@@ -1128,7 +1128,7 @@ COMMIT DISCIPLINE — this is critical for reviewability AND for surviving rate-
   - Commit sequence per module:
       a. .mli + skeleton (dune build passes) → commit
       b. tests (mostly failing) → commit
-      c. implementation (dune build && dune runtest passes) → commit
+      c. implementation (dune build passes) → commit
       d. dune fmt → commit if it changed anything
   - Each commit must build and (where possible) pass tests on its own
   - Push after every commit:
@@ -1186,7 +1186,7 @@ print(json.loads(urllib.request.urlopen(req).read())["number"])
 
 MAX ITERATIONS — build-fix cycles:
   - If you have attempted 3 consecutive build-fix cycles without passing
-    dune build && dune runtest, stop immediately.
+    dune build (touched dirs) and dune build @fmt, stop immediately.
   - Report your partial state and the specific blocker.
   - Do not attempt a 4th cycle — let the orchestrator decide (retry vs. escalate).
 
@@ -1194,7 +1194,7 @@ Do as much meaningful work as you can in one session.
 Stop at a natural boundary (a passing build, a completed module).
 
 CRITICAL — before returning, do all of these (in this order, so a kill during the last step still leaves the PR open):
-  1. Ensure dune build && dune runtest passes **on a clean checkout** of your branch (your worktree is isolated, so this is the local state — but verify nothing relies on files from sibling subagents' workspaces; only content tracked in your commits should matter)
+  1. Ensure dune build on the touched dirs and dune build @fmt pass (CI runs the tests) **on a clean checkout** of your branch (your worktree is isolated, so this is the local state — but verify nothing relies on files from sibling subagents' workspaces; only content tracked in your commits should matter)
   2. All changes committed and pushed (nothing uncommitted)
   3. Draft PR already open from first push (see commit discipline); if not, open it now — `GH_TOKEN=$GH_TOKEN jst submit feat/<feature>` LOCAL, the REST POST recipe from commit discipline above in GHA
   4. Update dev/status/<feature>.md (status, interface-stable, completed, in-progress, next-steps, commits)
@@ -1297,7 +1297,7 @@ Your branch: feat/<feature> (already exists — do not recreate).
 - Touch tracks other than <FEATURE>.
 
 ### Acceptance check before returning
-- `dune build && dune runtest` passes clean on your branch.
+- `dune build` on the touched dirs passes clean on your branch; CI runs the tests (no local `dune runtest`).
 - `dune build @fmt` passes.
 - Every checked-fail item in dev/reviews/<feature>.md has either a code change
   addressing it OR a note in your return value explaining why you did not change

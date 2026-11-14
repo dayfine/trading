@@ -15,10 +15,16 @@ scope or the delta since the last review, the prior review's location, and the r
 below apply without being restated; a brief that repeats them is wasted context.
 
 - **No waiting.** Run every `dune` call in the foreground with `timeout: 600000`, split into scoped calls
-  (`dune build @fmt`, `dune build`, `dune runtest <dir>`) when one call could exceed it. Read dune's exit
+  (`dune build @fmt`, `dune build <touched dirs>`) when one call could exceed it. Read dune's exit
   code from a file (`…; echo $? > rc`), never through a pipe. Never background a build and end the turn
   waiting for an event: a subagent is never woken by one (`feedback_agents_background_wait_stall`). If a
   call is moved to the background anyway, keep reading its output file until it finishes.
+- **Tests run on CI, not locally** (user decision 2026-11-14). Never run `dune runtest`, full or scoped: it
+  holds the container slot and the dune lock for tens of minutes, and CI's `build-and-test` runs the whole
+  suite plus the linters a local run skips. Your local gates are `dune build` on the dirs you touched (a
+  signature change also touches its callers' dirs; include the new test file's directory so it compiles)
+  and `dune build @fmt`. Write the tests, make them compile, push, and stop: the dispatcher waits on CI
+  and sends a failure back as a rework.
 - **Build your own tree.** Locally (`$TRADING_IN_CONTAINER` unset) dune runs in the container:
   `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/<your-tree>/trading && eval $(opam env) &&
   dune build'`, where `<your-tree>` is your worktree's path relative to the repo root (it lives under
@@ -28,10 +34,11 @@ below apply without being restated; a brief that repeats them is wasted context.
   the steps in a wrapper script inside your worktree and delete it before you finish
   (`feedback_agent_sandbox_docker_wrapper`). On GHA (`$TRADING_IN_CONTAINER=1`) you are already inside the
   container: run `dev/lib/run-in-env.sh dune …` with your cwd inside your own worktree.
-- **Finish protocol, in the foreground, without ending the turn in between.** Full gates
-  (`dune build @fmt && dune build && dune runtest`, exit code read from a file) → commit with the trailers
-  your session's attribution rules require → push the branch → open the PR (`gh pr create`, or the GitHub
-  MCP `create_pull_request` tool) → check the PR's file list matches your task.
+- **Finish protocol, in the foreground, without ending the turn in between.** Local gates
+  (`dune build @fmt && dune build` on the touched dirs, exit code read from a file) → commit with the
+  trailers your session's attribution rules require → push the branch → open the PR (`gh pr create`, or the
+  GitHub MCP `create_pull_request` tool) → check the PR's file list matches your task → report the PR
+  number and tip SHA and stop; never wait for CI.
   **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
   name, the commit id and "PR NOT opened" so the dispatcher can open it
   (`dev/rules/worktree-isolation.md` §Finish Protocol).
@@ -59,7 +66,7 @@ below apply without being restated; a brief that repeats them is wasted context.
 
 **Work you do NOT own:**
 
-- **Behavior changes.** Any cleanup that alters trading logic, screener output, stop placement, or simulation results is out of scope — escalate to the relevant feat-agent via your status file. Cleanup PRs must be functional no-ops by the parity test (when one exists) and by `dune runtest` exit code.
+- **Behavior changes.** Any cleanup that alters trading logic, screener output, stop placement, or simulation results is out of scope — escalate to the relevant feat-agent via your status file. Cleanup PRs must be functional no-ops by the parity test (when one exists) and by CI's `dune runtest` exit code.
 - **Linter rule changes** (`devtools/checks/linter_*.sh`, `dune` integration): that's `harness-maintainer`.
 - **Agent definitions** (`.claude/agents/*.md`): that's `harness-maintainer`.
 - **Plan / status / decision docs:** read-only except for `dev/status/cleanup.md` (your own backlog).
@@ -91,12 +98,12 @@ Before commit and before push, follow `dev/rules/worktree-isolation.md` to verif
 
 ## Allowed Tools
 
-Read, Write, Edit, Glob, Grep, Bash (build/test commands only).
+Read, Write, Edit, Glob, Grep, Bash (build and fmt commands, and the linter you are fixing; no `dune runtest`).
 Do not use the Agent tool (no subagent spawning).
 
 ## Max-Iterations Policy
 
-If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still failing: stop, report the blocker, note it in `dev/status/cleanup.md`, and end the session. Cleanup work is supposed to be small — if you are looping, the cleanup is actually a refactor and should be re-scoped or escalated.
+If after **3 consecutive build-fix cycles** `dune build` (or `dune build @fmt`) is still failing: stop, report the blocker, note it in `dev/status/cleanup.md`, and end the session. Cleanup work is supposed to be small — if you are looping, the cleanup is actually a refactor and should be re-scoped or escalated.
 
 ## Hard caps (the small-CL discipline)
 
@@ -104,7 +111,7 @@ These are non-negotiable. Violating any one means re-scope or hand off:
 
 - **≤200 LOC diff** (status / fixture files don't count, same as `feat-agent-template.md` §PR sizing).
 - **Single concern per PR.** One finding, one fix. If you notice a second finding while working, log it in `dev/status/cleanup.md` §Backlog and leave the code alone.
-- **No behavior change.** `dune runtest` must pass with identical output (advisory linter FAIL lines may *decrease* — that's the point — but no test should newly pass or fail).
+- **No behavior change.** CI's `dune runtest` (never run locally) must pass with identical output (advisory linter FAIL lines may *decrease* — that's the point — but no test should newly pass or fail).
 - **No new public symbols.** Cleanup may remove or rename internals; new public surface is feature work.
 - **Tests adjust only mechanically.** If a test break requires logic understanding to fix, you have a behavior change — escalate.
 
@@ -114,9 +121,9 @@ QC agents will verify all of the following. Satisfy every item before setting st
 
 - [ ] Diff is ≤200 LOC (excluding status/fixture files).
 - [ ] Single finding addressed (one entry from `dev/status/cleanup.md`).
-- [ ] `dune build && dune runtest` passes; no test newly fails or passes.
+- [ ] `dune build` on the touched dirs passes; CI's `build-and-test` shows no test newly failing or passing (the dispatcher waits on it).
 - [ ] `dune build @fmt` passes.
-- [ ] Linter that flagged the original finding now passes (or shows fewer violations) on the touched files.
+- [ ] Linter that flagged the original finding now passes (or shows fewer violations) on the touched files — run it directly (`sh trading/devtools/checks/<linter>.sh`, or `dune exec` for an OCaml linter), never through `dune runtest`.
 - [ ] No new public symbols in any `.mli`.
 - [ ] No edits to `dev/decisions.md`, `dev/plans/*`, `docs/design/*`, agent definitions, or feature status files.
 - [ ] `dev/status/cleanup.md` updated: finding flipped from `[~]` to `[x]` with one-line completion note.

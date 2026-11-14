@@ -169,11 +169,12 @@ state. The work survived only because it could be recovered from disk by hand.
 Every jj-writing agent MUST finish with this exact sequence, **in the foreground,
 as its last actions, without ending the turn in between:**
 
-1. **Verify in the foreground.** Run `dune build @fmt && dune build && dune runtest`
-   and read the **exit code** (not a `grep FAIL:` — OUnit failures and some
-   linters don't print that literal; and `… | tail; echo $?` captures `tail`'s
-   exit, not dune's). Blocking ~10 min here is expected and correct. Do NOT
-   background it and wait for an event.
+1. **Run the local gates in the foreground.** `dune build @fmt && dune build` on
+   the touched dirs, and read the **exit code** (`… | tail; echo $?` captures
+   `tail`'s exit, not dune's). Blocking here is expected and correct. Do NOT
+   background it and wait for an event. Do NOT run `dune runtest` locally (user
+   decision 2026-11-14): CI's `build-and-test` runs the tests, and the dispatcher
+   waits on it and sends a failure back as a rework.
 2. **Commit → bookmark → push → open PR, atomically:**
    `jj describe -m "…"` → `jj bookmark set feat/<name> -r @` →
    `jj git push -b feat/<name>` → `gh pr create …`.

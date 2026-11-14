@@ -29,6 +29,13 @@ need() { # agent, fixed string
     echo "FAIL: $1: standing rule missing: $2" >&2; FAILED=$((FAILED + 1))
   fi
 }
+forbid() { # agent, fixed string a retired rule used to say
+  f="$AGENTS/$1.md"
+  [ -f "$f" ] || return 0 # need() already reports a missing file
+  if grep -qF -- "$2" "$f"; then
+    echo "FAIL: $1: retired rule still present: $2" >&2; FAILED=$((FAILED + 1))
+  fi
+}
 
 for a in $QC_ALL $FEAT; do
   need "$a" "## Standing rules — the dispatch brief does not repeat these"
@@ -56,6 +63,24 @@ for a in $FEAT; do
   need "$a" 'Never edit `dev/status/_index.md`'
   need "$a" "exception is the row for a brand-new tracked work item"
 done
+# User decision 2026-11-14: build agents do not run `dune runtest` locally. Their local gates are
+# `dune build` on the touched dirs + `dune build @fmt`; CI's build-and-test runs the tests and the
+# dispatcher sends a failure back as a rework. The QC agents keep their own rules (CI is their build of
+# record) and are not listed here.
+for a in $FEAT; do
+  need "$a" "Tests run on CI, not locally"
+  need "$a" 'Never run `dune runtest`, full or scoped'
+  need "$a" "the dispatcher waits on CI"
+  need "$a" "(\`dune build @fmt && dune build\` on the touched dirs"
+  need "$a" "never wait for CI."
+  forbid "$a" 'dune build @fmt && dune build && dune runtest'
+  forbid "$a" '`dune runtest <dir>`'
+  forbid "$a" '`dune build && dune runtest` passes'
+  forbid "$a" 'build-fix cycles** `dune build && dune runtest`'
+  forbid "$a" '(build/test commands only'
+done
+need harness-maintainer 'run it directly with `sh <script>`'
+need code-health "run it directly (\`sh trading/devtools/checks/<linter>.sh\`"
 
 [ "$FAILED" = 0 ] || exit 1
 echo "agent_standing_rules_check: all agent definitions carry their standing rules"
