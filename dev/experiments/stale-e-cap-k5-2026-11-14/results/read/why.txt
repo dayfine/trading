@@ -1,0 +1,285 @@
+== 1. Max-drawdown episode per arm and seed (equity_curve.csv)
+k0 S maxDD 27.22% peak 2018-06-06 trough 2020-03-25
+k0 C maxDD 41.44% peak 2007-07-19 trough 2009-07-08
+k0 G maxDD 27.78% peak 2018-06-15 trough 2020-03-25
+k1 S maxDD 24.55% peak 2021-04-12 trough 2023-10-27
+k1 C maxDD 45.47% peak 2007-07-19 trough 2009-07-08
+k1 G maxDD 25.08% peak 2018-06-14 trough 2020-03-25
+k2 S maxDD 32.08% peak 2021-04-12 trough 2023-10-27
+k2 C maxDD 41.80% peak 2007-07-19 trough 2009-07-08
+k2 G maxDD 32.02% peak 2021-04-12 trough 2023-10-27
+k3 S maxDD 25.56% peak 2018-06-15 trough 2020-03-23
+k3 C maxDD 44.23% peak 2007-07-19 trough 2009-07-08
+k3 G maxDD 25.29% peak 2017-11-24 trough 2020-03-23
+k4 S maxDD 25.11% peak 2018-01-26 trough 2020-03-25
+k4 C maxDD 45.16% peak 2007-07-19 trough 2009-07-08
+k4 G maxDD 24.52% peak 2018-06-14 trough 2020-03-25
+
+== 2. Each arm over C's episode (2007-07-19..2009-07-08) and the dot-com bear (2000-01-03..2003-03-31)
+k0 S 2007-07-19..2009-07-08 return -7.6% maxDD inside 12.6%
+k0 C 2007-07-19..2009-07-08 return -41.4% maxDD inside 41.4%
+k0 G 2007-07-19..2009-07-08 return -16.7% maxDD inside 19.0%
+k1 S 2007-07-19..2009-07-08 return -7.5% maxDD inside 11.3%
+k1 C 2007-07-19..2009-07-08 return -45.5% maxDD inside 45.5%
+k1 G 2007-07-19..2009-07-08 return -11.2% maxDD inside 13.6%
+k2 S 2007-07-19..2009-07-08 return -15.0% maxDD inside 17.3%
+k2 C 2007-07-19..2009-07-08 return -41.8% maxDD inside 41.8%
+k2 G 2007-07-19..2009-07-08 return -17.7% maxDD inside 18.5%
+k3 S 2007-07-19..2009-07-08 return -19.2% maxDD inside 21.0%
+k3 C 2007-07-19..2009-07-08 return -44.2% maxDD inside 44.2%
+k3 G 2007-07-19..2009-07-08 return -15.2% maxDD inside 17.6%
+k4 S 2007-07-19..2009-07-08 return -16.1% maxDD inside 17.5%
+k4 C 2007-07-19..2009-07-08 return -45.2% maxDD inside 45.2%
+k4 G 2007-07-19..2009-07-08 return -15.8% maxDD inside 17.3%
+k0 S 2000-01-03..2003-03-31 return +19.1% maxDD inside 9.2%
+k0 C 2000-01-03..2003-03-31 return -4.2% maxDD inside 20.7%
+k0 G 2000-01-03..2003-03-31 return +19.8% maxDD inside 9.1%
+k1 S 2000-01-03..2003-03-31 return +9.5% maxDD inside 9.5%
+k1 C 2000-01-03..2003-03-31 return -15.9% maxDD inside 20.1%
+k1 G 2000-01-03..2003-03-31 return +10.2% maxDD inside 9.9%
+k2 S 2000-01-03..2003-03-31 return +11.4% maxDD inside 9.2%
+k2 C 2000-01-03..2003-03-31 return -9.3% maxDD inside 23.6%
+k2 G 2000-01-03..2003-03-31 return +12.1% maxDD inside 9.1%
+k3 S 2000-01-03..2003-03-31 return +18.8% maxDD inside 8.4%
+k3 C 2000-01-03..2003-03-31 return -10.8% maxDD inside 18.2%
+k3 G 2000-01-03..2003-03-31 return +19.5% maxDD inside 8.7%
+k4 S 2000-01-03..2003-03-31 return +13.0% maxDD inside 9.2%
+k4 C 2000-01-03..2003-03-31 return -8.0% maxDD inside 24.7%
+k4 G 2000-01-03..2003-03-31 return +13.6% maxDD inside 9.6%
+
+== 3. Tickets placed (capped) and entries by year, bear and recovery years (tickets.tsv, trades.csv, equity_curve.csv)
+2000 k0 | S tickets/capped 19/0, 18 entries +8.4 NAV-% (7 won) | C tickets/capped 35/22, 30 entries +2.6 NAV-% (10 won) | G tickets/capped 19/3, 18 entries +9.2 NAV-% (7 won)
+2000 k1 | S tickets/capped 21/0, 19 entries +6.3 NAV-% (6 won) | C tickets/capped 38/21, 32 entries -13.9 NAV-% (5 won) | G tickets/capped 21/2, 19 entries +7.0 NAV-% (6 won)
+2000 k2 | S tickets/capped 20/0, 19 entries +6.1 NAV-% (6 won) | C tickets/capped 35/20, 31 entries +2.4 NAV-% (10 won) | G tickets/capped 20/3, 19 entries +6.8 NAV-% (6 won)
+2000 k3 | S tickets/capped 19/0, 18 entries +7.6 NAV-% (6 won) | C tickets/capped 39/25, 35 entries -6.6 NAV-% (9 won) | G tickets/capped 19/2, 18 entries +8.4 NAV-% (6 won)
+2000 k4 | S tickets/capped 16/0, 15 entries +8.9 NAV-% (6 won) | C tickets/capped 36/24, 32 entries +0.9 NAV-% (9 won) | G tickets/capped 16/2, 15 entries +9.6 NAV-% (6 won)
+2001 k0 | S tickets/capped 2/0, 2 entries +3.5 NAV-% (1 won) | C tickets/capped 16/14, 11 entries -4.6 NAV-% (2 won) | G tickets/capped 2/0, 2 entries +3.5 NAV-% (1 won)
+2001 k1 | S tickets/capped 2/0, 2 entries +0.1 NAV-% (1 won) | C tickets/capped 17/15, 13 entries -4.9 NAV-% (3 won) | G tickets/capped 2/0, 2 entries +0.1 NAV-% (1 won)
+2001 k2 | S tickets/capped 1/0, 1 entries -1.3 NAV-% (0 won) | C tickets/capped 17/15, 12 entries -11.6 NAV-% (1 won) | G tickets/capped 1/0, 1 entries -1.3 NAV-% (0 won)
+2001 k3 | S tickets/capped 1/0, 1 entries +4.7 NAV-% (1 won) | C tickets/capped 15/14, 10 entries -2.7 NAV-% (2 won) | G tickets/capped 1/0, 1 entries +4.7 NAV-% (1 won)
+2001 k4 | S tickets/capped 1/0, 1 entries -1.1 NAV-% (0 won) | C tickets/capped 16/15, 12 entries -7.5 NAV-% (2 won) | G tickets/capped 1/0, 1 entries -1.1 NAV-% (0 won)
+2002 k0 | S tickets/capped 1/0, 1 entries -1.2 NAV-% (0 won) | C tickets/capped 23/21, 16 entries -5.9 NAV-% (3 won) | G tickets/capped 1/0, 1 entries -1.2 NAV-% (0 won)
+2002 k1 | S tickets/capped 4/0, 4 entries -4.3 NAV-% (0 won) | C tickets/capped 17/16, 13 entries -3.2 NAV-% (3 won) | G tickets/capped 4/0, 4 entries -4.3 NAV-% (0 won)
+2002 k2 | S tickets/capped 1/0, 1 entries -1.2 NAV-% (0 won) | C tickets/capped 18/17, 14 entries -4.4 NAV-% (3 won) | G tickets/capped 1/0, 1 entries -1.2 NAV-% (0 won)
+2002 k3 | S tickets/capped 3/0, 2 entries -1.9 NAV-% (0 won) | C tickets/capped 16/15, 14 entries -7.4 NAV-% (2 won) | G tickets/capped 3/1, 2 entries -1.9 NAV-% (0 won)
+2002 k4 | S tickets/capped 4/0, 3 entries -3.2 NAV-% (0 won) | C tickets/capped 23/20, 15 entries -5.4 NAV-% (3 won) | G tickets/capped 4/1, 3 entries -3.2 NAV-% (0 won)
+2007 k0 | S tickets/capped 39/0, 30 entries +2.6 NAV-% (12 won) | C tickets/capped 49/21, 35 entries -14.8 NAV-% (8 won) | G tickets/capped 31/5, 27 entries -2.8 NAV-% (8 won)
+2007 k1 | S tickets/capped 29/0, 26 entries +7.1 NAV-% (10 won) | C tickets/capped 50/29, 35 entries -19.8 NAV-% (6 won) | G tickets/capped 31/5, 25 entries +3.1 NAV-% (9 won)
+2007 k2 | S tickets/capped 34/0, 26 entries -1.8 NAV-% (9 won) | C tickets/capped 51/30, 34 entries -16.1 NAV-% (8 won) | G tickets/capped 32/4, 29 entries -5.8 NAV-% (8 won)
+2007 k3 | S tickets/capped 30/0, 27 entries -4.4 NAV-% (9 won) | C tickets/capped 46/26, 31 entries -18.7 NAV-% (6 won) | G tickets/capped 34/2, 29 entries +0.2 NAV-% (10 won)
+2007 k4 | S tickets/capped 31/0, 25 entries +4.6 NAV-% (11 won) | C tickets/capped 42/25, 33 entries -19.2 NAV-% (7 won) | G tickets/capped 28/2, 23 entries +3.7 NAV-% (10 won)
+2008 k0 | S tickets/capped 1/0, 0 entries +0.0 NAV-% (0 won) | C tickets/capped 22/21, 20 entries -17.5 NAV-% (0 won) | G tickets/capped 1/0, 0 entries +0.0 NAV-% (0 won)
+2008 k1 | S tickets/capped 1/0, 0 entries +0.0 NAV-% (0 won) | C tickets/capped 20/19, 21 entries -20.6 NAV-% (0 won) | G tickets/capped 1/0, 0 entries +0.0 NAV-% (0 won)
+2008 k2 | S tickets/capped 1/0, 0 entries +0.0 NAV-% (0 won) | C tickets/capped 20/19, 20 entries -17.8 NAV-% (0 won) | G tickets/capped 1/0, 0 entries +0.0 NAV-% (0 won)
+2008 k3 | S tickets/capped 1/0, 0 entries +0.0 NAV-% (0 won) | C tickets/capped 22/21, 23 entries -21.4 NAV-% (0 won) | G tickets/capped 1/0, 0 entries +0.0 NAV-% (0 won)
+2008 k4 | S tickets/capped 0/0, 0 entries +0.0 NAV-% (0 won) | C tickets/capped 20/20, 20 entries -18.8 NAV-% (0 won) | G tickets/capped 0/0, 0 entries +0.0 NAV-% (0 won)
+2009 k0 | S tickets/capped 15/0, 12 entries +14.0 NAV-% (8 won) | C tickets/capped 37/31, 32 entries +20.0 NAV-% (15 won) | G tickets/capped 15/0, 12 entries +14.0 NAV-% (8 won)
+2009 k1 | S tickets/capped 18/0, 13 entries +11.7 NAV-% (9 won) | C tickets/capped 44/36, 35 entries +12.3 NAV-% (16 won) | G tickets/capped 18/0, 13 entries +11.7 NAV-% (9 won)
+2009 k2 | S tickets/capped 20/0, 12 entries +9.6 NAV-% (8 won) | C tickets/capped 40/34, 32 entries +19.2 NAV-% (15 won) | G tickets/capped 20/0, 12 entries +9.5 NAV-% (8 won)
+2009 k3 | S tickets/capped 16/0, 14 entries +1.1 NAV-% (7 won) | C tickets/capped 38/33, 30 entries +25.0 NAV-% (16 won) | G tickets/capped 16/0, 14 entries +1.1 NAV-% (7 won)
+2009 k4 | S tickets/capped 21/0, 15 entries +1.7 NAV-% (7 won) | C tickets/capped 41/33, 32 entries +19.1 NAV-% (15 won) | G tickets/capped 21/0, 15 entries +1.7 NAV-% (7 won)
+
+== 4. S's recorded lists in 2001, 2002, 2008: Fridays, placed, stop-gate skips, other skips (entries.tsv)
+k0 2001 Fridays 2 placed 2 gate-skips 36 other 0
+k1 2001 Fridays 2 placed 2 gate-skips 32 other 0
+k2 2001 Fridays 1 placed 1 gate-skips 19 other 0
+k3 2001 Fridays 1 placed 1 gate-skips 18 other 0
+k4 2001 Fridays 1 placed 1 gate-skips 15 other 0
+k0 2002 Fridays 1 placed 1 gate-skips 15 other 0
+k1 2002 Fridays 4 placed 4 gate-skips 65 other 0
+k2 2002 Fridays 1 placed 1 gate-skips 15 other 0
+k3 2002 Fridays 3 placed 3 gate-skips 48 other 0
+k4 2002 Fridays 3 placed 4 gate-skips 47 other 0
+k0 2008 Fridays 1 placed 1 gate-skips 19 other 0
+k1 2008 Fridays 1 placed 1 gate-skips 19 other 0
+k2 2008 Fridays 1 placed 1 gate-skips 19 other 0
+k3 2008 Fridays 1 placed 1 gate-skips 19 other 0
+C's keys by year (S:C, pooled): all C-placed keys, of which capped admissions (KEYS)
+2001 81 73
+2002 97 88
+2008 104 100
+
+== 5. Exposure and return by period x SPY regime (pack site data)
+k0 2000-02  C all: strat    -5.9% spy   -36.9% inv 40.3% | UP(161d)   +2.3/ -24.2 inv 54.1 | MIXED(143d)   +3.0/ +11.2 inv 49.5 | DOWN(447d)  -10.7/ -25.2 inv 32.3 |
+k0 2000-02  G all: strat   +19.5% spy   -36.9% inv 22.2% | UP(161d)   +4.1/ -24.2 inv 36.0 | MIXED(143d)   +7.1/ +11.2 inv 16.9 | DOWN(447d)   +7.1/ -25.2 inv 18.9 |
+k0 2000-02  S all: strat   +18.7% spy   -36.9% inv 21.8% | UP(161d)   +3.6/ -24.2 inv 35.4 | MIXED(143d)   +6.9/ +11.2 inv 16.6 | DOWN(447d)   +7.2/ -25.2 inv 18.6 |
+k0 2003-06  C all: strat  +101.0% spy   +72.3% inv 76.5% | UP(760d)  +83.6/ +44.2 inv 80.2 | MIXED(172d)   -0.1/  +2.1 inv 73.3 | DOWN(75d)   +9.7/ +17.0 inv 46.7 |
+k0 2003-06  G all: strat  +104.0% spy   +72.3% inv 63.2% | UP(760d)  +85.3/ +44.2 inv 65.4 | MIXED(172d)   +2.3/  +2.1 inv 68.8 | DOWN(75d)   +7.6/ +17.0 inv 28.4 |
+k0 2003-06  S all: strat  +123.4% spy   +72.3% inv 65.1% | UP(760d) +104.5/ +44.2 inv 68.3 | MIXED(172d)   +1.4/  +2.1 inv 67.1 | DOWN(75d)   +7.7/ +17.0 inv 27.9 |
+k0 2007-09  C all: strat    -6.3% spy   -16.0% inv 53.6% | UP(337d)  +31.5/ +21.2 inv 84.0 | MIXED(93d)  -11.3/  +2.3 inv 46.7 | DOWN(326d)  -19.7/ -32.3 inv 24.2 |
+k0 2007-09  G all: strat   +15.6% spy   -16.0% inv 39.3% | UP(337d)  +23.9/ +21.2 inv 61.8 | MIXED(93d)   -7.3/  +2.3 inv 36.3 | DOWN(326d)   +0.7/ -32.3 inv 16.9 |
+k0 2007-09  S all: strat   +20.3% spy   -16.0% inv 39.7% | UP(337d)  +34.5/ +21.2 inv 59.3 | MIXED(93d)  -12.3/  +2.3 inv 38.7 | DOWN(326d)   +2.0/ -32.3 inv 19.7 |
+k0 2010-14  C all: strat   +75.4% spy  +104.1% inv 80.9% | UP(1012d)  +57.4/ +55.7 inv 82.1 | MIXED(139d)   -3.1/  +0.0 inv 81.0 | DOWN(107d)  +14.9/ +31.1 inv 69.6 |
+k0 2010-14  G all: strat  +122.5% spy  +104.1% inv 78.3% | UP(1012d)  +93.8/ +55.7 inv 79.4 | MIXED(139d)   +0.2/  +0.0 inv 76.6 | DOWN(107d)  +14.5/ +31.1 inv 69.3 |
+k0 2010-14  S all: strat  +110.8% spy  +104.1% inv 75.4% | UP(1012d)  +93.1/ +55.7 inv 77.1 | MIXED(139d)   -1.7/  +0.0 inv 71.5 | DOWN(107d)  +11.1/ +31.1 inv 64.1 |
+k0 2015-19  C all: strat   +44.4% spy   +72.8% inv 77.4% | UP(996d)  +33.3/ +29.9 inv 82.9 | MIXED(139d)   +4.0/  +7.2 inv 66.8 | DOWN(123d)   +4.1/ +24.2 inv 45.2 |
+k0 2015-19  G all: strat   +35.3% spy   +72.8% inv 60.1% | UP(996d)  +33.5/ +29.9 inv 67.9 | MIXED(139d)   -2.1/  +7.2 inv 40.2 | DOWN(123d)   +3.6/ +24.2 inv 19.4 |
+k0 2015-19  S all: strat   +24.5% spy   +72.8% inv 59.4% | UP(996d)  +23.7/ +29.9 inv 67.0 | MIXED(139d)   -2.0/  +7.2 inv 41.4 | DOWN(123d)   +2.7/ +24.2 inv 18.4 |
+k0 2020-22  C all: strat   +11.9% spy   +24.6% inv 71.2% | UP(441d)  +36.2/ +25.7 inv 79.6 | MIXED(117d)  -18.1/ -30.5 inv 70.0 | DOWN(198d)   +0.3/ +42.6 inv 53.2 |
+k0 2020-22  G all: strat   +57.2% spy   +24.6% inv 61.9% | UP(441d)  +57.8/ +25.7 inv 70.8 | MIXED(117d)  -12.4/ -30.5 inv 56.5 | DOWN(198d)  +13.7/ +42.6 inv 45.4 |
+k0 2020-22  S all: strat   +57.0% spy   +24.6% inv 60.5% | UP(441d)  +59.7/ +25.7 inv 67.9 | MIXED(117d)  -13.9/ -30.5 inv 58.0 | DOWN(198d)  +14.2/ +42.6 inv 45.5 |
+k0 2023-26  C all: strat   +39.4% spy  +100.8% inv 79.9% | UP(752d)  +20.2/ +68.9 inv 82.4 | MIXED(82d)   +9.8/  -1.8 inv 68.4 | DOWN(38d)   +5.6/ +21.1 inv 55.4 |
+k0 2023-26  G all: strat   +13.5% spy  +100.8% inv 62.2% | UP(752d)   +0.9/ +68.9 inv 67.4 | MIXED(82d)   +9.7/  -1.8 inv 35.6 | DOWN(38d)   +2.5/ +21.1 inv 17.9 |
+k0 2023-26  S all: strat   +19.6% spy  +100.8% inv 62.5% | UP(752d)   +5.3/ +68.9 inv 67.6 | MIXED(82d)  +10.7/  -1.8 inv 36.0 | DOWN(38d)   +2.5/ +21.1 inv 17.9 |
+k0 all      C all: strat  +599.6% spy  +705.8% inv 70.7% | UP(4459d) +748.3/+468.7 inv 80.9 | MIXED(885d)  -17.3/ -15.0 inv 66.0 | DOWN(1314d)   -0.3/ +66.7 inv 39.2 |
+k0 all      G all: strat +1414.2% spy  +705.8% inv 57.9% | UP(4459d) +885.1/+468.7 inv 68.7 | MIXED(885d)   -4.2/ -15.0 inv 49.0 | DOWN(1314d)  +60.5/ +66.7 inv 27.1 |
+k0 all      S all: strat +1472.1% spy  +705.8% inv 57.3% | UP(4459d) +1044.6/+468.7 inv 68.0 | MIXED(885d)  -12.8/ -15.0 inv 48.5 | DOWN(1314d)  +57.5/ +66.7 inv 27.1 |
+k0 S mean positions 5.5, mean invested 57.3%
+k0 C mean positions 7.6, mean invested 70.7%
+k0 G mean positions 5.5, mean invested 57.9%
+k0 S-only tickets, C cash skip: n 146, C invested that Friday 82.4% (>= 65% on 135), S 63.9%
+k0 S-only tickets, no C list: n 121, C invested that Friday 95.3% (>= 65% on 120), S 71.6%
+k1 2000-02  C all: strat   -17.6% spy   -36.9% inv 35.6% | UP(161d)   -4.0/ -24.2 inv 42.1 | MIXED(143d)   -2.5/ +11.2 inv 50.0 | DOWN(447d)  -11.9/ -25.2 inv 28.6 |
+k1 2000-02  G all: strat    +9.9% spy   -36.9% inv 21.1% | UP(161d)   +2.3/ -24.2 inv 34.8 | MIXED(143d)   +4.0/ +11.2 inv 24.4 | DOWN(447d)   +3.3/ -25.2 inv 15.1 |
+k1 2000-02  S all: strat    +9.2% spy   -36.9% inv 20.7% | UP(161d)   +1.9/ -24.2 inv 34.2 | MIXED(143d)   +3.8/ +11.2 inv 24.1 | DOWN(447d)   +3.4/ -25.2 inv 14.8 |
+k1 2003-06  C all: strat  +127.4% spy   +72.3% inv 76.4% | UP(760d)  +90.1/ +44.2 inv 80.6 | MIXED(172d)   +8.4/  +2.1 inv 72.6 | DOWN(75d)  +10.3/ +17.0 inv 42.6 |
+k1 2003-06  G all: strat  +109.3% spy   +72.3% inv 62.6% | UP(760d)  +84.7/ +44.2 inv 64.5 | MIXED(172d)   +3.7/  +2.1 inv 68.4 | DOWN(75d)   +9.4/ +17.0 inv 29.7 |
+k1 2003-06  S all: strat  +113.9% spy   +72.3% inv 63.1% | UP(760d)  +99.3/ +44.2 inv 66.1 | MIXED(172d)   +3.1/  +2.1 inv 66.6 | DOWN(75d)   +4.1/ +17.0 inv 24.5 |
+k1 2007-09  C all: strat   -18.1% spy   -16.0% inv 50.8% | UP(337d)  +15.5/ +21.2 inv 83.3 | MIXED(93d)  -10.9/  +2.3 inv 46.0 | DOWN(326d)  -20.4/ -32.3 inv 18.5 |
+k1 2007-09  G all: strat   +15.2% spy   -16.0% inv 36.6% | UP(337d)  +20.5/ +21.2 inv 59.5 | MIXED(93d)   -8.1/  +2.3 inv 34.9 | DOWN(326d)   +4.0/ -32.3 inv 13.4 |
+k1 2007-09  S all: strat   +18.6% spy   -16.0% inv 33.9% | UP(337d)  +23.7/ +21.2 inv 58.1 | MIXED(93d)   -7.3/  +2.3 inv 33.1 | DOWN(326d)   +3.4/ -32.3 inv  9.2 |
+k1 2010-14  C all: strat  +141.9% spy  +104.1% inv 81.9% | UP(1012d) +101.4/ +55.7 inv 83.8 | MIXED(139d)   +1.0/  +0.0 inv 78.2 | DOWN(107d)  +18.9/ +31.1 inv 68.9 |
+k1 2010-14  G all: strat   +88.3% spy  +104.1% inv 75.4% | UP(1012d)  +81.8/ +55.7 inv 76.8 | MIXED(139d)   -0.8/  +0.0 inv 70.4 | DOWN(107d)   +4.4/ +31.1 inv 69.1 |
+k1 2010-14  S all: strat   +95.8% spy  +104.1% inv 76.8% | UP(1012d)  +84.1/ +55.7 inv 78.6 | MIXED(139d)   -2.4/  +0.0 inv 70.7 | DOWN(107d)   +9.0/ +31.1 inv 67.8 |
+k1 2015-19  C all: strat   +46.5% spy   +72.8% inv 77.9% | UP(996d)  +38.0/ +29.9 inv 82.9 | MIXED(139d)   +1.9/  +7.2 inv 65.3 | DOWN(123d)   +4.2/ +24.2 inv 51.1 |
+k1 2015-19  G all: strat   +37.0% spy   +72.8% inv 54.4% | UP(996d)  +36.0/ +29.9 inv 61.2 | MIXED(139d)   -2.4/  +7.2 inv 34.9 | DOWN(123d)   +3.3/ +24.2 inv 20.7 |
+k1 2015-19  S all: strat   +36.6% spy   +72.8% inv 54.6% | UP(996d)  +34.6/ +29.9 inv 61.5 | MIXED(139d)   -2.1/  +7.2 inv 35.5 | DOWN(123d)   +3.6/ +24.2 inv 20.2 |
+k1 2020-22  C all: strat    +6.9% spy   +24.6% inv 70.0% | UP(441d)  +28.9/ +25.7 inv 76.9 | MIXED(117d)  -20.1/ -30.5 inv 69.6 | DOWN(198d)   +3.9/ +42.6 inv 54.9 |
+k1 2020-22  G all: strat   +69.4% spy   +24.6% inv 62.4% | UP(441d)  +81.5/ +25.7 inv 71.6 | MIXED(117d)  -16.2/ -30.5 inv 53.7 | DOWN(198d)  +11.4/ +42.6 inv 47.2 |
+k1 2020-22  S all: strat   +69.2% spy   +24.6% inv 60.9% | UP(441d)  +73.3/ +25.7 inv 70.5 | MIXED(117d)  -13.5/ -30.5 inv 52.1 | DOWN(198d)  +12.9/ +42.6 inv 44.9 |
+k1 2023-26  C all: strat   +67.9% spy  +100.8% inv 81.3% | UP(752d)  +53.0/ +68.9 inv 83.8 | MIXED(82d)   +4.2/  -1.8 inv 72.0 | DOWN(38d)   +5.4/ +21.1 inv 52.4 |
+k1 2023-26  G all: strat   +43.6% spy  +100.8% inv 64.3% | UP(752d)  +30.5/ +68.9 inv 69.5 | MIXED(82d)   +7.2/  -1.8 inv 37.6 | DOWN(38d)   +2.6/ +21.1 inv 17.9 |
+k1 2023-26  S all: strat   +41.7% spy  +100.8% inv 65.3% | UP(752d)  +27.5/ +68.9 inv 70.6 | MIXED(82d)   +7.7/  -1.8 inv 37.9 | DOWN(38d)   +3.2/ +21.1 inv 19.8 |
+k1 all      C all: strat  +876.4% spy  +705.8% inv 70.1% | UP(4459d) +1054.6/+468.7 inv 80.8 | MIXED(885d)  -19.3/ -15.0 inv 65.4 | DOWN(1314d)   +4.8/ +66.7 inv 36.9 |
+k1 all      G all: strat +1562.9% spy  +705.8% inv 56.0% | UP(4459d) +1232.6/+468.7 inv 66.7 | MIXED(885d)  -13.9/ -15.0 inv 48.0 | DOWN(1314d)  +44.9/ +66.7 inv 25.3 |
+k1 all      S all: strat +1677.6% spy  +705.8% inv 56.0% | UP(4459d) +1275.2/+468.7 inv 67.4 | MIXED(885d)  -11.6/ -15.0 inv 47.4 | DOWN(1314d)  +46.3/ +66.7 inv 23.5 |
+k1 S mean positions 5.3, mean invested 56.0%
+k1 C mean positions 7.5, mean invested 70.1%
+k1 G mean positions 5.2, mean invested 56.0%
+k1 S-only tickets, C cash skip: n 159, C invested that Friday 82.2% (>= 65% on 149), S 61.6%
+k1 S-only tickets, no C list: n 135, C invested that Friday 95.0% (>= 65% on 135), S 72.1%
+k2 2000-02  C all: strat   -10.9% spy   -36.9% inv 38.8% | UP(161d)   -0.9/ -24.2 inv 50.9 | MIXED(143d)   +5.8/ +11.2 inv 46.5 | DOWN(447d)  -15.0/ -25.2 inv 31.9 |
+k2 2000-02  G all: strat   +11.8% spy   -36.9% inv 19.1% | UP(161d)   +1.6/ -24.2 inv 33.1 | MIXED(143d)   +7.4/ +11.2 inv 16.4 | DOWN(447d)   +2.5/ -25.2 inv 14.9 |
+k2 2000-02  S all: strat   +11.1% spy   -36.9% inv 18.7% | UP(161d)   +1.1/ -24.2 inv 32.5 | MIXED(143d)   +7.1/ +11.2 inv 16.2 | DOWN(447d)   +2.6/ -25.2 inv 14.6 |
+k2 2003-06  C all: strat  +102.0% spy   +72.3% inv 75.4% | UP(760d)  +84.3/ +44.2 inv 78.3 | MIXED(172d)   +0.6/  +2.1 inv 75.1 | DOWN(75d)   +9.0/ +17.0 inv 46.1 |
+k2 2003-06  G all: strat  +126.6% spy   +72.3% inv 62.6% | UP(760d) +112.2/ +44.2 inv 65.4 | MIXED(172d)   +3.0/  +2.1 inv 67.6 | DOWN(75d)   +3.6/ +17.0 inv 22.8 |
+k2 2003-06  S all: strat  +136.3% spy   +72.3% inv 65.7% | UP(760d) +110.9/ +44.2 inv 68.2 | MIXED(172d)   +2.3/  +2.1 inv 70.1 | DOWN(75d)   +9.6/ +17.0 inv 29.9 |
+k2 2007-09  C all: strat    -7.5% spy   -16.0% inv 54.2% | UP(337d)  +22.2/ +21.2 inv 84.5 | MIXED(93d)   -9.0/  +2.3 inv 50.0 | DOWN(326d)  -16.9/ -32.3 inv 24.1 |
+k2 2007-09  G all: strat    +4.0% spy   -16.0% inv 40.0% | UP(337d)  +11.0/ +21.2 inv 57.3 | MIXED(93d)   -6.0/  +2.3 inv 43.1 | DOWN(326d)   -0.3/ -32.3 inv 21.2 |
+k2 2007-09  S all: strat    +8.5% spy   -16.0% inv 37.0% | UP(337d)  +20.9/ +21.2 inv 57.8 | MIXED(93d)  -12.0/  +2.3 inv 33.9 | DOWN(326d)   +1.9/ -32.3 inv 16.4 |
+k2 2010-14  C all: strat   +70.6% spy  +104.1% inv 80.9% | UP(1012d)  +46.3/ +55.7 inv 82.4 | MIXED(139d)   +0.8/  +0.0 inv 78.0 | DOWN(107d)  +15.7/ +31.1 inv 70.6 |
+k2 2010-14  G all: strat  +114.3% spy  +104.1% inv 75.3% | UP(1012d)  +59.5/ +55.7 inv 75.8 | MIXED(139d)   +6.6/  +0.0 inv 75.7 | DOWN(107d)  +26.1/ +31.1 inv 70.9 |
+k2 2010-14  S all: strat   +76.7% spy  +104.1% inv 73.8% | UP(1012d)  +46.5/ +55.7 inv 74.4 | MIXED(139d)   +0.8/  +0.0 inv 72.6 | DOWN(107d)  +19.7/ +31.1 inv 69.6 |
+k2 2015-19  C all: strat   +32.2% spy   +72.8% inv 75.8% | UP(996d)  +22.9/ +29.9 inv 80.6 | MIXED(139d)   +1.9/  +7.2 inv 66.4 | DOWN(123d)   +5.5/ +24.2 inv 47.6 |
+k2 2015-19  G all: strat   +32.5% spy   +72.8% inv 59.1% | UP(996d)  +33.6/ +29.9 inv 66.2 | MIXED(139d)   -3.9/  +7.2 inv 40.2 | DOWN(123d)   +3.2/ +24.2 inv 23.3 |
+k2 2015-19  S all: strat   +33.1% spy   +72.8% inv 59.0% | UP(996d)  +34.5/ +29.9 inv 65.8 | MIXED(139d)   -4.6/  +7.2 inv 42.5 | DOWN(123d)   +3.7/ +24.2 inv 23.0 |
+k2 2020-22  C all: strat    +1.1% spy   +24.6% inv 71.7% | UP(441d)  +22.1/ +25.7 inv 78.4 | MIXED(117d)  -22.3/ -30.5 inv 75.2 | DOWN(198d)   +6.6/ +42.6 inv 54.7 |
+k2 2020-22  G all: strat   +44.4% spy   +24.6% inv 55.7% | UP(441d)  +65.4/ +25.7 inv 70.1 | MIXED(117d)  -18.7/ -30.5 inv 43.4 | DOWN(198d)   +7.4/ +42.6 inv 30.9 |
+k2 2020-22  S all: strat   +48.0% spy   +24.6% inv 56.5% | UP(441d)  +71.7/ +25.7 inv 70.6 | MIXED(117d)  -19.6/ -30.5 inv 45.7 | DOWN(198d)   +7.2/ +42.6 inv 31.4 |
+k2 2023-26  C all: strat   +66.6% spy  +100.8% inv 80.4% | UP(752d)  +43.1/ +68.9 inv 82.7 | MIXED(82d)  +12.7/  -1.8 inv 70.1 | DOWN(38d)   +3.3/ +21.1 inv 57.9 |
+k2 2023-26  G all: strat   +45.7% spy  +100.8% inv 64.0% | UP(752d)  +34.7/ +68.9 inv 69.0 | MIXED(82d)   +6.9/  -1.8 inv 38.1 | DOWN(38d)   +1.1/ +21.1 inv 19.2 |
+k2 2023-26  S all: strat   +44.6% spy  +100.8% inv 63.7% | UP(752d)  +35.6/ +68.9 inv 68.8 | MIXED(82d)   +5.9/  -1.8 inv 38.3 | DOWN(38d)   +0.7/ +21.1 inv 19.2 |
+k2 all      C all: strat  +532.4% spy  +705.8% inv 70.2% | UP(4459d) +601.1/+468.7 inv 80.0 | MIXED(885d)  -12.8/ -15.0 inv 66.5 | DOWN(1314d)   +3.5/ +66.7 inv 39.6 |
+k2 all      G all: strat +1474.5% spy  +705.8% inv 56.3% | UP(4459d) +1037.4/+468.7 inv 67.2 | MIXED(885d)   -7.5/ -15.0 inv 47.8 | DOWN(1314d)  +49.7/ +66.7 inv 24.8 |
+k2 all      S all: strat +1334.4% spy  +705.8% inv 56.1% | UP(4459d) +1083.5/+468.7 inv 67.3 | MIXED(885d)  -21.1/ -15.0 inv 47.5 | DOWN(1314d)  +53.7/ +66.7 inv 23.8 |
+k2 S mean positions 5.3, mean invested 56.1%
+k2 C mean positions 7.5, mean invested 70.2%
+k2 G mean positions 5.2, mean invested 56.3%
+k2 S-only tickets, C cash skip: n 155, C invested that Friday 82.7% (>= 65% on 147), S 64.8%
+k2 S-only tickets, no C list: n 118, C invested that Friday 95.1% (>= 65% on 117), S 70.3%
+k3 2000-02  C all: strat   -11.4% spy   -36.9% inv 40.7% | UP(161d)   -2.3/ -24.2 inv 51.6 | MIXED(143d)   +0.6/ +11.2 inv 52.1 | DOWN(447d)   -9.9/ -25.2 inv 33.1 |
+k3 2000-02  G all: strat   +19.2% spy   -36.9% inv 22.1% | UP(161d)   +1.1/ -24.2 inv 34.9 | MIXED(143d)   +9.5/ +11.2 inv 17.6 | DOWN(447d)   +7.6/ -25.2 inv 19.0 |
+k3 2000-02  S all: strat   +18.5% spy   -36.9% inv 21.8% | UP(161d)   +0.7/ -24.2 inv 34.3 | MIXED(143d)   +9.3/ +11.2 inv 17.3 | DOWN(447d)   +7.7/ -25.2 inv 18.7 |
+k3 2003-06  C all: strat   +68.7% spy   +72.3% inv 74.4% | UP(760d)  +57.0/ +44.2 inv 78.2 | MIXED(172d)   -2.2/  +2.1 inv 73.4 | DOWN(75d)   +9.9/ +17.0 inv 38.9 |
+k3 2003-06  G all: strat  +107.9% spy   +72.3% inv 64.4% | UP(760d)  +95.1/ +44.2 inv 66.7 | MIXED(172d)   -2.5/  +2.1 inv 69.3 | DOWN(75d)   +9.3/ +17.0 inv 29.7 |
+k3 2003-06  S all: strat  +126.6% spy   +72.3% inv 65.8% | UP(760d) +101.8/ +44.2 inv 68.6 | MIXED(172d)   +1.8/  +2.1 inv 69.0 | DOWN(75d)  +10.3/ +17.0 inv 30.2 |
+k3 2007-09  C all: strat    -9.7% spy   -16.0% inv 52.8% | UP(337d)  +23.2/ +21.2 inv 84.8 | MIXED(93d)   -7.6/  +2.3 inv 45.9 | DOWN(326d)  -20.7/ -32.3 inv 21.6 |
+k3 2007-09  G all: strat    +6.4% spy   -16.0% inv 39.4% | UP(337d)  +20.1/ +21.2 inv 60.9 | MIXED(93d)  -12.0/  +2.3 inv 35.6 | DOWN(326d)   +0.7/ -32.3 inv 18.2 |
+k3 2007-09  S all: strat    +1.6% spy   -16.0% inv 36.4% | UP(337d)  +13.8/ +21.2 inv 60.3 | MIXED(93d)  -10.5/  +2.3 inv 34.2 | DOWN(326d)   -0.2/ -32.3 inv 12.2 |
+k3 2010-14  C all: strat  +121.1% spy  +104.1% inv 82.4% | UP(1012d)  +89.5/ +55.7 inv 83.8 | MIXED(139d)   -2.9/  +0.0 inv 78.7 | DOWN(107d)  +20.1/ +31.1 inv 73.9 |
+k3 2010-14  G all: strat   +99.6% spy  +104.1% inv 74.8% | UP(1012d)  +63.3/ +55.7 inv 75.8 | MIXED(139d)   +5.7/  +0.0 inv 71.2 | DOWN(107d)  +15.7/ +31.1 inv 70.6 |
+k3 2010-14  S all: strat  +105.0% spy  +104.1% inv 76.4% | UP(1012d)  +67.7/ +55.7 inv 77.8 | MIXED(139d)   +5.2/  +0.0 inv 71.8 | DOWN(107d)  +16.1/ +31.1 inv 68.6 |
+k3 2015-19  C all: strat   +33.9% spy   +72.8% inv 76.9% | UP(996d)  +27.1/ +29.9 inv 82.6 | MIXED(139d)   -2.7/  +7.2 inv 66.4 | DOWN(123d)   +8.3/ +24.2 inv 42.1 |
+k3 2015-19  G all: strat   +16.1% spy   +72.8% inv 56.2% | UP(996d)  +17.8/ +29.9 inv 63.9 | MIXED(139d)   -5.2/  +7.2 inv 35.6 | DOWN(123d)   +4.0/ +24.2 inv 16.6 |
+k3 2015-19  S all: strat   +30.3% spy   +72.8% inv 58.5% | UP(996d)  +33.1/ +29.9 inv 65.9 | MIXED(139d)   -3.8/  +7.2 inv 38.8 | DOWN(123d)   +1.8/ +24.2 inv 20.6 |
+k3 2020-22  C all: strat    +1.4% spy   +24.6% inv 70.4% | UP(441d)  +13.1/ +25.7 inv 77.8 | MIXED(117d)  -14.9/ -30.5 inv 70.6 | DOWN(198d)   +5.3/ +42.6 inv 53.8 |
+k3 2020-22  G all: strat   +63.1% spy   +24.6% inv 61.0% | UP(441d)  +61.6/ +25.7 inv 71.9 | MIXED(117d)  -12.3/ -30.5 inv 50.3 | DOWN(198d)  +15.0/ +42.6 inv 42.9 |
+k3 2020-22  S all: strat   +59.5% spy   +24.6% inv 59.1% | UP(441d)  +60.6/ +25.7 inv 69.5 | MIXED(117d)  -13.6/ -30.5 inv 47.6 | DOWN(198d)  +15.0/ +42.6 inv 42.7 |
+k3 2023-26  C all: strat   +41.7% spy  +100.8% inv 80.3% | UP(752d)  +20.7/ +68.9 inv 82.3 | MIXED(82d)  +13.2/  -1.8 inv 74.1 | DOWN(38d)   +3.7/ +21.1 inv 54.0 |
+k3 2023-26  G all: strat   +17.1% spy  +100.8% inv 61.7% | UP(752d)   +5.8/ +68.9 inv 67.3 | MIXED(82d)   +7.8/  -1.8 inv 31.8 | DOWN(38d)   +2.7/ +21.1 inv 15.0 |
+k3 2023-26  S all: strat   +13.5% spy  +100.8% inv 61.7% | UP(752d)   +1.6/ +68.9 inv 67.3 | MIXED(82d)   +8.8/  -1.8 inv 32.1 | DOWN(38d)   +2.7/ +21.1 inv 15.0 |
+k3 all      C all: strat  +473.6% spy  +705.8% inv 70.4% | UP(4459d) +521.0/+468.7 inv 80.7 | MIXED(885d)  -17.3/ -15.0 inv 66.5 | DOWN(1314d)  +11.6/ +66.7 inv 38.4 |
+k3 all      G all: strat +1066.5% spy  +705.8% inv 56.5% | UP(4459d) +678.9/+468.7 inv 67.2 | MIXED(885d)  -11.1/ -15.0 inv 46.4 | DOWN(1314d)  +68.4/ +66.7 inv 26.9 |
+k3 all      S all: strat +1219.6% spy  +705.8% inv 56.8% | UP(4459d) +741.7/+468.7 inv 68.1 | MIXED(885d)   -5.3/ -15.0 inv 46.4 | DOWN(1314d)  +65.6/ +66.7 inv 25.5 |
+k3 S mean positions 5.4, mean invested 56.8%
+k3 C mean positions 7.7, mean invested 70.4%
+k3 G mean positions 5.3, mean invested 56.4%
+k3 S-only tickets, C cash skip: n 142, C invested that Friday 81.3% (>= 65% on 128), S 59.2%
+k3 S-only tickets, no C list: n 142, C invested that Friday 96.0% (>= 65% on 142), S 70.4%
+k4 2000-02  C all: strat    -9.6% spy   -36.9% inv 38.9% | UP(161d)   +3.1/ -24.2 inv 51.8 | MIXED(143d)   +0.6/ +11.2 inv 47.6 | DOWN(447d)  -12.9/ -25.2 inv 31.5 |
+k4 2000-02  G all: strat   +13.3% spy   -36.9% inv 16.9% | UP(161d)   +3.9/ -24.2 inv 34.9 | MIXED(143d)   +6.2/ +11.2 inv 18.5 | DOWN(447d)   +2.7/ -25.2 inv  9.9 |
+k4 2000-02  S all: strat   +12.7% spy   -36.9% inv 16.6% | UP(161d)   +3.4/ -24.2 inv 34.3 | MIXED(143d)   +6.0/ +11.2 inv 18.2 | DOWN(447d)   +2.8/ -25.2 inv  9.7 |
+k4 2003-06  C all: strat   +92.5% spy   +72.3% inv 75.3% | UP(760d)  +69.7/ +44.2 inv 79.2 | MIXED(172d)   +4.1/  +2.1 inv 71.9 | DOWN(75d)   +9.0/ +17.0 inv 44.3 |
+k4 2003-06  G all: strat  +102.6% spy   +72.3% inv 62.6% | UP(760d)  +93.0/ +44.2 inv 66.2 | MIXED(172d)   +1.8/  +2.1 inv 65.6 | DOWN(75d)   +3.1/ +17.0 inv 19.2 |
+k4 2003-06  S all: strat   +98.4% spy   +72.3% inv 63.2% | UP(760d)  +87.9/ +44.2 inv 66.4 | MIXED(172d)   +2.8/  +2.1 inv 66.3 | DOWN(75d)   +2.7/ +17.0 inv 24.1 |
+k4 2007-09  C all: strat   -12.6% spy   -16.0% inv 53.6% | UP(337d)  +21.0/ +21.2 inv 86.4 | MIXED(93d)  -12.1/  +2.3 inv 50.2 | DOWN(326d)  -17.8/ -32.3 inv 20.6 |
+k4 2007-09  G all: strat   +12.5% spy   -16.0% inv 38.0% | UP(337d)  +28.5/ +21.2 inv 58.5 | MIXED(93d)  -14.4/  +2.3 inv 36.6 | DOWN(326d)   +2.2/ -32.3 inv 17.3 |
+k4 2007-09  S all: strat    +6.7% spy   -16.0% inv 34.7% | UP(337d)  +22.1/ +21.2 inv 56.7 | MIXED(93d)  -10.9/  +2.3 inv 33.0 | DOWN(326d)   -1.8/ -32.3 inv 12.4 |
+k4 2010-14  C all: strat   +73.1% spy  +104.1% inv 79.7% | UP(1012d)  +56.2/ +55.7 inv 81.2 | MIXED(139d)   -0.7/  +0.0 inv 79.4 | DOWN(107d)  +11.6/ +31.1 inv 66.6 |
+k4 2010-14  G all: strat  +115.7% spy  +104.1% inv 78.1% | UP(1012d)  +74.8/ +55.7 inv 78.2 | MIXED(139d)   +6.6/  +0.0 inv 78.1 | DOWN(107d)  +15.7/ +31.1 inv 77.4 |
+k4 2010-14  S all: strat  +127.3% spy  +104.1% inv 78.5% | UP(1012d)  +83.9/ +55.7 inv 78.7 | MIXED(139d)   +6.8/  +0.0 inv 77.9 | DOWN(107d)  +15.7/ +31.1 inv 77.3 |
+k4 2015-19  C all: strat   +58.7% spy   +72.8% inv 77.2% | UP(996d)  +41.4/ +29.9 inv 82.3 | MIXED(139d)   +6.0/  +7.2 inv 65.9 | DOWN(123d)   +5.9/ +24.2 inv 48.5 |
+k4 2015-19  G all: strat   +35.5% spy   +72.8% inv 57.4% | UP(996d)  +35.9/ +29.9 inv 65.6 | MIXED(139d)   -1.9/  +7.2 inv 32.7 | DOWN(123d)   +1.6/ +24.2 inv 18.9 |
+k4 2015-19  S all: strat   +42.1% spy   +72.8% inv 59.9% | UP(996d)  +36.0/ +29.9 inv 66.8 | MIXED(139d)   +1.5/  +7.2 inv 39.8 | DOWN(123d)   +3.0/ +24.2 inv 27.2 |
+k4 2020-22  C all: strat    +5.2% spy   +24.6% inv 68.2% | UP(441d)  +19.1/ +25.7 inv 73.2 | MIXED(117d)  -18.6/ -30.5 inv 74.0 | DOWN(198d)   +8.4/ +42.6 inv 53.8 |
+k4 2020-22  G all: strat   +68.1% spy   +24.6% inv 60.4% | UP(441d)  +66.6/ +25.7 inv 68.4 | MIXED(117d)  -12.7/ -30.5 inv 54.8 | DOWN(198d)  +15.6/ +42.6 inv 46.1 |
+k4 2020-22  S all: strat   +61.9% spy   +24.6% inv 60.9% | UP(441d)  +61.4/ +25.7 inv 68.8 | MIXED(117d)  -13.4/ -30.5 inv 55.9 | DOWN(198d)  +15.9/ +42.6 inv 46.4 |
+k4 2023-26  C all: strat   +55.7% spy  +100.8% inv 79.9% | UP(752d)  +35.4/ +68.9 inv 82.0 | MIXED(82d)  +10.8/  -1.8 inv 72.9 | DOWN(38d)   +3.8/ +21.1 inv 53.7 |
+k4 2023-26  G all: strat   +43.5% spy  +100.8% inv 63.4% | UP(752d)  +30.1/ +68.9 inv 67.9 | MIXED(82d)   +9.0/  -1.8 inv 41.7 | DOWN(38d)   +1.1/ +21.1 inv 21.8 |
+k4 2023-26  S all: strat   +39.4% spy  +100.8% inv 62.9% | UP(752d)  +27.6/ +68.9 inv 67.4 | MIXED(82d)   +8.0/  -1.8 inv 40.9 | DOWN(38d)   +1.1/ +21.1 inv 21.8 |
+k4 all      C all: strat  +585.1% spy  +705.8% inv 69.7% | UP(4459d) +654.8/+468.7 inv 79.8 | MIXED(885d)  -12.6/ -15.0 inv 66.3 | DOWN(1314d)   +3.8/ +66.7 inv 38.0 |
+k4 all      G all: strat +1720.3% spy  +705.8% inv 56.5% | UP(4459d) +1226.1/+468.7 inv 67.6 | MIXED(885d)   -7.8/ -15.0 inv 48.1 | DOWN(1314d)  +48.9/ +66.7 inv 24.4 |
+k4 all      S all: strat +1638.8% spy  +705.8% inv 56.7% | UP(4459d) +1121.5/+468.7 inv 67.8 | MIXED(885d)   -1.7/ -15.0 inv 48.9 | DOWN(1314d)  +44.8/ +66.7 inv 24.2 |
+k4 S mean positions 5.3, mean invested 56.7%
+k4 C mean positions 7.5, mean invested 69.7%
+k4 G mean positions 5.2, mean invested 56.5%
+k4 S-only tickets, C cash skip: n 139, C invested that Friday 81.2% (>= 65% on 130), S 64.1%
+k4 S-only tickets, no C list: n 129, C invested that Friday 95.2% (>= 65% on 129), S 71.6%
+
+== 6. Admissions vs the S tickets C could not take: per-trade return distribution (KEYS, tickets, trades)
+k0 ADM  n=476 win=35% ret%: p10 -14.7 p25 -13.2 p50 -4.7 p75 3.4 p90 20.8 max 312.3 >=100%: 5 | mean weight 7.4% | sum c 75.5 NAV-%
+k1 ADM  n=484 win=34% ret%: p10 -14.8 p25 -13.4 p50 -5.5 p75 4.0 p90 20.8 max 312.3 >=100%: 5 | mean weight 7.4% | sum c 67.3 NAV-%
+k2 ADM  n=483 win=35% ret%: p10 -14.7 p25 -13.2 p50 -5.6 p75 3.4 p90 20.8 max 312.3 >=100%: 5 | mean weight 7.4% | sum c 70.8 NAV-%
+k3 ADM  n=490 win=34% ret%: p10 -14.7 p25 -13.3 p50 -5.1 p75 3.8 p90 22.5 max 312.3 >=100%: 5 | mean weight 7.4% | sum c 60.8 NAV-%
+k4 ADM  n=483 win=35% ret%: p10 -14.8 p25 -13.4 p50 -5.7 p75 4.4 p90 24.8 max 312.3 >=100%: 6 | mean weight 7.4% | sum c 85.5 NAV-%
+k0 DISP n=233 win=43% ret%: p10 -12.5 p25 -7.7 p50 -2.2 p75 9.0 p90 28.4 max 525.6 >=100%: 6 | mean weight 9.6% | sum c 206.8 NAV-%
+k1 DISP n=247 win=46% ret%: p10 -13.7 p25 -9.0 p50 -1.9 p75 6.7 p90 30.0 max 525.6 >=100%: 4 | mean weight 10.2% | sum c 184.1 NAV-%
+k2 DISP n=229 win=40% ret%: p10 -12.2 p25 -8.0 p50 -2.3 p75 6.5 p90 29.6 max 525.6 >=100%: 5 | mean weight 10.1% | sum c 196.3 NAV-%
+k3 DISP n=237 win=41% ret%: p10 -12.4 p25 -8.7 p50 -2.7 p75 6.5 p90 29.1 max 525.6 >=100%: 5 | mean weight 10.0% | sum c 166.0 NAV-%
+k4 DISP n=219 win=45% ret%: p10 -12.3 p25 -8.4 p50 -2.3 p75 8.0 p90 28.4 max 525.6 >=100%: 5 | mean weight 10.2% | sum c 199.2 NAV-%
+stop width (fraction of the ticket's trigger), k0: S all, C capped admissions, G capped (tickets.tsv)
+S k0 all                   n  683 p10 0.049 p50 0.117 p90 0.144
+C k0 capped admissions     n  654 p10 0.123 p50 0.135 p90 0.147
+G k0 capped                n  136 p10 0.110 p50 0.127 p90 0.141
+
+== 7. Capped keys both arms filled, by fill week (fill age S vs test arm), per seed and pooled (KEYS)
+S:G gap 0    weeks: n 236 total  +25.10, without ROL/LMT  +25.10
+S:G gap 1    weeks: n  73 total  +11.90, without ROL/LMT  +11.90
+S:G gap 2-3  weeks: n  35 total   +7.35, without ROL/LMT   +7.35
+S:G gap 4-8  weeks: n  29 total  -28.05, without ROL/LMT   +1.14
+S:G gap 9+   weeks: n  33 total   -1.65, without ROL/LMT   -1.65
+S:G same week    pooled n 236 price +15.29 size  +9.90 exit   -0.09 total  +25.10 | per seed +5.82 +4.59 +4.76 +5.77 +4.15
+S:G test earlier pooled n 170 price +25.43 size  +5.74 exit  -41.61 total  -10.44 | per seed -1.34 -4.96 -0.90 -1.21 -2.03
+S:C gap 0    weeks: n 124 total  +15.97, without ROL/LMT  +15.97
+S:C gap 1    weeks: n  42 total   +4.63, without ROL/LMT   +4.63
+S:C gap 2-3  weeks: n  28 total   +4.46, without ROL/LMT   +4.46
+S:C gap 4-8  weeks: n   7 total   -4.57, without ROL/LMT   -0.39
+S:C gap 9+   weeks: n  12 total   -1.26, without ROL/LMT   -1.26
+S:C same week    pooled n 124 price  +8.69 size  +7.30 exit   -0.01 total  +15.97 | per seed +3.68 +3.11 +2.87 +3.31 +3.00
+S:C test earlier pooled n  89 price +12.70 size  +0.95 exit  -10.39 total   +3.26 | per seed +0.42 +0.37 +0.52 +1.34 +0.61
+the screen's H2' gain by replay fill timing (screen replay-kK.csv, NAV-% vs its null)
+k0 total +11.60 | same n 42 +2.98 (26%) | later n 1 +0.26 (2%) | earlier n 62 +8.35 (72%)
+k1 total +7.32 | same n 39 +2.69 (37%) | later n 1 +0.26 (4%) | earlier n 56 +4.37 (60%)
+k2 total +6.80 | same n 36 +2.25 (33%) | later n 1 +0.26 (4%) | earlier n 66 +4.29 (63%)
+k3 total +11.98 | same n 34 +3.08 (26%) | later n 1 +0.26 (2%) | earlier n 71 +8.64 (72%)
+k4 total +9.72 | same n 36 +2.73 (28%) | later n 1 +0.26 (3%) | earlier n 53 +6.73 (69%)

@@ -1,6 +1,7 @@
 # Stale-E entry cap, K = 5 paired 26y (2026-11-14): pre-registration
 
-**Status: pre-registered, no runs.** Written before any result of any 26-year arm. The only backtests behind it are
+**Status: read 2026-11-14 — NEITHER PASSES (C NO-BUILD, G INCONCLUSIVE); see §Results.**
+Everything above §Results was written before any result of any 26-year arm. The only backtests behind it are
 one-year local smokes (§Smoke). They are liveness checks, and they changed the design twice:
 
 - They showed that the cap also admits names that S's stop gate rejects (§How the cap reaches a fill, item 5).
@@ -776,8 +777,11 @@ entry prices and share counts, never a mark, and count the open-leg keys.
     open-position contributions, from which a raw close can be recovered, so that file is never committed.
 - `read/combine_check.sh` runs `combine.awk` on fabricated `RULE` lines for every row of the combined table and every
   channel value (§The combined outcome); its output is `results/smoke/combine_check.txt`.
-- `results/smoke/` holds the smoke's per-arm artifacts, its read and its log (§Smoke).
-- `results/k<K>/` holds each seed's `chain.sh collect` output, after the runs.
+- `results/smoke/` holds the smoke's per-arm artifacts, its read and its log (§Smoke). Its price-bearing files moved to
+  the private dayfine/trading-results (§Results, "Where the artifacts are").
+- `results/k<K>/` holds the price-free part of each seed's `chain.sh collect` output; the rest is in dayfine/trading-results
+  at b46c88db, same paths.
+- `read/why.sh` (`read/lib/regime.awk`, `read/lib/cohort.awk`) writes `results/read/why.txt`, the §Results why tables.
 
 ## Smoke (local, 2026-11-14): liveness only
 
@@ -907,3 +911,432 @@ After the runs:
    #3595 did (RV1). It is looked at and not committed.
 4. `results-analyst` reads the PR and the pack, applies the outcome and writes the why.
 5. `qc-results` reviews the PR (`dev/rules/model-routing.md`).
+
+## Results (read 2026-11-14)
+
+**Outcome, by the pre-registered rule:**
+- **C vs S: NO-BUILD** (the harm bar).
+- **G vs S: INCONCLUSIVE** (the D bar).
+- **C vs G: "admissions cost".**
+- **Combined: NEITHER PASSES.**
+
+The cap as built lost 0.60–0.93 log in every seed over 26 years: terminal NAV 0.39–0.55× S's, CAGR 2.5–3.9 pp a year
+lower. Its max drawdown rose from 25–32 % to 41–45 %, and in every seed it is the same 2007–09 episode. With the stop
+gate read at the uncapped trigger (G), the book is flat: median Δ ln(1 + R) −0.04, two seeds up and three down. No
+candidate follows, and both flags stay default-off.
+
+**Where the artifacts are (user decision 2026-11-14, EODHD terms).** Price-bearing per-arm files no longer go in this
+public repo.
+- **Public, here:** `results/kK/` holds the chain logs, `actual.sexp`, `summary.sexp`, `params.sexp`,
+  `macro_trend.sexp`, `entries.tsv`, the validator and V6 logs, the `.rss` files and the in-session reads.
+  `results/read/split.txt` is the pre-registered read and `results/read/why.txt` the why tables.
+- **Private, TR:** dayfine/trading-results at b46c88db, under the same `dev/experiments/stale-e-cap-k5-2026-11-14/results/`
+  paths. Per arm it holds `equity_curve.csv`, `trades.csv`, `open_positions.csv`, `tickets.tsv`, `splits.csv`,
+  `firstdiff.txt`, the cell log and the validator report. The smoke's k0 price-bearing files moved there too.
+- **Re-running the read** needs both trees overlaid, plus the bar store: `sh read/split.sh <merged results> data`.
+  Re-run that way, it reproduces `results/read/split.txt` byte for byte.
+- `read/why.sh` (with `read/lib/regime.awk` and `read/lib/cohort.awk`) produces `results/read/why.txt`, cited below as
+  why §N. It reads the per-key file (`KEYS=FILE sh read/split.sh …`) and the review packs, neither of which is
+  committed, and prints only NAV-%, %, ratios, counts and dates.
+
+### Validity (README §Decision rule 0, §Arm G)
+
+- **One build, image and data stage.** All five sessions logged:
+  - `HEAD=aab060262` and image `sha256:3865e48e8a61`;
+  - `STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv, 11888 data.csv`;
+  - `SPEC CHECKS OK` and three `PREFLIGHT_OK` lines (`results/kK/chain-kK.log`).
+- **Tripwire.** `TRIPWIRE MATCH` 5/5 on #3595's md5s, and `PARITY … identical` for `actual.sexp` and
+  `equity_curve.csv` 5/5. S here is #3595's S, byte for byte.
+- **V6.** Exit 0 for C and for G against S, in all five seeds (`sec-{C,G}-kK-s0.v6diff-S.log`).
+- **Other validity checks:**
+  - `n_symbols_absent=1` on all 15 RESULT lines, and S capped 0 in every seed;
+  - every open leg had a bar file (`marked=1 unmarked=0`), so nothing reads PROVISIONAL.
+- **G check: PASS.** G's capped tickets on a key an S cell skipped at the stop gate number 0, pooled and own-seed. The
+  premise count is 0. C has 1,717 capped tickets on the same pooled keys (`split.txt` line 420; `GCHECK kK … G 0` in
+  each log).
+
+### The rule, applied as written
+
+**C vs S** (`split.txt` lines 1–416). D and trim3 are in NAV-%, closed legs; the bars read the marked values, and the
+SEED lines give the same signs.
+
+| seed | R_S % | R_C % | Δk | maxDD S → C | L | F | D | trim3 |
+|---|---:|---:|---:|---|---:|---:|---:|---:|
+| k0 | 1472.8 | 599.9 | −0.810 | 27.2 → 41.4 | 62.8 % | 91.1 % | +3.88 | −70.82 |
+| k1 | 1678.3 | 876.8 | −0.599 | 24.6 → 45.5 | 64.6 % | 91.3 % | −1.64 | −55.57 |
+| k2 | 1335.0 | 532.7 | −0.819 | 32.1 → 41.8 | 63.9 % | 88.6 % | +1.22 | −78.57 |
+| k3 | 1220.1 | 473.8 | −0.833 | 25.6 → 44.2 | 64.3 % | 88.6 % | +3.31 | −77.29 |
+| k4 | 1639.5 | 585.4 | −0.931 | 25.1 → 45.2 | 63.9 % | 94.1 % | +2.40 | −83.44 |
+
+1. **Validity.** 5 valid seeds.
+2. **L = 63.9 %** pooled (3,646 of 5,707), above the 10 % bar. As §Decision rule 1 said it would, L sits far above the
+   screen's 20 % base, because every admission is a capped ticket.
+3. **F = 90.6 %** over 213 capped pairs (bar 50 % over at least 30 pairs). The cap reaches the fill.
+4. **Return.** δ = max(0.20, m_S = 0.149) = 0.20. The median Δk is −0.819, and Δk < 0 in 5 of 5. **The harm bar
+   holds.**
+5. → **NO-BUILD**, the first matching row. For the record:
+   - D > 0 in 4 of 5, so the D bar would hold;
+   - trim3 > 0 in 0 of 5;
+   - the arm-median max drawdown of C exceeds S's by 18.67 pp (bar 3.0).
+
+**G vs S** (`split.txt` lines 418–825):
+
+| seed | R_G % | Δk | maxDD S → G | price | size | exit | M | RC cap | RS cap | D | trim3 |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| k0 | 1414.8 | −0.038 | 27.2 → 27.8 | +8.82 | +3.58 | −7.91 | +4.49 | −0.86 | −6.86 | −3.24 | +3.95 |
+| k1 | 1563.6 | −0.067 | 24.6 → 25.1 | +6.75 | +2.41 | −9.54 | −0.38 | −0.72 | −1.47 | −2.57 | −7.08 |
+| k2 | 1475.1 | +0.093 | 32.1 → 32.0 | +8.74 | +3.09 | −7.97 | +3.87 | +3.13 | −6.24 | +0.75 | +9.65 |
+| k3 | 1067.0 | −0.123 | 25.6 → 25.3 | +9.35 | +3.43 | −8.21 | +4.57 | −4.10 | −7.85 | −7.38 | −9.06 |
+| k4 | 1721.1 | +0.046 | 25.1 → 24.5 | +7.07 | +3.13 | −8.08 | +2.12 | −0.57 | +0.88 | +2.43 | +3.64 |
+
+1. **Valid; L = 19.1 %** (635 of 3,331), which is the screen's 20.0 % base, so G is the arm designed. **F = 90.6 %**
+   over 406 pairs.
+2. **Return.** The median Δk is −0.0375, inside the band. Two seeds are up and three down. The arm-median max drawdown
+   moves −0.27 pp.
+3. **The D bar fails.** D > 0 in 2 of 5 (k2 and k4).
+   - That is not NO-BUILD, which needs D > 0 in at most one seed.
+   - It is not KEEP-AXIS, which needs D > 0 in four.
+   - → **INCONCLUSIVE** ("D positive in 2–3 seeds"). trim3 > 0 in 3 of 5.
+4. **By how much.** Two seeds short of the bar: k0 −3.24, k1 −2.57, k3 −7.38. The key-by-key trace is in §Why: G.
+
+**C vs G** (`split.txt` lines 827–1237):
+- The median Δk_CG is −0.772, and it is < 0 in 5 of 5 → **"admissions cost"**.
+- C's 3,317 capped tickets on keys G did not place made +377.62 NAV-% pooled over closed legs.
+- G's tickets that C skipped for cash count −534.01.
+
+**Combined** (line 1241): **NEITHER PASSES.** "Each arm's own outcome applies to its configuration." The
+pre-registration predicted G at KEEP-AXIS; it came out INCONCLUSIVE. What follows (README §Outcome):
+- **C:** REJECT-as-default, keep-as-axis. One window cannot earn do-not-revive. It is not bundled into a preset without
+  a new mechanism argument.
+- **G:** no new cells without a fresh rationale, and no default change. `entry_cap_stop_gate_on_uncapped` stays a
+  control.
+
+### Verdict, calibrated (`dev/rules/mechanism-validation-rigor.md`)
+
+**C, the cap as built: NO-BUILD, and clearly so.** This is the real test the 11-12 screen asked for:
+- the flag was built default-off and run paired with the record at K = 5;
+- one build, one data stage, V6-gated, on the broad top-3000 schedule.
+
+The size of the harm:
+- 0.60–0.93 log in every seed. The median of 0.82 is 4.1× δ and 3.6 record-band SDs (0.225, `project_record_kseed_band`).
+- CAGR 6.8–9.0 % against S's 10.2–11.5 %.
+- Max drawdown up 9.7 to 20.9 pp, seed by seed.
+
+The window is the one the screen chose the lever on, which favours the cap, so the sign is not a selection artefact.
+Only N = 4 ran, so there is no surface. The mechanism below does not depend on N, but this design cannot speak for
+other N, other windows or other universes.
+
+**G, the screen's lever alone: INCONCLUSIVE, and economically flat.**
+- Δk ranges from −0.12 to +0.09 (mean −0.018, SD 0.087), and the max drawdown is unchanged.
+- The re-pricing is real per ticket (§Why: G), but it is worth about +5 NAV-% per seed over 26 years: roughly +0.05
+  log, under 0.2 pp of CAGR. That is below what K = 5 resolves (README §Power).
+- What the design can claim: no sign that the screen's +0.05 to +0.15 log materialises in the book, and most of that
+  estimate rested on fills the book's exit rules treat differently.
+- It cannot claim the lever is harmful.
+
+### Why: C
+
+**Where the loss sits.** NAV-% of each arm's NAV at the decision, closed legs. From `split.txt` §4 and its component
+lines; counts of closed-leg keys in brackets. The total approximates Δk and does not equal it (README §The price/size
+split).
+
+| seed | Δk | same-ticket D | path null M0 | shared uncapped, one arm lost for cash | admissions | other C-only | S-only, C skipped for cash | S-only, C placed nothing that Friday | S-only, other | total |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| k0 | −0.810 | +3.88 | +0.85 | −12.12 | +77.85 (651) | +22.18 | −122.51 (146) | −84.24 (121) | +1.69 | −112.43 |
+| k1 | −0.599 | −1.64 | −0.03 | −7.91 | +69.55 (669) | +37.38 | −90.05 (159) | −97.21 (135) | −4.02 | −93.93 |
+| k2 | −0.819 | +1.22 | +0.03 | −16.59 | +73.72 (658) | +19.14 | −87.17 (155) | −110.90 (118) | −0.05 | −120.60 |
+| k3 | −0.833 | +3.31 | −0.00 | −13.51 | +63.63 (662) | −5.68 | −74.84 (142) | −92.02 (142) | −3.46 | −122.57 |
+| k4 | −0.931 | +2.40 | +0.59 | −11.45 | +87.55 (670) | −8.93 | −109.37 (139) | −94.23 (129) | −3.03 | −136.48 |
+
+Three things carry it. In order of size:
+
+**1. Crowding out: −167 to −207 NAV-% per seed.** S placed 267–294 tickets per seed (about 40 % of its 658–683) that C
+did not place. C's book was full each time (why §5, from the packs' daily invested %):
+- On the Fridays C placed nothing at all, it was 95.0–96.0 % invested (S 70.3–72.1 %), and at least 65 % on 99–100 %
+  of them.
+- On the Fridays it skipped S's name for `Insufficient_cash`, it was 81.2–82.7 % invested (S 59.2–64.8 %).
+
+The tickets lost were S's better names (why §6, TR `trades.csv`):
+- filled, they return median −1.9 to −2.7 %, p75 +6.5 to +9.0 %, p90 +28 to +30 %;
+- they sat at 9.6–10.2 % mean weight.
+
+They include S's three largest keys, lost in all five seeds:
+- ADSK 2003-09-12: +41.68 NAV-% in S;
+- APPS 2020-06-12: +37.73;
+- MMYT 2023-10-06: +22.10.
+
+Together those three are −101.5 NAV-% per seed. The loss does not rest on them alone: trim3 is −55.6 to −83.4 in every
+seed.
+
+**2. The admissions: +64 to +88 NAV-% per seed on their own, worse per ticket than what they displace, and carried by a
+few names.**
+- **How many.** 651–670 capped tickets per seed on keys S did not place: 57–59 % of C's placed tickets, about 25 a year.
+  - 326–355 are on a key an S list recorded as a stop-gate skip.
+  - 298–332 are on Fridays this seed's S recorded no list.
+- **What they look like.** Their stops sit 12.3–14.7 % below the capped trigger (k0, p10–p90), against S's median
+  11.7 % (why §6, TR `tickets.tsv`). Filled, they return:
+  - median −4.7 to −5.7 %;
+  - p25 −13.3 %, a full stop;
+  - p90 +21 to +25 %;
+  - at 7.4 % mean weight.
+- **Tail rate.** 5–6 of about 480 doubled, against 4–6 of about 230 among S's displaced names.
+- **Without their three largest keys** they make only +6 to +28 per seed ("A w/o top3"). The largest are:
+  - DEG 2014-02-07: +26.93 in every seed;
+  - TKO 2017-09-01: +18.6 (k1);
+  - SHS 2017-03-03: +17.5;
+  - SID 2003-01-03: +15.1;
+  - HNZ 2005-10-21: +14.2;
+  - VKTX 2023-12-29: +14.1 (k0, k3).
+- **By decision year** (`split.txt` §4b), the admissions turn with the tape:
+  - 2000–02: −14.6 to −20.3 per seed;
+  - 2007–08: −24.0 to −33.3;
+  - the two V-recoveries (2003 and 2009 together): +37.3 to +49.4;
+  - all other years: +67.5 to +88.0, which is where DEG, SHS and TKO sit.
+
+**3. The screen's lever, D: −1.6 to +3.9 NAV-% per seed.** On the 34–46 capped keys both arms filled:
+- C paid 1.0–1.4 % less (C/S fill p50 0.986–0.990) at 9–11 % more weight (p50 1.090–1.109).
+- Price +3.2 to +5.3, size +1.3 to +2.2, exit −1.0 to −3.4.
+- Same-week fills carry it, at +2.9 to +3.7 per seed. Fills earlier than S's add +0.4 to +1.3 (why §7).
+
+The uncapped tickets both arms filled are identical: M0 ≈ 0, mean |c_C − c_S| ≤ 0.004.
+
+**Concentration.** C holds 7.5–7.7 positions on average and is 69.7–70.7 % invested; S holds 5.3–5.5 at 56.0–57.3 %,
+and G 5.2–5.5 at 56.0–57.9 % (why §5). The book that admits more runs more, smaller positions, and runs out of cash
+before S's breakouts arrive.
+
+### Why C's drawdown rose to 41–45 %
+
+- **It is one episode in every seed:** peak 2007-07-19, trough 2009-07-08, −41.4 to −45.5 % (why §1).
+  - S's and G's worst episodes are elsewhere: 2018-06 → 2020-03 or 2021-04 → 2023-10, at 24.5–32.1 %.
+  - Over C's episode, S lost 7.5–19.2 % and G 11.2–17.7 % (why §2).
+  - C needed 3.8–6.7 years to regain the 2007 high (packs, flat stretches).
+- **How C got there** (k0, TR `equity_curve.csv`):
+  - −14 % by October 2007, −23 % by January 2008, −32 % by July 2008, −38 % by October 2008;
+  - then near 0 % invested to April 2009;
+  - then the low on 2009-07-08, after re-investing to about 65 % into the June 2009 dip.
+  - S stood at −8 % by July 2008 and then sat at 0 % invested from October 2008 to July 2009.
+- **What C bought** (why §3, from `tickets.tsv` and `trades.csv`, NAV at entry):
+  - 2007 entries −14.8 to −19.8 NAV-% per seed, against S's −4.4 to +7.1.
+  - 2008: C placed 20–22 tickets (19–21 capped) and entered 20–23 names, none of which won: −17.5 to −21.4 NAV-%. S and
+    G entered nothing.
+  - 2001–02: S placed 2–5 tickets, C 31–40.
+  - From 2000-01-03 to 2003-03-31, C made −4.2 to −15.9 % with an 18.2–24.7 % drawdown inside, while S made +9.5 to
+    +19.1 % with 8.4–9.5 % (why §2).
+- **Why S stayed out: the stop gate, not the macro gate.** The macro gate was open (Neutral, with one Bullish week) on
+  every C decision Friday from 2008-04-18 to 2008-06-13, from the identical `macro_trend.sexp` of all three arms.
+  - S's only recorded list that spring (2008-04-18, k0–k3) placed 1 name and skipped 19 at the stop gate.
+  - Every S list in 2001, 2002 and 2008 shows 15–19 gate skips per placed ticket, and no other skip reason (why §4,
+    `results/kK/sec-S-kK-s0-entries.tsv`).
+  - C's keys in those years were almost all admissions: 73 of 81 (2001), 88 of 97 (2002), 100 of 104 (2008), pooled.
+- **So the 15 % gate, measured from the graded top, is the book's bear brake.**
+  - In volatile tapes, nearly every candidate's floor sits more than 15 % below its graded top.
+  - The cap measures the gate from the 4-week high instead, so the brake is gone in every regime.
+  - The same brake also keeps S out of the V-recoveries. The macro gate was just as open in spring 2009 (Neutral from
+    2009-04-17, Bullish from 05-01), and there C's 2009 entries made +12.3 to +25.0 NAV-% against S's +1.1 to +14.0.
+  - Nothing available ex ante tells the two apart.
+  - Over 26 years the admissions' bear and recovery legs roughly cancel in their own P&L: −38.6 to −53.3 against +37.3
+    to +49.4 per seed. The bears come with the drawdown.
+
+### Exposure against market condition (RV2)
+
+The pack's SPY regime, by period: C, S and G return, with mean invested % in brackets. Ranges are over the five seeds
+(why §5, the packs' daily NAV and invested %).
+
+| period | SPY | S | C | G |
+|---|---:|---|---|---|
+| 2000–02 | −36.9 % | +9.2 to +18.7 (17–22 %) | −17.6 to −5.9 (36–41 %) | +9.9 to +19.5 (17–22 %) |
+| 2003–06 | +72.3 % | +98 to +136 (63–66 %) | +69 to +127 (74–77 %) | +103 to +127 (63–64 %) |
+| 2007–09 | −16.0 % | +1.6 to +20.3 (34–40 %) | −18.1 to −6.3 (51–54 %) | +4.0 to +15.6 (37–40 %) |
+| 2010–14 | +104.1 % | +77 to +127 (74–79 %) | +71 to +142 (80–82 %) | +88 to +123 (75–78 %) |
+| 2015–19 | +72.8 % | +24.5 to +42.1 (55–60 %) | +32.2 to +58.7 (76–78 %) | +16.1 to +37.0 (54–60 %) |
+| 2020–22 | +24.6 % | +48 to +69 (57–61 %) | +1.1 to +11.9 (68–72 %) | +44 to +69 (56–62 %) |
+| 2023–26 | +100.8 % | +13.5 to +44.6 (62–65 %) | +39.4 to +67.9 (79–81 %) | +13.5 to +45.7 (62–64 %) |
+| whole window | +705.8 % | (56–57 %) | (70–71 %) | (56–58 %) |
+
+- **C is the more invested arm in every period.**
+  - It trails S in all five seeds in 2000–02, 2007–09 and 2020–22 (APPS, then 2022).
+  - It trails S in 4 of 5 seeds in 2003–06 (ADSK) and 3 of 5 in 2010–14.
+  - It leads S in 2015–19 (4 of 5) and 2023–26 (5 of 5), the two long rising stretches where S's own pack reads
+    "eroded".
+- **The bears are holdings as well as exposure.** On DOWN-regime days:
+  - 2000–02 (SPY −25.2 %): C −9.9 to −15.0 % at 29–33 % invested; S +2.6 to +7.7 % at 10–19 %.
+  - 2007–09 (SPY −32.3 %): C −16.9 to −20.7 % at 19–24 %; S −1.8 to +3.4 % at 9–20 %.
+  - C was about 1.2–2× as invested, and what it held fell.
+- **Whole window.**
+  - On DOWN days C made −0.3 to +11.6 % at 37–40 % invested, against S's +44.8 to +65.6 % at 24–27 %.
+  - On UP days C trails S in all five seeds despite 12–13 pp more exposure: +521 to +1,055 % against S's +742 to
+    +1,275 %. That is the crowding.
+
+### Why: G
+
+1. **The lever pays where it only re-prices.** Capped keys both arms filled in the same week (why §7):
+   - 236 pair-seeds over 85 distinct keys;
+   - price +15.29, size +9.90, exit −0.09 pooled;
+   - +4.15 to +5.82 NAV-% per seed. In k0, 45 of 54 are positive, with median +0.03 NAV-%.
+2. **It loses where it moves the fill earlier.** 170 pair-seeds over 71 keys:
+   - −0.90 to −4.96 per seed;
+   - exit −41.61 pooled.
+3. **Perturbed before believing it** (`feedback_perturb_before_believing_a_cohort_split`). By the S-minus-G fill-week gap:
+   - 0 weeks: +25.10; 1 week: +11.90; 2–3 weeks: +7.35; 9+ weeks: −1.65;
+   - 4–8 weeks: −28.05, which becomes **+1.14 without ROL and LMT**.
+   - So there is no "earlier fill" population effect. It is two tickets, replicated in all five seeds.
+4. **ROL 2016-09-02** (TR `k0/sec-{S,G}-k0-s0-trades.csv` and `tickets.tsv`):
+   - G's capped ticket filled 2016-09-07 (week 0). Laggard rotation (`hysteresis_weeks 2` on the stock's 13-week RS)
+     closed it 2016-10-03, after 26 days, at −0.6 %.
+   - S's ticket rested at the graded top for 7 weeks, filled 2016-10-26 on the breakout and rode to 2017-11-06:
+     +52.5 %, +4.73 NAV-%.
+   - Every G seed: −4.79 NAV-%, the largest single term in G's exit channel (`split.txt` line 642: k3
+     "ROL|2016-09-02 MF −4.79").
+5. **LMT 2017-01-20:**
+   - G filled in week 3 and was rotated out 11 days later at +1.7 %;
+   - S filled in week 8 and held to 2017-11-13, +14.7 %;
+   - −1.05 per seed.
+6. **Cash at the fill** (the RS channel, mostly "G cash, short of S's size": the larger positions elsewhere had used the
+   cash):
+   - WING 2017-05-12: −4.84 (k0, k2, k3);
+   - ENB 2004-03-26: −2.19 (k0, k1, k3);
+   - UHAL 2015-01-09: −2.23 (k3).
+   - k3's RC −4.10 is five small losers that S never filled (DKS, KYOCY, PNNT, JJSF, REG).
+7. **Leave one key out:** without ROL, D is +1.55, +2.22, +5.54, −2.59, +7.22, which is positive in 4 of 5. One ticket
+   replicated in all five seeds decides G's D bar. Seeds re-draw tie order, not the market (README §Not claimed).
+8. **The screen against the book.** In the screen's replay, ROL's capped ticket also filled 2016-09-07, but it kept the
+   null's exit: 5.31 R against 4.78 R (`../entry-timing-screen-2026-11-12/results/replay-k0.csv`, row ROL-wein-767).
+   - Across the screen, 60–72 % of H2′'s per-seed gain came from fills that moved earlier and were credited with the
+     null's exit: +4.29 to +8.64 of +6.80 to +11.98 NAV-% (why §7).
+   - Same-date fills gave the screen +2.25 to +3.08.
+   - The screen's price channel (here price + exit): +0.91, −2.79, +0.77, +1.14, −1.01 in the book, against the
+     screen's +3.9, +4.4, +2.7, +6.5, +6.1. Size +2.4 to +3.6, against +3.0 to +7.7.
+   - G/S weight p50 1.090–1.109 and p90 1.208–1.264, in line with the screen's +10.3 % and +28.0 %.
+
+### How it fits what we know
+
+- **Confirms `project_recovery_reentry_gap`** (the 10-02 entry-anchor recovery experiment: the 4-week anchor diluted 6
+  of 6; "nearer highs trigger in every market").
+  - C's admissions are that mechanism: a lower trigger brings the floor inside 15 %.
+  - At 26 years and K = 5 the sign is the same and larger.
+  - Refinement: C does catch 2003 and 2009, but pays for it in 2000–02 and 2007–08 and in crowding.
+- **Refines `project_max_stop_filters_structural_stops`.** The 15 % gate on book-faithful `Support_floor` stops is also
+  the bear brake: 15–19 gate skips per placed ticket in 2001, 2002 and 2008. A lever that moves its effective distance
+  moves the regime behaviour with it.
+- **Confirms `project_record_gap_is_concentration`.**
+  - Wider admission dilutes: 7.5 against 5.3 positions.
+  - Admission weight 7.4 % against 9.6–10.2 % for the names displaced.
+  - The monsters ADSK, APPS and MMYT are lost to a full book.
+- **Confirms `project_edge_is_the_fat_tail`.**
+  - C's loss concentrates in missed monsters.
+  - The admissions' own net rests on their top three keys.
+- **Refines `project_entry_anchor_stale_e`** (stale E inflates measured risk, so candidates are "falsely" rejected).
+  - In isolation, the rejected cohort is net positive (+64 to +88 per seed).
+  - Against the names it competes with for cash it is worse: median −5 % against −2 % per trade, p25 at a full stop.
+  - So the rejections are correct for a cash-bound book.
+- **Contradicts the "why" of `project_entry_timing_screen_1112`** ("only a rule that changes price and size without
+  changing WHICH names fill survives").
+  - As built, the cap changes which names fill, through the gate.
+  - Even with the gate held (G), it changes when they fill, and the screen's fixed exits credited that.
+- **Confirms `project_stop_width_regime_dependent` and `project_stop_anchor_surface_is_dds`.**
+  - Admission gains turn with the tape.
+  - A few admissions carry them (DEG 2014).
+- **Refines `project_laggard_broad_recheck`** (laggard ON helps). Laggard rotation is what turns an earlier capped fill
+  into a lost trade, so any entry-timing lever must model it.
+- **Noise floors** (`project_26y_path_noise_floor`, `project_record_kseed_band`): C's −0.82 is far beyond path noise;
+  G's −0.12 to +0.09 is within it.
+
+### What it implies next (options; the choice is the user's)
+
+1. **Stop the stale-E line here (recommended).**
+   - C is NO-BUILD. G has no fresh rationale.
+   - The only surviving piece, same-week re-pricing at about +5 NAV-% per seed in 26 years, is below anything a
+     26-year K = 5 run resolves, and cannot be separated from the timing change ex ante.
+   - No N sweep, and no anchor or cap variant.
+   - The "fix the stale E" premise is ruled out: the stale E, through the gate, is load-bearing.
+2. **Record two transferable rules (docs only, cheap):**
+   - **(a)** A lever that changes the gate's effective distance (trigger, anchor, gate width, stop anchoring) is read
+     for:
+     - the positions count;
+     - admissions and returns by decision year, bear years included;
+     - the S tickets it crowds out, not only for the tickets it adds.
+     The bar for an added ticket is the marginal S ticket it displaces, not zero.
+   - **(b)** Entry-timing screens replay the exit rules, laggard rotation included, from the moved fill, or restrict
+     themselves to same-week fills. This belongs with check 1 of the rigor rule and the `screen-rigor` skill.
+3. **A regime-conditional admission: not recommended without a new mechanism argument.** For example, admit the
+   wide-floor cohort only for N weeks after a reopen from Bearish.
+   - It is the only lever the by-year asymmetry suggests: +37 to +49 per seed in 2003 and 2009.
+   - It rests on two episodes, and the macro gate was open in the spring-2008 rally too.
+   - Width, regime and cadence dials have failed their grids before (`project_stop_buffer_by_macro_state_axis`,
+     `project_cadence_12w_v10dedup_accept`).
+   - If pursued: first a screen on these committed artifacts (C's admissions inside and outside the 13 and 26 weeks
+     after each reopen), not a cell.
+4. **For future pre-registrations of per-ticket levers.** D summed per seed replicates the same tickets across seeds;
+   one key decided this bar. Read distinct keys with a leave-one-key-out check instead.
+
+### Review-pack look (RV1, RV3)
+
+**What was read:**
+- One pack per seed, arms S, C and G, charts on C, built with `review_pack.sh --run-kind arm --charts-run 1
+  --no-container` at 26a8d163c and rendered with `review_pack_render.sh`.
+- k0: `top.png` and all 32 parts.
+- k1–k4: `top.png` each, plus the signal, flat-stretch, arms and overlap parts (k1 parts 2, 10, 30, 31; k2 parts 10,
+  30; k3 parts 10, 31; k4 parts 10, 31).
+- The k1 and k4 parts came from complete scratch re-renders (Defects 1).
+- The per-trade faithfulness list parts of k1–k4 were not read; k0's render cleanly.
+
+**Checked:**
+- **Window and counts.** 2000-01-03 → 2026-06-25 and 9,185 symbols on every pack. C's KPI strip equals its
+  `actual.sexp` in all five seeds (return, CAGR, max drawdown, Sharpe, trades, open count).
+- **Rendering.** No mojibake, NaN or empty data panels beyond the blank slices.
+- **Missing inputs.** Audit-dependent cards read n/a, never 0.
+- **15 % checks:**
+  - "Initial stop wider than 15 %" is all clear.
+  - "Installed stop within 15 % of fill" fails 50 of C-k0's 870 trades: a fill up to 2 % above E′ pushes the distance
+    past 15 % (book §5.1 measures from the purchase price).
+- **Saturday fills:** 0.
+- **Arms tables against the read.** The yearly-by-arm table and the trade overlap agree with it: ADSK 2003, APPS 2020
+  and MMYT 2023 (ADMA in k4) are held by S and G, not C; DEG 2014 and SHS or TKO 2017 by C alone.
+
+**Signals on C's pack:**
+- **Eras vs SPY and "eroded 2016–26: mostly in cash through rebounds" — refined.** Against S, C was the more invested
+  arm in every period; its DOWN-day gap is holdings, not cash.
+- **Gate reopen 2009-05 "invested and lagged" (16 entries in 13 weeks) — confirmed.** That is C buying the recovery S
+  sat out.
+- **"Concentrated open gain before a drawdown" (k0 VKTX 2024; k1 TKO 2018, ADMA 2024) — confirmed.** The fat tail;
+  VKTX 2023-12-29 and TKO 2017-09-01 are admissions.
+- **"Initial stop under 2 % below E" (S 18, C 8, G 18 in k0) — not cap-specific.** It is the decision walk's D4 class
+  (#3546). C has fewer because capped stops are wide.
+- **"Average invested 71 %, about 7.6 positions" — confirmed** (§Exposure).
+- **"1 sold at an open after the day the stop traded" — that is TRW-wein-742** (Defects 3).
+- **"V13 59" — chain-w D1** (Defects 2).
+- **"Ten trades made 209 % of the realised total" — the fat tail.**
+
+### Defects found
+
+1. **Pack render: blank slices, silent.**
+   - The original k1 render has 15 of its 31 `part-N.png` as an identical blank image (31,119 bytes: parts 7–13,
+     23–29, 31). k4's has 15 of 32 (parts 7–14, 24–29, 31, 32) and a near-blank part 23.
+   - Both `full.png` files are about 5.2 MB, against about 11 MB for the complete ones.
+   - `render-kK.log` reports success.
+   - Rendered alone, k1 came out complete the first time. k4 was blank again on the first try and complete on the
+     second, so the failure is intermittent, not just concurrency.
+   - Fix: a blank-slice check in `dev/scripts/review_pack_render.sh` (near-uniform slice → retry, else fail), pinned in
+     `trading/devtools/checks/review_pack_test.sh`.
+2. **V7 and V13 include chain-w D1 artifacts** (the validator's data dir reads td-full's 650 committed short files;
+   `../chain-w-2026-11-10/README.md` D1, #3384).
+   - S-k0 reads V7 36 and V13 39, exactly chain-w W0's; the record's full store gives 21 and 24.
+   - C's V7 is 222–223 (k0, k2), against S's 32–36 and G's 35. That is mostly not D1: the admissions are enriched in
+     `Virgin_territory` tops. Listing age explains only part: 40 % of filled admissions had under 10 years of history
+     at entry, against 33 % for S (k0, bar-store row counts).
+   - Not a verdict input. V6 is the gate and is 0 everywhere.
+3. **A stop traded days before the exit fill** (the #3075 class).
+   - **TRW-wein-742 (C, capped, all five seeds).** The raw low reached the recorded `entry_stop` on 2008-05-28, but the
+     fill came 2008-06-02. `trades.csv` puts the first trigger on the exit day, and there is no split (adjusted/raw
+     1.0).
+   - **RGP 2013-07-19 (C, capped, k1 and k4).** A laggard exit three days after the stop traded.
+   - **CAL-wein-719 (G-k0, uncapped).** Seven days.
+   - S has none in any seed. Tracing it needs the session's `trade_audit.sexp`, which is not committed. One trade per
+     seed; no verdict weight.
+4. **A screen estimand gap** (`../entry-timing-screen-2026-11-12/`, H2′). The replay held exits fixed when the capped
+   fill moved earlier, and 60–72 % of its per-seed gain came from such fills (why §7). Worth a line in that README and
+   among the rigor rule's check-1 examples.
+5. **A design limit, not code.** D's per-seed sums replicate tickets across seeds; one key (ROL 2016-09-02) decides G's
+   bar (§Why: G, item 7).
+6. **Expected, not a defect.** The committed `chain-kK.log` stops at `CELLS DONE kK`, because `collect` copies the log
+   before the in-session READ and `STALE-E-CAP kK DONE` lines (`chain.sh` lines 433–438).
