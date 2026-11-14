@@ -163,7 +163,7 @@ still hardcoded 0 — minor.)
   `dev/experiments/decision-grading-deep-2026-06-18/FINDINGS.md`. Lens gap to fix
   if exits become focus: a portfolio-path/ruin-weighted exit metric.
 - **(b) Phase 5 SHIPPED (PR #1653, 2026-06-18).** `Decision_grading.Laggard_cf`
-  + `laggard_cf` bin (deleted in #3574; recover from git history): per-event cohort counterfactual (no 1:1 sold→bought link
+  + `laggard_cf` bin: per-event cohort counterfactual (no 1:1 sold→bought link
   exists — cash → shared pool — so each rotation exit is paired vs new entries in
   a 10-day window after it; forward = Post_exit continuation). **VERDICT: the swap
   is a COIN FLIP.** Funded cohort beats dumped laggard ~50-53% across 1998-2026

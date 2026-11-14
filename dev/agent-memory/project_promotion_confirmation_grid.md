@@ -9,7 +9,7 @@ metadata:
 
 A ledger **ACCEPT** from one walk-forward surface is necessary but NOT
 sufficient to flip a mechanism's global default. The single-window DSR winner is
-frequently overfit. Codified 2026-05-31 as **`.claude/rules/promotion-confirmation.md`**
+frequently overfit. Codified 2026-05-31 as **`dev/rules/promotion-confirmation.md`**
 + `experiment-gap-closing` skill step 7 (PR #1384).
 
 **The grid:** re-run the candidate surface (winner + 1-2 neighbours, not the full
@@ -36,7 +36,7 @@ calendar diversity.** A grid whose cells all share one macro era can only
 certify an artifact of that era. **Whenever data permits, one cell MUST span a
 genuinely different regime — ideally a deep 2000-02 + 2008 window** (build via
 the `fetch-historical-data` skill + `build_deep_universe.sh`). The rule
-(`.claude/rules/promotion-confirmation.md`) now mandates this.
+(`dev/rules/promotion-confirmation.md`) now mandates this.
 
 **Tooling note:** ranking + DSR were computed by a throwaway exe rebuilt 4×
 (`Variant_ranking` + `Deflated_sharpe` have no committed CLI — open follow-up

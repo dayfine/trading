@@ -1,13 +1,13 @@
 ---
 name: project_mechanism_validation_rigor
-description: "Rule .claude/rules/mechanism-validation-rigor.md — the 7-check bar a read-only validate-before-build screen must clear, and the build-vs-reject verdict calibration"
+description: "Rule dev/rules/mechanism-validation-rigor.md — the 7-check bar a read-only validate-before-build screen must clear, and the build-vs-reject verdict calibration"
 metadata: 
   node_type: memory
   type: project
   originSessionId: ef5f87b6-2ba9-4ab1-870c-61358d4e71b7
 ---
 
-**`.claude/rules/mechanism-validation-rigor.md`** (created 2026-06-10 after the
+**`dev/rules/mechanism-validation-rigor.md`** (created 2026-06-10 after the
 harvest-rotate overclaim). A cheap read-only screen run *before* building a
 strategy mechanism must clear seven checks **in its writeup**, or it's a draft not
 a verdict:

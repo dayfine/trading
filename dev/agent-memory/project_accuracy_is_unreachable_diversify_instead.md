@@ -56,3 +56,12 @@ separator is strong. Look there only to *close* the question, not expecting a wi
 → redirect to a diversifying layer (barbell / regime / long-short). Do NOT tighten
 entry selection, raise the score floor, or reweight toward win-rate — that taxes
 the tail and has been WF-CV-rejected.
+
+**11-12 feature scan on the record's own trades (903 unique trades over rk k0-k4; 13 >= +100 %, 40 >= +50 %; results/features.txt in entry-timing-screen-2026-11-12, was scratch
+`feat/quintiles.txt`):** entry-time features load on ONE "heat" factor that predicts losers AND monsters in the same
+direction. AUC(+50 %) / AUC(loser): ext at screen 0.60/0.58, RS 0.62/0.58, MA slope 0.60/0.55, book-floor distance
+0.62/0.55. Hottest quintile = worst win rate (28-30 %) and median (-7 %) but the most +50 % trades (11-13) and flat-to-
+higher NAV-% per trade; calmest quintile wins most (46-48 %) with 4-6 tail trades. Features sort by variance, not
+expected value. Newly used features (stale E, book floor, ticket age, stop width) add no EV split either. 13
+monsters in 26y = no power for a multivariate model. "Best of both worlds" must come from POST-entry information
+(e.g. post-stop re-entry, still untested per [[project_weekly_close_stop_lever]]), not entry selection.

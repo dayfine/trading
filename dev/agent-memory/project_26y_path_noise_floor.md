@@ -16,3 +16,4 @@ paths and understate this.
 **How to apply:** a 26y level delta below ~0.45 log that is not traced to the lever's own trades is path noise. Read only
 within-tree pairs with trade-level traces; optionally measure a perturbation null (3–5 inert single-name deletions) once.
 Any twin dedupe (#3388) re-draws the record path. Measured 2026-10-31 (#3489): the full dedupe re-drew it as a few local steps that re-synchronise, |d| <= 0.048 per seed, because no tail trade moved. A universe change moves the record by how far its cascade reaches a tail trade, not by how many names it removes.
+**Nested windows re-synchronise too (11-14, #3610):** a sub-window cell started from cash on its parent's seeds converged on the parent's positions within 2–6 years (Seeded hashes seed|date|ticker; sizes are NAV fractions), so it re-measures the parent rather than replicating it. Period cells must be disjoint.

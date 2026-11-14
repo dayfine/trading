@@ -29,7 +29,7 @@ folds — not a replacement).
   (raises on typo'd key — the 2026-05-12 81-cell silent-drop guard). Optional
   `axes` block on `Walk_forward.Spec.load`; backward-compatible.
 - B. Loud override validation — already shipped (#1069), reused by A.
-- E. Flag-discipline rule — **DONE, PR-1.** `.claude/rules/experiment-flag-discipline.md`:
+- E. Flag-discipline rule — **DONE, PR-1.** `dev/rules/experiment-flag-discipline.md`:
   every new mechanism lands behind a default-off flag; becomes an axis the day it
   lands; not wired into default config until an ACCEPT verdict in the ledger.
 - D. Experiment ledger — **TODO PR-2.** `dev/experiments/_ledger/` append-only

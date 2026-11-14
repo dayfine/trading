@@ -45,3 +45,12 @@ fundamentals General::Type or blocklist); trades.csv exit_trigger/kind
 export-join misalignment on re-traded symbols (key both by position_id).
 Validator harness (#TBD): V9/V10 stay report-only statistics FOREVER —
 measured harmful as gates.
+
+**11-12 follow-up: "sideways for years" (trendless range) skip -- NO-BUILD** (user's read of TRW1 2000; scratch
+`trend/trend.awk`, `tscan.awk`, not committed). Decision-time measures over the 104 (and 78) weeks before the
+screen: MA crossings, MA direction flips, efficiency |net| / path, |MA drift|. Every skip rule loses in every seed
+at 104w (-9..-109 NAV-%); the most sideways quintile by efficiency / flat MA has the BEST win rate (46-48 %) and
++0.66..+0.78 NAV-%/trade (AVGO 2013 +200 % came out of 19 crossings, efficiency 0.06). Only 78w crossings >= 20
+(13-19 trades/seed) is +3..+7, contradicted by the same rule at 104w -> noise. TRW1 itself is not extreme (78w: 7
+crossings, efficiency ~p25). Its real defect is no base after a fresh breakdown (4 -> 2 stage jump), which is the
+ws4 <= 8 shape above.

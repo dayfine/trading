@@ -106,3 +106,11 @@ NEXT = lens-screen `vol_scaled_stop_atr_mult` ∈ {1.0,1.5,2.0}: does stop
 upside-foregone shrink while disaster-dodged holds (the asymmetry weekly-close
 failed)? Promising → WF-CV + grid. **Weekly-close (`trigger_on_weekly_close`,
 #1655) stays REJECTED.** Post-stop re-entry still untested.
+
+**Post-stop re-entry SCREENED 11-12 (`dev/experiments/entry-timing-screen-2026-11-12/lib/reentry.awk`, record rk k0-k4, ~280 stop exits/seed): NO-BUILD.**
+Re-buy above the high made while held (x1.005, limit +2 %) within 8/13/26 weeks, stop 0.96 x shakeout low, 26-week
+proxy hold. With the 15 % gate: 69-146 of ~280 re-triggers blocked, 23-37 fills, median trade ~-11 %, 4/5 seeds
+negative. Without the gate: +143..+194 NAV-% 5/5, but it is ONE trade -- GME stopped 2020-09-11, re-bought 09-14,
++2,684 % (+139 NAV-% in k0); minus top 3 +1..+17, minus top 10 negative 5/5, 2000-12 only +2..+14. Shallow
+shakeouts (<= 15 %) re-fail (-0.08/fill). WHY: recoveries to a new high are not better than average entries once the
+one squeeze is removed; in a cash-bound book they would displace better tickets.

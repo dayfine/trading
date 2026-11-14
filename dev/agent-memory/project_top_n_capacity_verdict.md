@@ -20,6 +20,6 @@ null at s0; ECHO +$677 k in the arm at s1). #2490's "36 % of monsters die at top
 tighter salt band (maxDD 0.9 pt vs 12.4 pt spread) — test it with the grid ({30,40,60} × 2019–2025 sub-window × top-1000
 schedule) before any default change; (3) the next top-of-funnel lever is **slot-fill ordering** (score → RS → volume
 ratio, never alphabetical; spine item 7 supports RS for selection), pre-registered as a screener-ordering dial;
-(4) `--emit-candidates` doubles a cell (7h25m / 7.6 GB) — diagnostic cells only. Related:
+(4) `--emit-candidates` doubled a cell then (7h25m / 7.6 GB); on the 11-14 build (645065bb2) it cost ~0 wall and +3.3 GB RSS (#3602). Related:
 [[project_monster_funnel_top_of_funnel]], [[project_screener_alphabetical_tiebreak]], [[project_edge_is_the_fat_tail]],
 [[project_index_stage_veto_verdict]], [[project_concentration_deploy_probe_reject]].

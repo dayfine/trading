@@ -10,7 +10,7 @@ metadata:
 **The strategy's edge is the let-winners-run fat right tail — and that explains a
 whole class of rejections.** Not a single experiment; the *generalisation* of
 several, surfaced as the standing guidance for future search (the "explain WHY to
-guide later work" principle, `.claude/rules/mechanism-validation-rigor.md`).
+guide later work" principle, `dev/rules/mechanism-validation-rigor.md`).
 
 **The pattern.** On the broad (top-3000) universe the realised return is dominated
 by a few right-tail monsters (AXTI 36×, etc.) ridden through a long Stage-2 advance.

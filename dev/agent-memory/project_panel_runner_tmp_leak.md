@@ -23,7 +23,7 @@ orphaned *more*, a vicious cycle.
 `Fork_pool: job index N raised: (Failure "Csv_snapshot_builder: ... <SYM>.snap:
 No space left on device")`. The logic is fine — it's disk. Note this is the
 CONTAINER overlay filling, distinct from the host-disk / Docker.raw growth in
-`.claude/rules/sweep-hygiene.md`; `df -h /` on the HOST can look healthy (74 GB
+`dev/rules/sweep-hygiene.md`; `df -h /` on the HOST can look healthy (74 GB
 free) while the container `/tmp` is full.
 
 **Fix (immediate).** No run active → purge:
@@ -40,4 +40,4 @@ the most exposed.
 needs to also fire on **abnormal exit** — an `at_exit` / signal handler (or
 Fork_pool teardown) that purges `/tmp/panel_runner_csv_snapshot_*` when a run
 crashes or is killed. Related: [[project_deep_history_infra]],
-`.claude/rules/sweep-hygiene.md`.
+`dev/rules/sweep-hygiene.md`.
