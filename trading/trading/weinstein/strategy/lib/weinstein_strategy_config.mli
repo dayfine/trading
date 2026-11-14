@@ -1224,7 +1224,7 @@ type config = {
           below [T] is unchanged. Example value: [4] (the screen's 4-week high).
 
           {b A cap, not a replace.} The replace anchor
-          ({i entry_anchor_local_range_weeks}, the screen's H2) moves [E] to the
+          ([entry_anchor_local_range_weeks], the screen's H2) moves [E] to the
           range top unconditionally. That raised the price paid in most trades
           and dropped the orders that never reached it, and it diluted in the
           2026-10-03 backtest. The cap only lowers a stale [E], so it never
@@ -1259,12 +1259,12 @@ type config = {
           until a ledger ACCEPT (the K = 5 paired 26y run). *)
   entry_cap_stop_gate_on_uncapped : bool; [@sexp.default false]
       (** Stop gate on the uncapped trigger: an {b attribution control} for the
-          stale-entry cap ({i entry_cap_local_range_weeks}), not a mechanism to
+          stale-entry cap ([entry_cap_local_range_weeks]), not a mechanism to
           promote. When [true] and the cap lowered a long ticket's trigger [E]
           to [E′], every stop-width {i decision} in the entry walk reads the
           trigger the ticket would have had with the cap off: the §5.1 re-anchor
-          test ({i stop_anchor_at_entry_base}), the {i require_structural_stop}
-          test, the {i max_stop_distance_pct} gate and the [Demote_over_max]
+          test ([stop_anchor_at_entry_base]), the [require_structural_stop]
+          test, the [max_stop_distance_pct] gate and the [Demote_over_max]
           ordering. The trigger, the StopLimit limit, the installed stop and the
           size still follow [E′]. So the gate admits exactly the names the
           cap-off config admits, and places them at [E′] with the size from [E′]
@@ -1274,12 +1274,12 @@ type config = {
           §"How the cap reaches a fill", channel 5).
 
           {b Does nothing without the cap} ([entry_cap_local_range_weeks = 0]),
-          without the trigger entry ({i sim_entry_trigger_at_suggested} and
-          {i enable_sim_entry_stoplimit}; otherwise the entry is the decision
+          without the trigger entry ([sim_entry_trigger_at_suggested] and
+          [enable_sim_entry_stoplimit]; otherwise the entry is the decision
           close in both arms), on shorts, and on a ticket the cap did not lower.
           With the cap armed, [Weinstein_strategy.make] rejects it alongside the
           replace anchor ([entry_anchor_local_range_weeks > 0]) or the entry
-          freeze ({i freeze_entry_at_first_breakout}): the candidate does not
+          freeze ([freeze_entry_at_first_breakout]): the candidate does not
           carry the cap-off trigger in either case. A re-anchored buffer stop
           kept with [require_structural_stop = false] is placed below [E′] (the
           ticket's own entry), while the width gate reads the cap-off ticket's

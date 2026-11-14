@@ -29,7 +29,9 @@
 #      RELATED knob (cited via "[bracket]" syntax), not the changed one
 #      -> FAIL naming "related-via:<changed knob>".
 #   9. Non-snake_case bracket citations ("[E]", "[Entering]") are NOT
-#      treated as related-knob citations -> OK, exit 0.
+#      treated as related-knob citations: a default flip on an EXISTING
+#      field (Step 2.5 skips fresh fields since #3614) FAILs on Step 4b
+#      AFFECTS-ALL alone, with no related-via row.
 #   10. A docstring containing prose "Word:" lines (e.g. "Motivation:",
 #       "bug:") BEFORE its genuine "[bracket]" citation does not
 #       falsely end the field-declaration block early -> still FAIL,
@@ -97,6 +99,19 @@
 #       distinguishes "added" from "changed" for the very field shape
 #       that caused the false positive -- the fix must not over-suppress
 #       real nested default changes.
+#   24. (#3614) A brand-new default-off field (absent at BASE_REF) whose
+#       docstring cites an ARMED knob in "[bracket]" form -> OK, exit 0.
+#       Pins the false-positive fix seen on PRs #3604 / #3609: Step 2.5
+#       must not expand a fresh field's citations, since both arms of a
+#       paired run would be identical.
+#   25. (#3614 regression guard) The SAME docstring on a field that already
+#       exists at BASE_REF with only its default VALUE changed -> still
+#       FAIL via related-via:<field>. Proves the base-presence test, not
+#       the docstring shape, is what separates 24 from 25.
+#   26. (#3614) A brand-new field that is ALSO armed through
+#       live-config-overrides.sexp -> docstring still expanded -> FAIL. An
+#       override-sourced knob is never treated as brand-new (no surface
+#       file to test it against; direct knobs merge by name).
 #
 # Run:
 #   sh trading/devtools/checks/goldens_affected_check_test.sh
@@ -377,18 +392,23 @@ echo "=== Assertion 9: non-snake_case bracket citations ([E], [Entering]) are NO
 # "E" somewhere in their text. The bracket-citation extraction requires
 # a lowercase snake_case identifier (at least one underscore).
 #
-# knob_c is added FRESH here (not a value flip of a pre-existing field)
-# so Step 4b's affects-all/default-flip widening (assertions 19/20)
-# never applies to it -- a genuinely new field has no old value to
-# widen from (see assertion 21). A value-flip shape here would
-# legitimately trip AFFECTS-ALL under the corrected #2558 semantics
-# (zero goldens override knob_c), which would be a real, not spurious,
-# FAIL and would defeat the point of this assertion.
+# knob_c must PRE-EXIST at BASE_REF here (a default flip, 25 -> 26): since
+# #3614 Step 2.5 skips a brand-new field's docstring entirely, so a fresh
+# knob_c would never reach the extraction this assertion pins. The flip
+# means Step 4b legitimately reports AFFECTS-ALL (the golden does not
+# override knob_c), so the verdict is FAIL; what this pins is that the
+# FAIL carries NO "related-via:knob_c" row, i.e. [E] / [Entering] were not
+# extracted. (The golden's text contains the word "E", so an extracted [E]
+# would match it.) MUTATION-TESTED: loosening the extraction regex in
+# _docstring_related_knobs to any-case identifiers makes this assertion
+# fail.
 REPO9="$(_new_repo)"
 mkdir -p "$(dirname "$REPO9/$SURFACE_MLI_REL")" "$REPO9/.github/workflows"
 mkdir -p "$REPO9/trading/test_data/backtest_scenarios/goldens-sp500"
 {
   echo "type config = {"
+  echo "  knob_c : int; [@sexp.default 25]"
+  echo "      (** Entering a position at price [E] is unrelated to [knob_d]. *)"
   echo "  knob_d : bool; [@sexp.default false]"
   echo "}"
 } > "$REPO9/$SURFACE_MLI_REL"
@@ -400,19 +420,16 @@ mkdir -p "$REPO9/trading/test_data/backtest_scenarios/goldens-sp500"
   echo " (description \"mentions the letter E and the word Entering in prose\"))"
 } > "$REPO9/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
 SHA9A="$(_commit "$REPO9" "base")"
-{
-  echo "type config = {"
-  echo "  knob_c : int; [@sexp.default 26]"
-  echo "      (** Entering a position at price [E] is unrelated to [knob_d]. *)"
-  echo "  knob_d : bool; [@sexp.default false]"
-  echo "}"
-} > "$REPO9/$SURFACE_MLI_REL"
-SHA9B="$(_commit "$REPO9" "head: add new knob_c field with [E]/[Entering] prose")"
+sed -i.bak 's/knob_c : int; \[@sexp.default 25\]/knob_c : int; [@sexp.default 26]/' "$REPO9/$SURFACE_MLI_REL"
+rm -f "$REPO9/$SURFACE_MLI_REL.bak"
+SHA9B="$(_commit "$REPO9" "head: flip knob_c default 25 -> 26, docstring cites [E]/[Entering]")"
 _run "$REPO9" "$SHA9A" "$SHA9B"
-if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "zero postsubmit golden specs"; then
-  pass "assertion 9: [E] / [Entering] excluded from related-knob extraction -> OK"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "AFFECTS-ALL" \
+  && ! echo "$OUT" | grep -q "related-via:knob_c"; then
+  pass "assertion 9: [E] / [Entering] excluded from related-knob extraction (no related-via row)"
 else
-  fail "assertion 9: expected OK/exit0 (non-snake_case citations excluded), got rc=$RC output=$OUT"
+  fail "assertion 9: expected FAIL/exit1 (AFFECTS-ALL only) with no related-via:knob_c row, got rc=$RC output=$OUT"
 fi
 rm -rf "$REPO9"
 
@@ -928,6 +945,102 @@ else
   fail "assertion 23: expected FAIL/exit1 naming stops_config via embeds:stop_types.mli, got rc=$RC output=$OUT"
 fi
 rm -rf "$REPO23"
+
+# Assertions 24-26 (issue #3614): Step 2.5 must not expand the docstring
+# citations of a direct knob that did not exist at BASE_REF. All three use
+# the same shape: knob_new's docstring cites [knob_b], and a golden arms
+# knob_b (never knob_new). They differ only in whether knob_new pre-dates
+# the base revision, so each one flips on exactly the presence test.
+_write_citing_mli() {
+  default_value="$1"   # knob_new's [@sexp.default ...] value; "none" omits knob_new
+  {
+    echo "type config = {"
+    echo "  knob_b : bool; [@sexp.default false]"
+    echo "      (** Existing field. *)"
+    if [ "$default_value" != "none" ]; then
+      echo "  knob_new : int; [@sexp.default ${default_value}]"
+      echo "      (** Default-off. Does nothing without [knob_b]. *)"
+    fi
+    echo "}"
+  } > "$2"
+}
+
+# _make_citing_repo <base-default-of-knob_new | none> -- fixture repo whose
+# golden arms knob_b only; the caller commits base, rewrites the mli, and
+# commits head.
+_make_citing_repo() {
+  repo="$(_new_repo)"
+  mkdir -p "$(dirname "$repo/$SURFACE_MLI_REL")" "$repo/.github/workflows" \
+    "$repo/trading/test_data/backtest_scenarios/goldens-sp500"
+  _write_citing_mli "$1" "$repo/$SURFACE_MLI_REL"
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500" > "$repo/.github/workflows/golden-runs-fixture.yml"
+  {
+    echo "((name \"fixture-golden\")"
+    echo " (config_overrides (((knob_b true)))))"
+  } > "$repo/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+  echo "$repo"
+}
+
+echo "=== Assertion 24: brand-new default-off field whose docstring cites an ARMED knob -> OK (issue #3614) ==="
+# The #3604 / #3609 shape: knob_new did not exist at BASE_REF, so no golden
+# can change (both arms of a paired run would be identical). Before #3614,
+# Step 2.5 expanded [knob_b] from knob_new's docstring, matched the golden
+# that arms knob_b, and FAILed asking for that no-op paired run.
+REPO24="$(_make_citing_repo none)"
+SHA24A="$(_commit "$REPO24" "base: no knob_new")"
+_write_citing_mli 0 "$REPO24/$SURFACE_MLI_REL"
+SHA24B="$(_commit "$REPO24" "head: add brand-new knob_new citing [knob_b]")"
+_run "$REPO24" "$SHA24A" "$SHA24B"
+if [ "$RC" -eq 0 ] \
+  && echo "$OUT" | grep -q "zero postsubmit golden specs" \
+  && ! echo "$OUT" | grep -q "related-via"; then
+  pass "assertion 24: brand-new field's docstring citation of an armed knob is not expanded -> OK"
+else
+  fail "assertion 24: expected OK/exit0 (new field, no docstring expansion), got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO24"
+
+echo "=== Assertion 25: SAME docstring, but knob_new PRE-EXISTS and only its default changes -> still FAIL via related-via (regression guard for #3614) ==="
+# Identical head content to assertion 24; the only difference is that
+# knob_new is already in the base mli (default 0 -> 26). The presence test
+# must tell the two apart, so this change keeps expanding [knob_b] and
+# FAILs, exactly like assertion 8.
+REPO25="$(_make_citing_repo 0)"
+SHA25A="$(_commit "$REPO25" "base: knob_new already exists at 0")"
+_write_citing_mli 26 "$REPO25/$SURFACE_MLI_REL"
+SHA25B="$(_commit "$REPO25" "head: flip knob_new default 0 -> 26")"
+_run "$REPO25" "$SHA25A" "$SHA25B"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "knob 'knob_b'" \
+  && echo "$OUT" | grep -q "related-via:knob_new" \
+  && echo "$OUT" | grep -q "fixture-golden.sexp"; then
+  pass "assertion 25: existing field's default change still expands its docstring citations -> FAIL"
+else
+  fail "assertion 25: expected FAIL/exit1 naming knob_b via related-via:knob_new, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO25"
+
+echo "=== Assertion 26: brand-new field ALSO armed via live-config-overrides.sexp -> docstring still expanded -> FAIL ==="
+# Override provenance carries no base-presence test (there is no surface
+# file to test against, and a direct knob is merged by name across sources),
+# so an override knob is never treated as brand-new. Same head mli as
+# assertion 24 plus an override line for knob_new.
+REPO26="$(_make_citing_repo none)"
+mkdir -p "$REPO26/dev/weekly-picks"
+echo "; live overrides, empty at base" > "$REPO26/$SURFACE_OVERRIDES_REL"
+SHA26A="$(_commit "$REPO26" "base: no knob_new")"
+_write_citing_mli 0 "$REPO26/$SURFACE_MLI_REL"
+echo "((knob_new 5))" >> "$REPO26/$SURFACE_OVERRIDES_REL"
+SHA26B="$(_commit "$REPO26" "head: add knob_new and arm it in the live overrides")"
+_run "$REPO26" "$SHA26A" "$SHA26B"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "related-via:knob_new" \
+  && echo "$OUT" | grep -q "fixture-golden.sexp"; then
+  pass "assertion 26: override-sourced knob keeps expanding its docstring citations -> FAIL"
+else
+  fail "assertion 26: expected FAIL/exit1 naming knob_b via related-via:knob_new, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO26"
 
 echo ""
 # Tier-2/tier-4 and smoke/sweep specs must be covered without a
