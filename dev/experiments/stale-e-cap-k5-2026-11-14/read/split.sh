@@ -7,8 +7,11 @@
 #   RESULTS_DIR holds k0..k4/ as `chain.sh collect` writes them: sec-{S,C,G}-kK-s0-{tickets.tsv,entries.tsv,trades.csv,
 #     open_positions.csv,equity_curve.csv,splits.csv,actual.sexp}, sec-{C,G}-kK-s0.v6diff-S.log and chain-kK.log.
 #   DATA_DIR (optional) is the bar store (data/<first letter>/<last letter>/<SYMBOL>/data.csv). Open positions are then
-#     marked at the last raw close on or before the arm's last equity-curve date. Without it they are left out of every
-#     NAV-% sum, and the outcome is printed as PROVISIONAL (the in-session read in chain.sh is that case).
+#     marked at the last raw close on or before the arm's last equity-curve date. The marks feed only the outcome's bars
+#     (D, trim3 and the A-without-top-3 count): no printed sum includes a key whose ticket is still open in either arm
+#     (an "open-leg key", README §What the read prints). Without DATA_DIR, or for an open position with no bar file,
+#     such a key is left out of the bars too, it is counted in the output, and the outcome is printed as PROVISIONAL
+#     (the in-session read in chain.sh is the first case).
 #   PAIRS (default "S:C S:G G:C") the arm pairs read, each BASE:TEST, in that order. A pair's BASE takes the role the
 #     README calls S and its TEST the role it calls C: delta = ln(1 + R_TEST) - ln(1 + R_BASE), and so on. S:C is the
 #     flag as built (§Decision rule), S:G the screen's lever and G:C the admissions (§Arm G); with all three the
@@ -17,7 +20,10 @@
 #   KEYS=FILE also writes the per-key rows (keys.awk) of every pair to FILE, each prefixed by its pair. With DATA_DIR
 #     they carry marked open-position contributions, from which a raw close can be recovered, so that file is never
 #     committed.
-# Only summaries reach stdout: counts, NAV-% sums, ratios and simulator dollars. No price or bar is printed.
+# What reaches stdout (README §What the read prints): counts, the simulator's own return, drawdown and ratio figures
+# (actual.sexp), NAV-% sums over the keys with no open leg, per-key lines for those keys only (symbol, Friday, class,
+# NAV-% difference), the number of open-leg keys each table leaves out, and the pass or fail of the bars that read the
+# marks. No price, bar or mark is printed, and no sum that includes an open-leg key.
 R=${1:?usage: sh split.sh RESULTS_DIR [DATA_DIR]}; D=${2:-}
 PAIRS=${PAIRS:-"S:C S:G G:C"}
 LIB=$(cd "$(dirname "$0")/lib" && pwd)
@@ -99,12 +105,14 @@ gcheck() {
 gcheck > "$TMP/gc.tsv"
 
 pair() { # $1 base, $2 test -> the pair's read on stdout
-  b=$1; t=$2; rows=$TMP/rows-$b$t.tsv; : > "$rows"; n=0
+  b=$1; t=$2; rows=$TMP/rows-$b$t.tsv; : > "$rows"; n=0; skipped=""
   for k in 0 1 2 3 4; do
     d=$R/k$k; s=$d/sec-$b-k$k-s0-; c=$d/sec-$t-k$k-s0-
-    for f in tickets.tsv entries.tsv trades.csv open_positions.csv equity_curve.csv splits.csv actual.sexp; do
-      [ -f "$s$f" ] && [ -f "$c$f" ] || continue 2; done
-    [ -f "$d/sec-S-k$k-s0-actual.sexp" ] || continue
+    if [ ! -d "$d" ]; then skipped="$skipped k$k(no directory)"; continue; fi
+    miss=""; for f in tickets.tsv entries.tsv trades.csv open_positions.csv equity_curve.csv splits.csv actual.sexp; do
+      [ -f "$s$f" ] && [ -f "$c$f" ] || miss="$miss $f"; done
+    [ -f "$d/sec-S-k$k-s0-actual.sexp" ] || miss="$miss S-actual.sexp"
+    if [ -n "$miss" ]; then skipped="$skipped k$k(missing$miss)"; continue; fi
     n=$((n + 1))
     validity "$d" "$k" "$b" "$t" >> "$rows"
     metrics "k$k" S "$s" >> "$rows"; metrics "k$k" C "$c" >> "$rows"; sret "k$k" "$d/sec-S-k$k-s0-" >> "$rows"
@@ -115,6 +123,7 @@ pair() { # $1 base, $2 test -> the pair's read on stdout
       | LC_ALL=C sort -t "$(printf '\t')" -k1,1 -k2,2 -k3,3 >> "$rows"
   done
   if [ "$n" = 0 ]; then echo "######## pair $b:$t -- no seed holds both arms; not read"; echo; return 0; fi
+  [ -n "$skipped" ] && printf 'W\tseeds\tnot-read\t%s\n' "${skipped# }" >> "$rows"   # a seed left out of the pair is reported, never silent
   cat "$TMP/gc.tsv" >> "$rows"
   [ -n "${KEYS:-}" ] && grep '^K' "$rows" | sed "s/^/$b:$t	/" >> "$KEYS"
   echo "######## pair $b:$t -- delta = ln(1 + R_$t) - ln(1 + R_$b); in the tables $b takes the role README calls S, $t the role it calls C"

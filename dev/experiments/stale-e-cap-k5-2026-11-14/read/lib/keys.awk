@@ -9,9 +9,12 @@
 #   S and C equity_curve.csv, splits.csv, tickets.tsv, entries.tsv, trades.csv, open_positions.csv
 # Variables: seed (e.g. k0); test, the test arm's letter (default C).
 #
-# Output rows, tab-separated, prefixed "K" (columns named in split.sh), and "W" warnings.
+# Output rows, tab-separated, prefixed "K" (columns named in split.sh), and "W" warnings. Column 22 is 1 when an open leg
+# has no mark (no DATA_DIR, or no bar file), column 24 is 1 when either arm holds the key as an open position: such a
+# key's contribution depends on a mark from the bar store, which summary.awk keeps out of every printed sum.
 # Contributions are NAV-%: 100 x (pnl_dollars + dividends_received) / the arm's NAV on the last equity-curve date on or
-# before the decision date. Prices never leave this script; only their ratios do.
+# before the decision date. Prices never leave this script; only their ratios do, and the marked contribution of an open
+# position (a function of the mark), which is why a KEYS file is never committed.
 BEGIN { FS = "[,\t]"; OFS = "\t"; if (test == "") test = "C" }
 function arm(f) { return (f ~ ("-" test "-k[0-9]")) ? "C" : "S" }
 function navat(a, d,   lo, hi, mid) {   # last curve value dated <= d (binary search; the first value if d precedes it)
@@ -110,6 +113,6 @@ END {
     if (cls == "PS") { oth = other("C", k, d); nr = near("C", ksym[k], d) }
     um = (("S", k) in unm || ("C", k) in unm) ? 1 : 0
     print "K", seed, k, cls, cap, capS, lrtok, sS, sC, sprintf("%.4f", cS), sprintf("%.4f", cC), price, size, ex,
-      lower, rc, wr, fit, oth, (pS ? fage["S", k] : "-"), (pC ? fage["C", k] : "-"), um, nr
+      lower, rc, wr, fit, oth, (pS ? fage["S", k] : "-"), (pC ? fage["C", k] : "-"), um, nr, ((sS == "open" || sC == "open") ? 1 : 0)
   }
 }

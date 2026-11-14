@@ -180,7 +180,9 @@ determinism, not the flag's inertness; the code reading above carries that.
 
 `read/split.sh RESULTS_DIR DATA_DIR` computes every quantity below from the committed per-arm artifacts and prints
 the outcome, for C vs S, then for G vs S and C vs G (§Arm G), then the combined outcome. `DATA_DIR` (the bar store) is
-needed only to mark the open positions at the end; without it the outcome prints as PROVISIONAL.
+needed only to mark the open positions at the end. The marks feed the bars of the rule (D, trim3 and the A count) and
+nothing else that is printed (§What the read prints); without `DATA_DIR`, or for an open position with no bar file,
+the outcome prints as PROVISIONAL.
 
 This section is the C vs S rule, the flag as built and the promotion question. It is unchanged by arm G; §Arm G
 applies the same machinery to G vs S and adds the combined table.
@@ -238,7 +240,8 @@ Why:
   0.225 (`dev/agent-memory/project_record_kseed_band.md`), and an untraced 26-year difference under about 0.2 log is
   one draw (`project_26y_path_noise_floor.md`).
 - **m_S is the cell's own reshuffle null.** By the tripwire, the S cells are #3595's, whose m_S was 0.149. So δ will be
-  0.20.
+  0.20 when all five S seeds are valid. If seed 0 alone is left out, m_S over k1..k4 is 0.2035 and δ is 0.2035 (from
+  #3595's five S `actual.sexp`); leaving out any other single seed leaves δ at 0.20.
 - **The expectation, written now.** The screen's proportional estimate is +0.05 to +0.15 log, below δ.
   - In #3595 the paired SD of Δ at 26 years was 0.167, and pairing by seed removed almost no variance (correlation
     +0.26). Any change to the fills re-draws later cash states, as a tie-order change does.
@@ -341,7 +344,9 @@ from `<tag>-tickets.tsv`, extracted from `trade_audit.sexp` in the session (§Fi
 **Contribution.** For a filled ticket in arm a, c_a = 100 × (`pnl_dollars` + `dividends_received`) / N_a, in NAV-%.
 N_a is arm a's NAV on the last equity-curve date on or before the decision date: the NAV the ticket was sized
 against. An open position contributes quantity × (mark − `entry_price`), marked at the last raw close on or before
-the arm's last equity-curve date, without dividends.
+the arm's last equity-curve date, without dividends. That contribution reads the bar store, so the committed read
+leaves every key with an open leg out of its printed sums (§What the read prints); the bars read it marked, as defined
+here.
 
 **Decision-date basis.** `trades.csv` restates `entry_price` and `quantity` for splits during the hold (#3595 §Defects
 2, #3384). The read undoes this with each arm's `splits.csv`. With F the product of the split factors of that symbol
@@ -530,17 +535,32 @@ The rule of §Decision rule, applied as written with G in C's place: validity, L
 ### The combined outcome (the first row that matches)
 
 C's outcome is the C vs S rule's, and G's is the G vs S rule's. This table changes neither. It says which reading and
-which candidate follow from the two. "Passes" means ESCALATE.
+which candidate follow from the two. "Passes" means ESCALATE; an arm that does not pass can still clear δ on its median
+Δk and fail ESCALATE on its drawdown bar, its concentration (trim3) bar, its sign count, or an unreadable F. The row is
+chosen by the two outcomes alone; the channel from C vs G (above) then fixes the reading inside the row, for all three of
+its values, in the second table.
 
-| combined | when | reading and next step |
+| combined | when | next step |
 |---|---|---|
 | **G INVALID** | the G check fails, fewer than 4 G seeds are valid, or G vs S is NOT LIVE | C vs S stands alone, exactly as §Outcome. G reads are information only, and no channel is named. |
-| **BOTH PASS** | C and G both pass | The screen's lever alone clears δ, and the admissions do not take it back. The candidate is the cap as built (C): the flag the run tests, with the gate §5.1 describes. If C vs G reads "admissions cost", the candidate is G instead. |
-| **LEVER, NOT ADMISSIONS** | G passes, C does not | The screen's lever survives the book, and the admissions cost it or bury it in noise. The candidate is the cap with the uncapped gate (G). C's own outcome stands for the flag as built. |
-| **ADMISSIONS** | C passes, G does not | C's ESCALATE stands under its rule, but this run cannot say the screen's lever carries it. C vs G names the channel: "admissions add" or "unresolved". Either way the gain is read as a change to the stop gate, against the history below, before any promotion work starts. |
+| **BOTH PASS** | C and G both pass | The screen's lever alone clears δ. The candidate is the cap as built (C): the flag the run tests, with the gate §5.1 describes. If C vs G reads "admissions cost", the candidate is G instead. |
+| **LEVER, NOT ADMISSIONS** | G passes, C does not | The candidate is the cap with the uncapped gate (G). C's own outcome stands for the flag as built. |
+| **ADMISSIONS** | C passes, G does not | C's ESCALATE stands under its rule. Which candidate follows, if any, depends on the channel (below). |
 | **NEITHER PASSES** | neither passes | Each arm's own outcome applies to its configuration. G at KEEP-AXIS is the predicted case: the lever survives per ticket, below what K = 5 resolves. |
 
-`read/lib/combine.awk` prints the row from the three pairs' `RULE` lines.
+**The channel inside each row.** C vs G reads "admissions add", "admissions cost" or "unresolved" (above). Where the
+channel can disagree with a row's reading, the row says what each value means:
+
+| row | "admissions add" (C beats G by δ) | "admissions cost" (G beats C by δ) | "unresolved" |
+|---|---|---|---|
+| **BOTH PASS** | Candidate C. The admissions add to the lever. | Candidate G. | Candidate C. The admissions do not take the lever back, and are not shown to add. |
+| **LEVER, NOT ADMISSIONS** | Candidate G stands. C's admissions added at least δ over G, but C failed a bar of its own, named in the read (its drawdown gap, trim3 count, sign count, or its outcome if NOT LIVE or fewer than 4 seeds). That does not make C a candidate; C's own outcome stands. | Candidate G. The admissions cost the lever's gain. | Candidate G. The admissions neither clearly add nor cost: they bury the lever's gain in noise, or C fails for another reason. |
+| **ADMISSIONS** | C's ESCALATE stands, and the gain rides on the admissions, so it is read as a change to the stop gate against the history below, before any promotion work starts. | C's ESCALATE stands, but the lever, not the admissions, carries the gain: G beat C by at least δ in all but one seed and failed a bar of its own (named in the read). No candidate is named, and the call between C and G goes to the user with both outcomes. The history below applies to C's candidacy as before. | C's ESCALATE stands, but this run cannot say the screen's lever carries it. The gain is read as a change to the stop gate against the history below, before any promotion work starts. |
+
+`read/lib/combine.awk` prints the row and the channel's reading from the three pairs' `RULE` lines, and names the failed
+bar of the arm that clears δ and does not pass. `read/combine_check.sh` feeds it fabricated `RULE` lines for every row,
+and for each of the three channel values in each of the three rows above, and checks the row and the phrase
+(`results/smoke/combine_check.txt` is its output).
 
 **The stop-width history that the ADMISSIONS row is read against.** An admitted name has a support floor more than 15 %
 below E but within 15 % of E′. So the cap acts as a selective widening of the 15 % gate. The relevant history
@@ -558,6 +578,11 @@ So under ADMISSIONS the analyst also reports, per valid seed, the A total withou
 ≤ 0 in at least three valid seeds, the gain rests on a few admissions, in the pattern above. That is flagged to the
 user with the ESCALATE, before any promotion work starts.
 
+Under BOTH PASS the read prints the same count (A without its three largest keys ≤ 0 in how many valid seeds), because
+C is then the candidate and C's candidacy includes the admissions this history warns about. There it is reported only: it
+changes neither the row nor the candidate, and the flag to the user above is an ADMISSIONS-row rule. The count is read on
+the admissions' marked values, as the bars are (§What the read prints).
+
 ### Power and expectations (written before any result)
 
 - **G vs S.** The screen predicts +0.05 to +0.15 log, inside the band (δ = 0.20). With #3595's paired SD of 0.167, K = 5
@@ -565,7 +590,8 @@ user with the ESCALATE, before any promotion work starts.
   read.
 - **D_G is much better powered than C's D.** C's D rests on the few keys both arms placed with C capped (2 in the smoke
   year). G places S's own keys, so nearly every capped G ticket enters D_G (3 of 3 in the smoke year).
-- **C vs G** resolves only a large admissions effect. The smoke year (A gate +6.00, A no list −5.41 NAV-%) says nothing
+- **C vs G** resolves only a large admissions effect. The smoke year (closed legs only: A gate −2.68 over 8 keys, A no
+  list −5.41 over 9; the 2 open-leg gate admissions are left out, §What the read prints) says nothing
   about its sign.
 
 ### Where I was unsure
@@ -582,6 +608,12 @@ user with the ESCALATE, before any promotion work starts.
   change the C vs S rule, which stays as written.
 - **`CELL_TIMEOUT` at twice the slowest cell, not three times** (§Cost). A cloud session slower than twice the 11-13
   ones would now lose a healthy cell; the relaunch would then re-run it once.
+- **No pooled sum over open-leg keys.** The data-terms rule would allow a printed sum that pools at least 5 open
+  symbols. I print none, because a pool can be dominated by one term. In the smoke's S:G pair, 4 of the 5 pooled keys
+  are positions both arms hold at nearly the same size, and carry almost nothing; the pool would give the fifth mark to
+  within a few percent. The cost is that the printed D and trim3 are closed-leg sums while the bars read the marked
+  ones; the `SEED` line prints each bar's pass or fail to keep the outcome auditable (§What the read prints). Printing
+  a pooled line later is a small change in `summary.awk`, and the user's call.
 
 ## Reported regardless of the verdict
 
@@ -598,18 +630,71 @@ called S below and the second in the role called C), then the combined outcome:
   - Fill age from placement (p50, p90, share within one week), all tickets and capped ones.
 - **The split.**
   - Per seed: n, price, size, exit and M; RC and RS on capped keys, by outcome; D; M0 with its mean |c_C − c_S|; PC
-    and PS by what the other arm did; the total; the trimmed total.
+    and PS by what the other arm did; the total; the trimmed total. All over the keys with no open leg (§What the read
+    prints), with the open-leg keys each sum leaves out counted in a table beside it.
   - Beside the screen's per-seed price and size channels: the size share of M, and the p50 and p90 of C's position
     weight over S's on capped pairs (the screen: +10.3 % and +28.0 % more shares).
+- **By decision year** (§4b of the read). Per seed, then pooled over the valid seeds, one row per year of the decision
+  Friday: the number of keys, D, M0, the admissions' sum A (all three A classes, with their count) and the total
+  c_C − c_S, with the open-leg keys left out of that year counted beside them. The "all" row of each seed equals the
+  split's D, M0, A and total.
+  - **Why.** The stop-width history above says earlier gains came down to one admission or to concentration, "and their
+    sign turned with the regime". Δk and D are whole-window sums, so only a per-year view shows whether D, the same-ticket
+    null M0 or the admissions are carried by one stretch of the 26 years.
+  - **Why from the committed artifacts.** The year of a key is its decision Friday, which the tickets already carry, so
+    the table comes from the same per-arm files as the split and its numbers trace. It could not be added after the
+    runs from anything else.
+  - **What it is not.** A descriptive table: no bar reads it, and no outcome changes with it. A year holds few keys per
+    seed, so a single year's sign is an observation, not a test.
 - **The admissions and the displacement** (§The admission channel): count and NAV-% sum per class and seed, the A total
-  without its three largest keys, and the PC and PS components by the other arm's record.
-- **The three largest and three smallest keys per seed**, with their class.
+  without its three largest keys (under BOTH PASS too, §The combined outcome), and the PC and PS components by the other
+  arm's record.
+- **The largest keys.** The three largest and three smallest keys per seed, with their class, among the keys with no
+  open leg.
+- **The open-leg keys.** Per pair and seed: how many keys have an open leg, how many of them were marked and how many
+  were not, and how many each of M, RC cap, RS cap, M0, RC0, RS0, PC and PS leaves out.
 - **The G check** (§Arm G): the pooled and own-seed counts, the premise count, and C's count beside them.
 - **Validity.** The `HEAD=`, image and `STAGE OK` lines, `SPEC CHECKS OK`, the `PREFLIGHT_OK` lines (each logs the
   capped tickets of its first quarter, and C's and G's count on S's gate skips), the `TRIPWIRE` and `PARITY` lines, V6
   for C and for G, the `GCHECK` lines, and the cache lines.
 - **The review pack**, built over the fifteen cells and looked at before any analysis
   (`dev/rules/backtest-result-review.md` RV1–RV3). It is not committed (EODHD terms).
+
+### What the read prints, and what it leaves out
+
+The repo is public, and bar data stays out of it (the reason the review pack, the KEYS file and `trade_audit.sexp` are
+never committed). Fill prices in `trades.csv` and `open_positions.csv` are committed as in every earlier results PR; this
+rework does not touch that practice.
+
+**Printed.**
+
+- Counts: tickets by outcome, keys by class, open-leg keys and the keys each table leaves out.
+- The simulator's own figures from `actual.sexp`: return, drawdown, Sharpe, Ulcer index, trades.
+- NAV-% sums over the keys whose legs are all closed, per seed and by decision year. A closed leg's contribution is the
+  simulator's `pnl_dollars` and dividends over the arm's NAV: no bar-store read.
+- Key lines (symbol, Friday, class, NAV-% difference) for those keys only.
+- The pass or fail of each bar that needs the marks: D > 0 and trim3 > 0 per seed (the `SEED` lines), the counts of
+  seeds in the outcome, and the A-without-top-3 count.
+
+**Not printed.** Any price, bar or mark; and any sum, pooled or not, that includes an *open-leg key*, a key whose ticket
+either arm still holds open at the window end. Its contribution is quantity × (mark − entry price) over NAV, the mark
+being the raw close of the arm's last equity-curve date. The 11-14 review recovered one close from one such line
+(2,733 shares at 25.52 and the NAV, both already committed). A pooled sum would be safe only while no single term
+dominates it, and the read does not depend on that: it prints no such sum.
+
+**Every exclusion is counted and printed.**
+
+- Each table says how many open-leg keys it left out, and the open-leg table splits them by class and by marked or not.
+- An open leg with no mark (no `DATA_DIR`, or no bar file for the symbol) is in neither the printed sums nor the bars.
+  It is counted, and the outcome and the combined row print PROVISIONAL.
+- A seed left out of a pair, because its directory or one of its files is missing, is named in a warning.
+
+**The bars read the marks; the printed sums do not.** D, trim3 and the A-without-top-3 count are evaluated with the open
+legs marked, as §Decision rule defines them. The printed D and trim3 are the closed-leg sums, so they can differ from the
+sums the bars read. The `SEED` line prints each bar's pass or fail on the marked values, so the outcome stays auditable.
+To see the marked sums, run the read locally with `KEYS=FILE` (never committed), or re-run it with `DATA_DIR`: both start
+from the committed per-arm artifacts, so every printed number traces to them. L, F and the weight ratios read tickets,
+entry prices and share counts, never a mark, and count the open-leg keys.
 
 ## Not claimed
 
@@ -628,7 +713,8 @@ called S below and the second in the role called C), then the combined outcome:
 - **G is a control, not a more faithful gate.** §5.1 measures the stop from the purchase price, E′ under the cap. A G
   that passes names a candidate configuration; it does not show that the book's gate should read E.
 - **C vs G is an attribution, not a third test.** It is Δk_CS − Δk_GS, seed by seed.
-- **The window's end.** Open positions are marked at the last raw close, without dividends.
+- **The window's end.** Open positions are marked at the last raw close, without dividends. The marks feed the bars
+  only; the read prints no sum that includes an open position (§What the read prints).
 
 ## Cost (`dev/rules/sweep-hygiene.md`)
 
@@ -682,9 +768,14 @@ called S below and the second in the role called C), then the combined outcome:
   - It carries no price: the stop and trigger levels stay in the session.
   - `<tag>-entries.tsv` is #3588's placed-and-skipped list.
 - `read/split.sh` (POSIX sh + awk, `read/lib/keys.awk`, `read/lib/summary.awk`, `read/lib/combine.awk`) is the whole
-  read above. It reads the pairs S:C, S:G and G:C in turn (`PAIRS` picks others), then prints the combined outcome. It
-  prints summaries only. `KEYS=FILE` also writes the per-key rows; with `DATA_DIR` those carry marked open positions,
-  from which a raw close can be recovered, so that file is never committed.
+  read above. It reads the pairs S:C, S:G and G:C in turn (`PAIRS` picks others), then prints the combined outcome.
+  - **What it prints** is stated exactly in §What the read prints: counts, the simulator's own figures, NAV-% sums and
+    key lines over the keys with no open leg, the number of open-leg keys each table leaves out, and the pass or fail
+    of the bars that read the marks. No price, bar or mark, and no sum that includes an open-leg key.
+  - `KEYS=FILE` also writes the per-key rows of every key, open-leg ones included. With `DATA_DIR` those carry marked
+    open-position contributions, from which a raw close can be recovered, so that file is never committed.
+- `read/combine_check.sh` runs `combine.awk` on fabricated `RULE` lines for every row of the combined table and every
+  channel value (§The combined outcome); its output is `results/smoke/combine_check.txt`.
 - `results/smoke/` holds the smoke's per-arm artifacts, its read and its log (§Smoke).
 - `results/k<K>/` holds each seed's `chain.sh collect` output, after the runs.
 
@@ -701,8 +792,10 @@ about the cap's effect on returns, and none enters the read.
 
 - `results/smoke/smoke.txt` has the commands, the logs and the checks.
 - `results/smoke/k0/` has the per-arm artifacts and both extracts.
-- `results/smoke/split.txt` is `read/split.sh` run on them. It was regenerated with arm G (below); its S:C numbers
-  are unchanged.
+- `results/smoke/split.txt` is `read/split.sh` run on them. It was regenerated twice: with arm G (below), and for the
+  rework of #3608 under §What the read prints. Its sums now leave out the open-leg keys (8 of the S:C pair's 39 keys),
+  so they differ from the first version's, whose per-key lines carried marked open positions.
+  `results/smoke/smoke.txt` (last section) records the change and the check that no printed byte depends on a mark.
 
 | arm | wall | placed tickets | capped | closed | open at the end |
 |---|---:|---:|---:|---:|---:|
@@ -757,7 +850,8 @@ the container, later in the day than S and C, so its wall time is not comparable
 - **No admissions.** G's capped tickets on a key S skipped at the stop gate: 0. The premise count (S's own tickets on a
   gate key) is 0. C has 10 on the same record.
 - **The uncapped tickets do not move.** The 15 uncapped keys both arms filled have the same fill days and prices, and
-  share counts within 0–48 of S's, because G's NAV runs slightly higher. M0 is +0.00 NAV-%.
+  share counts within 0–48 of S's, because G's NAV runs slightly higher. M0 is +0.00 NAV-% over the 11 of them with
+  closed legs (the other 4 are open-leg keys, left out).
 - **The read runs on three arms.** The S:G and G:C passes and the combined table run end to end
   (`results/smoke/split.txt`). With one seed, every outcome is INCONCLUSIVE and the combined row is G INVALID (fewer
   than 4 valid G seeds), as the rule says.
@@ -806,7 +900,8 @@ After the runs:
 1. The dispatcher gathers the five branches into one results PR.
 2. **The read, on the host,** with a local `data/`:
    `sh dev/experiments/stale-e-cap-k5-2026-11-14/read/split.sh dev/experiments/stale-e-cap-k5-2026-11-14/results data > dev/experiments/stale-e-cap-k5-2026-11-14/results/read/split.txt`.
-   It prints the three pairs and the combined outcome.
+   It prints the three pairs and the combined outcome, and no price or mark (§What the read prints). Its output,
+   `results/read/split.txt`, is committed.
 3. One review pack covers the fifteen cells: `dev/scripts/review_pack.sh`, rendered with `review_pack_render.sh`, as
    #3595 did (RV1). It is looked at and not committed.
 4. `results-analyst` reads the PR and the pack, applies the outcome and writes the why.
