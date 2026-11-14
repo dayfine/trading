@@ -1,0 +1,84 @@
+# read/ applied to the #3595 artifacts (TAG pb, RESULTS = ../price-band-tiebreak-2026-11-13/results), 2026-11-13.
+# Inputs regenerated from the local data/ (list_bands.sh, positions.sh); only these summaries are committed.
+
+## decide.sh
+k0: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+k1: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+k2: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+k3: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+k4: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+seeds in the read:  0 1 2 3 4 (n=5)
+liveness k0: Friday-pairs 403, lists changed 66.3 %; >=$33 share S-not-P 86.2 % (n 566), P-not-S 7.0 % (n 531), gap 79.3 pp; P tickets not placed by S that Friday 22.5 %
+liveness k1: Friday-pairs 402, lists changed 66.9 %; >=$33 share S-not-P 86.6 % (n 603), P-not-S 5.0 % (n 581), gap 81.6 pp; P tickets not placed by S that Friday 22.8 %
+liveness k2: Friday-pairs 401, lists changed 69.6 %; >=$33 share S-not-P 87.1 % (n 613), P-not-S 5.7 % (n 594), gap 81.4 pp; P tickets not placed by S that Friday 19.0 %
+liveness k3: Friday-pairs 411, lists changed 66.2 %; >=$33 share S-not-P 85.0 % (n 593), P-not-S 7.1 % (n 567), gap 77.9 pp; P tickets not placed by S that Friday 21.5 %
+liveness k4: Friday-pairs 394, lists changed 65.2 %; >=$33 share S-not-P 83.6 % (n 573), P-not-S 3.5 % (n 546), gap 80.1 pp; P tickets not placed by S that Friday 21.5 %
+liveness pooled: Friday-pairs 2011; B lists changed 66.8 % (bar 33 %); G >=$33 gap 80.1 pp (S-not-P 85.7 %, P-not-S 5.6 %; bar 40 pp); P tickets re-drawn 21.5 %
+LIVENESS LIVE
+seed k0: R_S 1472.76 % R_P 2661.80 % | ln S 2.7554 P 3.3185 | Dk +0.5631 | maxDD S 27.22 P 32.01 (P-S +4.79) | one-arm net +70.7, trim 3 +39.9
+seed k1: R_S 1678.33 % R_P 2093.88 % | ln S 2.8783 P 3.0883 | Dk +0.2100 | maxDD S 24.55 P 25.19 (P-S +0.64) | one-arm net +26.3, trim 3 +16.4
+seed k2: R_S 1334.99 % R_P 2085.43 % | ln S 2.6637 P 3.0844 | Dk +0.4207 | maxDD S 32.08 P 32.09 (P-S +0.01) | one-arm net +46.3, trim 3 +37.1
+seed k3: R_S 1220.15 % R_P 1770.25 % | ln S 2.5803 P 2.9287 | Dk +0.3483 | maxDD S 25.56 P 31.20 (P-S +5.64) | one-arm net +41.6, trim 3 +12.0
+seed k4: R_S 1639.51 % R_P 1906.46 % | ln S 2.8562 P 2.9990 | Dk +0.1428 | maxDD S 25.11 P 26.39 (P-S +1.28) | one-arm net +22.5, trim 3 +16.4
+return: median Dk +0.3483; m_S 0.1490 over 10 S pairs; delta = max(0.20, m_S) = 0.2000; Dk > 0 in 5 of 5 (pass needs 4)
+drawdown (arm medians): median maxDD P 31.20 - S 25.56 = +5.64 pp (limit 3.0); paired median +1.28 pp (reported, not read)
+concentration: trim-3 one-arm net > 0 in 5 of 5 (pass needs 4)
+bars: return PASS, drawdown FAIL, concentration PASS
+CELL pb OUTCOME INCONCLUSIVE
+
+## report.sh, sections B and C
+B. one-arm net by band (P-only minus S-only, points of entry NAV; n = P-only/S-only positions)
+k0  b0 +51.3 (7/5)  b1 +8.2 (18/8)  b2 +29.3 (45/36)  b3 -18.1 (50/95)  total +70.7
+k1  b0 +14.7 (7/3)  b1 -1.5 (18/13)  b2 +19.2 (61/41)  b3 -6.2 (50/95)  total +26.3
+k2  b0 +28.8 (10/4)  b1 +10.8 (17/11)  b2 +12.9 (54/28)  b3 -6.1 (31/101)  total +46.3
+k3  b0 +37.2 (7/6)  b1 -4.5 (19/7)  b2 +5.5 (66/29)  b3 +3.4 (36/95)  total +41.6
+k4  b0 +22.3 (8/10)  b1 +3.1 (20/4)  b2 +39.7 (61/33)  b3 -42.6 (33/80)  total +22.5
+pooled  b0 +154.3 (39/28)  b1 +16.1 (92/43)  b2 +106.5 (287/167)  b3 -69.5 (200/466)  total +207.5
+era 2000-09: P-only 157/+89.7  S-only 173/+71.3  net +18.5
+era 2010-12: P-only 145/+191.1  S-only 172/+44.0  net +147.0
+era 2013-17: P-only 103/+89.3  S-only 153/+55.0  net +34.3
+era 2018-23: P-only 142/+43.8  S-only 119/+27.1  net +16.7
+era 2024-26: P-only 71/-2.0  S-only 87/+7.0  net -9.0
+
+C. year-end ln(NAV_P / NAV_S); the incr row = change from end-2012 (0 if the cell starts in 2013) to the last date
+2000	k0 0.0000	k1 0.0315	k2 0.0149	k3 0.0100	k4 -0.0100
+2001	k0 0.0001	k1 0.0325	k2 0.0152	k3 -0.0031	k4 -0.0236
+2002	k0 -0.0096	k1 0.0287	k2 0.0055	k3 -0.0031	k4 -0.0335
+2003	k0 -0.0183	k1 0.0253	k2 -0.0047	k3 -0.0361	k4 -0.0176
+2004	k0 0.0868	k1 0.0750	k2 -0.0230	k3 -0.0495	k4 0.0923
+2005	k0 0.1348	k1 0.0448	k2 -0.0215	k3 -0.0889	k4 0.0448
+2006	k0 0.0883	k1 0.0971	k2 0.0010	k3 -0.0553	k4 0.0859
+2007	k0 0.0888	k1 0.0584	k2 0.0045	k3 0.0314	k4 0.1013
+2008	k0 0.0475	k1 0.0367	k2 -0.0288	k3 -0.0126	k4 0.1125
+2009	k0 0.0356	k1 0.0302	k2 -0.0148	k3 -0.0113	k4 0.1492
+2010	k0 0.0781	k1 0.0283	k2 -0.0423	k3 0.0730	k4 0.0680
+2011	k0 0.2429	k1 0.2527	k2 0.1717	k3 0.2132	k4 0.2706
+2012	k0 0.2735	k1 0.2713	k2 0.2307	k3 0.1969	k4 0.2977
+2013	k0 0.3691	k1 0.2297	k2 0.3191	k3 0.1199	k4 0.2858
+2014	k0 0.3538	k1 0.2046	k2 0.3886	k3 0.0797	k4 0.2648
+2015	k0 0.4170	k1 0.3322	k2 0.5004	k3 0.1473	k4 0.2695
+2016	k0 0.3749	k1 0.3443	k2 0.5138	k3 0.1503	k4 0.2829
+2017	k0 0.4879	k1 0.3073	k2 0.4650	k3 0.2649	k4 0.2723
+2018	k0 0.4438	k1 0.2901	k2 0.4366	k3 0.1929	k4 0.2472
+2019	k0 0.4538	k1 0.2741	k2 0.4321	k3 0.1872	k4 0.2850
+2020	k0 0.4421	k1 0.2928	k2 0.4443	k3 0.1823	k4 0.2926
+2021	k0 0.3940	k1 0.1718	k2 0.3582	k3 0.1673	k4 0.2277
+2022	k0 0.3945	k1 0.2054	k2 0.3770	k3 0.0898	k4 0.2010
+2023	k0 0.3978	k1 0.2326	k2 0.4099	k3 0.1387	k4 0.2331
+2024	k0 0.6021	k1 0.2495	k2 0.4583	k3 0.3194	k4 0.1915
+2025	k0 0.5826	k1 0.2473	k2 0.4364	k3 0.3406	k4 0.2126
+2026	k0 0.5631	k1 0.2100	k2 0.4207	k3 0.3483	k4 0.1428
+incr-2013-26	k0 +0.2896	k1 -0.0613	k2 +0.1899	k3 +0.1514	k4 -0.1549
+
+## capacity.sh (<= $14 entries)
+P all: n 384, p50 0.038, p90 0.194, max 0.949 (TCPC 2021-12-20 k0), >= 0.25: 18, no bars: 0
+P from 2023-07-01: n 70, p50 0.092, p90 0.265, max 0.516
+S all: n 324, p50 0.029, p90 0.146, max 0.749 (TRTX 2021-08-17 k1), >= 0.25: 7, no bars: 0
+S from 2023-07-01: n 65, p50 0.069, p90 0.221, max 0.337
+
+## cash.sh
+k0  S lost to P cash: 49 placed / 36 filled, +5.5 % of entry NAV | P lost to S cash: 36 / 31, +13.3 % | net +7.8 | other-norecord S 80 P 76 other-cut S 33 P 38 other-nostop S 0 P 1 both-placed S 521 P 521 other-cash S 49 P 36
+k1  S lost to P cash: 43 placed / 33 filled, +21.0 % of entry NAV | P lost to S cash: 45 / 37, +23.4 % | net +2.4 | other-norecord S 77 P 74 other-cut S 40 P 33 other-nostop S 0 P 0 both-placed S 515 P 515 other-cash S 43 P 45
+k2  S lost to P cash: 48 placed / 36 filled, +9.9 % of entry NAV | P lost to S cash: 27 / 21, +36.0 % | net +26.1 | other-norecord S 82 P 51 other-cut S 34 P 43 other-nostop S 0 P 0 both-placed S 515 P 515 other-cash S 48 P 27
+k3  S lost to P cash: 51 placed / 40 filled, +12.4 % of entry NAV | P lost to S cash: 40 / 30, +10.3 % | net -2.0 | other-norecord S 75 P 57 other-cut S 30 P 44 other-nostop S 0 P 1 both-placed S 520 P 520 other-cash S 51 P 40
+k4  S lost to P cash: 41 placed / 33 filled, +22.8 % of entry NAV | P lost to S cash: 35 / 29, +7.8 % | net -15.0 | other-norecord S 71 P 69 other-cut S 39 P 35 other-nostop S 0 P 0 both-placed S 507 P 507 other-cash S 41 P 35

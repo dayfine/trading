@@ -1,0 +1,59 @@
+# Local smoke of chain.sh's preflight path, 2026-11-13 (14 Nov UTC), trading-1-dev container, RUNNER=exec.
+# Tree: this PR's workspace on main 7aa1ffcc4 + the uncommitted experiment dir; build of scenario_runner.exe in that tree.
+# WH = the container's /tmp/snap_top3000_pit_v12wk (9,236-symbol v12wk, the warehouse R2 v12wk-9236 was pushed from).
+# TD = the tree's committed trading/test_data (no bar store, no corpact: dividends are not credited; preflight only).
+# Command, per spec: REPO=<tree> RUNNER=exec CROOT=<tree in container> TD=<tree>/trading/test_data \
+#   WH=/tmp/snap_top3000_pit_v12wk OUT=<tree>/.sweep-output/price-band-confirm sh chain.sh preflight 0 <spec>
+# The first run (pbc1-S-k0) shared the container with another agent's dune runtest for ~16 of its 19 min.
+
+## chain.log
+[11-14 01:04:58Z] price-band-confirm preflight k0 (RUNNER=exec, smoke only: no guards, no stage)
+[11-14 01:04:58Z] SPEC CHECKS OK (pbc1-S-k0 = rk-k0 + start 2013-01-01; pbc2-S-k0 = rk-k0 on top-1000 lists; P = S + Price_band_seeded)
+[11-14 01:04:58Z] PREFLIGHT pbc1-S-k0 (to 2013-03-29)
+[11-14 01:24:05Z] PREFLIGHT_OK pbc1-S-k0 (1147s, Price_band_seeded in params: no, n_symbols=9200 absent=1, macro = 26y on 12/12 Fridays)
+[11-14 01:24:42Z] price-band-confirm preflight k0 (RUNNER=exec, smoke only: no guards, no stage)
+[11-14 01:24:42Z] SPEC CHECKS OK (pbc1-S-k0 = rk-k0 + start 2013-01-01; pbc2-S-k0 = rk-k0 on top-1000 lists; P = S + Price_band_seeded)
+[11-14 01:24:42Z] PREFLIGHT pbc2-P-k0 (to 2000-03-31)
+[11-14 01:27:58Z] PREFLIGHT_OK pbc2-P-k0 (196s, Price_band_seeded in params: yes, n_symbols=3492 absent=1, macro = 26y on 12/12 Fridays)
+[11-14 01:28:05Z] price-band-confirm preflight k0 (RUNNER=exec, smoke only: no guards, no stage)
+[11-14 01:28:05Z] SPEC CHECKS OK (pbc1-S-k0 = rk-k0 + start 2013-01-01; pbc2-S-k0 = rk-k0 on top-1000 lists; P = S + Price_band_seeded)
+[11-14 01:28:05Z] PREFLIGHT pbc2-S-k0 (to 2000-03-31)
+[11-14 01:35:02Z] PREFLIGHT_OK pbc2-S-k0 (416s, Price_band_seeded in params: no, n_symbols=3492 absent=1, macro = 26y on 12/12 Fridays)
+[11-14 01:35:13Z] price-band-confirm preflight k0 (RUNNER=exec, smoke only: no guards, no stage)
+[11-14 01:35:14Z] SPEC CHECKS OK (pbc1-S-k0 = rk-k0 + start 2013-01-01; pbc2-S-k0 = rk-k0 on top-1000 lists; P = S + Price_band_seeded)
+[11-14 01:35:14Z] PREFLIGHT pbc1-P-k0 (to 2013-03-29)
+[11-14 01:49:51Z] PREFLIGHT_OK pbc1-P-k0 (877s, Price_band_seeded in params: yes, n_symbols=9200 absent=1, macro = 26y on 12/12 Fridays)
+
+## snapshot cache lines (per preflight, trimmed after loads_per_touched)
+pbc1-S-k0: Panel_runner: snapshot cache hits=6619733 misses=9714 miss_absent=515 evictions=0 n_symbols=9200 misses_per_symbol=1.06 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00
+pbc1-P-k0: Panel_runner: snapshot cache hits=6619623 misses=9714 miss_absent=515 evictions=0 n_symbols=9200 misses_per_symbol=1.06 n_symbols_touched=9199 n_symbols_absent=1 loads_per_touched=1.00
+pbc2-S-k0: Panel_runner: snapshot cache hits=2650450 misses=4008 miss_absent=517 evictions=0 n_symbols=3492 misses_per_symbol=1.15 n_symbols_touched=3491 n_symbols_absent=1 loads_per_touched=1.00
+pbc2-P-k0: Panel_runner: snapshot cache hits=2650440 misses=4008 miss_absent=517 evictions=0 n_symbols=3492 misses_per_symbol=1.15 n_symbols_touched=3491 n_symbols_absent=1 loads_per_touched=1.00
+
+## macro trend rows compared (date trend breadth_state), C1 preflight; equal to pb-S-k0 (#3595) on every row
+2013-01-04 Bullish Bullish_breadth
+2013-01-11 Bullish Bullish_breadth
+2013-01-18 Bullish Bullish_breadth
+2013-01-25 Bullish Bullish_breadth
+2013-02-01 Bullish Bullish_breadth
+2013-02-08 Bullish Bullish_breadth
+2013-02-15 Bullish Bullish_breadth
+2013-02-22 Bullish Bullish_breadth
+2013-03-01 Bullish Bullish_breadth
+2013-03-08 Bullish Bullish_breadth
+2013-03-15 Bullish Bullish_breadth
+2013-03-22 Bullish Bullish_breadth
+
+## entries and RS coverage in each preflight (trades.csv + open_positions.csv; trade_audit.sexp rs_value fields)
+pbc1-S-k0: entries 6, first entry 2013-02-22, rs_value 150 rows, 0 None
+pbc1-P-k0: entries 6, first entry 2013-02-22, rs_value 150 rows, 0 None
+pbc2-S-k0: entries 11, first entry 2000-01-12, rs_value 234 rows, 0 None
+pbc2-P-k0: entries 11, first entry 2000-01-12, rs_value 234 rows, 0 None
+
+## spec-check negative tests (each tamper restored afterwards)
+extra override in pbc1-P-k0 (min_cash_pct 0.25): ABORT: pbc1-P-k0 differs from pbc1-S-k0 by more than the override
+a top-3000 list left in pbc2-S-k0 (2010):          ABORT: pbc2-S-k0 differs from rk-k0 by more than the C2 change
+end_date moved in pbc1-S-k0 (2026-06-25):          ABORT: pbc1-S-k0 differs from rk-k0 by more than the C1 change
+tiebreak_seed 0 -> 1 in pbc2-S-k0:                 ABORT: pbc2-S-k0 differs from rk-k0 by more than the C2 change
+spec checks for seeds 1-4 (untampered):           SPEC CHECKS OK for each
+macro comparison with one 26y row altered (2013-02-15 Bullish -> Bearish): 12 rows, 1 differs (the check would ABORT)
