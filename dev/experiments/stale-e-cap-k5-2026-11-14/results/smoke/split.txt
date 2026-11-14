@@ -1,0 +1,58 @@
+== 0. Validity (README §Decision rule 0)
+k0  V6 n/a  tripwire n/a  absent-symbols n/a  S capped 0  -> VALID
+(validity not checked: VALIDITY=skip, the local smoke)
+
+== 1. Per seed and arm (actual.sexp; closed trades, open positions, trades at >= +100 %)
+seed arm          R %   ln(1+R)     delta  maxDD %   Sharpe   Ulcer closed  open >=100
+k0   S           21.5    0.1948               9.17    1.103    2.46     13     5     0
+k0   C           14.3    0.1340   -0.0608    12.61    0.563    3.19     24     5     0
+
+== 2. Liveness (README §Decision rule 1): L = C's placed long tickets anchored at local_range_top; F = capped pairs C filled lower
+seed C placed   capped        L   S capped cap pairs   C lower        F lrt!=anc
+k0         34       21   61.8 %          0         2         2  100.0 %        0
+pool       34       21   61.8 %                    2         2  100.0 %   (valid seeds)
+
+== 3. Ticket outcomes per arm: placed long tickets by resolution (closed / open / refused for cash at the fill / TTL / requalification / delisted / resting at the end)
+seed set                     placed   closed     open     cash      ttl   requal delisted  resting    other
+k0   S, all                      19       13        5        0        0        0        0        1        0
+k0   C, all                      34       24        5        1        0        0        0        4        0
+k0   C, capped tickets           21       15        2        1        0        0        0        3        0
+k0   S twins of capped           21        2        0        0        0        0        0        0       19
+("S twins of capped": what S did with the same symbol on the same Friday; "none" = S placed no ticket, counted under other)
+
+Fill age in weeks from placement, closed trades (p50 / p90 / share filled within 1 week):
+k0 S all: 1 / 7 / 69.2 %   k0 C all: 1 / 7 / 54.2 %   C capped: 1 / 7 / 53.3 %
+
+== 4. The price/size split, NAV-% of the arm's NAV at the decision (README §The price/size split)
+seed   n M    price     size     exit        M |  n RC   RC cap |  n RS   RS cap |        D |  n M0       M0   |d| M0 |       PC       PS    total    trim3
+k0       2    +0.15    -0.12    +0.00    +0.03 |     0    +0.00 |     0    +0.00 |    +0.03 |    11    -0.00    0.000 |    +9.73   -15.30    -5.54    -5.14
+M = price + size + exit over capped keys both arms filled; RC cap = capped keys only C filled (+cC); RS cap = capped keys only S filled (-cS);
+D = M + RC cap + RS cap (the same-ticket effect: keys both arms placed, C capped); M0 = the same-ticket path null (uncapped, both filled);
+PC / PS = keys placed in one arm only (admissions and path); total = sum over all keys of cC - cS; trim3 = total without the 3 largest and 3 smallest keys.
+
+Screen comparison (#3594 sizing.txt: screen price = this price + exit, as its exits were fixed; screen size = this size):
+k0  price+exit   +0.15 (screen +3.9)  size   -0.12 (screen +7.7)  size share of M -439 %  C/S weight on capped pairs p50 1.038 p90 1.087  C/S fill p50 0.9866
+
+Admission and displacement (README §The admission channel): capped tickets only C placed, by what S did that Friday,
+and S's tickets that C skipped for cash (n tickets, NAV-% summed; an unfilled ticket counts 0):
+seed    A gate (rec.)      A no S list          A other            A all | displaced (cash)
+k0      10      +6.00     9      -5.41     0      +0.00    19      +0.59 |     3     -17.37
+
+Components by outcome (n, NAV-% summed):
+k0  PC:capped, nolist                                    9     -5.41
+k0  PC:capped, skip:No_structural_stop                  10     +6.00
+k0  PC:nolist                                            1     +9.14
+k0  PS:nolist                                            2     +2.07
+k0  PS:skip:Insufficient_cash                            3    -17.37
+k0  RN:uncapped, S resting, C resting                    1     +0.00
+k0  shifted:PC (other arm placed the symbol within 28 days)     1     +9.14
+k0  shifted:PS (other arm placed the symbol within 28 days)     1     -8.42
+
+Largest key-level differences per seed (cC - cS, NAV-%; key class):
+k0 +:  WRB|2000-08-18 PC +9.14  TOL|2000-04-14 PC +5.45  WLP1|2000-04-14 PC +3.23   -:  EOG|2000-04-14 PS -8.72  WRB|2000-08-11 PS -8.42  IMAX|2000-07-21 PC -1.08
+
+== 5. Outcome (README §Decision rule, applied as written)
+valid seeds 1; L 0.6176 (bar 0.10); F 1.0000 over 2 capped pairs (bar 0.50, >= 30 pairs)
+median delta -0.0608; delta > 0 in 0, < 0 in 1 of 1; delta bar 0.2000 (max(0.20, m_S = n/a)); D > 0 in 1; trim3 > 0 in 0; maxDD median C - S +3.44 pp
+OUTCOME: INCONCLUSIVE (fewer than 4 valid seeds)
+SEED k0 delta -0.0608 L 61.8 % F 100.0 % D +0.03 M +0.03 price +0.15 size -0.12 exit +0.00 total -5.54

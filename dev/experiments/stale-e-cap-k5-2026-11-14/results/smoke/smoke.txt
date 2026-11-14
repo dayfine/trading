@@ -1,0 +1,80 @@
+# Local smoke of stale-e-cap-k5-2026-11-14, 2026-11-14 07:43-08:19 UTC, trading-1-dev container (5 GB / 6 CPU).
+# LIVENESS AND PLUMBING ONLY. One seed, one year, local data without corporate actions: no figure here is evidence
+# about the cap's effect on returns, and none enters the pre-registered read.
+#
+# Tree: main d521e5254 (#3604) from a jj workspace, copied into .claude/worktrees/stalecap-k5-smoke/ (untracked, inside
+#   the default checkout so the container sees it); scenario_runner.exe built there.
+#   params.sexp's code_version reads b54e44ea9: the runner takes it from the enclosing git checkout, which the copy is
+#   not. The code that ran is d521e5254's: arm C's params.sexp carries entry_cap_local_range_weeks 4, a field
+#   b54e44ea9 does not have, and its audit carries Local_range_top anchors.
+# Specs: specs/sec-S-k0.sexp and specs/sec-C-k0.sexp with (end_date 2026-06-26) -> (end_date 2000-12-29), nothing else.
+#   Universe: the record's top-3000 PIT v12 schedule (broad); 2000-01-01 -> 2000-12-29 after the 364-day warm-up.
+# WH: the container's /tmp/snap_top3000_pit_v12wk (9,236 manifest entries, the warehouse R2 v12wk-9236 was pushed from).
+# TD: the tree's committed trading/test_data. No bar store and no corpact: dividends are not credited.
+# Command (both specs in one dir, run one after the other):
+#   docker exec -w <tree>/trading trading-1-dev bash -c 'eval $(opam env); TRADING_DATA_DIR=<tree>/trading/test_data
+#     TRADING_PATH_SEED_SALT=0 SNAPSHOT_CACHE_MB=1024 SNAPSHOT_MAX_MMAP_HANDLES=12000 /usr/bin/time -f peak_rss_kb=%M
+#     timeout 7200 ./_build/default/trading/backtest/scenarios/scenario_runner.exe --dir <tree>/smoke/specs
+#     --fixtures-root <tree>/trading/test_data/backtest_scenarios --snapshot-dir /tmp/snap_top3000_pit_v12wk
+#     --no-emit-all-eligible --progress-every 13 --parallel 1'
+# Extracts: `chain.sh tickets` and `chain.sh entries` on each arm's trade_audit.sexp (k0/sec-?-k0-s0-{tickets,entries}.tsv).
+# Read: VALIDITY=skip sh read/split.sh results/smoke <local data/> > results/smoke/split.txt (open positions marked
+#   from the local bar store; split.txt prints summaries only).
+
+## Runs
+sec-C-k0  wall 1,111 s  exit 0  total_return_pct 14.34  closed 24  open 5  max_drawdown_pct 12.61
+sec-S-k0  wall 1,076 s  exit 0  total_return_pct 21.50  closed 13  open 5  max_drawdown_pct 9.17
+peak_rss_kb=3764352 (the larger of the two children)
+cache, both arms: n_symbols=9200 n_symbols_touched=9199 n_symbols_absent=1 (the record's MEL baseline)
+split_dividend_guard rejected=0 no_files=0, both arms
+
+## Arm S reproduces #3595's arm S decisions locally
+S placed 19 tickets in 2000, the same (symbol, decision Friday) set as #3595's pb-S-k0-s0-entries.tsv for 2000.
+Its closed trades differ from pb-S-k0's 2000 rows only in quantity (3-13 shares on four rows: no dividends credited
+here, so a slightly smaller NAV) and in the rows the 2000-12-29 window end leaves open (EOG, NMK1, NUI, TCR, WRB).
+
+## Liveness: the cap fires and reaches the fill
+C placed 34 long tickets; 21 anchored at Local_range_top (L = 61.8 %). local_range_top present on exactly those 21.
+S: 0 tickets anchored at Local_range_top.
+Capped keys both arms placed: 2 (DIS 2000-01-14, TRW1 2000-03-24); both filled in both arms, C lower in both
+  (F 2 of 2; C/S entry price p50 0.9866; C/S position weight per unit of NAV p50 1.038).
+  DIS is the screen's traced case (#3594): T = 36.75, its 4-week top. Both arms fill on 2000-01-25 and stop out on
+  2000-02-25: S at 37.23 for 1,949 shares, C at 36.96 for 2,024 (TRW1: 58.34 x 1,178 against 57.56 x 1,264, same
+  days). Lower price, more shares, same exit: the screen's two channels, on the same ticket.
+Capped keys only C placed (admissions): 19.
+  10 on Fridays S's entries.tsv lists the symbol as skipped No_structural_stop (the stop gate):
+     NTPIF 03-17, PLL_old 03-24, TBI1 03-24, HNI 04-14, TOL 04-14, WLP1 04-14, DPHIQ 04-28, FAST 04-28, IMAX 07-21, FDX 08-11
+  9 on Fridays S placed nothing (no list recorded): CHH, ECIL 01-07; IEX, MENT 01-21; SPGI 07-14; KFY 07-28;
+     GDT_old 08-18; AMTD_old, WIND 09-15
+Stop width of C's 21 capped tickets: 12.3-14.9 % (the gate is 15 %). DIS: 13.85 % in S, 13.40 % in C.
+C's capped tickets: 15 closed, 2 open, 1 refused for cash at the fill (FDX), 3 resting at the end.
+S's tickets C did not place, skipped by C for Insufficient_cash that Friday: 3 (displacement).
+
+## Read plumbing
+read/split.sh runs end to end on these artifacts (split.txt). Same read on a fake pair (record rk-k0 as S, rk-k1 as C,
+not committed): 390 shared keys give M0 +0.04 NAV-% in total with mean |c_C - c_S| 0.000, as two seeds' copies of the
+same position should; open positions marked from the bar store; split.sh's validity parser reads MATCH / MISMATCH /
+WAIVED, V6 exit 0 / 1 and the absent-symbol lines correctly on fabricated chain logs.
+
+## Spec checks (chain.sh check K, no container)
+untampered, seeds 0-4:                         SPEC CHECKS OK for each
+extra override in sec-C-k1 (min_cash_pct 0.25): ABORT: sec-C-k1 differs from sec-S-k1 by more than the override
+cap 4 -> 8 in sec-C-k2:                         ABORT: sec-C-k2 differs from sec-S-k2 by more than the override
+tiebreak_seed 3 -> 4 in sec-S-k3:               ABORT: sec-S-k3 differs from rk-k3 below the header
+override removed from sec-C-k4:                 ABORT: sec-C-k4 lacks the override
+trigger-at-E dropped from rk/pb/sec k0 alike:   ABORT: sec-S-k0 lacks ((sim_entry_trigger_at_suggestedtrue))
+replace anchor added to rk/pb/sec k0 alike:     ABORT: sec-S-k0 sets entry_anchor_local_range_weeks (README §Design: scope)
+
+## The chain's own preflight path (chain.sh preflight 0, RUNNER=exec), 08:21-08:44 UTC
+# REPO=<tree> RUNNER=exec CROOT=<tree in container> TD=<tree>/trading/test_data WH=/tmp/snap_top3000_pit_v12wk \
+#   OUT=<tree>/.sweep-output/stale-e-cap-k5 sh dev/experiments/stale-e-cap-k5-2026-11-14/chain.sh preflight 0
+# Run before the preflight's capped-ticket abort was added; that check was then run by hand on these two
+# tickets files (S 0, C 9: both pass).
+  [11-14 08:21:06Z] stale-e-cap-k5 preflight k0 (RUNNER=exec, smoke only: no guards, no stage)
+  [11-14 08:21:06Z] SPEC CHECKS OK (sec-S-k0 = rk-k0 = pb-S-k0; sec-C-k0 = sec-S-k0 + entry_cap_local_range_weeks 4; trigger at E, StopLimit 2 %)
+  [11-14 08:21:06Z] PREFLIGHT sec-S-k0 (to 2000-03-31)
+  [11-14 08:31:36Z] PREFLIGHT_OK sec-S-k0 (630s, entry_cap_local_range_weeks=0, n_symbols=9200 absent=1, capped tickets 0 of 8)
+  [11-14 08:31:36Z] PREFLIGHT sec-C-k0 (to 2000-03-31)
+  [11-14 08:44:25Z] PREFLIGHT_OK sec-C-k0 (769s, entry_cap_local_range_weeks=4, n_symbols=9200 absent=1, capped tickets 9 of 15)
+  C's 9 capped tickets in the quarter are the full-year smoke's 9 for the same Fridays (CHH, ECIL 01-07; DIS 01-14;
+  IEX, MENT 01-21; NTPIF 03-17; PLL_old, TBI1, TRW1 03-24).
