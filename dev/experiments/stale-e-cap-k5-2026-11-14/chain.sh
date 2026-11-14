@@ -1,9 +1,11 @@
 #!/bin/sh
-# stale-e-cap-k5-2026-11-14: one tie seed's pair (arm S, then arm C) in a Claude cloud session. Five sessions, one per
-# seed, run side by side. Pre-registration and read rule: README.md beside this file. NOT run by its author.
+# stale-e-cap-k5-2026-11-14: one tie seed's three arms (S, then C, then G) in a Claude cloud session. Five sessions, one
+# per seed, run side by side. Pre-registration and read rule: README.md beside this file. NOT run by its author.
 #
 #   sec-S-kK  the record config (rk-kK), Seeded tie order seed K       2000-01-01 -> 2026-06-26, top-3000 PIT v12
 #   sec-C-kK  sec-S-kK + ((entry_cap_local_range_weeks 4)) (#3604)     same window and schedule; V6 against sec-S-kK
+#   sec-G-kK  sec-C-kK + ((entry_cap_stop_gate_on_uncapped true))      same window and schedule; V6 against sec-S-kK
+#             (#3609): the cap, with every stop-gate decision read at the uncapped trigger (README §Arm G)
 #
 # Runs on the session host (POSIX sh) from the session's checkout at SC_SHA, the one main SHA all five sessions use
 # (named in the launch brief). Every OCaml step runs in ghcr.io/dayfine/trading-ci:latest with the checkout mounted at
@@ -11,36 +13,48 @@
 # restart that wipes /tmp loses nothing); TMPDIR points there too.
 #
 # Subcommands (SC_SHA must be set for run and stage):
-#   sh chain.sh run K          lock -> guards -> stage (R2 pulls, data dir) -> build -> spec checks -> preflight of both
-#                              arms -> sec-S-kK -> TRIPWIRE (hard gate) -> sec-C-kK (V6 vs S) -> pair extracts ->
-#                              collect into results/kK -> read/split.sh on it (information only)
+#   sh chain.sh run K          lock -> guards -> stage (R2 pulls, data dir) -> build -> spec checks -> preflight of the
+#                              three arms -> sec-S-kK -> TRIPWIRE (hard gate) -> sec-C-kK (V6 vs S) -> sec-G-kK (V6 vs
+#                              S), each arm's extracts right after its cell -> G check (information) -> collect into
+#                              results/kK -> read/split.sh on it (information only)
 #   sh chain.sh stage          only the R2 pulls and the data dir (resumable; each step leaves a .done marker)
 #   sh chain.sh collect K DEST copy seed K's artifacts and extracts into DEST
 #   sh chain.sh check K        only the spec checks of seed K (no guards, no container)
 #   sh chain.sh tickets AUDIT  print the per-ticket extract of one trade_audit.sexp (README §Files; no guards)
 #   sh chain.sh entries AUDIT  print the placed/skipped list extract of one trade_audit.sexp (no guards)
-#   sh chain.sh preflight K    local smoke only: spec checks + the preflight of both arms against an existing WH and
-#                              TD (RUNNER=exec), with no guards and no stage. The run path never uses it.
-# Re-running `run K` skips every cell whose RESULT line is already in chain.log (resume after a session restart). The
-# lock is an flock on a file descriptor, so a killed run leaves no stale lock behind.
+#   sh chain.sh preflight K    local smoke only: spec checks + the preflight of the three arms against an existing WH
+#                              and TD (RUNNER=exec), with no guards and no stage. The run path never uses it.
+# Resume, per arm (from chain.log, as ../price-band-binding-2026-11-13/chain.sh does): re-running `run K` skips each
+# arm's preflight whose PREFLIGHT_OK line is logged (all of them once any cell's RESULT is), each cell whose RESULT line
+# is logged, the tripwire once its MATCH or WAIVED line is, and each arm's extracts once its EXTRACT line is and both
+# files are non-empty. A restart therefore costs only the cell in flight. RESULT is logged only for a cell that exited
+# 0 and wrote actual.sexp and trades.csv; a failed cell logs CELL FAILED and aborts, so a relaunch re-runs it rather
+# than skipping it. The lock is an flock on a file descriptor, so a killed run leaves no stale lock behind.
 #
 # Derived from ../price-band-confirm-2026-11-13/chain.sh (#3598), itself from #3588's: the same guards, SHA pin and
 # resume, stage (warehouse v12wk-9236, corpact-2026-10-27, bars data-20261102 for the validator's data dir, the
 # warehouse .done marker outside the verified dir per #3599/#3601), build, run_cell, V6 diff, keyed trades diff,
 # entries extract, collect, RUNNER=exec, and the leftover cleanup under the lock. Changes:
-#   1. Two cells per seed (S, C). Spec checks: sec-S-kK = rk-kK = #3595's pb-S-kK below the header; sec-C-kK = sec-S-kK
-#      plus the one override; the fill-model and scope settings the cap depends on are asserted in S (README §Design).
-#   2. TRIPWIRE: sec-S-kK's trades.csv must be byte-identical to #3595's pb-S-kK-s0-trades.csv (md5 below). The flag
-#      is inert when off (README §Tripwire), so a mismatch means the build, image or data stage moved; the chain stops
+#   1. Three cells per seed (S, C, G). Spec checks: sec-S-kK = rk-kK = #3595's pb-S-kK below the header; sec-C-kK =
+#      sec-S-kK plus the cap; sec-G-kK = sec-C-kK plus the gate flag; the fill-model and scope settings the cap depends
+#      on are asserted in S, and G is asserted free of the two settings `make` refuses with the flag (README §Design).
+#   2. TRIPWIRE: sec-S-kK's trades.csv must be byte-identical to #3595's pb-S-kK-s0-trades.csv (md5 below). Both flags
+#      are inert when off (README §Tripwire), so a mismatch means the build, image or data stage moved; the chain stops
 #      before arm C. TRIPWIRE_WAIVE="<reason>" continues past a mismatch and logs the reason (the read reports it).
 #   3. tickets_extract: one row per placed ticket from trade_audit.sexp (anchor, cap flag, resolution), never prices.
-#   4. Preflight: each arm's FIRST three months (2000-01-03 .. 2000-03-31). It checks the override in params.sexp
-#      (4 in C, 0 in S), the cache line (n_symbols=9200, n_symbols_absent=1), and that C caps at least one ticket and
-#      S none (the local smoke's C capped 9 in this quarter).
+#   4. Preflight: each arm's FIRST three months (2000-01-03 .. 2000-03-31). It checks the overrides in params.sexp
+#      (the cap 4 in C and G, 0 in S; the gate flag in G only), the cache line (n_symbols=9200, n_symbols_absent=1),
+#      that C and G each cap at least one ticket and S none, and that G caps no ticket on a key S's preflight skipped
+#      at the stop gate (the G check, README §Arm G; the local smoke's C had 3 such admissions in this quarter).
+#   5. The G check on the full cells, logged per seed (information; the read applies it pooled, README §Arm G).
+#   6. Resume per arm (above): per-arm preflight and extract markers, and CELL FAILED in place of a RESULT line for a
+#      failed cell, which the derived chains logged as RESULT and then skipped on a relaunch.
 #
-# Cell guard: CELL_TIMEOUT=24200 s = 3 x the slowest #3595 cloud cell of this spec (pb-S-k0, 8,058 s; the ten cells ran
-# 7,161-8,058 s). Peak RSS was 5.71-5.77 GB (maxrss 5.91 GB), so MEM_MIN_GB=7 (whole GiB). The session should take about 4.6 h:
-# stage ~0.2 h, build ~0.02 h, preflight ~0.2 h, two cells 4.0-4.5 h, extracts and read ~0.05 h.
+# Cell guard: CELL_TIMEOUT=16200 s = 2 x the slowest #3595 cloud cell of this spec (pb-S-k0, 8,058 s; the ten cells ran
+# 7,161-8,058 s). Three cells now share a session, so 3 x (24,200 s) would let one hung cell take the whole session;
+# 2 x still clears the observed spread with room. Peak RSS was 5.71-5.77 GB (maxrss 5.91 GB) and the arms run one at a
+# time (the one-year smoke: S and C 3.76 GB, G 3.61 GB), so MEM_MIN_GB=7 (whole GiB). The session should take about
+# 7 h: stage ~0.2 h, build ~0.02 h, three preflights ~0.3 h, three cells 6.0-6.7 h, extracts and read ~0.1 h.
 #
 # R2 credentials (R2_*) come from the environment and are never printed (dev/scripts/r2_bars.sh header).
 set -u
@@ -59,7 +73,7 @@ WH=${WH:-$OUT/warehouse/snap_top3000_pit_v12wk}; CA=$OUT/warehouse/corpact
 BARS=$OUT/bars; TD=${TD:-$OUT/td-full}                # TD: bars + committed test_data + corpact (chain-w README §Data)
 ART=$OUT/art; WORK=$OUT/work; LOG=$OUT/chain.log
 EXPECT_WH=9236; EXPECT_DIV=11880                      # manifest entries; dividends.csv count of corpact-2026-10-27
-CELL_TIMEOUT=${CELL_TIMEOUT:-24200}
+CELL_TIMEOUT=${CELL_TIMEOUT:-16200}
 MEM_MIN_GB=${MEM_MIN_GB:-7}                         # MemTotal in whole GiB, truncated; a cell peaks at ~5.9 GB
 MMAP_HANDLES=12000                                    # >= manifest size (#2839/#2882)
 DISK_MIN_GB=${DISK_MIN_GB:-5}                         # before each cell (a cell's outputs are < 1 GB, #3595 logs)
@@ -68,10 +82,12 @@ NSYM=9200                                             # pb-S-k0's cache line: n_
 REC=dev/experiments/record-kseed-2026-10-27           # the record cells rk-k0..rk-k4 the S specs derive from
 PB=dev/experiments/price-band-tiebreak-2026-11-13     # #3595: its arm S cells are this experiment's tripwire
 OVR='((entry_cap_local_range_weeks4))'                # arm C's one override, whitespace dropped
+GOVR='((entry_cap_stop_gate_on_uncappedtrue))'        # arm G's one override on top of C's, whitespace dropped
 # #3595's pb-S-kK-s0-trades.csv md5 for K = 0..4 (HEAD=1034b458e, image sha256:3865e48e8a61, same data stage).
 TRIP_MD5="0928cfe40333560429f5a6e57c9c18de 9441578a81c6cfe4be68a7ca5aecbb8f 2034e05dd8dd00f10c16d93be4ce2ce2 0f33cdad0d6e28e1829f53f7e3fd3d92 995be28e6ef1c1829f7db0c8ecd79a41"
-# Commits the run tree must contain: #3510 (upper-case shards), #3547 (relocatable warehouse), #3604 (the flag).
-NEED="20824663d 8ee1ed797 d521e5254"
+# Commits the run tree must contain: #3510 (upper-case shards), #3547 (relocatable warehouse), #3604 (the cap),
+# #3609 (the gate flag).
+NEED="20824663d 8ee1ed797 d521e5254 9664e1705"
 
 mkdir -p "$OUT" "$ART" "$WORK" "$OUT/tmp"
 export TMPDIR=$OUT/tmp                                # r2_bars.sh stages downloads in $TMPDIR; keep them off /tmp
@@ -86,6 +102,7 @@ dk() {
 disk_ok() { g=$(df -BG --output=avail "$REPO" | tail -1 | tr -dc 0-9); log "disk free ${g}G"; [ "$g" -ge "${1:-$DISK_MIN_GB}" ]; }
 seed_ok() { case "${1:-}" in 0|1|2|3|4) return 0 ;; *) return 1 ;; esac; }
 md5_of() { { md5sum "$1" 2>/dev/null || md5 -q "$1" 2>/dev/null; } | cut -c1-32; }
+logged() { grep -q "$1" "$LOG" 2>/dev/null; }
 FIX() { echo "$CROOT/trading/test_data/backtest_scenarios"; }
 
 # ------------------------------------------------------------------------------------------------------------ guards
@@ -100,9 +117,14 @@ guards() {
   prev=$(sed -n 's/.*\] HEAD=\([0-9a-f]*\) .*/\1/p' "$LOG" | head -1)
   [ -z "$prev" ] || [ "$prev" = "$(git rev-parse --short=9 HEAD)" ] || die "HEAD differs from this chain.log's earlier HEAD=$prev"
   for c in $NEED; do git merge-base --is-ancestor "$c" HEAD || die "HEAD lacks $c"; done
-  # The flag-off identity the tripwire relies on (README §Tripwire): cap off returns the replace anchor unchanged.
+  # The flag-off identities the tripwire relies on (README §Tripwire): cap off returns the replace anchor unchanged, and
+  # the gate flag yields no gate entry unless it and the cap are both armed.
   grep -q '| None, _, _ -> range_top' trading/analysis/weinstein/stock_analysis/lib/stale_entry_cap.ml \
     || die "Stale_entry_cap.ticket_anchor's cap-off arm changed (README §Tripwire)"
+  f=trading/trading/weinstein/strategy/lib/entry_cap_stop_gate.ml
+  grep -q 'config.entry_cap_stop_gate_on_uncapped$' "$f" && grep -q '&& config.entry_cap_local_range_weeks > 0' "$f" \
+    && grep -q 'if _armed config && entry_is_trigger then _uncapped_trigger ~config cand' "$f" \
+    || die "Entry_cap_stop_gate.gate_entry's off path changed (README §Tripwire)"
   [ -z "$(git status --porcelain --untracked-files=no)" ] || die "checkout dirty"
   [ -f "$EXP/README.md" ] || die "$EXP not in the checkout (pre-registration not merged?)"
   mem=$(awk '/^MemTotal/ { printf "%d", $2 / 1048576 }' /proc/meminfo 2>/dev/null)
@@ -154,20 +176,27 @@ stage() {
 # Normalised content: comments, the name and description lines and all whitespace dropped, one override removed ($2).
 norm() { sed -e 's/;;.*$//' -e '/^((name "/d' -e '/^ (description "/d' "$1" | tr -d ' \t\n' | sed "s/$2//"; }
 spec_checks() { # $1 seed
-  cd "$REPO" || exit 1; S=$EXP/specs; s=$S/sec-S-k$1.sexp; c=$S/sec-C-k$1.sexp
+  cd "$REPO" || exit 1; S=$EXP/specs; s=$S/sec-S-k$1.sexp; c=$S/sec-C-k$1.sexp; g=$S/sec-G-k$1.sexp
   [ "$(norm "$s" '^$')" = "$(norm "$REC/specs/rk-k$1.sexp" '^$')" ] || die "sec-S-k$1 differs from rk-k$1 below the header"
   [ "$(norm "$s" '^$')" = "$(norm "$PB/specs/pb-S-k$1.sexp" '^$')" ] || die "sec-S-k$1 differs from #3595's pb-S-k$1"
   [ "$(norm "$c" "$OVR")" = "$(norm "$s" '^$')" ] || die "sec-C-k$1 differs from sec-S-k$1 by more than the override"
   [ "$(norm "$c" '^$')" != "$(norm "$s" '^$')" ] || die "sec-C-k$1 lacks the override"
-  ns=$(norm "$s" '^$')
+  [ "$(norm "$g" "$GOVR")" = "$(norm "$c" '^$')" ] || die "sec-G-k$1 differs from sec-C-k$1 by more than the gate flag"
+  [ "$(norm "$g" '^$')" != "$(norm "$c" '^$')" ] || die "sec-G-k$1 lacks the gate flag"
+  ns=$(norm "$s" '^$'); ng=$(norm "$g" '^$')
   # The cap reaches a fill only through these (README §Design): the trigger AT the ticket E, as a StopLimit(E, 1.02 E).
   for need in '((enable_sim_entry_stoplimittrue))' '((sim_entry_trigger_at_suggestedtrue))' '((entry_extension_max_pct2.0))' \
               '((enable_short_sidefalse))' '((screening_config((tiebreak_seed'"$1"'))))'; do
     case "$ns" in *"$need"*) ;; *) die "sec-S-k$1 lacks $need" ;; esac; done
   # Scope: the replace anchor, continuation buys and the frozen E would each change what the cap acts on.
-  for bad in entry_anchor_local_range_weeks enable_continuation_buys freeze_entry_at_first_breakout entry_cap_local_range_weeks; do
+  for bad in entry_anchor_local_range_weeks enable_continuation_buys freeze_entry_at_first_breakout entry_cap_local_range_weeks \
+             entry_cap_stop_gate_on_uncapped; do
     case "$ns" in *"$bad"*) die "sec-S-k$1 sets $bad (README §Design: scope)" ;; esac; done
-  log "SPEC CHECKS OK (sec-S-k$1 = rk-k$1 = pb-S-k$1; sec-C-k$1 = sec-S-k$1 + entry_cap_local_range_weeks 4; trigger at E, StopLimit 2 %)"
+  # Implied by the relations above, asserted on G's own text: Weinstein_strategy.make refuses the gate flag together with
+  # the replace anchor or the entry freeze (#3609), which would fail every G cell at its start.
+  for bad in entry_anchor_local_range_weeks freeze_entry_at_first_breakout; do
+    case "$ng" in *"$bad"*) die "sec-G-k$1 sets $bad (#3609: make refuses the gate flag with it)" ;; esac; done
+  log "SPEC CHECKS OK (sec-S-k$1 = rk-k$1 = pb-S-k$1; sec-C-k$1 = sec-S-k$1 + entry_cap_local_range_weeks 4; sec-G-k$1 = sec-C-k$1 + entry_cap_stop_gate_on_uncapped true, no replace anchor or freeze; trigger at E, StopLimit 2 %)"
 }
 
 build() {
@@ -182,31 +211,52 @@ capped_count() { # $1 tickets.tsv
   awk -F'\t' 'NR > 1 && $4 == "Long" { n++; if ($5 == "Local_range_top") c++ } END { printf "%d of %d", c + 0, n + 0 }' "$1"
 }
 
-# A three-month run from each arm's own start: the spec parses at this build, C's override resolves (and S's stays 0),
-# and the runner resolves the record universe.
+# The G check's two inputs and its count (README §Arm G). gate_keys: symbol|date of every skip at the stop gate in an
+# entries.tsv. gate_admits: capped long tickets of a tickets.tsv on one of those keys (0 for arm G, by construction).
+gate_keys() { awk -F'\t' '$4 == "skipped" && ($6 == "No_structural_stop" || $6 == "Stop_too_wide") { print $2 "|" $3 }' "$@" | LC_ALL=C sort -u; }
+gate_admits() { # $1 gate keys, $2 tickets.tsv
+  awk -F'\t' 'FILENAME == ARGV[1] { g[$1] = 1; next }
+    FNR > 1 && $4 == "Long" && $5 == "Local_range_top" && (($2 "|" $3) in g) { n++ } END { print n + 0 }' "$1" "$2"
+}
+
+# A three-month run from each arm's own start: the spec parses at this build, the overrides resolve, and the runner
+# resolves the record universe. Each arm is skipped once its PREFLIGHT_OK is logged (resume).
 preflight() { # $1 seed
   k=$1; pend=2000-03-31
-  for name in sec-S-k$k sec-C-k$k; do pd=$WORK/preflight-$name; rm -rf "$pd" "$pd.log"; mkdir -p "$pd"
+  for name in sec-S-k$k sec-C-k$k sec-G-k$k; do pd=$WORK/preflight-$name
+    if logged "PREFLIGHT_OK $name " && [ -s "$pd.tickets.tsv" ] && [ -s "$pd.entries.tsv" ]; then log "SKIP preflight $name (done)"; continue; fi
+    rm -rf "$pd" "$pd.log"; mkdir -p "$pd"
     sed "s/(end_date 2026-06-26)/(end_date $pend)/" "$REPO/$EXP/specs/$name.sexp" > "$pd/$name.sexp"
     grep -q "(end_date $pend)" "$pd/$name.sexp" || die "preflight $name: end_date not rewritten"
     log "PREFLIGHT $name (to $pend)"; t0=$(date +%s)
     dk "TRADING_DATA_DIR=$(cpath "$TD") TRADING_PATH_SEED_SALT=0 SNAPSHOT_CACHE_MB=1024 SNAPSHOT_MAX_MMAP_HANDLES=$MMAP_HANDLES timeout 3600 ./_build/default/trading/backtest/scenarios/scenario_runner.exe --dir $(cpath "$pd") --fixtures-root $(FIX) --snapshot-dir $(cpath "$WH") --no-emit-all-eligible --parallel 1 > $(cpath "$pd").log 2>&1"
     out=$(hpath "$(grep 'Output root' "$pd.log" | tail -1 | sed 's/.*: //')")
     [ -s "$out/$name/actual.sexp" ] || die "preflight $name wrote no actual.sexp (see $pd.log)"
-    # params.sexp lists the spec's overrides: C carries ((entry_cap_local_range_weeks 4)), S carries none (default 0).
-    w=$(tr -s ' \t\n' '   ' < "$out/$name/params.sexp" | grep -o '(entry_cap_local_range_weeks [0-9]*)' | tr -dc 0-9)
-    case "$name" in *-C-*) [ "$w" = 4 ] || die "preflight $name params.sexp has entry_cap_local_range_weeks '${w}', expected 4" ;;
-                    *) [ "${w:-0}" = 0 ] || die "preflight $name params.sexp has entry_cap_local_range_weeks '${w}', expected 0" ;; esac
+    # params.sexp lists the spec's overrides: the cap at 4 in C and G (0 in S); the gate flag true in G (absent in S, C).
+    p=$(tr -s ' \t\n' '   ' < "$out/$name/params.sexp")
+    w=$(echo "$p" | grep -o '(entry_cap_local_range_weeks [0-9]*)' | tr -dc 0-9)
+    gf=$(echo "$p" | grep -o '(entry_cap_stop_gate_on_uncapped [a-z]*)' | sed 's/.* \([a-z]*\))/\1/')
+    case "$name" in *-S-*) [ "${w:-0}" = 0 ] && [ -z "$gf" ] || die "preflight $name params.sexp: cap '${w}', gate flag '${gf}' (expected none)" ;;
+                    *-C-*) [ "$w" = 4 ] && [ -z "$gf" ] || die "preflight $name params.sexp: cap '${w}', gate flag '${gf}' (expected 4, none)" ;;
+                    *-G-*) [ "$w" = 4 ] && [ "$gf" = true ] || die "preflight $name params.sexp: cap '${w}', gate flag '${gf}' (expected 4, true)" ;; esac
     cache=$(grep -h 'Panel_runner: snapshot cache hits' "$pd.log" | tail -1)
     ns=$(echo "$cache" | sed -n 's/.* n_symbols=\([0-9]*\) .*/\1/p'); na=$(echo "$cache" | sed -n 's/.*n_symbols_absent=\([0-9]*\).*/\1/p')
     [ "$ns" = "$NSYM" ] && [ "$na" = 1 ] || die "preflight $name: n_symbols=$ns n_symbols_absent=$na (expected $NSYM and 1)"
     tickets_extract "$out/$name/trade_audit.sexp" > "$pd.tickets.tsv"
-    # Liveness before the 4-hour cells: the local smoke's C capped 9 tickets in this quarter (CHH and ECIL on its first
-    # Friday, 2000-01-07), from screens that do not depend on the portfolio; S caps none (README §Smoke).
+    entries_extract "$out/$name/trade_audit.sexp" > "$pd.entries.tsv"
+    # Liveness before the 2-hour cells: the local smoke's C capped 9 tickets in this quarter (CHH and ECIL on its first
+    # Friday, 2000-01-07) and its G 2 (DIS 01-14, TRW1 03-24), from screens that do not depend on the portfolio; S caps
+    # none (README §Smoke).
     nc=$(capped_count "$pd.tickets.tsv" | cut -d' ' -f1)
-    case "$name" in *-C-*) [ "$nc" -ge 1 ] || die "preflight $name capped no ticket (the cap is not reaching the ticket)" ;;
-                    *) [ "$nc" = 0 ] || die "preflight $name capped $nc tickets with the flag off" ;; esac
-    log "PREFLIGHT_OK $name ($(( $(date +%s) - t0 ))s, entry_cap_local_range_weeks=${w:-0}, n_symbols=$ns absent=$na, capped tickets $(capped_count "$pd.tickets.tsv"))"
+    case "$name" in *-S-*) [ "$nc" = 0 ] || die "preflight $name capped $nc tickets with the flag off" ;;
+                    *) [ "$nc" -ge 1 ] || die "preflight $name capped no ticket (the cap is not reaching the ticket)" ;; esac
+    ga=""
+    if [ "$name" != "sec-S-k$k" ]; then   # the G check on the quarter, against S's preflight record of its stop gate
+      gate_keys "$WORK/preflight-sec-S-k$k.entries.tsv" > "$pd.gatekeys"
+      nga=$(gate_admits "$pd.gatekeys" "$pd.tickets.tsv"); ga=", capped on an S gate key $nga"
+      case "$name" in *-G-*) [ "$nga" = 0 ] || die "preflight $name capped $nga tickets S skipped at the stop gate (the G check, README §Arm G)" ;; esac
+    fi
+    log "PREFLIGHT_OK $name ($(( $(date +%s) - t0 ))s, entry_cap_local_range_weeks=${w:-0}, gate flag ${gf:-off}, n_symbols=$ns absent=$na, capped tickets $(capped_count "$pd.tickets.tsv")$ga)"
   done
 }
 
@@ -214,9 +264,10 @@ preflight() { # $1 seed
 # run_cell TAG SPEC_FILE(host) PAIR(label=validator-host-path or -)
 run_cell() {
   tag=$1; spec=$2; pair=$3; d=$WORK/cell-$tag
-  if grep -q "RESULT $tag " "$LOG" 2>/dev/null; then log "SKIP $tag (done)"; return 0; fi
+  if logged "RESULT $tag "; then log "SKIP $tag (done)"; return 0; fi
   disk_ok || die "disk < ${DISK_MIN_GB}G before $tag"
   rm -rf "$d"; mkdir -p "$d"; cp "$spec" "$d/" || die "spec $spec"
+  for f in "$ART/$tag"-* "$ART/$tag".*; do [ -f "$f" ] && rm -f "$f"; done   # a lost run's leftovers
   name=$(sed -n 's/^((name "\([^"]*\)").*/\1/p' "$spec")
   td=$(cpath "$TD")
   log "RUN $tag ($name)"; start=$(date +%s)
@@ -225,6 +276,9 @@ run_cell() {
   out=$(hpath "$(grep 'Output root' "$ART/$tag.log" | tail -1 | sed 's/.*: //')")
   for f in actual.sexp trades.csv splits.csv params.sexp summary.sexp trade_audit.sexp open_positions.csv force_liquidations.sexp equity_curve.csv macro_trend.sexp; do
     cp "$out/$name/$f" "$ART/$tag-$f" 2>/dev/null; done
+  ex=$(tail -1 "$ART/$tag.log" 2>/dev/null)
+  if [ "$ex" != exit=0 ] || [ ! -s "$ART/$tag-actual.sexp" ] || [ ! -s "$ART/$tag-trades.csv" ]; then
+    die "CELL FAILED $tag (${ex:-no exit line}, wall ${wall}s; see art/$tag.log). No RESULT is logged, so a relaunch re-runs it."; fi
   # one arm's actual.sexp only (sweep-hygiene: a metric glob must be scoped to ONE arm)
   m=$(grep -hoE 'total_return_pct [0-9.eE+-]+|total_trades [0-9]+|sharpe_ratio [0-9.eE+-]+|max_drawdown_pct [0-9.eE+-]+|calmar_ratio [0-9.eE+-]+' "$out/$name/actual.sexp" 2>/dev/null | tr '\n' ' ')
   dk "./_build/default/trading/backtest/validation/bin/post_run_validator_cli.exe -run-dir $(cpath "$out/$name") -data-dir $td -share-classes $CROOT/trading/test_data/share_classes.sexp -out $(cpath "$ART")/$tag-validator.sexp > $(cpath "$ART")/$tag.validator.log 2>&1; echo exit=\$? >> $(cpath "$ART")/$tag.validator.log"
@@ -234,7 +288,7 @@ run_cell() {
     dk "./_build/default/trading/backtest/validation/bin/validator_diff.exe -check V6 -report pair=$(cpath "$pv") -report arm=$(cpath "$ART")/$tag-validator.sexp.sexp > $(cpath "$ART")/$tag.v6diff-$lab.log 2>&1; echo exit=\$? >> $(cpath "$ART")/$tag.v6diff-$lab.log"
     v6=" vs$lab:$(tail -1 "$ART/$tag.v6diff-$lab.log")"; fi
   guards=$(grep -hE 'Panel_runner: (split_dividend_guard|snapshot cache)' "$ART/$tag.log" | tr '\n' ' ')
-  log "RESULT $tag => ${m:-<no result>} ${q:-<no validator>} v6diff:${v6:- none} $(tail -1 "$ART/$tag.rss" 2>/dev/null) $(tail -1 "$ART/$tag.log") ${guards} (wall ${wall}s)"
+  log "RESULT $tag => ${m:-<no result>} ${q:-<no validator>} v6diff:${v6:- none} $(tail -1 "$ART/$tag.rss" 2>/dev/null) $ex ${guards} (wall ${wall}s)"
 }
 
 # Arm S must reproduce #3595's arm S of the same seed byte for byte (README §Tripwire). Hard gate unless waived.
@@ -278,7 +332,7 @@ firstdiff() { # $1 base tag, $2 arm tag
 audit_records() { tr -s '\n\t ' '   ' < "$1" | awk '{ gsub(/\(\(entry \(/, "\n&"); print }'; }
 
 # Entry decisions of one cell (from #3588/#3598): one row per placed entry and one per distinct skipped alternative
-# (date, symbol, reason_skipped). The read's cash-displacement and path classes use it.
+# (date, symbol, reason_skipped). The read's cash-displacement and path classes, and the G check, use it.
 entries_extract() { # $1 trade_audit.sexp -> stdout TSV
   printf 'position_id\tsymbol\tdecision_date\tkind\tside\tskip_reason\n'
   audit_records "$1" | awk '
@@ -315,7 +369,7 @@ tickets_extract() { # $1 trade_audit.sexp -> stdout TSV
       if (match($0, /\(symbol [^ )]+\)/)) sym = substr($0, RSTART + 8, RLENGTH - 9)
       if (match($0, /\(entry_date [0-9-]+\)/)) d = substr($0, RSTART + 12, RLENGTH - 13)
       se = num("suggested_entry"); st = num("installed_stop")
-      sw = (se != "-" && st != "-" && se + 0 > 0) ? sprintf("%.4f", (se > st ? se - st : st - se) / se) : "-"
+      sw = (se != "-" && st != "-" && se + 0 > 0) ? sprintf("%.4f", (se + 0 > st + 0 ? se - st : st - se) / se) : "-"   # numeric compare (#3608 smoke: TCR)
       rq = "-\t-"; if (match($0, /\(cash_rejection \(\(required [-0-9.eE+]+\) \(available [-0-9.eE+]+\)/)) {
         split(substr($0, RSTART, RLENGTH), c, /[() ]+/); rq = sprintf("%.2f\t%.2f", c[4], c[6]) }
       fv = num("fill_vs_trigger_pct"); if (fv != "-") fv = sprintf("%.5f", fv)
@@ -327,22 +381,29 @@ tickets_extract() { # $1 trade_audit.sexp -> stdout TSV
     LC_ALL=C sort -t "$(printf '\t')" -k3,3 -k1,1
 }
 
-pair_reads() { # $1 S tag, $2 C tag
-  firstdiff "$1" "$2"
-  for tag in "$1" "$2"; do [ -s "$ART/$tag-trade_audit.sexp" ] || { log "EXTRACT $tag: no trade_audit.sexp"; continue; }
-    entries_extract "$ART/$tag-trade_audit.sexp" > "$ART/$tag-entries.tsv" || log "ENTRIES $tag: extract FAILED"
-    tickets_extract "$ART/$tag-trade_audit.sexp" > "$ART/$tag-tickets.tsv" || log "TICKETS $tag: extract FAILED"
-    log "EXTRACT $tag: $(awk -F'\t' '$4 == "placed"' "$ART/$tag-entries.tsv" | wc -l | tr -d ' ') placed, $(awk -F'\t' '$4 == "skipped"' "$ART/$tag-entries.tsv" | wc -l | tr -d ' ') skipped; capped tickets $(capped_count "$ART/$tag-tickets.tsv")"
-  done
+arm_reads() { # $1 tag: the two extracts of one finished cell, skipped once logged (resume)
+  tag=$1
+  if logged "EXTRACT $tag:" && [ -s "$ART/$tag-entries.tsv" ] && [ -s "$ART/$tag-tickets.tsv" ]; then log "SKIP extracts $tag (done)"; return 0; fi
+  [ -s "$ART/$tag-trade_audit.sexp" ] || { log "EXTRACT $tag: no trade_audit.sexp"; return 0; }
+  entries_extract "$ART/$tag-trade_audit.sexp" > "$ART/$tag-entries.tsv" || die "ENTRIES $tag: extract FAILED"
+  tickets_extract "$ART/$tag-trade_audit.sexp" > "$ART/$tag-tickets.tsv" || die "TICKETS $tag: extract FAILED"
+  log "EXTRACT $tag: $(awk -F'\t' '$4 == "placed"' "$ART/$tag-entries.tsv" | wc -l | tr -d ' ') placed, $(awk -F'\t' '$4 == "skipped"' "$ART/$tag-entries.tsv" | wc -l | tr -d ' ') skipped; capped tickets $(capped_count "$ART/$tag-tickets.tsv")"
 }
 
-cells() { # $1 seed
-  S=$REPO/$EXP/specs; s=sec-S-k$1-s0; c=sec-C-k$1-s0
-  run_cell "$s" "$S/sec-S-k$1.sexp" -
-  [ -s "$ART/$s-trades.csv" ] || die "$s wrote no trades.csv"
-  grep -q "TRIPWIRE MATCH $s \|TRIPWIRE WAIVED for $s:" "$LOG" 2>/dev/null || tripwire "$1" "$s"
-  run_cell "$c" "$S/sec-C-k$1.sexp" "S=$ART/$s-validator.sexp.sexp"
-  pair_reads "$s" "$c"
+cells() { # $1 seed. POSIX sh has no locals: these names must not be reused by the functions called below
+  # (disk_ok sets g, run_cell sets tag, d and the rest).
+  SP=$REPO/$EXP/specs; cs=sec-S-k$1-s0; cc=sec-C-k$1-s0; cg=sec-G-k$1-s0
+  run_cell "$cs" "$SP/sec-S-k$1.sexp" -
+  logged "TRIPWIRE MATCH $cs \|TRIPWIRE WAIVED for $cs:" || tripwire "$1" "$cs"
+  arm_reads "$cs"
+  run_cell "$cc" "$SP/sec-C-k$1.sexp" "S=$ART/$cs-validator.sexp.sexp"
+  arm_reads "$cc"
+  run_cell "$cg" "$SP/sec-G-k$1.sexp" "S=$ART/$cs-validator.sexp.sexp"
+  arm_reads "$cg"
+  firstdiff "$cs" "$cc"; firstdiff "$cs" "$cg"
+  # The G check on this seed's own S record (information; the read applies it pooled over every S seed, README §Arm G).
+  gate_keys "$ART/$cs-entries.tsv" > "$WORK/gatekeys-k$1"
+  log "GCHECK k$1: capped tickets on a key sec-S-k$1 skipped at the stop gate: G $(gate_admits "$WORK/gatekeys-k$1" "$ART/$cg-tickets.tsv") (must be 0), C $(gate_admits "$WORK/gatekeys-k$1" "$ART/$cc-tickets.tsv")"
   log "CELLS DONE k$1"
 }
 
@@ -367,7 +428,7 @@ cmd_run() { # $1 seed
   log "stale-e-cap-k5 run k$1; SC_SHA=${SC_SHA:-unset} CELL_TIMEOUT=${CELL_TIMEOUT}s"
   guards; disk_ok || die "disk < ${DISK_MIN_GB}G"
   stage; build; spec_checks "$1"
-  if grep -q "PREFLIGHT_OK sec-C-k$1 " "$LOG" 2>/dev/null; then log "SKIP preflight (done)"; else preflight "$1"; fi
+  if logged "RESULT sec-[SCG]-k$1-s0 "; then log "SKIP preflight (a cell of k$1 has run)"; else preflight "$1"; fi
   cells "$1"
   collect "$1" "$OUT/results/k$1"
   # Information only, for the session's report: the pre-registered read runs on the host after all five seeds.

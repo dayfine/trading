@@ -78,3 +78,94 @@ replace anchor added to rk/pb/sec k0 alike:     ABORT: sec-S-k0 sets entry_ancho
   [11-14 08:44:25Z] PREFLIGHT_OK sec-C-k0 (769s, entry_cap_local_range_weeks=4, n_symbols=9200 absent=1, capped tickets 9 of 15)
   C's 9 capped tickets in the quarter are the full-year smoke's 9 for the same Fridays (CHH, ECIL 01-07; DIS 01-14;
   IEX, MENT 01-21; NTPIF 03-17; PLL_old, TBI1, TRW1 03-24).
+
+# ======================================================================================================================
+# Arm G (#3609), 2026-11-14 11:31-11:42 UTC, trading-1-dev container (5 GB / 6 CPU), nothing else running in it.
+# LIVENESS AND PLUMBING ONLY, as above: one seed, one year, local data without corporate actions.
+#
+# Tree: main 9664e1705e (#3609), a `git clone --shared` of the repo under .claude/worktrees/stalecap-g-smoke/ with
+#   `git checkout --detach 9664e1705e842fa0971f6f3f94e155ebefe29a3f`, so the runner's `git rev-parse HEAD` is the code
+#   that ran: params.sexp reads (code_version 9664e1705e842fa0971f6f3f94e155ebefe29a3f). scenario_runner.exe built there.
+# Spec: specs/sec-G-k0.sexp with (end_date 2026-06-26) -> (end_date 2000-12-29), nothing else. params.sexp carries
+#   ((entry_cap_local_range_weeks 4)) and ((entry_cap_stop_gate_on_uncapped true)).
+# WH, TD and the runner flags: as for S and C above (WH /tmp/snap_top3000_pit_v12wk, TD the tree's trading/test_data,
+#   TRADING_PATH_SEED_SALT=0 SNAPSHOT_CACHE_MB=1024 SNAPSHOT_MAX_MMAP_HANDLES=12000, --no-emit-all-eligible
+#   --progress-every 13 --parallel 1), one spec in the dir.
+# Extracts: `chain.sh tickets` and `chain.sh entries` on G's trade_audit.sexp, in the container (mawk); the host's awk
+#   gives a byte-identical tickets file. tickets_extract now compares the trigger and the stop numerically: the S and C
+#   extracts above predate that and print TCR 2000-03-31's width as -0.1156 (0.1156 here). The read does not use it.
+# Read: VALIDITY=skip sh read/split.sh results/smoke <local data/> > results/smoke/split.txt (all three pairs, then the
+#   combined table; open positions marked from the local bar store; summaries only).
+
+## Run
+sec-G-k0  wall 606 s  exit 0  total_return_pct 22.81  closed 13  open 5  max_drawdown_pct 9.08
+peak_rss_kb=3607724 (runner maxrss_bytes=3692777472)
+cache: n_symbols=9200 n_symbols_touched=9199 n_symbols_absent=1; split_dividend_guard rejected=0 no_files=0
+
+## G places S's tickets, and caps only names S placed
+G placed 19 long tickets: the same (symbol, decision Friday) set as S's 19. 3 anchored at Local_range_top
+  (L = 15.8 %), local_range_top present on exactly those 3:
+  DIS 2000-01-14   G 36.96 x 2,024  S 37.23 x 1,949  (C 36.96 x 2,024)  fill 2000-01-25 in all three, stop 2000-02-25
+  TRW1 2000-03-24  G 57.56 x 1,281  S 58.34 x 1,178  (C 57.56 x 1,264)  fill 2000-03-27, stop 2000-05-25
+  EOG 2000-04-14   G 25.21 x 3,123  S 25.52 x 2,733  open at the end; C skipped it for Insufficient_cash that Friday
+  F 3 of 3; G/S position weight per unit of NAV p50 1.087, p90 1.142; G/S entry price p50 0.9879.
+G's entries.tsv lists the same 227 skipped alternatives as S's, symbol, Friday and reason (224 No_structural_stop,
+  3 Sized_to_zero): the 10 names C admitted at the gate (NTPIF 03-17, PLL_old 03-24, TBI1 03-24, HNI 04-14, TOL 04-14,
+  WLP1 04-14, DPHIQ 04-28, FAST 04-28, IMAX 07-21, FDX 08-11) are No_structural_stop skips in G, as in S.
+The 15 uncapped keys both arms filled: same fill days and prices; share counts within 0-48 of S's (G's NAV runs a
+  little higher after DIS, TRW1 and EOG). M0 +0.00 NAV-%.
+
+## The G check (README §Arm G)
+G's capped tickets on a key S skipped at the stop gate: 0 (pooled S record = this one seed's; own record 0).
+Premise, S's own tickets on a pooled gate key: 0. C's capped tickets on the same keys: 10.
+Admissions in the S:G read: A gate 0, A no S list 0, A other 0. In the G:C read, C's 19 admissions against G:
+  A gate (recorded, from G's own skips) 10, A no G list 9; displaced (G's tickets C skipped for cash) 3.
+
+## Read plumbing
+read/split.sh reads S:C, S:G and G:C and prints the combined table (split.txt). The S:C numbers equal the earlier
+read's. With one seed every pair is INCONCLUSIVE (fewer than 4 valid seeds) and the combined row is G INVALID (fewer
+than 4 valid G seeds). combine.awk was also run on fabricated RULE lines for every row of the combined table (G check
+failed, G NOT LIVE, n < 4, both pass with and without "admissions cost", lever only, admissions with and without the
+three-largest-keys flag, neither): each printed its row. Not committed.
+
+## Spec checks with G (chain.sh check K, no container, a scratch copy of the specs)
+untampered, seeds 0-4:                                   SPEC CHECKS OK for each
+extra override in sec-G-k1 (min_cash_pct 0.25):          ABORT: sec-G-k1 differs from sec-C-k1 by more than the gate flag
+gate flag true -> false in sec-G-k2:                     ABORT: sec-G-k2 differs from sec-C-k2 by more than the gate flag
+gate flag removed from sec-G-k3:                         ABORT: sec-G-k3 lacks the gate flag
+cap removed from sec-G-k4:                               ABORT: sec-G-k4 differs from sec-C-k4 by more than the gate flag
+replace anchor added to sec-G-k0 only:                   ABORT: sec-G-k0 differs from sec-C-k0 by more than the gate flag
+entry freeze added to rk/pb/sec-S/C/G k0 alike:          ABORT: sec-S-k0 sets freeze_entry_at_first_breakout (README §Design: scope)
+gate flag added to rk/pb/sec-S/C/G k1 (G then twice):    ABORT: sec-G-k1 differs from sec-C-k1 by more than the gate flag
+(The explicit check that G sets neither the replace anchor nor the freeze is implied by the relations, so no tamper
+reaches it alone; it stays as the direct statement of #3609's `make` refusal.)
+
+## The chain's own preflight path, three arms (chain.sh preflight 0, RUNNER=exec), 11:43-11:59 UTC
+# REPO=<tree> RUNNER=exec CROOT=<tree in container> TD=<tree>/trading/test_data WH=/tmp/snap_top3000_pit_v12wk \
+#   OUT=<tree>/.sweep-output/stale-e-cap-k5 sh dev/experiments/stale-e-cap-k5-2026-11-14/chain.sh preflight 0
+# Tree as for G above (main 9664e1705e). The chain.sh that ran is this commit's, before two edits that do not touch
+# the preflight: cells()'s variable names (below) and header comments.
+  [11-14 11:43:15Z] stale-e-cap-k5 preflight k0 (RUNNER=exec, smoke only: no guards, no stage)
+  [11-14 11:43:15Z] SPEC CHECKS OK (sec-S-k0 = rk-k0 = pb-S-k0; sec-C-k0 = sec-S-k0 + entry_cap_local_range_weeks 4; sec-G-k0 = sec-C-k0 + entry_cap_stop_gate_on_uncapped true, no replace anchor or freeze; trigger at E, StopLimit 2 %)
+  [11-14 11:43:15Z] PREFLIGHT sec-S-k0 (to 2000-03-31)
+  [11-14 11:48:52Z] PREFLIGHT_OK sec-S-k0 (337s, entry_cap_local_range_weeks=0, gate flag off, n_symbols=9200 absent=1, capped tickets 0 of 8)
+  [11-14 11:48:52Z] PREFLIGHT sec-C-k0 (to 2000-03-31)
+  [11-14 11:54:26Z] PREFLIGHT_OK sec-C-k0 (334s, entry_cap_local_range_weeks=4, gate flag off, n_symbols=9200 absent=1, capped tickets 9 of 15, capped on an S gate key 3)
+  [11-14 11:54:26Z] PREFLIGHT sec-G-k0 (to 2000-03-31)
+  [11-14 11:59:29Z] PREFLIGHT_OK sec-G-k0 (303s, entry_cap_local_range_weeks=4, gate flag true, n_symbols=9200 absent=1, capped tickets 2 of 8, capped on an S gate key 0)
+  exit 0. Capped tickets in the quarter: S none; C the full-year smoke's 9 (CHH, ECIL 01-07; DIS 01-14; IEX, MENT 01-21;
+  NTPIF 03-17; PLL_old, TBI1, TRW1 03-24), 3 of them on S's gate skips (NTPIF, PLL_old, TBI1); G 2 (DIS 01-14,
+  TRW1 03-24), none on S's gate skips. G's 8 tickets are S's 8, symbol and Friday.
+
+## The run path with stubs (not committed)
+cells() and collect, with this commit's functions, against a stub docker / scenario_runner / validator (the stub
+runner copies the smoke artifacts, S's trades.csv being #3595's pb-S-k0-s0 so the tripwire can MATCH), in the
+container:
+  C fails (exit 1):    S RUN, RESULT, TRIPWIRE MATCH, EXTRACT; C RUN, "ABORT: CELL FAILED sec-C-k0-s0", no RESULT
+  relaunch, G fails:   SKIP S, SKIP extracts S; C RUN, RESULT, EXTRACT; G RUN, "ABORT: CELL FAILED sec-G-k0-s0"
+  relaunch:            SKIP S, C and their extracts; G RUN, RESULT, EXTRACT; GCHECK; CELLS DONE; collect 50 files
+  relaunch:            every cell and extract SKIPped; GCHECK; CELLS DONE
+  read/split.sh on the collected seed: validity V6 ok, tripwire match, absent-symbols ok for every pair, and the
+    combined line.
+The first stub run found a defect, fixed before this commit: cells() kept the G tag in `g`, which disk_ok also sets
+(POSIX sh has no locals), so G ran under the tag "59". cells() now uses cs / cc / cg.

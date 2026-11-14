@@ -1,17 +1,19 @@
 # keys.awk -- one row per ticket key (symbol|decision_date) of one seed's pair, with each arm's outcome and, for keys
 # both arms filled, the price / size / exit split. Definitions: ../../README.md §The price/size split.
 #
-# Input files, in this order (the arm is read from the file name, "-S-k" or "-C-k"):
+# Roles: the pair's base arm is "S" and its test arm "C" here, whatever the arms are (split.sh PAIRS: S:C, S:G, G:C);
+# a file is the test arm's when its name carries "-<test>-k", otherwise the base arm's.
+# Input files, in this order:
 #   gate.tsv     symbol|date pairs that any S seed's entries.tsv lists as skipped at the stop gate (split.sh)
 #   [marks-kK.tsv]  symbol, date, raw close: the open-position marks (split.sh writes it from DATA; optional)
 #   S and C equity_curve.csv, splits.csv, tickets.tsv, entries.tsv, trades.csv, open_positions.csv
-# Variables: seed (e.g. k0).
+# Variables: seed (e.g. k0); test, the test arm's letter (default C).
 #
 # Output rows, tab-separated, prefixed "K" (columns named in split.sh), and "W" warnings.
 # Contributions are NAV-%: 100 x (pnl_dollars + dividends_received) / the arm's NAV on the last equity-curve date on or
 # before the decision date. Prices never leave this script; only their ratios do.
-BEGIN { FS = "[,\t]"; OFS = "\t" }
-function arm(f) { return (f ~ /-C-k[0-9]/) ? "C" : "S" }
+BEGIN { FS = "[,\t]"; OFS = "\t"; if (test == "") test = "C" }
+function arm(f) { return (f ~ ("-" test "-k[0-9]")) ? "C" : "S" }
 function navat(a, d,   lo, hi, mid) {   # last curve value dated <= d (binary search; the first value if d precedes it)
   if (nc[a] == 0) return 0
   if (cd[a, 1] > d) return cv[a, 1]
