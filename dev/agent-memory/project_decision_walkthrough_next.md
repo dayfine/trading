@@ -1,8 +1,11 @@
 ---
 name: project_decision_walkthrough_next
-description: "NEXT when container frees (user 09-26): step-by-step walkthrough of the ENTIRE decision tree over time (every weekly screen, entry, stop move, exit) to find opportunities/issues"
+description: "DONE on record k0 11-06 (PR #3546); was: step-by-step walkthrough of the ENTIRE decision tree over time (every weekly screen, entry, stop move, exit) to find opportunities/issues"
 metadata:
+  node_type: memory
   type: project
+  originSessionId: e5946d22-0047-41a7-9433-b3e06c7dfbef
+  modified: 2026-11-08T07:08:47.247Z
 ---
 
 User 2026-09-26, after the obvious-fixes f2 s0 report (artifact AEKnAbPUqth16b1Ye7nKiA):
@@ -67,3 +70,8 @@ Record spec pins `entry_order_max_rest_weeks 0` (default is 52).
 Filed #2974 (trailing stops rarely rise — book §5.2 raises only after an 8–10 % correction +
 recovery, so maybe faithful), #2975 (installed stop ≈ half `suggested_stop`), #2976 (tickets
 fill in Bearish weeks), #2977 (record weekly stop decisions), #2978 (review_pack sed noise).
+
+**11-06: done on the record** (k0 of record-kseed-2026-10-27, PR #3546 `dev/experiments/decision-walk-rk-2026-11-06/`, host-only `walk-rk.sh`). 09-26 shakeout + resting-ticket findings GONE on the record (structural stops, 52-w clock); picks ≈ alternatives HOLDS; rotation = profit engine (+$20.75M); trail mostly inert from the basis gap + stale anchor ([[project-stop-raise-basis-mix-defect]]); no new return lever. Open user decisions: trail basis choice, record the tightening trigger in `Stop_decision.t`, pack detectors, inert envelope knobs in record specs.
+**Forward guidance (after QC rework):** (1) any stop change that makes stops rise more often prices NEGATIVE at first order in 5/5 seeds (fat-tail law again) — don't propose trail-tightening levers without a per-trade read. (2) Regime reading per period (log gap): 2023–26 = holdings (UP −0.47 of −0.52), cash on DOWN days second; 2016–19 = holdings AND cash about equal (UP −0.15, DOWN −0.12); cash on DOWN days costs in every period after 2008 — never say "holdings, not cash" for the whole post-2016 span. (3) Quick-fail initial stops (n=93) are right at the median but the MEAN favours holding through (−0.8 % vs −8.8 % realised, thin right tail, n too small). (4) D3: `Stop_decision.t` drops the tightening reason, so the 38 post-tightening stop exits can't be split — record it before any tightening screen. (5) No entry/selection lever indicated.
+
+**11-10 user decisions (PR #3570, walkthrough README §7):** trail = (a) keep de-facto rule; the v12wk warehouse + corpact-2026-10-27 vintage is part of the record identity (a data refresh = re-baseline); `stop_ma_same_basis` stays an axis, (b) not run. Build the Tightened-trigger field (cloud routine `trig_01JNcKJ4bTahDNtG5MDwpFPg`) and 3 pack detectors (`trig_01F2SG3iu9zcHTeVhF9Das5K`); then screen the 38 near-tightening stop exits. Inert record overrides labelled, not dropped.

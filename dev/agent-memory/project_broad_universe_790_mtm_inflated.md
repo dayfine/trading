@@ -49,7 +49,7 @@ and *raised* MaxDD (carrying a delisted name flat adds no volatility; redeployin
 into a live one does). **AXTI still dominates the unrealized ($4.02M) regardless** —
 the single-name MTM problem is independent of the zombie fix. Lesson: stale-exit is
 a *correctness* mechanism but NOT free; default-off is vindicated; promotion to
-default-on needs a confirmation grid (`.claude/rules/promotion-confirmation.md`).
+default-on needs a confirmation grid (`dev/rules/promotion-confirmation.md`).
 
 **P1 dispersion (#1486):** breadth caps the DD tail — top-3000 bounds peak-MaxDD
 24-33% on every start vs top-1000 blowing to 58-61%; beats CAGR 8/8 matched

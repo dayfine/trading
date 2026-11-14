@@ -24,7 +24,7 @@ metadata:
    `git fetch` + `git checkout --detach <sha>`, then redid every check.
 
 **Why this matters more than the existing rule says.**
-`.claude/rules/worktree-isolation.md` §"jj workspace isolation" instructs every
+`dev/rules/worktree-isolation.md` §"jj workspace isolation" instructs every
 jj-writing agent to run `jj workspace add .claude/worktrees/jjws-<id>` as its
 first step. That instruction assumes `jj` in the dispatched worktree addresses
 *that* worktree. It does not — it addresses the parent. So the boilerplate is

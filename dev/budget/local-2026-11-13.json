@@ -1,15 +1,15 @@
 {
   "run_id": "local-2026-11-13",
-  "timestamp": "2026-11-14T03:54:40Z",
+  "timestamp": "2026-11-14T14:18:52Z",
   "commit_sha": null,
   "source": "local-session",
   "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
   "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
   "totals": {
-    "input_tokens": 29242,
-    "output_tokens": 7627693,
-    "cache_read_input_tokens": 2037939829,
-    "cache_creation_input_tokens": 36699428,
+    "input_tokens": 31976,
+    "output_tokens": 8111496,
+    "cache_read_input_tokens": 2274744070,
+    "cache_creation_input_tokens": 37903098,
     "total_cost_usd": null,
     "codex_input_tokens": null,
     "codex_output_tokens": null,
@@ -18,7 +18,7 @@
   "claude": {
     "date": "2026-11-13",
     "source": "local-transcripts",
-    "generated_at": "2026-11-14T03:54:40Z",
+    "generated_at": "2026-11-14T14:18:52Z",
     "projects_dir": "/Users/difan/.claude/projects",
     "window": {
       "since": "2026-11-13",
@@ -28,13 +28,13 @@
       "dispatches": 166,
       "sessions": 1,
       "resumes": 60,
-      "api_calls": 14083,
-      "input_tokens": 29242,
-      "output_tokens": 7627693,
-      "cache_read_input_tokens": 2037939829,
-      "cache_creation_input_tokens": 36699428,
+      "api_calls": 15216,
+      "input_tokens": 31976,
+      "output_tokens": 8111496,
+      "cache_read_input_tokens": 2274744070,
+      "cache_creation_input_tokens": 37903098,
       "subagent_tokens": 1664143407,
-      "main_tokens": 418152785,
+      "main_tokens": 656647233,
       "by_model": {
         "claude-haiku-4-5-20251001": {
           "api_calls": 2,
@@ -51,11 +51,11 @@
           "cache_creation_input_tokens": 49729
         },
         "claude-opus-5-5": {
-          "api_calls": 8689,
-          "input_tokens": 18366,
-          "output_tokens": 4264804,
-          "cache_read_input_tokens": 1420353235,
-          "cache_creation_input_tokens": 23875529
+          "api_calls": 9822,
+          "input_tokens": 21100,
+          "output_tokens": 4748607,
+          "cache_read_input_tokens": 1657157476,
+          "cache_creation_input_tokens": 25079199
         },
         "claude-sonnet-5-5": {
           "api_calls": 5387,
@@ -67,13 +67,13 @@
       }
     },
     "context_histogram": {
-      "calls": 1914,
-      "p50": 217403,
-      "p90": 336759,
+      "calls": 3047,
+      "p50": 214297,
+      "p90": 331013,
       "max": 367005,
       "compact_threshold": 250000,
-      "calls_above_threshold": 736,
-      "share_above_threshold_pct": 38.4,
+      "calls_above_threshold": 1106,
+      "share_above_threshold_pct": 36.2,
       "buckets": [
         {
           "label": "0-50k",
@@ -82,28 +82,28 @@
         },
         {
           "label": "50-100k",
-          "calls": 169,
-          "share_pct": 8.8
+          "calls": 255,
+          "share_pct": 8.3
         },
         {
           "label": "100-150k",
-          "calls": 361,
-          "share_pct": 18.8
+          "calls": 576,
+          "share_pct": 18.9
         },
         {
           "label": "150-200k",
-          "calls": 318,
-          "share_pct": 16.6
+          "calls": 541,
+          "share_pct": 17.7
         },
         {
           "label": "200-300k",
-          "calls": 648,
-          "share_pct": 33.8
+          "calls": 1083,
+          "share_pct": 35.5
         },
         {
           "label": "300-500k",
-          "calls": 418,
-          "share_pct": 21.8
+          "calls": 592,
+          "share_pct": 19.4
         },
         {
           "label": "500k+",
@@ -4601,23 +4601,23 @@
         "kind": "session",
         "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
         "date": "2026-11-13",
-        "wall_seconds": 67612,
-        "dispatches_launched": 82,
+        "wall_seconds": 104948,
+        "dispatches_launched": 140,
         "model": "claude-opus-5-5",
         "models": {
           "claude-opus-5-5": {
-            "api_calls": 1914,
-            "input_tokens": 4740,
-            "output_tokens": 792587,
-            "cache_read_input_tokens": 415289730,
-            "cache_creation_input_tokens": 2065728
+            "api_calls": 3047,
+            "input_tokens": 7474,
+            "output_tokens": 1276390,
+            "cache_read_input_tokens": 652093971,
+            "cache_creation_input_tokens": 3269398
           }
         },
-        "api_calls": 1914,
-        "input_tokens": 4740,
-        "output_tokens": 792587,
-        "cache_read_input_tokens": 415289730,
-        "cache_creation_input_tokens": 2065728
+        "api_calls": 3047,
+        "input_tokens": 7474,
+        "output_tokens": 1276390,
+        "cache_read_input_tokens": 652093971,
+        "cache_creation_input_tokens": 3269398
       }
     ]
   },

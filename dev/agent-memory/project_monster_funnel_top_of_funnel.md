@@ -50,3 +50,5 @@ stage/entry-FRESHNESS clock, not volume confirmation. The real
 decomposition needs the 26y instrumented regeneration (~4.5h,
 run_chain.sh) against the record baseline — that run is the #2490
 follow-up's next step.
+
+**11-14 (#3602):** on the record config the breakout-phase loss of cheap (< $14) monsters is `Stage_setup` (44.7 % exact / 32.0 % window of those with a cascade row) at lift 0.99 / 0.88: breadth, not anti-selection. `Breakout_volume` 0.4-1.4 %; other sub-gates 0.

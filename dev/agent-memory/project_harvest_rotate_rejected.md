@@ -34,7 +34,7 @@ read-only on the Cell-E **top-3000** baseline (scenarios-2026-06-10-184414,
 **⚠ Honest revision (user pushback 2026-06-10): the first writeup OVERCLAIMED.**
 It said "REJECTED, both fail decisively" off point-estimate medians. The real
 distributions are weaker and differently shaped — this episode produced the rule
-[[project_mechanism_validation_rigor]] (`.claude/rules/mechanism-validation-rigor.md`):
+[[project_mechanism_validation_rigor]] (`dev/rules/mechanism-validation-rigor.md`):
 
 - **(b) realizable per-event test** `diff = C_fwd − P_mostext_fwd` over 373 actual
   cash-blocked decisions: **median −0.12%, mean −1.79%, C beats P 49.9%** — a

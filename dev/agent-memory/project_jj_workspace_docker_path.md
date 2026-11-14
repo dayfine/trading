@@ -6,7 +6,7 @@ originSessionId: 62a91729-bd17-40ce-ab8e-226d718d658a
 ---
 ## Problem
 
-`.claude/rules/worktree-isolation.md` boilerplate says:
+`dev/rules/worktree-isolation.md` boilerplate says:
 
 ```bash
 AGENT_ID="${HOSTNAME}-$$-$(date +%s)"

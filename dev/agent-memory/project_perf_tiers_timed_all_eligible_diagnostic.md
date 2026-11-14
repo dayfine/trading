@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-21T19:28:13.805Z
 ---
 
-**Finding (2026-09-21, first real pass of `.claude/rules/perf-review-weekly.md`):** `dev/scripts/perf_tier{1,2,3,4}_*.sh`
+**Finding (2026-09-21, first real pass of `dev/rules/perf-review-weekly.md`):** `dev/scripts/perf_tier{1,2,3,4}_*.sh`
 and `run_tier4_release_gate.sh` never passed `--no-emit-all-eligible`; `golden_sp500_postsubmit.sh` (since #2601's rework
 08-31), `promote_config.sh` and every verdict chain do. `emit_all_eligible` defaults to `true` in `scenario_runner`, and
 #2616 (09-01) moved the `wall_seconds` timer to span the post-steps, so from 09-01 the tiers timed backtest + diagnostic.
