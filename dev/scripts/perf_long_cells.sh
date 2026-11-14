@@ -17,7 +17,8 @@
 #   [MM-DD HH:MM:SS] RESULT <tag> => <metrics> ... (wall <N>s)
 # plus optional header lines "HEAD=<sha>" and "SNAPSHOT_MAX_MMAP_HANDLES=<n>"
 # (a chain that never logs the cap ran at the pre-#2882 default, 256).
-# The cell's spec is found by name (<tag> minus "-s<salt>[-suffix]" or a "-k<N>" seed tag) under the
+# A cloud chain stamps UTC as [MM-DD HH:MM:SSZ]; the Z is accepted and the time kept as logged.
+# The cell's spec is found by name (<tag> minus "-s<salt>[-suffix]", then minus a "-k<N>" seed tag) under the
 # chain log's experiment directory, or under PERF_LONG_SPECS if set; window
 # and universe come from it. A cell whose spec cannot be found keeps "?" for
 # both and never enters a comparison.
@@ -73,14 +74,22 @@ collect_one() { # $1 chain log
   awk '
     /HEAD=[0-9a-f]+/ { match($0, /HEAD=[0-9a-f]+/); head = substr($0, RSTART + 5, RLENGTH - 5) }
     /SNAPSHOT_MAX_MMAP_HANDLES=[0-9]+/ { match($0, /SNAPSHOT_MAX_MMAP_HANDLES=[0-9]+/); cap = substr($0, RSTART + 26, RLENGTH - 26) }
-    /^\[[0-9][0-9]-[0-9][0-9] [0-9:]+\] RESULT / && /\(wall [0-9]+s\)/ && !/<no result>/ {
+    /^\[[0-9][0-9]-[0-9][0-9] [0-9:]+Z?\] RESULT / && /\(wall [0-9]+s\)/ && !/<no result>/ {
       md = substr($0, 2, 5); hms = substr($0, 8, 8)
       match($0, / RESULT [^ ]+/); tag = substr($0, RSTART + 8, RLENGTH - 8)
       match($0, /\(wall [0-9]+s\)/); w = substr($0, RSTART + 6, RLENGTH - 8)
-      printf "%s\t%s\t%s\t%s\t%s\n", md "T" hms, tag, (cap == "" ? 256 : cap), (head == "" ? "?" : head), w
+      # a cell that prints its own cache stats (cloud chains) carries its cap on the RESULT line
+      c = (cap == "" ? 256 : cap)
+      if (match($0, /cap_mmap_handles=[0-9]+/)) c = substr($0, RSTART + 17, RLENGTH - 17)
+      printf "%s\t%s\t%s\t%s\t%s\n", md "T" hms, tag, c, (head == "" ? "?" : head), w
     }' "$1" | while IFS="$(printf '\t')" read -r md tag cap head w; do
-    name=$(printf '%s\n' "$tag" | sed -E 's/-s[0-9]+(-.*)?$//; s/-k[0-9]+$//')
+    # a spec may be named per seed (pb-S-k1) or once for all seeds (g1, run as g1-k3): try the first
+    name=$(printf '%s\n' "$tag" | sed -E 's/-s[0-9]+(-.*)?$//')
     shape=$(spec_shape "$search" "$name")
+    if [ "$shape" = "?,?" ]; then
+      name=$(printf '%s\n' "$name" | sed -E 's/-k[0-9]+$//')
+      shape=$(spec_shape "$search" "$name")
+    fi
     if [ "$shape" = "?,?" ]; then
       # golden cells are tagged <family>--<golden>-new|old; their specs are fixtures
       gname=$(printf '%s\n' "$name" | sed -E 's/^.*--//; s/-(new|old)$//')

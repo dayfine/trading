@@ -422,3 +422,15 @@ date,experiment,tag,universe,years,cap,head,wall_s,s_per_year
 2026-10-29T22:13:16,tier4-seed-band-2026-10-29,goldens-broad--decade-2014-2023-k2,top-1000-2014,9.99,12000,7615dde7d,532,53
 2026-10-29T22:21:36,tier4-seed-band-2026-10-29,goldens-broad--decade-2014-2023-k3,top-1000-2014,9.99,12000,7615dde7d,499,50
 2026-10-29T22:29:22,tier4-seed-band-2026-10-29,goldens-broad--decade-2014-2023-k4,top-1000-2014,9.99,12000,7615dde7d,464,46
+2026-11-12T10:39:57,chain-w-2026-11-10,cw-W0-s0,pit-schedule-3000,26.49,12000,b54e44ea9,6875,260
+2026-11-12T12:35:56,chain-w-2026-11-10,cw-Wtd-s0,pit-schedule-3000,26.49,12000,b54e44ea9,6952,262
+2026-11-13T15:56:33,price-band-tiebreak-2026-11-13,pb-S-k1-s0,pit-schedule-3000,26.49,12000,1034b458e,7375,278
+2026-11-13T15:57:42,price-band-tiebreak-2026-11-13,pb-S-k2-s0,pit-schedule-3000,26.49,12000,1034b458e,7624,288
+2026-11-13T16:01:19,price-band-tiebreak-2026-11-13,pb-S-k4-s0,pit-schedule-3000,26.49,12000,1034b458e,7798,294
+2026-11-13T16:05:31,price-band-tiebreak-2026-11-13,pb-S-k3-s0,pit-schedule-3000,26.49,12000,1034b458e,8039,303
+2026-11-13T16:08:03,price-band-tiebreak-2026-11-13,pb-S-k0-s0,pit-schedule-3000,26.49,12000,1034b458e,8058,304
+2026-11-13T17:56:01,price-band-tiebreak-2026-11-13,pb-P-k1-s0,pit-schedule-3000,26.49,12000,1034b458e,7161,270
+2026-11-13T18:06:11,price-band-tiebreak-2026-11-13,pb-P-k2-s0,pit-schedule-3000,26.49,12000,1034b458e,7702,291
+2026-11-13T18:08:23,price-band-tiebreak-2026-11-13,pb-P-k4-s0,pit-schedule-3000,26.49,12000,1034b458e,7617,288
+2026-11-13T18:14:07,price-band-tiebreak-2026-11-13,pb-P-k0-s0,pit-schedule-3000,26.49,12000,1034b458e,7557,285
+2026-11-13T18:15:23,price-band-tiebreak-2026-11-13,pb-P-k3-s0,pit-schedule-3000,26.49,12000,1034b458e,7784,294
