@@ -1,0 +1,438 @@
+######## pair S:C -- delta = ln(1 + R_C) - ln(1 + R_S); in the tables S takes the role README calls S, C the role it calls C
+== 0. Validity (README §Decision rule 0)
+k4  V6 ok  tripwire match  absent-symbols ok  S capped 0  -> VALID
+warning: seeds not-read: k0(no directory) k1(no directory) k2(no directory) k3(no directory)
+(no DATA_DIR: no open position carries a mark; every open-leg key is left out of the sums and of the bars, and the outcome is PROVISIONAL)
+
+== 1. Per seed and arm (actual.sexp; closed trades, open positions, trades at >= +100 %); delta = C - S
+seed arm          R %   ln(1+R)     delta  maxDD %   Sharpe   Ulcer closed  open >=100
+k4   S         1639.5    2.8562              25.11    0.651   10.49    548     5     9
+k4   C          585.4    1.9249   -0.9313    45.16    0.396   17.82    850     7    10
+
+== 2. Liveness (README §Decision rule 1): L = C's placed long tickets anchored at local_range_top; F = capped pairs C filled lower
+seed C placed   capped        L   S capped cap pairs   C lower        F lrt!=anc
+k4       1142      730   63.9 %          0        34        32   94.1 %        0
+pool     1142      730   63.9 %                   34        32   94.1 %   (valid seeds)
+(L, F and the weights below read tickets, entry prices and share counts, never a mark: open-leg keys count in them)
+
+== 3. Ticket outcomes per arm: placed long tickets by resolution (closed / open / refused for cash at the fill / TTL / requalification / delisted / resting at the end)
+seed set                     placed   closed     open     cash      ttl   requal delisted  resting    other
+k4   S, all                     658      548        5       49       46        0        4        6        0
+k4   C, all                    1142      850        7      148      126        0        7        4        0
+k4   C, capped tickets          730      522        4      100       96        0        5        3        0
+k4   S twins of capped          730       41        0        7        7        0        1        0      674
+("S twins of capped": what S did with the same symbol on the same Friday; "none" = S placed no ticket, counted under other)
+
+Fill age in weeks from placement, closed trades (p50 / p90 / share filled within 1 week):
+k4 S all: 1 / 11 / 61.3 %   k4 C all: 1 / 12 / 60.4 %   C capped: 1 / 13 / 55.9 %
+
+== 4. The price/size split, NAV-% of the arm's NAV at the decision (README §The price/size split), closed legs only
+seed   n M    price     size     exit        M |  n RC   RC cap |  n RS   RS cap |        D |  n M0       M0   |d| M0 |       PC       PS    total    trim3
+k4      34    +3.21    +1.36    -0.96    +3.61 |     5    +0.76 |     7    -1.96 |    +2.40 |   244    +0.59    0.003 |   +78.61  -206.63  -136.48   -83.44
+M = price + size + exit over capped keys both arms filled; RC cap = capped keys only C filled (+cC); RS cap = capped keys only S filled (-cS);
+D = M + RC cap + RS cap (the same-ticket effect: keys both arms placed, C capped); M0 = the same-ticket path null (uncapped, both filled);
+PC / PS = keys placed in one arm only (admissions and path); total = sum over the keys of c_test - c_base; trim3 = total without the 3 largest and 3 smallest keys.
+Every sum in this section is over closed legs only (the simulator's own pnl); the open-leg keys left out of it are counted in the next table.
+
+Open-leg keys: a ticket either arm still holds open at the window end. Its c depends on a mark from the bar store, so no sum above includes it.
+seed open-leg  marked unmarked | left out of:    M  RCcap  RScap   M0  RC0  RS0   PC   PS
+k4          9       0        9 |                 0      0      0    3    0    2    4    0
+(No sum over these keys is printed, pooled or not: the bars below read their marked values, and only the bars' pass or fail leaves the script.)
+
+Screen comparison (#3594 sizing.txt: screen price = this price + exit, as its exits were fixed; screen size = this size; closed legs only):
+k4  price+exit   +2.25 (screen +6.1)  size   +1.36 (screen +3.6)  size share of M 38 %  C/S weight on capped pairs p50 1.095 p90 1.226  C/S fill p50 0.9883
+
+Admission and displacement (README §The admission channel): capped tickets only C placed, by what S did that Friday,
+and S's tickets that C skipped for cash (n tickets, NAV-% summed over closed legs; an unfilled ticket counts 0):
+seed    A gate (rec.)      A no S list          A other            A all A w/o top3 | displaced (cash) | open-leg left out (A, displaced)
+k4     271     +41.94   387     +36.76    12      +8.86   670     +87.55     +28.02 |   139    -109.37 | 4, 0
+(A w/o top3 = the A total without its 3 largest keys; README §Arm G, the ADMISSIONS row)
+
+Components by outcome (n keys, NAV-% summed, both over closed legs; then the open-leg keys left out):
+k4  PC:capped, nolist                                  387    +36.76   left out 1
+k4  PC:capped, notlisted                                 7     +1.04   left out 0
+k4  PC:capped, skip:Insufficient_cash                    5     +7.82   left out 0
+k4  PC:capped, skip:No_structural_stop                 271    +41.94   left out 3
+k4  PC:nolist                                           49    -12.25   left out 0
+k4  PC:notlisted                                        12     -4.17   left out 0
+k4  PC:skip:Insufficient_cash                           37     +7.49   left out 0
+k4  PS:nolist                                          129    -94.23   left out 0
+k4  PS:notlisted                                        20     -3.03   left out 0
+k4  PS:skip:Insufficient_cash                          139   -109.37   left out 0
+k4  RC:capped, S cash                                    5     +0.76   left out 0
+k4  RC:uncapped, S cash                                  8     -6.40   left out 0
+k4  RN:capped, S cash, C cash                            2     +0.00   left out 0
+k4  RN:capped, S delisted, C delisted                    1     +0.00   left out 0
+k4  RN:capped, S ttl, C ttl                              7     +0.00   left out 0
+k4  RN:uncapped, S cash, C cash                          7     +0.00   left out 0
+k4  RN:uncapped, S delisted, C delisted                  2     +0.00   left out 0
+k4  RN:uncapped, S resting, C resting                    1     +0.00   left out 0
+k4  RN:uncapped, S ttl, C ttl                           20     +0.00   left out 0
+k4  RS:capped, C cash, S's size fits                     1     +0.03   left out 0
+k4  RS:capped, C cash, short of S's size                 6     -1.99   left out 0
+k4  RS:uncapped, C cash, short of S's size              27     -5.05   left out 2
+k4  shifted:PC (other arm placed the symbol within 28 days)    34     +6.97   left out 0
+k4  shifted:PS (other arm placed the symbol within 28 days)    33    -11.62   left out 0
+
+Largest key-level differences per seed (c_C - c_S, NAV-%; key class; closed legs only, the open-leg keys left out are counted at the end of the line):
+k4 +:  DEG|2014-02-07 PC +26.93  SHS|2017-03-03 PC +17.51  SID|2003-01-03 PC +15.09   -:  ADSK|2003-09-12 PS -41.68  APPS|2020-06-12 PS -37.73  ADMA|2023-08-18 PS -33.16   (9 open-leg keys left out)
+
+== 4b. By decision year, NAV-% summed over the keys decided that year, closed legs only (README §Reported regardless); c = c_C - c_S
+seed year   keys         D        M0   n A         A     total | open-leg keys left out
+k4   2000     39     +0.76     -0.00    22     -6.97     -9.26 | 0
+k4   2001     16     +0.00     +0.00    15     -5.04     -5.04 | 0
+k4   2002     23     +0.00     +0.00    19     -3.02     -3.02 | 0
+k4   2003     36     +0.47     +0.00    16    +25.40    -18.89 | 0
+k4   2004     52     -1.51     +0.00    25     -3.91     -9.54 | 0
+k4   2005     68     +0.30     +0.03    31    +16.22    +11.42 | 0
+k4   2006     54     -0.61     -0.00    32    +10.19    +11.50 | 0
+k4   2007     59     -1.03     +0.01    23    -15.42    -24.21 | 0
+k4   2008     20     +0.00     +0.00    20    -15.99    -15.99 | 0
+k4   2009     56     +0.00     +0.00    33    +20.63    +16.87 | 0
+k4   2010     50     +0.00     -0.00    19     +5.37    -14.64 | 0
+k4   2011     74     -0.04     +0.00    29     -6.43    -10.30 | 0
+k4   2012     64     +0.88     +0.01    28     +5.63     -5.48 | 0
+k4   2013     56     +0.48     +0.00    16     -0.79     -3.69 | 0
+k4   2014     66     +0.19     -0.00    28    +28.96    +17.58 | 0
+k4   2015     42     +0.70     +0.00    30     -9.63    -19.76 | 0
+k4   2016     49     +0.11     -0.00    33    +21.92     +7.66 | 0
+k4   2017     55     +0.04     +0.00    16    +23.46    +10.27 | 0
+k4   2018     79     +0.11     +0.00    35     +5.70    +16.78 | 0
+k4   2019     61     +0.00     +0.00    39     +1.87     -6.45 | 0
+k4   2020     63     +0.00     +0.56    24     +6.97    -33.62 | 0
+k4   2021     73     +1.45     +0.00    21     -9.09     -8.42 | 0
+k4   2022     41     +0.00     -0.00    27     -0.17     -0.29 | 0
+k4   2023     64     +0.00     +0.00    35     +8.34    -44.87 | 0
+k4   2024     68     +0.10     +0.00    17     -7.96     -4.41 | 0
+k4   2025     69     +0.00     -0.02    30     -5.02     +8.46 | 4
+k4   2026     24     +0.00     +0.00     7     -3.66     +0.86 | 5
+k4   all    1421     +2.40     +0.59   670    +87.55   -136.48 | 9
+pool year   keys         D        M0   n A         A     total | (valid seeds, summed)
+pool 2000     39     +0.76     -0.00    22     -6.97     -9.26 | 0
+pool 2001     16     +0.00     +0.00    15     -5.04     -5.04 | 0
+pool 2002     23     +0.00     +0.00    19     -3.02     -3.02 | 0
+pool 2003     36     +0.47     +0.00    16    +25.40    -18.89 | 0
+pool 2004     52     -1.51     +0.00    25     -3.91     -9.54 | 0
+pool 2005     68     +0.30     +0.03    31    +16.22    +11.42 | 0
+pool 2006     54     -0.61     -0.00    32    +10.19    +11.50 | 0
+pool 2007     59     -1.03     +0.01    23    -15.42    -24.21 | 0
+pool 2008     20     +0.00     +0.00    20    -15.99    -15.99 | 0
+pool 2009     56     +0.00     +0.00    33    +20.63    +16.87 | 0
+pool 2010     50     +0.00     -0.00    19     +5.37    -14.64 | 0
+pool 2011     74     -0.04     +0.00    29     -6.43    -10.30 | 0
+pool 2012     64     +0.88     +0.01    28     +5.63     -5.48 | 0
+pool 2013     56     +0.48     +0.00    16     -0.79     -3.69 | 0
+pool 2014     66     +0.19     -0.00    28    +28.96    +17.58 | 0
+pool 2015     42     +0.70     +0.00    30     -9.63    -19.76 | 0
+pool 2016     49     +0.11     -0.00    33    +21.92     +7.66 | 0
+pool 2017     55     +0.04     +0.00    16    +23.46    +10.27 | 0
+pool 2018     79     +0.11     +0.00    35     +5.70    +16.78 | 0
+pool 2019     61     +0.00     +0.00    39     +1.87     -6.45 | 0
+pool 2020     63     +0.00     +0.56    24     +6.97    -33.62 | 0
+pool 2021     73     +1.45     +0.00    21     -9.09     -8.42 | 0
+pool 2022     41     +0.00     -0.00    27     -0.17     -0.29 | 0
+pool 2023     64     +0.00     +0.00    35     +8.34    -44.87 | 0
+pool 2024     68     +0.10     +0.00    17     -7.96     -4.41 | 0
+pool 2025     69     +0.00     -0.02    30     -5.02     +8.46 | 4
+pool 2026     24     +0.00     +0.00     7     -3.66     +0.86 | 5
+(D = M + RC cap + RS cap of §4 over the capped keys both arms placed; A = the capped keys only C placed; keys = every key of the year with closed legs only, RN included)
+
+== 5. Outcome, C vs S (README §Decision rule, applied as written)
+valid seeds 1; L 0.6392 (bar 0.10); F 0.9412 over 34 capped pairs (bar 0.50, >= 30 pairs)
+median delta -0.9313; delta > 0 in 0, < 0 in 1 of 1; delta bar 0.2000 (max(0.20, m_S = n/a)); D > 0 in 1; trim3 > 0 in 0 (D and trim3 read on the closed legs together with the open legs that have a mark); maxDD median C - S +20.05 pp
+OUTCOME C vs S: INCONCLUSIVE (fewer than 4 valid seeds)  PROVISIONAL: open positions not marked
+SEED k4 C-S delta -0.9313 L 63.9 % F 94.1 % D +2.40 M +3.61 price +3.21 size +1.36 exit -0.96 total -136.48 (closed legs only; 9 open-leg keys left out; bars read with the open legs that have a mark: D>0 yes, trim3>0 no)
+RULE S,C INCONCLUSIVE n=1 median=-0.9313 pos=0 neg=1 delta=0.2000 Dp=1 Tp=0 mdd=20.05 L=0.6392 F=0.9412 Mp=34 Ale0=0 gbad=0 marked=0 unmarked=9
+
+######## pair S:G -- delta = ln(1 + R_G) - ln(1 + R_S); in the tables S takes the role README calls S, G the role it calls C
+== 0. Validity (README §Decision rule 0; §Arm G, the G check)
+G check (README §Arm G): G's capped tickets on a key S skipped at the stop gate: pooled S record 0, own seed's S record 0, over 1 seeds (bar 0); premise, S's own tickets on a pooled gate key: 0 (0 expected); C's capped tickets on a pooled gate key: 274 -> PASS
+k4  V6 ok  tripwire match  absent-symbols ok  S capped 0  -> VALID
+warning: seeds not-read: k0(no directory) k1(no directory) k2(no directory) k3(no directory)
+(no DATA_DIR: no open position carries a mark; every open-leg key is left out of the sums and of the bars, and the outcome is PROVISIONAL)
+
+== 1. Per seed and arm (actual.sexp; closed trades, open positions, trades at >= +100 %); delta = G - S
+seed arm          R %   ln(1+R)     delta  maxDD %   Sharpe   Ulcer closed  open >=100
+k4   S         1639.5    2.8562              25.11    0.651   10.49    548     5     9
+k4   G         1721.1    2.9020   +0.0458    24.52    0.663   10.57    544     4    10
+
+== 2. Liveness (README §Decision rule 1): L = G's placed long tickets anchored at local_range_top; F = capped pairs G filled lower
+seed G placed   capped        L   S capped cap pairs   G lower        F lrt!=anc
+k4        647      113   17.5 %          0        70        65   92.9 %        0
+pool      647      113   17.5 %                   70        65   92.9 %   (valid seeds)
+(L, F and the weights below read tickets, entry prices and share counts, never a mark: open-leg keys count in them)
+
+== 3. Ticket outcomes per arm: placed long tickets by resolution (closed / open / refused for cash at the fill / TTL / requalification / delisted / resting at the end)
+seed set                     placed   closed     open     cash      ttl   requal delisted  resting    other
+k4   S, all                     658      548        5       49       46        0        4        6        0
+k4   G, all                     647      544        4       44       45        0        4        6        0
+k4   G, capped tickets          113       93        0        8       10        0        1        1        0
+k4   S twins of capped          113       72        0       11       11        0        1        0       18
+("S twins of capped": what S did with the same symbol on the same Friday; "none" = S placed no ticket, counted under other)
+
+Fill age in weeks from placement, closed trades (p50 / p90 / share filled within 1 week):
+k4 S all: 1 / 11 / 61.3 %   k4 G all: 1 / 10 / 63.6 %   G capped: 2 / 24 / 48.4 %
+
+== 4. The price/size split, NAV-% of the arm's NAV at the decision (README §The price/size split), closed legs only
+seed   n M    price     size     exit        M |  n RC   RC cap |  n RS   RS cap |        D |  n M0       M0   |d| M0 |       PC       PS    total    trim3
+k4      70    +7.07    +3.13    -8.08    +2.12 |     7    -0.57 |     2    +0.88 |    +2.43 |   402    +0.01    0.000 |   +30.32   -21.63    +7.25    +3.64
+M = price + size + exit over capped keys both arms filled; RC cap = capped keys only G filled (+cG); RS cap = capped keys only S filled (-cS);
+D = M + RC cap + RS cap (the same-ticket effect: keys both arms placed, G capped); M0 = the same-ticket path null (uncapped, both filled);
+PC / PS = keys placed in one arm only (admissions and path); total = sum over the keys of c_test - c_base; trim3 = total without the 3 largest and 3 smallest keys.
+Every sum in this section is over closed legs only (the simulator's own pnl); the open-leg keys left out of it are counted in the next table.
+
+Open-leg keys: a ticket either arm still holds open at the window end. Its c depends on a mark from the bar store, so no sum above includes it.
+seed open-leg  marked unmarked | left out of:    M  RCcap  RScap   M0  RC0  RS0   PC   PS
+k4          5       0        5 |                 0      0      0    4    0    0    0    1
+(No sum over these keys is printed, pooled or not: the bars below read their marked values, and only the bars' pass or fail leaves the script.)
+
+Screen comparison (#3594 sizing.txt: screen price = this price + exit, as its exits were fixed; screen size = this size; closed legs only):
+k4  price+exit   -1.01 (screen +6.1)  size   +3.13 (screen +3.6)  size share of M 148 %  G/S weight on capped pairs p50 1.093 p90 1.218  G/S fill p50 0.9866
+
+Admission and displacement (README §The admission channel): capped tickets only G placed, by what S did that Friday,
+and S's tickets that G skipped for cash (n tickets, NAV-% summed over closed legs; an unfilled ticket counts 0):
+seed    A gate (rec.)      A no S list          A other            A all A w/o top3 | displaced (cash) | open-leg left out (A, displaced)
+k4       0      +0.00     9      +3.38     9     +14.48    18     +17.86      -0.93 |    26      -5.92 | 0, 1
+(A w/o top3 = the A total without its 3 largest keys; README §Arm G, the ADMISSIONS row)
+
+Components by outcome (n keys, NAV-% summed, both over closed legs; then the open-leg keys left out):
+k4  PC:capped, nolist                                    9     +3.38   left out 0
+k4  PC:capped, skip:Insufficient_cash                    9    +14.48   left out 0
+k4  PC:nolist                                           27     +8.05   left out 0
+k4  PC:notlisted                                         3     +1.15   left out 0
+k4  PC:skip:Insufficient_cash                           21     +3.26   left out 0
+k4  PS:nolist                                           45     -9.98   left out 0
+k4  PS:notlisted                                         8     -5.72   left out 0
+k4  PS:skip:Insufficient_cash                           26     -5.92   left out 1
+k4  RC:capped, S cash                                    6     +0.48   left out 0
+k4  RC:capped, S ttl                                     1     -1.05   left out 0
+k4  RC:uncapped, S cash                                  4     -0.52   left out 0
+k4  RN:capped, S cash, G cash                            5     +0.00   left out 0
+k4  RN:capped, S delisted, G delisted                    1     +0.00   left out 0
+k4  RN:capped, S ttl, G ttl                             10     +0.00   left out 0
+k4  RN:uncapped, S cash, G cash                         25     +0.00   left out 0
+k4  RN:uncapped, S delisted, G delisted                  3     +0.00   left out 0
+k4  RN:uncapped, S resting, G resting                    5     +0.00   left out 0
+k4  RN:uncapped, S ttl, G ttl                           31     +0.00   left out 0
+k4  RS:capped, G cash, short of S's size                 2     +0.88   left out 0
+k4  RS:uncapped, G cash, short of S's size               9     -3.36   left out 0
+k4  shifted:PC (other arm placed the symbol within 28 days)    15     +5.18   left out 0
+k4  shifted:PS (other arm placed the symbol within 28 days)    15     -0.52   left out 0
+
+Largest key-level differences per seed (c_G - c_S, NAV-%; key class; closed legs only, the open-leg keys left out are counted at the end of the line):
+k4 +:  HURN|2006-03-10 PC +10.43  CHDN|2017-03-24 PC +5.49  GTIV|2014-06-06 PC +4.44   -:  IPHI|2015-01-02 PS -6.29  SKX|2014-03-07 PS -5.67  ROL|2016-09-02 MF -4.79   (5 open-leg keys left out)
+
+== 4b. By decision year, NAV-% summed over the keys decided that year, closed legs only (README §Reported regardless); c = c_G - c_S
+seed year   keys         D        M0   n A         A     total | open-leg keys left out
+k4   2000     16     +0.76     +0.00     0     +0.00     +0.76 | 0
+k4   2001      1     +0.00     +0.00     0     +0.00     +0.00 | 0
+k4   2002      4     +0.00     -0.00     0     +0.00     -0.00 | 0
+k4   2003     21     +0.47     +0.00     0     +0.00     -0.37 | 0
+k4   2004     24     +0.13     +0.00     0     +0.00     -5.60 | 0
+k4   2005     36     +0.11     -0.00     2     +0.38     +1.15 | 0
+k4   2006     26     -0.16     -0.00     3    +10.98    +12.37 | 0
+k4   2007     36     +0.33     +0.00     0     +0.00     -0.34 | 0
+k4   2009     21     +0.00     +0.00     0     +0.00     +0.00 | 0
+k4   2010     26     -0.26     +0.00     0     +0.00     -0.25 | 0
+k4   2011     34     +0.12     -0.00     0     +0.00     +0.12 | 0
+k4   2012     39     +1.35     +0.00     1     +2.88     -1.45 | 0
+k4   2013     41     +0.28     -0.00     1     +0.11     +1.10 | 0
+k4   2014     39     -0.20     +0.00     0     +0.00     -5.62 | 0
+k4   2015     20     +0.57     -0.00     6     -1.75     -9.95 | 0
+k4   2016     17     -4.29     +0.00     1     +0.23     -4.06 | 0
+k4   2017     40     +1.67     +0.00     2     +5.49     +7.74 | 0
+k4   2018     43     -0.44     +0.01     1     -0.45     +1.74 | 0
+k4   2019     22     +0.18     +0.00     0     +0.00     +0.39 | 0
+k4   2020     39     +0.00     +0.00     0     +0.00     +1.24 | 0
+k4   2021     46     +1.50     +0.00     0     +0.00     +1.81 | 0
+k4   2022     11     +0.00     +0.00     0     +0.00     +0.00 | 0
+k4   2023     28     +0.17     -0.00     0     +0.00     +0.16 | 0
+k4   2024     36     +0.10     +0.00     0     +0.00     +4.81 | 0
+k4   2025     38     +0.04     +0.00     0     +0.00     +0.04 | 1
+k4   2026     18     +0.00     +0.00     1     +0.00     +1.47 | 4
+k4   all     722     +2.43     +0.01    18    +17.86     +7.25 | 5
+pool year   keys         D        M0   n A         A     total | (valid seeds, summed)
+pool 2000     16     +0.76     +0.00     0     +0.00     +0.76 | 0
+pool 2001      1     +0.00     +0.00     0     +0.00     +0.00 | 0
+pool 2002      4     +0.00     -0.00     0     +0.00     -0.00 | 0
+pool 2003     21     +0.47     +0.00     0     +0.00     -0.37 | 0
+pool 2004     24     +0.13     +0.00     0     +0.00     -5.60 | 0
+pool 2005     36     +0.11     -0.00     2     +0.38     +1.15 | 0
+pool 2006     26     -0.16     -0.00     3    +10.98    +12.37 | 0
+pool 2007     36     +0.33     +0.00     0     +0.00     -0.34 | 0
+pool 2009     21     +0.00     +0.00     0     +0.00     +0.00 | 0
+pool 2010     26     -0.26     +0.00     0     +0.00     -0.25 | 0
+pool 2011     34     +0.12     -0.00     0     +0.00     +0.12 | 0
+pool 2012     39     +1.35     +0.00     1     +2.88     -1.45 | 0
+pool 2013     41     +0.28     -0.00     1     +0.11     +1.10 | 0
+pool 2014     39     -0.20     +0.00     0     +0.00     -5.62 | 0
+pool 2015     20     +0.57     -0.00     6     -1.75     -9.95 | 0
+pool 2016     17     -4.29     +0.00     1     +0.23     -4.06 | 0
+pool 2017     40     +1.67     +0.00     2     +5.49     +7.74 | 0
+pool 2018     43     -0.44     +0.01     1     -0.45     +1.74 | 0
+pool 2019     22     +0.18     +0.00     0     +0.00     +0.39 | 0
+pool 2020     39     +0.00     +0.00     0     +0.00     +1.24 | 0
+pool 2021     46     +1.50     +0.00     0     +0.00     +1.81 | 0
+pool 2022     11     +0.00     +0.00     0     +0.00     +0.00 | 0
+pool 2023     28     +0.17     -0.00     0     +0.00     +0.16 | 0
+pool 2024     36     +0.10     +0.00     0     +0.00     +4.81 | 0
+pool 2025     38     +0.04     +0.00     0     +0.00     +0.04 | 1
+pool 2026     18     +0.00     +0.00     1     +0.00     +1.47 | 4
+(D = M + RC cap + RS cap of §4 over the capped keys both arms placed; A = the capped keys only G placed; keys = every key of the year with closed legs only, RN included)
+
+== 5. Outcome, G vs S (README §Decision rule, applied as written; §Arm G "G vs S")
+valid seeds 1; L 0.1747 (bar 0.10); F 0.9286 over 70 capped pairs (bar 0.50, >= 30 pairs)
+median delta +0.0458; delta > 0 in 1, < 0 in 0 of 1; delta bar 0.2000 (max(0.20, m_S = n/a)); D > 0 in 1; trim3 > 0 in 1 (D and trim3 read on the closed legs together with the open legs that have a mark); maxDD median G - S -0.59 pp
+OUTCOME G vs S: INCONCLUSIVE (fewer than 4 valid seeds)  PROVISIONAL: open positions not marked
+SEED k4 G-S delta +0.0458 L 17.5 % F 92.9 % D +2.43 M +2.12 price +7.07 size +3.13 exit -8.08 total +7.25 (closed legs only; 5 open-leg keys left out; bars read with the open legs that have a mark: D>0 yes, trim3>0 yes)
+RULE S,G INCONCLUSIVE n=1 median=0.0458 pos=1 neg=0 delta=0.2000 Dp=1 Tp=1 mdd=-0.59 L=0.1747 F=0.9286 Mp=70 Ale0=1 gbad=0 marked=0 unmarked=5
+
+######## pair G:C -- delta = ln(1 + R_C) - ln(1 + R_G); in the tables G takes the role README calls S, C the role it calls C
+== 0. Validity (README §Decision rule 0; §Arm G, the G check)
+G check (README §Arm G): G's capped tickets on a key S skipped at the stop gate: pooled S record 0, own seed's S record 0, over 1 seeds (bar 0); premise, S's own tickets on a pooled gate key: 0 (0 expected); C's capped tickets on a pooled gate key: 274 -> PASS
+k4  V6 ok  tripwire match  absent-symbols ok  G capped 113  -> VALID
+(G is not the control: its capped tickets are expected and do not count against validity)
+warning: seeds not-read: k0(no directory) k1(no directory) k2(no directory) k3(no directory)
+(no DATA_DIR: no open position carries a mark; every open-leg key is left out of the sums and of the bars, and the outcome is PROVISIONAL)
+
+== 1. Per seed and arm (actual.sexp; closed trades, open positions, trades at >= +100 %); delta = C - G
+seed arm          R %   ln(1+R)     delta  maxDD %   Sharpe   Ulcer closed  open >=100
+k4   G         1721.1    2.9020              24.52    0.663   10.57    544     4    10
+k4   C          585.4    1.9249   -0.9772    45.16    0.396   17.82    850     7    10
+
+== 2. Liveness (README §Decision rule 1): L = C's placed long tickets anchored at local_range_top; F = capped pairs C filled lower
+seed C placed   capped        L   G capped cap pairs   C lower        F lrt!=anc
+k4       1142      730   63.9 %        113        36         0    0.0 %        0
+pool     1142      730   63.9 %                   36         0    0.0 %   (valid seeds)
+(L, F and the weights below read tickets, entry prices and share counts, never a mark: open-leg keys count in them)
+(both arms cap: "cap pairs" are keys both filled where C's ticket is capped, mostly the same ticket in both arms)
+
+== 3. Ticket outcomes per arm: placed long tickets by resolution (closed / open / refused for cash at the fill / TTL / requalification / delisted / resting at the end)
+seed set                     placed   closed     open     cash      ttl   requal delisted  resting    other
+k4   G, all                     647      544        4       44       45        0        4        6        0
+k4   C, all                    1142      850        7      148      126        0        7        4        0
+k4   C, capped tickets          730      522        4      100       96        0        5        3        0
+k4   G twins of capped          730       42        0        4        7        0        1        1      675
+("G twins of capped": what G did with the same symbol on the same Friday; "none" = G placed no ticket, counted under other)
+
+Fill age in weeks from placement, closed trades (p50 / p90 / share filled within 1 week):
+k4 G all: 1 / 10 / 63.6 %   k4 C all: 1 / 12 / 60.4 %   C capped: 1 / 13 / 55.9 %
+
+== 4. The price/size split, NAV-% of the arm's NAV at the decision (README §The price/size split), closed legs only
+seed   n M    price     size     exit        M |  n RC   RC cap |  n RS   RS cap |        D |  n M0       M0   |d| M0 |       PC       PS    total    trim3
+k4      36    +0.00    +0.00    -0.01    -0.00 |     1    -0.17 |     6    -4.30 |    -4.47 |   240    +0.58    0.003 |   +67.95  -200.42  -143.73   -90.69
+M = price + size + exit over capped keys both arms filled; RC cap = capped keys only C filled (+cC); RS cap = capped keys only G filled (-cG);
+D = M + RC cap + RS cap (the same-ticket effect: keys both arms placed, C capped); M0 = the same-ticket path null (uncapped, both filled);
+PC / PS = keys placed in one arm only (admissions and path); total = sum over the keys of c_test - c_base; trim3 = total without the 3 largest and 3 smallest keys.
+Every sum in this section is over closed legs only (the simulator's own pnl); the open-leg keys left out of it are counted in the next table.
+
+Open-leg keys: a ticket either arm still holds open at the window end. Its c depends on a mark from the bar store, so no sum above includes it.
+seed open-leg  marked unmarked | left out of:    M  RCcap  RScap   M0  RC0  RS0   PC   PS
+k4          9       0        9 |                 0      0      0    2    0    2    5    0
+(No sum over these keys is printed, pooled or not: the bars below read their marked values, and only the bars' pass or fail leaves the script.)
+
+Admission and displacement (README §The admission channel): capped tickets only C placed, by what G did that Friday,
+and G's tickets that C skipped for cash (n tickets, NAV-% summed over closed legs; an unfilled ticket counts 0):
+seed    A gate (rec.)      A no G list          A other            A all A w/o top3 | displaced (cash) | open-leg left out (A, displaced)
+k4     279     +39.79   381     +38.26    11      +4.77   671     +82.82     +23.29 |   138    -132.29 | 4, 0
+(A w/o top3 = the A total without its 3 largest keys; README §Arm G, the ADMISSIONS row)
+
+Components by outcome (n keys, NAV-% summed, both over closed legs; then the open-leg keys left out):
+k4  PC:capped, gate-other-seed                          11     -3.96   left out 0
+k4  PC:capped, nolist                                  381    +38.26   left out 1
+k4  PC:capped, notlisted                                 7     +1.04   left out 0
+k4  PC:capped, skip:Insufficient_cash                    4     +3.74   left out 0
+k4  PC:capped, skip:No_structural_stop                 268    +43.75   left out 3
+k4  PC:nolist                                           54    -13.82   left out 0
+k4  PC:notlisted                                        12     -2.24   left out 0
+k4  PC:skip:Insufficient_cash                           34     +1.20   left out 1
+k4  PS:nolist                                          126    -66.93   left out 0
+k4  PS:notlisted                                        17     -1.20   left out 0
+k4  PS:skip:Insufficient_cash                          138   -132.29   left out 0
+k4  RC:capped, G cash                                    1     -0.17   left out 0
+k4  RC:uncapped, G cash                                 10     -0.84   left out 0
+k4  RN:capped, G cash, C cash                            3     +0.00   left out 0
+k4  RN:capped, G delisted, C delisted                    1     +0.00   left out 0
+k4  RN:capped, G resting, C resting                      1     +0.00   left out 0
+k4  RN:capped, G ttl, C ttl                              7     +0.00   left out 0
+k4  RN:uncapped, G cash, C cash                          9     +0.00   left out 0
+k4  RN:uncapped, G delisted, C delisted                  2     +0.00   left out 0
+k4  RN:uncapped, G resting, C resting                    1     +0.00   left out 0
+k4  RN:uncapped, G ttl, C ttl                           20     +0.00   left out 0
+k4  RS:capped, C cash, short of G's size                 6     -4.30   left out 0
+k4  RS:uncapped, C cash, short of G's size              25     -6.54   left out 2
+k4  shifted:PC (other arm placed the symbol within 28 days)    32     +2.76   left out 0
+k4  shifted:PS (other arm placed the symbol within 28 days)    31     -7.68   left out 0
+
+Largest key-level differences per seed (c_C - c_G, NAV-%; key class; closed legs only, the open-leg keys left out are counted at the end of the line):
+k4 +:  DEG|2014-02-07 PC +26.93  SHS|2017-03-03 PC +17.51  SID|2003-01-03 PC +15.09   -:  ADSK|2003-09-12 PS -41.68  APPS|2020-06-12 PS -37.73  ADMA|2023-08-18 PS -33.16   (9 open-leg keys left out)
+
+== 4b. By decision year, NAV-% summed over the keys decided that year, closed legs only (README §Reported regardless); c = c_C - c_G
+seed year   keys         D        M0   n A         A     total | open-leg keys left out
+k4   2000     39     -0.00     -0.00    22     -6.97    -10.02 | 0
+k4   2001     16     +0.00     +0.00    15     -5.04     -5.04 | 0
+k4   2002     23     +0.00     +0.00    19     -3.02     -3.02 | 0
+k4   2003     35     +0.00     +0.00    16    +25.40    -18.51 | 0
+k4   2004     50     -2.01     +0.00    25     -3.91     -3.95 | 0
+k4   2005     64     +0.00     +0.03    30    +15.90    +10.27 | 0
+k4   2006     57     -0.31     -0.00    32    +10.19     -0.87 | 0
+k4   2007     55     -1.36     +0.01    23    -15.42    -23.86 | 0
+k4   2008     20     +0.00     +0.00    20    -15.99    -15.99 | 0
+k4   2009     56     +0.00     +0.00    33    +20.63    +16.87 | 0
+k4   2010     50     +0.00     -0.00    19     +5.37    -14.39 | 0
+k4   2011     74     -0.17     +0.00    29     -6.43    -10.43 | 0
+k4   2012     63     +0.04     +0.01    29     +5.89     -4.03 | 0
+k4   2013     55     -0.00     +0.00    17     -0.72     -4.79 | 0
+k4   2014     65     -0.65     -0.00    28    +28.96    +23.21 | 0
+k4   2015     47     -0.00     +0.00    30     -8.65     -9.81 | 0
+k4   2016     50     +0.00     -0.00    33    +21.92    +11.72 | 0
+k4   2017     58     -0.00     -0.00    16    +18.22     +2.53 | 0
+k4   2018     76     -0.00     -0.00    36     +5.22    +15.04 | 0
+k4   2019     61     +0.00     +0.00    39     +1.87     -6.84 | 0
+k4   2020     64     +0.00     +0.56    24     +6.97    -34.86 | 0
+k4   2021     75     -0.01     +0.00    21     -9.09    -10.23 | 0
+k4   2022     41     +0.00     -0.00    27     -0.17     -0.29 | 0
+k4   2023     64     +0.00     +0.00    35     +8.34    -45.04 | 0
+k4   2024     67     +0.00     +0.00    17     -7.96     -9.23 | 0
+k4   2025     68     +0.00     -0.02    30     -5.02     +8.42 | 4
+k4   2026     21     +0.00     +0.00     6     -3.66     -0.61 | 5
+k4   all    1414     -4.47     +0.58   671    +82.82   -143.73 | 9
+pool year   keys         D        M0   n A         A     total | (valid seeds, summed)
+pool 2000     39     -0.00     -0.00    22     -6.97    -10.02 | 0
+pool 2001     16     +0.00     +0.00    15     -5.04     -5.04 | 0
+pool 2002     23     +0.00     +0.00    19     -3.02     -3.02 | 0
+pool 2003     35     +0.00     +0.00    16    +25.40    -18.51 | 0
+pool 2004     50     -2.01     +0.00    25     -3.91     -3.95 | 0
+pool 2005     64     +0.00     +0.03    30    +15.90    +10.27 | 0
+pool 2006     57     -0.31     -0.00    32    +10.19     -0.87 | 0
+pool 2007     55     -1.36     +0.01    23    -15.42    -23.86 | 0
+pool 2008     20     +0.00     +0.00    20    -15.99    -15.99 | 0
+pool 2009     56     +0.00     +0.00    33    +20.63    +16.87 | 0
+pool 2010     50     +0.00     -0.00    19     +5.37    -14.39 | 0
+pool 2011     74     -0.17     +0.00    29     -6.43    -10.43 | 0
+pool 2012     63     +0.04     +0.01    29     +5.89     -4.03 | 0
+pool 2013     55     -0.00     +0.00    17     -0.72     -4.79 | 0
+pool 2014     65     -0.65     -0.00    28    +28.96    +23.21 | 0
+pool 2015     47     -0.00     +0.00    30     -8.65     -9.81 | 0
+pool 2016     50     +0.00     -0.00    33    +21.92    +11.72 | 0
+pool 2017     58     -0.00     -0.00    16    +18.22     +2.53 | 0
+pool 2018     76     -0.00     -0.00    36     +5.22    +15.04 | 0
+pool 2019     61     +0.00     +0.00    39     +1.87     -6.84 | 0
+pool 2020     64     +0.00     +0.56    24     +6.97    -34.86 | 0
+pool 2021     75     -0.01     +0.00    21     -9.09    -10.23 | 0
+pool 2022     41     +0.00     -0.00    27     -0.17     -0.29 | 0
+pool 2023     64     +0.00     +0.00    35     +8.34    -45.04 | 0
+pool 2024     67     +0.00     +0.00    17     -7.96     -9.23 | 0
+pool 2025     68     +0.00     -0.02    30     -5.02     +8.42 | 4
+pool 2026     21     +0.00     +0.00     6     -3.66     -0.61 | 5
+(D = M + RC cap + RS cap of §4 over the capped keys both arms placed; A = the capped keys only C placed; keys = every key of the year with closed legs only, RN included)
+
+== 5. Report, C vs G (README §Arm G "C vs G": attribution only, no outcome of its own)
+valid seeds 1; median delta_CG -0.9772; delta > 0 in 0, < 0 in 1; the bar 0.2000 (max(0.20, m_S = n/a))
+admissions pooled (capped C tickets on keys G did not place), closed legs only: 671 tickets, NAV-% A gate (rec.) +39.79, A no G list +38.26, A other +4.77, A all +82.82; displaced (cash) -132.29; 4 open-leg keys left out
+SEED k4 C-G delta -0.9772 A all +82.82 displaced -132.29 total -143.73 (closed legs only; 9 open-leg keys left out)
+RULE G,C REPORT n=1 median=-0.9772 pos=0 neg=1 delta=0.2000 arec=39.79 anolist=38.26 aother=4.77 aall=82.82 xcash=-132.29 gbad=0 marked=0 unmarked=9
+
+== 6. Combined outcome (README §Arm G, the combined table: the first row that matches)
+C vs S: INCONCLUSIVE; G vs S: INCONCLUSIVE; G check: pass; C vs G: median n/a against the bar 0.2000, > 0 in 0, < 0 in 1 of 1 valid seeds (unresolved)
+COMBINED: G INVALID (fewer than 4 valid G seeds (1); C's outcome INCONCLUSIVE stands alone, G reads are information only, no channel is named)  PROVISIONAL: an open-leg key has no mark
