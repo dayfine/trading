@@ -1026,20 +1026,38 @@ These are options; the choice is the user's.
 
 ### Review-pack look
 
-**Owed.** Step 3 asks for one pack over the 20 cells, rendered and looked at (`dev/rules/backtest-result-review.md`
-RV1).
-- When this read was written, the C1 pack had been restarted at 03:35 PST, with the C2 pack alongside it. Neither had
-  rendered, so no image was read here.
-- The data extracts already written corroborate §Why 2. C1 P-k0's peak table (`P-k0_peaks.json`, not committed) holds:
-  - the 2018-01-26 → 2020-03-25 episode (−29.77 %), with SAGE and NOAH among the largest open gains;
-  - peaks on 2021-04-13 and 2024-11-28 that fall 25.7 % and 23.8 %, with APPS at 30.4 % of the 2021 peak NAV. Those
-    are #3595's pack figures for its own P-k0, as re-synchronisation implies.
+Two packs, one per cell, each over its ten arms with charts on P-k0. They were built with `review_pack.sh --run-kind arm
+--charts-run 0 --no-container` (pack b54e44ea9, run 04ca2ff0b) and rendered with `review_pack_render.sh` (C1 21 slices,
+C2 31). The dispatcher looked at them (RV1–RV3). They are not committed (per-trade charts from the bar store). One pack per
+cell rather than one over all 20, because the two cells differ in window and universe and one overlay would mix them.
 
-When the render lands, check:
-- **the KPI strips** against the per-arm table above;
-- **the window:** C1's charts should start 2013-01-02 and C2's 2000-01-03;
-- **C2 S-k0's one-day +9.9 % step on 2013-07-01** (§Defects 1). If no signal flags it, it is a detector candidate
-  (RV3): a NAV day-move that the held positions' price moves do not explain;
-- **every era, regime and one-trade-year bullet** per cell (RV2, RV3), confirmed, refined or rejected with the reason.
-  2024 should read as ADMA in C1 k0 and k3;
-- **the entry-geometry counts** (D4, D5, D1): about equal across arms, as in #3595.
+- **KPI strips (P-k0) match the per-arm table.**
+  - C1: +349 %, maximum drawdown −29.8 %, Sharpe 0.63, 334 trades.
+  - C2: +976 %, −28.2 %, 0.56, 644 trades.
+  - Both arms lists match `decide-{1,2}.txt` arm by arm: C1 +349 / +279 / +318 / +337 / +342 / +259 / +312 / +259 / +291 /
+    +362 %, and C2 +976 / +1,544 / +948 / +759 / +1,373 / +1,448 / +715 / +979 / +786 / +1,087 %.
+- **Windows.** C1 runs 2013-01-02 → 2026-06-25 over 9,185 symbols, and C2 2000-01-03 → 2026-06-25 over 3,477.
+- **C1 re-synchronisation (§Why 2), confirmed.**
+  - P-k0's concentration signals are #3595's P-k0 figures. The 2021-04-13 peak falls 25.7 % to 2023-10-27, with APPS at
+    30.4 % of peak NAV. The 2024-11-28 peak falls 23.8 %, with MMYT at 15.0 % and ADMA at 23.3 %.
+  - The 2018-01-26 peak reads n/a for one position's open gain.
+  - The arms table puts ADMA 2023-12-19 first: impact 28.6 %, held by P-k0..4 and S-k1, S-k2, S-k4, not by S-k0 or S-k3.
+    SAGE 2017-12-04 is third (8.0 %, P-k0 and P-k3 only). Both match §Why 2 and [N].
+- **C2 signals, confirmed or refined.**
+  - The 2021-02-16 peak falls 28.2 % to 2023-10-26, with NIO at 16.5 % of peak NAV. NIO is the order's swap (§Why 6).
+  - The 2025-11-05 peak falls 20.3 %, with IREN at 28.0 %. That is not a swap: both arms of k0–k3 hold IREN, and only k4
+    holds it in P alone, as §Why 3 has it.
+- **Not flagged: C2 S-k0's 2013-07-01 step (§Defects 1).** The pack charts P-k0 only. S-k0's NAV series shows the +9.9 %
+  day (4,205,296 → 4,620,793), and no signal names it. This is a detector candidate for the pack (RV3): a one-day NAV
+  move that the held positions' price moves do not explain.
+- **Era bullets.**
+  - C1 ends at 0.71× SPY over 2013–2026 (SPY +533 %). It eroded in 2018–19, 2021 and 2025–26, with holdings lagging while
+    the market rose, not an exposure effect.
+  - C2 ends at 1.33× SPY. It built 2000–08 and 2010–15 and eroded 2016–19 and 2021–26.
+  - Neither cell's eras turn on a price-band swap. The eroding legs are the record config's own.
+- **Execution flags (P-k0's summary) carry no band signal.**
+  - The initial-stop-under-2 % list repeats the same handful of tickets across arms and seeds: GME, APPF and AAON in C1,
+    and CRM, SBUX and DECK in C2.
+  - On P-k0, 59 (C1) and 106 (C2) long fills were filled from above. 44 of 175 (C1) and 60 of 271 (C2) stop exits filled
+    more than 0.5 % past the stop.
+  - None of these is a band swap. The entry-geometry diagnostics (D1, D4, D5) were not compared across arms here.
