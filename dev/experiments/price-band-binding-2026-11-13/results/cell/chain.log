@@ -1,0 +1,20 @@
+[11-14 03:25:40Z] price-band-binding run; PB_SHA=645065bb207fbe62ede68be8959900122e465bab CELL_TIMEOUT=49500s
+[11-14 03:25:46Z] HEAD=645065bb2 image=ghcr.io/dayfine/trading-ci:latest sha256:3865e48e8a61 mem=15G
+[11-14 03:25:46Z] disk free 22G
+[11-14 03:25:46Z] PULL warehouse v12wk-9236
+[11-14 03:31:37Z] PULL corpact corpact-2026-10-27
+[11-14 03:31:38Z] PULL bars data-20261102
+[11-14 03:32:16Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-14 03:32:17Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv, 11888 data.csv
+[11-14 03:32:17Z] BUILD
+[11-14 03:33:30Z] BUILD_DONE
+[11-14 03:33:30Z] SPEC CHECK OK (dev/experiments/price-band-tiebreak-2026-11-13/specs/pb-S-k0.sexp md5 7a2d9eba26bc5c49a7db29df468c0e2c)
+[11-14 03:33:30Z] PREFLIGHT pb-S-k0 (2026-04-01..06-26, --emit-candidates)
+[11-14 03:39:52Z] PREFLIGHT_OK (382s): SC1 (the Seeded re-rank reproduces the Admitted set): PASS on all 10 longs-open dates SC2 (the walk order is the Seeded order): PASS on all 10 dates with a walk record 
+[11-14 03:39:52Z] disk free 16G
+[11-14 03:39:52Z] RUN pbb-S-k0-s0 (pb-S-k0 + --emit-candidates, CELL_TIMEOUT=49500s)
+[11-14 05:44:37Z] RESULT pbb-S-k0-s0 => total_return_pct 1472.7554563229353 total_trades 576 sharpe_ratio 0.63378419510324935 max_drawdown_pct 27.21768913331405 calmar_ratio 0.40279380963353373  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 1 violations (31 skipped)  candidates_bytes=974492879 peak_rss_kb=9059888 exit=0 (wall 7477s)
+[11-14 05:44:38Z] TRIPWIRE MATCH trades.csv md5 0928cfe40333560429f5a6e57c9c18de (577 lines)
+[11-14 05:44:38Z] TRIPWIRE vs committed dev/experiments/price-band-tiebreak-2026-11-13/results/k0: identical
+[11-14 05:44:38Z] READ (EVENTS=all)
+[11-14 05:53:14Z] READ DONE (516s): SC1 (the Seeded re-rank reproduces the Admitted set): PASS on all 1099 longs-open dates Rule 1 (tiebreak), mechanical: CLOSE-AXIS (T: the order binds, but among tied names it swaps in no fatter tail; keep as a default-off axis) Rule 2 (sub-gate), mechanical: NO CONCLUSION (lift >= 1.25 but under the 20 % share: window:Breakout_volume) 

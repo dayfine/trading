@@ -1,0 +1,4 @@
+Rule 1 inputs: L1 0.6897 (bar 0.25) | L2 E_net 0.953 (bars 0.75 / 1.5) | T ratio 3.069 (bars 1.0 / 1.5), in>out 2000-12 1, 2013-26 1, monsters 205 (min 20), ride diff -0.0010
+Rule 1 (tiebreak), mechanical: CLOSE-AXIS (T: the order binds, but among tied names it swaps in no fatter tail; keep as a default-off axis)
+Rule 2 inputs: hits (all three bars) exact none, window none | lift >= 1.25 at any share: exact none, window Breakout_volume | cheap monsters with a cascade row: exact 385, window 444 (min 30 each)
+Rule 2 (sub-gate), mechanical: NO CONCLUSION (lift >= 1.25 but under the 20 % share: window:Breakout_volume)
