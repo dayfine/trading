@@ -288,6 +288,26 @@ run_mutation r4 killed \
   's/^  if _is_docs_only "\$files"; then$/  if _is_docs_only "$files" \&\& ! _is_results_only "$files"; then/' \
   '(r) docs-only no longer wins when both classifiers match: a README-only experiment change falls into the results lane'
 
+# #3596: the gh backend reads the file list with `gh api --paginate`, failing
+# closed (sentinel path) only when pagination fails. Each mutation reopens a way
+# for a 100+-file PR to land in the wrong lane; the "#3596 e2e (gh)" cases kill
+# them.
+run_mutation gh1 killed \
+  's/gh api --paginate "repos/gh api "repos/' \
+  '(#3596) gh backend drops --paginate: the first page only, so a 150-file results PR leaves the results lane (stub serves nothing without --paginate)'
+
+run_mutation gh2 killed \
+  's/\[{path: \$s}\]/[]/' \
+  '(#3596) gh backend fails OPEN on a pagination failure: an empty file list instead of the sentinel path'
+
+run_mutation gh3 killed \
+  's/if length > 0 and all/if all/' \
+  '(#3596) gh backend accepts empty pagination output as a complete empty list (fails open to docs-only)'
+
+run_mutation gh4 killed \
+  's/ || _gf_out=$/ || true/' \
+  '(#3596) gh backend ignores gh api exit status and keeps the pages printed before a mid-stream failure as if complete'
+
 run_mutation s5 survivor \
   's/(?<h>\.\*)\$")\]/(?<h>.*)")]/' \
   'UNPINNED: drop the trailing $ end-anchor from the heading regex -- a VERIFIED EQUIVALENT MUTANT, not a live defect. What bounds "." at end-of-line is the ABSENCE of dot-all ((?s)), not (?m): confirmed in this container jq-1.6/Oniguruma, `"a\nb" | test("(?m)a.b")` is false but `"a\nb" | test("(?ms)a.b")` is true, so with only (?m) set the capture is line-bounded with or without the trailing $, making it redundant here. (Also a jq-semantics tripwire: if a future jq made "." dot-all by default, s5 would stop being equivalent.) The suite pins neither reading, but no test can ever distinguish them -- this is not left-for-follow-up work.' \
