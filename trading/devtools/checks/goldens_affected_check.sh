@@ -221,6 +221,12 @@
 #   docstring and reason about gating relationships, not just grep for
 #   the name.
 #
+#   Step 2.5 also skips a brand-new field (absent at BASE_REF, #3614), on
+#   the assumption that it lands default-off
+#   (`dev/rules/experiment-flag-discipline.md` R1). A new field that lands
+#   default-on, with an effect gated by a cited knob that goldens arm,
+#   passes here; R1 and QC are the backstop for that case.
+#
 # USAGE
 #
 #   sh goldens_affected_check.sh <base-ref> <head-ref>
