@@ -83,7 +83,8 @@ Use Test driven development to develop iteratively
 2. Write tests for the desired behaviors, which at first mostly (if not all) fail
    - Using OUnit2 or Alcotest
 3. Update implementation to make tests pass (while builds too)
-   - `dune build && dune runtest`
+   - `dune build` locally, then push: CI's `build-and-test` runs the tests. Build agents never run `dune runtest`
+     locally (their standing rules, #3619); elsewhere, run a scoped `dune runtest <dir>` only when it is quick
 4. Once a working solution is done, self-review and criticize the code just
    written
 5. Do another round of updates for style, abstraction, and corner cases
@@ -155,7 +156,7 @@ When the user gives feedback on a PR, add the changes as a **second commit on to
 
 1. `jj edit <bookmark>` — land on the commit under review
 2. `jj new -m "Apply review: <short description>"` — creates an empty child commit; the bookmark still points to the original
-3. Make the changes, then `dune build && dune runtest` and `dune fmt`
+3. Make the changes, then `dune build` and `dune fmt` (CI runs the tests)
 4. `jj bookmark set <bookmark> -r @` — advance the bookmark to the new tip
 5. `jj git push -b <bookmark>`
 
