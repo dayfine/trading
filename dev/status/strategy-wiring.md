@@ -1,6 +1,6 @@
 # Status: strategy-wiring
 
-## Last updated: 2026-04-14
+## Last updated: 2026-11-14
 
 ## Status
 MERGED
@@ -60,6 +60,13 @@ All items complete. Awaiting QC review.
   overlap window and record correlation in `dev/notes/synthetic-adl-validation.md`.
   The `compute_synthetic_adl.exe` already runs this validation at generation time;
   a separate one-off recording is a documentation task.
+
+### Later additions
+- 2026-11-14: Friday pipeline demo, `trading/trading/weinstein/strategy/friday_demo/`.
+  Prints what the strategy's Friday path does stage by stage on a synthetic
+  market, with the trace checked in as a golden and a test that its orders
+  match `on_market_close`. Follow-up: a local-only CLI that prints the same
+  trace for a real date from real bars.
 
 ## Dependencies
 - None between items. Either can land first.

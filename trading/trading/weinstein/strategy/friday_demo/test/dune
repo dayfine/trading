@@ -11,3 +11,16 @@
  (alias runtest)
  (action
   (diff friday_demo_trace.expected friday_demo_trace.actual)))
+
+(test
+ (name test_friday_demo)
+ (libraries
+  core
+  ounit2
+  matchers
+  status
+  trading.base
+  trading.strategy
+  weinstein_trading.stops
+  weinstein_trading.strategy
+  weinstein_trading.friday_demo))

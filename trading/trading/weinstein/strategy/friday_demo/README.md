@@ -73,6 +73,14 @@ columns (stages, sector ratings, ranking order, stop distances) are recomputed
 through the same exported functions the screen uses, on copies of the
 strategy's state.
 
+`test/test_friday_demo.ml` holds it to that. On the same fixture and the same
+warmed-up state it runs the real `on_market_close` and requires the same
+orders (symbol, side, shares, trigger, initial stop) and nothing else; then it
+checks the display columns against the strategy's own records: the names above
+the ranking cut are the walk's, in its order; the stop shown for each placed
+name is the one the walk installed; each analysed stock's stage is the one the
+screen's analysis carried.
+
 ## Next
 
 A local-only CLI that builds the same trace from real bars for a chosen date,
