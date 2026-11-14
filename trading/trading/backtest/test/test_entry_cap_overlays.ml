@@ -48,6 +48,21 @@ let test_absent_field_parses_as_zero _ =
     (Weinstein_strategy.config_of_sexp sexp).entry_cap_local_range_weeks
     (equal_to 0)
 
+(* The attribution control [entry_cap_stop_gate_on_uncapped]: default off, and
+   an axis through the same validator. *)
+let test_stop_gate_flag_default_off_and_axis _ =
+  let gate_after overlay =
+    (Backtest.Overlay_validator.apply_overrides (_default_config ())
+       [ Sexp.of_string overlay ])
+      .entry_cap_stop_gate_on_uncapped
+  in
+  assert_that
+    [
+      (_default_config ()).entry_cap_stop_gate_on_uncapped;
+      gate_after "((entry_cap_stop_gate_on_uncapped true))";
+    ]
+    (elements_are [ equal_to false; equal_to true ])
+
 let suite =
   "entry_cap_overlays"
   >::: [
@@ -55,6 +70,8 @@ let suite =
          "axis resolves via Overlay_validator"
          >:: test_axis_resolves_via_overlay_validator;
          "absent field parses as 0" >:: test_absent_field_parses_as_zero;
+         "stop gate flag: default off, an axis"
+         >:: test_stop_gate_flag_default_off_and_axis;
        ]
 
 let () = run_test_tt_main suite

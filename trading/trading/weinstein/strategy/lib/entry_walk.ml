@@ -87,10 +87,11 @@ let _sleeve_decisions ~gate ~held_set ~make_entry ~portfolio_value ~state
 (** Build the per-candidate entry constructor for a walk. Computes the
     E-anchored trigger (both StopLimit flags armed — user decision 2026-08-05)
     and threads the ticket-level stop-anchor knob
-    ([config.stop_anchor_at_entry_base], user go 2026-08-06); both default-off,
-    so the closure is bit-identical to the pre-flag path when the flags are off
-    (R1). Factored out of {!entries_from_candidates} so that function stays
-    under the function-length limit. *)
+    ([config.stop_anchor_at_entry_base], user go 2026-08-06) and the stop gate
+    on the uncapped trigger ({!Entry_cap_stop_gate}); all default-off, so the
+    closure is bit-identical to the pre-flag path when the flags are off (R1).
+    Factored out of {!entries_from_candidates} so that function stays under the
+    function-length limit. *)
 let _make_entry_fn ~config ~initial_stop_buffer ~bar_reader ~current_date
     ~stop_states ~portfolio_value (cand : Screener.scored_candidate) =
   let trigger_at_suggested =
@@ -105,6 +106,7 @@ let _make_entry_fn ~config ~initial_stop_buffer ~bar_reader ~current_date
         Stop_width_mode.mode = config.stop_width_mode;
         size_down_max_pct = config.stop_width_size_down_max_pct;
       }
+    ?gate_entry:(Entry_cap_stop_gate.gate_entry ~config cand)
     ~min_stop_distance_pct:
       (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
          ~current_date cand)

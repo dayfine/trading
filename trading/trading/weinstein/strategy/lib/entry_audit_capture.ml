@@ -171,13 +171,52 @@ let _reject_no_structural_stop ~effective_entry ~initial_stop ~floor_kind
   No_structural_stop
     { Audit_recorder.floor_kind; floor_price; distance_pct = stop_distance_pct }
 
+(* The ticket's initial stop and what the stop-width decisions read. [placed]
+   is the stop installed at [effective_entry]. Without [gate_entry] the
+   decisions read its floor kind and distance, so the default path is
+   unchanged. With [Some e] ({!Entry_cap_stop_gate}) they read those of the stop
+   the ticket would install at [e]; [stop_at] runs the §5.1 re-anchor test of
+   the placed stop at [e] too, so both carry the same floor kind. *)
+type initial_stops = {
+  placed : Weinstein_stops.stop_state;
+  placed_kind : Audit_recorder.stop_floor_kind;
+  placed_basis : Audit_recorder.split_safe_basis;
+  placed_distance_pct : float;
+  gate_kind : Audit_recorder.stop_floor_kind;
+  gate_distance_pct : float;
+}
+
+let _distance_from ~entry stop =
+  Entry_audit_helpers.stop_distance_pct ~effective_entry:entry
+    ~installed_stop:(Weinstein_stops.get_stop_level stop)
+
+let _initial_stops ~stop_at ~gate_entry ~effective_entry =
+  let placed, placed_kind, placed_basis = stop_at ~gate_entry effective_entry in
+  let placed_distance_pct = _distance_from ~entry:effective_entry placed in
+  let gate_kind, gate_distance_pct =
+    match gate_entry with
+    | None -> (placed_kind, placed_distance_pct)
+    | Some entry ->
+        let stop, kind, _basis = stop_at ~gate_entry:None entry in
+        (kind, _distance_from ~entry stop)
+  in
+  {
+    placed;
+    placed_kind;
+    placed_basis;
+    placed_distance_pct;
+    gate_kind;
+    gate_distance_pct;
+  }
+
 let make_entry_transition ?(min_stop_distance_pct = 0.0)
     ?(trigger_at_suggested = false) ?(stop_anchor_at_entry_base = false)
     ?(continuation_stop_at_pullback_low = false)
     ?(require_structural_stop = false)
-    ?(stop_width = Stop_width_mode.default_policy) ~portfolio_risk_config
-    ~stops_config ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value
-    ~current_date (cand : Screener.scored_candidate) : entry_attempt_result =
+    ?(stop_width = Stop_width_mode.default_policy) ?gate_entry
+    ~portfolio_risk_config ~stops_config ~initial_stop_buffer ~stop_states
+    ~bar_reader ~portfolio_value ~current_date
+    (cand : Screener.scored_candidate) : entry_attempt_result =
   let decision_bar =
     Entry_audit_helpers.latest_bar ~bar_reader ~current_date cand
   in
@@ -192,28 +231,28 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
   let reanchor_to_entry_base =
     stop_anchor_at_entry_base && trigger_at_suggested
   in
-  let initial_stop, stop_floor_kind, split_safe_basis =
+  let stop_at ~gate_entry entry =
     Entry_audit_helpers.initial_stop_and_kind ~min_stop_distance_pct
-      ~continuation_stop_at_pullback_low ~reanchor_to_entry_base ~stops_config
-      ~initial_stop_buffer ~bar_reader ~current_date ~effective_entry cand
+      ~continuation_stop_at_pullback_low ~reanchor_to_entry_base ?gate_entry
+      ~stops_config ~initial_stop_buffer ~bar_reader ~current_date
+      ~effective_entry:entry cand
   in
-  let stop_distance_pct =
-    Entry_audit_helpers.stop_distance_pct ~effective_entry
-      ~installed_stop:(Weinstein_stops.get_stop_level initial_stop)
-  in
+  let stops = _initial_stops ~stop_at ~gate_entry ~effective_entry in
   let max_stop_distance_pct =
     stops_config.Weinstein_stops.max_stop_distance_pct
   in
   if
     _lacks_required_structural_stop ~require_structural_stop
-      ~floor_kind:stop_floor_kind
+      ~floor_kind:stops.gate_kind
   then
-    _reject_no_structural_stop ~effective_entry ~initial_stop
-      ~floor_kind:stop_floor_kind ~stop_distance_pct ~max_stop_distance_pct cand
+    _reject_no_structural_stop ~effective_entry ~initial_stop:stops.placed
+      ~floor_kind:stops.gate_kind ~stop_distance_pct:stops.placed_distance_pct
+      ~max_stop_distance_pct cand
   else
     _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
-      ~stop_states ~current_date ~effective_entry ~decision_bar ~initial_stop
-      ~floor_kind:stop_floor_kind ~basis:split_safe_basis ~stop_distance_pct
+      ~stop_states ~current_date ~effective_entry ~decision_bar
+      ~initial_stop:stops.placed ~floor_kind:stops.placed_kind
+      ~basis:stops.placed_basis ~stop_distance_pct:stops.gate_distance_pct
       ~max_stop_distance_pct cand
 
 (* Decide + apply the cash draw for a [CreateEntering] of [side] costing [cost].

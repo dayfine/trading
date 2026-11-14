@@ -117,6 +117,7 @@ type config = {
       (** See [.mli]. *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
   entry_cap_local_range_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
+  entry_cap_stop_gate_on_uncapped : bool; [@sexp.default false]  (** .mli *)
   entry_freshness_basis : Entry_freshness.basis;
       [@sexp.default Entry_freshness.Ma_cross]
       (** See [.mli]. *)
@@ -166,8 +167,7 @@ type config = {
 (* Top-level: keeps [default_config] a flat literal. *)
 let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
-(* Promoted-bundle (2026-07-23) screener defaults with the overhead-supply
-   weight armed; pairs with [overhead_supply] in [default_config]. *)
+(* 2026-07-23 bundle: supply weight on, pairs with [overhead_supply]. *)
 let _default_screening_config =
   {
     Screener.default_config with
@@ -258,6 +258,7 @@ let default_config ~universe ~index_symbol =
     sim_entry_trigger_at_suggested = false;
     entry_anchor_local_range_weeks = 0;
     entry_cap_local_range_weeks = 0;
+    entry_cap_stop_gate_on_uncapped = false;
     entry_freshness_basis = Entry_freshness.Ma_cross;
     stop_anchor_at_entry_base = false;
     continuation_stop_at_pullback_low = false;
@@ -291,8 +292,7 @@ let default_config ~universe ~index_symbol =
     trailing_stop_ma_period = None;
   }
 
-(* F5 arming predicate, the one source for both halves (placement waiver +
-   at-fill eject), so they cannot drift apart. See [.mli]. *)
+(* F5 arming predicate: one source for placement waiver and at-fill eject. *)
 let volume_confirm_at_fill_armed (c : config) : bool =
   c.volume_confirm_at_fill && c.sim_entry_trigger_at_suggested
   && c.enable_sim_entry_stoplimit

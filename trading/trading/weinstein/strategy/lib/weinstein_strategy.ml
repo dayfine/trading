@@ -53,6 +53,7 @@ module Entry_freshness = Entry_freshness
 module Entry_walk = Entry_walk
 module Entry_freeze = Entry_freeze
 module Entry_stop_width_order = Entry_stop_width_order
+module Entry_cap_stop_gate = Entry_cap_stop_gate
 module Entry_ticket_ttl = Entry_ticket_ttl
 module Split_ticket_cancel = Split_ticket_cancel
 module Exchange_calendar = Exchange_calendar
@@ -402,12 +403,14 @@ let _breadth_series_of_bars = function
   | bars -> Some (Breadth_series_cache.of_daily_bars bars)
 
 (* Fail loudly on an inconsistent dawn-leverage config (margin must be armed;
-   the dawn requirement must be a fractional (0,1] requirement), and on the
-   one-share-class rule running unarmed (flag on, no map; #3015). Both are
+   the dawn requirement must be a fractional (0,1] requirement), on the
+   one-share-class rule running unarmed (flag on, no map; #3015), and on the
+   uncapped stop gate with a ticket transform it cannot see through. All are
    no-ops for a default config. *)
 let _validate_config config =
   Leverage_dawn.validate config;
-  Share_class_gate.validate config
+  Share_class_gate.validate config;
+  Entry_cap_stop_gate.validate config
 
 let make_with_state ?(ad_bars = []) ?(breadth_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
