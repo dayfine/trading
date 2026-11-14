@@ -516,7 +516,9 @@ it without a new mechanism argument.
   - The audit join is 100 % in all 20 cells, and V12, V19 and V20 pass.
   - V7, V13 and V17 read the validator's data dir, whose committed short bar files shadow the store (§Defects 2).
   - V16 flags one fallback exit in both arms of C2 k0, k1, k2 and k4: MAY 2005-03-02, `stale_force_exit`.
-  - None of these differs between the arms of a pair.
+  - Both arms of a pair read the same shadowing files, and V6, V12, V16, V19, V20 and the audit join are the same
+    within each pair. The V7, V13 and V17 counts differ by path: C2 k1 V13 is S 106 / P 99, C1 k0 V7 is 15 / 13, and
+    V17 is 3 / 2 in C2 k2 and k3 (QCOM and SNA are S-only specimens, §Defects 2).
 
 ### The rule, as written
 
@@ -790,8 +792,9 @@ routine in both arms: 15–30 per C1 cell and 60–79 per C2 cell† [J]. AVGO 2
   | total, P minus S over all positions | +32.6 | −107.6 |
 
   - In C1, the cut channel is ADMA: +27.8 in k0 and +30.3 in k3.
-  - In C2, where the other arm's list is visible, the order's own swaps net +1.0. The loss sits in the cash channels
-    (−76.5) and the unresolved one (−32.0).
+  - In C2, where the other arm's list is visible, the order's own swaps net +1.0. The loss sits in the decision-time
+    cash skips (−39.0), the both-placed channel (−37.5) and the unresolved one (−32.0). Both-placed is mostly cash
+    too (AVGO's two fill-time cash rejections, −31.1), but `cash.sh` cannot split it (§Defects 4).
 - **The systematic swaps are P's; the large one-off draws are S's** [E]†. Position keys are grouped by how many P seeds
   hold them minus how many S seeds:
   - **P in at least 3 more seeds:** 62 keys, net +98.6. NIO 2020-09-24 leads (+52.5; $14–33; P in 4 seeds, S in
@@ -1001,8 +1004,8 @@ These are options; the choice is the user's.
    - The store runs to 2026-08-17 for all four names.
    - The same files drive most of C2's V13 (99–109 per cell, mostly "no bar on entry_date … nearest earlier bar:
      none") and its V7 (60–68).
-   - This is not a simulator defect. V6 is unaffected, and the counts match within each pair. The fix is chain-w
-     §5 item 5.
+   - This is not a simulator defect. V6 is unaffected, and both arms of a pair read the same files; the counts differ
+     only by path. The fix is chain-w §5 item 5.
 3. **Design: a nested window re-synchronises with its parent.**
    - §Not claimed says C1 "re-runs 2013–26 from cash and removes only the 2010–12 entries". In fact it reproduces
      #3595's positions from 2015–2023, depending on arm and seed (§Why 2), so most of its 13.5 years re-measure
