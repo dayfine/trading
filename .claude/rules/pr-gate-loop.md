@@ -89,10 +89,15 @@ When a verdict is NEEDS_REWORK, the rework dispatch must carry:
 - "Address every checked-fail item. Do not introduce new scope."
 - Commit as a **second commit** (`fix(review): address QC rework iteration N (#PR)`),
   never an amend, so the reviewer can diff what changed.
-- Nothing else. The no-waiting rule (`timeout: 600000`, scoped foreground dune
-  calls), the checkout, the docker cwd, the review format and the finish protocol
-  live in the agent definitions' "Standing rules" block (#2738,
+- For a **red CI** rework (no QC verdict yet), the failing step's log lines
+  (`gh run view <run_id> --log-failed`) in place of the review body: build agents do
+  not run `dune runtest` locally, so the log is their only view of the failure.
+- Nothing else. The no-waiting rule (`timeout: 600000`, foreground dune calls), the
+  tests-on-CI rule (local `dune build` + `dune build @fmt` only, user decision
+  2026-11-14), the checkout, the docker cwd, the review format and the finish
+  protocol live in the agent definitions' "Standing rules" block (#2738,
   `agent_standing_rules_check.sh`); repeating them in the brief is wasted context.
+  The agent pushes, reports the tip SHA and stops; the dispatcher waits on CI.
 
 ## Dispatcher-side recovery (do not re-dispatch reflexively)
 

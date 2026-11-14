@@ -25,10 +25,16 @@ scope or the delta since the last review, the prior review's location, and the r
 below apply without being restated; a brief that repeats them is wasted context.
 
 - **No waiting.** Run every `dune` call in the foreground with `timeout: 600000`, split into scoped calls
-  (`dune build @fmt`, `dune build`, `dune runtest <dir>`) when one call could exceed it. Read dune's exit
+  (`dune build @fmt`, `dune build <touched dirs>`) when one call could exceed it. Read dune's exit
   code from a file (`…; echo $? > rc`), never through a pipe. Never background a build and end the turn
   waiting for an event: a subagent is never woken by one (`feedback_agents_background_wait_stall`). If a
   call is moved to the background anyway, keep reading its output file until it finishes.
+- **Tests run on CI, not locally** (user decision 2026-11-14). Never run `dune runtest`, full or scoped: it
+  holds the container slot and the dune lock for tens of minutes, and CI's `build-and-test` runs the whole
+  suite plus the linters a local run skips. Your local gates are `dune build` on the dirs you touched (a
+  signature change also touches its callers' dirs; include the new test file's directory so it compiles)
+  and `dune build @fmt`. Write the tests, make them compile, push, and stop: the dispatcher waits on CI
+  and sends a failure back as a rework.
 - **Build your own tree.** Locally (`$TRADING_IN_CONTAINER` unset) dune runs in the container:
   `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/<your-tree>/trading && eval $(opam env) &&
   dune build'`, where `<your-tree>` is your worktree's path relative to the repo root (it lives under
@@ -38,10 +44,11 @@ below apply without being restated; a brief that repeats them is wasted context.
   the steps in a wrapper script inside your worktree and delete it before you finish
   (`feedback_agent_sandbox_docker_wrapper`). On GHA (`$TRADING_IN_CONTAINER=1`) you are already inside the
   container: run `dev/lib/run-in-env.sh dune …` with your cwd inside your own worktree.
-- **Finish protocol, in the foreground, without ending the turn in between.** Full gates
-  (`dune build @fmt && dune build && dune runtest`, exit code read from a file) → commit with the trailers
-  your session's attribution rules require → push the branch → open the PR (`gh pr create`, or the GitHub
-  MCP `create_pull_request` tool) → check the PR's file list matches your task.
+- **Finish protocol, in the foreground, without ending the turn in between.** Local gates
+  (`dune build @fmt && dune build` on the touched dirs, exit code read from a file) → commit with the
+  trailers your session's attribution rules require → push the branch → open the PR (`gh pr create`, or the
+  GitHub MCP `create_pull_request` tool) → check the PR's file list matches your task → report the PR
+  number and tip SHA and stop; never wait for CI.
   **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
   name, the commit id and "PR NOT opened" so the dispatcher can open it
   (`dev/rules/worktree-isolation.md` §Finish Protocol).
@@ -122,8 +129,8 @@ Do **not** modify the state machine itself (Initial → FirstCorrection → Trai
 - [ ] `Support_floor.find_recent_low` implemented + unit tests: peak + pullback identification, depth threshold, lookback truncation, no-pullback returns None, empty bars returns None
 - [ ] `Stops.compute_initial_stop` accepts the output; behaviour under `None` is identical to today's fixed-buffer code path
 - [ ] Smoke test: run `Weinstein_strategy` on cached 2018-2023 data and confirm at least one Stage-2 entry places its initial stop based on a support-floor value (not the fixed-buffer proxy)
-- [ ] `dune build && dune runtest` passes, `dune build @fmt` passes — run in the **foreground**, check the **exit code** (not `grep FAIL:`; not `… | tail; echo $?` which captures tail)
-- [ ] **Finish Protocol** followed (`dev/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
+- [ ] `dune build` on the touched dirs and `dune build @fmt` pass — run in the **foreground**, check the **exit code** (not `… | tail; echo $?` which captures tail). No local `dune runtest`: CI's `build-and-test` runs the tests and the dispatcher sends a failure back as a rework
+- [ ] **Finish Protocol** followed (`dev/rules/worktree-isolation.md` §"Finish Protocol"): local gates → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
 - [ ] PR diff respects `## PR sizing` rules from `feat-agent-template.md` (≤500 LOC, one new module per PR)
 - [ ] No changes to screener, portfolio_risk, order_gen, or trading_state
 
@@ -146,12 +153,12 @@ Otherwise (local runs), use **jj** with a per-session workspace. The orchestrato
 
 ## Allowed Tools
 
-Read, Write, Edit, Glob, Grep, Bash (build/test commands only), WebFetch.
+Read, Write, Edit, Glob, Grep, Bash (build and fmt commands; no `dune runtest`), WebFetch.
 Do not use the Agent tool (no subagent spawning).
 
 ## Max-Iterations Policy
 
-If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still failing: stop, report the blocker, update the relevant `dev/status/<track>.md` to BLOCKED, and end the session.
+If after **3 consecutive build-fix cycles** `dune build` (or `dune build @fmt`) is still failing: stop, report the blocker, update the relevant `dev/status/<track>.md` to BLOCKED, and end the session.
 
 ## Status file updates
 

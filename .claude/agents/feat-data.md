@@ -44,10 +44,16 @@ scope or the delta since the last review, the prior review's location, and the r
 below apply without being restated; a brief that repeats them is wasted context.
 
 - **No waiting.** Run every `dune` call in the foreground with `timeout: 600000`, split into scoped calls
-  (`dune build @fmt`, `dune build`, `dune runtest <dir>`) when one call could exceed it. Read dune's exit
+  (`dune build @fmt`, `dune build <touched dirs>`) when one call could exceed it. Read dune's exit
   code from a file (`…; echo $? > rc`), never through a pipe. Never background a build and end the turn
   waiting for an event: a subagent is never woken by one (`feedback_agents_background_wait_stall`). If a
   call is moved to the background anyway, keep reading its output file until it finishes.
+- **Tests run on CI, not locally** (user decision 2026-11-14). Never run `dune runtest`, full or scoped: it
+  holds the container slot and the dune lock for tens of minutes, and CI's `build-and-test` runs the whole
+  suite plus the linters a local run skips. Your local gates are `dune build` on the dirs you touched (a
+  signature change also touches its callers' dirs; include the new test file's directory so it compiles)
+  and `dune build @fmt`. Write the tests, make them compile, push, and stop: the dispatcher waits on CI
+  and sends a failure back as a rework.
 - **Build your own tree.** Locally (`$TRADING_IN_CONTAINER` unset) dune runs in the container:
   `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/<your-tree>/trading && eval $(opam env) &&
   dune build'`, where `<your-tree>` is your worktree's path relative to the repo root (it lives under
@@ -57,10 +63,11 @@ below apply without being restated; a brief that repeats them is wasted context.
   the steps in a wrapper script inside your worktree and delete it before you finish
   (`feedback_agent_sandbox_docker_wrapper`). On GHA (`$TRADING_IN_CONTAINER=1`) you are already inside the
   container: run `dev/lib/run-in-env.sh dune …` with your cwd inside your own worktree.
-- **Finish protocol, in the foreground, without ending the turn in between.** Full gates
-  (`dune build @fmt && dune build && dune runtest`, exit code read from a file) → commit with the trailers
-  your session's attribution rules require → push the branch → open the PR (`gh pr create`, or the GitHub
-  MCP `create_pull_request` tool) → check the PR's file list matches your task.
+- **Finish protocol, in the foreground, without ending the turn in between.** Local gates
+  (`dune build @fmt && dune build` on the touched dirs, exit code read from a file) → commit with the
+  trailers your session's attribution rules require → push the branch → open the PR (`gh pr create`, or the
+  GitHub MCP `create_pull_request` tool) → check the PR's file list matches your task → report the PR
+  number and tip SHA and stop; never wait for CI.
   **Never end with an unpushed commit.** If the push or PR step fails twice, report the branch
   name, the commit id and "PR NOT opened" so the dispatcher can open it
   (`dev/rules/worktree-isolation.md` §Finish Protocol).
@@ -180,12 +187,12 @@ within `data-foundations.md`:
 
 ## Allowed Tools
 
-Read, Write, Edit, Glob, Grep, Bash (build/test commands only), WebFetch.
+Read, Write, Edit, Glob, Grep, Bash (build and fmt commands; no `dune runtest`), WebFetch.
 Do not use the Agent tool (no subagent spawning).
 
 ## Max-Iterations Policy
 
-If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still
+If after **3 consecutive build-fix cycles** `dune build` (or `dune build @fmt`) is still
 failing: stop, report your partial state and the specific blocker, update
 `dev/status/data-foundations.md` to BLOCKED, and end the session. Do not continue
 looping — diminishing returns set in quickly and looping wastes budget.
@@ -212,8 +219,8 @@ status to READY_FOR_REVIEW.
 - [ ] **No Python** — confirmed via `find <touched paths> -name '*.py'` returning zero matches; `trading/devtools/checks/no_python_check.sh` (wired into `dune runtest`) catches this on CI
 - [ ] **Pinned data fixtures are committed** — any HTML / CSV / sexp the test depends on lives under `test/data/` and is referenced by relative path. Do not depend on network fetches in tests.
 - [ ] **Cached data is gitignored** — `dev/data/<vendor>/` (anything fetched at runtime) is in `.gitignore`; small samples for tests live under `test/data/` and are checked in.
-- [ ] `dune build && dune runtest` passes with zero warnings on a clean checkout of the branch — run in the **foreground**, check the **exit code** (not `grep FAIL:`; not `… | tail; echo $?` which captures tail not dune)
-- [ ] **Finish Protocol** followed (`dev/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
+- [ ] `dune build` on the touched dirs passes with zero warnings on a clean checkout of the branch — run in the **foreground**, check the **exit code** (not `… | tail; echo $?` which captures tail not dune). No local `dune runtest`: CI's `build-and-test` runs the tests and the dispatcher sends a failure back as a rework
+- [ ] **Finish Protocol** followed (`dev/rules/worktree-isolation.md` §"Finish Protocol"): local gates → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
 - [ ] `dune build @fmt` passes (formatter in check mode)
 - [ ] `dev/status/data-foundations.md` updated: tick off the item, add a Completed entry with what was built, where it lives, and how to verify
 - [ ] PR body is non-empty — after `jst submit`, write the PR description (what/why/test plan) via `gh pr edit <N> --body-file <path>`. `jst submit` does not populate the body.
