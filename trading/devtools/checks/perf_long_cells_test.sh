@@ -11,6 +11,9 @@
 #     (pit-schedule-3000), years (10.00), cap (12000), HEAD, wall, s/yr;
 #   - a <no result> (guard-killed) cell is dropped, never timed;
 #   - a -k<N> seed tag resolves to its spec like a -s<N> salt tag;
+#   - a cloud chain's [MM-DD HH:MM:SSZ] stamp gives the same rows as the local one;
+#   - a cloud cell's cap comes from its own cap_mmap_handles=N, and a spec named
+#     per seed (pb-S-k1) is found before the -k<N> is stripped;
 #   - a cell whose spec is missing keeps "?" and never enters a comparison;
 #   - update dedupes on (date, tag): a second update adds no rows;
 #   - check exits 1 when the newest cell of a shape is > 20 % slower per
@@ -66,6 +69,23 @@ expect_eq "a preflight spec of the same name is not the cell's spec" "pit-schedu
 rm -rf "$TMP/pf/dev/experiments/demo-2026-01-01/specs"
 expect_eq "a preflight spec alone resolves to ?" "?,?" \
   "$(sh "$SCRIPT" collect "$TMP/pf/dev/experiments/demo-2026-01-01/chain.log" | grep ',n0-s0-v11,' | cut -d, -f4,5)"
+
+# A cloud chain stamps its lines [MM-DD HH:MM:SSZ] (chain-w, price-band: every cell since
+# cloud runs became the default was missing from the ledger): same rows as the local stamp.
+mkdir -p "$TMP/z/dev/experiments"
+cp -R "${FIX}/dev/experiments/demo-2026-01-01" "$TMP/z/dev/experiments/"
+sed "s/^\(\[[0-9][0-9]-[0-9][0-9] [0-9:]*\)\]/\1Z]/" "$LOG" > "$TMP/z/dev/experiments/demo-2026-01-01/chain.log"
+expect_eq "fixture rewrite added the Z stamp" 1 "$(grep -c "^\[01-01 01:00:00Z\] RESULT n0-s0-v11 " "$TMP/z/dev/experiments/demo-2026-01-01/chain.log")"
+expect_eq "a Z-stamped (cloud) chain log gives the same rows" "$rows" "$(sh "$SCRIPT" collect "$TMP/z/dev/experiments/demo-2026-01-01/chain.log")"
+# A cloud cell prints its cap only in its own cache stats (cap_mmap_handles=N, no
+# SNAPSHOT_MAX_MMAP_HANDLES= header), and its spec is named per seed (pb-S-k1.sexp holds
+# "pb-S-k1"): both were read as cap 256 / "?" before.
+C="$TMP/z/dev/experiments/cloud-2026-01-03"; mkdir -p "$C/specs"
+sed 's/(name "n0")/(name "cz-k1")/' "${FIX}/dev/experiments/demo-2026-01-01/specs/n0.sexp" > "$C/specs/cz-k1.sexp"
+printf '%s\n' "[01-03 00:00:00Z] chain HEAD=fff0001" \
+  "[01-03 01:00:00Z] RESULT cz-k1-s0 => total_return_pct 1.0 cap_mb=1024 cap_mmap_handles=12000 maxrss_bytes=1  (wall 2000s)" > "$C/chain.log"
+expect_eq "cloud cell: per-seed spec and its own cap" "2026-01-03T01:00:00,cloud-2026-01-03,cz-k1-s0,pit-schedule-3000,10.00,12000,fff0001,2000,200" \
+  "$(sh "$SCRIPT" collect "$C/chain.log")"
 
 rows2=$(sh "$SCRIPT" collect "$LOG2")
 expect_eq "a chain that logs no cap ran at the pre-#2882 default 256" 256 "$(printf '%s\n' "$rows2" | grep ',n0-s0-v11,' | cut -d, -f6)"
