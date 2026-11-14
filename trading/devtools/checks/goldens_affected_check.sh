@@ -140,6 +140,19 @@
 #   correct bias for a gate whose failure mode on a MISS is a silent
 #   regression (#2384) and whose failure mode on a false positive is one
 #   extra manual paired run — cheap and mechanical, not a re-review.
+#   EXCEPTION (issue #3614): a direct knob that did not exist at BASE_REF
+#   (a brand-new default-off field) is NOT expanded. Its docstring routinely
+#   cites existing knobs in the house `[field_name]` form, but a field that
+#   was not there before cannot change any golden — both arms of a paired
+#   run would be identical (same reasoning as Step 4b's newly-added carve-
+#   out and #2643's nested-field fix above). "Absent at BASE_REF" is the
+#   same whole-word presence test #2643 uses, run against the file that
+#   changed the knob (`_field_present_at_base`). A knob that ALSO changed in
+#   a file where it already existed, or that arrives via
+#   live-config-overrides.sexp, keeps expanding; so does any changed
+#   default on an existing knob. Without this, PRs #3604 and #3609 had to
+#   write their citations as `{i name}`, breaking the very convention this
+#   step reads.
 #
 #   Golden discovery (Step 3) — every `.github/workflows/golden-runs-*.yml`
 #   file's `GOLDEN_SP500_SUBDIRS:` value names the
@@ -272,7 +285,8 @@ RELATED_KNOBS_FILE="$(mktemp)"
 KNOBS_FILE="$(mktemp)"
 MLI_HEAD_CONTENT="$(mktemp)"
 VALUECHANGE_KNOBS_FILE="$(mktemp)"
-trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE"' EXIT
+BASE_PRESENCE_FILE="$(mktemp)"
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$BASE_PRESENCE_FILE"' EXIT
 
 # _changed_body_lines <ref> <ref> <files...>
 # Prints the text (post "+"/"-" marker stripped) of every ADDED/REMOVED
@@ -369,11 +383,24 @@ _embedding_field() {
   esac
 }
 
+# _field_present_at_base <file> <field>
+# Succeeds iff <field> appears as a whole word ANYWHERE in <file>'s content
+# at BASE_REF (code or comment; a file absent at BASE_REF counts as "not
+# present"). This is the single "was this knob already there?" test: the
+# #2643 nested-embedding carve-out (Step 2c) and the #3614 brand-new-field
+# carve-out (Step 2.5) both ask it, so they cannot drift apart. It is a
+# conservative presence test, not a syntax parse: a name that merely
+# appears in a base-revision comment counts as present, which errs toward
+# keeping the check's signal (see Step 2c's comment for the reasoning).
+_field_present_at_base() {
+  git show "${BASE_REF}:${1}" 2>/dev/null | grep -qw -- "$2"
+}
+
 LIT_BASE="$(mktemp)"
 LIT_HEAD="$(mktemp)"
 FILE_KNOBS="$(mktemp)"
 LIT_CHANGED_FIELDS="$(mktemp)"
-trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$LIT_BASE" "$LIT_HEAD" "$FILE_KNOBS" "$LIT_CHANGED_FIELDS"' EXIT
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$BASE_PRESENCE_FILE" "$LIT_BASE" "$LIT_HEAD" "$FILE_KNOBS" "$LIT_CHANGED_FIELDS"' EXIT
 
 # --- Steps 2 + 2b + 2c, per changed surface file ---
 # 2  : field names changed via [@sexp.default lines.
@@ -439,6 +466,23 @@ for f in $CHANGED_CONFIG_FILES; do
 
   if [ -s "$FILE_KNOBS" ]; then
     cat "$FILE_KNOBS" >> "$DIRECT_KNOBS_FILE"
+
+    # Classify each changed field as "existing" (already in this file at
+    # BASE_REF: a real value change or removal) or "new" (absent at
+    # BASE_REF: a fresh addition). Both consumers below read the result:
+    # Step 2c here, and Step 2.5's brand-new-field skip via
+    # BASE_PRESENCE_FILE ("<field><TAB>new|existing").
+    HAS_PREEXISTING_FIELD=0
+    while IFS= read -r knob_field; do
+      [ -n "$knob_field" ] || continue
+      if _field_present_at_base "$f" "$knob_field"; then
+        HAS_PREEXISTING_FIELD=1
+        printf '%s\texisting\n' "$knob_field" >> "$BASE_PRESENCE_FILE"
+      else
+        printf '%s\tnew\n' "$knob_field" >> "$BASE_PRESENCE_FILE"
+      fi
+    done < "$FILE_KNOBS"
+
     outer="$(_embedding_field "$f")"
     if [ -n "$outer" ]; then
       # Only emit the OUTER embedding knob if at least one of this file's
@@ -455,25 +499,18 @@ for f in $CHANGED_CONFIG_FILES; do
       # the nested-embedding case.
       #
       # Classification is a conservative whole-word presence check, not a
-      # syntax parse: a field counts as "pre-existing" if its name appears
-      # ANYWHERE in the file's BASE_REF content (even in a comment). That
-      # bias is deliberate and matches Step 2.5's own bias (see its header
-      # comment): when a diff-parse can't cleanly separate "added" from
-      # "changed", prefer the direction that still emits the outer knob
-      # (over-inclusive, one extra manual paired run) over the direction
-      # that could silently suppress a real change (#2384's failure mode).
-      # A field that changed value keeps its name in the BASE_REF file
-      # (the old value line still contains it), so this never misses a
-      # real value-change or removal; it only skips files whose FILE_KNOBS
-      # are entirely fresh additions.
-      HAS_PREEXISTING_FIELD=0
-      while IFS= read -r knob_field; do
-        [ -n "$knob_field" ] || continue
-        if git show "${BASE_REF}:${f}" 2>/dev/null | grep -qw -- "$knob_field"; then
-          HAS_PREEXISTING_FIELD=1
-          break
-        fi
-      done < "$FILE_KNOBS"
+      # syntax parse (see _field_present_at_base): a field counts as
+      # "pre-existing" if its name appears ANYWHERE in the file's BASE_REF
+      # content (even in a comment). That bias is deliberate and matches
+      # Step 2.5's own bias (see its header comment): when a diff-parse
+      # can't cleanly separate "added" from "changed", prefer the
+      # direction that still emits the outer knob (over-inclusive, one
+      # extra manual paired run) over the direction that could silently
+      # suppress a real change (#2384's failure mode). A field that
+      # changed value keeps its name in the BASE_REF file (the old value
+      # line still contains it), so this never misses a real value-change
+      # or removal; it only skips files whose FILE_KNOBS are entirely
+      # fresh additions.
       if [ "$HAS_PREEXISTING_FIELD" -eq 1 ]; then
         printf '%s\tembeds:%s\n' "$outer" "$(basename "$f")" >> "$RELATED_KNOBS_FILE"
       fi
@@ -481,10 +518,15 @@ for f in $CHANGED_CONFIG_FILES; do
   fi
 done
 
+# An override knob is never treated as brand-new (Step 2.5 keeps expanding
+# its docstring citations): there is no surface file here to run the
+# base-presence test against, and the over-inclusive direction is the safe
+# one. Tagging it "existing" in BASE_PRESENCE_FILE is what pins that.
 if [ -n "$OVERRIDES_FILE" ]; then
   _changed_body_lines "$BASE_REF" "$HEAD_REF" "$OVERRIDES_FILE" \
     | sed -n 's/^[[:space:]]*((\([A-Za-z_][A-Za-z0-9_]*\)[[:space:]].*$/\1/p' \
-    >> "$DIRECT_KNOBS_FILE" || true
+    | tee -a "$DIRECT_KNOBS_FILE" \
+    | awk '{ print $0 "\texisting" }' >> "$BASE_PRESENCE_FILE" || true
 fi
 
 sort -u "$DIRECT_KNOBS_FILE" -o "$DIRECT_KNOBS_FILE"
@@ -542,9 +584,27 @@ _docstring_related_knobs() {
     | grep -v -x -- "$target" || true
 }
 
+# _is_brand_new_knob <knob>
+# Succeeds iff <knob> is a fresh addition: every surface file that changed
+# it lacks the name at BASE_REF (BASE_PRESENCE_FILE says "new" and never
+# "existing"). Issue #3614: a field that did not exist at BASE_REF cannot
+# change any golden -- both arms of a paired run would be identical, the
+# same reasoning as Step 4b's newly-added carve-out and #2643's nested-field
+# fix -- so its docstring citations are not worth a paired run. A knob that
+# also changed in a file where it pre-dates BASE_REF, or that came from the
+# overrides file, is tagged "existing" and keeps expanding.
+_is_brand_new_knob() {
+  tab="$(printf '\t')"
+  grep -q -F -x -- "${1}${tab}new" "$BASE_PRESENCE_FILE" \
+    && ! grep -q -F -x -- "${1}${tab}existing" "$BASE_PRESENCE_FILE"
+}
+
 if [ -s "$MLI_HEAD_CONTENT" ]; then
   while IFS= read -r knob; do
     [ -n "$knob" ] || continue
+    if _is_brand_new_knob "$knob"; then
+      continue
+    fi
     _docstring_related_knobs "$knob" | while IFS= read -r related; do
       [ -n "$related" ] || continue
       printf '%s\trelated-via:%s\n' "$related" "$knob" >> "$RELATED_KNOBS_FILE"
@@ -565,7 +625,7 @@ sort -u "$KNOBS_FILE" -o "$KNOBS_FILE"
 
 WORKFLOWS_DIR="${REPO_ROOT}/.github/workflows"
 SUBDIRS_FILE="$(mktemp)"
-trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$LIT_BASE" "$LIT_HEAD" "$LIT_CHANGED_FIELDS" "$SUBDIRS_FILE"' EXIT
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$BASE_PRESENCE_FILE" "$LIT_BASE" "$LIT_HEAD" "$LIT_CHANGED_FIELDS" "$SUBDIRS_FILE"' EXIT
 
 printf '%s\n' goldens-small goldens-broad smoke perf-sweep >> "$SUBDIRS_FILE"
 for wf in "$WORKFLOWS_DIR"/golden-runs-*.yml; do
@@ -626,7 +686,7 @@ sort -u "$VALUECHANGE_KNOBS_FILE" -o "$VALUECHANGE_KNOBS_FILE"
 # always wins over the compiled-in default, so anything that doesn't pin
 # the knob silently inherits whatever the new default is.
 ALL_SPECS_FILE="$(mktemp)"
-trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$LIT_BASE" "$LIT_HEAD" "$LIT_CHANGED_FIELDS" "$SUBDIRS_FILE" "$ALL_SPECS_FILE"' EXIT
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$BASE_PRESENCE_FILE" "$LIT_BASE" "$LIT_HEAD" "$LIT_CHANGED_FIELDS" "$SUBDIRS_FILE" "$ALL_SPECS_FILE"' EXIT
 : > "$ALL_SPECS_FILE"
 while IFS= read -r subdir; do
   [ -n "$subdir" ] || continue
