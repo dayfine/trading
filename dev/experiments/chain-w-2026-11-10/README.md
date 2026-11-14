@@ -623,7 +623,7 @@ With M1–M4 recorded, #3183's item is met.
 
 **The gate's own trades net to about zero.**
 - Summed impact is −0.03 % of NAV: blocked → admitted −2.12 %, admitted → blocked +0.96 %, hold exit +1.13 %.
-- Removing any one of CVM, VHC or PENN flips the sign, so no sign is claimed (n = 8).
+- Removing any one of CVM, VHC, MAXN or even HAFC (−0.06 %) flips the sign, so no sign is claimed (n = 8).
 
 **The level gap is displacement, and mostly one trade.**
 - The 26 one-arm displacement rows sum to −4.77 % of NAV (median −0.18 %, range −4.01 % to +2.29 %).
