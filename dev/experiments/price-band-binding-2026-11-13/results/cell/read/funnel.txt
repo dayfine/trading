@@ -1,0 +1,54 @@
+== Measurement 4: the population screen's breakouts in this run's cascade (README §Measurements) ==
+events in the screened weeks: 18957; by band (all / monster): <$8 1041/212, $8-14 2155/275, $14-33 6639/494, >=$33 9122/484
+
+-- exact-week view: share of the band's events (monster | all) --
+class                  | <$8               | $8-14             | $14-33            | >=$33            
+ADMITTED               |   6.1%    5.4%    |   4.4%    5.1%    |   5.7%    6.1%    |   5.8%    7.1%   
+TOP_N                  |  34.9%   33.2%    |  40.7%   38.8%    |  48.4%   48.2%    |  60.1%   58.8%   
+GRADE                  |   0.0%    0.3%    |   0.0%    0.2%    |   0.2%    0.1%    |   0.2%    0.1%   
+SECTOR                 |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Price_floor        |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Stage_setup        |  36.8%   41.5%    |  34.2%   32.4%    |  22.9%   22.8%    |  16.3%   13.2%   
+BRK_Breakout_volume    |   0.5%    0.4%    |   0.4%    0.3%    |   1.4%    1.0%    |   0.6%    1.0%   
+BRK_Rs_declining       |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.1%    |   0.0%    0.0%   
+BRK_Failed_breakout    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Volume_band        |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%   
+NOT_SURFACED           |   8.5%   10.1%    |  11.3%   10.8%    |  11.7%   10.3%    |   9.5%   12.7%   
+MACRO_BLOCKED          |  11.8%    7.7%    |   8.0%   11.0%    |   8.1%   10.4%    |   6.6%    6.2%   
+NO_SCREEN              |   1.4%    1.4%    |   1.1%    1.3%    |   1.6%    1.1%    |   0.8%    0.8%   
+
+-- exact view: breakout sub-gates among events with a cascade row (monster share, all share, lift = M/A) --
+sub-gate               | < $14 (cheap)                  | $14-33                         | >= $33                        
+BRK_Price_floor        | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Stage_setup        | M  44.7 % A  45.3 % lift 0.99 | M  29.1 % A  29.1 % lift 1.00 | M  19.7 % A  16.4 % lift 1.20
+BRK_Breakout_volume    | M   0.5 % A   0.4 % lift 1.18 | M   1.8 % A   1.2 % lift 1.46 | M   0.7 % A   1.3 % lift 0.59
+BRK_Rs_declining       | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.1 % lift 0.00 | M   0.0 % A   0.1 % lift 0.00
+BRK_Failed_breakout    | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Volume_band        | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+events with a cascade row: cheap monster 385, cheap all 2498; $14-33 388 / 5196; >= $33 402 / 7326
+
+-- best of weeks 0..+4 view: share of the band's events (monster | all) --
+class                  | <$8               | $8-14             | $14-33            | >=$33            
+ADMITTED               |   9.9%    9.5%    |  10.2%    8.8%    |   9.7%   10.3%    |  10.3%   12.7%   
+TOP_N                  |  48.1%   44.8%    |  54.2%   49.8%    |  62.3%   57.9%    |  71.5%   67.7%   
+GRADE                  |   0.0%    0.4%    |   0.0%    0.3%    |   0.2%    0.1%    |   0.2%    0.2%   
+SECTOR                 |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Price_floor        |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Stage_setup        |  31.1%   37.8%    |  27.6%   31.0%    |  19.8%   20.8%    |  12.0%   11.2%   
+BRK_Breakout_volume    |   0.5%    0.2%    |   0.4%    0.1%    |   0.2%    0.2%    |   0.2%    0.3%   
+BRK_Rs_declining       |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.1%    |   0.0%    0.0%   
+BRK_Failed_breakout    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%   
+BRK_Volume_band        |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%   
+NOT_SURFACED           |   1.9%    2.3%    |   2.9%    3.7%    |   3.4%    3.3%    |   4.1%    4.2%   
+MACRO_BLOCKED          |   8.5%    5.1%    |   4.7%    6.3%    |   4.3%    7.2%    |   1.7%    3.8%   
+NO_SCREEN              |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%    |   0.0%    0.0%   
+
+-- window view: breakout sub-gates among events with a cascade row (monster share, all share, lift = M/A) --
+sub-gate               | < $14 (cheap)                  | $14-33                         | >= $33                        
+BRK_Price_floor        | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Stage_setup        | M  32.0 % A  36.5 % lift 0.88 | M  21.5 % A  23.3 % lift 0.92 | M  12.7 % A  12.1 % lift 1.05
+BRK_Breakout_volume    | M   0.5 % A   0.1 % lift 3.27 | M   0.2 % A   0.2 % lift 1.09 | M   0.2 % A   0.3 % lift 0.64
+BRK_Rs_declining       | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.1 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Failed_breakout    | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+BRK_Volume_band        | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00 | M   0.0 % A   0.0 % lift 0.00
+events with a cascade row: cheap monster 444, cheap all 2905; $14-33 456 / 5939; >= $33 456 / 8400

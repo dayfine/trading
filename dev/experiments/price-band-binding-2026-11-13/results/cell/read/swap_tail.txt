@@ -1,0 +1,22 @@
+== Measurement 3: the swap tail (README §Measurements; screen definitions, deduped per symbol per 26 weeks) ==
+deduped rows: in 1526 (F 1416, D 108, T 2, X 0) | out 1616 (F 1380, D 89, T 0, X 147)
+primary convention FD (cov F or D):
+  swapped in             n= 1524  monster  156 =  10.2 %  win  38.5 %  mean ride   +4.0 %  p10 -17.3% p25 -10.1% p50 -4.1% p75 +7.8% p90 +33.2%
+  swapped out            n= 1469  monster   49 =   3.3 %  win  42.0 %  mean ride   +4.1 %  p10 -12.3% p25 -7.7% p50 -2.1% p75 +7.8% p90 +26.6%
+  in, 2000-12            n=  722  monster   75 =  10.4 %  win  38.2 %  mean ride   +3.6 %  p10 -17.7% p25 -10.2% p50 -4.3% p75 +7.1% p90 +32.9%
+  out, 2000-12           n=  630  monster   23 =   3.7 %  win  39.8 %  mean ride   +4.1 %  p10 -11.9% p25 -7.8% p50 -2.2% p75 +7.8% p90 +25.8%
+  in, 2013-26            n=  802  monster   81 =  10.1 %  win  38.8 %  mean ride   +4.4 %  p10 -16.9% p25 -9.8% p50 -4.0% p75 +8.3% p90 +35.4%
+  out, 2013-26           n=  839  monster   26 =   3.1 %  win  43.6 %  mean ride   +4.2 %  p10 -13.0% p25 -7.5% p50 -1.9% p75 +7.8% p90 +27.3%
+  in, <$8                n=  294  monster   69 =  23.5 %  win  37.8 %  mean ride   +5.9 %  p10 -27.4% p25 -15.5% p50 -6.0% p75 +13.8% p90 +64.8%
+  out, <$8               n=0
+  in, $8-14              n=  379  monster   27 =   7.1 %  win  37.7 %  mean ride   +3.0 %  p10 -18.8% p25 -10.5% p50 -4.6% p75 +6.2% p90 +32.0%
+  out, $8-14             n=    5  monster    2 =  40.0 %  win  60.0 %  mean ride  +41.8 %  p10 -21.2% p25 -9.2% p50 +3.7% p75 +74.3% p90 +161.3%
+  in, $14-33             n=  851  monster   60 =   7.1 %  win  39.1 %  mean ride   +3.9 %  p10 -13.4% p25 -8.8% p50 -3.4% p75 +7.7% p90 +28.9%
+  out, $14-33            n=  148  monster   12 =   8.1 %  win  48.6 %  mean ride  +10.3 %  p10 -11.7% p25 -6.0% p50 -0.3% p75 +11.6% p90 +43.7%
+  in, >=$33              n=0
+  out, >=$33             n= 1316  monster   35 =   2.7 %  win  41.2 %  mean ride   +3.3 %  p10 -12.3% p25 -7.8% p50 -2.5% p75 +7.1% p90 +25.7%
+screen convention F (52 forward weeks only):
+  swapped in             n= 1416  monster  146 =  10.3 %  win  38.0 %  mean ride   +4.0 %  p10 -16.7% p25 -9.8% p50 -4.3% p75 +7.3% p90 +32.9%
+  swapped out            n= 1380  monster   45 =   3.3 %  win  41.2 %  mean ride   +3.7 %  p10 -12.1% p25 -7.7% p50 -2.4% p75 +7.7% p90 +26.0%
+monster-rate ratio in/out: FD 3.07 (F 3.16); monsters on both sides 205
+paired per changed date (in minus out, mean capped ride): n=725  in > out on 46.8 %  mean +0.9 pp  p10 -24.8 pp  median -1.4 pp  p90 +26.3 pp

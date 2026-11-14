@@ -1,0 +1,8 @@
+# price-band-binding self-check (read/read.sh step 3; README §Self-check). SEED=0 CAP=20
+band proxy (decision-date raw close from the bar store) vs the ticket band (suggested_entry): 621 of 644 placed tickets (trade_audit entry records) agree (96.4 %); 39 without a bar
+bar lookup vs trade_audit close_at_decision band: 644 of 644 agree (100.0 %)
+SC1 (the Seeded re-rank reproduces the Admitted set): PASS on all 1099 longs-open dates
+SC2 (the walk order is the Seeded order): PASS on all 1099 dates with a walk record
+SC power: the cut fell inside a score tie on 921 dates; the Alphabetical control misses the Admitted set on 877 dates
+pool rows with no price (band NA, ranked in the top band): 40229
+SELF-CHECK PASSED

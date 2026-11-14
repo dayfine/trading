@@ -1,0 +1,6 @@
+# inputs of this read
+SEED=0 CAP=20 EVENTS=all STORE_END=2026-09-11
+candidates.sexp md5 b3b368df384ce602d740d0577d65376c bytes 974492879
+trade_audit.sexp md5 7a4582caf41cf31401ce301ffb06a37a
+trades.csv md5 0928cfe40333560429f5a6e57c9c18de
+screened dates 1335, Long rows 2252848, pool rows 498225, walk rows 21450, entries 581, screen events 18957
