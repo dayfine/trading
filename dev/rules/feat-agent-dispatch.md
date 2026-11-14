@@ -19,7 +19,7 @@ reality.
 
 ```
 ### Current test failures in your test directory
-<paste `dune runtest <target-test-dir>` output, OR "All passing" if clean>
+<paste the failing tests from main's latest CI run for the target test dir, OR "All passing on main (CI green at <sha>)">
 
 ### Last QC review findings
 <paste relevant sections from `gh pr view <N> --json reviews --jq '.reviews[].body'`

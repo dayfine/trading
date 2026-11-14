@@ -1074,7 +1074,7 @@ You are implementing the <FEATURE> track for the Weinstein Trading System.
 ## Pre-flight context (read this before starting any work)
 
 ### Current test failures in your test directory
-<paste dune runtest output for this feature's test dir, or "All passing" if clean>
+<paste the failing tests from main's latest CI run for this feature's test dir, or "All passing on main (CI green at <sha>)">
 
 ### Last QC review findings
 <paste relevant sections from dev/reviews/<feature>.md, or "No prior review" if first run>
@@ -1114,7 +1114,7 @@ Your branch: feat/<feature>
 Work using TDD (CLAUDE.md workflow):
   1. .mli interface + skeleton → dune build passes
   2. Write tests
-  3. Implement → dune build && dune runtest passes
+  3. Implement → dune build passes (CI runs the tests)
   4. dune fmt
   5. Commit and push (see commit discipline below)
 
@@ -1128,7 +1128,7 @@ COMMIT DISCIPLINE — this is critical for reviewability AND for surviving rate-
   - Commit sequence per module:
       a. .mli + skeleton (dune build passes) → commit
       b. tests (mostly failing) → commit
-      c. implementation (dune build && dune runtest passes) → commit
+      c. implementation (dune build passes) → commit
       d. dune fmt → commit if it changed anything
   - Each commit must build and (where possible) pass tests on its own
   - Push after every commit:
