@@ -1,7 +1,8 @@
-emit wall 86 s, peak_rss_kb=343816
-plain wall 95 s, peak_rss_kb=293340
+# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
+emit wall 78 s, peak_rss_kb=336188
+plain wall 79 s, peak_rss_kb=296468
 tripwire on the smoke window: trades.csv md5 with --emit-candidates dcb8e99dfe7b9ee23bce2e5674876dd1, without dcb8e99dfe7b9ee23bce2e5674876dd1: MATCH (41 lines)
 candidates.sexp 13004988 bytes, trade_audit.sexp 889452 bytes
-read exit 0, wall 51 s
+read exit 0, wall 55 s
 self-check with SEED=1: exit 3 | SC1 (the Seeded re-rank reproduces the Admitted set): FAIL on 19 dates SC2 (the walk order is the Seeded order): FAIL on 68 dates 
 self-check with SEED=0: exit 0 | SC1 (the Seeded re-rank reproduces the Admitted set): PASS on all 99 longs-open dates SC2 (the walk order is the Seeded order): PASS on all 82 dates with a walk record 

@@ -40,8 +40,7 @@ for seed in 1 0; do
   echo "self-check with SEED=$seed: exit $? | $(grep -h '^SC[12] (' "$S/neg-$seed.txt" | tr '\n' ' ')" >> "$S/smoke.txt"
 done
 mkdir -p "$ROOT/$EXP/results/smoke"; rm -f "$ROOT/$EXP/results/smoke"/*
-cp "$S/smoke.txt" "$S/read"/*.tsv "$ROOT/$EXP/results/smoke/"
-for f in "$S/read"/*.txt; do   # every table carries the banner: the smoke exercises the code and bears on no rule
+for f in "$S/smoke.txt" "$S/read"/*.txt "$S/read"/*.tsv; do   # every file carries the banner: the smoke bears on no rule
   { echo "# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke)."; cat "$f"; } \
     > "$ROOT/$EXP/results/smoke/$(basename "$f")"
 done

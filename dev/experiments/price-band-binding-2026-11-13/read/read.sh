@@ -55,7 +55,7 @@ n_entries=$(( $(awk 'END { print NR - 1 }' "$TRADES") + $(awk 'END { print NR - 
     $3 == "Long" { b = B[$1, $2]; if (b == "" || b == "NA") { na++; next }
       n++; s = ($4 >= 8) + ($4 >= 14) + ($4 >= 33); agree += (s == b)
       if ($5 != "NA") { m++; c = ($5 >= 8) + ($5 >= 14) + ($5 >= 33); cagree += (c == b) } }
-    END { printf "band proxy (decision-date raw close from the bar store) vs the ticket band (suggested_entry): %d of %d filled entries agree (%.1f %%); %d without a bar\n", agree, n, (n ? 100 * agree / n : 0), na
+    END { printf "band proxy (decision-date raw close from the bar store) vs the ticket band (suggested_entry): %d of %d placed tickets (trade_audit entry records) agree (%.1f %%); %d without a bar\n", agree, n, (n ? 100 * agree / n : 0), na
           printf "bar lookup vs trade_audit close_at_decision band: %d of %d agree (%.1f %%)\n", cagree, m, (m ? 100 * cagree / m : 0)
           printf "AG %.4f\n", (n ? agree / n : 0) > AG }' \
     "$WORK/fwd.tsv" "$WORK/entries.tsv"; } > "$OUT/selfcheck.txt"
@@ -105,13 +105,21 @@ cat "$WORK/agates.txt" "$WORK/bgates.txt" "$WORK/tgates.txt" "$WORK/fgates.txt" 
   bfail = (L1 < 0.25 || L2 < 0.75); bpass = (L1 >= 0.25 && L2 >= 1.5)
   tfail = (tm >= 20 && (tr < 1.0 || td <= 0)); tpass = (tm >= 20 && tr >= 1.5 && v["T_h1_in_gt_out"] && v["T_h2_in_gt_out"] && td > 0)
   printf "Rule 1 inputs: L1 %.4f (bar 0.25) | L2 E_net %.3f (bars 0.75 / 1.5) | T ratio %.3f (bars 1.0 / 1.5), in>out 2000-12 %d, 2013-26 %d, monsters %d (min 20), ride diff %+.4f\n", L1, L2, tr, v["T_h1_in_gt_out"], v["T_h2_in_gt_out"], tm, td
-  r1 = bfail ? "CLOSE-AXIS (the order does not bind enough to move the tail)" : tfail ? "CLOSE-AXIS (it binds, but swaps in no fatter tail)" : (bpass && tpass) ? "FRESH-PREREGISTRATION" : "PARK"
-  if (v["AG"] < 0.90) r1 = sprintf("NOT APPLIED (the band proxy agrees with the ticket band on %.1f %% of filled entries, below 90 %%)", 100 * v["AG"])
+  r1 = bfail ? "CLOSE-AXIS (the expected direct tail effect on this path is below the noise floor; keep as a default-off axis)" : tfail ? "CLOSE-AXIS (it binds, but swaps in no fatter tail; keep as a default-off axis)" : (bpass && tpass) ? "FRESH-PREREGISTRATION" : "PARK"
+  if (v["AG"] < 0.90) r1 = sprintf("NOT APPLIED (the band proxy agrees with the ticket band on %.1f %% of placed tickets, below 90 %%)", 100 * v["AG"])
   printf "Rule 1 (tiebreak), mechanical: %s\n", r1
-  n = split(v["F_exact"], a, ","); hit = ""
-  for (i = 1; i <= n; i++) if (a[i] != "none" && index("," v["F_window"] ",", "," a[i] ",")) hit = hit " " a[i]
-  printf "Rule 2 inputs: exact-week hits %s | window hits %s | cheap monsters with a cascade row %d (min 30)\n", v["F_exact"], v["F_window"], v["F_cheap_monsters_exact"]
-  printf "Rule 2 (sub-gate), mechanical: %s\n", (hit == "") ? "NOTHING" : "DIAL-STUDY on" hit
+  # Rule 2, in README order: UNDERPOWERED, DIAL-STUDY (both views), one view only, lift below the share bar, NOTHING.
+  ne = split(v["F_exact"], a, ","); nw = split(v["F_window"], b, ","); hit = ""; one = ""
+  for (i = 1; i <= ne; i++) if (a[i] != "none") { if (index("," v["F_window"] ",", "," a[i] ",")) hit = hit " " a[i]; else one = one " " a[i] }
+  for (i = 1; i <= nw; i++) if (b[i] != "none" && !index("," v["F_exact"] ",", "," b[i] ",")) one = one " " b[i]
+  lift = ""; if (v["F_lift_exact"] != "none") lift = lift " exact:" v["F_lift_exact"]; if (v["F_lift_window"] != "none") lift = lift " window:" v["F_lift_window"]
+  printf "Rule 2 inputs: hits (all three bars) exact %s, window %s | lift >= 1.25 at any share: exact %s, window %s | cheap monsters with a cascade row: exact %d, window %d (min 30 each)\n", v["F_exact"], v["F_window"], v["F_lift_exact"], v["F_lift_window"], v["F_cheap_monsters_exact"], v["F_cheap_monsters_window"]
+  if (v["F_cheap_monsters_exact"] < 30 || v["F_cheap_monsters_window"] < 30) r2 = "UNDERPOWERED (fewer than 30 cheap monsters with a cascade row in a view): no conclusion"
+  else if (hit != "") r2 = "DIAL-STUDY on" hit
+  else if (one != "") r2 = "NO CONCLUSION (passes in one view only:" one ")"
+  else if (lift != "") r2 = "NO CONCLUSION (lift >= 1.25 but under the 20 % share:" lift ")"
+  else r2 = "NOTHING (breadth: no sub-gate is first to drop cheap monsters 1.25x as often as cheap breakouts, in either view)"
+  printf "Rule 2 (sub-gate), mechanical: %s\n", r2
 }' > "$OUT/rules.txt"
 { echo "# inputs of this read"
   echo "SEED=$SEED CAP=$CAP EVENTS=$EVENTS STORE_END=$STORE_END"

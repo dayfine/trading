@@ -1,3 +1,4 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
 date	n_long	n_pool	n_admitted	binding	tie_at_cut	multiband_tie	changed	swaps	order_changed	sc1	sc2	alpha	n_walk	n_placed
 2019-07-05	397	15	15	0	0	0	0	0	1	ok	ok	same	14	2
 2019-07-12	413	12	12	0	0	0	0	0	1	ok	ok	same	11	0

@@ -24,4 +24,4 @@ fill ratio = entries 43 / placed tickets 53 = 0.811
   $14-33  expected tickets re-drawn in    0.39 out    0.00   r = 0.0097
   >=$33   expected tickets re-drawn in    1.00 out    2.00   r = 0.0089
 re-drawn tickets: in 1.4, out 2.0 (0.73 a year over 1.9 screened years); by channel: cut dates in 0.4 / out 1.0, order-only dates in 1.0 / out 1.0
-E_net = fill x sum over bands of (in - out) x r = -0.004 expected net >= +100 % trades over the window (L2)
+E_net = fill x sum over bands of (in - out) x r = -0.004 expected net >= +100 % trades over the window (L2; P modelled vs S placed)

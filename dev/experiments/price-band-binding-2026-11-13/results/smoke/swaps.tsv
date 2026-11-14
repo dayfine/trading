@@ -1,3 +1,4 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only. No verdict; sp500 is a fixture (README §Smoke).
 date	dir	symbol	band	score	rank_S	rank_P
 2020-01-24	in	IVZ	2	40	21	19
 2020-01-24	out	LH	3	40	20	21

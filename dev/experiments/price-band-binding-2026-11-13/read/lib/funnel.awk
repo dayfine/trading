@@ -74,11 +74,13 @@ END {
       }
       print ""
       mS = fr(G[view, c, "cheap", "M"], NW[view, "cheap", "M"]); aS = fr(G[view, c, "cheap", "A"], NW[view, "cheap", "A"])
+      if (aS > 0 && mS / aS >= 1.25) lifted[view] = lifted[view] "," substr(c, 5)   # README Rule 2: lift bar alone
       if (mS >= 0.20 && aS > 0 && mS / aS >= 1.25 && NW[view, "cheap", "M"] >= 30) hit[view] = hit[view] "," substr(c, 5)
     }
     printf "events with a cascade row: cheap monster %d, cheap all %d; $14-33 %d / %d; >= $33 %d / %d\n", NW[view, "cheap", "M"], NW[view, "cheap", "A"], NW[view, 2, "M"], NW[view, 2, "A"], NW[view, 3, "M"], NW[view, 3, "A"]
   }
-  printf "F_exact %s F_window %s F_cheap_monsters_exact %d\n", (hit["exact"] == "") ? "none" : substr(hit["exact"], 2), (hit["window"] == "") ? "none" : substr(hit["window"], 2), NW["exact", "cheap", "M"] > GATES
+  printf "F_exact %s F_window %s F_lift_exact %s F_lift_window %s F_cheap_monsters_exact %d F_cheap_monsters_window %d\n", lst(hit["exact"]), lst(hit["window"]), lst(lifted["exact"]), lst(lifted["window"]), NW["exact", "cheap", "M"], NW["window", "cheap", "M"] > GATES
 }
+function lst(s) { return (s == "") ? "none" : substr(s, 2) }
 function fr(a, b) { return (b > 0) ? a / b : 0 }
 function sh(a, b) { return (b > 0) ? sprintf("%5.1f%%", 100 * a / b) : "  n/a" }

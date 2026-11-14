@@ -99,7 +99,9 @@ function one_date(d,   n, i, k, r, b, half, binding, ties, nb, changed, ordch, s
 # A name's fundability: S's walk outcome when S walked it (Placed or Insufficient_cash = fundable, any other skip =
 # not); 0 when it sat in S's top-N but a post-cut gate dropped it; Q[band] (S's per-band fundable share of its top-N)
 # when S cut it. When S's walk ran out of cash (any Insufficient_cash), both orders fund only as many tickets as S
-# placed, in their own order; otherwise every fundable top-N name is funded. Expected values, not draws.
+# placed, in their own order; otherwise every fundable top-N name is funded. Expected values, not draws. The re-draw
+# compares P's MODELLED funding (eP) with S's ACTUAL placements, so the model's error on cash dates enters L2; the
+# model check (the same model on S's own order, eS) bounds it.
 function fundable(i) { if (inS[i]) return (wout[i] == "Placed" || wout[i] == "Insufficient_cash") ? 1 : 0; return Q[BD[i]] }
 function walk_order(o, cash, m, e,   r, cum, x, p) {
   cum = 0
@@ -163,6 +165,6 @@ function report(   b, L, fill, enet, rr, tin, tout, yrs) {
   }
   yrs = (open_n + mblk) / 52.18
   printf "re-drawn tickets: in %.1f, out %.1f (%.2f a year over %.1f screened years); by channel: cut dates in %.1f / out %.1f, order-only dates in %.1f / out %.1f\n", tin, tout, (yrs > 0 ? tin / yrs : 0), yrs, rin_ch["cut"], rout_ch["cut"], rin_ch["order"], rout_ch["order"]
-  printf "E_net = fill x sum over bands of (in - out) x r = %.3f expected net >= +100 %% trades over the window (L2)\n", enet
+  printf "E_net = fill x sum over bands of (in - out) x r = %.3f expected net >= +100 %% trades over the window (L2; P modelled vs S placed)\n", enet
   printf "L1 %.4f L2 %.4f\n", (bind_n ? chg_n / bind_n : 0), enet > GATES
 }
