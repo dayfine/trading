@@ -69,7 +69,10 @@ val prefer_narrow_stops :
     exactly one the gate would call wide.
     {b Agreeing with the gate is the contract}, and it settles the edge cases:
     there is no separate policy here for thin data, because whatever stop the
-    gate would install is the stop this pass measures.
+    gate would install is the stop this pass measures. Under
+    [entry_cap_stop_gate_on_uncapped] the gate reads the stop the ticket would
+    install at its uncapped trigger ({!Entry_cap_stop_gate.gate_entry}), and so
+    does this pass.
 
     In particular, a symbol with {b no resident bars} is not a special case.
     {!Entry_audit_helpers.latest_close} returns [None], the effective entry

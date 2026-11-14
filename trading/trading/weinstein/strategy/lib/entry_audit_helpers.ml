@@ -86,12 +86,13 @@ let effective_entry_price ?(trigger_at_suggested = false) ~bar_reader
     A structural floor already within the 15% limit (normal-shape candidates) is
     returned verbatim, so off-path and in-limit behaviour are bit-identical. The
     audit [stop_floor_kind] becomes [Buffer_fallback] on re-anchor, honestly
-    reflecting the installed level. *)
+    reflecting the installed level. The distance test reads [gate_entry]; the
+    buffer stop sits below [effective_entry] ({!Entry_cap_stop_gate}). *)
 let _maybe_reanchor_to_entry_base ~reanchor ~stops_config ~side ~effective_entry
-    ~initial_stop_buffer ~current_date ~raw_stop
+    ~gate_entry ~initial_stop_buffer ~current_date ~raw_stop
     ~(structural_kind : Audit_recorder.stop_floor_kind) =
   let level = Weinstein_stops.get_stop_level raw_stop in
-  let dist = Float.abs (level -. effective_entry) /. effective_entry in
+  let dist = Float.abs (level -. gate_entry) /. gate_entry in
   let should_reanchor =
     reanchor
     && Float.( > ) dist stops_config.Weinstein_stops.max_stop_distance_pct
@@ -157,7 +158,8 @@ let stop_at_pullback_low ~enabled ~stops_config ~effective_entry ~raw_stop
     initial-stop re-anchoring (see {!_maybe_reanchor_to_entry_base}) before the
     min-distance widening. The strategy sets it only when
     [config.stop_anchor_at_entry_base] AND the entry is E-anchored; default
-    [false] keeps the support-floor stop verbatim (bit-identical, R1).
+    [false] keeps the support-floor stop verbatim (bit-identical, R1). Its
+    distance test reads [?gate_entry] (default [effective_entry]).
 
     The third component of the result is the F5 telemetry tag: which price basis
     the floor scan actually ran on ([Flag_off] / [Adjusted] / [Raw_fallback]).
@@ -169,8 +171,8 @@ let stop_at_pullback_low ~enabled ~stops_config ~effective_entry ~raw_stop
     describes the scan. *)
 let initial_stop_and_kind ?(min_stop_distance_pct = 0.0)
     ?(continuation_stop_at_pullback_low = false)
-    ?(reanchor_to_entry_base = false) ~stops_config ~initial_stop_buffer
-    ~bar_reader ~current_date ~effective_entry
+    ?(reanchor_to_entry_base = false) ?gate_entry ~stops_config
+    ~initial_stop_buffer ~bar_reader ~current_date ~effective_entry
     (cand : Screener.scored_candidate) =
   let daily_view =
     Bar_reader.daily_view_for bar_reader ~symbol:cand.ticker ~as_of:current_date
@@ -201,8 +203,9 @@ let initial_stop_and_kind ?(min_stop_distance_pct = 0.0)
   in
   let raw_stop, stop_floor_kind =
     _maybe_reanchor_to_entry_base ~reanchor:reanchor_to_entry_base ~stops_config
-      ~side:cand.side ~effective_entry ~initial_stop_buffer ~current_date
-      ~raw_stop ~structural_kind
+      ~side:cand.side ~effective_entry
+      ~gate_entry:(Option.value gate_entry ~default:effective_entry)
+      ~initial_stop_buffer ~current_date ~raw_stop ~structural_kind
   in
   let initial_stop =
     Weinstein_stops.Stop_widen.widen_initial_to_min_distance

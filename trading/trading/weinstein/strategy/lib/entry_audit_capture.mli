@@ -132,6 +132,7 @@ val make_entry_transition :
   ?continuation_stop_at_pullback_low:bool ->
   ?require_structural_stop:bool ->
   ?stop_width:Stop_width_mode.policy ->
+  ?gate_entry:float ->
   portfolio_risk_config:Portfolio_risk.config ->
   stops_config:Weinstein_stops.config ->
   initial_stop_buffer:float ->
@@ -231,7 +232,22 @@ val make_entry_transition :
     exactly the risk-parity size-down. The caller builds the policy from
     [config.stop_width_mode] / [config.stop_width_size_down_max_pct]; see
     {!Stop_width_mode} for the honest-citation framing (a tolerated-
-    participation reading of §5.1, not a documented book mechanism). *)
+    participation reading of §5.1, not a documented book mechanism).
+
+    [?gate_entry] (default: absent, bit-identical) is the entry the stop-width
+    {i decisions} measure from, when it is not the ticket's own: the
+    [?stop_anchor_at_entry_base] re-anchor test, the [?require_structural_stop]
+    test and step (3). With [Some e] the re-anchor test of step (2) reads [e],
+    and the other two read the floor kind and distance of the stop the ticket
+    would install at [e], computed by the same helper. The trigger, the
+    installed stop (a re-anchored one included, placed below [effective_entry]),
+    the sizing and the [No_structural_stop] detail still follow
+    [effective_entry]. In the candidate trace of [Pass], [Stop_too_wide] and
+    [Sized_zero], the entry and the stop are the placed ones while the
+    [stop_distance_pct] is the gate's, measured from [e], so recomputing it from
+    the same line gives a different number (audit only). The strategy passes
+    {!Entry_cap_stop_gate.gate_entry}: the trigger the ticket would have had
+    with the stale-entry cap off. *)
 
 val check_cash_and_deduct :
   leverage_enabled:bool ->

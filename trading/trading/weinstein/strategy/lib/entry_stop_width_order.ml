@@ -25,6 +25,9 @@ let _distance_at ~config ~initial_stop_buffer ~bar_reader ~current_date
   Entry_audit_helpers.stop_distance_pct ~effective_entry
     ~installed_stop:(Weinstein_stops.get_stop_level initial_stop)
 
+(* Measured from the entry the gate reads: the ticket's own, or the uncapped
+   trigger under {!Entry_cap_stop_gate}, where [_distance_at] then computes the
+   same stop the gate computes at that entry. *)
 let _stop_distance_pct_for ~config ~initial_stop_buffer ~bar_reader
     ~current_date (cand : Screener.scored_candidate) =
   let close = Entry_audit_helpers.latest_close ~bar_reader ~current_date cand in
@@ -32,8 +35,11 @@ let _stop_distance_pct_for ~config ~initial_stop_buffer ~bar_reader
     config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit
   in
   let effective_entry =
-    Entry_audit_helpers.effective_entry_of_close ~trigger_at_suggested ~close
-      cand
+    match Entry_cap_stop_gate.gate_entry ~config cand with
+    | Some uncapped -> uncapped
+    | None ->
+        Entry_audit_helpers.effective_entry_of_close ~trigger_at_suggested
+          ~close cand
   in
   if Float.( <= ) effective_entry 0.0 then None
   else

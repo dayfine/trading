@@ -1257,6 +1257,46 @@ type config = {
              golden} (R1). R2: axis-expressible as
           [((flag entry_cap_local_range_weeks) (values (0 4)))]. R3: stays [0]
           until a ledger ACCEPT (the K = 5 paired 26y run). *)
+  entry_cap_stop_gate_on_uncapped : bool; [@sexp.default false]
+      (** Stop gate on the uncapped trigger: an {b attribution control} for the
+          stale-entry cap ({i entry_cap_local_range_weeks}), not a mechanism to
+          promote. When [true] and the cap lowered a long ticket's trigger [E]
+          to [E′], every stop-width {i decision} in the entry walk reads the
+          trigger the ticket would have had with the cap off: the §5.1 re-anchor
+          test ({i stop_anchor_at_entry_base}), the {i require_structural_stop}
+          test, the {i max_stop_distance_pct} gate and the [Demote_over_max]
+          ordering. The trigger, the StopLimit limit, the installed stop and the
+          size still follow [E′]. So the gate admits exactly the names the
+          cap-off config admits, and places them at [E′] with the size from [E′]
+          minus the stop. The run it exists for keeps the cap's price, size and
+          limit channels and takes out its admissions
+          ([dev/experiments/stale-e-cap-k5-2026-11-14/README.md], PR #3608,
+          §"How the cap reaches a fill", channel 5).
+
+          {b Does nothing without the cap} ([entry_cap_local_range_weeks = 0]),
+          without the trigger entry ({i sim_entry_trigger_at_suggested} and
+          {i enable_sim_entry_stoplimit}; otherwise the entry is the decision
+          close in both arms), on shorts, and on a ticket the cap did not lower.
+          With the cap armed, [Weinstein_strategy.make] rejects it alongside the
+          replace anchor ([entry_anchor_local_range_weeks > 0]) or the entry
+          freeze ({i freeze_entry_at_first_breakout}): the candidate does not
+          carry the cap-off trigger in either case. A re-anchored buffer stop
+          kept with [require_structural_stop = false] is placed below [E′] (the
+          ticket's own entry), while the width gate reads the cap-off ticket's
+          buffer stop below [E]. See [Entry_cap_stop_gate].
+
+          {b Faithfulness (W1/W2).} [docs/design/weinstein-book-reference.md]
+          §4.7 (the buy-stop at the top of the current range: the cap) and §5.1
+          "Initial Stop Placement" (pre-calculate the stop; prefer other
+          candidates when it needs more than 15 % risk). The flag changes only
+          which [E] that 15 % test reads, a dial; the stop still sits under the
+          base and the spine is intact. §5.1 measures from the purchase price,
+          [E′] under the cap, so this is a control, not a more faithful gate.
+
+          {b Default [false] = off, bit-identical to every existing baseline and
+             golden} (R1). R2: axis-expressible as
+          [((flag entry_cap_stop_gate_on_uncapped) (values (false true)))]. R3:
+          stays [false]; it is a control arm. *)
   entry_freshness_basis : Entry_freshness.basis;
       [@sexp.default Entry_freshness.Ma_cross]
       (** F1 — which event starts the Stage-2 admission clock.

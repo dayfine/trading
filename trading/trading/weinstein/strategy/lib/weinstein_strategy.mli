@@ -291,6 +291,12 @@ module Entry_stop_width_order = Entry_stop_width_order
     two modes. Re-exposed so tests can pin the ordering independently of a full
     entry walk. See {!Entry_stop_width_order}. *)
 
+module Entry_cap_stop_gate = Entry_cap_stop_gate
+(** The stop gate on the uncapped trigger
+    ([config.entry_cap_stop_gate_on_uncapped], default-off): an attribution
+    control for the stale-entry cap. Re-exposed so tests can pin the gate entry
+    and the config validation. See {!Entry_cap_stop_gate}. *)
+
 module Entry_ticket_ttl = Entry_ticket_ttl
 (** F2 resting-entry-ticket lifecycle: re-screen cancel (primary) + clock TTL
     (backstop), armed independently by [config.enable_entry_ticket_rescreen] and
@@ -1009,6 +1015,13 @@ type config = {
           is unchanged. A cap, not a replace. Strictly ticket-level; default [0]
           = off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.entry_cap_local_range_weeks]. *)
+  entry_cap_stop_gate_on_uncapped : bool; [@sexp.default false]
+      (** Attribution control for the stale-entry cap: when the cap lowered a
+          long's trigger, the entry walk's stop-width decisions read the trigger
+          the ticket would have had with the cap off, while the price, the
+          installed stop and the size follow the capped trigger. Does nothing
+          without the cap. Default [false] = off, bit-identical baselines (R1).
+          See [Weinstein_strategy_config.entry_cap_stop_gate_on_uncapped]. *)
   entry_freshness_basis : Entry_freshness.basis;
       [@sexp.default Entry_freshness.Ma_cross]
       (** F1 — which event starts the Stage-2 admission clock. [Ma_cross]
