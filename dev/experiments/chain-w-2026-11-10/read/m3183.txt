@@ -1,0 +1,116 @@
+M1 per vintage (list, committed, off, on, dropped=off-on, warrant, unit, non-USD, dual-class collapse=committed-off, class drops in the on report):
+  top-1000-1998	956	955	950	5	3	0	2	1	5
+  top-1000-1999	955	954	949	5	2	1	2	1	5
+  top-1000-2000	961	960	954	6	2	1	3	1	6
+  top-1000-2001	949	948	943	5	2	0	3	1	5
+  top-1000-2002	951	949	942	7	2	1	4	2	7
+  top-1000-2003	945	943	936	7	2	1	4	2	7
+  top-1000-2004	926	924	917	7	2	1	4	2	7
+  top-1000-2005	923	920	915	5	2	0	3	3	5
+  top-1000-2006	921	918	911	7	2	1	4	3	7
+  top-1000-2007	922	919	913	6	2	0	4	3	6
+  top-1000-2008	919	916	910	6	2	0	4	3	6
+  top-1000-2009	914	911	903	8	3	1	4	3	8
+  top-1000-2010	915	912	905	7	2	1	4	3	7
+  top-1000-2011	922	919	910	9	3	2	4	3	9
+  top-1000-2012	915	912	903	9	3	2	4	3	9
+  top-1000-2013	919	916	907	9	3	2	4	3	9
+  top-1000-2014	921	918	906	12	5	3	4	3	12
+  top-1000-2015	925	922	910	12	5	3	4	3	12
+  top-1000-2016	928	923	912	11	5	2	4	5	11
+  top-1000-2017	927	923	910	13	6	3	4	4	13
+  top-1000-2018	937	933	927	6	0	2	4	4	6
+  top-1000-2019	941	937	932	5	0	2	3	4	5
+  top-1000-2020	953	950	945	5	0	2	3	3	5
+  top-1000-2021	949	946	943	3	1	1	1	3	3
+  top-1000-2022	966	963	963	0	0	0	0	3	0
+  top-1000-2023	976	973	973	0	0	0	0	3	0
+  top-1000-2024	989	986	986	0	0	0	0	3	0
+  top-1000-2025	995	993	993	0	0	0	0	2	0
+  top-3000-1998	2879	2876	2870	6	3	1	2	3	6
+  top-3000-1999	2882	2880	2874	6	3	1	2	2	6
+  top-3000-2000	2879	2876	2869	7	3	1	3	3	7
+  top-3000-2001	2867	2864	2857	7	3	1	3	3	7
+  top-3000-2002	2858	2855	2847	8	3	1	4	3	8
+  top-3000-2003	2852	2850	2842	8	3	1	4	2	8
+  top-3000-2004	2804	2800	2792	8	3	1	4	4	8
+  top-3000-2005	2799	2794	2787	7	3	1	3	5	7
+  top-3000-2006	2793	2788	2779	9	3	2	4	5	9
+  top-3000-2007	2785	2781	2772	9	3	2	4	4	9
+  top-3000-2008	2779	2775	2766	9	3	2	4	4	9
+  top-3000-2009	2772	2767	2758	9	3	2	4	5	9
+  top-3000-2010	2782	2778	2769	9	3	2	4	4	9
+  top-3000-2011	2778	2775	2764	11	4	3	4	3	11
+  top-3000-2012	2770	2766	2755	11	4	3	4	4	11
+  top-3000-2013	2756	2752	2741	11	4	3	4	4	11
+  top-3000-2014	2750	2745	2732	13	6	3	4	5	13
+  top-3000-2015	2755	2747	2732	15	8	3	4	8	17
+  top-3000-2016	2753	2742	2729	13	6	3	4	11	14
+  top-3000-2017	2774	2766	2752	14	7	3	4	8	15
+  top-3000-2018	2786	2778	2770	8	1	3	4	8	8
+  top-3000-2019	2792	2784	2779	5	0	2	3	8	5
+  top-3000-2020	2814	2804	2798	6	1	2	3	10	6
+  top-3000-2021	2789	2781	2775	6	3	2	1	8	6
+  top-3000-2022	2863	2853	2853	0	0	0	0	10	0
+  top-3000-2023	2892	2881	2881	0	0	0	0	11	0
+  top-3000-2024	2919	2908	2908	0	0	0	0	11	0
+  top-3000-2025	2953	2943	2943	0	0	0	0	10	0
+  totals over 56 lists: dropped 390 (warrant 142, unit 80, non-USD 168); dual-class collapse 243; class drops in the reports 394
+  lists with nothing dropped: top-1000-2022 top-1000-2023 top-1000-2024 top-1000-2025 top-3000-2022 top-3000-2023 top-3000-2024 top-3000-2025
+M2 dropped names (name, lists dropped from, rank min-max, avg_dollar_volume min-max in the committed lists):
+  CTRA_old   44 lists  rank 1-330  adv 7.1e+07-3.94e+10
+  SBER       44 lists  rank 2-862  adv 1.46e+07-2.07e+10
+  HSBA       42 lists  rank 1-5  adv 1.29e+10-6.55e+10
+  WFC-WS     40 lists  rank 10-158  adv 1.09e+08-3.55e+09
+  CMA-WS     39 lists  rank 292-1265  adv 2.31e+07-1.61e+08
+  CELSIA     38 lists  rank 1-119  adv 5.72e+08-8.06e+10
+  RCF-UN     36 lists  rank 146-2828  adv 1.6e+05-5.28e+08
+  CND-UN     23 lists  rank 166-2637  adv 7.37e+05-1.1e+08
+  LHC-UN     20 lists  rank 1-9  adv 8.45e+09-2.05e+10
+  VLY-WS     18 lists  rank 880-2011  adv 2.61e+06-2.84e+07
+  AIG-WS     15 lists  rank 111-580  adv 1.59e+07-3.06e+08
+  COF-WS      8 lists  rank 179-593  adv 8.65e+07-2.43e+08
+  GM-WS-B     6 lists  rank 160-363  adv 1.45e+08-2.85e+08
+  STI-WS-A    6 lists  rank 425-1150  adv 3.11e+07-1.17e+08
+  BAC-WS-A    4 lists  rank 100-2591  adv 4.24e+06-3.94e+08
+  DNMR-WS     2 lists  rank 921-921  adv 7.04e+07-7.04e+07
+  ACIC-WS     1 lists  rank 2353-2353  adv 1.05e+07-1.05e+07
+  BIOA-WS     1 lists  rank 2779-2779  adv 3.64e+06-3.64e+06
+  C-WS-A      1 lists  rank 1846-1846  adv 1.11e+07-1.11e+07
+  CVE-WS      1 lists  rank 1123-1123  adv 5.21e+07-5.21e+07
+  SEDA-UN     1 lists  rank 1298-1298  adv 4.04e+07-4.04e+07
+  distinct names: 21, list-drops: 390
+M2 specimens (committed member of N lists; excluded by class in M of them; lists where a member was not excluded):
+  HSBA: member of 42, excluded in 42
+  CELSIA: member of 38, excluded in 38
+  SBER: member of 44, excluded in 44
+  CTRA_old: member of 44, excluded in 44
+  AIG-WS: member of 15, excluded in 15
+  C-WS-A: member of 1, excluded in 1
+  LHC-UN: member of 20, excluded in 20
+  LDG: member of 21, excluded in 0; kept in: top-1000-2016 top-1000-2017 top-1000-2018 top-1000-2019 top-1000-2020 top-3000-1998 top-3000-1999 top-3000-2000 top-3000-2001 top-3000-2002 top-3000-2003 top-3000-2004 top-3000-2005 top-3000-2006 top-3000-2007 top-3000-2008 top-3000-2016 top-3000-2017 top-3000-2018 top-3000-2019 top-3000-2020 
+M3 dropped names traded by rk-k0 s0:
+  none
+M3 dropped names in W0's entries extract (decision date, kind, skip reason):
+  RCF-UN 2007-06-29 skipped No_structural_stop
+  CND-UN 2010-06-11 skipped No_structural_stop
+  CND-UN 2011-06-10 skipped No_structural_stop
+  CELSIA 2013-09-06 skipped No_structural_stop
+  CELSIA 2014-04-25 skipped No_structural_stop
+  LHC-UN 2014-04-25 skipped No_structural_stop
+  CELSIA 2014-05-16 skipped No_structural_stop
+  GM-WS-B 2017-09-22 skipped No_structural_stop
+  BAC-WS-A 2018-08-10 skipped No_structural_stop
+  CELSIA 2020-02-28 skipped No_structural_stop
+M4 on-list members spelled -WT, -U, -R, -RI, -RT (name, lists, rank min-max, avg_dollar_volume min-max):
+  GIX-U      12 lists  rank 179-2203  adv 1.49e+06-5.65e+07
+  OIBR-R     11 lists  rank 621-2579  adv 1.88e+06-9.95e+07
+  GRP-U       7 lists  rank 1614-2766  adv 8.7e+05-6.72e+06
+  NEE-P-R     5 lists  rank 2023-2609  adv 6.69e+06-1.24e+07
+  GIG-U       3 lists  rank 1536-1933  adv 1.07e+07-1.46e+07
+  OXY-WT      3 lists  rank 1761-2576  adv 5.53e+06-2.01e+07
+  MOSC-U      2 lists  rank 2305-2493  adv 1.46e+06-3.55e+06
+  ACIC-U      1 lists  rank 1956-1956  adv 1.72e+07-1.72e+07
+  BMY-RI      1 lists  rank 1854-1854  adv 1.35e+07-1.35e+07
+  HYLN-WT     1 lists  rank 1142-1142  adv 5.03e+07-5.03e+07
+  distinct names: 10, list-memberships: 46
