@@ -754,13 +754,41 @@ case "$1 $2" in
     case "$*" in
       *"--json comments"*) printf '%s\n' "${GATE_COMMENTS_JSON:-[]}"; exit 0 ;;
     esac
+    # Like the real `gh pr view --json files`, emit `files` only when asked and
+    # cap it at 100 (#3596): a script that read the list this way would lose
+    # every file past position 100.
     jq -n --arg tip "$GATE_TIP" --argjson reviews "$GATE_REVIEWS_JSON" --arg files "$GATE_FILES" \
       --argjson labels "${GATE_LABELS_JSON:-[]}" --arg body "${GATE_BODY:-}" --arg args "$*" \
       '{headRefOid: $tip,
-        files: ($files | split("\n") | map(select(length > 0) | {path: .})),
         reviews: $reviews,
         labels: $labels}
+       + (if ($args | test("--json [^ ]*files")) then
+            {files: ($files | split("\n") | map(select(length > 0) | {path: .}) | .[0:100])}
+          else {} end)
        + (if ($args | test("--json [^ ]*body")) then {body: $body} else {} end)'
+    ;;
+  "api --paginate")
+    # `gh api --paginate repos/R/pulls/N/files?per_page=100`: one JSON array per
+    # page, pages of 100, concatenated like the real command. GATE_API_CASE
+    # injects pagination failures: fail (no output), partial (page 1 then a
+    # non-zero exit), invalid (not JSON), empty (success, no output).
+    case "$*" in
+      *"/pulls/$GATE_PR_NUMBER/files"*) ;;
+      *) echo "gh stub: unexpected api call: $*" >&2; exit 1 ;;
+    esac
+    case "${GATE_API_CASE:-}" in
+      fail)    echo "gh: HTTP 502" >&2; exit 1 ;;
+      invalid) printf 'not-json'; exit 0 ;;
+      empty)   exit 0 ;;
+    esac
+    _pages=$(printf '%s\n' "$GATE_FILES" | jq -R -s -c '
+      split("\n") | map(select(length > 0) | {filename: ., patch: "x"}) as $all
+      | range(0; ([($all | length), 1] | max); 100) as $s | $all[$s:$s + 100]')
+    if [ "${GATE_API_CASE:-}" = partial ]; then
+      printf '%s\n' "$_pages" | head -n 1
+      exit 1
+    fi
+    printf '%s\n' "$_pages"
     ;;
   "pr checks")
     printf '%s\n' "$GATE_CHECKS" | awk 'NF{print "check-name\t" $0 "\tlink"}'
@@ -976,17 +1004,65 @@ check "VERIFIES e2e (gh): code PR never gets the hint" no "$(
 GATE_FILES=$_SAVED_FILES; GATE_REVIEWS_JSON=$_SAVED_REVIEWS; GATE_BODY=""
 export GATE_FILES GATE_REVIEWS_JSON GATE_BODY
 
-# #3421 (gh backend): `gh pr view --json files` is capped at 100, so a list of
-# 100 or more cannot be proven complete and fails closed to the three-gate lane.
+# #3596 (gh backend): the file list is read with `gh api --paginate`, not
+# `gh pr view --json files` (capped at 100; the stub reproduces the cap), so the
+# lane is decided from the COMPLETE list. Fails closed only when pagination
+# itself fails. `_numbered_files PREFIX N SUFFIX` prints N paths, one per line.
+_numbered_files() {
+  _nf_i=0
+  while [ "$_nf_i" -lt "$2" ]; do printf '%s%d%s\n' "$1" "$_nf_i" "$3"; _nf_i=$((_nf_i+1)); done
+}
+_gh_row() { _e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1; }
 _SAVED_FILES=$GATE_FILES
-GATE_FILES=$( { i=0; while [ "$i" -lt 100 ]; do printf 'dev/notes/n%d.md\n' "$i"; i=$((i+1)); done; } )
+GATE_FILES=$(_numbered_files dev/notes/n 99 .md)
 export GATE_FILES
-row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
-check "#3421 e2e (gh): a 100-file (possibly truncated) list fails closed to three gates" ok "$(printf '%s' "$row" | awk '{print $3}')"
-GATE_FILES=$( { i=0; while [ "$i" -lt 99 ]; do printf 'dev/notes/n%d.md\n' "$i"; i=$((i+1)); done; } )
+row=$(_gh_row)
+check "#3421 e2e (gh): a 99-file doc list stays docs-only" skip "$(printf '%s' "$row" | awk '{print $3}')"
+GATE_FILES=$(_numbered_files dev/notes/n 100 .md)
 export GATE_FILES
-row=$(_e2e_probe "$GH_E2E_STUB_DIR" "" 501 | tail -1)
-check "#3421 e2e (gh): a 99-file doc list is complete and stays docs-only" skip "$(printf '%s' "$row" | awk '{print $3}')"
+row=$(_gh_row)
+check "#3596 e2e (gh): exactly 100 doc files stay docs-only (no longer fail closed)" skip "$(printf '%s' "$row" | awk '{print $3}')"
+GATE_FILES=$(_numbered_files dev/notes/n 150 .md)
+export GATE_FILES
+row=$(_gh_row)
+check "#3596 e2e (gh): 150 doc files over two pages stay docs-only" skip "$(printf '%s' "$row" | awk '{print $3}')"
+# The K=5 results-PR shape: 150 artifact files, all under dev/experiments/ with
+# allowed extensions -> the one-gate results lane (STRUCT skip, qc-results).
+GATE_FILES=$( { printf 'dev/experiments/k5-2026-11-13/README.md\n'
+                _numbered_files dev/experiments/k5-2026-11-13/results/arm 74 /trades.csv
+                _numbered_files dev/experiments/k5-2026-11-13/specs/arm 75 .sexp; } )
+export GATE_FILES
+row=$(_gh_row)
+check "#3596 e2e (gh): a 150-file all-artifact PR is results-only (STRUCT=skip)" skip "$(printf '%s' "$row" | awk '{print $3}')"
+case "$row" in
+  *'qc-results'*|*'results-only'*) got=yes ;;
+  *)                               got=no ;;
+esac
+check "#3596 e2e (gh): ... and dispatches qc-results, not the structural/behavioral pair" yes "$got"
+# One non-allowlisted file (a .png under dev/experiments/) at position 121, on
+# the second page: the PR takes the three gates.
+GATE_FILES=$( { printf 'dev/experiments/k5-2026-11-13/README.md\n'
+                _numbered_files dev/experiments/k5-2026-11-13/results/arm 119 /trades.csv
+                printf 'dev/experiments/k5-2026-11-13/plot.png\n'
+                _numbered_files dev/experiments/k5-2026-11-13/specs/arm 29 .sexp; } )
+export GATE_FILES
+row=$(_gh_row)
+check "#3596 e2e (gh): a non-allowlisted file past position 100 keeps the three-gate lane" ok "$(printf '%s' "$row" | awk '{print $3}')"
+# Same for a code file as the very last of 150 files.
+GATE_FILES=$( { _numbered_files dev/experiments/k5-2026-11-13/results/arm 149 /trades.csv; printf 'trading/foo/late.ml\n'; } )
+export GATE_FILES
+row=$(_gh_row)
+check "#3596 e2e (gh): a code file at position 150 keeps the three-gate lane" ok "$(printf '%s' "$row" | awk '{print $3}')"
+# Pagination failures fail closed: an all-artifact list that would be
+# results-only must NOT be read as such when the read cannot be proven complete.
+GATE_FILES=$(_numbered_files dev/experiments/k5-2026-11-13/results/arm 150 /trades.csv)
+export GATE_FILES
+for GATE_API_CASE in fail partial invalid empty; do
+  export GATE_API_CASE
+  row=$(_gh_row)
+  check "#3596 e2e (gh): pagination $GATE_API_CASE fails closed to three gates" ok "$(printf '%s' "$row" | awk '{print $3}')"
+done
+unset GATE_API_CASE
 GATE_FILES=$_SAVED_FILES
 export GATE_FILES
 rm -rf "$GH_E2E_STUB_DIR"

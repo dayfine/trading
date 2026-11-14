@@ -678,18 +678,37 @@ _detect_backend() {
 _list_open_prs_gh() {
   gh pr list --repo "$REPO" --state open --limit 50 --json number --jq '.[].number'
 }
+# The file list, read to completion from the REST endpoint with `gh api
+# --paginate` and echoed as one JSON array of {path}. `gh pr view --json files`
+# returns at most 100 files, so a K=5 results PR (150-200 artifact files) fell
+# out of the results-only lane (#3596). `gh api --paginate` prints one JSON
+# array per page; `jq -s` joins them. Fails closed like the curl backend
+# (#3421): when pagination itself fails (non-zero exit, even after earlier
+# pages were printed) or the output is not a stream of arrays, the list is the
+# sentinel path alone, which no allowlist matches, so the PR takes the
+# three-gate lane. Always returns 0; the sentinel is the failure signal.
+_gh_all_files() {
+  _gf_out=$(gh api --paginate "repos/$REPO/pulls/$1/files?per_page=$_FILES_PAGE_SIZE") || _gf_out=
+  printf '%s\n' "$_gf_out" | jq -sce '
+      if length > 0 and all(.[]; type == "array")
+      then [.[][] | {path: .filename}]
+      else error("not a stream of file pages") end' 2>/dev/null \
+    || jq -nc --arg s "$_FILES_INCOMPLETE_SENTINEL" '[{path: $s}]'
+}
 _pr_meta_gh() {
   # `mergeable` (H-CI-DISPATCH): gh's own three-value vocabulary --
   # MERGEABLE / CONFLICTING / UNKNOWN -- read straight through with no
   # reshaping needed, unlike the curl backend below which has to normalise
   # REST's separate boolean + mergeable_state fields into the same three.
-  # `gh pr view --json files` returns at most 100 files (#3421). With 100 or
-  # more the list cannot be proven complete: append the sentinel path so the
-  # lane logic falls to the three-gate lane. (An unreadable payload yields
-  # empty output, which the caller's shape check reports as a meta error.)
-  gh pr view "$1" --repo "$REPO" --json headRefOid,files,reviews,labels,mergeable,body \
-    | jq -c --arg s "$_FILES_INCOMPLETE_SENTINEL" --argjson max "$_FILES_PAGE_SIZE" \
-        'if (.files | length) >= $max then .files += [{path: $s}] else . end'
+  # `files` is not requested here (capped at 100, #3596): `_gh_all_files`
+  # supplies it, streamed into jq rather than passed as an argument so a very
+  # long list cannot hit the per-argument size cap (#2886). (An unreadable
+  # payload leaves one input, so jq prints nothing and the caller's shape
+  # check reports a meta error.)
+  _gm_files=$(_gh_all_files "$1")
+  { gh pr view "$1" --repo "$REPO" --json headRefOid,reviews,labels,mergeable,body
+    printf '%s\n' "$_gm_files"; } \
+    | jq -sc 'if length == 2 then .[0] + {files: .[1]} else empty end'
 }
 _pr_checks_gh() {
   gh pr checks "$1" --repo "$REPO" 2>/dev/null | awk '{print $2}' | sort -u | tr '\n' ' '
