@@ -108,12 +108,12 @@ guards() {
 # ------------------------------------------------------------------------------------------------------------- stage
 stage() {
   cd "$REPO" || exit 1; R2="sh dev/scripts/r2_bars.sh"
-  if [ ! -f "$WH/.done" ] || [ ! -f "$CA/.done" ] || [ ! -f "$TD/.done" ]; then
+  if [ ! -f "$WH.done" ] || [ ! -f "$CA/.done" ] || [ ! -f "$TD/.done" ]; then
     disk_ok "$DISK_STAGE_GB" || die "disk < ${DISK_STAGE_GB}G before an unfinished stage"; fi
-  if [ -f "$WH/.done" ]; then $R2 verify-dir --dir "$WH" --name "$WH_NAME" >> "$WORK/r2.log" 2>&1 || die "warehouse verify failed"
+  if [ -f "$WH.done" ]; then $R2 verify-dir --dir "$WH" --name "$WH_NAME" >> "$WORK/r2.log" 2>&1 || die "warehouse verify failed"
   else rm -rf "$WH"; mkdir -p "$(dirname "$WH")"
     log "PULL warehouse $WH_NAME"; $R2 pull-dir --dest "$WH" --name "$WH_NAME" >> "$WORK/r2.log" 2>&1 || die "pull-dir $WH_NAME"
-    touch "$WH/.done"; fi
+    touch "$WH.done"; fi
   n=$(grep -c '(symbol ' "$WH/manifest.sexp"); [ "$n" = "$EXPECT_WH" ] || die "warehouse manifest has $n entries, expected $EXPECT_WH"
   if [ ! -f "$CA/.done" ]; then rm -rf "$CA"
     log "PULL corpact $CA_NAME"; $R2 pull-dir --dest "$CA" --name "$CA_NAME" >> "$WORK/r2.log" 2>&1 || die "pull-dir $CA_NAME"
