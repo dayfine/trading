@@ -1,0 +1,93 @@
+== A. cell parity: every per-arm artifact against #3595 pb-S-k0
+  same  actual.sexp
+  same  trades.csv
+  same  equity_curve.csv
+  same  splits.csv
+  same  open_positions.csv
+  same  entries.tsv
+  same  summary.sexp
+  same  macro_trend.sexp
+  same  validator.sexp.sexp
+  same  validator.sexp.md
+  DIFF  params.sexp (expected only for params.sexp: code_version, data_dir)
+== B. proxy precondition, strict denominator (every placed ticket)
+  agree 621 of 644 with a bar = 96.4 %; of all 683 placed = 90.9 % (bar 90 %)
+== C. E_net arithmetic from binding.txt (README Measurement 2) and its sensitivity
+  <$8     in   8.81 out   0.00 net   +8.81 r 0.08036 -> +0.602
+  $8-14   in  16.58 out   4.00 net  +12.58 r 0.04608 -> +0.493
+  $14-33  in  50.08 out   9.00 net  +41.08 r 0.00966 -> +0.338
+  >=$33   in   8.79 out  72.13 net  -63.34 r 0.00890 -> -0.480
+  E_net 0.953 (fill 0.8507); Poisson SE from the pooled counts 0.307
+  in tickets 84.3 (30.1 % under $14), value 0.0241 each; out tickets 85.1 (84.7 % >= $33), value 0.0107 each
+  net value per re-drawn in-ticket after fills 0.0113 (pre-registration assumed 0.0166)
+  E_net with ADSK 2003-09-15 (5 doublers, 5 entries) in its decision band $14-33: 0.920
+  E_net with every rate 1 SE in P favour: 1.553 (FRESH bar 1.5)
+  log value at 0.10-0.15 per doubler (pre-registration): 0.095-0.143
+== D. distinct >= +100 % trades behind r(b), #3595 S cells (band of trades.csv entry_price)
+  band 0: 9 trades, 3 distinct: BGO|2003-07-15 x5 MERC|2010-11-15 x1 ADMA|2023-12-19 x3
+  band 1: 10 trades, 2 distinct: ADSK|2003-09-15 x5 APPS|2020-06-15 x5
+  band 2: 8 trades, 4 distinct: BBWI|2020-08-05 x5 LAD|2012-08-13 x1 HURN|2006-03-13 x1 LGND|2012-12-17 x1
+  band 3: 15 trades, 5 distinct: AVGO|2013-09-10 x3 CMG|2010-02-08 x1 DXCM|2019-07-22 x5 CRM|2010-02-05 x1 MMYT|2023-10-26 x5
+== E. log value of each >= +100 % trade: ln(1 + (pnl_dollars + dividends_received) / NAV on the entry date)
+  P cells: 53 trades, median 0.143, mean 0.176 log each
+  S cells: 42 trades, median 0.149, mean 0.189 log each
+  k0: >= +100 % closed trades S 9, P 11, P - S 2
+  k1: >= +100 % closed trades S 8, P 11, P - S 3
+  k2: >= +100 % closed trades S 8, P 10, P - S 2
+  k3: >= +100 % closed trades S 8, P 10, P - S 2
+  k4: >= +100 % closed trades S 9, P 11, P - S 2
+== F. swaps traced to the arms' own walks (#3595 P-k0 ran the band order on its own path; V6 vs S-k0 agree)
+  swapped in,  placed by P-k0 that date: band 0: placed 8, closed trades 6, >= +100 %: MERC(2010-11-12 +111%) ADMA(2023-08-18 +300%)
+  swapped in,  placed by P-k0 that date: band 1: placed 10, closed trades 9, >= +100 %:
+  swapped in,  placed by P-k0 that date: band 2: placed 25, closed trades 18, >= +100 %:
+  swapped out, placed by S-k0 that date: band 2: placed 7, closed trades 5, >= +100 %: LGND(2012-12-14 +233%)
+  swapped out, placed by S-k0 that date: band 3: placed 52, closed trades 46, >= +100 %:
+  swapped out, placed by P-k0 anyway:    band 2: placed 5, closed trades 5, >= +100 %: LGND(2012-12-14 +233%)
+  swapped out, placed by P-k0 anyway:    band 3: placed 2, closed trades 2, >= +100 %:
+  walk rows on S-k0 placement Fridays: 9271, of which No_structural_stop 8259 (89.1 %)
+== G. swap rows the store truncates (tail.awk dedup replicated: one row per side and symbol per 182 days)
+  out deduped 1616 (committed swap_tail.txt must match); dated >= 2025-06-27: 51; after 2025-09-12: 34
+  in  deduped 1526 (committed swap_tail.txt must match); dated >= 2025-06-27: 51; after 2025-09-12: 33
+  committed: deduped rows: in 1526 (F 1416, D 108, T 2, X 0) | out 1616 (F 1380, D 89, T 0, X 147)
+== H. what the FD - F difference implies for the D rows (one-decimal means, so ranges)
+  in : FD n 1524 mean +4.0, F n 1416 mean +4.0 -> 108 D rows, mean between +2.6 and +5.4 %
+  out: FD n 1469 mean +4.1, F n 1380 mean +3.7 -> 89 D rows, mean between +8.7 and +11.9 %
+== I. swaps by half and by year
+  swaps in 2000-12 838 / 2013-26 906; < $8 swapped in 2000-12 180 / 2013-26 174
+  swapped-out rows below $33 by year: 2000:11 2001:2 2002:6 2003:9 2004:8 2005:2 2006:4 2007:2 2009:31 2010:22 2011:3 2012:13 2013:6 2014:4 2015:1 2018:1 2019:7 2020:5 2021:5 2022:1 2023:5 2024:3 2025:5
+== J. fundable share of S's top-20 slots; value of the swapped names the arms placed; standard errors
+  top-20 slots on open dates 21980, fundable 1163 = 5.3 %, never fundable 94.7 %
+  P-k0 placed swapped-in 8 / 10 / 25 (< $8 / $8-14 / $14-33): 1.14 expected doublers at S rates after fills
+  S-k0 placed swapped-out 7 / 52 ($14-33 / >= $33): 0.45 expected doublers
+  normal reading of the p10-p90 spread: SD in 19.7, out 15.2 pp -> SE of the mean difference 0.64 pp (heavier with the capped tail)
+  paired per date: SD 19.9 pp over 725 dates -> SE of the mean 0.74 pp; sign rate 46.8 % -> z -1.72 against 50 %
+== K. pool sizes and the top-20 change rate by calendar year (fridays.tsv, open dates)
+  2000 14/20 = 70 %
+  2001 8/12 = 67 %
+  2002 10/14 = 71 %
+  2003 26/38 = 68 %
+  2004 30/49 = 61 %
+  2005 36/51 = 71 %
+  2006 34/50 = 68 %
+  2007 35/48 = 73 %
+  2008 8/8 = 100 %
+  2009 27/35 = 77 %
+  2010 35/50 = 70 %
+  2011 35/45 = 78 %
+  2012 40/51 = 78 %
+  2013 39/51 = 76 %
+  2014 33/50 = 66 %
+  2015 31/38 = 82 %
+  2016 30/44 = 68 %
+  2017 40/51 = 78 %
+  2018 31/45 = 69 %
+  2019 31/46 = 67 %
+  2020 35/49 = 71 %
+  2021 33/50 = 66 %
+  2022 22/30 = 73 %
+  2023 24/51 = 47 %
+  2024 28/51 = 55 %
+  2025 31/49 = 63 %
+  2026 12/23 = 52 %
+  lowest year: 2023 at 47 %
+  pool: mean 453, min 25, max 946 over 1099 open dates
