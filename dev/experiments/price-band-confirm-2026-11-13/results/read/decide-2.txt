@@ -1,0 +1,23 @@
+k0: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+k1: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+k2: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+k3: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+k4: valid (V6 exit=0, n_symbols_absent=1 in both arms)
+seeds in the read:  0 1 2 3 4 (n=5)
+liveness k0: Friday-pairs 449, lists changed 59.9 %; >=$33 share S-not-P 92.6 % (n 542), P-not-S 19.7 % (n 539), gap 73.0 pp; P tickets not placed by S that Friday 22.7 %
+liveness k1: Friday-pairs 464, lists changed 59.1 %; >=$33 share S-not-P 92.8 % (n 516), P-not-S 19.5 % (n 519), gap 73.4 pp; P tickets not placed by S that Friday 17.4 %
+liveness k2: Friday-pairs 475, lists changed 55.8 %; >=$33 share S-not-P 94.2 % (n 537), P-not-S 16.1 % (n 533), gap 78.1 pp; P tickets not placed by S that Friday 17.2 %
+liveness k3: Friday-pairs 442, lists changed 58.6 %; >=$33 share S-not-P 91.5 % (n 507), P-not-S 16.2 % (n 506), gap 75.3 pp; P tickets not placed by S that Friday 22.7 %
+liveness k4: Friday-pairs 449, lists changed 58.4 %; >=$33 share S-not-P 91.9 % (n 492), P-not-S 19.2 % (n 494), gap 72.6 pp; P tickets not placed by S that Friday 20.2 %
+liveness pooled: Friday-pairs 2279; B lists changed 58.3 % (bar 33 %); G >=$33 gap 74.5 pp (S-not-P 92.6 %, P-not-S 18.1 %; bar 40 pp); P tickets re-drawn 20.0 %
+LIVENESS LIVE
+seed k0: R_S 1544.22 % R_P 975.62 % | ln S 2.7999 P 2.3755 | Dk -0.4244 | maxDD S 25.41 P 28.17 (P-S +2.76) | one-arm net -55.9, trim 3 -15.6
+seed k1: R_S 759.33 % R_P 948.30 % | ln S 2.1510 P 2.3498 | Dk +0.1988 | maxDD S 30.50 P 33.12 (P-S +2.62) | one-arm net +17.5, trim 3 +19.2
+seed k2: R_S 1447.96 % R_P 1373.46 % | ln S 2.7395 P 2.6902 | Dk -0.0493 | maxDD S 26.66 P 27.85 (P-S +1.19) | one-arm net -3.0, trim 3 +4.8
+seed k3: R_S 978.57 % R_P 714.93 % | ln S 2.3782 P 2.0979 | Dk -0.2803 | maxDD S 30.54 P 25.78 (P-S -4.76) | one-arm net -37.3, trim 3 -33.3
+seed k4: R_S 1087.42 % R_P 785.60 % | ln S 2.4744 P 2.1811 | Dk -0.2933 | maxDD S 25.79 P 33.97 (P-S +8.18) | one-arm net -30.7, trim 3 -34.6
+return: median Dk -0.2803; m_S 0.3244 over 10 S pairs; delta = max(0.20, m_S) = 0.3244; Dk > 0 in 1 of 5 (pass needs 4)
+drawdown (arm medians): median maxDD P 28.17 - S 26.66 = +1.51 pp (limit 3.0); paired median +2.62 pp (reported, not read)
+concentration: trim-3 one-arm net > 0 in 2 of 5 (pass needs 4)
+bars: return FAIL, drawdown PASS, concentration FAIL
+CELL pbc2 OUTCOME FAIL

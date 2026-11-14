@@ -1,0 +1,5 @@
+k0  S lost to P cash: 21 placed / 16 filled, +7.5 % of entry NAV | P lost to S cash: 19 / 15, -6.5 % | net -14.0 | other-cut S 18 P 15 other-norecord S 47 P 48 other-nostop S 0 P 1 both-placed S 327 P 327 other-cash S 21 P 19
+k1  S lost to P cash: 23 placed / 15 filled, -0.6 % of entry NAV | P lost to S cash: 23 / 17, +9.2 % | net +9.7 | other-cut S 20 P 21 other-norecord S 41 P 39 other-nostop S 0 P 0 both-placed S 320 P 320 other-cash S 23 P 23
+k2  S lost to P cash: 25 placed / 16 filled, -4.1 % of entry NAV | P lost to S cash: 8 / 7, +0.6 % | net +4.6 | other-cut S 18 P 19 other-norecord S 42 P 27 other-nostop S 0 P 0 both-placed S 335 P 335 other-cash S 25 P 8
+k3  S lost to P cash: 24 placed / 17 filled, +12.6 % of entry NAV | P lost to S cash: 22 / 15, +9.2 % | net -3.4 | other-cut S 21 P 22 other-norecord S 39 P 38 other-nostop S 0 P 1 both-placed S 325 P 325 other-cash S 24 P 22
+k4  S lost to P cash: 17 placed / 12 filled, +4.4 % of entry NAV | P lost to S cash: 20 / 15, +7.0 % | net +2.6 | other-cut S 17 P 18 other-norecord S 31 P 32 other-nostop S 0 P 0 both-placed S 336 P 336 other-cash S 17 P 20

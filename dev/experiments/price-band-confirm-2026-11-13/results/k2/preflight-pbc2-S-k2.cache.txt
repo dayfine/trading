@@ -1,0 +1,1 @@
+Panel_runner: snapshot cache hits=2650313 misses=4008 miss_absent=517 evictions=0 n_symbols=3492 misses_per_symbol=1.15 n_symbols_touched=3491 n_symbols_absent=1 loads_per_touched=1.00 max_entries=3491 max_bytes=58535756 max_mmap_open=3491 avg_entries=1746.0 avg_bytes=29452409 cap_mb=1024 cap_mmap_handles=12000 top_heap_bytes=770571496 maxrss_bytes=1954664448

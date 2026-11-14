@@ -1,0 +1,27 @@
+share-class map (V6): /w/trading/test_data/share_classes.sexp
+V1 INV PASS
+V2 INV PASS
+V3 INV PASS
+V4 INV PASS
+V5 INV PASS
+V6 INV PASS
+V7 INV 15 violations
+V8 EXP PASS
+V9 EXP 79 violations
+V10 EXP 5 violations
+V11 EXP PASS
+V12 INV PASS
+V13 INV 4 violations
+V14 EXP 11 violations
+V15 EXP PASS
+V16 EXP PASS
+V17 EXP 1 violations
+V18 EXP 6 violations
+V19 INV PASS
+V20 INV PASS
+V21 EXP 37 violations
+V22 EXP 46 violations (59 skipped: position has no stop-decision rows)
+V23 EXP 7 violations
+audit join: 325/325 rows matched
+wrote /w/.sweep-output/price-band-confirm/art/pbc1-P-k2-s0-validator.sexp.sexp + /w/.sweep-output/price-band-confirm/art/pbc1-P-k2-s0-validator.sexp.md
+exit=0
