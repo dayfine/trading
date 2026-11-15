@@ -27,7 +27,12 @@ type walk_report = {
           under [reserve_cash_for_resting_tickets]) in the combined walk, or the
           part above the reserved short sleeve when [short_sleeve_fraction > 0];
           short tickets never reduce it. Negative only under long-margin
-          leverage. [0.0] when portfolio value is not positive. *)
+          leverage. [0.0] when portfolio value is not positive.
+
+          On the default path ([reserve_cash_for_resting_tickets = false]) the
+          figure does not subtract the cash committed to long entry tickets
+          still resting from earlier Fridays, so it overstates the free cash by
+          that amount. *)
   held : Core.String.Set.t;
       (** The symbols the walk treated as held ([Already_held]). *)
   stop_check : Screener.scored_candidate -> Entry_stop_check.t;

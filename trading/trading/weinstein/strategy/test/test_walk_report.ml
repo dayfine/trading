@@ -78,9 +78,13 @@ let _bar_reader =
       (* No correction: only the automatic-percentage fallback exists. *)
       ( "RISING",
         _daily [ 95.0; 96.0; 97.0; 98.0; 99.0; 100.0; 101.0; 102.0; 103.0 ] );
+      (* A steady decline with no rally: a short on it gets a narrow stop. *)
+      ( "FALLING",
+        _daily [ 105.0; 104.0; 103.0; 102.0; 101.0; 100.0; 99.0; 97.0; 95.0 ] );
     ]
 
-let _candidate ticker : Screener.scored_candidate =
+let _candidate ?(side = Trading_base.Types.Long) ticker :
+    Screener.scored_candidate =
   {
     ticker;
     analysis =
@@ -117,7 +121,7 @@ let _candidate ticker : Screener.scored_candidate =
         rating = Neutral;
         stage = Weinstein_types.Stage2 { weeks_advancing = 8; late = false };
       };
-    side = Trading_base.Types.Long;
+    side;
     grade = Weinstein_types.B;
     score = 60;
     suggested_entry = 105.0;
@@ -290,10 +294,86 @@ let test_long_cash_left_is_budget_less_placed_cost _ =
           (fun (r : Entry_walk.walk_report) -> r.long_cash_left_pct)
           (float_equal ((_portfolio.cash -. placed) /. value))))
 
+(* A walk over one long (NARROW) and one short (FALLING) on an empty book
+   holding [cash], with fallback stops allowed so both can be placed: its
+   transitions and its report. *)
+let _cash_walk ?(short_sleeve_fraction = 0.0) ~cash () =
+  let report = ref None in
+  let transitions =
+    Entry_walk.entries_from_candidates
+      ~config:
+        { _config with require_structural_stop = false; short_sleeve_fraction }
+      ~candidates:
+        [
+          _candidate "NARROW";
+          _candidate ~side:Trading_base.Types.Short "FALLING";
+        ]
+      ~stop_states:(ref String.Map.empty) ~bar_reader:_bar_reader
+      ~portfolio:{ cash; positions = String.Map.empty }
+      ~get_price:(fun _ -> None)
+      ~current_date:_current_date
+      ~on_walk_report:(fun r -> report := Some r)
+      ()
+  in
+  (transitions, Option.value_exn !report)
+
+(* What the placed tickets on [side] cost. *)
+let _cost_on side transitions =
+  List.sum
+    (module Float)
+    transitions
+    ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.CreateEntering e
+        when Trading_base.Types.equal_position_side e.side side ->
+          e.target_quantity *. e.entry_price
+      | _ -> 0.0)
+
+let _cash = 1_000_000.0
+
+(** A short ticket draws on the same cash in the combined walk but never reduces
+    the long figure: with one long and one short placed, the figure is the cash
+    less the long's cost only. *)
+let test_short_tickets_do_not_reduce_long_cash _ =
+  let transitions, report = _cash_walk ~cash:_cash () in
+  assert_that
+    (_cost_on Trading_base.Types.Short transitions, report.long_cash_left_pct)
+    (all_of
+       [
+         field fst (gt (module Float_ord) 0.0);
+         field snd
+           (float_equal
+              ((_cash -. _cost_on Trading_base.Types.Long transitions) /. _cash));
+       ])
+
+(** Under a reserved short sleeve the long budget is what lies above the sleeve,
+    so the figure is measured against it. *)
+let test_long_cash_left_is_measured_above_the_sleeve _ =
+  let sleeve = 0.2 in
+  let transitions, report =
+    _cash_walk ~short_sleeve_fraction:sleeve ~cash:_cash ()
+  in
+  assert_that report.long_cash_left_pct
+    (float_equal
+       ((_cash -. (_cash *. sleeve)
+        -. _cost_on Trading_base.Types.Long transitions)
+       /. _cash))
+
+(** A book worth nothing reports [0.0], not a division by zero. *)
+let test_long_cash_left_is_zero_on_a_worthless_book _ =
+  assert_that (snd (_cash_walk ~cash:0.0 ())).long_cash_left_pct
+    (float_equal 0.0)
+
 let () =
   run_test_tt_main
     ("walk_report"
     >::: [
+           "short tickets do not reduce long cash"
+           >:: test_short_tickets_do_not_reduce_long_cash;
+           "long cash left is measured above the sleeve"
+           >:: test_long_cash_left_is_measured_above_the_sleeve;
+           "long cash left is zero on a worthless book"
+           >:: test_long_cash_left_is_zero_on_a_worthless_book;
            "the shadow agrees with the walk"
            >:: test_shadow_agrees_with_the_walk;
            "every shadow verdict" >:: test_every_shadow_verdict;
