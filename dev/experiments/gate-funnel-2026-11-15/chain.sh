@@ -162,7 +162,7 @@ build() {
 # actual.sexp}) OUT PRIV WORK EVENTS
 read_on() {
   p=$(cpath "$1")
-  dk "cd /w && CANDS=${p}candidates.sexp AUDIT=${p}trade_audit.sexp TRADES=${p}trades.csv OPENPOS=${p}open_positions.csv EQUITY=${p}equity_curve.csv ACTUAL=${p}actual.sexp PARAMS=${p}params.sexp DATA=$(cpath "$TD") PIT=$PIT OUT=$(cpath "$2") PRIV=$(cpath "$3") WORK=$(cpath "$4") EVENTS=$5 STORE_END=$RUN_END SEED=0 CAP=20 sh $EXP/read/read.sh > $(cpath "$4").log 2>&1"
+  dk "cd /w && CANDS=${p}candidates.sexp AUDIT=${p}trade_audit.sexp TRADES=${p}trades.csv OPENPOS=${p}open_positions.csv EQUITY=${p}equity_curve.csv ACTUAL=${p}actual.sexp PARAMS=${p}params.sexp DATA=$(cpath "$TD") PIT=$PIT OUT=$(cpath "$2") PRIV=$(cpath "$3") WORK=$(cpath "$4") EVENTS=$5 STORE_END=$RUN_END SEED=0 CAP=20 timeout 10800 sh $EXP/read/read.sh > $(cpath "$4").log 2>&1"
 }
 
 # A 3-month run of the cell with --emit-candidates, then the read on it: the spec parses at this build, the flag writes

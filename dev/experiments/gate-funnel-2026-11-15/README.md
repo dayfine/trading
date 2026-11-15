@@ -48,7 +48,8 @@ each gate of the long cascade removes, and whether the removed names were worth 
 ## Validity (gates the read)
 
 `chain.sh` checks these after the cell. If either gate fails, the read does not run (`READ SKIPPED`), and the
-artifacts and log are still published. `FORCE_READ=1` reads anyway, and the log records that it did.
+artifacts and log are still published. `FORCE_READ=1` reads anyway, and the log records that it did. A forced read is diagnostic only: it decides nothing, and
+no outcome from it enters the ledger or the observatory queue.
 
 - **TRIPWIRE.** The cell's `trades.csv` must be byte-identical to #3602's `pbb-S-k0-s0-trades.csv` and #3595's
   `pb-S-k0-s0-trades.csv`: md5 `0928cfe40333560429f5a6e57c9c18de`, 577 lines.
@@ -152,10 +153,11 @@ Checked in this order:
 
 0. **NOT APPLIED** if `long_resting_reserved_pct` is missing on any open Friday. X net cannot be computed; X gross is
    reported only. (`chain.sh` refuses a build without the field, so this branch exists for a re-read of an older file.)
-1. **CLOSE** if `X net · f < 25` over the 26 years. Gate-before-cap is dead: no build, and the observatory's queue drops
-   the "gate-before-cap, not built" row.
+1. **CLOSE** if `X net · f < 25` over the 26 years. A no-build decision: even the upper-bound shadow finds too few crowded-out
+   buyable names, so nothing is built and the observatory's queue drops the "gate-before-cap, not built" row.
 2. Otherwise **REFINE** before any build. Measure s, compute X ref, and compare C\* (net) with the funded names
-   (`walk` `Funded`) on mean capped ride. **BUILD** only if all three hold:
+   (`walk` `Funded`) on mean capped ride. The monster rate is printed beside the ride but enters no clause. **BUILD** only
+   if all three hold:
    - `X ref · f ≥ 40`;
    - C\*'s mean capped ride ≥ the funded names' mean − 1 pp;
    - the bear years' share of X ref ≤ their share of open Fridays + 10 pp (C\* is not concentrated in bear years).
