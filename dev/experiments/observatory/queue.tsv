@@ -1,0 +1,9 @@
+# Axis observatory queue (dev/plans/axis-observatory-2026-11-14.md §2.2). lane.sh takes the first pending row. An arm is
+# a config overlay of dials already on main, run as K=5 seeds paired with S (the record config, rk-kK) on one build.
+# Tab-separated. overrides: config_overrides forms, inserted as written after the tiebreak_seed line of rk-kK.sexp.
+# ledger: the ledger row or experiment the arm comes from. status: pending, or set by the lane on the
+# observatory/lane-results branch: done@<head>, dead@<head> (trades.csv identical to S on every seed), invalid@<head>
+# (V6 or obs_read.sh refused the pair). README.md §Lane.
+label	overrides	ledger	status
+msd-12	((stops_config ((max_stop_distance_pct 0.12))))	stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15	pending
+msd-18	((stops_config ((max_stop_distance_pct 0.18))))	stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15	pending

@@ -7,7 +7,8 @@
 # usage: sh obs_read.sh -r RUN_DIR -p PREFIX -a ARM -l LABEL -v OVERLAY|@FILE -c COMMIT -O OUT_DIR
 #                       [-b BASE] [-k "0 1 2 3 4"] [-y SPY_YEARS] [-t SURFACE]
 # A seed K's files are RUN_DIR/[kK/]PREFIX-<arm>-kK[-<salt>]-<kind>, e.g. results/k0/pbc1-S-k0-s0-equity_curve.csv.
-# Exit: 0 row appended; 1 usage / missing input / refused out dir / failed V6; 2 unpaired curves; 3 a level leaked.
+# Exit: 0 row appended (or replaced: a re-read of the same arm at the same commit); 1 usage / missing input / refused
+# out dir / failed V6; 2 unpaired curves or unequal starting cash; 3 a level leaked.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd); LIB=$HERE/read/lib; TAB=$(printf '\t')
 die() { echo "obs_read: $*" >&2; exit 1; }
@@ -76,14 +77,22 @@ awk -F'\t' 'FNR == 1 { c++; s = FILENAME; sub(/.*\/D-/, "", s); sub(/\.tsv$/, ""
   "$OUT"/D-k*.tsv > "$OUT/D.tsv" && rm -f "$OUT"/D-k*.tsv
 
 HDR=$(awk -v header=1 -f "$LIB/common.awk" -f "$LIB/row.awk" < /dev/null)
+L1=$(one_line "$LABEL"); C1=$(one_line "$COMMIT"); prev=
 if [ -s "$SURF" ]; then
   [ "$(head -1 "$SURF")" = "$HDR" ] || die "$SURF header differs from this reader's columns; not appending"
   runs=$(awk 'NR > 1 && NF' "$SURF" | wc -l | tr -d ' ')
+  # A re-read of the same arm at the same commit replaces its row and keeps its ordinal (README §Definitions, arms_run).
+  prev=$(OBS_L=$L1 OBS_C=$C1 awk -F'\t' 'NR > 1 && $2 == ENVIRON["OBS_L"] && $4 == ENVIRON["OBS_C"] { print $1; exit }' "$SURF")
 else runs=0; fi
-ROW=$(OBS_LABEL=$(one_line "$LABEL") OBS_OVERLAY=$(one_line "$OVERLAY") OBS_COMMIT=$(one_line "$COMMIT") \
-  awk -v arms_run=$((runs + 1)) -v v6="$V6" -f "$LIB/common.awk" -f "$LIB/row.awk" "$OUT/seeds.tsv") || exit 3
+ORD=${prev:-$((runs + 1))}
+ROW=$(OBS_LABEL=$L1 OBS_OVERLAY=$(one_line "$OVERLAY") OBS_COMMIT=$C1 \
+  awk -v arms_run="$ORD" -v v6="$V6" -f "$LIB/common.awk" -f "$LIB/row.awk" "$OUT/seeds.tsv") || exit 3
 [ -s "$SURF" ] || printf '%s\n' "$HDR" > "$SURF"
-printf '%s\n' "$ROW" >> "$SURF"
+if [ -n "$prev" ]; then
+  OBS_L=$L1 OBS_C=$C1 OBS_ROW=$ROW awk -F'\t' 'NR > 1 && !done && $2 == ENVIRON["OBS_L"] && $4 == ENVIRON["OBS_C"] {
+    print ENVIRON["OBS_ROW"]; done = 1; next } { print }' "$SURF" > "$SURF.tmp.$$" && mv "$SURF.tmp.$$" "$SURF"
+  HOW=replaced
+else printf '%s\n' "$ROW" >> "$SURF"; HOW=appended; fi
 printf '%s\n%s\n' "$HDR" "$ROW" > "$OUT/row.tsv"
 SUMMARY=$(printf '%s\n' "$ROW" | awk -F'\t' '{ print "median D_end " $8 ", flag " $NF }')
-echo "obs_read: $LABEL row $((runs + 1)) -> $SURF: $SUMMARY; detail in $OUT"
+echo "obs_read: $LABEL row $ORD $HOW -> $SURF: $SUMMARY; detail in $OUT"

@@ -1,0 +1,6 @@
+# Fixture queue for observatory_lane_check.sh (made-up arms; the overrides are real record-config paths).
+label	overrides	ledger	status
+old-arm	((stops_config ((max_stop_distance_pct 0.10))))	fixture: finished earlier	done@aaaaaaaaa
+dead-arm	((stops_config ((max_stop_distance_pct 0.11))))	fixture: its cells copy S	pending
+up-arm	((stops_config ((max_stop_distance_pct 0.13))))	fixture: its cells are obs_read fixture arm U	pending
+dup-arm	((portfolio_config ((max_position_pct_long 0.10))))	fixture: a field the record config already sets	pending

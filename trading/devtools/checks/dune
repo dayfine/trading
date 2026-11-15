@@ -1605,3 +1605,19 @@
   (universe))
  (action
   (run sh %{dep:obs_read_check.sh})))
+
+; Axis observatory P2b (dev/plans/axis-observatory-2026-11-14.md §2.1, §2.2): lane.sh
+; --dry-run on a fixture queue (arm choice, per-cell reuse decision, batches, tripwire,
+; drift pair, publish lists), its spec writer, and its read/collect path on synthetic
+; cells from fixtures/obs_read/gen_fixture.sh, in a temp git repo with no container or
+; network. Reads dev/experiments/ via repo_root() at RUN TIME, so (universe).
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (source_tree fixtures/observatory_lane)
+  (source_tree fixtures/obs_read)
+  (universe))
+ (action
+  (run sh %{dep:observatory_lane_check.sh})))
