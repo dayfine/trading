@@ -1,6 +1,6 @@
 ---
 name: project-entry-timing-screen-1112
-description: "11-12 per-trade screen on record rk k0-k4 (2,756 trades): skip-extended, range-top anchor, MA-pullback all NO-BUILD (fat tail); stale-E cap (min(E, 4wk high x1.005)) +7..+12 NAV-% 5/5 seeds -> escalate"
+description: "11-12 screen: H2' stale-E cap +7..+12 NAV-% escalated; K=5 26y (11-14): cap as built NO-BUILD (-0.82 log, DD 41-45 %: gate's bear brake removed + monsters crowded out); gate-held G flat/INCONCLUSIVE; stop the line"
 metadata:
   node_type: memory
   type: project
@@ -35,3 +35,10 @@ Unit = NAV-% (sum P&L / NAV at screen); a seed's realised total is 256-322.
 and position size without changing WHICH names fill (the cap) survives. **How to apply:** don't re-screen skip/anchor/pullback
 variants; the next step is a default-off stale-E-cap flag + K=5 paired run. Artifact
 https://claude.ai/artifact/2hqayoBnVnFkpskr5pqqQQ (per-trade charts for all k0 trades).
+
+**K = 5 26y outcome (2026-11-14; pre-registration #3608 at aab060262; results PR stale-e-cap-k5): NEITHER PASSES — stop the stale-E line.**
+- **C, the cap as built (`entry_cap_local_range_weeks 4`): NO-BUILD by the harm bar.** Median Δ ln(1+R) −0.819, 0/5 seeds positive (−0.60..−0.93); max DD 25–32 % → 41–45 %; CAGR −2.5..−3.9 pp/yr.
+- **G, cap + `entry_cap_stop_gate_on_uncapped` (#3609): INCONCLUSIVE.** Median −0.038, 2/5 up; D > 0 in 2/5. C vs G "admissions cost".
+- **Why C lost:** the 15 % gate read from the capped E′ admits ~660 names/seed (~25/yr). The gate is the book's **bear brake**: S's 2001/2002/2008 lists show 15–19 gate skips per placed ticket and S entered nothing in 2008; C bought 20–23 names in the spring-2008 rally (macro gate open), 0 won; its max DD is one episode in every seed, 2007-07-19 → 2009-07-08. In normal years the admissions fill the book (70 % invested, 7.5 positions vs 56 %, 5.3) and crowd out S's monsters (ADSK 2003, APPS 2020, MMYT 2023: −101.5 NAV-%/seed). On their own the admissions net +64..+88/seed (win the V-recoveries 2003+2009, lose the bears) but run median −5 %/trade, p25 a full stop.
+- **Why G is flat:** same-week re-pricing pays +4.2..+5.8 NAV-%/seed (~+0.05 log/26y), but a lower trigger also fills earlier and laggard rotation (hysteresis 2, 13-week RS) ejects the early fill inside the unbroken base: ROL 2016-09-02 (G week 0, rotated after 26 d at −0.6 %; S filled on the breakout 7 weeks later, +52 %) = −4.79/seed and decides the D bar (ex-ROL D > 0 in 4/5). The 11-12 screen held exits fixed: 60–72 % of its H2′ gain was earlier fills credited with the null's exit.
+- **How to apply:** the "Why" above ("only a rule that changes price/size without changing WHICH names fill survives") was wrong for the cap — it changes which names fill (gate) and when (timing). Don't revisit stale-E / cap / anchor levers; the stale E is load-bearing. Entry-timing screens replay exits from the moved fill (laggard rotation included). Any lever that moves the gate's effective distance is read for positions count, by-year admissions and the S tickets it crowds out. Related: [[project_max_stop_filters_structural_stops]], [[project_entry_anchor_stale_e]], [[project_recovery_reentry_gap]], [[project_record_gap_is_concentration]].

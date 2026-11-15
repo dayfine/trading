@@ -1,6 +1,6 @@
 ---
 name: project-trait-y-low-price
-description: "Low price lifts monster rate 2-4x, win rate flat; price tiebreak closed: binding CLOSE-AXIS (#3602) + confirm NO-BUILD (#3610: C2 top-1000 FAIL, C1 replays 26y half); gap = few sub-top-1000 names"
+description: "Low price lifts monster rate 2-4x, win rate flat; price tiebreak closed (#3602 CLOSE-AXIS, #3610 NO-BUILD) on binding arithmetic: ~84 funded tickets re-drawn in 26y = +0.10-0.18 log; sub-top-1000 locus is scope, not a defect (USER 11-14)"
 metadata:
   node_type: memory
   type: project
@@ -70,3 +70,5 @@ by 2023) and C1's Δk matched #3595's increment seed by seed (ADMA cut lottery, 
 apply:** the price-order axis is closed; a nested window on the parent's seeds re-measures the parent after 2–6 y, so
 period cells must be disjoint; top-N-cut levers' top-3000 gains sit in the lower 2,000 names, so run the top-1000 cell
 early (cf. cap 40). Found a #3109 specimen: CERN 2013-07-01 phantom 2:1 rescale in C2 S-k0 (+9.9 % NAV day).
+
+**Framing correction (user, 11-14):** "the gap came from a few cheap names outside the top 1,000 — I don't see that as a problem." Agreed: those names are in our top-3000 trading universe and are the trait's premise, so the C2 (top-1000) FAIL is a scope finding, not evidence against the lever. The NO-BUILD rests on: (1) binding arithmetic — 95 % of top-20 slots never fund (cheap names worst, `No_structural_stop`), so the order re-draws ~84 funded tickets in 26 y ≈ +0.10–0.18 log expected; (2) #3595's +0.348 is 2–3× that, the rest one shared draw (5 seeds share one market); (3) C1 top-3000 2013–26 not independent (re-synced), +0.139 < 0.20; (4) DD +5.6 pp, Ulcer worse 5/5. **How to apply:** don't cite "sub-top-1000 names" as a reason against a lever on our universe; a top-1000 cell tests scope/capacity, not validity. The cheap-monster loss is upstream at the 15 % stop gate (volatile names' floors > 15 % below E), which #3621 showed is the bear brake — any price-conditioned loosening must show it doesn't reopen 2008. Related: [[project_entry_timing_screen_1112]].
