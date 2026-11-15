@@ -228,13 +228,23 @@ type week = {
           by cash. [None] on files written before the field existed. *)
   long_resting_reserved_pct : float option; [@sexp.option]
       (** The unfilled cost of the long entry tickets still resting at the walk
-          (placed on earlier Fridays, not yet filled or cancelled), as a
-          fraction of portfolio value — what [reserve_cash_for_resting_tickets]
-          (G3) would hold back, computed whether or not G3 is on. With G3 off
-          (the default) [long_cash_left_pct] does not net it, so the free cash
-          is [long_cash_left_pct - long_resting_reserved_pct]; with G3 on it is
-          already out of [long_cash_left_pct]. [None] on files written before
-          the field existed. *)
+          (placed on earlier Fridays, not yet filled or cancelled before this
+          Friday), as a fraction of portfolio value — what
+          [reserve_cash_for_resting_tickets] (G3) would hold back, computed
+          whether or not G3 is on. With G3 off (the default)
+          [long_cash_left_pct] does not net it, so the free cash is
+          [long_cash_left_pct - long_resting_reserved_pct]; with G3 on it is
+          already out of [long_cash_left_pct].
+
+          Two caveats on that identity. A ticket this same Friday's own cancels
+          retire (the F2 rescreen, the TTL clock, the macro suspension) is still
+          counted, as G3 counts it, because the walk reads the book before those
+          cancels apply; on such Fridays the identity understates the free cash
+          by those tickets. And the G3-off difference can go negative (the
+          resting tickets over-commit the cash), while the G3-on
+          [long_cash_left_pct] floors at 0, so the two agree only while the cash
+          covers the reserve. [None] on files written before the field existed.
+      *)
 }
 [@@deriving sexp, eq]
 (** One Friday's candidate population. Emitted for {b every} screened Friday

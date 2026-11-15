@@ -224,6 +224,10 @@ gains, all `[@sexp.option]` so older files parse unchanged:
   `long_resting_reserved_pct` (the unfilled cost of long tickets still resting
   from earlier Fridays, as G3 would reserve it, computed whether or not G3 is
   on); with G3 off, free cash is `long_cash_left_pct - long_resting_reserved_pct`.
+  Two caveats: tickets this same Friday's own cancels retire (F2 rescreen, TTL
+  clock, suspension) are still counted, as G3 counts them, so on those Fridays
+  the identity understates free cash; and the G3-off difference can go negative
+  (over-commitment) while the G3-on figure floors at 0.
 
 Still gated on the recorder (`capture_candidates`), never on a config. The
 shadow ignores cash, the caps, sizing and the entry-assembly gates. Stacked

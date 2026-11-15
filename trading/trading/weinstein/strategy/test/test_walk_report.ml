@@ -402,7 +402,7 @@ let _book_with_resting_tickets =
 
 (* The report's resting reserve on [_book_with_resting_tickets] with G3 set to
    [reserve]. *)
-let _resting_reserved ~reserve =
+let _resting_report ~reserve : Entry_walk.walk_report =
   let report = ref None in
   ignore
     (Entry_walk.entries_from_candidates
@@ -415,7 +415,7 @@ let _resting_reserved ~reserve =
        ~on_walk_report:(fun r -> report := Some r)
        ()
       : Position.transition list);
-  (Option.value_exn !report).long_resting_reserved_pct
+  Option.value_exn !report
 
 (** [long_resting_reserved_pct] is the unfilled cost of the long tickets still
     resting (the short and the held position count for nothing), over portfolio
@@ -427,9 +427,19 @@ let test_long_resting_reserved_is_the_unfilled_long_ticket_cost _ =
          _book_with_resting_tickets ~get_price:(fun _ -> None)
   in
   assert_that
-    (_resting_reserved ~reserve:false, _resting_reserved ~reserve:true)
+    ( (_resting_report ~reserve:false).long_resting_reserved_pct,
+      (_resting_report ~reserve:true).long_resting_reserved_pct )
     (all_of
        [ field fst (float_equal expected); field snd (float_equal expected) ])
+
+(** The free-cash identity, on a book whose cash covers the reserve: with G3 on
+    the reserve is already out of [long_cash_left_pct], so the G3-on figure is
+    the G3-off figure less [long_resting_reserved_pct]. *)
+let test_g3_on_long_cash_is_g3_off_less_the_reserve _ =
+  let off = _resting_report ~reserve:false in
+  let on = _resting_report ~reserve:true in
+  assert_that on.long_cash_left_pct
+    (float_equal (off.long_cash_left_pct -. off.long_resting_reserved_pct))
 
 let () =
   run_test_tt_main
@@ -443,6 +453,8 @@ let () =
            >:: test_long_cash_left_is_zero_on_a_worthless_book;
            "long resting reserve is the unfilled long ticket cost"
            >:: test_long_resting_reserved_is_the_unfilled_long_ticket_cost;
+           "G3-on long cash is G3-off less the reserve"
+           >:: test_g3_on_long_cash_is_g3_off_less_the_reserve;
            "the shadow agrees with the walk"
            >:: test_shadow_agrees_with_the_walk;
            "every shadow verdict" >:: test_every_shadow_verdict;

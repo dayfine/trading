@@ -98,10 +98,13 @@ val long_cash_fractions :
       [Kept] long [CreateEntering]s in [decisions], at the
       [target_quantity * entry_price] the cash gate charged; shorts and skips
       count for nothing);
-    - the unfilled cost of the long entry tickets still resting in [portfolio]
-      (placed on earlier Fridays, not yet filled or cancelled), measured exactly
-      as {!spendable_cash} reserves it under [reserve_cash_for_resting_tickets]
-      (G3), but computed whether or not G3 is on.
+    - the unfilled cost of the long entry tickets still [Entering] in
+      [portfolio] (placed on earlier Fridays), measured exactly as
+      {!spendable_cash} reserves it under [reserve_cash_for_resting_tickets]
+      (G3), but computed whether or not G3 is on. Like G3, it counts a ticket
+      this Friday's own cancels (F2 rescreen, TTL clock, macro suspension) are
+      about to retire, since those cancels apply after the walk reads
+      [portfolio].
 
     Observation only (the [candidates.sexp] top-N view): nothing here changes
     what the walk may spend. *)
