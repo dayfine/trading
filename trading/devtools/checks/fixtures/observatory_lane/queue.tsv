@@ -3,7 +3,8 @@ label	overrides	ledger	status
 old-arm	((stops_config ((max_stop_distance_pct 0.10))))	fixture: finished earlier	done@aaaaaaaaa
 dead-arm	((stops_config ((max_stop_distance_pct 0.11))))	fixture: its cells copy S	pending
 up-arm	((stops_config ((max_stop_distance_pct 0.13))))	fixture: its cells are obs_read fixture arm U	pending
-dup-arm	((portfolio_config ((max_position_pct_long 0.10))))	fixture: a field the record config already sets	pending
+dup-arm	((laggard_rotation_config ((hysteresis_weeks 3))))	fixture: resets a field the record sets (hysteresis_weeks 2)	pending
 v6-arm	((stops_config ((max_stop_distance_pct 0.14))))	fixture: live, one seed's V6 log fails	pending
 v6dead-arm	((stops_config ((max_stop_distance_pct 0.16))))	fixture: its cells copy S, one seed's V6 log fails	pending
 one-arm	((stops_config ((max_stop_distance_pct 0.17))))	fixture: copies S except k4 (obs_read fixture arm U)	pending
+stale-arm	((stale_exit_after_days (10)))	fixture: resets a non-scalar field the record sets ((5))	pending

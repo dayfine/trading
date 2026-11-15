@@ -168,8 +168,11 @@ credentials in its environment.
 
 ```sh
 git checkout <LANE_SHA>
-LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > lane.out 2>&1 &
+mkdir -p .sweep-output/observatory-lane
+LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > .sweep-output/observatory-lane/lane.out 2>&1 &
 ```
+
+- `lane.out` goes in the gitignored out dir, not the repo root, where a session's Stop hook flags it as untracked.
 
 - Launch consecutive arms at the same `LANE_SHA`, so they reuse S. A new SHA runs S again, which is also the next
   drift point.
@@ -191,7 +194,12 @@ LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > la
 3. **Stage, SPY years, docker, build.** The record's data stage (warehouse v12wk-9236, corpact-2026-10-27, bars
    data-20261102). If `docker info` fails, the lane starts `dockerd` and logs why it had to.
 4. **Specs.** `obs-S-kK` is `rk-kK` below the header. `obs-<label>-kK` is `obs-S-kK` with the arm's overrides added
-   after the `tiebreak_seed` line. The checks refuse an arm that sets a field the record config already sets.
+   after the `tiebreak_seed` line.
+   - An override of a field the record config already sets replaces it, scalar or not (`hysteresis_weeks 3` over the
+     record's 2, `stale_exit_after_days (10)` over `(5)`). The record's line for the same field path is dropped, so the
+     arm's value is the only one in the spec, and the lane logs `OVERRIDE <field>: <record> -> <arm>`.
+   - The field path is the chain of single-field records down to the value, one override form per spec line, as
+     `rk-kK` writes them. An arm may not set `tiebreak_seed`, which the lane sets per seed.
 5. **Cells.** For S and for the arm, each of k0–k4 is reused when this HEAD's cell is finished in the out dir, else in
    trading-results (`runs/<head>/<arm>/`), and run otherwise. S therefore runs once per HEAD. The cells to run go
    `PAR` at a time, after a three-month preflight of the arm's k0: the spec parses, the overrides reach
@@ -207,7 +215,7 @@ LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > la
 7. **Read.** `obs_read.sh` writes the arm's row to `surface.tsv`, and the arm becomes `done@<head>`.
 8. **Drift read** (plan §2.1). S at HEAD is read against S at the last HEAD whose S is in trading-results: the same
    read with A = the new S, labelled `drift@<prev>`, into `drift.tsv`. If the trades are identical on every seed, the
-   lane writes a `drift-none` event instead.
+   lane writes a `drift-none` event instead; if `obs_read.sh` refuses the pair, a `drift-read-failed` event.
 9. **Collect and publish.**
 
 ### Files
@@ -263,7 +271,9 @@ builds a two-commit git repo in a temp dir from the lane, the reader, the record
   - The batches at 15 GB and at 14 GB, where the reserve leaves one cell at a time.
   - The tripwire's md5 and source, and the drift pair.
   - The publish lists, and that a dry run copies nothing.
-- **Specs.** The arm is the record plus exactly its overrides, and an arm that resets a record field is refused.
+- **Specs.** The arm is the record plus exactly its overrides. An override of a field the record sets (a scalar,
+  `hysteresis_weeks`, and a list, `stale_exit_after_days`) replaces the record's line: the field appears once, with the
+  arm's value, and the lane logs the `OVERRIDE`.
 - **`read` on synthetic cells** (the obs_read fixture's S, U and H):
   - a live arm's row and `done@`;
   - the drift row;
@@ -278,6 +288,7 @@ builds a two-commit git repo in a temp dir from the lane, the reader, the record
   - a parent S identical to HEAD's gives a tripwire match with no `baseline-drift` event, and a `drift-none` event
     with no drift row;
   - a failing drift V6 log gives a `drift-invalid` event and no drift row.
+  - a drift pair that `obs_read.sh` refuses (unequal starting cash) gives a `drift-read-failed` event and no drift row.
 - **`years`.** The label rule on a made-up bar file: a fall, a tie, a gap, the run-end cut and a bad header, and
   that `years` writes nothing under the out dir.
 - **The lock** (where `flock` exists). `run`, `read`, `stage`, `docker`, `collect` and `publish` refuse to run beside
