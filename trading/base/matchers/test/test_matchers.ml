@@ -10,6 +10,16 @@ let assert_fails f =
   in
   assert_bool "Expected matcher to fail but it passed" raised
 
+(* Stricter than [assert_fails]: the matcher must fail an OUnit assertion (not
+   some other exception) and the failure message must contain [substring]. *)
+let assert_fails_naming ~substring f =
+  match f () with
+  | () -> assert_failure "Expected matcher to fail but it passed"
+  | exception OUnitTest.OUnit_failure msg ->
+      assert_that msg (contains_substring substring)
+
+let nan = Float.nan
+
 (* ------------------------------------------------------------------ *)
 (* not_                                                                 *)
 (* ------------------------------------------------------------------ *)
@@ -58,6 +68,131 @@ let test_le_passes _ =
 
 let test_le_fails_when_greater _ =
   assert_fails (fun () -> assert_that 5 (le (module Int_ord) 4))
+
+(* ------------------------------------------------------------------ *)
+(* float_equal                                                          *)
+(* ------------------------------------------------------------------ *)
+
+let test_float_equal_passes_within_epsilon _ =
+  assert_that 1.0 (float_equal 1.0);
+  assert_that 1.0000000001 (float_equal 1.0);
+  assert_that 1.05 (float_equal ~epsilon:0.1 1.0)
+
+let test_float_equal_fails_beyond_epsilon _ =
+  assert_fails (fun () -> assert_that 1.1 (float_equal 1.0));
+  assert_fails (fun () -> assert_that 1.2 (float_equal ~epsilon:0.1 1.0));
+  assert_fails (fun () -> assert_that 0.8 (float_equal ~epsilon:0.1 1.0))
+
+let test_float_equal_fails_at_exactly_epsilon _ =
+  assert_fails (fun () -> assert_that 0.5 (float_equal ~epsilon:0.5 0.0))
+
+let test_float_equal_infinities _ =
+  assert_that Float.infinity (float_equal Float.infinity);
+  assert_that Float.neg_infinity (float_equal Float.neg_infinity);
+  assert_fails (fun () ->
+      assert_that Float.neg_infinity (float_equal Float.infinity));
+  assert_fails (fun () -> assert_that 1.0 (float_equal Float.infinity));
+  assert_fails (fun () -> assert_that Float.infinity (float_equal 1.0))
+
+let test_float_equal_fails_when_actual_is_nan _ =
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (float_equal 1.0));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (float_equal 0.0))
+
+let test_float_equal_fails_when_expected_is_nan _ =
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that 1.0 (float_equal nan));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that 0.0 (float_equal nan))
+
+let test_float_equal_fails_when_actual_is_nan_against_infinity _ =
+  assert_fails (fun () -> assert_that nan (float_equal Float.infinity));
+  assert_fails (fun () -> assert_that Float.infinity (float_equal nan))
+
+let test_float_equal_fails_when_both_nan_by_default _ =
+  assert_fails_naming ~substring:"nan_equal" (fun () ->
+      assert_that nan (float_equal nan));
+  assert_fails (fun () -> assert_that nan (float_equal ~nan_equal:false nan))
+
+let test_float_equal_passes_when_both_nan_and_opted_in _ =
+  assert_that nan (float_equal ~nan_equal:true nan);
+  assert_that nan (float_equal ~epsilon:0.1 ~nan_equal:true nan)
+
+let test_float_equal_nan_equal_does_not_excuse_one_sided_nan _ =
+  assert_fails (fun () -> assert_that nan (float_equal ~nan_equal:true 1.0));
+  assert_fails (fun () -> assert_that 1.0 (float_equal ~nan_equal:true nan))
+
+let test_float_equal_nan_is_visible_through_not_ _ =
+  (* A NaN is "not equal" to a number, so the negated matcher passes. *)
+  assert_that nan (not_ (float_equal 1.0));
+  assert_that 1.0 (not_ (float_equal nan));
+  assert_that nan (not_ (float_equal nan))
+
+let test_float_equal_works_as_unapplied_function _ =
+  (* Call sites pass [float_equal] straight to [List.map]; the optional
+     arguments must keep being erased there. *)
+  let matchers = List.map float_equal [ 1.0; 2.0 ] in
+  assert_that [ 1.0; 2.0 ] (elements_are matchers)
+
+(* ------------------------------------------------------------------ *)
+(* Float_ord with NaN                                                   *)
+(* ------------------------------------------------------------------ *)
+
+(* [Float.compare] orders NaN below every number, so without a guard
+   [lt]/[le] would pass on a NaN actual and [gt]/[ge] on a NaN threshold. *)
+
+let test_float_ord_gt_fails_on_nan _ =
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (gt (module Float_ord) 0.0));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that 1.0 (gt (module Float_ord) nan));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (gt (module Float_ord) nan))
+
+let test_float_ord_ge_fails_on_nan _ =
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (ge (module Float_ord) 0.0));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that 1.0 (ge (module Float_ord) nan));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (ge (module Float_ord) nan))
+
+let test_float_ord_lt_fails_on_nan _ =
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (lt (module Float_ord) 0.0));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that (-1.0) (lt (module Float_ord) nan));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (lt (module Float_ord) nan))
+
+let test_float_ord_le_fails_on_nan _ =
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (le (module Float_ord) 0.0));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that (-1.0) (le (module Float_ord) nan));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (le (module Float_ord) nan))
+
+let test_float_ord_is_between_fails_on_nan _ =
+  let between = is_between (module Float_ord) in
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that nan (between ~low:0.0 ~high:1.0));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that 0.5 (between ~low:nan ~high:1.0));
+  assert_fails_naming ~substring:"NaN" (fun () ->
+      assert_that 0.5 (between ~low:0.0 ~high:nan))
+
+let test_float_ord_ordinary_comparisons_unchanged _ =
+  assert_that 1.0 (gt (module Float_ord) 0.0);
+  assert_that 1.0 (ge (module Float_ord) 1.0);
+  assert_that (-1.0) (lt (module Float_ord) 0.0);
+  assert_that 1.0 (le (module Float_ord) 1.0);
+  assert_that 0.5 (is_between (module Float_ord) ~low:0.0 ~high:1.0);
+  assert_that Float.infinity (gt (module Float_ord) 1e300);
+  assert_that Float.neg_infinity (lt (module Float_ord) (-1e300));
+  assert_fails (fun () -> assert_that 0.0 (gt (module Float_ord) 1.0));
+  assert_fails (fun () -> assert_that 1.0 (lt (module Float_ord) 0.0))
 
 (* ------------------------------------------------------------------ *)
 (* pair                                                                 *)
@@ -131,6 +266,37 @@ let suite =
          "lt_fails_when_greater" >:: test_lt_fails_when_greater;
          "le_passes" >:: test_le_passes;
          "le_fails_when_greater" >:: test_le_fails_when_greater;
+         "float_equal_passes_within_epsilon"
+         >:: test_float_equal_passes_within_epsilon;
+         "float_equal_fails_beyond_epsilon"
+         >:: test_float_equal_fails_beyond_epsilon;
+         "float_equal_fails_at_exactly_epsilon"
+         >:: test_float_equal_fails_at_exactly_epsilon;
+         "float_equal_infinities" >:: test_float_equal_infinities;
+         "float_equal_fails_when_actual_is_nan"
+         >:: test_float_equal_fails_when_actual_is_nan;
+         "float_equal_fails_when_expected_is_nan"
+         >:: test_float_equal_fails_when_expected_is_nan;
+         "float_equal_fails_when_actual_is_nan_against_infinity"
+         >:: test_float_equal_fails_when_actual_is_nan_against_infinity;
+         "float_equal_fails_when_both_nan_by_default"
+         >:: test_float_equal_fails_when_both_nan_by_default;
+         "float_equal_passes_when_both_nan_and_opted_in"
+         >:: test_float_equal_passes_when_both_nan_and_opted_in;
+         "float_equal_nan_equal_does_not_excuse_one_sided_nan"
+         >:: test_float_equal_nan_equal_does_not_excuse_one_sided_nan;
+         "float_equal_nan_is_visible_through_not_"
+         >:: test_float_equal_nan_is_visible_through_not_;
+         "float_equal_works_as_unapplied_function"
+         >:: test_float_equal_works_as_unapplied_function;
+         "float_ord_gt_fails_on_nan" >:: test_float_ord_gt_fails_on_nan;
+         "float_ord_ge_fails_on_nan" >:: test_float_ord_ge_fails_on_nan;
+         "float_ord_lt_fails_on_nan" >:: test_float_ord_lt_fails_on_nan;
+         "float_ord_le_fails_on_nan" >:: test_float_ord_le_fails_on_nan;
+         "float_ord_is_between_fails_on_nan"
+         >:: test_float_ord_is_between_fails_on_nan;
+         "float_ord_ordinary_comparisons_unchanged"
+         >:: test_float_ord_ordinary_comparisons_unchanged;
          "pair_passes" >:: test_pair_passes;
          "pair_fails_on_first" >:: test_pair_fails_on_first;
          "pair_fails_on_second" >:: test_pair_fails_on_second;
