@@ -14,7 +14,7 @@
 #   sh lane.sh drift [--dry-run]  the same without an arm: S at HEAD, then the baseline-drift read (S at HEAD against S at
 #                                 the last HEAD whose S is in trading-results, i.e. A = the new S) into drift.tsv
 #   sh lane.sh read [LABEL]       re-run the checks and reads on finished cells (no guards; a missing V6 log needs docker)
-#   sh lane.sh stage | collect | publish     one step alone
+#   sh lane.sh stage | docker | collect | publish     one step alone, under the lock (docker: the daemon preflight)
 #   sh lane.sh specs LABEL DIR    write and check obs-S-kK and obs-LABEL-kK for the queue's LABEL (no guards)
 #   sh lane.sh years CSV          print the SPY bull/bear labels of a bar file (no guards)
 # --dry-run prints the arm, the cell plan with each cell's reuse decision, the batches, the checks and the publish lists.
@@ -166,6 +166,13 @@ spec_checks() { # $1 dir, $2 label ("" = S only), $3 overrides
   log "SPEC CHECKS OK: obs-S-kK = rk-kK${2:+; obs-$2-kK = obs-S-kK + $3}"
 }
 
+# The single-instance lock on fd 9, for every step that writes OUT. The kernel drops it when the last holder exits, so a
+# killed lane leaves no stale lock; a process that must outlive the lane is launched with 9>&- (docker_ok).
+lock() {
+  if command -v flock > /dev/null; then exec 9> "$OUT/lane.lock"; flock -n 9 || die "another lane.sh holds $OUT/lane.lock"
+  else log "no flock on this host: single instance not enforced"; fi
+}
+
 # --------------------------------------------------------------------------------------------------------- cell reuse
 cell_ok() { # $1 dir, $2 cell tag: finished (its .ok marker and every file the read and V6 need)
   [ -f "$1/$2.ok" ] || return 1
@@ -237,8 +244,9 @@ docker_ok() { # sweep-hygiene §"Chains that publish": a cloud session's dockerd
   if [ "$RUNNER" = exec ]; then docker exec "$CTR" true > /dev/null 2>&1 || die "container $CTR not running (RUNNER=exec)"; return 0; fi
   docker info > /dev/null 2>&1 && return 0
   log "DOCKER daemon not answering ($(docker info 2>&1 | tail -1)); starting dockerd"
-  if [ "$(id -u)" = 0 ]; then (setsid nohup dockerd > "$WORK/dockerd.log" 2>&1 &)
-  else (setsid nohup sudo -n dockerd > "$WORK/dockerd.log" 2>&1 &); fi
+  # 9>&-: the daemon outlives the lane, and an inherited lock descriptor would hold lane.lock against every relaunch.
+  if [ "$(id -u)" = 0 ]; then (setsid nohup dockerd > "$WORK/dockerd.log" 2>&1 9>&- &)
+  else (setsid nohup sudo -n dockerd > "$WORK/dockerd.log" 2>&1 9>&- &); fi
   i=0; while [ "$i" -lt 30 ]; do docker info > /dev/null 2>&1 && { log "DOCKER dockerd started"; return 0; }; sleep 2; i=$((i + 1)); done
   die "docker daemon down and dockerd did not start in 60 s: $(tail -3 "$WORK/dockerd.log" 2> /dev/null | tr '\n' ' ')"
 }
@@ -347,7 +355,8 @@ run_cell() { # $1 arm, $2 seed
   m=$(grep -hoE 'total_return_pct [0-9.eE+-]+|total_trades [0-9]+|max_drawdown_pct [0-9.eE+-]+' "$dest/$tag-actual.sexp" | tr '\n' ' ')
   log "RESULT $tag => $m$rss (wall $(( $(date +%s) - t0 ))s)"
 }
-run_cells() { # TORUN, PAR at a time; every cell must finish
+run_cells() { # TORUN, PAR at a time; every cell must finish. A cell keeps the lock descriptor on purpose: if lane.sh is
+  # killed, a relaunch is refused until the cells still running finish, instead of starting them again into the same files.
   n=0; for c in $TORUN; do run_cell "${c%:*}" "${c##*:}" & n=$((n + 1)); [ "$n" -lt "$PAR" ] || { wait; n=0; disk_ok || die "disk < ${DISK_MIN_GB}G"; }; done
   wait
   for c in $TORUN; do cell_ok "$HD/${c%:*}" "obs-${c%:*}-k${c##*:}-s0" \
@@ -456,8 +465,7 @@ lane() { # $1 run | drift
   MODE=$1; PAR=$(par_n)
   if [ "$DRY" = 1 ]; then log "DRY-RUN lane $MODE at HEAD $HEAD9: no guards, container or network; writes only under $OUT/dry"
   else
-    if command -v flock > /dev/null; then exec 9> "$OUT/lane.lock"; flock -n 9 || die "another lane.sh holds $OUT/lane.lock"
-    else log "no flock on this host: single instance not enforced"; fi
+    lock
     rm -rf "$OUT/tmp"/r2_bars.* "$WH".partial.*   # a restart mid-pull leaves these; safe to drop under the lock
     log "observatory lane $MODE; LANE_SHA=${LANE_SHA:-unset} PAR=$PAR CELL_TIMEOUT=${CELL_TIMEOUT}s"
     guards; disk_ok || die "disk < ${DISK_MIN_GB}G"
@@ -487,7 +495,7 @@ lane() { # $1 run | drift
 checks_and_reads() { r=0; tripwire; [ -z "$LABEL" ] || read_arm || r=1; drift_read || r=1; return "$r"; }
 cmd_read() { # $1 label (default: the session's arm) -- the checks and reads again on finished cells, then collect
   l=${1:-$(cat "$OUT/current" 2> /dev/null)}; MODE=run
-  if command -v flock > /dev/null; then exec 9> "$OUT/lane.lock"; flock -n 9 || die "another lane.sh holds $OUT/lane.lock"; fi
+  lock
   state_init; [ -z "$l" ] || [ "$l" = drift ] || set_arm "$l"; echo "${LABEL:-drift}" > "$OUT/current"
   for ks in $SEEDS; do for arm in S $LABEL; do cell_ok "$HD/$arm" "obs-$arm-k$ks-s0" || die "obs-$arm-k$ks-s0 is not finished in $HD"; done; done
   years_step; PREV=$(prev_head); checks_and_reads; r=$?; collect; return "$r"
@@ -496,11 +504,12 @@ cmd_read() { # $1 label (default: the session's arm) -- the checks and reads aga
 case "$CMD" in
   run|drift) lane "$CMD" ;;
   read) cmd_read "${1:-}" ;;
-  stage) guards; stage ;;
-  collect) collect ;;
-  publish) guards; [ "$(cat "$OUT/current" 2> /dev/null)" = drift ] || LABEL=$(cat "$OUT/current" 2> /dev/null); publish ;;
+  stage) lock; guards; stage ;;
+  docker) lock; docker_ok; log "DOCKER ok" ;;
+  collect) lock; collect ;;
+  publish) lock; guards; [ "$(cat "$OUT/current" 2> /dev/null)" = drift ] || LABEL=$(cat "$OUT/current" 2> /dev/null); publish ;;
   specs) [ $# -eq 2 ] || { echo "usage: sh $0 specs LABEL DIR" >&2; exit 2; }
     cp "$QUEUE" "$STATE/queue.tsv"; set_arm "$1"; write_specs S "" "$2"; write_specs "$1" "$OVR" "$2"; spec_checks "$2" "$1" "$OVR" ;;
   years) spy_years "${1:?usage: sh $0 years SPY_CSV}" ;;
-  *) echo "usage: sh $0 {run [--dry-run] | drift [--dry-run] | read [LABEL] | stage | collect | publish | specs LABEL DIR | years CSV}" >&2; exit 2 ;;
+  *) echo "usage: sh $0 {run [--dry-run] | drift [--dry-run] | read [LABEL] | stage | docker | collect | publish | specs LABEL DIR | years CSV}" >&2; exit 2 ;;
 esac

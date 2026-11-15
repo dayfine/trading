@@ -176,7 +176,8 @@ LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > la
 - `sh lane.sh run --dry-run` prints the arm, every cell's reuse decision, the batches, the checks and the publish
   lists. It runs nothing and needs no container, network or credentials.
 - `sh lane.sh drift` runs S at HEAD and the drift read only (plan §2.1).
-- `sh lane.sh read [LABEL]` repeats the checks and reads on finished cells. `collect` and `publish` repeat one step.
+- `sh lane.sh read [LABEL]` repeats the checks and reads on finished cells. `stage`, `docker`, `collect` and `publish`
+  repeat one step, under the same lock as a run.
 - A relaunch reuses every finished cell, replaces its own surface row and commits only what changed.
 
 ### What one run does
@@ -268,3 +269,8 @@ builds a two-commit git repo in a temp dir from the lane, the reader, the record
   - a re-read over the branch's surface that replaces its row and keeps another;
   - a collect whose public tree holds no price-bearing file.
 - **`years`.** The label rule on a made-up bar file: a fall, a tie, a gap, the run-end cut and a bad header.
+- **The lock** (where `flock` exists). `stage`, `docker`, `collect` and `publish` refuse to run beside another holder.
+  A `dockerd` that the docker preflight starts (a stub on PATH) must not keep `lane.lock` once the lane has exited; the
+  lane launches it with the descriptor closed. The cells keep it on purpose: if the lane is killed, a relaunch waits
+  for the cells still running instead of starting them again.
+- **Parse.** `lane.sh` is outside `posix_sh_check.sh`'s scan dirs, so the check runs `dash -n` on it.

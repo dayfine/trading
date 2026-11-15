@@ -13,7 +13,10 @@
 #     row and becomes done@HEAD; S against the last published HEAD's S is the drift row; a changed S k0 is one
 #     baseline-drift event; a dead arm reads nothing and becomes dead@HEAD; a re-read over the branch's surface replaces
 #     its row and keeps the others; collect keeps every price-bearing file out of the public tree;
-#   - years: the SPY bull/bear rule on a made-up bar file (tie, gap, the run-end cut, a bad header).
+#   - years: the SPY bull/bear rule on a made-up bar file (tie, gap, the run-end cut, a bad header);
+#   - the lock (where flock exists): stage, docker, collect and publish refuse to run beside another holder, and a
+#     dockerd that the docker preflight starts (a stub on PATH) does not keep lane.lock after the lane exits;
+#   - lane.sh parses under dash -n (it is outside posix_sh_check.sh's scan dirs).
 # Run: sh trading/devtools/checks/observatory_lane_check.sh
 set -eu
 . "$(dirname "$0")/_check_lib.sh"
@@ -22,13 +25,17 @@ ROOT=$(repo_root); EXP=dev/experiments/observatory
 LFIX=$ROOT/trading/devtools/checks/fixtures/observatory_lane; OFIX=$ROOT/trading/devtools/checks/fixtures/obs_read
 [ -f "$ROOT/$EXP/lane.sh" ] || die "observatory_lane_check: script under test not found: $ROOT/$EXP/lane.sh"
 command -v git > /dev/null 2>&1 || { echo "SKIP: observatory_lane_check: no git"; exit 0; }
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT INT TERM
+TMP=$(mktemp -d); trap 'kill "$(cat "$TMP/dockerd.pid" 2> /dev/null)" 2> /dev/null || :; rm -rf "$TMP"' EXIT INT TERM
 fails=0
 ok() { echo "OK: observatory_lane_check: $1"; }
 bad() { echo "FAIL: observatory_lane_check: $1" >&2; fails=$((fails + 1)); }
 expect() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1: expected '$2', got '$3'"; fi; }
 has() { if grep -qxF -- "$2" "$TMP/$3"; then ok "$1"; else bad "$1: no line '$2' in $3"; fi; }
 md5_of() { { md5sum "$1" 2> /dev/null || md5 -q "$1" 2> /dev/null; } | cut -c1-32; }
+
+# lane.sh sits outside posix_sh_check.sh's scan dirs: parse it here.
+if command -v dash > /dev/null 2>&1; then psh=dash; else psh=sh; fi
+if $psh -n "$ROOT/$EXP/lane.sh"; then ok "lane.sh parses under $psh -n"; else bad "lane.sh does not parse under $psh -n"; fi
 
 # The repo: the lane, the reader, the record specs and the fixture queue, in two commits so HEAD has a parent.
 R=$TMP/repo; mkdir -p "$R/$EXP" "$R/dev/experiments/record-kseed-2026-10-27"
@@ -160,6 +167,28 @@ expect "years: fall bear, tie bull, no prior year unlabelled, cut at the run end
   "$(lane years "$TMP/spy.csv" | grep -v '^#' | tr '\t\n' ' ,' | sed 's/,$//')"
 sed '1s/close/last/' "$TMP/spy.csv" > "$TMP/spy2.csv"; rc=0; lane years "$TMP/spy2.csv" > /dev/null 2>&1 || rc=$?
 expect "years: a file without a close column is refused" 1 "$rc"
+
+# --- the lock: each step that writes OUT refuses to run beside another holder, and a dockerd the docker preflight starts
+# does not keep lane.lock once the lane has exited (it would refuse every relaunch).
+if command -v flock > /dev/null 2>&1; then
+  exec 8> "$TMP/out/lane.lock"; flock -n 8 || bad "the check could not take lane.lock"
+  for c in stage docker collect publish; do rc=0; lane "$c" > "$TMP/L" 2>&1 || rc=$?
+    expect "$c refuses a held lock" "1 1" "$rc $(grep -c "another lane.sh holds" "$TMP/L")"; done
+  exec 8>&-
+  # Stubs: docker info fails until the stub dockerd has started; dockerd then sleeps on, as the real daemon runs on.
+  mkdir -p "$TMP/bin"
+  printf '#!/bin/sh\n[ "$1" = info ] || exit 0\n[ -f "%s" ] || { echo "Cannot connect to the Docker daemon" >&2; exit 1; }\n' "$TMP/dockerd.up" > "$TMP/bin/docker"
+  printf '#!/bin/sh\necho $$ > "%s"; touch "%s"; exec sleep 30\n' "$TMP/dockerd.pid" "$TMP/dockerd.up" > "$TMP/bin/dockerd"
+  printf '#!/bin/sh\nexec "$@"\n' > "$TMP/bin/setsid"
+  printf '#!/bin/sh\n[ "$1" = -n ] && shift\nexec "$@"\n' > "$TMP/bin/sudo"
+  chmod +x "$TMP/bin/docker" "$TMP/bin/dockerd" "$TMP/bin/setsid" "$TMP/bin/sudo"
+  rc=0; (PATH=$TMP/bin:$PATH; lane docker) > "$TMP/L" 2>&1 || rc=$?
+  expect "docker: the preflight starts the stub dockerd" "0 1" "$rc $(grep -c "DOCKER dockerd started" "$TMP/L")"
+  expect "the stub dockerd is still running" yes "$(kill -0 "$(cat "$TMP/dockerd.pid")" 2> /dev/null && echo yes || echo no)"
+  rc=0; flock -n "$TMP/out/lane.lock" true || rc=$?
+  expect "the running dockerd does not hold lane.lock" 0 "$rc"
+  kill "$(cat "$TMP/dockerd.pid")" 2> /dev/null || :
+else echo "SKIP: observatory_lane_check: no flock; the lock cases need it"; fi
 
 [ "$fails" -eq 0 ] || die "observatory_lane_check: $fails check(s) failed"
 echo "OK: observatory_lane_check: all checks passed"
