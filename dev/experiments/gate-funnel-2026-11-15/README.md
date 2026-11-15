@@ -609,8 +609,9 @@ trait Y's heat signature, not a ranking lever.
   2003-04-25 → 09-05 (130, 9.2 %), 2001-12-07 → 2002-02-01 (99, 7.0 %).
 - **The book has two states, and X lives in one.** On the 380 open Fridays with no X, S holds 8.4 positions with 4 %
   cash left; those Fridays carry 447 of the 480 cash skips. On the 270 X-net Fridays it holds 2.7 positions with 0.69
-  of NAV in cash, and the walk made **no** cash skip there. On a further 449 Fridays gross free cash exceeds m but
-  resting tickets claim it (0.49 reserved against 0.26 left): X gross − X net = 1,719 slots of that kind.
+  of NAV in cash, and the walk made **no** cash skip there. Resting tickets account for all of X gross − X net = 1,719
+  slots: 1,145 on a further 449 Fridays where gross free cash exceeds m but resting tickets claim it (0.49 reserved
+  against 0.26 left), and 574 on the X-net Fridays themselves.
 - By SPY regime (the review pack's weekly close vs 30-week MA and its 4-week slope, known at the prior close), X is
   mostly in UP weeks after a reopen: UP 58.5 %, MIXED 25.9 %, DOWN 15.5 %. In 2000–02 alone, 75 % of X sits in MIXED
   and DOWN weeks.
@@ -632,7 +633,7 @@ the private `pool_outcomes.tsv.gz`).
   (`project_floor_after_breakout_pattern`). A fresh-high name rarely has one.
 - On the 270 X-net Fridays, 5,057 of the 5,400 top-20 rows were skipped `No_structural_stop`, 234 `Not_reached`, 97
   funded, while an average of 54 shadow-buyable names sat below the cut.
-- C\* (net) is 65.8 % grade A and 24.9 % A+, mean score 77 against 100 for the top 20 above it; 15.7 % of it sits at
+- C\* (net) is 65.8 % grade A and 24.9 % A+, mean score 77 against 100 for the top 20 above it (ad hoc, §Derivations); 15.7 % of it sits at
   ranks 21–40, 35.6 % at 41–100, 48.8 % at 101+ (`read/gate_before_cap.txt`).
 - **So on X Fridays the binding gate is the structural-stop check on an all-A+ list.** The cap only decides which of
   them the walk sees.
@@ -724,8 +725,11 @@ bear clause exists to stop.
 
 ### What it rules in and out
 
-- **Ruled out:** CLOSE's premise that supply never binds (it binds on empty-book Fridays); a cap-width route to X; a
-  score-tier ranking lever after the RS fix; s as a material refinement.
+- **Ruled out:** CLOSE's premise that supply never binds (it binds on empty-book Fridays); a score-tier ranking lever
+  after the RS fix; s as a material refinement.
+- **Not ruled out by the counts:** a wider cap. Ranks 21–40 hold 221 of X net (about 188 after f), which clears both
+  count bars. A cap of 40 still reaches only the edge of X (84 % sits at ranks 41+), and it meets the same bear share
+  and outcomes.
 - **Ruled in:** after the cap, the binding gate is the structural-stop check, which in this config is also the width
   gate. X is a regime phenomenon; any lever that reaches it is a regime lever.
 - **Left open:** a recovery-conditioned rule that takes 2003 and 2009 without the 2001–02 and 2008 rallies. This
@@ -779,6 +783,6 @@ Friday d: `entry_date ≤ d < exit_date`, plus open positions entered on or befo
 last Bearish Friday. SPY regime: the pack's `spyRegimeByDay` on SPY adjusted closes from the local bar store (only the
 labels are committed, `why/spyweek.tsv`). Outcome dedup: one row per symbol per 182 days, FD coverage, ride capped at
 +190 %. The joins reproduce the read's own X net 1,411, path-aware 393 / 181, C\* net n 880 at +3.97 %, funded n 616
-at +4.90 %, and m 0.0857 from the sizing rule. The rank-band, regime-by-period and sizing tables were computed ad hoc
-over the private pool and crowd tables and have no committed script; their inputs are listed above. Rule 2's per-half
-monster counts are not printed in any public file.
+at +4.90 %, and m 0.0857 from the sizing rule. The rank-band, regime-by-period and sizing tables, and C\*'s grade mix
+and mean scores, were computed ad hoc over the private pool and crowd tables and have no committed script; their
+inputs are listed above. Rule 2's per-half monster counts are not printed in any public file.
