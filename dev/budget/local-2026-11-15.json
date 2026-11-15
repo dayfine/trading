@@ -1,0 +1,2142 @@
+{
+  "run_id": "local-2026-11-15",
+  "timestamp": "2026-11-15T06:59:42Z",
+  "commit_sha": null,
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 13554,
+    "output_tokens": 1652443,
+    "cache_read_input_tokens": 428563115,
+    "cache_creation_input_tokens": 17741730,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-11-15",
+    "source": "local-transcripts",
+    "generated_at": "2026-11-15T06:59:42Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-11-15",
+      "until": "2026-11-15"
+    },
+    "totals": {
+      "dispatches": 75,
+      "sessions": 0,
+      "resumes": 79,
+      "api_calls": 3047,
+      "input_tokens": 13554,
+      "output_tokens": 1652443,
+      "cache_read_input_tokens": 428563115,
+      "cache_creation_input_tokens": 17741730,
+      "subagent_tokens": 447970842,
+      "main_tokens": 0,
+      "by_model": {
+        "claude-fable-5-1": {
+          "api_calls": 259,
+          "input_tokens": 7964,
+          "output_tokens": 267894,
+          "cache_read_input_tokens": 27734838,
+          "cache_creation_input_tokens": 1024990
+        },
+        "claude-opus-5-5": {
+          "api_calls": 2725,
+          "input_tokens": 5462,
+          "output_tokens": 1381843,
+          "cache_read_input_tokens": 396068435,
+          "cache_creation_input_tokens": 15906449
+        },
+        "claude-sonnet-5-5": {
+          "api_calls": 63,
+          "input_tokens": 128,
+          "output_tokens": 2706,
+          "cache_read_input_tokens": 4759842,
+          "cache_creation_input_tokens": 810291
+        }
+      }
+    },
+    "context_histogram": {
+      "calls": 0,
+      "p50": 0,
+      "p90": 0,
+      "max": 0,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 0,
+      "share_above_threshold_pct": 0,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "50-100k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "100-150k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "150-200k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "200-300k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "300-500k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "aa4f7cf35415edcfc",
+        "agent_type": "general-purpose",
+        "description": "Gate-funnel cell pre-registration",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 11652,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 255,
+            "input_tokens": 510,
+            "output_tokens": 8019,
+            "cache_read_input_tokens": 96944677,
+            "cache_creation_input_tokens": 7676122
+          }
+        },
+        "api_calls": 255,
+        "input_tokens": 510,
+        "output_tokens": 8019,
+        "cache_read_input_tokens": 96944677,
+        "cache_creation_input_tokens": 7676122
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "aa03003705c8f96c6",
+        "agent_type": "feat-weinstein",
+        "description": "Rework PR 3623 iteration 1",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 3410,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 158,
+            "input_tokens": 316,
+            "output_tokens": 4315,
+            "cache_read_input_tokens": 34180966,
+            "cache_creation_input_tokens": 1253373
+          }
+        },
+        "api_calls": 158,
+        "input_tokens": 316,
+        "output_tokens": 4315,
+        "cache_read_input_tokens": 34180966,
+        "cache_creation_input_tokens": 1253373
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a3b01166247c201c7",
+        "agent_type": "autostory-code",
+        "description": "FRLG #458 sim failures",
+        "ref": "#458",
+        "date": "2026-11-15",
+        "wall_seconds": 2299,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 134,
+            "input_tokens": 268,
+            "output_tokens": 85108,
+            "cache_read_input_tokens": 22351103,
+            "cache_creation_input_tokens": 274080
+          }
+        },
+        "api_calls": 134,
+        "input_tokens": 268,
+        "output_tokens": 85108,
+        "cache_read_input_tokens": 22351103,
+        "cache_creation_input_tokens": 274080
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "aa5204f91cf5c8484",
+        "agent_type": "autostory-code",
+        "description": "FRLG known-failing + E4 sim",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 1104,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 115,
+            "input_tokens": 232,
+            "output_tokens": 73662,
+            "cache_read_input_tokens": 16579537,
+            "cache_creation_input_tokens": 210271
+          }
+        },
+        "api_calls": 115,
+        "input_tokens": 232,
+        "output_tokens": 73662,
+        "cache_read_input_tokens": 16579537,
+        "cache_creation_input_tokens": 210271
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "abde5eaf5076c0230",
+        "agent_type": "autostory-code",
+        "description": "Handoff 5: FRLG plans to v2",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 1132,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 102,
+            "input_tokens": 204,
+            "output_tokens": 64811,
+            "cache_read_input_tokens": 15785324,
+            "cache_creation_input_tokens": 209020
+          }
+        },
+        "api_calls": 102,
+        "input_tokens": 204,
+        "output_tokens": 64811,
+        "cache_read_input_tokens": 15785324,
+        "cache_creation_input_tokens": 209020
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a562bd6ed972aa4ca",
+        "agent_type": "autostory-code",
+        "description": "mGBA slice 2b controller",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 962,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/506",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 83,
+            "input_tokens": 166,
+            "output_tokens": 93202,
+            "cache_read_input_tokens": 12482348,
+            "cache_creation_input_tokens": 205926
+          }
+        },
+        "api_calls": 83,
+        "input_tokens": 166,
+        "output_tokens": 93202,
+        "cache_read_input_tokens": 12482348,
+        "cache_creation_input_tokens": 205926
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "ac2e71d50c3346599",
+        "agent_type": "autostory-code",
+        "description": "PLZA 03.09 false pass fix",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 646,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 80,
+            "input_tokens": 160,
+            "output_tokens": 58258,
+            "cache_read_input_tokens": 12042202,
+            "cache_creation_input_tokens": 191099
+          }
+        },
+        "api_calls": 80,
+        "input_tokens": 160,
+        "output_tokens": 58258,
+        "cache_read_input_tokens": 12042202,
+        "cache_creation_input_tokens": 191099
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a0e7e8bf2b7838788",
+        "agent_type": "autostory-code",
+        "description": "MCP Slice 4 part 2",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 639,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/504",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 86,
+            "input_tokens": 172,
+            "output_tokens": 54774,
+            "cache_read_input_tokens": 11482102,
+            "cache_creation_input_tokens": 174888
+          }
+        },
+        "api_calls": 86,
+        "input_tokens": 172,
+        "output_tokens": 54774,
+        "cache_read_input_tokens": 11482102,
+        "cache_creation_input_tokens": 174888
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "ad77e2428a0d47617",
+        "agent_type": "autostory-code",
+        "description": "MCP Slice 1 gaps",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 734,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/507",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 69,
+            "input_tokens": 138,
+            "output_tokens": 70482,
+            "cache_read_input_tokens": 10577510,
+            "cache_creation_input_tokens": 204285
+          }
+        },
+        "api_calls": 69,
+        "input_tokens": 138,
+        "output_tokens": 70482,
+        "cache_read_input_tokens": 10577510,
+        "cache_creation_input_tokens": 204285
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a51777a53ac228ad7",
+        "agent_type": "autostory-code",
+        "description": "FRLG rows failing clean sim",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 591,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 78,
+            "input_tokens": 156,
+            "output_tokens": 46970,
+            "cache_read_input_tokens": 9013724,
+            "cache_creation_input_tokens": 152158
+          }
+        },
+        "api_calls": 78,
+        "input_tokens": 156,
+        "output_tokens": 46970,
+        "cache_read_input_tokens": 9013724,
+        "cache_creation_input_tokens": 152158
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a6a1a5f32ce7df8a8",
+        "agent_type": "autostory-code",
+        "description": "PLZA patrol catch nits",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 641,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 56,
+            "input_tokens": 112,
+            "output_tokens": 61440,
+            "cache_read_input_tokens": 8468879,
+            "cache_creation_input_tokens": 194930
+          }
+        },
+        "api_calls": 56,
+        "input_tokens": 112,
+        "output_tokens": 61440,
+        "cache_read_input_tokens": 8468879,
+        "cache_creation_input_tokens": 194930
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "aec7507401f89e648",
+        "agent_type": "qc-results",
+        "description": "qc-results on PR 3628 prereg",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 605,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 48,
+            "input_tokens": 96,
+            "output_tokens": 910,
+            "cache_read_input_tokens": 7967418,
+            "cache_creation_input_tokens": 234140
+          }
+        },
+        "api_calls": 48,
+        "input_tokens": 96,
+        "output_tokens": 910,
+        "cache_read_input_tokens": 7967418,
+        "cache_creation_input_tokens": 234140
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "adb86b927a375b647",
+        "agent_type": "autostory-code",
+        "description": "Lab server Slice 4",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 495,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 62,
+            "input_tokens": 126,
+            "output_tokens": 37440,
+            "cache_read_input_tokens": 7104493,
+            "cache_creation_input_tokens": 154634
+          }
+        },
+        "api_calls": 62,
+        "input_tokens": 126,
+        "output_tokens": 37440,
+        "cache_read_input_tokens": 7104493,
+        "cache_creation_input_tokens": 154634
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "ab98b440c0dac2e2c",
+        "agent_type": "autostory-code",
+        "description": "FRLG 15.01 missed door fade",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 431,
+        "resumes": 2,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/514",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 59,
+            "input_tokens": 120,
+            "output_tokens": 33722,
+            "cache_read_input_tokens": 7066901,
+            "cache_creation_input_tokens": 162232
+          }
+        },
+        "api_calls": 59,
+        "input_tokens": 120,
+        "output_tokens": 33722,
+        "cache_read_input_tokens": 7066901,
+        "cache_creation_input_tokens": 162232
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a980af5cf3bfc692f",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3623",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 496,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 48,
+            "input_tokens": 96,
+            "output_tokens": 3254,
+            "cache_read_input_tokens": 6862602,
+            "cache_creation_input_tokens": 182375
+          }
+        },
+        "api_calls": 48,
+        "input_tokens": 96,
+        "output_tokens": 3254,
+        "cache_read_input_tokens": 6862602,
+        "cache_creation_input_tokens": 182375
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "ae9ef115b0be21cd7",
+        "agent_type": "autostory-code",
+        "description": "BDSP shared fault classes",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 497,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 64,
+            "input_tokens": 128,
+            "output_tokens": 38272,
+            "cache_read_input_tokens": 6685474,
+            "cache_creation_input_tokens": 143662
+          }
+        },
+        "api_calls": 64,
+        "input_tokens": 128,
+        "output_tokens": 38272,
+        "cache_read_input_tokens": 6685474,
+        "cache_creation_input_tokens": 143662
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "af65b529e2fe413e7",
+        "agent_type": "autostory-code",
+        "description": "Engine: handle dropped frames gracefully",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 586,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 63,
+            "input_tokens": 126,
+            "output_tokens": 46344,
+            "cache_read_input_tokens": 6362695,
+            "cache_creation_input_tokens": 126012
+          }
+        },
+        "api_calls": 63,
+        "input_tokens": 126,
+        "output_tokens": 46344,
+        "cache_read_input_tokens": 6362695,
+        "cache_creation_input_tokens": 126012
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "ae7bbebac1a09e7b0",
+        "agent_type": "autostory-code",
+        "description": "PLZA party slot count done-check",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 1017,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 48,
+            "input_tokens": 1506,
+            "output_tokens": 56142,
+            "cache_read_input_tokens": 6022966,
+            "cache_creation_input_tokens": 189931
+          }
+        },
+        "api_calls": 48,
+        "input_tokens": 1506,
+        "output_tokens": 56142,
+        "cache_read_input_tokens": 6022966,
+        "cache_creation_input_tokens": 189931
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "ac4e6e02f3122a873",
+        "agent_type": "autostory-code",
+        "description": "FRLG 15.01 gate fail fix",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 1253,
+        "resumes": 2,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/510",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 48,
+            "input_tokens": 1481,
+            "output_tokens": 69686,
+            "cache_read_input_tokens": 5792146,
+            "cache_creation_input_tokens": 240182
+          }
+        },
+        "api_calls": 48,
+        "input_tokens": 1481,
+        "output_tokens": 69686,
+        "cache_read_input_tokens": 5792146,
+        "cache_creation_input_tokens": 240182
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a2b42a137edc0528c",
+        "agent_type": "autostory-code",
+        "description": "mGBA slice 2 without ROM",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 528,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 46,
+            "input_tokens": 92,
+            "output_tokens": 47815,
+            "cache_read_input_tokens": 5540367,
+            "cache_creation_input_tokens": 138968
+          }
+        },
+        "api_calls": 46,
+        "input_tokens": 92,
+        "output_tokens": 47815,
+        "cache_read_input_tokens": 5540367,
+        "cache_creation_input_tokens": 138968
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "acaee9ff95de3be50",
+        "agent_type": "autostory-code",
+        "description": "PLZA fault-class sweep PR",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 376,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 48,
+            "input_tokens": 96,
+            "output_tokens": 30786,
+            "cache_read_input_tokens": 5482655,
+            "cache_creation_input_tokens": 140673
+          }
+        },
+        "api_calls": 48,
+        "input_tokens": 96,
+        "output_tokens": 30786,
+        "cache_read_input_tokens": 5482655,
+        "cache_creation_input_tokens": 140673
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a578f04daf372968d",
+        "agent_type": "autostory-code",
+        "description": "mGBA LOAD/RESET re-anchor",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 474,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/508",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 46,
+            "input_tokens": 92,
+            "output_tokens": 45440,
+            "cache_read_input_tokens": 5448454,
+            "cache_creation_input_tokens": 134459
+          }
+        },
+        "api_calls": 46,
+        "input_tokens": 92,
+        "output_tokens": 45440,
+        "cache_read_input_tokens": 5448454,
+        "cache_creation_input_tokens": 134459
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a2d1002ce7a3473a1",
+        "agent_type": "autostory-code",
+        "description": "Seam 4 shared sweep runner",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 513,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 50,
+            "input_tokens": 100,
+            "output_tokens": 46229,
+            "cache_read_input_tokens": 5293181,
+            "cache_creation_input_tokens": 128578
+          }
+        },
+        "api_calls": 50,
+        "input_tokens": 100,
+        "output_tokens": 46229,
+        "cache_read_input_tokens": 5293181,
+        "cache_creation_input_tokens": 128578
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a0293c49f09db8273",
+        "agent_type": "autostory-code",
+        "description": "PLZA dedup items 8 and 11",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 771,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 48,
+            "input_tokens": 1506,
+            "output_tokens": 43715,
+            "cache_read_input_tokens": 5107498,
+            "cache_creation_input_tokens": 129939
+          }
+        },
+        "api_calls": 48,
+        "input_tokens": 1506,
+        "output_tokens": 43715,
+        "cache_read_input_tokens": 5107498,
+        "cache_creation_input_tokens": 129939
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "acee2f6f0f28f9b46",
+        "agent_type": "autostory-code",
+        "description": "16.02 Grunt1 talk-fight plan edit",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 2135,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 42,
+            "input_tokens": 1224,
+            "output_tokens": 42808,
+            "cache_read_input_tokens": 5005590,
+            "cache_creation_input_tokens": 174003
+          }
+        },
+        "api_calls": 42,
+        "input_tokens": 1224,
+        "output_tokens": 42808,
+        "cache_read_input_tokens": 5005590,
+        "cache_creation_input_tokens": 174003
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a81aac85c752c79fc",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3626",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 600,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 37,
+            "input_tokens": 74,
+            "output_tokens": 568,
+            "cache_read_input_tokens": 5045082,
+            "cache_creation_input_tokens": 157482
+          }
+        },
+        "api_calls": 37,
+        "input_tokens": 74,
+        "output_tokens": 568,
+        "cache_read_input_tokens": 5045082,
+        "cache_creation_input_tokens": 157482
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "ae6185c53cfc3f4c0",
+        "agent_type": "autostory-code",
+        "description": "PLZA: dex count check in THOROUGH",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 440,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 51,
+            "input_tokens": 104,
+            "output_tokens": 32341,
+            "cache_read_input_tokens": 5022801,
+            "cache_creation_input_tokens": 116275
+          }
+        },
+        "api_calls": 51,
+        "input_tokens": 104,
+        "output_tokens": 32341,
+        "cache_read_input_tokens": 5022801,
+        "cache_creation_input_tokens": 116275
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "af76f4c88bae27d80",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3623 re-review",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 268,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 40,
+            "input_tokens": 80,
+            "output_tokens": 581,
+            "cache_read_input_tokens": 4663114,
+            "cache_creation_input_tokens": 152524
+          }
+        },
+        "api_calls": 40,
+        "input_tokens": 80,
+        "output_tokens": 581,
+        "cache_read_input_tokens": 4663114,
+        "cache_creation_input_tokens": 152524
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "ae88a8f5eb92ab347",
+        "agent_type": "autostory-code",
+        "description": "PLZA elevator choice rows",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 391,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 47,
+            "input_tokens": 94,
+            "output_tokens": 33964,
+            "cache_read_input_tokens": 4609332,
+            "cache_creation_input_tokens": 140657
+          }
+        },
+        "api_calls": 47,
+        "input_tokens": 94,
+        "output_tokens": 33964,
+        "cache_read_input_tokens": 4609332,
+        "cache_creation_input_tokens": 140657
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a9d03004b46103ea5",
+        "agent_type": "autostory-code",
+        "description": "Fix #114 CI failures",
+        "ref": "#114",
+        "date": "2026-11-15",
+        "wall_seconds": 251,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 41,
+            "input_tokens": 82,
+            "output_tokens": 16623,
+            "cache_read_input_tokens": 3499678,
+            "cache_creation_input_tokens": 109325
+          }
+        },
+        "api_calls": 41,
+        "input_tokens": 82,
+        "output_tokens": 16623,
+        "cache_read_input_tokens": 3499678,
+        "cache_creation_input_tokens": 109325
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a954ac711d9f9e2be",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3626 re-review",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 711,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 30,
+            "input_tokens": 60,
+            "output_tokens": 3074,
+            "cache_read_input_tokens": 3453622,
+            "cache_creation_input_tokens": 146837
+          }
+        },
+        "api_calls": 30,
+        "input_tokens": 60,
+        "output_tokens": 3074,
+        "cache_read_input_tokens": 3453622,
+        "cache_creation_input_tokens": 146837
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a024e06736571e8a2",
+        "agent_type": "autostory-code",
+        "description": "FRLG #510 CI failures",
+        "ref": "#510",
+        "date": "2026-11-15",
+        "wall_seconds": 253,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 39,
+            "input_tokens": 78,
+            "output_tokens": 16833,
+            "cache_read_input_tokens": 3475286,
+            "cache_creation_input_tokens": 96473
+          }
+        },
+        "api_calls": 39,
+        "input_tokens": 78,
+        "output_tokens": 16833,
+        "cache_read_input_tokens": 3475286,
+        "cache_creation_input_tokens": 96473
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "aeb792610467e7b69",
+        "agent_type": "autostory-code",
+        "description": "PLZA throw on frame-covered watch",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 388,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 38,
+            "input_tokens": 76,
+            "output_tokens": 32558,
+            "cache_read_input_tokens": 3382673,
+            "cache_creation_input_tokens": 104242
+          }
+        },
+        "api_calls": 38,
+        "input_tokens": 76,
+        "output_tokens": 32558,
+        "cache_read_input_tokens": 3382673,
+        "cache_creation_input_tokens": 104242
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a850620622668db22",
+        "agent_type": "autostory-code",
+        "description": "PLZA fade-ends-walk test",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 329,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 38,
+            "input_tokens": 80,
+            "output_tokens": 15503,
+            "cache_read_input_tokens": 3402902,
+            "cache_creation_input_tokens": 94183
+          }
+        },
+        "api_calls": 38,
+        "input_tokens": 80,
+        "output_tokens": 15503,
+        "cache_read_input_tokens": 3402902,
+        "cache_creation_input_tokens": 94183
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "aefdc0b0aabf7d408",
+        "agent_type": "autostory-code",
+        "description": "PLZA: split 03.08 at zone exit",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 236,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 39,
+            "input_tokens": 78,
+            "output_tokens": 14423,
+            "cache_read_input_tokens": 3220959,
+            "cache_creation_input_tokens": 84366
+          }
+        },
+        "api_calls": 39,
+        "input_tokens": 78,
+        "output_tokens": 14423,
+        "cache_read_input_tokens": 3220959,
+        "cache_creation_input_tokens": 84366
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a86e479b4d64fa272",
+        "agent_type": "pr-maintenance",
+        "description": "PLZA #335: fix red CI tests",
+        "ref": "#335",
+        "date": "2026-11-15",
+        "wall_seconds": 362,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 41,
+            "input_tokens": 82,
+            "output_tokens": 15611,
+            "cache_read_input_tokens": 3111338,
+            "cache_creation_input_tokens": 75271
+          }
+        },
+        "api_calls": 41,
+        "input_tokens": 82,
+        "output_tokens": 15611,
+        "cache_read_input_tokens": 3111338,
+        "cache_creation_input_tokens": 75271
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "accedfd5255e0985c",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3625",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 291,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 24,
+            "input_tokens": 48,
+            "output_tokens": 549,
+            "cache_read_input_tokens": 2912753,
+            "cache_creation_input_tokens": 131297
+          }
+        },
+        "api_calls": 24,
+        "input_tokens": 48,
+        "output_tokens": 549,
+        "cache_read_input_tokens": 2912753,
+        "cache_creation_input_tokens": 131297
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "aed624efff14fb970",
+        "agent_type": "run-records",
+        "description": "pa_lab MCP tools for 4b",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 261,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/505",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 30,
+            "input_tokens": 60,
+            "output_tokens": 20759,
+            "cache_read_input_tokens": 2771809,
+            "cache_creation_input_tokens": 100849
+          }
+        },
+        "api_calls": 30,
+        "input_tokens": 60,
+        "output_tokens": 20759,
+        "cache_read_input_tokens": 2771809,
+        "cache_creation_input_tokens": 100849
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a7f1ff05236a2bc14",
+        "agent_type": "autostory-code",
+        "description": "Fix #114 frame coverage review",
+        "ref": "#114",
+        "date": "2026-11-15",
+        "wall_seconds": 359,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/114",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 32,
+            "input_tokens": 64,
+            "output_tokens": 26738,
+            "cache_read_input_tokens": 2710420,
+            "cache_creation_input_tokens": 85757
+          }
+        },
+        "api_calls": 32,
+        "input_tokens": 64,
+        "output_tokens": 26738,
+        "cache_read_input_tokens": 2710420,
+        "cache_creation_input_tokens": 85757
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a108a62702424fb47",
+        "agent_type": "autostory-code",
+        "description": "CFR retire, option B",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 546,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 30,
+            "input_tokens": 930,
+            "output_tokens": 23192,
+            "cache_read_input_tokens": 2664032,
+            "cache_creation_input_tokens": 99324
+          }
+        },
+        "api_calls": 30,
+        "input_tokens": 930,
+        "output_tokens": 23192,
+        "cache_read_input_tokens": 2664032,
+        "cache_creation_input_tokens": 99324
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a49319c1cb02f562b",
+        "agent_type": "reviewer",
+        "description": "Re-review #493 mGBA fixes",
+        "ref": "#493",
+        "date": "2026-11-15",
+        "wall_seconds": 217,
+        "resumes": 1,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 25,
+            "input_tokens": 50,
+            "output_tokens": 16999,
+            "cache_read_input_tokens": 2069156,
+            "cache_creation_input_tokens": 92825
+          }
+        },
+        "api_calls": 25,
+        "input_tokens": 50,
+        "output_tokens": 16999,
+        "cache_read_input_tokens": 2069156,
+        "cache_creation_input_tokens": 92825
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "ae8073b3c8585444e",
+        "agent_type": "autostory-code",
+        "description": "Stats part 2 on #391",
+        "ref": "#391",
+        "date": "2026-11-15",
+        "wall_seconds": 253,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 29,
+            "input_tokens": 58,
+            "output_tokens": 11829,
+            "cache_read_input_tokens": 2042647,
+            "cache_creation_input_tokens": 69564
+          }
+        },
+        "api_calls": 29,
+        "input_tokens": 58,
+        "output_tokens": 11829,
+        "cache_read_input_tokens": 2042647,
+        "cache_creation_input_tokens": 69564
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "afa987aac58674440",
+        "agent_type": "reviewer",
+        "description": "Review PokeSim #106 plans v2",
+        "ref": "#106",
+        "date": "2026-11-15",
+        "wall_seconds": 198,
+        "resumes": 1,
+        "outcome": "APPROVED",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 25,
+            "input_tokens": 50,
+            "output_tokens": 16120,
+            "cache_read_input_tokens": 1905908,
+            "cache_creation_input_tokens": 86618
+          }
+        },
+        "api_calls": 25,
+        "input_tokens": 50,
+        "output_tokens": 16120,
+        "cache_read_input_tokens": 1905908,
+        "cache_creation_input_tokens": 86618
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "aaa32c4fd607fffeb",
+        "agent_type": "autostory-code",
+        "description": "#114 Windows Clang field inits",
+        "ref": "#114",
+        "date": "2026-11-15",
+        "wall_seconds": 273,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 28,
+            "input_tokens": 56,
+            "output_tokens": 11183,
+            "cache_read_input_tokens": 1789099,
+            "cache_creation_input_tokens": 54821
+          }
+        },
+        "api_calls": 28,
+        "input_tokens": 56,
+        "output_tokens": 11183,
+        "cache_read_input_tokens": 1789099,
+        "cache_creation_input_tokens": 54821
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a3191d8af1fcf8711",
+        "agent_type": "pr-maintenance",
+        "description": "Merge story-engine into #492",
+        "ref": "#492",
+        "date": "2026-11-15",
+        "wall_seconds": 385,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 24,
+            "input_tokens": 738,
+            "output_tokens": 13985,
+            "cache_read_input_tokens": 1760574,
+            "cache_creation_input_tokens": 76992
+          }
+        },
+        "api_calls": 24,
+        "input_tokens": 738,
+        "output_tokens": 13985,
+        "cache_read_input_tokens": 1760574,
+        "cache_creation_input_tokens": 76992
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a6d3993775b8a5746",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3624",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 592,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 17,
+            "input_tokens": 34,
+            "output_tokens": 378,
+            "cache_read_input_tokens": 1566789,
+            "cache_creation_input_tokens": 200526
+          }
+        },
+        "api_calls": 17,
+        "input_tokens": 34,
+        "output_tokens": 378,
+        "cache_read_input_tokens": 1566789,
+        "cache_creation_input_tokens": 200526
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a0d0c93685406fde8",
+        "agent_type": "autostory-code",
+        "description": "Rename AutoStory run stats",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 201,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 22,
+            "input_tokens": 44,
+            "output_tokens": 11249,
+            "cache_read_input_tokens": 1665143,
+            "cache_creation_input_tokens": 73099
+          }
+        },
+        "api_calls": 22,
+        "input_tokens": 44,
+        "output_tokens": 11249,
+        "cache_read_input_tokens": 1665143,
+        "cache_creation_input_tokens": 73099
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a6fba840e770e6b2e",
+        "agent_type": "pr-maintenance",
+        "description": "FRLG #458: CLT pin + 09.01 known-failing",
+        "ref": "#458",
+        "date": "2026-11-15",
+        "wall_seconds": 203,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 27,
+            "input_tokens": 54,
+            "output_tokens": 9268,
+            "cache_read_input_tokens": 1615360,
+            "cache_creation_input_tokens": 52814
+          }
+        },
+        "api_calls": 27,
+        "input_tokens": 54,
+        "output_tokens": 9268,
+        "cache_read_input_tokens": 1615360,
+        "cache_creation_input_tokens": 52814
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "acb142b10bc56df7b",
+        "agent_type": "autostory-code",
+        "description": "Fix #506 CoreLib Qt build",
+        "ref": "#506",
+        "date": "2026-11-15",
+        "wall_seconds": 160,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 24,
+            "input_tokens": 48,
+            "output_tokens": 10179,
+            "cache_read_input_tokens": 1571113,
+            "cache_creation_input_tokens": 81635
+          }
+        },
+        "api_calls": 24,
+        "input_tokens": 48,
+        "output_tokens": 10179,
+        "cache_read_input_tokens": 1571113,
+        "cache_creation_input_tokens": 81635
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a6a0c595a7fea0074",
+        "agent_type": "reviewer",
+        "description": "Review #114 frame coverage",
+        "ref": "#114",
+        "date": "2026-11-15",
+        "wall_seconds": 178,
+        "resumes": 1,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 20,
+            "input_tokens": 40,
+            "output_tokens": 14347,
+            "cache_read_input_tokens": 1440590,
+            "cache_creation_input_tokens": 84927
+          }
+        },
+        "api_calls": 20,
+        "input_tokens": 40,
+        "output_tokens": 14347,
+        "cache_read_input_tokens": 1440590,
+        "cache_creation_input_tokens": 84927
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a457186f5d9f5b91e",
+        "agent_type": "reviewer",
+        "description": "Review #516 SwSh work plan",
+        "ref": "#516",
+        "date": "2026-11-15",
+        "wall_seconds": 339,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-fable-5-1",
+        "models": {
+          "claude-fable-5-1": {
+            "api_calls": 19,
+            "input_tokens": 579,
+            "output_tokens": 18366,
+            "cache_read_input_tokens": 1382032,
+            "cache_creation_input_tokens": 114619
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 579,
+        "output_tokens": 18366,
+        "cache_read_input_tokens": 1382032,
+        "cache_creation_input_tokens": 114619
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a948a70e5cb8c0960",
+        "agent_type": "autostory-code",
+        "description": "Split PLZA 03.09 at autosave",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 151,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 20,
+            "input_tokens": 40,
+            "output_tokens": 10527,
+            "cache_read_input_tokens": 1414785,
+            "cache_creation_input_tokens": 66343
+          }
+        },
+        "api_calls": 20,
+        "input_tokens": 40,
+        "output_tokens": 10527,
+        "cache_read_input_tokens": 1414785,
+        "cache_creation_input_tokens": 66343
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a2ae4c5b81a0e06bd",
+        "agent_type": "autostory-code",
+        "description": "PLZA dedup per reuse audit",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 122,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 17,
+            "input_tokens": 34,
+            "output_tokens": 11687,
+            "cache_read_input_tokens": 1348668,
+            "cache_creation_input_tokens": 112842
+          }
+        },
+        "api_calls": 17,
+        "input_tokens": 34,
+        "output_tokens": 11687,
+        "cache_read_input_tokens": 1348668,
+        "cache_creation_input_tokens": 112842
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a0409591a6ac328c4",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3625 re-review",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 1326,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 16,
+            "input_tokens": 32,
+            "output_tokens": 588,
+            "cache_read_input_tokens": 1231364,
+            "cache_creation_input_tokens": 231667
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 32,
+        "output_tokens": 588,
+        "cache_read_input_tokens": 1231364,
+        "cache_creation_input_tokens": 231667
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a94baabb49029f60b",
+        "agent_type": "autostory-code",
+        "description": "CFR retirement step 1",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 106,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 17,
+            "input_tokens": 34,
+            "output_tokens": 8652,
+            "cache_read_input_tokens": 1274587,
+            "cache_creation_input_tokens": 83324
+          }
+        },
+        "api_calls": 17,
+        "input_tokens": 34,
+        "output_tokens": 8652,
+        "cache_read_input_tokens": 1274587,
+        "cache_creation_input_tokens": 83324
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a6b66dc7e979d6735",
+        "agent_type": "autostory-code",
+        "description": "PLZA 03.08b save mode autosave",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 198,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 19,
+            "input_tokens": 38,
+            "output_tokens": 7785,
+            "cache_read_input_tokens": 1190552,
+            "cache_creation_input_tokens": 58252
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 38,
+        "output_tokens": 7785,
+        "cache_read_input_tokens": 1190552,
+        "cache_creation_input_tokens": 58252
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a8952be4d427d20b7",
+        "agent_type": "run-records",
+        "description": "Check in dispatch skill",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 165,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/515",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 16,
+            "input_tokens": 32,
+            "output_tokens": 11493,
+            "cache_read_input_tokens": 1046420,
+            "cache_creation_input_tokens": 60206
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 32,
+        "output_tokens": 11493,
+        "cache_read_input_tokens": 1046420,
+        "cache_creation_input_tokens": 60206
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a244be7e05469f57c",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3626 iteration 2",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 251,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 12,
+            "input_tokens": 24,
+            "output_tokens": 1058,
+            "cache_read_input_tokens": 997166,
+            "cache_creation_input_tokens": 81043
+          }
+        },
+        "api_calls": 12,
+        "input_tokens": 24,
+        "output_tokens": 1058,
+        "cache_read_input_tokens": 997166,
+        "cache_creation_input_tokens": 81043
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "ab9f1ab15430a422b",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3623 re-review",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 67,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 12,
+            "input_tokens": 24,
+            "output_tokens": 169,
+            "cache_read_input_tokens": 968960,
+            "cache_creation_input_tokens": 94999
+          }
+        },
+        "api_calls": 12,
+        "input_tokens": 24,
+        "output_tokens": 169,
+        "cache_read_input_tokens": 968960,
+        "cache_creation_input_tokens": 94999
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "af9075598c45aeb96",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3623",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 1969,
+        "resumes": 2,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 11,
+            "input_tokens": 24,
+            "output_tokens": 1424,
+            "cache_read_input_tokens": 827875,
+            "cache_creation_input_tokens": 204021
+          }
+        },
+        "api_calls": 11,
+        "input_tokens": 24,
+        "output_tokens": 1424,
+        "cache_read_input_tokens": 827875,
+        "cache_creation_input_tokens": 204021
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a6c45b8e04d687027",
+        "agent_type": "pr-maintenance",
+        "description": "Resolve #504, retarget #506",
+        "ref": "#504",
+        "date": "2026-11-15",
+        "wall_seconds": 86,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 16,
+            "input_tokens": 32,
+            "output_tokens": 6078,
+            "cache_read_input_tokens": 945827,
+            "cache_creation_input_tokens": 50540
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 32,
+        "output_tokens": 6078,
+        "cache_read_input_tokens": 945827,
+        "cache_creation_input_tokens": 50540
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a59b81cd8464c5135",
+        "agent_type": "autostory-code",
+        "description": "Fix mGBA key sender test",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 109,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 14,
+            "input_tokens": 28,
+            "output_tokens": 7382,
+            "cache_read_input_tokens": 913717,
+            "cache_creation_input_tokens": 80137
+          }
+        },
+        "api_calls": 14,
+        "input_tokens": 28,
+        "output_tokens": 7382,
+        "cache_read_input_tokens": 913717,
+        "cache_creation_input_tokens": 80137
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a31fc9d12c1dbe1b6",
+        "agent_type": "pr-maintenance",
+        "description": "Fix #493 M5 watchdog",
+        "ref": "#493",
+        "date": "2026-11-15",
+        "wall_seconds": 102,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/Arduino-Source/pull/493",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 15,
+            "input_tokens": 30,
+            "output_tokens": 6548,
+            "cache_read_input_tokens": 913028,
+            "cache_creation_input_tokens": 54148
+          }
+        },
+        "api_calls": 15,
+        "input_tokens": 30,
+        "output_tokens": 6548,
+        "cache_read_input_tokens": 913028,
+        "cache_creation_input_tokens": 54148
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a9b0d74cd5416a5a9",
+        "agent_type": "qc-results",
+        "description": "qc-results re-review 3628 tip",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 103,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 11,
+            "input_tokens": 22,
+            "output_tokens": 94,
+            "cache_read_input_tokens": 819637,
+            "cache_creation_input_tokens": 91325
+          }
+        },
+        "api_calls": 11,
+        "input_tokens": 22,
+        "output_tokens": 94,
+        "cache_read_input_tokens": 819637,
+        "cache_creation_input_tokens": 91325
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a3cdffa3a1e844c03",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3625",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 74,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 9,
+            "input_tokens": 18,
+            "output_tokens": 87,
+            "cache_read_input_tokens": 751176,
+            "cache_creation_input_tokens": 78990
+          }
+        },
+        "api_calls": 9,
+        "input_tokens": 18,
+        "output_tokens": 87,
+        "cache_read_input_tokens": 751176,
+        "cache_creation_input_tokens": 78990
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "af63dd4c6ec2ce9c0",
+        "agent_type": "autostory-code",
+        "description": "FRLG #424 shared fault classes",
+        "ref": "#424",
+        "date": "2026-11-15",
+        "wall_seconds": 66,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 11,
+            "input_tokens": 22,
+            "output_tokens": 5619,
+            "cache_read_input_tokens": 684079,
+            "cache_creation_input_tokens": 59374
+          }
+        },
+        "api_calls": 11,
+        "input_tokens": 22,
+        "output_tokens": 5619,
+        "cache_read_input_tokens": 684079,
+        "cache_creation_input_tokens": 59374
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a2fff8e967560032b",
+        "agent_type": "run-records",
+        "description": "Document file-channel alternatives",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 98,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 12,
+            "input_tokens": 24,
+            "output_tokens": 5843,
+            "cache_read_input_tokens": 687775,
+            "cache_creation_input_tokens": 49734
+          }
+        },
+        "api_calls": 12,
+        "input_tokens": 24,
+        "output_tokens": 5843,
+        "cache_read_input_tokens": 687775,
+        "cache_creation_input_tokens": 49734
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a9f641ecf0d502174",
+        "agent_type": "autostory-code",
+        "description": "Handoff 4: PokeSim #104 nits",
+        "ref": "#104",
+        "date": "2026-11-15",
+        "wall_seconds": 162,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 13,
+            "input_tokens": 26,
+            "output_tokens": 4675,
+            "cache_read_input_tokens": 691435,
+            "cache_creation_input_tokens": 42505
+          }
+        },
+        "api_calls": 13,
+        "input_tokens": 26,
+        "output_tokens": 4675,
+        "cache_read_input_tokens": 691435,
+        "cache_creation_input_tokens": 42505
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "aaeb2f9481c8e35a9",
+        "agent_type": "run-records",
+        "description": "Design: retire CFR via MCP slice",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 121,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 11,
+            "input_tokens": 22,
+            "output_tokens": 6914,
+            "cache_read_input_tokens": 666725,
+            "cache_creation_input_tokens": 57277
+          }
+        },
+        "api_calls": 11,
+        "input_tokens": 22,
+        "output_tokens": 6914,
+        "cache_read_input_tokens": 666725,
+        "cache_creation_input_tokens": 57277
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "ae5462dd1cf6b6269",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3626 re-review",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 79,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 8,
+            "input_tokens": 16,
+            "output_tokens": 84,
+            "cache_read_input_tokens": 593457,
+            "cache_creation_input_tokens": 97771
+          }
+        },
+        "api_calls": 8,
+        "input_tokens": 16,
+        "output_tokens": 84,
+        "cache_read_input_tokens": 593457,
+        "cache_creation_input_tokens": 97771
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a73c5fd35d5d57b4f",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3624",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 53,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 8,
+            "input_tokens": 16,
+            "output_tokens": 137,
+            "cache_read_input_tokens": 597056,
+            "cache_creation_input_tokens": 91535
+          }
+        },
+        "api_calls": 8,
+        "input_tokens": 16,
+        "output_tokens": 137,
+        "cache_read_input_tokens": 597056,
+        "cache_creation_input_tokens": 91535
+      },
+      {
+        "kind": "dispatch",
+        "session": "6e30a01e-f167-4e6f-80f0-5192a770665e",
+        "agent_id": "a57ba7b3481e0a4d1",
+        "agent_type": "pr-maintenance",
+        "description": "Resolve #493 conflicts with lab/tooling",
+        "ref": "#493",
+        "date": "2026-11-15",
+        "wall_seconds": 61,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 11,
+            "input_tokens": 22,
+            "output_tokens": 3970,
+            "cache_read_input_tokens": 572484,
+            "cache_creation_input_tokens": 43480
+          }
+        },
+        "api_calls": 11,
+        "input_tokens": 22,
+        "output_tokens": 3970,
+        "cache_read_input_tokens": 572484,
+        "cache_creation_input_tokens": 43480
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a60f5e3ff479c01a5",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3626",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 49,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 6,
+            "input_tokens": 12,
+            "output_tokens": 100,
+            "cache_read_input_tokens": 471409,
+            "cache_creation_input_tokens": 74735
+          }
+        },
+        "api_calls": 6,
+        "input_tokens": 12,
+        "output_tokens": 100,
+        "cache_read_input_tokens": 471409,
+        "cache_creation_input_tokens": 74735
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a924a6c382915acf7",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3626 iteration 2",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 38,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 5,
+            "input_tokens": 10,
+            "output_tokens": 61,
+            "cache_read_input_tokens": 317514,
+            "cache_creation_input_tokens": 85907
+          }
+        },
+        "api_calls": 5,
+        "input_tokens": 10,
+        "output_tokens": 61,
+        "cache_read_input_tokens": 317514,
+        "cache_creation_input_tokens": 85907
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a8f5cd22b28d93c70",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3625 re-review",
+        "ref": "",
+        "date": "2026-11-15",
+        "wall_seconds": 30,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 4,
+            "input_tokens": 8,
+            "output_tokens": 644,
+            "cache_read_input_tokens": 232395,
+            "cache_creation_input_tokens": 82333
+          }
+        },
+        "api_calls": 4,
+        "input_tokens": 8,
+        "output_tokens": 644,
+        "cache_read_input_tokens": 232395,
+        "cache_creation_input_tokens": 82333
+      }
+    ],
+    "sessions": []
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}
