@@ -1,6 +1,6 @@
 # Status: cleanup
 
-## Last updated: 2026-10-26
+## Last updated: 2026-11-15
 
 ## Status
 IN_PROGRESS
@@ -145,6 +145,8 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] test_gap: trading/backtest/decision_grading/bin/decision_grading_bin.ml — no test ran the bin (source: 2026-10-20-run2 summary follow-up). DONE 2026-10-26: `test_decision_grading_bin.ml` builds a synthetic snapshot warehouse + scenario dir (trades.csv, trade_audit.sexp, summary.sexp), runs the real exe and pins the full markdown; 7 bin mutants proven red (pnl scale, side wiring, grade-horizon pick, MFE entry-date join, empty-reason label, exit-reason key, exit_price). Surprise: the bin takes `side` from the audit entry (default Long), not trades.csv `side`, so a short with no audit record is graded as a long (TAR render, `trade_audit_report.ml:105`). Branch cleanup/decision-grading-runner-test.
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 - [x] test_gap: trading/analysis/scripts/rebuild_weekly_sidetables/sidetable_migrator.ml -- `_csv_bars` Csv_storage.create Error branch pinned (unreadable CSV store -> Fallback_no_csv; .mli silent, current behavior pinned); mutation-verified RED (source: qc-behavioral review 5669200600 on #3450)
+
+- [x] file_length: trading/analysis/weinstein/screener/lib/screener.ml — 498 lines against the 500 hard limit after #3626 added `rank_survivors`; per-candidate evaluation block (`_build_candidate`, `_score_and_build`, `_long_candidate`, `_short_candidate`, `_evaluate_longs`, `_evaluate_shorts`) moved verbatim to new `screener_candidate_eval.ml(i)`, with `candidate_params` / `scored_candidate` re-exported from `Screener` as type aliases (same pattern as `cascade_diagnostics`). 498 -> 345 lines; `screener.mli` and every test unchanged. Branch cleanup/screener-candidate-eval (2026-11-15)
 
 ## Completed
 - [x] test_gap: trading/analysis/scripts/rebuild_weekly_sidetables/test/test_sidetable_migrator.ml — pinned `migrate` returning Error (no exception, no output manifest) when the source manifest is missing; mutation (manifest-read Error raises) turns it RED, restored GREEN. Test-only. Branch cleanup/migrate-missing-manifest-test (source: qc-behavioral 5669200600 on PR #3450) (2026-10-27)
