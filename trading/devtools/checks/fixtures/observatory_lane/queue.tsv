@@ -8,3 +8,4 @@ v6-arm	((stops_config ((max_stop_distance_pct 0.14))))	fixture: live, one seed's
 v6dead-arm	((stops_config ((max_stop_distance_pct 0.16))))	fixture: its cells copy S, one seed's V6 log fails	pending
 one-arm	((stops_config ((max_stop_distance_pct 0.17))))	fixture: copies S except k4 (obs_read fixture arm U)	pending
 stale-arm	((stale_exit_after_days (10)))	fixture: resets a non-scalar field the record sets ((5))	pending
+seed-arm	((screening_config ((tiebreak_seed 9))))	fixture: sets the tie seed the lane owns	pending

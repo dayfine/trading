@@ -8,7 +8,8 @@
 #     in OUT); the batches at PAR = (15 - 3) / 6 = 2; the tripwire's md5 and its source; the drift pair; the publish
 #     lists (price-bearing kinds private, mark-free kinds public, trade_audit never); and that it copies nothing;
 #   - specs: obs-S-kK is rk-kK below the header, the arm adds exactly its overrides after the tiebreak line, and an arm
-#     that resets a field the record sets (a scalar and a list) replaces the record's line: the field appears once;
+#     that resets a field the record sets (a scalar and a list) replaces the record's line: the field appears once,
+#     and the spec is S with exactly that line replaced; an arm that sets tiebreak_seed is refused;
 #   - read, the lane's real path, on synthetic cells from fixtures/obs_read/gen_fixture.sh: a live arm appends a surface
 #     row and becomes done@HEAD; S against the last published HEAD's S is the drift row; a changed S k0 is one
 #     baseline-drift event; a dead arm reads nothing and becomes dead@HEAD; a re-read over the branch's surface replaces
@@ -131,6 +132,13 @@ replaced stale-arm stale_exit_after_days '((stale_exit_after_days(10)))'
 expect "S keeps the record's hysteresis_weeks" '((laggard_rotation_config((hysteresis_weeks2))))' \
   "$(grep -v '^;;' "$TMP/specs-dup-arm/obs-S-k3.sexp" | grep hysteresis_weeks | tr -d ' ')"
 expect "the replacements are logged" "1 1" "$(grep -c 'OVERRIDE laggard_rotation_config.hysteresis_weeks: 2 -> 3' "$TMP/sp-dup-arm") $(grep -c 'OVERRIDE stale_exit_after_days: (5) -> (10)' "$TMP/sp-stale-arm")"
+# Byte for byte: obs-dup-arm-k3 is obs-S-k3 without the record's hysteresis line, plus the arm's line.
+sed 1,4d "$TMP/specs-dup-arm/obs-S-k3.sexp" | grep -vxF '   ((laggard_rotation_config ((hysteresis_weeks 2))))' > "$TMP/dupS"
+expect "obs-dup-arm-k3 is obs-S-k3 with exactly the one line replaced" "" \
+  "$(sed 1,4d "$TMP/specs-dup-arm/obs-dup-arm-k3.sexp" | grep -vxF '   ((laggard_rotation_config ((hysteresis_weeks 3))))' | diff "$TMP/dupS" -)"
+# The tie seed is the lane's: an arm that sets it is refused.
+rc=0; lane specs seed-arm "$TMP/specs-seed" > "$TMP/sp-seed" 2>&1 || rc=$?
+expect "an arm setting tiebreak_seed is refused" "1 1" "$rc $(grep -c 'an arm may not set tiebreak_seed' "$TMP/sp-seed")"
 
 # --- read: the real path on finished cells (S is in OUT from D; the parent's S is in trading-results from B)
 cell "$TMP/run" U "$TMP/out/runs/$C2/up-arm" up-arm; cell "$TMP/run" S "$TMP/out/runs/$C2/dead-arm" dead-arm
