@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-11-14 (orchestrator run — see `dev/daily/2026-11-14.md`). Queue: 0 open PRs; no dispatchable track work; screener row refreshed (price-band closed, stale-E cap K=5 in flight).
+Last updated: 2026-11-15 (orchestrator run — see `dev/daily/2026-11-15.md`). Queue: 0 open PRs; no dispatchable track work; backtest-infra and cleanup rows refreshed.
 11-13→14: merged #3601-#3612, #3615, #3616 (local). 11-11: merged #3572, #3573, #3574, #3576, #3577, #3578, #3579 (local).
 11-06: merged #3536 (local). 11-05: merged #3530, #3532. 11-04: merged #3524, #3526, #3527, #3529. 11-03: merged #3512, #3513, #3517, #3521. 11-02: merged #3499, #3500, #3501, #3502, #3503, #3504, #3507, #3508, #3510. 11-01: merged #3483, #3485, #3494, #3495, #3497. 10-31: merged #3490, #3493. 10-30: merged #3481. 10-29: merged #3470, #3472. 10-28: merged #3460, #3459, #3458, #3461, #3462, #3463, #3464. 10-27: merged #3440, #3441, #3442, #3450, #3451, #3453, #3454, #3455. 10-26: merged #3433, #3434. 10-24: merged #3411, #3414. 10-23: merged #3399, #3398, #3400, #3402, #3401. 10-22: merged #3385, #3386, #3389, #3390. 10-21: merged #3371, #3370, #3373. 10-20: merged #3358, #3359, #3361, #3360. 10-19: merged #3350, #3349. 10-18: merged #3321, #3322, #3323, #3319. 10-13: merged #3288, #3289, #3290. 10-12: merged #3257, #3258, #3269, #3268.
 
@@ -106,7 +106,7 @@ immune (#2605).
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2984 live stop-sync MERGED #3121 (10-04); trades-stream wiring pinned #3497; PIT LOCAL; next #2839 |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | 11-14: #3626 candidates top-N view; 11-15: #3634 obs reader; next: observatory P2b lane chain (harness/observatory-lane, LOCAL) |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1/v2 MERGED; twin-detector direct-match + hub guard MERGED #2862 (default-off); alias sidecar is armed-pass only (#2870); next: arm the guards on a PIT rebuild |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | #3500 merged (#3420 V12/V13); remaining: #3420 [after-merge] verify items |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
@@ -133,7 +133,7 @@ immune (#2605).
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | 11-02: #3508 session-brief hooks merged (1 rework); next: H-GATE-TWO-VERDICTS-ONE-SHA (needs maintainer rule) |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 10-28: #3458 `_csv_bars` Error-branch pin; next: linter_coverage test-file policy decision |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 11-15: #3630 screener.ml split; next: linter_coverage test-file policy decision |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
