@@ -198,8 +198,11 @@ LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > .s
    - An override of a field the record config already sets replaces it, scalar or not (`hysteresis_weeks 3` over the
      record's 2, `stale_exit_after_days (10)` over `(5)`). The record's line for the same field path is dropped, so the
      arm's value is the only one in the spec, and the lane logs `OVERRIDE <field>: <record> -> <arm>`.
-   - The field path is the chain of single-field records down to the value, one override form per spec line, as
-     `rk-kK` writes them. An arm may not set `tiebreak_seed`, which the lane sets per seed.
+   - The field path is the full chain of single-field records down to the value, one override form per spec line, as
+     `rk-kK` writes them. Only that exact path is replaced: a sibling under the same parent, or a field that shares
+     only the leaf name, stays.
+   - Refused: a form that sets more than one field at once (write one form per field), and `tiebreak_seed`, which
+     the lane sets per seed.
 5. **Cells.** For S and for the arm, each of k0–k4 is reused when this HEAD's cell is finished in the out dir, else in
    trading-results (`runs/<head>/<arm>/`), and run otherwise. S therefore runs once per HEAD. The cells to run go
    `PAR` at a time, after a three-month preflight of the arm's k0: the spec parses, the overrides reach
@@ -273,7 +276,9 @@ builds a two-commit git repo in a temp dir from the lane, the reader, the record
   - The publish lists, and that a dry run copies nothing.
 - **Specs.** The arm is the record plus exactly its overrides. An override of a field the record sets (a scalar,
   `hysteresis_weeks`, and a list, `stale_exit_after_days`) replaces the record's line: the field appears once, with the
-  arm's value, and the lane logs the `OVERRIDE`.
+  arm's value, and the lane logs the `OVERRIDE`. The match is on the full path: `pos-arm` swaps exactly one of the three
+  `portfolio_config` lines, and `leaf-arm` (`stage3_force_exit_config.hysteresis_weeks`) replaces nothing. A form
+  setting two fields, and an arm setting `tiebreak_seed`, are refused.
 - **`read` on synthetic cells** (the obs_read fixture's S, U and H):
   - a live arm's row and `done@`;
   - the drift row;

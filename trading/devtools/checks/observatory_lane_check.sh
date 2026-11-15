@@ -9,7 +9,8 @@
 #     lists (price-bearing kinds private, mark-free kinds public, trade_audit never); and that it copies nothing;
 #   - specs: obs-S-kK is rk-kK below the header, the arm adds exactly its overrides after the tiebreak line, and an arm
 #     that resets a field the record sets (a scalar and a list) replaces the record's line: the field appears once,
-#     and the spec is S with exactly that line replaced; an arm that sets tiebreak_seed is refused;
+#     and the spec is S with exactly that line replaced, matched on the full field path (a sibling under the same
+#     parent and a field sharing only the leaf name stay); a form setting two fields, or tiebreak_seed, is refused;
 #   - read, the lane's real path, on synthetic cells from fixtures/obs_read/gen_fixture.sh: a live arm appends a surface
 #     row and becomes done@HEAD; S against the last published HEAD's S is the drift row; a changed S k0 is one
 #     baseline-drift event; a dead arm reads nothing and becomes dead@HEAD; a re-read over the branch's surface replaces
@@ -17,7 +18,7 @@
 #   - the gates on their failing side: one failing V6 log makes a live arm, or a would-be-dead one, invalid@HEAD and
 #     unread; one differing seed is live; a parent S identical to HEAD's is a tripwire match with no baseline-drift
 #     event and a drift-none event with no drift row; a failing drift V6 log is drift-invalid with no drift row;
-#     a drift pair obs_read.sh refuses is drift-read-failed with no drift row;
+#     a drift pair obs_read.sh refuses is drift-read-failed (with its exit 2) and no drift row;
 #   - years: the SPY bull/bear rule on a made-up bar file (tie, gap, the run-end cut, a bad header), writing no OUT;
 #   - the lock (where flock exists): run, read, stage, docker, collect and publish refuse to run beside another
 #     holder, and a dockerd that the docker preflight starts (a stub on PATH) does not keep lane.lock after the lane exits;
@@ -139,6 +140,23 @@ expect "obs-dup-arm-k3 is obs-S-k3 with exactly the one line replaced" "" \
 # The tie seed is the lane's: an arm that sets it is refused.
 rc=0; lane specs seed-arm "$TMP/specs-seed" > "$TMP/sp-seed" 2>&1 || rc=$?
 expect "an arm setting tiebreak_seed is refused" "1 1" "$rc $(grep -c 'an arm may not set tiebreak_seed' "$TMP/sp-seed")"
+# The match is on the full field path. pos-arm resets one of the three portfolio_config lines: exactly that line is
+# swapped and its siblings stay. leaf-arm sets stage3_force_exit_config.hysteresis_weeks, which shares only its leaf name
+# with the record's laggard hysteresis: nothing is replaced, so its spec is S plus its line.
+# swapped LABEL RECORD_LINE ARM_LINE: obs-LABEL-k3 is obs-S-k3 without RECORD_LINE (none if empty) plus ARM_LINE, exactly
+swapped() { rc=0; lane specs "$1" "$TMP/specs-$1" > "$TMP/sp-$1" 2>&1 || rc=$?; f=$TMP/specs-$1/obs-$1-k3.sexp
+  sed 1,4d "$TMP/specs-$1/obs-S-k3.sexp" | grep -vxF "${2:-@none@}" > "$TMP/sw-S"
+  expect "$1: specs written, the arm line once" "0 1" "$rc $(grep -cxF "$3" "$f")"
+  what=${2:+that line swapped}; what=${what:-no line replaced}
+  expect "$1: obs-S-k3 with exactly $what, every other line kept" "" \
+    "$(sed 1,4d "$f" | grep -vxF "$3" | diff "$TMP/sw-S" -)"; }
+swapped pos-arm '   ((portfolio_config ((max_position_pct_long 0.14))))' '   ((portfolio_config ((max_position_pct_long 0.10))))'
+swapped leaf-arm "" '   ((stage3_force_exit_config ((hysteresis_weeks 1))))'
+expect "pos-arm logs its OVERRIDE; leaf-arm logs none" "1 0" \
+  "$(grep -c 'OVERRIDE portfolio_config.max_position_pct_long: 0.14 -> 0.10' "$TMP/sp-pos-arm") $(grep -c OVERRIDE "$TMP/sp-leaf-arm")"
+# A form that sets two fields at once cannot replace a single record line: refused.
+rc=0; lane specs multi-arm "$TMP/specs-multi" > "$TMP/sp-multi" 2>&1 || rc=$?
+expect "a form setting two fields is refused" "1 1" "$rc $(grep -c 'an override form sets more than one field' "$TMP/sp-multi")"
 
 # --- read: the real path on finished cells (S is in OUT from D; the parent's S is in trading-results from B)
 cell "$TMP/run" U "$TMP/out/runs/$C2/up-arm" up-arm; cell "$TMP/run" S "$TMP/out/runs/$C2/dead-arm" dead-arm
@@ -219,6 +237,8 @@ sed 's/(initial_cash 1000000.00)/(initial_cash 1000001.00)/' "$f" > "$TMP/x" && 
 rc=0; (OUTX=$TMP/out3; TRX=$TMP/tr3; lane read drift) > "$TMP/RF" 2>&1 || rc=$?
 expect "a refused drift read: one drift-read-failed event, no drift row" "1 1 0" \
   "$rc $(nev "$TMP/out3/state/events.tsv" drift-read-failed) $(rows "$TMP/out3/state/drift.tsv")"
+expect "the drift-read-failed event carries obs_read's exit 2 (unequal cash)" 1 \
+  "$(awk -F'\t' '$3 == "drift-read-failed"' "$TMP/out3/state/events.tsv" | grep -c '(exit 2;')"
 
 # --- years
 printf '%s\n' date,open,high,low,close,adjusted_close,volume 1999-12-31,1,1,1,100,1,1 2000-06-30,1,1,1,120,1,1 \

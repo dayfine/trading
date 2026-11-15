@@ -147,21 +147,23 @@ write_specs() { # $1 S or a label, $2 overrides ("" for S), $3 dir
         function balanced(s,   i, d, c) { d = 0
           for (i = 1; i <= length(s); i++) { c = substr(s, i, 1); if (c == "(") d++; else if (c == ")" && --d < 0) return 0 }
           return d == 0 }
-        function opath(s,   f, r, p) {   # one override form -> "path<TAB>value", descending single-field records
+        function opath(s,   f, r, p, m) {   # one override form -> "path<TAB>value<TAB>multi", descending single-field
+          # records; multi is 1 when a record on the way holds more than one field (the form sets several fields)
           gsub(/^[ \t]+|[ \t]+$/, "", s); gsub(/[ \t]+/, " ", s)
           while (match(s, /^\(\([a-z_][a-z_0-9]* /) && substr(s, length(s) - 1) == "))") {
             f = substr(s, 3, RLENGTH - 3); r = substr(s, RLENGTH + 1, length(s) - RLENGTH - 2)
-            if (!balanced(r)) break
+            if (!balanced(r)) { m = 1; break }
             p = p (p == "" ? "" : ".") f; s = r }
-          return p "\t" s }
+          return p "\t" s "\t" (m + 0) }
         BEGIN { o = ENVIRON["OVRX"]; d = 0; f = ""   # the overrides, split into top-level forms: ap[path] = value
           for (i = 1; i <= length(o); i++) { c = substr(o, i, 1); if (c == "(") d++; if (d > 0) f = f c
-            if (c == ")" && --d == 0) { split(opath(f), t, "\t"); if (t[1] != "") ap[t[1]] = t[2]; f = "" } } }
+            if (c == ")" && --d == 0) { split(opath(f), t, "\t")
+              if (t[3] == 1) { if (first) print "*multi*\t" f > rep } else if (t[1] != "") ap[t[1]] = t[2]; f = "" } } }
         /^;;/ { next }
         /^\(\(name "/ { print "((name \"" name "\")"; next }
         /^ \(description "/ { print " (description \"" desc "\")"; next }
         /^[ \t]*\(\(/ { split(opath($0), t, "\t")
-          if (t[1] in ap) { if (first) { l = $0; gsub(/^[ \t]+|[ \t]+$/, "", l); print t[1] "\t" t[2] "\t" ap[t[1]] "\t" l > rep }; next } }
+          if (t[3] != 1 && (t[1] in ap)) { if (first) { l = $0; gsub(/^[ \t]+|[ \t]+$/, "", l); print t[1] "\t" t[2] "\t" ap[t[1]] "\t" l > rep }; next } }
         { print }
         /\(\(screening_config \(\(tiebreak_seed [0-9]+\)\)\)\)/ && o != "" { print "   " o }' "$REPO/$REC/rk-k$ks.sexp"
     } > "$3/obs-$1-k$ks.sexp"
@@ -176,6 +178,8 @@ spec_checks() { # $1 dir, $2 label ("" = S only), $3 overrides
   o=$(printf '%s' "$3" | tr -d ' \t\n'); rp=$1/obs-$2.replaced
   rf=$([ -z "$2" ] || cut -f4 "$rp" | tr -d ' \t')   # the record lines the arm replaces, whitespace removed
   ! grep -q '^screening_config\.tiebreak_seed	' "$rp" 2> /dev/null || die "an arm may not set tiebreak_seed: the lane sets it per seed"
+  ! grep -q '^\*multi\*' "$rp" 2> /dev/null \
+    || die "an override form sets more than one field ($(grep '^\*multi\*' "$rp" | cut -f2 | head -1)): write one form per field, so each replaces the record's"
   for ks in $SEEDS; do s=$1/obs-S-k$ks.sexp; ns=$(norm "$s" "")
     [ "$ns" = "$(norm "$REPO/$REC/rk-k$ks.sexp" "")" ] || die "obs-S-k$ks differs from rk-k$ks below the header"
     case $ns in *"((screening_config((tiebreak_seed$ks))))"*) ;; *) die "obs-S-k$ks lacks tiebreak_seed $ks" ;; esac

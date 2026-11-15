@@ -9,3 +9,6 @@ v6dead-arm	((stops_config ((max_stop_distance_pct 0.16))))	fixture: its cells co
 one-arm	((stops_config ((max_stop_distance_pct 0.17))))	fixture: copies S except k4 (obs_read fixture arm U)	pending
 stale-arm	((stale_exit_after_days (10)))	fixture: resets a non-scalar field the record sets ((5))	pending
 seed-arm	((screening_config ((tiebreak_seed 9))))	fixture: sets the tie seed the lane owns	pending
+pos-arm	((portfolio_config ((max_position_pct_long 0.10))))	fixture: one of three portfolio_config lines the record sets	pending
+leaf-arm	((stage3_force_exit_config ((hysteresis_weeks 1))))	fixture: shares only its leaf name with the record's laggard hysteresis	pending
+multi-arm	((portfolio_config ((max_position_pct_long 0.10) (min_cash_pct 0.20))))	fixture: one form setting two fields	pending
