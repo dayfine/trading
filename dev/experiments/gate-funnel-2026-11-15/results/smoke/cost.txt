@@ -1,0 +1,49 @@
+# SMOKE: top-3000 cost probe, the first quarter or half of 2000, timings and counts only. No verdict (README §Smoke).
+
+# run 1 (flag first, then plain; build 0ce303929, the #3626 tip before long_resting_reserved_pct; peak RSS only)
+# cost probe: pb-S-k0 cut to 2000-01-01..2000-03-31, top-3000 PIT v12, WH=/tmp/snap_top3000_pit_v12wk, TD=committed test_data, 2026-11-15 03:05Z, build 0ce303929
+emit wall 1093 s, peak_rss_kb=3241316
+plain wall 483 s, peak_rss_kb=3136948
+trades.csv md5 with the flag 777b9f329b1fc887f42b51cfac0edf88, without 777b9f329b1fc887f42b51cfac0edf88: MATCH (4 lines)
+candidates.sexp 13751905 bytes
+Long rows by outcome: Dropped_at_top_n 2834 Dropped_at_breakout 11509 Dropped_at_grade 187 Admitted 120
+cut rows by shadow (one stop check each): Buyable 564 No_structural_stop 2270
+screened Fridays 12, with Long rows 6
+cache line (flag on): n_symbols=9200  n_symbols_absent=1 
+
+# run 2 (plain first, then the flag; other agents' dune builds ran in the container during both)
+# cost probe: pb-S-k0 cut to 2000-01-01..2000-03-31, top-3000 PIT v12, WH=/tmp/snap_top3000_pit_v12wk, TD=committed test_data, 2026-11-15 03:33Z, build 95e4ff816
+plain wall 1071 s, peak_rss_kb=3088996
+emit wall 1673 s, peak_rss_kb=2474200
+trades.csv md5 with the flag 777b9f329b1fc887f42b51cfac0edf88, without 777b9f329b1fc887f42b51cfac0edf88: MATCH (4 lines)
+candidates.sexp 13752464 bytes
+Long rows by outcome: Dropped_at_top_n 2834 Dropped_at_breakout 11509 Dropped_at_grade 187 Admitted 120
+cut rows by shadow (one stop check each): Buyable 564 No_structural_stop 2270
+screened Fridays 12, with Long rows 6
+cache line (flag on): n_symbols=9200  n_symbols_absent=1 
+
+# run 3 (CPU-timed; plain ran first, after a build and the plumbing smoke had used the container: note its sys time)
+# cost probe: pb-S-k0 cut to 2000-01-01..2000-03-31, top-3000 PIT v12, WH=/tmp/snap_top3000_pit_v12wk, TD=committed test_data, 2026-11-15 04:30Z, build 95e4ff816; arms in order: plain base emit; base = /workspaces/trading-1/.claude/worktrees/gf-main/trading/_build/default/trading/backtest/scenarios/scenario_runner.exe at 63a608151
+plain wall 1110 s, peak_rss_kb=2906276 user_s=1047.74 sys_s=48.15
+plain: trades.csv md5 777b9f329b1fc887f42b51cfac0edf88 (same as the first arm), snapshot cache hits=6508442 misses=9716, n_symbols=9200 n_symbols_absent=1
+base wall 332 s, peak_rss_kb=3126324 user_s=325.37 sys_s=6.14
+base: trades.csv md5 777b9f329b1fc887f42b51cfac0edf88 (same as the first arm), snapshot cache hits=6508442 misses=9716, n_symbols=9200 n_symbols_absent=1
+emit wall 617 s, peak_rss_kb=3126492 user_s=605.81 sys_s=7.25
+emit: trades.csv md5 777b9f329b1fc887f42b51cfac0edf88 (same as the first arm), snapshot cache hits=6853988 misses=9716, n_symbols=9200 n_symbols_absent=1
+emit: candidates.sexp 13752464 bytes
+emit, Long rows in the window by outcome: Dropped_at_top_n 2834 Dropped_at_breakout 11509 Dropped_at_grade 187 Admitted 120
+emit, cut rows in the window by shadow (one stop check each): Buyable 564 No_structural_stop 2270
+emit: screened Fridays in the window 12, with Long rows 6 (the warm-up's 52 Fridays are screened too, but not written)
+
+# run 4 (CPU-timed; half a year; base twice, around emit, to bracket drift)
+# cost probe: pb-S-k0 cut to 2000-01-01..2000-06-30, top-3000 PIT v12, WH=/tmp/snap_top3000_pit_v12wk, TD=committed test_data, 2026-11-15 05:11Z, build 917341665; arms in order: base emit base; base = /workspaces/trading-1/.claude/worktrees/gf-main/trading/_build/default/trading/backtest/scenarios/scenario_runner.exe at 63a608151
+base wall 631 s, peak_rss_kb=3291048 user_s=622.31 sys_s=6.80
+base: trades.csv md5 54d79553e68d035928ef67dfcd1d1f35 (same as the first arm), snapshot cache hits=7831649 misses=9819, n_symbols=9200 n_symbols_absent=1
+emit wall 553 s, peak_rss_kb=3331612 user_s=546.89 sys_s=6.45
+emit: trades.csv md5 54d79553e68d035928ef67dfcd1d1f35 (same as the first arm), snapshot cache hits=8221915 misses=9819, n_symbols=9200 n_symbols_absent=1
+base wall 580 s, peak_rss_kb=3313284 user_s=575.02 sys_s=5.25
+base: trades.csv md5 54d79553e68d035928ef67dfcd1d1f35 (same as the first arm), snapshot cache hits=7831649 misses=9819, n_symbols=9200 n_symbols_absent=1
+emit: candidates.sexp 25840541 bytes
+emit, Long rows in the window by outcome: Dropped_at_top_n 4760 Dropped_at_breakout 20742 Admitted 220 Dropped_at_grade 453
+emit, cut rows in the window by shadow (one stop check each): Buyable 841 No_structural_stop 3919
+emit: screened Fridays in the window 24, with Long rows 11 (the warm-up's 52 Fridays are screened too, but not written)

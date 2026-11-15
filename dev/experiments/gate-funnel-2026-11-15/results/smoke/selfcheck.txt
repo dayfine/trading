@@ -1,0 +1,9 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only; sp500 is a fixture. No verdict (README §Smoke).
+# gate-funnel self-check (read/read.sh step 2; README §Self-check). SEED=0 CAP=20
+SK1 (rank: the pool is ranked 1..n in the Seeded order, and Admitted is exactly rank <= 20 on open Fridays): PASS on 99 open Fridays, 1329 pool rows
+SK2 (walk: each Admitted row's walk equals trade_audit's weekly decision for that name): PASS on 1120 walked rows (13 Not_reached rows have no decision, as they must)
+SK3 (fields: tickets_placed = cascade_summary.entered; walk on every Admitted row, shadow on every cut row; long_cash_left_pct on every open Friday): PASS
+SK4 (information): open Fridays 99, macro-blocked 0 (no Long rows), live-blocked 0 (a cut row ranked <= 20); trace phase counts equal cascade_summary counts on 99 of 99 open Fridays; Long rows exist exactly when long_macro_admitted > 0 on 99 of 99 screened Fridays
+SK5 (information): stop distance, as a fraction of the trigger -- shadow Buyable max 0.1472, shadow Stop_too_wide min none; walk Funded max 0.1491, walk Skipped_Stop_too_wide min none
+long_resting_reserved_pct present on 99 of 99 open Fridays
+SELF-CHECK PASSED

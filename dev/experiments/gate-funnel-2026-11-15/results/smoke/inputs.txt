@@ -1,0 +1,9 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only; sp500 is a fixture. No verdict (README §Smoke).
+# inputs of this read
+SEED=0 CAP=20 EVENTS=surfaced STORE_END=2026-06-26 G3=0 (reserve_cash_for_resting_tickets; net free cash = gross when 1)
+candidates.sexp md5 2918a1a7d410a22c1ad5d54d37610790 bytes 13199515
+trade_audit.sexp md5 1d6c6f26672a6d44b2fb633c6559e661
+trades.csv md5 dcb8e99dfe7b9ee23bce2e5674876dd1
+screened dates 99, Long rows 36521, pool rows on open Fridays 1329, walk rows 1120, placed long tickets 53, entries 43, screen events 1827, macro-proxy events 0, forward-outcome requests 4421
+pool_outcomes.tsv.gz 17430 bytes: private
+crowd_outcomes.tsv.gz 212 bytes: private
