@@ -19,6 +19,26 @@ val held_symbols : Trading_strategy.Portfolio_view.t -> string list
     natural query on strategy state and the behaviour (exclude [Closed]) is
     worth pinning by direct unit test. *)
 
+type walk_report = {
+  long_cash_left_pct : float;
+      (** The long side's spendable cash less the cost of every long ticket the
+          walk placed, as a fraction of portfolio value — the cash the long walk
+          left unspent. The budget is [portfolio.cash] (net of resting tickets
+          under [reserve_cash_for_resting_tickets]) in the combined walk, or the
+          part above the reserved short sleeve when [short_sleeve_fraction > 0];
+          short tickets never reduce it. Negative only under long-margin
+          leverage. [0.0] when portfolio value is not positive. *)
+  held : Core.String.Set.t;
+      (** The symbols the walk treated as held ([Already_held]). *)
+  stop_check : Screener.scored_candidate -> Entry_stop_check.t;
+      (** The walk's own initial-stop check, with this tick's config, fallback
+          buffer, bar reader and date: the same closure every entry of the walk
+          was built from. Pure, so it can judge a candidate the walk never saw
+          without placing anything. *)
+}
+(** What the [candidates.sexp] top-N view needs from one Friday's walk. Built
+    only when {!entries_from_candidates} is given [?on_walk_report]. *)
+
 val entries_from_candidates :
   ?sector_lookup:(string -> string option) ->
   ?pending_entry_e:Entry_freeze.t ->
@@ -33,6 +53,7 @@ val entries_from_candidates :
   ?audit_recorder:Audit_recorder.t ->
   ?macro:Macro.result ->
   ?on_candidates_considered:(Audit_recorder.walk_decision list -> unit) ->
+  ?on_walk_report:(walk_report -> unit) ->
   unit ->
   Trading_strategy.Position.transition list
 (** Generate [CreateEntering] transitions for a list of screener candidates.
@@ -102,6 +123,11 @@ val entries_from_candidates :
       separate parameter rather than a recorder callback because the list
       belongs to the {i week}'s cascade event, which the entry walk does not
       itself assemble.
+    @param on_walk_report
+      When present, called once after the walk with its {!walk_report}. Absent
+      (the default) is a provable no-op: the report is never built. Meant to be
+      installed only when candidate capture is on. Observational: the walk's
+      order, decisions and transitions are the same with or without it.
     @param pending_entry_e
       Fix #2 no-chase pin table ({!Entry_freeze.t}). Threaded from the
       {!Weinstein_strategy.make} closure so the first-qualifying entry [E]

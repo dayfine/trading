@@ -65,6 +65,25 @@ val borrowed_balance : entry_walk_state -> float
     cash (always so at the default cash-account setting, where
     [leverage_enabled = false]). *)
 
+val spendable_cash :
+  config:Weinstein_strategy_config.config -> Portfolio_view.t -> float
+(** The cash the entry walk may commit this tick: [portfolio.cash] verbatim, or,
+    under [config.reserve_cash_for_resting_tickets] (G3), that cash less the
+    unfilled cost of every resting long entry ticket, floored at [0.0]. Moved
+    here from {!Entry_walk} unchanged. *)
+
+val long_budget :
+  config:Weinstein_strategy_config.config ->
+  spendable:float ->
+  portfolio_value:float ->
+  float
+(** The part of [spendable] the long side may commit: all of it in the combined
+    walk ([config.short_sleeve_fraction <= 0.0]), else what is left above the
+    reserved short sleeve ([portfolio_value * short_sleeve_fraction]), floored
+    at [0.0]. The reserved-sleeve walk's long cash, and the budget the
+    [candidates.sexp] top-N view measures the long walk's unspent cash against
+    ({!Entry_walk.walk_report}). *)
+
 val make_entry_walk_state :
   cash:float ->
   config:Weinstein_strategy_config.config ->

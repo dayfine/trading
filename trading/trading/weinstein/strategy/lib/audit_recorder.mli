@@ -301,6 +301,35 @@ type exit_event = {
 }
 (** Event captured at exit-decision time. *)
 
+(** The [candidates.sexp] top-N view: the rows the screener's
+    [max_buy_candidates] / [max_short_candidates] cap ranked, kept ([Admitted])
+    or cut ([Dropped_at_top_n]). The cap runs before the entry walk's buyability
+    checks, so a cut name is never asked whether it was buyable; this view asks
+    it, offline. Observation only. *)
+module Top_n : sig
+  (** The entry walk's stop question asked of a candidate the cap cut: the
+      walk's own initial-stop check ({!Entry_walk.walk_report}'s [stop_check])
+      with its [require_structural_stop] gate and its [max_stop_distance_pct]
+      width gate under the configured [stop_width_mode]. Cash, the notional and
+      sector caps, the share-class rule and sizing are ignored. The shadow is
+      pure: it places no order, debits no cash, registers no stop state and
+      consumes no position id. *)
+  type shadow =
+    | Buyable of float
+        (** Both gates pass. The payload is the stop distance the width gate
+            measured, as a fraction of the entry trigger. *)
+    | No_structural_stop
+        (** The investor-preset gate would reject it: the stop is the
+            automatic-percentage fallback. Never produced when
+            [require_structural_stop] is off. *)
+    | Stop_too_wide of float
+        (** The width gate would drop it; the payload is the measured distance.
+        *)
+    | Already_held
+        (** The walk's held set contains the symbol, so the walk would skip it
+            before any stop is computed. *)
+end
+
 type cascade_drop = {
   analysis : Stock_analysis.t;
       (** The candidate's decision-time analysis — stage, RS, volume. The

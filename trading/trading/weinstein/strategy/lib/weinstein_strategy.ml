@@ -47,6 +47,7 @@ module Cascade_trace = Cascade_trace
 module Stop_width_mode = Stop_width_mode
 module Stop_buffer_by_state = Stop_buffer_by_state
 module Entry_audit_capture = Entry_audit_capture
+module Entry_stop_check = Entry_stop_check
 module Entry_audit_emit = Entry_audit_emit
 module Entry_ticket_tags = Entry_ticket_tags
 module Entry_freshness = Entry_freshness

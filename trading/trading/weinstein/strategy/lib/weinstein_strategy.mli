@@ -256,6 +256,10 @@ module Entry_audit_capture = Entry_audit_capture
     main strategy file to keep it under the file-length cap. See
     {!Entry_audit_capture}. *)
 
+module Entry_stop_check = Entry_stop_check
+(** The pure initial-stop half of the entry decision, shared by the entry walk
+    and the [candidates.sexp] top-N shadow. See {!Entry_stop_check}. *)
+
 module Entry_audit_emit = Entry_audit_emit
 (** Projection of the entry walk's decisions into audit rows (alternatives,
     entry events). See {!Entry_audit_emit}. *)
@@ -1430,6 +1434,7 @@ val entries_from_candidates :
   ?audit_recorder:Audit_recorder.t ->
   ?macro:Macro.result ->
   ?on_candidates_considered:(Audit_recorder.walk_decision list -> unit) ->
+  ?on_walk_report:(Entry_walk.walk_report -> unit) ->
   unit ->
   Trading_strategy.Position.transition list
 (** Generate [CreateEntering] transitions for a list of screener candidates.
@@ -1474,7 +1479,10 @@ val entries_from_candidates :
       accumulator is empty — held positions don't contribute to any sector
       bucket. Default-off path
       ([config.portfolio_config.max_sector_exposure_pct = None]) is bit-equal to
-      pre-P1 behaviour regardless of whether [sector_lookup] is passed. *)
+      pre-P1 behaviour regardless of whether [sector_lookup] is passed.
+
+    [?on_candidates_considered] and [?on_walk_report] are the walk's
+    observational sinks; see {!Entry_walk.entries_from_candidates}. *)
 
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
