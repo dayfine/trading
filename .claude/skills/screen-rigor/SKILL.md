@@ -66,6 +66,15 @@ Bound it: which direction does the proxy bias?
    benignly with the trade list any lever changes by design. See
    `dev/rules/mechanism-validation-rigor.md` check 8.
 
+Two more one-line checks, from `dev/rules/mechanism-validation-rigor.md`
+§"Read rules that transferred from later screens":
+
+- **Pooled clause, leave-one-year-out** — a pooled outcome clause is also read
+  with each year dropped; a pass that flips is reported as resting on that year
+  (#3631: ride clause passed by 0.07 pp, failed 7 of 21 drops).
+- **Binding count, path-aware** — a count meant to bind (idle cash) is counted
+  along the path, not on every Friday (#3631: path-aware X was 87 % smaller).
+
 ### Step 3 — Calibrate the verdict to what a proxy can claim
 
 A screen MAY conclude one of:
