@@ -1,0 +1,6 @@
+; Print the Friday demo trace (run from trading/):
+;   dune exec trading/weinstein/strategy/friday_demo/bin/friday_demo_main.exe
+
+(executable
+ (name friday_demo_main)
+ (libraries weinstein_trading.friday_demo))

@@ -1,0 +1,21 @@
+(library
+ (name friday_demo)
+ (public_name weinstein_trading.friday_demo)
+ (modules_without_implementation friday_trace)
+ (libraries
+  core
+  status
+  types
+  trading.base
+  trading.strategy
+  weinstein.types
+  weinstein.snapshot_runtime
+  weinstein.stage
+  weinstein.macro
+  weinstein.rs
+  weinstein.volume
+  weinstein.screener
+  weinstein.stock_analysis
+  weinstein_trading.portfolio_risk
+  weinstein_trading.stops
+  weinstein_trading.strategy))

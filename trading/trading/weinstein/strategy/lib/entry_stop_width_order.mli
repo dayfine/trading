@@ -87,3 +87,34 @@ val prefer_narrow_stops :
     a distance ratio is undefined. Such a candidate keeps its rank rather than
     being demoted on a division that has no answer; sizing rejects it
     downstream. *)
+
+type gate_stop = {
+  entry : float;
+      (** The entry the §5.1 width gate measures from: the ticket's trigger, or
+          the uncapped trigger under [entry_cap_stop_gate_on_uncapped]. *)
+  stop : float;  (** The initial stop the ticket would install at [entry]. *)
+  distance_pct : float;
+      (** [|stop - entry| / entry], the number the gate compares against
+          [stops_config.max_stop_distance_pct]. *)
+  floor_kind : Audit_recorder.stop_floor_kind;
+      (** Whether [stop] sits under a correction low found in the bars or is the
+          fallback, as [require_structural_stop] reads it. *)
+}
+(** One candidate's initial stop, as the entry walk's stop-width gate sees it.
+*)
+
+val gate_stop :
+  ?initial_stop_buffer:float ->
+  config:Weinstein_strategy_config.config ->
+  bar_reader:Bar_reader.t ->
+  current_date:Core.Date.t ->
+  Screener.scored_candidate ->
+  gate_stop option
+(** [gate_stop ?initial_stop_buffer ~config ~bar_reader ~current_date cand] is
+    the stop-width measurement {!prefer_narrow_stops} partitions by, exposed so
+    a report can show the stop and distance behind a [Stop_too_wide] skip, which
+    the skip reason itself does not carry. Computed through the same helpers as
+    {!Entry_audit_capture.make_entry_transition}, so it agrees with the gate;
+    [?initial_stop_buffer] defaults to [config.initial_stop_buffer] as above.
+    [None] only for a non-positive entry, where the distance is undefined.
+    Observation only: it writes no stop state and mints no position id. *)

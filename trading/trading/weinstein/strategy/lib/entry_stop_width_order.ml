@@ -4,13 +4,19 @@
 open Core
 open Weinstein_strategy_config
 
-(* The structural stop distance this candidate would install, recomputed through
-   the same helpers [Entry_audit_capture.make_entry_transition] uses so the
-   ordering and the gate cannot disagree at the boundary. [None] when no bars are
-   resident and the distance is therefore unmeasurable. *)
-let _distance_at ~config ~initial_stop_buffer ~bar_reader ~current_date
+type gate_stop = {
+  entry : float;
+  stop : float;
+  distance_pct : float;
+  floor_kind : Audit_recorder.stop_floor_kind;
+}
+
+(* The structural stop this candidate would install at [effective_entry],
+   recomputed through the same helpers [Entry_audit_capture.make_entry_transition]
+   uses so the ordering and the gate cannot disagree at the boundary. *)
+let _gate_stop_at ~config ~initial_stop_buffer ~bar_reader ~current_date
     ~trigger_at_suggested ~effective_entry (cand : Screener.scored_candidate) =
-  let initial_stop, _kind, _basis =
+  let initial_stop, floor_kind, _basis =
     Entry_audit_helpers.initial_stop_and_kind
       ~min_stop_distance_pct:
         (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
@@ -22,14 +28,24 @@ let _distance_at ~config ~initial_stop_buffer ~bar_reader ~current_date
       ~stops_config:config.stops_config ~initial_stop_buffer ~bar_reader
       ~current_date ~effective_entry cand
   in
-  Entry_audit_helpers.stop_distance_pct ~effective_entry
-    ~installed_stop:(Weinstein_stops.get_stop_level initial_stop)
+  let stop = Weinstein_stops.get_stop_level initial_stop in
+  {
+    entry = effective_entry;
+    stop;
+    distance_pct =
+      Entry_audit_helpers.stop_distance_pct ~effective_entry
+        ~installed_stop:stop;
+    floor_kind;
+  }
 
 (* Measured from the entry the gate reads: the ticket's own, or the uncapped
-   trigger under {!Entry_cap_stop_gate}, where [_distance_at] then computes the
+   trigger under {!Entry_cap_stop_gate}, where [_gate_stop_at] then computes the
    same stop the gate computes at that entry. *)
-let _stop_distance_pct_for ~config ~initial_stop_buffer ~bar_reader
-    ~current_date (cand : Screener.scored_candidate) =
+let gate_stop ?initial_stop_buffer ~config ~bar_reader ~current_date
+    (cand : Screener.scored_candidate) =
+  let initial_stop_buffer =
+    Option.value initial_stop_buffer ~default:config.initial_stop_buffer
+  in
   let close = Entry_audit_helpers.latest_close ~bar_reader ~current_date cand in
   let trigger_at_suggested =
     config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit
@@ -44,7 +60,7 @@ let _stop_distance_pct_for ~config ~initial_stop_buffer ~bar_reader
   if Float.( <= ) effective_entry 0.0 then None
   else
     Some
-      (_distance_at ~config ~initial_stop_buffer ~bar_reader ~current_date
+      (_gate_stop_at ~config ~initial_stop_buffer ~bar_reader ~current_date
          ~trigger_at_suggested ~effective_entry cand)
 
 (* [true] when this candidate's stop is wider than the §5.1 limit — measured
@@ -56,15 +72,14 @@ let _stop_distance_pct_for ~config ~initial_stop_buffer ~bar_reader
    demoted on a division with no answer. *)
 let _is_wide ~config ~initial_stop_buffer ~bar_reader ~current_date cand =
   match
-    _stop_distance_pct_for ~config ~initial_stop_buffer ~bar_reader
-      ~current_date cand
+    gate_stop ~initial_stop_buffer ~config ~bar_reader ~current_date cand
   with
   | None -> false
-  | Some stop_distance_pct ->
+  | Some { distance_pct; _ } ->
       Stop_width_mode.over_book_limit
         ~max_stop_distance_pct:
           config.stops_config.Weinstein_stops.max_stop_distance_pct
-        ~stop_distance_pct
+        ~stop_distance_pct:distance_pct
 
 let prefer_narrow_stops ?initial_stop_buffer ~config ~bar_reader ~current_date
     candidates =

@@ -1,0 +1,26 @@
+; The demo's printed trace is checked in as friday_demo_trace.expected.
+; `dune runtest` diffs a fresh print against it; when the pipeline's behaviour
+; changes, read the diff and, if intended, accept it with `dune promote`.
+
+(rule
+ (with-stdout-to
+  friday_demo_trace.actual
+  (run %{exe:../bin/friday_demo_main.exe})))
+
+(rule
+ (alias runtest)
+ (action
+  (diff friday_demo_trace.expected friday_demo_trace.actual)))
+
+(test
+ (name test_friday_demo)
+ (libraries
+  core
+  ounit2
+  matchers
+  status
+  trading.base
+  trading.strategy
+  weinstein_trading.stops
+  weinstein_trading.strategy
+  weinstein_trading.friday_demo))
