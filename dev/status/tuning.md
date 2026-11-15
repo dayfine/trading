@@ -1,9 +1,11 @@
 # Status: tuning
 
-## Last updated: 2026-06-21
+## Last updated: 2026-11-15
 
 ## Status
 IN_PROGRESS
+
+Next task: parked: M2 qNEHVI enable-commit (#1327) awaits the user. Parked on purpose by user decision 2026-11-15 (pacer #3635): KEEP_AS_INFO until the user acts.
 
 **2026-05-22 — Bayesian Phase 3 stack COMPLETE; V1→V7 production
 sweep stack run; methodology redesign IN REVIEW (PR #1237).** The full

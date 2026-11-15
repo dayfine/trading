@@ -100,21 +100,21 @@ immune (#2605).
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [arc-readiness](arc-readiness.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | Funding program CLOSED (A1-1..A1-4); G3 terminal REJECT as default, G2a/G2b default-off axes; Axis 1+3 complete; next: A2-4 |
-| [resistance-v2](resistance-v2.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | grid 3/3 ACCEPT w=30; BUNDLE PROMOTED default-on #2047 (R3 human-approved 07-23); next: WF-CV vs w30 (data-gated) + lever-b axis |
+| [arc-readiness](arc-readiness.md) | MERGED | dayfine (LOCAL) + feat-weinstein | — | Closed 2026-11-15: A2-4 (picks chart) never dispatched, only its plan merged (#2453); Axes 1 and 3 complete |
+| [resistance-v2](resistance-v2.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | grid 3/3 ACCEPT w=30; BUNDLE PROMOTED default-on #2047; parked: #3527 grade-basis finding open (#2973); WF-CV vs w30 is LOCAL |
 | [margin-realism](margin-realism.md) | MERGED | dayfine (maintainer LOCAL) + feat-backtest | — | Closed 2026-10-04: M1-M4 shipped; leverage REJECT (ledger 07-24); no further work |
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | 11-14: #3626 candidates top-N view; 11-15: #3634 obs reader; next: observatory P2b lane chain (harness/observatory-lane, LOCAL) |
-| [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1/v2 MERGED; twin-detector direct-match + hub guard MERGED #2862 (default-off); alias sidecar is armed-pass only (#2870); next: arm the guards on a PIT rebuild |
+| [rename-twin-dedup](rename-twin-dedup.md) | MERGED | feat-backtest | — | Closed 2026-11-15: work done; detector + guards (#1940, #1946, #2862) and PIT-v12 full dedupe (#3475, #3480, #3489) shipped |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | #3500 merged (#3420 V12/V13); remaining: #3420 [after-merge] verify items |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | #2899 flag-pin + #2896 PIT-smoke cell shipped (09-22); 10-29 weekly review: re-check two SLOWER 10y cap256 shapes on a quiet host |
 | [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | t3k factor-lens matrix SHIPPED LOCAL (#1639 2000-26 H1 r=-0.744; #1642 2011-26 confirm); next: regime-gated deploy proxy validation (LOCAL/data-gated) |
 | [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay (#1683) + scenario wiring (#1689) + floor_weight searchable axis (#1697, R2 complete) all MERGED default-off; no remaining follow-ups |
-| [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
+| [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 wiring MERGED (#1574, opt-in default-off); parked: manual flambda rebuild of local trading-1-dev (ghcr auto-rebuilds weekly) |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
@@ -122,8 +122,8 @@ immune (#2605).
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
-| [support-floor-stops](support-floor-stops.md) | IN_PROGRESS | feat-weinstein | — | #2486 book-faithful stops basis SHIPPED 08-24 (buffer 1.02->1.0, anchor-reset on); next: UNSET — prior cell cited #2486 H1, already done (09-15) |
-| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #2081 robust dollar-ADV (#2060) MERGED `9670e49a`; next: short-leg regime-P&L decomposition (LOCAL) |
+| [support-floor-stops](support-floor-stops.md) | MERGED | feat-weinstein | — | Closed 2026-11-15: floor-nearest SM INCONCLUSIVE (#3446), no next step; reopens only with a new mechanism argument |
+| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #2081 robust dollar-ADV (#2060) MERGED `9670e49a`; parked: paired off/on surface + shorts close-out (a)/(c) await the user |
 | [extension-stop](extension-stop.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | arming + insurance-ACCEPT MERGED (#1960, ext_stop 2.0/0.25, default-off); next: default-flip only on further insurance-ACCEPT (R3, human-gated) |
 | [decline-character](decline-character.md) | MERGED | — | — | WORKSTREAM EXHAUSTED (#1739); closed in #2493 after 8 pacer asks; one EODHD-gated item to re-home |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
@@ -144,8 +144,8 @@ immune (#2605).
 | [experiment-platform](experiment-platform.md) | MERGED | feat-backtest | — | Closed 2026-10-04: Gaps A-F shipped; ledger in active use (70 entries); no code successor |
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
-| [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2182 MERGED `06487307`; #2185 CLOSED obsolete (fixes superseded by #2189 refactor, main green); next: none queued |
+| [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); parked: M2 qNEHVI enable-commit (#1327) awaits the user |
+| [weekly-snapshot](weekly-snapshot.md) | MERGED | feat-weinstein | — | Closed 2026-11-15: no next step queued; split work lands under #2973 (open) |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |

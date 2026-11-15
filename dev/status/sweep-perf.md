@@ -1,9 +1,11 @@
 # Status: sweep-perf
 
-## Last updated: 2026-06-21
+## Last updated: 2026-11-15
 
 ## Status
 IN_PROGRESS
+
+Next task: parked: manual flambda rebuild of the local sweep container (`trading-1-dev` reports `flambda: false`; the ghcr images already rebuild weekly with flambda, `image.yml` 2026-11-09). Parked on purpose by user decision 2026-11-15 (pacer #3635): KEEP_AS_INFO until the user rebuilds it.
 
 ## Interface stable
 NO
