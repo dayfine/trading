@@ -1,0 +1,21 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only; sp500 is a fixture. No verdict (README §Smoke).
+== Descriptive read 1: the funnel, name-Fridays summed over the window (README §Descriptive reads; per year in funnel_year.tsv) ==
+screened Fridays 99, open 99 | entering 36521
+  macro                             0  =   0.00 % of entering,   0.00 % of what reached it
+  brk_Price_floor                   0  =   0.00 % of entering,   0.00 % of what reached it
+  brk_Stage_setup               32909  =  90.11 % of entering,  90.11 % of what reached it
+  brk_Breakout_volume            2086  =   5.71 % of entering,  57.75 % of what reached it
+  brk_Rs_declining                179  =   0.49 % of entering,  11.73 % of what reached it
+  brk_Failed_breakout               0  =   0.00 % of entering,   0.00 % of what reached it
+  brk_Volume_band                   0  =   0.00 % of entering,   0.00 % of what reached it
+  sector                            0  =   0.00 % of entering,   0.00 % of what reached it
+  grade                            18  =   0.05 % of entering,   1.34 % of what reached it
+  topn_cut                        196  =   0.54 % of entering,  14.75 % of what reached it
+  admitted                       1133  (reaches the walk)
+  not_reached                      13  =   0.04 % of entering,   1.15 % of admitted
+  w_no_structural_stop           1051  =   2.88 % of entering,  92.76 % of admitted
+  w_stop_too_wide                   0  =   0.00 % of entering,   0.00 % of admitted
+  w_cash                           13  =   0.04 % of entering,   1.15 % of admitted
+  w_held                            0  =   0.00 % of entering,   0.00 % of admitted
+  w_other                           3  =   0.01 % of entering,   0.26 % of admitted
+  funded                           53  =   0.15 % of entering,   4.68 % of admitted

@@ -1,0 +1,15 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only; sp500 is a fixture. No verdict (README §Smoke).
+ticket cost as a NAV fraction (initial_position_value / equity_curve on the decision date): 53 placed long tickets, 53 with a NAV, 0 without; p10 / p25 / p50 / p75 / p90 = 0.0678 / 0.0706 / 0.081644 / 0.1159 / 0.1400; m = the median
+fill f = entries 43 (trades.csv + open_positions.csv) / placed long tickets 53 = 0.811321
+yardstick: ln(1 + R) 0.4148 over 40 trades = 0.010370 log per trade (actual.sexp)
+== Gate before cap (README §Decision rule; §Definitions) ==
+m (median NAV fraction of a placed long ticket's cost) 0.0816 | f (placed -> filled, long) 0.8113 | s (Admitted rows an entry-assembly gate removed: walk Not_reached) 13 / 1133 = 0.0115 | other non-stop, non-cash skips among Admitted 3
+open Fridays 99 | free-cash Fridays: gross 90, net 50 | resting-ticket field: present on every open Friday
+year  open  free(g)  free(n)  cut rows  Buyable cut  crowded(g)  crowded(n)  X gross  X net  X ref  placed(funded)
+2019    26       26       22         3            0           0           0        0      0    0.0  13
+2020    49       47       27       176           10           7           2        6      1    1.0  27
+2021    24       17        1        17            0           0           0        0      0    0.0  13
+total: X gross 6 (X.f 4.9) | X net 1 (X.f 0.8) | X ref 1.0 (X.f 0.8)
+path-aware (reported, not in the rule): each would-be-funded name holds m for 84 days (avg_holding_days), so later Fridays' cash shrinks: X gross 4, X net 1
+C* by cut rank (gross / net / every Buyable cut row on a gross free-cash Friday): 21-40 6 / 1 / 7, 41-100 0 / 0 / 0, 101+ 0 / 0 / 0
+bear years 2000-02 + 2008: share of X ref 0.0000, share of open Fridays 0.0000

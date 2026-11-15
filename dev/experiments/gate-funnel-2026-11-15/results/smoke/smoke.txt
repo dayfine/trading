@@ -1,0 +1,21 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only; sp500 is a fixture. No verdict (README §Smoke).
+# plumbing smoke: specs/smoke-sp500.sexp, CSV mode on the committed test_data, 2026-11-15 05:06Z, build 917341665
+emit wall 81 s, peak_rss_kb=344888 user_s=78.91 sys_s=1.80
+plain wall 75 s, peak_rss_kb=294424 user_s=73.31 sys_s=1.29
+tripwire on the smoke window: trades.csv md5 with --emit-candidates dcb8e99dfe7b9ee23bce2e5674876dd1, without dcb8e99dfe7b9ee23bce2e5674876dd1: MATCH (41 lines)
+candidates.sexp 13199515 bytes, trade_audit.sexp 889452 bytes
+read exit 0, wall 57 s; private tables: pool_outcomes.tsv.gz 17430 bytes: private crowd_outcomes.tsv.gz 212 bytes: private 
+SK1 (rank: the pool is ranked 1..n in the Seeded order, and Admitted is exactly rank <= 20 on open Fridays): PASS on 99 open Fridays, 1329 pool rows
+SK2 (walk: each Admitted row's walk equals trade_audit's weekly decision for that name): PASS on 1120 walked rows (13 Not_reached rows have no decision, as they
+SK3 (fields: tickets_placed = cascade_summary.entered; walk on every Admitted row, shadow on every cut row; long_cash_left_pct on every open Friday): PASS
+SK4 (information): open Fridays 99, macro-blocked 0 (no Long rows), live-blocked 0 (a cut row ranked <= 20); trace phase counts equal cascade_summary counts on 
+long_resting_reserved_pct present on 99 of 99 open Fridays
+m (median NAV fraction of a placed long ticket's cost) 0.0816 | f (placed -> filled, long) 0.8113 | s (Admitted rows an entry-assembly gate removed: walk Not_reached) 13 / 1133 = 0.0115 | other non-stop, non-cash skips among Admitted 3
+open Fridays 99 | free-cash Fridays: gross 90, net 50 | resting-ticket field: present on every open Friday
+total: X gross 6 (X.f 4.9) | X net 1 (X.f 0.8) | X ref 1.0 (X.f 0.8)
+path-aware (reported, not in the rule): each would-be-funded name holds m for 84 days (avg_holding_days), so later Fridays' cash shrinks: X gross 4, X net 1
+Rule 1 (gate before cap), mechanical: CLOSE (X net.f = 0.8 < 25, about 0.008 log at the yardstick: gate-before-cap dead, no build)
+Rule 2 (score tier), mechanical: UNDERPOWERED (a tier has under 100 rows in a half, or the two tiers under 20 monsters in a half): no ranking lever follows
+self-check with SEED=1: exit 3 | SK1 FAIL on 422 rows
+self-check with SEED=0: exit 0 | SK1 PASS on 99 open Fridays, 1329 pool rows
+rules_check exit 0

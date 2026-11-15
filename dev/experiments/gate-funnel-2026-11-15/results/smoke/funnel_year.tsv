@@ -1,0 +1,6 @@
+# SMOKE: sp500, 2019-07..2021-06, plumbing only; sp500 is a fixture. No verdict (README §Smoke).
+year	fridays	open	entering	macro	brk_Price_floor	brk_Stage_setup	brk_Breakout_volume	brk_Rs_declining	brk_Failed_breakout	brk_Volume_band	sector	grade	topn_cut	admitted	not_reached	w_no_structural_stop	w_stop_too_wide	w_cash	w_held	w_other	funded
+2019	26	26	6710	0	0	6214	278	26	0	0	0	1	3	188	7	168	0	0	0	0	13
+2020	49	49	19567	0	0	17163	1403	103	0	0	0	6	176	716	6	670	0	10	0	3	27
+2021	24	24	10244	0	0	9532	405	50	0	0	0	11	17	229	0	213	0	3	0	0	13
+total	99	99	36521	0	0	32909	2086	179	0	0	0	18	196	1133	13	1051	0	13	0	3	53
