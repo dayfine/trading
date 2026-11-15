@@ -1,6 +1,6 @@
 # Gate funnel (2026-11-15): pre-registration
 
-**Status: pre-registered, not run.** One 26-year diagnostic cell (P1 of `dev/plans/axis-observatory-2026-11-14.md`
+**Status: run and read 2026-11-15 (#3631): Rule 1 PARK, Rule 2 NO RANKING LEVER (§Results).** The pre-registration below is unchanged. One 26-year diagnostic cell (P1 of `dev/plans/axis-observatory-2026-11-14.md`
 §2.0). The rules below are fixed before the run. `chain.sh` runs it in one Claude cloud session (§Launching).
 
 ## Why
@@ -406,3 +406,379 @@ After the run:
   rank, the names the extra cash would have bought.
 - **The macro proxy.** The only way to read what the macro gate removed, given the trace. It is labelled as a proxy
   everywhere it appears.
+
+## Results
+
+**Run and read 2026-11-15**, one Claude cloud session at `GF_SHA` 47b7c476a. Mark-free outputs are on branch
+`experiment/gate-funnel-results` under `results/cell/`. Price-bearing per-arm files and the row-level read tables are
+in `dayfine/trading-results` a3a2dadc2, same path. The why-tables below come from `results/cell/read/why/`
+(§Derivations).
+
+**Rule 1: PARK. Rule 2: NO RANKING LEVER.** Nothing is built.
+
+### Validity
+
+| check | result | source |
+|---|---|---|
+| TRIPWIRE | `trades.csv` md5 `0928cfe40333560429f5a6e57c9c18de`, 577 lines: MATCH | `chain.log` |
+| n_symbols_absent | `ABSENT ok: 1 n_symbols_absent=1` | `chain.log` |
+| parity | `actual.sexp`, `summary.sexp`, `macro_trend.sexp`, `entries.tsv`, `equity_curve.csv`, `open_positions.csv`, `splits.csv` identical to #3602's | `chain.log` |
+| SK1–SK3 | SK1 PASS on 1,099 open Fridays (498,225 pool rows); SK2 PASS on 21,450 walked rows (the 530 `Not_reached` rows have no decision, as they must); SK3 PASS | `read/selfcheck.txt` |
+| SK4 (information) | 236 macro-blocked, 0 live-blocked; phase counts agree on 1,099 of 1,099 open Fridays; Long rows exist exactly when `long_macro_admitted > 0` on 1,335 of 1,335 screened Fridays | `read/selfcheck.txt` |
+| SK5 (information) | shadow `Buyable` max 0.1500, walk `Funded` max 0.1500; no `Stop_too_wide` row anywhere | `read/selfcheck.txt` |
+| resting-ticket field | present on 1,099 of 1,099 open Fridays | `read/selfcheck.txt` |
+| validator (check 8) | V6 INVARIANT PASS; a single cell has no pair. Every count equals #3602's `pbb-S-k0-s0.validator.log` (V7 36, V13 39, …) | `gf-S-k0-s0.validator.log` |
+| universe | top-3000 PIT v12 (U1); the sp500 smoke is plumbing only (U2) | spec; §Smoke |
+
+**The book:** +1,472.76 %, 576 trades, max DD 27.22 %, Sharpe 0.634 (`gf-S-k0-s0-actual.sexp`), #3602's S-k0 to the
+byte.
+
+**Cost** (`chain.log`, `gf-S-k0-s0.rss`): cell wall 11,391 s, 11,300 s user CPU, peak RSS 8,762,816 kB;
+`candidates.sexp` 1,001,872,459 bytes; preflight 512 s; read 432 s. The wall is 3,914 s over #3602's 7,477 s, inside
+the 7,500–21,000 s budget.
+
+### Rule 1: gate before cap: PARK
+
+The rule as §Decision rule states it:
+
+> 0. **NOT APPLIED** if `long_resting_reserved_pct` is missing on any open Friday.
+> 1. **CLOSE** if `X net · f < 25` over the 26 years.
+> 2. Otherwise **REFINE** before any build. Measure s, compute X ref, and compare C\* (net) with the funded names
+>    (`walk` `Funded`) on mean capped ride. **BUILD** only if all three hold: `X ref · f ≥ 40`; C\*'s mean capped ride ≥
+>    the funded names' mean − 1 pp; the bear years' share of X ref ≤ their share of open Fridays + 10 pp.
+> 3. **PARK** otherwise, with the numbers.
+
+| input | value | source |
+|---|---|---|
+| m | 0.0857 (p10 0.0693, p25 0.0742, p75 0.1169, p90 0.1400; 683 placed long tickets) | `read/gate_before_cap.txt` |
+| f | 581 / 683 = 0.8507 | same |
+| s | 530 / 21,980 = 0.0241 | same |
+| G3 | 0: net free cash ≠ gross | `read/inputs.txt` |
+| open Fridays | 1,099; free-cash Fridays gross 720, net 271 | `read/gate_before_cap.txt` |
+| X gross / net / ref | 3,130 / 1,411 / 1,409.8; X·f 2,662.6 / 1,200.3 / 1,199.2 | same |
+| path-aware X (information) | gross 393, net 181 | same |
+| C\* (net) vs funded, mean capped ride | +3.97 % (n 880) vs +4.90 % (n 616) | `read/rules.txt` |
+| monster rate (in no clause) | 8.8 % vs 6.5 % | `read/rules.txt` |
+| bear years 2000–02 + 2008 | 0.2603 of X ref; 0.0491 of open Fridays (+ 0.10 = 0.1491) | `read/rules.txt` |
+| yardstick | ln(1 + R) 2.7554 / 576 = 0.004784 log per trade | `read/gate_before_cap.txt` |
+
+In order:
+
+0. Not NOT APPLIED: the field is present on every open Friday.
+1. Not CLOSE: X net · f = 1,200.3 ≥ 25, 48× the bar.
+2. REFINE. X ref · f 1,199.2 ≥ 40: met. Ride, +3.97 ≥ 4.90 − 1 = 3.90: met, by 0.07 pp. Bear share, 0.2603 ≤ 0.1491:
+   **not met**, by 11.1 pp. Not BUILD.
+3. **PARK**, as `read/rules.txt` prints.
+
+X by period (`read/gate_before_cap.txt`, condensed):
+
+| years | open | free-cash (net) | X gross | X net | X ref |
+|---|---:|---:|---:|---:|---:|
+| 2000–02 | 46 | 42 | 388 | 333 | 333.0 |
+| 2003 | 38 | 22 | 202 | 163 | 163.0 |
+| 2004–07 | 198 | 25 | 303 | 64 | 64.0 |
+| 2008 | 8 | 8 | 61 | 34 | 34.0 |
+| 2009 | 35 | 29 | 263 | 245 | 244.0 |
+| 2010–15 | 285 | 47 | 472 | 112 | 112.0 |
+| 2016 | 44 | 34 | 290 | 183 | 183.0 |
+| 2017–21 | 241 | 16 | 502 | 25 | 25.0 |
+| 2022–23 | 81 | 37 | 414 | 228 | 227.8 |
+| 2024–26 | 123 | 11 | 235 | 24 | 24.0 |
+
+### Rule 2: score against outcome: NO RANKING LEVER
+
+> 1. **UNDERPOWERED** if A+ or A has fewer than 100 rows in either half, or the two together have fewer than 20
+>    monsters in either half.
+> 2. **RANKING LEVER** if A+'s mean capped ride beats A's by at least 2 pp in both halves, and A+'s monster rate is at
+>    least 1.3× A's over the whole window.
+> 3. **NO RANKING LEVER** otherwise.
+
+| | A+ | A | source |
+|---|---|---|---|
+| rows kept, 2000–12 / 2013–26 | 10,549 / 12,875 | 19,964 / 25,223 | `read/rules.txt` |
+| mean capped ride, 2000–12 / 2013–26 | +4.2 % / +2.6 % | +3.5 % / +2.8 % | `read/score.txt` |
+| A+ − A | +0.73 pp / −0.14 pp | | `read/rules.txt` |
+| monster rate, whole window | 6.5 % (1,517 monsters) | 6.1 % (2,735) | `read/rules.txt` |
+
+Not UNDERPOWERED: each tier has well over 100 rows per half, and at `score.txt`'s per-half rates each half holds about
+2,100 monsters (rate × n; the per-half counts are not printed). Not RANKING LEVER: +0.73 and −0.14 pp against 2 pp,
+monster ratio 1.07× against 1.3×. **NO RANKING LEVER.** This is the first score-against-outcome read since the #2380 RS
+fix, and it agrees with every read before it.
+
+### Descriptive reads
+
+**1. The funnel** (`read/funnel.txt`; per year `read/funnel_year.tsv`). Name-Fridays over 1,335 screened Fridays (1,099
+open), 2,799,474 entering.
+
+| gate | removed | % of entering | % of what reached it |
+|---|---:|---:|---:|
+| macro | 546,626 | 19.53 | 19.53 |
+| breakout: `Stage_setup` | 1,344,018 | 48.01 | 59.66 |
+| breakout: `Breakout_volume` | 344,128 | 12.29 | 37.86 |
+| breakout: `Rs_declining` | 31,973 | 1.14 | 5.66 |
+| `Price_floor`, `Failed_breakout`, `Volume_band`, sector | 0 | 0 | 0 |
+| grade | 34,504 | 1.23 | 6.48 |
+| top-N cut | 476,245 | 17.01 | 95.59 |
+
+| walk outcome of the 21,980 admitted | rows | % |
+|---|---:|---:|
+| `Not_reached` | 530 | 2.41 |
+| `No_structural_stop` | 20,104 | 91.46 |
+| `Stop_too_wide` | 0 | 0 |
+| cash | 480 | 2.18 |
+| other (`Sized_to_zero` 180, `Share_class_held` 3) | 183 | 0.83 |
+| funded | 683 | 3.11 |
+
+- `Stage_setup` removes half of everything entering; the cut removes 95.6 % of what reaches it; the structural-stop
+  check removes 91.5 % of what passes the cut.
+- **The width gate never fires.** `Stop_too_wide` has 0 rows in 26 years, walk and shadow alike, because
+  `entry_stop_check.ml` tests `Buffer_fallback` before the width gate: a name whose floor fails the 15 % gate reads as
+  `No_structural_stop`. In the record config the structural-stop gate and the width gate are one gate.
+- By year: the walk's `No_structural_stop` share of admitted runs 82.9 % (2003) to 98.8 % (2008); `Not_reached` is
+  5.8, 10.4, 14.6, 12.1 % in 2000–03 and under 1 % in most later years.
+
+**2. What each gate's removed names did next** (`read/counterfactual.txt`; one row per symbol per 26 weeks, FD
+coverage, ride capped at +190 %).
+
+| population | n (FD) | monster | win | mean ride | p10 / p50 / p90 | 2000–12 / 2013–26 | vs funded |
+|---|---:|---:|---:|---:|---|---|---:|
+| macro (proxy) | 1,576 | 7.6 % | 26.5 % | −6.3 % | −32.2 / −11.2 / +22.2 | −6.5 / −3.8 % | −11.2 pp |
+| every evaluated row | 122,393 | 7.5 % | 38.8 % | +1.6 % | −12.7 / −1.8 / +16.7 | +1.6 / +1.6 % | −3.3 pp |
+| `Stage_setup` | 97,190 | 8.5 % | 41.3 % | +1.2 % | −12.4 / −1.2 / +13.8 | +1.0 / +1.4 % | −3.6 pp |
+| `Breakout_volume` | 53,213 | 5.1 % | 37.3 % | +3.0 % | −12.7 / −2.8 / +24.4 | +3.5 / +2.6 % | −1.9 pp |
+| `Rs_declining` | 13,693 | 5.3 % | 32.0 % | +1.3 % | −9.4 / −2.3 / +13.8 | +1.9 / +0.9 % | −3.6 pp |
+| grade | 15,628 | 5.1 % | 36.9 % | +1.2 % | −10.1 / −1.4 / +11.9 | +1.7 / +0.7 % | −3.7 pp |
+| cut, shadow `Buyable` | 19,886 | 5.6 % | 37.7 % | +3.0 % | −13.6 / −2.4 / +24.8 | +3.4 / +2.7 % | −1.9 pp |
+| cut, shadow `No_structural_stop` | 64,752 | 6.4 % | 37.2 % | +2.7 % | −15.0 / −3.2 / +25.8 | +3.5 / +2.1 % | −2.2 pp |
+| C\* gross | 2,032 | 7.8 % | 37.6 % | +4.0 % | −16.0 / −3.3 / +30.0 | +5.8 / +2.6 % | −0.9 pp |
+| C\* net | 880 | 8.8 % | 37.0 % | +4.0 % | −17.3 / −3.6 / +28.9 | +6.6 / −0.8 % | −0.9 pp |
+| walk `Not_reached` | 397 | 14.6 % | 35.3 % | +2.6 % | −24.6 / −4.3 / +31.1 | +5.4 / −5.5 % | −2.3 pp |
+| walk `No_structural_stop` | 11,845 | 6.2 % | 39.3 % | +3.6 % | −15.1 / −3.5 / +29.4 | +3.6 / +3.5 % | −1.3 pp |
+| walk cash | 396 | 6.3 % | 42.4 % | +4.8 % | −14.0 / −1.9 / +31.2 | +5.6 / +4.4 % | −0.1 pp |
+| walk `Funded` | 616 | 6.5 % | 39.4 % | +4.9 % | −13.7 / −3.3 / +30.2 | +5.5 / +4.5 % | 0 |
+
+- The cascade lifts mean ride from +1.6 % (every row) to +4.9 % (funded) and lowers the monster rate from 7.5 % to
+  6.5 %: it buys mean, not tail.
+- Every gate removes names that ride worse than the funded names, except cash (−0.1 pp, a coin flip). The
+  structural-stop gate is closest among the large populations (−1.3 pp).
+- `Stage_setup` removes heat: 1.31× the funded monster rate at −3.6 pp mean. `Not_reached` is the cheap-name signature
+  (14.6 % monsters, deepest p10). On the proxy, the macro gate removes clearly worse names (−6.3 %).
+
+**3. Score against outcome** (`read/score.txt`). Deduped mean ride +3.3 % (A+), +3.1 % (A), +2.6 % (B), +2.2 % (C);
+monster rates 6.5, 6.1, 6.1, 5.0 %. A shallow gradient on the mean, flat at the top, nothing in the tail. *Post hoc,
+not a rule outcome:* scores that are not multiples of 5 can only come from a partial overhead-supply term, and those
+rows carry about 1.6× the monster rate (10.1 % vs 6.2 %, the same in both halves) with no mean edge (+2.6 vs +2.8 %):
+trait Y's heat signature, not a ranking lever.
+
+### Verdict, calibrated
+
+- **Rule 1 PARK is a no-build decision for now**, not a finding that gate-before-cap fails
+  (`mechanism-validation-rigor.md`). The design counts, on one path and one seed, the Fridays where idle cash and
+  shadow-buyable names below the cap coincided, and reads what those names did ex post against the names S funded. It
+  cannot say what an arm would earn: X counts the same idle cash every Friday, ignores the names an arm would later
+  crowd out, and the ride is not a stop-managed trade.
+- The strong claims here are structural and rest on counts: where X lives and why the cap bites there. The value claim
+  is weak and points the same way as the rule: C\*'s tie with the funded names on ride is one year.
+- **The prior was half wrong.** It said CLOSE; X net · f is 48× the CLOSE bar. Its mechanism holds for the state the
+  book spends most of its time in (§How it fits).
+- **Rule 2 is powered and negative.** Nothing here is near promotion.
+
+### Why
+
+**X lives in the empty book after the macro gate or the stops cleared it.** Positions held come from the private
+`trades.csv` + `open_positions.csv`; gate age from `macro_trend.sexp` (`read/why/fj.tsv`).
+
+| positions S held | open Fridays | X net | share of X net |
+|---|---:|---:|---:|
+| 0 | 74 (6.7 %) | 731 | 51.8 % |
+| 1 | 36 (3.3 %) | 213 | 15.1 % |
+| 2–5 | 245 (22.3 %) | 400 | 28.3 % |
+| 6+ | 744 (67.7 %) | 67 | 4.7 % |
+
+| open Fridays since the gate last read Bearish | open Fridays | X net | share |
+|---|---:|---:|---:|
+| 1–4 | 106 | 398 | 28.2 % |
+| 5–13 | 118 | 500 | 35.4 % |
+| 14–26 | 117 | 371 | 26.3 % |
+| 27+ | 758 | 142 | 10.1 % |
+
+- Neutral macro is 15.4 % of open Fridays and carries 35.7 % of X net. The 50 all-cash Fridays (free net ≥ 0.99)
+  carry 37.9 %; free net ≥ 0.50 carries 69.2 %.
+- X falls in 30 runs of consecutive X Fridays (`read/why/episodes.tsv`); the top five carry 60.3 % and the top ten
+  82.5 %: 2009-04-17 → 10-23 (243, 17.2 %), 2022-11-11 → 2023-06-02 (196, 13.9 %), 2016-02-26 → 10-21 (183, 13.0 %),
+  2003-04-25 → 09-05 (130, 9.2 %), 2001-12-07 → 2002-02-01 (99, 7.0 %).
+- **The book has two states, and X lives in one.** On the 380 open Fridays with no X, S holds 8.4 positions with 4 %
+  cash left; those Fridays carry 447 of the 480 cash skips. On the 270 X-net Fridays it holds 2.7 positions with 0.69
+  of NAV in cash, and the walk made **no** cash skip there. On a further 449 Fridays gross free cash exceeds m but
+  resting tickets claim it (0.49 reserved against 0.26 left): X gross − X net = 1,719 slots of that kind.
+- By SPY regime (the review pack's weekly close vs 30-week MA and its 4-week slope, known at the prior close), X is
+  mostly in UP weeks after a reopen: UP 58.5 %, MIXED 25.9 %, DOWN 15.5 %. In 2000–02 alone, 75 % of X sits in MIXED
+  and DOWN weeks.
+
+**Why the cap bites only there: the score and the stop gate point opposite ways.** "Buyable" means a valid stop: for
+ranks 1–20 the walk's funded, cash, sized-to-zero and share-class outcomes; below 20 the shadow's `Buyable` (rows from
+the private `pool_outcomes.tsv.gz`).
+
+| rank | X-net Fridays: A+ share | X-net Fridays: buyable | other Fridays: A+ share | other Fridays: buyable |
+|---|---:|---:|---:|---:|
+| 1–20 | 96.2 % | 2.0 % | 95.5 % | 7.5 % |
+| 21–40 | 78.7 % | 5.1 % | 69.1 % | 9.8 % |
+| 41–100 | 40.1 % | 7.5 % | 22.1 % | 12.2 % |
+| 101–200 | 6.6 % | 10.3 % | 1.6 % | 14.3 % |
+| 201+ | 0.1 % | 13.0 % | 0.0 % | 17.2 % |
+
+- The score's largest terms reward a name at a fresh high: the Stage 1→2 breakout (+30) and virgin overhead supply (up
+  to +30). The walk's `Window_extreme` floor needs a dip of at least 8 % after the 90-bar high, within 15 % of E
+  (`project_floor_after_breakout_pattern`). A fresh-high name rarely has one.
+- On the 270 X-net Fridays, 5,057 of the 5,400 top-20 rows were skipped `No_structural_stop`, 234 `Not_reached`, 97
+  funded, while an average of 54 shadow-buyable names sat below the cut.
+- C\* (net) is 65.8 % grade A and 24.9 % A+, mean score 77 against 100 for the top 20 above it; 15.7 % of it sits at
+  ranks 21–40, 35.6 % at 41–100, 48.8 % at 101+ (`read/gate_before_cap.txt`).
+- **So on X Fridays the binding gate is the structural-stop check on an all-A+ list.** The cap only decides which of
+  them the walk sees.
+
+**What the would-be names did** (private `crowd_outcomes.tsv.gz`, same dedup and coverage as `counterfactual.txt`):
+
+| years | C\* (net) n | mean ride | win | monster | funded n | funded mean |
+|---|---:|---:|---:|---:|---:|---:|
+| bear years 2000–02, 2008 | 221 | −3.06 % | 29.0 % | 6.8 % | 18 | −3.57 % |
+| 2003 | 93 | +31.30 % | 63.4 % | 23.7 % | 15 | +18.36 % |
+| 2009 | 130 | +8.01 % | 49.2 % | 12.3 % | 15 | +12.44 % |
+| 2016, 2022, 2023 | 257 | +0.67 % | 31.1 % | 5.8 % | 57 | +5.57 % |
+| all other years | 179 | +0.24 % | 33.0 % | 5.0 % | 511 | +4.50 % |
+| all | 880 | +3.97 % | 37.0 % | 8.8 % | 616 | +4.90 % |
+
+Perturbed before believed:
+- **2003 carries the tie.** 2003 is 93 of 880 rows and 83 % of C\*'s ride sum. Without it C\* rides +0.74 % against
+  the funded names' +4.56 %, −3.8 pp. Leave one year out, the ride clause fails on 7 of 21 drops (2003, 2007, 2009,
+  2010, 2011, 2017, 2021; `read/why/loo.txt`); pooled it passes by 0.07 pp.
+- Halves: C\* +6.6 % vs +5.5 % in 2000–12, −0.8 % vs +4.5 % in 2013–26 (`counterfactual.txt`).
+- Outside 2003 and 2009, C\* rides +0.38 % in UP weeks (n 340) and −1.86 % in MIXED and DOWN (317); 2003's UP weeks
+  alone ride +35.3 % (n 77).
+- Tail: more doublers (8.8 vs 6.5 %) and a deeper p10 (−17.3 vs −13.7), no higher p90 (+28.9 vs +30.2).
+- By episode: of seven gate aftermaths (2000, 2001–02, 2003, 2008, 2009, 2016, 2022–23), C\* out-rode the funded
+  average in two (2003, 2009), tied in one (2016) and lost four, including 2022–23, the third bear-to-recovery turn.
+
+**Opportunity or cash-in-bear-tape artifact? Both, precisely.** The idle cash is real, and the macro gate and the stops
+create it. In the invested state the cap wastes nothing, because cash binds. In the empty-book state the cap hides
+buyable names, because the ranking puts the unbuyable ones first. Whether filling that cash pays depends on the tape:
+it pays in the two V-recoveries after the deepest bears and is flat or negative in the bear rallies (2001–02, 2008) and
+the later recoveries. The measurable opportunity is two in-sample episodes; the rest is a regime bet, which is what the
+bear clause exists to stop.
+
+**How big X really is.**
+- Path: X counts idle cash once per Friday; 2001-12-07 → 2002-05-03 alone is 18 Fridays and 197 of X net. Path-aware
+  X net is 181 (−87 %). Re-running `gbc.awk`'s `path()` with the losers' and winners' average holds (41, 164 days)
+  gives 319 and 139 (`read/why/path.awk`).
+- Sizing: the record sizes at min(1 % NAV / stop distance, 14 % NAV), which gives the funded tickets median 0.0857 = m.
+  C\*'s stops are tighter (9.3 % under 2 % vs 3.2 % of funded); at their implied cost (median 0.0997; 32.5 % at the
+  14 % cap vs 18.9 %) X net falls to 1,221 and path-aware X to 121–275.
+- The bear share holds in every variant: 0.26–0.30.
+- s does not bind: X ref − X net = −1.2 slots in 26 years, because an X Friday offers about 54 buyable names for at
+  most 11 slots. s is higher where X lives (4.3 % on X-net Fridays, 10–15 % in 2001–03) but would need to approach
+  about 80 % to bind. The shadow's skip of the entry-assembly gates is a small error; its weakness is path and outcome.
+- In trades even the smallest variant clears the count bar (121 × f = 103 > 40). The bear clause and the outcomes stop
+  a build, not the counts. On the ride proxy a would-be name is worth about 0.40 % of NAV pooled (0.0997 × 3.97 %),
+  0.07 % without 2003 and −0.31 % in the bear years; a funded name is worth 0.42 %.
+
+**Traces.**
+1. **2001-12-07 → 2002-05-03, a bear rally.** S's last position (IART, laggard rotation) left 2001-11-26; S then held
+   nothing until SEIC filled 2003-07-07, apart from MOVIQ (placed 2002-05-03, stopped 05-10). The gate read Neutral on
+   17 of 18 open Fridays. Every top 20 was all A+ and all skipped (2001-12-07: 17 `No_structural_stop`, 3
+   `Not_reached`), with 30–106 shadow-buyable names below the cut each Friday. X counts 197 slots here; C\* rode −4.6 %
+   in 2001 (n 75) and +0.2 % in 2002 (n 74).
+2. **2003-05-23, the recovery that decides the ride clause.** Gate Bullish from 2003-05-02, SPY UP, S all cash. The
+   top 20 were twenty A+ names scored 105–120 (AAPL, ACN, DXC at 120): 16 `No_structural_stop`, 4 `Not_reached`.
+   C\* was 11 names at ranks 122–315, scored 70–85, shadow stop distances 0.04 % (MBT) to 14.7 %. 2003-04-25 → 06-20
+   gave 99 of X net with nothing funded; S's first 2003 tickets came 2003-06-27.
+3. **2009-05-01 → 2009-09-04, the largest episode.** S's book was empty from 2008-07-21 to 2009-10-05, the gate
+   Bullish throughout. The 360 top-20 rows over 18 Fridays were all A+: 348 `No_structural_stop`, 12 `Not_reached`, 0
+   funded, with 7–47 shadow-buyable names below the cut each Friday. This is the review pack's "2009-05 sat out"
+   (`project_recovery_reentry_gap`) seen from the funnel.
+4. **2003-09-12, the displacement X ignores.** The walk placed ADSK and ISPH and left no free cash (0.104 left against
+   0.224 resting). ADSK filled 2003-09-15, was held to 2005-01-10 and is S's largest 2003 entry by realised P&L. An arm
+   that had filled up to 11 slots from 2003-04-25 needed them cleared by mid-September to fund it; the stale-E K = 5 C
+   arm lost ADSK 2003 to exactly this crowding.
+
+### How it fits what we know
+
+- **`project_top_n_capacity_verdict` (the CLOSE prior): confirmed for the invested state, refined by a second state.**
+  The invested state is 744 of 1,099 open Fridays at 6+ positions, and 447 of the 480 cash skips fall on no-X Fridays.
+  The empty book after a gate block is a second state the prior averaged over. Not a contradiction: the 09-22 arm drew
+  28 % of its arm-only entries from ranks 21–40, and 15.7 % of C\* sits there; a cap of 40 reaches the edge of X, not
+  its body (84 % at ranks 41+). §Why's "about 28 entries a year into about 5 slots" is the 09-22 build's figure; this
+  cell holds 6.3 positions on an average open Friday and fills about 22 entries a year.
+- **`project_recovery_reentry_gap`: re-derived from the other side.** Buyable names existed in 2009, below the cap:
+  the gap is "the score puts the unbuyable names first", not "nothing was buyable".
+- **`project_entry_timing_screen_1112` (the 15 % gate is the bear brake): extended.** The same `No_structural_stop`
+  gate that kept S out of the 2008 rally kept it out of 2003 and 2009; C\* rides −3.1 % in the bear years.
+- **`project_index_stage_veto_verdict`: the mirror image.** Protection levers are read against the 2020 recovery;
+  re-entry levers must be read against the 2001–02 and 2008 rallies.
+- **`project_entry_selection_closed_powered`, `project_cascade_selection_inversion`,
+  `project_rs_trend_dead_and_rs_value_unpredictive`: unchanged by the RS fix.** Rule 2 re-measures after #2380 and
+  A+ ≈ A.
+- **`project_edge_is_the_fat_tail`, `project_26y_path_noise_floor`: confirmed.** The one value-bearing clause rests on
+  one year.
+- **`project_trait_y_low_price`, `project_monster_funnel_top_of_funnel`: consistent.** `Not_reached` (14.6 % monsters)
+  and `Stage_setup` (1.31×) remove higher-monster names at lower mean: breadth and heat, not anti-selection.
+
+### What it rules in and out
+
+- **Ruled out:** CLOSE's premise that supply never binds (it binds on empty-book Fridays); a cap-width route to X; a
+  score-tier ranking lever after the RS fix; s as a material refinement.
+- **Ruled in:** after the cap, the binding gate is the structural-stop check, which in this config is also the width
+  gate. X is a regime phenomenon; any lever that reaches it is a regime lever.
+- **Left open:** a recovery-conditioned rule that takes 2003 and 2009 without the 2001–02 and 2008 rallies. This
+  history cannot test it: the bear-to-recovery turns are the sample (two pay, one ties, four lose), any rule fitted to
+  it is fitted to 2003, and a disjoint-window cell does not help. It needs a book argument first (W2).
+
+**Forward.** Keep gate-before-cap as "not built (PARK)" in the observatory's dial table, unqueued. For the P3 dial queue:
+`max_stop_distance_pct` 12/15/18 first (its gate removes 91.5 % of admitted names, 93.6 % on X Fridays; its removed
+names come closest to the funded ones; it decides both the bear brake and the recovery gap), read as D(t) around the
+reopen episodes (2002, 2003, 2008, 2009, 2016, 2022–23) by regime, with positions held and S tickets crowded out.
+`max_buy_candidates` 40 low (ranks 21–40 hold 15.7 % of C\*; its 09-22 effect was a slot re-draw, so expect steps, not
+slope). Ranking dials low. For future pre-registrations: read pooled outcome clauses leave-one-year-out, and count X
+path-aware if the count is meant to bind.
+
+### Not claimed, against this result
+
+- No return verdict. PARK is not evidence of an effect, either way.
+- The shadow is an upper bound: it skips the entry-assembly gates (s = 0.024, non-binding), sector caps, the
+  share-class rule and `Sized_to_zero` (0.83 % of admitted), and ignores cash sizing (1,411 → 1,221).
+- X ignores path (path-aware is 87 % smaller), repeat names and displacement (Trace 4).
+- Outcomes are the screen's ex-post ride, not stop-managed trades; for the 9.3 % of C\* with stops under 2 %, a real
+  trade would likely have stopped out early.
+- The macro counterfactual is a proxy on the screen's breakout predicate. `Stage_setup`'s removed population is not
+  what loosening that gate alone would admit.
+- In-sample, one path, one seed. The smoke is plumbing; no smoke number is used.
+
+### Defects found
+
+1. **Chain.** The first `BUILD` aborted at 06:57:03, in the second it started, with no cause in the public log. The
+   cause was the cloud container's Docker daemon not running at launch (the session's log); the session started
+   `dockerd` and relaunched at 06:57:31, which skipped the finished stage and built clean. No effect on the cell.
+   `chain.sh` should check `docker info` before `BUILD` and print a cause line.
+2. No simulator or data defect: the cell is byte-identical to #3602's S-k0 and the validator counts match line for
+   line.
+3. Read and rule design, not code: `Stop_too_wide` is unreachable under `require_structural_stop`, so SK5's separation
+   cannot be tested in this config and the shadow's `Stop_too_wide` branch is dead here. The ride clause compares
+   pooled means and passed on one year (leave-one-year-out flips it 7 of 21).
+
+### Review-pack look
+
+No pack was built for this cell; the pre-registration asks for none. Every per-arm artifact is byte-identical to
+#3595's pb-S-k0, which #3595's ten-cell pack covered. That pack's "initial stop under 2 % below E" signal (S-k0, 18
+trades) is the same entry-geometry item as C\*'s narrow-stop share above.
+
+### Derivations
+
+The why-numbers come from joins in `results/cell/read/why/` (awk; `why/README.txt` maps scripts to tables) over the
+public `read/fridays.tsv`, `gf-S-k0-s0-macro_trend.sexp` and `gf-S-k0-s0-entries.tsv`, and the private (a3a2dadc2)
+`trades.csv`, `open_positions.csv`, `read/crowd_outcomes.tsv.gz` and `read/pool_outcomes.tsv.gz`. Positions held on
+Friday d: `entry_date ≤ d < exit_date`, plus open positions entered on or before d. Gate age: open Fridays since the
+last Bearish Friday. SPY regime: the pack's `spyRegimeByDay` on SPY adjusted closes from the local bar store (only the
+labels are committed, `why/spyweek.tsv`). Outcome dedup: one row per symbol per 182 days, FD coverage, ride capped at
++190 %. The joins reproduce the read's own X net 1,411, path-aware 393 / 181, C\* net n 880 at +3.97 %, funded n 616
+at +4.90 %, and m 0.0857 from the sizing rule. The rank-band, regime-by-period and sizing tables were computed ad hoc
+over the private pool and crowd tables and have no committed script; their inputs are listed above. Rule 2's per-half
+monster counts are not printed in any public file.
