@@ -18,7 +18,16 @@ end
 module Float_ord = struct
   type t = float
 
-  let compare = Float.compare
+  (* [Float.compare] ranks NaN below every number, so [lt]/[le] would pass on a
+     NaN actual and [gt]/[ge] on a NaN threshold. NaN has no place in an
+     ordering: fail the assertion instead of returning a rank. *)
+  let compare a b =
+    if Float.is_nan a || Float.is_nan b then
+      assert_failure
+        (Printf.sprintf "Float_ord.compare: NaN has no ordering (%s vs %s)"
+           (Float.to_string a) (Float.to_string b))
+    else Float.compare a b
+
   let show = Float.to_string
 end
 
@@ -132,11 +141,24 @@ let pair fst_matcher snd_matcher (a, b) =
 (* Numeric Matchers                                                          *)
 (* ========================================================================== *)
 
-let float_equal ?(epsilon = 1e-9) expected actual =
-  if Float.(abs (expected - actual) >= epsilon) then
-    assert_failure
-      (Printf.sprintf "Expected float %f but got %f (epsilon: %g)" expected
-         actual epsilon)
+let _float_equal_failure ~epsilon ~note expected actual =
+  assert_failure
+    (Printf.sprintf "Expected float %f but got %f (%sepsilon: %g)" expected
+       actual note epsilon)
+
+(* Equal infinities have a NaN difference, so test exact equality first. *)
+let _floats_differ ~epsilon expected actual =
+  Float.(expected <> actual) && Float.(abs (expected - actual) >= epsilon)
+
+let float_equal ?(epsilon = 1e-9) ?(nan_equal = false) expected actual =
+  let fail ~note = _float_equal_failure ~epsilon ~note expected actual in
+  match (Float.is_nan expected, Float.is_nan actual) with
+  | true, true ->
+      if not nan_equal then
+        fail ~note:"NaN is not equal to NaN unless ~nan_equal:true; "
+  | true, false | false, true -> fail ~note:"NaN is not equal to any number; "
+  | false, false ->
+      if _floats_differ ~epsilon expected actual then fail ~note:""
 
 let gt (type a) (module M : Ord with type t = a) threshold actual =
   if M.compare actual threshold <= 0 then

@@ -21,7 +21,13 @@ module Int_ord : Ord with type t = int
 (** Ready-made [Ord] instance for [int]. *)
 
 module Float_ord : Ord with type t = float
-(** Ready-made [Ord] instance for [float]. *)
+(** Ready-made [Ord] instance for [float].
+
+    NaN rule: [compare] fails the running test (an OUnit assertion failure) when
+    either argument is NaN, rather than ranking NaN below every number as
+    [Float.compare] does. So [gt], [ge], [lt], [le] and [is_between]
+    instantiated with [Float_ord] fail whenever the actual value or any bound is
+    NaN. *)
 
 type 'a matcher = 'a -> unit
 (** A matcher is a function that takes a value and performs assertions on it.
@@ -249,9 +255,18 @@ val pair : 'a matcher -> 'b matcher -> ('a * 'b) matcher
 
 (** {1 Numeric Matchers} *)
 
-val float_equal : ?epsilon:float -> float -> float matcher
-(** [float_equal ?epsilon expected] creates a matcher that checks a float value
-    equals [expected] within the given epsilon tolerance (default: 1e-9).
+val float_equal : ?epsilon:float -> ?nan_equal:bool -> float -> float matcher
+(** [float_equal ?epsilon ?nan_equal expected] creates a matcher that checks a
+    float value equals [expected] within the given epsilon tolerance (default:
+    1e-9).
+
+    NaN rule: NaN never compares equal, so a NaN on either side must not slip
+    through as a pass. The matcher {b fails} when exactly one of [expected] and
+    the actual value is NaN, and also when both are NaN unless the caller opts
+    in with [~nan_equal:true] (default: [false]). [nan_equal] only covers the
+    both-NaN case; a NaN against a number fails regardless. Use
+    [~nan_equal:true] only when a test asserts that a value {e is} NaN. Equal
+    infinities pass; an infinity against a different value fails.
 
     Example:
     {[
@@ -259,12 +274,16 @@ val float_equal : ?epsilon:float -> float -> float matcher
     ]}
     {[
     assert_that computed_value (float_equal ~epsilon:0.01 expected)
+    ]}
+    {[
+    assert_that undefined_ratio (float_equal ~nan_equal:true Float.nan)
     ]} *)
 
 val gt : (module Ord with type t = 'a) -> 'a -> 'a matcher
 (** [gt m threshold] asserts the actual value is strictly greater than
     [threshold]. Requires a first-class [Ord] module for comparison and error
-    messages.
+    messages. For floats pass [Float_ord], which fails on NaN (see
+    {!Float_ord}); the same holds for [ge], [lt], [le] and [is_between].
 
     Example:
     {[
