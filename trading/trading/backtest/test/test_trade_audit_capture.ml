@@ -295,6 +295,78 @@ let test_candidate_weeks_carry_named_candidates _ =
   in
   assert_that named (gt (module Int_ord) 0)
 
+(* -------------------------------------------------------------------- *)
+(* The top-N view changes no trade                                       *)
+(* -------------------------------------------------------------------- *)
+
+(* A one-slot cap, and Stage 2 admitted up to 52 weeks in rather than 4, so
+   that several of the seven names clear the cascade on some Fridays: the cap
+   cuts all but the first, and each cut name gets a shadow (measured on this
+   fixture: 8 admitted rows, 3 cut rows at ranks 2-3 with their shadows, 6
+   trades). With the default 4 weeks only one name ever clears and no shadow
+   runs. *)
+let _one_slot =
+  Sexp.of_string
+    "((screening_config ((max_buy_candidates 1) (early_stage2_max_weeks 52))))"
+
+(* One run with or without the collector, written out by [Result_writer]:
+   [(trades.csv, equity_curve.csv)] and the run's candidate weeks. The
+   position-id counter is process-global and [trades.csv] carries the ids, so
+   every run starts it from the same value. *)
+let _written_run ~capture =
+  Weinstein_strategy.Entry_audit_capture.set_position_counter 0;
+  let result =
+    _run_scenario
+      ?candidate_log:(Option.some_if capture (Candidate_log.create ()))
+      ~extra_overrides:[ _one_slot ] ()
+  in
+  let dir = Filename_unix.temp_dir "top_n_no_trade_change" "" in
+  Exn.protect
+    ~f:(fun () ->
+      Backtest.Result_writer.write ~output_dir:dir result;
+      let read name = In_channel.read_all (Filename.concat dir name) in
+      ((read "trades.csv", read "equity_curve.csv"), result.candidate_weeks))
+    ~finally:(fun () ->
+      Core_unix.system (sprintf "rm -rf %s" (Filename.quote dir)) |> ignore)
+
+(** The no-trade-change pin for the whole top-N view: with [--emit-candidates]'s
+    collector on, [trades.csv] and [equity_curve.csv] are byte-identical to the
+    run without it. The capture run is not vacuous: it re-asks the walk's stop
+    check for every walked name and runs the shadow on every cut name, which the
+    next two tests pin. *)
+let test_capture_changes_no_trade _ =
+  let off, _ = _written_run ~capture:false in
+  let on, _ = _written_run ~capture:true in
+  assert_that on (equal_to (off : string * string))
+
+(** The capture run above really computed the top-N view: at least one admitted
+    row carries a rank and the stop distance the post-walk check measured. *)
+let test_capture_run_carries_the_top_n_view _ =
+  let _, weeks = _written_run ~capture:true in
+  assert_that
+    (List.concat_map weeks ~f:(fun (w : Candidate_log.week) -> w.candidates)
+    |> List.count ~f:(fun (c : Candidate_log.candidate) ->
+        Option.is_some c.rank
+        &&
+        match c.walk with
+        | Some { stop_distance_pct = Some _; _ } -> true
+        | Some _ | None -> false))
+    (gt (module Int_ord) 0)
+
+(** ... and ran the shadow: at least one name the cap cut ([Dropped_at_top_n],
+    rank 2 or more) carries a shadow verdict, so the byte-identity pin above
+    covers the shadow and fails loudly if the fixture stops producing cut names.
+*)
+let test_capture_run_shadows_cut_names _ =
+  let _, weeks = _written_run ~capture:true in
+  assert_that
+    (List.concat_map weeks ~f:(fun (w : Candidate_log.week) -> w.candidates)
+    |> List.count ~f:(fun (c : Candidate_log.candidate) ->
+        Candidate_log.equal_cascade_outcome c.outcome Dropped_at_top_n
+        && Option.is_some c.shadow
+        && Option.value_map c.rank ~default:false ~f:(fun r -> r >= 2)))
+    (gt (module Int_ord) 0)
+
 let suite =
   "Trade_audit_capture"
   >::: [
@@ -319,6 +391,12 @@ let suite =
          >:: test_candidate_weeks_track_cascade_summaries;
          "candidate weeks carry named candidates"
          >:: test_candidate_weeks_carry_named_candidates;
+         "top-N view: capture changes no trade"
+         >:: test_capture_changes_no_trade;
+         "top-N view: the capture run carries it"
+         >:: test_capture_run_carries_the_top_n_view;
+         "top-N view: the capture run shadows cut names"
+         >:: test_capture_run_shadows_cut_names;
        ]
 
 let () = run_test_tt_main suite

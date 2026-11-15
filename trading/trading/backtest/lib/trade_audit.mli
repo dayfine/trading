@@ -91,7 +91,7 @@ type skip_reason =
           GOOG / GOOGL) already had an open or pending long, under
           [Weinstein_strategy_config.config.max_one_share_class_per_issuer]
           (default [false] => never emitted). Long candidates only. *)
-[@@deriving sexp]
+[@@deriving sexp, eq]
 
 (** Whether the installed initial stop sat on a support floor or fell back to a
     fixed buffer off the effective entry price ([Buffer_fallback]: reference

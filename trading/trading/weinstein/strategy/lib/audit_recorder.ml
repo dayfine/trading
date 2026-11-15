@@ -99,6 +99,13 @@ module Top_n = struct
     | No_structural_stop
     | Stop_too_wide of float
     | Already_held
+
+  type verdict =
+    | Walked of { outcome : walk_outcome; stop_distance_pct : float option }
+    | Not_reached
+    | Shadow of shadow
+
+  type t = { rank : int; verdict : verdict }
 end
 
 type cascade_drop = {
@@ -106,6 +113,7 @@ type cascade_drop = {
   sector : Screener.sector_context;
   side : Trading_base.Types.position_side;
   outcome : Screener.candidate_outcome;
+  top_n : Top_n.t option;
 }
 
 type cascade_event = {
@@ -116,6 +124,8 @@ type cascade_event = {
   candidates : alternative_input list;
   decisions : walk_decision list;
   drops : cascade_drop list;
+  long_cash_left_pct : float option;
+  long_resting_reserved_pct : float option;
 }
 
 type force_liquidation_event = Portfolio_risk.Force_liquidation.event

@@ -286,6 +286,59 @@ let test_max_buy_candidates_cap _ =
   in
   assert_that (List.length result.buy_candidates) (equal_to 2)
 
+(* Twelve identical breakouts screened under a cap of three. Returns the
+   screen's [buy_candidates] tickers, [rank_survivors]' long tickers, and the
+   first three of those longs re-sorted by the same seeded tiebreak without the
+   screen date. *)
+let _capped_and_ranked ~macro_trend =
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
+  let prior = Some (Stage1 { weeks_in_base = 10 }) in
+  let stocks =
+    List.init 12 ~f:(fun i -> make_analysis (Printf.sprintf "T%d" i) prior bars)
+  in
+  let config = { cfg with max_buy_candidates = 3 } in
+  let candidates = ref [] in
+  let result =
+    screen_with_cooldown ~config ~macro_trend ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[] ~as_of ~last_stop_out_dates:[]
+      ~on_candidates:(fun cs -> candidates := cs)
+      ()
+  in
+  let longs, _ = rank_survivors ~config ~as_of ~candidates:!candidates in
+  let tickers = List.map ~f:(fun (c : scored_candidate) -> c.ticker) in
+  let undated =
+    List.sort longs
+      ~compare:
+        (compare_for_ranking ~tiebreak_seed:config.tiebreak_seed
+           config.candidate_ranking)
+  in
+  ( tickers result.buy_candidates,
+    tickers longs,
+    List.take (tickers undated) config.max_buy_candidates )
+
+(** [rank_survivors] is the cap's own order with the cap lifted: all twelve
+    survivors, and its first [max_buy_candidates] are exactly the screen's
+    [buy_candidates], in order. The twelve tie on score, so the seeded tiebreak,
+    keyed on the screen date, decides the order. The undated draw picks a
+    different first three (asserted, so the pin stays date-sensitive): a
+    [rank_survivors] that dropped its [as_of] would fail here. *)
+let test_rank_survivors_prefix_is_the_capped_screen _ =
+  let kept, ranked, undated_prefix = _capped_and_ranked ~macro_trend:Bullish in
+  assert_that (ranked, undated_prefix)
+    (all_of
+       [
+         field fst
+           (all_of
+              [ size_is 12; field (fun l -> List.take l 3) (equal_to kept) ]);
+         field snd (not_ (equal_to kept));
+       ])
+
+(** The macro gate is not applied: on a Bearish tape the screen buys nothing,
+    yet the same twelve survivors are ranked. *)
+let test_rank_survivors_ignores_the_macro_gate _ =
+  let kept, ranked, _ = _capped_and_ranked ~macro_trend:Bearish in
+  assert_that (kept, List.length ranked) (equal_to ([], 12))
+
 (* ------------------------------------------------------------------ *)
 (* Grade filter and watchlist                                          *)
 (* ------------------------------------------------------------------ *)
@@ -4016,6 +4069,10 @@ let suite =
          "test_pure_same_inputs" >:: test_pure_same_inputs;
          "test_scores_drive_sort_order" >:: test_scores_drive_sort_order;
          "test_max_buy_candidates_cap" >:: test_max_buy_candidates_cap;
+         "rank_survivors: prefix is the capped screen"
+         >:: test_rank_survivors_prefix_is_the_capped_screen;
+         "rank_survivors: ignores the macro gate"
+         >:: test_rank_survivors_ignores_the_macro_gate;
          "test_watchlist_captures_low_grade"
          >:: test_watchlist_captures_low_grade;
          "test_min_score_override_filters_below_threshold"

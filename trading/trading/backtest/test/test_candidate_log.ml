@@ -136,7 +136,27 @@ let test_signals_project_field_for_field _ =
 (* Collector + window filter                                            *)
 (* ------------------------------------------------------------------ *)
 
-let _week date = { CL.date = _date date; candidates = [] }
+let _week date =
+  {
+    CL.date = _date date;
+    candidates = [];
+    tickets_placed = None;
+    long_cash_left_pct = None;
+    long_resting_reserved_pct = None;
+  }
+
+(* A row off the top-N view: every field the pre-top-N writer knew about. *)
+let _row ~symbol ~outcome : CL.candidate =
+  {
+    symbol;
+    side = Trading_base.Types.Long;
+    outcome;
+    breakout_gate = None;
+    signals = CL.signals_of_alternative _alternative;
+    rank = None;
+    walk = None;
+    shadow = None;
+  }
 
 let test_collector_keeps_record_order _ =
   let c = CL.create () in
@@ -188,17 +208,8 @@ let test_emit_enabled_round_trips _ =
       let weeks =
         [
           {
-            CL.date = _date "2024-06-14";
-            candidates =
-              [
-                {
-                  CL.symbol = "ZZZZ";
-                  side = Trading_base.Types.Long;
-                  outcome = CL.Admitted;
-                  breakout_gate = None;
-                  signals = CL.signals_of_alternative _alternative;
-                };
-              ];
+            (_week "2024-06-14") with
+            candidates = [ _row ~symbol:"ZZZZ" ~outcome:CL.Admitted ];
           };
         ]
       in
@@ -253,6 +264,8 @@ let test_decisions_reach_the_summary_without_capture _ =
       entered = 1;
       candidates = [];
       drops = [];
+      long_cash_left_pct = None;
+      long_resting_reserved_pct = None;
       decisions =
         [
           { AR.ranked = _scored_candidate; outcome = AR.Placed };
@@ -333,6 +346,8 @@ let test_zero_funded_week_still_carries_its_candidates _ =
         [ { AR.candidate = _scored_candidate; reason = AR.Insufficient_cash } ];
       drops = [];
       decisions = [];
+      long_cash_left_pct = None;
+      long_resting_reserved_pct = None;
     };
   assert_that (CL.weeks c)
     (elements_are
@@ -363,7 +378,8 @@ let test_zero_funded_week_still_carries_its_candidates _ =
 (* G2 — the cascade population                                          *)
 (* ------------------------------------------------------------------ *)
 
-let _drop ~ticker ~(phase : Screener.cascade_phase) : AR.cascade_drop =
+let _drop ?top_n ~ticker ~(phase : Screener.cascade_phase) () : AR.cascade_drop
+    =
   {
     analysis = { _stock_analysis with ticker };
     sector =
@@ -374,25 +390,33 @@ let _drop ~ticker ~(phase : Screener.cascade_phase) : AR.cascade_drop =
       };
     side = Trading_base.Types.Long;
     outcome = { ticker; phase; score = 71; grade = Weinstein_types.A };
+    top_n;
   }
 
-let _week_with ~drops ~candidates =
+(* Drive one cascade event through the recorder; the one week it records. *)
+let _record_week ?(entered = 0) ?long_cash_left_pct ?long_resting_reserved_pct
+    ~drops ~candidates () =
   let c = CL.create () in
   (_recorder ~candidate_log:c ()).record_cascade_summary
     {
       date = _date "2024-06-14";
       diagnostics = _diagnostics ~long_top_n:1;
       breadth_state = Weinstein_types.Bullish_breadth;
-      entered = 0;
+      entered;
       candidates;
       drops;
       decisions = [];
+      long_cash_left_pct;
+      long_resting_reserved_pct;
     };
   match CL.weeks c with
-  | [ w ] -> w.candidates
+  | [ w ] -> w
   | ws ->
       assert_failure
         (sprintf "expected exactly one week, got %d" (List.length ws))
+
+let _week_with ~drops ~candidates =
+  (_record_week ~drops ~candidates ()).candidates
 
 (* One ticker per [Screener.cascade_phase] constructor, paired with the
    artefact outcome [_outcome_of_phase] must produce for it. Exhaustive by
@@ -420,7 +444,7 @@ let test_drops_carry_their_cascade_phase _ =
     _week_with ~candidates:[]
       ~drops:
         (List.map _phase_cases ~f:(fun (ticker, phase, _) ->
-             _drop ~ticker ~phase))
+             _drop ~ticker ~phase ()))
   in
   assert_that
     (List.map week ~f:(fun (x : CL.candidate) -> (x.symbol, x.outcome)))
@@ -435,7 +459,7 @@ let test_drops_supersede_the_entry_walk_list _ =
     (_week_with
        ~candidates:
          [ { AR.candidate = _scored_candidate; reason = AR.Insufficient_cash } ]
-       ~drops:[ _drop ~ticker:"AAAA" ~phase:Admitted ])
+       ~drops:[ _drop ~ticker:"AAAA" ~phase:Admitted () ])
     (elements_are
        [ field (fun (x : CL.candidate) -> x.symbol) (equal_to "AAAA") ])
 
@@ -512,7 +536,7 @@ let test_breakout_drops_carry_their_sub_gate _ =
     _week_with ~candidates:[]
       ~drops:
         (List.map _gate_cases ~f:(fun (ticker, gate, _) ->
-             _drop ~ticker ~phase:(Dropped_at_breakout gate)))
+             _drop ~ticker ~phase:(Dropped_at_breakout gate) ()))
   in
   assert_that
     (List.map week ~f:(fun (x : CL.candidate) -> (x.symbol, x.breakout_gate)))
@@ -532,7 +556,7 @@ let test_non_breakout_rows_carry_no_sub_gate _ =
         (List.filter_map _phase_cases ~f:(fun (ticker, phase, _) ->
              match phase with
              | Screener.Dropped_at_breakout _ -> None
-             | _ -> Some (_drop ~ticker ~phase)))
+             | _ -> Some (_drop ~ticker ~phase ())))
   in
   assert_that
     (List.count week ~f:(fun (x : CL.candidate) ->
@@ -567,27 +591,226 @@ let test_absent_sub_gate_is_omitted_from_the_sexp _ =
   let sexp =
     CL.sexp_of_week
       {
-        CL.date = _date "2024-06-14";
-        candidates =
-          [
-            {
-              CL.symbol = "ZZZZ";
-              side = Trading_base.Types.Long;
-              outcome = CL.Admitted;
-              breakout_gate = None;
-              signals = CL.signals_of_alternative _alternative;
-            };
-          ];
+        (_week "2024-06-14") with
+        candidates = [ _row ~symbol:"ZZZZ" ~outcome:CL.Admitted ];
       }
   in
   assert_that
     (String.is_substring (Sexp.to_string sexp) ~substring:"breakout_gate")
     (equal_to false)
 
+(* ------------------------------------------------------------------ *)
+(* The top-N view                                                       *)
+(* ------------------------------------------------------------------ *)
+
+let _top_n rank verdict = { AR.Top_n.rank; verdict }
+
+let _walked outcome stop_distance_pct =
+  AR.Top_n.Walked { outcome; stop_distance_pct }
+
+(** Rank reaches both row kinds that cleared the cascade — the kept ([Admitted])
+    and the cut ([Dropped_at_top_n]) — and no other. *)
+let test_rank_on_both_row_kinds _ =
+  let week =
+    _week_with ~candidates:[]
+      ~drops:
+        [
+          _drop ~ticker:"AAAA" ~phase:Admitted
+            ~top_n:(_top_n 3 (_walked AR.Placed (Some 0.07)))
+            ();
+          _drop ~ticker:"GGGG" ~phase:Dropped_at_top_n
+            ~top_n:(_top_n 21 (AR.Top_n.Shadow (Buyable 0.09)))
+            ();
+          _drop ~ticker:"FFFF" ~phase:Dropped_at_grade ();
+        ]
+  in
+  assert_that
+    (List.map week ~f:(fun (x : CL.candidate) -> (x.symbol, x.rank)))
+    (equal_to [ ("AAAA", Some 3); ("GGGG", Some 21); ("FFFF", None) ])
+
+(* One cut row per shadow constructor, paired with the on-disk verdict the hop
+   must produce. All four, so a transposition fails the pin. *)
+let _shadow_cases : (AR.Top_n.shadow * CL.shadow_verdict) list =
+  [
+    (Buyable 0.09, CL.Buyable 0.09);
+    (No_structural_stop, CL.No_structural_stop);
+    (Stop_too_wide 0.22, CL.Stop_too_wide 0.22);
+    (Already_held, CL.Already_held);
+  ]
+
+(** Every shadow constructor reaches the [Dropped_at_top_n] row under its own
+    name with its distance; a cut row never carries a walk outcome. *)
+let test_every_shadow_verdict_reaches_the_row _ =
+  let week =
+    _week_with ~candidates:[]
+      ~drops:
+        (List.mapi _shadow_cases ~f:(fun i (shadow, _) ->
+             _drop ~ticker:(sprintf "S%d" i) ~phase:Dropped_at_top_n
+               ~top_n:(_top_n (21 + i) (AR.Top_n.Shadow shadow))
+               ()))
+  in
+  assert_that
+    (List.map week ~f:(fun (x : CL.candidate) -> (x.walk, x.shadow)))
+    (equal_to
+       (List.map _shadow_cases ~f:(fun (_, verdict) -> (None, Some verdict))))
+
+(** An [Admitted] row carries what the walk did: a funded name with its stop
+    distance, a [Stop_too_wide] skip with the distance the gate measured, and a
+    name the walk never reached with neither. A kept row never carries a shadow.
+*)
+let test_admitted_rows_carry_the_walk_outcome _ =
+  let week =
+    _week_with ~candidates:[]
+      ~drops:
+        [
+          _drop ~ticker:"AAAA" ~phase:Admitted
+            ~top_n:(_top_n 1 (_walked AR.Placed (Some 0.07)))
+            ();
+          _drop ~ticker:"BBBB" ~phase:Admitted
+            ~top_n:
+              (_top_n 2 (_walked (AR.Skipped AR.Stop_too_wide) (Some 0.22)))
+            ();
+          _drop ~ticker:"CCCC" ~phase:Admitted
+            ~top_n:(_top_n 3 AR.Top_n.Not_reached)
+            ();
+        ]
+  in
+  assert_that
+    (List.map week ~f:(fun (x : CL.candidate) -> (x.walk, x.shadow)))
+    (equal_to
+       ([
+          (Some { result = Funded; stop_distance_pct = Some 0.07 }, None);
+          ( Some
+              {
+                result = Skipped TA.Stop_too_wide;
+                stop_distance_pct = Some 0.22;
+              },
+            None );
+          (Some { result = Not_reached; stop_distance_pct = None }, None);
+        ]
+         : (CL.walk_result option * CL.shadow_verdict option) list))
+
+(** The week carries the walk's ticket count, the long side's unspent cash and
+    the resting-ticket reserve, each from its own event field. *)
+let test_week_carries_tickets_and_long_cash _ =
+  assert_that
+    (_record_week ~entered:2 ~long_cash_left_pct:0.31
+       ~long_resting_reserved_pct:0.12 ~drops:[] ~candidates:[] ())
+    (all_of
+       [
+         field (fun (w : CL.week) -> w.tickets_placed) (equal_to (Some 2));
+         field
+           (fun (w : CL.week) -> w.long_cash_left_pct)
+           (is_some_and (float_equal 0.31));
+         field
+           (fun (w : CL.week) -> w.long_resting_reserved_pct)
+           (is_some_and (float_equal 0.12));
+       ])
+
+(** Back-compat pin: a [candidates.sexp] written before the top-N view — no
+    [rank] / [walk] / [shadow] on any row, no [tickets_placed] /
+    [long_cash_left_pct] / [long_resting_reserved_pct] on the week — still
+    parses, with every new field [None]. A literal, so the old on-disk shape
+    stays fixed as the type grows. *)
+let test_parses_pre_top_n_candidates_sexp _ =
+  let legacy =
+    Sexp.of_string
+      {|((date 2024-06-14)
+         (candidates
+           (((symbol GGGG) (side Long) (outcome Dropped_at_top_n)
+             (signals ((score 71) (grade A)
+                       (stage (Stage2 (weeks_advancing 9) (late false)))
+                       (weeks_advancing (9)) (rs_value (1.31))
+                       (volume_ratio (2.4)) (sector_name Technology)))))))|}
+  in
+  assert_that (CL.week_of_sexp legacy)
+    (all_of
+       [
+         field (fun (w : CL.week) -> w.tickets_placed) is_none;
+         field (fun (w : CL.week) -> w.long_cash_left_pct) is_none;
+         field (fun (w : CL.week) -> w.long_resting_reserved_pct) is_none;
+         field
+           (fun (w : CL.week) -> w.candidates)
+           (elements_are
+              [
+                field
+                  (fun (x : CL.candidate) ->
+                    (x.outcome, x.rank, x.walk, x.shadow))
+                  (equal_to (CL.Dropped_at_top_n, None, None, None));
+              ]);
+       ])
+
+(** The write half: a week whose rows carry the whole top-N view round-trips
+    through its sexp, so a reader recovers exactly what the writer saw. *)
+let test_top_n_week_round_trips _ =
+  let week =
+    {
+      (_week "2024-06-14") with
+      tickets_placed = Some 2;
+      long_cash_left_pct = Some 0.31;
+      long_resting_reserved_pct = Some 0.12;
+      candidates =
+        [
+          {
+            (_row ~symbol:"AAAA" ~outcome:CL.Admitted) with
+            rank = Some 1;
+            walk =
+              Some
+                {
+                  result = Skipped TA.Stop_too_wide;
+                  stop_distance_pct = Some 0.22;
+                };
+          };
+          {
+            (_row ~symbol:"GGGG" ~outcome:CL.Dropped_at_top_n) with
+            rank = Some 21;
+            shadow = Some (CL.Buyable 0.09);
+          };
+        ];
+    }
+  in
+  assert_that (CL.week_of_sexp (CL.sexp_of_week week)) (equal_to week)
+
+(** A row off the top-N view prints none of the new fields, and neither does a
+    week built without them: such a file is byte-identical to what the pre-top-N
+    writer produced. *)
+let test_absent_top_n_fields_are_omitted _ =
+  let printed =
+    Sexp.to_string
+      (CL.sexp_of_week
+         {
+           (_week "2024-06-14") with
+           candidates = [ _row ~symbol:"ZZZZ" ~outcome:CL.Dropped_at_grade ];
+         })
+  in
+  assert_that
+    (List.filter
+       [
+         "rank";
+         "walk";
+         "shadow";
+         "tickets_placed";
+         "long_cash_left_pct";
+         "long_resting_reserved_pct";
+       ] ~f:(fun name -> String.is_substring printed ~substring:name))
+    (size_is 0)
+
 let () =
   run_test_tt_main
     ("candidate_log"
     >::: [
+           "top-N: rank on both row kinds" >:: test_rank_on_both_row_kinds;
+           "top-N: every shadow verdict reaches the row"
+           >:: test_every_shadow_verdict_reaches_the_row;
+           "top-N: admitted rows carry the walk outcome"
+           >:: test_admitted_rows_carry_the_walk_outcome;
+           "top-N: week carries tickets and long cash"
+           >:: test_week_carries_tickets_and_long_cash;
+           "top-N: parses a pre-top-N candidates.sexp"
+           >:: test_parses_pre_top_n_candidates_sexp;
+           "top-N: a top-N week round-trips" >:: test_top_n_week_round_trips;
+           "top-N: absent fields are omitted from the sexp"
+           >:: test_absent_top_n_fields_are_omitted;
            "#3139: decisions reach the summary without capture"
            >:: test_decisions_reach_the_summary_without_capture;
            "G3: breakout drops carry their sub-gate"

@@ -212,19 +212,20 @@ let _cascade_summary_of_event (e : AR.cascade_event) :
       List.map e.decisions ~f:Trade_audit_enum_hops.weekly_decision_of_event;
   }
 
-(** Drain one cascade event into [candidate_log] as a week. The near-miss
-    projection is {!_alternative_of_event}, the same one [trade_audit.sexp]'s
-    [alternatives_considered] uses, so the two artefacts cannot disagree about a
-    candidate's decision-time signals.
+(** One cascade event as a [candidates.sexp] week. The near-miss projection is
+    {!_alternative_of_event}, the one [trade_audit.sexp] uses, so the two cannot
+    disagree about a candidate's signals; the G2 rows ride through untranslated
+    ({!Candidate_log.week_of} owns the on-disk mapping and supersede rule). *)
+let _candidate_week_of (e : AR.cascade_event) =
+  Candidate_log.week_of ~date:e.date
+    ~alternatives:(List.map e.candidates ~f:_alternative_of_event)
+    ~drops:e.drops ~tickets_placed:e.entered
+    ~long_cash_left_pct:e.long_cash_left_pct
+    ~long_resting_reserved_pct:e.long_resting_reserved_pct
 
-    The G2 cascade rows ride through untranslated: {!Candidate_log.week_of} owns
-    both the phase→outcome mapping and the supersede rule between the two
-    populations, because both are properties of the on-disk schema. *)
-let _record_candidate_week ~candidate_log (e : AR.cascade_event) =
+let _record_candidate_week ~candidate_log e =
   Option.iter candidate_log ~f:(fun c ->
-      let alternatives = List.map e.candidates ~f:_alternative_of_event in
-      Candidate_log.record c
-        (Candidate_log.week_of ~date:e.date ~alternatives ~drops:e.drops))
+      Candidate_log.record c (_candidate_week_of e))
 
 (* Issue #2974: the entry-decision event is the only place the Weinstein
    strategy's installed initial stop surfaces (the simulator's [EntryComplete]

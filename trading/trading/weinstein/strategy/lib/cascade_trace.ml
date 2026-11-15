@@ -18,7 +18,7 @@ let _tickers_of candidates =
 let _drops_of_outcomes ~side ~candidates outcomes =
   List.map2_exn candidates outcomes
     ~f:(fun (analysis, sector) (outcome : Screener.candidate_outcome) ->
-      { Audit_recorder.analysis; sector; side; outcome })
+      { Audit_recorder.analysis; sector; side; outcome; top_n = None })
 
 let _long_drops ~(config : Screener.config) ~macro_trend ~candidates
     ~(result : Screener.result) =
@@ -65,20 +65,83 @@ let shadow_verdict (report : Entry_walk.walk_report)
     | Width Drop -> Stop_too_wide c.stops.gate_distance_pct
     | Width (Admit | Admit_sized_down) -> Buyable c.stops.gate_distance_pct
 
+(* The two skips the walk takes before building any stop. *)
+let _walk_built_a_stop : Audit_recorder.walk_outcome -> bool = function
+  | Skipped (Already_held | Share_class_held) -> false
+  | Placed
+  | Skipped
+      ( Insufficient_cash | Sized_to_zero | Short_notional_cap | Stop_too_wide
+      | Sector_exposure_cap | Long_exposure_cap | No_structural_stop _ ) ->
+      true
+
+let _same_row (d : Audit_recorder.cascade_drop)
+    (w : Audit_recorder.walk_decision) =
+  String.equal w.ranked.ticker d.outcome.ticker
+  && Trading_base.Types.equal_position_side w.ranked.side d.side
+
+(* An [Admitted] row's walk outcome, re-asking the walk's stop check of the
+   candidate exactly as the walk classified it ([w.ranked]). *)
+let _walked ~decisions ~(report : Entry_walk.walk_report) d :
+    Audit_recorder.Top_n.verdict =
+  match List.find decisions ~f:(_same_row d) with
+  | None -> Not_reached
+  | Some (w : Audit_recorder.walk_decision) ->
+      let stop_distance_pct =
+        if _walk_built_a_stop w.outcome then
+          Some (report.stop_check w.ranked).stops.gate_distance_pct
+        else None
+      in
+      Walked { outcome = w.outcome; stop_distance_pct }
+
+(* Per side: ticker -> (1-based rank, the screener's own candidate). *)
+let _rank_table ranked =
+  List.mapi ranked ~f:(fun i (c : Screener.scored_candidate) ->
+      (c.ticker, (i + 1, c)))
+  |> String.Map.of_alist_reduce ~f:(fun first _ -> first)
+
+let _top_n_of ~ranks:(longs, shorts) ~decisions ~report
+    (d : Audit_recorder.cascade_drop) =
+  let table = match d.side with Long -> longs | Short -> shorts in
+  let view verdict_of =
+    Option.map (Map.find table d.outcome.ticker) ~f:(fun (rank, cand) ->
+        { Audit_recorder.Top_n.rank; verdict = verdict_of cand })
+  in
+  match d.outcome.phase with
+  | Admitted -> view (fun _ -> _walked ~decisions ~report d)
+  | Dropped_at_top_n -> view (fun cand -> Shadow (shadow_verdict report cand))
+  | Dropped_at_macro | Dropped_at_breakout _ | Dropped_at_sector | Dropped_at_rs
+  | Dropped_at_grade ->
+      None
+
+let with_top_n ~config ~date ~candidates ~decisions ~report drops =
+  let longs, shorts = Screener.rank_survivors ~config ~as_of:date ~candidates in
+  let ranks = (_rank_table longs, _rank_table shorts) in
+  List.map drops ~f:(fun (d : Audit_recorder.cascade_drop) ->
+      { d with top_n = _top_n_of ~ranks ~decisions ~report d })
+
 type t = {
   enabled : bool;
   cascade : (Stock_analysis.t * Screener.sector_context) list ref;
   walk : Audit_recorder.walk_decision list ref;
+  report : Entry_walk.walk_report option ref;
 }
 
 let create (recorder : Audit_recorder.t) =
-  { enabled = recorder.capture_candidates; cascade = ref []; walk = ref [] }
+  {
+    enabled = recorder.capture_candidates;
+    cascade = ref [];
+    walk = ref [];
+    report = ref None;
+  }
 
 let on_candidates t =
   if t.enabled then Some (fun cs -> t.cascade := cs) else None
 
 (* Always installed (#3139): the weekly decision record is unconditional. *)
 let on_walk_candidates t = Some (fun decisions -> t.walk := decisions)
+
+let on_walk_report t =
+  if t.enabled then Some (fun report -> t.report := Some report) else None
 
 (* The pre-#3139 [candidates] projection: the passed-over rows, capture only. *)
 let _passed_over t =
@@ -89,9 +152,23 @@ let _passed_over t =
         | Skipped reason -> Some { Audit_recorder.candidate = d.ranked; reason }
         | Placed -> None)
 
-let _drops t ~config ~macro_trend ~result =
+let _drops t ~config ~macro_trend ~result ~date =
   if not t.enabled then []
-  else of_screen ~config ~macro_trend ~candidates:!(t.cascade) ~result
+  else
+    let candidates = !(t.cascade) in
+    let drops = of_screen ~config ~macro_trend ~candidates ~result in
+    match !(t.report) with
+    | None -> drops
+    | Some report ->
+        with_top_n ~config ~date ~candidates ~decisions:!(t.walk) ~report drops
+
+let _long_cash_left_pct t =
+  Option.map !(t.report) ~f:(fun (r : Entry_walk.walk_report) ->
+      r.long_cash_left_pct)
+
+let _long_resting_reserved_pct t =
+  Option.map !(t.report) ~f:(fun (r : Entry_walk.walk_report) ->
+      r.long_resting_reserved_pct)
 
 let record t ~(audit_recorder : Audit_recorder.t) ~date ~config
     ~(macro : Macro.result) ~(result : Screener.result) ~entered =
@@ -103,5 +180,7 @@ let record t ~(audit_recorder : Audit_recorder.t) ~date ~config
       entered;
       candidates = _passed_over t;
       decisions = !(t.walk);
-      drops = _drops t ~config ~macro_trend:macro.trend ~result;
+      drops = _drops t ~config ~macro_trend:macro.trend ~result ~date;
+      long_cash_left_pct = _long_cash_left_pct t;
+      long_resting_reserved_pct = _long_resting_reserved_pct t;
     }

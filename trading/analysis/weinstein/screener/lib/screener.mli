@@ -658,6 +658,28 @@ val compare_for_ranking :
     ordering contract is unit-testable in isolation of the cascade pipeline.
     Pure. *)
 
+val rank_survivors :
+  config:config ->
+  as_of:Core.Date.t ->
+  candidates:(Stock_analysis.t * sector_context) list ->
+  scored_candidate list * scored_candidate list
+(** [rank_survivors ~config ~as_of ~candidates] is [(longs, shorts)]: every
+    candidate that clears each side's per-candidate cascade (price floor,
+    sector, breakout / breakdown, RS, volume band, score floor), sorted by the
+    cap's own comparator but {b not capped}. The macro, breadth, index-stage and
+    slow-grind gates are not applied.
+
+    [candidates] is the list {!screen_with_cooldown} hands its [?on_candidates]
+    callback. For the same list and [as_of], the first
+    [config.max_buy_candidates] longs are exactly that call's [buy_candidates]
+    whenever its macro gate admitted longs (likewise [max_short_candidates] and
+    [short_candidates]): both come from one filter, one sort and one total
+    order, and the cap only truncates. A candidate's 1-based position here is
+    therefore the rank the top-N cap cut on.
+
+    Observability only (the [candidates.sexp] top-N view): the strategy calls it
+    only when candidate capture is on. Pure. *)
+
 val screen :
   config:config ->
   macro_trend:Weinstein_types.market_trend ->

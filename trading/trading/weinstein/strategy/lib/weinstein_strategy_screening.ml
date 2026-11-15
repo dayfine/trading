@@ -420,9 +420,9 @@ let _run_screener ?membership_at ?on_candidates ~config
    (P1b, default-off): on a "dawn" week lower the effective long initial-margin
    requirement for THIS entry walk only — a no-op (returns [config] unchanged,
    no fetch) when [config.dawn_leverage_enabled = false]. See {!Leverage_dawn}. *)
-let _entries_of_screen_result ?pending_entry_e ?on_candidates_considered
-    ~suspended_held ~config ~sector_map ~stop_states ~portfolio ~get_price
-    ~bar_reader ~current_date ~audit_recorder ~macro_result screen_result =
+let _entries_of_screen_result ?pending_entry_e ~trace ~suspended_held ~config
+    ~sector_map ~stop_states ~portfolio ~get_price ~bar_reader ~current_date
+    ~audit_recorder ~macro_result screen_result =
   let combined_candidates =
     Entry_assembly.assemble ~config ~bar_reader ~current_date screen_result
   in
@@ -431,9 +431,11 @@ let _entries_of_screen_result ?pending_entry_e ?on_candidates_considered
   in
   Entry_walk.entries_from_candidates
     ~sector_lookup:(_sector_lookup_of ~sector_map)
-    ?pending_entry_e ?on_candidates_considered ~suspended_held
-    ~config:entry_config ~candidates:combined_candidates ~stop_states
-    ~bar_reader ~portfolio ~get_price ~current_date ~audit_recorder
+    ?pending_entry_e
+    ?on_candidates_considered:(Cascade_trace.on_walk_candidates trace)
+    ?on_walk_report:(Cascade_trace.on_walk_report trace)
+    ~suspended_held ~config:entry_config ~candidates:combined_candidates
+    ~stop_states ~bar_reader ~portfolio ~get_price ~current_date ~audit_recorder
     ~macro:macro_result ()
 
 let screen_universe ?active_through_for ?fold_start_date ?membership_at
@@ -473,10 +475,9 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
       ~last_stop_out_dates ~current_date ~suspended_held ()
   in
   let entries =
-    _entries_of_screen_result ?pending_entry_e
-      ?on_candidates_considered:(Cascade_trace.on_walk_candidates trace)
-      ~suspended_held ~config ~sector_map ~stop_states ~portfolio ~get_price
-      ~bar_reader ~current_date ~audit_recorder ~macro_result screen_result
+    _entries_of_screen_result ?pending_entry_e ~trace ~suspended_held ~config
+      ~sector_map ~stop_states ~portfolio ~get_price ~bar_reader ~current_date
+      ~audit_recorder ~macro_result screen_result
   in
   (* Per-Friday cascade capture. Fires after the entry walk so [entered] counts
      actual transitions emitted, not the screener's top-N. Inert when the

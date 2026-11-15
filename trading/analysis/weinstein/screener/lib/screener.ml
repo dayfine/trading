@@ -415,6 +415,18 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~longs_admitted
   in
   (buy_candidates, short_candidates)
 
+(* A [Bearish] tape admits shorts whatever [neutral_blocks_shorts] says. *)
+let rank_survivors ~config ~as_of ~candidates =
+  _evaluate_candidates
+    ~config:
+      {
+        config with
+        max_buy_candidates = Int.max_value;
+        max_short_candidates = Int.max_value;
+      }
+    ~decline_is_slow_grind:true ~longs_admitted:true ~candidates
+    ~macro_trend:Bearish ~as_of:(Some as_of)
+
 let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
     ~breadth_state ~index_stage ~sector_map ~stocks ~held_tickers ~cooldown_set
     ~is_member ~as_of : result =
