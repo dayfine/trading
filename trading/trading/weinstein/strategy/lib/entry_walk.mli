@@ -39,11 +39,11 @@ type walk_report = {
 (** What the [candidates.sexp] top-N view needs from one Friday's walk. Built
     only when {!entries_from_candidates} is given [?on_walk_report]. *)
 
-val entries_from_candidates :
+type 'config entries_fn =
   ?sector_lookup:(string -> string option) ->
   ?pending_entry_e:Entry_freeze.t ->
   ?suspended_held:string list ->
-  config:Weinstein_strategy_config.config ->
+  config:'config ->
   candidates:Screener.scored_candidate list ->
   stop_states:Weinstein_stops.stop_state Core.String.Map.t ref ->
   bar_reader:Bar_reader.t ->
@@ -56,6 +56,12 @@ val entries_from_candidates :
   ?on_walk_report:(walk_report -> unit) ->
   unit ->
   Trading_strategy.Position.transition list
+(** The type of {!entries_from_candidates}, named so {!Weinstein_strategy}
+    re-exports the function without restating its signature. Parameterised by
+    the config type only because {!Weinstein_strategy} re-declares [config] as a
+    nominally distinct copy. *)
+
+val entries_from_candidates : Weinstein_strategy_config.config entries_fn
 (** Generate [CreateEntering] transitions for a list of screener candidates.
 
     For each candidate:

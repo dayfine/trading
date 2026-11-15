@@ -1420,23 +1420,7 @@ val resolve_share_class_map : data_dir:string -> config -> config
     function as {!Share_class_gate.resolve_config}, typed at this module's
     re-declared {!config}. Called once per run by the backtest runner. *)
 
-val entries_from_candidates :
-  ?sector_lookup:(string -> string option) ->
-  ?pending_entry_e:Entry_freeze.t ->
-  ?suspended_held:string list ->
-  config:config ->
-  candidates:Screener.scored_candidate list ->
-  stop_states:Weinstein_stops.stop_state String.Map.t ref ->
-  bar_reader:Bar_reader.t ->
-  portfolio:Trading_strategy.Portfolio_view.t ->
-  get_price:(string -> Types.Daily_price.t option) ->
-  current_date:Date.t ->
-  ?audit_recorder:Audit_recorder.t ->
-  ?macro:Macro.result ->
-  ?on_candidates_considered:(Audit_recorder.walk_decision list -> unit) ->
-  ?on_walk_report:(Entry_walk.walk_report -> unit) ->
-  unit ->
-  Trading_strategy.Position.transition list
+val entries_from_candidates : config Entry_walk.entries_fn
 (** Generate [CreateEntering] transitions for a list of screener candidates.
 
     For each candidate:

@@ -185,6 +185,24 @@ type walk_report = {
   stop_check : Screener.scored_candidate -> Entry_stop_check.t;
 }
 
+type 'config entries_fn =
+  ?sector_lookup:(string -> string option) ->
+  ?pending_entry_e:Entry_freeze.t ->
+  ?suspended_held:string list ->
+  config:'config ->
+  candidates:Screener.scored_candidate list ->
+  stop_states:Weinstein_stops.stop_state String.Map.t ref ->
+  bar_reader:Bar_reader.t ->
+  portfolio:Portfolio_view.t ->
+  get_price:(string -> Types.Daily_price.t option) ->
+  current_date:Date.t ->
+  ?audit_recorder:Audit_recorder.t ->
+  ?macro:Macro.result ->
+  ?on_candidates_considered:(Audit_recorder.walk_decision list -> unit) ->
+  ?on_walk_report:(walk_report -> unit) ->
+  unit ->
+  Position.transition list
+
 (* What a placed long ticket drew from the walk's cash: the charge
    [Entry_audit_capture.check_cash_and_deduct] made and no later gate refunded. *)
 let _long_ticket_cost (d : Entry_audit_capture.candidate_decision) =
