@@ -1,0 +1,8 @@
+# inputs of this read
+SEED=0 CAP=20 EVENTS=all STORE_END=2026-06-26 G3=0 (reserve_cash_for_resting_tickets; net free cash = gross when 1)
+candidates.sexp md5 80a757097704283d521fb1cf6b7dc417 bytes 1001872459
+trade_audit.sexp md5 7a4582caf41cf31401ce301ffb06a37a
+trades.csv md5 0928cfe40333560429f5a6e57c9c18de
+screened dates 1335, Long rows 2252848, pool rows on open Fridays 498225, walk rows 21450, placed long tickets 683, entries 581, screen events 18957, macro-proxy events 1576, forward-outcome requests 743021
+pool_outcomes.tsv.gz 6160944 bytes: private
+crowd_outcomes.tsv.gz 585925 bytes: private

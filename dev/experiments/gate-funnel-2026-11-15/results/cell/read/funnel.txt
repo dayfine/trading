@@ -1,0 +1,20 @@
+== Descriptive read 1: the funnel, name-Fridays summed over the window (README §Descriptive reads; per year in funnel_year.tsv) ==
+screened Fridays 1335, open 1099 | entering 2799474
+  macro                        546626  =  19.53 % of entering,  19.53 % of what reached it
+  brk_Price_floor                   0  =   0.00 % of entering,   0.00 % of what reached it
+  brk_Stage_setup             1344018  =  48.01 % of entering,  59.66 % of what reached it
+  brk_Breakout_volume          344128  =  12.29 % of entering,  37.86 % of what reached it
+  brk_Rs_declining              31973  =   1.14 % of entering,   5.66 % of what reached it
+  brk_Failed_breakout               0  =   0.00 % of entering,   0.00 % of what reached it
+  brk_Volume_band                   0  =   0.00 % of entering,   0.00 % of what reached it
+  sector                            0  =   0.00 % of entering,   0.00 % of what reached it
+  grade                         34504  =   1.23 % of entering,   6.48 % of what reached it
+  topn_cut                     476245  =  17.01 % of entering,  95.59 % of what reached it
+  admitted                      21980  (reaches the walk)
+  not_reached                     530  =   0.02 % of entering,   2.41 % of admitted
+  w_no_structural_stop          20104  =   0.72 % of entering,  91.46 % of admitted
+  w_stop_too_wide                   0  =   0.00 % of entering,   0.00 % of admitted
+  w_cash                          480  =   0.02 % of entering,   2.18 % of admitted
+  w_held                            0  =   0.00 % of entering,   0.00 % of admitted
+  w_other                         183  =   0.01 % of entering,   0.83 % of admitted
+  funded                          683  =   0.02 % of entering,   3.11 % of admitted
