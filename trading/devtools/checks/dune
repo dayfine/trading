@@ -1590,3 +1590,18 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:split_corpus_trade_extract_check.sh})))
+
+; Axis observatory P2a (dev/plans/axis-observatory-2026-11-14.md §3): obs_read.sh over a
+; synthetic five-seed run (fixtures/obs_read/gen_fixture.sh, made-up NAVs) must append
+; the golden surface.tsv rows -- slope arm UP, one-step lottery none, harm arm HARM -- and
+; refuse a failed V6 log, a tracked out dir, unpaired curves and a leaked level. Reads
+; dev/experiments/observatory/ via repo_root() at RUN TIME, so (universe).
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (source_tree fixtures/obs_read)
+  (universe))
+ (action
+  (run sh %{dep:obs_read_check.sh})))
