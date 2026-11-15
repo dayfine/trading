@@ -1,0 +1,6 @@
+Rule inputs: m 0.0857 | f 0.8507 | s 0.0241 | X gross 3130 (X.f 2662.6) | X net 1411 | X ref 1409.7837 | yardstick 0.004784 log per trade | path-aware X (information): gross 393, net 181
+C* (net) vs funded, mean capped ride: +3.97 % (n 880) vs +4.90 % (n 616); monster 8.8 % vs 6.5 % | bear years 2000-02 + 2008: share of X ref 0.260324, of open Fridays 0.0491 (+ 0.10 = 0.1491)
+REFINE: X ref.f 1199.2 >= 40: yes | C* mean ride >= funded - 1 pp: yes | bear share within open share + 10 pp: no
+Rule 1 (gate before cap), mechanical: PARK (X net.f 1200.3 >= 25 but the refined bars are not all met)
+Rule 2 inputs: A+ vs A mean capped ride 2000-12 +0.73 pp (n 10549 / 19964), 2013-26 -0.14 pp (n 12875 / 25223); monster rate 6.5 % vs 6.1 % = x1.07 (monsters 1517 / 2735)
+Rule 2 (score tier), mechanical: NO RANKING LEVER (the top tier does not beat the next by the bars)

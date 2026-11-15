@@ -1,0 +1,8 @@
+# gate-funnel self-check (read/read.sh step 2; README §Self-check). SEED=0 CAP=20
+SK1 (rank: the pool is ranked 1..n in the Seeded order, and Admitted is exactly rank <= 20 on open Fridays): PASS on 1099 open Fridays, 498225 pool rows
+SK2 (walk: each Admitted row's walk equals trade_audit's weekly decision for that name): PASS on 21450 walked rows (530 Not_reached rows have no decision, as they must)
+SK3 (fields: tickets_placed = cascade_summary.entered; walk on every Admitted row, shadow on every cut row; long_cash_left_pct on every open Friday): PASS
+SK4 (information): open Fridays 1099, macro-blocked 236 (no Long rows), live-blocked 0 (a cut row ranked <= 20); trace phase counts equal cascade_summary counts on 1099 of 1099 open Fridays; Long rows exist exactly when long_macro_admitted > 0 on 1335 of 1335 screened Fridays
+SK5 (information): stop distance, as a fraction of the trigger -- shadow Buyable max 0.1500, shadow Stop_too_wide min none; walk Funded max 0.1500, walk Skipped_Stop_too_wide min none
+long_resting_reserved_pct present on 1099 of 1099 open Fridays
+SELF-CHECK PASSED

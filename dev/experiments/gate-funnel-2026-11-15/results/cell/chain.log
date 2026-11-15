@@ -1,0 +1,36 @@
+[11-15 06:49:08Z] gate-funnel run; GF_SHA=47b7c476a51963d4912b57b9c1796d05ffc7ad37 CELL_TIMEOUT=50000s
+[11-15 06:49:13Z] TR push check ok (/home/user/trading/../trading-results)
+[11-15 06:49:13Z] HEAD=47b7c476a image=ghcr.io/dayfine/trading-ci:latest  mem=15G
+[11-15 06:49:13Z] disk free 30G
+[11-15 06:49:13Z] PULL warehouse v12wk-9236
+[11-15 06:56:21Z] PULL corpact corpact-2026-10-27
+[11-15 06:56:22Z] PULL bars data-20261102
+[11-15 06:57:03Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-15 06:57:03Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv, 11888 data.csv
+[11-15 06:57:03Z] BUILD
+[11-15 06:57:03Z] ABORT: build failed (work/build.log)
+[11-15 06:57:31Z] gate-funnel run; GF_SHA=47b7c476a51963d4912b57b9c1796d05ffc7ad37 CELL_TIMEOUT=50000s
+[11-15 06:57:33Z] TR push check ok (/home/user/trading/../trading-results)
+[11-15 06:57:33Z] HEAD=47b7c476a image=ghcr.io/dayfine/trading-ci:latest  mem=15G
+[11-15 06:57:33Z] disk free 25G
+[11-15 06:58:13Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv, 11888 data.csv
+[11-15 06:58:13Z] BUILD
+[11-15 07:00:00Z] BUILD_DONE
+[11-15 07:00:00Z] SPEC CHECK OK (dev/experiments/price-band-tiebreak-2026-11-13/specs/pb-S-k0.sexp md5 7a2d9eba26bc5c49a7db29df468c0e2c)
+[11-15 07:00:00Z] PREFLIGHT pb-S-k0 (2026-04-01..06-26, --emit-candidates)
+[11-15 07:08:32Z] PREFLIGHT_OK (512s): SK1 (rank: the pool is ranked 1..n in the Seeded order, and  SK2 (walk: each Admitted row's walk equals trade_audit's wee SK3 (fields: tickets_placed = cascade_summary.entered; walk  
+[11-15 07:08:32Z] disk free 16G
+[11-15 07:08:32Z] RUN gf-S-k0-s0 (pb-S-k0 + --emit-candidates, CELL_TIMEOUT=50000s)
+[11-15 10:18:34Z] RESULT gf-S-k0-s0 => total_return_pct 1472.7554563229353 total_trades 576 sharpe_ratio 0.63378419510324935 max_drawdown_pct 27.21768913331405 calmar_ratio 0.40279380963353373  V3 INVARIANT PASS V6 INVARIANT PASS (share-class map: /w/trading/test_data/share_classes.sexp) V16 EXPECTATION 1 violations V17 EXPECTATION 1 violations (31 skipped)  candidates_bytes=1001872459 peak_rss_kb=8762816 user_s=11300.29 sys_s=10.53 exit=0 (wall 11391s)
+[11-15 10:18:34Z] TRIPWIRE MATCH trades.csv md5 0928cfe40333560429f5a6e57c9c18de (577 lines)
+[11-15 10:18:34Z] ABSENT ok: 1 n_symbols_absent=1 
+[11-15 10:18:34Z] PARITY actual.sexp identical to #3602's
+[11-15 10:18:34Z] PARITY summary.sexp identical to #3602's
+[11-15 10:18:34Z] PARITY macro_trend.sexp identical to #3602's
+[11-15 10:18:34Z] PARITY entries.tsv identical to #3602's
+[11-15 10:18:34Z] PARITY equity_curve.csv identical to #3602's
+[11-15 10:18:34Z] PARITY open_positions.csv identical to #3602's
+[11-15 10:18:34Z] PARITY splits.csv identical to #3602's
+[11-15 10:18:34Z] READ (EVENTS=all, STORE_END=2026-06-26)
+[11-15 10:25:46Z] READ DONE (432s): Rule 1 (gate before cap), mechanical: PARK (X net.f 1200.3 >= 25 but the refined bars are not all met) Rule 2 (score tier), mechanical: NO RANKING LEVER (the top tier does not beat the next by the bars) 
+[11-15 10:25:46Z] COLLECT public 18 files, private 9 files
