@@ -4,7 +4,9 @@
 
 IN_PROGRESS
 
-## Last updated: 2026-10-04
+Next task: parked: #3527 grade-basis finding open (registry row under #2973); WF-CV vs w30 is LOCAL. Parked on purpose by user decision 2026-11-15 (pacer #3635): KEEP_AS_INFO until the finding is disposed and the user runs the WF-CV.
+
+## Last updated: 2026-11-15
 
 ## Interface stable
 

@@ -1,9 +1,11 @@
 # Status: arc-readiness
 
-## Last updated: 2026-09-26
+## Last updated: 2026-11-15
 
 ## Status
-IN_PROGRESS
+MERGED
+
+Closed 2026-11-15 (user decision, pacer #3635): A2-4 (picks chart) was never dispatched; only its plan merged (#2453). Sections below are history, not queued.
 
 ## Interface stable
 NO
