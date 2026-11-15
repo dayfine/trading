@@ -220,7 +220,10 @@ gains, all `[@sexp.option]` so older files parse unchanged:
 - `Dropped_at_top_n` rows: `shadow` = `Buyable d` / `No_structural_stop` /
   `Stop_too_wide d` / `Already_held`, from the walk's own pure stop check
   (`Entry_stop_check.evaluate`, handed out by `Entry_walk.walk_report`);
-- each week: `tickets_placed` and `long_cash_left_pct`.
+- each week: `tickets_placed`, `long_cash_left_pct`, and
+  `long_resting_reserved_pct` (the unfilled cost of long tickets still resting
+  from earlier Fridays, as G3 would reserve it, computed whether or not G3 is
+  on); with G3 off, free cash is `long_cash_left_pct - long_resting_reserved_pct`.
 
 Still gated on the recorder (`capture_candidates`), never on a config. The
 shadow ignores cash, the caps, sizing and the entry-assembly gates. Stacked

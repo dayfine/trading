@@ -303,6 +303,7 @@ let _week date : CL.week =
       ];
     tickets_placed = Some 1;
     long_cash_left_pct = Some 0.4;
+    long_resting_reserved_pct = Some 0.1;
   }
 
 let test_candidate_log _ =

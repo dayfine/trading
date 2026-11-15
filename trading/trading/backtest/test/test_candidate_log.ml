@@ -142,6 +142,7 @@ let _week date =
     candidates = [];
     tickets_placed = None;
     long_cash_left_pct = None;
+    long_resting_reserved_pct = None;
   }
 
 (* A row off the top-N view: every field the pre-top-N writer knew about. *)
@@ -264,6 +265,7 @@ let test_decisions_reach_the_summary_without_capture _ =
       candidates = [];
       drops = [];
       long_cash_left_pct = None;
+      long_resting_reserved_pct = None;
       decisions =
         [
           { AR.ranked = _scored_candidate; outcome = AR.Placed };
@@ -345,6 +347,7 @@ let test_zero_funded_week_still_carries_its_candidates _ =
       drops = [];
       decisions = [];
       long_cash_left_pct = None;
+      long_resting_reserved_pct = None;
     };
   assert_that (CL.weeks c)
     (elements_are
@@ -391,7 +394,8 @@ let _drop ?top_n ~ticker ~(phase : Screener.cascade_phase) () : AR.cascade_drop
   }
 
 (* Drive one cascade event through the recorder; the one week it records. *)
-let _record_week ?(entered = 0) ?long_cash_left_pct ~drops ~candidates () =
+let _record_week ?(entered = 0) ?long_cash_left_pct ?long_resting_reserved_pct
+    ~drops ~candidates () =
   let c = CL.create () in
   (_recorder ~candidate_log:c ()).record_cascade_summary
     {
@@ -403,6 +407,7 @@ let _record_week ?(entered = 0) ?long_cash_left_pct ~drops ~candidates () =
       drops;
       decisions = [];
       long_cash_left_pct;
+      long_resting_reserved_pct;
     };
   match CL.weeks c with
   | [ w ] -> w
@@ -685,25 +690,28 @@ let test_admitted_rows_carry_the_walk_outcome _ =
         ]
          : (CL.walk_result option * CL.shadow_verdict option) list))
 
-(** The week carries the walk's ticket count and the long side's unspent cash.
-*)
+(** The week carries the walk's ticket count, the long side's unspent cash and
+    the resting-ticket reserve, each from its own event field. *)
 let test_week_carries_tickets_and_long_cash _ =
   assert_that
-    (_record_week ~entered:2 ~long_cash_left_pct:0.31 ~drops:[] ~candidates:[]
-       ())
+    (_record_week ~entered:2 ~long_cash_left_pct:0.31
+       ~long_resting_reserved_pct:0.12 ~drops:[] ~candidates:[] ())
     (all_of
        [
          field (fun (w : CL.week) -> w.tickets_placed) (equal_to (Some 2));
          field
            (fun (w : CL.week) -> w.long_cash_left_pct)
            (is_some_and (float_equal 0.31));
+         field
+           (fun (w : CL.week) -> w.long_resting_reserved_pct)
+           (is_some_and (float_equal 0.12));
        ])
 
 (** Back-compat pin: a [candidates.sexp] written before the top-N view — no
     [rank] / [walk] / [shadow] on any row, no [tickets_placed] /
-    [long_cash_left_pct] on the week — still parses, with every new field
-    [None]. A literal, so the old on-disk shape stays fixed as the type grows.
-*)
+    [long_cash_left_pct] / [long_resting_reserved_pct] on the week — still
+    parses, with every new field [None]. A literal, so the old on-disk shape
+    stays fixed as the type grows. *)
 let test_parses_pre_top_n_candidates_sexp _ =
   let legacy =
     Sexp.of_string
@@ -720,6 +728,7 @@ let test_parses_pre_top_n_candidates_sexp _ =
        [
          field (fun (w : CL.week) -> w.tickets_placed) is_none;
          field (fun (w : CL.week) -> w.long_cash_left_pct) is_none;
+         field (fun (w : CL.week) -> w.long_resting_reserved_pct) is_none;
          field
            (fun (w : CL.week) -> w.candidates)
            (elements_are
@@ -739,6 +748,7 @@ let test_top_n_week_round_trips _ =
       (_week "2024-06-14") with
       tickets_placed = Some 2;
       long_cash_left_pct = Some 0.31;
+      long_resting_reserved_pct = Some 0.12;
       candidates =
         [
           {
@@ -775,8 +785,14 @@ let test_absent_top_n_fields_are_omitted _ =
   in
   assert_that
     (List.filter
-       [ "rank"; "walk"; "shadow"; "tickets_placed"; "long_cash_left_pct" ]
-       ~f:(fun name -> String.is_substring printed ~substring:name))
+       [
+         "rank";
+         "walk";
+         "shadow";
+         "tickets_placed";
+         "long_cash_left_pct";
+         "long_resting_reserved_pct";
+       ] ~f:(fun name -> String.is_substring printed ~substring:name))
     (size_is 0)
 
 let () =

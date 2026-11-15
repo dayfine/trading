@@ -33,6 +33,16 @@ type walk_report = {
           figure does not subtract the cash committed to long entry tickets
           still resting from earlier Fridays, so it overstates the free cash by
           that amount. *)
+  long_resting_reserved_pct : float;
+      (** That amount: the unfilled cost of the long entry tickets still resting
+          at the walk (placed on earlier Fridays, not yet filled or cancelled),
+          as a fraction of portfolio value. Measured exactly as
+          [reserve_cash_for_resting_tickets] (G3) reserves it
+          ({!Screening_notional.long_cash_fractions}), but computed whether or
+          not G3 is on. With G3 off the free cash is
+          [long_cash_left_pct - long_resting_reserved_pct]; with G3 on the
+          reserve is already out of [long_cash_left_pct]. [0.0] when portfolio
+          value is not positive. *)
   held : Core.String.Set.t;
       (** The symbols the walk treated as held ([Already_held]). *)
   stop_check : Screener.scored_candidate -> Entry_stop_check.t;

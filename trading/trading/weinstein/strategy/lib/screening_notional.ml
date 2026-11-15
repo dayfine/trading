@@ -106,6 +106,28 @@ let long_budget ~(config : Weinstein_strategy_config.config) ~spendable
     Float.max 0.0
       (spendable -. (portfolio_value *. config.short_sleeve_fraction))
 
+let _fraction_of ~portfolio_value amount =
+  if Float.( <= ) portfolio_value 0.0 then 0.0 else amount /. portfolio_value
+
+(* What a placed long ticket drew from the walk's cash: the charge
+   [Entry_audit_capture.check_cash_and_deduct] made and no later gate refunded. *)
+let _long_ticket_cost (d : Entry_audit_capture.candidate_decision) =
+  match d with
+  | Kept ({ kind = Position.CreateEntering e; _ }, _)
+    when Trading_base.Types.equal_position_side e.side Trading_base.Types.Long
+    ->
+      e.target_quantity *. e.entry_price
+  | Kept _ | Skipped _ -> 0.0
+
+(* The resting reserve is G3's own [_resting_long_ticket_cost], read whether or
+   not G3 is armed; nothing here feeds the walk. *)
+let long_cash_fractions ~config ~portfolio ~spendable ~portfolio_value
+    ~decisions =
+  let long_spent = List.sum (module Float) decisions ~f:_long_ticket_cost in
+  ( _fraction_of ~portfolio_value
+      (long_budget ~config ~spendable ~portfolio_value -. long_spent),
+    _fraction_of ~portfolio_value (_resting_long_ticket_cost portfolio) )
+
 let make_entry_walk_state ~cash ~(config : Weinstein_strategy_config.config)
     ~(portfolio : Portfolio_view.t) ~portfolio_value ~sector_lookup =
   let short_notional_acc =

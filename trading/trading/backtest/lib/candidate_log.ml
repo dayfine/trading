@@ -65,6 +65,7 @@ type week = {
   candidates : candidate list;
   tickets_placed : int option; [@sexp.option]
   long_cash_left_pct : float option; [@sexp.option]
+  long_resting_reserved_pct : float option; [@sexp.option]
 }
 [@@deriving sexp, eq]
 
@@ -211,13 +212,20 @@ let _candidate_of_drop (d : Weinstein_strategy.Audit_recorder.cascade_drop) =
     shadow;
   }
 
-let week_of ~date ~alternatives ~drops ~tickets_placed ~long_cash_left_pct =
+let week_of ~date ~alternatives ~drops ~tickets_placed ~long_cash_left_pct
+    ~long_resting_reserved_pct =
   let candidates =
     match drops with
     | [] -> List.map alternatives ~f:_candidate_of_alternative
     | drops -> List.map drops ~f:_candidate_of_drop
   in
-  { date; candidates; tickets_placed = Some tickets_placed; long_cash_left_pct }
+  {
+    date;
+    candidates;
+    tickets_placed = Some tickets_placed;
+    long_cash_left_pct;
+    long_resting_reserved_pct;
+  }
 
 let _candidates_path ~scenario_dir =
   Filename.concat scenario_dir "candidates.sexp"

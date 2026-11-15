@@ -166,6 +166,10 @@ let _long_cash_left_pct t =
   Option.map !(t.report) ~f:(fun (r : Entry_walk.walk_report) ->
       r.long_cash_left_pct)
 
+let _long_resting_reserved_pct t =
+  Option.map !(t.report) ~f:(fun (r : Entry_walk.walk_report) ->
+      r.long_resting_reserved_pct)
+
 let record t ~(audit_recorder : Audit_recorder.t) ~date ~config
     ~(macro : Macro.result) ~(result : Screener.result) ~entered =
   audit_recorder.record_cascade_summary
@@ -178,4 +182,5 @@ let record t ~(audit_recorder : Audit_recorder.t) ~date ~config
       decisions = !(t.walk);
       drops = _drops t ~config ~macro_trend:macro.trend ~result ~date;
       long_cash_left_pct = _long_cash_left_pct t;
+      long_resting_reserved_pct = _long_resting_reserved_pct t;
     }

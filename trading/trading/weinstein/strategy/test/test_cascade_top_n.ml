@@ -117,6 +117,7 @@ let _rows ~outcome ~high_check =
   let report : Entry_walk.walk_report =
     {
       long_cash_left_pct = 0.5;
+      long_resting_reserved_pct = 0.0;
       held = String.Set.empty;
       stop_check =
         (fun (c : Screener.scored_candidate) ->

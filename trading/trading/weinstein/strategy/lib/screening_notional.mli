@@ -84,6 +84,28 @@ val long_budget :
     [candidates.sexp] top-N view measures the long walk's unspent cash against
     ({!Entry_walk.walk_report}). *)
 
+val long_cash_fractions :
+  config:Weinstein_strategy_config.config ->
+  portfolio:Portfolio_view.t ->
+  spendable:float ->
+  portfolio_value:float ->
+  decisions:Entry_audit_capture.candidate_decision list ->
+  float * float
+(** [(long_cash_left_pct, long_resting_reserved_pct)] for one walk, both as
+    fractions of [portfolio_value] ([0.0] when it is not positive):
+
+    - the {!long_budget} less the cost of the long tickets the walk placed (its
+      [Kept] long [CreateEntering]s in [decisions], at the
+      [target_quantity * entry_price] the cash gate charged; shorts and skips
+      count for nothing);
+    - the unfilled cost of the long entry tickets still resting in [portfolio]
+      (placed on earlier Fridays, not yet filled or cancelled), measured exactly
+      as {!spendable_cash} reserves it under [reserve_cash_for_resting_tickets]
+      (G3), but computed whether or not G3 is on.
+
+    Observation only (the [candidates.sexp] top-N view): nothing here changes
+    what the walk may spend. *)
+
 val make_entry_walk_state :
   cash:float ->
   config:Weinstein_strategy_config.config ->

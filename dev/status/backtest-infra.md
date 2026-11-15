@@ -28,7 +28,8 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   carry the walk's outcome (`Funded` / `Skipped <reason>` / `Not_reached`) and
   stop distance; `Dropped_at_top_n` rows carry a pure **shadow** from the walk's
   own stop check (`Buyable d` / `No_structural_stop` / `Stop_too_wide d` /
-  `Already_held`); each week carries `tickets_placed` and `long_cash_left_pct`.
+  `Already_held`); each week carries `tickets_placed`, `long_cash_left_pct` and
+  `long_resting_reserved_pct` (free cash with G3 off = the difference).
   All fields `[@sexp.option]` (older files parse); gate stays on the recorder.
   Lives in `strategy/lib/{entry_stop_check,entry_walk,cascade_trace}`,
   `Screener.rank_survivors`, `backtest/lib/candidate_log`. Cost under capture:

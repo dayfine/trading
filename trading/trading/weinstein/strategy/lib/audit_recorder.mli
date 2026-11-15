@@ -433,6 +433,11 @@ type cascade_event = {
       (** The cash the long entry walk left unspent, as a fraction of portfolio
           value ({!Entry_walk.walk_report}'s [long_cash_left_pct]). [None] when
           [capture_candidates] is [false]. *)
+  long_resting_reserved_pct : float option;
+      (** The unfilled cost of long entry tickets still resting from earlier
+          Fridays, as a fraction of portfolio value ({!Entry_walk.walk_report}'s
+          [long_resting_reserved_pct]). [None] when [capture_candidates] is
+          [false]. *)
 }
 (** Event captured at the end of one Friday's cascade. Complements
     [entry_event]: where [entry_event] records a single chosen candidate plus

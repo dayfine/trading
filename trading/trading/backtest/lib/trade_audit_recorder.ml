@@ -221,6 +221,7 @@ let _candidate_week_of (e : AR.cascade_event) =
     ~alternatives:(List.map e.candidates ~f:_alternative_of_event)
     ~drops:e.drops ~tickets_placed:e.entered
     ~long_cash_left_pct:e.long_cash_left_pct
+    ~long_resting_reserved_pct:e.long_resting_reserved_pct
 
 let _record_candidate_week ~candidate_log e =
   Option.iter candidate_log ~f:(fun c ->

@@ -226,6 +226,15 @@ type week = {
           long-margin leverage). Read against the [Dropped_at_top_n] shadows it
           says whether a buyable name past the cap was crowded out by the cap or
           by cash. [None] on files written before the field existed. *)
+  long_resting_reserved_pct : float option; [@sexp.option]
+      (** The unfilled cost of the long entry tickets still resting at the walk
+          (placed on earlier Fridays, not yet filled or cancelled), as a
+          fraction of portfolio value — what [reserve_cash_for_resting_tickets]
+          (G3) would hold back, computed whether or not G3 is on. With G3 off
+          (the default) [long_cash_left_pct] does not net it, so the free cash
+          is [long_cash_left_pct - long_resting_reserved_pct]; with G3 on it is
+          already out of [long_cash_left_pct]. [None] on files written before
+          the field existed. *)
 }
 [@@deriving sexp, eq]
 (** One Friday's candidate population. Emitted for {b every} screened Friday
@@ -289,6 +298,7 @@ val week_of :
   drops:Weinstein_strategy.Audit_recorder.cascade_drop list ->
   tickets_placed:int ->
   long_cash_left_pct:float option ->
+  long_resting_reserved_pct:float option ->
   week
 (** Assemble one screened Friday's row set.
 
@@ -297,7 +307,8 @@ val week_of :
     [drops] are the candidates the {i cascade} evaluated (G2), each carrying the
     phase that dropped it and, on the rows that cleared the cascade, the top-N
     view ([cascade_drop.top_n]) that becomes [rank] / [walk] / [shadow]. The
-    week's [tickets_placed] and [long_cash_left_pct] are copied through.
+    week's [tickets_placed], [long_cash_left_pct] and
+    [long_resting_reserved_pct] are copied through.
 
     Emitted even when both are empty: a Friday that funded nothing is still a
     screened Friday, and eliding it would make "no week" and "no candidates"

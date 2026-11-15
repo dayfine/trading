@@ -125,6 +125,7 @@ type cascade_event = {
   decisions : walk_decision list;
   drops : cascade_drop list;
   long_cash_left_pct : float option;
+  long_resting_reserved_pct : float option;
 }
 
 type force_liquidation_event = Portfolio_risk.Force_liquidation.event

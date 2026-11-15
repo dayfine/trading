@@ -118,7 +118,7 @@ val create : Audit_recorder.t -> t
     [recorder.capture_candidates] is [true]: {!on_candidates} and
     {!on_walk_report} then return [None] (neither the screener nor the walk is
     handed a callback) and {!record} emits an event whose [candidates] and
-    [drops] are empty and whose [long_cash_left_pct] is [None]. The weekly
+    [drops] are empty and whose two cash fractions are [None]. The weekly
     decision record (#3139) is not gated: {!on_walk_candidates} always offers a
     sink and the event's [decisions] always carries the walk's top-N outcomes.
 *)
@@ -138,7 +138,8 @@ val on_walk_report : t -> (Entry_walk.walk_report -> unit) option
 (** Pass straight to {!Entry_walk.entries_from_candidates}'s [?on_walk_report].
     [None] when inert, so the walk never builds the report and no top-N view is
     computed. When capturing, {!record} hands the report to {!with_top_n} and
-    copies its [long_cash_left_pct] onto the event. *)
+    copies its [long_cash_left_pct] and [long_resting_reserved_pct] onto the
+    event. *)
 
 val record :
   t ->
@@ -153,8 +154,8 @@ val record :
     [cascade_diagnostics], the macro reading, [entered], whatever
     {!on_walk_candidates} captured, and {!of_screen} over whatever
     {!on_candidates} captured, with the top-N view ({!with_top_n}) and the long
-    walk's unspent cash when {!on_walk_report} captured a report — and route it
-    through [audit_recorder.record_cascade_summary].
+    walk's unspent cash and resting reserve when {!on_walk_report} captured a
+    report — and route it through [audit_recorder.record_cascade_summary].
 
     [~macro] supplies two independent things and only two: its [breadth_state]
     is recorded verbatim on the event, and its [trend] drives the drop trace's

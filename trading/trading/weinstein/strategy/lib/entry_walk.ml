@@ -181,6 +181,7 @@ let _walk_decisions ~config ~gate ~held_set ~make_entry ~portfolio_value ~state
 
 type walk_report = {
   long_cash_left_pct : float;
+  long_resting_reserved_pct : float;
   held : String.Set.t;
   stop_check : Screener.scored_candidate -> Entry_stop_check.t;
 }
@@ -203,30 +204,21 @@ type 'config entries_fn =
   unit ->
   Position.transition list
 
-(* What a placed long ticket drew from the walk's cash: the charge
-   [Entry_audit_capture.check_cash_and_deduct] made and no later gate refunded. *)
-let _long_ticket_cost (d : Entry_audit_capture.candidate_decision) =
-  match d with
-  | Kept ({ kind = Position.CreateEntering e; _ }, _)
-    when Trading_base.Types.equal_position_side e.side Trading_base.Types.Long
-    ->
-      e.target_quantity *. e.entry_price
-  | Kept _ | Skipped _ -> 0.0
-
-(* [stop_check] is the closure the walk's own [make_entry] was built from. *)
-let _walk_report ~config ~spendable ~stop_check ~held_set ~portfolio_value
+(* [stop_check] is the closure the walk's own [make_entry] was built from; the
+   held set is the walk's own, rebuilt from the same [portfolio]. *)
+let _walk_report ~config ~portfolio ~spendable ~stop_check ~portfolio_value
     decisions =
-  let long_budget =
-    Screening_notional.long_budget ~config ~spendable ~portfolio_value
+  let long_cash_left_pct, long_resting_reserved_pct =
+    Screening_notional.long_cash_fractions ~config ~portfolio ~spendable
+      ~portfolio_value
+      ~decisions:(List.map decisions ~f:snd)
   in
-  let spent =
-    List.sum (module Float) decisions ~f:(fun (_, d) -> _long_ticket_cost d)
-  in
-  let long_cash_left_pct =
-    if Float.( <= ) portfolio_value 0.0 then 0.0
-    else (long_budget -. spent) /. portfolio_value
-  in
-  { long_cash_left_pct; held = held_set; stop_check }
+  {
+    long_cash_left_pct;
+    long_resting_reserved_pct;
+    held = String.Set.of_list (held_symbols portfolio);
+    stop_check;
+  }
 
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
@@ -291,6 +283,6 @@ let entries_from_candidates ?sector_lookup
       f (Entry_audit_emit.walk_decisions_of ~decisions));
   Option.iter on_walk_report ~f:(fun f ->
       f
-        (_walk_report ~config ~spendable ~stop_check ~held_set ~portfolio_value
+        (_walk_report ~config ~portfolio ~spendable ~stop_check ~portfolio_value
            decisions));
   kept
