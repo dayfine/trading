@@ -13,9 +13,12 @@
 #     row and becomes done@HEAD; S against the last published HEAD's S is the drift row; a changed S k0 is one
 #     baseline-drift event; a dead arm reads nothing and becomes dead@HEAD; a re-read over the branch's surface replaces
 #     its row and keeps the others; collect keeps every price-bearing file out of the public tree;
-#   - years: the SPY bull/bear rule on a made-up bar file (tie, gap, the run-end cut, a bad header);
-#   - the lock (where flock exists): stage, docker, collect and publish refuse to run beside another holder, and a
-#     dockerd that the docker preflight starts (a stub on PATH) does not keep lane.lock after the lane exits;
+#   - the gates on their failing side: one failing V6 log makes a live arm, or a would-be-dead one, invalid@HEAD and
+#     unread; one differing seed is live; a parent S identical to HEAD's is a tripwire match with no baseline-drift
+#     event and a drift-none event with no drift row; a failing drift V6 log is drift-invalid with no drift row;
+#   - years: the SPY bull/bear rule on a made-up bar file (tie, gap, the run-end cut, a bad header), writing no OUT;
+#   - the lock (where flock exists): run, read, stage, docker, collect and publish refuse to run beside another
+#     holder, and a dockerd that the docker preflight starts (a stub on PATH) does not keep lane.lock after the lane exits;
 #   - lane.sh parses under dash -n (it is outside posix_sh_check.sh's scan dirs).
 # Run: sh trading/devtools/checks/observatory_lane_check.sh
 set -eu
@@ -44,9 +47,9 @@ cp -R "$ROOT/dev/experiments/record-kseed-2026-10-27/specs" "$R/dev/experiments/
 g() { git -C "$R" -c user.name=check -c user.email=check@example.com "$@"; }
 g init -q 2> /dev/null; g symbolic-ref HEAD refs/heads/main; g add -A; g commit -qm c1; C1=$(g rev-parse --short=9 HEAD)
 echo x > "$R/marker"; g add marker; g commit -qm c2; C2=$(g rev-parse --short=9 HEAD)
-# lane ARGS... -> lane.sh in the repo, with OUT and the trading-results dir under TMP, MemTotal $MEMGB (15) and the
-# state ref $SREF. Set MEMGB and SREF in a subshell only: an assignment before a function call may outlive it.
-lane() { REPO=$R OUT=$TMP/out TR=$TMP/tr LANE_MEM_GB=${MEMGB:-15} PAR= STATE_REF=${SREF:-origin/observatory/lane-results} \
+# lane ARGS... -> lane.sh in the repo, with OUT $OUTX (TMP/out), trading-results $TRX (TMP/tr), MemTotal $MEMGB (15)
+# and the state ref $SREF. Set these in a subshell only: an assignment before a function call may outlive it.
+lane() { REPO=$R OUT=${OUTX:-$TMP/out} TR=${TRX:-$TMP/tr} LANE_MEM_GB=${MEMGB:-15} PAR= STATE_REF=${SREF:-origin/observatory/lane-results} \
   sh "$R/$EXP/lane.sh" "$@"; }
 # cell RUN ARM DIR NAME: one finished cell per seed in DIR from a gen_fixture run (plus actual, validator report, .ok)
 cell() { mkdir -p "$3"; for k in 0 1 2 3 4; do s=obs-$2-k$k-s0; d=$3/obs-$4-k$k-s0
@@ -159,6 +162,41 @@ rc=0; (SREF=observatory/lane-results lane read up-arm) > "$TMP/R3" 2>&1 || rc=$?
 expect "the re-read replaced its row and kept the other" "1 up-arm $C2|2 other $C2" \
   "$(awk -F'\t' 'NR > 1 { printf "%s%s %s %s", s, $1, $2, $4; s = "|" }' "$S1")"
 
+
+# --- the gates on their failing side (no docker: v6_pair keeps a V6 log that already exists)
+rows() { if [ -f "$1" ]; then awk 'NR > 1' "$1" | wc -l | tr -d ' '; else echo 0; fi; }      # data rows of a table
+nev() { if [ -f "$1" ]; then awk -F'\t' -v k="$2" -v l="${3:-}" '$3 == k && (l == "" || $4 == l)' "$1" | wc -l | tr -d ' '; else echo 0; fi; }
+# A live arm with one failing V6 log is invalid; so is a would-be-dead one, since V6 runs before liveness. Neither reads.
+cell "$TMP/run" U "$TMP/out/runs/$C2/v6-arm" v6-arm; v6ok "$TMP/out/runs/$C2/v6-arm" v6-arm S
+echo exit=1 >> "$TMP/out/runs/$C2/v6-arm/obs-v6-arm-k2-s0.v6diff-S.log"
+cell "$TMP/run" S "$TMP/out/runs/$C2/v6dead-arm" v6dead-arm; v6ok "$TMP/out/runs/$C2/v6dead-arm" v6dead-arm S
+echo exit=1 >> "$TMP/out/runs/$C2/v6dead-arm/obs-v6dead-arm-k0-s0.v6diff-S.log"
+for a in v6-arm v6dead-arm; do rc=0; lane read "$a" > "$TMP/V" 2>&1 || rc=$?
+  expect "$a: a failing V6 log stops the read" "1 1" "$rc $(grep -c "V6 FAILED $a: k[02]; no read" "$TMP/V")"
+  expect "$a: invalid@HEAD, one invalid event, no row, no read dir" "invalid@$C2 1 0 no" \
+    "$(awk -F'\t' -v a="$a" '$1 == a { print $4 }' "$TMP/out/state/queue.tsv") $(nev "$TMP/out/state/events.tsv" invalid "$a") $(rows "$S1") $([ -d "$TMP/out/reads/$a@$C2" ] && echo yes || echo no)"; done
+# An arm that differs from S on one seed only is live.
+cell "$TMP/run" S "$TMP/out/runs/$C2/one-arm" one-arm
+for f in "$TMP/run/k4/obs-U-k4-s0"-*; do cp "$f" "$TMP/out/runs/$C2/one-arm/obs-one-arm-k4-s0-${f##*/obs-U-k4-s0-}"; done
+v6ok "$TMP/out/runs/$C2/one-arm" one-arm S
+rc=0; lane read one-arm > "$TMP/O" 2>&1 || rc=$?; expect "read one-arm" 0 "$rc"
+expect "one differing seed is live" 1 "$(grep -c 'LIVE one-arm: trades.csv differs from S on 1 of 5 seeds' "$TMP/O")"
+expect "the one-seed arm is read and done@HEAD" "one-arm done@$C2" \
+  "$(awk -F'\t' 'NR > 1 { print $2 }' "$S1") $(awk -F'\t' '$1 == "one-arm" { print $4 }' "$TMP/out/state/queue.tsv")"
+# The parent's S identical to HEAD's: the tripwire matches, with no baseline-drift event, and the drift read is a
+# drift-none event with no row.
+cell "$TMP/run" S "$TMP/out2/runs/$C2/S" S; v6ok "$TMP/out2/runs/$C2/S" S "$C1"
+cell "$TMP/run" S "$TMP/tr2/$EXP/runs/$C1/S" S
+rc=0; (OUTX=$TMP/out2; TRX=$TMP/tr2; lane read drift) > "$TMP/M" 2>&1 || rc=$?; expect "read drift, parent identical" 0 "$rc"
+expect "the tripwire matches the parent's S" 1 "$(grep -c "TRIPWIRE MATCH S k0 trades.csv md5 [0-9a-f]* (S@$C1 in trading-results)" "$TMP/M")"
+expect "no baseline-drift event, one drift-none event, no drift row" "0 1 0" \
+  "$(nev "$TMP/out2/state/events.tsv" baseline-drift) $(nev "$TMP/out2/state/events.tsv" drift-none) $(rows "$TMP/out2/state/drift.tsv")"
+# A failing drift V6 log: a drift-invalid event and no drift row (S at HEAD still differs from the parent's, fixture H).
+echo exit=1 >> "$TMP/out/runs/$C2/S/obs-S-k1-s0.v6diff-$C1.log"
+rc=0; lane read drift > "$TMP/DI" 2>&1 || rc=$?
+expect "a failing drift V6 log stops the drift read" "1 1" "$rc $(grep -c "DRIFT V6 FAILED S@$C2 vs S@$C1: k1; no read" "$TMP/DI")"
+expect "one drift-invalid event, no drift row" "1 0" "$(nev "$TMP/out/state/events.tsv" drift-invalid) $(rows "$TMP/out/state/drift.tsv")"
+
 # --- years
 printf '%s\n' date,open,high,low,close,adjusted_close,volume 1999-12-31,1,1,1,100,1,1 2000-06-30,1,1,1,120,1,1 \
   2000-12-29,1,1,1,95,1,1 2001-12-31,1,1,1,95,1,1 2002-12-31,1,1,1,94,1,1 2025-12-31,1,1,1,96,1,1 \
@@ -167,12 +205,14 @@ expect "years: fall bear, tie bull, no prior year unlabelled, cut at the run end
   "$(lane years "$TMP/spy.csv" | grep -v '^#' | tr '\t\n' ' ,' | sed 's/,$//')"
 sed '1s/close/last/' "$TMP/spy.csv" > "$TMP/spy2.csv"; rc=0; lane years "$TMP/spy2.csv" > /dev/null 2>&1 || rc=$?
 expect "years: a file without a close column is refused" 1 "$rc"
+rc=0; (OUTX=$TMP/nope; lane years "$TMP/spy.csv") > /dev/null 2>&1 || rc=$?
+expect "years writes nothing under OUT" "0 no" "$rc $([ -e "$TMP/nope" ] && echo yes || echo no)"
 
 # --- the lock: each step that writes OUT refuses to run beside another holder, and a dockerd the docker preflight starts
 # does not keep lane.lock once the lane has exited (it would refuse every relaunch).
 if command -v flock > /dev/null 2>&1; then
   exec 8> "$TMP/out/lane.lock"; flock -n 8 || bad "the check could not take lane.lock"
-  for c in stage docker collect publish; do rc=0; lane "$c" > "$TMP/L" 2>&1 || rc=$?
+  for c in run read stage docker collect publish; do rc=0; lane "$c" > "$TMP/L" 2>&1 || rc=$?
     expect "$c refuses a held lock" "1 1" "$rc $(grep -c "another lane.sh holds" "$TMP/L")"; done
   exec 8>&-
   # Stubs: docker info fails until the stub dockerd has started; dockerd then sleeps on, as the real daemon runs on.

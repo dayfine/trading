@@ -53,13 +53,14 @@ NEED="20824663d 8ee1ed797"                            # #3510 (upper-case shards
 KINDS="actual.sexp trades.csv splits.csv params.sexp summary.sexp open_positions.csv force_liquidations.sexp equity_curve.csv macro_trend.sexp"
 NEED_KINDS="actual.sexp trades.csv equity_curve.csv open_positions.csv summary.sexp macro_trend.sexp validator.sexp.sexp"
 
-mkdir -p "$OUT" && OUT=$(cd "$OUT" && pwd)              # absolute: the reads link cells by path
+case $CMD in years|'') PURE=1 ;; *) PURE=0 ;; esac            # years and the usage line write nothing
+[ "$PURE" = 1 ] || { mkdir -p "$OUT" && OUT=$(cd "$OUT" && pwd); }   # absolute: the reads link cells by path
 HEAD9=$(git -C "$REPO" rev-parse --short=9 HEAD 2> /dev/null)
-case $CMD in years|'') ;; *) [ -n "$HEAD9" ] || { echo "lane: $REPO is not a git checkout" >&2; exit 2; } ;; esac
+[ "$PURE" = 1 ] || [ -n "$HEAD9" ] || { echo "lane: $REPO is not a git checkout" >&2; exit 2; }
 HD=$OUT/runs/$HEAD9; THD=$TR/$EXP/runs/$HEAD9            # this HEAD's cells, in OUT and in trading-results
 if [ "$DRY" = 1 ]; then WORK=$OUT/dry/work; STATE=$OUT/dry/state; SPECS=$OUT/dry/specs; LOG=$OUT/dry/lane.log
 else WORK=$OUT/work; STATE=$OUT/state; SPECS=$OUT/specs/$HEAD9; LOG=$OUT/lane.log; fi
-mkdir -p "$WORK" "$STATE" "$OUT/tmp"
+[ "$PURE" = 1 ] || mkdir -p "$WORK" "$STATE" "$OUT/tmp"
 export TMPDIR=$OUT/tmp                                # r2_bars.sh stages downloads in $TMPDIR; keep them off /tmp
 LABEL=; OVR=; LEDGER=; PREV=; TORUN=
 

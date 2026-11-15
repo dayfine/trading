@@ -237,6 +237,9 @@ LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > la
   committed `test_data` overlay replaces SPY with one that starts in 2009. It logs any difference from the committed
   copy, and publishes only the labels.
 - The committed copy came from `sh lane.sh years data/S/Y/SPY/data.csv` on the local bar store.
+- **Weakness.** 2011 and 2015 sit within 1 % of the prior close, so the bear years mix two flat years with 2008 and
+  2022, and `d_bear_yr` is diluted by chop. 2026 is a half year. The labels feed only the descriptive `d_bull_yr` and
+  `d_bear_yr` columns, never the flag rule; the regime read of record is `d_mac_*`, from the base's `macro_trend`.
 
 ### Cost
 
@@ -268,9 +271,18 @@ builds a two-commit git repo in a temp dir from the lane, the reader, the record
   - a dead arm's `dead@` and no row;
   - a re-read over the branch's surface that replaces its row and keeps another;
   - a collect whose public tree holds no price-bearing file.
-- **`years`.** The label rule on a made-up bar file: a fall, a tie, a gap, the run-end cut and a bad header.
-- **The lock** (where `flock` exists). `stage`, `docker`, `collect` and `publish` refuse to run beside another holder.
+- **The gates on their failing side**, in the same `read` path:
+  - a live arm with one failing V6 log ends `invalid@`, with one `invalid` event, no row and no read dir;
+  - a would-be-dead arm with a failing V6 log is `invalid`, not `dead`, since V6 runs before liveness;
+  - an arm that differs from S on one seed only is live and read;
+  - a parent S identical to HEAD's gives a tripwire match with no `baseline-drift` event, and a `drift-none` event
+    with no drift row;
+  - a failing drift V6 log gives a `drift-invalid` event and no drift row.
+- **`years`.** The label rule on a made-up bar file: a fall, a tie, a gap, the run-end cut and a bad header, and
+  that `years` writes nothing under the out dir.
+- **The lock** (where `flock` exists). `run`, `read`, `stage`, `docker`, `collect` and `publish` refuse to run beside
+  another holder.
   A `dockerd` that the docker preflight starts (a stub on PATH) must not keep `lane.lock` once the lane has exited; the
-  lane launches it with the descriptor closed. The cells keep it on purpose: if the lane is killed, a relaunch waits
-  for the cells still running instead of starting them again.
+  lane launches it with the descriptor closed. The cells keep it on purpose: if the lane is killed, a relaunch is
+  refused until the cells still running finish, instead of starting them again.
 - **Parse.** `lane.sh` is outside `posix_sh_check.sh`'s scan dirs, so the check runs `dash -n` on it.
