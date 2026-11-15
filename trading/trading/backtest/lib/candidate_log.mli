@@ -132,11 +132,12 @@ type signals = {
     gate (under the configured [stop_width_mode]) the walk applies, called — not
     re-implemented — through the walk's own closure. Cash, the notional and
     sector caps, the share-class rule, sizing, the entry-assembly gates (short
-    side off, liquidity, bar recency, delisting, declining MA) and the
-    [freeze_entry_at_first_breakout] re-pin are ignored. It is pure: no order,
-    no cash debit, no stop-state registration, no position id, no recorder event
-    beyond this row. Every distance is a fraction of the entry trigger ([0.08] =
-    8%), the number the width gate compared — never a price. *)
+    side off, short minimum price, short borrow, liquidity, bar recency,
+    delisting, declining MA) and the [freeze_entry_at_first_breakout] re-pin are
+    ignored. It is pure: no order, no cash debit, no stop-state registration, no
+    position id, no recorder event beyond this row. Every distance is a fraction
+    of the entry trigger ([0.08] = 8%), the number the width gate compared —
+    never a price. *)
 type shadow_verdict =
   | Buyable of float  (** Both gates pass; the stop distance. *)
   | No_structural_stop
@@ -153,8 +154,10 @@ type walk_outcome =
       (** Passed over, with the reason — the same hop [trade_audit.sexp]'s
           weekly decision record uses. *)
   | Not_reached
-      (** The walk never classified it: an entry-assembly gate (short side off,
-          liquidity, bar recency, delisting, declining MA) removed it first. *)
+      (** The walk never classified it: an entry-assembly gate removed it first
+          — the short side switched off, the short-only [short_min_price] floor
+          and [Short_borrow_gate], or, on either side, liquidity, bar recency,
+          delisting or the declining-MA gate. *)
 [@@deriving sexp, eq]
 
 type walk_result = {

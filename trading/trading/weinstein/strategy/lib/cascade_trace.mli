@@ -74,11 +74,11 @@ val shadow_verdict :
     consumes no position id and emits no debug trace: [stop_check] is
     {!Entry_stop_check.evaluate}, which does none of those. Cash, the notional
     and sector caps, the share-class rule and sizing are deliberately ignored.
-    So are the entry-assembly gates (short side off, liquidity, bar recency,
-    delisting, declining MA) and, under [freeze_entry_at_first_breakout]
-    (default off), the re-pinning of a previously walked name's entry: the
-    shadow judges the screener's candidate as the cap cut it, and must not touch
-    the pin table. *)
+    So are the entry-assembly gates (short side off, short minimum price, short
+    borrow, liquidity, bar recency, delisting, declining MA) and, under
+    [freeze_entry_at_first_breakout] (default off), the re-pinning of a
+    previously walked name's entry: the shadow judges the screener's candidate
+    as the cap cut it, and must not touch the pin table. *)
 
 val with_top_n :
   config:Screener.config ->

@@ -299,9 +299,15 @@ let test_candidate_weeks_carry_named_candidates _ =
 (* The top-N view changes no trade                                       *)
 (* -------------------------------------------------------------------- *)
 
-(* A one-slot cap, so on any Friday with two cleared names the second is cut
-   and gets a shadow; the run still funds the first. *)
-let _one_slot = Sexp.of_string "((screening_config ((max_buy_candidates 1))))"
+(* A one-slot cap, and Stage 2 admitted up to 52 weeks in rather than 4, so
+   that several of the seven names clear the cascade on some Fridays: the cap
+   cuts all but the first, and each cut name gets a shadow (measured on this
+   fixture: 8 admitted rows, 3 cut rows at ranks 2-3 with their shadows, 6
+   trades). With the default 4 weeks only one name ever clears and no shadow
+   runs. *)
+let _one_slot =
+  Sexp.of_string
+    "((screening_config ((max_buy_candidates 1) (early_stage2_max_weeks 52))))"
 
 (* One run with or without the collector, written out by [Result_writer]:
    [(trades.csv, equity_curve.csv)] and the run's candidate weeks. The
@@ -326,8 +332,8 @@ let _written_run ~capture =
 (** The no-trade-change pin for the whole top-N view: with [--emit-candidates]'s
     collector on, [trades.csv] and [equity_curve.csv] are byte-identical to the
     run without it. The capture run is not vacuous: it re-asks the walk's stop
-    check after the walk for every funded name (the same pure check the shadow
-    uses), which the next test pins. *)
+    check for every walked name and runs the shadow on every cut name, which the
+    next two tests pin. *)
 let test_capture_changes_no_trade _ =
   let off, _ = _written_run ~capture:false in
   let on, _ = _written_run ~capture:true in
@@ -345,6 +351,20 @@ let test_capture_run_carries_the_top_n_view _ =
         match c.walk with
         | Some { stop_distance_pct = Some _; _ } -> true
         | Some _ | None -> false))
+    (gt (module Int_ord) 0)
+
+(** ... and ran the shadow: at least one name the cap cut ([Dropped_at_top_n],
+    rank 2 or more) carries a shadow verdict, so the byte-identity pin above
+    covers the shadow and fails loudly if the fixture stops producing cut names.
+*)
+let test_capture_run_shadows_cut_names _ =
+  let _, weeks = _written_run ~capture:true in
+  assert_that
+    (List.concat_map weeks ~f:(fun (w : Candidate_log.week) -> w.candidates)
+    |> List.count ~f:(fun (c : Candidate_log.candidate) ->
+        Candidate_log.equal_cascade_outcome c.outcome Dropped_at_top_n
+        && Option.is_some c.shadow
+        && Option.value_map c.rank ~default:false ~f:(fun r -> r >= 2)))
     (gt (module Int_ord) 0)
 
 let suite =
@@ -375,6 +395,8 @@ let suite =
          >:: test_capture_changes_no_trade;
          "top-N view: the capture run carries it"
          >:: test_capture_run_carries_the_top_n_view;
+         "top-N view: the capture run shadows cut names"
+         >:: test_capture_run_shadows_cut_names;
        ]
 
 let () = run_test_tt_main suite

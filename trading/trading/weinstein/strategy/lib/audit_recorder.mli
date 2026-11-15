@@ -338,8 +338,10 @@ module Top_n : sig
             [No_structural_stop] row it is the fallback stop's distance. *)
     | Not_reached
         (** An [Admitted] row the walk never classified: an entry-assembly gate
-            (short side off, liquidity, bar recency, delisting, declining MA)
-            removed it before the walk. *)
+            removed it before the walk — the short side switched off, the
+            short-only [short_min_price] floor and [Short_borrow_gate], or, on
+            either side, liquidity, bar recency, delisting or the declining-MA
+            gate. *)
     | Shadow of shadow  (** A [Dropped_at_top_n] row. *)
 
   type t = {
