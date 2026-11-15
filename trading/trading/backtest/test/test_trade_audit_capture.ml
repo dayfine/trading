@@ -295,6 +295,58 @@ let test_candidate_weeks_carry_named_candidates _ =
   in
   assert_that named (gt (module Int_ord) 0)
 
+(* -------------------------------------------------------------------- *)
+(* The top-N view changes no trade                                       *)
+(* -------------------------------------------------------------------- *)
+
+(* A one-slot cap, so on any Friday with two cleared names the second is cut
+   and gets a shadow; the run still funds the first. *)
+let _one_slot = Sexp.of_string "((screening_config ((max_buy_candidates 1))))"
+
+(* One run with or without the collector, written out by [Result_writer]:
+   [(trades.csv, equity_curve.csv)] and the run's candidate weeks. The
+   position-id counter is process-global and [trades.csv] carries the ids, so
+   every run starts it from the same value. *)
+let _written_run ~capture =
+  Weinstein_strategy.Entry_audit_capture.set_position_counter 0;
+  let result =
+    _run_scenario
+      ?candidate_log:(Option.some_if capture (Candidate_log.create ()))
+      ~extra_overrides:[ _one_slot ] ()
+  in
+  let dir = Filename_unix.temp_dir "top_n_no_trade_change" "" in
+  Exn.protect
+    ~f:(fun () ->
+      Backtest.Result_writer.write ~output_dir:dir result;
+      let read name = In_channel.read_all (Filename.concat dir name) in
+      ((read "trades.csv", read "equity_curve.csv"), result.candidate_weeks))
+    ~finally:(fun () ->
+      Core_unix.system (sprintf "rm -rf %s" (Filename.quote dir)) |> ignore)
+
+(** The no-trade-change pin for the whole top-N view: with [--emit-candidates]'s
+    collector on, [trades.csv] and [equity_curve.csv] are byte-identical to the
+    run without it. The capture run is not vacuous: it re-asks the walk's stop
+    check after the walk for every funded name (the same pure check the shadow
+    uses), which the next test pins. *)
+let test_capture_changes_no_trade _ =
+  let off, _ = _written_run ~capture:false in
+  let on, _ = _written_run ~capture:true in
+  assert_that on (equal_to (off : string * string))
+
+(** The capture run above really computed the top-N view: at least one admitted
+    row carries a rank and the stop distance the post-walk check measured. *)
+let test_capture_run_carries_the_top_n_view _ =
+  let _, weeks = _written_run ~capture:true in
+  assert_that
+    (List.concat_map weeks ~f:(fun (w : Candidate_log.week) -> w.candidates)
+    |> List.count ~f:(fun (c : Candidate_log.candidate) ->
+        Option.is_some c.rank
+        &&
+        match c.walk with
+        | Some { stop_distance_pct = Some _; _ } -> true
+        | Some _ | None -> false))
+    (gt (module Int_ord) 0)
+
 let suite =
   "Trade_audit_capture"
   >::: [
@@ -319,6 +371,10 @@ let suite =
          >:: test_candidate_weeks_track_cascade_summaries;
          "candidate weeks carry named candidates"
          >:: test_candidate_weeks_carry_named_candidates;
+         "top-N view: capture changes no trade"
+         >:: test_capture_changes_no_trade;
+         "top-N view: the capture run carries it"
+         >:: test_capture_run_carries_the_top_n_view;
        ]
 
 let () = run_test_tt_main suite

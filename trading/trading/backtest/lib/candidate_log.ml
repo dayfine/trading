@@ -32,16 +32,42 @@ type signals = {
 }
 [@@deriving sexp, eq]
 
+type shadow_verdict =
+  | Buyable of float
+  | No_structural_stop
+  | Stop_too_wide of float
+  | Already_held
+[@@deriving sexp, eq, show]
+
+type walk_outcome = Funded | Skipped of Trade_audit.skip_reason | Not_reached
+[@@deriving sexp, eq]
+
+type walk_result = {
+  result : walk_outcome;
+  stop_distance_pct : float option; [@sexp.option]
+}
+[@@deriving sexp, eq]
+
 type candidate = {
   symbol : string;
   side : Trading_base.Types.position_side;
   outcome : cascade_outcome;
   breakout_gate : breakout_gate option; [@sexp.option]
   signals : signals;
+  rank : int option; [@sexp.option]
+  walk : walk_result option; [@sexp.option]
+  shadow : shadow_verdict option; [@sexp.option]
 }
 [@@deriving sexp, eq]
 
-type week = { date : Date.t; candidates : candidate list } [@@deriving sexp, eq]
+type week = {
+  date : Date.t;
+  candidates : candidate list;
+  tickets_placed : int option; [@sexp.option]
+  long_cash_left_pct : float option; [@sexp.option]
+}
+[@@deriving sexp, eq]
+
 type t = week list [@@deriving sexp]
 
 (* Field-for-field. Deliberately exhaustive on the source record's decision-time
@@ -103,6 +129,9 @@ let _candidate_of_alternative (a : Trade_audit.alternative_candidate) =
     outcome = Admitted;
     breakout_gate = None;
     signals = signals_of_alternative a;
+    rank = None;
+    walk = None;
+    shadow = None;
   }
 
 (* Total mapping from the screener's breakout sub-gate onto the artefact's own.
@@ -136,11 +165,39 @@ let _outcome_of_phase :
   | Dropped_at_grade -> (Dropped_at_grade, None)
   | Dropped_at_top_n -> (Dropped_at_top_n, None)
 
+(* The top-N view's three on-disk hops, each a total match so a constructor
+   added upstream fails to compile here rather than vanishing from the file. *)
+let _shadow_of :
+    Weinstein_strategy.Audit_recorder.Top_n.shadow -> shadow_verdict = function
+  | Buyable d -> Buyable d
+  | No_structural_stop -> No_structural_stop
+  | Stop_too_wide d -> Stop_too_wide d
+  | Already_held -> Already_held
+
+let _walk_outcome_of :
+    Weinstein_strategy.Audit_recorder.walk_outcome -> walk_outcome = function
+  | Placed -> Funded
+  | Skipped reason ->
+      Skipped (Trade_audit_enum_hops.skip_reason_of_event reason)
+
+(* [(rank, walk, shadow)] for a row; all [None] off the top-N view. *)
+let _top_n_fields : Weinstein_strategy.Audit_recorder.Top_n.t option -> _ =
+  function
+  | None -> (None, None, None)
+  | Some { rank; verdict = Walked { outcome; stop_distance_pct } } ->
+      ( Some rank,
+        Some { result = _walk_outcome_of outcome; stop_distance_pct },
+        None )
+  | Some { rank; verdict = Not_reached } ->
+      (Some rank, Some { result = Not_reached; stop_distance_pct = None }, None)
+  | Some { rank; verdict = Shadow s } -> (Some rank, None, Some (_shadow_of s))
+
 (* A G2 cascade row: its candidate never reached the entry walk, so the signals
    come off the analysis plus the screener's own trace rather than an
    [alternative_candidate]. *)
 let _candidate_of_drop (d : Weinstein_strategy.Audit_recorder.cascade_drop) =
   let outcome, breakout_gate = _outcome_of_phase d.outcome.phase in
+  let rank, walk, shadow = _top_n_fields d.top_n in
   {
     symbol = d.outcome.ticker;
     side = d.side;
@@ -149,15 +206,18 @@ let _candidate_of_drop (d : Weinstein_strategy.Audit_recorder.cascade_drop) =
     signals =
       signals_of_analysis ~analysis:d.analysis ~sector_name:d.sector.sector_name
         ~score:d.outcome.score ~grade:d.outcome.grade;
+    rank;
+    walk;
+    shadow;
   }
 
-let week_of ~date ~alternatives ~drops =
+let week_of ~date ~alternatives ~drops ~tickets_placed ~long_cash_left_pct =
   let candidates =
     match drops with
     | [] -> List.map alternatives ~f:_candidate_of_alternative
     | drops -> List.map drops ~f:_candidate_of_drop
   in
-  { date; candidates }
+  { date; candidates; tickets_placed = Some tickets_placed; long_cash_left_pct }
 
 let _candidates_path ~scenario_dir =
   Filename.concat scenario_dir "candidates.sexp"

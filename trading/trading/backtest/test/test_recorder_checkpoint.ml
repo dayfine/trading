@@ -296,8 +296,13 @@ let _week date : CL.week =
               volume_ratio = None;
               sector_name = "Tech";
             };
+          rank = Some 1;
+          walk = Some { result = CL.Funded; stop_distance_pct = Some 0.06 };
+          shadow = None;
         };
       ];
+    tickets_placed = Some 1;
+    long_cash_left_pct = Some 0.4;
   }
 
 let test_candidate_log _ =

@@ -51,12 +51,13 @@ val of_screen :
     a broad-universe multi-decade run produces a large file; this is a
     diagnostic you ask for, not one you get by default. *)
 
-(** {1 The top-N shadow}
+(** {1 The top-N view}
 
     The screener caps its sorted output at [max_buy_candidates] before the entry
     walk checks anything, so a name ranked past the cap is never asked whether
-    it was buyable. {!shadow_verdict} asks it, offline, with the walk's own
-    check. *)
+    it was buyable. These two functions ask it, offline, with the walk's own
+    check, and attach the answer ({!Audit_recorder.Top_n.t}) to the cascade rows
+    that cleared every per-candidate gate. *)
 
 val shadow_verdict :
   Entry_walk.walk_report ->
@@ -79,6 +80,30 @@ val shadow_verdict :
     shadow judges the screener's candidate as the cap cut it, and must not touch
     the pin table. *)
 
+val with_top_n :
+  config:Screener.config ->
+  date:Core.Date.t ->
+  candidates:(Stock_analysis.t * Screener.sector_context) list ->
+  decisions:Audit_recorder.walk_decision list ->
+  report:Entry_walk.walk_report ->
+  Audit_recorder.cascade_drop list ->
+  Audit_recorder.cascade_drop list
+(** Fill [top_n] on every [Admitted] and [Dropped_at_top_n] row of [drops]
+    (others keep [None]), in place of order.
+
+    The rank is the row's position in {!Screener.rank_survivors}
+    [~config ~as_of:date ~candidates] for its side — the order the cap cut. An
+    [Admitted] row gets [Walked] with its entry in [decisions] (matched on
+    ticker and side) and, when the walk built a stop for it, the distance
+    [report.stop_check] measures on the walk's own copy of the candidate; with
+    no entry it gets [Not_reached]. A [Dropped_at_top_n] row gets
+    [Shadow (shadow_verdict report cand)] on the screener's candidate.
+
+    Neither the walk's order nor its decisions can change: this runs after the
+    walk, on its finished output. Cost, paid only under capture: one uncapped
+    re-sort of the cascade survivors and one stop check per cleared row (every
+    survivor past the cap, plus the walked names that built a stop). Pure. *)
+
 (** {1 Per-Friday capture handle}
 
     {!of_screen} is the whole computation, but a caller also needs somewhere to
@@ -90,11 +115,13 @@ type t
 
 val create : Audit_recorder.t -> t
 (** A capture handle for one Friday. The G1/G2 capture is {b inert} unless
-    [recorder.capture_candidates] is [true]: {!on_candidates} then returns
-    [None] (the screener installs no callback) and {!record} emits an event
-    whose [candidates] and [drops] are empty. The weekly decision record (#3139)
-    is not gated: {!on_walk_candidates} always offers a sink and the event's
-    [decisions] always carries the walk's top-N outcomes. *)
+    [recorder.capture_candidates] is [true]: {!on_candidates} and
+    {!on_walk_report} then return [None] (neither the screener nor the walk is
+    handed a callback) and {!record} emits an event whose [candidates] and
+    [drops] are empty and whose [long_cash_left_pct] is [None]. The weekly
+    decision record (#3139) is not gated: {!on_walk_candidates} always offers a
+    sink and the event's [decisions] always carries the walk's top-N outcomes.
+*)
 
 val on_candidates :
   t -> ((Stock_analysis.t * Screener.sector_context) list -> unit) option
@@ -106,6 +133,12 @@ val on_walk_candidates : t -> (Audit_recorder.walk_decision list -> unit) option
     [?on_candidates_considered]. Always [Some] since #3139: the walk's decisions
     feed {!Audit_recorder.cascade_event.decisions} on every Friday, and, when
     capture is on, its passed-over rows feed [candidates]. *)
+
+val on_walk_report : t -> (Entry_walk.walk_report -> unit) option
+(** Pass straight to {!Entry_walk.entries_from_candidates}'s [?on_walk_report].
+    [None] when inert, so the walk never builds the report and no top-N view is
+    computed. When capturing, {!record} hands the report to {!with_top_n} and
+    copies its [long_cash_left_pct] onto the event. *)
 
 val record :
   t ->
@@ -119,8 +152,9 @@ val record :
 (** Build this Friday's {!Audit_recorder.cascade_event} — [result]'s
     [cascade_diagnostics], the macro reading, [entered], whatever
     {!on_walk_candidates} captured, and {!of_screen} over whatever
-    {!on_candidates} captured — and route it through
-    [audit_recorder.record_cascade_summary].
+    {!on_candidates} captured, with the top-N view ({!with_top_n}) and the long
+    walk's unspent cash when {!on_walk_report} captured a report — and route it
+    through [audit_recorder.record_cascade_summary].
 
     [~macro] supplies two independent things and only two: its [breadth_state]
     is recorded verbatim on the event, and its [trend] drives the drop trace's

@@ -203,3 +203,25 @@ extending PR-A's artefact with the pre-top-N population).
   G2).
 - `Candidate_log.signals` projects onto
   `Trade_audit.alternative_candidate` field-for-field.
+
+## Top-N view (2026-11-14) — rank, walk outcome, buyability shadow
+
+Shipped G1/G2/G3 do not answer whether the screener's top-N cap
+(`max_buy_candidates`, default 20) costs entries: the cap cuts names ranked
+21+ as `Dropped_at_top_n` before the entry walk checks buyability, and ~95% of
+top-20 slots never fund (no structural stop, or `Stop_too_wide`). The schema
+gains, all `[@sexp.option]` so older files parse unchanged:
+
+- every row that cleared the cascade (`Admitted`, `Dropped_at_top_n`):
+  `rank`, its 1-based position in the screener's own sorted order
+  (`Screener.rank_survivors`, the cap's comparator with the cap lifted);
+- `Admitted` rows: `walk` = `Funded` / `Skipped <Trade_audit.skip_reason>` /
+  `Not_reached`, plus `stop_distance_pct` where the walk built a stop;
+- `Dropped_at_top_n` rows: `shadow` = `Buyable d` / `No_structural_stop` /
+  `Stop_too_wide d` / `Already_held`, from the walk's own pure stop check
+  (`Entry_stop_check.evaluate`, handed out by `Entry_walk.walk_report`);
+- each week: `tickets_placed` and `long_cash_left_pct`.
+
+Still gated on the recorder (`capture_candidates`), never on a config. The
+shadow ignores cash, the caps, sizing and the entry-assembly gates. Stacked
+PRs: the pure stop check + walk report, then the view and its emission.

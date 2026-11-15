@@ -328,6 +328,30 @@ module Top_n : sig
     | Already_held
         (** The walk's held set contains the symbol, so the walk would skip it
             before any stop is computed. *)
+
+  type verdict =
+    | Walked of { outcome : walk_outcome; stop_distance_pct : float option }
+        (** An [Admitted] row the walk classified: its actual outcome, and the
+            stop distance the walk's width gate measured whenever the walk
+            computed an initial stop for it (every outcome except [Already_held]
+            and [Share_class_held], which skip the name first). For a
+            [No_structural_stop] row it is the fallback stop's distance. *)
+    | Not_reached
+        (** An [Admitted] row the walk never classified: an entry-assembly gate
+            (short side off, liquidity, bar recency, delisting, declining MA)
+            removed it before the walk. *)
+    | Shadow of shadow  (** A [Dropped_at_top_n] row. *)
+
+  type t = {
+    rank : int;
+        (** 1-based position in the screener's own sorted order for the row's
+            side (score descending, then the configured tiebreak), before the
+            cap: [Screener.rank_survivors]. [rank <= cap] for every [Admitted]
+            row. A [Dropped_at_top_n] row with [rank <= cap] means the live
+            macro gate (a [neutral_blocks_longs]-style flag) blocked the whole
+            side while the trace's own gate admitted it. *)
+    verdict : verdict;
+  }
 end
 
 type cascade_drop = {
@@ -340,6 +364,13 @@ type cascade_drop = {
       (** Which cascade evaluated it. The two sides score and gate the same name
           differently, so a candidate can appear once per side. *)
   outcome : Screener.candidate_outcome;
+  top_n : Top_n.t option;
+      (** [Some] on [Admitted] and [Dropped_at_top_n] rows when the entry walk
+          handed over its {!Entry_walk.walk_report}; [None] on every other
+          phase, and on a row whose ticker {!Screener.rank_survivors} did not
+          rank (the trace's admission predicates and the screener's candidate
+          builder disagreeing; [test_cascade_top_n.ml] checks they agree on a
+          real screen). *)
 }
 (** One candidate the cascade {b evaluated}, with the phase that dropped it — or
     [Admitted] if it survived to the top-N (issue #2490 gap G2).
@@ -396,6 +427,10 @@ type cascade_event = {
 
           [[]] when [capture_candidates] is [false] — the screener callback is
           not even installed, so the cascade allocates nothing extra. *)
+  long_cash_left_pct : float option;
+      (** The cash the long entry walk left unspent, as a fraction of portfolio
+          value ({!Entry_walk.walk_report}'s [long_cash_left_pct]). [None] when
+          [capture_candidates] is [false]. *)
 }
 (** Event captured at the end of one Friday's cascade. Complements
     [entry_event]: where [entry_event] records a single chosen candidate plus

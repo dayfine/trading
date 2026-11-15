@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-10-09
+## Last updated: 2026-11-14
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,25 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-11-14 — `candidates.sexp` top-N view: rank, walk outcome, buyability shadow (#3625 + stacked follow-up)
+
+- [x] **Does the top-N cap cost entries?** The screener caps at
+  `max_buy_candidates` (20) before the entry walk checks buyability, so names
+  ranked 21+ were cut as `Dropped_at_top_n` unasked. With `--emit-candidates`
+  every cleared row now carries its `rank` in the cap's order; `Admitted` rows
+  carry the walk's outcome (`Funded` / `Skipped <reason>` / `Not_reached`) and
+  stop distance; `Dropped_at_top_n` rows carry a pure **shadow** from the walk's
+  own stop check (`Buyable d` / `No_structural_stop` / `Stop_too_wide d` /
+  `Already_held`); each week carries `tickets_placed` and `long_cash_left_pct`.
+  All fields `[@sexp.option]` (older files parse); gate stays on the recorder.
+  Lives in `strategy/lib/{entry_stop_check,entry_walk,cascade_trace}`,
+  `Screener.rank_survivors`, `backtest/lib/candidate_log`. Cost under capture:
+  one uncapped re-sort and one stop check (one daily-bar read) per cleared row
+  per Friday. Verify: `test_walk_report`, `test_cascade_top_n`,
+  `test_candidate_log`, `test_screener` (rank_survivors), and
+  `test_trade_audit_capture` (`trades.csv` / `equity_curve.csv` byte-identical
+  with capture on vs off) on CI.
 
 ## 2026-10-09 — `dividend_crediting` + `split_dividend_guard` default-on (#3137, #3173)
 

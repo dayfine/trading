@@ -224,7 +224,8 @@ let _record_candidate_week ~candidate_log (e : AR.cascade_event) =
   Option.iter candidate_log ~f:(fun c ->
       let alternatives = List.map e.candidates ~f:_alternative_of_event in
       Candidate_log.record c
-        (Candidate_log.week_of ~date:e.date ~alternatives ~drops:e.drops))
+        (Candidate_log.week_of ~date:e.date ~alternatives ~drops:e.drops
+           ~tickets_placed:e.entered ~long_cash_left_pct:e.long_cash_left_pct))
 
 (* Issue #2974: the entry-decision event is the only place the Weinstein
    strategy's installed initial stop surfaces (the simulator's [EntryComplete]
