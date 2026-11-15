@@ -1,6 +1,7 @@
 # pair.awk -- one seed's paired read of arm A against the base S (dev/plans/axis-observatory-2026-11-14.md §1).
 # D(t) = ln(NAV_A(t) / NAV_S(t)) at the last equity-curve row of each Monday-aligned week, from an anchor of 0 on the
-# first row (both arms start from the same cash), so the weekly steps sum to D_end.
+# first row (both arms start from the same cash: the summaries' initial_cash must be equal), so the weekly steps sum to
+# D_end.
 # Operands, each preceded by role=<R>: Y the SPY years file ("YYYY bull|bear" lines, # comments; /dev/null if none),
 # M the base's macro_trend.sexp, SE AE equity_curve.csv, ST AT trades.csv, SO AO open_positions.csv, SS AS summary.sexp.
 # Variables: seed (k0), out (the private out dir), have_years (1 when Y is a real file). Needs common.awk.
@@ -30,10 +31,13 @@ role ~ /T$/ { if (split($0, f, ",") < 9 || f[1] == "symbol") next
 role ~ /O$/ { if (split($0, f, ",") < 5 || f[1] == "symbol") next
   addpos(substr(role, 1, 1), f[1], f[3], "", f[4], f[5], "", $0); next }
 role ~ /S$/ { a = substr(role, 1, 1)
+  if (match($0, /\(initial_cash -?[0-9.]+\)/)) ic[a] = substr($0, RSTART + 14, RLENGTH - 15)
   if (match($0, /maxdrawdown -?[0-9.]+/)) mdd[a] = substr($0, RSTART + 12, RLENGTH - 12) + 0
   if (match($0, /ulcerindex -?[0-9.]+/)) ulc[a] = substr($0, RSTART + 11, RLENGTH - 11) + 0
   next }
-function pairing(   i) {   # the two curves must share every date: same window, same build
+function pairing(   i) {   # same starting cash, and the two curves share every date: same window, same build
+  if (!("S" in ic) || !("A" in ic)) die("a summary.sexp has no initial_cash, so equal starting cash cannot be checked")
+  if (ic["S"] + 0 != ic["A"] + 0) die("the arms start from different cash: S " ic["S"] ", A " ic["A"])
   if (nc["S"] == 0 || nc["S"] != nc["A"]) die("equity curves differ in length: S " nc["S"] ", A " nc["A"] " rows")
   fdd = "-"
   for (i = 1; i <= nc["S"]; i++) {

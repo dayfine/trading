@@ -27,11 +27,16 @@
 # Trades: SH* shared by every arm (arms carry shifted position ids: id-shift, not a change); S also holds SX* (U drops
 # them), HX* (H drops them), LOSTX (L drops it) and BIGWIN (Q and K drop it). U adds UP* and the open UOPEN and changes
 # SH5's size; L adds MONSTR; P and T add JUMP; H adds HB*. U carries a passing V6 log per seed.
-# usage: sh gen_fixture.sh RUN_DIR
+# Mode five (the second argument) writes a 5-year run instead, 2010-01-01 .. 2014-12-31, with S and two arms that pin
+# the per-seed sign rate's ">=": with five years one seed can sit at exactly 3/5 = 0.60.
+#   F    UP    4 seeds >= 60 %, k0 at exactly 3/5 (k1 5/5, k2 4/5,      -      UP (">" would leave 3 seeds: none)
+#              k3 4/5, k4 2/5); median D_end 0.34, small steps
+#   G    HARM  F's mirror                                          -      HARM
+# usage: sh gen_fixture.sh RUN_DIR [five]
 set -eu
-OUT=${1:?usage: gen_fixture.sh RUN_DIR}
+OUT=${1:?usage: gen_fixture.sh RUN_DIR [five]}
 for k in 0 1 2 3 4; do mkdir -p "$OUT/k$k"; done
-awk -v out="$OUT" '
+awk -v out="$OUT" -v mode="${2:-seven}" '
 function mlen(y, m) { return m == 2 ? ((y % 4 == 0) ? 29 : 28) : (m == 4 || m == 6 || m == 9 || m == 11) ? 30 : 31 }
 function arm(a, side, sig, pats, dends,   p, d, k) {   # register arm a: five seed patterns and five D_end targets
   na++; AL[na] = a; SD[a] = side; SG[a] = sig; split(pats, p, " "); split(dends, d, " ")
@@ -70,7 +75,8 @@ function macro(f,   i, d, s, n) {   # one record per Friday row
         (d < "2010-03-01" || (d >= "2012-06-01" && d <= "2012-06-30")) ? "Neutral" : "Bullish"
     printf "%s(date %s) (trend %s) (breadth_state %s_breadth))\n", (n++ ? " (" : "(("), d, s, s > f } }
 function summary(f, k, a,   o) { o = (a == "U") ? -2 : (a == "L") ? 0.5 : (a == "H") ? 5 : 0
-  printf "((start_date 2010-01-01) (end_date 2016-12-30)\n (metrics\n  ((%s.maxdrawdown %.2f)\n", MT, 20 + k + o > f
+  printf "((start_date 2010-01-01) (end_date %s) (initial_cash 1000000.00)\n (metrics\n  ((%s.maxdrawdown %.2f)\n", ds[tend], MT,
+    20 + k + o > f
   printf "   (%s.maxdrawdowndurationdays 400)\n   (%s.ulcerindex %.2f))))\n", MT, MT, 8 + 0.5 * k + o / 2 > f }
 function trades(f, k, a,   i, t) { print TH > f
   for (i = 1; 3 + 28 * (i - 1) + 56 <= tend; i++) { t = 3 + 28 * (i - 1)
@@ -90,10 +96,11 @@ function files(k, a,   p, f) { p = out "/k" k "/obs-" a "-k" k "-s0"
   f = p "-summary.sexp"; summary(f, k, a); close(f)
   f = p "-trades.csv"; trades(f, k, a); close(f)
   f = p "-open_positions.csv"; print "symbol,side,entry_date,entry_price,quantity" > f
-  print "OPN1,LONG,2015-11-02,50.00,1000" > f; if (a == "U") print "UOPEN,LONG,2016-12-05,40.00,900" > f; close(f)
+  print "OPN1,LONG," (Y1 == 2016 ? "2015-11-02" : "2014-11-03") ",50.00,1000" > f
+  if (a == "U") print "UOPEN,LONG,2016-12-05,40.00,900" > f; close(f)
   if (a == "U") { f = p ".v6diff-S.log"; print "V6 | 0 | 0 | agree\nexit=0" > f; close(f) } }
 BEGIN {
-  MT = "metric_types.metric_type.t"; Y0 = 2010; Y1 = 2016; YJ = 2013
+  MT = "metric_types.metric_type.t"; Y0 = 2010; Y1 = (mode == "five") ? 2014 : 2016; YJ = 2013
   TH = "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,"
   TH = TH "exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,"
   TH = TH "days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises,"
@@ -105,6 +112,9 @@ BEGIN {
   tend = rt[nr]; tj = td["2013-03-06"]; ye[Y0 - 1] = rt[1]
   for (i = 1; i <= nr; i++) if (i == nr || int((rt[i + 1] + 4) / 7) != int((rt[i] + 4) / 7)) {   # week-end samples
     ye[substr(ds[rt[i]], 1, 4) + 0] = rt[i]; if (rt[i] >= tj && !sj) sj = rt[i]; if (!sj) pj = rt[i] }
+  if (mode == "five") {
+    arm("F", 1, 0, "wwaaw wwwww wawww wwwaw waaaw", "0.30 0.32 0.34 0.36 0.38")
+    arm("G", -1, 0, "wwaaw wwwww wawww wwwaw waaaw", "-0.30 -0.32 -0.34 -0.36 -0.38") } else {
   arm("U", 1, 0, "wwwwwww wawwwww wawawaw wwawwww wwwwwww", "0.40 0.33 0.15 0.36 0.47")
   arm("L", 1, 0.85, "wwwwwww wwwwwww wwwwwww wwwwwww wwwwwww", "0.44 0.455 0.47 0.485 0.50")
   arm("H", -1, 0, "wwawwww wwwwwww wwwwwww wwwwwww wwwwwww", "-0.26 -0.36 -0.37 -0.38 -0.39")
@@ -115,7 +125,7 @@ BEGIN {
   arm("T", 1, 0.5, "wwwwwww wwwwwww wwwwwww wwwwwww wwwwwww", "0.26 0.28 0.30 0.32 0.34")
   arm("E", -1, 0, "wwwwwww wawwwww wwwwwww wwwwwwa wwwwwww", "-0.1999 -0.25 -0.30 -0.12 -0.15")
   arm("M", -1, 0, "0wawaww wawawaw wwwwwww wwawwww wwwwwaw", "-0.30 -0.25 -0.40 -0.35 -0.45")
-  arm("K", -1, 0.5, "wwwwwww wwwwwww wwwwwww wwwwwww wwwwwww", "-0.26 -0.28 -0.30 -0.32 -0.34")
+  arm("K", -1, 0.5, "wwwwwww wwwwwww wwwwwww wwwwwww wwwwwww", "-0.26 -0.28 -0.30 -0.32 -0.34") }
   for (i = 1; i <= na; i++) { ix[AL[i]] = i; for (k = 0; k <= 4; k++) solve(AL[i], k) }
   for (k = 0; k <= 4; k++) { files(k, "S"); for (i = 1; i <= na; i++) files(k, AL[i]) }
 }'

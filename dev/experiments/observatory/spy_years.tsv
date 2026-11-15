@@ -1,0 +1,30 @@
+# SPY bull/bear years for obs_read.sh -y, written by lane.sh years (README.md §Lane, "SPY years"). Rule: year Y
+# is bull when the last SPY close in Y (on or before 2026-06-26) is at or above the last close in Y-1, else bear.
+# Labels only: no price leaves the bar store.
+2000	bear
+2001	bear
+2002	bear
+2003	bull
+2004	bull
+2005	bull
+2006	bull
+2007	bull
+2008	bear
+2009	bull
+2010	bull
+2011	bear
+2012	bull
+2013	bull
+2014	bull
+2015	bear
+2016	bull
+2017	bull
+2018	bear
+2019	bull
+2020	bull
+2021	bull
+2022	bear
+2023	bull
+2024	bull
+2025	bull
+2026	bull

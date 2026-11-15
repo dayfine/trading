@@ -1,0 +1,5 @@
+# surface.tsv, drift.tsv and events.tsv only grow, row by row, from more than one lane: merge them as a union so
+# no lane's row is lost (lane.sh publish; README.md §Lane, Files). queue.tsv is not here: the lane rewrites it.
+surface.tsv merge=union
+drift.tsv merge=union
+events.tsv merge=union
