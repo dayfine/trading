@@ -88,6 +88,27 @@ forward-return studies, selection-edge checks, "is there alpha in X" screens.
    V6 carries instrument-set identity, so gate the paired read on it and read the
    bare form as an audit, not a verdict.
 
+## Read rules that transferred from later screens (2026-11-15)
+
+Four reads that the eight checks do not force on their own. Each cost a
+verdict or nearly did.
+
+- **(a) Gate-distance levers.** A lever that moves the stop gate's effective
+  distance is read for positions held, admissions by year and S tickets crowded
+  out, not only the endpoint. Source: stale-E K=5 (#3621): C's admissions
+  removed the bear brake and crowded out ADSK 2003.
+- **(b) Entry-timing screens replay exits from the moved fill.** A screen that
+  holds exits fixed credits an earlier fill with the null's exit. Source: #3621:
+  the screen held exits fixed, and 60-72 % of its H2' gain came from earlier
+  fills credited with the null's exit.
+- **(c) Pooled outcome clauses are also read leave-one-year-out.** In a
+  pre-registration, a pass that flips when one year is dropped is reported as
+  resting on that year. Source: gate funnel (#3631): the ride clause passed by
+  0.07 pp, failed 7 of 21 drops, and 2003 carried 83 % of the ride sum.
+- **(d) Binding counts are path-aware.** A count meant to bind (idle cash, slots
+  full) is counted along the path, not on every Friday: idle cash counted on
+  every Friday overstates it. Source: #3631: path-aware X was 87 % smaller.
+
 ## Verdict calibration — what a screen may and may not claim
 
 A cheap read-only screen operates on a proxy with the limits above. It may

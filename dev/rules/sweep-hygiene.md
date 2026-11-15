@@ -175,6 +175,29 @@ Key invariants in this incantation:
 - Per-iter scores: `grep -E 'metric ' /tmp/sweeps/<name>/bo_checkpoint.sexp | awk '{print $2}' | tr -d ')' | sort -g`.
 - Container can be restarted (`docker restart trading-1-dev`) without losing the bind-mounted output — but the running sweep process inside dies. Only restart the container if necessary; the sweep does NOT resume from checkpoint today (see `memory/project_bayesian_sweep_checkpoint_needed.md`).
 
+## Chains that publish (2026-11-15)
+
+A chain that ends in committed results splits `collect` from `publish`, so the
+public/private line is drawn once, in code, not by hand at PR time.
+
+- **Mark-free outputs** (counts, fractions, ride %, symbols, dates) go to the
+  public experiment branch of `dayfine/trading`.
+- **Price-bearing files** (`trades.csv`, `equity_curve.csv`,
+  `open_positions.csv`, row-level outcome tables) go to the private
+  `dayfine/trading-results`, at the same path, under the EODHD terms
+  (`memory/project_eodhd_terms_private_bucket.md`).
+- **Reference implementation:** `dev/experiments/gate-funnel-2026-11-15/chain.sh`
+  with `run` / `read` / `collect` / `publish`, `TR=../trading-results`, and a
+  push check against `TR` at start, so a missing credential shows up before the
+  cell runs, not after.
+- **Claude cloud session:** run `docker info` before BUILD; if the daemon is
+  down, start `dockerd` and re-check. Log the cause on every ABORT, not just
+  "BUILD failed".
+
+Why: the gate-funnel's first cloud launch (2026-11-15) aborted at BUILD within
+the same second because `dockerd` was not running. The public log gave no cause,
+and the session restarted it by hand.
+
 ## Acceptance — these rules apply when
 
 - A sweep is expected to take > 1 hour wall-time, OR
