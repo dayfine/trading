@@ -124,136 +124,70 @@ let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
    [Size_down] admits it up to the sanity ceiling and tags it [sized_down], so
    fixed-risk sizing shrinks the share count ~[1 / stop_distance] instead.
    Sizing keys off the INSTALLED stop, not [cand.suggested_stop], so total
-   risk-to-stop stays [risk_per_trade_pct * portfolio_value] either way.
-   Extracted so {!make_entry_transition} stays inside the fn-length cap. *)
-let _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
-    ~stop_states ~current_date ~effective_entry ~decision_bar ~initial_stop
-    ~floor_kind ~basis ~stop_distance_pct ~max_stop_distance_pct
+   risk-to-stop stays [risk_per_trade_pct * portfolio_value] either way. The
+   width verdict itself comes from {!Entry_stop_check.evaluate}; this applies
+   it. Stop-width decisions read the gate distance, the build the placed stop. *)
+let _gate_and_build ~outcome ~portfolio_risk_config ~portfolio_value
+    ~stop_states ~current_date (c : Entry_stop_check.t)
     (cand : Screener.scored_candidate) : entry_attempt_result =
+  let stop_distance_pct = c.stops.gate_distance_pct in
+  let max_stop_distance_pct = c.max_stop_distance_pct in
   let build ~sized_down =
     _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
-      ~current_date ~effective_entry ~decision_bar ~initial_stop
-      ~stop_tags:{ floor_kind; basis; sized_down }
+      ~current_date ~effective_entry:c.effective_entry
+      ~decision_bar:c.decision_bar ~initial_stop:c.stops.placed
+      ~stop_tags:
+        {
+          floor_kind = c.stops.placed_kind;
+          basis = c.stops.placed_basis;
+          sized_down;
+        }
       ~id:(gen_position_id cand.ticker)
       ~stop_distance_pct ~max_stop_distance_pct cand
   in
-  match
-    Stop_width_mode.gate ~policy:stop_width ~max_stop_distance_pct
-      ~stop_distance_pct
-  with
-  | Stop_width_mode.Admit -> build ~sized_down:false
-  | Stop_width_mode.Admit_sized_down -> build ~sized_down:true
-  | Stop_width_mode.Drop ->
+  match (outcome : Stop_width_mode.outcome) with
+  | Admit -> build ~sized_down:false
+  | Admit_sized_down -> build ~sized_down:true
+  | Drop ->
       Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker
-        ~score:cand.score ~rationale:cand.rationale ~effective_entry
-        ~installed_stop:(Weinstein_stops.get_stop_level initial_stop)
+        ~score:cand.score ~rationale:cand.rationale
+        ~effective_entry:c.effective_entry
+        ~installed_stop:(Weinstein_stops.get_stop_level c.stops.placed)
         ~stop_distance_pct ~max_stop_distance_pct ~outcome:"Stop_too_wide";
       Stop_too_wide
 
-(* Investor-preset gate ([require_structural_stop], book Ch. 6: "investors
-   should never use automatic percentages"). Rejects a candidate whose initial
-   stop is the automatic-percentage fallback, before the width gate: a ticket
-   with no structural stop is not one the investor places at any width. Side-
-   agnostic — the fallback and its tag are shared by both sides, and Ch. 7 makes
-   the 4-6% buy-stop trader-only on the short side too. *)
-let _lacks_required_structural_stop ~require_structural_stop
-    ~(floor_kind : Audit_recorder.stop_floor_kind) =
-  require_structural_stop
-  && match floor_kind with Buffer_fallback -> true | Support_floor -> false
-
-let _reject_no_structural_stop ~effective_entry ~initial_stop ~floor_kind
-    ~stop_distance_pct ~max_stop_distance_pct (cand : Screener.scored_candidate)
-    =
-  let floor_price = Weinstein_stops.get_stop_level initial_stop in
+(* The rejected stop is the placed one: its level and distance, with the floor
+   kind the gate read. *)
+let _reject_no_structural_stop (c : Entry_stop_check.t)
+    (cand : Screener.scored_candidate) =
+  let floor_price = Weinstein_stops.get_stop_level c.stops.placed in
+  let distance_pct = c.stops.placed_distance_pct in
   Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker ~score:cand.score
-    ~rationale:cand.rationale ~effective_entry ~installed_stop:floor_price
-    ~stop_distance_pct ~max_stop_distance_pct ~outcome:"No_structural_stop";
+    ~rationale:cand.rationale ~effective_entry:c.effective_entry
+    ~installed_stop:floor_price ~stop_distance_pct:distance_pct
+    ~max_stop_distance_pct:c.max_stop_distance_pct ~outcome:"No_structural_stop";
   No_structural_stop
-    { Audit_recorder.floor_kind; floor_price; distance_pct = stop_distance_pct }
+    { Audit_recorder.floor_kind = c.stops.gate_kind; floor_price; distance_pct }
 
-(* The ticket's initial stop and what the stop-width decisions read. [placed]
-   is the stop installed at [effective_entry]. Without [gate_entry] the
-   decisions read its floor kind and distance, so the default path is
-   unchanged. With [Some e] ({!Entry_cap_stop_gate}) they read those of the stop
-   the ticket would install at [e]; [stop_at] runs the §5.1 re-anchor test of
-   the placed stop at [e] too, so both carry the same floor kind. *)
-type initial_stops = {
-  placed : Weinstein_stops.stop_state;
-  placed_kind : Audit_recorder.stop_floor_kind;
-  placed_basis : Audit_recorder.split_safe_basis;
-  placed_distance_pct : float;
-  gate_kind : Audit_recorder.stop_floor_kind;
-  gate_distance_pct : float;
-}
+let entry_of_stop_check ~portfolio_risk_config ~stop_states ~portfolio_value
+    ~current_date (cand : Screener.scored_candidate) (c : Entry_stop_check.t) =
+  match c.decision with
+  | Lacks_structural_stop -> _reject_no_structural_stop c cand
+  | Width outcome ->
+      _gate_and_build ~outcome ~portfolio_risk_config ~portfolio_value
+        ~stop_states ~current_date c cand
 
-let _distance_from ~entry stop =
-  Entry_audit_helpers.stop_distance_pct ~effective_entry:entry
-    ~installed_stop:(Weinstein_stops.get_stop_level stop)
-
-let _initial_stops ~stop_at ~gate_entry ~effective_entry =
-  let placed, placed_kind, placed_basis = stop_at ~gate_entry effective_entry in
-  let placed_distance_pct = _distance_from ~entry:effective_entry placed in
-  let gate_kind, gate_distance_pct =
-    match gate_entry with
-    | None -> (placed_kind, placed_distance_pct)
-    | Some entry ->
-        let stop, kind, _basis = stop_at ~gate_entry:None entry in
-        (kind, _distance_from ~entry stop)
-  in
-  {
-    placed;
-    placed_kind;
-    placed_basis;
-    placed_distance_pct;
-    gate_kind;
-    gate_distance_pct;
-  }
-
-let make_entry_transition ?(min_stop_distance_pct = 0.0)
-    ?(trigger_at_suggested = false) ?(stop_anchor_at_entry_base = false)
-    ?(continuation_stop_at_pullback_low = false)
-    ?(require_structural_stop = false)
-    ?(stop_width = Stop_width_mode.default_policy) ?gate_entry
-    ~portfolio_risk_config ~stops_config ~initial_stop_buffer ~stop_states
-    ~bar_reader ~portfolio_value ~current_date
-    (cand : Screener.scored_candidate) : entry_attempt_result =
-  let decision_bar =
-    Entry_audit_helpers.latest_bar ~bar_reader ~current_date cand
-  in
-  let effective_entry =
-    Entry_audit_helpers.effective_entry_of_close ~trigger_at_suggested
-      ~close:(_raw_close_of decision_bar)
-      cand
-  in
-  (* The book §5.1 stop re-anchor only fires for the E-family entry: it pairs a
-     stop just under the breakout base with an entry AT the breakout, so it is
-     meaningful only when [trigger_at_suggested] anchors the entry at E. *)
-  let reanchor_to_entry_base =
-    stop_anchor_at_entry_base && trigger_at_suggested
-  in
-  let stop_at ~gate_entry entry =
-    Entry_audit_helpers.initial_stop_and_kind ~min_stop_distance_pct
-      ~continuation_stop_at_pullback_low ~reanchor_to_entry_base ?gate_entry
-      ~stops_config ~initial_stop_buffer ~bar_reader ~current_date
-      ~effective_entry:entry cand
-  in
-  let stops = _initial_stops ~stop_at ~gate_entry ~effective_entry in
-  let max_stop_distance_pct =
-    stops_config.Weinstein_stops.max_stop_distance_pct
-  in
-  if
-    _lacks_required_structural_stop ~require_structural_stop
-      ~floor_kind:stops.gate_kind
-  then
-    _reject_no_structural_stop ~effective_entry ~initial_stop:stops.placed
-      ~floor_kind:stops.gate_kind ~stop_distance_pct:stops.placed_distance_pct
-      ~max_stop_distance_pct cand
-  else
-    _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
-      ~stop_states ~current_date ~effective_entry ~decision_bar
-      ~initial_stop:stops.placed ~floor_kind:stops.placed_kind
-      ~basis:stops.placed_basis ~stop_distance_pct:stops.gate_distance_pct
-      ~max_stop_distance_pct cand
+let make_entry_transition ?min_stop_distance_pct ?trigger_at_suggested
+    ?stop_anchor_at_entry_base ?continuation_stop_at_pullback_low
+    ?require_structural_stop ?stop_width ?gate_entry ~portfolio_risk_config
+    ~stops_config ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value
+    ~current_date (cand : Screener.scored_candidate) : entry_attempt_result =
+  Entry_stop_check.evaluate ?min_stop_distance_pct ?trigger_at_suggested
+    ?stop_anchor_at_entry_base ?continuation_stop_at_pullback_low
+    ?require_structural_stop ?stop_width ?gate_entry ~stops_config
+    ~initial_stop_buffer ~bar_reader ~current_date cand
+  |> entry_of_stop_check ~portfolio_risk_config ~stop_states ~portfolio_value
+       ~current_date cand
 
 (* Decide + apply the cash draw for a [CreateEntering] of [side] costing [cost].
    [borrow_ok] is [true] when long-margin leverage is engaged ([leverage_enabled],

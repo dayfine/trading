@@ -256,6 +256,10 @@ module Entry_audit_capture = Entry_audit_capture
     main strategy file to keep it under the file-length cap. See
     {!Entry_audit_capture}. *)
 
+module Entry_stop_check = Entry_stop_check
+(** The pure initial-stop half of the entry decision, shared by the entry walk
+    and the [candidates.sexp] top-N shadow. See {!Entry_stop_check}. *)
+
 module Entry_audit_emit = Entry_audit_emit
 (** Projection of the entry walk's decisions into audit rows (alternatives,
     entry events). See {!Entry_audit_emit}. *)
@@ -1416,22 +1420,7 @@ val resolve_share_class_map : data_dir:string -> config -> config
     function as {!Share_class_gate.resolve_config}, typed at this module's
     re-declared {!config}. Called once per run by the backtest runner. *)
 
-val entries_from_candidates :
-  ?sector_lookup:(string -> string option) ->
-  ?pending_entry_e:Entry_freeze.t ->
-  ?suspended_held:string list ->
-  config:config ->
-  candidates:Screener.scored_candidate list ->
-  stop_states:Weinstein_stops.stop_state String.Map.t ref ->
-  bar_reader:Bar_reader.t ->
-  portfolio:Trading_strategy.Portfolio_view.t ->
-  get_price:(string -> Types.Daily_price.t option) ->
-  current_date:Date.t ->
-  ?audit_recorder:Audit_recorder.t ->
-  ?macro:Macro.result ->
-  ?on_candidates_considered:(Audit_recorder.walk_decision list -> unit) ->
-  unit ->
-  Trading_strategy.Position.transition list
+val entries_from_candidates : config Entry_walk.entries_fn
 (** Generate [CreateEntering] transitions for a list of screener candidates.
 
     For each candidate:
@@ -1474,7 +1463,10 @@ val entries_from_candidates :
       accumulator is empty — held positions don't contribute to any sector
       bucket. Default-off path
       ([config.portfolio_config.max_sector_exposure_pct = None]) is bit-equal to
-      pre-P1 behaviour regardless of whether [sector_lookup] is passed. *)
+      pre-P1 behaviour regardless of whether [sector_lookup] is passed.
+
+    [?on_candidates_considered] and [?on_walk_report] are the walk's
+    observational sinks; see {!Entry_walk.entries_from_candidates}. *)
 
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->

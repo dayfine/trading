@@ -247,7 +247,28 @@ val make_entry_transition :
     [stop_distance_pct] is the gate's, measured from [e], so recomputing it from
     the same line gives a different number (audit only). The strategy passes
     {!Entry_cap_stop_gate.gate_entry}: the trigger the ticket would have had
-    with the stale-entry cap off. *)
+    with the stale-entry cap off.
+
+    Implemented as {!Entry_stop_check.evaluate} (steps 1-3, pure) followed by
+    {!entry_of_stop_check} (the side effects). *)
+
+val entry_of_stop_check :
+  portfolio_risk_config:Portfolio_risk.config ->
+  stop_states:Weinstein_stops.stop_state Core.String.Map.t ref ->
+  portfolio_value:float ->
+  current_date:Core.Date.t ->
+  Screener.scored_candidate ->
+  Entry_stop_check.t ->
+  entry_attempt_result
+(** The second half of {!make_entry_transition}: act on a stop check already
+    made for [cand]. [Lacks_structural_stop] gives [No_structural_stop] (the
+    placed stop's level and distance, with the gate's floor kind); a width
+    [Drop] gives [Stop_too_wide]; an admit proceeds to sizing (step 4) and, on
+    [Entry_ok], registers the stop in [stop_states] and consumes a position id.
+    Each branch emits the same [PANEL_GOLDEN_DEBUG] candidate trace as before.
+
+    The entry walk calls the two halves itself, so that the stop check it acts
+    on is the one {!Entry_walk.walk_report.stop_check} hands out. *)
 
 val check_cash_and_deduct :
   leverage_enabled:bool ->

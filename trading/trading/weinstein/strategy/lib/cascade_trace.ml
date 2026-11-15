@@ -55,6 +55,16 @@ let of_screen ~config ~macro_trend ~candidates ~result =
   _long_drops ~config ~macro_trend ~candidates ~result
   @ _short_drops ~config ~macro_trend ~candidates ~result
 
+let shadow_verdict (report : Entry_walk.walk_report)
+    (cand : Screener.scored_candidate) : Audit_recorder.Top_n.shadow =
+  if Set.mem report.held cand.ticker then Already_held
+  else
+    let c = report.stop_check cand in
+    match c.decision with
+    | Lacks_structural_stop -> No_structural_stop
+    | Width Drop -> Stop_too_wide c.stops.gate_distance_pct
+    | Width (Admit | Admit_sized_down) -> Buyable c.stops.gate_distance_pct
+
 type t = {
   enabled : bool;
   cascade : (Stock_analysis.t * Screener.sector_context) list ref;

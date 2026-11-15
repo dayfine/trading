@@ -51,6 +51,34 @@ val of_screen :
     a broad-universe multi-decade run produces a large file; this is a
     diagnostic you ask for, not one you get by default. *)
 
+(** {1 The top-N shadow}
+
+    The screener caps its sorted output at [max_buy_candidates] before the entry
+    walk checks anything, so a name ranked past the cap is never asked whether
+    it was buyable. {!shadow_verdict} asks it, offline, with the walk's own
+    check. *)
+
+val shadow_verdict :
+  Entry_walk.walk_report ->
+  Screener.scored_candidate ->
+  Audit_recorder.Top_n.shadow
+(** [shadow_verdict report cand]: [Already_held] when [report.held] holds the
+    symbol; otherwise [report.stop_check cand] — the walk's own initial-stop
+    computation — read as the walk reads it: the investor-preset gate first
+    ([No_structural_stop]), then the [max_stop_distance_pct] width gate
+    ([Stop_too_wide] on its [Drop], [Buyable] on either admit), each carrying
+    the distance that gate measured.
+
+    {b Pure.} It places no order, debits no cash, registers no stop state,
+    consumes no position id and emits no debug trace: [stop_check] is
+    {!Entry_stop_check.evaluate}, which does none of those. Cash, the notional
+    and sector caps, the share-class rule and sizing are deliberately ignored.
+    So are the entry-assembly gates (short side off, liquidity, bar recency,
+    delisting, declining MA) and, under [freeze_entry_at_first_breakout]
+    (default off), the re-pinning of a previously walked name's entry: the
+    shadow judges the screener's candidate as the cap cut it, and must not touch
+    the pin table. *)
+
 (** {1 Per-Friday capture handle}
 
     {!of_screen} is the whole computation, but a caller also needs somewhere to

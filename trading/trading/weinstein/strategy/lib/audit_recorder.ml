@@ -93,6 +93,14 @@ type exit_event = {
   max_adverse_excursion_pct : float;
 }
 
+module Top_n = struct
+  type shadow =
+    | Buyable of float
+    | No_structural_stop
+    | Stop_too_wide of float
+    | Already_held
+end
+
 type cascade_drop = {
   analysis : Stock_analysis.t;
   sector : Screener.sector_context;

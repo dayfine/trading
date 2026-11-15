@@ -84,20 +84,20 @@ let _sleeve_decisions ~gate ~held_set ~make_entry ~portfolio_value ~state
   |> List.sort ~compare:(fun (i, _, _) (j, _, _) -> Int.compare i j)
   |> List.map ~f:(fun (_, c, d) -> (c, d))
 
-(** Build the per-candidate entry constructor for a walk. Computes the
-    E-anchored trigger (both StopLimit flags armed — user decision 2026-08-05)
-    and threads the ticket-level stop-anchor knob
-    ([config.stop_anchor_at_entry_base], user go 2026-08-06) and the stop gate
-    on the uncapped trigger ({!Entry_cap_stop_gate}); all default-off, so the
-    closure is bit-identical to the pre-flag path when the flags are off (R1).
-    Factored out of {!entries_from_candidates} so that function stays under the
-    function-length limit. *)
-let _make_entry_fn ~config ~initial_stop_buffer ~bar_reader ~current_date
-    ~stop_states ~portfolio_value (cand : Screener.scored_candidate) =
+(** The walk's initial-stop check for one candidate: the E-anchored trigger
+    (both StopLimit flags armed — user decision 2026-08-05), the ticket-level
+    stop-anchor knob ([config.stop_anchor_at_entry_base], user go 2026-08-06)
+    and the stop gate on the uncapped trigger ({!Entry_cap_stop_gate}); all
+    default-off, so the check is bit-identical to the pre-flag path when the
+    flags are off (R1). Pure. {!entries_from_candidates} partially applies it
+    once per tick and hands that one closure both to {!_make_entry_fn} and to
+    the {!walk_report}, so the walk and the top-N shadow cannot drift. *)
+let _stop_check ~config ~initial_stop_buffer ~bar_reader ~current_date
+    (cand : Screener.scored_candidate) =
   let trigger_at_suggested =
     config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit
   in
-  Entry_audit_capture.make_entry_transition ~trigger_at_suggested
+  Entry_stop_check.evaluate ~trigger_at_suggested
     ~stop_anchor_at_entry_base:config.stop_anchor_at_entry_base
     ~continuation_stop_at_pullback_low:config.continuation_stop_at_pullback_low
     ~require_structural_stop:config.require_structural_stop
@@ -110,9 +110,21 @@ let _make_entry_fn ~config ~initial_stop_buffer ~bar_reader ~current_date
     ~min_stop_distance_pct:
       (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
          ~current_date cand)
-    ~portfolio_risk_config:config.portfolio_config
-    ~stops_config:config.stops_config ~initial_stop_buffer ~stop_states
-    ~bar_reader ~portfolio_value ~current_date cand
+    ~stops_config:config.stops_config ~initial_stop_buffer ~bar_reader
+    ~current_date cand
+
+(** Build the per-candidate entry constructor for a walk: the tick's
+    [stop_check] ({!_stop_check}), then sizing and the ticket
+    ({!Entry_audit_capture.entry_of_stop_check}) — together exactly
+    {!Entry_audit_capture.make_entry_transition}. Factored out of
+    {!entries_from_candidates} so that function stays under the function-length
+    limit. *)
+let _make_entry_fn ~config ~stop_check ~current_date ~stop_states
+    ~portfolio_value (cand : Screener.scored_candidate) =
+  stop_check cand
+  |> Entry_audit_capture.entry_of_stop_check
+       ~portfolio_risk_config:config.portfolio_config ~stop_states
+       ~portfolio_value ~current_date cand
 
 (** The two pre-walk transforms of the candidate list, both default-off
     identities (R1):
@@ -152,41 +164,69 @@ let _initial_stop_buffer ~config ~macro =
       Stop_buffer_by_state.buffer_for config.initial_stop_buffer_by_macro_state
         ~fallback:config.initial_stop_buffer ~state:m.breadth_state
 
-(* G3: what one position still owes on a resting entry ticket, 0 for anything
-   that is not one.
+(* The combined walk by default (bit-identical to the pre-sleeve path); under a
+   reserved short sleeve, a long and a short walk sharing [state]'s
+   notional/sector accumulators. *)
+let _walk_decisions ~config ~gate ~held_set ~make_entry ~portfolio_value ~state
+    ~spendable candidates =
+  if Float.( <= ) config.short_sleeve_fraction 0.0 then
+    _classify_candidates ~gate ~held_set ~make_entry ~portfolio_value ~state
+      candidates
+  else
+    _sleeve_decisions ~gate ~held_set ~make_entry ~portfolio_value ~state
+      ~long_cash:
+        (Screening_notional.long_budget ~config ~spendable ~portfolio_value)
+      ~short_budget:(portfolio_value *. config.short_sleeve_fraction)
+      candidates
 
-   Only the UNFILLED remainder counts — a partial fill already drew its own cash
-   out of [portfolio.cash], so charging [target_quantity] would double-count it.
-   Longs only: an entering short credits cash on fill, so reserving against one
-   would shrink the budget for a claim that pays in.
+type walk_report = {
+  long_cash_left_pct : float;
+  held : String.Set.t;
+  stop_check : Screener.scored_candidate -> Entry_stop_check.t;
+}
 
-   Split out of the fold below rather than inlined: the per-position rule is the
-   part with the two easy-to-get-wrong cases, and keeping it a named function
-   keeps both it and the fold under the nesting limit. *)
-let _resting_ticket_cost_of (pos : Position.t) =
-  match (pos.state, pos.side) with
-  | ( Position.Entering { target_quantity; entry_price; filled_quantity; _ },
-      Trading_base.Types.Long ) ->
-      (target_quantity -. filled_quantity) *. entry_price
-  | _ -> 0.0
+type 'config entries_fn =
+  ?sector_lookup:(string -> string option) ->
+  ?pending_entry_e:Entry_freeze.t ->
+  ?suspended_held:string list ->
+  config:'config ->
+  candidates:Screener.scored_candidate list ->
+  stop_states:Weinstein_stops.stop_state String.Map.t ref ->
+  bar_reader:Bar_reader.t ->
+  portfolio:Portfolio_view.t ->
+  get_price:(string -> Types.Daily_price.t option) ->
+  current_date:Date.t ->
+  ?audit_recorder:Audit_recorder.t ->
+  ?macro:Macro.result ->
+  ?on_candidates_considered:(Audit_recorder.walk_decision list -> unit) ->
+  ?on_walk_report:(walk_report -> unit) ->
+  unit ->
+  Position.transition list
 
-(* Total the book has committed to tickets that have not yet drawn their cash. *)
-let _resting_long_ticket_cost (portfolio : Portfolio_view.t) =
-  Map.fold portfolio.positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
-      acc +. _resting_ticket_cost_of pos)
+(* What a placed long ticket drew from the walk's cash: the charge
+   [Entry_audit_capture.check_cash_and_deduct] made and no later gate refunded. *)
+let _long_ticket_cost (d : Entry_audit_capture.candidate_decision) =
+  match d with
+  | Kept ({ kind = Position.CreateEntering e; _ }, _)
+    when Trading_base.Types.equal_position_side e.side Trading_base.Types.Long
+    ->
+      e.target_quantity *. e.entry_price
+  | Kept _ | Skipped _ -> 0.0
 
-(* Cash the walk may commit this tick.
-
-   The default is [portfolio.cash] verbatim. Under G3 the resting tickets'
-   unfilled cost is held back, because the per-tick [remaining_cash] discipline
-   in {!Entry_audit_capture.check_cash_and_deduct} is re-seeded every tick and
-   so cannot see that last week's tickets have already claimed this week's cash.
-   Floored at 0: over-commitment from before the flag was armed must not produce
-   a negative budget. *)
-let _spendable_cash ~config (portfolio : Portfolio_view.t) =
-  if config.reserve_cash_for_resting_tickets then
-    Float.max 0.0 (portfolio.cash -. _resting_long_ticket_cost portfolio)
-  else portfolio.cash
+(* [stop_check] is the closure the walk's own [make_entry] was built from. *)
+let _walk_report ~config ~spendable ~stop_check ~held_set ~portfolio_value
+    decisions =
+  let long_budget =
+    Screening_notional.long_budget ~config ~spendable ~portfolio_value
+  in
+  let spent =
+    List.sum (module Float) decisions ~f:(fun (_, d) -> _long_ticket_cost d)
+  in
+  let long_cash_left_pct =
+    if Float.( <= ) portfolio_value 0.0 then 0.0
+    else (long_budget -. spent) /. portfolio_value
+  in
+  { long_cash_left_pct; held = held_set; stop_check }
 
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
@@ -212,7 +252,7 @@ let entries_from_candidates ?sector_lookup
     ?(pending_entry_e = Entry_freeze.create ()) ?(suspended_held = []) ~config
     ~candidates ~stop_states ~bar_reader ~(portfolio : Portfolio_view.t)
     ~get_price ~current_date ?(audit_recorder = Audit_recorder.noop) ?macro
-    ?on_candidates_considered () =
+    ?on_candidates_considered ?on_walk_report () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let initial_stop_buffer = _initial_stop_buffer ~config ~macro in
   let candidates =
@@ -220,29 +260,22 @@ let entries_from_candidates ?sector_lookup
       ~bar_reader ~current_date candidates
   in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
-  let make_entry =
-    _make_entry_fn ~config ~initial_stop_buffer ~bar_reader ~current_date
-      ~stop_states ~portfolio_value
+  let stop_check =
+    _stop_check ~config ~initial_stop_buffer ~bar_reader ~current_date
   in
-  let spendable = _spendable_cash ~config portfolio in
+  let make_entry =
+    _make_entry_fn ~config ~stop_check ~current_date ~stop_states
+      ~portfolio_value
+  in
+  let spendable = Screening_notional.spendable_cash ~config portfolio in
   let state =
     Screening_notional.make_entry_walk_state ~cash:spendable ~config ~portfolio
       ~portfolio_value ~sector_lookup
   in
   let gate = Share_class_gate.create ~config ~portfolio ~suspended_held in
   let decisions =
-    if Float.( <= ) config.short_sleeve_fraction 0.0 then
-      (* No-op default: single combined walk over [candidates], bit-identical
-         to the pre-sleeve path. *)
-      _classify_candidates ~gate ~held_set ~make_entry ~portfolio_value ~state
-        candidates
-    else
-      (* Reserved short sleeve: partition the cash budget between a long and a
-         short walk that share [state]'s notional/sector accumulators. *)
-      let short_budget = portfolio_value *. config.short_sleeve_fraction in
-      let long_cash = Float.max 0.0 (spendable -. short_budget) in
-      _sleeve_decisions ~gate ~held_set ~make_entry ~portfolio_value ~state
-        ~long_cash ~short_budget candidates
+    _walk_decisions ~config ~gate ~held_set ~make_entry ~portfolio_value ~state
+      ~spendable candidates
   in
   let kept =
     List.filter_map decisions ~f:(fun (_, d) ->
@@ -252,9 +285,12 @@ let entries_from_candidates ?sector_lookup
   in
   Entry_audit_emit.emit_entries ~audit_recorder ~pending_entry_e ~macro
     ~current_date ~decisions;
-  (* G1 (#2490) + #3139: hand the whole walk's decisions to the caller so
-     they land on this Friday's cascade event even when [kept] is empty. Absent
-     callback = the projection is never computed. *)
+  (* G1 (#2490) + #3139, and the top-N view: hand the walk's decisions and
+     report to the caller. Absent callbacks = neither is ever computed. *)
   Option.iter on_candidates_considered ~f:(fun f ->
       f (Entry_audit_emit.walk_decisions_of ~decisions));
+  Option.iter on_walk_report ~f:(fun f ->
+      f
+        (_walk_report ~config ~spendable ~stop_check ~held_set ~portfolio_value
+           decisions));
   kept

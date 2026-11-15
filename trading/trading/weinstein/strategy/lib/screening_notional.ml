@@ -62,6 +62,50 @@ type entry_walk_state = {
 
 let borrowed_balance state = Float.max 0.0 (-. !(state.remaining_cash))
 
+(* G3: what one position still owes on a resting entry ticket, 0 for anything
+   that is not one.
+
+   Only the UNFILLED remainder counts — a partial fill already drew its own cash
+   out of [portfolio.cash], so charging [target_quantity] would double-count it.
+   Longs only: an entering short credits cash on fill, so reserving against one
+   would shrink the budget for a claim that pays in.
+
+   Split out of the fold below rather than inlined: the per-position rule is the
+   part with the two easy-to-get-wrong cases, and keeping it a named function
+   keeps both it and the fold under the nesting limit. *)
+let _resting_ticket_cost_of (pos : Position.t) =
+  match (pos.state, pos.side) with
+  | ( Position.Entering { target_quantity; entry_price; filled_quantity; _ },
+      Trading_base.Types.Long ) ->
+      (target_quantity -. filled_quantity) *. entry_price
+  | _ -> 0.0
+
+(* Total the book has committed to tickets that have not yet drawn their cash. *)
+let _resting_long_ticket_cost (portfolio : Portfolio_view.t) =
+  Map.fold portfolio.positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
+      acc +. _resting_ticket_cost_of pos)
+
+(* Cash the walk may commit this tick.
+
+   The default is [portfolio.cash] verbatim. Under G3 the resting tickets'
+   unfilled cost is held back, because the per-tick [remaining_cash] discipline
+   in {!Entry_audit_capture.check_cash_and_deduct} is re-seeded every tick and
+   so cannot see that last week's tickets have already claimed this week's cash.
+   Floored at 0: over-commitment from before the flag was armed must not produce
+   a negative budget. *)
+let spendable_cash ~(config : Weinstein_strategy_config.config)
+    (portfolio : Portfolio_view.t) =
+  if config.reserve_cash_for_resting_tickets then
+    Float.max 0.0 (portfolio.cash -. _resting_long_ticket_cost portfolio)
+  else portfolio.cash
+
+let long_budget ~(config : Weinstein_strategy_config.config) ~spendable
+    ~portfolio_value =
+  if Float.( <= ) config.short_sleeve_fraction 0.0 then spendable
+  else
+    Float.max 0.0
+      (spendable -. (portfolio_value *. config.short_sleeve_fraction))
+
 let make_entry_walk_state ~cash ~(config : Weinstein_strategy_config.config)
     ~(portfolio : Portfolio_view.t) ~portfolio_value ~sector_lookup =
   let short_notional_acc =
