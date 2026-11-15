@@ -120,18 +120,22 @@ A flag opens a pre-registration on a disjoint window. It is not a promotion.
 `trading/devtools/checks/obs_read_check.sh` runs under `dune runtest`.
 
 **Fixture.** `trading/devtools/checks/fixtures/obs_read/gen_fixture.sh` builds five seeds of made-up NAVs, with no
-bars. It has three arms:
+bars, over seven years. Its eleven arms (table in the generator's header) pin every clause of the flag rule in both
+directions:
 
-- a slope arm, which must flag UP;
-- a one-step lottery arm, which must not flag; only its step clause fails;
-- a harm arm, which must flag HARM.
+- a slope arm, which must flag UP, and a harm arm, which must flag HARM;
+- an UP arm and a HARM arm that sit on every boundary (median D_end ±0.2000, exactly 4 seeds at 60 % or more with
+  three at 5/7, largest step share 0.499), which must flag;
+- for each clause and each direction, an arm that misses only that clause by a hair and must not flag: median D_end
+  ±0.1999; 3 seeds at 60 % or more, with two at 4/7 = 0.571; a step share of 0.500, or the one-step lottery at 0.85;
+- a zero year (seed k0 of each seeds near-miss is identical to S through 2010), which must count as neither sign.
 
 The appended rows must equal `expected_surface.tsv` beside it.
 
-**Refusals.** Each of these must leave the surface unchanged:
+**Refusals.** Each of these must leave the surface it targets byte-identical:
 
 - a failed V6 log;
 - an out dir that git would track;
 - unpaired equity curves;
 - a surface with another header;
-- a row carrying a value the size of a price or NAV level.
+- a max-drawdown delta the size of a price or NAV level, read end to end through `obs_read.sh`.
