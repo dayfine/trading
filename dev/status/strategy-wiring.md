@@ -65,8 +65,10 @@ All items complete. Awaiting QC review.
 - 2026-11-14: Friday pipeline demo, `trading/trading/weinstein/strategy/friday_demo/`.
   Prints what the strategy's Friday path does stage by stage on a synthetic
   market, with the trace checked in as a golden and a test that its orders
-  match `on_market_close`. Follow-up: a local-only CLI that prints the same
-  trace for a real date from real bars.
+  match `on_market_close`. Each stage's "Does:" prose is built from the run's
+  config (`lib/friday_trace_rules.ml`), with the demo's own settings marked.
+  Follow-up: a local-only CLI that prints the same trace for a real date from
+  real bars.
 
 ## Dependencies
 - None between items. Either can land first.

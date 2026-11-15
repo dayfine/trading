@@ -6,6 +6,12 @@ module Audit_recorder = Weinstein_strategy.Audit_recorder
 let _closes closes =
   String.concat ~sep:" " (List.map closes ~f:(sprintf "%7.2f"))
 
+let _inputs_output =
+  sprintf
+    "the last weekly closes (oldest first), and this week's volume over the \
+     prior %d weeks' average."
+    Volume.default_config.lookback_bars
+
 let _stage1 buf (t : P.t) =
   header buf ~n:1 ~title:"INPUTS"
     ~does:[ "rolls each ticker's daily bars up to weeks ending on Friday." ]
@@ -14,9 +20,7 @@ let _stage1 buf (t : P.t) =
          (Date.to_string t.setup.date)
          (List.length t.tickers) t.setup.config.indices.primary
          (List.length t.sectors))
-    ~output:
-      "the last weekly closes (oldest first), and this week's volume over the \
-       prior 4 weeks' average.";
+    ~output:_inputs_output;
   row buf "%-12s %-12s %31s %8s" "ticker" "sector" "weekly closes" "vol/avg";
   List.iter t.tickers ~f:(fun (r : P.ticker_row) ->
       row buf "%-12s %-12s %31s %8s" r.ticker
@@ -30,24 +34,6 @@ let _transition (r : P.ticker_row) =
       sprintf "  <- Stage %d to %d" (stage_number from) (stage_number to_)
   | None -> ""
 
-let _stage_rules (sc : Stage.config) =
-  [
-    sprintf
-      "places each stock in Stage 1-4 by its close against the %d-week moving"
-      sc.ma_period;
-    sprintf
-      "average (MA). Stage 2: the MA rising (up over %s in %d weeks) and the \
-       close"
-      (pct sc.slope_threshold) sc.slope_lookback;
-    sprintf
-      "above it in most of the last %d weeks. Stage 4: the MA falling and the \
-       close"
-      sc.confirm_weeks;
-    "mostly below it. A flat MA keeps last week's reading: Stage 1 after a \
-     base or";
-    "a decline, Stage 3 after an advance.";
-  ]
-
 let _stage2_row buf (sc : Stage.config) (r : P.ticker_row) =
   row buf "%-12s %8.2f %9s %5d/%d  %-16s %s%s" r.ticker r.stage.ma_value
     (signed_pct r.stage.ma_slope_pct)
@@ -57,7 +43,8 @@ let _stage2_row buf (sc : Stage.config) (r : P.ticker_row) =
 
 let _stage2 buf (t : P.t) =
   let sc = t.setup.config.stage_config in
-  header buf ~n:2 ~title:"STAGE CLASSIFICATION" ~does:(_stage_rules sc)
+  header buf ~n:2 ~title:"STAGE CLASSIFICATION"
+    ~does:(Friday_trace_rules.stage_classification sc)
     ~input:
       "the weekly closes, and last Friday's stage (state the strategy carries)."
     ~output:"this Friday's stage. A change of stage number is a transition.";
@@ -86,11 +73,7 @@ let _macro_gate_line buf (t : P.t) =
 let _stage3 buf (t : P.t) =
   let m = t.macro and c = t.setup.config in
   header buf ~n:3 ~title:"MACRO GATE"
-    ~does:
-      [
-        "reads the market as a whole from weighted indicators. A Bearish market";
-        "blocks new buys; a Bullish one blocks new shorts.";
-      ]
+    ~does:(Friday_trace_rules.macro_gate c)
     ~input:
       (sprintf
          "the index %s; the A-D line and global indices too when supplied \
@@ -126,10 +109,9 @@ let _stage4 buf (t : P.t) =
     ~does:
       [
         "rates each sector from its ETF's stage and relative strength (RS) \
-         against";
-        "the index. A Stage 2 stock in a Weak sector is not bought, a Stage 4 \
-         stock in";
-        "a Strong sector is not shorted, and only Stage 2 and 4 stocks go on.";
+         against the index. A Stage 2 stock in a Weak sector is not bought, a \
+         Stage 4 stock in a Strong sector is not shorted, and only Stage 2 and \
+         4 stocks go on.";
       ]
     ~input:"each sector ETF's weekly bars, the index, and each stock's stage."
     ~output:"a rating per sector, and the stocks that go on to full analysis.";
@@ -178,33 +160,9 @@ let _rs_cell (a : Stock_analysis.t) =
     (fun (r : Rs.result) -> unqualified (Weinstein_types.show_rs_trend r.trend))
     a.rs
 
-let _on_off ~on text = if on then text else text ^ " (off)"
-
-let _cascade_rules (c : Weinstein_strategy.Weinstein_strategy_config.config) =
-  let sc = c.screening_config in
-  [
-    "checks each analysed stock against the buy rules in order; the first rule \
-     it";
-    "fails is where it stops. Long rules: "
-    ^ _on_off ~on:Float.(sc.min_price > 0.0) "price floor"
-    ^ " -> stage setup";
-    sprintf
-      "(a Stage 1 to 2 transition, or Stage 2 for at most %d weeks) -> \
-       breakout volume"
-      sc.early_stage2_max_weeks;
-    sprintf
-      "(at least %.1fx the prior %d weeks) -> RS not declining -> %s -> %s."
-      Volume.default_config.adequate_threshold
-      Volume.default_config.lookback_bars
-      (_on_off
-         ~on:Float.(sc.failed_breakout_tolerance_pct > 0.0)
-         "failed breakout")
-      (_on_off ~on:(Option.is_some sc.volume_ratio_exclude_range) "volume band");
-  ]
-
 let _stage5 buf (t : P.t) =
   header buf ~n:5 ~title:"BREAKOUT CASCADE"
-    ~does:(_cascade_rules t.setup.config)
+    ~does:(Friday_trace_rules.breakout_cascade t.setup.config)
     ~input:
       "per analysed stock: stage, breakout-week volume, RS against the index."
     ~output:"where each stock stopped, per side.";
@@ -236,6 +194,9 @@ let render (t : P.t) =
     (Day_of_week.to_string_long (Date.day_of_week t.setup.date));
   bprintf buf "Account: %s cash, portfolio value %s.\n" (money t.setup.cash)
     (money t.setup.portfolio_value);
+  bprintf buf
+    "Rule values quoted under \"Does:\" are read from the config this run uses:\n";
+  bprintf buf "the strategy default, except where marked as a demo setting.\n";
   _stage1 buf t;
   _stage2 buf t;
   _stage3 buf t;

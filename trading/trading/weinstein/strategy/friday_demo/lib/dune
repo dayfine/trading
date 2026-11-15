@@ -17,4 +17,5 @@
   weinstein.screener
   weinstein.stock_analysis
   weinstein_trading.portfolio_risk
+  weinstein_trading.stops
   weinstein_trading.strategy))

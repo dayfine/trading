@@ -1,5 +1,7 @@
 WEINSTEIN STRATEGY: ONE FRIDAY, STAGE BY STAGE (2024-06-28, Friday)
 Account: $100,000.00 cash, portfolio value $100,000.00.
+Rule values quoted under "Does:" are read from the config this run uses:
+the strategy default, except where marked as a demo setting.
 
 ==== STAGE 1 of 9: INPUTS ====
   Does: rolls each ticker's daily bars up to weeks ending on Friday.
@@ -19,9 +21,11 @@ Account: $100,000.00 cash, portfolio value $100,000.00.
 
 ==== STAGE 2 of 9: STAGE CLASSIFICATION ====
   Does: places each stock in Stage 1-4 by its close against the 30-week moving
-        average (MA). Stage 2: the MA rising (up over 0.5% in 4 weeks) and the close
-        above it in most of the last 6 weeks. Stage 4: the MA falling and the close
-        mostly below it. A flat MA keeps last week's reading: Stage 1 after a base or
+        average (MA).
+        Stage 2: the MA rising (up over 0.5% in 4 weeks) and the close above it in
+        most of the last 6 weeks.
+        Stage 4: the MA falling and the close mostly below it.
+        With a flat MA the stage is decided by last week's: Stage 1 after a base or
         a decline, Stage 3 after an advance.
   In:   the weekly closes, and last Friday's stage (state the strategy carries).
   Out:  this Friday's stage. A change of stage number is a transition.
@@ -38,8 +42,10 @@ Account: $100,000.00 cash, portfolio value $100,000.00.
   DEMO_TIE_B      50.53    +0.62%     4/6  Stage 1 (wk 29)  Stage 2 (wk 1)  <- Stage 1 to 2
 
 ==== STAGE 3 of 9: MACRO GATE ====
-  Does: reads the market as a whole from weighted indicators. A Bearish market
-        blocks new buys; a Bullish one blocks new shorts.
+  Does: reads the market as a whole from weighted indicators. The confidence is the
+        Bullish share of the weight of the indicators that are not Neutral.
+        A Bearish market blocks new buys and a Bullish one blocks new shorts; a
+        Neutral one allows new buys and blocks new shorts.
   In:   the index DEMO_INDEX; the A-D line and global indices too when supplied (none here).
   Out:  the market trend, and which side may open new positions.
 
@@ -54,8 +60,8 @@ Account: $100,000.00 cash, portfolio value $100,000.00.
 
 ==== STAGE 4 of 9: SECTORS AND PRE-SCREEN ====
   Does: rates each sector from its ETF's stage and relative strength (RS) against
-        the index. A Stage 2 stock in a Weak sector is not bought, a Stage 4 stock in
-        a Strong sector is not shorted, and only Stage 2 and 4 stocks go on.
+        the index. A Stage 2 stock in a Weak sector is not bought, a Stage 4 stock
+        in a Strong sector is not shorted, and only Stage 2 and 4 stocks go on.
   In:   each sector ETF's weekly bars, the index, and each stock's stage.
   Out:  a rating per sector, and the stocks that go on to full analysis.
 
@@ -76,9 +82,16 @@ Account: $100,000.00 cash, portfolio value $100,000.00.
 
 ==== STAGE 5 of 9: BREAKOUT CASCADE ====
   Does: checks each analysed stock against the buy rules in order; the first rule it
-        fails is where it stops. Long rules: price floor (off) -> stage setup
-        (a Stage 1 to 2 transition, or Stage 2 for at most 4 weeks) -> breakout volume
-        (at least 1.5x the prior 4 weeks) -> RS not declining -> failed breakout (off) -> volume band (off).
+        fails is where it stops. Long rules:
+        price floor (off)
+        -> stage setup: a Stage 1 to 2 transition, or Stage 2 for at most 4 weeks;
+        or Stage 2 at any age when the breakout reaches new high ground (above every
+        weekly high of the last 10 years, or with no overhead supply in the last 130
+        weeks)
+        -> breakout volume: at least 1.5x the prior 4 weeks
+        -> RS not declining
+        -> failed breakout (off)
+        -> volume band (off)
   In:   per analysed stock: stage, breakout-week volume, RS against the index.
   Out:  where each stock stopped, per side.
 
@@ -93,7 +106,7 @@ Account: $100,000.00 cash, portfolio value $100,000.00.
   No stock was checked as a short: the macro gate (stage 3) closed new shorts.
 
 ==== STAGE 6 of 9: SCORING ====
-  Does: adds up points for each signal a breakout carries. The total maps to a grade:
+  Does: adds up points for each signal a breakout carries, and grades the total:
         A+ >= 85, A >= 70, B >= 55, C >= 40, D >= 25. The lowest grade bought is C.
   In:   the stocks that passed the breakout gates.
   Out:  a score and a grade per stock; a grade below the lowest stops it.
@@ -128,9 +141,12 @@ Account: $100,000.00 cash, portfolio value $100,000.00.
                 +15  Virgin territory
 
 ==== STAGE 7 of 9: RANKING ====
-  Does: orders the graded stocks by score, highest first. Equal scores go by
-        a seeded hash of the ticker (seed 7, date 2024-06-28), smallest first.
-        Only the top 4 (max_buy_candidates) go on to the entry walk.
+  Does: orders the graded stocks by score, highest first. Equal scores go by a hash
+        of the ticker and the date (2024-06-28) seeded with 7 (demo setting; the
+        default is 0), smallest first.
+        Only the top names on each side go on to the entry walk:
+        longs: max_buy_candidates = 4 (demo setting; the default is 20)
+        shorts: max_short_candidates = 10
   In:   the graded stocks.
   Out:  the ranked list, and the cut.
 
@@ -144,27 +160,35 @@ Account: $100,000.00 cash, portfolio value $100,000.00.
 
 ==== STAGE 8 of 9: ENTRY WALK ====
   Does: takes the names above the cut in rank order. The trigger is the last close.
-        The initial stop goes just under the low of the last pullback of 8.0% or
-        more; with no such pullback it is a fallback stop. A stop over 15.0% below
-        the trigger is skipped (book 5.1), and so is a fallback stop (investor preset).
-        Shares: 1.0% of the portfolio at risk to the stop, within cash.
+        Initial stop: 4.0% (half of 8.0%) under the lowest low since the highest
+        high of the last 90 trading days, when that low is 8.0% or more below that
+        high. With no such low it is a fallback stop, 4.0% under the trigger. A stop
+        at or up to $0.125 above a half-dollar is moved to $0.125 below it.
+        Skipped: a stop more than 15.0% below the trigger (book 5.1), and a fallback
+        stop, since require_structural_stop is on (demo setting; the default is
+        off), as in the investor preset.
+        Shares: as many as put 1.0% of the portfolio at risk between trigger and
+        stop, but at most 30.0% of the portfolio in one long name (20.0% in one
+        short); a name that costs more than the cash left is skipped.
   In:   the names above the cut, and $100,000.00 cash.
   Out:  an entry ticket, or the reason for skipping, per name.
 
-  DEMO_WIDE    trigger 54.50, stop 39.92 (under the last correction low), 26.8% below
+  DEMO_WIDE    trigger 54.50, stop 39.92 (under the correction low), 26.8% below
                SKIPPED: stop more than 15.0% below the trigger. Cash unchanged.
-  DEMO_NOSTOP  trigger 54.50, stop 52.32 (fallback: no correction low found), 4.0% below
+  DEMO_NOSTOP  trigger 54.50, stop 52.32 (fallback: no qualifying correction low), 4.0% below
                SKIPPED: no correction low to put the stop under. Cash unchanged.
-  DEMO_GOOD    trigger 54.50, stop 47.14 (under the last correction low), 13.5% below
+  DEMO_GOOD    trigger 54.50, stop 47.14 (under the correction low), 13.5% below
                PLACED 135 shares: risk $993.62 of the $1,000.00 budget, cost $7,357.50
                cash $100,000.00 -> $92,642.50
-  DEMO_TIE_B   trigger 54.50, stop 47.14 (under the last correction low), 13.5% below
+  DEMO_TIE_B   trigger 54.50, stop 47.14 (under the correction low), 13.5% below
                PLACED 135 shares: risk $993.62 of the $1,000.00 budget, cost $7,357.50
                cash $92,642.50 -> $85,285.00
 
 ==== STAGE 9 of 9: ORDERS ====
-  Does: the day's output: one stop-entry ticket per placed name, for its shares at
-        its trigger, with the initial stop the position starts under once filled.
+  Does: puts out the day's orders: one stop-limit entry ticket per placed name, for
+        its shares. It triggers at the trigger price and does not fill more than
+        2.0% past it.
+        Once filled, the position starts under its initial stop.
   In:   the placed names.
   Out:  the tickets, worked from the next session.
 

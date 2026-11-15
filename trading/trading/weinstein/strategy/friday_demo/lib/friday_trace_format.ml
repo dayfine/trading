@@ -5,6 +5,11 @@ let signed_pct x = sprintf "%+.2f%%" (x *. 100.0)
 let money x = "$" ^ Float.to_string_hum ~delimiter:',' ~decimals:2 x
 let opt f = function Some x -> f x | None -> "-"
 
+let setting ~show ~equal ~default value =
+  if equal value default then show value
+  else
+    sprintf "%s (demo setting; the default is %s)" (show value) (show default)
+
 (* [ppx_deriving.show] qualifies constructors ("Weinstein_types.Bullish"). *)
 let unqualified s = List.last_exn (String.split s ~on:'.')
 
@@ -27,9 +32,26 @@ let side_name : Trading_base.Types.position_side -> string = function
   | Long -> "long"
   | Short -> "short"
 
+(* Width of the "Does:" text column; with its 8-column indent a line stays
+   within 84 columns. *)
+let _does_width = 76
+
+(* Greedy word wrap: each line takes words while it stays within [width]. *)
+let _wrap ~width text =
+  String.split text ~on:' '
+  |> List.filter ~f:(fun word -> not (String.is_empty word))
+  |> List.fold ~init:[] ~f:(fun lines word ->
+      match lines with
+      | line :: rest when String.length line + 1 + String.length word <= width
+        ->
+          (line ^ " " ^ word) :: rest
+      | _ -> word :: lines)
+  |> List.rev
+
 let header buf ~n ~title ~does ~input ~output =
   bprintf buf "\n==== STAGE %d of 9: %s ====\n" n title;
-  List.iteri does ~f:(fun i line ->
+  List.concat_map does ~f:(_wrap ~width:_does_width)
+  |> List.iteri ~f:(fun i line ->
       bprintf buf "  %s %s\n" (if i = 0 then "Does:" else "     ") line);
   bprintf buf "  In:   %s\n  Out:  %s\n\n" input output
 

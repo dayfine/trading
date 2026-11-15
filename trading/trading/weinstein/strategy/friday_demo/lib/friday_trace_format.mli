@@ -12,6 +12,13 @@ val money : float -> string
 val opt : ('a -> string) -> 'a option -> string
 (** [opt f x] is [f v] for [Some v], ["-"] for [None]. *)
 
+val setting :
+  show:('a -> string) -> equal:('a -> 'a -> bool) -> default:'a -> 'a -> string
+(** [setting ~show ~equal ~default v] prints a config value the trace quotes:
+    [show v] when [v] is the strategy default, and
+    ["<v> (demo setting; the default is <default>)"] when the demo changed it,
+    so the reader can tell the two apart. *)
+
 val unqualified : string -> string
 (** Drop the module path a derived [show] puts in front of a constructor:
     ["Weinstein_types.Bullish"] becomes ["Bullish"]. *)
@@ -33,7 +40,9 @@ val header :
   input:string ->
   output:string ->
   unit
-(** Print a stage's banner and its "Does / In / Out" lines. *)
+(** Print a stage's banner and its "Does / In / Out" lines. Each [does] element
+    is a paragraph: it starts on a new line and is word-wrapped, so a sentence
+    built from config values never needs wrapping by hand. *)
 
 val row : Buffer.t -> ('a, unit, string, unit) format4 -> 'a
 (** Print one indented table row. *)

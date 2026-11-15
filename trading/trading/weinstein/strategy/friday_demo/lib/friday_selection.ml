@@ -31,12 +31,14 @@ let _walk_row ~gate_stop ~entries cash_before (d : Audit_recorder.walk_decision)
   in
   (cash_after, row)
 
+let initial_stop_buffer (config : WS.Weinstein_strategy_config.config)
+    ~(macro : Macro.result) =
+  WS.Stop_buffer_by_state.buffer_for config.initial_stop_buffer_by_macro_state
+    ~fallback:config.initial_stop_buffer ~state:macro.breadth_state
+
 let walk_rows (config : WS.Weinstein_strategy_config.config) ~bar_reader ~date
-    ~(macro : Macro.result) ~cash ~entries decisions =
-  let initial_stop_buffer =
-    WS.Stop_buffer_by_state.buffer_for config.initial_stop_buffer_by_macro_state
-      ~fallback:config.initial_stop_buffer ~state:macro.breadth_state
-  in
+    ~macro ~cash ~entries decisions =
+  let initial_stop_buffer = initial_stop_buffer config ~macro in
   let gate_stop =
     WS.Entry_stop_width_order.gate_stop ~initial_stop_buffer ~config ~bar_reader
       ~current_date:date

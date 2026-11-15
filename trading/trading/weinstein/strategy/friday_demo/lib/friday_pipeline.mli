@@ -14,8 +14,10 @@
       measurements are recomputed for display through the same exported
       functions the screen uses, on copies of the strategy state.
 
-    [test_friday_demo.ml] checks {!run}'s orders against [on_market_close] on
-    the same fixture, so this module cannot drift from production unnoticed.
+    [test/test_friday_demo.ml] holds it to that: on the same fixture and
+    warmed-up state it runs the real [on_market_close] and requires {!run}'s
+    orders to equal its transitions, then checks the display-only columns (the
+    ranking cut, placed stops, stages, cash) against the strategy's own records.
 
     Not covered: A-D, breadth and global-index inputs to the macro gate (the
     demo has none), and the exits and stop updates a held position would get;

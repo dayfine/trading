@@ -27,10 +27,13 @@ an index and three sector ETFs. No vendor data is involved. The screen date is
 Friday 2024-06-28; before it, the real strategy runs on the 30 prior Fridays so
 that it carries last week's stage for every stock, as it would in a backtest.
 
-The demo config is the strategy default with three changes, all visible in the
-trace: a top-N of 4 (`max_buy_candidates`) so the cut shows, a fixed seed for
-the tiebreak among equal scores, and `require_structural_stop` (the investor
-preset) so a stock with no pullback to put a stop under is visibly refused.
+The demo config is the strategy default with three changes, each marked
+"demo setting" where the trace quotes it: a top-N of 4 (`max_buy_candidates`)
+so the cut shows, a fixed seed for the tiebreak among equal scores, and
+`require_structural_stop` (the investor preset) so a stock with no pullback to
+put a stop under is visibly refused. Every rule value in a stage's "Does:" text
+is read from that config (`lib/friday_trace_rules.ml`), not typed into the
+prose.
 
 | ticker | built as | where it stops |
 |---|---|---|
@@ -62,7 +65,7 @@ preset) so a stock with no pullback to put a stop under is visibly refused.
 8. **Entry walk**: per name above the cut, the trigger, the initial stop and
    its distance, the size from the 1 % risk budget, cash before and after, or
    the reason it was skipped.
-9. **Orders**: the stop-entry tickets the day produces.
+9. **Orders**: the stop-limit entry tickets the day produces.
 
 ## How it stays honest
 
@@ -76,10 +79,13 @@ strategy's state.
 `test/test_friday_demo.ml` holds it to that. On the same fixture and the same
 warmed-up state it runs the real `on_market_close` and requires the same
 orders (symbol, side, shares, trigger, initial stop) and nothing else; then it
-checks the display columns against the strategy's own records: the names above
-the ranking cut are the walk's, in its order; the stop shown for each placed
-name is the one the walk installed; each analysed stock's stage is the one the
-screen's analysis carried.
+checks the display columns against the strategy's own records: per side, the
+rows printed above the ranking cut are the walk's names in its order, and no
+admitted name is printed below it; the stop shown for each placed name is the
+one the walk installed; each analysed stock's stage columns are the ones the
+screen's analysis carried; the cash left after the walk is the starting cash
+less the orders' cost. It also pins that the demo config differs from the
+default only in the three settings the trace marks.
 
 ## Next
 

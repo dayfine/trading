@@ -1,6 +1,14 @@
 (** Stages 7 and 8 of {!Friday_pipeline.run}: the ranking and the entry walk,
     rebuilt for display from what the strategy recorded. *)
 
+val initial_stop_buffer :
+  Weinstein_strategy.Weinstein_strategy_config.config ->
+  macro:Macro.result ->
+  float
+(** This Friday's fallback stop buffer: the per-breadth-state multiplier when
+    the config sets one for [macro]'s breadth state, else [initial_stop_buffer].
+    The same resolution the entry walk makes. *)
+
 val walk_rows :
   Weinstein_strategy.Weinstein_strategy_config.config ->
   bar_reader:Weinstein_strategy.Bar_reader.t ->
