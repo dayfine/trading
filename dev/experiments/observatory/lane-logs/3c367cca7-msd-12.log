@@ -1,0 +1,68 @@
+[11-15 17:24:37Z] observatory lane run; LANE_SHA=3c367cca7ff5f5209136c7ad4625333c6acb08d4 PAR=2 CELL_TIMEOUT=20000s
+[11-15 17:24:45Z] TR push check ok (/home/user/trading/../trading-results)
+[11-15 17:24:46Z] public push check ok
+[11-15 17:24:46Z] HEAD=3c367cca7 image=ghcr.io/dayfine/trading-ci:latest  mem=15G par=2
+[11-15 17:24:46Z] disk free 30G
+[11-15 17:24:46Z] STATE from HEAD (no observatory/lane-results yet)
+[11-15 17:24:46Z] ARM msd-12: ((stops_config ((max_stop_distance_pct 0.12)))) (ledger: stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15)
+[11-15 17:24:46Z] disk free 30G
+[11-15 17:24:46Z] PULL warehouse v12wk-9236
+[11-15 17:32:58Z] PULL corpact corpact-2026-10-27
+[11-15 17:32:59Z] PULL bars data-20261102
+[11-15 17:33:43Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-15 17:33:43Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv
+[11-15 17:33:43Z] SPY YEARS from /home/user/trading/.sweep-output/observatory-lane/spy/data.csv: 19 bull, 8 bear
+[11-15 17:33:44Z] DOCKER daemon not answering (failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /var/run/docker.sock: connect: no such file or directory); starting dockerd
+[11-15 17:33:46Z] DOCKER dockerd started
+[11-15 17:33:46Z] BUILD
+[11-15 17:35:37Z] BUILD_DONE
+[11-15 17:35:37Z] SPEC CHECKS OK: obs-S-kK = rk-kK; obs-msd-12-kK = obs-S-kK + ((stops_config ((max_stop_distance_pct 0.12))))
+[11-15 17:35:37Z] PARALLEL 2 cells at a time (MemTotal 15 GB, reserve 3 GB, 6 GB per cell)
+[11-15 17:35:37Z] CELL obs-S-k0-s0 run
+[11-15 17:35:37Z] CELL obs-S-k1-s0 run
+[11-15 17:35:37Z] CELL obs-S-k2-s0 run
+[11-15 17:35:37Z] CELL obs-S-k3-s0 run
+[11-15 17:35:37Z] CELL obs-S-k4-s0 run
+[11-15 17:35:37Z] CELL obs-msd-12-k0-s0 run
+[11-15 17:35:37Z] CELL obs-msd-12-k1-s0 run
+[11-15 17:35:37Z] CELL obs-msd-12-k2-s0 run
+[11-15 17:35:37Z] CELL obs-msd-12-k3-s0 run
+[11-15 17:35:37Z] CELL obs-msd-12-k4-s0 run
+[11-15 17:35:37Z] BATCH 1: obs-S-k0-s0 obs-S-k1-s0
+[11-15 17:35:37Z] BATCH 2: obs-S-k2-s0 obs-S-k3-s0
+[11-15 17:35:37Z] BATCH 3: obs-S-k4-s0 obs-msd-12-k0-s0
+[11-15 17:35:37Z] BATCH 4: obs-msd-12-k1-s0 obs-msd-12-k2-s0
+[11-15 17:35:37Z] BATCH 5: obs-msd-12-k3-s0 obs-msd-12-k4-s0
+[11-15 17:35:37Z] PREFLIGHT obs-msd-12-k0 (to 2000-03-31)
+[11-15 17:39:54Z] PREFLIGHT_OK 3c367cca7 obs-msd-12-k0 (n_symbols=9200 absent=1)
+[11-15 17:39:54Z] RUN obs-S-k1-s0
+[11-15 17:39:54Z] RUN obs-S-k0-s0
+[11-15 19:36:51Z] RESULT obs-S-k1-s0 => total_return_pct 1678.3331344277278 total_trades 568 max_drawdown_pct 24.551569709571016 peak_rss_kb=5722272 (wall 7017s)
+[11-15 19:36:58Z] RESULT obs-S-k0-s0 => total_return_pct 1472.7554563229353 total_trades 576 max_drawdown_pct 27.21768913331405 peak_rss_kb=5737084 (wall 7024s)
+[11-15 19:36:58Z] disk free 16G
+[11-15 19:36:58Z] RUN obs-S-k2-s0
+[11-15 19:36:58Z] RUN obs-S-k3-s0
+[11-15 21:32:47Z] RESULT obs-S-k2-s0 => total_return_pct 1334.989897511811 total_trades 562 max_drawdown_pct 32.07586548780489 peak_rss_kb=5735304 (wall 6949s)
+[11-15 21:34:11Z] RESULT obs-S-k3-s0 => total_return_pct 1220.14585307154 total_trades 562 max_drawdown_pct 25.558343357764624 peak_rss_kb=5760220 (wall 7033s)
+[11-15 21:34:11Z] disk free 16G
+[11-15 21:34:11Z] RUN obs-S-k4-s0
+[11-15 21:34:11Z] RUN obs-msd-12-k0-s0
+[11-15 23:24:48Z] RESULT obs-msd-12-k0-s0 => total_return_pct 1098.7269030112027 total_trades 415 max_drawdown_pct 24.970362632157219 peak_rss_kb=5708332 (wall 6637s)
+[11-15 23:29:19Z] RESULT obs-S-k4-s0 => total_return_pct 1639.5074156607905 total_trades 548 max_drawdown_pct 25.10502676696462 peak_rss_kb=5726528 (wall 6908s)
+[11-15 23:29:19Z] disk free 16G
+[11-15 23:29:19Z] RUN obs-msd-12-k1-s0
+[11-15 23:29:19Z] RUN obs-msd-12-k2-s0
+[11-16 01:18:36Z] RESULT obs-msd-12-k2-s0 => total_return_pct 1042.2000515131233 total_trades 408 max_drawdown_pct 27.31198018381421 peak_rss_kb=5717708 (wall 6557s)
+[11-16 01:19:01Z] RESULT obs-msd-12-k1-s0 => total_return_pct 1093.2260914429462 total_trades 423 max_drawdown_pct 25.980041743953297 peak_rss_kb=5701252 (wall 6582s)
+[11-16 01:19:01Z] disk free 16G
+[11-16 01:19:01Z] RUN obs-msd-12-k4-s0
+[11-16 01:19:01Z] RUN obs-msd-12-k3-s0
+[11-16 03:10:42Z] RESULT obs-msd-12-k3-s0 => total_return_pct 972.61940258386142 total_trades 421 max_drawdown_pct 23.819835345331704 peak_rss_kb=5694948 (wall 6701s)
+[11-16 03:10:59Z] RESULT obs-msd-12-k4-s0 => total_return_pct 719.27931754568544 total_trades 420 max_drawdown_pct 27.195947421125972 peak_rss_kb=5686216 (wall 6718s)
+[11-16 03:10:59Z] disk free 16G
+[11-16 03:10:59Z] TRIPWIRE MATCH S k0 trades.csv md5 0928cfe40333560429f5a6e57c9c18de (the record (#3595 pb-S-k0 = #3602 pbb-S-k0))
+[11-16 03:11:01Z] V6 OK msd-12 (k0-k4 against S)
+[11-16 03:11:01Z] LIVE msd-12: trades.csv differs from S on 5 of 5 seeds
+[11-16 03:11:03Z] READ msd-12: obs_read: msd-12 row 1 appended -> median D_end -0.2716, flag none
+[11-16 03:11:03Z] QUEUE msd-12 -> done@3c367cca7
+[11-16 03:11:03Z] DRIFT none: no earlier HEAD has a finished S in trading-results
