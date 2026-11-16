@@ -1,9 +1,11 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-11-02
+## Last updated: 2026-11-15
 
 ## Status
 IN_PROGRESS
+
+Next task: parked: the paired off/on surface and the shorts close-out (a)/(c) await the user. Parked on purpose by user decision 2026-11-15 (pacer #3635): KEEP_AS_INFO until the user decides.
 
 ## 2026-11-02 — laggard rotation: split-adjusted returns + streak clear, default-off (#3426, branch `feat/laggard-split-streak`)
 

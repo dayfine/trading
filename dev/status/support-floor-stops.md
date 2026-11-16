@@ -1,9 +1,11 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-10-02
+## Last updated: 2026-11-15
 
 ## Status
-IN_PROGRESS
+MERGED
+
+Closed 2026-11-15 (user decision, pacer #3635): floor-nearest SM was INCONCLUSIVE (#3446) and there is no next step; it can reopen with a new mechanism argument. Sections below are history, not queued: every branch under `## Open PR` has merged.
 
 ## Interface stable
 YES
