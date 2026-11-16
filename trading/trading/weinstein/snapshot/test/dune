@@ -13,7 +13,8 @@
   test_render_weekly_report_cli
   test_snapshot_validator
   test_report_cross_artifact
-  test_committed_records)
+  test_committed_records
+  test_public_summary)
  (libraries
   weinstein_trading.snapshot
   status

@@ -4,6 +4,7 @@
   verify_corporate_actions
   diff_picks
   render_weekly_report
+  public_picks_summary
   validate_weekly_snapshot)
  (libraries
   core
