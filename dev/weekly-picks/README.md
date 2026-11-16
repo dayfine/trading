@@ -124,6 +124,50 @@ readings follow the index closing under its 30-week weighted MA as that MA
 flattened (late Stage 2, then Stage 3, which this path scores Bearish), not
 stale data.
 
+
+## Weekly cadence
+
+**Owner:** the local Saturday slot (user decision 2026-11-16): one local session each
+Saturday after Friday's close. First run: Sat 2026-11-21, as-of 2026-11-20. Run it before
+Monday's open, so the bars it fetches end on the Friday.
+
+```sh
+EODHD_API_KEY=... TR=~/Projects/trading-results SYSVER=<short sha of main@origin> \
+  sh dev/weekly-picks/weekly.sh [--dry-run] 2026-11-20
+```
+
+`--dry-run` prints every command and output path and runs nothing. A real run builds the
+executables, refreshes bars through the Friday (last week's warehouse superset plus the new
+eligible list, one `fetch_symbols` per shard-disjoint bucket), rebuilds the inventory, the
+eligible universe (minus the csv-only names in
+`$TR/dev/weekly-picks/89a08b1fe/controls/csv-only-excluded.txt`) and the warehouse, then
+generates, validates and renders on `record-config-overrides.sexp`. Each step leaves a
+marker in `dev/data/weekly-picks-<friday>/done/`, so a re-run resumes at the first
+unfinished one. `SYSVER` defaults to the checkout's git HEAD; a jj workspace has none, so
+pass it. The bar store and the warehouse are read from the main checkout (`dev/data/`).
+
+**Publish** (the script commits, pushes and opens nothing; it prints these):
+
+1. Private records: `git -C $TR add dev/weekly-picks/<sysver> && git -C $TR commit && git -C $TR push`.
+   The full `.sexp/.md/.html`, `.validation.txt` and `universe-<date>.sexp` print prices and
+   stay out of this repo, PRs, logs and artifacts (EODHD terms).
+2. Public summary: `dev/weekly-picks/<sysver>/<friday>-picks.md` (`WEEKLY_PUBLIC_ROOT=<workspace>` writes it into a docs workspace) on a docs branch off
+   `main@origin`, one docs PR (CI only). Quote the trading-results commit in its body.
+
+**When validation reports errors.** Exit 1 from `validate_weekly_snapshot` is a finding,
+not a failed run; the script ends with the error and warning counts. Read
+`$TR/dev/weekly-picks/<sysver>/<friday>.validation.txt`. `split_in_window` warnings (#2133)
+and `stop_side` errors on an extended long (rows sized to 0 shares, see the 2026-11
+backfill) are known and go in the PR body with the counts. Any other check
+(chart coverage, risk identity): do not publish. Open an issue naming the check and Friday.
+Do not edit a record by hand.
+
+**Side effects.** `build_inventory` rewrites the tracked `data/inventory.sexp` in the data
+checkout; never commit it. Each run leaves a work dir (warehouse about 300 MB) and
+`dev/data/snapshots/universe-superset-<friday>.sexp`, which is next week's prior superset:
+delete old work dirs, keep the superset. A symbol never fetched before is not in the fetch
+set; fetch new listings with `ops-data` first.
+
 ## Superseded records
 
 - **2026-07-31: use `3e10a92c7/` (v2, enriched reporting).** Regenerated on
