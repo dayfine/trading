@@ -1,8 +1,9 @@
 #!/bin/sh
 # observatory_lane_check.sh -- fixture test of dev/experiments/observatory/lane.sh, the axis observatory lane
 # (dev/plans/axis-observatory-2026-11-14.md §2.1, §2.2). No container and no network: it builds a two-commit git repo in
-# a temp dir holding the lane, the reader, the record specs and the fixture queue (fixtures/observatory_lane/queue.tsv),
-# plus a made-up trading-results dir, and checks:
+# a temp dir holding the lane, the reader, the record specs, the fixture queue (fixtures/observatory_lane/queue.tsv),
+# an empty lane state (the surface header alone, whatever lanes have merged) and a made-up trading-results dir, and
+# checks:
 #   - --dry-run: the first pending arm is chosen, and a status on the lane-results branch beats HEAD's queue (none
 #     pending: the drift mode); each cell's reuse decision (run; trading-results for the seeds finished there; finished
 #     in OUT); the batches at PAR = (15 - 3) / 6 = 2; the tripwire's md5 and its source; the drift pair; the publish
@@ -46,6 +47,10 @@ if $psh -n "$ROOT/$EXP/lane.sh"; then ok "lane.sh parses under $psh -n"; else ba
 # The repo: the lane, the reader, the record specs and the fixture queue, in two commits so HEAD has a parent.
 R=$TMP/repo; mkdir -p "$R/$EXP" "$R/dev/experiments/record-kseed-2026-10-27"
 cp -R "$ROOT/$EXP"/. "$R/$EXP/"; cp "$LFIX/queue.tsv" "$R/$EXP/queue.tsv"
+# Merged lane results (surface rows, events, drift rows, cells, lane logs) are data, not the code under test: start
+# from the surface header alone, so the fixtures see the same state whatever lanes have merged.
+head -n 1 "$ROOT/$EXP/surface.tsv" > "$R/$EXP/surface.tsv"
+rm -rf "$R/$EXP/runs" "$R/$EXP/lane-logs" "$R/$EXP/events.tsv" "$R/$EXP/drift.tsv"
 cp -R "$ROOT/dev/experiments/record-kseed-2026-10-27/specs" "$R/dev/experiments/record-kseed-2026-10-27/"
 g() { git -C "$R" -c user.name=check -c user.email=check@example.com "$@"; }
 g init -q 2> /dev/null; g symbolic-ref HEAD refs/heads/main; g add -A; g commit -qm c1; C1=$(g rev-parse --short=9 HEAD)
