@@ -207,6 +207,13 @@ LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > .s
    trading-results (`runs/<head>/<arm>/`), and run otherwise. S therefore runs once per HEAD. The cells to run go
    `PAR` at a time, after a three-month preflight of the arm's k0: the spec parses, the overrides reach
    `params.sexp`, and the cache line is the record's (`n_symbols=9200`, one absent).
+   - **Validator gate.** V12 compares each stop with `gate_max_stop_distance_pct`, which defaults to 0.15, the record's
+     `stops_config.max_stop_distance_pct`. An arm that sets `stops_config.max_stop_distance_pct` X is validated with
+     `-config` carrying `((gate_max_stop_distance_pct X))`, so **V12 follows the arm's gate**; without it msd-18 showed
+     274-294 false V12 INV violations per seed (#3648). The lane logs one
+     `VALIDATOR CONFIG <label> gate_max_stop_distance_pct X` line per arm and writes the file into each cell's dir as
+     `<cell>-validator-config.sexp` (public: it is the arm's own number). S, and an arm that does not set the dial,
+     run the validator's defaults with no `-config`. V6, the paired gate, is unaffected.
 6. **Validity, before any read.**
    - **Tripwire.** S k0's `trades.csv` md5 is compared with the S k0 of the last HEAD published to trading-results, or
      with the record's `0928cfe40333560429f5a6e57c9c18de` when there is none. A mismatch is a `baseline-drift`
@@ -225,7 +232,7 @@ LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > .s
 
 | where | what |
 |---|---|
-| branch `observatory/lane-results` of dayfine/trading (public) | `surface.tsv`, `drift.tsv`, `events.tsv`, `queue.tsv`, `spy_years.tsv`; per cell under `runs/<head>/<arm>/`: `actual.sexp`, `summary.sexp`, `params.sexp`, `macro_trend.sexp`, `.rss`, `.validator.log`, the V6 logs; `lane-logs/<head>-<label>.log` |
+| branch `observatory/lane-results` of dayfine/trading (public) | `surface.tsv`, `drift.tsv`, `events.tsv`, `queue.tsv`, `spy_years.tsv`; per cell under `runs/<head>/<arm>/`: `actual.sexp`, `summary.sexp`, `params.sexp`, `macro_trend.sexp`, `.rss`, `.validator.log`, the V6 logs, `-validator-config.sexp` (arms that set the stop gate); `lane-logs/<head>-<label>.log` |
 | dayfine/trading-results main (private), same paths | every file above, plus each cell's `trades.csv`, `equity_curve.csv`, `open_positions.csv`, `splits.csv`, `force_liquidations.sexp`, validator reports, runner log and `.ok` marker; `obs_read.sh`'s out dirs `reads/<label>@<head>/` and `drift/<head>-vs-<prev>/` |
 | nowhere | `trade_audit.sexp`, `candidates.sexp` |
 
@@ -279,6 +286,12 @@ builds a two-commit git repo in a temp dir from the lane, the reader, the record
   arm's value, and the lane logs the `OVERRIDE`. The match is on the full path: `pos-arm` swaps exactly one of the three
   `portfolio_config` lines, and `leaf-arm` (`stage3_force_exit_config.hysteresis_weeks`) replaces nothing. A form
   setting two fields, and an arm setting `tiebreak_seed`, are refused.
+  A `screening_config` sibling of `tiebreak_seed` (`sib-arm`, the queue's `cap-40` and `fbt-05` shape) is added beside
+  it and replaces nothing. Every pending arm of the real `queue.tsv` must pass the same spec checks.
+- **The validator config.** An arm that sets `stops_config.max_stop_distance_pct` 0.18 (`msd-arm`) gets
+  `((gate_max_stop_distance_pct 0.18))`, logged once as `VALIDATOR CONFIG`, passed as `-config` in the validator
+  command the dry run prints (the string `run_cell` runs) and published with the cell. S and the arms that do not set the
+  dial get none. The check fails if the config is dropped, if the command omits `-config`, or if a no-stop arm gets one.
 - **`read` on synthetic cells** (the obs_read fixture's S, U and H):
   - a live arm's row and `done@`;
   - the drift row;

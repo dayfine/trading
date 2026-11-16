@@ -85,7 +85,7 @@ G() { gd=$1; shift   # git in a checkout, with a fallback identity for a session
 classify() {
   case $1 in
     *-trade_audit.sexp|*-candidates.sexp) echo skip ;;
-    *-actual.sexp|*-summary.sexp|*-params.sexp|*-macro_trend.sexp|*.rss|*.validator.log|*.v6diff-*.log) echo public ;;
+    *-actual.sexp|*-summary.sexp|*-params.sexp|*-macro_trend.sexp|*-validator-config.sexp|*.rss|*.validator.log|*.v6diff-*.log) echo public ;;
     *) echo private ;;   # trades, equity curve, open positions, splits, liquidations, validator reports, cell log, .ok
   esac
 }
@@ -136,14 +136,15 @@ select_arm() { # run mode: the first pending arm; none pending -> the drift mode
 # obs-$1-kK is rk-kK with the arm's overrides added after the tiebreak_seed line (../stale-e-cap-k5-*/make_specs.sh).
 # An override of a field the record already sets replaces it: the record's line for the same field path (the chain of
 # single-field records down to the value, scalar or not) is dropped, so the arm's value is the only one in the spec.
-# Each replacement is listed in $3/obs-$1.replaced as "path<TAB>record value<TAB>arm value<TAB>record line".
+# Each replacement is listed in $3/obs-$1.replaced as "path<TAB>record value<TAB>arm value<TAB>record line"; every
+# accepted form, replacing or not, is listed in $3/obs-$1.set as "path<TAB>arm value" (vcfg_write reads it).
 write_specs() { # $1 S or a label, $2 overrides ("" for S), $3 dir
-  mkdir -p "$3"; : > "$3/obs-$1.replaced"
+  mkdir -p "$3"; : > "$3/obs-$1.replaced"; : > "$3/obs-$1.set"
   for ks in $SEEDS; do
     { echo ";; observatory lane obs-$1-k$ks: ../record-kseed-2026-10-27/specs/rk-k$ks.sexp below this header${2:+, plus $2}."
       echo ";; Staging scenario, NOT a golden. Written by dev/experiments/observatory/lane.sh."
       OVRX=$2 awk -v name="obs-$1-k$ks" -v desc="observatory $1 = record config${2:+ + queue overrides}, Seeded tie order seed $ks, 26y, pit-v12" \
-        -v rep="$3/obs-$1.replaced" -v first="$([ "$ks" = 0 ] && echo 1)" '
+        -v rep="$3/obs-$1.replaced" -v setf="$3/obs-$1.set" -v first="$([ "$ks" = 0 ] && echo 1)" '
         function balanced(s,   i, d, c) { d = 0
           for (i = 1; i <= length(s); i++) { c = substr(s, i, 1); if (c == "(") d++; else if (c == ")" && --d < 0) return 0 }
           return d == 0 }
@@ -158,7 +159,8 @@ write_specs() { # $1 S or a label, $2 overrides ("" for S), $3 dir
         BEGIN { o = ENVIRON["OVRX"]; d = 0; f = ""   # the overrides, split into top-level forms: ap[path] = value
           for (i = 1; i <= length(o); i++) { c = substr(o, i, 1); if (c == "(") d++; if (d > 0) f = f c
             if (c == ")" && --d == 0) { split(opath(f), t, "\t")
-              if (t[3] == 1) { if (first) print "*multi*\t" f > rep } else if (t[1] != "") ap[t[1]] = t[2]; f = "" } } }
+              if (t[3] == 1) { if (first) print "*multi*\t" f > rep }
+              else if (t[1] != "") { ap[t[1]] = t[2]; if (first) print t[1] "\t" t[2] > setf }; f = "" } } }
         /^;;/ { next }
         /^\(\(name "/ { print "((name \"" name "\")"; next }
         /^ \(description "/ { print " (description \"" desc "\")"; next }
@@ -190,6 +192,18 @@ spec_checks() { # $1 dir, $2 label ("" = S only), $3 overrides
   done
   [ -z "$2" ] || while IFS=$(printf '\t') read -r p rv av rl; do log "OVERRIDE $p: $rv -> $av"; done < "$rp"
   log "SPEC CHECKS OK: obs-S-kK = rk-kK${2:+; obs-$2-kK = obs-S-kK + $3}"
+}
+
+# The validator's V12 reports a stop wider than gate_max_stop_distance_pct (default 0.15) as an INV violation, so an arm
+# that moves the strategy's gate (stops_config.max_stop_distance_pct) is validated against its own number: the config
+# $2/obs-$1.validator-config.sexp, which run_cell copies to each cell and passes as -config. S and an arm that does not
+# set the dial have none, so they run the defaults. The file is mark-free: the number the arm's spec already carries.
+vcfg_write() { # $1 label, $2 spec dir (after write_specs and spec_checks): write or remove the config, log the choice once
+  vf=$2/obs-$1.validator-config.sexp; rm -f "$vf"
+  x=$(awk -F'\t' '$1 == "stops_config.max_stop_distance_pct" { v = $2 } END { print v }' "$2/obs-$1.set")
+  [ -n "$x" ] || { log "VALIDATOR CONFIG $1 default (no -config)"; return 0; }
+  case $x in *[!0-9.eE+-]*) die "$1: stops_config.max_stop_distance_pct '$x' is not a plain number: no validator config" ;; esac
+  printf '((gate_max_stop_distance_pct %s))\n' "$x" > "$vf"; log "VALIDATOR CONFIG $1 gate_max_stop_distance_pct $x"
 }
 
 # The single-instance lock on fd 9, for every step that writes OUT. The kernel drops it when the last holder exits, so a
@@ -363,6 +377,12 @@ preflight() {
   [ "$ns" = "$NSYM" ] && [ "$na" = 1 ] || die "preflight $pf: n_symbols=$ns n_symbols_absent=$na (expected $NSYM and 1)"
   rm_root "$po"; log "PREFLIGHT_OK $HEAD9 $pf (n_symbols=$ns absent=$na)"
 }
+# The post-run validator on one cell. With the arm's validator config (vcfg_write) it passes -config, the copy in the cell's
+# own dir, so V12 reads the arm's stop gate. The dry run prints this very string, which is how the check pins it.
+validator_cmd() { # $1 run dir, $2 the cell's dir, $3 cell tag, $4 arm
+  vcf=; [ ! -s "$SPECS/obs-$4.validator-config.sexp" ] || vcf=" -config $(cpath "$2")/$3-validator-config.sexp"
+  printf '%s' "./_build/default/trading/backtest/validation/bin/post_run_validator_cli.exe -run-dir $(cpath "$1") -data-dir $(cpath "$TD") -share-classes $CROOT/trading/test_data/share_classes.sexp$vcf -out $(cpath "$2")/$3-validator.sexp > $(cpath "$2")/$3.validator.log 2>&1; echo exit=\$? >> $(cpath "$2")/$3.validator.log"
+}
 # One 26y cell, run in the background by run_cells: its files land in $HD/<arm>/ and its .ok marker is written last.
 # A failed cell keeps only its .log and .rss, so the next launch re-runs it.
 run_cell() { # $1 arm, $2 seed
@@ -374,7 +394,9 @@ run_cell() { # $1 arm, $2 seed
   for f in $KINDS; do cp "$root/$name/$f" "$dest/$tag-$f" 2> /dev/null; done
   if [ "$ex" != exit=0 ] || [ ! -s "$dest/$tag-actual.sexp" ] || [ ! -s "$dest/$tag-trades.csv" ]; then
     rm -f "$dest/$tag"-*; log "CELL FAILED $tag: $ex ${rss:-no rss} (wall $(( $(date +%s) - t0 ))s)"; return 1; fi
-  dk "./_build/default/trading/backtest/validation/bin/post_run_validator_cli.exe -run-dir $(cpath "$root/$name") -data-dir $(cpath "$TD") -share-classes $CROOT/trading/test_data/share_classes.sexp -out $(cpath "$dest")/$tag-validator.sexp > $(cpath "$dest")/$tag.validator.log 2>&1; echo exit=\$? >> $(cpath "$dest")/$tag.validator.log"
+  [ ! -s "$SPECS/obs-$1.validator-config.sexp" ] || cp "$SPECS/obs-$1.validator-config.sexp" "$dest/$tag-validator-config.sexp" \
+    || { rm -f "$dest/$tag"-*; log "CELL FAILED $tag: cannot copy the validator config"; return 1; }
+  dk "$(validator_cmd "$root/$name" "$dest" "$tag" "$1")"
   rm_root "$root"
   [ -s "$dest/$tag-validator.sexp.sexp" ] || { log "CELL FAILED $tag: no validator report (see $tag.validator.log)"; return 1; }
   touch "$dest/$tag.ok"
@@ -483,6 +505,8 @@ publish_lists() { # dry run: where each file of this plan goes, by the classify 
       log "$(classify "$pf" | tr a-z A-Z) $EXP/runs/$HEAD9/$arm/$pf"; done
     for f in .log .rss .validator.log .ok ${LABEL:+.v6diff-S.log}; do [ "$arm$f" != S.v6diff-S.log ] || continue
       log "$(classify "obs-$arm-k*-s0$f" | tr a-z A-Z) $EXP/runs/$HEAD9/$arm/obs-$arm-k*-s0$f"; done; done
+  [ -z "$LABEL" ] || [ ! -s "$SPECS/obs-$LABEL.validator-config.sexp" ] \
+    || log "$(classify "obs-$LABEL-k*-s0-validator-config.sexp" | tr a-z A-Z) $EXP/runs/$HEAD9/$LABEL/obs-$LABEL-k*-s0-validator-config.sexp"
   [ -z "$PREV" ] || log "PUBLIC $EXP/runs/$HEAD9/S/obs-S-k*-s0.v6diff-$PREV.log"
   [ -z "$LABEL" ] || log "PRIVATE $EXP/reads/$LABEL@$HEAD9/ (D.tsv, steps-kK, years-kK, firstdiff-kK, seeds, row, obs_read.log)"
   [ -z "$PREV" ] || log "PRIVATE $EXP/drift/$HEAD9-vs-$PREV/ (the same files for the drift read)"
@@ -501,11 +525,14 @@ lane() { # $1 run | drift
   if [ "$DRY" = 1 ]; then log "SPY YEARS from the archive's S/Y/SPY/data.csv after the stage (rule: README §Lane)"
   else stage; years_step; docker_ok; build; fi
   write_specs S "" "$SPECS"; [ -z "$LABEL" ] || write_specs "$LABEL" "$OVR" "$SPECS"; spec_checks "$SPECS" "$LABEL" "$OVR"
+  [ -z "$LABEL" ] || vcfg_write "$LABEL" "$SPECS"
   PREV=$(prev_head)
   log "PARALLEL $PAR cells at a time (MemTotal $(mem_gb) GB, reserve $MEM_RESERVE_GB GB, $CELL_GB GB per cell)"
   plan; batches
   if [ "$DRY" = 1 ]; then
     [ -z "$TORUN" ] || log "PREFLIGHT obs-${LABEL:-S}-k0 to 2000-03-31 before the cells"
+    [ -z "$TORUN" ] || for arm in S $LABEL; do
+      log "VALIDATOR CMD obs-$arm-k0-s0: $(validator_cmd "<run dir>" "$HD/$arm" "obs-$arm-k0-s0" "$arm")"; done
     log "TRIPWIRE S k0 trades.csv md5 must be $(trip_expect); otherwise a baseline-drift event"
     [ -z "$LABEL" ] || log "VALIDITY $LABEL: V6 on every seed against S; live when trades.csv differs from S on a seed, else DEAD and no read; obs_read.sh checks equal starting cash and paired curves"
     [ -z "$LABEL" ] || log "READ obs_read.sh -a $LABEL -c $HEAD9 -> surface.tsv"
@@ -536,7 +563,8 @@ case "$CMD" in
   collect) lock; collect ;;
   publish) lock; guards; [ "$(cat "$OUT/current" 2> /dev/null)" = drift ] || LABEL=$(cat "$OUT/current" 2> /dev/null); publish ;;
   specs) [ $# -eq 2 ] || { echo "usage: sh $0 specs LABEL DIR" >&2; exit 2; }
-    cp "$QUEUE" "$STATE/queue.tsv"; set_arm "$1"; write_specs S "" "$2"; write_specs "$1" "$OVR" "$2"; spec_checks "$2" "$1" "$OVR" ;;
+    cp "$QUEUE" "$STATE/queue.tsv"; set_arm "$1"; write_specs S "" "$2"; write_specs "$1" "$OVR" "$2"; spec_checks "$2" "$1" "$OVR"
+    vcfg_write "$1" "$2" ;;
   years) spy_years "${1:?usage: sh $0 years SPY_CSV}" ;;
   *) echo "usage: sh $0 {run [--dry-run] | drift [--dry-run] | read [LABEL] | stage | docker | collect | publish | specs LABEL DIR | years CSV}" >&2; exit 2 ;;
 esac
