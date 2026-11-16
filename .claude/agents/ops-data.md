@@ -88,20 +88,24 @@ All scripts run inside Docker. Build the project first if executables are stale.
 
 ```bash
 dev/lib/run-in-env.sh ./_build/default/analysis/scripts/fetch_symbols/fetch_symbols.exe \
-  --symbols AAPL,GSPCX \
-  --data-dir /workspaces/trading-1/data \
-  --api-key "$EODHD_API_KEY"
+  -symbols AAPL,GSPCX \
+  -data-dir /workspaces/trading-1/data \
+  -api-key "$EODHD_API_KEY"
 ```
 
 `EODHD_API_KEY` must be set in the host environment. `run-in-env.sh` forwards it into the container automatically.
 
-Idempotent: re-running for a cached symbol appends only new bars. Omit `--symbols` to fetch all symbols in `universe.sexp`.
+Idempotent: re-running for a cached symbol appends only new bars. Omit `-symbols` to fetch all symbols in `universe.sexp`. The flags are single-dash (`--symbols` fails with "unknown flag").
+
+Parallel fetches must not share a shard (`data/<first char>/<last char>/`): concurrent writers corrupt the per-shard
+`manifest.sexp` and the fetch dies in `Manifest.read` (2026-11-16 refresh, #3645). Bucket symbols by first + last
+character, one bucket per process.
 
 ### Rebuild inventory
 
 ```bash
 dev/lib/run-in-env.sh ./_build/default/analysis/scripts/build_inventory/build_inventory.exe \
-  --data-dir /workspaces/trading-1/data
+  -data-dir /workspaces/trading-1/data
 ```
 
 Walks `data/`, reads each `data.metadata.sexp`, writes `data/inventory.sexp`. Run after any fetch.
@@ -110,7 +114,7 @@ Walks `data/`, reads each `data.metadata.sexp`, writes `data/inventory.sexp`. Ru
 
 ```bash
 dev/lib/run-in-env.sh ./_build/default/analysis/scripts/bootstrap_universe/bootstrap_universe.exe \
-  --data-dir /workspaces/trading-1/data
+  -data-dir /workspaces/trading-1/data
 ```
 
 Builds `data/universe.sexp` from the local inventory. Sector/industry fields will be empty (use `fetch_universe.exe` for full metadata from EODHD fundamentals).
