@@ -1,0 +1,28 @@
+QUALITY-FLAG: 1 fallback exits (V16)
+share-class map (V6): /w/trading/test_data/share_classes.sexp
+V1 INV PASS
+V2 INV PASS
+V3 INV PASS
+V4 INV PASS
+V5 INV PASS
+V6 INV PASS
+V7 INV PASS
+V8 EXP PASS
+V9 EXP 110 violations
+V10 EXP 3 violations
+V11 EXP PASS
+V12 INV PASS
+V13 INV 26 violations
+V14 EXP 15 violations
+V15 EXP PASS
+V16 EXP 1 violations
+V17 EXP 1 violations
+V18 EXP 8 violations
+V19 INV PASS
+V20 INV PASS
+V21 EXP 82 violations
+V22 EXP 69 violations (41 skipped: position has no stop-decision rows)
+V23 EXP 7 violations
+audit join: 420/420 rows matched
+wrote /w/.sweep-output/observatory-lane/runs/3c367cca7/msd-12/obs-msd-12-k4-s0-validator.sexp.sexp + /w/.sweep-output/observatory-lane/runs/3c367cca7/msd-12/obs-msd-12-k4-s0-validator.sexp.md
+exit=0
