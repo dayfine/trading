@@ -1,6 +1,6 @@
 ---
 name: project-axis-observatory-gate-funnel
-description: "Axis observatory (#3622, user 11-14) + P1 gate funnel READ 11-15 (#3631): Rule 1 PARK, Rule 2 NO RANKING LEVER; X = empty-book state, top 20 all A+ No_structural_stop; P3 leads max_stop_distance"
+description: "Axis observatory (#3622, user 11-14): P1 gate funnel (#3631) PARK, X = empty book; P3 lane msd-12 (#3642) flag none, D_end −0.27 but yearly 50/50; msd-18 running"
 metadata:
   node_type: memory
   type: project
@@ -19,3 +19,5 @@ User 11-14: "keep running some axis combinations… to track the effects and dis
 
 **Why:** endpoint verdicts reduce to which monster landed ([[project-26y-path-noise-floor]]); the funnel says where gates bind.
 **How to apply:** no gate-before-cap flag (PARK, unqueued). P3 dial queue leads `max_stop_distance_pct` 12/15/18, read as D(t) around reopen episodes (2002, 2003, 2008, 2009, 2016, 2022–23) by regime with positions held and crowded-out S tickets — it is both the bear brake ([[project-entry-timing-screen-1112]]) and the recovery gap ([[project-recovery-reentry-gap]]). Cap 40 low; ranking dials low. A recovery-conditioned re-entry rule is untestable on this history (turns are the sample) and needs a book argument. Pre-regs: read pooled outcome clauses leave-one-year-out; count X path-aware. Friday demo (#3623): `dune exec trading/weinstein/strategy/friday_demo/bin/friday_demo_main.exe`. Cloud routine `trig_01EGdsscqsgyTNNLHwbG7h5T`; its first launch hit a dead dockerd (chain.sh should check `docker info`). Related: [[project-eodhd-terms-private-bucket]].
+
+**P3 lane 1, msd-12 (11-15/16, LANE_SHA 3c367cca7, results #3642; private trading-results 5ddca9182): flag none.** Validity all passed (S k0 = record md5 0928cfe4, V6 5/5, live 5/5). Median D_end −0.272 (seeds −0.21…−0.75) but yearly sign 50/50, seeds_neg60 0 → HARM clause fails. Orientation only: bear-year +0.12, bear-macro +0.05, max DD −1.7 pp, −5.5 entries/yr; k0's biggest steps = 2020–21 weeks S held APPS (tighter gate = more brake, less tail, as #3621 predicts). msd-18 running at the same SHA (cloud `cse_013VUubgvrtZ7KtUP5iT9fV7`, reuses S); its read adds a ≤ $14 admissions slice (low-price trait's next stop). Next arms need a new HEAD (re-runs S = drift point); after a lane PR merges, the repo deletes the branch, so run `gh pr update-branch` on the next lane PR. Lane check copied live state (fixed #3643). Cloud wait: Monitor + 30-min heartbeat ≈ 4 wakes/h; background wait ≤ 110 min + one fallback ≈ 1 wake / 2 h.
