@@ -2,9 +2,11 @@
 
 ## Status
 
-IN_PROGRESS
+MERGED
 
-## Last updated: 2026-09-16
+Closed 2026-11-15 (user decision, pacer #3635): work done. The detector and guards (#1940, #1946, #2862) and the PIT-v12 full dedupe (#3475, #3480, #3489) shipped. Sections below are history, not queued.
+
+## Last updated: 2026-11-15
 
 ## Interface stable
 

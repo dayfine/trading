@@ -1,9 +1,11 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-08-24
+## Last updated: 2026-11-15
 
 ## Status
-IN_PROGRESS
+MERGED
+
+Closed 2026-11-15 (user decision, pacer #3635): no next step is queued, and the split work lands under #2973 (open). Sections below are history, not queued.
 
 **2026-08-24 (issue #2404 — past-band picks are shown, not suppressed; branch
 `feat/picks-nofill-2404`):** user decision 2026-08-24, adopting the issue's

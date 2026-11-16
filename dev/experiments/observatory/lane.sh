@@ -133,37 +133,62 @@ select_arm() { # run mode: the first pending arm; none pending -> the drift mode
 }
 
 # --------------------------------------------------------------------------------------------------------------- specs
-write_specs() { # $1 S or a label, $2 overrides ("" for S), $3 dir: obs-$1-kK from rk-kK (../stale-e-cap-k5-*/make_specs.sh)
-  mkdir -p "$3"
+# obs-$1-kK is rk-kK with the arm's overrides added after the tiebreak_seed line (../stale-e-cap-k5-*/make_specs.sh).
+# An override of a field the record already sets replaces it: the record's line for the same field path (the chain of
+# single-field records down to the value, scalar or not) is dropped, so the arm's value is the only one in the spec.
+# Each replacement is listed in $3/obs-$1.replaced as "path<TAB>record value<TAB>arm value<TAB>record line".
+write_specs() { # $1 S or a label, $2 overrides ("" for S), $3 dir
+  mkdir -p "$3"; : > "$3/obs-$1.replaced"
   for ks in $SEEDS; do
     { echo ";; observatory lane obs-$1-k$ks: ../record-kseed-2026-10-27/specs/rk-k$ks.sexp below this header${2:+, plus $2}."
       echo ";; Staging scenario, NOT a golden. Written by dev/experiments/observatory/lane.sh."
-      OVRX=$2 awk -v name="obs-$1-k$ks" -v desc="observatory $1 = record config${2:+ + queue overrides}, Seeded tie order seed $ks, 26y, pit-v12" '
+      OVRX=$2 awk -v name="obs-$1-k$ks" -v desc="observatory $1 = record config${2:+ + queue overrides}, Seeded tie order seed $ks, 26y, pit-v12" \
+        -v rep="$3/obs-$1.replaced" -v first="$([ "$ks" = 0 ] && echo 1)" '
+        function balanced(s,   i, d, c) { d = 0
+          for (i = 1; i <= length(s); i++) { c = substr(s, i, 1); if (c == "(") d++; else if (c == ")" && --d < 0) return 0 }
+          return d == 0 }
+        function opath(s,   f, r, p, m) {   # one override form -> "path<TAB>value<TAB>multi", descending single-field
+          # records; multi is 1 when a record on the way holds more than one field (the form sets several fields)
+          gsub(/^[ \t]+|[ \t]+$/, "", s); gsub(/[ \t]+/, " ", s)
+          while (match(s, /^\(\([a-z_][a-z_0-9]* /) && substr(s, length(s) - 1) == "))") {
+            f = substr(s, 3, RLENGTH - 3); r = substr(s, RLENGTH + 1, length(s) - RLENGTH - 2)
+            if (!balanced(r)) { m = 1; break }
+            p = p (p == "" ? "" : ".") f; s = r }
+          return p "\t" s "\t" (m + 0) }
+        BEGIN { o = ENVIRON["OVRX"]; d = 0; f = ""   # the overrides, split into top-level forms: ap[path] = value
+          for (i = 1; i <= length(o); i++) { c = substr(o, i, 1); if (c == "(") d++; if (d > 0) f = f c
+            if (c == ")" && --d == 0) { split(opath(f), t, "\t")
+              if (t[3] == 1) { if (first) print "*multi*\t" f > rep } else if (t[1] != "") ap[t[1]] = t[2]; f = "" } } }
         /^;;/ { next }
         /^\(\(name "/ { print "((name \"" name "\")"; next }
         /^ \(description "/ { print " (description \"" desc "\")"; next }
+        /^[ \t]*\(\(/ { split(opath($0), t, "\t")
+          if (t[3] != 1 && (t[1] in ap)) { if (first) { l = $0; gsub(/^[ \t]+|[ \t]+$/, "", l); print t[1] "\t" t[2] "\t" ap[t[1]] "\t" l > rep }; next } }
         { print }
-        /\(\(screening_config \(\(tiebreak_seed [0-9]+\)\)\)\)/ && ENVIRON["OVRX"] != "" { print "   " ENVIRON["OVRX"] }' "$REPO/$REC/rk-k$ks.sexp"
+        /\(\(screening_config \(\(tiebreak_seed [0-9]+\)\)\)\)/ && o != "" { print "   " o }' "$REPO/$REC/rk-k$ks.sexp"
     } > "$3/obs-$1-k$ks.sexp"
   done
 }
-norm() { # $1 spec, $2 text to drop once: comments, name, description and whitespace removed
+norm() { # $1 spec, $2 texts to drop once each, newline-separated: comments, name, description and whitespace removed
   sed -e 's/;;.*$//' -e '/^((name "/d' -e '/^ (description "/d' "$1" | tr -d ' \t\n' |
-    DROP=$2 awk '{ d = ENVIRON["DROP"]; i = (d == "") ? 0 : index($0, d); if (i) $0 = substr($0, 1, i - 1) substr($0, i + length(d)); print }'
+    DROP=$2 awk '{ n = split(ENVIRON["DROP"], d, "\n")
+      for (k = 1; k <= n; k++) if (d[k] != "" && (i = index($0, d[k]))) $0 = substr($0, 1, i - 1) substr($0, i + length(d[k])); print }'
 }
 spec_checks() { # $1 dir, $2 label ("" = S only), $3 overrides
-  o=$(printf '%s' "$3" | tr -d ' \t\n')
+  o=$(printf '%s' "$3" | tr -d ' \t\n'); rp=$1/obs-$2.replaced
+  rf=$([ -z "$2" ] || cut -f4 "$rp" | tr -d ' \t')   # the record lines the arm replaces, whitespace removed
+  ! grep -q '^screening_config\.tiebreak_seed	' "$rp" 2> /dev/null || die "an arm may not set tiebreak_seed: the lane sets it per seed"
+  ! grep -q '^\*multi\*' "$rp" 2> /dev/null \
+    || die "an override form sets more than one field ($(grep '^\*multi\*' "$rp" | cut -f2 | head -1)): write one form per field, so each replaces the record's"
   for ks in $SEEDS; do s=$1/obs-S-k$ks.sexp; ns=$(norm "$s" "")
     [ "$ns" = "$(norm "$REPO/$REC/rk-k$ks.sexp" "")" ] || die "obs-S-k$ks differs from rk-k$ks below the header"
     case $ns in *"((screening_config((tiebreak_seed$ks))))"*) ;; *) die "obs-S-k$ks lacks tiebreak_seed $ks" ;; esac
     [ -n "$2" ] || continue
-    [ "$(norm "$1/obs-$2-k$ks.sexp" "$o")" = "$ns" ] || die "obs-$2-k$ks differs from obs-S-k$ks by more than the overrides"
+    [ "$(norm "$1/obs-$2-k$ks.sexp" "$o")" = "$(norm "$s" "$rf")" ] \
+      || die "obs-$2-k$ks differs from obs-S-k$ks by more than the overrides and the record lines they replace"
     [ "$(norm "$1/obs-$2-k$ks.sexp" "")" != "$ns" ] || die "obs-$2-k$ks lacks the overrides"
   done
-  # A field the record already sets would be set twice; the arm must be the record plus new settings only.
-  rs=$(sed 's/;;.*$//' "$1/obs-S-k0.sexp" | tr -s ' \t\n' '   ')
-  for key in $(printf '%s' "$3" | grep -o '([a-z_][a-z_0-9]* [^() ]' | sed 's/^(\([a-z_0-9]*\) .*/\1/'); do
-    case $rs in *"($key "*) die "the record config already sets $key" ;; esac; done
+  [ -z "$2" ] || while IFS=$(printf '\t') read -r p rv av rl; do log "OVERRIDE $p: $rv -> $av"; done < "$rp"
   log "SPEC CHECKS OK: obs-S-kK = rk-kK${2:+; obs-$2-kK = obs-S-kK + $3}"
 }
 
@@ -412,7 +437,8 @@ drift_read() { # S at HEAD (arm "drift") against S at PREV, into drift.tsv
   if [ -n "$bad" ]; then log "DRIFT V6 FAILED S@$HEAD9 vs S@$PREV:$bad; no read"; event drift-invalid S "V6 failed on$bad vs $PREV"; return 1; fi
   if [ "$same" -eq "$NSEEDS" ]; then log "DRIFT NONE: S@$HEAD9 trades.csv identical to S@$PREV on every seed"; event drift-none S "vs $PREV"; return 0; fi
   rd=$WORK/read-drift; rm -rf "$rd"; link_cells "$pv" S "$rd" S ""; link_cells "$HD/S" S "$rd" drift "$PREV"
-  obs_run "$rd" drift "drift@$PREV" "S@$PREV -> S@$HEAD9" "$STATE/drift.tsv" "$OUT/drift/$HEAD9-vs-$PREV"
+  obs_run "$rd" drift "drift@$PREV" "S@$PREV -> S@$HEAD9" "$STATE/drift.tsv" "$OUT/drift/$HEAD9-vs-$PREV" \
+    || { event drift-read-failed S "obs_read.sh refused S@$HEAD9 vs S@$PREV (exit $rc; its log is in trading-results)"; return 1; }
 }
 
 # ------------------------------------------------------------------------------------------------- collect and publish
