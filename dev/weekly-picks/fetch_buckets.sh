@@ -7,7 +7,8 @@
 # One fetch_symbols.exe per <bucket-dir>/batch_NN.txt (one symbol per line), all in parallel.
 # The buckets are shard-disjoint (weekly.sh buckets by first + last letter, Csv_storage's
 # shard key): Csv_storage's per-shard manifest read-modify-write is not safe across
-# processes (#3645). The API key comes from $EODHD_API_KEY and is never printed.
+# processes (#3645). The API key comes from $EODHD_API_KEY and is never printed; the exe
+# takes it only as -api-key argv, so it is visible to `ps` inside the container.
 # Exit 0 only when every process exited 0 and every log ends in a "Done:" line (a process
 # that died on the manifest race leaves no such line).
 set -u

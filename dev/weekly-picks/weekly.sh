@@ -20,7 +20,8 @@
 #
 # EODHD terms (user decisions 2026-11-14): bars and anything printing prices (closes, entries,
 # stops, tickets) stay in the work dir (gitignored, dev/data/) and the private trading-results
-# checkout $TR. The only file written inside this repo's tracked tree is the public
+# checkout $TR. Besides the price-free data/inventory.sexp (rewritten by the inventory step;
+# never commit it), the only file written inside this repo's tracked tree is the public
 # <friday>-picks.md. The key comes from $EODHD_API_KEY and is never printed.
 # The script never commits, pushes or opens a PR: it ends by printing the publish commands.
 #
@@ -41,6 +42,8 @@ ROOT=$(cd "$HERE/../.." && pwd)
 
 die() { printf 'weekly.sh: %s\n' "$1" >&2; exit 1; }
 usage() { printf 'usage: weekly.sh [--dry-run] <friday YYYY-MM-DD>\n' >&2; exit 2; }
+# bucket_shards and check_public_price_free: guarded helpers, pinned directly by the check.
+. "$HERE/weekly_lib.sh"
 
 DRY=0
 FRIDAY=""
@@ -135,26 +138,6 @@ crun_out() { _o=$1; _e=$2; shift 2; say "[container] $* > $_o 2> $_e"; [ "$DRY" 
 syms() { tr '\n' ' ' < "$1" | awk '{ n = split($0, p, "\\(symbol "); for (i = 2; i <= n; i++) print substr(p[i], 1, index(p[i], ")") - 1) }'; }
 make_fetch_set() { { syms "$1"; syms "$2"; } | sort -u > "$3"; }
 
-# bucket_shards <symbols> <prefix> <n>: <prefix>_NN.txt, whole shard keys (first + last letter,
-# upper-cased, as Csv_storage's Symbol_shard) per bucket, largest key first onto the lightest bucket.
-bucket_shards() {
-  rm -f "$2"_??.txt
-  awk '{ print toupper(substr($1, 1, 1)) toupper(substr($1, length($1), 1)) "\t" $1 }' "$1" | sort | awk -F'\t' -v prefix="$2" -v nb="$3" '
-    { key[NR] = $1; sym[NR] = $2; cnt[$1]++ }
-    END {
-      for (k in cnt) keys[++n] = k
-      for (i = 2; i <= n; i++) {
-        v = keys[i]; j = i - 1
-        while (j >= 1 && (cnt[keys[j]] < cnt[v] || (cnt[keys[j]] == cnt[v] && keys[j] > v))) { keys[j + 1] = keys[j]; j-- }
-        keys[j + 1] = v }
-      for (b = 0; b < nb; b++) load[b] = 0
-      for (i = 1; i <= n; i++) {
-        best = 0
-        for (b = 1; b < nb; b++) if (load[b] < load[best]) best = b
-        bucket[keys[i]] = best; load[best] += cnt[keys[i]] }
-      for (i = 1; i <= NR; i++) { f = sprintf("%s_%02d.txt", prefix, bucket[key[i]]); print sym[i] > f } }'
-}
-
 # pinned_universe <eligible> <exclude-list> <out>: a (Pinned ...) universe of the eligible
 # symbols and sectors, minus the names in the exclude list.
 pinned_universe() {
@@ -175,13 +158,6 @@ pinned_superset() {
   { echo "(Pinned ("
     { syms "$1"; syms "$2"; } | sort -u | awk '{ printf "  ((symbol %s) (sector \"\"))\n", $1 }'
     echo "))"; } > "$3"
-}
-
-# The public summary is committed: refuse a table row carrying a two-decimal number (a price).
-check_public_price_free() {
-  if grep '^| [0-9]' "$1" | grep -Eq '[0-9]\.[0-9][0-9]'; then
-    die "$1: a table row carries a number with two decimals; not staging it"
-  fi
 }
 
 step_preflight() {
@@ -216,7 +192,7 @@ step_fetch_set() {
 }
 
 step_fetch() {
-  say "EODHD_API_KEY is forwarded into the container by run-in-env.sh and read there; it is not on any command line here"
+  say "EODHD_API_KEY is forwarded into the container by run-in-env.sh (not on a host command line); fetch_buckets.sh passes it as argv to fetch_symbols.exe inside the container (the exe takes no env var)"
   crun sh ../dev/weekly-picks/fetch_buckets.sh $B/analysis/scripts/fetch_symbols/fetch_symbols.exe "$CDATA" \
     "$CWORK/fetch" "$CWORK/fetch/logs"
   writes local "$MAIN/data"

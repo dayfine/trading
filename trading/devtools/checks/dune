@@ -1624,7 +1624,9 @@
 
 ; dev/weekly-picks/weekly.sh (the weekly live-picks runner) through --dry-run on a fixture
 ; checkout: step order, private outputs only under $TR, the public -picks.md as the only
-; repo-side write, and a planted fake EODHD key never printed. The scripts are read from
+; repo-side write, and a planted fake EODHD key never printed. It also calls the guarded
+; helpers a dry run never reaches (weekly_lib.sh: shard-disjoint buckets, the price-free
+; tripwire) and runs fetch_buckets.sh against a fake exe. The scripts are read from
 ; the repo via repo_root() at RUN TIME, so (universe).
 
 (rule
