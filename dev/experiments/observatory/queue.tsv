@@ -6,4 +6,4 @@
 # (V6 or obs_read.sh refused the pair). README.md §Lane.
 label	overrides	ledger	status
 msd-12	((stops_config ((max_stop_distance_pct 0.12))))	stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15	done@3c367cca7
-msd-18	((stops_config ((max_stop_distance_pct 0.18))))	stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15	pending
+msd-18	((stops_config ((max_stop_distance_pct 0.18))))	stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15	done@3c367cca7
