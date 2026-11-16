@@ -11,7 +11,13 @@
 #   - specs: obs-S-kK is rk-kK below the header, the arm adds exactly its overrides after the tiebreak line, and an arm
 #     that resets a field the record sets (a scalar and a list) replaces the record's line: the field appears once,
 #     and the spec is S with exactly that line replaced, matched on the full field path (a sibling under the same
-#     parent and a field sharing only the leaf name stay); a form setting two fields, or tiebreak_seed, is refused;
+#     parent and a field sharing only the leaf name stay); a form setting two fields, or tiebreak_seed, is refused; a
+#     screening_config sibling of tiebreak_seed (queue cap-40, fbt-05) is added beside it, replacing nothing; and every
+#     pending arm of the real queue.tsv passes the lane's spec checks;
+#   - the validator config (V12 follows the arm's stop gate): an arm that sets stops_config.max_stop_distance_pct X gets
+#     ((gate_max_stop_distance_pct X)), logged once as VALIDATOR CONFIG, passed as -config in the validator command the
+#     dry run prints (the one run_cell runs) and published; S and an arm that does not set the dial get none, so the
+#     validator keeps its defaults;
 #   - read, the lane's real path, on synthetic cells from fixtures/obs_read/gen_fixture.sh: a live arm appends a surface
 #     row and becomes done@HEAD; S against the last published HEAD's S is the drift row; a changed S k0 is one
 #     baseline-drift event; a dead arm reads nothing and becomes dead@HEAD; a re-read over the branch's surface replaces
@@ -86,9 +92,23 @@ has "A: no drift pair" "DRIFT none: no earlier HEAD has a finished S in trading-
 P=$EXP/runs/$C2/dead-arm/obs-dead-arm-k*-s0
 for f in -trades.csv -equity_curve.csv -open_positions.csv -splits.csv -validator.sexp.sexp .log .ok; do
   has "A: $f is private" "PRIVATE $P$f" A; done
-for f in -actual.sexp -summary.sexp -params.sexp -macro_trend.sexp .rss .validator.log .v6diff-S.log; do
+for f in -actual.sexp -summary.sexp -params.sexp -macro_trend.sexp -validator-config.sexp .rss .validator.log .v6diff-S.log; do
   has "A: $f is public" "PUBLIC $P$f" A; done
 expect "A: trade_audit only on the SKIP line" "SKIP" "$(grep trade_audit "$TMP/A" | cut -d' ' -f1)"
+# The validator's V12 follows the arm's stop gate (dead-arm sets 0.11): its command passes -config, S's does not.
+has "A: the arm's validator config is logged" "VALIDATOR CONFIG dead-arm gate_max_stop_distance_pct 0.11" A
+expect "A: the arm's validator config carries its gate" "((gate_max_stop_distance_pct 0.11))" \
+  "$(cat "$TMP/out/dry/specs/obs-dead-arm.validator-config.sexp" 2> /dev/null)"
+expect "A: S has no validator config" no "$([ -e "$TMP/out/dry/specs/obs-S.validator-config.sexp" ] && echo yes || echo no)"
+expect "A: the arm's validator command passes its config, from the cell's own dir" 1 \
+  "$(grep -c "^VALIDATOR CMD obs-dead-arm-k0-s0: .*post_run_validator_cli.exe .* -config [^ ]*/runs/$C2/dead-arm/obs-dead-arm-k0-s0-validator-config.sexp -out " "$TMP/A")"
+expect "A: S's validator command has no -config" "1 0" \
+  "$(grep -c '^VALIDATOR CMD obs-S-k0-s0: .*post_run_validator_cli.exe ' "$TMP/A") $(grep '^VALIDATOR CMD obs-S-k0-s0: ' "$TMP/A" | grep -c ' -config ')"
+# run_cell cannot run here (it needs the container): it must build its validator command with the function printed above,
+# and copy the arm's config into the cell's dir before it runs.
+expect "run_cell runs the validator through validator_cmd and copies the config" "1 1" \
+  "$(awk '/^run_cell\(\)/,/^}/' "$ROOT/$EXP/lane.sh" | grep -cF 'dk "$(validator_cmd "$root/$name" "$dest" "$tag" "$1")"') \
+$(awk '/^run_cell\(\)/,/^}/' "$ROOT/$EXP/lane.sh" | grep -cF 'cp "$SPECS/obs-$1.validator-config.sexp" "$dest/$tag-validator-config.sexp"')"
 
 # --- dry run B: trading-results has the parent's S and this HEAD's S for k0-k2
 cell "$TMP/run" H "$TMP/tr/$EXP/runs/$C1/S" S
@@ -162,9 +182,33 @@ expect "pos-arm logs its OVERRIDE; leaf-arm logs none" "1 0" \
 # A form that sets two fields at once cannot replace a single record line: refused.
 rc=0; lane specs multi-arm "$TMP/specs-multi" > "$TMP/sp-multi" 2>&1 || rc=$?
 expect "a form setting two fields is refused" "1 1" "$rc $(grep -c 'an override form sets more than one field' "$TMP/sp-multi")"
+# A screening_config sibling of tiebreak_seed (the queue's cap-40 and fbt-05) is another path: it lands after the tiebreak
+# line, which stays, and replaces nothing.
+swapped sib-arm "" '   ((screening_config ((max_buy_candidates 40))))'
+expect "sib-arm logs no OVERRIDE, keeps tiebreak_seed 3 above its line" "0 1" \
+  "$(grep -c OVERRIDE "$TMP/sp-sib-arm") $(grep -c 'screening_config ((tiebreak_seed 3))' "$TMP/specs-sib-arm/obs-sib-arm-k3.sexp")"
+
+# --- the validator config: V12 follows the arm's stop gate. msd-arm sets 0.18 (the queue's msd-18); the validator's own
+# default is 0.15, so without the config every stop between them is a false V12 INV violation.
+vcf() { cat "$TMP/specs-$1/obs-$1.validator-config.sexp" 2> /dev/null || echo none; }   # the arm's config, or none
+rc=0; lane specs msd-arm "$TMP/specs-msd-arm" > "$TMP/sp-msd-arm" 2>&1 || rc=$?; expect "msd-arm: specs written" 0 "$rc"
+expect "an arm setting max_stop_distance_pct 0.18 gets a validator config with 0.18" "((gate_max_stop_distance_pct 0.18))" "$(vcf msd-arm)"
+expect "it is logged once, as the lane's VALIDATOR CONFIG line" 1 \
+  "$(grep -c 'VALIDATOR CONFIG msd-arm gate_max_stop_distance_pct 0.18$' "$TMP/sp-msd-arm")"
+expect "the config is the only file the arm adds beside S's" "msd-arm.validator-config.sexp" \
+  "$(ls "$TMP/specs-msd-arm" | grep 'validator-config' | sed 's/^obs-//')"
+# S and arms that do not set the dial: no config, so the validator keeps its defaults.
+expect "S gets no validator config (in any specs dir)" "none" "$(ls "$TMP"/specs*/obs-S.validator-config.sexp 2> /dev/null | head -1 | grep . || echo none)"
+for a in dup-arm sib-arm pos-arm leaf-arm; do
+  expect "$a (no stop gate) gets no validator config, and says so" "none 1" \
+    "$(vcf $a) $(grep -c "VALIDATOR CONFIG $a default (no -config)$" "$TMP/sp-$a")"; done
+rc=0; lane specs stale-arm "$TMP/specs-stale-arm" > "$TMP/sp-stale-arm" 2>&1 || rc=$?
+expect "stale-arm (a list field) gets no validator config" "0 none" "$rc $(vcf stale-arm)"
 
 # --- read: the real path on finished cells (S is in OUT from D; the parent's S is in trading-results from B)
 cell "$TMP/run" U "$TMP/out/runs/$C2/up-arm" up-arm; cell "$TMP/run" S "$TMP/out/runs/$C2/dead-arm" dead-arm
+# up-arm ran with a validator config (a stop-gate arm): its copy in the cell dir is public, with the cell
+echo "((gate_max_stop_distance_pct 0.13))" > "$TMP/out/runs/$C2/up-arm/obs-up-arm-k0-s0-validator-config.sexp"
 v6ok "$TMP/out/runs/$C2/up-arm" up-arm S; v6ok "$TMP/out/runs/$C2/dead-arm" dead-arm S; v6ok "$TMP/out/runs/$C2/S" S "$C1"
 mkdir -p "$TMP/out/spy"; printf '%s\n' date,open,high,low,close,adjusted_close,volume 2009-12-31,1,1,1,50,1,1 \
   2010-12-31,1,1,1,60,1,1 2011-12-30,1,1,1,55,1,1 2016-12-30,1,1,1,70,1,1 > "$TMP/out/spy/data.csv"
@@ -183,10 +227,12 @@ PUB=$TMP/out/results/public/$EXP; PRV=$TMP/out/results/private/$EXP
 expect "public: no price-bearing file" "" "$(find "$PUB" -type f \( -name '*trades.csv' -o -name '*equity_curve.csv' \
   -o -name '*open_positions.csv' -o -name 'D.tsv' -o -name 'firstdiff-*' -o -name '*validator.sexp.sexp' -o -name '*.ok' \) | head -3)"
 for f in surface.tsv drift.tsv events.tsv queue.tsv spy_years.tsv "lane-logs/$C2-up-arm.log" \
-  "runs/$C2/up-arm/obs-up-arm-k0-s0-summary.sexp" "runs/$C2/up-arm/obs-up-arm-k0-s0.v6diff-S.log"; do
+  "runs/$C2/up-arm/obs-up-arm-k0-s0-summary.sexp" "runs/$C2/up-arm/obs-up-arm-k0-s0.v6diff-S.log" \
+  "runs/$C2/up-arm/obs-up-arm-k0-s0-validator-config.sexp"; do
   expect "public has $f" yes "$([ -f "$PUB/$f" ] && echo yes || echo no)"; done
 for f in "runs/$C2/up-arm/obs-up-arm-k0-s0-trades.csv" "runs/$C2/S/obs-S-k0-s0-equity_curve.csv" "reads/up-arm@$C2/D.tsv" \
-  "drift/$C2-vs-$C1/D.tsv" "runs/$C2/up-arm/obs-up-arm-k0-s0.ok" "runs/$C2/up-arm/obs-up-arm-k0-s0-summary.sexp"; do
+  "drift/$C2-vs-$C1/D.tsv" "runs/$C2/up-arm/obs-up-arm-k0-s0.ok" "runs/$C2/up-arm/obs-up-arm-k0-s0-summary.sexp" \
+  "runs/$C2/up-arm/obs-up-arm-k0-s0-validator-config.sexp"; do
   expect "private has $f" yes "$([ -f "$PRV/$f" ] && echo yes || echo no)"; done
 
 rc=0; lane read dead-arm > "$TMP/R2" 2>&1 || rc=$?; expect "read dead-arm" 0 "$rc"
@@ -255,6 +301,14 @@ sed '1s/close/last/' "$TMP/spy.csv" > "$TMP/spy2.csv"; rc=0; lane years "$TMP/sp
 expect "years: a file without a close column is refused" 1 "$rc"
 rc=0; (OUTX=$TMP/nope; lane years "$TMP/spy.csv") > /dev/null 2>&1 || rc=$?
 expect "years writes nothing under OUT" "0 no" "$rc $([ -e "$TMP/nope" ] && echo yes || echo no)"
+
+# --- the real queue: every pending arm passes the lane's spec checks. A refusal would end a cloud session at its launch,
+# after the stage pull. The fixture queue is back in place afterwards.
+cp "$ROOT/$EXP/queue.tsv" "$R/$EXP/queue.tsv"
+for a in $(awk -F'\t' '$0 !~ /^#/ && $1 != "label" && $4 == "pending" { print $1 }' "$ROOT/$EXP/queue.tsv"); do
+  rc=0; lane specs "$a" "$TMP/specs-q-$a" > "$TMP/sp-q-$a" 2>&1 || rc=$?
+  expect "queue.tsv: pending arm $a passes the spec checks" "0 1" "$rc $(grep -c 'SPEC CHECKS OK' "$TMP/sp-q-$a")"; done
+cp "$LFIX/queue.tsv" "$R/$EXP/queue.tsv"
 
 # --- the lock: each step that writes OUT refuses to run beside another holder, and a dockerd the docker preflight starts
 # does not keep lane.lock once the lane has exited (it would refuse every relaunch).
