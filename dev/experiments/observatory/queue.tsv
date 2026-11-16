@@ -6,6 +6,6 @@
 # (V6 or obs_read.sh refused the pair). README.md §Lane.
 label	overrides	ledger	status
 msd-12	((stops_config ((max_stop_distance_pct 0.12))))	stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15	done@3c367cca7
-msd-18	((stops_config ((max_stop_distance_pct 0.18))))	stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15	pending
+msd-18	((stops_config ((max_stop_distance_pct 0.18))))	stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15	done@3c367cca7
 fbt-05	((screening_config ((failed_breakout_tolerance_pct 0.05))))	weekly picks decision 2026-11-16 (#3647): the live picks gate, off in the record; overlaps the F2 re-screen cancel (#2263)	pending
 cap-40	((screening_config ((max_buy_candidates 40))))	gate funnel P1 (#3631): ranks 21-40 hold 16 % of C*; top-N grid (cap 40 dominated on top-1000)	pending
