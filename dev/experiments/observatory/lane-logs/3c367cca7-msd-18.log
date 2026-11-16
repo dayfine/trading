@@ -1,0 +1,53 @@
+[11-16 03:31:00Z] observatory lane run; LANE_SHA=3c367cca7ff5f5209136c7ad4625333c6acb08d4 PAR=2 CELL_TIMEOUT=20000s
+[11-16 03:31:08Z] TR push check ok (/home/user/trading/../trading-results)
+[11-16 03:31:09Z] public push check ok
+[11-16 03:31:09Z] HEAD=3c367cca7 image=ghcr.io/dayfine/trading-ci:latest  mem=15G par=2
+[11-16 03:31:09Z] disk free 30G
+[11-16 03:31:09Z] STATE from origin/observatory/lane-results 32ff86c0078655bda0e834356ebf11982be299b4
+[11-16 03:31:09Z] ARM msd-18: ((stops_config ((max_stop_distance_pct 0.18)))) (ledger: stale-E K=5 2026-11-14 (#3621): the stop gate is the bear brake; record 0.15)
+[11-16 03:31:09Z] disk free 30G
+[11-16 03:31:09Z] PULL warehouse v12wk-9236
+[11-16 03:39:06Z] PULL corpact corpact-2026-10-27
+[11-16 03:39:08Z] PULL bars data-20261102
+[11-16 03:39:43Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-16 03:39:43Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv
+[11-16 03:39:43Z] SPY YEARS from /home/user/trading/.sweep-output/observatory-lane/spy/data.csv: 19 bull, 8 bear
+[11-16 03:39:43Z] DOCKER daemon not answering (failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /var/run/docker.sock: connect: no such file or directory); starting dockerd
+[11-16 03:39:45Z] DOCKER dockerd started
+[11-16 03:39:45Z] BUILD
+[11-16 03:41:48Z] BUILD_DONE
+[11-16 03:41:48Z] SPEC CHECKS OK: obs-S-kK = rk-kK; obs-msd-18-kK = obs-S-kK + ((stops_config ((max_stop_distance_pct 0.18))))
+[11-16 03:41:48Z] PARALLEL 2 cells at a time (MemTotal 15 GB, reserve 3 GB, 6 GB per cell)
+[11-16 03:41:48Z] CELL obs-S-k0-s0 reuse: trading-results dev/experiments/observatory/runs/3c367cca7/S
+[11-16 03:41:48Z] CELL obs-S-k1-s0 reuse: trading-results dev/experiments/observatory/runs/3c367cca7/S
+[11-16 03:41:48Z] CELL obs-S-k2-s0 reuse: trading-results dev/experiments/observatory/runs/3c367cca7/S
+[11-16 03:41:48Z] CELL obs-S-k3-s0 reuse: trading-results dev/experiments/observatory/runs/3c367cca7/S
+[11-16 03:41:48Z] CELL obs-S-k4-s0 reuse: trading-results dev/experiments/observatory/runs/3c367cca7/S
+[11-16 03:41:48Z] CELL obs-msd-18-k0-s0 run
+[11-16 03:41:48Z] CELL obs-msd-18-k1-s0 run
+[11-16 03:41:48Z] CELL obs-msd-18-k2-s0 run
+[11-16 03:41:48Z] CELL obs-msd-18-k3-s0 run
+[11-16 03:41:48Z] CELL obs-msd-18-k4-s0 run
+[11-16 03:41:48Z] BATCH 1: obs-msd-18-k0-s0 obs-msd-18-k1-s0
+[11-16 03:41:48Z] BATCH 2: obs-msd-18-k2-s0 obs-msd-18-k3-s0
+[11-16 03:41:48Z] BATCH 3: obs-msd-18-k4-s0
+[11-16 03:41:48Z] PREFLIGHT obs-msd-18-k0 (to 2000-03-31)
+[11-16 03:45:56Z] PREFLIGHT_OK 3c367cca7 obs-msd-18-k0 (n_symbols=9200 absent=1)
+[11-16 03:45:56Z] RUN obs-msd-18-k0-s0
+[11-16 03:45:56Z] RUN obs-msd-18-k1-s0
+[11-16 05:55:13Z] RESULT obs-msd-18-k1-s0 => total_return_pct 819.62288810379459 total_trades 726 max_drawdown_pct 31.637779582230412 peak_rss_kb=5769228 (wall 7757s)
+[11-16 05:55:24Z] RESULT obs-msd-18-k0-s0 => total_return_pct 1117.5935785256825 total_trades 726 max_drawdown_pct 25.428934829324596 peak_rss_kb=5788488 (wall 7768s)
+[11-16 05:55:24Z] disk free 16G
+[11-16 05:55:24Z] RUN obs-msd-18-k3-s0
+[11-16 05:55:24Z] RUN obs-msd-18-k2-s0
+[11-16 08:09:26Z] RESULT obs-msd-18-k3-s0 => total_return_pct 1024.0514730155946 total_trades 728 max_drawdown_pct 26.054759399120798 peak_rss_kb=5778796 (wall 8042s)
+[11-16 08:09:47Z] RESULT obs-msd-18-k2-s0 => total_return_pct 576.6042566307874 total_trades 761 max_drawdown_pct 32.900466140287456 peak_rss_kb=5807028 (wall 8063s)
+[11-16 08:09:47Z] disk free 16G
+[11-16 08:09:47Z] RUN obs-msd-18-k4-s0
+[11-16 10:26:35Z] RESULT obs-msd-18-k4-s0 => total_return_pct 874.13971502384436 total_trades 752 max_drawdown_pct 34.29748488973766 peak_rss_kb=5806004 (wall 8208s)
+[11-16 10:26:35Z] TRIPWIRE MATCH S k0 trades.csv md5 0928cfe40333560429f5a6e57c9c18de (the record (#3595 pb-S-k0 = #3602 pbb-S-k0))
+[11-16 10:26:37Z] V6 OK msd-18 (k0-k4 against S)
+[11-16 10:26:37Z] LIVE msd-18: trades.csv differs from S on 5 of 5 seeds
+[11-16 10:26:40Z] READ msd-18: obs_read: msd-18 row 2 appended -> median D_end -0.5798, flag none
+[11-16 10:26:40Z] QUEUE msd-18 -> done@3c367cca7
+[11-16 10:26:40Z] DRIFT none: no earlier HEAD has a finished S in trading-results
