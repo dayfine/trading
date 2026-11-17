@@ -105,6 +105,7 @@ let _candidate ?(ticker = _ticker) ?(side = Trading_base.Types.Long) ~breakout
         range_top_freshness = None;
         require_breakout_volume = true;
         current_close = None;
+        current_raw_close = None;
         as_of_date = _current_date;
       };
     sector = { sector_name = "Test"; rating = Neutral; stage = _stage.stage };

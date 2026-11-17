@@ -58,6 +58,7 @@ let _analysis ?volume ?rs ?breakout_price ?breakdown_price
     range_top_freshness;
     require_breakout_volume = true;
     current_close = None;
+    current_raw_close = None;
     as_of_date = _date "2024-03-15";
   }
 

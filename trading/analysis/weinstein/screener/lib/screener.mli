@@ -361,10 +361,11 @@ type config = {
           and changes no backtest result.
 
           When [k > 0.0], a long candidate whose current close has fallen back
-          below [breakout_price *. (1. -. k)] is dropped from [buy_candidates]
-          and {b demoted to the watchlist} carrying the drop reason from
-          {!Screener_admission.failed_breakout_reason}. A candidate with an
-          unknown breakout price or an unknown current close is never
+          below [breakout_price *. (1. -. k)], both on the raw basis
+          ([Stock_analysis.t.current_raw_close], #3659), is dropped from
+          [buy_candidates] and {b demoted to the watchlist} carrying the drop
+          reason from {!Screener_admission.failed_breakout_reason}. A candidate
+          with an unknown breakout price or an unknown current close is never
           invalidated — absence of data is not evidence of failure.
 
           {b Engineering adaptation, not a book-quoted rule.} The reference doc

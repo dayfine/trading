@@ -7,7 +7,7 @@
 
     Extracted from {!Stock_analysis} to keep that coordinator within the
     declared-large file-length cap. Pure: depends only on the closures passed
-    in. *)
+    in. [raw_close] puts a close on the scans' raw basis (#3659). *)
 
 open Core
 
@@ -104,3 +104,12 @@ let scan_min_low ~get_low ~get_split_factor ~base_end_offset ~base_lookback :
 let scan_recent_max_high ~get_high ~get_split_factor ~weeks : float option =
   scan_max_high ~get_high ~get_split_factor ~base_end_offset:0
     ~base_lookback:weeks
+
+(** Raw close from an adjusted close and its own bar's split factor
+    ([adjusted_close / close_price]): dividing the factor back out recovers
+    [close_price]. [None] when either input is unknown or the factor is not
+    positive. *)
+let raw_close ~adjusted_close ~split_factor : float option =
+  match (adjusted_close, split_factor) with
+  | Some close, Some factor when Float.(factor > 0.0) -> Some (close /. factor)
+  | _ -> None
