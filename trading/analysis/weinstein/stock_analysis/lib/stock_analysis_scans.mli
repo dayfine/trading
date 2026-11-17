@@ -64,3 +64,13 @@ val raw_close :
 
     [None] when either input is [None] or the factor is not positive (a bad bar
     — never divide by it). *)
+
+val find_peak_volume_offset :
+  get_volume:(week_offset:int -> float option) -> lookback:int -> int option
+(** The [week_offset] of the peak-volume bar among the [lookback] newest bars:
+    the breakout event {!Stock_analysis} hands to the volume confirmation.
+    Counts only the contiguous defined tail (the walk stops at the first [None],
+    matching the bar-list path's contiguous slice) and returns [None] when fewer
+    than two bars are defined. On a volume tie the older bar wins, matching the
+    bar-list [List.foldi] with a strict [>]. Moved unchanged from
+    {!Stock_analysis} (file-length cap, #3664). *)

@@ -412,6 +412,29 @@
  (guard ((unit ("trading/analysis/weinstein/screener/test/test_screener.ml"
                 "test_failed_breakout_later_split_raw_close_passes"))))
  (status fixed))
+((issue 3664) (ref "#3659 sibling audit: virgin test and supply grade basis mix")
+ (finding "the virgin-crossing test and the overhead-supply grade compared the raw breakout with the back-adjusted sketch (520-week high, histogram), so on history a name below its 10-year high passed as virgin when it later split or paid dividends: in fbt-05's S run 374 of 2,816 trades (13 %, an upper bound) passed the virgin test only through the mix, carrying 31-47 % of the record's summed contribution per seed. virgin_supply_basis = One_basis puts the breakout on the sketch's basis for both; the default Legacy_mixed keeps the record byte-identical until the paired K=5 run")
+ (guard ((unit ("trading/trading/weinstein/strategy/test/test_virgin_supply_basis.ml"
+                "test_virgin_later_split_not_virgin_on_one_basis"))
+         (unit ("trading/trading/weinstein/strategy/test/test_virgin_supply_basis.ml"
+                "test_supply_grade_later_split_not_virgin_on_one_basis"))))
+ (status fixed-behind-flag))
+((issue 3664) (ref "#3659 sibling audit: continuation detector basis mix")
+ (finding "the continuation detector divided its raw consolidation range by a mean adjusted close (continuation.ml:114) and tested the adjusted close against the raw consolidation high (:133), so it picked its fires by later corporate actions: replayed on the 16y cells, its price tests fired 31 times where the adjusted/raw factor was below 0.95, against 13,783 on one basis. Both tests now read the raw close (default-off mechanism)")
+ (guard ((unit ("trading/analysis/weinstein/stock_analysis/test/test_stock_analysis.ml"
+                "test_continuation_later_split_reads_raw_close"))
+         (unit ("trading/analysis/weinstein/continuation/test/test_continuation.ml"
+                "later split: range and breakout read the raw close"))))
+ (status fixed))
+((issue 3664) (ref "#3659 sibling audit: range-top freshness basis mix")
+ (finding "the F1 range-top freshness clock tested the adjusted close against the raw ticket anchor (entry_freshness.ml:25) and the raw anchor against the adjusted MA (:17), so the range-top route could never admit a name whose adjusted/raw factor was below 0.95 (none of the 5,753 such rt-freshness trades passed the coded test on any screen before entry). Both tests now read the anchor times the as-of split factor (default-off basis)")
+ (guard ((unit ("trading/analysis/weinstein/stock_analysis/test/test_stock_analysis.ml"
+                "test_freshness_verdict_independent_of_later_splits"))
+         (unit ("trading/analysis/weinstein/stock_analysis/test/test_entry_freshness.ml"
+                "later forward split: close reads the adjusted anchor"))
+         (unit ("trading/analysis/weinstein/stock_analysis/test/test_entry_freshness.ml"
+                "later reverse split: anchor clears the adjusted MA"))))
+ (status fixed))
 ((issue 2973) (ref "split corpus scan column: prior-base scan blind after an ex-date")
  (finding "prior-base scan blind for base_end_offset_weeks - 1 weeks after an ex-date: the G14 guard only compares offsets >= base_end_offset_weeks, so breakout / breakdown come wholly from pre-split raw bars (AAPL 2014-06-13 breakout 575.14 vs close 91.28; GE 2021-08-06 14.42 vs 104.52)")
  (guard none)

@@ -891,6 +891,37 @@ type config = {
           entry regardless of how long ago the Stage-2 transition happened
           (weinstein-book-reference.md §Buy Criteria). Spine intact. R2: real
           top-level [bool] field → [Variant_matrix] flag axis. *)
+  virgin_supply_basis : Stock_analysis_supply.basis;
+      [@sexp.default Stock_analysis_supply.Legacy_mixed]
+      (** Price basis of the virgin test and the overhead-supply grade (#3664),
+          copied into [Stock_analysis.config.virgin_supply_basis].
+
+          {b The defect.} The breakout price is a raw weekly high; since #2145
+          the warehouse sketch ([max_high_520w], the histogram) is
+          back-adjusted, so on history it already carries every split and
+          dividend the name pays {i later}. Comparing the two admits a name
+          below its 10-year high as virgin when it later splits: in fbt-05's S
+          run 374 of 2,816 trades (13 %) passed the virgin test only through the
+          mix (#3659 sibling audit). In live use the newest bars have factor 1
+          and the comparison is consistent.
+
+          {b [Legacy_mixed] (default, no-op)} — today's comparison verbatim; the
+          record, every golden and every default config stay byte-identical
+          (R1).
+
+          {b [One_basis]} — the breakout is put on the sketch's basis
+          ([Stock_analysis_supply.breakout_on_sketch_basis]) before both the
+          virgin test and the grade; ticket prices stay raw. Works on raw- and
+          adjusted-basis warehouses alike (it rescales by the sketch's own
+          anchor close).
+
+          {b Faithfulness (W1/W2).} A correctness fix to how "new high ground"
+          (weinstein-book-reference.md §Buy Criteria) is measured, not a new
+          dial: the spine is untouched. R2: axis-expressible as
+          [((flag virgin_supply_basis) (values (Legacy_mixed One_basis)))]. R3:
+          stays [Legacy_mixed] until the paired K=5 record-vs-one-basis run
+          ([#3664] after-merge item) and the [config-default-blast-radius.md]
+          decision. *)
   dawn_leverage_enabled : bool; [@sexp.default false]
       (** Master switch for the regime-conditional long-leverage "dawn"
           mechanism ({!Leverage_dawn}). When [true] AND the primary index is in
@@ -1326,7 +1357,7 @@ type config = {
           MA — §4.1 requirements 1–3 kept explicit, because "a breakout below a
           declining MA is a trap, not a buy". The MA-cross age is not consulted:
           the basis {b replaces} that window rather than widening it, so this is
-          not a stealth re-run of the rejected continuation (#1366) or
+          not a stealth re-run of the rejected continuation (#1095) or
           early-admission axes — the [<= 4] value itself is untouched.
 
           {b Composes with [reject_declining_ma_long_entry] (#1775)} without

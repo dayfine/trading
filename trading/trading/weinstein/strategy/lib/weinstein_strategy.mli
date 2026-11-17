@@ -898,6 +898,14 @@ type config = {
           warehouse sketch (absent → no re-admission). Independent of
           [overhead_supply]. See
           [Weinstein_strategy_config.virgin_crossing_readmission]. *)
+  virgin_supply_basis : Stock_analysis_supply.basis;
+      [@sexp.default Stock_analysis_supply.Legacy_mixed]
+      (** Price basis of the virgin test and the overhead-supply grade (#3664).
+          [Legacy_mixed] (default) compares the raw breakout with the sketch as
+          stored, which since #2145 is back-adjusted (bit-identical, R1);
+          [One_basis] puts the breakout on the sketch's basis first, so a name
+          below its 10-year high is not virgin because it later splits. See
+          [Weinstein_strategy_config.virgin_supply_basis]. *)
   dawn_leverage_enabled : bool; [@sexp.default false]
       (** Master switch for the regime-conditional long-leverage "dawn"
           mechanism ({!Leverage_dawn}). When [true] and the primary index is in

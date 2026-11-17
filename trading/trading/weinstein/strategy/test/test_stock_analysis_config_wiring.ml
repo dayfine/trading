@@ -145,6 +145,53 @@ let test_threads_entry_freshness_basis _ =
   assert_that built.entry_freshness_basis
     (equal_to Entry_freshness.Range_top_breakout)
 
+(** The seam threads [virgin_supply_basis] (#3664, the price basis of the virgin
+    test and the supply grade) verbatim into the built per-screen
+    [Stock_analysis.config]. The [Legacy_mixed] default is pinned by
+    [test_default_builds_stock_analysis_default_config].
+
+    EFFECTIVENESS-PIN: virgin_supply_basis -- arms the field away from its
+    [Legacy_mixed] default; severing the copy would leave
+    [built.virgin_supply_basis = Legacy_mixed] and fail the assertion below. *)
+let test_threads_virgin_supply_basis _ =
+  let config =
+    {
+      (_default_config ()) with
+      Weinstein_strategy.virgin_supply_basis = Stock_analysis_supply.One_basis;
+    }
+  in
+  let built = Weinstein_strategy.stock_analysis_config_for ~config in
+  assert_that built.virgin_supply_basis
+    (equal_to Stock_analysis_supply.One_basis)
+
+(** A config sexp written before the knob (no [virgin_supply_basis] field)
+    parses to [Legacy_mixed], so every existing scenario keeps the mixed
+    comparison; [One_basis] round-trips. *)
+let test_virgin_supply_basis_sexp_default_and_round_trip _ =
+  let without_field =
+    match Weinstein_strategy.sexp_of_config (_default_config ()) with
+    | Core.Sexp.List fields ->
+        Core.Sexp.List
+          (Core.List.filter fields ~f:(function
+            | Core.Sexp.List (Core.Sexp.Atom "virgin_supply_basis" :: _) ->
+                false
+            | _ -> true))
+    | atom -> atom
+  in
+  let one_basis =
+    {
+      (_default_config ()) with
+      Weinstein_strategy.virgin_supply_basis = Stock_analysis_supply.One_basis;
+    }
+  in
+  assert_that
+    ( (Weinstein_strategy.config_of_sexp without_field).virgin_supply_basis,
+      (Weinstein_strategy.config_of_sexp
+         (Weinstein_strategy.sexp_of_config one_basis))
+        .virgin_supply_basis )
+    (equal_to
+       (Stock_analysis_supply.Legacy_mixed, Stock_analysis_supply.One_basis))
+
 (* ------------------------------------------------------------------ *)
 (* F5 — volume_confirm_at_fill => require_breakout_volume = false       *)
 (* ------------------------------------------------------------------ *)
@@ -225,6 +272,10 @@ let suite =
          >:: test_threads_entry_cap_local_range_weeks;
          "threads entry_freshness_basis into built config"
          >:: test_threads_entry_freshness_basis;
+         "threads virgin_supply_basis into built config"
+         >:: test_threads_virgin_supply_basis;
+         "virgin_supply_basis sexp default and round trip"
+         >:: test_virgin_supply_basis_sexp_default_and_round_trip;
        ]
 
 let () = run_test_tt_main suite

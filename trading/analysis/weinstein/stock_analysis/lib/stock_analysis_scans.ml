@@ -7,7 +7,8 @@
 
     Extracted from {!Stock_analysis} to keep that coordinator within the
     declared-large file-length cap. Pure: depends only on the closures passed
-    in. [raw_close] puts a close on the scans' raw basis (#3659). *)
+    in. [raw_close] puts a close on the scans' raw basis (#3659). The
+    peak-volume scan moved here unchanged for the same cap (#3664). *)
 
 open Core
 
@@ -113,3 +114,56 @@ let raw_close ~adjusted_close ~split_factor : float option =
   match (adjusted_close, split_factor) with
   | Some close, Some factor when Float.(factor > 0.0) -> Some (close /. factor)
   | _ -> None
+
+(* ------------------------------------------------------------------ *)
+(* Callback-shaped peak-volume scan                                     *)
+(* ------------------------------------------------------------------ *)
+
+(** Count how many of the [lookback] newest bars are defined. Walks newest →
+    oldest and stops at the first [None]: bars older than the first hole are
+    effectively absent, matching the bar-list's
+    [List.sub bars ~pos:(max 0 (n - lookback))] which slices contiguous tails.
+*)
+let _count_defined ~get_volume ~lookback : int =
+  let rec walk off n =
+    if off >= lookback then n
+    else
+      match get_volume ~week_offset:off with
+      | None -> n
+      | Some _ -> walk (off + 1) (n + 1)
+  in
+  walk 0 0
+
+(** Update [(best_off, best_vol)] with the sample read at [off]. Returns the
+    updated pair plus a flag indicating whether the walk should continue
+    ([true]) or stop ([false], when [get_volume] returned [None]). Strict [>]
+    keeps the first-encountered maximum on ties. *)
+let _peak_step ~get_volume ~off ~best_off ~best_vol : (int * float) * bool =
+  match get_volume ~week_offset:off with
+  | None -> ((best_off, best_vol), false)
+  | Some v when Float.(v > best_vol) -> ((off, v), true)
+  | Some _ -> ((best_off, best_vol), true)
+
+(** Find the [week_offset] in [0 .. defined - 1] with the highest [get_volume].
+    Scans oldest → newest (offset [defined-1] down to [0]) so that on ties the
+    older bar wins — matching the bar-list [_find_peak_volume_idx], where
+    [List.foldi] starts from the oldest [recent] bar with init [(0, 0)] and a
+    strict [>] comparison keeps the first occurrence of the max. *)
+let _peak_offset_in ~get_volume ~defined : int =
+  let rec loop off best_off best_vol =
+    if off < 0 then best_off
+    else
+      let (best_off', best_vol'), continue =
+        _peak_step ~get_volume ~off ~best_off ~best_vol
+      in
+      if not continue then best_off' else loop (off - 1) best_off' best_vol'
+  in
+  loop (defined - 1) (defined - 1) Float.neg_infinity
+
+(** Find the [week_offset] of the peak-volume bar within the last [lookback]
+    bars. Returns [None] when fewer than two bars are defined (matches the
+    bar-list [_find_peak_volume_idx]'s [if n < 2 then None] guard). The returned
+    offset is the offset from the current week back to the peak. *)
+let find_peak_volume_offset ~get_volume ~lookback : int option =
+  let defined = _count_defined ~get_volume ~lookback in
+  if defined < 2 then None else Some (_peak_offset_in ~get_volume ~defined)

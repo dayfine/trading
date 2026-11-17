@@ -32,6 +32,9 @@ type config = {
           .mli. *)
   virgin_crossing_readmission : bool; [@sexp.default false]
       (** resistance-v2 lever (a); [false] = off (bit-identical). See .mli. *)
+  virgin_supply_basis : Stock_analysis_supply.basis;
+      [@sexp.default Stock_analysis_supply.Legacy_mixed]
+      (** Price basis of the virgin test and supply grade (#3664). See .mli. *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]
       (** Ticket-level local-range entry anchor (default [0] = off). When [> 0],
           {!local_range_top} is the split-safe max high over the last
@@ -60,6 +63,7 @@ let default_config =
     continuation = None;
     overhead_supply = None;
     virgin_crossing_readmission = false;
+    virgin_supply_basis = Stock_analysis_supply.Legacy_mixed;
     entry_anchor_local_range_weeks = 0;
     entry_cap_local_range_weeks = 0;
     entry_freshness_basis = Entry_freshness.Ma_cross;
@@ -132,59 +136,6 @@ type callbacks = {
   volume : Volume.callbacks;  (** Nested Volume callbacks. *)
   resistance : Resistance.callbacks;  (** Nested Resistance callbacks. *)
 }
-
-(* ------------------------------------------------------------------ *)
-(* Callback-shaped peak-volume scan                                     *)
-(* ------------------------------------------------------------------ *)
-
-(** Count how many of the [lookback] newest bars are defined. Walks newest →
-    oldest and stops at the first [None]: bars older than the first hole are
-    effectively absent, matching the bar-list's
-    [List.sub bars ~pos:(max 0 (n - lookback))] which slices contiguous tails.
-*)
-let _count_defined ~get_volume ~lookback : int =
-  let rec walk off n =
-    if off >= lookback then n
-    else
-      match get_volume ~week_offset:off with
-      | None -> n
-      | Some _ -> walk (off + 1) (n + 1)
-  in
-  walk 0 0
-
-(** Update [(best_off, best_vol)] with the sample read at [off]. Returns the
-    updated pair plus a flag indicating whether the walk should continue
-    ([true]) or stop ([false], when [get_volume] returned [None]). Strict [>]
-    keeps the first-encountered maximum on ties. *)
-let _peak_step ~get_volume ~off ~best_off ~best_vol : (int * float) * bool =
-  match get_volume ~week_offset:off with
-  | None -> ((best_off, best_vol), false)
-  | Some v when Float.(v > best_vol) -> ((off, v), true)
-  | Some _ -> ((best_off, best_vol), true)
-
-(** Find the [week_offset] in [0 .. defined - 1] with the highest [get_volume].
-    Scans oldest → newest (offset [defined-1] down to [0]) so that on ties the
-    older bar wins — matching the bar-list [_find_peak_volume_idx], where
-    [List.foldi] starts from the oldest [recent] bar with init [(0, 0)] and a
-    strict [>] comparison keeps the first occurrence of the max. *)
-let _peak_offset_in ~get_volume ~defined : int =
-  let rec loop off best_off best_vol =
-    if off < 0 then best_off
-    else
-      let (best_off', best_vol'), continue =
-        _peak_step ~get_volume ~off ~best_off ~best_vol
-      in
-      if not continue then best_off' else loop (off - 1) best_off' best_vol'
-  in
-  loop (defined - 1) (defined - 1) Float.neg_infinity
-
-(** Find the [week_offset] of the peak-volume bar within the last [lookback]
-    bars. Returns [None] when fewer than two bars are defined (matches the
-    bar-list [_find_peak_volume_idx]'s [if n < 2 then None] guard). The returned
-    offset is the offset from the current week back to the peak. *)
-let _find_peak_volume_offset_callback ~get_volume ~lookback : int option =
-  let defined = _count_defined ~get_volume ~lookback in
-  if defined < 2 then None else Some (_peak_offset_in ~get_volume ~defined)
 
 (* ------------------------------------------------------------------ *)
 (* Bar-list helpers used by the wrapper to build [callbacks]            *)
@@ -274,12 +225,19 @@ let _support_result ~(config : config)
 (** Build a {!Continuation.callbacks} bundle from this module's callbacks (Stage
     \+ Resistance sub-bundles + our own [get_high]). [get_low] adapts the
     Resistance callback's [~bar_offset] naming to Continuation's [~week_offset]
-    — both indices mean "offset back from the newest bar" in weekly cadence. *)
+    — both indices mean "offset back from the newest bar" in weekly cadence.
+    [get_raw_close] divides each bar's own split factor out of the stage close,
+    the basis of the raw highs and lows (#3664). *)
 let _continuation_callbacks_of (callbacks : callbacks) : Continuation.callbacks
     =
   {
     get_ma = callbacks.stage.get_ma;
     get_close = callbacks.stage.get_close;
+    get_raw_close =
+      (fun ~week_offset ->
+        Stock_analysis_scans.raw_close
+          ~adjusted_close:(callbacks.stage.get_close ~week_offset)
+          ~split_factor:(callbacks.get_split_factor ~week_offset));
     get_high = callbacks.get_high;
     get_low =
       (fun ~week_offset -> callbacks.resistance.get_low ~bar_offset:week_offset);
@@ -344,14 +302,18 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
       ~cap_weeks:config.entry_cap_local_range_weeks ~breakout_price
   in
   let current_close = callbacks.stage.get_close ~week_offset:0 in
+  let split_factor = callbacks.get_split_factor ~week_offset:0 in
+  let current_raw_close =
+    Stock_analysis_scans.raw_close ~adjusted_close:current_close ~split_factor
+  in
   let range_top_freshness =
     Entry_freshness.range_top_freshness ~basis:config.entry_freshness_basis
       ~ma_direction:stage_result.ma_direction ~ma_value:stage_result.ma_value
-      ~local_range_top:range_top ~current_close
+      ~local_range_top:range_top ~split_factor ~current_close
   in
   let peak_offset_opt =
-    _find_peak_volume_offset_callback ~get_volume:callbacks.get_volume
-      ~lookback:config.breakout_event_lookback
+    Stock_analysis_scans.find_peak_volume_offset
+      ~get_volume:callbacks.get_volume ~lookback:config.breakout_event_lookback
   in
   let volume_result =
     _volume_result ~config ~volume_callbacks:callbacks.volume ~peak_offset_opt
@@ -368,7 +330,8 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
   let supply, virgin_readmission =
     Stock_analysis_supply.results ~overhead_supply:config.overhead_supply
       ~virgin_crossing_readmission:config.virgin_crossing_readmission
-      ~get_sketch:callbacks.get_sketch ~breakout_price
+      ~basis:config.virgin_supply_basis ~get_sketch:callbacks.get_sketch
+      ~breakout_price ~current_raw_close
   in
   {
     ticker;
@@ -387,9 +350,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     range_top_freshness;
     require_breakout_volume = config.require_breakout_volume;
     current_close;
-    current_raw_close =
-      Stock_analysis_scans.raw_close ~adjusted_close:current_close
-        ~split_factor:(callbacks.get_split_factor ~week_offset:0);
+    current_raw_close;
     as_of_date;
   }
 

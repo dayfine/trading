@@ -98,6 +98,9 @@ type config = {
   overhead_supply : Resistance_supply.config option; [@sexp.default None]
       (** See [.mli]. *)
   virgin_crossing_readmission : bool; [@sexp.default false]  (** See [.mli]. *)
+  virgin_supply_basis : Stock_analysis_supply.basis;
+      [@sexp.default Stock_analysis_supply.Legacy_mixed]
+      (** See [.mli]. *)
   dawn_leverage_enabled : bool; [@sexp.default false]  (** See [.mli]. *)
   dawn_initial_long_margin_req : float; [@sexp.default 1.0]  (** See [.mli]. *)
   dawn_max_ma_flip_age_weeks : int;
@@ -167,17 +170,6 @@ type config = {
 (* Top-level: keeps [default_config] a flat literal. *)
 let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
-(* 2026-07-23 bundle: supply weight on, pairs with [overhead_supply]. *)
-let _default_screening_config =
-  {
-    Screener.default_config with
-    weights =
-      {
-        Screener.default_config.weights with
-        w_overhead_supply = Some bundle_w_overhead_supply;
-      };
-  }
-
 (* @large-function: flat default-config record literal, one line per field *)
 let default_config ~universe ~index_symbol =
   {
@@ -186,7 +178,7 @@ let default_config ~universe ~index_symbol =
     sector_etfs = [];
     stage_config = Stage.default_config;
     macro_config = Macro.default_config;
-    screening_config = _default_screening_config;
+    screening_config = default_screening_config;
     portfolio_config = Portfolio_risk.default_config;
     stops_config = Weinstein_stops.default_config;
     initial_stop_buffer = 1.0;
@@ -244,6 +236,7 @@ let default_config ~universe ~index_symbol =
     resistance_lookback_bars = 0;
     overhead_supply = Some Resistance_supply.default_config;
     virgin_crossing_readmission = true;
+    virgin_supply_basis = Stock_analysis_supply.Legacy_mixed;
     dawn_leverage_enabled = false;
     dawn_initial_long_margin_req = 1.0;
     dawn_max_ma_flip_age_weeks = default_dawn_max_flip_age_weeks;

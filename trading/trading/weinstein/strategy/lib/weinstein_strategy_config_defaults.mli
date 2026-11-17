@@ -24,6 +24,12 @@ val bundle_w_overhead_supply : int
 (** Continuous overhead-supply ranking weight ([30]) armed into the default
     screening weights by the 2026-07-23 bundle promotion. *)
 
+val default_screening_config : Screener.config
+(** [Screener.default_config] with [w_overhead_supply = Some]
+    {!bundle_w_overhead_supply}: the [screening_config] of [default_config]
+    (2026-07-23 bundle). Moved here unchanged for the file-length cap (#3664).
+*)
+
 val default_dawn_max_flip_age_weeks : int
 (** Default [dawn_max_ma_flip_age_weeks] ([78] weeks ~= 1.5y, P1b memo). *)
 
