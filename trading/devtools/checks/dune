@@ -552,6 +552,21 @@
  (action
   (run sh %{dep:docker_dune_smoke.sh})))
 
+; On-demand dev container (user decision 2026-11-16): dev/lib/ensure_container.sh
+; starts Docker Desktop and the container for the scripts that run work in it,
+; dev/lib/container_idle_stop.sh stops it when idle, and the scripts that only
+; observe it (wait_for.sh proc, where_is_work.sh, sweep_disk_watcher.sh) must
+; never start it. A fake `docker` on PATH keeps its state in files, so no
+; container is needed. The scripts it reads live under dev/, outside the dune
+; workspace root, and are found via repo_root() at RUN TIME, so (universe) is
+; required for the same reason as docker_dune_smoke.sh above (H-CHECK-CACHE-BLIND).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:container_on_demand_check.sh})))
+
 ; Smoke test for dev/lib/gnu_time_rss.sh's shared _parse_gnu_time_rss()
 ; helper (issues #2553, #2559): `tr -d '\n'` over GNU /usr/bin/time's output
 ; file fused the trailing status-line digit onto the %M value on FAILING

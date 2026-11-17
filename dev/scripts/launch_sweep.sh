@@ -29,7 +29,7 @@
 #   1. Host disk free  >= LAUNCH_SWEEP_DISK_FREE_GB_MIN (default 50 GB)
 #   2. Docker.raw size <  LAUNCH_SWEEP_DOCKER_RAW_GB_MAX (default 30 GB)
 #                         (skipped if Docker.raw path is absent — Linux hosts)
-#   3. Container       running
+#   3. Container       running (started first when stopped: dev/lib/ensure_container.sh)
 #   4. /tmp/sweeps/    bind-mounted into the container
 #   5. No other        `bayesian_runner.exe` already running in the container
 #   6. No stale agent worktrees older than
@@ -174,6 +174,10 @@ check_docker_raw() {
 # ---------------------------------------------------------------------------
 check_container_running() {
   local state
+  # On-demand container (user decision 2026-11-16): start it when stopped. A failure prints its own
+  # reason; the state read below then fails the check.
+  DOCKER_CONTAINER="${CONTAINER}" ENSURE_CONTAINER_DOCKER_BIN="${DOCKER_BIN}" \
+    sh "${SCRIPT_DIR}/../lib/ensure_container.sh" || true
   state="$("${DOCKER_BIN}" inspect -f '{{.State.Running}}' "${CONTAINER}" 2>/dev/null || true)"
   if [[ "${state}" != "true" ]]; then
     err "container '${CONTAINER}' is not running (docker inspect → '${state:-not-found}')"

@@ -106,6 +106,8 @@ container_path() { # host path -> container path (must sit under the repo)
   case "$1" in "$REPO"/*) printf '%s%s' "$CROOT" "${1#"$REPO"}" ;; *) return 1 ;; esac
 }
 docker_steps() {
+  # on-demand container (user decision 2026-11-16): it is stopped when idle, so bring it up first
+  DOCKER_CONTAINER="$CONTAINER" sh "$REPO/dev/lib/ensure_container.sh" || { echo "review_pack: container $CONTAINER is not up" >&2; exit 2; }
   # this checkout's container path, not the mount root: a worktree builds and runs its own tree (#3262)
   src=$(mount_source "$CONTAINER" "$MOUNT"); [ -n "$src" ] || { src=$REPO; log "docker: no mount at $MOUNT found by docker inspect; assuming it is $REPO"; }
   CROOT=$(croot_for "$src" "$REPO" "$MOUNT") || { echo "review_pack: $REPO is not under $src, the directory $CONTAINER mounts at $MOUNT" >&2; exit 2; }

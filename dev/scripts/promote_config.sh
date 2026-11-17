@@ -324,6 +324,13 @@ else
   # This repo's OCaml toolchain lives in the trading-1-dev container; the
   # host opam switch is intentionally minimal and missing libraries like
   # core_unix.
+  # On-demand container (user decision 2026-11-16): it is stopped when idle, so bring it up first.
+  DOCKER_CONTAINER="${PROMOTE_DOCKER_CONTAINER:-trading-1-dev}" \
+    sh "$trading_repo_root/dev/lib/ensure_container.sh" || {
+      echo "Error: container ${PROMOTE_DOCKER_CONTAINER:-trading-1-dev} is not up" >&2
+      rm -rf "$target_dir"
+      exit 1
+    }
   echo "Building scenario_runner.exe (inside docker)..."
   docker exec "${PROMOTE_DOCKER_CONTAINER:-trading-1-dev}" bash -c \
     'cd /workspaces/trading-1/trading && eval $(opam env) && dune build trading/backtest/scenarios/scenario_runner.exe' \
