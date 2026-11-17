@@ -1,0 +1,129 @@
+[11-16 12:02:46Z] observatory lane run; LANE_SHA=ecd77c76042691874f78e8d61f53ee0c278a4816 PAR=2 CELL_TIMEOUT=20000s
+[11-16 12:02:53Z] TR push check ok (/home/user/trading/../trading-results)
+[11-16 12:02:54Z] public push check ok
+[11-16 12:02:54Z] HEAD=ecd77c760 image=ghcr.io/dayfine/trading-ci:latest  mem=15G par=2
+[11-16 12:02:54Z] disk free 30G
+[11-16 12:02:54Z] STATE from HEAD (no observatory/lane-results yet)
+[11-16 12:02:54Z] ARM fbt-05: ((screening_config ((failed_breakout_tolerance_pct 0.05)))) (ledger: weekly picks decision 2026-11-16 (#3647): the live picks gate, off in the record; overlaps the F2 re-screen cancel (#2263))
+[11-16 12:02:54Z] disk free 30G
+[11-16 12:02:54Z] PULL warehouse v12wk-9236
+[11-16 12:10:04Z] PULL corpact corpact-2026-10-27
+[11-16 12:10:05Z] PULL bars data-20261102
+[11-16 12:10:39Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-16 12:10:39Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv
+[11-16 12:10:39Z] SPY YEARS from /home/user/trading/.sweep-output/observatory-lane/spy/data.csv: 19 bull, 8 bear
+[11-16 12:10:40Z] DOCKER daemon not answering (failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /var/run/docker.sock: connect: no such file or directory); starting dockerd
+[11-16 12:10:42Z] DOCKER dockerd started
+[11-16 12:10:42Z] BUILD
+[11-16 12:12:44Z] BUILD_DONE
+[11-16 12:12:44Z] SPEC CHECKS OK: obs-S-kK = rk-kK; obs-fbt-05-kK = obs-S-kK + ((screening_config ((failed_breakout_tolerance_pct 0.05))))
+[11-16 12:12:44Z] VALIDATOR CONFIG fbt-05 default (no -config)
+[11-16 12:12:44Z] PARALLEL 2 cells at a time (MemTotal 15 GB, reserve 3 GB, 6 GB per cell)
+[11-16 12:12:44Z] CELL obs-S-k0-s0 run
+[11-16 12:12:44Z] CELL obs-S-k1-s0 run
+[11-16 12:12:44Z] CELL obs-S-k2-s0 run
+[11-16 12:12:44Z] CELL obs-S-k3-s0 run
+[11-16 12:12:44Z] CELL obs-S-k4-s0 run
+[11-16 12:12:44Z] CELL obs-fbt-05-k0-s0 run
+[11-16 12:12:44Z] CELL obs-fbt-05-k1-s0 run
+[11-16 12:12:44Z] CELL obs-fbt-05-k2-s0 run
+[11-16 12:12:44Z] CELL obs-fbt-05-k3-s0 run
+[11-16 12:12:44Z] CELL obs-fbt-05-k4-s0 run
+[11-16 12:12:44Z] BATCH 1: obs-S-k0-s0 obs-S-k1-s0
+[11-16 12:12:44Z] BATCH 2: obs-S-k2-s0 obs-S-k3-s0
+[11-16 12:12:44Z] BATCH 3: obs-S-k4-s0 obs-fbt-05-k0-s0
+[11-16 12:12:44Z] BATCH 4: obs-fbt-05-k1-s0 obs-fbt-05-k2-s0
+[11-16 12:12:44Z] BATCH 5: obs-fbt-05-k3-s0 obs-fbt-05-k4-s0
+[11-16 12:12:44Z] PREFLIGHT obs-fbt-05-k0 (to 2000-03-31)
+[11-16 12:17:08Z] PREFLIGHT_OK ecd77c760 obs-fbt-05-k0 (n_symbols=9200 absent=1)
+[11-16 12:17:08Z] RUN obs-S-k1-s0
+[11-16 12:17:08Z] RUN obs-S-k0-s0
+[11-16 14:24:30Z] RESULT obs-S-k1-s0 => total_return_pct 1678.3331344277278 total_trades 568 max_drawdown_pct 24.551569709571016 peak_rss_kb=5724800 (wall 7642s)
+[11-16 14:24:36Z] RESULT obs-S-k0-s0 => total_return_pct 1472.7554563229353 total_trades 576 max_drawdown_pct 27.21768913331405 peak_rss_kb=5745832 (wall 7648s)
+[11-16 14:24:36Z] disk free 16G
+[11-16 14:24:36Z] RUN obs-S-k3-s0
+[11-16 14:24:36Z] RUN obs-S-k2-s0
+[11-16 16:29:04Z] RESULT obs-S-k2-s0 => total_return_pct 1334.989897511811 total_trades 562 max_drawdown_pct 32.07586548780489 peak_rss_kb=5734120 (wall 7468s)
+[11-16 16:29:35Z] RESULT obs-S-k3-s0 => total_return_pct 1220.14585307154 total_trades 562 max_drawdown_pct 25.558343357764624 peak_rss_kb=5759512 (wall 7499s)
+[11-16 16:29:35Z] disk free 16G
+[11-16 16:29:35Z] RUN obs-S-k4-s0
+[11-16 16:29:35Z] RUN obs-fbt-05-k0-s0
+[11-16 18:27:28Z] RESULT obs-fbt-05-k0-s0 => total_return_pct 133.04527853757673 total_trades 836 max_drawdown_pct 56.594921547973023 peak_rss_kb=5794896 (wall 7073s)
+[11-16 18:28:20Z] RESULT obs-S-k4-s0 => total_return_pct 1639.5074156607905 total_trades 548 max_drawdown_pct 25.10502676696462 peak_rss_kb=5725976 (wall 7125s)
+[11-16 18:28:20Z] disk free 16G
+[11-16 18:28:20Z] RUN obs-fbt-05-k1-s0
+[11-16 18:28:20Z] RUN obs-fbt-05-k2-s0
+[11-16 20:25:35Z] RESULT obs-fbt-05-k2-s0 => total_return_pct 43.48050559123643 total_trades 837 max_drawdown_pct 66.2195675334773 peak_rss_kb=5747756 (wall 7035s)
+[11-16 20:25:45Z] RESULT obs-fbt-05-k1-s0 => total_return_pct 52.278796222205372 total_trades 833 max_drawdown_pct 68.091353527690771 peak_rss_kb=5763252 (wall 7045s)
+[11-16 20:25:45Z] disk free 16G
+[11-16 20:25:45Z] RUN obs-fbt-05-k3-s0
+[11-16 20:25:45Z] RUN obs-fbt-05-k4-s0
+[11-16 22:16:49Z] observatory lane run; LANE_SHA=ecd77c76042691874f78e8d61f53ee0c278a4816 PAR=2 CELL_TIMEOUT=20000s
+[11-16 22:16:57Z] TR push check ok (/home/user/trading/../trading-results)
+[11-16 22:16:57Z] public push check ok
+[11-16 22:16:58Z] HEAD=ecd77c760 image=ghcr.io/dayfine/trading-ci:latest  mem=15G par=2
+[11-16 22:16:58Z] disk free 16G
+[11-16 22:16:58Z] STATE from HEAD (no observatory/lane-results yet)
+[11-16 22:16:58Z] ARM fbt-05: ((screening_config ((failed_breakout_tolerance_pct 0.05)))) (ledger: weekly picks decision 2026-11-16 (#3647): the live picks gate, off in the record; overlaps the F2 re-screen cancel (#2263))
+[11-16 22:19:54Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv
+[11-16 22:19:55Z] SPY YEARS from /home/user/trading/.sweep-output/observatory-lane/spy/data.csv: 19 bull, 8 bear
+[11-16 22:19:55Z] DOCKER daemon not answering (Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?); starting dockerd
+[11-16 22:19:58Z] DOCKER dockerd started
+[11-16 22:19:58Z] BUILD
+[11-16 22:20:17Z] BUILD_DONE
+[11-16 22:20:17Z] SPEC CHECKS OK: obs-S-kK = rk-kK; obs-fbt-05-kK = obs-S-kK + ((screening_config ((failed_breakout_tolerance_pct 0.05))))
+[11-16 22:20:17Z] VALIDATOR CONFIG fbt-05 default (no -config)
+[11-16 22:20:17Z] PARALLEL 2 cells at a time (MemTotal 15 GB, reserve 3 GB, 6 GB per cell)
+[11-16 22:20:17Z] CELL obs-S-k0-s0 reuse: finished in OUT
+[11-16 22:20:17Z] CELL obs-S-k1-s0 reuse: finished in OUT
+[11-16 22:20:17Z] CELL obs-S-k2-s0 reuse: finished in OUT
+[11-16 22:20:17Z] CELL obs-S-k3-s0 reuse: finished in OUT
+[11-16 22:20:17Z] CELL obs-S-k4-s0 reuse: finished in OUT
+[11-16 22:20:17Z] CELL obs-fbt-05-k0-s0 reuse: finished in OUT
+[11-16 22:20:17Z] CELL obs-fbt-05-k1-s0 reuse: finished in OUT
+[11-16 22:20:17Z] CELL obs-fbt-05-k2-s0 reuse: finished in OUT
+[11-16 22:20:17Z] CELL obs-fbt-05-k3-s0 run
+[11-16 22:20:17Z] CELL obs-fbt-05-k4-s0 run
+[11-16 22:20:17Z] BATCH 1: obs-fbt-05-k3-s0 obs-fbt-05-k4-s0
+[11-16 22:20:17Z] SKIP preflight obs-fbt-05-k0 (done)
+[11-16 22:20:17Z] RUN obs-fbt-05-k4-s0
+[11-16 22:20:17Z] RUN obs-fbt-05-k3-s0
+[11-16 22:35:23Z] observatory lane run; LANE_SHA=ecd77c76042691874f78e8d61f53ee0c278a4816 PAR=2 CELL_TIMEOUT=20000s
+[11-16 22:35:24Z] TR push check ok (/home/user/trading/../trading-results)
+[11-16 22:35:25Z] public push check ok
+[11-16 22:35:26Z] HEAD=ecd77c760 image=ghcr.io/dayfine/trading-ci:latest  mem=15G par=2
+[11-16 22:35:26Z] disk free 16G
+[11-16 22:35:26Z] STATE from HEAD (no observatory/lane-results yet)
+[11-16 22:35:26Z] ARM fbt-05: ((screening_config ((failed_breakout_tolerance_pct 0.05)))) (ledger: weekly picks decision 2026-11-16 (#3647): the live picks gate, off in the record; overlaps the F2 re-screen cancel (#2263))
+[11-16 22:37:55Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv
+[11-16 22:37:55Z] SPY YEARS from /home/user/trading/.sweep-output/observatory-lane/spy/data.csv: 19 bull, 8 bear
+[11-16 22:37:58Z] DOCKER daemon not answering (Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?); starting dockerd
+[11-16 22:38:03Z] DOCKER dockerd started
+[11-16 22:38:03Z] BUILD
+[11-16 22:38:20Z] BUILD_DONE
+[11-16 22:38:20Z] SPEC CHECKS OK: obs-S-kK = rk-kK; obs-fbt-05-kK = obs-S-kK + ((screening_config ((failed_breakout_tolerance_pct 0.05))))
+[11-16 22:38:20Z] VALIDATOR CONFIG fbt-05 default (no -config)
+[11-16 22:38:20Z] PARALLEL 2 cells at a time (MemTotal 15 GB, reserve 3 GB, 6 GB per cell)
+[11-16 22:38:20Z] CELL obs-S-k0-s0 reuse: finished in OUT
+[11-16 22:38:20Z] CELL obs-S-k1-s0 reuse: finished in OUT
+[11-16 22:38:20Z] CELL obs-S-k2-s0 reuse: finished in OUT
+[11-16 22:38:20Z] CELL obs-S-k3-s0 reuse: finished in OUT
+[11-16 22:38:20Z] CELL obs-S-k4-s0 reuse: finished in OUT
+[11-16 22:38:20Z] CELL obs-fbt-05-k0-s0 reuse: finished in OUT
+[11-16 22:38:20Z] CELL obs-fbt-05-k1-s0 reuse: finished in OUT
+[11-16 22:38:20Z] CELL obs-fbt-05-k2-s0 reuse: finished in OUT
+[11-16 22:38:20Z] CELL obs-fbt-05-k3-s0 run
+[11-16 22:38:20Z] CELL obs-fbt-05-k4-s0 run
+[11-16 22:38:20Z] BATCH 1: obs-fbt-05-k3-s0 obs-fbt-05-k4-s0
+[11-16 22:38:20Z] SKIP preflight obs-fbt-05-k0 (done)
+[11-16 22:38:20Z] RUN obs-fbt-05-k4-s0
+[11-16 22:38:20Z] RUN obs-fbt-05-k3-s0
+[11-17 00:31:39Z] RESULT obs-fbt-05-k3-s0 => total_return_pct 168.10990294104306 total_trades 824 max_drawdown_pct 65.086698578651109 peak_rss_kb=5791336 (wall 6799s)
+[11-17 00:31:39Z] RESULT obs-fbt-05-k4-s0 => total_return_pct 148.70365806391248 total_trades 812 max_drawdown_pct 66.188715663054083 peak_rss_kb=5748488 (wall 6799s)
+[11-17 00:31:39Z] disk free 16G
+[11-17 00:31:39Z] TRIPWIRE MATCH S k0 trades.csv md5 0928cfe40333560429f5a6e57c9c18de (S@3c367cca7 in trading-results)
+[11-17 00:31:42Z] V6 OK fbt-05 (k0-k4 against S)
+[11-17 00:31:42Z] LIVE fbt-05: trades.csv differs from S on 5 of 5 seeds
+[11-17 00:31:45Z] READ fbt-05: obs_read: fbt-05 row 3 appended -> median D_end -1.9451, flag HARM
+[11-17 00:31:45Z] QUEUE fbt-05 -> done@ecd77c760
+[11-17 00:31:48Z] DRIFT NONE: S@ecd77c760 trades.csv identical to S@3c367cca7 on every seed
