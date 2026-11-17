@@ -1,5 +1,7 @@
 # Does the 5-year testbed have a drawdown null? — 2 arms × 3 salts
 
+> **Trade files moved (2026-11-16).** The per-arm `results/s*-trades.csv` files carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit 477a85e), per the EODHD terms. References to them below resolve there.
+
 > # ⚠ RETRACTED 2026-08-20 — this cell's headline is wrong
 >
 > **What was claimed:** that `Range_top_breakout` "fails its first independent
