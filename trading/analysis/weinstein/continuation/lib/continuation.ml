@@ -31,6 +31,7 @@ type result = {
 type callbacks = {
   get_ma : week_offset:int -> float option;
   get_close : week_offset:int -> float option;
+  get_raw_close : week_offset:int -> float option;
   get_high : week_offset:int -> float option;
   get_low : week_offset:int -> float option;
 }
@@ -72,14 +73,15 @@ let _find_pullback_offset ~callbacks ~band ~lookback_weeks : int option =
   in
   loop 1
 
-(** Fold high/low/close over offsets [1 .. n]. The current bar (offset 0) is
-    DELIBERATELY excluded — the consolidation window measures the base the stock
-    just broke out of; including offset 0 would mean the breakout bar's high
-    becomes the level the breakout must exceed, which is self-defeating.
+(** Fold high / low / raw close over offsets [1 .. n], all on the raw basis
+    (#3664). The current bar (offset 0) is DELIBERATELY excluded — the
+    consolidation window measures the base the stock just broke out of;
+    including offset 0 would mean the breakout bar's high becomes the level the
+    breakout must exceed, which is self-defeating.
 
-    Returns [Some (high, low, sum_close)] iff every offset returned a defined
-    bar; [None] on the first hole (mirrors the contiguous-tail semantics used by
-    {!Stock_analysis._count_defined}). *)
+    Returns [Some (high, low, sum_raw_close)] iff every offset returned a
+    defined bar; [None] on the first hole (mirrors the contiguous-tail semantics
+    used by {!Stock_analysis_scans.find_peak_volume_offset}). *)
 let _scan_window ~callbacks ~n : (float * float * float) option =
   let rec loop off hi lo sum =
     if off > n then Some (hi, lo, sum)
@@ -87,7 +89,7 @@ let _scan_window ~callbacks ~n : (float * float * float) option =
       match
         ( callbacks.get_high ~week_offset:off,
           callbacks.get_low ~week_offset:off,
-          callbacks.get_close ~week_offset:off )
+          callbacks.get_raw_close ~week_offset:off )
       with
       | Some h, Some l, Some c ->
           let hi' = Float.max hi h in
@@ -100,14 +102,15 @@ let _scan_window ~callbacks ~n : (float * float * float) option =
     match
       ( callbacks.get_high ~week_offset:1,
         callbacks.get_low ~week_offset:1,
-        callbacks.get_close ~week_offset:1 )
+        callbacks.get_raw_close ~week_offset:1 )
     with
     | Some h, Some l, Some c -> loop 2 h l c
     | _ -> None
 
 (** [Some hi] when the [weeks]-bar window's [(hi - lo) / avg_close <= range_pct]
-    and [avg_close > 0]; [None] otherwise. Split out from [_consolidation_high]
-    so the gate evaluation is a flat else-if chain (no nested-else). *)
+    and [avg_close > 0]; [None] otherwise. [avg_close] is the mean raw close,
+    the basis of [hi] and [lo]. Split out from [_consolidation_high] so the gate
+    evaluation is a flat else-if chain (no nested-else). *)
 let _check_tight_window ~weeks ~range_pct ~hi ~lo ~sum : float option =
   let avg = sum /. Float.of_int weeks in
   if Float.( <= ) avg 0.0 then None
@@ -124,12 +127,13 @@ let _consolidation_high ~callbacks ~weeks ~range_pct : float option =
   | None -> None
   | Some (hi, lo, sum) -> _check_tight_window ~weeks ~range_pct ~hi ~lo ~sum
 
-(** Check the breakout-arm gate: the current close (offset 0) exceeds the
-    consolidation high. Mirrors the book's "breaks out anew above the top of its
-    resistance zone". Returns [false] when the current close is missing. *)
-let _current_close_above ~(get_close : week_offset:int -> float option) ~level :
-    bool =
-  match get_close ~week_offset:0 with
+(** Check the breakout-arm gate: the current raw close (offset 0) exceeds the
+    consolidation high, a raw level. Mirrors the book's "breaks out anew above
+    the top of its resistance zone". Returns [false] when the current close is
+    missing. *)
+let _current_close_above ~(get_raw_close : week_offset:int -> float option)
+    ~level : bool =
+  match get_raw_close ~week_offset:0 with
   | Some c -> Float.( > ) c level
   | None -> false
 
@@ -151,7 +155,8 @@ let analyze_with_callbacks ~(config : config) ~(callbacks : callbacks) : result
   in
   let breakout_ok =
     match consolidation_high with
-    | Some level -> _current_close_above ~get_close:callbacks.get_close ~level
+    | Some level ->
+        _current_close_above ~get_raw_close:callbacks.get_raw_close ~level
     | None -> false
   in
   let is_continuation =

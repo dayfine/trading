@@ -76,6 +76,7 @@
   test_weinstein_strategy
   test_weinstein_strategy_smoke
   test_stock_analysis_config_wiring
+  test_virgin_supply_basis
   test_selection_trace)
  (libraries
   core

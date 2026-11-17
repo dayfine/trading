@@ -18,9 +18,10 @@ let ma_below_anchor = 90.0
     has just happened). *)
 let freshness ?(basis = Entry_freshness.Range_top_breakout)
     ?(ma_direction = Rising) ?(ma_value = ma_below_anchor)
-    ?(local_range_top = Some anchor) ?(current_close = Some anchor) () =
+    ?(local_range_top = Some anchor) ?(split_factor = Some 1.0)
+    ?(current_close = Some anchor) () =
   Entry_freshness.range_top_freshness ~basis ~ma_direction ~ma_value
-    ~local_range_top ~current_close
+    ~local_range_top ~split_factor ~current_close
 
 (* --- The default basis has no opinion (R1) ------------------------- *)
 
@@ -71,7 +72,7 @@ let test_close_below_proximity_band_is_not_live _ =
 (** A close ABOVE the anchor still satisfies the band (the ticket has filled /
     is filling). There is deliberately no separate "already broke out N weeks
     ago" disjunct — that shape is the pullback second-chance buy, out of scope
-    (#1366). *)
+    (continuation buys, #1095). *)
 let test_close_above_anchor_is_live _ =
   assert_that
     (freshness ~current_close:(Some (anchor *. 1.01)) ())
@@ -131,6 +132,44 @@ let test_missing_anchor_admits_nothing _ =
 let test_missing_close_admits_nothing _ =
   assert_that (freshness ~current_close:None ()) (is_some_and (equal_to false))
 
+(** ... and for a missing or non-positive split factor: without it the raw
+    anchor has no level on the close's basis (#3664). *)
+let test_missing_or_bad_split_factor_admits_nothing _ =
+  assert_that
+    [
+      freshness ~split_factor:None ();
+      freshness ~split_factor:(Some 0.0) ();
+      freshness ~split_factor:(Some (-1.0)) ();
+    ]
+    (elements_are
+       [
+         is_some_and (equal_to false);
+         is_some_and (equal_to false);
+         is_some_and (equal_to false);
+       ])
+
+(* --- One price basis (#3664) --------------------------------------- *)
+
+(** A 2-for-1 split after the as-of date: the raw anchor is 100, the adjusted
+    close and MA are half their raw values. On one basis the close (50) sits at
+    the adjusted anchor (100 * 0.5) above the MA (45): live. Comparing the
+    adjusted close with the raw anchor would see it 50 % under the range top. *)
+let test_later_forward_split_close_reads_adjusted_anchor _ =
+  assert_that
+    (freshness ~split_factor:(Some 0.5) ~ma_value:45.0
+       ~current_close:(Some 50.0) ())
+    (is_some_and (equal_to true))
+
+(** A 1-for-2 reverse split after the as-of date doubles the adjusted series:
+    close 200, MA 180, raw anchor 100. On one basis the anchor (200) clears the
+    MA; the raw anchor against the adjusted MA would read 100 < 180 and reject a
+    breakout above its MA. *)
+let test_later_reverse_split_anchor_clears_adjusted_ma _ =
+  assert_that
+    (freshness ~split_factor:(Some 2.0) ~ma_value:180.0
+       ~current_close:(Some 200.0) ())
+    (is_some_and (equal_to true))
+
 let suite =
   "entry_freshness"
   >::: [
@@ -151,6 +190,12 @@ let suite =
          >:: test_ma_between_close_and_anchor_admits;
          "missing anchor admits nothing" >:: test_missing_anchor_admits_nothing;
          "missing close admits nothing" >:: test_missing_close_admits_nothing;
+         "missing or bad split factor admits nothing"
+         >:: test_missing_or_bad_split_factor_admits_nothing;
+         "later forward split: close reads the adjusted anchor"
+         >:: test_later_forward_split_close_reads_adjusted_anchor;
+         "later reverse split: anchor clears the adjusted MA"
+         >:: test_later_reverse_split_anchor_clears_adjusted_ma;
        ]
 
 let () = run_test_tt_main suite

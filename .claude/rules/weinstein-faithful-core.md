@@ -80,8 +80,8 @@ For any PR that adds or changes strategy logic:
 
 ## Why this is load-bearing
 
-The program's three big rejections (continuation-buys #1366, early-admission deep,
-stage3-hysteresis) were all *trader-mode dials grafted one-at-a-time onto the
+The program's three big rejections (continuation-buys #1095, early-admission deep,
+stage3-hysteresis #1366) were all *trader-mode dials grafted one-at-a-time onto the
 investor base*. That is neither faithful (it mixes two presets incoherently) nor
 how Weinstein frames them. This rule prevents that failure mode: adapt a dial only
 within a coherent preset, keep the spine fixed, and test presets as wholes.

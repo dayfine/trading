@@ -54,6 +54,24 @@ type config = {
           to pre-feature behaviour. The [@sexp.default false] attribute is inert
           here (this config does not derive sexp) but marks the field as an
           additive, default-off option. *)
+  virgin_supply_basis : Stock_analysis_supply.basis;
+      [@sexp.default Stock_analysis_supply.Legacy_mixed]
+      (** Which price basis the virgin test ({!t.virgin_readmission}) and the
+          supply grade ({!t.supply}) compare the breakout on (#3664). Both
+          always share one setting, so the grade and the re-admission can never
+          disagree on basis.
+
+          [Legacy_mixed] {b (default, no-op)} passes the raw {!t.breakout_price}
+          to the sketch as stored. Since #2145 the sketch is back-adjusted, so
+          on history this admits a name below its 10-year high as virgin when it
+          later splits or pays dividends. Bit-identical to pre-flag behaviour.
+
+          [One_basis] puts the breakout on the sketch's basis first
+          ({!Stock_analysis_supply.breakout_on_sketch_basis}: times the sketch's
+          as-of close over {!t.current_raw_close}). {!t.breakout_price} and
+          every ticket price stay raw. Inert when neither [overhead_supply] nor
+          [virgin_crossing_readmission] is armed. The [@sexp.default] attribute
+          is inert here (this config does not derive sexp). *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]
       (** Ticket-level "local trading-range" entry anchor (Weinstein Ch. 3: the
           buy-stop is placed just above the top of the {i current} trading range
@@ -206,13 +224,16 @@ type t = {
           price could be determined. [Some r] carries [r.score] in [0, 1] (0 =
           virgin territory, 1 = heavy recent supply just above the breakout),
           consumed by the screener's long-side [w_overhead_supply] scoring
-          weight in place of the binary virgin/clean grade. *)
+          weight in place of the binary virgin/clean grade. The breakout is
+          compared on [config.virgin_supply_basis]. *)
   virgin_readmission : bool;
       (** resistance-v2 lever (a) eligibility. [true] iff
           [config.virgin_crossing_readmission] is armed AND
           [callbacks.get_sketch] returned a sketch AND a breakout price exists
-          AND the breakout is virgin ([Resistance_supply.is_virgin] — crosses
-          the 520-week max high). Read by {!is_breakout_candidate}'s
+          AND the breakout is into new high ground
+          ({!Stock_analysis_supply.results}: [Resistance_supply.is_virgin] —
+          crosses the 520-week max high — or [is_clear_of_supply]), compared on
+          [config.virgin_supply_basis]. Read by {!is_breakout_candidate}'s
           re-admission arm to bypass the [early_stage2_max_weeks] staleness
           rejection for a genuine new-high breakout. [false] whenever the flag
           is off — bit-identical to pre-feature behaviour. *)
@@ -222,7 +243,8 @@ type t = {
           [config.entry_freshness_basis], the stage MA direction / value, the
           replace anchor over [config.entry_anchor_local_range_weeks] (equal to
           {!local_range_top} unless the stale-entry cap is armed; the clock
-          never reads the cap), and {!current_close}.
+          never reads the cap) times the offset-0 split factor, and
+          {!current_close} — all on the adjusted basis (#3664).
 
           [None] under the default [Ma_cross] basis — "this basis has no
           opinion", which {!is_breakout_candidate} reads as "run the pre-F1
@@ -261,7 +283,10 @@ type t = {
           1 (breakout above resistance) at evaluation time rather than only on
           the breakout bar; it is not a book-quoted rule. See
           {!Screener_admission.failed_breakout_reason}. Consumers must treat
-          [None] as "unknown", never as evidence of a failed breakout. *)
+          [None] as "unknown", never as evidence of a failed breakout. Under
+          [config.virgin_supply_basis = One_basis] it is also the raw as-of
+          close {!Stock_analysis_supply.breakout_on_sketch_basis} rescales the
+          breakout by (#3664). *)
   as_of_date : Core.Date.t;  (** The date this analysis was computed. *)
 }
 (** The full per-stock analysis. *)

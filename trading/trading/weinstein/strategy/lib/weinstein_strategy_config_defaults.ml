@@ -27,6 +27,18 @@ let default_stale_exit_days = 5
    virgin/clean grade points when the continuous supply score is present. *)
 let bundle_w_overhead_supply = 30
 
+(* The default screening config with that weight armed (2026-07-23 bundle);
+   pairs with the armed [overhead_supply] default. *)
+let default_screening_config =
+  {
+    Screener.default_config with
+    weights =
+      {
+        Screener.default_config.weights with
+        w_overhead_supply = Some bundle_w_overhead_supply;
+      };
+  }
+
 (* Default lagging dawn-label window (weeks) for [dawn_max_ma_flip_age_weeks]:
    78 weeks ~= 1.5y per the P1b memo
    ([dev/notes/regime-dependency-evaluation-2026-07-24.md]). Named so the sexp

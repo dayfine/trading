@@ -232,7 +232,7 @@ let axti_shape ?(basis = Entry_freshness.Range_top_breakout)
     ~ma_value ~local_range_top ~current_close
     ~range_top_freshness:
       (Entry_freshness.range_top_freshness ~basis ~ma_direction ~ma_value
-         ~local_range_top ~current_close)
+         ~local_range_top ~split_factor:(Some 1.0) ~current_close)
     ()
 
 (* The motivating shape (plan §2 M1): 10 weeks above a rising MA but still 2%
@@ -1217,6 +1217,113 @@ let test_raw_close_unknown_or_bad_factor_is_none _ =
     (elements_are
        [ is_some_and (float_equal 100.0); is_none; is_none; is_none; is_none ])
 
+(* ------------------------------------------------------------------ *)
+(* One price basis (#3664)                                              *)
+(* ------------------------------------------------------------------ *)
+
+(** [bars] stored the way the bar store keeps a name whose corporate action
+    lands AFTER the as-of date: raw OHLC as traded, every adjusted close the raw
+    close times [factor] (0.5 = a later 2-for-1 split, 2.0 = a later 1-for-2
+    reverse split). *)
+let _with_later_split ~factor bars =
+  List.map bars ~f:(fun (b : Daily_price.t) ->
+      { b with adjusted_close = b.close_price *. factor })
+
+(* The continuation tape of [test_continuation_enabled_admits_mature_stage2]
+   with a later 2-for-1 split, through [analyze]. Raw, the consolidation (bars
+   55-58) spans highs up to 115 * 1.02 = 117.3 and lows from 108.78 around a
+   mean close of 113.25, a 7.5 % range, and the as-of bar closes at 130 above
+   that top. The adjusted closes are half the raw ones, so a mixed reading sees
+   a 15 % range and a close of 65 under the top. On one basis the detector fires
+   as on the split-free tape. Red when the range test ([consolidation_high] =
+   [None]) or the breakout test reads the adjusted close. *)
+let test_continuation_later_split_reads_raw_close _ =
+  let bars = _with_later_split ~factor:0.5 _continuation_shape_bars in
+  let config = { cfg with continuation = Some Continuation.default_config } in
+  let result =
+    analyze ~config ~ticker:"X" ~bars
+      ~benchmark_bars:(rising_bars ~n:60 80.0 110.0)
+      ~prior_stage:(Some (Stage2 { weeks_advancing = 10; late = false }))
+      ~as_of_date:as_of
+  in
+  assert_that result.continuation
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (c : Continuation.result) -> c.consolidation_high)
+              (is_some_and (float_equal (115.0 *. 1.02)));
+            field
+              (fun (c : Continuation.result) -> c.is_continuation)
+              (equal_to true);
+          ]))
+
+(* F1 through [analyze] on the rising tape of
+   [test_analyze_threads_entry_freshness_basis], stored split-free, with a
+   later 2-for-1 split and with a later 1-for-2 reverse split. On one basis the
+   setup is live in all three: what the name does after the as-of date cannot
+   move the verdict. A mixed reading fails the forward split on the proximity
+   band (adjusted close 75 against the raw anchor 153) and the reverse split on
+   the MA test (raw anchor 153 under the adjusted MA, about 250). *)
+let test_freshness_verdict_independent_of_later_splits _ =
+  let armed =
+    {
+      cfg with
+      entry_anchor_local_range_weeks = 26;
+      entry_freshness_basis = Entry_freshness.Range_top_breakout;
+    }
+  in
+  let freshness factor =
+    (analyze ~config:armed ~ticker:"X"
+       ~bars:(_with_later_split ~factor (rising_bars ~n:60 50.0 150.0))
+       ~benchmark_bars:(rising_bars ~n:60 80.0 110.0)
+       ~prior_stage:None ~as_of_date:as_of)
+      .range_top_freshness
+  in
+  assert_that
+    (List.map [ 1.0; 0.5; 2.0 ] ~f:freshness)
+    (elements_are
+       [ equal_to (Some true); equal_to (Some true); equal_to (Some true) ])
+
+(* [Stock_analysis_supply.breakout_on_sketch_basis]: [Legacy_mixed] passes the
+   raw breakout through; [One_basis] rescales it by the sketch's as-of close
+   over the raw as-of close — the split factor (49 / 98) on an adjusted sketch,
+   1 on a raw-basis sketch anchored at the raw close — and fabricates nothing
+   without a positive raw close. *)
+let test_breakout_on_sketch_basis_rescales_by_anchor _ =
+  let on ~basis ~anchor_close ~current_raw_close =
+    Stock_analysis_supply.breakout_on_sketch_basis ~basis
+      ~sketch:{ (make_sketch ()) with anchor_close }
+      ~breakout_price:(Some 100.0) ~current_raw_close
+  in
+  assert_that
+    [
+      on ~basis:Stock_analysis_supply.Legacy_mixed ~anchor_close:49.0
+        ~current_raw_close:(Some 98.0);
+      on ~basis:Stock_analysis_supply.One_basis ~anchor_close:49.0
+        ~current_raw_close:(Some 98.0);
+      on ~basis:Stock_analysis_supply.One_basis ~anchor_close:98.0
+        ~current_raw_close:(Some 98.0);
+      on ~basis:Stock_analysis_supply.One_basis ~anchor_close:49.0
+        ~current_raw_close:None;
+      on ~basis:Stock_analysis_supply.One_basis ~anchor_close:49.0
+        ~current_raw_close:(Some 0.0);
+    ]
+    (elements_are
+       [
+         is_some_and (float_equal 100.0);
+         is_some_and (float_equal 50.0);
+         is_some_and (float_equal 100.0);
+         is_none;
+         is_none;
+       ])
+
+(* R1: the default keeps the mixed comparison, so the record and every golden
+   stay byte-identical until the paired run decides (#3664). *)
+let test_default_virgin_supply_basis_is_legacy_mixed _ =
+  assert_that default_config.virgin_supply_basis
+    (equal_to Stock_analysis_supply.Legacy_mixed)
+
 let suite =
   "stock_analysis_tests"
   >::: [
@@ -1322,6 +1429,14 @@ let suite =
          >:: test_current_raw_close_none_without_bars;
          "raw_close is None on an unknown or bad factor"
          >:: test_raw_close_unknown_or_bad_factor_is_none;
+         "test_continuation_later_split_reads_raw_close"
+         >:: test_continuation_later_split_reads_raw_close;
+         "test_freshness_verdict_independent_of_later_splits"
+         >:: test_freshness_verdict_independent_of_later_splits;
+         "breakout_on_sketch_basis rescales by the sketch anchor"
+         >:: test_breakout_on_sketch_basis_rescales_by_anchor;
+         "default virgin_supply_basis is Legacy_mixed"
+         >:: test_default_virgin_supply_basis_is_legacy_mixed;
          "dried-up base admitted only when the volume gate is waived"
          >:: test_dried_up_base_admitted_only_when_volume_gate_waived;
          "volume waiver does not widen other gates"

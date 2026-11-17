@@ -7,7 +7,8 @@ open Continuation
 (* Synthetic-callback builder                                          *)
 (*                                                                      *)
 (* The detector reads [get_ma], [get_close], [get_high], [get_low] at  *)
-(* weekly offsets. Tests build an explicit array per metric so each    *)
+(* weekly offsets, plus [get_raw_close] (the raw-basis close).        *)
+(* Tests build an explicit array per metric so each                    *)
 (* precondition can be flipped independently. Offset 0 = most recent   *)
 (* bar; offsets grow back in time. Missing offsets return [None].      *)
 (* ------------------------------------------------------------------ *)
@@ -16,10 +17,13 @@ let _make_get arr ~week_offset =
   let n = Array.length arr in
   if week_offset < 0 || week_offset >= n then None else Some arr.(week_offset)
 
+(* Split-free: the raw close is the close. The later-split test below passes
+   the adjusted series and overrides [get_raw_close]. *)
 let make_callbacks ~ma ~close ~high ~low : callbacks =
   {
     get_ma = _make_get (Array.of_list ma);
     get_close = _make_get (Array.of_list close);
+    get_raw_close = _make_get (Array.of_list close);
     get_high = _make_get (Array.of_list high);
     get_low = _make_get (Array.of_list low);
   }
@@ -207,6 +211,41 @@ let test_empty_callbacks_no_continuation _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* One price basis (#3664)                                              *)
+(* ------------------------------------------------------------------ *)
+
+(** The happy path stored the way the bar store keeps a name that splits 2-for-1
+    after the as-of date: the adjusted close and the MA built from it are half
+    their raw values; highs, lows and the raw close stay as traded. The pullback
+    band reads close / MA (both adjusted, ratio unchanged), and the range and
+    breakout tests read the raw close, so the detector fires exactly as on the
+    split-free tape. Mixing bases would read the range as (125 - 117) / 61 = 13
+    % > 10 % and the breakout as 65 > 125: false. *)
+let test_later_split_range_and_breakout_read_raw_close _ =
+  let halve = List.map ~f:(fun x -> x *. 0.5) in
+  let callbacks =
+    {
+      (make_callbacks ~ma:(halve _rising_ma)
+         ~close:(halve _close_with_pullback)
+         ~high:_high_with_consolidation ~low:_low_with_pullback)
+      with
+      get_raw_close = _make_get (Array.of_list _close_with_pullback);
+    }
+  in
+  assert_that
+    (analyze_with_callbacks ~config:_happy_cfg ~callbacks)
+    (all_of
+       [
+         field
+           (fun (r : result) -> r.consolidation_high)
+           (is_some_and (float_equal 125.0));
+         field (fun (r : result) -> r.is_continuation) (equal_to true);
+         field
+           (fun (r : result) -> r.pullback_low)
+           (is_some_and (float_equal 90.0));
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Purity                                                              *)
 (* ------------------------------------------------------------------ *)
 
@@ -236,6 +275,8 @@ let suite =
          "empty callbacks no continuation"
          >:: test_empty_callbacks_no_continuation;
          "pure: same inputs produce same result" >:: test_pure_same_inputs;
+         "later split: range and breakout read the raw close"
+         >:: test_later_split_range_and_breakout_read_raw_close;
        ]
 
 let () = run_test_tt_main suite

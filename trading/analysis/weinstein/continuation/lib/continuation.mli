@@ -36,7 +36,8 @@ type config = {
       (** How many weeks back to scan for a pullback bar. Default: 8. *)
   consolidation_range_pct : float;
       (** Maximum [(window_high - window_low) / avg_close] over the
-          consolidation window for §3.(c). Default: 0.10 (10%). *)
+          consolidation window for §3.(c), all three raw. Default: 0.10 (10%).
+      *)
   consolidation_weeks : int;
       (** Number of bars (ending at the as-of bar) used to compute the
           consolidation range. Default: 4. *)
@@ -80,22 +81,31 @@ type callbacks = {
   get_ma : week_offset:int -> float option;
       (** 30-week MA at [week_offset] weeks back (offset 0 = current). *)
   get_close : week_offset:int -> float option;
-      (** Bar close at [week_offset] weeks back. *)
+      (** Bar close at [week_offset] weeks back, on the MA's basis (the stage
+          series, back-adjusted). Read only by the pullback band, against
+          [get_ma]. *)
+  get_raw_close : week_offset:int -> float option;
+      (** The same close on the raw (as-traded) basis of [get_high] / [get_low].
+          The consolidation range and the breakout test read it, so they compare
+          one basis (#3664): on history the adjusted close carries every split
+          and dividend paid later and the raw highs and lows do not. *)
   get_high : week_offset:int -> float option;
-      (** Bar high at [week_offset] weeks back. *)
+      (** Raw bar high at [week_offset] weeks back. *)
   get_low : week_offset:int -> float option;
-      (** Bar low at [week_offset] weeks back. *)
+      (** Raw bar low at [week_offset] weeks back. *)
 }
 (** Bundle of indicator callbacks consumed by {!analyze_with_callbacks}. Shaped
     to be trivially constructed from {!Stock_analysis.callbacks} (the [stage]
-    sub-bundle plus [get_high] / a [get_low] adapter). *)
+    sub-bundle plus [get_high] / a [get_low] adapter, and [get_raw_close] from
+    the stage close and [get_split_factor]). [consolidation_high] and
+    [pullback_low] stay raw: they become the ticket and the stop. *)
 
 val analyze_with_callbacks : config:config -> callbacks:callbacks -> result
 (** [analyze_with_callbacks ~config ~callbacks] runs the four-precondition
     detection ((a) MA slope ≥ [ma_slope_min], (b) pullback to MA inside
     [pullback_band] within [pullback_lookback_weeks], (c) consolidation range ≤
-    [consolidation_range_pct] over [consolidation_weeks], (d) current close
-    above the consolidation high). Returns a {!result} whose [is_continuation]
-    field is [true] iff all four fired.
+    [consolidation_range_pct] over [consolidation_weeks], (d) current raw close
+    above the consolidation high). (c) and (d) read [get_raw_close]. Returns a
+    {!result} whose [is_continuation] field is [true] iff all four fired.
 
     Pure function: same callback outputs always produce the same result. *)

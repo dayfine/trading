@@ -13,10 +13,10 @@
     base-then-breakout population.
 
     This module supplies the alternative clock. It is a leaf: it consumes only
-    the already-computed MA direction / MA value, the ticket anchor, and the
-    current close — no [Stock_analysis.t], no callbacks, no bar walking — so
-    {!Stock_analysis} can call it without a cycle and tests can pin it directly.
-*)
+    the already-computed MA direction / MA value, the ticket anchor, its split
+    factor and the current close — no [Stock_analysis.t], no callbacks, no bar
+    walking — so {!Stock_analysis} can call it without a cycle and tests can pin
+    it directly. *)
 
 (** Which event the Stage-2 admission clock is measured from.
 
@@ -49,25 +49,35 @@ val range_top_freshness :
   ma_direction:Weinstein_types.ma_direction ->
   ma_value:float ->
   local_range_top:float option ->
+  split_factor:float option ->
   current_close:float option ->
   bool option
 (** [range_top_freshness ~basis ~ma_direction ~ma_value ~local_range_top
-     ~current_close] evaluates the armed clock.
+     ~split_factor ~current_close] evaluates the armed clock.
 
     [None] whenever [basis = Ma_cross] — "this basis has no opinion; use the
     MA-cross window". [Stock_analysis] treats [None] as "run the pre-feature
     admission arm unchanged", which is what makes the default bit-identical.
 
+    {b One price basis (#3664).} [local_range_top] is a raw (as-traded) level —
+    the ticket — while [current_close] and [ma_value] are back-adjusted, which
+    on history already carries every split and dividend the name pays later.
+    Both tests below therefore read the {i adjusted anchor}
+    [local_range_top * split_factor], where [split_factor] is the offset-0 bar's
+    [adjusted_close / close_price] ({!Stock_analysis.callbacks}
+    [get_split_factor ~week_offset:0]). The anchor's scan never crosses a split
+    boundary and its window includes offset 0, so that factor is its own up to
+    dividend drift. The ticket price itself stays raw.
+
     [Some live] when [basis = Range_top_breakout]. [live] is [true] iff {b all}
     of:
 
-    - {b the setup is live}:
-      [current_close >= local_range_top * (1 - ]{!proximity_pct}[)] — the stock
-      is at, or within the band just under, the top of its current trading
-      range, so a resting buy-stop at the anchor is a pending breakout rather
-      than a stale one;
+    - {b the setup is live}: [current_close >= adjusted anchor * (1 - ]
+      {!proximity_pct}[)] — the stock is at, or within the band just under, the
+      top of its current trading range, so a resting buy-stop at the anchor is a
+      pending breakout rather than a stale one;
     - {b the MA is not declining} ([Rising] or [Flat]) — §4.1 requirement 2;
-    - {b the trigger sits above the MA}: [local_range_top > ma_value] — §4.1
+    - {b the trigger sits above the MA}: [adjusted anchor > ma_value] — §4.1
       requirements 1 and 3. A breakout below a declining MA "is a trap, not a
       buy" (Ch. 3, Western Union: broke out of its range below a declining MA,
       then fell 45 → 8½). The ticket rests at [local_range_top], so the anchor
@@ -79,10 +89,11 @@ val range_top_freshness :
       MA while the trigger level stays above it (that rejected close never
       fills; the breakout through the anchor does).
 
-    [Some false] when either [local_range_top] or [current_close] is [None]: the
-    anchor is the ticket level, so with no anchor there is no breakout to be
-    fresh from, and the armed basis admits nothing (never falls back to the
-    MA-cross window — the two clocks are alternatives, not a disjunction).
+    [Some false] when [local_range_top], [split_factor] or [current_close] is
+    [None], or the factor is not positive: the anchor is the ticket level, so
+    with no anchor on the close's basis there is no breakout to be fresh from,
+    and the armed basis admits nothing (never falls back to the MA-cross window
+    — the two clocks are alternatives, not a disjunction).
 
     {b The anchor must be the ticket anchor.} Callers pass the replace anchor
     over [entry_anchor_local_range_weeks], the same level the screener anchors
@@ -96,6 +107,7 @@ val range_top_freshness :
 
     {b Not the continuation / pullback buy.} There is deliberately no "already
     broke out N weeks ago" disjunct: that shape is the book's second-chance
-    pullback buy, which is out of scope here and was rejected as an axis in
-    #1366. F1 changes only which event the clock starts at; the
+    pullback buy, which is out of scope here (the continuation-buy experiments
+    #1082 / #1091 / #1095 rejected it; the #3659 audit found those runs mixed
+    price bases). F1 changes only which event the clock starts at; the
     [early_stage2_max_weeks <= 4] value is untouched. *)
