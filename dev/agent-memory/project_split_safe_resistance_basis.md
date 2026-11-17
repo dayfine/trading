@@ -58,3 +58,5 @@ self-check (#2122 slice a).
 Ops law: weekly warehouse rebuild = full non-incremental `build_snapshots.exe`
 with Pinned superset universe (picks + 15 context syms), grammar
 `(Pinned ( ((symbol X) (sector "S")) ... ))`. [[leverage-dawn-drift-root-cause]]
+
+**#3664 (11-17): #2145 left the breakout raw.** Sketch side-tables are adjusted, `breakout_price` is raw, so `is_virgin` and the supply grade admit names below their 10y high if they later split/pay dividends (look-ahead on history; consistent live). Every record run since 07-28 carries it. Upper bound in fbt-05 S: 374/2,816 trades (13 %) virgin only via the mix, 31-47 % of summed contribution per seed, incl. the largest trade. Fix + paired K=5 = #3664 (USER decision pending).
