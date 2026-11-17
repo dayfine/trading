@@ -2,6 +2,8 @@
 
 > **Trade files moved (2026-11-17).** This directory's 8 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
+> **Position files moved (2026-11-17).** This directory's 8 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
+
 The P0 named by `exit-lever-surface-2026-09-04`: the KEEP-52 decision
 (`project_clock52_promoted`, ledger `2026-08-27-entry-rest-weeks-surface`)
 leans on a **universal maxDD win** measured on the pre-fix simulator. On the

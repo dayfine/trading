@@ -2,6 +2,8 @@
 
 > **Trade files moved (2026-11-17).** This directory's 14 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
+> **Position files moved (2026-11-17).** This directory's 14 `*open_positions.csv`, 14 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
+
 Mechanism: `initial_stop_buffer_by_macro_state` (#2718, default-off axis; plan `dev/plans/stop-width-by-macro-state-2026-09-06.md`). Question: does sizing the FALLBACK initial stop by the five-state breadth read (#2685) beat the record's flat 4% on the clean 2000-vintage basis? Motivation: the 09-04 yearly review's per-state P&L (Deteriorating entries −$604k, Recovering +$627k) and the 09-05 width surface (12% wins at 26y on the OLD basis — every pre-#2672 width read must be re-measured).
 
 ## Arms (salt 0 first; salts 1–2 on anything that moves)

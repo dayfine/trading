@@ -2,6 +2,8 @@
 
 > **Trade files moved (2026-11-17).** This directory's 6 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
+> **Position files moved (2026-11-17).** This directory's 6 `*open_positions.csv`, 6 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
+
 Plan: `dev/plans/total-return-and-shorts-phase-b-2026-10-05.md` decisions 1, 3, 3a. Issue #3137 `[after-merge]`:
 "Paired pre-registered 3-salt 26y A/B (implementation check: ≈ +0.24 log; V6 agree; path effects reported);
 restate the SPY comparison on a total-return basis."

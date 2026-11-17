@@ -2,6 +2,8 @@
 
 > **Trade files moved (2026-11-17).** This directory's 18 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
+> **Position files moved (2026-11-17).** This directory's 18 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
+
 Third chain on the fixed exit basis (post #2648), after
 `record-rebase-2026-09-03` (the null) and `stop-width-surface-2026-09-03`.
 The record-rebase README names this as the next chain: every exit-side

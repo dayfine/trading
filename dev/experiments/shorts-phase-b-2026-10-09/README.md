@@ -2,6 +2,8 @@
 
 > **Trade files moved (2026-11-17).** This directory's 6 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
+> **Position files moved (2026-11-17).** This directory's 6 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
+
 Plan: `dev/plans/total-return-and-shorts-phase-b-2026-10-05.md`, decisions 6–10 and the progress note "Phase B
 stop arms". This is queue item (3) of decision 9: the 26y shorts pair, on the same warehouse and accounting as the
 long record (`../rebaseline-v12-2026-10-08/`, PR #3219). It is **round 1** of the decision-10 round cap. Phase A
