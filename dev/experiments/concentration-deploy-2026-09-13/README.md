@@ -1,5 +1,7 @@
 # Concentration / deployment probe on the 26y record — item 3 of the 09-14 queue (2026-09-13)
 
+> **Trade files moved (2026-11-17).** This directory's 4 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Status: PRE-REGISTERED** (written 18:35 PT before any cell ran). Two arms, three salts each, on the record convention.
 
 ## Why

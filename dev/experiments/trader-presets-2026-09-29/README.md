@@ -1,5 +1,7 @@
 # Trader presets vs investor vs hybrid (#3038)
 
+> **Trade files moved (2026-11-17).** This directory's 30 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Question.** What does each *trader* dial contribute, measured as a coherent preset rather than
 a one-knob graft onto the investor base? And how do the trader, hybrid and investor presets rank
 over several horizons?

@@ -1,5 +1,7 @@
 # floor-nearest-2026-10-25: Nearest support floor under `require_structural_stop`, pre-registered
 
+> **Trade files moved (2026-11-17).** This directory's 12 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 Status: **SN RUN 2026-10-25, NOT LIVE as screened (§Results, #3423); SM RUN 2026-10-26, INCONCLUSIVE (§Results, arm SM).** Pre-registered in #3418 (97b6daa99, plus the §Log
 06:57 PT amendment) before any SN cell ran; the null is path-stability arm S (#3419). All 6 SN cells ran clean (V6 exit 0).
 

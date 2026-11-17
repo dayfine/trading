@@ -1,5 +1,7 @@
 # stop-anchor-rebase-2026-09-03 — the #2408 surface re-measured on the fixed exit basis
 
+> **Trade files moved (2026-11-17).** This directory's 18 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 The 2026-08-31 stop-anchor surface (`wip/sa2408-specs`, never PR'd:
 `stop_anchor_at_entry_base` {off,on} × `initial_stop_buffer` {1.0, 0.98, 0.96,
 0.92, 0.885}, 2019–23 × top-3000-2019, record-lineage cell-B base) read

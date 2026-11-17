@@ -1,5 +1,7 @@
 # Shorts liveness on the investor preset, 5d (2026-10-03)
 
+> **Trade files moved (2026-11-17).** This directory's 2 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 ## Why
 
 User decision 2026-10-03: run the next-session item 4(d) first — one liveness pair, not a programme

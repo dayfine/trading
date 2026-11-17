@@ -1,5 +1,7 @@
 # record-kseed-2026-10-27: the record as K = 5 tie-order seeds on the Seeded default
 
+> **Trade files moved (2026-11-17).** This directory's 5 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Pre-registration.** Nothing has run. Everything below is fixed before the first cell launches.
 
 ## Why

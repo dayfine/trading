@@ -1,5 +1,7 @@
 # arc-rerun-2026-09-01 — rerun the arc-faithful bundle on current main and find what is wrong
 
+> **Trade files moved (2026-11-17).** This directory's 19 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 User directive 2026-09-01 (overnight session): *"let's rerun and figure out
 what's wrong? do some deep trade analysis and guard against typical errors
 with integration tests."*

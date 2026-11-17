@@ -1,5 +1,7 @@
 # #2672 delisting guards — paired record re-run (2026-09-06)
 
+> **Trade files moved (2026-11-17).** This directory's 5 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 > **Retired knob (2026-09-07).** Guard 3, `stub_print_max_ratio`, was removed
 > from the strategy config — the build-time `Snapshot_pipeline.Series_tail`
 > (#2691) supersedes it, and every live warehouse is a `_v7mark` rebuild

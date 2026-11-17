@@ -1,5 +1,7 @@
 # Warehouse rebuild on the data-layer fix, V16/V17 acceptance, salted record re-base (queued 2026-09-06)
 
+> **Trade files moved (2026-11-17).** This directory's 11 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Status: QUEUED** — runs in this order once PR #2692 merges (it carries the `delisted`
 exit and the V16/V17 validator the acceptance step reads). Each step is
 container-exclusive: no agents alongside a rebuild or a 26y cell

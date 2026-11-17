@@ -1,5 +1,7 @@
 # Fresh-eyes study — step 1: the sample and the charts
 
+> **Trade files moved (2026-11-17).** This directory's 7 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 Plan: `dev/plans/fresh-eyes-weinstein-2026-10-13.md` (PR #3298). This directory holds step 1 of its build order (§7):
 the sample, the weekly series, the market series and the chart renderer. Nothing here reads our strategy code; the
 fresh agent will only ever see the PNGs and the last-bar JSON these scripts write.

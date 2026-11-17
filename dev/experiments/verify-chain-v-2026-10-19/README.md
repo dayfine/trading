@@ -1,5 +1,7 @@
 # verify-chain-v-2026-10-19: the 26y verification chain for #3266, #3263, #3173, #3138 and #3174
 
+> **Trade files moved (2026-11-17).** This directory's 8 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Pre-registration.** Nothing has run. Every read below is fixed before the first cell launches. Plan:
 `dev/plans/issue-burndown-2026-10-19.md` §Chain V (PR #3340).
 

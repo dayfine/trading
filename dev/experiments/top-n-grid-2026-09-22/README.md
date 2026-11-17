@@ -1,5 +1,7 @@
 # Top-N confirmation grid — sub-window cells (2026-09-22)
 
+> **Trade files moved (2026-11-17).** This directory's 18 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Status: PRE-REGISTERED** (written 15:10 PT 2026-09-22, before any cell ran; README, specs and chain pushed before the
 first launch). The promotion-confirmation grid (`.claude/rules/promotion-confirmation.md`) for the one ACCEPT on the
 table, `screening_config.max_buy_candidates` 20 → 40 (`_ledger/2026-09-22-top-of-funnel-capacity.sexp`, #2900). This

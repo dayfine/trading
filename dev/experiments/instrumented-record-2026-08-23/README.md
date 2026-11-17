@@ -1,5 +1,7 @@
 # Instrumented record-convention paired run — 2026-08-23/24
 
+> **Trade files moved (2026-11-17).** This directory's 4 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 One 26y broad run, paired arms, three analyses (#2486 / #2489 / #2490). Build:
 main `2b11c60dd` (params.sexp per arm committed — the provenance gap that made
 #2503 hard to pin is closed here). Warehouse `/tmp/snap_top3000_dedup_v5thin_adj`

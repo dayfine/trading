@@ -1,5 +1,7 @@
 # rebaseline-v12-2026-10-08 — the investor record on pit-v12, total-return basis
 
+> **Trade files moved (2026-11-17).** This directory's 6 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 Plan: `dev/plans/total-return-and-shorts-phase-b-2026-10-05.md` decisions 1–3 and 5 (queue: #3136 → combined long
 baseline re-run, 3 salts → shorts Phase B). This is the "one combined re-baseline" (decision 1). It also carries two
 `[after-merge]` items: #3136 (re-run on the rebuilt universe) and #3173 (the guard credits TDG / WING / BCH once).

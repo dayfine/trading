@@ -1,5 +1,7 @@
 # Canonical record baseline — 2026-08-24 (book-faithful stops basis)
 
+> **Trade files moved (2026-11-17).** This directory's 1 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **THE pinned record-convention baseline** per the #2503 resolution (user ack
 2026-08-24) and the #2486 §2.1 stops-basis decision. Supersedes the
 unreproducible grid1-null 305% record (ladder-3-era build, params never

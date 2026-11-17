@@ -1,5 +1,7 @@
 # Top-of-funnel capacity on the PIT band — P1 #3 of the 09-21 queue (2026-09-21)
 
+> **Trade files moved (2026-11-17).** This directory's 4 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Status: PRE-REGISTERED** (written 14:05 PT 2026-09-21, before any cell ran; this README, the specs and the chain are
 pushed before the first launch). One arm, three salts, paired against the committed PIT record null, plus one
 diagnostic cell that changes no behaviour.

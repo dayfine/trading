@@ -1,5 +1,7 @@
 # twin-dedupe-26y-2026-10-29: the full rename-twin dedupe (#3388), applied and measured paired on the record
 
+> **Trade files moved (2026-11-17).** This directory's 6 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Pre-registration.** Nothing has run. Everything below is fixed before the first cell launches.
 
 Refs #3388. Applies the scan's full proposal (`../v12-twin-scan-2026-10-22/results/drops.txt`), of which #3391 applied
