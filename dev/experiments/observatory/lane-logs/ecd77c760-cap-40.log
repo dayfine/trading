@@ -1,0 +1,118 @@
+[11-17 00:40:30Z] observatory lane run; LANE_SHA=ecd77c76042691874f78e8d61f53ee0c278a4816 PAR=2 CELL_TIMEOUT=20000s
+[11-17 00:40:36Z] TR push check ok (/home/user/trading/../trading-results)
+[11-17 00:40:36Z] public push check ok
+[11-17 00:40:36Z] HEAD=ecd77c760 image=ghcr.io/dayfine/trading-ci:latest  mem=15G par=2
+[11-17 00:40:36Z] disk free 30G
+[11-17 00:40:37Z] STATE from origin/observatory/lane-results ca5ea8f833dc44f9b44a2af6148b41245c186091
+[11-17 00:40:37Z] ARM cap-40: ((screening_config ((max_buy_candidates 40)))) (ledger: gate funnel P1 (#3631): ranks 21-40 hold 16 % of C*; top-N grid (cap 40 dominated on top-1000))
+[11-17 00:40:37Z] disk free 30G
+[11-17 00:40:37Z] PULL warehouse v12wk-9236
+[11-17 00:46:20Z] PULL corpact corpact-2026-10-27
+[11-17 00:46:21Z] PULL bars data-20261102
+[11-17 00:46:52Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-17 00:46:52Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv
+[11-17 00:46:52Z] SPY YEARS from /home/user/trading/.sweep-output/observatory-lane/spy/data.csv: 19 bull, 8 bear
+[11-17 00:46:52Z] DOCKER daemon not answering (failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /var/run/docker.sock: connect: no such file or directory); starting dockerd
+[11-17 00:46:54Z] DOCKER dockerd started
+[11-17 00:46:54Z] BUILD
+[11-17 00:48:29Z] BUILD_DONE
+[11-17 00:48:29Z] SPEC CHECKS OK: obs-S-kK = rk-kK; obs-cap-40-kK = obs-S-kK + ((screening_config ((max_buy_candidates 40))))
+[11-17 00:48:29Z] VALIDATOR CONFIG cap-40 default (no -config)
+[11-17 00:48:29Z] PARALLEL 2 cells at a time (MemTotal 15 GB, reserve 3 GB, 6 GB per cell)
+[11-17 00:48:29Z] CELL obs-S-k0-s0 reuse: trading-results dev/experiments/observatory/runs/ecd77c760/S
+[11-17 00:48:29Z] CELL obs-S-k1-s0 reuse: trading-results dev/experiments/observatory/runs/ecd77c760/S
+[11-17 00:48:29Z] CELL obs-S-k2-s0 reuse: trading-results dev/experiments/observatory/runs/ecd77c760/S
+[11-17 00:48:29Z] CELL obs-S-k3-s0 reuse: trading-results dev/experiments/observatory/runs/ecd77c760/S
+[11-17 00:48:29Z] CELL obs-S-k4-s0 reuse: trading-results dev/experiments/observatory/runs/ecd77c760/S
+[11-17 00:48:29Z] CELL obs-cap-40-k0-s0 run
+[11-17 00:48:29Z] CELL obs-cap-40-k1-s0 run
+[11-17 00:48:29Z] CELL obs-cap-40-k2-s0 run
+[11-17 00:48:29Z] CELL obs-cap-40-k3-s0 run
+[11-17 00:48:29Z] CELL obs-cap-40-k4-s0 run
+[11-17 00:48:29Z] BATCH 1: obs-cap-40-k0-s0 obs-cap-40-k1-s0
+[11-17 00:48:29Z] BATCH 2: obs-cap-40-k2-s0 obs-cap-40-k3-s0
+[11-17 00:48:29Z] BATCH 3: obs-cap-40-k4-s0
+[11-17 00:48:29Z] PREFLIGHT obs-cap-40-k0 (to 2000-03-31)
+[11-17 00:51:44Z] PREFLIGHT_OK ecd77c760 obs-cap-40-k0 (n_symbols=9200 absent=1)
+[11-17 00:51:44Z] RUN obs-cap-40-k0-s0
+[11-17 00:51:44Z] RUN obs-cap-40-k1-s0
+[11-17 01:11:30Z] observatory lane run; LANE_SHA=ecd77c76042691874f78e8d61f53ee0c278a4816 PAR=2 CELL_TIMEOUT=20000s
+[11-17 01:11:32Z] TR push check ok (/home/user/trading/../trading-results)
+[11-17 01:11:32Z] public push check ok
+[11-17 01:11:32Z] HEAD=ecd77c760 image=ghcr.io/dayfine/trading-ci:latest  mem=15G par=2
+[11-17 01:11:32Z] disk free 16G
+[11-17 01:11:33Z] STATE from origin/observatory/lane-results ca5ea8f833dc44f9b44a2af6148b41245c186091
+[11-17 01:11:33Z] ARM cap-40: ((screening_config ((max_buy_candidates 40)))) (ledger: gate funnel P1 (#3631): ranks 21-40 hold 16 % of C*; top-N grid (cap 40 dominated on top-1000))
+[11-17 01:13:32Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv
+[11-17 01:13:32Z] SPY YEARS from /home/user/trading/.sweep-output/observatory-lane/spy/data.csv: 19 bull, 8 bear
+[11-17 01:13:32Z] DOCKER daemon not answering (Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?); starting dockerd
+[11-17 01:13:35Z] DOCKER dockerd started
+[11-17 01:13:35Z] BUILD
+[11-17 01:13:51Z] BUILD_DONE
+[11-17 01:13:52Z] SPEC CHECKS OK: obs-S-kK = rk-kK; obs-cap-40-kK = obs-S-kK + ((screening_config ((max_buy_candidates 40))))
+[11-17 01:13:52Z] VALIDATOR CONFIG cap-40 default (no -config)
+[11-17 01:13:52Z] PARALLEL 2 cells at a time (MemTotal 15 GB, reserve 3 GB, 6 GB per cell)
+[11-17 01:13:52Z] CELL obs-S-k0-s0 reuse: finished in OUT
+[11-17 01:13:52Z] CELL obs-S-k1-s0 reuse: finished in OUT
+[11-17 01:13:52Z] CELL obs-S-k2-s0 reuse: finished in OUT
+[11-17 01:13:52Z] CELL obs-S-k3-s0 reuse: finished in OUT
+[11-17 01:13:52Z] CELL obs-S-k4-s0 reuse: finished in OUT
+[11-17 01:13:52Z] CELL obs-cap-40-k0-s0 run
+[11-17 01:13:52Z] CELL obs-cap-40-k1-s0 run
+[11-17 01:13:52Z] CELL obs-cap-40-k2-s0 run
+[11-17 01:13:52Z] CELL obs-cap-40-k3-s0 run
+[11-17 01:13:52Z] CELL obs-cap-40-k4-s0 run
+[11-17 01:13:52Z] BATCH 1: obs-cap-40-k0-s0 obs-cap-40-k1-s0
+[11-17 01:13:52Z] BATCH 2: obs-cap-40-k2-s0 obs-cap-40-k3-s0
+[11-17 01:13:52Z] BATCH 3: obs-cap-40-k4-s0
+[11-17 01:13:52Z] SKIP preflight obs-cap-40-k0 (done)
+[11-17 01:13:52Z] RUN obs-cap-40-k0-s0
+[11-17 01:13:52Z] RUN obs-cap-40-k1-s0
+[11-17 01:37:01Z] observatory lane run; LANE_SHA=ecd77c76042691874f78e8d61f53ee0c278a4816 PAR=2 CELL_TIMEOUT=20000s
+[11-17 01:37:03Z] TR push check ok (/home/user/trading/../trading-results)
+[11-17 01:37:03Z] public push check ok
+[11-17 01:37:04Z] HEAD=ecd77c760 image=ghcr.io/dayfine/trading-ci:latest  mem=15G par=2
+[11-17 01:37:04Z] disk free 16G
+[11-17 01:37:04Z] STATE from origin/observatory/lane-results 13565fe295043d2267871fc2707777992133f47c
+[11-17 01:37:04Z] ARM cap-40: ((screening_config ((max_buy_candidates 40)))) (ledger: gate funnel P1 (#3631): ranks 21-40 hold 16 % of C*; top-N grid (cap 40 dominated on top-1000))
+[11-17 01:39:07Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv
+[11-17 01:39:07Z] SPY YEARS from /home/user/trading/.sweep-output/observatory-lane/spy/data.csv: 19 bull, 8 bear
+[11-17 01:39:10Z] DOCKER daemon not answering (Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?); starting dockerd
+[11-17 01:39:15Z] DOCKER dockerd started
+[11-17 01:39:15Z] BUILD
+[11-17 01:39:31Z] BUILD_DONE
+[11-17 01:39:31Z] SPEC CHECKS OK: obs-S-kK = rk-kK; obs-cap-40-kK = obs-S-kK + ((screening_config ((max_buy_candidates 40))))
+[11-17 01:39:31Z] VALIDATOR CONFIG cap-40 default (no -config)
+[11-17 01:39:31Z] PARALLEL 2 cells at a time (MemTotal 15 GB, reserve 3 GB, 6 GB per cell)
+[11-17 01:39:31Z] CELL obs-S-k0-s0 reuse: finished in OUT
+[11-17 01:39:31Z] CELL obs-S-k1-s0 reuse: finished in OUT
+[11-17 01:39:31Z] CELL obs-S-k2-s0 reuse: finished in OUT
+[11-17 01:39:31Z] CELL obs-S-k3-s0 reuse: finished in OUT
+[11-17 01:39:31Z] CELL obs-S-k4-s0 reuse: finished in OUT
+[11-17 01:39:31Z] CELL obs-cap-40-k0-s0 run
+[11-17 01:39:31Z] CELL obs-cap-40-k1-s0 run
+[11-17 01:39:31Z] CELL obs-cap-40-k2-s0 run
+[11-17 01:39:31Z] CELL obs-cap-40-k3-s0 run
+[11-17 01:39:31Z] CELL obs-cap-40-k4-s0 run
+[11-17 01:39:31Z] BATCH 1: obs-cap-40-k0-s0 obs-cap-40-k1-s0
+[11-17 01:39:31Z] BATCH 2: obs-cap-40-k2-s0 obs-cap-40-k3-s0
+[11-17 01:39:31Z] BATCH 3: obs-cap-40-k4-s0
+[11-17 01:39:31Z] SKIP preflight obs-cap-40-k0 (done)
+[11-17 01:39:31Z] RUN obs-cap-40-k1-s0
+[11-17 01:39:31Z] RUN obs-cap-40-k0-s0
+[11-17 03:34:26Z] RESULT obs-cap-40-k0-s0 => total_return_pct 883.37604333732 total_trades 737 max_drawdown_pct 33.383256306336989 peak_rss_kb=5818980 (wall 6895s)
+[11-17 03:34:31Z] RESULT obs-cap-40-k1-s0 => total_return_pct 573.0369806700927 total_trades 766 max_drawdown_pct 39.105432630844682 peak_rss_kb=5827112 (wall 6900s)
+[11-17 03:34:31Z] disk free 16G
+[11-17 03:34:31Z] RUN obs-cap-40-k3-s0
+[11-17 03:34:31Z] RUN obs-cap-40-k2-s0
+[11-17 05:30:28Z] RESULT obs-cap-40-k3-s0 => total_return_pct 859.81763066173858 total_trades 739 max_drawdown_pct 33.784341349032978 peak_rss_kb=5816980 (wall 6957s)
+[11-17 05:30:53Z] RESULT obs-cap-40-k2-s0 => total_return_pct 1604.669470810396 total_trades 727 max_drawdown_pct 33.248538591702392 peak_rss_kb=5841564 (wall 6982s)
+[11-17 05:30:53Z] disk free 16G
+[11-17 05:30:53Z] RUN obs-cap-40-k4-s0
+[11-17 07:25:44Z] RESULT obs-cap-40-k4-s0 => total_return_pct 1008.5739366654502 total_trades 743 max_drawdown_pct 26.9186839438883 peak_rss_kb=5812336 (wall 6891s)
+[11-17 07:25:44Z] TRIPWIRE MATCH S k0 trades.csv md5 0928cfe40333560429f5a6e57c9c18de (S@3c367cca7 in trading-results)
+[11-17 07:25:47Z] V6 OK cap-40 (k0-k4 against S)
+[11-17 07:25:47Z] LIVE cap-40: trades.csv differs from S on 5 of 5 seeds
+[11-17 07:25:50Z] READ cap-40: obs_read: cap-40 row 4 appended -> median D_end -0.4505, flag none
+[11-17 07:25:50Z] QUEUE cap-40 -> done@ecd77c760
+[11-17 07:25:50Z] DRIFT NONE: S@ecd77c760 trades.csv identical to S@3c367cca7 on every seed
