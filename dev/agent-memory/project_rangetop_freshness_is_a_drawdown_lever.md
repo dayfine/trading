@@ -140,3 +140,5 @@ per-arm `actual.sexp`, never the chain log
 Related: [[project-never-measure-on-sp500]], [[project-entry-cap-horizon-reversal]],
 [[project-promotion-confirmation-grid]], [[feedback-run-the-null-control-first]],
 [[project-record-gap-is-concentration]].
+
+**#3664 (11-17 sibling audit of #3659): the drawdown claim rests on a basis-mixed treatment.** `entry_freshness.ml:25` compared the adjusted close with a raw 4-week high, so the range-top route never admitted F<0.95 names; the arm ran as "virgin route only" for 69 % of trades, and 27 % of its 26y trades came in only through the virgin test's own mix. Do not quote "drawdown lever" until both read one basis; "not promotable" stands; rerun waits on #3664. Noise-floor law (control nulls) unaffected.
