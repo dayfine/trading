@@ -1,5 +1,9 @@
 # F1 freshness axis, seeded — `Range_top_breakout` vs `Ma_cross` on the 26y base
 
+> **Trade files moved (2026-11-16).** The per-arm `results/s*-trades.csv` files carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit 477a85e), per the EODHD terms. References to them below resolve there.
+>
+> **Basis caveat (2026-11-17, #3664).** Both arms compared prices on mixed bases: the range-top test used an adjusted close against a raw high, and the virgin test a raw breakout against an adjusted 520-week high. On history both select by later splits and dividends. The result below did not measure the range-top clock cleanly, so do not quote it as a drawdown lever until a one-basis rerun. "Not promotable" stands. Audit: comment on #3659.
+
 **RESULT: on the 26-year base, `Range_top_breakout` improves ulcer index, win
 rate and max drawdown past their own nulls at all three salts, and moves return
 and Sharpe not at all. The broad-5y cell (#2448) SPLITS that result rather
