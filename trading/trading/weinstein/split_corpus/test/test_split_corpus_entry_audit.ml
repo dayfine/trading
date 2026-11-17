@@ -71,6 +71,7 @@ let _analysis (stage : Stage.result) : Stock_analysis.t =
     range_top_freshness = None;
     require_breakout_volume = true;
     current_close = None;
+    current_raw_close = None;
     as_of_date = _decision_date;
   }
 

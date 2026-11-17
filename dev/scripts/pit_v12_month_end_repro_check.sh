@@ -3,7 +3,8 @@
 # build_composition_universes_runner (--month-ends) must reproduce the committed pit-v12 yearly lists byte for byte,
 # including pit-v12's post-processing, so monthly lists differ from the yearly ones only by date. POSIX sh.
 #
-# Runs INSIDE the container (the bar store is there). From the host:
+# Runs INSIDE the container (the bar store is there), so it has nothing to start. From the host, the container is
+# stopped when idle: `sh dev/lib/ensure_container.sh` first, then
 #   docker exec -w /workspaces/trading-1/<tree> trading-1-dev sh dev/scripts/pit_v12_month_end_repro_check.sh
 # after `dune build analysis/data/universe/bin/build_composition_universes_runner.exe` in <tree>/trading.
 #

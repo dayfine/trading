@@ -300,6 +300,12 @@ phase_verify() {
 
 [ -z "${V12_LIB_ONLY:-}" ] || { echo "V12_LIB_ONLY set: functions defined, no phase run" >&2; return 0 2>/dev/null || exit 0; }   # dry-harness hook
 
+# On-demand container (user decision 2026-11-16): every phase runs work in it, and it is stopped when idle.
+case "$PHASE" in
+  preflight|superset|chunks|classify|chunk5|twinscan|twinfix|verify|all)
+    DOCKER_CONTAINER="$CONTAINER" sh "$HERE/dev/lib/ensure_container.sh" || die "container $CONTAINER is not up" ;;
+esac
+
 case "$PHASE" in
   preflight) phase_preflight ;;
   superset) phase_superset ;;

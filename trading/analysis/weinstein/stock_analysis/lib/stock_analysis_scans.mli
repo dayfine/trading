@@ -9,7 +9,10 @@
 
     Extracted verbatim from {!Stock_analysis} to keep that coordinator within
     the declared-large file-length cap; behaviour is unchanged. Pure: depends
-    only on the closures passed in. *)
+    only on the closures passed in.
+
+    The scans read raw highs and lows. {!raw_close} puts a close on that same
+    raw basis, so a close can be compared with a scanned level (#3659). *)
 
 val scan_max_high :
   get_high:(week_offset:int -> float option) ->
@@ -49,3 +52,15 @@ val scan_recent_max_high :
     shorter window's result never exceeds a longer one's. Backs both the replace
     anchor ([entry_anchor_local_range_weeks]) and the stale-entry cap
     ([entry_cap_local_range_weeks], {!Stale_entry_cap}). *)
+
+val raw_close :
+  adjusted_close:float option -> split_factor:float option -> float option
+(** The raw (as-traded) close of one bar, from its back-adjusted close and its
+    own per-bar split factor [adjusted_close / close_price] (the
+    {!Stock_analysis.callbacks} [get_split_factor] convention, read at the same
+    offset): [adjusted_close /. split_factor]. This puts a close on the same
+    basis as {!scan_max_high}'s raw highs. On history the adjusted close carries
+    every split and dividend paid after the bar; the raw close carries none.
+
+    [None] when either input is [None] or the factor is not positive (a bad bar
+    — never divide by it). *)

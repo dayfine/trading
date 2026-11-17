@@ -25,7 +25,8 @@ let entry ~weights ~thresholds ~early_stage2_max_weeks
        would-be buy disappeared. *)
     match
       failed_breakout_reason ~tolerance_pct:failed_breakout_tolerance_pct
-        ~breakout_price:sa.breakout_price ~current_close:sa.current_close
+        ~breakout_price:sa.breakout_price
+        ~current_raw_close:sa.current_raw_close
     with
     | Some reason -> Some (sa.ticker, reason)
     | None ->

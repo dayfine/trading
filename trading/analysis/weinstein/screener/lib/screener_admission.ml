@@ -31,10 +31,10 @@ let passes_price_floor ~min_price ~price =
     both prices are known; [None] when the gate is disabled
     ([tolerance_pct <= 0.0], the default no-op) or either price is unknown —
     absence of data must never invalidate a candidate. *)
-let _failed_breakout_levels ~tolerance_pct ~breakout_price ~current_close =
+let _failed_breakout_levels ~tolerance_pct ~breakout_price ~current_raw_close =
   if Float.(tolerance_pct <= 0.0) then None
   else
-    match (breakout_price, current_close) with
+    match (breakout_price, current_raw_close) with
     | None, _ | _, None -> None
     | Some bp, Some close -> Some (close, bp, bp *. (1.0 -. tolerance_pct))
 
@@ -45,11 +45,12 @@ let _failed_breakout_message ~close ~breakout ~tolerance_pct ~floor_price =
 
 (* Failed-breakout re-validation. Engineering adaptation, not a book-quoted
    rule: it enforces §4.1 requirement 1 (breakout above resistance) as a
-   condition that must still hold at evaluation time. See the .mli for the full
-   authority note, including why tolerance_pct must not be set small. *)
-let failed_breakout_reason ~tolerance_pct ~breakout_price ~current_close =
+   condition that must still hold at evaluation time. Both prices are raw
+   (#3659). See the .mli for the full authority note, including why
+   tolerance_pct must not be set small. *)
+let failed_breakout_reason ~tolerance_pct ~breakout_price ~current_raw_close =
   match
-    _failed_breakout_levels ~tolerance_pct ~breakout_price ~current_close
+    _failed_breakout_levels ~tolerance_pct ~breakout_price ~current_raw_close
   with
   | None -> None
   | Some (close, breakout, floor_price) ->
@@ -58,13 +59,13 @@ let failed_breakout_reason ~tolerance_pct ~breakout_price ~current_close =
         Some
           (_failed_breakout_message ~close ~breakout ~tolerance_pct ~floor_price)
 
-let passes_failed_breakout ~tolerance_pct ~breakout_price ~current_close =
+let passes_failed_breakout ~tolerance_pct ~breakout_price ~current_raw_close =
   Option.is_none
-    (failed_breakout_reason ~tolerance_pct ~breakout_price ~current_close)
+    (failed_breakout_reason ~tolerance_pct ~breakout_price ~current_raw_close)
 
 let _long_passes_failed_breakout ~tolerance_pct (a : Stock_analysis.t) =
   passes_failed_breakout ~tolerance_pct ~breakout_price:a.breakout_price
-    ~current_close:a.current_close
+    ~current_raw_close:a.current_raw_close
 
 let rs_blocks_short = function
   | Some { Rs.trend = Positive_rising | Positive_flat | Bullish_crossover; _ }

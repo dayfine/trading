@@ -58,6 +58,8 @@ if [ -z "${EODHD_API_KEY:-}" ]; then
   exit 1
 fi
 
+# On-demand container (user decision 2026-11-16): start Docker Desktop / the container when they are down.
+DOCKER_CONTAINER="$CONTAINER" sh "${REPO_ROOT}/dev/lib/ensure_container.sh" || exit 1
 if ! docker exec "$CONTAINER" true 2>/dev/null; then
   printf 'FAIL: docker container "%s" is not responsive\n' "$CONTAINER" >&2
   exit 1

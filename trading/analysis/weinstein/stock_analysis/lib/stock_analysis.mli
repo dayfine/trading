@@ -241,12 +241,25 @@ type t = {
           [callbacks.stage.get_close]. [None] when the callback bundle has no
           bar at offset 0 (empty / truncated history).
 
-          Purely additive: no existing analysis path reads it. It exists so the
-          screener can re-validate a breakout candidate against the *current*
-          price — an engineering adaptation that enforces
-          weinstein-book-reference.md §4.1 requirement 1 (breakout above
-          resistance) at evaluation time rather than only on the breakout bar;
-          it is not a book-quoted rule. See
+          {b Basis: back-adjusted} — the same series the stage MA is built from.
+          The bar store adjusts to the end of its data, so on a historical bar
+          this close already reflects every split and dividend the name pays
+          later. Compare it only with adjusted values (the MA), never with a raw
+          level such as {!breakout_price}: use {!current_raw_close} for that
+          (#3659). *)
+  current_raw_close : float option;
+      (** {!current_close} on the {b raw} (as-traded) basis that
+          {!breakout_price}, {!breakdown_price} and {!local_range_top} use:
+          {!Stock_analysis_scans.raw_close} of [current_close] and
+          [callbacks.get_split_factor ~week_offset:0]. [None] when either is
+          unknown — no offset-0 bar, or a callback bundle without both raw and
+          adjusted closes.
+
+          It exists so the screener can re-validate a breakout candidate against
+          the {i current} price with both sides on one basis — an engineering
+          adaptation that enforces weinstein-book-reference.md §4.1 requirement
+          1 (breakout above resistance) at evaluation time rather than only on
+          the breakout bar; it is not a book-quoted rule. See
           {!Screener_admission.failed_breakout_reason}. Consumers must treat
           [None] as "unknown", never as evidence of a failed breakout. *)
   as_of_date : Core.Date.t;  (** The date this analysis was computed. *)

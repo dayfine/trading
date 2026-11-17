@@ -102,7 +102,9 @@ type t = {
           {!is_breakout_candidate} (which sees only [t]) can honour it. [true]
           (default) keeps the screen-time volume gate. See .mli. *)
   current_close : float option;
-      (** Most recent (offset-0) weekly close; see .mli. *)
+      (** Most recent (offset-0) weekly close, adjusted basis; see .mli. *)
+  current_raw_close : float option;
+      (** [current_close] on the raw basis of [breakout_price]; see .mli. *)
   as_of_date : Date.t;
 }
 
@@ -385,6 +387,9 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     range_top_freshness;
     require_breakout_volume = config.require_breakout_volume;
     current_close;
+    current_raw_close =
+      Stock_analysis_scans.raw_close ~adjusted_close:current_close
+        ~split_factor:(callbacks.get_split_factor ~week_offset:0);
     as_of_date;
   }
 

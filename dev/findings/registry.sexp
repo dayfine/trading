@@ -407,6 +407,11 @@
          (unit ("trading/trading/simulation/test/test_trigger_bar_stop_fill.ml" "SGNT stop fills on the bar whose low equals it"))
          (unit ("trading/trading/weinstein/stops/test/test_stop_hit_float_noise.ml" "SGNT stop hit by low 23.76, not 23.77"))))
  (status fixed))
+((issue 3659) (ref "observatory read fbt-05: failed-breakout gate basis mix")
+ (finding "the failed-breakout admission gate compared the back-adjusted current close with the raw breakout high, so on history it dropped names by the splits and dividends they paid later: the fbt-05 arm kept 0 of the record's 659 trades in later forward-splitters, and ADSK 2003-09 was dropped every week with its raw close above the breakout. The gate now reads Stock_analysis.t.current_raw_close")
+ (guard ((unit ("trading/analysis/weinstein/screener/test/test_screener.ml"
+                "test_failed_breakout_later_split_raw_close_passes"))))
+ (status fixed))
 ((issue 2973) (ref "split corpus scan column: prior-base scan blind after an ex-date")
  (finding "prior-base scan blind for base_end_offset_weeks - 1 weeks after an ex-date: the G14 guard only compares offsets >= base_end_offset_weeks, so breakout / breakdown come wholly from pre-split raw bars (AAPL 2014-06-13 breakout 575.14 vs close 91.28; GE 2021-08-06 14.42 vs 104.52)")
  (guard none)

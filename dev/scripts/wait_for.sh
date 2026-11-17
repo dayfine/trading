@@ -28,6 +28,8 @@
 # leaves defunct dune entries that `pgrep -x dune` still matches (#2738,
 # 2026-10-13). For a process inside the container, set
 #   WAIT_FOR_PS='docker exec trading-1-dev ps -eo stat=,args='
+# The container is stopped when idle (dev/lib/ensure_container.sh): a failing ps (container stopped, daemon
+# down) reads as "no live process", so `proc` fires at once. It never starts the container.
 #
 # The PR conditions use `gh api` (REST), not `gh pr checks` / `gh pr view`,
 # which go through GraphQL and are refused in Claude cloud sessions.
@@ -129,6 +131,7 @@ _cond_reviews() {
 _cond_proc() {
   # Snapshot first: a filter in the same pipeline as `ps` is itself a live
   # process whose args hold the pattern, so it would always match.
+  # A failing ps (stopped container, daemon down) leaves snap empty: idle.
   snap=$($PS_CMD 2>/dev/null) || true
   live=$(printf '%s\n' "$snap" | awk '$1 !~ /^Z/' | grep -E -- "$1" |
     grep -v 'wait_for' || true)

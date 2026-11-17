@@ -92,6 +92,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # the fused-digit bug this guards against (#2553, #2559).
 . "${REPO_ROOT}/dev/lib/gnu_time_rss.sh"
 
+# On-demand container (user decision 2026-11-16): start Docker Desktop / the container when they are down.
+DOCKER_CONTAINER="$C" sh "${REPO_ROOT}/dev/lib/ensure_container.sh" || exit 2
 if ! docker exec "$C" true >/dev/null 2>&1; then
   echo "FAIL: container '$C' not responsive (docker daemon down or container stopped)" >&2
   exit 2

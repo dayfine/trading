@@ -13,7 +13,11 @@
 #     exactly one bucket and loses no symbol (#3645); check_public_price_free refuses a table
 #     row with a two-decimal number; fetch_buckets.sh, run against a fake fetch_symbols.exe,
 #     exits 0 only when every process exited 0 and every log ends in a Done: line, and hands
-#     the exe the key without printing it.
+#     the exe the key without printing it;
+#   - the call sites of those two helpers in weekly.sh, which a dry run never executes
+#     (`run` only echoes, and the price check is skipped): `run bucket_shards` and
+#     `[ "$DRY" = 1 ] || check_public_price_free` must each appear on a non-comment line,
+#     so deleting or commenting out a call turns this red.
 # Run:  sh trading/devtools/checks/weekly_picks_dry_run_check.sh
 set -eu
 
@@ -183,6 +187,13 @@ expect_eq "fetch_buckets: a bucket that exits non-zero fails the run" \
 rc=0; EODHD_API_KEY="" sh "$FIX/dev/weekly-picks/fetch_buckets.sh" "$TMP/fake_fetch" "$TMP/fb-ok/data" "$TMP/fb-ok/b" "$TMP/fb-ok/logs" \
   > /dev/null 2>&1 || rc=$?
 expect_eq "fetch_buckets: without a key it fails before any fetch" 1 "$rc"
+
+# The call sites in weekly.sh. The dry run does not execute either helper, so the pins above
+# hold even when weekly.sh stops calling them; a name that survives only in a comment (or
+# after a `#` on a code line) does not count as a call.
+calls() { sed "s/#.*//" "$FIX/dev/weekly-picks/weekly.sh" | grep -q -w -e "$1" && echo yes || echo no; }
+expect_eq "weekly.sh calls bucket_shards on a non-comment line" yes "$(calls bucket_shards)"
+expect_eq "weekly.sh calls check_public_price_free on a non-comment line" yes "$(calls check_public_price_free)"
 
 # The work dir holds bar-derived files: it must stay gitignored in the real repo.
 grep -qE '^/?dev/data/?$' "$ROOT/.gitignore" || { echo "FAIL: weekly_picks_dry_run_check: dev/data/ is not in .gitignore" >&2; FAILED=$((FAILED + 1)); }

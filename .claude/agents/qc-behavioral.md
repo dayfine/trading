@@ -30,7 +30,9 @@ below apply without being restated; a brief that repeats them is wasted context.
   checked-out SHA differs from the brief's tip, the PR moved: review the new tip and say so. Never `jj`,
   never `git checkout <branch>`, never `gh pr checkout` in the parent tree. Finish with
   `git worktree remove --force <path>`.
-- **Build your own tree.** Locally (`$TRADING_IN_CONTAINER` unset) dune runs in the container:
+- **Build your own tree.** Locally (`$TRADING_IN_CONTAINER` unset) dune runs in the container, which is
+  stopped when idle: run `sh dev/lib/ensure_container.sh` before your first `docker exec` (a no-op when
+  it is up). Then:
   `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/<your-tree>/trading && eval $(opam env) &&
   dune build'`, where `<your-tree>` is your worktree's path relative to the repo root (it lives under
   `.claude/worktrees/` so the container sees it). Never `cd /workspaces/trading-1/trading`: that builds the

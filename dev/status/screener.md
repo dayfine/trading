@@ -1,6 +1,6 @@
 # Status: screener
 
-## Last updated: 2026-11-13
+## Last updated: 2026-11-16
 
 ## Status
 IN_PROGRESS
@@ -26,6 +26,8 @@ grep -n 'PR OPEN' dev/status/screener.md   # then check each #N is actually open
 ```
 
 If you write `PR OPEN`, you owe this file an edit when the PR merges.
+
+**2026-11-16**: `fix(screener): failed-breakout gate on one price basis (#3659)` (branch `feat/failed-breakout-one-basis`, **PR OPEN #3661**) — the default-off failed-breakout gate compared `Stock_analysis.t.current_close` (back-adjusted, so on history already divided by every later split) with the raw `breakout_price`, dropping later splitters every week (fbt-05 observatory read, #3658). Adds `Stock_analysis.t.current_raw_close` (the offset-0 close with its own split factor divided back out, `Stock_analysis_scans.raw_close`); the gate's label is now `~current_raw_close` and all three call sites (`Screener_admission._long_passes_failed_breakout`, `Screener_candidate_eval._long_candidate`, `Screener_watchlist.entry`) read it. `current_close` keeps the adjusted basis and its other readers. Gate off (default) is unchanged: it returns before reading a price. Test: `test_failed_breakout_later_split_raw_close_passes` drives real bars with a later 2:1 split through `Stock_analysis.analyze` and the screener; red when any of the three sites reads the adjusted close (each mutated alone). Registry row added. After merge: the host-only audit of the rt-freshness and continuation trades by later-split status (`entry_freshness.ml`, `continuation.ml` carry the same expression, untouched here).
 
 **2026-11-13**: `feat(screener): default-off Price_band_seeded tiebreak` (branch `feat/screener-price-band-seeded`, **PR OPEN #3587**) — new `Screener_ranking.Price_band_seeded` mode: among equal scores, the cheaper price band first, then the `Seeded` FNV-1a draw, then ticker. The band is the count of `screening_config.ranking_price_band_edges` (new, `[@sexp.default default_price_band_edges]` = `[8.0; 14.0; 33.0]`) at or below the raw ticket price `suggested_entry`; the adjusted `current_close` is not used (later splits would leak into old prices). Default ranking stays `Seeded`, so no golden moves. Evidence: the 2026-11-13 PIT population screen (20,195 breakouts; $5-8 breakouts double 2-4x as often as >$33 ones at the same 39 % win rate, both halves); book Ch. 5 low-priced big winners, written back to `weinstein-book-reference.md` §4.5. To stay under the 500-line cap on `screener.ml`, `_top_n` / `_filter_and_cap` moved unchanged into `Screener_ranking` (`filter_and_cap`). Tests: 7 in `test_screener.ml` (band count, band order, Seeded within a band, one band = Seeded, score primary, sexp parse/default, cascade reads the config edges), an overlay pin in `test_seeded_tiebreak_overlays.ml` and a `Variant_matrix` two-axis expansion in `test_variant_matrix.ml`. Next: the paired K-seed run (`Seeded` vs `Price_band_seeded`) on a broad universe.
 
@@ -175,7 +177,8 @@ Total: 87 new tests across 9 modules, all passing.
 PR #2087 implements the long-side re-validation only. The symmetric short-side
 case — a candidate whose close has rebounded back *above* `breakdown_price *
 (1 + k)` is a failed breakdown — is not implemented. `Stock_analysis.t` already
-carries both `breakdown_price` and the new `current_close`, so the mirror is a
+carries both `breakdown_price` and `current_raw_close` (raw, like the
+breakdown price; #3659), so the mirror is a
 small addition to `Screener_admission` plus threading through
 `_short_candidate` / `_short_admission`. Deferred to keep #2087 single-sided
 and reviewable.
@@ -187,7 +190,9 @@ and reviewable.
 `dev/weekly-picks/live-config-overrides.sexp` as a signal-validity fix (the
 `candidate_ranking Quality` precedent) rather than as a return lever. The live
 case is the motivating defect (#2084), so it may not need to wait on the
-backtest surface.
+backtest surface. Runs before the #3659 fix (fbt-05 among them) measured the
+gate with the adjusted close against the raw breakout; a verdict on arming
+needs a run on the one-basis gate.
 
 ### Cascade post-stop-out — re-base detection
 PR #718 lands a time-based cooldown only. The findings note flags that

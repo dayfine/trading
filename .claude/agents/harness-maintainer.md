@@ -27,7 +27,9 @@ below apply without being restated; a brief that repeats them is wasted context.
   and sends a failure back as a rework.
   A check or test script you added or changed (`trading/devtools/`, `dev/scripts/`) is not `dune runtest`:
   run it directly with `sh <script>` when it is quick, and name it in the PR body.
-- **Build your own tree.** Locally (`$TRADING_IN_CONTAINER` unset) dune runs in the container:
+- **Build your own tree.** Locally (`$TRADING_IN_CONTAINER` unset) dune runs in the container, which is
+  stopped when idle: run `sh dev/lib/ensure_container.sh` before your first `docker exec` (a no-op when
+  it is up). Then:
   `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/<your-tree>/trading && eval $(opam env) &&
   dune build'`, where `<your-tree>` is your worktree's path relative to the repo root (it lives under
   `.claude/worktrees/` so the container sees it). Never `cd /workspaces/trading-1/trading`: that builds the

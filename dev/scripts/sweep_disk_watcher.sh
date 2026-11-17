@@ -12,6 +12,9 @@
 # cannot react to mid-flight disk fill — 2026-05-23..25 sweep crashes
 # all came from disk filling AFTER launch (snapshot churn over hours).
 #
+# Observer only: it never starts the container (dev/lib/ensure_container.sh). A stopped
+# container reads as "the sweep is gone": the liveness probe fails and the watcher exits 0.
+#
 # Usage:
 #   sweep_disk_watcher.sh --sweep-pid <pid> --sweep-name <name>
 #                         [--container NAME]            (default trading-1-dev)

@@ -108,7 +108,7 @@ let _long_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
     not
       (passes_failed_breakout ~tolerance_pct:failed_breakout_tolerance_pct
          ~breakout_price:a.Stock_analysis.breakout_price
-         ~current_close:a.Stock_analysis.current_close)
+         ~current_raw_close:a.Stock_analysis.current_raw_close)
   then None
   else if rs_blocks_long ~min_rs_normalized a.Stock_analysis.rs then None
   else if not (passes_volume_band ~excl:volume_ratio_exclude_range a) then None

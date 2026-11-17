@@ -39,6 +39,10 @@ costs 2.3× one at 150k.
    only waits, such as a chain running or PRs waiting on reviewers, and not partway through a merge wave.
    Compaction thresholds stay as `session-rampup.md` Step 3 sets them; there is no flat context cap.
 
+5. **Stop the idle container.** The local container is on-demand (user decision 2026-11-16;
+   `sh dev/lib/ensure_container.sh` starts it): after a build or QC wave and at session end, run
+   `sh dev/lib/container_idle_stop.sh`.
+
 ## Known hazards the helper accounts for
 
 - **Zombie dune.** A `docker exec` killed at its time limit leaves defunct `dune` entries, and

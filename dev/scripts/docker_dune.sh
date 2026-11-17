@@ -43,8 +43,9 @@
 #
 # EXIT STATUS
 #   The dune command's own exit code, recovered from the sentinel.
-#   124 if --timeout elapsed first. 125 if the container is not running, or
-#   becomes unreachable mid-run (a `docker exec` poll itself fails -- crash,
+#   124 if --timeout elapsed first. 125 if the container is not running and
+#   dev/lib/ensure_container.sh could not start it (it is stopped when idle, so
+#   a stopped container is started first), or becomes unreachable mid-run (a `docker exec` poll itself fails -- crash,
 #   `docker restart`, daemon hiccup). 2 on a usage/setup error (unknown
 #   flag, missing dune args).
 #
@@ -79,7 +80,9 @@ if [ $# -eq 0 ]; then
   exit 2
 fi
 
-if ! docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true; then
+# On-demand container (user decision 2026-11-16): it is stopped when idle, so start Docker Desktop and the
+# container first. ensure_container.sh prints its own reason; 125 keeps its "not running" meaning.
+if ! DOCKER_CONTAINER="$CONTAINER" sh "$(dirname "$0")/../lib/ensure_container.sh"; then
   echo "docker_dune: container '$CONTAINER' is not running." >&2
   exit 125
 fi

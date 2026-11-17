@@ -53,6 +53,14 @@ FAKE_BIN="$(mktemp -d)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$FAKE_BIN" "$WORK"' EXIT INT TERM
 
+# The wrapper first runs dev/lib/ensure_container.sh (the container is on-demand). Switch off its in-container
+# no-ops (GHA runs this check inside one) and shorten its wait so a container that never comes up costs 2 s.
+unset TRADING_IN_CONTAINER
+ENSURE_CONTAINER_ENV_FILES="${WORK}/no-such-file"
+ENSURE_CONTAINER_POLL=1
+ENSURE_CONTAINER_START_TIMEOUT=2
+export ENSURE_CONTAINER_ENV_FILES ENSURE_CONTAINER_POLL ENSURE_CONTAINER_START_TIMEOUT
+
 # ---------------------------------------------------------------------------
 # Fake `opam`: `opam env` prints nothing and succeeds, so `eval $(opam env)`
 # inside the wrapper's generated command is a harmless no-op.
@@ -93,6 +101,12 @@ case "$1" in
       shift
     fi
     shift # drop container name
+    # `exec <c> true` is ensure_container.sh's readiness probe: it follows FAKE_DOCKER_RUNNING and is
+    # not one of the counted poll calls.
+    if [ "$1" = true ] && [ "$#" -eq 1 ]; then
+      [ "${FAKE_DOCKER_RUNNING:-true}" = true ]
+      exit $?
+    fi
     INTERP="$1"
     shift
     shift # drop -c

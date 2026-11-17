@@ -47,7 +47,7 @@ val passes_price_floor : min_price:float -> price:float option -> bool
 val failed_breakout_reason :
   tolerance_pct:float ->
   breakout_price:float option ->
-  current_close:float option ->
+  current_raw_close:float option ->
   string option
 (** Failed-breakout re-validation for long candidates.
 
@@ -73,17 +73,25 @@ val failed_breakout_reason :
     stands.
 
     [tolerance_pct] is the knob [k]: invalidate iff
-    [current_close < breakout_price *. (1. -. k)].
+    [current_raw_close < breakout_price *. (1. -. k)].
     - [k <= 0.0] (the default no-op) disables the gate entirely — always [None],
       bit-identical to pre-feature behaviour on every input.
-    - A missing [breakout_price] or a missing [current_close] is treated as
+    - A missing [breakout_price] or a missing [current_raw_close] is treated as
       "unknown" and never invalidates. Absence of data is not evidence of a
-      failed breakout. *)
+      failed breakout.
+
+    {b Basis: both prices are raw} (as traded on the evaluation date).
+    [breakout_price] is {!Stock_analysis.t.breakout_price}, a raw weekly high;
+    pass {!Stock_analysis.t.current_raw_close}, never the back-adjusted
+    {!Stock_analysis.t.current_close}. The bar store adjusts to the end of its
+    data, so on history an adjusted close is already divided by every later
+    split: a name that splits 2-for-1 next year would read as having lost half
+    its price and be dropped every week (#3659). *)
 
 val passes_failed_breakout :
   tolerance_pct:float ->
   breakout_price:float option ->
-  current_close:float option ->
+  current_raw_close:float option ->
   bool
 (** Boolean form of {!failed_breakout_reason}: [true] iff the candidate is NOT
     invalidated. Defined as [Option.is_none (failed_breakout_reason ...)] so the

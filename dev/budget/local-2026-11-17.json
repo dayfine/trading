@@ -1,0 +1,515 @@
+{
+  "run_id": "local-2026-11-17",
+  "timestamp": "2026-11-17T02:45:42Z",
+  "commit_sha": "89a08b1fe2629a7c98dc83da1e56d1a790fe9681",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 1758,
+    "output_tokens": 564470,
+    "cache_read_input_tokens": 135734472,
+    "cache_creation_input_tokens": 2807825,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-11-17",
+    "source": "local-transcripts",
+    "generated_at": "2026-11-17T02:45:42Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-11-17",
+      "until": "2026-11-17"
+    },
+    "totals": {
+      "dispatches": 15,
+      "sessions": 0,
+      "resumes": 7,
+      "api_calls": 873,
+      "input_tokens": 1758,
+      "output_tokens": 564470,
+      "cache_read_input_tokens": 135734472,
+      "cache_creation_input_tokens": 2807825,
+      "subagent_tokens": 139108525,
+      "main_tokens": 0,
+      "by_model": {
+        "claude-opus-5-5": {
+          "api_calls": 835,
+          "input_tokens": 1682,
+          "output_tokens": 543665,
+          "cache_read_input_tokens": 132407316,
+          "cache_creation_input_tokens": 2581674
+        },
+        "claude-sonnet-5-5": {
+          "api_calls": 38,
+          "input_tokens": 76,
+          "output_tokens": 20805,
+          "cache_read_input_tokens": 3327156,
+          "cache_creation_input_tokens": 226151
+        }
+      }
+    },
+    "context_histogram": {
+      "calls": 0,
+      "p50": 0,
+      "p90": 0,
+      "max": 0,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 0,
+      "share_above_threshold_pct": 0,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "50-100k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "100-150k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "150-200k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "200-300k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "300-500k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a4ab75e0842722f12",
+        "agent_type": "results-analyst",
+        "description": "fbt-05 HARM read",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 2535,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 127,
+            "input_tokens": 254,
+            "output_tokens": 2238,
+            "cache_read_input_tokens": 32654286,
+            "cache_creation_input_tokens": 457814
+          }
+        },
+        "api_calls": 127,
+        "input_tokens": 254,
+        "output_tokens": 2238,
+        "cache_read_input_tokens": 32654286,
+        "cache_creation_input_tokens": 457814
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "aa95c57b471d8f2d7",
+        "agent_type": "autostory-code",
+        "description": "FRLG League battle policy fixes",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 1396,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 87,
+            "input_tokens": 178,
+            "output_tokens": 82086,
+            "cache_read_input_tokens": 16144220,
+            "cache_creation_input_tokens": 248528
+          }
+        },
+        "api_calls": 87,
+        "input_tokens": 178,
+        "output_tokens": 82086,
+        "cache_read_input_tokens": 16144220,
+        "cache_creation_input_tokens": 248528
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "a55e060d0282b4256",
+        "agent_type": "autostory-code",
+        "description": "PLZA 03.09 walk_to_marker false arrive",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 775,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 90,
+            "input_tokens": 182,
+            "output_tokens": 74612,
+            "cache_read_input_tokens": 15561726,
+            "cache_creation_input_tokens": 238005
+          }
+        },
+        "api_calls": 90,
+        "input_tokens": 182,
+        "output_tokens": 74612,
+        "cache_read_input_tokens": 15561726,
+        "cache_creation_input_tokens": 238005
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "ae65c3199236f3df9",
+        "agent_type": "autostory-code",
+        "description": "FRLG Solar Beam charge + Lv54 threats",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 874,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 88,
+            "input_tokens": 176,
+            "output_tokens": 74031,
+            "cache_read_input_tokens": 13118733,
+            "cache_creation_input_tokens": 201255
+          }
+        },
+        "api_calls": 88,
+        "input_tokens": 176,
+        "output_tokens": 74031,
+        "cache_read_input_tokens": 13118733,
+        "cache_creation_input_tokens": 201255
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "acb4d58ae8861a741",
+        "agent_type": "autostory-code",
+        "description": "PLZA 03.08 legs with map pin checks",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 900,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 92,
+            "input_tokens": 184,
+            "output_tokens": 85587,
+            "cache_read_input_tokens": 12927500,
+            "cache_creation_input_tokens": 202248
+          }
+        },
+        "api_calls": 92,
+        "input_tokens": 184,
+        "output_tokens": 85587,
+        "cache_read_input_tokens": 12927500,
+        "cache_creation_input_tokens": 202248
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "ab7d22cf7464d71c7",
+        "agent_type": "autostory-code",
+        "description": "Port original 03.08 patrol walker",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 844,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 83,
+            "input_tokens": 166,
+            "output_tokens": 54925,
+            "cache_read_input_tokens": 11417670,
+            "cache_creation_input_tokens": 204863
+          }
+        },
+        "api_calls": 83,
+        "input_tokens": 166,
+        "output_tokens": 54925,
+        "cache_read_input_tokens": 11417670,
+        "cache_creation_input_tokens": 204863
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a9252cc11ee104fd3",
+        "agent_type": "qc-results",
+        "description": "qc-results #3658",
+        "ref": "#3658",
+        "date": "2026-11-17",
+        "wall_seconds": 521,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 55,
+            "input_tokens": 110,
+            "output_tokens": 1398,
+            "cache_read_input_tokens": 8467356,
+            "cache_creation_input_tokens": 210101
+          }
+        },
+        "api_calls": 55,
+        "input_tokens": 110,
+        "output_tokens": 1398,
+        "cache_read_input_tokens": 8467356,
+        "cache_creation_input_tokens": 210101
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "a7d06fc327886609e",
+        "agent_type": "general-purpose",
+        "description": "FRLG League policy: get it right in sim",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 851,
+        "resumes": 0,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 55,
+            "input_tokens": 114,
+            "output_tokens": 68140,
+            "cache_read_input_tokens": 6601079,
+            "cache_creation_input_tokens": 194674
+          }
+        },
+        "api_calls": 55,
+        "input_tokens": 114,
+        "output_tokens": 68140,
+        "cache_read_input_tokens": 6601079,
+        "cache_creation_input_tokens": 194674
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "ae7c39ed5b1130357",
+        "agent_type": "general-purpose",
+        "description": "Fix sim Champion port + Lapras crit",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 566,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 57,
+            "input_tokens": 116,
+            "output_tokens": 40311,
+            "cache_read_input_tokens": 5729341,
+            "cache_creation_input_tokens": 122171
+          }
+        },
+        "api_calls": 57,
+        "input_tokens": 116,
+        "output_tokens": 40311,
+        "cache_read_input_tokens": 5729341,
+        "cache_creation_input_tokens": 122171
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "aac64935a59a8a983",
+        "agent_type": "general-purpose",
+        "description": "Sim rerun with real bag + log check",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 375,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 35,
+            "input_tokens": 70,
+            "output_tokens": 34867,
+            "cache_read_input_tokens": 3917936,
+            "cache_creation_input_tokens": 157360
+          }
+        },
+        "api_calls": 35,
+        "input_tokens": 70,
+        "output_tokens": 34867,
+        "cache_read_input_tokens": 3917936,
+        "cache_creation_input_tokens": 157360
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "a0eccf4114391a6d5",
+        "agent_type": "autostory-code",
+        "description": "PLZA approach by bracket size + after miss",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 254,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 29,
+            "input_tokens": 58,
+            "output_tokens": 22882,
+            "cache_read_input_tokens": 2426447,
+            "cache_creation_input_tokens": 111016
+          }
+        },
+        "api_calls": 29,
+        "input_tokens": 58,
+        "output_tokens": 22882,
+        "cache_read_input_tokens": 2426447,
+        "cache_creation_input_tokens": 111016
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a18a867c4d1f792f7",
+        "agent_type": "feat-weinstein",
+        "description": "Fix #3659 failed-breakout basis",
+        "ref": "#3659",
+        "date": "2026-11-17",
+        "wall_seconds": 216,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 24,
+            "input_tokens": 48,
+            "output_tokens": 1069,
+            "cache_read_input_tokens": 2399061,
+            "cache_creation_input_tokens": 134725
+          }
+        },
+        "api_calls": 24,
+        "input_tokens": 48,
+        "output_tokens": 1069,
+        "cache_read_input_tokens": 2399061,
+        "cache_creation_input_tokens": 134725
+      },
+      {
+        "kind": "dispatch",
+        "session": "2aeec571-e7bd-4fbc-9a6c-41741cf7904b",
+        "agent_id": "a7cb43629c9d5e402",
+        "agent_type": "general-purpose",
+        "description": "Console vs PokeGuy League comparison",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 196,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 24,
+            "input_tokens": 48,
+            "output_tokens": 20670,
+            "cache_read_input_tokens": 2215871,
+            "cache_creation_input_tokens": 129215
+          }
+        },
+        "api_calls": 24,
+        "input_tokens": 48,
+        "output_tokens": 20670,
+        "cache_read_input_tokens": 2215871,
+        "cache_creation_input_tokens": 129215
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a40f447dfa3fa033e",
+        "agent_type": "harness-maintainer",
+        "description": "Pin weekly.sh call sites",
+        "ref": "",
+        "date": "2026-11-17",
+        "wall_seconds": 113,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 14,
+            "input_tokens": 28,
+            "output_tokens": 135,
+            "cache_read_input_tokens": 1111285,
+            "cache_creation_input_tokens": 96936
+          }
+        },
+        "api_calls": 14,
+        "input_tokens": 28,
+        "output_tokens": 135,
+        "cache_read_input_tokens": 1111285,
+        "cache_creation_input_tokens": 96936
+      },
+      {
+        "kind": "dispatch",
+        "session": "249246cf-fc3d-457f-8536-5d3b905a45a5",
+        "agent_id": "a5238889879357a41",
+        "agent_type": "qc-results",
+        "description": "qc-results #3658 carry-forward",
+        "ref": "#3658",
+        "date": "2026-11-17",
+        "wall_seconds": 129,
+        "resumes": 1,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 13,
+            "input_tokens": 26,
+            "output_tokens": 1519,
+            "cache_read_input_tokens": 1041961,
+            "cache_creation_input_tokens": 98914
+          }
+        },
+        "api_calls": 13,
+        "input_tokens": 26,
+        "output_tokens": 1519,
+        "cache_read_input_tokens": 1041961,
+        "cache_creation_input_tokens": 98914
+      }
+    ],
+    "sessions": []
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}
