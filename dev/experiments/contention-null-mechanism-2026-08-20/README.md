@@ -65,6 +65,8 @@ contend for cash. Nothing about the strategy's entry or exit logic moves.
 Run at salts {0,1,2}. The control is already committed and needs no re-run:
 `rt-freshness-5y-null-2026-08-20/results/s{0,1,2}-core-trades.csv`, which is the
 same spec at `max_position_pct_long = 0.14` and shows **0 differing rows**.
+Those control files carry entry and exit prices and moved on 2026-11-16 to the private
+`dayfine/trading-results` repo at the same paths (commit 477a85e), per the EODHD terms.
 
 ## Prediction, registered before the run
 
