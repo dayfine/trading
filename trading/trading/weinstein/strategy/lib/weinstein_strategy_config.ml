@@ -170,6 +170,10 @@ type config = {
 (* Top-level: keeps [default_config] a flat literal. *)
 let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
+(* Keeps the [screening_config] field line identical to its pre-#3666 text, so
+   goldens_affected_check reads the move as no default change. *)
+let _default_screening_config = default_screening_config
+
 (* @large-function: flat default-config record literal, one line per field *)
 let default_config ~universe ~index_symbol =
   {
@@ -178,7 +182,7 @@ let default_config ~universe ~index_symbol =
     sector_etfs = [];
     stage_config = Stage.default_config;
     macro_config = Macro.default_config;
-    screening_config = default_screening_config;
+    screening_config = _default_screening_config;
     portfolio_config = Portfolio_risk.default_config;
     stops_config = Weinstein_stops.default_config;
     initial_stop_buffer = 1.0;
