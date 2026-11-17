@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Development environment runs in Docker
 - All commands must be executed inside Docker container:
   `docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval \$(opam env) && <command>'`
+- The container is stopped when idle: run `sh dev/lib/ensure_container.sh` before the first `docker exec`
 - OCaml codebase built with Dune build system
 - Uses Core library extensively for standard data structures and utilities
 
