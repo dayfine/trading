@@ -1,5 +1,7 @@
 # exit-basis-flip-2026-09-03 — paired goldens for the D1/D2 default flip (PR #2648)
 
+> **Trade files moved (2026-11-17).** This directory's 43 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 User decision 2026-09-03 (P0 of `dev/notes/next-session-priorities-2026-09-03.md`):
 flip `sim_exit_fill_next_open` (D1, #2644) and `stops_config.stop_skip_entry_bar`
 (D2, #2642) default ON. Ledger record:

@@ -1,5 +1,7 @@
 # stop-width-cadence-surface-2026-09-05 — fallback stop width {4, 8, 10, 12, 14}% × stop cadence {daily trail update, weekly trail update}, record convention, fixed basis
 
+> **Trade files moved (2026-11-17).** This directory's 37 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 Motivated by `dev/notes/yearly-trade-review-2000-2026.md` (#2673): 389 of the record's 469
 stop exits are the ~4% fallback ticket and carry −$5.8M of the −$6.7M stop total; 121 losers
 exit within five days; the unselected width counterfactual over all stop exits puts 8–12%

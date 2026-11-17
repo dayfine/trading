@@ -1,5 +1,7 @@
 # Index-stage veto on the PIT band — P0 #1 of the 09-17 queue (2026-09-16)
 
+> **Trade files moved (2026-11-17).** This directory's 3 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Status: PRE-REGISTERED** (written 17:10 PT 2026-09-16, before the mechanism merged and before any cell ran). One arm,
 three salts, paired against the committed PIT record null.
 

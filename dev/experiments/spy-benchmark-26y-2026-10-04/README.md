@@ -1,5 +1,7 @@
 # SPY benchmarks on the 26y investor window (2026-10-04)
 
+> **Trade files moved (2026-11-17).** This directory's 2 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 User decision 2026-10-04: rerun the SPY 30-week-MA reference strategy once on the current build as a benchmark
 for the 26y investor baseline, then close the `spy-only-reference` track. Not an experiment with a verdict —
 a reference row. Build: code_version e9457c3ec per both `results/*-params.sexp` (workspace `jjws-spy` at `main` 63b14a8a7, code-identical — the two differ only under `dev/`), CSV mode, bars from the full data store

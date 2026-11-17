@@ -1,5 +1,7 @@
 # record-rebase-2026-09-03 — the record convention on the fixed exit basis
 
+> **Trade files moved (2026-11-17).** This directory's 6 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 PR #2648 flipped `sim_exit_fill_next_open` and `stops_config.stop_skip_entry_bar`
 on by default. The canonical record baseline (`record-baseline-2026-08-24`,
 731.64% / 780 trades / Sharpe 0.666 / MaxDD 26.6 at build `c7660cac3`) was

@@ -1,5 +1,7 @@
 # Price-band binding (2026-11-13): pre-registration
 
+> **Trade files moved (2026-11-17).** This directory's 1 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Status: run 2026-11-14.** Rule 1: CLOSE-AXIS (branch 3). Rule 2: NO CONCLUSION (immaterial). `Price_band_seeded`
 stays a default-off axis (§Results). The rules below were applied as written to the one cloud cell this directory launched.
 

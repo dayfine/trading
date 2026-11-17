@@ -1,5 +1,7 @@
 # Tier-4 goldens-broad seed band (2026-10-29)
 
+> **Trade files moved (2026-11-17).** This directory's 16 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 Follow-up to #3404 / `tier4-seeded-repin-2026-10-29`. That PR pinned the four goldens-broad cells to
 ±15 % around one seed-0 draw. This run adds tiebreak seeds 1–4 (`((screening_config ((tiebreak_seed k))))`
 prepended to the golden's `config_overrides`, otherwise the golden spec on main) so the pins can cover the

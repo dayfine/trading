@@ -1,5 +1,7 @@
 # stop-width-surface-2026-09-03 — `initial_stop_buffer` {1.0, 0.98}, anchor off, record convention, fixed basis
 
+> **Trade files moved (2026-11-17).** This directory's 11 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 Follow-on to `stop-anchor-rebase-2026-09-03`, where the anchor-off 5.9%
 fallback stop (`initial_stop_buffer 0.98`) beat the 4% null 3/3 salts on the
 2019–23 cell-B base with no monster and shared-trade drift ≈ 0 — the first

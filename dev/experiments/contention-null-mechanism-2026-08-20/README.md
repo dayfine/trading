@@ -1,5 +1,7 @@
 # Does capital contention create the noise floor? — 3 cells
 
+> **Trade files moved (2026-11-17).** This directory's 3 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Status at commit time: NOT YET RUN.** Everything below is pre-registered.
 Results land in a later commit, so the prediction provably predates the numbers.
 

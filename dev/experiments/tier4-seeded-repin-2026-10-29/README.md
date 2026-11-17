@@ -1,5 +1,7 @@
 # tier4-seeded-repin-2026-10-29 — paired tier-4 goldens for the Seeded tiebreak default (#3425, #3404)
 
+> **Trade files moved (2026-11-17).** This directory's 30 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 #3425 made `screening_config.candidate_ranking = Seeded` (seed 0) the default and
 re-pinned the goldens CI runs. The local tier-4 goldens (`goldens-broad/`,
 `goldens-sp500-historical/`) have no CI consumer and still held Alphabetical-era

@@ -1,5 +1,7 @@
 # clock-surface — entry_order_max_rest_weeks {0,13,26,52,156} on three broad cells (#2405)
 
+> **Trade files moved (2026-11-17).** This directory's 48 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 The re-flip test #2405's own record demands: the clock measured as a SURFACE
 (value re-opened, not assumed — 26 was never derived), multi-cell, with the
 fill-model default pair ON (#2569) so every backtest grows resting tickets.

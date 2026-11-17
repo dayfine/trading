@@ -1,5 +1,7 @@
 # verify-3266-rerun-2026-10-22: rerun M-pre3339 s0 on the #3391-deduped lists, read #3266 against N s0
 
+> **Trade files moved (2026-11-17).** This directory's 1 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Pre-registration.** Nothing has run. The read below is fixed before the cell launches. User-approved plan "(a) minimal",
 2026-10-22.
 

@@ -1,5 +1,7 @@
 # Price-band tiebreak (2026-11-13): pre-registration
 
+> **Trade files moved (2026-11-17).** This directory's 10 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
+
 **Status: pre-registered, no runs.** Written before the first result of either arm. The rule below is applied as
 written.
 
