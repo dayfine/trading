@@ -163,6 +163,7 @@ let fresh_stage2 ?(virgin_readmission = false) ?(range_top_freshness = None)
     range_top_freshness;
     require_breakout_volume;
     current_close;
+    current_raw_close = current_close;
     as_of_date = as_of;
   }
 
@@ -1169,6 +1170,53 @@ let test_current_close_none_without_bars _ =
   in
   assert_that result.current_close is_none
 
+(* A name that splits 2-for-1 after the as-of date: the store halves every
+   adjusted close, raw OHLC stays as traded. [current_close] keeps the adjusted
+   basis; [current_raw_close] divides the per-bar split factor back out and
+   lands on the raw close, the basis of [breakout_price] (#3659). *)
+let test_current_raw_close_divides_out_later_split _ =
+  let bars =
+    List.map (rising_bars ~n:40 50.0 100.0) ~f:(fun (b : Daily_price.t) ->
+        { b with adjusted_close = b.close_price *. 0.5 })
+  in
+  let result =
+    analyze ~config:cfg ~ticker:"AAPL" ~bars ~benchmark_bars:[]
+      ~prior_stage:None ~as_of_date:as_of
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun (r : t) -> r.current_close) (is_some_and (float_equal 50.0));
+         field
+           (fun (r : t) -> r.current_raw_close)
+           (is_some_and (float_equal 100.0));
+       ])
+
+let test_current_raw_close_none_without_bars _ =
+  let result =
+    analyze ~config:cfg ~ticker:"AAPL" ~bars:[] ~benchmark_bars:[]
+      ~prior_stage:None ~as_of_date:as_of
+  in
+  assert_that result.current_raw_close is_none
+
+(* [raw_close] never divides by an unknown or non-positive factor. *)
+let test_raw_close_unknown_or_bad_factor_is_none _ =
+  assert_that
+    [
+      Stock_analysis_scans.raw_close ~adjusted_close:(Some 50.0)
+        ~split_factor:(Some 0.5);
+      Stock_analysis_scans.raw_close ~adjusted_close:None
+        ~split_factor:(Some 0.5);
+      Stock_analysis_scans.raw_close ~adjusted_close:(Some 50.0)
+        ~split_factor:None;
+      Stock_analysis_scans.raw_close ~adjusted_close:(Some 50.0)
+        ~split_factor:(Some 0.0);
+      Stock_analysis_scans.raw_close ~adjusted_close:(Some 50.0)
+        ~split_factor:(Some (-0.5));
+    ]
+    (elements_are
+       [ is_some_and (float_equal 100.0); is_none; is_none; is_none; is_none ])
+
 let suite =
   "stock_analysis_tests"
   >::: [
@@ -1268,6 +1316,12 @@ let suite =
          >:: test_current_close_is_last_bar_close;
          "current_close is None without bars"
          >:: test_current_close_none_without_bars;
+         "current_raw_close divides out a later split"
+         >:: test_current_raw_close_divides_out_later_split;
+         "current_raw_close is None without bars"
+         >:: test_current_raw_close_none_without_bars;
+         "raw_close is None on an unknown or bad factor"
+         >:: test_raw_close_unknown_or_bad_factor_is_none;
          "dried-up base admitted only when the volume gate is waived"
          >:: test_dried_up_base_admitted_only_when_volume_gate_waived;
          "volume waiver does not widen other gates"

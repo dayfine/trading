@@ -1858,6 +1858,7 @@ let ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio :
     range_top_freshness = None;
     require_breakout_volume = true;
     current_close = None;
+    current_raw_close = None;
     as_of_date = as_of;
   }
 
@@ -2454,7 +2455,9 @@ let test_early_stage2_max_weeks_omitted_defaults_4 _ =
 (** A clean Stage-2 breakout candidate whose breakout price and current close
     are both controllable. Everything else is the minimal setup that clears
     {!Stock_analysis.is_breakout_candidate}: Stage2 fresh off Stage1, Strong
-    volume, non-declining RS. *)
+    volume, non-declining RS. A split-free name, so [current_close] sets both
+    the adjusted and the raw close. The basis split itself is pinned through
+    real bars by {!test_failed_breakout_later_split_raw_close_passes}. *)
 let breakout_analysis ~ticker ~breakout_price ~current_close : Stock_analysis.t
     =
   {
@@ -2496,6 +2499,7 @@ let breakout_analysis ~ticker ~breakout_price ~current_close : Stock_analysis.t
     range_top_freshness = None;
     require_breakout_volume = true;
     current_close;
+    current_raw_close = current_close;
     as_of_date = as_of;
   }
 
@@ -2625,13 +2629,13 @@ let test_failed_breakout_default_config_is_zero _ =
 let test_failed_breakout_reason_disabled_at_or_below_zero _ =
   assert_that
     (failed_breakout_reason ~tolerance_pct:0.0 ~breakout_price:(Some 100.0)
-       ~current_close:(Some 1.0))
+       ~current_raw_close:(Some 1.0))
     is_none
 
 let test_failed_breakout_reason_disabled_at_negative_tolerance _ =
   assert_that
     (failed_breakout_reason ~tolerance_pct:(-1.0) ~breakout_price:(Some 100.0)
-       ~current_close:(Some 1.0))
+       ~current_raw_close:(Some 1.0))
     is_none
 
 (* The [zero_if long_macro_admitted] wrapper on [long_failed_breakout_dropped]
@@ -2688,7 +2692,7 @@ let test_failed_breakout_negative_tolerance_is_inert _ =
 let test_failed_breakout_reason_mentions_prices _ =
   assert_that
     (failed_breakout_reason ~tolerance_pct:0.05 ~breakout_price:(Some 36.93)
-       ~current_close:(Some 28.0))
+       ~current_raw_close:(Some 28.0))
     (is_some_and
        (matching ~msg:"reason names close and breakout"
           (fun r ->
@@ -2706,14 +2710,74 @@ let test_failed_breakout_boolean_agrees_with_reason _ =
     [ (Some 100.0, Some 90.0); (Some 100.0, Some 99.0); (None, Some 1.0) ]
   in
   assert_that
-    (List.map cases ~f:(fun (breakout_price, current_close) ->
+    (List.map cases ~f:(fun (breakout_price, current_raw_close) ->
          Bool.equal
            (passes_failed_breakout ~tolerance_pct:0.05 ~breakout_price
-              ~current_close)
+              ~current_raw_close)
            (Option.is_none
               (failed_breakout_reason ~tolerance_pct:0.05 ~breakout_price
-                 ~current_close))))
+                 ~current_raw_close))))
     (elements_are [ equal_to true; equal_to true; equal_to true ])
+
+(** The admitted Stage1 -> Stage2 tape of {!test_candidate_has_suggested_entry},
+    stored the way the bar store keeps a name that splits AFTER the as-of date:
+    raw OHLC as traded, [adjusted_close] back-adjusted to the end of the data —
+    so every bar's adjusted close is its raw close times [factor]. *)
+let _later_split_bars ~factor =
+  rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31
+  |> List.map ~f:(fun (b : Daily_price.t) ->
+      { b with adjusted_close = b.close_price *. factor })
+
+(* #3659, through the real bar -> [Stock_analysis.analyze] path (the tests above
+   hand-build [Stock_analysis.t], which is why nothing caught the basis mix). A
+   2-for-1 split after the as-of date halves every stored adjusted close. Raw
+   close 100.0 sits above the raw breakout (the base high, 90.0); the adjusted
+   close 50.0 sits below the k = 5% floor, 90.0 * 0.95 = 85.5. One basis means
+   the breakout stands, at each of the gate's three call sites: bought
+   ([Screener_candidate_eval]), not counted as a failed breakout
+   ([Screener_admission]), and not demoted to the watchlist
+   ([Screener_watchlist], called directly because a bought name never reaches
+   its gate). Red when any site compares the adjusted close. *)
+let test_failed_breakout_later_split_raw_close_passes _ =
+  let a =
+    make_analysis "SPLITS"
+      (Some (Stage1 { weeks_in_base = 10 }))
+      (_later_split_bars ~factor:0.5)
+  in
+  let result = screen_one ~failed_breakout_tolerance_pct:0.05 a in
+  let watchlist_row =
+    Screener_watchlist.entry ~weights:cfg.weights
+      ~thresholds:cfg.grade_thresholds
+      ~early_stage2_max_weeks:cfg.early_stage2_max_weeks
+      ~failed_breakout_tolerance_pct:0.05 ~buy_tickers:String.Set.empty
+      (a, make_sector "Tech")
+  in
+  assert_that (a, result, watchlist_row)
+    (all_of
+       [
+         field
+           (fun (a, _, _) -> a.Stock_analysis.breakout_price)
+           (is_some_and (float_equal 90.0));
+         field
+           (fun (a, _, _) -> a.Stock_analysis.current_close)
+           (is_some_and (float_equal 50.0));
+         field
+           (fun (a, _, _) -> a.Stock_analysis.current_raw_close)
+           (is_some_and (float_equal 100.0));
+         field
+           (fun (_, (r : result), _) ->
+             List.map r.buy_candidates ~f:(fun c -> c.ticker))
+           (elements_are [ equal_to "SPLITS" ]);
+         field
+           (fun (_, (r : result), _) ->
+             r.cascade_diagnostics.long_failed_breakout_dropped)
+           (equal_to 0);
+         field
+           (fun (_, _, row) ->
+             Option.exists row ~f:(fun (_, reason) ->
+                 String.is_substring reason ~substring:"Failed breakout"))
+           (equal_to false);
+       ])
 
 (* The knob round-trips through the config sexp, and an omitted field
    deserialises to the 0.0 no-op — older config sexps that predate this knob
@@ -3095,6 +3159,7 @@ let continuation_tape ?(local_range_top = None) ~mature ~continuation () :
     with
     breakout_price = Some 100.0;
     current_close = Some 125.0;
+    current_raw_close = Some 125.0;
     prior_stage =
       (if mature then Some (Stage2 { weeks_advancing = 19; late = false })
        else Some (Stage1 { weeks_in_base = 10 }));
@@ -3884,6 +3949,7 @@ let _collapsed_breakout (a : Stock_analysis.t) =
     a with
     Stock_analysis.breakout_price = Some 100.0;
     current_close = Some 50.0;
+    current_raw_close = Some 50.0;
   }
 
 (** [Breakout_volume] driven end-to-end from the screener, which
@@ -4254,6 +4320,8 @@ let suite =
          >:: test_failed_breakout_reason_mentions_prices;
          "test_failed_breakout_boolean_agrees_with_reason"
          >:: test_failed_breakout_boolean_agrees_with_reason;
+         "test_failed_breakout_later_split_raw_close_passes"
+         >:: test_failed_breakout_later_split_raw_close_passes;
          "test_failed_breakout_tolerance_sexp_round_trips"
          >:: test_failed_breakout_tolerance_sexp_round_trips;
          "entry anchor: graded top when knob off"

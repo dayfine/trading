@@ -404,6 +404,7 @@ let _candidate ~entry : Screener.scored_candidate =
       range_top_freshness = None;
       require_breakout_volume = true;
       current_close = None;
+      current_raw_close = None;
       as_of_date = _friday;
     }
   in
