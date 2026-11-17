@@ -550,6 +550,12 @@ phase_verify() {
   log "VERIFY OK: manifest $m == lists' warehouse set (union - MEL + GSPC.INDX + 14 extras); snaps $m; weekly $n_wk; size $(dx du -sh "$OUT" | awk '{ print $1 }'). Chains: EXPECT_WH=$m, EXPECT_ABSENT=1 (MEL)"
 }
 
+# On-demand container (user decision 2026-11-16): every phase runs work in it, and it is stopped when idle.
+case "$PHASE" in
+  preflight|lists|post|twinscan|install|warehouse|verify|all)
+    DOCKER_CONTAINER="$CONTAINER" sh "$HERE/dev/lib/ensure_container.sh" || die "container $CONTAINER is not up" ;;
+esac
+
 case "$PHASE" in
   preflight) phase_preflight ;;
   lists) phase_lists ;;

@@ -58,6 +58,10 @@
 # trading/devtools/checks/run_in_env_root_check.sh — never set this in normal
 # operation.
 #
+# On-demand container (user decision 2026-11-16): the local container is stopped when idle, so the local
+# path first runs dev/lib/ensure_container.sh, which starts Docker Desktop and the container when needed
+# (silent when it is already up; a failure prints one line and exits 1).
+#
 # Docker liveness probe (local path only):
 #   Before running the user command, the script verifies the container is
 #   responsive via a lightweight `docker exec <container> true`. If this
@@ -141,6 +145,9 @@ if [ -n "${TRADING_IN_CONTAINER:-}" ]; then
   exec "$@"
 else
   # --- Local path: delegate to docker exec ---
+
+  # On-demand container: start Docker Desktop / the container when they are down.
+  DOCKER_CONTAINER="$CONTAINER_NAME" sh "$(cd "$(dirname "$0")" && pwd)/ensure_container.sh" || exit 1
 
   # Bug 1 fix: liveness probe before running the user command.
   # Detects docker daemon down or container stopped; avoids silent success

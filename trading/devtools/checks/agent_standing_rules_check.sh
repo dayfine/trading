@@ -46,6 +46,8 @@ for a in $QC_BUILD $FEAT; do
   need "$a" "Never background a build and end the turn"
   need "$a" 'Never `cd /workspaces/trading-1/trading`'
   need "$a" 'On GHA (`$TRADING_IN_CONTAINER=1`) you are already inside the'
+  # User decision 2026-11-16: the local container is on-demand, stopped when idle.
+  need "$a" 'run `sh dev/lib/ensure_container.sh` before your first `docker exec`'
 done
 for a in $QC_BUILD; do
   need "$a" 'git fetch origin pull/<N>/head && git worktree add --detach'

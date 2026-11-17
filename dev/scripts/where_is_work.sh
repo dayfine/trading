@@ -34,9 +34,13 @@ host_jobs=$(ps -axo pid=,etime=,command= | grep -E 'forward\.sh|reader\.sh|stage
   | grep -v grep | cut -c1-150 || true)
 echo "${host_jobs:-(none on the host)}"
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^trading-1-dev$'; then
-  docker exec trading-1-dev ps -axo pid=,etime=,args= 2>/dev/null \
-    | grep -E 'scenario_runner|panel_runner|bayesian_runner|dune (build|runtest)' | grep -v grep | cut -c1-150 \
-    || echo "(container idle)"
+  # captured first: in a bare pipeline `cut` always succeeds, so `|| echo` never printed "(container idle)"
+  container_jobs=$(docker exec trading-1-dev ps -axo pid=,etime=,args= 2>/dev/null \
+    | grep -E 'scenario_runner|panel_runner|bayesian_runner|dune (build|runtest)' | grep -v grep | cut -c1-150 || true)
+  echo "${container_jobs:-(container idle)}"
+else
+  # on-demand container (dev/lib/ensure_container.sh): this script only observes, so it never starts it
+  echo "(container stopped)"
 fi
 
 echo; echo "== Codex cloud tasks"

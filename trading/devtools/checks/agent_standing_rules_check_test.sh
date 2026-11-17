@@ -66,6 +66,14 @@ grep -vF 'run it directly (`sh trading/devtools/checks/<linter>.sh`' "$ROOT/.cla
 expect_fail "linter exception deleted from code-health.md" \
   "FAIL: code-health: standing rule missing: run it directly ("
 
+# 4b. The on-demand-container sentence is pinned in a QC agent and in a build agent (user decision 2026-11-16).
+for a in qc-structural harness-maintainer; do
+  fresh_copy
+  grep -vF 'stopped when idle: run `sh dev/lib/ensure_container.sh` before your first `docker exec`' "$ROOT/.claude/agents/$a.md" >"$TMP/.claude/agents/$a.md"
+  expect_fail "ensure_container sentence deleted from $a.md" \
+    "FAIL: $a: standing rule missing: run \`sh dev/lib/ensure_container.sh\` before your first"
+done
+
 # 5. QC agents keep their own rules: a runtest mention there is not a violation.
 fresh_copy
 printf '%s\n' '- [ ] `dune build && dune runtest` passes' >>"$TMP/.claude/agents/qc-structural.md"
