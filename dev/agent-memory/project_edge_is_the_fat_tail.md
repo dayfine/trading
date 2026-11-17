@@ -65,3 +65,5 @@ names hits the capacity wall; the realistic edge is capacity-bounded, not MA-bou
 The 30wk bull-lag is partly the PRICE of a capacity-realistic book. Bull-lag is
 STRUCTURAL; address via barbell floor (capacity-safe), not faster MA. Record:
 `dev/backtest/engine-edge-1998-2026/PHASE-C-ma-period.md` (#TBD).
+
+**Caveat (11-17, #3664):** part of the tail may be look-ahead admitted. The virgin test compares a raw breakout with an adjusted 520w high; trades that pass only through that mix carry up to 31-47 % of the record's summed contribution per seed (upper bound; the MA-cross route may admit some anyway). Measure before quoting tail figures as edge.

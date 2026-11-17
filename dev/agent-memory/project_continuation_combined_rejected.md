@@ -65,3 +65,5 @@ verdict covers which flag*, and that mapping can be wrong. Always re-read the
 cited ledger entry and confirm it armed **this** field before removing anything —
 the 08-12 `trigger_on_weekly_close` correction was the same class of error
 (a verdict about a simulator lever, misread as covering the field).
+
+**#3664 (11-17): void as evidence.** `continuation.ml:133` tests the adjusted close vs a raw consolidation high, `:114` divides a raw range by an adjusted mean close, so the detector picked additions by FUTURE corporate actions (replay: on F<0.95 symbol-weeks it fired 17 vs 3,548 on one basis, 5y). Cells were sp500 too. Keep-axis status unchanged; a real test needs one basis + broad universe. (#1366 is stage3-hysteresis, not continuation; two docs mis-cite it.)
