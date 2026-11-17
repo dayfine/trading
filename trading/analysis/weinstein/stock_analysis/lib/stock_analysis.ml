@@ -33,7 +33,7 @@ type config = {
   virgin_crossing_readmission : bool; [@sexp.default false]
       (** resistance-v2 lever (a); [false] = off (bit-identical). See .mli. *)
   virgin_supply_basis : Stock_analysis_supply.basis;
-      [@sexp.default Stock_analysis_supply.Legacy_mixed]
+      [@sexp.default Stock_analysis_supply.One_basis]
       (** Price basis of the virgin test and supply grade (#3664). See .mli. *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]
       (** Ticket-level local-range entry anchor (default [0] = off). When [> 0],
@@ -63,7 +63,7 @@ let default_config =
     continuation = None;
     overhead_supply = None;
     virgin_crossing_readmission = false;
-    virgin_supply_basis = Stock_analysis_supply.Legacy_mixed;
+    virgin_supply_basis = Stock_analysis_supply.One_basis;
     entry_anchor_local_range_weeks = 0;
     entry_cap_local_range_weeks = 0;
     entry_freshness_basis = Entry_freshness.Ma_cross;

@@ -99,7 +99,7 @@ type config = {
       (** See [.mli]. *)
   virgin_crossing_readmission : bool; [@sexp.default false]  (** See [.mli]. *)
   virgin_supply_basis : Stock_analysis_supply.basis;
-      [@sexp.default Stock_analysis_supply.Legacy_mixed]
+      [@sexp.default Stock_analysis_supply.One_basis]
       (** See [.mli]. *)
   dawn_leverage_enabled : bool; [@sexp.default false]  (** See [.mli]. *)
   dawn_initial_long_margin_req : float; [@sexp.default 1.0]  (** See [.mli]. *)
@@ -240,7 +240,7 @@ let default_config ~universe ~index_symbol =
     resistance_lookback_bars = 0;
     overhead_supply = Some Resistance_supply.default_config;
     virgin_crossing_readmission = true;
-    virgin_supply_basis = Stock_analysis_supply.Legacy_mixed;
+    virgin_supply_basis = Stock_analysis_supply.One_basis;
     dawn_leverage_enabled = false;
     dawn_initial_long_margin_req = 1.0;
     dawn_max_ma_flip_age_weeks = default_dawn_max_flip_age_weeks;

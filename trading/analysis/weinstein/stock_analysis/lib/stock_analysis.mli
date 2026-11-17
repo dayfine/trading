@@ -55,23 +55,26 @@ type config = {
           here (this config does not derive sexp) but marks the field as an
           additive, default-off option. *)
   virgin_supply_basis : Stock_analysis_supply.basis;
-      [@sexp.default Stock_analysis_supply.Legacy_mixed]
+      [@sexp.default Stock_analysis_supply.One_basis]
       (** Which price basis the virgin test ({!t.virgin_readmission}) and the
           supply grade ({!t.supply}) compare the breakout on (#3664). Both
           always share one setting, so the grade and the re-admission can never
           disagree on basis.
 
-          [Legacy_mixed] {b (default, no-op)} passes the raw {!t.breakout_price}
-          to the sketch as stored. Since #2145 the sketch is back-adjusted, so
-          on history this admits a name below its 10-year high as virgin when it
-          later splits or pays dividends. Bit-identical to pre-flag behaviour.
-
-          [One_basis] puts the breakout on the sketch's basis first
+          [One_basis] {b (default since 2026-11-17)} puts the breakout on the
+          sketch's basis first
           ({!Stock_analysis_supply.breakout_on_sketch_basis}: times the sketch's
           as-of close over {!t.current_raw_close}). {!t.breakout_price} and
           every ticket price stay raw. Inert when neither [overhead_supply] nor
-          [virgin_crossing_readmission] is armed. The [@sexp.default] attribute
-          is inert here (this config does not derive sexp). *)
+          [virgin_crossing_readmission] is armed.
+
+          [Legacy_mixed] passes the raw {!t.breakout_price} to the sketch as
+          stored. Since #2145 the sketch is back-adjusted, so on history this
+          admits a name below its 10-year high as virgin when it later splits or
+          pays dividends. The pre-flip behaviour, still selectable.
+
+          The [@sexp.default] attribute is inert here (this config does not
+          derive sexp). *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]
       (** Ticket-level "local trading-range" entry anchor (Weinstein Ch. 3: the
           buy-stop is placed just above the top of the {i current} trading range

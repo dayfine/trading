@@ -1318,11 +1318,11 @@ let test_breakout_on_sketch_basis_rescales_by_anchor _ =
          is_none;
        ])
 
-(* R1: the default keeps the mixed comparison, so the record and every golden
-   stay byte-identical until the paired run decides (#3664). *)
-let test_default_virgin_supply_basis_is_legacy_mixed _ =
+(* The default reads one basis (#3664, flipped on correctness 2026-11-17);
+   [Legacy_mixed] stays selectable but is no longer what an unset config gets. *)
+let test_default_virgin_supply_basis_is_one_basis _ =
   assert_that default_config.virgin_supply_basis
-    (equal_to Stock_analysis_supply.Legacy_mixed)
+    (equal_to Stock_analysis_supply.One_basis)
 
 let suite =
   "stock_analysis_tests"
@@ -1435,8 +1435,8 @@ let suite =
          >:: test_freshness_verdict_independent_of_later_splits;
          "breakout_on_sketch_basis rescales by the sketch anchor"
          >:: test_breakout_on_sketch_basis_rescales_by_anchor;
-         "default virgin_supply_basis is Legacy_mixed"
-         >:: test_default_virgin_supply_basis_is_legacy_mixed;
+         "default virgin_supply_basis is One_basis"
+         >:: test_default_virgin_supply_basis_is_one_basis;
          "dried-up base admitted only when the volume gate is waived"
          >:: test_dried_up_base_admitted_only_when_volume_gate_waived;
          "volume waiver does not widen other gates"
