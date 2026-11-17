@@ -10,14 +10,18 @@ the record K=5 band, median 2.78, SD 0.225, #3467), says the flag is descriptive
 before any reading.
 
 **Who read it.** The dispatcher (main session), not `results-analyst`: the week's quota stood at 72 % with the SMALL
-suggestion, and the default decision this run feeds was taken by the user on correctness before the run read (§4).
-The read is the pre-registered numbers only; it does not decompose which trades the look-ahead selected.
+suggestion, and the default decision this run feeds was taken by the user on correctness before the paired read
+(§4; #3664 comment 6960893659). The RESULT lines of 8 of the 10 cells were already in the lane log by then, which does
+not bear on option (a): it does not depend on returns. The read is the pre-registered numbers plus the supply-path
+count of §2; it does not decompose which trades the look-ahead selected.
 
 **Files.**
 - Public, branch `observatory/lane-results` at 750b58480: `surface.tsv` row 5, `events.tsv`,
   `lane-logs/96cacbe20-vsb-1.log`, `runs/96cacbe20/{S,vsb-1}/` (summaries, params, validator logs, v6diff logs).
 - Private, `dayfine/trading-results` at 8bf9a49: the same `runs/` with `trades.csv` and `equity_curve.csv`, and
   `reads/vsb-1@96cacbe20/` (`seeds.tsv`, `years-kK.tsv`, `steps-kK.tsv`, `firstdiff-kK.tsv`).
+- Supply-path count (§2): public `reads/vsb-1-supply-count.{tsv,sh}`; private `reads/vsb-1@96cacbe20/supply-count/`
+  in `dayfine/trading-results` at b868865.
 
 ## 1. Validity, checked before the read
 
@@ -35,17 +39,44 @@ The read is the pre-registered numbers only; it does not decompose which trades 
 The pre-registration's threshold reads "median `s_out` > about 840 (30 % of S's trades)". **That threshold mixes
 units:** 2,816 is the K=5 *total* of S's trades in the #3659 audit, while `s_out` is a per-seed median. Read per seed,
 30 % of S's ~563 trades is ~169, and `s_out` (202) is above it. So the check's second branch applies — "treat it as a
-possible collapse first; check the admission counts" — and the counts rule a collapse out:
+possible collapse first; check the admission counts".
 
-- **Admissions held.** vsb-1 trades per seed 559, 536, 540, 557, 555 against S's 576, 568, 562, 562, 548 (median
-  change −3.0 %; `n_round_trips`). `a_new` (193) ≈ `s_out` (202): the arm swaps names, it does not lose them.
-- **The churn is ordinary for a paired arm.** `s_out` for the four earlier arms is 261, 187, 441 and 237
-  (`surface.tsv`); 202 sits inside that range. Path dependence through the cap and cash moves ~200 names per seed for
-  any live overlay.
-- **Virgin admissions are live on every seed.** The V7 report lists `Virgin_territory` entries with under 520 weekly
-  bars of history: 47, 35, 44, 44, 47 under vsb-1 against 36, 33, 32, 39, 38 under S (`*.validator.log`). A
-  `One_basis` path that lost its breakout or raw close would grade no name `Virgin_territory`
-  (`stock_analysis_supply.ml`), so these counts would be ~0.
+**The count that reads the knob.** `virgin_supply_basis` reaches only the continuous supply path
+(`Stock_analysis_supply.results`, `stock_analysis.ml:330-334`). Its two outputs, the supply score and the virgin
+readmission, need the same mapped breakout (`stock_analysis_supply.ml`), so an entry with a supply score also had
+its virgin test run. When the path returns a score, the screener writes "Overhead supply (continuous)" into the
+entry's `cascade_rationale`. When it returns none — what a `One_basis` path that lost its breakout or raw close
+produces — the screener falls back to the binary v1 grade (`screener_scoring.ml:183-187`). The lane keeps no
+`trade_audit.sexp`, so a short k0 pair was re-run with it kept: same build (96cacbe20) and stage, the lane's k0 specs
+with only the window changed (2019-01-01 to 2021-12-31).
+
+| arm | round trips | entry decisions (audit records) | graded by the supply path | v1 grade Clean / Moderate / Virgin / Heavy |
+|---|---:|---:|---:|---|
+| S | 80 | 114 | 114 (100 %) | 87 / 15 / 11 / 1 |
+| vsb-1 | 68 | 103 | 102 (99 %) | 77 / 10 / 15 / 1 |
+
+- **The path is live, not collapsed.** Under `One_basis` 102 of 103 entry decisions carry a supply score, against
+  114 of 114 under S. A collapsed path would show ~0. One entry fell back to the v1 grade; its cause is not traced
+  here. The one route to that fallback that only `One_basis` has is a missing current raw close on the panel path,
+  which the open panel-path `current_raw_close` follow-up covers.
+- **One seed covers all five.** The tie seed orders equal-scored candidates. It does not touch the inputs of the basis
+  mapping (the 520-week sketch, the breakout, the raw and adjusted closes), so whether a name gets a supply score
+  does not depend on it.
+- **The window is three years, not 26.** The mapping is per symbol and per week, with no state that changes by era, so
+  the check covers the mechanism, not every name the 26-year cells graded.
+- Files: `vsb-1-supply-count.tsv`, from `vsb-1-supply-count.sh` over the two `trade_audit.sexp` files in private
+  `dayfine/trading-results` at b868865, under `dev/experiments/observatory/reads/vsb-1@96cacbe20/supply-count/`
+  (`S/`, `vsb-1/`, with the specs, `trades.csv`, summaries, params and runner logs).
+
+**The other legs agree but would not separate a fix from a collapse on their own:** in a slot-limited book a dead
+admission route also leaves the slots full.
+- vsb-1 trades per seed 559, 536, 540, 557, 555 against S's 576, 568, 562, 562, 548 (median change −3.0 %;
+  `n_round_trips`). `a_new` (193) ≈ `s_out` (202).
+- `s_out` for the four earlier arms is 261, 187, 441 and 237 (`surface.tsv`); 202 sits inside that range.
+- **V7 does not read the knob.** It counts the audit's `resistance_quality`, the v1 grade
+  (`trade_audit_recorder.ml:129-131`), computed with no basis input. Its rise (47, 35, 44, 44, 47 `Virgin_territory`
+  entries under vsb-1 against 36, 33, 32, 39, 38 under S) says nothing about the supply path. The first draft of
+  this read used it as the collapse check (QC R1 on #3671).
 
 ## 3. The pre-registered numbers
 
@@ -66,8 +97,9 @@ possible collapse first; check the admission counts" — and the counts rule a c
 - S reproduces the record band (median 2.755 against 2.78).
 - Every vsb-1 seed sits below S's lowest seed (2.580). The vsb-1 median, 2.48, is 1.3 record SDs below the record
   median; k3 (2.07) is 3.2 SDs below.
-- In wealth terms the median seed ends at e^−0.35 ≈ 0.71 of the record's final value: about 29 % of the record's
-  26-year outcome rested on selecting names by their future splits and dividends.
+- In wealth terms the median seed ends ~29 % lower without the mix (e^−0.35 ≈ 0.71 of S's final value; seed range
+  19–40 %). That is the whole paired effect of the basis change, knock-on churn and path noise included; this read
+  does not decompose it.
 - Max drawdown is worse on 4 of 5 seeds (median +6.35 pp, `d_maxdd_pp`; `d_ulcer` +1.27).
 
 **The flag, as written: none.** UP and HARM need four seeds with ≥ 60 % of years carrying the flag's sign. Each seed is
@@ -80,10 +112,13 @@ measured a defect's share of the record, not a dial, and "none" does not make th
 ## 4. What follows
 
 - **The default decision is the user's, taken 2026-11-17 11:00 PT: option (a), flip `virgin_supply_basis` to
-  `One_basis` on correctness.** The run is valid (§1) and not a collapse (§2), which were the only stops (a) named.
+  `One_basis` on correctness** (#3664 comment 6960893659). The run is valid (§1), and the supply-path count shows
+  `One_basis` live (§2: 102 of 103 entries graded, against 114 of 114 under S). Those were the only stops (a) named.
 - **vsb-1's five cells become the new record band** at the flip HEAD, with no re-run: ln(1+R) 2.546, 2.531, 2.332,
-  2.070, 2.481 (median 2.481, sample SD 0.20). The record figure 2.78 (#3467) carried the look-ahead.
+  2.070, 2.481 (median 2.481, sample SD 0.20). The record figure 2.78 (#3467) carried the look-ahead. The flip PR
+  carries the tripwire for "no re-run": the flipped default must reproduce vsb-1 k0's `trades.csv` (md5
+  `3ee10dca319e54a85f5e0a7842d8c537`) at the flip HEAD.
 - **Earlier observatory rows stay as reads on the mixed basis.** msd-12, msd-18, fbt-05 and cap-40 were paired against
   an S that carries this look-ahead; their D_end values are not re-based. Arms run after the flip pair against the new S.
 - #3664's `[after-merge]` item is half met by this run (the band share); the other half, the default decision under
-  `config-default-blast-radius.md`, lands with the flip PR.
+  `config-default-blast-radius.md`, lands with the flip PR. #3664 stays open with `verify/pending` until then.
