@@ -16,14 +16,20 @@
 #     between `docker exec` calls, and the container going away mid-script fails the next call.
 # --dry-run prints the decision and stops nothing. Never touches another container, and never quits Docker
 # Desktop. One line on stdout; exit 0 for any decision (including "kept"), 2 for a usage error, 1 when
-# `docker stop` itself fails.
+# `docker stop` itself fails or does not return.
 #
-# Env: DOCKER_CONTAINER (trading-1-dev), CONTAINER_IDLE_DRIVERS (ERE of host driver scripts, default below).
+# Every `docker` call is bounded (CONTAINER_IDLE_CALL_TIMEOUT, dev/lib/bounded_call.sh: a hung CLI is killed).
+# A hung daemon is not a down one: an `inspect` or `exec ps` that does not return reads as "cannot tell", so the
+# container is kept, never "not running" and never stopped.
+#
+# Env: DOCKER_CONTAINER (trading-1-dev), CONTAINER_IDLE_DRIVERS (ERE of host driver scripts, default below),
+#      CONTAINER_IDLE_CALL_TIMEOUT (30 s per docker call, whole seconds).
 # Test seam: CONTAINER_IDLE_DOCKER_BIN (docker).
 set -u
 
 CONTAINER="${DOCKER_CONTAINER:-trading-1-dev}"
 DOCKER="${CONTAINER_IDLE_DOCKER_BIN:-docker}"
+CALL_TIMEOUT="${CONTAINER_IDLE_CALL_TIMEOUT:-30}"
 DRIVERS="${CONTAINER_IDLE_DRIVERS:-(docker_dune|launch_sweep|build_monthly_universe_warehouse|build_pit_warehouse_v12|perf_pit_smoke|promote_config|review_pack|run_delisted_pipeline|chain[^ /]*)\.sh}"
 # What an idle container runs: its init, and the `ps` this script runs inside it.
 IDLE_INIT='^(/sbin/docker-init( |$)|(opam exec -- )?tail -f /dev/null$|sleep infinity$|ps -eo stat=,args=$)'
@@ -35,6 +41,8 @@ case "${1:-}" in
   --dry-run) dry=1 ;;
   *) echo "usage: container_idle_stop.sh [--dry-run]" >&2; exit 2 ;;
 esac
+
+. "$(dirname "$0")/bounded_call.sh"
 
 _say() { echo "container_idle_stop: $*"; }
 
@@ -50,7 +58,12 @@ _decide() {
     verdict=keep; why="a host driver script is running: $(printf '%s\n' "$drivers" | head -1 | cut -c1-100)"
     return
   fi
-  if ! snap=$("$DOCKER" exec "$CONTAINER" $PS_IN_CONTAINER 2>/dev/null); then
+  snap=$(_bounded "$CALL_TIMEOUT" "$DOCKER" exec "$CONTAINER" $PS_IN_CONTAINER 2>/dev/null) && _rc=0 || _rc=$?
+  if [ "$_rc" -eq 124 ]; then
+    verdict=keep; why="docker did not answer 'exec ps' within ${CALL_TIMEOUT}s, so cannot tell it is idle"
+    return
+  fi
+  if [ "$_rc" -ne 0 ]; then
     verdict=keep; why="cannot list its processes, so cannot tell it is idle"
     return
   fi
@@ -62,7 +75,12 @@ _decide() {
   verdict=stop; why="only its init runs and nothing on the host uses it"
 }
 
-running=$("$DOCKER" inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null) || running=false
+running=$(_bounded "$CALL_TIMEOUT" "$DOCKER" inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null) && _rc=0 || _rc=$?
+if [ "$_rc" -eq 124 ]; then
+  _say "$CONTAINER kept: docker did not answer 'inspect' within ${CALL_TIMEOUT}s, so cannot tell it is stopped"
+  exit 0
+fi
+[ "$_rc" -eq 0 ] || running=false
 if [ "$running" != true ]; then
   _say "$CONTAINER is not running; nothing to do"
   exit 0
@@ -77,5 +95,10 @@ if [ "$dry" = 1 ]; then
   _say "DRY-RUN $CONTAINER would stop: $why"
   exit 0
 fi
-"$DOCKER" stop -t 5 "$CONTAINER" >/dev/null 2>&1 || { _say "FAIL: 'docker stop $CONTAINER' failed"; exit 1; }
+_bounded "$CALL_TIMEOUT" "$DOCKER" stop -t 5 "$CONTAINER" >/dev/null 2>&1 && _rc=0 || _rc=$?
+if [ "$_rc" -eq 124 ]; then
+  _say "FAIL: 'docker stop $CONTAINER' did not return within ${CALL_TIMEOUT}s"
+  exit 1
+fi
+[ "$_rc" -eq 0 ] || { _say "FAIL: 'docker stop $CONTAINER' failed"; exit 1; }
 _say "$CONTAINER stopped: $why"

@@ -12,9 +12,13 @@
 #                        and inside a container; error when the container does not exist, docker is
 #                        missing, the daemon never comes up, or the container never answers; Docker Desktop
 #                        started with `open -a Docker` on macOS only; DOCKER_CONTAINER honoured.
+#                        every docker call is bounded: a call that never returns (exec, info, inspect, start) is a
+#                        one-line FAIL and exit 1 within the call limit, never a hang.
 #   container_idle_stop.sh  refuses while a dune process (or any non-init process) runs inside, while a host
 #                        `docker exec` targets it, or while a host driver script runs; stops only the one
 #                        container when idle; --dry-run stops nothing; a zombie is not "busy".
+#                        a hung `inspect` or `exec ps` reads as "cannot tell" (kept, never "not running", never
+#                        stopped); a hung `stop` is a FAIL and exit 1. The hung fake is killed, not left behind.
 #   observers            wait_for.sh proc fires on a stopped container (and on a down daemon), where_is_work.sh
 #                        reports it stopped, sweep_disk_watcher.sh exits cleanly: none of them starts it.
 #   wiring               run-in-env.sh starts the container in local mode; every script that runs work in it
@@ -53,9 +57,13 @@ NOFILE="$WORK/no-such-file"
 #   start_noop  `docker start` succeeds but the container never comes up
 #   ps       the process table served for `docker exec <c> ps ...`
 #   ps_fail  `docker exec <c> ps ...` fails although the container is running
+#   hang_<subcommand>  (hang_exec, hang_info, hang_inspect, hang_start, hang_stop) that call never returns, like a
+#            wedged Docker Desktop. The fake `exec`s `sleep 63`, so the call's own process is the sleep: killing the
+#            call kills the sleep, and nothing is left behind (the check asserts it).
 cat > "$FAKE_BIN/docker" <<'FAKE_DOCKER_EOF'
 #!/bin/sh
 echo "$*" >> "$FAKE_STATE/calls.log"
+[ ! -f "$FAKE_STATE/hang_$1" ] || exec sleep 63
 [ -f "$FAKE_STATE/daemon" ] || { echo "Cannot connect to the Docker daemon" >&2; exit 1; }
 case "$1" in
   info) exit 0 ;;
@@ -130,16 +138,22 @@ new_state() {
 INIT_PS='Ss   /sbin/docker-init -- opam exec -- tail -f /dev/null
 S    tail -f /dev/null
 Rs   ps -eo stat=,args='
-# with_env CMD...: run CMD with the fakes first on PATH and the in-container guards off.
+# with_env CMD...: run CMD with the fakes first on PATH and the in-container guards off. The per-call limits are
+# generous here (CALL_LIMIT, 10 s: the fakes answer at once) so a slow runner cannot trip them; the hang cases lower it.
+CALL_LIMIT=10
 with_env() {
   env -u TRADING_IN_CONTAINER FAKE_STATE="$S" PATH="$FAKE_BIN:$PATH" \
     ENSURE_CONTAINER_ENV_FILES="$NOFILE" ENSURE_CONTAINER_POLL=1 \
-    ENSURE_CONTAINER_START_TIMEOUT=2 ENSURE_CONTAINER_DOCKER_TIMEOUT=2 "$@"
+    ENSURE_CONTAINER_START_TIMEOUT=2 ENSURE_CONTAINER_DOCKER_TIMEOUT=2 \
+    ENSURE_CONTAINER_CALL_TIMEOUT="$CALL_LIMIT" CONTAINER_IDLE_CALL_TIMEOUT="$CALL_LIMIT" "$@"
 }
-# run_ensure: OUT and RC from ensure_container.sh under with_env.
-run_ensure() { OUT=$(with_env sh "$ENSURE" 2>&1) && RC=0 || RC=$?; }
-# run_idle [args]: OUT and RC from container_idle_stop.sh under with_env.
-run_idle() { OUT=$(with_env sh "$IDLE_STOP" "$@" 2>&1) && RC=0 || RC=$?; }
+# run_ensure / run_idle [args]: OUT, RC and ELAPSED (whole seconds) from ensure_container.sh /
+# container_idle_stop.sh under with_env.
+run_ensure() { _t0=$(date +%s); OUT=$(with_env sh "$ENSURE" 2>&1) && RC=0 || RC=$?; ELAPSED=$(($(date +%s) - _t0)); }
+run_idle() { _t0=$(date +%s); OUT=$(with_env sh "$IDLE_STOP" "$@" 2>&1) && RC=0 || RC=$?; ELAPSED=$(($(date +%s) - _t0)); }
+# run_ensure_hang / run_idle_hang [args]: the same with a 1 s limit per docker call, for the hang cases.
+run_ensure_hang() { CALL_LIMIT=1; run_ensure; CALL_LIMIT=10; }
+run_idle_hang() { CALL_LIMIT=1; run_idle "$@"; CALL_LIMIT=10; }
 logged() { grep -q -- "$1" "$S/calls.log"; }
 has_out() { printf '%s' "$OUT" | grep -qF -- "$1"; }
 # expect LABEL RC-WANTED: RC must equal RC-WANTED.
@@ -154,6 +168,14 @@ expect_logged() { # label, regex that must be in calls.log
 }
 expect_not_logged() { # label, regex that must NOT be in calls.log
   if logged "$2"; then bad "${LABEL} -- $1: unexpected docker call matching '$2'; calls: $(tr '\n' ';' < "$S/calls.log")"; else ok "${LABEL} -- $1"; fi
+}
+expect_not_out() { # label, fixed string the output must NOT hold
+  if has_out "$2"; then bad "${LABEL} -- $1: output holds '$2'; got '$OUT'"; else ok "${LABEL} -- $1: output does not say '$2'"; fi
+}
+# expect_within LABEL MAX-SECONDS: the case ended within MAX-SECONDS. A hung fake sleeps 63 s, so a missing bound
+# shows as ~63 s here; the margin only has to cover a slow runner.
+expect_within() {
+  if [ "$ELAPSED" -le "$2" ]; then ok "${LABEL} -- $1: returned in ${ELAPSED}s (limit 1s per call)"; else bad "${LABEL} -- $1: took ${ELAPSED}s, wanted <= $2s"; fi
 }
 
 # ===================================================================== ensure_container.sh
@@ -293,6 +315,78 @@ expect_out "daemon down" "not running"
 new_state daemon exists running
 OUT=$(with_env sh "$IDLE_STOP" --bogus 2>&1) && RC=0 || RC=$?
 expect_rc "unknown flag" 2
+
+# ===================================================================== a docker call that never returns
+# Every docker call has its own limit (1 s here; the wait limits are untouched), so a wedged Docker Desktop is a
+# one-line answer, not a hang. See `hang_<subcommand>` in the fake docker.
+
+# ensure: the fast path `docker exec <c> true` hangs
+new_state daemon exists running hang_exec
+run_ensure_hang
+expect_rc "ensure, exec hangs" 1
+expect_out "ensure, exec hangs" "FAIL: docker exec did not return within 1s"
+expect_within "ensure, exec hangs" 5
+expect_not_logged "ensure, exec hangs: nothing started" '^start '
+
+# ensure: `docker info` hangs (the daemon exists but does not answer): not "down", so Docker Desktop is not launched
+new_state exists hang_info
+run_ensure_hang
+expect_rc "ensure, info hangs" 1
+expect_out "ensure, info hangs" "FAIL: docker info did not return within 1s"
+expect_within "ensure, info hangs" 5
+[ ! -f "$S/open.log" ] && ok "${LABEL} -- ensure, info hangs: 'open -a Docker' not run" || bad "${LABEL} -- ensure, info hangs ran 'open -a Docker'"
+
+# ensure: `docker inspect` hangs: reported as hung, not as "does not exist"
+new_state daemon exists hang_inspect
+run_ensure_hang
+expect_rc "ensure, inspect hangs" 1
+expect_out "ensure, inspect hangs" "FAIL: docker inspect did not return within 1s"
+expect_not_out "ensure, inspect hangs" "does not exist"
+expect_within "ensure, inspect hangs" 5
+
+# ensure: `docker start` hangs; its limit is ENSURE_CONTAINER_START_TIMEOUT (2 s here)
+new_state daemon exists hang_start
+run_ensure_hang
+expect_rc "ensure, start hangs" 1
+expect_out "ensure, start hangs" "FAIL: docker start did not return within 2s"
+expect_not_out "ensure, start hangs" "failed"
+expect_within "ensure, start hangs" 6
+
+# idle stop: `docker inspect` hangs -- a hung daemon is not a stopped container: kept, never "not running", no stop
+new_state daemon exists running hang_inspect
+printf '%s\n' "$INIT_PS" > "$S/ps"
+run_idle_hang
+expect_rc "idle stop, inspect hangs" 0
+expect_out "idle stop, inspect hangs" "kept"
+expect_out "idle stop, inspect hangs" "did not answer"
+expect_not_out "idle stop, inspect hangs" "not running"
+expect_within "idle stop, inspect hangs" 5
+expect_not_logged "idle stop, inspect hangs: NOT stopped" '^stop '
+
+# idle stop: `docker exec <c> ps` hangs -- cannot tell it is idle: kept, no stop
+new_state daemon exists running hang_exec
+run_idle_hang
+expect_rc "idle stop, exec ps hangs" 0
+expect_out "idle stop, exec ps hangs" "kept"
+expect_out "idle stop, exec ps hangs" "did not answer"
+expect_within "idle stop, exec ps hangs" 5
+expect_not_logged "idle stop, exec ps hangs: NOT stopped" '^stop '
+
+# idle stop: `docker stop` hangs -- a FAIL and exit 1 (the container was not confirmed stopped)
+new_state daemon exists running hang_stop
+printf '%s\n' "$INIT_PS" > "$S/ps"
+run_idle_hang
+expect_rc "idle stop, stop hangs" 1
+expect_out "idle stop, stop hangs" "FAIL: 'docker stop trading-1-dev' did not return within 1s"
+expect_within "idle stop, stop hangs" 5
+
+# The hung fakes were killed with their calls, not left behind (the real `ps`: with_env's fake is not on PATH here).
+if ps -axo args= >/dev/null 2>&1; then
+  strays=$(ps -axo args= | grep -c '^sleep 63$' || true)
+  [ "$strays" -eq 0 ] && ok "${LABEL} -- hung docker calls are killed: no 'sleep 63' left running" || bad "${LABEL} -- ${strays} hung 'sleep 63' left running after the hang cases"
+else
+  echo "OK: ${LABEL} -- stray-process assertion SKIPPED (no usable ps)."
+fi
 
 # ===================================================================== observers never start it
 new_state daemon exists

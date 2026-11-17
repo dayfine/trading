@@ -15,11 +15,14 @@
 #                                                   elsewhere: error (start the daemon yourself).
 #   3. container does not exist                  -> error, exit 1.
 #   4. container stopped                         -> `docker start`, wait until `docker exec <c> true` works.
-# Progress and errors go to stderr, one line each, so a caller's stdout is untouched. Every wait is bounded;
-# a timeout is a one-line `ensure_container: FAIL: ...` and exit 1.
+# Progress and errors go to stderr, one line each, so a caller's stdout is untouched. Every wait is bounded, and
+# so is every single `docker` call (dev/lib/bounded_call.sh: a hung CLI is killed): a timeout, or a call that
+# does not return, is a one-line `ensure_container: FAIL: ...` and exit 1. A wait can overrun its limit by at
+# most one call's limit, because the deadline is checked between calls.
 #
 # Env: DOCKER_CONTAINER (trading-1-dev), ENSURE_CONTAINER_DOCKER_TIMEOUT (180 s for Docker Desktop),
-#      ENSURE_CONTAINER_START_TIMEOUT (60 s for the container), ENSURE_CONTAINER_POLL (2 s).
+#      ENSURE_CONTAINER_START_TIMEOUT (60 s for the container; also the limit on the `docker start` call),
+#      ENSURE_CONTAINER_CALL_TIMEOUT (30 s per other docker call, whole seconds), ENSURE_CONTAINER_POLL (2 s).
 # Test seams: ENSURE_CONTAINER_DOCKER_BIN (docker), ENSURE_CONTAINER_ENV_FILES ("/.dockerenv /run/.containerenv").
 set -u
 
@@ -27,6 +30,7 @@ CONTAINER="${DOCKER_CONTAINER:-trading-1-dev}"
 DOCKER="${ENSURE_CONTAINER_DOCKER_BIN:-docker}"
 DOCKER_TIMEOUT="${ENSURE_CONTAINER_DOCKER_TIMEOUT:-180}"
 START_TIMEOUT="${ENSURE_CONTAINER_START_TIMEOUT:-60}"
+CALL_TIMEOUT="${ENSURE_CONTAINER_CALL_TIMEOUT:-30}"
 POLL="${ENSURE_CONTAINER_POLL:-2}"
 ENV_FILES="${ENSURE_CONTAINER_ENV_FILES:-/.dockerenv /run/.containerenv}"
 
@@ -40,8 +44,24 @@ done
 
 command -v "$DOCKER" >/dev/null 2>&1 || _fail "'$DOCKER' not found on PATH"
 
-_exec_ok() { "$DOCKER" exec "$CONTAINER" true >/dev/null 2>&1; }
-_daemon_up() { "$DOCKER" info >/dev/null 2>&1; }
+. "$(dirname "$0")/bounded_call.sh"
+
+_hung() { _fail "docker $1 did not return within ${2}s"; }
+
+# _docker <seconds> <docker-args...>: docker under a time limit, output discarded. A call that does not return
+# is a FAIL (exit 1) naming its subcommand; any other status is returned. Call it from the main shell, not from
+# a `$(...)`, where the exit would only leave the substitution.
+_docker() {
+  _t=$1
+  shift
+  _bounded "$_t" "$DOCKER" "$@" >/dev/null 2>&1
+  _rc=$?
+  [ "$_rc" -ne 124 ] || _hung "$1" "$_t"
+  return "$_rc"
+}
+
+_exec_ok() { _docker "$CALL_TIMEOUT" exec "$CONTAINER" true; }
+_daemon_up() { _docker "$CALL_TIMEOUT" info; }
 
 # _wait_for <predicate> <timeout-seconds>: poll until the predicate holds; 1 on timeout.
 _wait_for() {
@@ -65,12 +85,13 @@ if ! _daemon_up; then
   fi
 fi
 
-state=$("$DOCKER" inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null) ||
-  _fail "container '$CONTAINER' does not exist (create it: .devcontainer/setup.sh start)"
+state=$(_bounded "$CALL_TIMEOUT" "$DOCKER" inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null) && _rc=0 || _rc=$?
+[ "$_rc" -ne 124 ] || _hung inspect "$CALL_TIMEOUT"
+[ "$_rc" -eq 0 ] || _fail "container '$CONTAINER' does not exist (create it: .devcontainer/setup.sh start)"
 
 if [ "$state" != true ]; then
   _say "starting '$CONTAINER'"
-  "$DOCKER" start "$CONTAINER" >/dev/null 2>&1 || _fail "'docker start $CONTAINER' failed"
+  _docker "$START_TIMEOUT" start "$CONTAINER" || _fail "'docker start $CONTAINER' failed"
 fi
 _wait_for _exec_ok "$START_TIMEOUT" ||
   _fail "container '$CONTAINER' did not answer 'docker exec' within ${START_TIMEOUT}s"
