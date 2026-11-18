@@ -1,5 +1,7 @@
 # yearly-trade-review-2026-09-04 — scripts and small artifacts behind `dev/notes/yearly-trade-review-2000-2026.md`
 
+> **Run tables moved (2026-11-17).** This directory's `graded.csv` (723 trades with entry and exit prices) carries prices, so it also lives in the private `dayfine/trading-results` repo now, at the same path (commit 96f047f). Index: `../TRADES-PRIVATE.md`.
+
 - `grade.sh` — reads the record's `trades.csv` and the CSV store; emits `graded.csv` (every trade
   with its basis-free post-entry / post-exit 13-week path and an A–F grade; rubric in the note).
 - `px_extract.sh` — half-year adjusted-close snapshots (last bar ≤ each Jun 30 / Dec 31, 1999–2026)

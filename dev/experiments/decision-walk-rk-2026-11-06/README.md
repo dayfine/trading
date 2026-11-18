@@ -1,5 +1,7 @@
 # Decision-tree walkthrough on the record, seed k0 (2026-11-06)
 
+> **Run tables moved (2026-11-17).** This directory's `out/extras.txt` (E, close and stop per line) carries prices, so it also lives in the private `dayfine/trading-results` repo now, at the same path (commit 96f047f). Index: `../TRADES-PRIVATE.md`.
+
 **What this is.** A descriptive walk over every recorded decision of one record cell: the weekly screens, the
 placements, the fills, the weekly stop decisions and the exits. It re-runs the 2026-09-26 walk
 (`dev/experiments/obvious-fixes-2026-09-25/salt0-analysis.md`, f2 s0) on the current record and adds the stop-decision

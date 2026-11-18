@@ -2,7 +2,7 @@
 
 > **Trade files moved (2026-11-17).** This directory's 7 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
-> **Run tables moved (2026-11-17).** This directory's 6 follow logs, 4 bar/close dumps and daily tables (10 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7, dca23d2). 1 more price table(s) (`ours.csv`) followed in commit 96f047f. Index: `../TRADES-PRIVATE.md`.
+> **Run tables moved (2026-11-17).** This directory's 6 follow logs, 3 bar/close dumps, 1 forward decisions table (10 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7, dca23d2). 1 more price table(s) (`ours.csv`) followed in commit 96f047f. Index: `../TRADES-PRIVATE.md`.
 
 Plan: `dev/plans/fresh-eyes-weinstein-2026-10-13.md` (PR #3298). This directory holds step 1 of its build order (§7):
 the sample, the weekly series, the market series and the chart renderer. Nothing here reads our strategy code; the

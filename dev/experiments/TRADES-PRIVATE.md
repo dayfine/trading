@@ -118,7 +118,7 @@ The #3673 and #3675 reviews found the same prices in other per-run files. These 
 
 ## Run tables (2026-11-17, trading-results a5753f7, dca23d2 and 96f047f)
 
-The user chose on 2026-11-17 to move every price-bearing file; these are the ones found so far. The first 458 match main at 958d301ca byte for byte in trading-results: 240 `equity_curve.csv` (a day with one open position gives back that day's close from the change in NAV), the bar and close dumps, the per-event tables (`raw_close`, `e1_px`, `stop`), the `audit_extract.csv` and `terminal_runs_*.csv` tables, the arc-rerun same-day-stop, fill-day-gap and Saturday-exit reprice tables, and the fresh-eyes order tickets (`trigger,limit,stop`), follow logs (`trigger,stop`), forward decisions and list scan (`close,anchor`). The 124 files in dca23d2 were found by the #3675 review (note N4). The second batch, 35 files in 96f047f, was found by the #3678 review's value scan; they match main at 10a5b1160 byte for byte. They are listed after the first table.
+The user chose on 2026-11-17 to move every price-bearing file; these are the ones found so far. The first 458 match main at 958d301ca byte for byte in trading-results: 240 `equity_curve.csv` (a day with one open position gives back that day's close from the change in NAV), the bar and close dumps, the per-event tables (`raw_close`, `e1_px`, `stop`), the `audit_extract.csv` and `terminal_runs_*.csv` tables, the arc-rerun same-day-stop, fill-day-gap and Saturday-exit reprice tables, and the fresh-eyes order tickets (`trigger,limit,stop`), follow logs (`trigger,stop`), forward decisions and list scan (`close,anchor`). The 124 files in dca23d2 were found by the #3675 review (note N4). The second batch, 35 files in 96f047f, was found by the #3678 review's value scan; they match main at 958d301ca byte for byte (unchanged there since). They are listed after the first table.
 
 | directory | files | kinds | commit |
 |---|---:|---|---|
@@ -131,7 +131,7 @@ The user chose on 2026-11-17 to move every price-bearing file; these are the one
 | `delisting-guards-rerun-2026-09-06` | 1 | 1 terminal-run table | a5753f7 |
 | `entry-anchor-recovery-2026-10-02` | 24 | 24 equity curves | a5753f7 |
 | `floor-nearest-2026-10-25` | 12 | 12 equity curves | a5753f7 |
-| `fresh-eyes-2026-10-13` | 10 | 6 follow logs, 4 bar/close dumps and daily tables | a5753f7, dca23d2 |
+| `fresh-eyes-2026-10-13` | 10 | 6 follow logs, 3 bar/close dumps, 1 forward decisions table (`trigger,limit,stop`) | a5753f7, dca23d2 |
 | `fresh-eyes-dated-2026-10-18` | 114 | 81 follow logs, 32 order tickets, 1 bar/close dump or daily table | dca23d2 |
 | `index-hedge-screen-2026-10-12` | 1 | 1 bar/close dump or daily table | a5753f7 |
 | `investor-preset-2026-09-26` | 4 | 4 equity curves | a5753f7 |
@@ -182,10 +182,11 @@ Second batch (trading-results 96f047f):
 
 ### Still public
 
-A value scan of what is left (a line with a ticker and at least two numbers ≥ 1, at least 20 such lines per file) still flags about 215 files in `dev/experiments/`. A sample read shows two kinds. They stay here pending the user's call:
+A value scan of what is left (a line with a ticker and at least two numbers ≥ 1, at least 20 such lines per file) still flags about 215 files in `dev/experiments/`, and the validator reports add a third kind. A sample read shows these three kinds. They stay here pending the user's call:
 
 - **Runner logs** (about 150 `*.log`): `WARN: portfolio rejected fill for <SYM> (... price=<p>)` and similar lines that quote one fill price per event.
 - **Analysis tables and reports** whose numbers are cash in dollars (`required`, `available` in `*cash_rejections.csv` and `*audit_entries.csv`), returns, ratios or scores rather than prices. Examples are the `entry-timing-screen-2026-11-12` replay and feature tables, `fresh-eyes-dated` `fwd*.csv`, and the read `.txt` reports. Some of them quote a single price in passing.
+- **Validator reports** (303 `*validator*.md`): their sample lines quote prices as `key=value` tokens (`entry=<p>`, `prior_top=<p>`), about 10,500 such lines across some 290 files (count from the #3678 review). The value scan above missed them because it does not split `key=value` tokens.
 
 Outside `dev/experiments/`:
 
