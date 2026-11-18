@@ -2,6 +2,8 @@
 
 > **Trade files moved (2026-11-17).** This directory's 24 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
+> **Position files moved (2026-11-17).** This directory's 24 `*open_positions.csv`, 24 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
+
 Status: **RUN 2026-10-23/24; read below (§Results).** The text down to §Results is the pre-registration as committed at
 `a8ba322fc` (then: "PRE-REGISTERED, NOT RUN"). The chain is launched by the dispatcher when the container is free (no agents, no other backtest), after #3406
 (Step 1, `Seeded` tiebreak) merges: `launch` aborts otherwise.

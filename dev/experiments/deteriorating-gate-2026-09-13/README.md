@@ -2,6 +2,8 @@
 
 > **Trade files moved (2026-11-17).** This directory's 3 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
+> **Position files moved (2026-11-17).** This directory's 3 `*open_positions.csv`, 3 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
+
 **Status: PRE-REGISTERED** (written before any cell ran). Mechanism: `deteriorating_blocks_longs`
 (issue #2755, PR #2759) — a default-off long-admission gate that rejects new longs when
 `Macro.result.breadth_state = Deteriorating`; inert unless `macro_config.breadth_direction.enabled`.
