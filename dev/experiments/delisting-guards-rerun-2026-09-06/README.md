@@ -12,6 +12,8 @@
 > was run, not as runnable specs. Guards 1 and 2
 > (`entry_max_bar_age_days`, `stale_exit_without_prior_bar`) are unchanged.
 
+> **Run tables moved (2026-11-17).** This directory's 1 terminal-run tables (1 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Status: salt 0 DONE (2026-09-06 09:13 PT); salts 1–2 of the 26y pair RUNNING (`chain-salts.sh`, ~11 h).** Build pinned at 3113f751e = PR #2686's first commit; the two rework commits (cd6c8febc, 72670075a) and the squash 1b7295cae add only tests, docstrings and one exported helper, so the pinned build is behaviour-identical to merged main. Field names in
 `specs/dg-*-on.sexp` / `chain.sh` are the merged ones.
 

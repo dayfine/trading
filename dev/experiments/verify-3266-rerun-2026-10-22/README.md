@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 1 `*open_positions.csv`, 1 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 1 equity curves (1 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Pre-registration.** Nothing has run. The read below is fixed before the cell launches. User-approved plan "(a) minimal",
 2026-10-22.
 

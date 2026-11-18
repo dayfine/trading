@@ -1,5 +1,7 @@
 # Short wide-top screen (2026-10-13)
 
+> **Run tables moved (2026-11-17).** This directory's 26 per-event tables (26 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 Option (b) of the shorts-track decision. Pre-registration: `dev/plans/short-wide-top-screen-2026-10-13.md`, committed
 in `6a0177107` before any number here was computed. Host-only; no container, no strategy code.
 

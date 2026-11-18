@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 1 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 1 equity curves (1 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Status: run 2026-11-14.** Rule 1: CLOSE-AXIS (branch 3). Rule 2: NO CONCLUSION (immaterial). `Price_band_seeded`
 stays a default-off axis (§Results). The rules below were applied as written to the one cloud cell this directory launched.
 

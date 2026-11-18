@@ -2,6 +2,8 @@
 
 > **Trade files moved (2026-11-17).** This directory's 81 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 81 follow logs, 32 order tickets, 1 bar/close dumps and daily tables (114 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit dca23d2). Index: `../TRADES-PRIVATE.md`.
+
 Plan: `dev/plans/fresh-eyes-dated-picks-2026-10-18.md` (PR #3326). On each of 24 decision Fridays a reader that knows
 only the book's rules (the 2026-10-13 rule card) and sees only charts up to that day reads the market, screens a
 pool, places up to 5 orders and manages them to the exit (at most 104 weeks). The same dates are read from the

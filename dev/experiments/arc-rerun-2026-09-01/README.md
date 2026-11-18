@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 19 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 19 audit extracts, 3 bar/close dumps and daily tables, 3 reprice tables (25 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7, dca23d2). Index: `../TRADES-PRIVATE.md`.
+
 User directive 2026-09-01 (overnight session): *"let's rerun and figure out
 what's wrong? do some deep trade analysis and guard against typical errors
 with integration tests."*

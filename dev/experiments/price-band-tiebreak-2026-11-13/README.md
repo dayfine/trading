@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 10 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 10 equity curves (10 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Status: pre-registered, no runs.** Written before the first result of either arm. The rule below is applied as
 written.
 

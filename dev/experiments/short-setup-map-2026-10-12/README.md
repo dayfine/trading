@@ -1,5 +1,7 @@
 # short-setup-map-2026-10-12: the book's short setup, mapped over every Stage 3 → 4 breakdown
 
+> **Run tables moved (2026-11-17).** This directory's 26 per-event tables (26 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Pre-registration:** `dev/plans/short-setup-map-2026-10-12.md`, confirmed by the user on 2026-10-12 and merged at
 `b666ad751` (#3274). Amendment 1 (the dividend splits) is `d65968e28` (#3278), committed at 20:54 PT. That is before
 the event extraction: the per-symbol event files are dated 22:07–22:13 PT, and the 19:48 stage replay computes stages,

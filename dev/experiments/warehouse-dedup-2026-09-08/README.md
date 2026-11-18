@@ -1,5 +1,7 @@
 # Warehouse dedupe rebuild — `_v10dedup` (2026-09-08, #2730 ask 3)
 
+> **Run tables moved (2026-11-17).** This directory's 3 terminal-run tables (3 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 Rebuild of the three vintage warehouses (`top-3000` 2000 / 2009 / 2019, the `_v7mark` supersets from `warehouse-rebuild-2026-09-06`) with two changes:
 
 1. **Rename-twin pass armed** (`-dedupe-rename-twins -twin-basis returns`, PR #2733): the `_v7mark` warehouses carried twin pairs (NLS/BFX, BB/BBRY, AABA/YHOO, DOC/HCP_old, AORT/CRY_old, AZN/AZN_old, LANC/MZTI, HPT/SVC …) and every wider-stop arm funded both legs — up to +$890k of a single arm's "edge" was one instrument counted twice (`stop-width-by-state-2026-09-08`).

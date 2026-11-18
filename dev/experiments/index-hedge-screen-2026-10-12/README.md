@@ -1,5 +1,7 @@
 # index-hedge-screen-2026-10-12: index-short overlay screen on the record (N)
 
+> **Run tables moved (2026-11-17).** This directory's 1 bar/close dumps and daily tables (1 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Pre-registration:** `dev/plans/index-hedge-screen-2026-10-11.md`, CONFIRMED by the user and merged as `776e8d355`
 (#3251). This directory applies it without changes, except for the operational choices listed below.
 

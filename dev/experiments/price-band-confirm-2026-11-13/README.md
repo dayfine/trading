@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 20 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 20 equity curves (20 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Status: run 2026-11-14.** NO-BUILD: C1 INCONCLUSIVE (return short, drawdown +3.83 pp, concentration 1 of 5), C2
 FAIL (median Δ ln(1+R) −0.280, 1 of 5 seeds positive). `Price_band_seeded` stays a default-off axis, and no further
 confirmation cells run on it without a new mechanism argument (§Results). The rule below was applied as written to the

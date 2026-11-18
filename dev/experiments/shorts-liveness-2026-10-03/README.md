@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 2 `*open_positions.csv`, 2 `*force_liquidations.sexp`, 1 `trade_audit.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 2 equity curves (2 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 ## Why
 
 User decision 2026-10-03: run the next-session item 4(d) first — one liveness pair, not a programme

@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 4 `*open_positions.csv`, 4 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 4 equity curves (4 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Status: PRE-REGISTERED** (written 18:35 PT before any cell ran). Two arms, three salts each, on the record convention.
 
 ## Why
