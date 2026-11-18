@@ -87,7 +87,7 @@ expect "A: five batches" 5 "$(grep -c '^BATCH ' "$TMP/A")"
 has "A14: one cell at a time on 14 GB: the 3 GB reserve counts" "PARALLEL 1 cells at a time (MemTotal 14 GB, reserve 3 GB, 6 GB per cell)" A14
 expect "A14: ten batches of one" 10 "$(grep -c "^BATCH [0-9]*: obs-[^ ]*$" "$TMP/A14")"
 has "A: the preflight runs the arm" "PREFLIGHT obs-dead-arm-k0 to 2000-03-31 before the cells" A
-has "A: the tripwire is the record's" "TRIPWIRE S k0 trades.csv md5 must be 0928cfe40333560429f5a6e57c9c18de the record (#3595 pb-S-k0 = #3602 pbb-S-k0); otherwise a baseline-drift event" A
+has "A: the tripwire is the record's" "TRIPWIRE S k0 trades.csv md5 must be 3ee10dca319e54a85f5e0a7842d8c537 the record (S k0 at the One_basis flip, #3677 = vsb-1 k0); otherwise a baseline-drift event" A
 has "A: no drift pair" "DRIFT none: no earlier HEAD has a finished S in trading-results" A
 P=$EXP/runs/$C2/dead-arm/obs-dead-arm-k*-s0
 for f in -trades.csv -equity_curve.csv -open_positions.csv -splits.csv -validator.sexp.sexp .log .ok; do

@@ -216,7 +216,7 @@ LANE_SHA=<LANE_SHA> setsid nohup sh dev/experiments/observatory/lane.sh run > .s
      run the validator's defaults with no `-config`. V6, the paired gate, is unaffected.
 6. **Validity, before any read.**
    - **Tripwire.** S k0's `trades.csv` md5 is compared with the S k0 of the last HEAD published to trading-results, or
-     with the record's `0928cfe40333560429f5a6e57c9c18de` when there is none. A mismatch is a `baseline-drift`
+     with the record's `3ee10dca319e54a85f5e0a7842d8c537` (S k0 on the One_basis default since #3677; `0928cfe4…` before it) when there is none. A mismatch is a `baseline-drift`
      event in `events.tsv`. The pair is still read, since S and the arm share the build.
    - **V6** on every seed, arm against S. A failure marks the arm `invalid@<head>`.
    - **Liveness.** The arm's `trades.csv` must differ from S's on at least one seed. Otherwise the dial is dead: the
