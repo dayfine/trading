@@ -10,9 +10,10 @@
     the raw breakout, is 100, and the as-of week closes at 98. A 2-for-1 split
     AFTER the as-of date halves every stored adjusted price, so the sketch's
     520-week high reads 75 and its anchor 49. [Legacy_mixed] compares the raw
-    100 with 75 and calls the name virgin (the record's defect, pinned as the
-    unchanged default). [One_basis] reads the breakout as 100 * 49 / 98 = 50,
-    which is not virgin, as it is not on the raw tape (100 < 150). *)
+    100 with 75 and calls the name virgin (the pre-flip record's defect, still
+    selectable). [One_basis] reads the breakout as 100 * 49 / 98 = 50, which is
+    not virgin, as it is not on the raw tape (100 < 150); it is the default
+    since 2026-11-17, pinned by [test_default_is_one_basis]. *)
 
 open OUnit2
 open Core
@@ -57,10 +58,9 @@ let _config ~basis =
     virgin_supply_basis = basis;
   }
 
-let _analyze ~basis ~factor =
+let _analyze_with ~config ~factor =
   let bars = _bars ~factor in
   let as_of = (List.last_exn bars).date in
-  let config = _config ~basis in
   let reader = Bar_reader.of_in_memory_bars [ (_symbol, bars) ] in
   let stock =
     Bar_reader.weekly_view_for reader ~symbol:_symbol ~n:_n_weeks ~as_of
@@ -76,6 +76,7 @@ let _analyze ~basis ~factor =
   Stock_analysis.analyze_with_callbacks ~config ~ticker:_symbol ~callbacks
     ~prior_stage:None ~as_of_date:as_of
 
+let _analyze ~basis ~factor = _analyze_with ~config:(_config ~basis) ~factor
 let _legacy = Stock_analysis_supply.Legacy_mixed
 let _one_basis = Stock_analysis_supply.One_basis
 
@@ -96,7 +97,7 @@ let _is_later_split_fixture =
     ]
 
 (* The virgin test. Legacy: the raw breakout clears the adjusted 520-week high,
-   so the name is re-admitted as virgin (unchanged default). One basis: it is
+   so the name is re-admitted as virgin (the pre-flip default). One basis: it is
    not virgin, and the sketch is not clear of supply (the ten weeks at the old
    high sit in the 78-130w band), so re-admission is off. Red when the virgin
    test reads the raw breakout under [One_basis]. *)
@@ -167,9 +168,39 @@ let test_split_free_one_basis_matches_legacy _ =
          equal_to (verdicts _legacy);
        ])
 
+(* The default is [One_basis] (#3664, flipped on correctness 2026-11-17). Pinned
+   at all three places a default lives: the strategy config, the config the
+   strategy builds per screen from it, and [Stock_analysis.default_config]. Then
+   the effect: the default strategy config, armed as the record arms it, does
+   NOT re-admit the later-splitting fixture, which [Legacy_mixed] does (the
+   pre-flip record's behaviour). Red when any default reverts to [Legacy_mixed]. *)
+let test_default_is_one_basis _ =
+  let strategy_default =
+    Weinstein_strategy.default_config ~universe:[ _symbol ]
+      ~index_symbol:"GSPCX"
+  in
+  let built =
+    Weinstein_strategy.stock_analysis_config_for ~config:strategy_default
+  in
+  assert_that
+    ( strategy_default.virgin_supply_basis,
+      built.virgin_supply_basis,
+      Stock_analysis.default_config.virgin_supply_basis,
+      _analyze_with ~config:built ~factor:0.5 )
+    (all_of
+       [
+         field (fun (s, _, _, _) -> s) (equal_to _one_basis);
+         field (fun (_, b, _, _) -> b) (equal_to _one_basis);
+         field (fun (_, _, d, _) -> d) (equal_to _one_basis);
+         field
+           (fun (_, _, _, (a : Stock_analysis.t)) -> a.virgin_readmission)
+           (equal_to false);
+       ])
+
 let suite =
   "virgin_supply_basis"
   >::: [
+         "test_default_is_one_basis" >:: test_default_is_one_basis;
          "test_virgin_later_split_not_virgin_on_one_basis"
          >:: test_virgin_later_split_not_virgin_on_one_basis;
          "test_supply_grade_later_split_not_virgin_on_one_basis"

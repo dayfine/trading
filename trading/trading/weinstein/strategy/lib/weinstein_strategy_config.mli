@@ -892,7 +892,7 @@ type config = {
           (weinstein-book-reference.md §Buy Criteria). Spine intact. R2: real
           top-level [bool] field → [Variant_matrix] flag axis. *)
   virgin_supply_basis : Stock_analysis_supply.basis;
-      [@sexp.default Stock_analysis_supply.Legacy_mixed]
+      [@sexp.default Stock_analysis_supply.One_basis]
       (** Price basis of the virgin test and the overhead-supply grade (#3664),
           copied into [Stock_analysis.config.virgin_supply_basis].
 
@@ -905,23 +905,27 @@ type config = {
           mix (#3659 sibling audit). In live use the newest bars have factor 1
           and the comparison is consistent.
 
-          {b [Legacy_mixed] (default, no-op)} — today's comparison verbatim; the
-          record, every golden and every default config stay byte-identical
-          (R1).
+          {b [One_basis] (default since 2026-11-17)} — the breakout is put on
+          the sketch's basis ([Stock_analysis_supply.breakout_on_sketch_basis])
+          before both the virgin test and the grade; ticket prices stay raw.
+          Works on raw- and adjusted-basis warehouses alike (it rescales by the
+          sketch's own anchor close).
 
-          {b [One_basis]} — the breakout is put on the sketch's basis
-          ([Stock_analysis_supply.breakout_on_sketch_basis]) before both the
-          virgin test and the grade; ticket prices stay raw. Works on raw- and
-          adjusted-basis warehouses alike (it rescales by the sketch's own
-          anchor close).
+          {b [Legacy_mixed]} — the pre-flip comparison verbatim (raw breakout
+          against the sketch as stored). Still selectable: it reproduces the
+          pre-2026-11-17 record path, whose band (median 2.78) carried the basis
+          mix; a spec or [--config-overrides] pins it with
+          [((virgin_supply_basis Legacy_mixed))].
 
           {b Faithfulness (W1/W2).} A correctness fix to how "new high ground"
           (weinstein-book-reference.md §Buy Criteria) is measured, not a new
           dial: the spine is untouched. R2: axis-expressible as
           [((flag virgin_supply_basis) (values (Legacy_mixed One_basis)))]. R3:
-          stays [Legacy_mixed] until the paired K=5 record-vs-one-basis run
-          ([#3664] after-merge item) and the [config-default-blast-radius.md]
-          decision. *)
+          flipped from [Legacy_mixed] on correctness, a user-directed override
+          of the ledger-Accept gate (#3664 comment 6960893659; ledger
+          [2026-11-17-virgin-supply-one-basis-correctness], verdict
+          [Inconclusive]); the paired K=5 run (vsb-1, #3671) read median D_end
+          -0.35 and is the new record band, not a reason to hold the fix. *)
   dawn_leverage_enabled : bool; [@sexp.default false]
       (** Master switch for the regime-conditional long-leverage "dawn"
           mechanism ({!Leverage_dawn}). When [true] AND the primary index is in

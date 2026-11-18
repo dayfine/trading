@@ -13,14 +13,14 @@
     warehouse's basis: since #2145 that is the back-adjusted one, which on
     history already carries every split and dividend the name pays {i later}.
 
-    - [Legacy_mixed] {b (default)} — today's comparison, verbatim: the raw
-      breakout against the sketch as stored. On an adjusted-basis sketch that
-      mixes bases, so a name below its 10-year high passes as virgin when it
-      later splits (the record's path; #3664). Kept as the default so every
-      golden, the record and every default config stay byte-identical
-      ([dev/rules/experiment-flag-discipline.md] R1).
-    - [One_basis] — the breakout is put on the sketch's basis first
-      ({!breakout_on_sketch_basis}); the ticket price stays raw. *)
+    - [One_basis] {b (default since 2026-11-17)} — the breakout is put on the
+      sketch's basis first ({!breakout_on_sketch_basis}); the ticket price stays
+      raw.
+    - [Legacy_mixed] — the pre-flip comparison, verbatim: the raw breakout
+      against the sketch as stored. On an adjusted-basis sketch that mixes
+      bases, so a name below its 10-year high passes as virgin when it later
+      splits (the pre-flip record's path; #3664). Still selectable, to reproduce
+      that path. *)
 type basis = Legacy_mixed | One_basis [@@deriving show, eq, sexp]
 
 val breakout_on_sketch_basis :

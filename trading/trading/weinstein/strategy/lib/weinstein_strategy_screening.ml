@@ -85,7 +85,7 @@ let _rs_config_for ~(config : Weinstein_strategy_config.config) : Rs.config =
     [Weinstein_strategy_config.resistance_min_history_bars] is non-zero, and (c)
     threading the resistance-v2 [overhead_supply] +
     [virgin_crossing_readmission] knobs (both default off, bit-identical) and
-    their price basis [virgin_supply_basis] (default [Legacy_mixed], #3664), and
+    their price basis [virgin_supply_basis] (default [One_basis], #3664), and
     (d) threading the ticket-level [entry_anchor_local_range_weeks] knob and its
     stale-entry cap [entry_cap_local_range_weeks] (both default 0 = off,
     bit-identical; they move only the screener's entry ticket, never

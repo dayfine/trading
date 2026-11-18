@@ -147,26 +147,28 @@ let test_threads_entry_freshness_basis _ =
 
 (** The seam threads [virgin_supply_basis] (#3664, the price basis of the virgin
     test and the supply grade) verbatim into the built per-screen
-    [Stock_analysis.config]. The [Legacy_mixed] default is pinned by
-    [test_default_builds_stock_analysis_default_config].
+    [Stock_analysis.config]. The [One_basis] default is pinned by
+    [test_default_builds_stock_analysis_default_config] and
+    [test_default_is_one_basis] (test_virgin_supply_basis.ml).
 
     EFFECTIVENESS-PIN: virgin_supply_basis -- arms the field away from its
-    [Legacy_mixed] default; severing the copy would leave
-    [built.virgin_supply_basis = Legacy_mixed] and fail the assertion below. *)
+    [One_basis] default; severing the copy would leave
+    [built.virgin_supply_basis = One_basis] and fail the assertion below. *)
 let test_threads_virgin_supply_basis _ =
   let config =
     {
       (_default_config ()) with
-      Weinstein_strategy.virgin_supply_basis = Stock_analysis_supply.One_basis;
+      Weinstein_strategy.virgin_supply_basis =
+        Stock_analysis_supply.Legacy_mixed;
     }
   in
   let built = Weinstein_strategy.stock_analysis_config_for ~config in
   assert_that built.virgin_supply_basis
-    (equal_to Stock_analysis_supply.One_basis)
+    (equal_to Stock_analysis_supply.Legacy_mixed)
 
-(** A config sexp written before the knob (no [virgin_supply_basis] field)
-    parses to [Legacy_mixed], so every existing scenario keeps the mixed
-    comparison; [One_basis] round-trips. *)
+(** A config sexp with no [virgin_supply_basis] field parses to the default,
+    [One_basis] (flipped from [Legacy_mixed] on 2026-11-17, so a spec that does
+    not pin the knob now runs one basis); [Legacy_mixed] round-trips. *)
 let test_virgin_supply_basis_sexp_default_and_round_trip _ =
   let without_field =
     match Weinstein_strategy.sexp_of_config (_default_config ()) with
@@ -178,19 +180,20 @@ let test_virgin_supply_basis_sexp_default_and_round_trip _ =
             | _ -> true))
     | atom -> atom
   in
-  let one_basis =
+  let legacy_mixed =
     {
       (_default_config ()) with
-      Weinstein_strategy.virgin_supply_basis = Stock_analysis_supply.One_basis;
+      Weinstein_strategy.virgin_supply_basis =
+        Stock_analysis_supply.Legacy_mixed;
     }
   in
   assert_that
     ( (Weinstein_strategy.config_of_sexp without_field).virgin_supply_basis,
       (Weinstein_strategy.config_of_sexp
-         (Weinstein_strategy.sexp_of_config one_basis))
+         (Weinstein_strategy.sexp_of_config legacy_mixed))
         .virgin_supply_basis )
     (equal_to
-       (Stock_analysis_supply.Legacy_mixed, Stock_analysis_supply.One_basis))
+       (Stock_analysis_supply.One_basis, Stock_analysis_supply.Legacy_mixed))
 
 (* ------------------------------------------------------------------ *)
 (* F5 — volume_confirm_at_fill => require_breakout_volume = false       *)

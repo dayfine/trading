@@ -45,7 +45,7 @@ BARS_NAME=${BARS_NAME:-data-20261102}; WH_NAME=v12wk-9236; CA_NAME=corpact-2026-
 WH=${WH:-$OUT/warehouse/snap_top3000_pit_v12wk}; CA=$OUT/warehouse/corpact; BARS=$OUT/bars; TD=${TD:-$OUT/td-full}
 EXPECT_WH=9236; EXPECT_DIV=11880; NSYM=9200; MMAP_HANDLES=12000
 RUN_START=2000-01-01; RUN_END=2026-06-26; SEEDS="0 1 2 3 4"; NSEEDS=5
-TRIP_MD5=0928cfe40333560429f5a6e57c9c18de             # #3602 pbb-S-k0 = #3595 pb-S-k0 trades.csv: the record's S k0
+TRIP_MD5=3ee10dca319e54a85f5e0a7842d8c537             # S k0 at the #3677 One_basis flip build 08e2fac19 = vsb-1 k0 trades.csv (trading-results 6cad233); was 0928cfe4 (#3595/#3602) before the flip
 CELL_TIMEOUT=${CELL_TIMEOUT:-20000}
 CELL_GB=${CELL_GB:-6}; MEM_RESERVE_GB=${MEM_RESERVE_GB:-3}
 DISK_MIN_GB=${DISK_MIN_GB:-8}; DISK_STAGE_GB=${DISK_STAGE_GB:-12}
@@ -251,7 +251,7 @@ batches() { # the cells to run, PAR at a time, in the order run_cells starts the
 }
 trip_expect() { # the md5 S k0's trades.csv must have when HEAD's trades are unchanged, and its source
   if [ -n "$PREV" ]; then echo "$(md5_of "$TR/$EXP/runs/$PREV/S/obs-S-k0-s0-trades.csv") S@$PREV in trading-results"
-  else echo "$TRIP_MD5 the record (#3595 pb-S-k0 = #3602 pbb-S-k0)"; fi
+  else echo "$TRIP_MD5 the record (S k0 at the One_basis flip, #3677 = vsb-1 k0)"; fi
 }
 
 # ------------------------------------------------------------------------------------------------- guards and stage

@@ -413,12 +413,14 @@
                 "test_failed_breakout_later_split_raw_close_passes"))))
  (status fixed))
 ((issue 3664) (ref "#3659 sibling audit: virgin test and supply grade basis mix")
- (finding "the virgin-crossing test and the overhead-supply grade compared the raw breakout with the back-adjusted sketch (520-week high, histogram), so on history a name below its 10-year high passed as virgin when it later split or paid dividends: in fbt-05's S run 374 of 2,816 trades (13 %, an upper bound) passed the virgin test only through the mix, carrying 31-47 % of the record's summed contribution per seed. virgin_supply_basis = One_basis puts the breakout on the sketch's basis for both; the default Legacy_mixed keeps the record byte-identical until the paired K=5 run")
+ (finding "the virgin-crossing test and the overhead-supply grade compared the raw breakout with the back-adjusted sketch (520-week high, histogram), so on history a name below its 10-year high passed as virgin when it later split or paid dividends: in fbt-05's S run 374 of 2,816 trades (13 %, an upper bound) passed the virgin test only through the mix, carrying 31-47 % of the record's summed contribution per seed. virgin_supply_basis = One_basis puts the breakout on the sketch's basis for both. The paired K=5 run (vsb-1, #3671) read median D_end -0.35 (the mix carried ~0.35 log of the record); the default flipped from Legacy_mixed to One_basis on correctness (user, 2026-11-17, #3664 comment 6960893659; ledger 2026-11-17-virgin-supply-one-basis-correctness), Legacy_mixed stays selectable")
  (guard ((unit ("trading/trading/weinstein/strategy/test/test_virgin_supply_basis.ml"
                 "test_virgin_later_split_not_virgin_on_one_basis"))
          (unit ("trading/trading/weinstein/strategy/test/test_virgin_supply_basis.ml"
-                "test_supply_grade_later_split_not_virgin_on_one_basis"))))
- (status fixed-behind-flag))
+                "test_supply_grade_later_split_not_virgin_on_one_basis"))
+         (unit ("trading/trading/weinstein/strategy/test/test_virgin_supply_basis.ml"
+                "test_default_is_one_basis"))))
+ (status fixed))
 ((issue 3664) (ref "#3659 sibling audit: continuation detector basis mix")
  (finding "the continuation detector divided its raw consolidation range by a mean adjusted close (continuation.ml:114) and tested the adjusted close against the raw consolidation high (:133), so it picked its fires by later corporate actions: replayed on the 16y cells, its price tests fired 31 times where the adjusted/raw factor was below 0.95, against 13,783 on one basis. Both tests now read the raw close (default-off mechanism)")
  (guard ((unit ("trading/analysis/weinstein/stock_analysis/test/test_stock_analysis.ml"

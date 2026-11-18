@@ -1,0 +1,75 @@
+;; perf-tier: 4
+;; perf-tier-rationale: N=1000 × ~5y. Per dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md (RSS ≈ 67 + 3.94·N + 0.19·N·(T−1) MB), this projects to ~4.8 GB peak RSS — fits the local 7.75 GB Docker ceiling. Run on-demand via `dev/scripts/perf_tier4_release_gate.sh`.
+;;
+;; PIT-clean universe migration 2026-06-05 (dev/plans/goldens-broad-pit-migration-2026-06-05.md).
+;; Replaced the non-reproducible `universes/broad.sexp` sentinel (Full_sector_map +
+;; universe_cap=1000 = "first-1000 of the live, growing data/sectors.csv") with the frozen
+;; point-in-time composition snapshot `top-1000-2020` (the 1000 largest by historical
+;; cap-weight as of the window start, survivorship-clean — it includes names that failed
+;; afterward, e.g. SIVB/FRC). The universe is now reproducible: it no longer shifts when
+;; sectors.csv changes. Numbers are LOWER than the prior top-N pins (294.5% / 38.6% on
+;; 2026-05-11) because that universe was a drifting artifact, not because of a regression —
+;; see the migration plan for the full diagnosis.
+;;
+;; enable_short_side stays false (short-side gaps G1-G4, dev/notes/short-side-gaps-2026-04-29.md).
+;; Cell E config (max_position_pct_long=0.30, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+;; stage3 force-exit h=1, laggard rotation h=2).
+;;
+;; Measured 2026-06-05 (Cell E, PIT top-1000-2020):
+;;   total_return_pct 41.3   total_trades 272   win_rate 33.1
+;;   sharpe_ratio 0.46   max_drawdown 36.1   avg_holding_days 38.7   calmar 0.20
+;; Tolerances ±20% (return/DD/sharpe/trades/holding), win_rate ±5pp — first PIT pin.
+;;
+;; RE-PINNED 2026-06-24 (#1729 decision C): complete-universe warehouse run
+;; (top-1000-2020, 1000/1000 symbols loaded; 1015 incl. ^GSPC + sector ETFs).
+;; The prior band was measured against an incomplete (survivor-subset) test_data
+;; store. Re-measured against the delisting-complete warehouse snapshot
+;; /tmp/snap_top3000_1998_2026 (3015 syms). The complete-universe number (35.31%)
+;; is close to the prior band (which happened to overlap), but the band is now
+;; re-centred on the honest warehouse point. Determinism established on the
+;; sibling decade cell (bit-identical across two runs). This cell will (correctly)
+;; keep FAILING in GHA perf-tier4 against the incomplete committed test_data —
+;; that failure is the intentional missing-data signal; a local snapshot run
+;; reproduces the band below.
+;;
+;; Measured 2026-06-24 (complete-universe warehouse, top-1000-2020):
+;;   total_return_pct 35.31   total_trades 277   win_rate 35.74
+;;   sharpe_ratio 0.47   max_drawdown 29.78   avg_holding_days 39.09   calmar 0.21
+;; Tolerances ±20% (return/DD/sharpe/trades/holding), win_rate ±5pp.
+((name "covid-recovery-2020-2024")
+ (description "COVID crash and recovery through 2024 (PIT top-1000-2020)")
+ (period ((start_date 2020-01-02) (end_date 2024-12-31)))
+ (universe_path "../goldens-custom-universe/composition/top-1000-2020.sexp")
+ (universe_size 1000)
+ (config_overrides
+  (((virgin_supply_basis Legacy_mixed)) ((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.30))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ (expected
+  ;; Concentration=0.30 promotion 2026-06-25 (max_position_pct_long 0.14 -> 0.30, the
+  ;; production default; ledger 2026-06-25-capacity-concentration-broad). Warehouse
+  ;; re-measure, ±20% around 0.30 actuals (ret 52.86 sharpe 0.571 maxDD 34.55).
+  ;; 0.30 lifts this 4y window's return (41->53%) and sharpe (0.46->0.57).
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±20% around 364 actuals
+  ;; vs rebuilt warehouse: ret 134.01  trades 193  win 42.49  sharpe 0.84
+  ;; maxDD 31.50  hold 49.46 (return 53→134% on this window — RS-honest early
+  ;; screens compound the 2020-21 recovery cohort).
+  ;; Verified 2026-07-11 under the realism-defaults flip (ledger
+  ;; 2026-07-10-realism-defaults-flip): BIT-IDENTICAL actuals (134.01 / 193 /
+  ;; 42.49 / 0.84 / 31.50 / 49.46) — no ghost or sub-$1M-ADV fill in this
+  ;; window's path. Bands unchanged.
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + dissection in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips; tier 4 is a local release gate with no CI consumer. Correctness re-pin: no return claim attaches to the delta.
+  ;; RE-PINNED 2026-10-29 for the Seeded tiebreak default (#3425), ±15% around the new-arm actual (dev/experiments/tier4-seeded-repin-2026-10-29/). The prior pin was already stale: the Alphabetical arm fails it too. Single seed-0 draw; the cross-arm move is path noise (#3419), see the README.
+  ;; SEED-BAND RE-PIN 2026-10-29 (#3404 follow-up): each metric is the min..max over tiebreak seeds 0-4, widened 15% each side (total_return_pct: at least 5pp); seeds and per-seed actuals in dev/experiments/tier4-seed-band-2026-10-29/. Seed-to-seed spread is path noise (#3419), so a single-seed ±15% pin fails on any path-perturbing change; this band fails only on moves outside that noise.
+  ((total_return_pct ((min 18.9711) (max 612.7913)))
+   (total_trades ((min 119.8500) (max 197.8000)))
+   (win_rate ((min 24.7163) (max 37.4419)))
+   (sharpe_ratio ((min 0.1646) (max 0.9031)))
+   (max_drawdown_pct ((min 26.4813) (max 88.7530)))
+   (avg_holding_days ((min 44.8324) (max 75.2720))))))
