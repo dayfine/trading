@@ -21,7 +21,7 @@ days to reset. Run one agent at a time and no batch runs.
 
 - **#3677, the flip** (`feat/virgin-supply-one-basis-default`, tip 08e2fac19).
   - The tripwire passed: S k0 26y on the flip build reproduces vsb-1 k0 `trades.csv` exactly (md5 `3ee10dca319e54a85f5e0a7842d8c537`, 559 round trips). The files are in trading-results 6cad233.
-  - The paired golden chain is running locally. The script is `/tmp/vsb-flip-run/chain.sh` and the log is `/tmp/vsb-flip-run/chain.log`; artifacts go to `.sweep-output/vsbg/`. The old arm is the same spec with `((virgin_supply_basis Legacy_mixed))` prepended.
+  - The paired golden chain is running locally. The script and log are in `.sweep-output/vsb-flip-run/` (moved out of `/tmp` after a second host restart); artifacts go to `.sweep-output/vsbg/`. The old arm is the same spec with `((virgin_supply_basis Legacy_mixed))` prepended.
   - Chain progress: phases 1 and 2 are done (33 cells). A host restart killed it in phase 3. It was resumed at 21:39 PT, and its log was rebuilt from the finished cells' summaries.
   - When the chain is done:
     - build the paired table;
