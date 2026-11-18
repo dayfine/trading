@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 21 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 21 equity curves (21 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 Follow-up to `../trader-presets-2026-09-29/` (#3038, writeup `results-2026-10-01.md`, PR #3061).
 That matrix left two questions open:
 

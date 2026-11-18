@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 12 `*open_positions.csv`, 12 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 12 equity curves (12 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). 1 more price table(s) (`y2022-positions.txt`) followed in commit 96f047f. Index: `../TRADES-PRIVATE.md`.
+
 Status: **SN RUN 2026-10-25, NOT LIVE as screened (§Results, #3423); SM RUN 2026-10-26, INCONCLUSIVE (§Results, arm SM).** Pre-registered in #3418 (97b6daa99, plus the §Log
 06:57 PT amendment) before any SN cell ran; the null is path-stability arm S (#3419). All 6 SN cells ran clean (V6 exit 0).
 

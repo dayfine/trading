@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 30 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 30 equity curves (30 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Question.** What does each *trader* dial contribute, measured as a coherent preset rather than
 a one-knob graft onto the investor base? And how do the trader, hybrid and investor presets rank
 over several horizons?

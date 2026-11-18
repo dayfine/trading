@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 2 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 2 equity curves (2 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 User decision 2026-10-04: rerun the SPY 30-week-MA reference strategy once on the current build as a benchmark
 for the 26y investor baseline, then close the `spy-only-reference` track. Not an experiment with a verdict —
 a reference row. Build: code_version e9457c3ec per both `results/*-params.sexp` (workspace `jjws-spy` at `main` 63b14a8a7, code-identical — the two differ only under `dev/`), CSV mode, bars from the full data store

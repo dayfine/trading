@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 11 `*open_positions.csv`, 1 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 1 bar/close dumps and daily tables, 9 terminal-run tables (10 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+
 **Status: QUEUED** — runs in this order once PR #2692 merges (it carries the `delisted`
 exit and the V16/V17 validator the acceptance step reads). Each step is
 container-exclusive: no agents alongside a rebuild or a 26y cell

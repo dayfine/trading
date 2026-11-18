@@ -4,6 +4,8 @@
 
 > **Position files moved (2026-11-17).** This directory's 3 `*open_positions.csv`, 3 `*force_liquidations.sexp` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
+> **Run tables moved (2026-11-17).** This directory's 1 terminal-run table (1 file) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). 2 more price table(s) (`fetch_miss.txt`, `fetch_2026-09-14.log`) followed in commit 96f047f. Index: `../TRADES-PRIVATE.md`.
+
 Plan: `dev/plans/pit-universe-migration-2026-09-14.md` (step 2 of 6). Recipe: the 2026-09-08
 gap fetch (`dev/experiments/warehouse-rebuild-2026-09-06/fetch_gap.sh` — EODHD `/api/eod`,
 `>200`-row floor, `_old` synthetic twins skipped) run on the host against the CSV store
