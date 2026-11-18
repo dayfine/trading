@@ -61,7 +61,4 @@ days to reset. Run one agent at a time and no batch runs.
 
 ## Decisions waiting (deferred to 11:00 PT)
 
-**Cheap-stock line, next step** (step 1 above). The options:
-- **(a) Recommended: a cheap screen of the ADV floor.** For the 313 cheap names below $1M, compute the participation they would need at the run's NAV. If the position fits inside, say, 10 % of ADV at entry, pre-register a default-off lower floor (for example $250k) with K=5 paired 26y after the quota reset.
-- **(b) Close the cheap line.** The loss is a realism floor working as designed.
-- **(c) Instead, open NSS as a universal question:** do volatile names miss their base for every band? This is bigger and not about price.
+None. The cheap-stock choice was answered: the user picked (a) on 11-18. The ADV-floor screen then came out NO-BUILD. A median-size position would be a median 46 % of a day's dollar volume, and none of the 64 monster rows fit under 10 %. Capping positions to 10 % of volume leaves about +0.06 log over 26 years, which is under the 0.2 noise floor. Recommendation: close the cheap-stock line. `No_structural_stop` remains an open question for every price band. Memory: `project_trait_y_low_price`.
