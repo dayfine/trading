@@ -33,6 +33,7 @@ days to reset. Run one agent at a time and no batch runs.
 
 ## 3. Queue
 
+0. **Cheap-stock line, step 1 (USER 11-17).** Once #3677 merges, do a read-only dissection of cheap (≤ $14) candidates dropped as `No_structural_stop` in the #3602 S-k0 candidate log. The question is whether they are real no-base breakouts or volatile names whose base the detector misses. If bases are being missed, pre-register a default-off MA-fallback initial stop (spine 5), K=5 paired 26y plus a top-1000 cell, after the quota reset. If they really have no base, close the line. Memory: `project_trait_y_low_price`.
 1. **#3676 bar fixtures.** Move the 650 EODHD bar files in `trading/test_data/<A-Z>/` to trading-results. CI fetches them with a read-only deploy key, and the repo stays public. Purging them from history is a separate decision. Do this after the flip.
 2. **After the flip:**
    - `weekly_snapshot_generator.ml` does not pass `virgin_supply_basis` through, so it always uses the default (follow-up);
