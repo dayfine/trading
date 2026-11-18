@@ -1,4 +1,4 @@
-# Next-session priorities — 2026-11-17 (supersedes 2026-11-15)
+# Next-session priorities — 2026-11-18 (covers 11-17 evening to 11-18 01:00 PT; supersedes 2026-11-15)
 
 The virgin/supply look-ahead (#3664) is being fixed by flipping `virgin_supply_basis` to `One_basis` (user decision
 11-17, "flip on correctness"). The fix is PR #3677. It waits on a paired golden chain, after which the moved goldens
@@ -37,6 +37,12 @@ days to reset. Run one agent at a time and no batch runs.
    - `No_structural_stop` is not cheap-specific. It skips 85.7 % of admitted rows at ≤ $14, 92.3 % at $14–33 and 92.8 % above $33. A cheap name skipped there is more often a monster: 13.6 % against 3.6 % above $33.
    - The loss that is specific to cheap names is the $1M entry-ADV liquidity floor. It accounts for 313 of the 319 cheap `Not_reached` rows (9.5 % of cheap admitted rows, against 0.5 % above $33), and all 64 cheap monsters among them.
    - So there is no detector defect to fix. The open lever is `min_entry_dollar_adv`, a capacity dial: see Decisions waiting. Memory: `project_trait_y_low_price`.
+0a. **#3681: participation-scaled entry liquidity gate** (`ready-for-agent`; build after the quota reset, about 11-21,
+   with one feat-weinstein agent). Today's entry floor is a fixed $1M of 20-day dollar ADV. #3681 adds
+   `max_entry_adv_participation` (default off) so the bar scales with position size, and lets the weekly picks take
+   an account or position size. User, 11-18: "initially if we can buy $10k it's good enough -- this should be
+   configurable", then "we can wait". So the live picks keep the $1M floor
+   (`dev/weekly-picks/record-config-overrides.sexp:22`) until #3681 merges; do not lower it by hand.
 1. **#3676 bar fixtures.** Move the 650 EODHD bar files in `trading/test_data/<A-Z>/` to trading-results. CI fetches them with a read-only deploy key, and the repo stays public. Purging them from history is a separate decision. Do this after the flip.
 2. **After the flip:**
    - `weekly_snapshot_generator.ml` does not pass `virgin_supply_basis` through, so it always uses the default (follow-up);
@@ -61,4 +67,4 @@ days to reset. Run one agent at a time and no batch runs.
 
 ## Decisions waiting (deferred to 11:00 PT)
 
-None. The cheap-stock choice was answered: the user picked (a) on 11-18. The ADV-floor screen then came out NO-BUILD. A median-size position would be a median 46 % of a day's dollar volume, and none of the 64 monster rows fit under 10 %. Capping positions to 10 % of volume leaves about +0.06 log over 26 years, which is under the 0.2 noise floor. Recommendation: close the cheap-stock line. `No_structural_stop` remains an open question for every price band. Memory: `project_trait_y_low_price`.
+None. The cheap-stock choice was answered: the user picked (a) on 11-18. The ADV-floor screen then came out NO-BUILD. A median-size position would be a median 46 % of a day's dollar volume, and none of the 64 monster rows fit under 10 %. Capping positions to 10 % of volume leaves about +0.06 log over 26 years, which is under the 0.2 noise floor. The cheap-stock line is closed at backtest size. At live size ($10k positions) the same names fit, which is #3681; the user chose to wait for it rather than lower the floor now. `No_structural_stop` remains an open question for every price band. Memory: `project_trait_y_low_price`.
