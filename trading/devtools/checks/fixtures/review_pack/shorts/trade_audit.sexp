@@ -4,15 +4,15 @@
       (macro_trend Bullish) (macro_confidence 0.75)
       (side Long) (suggested_entry 10.00) (close_at_decision 9.90))))
    ((entry
-     ((symbol RMD) (entry_date 2020-02-21) (position_id RMD-wein-2)
+     ((symbol BBB) (entry_date 2020-02-21) (position_id BBB-wein-2)
       (macro_trend Bearish) (macro_confidence 0.25)
-      (side Short) (suggested_entry 54.85) (close_at_decision 41.07)
+      (side Short) (suggested_entry 50.00) (close_at_decision 40.00)
       (alternatives_considered
-       (((symbol REGN) (side Short) (score 110) (grade A_plus))))))
+       (((symbol CCC) (side Short) (score 110) (grade A_plus))))))
    ((entry
-     ((symbol GFI) (entry_date 2020-03-13) (position_id GFI-wein-3)
+     ((symbol DDD) (entry_date 2020-03-13) (position_id DDD-wein-3)
       (macro_trend Bearish) (macro_confidence 0.25)
-      (side Short) (suggested_entry 18.79) (close_at_decision 15.59))))))
+      (side Short) (suggested_entry 20.00) (close_at_decision 16.00))))))
  (cascade_summaries
   (((date 2020-02-14) (total_stocks 3) (candidates_after_held 3)
     (macro_trend Bearish) (breadth_state Bearish_breadth)
