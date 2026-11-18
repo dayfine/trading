@@ -2,7 +2,7 @@
 
 > **Trade files moved (2026-11-17).** This directory's 18 `*trades*.csv` file(s) carry entry and exit prices, so they now live in the private `dayfine/trading-results` repo at the same paths (commit e0252b2), per the EODHD terms. References to them below resolve there. Index: `../TRADES-PRIVATE.md`.
 
-> **Position files moved (2026-11-17).** This directory's 18 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
+> **Position files moved (2026-11-17).** This directory's 18 `*open_positions.csv`, 18 `*final_prices.csv` file(s) carry entry prices or end-of-run marks, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commits 3ccfce9, 0d2eec7). Index: `../TRADES-PRIVATE.md`.
 
 Third chain on the fixed exit basis (post #2648), after
 `record-rebase-2026-09-03` (the null) and `stop-width-surface-2026-09-03`.
