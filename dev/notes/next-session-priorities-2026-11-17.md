@@ -14,6 +14,8 @@ days to reset. Run one agent at a time and no batch runs.
 | #3672 | CLAUDE.md container line |
 | #3673 | 709 trades CSVs moved to trading-results (e0252b2) |
 | #3675 | 515 position and mark files moved (trading-results 3ccfce9, 0d2eec7) |
+| #3678 | 493 run tables moved (trading-results a5753f7, dca23d2, 96f047f): equity curves, dumps, event tables, firstdiff trade dumps, fresh-eyes tickets and logs. Two QC rework rounds: a header scan misses header-less price files, so scan by value |
+| #3680 | 47 run files outside `dev/experiments` moved (f72dd07, 192fba1); `.gitignore` trades negations dropped; review-pack shorts fixture made synthetic |
 
 ## 2. In flight
 
@@ -28,8 +30,6 @@ days to reset. Run one agent at a time and no batch runs.
     - update lane.sh `TRIP_MD5`, `observatory_lane_check.sh:90` and observatory README:219 from `0928cfe4` to `3ee10dca…`;
     - add the table to the PR body, add the `paired-run-done` label, and change the body to `Closes #3664`.
   - Then run the gates: CI → qc-structural (sonnet) → qc-behavioral → merge.
-- **#3678** deletes 458 run tables: equity curves, dumps, event tables, and fresh-eyes order tickets and logs. The private copies are a5753f7 and dca23d2. Needs CI → qc-results → merge.
-- **Next PR (full gates):** delete the outside-`dev/experiments` run files (private copy f72dd07), drop the `.gitignore` negations that track them (around lines 166-175), and handle the review-pack fixture `trading/devtools/checks/fixtures/review_pack/shorts/trade_audit.sexp` (real tickers and entry prices). Count the files from the diff itself; the #3675 review recounts 35-40.
 
 ## 3. Queue
 
@@ -51,6 +51,8 @@ days to reset. Run one agent at a time and no batch runs.
 
 ## 4. For the user
 
+- **Still public, your call:** about 150 runner logs that quote one fill price per rejected fill, 303 validator reports with `entry=<p>` sample lines, and passing quotes in reports. All are listed in `dev/experiments/TRADES-PRIVATE.md` §Still public. The bar fixtures are #3676.
+- **x86 sweep done (11-17):** the dead Python 3.8 links, Parallels links and rustup proxies are removed, and the hook now runs on `/usr/bin/python3`. Still needs sudo: `sudo rm -rf /Library/Frameworks/Python.framework "/Applications/Python 3.8"`. HiPKILocalSignServer and Memory Clean 2 need Rosetta.
 - **Rotate the GitHub token.** Then update the plaintext `~/.git-credentials` entry; credential.helper is `store`.
 - **The host moved or restarted on 11-17 evening.** `/tmp` and the session scratchpad were wiped. The container and the repo, including `.sweep-output`, survived.
 
