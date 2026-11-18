@@ -188,8 +188,21 @@ A value scan of what is left (a line with a ticker and at least two numbers ≥ 
 - **Analysis tables and reports** whose numbers are cash in dollars (`required`, `available` in `*cash_rejections.csv` and `*audit_entries.csv`), returns, ratios or scores rather than prices. Examples are the `entry-timing-screen-2026-11-12` replay and feature tables, `fresh-eyes-dated` `fwd*.csv`, and the read `.txt` reports. Some of them quote a single price in passing.
 - **Validator reports** (303 `*validator*.md`): their sample lines quote prices as `key=value` tokens (`entry=<p>`, `prior_top=<p>`), about 10,500 such lines across some 290 files (count from the #3678 review). The value scan above missed them because it does not split `key=value` tokens.
 
-Outside `dev/experiments/`:
+Outside `dev/experiments/` (status as of 2026-11-17):
 
-- **Run files** with a price column in `dev/backtest`, `dev/warmup-fix-runs` and `dev/all_eligible`. They are already copied to trading-results f72dd07. Their delete takes the full PR gates and comes next.
-- **Test fixture** `trading/devtools/checks/fixtures/review_pack/shorts/trade_audit.sexp`, which holds real tickers with entry prices (#3675 review note N2). It goes with that full-gate PR.
+- **Run files** in `dev/backtest`, `dev/warmup-fix-runs` and `dev/all_eligible`: moved 2026-11-17 (trading-results f72dd07 and 192fba1; 47 files, byte-identical to main). They are 24 `trades.csv` with entry and exit prices, 5 each of `open_positions.csv`, `final_prices.csv`, `trade_audit.sexp` and `equity_curve.csv`, 1 `force_liquidations.sexp`, and 2 extension-screen per-trade tables. `.gitignore` no longer re-includes the stop-buffer `trades.csv`. Test and `.mli` comments that cite these paths are provenance only, and the copies sit at the same paths in trading-results.
+
+  | directory | files |
+  |---|---:|
+  | `dev/all_eligible/sp500-2019-2023` | 7 |
+  | `dev/backtest/2026-04-13-063339` | 1 |
+  | `dev/backtest/2026-04-13-063802` | 1 |
+  | `dev/backtest/2026-04-13-064344` | 1 |
+  | `dev/backtest/2026-04-13-064814` | 1 |
+  | `dev/backtest/extension-screen-2026-07-11` | 2 |
+  | `dev/backtest/scenarios-2026-04-14-222425` | 5 |
+  | `dev/backtest/scenarios-2026-04-14-225929` | 3 |
+  | `dev/warmup-fix-runs/after-fix1-stop-log` | 26 |
+
+- **Test fixture** `trading/devtools/checks/fixtures/review_pack/shorts/trade_audit.sexp`: its three real tickers and prices were replaced on 2026-11-17 with synthetic ones (BBB, CCC, DDD). The test reads only counts.
 - **Bar fixtures:** 650 EODHD daily bar files in `trading/test_data/<A-Z>/`, tracked by #3676.
