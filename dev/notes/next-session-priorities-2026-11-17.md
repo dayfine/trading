@@ -17,7 +17,7 @@ days to reset. Run one agent at a time and no batch runs.
 | #3678 | 493 run tables moved (trading-results a5753f7, dca23d2, 96f047f): equity curves, dumps, event tables, firstdiff trade dumps, fresh-eyes tickets and logs. Two QC rework rounds: a header scan misses header-less price files, so scan by value |
 | #3680 | 47 run files outside `dev/experiments` moved (f72dd07, 192fba1); `.gitignore` trades negations dropped; review-pack shorts fixture made synthetic |
 
-## 2. In flight
+## 2. In flight (#3677 merged 11-18 as 1b5b991; the flip is done, no golden moved)
 
 - **#3677, the flip** (`feat/virgin-supply-one-basis-default`, tip 08e2fac19).
   - The tripwire passed: S k0 26y on the flip build reproduces vsb-1 k0 `trades.csv` exactly (md5 `3ee10dca319e54a85f5e0a7842d8c537`, 559 round trips). The files are in trading-results 6cad233.
@@ -33,7 +33,10 @@ days to reset. Run one agent at a time and no batch runs.
 
 ## 3. Queue
 
-0. **Cheap-stock line, step 1 (USER 11-17).** Once #3677 merges, do a read-only dissection of cheap (≤ $14) candidates dropped as `No_structural_stop` in the #3602 S-k0 candidate log. The question is whether they are real no-base breakouts or volatile names whose base the detector misses. If bases are being missed, pre-register a default-off MA-fallback initial stop (spine 5), K=5 paired 26y plus a top-1000 cell, after the quota reset. If they really have no base, close the line. Memory: `project_trait_y_low_price`.
+0. **Cheap-stock line: step 1 done (11-18, read-only).** Source: the gate-funnel S-k0 `pool_outcomes`, with raw closes joined from `data/`. It is one seed on a pre-flip build.
+   - `No_structural_stop` is not cheap-specific. It skips 85.7 % of admitted rows at ≤ $14, 92.3 % at $14–33 and 92.8 % above $33. A cheap name skipped there is more often a monster: 13.6 % against 3.6 % above $33.
+   - The loss that is specific to cheap names is the $1M entry-ADV liquidity floor. It accounts for 313 of the 319 cheap `Not_reached` rows (9.5 % of cheap admitted rows, against 0.5 % above $33), and all 64 cheap monsters among them.
+   - So there is no detector defect to fix. The open lever is `min_entry_dollar_adv`, a capacity dial: see Decisions waiting. Memory: `project_trait_y_low_price`.
 1. **#3676 bar fixtures.** Move the 650 EODHD bar files in `trading/test_data/<A-Z>/` to trading-results. CI fetches them with a read-only deploy key, and the repo stays public. Purging them from history is a separate decision. Do this after the flip.
 2. **After the flip:**
    - `weekly_snapshot_generator.ml` does not pass `virgin_supply_basis` through, so it always uses the default (follow-up);
@@ -58,4 +61,7 @@ days to reset. Run one agent at a time and no batch runs.
 
 ## Decisions waiting (deferred to 11:00 PT)
 
-None.
+**Cheap-stock line, next step** (step 1 above). The options:
+- **(a) Recommended: a cheap screen of the ADV floor.** For the 313 cheap names below $1M, compute the participation they would need at the run's NAV. If the position fits inside, say, 10 % of ADV at entry, pre-register a default-off lower floor (for example $250k) with K=5 paired 26y after the quota reset.
+- **(b) Close the cheap line.** The loss is a realism floor working as designed.
+- **(c) Instead, open NSS as a universal question:** do volatile names miss their base for every band? This is bigger and not about price.
