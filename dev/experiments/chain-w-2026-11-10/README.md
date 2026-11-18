@@ -4,7 +4,7 @@
 
 > **Position files moved (2026-11-17).** This directory's 2 `*open_positions.csv` file(s) carry entry prices, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit 3ccfce9). Index: `../TRADES-PRIVATE.md`.
 
-> **Run tables moved (2026-11-17).** This directory's 2 equity curves (2 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). Index: `../TRADES-PRIVATE.md`.
+> **Run tables moved (2026-11-17).** This directory's 2 equity curves (2 file(s)) carry prices or closes, so they also live in the private `dayfine/trading-results` repo now, at the same paths (commit a5753f7). 1 more price table(s) (`firstdiff.txt`) followed in commit 96f047f. Index: `../TRADES-PRIVATE.md`.
 
 **Status: run 2026-11-12, read 2026-11-13 (§Results).** The pre-registration below is unchanged: every read was
 fixed before the first cell launched. The chain ran in a Claude cloud session (`docs/howtos/claude_cloud_sessions.md`).

@@ -5,7 +5,7 @@ Per-trade CSVs that carry entry and exit prices (`entry_price`/`exit_price` or `
 - 2026-11-16, #3665 (trading-results 477a85e): the 18 `rt-freshness-*-2026-08-20` arm files.
 - 2026-11-17 (trading-results e0252b2): the 709 files listed below by directory, copied from main at 777f09ed4 and checked byte-identical before the delete.
 - 2026-11-17 (trading-results 3ccfce9, 0d2eec7): 515 position and mark files (open positions, forced liquidations, trade audits, final marks), listed under §Position files below.
-- 2026-11-17 (trading-results a5753f7, dca23d2): 458 run tables that carry a price or close in every row (equity curves, bar and close dumps, per-event tables, order tickets and follow logs), listed under §Run tables below.
+- 2026-11-17 (trading-results a5753f7, dca23d2, 96f047f): 493 run tables that carry a price or close in every row (equity curves, bar and close dumps, per-event tables, trade-row dumps, order tickets and follow logs), listed under §Run tables below.
 
 Trade files with returns only (`ret`, `spy_ret`, `excess`; no price column) stay public. New experiment and lane output follows the same split: price-bearing files to trading-results, mark-free files here (`dev/experiments/observatory/README.md` §Lane).
 
@@ -116,32 +116,32 @@ The #3673 and #3675 reviews found the same prices in other per-run files. These 
 | `warehouse-rebuild-2026-09-06` | 11 | 1 | 0 | 0 | 0 | 12 |
 | **total** | **345** | **125** | **3** | **41** | **1** | **515** |
 
-## Run tables (2026-11-17, trading-results a5753f7 and dca23d2)
+## Run tables (2026-11-17, trading-results a5753f7, dca23d2 and 96f047f)
 
-The user chose to move every remaining price-bearing file (2026-11-17). All 458 match main at 958d301ca byte for byte in trading-results: 240 `equity_curve.csv` (a day with one open position gives back that day's close from the change in NAV), the bar and close dumps, the per-event tables (`raw_close`, `e1_px`, `stop`), the `audit_extract.csv` and `terminal_runs_*.csv` tables, the arc-rerun same-day-stop, fill-day-gap and Saturday-exit reprice tables, and the fresh-eyes order tickets (`trigger,limit,stop`), follow logs (`trigger,stop`), forward decisions and list scan (`close,anchor`). The 124 files in dca23d2 were found by the #3675 review (note N4).
+The user chose on 2026-11-17 to move every price-bearing file; these are the ones found so far. The first 458 match main at 958d301ca byte for byte in trading-results: 240 `equity_curve.csv` (a day with one open position gives back that day's close from the change in NAV), the bar and close dumps, the per-event tables (`raw_close`, `e1_px`, `stop`), the `audit_extract.csv` and `terminal_runs_*.csv` tables, the arc-rerun same-day-stop, fill-day-gap and Saturday-exit reprice tables, and the fresh-eyes order tickets (`trigger,limit,stop`), follow logs (`trigger,stop`), forward decisions and list scan (`close,anchor`). The 124 files in dca23d2 were found by the #3675 review (note N4). The second batch, 35 files in 96f047f, was found by the #3678 review's value scan; they match main at 10a5b1160 byte for byte. They are listed after the first table.
 
 | directory | files | kinds | commit |
 |---|---:|---|---|
 | `arc-rerun-2026-09-01` | 25 | 19 audit extracts, 3 bar/close dumps and daily tables, 3 reprice tables | a5753f7, dca23d2 |
 | `breadth-fix-rb1-2026-10-11` | 6 | 6 equity curves | a5753f7 |
-| `cell-e-15y-2026-05-07` | 1 | 1 equity curves | a5753f7 |
+| `cell-e-15y-2026-05-07` | 1 | 1 equity curve | a5753f7 |
 | `chain-w-2026-11-10` | 2 | 2 equity curves | a5753f7 |
 | `concentration-deploy-2026-09-13` | 4 | 4 equity curves | a5753f7 |
-| `deep-1998-2026-2026-06-14` | 1 | 1 equity curves | a5753f7 |
-| `delisting-guards-rerun-2026-09-06` | 1 | 1 terminal-run tables | a5753f7 |
+| `deep-1998-2026-2026-06-14` | 1 | 1 equity curve | a5753f7 |
+| `delisting-guards-rerun-2026-09-06` | 1 | 1 terminal-run table | a5753f7 |
 | `entry-anchor-recovery-2026-10-02` | 24 | 24 equity curves | a5753f7 |
 | `floor-nearest-2026-10-25` | 12 | 12 equity curves | a5753f7 |
 | `fresh-eyes-2026-10-13` | 10 | 6 follow logs, 4 bar/close dumps and daily tables | a5753f7, dca23d2 |
-| `fresh-eyes-dated-2026-10-18` | 114 | 81 follow logs, 32 order tickets, 1 bar/close dumps and daily tables | dca23d2 |
-| `index-hedge-screen-2026-10-12` | 1 | 1 bar/close dumps and daily tables | a5753f7 |
+| `fresh-eyes-dated-2026-10-18` | 114 | 81 follow logs, 32 order tickets, 1 bar/close dump or daily table | dca23d2 |
+| `index-hedge-screen-2026-10-12` | 1 | 1 bar/close dump or daily table | a5753f7 |
 | `investor-preset-2026-09-26` | 4 | 4 equity curves | a5753f7 |
 | `macro-suspend-investor-2026-10-04` | 12 | 12 equity curves | a5753f7 |
 | `path-stability-2026-10-23` | 24 | 24 equity curves | a5753f7 |
-| `pit-universe-2026-09-14` | 1 | 1 terminal-run tables | a5753f7 |
-| `price-band-binding-2026-11-13` | 1 | 1 equity curves | a5753f7 |
+| `pit-universe-2026-09-14` | 1 | 1 terminal-run table | a5753f7 |
+| `price-band-binding-2026-11-13` | 1 | 1 equity curve | a5753f7 |
 | `price-band-confirm-2026-11-13` | 20 | 20 equity curves | a5753f7 |
 | `price-band-tiebreak-2026-11-13` | 10 | 10 equity curves | a5753f7 |
-| `rebaseline-v12-2026-10-08` | 7 | 6 equity curves, 1 terminal-run tables | a5753f7 |
+| `rebaseline-v12-2026-10-08` | 7 | 6 equity curves, 1 terminal-run table | a5753f7 |
 | `record-kseed-2026-10-27` | 5 | 5 equity curves | a5753f7 |
 | `short-only-liveness-2026-10-04` | 2 | 2 equity curves | a5753f7 |
 | `short-setup-map-2026-10-12` | 26 | 26 per-event tables | a5753f7 |
@@ -156,15 +156,39 @@ The user chose to move every remaining price-bearing file (2026-11-17). All 458 
 | `trader-presets-2026-09-29` | 30 | 30 equity curves | a5753f7 |
 | `trader-presets-rerun-2026-10-02` | 21 | 21 equity curves | a5753f7 |
 | `twin-dedupe-26y-2026-10-29` | 6 | 6 equity curves | a5753f7 |
-| `verify-3266-rerun-2026-10-22` | 1 | 1 equity curves | a5753f7 |
+| `verify-3266-rerun-2026-10-22` | 1 | 1 equity curve | a5753f7 |
 | `verify-chain-v-2026-10-19` | 8 | 8 equity curves | a5753f7 |
 | `warehouse-dedup-2026-09-08` | 3 | 3 terminal-run tables | a5753f7 |
-| `warehouse-rebuild-2026-09-06` | 10 | 1 bar/close dumps and daily tables, 9 terminal-run tables | a5753f7 |
+| `warehouse-rebuild-2026-09-06` | 10 | 1 bar/close dump or daily table, 9 terminal-run tables | a5753f7 |
 | **total** | **458** | | |
+
+Second batch (trading-results 96f047f):
+
+| directory | files | what |
+|---|---:|---|
+| `arc-rerun-2026-09-01` | 4 | `splice-scan.csv`, `splice-scan-tradeable.csv` (consecutive closes), `b5-arc-s0/fwdvol.csv` (fill and later close), `b5-arc-s0/neverfilled-crossing.csv` (E and bar prices) |
+| `chain-w-2026-11-10` | 1 | `results/firstdiff.txt` (keyed trades.csv diff, full trade rows) |
+| `decision-walk-rk-2026-11-06` | 1 | `out/extras.txt` (E, close, stop) |
+| `floor-nearest-2026-10-25` | 1 | `results/sm/read/y2022-positions.txt` (entry and exit prices) |
+| `fresh-eyes-2026-10-13` | 1 | `results/forward/analysis/ours.csv` (weekly closes) |
+| `fresh-eyes-dated-2026-10-18` | 5 | `results/analysis/{nss_sample_scan,placed_geo,placed_s0,nss,nearest_on_none}.csv` (anchor, close, trigger, limit, stop) |
+| `pit-universe-2026-09-14` | 2 | `results/fetch_miss.txt`, `results/fetch_2026-09-14.log` (`MISS` lines carry an OHLCV bar) |
+| `price-band-confirm-2026-11-13` | 10 | `results/k*/pbc{1,2}-P-k*-s0-firstdiff.txt` (full trade rows) |
+| `price-band-tiebreak-2026-11-13` | 5 | `results/k*/pb-P-k*-s0-firstdiff.txt` (full trade rows) |
+| `short-setup-map-2026-10-12` | 1 | `results/analysis/traces.txt` (raw and adjusted closes) |
+| `stoplimit-entry-wfcv-2026-08-04` | 3 | `localtop-ladder/*-equity.csv` (daily equity curves) |
+| `yearly-trade-review-2026-09-04` | 1 | `graded.csv` (entry and exit prices, `ep,xp`) |
+| **total** | **35** | |
 
 ### Still public
 
-- **Passing quotes:** analysis outputs and prose writeups that quote a few single prices, for example `price-band-confirm-2026-11-13/results/read/report-*.txt`. They stay.
-- **Outside `dev/experiments/`:** the run files with a price column in `dev/backtest`, `dev/warmup-fix-runs` and `dev/all_eligible`, already copied to trading-results f72dd07. Their delete takes the full PR gates and follows this one.
-- **Test fixture:** `trading/devtools/checks/fixtures/review_pack/shorts/trade_audit.sexp` holds real tickers with entry prices (#3675 review note N2). It goes with the full-gate PR above.
+A value scan of what is left (a line with a ticker and at least two numbers ≥ 1, at least 20 such lines per file) still flags about 215 files in `dev/experiments/`. A sample read shows two kinds. They stay here pending the user's call:
+
+- **Runner logs** (about 150 `*.log`): `WARN: portfolio rejected fill for <SYM> (... price=<p>)` and similar lines that quote one fill price per event.
+- **Analysis tables and reports** whose numbers are cash in dollars (`required`, `available` in `*cash_rejections.csv` and `*audit_entries.csv`), returns, ratios or scores rather than prices. Examples are the `entry-timing-screen-2026-11-12` replay and feature tables, `fresh-eyes-dated` `fwd*.csv`, and the read `.txt` reports. Some of them quote a single price in passing.
+
+Outside `dev/experiments/`:
+
+- **Run files** with a price column in `dev/backtest`, `dev/warmup-fix-runs` and `dev/all_eligible`. They are already copied to trading-results f72dd07. Their delete takes the full PR gates and comes next.
+- **Test fixture** `trading/devtools/checks/fixtures/review_pack/shorts/trade_audit.sexp`, which holds real tickers with entry prices (#3675 review note N2). It goes with that full-gate PR.
 - **Bar fixtures:** 650 EODHD daily bar files in `trading/test_data/<A-Z>/`, tracked by #3676.
