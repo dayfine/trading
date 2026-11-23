@@ -57,7 +57,7 @@ else
   here: push the branch to dayfine/trading instead."
   TMP=$(mktemp -d)
   trap 'rm -rf "$TMP"' EXIT
-  AUTH=$(printf 'x-access-token:%s' "$TRADING_RESULTS_TOKEN" | base64 | tr -d '\n')
+  AUTH=$(printf 'x-access-token:%s' "$TRADING_RESULTS_TOKEN" | base64 | tr -d '[:space:]')  # GNU base64 wraps at 76 columns
   git init -q "$TMP/r"
   git -C "$TMP/r" -c "http.extraheader=Authorization: Basic $AUTH" \
     fetch -q --depth 1 https://github.com/dayfine/trading-results.git "$PIN" ||
