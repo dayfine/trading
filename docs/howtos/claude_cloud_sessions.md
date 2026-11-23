@@ -156,6 +156,41 @@ unpacking:
 
 With that step the rk-k0 cloud run matched the record byte-identically (2026-11-09).
 
+## Building a PIT warehouse in a session (v13)
+
+The pit-v13 lists (`trading/test_data/backtest_scenarios/pit-v13/`, top-4000 true-dollar-volume, 1998-2026,
+union 13,747 names after quarantine) need a warehouse that does not exist yet. The build needs no local Docker:
+`dev/scripts/build_pit_warehouse_v13.sh` runs the same phases as the v12 script with `CONTAINER=none`, so every
+command runs in the session itself. It takes hours, so launch it detached (see "Backtest chain longer than 2 h").
+Everything goes under `.sweep-output/` (gitignored), not `/tmp`, which a worker restart wipes.
+
+```sh
+# 1. the bar store (private R2, 16,203 symbols). data/ already holds tracked files, so pull elsewhere.
+sh dev/scripts/r2_bars.sh pull --dest "$PWD/.sweep-output/data" --name data-20261123
+# 2. the exe (inside the CI image if the session has no opam of its own, see "Building and testing")
+(cd trading && eval $(opam env) && dune build analysis/scripts/build_snapshots/build_snapshots.exe)
+# 3. build: phases preflight superset chunks classify chunk5 twinscan twinfix verify; each is resumable
+export CONTAINER=none CHUNKS=6 CSV="$PWD/.sweep-output/data" \
+  OUT="$PWD/.sweep-output/warehouse/snap_top4000_pit_v13pit" WORK="$PWD/.sweep-output/pit-v13-work"
+setsid nohup sh dev/scripts/build_pit_warehouse_v13.sh all >> "$WORK.out" 2>&1 < /dev/null &
+# 4. upload (the name carries the manifest count that `verify` logged), then check it from R2's side
+sh dev/scripts/r2_bars.sh push-dir --dir "$OUT" --name v13pit-<N> --resume
+sh dev/scripts/r2_bars.sh verify-dir --dir "$OUT" --name v13pit-<N>
+```
+
+- `CHUNKS=6` is the v13 default of the wrapper: about 2.3k names per chunk, as in v11, so a chunk build peaks near
+  5 GB and a pair scan (two chunks) near 4 GB. A session with less memory sets a larger `CHUNKS`; the pair scans become
+  C(CHUNKS,2) smaller ones (15 at 6, 28 at 8) and the extra builds are numbered after the chunks. `CHUNKS=4` is the v12
+  setting.
+- `pit-v13/quarantine.txt` (DNGFF, HLAN, MDFI, SYNI: absurd average dollar volume) is dropped from the union and is
+  expected-absent in `verify`; the lists still name them.
+- `preflight` needs a clean tree (it checks the exe's checkout with `git status`) and 30 GB free. After a restart, rerun a
+  single phase (`sh dev/scripts/build_pit_warehouse_v13.sh <phase>`); `twinfix` reuses its saved plan.
+- Readers of the finished warehouse export `SNAPSHOT_MAX_MMAP_HANDLES` at or above the manifest size (the wrapper's
+  default is 16000, the v12 script's 12000).
+- The v13 lists are not twin-aliased yet. After `twinfix`, apply `$WORK/alias-v12-new.txt` (the file name is the same
+  for every version) with the `alias-lists.pl` command the script logs, then regenerate the list `.md5` files.
+
 ## Building and testing inside a session
 
 ```sh

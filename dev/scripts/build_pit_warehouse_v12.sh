@@ -16,7 +16,7 @@
 #     sh dev/scripts/build_pit_warehouse_v12.sh <phase>
 # Phases, in order (each is resumable; `all` = preflight superset chunks classify chunk5 twinscan twinfix verify):
 #   preflight  host/container guards (no network, no writes)
-#   superset   union of the v12 lists + extras - quarantine -> $WORK/union.txt, 4 chunk specs        (host only)
+#   superset   union of the lists + extras - quarantine -> $WORK/union.txt, CHUNKS chunk specs        (host only)
 #   chunks     chunks 1-4: build_snapshots -incremental -dedupe-rename-twins -twin-basis returns
 #   classify   in-chunk twin drops -> legit (match >= 0.95) alias map vs false legs (match < 0.95)    (host only)
 #   chunk5     rebuild the false legs as their own series, no dedupe (-incremental)
@@ -24,37 +24,66 @@
 #   twinfix    direct-edge cross-chunk twins -> one -incremental dedupe rebuild of the pairs; collateral rebuilt alone
 #   verify     manifest == .snap set, D6 list coverage (expected absent = MEL + alias-delta legs), sample symbols, size
 # Dry harness for the guard / resume / D6 logic: trading/devtools/checks/build_pit_warehouse_v12_guard_smoke.sh
-# Output: warehouse in the container ($OUT); everything else under $WORK (host path /tmp/pit-v12-work).
+# Output: warehouse in the container ($OUT); everything else under $WORK (host path /tmp/pit-$VERSION-work).
 #
 # Estimates, from the v11 build (rebuild-pit-chunked.log, pair-scan.log): chunks 28-41 min each, ~2 h for four;
 # chunk 5 and the twin fix ~1 min each; the six pair scans 33-38 min each, ~3.6 h; total ~6 h wall, container-
 # exclusive (peak ~5-6 GB in a chunk build; ~4.3 GB in a pair scan). Warehouse 3.5 GB at 9,364 entries.
 # v12's union is larger than v11's 9,900 (the inventory grew 5,734 -> 11,888), so budget 7-8 h.
 #
-# Env: RUN_TREE (required), CONTAINER (trading-1-dev), HOST_ROOT (/Users/difan/Projects/trading-1),
-#      OUT (/tmp/snap_top3000_pit_v12pit), WORK (/tmp/pit-v12-work), END (today), START (1998-01-01).
+# Version parameter (v13, #3136 universe-depth): the same script builds any pit-<VERSION> list set. VERSION (default v12)
+# picks the list directory trading/test_data/backtest_scenarios/pit-$VERSION (variable V12 below, name kept for the guard
+# smoke), TOPN (default 3000) picks the composition/top-$TOPN-<year>.sexp lists, and the default OUT/WORK names follow
+# them. v13 is built by dev/scripts/build_pit_warehouse_v13.sh (a wrapper that sets VERSION=v13 TOPN=4000). Extra
+# quarantine: when pit-$VERSION/quarantine.txt exists its first column (symbols) is removed from the union too, and those
+# symbols count as expected-absent in `verify` (a v13 list still names them; the warehouse must not hold them).
+# CHUNKS (default 4) is the number of chunk builds: more, smaller chunks keep peak RSS lower (a v13 union of ~14.2k names
+# in 6 chunks is ~2.4k per chunk, like v11's 2.5k; the six pair scans become C(CHUNKS,2) smaller ones). The extra builds
+# are numbered after the chunks (CHUNKS+1 false legs, +2 twin fix, +3 collateral), identical to chunk5/6/7 at CHUNKS=4.
+#
+# CONTAINER=none runs everything directly on this machine, no docker (a Claude cloud session): RUN_TREE defaults to this
+# checkout, CSV to $HERE/data (pull it with dev/scripts/r2_bars.sh pull), the container-only guards are skipped.
+# Recipe: docs/howtos/claude_cloud_sessions.md section "Building a PIT warehouse in a session".
+#
+# Env: RUN_TREE (required unless CONTAINER=none), CONTAINER (trading-1-dev, or none), HOST_ROOT (/Users/difan/Projects/trading-1),
+#      OUT (/tmp/snap_top<TOPN>_pit_<VERSION>pit), WORK (/tmp/pit-$VERSION-work), END (today), START (1998-01-01),
+#      VERSION (v12), TOPN (3000), CHUNKS (4), CSV (the bar store).
 set -u
 
 PHASE=${1:-}
 CONTAINER=${CONTAINER:-trading-1-dev}
 HOST_ROOT=${HOST_ROOT:-/Users/difan/Projects/trading-1}
-OUT=${OUT:-/tmp/snap_top3000_pit_v12pit}
-WORK=${WORK:-/tmp/pit-v12-work}
+VERSION=${VERSION:-v12}
+TOPN=${TOPN:-3000}
+CHUNKS=${CHUNKS:-4}
+case "$CHUNKS" in ''|*[!0-9]*) echo "CHUNKS must be a positive integer, got '$CHUNKS'" >&2; exit 2 ;; esac
+[ "$CHUNKS" -ge 1 ] || { echo "CHUNKS must be >= 1" >&2; exit 2; }
+OUT=${OUT:-/tmp/snap_top${TOPN}_pit_${VERSION}pit}
+WORK=${WORK:-/tmp/pit-$VERSION-work}
 START=${START:-1998-01-01}
 END=${END:-$(date +%Y-%m-%d)}
-CSV=/workspaces/trading-1/data
 HERE=$(cd "$(dirname "$0")/../.." && pwd)                  # the checkout holding the lists
-V12=$HERE/trading/test_data/backtest_scenarios/pit-v12
+if [ "$CONTAINER" = none ]; then CSV=${CSV:-$HERE/data}; RUN_TREE=${RUN_TREE:-$HERE}; else CSV=${CSV:-/workspaces/trading-1/data}; fi
+V12=$HERE/trading/test_data/backtest_scenarios/pit-$VERSION      # the list directory of $VERSION (name kept: the smoke sets it)
 V11EXP=$HERE/dev/experiments/pit-universe-2026-09-14
 EXC=$HERE/trading/test_data/warehouse_exceptions.sexp
 RUN_TREE=${RUN_TREE:-}
 EXE=$RUN_TREE/trading/_build/default/analysis/scripts/build_snapshots/build_snapshots.exe
 HANDLE_CAP=${SNAPSHOT_MAX_MMAP_HANDLES:-12000}
+C_FALSE=chunk$((CHUNKS + 1)); C_TWIN=chunk$((CHUNKS + 2)); C_COLL=chunk$((CHUNKS + 3))   # chunk5/6/7 at CHUNKS=4
 
 mkdir -p "$WORK"
 log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$WORK/build.log"; }
 die() { log "ABORT: $*"; exit 1; }
-dx() { docker exec "$CONTAINER" "$@"; }                    # the dry harness redefines dx after sourcing this file
+# dx runs a command where the bar store and exes live: in the container, or here with CONTAINER=none.
+# The dry harness redefines dx and docker after sourcing this file.
+dx() { if [ "$CONTAINER" = none ]; then "$@"; else docker exec "$CONTAINER" "$@"; fi; }
+cp_in() { if [ "$CONTAINER" = none ]; then cp "$1" "$2"; else docker cp "$1" "$CONTAINER:$2"; fi; }    # host file -> exe side
+cp_out() { if [ "$CONTAINER" = none ]; then cp "$1" "$2"; else docker cp "$CONTAINER:$1" "$2"; fi; }  # exe side -> host file
+dx_bg() { if [ "$CONTAINER" = none ]; then nohup "$@" > /dev/null 2>&1 & else docker exec -d "$CONTAINER" "$@"; fi; }
+chunk_files() { i=1; while [ "$i" -le "$CHUNKS" ]; do printf '%s/chunk-%s.txt\n' "$WORK" "$i"; i=$((i + 1)); done; }
+list_files() { for f in "$V12"/composition/top-$TOPN-199[9].sexp "$V12"/composition/top-$TOPN-20*.sexp; do echo "$f"; done; }
+extra_quarantine() { [ -f "$V12/quarantine.txt" ] && awk '{ print $1 }' "$V12/quarantine.txt" || true; }
 n_manifest() { dx sh -c "grep -c '(symbol ' $OUT/manifest.sexp 2>/dev/null || echo 0"; }
 manifest_syms() { dx grep -o '((symbol [^)]*)' "$OUT/manifest.sexp" | sed 's/((symbol //; s/)$//' | LC_ALL=C sort -u; }
 
@@ -88,13 +117,13 @@ prune_orphans() {
 # $1 tag, $2 spec (host), $3.. extra build_snapshots flags
 run_build() {
   tag=$1; spec=$2; shift 2
-  docker cp "$spec" "$CONTAINER:/tmp/v12-$tag.sexp" || die "docker cp $spec"
-  docker cp "$EXC" "$CONTAINER:/tmp/warehouse_exceptions.sexp" || die "docker cp exceptions"
+  cp_in "$spec" "/tmp/$VERSION-$tag.sexp" || die "cp $spec to the exe side"
+  cp_in "$EXC" /tmp/warehouse_exceptions.sexp || die "cp exceptions"
   log "BUILD $tag ($(grep -c '(symbol ' "$spec") symbols) -> $OUT"
-  dx bash -c "cd $RUN_TREE/trading && eval \$(opam env) && $EXE -universe-path /tmp/v12-$tag.sexp -csv-data-dir $CSV -output-dir $OUT -benchmark-symbol GSPC.INDX -start-date $START -end-date $END -incremental $* -tail-exceptions /tmp/warehouse_exceptions.sexp > /tmp/v12-$tag.build.log 2>&1; echo exit=\$? >> /tmp/v12-$tag.build.log"
-  docker cp "$CONTAINER:/tmp/v12-$tag.build.log" "$WORK/$tag.build.log" 2>/dev/null
+  dx bash -c "cd $RUN_TREE/trading && eval \$(opam env 2>/dev/null) && $EXE -universe-path /tmp/$VERSION-$tag.sexp -csv-data-dir $CSV -output-dir $OUT -benchmark-symbol GSPC.INDX -start-date $START -end-date $END -incremental $* -tail-exceptions /tmp/warehouse_exceptions.sexp > /tmp/$VERSION-$tag.build.log 2>&1; echo exit=\$? >> /tmp/$VERSION-$tag.build.log"
+  cp_out "/tmp/$VERSION-$tag.build.log" "$WORK/$tag.build.log" 2>/dev/null
   tail -1 "$WORK/$tag.build.log" | grep -qx 'exit=0' || die "build $tag did not exit 0 (see $WORK/$tag.build.log; exit=137 = OOM)"
-  docker cp "$CONTAINER:$OUT/rename_twin_report.txt" "$WORK/$tag.rename_twin_report.txt" 2>/dev/null
+  cp_out "$OUT/rename_twin_report.txt" "$WORK/$tag.rename_twin_report.txt" 2>/dev/null
   assert_manifest_matches "$tag" "${ORPHAN_OK:-}"
 }
 
@@ -108,53 +137,59 @@ pinned_spec() {
 phase_preflight() {
   [ -n "$RUN_TREE" ] || die "RUN_TREE (container path of a pinned, built tree) is required"
   dx test -x "$EXE" || die "exe missing: $EXE (build it in the pinned tree: dune build analysis/scripts/build_snapshots/build_snapshots.exe)"
-  host_tree=$(echo "$RUN_TREE" | sed "s#^/workspaces/trading-1#$HOST_ROOT#")
+  host_tree=$RUN_TREE
+  [ "$CONTAINER" = none ] || host_tree=$(echo "$RUN_TREE" | sed "s#^/workspaces/trading-1#$HOST_ROOT#")
   git -C "$host_tree" rev-parse --git-dir >/dev/null 2>&1 || die "run tree $host_tree is not a git tree (RUN_TREE outside /workspaces/trading-1? set HOST_ROOT)"
   [ -z "$(git -C "$host_tree" status --porcelain)" ] || die "run tree $host_tree is dirty"
   git -C "$host_tree" merge-base --is-ancestor 6141b23c3239cca9e9c4a0927694ec163adfb610 HEAD || die "run tree lacks #2724 (-incremental manifest merge, commit 6141b23c3): rebase it onto main"
   log "run tree HEAD=$(git -C "$host_tree" rev-parse --short HEAD) (#2724 verified present; #2882 handle cap is an env knob)"
   # container-exclusive: no other long job
   if dx pgrep -f 'build_snapshots|scenario_runner|panel_runner|bayesian_runner' >/dev/null; then die "another build/backtest is running in $CONTAINER"; fi
-  used=$(docker stats --no-stream --format '{{.MemUsage}}' "$CONTAINER" | awk '{print $1}')
-  log "container mem in use: $used (need >= 6 GB free of 7.75 GB: expect < 1.5 GB)"
-  free_gb=$(df -g / | awk 'NR==2{print $4}'); [ "$free_gb" -gt 30 ] || die "host free ${free_gb} GB < 30 GB (sweep-hygiene.md)"
+  if [ "$CONTAINER" = none ]; then log "memory (MB): $(free -m 2>/dev/null | awk 'NR==2{print "total " $2 " free " $7}') (peak RSS of a chunk build is about 5-6 GB at 4 chunks; raise CHUNKS if this host has less)"
+  else used=$(docker stats --no-stream --format '{{.MemUsage}}' "$CONTAINER" | awk '{print $1}')
+    log "container mem in use: $used (need >= 6 GB free of 7.75 GB: expect < 1.5 GB)"; fi
+  free_gb=$(df -Pk / | awk 'NR==2{print int($4 / 1048576)}'); [ "$free_gb" -gt 30 ] || die "host free ${free_gb} GB < 30 GB (sweep-hygiene.md)"
   dx test -e "$OUT" && die "$OUT already exists; refusing to overwrite (move it or set OUT)"
   # the SGP_old1 tail cut is a store edit, not a build flag: rows after 2009-11-03 must be absent
   late=$(dx awk -F, '$1 > "2009-11-03" && $1 ~ /^[0-9]/' "$CSV/S/1/SGP_old1/data.csv" | wc -l | tr -d ' ')
   [ "$late" = 0 ] || die "SGP_old1 has $late rows after 2009-11-03: the 3b store edit is missing (see pit-universe-2026-09-14 README)"
-  n_lists=$(ls "$V12/composition"/top-3000-*.sexp | wc -l | tr -d ' ')
-  [ "$n_lists" -ge 27 ] || die "expected >= 27 top-3000 lists in $V12/composition, found $n_lists"
+  n_lists=$(ls "$V12/composition"/top-$TOPN-*.sexp | wc -l | tr -d ' ')
+  [ "$n_lists" -ge 27 ] || die "expected >= 27 top-$TOPN lists in $V12/composition, found $n_lists"
   log "preflight OK; HANDLE CAP for every chain on this warehouse: export SNAPSHOT_MAX_MMAP_HANDLES=$HANDLE_CAP (must be >= manifest size)"
 }
 
 phase_superset() {
   rm -f "$WORK/twinfix.plan"                                 # a new universe starts a new run: never inherit an old plan
   rm -rf "$WORK/twin-scan"  # scan reports belong to the previous universe too
-  quarantine=$(awk '{print $1}' "$V11EXP/results/quarantine.txt")
+  quarantine=$({ awk '{print $1}' "$V11EXP/results/quarantine.txt"; extra_quarantine; })
   {
-    for f in "$V12"/composition/top-3000-199[9].sexp "$V12"/composition/top-3000-20*.sexp; do grep -o '(symbol [^)]*)' "$f"; done | sed 's/(symbol //; s/)$//'
+    for f in $(list_files); do grep -o '(symbol [^)]*)' "$f"; done | sed 's/(symbol //; s/)$//'
     cat "$V12/warehouse-extras.txt"
   } | LC_ALL=C sort -u | grep -v -x -e GSPC.INDX -e MEL $(for q in $quarantine; do printf -- '-e %s ' "$q"; done) > "$WORK/union.txt"
   # chunk key: the symbol without its _old[N] suffix, so a rename twin pair never straddles a chunk boundary
-  # (v11 chunked by first letter for the same reason). Four equal chunks cut only where the key changes.
+  # (v11 chunked by first letter for the same reason). CHUNKS equal chunks cut only where the key changes.
   sed 's/_old[0-9]*$//' "$WORK/union.txt" | paste - "$WORK/union.txt" | LC_ALL=C sort -k1,1 -k2,2 > "$WORK/keyed.txt"
   total=$(wc -l < "$WORK/keyed.txt" | tr -d ' ')
-  awk -v total="$total" -v dir="$WORK" '
-    BEGIN { target = int((total + 3) / 4); c = 1 }
-    { if (n >= c * target && c < 4 && $1 != prev) c++
+  awk -v total="$total" -v n_chunks="$CHUNKS" -v dir="$WORK" '
+    BEGIN { target = int((total + n_chunks - 1) / n_chunks); c = 1 }
+    { if (n >= c * target && c < n_chunks && $1 != prev) c++
       print $2 > (dir "/chunk-" c ".txt"); n++; prev = $1 }' "$WORK/keyed.txt"
-  for c in 1 2 3 4; do
+  c=1
+  while [ "$c" -le "$CHUNKS" ]; do
     [ "$c" = 1 ] && echo GSPC.INDX >> "$WORK/chunk-1.txt"
     LC_ALL=C sort -u -o "$WORK/chunk-$c.txt" "$WORK/chunk-$c.txt"
     pinned_spec "$WORK/chunk-$c.txt" | sed 's/((symbol GSPC.INDX) (sector "Unknown"))/((symbol GSPC.INDX) (sector "Index"))/' > "$WORK/chunk-$c.sexp"
     log "chunk $c: $(wc -l < "$WORK/chunk-$c.txt" | tr -d ' ') symbols"
+    c=$((c + 1))
   done
   log "union=$total (+GSPC.INDX); v11 comparison: union 9,900, manifest 9,364 after twin dedupe"
 }
 
 phase_chunks() {
-  for c in 1 2 3 4; do
+  c=1
+  while [ "$c" -le "$CHUNKS" ]; do
     run_build "chunk$c" "$WORK/chunk-$c.sexp" -dedupe-rename-twins -twin-basis returns
+    c=$((c + 1))
   done
 }
 
@@ -163,9 +198,11 @@ phase_chunks() {
 # false (match < 0.95: transitive component drops) -> $WORK/false-legs.txt, rebuilt as their own series in chunk5.
 phase_classify() {
   : > "$WORK/legs.txt"
-  for c in 1 2 3 4; do
+  c=1
+  while [ "$c" -le "$CHUNKS" ]; do
     awk '/^  survivor/ { s = $2 } /^    [^ ]+ \(overlap=/ { m = $3; gsub(/[^0-9.]/, "", m); print $1, s, m }' \
       "$WORK/chunk$c.rename_twin_report.txt" >> "$WORK/legs.txt"
+    c=$((c + 1))
   done
   awk '$3 >= 0.95 { print $1, $2 }' "$WORK/legs.txt" | LC_ALL=C sort -u > "$WORK/alias-raw.txt"
   awk '$3 < 0.95 { print $1 }' "$WORK/legs.txt" | LC_ALL=C sort -u > "$WORK/false-legs.txt"
@@ -178,27 +215,30 @@ phase_classify() {
 
 phase_chunk5() {
   [ -s "$WORK/false-legs.txt" ] || { log "chunk5: no false legs; skipped"; return 0; }
-  pinned_spec "$WORK/false-legs.txt" > "$WORK/chunk-5.sexp"
-  run_build chunk5 "$WORK/chunk-5.sexp"                      # no -dedupe-rename-twins: they are distinct series
+  pinned_spec "$WORK/false-legs.txt" > "$WORK/chunk-${C_FALSE#chunk}.sexp"
+  run_build "$C_FALSE" "$WORK/chunk-${C_FALSE#chunk}.sexp"                      # no -dedupe-rename-twins: they are distinct series
 }
+
+# All C(CHUNKS,2) chunk pairs "i j", i < j, in lexicographic order (six at CHUNKS=4).
+chunk_pairs() { i=1; while [ "$i" -lt "$CHUNKS" ]; do j=$((i + 1)); while [ "$j" -le "$CHUNKS" ]; do echo "$i $j"; j=$((j + 1)); done; i=$((i + 1)); done; }
 
 # Guard 2, detection half: the twin pass on each chunk-PAIR union. The report is written before the per-symbol loop,
 # so the build is killed once it exists. Output dir is a scratch dir, never $OUT.
 phase_twinscan() {
   mkdir -p "$WORK/twin-scan"
-  for pair in "1 2" "1 3" "1 4" "2 3" "2 4" "3 4"; do
-    set -- $pair; i=$1; j=$2; tag=pair-$i$j; d=/tmp/v12-twin-scan/$tag
+  for pair in $(chunk_pairs); do
+    set -- $pair; i=$1; j=$2; tag=pair-$i$j; d=/tmp/$VERSION-twin-scan/$tag
     [ -s "$WORK/twin-scan/$tag.report" ] && { log "scan $tag already done"; continue; }
     { cat "$WORK/chunk-$i.txt" "$WORK/chunk-$j.txt"; } | grep -v -x GSPC.INDX | LC_ALL=C sort -u > "$WORK/twin-scan/$tag.txt"
     { pinned_spec "$WORK/twin-scan/$tag.txt" | sed '$d'; echo '  ((symbol GSPC.INDX) (sector "Index"))'; echo "))"; } > "$WORK/twin-scan/$tag.sexp"
-    dx mkdir -p "$d"; docker cp "$WORK/twin-scan/$tag.sexp" "$CONTAINER:$d/universe.sexp"
+    dx mkdir -p "$d"; cp_in "$WORK/twin-scan/$tag.sexp" "$d/universe.sexp"
     log "SCAN $tag ($(grep -c '(symbol ' "$WORK/twin-scan/$tag.sexp") symbols)"; t0=$(date +%s)
-    docker exec -d "$CONTAINER" bash -c "cd $RUN_TREE/trading && eval \$(opam env) && $EXE -universe-path $d/universe.sexp -csv-data-dir $CSV -output-dir $d -benchmark-symbol GSPC.INDX -start-date $START -end-date $END -dedupe-rename-twins -twin-basis returns > $d/build.log 2>&1; echo exit=\$? >> $d/build.log"
+    dx_bg bash -c "cd $RUN_TREE/trading && eval \$(opam env 2>/dev/null) && $EXE -universe-path $d/universe.sexp -csv-data-dir $CSV -output-dir $d -benchmark-symbol GSPC.INDX -start-date $START -end-date $END -dedupe-rename-twins -twin-basis returns > $d/build.log 2>&1; echo exit=\$? >> $d/build.log"
     sleep 5
     while :; do
       if dx test -f "$d/rename_twin_report.txt"; then
         dx pkill -x build_snapshots; sleep 2                  # narrow pattern on purpose (feedback_pkill_narrow_pattern)
-        docker cp "$CONTAINER:$d/rename_twin_report.txt" "$WORK/twin-scan/$tag.report"
+        cp_out "$d/rename_twin_report.txt" "$WORK/twin-scan/$tag.report"
         log "RESULT $tag => $(sed -n 2p "$WORK/twin-scan/$tag.report") (wall $(( $(date +%s) - t0 ))s)"; break
       fi
       dx pgrep -x build_snapshots >/dev/null || { log "RESULT $tag => <no report> $(dx tail -1 "$d/build.log")"; die "pair scan $tag died (exit=137 = OOM)"; }
@@ -232,7 +272,7 @@ _twinfix_plan() {
 }
 
 # Identity of this run's symbol universe (the chunk files). A plan saved by an older run in the same $WORK carries another id.
-_union_id() { cat "$WORK"/chunk-[1-4].txt 2>/dev/null | cksum | awk '{ print $1 "-" $2 }'; }
+_union_id() { cat $(chunk_files) 2>/dev/null | cksum | awk '{ print $1 "-" $2 }'; }
 
 # Guard 2, repair half. A cross-chunk leg is real only on a DIRECT edge (overlap >= 200, match >= 0.95), whose
 # survivor is not a hub (> 4 legs: the flat-series class of #2823), whose leg is not a restored false leg, and with both
@@ -253,8 +293,8 @@ phase_twinfix() {
   fi
   before=$(sed -n 's/^manifest_before=//p' "$WORK/twinfix.plan")
   ORPHAN_OK="$WORK/pairs-universe.txt"
-  pinned_spec "$WORK/pairs-universe.txt" > "$WORK/chunk-6.sexp"
-  run_build chunk6 "$WORK/chunk-6.sexp" -dedupe-rename-twins -twin-basis returns
+  pinned_spec "$WORK/pairs-universe.txt" > "$WORK/chunk-${C_TWIN#chunk}.sexp"
+  run_build "$C_TWIN" "$WORK/chunk-${C_TWIN#chunk}.sexp" -dedupe-rename-twins -twin-basis returns
   ORPHAN_OK=
   prune_orphans "$WORK/drop-legs.txt"
   manifest_syms > "$WORK/manifest-syms.txt"
@@ -264,7 +304,7 @@ phase_twinfix() {
   LC_ALL=C comm -23 "$WORK/pairs-universe.txt" "$WORK/drop-legs.txt" | LC_ALL=C comm -23 - "$WORK/manifest-syms.txt" > "$WORK/collateral.txt"
   if [ -s "$WORK/collateral.txt" ]; then
     log "collateral (survivors swept out by a degenerate component): $(tr '\n' ' ' < "$WORK/collateral.txt") -> rebuilt alone, no dedupe"
-    pinned_spec "$WORK/collateral.txt" > "$WORK/chunk-7.sexp"; run_build chunk7 "$WORK/chunk-7.sexp"
+    pinned_spec "$WORK/collateral.txt" > "$WORK/chunk-${C_COLL#chunk}.sexp"; run_build "$C_COLL" "$WORK/chunk-${C_COLL#chunk}.sexp"
   fi
   log "twinfix: $np pairs, $(wc -l < "$WORK/drop-legs.txt" | tr -d ' ') legs dropped; manifest $before -> $(n_manifest). Next: apply $WORK/alias-v12-new.txt to the lists"
   log "  perl dev/experiments/pit-universe-2026-09-14/step4/twin-scan/alias-lists.pl $WORK/alias-v12-new.txt $V12/composition/top-*.sexp"
@@ -279,9 +319,9 @@ phase_verify() {
   # apply: an `_old` series missing here is a real drop. Expected absent = MEL (built from two interleaved issuers,
   # excluded in `superset`, not in warehouse_exceptions.sexp) + the legs the alias delta maps away (in-chunk drops from
   # `classify`, cross-chunk drops from `twinfix`), which the lists lose when alias-lists.pl is applied.
-  for f in "$V12"/composition/top-3000-199[9].sexp "$V12"/composition/top-3000-20*.sexp; do grep -o '(symbol [^)]*)' "$f"; done | sed 's/(symbol //; s/)$//' | LC_ALL=C sort -u > "$WORK/list-union.txt"
+  for f in $(list_files); do grep -o '(symbol [^)]*)' "$f"; done | sed 's/(symbol //; s/)$//' | LC_ALL=C sort -u > "$WORK/list-union.txt"
   LC_ALL=C comm -23 "$WORK/list-union.txt" "$WORK/manifest-syms.txt" > "$WORK/absent.txt"
-  { echo MEL; [ -s "$WORK/alias-v12-new.txt" ] && awk '{ print $1 }' "$WORK/alias-v12-new.txt"; [ -s "$WORK/alias-inchunk.txt" ] && awk '{ print $1 }' "$WORK/alias-inchunk.txt"; } | LC_ALL=C sort -u > "$WORK/expected-absent.txt"
+  { echo MEL; extra_quarantine; [ -s "$WORK/alias-v12-new.txt" ] && awk '{ print $1 }' "$WORK/alias-v12-new.txt"; [ -s "$WORK/alias-inchunk.txt" ] && awk '{ print $1 }' "$WORK/alias-inchunk.txt"; } | LC_ALL=C sort -u > "$WORK/expected-absent.txt"
   grep -v -x -F -f "$WORK/expected-absent.txt" "$WORK/absent.txt" > "$WORK/unexpected-absent.txt"
   log "D6: absent=$(wc -l < "$WORK/absent.txt" | tr -d ' ') of which expected (MEL + alias-delta legs) $(( $(wc -l < "$WORK/absent.txt") - $(wc -l < "$WORK/unexpected-absent.txt") )); UNEXPECTED absent=$(wc -l < "$WORK/unexpected-absent.txt" | tr -d ' ') (must be 0)"
   [ ! -s "$WORK/unexpected-absent.txt" ] || die "D6: list symbols missing from the warehouse and not aliased: see $WORK/unexpected-absent.txt (twin component dropped an unaliased series, or list/alias out of sync)"
@@ -303,7 +343,7 @@ phase_verify() {
 # On-demand container (user decision 2026-11-16): every phase runs work in it, and it is stopped when idle.
 case "$PHASE" in
   preflight|superset|chunks|classify|chunk5|twinscan|twinfix|verify|all)
-    DOCKER_CONTAINER="$CONTAINER" sh "$HERE/dev/lib/ensure_container.sh" || die "container $CONTAINER is not up" ;;
+    [ "$CONTAINER" = none ] || DOCKER_CONTAINER="$CONTAINER" sh "$HERE/dev/lib/ensure_container.sh" || die "container $CONTAINER is not up" ;;
 esac
 
 case "$PHASE" in

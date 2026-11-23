@@ -1,0 +1,4 @@
+DNGFF absurd avg_dollar_volume (junk series); excluded from the warehouse union
+HLAN absurd avg_dollar_volume (junk series); excluded from the warehouse union
+MDFI absurd avg_dollar_volume (junk series); excluded from the warehouse union
+SYNI absurd avg_dollar_volume (junk series); excluded from the warehouse union
