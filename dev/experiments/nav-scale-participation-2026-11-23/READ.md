@@ -20,7 +20,7 @@ Packs built with `review_pack.sh --no-container` from the private per-arm files 
 - **One-trade years land where §3.2 says.** k0's eras show the 2010–15 build (ODSY/FOSL era); k1 shows "built 2020 (2.08 → 2.57×)", the APPS draw; every pack shows the 2024 build (ADMA, MMYT).
 - **Eras vs SPY agree with §1.2.** Every pack erodes against SPY from 2016 or 2021 to the end. k3 ends at 0.98× SPY (ln 2.070 vs 2.087), the one seed below SPY, as §3.4 says.
 - **Not in this read, flagged by the k0 pack:** at the 2021-02-09 NAV peak, F-1M k0 held MSTR with an open gain of 37.8 % of peak NAV before the 39.6 % drawdown to 2023-10-27. It is shared by F and P at $1M, so it does not enter Δ; it is the concentration the record already carries.
-- Not checked: entry geometry and conformance rows need the container steps (`--no-container` skips them); no claim here rests on them.
+- **RV3, the remaining pack signals:** each pack's "What stands out" list printed (eras, reopen episodes, worst three-year stretch, concentration, fill and stop-exit counts) and nothing in it contradicts this read; the fallback-stop, E-below-close and trail-never-raised rows print n/a because they need the trade audit, which `--no-container` skips. Entry geometry and conformance rows are likewise not built; no claim here rests on them.
 
 ## 1. The rules, in order
 
@@ -236,10 +236,10 @@ Both decision arms are INCONCLUSIVE by wide margins: |median Δ| of 0.002 and 0.
 **What it cannot claim.**
 
 1. That the cap is harmless in general. Its footprint grows with NAV (measure 5). ADMA, the record's largest late winner, sat at 5.4–8.9 % of ADV in F-1M. On k0, a NAV about 12 % higher at the August 2023 decision would have put it over the cap.
-2. Anything about live sizing at ~$10k positions. That is below every cell here.
+2. Anything about live sizing at ~$10k positions. That is below every cell here: P-100k opens at about $14k a position (14 % of $100k) and its positions only grow as the account compounds (about ×11 over the run). What P-100k does answer for #3693 is narrower: at $14k-and-up positions in the backtest universe, the live-size profile changes about six trades a seed and no return. #3693's small-NAV verify item stays open.
 3. Significance. The five seeds share one price history, and their large one-arm trades are the same events: ODSY on 3 seeds, NJDCY on 3, TKPPY on 5, and the APPS cash draw. A 5/5 sign count is a consistency check, as the prereg says.
 
-**Noise scale.** The rounding-only null moves the record by up to 0.124 log between adjacent cash levels. P-1M's largest |Δ| is 0.226. The single-cell floor is about 0.45 log, at 2 SD of the seed band (record band SD 0.20). P-10M's −0.62 to −0.98 is outside all of these and traced to named trades (§3.4), but by the prereg it is descriptive.
+**Noise scale.** The rounding-only null moves the record by up to 0.124 log between adjacent cash levels. P-1M's largest |Δ| is 0.226. The single-cell floor is about 0.45 log, at 2 SD of the measured 26y seed band (SD 0.225, `project_26y_path_noise_floor`; the five vsb-1 cells alone give a sample SD of 0.20, i.e. about 0.40). P-10M's −0.62 to −0.98 is outside all of these and traced to named trades (§3.4), but by the prereg it is descriptive.
 
 The wording follows mechanism-validation-rigor. "No effect at backtest NAV" is about this cap value on this history. It does not say participation gating fails.
 
@@ -427,12 +427,7 @@ No contradiction found.
 ## 6. Defects found
 
 - **D1. No review pack at draft time.** Built and looked at afterwards; see "Review-pack look".
-- **D2. The local bar store has re-based two names relative to the run's bars.**
-  - CMRE 2012-10-03: the run's entry price in `prv:k0/ns-*-1M-k0-s0-trades.csv` is 5.1× the local close that day.
-  - In `data/C/E/CMRE/data.csv`, `close` jumps ×5.3 between 2026-05-04 and 2026-05-05 while `adjusted_close` is continuous. `splits.csv` records 2026-05-05 with factor 0.2, and 3,896 rows have adjusted_close > close.
-  - BFH 2004-03-10: run entry is 4.0× the local close.
-  - Scope: 2 of 958 traded (symbol, entry) pairs.
-  - Effect on this read: CMRE reconstructs below $1M of ADV, yet the run passed it through the $1M floor (F) and through P-1M's cap with $196–279k positions, so the run saw at least about $2.8M. It is excluded from measure 4. The file's `Verified` stamp (2026-11-16) does not catch a close / adjusted_close inversion. Fix this before reusing local bars for ADV reconstruction.
+- **D2. Two names where the run's prices sit above the local raw close (CMRE 5.1×, BFH 4.0×) are later reverse splits, not store defects.** CMRE's `splits.csv` records a 1:5 reverse split on 2026-05-05 (factor 0.2), which the store's `close` shows as a ×5.3 jump while `adjusted_close` is continuous. A follow-up depth audit (11-23) checked this shape across 280 sampled names: every case was backed by `splits.csv`. The run reads the back-adjusted basis, so for history before a later reverse split its stored dollar ADV is inflated by the split factor: CMRE reconstructs below $1M from raw close × volume, while the run saw at least about $2.8M and passed it through the $1M floor (F) and P-1M's cap. This is the D3 mechanism (#3136) in the other direction from MSTR, so no separate issue is filed. CMRE is excluded from measure 4; any ADV reconstruction from local bars must use the run's basis, not raw close. Scope: 2 of 958 traded (symbol, entry) pairs.
 - **D3. Stored-dollar ADV reaches the cap and floor** (#3136, `true_dollar_volume` off). MSTR 2020 is at 2.5–3.8 % of stored ADV against 25–38 % in true dollars, and passed P-10M's cap on one seed only because of the inflation.
 - **D4. `trades.csv` restates `entry_price` and `quantity` for splits during the hold;** position dollars are unchanged. 50–56 round trips per cell are restated. For example, TGI 2011-06-24's `entry_price` is half the as-traded price. Any price-tier read needs the cell's `splits.csv` to recover raw prices.
 - **D5. The audit is a lower bound,** as the prereg anticipated. Of the 253 F-only trades at $1M, 120 have no P audit row on their Friday, so blocked counts need the estimator (56 of 57 recorded skips reproduced).
