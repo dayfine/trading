@@ -67,3 +67,16 @@ val within_participation :
 (** {!participation_allows} with [config.max_entry_adv_participation] and the
     {!dollar_adv_for} reading of [ticker]. When the cap is [None] it returns
     [true] without reading any bars, so the default path is byte-identical. *)
+
+val cap_entry_attempt :
+  config:Liquidity_config.t ->
+  bar_reader:Bar_reader.t ->
+  current_date:Date.t ->
+  Screener.scored_candidate ->
+  Entry_audit_capture.entry_attempt_result ->
+  Entry_audit_capture.entry_attempt_result
+(** The entry walk's use of {!within_participation}: turns a sized [Entry_ok]
+    whose position dollars ([shares *. effective_entry_price], sized from the
+    current portfolio value) exceed the cap into [Over_adv_participation]. It
+    blocks rather than resizes. Every other result, and every result when the
+    cap is [None], passes through unchanged (R1). *)
