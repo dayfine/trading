@@ -114,17 +114,15 @@ jobs:
             CELLS_LINE="$(grep -m1 '^Cells:' "${MD}" || true)"
             WARN_LINE="$(grep -m1 '^> \*\*WARNING' "${MD}" || true)"
             if [ -n "${WARN_LINE}" ]; then
-              WARN_BLOCK="${WARN_LINE}
-
-"
               FOOTER_END="end_date was clamped to the last SPY bar (see warning above)."
             else
-              WARN_BLOCK=""
               FOOTER_END="end_date floats with the run date."
             fi
             BODY="## Weekly-start sweep -- ${DATE}
 
-          ${WARN_BLOCK}${CELLS_LINE}
+          ${WARN_LINE}
+
+          ${CELLS_LINE}
           ${BEST_LINE}
           ${WORST_LINE}
           ${MEDIAN_LINE}
