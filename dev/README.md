@@ -3,6 +3,21 @@
 This directory coordinates daily parallel development by a team of Claude agents
 building the Weinstein Trading System.
 
+## EODHD bar fixtures (private, fetched)
+
+The 650 `trading/test_data/<A-Z>/**/data.csv` bar files (+ `data.metadata.sexp`) are not tracked here (EODHD terms,
+#3676); they live in the private repo `dayfine/trading-results` at the same paths, pinned by `dev/test_bars.pin`.
+`trading/devtools/checks/no_tracked_bars_check.sh` fails CI if one is tracked again.
+
+- **Local**: keep a sibling checkout at `~/Projects/trading-results` (`git clone git@github.com:dayfine/trading-results.git`),
+  then run `sh dev/scripts/fetch_test_bars.sh` in each checkout or worktree before `dune runtest` or a backtest. It
+  extracts the pinned commit (`git -C ~/Projects/trading-results pull` if the pin is missing); set `TRADING_RESULTS_DIR`
+  for another location. The docker dev container sees the files because they sit under the checkout.
+- **Cloud sessions**: clone trading-results next to the repo, then `TRADING_RESULTS_DIR=<clone> sh dev/scripts/fetch_test_bars.sh`.
+- **CI**: every workflow that reads the bars runs the same script with `TRADING_RESULTS_TOKEN` set from the
+  `BOT_GITHUB_TOKEN` secret. Fork PRs get no secrets, so the step fails with a message instead of skipping tests.
+- **Bump the pin** (new or refreshed bars): commit them to trading-results, then put that commit in `dev/test_bars.pin`.
+
 ## Where agents run
 
 **Agents run on the host machine, not inside Docker.**

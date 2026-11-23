@@ -70,6 +70,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Fetch EODHD bar fixtures (private trading-results, #3676)
+        working-directory: ${{ github.workspace }}
+        env:
+          TRADING_RESULTS_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: sh dev/scripts/fetch_test_bars.sh
+
       - name: Cache _build
         uses: actions/cache@v4
         with:

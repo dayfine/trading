@@ -1649,3 +1649,12 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:weekly_picks_dry_run_check.sh})))
+
+; EODHD bar fixtures must not be tracked (#3676): they live in private
+; dayfine/trading-results. Reads live git state via repo_root(), so (universe).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:no_tracked_bars_check.sh})))

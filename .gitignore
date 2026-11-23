@@ -195,3 +195,6 @@ dev/experiments/bayesian-production-sweep-2026-05-18/output-v1-parallel4/*
 !dev/experiments/bayesian-production-sweep-2026-05-18/output-v3-parallel4/
 dev/experiments/bayesian-production-sweep-2026-05-18/output-v3-parallel4/*
 !dev/experiments/bayesian-production-sweep-2026-05-18/output-v3-parallel4/bo_checkpoint.sexp
+
+# Marker written by dev/scripts/fetch_test_bars.sh (#3676)
+trading/test_data/.bars-pin
