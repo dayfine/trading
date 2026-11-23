@@ -114,8 +114,9 @@ CONFIG=dev/weekly-picks/record-config-overrides.sexp
 LIVE_SIZE_CONFIG=dev/weekly-picks/live-size-overrides.sexp
 LAYERED_CONFIG=$WORK/config-overrides.sexp
 PORTFOLIO=dev/weekly-picks/portfolio.sexp
-# What the public summary names as its config: the record file, or the two layered files.
-SUMMARY_CONFIG=$CONFIG${SFX:+ + $LIVE_SIZE_CONFIG}
+# What the public summary names as its config: the record file, or the two layered files. One
+# token: run-in-env.sh re-splits container arguments on whitespace (check_container_args).
+SUMMARY_CONFIG=$CONFIG${SFX:++live-size-overrides.sexp}
 
 # The newest superset of either profile dated before the Friday (a live-size superset holds the
 # record one, so either serves as last week's warehouse universe).
@@ -155,9 +156,9 @@ trading/weinstein/snapshot/bin/render_weekly_report.exe trading/weinstein/snapsh
 say() { printf '  + %s\n' "$*"; }
 writes() { printf '  writes[%s]: %s\n' "$1" "$2"; } # class: private ($TR), public (the -picks.md), local (gitignored)
 run() { say "$*"; [ "$DRY" = 1 ] || "$@"; }
-crun() { say "[container] $*"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@"; }
-crun_log() { _f=$1; shift; say "[container] $* > $_f 2>&1"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@" > "$_f" 2>&1; }
-crun_out() { _o=$1; _e=$2; shift 2; say "[container] $* > $_o 2> $_e"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@" > "$_o" 2> "$_e"; }
+crun() { check_container_args "$@"; say "[container] $*"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@"; }
+crun_log() { _f=$1; shift; check_container_args "$@"; say "[container] $* > $_f 2>&1"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@" > "$_f" 2>&1; }
+crun_out() { _o=$1; _e=$2; shift 2; check_container_args "$@"; say "[container] $* > $_o 2> $_e"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@" > "$_o" 2> "$_e"; }
 
 # Symbols (one per line) of a universe / eligible / superset sexp.
 syms() { tr '\n' ' ' < "$1" | awk '{ n = split($0, p, "\\(symbol "); for (i = 2; i <= n; i++) print substr(p[i], 1, index(p[i], ")") - 1) }'; }

@@ -12,6 +12,8 @@
 #     $100k ADV floor, generates on record + live-size-overrides.sexp layered in its work dir, and
 #     writes its superset, private records and public file under -live-size / live-size/ names;
 #     the live-size file sets exactly the three lines test_participation_gate.ml pins;
+#   - no container argument holds whitespace (run-in-env.sh re-splits them, #3698): the helper
+#     refuses one, and crun / crun_log / crun_out each call it;
 #   - usage errors exit 2; a real run without a key stops in preflight, before any step;
 #   - the guarded helpers, which a dry run never reaches (sourced from weekly_lib.sh and called
 #     on fixtures): bucket_shards puts every shard key (first + last letter, upper-cased) in
@@ -84,7 +86,7 @@ grep -v '^  writes\[' "$TMP/out" | tr ' ' '\n' | grep -E '\.(sexp|md|html|txt|lo
   sed "s|^/workspaces/trading-1|$FIX|" |
   awk -v tr="$TR/" -v dd="$FIX/dev/data/" -v data="$FIX/data/" -v pub="$PUB" '
     index($0, tr) == 1 || index($0, dd) == 1 || index($0, data) == 1 || $0 == pub ||
-    $0 ~ /^(\.\.\/)?dev\/weekly-picks\/(record-config-overrides|live-size-overrides|portfolio)\.sexp$/ { ok++; next }
+    $0 ~ /^(\.\.\/)?dev\/weekly-picks\/(record-config-overrides(\+live-size-overrides)?|live-size-overrides|portfolio)\.sexp$/ { ok++; next }
     { bad++ }
     END { printf "%d\n", bad + 0 }' > "$TMP/stray"
 expect_eq "no artifact path outside \$TR / dev/data / the public file" 0 "$(cat "$TMP/stray")"
@@ -117,8 +119,8 @@ expect_eq "live-size profile: its own superset, private dir and public file" "1 
   "$(grep -c "^  writes\[local\]: $FIX/dev/data/snapshots/universe-superset-$FRI-live-size.sexp\$" "$TMP/out") \
 $(grep -c "^  writes\[private\]: $TR/dev/weekly-picks/$SYSVER/live-size/" "$TMP/out") \
 $(grep -c "^  writes\[public\]: $FIX/dev/weekly-picks/$SYSVER/live-size/$FRI-picks.md\$" "$TMP/out")"
-expect_eq "live-size profile: the public summary names both layered files" 1 \
-  "$(grep -c -- "-config-path dev/weekly-picks/record-config-overrides.sexp + dev/weekly-picks/live-size-overrides.sexp > " "$TMP/out")"
+expect_eq "live-size profile: the public summary names both layered files, as one token" 1 \
+  "$(grep -c -- "-config-path dev/weekly-picks/record-config-overrides.sexp+live-size-overrides.sexp > " "$TMP/out")"
 expect_eq "live-size profile: every other write is under its own work dir" 0 \
   "$(grep '^  writes\[local\]' "$TMP/out" | grep -v -e "$LWORK" -e "universe-superset-$FRI-live-size" -e ": $FIX/data\$" -e ": $FIX/data/" -c || true)"
 # The three live-size overlay lines, as test_participation_gate.ml "live-size layering" loads them.
@@ -188,6 +190,15 @@ rc=0; price_free "$PF/priced.md" > "$PF/out" 2>&1 || rc=$?
 expect_eq "price-free: a table row with a two-decimal number is refused" "1 yes" \
   "$rc $(grep -q 'two decimals' "$PF/out" && echo yes || echo no)"
 
+# check_container_args (#3698): run-in-env.sh re-splits container arguments on whitespace, so
+# crun / crun_log / crun_out refuse one, in the dry run too.
+cargs() { sh -c '. "$1"; die() { echo "die: $1" >&2; exit 1; }; shift; check_container_args "$@"' _ "$LIB" "$@"; }
+rc=0; cargs -config-path dev/weekly-picks/record-config-overrides.sexp+live-size-overrides.sexp > /dev/null 2>&1 || rc=$?
+expect_eq "container args: single tokens pass" 0 "$rc"
+rc=0; cargs -config-path "a.sexp + b.sexp" > "$TMP/cargs.out" 2>&1 || rc=$?
+expect_eq "container args: an argument with a space is refused" "1 yes" \
+  "$rc $(grep -q 'with whitespace' "$TMP/cargs.out" && echo yes || echo no)"
+
 # fetch_buckets.sh against a fake fetch_symbols.exe: it must receive the key, and the run
 # exits 0 only when every process exited 0 and every log ends in a Done: line.
 cat > "$TMP/fake_fetch" <<'FAKE'
@@ -233,6 +244,8 @@ expect_eq "fetch_buckets: without a key it fails before any fetch" 1 "$rc"
 calls() { sed "s/#.*//" "$FIX/dev/weekly-picks/weekly.sh" | grep -q -w -e "$1" && echo yes || echo no; }
 expect_eq "weekly.sh calls bucket_shards on a non-comment line" yes "$(calls bucket_shards)"
 expect_eq "weekly.sh calls check_public_price_free on a non-comment line" yes "$(calls check_public_price_free)"
+expect_eq "weekly.sh: crun, crun_log and crun_out each call check_container_args" 3 \
+  "$(sed "s/#.*//" "$FIX/dev/weekly-picks/weekly.sh" | grep -E '^crun(_log|_out)?\(\)' | grep -c -w check_container_args)"
 
 # The work dir holds bar-derived files: it must stay gitignored in the real repo.
 grep -qE '^/?dev/data/?$' "$ROOT/.gitignore" || { echo "FAIL: weekly_picks_dry_run_check: dev/data/ is not in .gitignore" >&2; FAILED=$((FAILED + 1)); }

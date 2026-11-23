@@ -3,6 +3,7 @@
 #
 #   bucket_shards          the shard-disjoint fetch buckets (#3645)
 #   check_public_price_free  the price-free tripwire on the one file that reaches the public repo
+#   check_container_args   no whitespace in an argument bound for run-in-env.sh (#3698)
 #
 # The sourcing script defines die() (print a message, exit non-zero) before calling these.
 
@@ -31,4 +32,13 @@ check_public_price_free() {
   if grep '^| [0-9]' "$1" | grep -Eq '[0-9]\.[0-9][0-9]'; then
     die "$1: a table row carries a number with two decimals; not staging it"
   fi
+}
+
+# check_container_args <arg>...: refuse an argument holding whitespace. run-in-env.sh runs the
+# command as `bash -c "... $*"` locally, which re-splits every argument on whitespace (#3698).
+# Runs in --dry-run too, so the dry run catches it.
+check_container_args() {
+  for _a in "$@"; do
+    case "$_a" in *[[:space:]]*) die "container argument with whitespace (run-in-env.sh would split it): '$_a'" ;; esac
+  done
 }
