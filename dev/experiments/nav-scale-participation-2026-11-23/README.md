@@ -38,7 +38,9 @@ only change across columns.
 1. Final log NAV ratio, `ln(final / initial)`, so the three cash levels are comparable.
 2. Max drawdown and the Ulcer index.
 3. Share of entries at or below $14 (raw entry price), and the funded-doubler count among them.
-4. Count of entries blocked by `Adv_participation_cap` and by the $1M floor, per year.
+4. P-arm entries whose 20-day dollar ADV at entry is below $1M, i.e. names the record's floor would have blocked
+   (computed in the read from `trades.csv` and the bars), per year; and the count of `Adv_participation_cap` skips,
+   stated as a lower bound (the audit lists skips only on Fridays with a buy).
 5. Median position as a share of 20-day dollar ADV at entry, per year. This shows the convergence: as each account
    compounds, the gate should bind harder.
 
@@ -46,21 +48,24 @@ Every metric is reported for three periods as well as the whole run: 2000–08, 
 
 ## Decision rule (fixed now)
 
-The paired read is P minus F at the same cash and seed, Δ = ln(P_final / F_final).
-
-- **P-100k (the live question).** If the median Δ ≥ +0.20 with ≥ 4/5 seeds positive, and the median max-DD is not
-  more than 3 pp deeper: the live-size profile earns its place, and the next step is a scope cell on top-1000
-  (`universe-discipline.md`). If the median Δ is in (−0.20, +0.20): no measurable effect at live size, and the
-  profile stays opt-in. If the median Δ ≤ −0.20 with ≥ 4/5 seeds negative: cheap names hurt at live size, so do not
-  use the live-size profile for live picks.
-- **P-1M (the #3681 verify item).** The same thresholds, read against the record. The 11-18 arithmetic predicts about
-  +0.06. A result inside ±0.20 is the expected outcome and closes #3681's verify item as "no effect at backtest NAV".
-- **P-10M** is descriptive only, with no decision: it shows the capacity limit.
-- **F across cash levels** is descriptive: how much of any difference is account size alone (whole-share rounding,
-  the $1 minimum commission) and how much is the gate.
-
-A Δ inside the 26-year path-noise floor (0.2 log, `project_26y_path_noise_floor`) is reported as no effect, whatever
-its sign.
+- **Definitions.** Δ = ln(P_final / F_final) per seed at the same cash. ΔDD = maxDD(P) − maxDD(F) in percentage
+  points, where maxDD is the max peak-to-trough of the daily equity curve, per seed. The read takes medians over the
+  valid seeds.
+- **Validity.** A seed whose V6 check fails is dropped from that cash level's read. With fewer than 4 valid seeds a
+  cash level is INVALID (no verdict). A P arm that fails liveness is DEAD (no verdict; reported as such).
+- **P-100k (the live question).**
+  - PASS = median Δ ≥ +0.20, ≥ 4 seeds positive, median ΔDD ≤ +3 pp → next step a top-1000 scope cell
+    (`universe-discipline.md`).
+  - PAYS-WITH-RISK = median Δ ≥ +0.20, ≥ 4 seeds positive, median ΔDD > +3 pp → not adopted; reported with the
+    Ulcer index and raised to the user as a decision.
+  - HARM = median Δ ≤ −0.20 and ≥ 4 seeds negative → do not use the live-size profile for live picks.
+  - INCONCLUSIVE = anything else (including 3/5 sign counts and |median Δ| < 0.20) → live-size stays opt-in; no
+    further cells without a new mechanism argument.
+  - DEAD or INVALID → live-size stays opt-in.
+- **P-1M (the #3681 verify item).** The same four branches. PASS or PAYS-WITH-RISK → no default change; any flip goes
+  through `promotion-confirmation.md` and `experiment-flag-discipline.md`. HARM → recorded; the gate stays default
+  off. INCONCLUSIVE closes #3681's verify item as "no effect at backtest NAV".
+- **P-10M and F across cash levels:** descriptive only.
 
 ## Known confounds, stated in advance
 
@@ -71,6 +76,13 @@ its sign.
   effect under study, not a flaw.
 - **One market.** The five seeds share one price history, so Δ seeds are not independent draws. A ≥ 4/5 sign count is
   a consistency check, not a significance test.
+
+## Read notes
+
+- P-1M changes three lines (the cap, the entry floor and the hold floor), not only the cap.
+- P-100k compounds past $10k positions.
+- The $0.01/share commission does not cancel on cheap names.
+- The read joins P and F trades by symbol and entry date.
 
 ## Run plan
 
