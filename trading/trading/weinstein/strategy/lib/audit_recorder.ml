@@ -20,6 +20,7 @@ type skip_reason =
   | Long_exposure_cap
   | No_structural_stop of stop_floor_detail
   | Share_class_held
+  | Adv_participation_cap
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

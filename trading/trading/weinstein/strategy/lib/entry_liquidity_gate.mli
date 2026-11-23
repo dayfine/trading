@@ -28,3 +28,42 @@ val apply :
 
     Delegates the keep/drop decision to {!Liquidity_gate.filter}; this function
     only supplies the [dollar_adv_for] lookup. *)
+
+val dollar_adv_for :
+  config:Liquidity_config.t ->
+  bar_reader:Bar_reader.t ->
+  current_date:Date.t ->
+  string ->
+  float option
+(** [dollar_adv_for ~config ~bar_reader ~current_date ticker] is the trailing
+    dollar-ADV every liquidity threshold is compared against: bars available at
+    [current_date], [config.adv_lookback_days] long, reduced by
+    [config.adv_aggregation] / [config.adv_trim_pct], on true dollars when the
+    reader carries a split divisor. [None] when there is no reading. *)
+
+(** {1 Participation cap (issue #3681)}
+
+    Scales the entry gate with position size: an entry is allowed only when its
+    planned position dollars are at most [p] times the dollar-ADV. It blocks; it
+    never resizes (see {!Liquidity_config.t.max_entry_adv_participation}). The
+    fixed [min_entry_dollar_adv] floor in {!apply} still applies first. *)
+
+val participation_allows :
+  max_participation:float option ->
+  position_dollars:float ->
+  dollar_adv:float option ->
+  bool
+(** [true] when [max_participation = None] (no cap), when [dollar_adv = None] (a
+    missing reading never blocks), or when [position_dollars <= p *. adv]. Pure.
+*)
+
+val within_participation :
+  config:Liquidity_config.t ->
+  bar_reader:Bar_reader.t ->
+  current_date:Date.t ->
+  ticker:string ->
+  position_dollars:float ->
+  bool
+(** {!participation_allows} with [config.max_entry_adv_participation] and the
+    {!dollar_adv_for} reading of [ticker]. When the cap is [None] it returns
+    [true] without reading any bars, so the default path is byte-identical. *)

@@ -113,18 +113,41 @@ let _stop_check ~config ~initial_stop_buffer ~bar_reader ~current_date
     ~stops_config:config.stops_config ~initial_stop_buffer ~bar_reader
     ~current_date cand
 
+(** #3681 participation cap: turn a sized [Entry_ok] whose position dollars
+    exceed [max_entry_adv_participation] times the dollar-ADV into
+    [Over_adv_participation]. It blocks rather than resizes (see
+    [Liquidity_config.mli]). Identity when the cap is [None] (R1). *)
+let _cap_participation ~config ~bar_reader ~current_date
+    (cand : Screener.scored_candidate) :
+    Entry_audit_capture.entry_attempt_result ->
+    Entry_audit_capture.entry_attempt_result = function
+  | Entry_ok (_, meta) as ok ->
+      let position_dollars =
+        Float.of_int meta.shares *. meta.effective_entry_price
+      in
+      if
+        Entry_liquidity_gate.within_participation
+          ~config:config.liquidity_config ~bar_reader ~current_date
+          ~ticker:cand.ticker ~position_dollars
+      then ok
+      else Over_adv_participation
+  | (Stop_too_wide | Sized_zero | No_structural_stop _ | Over_adv_participation)
+    as other ->
+      other
+
 (** Build the per-candidate entry constructor for a walk: the tick's
     [stop_check] ({!_stop_check}), then sizing and the ticket
     ({!Entry_audit_capture.entry_of_stop_check}) — together exactly
     {!Entry_audit_capture.make_entry_transition}. Factored out of
     {!entries_from_candidates} so that function stays under the function-length
     limit. *)
-let _make_entry_fn ~config ~stop_check ~current_date ~stop_states
+let _make_entry_fn ~config ~stop_check ~bar_reader ~current_date ~stop_states
     ~portfolio_value (cand : Screener.scored_candidate) =
   stop_check cand
   |> Entry_audit_capture.entry_of_stop_check
        ~portfolio_risk_config:config.portfolio_config ~stop_states
        ~portfolio_value ~current_date cand
+  |> _cap_participation ~config ~bar_reader ~current_date cand
 
 (** The two pre-walk transforms of the candidate list, both default-off
     identities (R1):
@@ -256,7 +279,7 @@ let entries_from_candidates ?sector_lookup
     _stop_check ~config ~initial_stop_buffer ~bar_reader ~current_date
   in
   let make_entry =
-    _make_entry_fn ~config ~stop_check ~current_date ~stop_states
+    _make_entry_fn ~config ~stop_check ~bar_reader ~current_date ~stop_states
       ~portfolio_value
   in
   let spendable = Screening_notional.spendable_cash ~config portfolio in

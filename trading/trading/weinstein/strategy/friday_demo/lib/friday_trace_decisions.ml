@@ -93,6 +93,7 @@ let _skip_text ~max_pct : Audit_recorder.skip_reason -> string = function
   | Sector_exposure_cap -> "sector exposure cap"
   | Long_exposure_cap -> "long exposure cap"
   | Share_class_held -> "another share class is held"
+  | Adv_participation_cap -> "position too large for its dollar volume"
 
 let _gate_line buf (w : P.walk_row) =
   match w.gate with

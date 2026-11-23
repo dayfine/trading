@@ -2214,7 +2214,8 @@ let _kept_and_skipped_decisions () =
         ~portfolio_value:100_000.0 ~current_date:as_of_date (cand "KEPT")
     with
     | Entry_audit_capture.Entry_ok (t, m) -> (t, m)
-    | Stop_too_wide | Sized_zero | No_structural_stop _ ->
+    | Stop_too_wide | Sized_zero | No_structural_stop _ | Over_adv_participation
+      ->
         OUnit2.assert_failure "fixture candidate failed to build an entry"
   in
   [

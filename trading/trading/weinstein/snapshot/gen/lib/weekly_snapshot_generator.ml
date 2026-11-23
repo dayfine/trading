@@ -247,9 +247,14 @@ let _build_candidates ~(inputs : inputs) ~(result : Screener.result)
     Spike_bar_gate.flag_candidates inputs.bar_reader ~as_of:inputs.as_of
       ~threshold_pct:inputs.config.spike_bar_threshold_pct
   in
+  let longs, participation_warnings =
+    Participation_gate.partition
+      ~liquidity_config:inputs.config.liquidity_config inputs.bar_reader
+      ~as_of:inputs.as_of longs
+  in
   let longs, long_warnings = flag_spikes longs in
   let shorts, short_warnings = flag_spikes shorts in
-  (longs, shorts, long_warnings @ short_warnings)
+  (longs, shorts, participation_warnings @ long_warnings @ short_warnings)
 
 let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in

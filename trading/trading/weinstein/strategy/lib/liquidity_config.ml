@@ -33,6 +33,7 @@ type t = {
       [@sexp.default default_adv_aggregation]
   adv_trim_pct : float; [@sexp.default default_adv_trim_pct]
   true_dollar_volume : bool; [@sexp.default false]
+  max_entry_adv_participation : float option; [@sexp.default None]
 }
 [@@deriving sexp]
 
@@ -44,4 +45,5 @@ let default_config =
     adv_aggregation = default_adv_aggregation;
     adv_trim_pct = default_adv_trim_pct;
     true_dollar_volume = false;
+    max_entry_adv_participation = None;
   }

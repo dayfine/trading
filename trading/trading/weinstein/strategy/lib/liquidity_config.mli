@@ -80,6 +80,27 @@ type t = {
           ([config-default-blast-radius.md]). Axis:
           [((key (liquidity_config true_dollar_volume)) (values (false true)))].
       *)
+  max_entry_adv_participation : float option;
+      (** Entry participation cap (issue #3681): when [Some p], an entry whose
+          planned position dollars (sized shares times the ticket's entry price)
+          exceed [p] times the trailing dollar-ADV is {b blocked}, recorded as
+          [Audit_recorder.Adv_participation_cap]. It is not resized down to
+          [p * ADV]: a smaller position than the risk sizing asked for changes
+          the risk per trade, and blocking keeps the sizing rule the one source
+          of position size. The ADV is the same reading [min_entry_dollar_adv]
+          uses (window [adv_lookback_days], [adv_aggregation], [adv_trim_pct],
+          [true_dollar_volume]); a missing reading never blocks.
+
+          Scales the liquidity gate with position size, where
+          [min_entry_dollar_adv] is a fixed floor: at a large NAV it blocks
+          names the floor admits, and at a small account it admits names the
+          floor alone would block once that floor is lowered.
+          [min_entry_dollar_adv] stays applied as an absolute dust floor (the
+          APPB / corrupt-bar class). Applies to longs and shorts.
+
+          {b Default [None]}: no cap, byte-identical to the pre-#3681 walk, and
+          no ADV is computed for it. Unpromoted. Override:
+          [((liquidity_config ((max_entry_adv_participation (0.10)))))]. *)
 }
 [@@deriving sexp]
 
@@ -88,9 +109,10 @@ val default_config : t
     (entry gate default-on since 2026-07-10), [min_hold_dollar_adv = 0.0] (exit
     default-off), [adv_aggregation = Mean] and
     [adv_trim_pct = Liquidity_metric.default_trim_pct] (robust aggregation
-    default-off). The entry gate drops sub-$1M-ADV candidates; the held-position
-    exit never fires; dollar-ADV is the plain arithmetic mean. To reproduce
-    pre-flip behaviour bit-for-bit, set [min_entry_dollar_adv = 0.0].
+    default-off) and [max_entry_adv_participation = None] (no participation
+    cap). The entry gate drops sub-$1M-ADV candidates; the held-position exit
+    never fires; dollar-ADV is the plain arithmetic mean. To reproduce pre-flip
+    behaviour bit-for-bit, set [min_entry_dollar_adv = 0.0].
 
     Both new fields are real config fields, so each is expressible as a
     {!Variant_matrix} axis (searchability, experiment-flag-discipline R2):

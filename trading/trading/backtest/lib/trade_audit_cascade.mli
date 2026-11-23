@@ -30,6 +30,7 @@ type skip_reason =
   | Long_exposure_cap
   | No_structural_stop
   | Share_class_held
+  | Adv_participation_cap
 [@@deriving sexp, eq]
 
 type weekly_outcome = Placed | Skipped of skip_reason [@@deriving sexp]
