@@ -33,6 +33,7 @@ let skip_reason_of_event = function
   | AR.Long_exposure_cap -> Trade_audit.Long_exposure_cap
   | AR.No_structural_stop _ -> Trade_audit.No_structural_stop
   | AR.Share_class_held -> Trade_audit.Share_class_held
+  | AR.Adv_participation_cap -> Trade_audit.Adv_participation_cap
 
 (* #3139: the floor a [No_structural_stop] row would have been given; [None]
    for every other outcome. *)

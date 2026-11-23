@@ -93,6 +93,15 @@ type entry_attempt_result =
           / ceiling — so the candidate is not entered. Mapped to
           [Audit_recorder.skip_reason.No_structural_stop], carrying the rejected
           stop's floor kind, level and distance (#3139). *)
+  | Over_adv_participation
+      (** #3681: the built entry's position dollars
+          ([shares * effective_entry_price]) exceed
+          [Liquidity_config.max_entry_adv_participation] times the trailing
+          dollar-ADV. Produced by the entry walk's wrapper around
+          {!entry_of_stop_check}, never by it; mapped to
+          [Audit_recorder.skip_reason.Adv_participation_cap]. Like a cash
+          rejection, the stop and position id the build consumed are left as
+          they are. *)
 
 (** Per-candidate decision tag emitted by the entry walk. The [Kept] case
     carries the produced transition + audit meta; [Skipped] records why the

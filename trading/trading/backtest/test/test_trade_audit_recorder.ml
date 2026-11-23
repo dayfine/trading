@@ -197,6 +197,7 @@ let test_skip_reason_projects_every_constructor _ =
           distance_pct = 0.08;
         };
       AR.Share_class_held;
+      AR.Adv_participation_cap;
     ]
   in
   let alternatives =
@@ -222,6 +223,7 @@ let test_skip_reason_projects_every_constructor _ =
             TA.Long_exposure_cap;
             TA.No_structural_stop;
             TA.Share_class_held;
+            TA.Adv_participation_cap;
           ] ~f:(fun r -> equal_to (r : TA.skip_reason))))
 
 (** The sibling tag on the same hop, pinned for the same reason: both

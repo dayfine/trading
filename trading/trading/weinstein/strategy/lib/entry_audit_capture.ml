@@ -41,6 +41,7 @@ type entry_attempt_result =
   | Stop_too_wide
   | Sized_zero
   | No_structural_stop of Audit_recorder.stop_floor_detail
+  | Over_adv_participation
 
 type candidate_decision =
   | Kept of Position.transition * entry_meta
@@ -405,6 +406,9 @@ let classify_candidate ?(leverage_enabled = false) ~held_set ~make_entry
     | No_structural_stop detail ->
         emit "No_structural_stop";
         Skipped (No_structural_stop detail)
+    | Over_adv_participation ->
+        emit "Adv_participation_cap";
+        Skipped Adv_participation_cap
     | Entry_ok (trans, meta) ->
         _apply_entry_ok_gates ~leverage_enabled ~remaining_cash
           ~short_notional_acc ~short_notional_cap ~long_notional_acc

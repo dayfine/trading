@@ -216,9 +216,9 @@ let _reconcile_entry ~(inputs : inputs) ~side candidate =
 
 (* Ranked long / short candidate lists, fully decorated — structural stop
    overlay (#2084 F2), entry reconciliation (#2103, BOTH sides), fixed-risk
-   sizing (longs only), spike-bar data-suspect flag (#2083 F3, which flags
-   rather than drops) — plus the spike warnings:
-   [(longs, shorts, spike_warnings)]. See [Spike_bar_gate.flag_candidates].
+   sizing (longs only), then the post-sizing gates ([Candidate_gates]: the
+   #3681 ADV-participation cap, the #2083 F3 spike flag) — plus their
+   warnings: [(longs, shorts, warnings)].
 
    Reconciliation sits between the stop overlay and sizing on purpose: the stop
    it reconciles against must already be the structural one, and the class it
@@ -243,13 +243,8 @@ let _build_candidates ~(inputs : inputs) ~(result : Screener.result)
         |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short
         |> _reconcile_entry ~inputs ~side:`Short)
   in
-  let flag_spikes =
-    Spike_bar_gate.flag_candidates inputs.bar_reader ~as_of:inputs.as_of
-      ~threshold_pct:inputs.config.spike_bar_threshold_pct
-  in
-  let longs, long_warnings = flag_spikes longs in
-  let shorts, short_warnings = flag_spikes shorts in
-  (longs, shorts, long_warnings @ short_warnings)
+  Candidate_gates.apply ~config:inputs.config inputs.bar_reader
+    ~as_of:inputs.as_of ~longs ~shorts
 
 let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in

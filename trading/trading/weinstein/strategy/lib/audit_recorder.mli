@@ -93,6 +93,10 @@ type skip_reason =
           pending long. Only fires when
           [Weinstein_strategy_config.config.max_one_share_class_per_issuer] is
           [true] (default [false] => never emitted). *)
+  | Adv_participation_cap
+      (** #3681: candidate dropped because its planned position dollars exceed
+          [Liquidity_config.max_entry_adv_participation] times its trailing
+          dollar-ADV. Default [None] => never emitted. Both sides. *)
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

@@ -7,6 +7,8 @@ MERGED
 
 Closed 2026-11-15 (user decision, pacer #3635): no next step is queued, and the split work lands under #2973 (open). Sections below are history, not queued.
 
+**2026-11-22 (issue #3681, branch `feat/entry-adv-participation`):** `Liquidity_config.max_entry_adv_participation` (default `None`) blocks an entry whose planned position dollars exceed p x dollar ADV, in the backtest entry walk (skip reason `Adv_participation_cap`) and in the weekly picks (`Participation_gate`, sized against the `--portfolio` account). Arming is documented, not armed, in `dev/weekly-picks/record-config-overrides.sexp`. Remaining after merge: the paired 26y K=5 run at p = 0.10 on the record config.
+
 **2026-08-24 (issue #2404 — past-band picks are shown, not suppressed; branch
 `feat/picks-nofill-2404`):** user decision 2026-08-24, adopting the issue's
 proposal. `Entry_reconciliation.Extended` stops being a suppression class and

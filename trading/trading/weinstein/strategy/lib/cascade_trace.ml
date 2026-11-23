@@ -71,7 +71,8 @@ let _walk_built_a_stop : Audit_recorder.walk_outcome -> bool = function
   | Placed
   | Skipped
       ( Insufficient_cash | Sized_to_zero | Short_notional_cap | Stop_too_wide
-      | Sector_exposure_cap | Long_exposure_cap | No_structural_stop _ ) ->
+      | Sector_exposure_cap | Long_exposure_cap | No_structural_stop _
+      | Adv_participation_cap ) ->
       true
 
 let _same_row (d : Audit_recorder.cascade_drop)

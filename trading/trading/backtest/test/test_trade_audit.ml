@@ -193,6 +193,7 @@ let test_skip_reason_sexp_round_trip _ =
       Top_n_cutoff;
       No_structural_stop;
       Share_class_held;
+      Adv_participation_cap;
     ]
   in
   let parsed =

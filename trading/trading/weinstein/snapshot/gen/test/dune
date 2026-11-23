@@ -14,7 +14,8 @@
   test_entry_reconcile
   test_snapshot_validation_report
   test_stop_track
-  test_stop_thread)
+  test_stop_thread
+  test_participation_gate)
  (libraries
   core
   core_unix

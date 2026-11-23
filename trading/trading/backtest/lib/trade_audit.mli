@@ -91,6 +91,10 @@ type skip_reason =
           GOOG / GOOGL) already had an open or pending long, under
           [Weinstein_strategy_config.config.max_one_share_class_per_issuer]
           (default [false] => never emitted). Long candidates only. *)
+  | Adv_participation_cap
+      (** #3681: skipped because the planned position dollars exceed
+          [Liquidity_config.max_entry_adv_participation] times the trailing
+          dollar-ADV. Default [None] => never emitted. Both sides. *)
 [@@deriving sexp, eq]
 
 (** Whether the installed initial stop sat on a support floor or fell back to a

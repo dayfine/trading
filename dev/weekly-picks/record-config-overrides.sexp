@@ -21,6 +21,15 @@
 ((laggard_rotation_config ((hysteresis_weeks 2))))
 ((liquidity_config ((min_entry_dollar_adv 1000000.0))))
 ((liquidity_config ((min_hold_dollar_adv 500000.0))))
+; Entry ADV-participation cap (issue #3681), NOT armed: the record does not set
+; it. To arm it for a live account, uncomment the line below. A long pick is
+; then dropped (with a warning line in the report) when its sized position
+; dollars exceed p x the trailing (adv_lookback_days) dollar ADV. The position
+; is sized against the --portfolio file (cash + held longs), which is how a run
+; states its account size: a $10k position at p = 0.10 needs only $100k of ADV.
+; In the backtest min_entry_dollar_adv stays applied as the dust floor; the
+; picks generator applies only this cap, not the fixed floor.
+; ((liquidity_config ((max_entry_adv_participation (0.10)))))
 ((stale_exit_after_days (5)))
 ((macro_config ((breadth_direction ((enabled true))))))
 ((require_structural_stop true))

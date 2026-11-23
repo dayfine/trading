@@ -119,12 +119,14 @@ let _stop_check ~config ~initial_stop_buffer ~bar_reader ~current_date
     {!Entry_audit_capture.make_entry_transition}. Factored out of
     {!entries_from_candidates} so that function stays under the function-length
     limit. *)
-let _make_entry_fn ~config ~stop_check ~current_date ~stop_states
+let _make_entry_fn ~config ~stop_check ~bar_reader ~current_date ~stop_states
     ~portfolio_value (cand : Screener.scored_candidate) =
   stop_check cand
   |> Entry_audit_capture.entry_of_stop_check
        ~portfolio_risk_config:config.portfolio_config ~stop_states
        ~portfolio_value ~current_date cand
+  |> Entry_liquidity_gate.cap_entry_attempt ~config:config.liquidity_config
+       ~bar_reader ~current_date cand
 
 (** The two pre-walk transforms of the candidate list, both default-off
     identities (R1):
@@ -256,7 +258,7 @@ let entries_from_candidates ?sector_lookup
     _stop_check ~config ~initial_stop_buffer ~bar_reader ~current_date
   in
   let make_entry =
-    _make_entry_fn ~config ~stop_check ~current_date ~stop_states
+    _make_entry_fn ~config ~stop_check ~bar_reader ~current_date ~stop_states
       ~portfolio_value
   in
   let spendable = Screening_notional.spendable_cash ~config portfolio in
