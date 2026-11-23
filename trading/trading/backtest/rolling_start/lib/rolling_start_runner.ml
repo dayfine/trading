@@ -199,6 +199,7 @@ let _run_one ~config ~sector_map_override ~benchmark_series ~factors ~start_date
     =
   let result =
     Backtest.Runner.run_backtest ~start_date ~end_date:config.end_date
+      ~initial_cash:config.scenario.initial_cash
       ~overrides:config.scenario.config_overrides ?sector_map_override
       ~strategy_choice:config.scenario.strategy
       ?slippage_bps:config.scenario.slippage_bps

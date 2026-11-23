@@ -223,10 +223,10 @@ val run : config -> Rolling_start_types.report
     [config.benchmark_symbol] + a snapshot source are set), runs
     {!Backtest.Runner.run_backtest} once per start (clipping the start, holding
     the end fixed, threading the scenario's overrides / strategy / slippage /
-    cost model and the resolved sector-map override + optional snapshot source),
-    projects each result via {!per_start_of_summary} (with the benchmark CAGR
-    for that start's window via {!bah_cagr_pct}), and assembles the
-    {!Rolling_start_types.report} via {!Rolling_start_types.build}.
+    cost model / [initial_cash] and the resolved sector-map override + optional
+    snapshot source), projects each result via {!per_start_of_summary} (with the
+    benchmark CAGR for that start's window via {!bah_cagr_pct}), and assembles
+    the {!Rolling_start_types.report} via {!Rolling_start_types.build}.
 
     When a snapshot [bar_data_source] is configured, it also resolves each
     start's screener-based factor columns (factor-decomposition lens stage 5b:

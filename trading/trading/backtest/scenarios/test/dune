@@ -15,7 +15,8 @@
   test_ladder_v4_overlays
   test_output_root
   test_scenario_runner_resume
-  test_scenario_initial_cash_e2e)
+  test_scenario_initial_cash_e2e
+  test_scenario_initial_cash_seam)
  (modules
   test_scenario
   test_universe_file
@@ -32,7 +33,8 @@
   test_ladder_v4_overlays
   test_output_root
   test_scenario_runner_resume
-  test_scenario_initial_cash_e2e)
+  test_scenario_initial_cash_e2e
+  test_scenario_initial_cash_seam)
  (libraries
   ounit2
   core

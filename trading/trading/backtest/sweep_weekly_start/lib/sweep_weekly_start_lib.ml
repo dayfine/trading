@@ -205,8 +205,9 @@ let _run_one_exn (cfg : config) (start_date : Date.t) ~sector_map_override =
   let strategy_choice : Scenario_strategy.t =
     Scenario_strategy.Bah_benchmark { symbol = cfg.symbol }
   in
-  (* [Backtest.Runner] hardcodes [initial_cash = $1,000,000] and the runner
-     does not currently accept an override for that value. BAH is linear in
+  (* This sweep runs at [Backtest.Runner.default_initial_cash] ($1M): it does
+     not pass [run_backtest ?initial_cash] (#3696), so its cells stay
+     byte-identical to earlier sweeps. BAH is linear in
      initial cash to a near-zero residual (commissions are $0.01/share, so on
      a $1M -> $100k re-scaling the commission drag changes by ~10x relative
      to final equity but ~$40 absolute — negligible for entry-timing
