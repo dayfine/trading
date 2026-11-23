@@ -4,13 +4,17 @@
   test_convexity_stats
   test_rolling_start_types
   test_rolling_start_factors
-  test_rolling_start_runner)
+  test_rolling_start_runner
+  test_rolling_start_initial_cash)
  (libraries
   ounit2
   core
   matchers
   rolling_start
   backtest
-  trading_simulation_types)
+  trading_simulation_types
+  scenario_lib
+  weinstein.data_source
+  fpath)
  (preprocess
   (pps ppx_compare ppx_sexp_conv)))

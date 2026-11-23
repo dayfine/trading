@@ -142,6 +142,16 @@ type t = {
           replace it). The per-share-commission and market-impact knobs in [cm]
           are not yet wired into the simulator — items 3 and 4 of the four-item
           plan tracked in [dev/status/cost-model.md]. *)
+  initial_cash : float;
+      [@sexp.default Backtest.Runner.default_initial_cash]
+      [@sexp_drop_default Float.equal]
+      (** Starting cash in dollars, threaded into
+          {!Backtest.Runner.run_backtest}'s [?initial_cash] (#3696). Omitted, it
+          is {!Backtest.Runner.default_initial_cash} ($1M), so every
+          pre-existing scenario file runs byte-identically; at the default it is
+          also dropped from [sexp_of_t]. Written e.g. [(initial_cash 100000.0)]
+          for a NAV-scaling run. Before this field existed such a line was
+          silently ignored by [@@sexp.allow_extra_fields]. *)
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]

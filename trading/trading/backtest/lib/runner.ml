@@ -11,7 +11,7 @@ module Sim_types = Trading_simulation_types.Simulator_types
 (* Configuration constants *)
 
 let index_symbol = "GSPC.INDX"
-let initial_cash = 1_000_000.0
+let default_initial_cash = 1_000_000.0
 let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
 (** Number of calendar days to prepend before [start_date] when the simulator
@@ -282,9 +282,9 @@ let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
     cash_yield = deps.cash_yield;
   }
 
-let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
-    ?strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
-    ?progress_emitter ?slippage_bps ?cost_model ?candidate_log
+let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ~initial_cash
+    ?on_step_setup ?strategy_choice ?trace ?gc_trace ?bar_data_source
+    ?shared_panels ?progress_emitter ?slippage_bps ?cost_model ?candidate_log
     ?universe_membership_at ?checkpoint () =
   Panel_runner.run
     ~input:(_panel_input_of_deps deps)
@@ -293,8 +293,8 @@ let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
     ?progress_emitter ?slippage_bps ?cost_model ?candidate_log ?on_step_setup
     ?universe_membership_at ?checkpoint ()
 
-let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
-    ~final_value ~round_trips ~sim_result ~stale_holds : Summary.t =
+let _make_summary ~start_date ~end_date ~initial_cash ~deps ~steps_in_range
+    ~steps ~final_value ~round_trips ~sim_result ~stale_holds : Summary.t =
   let stale_held_symbols =
     stale_holds
     |> List.map ~f:(fun (e : Trading_simulation.Stale_hold.event) -> e.symbol)
@@ -311,7 +311,8 @@ let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
     stale_held_symbols;
     metrics =
       Runner_metrics.align_summary_metrics ?cash_yield:deps.cash_yield
-        ~sim_result ~round_trips ~steps_in_range ~start_date ~end_date ();
+        ~initial_cash ~sim_result ~round_trips ~steps_in_range ~start_date
+        ~end_date ();
   }
 
 (** Symbol accessor for [portfolio_position]. *)
@@ -406,7 +407,7 @@ let _log_backtest_window ~start_date ~end_date ~warmup_start ~deps =
    Raises {!Window_filter.Empty_measurement_window} when the requested window
    holds no trading day (previously a raw [Invalid_argument "List.last"] from
    the final-value read — issue #2632). *)
-let _assemble_result ~start_date ~end_date ~deps ~overrides
+let _assemble_result ~start_date ~end_date ~initial_cash ~deps ~overrides
     ~(sim_result : Sim_types.run_result) ~stop_log ~trade_audit
     ~force_liquidation_log ~stale_hold_log ~final_close_prices ~candidate_log
     ?trace ?gc_trace () =
@@ -428,8 +429,8 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides
       ~order_links:sim_result.order_position_links ~start_date ()
   in
   let summary =
-    _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
-      ~final_value ~round_trips ~sim_result ~stale_holds
+    _make_summary ~start_date ~end_date ~initial_cash ~deps ~steps_in_range
+      ~steps ~final_value ~round_trips ~sim_result ~stale_holds
   in
   let final_portfolio = sim_result.final_portfolio in
   {
@@ -452,7 +453,8 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides
     universe = deps.universe;
   }
 
-let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
+let run_backtest ~start_date ~end_date ?(initial_cash = default_initial_cash)
+    ?(overrides = []) ?sector_map_override
     ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
     ?candidate_log ?on_step_setup ?universe_membership_at ?checkpoint () =
@@ -466,12 +468,12 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
         force_liquidation_log,
         stale_hold_log,
         final_close_prices ) =
-    _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
-      ~strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
-      ?progress_emitter ?slippage_bps ?cost_model ?candidate_log
+    _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ~initial_cash
+      ?on_step_setup ~strategy_choice ?trace ?gc_trace ?bar_data_source
+      ?shared_panels ?progress_emitter ?slippage_bps ?cost_model ?candidate_log
       ?universe_membership_at ?checkpoint ()
   in
   Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
-  _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result ~stop_log
-    ~trade_audit ~force_liquidation_log ~stale_hold_log ~final_close_prices
-    ~candidate_log ?trace ?gc_trace ()
+  _assemble_result ~start_date ~end_date ~initial_cash ~deps ~overrides
+    ~sim_result ~stop_log ~trade_audit ~force_liquidation_log ~stale_hold_log
+    ~final_close_prices ~candidate_log ?trace ?gc_trace ()

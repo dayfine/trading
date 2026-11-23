@@ -2,6 +2,7 @@ open Core
 
 val recompute_in_window_step_metrics :
   ?cash_yield:Trading_simulation_cash_yield.Cash_yield.t ->
+  initial_cash:float ->
   steps_in_range:Trading_simulation_types.Simulator_types.step_result list ->
   start_date:Date.t ->
   end_date:Date.t ->
@@ -14,6 +15,7 @@ val recompute_in_window_step_metrics :
     over that cash rate; without it, over 0 (unchanged). *)
 
 val recompute_calmar_ratio :
+  initial_cash:float ->
   base_metrics:Trading_simulation_types.Metric_types.metric_set ->
   Trading_simulation_types.Metric_types.metric_set
 (** Recompute [CalmarRatio = CAGR / MaxDrawdown] from [base_metrics] so the
@@ -22,6 +24,7 @@ val recompute_calmar_ratio :
 
 val align_summary_metrics :
   ?cash_yield:Trading_simulation_cash_yield.Cash_yield.t ->
+  initial_cash:float ->
   sim_result:Trading_simulation_types.Simulator_types.run_result ->
   round_trips:Trading_simulation.Metrics.trade_metrics list ->
   steps_in_range:Trading_simulation_types.Simulator_types.step_result list ->
@@ -34,4 +37,7 @@ val align_summary_metrics :
     Restores the invariant that published metrics describe the measurement
     window [start_date..end_date] only, not the warmup window the simulator ran
     from. [cash_yield] is passed to the Sharpe recompute (#3137); the
-    simulator's [CashInterestTotal], when present, passes through unchanged. *)
+    simulator's [CashInterestTotal], when present, passes through unchanged.
+    [initial_cash] is the run's starting cash, the same value the runner seeds
+    the simulator with and records in the summary (#3696); it goes into the
+    metric config of every recompute, which has no constant of its own. *)

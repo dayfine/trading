@@ -96,8 +96,9 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
       ~every_n_fridays:(Some progress_every) ~start_date:s.period.start_date
       ~f:(fun ?on_step_setup () ->
         Backtest.Runner.run_backtest ~start_date:s.period.start_date
-          ~end_date:s.period.end_date ~overrides:s.config_overrides
-          ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter
+          ~end_date:s.period.end_date ~initial_cash:s.initial_cash
+          ~overrides:s.config_overrides ?sector_map_override
+          ~strategy_choice:s.strategy ~progress_emitter
           ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ?bar_data_source
           ?candidate_log:(Backtest.Candidate_log.create_if emit_candidates)
           ?universe_membership_at ?on_step_setup

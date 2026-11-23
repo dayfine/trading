@@ -4,6 +4,11 @@
 
 open Core
 
+val default_initial_cash : float
+(** Starting cash, in dollars, of a run that does not pass [?initial_cash] to
+    {!run_backtest}: $1,000,000. Every pre-#3696 run used this value, so a
+    scenario that omits [initial_cash] stays byte-identical. *)
+
 val warmup_days_for : Strategy_choice.t -> int
 (** Number of calendar days the runner prepends before a scenario's [start_date]
     when it runs [strategy] — i.e.
@@ -187,6 +192,7 @@ val is_trading_day :
 val run_backtest :
   start_date:Date.t ->
   end_date:Date.t ->
+  ?initial_cash:float ->
   ?overrides:Sexp.t list ->
   ?sector_map_override:(string, string) Core.Hashtbl.t ->
   ?strategy_choice:Strategy_choice.t ->
@@ -215,6 +221,14 @@ val run_backtest :
       {!Window_filter.Empty_measurement_window} for why the runner raises rather
       than returning a flat, zero-return [result]. Before issue #2632 this case
       escaped as a raw stdlib [Invalid_argument "List.last"].
+
+    [initial_cash] (default {!default_initial_cash}) is the run's starting cash.
+    It seeds the simulator portfolio, is recorded as
+    [result.summary.initial_cash], and is the config value the in-window metric
+    recompute ({!Runner_metrics.align_summary_metrics}) reads, so the summary
+    and the metrics never disagree on it (#3696). Sizing is a fraction of
+    portfolio value, so a smaller [initial_cash] scales position sizes down
+    proportionally up to integer-share rounding.
 
     [universe_membership_at] is the run's dated point-in-time universe schedule:
     [f symbol as_of] answers whether [symbol] is a member of the universe on the

@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-11-14
+## Last updated: 2026-11-22
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,20 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-11-22 — scenario `initial_cash` field (#3696)
+
+- [x] **Starting cash per scenario.** `Scenario.t` has an optional
+  `initial_cash` (default `Backtest.Runner.default_initial_cash` = $1M, dropped
+  from `sexp_of_t` at the default, so every existing spec is byte-identical).
+  `Runner.run_backtest ?initial_cash` seeds the simulator, records it in
+  `summary.initial_cash`, and passes it to `Runner_metrics` (its duplicate
+  constant is gone). Threaded from every `Scenario.t` consumer:
+  `scenario_runner`, walk-forward, grid-search, Bayesian, barbell. Verify:
+  `scenarios/test/test_scenario.ml` (parse + round-trip) and
+  `scenarios/test/test_scenario_initial_cash_e2e.ml` (100k run: summary 100000,
+  first entries 1/10 the shares). Unblocks the NAV-scaling experiment
+  ($100k / $1M / $10M x participation gate #3681).
 
 ## 2026-11-14 — `candidates.sexp` top-N view: rank, walk outcome, buyability shadow (#3625 + stacked follow-up)
 

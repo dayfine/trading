@@ -187,18 +187,15 @@ let _sector_map_override ~fixtures_root scenario =
   Universe_schedule.sector_map_of_unscheduled ~fixtures_root
     ~runner_name:"Rolling_start_runner" scenario
 
-(** Run one backtest from [start_date] to [config.end_date], threading the
-    scenario's overrides / strategy / cost knobs and the shared sector-map
-    override + optional snapshot source, and project the terminal summary into a
-    {!Rolling_start_types.per_start}. [benchmark_series] is the (once-resolved)
-    benchmark close series; this start's benchmark CAGR is projected from it.
-    [factors] is this start's precomputed screener-based factor columns
-    (resolved in the parent via {!_resolve_factors_per_start}); they ride along
-    into the projected row. *)
+(** Run one backtest from [start_date] to [config.end_date] with the scenario's
+    knobs, the shared sector-map override and optional snapshot source, and
+    project it into a {!Rolling_start_types.per_start} carrying this start's
+    benchmark CAGR (from [benchmark_series]) and precomputed [factors]. *)
 let _run_one ~config ~sector_map_override ~benchmark_series ~factors ~start_date
     =
   let result =
     Backtest.Runner.run_backtest ~start_date ~end_date:config.end_date
+      ~initial_cash:config.scenario.initial_cash
       ~overrides:config.scenario.config_overrides ?sector_map_override
       ~strategy_choice:config.scenario.strategy
       ?slippage_bps:config.scenario.slippage_bps
