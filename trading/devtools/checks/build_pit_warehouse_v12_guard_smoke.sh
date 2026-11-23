@@ -277,6 +277,23 @@ grep -q 'docker must not be called' "$SB/k.out" && bad "k: docker was called" ||
 grep -q 'final_k: manifest=20 snaps=20' "$SB/workk/build.log" && ok "k: guard ran on the local output" || bad "k: guard log"
 }
 
+
+# l. extra-build numbering is computed from CHUNKS (not hard-coded) and a bad CHUNKS is refused
+case_l() {
+fresh
+V=vsmokel$$
+names() { ( CONTAINER=none VERSION=$V OUT="$SB/outl" WORK="$SB/workl"; export CONTAINER VERSION OUT WORK
+            unset CSV; [ -n "${1:-}" ] && CHUNKS=$1 && export CHUNKS
+            . "$SCRIPT"; echo "$C_FALSE $C_TWIN $C_COLL" ); }
+[ "$(unset CHUNKS; names)" = "chunk5 chunk6 chunk7" ] && ok "l: default CHUNKS=4 numbers the extras chunk5/6/7" || bad "l: default numbering"
+[ "$(names 6)" = "chunk7 chunk8 chunk9" ] && ok "l: CHUNKS=6 numbers the extras chunk7/8/9" || bad "l: CHUNKS=6 numbering"
+for c in 0 x; do
+  rc=0; ( CONTAINER=none VERSION=$V OUT="$SB/outl" WORK="$SB/workl" CHUNKS=$c; export CONTAINER VERSION OUT WORK CHUNKS
+          . "$SCRIPT" ) > "$SB/l.out" 2>&1 || rc=$?
+  expect "l: CHUNKS=$c is refused with exit 2" 2 "$rc"
+done
+}
+
 run_case case_a
 run_case case_c
 run_case case_b
@@ -288,6 +305,7 @@ run_case case_h
 run_case case_i
 run_case case_j
 run_case case_k
+run_case case_l
 
 PASS=$(grep -c '^PASS$' "$RESULTS" || true)
 FAIL=$(grep -c '^FAIL$' "$RESULTS" || true)

@@ -37,11 +37,11 @@
 # them. v13 is built by dev/scripts/build_pit_warehouse_v13.sh (a wrapper that sets VERSION=v13 TOPN=4000). Extra
 # quarantine: when pit-$VERSION/quarantine.txt exists its first column (symbols) is removed from the union too, and those
 # symbols count as expected-absent in `verify` (a v13 list still names them; the warehouse must not hold them).
-# CHUNKS (default 4) is the number of chunk builds: more, smaller chunks keep peak RSS lower (a v13 union of ~14.2k names
-# in 6 chunks is ~2.4k per chunk, like v11's 2.5k; the six pair scans become C(CHUNKS,2) smaller ones). The extra builds
+# CHUNKS (default 4) is the number of chunk builds: more, smaller chunks keep peak RSS lower (a v13 union of 13,747 names
+# in 6 chunks is ~2.3k per chunk, like v11's 2.5k; the six pair scans become C(CHUNKS,2) smaller ones). The extra builds
 # are numbered after the chunks (CHUNKS+1 false legs, +2 twin fix, +3 collateral), identical to chunk5/6/7 at CHUNKS=4.
 #
-# CONTAINER=none runs everything directly on this machine, no docker (a Claude cloud session): RUN_TREE defaults to this
+# CONTAINER=none runs everything directly on this machine, no docker (a host with the CI image's libraries, e.g. libta-lib.so.0): RUN_TREE defaults to this
 # checkout, CSV to $HERE/data (pull it with dev/scripts/r2_bars.sh pull), the container-only guards are skipped.
 # Recipe: docs/howtos/claude_cloud_sessions.md section "Building a PIT warehouse in a session".
 #
