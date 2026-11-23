@@ -60,7 +60,18 @@ re-entry after bottoms (missed 2009, 2019, 2022-11) and lag in melt-ups.
 
 ## Decisions waiting (deferred to 11:00 PT)
 
-- **Weekly picks trigger:** local launchd every Saturday, or a cloud routine (needs fresh bars in the cloud: R2 data
-  refresh). Recommended: local launchd running `weekly.sh` for the record profile, with a notification on finish.
-- **#3676 deploy key:** user action.
-- **Real account size in `portfolio.sexp`** for live-size picks: user input.
+All three were decided at 11:00+ PT on 11-23 (addendum below).
+
+## Addendum (11-23, after #3700)
+
+- **Weekly picks: local launchd** (user: "local ok"). `~/.local/bin/trading-weekly-picks.sh`, run by
+  `~/Library/LaunchAgents/com.difan.trading-weekly-picks.plist` every Saturday 09:00 local. It runs Friday's picks on
+  both profiles, pushes the records to trading-results, opens one docs PR with the public summaries (never merges),
+  stops the container, quits Docker Desktop and posts a macOS notification. Log: `~/Library/Logs/trading-weekly-picks.log`.
+  First live run Sat 11-28; check the log and the PR that day.
+- **Account size k** (user: "use 100k"). `portfolio.sexp` already holds 100000.0, so the live-size profile is real.
+- **Docker** stopped at the user's request (container stopped, Docker Desktop quit). `ensure_container.sh` reopens it.
+- **#3676 / #3701:** bar fixtures move to trading-results via the existing private repo, fetched in CI with
+  `BOT_GITHUB_TOKEN`. The first CI run got a 403; the user widened the token to trading-results on 11-23 and CI is
+  re-running. Then: confirm goldens unchanged, drop the probe step from `ci.yml`, QC, merge, and run
+  `sh dev/scripts/fetch_test_bars.sh` in each local checkout.
