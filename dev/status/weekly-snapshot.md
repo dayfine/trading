@@ -1,11 +1,13 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-11-15
+## Last updated: 2026-11-22
 
 ## Status
 MERGED
 
 Closed 2026-11-15 (user decision, pacer #3635): no next step is queued, and the split work lands under #2973 (open). Sections below are history, not queued.
+
+**2026-11-22 (issue #3693, branch `feat/live-size-picks`):** `weekly.sh` takes its universe floors from `WEEKLY_MIN_PRICE` / `WEEKLY_MIN_ADV` (defaults unchanged) and a `WEEKLY_PROFILE`: `record` (default) or `live-size`, which layers `dev/weekly-picks/live-size-overrides.sexp` (participation 0.10, dust entry floor $100k, hold floor $50k) on the record config and screens a $100k-ADV universe. The hold floor stays fixed: no field scales `Liquidity_exit_runner` with position size, and the picks generator never runs that exit; the smallest change (a hold-side `max_hold_adv_participation`) is proposed in the overrides file, not built. Remaining after merge: the small-NAV K=5 26y top-3000 run on the live-size profile vs the record config at the same NAV.
 
 **2026-11-22 (issue #3681, branch `feat/entry-adv-participation`):** `Liquidity_config.max_entry_adv_participation` (default `None`) blocks an entry whose planned position dollars exceed p x dollar ADV, in the backtest entry walk (skip reason `Adv_participation_cap`) and in the weekly picks (`Participation_gate`, sized against the `--portfolio` account). Arming is documented, not armed, in `dev/weekly-picks/record-config-overrides.sexp`. Remaining after merge: the paired 26y K=5 run at p = 0.10 on the record config.
 
